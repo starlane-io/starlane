@@ -22,6 +22,7 @@ use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Message,  Request, Response};
 use mesh_portal::version::latest::util::uuid;
 use mesh_portal::version::latest::parse::Res;
+use mesh_portal_versions::version::v0_0_1::id::id::{ToPoint, ToPort};
 use tokio::sync::oneshot::Sender;
 
 #[derive(Clone)]
@@ -38,11 +39,11 @@ impl MessagingApi {
         let mut proto = ProtoStarMessage::new();
         match message {
             Message::Request(request) => {
-                proto.to = ProtoStarMessageTo::Resource(request.to.clone());
+                proto.to = ProtoStarMessageTo::Resource(request.to.clone().to_point());
                 proto.payload = StarMessagePayload::Request(request);
             }
             Message::Response(response) => {
-                proto.to = ProtoStarMessageTo::Resource(response.to.clone());
+                proto.to = ProtoStarMessageTo::Resource(response.to.clone().to_point());
                 proto.payload = StarMessagePayload::Response(response);
             }
         }
@@ -75,7 +76,7 @@ impl MessagingApi {
 
     pub async fn notify(&self, request: Request)->Result<(),Error>{
         let mut proto = ProtoStarMessage::new();
-        proto.to = ProtoStarMessageTo::Resource(request.to.clone());
+        proto.to = ProtoStarMessageTo::Resource(request.to.clone().to_point());
         proto.payload = StarMessagePayload::Request(request);
         self.star_notify(proto);
         Ok(())
@@ -147,17 +148,17 @@ pub struct MessagingComponentInner {
     pub skel: StarSkel,
     pub exchanges: DashMap<MessageId, MessageExchanger>,
     pub resource_exchange: DashMap<String, oneshot::Sender<Response>>,
-    pub address: Point
+    pub point: Point
 }
 
 impl MessagingComponent {
     pub fn start(skel: StarSkel, rx: mpsc::Receiver<MessagingCall>) {
-        let address = Point::from_str(format!("<<{}>>::messaging", skel.info.key.to_string()).as_str() ).expect("expected messaging address to parse");
+        let point = Point::from_str(format!("<<{}>>::messaging", skel.info.key.to_string()).as_str() ).expect("expected messaging address to parse");
         let inner = Arc::new(MessagingComponentInner {
             skel: skel.clone(),
             exchanges: DashMap::new(),
             resource_exchange: DashMap::default(),
-            address
+            point
         });
         AsyncRunner::new(
             Box::new(Self {
@@ -199,7 +200,7 @@ impl AsyncProcessor<MessagingCall> for MessagingComponent {
                 MessagingCall::ExchangeRequest { request, tx } => {
                     inner.resource_exchange.insert(request.id.clone(), tx);
                     let mut proto = ProtoStarMessage::new();
-                    proto.to = ProtoStarMessageTo::Resource(request.to.clone());
+                    proto.to = ProtoStarMessageTo::Resource(request.to.clone().to_point());
                     proto.payload = StarMessagePayload::Request(request);
                     inner.send(proto).await;
                 }
@@ -279,7 +280,7 @@ impl MessagingComponentInner {
                 let response = Response {
                     id: uuid(),
                     to: request.from.clone(),
-                    from: self.skel.info.address.clone(),
+                    from: self.skel.info.point.clone().to_port(),
                     core: request.core.not_found(),
                     response_to: request.id.clone()
                 };

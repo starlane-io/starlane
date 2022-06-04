@@ -201,7 +201,7 @@ impl ResourceCoreDriverComponent {
     async fn resource_command(&mut self, to: Point, rc: Rc) -> Result<Payload,Error> {
         let resource_type = self.resources.get(&to ).ok_or(format!("could not find particle: {}", to.to_string()))?;
         let driver = self.drivers.get(resource_type).ok_or(format!("do not have a particle core driver for '{}' and StarKind '{}'", resource_type.to_string(), self.skel.info.kind.to_string() ))?;
-        let result = driver.resource_command(to,rc).await;
+        let result = driver.particle_command(to, rc).await;
         match &result {
             Ok(payload) => {
                 info!("particle command payload: {:?}", payload);
@@ -268,7 +268,7 @@ pub trait ParticleCoreDriver: Send + Sync {
 
     fn shutdown(&self) {}
 
-    async fn resource_command(&self, to: Point, rc: Rc) -> Result<Payload,Error> {
+    async fn particle_command(&self, to: Point, rc: Rc) -> Result<Payload,Error> {
         Err(format!("particle type: '{}' does not handle Core particle commands",self.kind().to_string()).into())
     }
 

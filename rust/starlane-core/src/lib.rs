@@ -80,6 +80,7 @@ pub mod endpoint;
 pub mod registry;
 pub mod bindex;
 pub mod databases;
+pub mod global;
 
 lazy_static! {
     static ref VERSION: semver::Version = {

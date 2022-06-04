@@ -52,7 +52,7 @@ impl StarDB {
        CREATE TABLE IF NOT EXISTS {}.wrangles(
 	      key  TEXT PRIMARY KEY,
 	      kind TEXT NOT NULL,
-	      hops INTEGER,
+	      hops INTEGER NOT NULL,
 	      selections INTEGER NOT NULL DEFAULT 0
         )"#,
             self.schema
@@ -172,11 +172,11 @@ impl StarDB {
         // in case this search was for EVERYTHING
         let statement = if !selector.is_empty() {
             format!(
-                "SELECT DISTINCT key,kind,hops  FROM {}.wrangles WHERE {} ORDER BY selections",
+                "SELECT key,kind,hops  FROM {}.wrangles WHERE {} ORDER BY selections",
                 self.schema, where_clause
             )
         } else {
-            format!("SELECT DISTINCT key,kind,hops  FROM {}.wrangles ORDER BY selections", self.schema)
+            format!("SELECT key,kind,hops  FROM {}.wrangles ORDER BY selections", self.schema)
         };
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
@@ -222,7 +222,7 @@ impl sqlx::FromRow<'_, PgRow> for WrangleCount{
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
         let kind: String = row.get(0);
         let count: i64 = row.get(1);
-        let count: u64 = count.abs() as u64;
+        let count: u32 = count.abs() as u32;
         let kind = match StarKind::from_str(kind.as_str()) {
             Ok(kind) => kind,
             Err(_) => {
@@ -238,7 +238,8 @@ impl sqlx::FromRow<'_, PgRow> for StarWrangle {
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
         let key: String = row.get(0);
         let kind: String = row.get(1);
-        let hops: u32= row.get(2);
+        let hops: i32= row.get(2);
+        let hops = hops.abs() as u32;
 
         let key = match StarKey::from_str(key.as_str()) {
             Ok(key) => key,
@@ -276,7 +277,7 @@ pub struct StarWrangle {
 
 pub struct WrangleCount{
     pub kind: StarKind,
-    pub count: u64,
+    pub count: u32,
 }
 
 pub struct StarSelector {

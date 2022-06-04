@@ -3,91 +3,26 @@ use std::fmt::write;
 use std::marker::PhantomData;
 use mesh_portal::error;
 use mesh_portal::version::latest::bin::Bin;
-use mesh_portal::version::latest::entity::request::create::{PointSegFactory, KindTemplate, Template};
+use mesh_portal::version::latest::entity::request::create::{KindTemplate, PointSegFactory, Template};
 use mesh_portal::version::latest::frame::PrimitiveFrame;
 use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::messaging::Message;
+use mesh_portal::version::latest::messaging::{Message, Request, Response};
 use mesh_portal::version::latest::particle::Stub;
 use mesh_portal_tcp_common::{PrimitiveFrameReader, PrimitiveFrameWriter};
-use mesh_portal::version::latest::entity::request::create::{PointTemplate, Fulfillment};
+use mesh_portal::version::latest::entity::request::create::{Fulfillment, PointTemplate};
+use mesh_portal::version::latest::entity::request::RequestCore;
 use mesh_portal::version::latest::id::RouteSegment;
-use mesh_portal_versions::version::v0_0_1::parse::Res;
+use mesh_portal_versions::version::v0_0_1::mesh_portal_uuid;
 use serde::Serialize;
 use tokio::io::AsyncWriteExt;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
 use tokio::net::ToSocketAddrs;
 use tokio::sync::mpsc;
-use crate::command::cli::outlet::Frame;
-use crate::command::execute::CommandExecutor;
-use crate::command::parse::command_line;
 use crate::endpoint::{AuthRequestFrame, EndpointResponse, Service};
 use crate::error::Error;
 use crate::star::shell::sys::SysResource;
 use crate::star::StarSkel;
-use crate::starlane::api::StarlaneApi;
-
-
-pub mod inlet {
-    use std::convert::{TryFrom, TryInto};
-    use mesh_portal::version::latest::bin::Bin;
-    use mesh_portal::version::latest::frame::PrimitiveFrame;
-    use serde::{Serialize, Deserialize};
-    use crate::error::Error;
-
-    #[derive(Debug,Clone,Serialize,Deserialize)]
-    pub enum Frame {
-        CommandLine(String),
-        TransferFile{ name: String, content: Bin },
-        EndRequires
-    }
-
-    impl TryFrom<PrimitiveFrame> for Frame {
-        type Error = mesh_portal::error::MsgErr;
-
-        fn try_from(value: PrimitiveFrame) -> Result<Self, Self::Error> {
-            Ok(bincode::deserialize(value.data.as_slice() )?)
-        }
-    }
-
-    impl TryInto<PrimitiveFrame> for Frame {
-        type Error = Error;
-
-        fn try_into(self) -> Result<PrimitiveFrame, Self::Error> {
-            Ok(PrimitiveFrame { data: bincode::serialize(&self )? })
-        }
-    }
-}
-
-pub mod outlet{
-    use std::convert::{TryFrom, TryInto};
-    use mesh_portal::version::latest::frame::PrimitiveFrame;
-    use serde::{Serialize, Deserialize};
-    use crate::error::Error;
-
-    #[derive(Debug,Clone,Serialize,Deserialize, strum_macros::Display)]
-    pub enum Frame {
-        StdOut(String),
-        StdErr(String),
-        EndOfCommand(i32)
-    }
-
-    impl TryFrom<PrimitiveFrame> for Frame {
-        type Error = mesh_portal::error::MsgErr;
-
-        fn try_from(value: PrimitiveFrame) -> Result<Self, Self::Error> {
-            Ok(bincode::deserialize(value.data.as_slice() )?)
-        }
-    }
-
-    impl TryInto<PrimitiveFrame> for Frame {
-        type Error = Error;
-
-        fn try_into(self) -> Result<PrimitiveFrame, Self::Error> {
-            Ok(PrimitiveFrame { data: bincode::serialize(&self )? })
-        }
-    }
-}
 
 pub struct CliServer {
 
@@ -119,7 +54,7 @@ impl CliServer {
 
         let stub = api.create_sys_resource(template,messenger_tx).await?;
 
-        let mut reader :FrameReader<inlet::Frame> = FrameReader::new( PrimitiveFrameReader::new( reader ));
+        let mut reader :FrameReader<inlet::CliFrame> = FrameReader::new( PrimitiveFrameReader::new( reader ));
         let mut writer: FrameWriter<outlet::Frame> = FrameWriter::new( PrimitiveFrameWriter::new( writer ));
         let (output_tx,mut output_rx):(mpsc::Sender<outlet::Frame>, mpsc::Receiver<outlet::Frame>) = mpsc::channel(1024);
 
@@ -131,15 +66,15 @@ impl CliServer {
 
                     while let Ok(frame) = reader.read().await {
                         match frame {
-                            inlet::Frame::CommandLine(line) => {
+                            inlet::CliFrame::Line(line) => {
                                 let mut fulfillments = vec![];
 
                                 while let Ok(frame) = reader.read().await {
                                     match frame {
-                                        inlet::Frame::TransferFile { name, content } => {
+                                        inlet::CliFrame::Transfer(Transfer{ id: name, content} ) => {
                                             fulfillments.push( Fulfillment::File {name,content});
                                         }
-                                        inlet::Frame::EndRequires => {break;}
+                                        inlet::CliFrame::EndRequires => {break;}
                                         _ => {
                                             eprintln!("cannot have this type of frame when sending requirements.");
                                             return;
@@ -173,7 +108,7 @@ impl CliServer {
         Ok(())
     }
 
-    pub async fn new_internal( api: StarlaneApi ) -> Result<(mpsc::Sender<inlet::Frame>,mpsc::Receiver<outlet::Frame>),Error> {
+    pub async fn new_internal( api: StarlaneApi ) -> Result<(mpsc::Sender<inlet::CliFrame>, mpsc::Receiver<outlet::Frame>),Error> {
         let template = Template {
             point: PointTemplate {
                 parent: Point::root(),
@@ -190,7 +125,7 @@ impl CliServer {
 
         tokio::spawn(async move {
             while let Some(_) = messenger_rx.recv().await {
-                // ignore messages for now
+                // ignore incomming messages for now
             }
         });
 
@@ -198,7 +133,7 @@ impl CliServer {
         let stub = api.create_sys_resource(template,messenger_tx).await?;
 
         let (output_tx,mut output_rx):(mpsc::Sender<outlet::Frame>, mpsc::Receiver<outlet::Frame>) = mpsc::channel(1024);
-        let (input_tx,mut input_rx):(mpsc::Sender<inlet::Frame>, mpsc::Receiver<inlet::Frame>) = mpsc::channel(1024);
+        let (input_tx,mut input_rx):(mpsc::Sender<inlet::CliFrame>, mpsc::Receiver<inlet::CliFrame>) = mpsc::channel(1024);
 
         {
             let stub = stub.clone();
@@ -208,15 +143,15 @@ impl CliServer {
 
                     while let Some(frame) = input_rx.recv().await {
                         match frame {
-                            inlet::Frame::CommandLine(line) => {
+                            inlet::CliFrame::Line(line) => {
                                 let mut fulfillments = vec![];
 
                                 while let Some(frame) = input_rx.recv().await {
                                     match frame {
-                                        inlet::Frame::TransferFile { name, content } => {
+                                        inlet::CliFrame::Transfer(Transfer { id: name, content }) => {
                                             fulfillments.push( Fulfillment::File {name,content});
                                         }
-                                        inlet::Frame::EndRequires => {break;}
+                                        inlet::CliFrame::EndRequires => {break;}
                                         _ => {
                                             eprintln!("cannot have this type of frame when sending requirements.");
                                             return;
@@ -239,12 +174,12 @@ impl CliServer {
     }
 }
 
-pub struct CliClient {
+pub struct TcpCliClient {
     reader: FrameReader<outlet::Frame>,
-    writer: FrameWriter<inlet::Frame>
+    writer: FrameWriter<inlet::CliFrame>
 }
 
-impl CliClient {
+impl TcpCliClient {
 
     pub async fn new( host: String, token: String ) -> Result<Self,Error> {
         let mut stream =
@@ -274,7 +209,7 @@ impl CliClient {
         reader.read().await?.to_result()?;
 
         let mut reader : FrameReader<outlet::Frame> = FrameReader::new( reader.done() );
-        let mut writer : FrameWriter<inlet::Frame>  = FrameWriter::new( writer.done() );
+        let mut writer : FrameWriter<inlet::CliFrame>  = FrameWriter::new( writer.done() );
 
         Ok(Self {
             reader,
@@ -285,7 +220,7 @@ impl CliClient {
     pub async fn send( mut self, command_line: String ) -> Result<CommandExchange,Error> {
         let exchange = tokio::task::spawn_blocking( move || {
             tokio::spawn(async move {
-                self.writer.write( inlet::Frame::CommandLine(command_line)).await;
+                self.writer.write( inlet::CliFrame::Line(command_line)).await;
                 self.into()
             } )
         }).await?.await?;
@@ -296,7 +231,7 @@ impl CliClient {
 
 }
 
-impl Into<CommandExchange> for CliClient {
+impl Into<CommandExchange> for TcpCliClient {
     fn into(self) -> CommandExchange{
         CommandExchange {
             reader: self.reader,
@@ -306,9 +241,9 @@ impl Into<CommandExchange> for CliClient {
     }
 }
 
-impl Into<CliClient> for CommandExchange{
-    fn into(self) -> CliClient{
-        CliClient{
+impl Into<TcpCliClient> for CommandExchange{
+    fn into(self) -> TcpCliClient {
+        TcpCliClient {
             reader: self.reader,
             writer: self.writer
         }
@@ -318,18 +253,18 @@ impl Into<CliClient> for CommandExchange{
 
 pub struct CommandExchange {
     reader: FrameReader<outlet::Frame>,
-    writer: FrameWriter<inlet::Frame>,
+    writer: FrameWriter<inlet::CliFrame>,
     complete: bool
 }
 
 impl CommandExchange {
 
     pub async fn file( &mut self, name: String, content: Bin ) -> Result<(),Error> {
-        self.write( inlet::Frame::TransferFile{name,content}).await
+        self.write( inlet::CliFrame::Transfer (Transfer{ id: name,content})).await
     }
 
     pub async fn end_requires( &mut self ) -> Result<(),Error> {
-        self.write( inlet::Frame::EndRequires ).await
+        self.write( inlet::CliFrame::EndRequires ).await
     }
 
     pub async fn read( &mut self ) -> Option<Result<outlet::Frame,Error>> {
@@ -340,7 +275,7 @@ impl CommandExchange {
         async fn handle( exchange: &mut CommandExchange ) -> Result<outlet::Frame,Error> {
             let frame = exchange.reader.read().await?;
 
-            if let outlet::Frame::EndOfCommand(code) = frame {
+            if let outlet::Frame::End(code) = frame {
                 exchange.complete = true;
             }
             Ok(frame)
@@ -349,7 +284,7 @@ impl CommandExchange {
         Option::Some(handle(self).await)
     }
 
-    pub async fn write( &mut self, frame: inlet::Frame ) -> Result<(),Error> {
+    pub async fn write(&mut self, frame: inlet::CliFrame) -> Result<(),Error> {
        self.writer.write(frame).await?;
        Ok(())
     }

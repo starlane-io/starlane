@@ -7,7 +7,6 @@ use std::thread;
 use url::Url;
 
 use crate::star::{StarSkel};
-use crate::starlane::api::{StarlaneApi, StarlaneApiRelay};
 use tokio::sync::{oneshot, mpsc};
 use crate::star::variant::{VariantCall, FrameVerdict};
 use crate::util::{AsyncRunner, AsyncProcessor};
@@ -29,7 +28,6 @@ use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::entity::request::{Method, RequestCore};
 use mesh_portal::version::latest::id::{Point, Meta};
 use mesh_portal::version::latest::messaging;
-use mesh_portal::version::latest::payload::{Payload, Primitive};
 use nom::AsBytes;
 use nom_supreme::error::ErrorTree;
 use nom_supreme::final_parser::final_parser;
@@ -40,6 +38,8 @@ use regex::Regex;
 use crate::particle::ArtifactSubKind;
 use serde::{Serialize,Deserialize};
 use tiny_http::{HeaderField, Server, StatusCode};
+use mesh_portal_versions::version::v0_0_1::messaging::AsyncMessengerAgent;
+use crate::message::StarlaneMessenger;
 use crate::star::variant::web::parse::host_and_port;
 
 lazy_static! {
@@ -76,15 +76,15 @@ impl AsyncProcessor<VariantCall> for WebVariant {
 
 impl WebVariant {
     fn init_web(&self, tx: tokio::sync::oneshot::Sender<Result<(), crate::error::Error>>) {
-        let api = StarlaneApi::new(self.skel.surface_api.clone(), self.skel.info.address.clone() );
+        let messenger = StarlaneMessenger::new(self.skel.surface_api.clone());
 
-        start(api,self.skel.clone());
+        start(messenger, self.skel.clone());
 
         tx.send(Ok(())).unwrap_or_default();
     }
 }
 
-fn start(api: StarlaneApi,skel: StarSkel) {
+fn start(messenger: StarlaneMessenger, skel: StarSkel) {
     thread::spawn(move || {
 
         let runtime = Runtime::new().unwrap();
@@ -96,16 +96,16 @@ fn start(api: StarlaneApi,skel: StarSkel) {
             for req in server.incoming_requests() {
 
                 info!("handling incoming http request");
-                handle(req,api.clone(),skel.clone());
+                handle(req, messenger.clone(), skel.clone());
             }
         });
     });
 }
 
-fn handle( req: tiny_http::Request, api: StarlaneApi, skel: StarSkel ) {
+fn handle( req: tiny_http::Request, api: StarlaneMessenger, skel: StarSkel ) {
 println!("handling web connection...");
     tokio::spawn( async move {
-        async fn process(mut req: tiny_http::Request, api: StarlaneApi, skel: StarSkel ) -> Result<(),Error> {
+        async fn process(mut req: tiny_http::Request, api: StarlaneMessenger, skel: StarSkel ) -> Result<(),Error> {
             let mut builder = http::Request::builder();
             builder = builder.uri(req.url()).method( req.method().to_string().as_str() );
 
@@ -164,13 +164,13 @@ async fn error_response( mut req: tiny_http::Request, status: u16, message: &str
     }
 }
 
-async fn process_request( http_request: http::Request<Bin>, api: StarlaneApi, skel: StarSkel ) -> Result<http::Response<Bin>,Error> {
+async fn process_request( http_request: http::Request<Bin>, api: StarlaneMessenger, skel: StarSkel ) -> Result<http::Response<Bin>,Error> {
 
     let host_and_port = http_request.headers().get("Host").ok_or("HOST header not set")?;
     let host = host_and_port.to_str()?.split(":").next().ok_or("expected host")?.to_string();
     let core = RequestCore::from(http_request);
     let to = Point::from_str( host.as_str() )?;
-    let from = skel.info.address;
+    let from = skel.info.point;
     let request = messaging::Request::new( core, from, to );
 println!("exchanging...to :{}", request.to.to_string() );
     let response = skel.messaging_api.request(request).await;
@@ -239,15 +239,14 @@ pub mod parse {
     use std::num::ParseIntError;
     use std::str::FromStr;
     use mesh_portal_versions::error::MsgErr;
-    use mesh_portal_versions::version::v0_0_1::parse::{domain, Res};
     use mesh_portal_versions::version::v0_0_1::parse::error::result;
-    use mesh_portal_versions::version::v0_0_1::span::new_span;
-    use mesh_portal_versions::version::v0_0_1::wrap::Span;
     use nom::bytes::complete::{is_a, tag, take_while};
     use nom::character::is_digit;
     use nom::error::{ErrorKind, ParseError, VerboseError};
     use nom::sequence::tuple;
     use nom_supreme::error::ErrorTree;
+    use cosmic_nom::Span;
+    use mesh_portal_versions::version::v0_0_1::parse::domain;
     use crate::star::variant::web::HostAndPort;
 
     pub fn host_and_port<I:Span>(input: I ) -> Result<HostAndPort,MsgErr> {

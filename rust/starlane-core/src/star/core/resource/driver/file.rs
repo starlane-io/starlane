@@ -52,10 +52,10 @@ impl ParticleCoreDriver for FileCoreManager {
                 }
                 _ => {
                     let state = match &assign.state {
-                        StateSrc::StatefulDirect(data) => {
+                        StateSrc::Payload(data) => {
                             data.clone()
                         },
-                        StateSrc::Stateless => {
+                        StateSrc::None => {
                             return Err("Artifact cannot be stateless".into())
                         },
                     };
@@ -112,7 +112,7 @@ impl ParticleCoreDriver for FileSystemManager {
         assign: ParticleAssign,
     ) -> Result<(), Error> {
         match assign.state {
-            StateSrc::Stateless => {}
+            StateSrc::None => {}
             _ => {
                 return Err("must be stateless or empty create args".into());
             }
@@ -131,9 +131,9 @@ impl ParticleCoreDriver for FileSystemManager {
                     point: PointTemplate { parent: assign.details.stub.point.clone(), child_segment_template: PointSegFactory::Exact(root_point_and_kind.point.last_segment().expect("expected final segment").to_string()) },
                     kind: KindTemplate { kind: root_point_and_kind.kind.kind.clone(), sub_kind: root_point_and_kind.kind.sub_kind.clone(), specific: None }
                 },
-                state: StateSrc::Stateless,
+                state: StateSrc::None,
                 properties: SetProperties::new(),
-                strategy: Strategy::Create,
+                strategy: Strategy::Commit,
                 registry: Default::default()
             };
 

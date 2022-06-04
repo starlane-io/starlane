@@ -3,7 +3,7 @@ use std::sync::{Arc, mpsc};
 use anyhow::anyhow;
 use mesh_portal_api_client::{Inlet, PrePortalSkel, ParticleCtrl, ParticleCtrlFactory, ParticleSkel};
 use mesh_portal::version::latest::artifact::ArtifactRequest;
-use mesh_portal::version::latest::config::{Assign, Config, ParticleConfigBody};
+use mesh_portal::version::latest::config::{ParticleConfigBody, PointConfig};
 use mesh_portal::version::latest::entity::response::ResponseCore;
 use mesh_portal::version::latest::frame::PrimitiveFrame;
 use mesh_portal::version::latest::id::Point;
@@ -17,6 +17,7 @@ use mesh_portal::version::latest::portal::outlet::RequestFrame;
 use mesh_portal_tcp_client::{PortalClient, PortalTcpClient};
 use mesh_portal_tcp_common::{FrameReader, FrameWriter, PrimitiveFrameReader, PrimitiveFrameWriter};
 use crate::artifact::ArtifactRef;
+use crate::config::config::ParticleConfig;
 use crate::config::wasm::{Wasm, WasmCompiler};
 use crate::error::Error;
 use crate::mechtron::wasm::WasmMembraneExt;
@@ -100,7 +101,7 @@ pub struct MechtronResourceCtrlFactory {
 }
 
 impl ParticleCtrlFactory for MechtronResourceCtrlFactory {
-    fn matches(&self, config: Config<ParticleConfigBody>) -> bool {
+    fn matches(&self, config: PointConfig<ParticleConfigBody>) -> bool {
         true
     }
 

@@ -1,6 +1,5 @@
 use crate::artifact::ArtifactRef;
 use crate::cache::{ArtifactItem, Cacheable};
-use crate::command::compose::{Command, CommandOp};
 use crate::error::Error;
 use crate::particle::{ArtifactSubKind, Kind};
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};

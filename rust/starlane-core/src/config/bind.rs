@@ -2,7 +2,6 @@ use std::convert::TryInto;
 use std::sync::Arc;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::config::bind::BindConfig;
-use mesh_portal::version::latest::config::Config;
 use mesh_portal_versions::version::v0_0_1::parse::{bind_config, doc};
 use crate::artifact::ArtifactRef;
 use crate::cache::{CachedConfig};

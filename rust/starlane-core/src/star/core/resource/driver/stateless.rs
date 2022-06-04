@@ -35,9 +35,9 @@ impl ParticleCoreDriver for StatelessCoreDriver {
         assign: ParticleAssign,
     ) -> Result<(), Error> {
         match assign.state {
-            StateSrc::Stateless => {
+            StateSrc::None=> {
             }
-            StateSrc::StatefulDirect(_) => {
+            StateSrc::Payload(_) => {
                 return Err("must be stateless".into());
             }
         };

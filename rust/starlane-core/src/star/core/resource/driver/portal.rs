@@ -43,8 +43,8 @@ impl ParticleCoreDriver for PortalCoreDriver {
         assign: ParticleAssign,
     ) -> Result<(), Error> {
         let state = match assign.state {
-            StateSrc::StatefulDirect(data) => data,
-            StateSrc::Stateless => return Err("File cannot be stateless".into()),
+            StateSrc::Payload(data) => data,
+            StateSrc::None => return Err("File cannot be stateless".into()),
             _ => {
                 return Err("File must specify Direct state".into() )
             }

@@ -25,7 +25,8 @@ use mesh_portal::version::latest::entity::response::ResponseCore;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Request, Response};
 use mesh_portal::version::latest::payload::{Call, CallKind, Errors, MsgCall, Payload};
-use mesh_portal_versions::version::v0_0_1::entity::request::Method;
+use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
+use mesh_portal_versions::version::v0_0_1::messaging::Method;
 use mesh_portal_versions::version::v0_0_1::parse::model::Subst;
 use mesh_portal_versions::version::v0_0_1::payload::payload::HttpCall;
 
@@ -55,7 +56,7 @@ where
     pub fn to(&self) -> Result<Point,Error> {
         match &self.star_message.payload {
             StarMessagePayload::Request(request) => {
-                Ok(request.to.clone())
+                Ok(request.to.clone().to_point())
             }
             _ => {
                 Err("this type of Delivery does not support to() resolution".into())
@@ -184,7 +185,7 @@ impl Delivery<Request>
         };
 
        Ok(Call {
-           point: self.item.to.clone(),
+           point: self.item.to.clone().to_point(),
            kind: kind.clone()
        })
     }

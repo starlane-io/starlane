@@ -12,9 +12,8 @@ use alcoholic_jwt::{JWK, JWKS, token_kid, validate, ValidJWT};
 use lru::LruCache;
 use mesh_portal::version::latest::entity::request::Method;
 use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::messaging::Request;
+use mesh_portal::version::latest::messaging::{ProtoRequest, Request};
 use mesh_portal::version::latest::msg::MsgMethod;
-use mesh_portal::version::latest::payload::{Payload, Primitive};
 
 use tokio::sync::{broadcast, RwLock};
 use tokio::sync::mpsc::Receiver;
@@ -27,8 +26,9 @@ use zip::result::ZipError;
 use zip::write::FileOptions;
 
 use crate::error::Error;
-use crate::starlane::api::StarlaneApi;
 use serde::Deserialize;
+use mesh_portal_versions::version::v0_0_1::id::id::ToPort;
+use crate::starlane::api::StarlaneApi;
 
 
 lazy_static! {
@@ -420,9 +420,10 @@ impl JwksCache {
 
         // in the case of jwks not being present OR jwk not present in jwks then fetch jwks from UserBase
 
-        let action = Method::Msg(MsgMethod::new("GetJwks")?);
-        let request = Request::new(action.into(), self.api.agent.clone(), Point::from_str(claims.userbase_ref.as_str())? );
-        let response = self.api.exchange(request).await.ok_or()?;
+        let action = MsgMethod::new("GetJwks")?;
+        let port = Point::from_str(claims.userbase_ref.as_str())?.to_port();
+        let request = ProtoRequest::msg(port, action);
+        let response = self.api.messenger().send(request).await.ok_or()?;
         let jwks = response.core.body.to_text()?;
         let jwks: JWKS = serde_json::from_str(jwks.as_str())?;
         {

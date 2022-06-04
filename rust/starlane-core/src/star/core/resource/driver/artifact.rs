@@ -80,10 +80,10 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
         assign: ParticleAssign,
     ) -> Result<(), Error> {
         let state = match &assign.state {
-            StateSrc::StatefulDirect(data) => {
+            StateSrc::Payload(data) => {
                 data.clone()
             },
-            StateSrc::Stateless => {
+            StateSrc::None => {
                 return Err("ArtifactBundle cannot be stateless".into())
             },
 
@@ -164,7 +164,7 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
                             Ok(kind) => {
                                 let state = match kind {
                                     Kind::Artifact(ArtifactSubKind::Dir) => {
-                                        StateSrc::Stateless
+                                        StateSrc::None
                                     }
                                     Kind::Artifact(_) => {
                                         let mut path = point_and_kind.point.filepath().expect("expecting non Dir artifact to have a filepath");
@@ -176,11 +176,11 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
                                                 file.read_to_end(&mut buf);
                                                 let bin = Arc::new(buf);
                                                 let payload = Payload::Bin(bin);
-                                                StateSrc::StatefulDirect(payload)
+                                                StateSrc::Payload(payload)
                                             }
                                             Err(err) => {
                                                 eprintln!("Artifact archive error: {}", err.to_string() );
-                                                StateSrc::Stateless
+                                                StateSrc::None
                                             }
                                         }
                                     }
@@ -194,7 +194,7 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
                                     },
                                     state,
                                     properties: SetProperties::new(),
-                                    strategy: Strategy::Create,
+                                    strategy: Strategy::Commit,
                                     registry: Default::default()
                                 };
 
@@ -270,10 +270,10 @@ impl ParticleCoreDriver for ArtifactManager{
                 }
                 _ => {
                     let state = match &assign.state {
-                        StateSrc::StatefulDirect(data) => {
+                        StateSrc::Payload(data) => {
                             data.clone()
                         },
-                        StateSrc::Stateless => {
+                        StateSrc::None => {
                             return Err("Artifact cannot be stateless".into())
                         },
                     };

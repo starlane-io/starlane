@@ -33,14 +33,15 @@ use mesh_portal_versions::version::v0_0_1::span::new_span;
 use reqwest::StatusCode;
 use tokio::io::AsyncReadExt;
 use tracing::error;
-use starlane_core::command::cli::{CliClient, outlet};
-use starlane_core::command::cli::outlet::Frame;
-use starlane_core::command::compose::CommandOp;
-use starlane_core::command::parse::{command_line, rec_script_line};
+use starlane_core::command::cli::TcpCliClient;
+use mesh_portal_versions::version::v0_0_1::cli::outlet::Frame;
+use mesh_portal_versions::version::v0_0_1::cli::CommandOp;
 use starlane_core::mechtron::portal_client::launch_mechtron_client;
 use starlane_core::mechtron::process::launch_mechtron_process;
 use starlane_core::star::shell::sys::SysCall::Create;
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
+use mesh_portal_versions::version::v0_0_1::cli::outlet;
+use mesh_portal_versions::version::v0_0_1::parse::{command_line, rec_script_line};
 
 
 pub mod cli;
@@ -169,7 +170,7 @@ async fn login(host: &str, oauth_url: &str, username: &str, password: &str ) -> 
   Ok(())
 }
 
-async fn exec_command_line(client: CliClient, line: String) -> Result<(CliClient,i32), Error> {
+async fn exec_command_line(client: TcpCliClient, line: String) -> Result<(TcpCliClient, i32), Error> {
     let op = CommandOp::from_str(line.as_str() )?;
     let requires = op.requires();
 
@@ -207,7 +208,7 @@ async fn exec_command_line(client: CliClient, line: String) -> Result<(CliClient
             outlet::Frame::StdErr(line) => {
                 eprintln!("{}", line);
             }
-            outlet::Frame::EndOfCommand(code) => {
+            outlet::Frame::End(code) => {
                 return Ok((exchange.into(), code) );
             }
         }
@@ -280,7 +281,7 @@ println!("Staring starlane mechtron process");
 }
 
 
-pub async fn client() -> Result<CliClient, Error> {
+pub async fn client() -> Result<TcpCliClient, Error> {
     let (host,refresh_token,oauth_url) = {
         let config = crate::cli::CLI_CONFIG.lock()?;
 
@@ -301,7 +302,7 @@ pub async fn client() -> Result<CliClient, Error> {
                     let res = client.post(refresh_url).body(refresh_token).send().await?;
                     if res.status().is_success() {
                         let res = res.json::<AccessTokenResp>().await?;
-                        CliClient::new(host, res.access_token).await
+                        TcpCliClient::new(host, res.access_token).await
                     } else {
                         Err("Refresh token invalid or an error.  You may need to login again.".into())
                     }

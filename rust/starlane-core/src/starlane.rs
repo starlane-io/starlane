@@ -27,18 +27,23 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::net::tcp::OwnedReadHalf;
 use tokio::sync::oneshot;
 use tokio::sync::{broadcast, mpsc};
+use mesh_portal::version::latest::messaging::Agent;
+use mesh_portal_versions::version::v0_0_1::id::id::ToPort;
+use mesh_portal_versions::version::v0_0_1::messaging::AsyncMessengerAgent;
 use crate::artifact::ArtifactRef;
 
-use crate::cache::{ArtifactCaches, ProtoArtifactCachesFactory};
+use crate::cache::{ArtifactBundleSrc, ArtifactCaches, ProtoArtifactCachesFactory};
 use crate::command::cli::CliServer;
 use crate::constellation::{Constellation, ConstellationStatus};
 use crate::endpoint::ServicesEndpoint;
 use crate::error::Error;
 use crate::file_access::FileAccess;
+use crate::global::GlobalApi;
 
 use crate::lane::{ClientSideTunnelConnector, LocalTunnelConnector, ProtoLaneEnd, ServerSideTunnelConnector, OnCloseAction};
 use crate::logger::{Flags, Logger};
 use crate::mechtron::portal_client::MechtronPortalClient;
+use crate::message::StarlaneMessenger;
 
 use crate::proto::{local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoStarKey, ProtoTunnel};
 use crate::registry::{Registry, RegistryApi};
@@ -58,8 +63,8 @@ use crate::template::{
 use crate::user::HyperUser;
 use crate::util::{AsyncHashMap, JwksCache};
 
-pub mod api;
 pub mod files;
+pub mod api;
 
 lazy_static! {
 //    pub static ref DATA_DIR: Mutex<String> = Mutex::new("data".to_string());
@@ -77,7 +82,8 @@ pub struct StarlaneMachine {
     run_complete_signal_tx: broadcast::Sender<()>,
     machine_filesystem: Arc<MachineFileSystem>,
     portals: Arc<DashMap<String,Portal>>,
-    pub registry: RegistryApi
+    pub registry: RegistryApi,
+    pub global: GlobalApi
 }
 
 impl StarlaneMachine {
@@ -110,12 +116,15 @@ impl StarlaneMachine {
         let tx = runner.command_tx.clone();
         let run_complete_signal_tx = runner.run();
         let registry = Registry::new().await?;
+        let registry = Arc::new(registry);
+        let global = GlobalApi::new( registry.clone() );
         let starlane = Self {
             tx: tx,
             run_complete_signal_tx: run_complete_signal_tx,
             machine_filesystem: Arc::new(MachineFileSystem::new()?),
             portals: Arc::new(DashMap::new()),
-            registry: Arc::new(registry)
+            registry,
+            global
         };
 
         Result::Ok(starlane)
@@ -214,7 +223,8 @@ pub struct StarlaneMachineRunner {
 }
 
 impl StarlaneMachineRunner {
-    pub fn new(machine: String, api: StarlaneApi) -> Result<Self, Error> {
+    pub fn new(machine: String, api: StarlaneMessenger) -> Result<Self, Error> {
+
         Self::new_with_artifact_caches(machine, Option::None)
     }
 
@@ -288,12 +298,14 @@ impl StarlaneMachineRunner {
                 }
             }
 
-            let (_info, star_ctrl) = best.unwrap();
+            let (info, star_ctrl) = best.unwrap();
 
-            Ok(StarlaneApi::new(
-                star_ctrl.surface_api,
-                HyperUser::address(),
-            ))
+        let messenger = StarlaneMessenger::new(
+            star_ctrl.surface_api,
+        );
+        let messenger = AsyncMessengerAgent::new(Agent::Anonymous, info.point.to_port(), Arc::new(messenger)  );
+        let api = StarlaneApi::new(messenger);
+        Ok(api)
     }
 
 
@@ -428,7 +440,7 @@ impl StarlaneMachineRunner {
             if self.name == *machine {
                 let star_key = StarKey::new(&name, &star_template.handle ) ;
                 // hacking to ProtoStarKey so we don't have to trouble with fixing the old setup yet
-                let star_key = ProtoStarKey::Key(star_key);
+                let proto_star_key = ProtoStarKey::Key(star_key.clone());
 
                 let (evolve_tx, evolve_rx) = oneshot::channel();
                 evolve_rxs.push(evolve_rx);
@@ -444,9 +456,12 @@ impl StarlaneMachineRunner {
                 self.star_controllers.put(star_template_id, star_ctrl).await;
 
                 if self.artifact_caches.is_none() {
-                    let api = StarlaneApi::new(surface_api.clone(), HyperUser::address() );
+                    let messenger = Arc::new(StarlaneMessenger::new(surface_api.clone()));
+                    let messenger = AsyncMessengerAgent::new(Agent::Anonymous, star_key.into(),messenger );
+                    let api = StarlaneApi::new(messenger);
+
                     let caches = Arc::new(ProtoArtifactCachesFactory::new(
-                        api.into(),
+                        ArtifactBundleSrc::STARLANE_API(api),
                         self.cache_access.clone(),
                         starlane_machine.clone()
                     )?);
@@ -454,7 +469,7 @@ impl StarlaneMachineRunner {
                 }
 
                 let (proto_star, _star_ctrl) = ProtoStar::new(
-                    star_key.clone(),
+                    proto_star_key.clone(),
                     star_template.kind.clone(),
                     star_tx.clone(),
                     star_rx,

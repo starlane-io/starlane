@@ -89,9 +89,9 @@ impl ParticleCoreDriver for UserBaseKeycloakCoreDriver {
         assign: ParticleAssign,
     ) -> Result<(), Error> {
         match assign.state {
-            StateSrc::Stateless => {
+            StateSrc::None=> {
             }
-            StateSrc::StatefulDirect(_) => {
+            StateSrc::Payload(_) => {
                 return Err("UserBase<Keycloak> must be stateless".into());
             }
         };
@@ -133,7 +133,8 @@ impl ParticleCoreDriver for UserBaseKeycloakCoreDriver {
 println!("USers handle reqeust...");
         match &request.core.method{
             Method::Cmd(rc) => {
-                request.clone().payload_result(self.resource_command(request.to.clone(), rc.clone() ).await)
+               // request.clone().payload_result(self.particle_command(request.to.clone(), rc.clone() ).await)
+                request.not_found()
             }
             Method::Http(_) => {
 println!("handle HTTP: {}", request.core.uri.to_string());
@@ -146,14 +147,17 @@ println!("handle HTTP: {}", request.core.uri.to_string());
     }
 
 
-    async fn resource_command(&self, to: Point, rc: Rc) -> Result<Payload,Error> {
-        match rc {
+    async fn particle_command(&self, to: Point, rc: Rc) -> Result<Payload,Error> {
+        unimplemented!()
+/*        match rc {
             Rc::Create(create) => { self.create_child(to, create).await }
             Rc::Set(set) => { self.set_child(to,set).await }
             Rc::Get(get) => { self.get_child(to,get).await }
             Rc::Select(select) => { self.select_child(to,select).await }
             _ => { unimplemented!() }
         }
+
+ */
     }
 
 }
@@ -203,7 +207,7 @@ println!("UserBase<Keycloak> ... Handle Message action: {}", method.to_string())
 println!("UserBaseKeycloakCoreDriver: handle_http");
         if let Method::Http(method) =&request.core.method{
             match method {
-                &HttpMethod::POST => {
+                &HttpMethod::Post=> {
                     match &request.core.uri.path() {
                         &"/login" => request.clone().result(self.handle_login(&request).await),
                         &"/introspect" => request.clone().payload_result(self.handle_introspect_token(&request).await),
@@ -494,9 +498,9 @@ impl ParticleCoreDriver for UserCoreDriver {
         assign: ParticleAssign,
     ) -> Result<(), Error> {
         match assign.state {
-            StateSrc::Stateless => {
+            StateSrc::None => {
             }
-            StateSrc::StatefulDirect(_) => {
+            StateSrc::Payload(_) => {
                 return Err("User must be stateless".into());
             }
         };

@@ -28,11 +28,11 @@ use http::uri::InvalidUri;
 use keycloak::KeycloakError;
 use mesh_portal::error::MsgErr;
 use mesh_portal_versions::error::StatusErr;
-use mesh_portal_versions::version::v0_0_1::wrap::Span;
 use nom_supreme::error::ErrorTree;
 use sqlx::error::DatabaseError;
 use tokio::task::JoinError;
 use wasmer::{CompileError, ExportError, RuntimeError};
+use cosmic_nom::Span;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Error {

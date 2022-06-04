@@ -53,14 +53,11 @@ use std::future::Future;
 use std::num::ParseIntError;
 use crate::star::core::resource::driver::ResourceCoreDriverApi;
 use std::str::FromStr;
-use mesh_portal::version::latest::id::Point;
+use mesh_portal::version::latest::id::{Point, Port};
 use mesh_portal::version::latest::log::{PointLogger, RootLogger};
 use mesh_portal::version::latest::portal;
 use mesh_portal::version::latest::particle::Status;
-use mesh_portal_versions::version::v0_0_1::parse::{lowercase_alphanumeric, Res, skewer_case};
 use mesh_portal_versions::version::v0_0_1::parse::error::result;
-use mesh_portal_versions::version::v0_0_1::span::new_span;
-use mesh_portal_versions::version::v0_0_1::wrap::Span;
 use mysql::prelude::FromRow;
 use mysql::{FromRowError, Row};
 use nom::sequence::{delimited, preceded, terminated, tuple};
@@ -73,6 +70,9 @@ use nom::error::{ErrorKind, ParseError, VerboseError};
 use nom::Parser;
 use nom_supreme::error::ErrorTree;
 use sqlx::postgres::PgTypeInfo;
+use cosmic_nom::{new_span, Res, Span};
+use mesh_portal_versions::version::v0_0_1::id::id::{ToPoint, ToPort};
+use mesh_portal_versions::version::v0_0_1::parse::lowercase_alphanumeric;
 use crate::registry::RegistryApi;
 use crate::logger::{Flags, Logger, LogInfo};
 use crate::star::shell::db::{StarDB, StarDBApi, StarWrangle, StarWrangleSatisfaction};
@@ -1027,6 +1027,29 @@ pub struct StarKey {
     index: u16
 }
 
+impl Into<Point> for StarKey {
+    fn into(self) -> Point {
+        self.to_point()
+    }
+}
+impl Into<Port> for StarKey {
+    fn into(self) -> Port {
+        self.to_port()
+    }
+}
+
+impl ToPoint for StarKey {
+    fn to_point(self) -> mesh_portal_versions::version::v0_0_1::id::id::Point {
+        Point::from_str(format!("<<{}>>::star", self.to_string()).as_str() ).unwrap()
+    }
+}
+
+impl ToPort for StarKey {
+    fn to_port(self) -> Port {
+        self.to_point().to_port()
+    }
+}
+
 impl StarKey {
 
     pub fn new(constellation:&ConstellationName, handle: &StarHandle) -> Self {
@@ -1039,7 +1062,7 @@ impl StarKey {
 
     pub fn central() -> Self {
         StarKey {
-            constellation: "central".to_string(),
+            constellation: "standalone".to_string(),
             name: "central".to_string(),
             index: 0,
         }
@@ -1137,16 +1160,16 @@ impl Debug for StarSkel {
 pub struct StarInfo {
     pub key: StarKey,
     pub kind: StarKind,
-    pub address: Point
+    pub point: Point
 }
 
 impl StarInfo {
     pub fn new(star: StarKey, kind: StarKind) -> Self {
-        let address = Point::from_str(format!("<<{}>>::star", star.to_string()).as_str() ).expect("expect to be able to create a simple star address");
+        let point = Point::from_str(format!("<<{}>>::star", star.to_string()).as_str() ).expect("expect to be able to create a simple star address");
         StarInfo {
             key:star,
             kind ,
-            address
+            point
         }
     }
 

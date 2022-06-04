@@ -1,15 +1,11 @@
 use crate::artifact::ArtifactRef;
-use crate::command::compose::{Command, CommandOp};
-use crate::command::parse::{script, script_line};
 use crate::config::config::ParticleConfig;
 use crate::error::Error;
 use crate::particle::config::Parser;
 use crate::particle::Kind;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::command::common::SetProperties;
-use mesh_portal_versions::version::v0_0_1::parse::{camel_case, domain, kind, set_properties, Res};
-use mesh_portal_versions::version::v0_0_1::span::new_span;
-use mesh_portal_versions::version::v0_0_1::wrap::Span;
+use mesh_portal_versions::version::v0_0_1::parse::{camel_case, domain, kind, script, script_line, set_properties};
 use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag, take_until};
 use nom::character::complete::multispace0;
@@ -20,6 +16,7 @@ use nom::sequence::{delimited, preceded, terminated, tuple};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
+use cosmic_nom::{new_span, Res, Span};
 
 pub struct ResourceConfigParser;
 

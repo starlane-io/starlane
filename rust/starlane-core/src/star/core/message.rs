@@ -24,9 +24,6 @@ use futures::StreamExt;
 use http::{HeaderMap, StatusCode, Uri};
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
-use mesh_portal::version::latest::config::bind::{BindConfig, Pipeline, PipelineStep, PipelineStop, Selector, StepKind};
-use mesh_portal::version::latest::config::Config;
-use mesh_portal::version::latest::entity::request::create::{KindTemplate, PointSegFactory, Strategy};
 use mesh_portal::version::latest::entity::request::{Method, Rc, RequestCore};
 use mesh_portal::version::latest::entity::request::get::Get;
 use mesh_portal::version::latest::fail;
@@ -40,13 +37,12 @@ use mesh_portal::version::latest::entity::request::select::Select;
 use mesh_portal::version::latest::entity::request::set::Set;
 use mesh_portal::version::latest::entity::response::ResponseCore;
 use mesh_portal::version::latest::id::Tks;
-use mesh_portal::version::latest::selector::{Block, HttpPattern, MsgPattern};
 use mesh_portal::version::latest::payload::CallKind;
-use mesh_portal::version::latest::entity::request::create::Create;
 use mesh_portal::version::latest::security::Access;
 use mesh_portal_versions::version::v0_0_1::particle::particle::ParticleDetails;
 use regex::Regex;
 use serde::de::Unexpected::Str;
+use mesh_portal::version::latest::config::bind::BindConfig;
 use crate::artifact::ArtifactRef;
 use crate::bindex::{BindConfigCache, BindEx, BindExRouter, RegistryApi};
 use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
@@ -56,6 +52,7 @@ use crate::star::core::resource::driver::{ResourceCoreDriverApi, ResourceCoreDri
 use crate::star::shell::db::{StarFieldSelection, StarSelector};
 
 
+/*
 lazy_static!{
 
     pub static ref PIPELINE_OVERRIDES: HashMap<Point,Vec<Selector<HttpPattern>>> = {
@@ -68,6 +65,8 @@ lazy_static!{
     };
 
 }
+
+ */
 
 pub enum CoreMessageCall {
     Message(StarMessage),
@@ -107,7 +106,7 @@ impl MessagingEndpointComponent {
         pub struct MockRegistryApi();
         impl RegistryApi for MockRegistryApi {
             fn access(&self, to: &Agent, on: &Point) -> anyhow::Result<Access> {
-                Ok(Access::Super(true))
+                Ok(Access::SuperOwner)
             }
         }
 

@@ -18,11 +18,11 @@ use mesh_portal::version::latest::particle::{Stub, Status};
 use mesh_portal::version::latest::security::Permissions;
 use mesh_portal_versions::version::v0_0_1::parse::consume_kind;
 use mesh_portal_versions::version::v0_0_1::particle::particle::ParticleDetails;
-use mesh_portal_versions::version::v0_0_1::span::new_span;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
 use tokio::sync::oneshot::Receiver;
 use tracing_futures::WithSubscriber;
+use cosmic_nom::new_span;
 
 use crate::{error, logger, util};
 use crate::error::Error;
@@ -37,7 +37,6 @@ use crate::particle::KindBase::Mechtron;
 use crate::particle::property::{AddressPattern, AnythingPattern, BoolPattern, EmailPattern, PropertiesConfig, PropertyPermit, PropertySource, U64Pattern};
 use crate::star::{StarInfo, StarKey, StarSkel};
 use crate::star::core::resource::driver::user::UsernamePattern;
-use crate::starlane::api::StarlaneApi;
 use crate::util::AsyncHashMap;
 
 pub mod artifact;

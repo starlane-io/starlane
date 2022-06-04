@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::hash::Hasher;
@@ -5,22 +6,18 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
-use anyhow::anyhow;
 
 use futures::FutureExt;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::config::bind::BindConfig;
-use mesh_portal::version::latest::config::Config;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::path::Path;
-use mesh_portal::version::latest::payload::Primitive;
 use mesh_portal_versions::version::v0_0_1::id::id::PointSegKind;
 use tokio::io::AsyncReadExt;
 use tokio::runtime::Handle;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use wasmer::{Cranelift, Store, Universal};
-
 
 use crate::artifact::ArtifactRef;
 use crate::bindex::BindConfigCache;
@@ -30,13 +27,13 @@ use crate::config::parse::ResourceConfigParser;
 use crate::config::wasm::{Wasm, WasmCompiler};
 use crate::error::Error;
 use crate::file_access::FileAccess;
-use crate::particle::{BaseSubKind, Kind, ParticleRecord};
-use crate::particle::ArtifactSubKind;
+use crate::message::StarlaneMessenger;
 use crate::particle::config::Parser;
+use crate::particle::ArtifactSubKind;
+use crate::particle::{BaseSubKind, Kind, ParticleRecord};
 use crate::starlane::api::StarlaneApi;
 use crate::starlane::StarlaneMachine;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
-
 
 pub type ZipFile = Point;
 
@@ -44,24 +41,28 @@ pub trait Cacheable: Send + Sync + 'static {
     fn artifact(&self) -> ArtifactRef;
     fn references(&self) -> Vec<ArtifactRef>;
 
-    fn point(&self)-> Point {
+    fn point(&self) -> Point {
         self.artifact().point.clone()
     }
 
-    fn bundle(&self)-> Result<Point,MsgErr> {
+    fn bundle(&self) -> Result<Point, MsgErr> {
         self.point().truncate(PointSegKind::Version)
     }
-
-
 }
 
-pub struct CachedConfig<T> where T: Send+Sync+'static{
+pub struct CachedConfig<T>
+where
+    T: Send + Sync + 'static,
+{
     pub artifact_ref: ArtifactRef,
     pub item: T,
-    pub references: Vec<ArtifactRef>
+    pub references: Vec<ArtifactRef>,
 }
 
-impl <T> Deref for CachedConfig<T> where T: Send+Sync+'static{
+impl<T> Deref for CachedConfig<T>
+where
+    T: Send + Sync + 'static,
+{
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -69,7 +70,10 @@ impl <T> Deref for CachedConfig<T> where T: Send+Sync+'static{
     }
 }
 
-impl <T> Cacheable for CachedConfig<T> where T: Send+Sync+'static{
+impl<T> Cacheable for CachedConfig<T>
+where
+    T: Send + Sync + 'static,
+{
     fn artifact(&self) -> ArtifactRef {
         self.artifact_ref.clone()
     }
@@ -84,7 +88,6 @@ pub struct ProtoArtifactCachesFactory {
 }
 
 impl ProtoArtifactCachesFactory {
-
     pub fn root_caches(&self) -> Arc<RootArtifactCaches> {
         self.root_caches.clone()
     }
@@ -110,7 +113,7 @@ pub struct ArtifactCaches {
     pub resource_configs: ArtifactItemCache<ParticleConfig>,
     pub bind_configs: ArtifactItemCache<CachedConfig<BindConfig>>,
     pub wasms: ArtifactItemCache<Wasm>,
-//    pub http_router_config: ArtifactItemCache<HttpRouterConfig>,
+    //    pub http_router_config: ArtifactItemCache<HttpRouterConfig>,
 }
 
 impl ArtifactCaches {
@@ -120,7 +123,7 @@ impl ArtifactCaches {
             resource_configs: ArtifactItemCache::new(),
             bind_configs: ArtifactItemCache::new(),
             wasms: ArtifactItemCache::new(),
- //           http_router_config: ArtifactItemCache::new()
+            //           http_router_config: ArtifactItemCache::new()
         }
     }
 }
@@ -190,19 +193,25 @@ impl ProtoArtifactCaches {
                     caches.raw.add(self.root_caches.raw.get(artifact).await?);
                 }
                 ArtifactSubKind::ParticleConfig => {
-                    caches.resource_configs.add( self.root_caches.resource_configs.get(artifact).await? );
+                    caches
+                        .resource_configs
+                        .add(self.root_caches.resource_configs.get(artifact).await?);
                 }
                 ArtifactSubKind::Bind => {
-                    caches.bind_configs.add( self.root_caches.bind_configs.get(artifact).await? );
+                    caches
+                        .bind_configs
+                        .add(self.root_caches.bind_configs.get(artifact).await?);
                 }
-                ArtifactSubKind::Wasm=> {
-                    caches.wasms.add( self.root_caches.wasms.get(artifact).await? );
+                ArtifactSubKind::Wasm => {
+                    caches
+                        .wasms
+                        .add(self.root_caches.wasms.get(artifact).await?);
                 }
-/*                ArtifactKind::HttpRouter => {
-                    caches.http_router_config.add( self.root_caches.http_router_configs.get(artifact).await? );
-                }
+                /*                ArtifactKind::HttpRouter => {
+                                   caches.http_router_config.add( self.root_caches.http_router_configs.get(artifact).await? );
+                               }
 
- */
+                */
                 ArtifactSubKind::Dir => {}
             }
         }
@@ -210,7 +219,6 @@ impl ProtoArtifactCaches {
         Ok(caches)
     }
 }
-
 
 enum ProtoArtifactCall {
     Cache {
@@ -254,7 +262,7 @@ impl ProtoArtifactCacheProc {
                 match &claim {
                     Ok(_) => {}
                     Err(err) => {
-                        println!("CLAIM ERROR: {}", err.to_string() );
+                        println!("CLAIM ERROR: {}", err.to_string());
                     }
                 }
                 let claim = claim?;
@@ -327,7 +335,7 @@ struct ArtifactBundleCacheRunner {
     file_access: FileAccess,
     notify: HashMap<Point, Vec<oneshot::Sender<Result<(), Error>>>>,
     logger: AuditLogger,
-    machine: StarlaneMachine
+    machine: StarlaneMachine,
 }
 
 impl ArtifactBundleCacheRunner {
@@ -365,7 +373,7 @@ impl ArtifactBundleCacheRunner {
             match command {
                 ArtifactBundleCacheCommand::Cache { bundle, tx } => {
                     let bundle_point: Point = bundle.clone().into();
-                    let record = match self.src.fetch_resource_record(bundle_point).await {
+                    let record = match self.machine.registry.locate(&bundle_point).await {
                         Ok(record) => record,
                         Err(err) => {
                             tx.send(Err(err.into()));
@@ -373,17 +381,18 @@ impl ArtifactBundleCacheRunner {
                         }
                     };
 
-                        if self.has(bundle.clone()).await.is_ok() {
+                    if self.has(bundle.clone()).await.is_ok() {
                         tx.send(Ok(()));
                     } else {
                         let first = if !self.notify.contains_key(&record.details.stub.point) {
-                            self.notify.insert(record.details.stub.point.clone(), vec![]);
+                            self.notify
+                                .insert(record.details.stub.point.clone(), vec![]);
                             true
                         } else {
                             false
                         };
 
-                        let notifiers = self.notify.get_mut(&record.details.stub.point ).unwrap();
+                        let notifiers = self.notify.get_mut(&record.details.stub.point).unwrap();
                         notifiers.push(tx);
 
                         let src = self.src.clone();
@@ -411,13 +420,13 @@ impl ArtifactBundleCacheRunner {
                     }
                 }
                 ArtifactBundleCacheCommand::Result { bundle, result } => {
-println!("~~ CACHE NOTIFYING OF RESULT: {} ",result.is_err() );
-match &result {
-    Ok(_) => {}
-    Err(err) => {
-        eprintln!("CACHE ERROR: {}",err.to_string() );
-    }
-}
+                    println!("~~ CACHE NOTIFYING OF RESULT: {} ", result.is_err());
+                    match &result {
+                        Ok(_) => {}
+                        Err(err) => {
+                            eprintln!("CACHE ERROR: {}", err.to_string());
+                        }
+                    }
                     let notifiers = self.notify.remove(&bundle);
                     if let Option::Some(mut notifiers) = notifiers {
                         for notifier in notifiers.drain(..) {
@@ -450,13 +459,14 @@ match &result {
         machine: StarlaneMachine,
         logger: AuditLogger,
     ) -> Result<(), Error> {
-        let record = src.fetch_resource_record(bundle.clone()).await?;
+        let record = machine.registry.locate(&bundle).await?;
 
         let zip = src.get_bundle_zip(bundle.clone()).await?;
 
-
-        let mut file_access =
-            ArtifactBundleCache::with_bundle_path(file_access, record.details.stub.point.clone().try_into()?)?;
+        let mut file_access = ArtifactBundleCache::with_bundle_path(
+            file_access,
+            record.details.stub.point.clone()
+        )?;
         let bundle_zip_path = Path::from_str("/bundle.zip")?;
         let key_file = Path::from_str("/key.ser")?;
         file_access.write(
@@ -478,7 +488,7 @@ match &result {
             )
             .await?;
 
-        logger.log(Audit::Download(bundle.try_into()?));
+        logger.log(Audit::Download(bundle));
 
         Ok(())
     }
@@ -523,10 +533,7 @@ impl ArtifactBundleCache {
         Ok(file_access.with_path(format!("bundles/{}/files", point.to_string()))?)
     }
 
-    pub fn with_bundle_path(
-        file_access: FileAccess,
-        point: Point,
-    ) -> Result<FileAccess, Error> {
+    pub fn with_bundle_path(file_access: FileAccess, point: Point) -> Result<FileAccess, Error> {
         Ok(file_access.with_path(format!("bundles/{}", point.to_string()))?)
     }
 }
@@ -537,27 +544,12 @@ pub enum ArtifactBundleSrc {
 }
 
 impl ArtifactBundleSrc {
-    pub async fn get_bundle_zip(
-        &self,
-        point: Point,
-    ) -> Result<Bin, Error> {
+    pub async fn get_bundle_zip(&self, point: Point) -> Result<Bin, Error> {
         Ok(match self {
             ArtifactBundleSrc::STARLANE_API(api) => {
-                                let payload = api.get_state(point).await?;
-                                payload.to_bin()?
+                api.get_state(point).await.as_result()?
             }
-            //            ArtifactBundleSrc::MOCK(mock) => mock.get_resource_state(point).await,
         })
-    }
-
-    pub async fn fetch_resource_record(
-        &self,
-        point: Point,
-    ) -> Result<ParticleRecord, Error> {
-        match self {
-            ArtifactBundleSrc::STARLANE_API(api) => api.fetch_resource_record(point).await,
-            //            ArtifactBundleSrc::MOCK(mock) => mock.fetch_resource_record(point).await,
-        }
     }
 }
 
@@ -566,71 +558,6 @@ impl From<StarlaneApi> for ArtifactBundleSrc {
         ArtifactBundleSrc::STARLANE_API(api)
     }
 }
-
-/*
-impl From<MockArtifactBundleSrc> for ArtifactBundleSrc {
-    fn from(mock: MockArtifactBundleSrc) -> Self {
-        ArtifactBundleSrc::MOCK(mock)
-    }
-}
-
-#[derive(Clone)]
-pub struct MockArtifactBundleSrc {
-    pub particle: ResourceRecord,
-}
-
-impl MockArtifactBundleSrc {
-    pub fn new() -> Result<Self, Error> {
-        let key = ResourceKey::ArtifactBundle(ArtifactBundleKey {
-            sub_space: SubSpaceKey {
-                space: SpaceKey::new(RootKey{},0),
-                id: 0,
-            },
-            id: 0,
-        });
-
-        let point = ResourceAddress::from_str("hyperspace:default:whiz:1.0.0::<ArtifactBundle>")?;
-
-        Ok(MockArtifactBundleSrc {
-            particle: ResourceRecord {
-                stub: ResourceStub {
-                    key: key,
-                    point: point,
-                    archetype: ResourceArchetype {
-                        kind: ResourceKind::ArtifactBundle(ArtifactBundleKind::Final),
-                        specific: None,
-                        config: None,
-                    },
-                    owner: None,
-                },
-                location: ResourceLocation {
-                    shell: StarKey::central(),
-                },
-            },
-        })
-    }
-}
-
-impl MockArtifactBundleSrc {
-    pub async fn get_resource_state(
-        &self,
-        point: Address,
-    ) -> Result<Option<Arc<Vec<u8>>>, Fail> {
-        let mut file = fs::File::open("test-data/localhost-config/artifact-bundle.zip").await?;
-        let mut data = vec![];
-        file.read_to_end(&mut data).await?;
-        Ok(Option::Some(Arc::new(data)))
-    }
-
-    pub async fn fetch_resource_record(
-        &self,
-        point: Address,
-    ) -> Result<ResourceRecord, Fail> {
-        Ok(self.particle.clone())
-    }
-}
-
- */
 
 pub struct RefCount<C: Cacheable> {
     pub count: usize,
@@ -962,12 +889,21 @@ impl<C: Cacheable> RootItemCacheProc<C> {
         bundle_cache: ArtifactBundleCache,
     ) -> Result<Arc<X>, Error> {
         let point: Point = artifact.point.clone().to_bundle()?;
-        bundle_cache.download(point.try_into()?).await?;
+        bundle_cache.download(point).await?;
         let file_access = ArtifactBundleCache::with_bundle_files_path(
             bundle_cache.file_access(),
             artifact.point.clone().to_bundle()?,
         )?;
-        let data = file_access.read(&Path::from_str(&artifact.point.filepath().ok_or("must be an point with a filesystem")?.to_string().as_str())? ).await?;
+        let data = file_access
+            .read(&Path::from_str(
+                &artifact
+                    .point
+                    .filepath()
+                    .ok_or("must be an point with a filesystem")?
+                    .to_string()
+                    .as_str(),
+            )?)
+            .await?;
         parser.parse(artifact, data)
     }
 }
@@ -978,20 +914,24 @@ pub struct RootArtifactCaches {
     resource_configs: RootItemCache<ParticleConfig>,
     bind_configs: RootItemCache<CachedConfig<BindConfig>>,
     wasms: RootItemCache<Wasm>,
-//    http_router_configs: RootItemCache<HttpRouterConfig>
+    //    http_router_configs: RootItemCache<HttpRouterConfig>
 }
 
 impl RootArtifactCaches {
     fn new(bundle_cache: ArtifactBundleCache) -> Self {
-
         Self {
             bundle_cache: bundle_cache.clone(),
             raw: RootItemCache::new(bundle_cache.clone(), Arc::new(RawParser::new())),
-            resource_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(ResourceConfigParser::new())),
-            bind_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(BindConfigParser::new())),
+            resource_configs: RootItemCache::new(
+                bundle_cache.clone(),
+                Arc::new(ResourceConfigParser::new()),
+            ),
+            bind_configs: RootItemCache::new(
+                bundle_cache.clone(),
+                Arc::new(BindConfigParser::new()),
+            ),
             wasms: RootItemCache::new(bundle_cache.clone(), Arc::new(WasmCompiler::new())),
-//            http_router_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(HttpRouterConfigParser::new())),
-
+            //            http_router_configs: RootItemCache::new(bundle_cache.clone(), Arc::new(HttpRouterConfigParser::new())),
         }
     }
     async fn core_claim(&self, artifact: ArtifactRef) -> Result<Claim, Error> {
@@ -999,8 +939,8 @@ impl RootArtifactCaches {
             ArtifactSubKind::ParticleConfig => self.resource_configs.cache(artifact).await?.into(),
             ArtifactSubKind::Bind => self.bind_configs.cache(artifact).await?.into(),
             ArtifactSubKind::Raw => self.raw.cache(artifact).await?.into(),
-            ArtifactSubKind::Wasm=> self.wasms.cache(artifact).await?.into(),
-//            ArtifactKind::HttpRouter => self.http_router_configs.cache(artifact).await?.into(),
+            ArtifactSubKind::Wasm => self.wasms.cache(artifact).await?.into(),
+            //            ArtifactKind::HttpRouter => self.http_router_configs.cache(artifact).await?.into(),
             ArtifactSubKind::Dir => {
                 panic!("DIr is not a coreclaim")
             }
@@ -1013,7 +953,7 @@ impl RootArtifactCaches {
         if let ArtifactSubKind::Dir = artifact.kind {
             None
         } else {
-            Some( self.core_claim(artifact).await )
+            Some(self.core_claim(artifact).await)
         }
     }
 }
@@ -1254,7 +1194,7 @@ pub struct Raw {
 }
 
 impl Raw {
-    pub fn data(&self) -> Bin{
+    pub fn data(&self) -> Bin {
         self.data.clone()
     }
 }
@@ -1278,7 +1218,7 @@ impl RawParser {
 }
 
 impl Parser<Raw> for RawParser {
-    fn parse(&self, artifact: ArtifactRef, data: Bin ) -> Result<Arc<Raw>, Error> {
+    fn parse(&self, artifact: ArtifactRef, data: Bin) -> Result<Arc<Raw>, Error> {
         Ok(Arc::new(Raw {
             artifact: artifact,
             data: data,
@@ -1286,12 +1226,13 @@ impl Parser<Raw> for RawParser {
     }
 }
 
-
-
 #[async_trait]
-impl BindConfigCache for RootArtifactCaches{
-    async fn get_bind_config(&self, point: &Point) -> anyhow::Result<ArtifactItem<CachedConfig<BindConfig>>> {
-        let aref = ArtifactRef::new(point.clone(), ArtifactSubKind::Bind );
-        Ok(self.bind_configs.get(aref ).await?)
+impl BindConfigCache for RootArtifactCaches {
+    async fn get_bind_config(
+        &self,
+        point: &Point,
+    ) -> anyhow::Result<ArtifactItem<CachedConfig<BindConfig>>> {
+        let aref = ArtifactRef::new(point.clone(), ArtifactSubKind::Bind);
+        Ok(self.bind_configs.get(aref).await?)
     }
 }

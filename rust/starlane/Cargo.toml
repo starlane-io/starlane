@@ -32,10 +32,10 @@ tablestream = "0.1.3"
 anyhow = "1.0.44"
 reqwest = { version = "0.11.10", features = ["json"] }
 
-mesh-portal={ path="../../../mesh-portal/rust/mesh-portal"}
-mesh-portal-versions= { path="../../../mesh-portal/rust/mesh-portal-versions"}
-mesh-portal-api-client= { path="../../../mesh-portal/rust/mesh-portal-api-client"}
-mesh-portal-tcp-common = { path="../../../mesh-portal/rust/mesh-portal-tcp-common"}
-mesh-portal-tcp-client = { path="../../../mesh-portal/rust/mesh-portal-tcp-client"}
+mesh-portal={ path="../mesh-portal"}
+mesh-portal-versions= { path="../mesh-portal-versions"}
+mesh-portal-api-client= { path="../mesh-portal-api-client"}
+mesh-portal-tcp-common = { path="../mesh-portal-tcp-common"}
+mesh-portal-tcp-client = { path="../mesh-portal-tcp-client"}
 
 

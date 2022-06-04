@@ -20,7 +20,6 @@ use mesh_portal::version::latest::entity::request::{Method, Rc};
 use mesh_portal::version::latest::id::{KindParts, Point, Specific, Version};
 use mesh_portal::version::latest::messaging::Request;
 use mesh_portal::version::latest::particle::{Properties, Property, Status, Stub};
-use mesh_portal::version::latest::payload::{Payload, PayloadMap, Primitive, PrimitiveList};
 use mesh_portal::version::latest::selector::specific::{
     ProductSelector, VariantSelector, VendorSelector,
 };
@@ -29,7 +28,6 @@ use mesh_portal::version::latest::selector::{
     PointSegSelector, PointSelector,
 };
 use mesh_portal::version::latest::util::ValuePattern;
-use mesh_portal_versions::version::v0_0_1::entity::request::select::{SelectKind, SubSelect};
 use mesh_portal_versions::version::v0_0_1::particle::particle::ParticleDetails;
 use mesh_portal_versions::version::v0_0_1::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask,
@@ -46,7 +44,10 @@ use std::num::ParseIntError;
 use std::ops::{Deref, Index};
 use std::str::FromStr;
 use std::sync::Arc;
+use mesh_portal_versions::version::v0_0_1::command::request::delete::Delete;
+use mesh_portal_versions::version::v0_0_1::command::request::select::{SelectKind, SubSelect};
 use tokio::sync::mpsc;
+use mesh_portal::version::latest::payload::{Payload, PayloadMap, PrimitiveList};
 use crate::databases::lookup_registry_db;
 
 lazy_static! {
@@ -440,6 +441,28 @@ impl Registry {
         return Ok(QueryResult::PointKindHierarchy(kind_path));
     }
 
+    pub async fn delete(&self, delete: &Delete ) -> Result<PrimitiveList, Error> {
+        let select = delete.clone().into();
+        let list = self.select(&select).await?;
+        if !list.is_empty() {
+            let mut points = String::new();
+            for (index, point) in list.iter().enumerate() {
+                if let Payload::Point(point) = &**point {
+                    points.push_str(format!("'{}'", point.to_string()).as_str());
+                    if index < list.len() - 1 {
+                        points.push_str(", ");
+                    }
+                }
+            }
+
+            let mut conn = self.pool.acquire().await?;
+            let statement = format!("DELETE FROM particles WHERE point IN [{}]", points);
+            sqlx::query(statement.as_str()).execute(&mut conn).await?;
+        }
+
+        Ok(list)
+    }
+
     #[async_recursion]
     pub async fn select(&self, select: &Select) -> Result<PrimitiveList, Error> {
         let point = select.pattern.query_root();
@@ -673,7 +696,11 @@ impl Registry {
         .0;
 
         if *HYPERUSER == *to {
-            return Ok(Access::Super(has_owner));
+            if has_owner {
+                return Ok(Access::Super);
+            } else {
+                return Ok(Access::SuperOwner);
+            }
         }
 
         if *to == *on && has_owner {
@@ -710,7 +737,11 @@ impl Registry {
                 match &access_grant.kind {
                     AccessGrantKind::Super => {
                         if by_access.has_super() {
-                            return Ok(Access::Super(has_owner));
+                            if has_owner {
+                                return Ok(Access::SuperOwner);
+                            } else {
+                                return Ok(Access::Super);
+                            }
                         }
                     }
                     AccessGrantKind::Privilege(privilege) => {
@@ -1115,6 +1146,7 @@ pub mod test {
     };
     use std::convert::TryInto;
     use std::str::FromStr;
+    use mesh_portal_versions::version::v0_0_1::command::request::select::SelectKind;
 
     #[tokio::test]
     pub async fn test_nuke() -> Result<(), Error> {

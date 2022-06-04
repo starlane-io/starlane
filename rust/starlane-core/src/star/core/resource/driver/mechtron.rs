@@ -20,10 +20,8 @@ use crate::util::AsyncHashMap;
 use crate::message::delivery::Delivery;
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::config;
-use mesh_portal::version::latest::config::{Assign, Config, ParticleConfigBody};
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Request, Response};
-use mesh_portal::version::latest::payload::{Payload, PayloadPattern, Primitive};
 use mesh_portal::version::latest::portal;
 use mesh_portal::version::latest::portal::Exchanger;
 use mesh_portal::version::latest::portal::inlet::AssignRequest;
@@ -33,15 +31,15 @@ use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot::error::RecvError;
-use crate::command::cli::outlet;
-use crate::command::cli::outlet::Frame;
-use crate::command::execute::CommandExecutor;
-use crate::config::config::MechtronConfig;
+use mesh_portal::version::latest::config::ParticleConfigBody;
+use mesh_portal_versions::version::v0_0_1::particle::particle::ParticleDetails;
+
+use crate::config::config::{MechtronConfig, ParticleConfig};
 
 use crate::fail::Fail;
 use crate::mechtron::process::launch_mechtron_process;
-use crate::message::Reply;
-use crate::starlane::api::StarlaneApi;
+use crate::message::{Reply, StarlaneMessenger};
+use crate::star::core::resource::driver::ResourceManagerCall::Assign;
 
 
 pub struct MechtronCoreDriver {
@@ -157,7 +155,7 @@ println!("MECHTRON: got config" );
 println!("MechtronConfig.wasm_src().is_ok() {}", config.wasm_src().is_ok() );
 println!("MechtronConfig.wasm_src() {}", config.wasm_src()?.to_string() );
 
-        let api = StarlaneApi::new( self.skel.surface_api.clone(), assign.details.stub.point.clone() );
+        let api = StarlaneMessenger::new( self.skel.surface_api.clone() );
         let substitution_map = config.substitution_map()?;
         for command_line in &config.install {
 //            let command_line = substitute(command_line.as_str(), &substitution_map)?;
@@ -171,7 +169,7 @@ println!("MechtronConfig.wasm_src() {}", config.wasm_src()?.to_string() );
                     outlet::Frame::StdErr(out) => {
                         eprintln!("{}", out);
                     }
-                    outlet::Frame::EndOfCommand(code) => {
+                    outlet::Frame::End(code) => {
                         if code != 0 {
                             eprintln!("install error code: {}",code);
                         }
@@ -194,7 +192,7 @@ println!("MechtronConfig.wasm_src() {}", config.wasm_src()?.to_string() );
         let portal = portal_rx.await?;
 
         let portal_assign = Assign {
-            config: Config {
+            config: ParticleDetails{
                 body: ParticleConfigBody::Named(config.mechtron_name()?),
                 point: assign.details.stub.point.clone()
             },

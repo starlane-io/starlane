@@ -11,12 +11,15 @@ use mesh_portal::version::latest::particle::Stub;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, oneshot};
 use uuid::Uuid;
+use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
+use mesh_portal_versions::version::v0_0_1::messaging::AsyncMessenger;
 
 use crate::error::Error;
 use crate::particle::{Kind, KindBase, ParticleRecord};
 use crate::star::{StarCommand, StarKey};
 use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
 use crate::frame::{StarMessagePayload, StarMessage, SimpleReply, MessageAck};
+use crate::star::surface::SurfaceApi;
 
 pub mod delivery;
 
@@ -343,7 +346,7 @@ fn hash_to_string(hash: &HashSet<KindBase>) -> String {
 impl From<Request> for ProtoStarMessage {
     fn from(request: Request) -> Self {
         let mut proto = ProtoStarMessage::new();
-        proto.to = request.to.clone().into();
+        proto.to = request.to.clone().to_point().into();
         proto.payload = StarMessagePayload::Request(request.into());
         proto
     }
@@ -354,5 +357,26 @@ impl From<Response> for ProtoStarMessage {
         let mut proto = ProtoStarMessage::new();
         proto.payload = StarMessagePayload::Response(response.into());
         proto
+    }
+}
+
+
+#[derive(Clone)]
+pub struct StarlaneMessenger {
+  surface_api: SurfaceApi
+}
+
+impl StarlaneMessenger {
+    pub fn new( surface_api: SurfaceApi ) -> Self {
+        Self {
+            surface_api
+        }
+    }
+}
+
+#[async_trait]
+impl AsyncMessenger for StarlaneMessenger {
+    async fn send(&self, request: mesh_portal_versions::version::v0_0_1::messaging::Request) -> mesh_portal_versions::version::v0_0_1::messaging::Response {
+        self.surface_api.exchange(request).await
     }
 }

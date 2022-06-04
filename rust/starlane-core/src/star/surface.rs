@@ -1,12 +1,16 @@
+use std::{sync, thread};
 use std::sync::Arc;
+use std::sync::mpsc::SendError;
 use futures::TryFutureExt;
 use mesh_portal::version::latest::entity::request::create::{PointTemplate, Template};
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Message, Request, Response};
 use mesh_portal::version::latest::particle::Stub;
+use mesh_portal_versions::version::v0_0_1::messaging::SyncMessenger;
 
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc};
 use tokio::time::Duration;
+use tokio::sync::oneshot;
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
@@ -26,6 +30,7 @@ pub struct SurfaceApi {
 
 impl SurfaceApi {
     pub fn new(tx: mpsc::Sender<SurfaceCall>) -> Self {
+
         Self { tx }
     }
 
@@ -100,6 +105,38 @@ println!("SurfaceApi::watch()");
 
 }
 
+/*
+impl SyncMessenger for SurfaceApi {
+    fn send(&self, request: Request) -> Response {
+        let (tx,rx) = sync_oneshot::channel();
+        let call = ThreadCall {
+            request: request.clone(),
+            tx
+        };
+        match self.thread_tx.send(call) {
+            Ok(()) => {
+                match rx.recv() {
+                    Ok(response)=> response,
+                    Err(err) => {
+                        request.fail("err")
+                    }
+                }
+            }
+            Err(err) => {
+                request.err("could not send message from surface".into())
+            }
+        }
+    }
+}
+
+
+
+pub struct ThreadCall {
+    pub request: Request,
+    pub tx: sync_oneshot::Sender<Response>
+}
+ */
+
 pub enum SurfaceCall {
     Init,
     GetCaches(oneshot::Sender<Arc<ProtoArtifactCachesFactory>>),
@@ -118,7 +155,7 @@ pub enum SurfaceCall {
     StarSearch{ star_pattern: StarPattern, tx: oneshot::Sender<Result<SearchHits,Error>>},
     RequestStarAddress { address_template: PointTemplate, tx: oneshot::Sender<Result<Point,Error>> },
     CreateSysResource{template:Template, messenger_tx: mpsc::Sender<Message>, tx:oneshot::Sender<Result<Stub,Error>>},
-    Request{ request: Request, tx:oneshot::Sender<Response>}
+    Request{ request: Request, tx:oneshot::Sender<Response>},
 }
 
 impl Call for SurfaceCall {}
