@@ -74,6 +74,7 @@ alcoholic_jwt = "1.0.1"
 base64 = "0.13.0"
 
 cosmic-nom={ path="../cosmic-nom"}
+cosmic-portal-cli={ path="../cosmic-portal-cli"}
 mesh-portal={ path="../mesh-portal"}
 mesh-portal-versions= { path="../mesh-portal-versions"}
 mesh-portal-api-client= { path="../mesh-portal-api-client"}

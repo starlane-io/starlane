@@ -23,8 +23,10 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::sync::oneshot::Receiver;
 use tracing_futures::WithSubscriber;
 use cosmic_nom::new_span;
+use mesh_portal::version::latest::config::{ParticleConfigBody, PointConfig};
 
 use crate::{error, logger, util};
+use crate::config::config::ParticleConfig;
 use crate::error::Error;
 use crate::fail::Fail;
 use crate::file_access::FileAccess;
@@ -34,7 +36,7 @@ use crate::logger::{elog, LogInfo, StaticLogInfo};
 use crate::message::{MessageExpect, ProtoStarMessage, ReplyKind};
 use crate::names::Name;
 use crate::particle::KindBase::Mechtron;
-use crate::particle::property::{AddressPattern, AnythingPattern, BoolPattern, EmailPattern, PropertiesConfig, PropertyPermit, PropertySource, U64Pattern};
+use crate::particle::property::{PointPattern, AnythingPattern, BoolPattern, EmailPattern, PropertiesConfig, PropertyPermit, PropertySource, U64Pattern};
 use crate::star::{StarInfo, StarKey, StarSkel};
 use crate::star::core::resource::driver::user::UsernamePattern;
 use crate::util::AsyncHashMap;
@@ -731,17 +733,17 @@ pub enum AssignKind {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParticleAssign {
     pub kind: AssignKind,
-    pub details: ParticleDetails,
+    pub config: PointConfig<ParticleConfigBody>,
     pub state: StateSrc,
 }
 
 
 impl ParticleAssign {
 
-    pub fn new(kind: AssignKind, details: ParticleDetails, state: StateSrc) -> Self {
+    pub fn new(kind: AssignKind, config: PointConfig<ParticleConfigBody>, state: StateSrc) -> Self {
         Self {
             kind,
-            details,
+            config,
             state
         }
     }
@@ -770,22 +772,22 @@ fn default_properties_config() -> PropertiesConfig {
 
 fn mechtron_properties_config() -> PropertiesConfig {
     let mut builder = PropertiesConfig::builder();
-    builder.add("bind", Box::new(AddressPattern{}), true, false, PropertySource::Shell, None, false, vec![] );
-    builder.add("config", Box::new(AddressPattern{}), true, false, PropertySource::Shell, None, false, vec![] );
+    builder.add("bind", Box::new(PointPattern {}), true, false, PropertySource::Shell, None, false, vec![] );
+    builder.add("config", Box::new(PointPattern {}), true, false, PropertySource::Shell, None, false, vec![] );
     builder.build()
 }
 
 
 fn unrequired_bind_and_config_properties_config() -> PropertiesConfig {
     let mut builder = PropertiesConfig::builder();
-    builder.add("bind", Box::new(AddressPattern{}), false, false, PropertySource::Shell, None, false, vec![] );
-    builder.add("config", Box::new(AddressPattern{}), false, false, PropertySource::Shell, None, false, vec![] );
+    builder.add("bind", Box::new(PointPattern {}), false, false, PropertySource::Shell, None, false, vec![] );
+    builder.add("config", Box::new(PointPattern {}), false, false, PropertySource::Shell, None, false, vec![] );
     builder.build()
 }
 
 fn user_properties_config() -> PropertiesConfig {
     let mut builder = PropertiesConfig::builder();
-    builder.add("bind", Box::new(AddressPattern{}), true, false,PropertySource::Shell, Some("hyperspace:repo:boot:1.0.0:/bind/user.bind".to_string()), true, vec![] );
+    builder.add("bind", Box::new(PointPattern {}), true, false, PropertySource::Shell, Some("hyperspace:repo:boot:1.0.0:/bind/user.bind".to_string()), true, vec![] );
     builder.add("username", Box::new(UsernamePattern{}), false, false, PropertySource::Core, None, false, vec![] );
     builder.add("email", Box::new(EmailPattern{}), false, true, PropertySource::Core, None, false, vec![PropertyPermit::Read] );
     builder.add("password", Box::new(AnythingPattern{}), false, true, PropertySource::CoreSecret, None, false, vec![] );
@@ -794,8 +796,8 @@ fn user_properties_config() -> PropertiesConfig {
 
 fn userbase_properties_config() -> PropertiesConfig {
     let mut builder = PropertiesConfig::builder();
-    builder.add("bind", Box::new(AddressPattern{}), true, false, PropertySource::Shell, Some("hyperspace:repo:boot:1.0.0:/bind/userbase.bind".to_string()), true, vec![] );
-    builder.add("config", Box::new(AddressPattern{}), false, true, PropertySource::Shell, None, false, vec![] );
+    builder.add("bind", Box::new(PointPattern {}), true, false, PropertySource::Shell, Some("hyperspace:repo:boot:1.0.0:/bind/userbase.bind".to_string()), true, vec![] );
+    builder.add("config", Box::new(PointPattern {}), false, true, PropertySource::Shell, None, false, vec![] );
     builder.add("registration-email-as-username", Box::new(BoolPattern{}), false, false, PropertySource::Shell, Some("true".to_string()), false, vec![] );
     builder.add("verify-email", Box::new(BoolPattern{}), false, false, PropertySource::Shell, Some("false".to_string()), false, vec![] );
     builder.add("sso-session-max-lifespan", Box::new(U64Pattern{}), false, true, PropertySource::Core, Some("315360000".to_string()), false, vec![] );

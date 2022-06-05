@@ -61,9 +61,9 @@ impl PropertyPattern for AnythingPattern {
 }
 
 #[derive(Clone)]
-pub struct AddressPattern{}
+pub struct PointPattern {}
 
-impl PropertyPattern for AddressPattern{
+impl PropertyPattern for PointPattern {
     fn is_match(&self, value: &String) -> Result<(), Error> {
         use std::str::FromStr;
         Point::from_str(value.as_str())?;
@@ -290,7 +290,7 @@ impl PropertiesConfigBuilder {
     }
 
     pub fn add_address( &mut self, name: &str, required: bool, mutable: bool ) -> Result<(),Error> {
-        let def = PropertyDef::new( Box::new(AddressPattern{} ),required,mutable,PropertySource::Shell,None,false,vec![])?;
+        let def = PropertyDef::new(Box::new(PointPattern {} ), required, mutable, PropertySource::Shell, None, false, vec![])?;
         self.config.properties.insert(name.to_string(), def );
         Ok(())
     }

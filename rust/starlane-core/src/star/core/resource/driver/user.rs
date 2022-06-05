@@ -26,9 +26,10 @@ use nom::combinator::all_consuming;
 use nom_supreme::final_parser::final_parser;
 use serde_json::{json, Value};
 use validator::validate_email;
+use mesh_portal_versions::version::v0_0_1::command::Command;
 use crate::error::Error;
 use crate::particle::{Kind, KindBase, ParticleAssign};
-use crate::particle::property::{AddressPattern, AnythingPattern, BoolPattern, EmailPattern, PropertiesConfig, PropertyPattern, PropertyPermit, PropertySource};
+use crate::particle::property::{PointPattern, AnythingPattern, BoolPattern, EmailPattern, PropertiesConfig, PropertyPattern, PropertyPermit, PropertySource};
 use crate::registry::{match_kind};
 use crate::star::core::resource::driver::ParticleCoreDriver;
 use crate::star::StarSkel;
@@ -97,30 +98,30 @@ impl ParticleCoreDriver for UserBaseKeycloakCoreDriver {
         };
 
 
-        if is_hyper_userbase(&assign.details.stub.point)
+        if is_hyper_userbase(&assign.config.stub.point)
         {
-            let sso_session_max_lifespan = assign.details.properties.get("sso-session-max-lifespan" ).ok_or("cannot get value for required property 'sso-session-max-lifespan'")?.value.clone();
-            self.admin.init_realm_for_point("master".to_string(), &assign.details.stub.point ).await?;
-            match self.admin.update_realm_for_point("master".to_string(), &assign.details.stub.point, Some(false), Some(false), Some(sso_session_max_lifespan)).await
+            let sso_session_max_lifespan = assign.config.properties.get("sso-session-max-lifespan" ).ok_or("cannot get value for required property 'sso-session-max-lifespan'")?.value.clone();
+            self.admin.init_realm_for_point("master".to_string(), &assign.config.stub.point ).await?;
+            match self.admin.update_realm_for_point("master".to_string(), &assign.config.stub.point, Some(false), Some(false), Some(sso_session_max_lifespan)).await
             {
                 Err(err) => {
                     error!("{}",err.to_string());
-                    return Err(format!("UserBase<Keyloak>: could not update master realm for {}", assign.details.stub.point.to_string()).into())
+                    return Err(format!("UserBase<Keyloak>: could not update master realm for {}", assign.config.stub.point.to_string()).into())
                 }
                 _ => {}
             }
         }
         else
         {
-            let registration_email_as_username = assign.details.properties.get("registration-email-as-username" ).map_or(None, |x|{ Some(x.value=="true") });
-            let verify_email= assign.details.properties.get("verify-email" ).map_or(None, |x|{ Some(x.value=="true") });
-            let sso_session_max_lifespan = assign.details.properties.get("sso-session-max-lifespan" ).ok_or("cannot get value for required property 'sso-session-max-lifespan'")?.value.clone();
+            let registration_email_as_username = assign.config.properties.get("registration-email-as-username" ).map_or(None, |x|{ Some(x.value=="true") });
+            let verify_email= assign.config.properties.get("verify-email" ).map_or(None, |x|{ Some(x.value=="true") });
+            let sso_session_max_lifespan = assign.config.properties.get("sso-session-max-lifespan" ).ok_or("cannot get value for required property 'sso-session-max-lifespan'")?.value.clone();
 
-            match self.admin.create_realm_from_point(&assign.details.stub.point, registration_email_as_username, verify_email, Some(sso_session_max_lifespan)).await
+            match self.admin.create_realm_from_point(&assign.config.stub.point, registration_email_as_username, verify_email, Some(sso_session_max_lifespan)).await
             {
                 Err(err) => {
                     error!("{}",err.to_string());
-                    return Err(format!("UserBase<Keyloak>: could not create realm for {}", assign.details.stub.point.to_string()).into())
+                    return Err(format!("UserBase<Keyloak>: could not create realm for {}", assign.config.stub.point.to_string()).into())
                 }
                 _ => {}
             }
@@ -147,17 +148,16 @@ println!("handle HTTP: {}", request.core.uri.to_string());
     }
 
 
-    async fn particle_command(&self, to: Point, rc: Rc) -> Result<Payload,Error> {
-        unimplemented!()
-/*        match rc {
-            Rc::Create(create) => { self.create_child(to, create).await }
-            Rc::Set(set) => { self.set_child(to,set).await }
-            Rc::Get(get) => { self.get_child(to,get).await }
-            Rc::Select(select) => { self.select_child(to,select).await }
-            _ => { unimplemented!() }
+    async fn particle_command(&self, to: Point, command: Command) -> Result<Payload,Error> {
+        match command {
+            Command::Create(create) => { self.create_child(to, create).await }
+            Command::Set(set) => { self.set_child(to,set).await }
+            Command::Get(get) => { self.get_child(to,get).await }
+            Command::Select(select) => { self.select_child(to,select).await }
+            _ => {
+                Err("UserBase does not handle this type of command".into())
+            }
         }
-
- */
     }
 
 }

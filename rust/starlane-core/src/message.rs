@@ -379,4 +379,11 @@ impl AsyncMessenger for StarlaneMessenger {
     async fn send(&self, request: mesh_portal_versions::version::v0_0_1::messaging::Request) -> mesh_portal_versions::version::v0_0_1::messaging::Response {
         self.surface_api.exchange(request).await
     }
+
+    fn send_sync(&self, request: mesh_portal_versions::version::v0_0_1::messaging::Request) -> mesh_portal_versions::version::v0_0_1::messaging::Response {
+        let surface_api = self.surface_api.clone();
+        tokio::runtime::Handle::current().block_on( async move {
+            self.surface_api.exchange(request).await
+        } )
+    }
 }

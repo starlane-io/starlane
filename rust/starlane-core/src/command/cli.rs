@@ -23,6 +23,7 @@ use crate::endpoint::{AuthRequestFrame, EndpointResponse, Service};
 use crate::error::Error;
 use crate::star::shell::sys::SysResource;
 use crate::star::StarSkel;
+use crate::starlane::api::StarlaneApi;
 
 pub struct CliServer {
 

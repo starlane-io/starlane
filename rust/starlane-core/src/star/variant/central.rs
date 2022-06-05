@@ -14,6 +14,7 @@ use crate::message::StarlaneMessenger;
 use crate::particle::{Kind, ParticleLocation, ParticleRecord};
 use crate::star::{StarKey, StarSkel};
 use crate::star::variant::{FrameVerdict, VariantCall};
+use crate::starlane::api::StarlaneApi;
 use crate::user::HyperUser;
 use crate::util::{AsyncProcessor, AsyncRunner};
 
@@ -76,16 +77,20 @@ impl CentralVariant {
 
 impl CentralVariant {
 
-    async fn ensure(starlane_api: StarlaneMessenger) -> Result<(), Error> {
+    async fn ensure(starlane_api: StarlaneApi) -> Result<(), Error> {
 
-        cli.exec("create? hyperspace<Space>" ).await?;
-        cli.exec("create? localhost<Space>" ).await?;
-        cli.exec("create? hyperspace:repo<Base<Repo>>").await?;
-        cli.exec("create? hyperspace:repo:boot<ArtifactBundleSeries>").await?;
+        let cli = starlane_api.cli();
+
+        let session = cli.session().await?;
+
+        session.exec("create? hyperspace<Space>" ).await;
+        session.exec("create? localhost<Space>" ).await;
+        session.exec("create? hyperspace:repo<Base<Repo>>").await;
+        session.exec("create? hyperspace:repo:boot<ArtifactBundleSeries>").await;
         let content = Arc::new( BOOT_BUNDLE_ZIP.to_vec() );
-        cli.exec_with_transfers("publish? ^[ bundle.zip ]-> hyperspace:repo:boot:1.0.0", vec![Transfer::new("bundle.zip", content)]).await?;
-        cli.exec("create? hyperspace:users<UserBase<Keycloak>>").await?;
-        cli.exec("create? hyperspace:users:hyperuser<User>").await?;
+        session.exec_with_transfers("publish? ^[ bundle.zip ]-> hyperspace:repo:boot:1.0.0", vec![Transfer::new("bundle.zip", content)]).await;
+        session.exec("create? hyperspace:users<UserBase<Keycloak>>").await;
+        session.exec("create? hyperspace:users:hyperuser<User>").await;
 
         Ok(())
     }

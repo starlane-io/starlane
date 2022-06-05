@@ -1,12 +1,13 @@
 use std::str::FromStr;
+use std::sync::Arc;
 use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::messaging::{Request, Response};
+use mesh_portal::version::latest::messaging::{ProtoRequest, Request, Response};
 use mesh_portal::version::latest::msg::MsgMethod;
 use mesh_portal::version::latest::payload::{Payload, PayloadType};
 use mesh_portal_versions::version::v0_0_1::command::Command;
 use mesh_portal_versions::version::v0_0_1::id::id::Port;
 use mesh_portal_versions::version::v0_0_1::id::id::ToPort;
-use mesh_portal_versions::version::v0_0_1::messaging::Method;
+use mesh_portal_versions::version::v0_0_1::messaging::{AsyncMessenger, AsyncMessengerAgent, Method};
 use mesh_portal_versions::version::v0_0_1::service::Global;
 use crate::error::Error;
 use crate::registry::RegistryApi;
@@ -17,7 +18,8 @@ lazy_static! {
 
 #[derive(Clone)]
 pub struct GlobalApi {
-    registry: RegistryApi
+    registry: RegistryApi,
+    messenger: Arc<dyn AsyncMessenger>
 }
 
 #[async_trait]
@@ -32,21 +34,27 @@ impl Global for GlobalApi {
 }
 impl GlobalApi {
 
-    pub fn new( registry: RegistryApi ) -> Self {
+    pub fn new( registry: RegistryApi, messenger: Arc<dyn AsyncMessenger> ) -> Self {
         Self {
-            registry
+            registry,
+            messenger
         }
     }
 
     async fn handle_command_service_request(&self, request: Request) -> Response {
         async fn handle(global: &GlobalApi, request: Request) -> Result<Response,Error> {
             match &request.core.method {
-                Method::Msg(method) if method.as_str() == "Command" && request.core.body.payload_type() == PayloadType::Command => {
+                Method::Msg(method) if method.as_str() == "Command" && request.core.body.kind() == PayloadType::Command => {
                     if let Payload::Command(command) = &request.core.body {
                         match &**command {
                             Command::Create(create) => {
-                                let stub = global.registry.create(create).await?.stub;
-                                Ok(request.ok_payload(Payload::Stub(stub)))
+                                let mut response = {
+                                    let mut request = request.clone();
+                                    request.to = create.template.point.parent.clone().to_port();
+                                    global.messenger.send(request).await
+                                };
+                                response.from = Point::global_executor().to_port();
+                                Ok(response)
                             }
                             Command::Delete(delete) => {
                                 let list = global.registry.delete(delete).await?;
@@ -55,10 +63,6 @@ impl GlobalApi {
                             Command::Select(select) => {
                                 let list = global.registry.select(select).await?;
                                 Ok(request.ok_payload(Payload::List(list)))
-                            }
-                            Command::Publish(create) => {
-                                let stub = global.registry.create(create).await?.stub;
-                                Ok(request.ok_payload(Payload::Stub(stub)))
                             }
                             Command::Set(set) => {
                                 global.registry.set(set).await?;
@@ -71,7 +75,7 @@ impl GlobalApi {
                             Command::Update(_) => {
                                 Ok(request.status(400))
                             }
-                            Command::Read => {
+                            Command::Read(_) => {
                                 Ok(request.status(400))
                             }
                         }

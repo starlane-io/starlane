@@ -42,7 +42,9 @@ use mesh_portal::version::latest::security::Access;
 use mesh_portal_versions::version::v0_0_1::particle::particle::ParticleDetails;
 use regex::Regex;
 use serde::de::Unexpected::Str;
+use mesh_portal::version::latest::command::request::CmdMethod;
 use mesh_portal::version::latest::config::bind::BindConfig;
+use mesh_portal_versions::version::v0_0_1::command::Command;
 use crate::artifact::ArtifactRef;
 use crate::bindex::{BindConfigCache, BindEx, BindExRouter, RegistryApi};
 use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
@@ -209,19 +211,29 @@ impl MessagingEndpointComponentInner {
         let resource_core_driver_api = self.resource_core_driver_api.clone();
         tokio::spawn(async move {
 
-            let rc = match &delivery.item.core.method{
+            let method = match &delivery.item.core.method{
                 Method::Cmd(rc) => {rc}
-                _ => { panic!("should not get requests that are not Rc") }
+                _ => { panic!("should not get requests that are not Cmd") }
             };
 
 
-            async fn process(skel: StarSkel, resource_core_driver_api: ResourceCoreDriverApi, rc: &Rc, to: Point) -> Result<Payload, Error> {
+            async fn process(skel: StarSkel, resource_core_driver_api: ResourceCoreDriverApi, method: &CmdMethod, to: Point, body: &Payload ) -> Result<Payload, Error> {
                 let record = skel.registry_api.locate(&to).await?;
                 let kind = Kind::try_from( record.details.stub.kind )?;
+
+                // intelij IDE has a gripe with this transformation, but
+                // cargo build does not because The TryInto<Command> for Payload
+                // is generated in a macro
+                let command: Command = body.clone().try_into()?;
+
+                if command.matches(method).is_err() {
+                    return Err(format!("CmdMethod {} does not match body Command", method.to_string()).into());
+                }
+
                 match kind.kind().child_resource_registry_handler() {
                     ChildResourceRegistryHandler::Shell => {
-                        match &rc {
-                            Rc::Create(create) => {
+                        match &command{
+                            Command::Create(create) => {
 
                                 let chamber = skel.registry_api.clone();
                                 let details= chamber.create(create).await?;
@@ -257,7 +269,6 @@ impl MessagingEndpointComponentInner {
                                     Ok(())
                                 }
 
-
                                 match assign(skel.clone(), details.clone(), create.state.clone()).await {
                                     Ok(_) => {
                                         Ok(Payload::Stub(details.stub))
@@ -274,16 +285,11 @@ impl MessagingEndpointComponentInner {
                                     }
                                 }
                             }
-
-                            Rc::Get(get) => {
-                                match get.op {
-                                    GetOp::State => {
-                                        unimplemented!()
-                                    }
-                                    GetOp::Properties(_) => {
-                                        return Err("messaging end point no longer handles this type of command".into());
-                                    }
-                                }
+                            Command::Update(update) => {
+                                unimplemented!()
+                            }
+                            Command::Read(point)  => {
+                                unimplemented!()
                             }
                             _ => {
                                 return Err("messaging end point no longer handles this type of command".into());
@@ -291,12 +297,12 @@ impl MessagingEndpointComponentInner {
                        }
                     }
                     ChildResourceRegistryHandler::Core => {
-                        resource_core_driver_api.particle_command(to.clone(), rc.clone()).await
+                        resource_core_driver_api.command(to.clone(), command.clone() ).await
                     }
                 }
             }
 
-            let result = process(skel, resource_core_driver_api.clone(), rc, delivery.to().expect("expected this to work since we have already established that the item is a Request")).await.into();
+            let result = process(skel, resource_core_driver_api.clone(), method, delivery.to().expect("expected this to work since we have already established that the item is a Request"), &delivery.core.body ).await.into();
             delivery.result(result);
         });
     }

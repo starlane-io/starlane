@@ -17,6 +17,7 @@ use crate::star::core::resource::driver::file::{FileSystemManager, FileCoreManag
 use std::collections::HashMap;
 use std::future::Future;
 use std::str::FromStr;
+use mesh_portal::version::latest::command::request::CmdMethod;
 use mesh_portal::version::latest::entity::request::Rc;
 use mesh_portal::version::latest::entity::request::set::Set;
 use mesh_portal::version::latest::fail;
@@ -25,6 +26,7 @@ use mesh_portal::version::latest::messaging::{Request, Response};
 use mesh_portal::version::latest::payload::Payload;
 use mesh_portal::version::latest::particle::Stub;
 use mesh_portal_api_client::ResourceCommand;
+use mesh_portal_versions::version::v0_0_1::command::Command;
 use crate::star::core::resource::driver::artifact::ArtifactManager;
 use crate::star::core::resource::driver::user::UserBaseKeycloakCoreDriver;
 
@@ -38,24 +40,24 @@ pub mod user;
 
 #[derive(Clone)]
 pub struct ResourceCoreDriverApi {
-    pub tx: mpsc::Sender<ResourceManagerCall>,
+    pub tx: mpsc::Sender<DriverCall>,
 }
 
 impl ResourceCoreDriverApi {
-    pub fn new(tx: mpsc::Sender<ResourceManagerCall>) -> Self {
+    pub fn new(tx: mpsc::Sender<DriverCall>) -> Self {
         Self { tx }
     }
 
     pub async fn assign(&self, assign: ParticleAssign) -> Result<(),Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(ResourceManagerCall::Assign{assign, tx }).await;
+        self.tx.send(DriverCall::Assign{assign, tx }).await;
         rx.await?
     }
 
     pub async fn request( &self, request: Request) -> Result<Response,Error> {
         let (tx,rx) = oneshot::channel();
 println!("Manager mod request....");
-        self.tx.send(ResourceManagerCall::Request{request, tx }).await;
+        self.tx.send(DriverCall::Request{request, tx }).await;
 println!("Manager mod requesxt .. waiting" );
         let rtn = rx.await?;
 println!("Manager mod RETURNING" );
@@ -64,26 +66,26 @@ println!("Manager mod RETURNING" );
 
     pub async fn get(&self, point: Point) -> Result<Payload,Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(ResourceManagerCall::Get{point, tx }).await;
+        self.tx.send(DriverCall::Get{point, tx }).await;
         rx.await?
     }
 
-    pub async fn particle_command(&self, to: Point, rc: Rc) -> Result<Payload,Error> {
+    pub async fn command(&self, to: Point, command: Command ) -> Result<Payload,Error> {
         let (tx,rx) = oneshot::channel();
-        self.tx.send(ResourceManagerCall::ResourceCommand { to, rc,  tx }).await;
+        self.tx.send(DriverCall::Command { to, command,  tx }).await;
         rx.await?
     }
 }
 
-pub enum ResourceManagerCall {
+pub enum DriverCall {
     Assign{ assign: ParticleAssign, tx: oneshot::Sender<Result<(),Error>> },
     Request { request: Request, tx: oneshot::Sender<Result<Response,Error>>},
     Get{ point: Point, tx: oneshot::Sender<Result<Payload,Error>>},
-    ResourceCommand { to: Point, rc: Rc, tx: oneshot::Sender<Result<Payload,Error>> }
+    Command { to: Point, command: Command, tx: oneshot::Sender<Result<Payload,Error>> }
 }
 
 
-impl Call for ResourceManagerCall {}
+impl Call for DriverCall {}
 
 
 
@@ -94,7 +96,7 @@ pub struct ResourceCoreDriverComponent {
 }
 
 impl ResourceCoreDriverComponent {
-    pub async fn new( skel: StarSkel, tx: mpsc::Sender<ResourceManagerCall>, rx: mpsc::Receiver<ResourceManagerCall> ) {
+    pub async fn new(skel: StarSkel, tx: mpsc::Sender<DriverCall>, rx: mpsc::Receiver<DriverCall> ) {
         let mut component = Self {
             skel,
             drivers: HashMap::new(),
@@ -112,13 +114,13 @@ impl ResourceCoreDriverComponent {
 }
 
 #[async_trait]
-impl AsyncProcessor<ResourceManagerCall> for ResourceCoreDriverComponent {
-    async fn process(&mut self, call: ResourceManagerCall) {
+impl AsyncProcessor<DriverCall> for ResourceCoreDriverComponent {
+    async fn process(&mut self, call: DriverCall) {
         match call {
-            ResourceManagerCall::Assign { assign, tx } => {
+            DriverCall::Assign { assign, tx } => {
                 self.assign(assign,tx).await;
             }
-            ResourceManagerCall::Request { request, tx } => {
+            DriverCall::Request { request, tx } => {
                 match self.resources.get(&request.to ) {
                     Some(resource_type) => {
                         match self.drivers.get(resource_type) {
@@ -139,11 +141,11 @@ impl AsyncProcessor<ResourceManagerCall> for ResourceCoreDriverComponent {
                     }
                 }
             }
-            ResourceManagerCall::Get { point, tx } => {
+            DriverCall::Get { point, tx } => {
                 self.get(point,tx).await;
             }
-            ResourceManagerCall::ResourceCommand { to, rc, tx } => {
-                tx.send( self.resource_command(to, rc).await );
+            DriverCall::Command { to, command , tx } => {
+                tx.send( self.particle_command(to, command).await );
             }
         }
     }
@@ -154,9 +156,9 @@ impl ResourceCoreDriverComponent {
     async fn assign(&mut self, assign: ParticleAssign, tx: oneshot::Sender<Result<(),Error>> ) {
 
        async fn process(manager_component: &mut ResourceCoreDriverComponent, assign: ParticleAssign) -> Result<(),Error> {
-           let resource_type = KindBase::from_str(assign.details.stub.kind.to_string().as_str())?;
+           let resource_type = KindBase::from_str(assign.config.stub.kind.to_string().as_str())?;
            let manager:&mut Box<dyn ParticleCoreDriver> = manager_component.drivers.get_mut(&resource_type ).ok_or(format!("could not get driver for {}", resource_type.to_string()))?;
-           manager_component.resources.insert(assign.details.stub.point.clone(), resource_type );
+           manager_component.resources.insert(assign.config.stub.point.clone(), resource_type );
            manager.assign(assign).await
        }
        let result = process(self,assign).await;
@@ -198,10 +200,10 @@ impl ResourceCoreDriverComponent {
         }
     }
 
-    async fn resource_command(&mut self, to: Point, rc: Rc) -> Result<Payload,Error> {
+    async fn particle_command(&mut self, to: Point, command: Command) -> Result<Payload,Error> {
         let resource_type = self.resources.get(&to ).ok_or(format!("could not find particle: {}", to.to_string()))?;
         let driver = self.drivers.get(resource_type).ok_or(format!("do not have a particle core driver for '{}' and StarKind '{}'", resource_type.to_string(), self.skel.info.kind.to_string() ))?;
-        let result = driver.particle_command(to, rc).await;
+        let result = driver.particle_command(to, command).await;
         match &result {
             Ok(payload) => {
                 info!("particle command payload: {:?}", payload);
@@ -268,7 +270,7 @@ pub trait ParticleCoreDriver: Send + Sync {
 
     fn shutdown(&self) {}
 
-    async fn particle_command(&self, to: Point, rc: Rc) -> Result<Payload,Error> {
+    async fn particle_command(&self, to: Point, command: Command) -> Result<Payload,Error> {
         Err(format!("particle type: '{}' does not handle Core particle commands",self.kind().to_string()).into())
     }
 

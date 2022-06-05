@@ -12,7 +12,7 @@ use mesh_portal::version::latest::artifact::{ArtifactRequest, ArtifactResponse};
 
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
-use crate::particle::{ArtifactSubKind, KindBase, ParticleAssign, AssignParticleStateSrc, Kind};
+use crate::particle::{ArtifactSubKind, KindBase, ParticleAssign, AssignParticleStateSrc, Kind, AssignKind};
 use crate::star::core::resource::driver::ParticleCoreDriver;
 use crate::star::core::resource::state::StateStore;
 use crate::star::{StarSkel};
@@ -31,7 +31,7 @@ use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot::error::RecvError;
-use mesh_portal::version::latest::config::ParticleConfigBody;
+use mesh_portal::version::latest::config::{ParticleConfigBody, PointConfig};
 use mesh_portal_versions::version::v0_0_1::particle::particle::ParticleDetails;
 
 use crate::config::config::{MechtronConfig, ParticleConfig};
@@ -39,7 +39,7 @@ use crate::config::config::{MechtronConfig, ParticleConfig};
 use crate::fail::Fail;
 use crate::mechtron::process::launch_mechtron_process;
 use crate::message::{Reply, StarlaneMessenger};
-use crate::star::core::resource::driver::ResourceManagerCall::Assign;
+use crate::star::core::resource::driver::DriverCall::Assign;
 use crate::starlane::api::StarlaneApi;
 
 
@@ -130,7 +130,7 @@ impl ParticleCoreDriver for MechtronCoreDriver {
         assign: ParticleAssign,
     ) -> Result<(), Error> {
         match assign.state {
-            StateSrc::Stateless => {}
+            StateSrc::None => {}
             _ => {
                 return Err("currently only supporting stateless mechtrons".into());
             }
@@ -138,7 +138,7 @@ impl ParticleCoreDriver for MechtronCoreDriver {
 
 println!("Assigning Mechtron...");
 
-        let config_point = assign.details.properties.get(&"config".to_string() ).ok_or(format!("'config' property required to be set for {}", self.resource_type.to_string() ))?.value.as_str();
+        let config_point = assign.config.properties.get(&"config".to_string() ).ok_or(format!("'config' property required to be set for {}", self.resource_type.to_string() ))?.value.as_str();
         let config_point = Point::from_str(config_point)?;
 
         let config_artifact_ref = ArtifactRef {
@@ -151,7 +151,7 @@ println!("Assigning Mechtron...");
 println!("MECHTRON: got caches" );
         let config = caches.resource_configs.get(&config_point).ok_or::<Error>(format!("expected mechtron_config").into())?;
 println!("MECHTRON: got config" );
-        let config = MechtronConfig::new(config, assign.details.stub.point.clone() );
+        let config = MechtronConfig::new(config, assign.config.stub.point.clone() );
 
 println!("MechtronConfig.wasm_src().is_ok() {}", config.wasm_src().is_ok() );
 println!("MechtronConfig.wasm_src() {}", config.wasm_src()?.to_string() );
@@ -161,7 +161,7 @@ println!("MechtronConfig.wasm_src() {}", config.wasm_src()?.to_string() );
         for command_line in &config.install {
 //            let command_line = substitute(command_line.as_str(), &substitution_map)?;
             println!("INSTALL: '{}'",command_line);
-            let mut output_rx = CommandExecutor::exec_simple(command_line.to_string(), assign.details.stub.clone(), api.clone() );
+            let mut output_rx = CommandExecutor::exec_simple(command_line.to_string(), assign.config.stub.clone(), api.clone() );
             while let Some(frame) = output_rx.recv().await {
                 match frame {
                     outlet::Frame::StdOut(out) => {
@@ -192,12 +192,13 @@ println!("MechtronConfig.wasm_src() {}", config.wasm_src()?.to_string() );
 
         let portal = portal_rx.await?;
 
-        let portal_assign = Assign {
-            config: ParticleDetails{
+        let portal_assign = ParticleAssign{
+            kind: AssignKind::Create,
+            config: PointConfig{
                 body: ParticleConfigBody::Named(config.mechtron_name()?),
-                point: assign.details.stub.point.clone()
+                point: assign.config.stub.point.clone()
             },
-            details: assign.details.clone()
+            state: StateSrc::None
         };
 
         portal.assign(portal_assign);

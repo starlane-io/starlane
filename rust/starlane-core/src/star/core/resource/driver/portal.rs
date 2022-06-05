@@ -50,10 +50,10 @@ impl ParticleCoreDriver for PortalCoreDriver {
             }
         };
 
-        self.store.put(assign.details.stub.point.clone(), state.clone() ).await?;
+        self.store.put(assign.config.stub.point.clone(), state.clone() ).await?;
 
         let selector = WatchSelector{
-            topic: Topic::Point(assign.details.stub.point),
+            topic: Topic::Point(assign.config.stub.point),
             property: Property::State
         };
 
