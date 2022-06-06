@@ -8,19 +8,19 @@ use mesh_portal::version::latest::messaging::{Message, Request, Response};
 use mesh_portal::version::latest::particle::Stub;
 use mesh_portal_versions::version::v0_0_1::messaging::SyncMessenger;
 
-use tokio::sync::{mpsc};
+use tokio::sync::mpsc;
 use tokio::time::Duration;
 use tokio::sync::oneshot;
+use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
 use crate::frame::{StarMessagePayload, StarPattern};
-use crate::message::{ProtoStarMessage, ReplyKind, Reply, ProtoStarMessageTo};
-use crate::particle::{ParticleRecord};
-use crate::star::{StarCommand, StarSkel, StarInfo};
+use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
+use crate::star::{StarCommand, StarInfo, StarSkel};
 use crate::star::shell::message::MessagingCall;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use crate::watch::{WatchSelector, Notification, Topic, Watch, WatchResourceSelector, Watcher};
+use crate::watch::{Notification, Topic, Watch, Watcher, WatchResourceSelector, WatchSelector};
 use crate::star::shell::search::SearchHits;
 
 #[derive(Clone)]

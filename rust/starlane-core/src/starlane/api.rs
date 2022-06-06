@@ -4,7 +4,7 @@ use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::id::{Point, Port, TargetLayer};
 use mesh_portal::version::latest::messaging::{Agent, Response};
 use mesh_portal_versions::version::v0_0_1::messaging::{AsyncMessenger, AsyncMessengerAgent};
-use crate::particle::ParticleRecord;
+use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 use cosmic_portal_cli::Cli;
 use cosmic_portal_cli::CliSession;
 

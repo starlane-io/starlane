@@ -12,18 +12,21 @@ use std::time::Duration;
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::entity::request::create::KindTemplate;
 
-use mesh_portal::version::latest::id::{Point, KindParts, ResourceKind, Specific};
+use mesh_portal::version::latest::id::{KindParts, Point, ResourceKind, Specific};
 use mesh_portal::version::latest::payload::Payload;
-use mesh_portal::version::latest::particle::{Stub, Status};
+use mesh_portal::version::latest::particle::{Status, Stub};
 use mesh_portal::version::latest::security::Permissions;
 use mesh_portal_versions::version::v0_0_1::parse::consume_kind;
-use mesh_portal_versions::version::v0_0_1::particle::particle::ParticleDetails;
+use mesh_portal_versions::version::v0_0_1::particle::particle::Details;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
 use tokio::sync::oneshot::Receiver;
 use tracing_futures::WithSubscriber;
 use cosmic_nom::new_span;
+use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::config::{ParticleConfigBody, PointConfig};
+use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
+use mesh_portal_versions::version::v0_0_1::sys::{AssignmentKind, ChildRegistry, Location};
 
 use crate::{error, logger, util};
 use crate::config::config::ParticleConfig;
@@ -36,9 +39,9 @@ use crate::logger::{elog, LogInfo, StaticLogInfo};
 use crate::message::{MessageExpect, ProtoStarMessage, ReplyKind};
 use crate::names::Name;
 use crate::particle::KindBase::Mechtron;
-use crate::particle::property::{PointPattern, AnythingPattern, BoolPattern, EmailPattern, PropertiesConfig, PropertyPermit, PropertySource, U64Pattern};
+use crate::particle::property::{AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit, PropertySource, U64Pattern};
 use crate::star::{StarInfo, StarKey, StarSkel};
-use crate::star::core::resource::driver::user::UsernamePattern;
+use crate::star::core::particle::driver::user::UsernamePattern;
 use crate::util::AsyncHashMap;
 
 pub mod artifact;
@@ -46,50 +49,13 @@ pub mod config;
 pub mod file;
 pub mod property;
 
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ParticleLocation {
-    Unassigned,
-    Star(StarKey)
-}
-
-impl ToString for ParticleLocation {
-    fn to_string(&self) -> String {
-        match self {
-            ParticleLocation::Unassigned => {
-                "Unassigned".to_string()
-            }
-            ParticleLocation::Star(host) => {
-                host.to_string()
-            }
-        }
-    }
-}
-
-
-impl ParticleLocation {
-    pub fn new(star: StarKey) -> Self {
-        ParticleLocation::Star( star )
-    }
-    pub fn root() -> Self {
-        ParticleLocation::Star(StarKey::central())
-    }
-
-    pub fn ok_or(&self)->Result<StarKey,Error> {
-        match self {
-            ParticleLocation::Unassigned => {
-                Err("ResourceLocation is unassigned".into())
-            }
-            ParticleLocation::Star(star) => {
-                Ok(star.clone())
-            }
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct DisplayValue {
     string: String,
+}
+
+pub fn root_location() -> Location {
+    Location::new(StarKey::central().to_point() )
 }
 
 impl DisplayValue {
@@ -115,63 +81,6 @@ impl FromStr for DisplayValue {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(DisplayValue::new(s)?)
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ParticleRecord {
-    pub details: ParticleDetails,
-    pub location: ParticleLocation,
-}
-
-
-impl Default for ParticleRecord {
-    fn default() -> Self {
-        Self {
-            details: ParticleDetails {
-                stub: Stub {
-                    point: Point::root(),
-                    kind: Kind::Root.to_resource_kind(),
-                    status: Status::Ready
-                },
-                properties: Default::default()
-            },
-            location: ParticleLocation::Star(StarKey::central()),
-        }
-    }
-}
-
-
-
-
-impl ParticleRecord {
-    pub fn new(details: ParticleDetails, host: StarKey ) -> Self {
-        ParticleRecord {
-            details,
-            location: ParticleLocation::new(host),
-        }
-    }
-
-    pub fn root() -> Self {
-        Self {
-            details: ParticleDetails {
-                stub: Stub {
-                    point: Point::root(),
-                    kind: Kind::Root.to_resource_kind(),
-                    status: Status::Ready
-                },
-                properties: Default::default(),
-            },
-            location: ParticleLocation::Star(StarKey::central())
-        }
-    }
-
-
-}
-
-impl Into<Stub> for ParticleRecord {
-    fn into(self) -> Stub {
-        self.details.stub
     }
 }
 
@@ -254,10 +163,10 @@ impl TryFrom<String> for KindBase {
 }
 
 impl KindBase {
-    pub fn child_resource_registry_handler(&self) -> ChildResourceRegistryHandler {
+    pub fn child_resource_registry_handler(&self) -> ChildRegistry {
         match self {
-            Self::UserBase => ChildResourceRegistryHandler::Core,
-            _ => ChildResourceRegistryHandler::Shell
+            Self::UserBase => ChildRegistry::Core,
+            _ => ChildRegistry::Shell
         }
     }
 }
@@ -694,67 +603,23 @@ pub enum ArtifactSubKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Particle {
-    pub stub: Stub,
-    pub state: Payload,
-}
-
-impl Particle {
-    pub fn new(stub: Stub, state: Payload) -> Particle {
-        Particle {
-            stub,
-            state
-        }
-    }
-
-    pub fn point(&self) -> Point {
-        self.stub.point.clone()
-    }
-
-    pub fn state_src(&self) -> Payload {
-        self.state.clone()
-    }
-}
-
-/// can have other options like to Initialize the state data
-#[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
-pub enum AssignParticleStateSrc {
-    Stateless,
-    Direct(Payload),
-}
-
-
-#[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
-pub enum AssignKind {
-    Create,
-    // eventually we will have Move as well as Create
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ParticleAssign {
-    pub kind: AssignKind,
-    pub config: PointConfig<ParticleConfigBody>,
+pub struct Assign {
+    pub kind: AssignmentKind,
+    pub details: Details,
     pub state: StateSrc,
 }
 
 
-impl ParticleAssign {
+impl Assign {
 
-    pub fn new(kind: AssignKind, config: PointConfig<ParticleConfigBody>, state: StateSrc) -> Self {
+    pub fn new(kind: AssignmentKind, details: Details, state: StateSrc) -> Self {
         Self {
             kind,
-            config,
+            details,
             state
         }
     }
 
-}
-
-
-#[derive(Debug,Clone,Serialize,Deserialize,strum_macros::Display)]
-pub enum ChildResourceRegistryHandler {
-    Shell,
-    Core
 }
 
 lazy_static! {

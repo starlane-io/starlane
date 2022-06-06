@@ -8,9 +8,11 @@ use tokio::net::tcp::OwnedReadHalf;
 use tokio::net::{TcpListener, TcpStream};
 use crate::command::cli::CliServer;
 use crate::error::Error;
+use crate::message::StarlaneMessenger;
 use crate::starlane::api::StarlaneApi;
 use crate::starlane::StarlaneMachine;
 use crate::util::JwksCache;
+
 
 pub struct ServicesEndpoint {
   runner: ServicesEndpointRunner,
@@ -19,7 +21,7 @@ pub struct ServicesEndpoint {
 
 #[derive(Clone)]
 struct ServicesEndpointRunner {
-    api: StarlaneApi,
+    messenger: StarlaneMessenger,
     machine: StarlaneMachine,
     jwksCache: JwksCache
 }
@@ -28,10 +30,10 @@ struct ServicesEndpointRunner {
 impl ServicesEndpoint {
 
     pub async fn new( machine: StarlaneMachine, port: usize ) -> Result<(),Error> {
-        let api = machine.get_starlane_api().await?;
+        let messenger = StarlaneMessenger::new(machine.tx.clone());
         let runner = ServicesEndpointRunner {
                 jwksCache: JwksCache::new(api.clone()),
-                api,
+                messenger,
                 machine
             };
 

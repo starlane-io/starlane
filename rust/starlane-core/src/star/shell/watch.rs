@@ -6,12 +6,13 @@ use mysql::uuid::Uuid;
 use tokio::sync::{mpsc, oneshot};
 use tokio::sync::mpsc::Sender;
 use tokio::time::Duration;
+use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
 
 use crate::error::Error;
 use crate::frame::{Frame, ProtoFrame,  StarMessage, WatchFrame};
 use crate::lane::{LaneKey, LaneSession, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
-use crate::particle::ParticleRecord;
+use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 use crate::star::{StarKey, StarSkel};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::variant::FrameVerdict;
@@ -163,7 +164,7 @@ impl WatchComponent {
         match &selector.topic {
             Topic::Point(point) => {
                 let record = skel.registry_api.locate(&point).await?;
-                if skel.info.key == record.location.ok_or()?{
+                if skel.info.key.to_point() == record.location.ok_or()?{
                     Ok(NextKind::Core)
                 } else {
                     let lane = skel.golden_path_api.golden_lane_leading_to_star(record.location.ok_or()?).await?;

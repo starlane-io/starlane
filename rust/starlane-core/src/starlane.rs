@@ -15,7 +15,7 @@ use futures::future::join_all;
 use futures::{FutureExt, StreamExt, TryFutureExt};
 use mesh_portal::version::latest::frame::PrimitiveFrame;
 use mesh_portal_api_server::Portal;
-use mesh_portal::version::latest::id::Point;
+use mesh_portal::version::latest::id::{Point, Port};
 use mesh_portal::version::latest::path;
 use mesh_portal_tcp_client::PortalTcpClient;
 use mesh_portal_tcp_common::{FrameReader, FrameWriter, PrimitiveFrameReader, PrimitiveFrameWriter};
@@ -27,7 +27,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::net::tcp::OwnedReadHalf;
 use tokio::sync::oneshot;
 use tokio::sync::{broadcast, mpsc};
-use mesh_portal::version::latest::messaging::Agent;
+use mesh_portal::version::latest::messaging::{Agent, Response};
 use mesh_portal_versions::version::v0_0_1::id::id::ToPort;
 use mesh_portal_versions::version::v0_0_1::messaging::AsyncMessengerAgent;
 use crate::artifact::ArtifactRef;
@@ -51,7 +51,7 @@ use crate::registry::{Registry, RegistryApi};
 use crate::star::surface::SurfaceApi;
 use crate::star::{ConstellationBroadcast, StarKind, StarStatus};
 use crate::star::{Request, Star, StarCommand, StarController, StarInfo, StarKey, StarTemplateId};
-use crate::star::core::resource::driver::mechtron::MechtronPortalServer;
+use crate::star::core::particle::driver::mechtron::MechtronPortalServer;
 use crate::starlane::api::StarlaneApi;
 use crate::starlane::files::MachineFileSystem;
 use crate::template::{
@@ -78,7 +78,7 @@ lazy_static! {
 
 #[derive(Clone)]
 pub struct StarlaneMachine {
-    tx: mpsc::Sender<StarlaneCommand>,
+    pub tx: mpsc::Sender<StarlaneCommand>,
     run_complete_signal_tx: broadcast::Sender<()>,
     machine_filesystem: Arc<MachineFileSystem>,
     portals: Arc<DashMap<String,Portal>>,
@@ -117,7 +117,7 @@ impl StarlaneMachine {
         let run_complete_signal_tx = runner.run();
         let registry = Registry::new().await?;
         let registry = Arc::new(registry);
-        let global = GlobalApi::new( registry.clone() );
+        let global = GlobalApi::new( registry.clone(), Arc::new(StarlaneMessenger::new(tx.clone())) );
         let starlane = Self {
             tx: tx,
             run_complete_signal_tx: run_complete_signal_tx,
@@ -185,10 +185,10 @@ impl StarlaneMachine {
         rx.await?
     }
 
-    pub async fn get_starlane_api(&self) -> Result<StarlaneApi, Error> {
+    pub async fn get_starlane_api(&self, port: Port) -> Result<StarlaneApi, Error> {
         let (tx, rx) = oneshot::channel();
         self.tx
-            .send(StarlaneCommand::StarlaneApiSelectBest(tx))
+            .send(StarlaneCommand::StarlaneApiSelectBest{port,tx})
             .await?;
         rx.await?
     }
@@ -259,53 +259,57 @@ impl StarlaneMachineRunner {
         })
     }
 
-    pub async fn get_starlane_api(&self) -> Result<StarlaneApi, Error> {
-
-            let map = match self.star_controllers.clone().into_map().await {
-                Ok(map) => map,
-                Err(err) => {
-                    return Err(err);
-                }
-            };
-            if map.is_empty() {
-                return Err(
-                    "ERROR: cannot create StarlaneApi: no StarControllers available."
-                        .into(),
-                );
-            }
-            let values: Vec<StarController> =
-                map.into_iter().map(|(_k, v)| v).collect();
-
-            let mut best = Option::None;
-
-            for star_ctrl in values {
-                let info = star_ctrl.get_star_info().await.unwrap().unwrap();
-                if best.is_none() {
-                    best = Option::Some((info, star_ctrl));
-                } else {
-                    let (prev_info, _) = best.as_ref().unwrap();
-                    match info.kind {
-                        StarKind::Relay => {
-                            best = Option::Some((info, star_ctrl));
-                        }
-                        StarKind::Client => {
-                            if prev_info.kind != StarKind::Relay {
-                                best = Option::Some((info, star_ctrl));
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
-            let (info, star_ctrl) = best.unwrap();
-
+    pub async fn get_starlane_api(&self, port: Port ) -> Result<StarlaneApi, Error> {
         let messenger = StarlaneMessenger::new(
-            star_ctrl.surface_api,
+            self.command_tx.clone()
         );
-        let messenger = AsyncMessengerAgent::new(Agent::Anonymous, info.point.to_port(), Arc::new(messenger)  );
+        let messenger = AsyncMessengerAgent::new(Agent::Anonymous, port, Arc::new(messenger)  );
         let api = StarlaneApi::new(messenger);
         Ok(api)
+    }
+
+    async fn get_best_surface_api(&self) -> Result<SurfaceApi, Error> {
+
+        let map = match self.star_controllers.clone().into_map().await {
+            Ok(map) => map,
+            Err(err) => {
+                return Err(err);
+            }
+        };
+        if map.is_empty() {
+            return Err(
+                "ERROR: cannot create StarlaneApi: no StarControllers available."
+                    .into(),
+            );
+        }
+        let values: Vec<StarController> =
+            map.into_iter().map(|(_k, v)| v).collect();
+
+        let mut best = Option::None;
+
+        for star_ctrl in values {
+            let info = star_ctrl.get_star_info().await.unwrap().unwrap();
+            if best.is_none() {
+                best = Option::Some((info, star_ctrl));
+            } else {
+                let (prev_info, _) = best.as_ref().unwrap();
+                match info.kind {
+                    StarKind::Relay => {
+                        best = Option::Some((info, star_ctrl));
+                    }
+                    StarKind::Client => {
+                        if prev_info.kind != StarKind::Relay {
+                            best = Option::Some((info, star_ctrl));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        let (info, star_ctrl) = best.unwrap();
+
+        Ok(star_ctrl.surface_api.clone())
     }
 
 
@@ -324,6 +328,19 @@ impl StarlaneMachineRunner {
 
             while let Option::Some(command) = self.command_rx.recv().await {
                 match command {
+                    StarlaneCommand::Request { request, tx } => {
+                        match self.get_best_surface_api().await {
+                            Ok(surface_api) => {
+                                tokio::spawn( async move {
+                                    tx.send(surface_api.exchange(request).await);
+                                });
+                            }
+                            Err(err) => {
+                                error!("{}",err.to_string());
+                                tx.send(request.status(503));
+                            }
+                        }
+                    }
                     StarlaneCommand::ConstellationCreate(command) => {
                         let result = self
                             .constellation_create(command.layout, command.name, command.machine)
@@ -335,8 +352,8 @@ impl StarlaneMachineRunner {
                         }
                         command.tx.send(result);
                     }
-                    StarlaneCommand::StarlaneApiSelectBest(tx) =>{
-                        tx.send(self.get_starlane_api().await);
+                    StarlaneCommand::StarlaneApiSelectBest{ port, tx} =>{
+                        tx.send(self.get_starlane_api(port).await);
                     }
                     StarlaneCommand::Shutdown => {
                         let listening = {
@@ -456,7 +473,7 @@ impl StarlaneMachineRunner {
                 self.star_controllers.put(star_template_id, star_ctrl).await;
 
                 if self.artifact_caches.is_none() {
-                    let messenger = Arc::new(StarlaneMessenger::new(surface_api.clone()));
+                    let messenger = Arc::new(StarlaneMessenger::new(self.command_tx.clone()));
                     let messenger = AsyncMessengerAgent::new(Agent::Anonymous, star_key.into(),messenger );
                     let api = StarlaneApi::new(messenger);
 
@@ -646,7 +663,9 @@ impl StarlaneMachineRunner {
 
     async fn start_mechtron_portal_server(&mut self, result_tx: oneshot::Sender<Result<mpsc::Sender<TcpServerCall>,Error>>) {
         {
+            /*
             async fn process( runner: &mut StarlaneMachineRunner) -> Result<mpsc::Sender<TcpServerCall>,Error> {
+
                 let starlane_api = runner.get_starlane_api().await?;
                 let mut inner_flags = runner.inner_flags.lock().unwrap();
                 let flags = inner_flags.get_mut();
@@ -668,7 +687,10 @@ impl StarlaneMachineRunner {
                     Ok(server_tx)
                 }
             }
-            result_tx.send(process(self).await);
+
+             */
+           // result_tx.send(process(self).await);
+           unimplemented!()
         }
     }
     fn listen(&mut self, machine: StarlaneMachine, result_tx: oneshot::Sender<Result<(), Error>>) {
@@ -840,10 +862,11 @@ pub struct VersionFrame {
 #[derive(strum_macros::Display)]
 pub enum StarlaneCommand {
     ConstellationCreate(ConstellationCreate),
-    StarlaneApiSelectBest(oneshot::Sender<Result<StarlaneApi, Error>>),
+    StarlaneApiSelectBest{port: Port, tx: oneshot::Sender<Result<StarlaneApi, Error>>},
     Listen{ machine: StarlaneMachine, tx: oneshot::Sender<Result<(), Error>> },
     GetProtoArtifactCachesFactory(oneshot::Sender<Option<Arc<ProtoArtifactCachesFactory>>>),
     StartMechtronPortal(oneshot::Sender<Result<mpsc::Sender<TcpServerCall>,Error>>),
+    Request{ request: mesh_portal::version::latest::messaging::Request, tx: oneshot::Sender<mesh_portal::version::latest::messaging::Response>},
     Shutdown,
 }
 

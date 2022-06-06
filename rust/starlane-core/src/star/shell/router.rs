@@ -11,7 +11,7 @@ use crate::frame::{
 };
 use crate::lane::{LaneKey, LaneSession, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply};
-use crate::particle::ParticleRecord;
+use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 use crate::star::core::message::CoreMessageCall;
 use crate::star::variant::FrameVerdict;
 use crate::star::StarSkel;

@@ -8,12 +8,12 @@ use k8s::K8sCoreDriver;
 use crate::error::Error;
 use crate::message::delivery::Delivery;
 use crate::{particle};
-use crate::particle::{ParticleAssign, KindBase};
+use crate::particle::{Assign, KindBase};
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, Call, AsyncRunner};
-use crate::star::core::resource::driver::stateless::StatelessCoreDriver;
-use crate::star::core::resource::driver::mechtron::MechtronCoreDriver;
-use crate::star::core::resource::driver::file::{FileSystemManager, FileCoreManager};
+use crate::star::core::particle::driver::stateless::StatelessCoreDriver;
+use crate::star::core::particle::driver::mechtron::MechtronCoreDriver;
+use crate::star::core::particle::driver::file::{FileSystemManager, FileCoreManager};
 use std::collections::HashMap;
 use std::future::Future;
 use std::str::FromStr;
@@ -27,8 +27,8 @@ use mesh_portal::version::latest::payload::Payload;
 use mesh_portal::version::latest::particle::Stub;
 use mesh_portal_api_client::ResourceCommand;
 use mesh_portal_versions::version::v0_0_1::command::Command;
-use crate::star::core::resource::driver::artifact::ArtifactManager;
-use crate::star::core::resource::driver::user::UserBaseKeycloakCoreDriver;
+use crate::star::core::particle::driver::artifact::ArtifactManager;
+use crate::star::core::particle::driver::user::UserBaseKeycloakCoreDriver;
 
 mod stateless;
 pub mod artifact;
@@ -48,7 +48,7 @@ impl ResourceCoreDriverApi {
         Self { tx }
     }
 
-    pub async fn assign(&self, assign: ParticleAssign) -> Result<(),Error> {
+    pub async fn assign(&self, assign: Assign) -> Result<(),Error> {
         let (tx,rx) = oneshot::channel();
         self.tx.send(DriverCall::Assign{assign, tx }).await;
         rx.await?
@@ -78,7 +78,7 @@ println!("Manager mod RETURNING" );
 }
 
 pub enum DriverCall {
-    Assign{ assign: ParticleAssign, tx: oneshot::Sender<Result<(),Error>> },
+    Assign{ assign: Assign, tx: oneshot::Sender<Result<(),Error>> },
     Request { request: Request, tx: oneshot::Sender<Result<Response,Error>>},
     Get{ point: Point, tx: oneshot::Sender<Result<Payload,Error>>},
     Command { to: Point, command: Command, tx: oneshot::Sender<Result<Payload,Error>> }
@@ -153,9 +153,9 @@ impl AsyncProcessor<DriverCall> for ResourceCoreDriverComponent {
 
 impl ResourceCoreDriverComponent {
 
-    async fn assign(&mut self, assign: ParticleAssign, tx: oneshot::Sender<Result<(),Error>> ) {
+    async fn assign(&mut self, assign: Assign, tx: oneshot::Sender<Result<(),Error>> ) {
 
-       async fn process(manager_component: &mut ResourceCoreDriverComponent, assign: ParticleAssign) -> Result<(),Error> {
+       async fn process(manager_component: &mut ResourceCoreDriverComponent, assign: Assign) -> Result<(),Error> {
            let resource_type = KindBase::from_str(assign.config.stub.kind.to_string().as_str())?;
            let manager:&mut Box<dyn ParticleCoreDriver> = manager_component.drivers.get_mut(&resource_type ).ok_or(format!("could not get driver for {}", resource_type.to_string()))?;
            manager_component.resources.insert(assign.config.stub.point.clone(), resource_type );
@@ -257,7 +257,7 @@ pub trait ParticleCoreDriver: Send + Sync {
 
     async fn assign(
         &mut self,
-        assign: ParticleAssign,
+        assign: Assign,
     ) -> Result<(),Error>;
 
     async fn handle_request(&self, request: Request ) -> Response {

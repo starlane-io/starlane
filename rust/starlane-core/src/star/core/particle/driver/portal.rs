@@ -6,13 +6,13 @@ use yaml_rust::Yaml;
 
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
-use crate::particle::{ArtifactSubKind, KindBase, ParticleAssign, AssignParticleStateSrc};
-use crate::star::core::resource::driver::ParticleCoreDriver;
-use crate::star::core::resource::state::StateStore;
+use crate::particle::{ArtifactSubKind, KindBase, Assign};
+use crate::star::core::particle::driver::ParticleCoreDriver;
+use crate::star::core::particle::state::StateStore;
 use crate::star::StarSkel;
-use crate::watch::{Notification, Change, Topic, WatchSelector, Property};
+use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 use crate::message::delivery::Delivery;
-use crate::frame::{StarMessagePayload, StarMessage};
+use crate::frame::{StarMessage, StarMessagePayload};
 
 use std::str::FromStr;
 use std::sync::atomic::AtomicU32;
@@ -40,7 +40,7 @@ impl PortalCoreDriver {
 impl ParticleCoreDriver for PortalCoreDriver {
     async fn assign(
         &mut self,
-        assign: ParticleAssign,
+        assign: Assign,
     ) -> Result<(), Error> {
         let state = match assign.state {
             StateSrc::Payload(data) => data,

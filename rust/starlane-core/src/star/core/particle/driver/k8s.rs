@@ -8,8 +8,8 @@ use mesh_portal::version::latest::id::Point;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
-use crate::particle::{AssignParticleStateSrc, Kind, ParticleAssign, KindBase};
-use crate::star::core::resource::driver::ParticleCoreDriver;
+use crate::particle::{Kind, KindBase, Assign};
+use crate::star::core::particle::driver::ParticleCoreDriver;
 use crate::star::StarSkel;
 
 pub struct K8sCoreDriver {
@@ -42,8 +42,8 @@ impl K8sCoreDriver {
             }
         };
 
-        let starlane_api: Api<crate::star::core::resource::driver::k8s::Starlane> = Api::namespaced(client.clone(), namespace.as_str() );
-        let starlane: crate::star::core::resource::driver::k8s::Starlane =  match starlane_api.get(kubernetes_instance_name.as_str()).await {
+        let starlane_api: Api<crate::star::core::particle::driver::k8s::Starlane> = Api::namespaced(client.clone(), namespace.as_str() );
+        let starlane: crate::star::core::particle::driver::k8s::Starlane =  match starlane_api.get(kubernetes_instance_name.as_str()).await {
             Ok(starlane) => starlane,
             Err(_err) => {
                 let message = format!("FATAL: could not access Kubernetes starlane instance named '{}'", kubernetes_instance_name);
@@ -72,7 +72,7 @@ impl ParticleCoreDriver for K8sCoreDriver {
 
      async fn assign(
          &mut self,
-         assign: ParticleAssign,
+         assign: Assign,
         ) -> Result<(), Error> {
 
 println!("Assigning Kube Resource Host....");

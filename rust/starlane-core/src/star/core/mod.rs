@@ -1,2 +1,2 @@
 pub mod message;
-pub mod resource;
+pub mod particle;

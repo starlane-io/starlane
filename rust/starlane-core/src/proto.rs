@@ -41,7 +41,7 @@ use crate::starlane::StarlaneMachine;
 use crate::template::StarKeyConstellationIndex;
 use crate::star::shell::golden::{GoldenPathApi, GoldenPathComponent};
 use crate::star::shell::watch::{WatchApi, WatchComponent};
-use crate::star::core::resource::driver::ResourceCoreDriverApi;
+use crate::star::core::particle::driver::ResourceCoreDriverApi;
 use crate::star::shell::db::StarDB;
 
 

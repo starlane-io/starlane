@@ -6,20 +6,20 @@ use yaml_rust::Yaml;
 
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
-use crate::particle::{ArtifactSubKind, KindBase, ParticleAssign, AssignParticleStateSrc, Kind, FileSubKind};
-use crate::star::core::resource::driver::ParticleCoreDriver;
-use crate::star::core::resource::state::StateStore;
+use crate::particle::{ArtifactSubKind, FileSubKind, Kind, KindBase, Assign};
+use crate::star::core::particle::driver::ParticleCoreDriver;
+use crate::star::core::particle::state::StateStore;
 use crate::star::StarSkel;
-use crate::watch::{Notification, Change, Topic, WatchSelector, Property};
+use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 use crate::message::delivery::Delivery;
-use crate::frame::{StarMessagePayload, StarMessage};
+use crate::frame::{StarMessage, StarMessagePayload};
 
 use std::str::FromStr;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
 use mesh_portal::version::latest::command::request::CmdMethod;
-use mesh_portal::version::latest::entity::request::create::{PointSegFactory, PointTemplate, Create, KindTemplate, Strategy, Template};
+use mesh_portal::version::latest::entity::request::create::{Create, KindTemplate, PointSegFactory, PointTemplate, Strategy, Template};
 use mesh_portal::version::latest::entity::request::{Method, Rc, RequestCore};
-use mesh_portal::version::latest::id::{Point, AddressAndKind, KindParts};
+use mesh_portal::version::latest::id::{AddressAndKind, KindParts, Point};
 use mesh_portal::version::latest::messaging::Request;
 use mesh_portal_versions::version::v0_0_1::messaging::ProtoRequest;
 
@@ -42,7 +42,7 @@ impl FileCoreManager {
 impl ParticleCoreDriver for FileCoreManager {
     async fn assign(
         &mut self,
-        assign: ParticleAssign,
+        assign: Assign,
     ) -> Result<(), Error> {
 
         let kind : Kind = TryFrom::try_from(assign.config.stub.kind)?;
@@ -111,7 +111,7 @@ impl ParticleCoreDriver for FileSystemManager {
 
     async fn assign(
         &mut self,
-        assign: ParticleAssign,
+        assign: Assign,
     ) -> Result<(), Error> {
         match assign.state {
             StateSrc::None => {}
@@ -140,7 +140,7 @@ impl ParticleCoreDriver for FileSystemManager {
             };
 
             let request :RequestCore= create.into();
-            let request = Request::new(request, assign.config.stub.point.clone(), Point::registry() );
+            let request = Request::new(request, assign.config.stub.point.clone(), Point::global_executor() );
             skel.messaging_api.request(request).await;
         });
         Ok(())

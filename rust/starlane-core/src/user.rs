@@ -7,8 +7,8 @@ use crate::message::delivery::Delivery;
 use crate::star::StarKey;
 
 lazy_static! {
-    pub static ref HYPERUSER: &'static str ="hyperspace:users:hyperuser";
-    pub static ref HYPER_USERBASE: &'static str ="hyperspace:users";
+    pub static ref HYPERUSER: &'static Point = &Point::from_str("hyperspace:users:hyperuser").unwrap();
+    pub static ref HYPER_USERBASE: &'static Point = &Point::from_str("hyperspace:users").unwrap();
 }
 
 pub struct HyperUser {
@@ -16,8 +16,8 @@ pub struct HyperUser {
 }
 
 impl HyperUser {
-    pub fn address() -> Point {
-        Point::from_str(&HYPERUSER).expect("should be a valid hyperuser address")
+    pub fn point() -> Point {
+        HYPERUSER.clone()
     }
 
     /*

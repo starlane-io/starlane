@@ -11,11 +11,11 @@ use tokio::time::Duration;
 
 use crate::error::Error;
 use crate::message::ProtoStarMessage;
-use crate::particle::{ParticleRecord, KindBase, Kind};
+use crate::particle::{Kind, KindBase};
 use crate::star::{StarCommand, StarSkel};
 use crate::util;
 use crate::fail::Fail;
-use crate::frame::{StarMessage, StarMessagePayload, SimpleReply};
+use crate::frame::{SimpleReply, StarMessage, StarMessagePayload};
 use mesh_portal::version::latest::util::uuid;
 use crate::message::Reply;
 use std::ops::Deref;
@@ -29,6 +29,7 @@ use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
 use mesh_portal_versions::version::v0_0_1::messaging::Method;
 use mesh_portal_versions::version::v0_0_1::parse::model::Subst;
 use mesh_portal_versions::version::v0_0_1::payload::payload::HttpCall;
+use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 
 pub struct Delivery<M>
 where

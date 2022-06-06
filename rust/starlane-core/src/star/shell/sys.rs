@@ -5,15 +5,16 @@ use mesh_portal::version::latest::entity::request::create::{PointSegFactory, Tem
 use mesh_portal::version::latest::fail;
 use mesh_portal::version::latest::id::{Point, RouteSegment};
 use mesh_portal::version::latest::messaging::{Message, Request};
-use mesh_portal::version::latest::particle::{Stub, Status};
+use mesh_portal::version::latest::particle::{Status, Stub};
 use mesh_portal::version::latest::security::Permissions;
-use mesh_portal_versions::version::v0_0_1::particle::particle::ParticleDetails;
+use mesh_portal_versions::version::v0_0_1::particle::particle::Details;
 use tokio::sync::{mpsc, oneshot};
+use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
+use mesh_portal_versions::version::v0_0_1::sys::{Location, ParticleRecord};
 use crate::error::Error;
 use crate::fail::{Fail, StarlaneFailure};
 use crate::frame::{StarMessage, StarMessagePayload};
 use crate::message::delivery::Delivery;
-use crate::particle::{ParticleLocation, ParticleRecord};
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
@@ -169,11 +170,11 @@ impl AsyncProcessor<SysCall> for SysComponent {
                     }
                     Some(resource) => {
                         let record = ParticleRecord {
-                            details: ParticleDetails {
+                            details: Details {
                                 stub: resource.stub.clone(),
                                 properties: Default::default(),
                             },
-                            location: ParticleLocation::Star(self.skel.info.key.clone()),
+                            location: Location::Somewhere(self.skel.info.key.clone().to_point()),
                         };
                         tx.send(Ok(record));
                     }

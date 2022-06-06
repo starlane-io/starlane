@@ -78,7 +78,7 @@ impl AsyncProcessor<VariantCall> for WebVariant {
 
 impl WebVariant {
     fn init_web(&self, tx: tokio::sync::oneshot::Sender<Result<(), crate::error::Error>>) {
-        let messenger = StarlaneMessenger::new(self.skel.surface_api.clone());
+        let messenger = StarlaneMessenger::new(self.skel.machine.tx.clone());
 
         start(messenger, self.skel.clone());
 

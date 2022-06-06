@@ -28,10 +28,10 @@ use serde_json::{json, Value};
 use validator::validate_email;
 use mesh_portal_versions::version::v0_0_1::command::Command;
 use crate::error::Error;
-use crate::particle::{Kind, KindBase, ParticleAssign};
+use crate::particle::{Kind, KindBase, Assign};
 use crate::particle::property::{PointPattern, AnythingPattern, BoolPattern, EmailPattern, PropertiesConfig, PropertyPattern, PropertyPermit, PropertySource};
 use crate::registry::{match_kind};
-use crate::star::core::resource::driver::ParticleCoreDriver;
+use crate::star::core::particle::driver::ParticleCoreDriver;
 use crate::star::StarSkel;
 
 
@@ -87,7 +87,7 @@ impl ParticleCoreDriver for UserBaseKeycloakCoreDriver {
 
     async fn assign(
         &mut self,
-        assign: ParticleAssign,
+        assign: Assign,
     ) -> Result<(), Error> {
         match assign.state {
             StateSrc::None=> {
@@ -225,7 +225,6 @@ println!("UserBaseKeycloakCoreDriver: handle_http");
     }
 
     async fn handle_login( &self, request: &Request ) -> Result<ResponseCore,Error>{
-println!("handle_login");
         let multipart: Vec<(String,String)> = serde_urlencoded::from_bytes(request.core.body.clone().to_bin()?.as_bytes() )?;
         let mut map = HashMap::new();
         for (key,value) in multipart {
@@ -495,7 +494,7 @@ impl ParticleCoreDriver for UserCoreDriver {
 
     async fn assign(
         &mut self,
-        assign: ParticleAssign,
+        assign: Assign,
     ) -> Result<(), Error> {
         match assign.state {
             StateSrc::None => {

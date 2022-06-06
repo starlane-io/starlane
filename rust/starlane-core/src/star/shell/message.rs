@@ -9,7 +9,7 @@ use tokio::time::Instant;
 use crate::error::Error;
 use crate::frame::{ SimpleReply, StarMessage, StarMessagePayload};
 use crate::message::{MessageExpect, ProtoStarMessage, ProtoStarMessageTo, MessageId, ReplyKind, Reply};
-use crate::particle::ParticleRecord;
+use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 use crate::star::{StarSkel, StarKey};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::fail::{Fail, StarlaneFailure};

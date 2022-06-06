@@ -19,6 +19,7 @@ use tokio::runtime::Handle;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use wasmer::{Cranelift, Store, Universal};
 use mesh_portal::version::latest::payload::Payload;
+use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 
 use crate::artifact::ArtifactRef;
 use crate::bindex::BindConfigCache;
@@ -31,7 +32,7 @@ use crate::file_access::FileAccess;
 use crate::message::StarlaneMessenger;
 use crate::particle::config::Parser;
 use crate::particle::ArtifactSubKind;
-use crate::particle::{BaseSubKind, Kind, ParticleRecord};
+use crate::particle::{BaseSubKind, Kind};
 use crate::starlane::api::StarlaneApi;
 use crate::starlane::StarlaneMachine;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};

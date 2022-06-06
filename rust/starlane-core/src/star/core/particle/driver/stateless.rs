@@ -2,9 +2,9 @@ use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::id::Point;
 
 use crate::error::Error;
-use crate::particle::{ParticleAssign, KindBase};
-use crate::star::core::resource::driver::ParticleCoreDriver;
-use crate::star::core::resource::state::StateStore;
+use crate::particle::{Assign, KindBase};
+use crate::star::core::particle::driver::ParticleCoreDriver;
+use crate::star::core::particle::state::StateStore;
 use crate::star::StarSkel;
 
 #[derive(Debug)]
@@ -32,7 +32,7 @@ impl ParticleCoreDriver for StatelessCoreDriver {
 
     async fn assign(
         &mut self,
-        assign: ParticleAssign,
+        assign: Assign,
     ) -> Result<(), Error> {
         match assign.state {
             StateSrc::None=> {

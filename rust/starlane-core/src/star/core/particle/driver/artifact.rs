@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::fs::File;
 use std::io::{Read, Write};
@@ -10,20 +10,20 @@ use std::sync::Arc;
 use tempdir::TempDir;
 use tokio::sync::Mutex;
 
-use crate::particle::{KindBase, AssignParticleStateSrc, ParticleAssign, Kind, ArtifactSubKind};
-use crate::star::core::resource::driver::ParticleCoreDriver;
-use crate::star::core::resource::state::StateStore;
+use crate::particle::{ArtifactSubKind, Kind, KindBase, Assign};
+use crate::star::core::particle::driver::ParticleCoreDriver;
+use crate::star::core::particle::state::StateStore;
 use crate::star::StarSkel;
 use crate::util;
 use crate::error::Error;
 
 use crate::message::delivery::Delivery;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
-use mesh_portal::version::latest::entity::request::create::{PointSegFactory, PointTemplate, Create, KindTemplate, Strategy, Template};
+use mesh_portal::version::latest::entity::request::create::{Create, KindTemplate, PointSegFactory, PointTemplate, Strategy, Template};
 use mesh_portal::version::latest::entity::request::{Method, Rc};
-use mesh_portal::version::latest::id::{Point, AddressAndKind, KindParts, RouteSegment};
+use mesh_portal::version::latest::id::{AddressAndKind, KindParts, Point, RouteSegment};
 use mesh_portal::version::latest::messaging::Request;
-use mesh_portal::version::latest::payload::{Payload};
+use mesh_portal::version::latest::payload::Payload;
 use zip::result::ZipResult;
 use crate::file_access::FileAccess;
 
@@ -77,7 +77,7 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
 
     async fn assign(
         &mut self,
-        assign: ParticleAssign,
+        assign: Assign,
     ) -> Result<(), Error> {
         let state = match &assign.state {
             StateSrc::Payload(data) => {
@@ -257,7 +257,7 @@ impl ParticleCoreDriver for ArtifactManager{
 
     async fn assign(
         &mut self,
-        assign: ParticleAssign,
+        assign: Assign,
     ) -> Result<(), Error> {
         let kind : Kind = TryFrom::try_from(assign.config.stub.kind)?;
         if let Kind::Artifact(artifact_kind) = kind

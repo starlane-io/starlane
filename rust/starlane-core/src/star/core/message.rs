@@ -13,8 +13,8 @@ use crate::frame::{
 
 use crate::message::delivery::Delivery;
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
-use crate::particle::{ArtifactSubKind, ChildResourceRegistryHandler, FileSubKind, Kind, KindBase, ParticleLocation, UserBaseSubKind};
-use crate::particle::{AssignKind, ParticleAssign, ParticleRecord};
+use crate::particle::{ArtifactSubKind, FileSubKind, Kind, KindBase, UserBaseSubKind};
+use crate::particle::Assign;
 use crate::star::{StarCommand, StarKey, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use mesh_portal::version::latest::fail::BadRequest;
@@ -39,18 +39,20 @@ use mesh_portal::version::latest::entity::response::ResponseCore;
 use mesh_portal::version::latest::id::Tks;
 use mesh_portal::version::latest::payload::CallKind;
 use mesh_portal::version::latest::security::Access;
-use mesh_portal_versions::version::v0_0_1::particle::particle::ParticleDetails;
+use mesh_portal_versions::version::v0_0_1::particle::particle::Details;
 use regex::Regex;
 use serde::de::Unexpected::Str;
 use mesh_portal::version::latest::command::request::CmdMethod;
 use mesh_portal::version::latest::config::bind::BindConfig;
 use mesh_portal_versions::version::v0_0_1::command::Command;
+use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
+use mesh_portal_versions::version::v0_0_1::sys::{AssignmentKind, ChildRegistry, Location, ParticleRecord};
 use crate::artifact::ArtifactRef;
 use crate::bindex::{BindConfigCache, BindEx, BindExRouter, RegistryApi};
 use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
 use crate::config::config::{ContextualConfig, ParticleConfig};
-use crate::registry::{RegError, Registration };
-use crate::star::core::resource::driver::{ResourceCoreDriverApi, ResourceCoreDriverComponent};
+use crate::registry::{RegError, Registration};
+use crate::star::core::particle::driver::{ResourceCoreDriverApi, ResourceCoreDriverComponent};
 use crate::star::shell::db::{StarFieldSelection, StarSelector};
 
 
@@ -231,7 +233,7 @@ impl MessagingEndpointComponentInner {
                 }
 
                 match kind.kind().child_resource_registry_handler() {
-                    ChildResourceRegistryHandler::Shell => {
+                    ChildRegistry::Shell => {
                         match &command{
                             Command::Create(create) => {
 
@@ -240,7 +242,7 @@ impl MessagingEndpointComponentInner {
 
                                 async fn assign(
                                     skel: StarSkel,
-                                    details: ParticleDetails,
+                                    details: Details,
                                     state: StateSrc,
                                 ) -> Result<(), Error> {
 
@@ -254,11 +256,11 @@ impl MessagingEndpointComponentInner {
                                         let wrangle = skel.star_db.next_wrangle(star_selector).await?;
                                         wrangle.key
                                     };
-                                    skel.registry_api.assign(&details.stub.point, &key).await?;
+                                    skel.registry_api.assign(&details.stub.point, &key.clone().to_point()).await?;
 
                                     let mut proto = ProtoStarMessage::new();
                                     proto.to(ProtoStarMessageTo::Star(key.clone()));
-                                    let assign = ParticleAssign::new(AssignKind::Create, details.clone(), state);
+                                    let assign = Assign::new(AssignmentKind::Create, details.clone(), state);
                                     proto.payload = StarMessagePayload::ResourceHost(
                                         ResourceHostAction::Assign(assign),
                                     );
@@ -296,7 +298,7 @@ impl MessagingEndpointComponentInner {
                             }
                        }
                     }
-                    ChildResourceRegistryHandler::Core => {
+                    ChildRegistry::Core => {
                         resource_core_driver_api.command(to.clone(), command.clone() ).await
                     }
                 }

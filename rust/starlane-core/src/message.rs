@@ -9,17 +9,19 @@ use mesh_portal::version::latest::payload::Payload;
 use mesh_portal::version::latest::particle::Stub;
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast, oneshot};
+use tokio::sync::{broadcast, mpsc, oneshot};
 use uuid::Uuid;
 use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
 use mesh_portal_versions::version::v0_0_1::messaging::AsyncMessenger;
+use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 
 use crate::error::Error;
-use crate::particle::{Kind, KindBase, ParticleRecord};
+use crate::particle::{Kind, KindBase};
 use crate::star::{StarCommand, StarKey};
 use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
-use crate::frame::{StarMessagePayload, StarMessage, SimpleReply, MessageAck};
+use crate::frame::{MessageAck, SimpleReply, StarMessage, StarMessagePayload};
 use crate::star::surface::SurfaceApi;
+use crate::starlane::StarlaneCommand;
 
 pub mod delivery;
 
@@ -363,13 +365,13 @@ impl From<Response> for ProtoStarMessage {
 
 #[derive(Clone)]
 pub struct StarlaneMessenger {
-  surface_api: SurfaceApi
+    tx: mpsc::Sender<StarlaneCommand>,
 }
 
 impl StarlaneMessenger {
-    pub fn new( surface_api: SurfaceApi ) -> Self {
+    pub fn new( tx: mpsc::Sender<StarlaneCommand>) -> Self {
         Self {
-            surface_api
+            tx
         }
     }
 }
@@ -377,13 +379,29 @@ impl StarlaneMessenger {
 #[async_trait]
 impl AsyncMessenger for StarlaneMessenger {
     async fn send(&self, request: mesh_portal_versions::version::v0_0_1::messaging::Request) -> mesh_portal_versions::version::v0_0_1::messaging::Response {
-        self.surface_api.exchange(request).await
+        let (tx,rx) = oneshot::channel();
+        self.tx.send( StarlaneCommand::Request { request: request.clone(), tx }).await;
+        match rx.await {
+            Ok(response) => response,
+            Err(err) => {
+                error!("{}",err.to_string() );
+                request.status(503)
+            }
+        }
     }
 
     fn send_sync(&self, request: mesh_portal_versions::version::v0_0_1::messaging::Request) -> mesh_portal_versions::version::v0_0_1::messaging::Response {
-        let surface_api = self.surface_api.clone();
+        let starlane_tx = self.tx.clone();
         tokio::runtime::Handle::current().block_on( async move {
-            self.surface_api.exchange(request).await
+            let (tx,rx) = oneshot::channel();
+            starlane_tx.send( StarlaneCommand::Request { request: request.clone(), tx }).await;
+            match rx.await {
+                Ok(response) => response,
+                Err(err) => {
+                    error!("{}",err.to_string() );
+                    request.status(503)
+                }
+            }
         } )
     }
 }

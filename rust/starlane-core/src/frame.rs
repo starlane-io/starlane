@@ -7,16 +7,17 @@ use semver::SemVerError;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time::error::Elapsed;
+use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 
 
 use crate::error::Error;
 use crate::id::Id;
 use crate::logger::Flags;
-use crate::message::{MessageExpect, MessageUpdate, ProtoStarMessage, MessageId, Reply};
+use crate::message::{MessageExpect, MessageId, MessageUpdate, ProtoStarMessage, Reply};
 use crate::message::delivery::ActorMessage;
-use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify };
+use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify};
 use crate::watch::{Notification, Watch, WatchKey};
-use crate::particle::{KindBase, ParticleAssign, AssignParticleStateSrc, ParticleRecord};
+use crate::particle::{KindBase, Assign};
 use crate::fail::{Fail, StarlaneFailure};
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
@@ -360,7 +361,7 @@ pub enum MessagePayload {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum ResourceHostAction {
     //IsHosting(Address),
-    Assign(ParticleAssign),
+    Assign(Assign),
     Init(Point),
     GetState(Point)
 }

@@ -2,10 +2,9 @@ use crate::error::Error;
 use crate::frame::{ResourceHostAction, StarMessagePayload};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
 use crate::particle::{
-    ArtifactSubKind, BaseSubKind, FileSubKind, Kind, KindBase, ParticleLocation, ParticleRecord,
+    ArtifactSubKind, BaseSubKind, FileSubKind, Kind, KindBase,
     UserBaseSubKind,
 };
-use crate::star::{StarKey, StarSkel};
 use futures::{FutureExt, StreamExt};
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties, SetRegistry};
@@ -28,7 +27,7 @@ use mesh_portal::version::latest::selector::{
     PointSegSelector, PointSelector,
 };
 use mesh_portal::version::latest::util::ValuePattern;
-use mesh_portal_versions::version::v0_0_1::particle::particle::ParticleDetails;
+use mesh_portal_versions::version::v0_0_1::particle::particle::Details;
 use mesh_portal_versions::version::v0_0_1::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask,
     PermissionsMaskKind, Privilege, Privileges,
@@ -48,6 +47,7 @@ use mesh_portal_versions::version::v0_0_1::command::request::delete::Delete;
 use mesh_portal_versions::version::v0_0_1::command::request::select::{SelectKind, SubSelect};
 use tokio::sync::mpsc;
 use mesh_portal::version::latest::payload::{Payload, PayloadMap, PrimitiveList};
+use mesh_portal_versions::version::v0_0_1::sys::{Location, ParticleRecord};
 use crate::databases::lookup_registry_db;
 
 lazy_static! {
@@ -100,7 +100,7 @@ impl Registry {
          variant TEXT,
          version TEXT,
          version_variant TEXT,
-         star TEXT,
+         location TEXT,
          status TEXT NOT NULL,
          sequence INTEGER DEFAULT 0,
          owner TEXT,
@@ -185,7 +185,7 @@ impl Registry {
         Ok(())
     }
 
-    pub async fn register(&self, registration: &Registration) -> Result<ParticleDetails, RegError> {
+    pub async fn register(&self, registration: &Registration) -> Result<Details, RegError> {
         /*
         async fn check<'a>( registration: &Registration,  trans:&mut Transaction<Postgres>, ) -> Result<(),RegError> {
             let params = RegistryParams::from_registration(registration)?;
@@ -242,7 +242,7 @@ impl Registry {
             }
         }
         trans.commit().await?;
-        Ok(ParticleDetails {
+        Ok(Details {
             stub: Stub {
                 point: registration.point.clone(),
                 kind: registration.kind.clone().into(),
@@ -252,7 +252,7 @@ impl Registry {
         })
     }
 
-    pub async fn assign(&self, point: &Point, host: &StarKey) -> Result<(), Error> {
+    pub async fn assign(&self, point: &Point, location: &Point) -> Result<(), Error> {
         let parent = point
             .parent()
             .ok_or("expecting parent since we have already established the segments are >= 2")?;
@@ -260,8 +260,8 @@ impl Registry {
             .last_segment()
             .ok_or("expecting a last_segment since we know segments are >= 2")?;
         let statement = format!(
-            "UPDATE particles SET star='{}' WHERE parent='{}' AND point_segment='{}'",
-            host.to_string(),
+            "UPDATE particles SET location='{}' WHERE parent='{}' AND point_segment='{}'",
+            location.to_string(),
             parent.to_string(),
             point_segment.to_string()
         );
@@ -398,13 +398,14 @@ impl Registry {
             .ok_or("expected last point_segment")?
             .to_string();
 
-        let mut record = sqlx::query_as::<Postgres, ParticleRecord>(
+        let mut record = sqlx::query_as::<Postgres, StarlaneParticleRecord>(
             "SELECT DISTINCT * FROM particles as r WHERE parent=$1 AND point_segment=$2",
         )
         .bind(parent.to_string())
         .bind(point_segment.clone())
         .fetch_one(&mut conn)
         .await?;
+        let mut record:ParticleRecord = record.into();
         let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut conn).await?;
         let mut map = HashMap::new();
         for p in properties {
@@ -577,13 +578,15 @@ impl Registry {
         );
 
         let mut query =
-            sqlx::query_as::<Postgres, ParticleRecord>(matching_so_far_statement.as_str());
+            sqlx::query_as::<Postgres, StarlaneParticleRecord>(matching_so_far_statement.as_str());
         for param in params {
             query = query.bind(param);
         }
 
         let mut conn = self.pool.acquire().await?;
         let mut matching_so_far = query.fetch_all(&mut conn).await?;
+
+        let mut matching_so_far:Vec<ParticleRecord> = matching_so_far.into_iter().map(|m|m.into()).collect();
         let mut matching_so_far: Vec<Stub> =
             matching_so_far.into_iter().map(|r| r.into()).collect();
 
@@ -1045,9 +1048,24 @@ impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
     }
 }
 
-impl sqlx::FromRow<'_, PgRow> for ParticleRecord {
+struct StarlaneParticleRecord {
+    pub details: Details,
+    pub location: Location,
+}
+
+impl Into<ParticleRecord> for StarlaneParticleRecord {
+    fn into(self) -> ParticleRecord {
+        ParticleRecord {
+            details: self.details,
+            location: self.location
+        }
+    }
+}
+
+
+impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
-        fn wrap(row: &PgRow) -> Result<ParticleRecord, Error> {
+        fn wrap(row: &PgRow) -> Result<StarlaneParticleRecord, Error> {
             let parent: String = row.get("parent");
             let point_segment: String = row.get("point_segment");
             let resource_type: String = row.get("resource_type");
@@ -1057,7 +1075,7 @@ impl sqlx::FromRow<'_, PgRow> for ParticleRecord {
             let variant: Option<String> = row.get("variant");
             let version: Option<String> = row.get("version");
             let version_variant: Option<String> = row.get("version_variant");
-            let star: Option<String> = row.get("star");
+            let location: Option<String> = row.get("location");
             let status: String = row.get("status");
 
             let point = Point::from_str(parent.as_str())?;
@@ -1095,9 +1113,9 @@ impl sqlx::FromRow<'_, PgRow> for ParticleRecord {
             };
 
             let kind = Kind::from(resource_type, kind, specific)?;
-            let location = match star {
-                Some(star) => ParticleLocation::Star(StarKey::from_str(star.as_str())?),
-                None => ParticleLocation::Unassigned,
+            let location = match location {
+                Some(location) => Location::Somewhere(Point::from_str(location.as_str())?),
+                None => Location::Nowhere,
             };
             let status = Status::from_str(status.as_str())?;
 
@@ -1107,12 +1125,12 @@ impl sqlx::FromRow<'_, PgRow> for ParticleRecord {
                 status,
             };
 
-            let details = ParticleDetails {
+            let details = Details {
                 stub,
                 properties: Default::default(), // not implemented yet...
             };
 
-            let record = ParticleRecord { details, location };
+            let record = StarlaneParticleRecord { details, location };
 
             Ok(record)
         }
@@ -1132,7 +1150,6 @@ pub mod test {
     use crate::error::Error;
     use crate::particle::{Kind, UserBaseSubKind};
     use crate::registry::{Registration, Registry};
-    use crate::star::StarKey;
     use mesh_portal::version::latest::entity::request::query::Query;
     use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoPayload};
     use mesh_portal::version::latest::id::Point;
@@ -1147,6 +1164,7 @@ pub mod test {
     use std::convert::TryInto;
     use std::str::FromStr;
     use mesh_portal_versions::version::v0_0_1::command::request::select::SelectKind;
+    use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
 
     #[tokio::test]
     pub async fn test_nuke() -> Result<(), Error> {
@@ -1181,8 +1199,8 @@ pub mod test {
         };
         registry.register(&registration).await?;
 
-        let star = StarKey::central();
-        registry.assign(&point, &star).await?;
+        let location = StarKey::central().to_point();
+        registry.assign(&point, &location ).await?;
         registry.set_status(&point, &Status::Ready).await?;
         registry.sequence(&point).await?;
         let record = registry.locate(&point).await?;
@@ -1690,7 +1708,7 @@ impl Registry {
         }
     }
 
-    pub async fn create(&self, create: &Create) -> Result<ParticleDetails, Error> {
+    pub async fn create(&self, create: &Create) -> Result<Details, Error> {
         let child_kind = match_kind(&create.template.kind)?;
         let stub = match &create.template.point.child_segment_template {
             PointSegFactory::Exact(child_segment) => {

@@ -7,15 +7,15 @@ use std::time::Duration;
 use anyhow::anyhow;
 use dashmap::DashMap;
 use dashmap::mapref::one::Ref;
-use mesh_portal_api_server::{Portal, PortalApi, PortalEvent, PortalRequestHandler, PortalParticleApi};
+use mesh_portal_api_server::{Portal, PortalApi, PortalEvent, PortalParticleApi, PortalRequestHandler};
 use mesh_portal::version::latest::artifact::{ArtifactRequest, ArtifactResponse};
 
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
-use crate::particle::{ArtifactSubKind, KindBase, ParticleAssign, AssignParticleStateSrc, Kind, AssignKind};
-use crate::star::core::resource::driver::ParticleCoreDriver;
-use crate::star::core::resource::state::StateStore;
-use crate::star::{StarSkel};
+use crate::particle::{ArtifactSubKind, Kind, KindBase, Assign};
+use crate::star::core::particle::driver::ParticleCoreDriver;
+use crate::star::core::particle::state::StateStore;
+use crate::star::StarSkel;
 use crate::util::AsyncHashMap;
 use crate::message::delivery::Delivery;
 use mesh_portal::version::latest::command::common::StateSrc;
@@ -32,14 +32,15 @@ use tokio::sync::broadcast::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot::error::RecvError;
 use mesh_portal::version::latest::config::{ParticleConfigBody, PointConfig};
-use mesh_portal_versions::version::v0_0_1::particle::particle::ParticleDetails;
+use mesh_portal_versions::version::v0_0_1::messaging::AsyncMessenger;
+use mesh_portal_versions::version::v0_0_1::particle::particle::Details;
 
 use crate::config::config::{MechtronConfig, ParticleConfig};
 
 use crate::fail::Fail;
 use crate::mechtron::process::launch_mechtron_process;
 use crate::message::{Reply, StarlaneMessenger};
-use crate::star::core::resource::driver::DriverCall::Assign;
+use crate::star::core::particle::driver::DriverCall::Assign;
 use crate::starlane::api::StarlaneApi;
 
 
@@ -80,7 +81,7 @@ impl MechtronCoreDriver {
                                 }
                                 PortalEvent::ParticleAdded(resource) => {
 
-println!("Particle ADDDED: '{}'", resource.stub.point.to_string() );
+println!("Particle ADDED: '{}'", resource.stub.point.to_string() );
                                     let point = resource.stub.point.clone();
                                     inner.mechtrons.insert( point.clone() , resource.clone() );
                                     if let Some(exchanges) = inner.mechtron_exchange.remove( &point ) {
@@ -127,7 +128,7 @@ impl ParticleCoreDriver for MechtronCoreDriver {
 
     async fn assign(
         &mut self,
-        assign: ParticleAssign,
+        assign: Assign,
     ) -> Result<(), Error> {
         match assign.state {
             StateSrc::None => {}
@@ -156,7 +157,7 @@ println!("MECHTRON: got config" );
 println!("MechtronConfig.wasm_src().is_ok() {}", config.wasm_src().is_ok() );
 println!("MechtronConfig.wasm_src() {}", config.wasm_src()?.to_string() );
 
-        let api = StarlaneMessenger::new( self.skel.surface_api.clone() );
+        let api = StarlaneMessenger::new( self.skel.machine.tx.clone() );
         let substitution_map = config.substitution_map()?;
         for command_line in &config.install {
 //            let command_line = substitute(command_line.as_str(), &substitution_map)?;
@@ -192,7 +193,7 @@ println!("MechtronConfig.wasm_src() {}", config.wasm_src()?.to_string() );
 
         let portal = portal_rx.await?;
 
-        let portal_assign = ParticleAssign{
+        let portal_assign = Assign {
             kind: AssignKind::Create,
             config: PointConfig{
                 body: ParticleConfigBody::Named(config.mechtron_name()?),
@@ -296,15 +297,15 @@ impl MechtronManagerInner {
 }
 
 pub struct MechtronPortalServer {
-    pub api: StarlaneApi,
+    pub messenger: Arc<dyn AsyncMessenger>,
     pub request_assign_handler: Arc<dyn PortalRequestHandler>,
     portals: Arc<DashMap<String, Portal>>,
 }
 
 impl MechtronPortalServer {
-    pub fn new(api: StarlaneApi) -> Self {
+    pub fn new(messenger: Arc<dyn AsyncMessenger>) -> Self {
         Self {
-            api: api.clone(),
+            messenger,
             request_assign_handler: Arc::new(MechtronPortalRequestHandler::new(api) ),
             portals: Arc::new(DashMap::new() ),
         }
@@ -338,13 +339,13 @@ fn test_logger(message: &str) {
 
 
 pub struct MechtronPortalRequestHandler {
-    api: StarlaneApi
+    messenger: Arc<dyn AsyncMessenger>
 }
 
 impl MechtronPortalRequestHandler {
-    pub fn new(api: StarlaneApi)-> Self {
+    pub fn new(messenger: Arc<dyn AsyncMessenger>)-> Self {
         MechtronPortalRequestHandler {
-            api
+            messenger
         }
     }
 }
@@ -352,7 +353,7 @@ impl MechtronPortalRequestHandler {
 #[async_trait]
 impl PortalRequestHandler for MechtronPortalRequestHandler {
     async fn route_to_mesh(&self, request: Request) -> Response {
-        self.api.exchange(request).await
+        self.messenger.send(request).await
     }
 
     async fn handle_artifact_request(
@@ -364,7 +365,7 @@ impl PortalRequestHandler for MechtronPortalRequestHandler {
             point: request.point.clone(),
             kind: ArtifactSubKind::Raw
         };
-        let caches = self.api.cache( &artifact_ref).await?;
+        let caches = self.messenger.cache( &artifact_ref).await?;
         let artifact = caches.raw.get(&request.point).ok_or(anyhow!("could not get raw artifact: '{}'",request.point.to_string()))?;
         Ok(ArtifactResponse{
             to: request.point.clone(),
