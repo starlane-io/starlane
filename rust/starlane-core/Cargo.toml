@@ -75,6 +75,7 @@ base64 = "0.13.0"
 
 cosmic-nom={ path="../cosmic-nom"}
 cosmic-portal-cli={ path="../cosmic-portal-cli"}
+cosmic-portal-cli-exe={ path="../cosmic-portal-cli-exe"}
 mesh-portal={ path="../mesh-portal"}
 mesh-portal-versions= { path="../mesh-portal-versions"}
 mesh-portal-api-client= { path="../mesh-portal-api-client"}
