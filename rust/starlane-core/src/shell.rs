@@ -13,15 +13,14 @@ use mesh_portal::version::latest::id::{Point, Port, Uuid};
 use mesh_portal::version::latest::log::{LogSpan, PointLogger, RootLogger};
 use mesh_portal::version::latest::messaging::{Agent, Request, Response, RootRequestCtx};
 use mesh_portal_versions::version::v0_0_1::config::config::bind::RouteSelector;
-use mesh_portal_versions::version::v0_0_1::id::id::{TargetLayer, ToPoint, ToPort};
-use mesh_portal_versions::version::v0_0_1::messaging::{AsyncInternalRequestHandlers, AsyncMessenger, AsyncMessengerAgent, AsyncPointRequestHandlers, AsyncRequestHandler, AsyncRequestHandlerRelay, AsyncRouter, InputCtx, Requestable, ResponseFrame, Wave, WaveFrame};
+use mesh_portal_versions::version::v0_0_1::id::id::{Layer, ToPoint, ToPort};
+use mesh_portal_versions::version::v0_0_1::messaging::{AsyncInternalRequestHandlers, AsyncMessenger, AsyncMessengerAgent, AsyncPointRequestHandlers, AsyncRequestHandler, AsyncRequestHandlerRelay, AsyncRouter, InputCtx, Requestable, RequestFrame, ResponseFrame, Wave, WaveFrame};
 use mesh_portal_versions::version::v0_0_1::quota::Timeouts;
 
 pub struct Shell {
-    port: Port,
-    messenger: AsyncMessengerAgent,
+    messenger: Arc<dyn AsyncMessenger<RequestFrame,ResponseFrame>>,
     handlers: ShellHandler,
-    logger: PointLogger,
+    logger: RootLogger,
     exchanges: Arc<DashMap<Uuid,oneshot::Sender<ResponseFrame>>>,
     outlet_tx: mpsc::Sender<WaveFrame>
 }
@@ -29,7 +28,7 @@ pub struct Shell {
 impl Shell {
     pub async fn new( point: Point, messenger: Arc<dyn AsyncMessenger<Request,Response>>, mut inlet_rx: mpsc::Receiver<WaveFrame>, outlet_tx: mpsc::Sender<WaveFrame>, logger: RootLogger ) -> Self {
         let logger = logger.point(point.clone());
-        let port = point.to_port().with_layer(TargetLayer::Shell );
+        let port = point.to_port().with_layer(Layer::Shell );
         let messenger = AsyncMessengerAgent::new( Agent::Anonymous, port.clone(), messenger );
         let exchanges = Arc::new(DashMap::new());
         let handlers = AsyncInternalRequestHandlers::new();
@@ -38,7 +37,7 @@ impl Shell {
             let port = port.clone();
             let outlet_tx = outlet_tx.clone();
             let exchanges = exchanges.clone();
-            let core_messenger = messenger.with_from( port.with_layer(TargetLayer::Core));
+            let core_messenger = messenger.with_from( port.with_layer(Layer::Core));
             tokio::spawn(async move {
                 while let Ok(frame) = inlet_rx.recv().await {
                     // first make sure from() is the expected assigned core port
@@ -50,7 +49,7 @@ impl Shell {
                         WaveFrame::Request(frame) => {
                             let stub = frame.as_stub();
                             if frame.to().point == port.point {
-                                if frame.to().layer == TargetLayer::Shell {
+                                if frame.to().layer == Layer::Shell {
                                     let request = frame.request;
                                     let logger = logger.opt_span(frame.span);
                                     let ctx = RootRequestCtx::new( request, logger.clone() );
@@ -70,7 +69,7 @@ impl Shell {
                         }
                         WaveFrame::Response(frame) => {
                             if frame.to().point == port.point {
-                                if frame.to().layer == TargetLayer::Shell {
+                                if frame.to().layer == Layer::Shell {
                                     match exchanges.remove(frame.response_to() ) {
                                         Some((_,mut tx)) => tx.send(frame).await,
                                         None => { }
@@ -86,7 +85,7 @@ impl Shell {
                         }
                     }
 
-                    if let TargetLayer::Shell = frame.to().layer {
+                    if let Layer::Shell = frame.to().layer {
 
                     } else {
 
@@ -95,7 +94,7 @@ impl Shell {
             });
         }
 
-        let cli = Cli::new(messenger.clone().with_from(port.clone().with_layer(TargetLayer::Core)));
+        let cli = Cli::new(messenger.clone().with_from(port.clone().with_layer(Layer::Core)));
         let cli_relay = CliRelay::new( port.clone(), messenger.clone() );
         handlers.add( RouteSelector::any(), AsyncRequestHandlerRelay::new(Box::new(cli_relay)) );
         let handlers = ShellHandler::new(handlers);
