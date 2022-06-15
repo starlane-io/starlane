@@ -36,7 +36,7 @@ use nom::combinator::map_res;
 use tokio::io::AsyncBufReadExt;
 use tokio::sync::Mutex;
 use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
-use mesh_portal_versions::version::v0_0_1::messaging::CmdMethod;
+use mesh_portal_versions::version::v0_0_1::wave::CmdMethod;
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 use crate::cache::{ArtifactItem, Cacheable, CachedConfig};
 

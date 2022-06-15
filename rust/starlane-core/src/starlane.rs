@@ -29,7 +29,7 @@ use tokio::sync::oneshot;
 use tokio::sync::{broadcast, mpsc};
 use mesh_portal::version::latest::messaging::{Agent, Response};
 use mesh_portal_versions::version::v0_0_1::id::id::ToPort;
-use mesh_portal_versions::version::v0_0_1::messaging::AsyncMessengerAgent;
+use mesh_portal_versions::version::v0_0_1::wave::AsyncMessengerAgent;
 use crate::artifact::ArtifactRef;
 
 use crate::cache::{ArtifactBundleSrc, ArtifactCaches, ProtoArtifactCachesFactory};

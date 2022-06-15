@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use uuid::Uuid;
 use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
-use mesh_portal_versions::version::v0_0_1::messaging::AsyncMessenger;
+use mesh_portal_versions::version::v0_0_1::wave::AsyncMessenger;
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 
 use crate::error::Error;
@@ -378,7 +378,7 @@ impl StarlaneMessenger {
 
 #[async_trait]
 impl AsyncMessenger for StarlaneMessenger {
-    async fn send(&self, request: mesh_portal_versions::version::v0_0_1::messaging::Request) -> mesh_portal_versions::version::v0_0_1::messaging::Response {
+    async fn send(&self, request: mesh_portal_versions::version::v0_0_1::wave::Request) -> mesh_portal_versions::version::v0_0_1::wave::Response {
         let (tx,rx) = oneshot::channel();
         self.tx.send( StarlaneCommand::Request { request: request.clone(), tx }).await;
         match rx.await {
@@ -390,7 +390,7 @@ impl AsyncMessenger for StarlaneMessenger {
         }
     }
 
-    fn send_sync(&self, request: mesh_portal_versions::version::v0_0_1::messaging::Request) -> mesh_portal_versions::version::v0_0_1::messaging::Response {
+    fn send_sync(&self, request: mesh_portal_versions::version::v0_0_1::wave::Request) -> mesh_portal_versions::version::v0_0_1::wave::Response {
         let starlane_tx = self.tx.clone();
         tokio::runtime::Handle::current().block_on( async move {
             let (tx,rx) = oneshot::channel();

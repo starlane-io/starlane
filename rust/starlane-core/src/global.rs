@@ -7,7 +7,7 @@ use mesh_portal::version::latest::payload::{Payload, PayloadType};
 use mesh_portal_versions::version::v0_0_1::command::Command;
 use mesh_portal_versions::version::v0_0_1::id::id::Port;
 use mesh_portal_versions::version::v0_0_1::id::id::ToPort;
-use mesh_portal_versions::version::v0_0_1::messaging::{AsyncMessenger, AsyncMessengerAgent, AuthedAgent, Method};
+use mesh_portal_versions::version::v0_0_1::wave::{AsyncMessenger, AsyncMessengerAgent, AuthedAgent, Method};
 use mesh_portal_versions::version::v0_0_1::service::Global;
 use crate::error::Error;
 use crate::registry::RegistryApi;

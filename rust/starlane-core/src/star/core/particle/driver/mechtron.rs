@@ -32,7 +32,7 @@ use tokio::sync::broadcast::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot::error::RecvError;
 use mesh_portal::version::latest::config::{ParticleConfigBody, PointConfig};
-use mesh_portal_versions::version::v0_0_1::messaging::AsyncMessenger;
+use mesh_portal_versions::version::v0_0_1::wave::AsyncMessenger;
 use mesh_portal_versions::version::v0_0_1::particle::particle::Details;
 
 use crate::config::config::{MechtronConfig, ParticleConfig};

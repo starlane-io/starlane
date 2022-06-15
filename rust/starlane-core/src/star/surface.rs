@@ -6,7 +6,7 @@ use mesh_portal::version::latest::entity::request::create::{PointTemplate, Templ
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Message, Request, Response};
 use mesh_portal::version::latest::particle::Stub;
-use mesh_portal_versions::version::v0_0_1::messaging::SyncMessenger;
+use mesh_portal_versions::version::v0_0_1::wave::SyncMessenger;
 
 use tokio::sync::mpsc;
 use tokio::time::Duration;
