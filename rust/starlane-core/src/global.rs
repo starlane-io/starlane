@@ -7,7 +7,7 @@ use mesh_portal::version::latest::payload::{Payload, PayloadType};
 use mesh_portal_versions::version::v0_0_1::command::Command;
 use mesh_portal_versions::version::v0_0_1::id::id::Port;
 use mesh_portal_versions::version::v0_0_1::id::id::ToPort;
-use mesh_portal_versions::version::v0_0_1::wave::{AsyncMessenger, AsyncMessengerAgent, AuthedAgent, Method};
+use mesh_portal_versions::version::v0_0_1::wave::{AsyncMessenger, AsyncTransmitterWithAgent, AuthedAgent, Method};
 use mesh_portal_versions::version::v0_0_1::service::Global;
 use crate::error::Error;
 use crate::registry::RegistryApi;
@@ -19,7 +19,7 @@ lazy_static! {
 #[derive(Clone)]
 pub struct GlobalApi {
     registry: RegistryApi,
-    messenger: AsyncMessengerAgent
+    messenger: AsyncTransmitterWithAgent
 }
 
 #[async_trait]
@@ -35,7 +35,7 @@ impl Global for GlobalApi {
 impl GlobalApi {
 
     pub fn new( registry: RegistryApi, messenger: Arc<dyn AsyncMessenger<Request,Response>> ) -> Self {
-        let messenger = AsyncMessengerAgent::new( Agent::Authenticated(AuthedAgent::new(Point::global_executor())))
+        let messenger = AsyncTransmitterWithAgent::new( Agent::Authenticated(AuthedAgent::new(Point::global_executor())))
         Self {
             registry,
             messenger

@@ -14,14 +14,14 @@ use mesh_portal::version::latest::log::{LogSpan, PointLogger, RootLogger};
 use mesh_portal::version::latest::messaging::{Agent, Request, Response, RootRequestCtx};
 use mesh_portal_versions::version::v0_0_1::config::config::bind::RouteSelector;
 use mesh_portal_versions::version::v0_0_1::id::id::{Layer, ToPoint, ToPort};
-use mesh_portal_versions::version::v0_0_1::wave::{AsyncInternalRequestHandlers, AsyncMessenger, AsyncMessengerAgent, AsyncPointRequestHandlers, AsyncRequestHandler, AsyncRequestHandlerRelay, AsyncRouter, InputCtx, Requestable, RequestFrame, ResponseFrame, Wave, WaveFrame};
+use mesh_portal_versions::version::v0_0_1::wave::{AsyncInternalRequestHandlers, AsyncMessenger, AsyncTransmitterWithAgent, AsyncPointRequestHandlers, AsyncRequestHandler, AsyncRequestHandlerRelay, AsyncRouter, ReqCtx, Requestable, ReqFrame, RespFrame, Wave, WaveFrame};
 use mesh_portal_versions::version::v0_0_1::quota::Timeouts;
 
 pub struct Shell {
-    messenger: Arc<dyn AsyncMessenger<RequestFrame,ResponseFrame>>,
+    messenger: Arc<dyn AsyncMessenger<ReqFrame, RespFrame>>,
     handlers: ShellHandler,
     logger: RootLogger,
-    exchanges: Arc<DashMap<Uuid,oneshot::Sender<ResponseFrame>>>,
+    exchanges: Arc<DashMap<Uuid,oneshot::Sender<RespFrame>>>,
     outlet_tx: mpsc::Sender<WaveFrame>
 }
 
@@ -29,7 +29,7 @@ impl Shell {
     pub async fn new( point: Point, messenger: Arc<dyn AsyncMessenger<Request,Response>>, mut inlet_rx: mpsc::Receiver<WaveFrame>, outlet_tx: mpsc::Sender<WaveFrame>, logger: RootLogger ) -> Self {
         let logger = logger.point(point.clone());
         let port = point.to_port().with_layer(Layer::Shell );
-        let messenger = AsyncMessengerAgent::new( Agent::Anonymous, port.clone(), messenger );
+        let messenger = AsyncTransmitterWithAgent::new(Agent::Anonymous, port.clone(), messenger );
         let exchanges = Arc::new(DashMap::new());
         let handlers = AsyncInternalRequestHandlers::new();
         {
@@ -46,7 +46,7 @@ impl Shell {
                         continue;
                     }
                     match frame {
-                        WaveFrame::Request(frame) => {
+                        WaveFrame::Req(frame) => {
                             let stub = frame.as_stub();
                             if frame.to().point == port.point {
                                 if frame.to().layer == Layer::Shell {
@@ -62,12 +62,12 @@ impl Shell {
                                     outlet_tx.send(frame.into() ).await;
                                 }
                             } else {
-                                let frame : ResponseFrame = stub.result(core_messenger.send( frame.request.into() ).await);
+                                let frame : RespFrame = stub.result(core_messenger.send( frame.request.into() ).await);
                                 let frame: WaveFrame = frame.into();
                                 outlet_tx.send(frame).await;
                             }
                         }
-                        WaveFrame::Response(frame) => {
+                        WaveFrame::Resp(frame) => {
                             if frame.to().point == port.point {
                                 if frame.to().layer == Layer::Shell {
                                     match exchanges.remove(frame.response_to() ) {
@@ -135,7 +135,7 @@ impl ShellHandler {
 #[routes(self.handlers)]
 impl ShellHandler {
     #[route_async(<*>)]
-    pub async fn any(&self, ctx: InputCtx<'_,Request> ) -> Result<ResponseCore,MsgErr> {
+    pub async fn any(&self, ctx: ReqCtx<'_,Request> ) -> Result<ResponseCore,MsgErr> {
         let (tx,rx) = oneshot::channel();
         self.exchanges.insert( ctx.input.id.clone(), tx );
         self.outlet_tx.send( (*ctx.input).into() ).await;

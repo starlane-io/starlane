@@ -29,7 +29,7 @@ use tokio::sync::oneshot;
 use tokio::sync::{broadcast, mpsc};
 use mesh_portal::version::latest::messaging::{Agent, Response};
 use mesh_portal_versions::version::v0_0_1::id::id::ToPort;
-use mesh_portal_versions::version::v0_0_1::wave::AsyncMessengerAgent;
+use mesh_portal_versions::version::v0_0_1::wave::AsyncTransmitterWithAgent;
 use crate::artifact::ArtifactRef;
 
 use crate::cache::{ArtifactBundleSrc, ArtifactCaches, ProtoArtifactCachesFactory};
@@ -263,7 +263,7 @@ impl StarlaneMachineRunner {
         let messenger = StarlaneMessenger::new(
             self.command_tx.clone()
         );
-        let messenger = AsyncMessengerAgent::new(Agent::Anonymous, port, Arc::new(messenger)  );
+        let messenger = AsyncTransmitterWithAgent::new(Agent::Anonymous, port, Arc::new(messenger)  );
         let api = StarlaneApi::new(messenger);
         Ok(api)
     }
@@ -474,7 +474,7 @@ impl StarlaneMachineRunner {
 
                 if self.artifact_caches.is_none() {
                     let messenger = Arc::new(StarlaneMessenger::new(self.command_tx.clone()));
-                    let messenger = AsyncMessengerAgent::new(Agent::Anonymous, star_key.into(),messenger );
+                    let messenger = AsyncTransmitterWithAgent::new(Agent::Anonymous, star_key.into(), messenger );
                     let api = StarlaneApi::new(messenger);
 
                     let caches = Arc::new(ProtoArtifactCachesFactory::new(

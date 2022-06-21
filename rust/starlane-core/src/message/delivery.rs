@@ -28,7 +28,7 @@ use mesh_portal::version::latest::payload::{Call, CallKind, Errors, MsgCall, Pay
 use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
 use mesh_portal_versions::version::v0_0_1::wave::Method;
 use mesh_portal_versions::version::v0_0_1::parse::model::Subst;
-use mesh_portal_versions::version::v0_0_1::payload::payload::HttpCall;
+use mesh_portal_versions::version::v0_0_1::substance::substance::HttpCall;
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 
 pub struct Delivery<M>

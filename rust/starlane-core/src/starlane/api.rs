@@ -3,18 +3,18 @@ use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::id::{Point, Port, TargetLayer};
 use mesh_portal::version::latest::messaging::{Agent, Response};
-use mesh_portal_versions::version::v0_0_1::wave::{AsyncMessenger, AsyncMessengerAgent};
+use mesh_portal_versions::version::v0_0_1::wave::{AsyncMessenger, AsyncTransmitterWithAgent};
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 use cosmic_portal_cli::Cli;
 use cosmic_portal_cli::CliSession;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
-    messenger: AsyncMessengerAgent
+    messenger: AsyncTransmitterWithAgent
 }
 
 impl StarlaneApi {
-    pub fn new( messenger: AsyncMessengerAgent ) -> Self {
+    pub fn new(messenger: AsyncTransmitterWithAgent) -> Self {
         Self {
             messenger
         }
@@ -30,11 +30,11 @@ impl StarlaneApi {
         unimplemented!()
     }
 
-    pub fn messenger(&self) -> &AsyncMessengerAgent {
+    pub fn messenger(&self) -> &AsyncTransmitterWithAgent {
         &self.messenger
     }
 
-    pub fn messenger_from_port( &self, port: Port ) -> AsyncMessengerAgent {
+    pub fn messenger_from_port( &self, port: Port ) -> AsyncTransmitterWithAgent {
         self.messenger.with_from(port)
     }
 

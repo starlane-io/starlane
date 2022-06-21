@@ -21,7 +21,7 @@ use mesh_portal::version::latest::entity::request::create::{Create, KindTemplate
 use mesh_portal::version::latest::entity::request::{Method, Rc, RequestCore};
 use mesh_portal::version::latest::id::{AddressAndKind, KindParts, Point};
 use mesh_portal::version::latest::messaging::Request;
-use mesh_portal_versions::version::v0_0_1::wave::ProtoRequest;
+use mesh_portal_versions::version::v0_0_1::wave::ReqProto;
 
 #[derive(Debug)]
 pub struct FileCoreManager {
