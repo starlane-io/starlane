@@ -35,7 +35,7 @@ impl Global for GlobalApi {
 impl GlobalApi {
 
     pub fn new(registry: RegistryApi, messenger: Arc<dyn AsyncTransmitter<ReqShell, RespShell>> ) -> Self {
-        let messenger = AsyncTransmitterWithAgent::new( Agent::Authenticated(AuthedAgent::new(Point::global_executor())))
+        let messenger = AsyncTransmitterWithAgent::new( Agent::Point(AuthedAgent::new(Point::global_executor())))
         Self {
             registry,
             messenger
