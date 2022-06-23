@@ -18,26 +18,26 @@ use mesh_portal_versions::version::v0_0_1::wave::{AsyncInternalRequestHandlers, 
 use mesh_portal_versions::version::v0_0_1::quota::Timeouts;
 
 pub struct Shell {
-    messenger: Arc<dyn AsyncTransmitter<ReqFrame, RespFrame>>,
+    transmitter: Arc<dyn AsyncTransmitter<ReqFrame, RespFrame>>,
     handlers: ShellHandler,
     logger: RootLogger,
     exchanges: Arc<DashMap<Uuid,oneshot::Sender<RespFrame>>>,
-    outlet_tx: mpsc::Sender<WaveFrame>
+    core_tx: mpsc::Sender<WaveFrame>
 }
 
 impl Shell {
-    pub async fn new(point: Point, messenger: Arc<dyn AsyncTransmitter<ReqShell, RespShell>>, mut inlet_rx: mpsc::Receiver<WaveFrame>, outlet_tx: mpsc::Sender<WaveFrame>, logger: RootLogger ) -> Self {
+    pub async fn new(point: Point, messenger: Arc<dyn AsyncTransmitter<ReqShell, RespShell>>, mut inlet_rx: mpsc::Receiver<WaveFrame>, core_tx: mpsc::Sender<WaveFrame>, logger: RootLogger ) -> Self {
         let logger = logger.point(point.clone());
         let port = point.to_port().with_layer(Layer::Shell );
-        let messenger = AsyncTransmitterWithAgent::new(Agent::Anonymous, port.clone(), messenger );
+        let transmitter = AsyncTransmitterWithAgent::new(Agent::Anonymous, port.clone(), messenger );
         let exchanges = Arc::new(DashMap::new());
         let handlers = AsyncInternalRequestHandlers::new();
         {
             let handlers =  handlers.clone();
             let port = port.clone();
-            let outlet_tx = outlet_tx.clone();
+            let core_tx = core_tx.clone();
             let exchanges = exchanges.clone();
-            let core_messenger = messenger.with_from( port.with_layer(Layer::Core));
+            let core_messenger = transmitter.with_from( port.with_layer(Layer::Core));
             tokio::spawn(async move {
                 while let Ok(frame) = inlet_rx.recv().await {
                     // first make sure from() is the expected assigned core port
@@ -56,15 +56,15 @@ impl Shell {
                                     let response: RespCore = handlers.handle(ctx).await.into();
                                     let frame = stub.core(response);
                                     let frame: WaveFrame = frame.into();
-                                    outlet_tx.send( frame ).await;
+                                    core_tx.send( frame ).await;
                                 } else {
                                     // sure, the core can send a message to itself...
-                                    outlet_tx.send(frame.into() ).await;
+                                    core_tx.send(frame.into() ).await;
                                 }
                             } else {
                                 let frame : RespFrame = stub.result(core_messenger.send( frame.request.into() ).await);
                                 let frame: WaveFrame = frame.into();
-                                outlet_tx.send(frame).await;
+                                core_tx.send(frame).await;
                             }
                         }
                         WaveFrame::Resp(frame) => {
@@ -76,7 +76,7 @@ impl Shell {
                                     }
                                 } else {
                                     // just responding to itself?
-                                    outlet_tx.send(frame.into())
+                                    core_tx.send(frame.into())
                                 }
                             } else {
                                 let response : RespShell = frame.into();
@@ -94,8 +94,8 @@ impl Shell {
             });
         }
 
-        let cli = Cli::new(messenger.clone().with_from(port.clone().with_layer(Layer::Core)));
-        let cli_relay = CliRelay::new( port.clone(), messenger.clone() );
+        let cli = Cli::new(transmitter.clone().with_from(port.clone().with_layer(Layer::Core)));
+        let cli_relay = CliRelay::new(port.clone(), transmitter.clone() );
         handlers.add( RouteSelector::any(), AsyncRequestHandlerRelay::new(Box::new(cli_relay)) );
         let handlers = ShellHandler::new(handlers);
 
@@ -104,8 +104,8 @@ impl Shell {
             handlers,
             logger,
             exchanges,
-            messenger,
-            outlet_tx
+            transmitter,
+            core_tx
         }
     }
 
@@ -115,17 +115,17 @@ impl Shell {
 #[derive(AsyncRequestHandler)]
 pub struct ShellHandler {
     handlers: AsyncInternalRequestHandlers<AsyncRequestHandlerRelay>,
-    outlet_tx: mpsc::Sender<WaveFrame>,
+    core_tx: mpsc::Sender<WaveFrame>,
     exchanges: Arc<DashMap<Uuid,oneshot::Sender<RespShell>>>,
     timeouts: Timeouts
 }
 
 
 impl ShellHandler {
-    pub fn new(handlers: AsyncInternalRequestHandlers<AsyncRequestHandlerRelay>, outlet_tx: mpsc::Sender<WaveFrame>, exchanges: Arc<DashMap<Uuid,oneshot::Sender<RespShell>>> ) -> Self {
+    pub fn new(handlers: AsyncInternalRequestHandlers<AsyncRequestHandlerRelay>, core_tx: mpsc::Sender<WaveFrame>, exchanges: Arc<DashMap<Uuid,oneshot::Sender<RespShell>>> ) -> Self {
         Self {
             handlers,
-            outlet_tx,
+            core_tx,
             exchanges,
             timeouts: Default::default()
         }
@@ -138,7 +138,7 @@ impl ShellHandler {
     pub async fn any(&self, ctx: ReqCtx<'_, ReqShell> ) -> Result<RespCore,MsgErr> {
         let (tx,rx) = oneshot::channel();
         self.exchanges.insert( ctx.input.id.clone(), tx );
-        self.outlet_tx.send( (*ctx.input).into() ).await;
+        self.core_tx.send( (*ctx.input).into() ).await;
         if let Ok(frame) = tokio::time::timeout( Duration::from_secs(self.timeouts.from(self.timeouts.from(&ctx.input.handling.wait) )), rx).await {
             if let Ok(response) = frame {
                 Ok(response.core)
