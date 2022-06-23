@@ -8,17 +8,17 @@ use cosmic_nom::Res;
 use cosmic_portal_cli::Cli;
 use cosmic_portal_cli_exe::CliRelay;
 use mesh_portal::error::MsgErr;
-use mesh_portal::version::latest::entity::response::ResponseCore;
+use mesh_portal::version::latest::entity::response::RespCore;
 use mesh_portal::version::latest::id::{Point, Port, Uuid};
 use mesh_portal::version::latest::log::{LogSpan, PointLogger, RootLogger};
-use mesh_portal::version::latest::messaging::{Agent, Request, Response, RootRequestCtx};
+use mesh_portal::version::latest::messaging::{Agent, ReqShell, RespShell, RootRequestCtx};
 use mesh_portal_versions::version::v0_0_1::config::config::bind::RouteSelector;
 use mesh_portal_versions::version::v0_0_1::id::id::{Layer, ToPoint, ToPort};
-use mesh_portal_versions::version::v0_0_1::wave::{AsyncInternalRequestHandlers, AsyncMessenger, AsyncTransmitterWithAgent, AsyncPointRequestHandlers, AsyncRequestHandler, AsyncRequestHandlerRelay, AsyncRouter, ReqCtx, Requestable, ReqFrame, RespFrame, Wave, WaveFrame};
+use mesh_portal_versions::version::v0_0_1::wave::{AsyncInternalRequestHandlers, AsyncTransmitter, AsyncTransmitterWithAgent, AsyncPointRequestHandlers, AsyncRequestHandler, AsyncRequestHandlerRelay, AsyncRouter, ReqCtx, Requestable, ReqFrame, RespFrame, Wave, WaveFrame};
 use mesh_portal_versions::version::v0_0_1::quota::Timeouts;
 
 pub struct Shell {
-    messenger: Arc<dyn AsyncMessenger<ReqFrame, RespFrame>>,
+    messenger: Arc<dyn AsyncTransmitter<ReqFrame, RespFrame>>,
     handlers: ShellHandler,
     logger: RootLogger,
     exchanges: Arc<DashMap<Uuid,oneshot::Sender<RespFrame>>>,
@@ -26,7 +26,7 @@ pub struct Shell {
 }
 
 impl Shell {
-    pub async fn new( point: Point, messenger: Arc<dyn AsyncMessenger<Request,Response>>, mut inlet_rx: mpsc::Receiver<WaveFrame>, outlet_tx: mpsc::Sender<WaveFrame>, logger: RootLogger ) -> Self {
+    pub async fn new(point: Point, messenger: Arc<dyn AsyncTransmitter<ReqShell, RespShell>>, mut inlet_rx: mpsc::Receiver<WaveFrame>, outlet_tx: mpsc::Sender<WaveFrame>, logger: RootLogger ) -> Self {
         let logger = logger.point(point.clone());
         let port = point.to_port().with_layer(Layer::Shell );
         let messenger = AsyncTransmitterWithAgent::new(Agent::Anonymous, port.clone(), messenger );
@@ -53,7 +53,7 @@ impl Shell {
                                     let request = frame.request;
                                     let logger = logger.opt_span(frame.span);
                                     let ctx = RootRequestCtx::new( request, logger.clone() );
-                                    let response: ResponseCore = handlers.handle(ctx).await.into();
+                                    let response: RespCore = handlers.handle(ctx).await.into();
                                     let frame = stub.core(response);
                                     let frame: WaveFrame = frame.into();
                                     outlet_tx.send( frame ).await;
@@ -79,7 +79,7 @@ impl Shell {
                                     outlet_tx.send(frame.into())
                                 }
                             } else {
-                                let response :Response = frame.into();
+                                let response : RespShell = frame.into();
                                 core_messenger.route( response.into() ).await;
                             }
                         }
@@ -116,13 +116,13 @@ impl Shell {
 pub struct ShellHandler {
     handlers: AsyncInternalRequestHandlers<AsyncRequestHandlerRelay>,
     outlet_tx: mpsc::Sender<WaveFrame>,
-    exchanges: Arc<DashMap<Uuid,oneshot::Sender<Response>>>,
+    exchanges: Arc<DashMap<Uuid,oneshot::Sender<RespShell>>>,
     timeouts: Timeouts
 }
 
 
 impl ShellHandler {
-    pub fn new( handlers: AsyncInternalRequestHandlers<AsyncRequestHandlerRelay>, outlet_tx: mpsc::Sender<WaveFrame>, exchanges: Arc<DashMap<Uuid,oneshot::Sender<Response>>> ) -> Self {
+    pub fn new(handlers: AsyncInternalRequestHandlers<AsyncRequestHandlerRelay>, outlet_tx: mpsc::Sender<WaveFrame>, exchanges: Arc<DashMap<Uuid,oneshot::Sender<RespShell>>> ) -> Self {
         Self {
             handlers,
             outlet_tx,
@@ -135,7 +135,7 @@ impl ShellHandler {
 #[routes(self.handlers)]
 impl ShellHandler {
     #[route_async(<*>)]
-    pub async fn any(&self, ctx: ReqCtx<'_,Request> ) -> Result<ResponseCore,MsgErr> {
+    pub async fn any(&self, ctx: ReqCtx<'_, ReqShell> ) -> Result<RespCore,MsgErr> {
         let (tx,rx) = oneshot::channel();
         self.exchanges.insert( ctx.input.id.clone(), tx );
         self.outlet_tx.send( (*ctx.input).into() ).await;

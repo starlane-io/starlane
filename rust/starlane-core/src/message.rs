@@ -3,7 +3,7 @@ use std::convert::{Infallible, TryFrom, TryInto};
 use std::string::FromUtf8Error;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::messaging::{Request, Response};
+use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 use mesh_portal::version::latest::selector::PointKindHierarchy;
 use mesh_portal::version::latest::payload::Payload;
 use mesh_portal::version::latest::particle::Stub;
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use uuid::Uuid;
 use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
-use mesh_portal_versions::version::v0_0_1::wave::AsyncMessenger;
+use mesh_portal_versions::version::v0_0_1::wave::AsyncTransmitter;
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 
 use crate::error::Error;
@@ -345,8 +345,8 @@ fn hash_to_string(hash: &HashSet<KindBase>) -> String {
     rtn
 }
 
-impl From<Request> for ProtoStarMessage {
-    fn from(request: Request) -> Self {
+impl From<ReqShell> for ProtoStarMessage {
+    fn from(request: ReqShell) -> Self {
         let mut proto = ProtoStarMessage::new();
         proto.to = request.to.clone().to_point().into();
         proto.payload = StarMessagePayload::Request(request.into());
@@ -354,8 +354,8 @@ impl From<Request> for ProtoStarMessage {
     }
 }
 
-impl From<Response> for ProtoStarMessage {
-    fn from(response: Response ) -> Self {
+impl From<RespShell> for ProtoStarMessage {
+    fn from(response: RespShell) -> Self {
         let mut proto = ProtoStarMessage::new();
         proto.payload = StarMessagePayload::Response(response.into());
         proto
@@ -377,7 +377,7 @@ impl StarlaneMessenger {
 }
 
 #[async_trait]
-impl AsyncMessenger for StarlaneMessenger {
+impl AsyncTransmitter for StarlaneMessenger {
     async fn send(&self, request: mesh_portal_versions::version::v0_0_1::wave::ReqShell) -> mesh_portal_versions::version::v0_0_1::wave::RespShell {
         let (tx,rx) = oneshot::channel();
         self.tx.send( StarlaneCommand::Request { request: request.clone(), tx }).await;

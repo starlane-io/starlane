@@ -21,9 +21,9 @@ use crate::message::Reply;
 use std::ops::Deref;
 use http::StatusCode;
 use mesh_portal::error::MsgErr;
-use mesh_portal::version::latest::entity::response::ResponseCore;
+use mesh_portal::version::latest::entity::response::RespCore;
 use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::messaging::{Request, Response};
+use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 use mesh_portal::version::latest::payload::{Call, CallKind, Errors, MsgCall, Payload};
 use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
 use mesh_portal_versions::version::v0_0_1::wave::Method;
@@ -83,7 +83,7 @@ impl<M> Into<StarMessage> for Delivery<M> where
 }
 impl <M> Delivery<M> where M: Clone + Send + Sync + 'static
 {
-  pub fn get_request(&self) -> Result<Request,Error> {
+  pub fn get_request(&self) -> Result<ReqShell,Error> {
       match &self.star_message.payload {
           StarMessagePayload::Request(request) => {
               Ok(request.clone())
@@ -95,7 +95,7 @@ impl <M> Delivery<M> where M: Clone + Send + Sync + 'static
   }
 }
 
-impl Delivery<Request>
+impl Delivery<ReqShell>
 {
     pub fn result( self, result: Result<Payload,Error>) {
         match result {
@@ -109,8 +109,8 @@ impl Delivery<Request>
         }
     }
 
-    pub fn respond(mut self, core: ResponseCore ) {
-        let response = Response {
+    pub fn respond(mut self, core: RespCore) {
+        let response = RespShell {
             id: uuid(),
             to: self.item.from,
             from: self.item.to,
@@ -126,7 +126,7 @@ impl Delivery<Request>
     }
 
    pub fn ok(self, payload: Payload) -> Result<(),Error> {
-        let core = ResponseCore {
+        let core = RespCore {
             headers: Default::default(),
             status: StatusCode::from_u16(200).unwrap(),
             body: payload
@@ -137,7 +137,7 @@ impl Delivery<Request>
 
     pub fn fail(self, fail: String ) ->Result<(),Error> {
 
-        let core = ResponseCore {
+        let core = RespCore {
             headers: Default::default(),
             status: StatusCode::from_u16(500).unwrap(),
             body: Payload::Text(fail)
@@ -149,7 +149,7 @@ impl Delivery<Request>
     pub fn not_found(self) ->Result<(),Error> {
 
         let request = self.get_request()?;
-        let core = ResponseCore {
+        let core = RespCore {
             headers: Default::default(),
             status: StatusCode::from_u16(404).unwrap(),
             body: Payload::Empty
@@ -162,7 +162,7 @@ impl Delivery<Request>
 
         let request = self.get_request()?;
 
-        let core = ResponseCore {
+        let core = RespCore {
             headers: Default::default(),
             status: StatusCode::from_u16(status)?,
             body: Payload::Errors(Errors::default(message))

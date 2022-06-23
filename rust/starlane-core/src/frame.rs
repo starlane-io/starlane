@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::messaging::{Request, Response};
+use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 
 use semver::SemVerError;
 use serde::{Deserialize, Serialize};
@@ -325,8 +325,8 @@ impl StarMessage {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum StarMessagePayload {
     None,
-    Request(Request),
-    Response(Response),
+    Request(ReqShell),
+    Response(RespShell),
     ResourceRegistry(ResourceRegistryRequest),
     ResourceHost(ResourceHostAction),
 //    Space(SpaceMessage),

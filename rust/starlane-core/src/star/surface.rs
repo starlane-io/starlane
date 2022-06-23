@@ -4,9 +4,9 @@ use std::sync::mpsc::SendError;
 use futures::TryFutureExt;
 use mesh_portal::version::latest::entity::request::create::{PointTemplate, Template};
 use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::messaging::{Message, Request, Response};
+use mesh_portal::version::latest::messaging::{Message, ReqShell, RespShell};
 use mesh_portal::version::latest::particle::Stub;
-use mesh_portal_versions::version::v0_0_1::wave::SyncMessenger;
+use mesh_portal_versions::version::v0_0_1::wave::SyncTransmitter;
 
 use tokio::sync::mpsc;
 use tokio::time::Duration;
@@ -51,11 +51,11 @@ impl SurfaceApi {
         Ok(tokio::time::timeout(Duration::from_secs(15), rx).await???)
     }
 
-    pub fn notify( &self, mut request: Request ) {
+    pub fn notify( &self, mut request: ReqShell) {
         self.tx.try_send(SurfaceCall::Notify(request));
     }
 
-    pub async fn exchange( &self, request: Request ) -> Response {
+    pub async fn exchange(&self, request: ReqShell) -> RespShell {
         let (tx,rx) = oneshot::channel();
         self.tx.send( SurfaceCall::Request {request:request.clone(), tx }).await;
         match rx.await {
@@ -150,12 +150,12 @@ pub enum SurfaceCall {
         tx: oneshot::Sender<Result<Reply, Error>>,
         description: String,
     },
-    Notify(Request),
+    Notify(ReqShell),
     Watch{ selector: WatchResourceSelector, tx: oneshot::Sender<Result<Watcher,Error>> },
     StarSearch{ star_pattern: StarPattern, tx: oneshot::Sender<Result<SearchHits,Error>>},
     RequestStarAddress { address_template: PointTemplate, tx: oneshot::Sender<Result<Point,Error>> },
     CreateSysResource{template:Template, messenger_tx: mpsc::Sender<Message>, tx:oneshot::Sender<Result<Stub,Error>>},
-    Request{ request: Request, tx:oneshot::Sender<Response>},
+    Request{ request: ReqShell, tx:oneshot::Sender<RespShell>},
 }
 
 impl Call for SurfaceCall {}

@@ -14,10 +14,10 @@ use mesh_portal::version::latest::entity::request::{Method, Rc};
 use mesh_portal::version::latest::entity::request::create::{Create, PointSegFactory};
 use mesh_portal::version::latest::entity::request::select::Select;
 use mesh_portal::version::latest::entity::request::set::Set;
-use mesh_portal::version::latest::entity::response::ResponseCore;
+use mesh_portal::version::latest::entity::response::RespCore;
 use mesh_portal::version::latest::http::HttpMethod;
 use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::messaging::{Request, Response};
+use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 use mesh_portal::version::latest::particle::Stub;
 use mesh_portal::version::latest::payload::Payload;
 use mesh_portal_versions::version::v0_0_1::parse::skewer_or_snake;
@@ -130,7 +130,7 @@ impl ParticleCoreDriver for UserBaseKeycloakCoreDriver {
         Ok(())
     }
 
-    async fn handle_request(&self, request: Request ) -> Response {
+    async fn handle_request(&self, request: ReqShell) -> RespShell {
 println!("USers handle reqeust...");
         match &request.core.method{
             Method::Cmd(rc) => {
@@ -168,7 +168,7 @@ impl UserBaseKeycloakCoreDriver{
         Ok(std::env::var("STARLANE_KEYCLOAK_URL").map_err(|e|{"User<Keycloak>: environment variable 'STARLANE_KEYCLOAK_URL' not set."})?)
     }
 
-    async fn handle_msg( &self, request: Request ) -> Response {
+    async fn handle_msg(&self, request: ReqShell) -> RespShell {
 
         if let Method::Msg(method) =&request.core.method{
 println!("UserBase<Keycloak> ... Handle Message action: {}", method.to_string());
@@ -183,7 +183,7 @@ println!("UserBase<Keycloak> ... Handle Message action: {}", method.to_string())
         }
     }
 
-    async fn handle_get_jwks( &self, request: &Request ) -> Result<Payload,Error>
+    async fn handle_get_jwks(&self, request: &ReqShell) -> Result<Payload,Error>
     {
         let client = reqwest::Client::new();
         let realm = normalize_realm(&request.to);
@@ -202,7 +202,7 @@ println!("UserBase<Keycloak> ... Handle Message action: {}", method.to_string())
     }
 
 
-    async fn handle_http( &self, request: Request ) -> Response
+    async fn handle_http(&self, request: ReqShell) -> RespShell
     {
 println!("UserBaseKeycloakCoreDriver: handle_http");
         if let Method::Http(method) =&request.core.method{
@@ -224,7 +224,7 @@ println!("UserBaseKeycloakCoreDriver: handle_http");
         }
     }
 
-    async fn handle_login( &self, request: &Request ) -> Result<ResponseCore,Error>{
+    async fn handle_login(&self, request: &ReqShell) -> Result<RespCore,Error>{
         let multipart: Vec<(String,String)> = serde_urlencoded::from_bytes(request.core.body.clone().to_bin()?.as_bytes() )?;
         let mut map = HashMap::new();
         for (key,value) in multipart {
@@ -246,7 +246,7 @@ println!("UserBaseKeycloakCoreDriver: handle_http");
             .form(&map)
             .send()
             .await?;
-        let response = ResponseCore {
+        let response = RespCore {
             status: response.status(),
             headers: response.headers().clone(),
             body: Payload::Bin(Arc::new(response.bytes().await?.to_vec()))
@@ -254,7 +254,7 @@ println!("UserBaseKeycloakCoreDriver: handle_http");
         Ok(response)
     }
 
-    async fn handle_introspect_token( &self, request: &Request ) -> Result<Payload,Error>{
+    async fn handle_introspect_token(&self, request: &ReqShell) -> Result<Payload,Error>{
         let token: String = request.core.body.clone().try_into()?;
         let realm = normalize_realm(&request.to);
         let url = Self::keycloak_url()?;
@@ -289,7 +289,7 @@ println!("UserBaseKeycloakCoreDriver: handle_http");
     refresh_token: <my-refresh-token>
      */
 
-    async fn handle_refresh_token( &self, request: &Request ) -> Result<Payload,Error>{
+    async fn handle_refresh_token(&self, request: &ReqShell) -> Result<Payload,Error>{
 println!("handle_refresh_token...");
         let token: String = request.core.body.clone().try_into()?;
 println!("received refresh token: {}", token );

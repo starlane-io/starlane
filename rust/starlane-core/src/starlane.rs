@@ -27,7 +27,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::net::tcp::OwnedReadHalf;
 use tokio::sync::oneshot;
 use tokio::sync::{broadcast, mpsc};
-use mesh_portal::version::latest::messaging::{Agent, Response};
+use mesh_portal::version::latest::messaging::{Agent, RespShell};
 use mesh_portal_versions::version::v0_0_1::id::id::ToPort;
 use mesh_portal_versions::version::v0_0_1::wave::AsyncTransmitterWithAgent;
 use crate::artifact::ArtifactRef;
@@ -866,7 +866,7 @@ pub enum StarlaneCommand {
     Listen{ machine: StarlaneMachine, tx: oneshot::Sender<Result<(), Error>> },
     GetProtoArtifactCachesFactory(oneshot::Sender<Option<Arc<ProtoArtifactCachesFactory>>>),
     StartMechtronPortal(oneshot::Sender<Result<mpsc::Sender<TcpServerCall>,Error>>),
-    Request{ request: mesh_portal::version::latest::messaging::Request, tx: oneshot::Sender<mesh_portal::version::latest::messaging::Response>},
+    Request{ request: mesh_portal::version::latest::messaging::ReqShell, tx: oneshot::Sender<mesh_portal::version::latest::messaging::RespShell>},
     Shutdown,
 }
 

@@ -4,7 +4,7 @@ use crate::mesh_portal_uuid;
 use crate::util::AsyncHashMap;
 use mesh_portal_api_client::{Inlet, PortalSkel, PrePortalSkel, ParticleSkel};
 use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::messaging::{Request, Response};
+use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 use mesh_portal::version::latest::portal;
 use std::convert::TryFrom;
 use std::future::Future;
@@ -184,7 +184,7 @@ impl WasmMembraneExt {
                                     request: i32,
                                 ) -> Result<i32, Error> {
                                     let request = ext.membrane.consume_buffer(request)?;
-                                    let request: Request =
+                                    let request: ReqShell =
                                         bincode::deserialize(request.as_slice())?;
                                     let response = ext.skel.api().exchange(request).await;
                                     let response = bincode::serialize(&response)?;
@@ -274,8 +274,8 @@ if let mechtron_common::outlet::Frame::Assign(_) = frame {
         });
     }
 
-    pub async fn handle_outlet_request(&self, request: Request) -> Response {
-        fn process(ext: &WasmMembraneExt, request: Request) -> Result<Response, Error> {
+    pub async fn handle_outlet_request(&self, request: ReqShell) -> RespShell {
+        fn process(ext: &WasmMembraneExt, request: ReqShell) -> Result<RespShell, Error> {
             let func = ext
                 .membrane
                 .instance
@@ -285,7 +285,7 @@ if let mechtron_common::outlet::Frame::Assign(_) = frame {
             let request = ext.membrane.write_buffer(&request)?;
             let response: i32 = func.call(request)?;
             let response = ext.membrane.consume_buffer(response)?;
-            let response: Response = bincode::deserialize(&response)?;
+            let response: RespShell = bincode::deserialize(&response)?;
             Ok(response)
         }
 

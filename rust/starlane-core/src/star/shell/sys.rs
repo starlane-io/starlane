@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use mesh_portal::version::latest::entity::request::create::{PointSegFactory, Template};
 use mesh_portal::version::latest::fail;
 use mesh_portal::version::latest::id::{Point, RouteSegment};
-use mesh_portal::version::latest::messaging::{Message, Request};
+use mesh_portal::version::latest::messaging::{Message, ReqShell};
 use mesh_portal::version::latest::particle::{Status, Stub};
 use mesh_portal::version::latest::security::Permissions;
 use mesh_portal_versions::version::v0_0_1::particle::particle::Details;
@@ -147,7 +147,7 @@ impl AsyncProcessor<SysCall> for SysComponent {
                 if let StarMessagePayload::Request(request) =  &message.payload {
                     match self.map.get( &request.to ) {
                         Some(resource) => {
-                            resource.tx.send(Message::Request(request.clone())).await;
+                            resource.tx.send(Message::Req(request.clone())).await;
                         },
                         None => {
                         }
@@ -156,7 +156,7 @@ impl AsyncProcessor<SysCall> for SysComponent {
                 else if let StarMessagePayload::Response(response) =  &message.payload {
                     match self.map.get( &response.to ) {
                         Some(resource) => {
-                            resource.tx.send(Message::Response(response.clone())).await;
+                            resource.tx.send(Message::Resp(response.clone())).await;
                         },
                         None => {
                         }

@@ -17,7 +17,7 @@ use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoPa
 use mesh_portal::version::latest::entity::request::set::Set;
 use mesh_portal::version::latest::entity::request::{Method, Rc};
 use mesh_portal::version::latest::id::{KindParts, Point, Specific, Version};
-use mesh_portal::version::latest::messaging::Request;
+use mesh_portal::version::latest::messaging::ReqShell;
 use mesh_portal::version::latest::particle::{Properties, Property, Status, Stub};
 use mesh_portal::version::latest::selector::specific::{
     ProductSelector, VariantSelector, VendorSelector,

@@ -4,11 +4,11 @@ use anyhow::anyhow;
 use mesh_portal_api_client::{Inlet, PrePortalSkel, ParticleCtrl, ParticleCtrlFactory, ParticleSkel};
 use mesh_portal::version::latest::artifact::ArtifactRequest;
 use mesh_portal::version::latest::config::{ParticleConfigBody, PointConfig};
-use mesh_portal::version::latest::entity::response::ResponseCore;
+use mesh_portal::version::latest::entity::response::RespCore;
 use mesh_portal::version::latest::frame::PrimitiveFrame;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::log::{LogSource, PointLogger, RootLogger};
-use mesh_portal::version::latest::messaging::{Request, Response};
+use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 use mesh_portal::version::latest::portal;
 use mesh_portal::version::latest::portal::{Exchanger, initin, initout};
 use mesh_portal::version::latest::portal::initin::PortalAuth;
@@ -148,7 +148,7 @@ impl ParticleCtrl for MechtronResourceCtrl {
         Ok(())
     }
 
-    async fn handle_request( &self, request: RequestFrame ) -> ResponseCore {
+    async fn handle_request( &self, request: RequestFrame ) -> RespCore {
         let response = self.skel.membrane.handle_outlet_request(request.request).await;
         response.core
     }

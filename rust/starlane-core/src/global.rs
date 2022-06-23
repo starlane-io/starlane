@@ -1,13 +1,13 @@
 use std::str::FromStr;
 use std::sync::Arc;
 use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::messaging::{Agent, ProtoRequest, Request, Response};
+use mesh_portal::version::latest::messaging::{Agent, ReqProto, ReqShell, RespShell};
 use mesh_portal::version::latest::msg::MsgMethod;
 use mesh_portal::version::latest::payload::{Payload, PayloadType};
 use mesh_portal_versions::version::v0_0_1::command::Command;
 use mesh_portal_versions::version::v0_0_1::id::id::Port;
 use mesh_portal_versions::version::v0_0_1::id::id::ToPort;
-use mesh_portal_versions::version::v0_0_1::wave::{AsyncMessenger, AsyncTransmitterWithAgent, AuthedAgent, Method};
+use mesh_portal_versions::version::v0_0_1::wave::{AsyncTransmitter, AsyncTransmitterWithAgent, AuthedAgent, Method};
 use mesh_portal_versions::version::v0_0_1::service::Global;
 use crate::error::Error;
 use crate::registry::RegistryApi;
@@ -24,7 +24,7 @@ pub struct GlobalApi {
 
 #[async_trait]
 impl Global for GlobalApi {
-    async fn handle(&self, request: Request) -> Response {
+    async fn handle(&self, request: ReqShell) -> RespShell {
         if request.to == *COMMAND_SERVICE_PORT {
             self.handle_command_service_request(request).await
         } else {
@@ -34,7 +34,7 @@ impl Global for GlobalApi {
 }
 impl GlobalApi {
 
-    pub fn new( registry: RegistryApi, messenger: Arc<dyn AsyncMessenger<Request,Response>> ) -> Self {
+    pub fn new(registry: RegistryApi, messenger: Arc<dyn AsyncTransmitter<ReqShell, RespShell>> ) -> Self {
         let messenger = AsyncTransmitterWithAgent::new( Agent::Authenticated(AuthedAgent::new(Point::global_executor())))
         Self {
             registry,
@@ -42,8 +42,8 @@ impl GlobalApi {
         }
     }
 
-    async fn handle_command_service_request(&self, request: Request) -> Response {
-        async fn handle(global: &GlobalApi, request: Request) -> Result<Response,Error> {
+    async fn handle_command_service_request(&self, request: ReqShell) -> RespShell {
+        async fn handle(global: &GlobalApi, request: ReqShell) -> Result<RespShell,Error> {
             match &request.core.method {
                 Method::Msg(method) if method.as_str() == "Command" && request.core.body.kind() == PayloadType::Command => {
                     if let Payload::Command(command) = &request.core.body {

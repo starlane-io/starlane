@@ -2,8 +2,8 @@ use std::sync::Arc;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::id::{Point, Port, TargetLayer};
-use mesh_portal::version::latest::messaging::{Agent, Response};
-use mesh_portal_versions::version::v0_0_1::wave::{AsyncMessenger, AsyncTransmitterWithAgent};
+use mesh_portal::version::latest::messaging::{Agent, RespShell};
+use mesh_portal_versions::version::v0_0_1::wave::{AsyncTransmitter, AsyncTransmitterWithAgent};
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 use cosmic_portal_cli::Cli;
 use cosmic_portal_cli::CliSession;
@@ -22,11 +22,11 @@ impl StarlaneApi {
 }
 
 impl StarlaneApi {
-    pub async fn get_state( &self, point: Point ) -> Response {
+    pub async fn get_state( &self, point: Point ) -> RespShell {
         unimplemented!()
     }
 
-    pub async fn set_state( &self, point: Point, state: StateSrc ) -> Response {
+    pub async fn set_state( &self, point: Point, state: StateSrc ) -> RespShell {
         unimplemented!()
     }
 

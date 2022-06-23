@@ -25,7 +25,7 @@ use ascii::IntoAsciiString;
 use http::{HeaderMap, HeaderValue, Response, Uri, Version};
 use http::header::{HeaderName, HOST};
 use mesh_portal::version::latest::bin::Bin;
-use mesh_portal::version::latest::entity::request::{Method, RequestCore};
+use mesh_portal::version::latest::entity::request::{Method, ReqCore};
 use mesh_portal::version::latest::id::{Point, Meta};
 use mesh_portal::version::latest::messaging;
 use nom::AsBytes;
@@ -171,7 +171,7 @@ async fn process_request( http_request: http::Request<Bin>, api: StarlaneMesseng
     let host_and_port = http_request.headers().get("Host").ok_or("HOST header not set")?;
     let host = host_and_port.to_str()?.split(":").next().ok_or("expected host")?.to_string();
 
-    let core = RequestCore  {
+    let core = ReqCore {
         headers: http_request.headers().clone().into(),
         method: Method::Http(HttpMethod::try_from(http_request.method().clone() )?),
         uri: http_request.uri().clone(),
@@ -180,7 +180,7 @@ async fn process_request( http_request: http::Request<Bin>, api: StarlaneMesseng
 
     let to = Point::from_str( host.as_str() )?;
     let from = skel.info.point;
-    let request = messaging::Request::new( core, from, to );
+    let request = messaging::ReqShell::new(core, from, to );
 println!("exchanging...to :{}", request.to.to_string() );
     let response = skel.messaging_api.request(request).await;
 println!("got response...(status: {})",response.core.status.as_u16());

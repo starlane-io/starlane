@@ -18,7 +18,7 @@ use std::str::FromStr;
 use std::sync::atomic::AtomicU32;
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::messaging::{Request, Response};
+use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 use mesh_portal_tcp_server::PortalServer;
 
 #[derive(Debug)]

@@ -22,7 +22,7 @@ use mesh_portal::version::latest::entity::request::Rc;
 use mesh_portal::version::latest::entity::request::set::Set;
 use mesh_portal::version::latest::fail;
 use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::messaging::{Request, Response};
+use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 use mesh_portal::version::latest::payload::Payload;
 use mesh_portal::version::latest::particle::Stub;
 use mesh_portal_api_client::ResourceCommand;
@@ -54,7 +54,7 @@ impl ResourceCoreDriverApi {
         rx.await?
     }
 
-    pub async fn request( &self, request: Request) -> Result<Response,Error> {
+    pub async fn request(&self, request: ReqShell) -> Result<RespShell,Error> {
         let (tx,rx) = oneshot::channel();
 println!("Manager mod request....");
         self.tx.send(DriverCall::Request{request, tx }).await;
@@ -79,7 +79,7 @@ println!("Manager mod RETURNING" );
 
 pub enum DriverCall {
     Assign{ assign: Assign, tx: oneshot::Sender<Result<(),Error>> },
-    Request { request: Request, tx: oneshot::Sender<Result<Response,Error>>},
+    Request { request: ReqShell, tx: oneshot::Sender<Result<RespShell,Error>>},
     Get{ point: Point, tx: oneshot::Sender<Result<Payload,Error>>},
     Command { to: Point, command: Command, tx: oneshot::Sender<Result<Payload,Error>> }
 }
@@ -183,8 +183,8 @@ impl ResourceCoreDriverComponent {
     }
 
 
-    async fn request( &mut self, request: Request) -> Response {
-        async fn process(manager: &mut ResourceCoreDriverComponent, request: Request) -> Result<Response,Error> {
+    async fn request(&mut self, request: ReqShell) -> RespShell {
+        async fn process(manager: &mut ResourceCoreDriverComponent, request: ReqShell) -> Result<RespShell,Error> {
             let resource_type = manager.resource_type(&request.to)?;
             let manager = manager.drivers.get(&resource_type ).ok_or(format!("could not get driver for {}", resource_type.to_string()))?;
             Ok(manager.handle_request(request).await)
@@ -260,7 +260,7 @@ pub trait ParticleCoreDriver: Send + Sync {
         assign: Assign,
     ) -> Result<(),Error>;
 
-    async fn handle_request(&self, request: Request ) -> Response {
+    async fn handle_request(&self, request: ReqShell) -> RespShell {
         request.fail(format!("particle type '{}' does not handle requests",self.kind().to_string()).as_str())
     }
 

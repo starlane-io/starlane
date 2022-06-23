@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use mesh_portal::version::latest::entity::request::create::{PointTemplate, KindTemplate, Template, PointSegFactory};
 use mesh_portal::version::latest::id::{Point, RouteSegment};
-use mesh_portal::version::latest::messaging::{Message, Request};
+use mesh_portal::version::latest::messaging::{Message, ReqShell};
 use tokio::sync::mpsc;
 use crate::message::delivery::Delivery;
 use crate::star::StarKey;

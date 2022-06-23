@@ -24,18 +24,18 @@ use futures::StreamExt;
 use http::{HeaderMap, StatusCode, Uri};
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
-use mesh_portal::version::latest::entity::request::{Method, Rc, RequestCore};
+use mesh_portal::version::latest::entity::request::{Method, Rc, ReqCore};
 use mesh_portal::version::latest::entity::request::get::Get;
 use mesh_portal::version::latest::fail;
 use mesh_portal::version::latest::id::{Meta, Point};
-use mesh_portal::version::latest::messaging::{Agent, Message, Request, Response};
+use mesh_portal::version::latest::messaging::{Agent, Message, ReqShell, RespShell};
 use mesh_portal::version::latest::payload::{Payload, PayloadMap,  };
 use mesh_portal::version::latest::particle::{Status, Stub};
 use mesh_portal::version::latest::entity::request::get::GetOp;
 use mesh_portal::version::latest::entity::request::query::Query;
 use mesh_portal::version::latest::entity::request::select::Select;
 use mesh_portal::version::latest::entity::request::set::Set;
-use mesh_portal::version::latest::entity::response::ResponseCore;
+use mesh_portal::version::latest::entity::response::RespCore;
 use mesh_portal::version::latest::id::Tks;
 use mesh_portal::version::latest::payload::CallKind;
 use mesh_portal::version::latest::security::Access;
@@ -158,7 +158,7 @@ impl AsyncProcessor<CoreMessageCall> for MessagingEndpointComponent {
 
 impl MessagingEndpointComponentInner {
 
-    async fn handle_request(&mut self, delivery: Delivery<Request>)
+    async fn handle_request(&mut self, delivery: Delivery<ReqShell>)
     {
         match self.bindex.handle_request(delivery).await {
             Ok(_) => {}
@@ -208,7 +208,7 @@ impl MessagingEndpointComponentInner {
         Ok(())
     }
 
-    async fn process_particle_command(&mut self, delivery: Delivery<Request>)  {
+    async fn process_particle_command(&mut self, delivery: Delivery<ReqShell>)  {
         let skel = self.skel.clone();
         let resource_core_driver_api = self.resource_core_driver_api.clone();
         tokio::spawn(async move {
@@ -325,10 +325,10 @@ impl BindExRouter for EndpointRouter {
 
     fn route_to_particle_core(&self, message: Message) {
         match message {
-            Message::Request(request) => {
+            Message::Req(request) => {
                 self.core_driver_api.request(request);
             }
-            Message::Response(_) => {
+            Message::Resp(_) => {
                 unimplemented!()
             }
         }

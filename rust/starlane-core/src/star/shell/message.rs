@@ -19,7 +19,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use dashmap::DashMap;
 use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::messaging::{Message,  Request, Response};
+use mesh_portal::version::latest::messaging::{Message, ReqShell, RespShell};
 use mesh_portal::version::latest::util::uuid;
 use mesh_portal::version::latest::parse::Res;
 use mesh_portal_versions::version::v0_0_1::id::id::{ToPoint, ToPort};
@@ -38,11 +38,11 @@ impl MessagingApi {
     pub fn message(&self, message: Message ) {
         let mut proto = ProtoStarMessage::new();
         match message {
-            Message::Request(request) => {
+            Message::Req(request) => {
                 proto.to = ProtoStarMessageTo::Resource(request.to.clone().to_point());
                 proto.payload = StarMessagePayload::Request(request);
             }
-            Message::Response(response) => {
+            Message::Resp(response) => {
                 proto.to = ProtoStarMessageTo::Resource(response.to.clone().to_point());
                 proto.payload = StarMessagePayload::Response(response);
             }
@@ -74,7 +74,7 @@ impl MessagingApi {
         rx.await?
     }
 
-    pub async fn notify(&self, request: Request)->Result<(),Error>{
+    pub async fn notify(&self, request: ReqShell) ->Result<(),Error>{
         let mut proto = ProtoStarMessage::new();
         proto.to = ProtoStarMessageTo::Resource(request.to.clone().to_point());
         proto.payload = StarMessagePayload::Request(request);
@@ -82,7 +82,7 @@ impl MessagingApi {
         Ok(())
     }
 
-    pub async fn request(&self, request: Request) ->Response {
+    pub async fn request(&self, request: ReqShell) -> RespShell {
         let (tx,rx) = oneshot::channel();
         let call = MessagingCall::ExchangeRequest{ request:request.clone(), tx };
         self.tx.send(call).await;
@@ -108,7 +108,7 @@ impl MessagingApi {
     }
 
 
-    pub fn on_response(&self, response: Response ) {
+    pub fn on_response(&self, response: RespShell) {
         let call = MessagingCall::Response(response);
         self.tx.try_send(call).unwrap_or_default();
     }
@@ -134,8 +134,8 @@ pub enum MessagingCall {
         fail: Error,
     },
     Reply(StarMessage),
-    ExchangeRequest{request: Request, tx: oneshot::Sender<Response> },
-    Response(Response)
+    ExchangeRequest{request: ReqShell, tx: oneshot::Sender<RespShell> },
+    Response(RespShell)
 }
 
 impl Call for MessagingCall {}
@@ -147,7 +147,7 @@ pub struct MessagingComponent {
 pub struct MessagingComponentInner {
     pub skel: StarSkel,
     pub exchanges: DashMap<MessageId, MessageExchanger>,
-    pub resource_exchange: DashMap<String, oneshot::Sender<Response>>,
+    pub resource_exchange: DashMap<String, oneshot::Sender<RespShell>>,
     pub point: Point
 }
 
@@ -277,7 +277,7 @@ impl MessagingComponentInner {
         }
         if let StarMessagePayload::Request(request) = &proto.payload {
             if let Option::Some((_,exchanger)) = self.resource_exchange.remove(&request.id) {
-                let response = Response {
+                let response = RespShell {
                     id: uuid(),
                     to: request.from.clone(),
                     from: self.skel.info.point.clone().to_port(),

@@ -22,7 +22,7 @@ use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
 use mesh_portal::version::latest::entity::request::create::{Create, KindTemplate, PointSegFactory, PointTemplate, Strategy, Template};
 use mesh_portal::version::latest::entity::request::{Method, Rc};
 use mesh_portal::version::latest::id::{AddressAndKind, KindParts, Point, RouteSegment};
-use mesh_portal::version::latest::messaging::Request;
+use mesh_portal::version::latest::messaging::ReqShell;
 use mesh_portal::version::latest::payload::Payload;
 use zip::result::ZipResult;
 use crate::file_access::FileAccess;
@@ -199,7 +199,7 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
                                 };
 
                                 let core = create.into();
-                                let request = Request::new(core, assign.config.stub.point.clone(), parent);
+                                let request = ReqShell::new(core, assign.config.stub.point.clone(), parent);
                                 let response = skel.messaging_api.request(request).await;
 
                             }

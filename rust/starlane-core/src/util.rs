@@ -12,7 +12,7 @@ use alcoholic_jwt::{JWK, JWKS, token_kid, validate, ValidJWT};
 use lru::LruCache;
 use mesh_portal::version::latest::entity::request::Method;
 use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::messaging::{ProtoRequest, Request};
+use mesh_portal::version::latest::messaging::{ReqProto, ReqShell};
 use mesh_portal::version::latest::msg::MsgMethod;
 
 use tokio::sync::{broadcast, RwLock};
@@ -422,7 +422,7 @@ impl JwksCache {
 
         let action = MsgMethod::new("GetJwks")?;
         let port = Point::from_str(claims.userbase_ref.as_str())?.to_port();
-        let request = ProtoRequest::msg(port, action);
+        let request = ReqProto::msg(port, action);
         let response = self.api.messenger().send(request).await.ok_or()?;
         let jwks = response.core.body.to_text()?;
         let jwks: JWKS = serde_json::from_str(jwks.as_str())?;

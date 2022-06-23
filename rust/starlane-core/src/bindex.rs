@@ -10,10 +10,10 @@ use mesh_portal::version::latest::config::bind::{
     BindConfig, Pipeline, PipelineStep, PipelineStop, StepKind,
 };
 use mesh_portal::version::latest::entity::request::get::{Get, GetOp};
-use mesh_portal::version::latest::entity::request::{Method, Rc, RequestCore};
-use mesh_portal::version::latest::entity::response::ResponseCore;
+use mesh_portal::version::latest::entity::request::{Method, Rc, ReqCore};
+use mesh_portal::version::latest::entity::response::RespCore;
 use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::messaging::{Agent, Message, Request, Response};
+use mesh_portal::version::latest::messaging::{Agent, Message, ReqShell, RespShell};
 use mesh_portal::version::latest::payload::{Call, CallKind, Payload};
 use mesh_portal::version::latest::log::{PointLogger, SpanLogger};
 use mesh_portal_versions::error::MsgErr;
@@ -52,16 +52,16 @@ pub struct BindEx {
     pub registry: Arc<dyn RegistryApi>,
 }
 
-fn request_id(request: &Request) -> String {
+fn request_id(request: &ReqShell) -> String {
     format!("{}{}", request.to.to_string(), request.id)
 }
 
-fn request_id_from_response(response: &Response) -> String {
+fn request_id_from_response(response: &RespShell) -> String {
     format!("{}{}", response.from.to_string(), response.response_to)
 }
 
 impl BindEx {
-    pub async fn handle_request(&self, delivery: Delivery<Request>) -> anyhow::Result<()>{
+    pub async fn handle_request(&self, delivery: Delivery<ReqShell>) -> anyhow::Result<()>{
 
         info!("BindEx: handle_request");
         let logger = self.logger.point(delivery.to.clone());
@@ -133,7 +133,7 @@ impl BindEx {
         Ok(())
     }
 
-    pub async fn handle_response(&self, response: Response) -> anyhow::Result<()> {
+    pub async fn handle_response(&self, response: RespShell) -> anyhow::Result<()> {
         let request_id = request_id_from_response(&response);
         let mut pipex = {
             let mut lock = self.pipeline_executors.lock().await;
@@ -178,10 +178,10 @@ impl BindEx {
     async fn handle_action( &self, action: RequestAction ) -> anyhow::Result<()> {
         match action.action {
             PipeAction::CoreRequest(request) => {
-                self.router.route_to_particle_core(Message::Request(request));
+                self.router.route_to_particle_core(Message::Req(request));
             }
             PipeAction::MeshRequest(request) => {
-                self.router.route_to_mesh(Message::Request(request));
+                self.router.route_to_mesh(Message::Req(request));
             }
             PipeAction::Respond => {
                 let pipex = {
@@ -213,7 +213,7 @@ pub struct PipeEx {
 
 impl PipeEx {
     pub fn new(
-        delivery: Delivery<Request>,
+        delivery: Delivery<ReqShell>,
         binder: BindEx,
         pipeline: PipelineVar,
         env: Env,
@@ -243,8 +243,8 @@ impl PipeEx {
         }
     }
 
-    pub fn handle_response(&mut self, response: Response) -> anyhow::Result<PipeAction> {
-        self.traversal.push(Message::Response(response));
+    pub fn handle_response(&mut self, response: RespShell) -> anyhow::Result<PipeAction> {
+        self.traversal.push(Message::Resp(response));
         self.next()
     }
 
@@ -274,11 +274,11 @@ impl PipeEx {
                         (Method::Http(http.method.clone()), path)
                     }
                 };
-                let mut core: RequestCore = method.into();
+                let mut core: ReqCore = method.into();
                 core.body = self.traversal.body.clone();
                 core.headers = self.traversal.headers.clone();
                 core.uri = Uri::from_str(path.as_str())?;
-                let request = Request::new(core, self.traversal.to(), call.point);
+                let request = ReqShell::new(core, self.traversal.to(), call.point);
                 Ok(PipeAction::MeshRequest(request))
             }
             PipelineStopVar::Respond => Ok(PipeAction::Respond),
@@ -287,7 +287,7 @@ impl PipeEx {
                 let point:Point = point.clone().to_resolved(&self.env)?;
                 let method = Method::Cmd(CmdMethod::Read);
                 let core = method.into();
-                let request = Request::new(core, self.traversal.to(), point);
+                let request = ReqShell::new(core, self.traversal.to(), point);
                 Ok(PipeAction::MeshRequest(request))
             }
         }
@@ -321,7 +321,7 @@ impl PipeEx {
 
 
 pub struct Traverser {
-    pub initial_request: Delivery<Request>,
+    pub initial_request: Delivery<ReqShell>,
     pub method: Method,
     pub body: Payload,
     pub uri: Uri,
@@ -330,7 +330,7 @@ pub struct Traverser {
 }
 
 impl Traverser {
-    pub fn new(initial_request: Delivery<Request>) -> Self {
+    pub fn new(initial_request: Delivery<ReqShell>) -> Self {
         Self {
             method: initial_request.core.method.clone(),
             body: initial_request.item.core.body.clone(),
@@ -341,8 +341,8 @@ impl Traverser {
         }
     }
 
-    pub fn request_core(&self) -> RequestCore {
-        RequestCore {
+    pub fn request_core(&self) -> ReqCore {
+        ReqCore {
             headers: self.headers.clone(),
             method: self.method.clone(),
             uri: self.uri.clone(),
@@ -358,20 +358,20 @@ impl Traverser {
         self.initial_request.from.clone().to_point()
     }
 
-    pub fn request(&self) -> Request {
-        Request::new(self.request_core(), self.from(), self.to())
+    pub fn request(&self) -> ReqShell {
+        ReqShell::new(self.request_core(), self.from(), self.to())
     }
 
-    pub fn response_core(&self) -> ResponseCore {
-        ResponseCore {
+    pub fn response_core(&self) -> RespCore {
+        RespCore {
             headers: self.headers.clone(),
             body: self.body.clone(),
             status: self.status.clone(),
         }
     }
 
-    pub fn response(&self) -> Response {
-        Response::new(
+    pub fn response(&self) -> RespShell {
+        RespShell::new(
             self.response_core(),
             self.to(),
             self.from(),
@@ -381,13 +381,13 @@ impl Traverser {
 
     pub fn push(&mut self, message: Message) {
         match message {
-            Message::Request(request) => {
+            Message::Req(request) => {
                 self.method = request.core.method;
                 self.uri = request.core.uri;
                 self.headers = request.core.headers;
                 self.body = request.core.body;
             }
-            Message::Response(response) => {
+            Message::Resp(response) => {
                 self.headers = response.core.headers;
                 self.body = response.core.body;
                 self.status = response.core.status;
@@ -427,8 +427,8 @@ struct RequestAction {
 }
 
 pub enum PipeAction {
-    CoreRequest(Request),
-    MeshRequest(Request),
+    CoreRequest(ReqShell),
+    MeshRequest(ReqShell),
     Respond,
 }
 
@@ -437,17 +437,17 @@ pub struct BindExSpanner {
 }
 
 impl BindExSpanner {
-   pub fn handle_request( &self, request: Request ) {
+   pub fn handle_request( &self, request: ReqShell) {
 
    }
 
-   pub fn handle_response( &self, response: Response ) {
+   pub fn handle_response( &self, response: RespShell) {
 
    }
 }
 
 pub struct RequestSpanner {
-    pub request: Request,
+    pub request: ReqShell,
     pub spanner: BindExSpanner
 }
 

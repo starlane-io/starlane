@@ -21,7 +21,7 @@ use crate::message::delivery::Delivery;
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::config;
 use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::messaging::{Request, Response};
+use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 use mesh_portal::version::latest::portal;
 use mesh_portal::version::latest::portal::Exchanger;
 use mesh_portal::version::latest::portal::inlet::AssignRequest;
@@ -32,7 +32,7 @@ use tokio::sync::broadcast::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot::error::RecvError;
 use mesh_portal::version::latest::config::{ParticleConfigBody, PointConfig};
-use mesh_portal_versions::version::v0_0_1::wave::AsyncMessenger;
+use mesh_portal_versions::version::v0_0_1::wave::AsyncTransmitter;
 use mesh_portal_versions::version::v0_0_1::particle::particle::Details;
 
 use crate::config::config::{MechtronConfig, ParticleConfig};
@@ -207,7 +207,7 @@ println!("MechtronConfig.wasm_src() {}", config.wasm_src()?.to_string() );
         Ok(())
     }
 
-    async fn handle_request(&self, request: Request ) -> Response {
+    async fn handle_request(&self, request: ReqShell) -> RespShell {
 
 info!("handling request");
 
@@ -297,13 +297,13 @@ impl MechtronManagerInner {
 }
 
 pub struct MechtronPortalServer {
-    pub messenger: Arc<dyn AsyncMessenger>,
+    pub messenger: Arc<dyn AsyncTransmitter>,
     pub request_assign_handler: Arc<dyn PortalRequestHandler>,
     portals: Arc<DashMap<String, Portal>>,
 }
 
 impl MechtronPortalServer {
-    pub fn new(messenger: Arc<dyn AsyncMessenger>) -> Self {
+    pub fn new(messenger: Arc<dyn AsyncTransmitter>) -> Self {
         Self {
             messenger,
             request_assign_handler: Arc::new(MechtronPortalRequestHandler::new(api) ),
@@ -339,11 +339,11 @@ fn test_logger(message: &str) {
 
 
 pub struct MechtronPortalRequestHandler {
-    messenger: Arc<dyn AsyncMessenger>
+    messenger: Arc<dyn AsyncTransmitter>
 }
 
 impl MechtronPortalRequestHandler {
-    pub fn new(messenger: Arc<dyn AsyncMessenger>)-> Self {
+    pub fn new(messenger: Arc<dyn AsyncTransmitter>) -> Self {
         MechtronPortalRequestHandler {
             messenger
         }
@@ -352,7 +352,7 @@ impl MechtronPortalRequestHandler {
 
 #[async_trait]
 impl PortalRequestHandler for MechtronPortalRequestHandler {
-    async fn route_to_mesh(&self, request: Request) -> Response {
+    async fn route_to_mesh(&self, request: ReqShell) -> RespShell {
         self.messenger.send(request).await
     }
 

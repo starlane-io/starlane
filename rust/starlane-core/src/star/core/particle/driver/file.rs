@@ -18,9 +18,9 @@ use std::str::FromStr;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
 use mesh_portal::version::latest::command::request::CmdMethod;
 use mesh_portal::version::latest::entity::request::create::{Create, KindTemplate, PointSegFactory, PointTemplate, Strategy, Template};
-use mesh_portal::version::latest::entity::request::{Method, Rc, RequestCore};
+use mesh_portal::version::latest::entity::request::{Method, Rc, ReqCore};
 use mesh_portal::version::latest::id::{AddressAndKind, KindParts, Point};
-use mesh_portal::version::latest::messaging::Request;
+use mesh_portal::version::latest::messaging::ReqShell;
 use mesh_portal_versions::version::v0_0_1::wave::ReqProto;
 
 #[derive(Debug)]
@@ -139,8 +139,8 @@ impl ParticleCoreDriver for FileSystemManager {
                 registry: Default::default()
             };
 
-            let request :RequestCore= create.into();
-            let request = Request::new(request, assign.config.stub.point.clone(), Point::global_executor() );
+            let request : ReqCore = create.into();
+            let request = ReqShell::new(request, assign.config.stub.point.clone(), Point::global_executor() );
             skel.messaging_api.request(request).await;
         });
         Ok(())
