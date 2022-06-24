@@ -14,19 +14,19 @@ use mesh_portal::version::latest::log::{LogSpan, PointLogger, RootLogger};
 use mesh_portal::version::latest::messaging::{Agent, ReqShell, RespShell, RootRequestCtx};
 use mesh_portal_versions::version::v0_0_1::config::config::bind::RouteSelector;
 use mesh_portal_versions::version::v0_0_1::id::id::{Layer, ToPoint, ToPort};
-use mesh_portal_versions::version::v0_0_1::wave::{AsyncInternalRequestHandlers, AsyncTransmitter, AsyncTransmitterWithAgent, AsyncPointRequestHandlers, AsyncRequestHandler, AsyncRequestHandlerRelay, AsyncRouter, ReqCtx, Requestable, ReqFrame, RespFrame, Wave, WaveFrame};
+use mesh_portal_versions::version::v0_0_1::wave::{AsyncInternalRequestHandlers, AsyncTransmitter, AsyncTransmitterWithAgent, AsyncPointRequestHandlers, AsyncRequestHandler, AsyncRequestHandlerRelay, AsyncRouter, ReqCtx, Requestable, ReqXtra, RespXtra, Wave, WaveXtra};
 use mesh_portal_versions::version::v0_0_1::quota::Timeouts;
 
 pub struct Shell {
-    transmitter: Arc<dyn AsyncTransmitter<ReqFrame, RespFrame>>,
+    transmitter: Arc<dyn AsyncTransmitter<ReqXtra, RespXtra>>,
     handlers: ShellHandler,
     logger: RootLogger,
-    exchanges: Arc<DashMap<Uuid,oneshot::Sender<RespFrame>>>,
-    core_tx: mpsc::Sender<WaveFrame>
+    exchanges: Arc<DashMap<Uuid,oneshot::Sender<RespXtra>>>,
+    core_tx: mpsc::Sender<WaveXtra>
 }
 
 impl Shell {
-    pub async fn new(point: Point, messenger: Arc<dyn AsyncTransmitter<ReqShell, RespShell>>, mut inlet_rx: mpsc::Receiver<WaveFrame>, core_tx: mpsc::Sender<WaveFrame>, logger: RootLogger ) -> Self {
+    pub async fn new(point: Point, messenger: Arc<dyn AsyncTransmitter<ReqShell, RespShell>>, mut inlet_rx: mpsc::Receiver<WaveXtra>, core_tx: mpsc::Sender<WaveXtra>, logger: RootLogger ) -> Self {
         let logger = logger.point(point.clone());
         let port = point.to_port().with_layer(Layer::Shell );
         let transmitter = AsyncTransmitterWithAgent::new(Agent::Anonymous, port.clone(), messenger );
@@ -46,7 +46,7 @@ impl Shell {
                         continue;
                     }
                     match frame {
-                        WaveFrame::Req(frame) => {
+                        WaveXtra::Req(frame) => {
                             let stub = frame.as_stub();
                             if frame.to().point == port.point {
                                 if frame.to().layer == Layer::Shell {
@@ -55,19 +55,19 @@ impl Shell {
                                     let ctx = RootRequestCtx::new( request, logger.clone() );
                                     let response: RespCore = handlers.handle(ctx).await.into();
                                     let frame = stub.core(response);
-                                    let frame: WaveFrame = frame.into();
+                                    let frame: WaveXtra = frame.into();
                                     core_tx.send( frame ).await;
                                 } else {
                                     // sure, the core can send a message to itself...
                                     core_tx.send(frame.into() ).await;
                                 }
                             } else {
-                                let frame : RespFrame = stub.result(core_messenger.send( frame.request.into() ).await);
-                                let frame: WaveFrame = frame.into();
+                                let frame : RespXtra = stub.result(core_messenger.send( frame.request.into() ).await);
+                                let frame: WaveXtra = frame.into();
                                 core_tx.send(frame).await;
                             }
                         }
-                        WaveFrame::Resp(frame) => {
+                        WaveXtra::Resp(frame) => {
                             if frame.to().point == port.point {
                                 if frame.to().layer == Layer::Shell {
                                     match exchanges.remove(frame.response_to() ) {
@@ -115,14 +115,14 @@ impl Shell {
 #[derive(AsyncRequestHandler)]
 pub struct ShellHandler {
     handlers: AsyncInternalRequestHandlers<AsyncRequestHandlerRelay>,
-    core_tx: mpsc::Sender<WaveFrame>,
+    core_tx: mpsc::Sender<WaveXtra>,
     exchanges: Arc<DashMap<Uuid,oneshot::Sender<RespShell>>>,
     timeouts: Timeouts
 }
 
 
 impl ShellHandler {
-    pub fn new(handlers: AsyncInternalRequestHandlers<AsyncRequestHandlerRelay>, core_tx: mpsc::Sender<WaveFrame>, exchanges: Arc<DashMap<Uuid,oneshot::Sender<RespShell>>> ) -> Self {
+    pub fn new(handlers: AsyncInternalRequestHandlers<AsyncRequestHandlerRelay>, core_tx: mpsc::Sender<WaveXtra>, exchanges: Arc<DashMap<Uuid,oneshot::Sender<RespShell>>> ) -> Self {
         Self {
             handlers,
             core_tx,
