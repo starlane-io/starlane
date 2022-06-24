@@ -11,7 +11,6 @@ use tokio::time::Duration;
 
 use crate::error::Error;
 use crate::message::ProtoStarMessage;
-use crate::particle::{Kind, KindBase};
 use crate::star::{StarCommand, StarSkel};
 use crate::util;
 use crate::fail::Fail;

@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::RandomState;
+use std::convert::TryFrom;
 use std::future::Future;
 
 use mysql::uuid::Uuid;
@@ -12,7 +13,7 @@ use crate::error::Error;
 use crate::frame::{Frame, ProtoFrame,  StarMessage, WatchFrame};
 use crate::lane::{LaneKey, LaneSession, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
-use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
+use mesh_portal_versions::version::v0_0_1::sys::{Location, ParticleRecord};
 use crate::star::{StarKey, StarSkel};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::variant::FrameVerdict;
@@ -164,11 +165,23 @@ impl WatchComponent {
         match &selector.topic {
             Topic::Point(point) => {
                 let record = skel.registry_api.locate(&point).await?;
-                if skel.info.key.to_point() == record.location.ok_or()?{
+                if skel.info.key.clone().to_point() == record.location.ok_or()?{
                     Ok(NextKind::Core)
                 } else {
-                    let lane = skel.golden_path_api.golden_lane_leading_to_star(record.location.ok_or()?).await?;
-                    Ok(NextKind::Lane(lane))
+                    match record.location {
+                        Location::Central => {
+                            let lane = skel.golden_path_api.golden_lane_leading_to_star(StarKey::central()).await?;
+                            Ok(NextKind::Lane(lane))
+                        }
+                        Location::Nowhere => {
+                            Err(Error::new("particle location is `Nowhere`"))
+                        }
+                        Location::Somewhere(point) => {
+                            let star = StarKey::try_from(point)?;
+                            let lane = skel.golden_path_api.golden_lane_leading_to_star(star).await?;
+                            Ok(NextKind::Lane(lane))
+                        }
+                    }
                 }
             }
             Topic::Star(star) => {

@@ -6,9 +6,6 @@ use mesh_portal::version::latest::id::Point;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
-use crate::particle::{
-    KindBase,
-};
 
 #[derive(Clone)]
 pub struct File {

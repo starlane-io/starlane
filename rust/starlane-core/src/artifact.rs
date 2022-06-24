@@ -3,10 +3,10 @@ use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::path::Path;
 
 use serde::{Deserialize, Serialize};
+use mesh_portal_versions::version::v0_0_1::id::ArtifactSubKind;
 
 use crate::error::Error;
 
-use crate::particle::{KindBase, ArtifactSubKind};
 
 #[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct ArtifactBundle {

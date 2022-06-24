@@ -1,14 +1,17 @@
 use crate::artifact::ArtifactRef;
 use crate::cache::{ArtifactItem, Cacheable};
 use crate::error::Error;
-use crate::particle::{ArtifactSubKind, Kind};
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::particle::Property;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::str::FromStr;
+use serde::{Deserialize, Serialize};
+use mesh_portal_versions::version::v0_0_1::id::ArtifactSubKind;
+use mesh_portal_versions::version::v0_0_1::id::id::Kind;
 
+#[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub struct ParticleConfig {
     pub artifact_ref: ArtifactRef,
     pub kind: Kind,

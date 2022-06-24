@@ -3,7 +3,6 @@ use std::ops::Deref;
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::payload::{Payload, PayloadPattern};
-use mesh_portal_api_client::ResourceCommand::Add;
 use mesh_portal_versions::version::v0_0_1::util::ValueMatcher;
 use validator::validate_email;
 use crate::error::Error;

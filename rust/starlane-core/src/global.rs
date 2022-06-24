@@ -7,7 +7,7 @@ use mesh_portal::version::latest::payload::{Payload, PayloadType};
 use mesh_portal_versions::version::v0_0_1::command::Command;
 use mesh_portal_versions::version::v0_0_1::id::id::Port;
 use mesh_portal_versions::version::v0_0_1::id::id::ToPort;
-use mesh_portal_versions::version::v0_0_1::wave::{AsyncTransmitter, AsyncTransmitterWithAgent, AuthedAgent, Method};
+use mesh_portal_versions::version::v0_0_1::wave::{AsyncTransmitter, AsyncTransmitterWithAgent,  Method};
 use mesh_portal_versions::version::v0_0_1::service::Global;
 use crate::error::Error;
 use crate::registry::RegistryApi;
@@ -19,7 +19,7 @@ lazy_static! {
 #[derive(Clone)]
 pub struct GlobalApi {
     registry: RegistryApi,
-    messenger: AsyncTransmitterWithAgent
+    transmitter: Arc<dyn AsyncTransmitter>
 }
 
 #[async_trait]
@@ -34,11 +34,11 @@ impl Global for GlobalApi {
 }
 impl GlobalApi {
 
-    pub fn new(registry: RegistryApi, messenger: Arc<dyn AsyncTransmitter<ReqShell, RespShell>> ) -> Self {
-        let messenger = AsyncTransmitterWithAgent::new( Agent::Point(AuthedAgent::new(Point::global_executor())))
+    pub fn new(registry: RegistryApi, transmitter: Arc<dyn AsyncTransmitter> ) -> Self {
+        //let transmitter = AsyncTransmitterWithAgent::new( Agent::Point(Point::global_executor()), Point::global_executor().to_port(), transmitter );
         Self {
             registry,
-            messenger
+            transmitter
         }
     }
 
@@ -52,18 +52,18 @@ impl GlobalApi {
                                 let mut response = {
                                     let mut request = request.clone();
                                     request.to = create.template.point.parent.clone().to_port();
-                                    global.messenger.send(request).await
+                                    global.transmitter.send(request).await
                                 };
                                 response.from = Point::global_executor().to_port();
                                 Ok(response)
                             }
                             Command::Delete(delete) => {
                                 let list = global.registry.delete(delete).await?;
-                                Ok(request.ok_payload(Payload::List(list)))
+                                Ok(request.ok_body(Payload::List(list)))
                             }
                             Command::Select(select) => {
                                 let list = global.registry.select(select).await?;
-                                Ok(request.ok_payload(Payload::List(list)))
+                                Ok(request.ok_body(Payload::List(list)))
                             }
                             Command::Set(set) => {
                                 global.registry.set(set).await?;
@@ -71,7 +71,7 @@ impl GlobalApi {
                             }
                             Command::Get(get) => {
                                 let payload= global.registry.get(get).await?;
-                                Ok(request.ok_payload(payload))
+                                Ok(request.ok_body(payload))
                             }
                             Command::Update(_) => {
                                 Ok(request.status(400))

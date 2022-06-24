@@ -17,9 +17,6 @@ use mesh_portal::version::latest::frame::PrimitiveFrame;
 use mesh_portal_api_server::Portal;
 use mesh_portal::version::latest::id::{Point, Port};
 use mesh_portal::version::latest::path;
-use mesh_portal_tcp_client::PortalTcpClient;
-use mesh_portal_tcp_common::{FrameReader, FrameWriter, PrimitiveFrameReader, PrimitiveFrameWriter};
-use mesh_portal_tcp_server::{PointFactory, PortalTcpServer, TcpServerCall};
 
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
@@ -33,16 +30,13 @@ use mesh_portal_versions::version::v0_0_1::wave::AsyncTransmitterWithAgent;
 use crate::artifact::ArtifactRef;
 
 use crate::cache::{ArtifactBundleSrc, ArtifactCaches, ProtoArtifactCachesFactory};
-use crate::command::cli::CliServer;
 use crate::constellation::{Constellation, ConstellationStatus};
-use crate::endpoint::ServicesEndpoint;
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::global::GlobalApi;
 
 use crate::lane::{ClientSideTunnelConnector, LocalTunnelConnector, ProtoLaneEnd, ServerSideTunnelConnector, OnCloseAction};
 use crate::logger::{Flags, Logger};
-use crate::mechtron::portal_client::MechtronPortalClient;
 use crate::message::StarlaneMessenger;
 
 use crate::proto::{local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoStarKey, ProtoTunnel};
@@ -51,7 +45,6 @@ use crate::registry::{Registry, RegistryApi};
 use crate::star::surface::SurfaceApi;
 use crate::star::{ConstellationBroadcast, StarKind, StarStatus};
 use crate::star::{Request, Star, StarCommand, StarController, StarInfo, StarKey, StarTemplateId};
-use crate::star::core::particle::driver::mechtron::MechtronPortalServer;
 use crate::starlane::api::StarlaneApi;
 use crate::starlane::files::MachineFileSystem;
 use crate::template::{
@@ -146,13 +139,7 @@ impl StarlaneMachine {
         Ok(rx.await?.ok_or("expected proto artifact cache")?)
     }
 
-    pub async fn start_mechtron_portal_server( &self ) -> Result<mpsc::Sender<TcpServerCall>,Error> {
-        let (tx,rx) = oneshot::channel();
-        self.tx
-            .send(StarlaneCommand::StartMechtronPortal(tx))
-            .await?;
-        Ok(rx.await??)
-    }
+
 
     pub fn machine_filesystem(&self) -> Arc<MachineFileSystem> {
         self.machine_filesystem.clone()
@@ -190,13 +177,6 @@ impl StarlaneMachine {
         self.tx
             .send(StarlaneCommand::StarlaneApiSelectBest{port,tx})
             .await?;
-        rx.await?
-    }
-
-    pub async fn listen(&self) -> Result<(), Error> {
-        let command_tx = self.tx.clone();
-        let (tx, rx) = oneshot::channel();
-        command_tx.send(StarlaneCommand::Listen{ machine: self.clone(), tx }).await;
         rx.await?
     }
 
@@ -363,9 +343,11 @@ impl StarlaneMachineRunner {
                             mut_flags.listening
                         };
 
-                        if listening {
+/*                        if listening {
                             Self::unlisten(self.inner_flags.clone(), self.port.clone());
                         }
+
+ */
 
                         for (_, star_ctrl) in self
                             .star_controllers
@@ -381,10 +363,6 @@ impl StarlaneMachineRunner {
                         self.command_rx.close();
                         break;
                     }
-                    StarlaneCommand::Listen{machine, tx} => {
-                        self.listen(machine, tx);
-                    }
-
                     StarlaneCommand::GetProtoArtifactCachesFactory(tx) => {
                         match self.artifact_caches.as_ref() {
                             None => {
@@ -394,9 +372,6 @@ impl StarlaneMachineRunner {
                                 tx.send(Option::Some(caches.clone()));
                             }
                         }
-                    }
-                    StarlaneCommand::StartMechtronPortal(tx) => {
-                        self.start_mechtron_portal_server(tx).await;
                     }
                 }
             }
@@ -661,46 +636,6 @@ impl StarlaneMachineRunner {
         Ok(())
     }
 
-    async fn start_mechtron_portal_server(&mut self, result_tx: oneshot::Sender<Result<mpsc::Sender<TcpServerCall>,Error>>) {
-        {
-            /*
-            async fn process( runner: &mut StarlaneMachineRunner) -> Result<mpsc::Sender<TcpServerCall>,Error> {
-
-                let starlane_api = runner.get_starlane_api().await?;
-                let mut inner_flags = runner.inner_flags.lock().unwrap();
-                let flags = inner_flags.get_mut();
-                if let Some(serve_tx) = &flags.mechtron_portal_server {
-                    Ok(serve_tx.clone() )
-                } else {
-
-                    pub struct HackedPointFactory{ };
-
-                    impl PointFactory for HackedPointFactory {
-                        fn point(&self) -> Point {
-                            Point::from_str("<<HACK>>::portal").unwrap()
-                        }
-                    }
-
-
-                    let server_tx = PortalTcpServer::new( STARLANE_MECHTRON_PORT.clone() , Box::new(MechtronPortalServer::new(starlane_api ) ), Arc::new( HackedPointFactory{}) );
-                    flags.mechtron_portal_server = Option::Some(server_tx.clone());
-                    Ok(server_tx)
-                }
-            }
-
-             */
-           // result_tx.send(process(self).await);
-           unimplemented!()
-        }
-    }
-    fn listen(&mut self, machine: StarlaneMachine, result_tx: oneshot::Sender<Result<(), Error>>) {
-        let port = self.port.clone();
-        tokio::spawn( async move {
-            let result = ServicesEndpoint::new(machine, port).await;
-println!("listening? {}", result.is_ok());
-            result_tx.send(result);
-        });
-    }
 
     pub fn caches(&self) -> Result<Arc<ProtoArtifactCachesFactory>, Error> {
         Ok(self
@@ -826,13 +761,7 @@ println!("listening? {}", result.is_ok());
         Ok(rtn)
     }
 
-    fn unlisten(inner_flags: Arc<Mutex<Cell<StarlaneInnerFlags>>>, port: usize) {
-        {
-            let mut flags = inner_flags.lock().unwrap();
-            flags.get_mut().shutdown = true;
-        }
-        std::net::TcpStream::connect(format!("localhost:{}", port));
-    }
+
 }
 
 impl Drop for StarlaneMachineRunner {
@@ -846,9 +775,7 @@ impl Drop for StarlaneMachineRunner {
                 warn!("dropping Starlane( {} ) unexpectedly", self.name);
             }
 
-            if !flags_mut.listening {
-                Self::unlisten(self.inner_flags.clone(), self.port.clone());
-            }
+
         }
     }
 }
@@ -863,9 +790,7 @@ pub struct VersionFrame {
 pub enum StarlaneCommand {
     ConstellationCreate(ConstellationCreate),
     StarlaneApiSelectBest{port: Port, tx: oneshot::Sender<Result<StarlaneApi, Error>>},
-    Listen{ machine: StarlaneMachine, tx: oneshot::Sender<Result<(), Error>> },
     GetProtoArtifactCachesFactory(oneshot::Sender<Option<Arc<ProtoArtifactCachesFactory>>>),
-    StartMechtronPortal(oneshot::Sender<Result<mpsc::Sender<TcpServerCall>,Error>>),
     Request{ request: mesh_portal::version::latest::messaging::ReqShell, tx: oneshot::Sender<mesh_portal::version::latest::messaging::RespShell>},
     Shutdown,
 }
@@ -927,7 +852,6 @@ pub enum StarAddress {
 struct StarlaneInnerFlags {
     pub shutdown: bool,
     pub listening: bool,
-    pub mechtron_portal_server: Option<mpsc::Sender<TcpServerCall>>
 }
 
 impl StarlaneInnerFlags {
@@ -935,7 +859,6 @@ impl StarlaneInnerFlags {
         Self {
             shutdown: false,
             listening: false,
-            mechtron_portal_server: Option::None
         }
     }
 }

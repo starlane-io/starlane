@@ -1,7 +1,7 @@
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
 use crate::message::delivery::Delivery;
-use crate::particle::ArtifactSubKind;
+use mesh_portal_versions::version::v0_0_1::id::ArtifactSubKind;
 use crate::star::core::particle::driver::ResourceCoreDriverApi;
 use crate::star::StarSkel;
 use http::{HeaderMap, StatusCode, Uri};
@@ -35,7 +35,7 @@ use mesh_portal_versions::version::v0_0_1::util::{ToResolved, ValueMatcher};
 use nom::combinator::map_res;
 use tokio::io::AsyncBufReadExt;
 use tokio::sync::Mutex;
-use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
+use mesh_portal_versions::version::v0_0_1::id::id::{ToPoint, ToPort};
 use mesh_portal_versions::version::v0_0_1::wave::CmdMethod;
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 use crate::cache::{ArtifactItem, Cacheable, CachedConfig};
@@ -373,8 +373,8 @@ impl Traverser {
     pub fn response(&self) -> RespShell {
         RespShell::new(
             self.response_core(),
-            self.to(),
-            self.from(),
+            self.to().to_port(),
+            self.from().to_port(),
             self.initial_request.id.clone(),
         )
     }
@@ -454,7 +454,7 @@ pub struct RequestSpanner {
 mod tmp {
     use crate::artifact::ArtifactRef;
     use crate::bindex::BindConfigCache;
-    use crate::particle::ArtifactSubKind;
+    use mesh_portal_versions::version::v0_0_1::id::ArtifactSubKind;
     use crate::star::StarSkel;
     use mesh_artifact_api::Artifact;
     use mesh_portal::version::latest::config::bind::BindConfig;

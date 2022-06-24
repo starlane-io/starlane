@@ -6,7 +6,6 @@ use yaml_rust::Yaml;
 
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
-use crate::particle::{ArtifactSubKind, KindBase, Assign};
 use crate::star::core::particle::driver::ParticleCoreDriver;
 use crate::star::core::particle::state::StateStore;
 use crate::star::StarSkel;
@@ -19,7 +18,9 @@ use std::sync::atomic::AtomicU32;
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
-use mesh_portal_tcp_server::PortalServer;
+use mesh_portal_versions::version::v0_0_1::id::ArtifactSubKind;
+use mesh_portal_versions::version::v0_0_1::id::id::KindBase;
+use mesh_portal_versions::version::v0_0_1::sys::Assign;
 
 #[derive(Debug)]
 pub struct PortalCoreDriver {
@@ -43,17 +44,17 @@ impl ParticleCoreDriver for PortalCoreDriver {
         assign: Assign,
     ) -> Result<(), Error> {
         let state = match assign.state {
-            StateSrc::Payload(data) => data,
+            StateSrc::Substance(data) => data,
             StateSrc::None => return Err("File cannot be stateless".into()),
             _ => {
                 return Err("File must specify Direct state".into() )
             }
         };
 
-        self.store.put(assign.config.stub.point.clone(), state.clone() ).await?;
+        self.store.put(assign.details.stub.point.clone(), state.clone() ).await?;
 
         let selector = WatchSelector{
-            topic: Topic::Point(assign.config.stub.point),
+            topic: Topic::Point(assign.details.stub.point),
             property: Property::State
         };
 

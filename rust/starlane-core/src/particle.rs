@@ -16,8 +16,8 @@ use mesh_portal::version::latest::id::{KindParts, Point, ResourceKind, Specific}
 use mesh_portal::version::latest::payload::Payload;
 use mesh_portal::version::latest::particle::{Status, Stub};
 use mesh_portal::version::latest::security::Permissions;
-use mesh_portal_versions::version::v0_0_1::parse::consume_kind;
-use mesh_portal_versions::version::v0_0_1::particle::particle::Details;
+use mesh_portal_versions::version::v0_0_1::parse::{CamelCase, consume_kind};
+use mesh_portal_versions::version::v0_0_1::particle::particle::{Details, Property};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
 use tokio::sync::oneshot::Receiver;
@@ -25,7 +25,8 @@ use tracing_futures::WithSubscriber;
 use cosmic_nom::new_span;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::config::{ParticleConfigBody, PointConfig};
-use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
+use mesh_portal_versions::version::v0_0_1::id::id::{KindBase, ToKindBase, ToPoint};
+use mesh_portal_versions::version::v0_0_1::id::{ArtifactSubKind, BaseSubKind, FileSubKind, UserBaseSubKind};
 use mesh_portal_versions::version::v0_0_1::sys::{AssignmentKind, ChildRegistry, Location};
 
 use crate::{error, logger, util};
@@ -38,7 +39,6 @@ use crate::logger::{elog, LogInfo, StaticLogInfo};
 
 use crate::message::{MessageExpect, ProtoStarMessage, ReplyKind};
 use crate::names::Name;
-use crate::particle::KindBase::Mechtron;
 use crate::particle::property::{AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit, PropertySource, U64Pattern};
 use crate::star::{StarInfo, StarKey, StarSkel};
 use crate::star::core::particle::driver::user::UsernamePattern;
@@ -84,136 +84,16 @@ impl FromStr for DisplayValue {
     }
 }
 
-#[derive(
-    Debug,
-    Clone,
-    Serialize,
-    Deserialize,
-    Eq,
-    PartialEq,
-    Hash,
-    strum_macros::Display,
-    strum_macros::EnumString,
-)]
-pub enum KindBase {
-    Root,
-    Space,
-    UserBase,
-    Base,
-    User,
-    App,
-    Mechtron,
-    FileSystem,
-    File,
-    Database,
-    Authenticator,
-    ArtifactBundleSeries,
-    ArtifactBundle,
-    Artifact,
-    Control,
-    Proxy,
-    Credentials,
-}
+
+
 
 /*
-impl FromStr for KindBase{
-    type Err = mesh_portal::error::MsgErr;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(
-           match s  {
-               "Root" => Self::Root,
-               "Space" => Self::Space,
-               "Base" => Self::Base,
-               "User" => Self::User,
-               "App" => Self::App,
-               "Mechtron" => Self::Mechtron,
-               "FileSystem" => Self::FileSystem,
-               "File" => Self::File,
-               "Database" => Self::Database,
-               "Authenticator" => Self::Authenticator,
-               "ArtifactBundleSeries" => Self::ArtifactBundleSeries,
-               "ArtifactBundle" => Self::ArtifactBundle,
-               "Artifact" => Self::Artifact,
-               "Proxy" => Self::Proxy,
-               "Credentials" => Self::Credentials,
-               "Control" => Self::Control,
-               what => {
-                   return Err(format!("invalid Kind: '{}'", what).into());
-               }
-           }
-        )
-    }
-}
-
- */
-
-impl Into<String> for KindBase {
-    fn into(self) -> String {
-        self.to_string()
-    }
-}
-
-impl TryFrom<String> for KindBase {
-    type Error = mesh_portal::error::MsgErr;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Ok(KindBase::from_str(value.as_str())?)
-    }
-}
-
-impl KindBase {
-    pub fn child_resource_registry_handler(&self) -> ChildRegistry {
-        match self {
-            Self::UserBase => ChildRegistry::Core,
-            _ => ChildRegistry::Shell
-        }
-    }
-}
-
-#[derive(
-    Debug,
-    Clone,
-    Serialize,
-    Deserialize,
-    Eq,
-    PartialEq,
-    Hash,
-)]
-pub enum Kind {
-    Root,
-    Space,
-    UserBase(UserBaseSubKind),
-    Base(BaseSubKind),
-    User,
-    App,
-    Mechtron,
-    FileSystem,
-    File(FileSubKind),
-    Database(DatabaseSubKind),
-    Authenticator,
-    ArtifactBundleSeries,
-    ArtifactBundle,
-    Artifact(ArtifactSubKind),
-    Proxy,
-    Credentials,
-    Control
-}
-
-impl Kind {
-
-    pub fn to_resource_kind(self) -> KindParts {
-        self.into()
-    }
-
-}
-
 impl TryInto<KindTemplate> for Kind {
     type Error = mesh_portal::error::MsgErr;
 
     fn try_into(self) -> Result<KindTemplate, Self::Error> {
         Ok(KindTemplate {
-            kind: self.kind().to_string(),
+            kind: self.base().into(),
             sub_kind: self.sub_kind(),
             specific: match self.specific() {
                 None => None,
@@ -246,6 +126,8 @@ impl ToString for Kind {
     }
 }
 
+ */
+
 
 /*
 impl TryInto<mesh_portal::version::latest::id::ResourceKind> for Kind {
@@ -263,88 +145,7 @@ impl TryInto<mesh_portal::version::latest::id::ResourceKind> for Kind {
 }
  */
 
-
-impl TryFrom<KindParts> for Kind {
-    type Error = mesh_portal::error::MsgErr;
-
-    fn try_from(parts: KindParts) -> Result<Self, Self::Error> {
-        match KindBase::from_str(parts.kind.as_str() )? {
-            KindBase::Base => {
-                match parts.sub_kind {
-                    None => {
-                        return Err("expected parts".into());
-                    }
-                    Some(parts) => {
-                        return Ok(Self::Base(BaseSubKind::from_str(parts.as_str())?));
-                    }
-                }
-            }
-            KindBase::Database => {
-                match parts.sub_kind
-                {
-                    None => {
-                        return Err("expected kind".into());
-                    }
-                    Some(sub_kind) => {
-                        match sub_kind.as_str() {
-                            "Relational" => {
-                                match parts.specific {
-                                    None => {
-                                        return Err("expected specific".into());
-                                    }
-                                    Some(specific) => {
-                                        return Ok(Kind::Database(DatabaseSubKind::Relational(specific)));
-                                    }
-                                }
-                            }
-                            what => {
-                                return Err(format!("Database type does not have a Kind {}", what).into());
-                            }
-                    }
-                }
-
-                }
-            }
-            KindBase::Artifact => {
-                match parts.sub_kind {
-                    None => {
-                        return Err("kind needs to be set".into())
-                    }
-                    Some(sub_kind)  => {
-                        return Ok(Self::Artifact(ArtifactSubKind::from_str(sub_kind.as_str())?))
-                    }
-                }
-            }
-            KindBase::UserBase=> {
-                match parts.sub_kind {
-                    None => {
-                        return Err("kind needs to be set for UserBase".into())
-                    }
-                    Some(sub_kind)  => {
-                        return Ok(Self::UserBase(UserBaseSubKind::from_str(sub_kind.as_str())?))
-                    }
-                }
-            }
-            _ => {}
-        }
-
-        Ok(match KindBase::from_str(parts.kind.as_str())? {
-            KindBase::Root => {Self::Root}
-            KindBase::Space => {Self::Space}
-            KindBase::User => {Self::User}
-            KindBase::App => {Self::App}
-            KindBase::Mechtron => {Self::Mechtron}
-            KindBase::FileSystem => {Self::FileSystem}
-            KindBase::Authenticator => {Self::Authenticator}
-            KindBase::ArtifactBundleSeries => {Self::ArtifactBundleSeries}
-            KindBase::ArtifactBundle => {Self::ArtifactBundle}
-            KindBase::Proxy => {Self::Proxy}
-            KindBase::Credentials => {Self::Credentials}
-            what => { return Err(format!("missing Kind from_str for: {}",what.to_string()).into())}
-        })
-    }
-}
-
+/*
 impl FromStr for Kind {
     type Err = mesh_portal::error::MsgErr;
 
@@ -357,15 +158,45 @@ impl FromStr for Kind {
 impl Into<KindParts> for Kind {
     fn into(self) -> KindParts {
         KindParts {
-            kind: self.kind().to_string(),
-            sub_kind: self.sub_kind(),
+            base: self.base().into(),
+            sub: self.sub_kind(),
             specific: self.specific()
         }
     }
 }
 
+impl Into<KindBase> for Kind {
+    fn into(self) -> KindBase {
+        self.base().into()
+    }
+}
+
+impl Into<KindBase> for KindBase {
+    fn into(self) -> KindBase {
+        match self {
+            KindBase::Root => KindBase::Root,
+            KindBase::Space => KindBase::Ext(CamelCase::from_str("Space").unwrap()),
+            KindBase::UserBase => KindBase::Ext(CamelCase::from_str("UserBase").unwrap()),
+            KindBase::Base => KindBase::Ext(CamelCase::from_str("Base").unwrap()),
+            KindBase::User => KindBase::Ext(CamelCase::from_str("User").unwrap()),
+            KindBase::App => KindBase::Ext(CamelCase::from_str("App").unwrap()),
+            KindBase::Mechtron => KindBase::Ext(CamelCase::from_str("Mechtron").unwrap()),
+            KindBase::FileSystem => KindBase::Ext(CamelCase::from_str("FileSystem").unwrap()),
+            KindBase::File => KindBase::Ext(CamelCase::from_str("File").unwrap()),
+            KindBase::Database => KindBase::Ext(CamelCase::from_str("Database").unwrap()),
+            KindBase::Authenticator => KindBase::Ext(CamelCase::from_str("Authenticator").unwrap()),
+            KindBase::BundleSeries => KindBase::BundleSeries,
+            KindBase::Bundle =>  KindBase::Bundle,
+            KindBase::Artifact => KindBase::Ext(CamelCase::from_str("Artifact").unwrap()),
+            KindBase::Control => KindBase::Ext(CamelCase::from_str("Control").unwrap()),
+            KindBase::Proxy => KindBase::Ext(CamelCase::from_str("Proxy").unwrap()),
+            KindBase::Credentials => KindBase::Ext(CamelCase::from_str("Credentials").unwrap()),
+        }
+    }
+}
+
 impl Kind {
-    pub fn kind(&self) -> KindBase {
+    pub fn base(&self) -> KindBase {
         match self {
             Kind::Root => KindBase::Root,
             Kind::Space => KindBase::Space,
@@ -377,8 +208,8 @@ impl Kind {
             Kind::File(_) => KindBase::File,
             Kind::Database(_) => KindBase::Database,
             Kind::Authenticator => KindBase::Authenticator,
-            Kind::ArtifactBundleSeries => KindBase::ArtifactBundleSeries,
-            Kind::ArtifactBundle => KindBase::ArtifactBundle,
+            Kind::BundleSeries => KindBase::BundleSeries,
+            Kind::Bundle => KindBase::Bundle,
             Kind::Artifact(_) => KindBase::Artifact,
             Kind::Proxy => KindBase::Proxy,
             Kind::Credentials => KindBase::Credentials,
@@ -469,8 +300,8 @@ impl Kind {
 
             }
             KindBase::Authenticator => {Self::Authenticator}
-            KindBase::ArtifactBundleSeries => {Self::ArtifactBundleSeries}
-            KindBase::ArtifactBundle => {Self::ArtifactBundle}
+            KindBase::BundleSeries => {Self::BundleSeries }
+            KindBase::Bundle => {Self::Bundle }
             KindBase::Artifact => {
                 match sub_kind {
                     None => {
@@ -497,111 +328,11 @@ impl Kind {
         })
     }
 
-    pub fn properties_config(&self) -> &'static PropertiesConfig {
-        match self {
-            Kind::Space => &UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG,
-            Kind::UserBase(_) => &USER_BASE_PROPERTIES_CONFIG,
-            Kind::User => &USER_PROPERTIES_CONFIG,
-            Kind::App => &MECHTRON_PROERTIES_CONFIG,
-            Kind::Mechtron => &MECHTRON_PROERTIES_CONFIG,
-            _ => &DEFAULT_PROPERTIES_CONFIG
-        }
-    }
 }
 
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    Hash,
-    Serialize,
-    Deserialize,
-    strum_macros::Display,
-)]
-pub enum DatabaseSubKind {
-    Relational(Specific),
-}
+ */
 
-impl DatabaseSubKind {
-    pub fn specific(&self) -> Option<Specific> {
-        match self {
-            Self::Relational(specific) => Option::Some(specific.clone()),
-            _ => Option::None,
-        }
-    }
-}
-
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    Hash,
-    Serialize,
-    Deserialize,
-    strum_macros::Display,
-    strum_macros::EnumString,
-)]
-pub enum BaseSubKind {
-    User,
-    App,
-    Mechtron,
-    Database,
-    Repo,
-    Any,
-}
-
-#[derive(
-Clone,
-Debug,
-Eq,
-PartialEq,
-Hash,
-Serialize,
-Deserialize,
-strum_macros::Display,
-strum_macros::EnumString,
-)]
-pub enum UserBaseSubKind {
-    Keycloak
-}
-
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    Hash,
-    Serialize,
-    Deserialize,
-    strum_macros::Display,
-    strum_macros::EnumString,
-)]
-pub enum FileSubKind {
-    File,
-    Dir,
-}
-
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    Hash,
-    Serialize,
-    Deserialize,
-    strum_macros::Display,
-    strum_macros::EnumString,
-)]
-pub enum ArtifactSubKind {
-    Raw,
-    ParticleConfig,
-    Bind,
-    Wasm,
-    Dir,
-}
-
+/*
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Assign {
     pub kind: AssignmentKind,
@@ -612,16 +343,31 @@ pub struct Assign {
 
 impl Assign {
 
-    pub fn new(kind: AssignmentKind, details: Details, state: StateSrc) -> Self {
+    pub fn new( kind: AssignmentKind,
+                details: Details,
+                state: StateSrc,
+
+    ) -> Self {
         Self {
             kind,
             details,
-            state
+            state,
+        }
+    }
+
+    pub fn config(&self) -> Option<Result<Point,MsgErr>> {
+        match self.details.properties.get("config") {
+            None => None,
+            Some(prop) => {
+                Some(Point::from_str(prop.value.as_str() ))
+            }
         }
     }
 
 }
 
+
+ */
 lazy_static! {
     pub static ref DEFAULT_PROPERTIES_CONFIG: PropertiesConfig = default_properties_config();
     pub static ref USER_PROPERTIES_CONFIG: PropertiesConfig = user_properties_config();
@@ -667,4 +413,16 @@ fn userbase_properties_config() -> PropertiesConfig {
     builder.add("verify-email", Box::new(BoolPattern{}), false, false, PropertySource::Shell, Some("false".to_string()), false, vec![] );
     builder.add("sso-session-max-lifespan", Box::new(U64Pattern{}), false, true, PropertySource::Core, Some("315360000".to_string()), false, vec![] );
     builder.build()
+}
+
+
+pub fn properties_config<K:ToKindBase>(base:K) -> &'static PropertiesConfig {
+    match base.to_base(){
+        KindBase::Space => &UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG,
+        KindBase::UserBase => &USER_BASE_PROPERTIES_CONFIG,
+        KindBase::User => &USER_PROPERTIES_CONFIG,
+        KindBase::App => &MECHTRON_PROERTIES_CONFIG,
+        KindBase::Mechtron => &MECHTRON_PROERTIES_CONFIG,
+        _ => &DEFAULT_PROPERTIES_CONFIG
+    }
 }

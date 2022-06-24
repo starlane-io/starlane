@@ -6,7 +6,6 @@ use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 
 use crate::frame::{ResourceRegistryRequest, SimpleReply, StarMessagePayload};
 use crate::message::ProtoStarMessage;
-use crate::particle::KindBase;
 use crate::star::{LogId, Set, Star, StarCommand, StarKey, StarKind, StarSkel};
 use crate::star::Request;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};

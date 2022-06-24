@@ -32,6 +32,8 @@ extern crate validate;
 #[macro_use]
 extern crate wasmer;
 #[macro_use]
+extern crate cosmic_macros;
+#[macro_use]
 extern crate async_recursion;
 extern crate core;
 
@@ -76,7 +78,6 @@ pub mod fail;
 pub mod command;
 pub mod user;
 pub mod mechtron;
-pub mod endpoint;
 pub mod registry;
 pub mod bindex;
 pub mod databases;

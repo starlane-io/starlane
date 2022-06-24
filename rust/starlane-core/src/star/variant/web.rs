@@ -35,7 +35,7 @@ use crate::artifact::ArtifactRef;
 use crate::cache::ArtifactItem;
 use crate::html::HTML;
 use regex::Regex;
-use crate::particle::ArtifactSubKind;
+use mesh_portal_versions::version::v0_0_1::id::ArtifactSubKind;
 use serde::{Serialize,Deserialize};
 use tiny_http::{HeaderField, Server, StatusCode};
 use mesh_portal::version::latest::http::HttpMethod;

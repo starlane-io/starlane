@@ -8,16 +8,14 @@ use k8s::K8sCoreDriver;
 use crate::error::Error;
 use crate::message::delivery::Delivery;
 use crate::{particle};
-use crate::particle::{Assign, KindBase};
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, Call, AsyncRunner};
 use crate::star::core::particle::driver::stateless::StatelessCoreDriver;
-use crate::star::core::particle::driver::mechtron::MechtronCoreDriver;
+//use crate::star::core::particle::driver::mechtron::MechtronCoreDriver;
 use crate::star::core::particle::driver::file::{FileSystemManager, FileCoreManager};
 use std::collections::HashMap;
 use std::future::Future;
 use std::str::FromStr;
-use mesh_portal::version::latest::command::request::CmdMethod;
 use mesh_portal::version::latest::entity::request::Rc;
 use mesh_portal::version::latest::entity::request::set::Set;
 use mesh_portal::version::latest::fail;
@@ -25,8 +23,9 @@ use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 use mesh_portal::version::latest::payload::Payload;
 use mesh_portal::version::latest::particle::Stub;
-use mesh_portal_api_client::ResourceCommand;
+use mesh_portal::version::latest::sys::Assign;
 use mesh_portal_versions::version::v0_0_1::command::Command;
+use mesh_portal_versions::version::v0_0_1::id::id::KindBase;
 use crate::star::core::particle::driver::artifact::ArtifactManager;
 use crate::star::core::particle::driver::user::UserBaseKeycloakCoreDriver;
 
@@ -156,9 +155,9 @@ impl ResourceCoreDriverComponent {
     async fn assign(&mut self, assign: Assign, tx: oneshot::Sender<Result<(),Error>> ) {
 
        async fn process(manager_component: &mut ResourceCoreDriverComponent, assign: Assign) -> Result<(),Error> {
-           let resource_type = KindBase::from_str(assign.config.stub.kind.to_string().as_str())?;
+           let resource_type = KindBase::from_str(assign.details.stub.kind.to_string().as_str())?;
            let manager:&mut Box<dyn ParticleCoreDriver> = manager_component.drivers.get_mut(&resource_type ).ok_or(format!("could not get driver for {}", resource_type.to_string()))?;
-           manager_component.resources.insert(assign.config.stub.point.clone(), resource_type );
+           manager_component.resources.insert(assign.details.stub.point.clone(), resource_type );
            manager.assign(assign).await
        }
        let result = process(self,assign).await;
@@ -230,14 +229,13 @@ impl ResourceCoreDriverComponent {
                 KindBase::Root => Box::new(StatelessCoreDriver::new(self.skel.clone(), KindBase::Root ).await),
                 KindBase::User => Box::new(StatelessCoreDriver::new(self.skel.clone(), KindBase::User ).await),
                 KindBase::Control => Box::new(StatelessCoreDriver::new(self.skel.clone(), KindBase::Control ).await),
-                KindBase::Proxy=> Box::new(StatelessCoreDriver::new(self.skel.clone(), KindBase::Proxy).await),
                 KindBase::Space => Box::new(StatelessCoreDriver::new(self.skel.clone(), KindBase::Space ).await),
                 KindBase::Base => Box::new(StatelessCoreDriver::new(self.skel.clone(), KindBase::Base ).await),
-                KindBase::ArtifactBundleSeries => Box::new(StatelessCoreDriver::new(self.skel.clone(), KindBase::ArtifactBundleSeries).await),
-                KindBase::ArtifactBundle=> Box::new(ArtifactBundleCoreDriver::new(self.skel.clone()).await),
+                KindBase::BundleSeries => Box::new(StatelessCoreDriver::new(self.skel.clone(), KindBase::BundleSeries).await),
+                KindBase::Bundle => Box::new(ArtifactBundleCoreDriver::new(self.skel.clone()).await),
                 KindBase::Artifact => Box::new(ArtifactManager::new(self.skel.clone()).await ),
-                KindBase::App => Box::new(MechtronCoreDriver::new(self.skel.clone(), KindBase::App).await?),
-                KindBase::Mechtron => Box::new(MechtronCoreDriver::new(self.skel.clone(), KindBase::Mechtron).await?),
+//                KindBase::App => Box::new(MechtronCoreDriver::new(self.skel.clone(), KindBase::App).await?),
+//                KindBase::Mechtron => Box::new(MechtronCoreDriver::new(self.skel.clone(), KindBase::Mechtron).await?),
                 KindBase::Database => Box::new(K8sCoreDriver::new(self.skel.clone(), KindBase::Database ).await?),
                 KindBase::FileSystem => Box::new(FileSystemManager::new(self.skel.clone() ).await),
                 KindBase::File => Box::new(FileCoreManager::new(self.skel.clone())),
@@ -253,7 +251,7 @@ impl ResourceCoreDriverComponent {
 #[async_trait]
 pub trait ParticleCoreDriver: Send + Sync {
 
-    fn kind(&self) -> particle::KindBase;
+    fn kind(&self) -> KindBase;
 
     async fn assign(
         &mut self,

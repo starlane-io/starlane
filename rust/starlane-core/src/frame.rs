@@ -7,7 +7,7 @@ use semver::SemVerError;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time::error::Elapsed;
-use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
+use mesh_portal_versions::version::v0_0_1::sys::{Assign, ParticleRecord};
 
 
 use crate::error::Error;
@@ -17,7 +17,6 @@ use crate::message::{MessageExpect, MessageId, MessageUpdate, ProtoStarMessage, 
 use crate::message::delivery::ActorMessage;
 use crate::star::{Star, StarCommand, StarInfo, StarKey, StarKind, StarNotify};
 use crate::watch::{Notification, Watch, WatchKey};
-use crate::particle::{KindBase, Assign};
 use crate::fail::{Fail, StarlaneFailure};
 
 #[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]

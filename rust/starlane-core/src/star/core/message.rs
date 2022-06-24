@@ -13,8 +13,6 @@ use crate::frame::{
 
 use crate::message::delivery::Delivery;
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
-use crate::particle::{ArtifactSubKind, FileSubKind, Kind, KindBase, UserBaseSubKind};
-use crate::particle::Assign;
 use crate::star::{StarCommand, StarKey, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use mesh_portal::version::latest::fail::BadRequest;
@@ -28,7 +26,7 @@ use mesh_portal::version::latest::entity::request::{Method, Rc, ReqCore};
 use mesh_portal::version::latest::entity::request::get::Get;
 use mesh_portal::version::latest::fail;
 use mesh_portal::version::latest::id::{Meta, Point};
-use mesh_portal::version::latest::messaging::{Agent, Message, ReqShell, RespShell};
+use mesh_portal::version::latest::messaging::{Agent, CmdMethod, Message, ReqShell, RespShell};
 use mesh_portal::version::latest::payload::{Payload, PayloadMap,  };
 use mesh_portal::version::latest::particle::{Status, Stub};
 use mesh_portal::version::latest::entity::request::get::GetOp;
@@ -36,17 +34,15 @@ use mesh_portal::version::latest::entity::request::query::Query;
 use mesh_portal::version::latest::entity::request::select::Select;
 use mesh_portal::version::latest::entity::request::set::Set;
 use mesh_portal::version::latest::entity::response::RespCore;
-use mesh_portal::version::latest::id::Tks;
 use mesh_portal::version::latest::payload::CallKind;
 use mesh_portal::version::latest::security::Access;
 use mesh_portal_versions::version::v0_0_1::particle::particle::Details;
 use regex::Regex;
-use serde::de::Unexpected::Str;
-use mesh_portal::version::latest::command::request::CmdMethod;
 use mesh_portal::version::latest::config::bind::BindConfig;
 use mesh_portal_versions::version::v0_0_1::command::Command;
-use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
-use mesh_portal_versions::version::v0_0_1::sys::{AssignmentKind, ChildRegistry, Location, ParticleRecord};
+use mesh_portal_versions::version::v0_0_1::id::{ArtifactSubKind, FileSubKind, UserBaseSubKind};
+use mesh_portal_versions::version::v0_0_1::id::id::{Kind, KindBase, Tks, ToPoint};
+use mesh_portal_versions::version::v0_0_1::sys::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
 use crate::artifact::ArtifactRef;
 use crate::bindex::{BindConfigCache, BindEx, BindExRouter, RegistryApi};
 use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
@@ -232,7 +228,7 @@ impl MessagingEndpointComponentInner {
                     return Err(format!("CmdMethod {} does not match body Command", method.to_string()).into());
                 }
 
-                match kind.kind().child_resource_registry_handler() {
+                match kind.base().child_resource_registry_handler() {
                     ChildRegistry::Shell => {
                         match &command{
                             Command::Create(create) => {
@@ -246,7 +242,7 @@ impl MessagingEndpointComponentInner {
                                     state: StateSrc,
                                 ) -> Result<(), Error> {
 
-                                    let star_kind = StarKind::hosts(&KindBase::from_str(details.stub.kind.kind.as_str())?);
+                                    let star_kind = StarKind::hosts(&KindBase::from_str(details.stub.kind.base.to_string().as_str())?);
                                     let key = if skel.info.kind == star_kind {
                                         skel.info.key.clone()
                                     }

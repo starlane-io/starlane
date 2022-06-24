@@ -39,11 +39,11 @@ impl MessagingApi {
         let mut proto = ProtoStarMessage::new();
         match message {
             Message::Req(request) => {
-                proto.to = ProtoStarMessageTo::Resource(request.to.clone().to_point());
+                proto.to = ProtoStarMessageTo::Point(request.to.clone().to_point());
                 proto.payload = StarMessagePayload::Request(request);
             }
             Message::Resp(response) => {
-                proto.to = ProtoStarMessageTo::Resource(response.to.clone().to_point());
+                proto.to = ProtoStarMessageTo::Point(response.to.clone().to_point());
                 proto.payload = StarMessagePayload::Response(response);
             }
         }
@@ -76,7 +76,7 @@ impl MessagingApi {
 
     pub async fn notify(&self, request: ReqShell) ->Result<(),Error>{
         let mut proto = ProtoStarMessage::new();
-        proto.to = ProtoStarMessageTo::Resource(request.to.clone().to_point());
+        proto.to = ProtoStarMessageTo::Point(request.to.clone().to_point());
         proto.payload = StarMessagePayload::Request(request);
         self.star_notify(proto);
         Ok(())
@@ -200,7 +200,7 @@ impl AsyncProcessor<MessagingCall> for MessagingComponent {
                 MessagingCall::ExchangeRequest { request, tx } => {
                     inner.resource_exchange.insert(request.id.clone(), tx);
                     let mut proto = ProtoStarMessage::new();
-                    proto.to = ProtoStarMessageTo::Resource(request.to.clone().to_point());
+                    proto.to = ProtoStarMessageTo::Point(request.to.clone().to_point());
                     proto.payload = StarMessagePayload::Request(request);
                     inner.send(proto).await;
                 }
@@ -350,28 +350,36 @@ impl MessagingComponentInner {
                     error!("ProtoStarMessage to address cannot be None");
                     return;
                 }
-                ProtoStarMessageTo::Resource(address) => {
-                    let record = match skel.registry_api.locate(&address).await {
+                ProtoStarMessageTo::Point(point) => {
+                    let record = match skel.registry_api.locate(&point).await {
                         Ok(record) => record,
                         Err(fail) => {
                             eprintln!("{}", fail.to_string());
                             error!(
                                 "locator could not find particle record for: '{}'",
-                                address.to_string()
+                                point.to_string()
                             );
                             skel.messaging_api.fail_exchange(id.clone(), proto, fail.into());
                             return;
                         }
                     };
                     match record.location.ok_or() {
-                        Ok(star) => {star}
+                        Ok(point) => {match StarKey::try_from(point) {
+                            Ok(star) => {
+                                star
+                            }
+                            Err(err) => {
+                                error!("{}", err.to_string());
+                                return;
+                            }
+                        }}
                         Err(_) => {
                             error!("ProtoStarMessage to address cannot be None");
                             return;
                         }
                     }
                 }
-                ProtoStarMessageTo::Star(star) => star.clone(),
+                ProtoStarMessageTo::Star(star) => star.clone()
             };
 
             match proto.validate() {

@@ -1,10 +1,7 @@
 use crate::error::Error;
 use crate::frame::{ResourceHostAction, StarMessagePayload};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
-use crate::particle::{
-    ArtifactSubKind, BaseSubKind, FileSubKind, Kind, KindBase,
-    UserBaseSubKind,
-};
+
 use futures::{FutureExt, StreamExt};
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties, SetRegistry};
@@ -32,7 +29,7 @@ use mesh_portal_versions::version::v0_0_1::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask,
     PermissionsMaskKind, Privilege, Privileges,
 };
-use mesh_portal_versions::version::v0_0_1::selector::selector::GenericSubKindSelector;
+use mesh_portal_versions::version::v0_0_1::selector::selector::SubKindSelector;
 use mysql::prelude::TextQuery;
 use sqlx::postgres::{PgArguments, PgPoolOptions, PgRow};
 use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
@@ -47,8 +44,11 @@ use mesh_portal_versions::version::v0_0_1::command::request::delete::Delete;
 use mesh_portal_versions::version::v0_0_1::command::request::select::{SelectKind, SubSelect};
 use tokio::sync::mpsc;
 use mesh_portal::version::latest::payload::{Payload, PayloadMap, PrimitiveList};
+use mesh_portal_versions::version::v0_0_1::id::{ArtifactSubKind, BaseSubKind, FileSubKind, UserBaseSubKind};
+use mesh_portal_versions::version::v0_0_1::id::id::{Kind, KindBase, Tks};
 use mesh_portal_versions::version::v0_0_1::sys::{Location, ParticleRecord};
 use crate::databases::lookup_registry_db;
+use crate::particle::properties_config;
 
 lazy_static! {
     pub static ref HYPERUSER: Point = Point::from_str("hyperspace:users:hyperuser").expect("point");
@@ -531,8 +531,8 @@ impl Registry {
             match &hop.kind_selector.kind {
                 GenericKindSelector::Any => {}
                 GenericKindSelector::Exact(kind) => match &hop.kind_selector.sub_kind {
-                    GenericSubKindSelector::Any => {}
-                    GenericSubKindSelector::Exact(sub_kind) => {
+                    SubKindSelector::Any => {}
+                    SubKindSelector::Exact(sub_kind) => {
                         index = index + 1;
                         where_clause.push_str(format!(" AND sub_kind=${}", index).as_str());
                         params.push(sub_kind.to_string());
@@ -1148,7 +1148,7 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
 #[cfg(test)]
 pub mod test {
     use crate::error::Error;
-    use crate::particle::{Kind, UserBaseSubKind};
+    use crate::particle::Kind;
     use crate::registry::{Registration, Registry};
     use mesh_portal::version::latest::entity::request::query::Query;
     use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoPayload};
@@ -1165,6 +1165,7 @@ pub mod test {
     use std::str::FromStr;
     use mesh_portal_versions::version::v0_0_1::command::request::select::SelectKind;
     use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
+    use mesh_portal_versions::version::v0_0_1::id::UserBaseSubKind;
 
     #[tokio::test]
     pub async fn test_nuke() -> Result<(), Error> {
@@ -1551,8 +1552,8 @@ impl RegistryParams {
             Some(parent) => parent.to_string(),
         };
 
-        let resource_type = registration.kind.kind().to_string();
-        let kind = registration.kind.sub_kind();
+        let resource_type = registration.kind.base().to_string();
+        let kind = registration.kind.sub();
         let vendor = match &registration.kind.specific() {
             None => Option::None,
             Some(specific) => Option::Some(specific.vendor.clone()),
@@ -1583,15 +1584,8 @@ impl RegistryParams {
             None => Option::None,
             Some(specific) => {
                 let version = &specific.version;
-                if version.is_prerelease() {
-                    let mut pre = String::new();
-                    for (i, x) in version.pre.iter().enumerate() {
-                        if i != 0 {
-                            pre.push_str(".");
-                        }
-                        pre.push_str(format!("{}", x).as_ref());
-                    }
-                    Option::Some(pre)
+                if !version.pre.is_empty() {
+                    Option::Some(version.pre.to_string())
                 } else {
                     Option::None
                 }
@@ -1615,11 +1609,11 @@ impl RegistryParams {
 }
 
 pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
-    let resource_type: KindBase = KindBase::from_str(template.kind.as_str())?;
+    let resource_type: KindBase = KindBase::from_str(template.base.to_string().as_str())?;
     Ok(match resource_type {
         KindBase::Root => Kind::Root,
         KindBase::Space => Kind::Space,
-        KindBase::Base => match &template.sub_kind {
+        KindBase::Base => match &template.sub {
             None => {
                 return Err("kind must be set for Base".into());
             }
@@ -1635,7 +1629,7 @@ pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
         KindBase::App => Kind::App,
         KindBase::Mechtron => Kind::Mechtron,
         KindBase::FileSystem => Kind::FileSystem,
-        KindBase::File => match &template.sub_kind {
+        KindBase::File => match &template.sub {
             None => return Err("expected kind for File".into()),
             Some(kind) => {
                 let file_kind = FileSubKind::from_str(kind.as_str())?;
@@ -1645,10 +1639,9 @@ pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
         KindBase::Database => {
             unimplemented!("need to write a SpecificPattern matcher...")
         }
-        KindBase::Authenticator => Kind::Authenticator,
-        KindBase::ArtifactBundleSeries => Kind::ArtifactBundleSeries,
-        KindBase::ArtifactBundle => Kind::ArtifactBundle,
-        KindBase::Artifact => match &template.sub_kind {
+        KindBase::BundleSeries => Kind::BundleSeries,
+        KindBase::Bundle => Kind::Bundle,
+        KindBase::Artifact => match &template.sub {
             None => {
                 return Err("expected kind for Artirtact".into());
             }
@@ -1657,10 +1650,8 @@ pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
                 return Ok(Kind::Artifact(artifact_kind));
             }
         },
-        KindBase::Proxy => Kind::Proxy,
-        KindBase::Credentials => Kind::Credentials,
         KindBase::Control => Kind::Control,
-        KindBase::UserBase => match &template.sub_kind {
+        KindBase::UserBase => match &template.sub {
             None => {
                 return Err("kind must be set for UserBase".into());
             }
@@ -1721,10 +1712,9 @@ impl Registry {
                 }
                 let point = point?;
 
-                let properties = child_kind
-                    .properties_config()
+                let properties = properties_config(child_kind)
                     .fill_create_defaults(&create.properties)?;
-                child_kind.properties_config().check_create(&properties)?;
+                properties_config(child_kind).check_create(&properties)?;
 
                 let registration = Registration {
                     point: point.clone(),

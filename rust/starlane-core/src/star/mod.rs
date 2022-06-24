@@ -1,6 +1,6 @@
 use std::cmp::{min, Ordering};
 use std::collections::{HashMap, HashSet};
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::fmt::{Debug, Formatter};
 use std::iter::FromIterator;
 use std::sync::atomic::AtomicU64;
@@ -34,7 +34,6 @@ use crate::message::{
     MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage,
     ProtoStarMessageTo, TrackerJob,
 };
-use crate::particle::KindBase;
 use crate::star::core::message::CoreMessageCall;
 use crate::star::shell::golden::GoldenPathApi;
 use crate::star::shell::lanes::LaneMuxerApi;
@@ -55,7 +54,6 @@ use crate::star::core::particle::driver::ResourceCoreDriverApi;
 use std::str::FromStr;
 use mesh_portal::version::latest::id::{Point, Port};
 use mesh_portal::version::latest::log::{PointLogger, RootLogger};
-use mesh_portal::version::latest::portal;
 use mesh_portal::version::latest::particle::Status;
 use mesh_portal_versions::version::v0_0_1::parse::error::result;
 use mysql::prelude::FromRow;
@@ -71,7 +69,7 @@ use nom::Parser;
 use nom_supreme::error::ErrorTree;
 use sqlx::postgres::PgTypeInfo;
 use cosmic_nom::{new_span, Res, Span};
-use mesh_portal_versions::version::v0_0_1::id::id::{ToPoint, ToPort};
+use mesh_portal_versions::version::v0_0_1::id::id::{KindBase, RouteSeg, ToPoint, ToPort};
 use mesh_portal_versions::version::v0_0_1::parse::lowercase_alphanumeric;
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 use crate::registry::RegistryApi;
@@ -198,7 +196,6 @@ impl StarKind {
                 StarKind::Space => vec![
                     KindBase::App,
                     KindBase::FileSystem,
-                    KindBase::Proxy,
                     KindBase::Database,
                 ],
                 StarKind::Relay => vec![],
@@ -232,12 +229,9 @@ impl StarKind {
             KindBase::FileSystem => Self::Space,
             KindBase::File => Self::Space,
             KindBase::Database => Self::K8s,
-            KindBase::Authenticator => Self::K8s,
-            KindBase::ArtifactBundleSeries => Self::Space,
-            KindBase::ArtifactBundle => Self::ArtifactStore,
+            KindBase::BundleSeries => Self::Space,
+            KindBase::Bundle => Self::ArtifactStore,
             KindBase::Artifact => Self::ArtifactStore,
-            KindBase::Proxy => Self::Space,
-            KindBase::Credentials => Self::Space,
             KindBase::Base => Self::Space,
             KindBase::Control => Self::Portal,
             KindBase::UserBase => Self::Space
@@ -254,12 +248,9 @@ impl StarKind {
             KindBase::FileSystem => Self::FileStore,
             KindBase::File => Self::FileStore,
             KindBase::Database => Self::K8s,
-            KindBase::Authenticator => Self::K8s,
-            KindBase::ArtifactBundleSeries => Self::ArtifactStore,
-            KindBase::ArtifactBundle => Self::ArtifactStore,
+            KindBase::BundleSeries => Self::ArtifactStore,
+            KindBase::Bundle => Self::ArtifactStore,
             KindBase::Artifact => Self::ArtifactStore,
-            KindBase::Proxy => Self::Space,
-            KindBase::Credentials => Self::Space,
             KindBase::Base => Self::Space,
             KindBase::Control => Self::Portal,
             KindBase::UserBase => Self::Space
@@ -274,7 +265,6 @@ impl StarKind {
                     KindBase::Space,
                     KindBase::User,
                     KindBase::Base,
-                    KindBase::Proxy,
                     KindBase::UserBase,
                 ],
                 StarKind::Relay => vec![],
@@ -287,8 +277,8 @@ impl StarKind {
                 StarKind::FileStore => vec![KindBase::FileSystem, KindBase::File],
                 StarKind::ArtifactStore => {
                     vec![
-                        KindBase::ArtifactBundleSeries,
-                        KindBase::ArtifactBundle,
+                        KindBase::BundleSeries,
+                        KindBase::Bundle,
                         KindBase::Artifact,
                     ]
                 }
@@ -1036,6 +1026,21 @@ impl Into<Point> for StarKey {
 impl Into<Port> for StarKey {
     fn into(self) -> Port {
         self.to_port()
+    }
+}
+
+impl TryFrom<Point> for StarKey {
+    type Error = Error;
+
+    fn try_from(point: Point) -> Result<Self, Self::Error> {
+        match point.route {
+            RouteSeg::Mesh(star) => {
+                StarKey::from_str(star.as_str())
+            }
+            _ => {
+                Err("can only extract StarKey from Mesh point routes".into())
+            }
+        }
     }
 }
 

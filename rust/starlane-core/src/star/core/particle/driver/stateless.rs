@@ -1,8 +1,9 @@
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::id::Point;
+use mesh_portal_versions::version::v0_0_1::id::id::KindBase;
+use mesh_portal_versions::version::v0_0_1::sys::Assign;
 
 use crate::error::Error;
-use crate::particle::{Assign, KindBase};
 use crate::star::core::particle::driver::ParticleCoreDriver;
 use crate::star::core::particle::state::StateStore;
 use crate::star::StarSkel;
@@ -37,7 +38,7 @@ impl ParticleCoreDriver for StatelessCoreDriver {
         match assign.state {
             StateSrc::None=> {
             }
-            StateSrc::Payload(_) => {
+            StateSrc::Substance(_) => {
                 return Err("must be stateless".into());
             }
         };

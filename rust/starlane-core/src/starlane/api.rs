@@ -10,13 +10,13 @@ use cosmic_portal_cli::CliSession;
 
 #[derive(Clone)]
 pub struct StarlaneApi {
-    messenger: AsyncTransmitterWithAgent
+    transmitter: AsyncTransmitterWithAgent
 }
 
 impl StarlaneApi {
     pub fn new(messenger: AsyncTransmitterWithAgent) -> Self {
         Self {
-            messenger
+            transmitter: messenger
         }
     }
 }
@@ -30,16 +30,16 @@ impl StarlaneApi {
         unimplemented!()
     }
 
-    pub fn messenger(&self) -> &AsyncTransmitterWithAgent {
-        &self.messenger
+    pub fn transmitter(&self) -> &AsyncTransmitterWithAgent {
+        &self.transmitter
     }
 
     pub fn messenger_from_port( &self, port: Port ) -> AsyncTransmitterWithAgent {
-        self.messenger.with_from(port)
+        self.transmitter.with_from(port)
     }
 
     pub fn cli(&self) -> Cli {
-        let messenger = self.messenger.clone().with_from( self.messenger.from.with_layer(TargetLayer::Core));
+        let messenger = self.transmitter.clone().with_from( self.transmitter.from.with_layer(TargetLayer::Core));
         Cli::new(messenger)
     }
 }

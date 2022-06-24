@@ -6,9 +6,10 @@ use kube::api::{ListParams, PostParams};
 use kube::Api;
 use mesh_portal::version::latest::id::Point;
 use serde::{Deserialize, Serialize};
+use mesh_portal_versions::version::v0_0_1::id::id::KindBase;
+use mesh_portal_versions::version::v0_0_1::sys::Assign;
 
 use crate::error::Error;
-use crate::particle::{Kind, KindBase, Assign};
 use crate::star::core::particle::driver::ParticleCoreDriver;
 use crate::star::StarSkel;
 

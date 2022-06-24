@@ -76,13 +76,11 @@ base64 = "0.13.0"
 cosmic-nom={ path="../cosmic-nom"}
 cosmic-portal-cli={ path="../cosmic-portal-cli"}
 cosmic-portal-cli-exe={ path="../cosmic-portal-cli-exe"}
+cosmic-macros={ path="../cosmic-macros"}
 mesh-portal={ path="../mesh-portal"}
 mesh-portal-versions= { path="../mesh-portal-versions"}
 mesh-portal-api-client= { path="../mesh-portal-api-client"}
 mesh-portal-api-server= { path="../mesh-portal-api-server"}
-mesh-portal-tcp-common = { path="../mesh-portal-tcp-common"}
-mesh-portal-tcp-client = { path="../mesh-portal-tcp-client"}
-mesh-portal-tcp-server= { path="../mesh-portal-tcp-server"}
 mesh-artifact-api ={ path="../mesh-artifact-api", default-features=true }
 
 async-recursion = "1.0.0"

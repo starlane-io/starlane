@@ -2,10 +2,9 @@ use crate::artifact::ArtifactRef;
 use crate::config::config::ParticleConfig;
 use crate::error::Error;
 use crate::particle::config::Parser;
-use crate::particle::Kind;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::command::common::SetProperties;
-use mesh_portal_versions::version::v0_0_1::parse::{camel_case_chars, domain, kind, script, script_line, set_properties};
+use mesh_portal_versions::version::v0_0_1::parse::{camel_case_chars, domain, script, script_line, set_properties};
 use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag, take_until};
 use nom::character::complete::multispace0;
@@ -16,7 +15,9 @@ use nom::sequence::{delimited, preceded, terminated, tuple};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
+use k8s_openapi::kind;
 use cosmic_nom::{new_span, Res, Span};
+use mesh_portal_versions::version::v0_0_1::id::id::Kind;
 
 pub struct ResourceConfigParser;
 
@@ -29,12 +30,12 @@ impl ResourceConfigParser {
 impl Parser<ParticleConfig> for ResourceConfigParser {
     fn parse(&self, artifact: ArtifactRef, _data: Bin) -> Result<Arc<ParticleConfig>, Error> {
         let raw = String::from_utf8(_data.to_vec())?;
-        let config = resource_config(new_span(raw.as_str()), artifact)?;
+        let config = particle_config(new_span(raw.as_str()), artifact)?;
         Ok(Arc::new(config))
     }
 }
 
-pub fn resource_config<I: Span>(
+pub fn particle_config<I: Span>(
     input: I,
     artifact_ref: ArtifactRef,
 ) -> Result<ParticleConfig, Error> {
@@ -47,7 +48,6 @@ pub fn resource_config<I: Span>(
         multispace0,
     )))(input)?;
 
-    let kind: Kind = TryFrom::try_from(kind)?;
 
     let mut config = ParticleConfig {
         artifact_ref,
@@ -124,10 +124,10 @@ pub enum Section {
 pub mod test {
     use crate::artifact::ArtifactRef;
     use crate::config::parse::{
-        properties_section, rec_command_line, rec_command_lines, resource_config,
+        properties_section, rec_command_line, rec_command_lines, particle_config,
     };
     use crate::error::Error;
-    use crate::particle::ArtifactSubKind;
+    use mesh_portal_versions::version::v0_0_1::id::ArtifactSubKind;
     use mesh_portal::version::latest::command::common::PropertyMod;
     use mesh_portal::version::latest::id::Point;
     use mesh_portal_versions::version::v0_0_1::parse::{
@@ -137,6 +137,8 @@ pub mod test {
     use nom::combinator::{all_consuming, recognize};
     use std::collections::HashMap;
     use std::str::FromStr;
+    use cosmic_nom::new_span;
+    use cosmic_nom::Span;
 
     #[test]
     pub async fn test_set() -> Result<(), Error> {

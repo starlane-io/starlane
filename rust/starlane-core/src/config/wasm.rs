@@ -1,4 +1,3 @@
-use crate::particle::{Kind, ArtifactSubKind};
 use crate::artifact::ArtifactRef;
 use crate::cache::Cacheable;
 use std::sync::Arc;
@@ -7,7 +6,8 @@ use std::str::FromStr;
 use std::convert::TryInto;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::id::Point;
-use wasmer::{Cranelift, Universal, Store, Module};
+use wasmer::{Cranelift, Module, Store, Universal};
+use mesh_portal_versions::version::v0_0_1::id::ArtifactSubKind;
 use crate::particle::config::Parser;
 
 pub struct Wasm {

@@ -6,7 +6,6 @@ use yaml_rust::Yaml;
 
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
-use crate::particle::{ArtifactSubKind, FileSubKind, Kind, KindBase, Assign};
 use crate::star::core::particle::driver::ParticleCoreDriver;
 use crate::star::core::particle::state::StateStore;
 use crate::star::StarSkel;
@@ -16,11 +15,13 @@ use crate::frame::{StarMessage, StarMessagePayload};
 
 use std::str::FromStr;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
-use mesh_portal::version::latest::command::request::CmdMethod;
 use mesh_portal::version::latest::entity::request::create::{Create, KindTemplate, PointSegFactory, PointTemplate, Strategy, Template};
 use mesh_portal::version::latest::entity::request::{Method, Rc, ReqCore};
 use mesh_portal::version::latest::id::{AddressAndKind, KindParts, Point};
 use mesh_portal::version::latest::messaging::ReqShell;
+use mesh_portal::version::latest::sys::Assign;
+use mesh_portal_versions::version::v0_0_1::id::{ArtifactSubKind, FileSubKind};
+use mesh_portal_versions::version::v0_0_1::id::id::{Kind, KindBase};
 use mesh_portal_versions::version::v0_0_1::wave::ReqProto;
 
 #[derive(Debug)]
@@ -45,7 +46,7 @@ impl ParticleCoreDriver for FileCoreManager {
         assign: Assign,
     ) -> Result<(), Error> {
 
-        let kind : Kind = TryFrom::try_from(assign.config.stub.kind)?;
+        let kind : Kind = TryFrom::try_from(assign.details.stub.kind)?;
         if let Kind::File(file_kind) = kind
         {
             match file_kind {
@@ -54,17 +55,17 @@ impl ParticleCoreDriver for FileCoreManager {
                 }
                 _ => {
                     let state = match &assign.state {
-                        StateSrc::Payload(data) => {
+                        StateSrc::Substance(data) => {
                             data.clone()
                         },
                         StateSrc::None => {
                             return Err("Artifact cannot be stateless".into())
                         },
                     };
-                    self.store.put(assign.config.stub.point.clone(), state.clone() ).await?;
+                    self.store.put(assign.details.stub.point.clone(), state.clone() ).await?;
 
                     let selector = WatchSelector{
-                        topic: Topic::Point(assign.config.stub.point),
+                        topic: Topic::Point(assign.details.stub.point),
                         property: Property::State
                     };
 
@@ -122,16 +123,16 @@ impl ParticleCoreDriver for FileSystemManager {
 
 
         let root_point_and_kind = AddressAndKind {
-            point: Point::from_str( format!("{}:/", assign.config.stub.point.to_string()).as_str())?,
-            kind: KindParts { kind: "File".to_string(), sub_kind: Option::Some("Dir".to_string()), specific: None }
+            point: Point::from_str( format!("{}:/", assign.details.stub.point.to_string()).as_str())?,
+            kind: KindParts { base: "File".to_string(), sub: Option::Some("Dir".to_string()), specific: None }
         };
 
         let skel = self.skel.clone();
         tokio::spawn( async move {
             let create = Create {
                 template: Template {
-                    point: PointTemplate { parent: assign.config.stub.point.clone(), child_segment_template: PointSegFactory::Exact(root_point_and_kind.point.last_segment().expect("expected final segment").to_string()) },
-                    kind: KindTemplate { kind: root_point_and_kind.kind.kind.clone(), sub_kind: root_point_and_kind.kind.sub_kind.clone(), specific: None }
+                    point: PointTemplate { parent: assign.details.stub.point.clone(), child_segment_template: PointSegFactory::Exact(root_point_and_kind.point.last_segment().expect("expected final segment").to_string()) },
+                    kind: KindTemplate { base: root_point_and_kind.kind.base.clone(), sub: root_point_and_kind.kind.sub.clone(), specific: None }
                 },
                 state: StateSrc::None,
                 properties: SetProperties::new(),
@@ -140,7 +141,7 @@ impl ParticleCoreDriver for FileSystemManager {
             };
 
             let request : ReqCore = create.into();
-            let request = ReqShell::new(request, assign.config.stub.point.clone(), Point::global_executor() );
+            let request = ReqShell::new(request, assign.details.stub.point.clone(), Point::global_executor() );
             skel.messaging_api.request(request).await;
         });
         Ok(())

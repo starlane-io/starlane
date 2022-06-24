@@ -14,7 +14,7 @@ use tokio::time::Duration;
 use walkdir::WalkDir;
 
 use crate::error::Error;
-use crate::particle::FileSubKind;
+use mesh_portal_versions::version::v0_0_1::id::FileSubKind;
 
 use crate::util;
 use std::convert::TryFrom;

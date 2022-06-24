@@ -423,7 +423,7 @@ impl JwksCache {
         let action = MsgMethod::new("GetJwks")?;
         let port = Point::from_str(claims.userbase_ref.as_str())?.to_port();
         let request = ReqProto::msg(port, action);
-        let response = self.api.messenger().send(request).await.ok_or()?;
+        let response = self.api.transmitter().send(request).await?;
         let jwks = response.core.body.to_text()?;
         let jwks: JWKS = serde_json::from_str(jwks.as_str())?;
         {

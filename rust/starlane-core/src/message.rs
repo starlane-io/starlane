@@ -11,12 +11,11 @@ use mesh_portal::version::latest::particle::Stub;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use uuid::Uuid;
-use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
-use mesh_portal_versions::version::v0_0_1::wave::AsyncTransmitter;
+use mesh_portal_versions::version::v0_0_1::id::id::{KindBase, ToPoint};
+use mesh_portal_versions::version::v0_0_1::wave::{AsyncTransmitter, Wave};
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 
 use crate::error::Error;
-use crate::particle::{Kind, KindBase};
 use crate::star::{StarCommand, StarKey};
 use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
 use crate::frame::{MessageAck, SimpleReply, StarMessage, StarMessagePayload};
@@ -31,7 +30,7 @@ pub type MessageId=String;
 pub enum ProtoStarMessageTo {
     None,
     Star(StarKey),
-    Resource(Point),
+    Point(Point),
 }
 
 impl ToString for ProtoStarMessageTo {
@@ -39,7 +38,7 @@ impl ToString for ProtoStarMessageTo {
         match self {
             ProtoStarMessageTo::None => {"None".to_string()}
             ProtoStarMessageTo::Star(star) => {star.to_string()}
-            ProtoStarMessageTo::Resource(address) => {address.to_string()}
+            ProtoStarMessageTo::Point(address) => {address.to_string()}
         }
     }
 }
@@ -49,7 +48,7 @@ impl ProtoStarMessageTo {
         match self {
             ProtoStarMessageTo::None => true,
             ProtoStarMessageTo::Star(_) => false,
-            ProtoStarMessageTo::Resource(_) => false,
+            ProtoStarMessageTo::Point(_) => false,
         }
     }
 }
@@ -62,7 +61,7 @@ impl From<StarKey> for ProtoStarMessageTo {
 
 impl From<Point> for ProtoStarMessageTo {
     fn from(id: Point) -> Self {
-        ProtoStarMessageTo::Resource(id)
+        ProtoStarMessageTo::Point(id)
     }
 }
 
@@ -70,7 +69,7 @@ impl From<Option<Point>> for ProtoStarMessageTo {
     fn from(id: Option<Point>) -> Self {
         match id {
             None => ProtoStarMessageTo::None,
-            Some(id) => ProtoStarMessageTo::Resource(id.into()),
+            Some(id) => ProtoStarMessageTo::Point(id.into()),
         }
     }
 }
@@ -403,5 +402,9 @@ impl AsyncTransmitter for StarlaneMessenger {
                 }
             }
         } )
+    }
+
+    async fn route(&self, wave: Wave) {
+        todo!()
     }
 }

@@ -27,8 +27,9 @@ use nom_supreme::final_parser::final_parser;
 use serde_json::{json, Value};
 use validator::validate_email;
 use mesh_portal_versions::version::v0_0_1::command::Command;
+use mesh_portal_versions::version::v0_0_1::id::id::{Kind, KindBase};
+use mesh_portal_versions::version::v0_0_1::sys::Assign;
 use crate::error::Error;
-use crate::particle::{Kind, KindBase, Assign};
 use crate::particle::property::{PointPattern, AnythingPattern, BoolPattern, EmailPattern, PropertiesConfig, PropertyPattern, PropertyPermit, PropertySource};
 use crate::registry::{match_kind};
 use crate::star::core::particle::driver::ParticleCoreDriver;
@@ -92,36 +93,36 @@ impl ParticleCoreDriver for UserBaseKeycloakCoreDriver {
         match assign.state {
             StateSrc::None=> {
             }
-            StateSrc::Payload(_) => {
+            StateSrc::Substance(_) => {
                 return Err("UserBase<Keycloak> must be stateless".into());
             }
         };
 
 
-        if is_hyper_userbase(&assign.config.stub.point)
+        if is_hyper_userbase(&assign.details.stub.point)
         {
-            let sso_session_max_lifespan = assign.config.properties.get("sso-session-max-lifespan" ).ok_or("cannot get value for required property 'sso-session-max-lifespan'")?.value.clone();
-            self.admin.init_realm_for_point("master".to_string(), &assign.config.stub.point ).await?;
-            match self.admin.update_realm_for_point("master".to_string(), &assign.config.stub.point, Some(false), Some(false), Some(sso_session_max_lifespan)).await
+            let sso_session_max_lifespan = assign.details.properties.get("sso-session-max-lifespan" ).ok_or("cannot get value for required property 'sso-session-max-lifespan'")?.value.clone();
+            self.admin.init_realm_for_point("master".to_string(), &assign.details.stub.point ).await?;
+            match self.admin.update_realm_for_point("master".to_string(), &assign.details.stub.point, Some(false), Some(false), Some(sso_session_max_lifespan)).await
             {
                 Err(err) => {
                     error!("{}",err.to_string());
-                    return Err(format!("UserBase<Keyloak>: could not update master realm for {}", assign.config.stub.point.to_string()).into())
+                    return Err(format!("UserBase<Keyloak>: could not update master realm for {}", assign.details.stub.point.to_string()).into())
                 }
                 _ => {}
             }
         }
         else
         {
-            let registration_email_as_username = assign.config.properties.get("registration-email-as-username" ).map_or(None, |x|{ Some(x.value=="true") });
-            let verify_email= assign.config.properties.get("verify-email" ).map_or(None, |x|{ Some(x.value=="true") });
-            let sso_session_max_lifespan = assign.config.properties.get("sso-session-max-lifespan" ).ok_or("cannot get value for required property 'sso-session-max-lifespan'")?.value.clone();
+            let registration_email_as_username = assign.details.properties.get("registration-email-as-username" ).map_or(None, |x|{ Some(x.value=="true") });
+            let verify_email= assign.details.properties.get("verify-email" ).map_or(None, |x|{ Some(x.value=="true") });
+            let sso_session_max_lifespan = assign.details.properties.get("sso-session-max-lifespan" ).ok_or("cannot get value for required property 'sso-session-max-lifespan'")?.value.clone();
 
-            match self.admin.create_realm_from_point(&assign.config.stub.point, registration_email_as_username, verify_email, Some(sso_session_max_lifespan)).await
+            match self.admin.create_realm_from_point(&assign.details.stub.point, registration_email_as_username, verify_email, Some(sso_session_max_lifespan)).await
             {
                 Err(err) => {
                     error!("{}",err.to_string());
-                    return Err(format!("UserBase<Keyloak>: could not create realm for {}", assign.config.stub.point.to_string()).into())
+                    return Err(format!("UserBase<Keyloak>: could not create realm for {}", assign.details.stub.point.to_string()).into())
                 }
                 _ => {}
             }
@@ -173,7 +174,7 @@ impl UserBaseKeycloakCoreDriver{
         if let Method::Msg(method) =&request.core.method{
 println!("UserBase<Keycloak> ... Handle Message action: {}", method.to_string());
             match method.as_str() {
-                "GetJwks" => request.clone().payload_result(self.handle_get_jwks(&request).await),
+                "GetJwks" => request.clone().body_result(self.handle_get_jwks(&request).await),
                 _ => {
                     request.status(404)
                 }
@@ -210,8 +211,8 @@ println!("UserBaseKeycloakCoreDriver: handle_http");
                 &HttpMethod::Post=> {
                     match &request.core.uri.path() {
                         &"/login" => request.clone().result(self.handle_login(&request).await),
-                        &"/introspect" => request.clone().payload_result(self.handle_introspect_token(&request).await),
-                        &"/refresh-token" => request.clone().payload_result(self.handle_refresh_token(&request).await),
+                        &"/introspect" => request.clone().body_result(self.handle_introspect_token(&request).await),
+                        &"/refresh-token" => request.clone().body_result(self.handle_refresh_token(&request).await),
                         _ => {
                             request.status(404)
                         }
@@ -499,7 +500,7 @@ impl ParticleCoreDriver for UserCoreDriver {
         match assign.state {
             StateSrc::None => {
             }
-            StateSrc::Payload(_) => {
+            StateSrc::Substance(_) => {
                 return Err("User must be stateless".into());
             }
         };
