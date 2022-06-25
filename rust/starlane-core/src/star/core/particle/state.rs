@@ -3,7 +3,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::path::Path;
-use mesh_portal::version::latest::payload::Payload;
+use mesh_portal::version::latest::payload::Substance;
 
 use tokio::sync::{mpsc, oneshot};
 
@@ -36,7 +36,7 @@ impl StateStore {
     pub async fn put(
         &self,
         key: Point,
-        state : Payload,
+        state : Substance,
     ) -> Result<(), Error> {
         let (tx, rx) = oneshot::channel();
 
@@ -46,7 +46,7 @@ impl StateStore {
         rx.await?
     }
 
-    pub async fn get(&self, address: Point) -> Result<Payload, Error> {
+    pub async fn get(&self, address: Point) -> Result<Substance, Error> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(ResourceStoreCommand::Get {
@@ -70,12 +70,12 @@ pub enum ResourceStoreCommand {
     Close,
     Save {
         address: Point,
-        state: Payload,
+        state: Substance,
         tx: oneshot::Sender<Result<(), Error>>,
     },
     Get {
         address: Point,
-        tx: oneshot::Sender<Result<Payload, Error>>,
+        tx: oneshot::Sender<Result<Substance, Error>>,
     },
     Has {
         address: Point,
@@ -122,7 +122,7 @@ impl StateStoreFS {
     async fn save(
         &mut self,
         address: Point,
-        state: Payload,
+        state: Substance,
     ) -> Result<(), Error> {
 
         let parent_path= Path::from_str(
@@ -141,7 +141,7 @@ impl StateStoreFS {
         Ok(())
     }
 
-    async fn get(&self, address: Point) -> Result<Payload, Error> {
+    async fn get(&self, address: Point) -> Result<Substance, Error> {
         let machine_filesystem = self.skel.machine.machine_filesystem();
         let mut data_access = machine_filesystem.data_access();
 
@@ -150,7 +150,7 @@ impl StateStoreFS {
         )?;
 
         let bin = data_access.read(&state_path).await?;
-        let payload: Payload = bincode::deserialize(bin.as_slice())?;
+        let payload: Substance = bincode::deserialize(bin.as_slice())?;
         Ok(payload)
     }
 

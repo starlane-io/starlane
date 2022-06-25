@@ -8,7 +8,7 @@ use crate::star::shell::watch::WatchApi;
 use crate::star::StarKey;
 use std::hash::Hash;
 use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::payload::Payload;
+use mesh_portal::version::latest::payload::Substance;
 use mesh_portal::version::latest::particle::Status;
 
 pub type WatchKey = Uuid;
@@ -79,7 +79,7 @@ impl Notification {
 
 #[derive(Debug,Clone,Serialize,Deserialize,strum_macros::Display)]
 pub enum Change {
-    State(Payload),
+    State(Substance),
     Children(Vec<ChildChange>),
     Status(Status)
 }

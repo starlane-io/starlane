@@ -18,14 +18,14 @@ use tokio::io::AsyncReadExt;
 use tokio::runtime::Handle;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use wasmer::{Cranelift, Store, Universal};
-use mesh_portal::version::latest::payload::Payload;
+use mesh_portal::version::latest::payload::Substance;
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 
 use crate::artifact::ArtifactRef;
 use crate::bindex::BindConfigCache;
 use crate::config::bind::BindConfigParser;
 use crate::config::config::ParticleConfig;
-use crate::config::parse::ResourceConfigParser;
+use crate::config::parse::ParticleConfigParser;
 use crate::config::wasm::{Wasm, WasmCompiler};
 use crate::error::Error;
 use crate::file_access::FileAccess;
@@ -548,10 +548,10 @@ impl ArtifactBundleSrc {
     pub async fn get_bundle_zip(&self, point: Point) -> Result<Bin, Error> {
         Ok(match self {
             ArtifactBundleSrc::STARLANE_API(api) => {
-                match api.get_state(point).await.as_result::<Error,Payload>() {
+                match api.get_state(point).await.as_result::<Error, Substance>() {
                     Ok(payload) => {
                         match payload {
-                            Payload::Bin(bin) => {
+                            Substance::Bin(bin) => {
                                 bin
                             }
                             _ => {
@@ -940,7 +940,7 @@ impl RootArtifactCaches {
             raw: RootItemCache::new(bundle_cache.clone(), Arc::new(RawParser::new())),
             resource_configs: RootItemCache::new(
                 bundle_cache.clone(),
-                Arc::new(ResourceConfigParser::new()),
+                Arc::new(ParticleConfigParser::new()),
             ),
             bind_configs: RootItemCache::new(
                 bundle_cache.clone(),

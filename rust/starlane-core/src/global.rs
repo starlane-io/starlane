@@ -3,7 +3,7 @@ use std::sync::Arc;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Agent, ReqProto, ReqShell, RespShell};
 use mesh_portal::version::latest::msg::MsgMethod;
-use mesh_portal::version::latest::payload::{Payload, PayloadType};
+use mesh_portal::version::latest::payload::{Substance, PayloadType};
 use mesh_portal_versions::version::v0_0_1::command::Command;
 use mesh_portal_versions::version::v0_0_1::id::id::Port;
 use mesh_portal_versions::version::v0_0_1::id::id::ToPort;
@@ -46,7 +46,7 @@ impl GlobalApi {
         async fn handle(global: &GlobalApi, request: ReqShell) -> Result<RespShell,Error> {
             match &request.core.method {
                 Method::Msg(method) if method.as_str() == "Command" && request.core.body.kind() == PayloadType::Command => {
-                    if let Payload::Command(command) = &request.core.body {
+                    if let Substance::Command(command) = &request.core.body {
                         match &**command {
                             Command::Create(create) => {
                                 let mut response = {
@@ -59,11 +59,11 @@ impl GlobalApi {
                             }
                             Command::Delete(delete) => {
                                 let list = global.registry.delete(delete).await?;
-                                Ok(request.ok_body(Payload::List(list)))
+                                Ok(request.ok_body(Substance::List(list)))
                             }
                             Command::Select(select) => {
                                 let list = global.registry.select(select).await?;
-                                Ok(request.ok_body(Payload::List(list)))
+                                Ok(request.ok_body(Substance::List(list)))
                             }
                             Command::Set(set) => {
                                 global.registry.set(set).await?;

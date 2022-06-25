@@ -46,8 +46,7 @@ impl ParticleCoreDriver for FileCoreManager {
         assign: Assign,
     ) -> Result<(), Error> {
 
-        let kind : Kind = TryFrom::try_from(assign.details.stub.kind)?;
-        if let Kind::File(file_kind) = kind
+        if let Kind::File(file_kind) = &assign.details.stub.kind
         {
             match file_kind {
                 FileSubKind::Dir => {
@@ -62,14 +61,14 @@ impl ParticleCoreDriver for FileCoreManager {
                             return Err("Artifact cannot be stateless".into())
                         },
                     };
-                    self.store.put(assign.details.stub.point.clone(), state.clone() ).await?;
+                    self.store.put(assign.details.stub.point.clone(), *state.clone() ).await?;
 
                     let selector = WatchSelector{
                         topic: Topic::Point(assign.details.stub.point),
                         property: Property::State
                     };
 
-                    self.skel.watch_api.fire( Notification::new(selector, Change::State(state) ));
+                    self.skel.watch_api.fire( Notification::new(selector, Change::State(*state) ));
 
                 }
             }
@@ -124,7 +123,7 @@ impl ParticleCoreDriver for FileSystemManager {
 
         let root_point_and_kind = AddressAndKind {
             point: Point::from_str( format!("{}:/", assign.details.stub.point.to_string()).as_str())?,
-            kind: KindParts { base: "File".to_string(), sub: Option::Some("Dir".to_string()), specific: None }
+            kind: Kind::File(FileSubKind::Dir)
         };
 
         let skel = self.skel.clone();
@@ -132,7 +131,7 @@ impl ParticleCoreDriver for FileSystemManager {
             let create = Create {
                 template: Template {
                     point: PointTemplate { parent: assign.details.stub.point.clone(), child_segment_template: PointSegFactory::Exact(root_point_and_kind.point.last_segment().expect("expected final segment").to_string()) },
-                    kind: KindTemplate { base: root_point_and_kind.kind.base.clone(), sub: root_point_and_kind.kind.sub.clone(), specific: None }
+                    kind: KindTemplate { base: root_point_and_kind.kind.base(), sub: root_point_and_kind.kind.sub().into(), specific: None }
                 },
                 state: StateSrc::None,
                 properties: SetProperties::new(),

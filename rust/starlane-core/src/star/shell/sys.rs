@@ -15,6 +15,7 @@ use crate::error::Error;
 use crate::fail::{Fail, StarlaneFailure};
 use crate::frame::{StarMessage, StarMessagePayload};
 use crate::message::delivery::Delivery;
+use crate::registry::match_kind;
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
@@ -98,7 +99,7 @@ impl AsyncProcessor<SysCall> for SysComponent {
 
                                 let stub = Stub {
                                     point: point.clone(),
-                                    kind: template.kind.try_into()?,
+                                    kind: match_kind(&template.kind)?,
                                     status: Status::Unknown
                                 };
 
@@ -123,7 +124,7 @@ impl AsyncProcessor<SysCall> for SysComponent {
                                     if !sys.map.contains_key(&point) {
                                         let stub = Stub {
                                             point: point.clone(),
-                                            kind: template.kind.try_into()?,
+                                            kind: match_kind(&template.kind)?,
                                             status: Status::Unknown
                                         };
 

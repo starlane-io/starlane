@@ -13,7 +13,7 @@ use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::entity::request::create::KindTemplate;
 
 use mesh_portal::version::latest::id::{KindParts, Point, ResourceKind, Specific};
-use mesh_portal::version::latest::payload::Payload;
+use mesh_portal::version::latest::payload::Substance;
 use mesh_portal::version::latest::particle::{Status, Stub};
 use mesh_portal::version::latest::security::Permissions;
 use mesh_portal_versions::version::v0_0_1::parse::{CamelCase, consume_kind};

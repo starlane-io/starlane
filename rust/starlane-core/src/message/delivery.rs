@@ -23,7 +23,7 @@ use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::entity::response::RespCore;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
-use mesh_portal::version::latest::payload::{Call, CallKind, Errors, MsgCall, Payload};
+use mesh_portal::version::latest::payload::{Call, CallKind, Errors, MsgCall, Substance};
 use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
 use mesh_portal_versions::version::v0_0_1::wave::Method;
 use mesh_portal_versions::version::v0_0_1::parse::model::Subst;
@@ -96,7 +96,7 @@ impl <M> Delivery<M> where M: Clone + Send + Sync + 'static
 
 impl Delivery<ReqShell>
 {
-    pub fn result( self, result: Result<Payload,Error>) {
+    pub fn result( self, result: Result<Substance,Error>) {
         match result {
             Ok(payload) => {
                 let request = self.item.core.clone();
@@ -124,7 +124,7 @@ impl Delivery<ReqShell>
         self.responded = true;
     }
 
-   pub fn ok(self, payload: Payload) -> Result<(),Error> {
+   pub fn ok(self, payload: Substance) -> Result<(),Error> {
         let core = RespCore {
             headers: Default::default(),
             status: StatusCode::from_u16(200).unwrap(),
@@ -139,7 +139,7 @@ impl Delivery<ReqShell>
         let core = RespCore {
             headers: Default::default(),
             status: StatusCode::from_u16(500).unwrap(),
-            body: Payload::Text(fail)
+            body: Substance::Text(fail)
         };
         self.respond(core);
         Ok(())
@@ -151,7 +151,7 @@ impl Delivery<ReqShell>
         let core = RespCore {
             headers: Default::default(),
             status: StatusCode::from_u16(404).unwrap(),
-            body: Payload::Empty
+            body: Substance::Empty
         };
         self.respond(core);
         Ok(())
@@ -164,7 +164,7 @@ impl Delivery<ReqShell>
         let core = RespCore {
             headers: Default::default(),
             status: StatusCode::from_u16(status)?,
-            body: Payload::Errors(Errors::default(message))
+            body: Substance::Errors(Errors::default(message))
         };
         self.respond(core);
 

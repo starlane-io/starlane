@@ -14,7 +14,7 @@ use mesh_portal::version::latest::entity::request::{Method, Rc, ReqCore};
 use mesh_portal::version::latest::entity::response::RespCore;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Agent, Message, ReqShell, RespShell};
-use mesh_portal::version::latest::payload::{Call, CallKind, Payload};
+use mesh_portal::version::latest::payload::{Call, CallKind, Substance};
 use mesh_portal::version::latest::log::{PointLogger, SpanLogger};
 use mesh_portal_versions::error::MsgErr;
 use regex::{CaptureMatches, Regex};
@@ -323,7 +323,7 @@ impl PipeEx {
 pub struct Traverser {
     pub initial_request: Delivery<ReqShell>,
     pub method: Method,
-    pub body: Payload,
+    pub body: Substance,
     pub uri: Uri,
     pub headers: HeaderMap,
     pub status: StatusCode,

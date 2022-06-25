@@ -43,7 +43,7 @@ use std::sync::Arc;
 use mesh_portal_versions::version::v0_0_1::command::request::delete::Delete;
 use mesh_portal_versions::version::v0_0_1::command::request::select::{SelectKind, SubSelect};
 use tokio::sync::mpsc;
-use mesh_portal::version::latest::payload::{Payload, PayloadMap, PrimitiveList};
+use mesh_portal::version::latest::payload::{Substance, PayloadMap, PrimitiveList};
 use mesh_portal_versions::version::v0_0_1::id::{ArtifactSubKind, BaseSubKind, FileSubKind, UserBaseSubKind};
 use mesh_portal_versions::version::v0_0_1::id::id::{Kind, BaseKind, Tks};
 use mesh_portal_versions::version::v0_0_1::parse::{CamelCase, Domain, SkewerCase};
@@ -224,7 +224,7 @@ impl Registry {
             return Err(RegError::Dupe);
         }
 
-        let statement = format!("INSERT INTO particles (point,point_segment,base,kind,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.base, opt(&params.kind), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
+        let statement = format!("INSERT INTO particles (point,point_segment,base,kind,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.base, opt(&params.sub), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
         trans.execute(statement.as_str()).await?;
 
         for (_, property_mod) in registration.properties.iter() {
@@ -450,7 +450,7 @@ impl Registry {
         if !list.is_empty() {
             let mut points = String::new();
             for (index, point) in list.iter().enumerate() {
-                if let Payload::Point(point) = &**point {
+                if let Substance::Point(point) = &**point {
                     points.push_str(format!("'{}'", point.to_string()).as_str());
                     if index < list.len() - 1 {
                         points.push_str(", ");
@@ -483,7 +483,7 @@ impl Registry {
         if select.pattern.matches_root() {
             list.push(Stub {
                 point: Point::root(),
-                kind: KindParts::new("Root".to_string(), None, None),
+                kind: Kind::Root,
                 status: Status::Ready,
             });
         }
@@ -525,7 +525,7 @@ impl Registry {
                 GenericKindSelector::Any => {}
                 GenericKindSelector::Exact(kind) => {
                     index = index + 1;
-                    where_clause.push_str(format!(" AND kind=${}", index).as_str());
+                    where_clause.push_str(format!(" AND base=${}", index).as_str());
                     params.push(kind.to_string());
                 }
             }
@@ -534,10 +534,15 @@ impl Registry {
                 GenericKindSelector::Any => {}
                 GenericKindSelector::Exact(kind) => match &hop.kind_selector.sub {
                     SubKindSelector::Any => {}
-                    SubKindSelector::Exact(sub_kind) => {
-                        index = index + 1;
-                        where_clause.push_str(format!(" AND sub_kind=${}", index).as_str());
-                        params.push(sub_kind.to_string());
+                    SubKindSelector::Exact(sub) => {
+                        match sub {
+                            None => {}
+                            Some(sub) => {
+                                index = index + 1;
+                                where_clause.push_str(format!(" AND sub=${}", index).as_str());
+                                params.push(sub.to_string());
+                            }
+                        }
                     }
                 },
             }
@@ -546,12 +551,20 @@ impl Registry {
                 ValuePattern::Any => {}
                 ValuePattern::None => {}
                 ValuePattern::Pattern(specific) => {
+                    match &specific.provider {
+                        VendorSelector::Any => {}
+                        VendorSelector::Exact(provider ) => {
+                            index = index + 1;
+                            where_clause.push_str(format!(" AND provider=${}", index).as_str());
+                            params.push(provider.to_string());
+                        }
+                    }
                     match &specific.vendor {
                         VendorSelector::Any => {}
                         VendorSelector::Exact(vendor) => {
                             index = index + 1;
                             where_clause.push_str(format!(" AND vendor=${}", index).as_str());
-                            params.push(vendor.clone());
+                            params.push(vendor.to_string());
                         }
                     }
                     match &specific.product {
@@ -559,7 +572,7 @@ impl Registry {
                         ProductSelector::Exact(product) => {
                             index = index + 1;
                             where_clause.push_str(format!(" AND product=${}", index).as_str());
-                            params.push(product.clone());
+                            params.push(product.to_string());
                         }
                     }
                     match &specific.variant {
@@ -567,7 +580,7 @@ impl Registry {
                         VariantSelector::Exact(variant) => {
                             index = index + 1;
                             where_clause.push_str(format!(" AND variant=${}", index).as_str());
-                            params.push(variant.clone());
+                            params.push(variant.to_string());
                         }
                     }
                 }
@@ -909,11 +922,11 @@ impl Registry {
     }
 }
 
-fn opt(opt: &Option<String>) -> String {
+fn opt<S:ToString>(opt: &Option<S>) -> String {
     match opt {
         None => "null".to_string(),
         Some(value) => {
-            format!("'{}'", value)
+            format!("'{}'", value.to_string())
         }
     }
 }
@@ -1555,10 +1568,11 @@ pub struct RegistryParams {
     pub point: String,
     pub point_segment: String,
     pub base: String,
-    pub kind: Option<String>,
-    pub vendor: Option<String>,
-    pub product: Option<String>,
-    pub variant: Option<String>,
+    pub sub: Option<String>,
+    pub provider: Option<Domain>,
+    pub vendor: Option<Domain>,
+    pub product: Option<SkewerCase>,
+    pub variant: Option<SkewerCase>,
     pub version: Option<String>,
     pub version_variant: Option<String>,
     pub parent: String,
@@ -1578,6 +1592,13 @@ impl RegistryParams {
 
         let base = registration.kind.base().to_string();
         let sub = registration.kind.sub();
+
+        let provider = match &registration.kind.specific() {
+            None => Option::None,
+            Some(specific) => Option::Some(specific.provider.clone()),
+        };
+
+
         let vendor = match &registration.kind.specific() {
             None => Option::None,
             Some(specific) => Option::Some(specific.vendor.clone()),
@@ -1621,7 +1642,8 @@ impl RegistryParams {
             point_segment: point_segment,
             parent,
             base,
-            kind: sub,
+            sub: sub.into(),
+            provider,
             vendor,
             product,
             variant,
@@ -1667,21 +1689,22 @@ pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
         BaseKind::Bundle => Kind::Bundle,
         BaseKind::Artifact => match &template.sub {
             None => {
-                return Err("expected kind for Artirtact".into());
+                return Err("expected Sub for Artirtact".into());
             }
-            Some(kind) => {
-                let artifact_kind = ArtifactSubKind::from_str(kind.as_str())?;
+            Some(sub ) => {
+                let artifact_kind = ArtifactSubKind::from_str(sub.as_str())?;
                 return Ok(Kind::Artifact(artifact_kind));
             }
         },
         BaseKind::Control => Kind::Control,
         BaseKind::UserBase => match &template.sub {
             None => {
-                return Err("kind must be set for UserBase".into());
+                return Err("SubKind must be set for UserBase<?>".into());
             }
-            Some(kind) => {
-                let kind = UserBaseSubKind::from_str(kind.as_str())?;
-                Kind::UserBase(kind)
+            Some(sub) => {
+                let specific = Specific::from_str("starlane.io:redhat.com:keycloak:community:18.0.0")?;
+                let sub = UserBaseSubKind::OAuth(specific);
+                Kind::UserBase(sub)
             }
         },
     })
@@ -1692,7 +1715,7 @@ impl Registry {
         self.set_properties(&set.point, &set.properties).await
     }
 
-    pub async fn get(&self, get: &Get) -> Result<Payload, Error> {
+    pub async fn get(&self, get: &Get) -> Result<Substance, Error> {
         match &get.op {
             GetOp::State => {
                 return Err("Registry does not handle GetOp::State operations".into());
@@ -1715,10 +1738,10 @@ impl Registry {
                 let mut map = PayloadMap::new();
                 for (index, property) in properties.iter().enumerate() {
                     println!("\tprop{}", property.0.clone());
-                    map.insert(property.0.clone(), Payload::Text(property.1.value.clone()));
+                    map.insert(property.0.clone(), Substance::Text(property.1.value.clone()));
                 }
 
-                Ok(Payload::Map(map))
+                Ok(Substance::Map(map))
             }
         }
     }
@@ -1793,13 +1816,13 @@ impl Registry {
         Ok(stub)
     }
 
-    pub async fn cmd_select(&self, select: &Select) -> Result<Payload, Error> {
-        let list = Payload::List(self.select(select).await?);
+    pub async fn cmd_select(&self, select: &Select) -> Result<Substance, Error> {
+        let list = Substance::List(self.select(select).await?);
         Ok(list)
     }
 
-    pub async fn cmd_query(&self, to: &Point, query: &Query) -> Result<Payload, Error> {
-        let result = Payload::Text(self.query(to, query).await?.to_string());
+    pub async fn cmd_query(&self, to: &Point, query: &Query) -> Result<Substance, Error> {
+        let result = Substance::Text(self.query(to, query).await?.to_string());
         Ok(result)
     }
 }

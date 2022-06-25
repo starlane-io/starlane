@@ -27,7 +27,7 @@ use mesh_portal::version::latest::entity::request::get::Get;
 use mesh_portal::version::latest::fail;
 use mesh_portal::version::latest::id::{Meta, Point};
 use mesh_portal::version::latest::messaging::{Agent, CmdMethod, Message, ReqShell, RespShell};
-use mesh_portal::version::latest::payload::{Payload, PayloadMap,  };
+use mesh_portal::version::latest::payload::{Substance, PayloadMap,  };
 use mesh_portal::version::latest::particle::{Status, Stub};
 use mesh_portal::version::latest::entity::request::get::GetOp;
 use mesh_portal::version::latest::entity::request::query::Query;
@@ -215,7 +215,7 @@ impl MessagingEndpointComponentInner {
             };
 
 
-            async fn process(skel: StarSkel, resource_core_driver_api: ResourceCoreDriverApi, method: &CmdMethod, to: Point, body: &Payload ) -> Result<Payload, Error> {
+            async fn process(skel: StarSkel, resource_core_driver_api: ResourceCoreDriverApi, method: &CmdMethod, to: Point, body: &Substance) -> Result<Substance, Error> {
                 let record = skel.registry_api.locate(&to).await?;
                 let kind = Kind::try_from( record.details.stub.kind )?;
 
@@ -269,7 +269,7 @@ impl MessagingEndpointComponentInner {
 
                                 match assign(skel.clone(), details.clone(), create.state.clone()).await {
                                     Ok(_) => {
-                                        Ok(Payload::Stub(details.stub))
+                                        Ok(Substance::Stub(details.stub))
                                     },
                                     Err(fail) => {
                                         eprintln!("FAIL {}",fail.to_string() );

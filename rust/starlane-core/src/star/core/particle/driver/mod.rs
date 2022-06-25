@@ -21,7 +21,7 @@ use mesh_portal::version::latest::entity::request::set::Set;
 use mesh_portal::version::latest::fail;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
-use mesh_portal::version::latest::payload::Payload;
+use mesh_portal::version::latest::payload::Substance;
 use mesh_portal::version::latest::particle::Stub;
 use mesh_portal::version::latest::sys::Assign;
 use mesh_portal_versions::version::v0_0_1::command::Command;
@@ -63,13 +63,13 @@ println!("Manager mod RETURNING" );
         rtn
     }
 
-    pub async fn get(&self, point: Point) -> Result<Payload,Error> {
+    pub async fn get(&self, point: Point) -> Result<Substance,Error> {
         let (tx,rx) = oneshot::channel();
         self.tx.send(DriverCall::Get{point, tx }).await;
         rx.await?
     }
 
-    pub async fn command(&self, to: Point, command: Command ) -> Result<Payload,Error> {
+    pub async fn command(&self, to: Point, command: Command ) -> Result<Substance,Error> {
         let (tx,rx) = oneshot::channel();
         self.tx.send(DriverCall::Command { to, command,  tx }).await;
         rx.await?
@@ -79,8 +79,8 @@ println!("Manager mod RETURNING" );
 pub enum DriverCall {
     Assign{ assign: Assign, tx: oneshot::Sender<Result<(),Error>> },
     Request { request: ReqShell, tx: oneshot::Sender<Result<RespShell,Error>>},
-    Get{ point: Point, tx: oneshot::Sender<Result<Payload,Error>>},
-    Command { to: Point, command: Command, tx: oneshot::Sender<Result<Payload,Error>> }
+    Get{ point: Point, tx: oneshot::Sender<Result<Substance,Error>>},
+    Command { to: Point, command: Command, tx: oneshot::Sender<Result<Substance,Error>> }
 }
 
 
@@ -171,8 +171,8 @@ impl ResourceCoreDriverComponent {
     }
 
 
-    async fn get(&mut self, point: Point, tx: oneshot::Sender<Result<Payload,Error>> ) {
-        async fn process(manager : &mut ResourceCoreDriverComponent, point: Point) -> Result<Payload,Error> {
+    async fn get(&mut self, point: Point, tx: oneshot::Sender<Result<Substance,Error>> ) {
+        async fn process(manager : &mut ResourceCoreDriverComponent, point: Point) -> Result<Substance,Error> {
             let resource_type = manager.resource_type(&point )?;
             let manager = manager.drivers.get(&resource_type ).ok_or(format!("could not get driver for {}", resource_type.to_string()))?;
             manager.get(point).await
@@ -199,7 +199,7 @@ impl ResourceCoreDriverComponent {
         }
     }
 
-    async fn particle_command(&mut self, to: Point, command: Command) -> Result<Payload,Error> {
+    async fn particle_command(&mut self, to: Point, command: Command) -> Result<Substance,Error> {
         let resource_type = self.resources.get(&to ).ok_or(format!("could not find particle: {}", to.to_string()))?;
         let driver = self.drivers.get(resource_type).ok_or(format!("do not have a particle core driver for '{}' and StarKind '{}'", resource_type.to_string(), self.skel.info.kind.to_string() ))?;
         let result = driver.particle_command(to, command).await;
@@ -262,13 +262,13 @@ pub trait ParticleCoreDriver: Send + Sync {
         request.fail(format!("particle type '{}' does not handle requests",self.kind().to_string()).as_str())
     }
 
-    async fn get(&self, point: Point) -> Result<Payload,Error> {
+    async fn get(&self, point: Point) -> Result<Substance,Error> {
         Err("Stateless".into())
     }
 
     fn shutdown(&self) {}
 
-    async fn particle_command(&self, to: Point, command: Command) -> Result<Payload,Error> {
+    async fn particle_command(&self, to: Point, command: Command) -> Result<Substance,Error> {
         Err(format!("particle type: '{}' does not handle Core particle commands",self.kind().to_string()).into())
     }
 

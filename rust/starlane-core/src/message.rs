@@ -5,7 +5,7 @@ use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 use mesh_portal::version::latest::selector::PointKindHierarchy;
-use mesh_portal::version::latest::payload::Payload;
+use mesh_portal::version::latest::payload::Substance;
 use mesh_portal::version::latest::particle::Stub;
 
 use serde::{Deserialize, Serialize};
@@ -319,7 +319,7 @@ pub enum Reply{
     Records(Vec<ParticleRecord>),
     Stubs(Vec<Stub>),
     AddressTksPath(PointKindHierarchy),
-    Payload(Payload)
+    Payload(Substance)
 }
 
 impl Reply{

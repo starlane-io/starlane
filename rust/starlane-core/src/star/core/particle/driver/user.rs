@@ -19,7 +19,7 @@ use mesh_portal::version::latest::http::HttpMethod;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 use mesh_portal::version::latest::particle::Stub;
-use mesh_portal::version::latest::payload::Payload;
+use mesh_portal::version::latest::payload::Substance;
 use mesh_portal_versions::version::v0_0_1::parse::skewer_or_snake;
 use nom::AsBytes;
 use nom::combinator::all_consuming;
@@ -149,7 +149,7 @@ println!("handle HTTP: {}", request.core.uri.to_string());
     }
 
 
-    async fn particle_command(&self, to: Point, command: Command) -> Result<Payload,Error> {
+    async fn particle_command(&self, to: Point, command: Command) -> Result<Substance,Error> {
         match command {
             Command::Create(create) => { self.create_child(to, create).await }
             Command::Set(set) => { self.set_child(to,set).await }
@@ -184,7 +184,7 @@ println!("UserBase<Keycloak> ... Handle Message action: {}", method.to_string())
         }
     }
 
-    async fn handle_get_jwks(&self, request: &ReqShell) -> Result<Payload,Error>
+    async fn handle_get_jwks(&self, request: &ReqShell) -> Result<Substance,Error>
     {
         let client = reqwest::Client::new();
         let realm = normalize_realm(&request.to);
@@ -198,7 +198,7 @@ println!("UserBase<Keycloak> ... Handle Message action: {}", method.to_string())
             .await?;
         let jwks = jwks.text().await?;
 
-        Ok(Payload::Text(jwks))
+        Ok(Substance::Text(jwks))
 
     }
 
@@ -250,12 +250,12 @@ println!("UserBaseKeycloakCoreDriver: handle_http");
         let response = RespCore {
             status: response.status(),
             headers: response.headers().clone(),
-            body: Payload::Bin(Arc::new(response.bytes().await?.to_vec()))
+            body: Substance::Bin(Arc::new(response.bytes().await?.to_vec()))
         };
         Ok(response)
     }
 
-    async fn handle_introspect_token(&self, request: &ReqShell) -> Result<Payload,Error>{
+    async fn handle_introspect_token(&self, request: &ReqShell) -> Result<Substance,Error>{
         let token: String = request.core.body.clone().try_into()?;
         let realm = normalize_realm(&request.to);
         let url = Self::keycloak_url()?;
@@ -276,7 +276,7 @@ println!("UserBaseKeycloakCoreDriver: handle_http");
         println!("valid_jwt: {}",valid_jwt.claims.to_string());
 
 
-        Ok(Payload::Empty)
+        Ok(Substance::Empty)
     }
 
 
@@ -290,7 +290,7 @@ println!("UserBaseKeycloakCoreDriver: handle_http");
     refresh_token: <my-refresh-token>
      */
 
-    async fn handle_refresh_token(&self, request: &ReqShell) -> Result<Payload,Error>{
+    async fn handle_refresh_token(&self, request: &ReqShell) -> Result<Substance,Error>{
 println!("handle_refresh_token...");
         let token: String = request.core.body.clone().try_into()?;
 println!("received refresh token: {}", token );
@@ -313,7 +313,7 @@ println!("received refresh token: {}", token );
         {
             200 => {
                 let response = response.text().await?;
-                Ok(Payload::Bin(Arc::new(response.as_bytes().to_vec())))
+                Ok(Substance::Bin(Arc::new(response.as_bytes().to_vec())))
             }
             other => {
                 println!("{}",other);
@@ -326,7 +326,7 @@ println!("received refresh token: {}", token );
 
 
 
-    async fn get_child(&self, to: Point, mut get: Get) -> Result<Payload,Error> {
+    async fn get_child(&self, to: Point, mut get: Get) -> Result<Substance,Error> {
 
         match &mut get.op {
             GetOp::State => {
@@ -341,11 +341,11 @@ println!("received refresh token: {}", token );
 
         self.skel.registry_api.get(&get).await?;
 
-        Ok(Payload::Empty)
+        Ok(Substance::Empty)
     }
 
 
-    async fn set_child(&self, to: Point, mut set: Set) -> Result<Payload,Error> {
+    async fn set_child(&self, to: Point, mut set: Set) -> Result<Substance,Error> {
         let record = self.skel.registry_api.locate(&set.point).await?;
         let password = match set.properties.map.remove("password") {
             None => {
@@ -370,10 +370,10 @@ println!("received refresh token: {}", token );
             self.admin.reset_password(&to, email, password.unwrap() ).await?;
         }
 
-        Ok(Payload::Empty)
+        Ok(Substance::Empty)
     }
 
-    async fn create_child(&self, to: Point, create: Create ) -> Result<Payload,Error> {
+    async fn create_child(&self, to: Point, create: Create ) -> Result<Substance,Error> {
         let mut create = create;
 
         let kind = match_kind(&create.template.kind)?;
@@ -430,11 +430,11 @@ println!("received refresh token: {}", token );
             }
         };
 
-       Ok(Payload::Stub(stub))
+       Ok(Substance::Stub(stub))
      }
 
 
-    async fn select_child(&self, to: Point, select: Select) -> Result<Payload,Error> {
+    async fn select_child(&self, to: Point, select: Select) -> Result<Substance,Error> {
         self.skel.registry_api.cmd_select(&select).await
 /*        let mut first = 0;
         let max = 100;
