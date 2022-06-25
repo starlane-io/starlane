@@ -41,7 +41,7 @@ use regex::Regex;
 use mesh_portal::version::latest::config::bind::BindConfig;
 use mesh_portal_versions::version::v0_0_1::command::Command;
 use mesh_portal_versions::version::v0_0_1::id::{ArtifactSubKind, FileSubKind, UserBaseSubKind};
-use mesh_portal_versions::version::v0_0_1::id::id::{Kind, KindBase, Tks, ToPoint};
+use mesh_portal_versions::version::v0_0_1::id::id::{Kind, BaseKind, Tks, ToPoint};
 use mesh_portal_versions::version::v0_0_1::sys::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
 use crate::artifact::ArtifactRef;
 use crate::bindex::{BindConfigCache, BindEx, BindExRouter, RegistryApi};
@@ -242,7 +242,7 @@ impl MessagingEndpointComponentInner {
                                     state: StateSrc,
                                 ) -> Result<(), Error> {
 
-                                    let star_kind = StarKind::hosts(&KindBase::from_str(details.stub.kind.base.to_string().as_str())?);
+                                    let star_kind = StarKind::hosts(&BaseKind::from_str(details.stub.kind.base().to_string().as_str())?);
                                     let key = if skel.info.kind == star_kind {
                                         skel.info.key.clone()
                                     }

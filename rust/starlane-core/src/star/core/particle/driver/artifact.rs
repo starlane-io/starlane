@@ -25,7 +25,7 @@ use mesh_portal::version::latest::messaging::ReqShell;
 use mesh_portal::version::latest::payload::Payload;
 use zip::result::ZipResult;
 use mesh_portal_versions::version::v0_0_1::id::ArtifactSubKind;
-use mesh_portal_versions::version::v0_0_1::id::id::{Kind, KindBase};
+use mesh_portal_versions::version::v0_0_1::id::id::{Kind, BaseKind};
 use mesh_portal_versions::version::v0_0_1::sys::Assign;
 use crate::file_access::FileAccess;
 
@@ -73,8 +73,8 @@ impl ArtifactBundleCoreDriver {
 
 #[async_trait]
 impl ParticleCoreDriver for ArtifactBundleCoreDriver {
-    fn kind(&self) -> KindBase {
-        KindBase::Bundle
+    fn kind(&self) -> BaseKind {
+        BaseKind::Bundle
     }
 
     async fn assign(
@@ -121,9 +121,9 @@ impl ParticleCoreDriver for ArtifactBundleCoreDriver {
                     }
                     let point = Point::from_str( format!("{}:/{}", assign.details.stub.point.to_string(), path.as_str()).as_str() )?;
                     let kind = if index < segments.len()-1 {
-                        KindParts { base: KindBase::Artifact, sub: Option::Some("Dir".to_string()), specific: None }
+                        KindParts { base: BaseKind::Artifact, sub: Option::Some("Dir".to_string()), specific: None }
                     }  else {
-                        KindParts { base: KindBase::Artifact, sub: Option::Some("Raw".to_string()), specific: None }
+                        KindParts { base: BaseKind::Artifact, sub: Option::Some("Raw".to_string()), specific: None }
                     };
                     let point_and_kind = AddressAndKind {
                         point,
@@ -253,8 +253,8 @@ impl ArtifactManager{
 
 #[async_trait]
 impl ParticleCoreDriver for ArtifactManager{
-    fn kind(&self) -> KindBase {
-        KindBase::Artifact
+    fn kind(&self) -> BaseKind {
+        BaseKind::Artifact
     }
 
     async fn assign(

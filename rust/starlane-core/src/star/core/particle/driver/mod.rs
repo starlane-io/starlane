@@ -25,7 +25,7 @@ use mesh_portal::version::latest::payload::Payload;
 use mesh_portal::version::latest::particle::Stub;
 use mesh_portal::version::latest::sys::Assign;
 use mesh_portal_versions::version::v0_0_1::command::Command;
-use mesh_portal_versions::version::v0_0_1::id::id::KindBase;
+use mesh_portal_versions::version::v0_0_1::id::id::BaseKind;
 use crate::star::core::particle::driver::artifact::ArtifactManager;
 use crate::star::core::particle::driver::user::UserBaseKeycloakCoreDriver;
 
@@ -90,8 +90,8 @@ impl Call for DriverCall {}
 
 pub struct ResourceCoreDriverComponent {
     pub skel: StarSkel,
-    drivers: HashMap<KindBase,Box<dyn ParticleCoreDriver>>,
-    resources: HashMap<Point, KindBase>
+    drivers: HashMap<BaseKind,Box<dyn ParticleCoreDriver>>,
+    resources: HashMap<Point, BaseKind>
 }
 
 impl ResourceCoreDriverComponent {
@@ -155,7 +155,7 @@ impl ResourceCoreDriverComponent {
     async fn assign(&mut self, assign: Assign, tx: oneshot::Sender<Result<(),Error>> ) {
 
        async fn process(manager_component: &mut ResourceCoreDriverComponent, assign: Assign) -> Result<(),Error> {
-           let resource_type = KindBase::from_str(assign.details.stub.kind.to_string().as_str())?;
+           let resource_type = BaseKind::from_str(assign.details.stub.kind.to_string().as_str())?;
            let manager:&mut Box<dyn ParticleCoreDriver> = manager_component.drivers.get_mut(&resource_type ).ok_or(format!("could not get driver for {}", resource_type.to_string()))?;
            manager_component.resources.insert(assign.details.stub.point.clone(), resource_type );
            manager.assign(assign).await
@@ -214,7 +214,7 @@ impl ResourceCoreDriverComponent {
         result
     }
 
-    fn resource_type(&mut self, point:&Point) ->Result<KindBase,Error> {
+    fn resource_type(&mut self, point:&Point) ->Result<BaseKind,Error> {
         Ok(self.resources.get(point ).ok_or(Error::new("could not find particle") )?.clone())
     }
 
@@ -226,20 +226,20 @@ impl ResourceCoreDriverComponent {
     {
         for resource_type in self.skel.info.kind.hosted() {
             let manager: Box<dyn ParticleCoreDriver> = match resource_type.clone() {
-                KindBase::Root => Box::new(StatelessCoreDriver::new(self.skel.clone(), KindBase::Root ).await),
-                KindBase::User => Box::new(StatelessCoreDriver::new(self.skel.clone(), KindBase::User ).await),
-                KindBase::Control => Box::new(StatelessCoreDriver::new(self.skel.clone(), KindBase::Control ).await),
-                KindBase::Space => Box::new(StatelessCoreDriver::new(self.skel.clone(), KindBase::Space ).await),
-                KindBase::Base => Box::new(StatelessCoreDriver::new(self.skel.clone(), KindBase::Base ).await),
-                KindBase::BundleSeries => Box::new(StatelessCoreDriver::new(self.skel.clone(), KindBase::BundleSeries).await),
-                KindBase::Bundle => Box::new(ArtifactBundleCoreDriver::new(self.skel.clone()).await),
-                KindBase::Artifact => Box::new(ArtifactManager::new(self.skel.clone()).await ),
+                BaseKind::Root => Box::new(StatelessCoreDriver::new(self.skel.clone(), BaseKind::Root ).await),
+                BaseKind::User => Box::new(StatelessCoreDriver::new(self.skel.clone(), BaseKind::User ).await),
+                BaseKind::Control => Box::new(StatelessCoreDriver::new(self.skel.clone(), BaseKind::Control ).await),
+                BaseKind::Space => Box::new(StatelessCoreDriver::new(self.skel.clone(), BaseKind::Space ).await),
+                BaseKind::Base => Box::new(StatelessCoreDriver::new(self.skel.clone(), BaseKind::Base ).await),
+                BaseKind::BundleSeries => Box::new(StatelessCoreDriver::new(self.skel.clone(), BaseKind::BundleSeries).await),
+                BaseKind::Bundle => Box::new(ArtifactBundleCoreDriver::new(self.skel.clone()).await),
+                BaseKind::Artifact => Box::new(ArtifactManager::new(self.skel.clone()).await ),
 //                KindBase::App => Box::new(MechtronCoreDriver::new(self.skel.clone(), KindBase::App).await?),
 //                KindBase::Mechtron => Box::new(MechtronCoreDriver::new(self.skel.clone(), KindBase::Mechtron).await?),
-                KindBase::Database => Box::new(K8sCoreDriver::new(self.skel.clone(), KindBase::Database ).await?),
-                KindBase::FileSystem => Box::new(FileSystemManager::new(self.skel.clone() ).await),
-                KindBase::File => Box::new(FileCoreManager::new(self.skel.clone())),
-                KindBase::UserBase=> Box::new(UserBaseKeycloakCoreDriver::new(self.skel.clone()).await? ),
+                BaseKind::Database => Box::new(K8sCoreDriver::new(self.skel.clone(), BaseKind::Database ).await?),
+                BaseKind::FileSystem => Box::new(FileSystemManager::new(self.skel.clone() ).await),
+                BaseKind::File => Box::new(FileCoreManager::new(self.skel.clone())),
+                BaseKind::UserBase=> Box::new(UserBaseKeycloakCoreDriver::new(self.skel.clone()).await? ),
                 t => Box::new(StatelessCoreDriver::new(self.skel.clone(), t ).await)
             };
             self.drivers.insert(resource_type, manager );
@@ -251,7 +251,7 @@ impl ResourceCoreDriverComponent {
 #[async_trait]
 pub trait ParticleCoreDriver: Send + Sync {
 
-    fn kind(&self) -> KindBase;
+    fn kind(&self) -> BaseKind;
 
     async fn assign(
         &mut self,

@@ -25,7 +25,7 @@ use tracing_futures::WithSubscriber;
 use cosmic_nom::new_span;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::config::{ParticleConfigBody, PointConfig};
-use mesh_portal_versions::version::v0_0_1::id::id::{KindBase, ToKindBase, ToPoint};
+use mesh_portal_versions::version::v0_0_1::id::id::{BaseKind, ToBaseKind, ToPoint};
 use mesh_portal_versions::version::v0_0_1::id::{ArtifactSubKind, BaseSubKind, FileSubKind, UserBaseSubKind};
 use mesh_portal_versions::version::v0_0_1::sys::{AssignmentKind, ChildRegistry, Location};
 
@@ -416,13 +416,13 @@ fn userbase_properties_config() -> PropertiesConfig {
 }
 
 
-pub fn properties_config<K:ToKindBase>(base:K) -> &'static PropertiesConfig {
+pub fn properties_config<K: ToBaseKind>(base:&K) -> &'static PropertiesConfig {
     match base.to_base(){
-        KindBase::Space => &UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG,
-        KindBase::UserBase => &USER_BASE_PROPERTIES_CONFIG,
-        KindBase::User => &USER_PROPERTIES_CONFIG,
-        KindBase::App => &MECHTRON_PROERTIES_CONFIG,
-        KindBase::Mechtron => &MECHTRON_PROERTIES_CONFIG,
+        BaseKind::Space => &UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG,
+        BaseKind::UserBase => &USER_BASE_PROPERTIES_CONFIG,
+        BaseKind::User => &USER_PROPERTIES_CONFIG,
+        BaseKind::App => &MECHTRON_PROERTIES_CONFIG,
+        BaseKind::Mechtron => &MECHTRON_PROERTIES_CONFIG,
         _ => &DEFAULT_PROPERTIES_CONFIG
     }
 }

@@ -6,7 +6,7 @@ use kube::api::{ListParams, PostParams};
 use kube::Api;
 use mesh_portal::version::latest::id::Point;
 use serde::{Deserialize, Serialize};
-use mesh_portal_versions::version::v0_0_1::id::id::KindBase;
+use mesh_portal_versions::version::v0_0_1::id::id::BaseKind;
 use mesh_portal_versions::version::v0_0_1::sys::Assign;
 
 use crate::error::Error;
@@ -19,11 +19,11 @@ pub struct K8sCoreDriver {
     starlane_meta: ObjectMeta,
     namespace: String,
     api_version: String,
-    resource_type: KindBase
+    resource_type: BaseKind
 }
 
 impl K8sCoreDriver {
-    pub async fn new(skel: StarSkel, resource_type: KindBase) -> Result<Self, Error> {
+    pub async fn new(skel: StarSkel, resource_type: BaseKind) -> Result<Self, Error> {
 
         let client = kube::Client::try_default().await?;
 
@@ -130,7 +130,7 @@ println!("Assigning Kube Resource Host....");
     }
 
 
-    fn kind(&self) -> KindBase {
+    fn kind(&self) -> BaseKind {
         self.resource_type.clone()
     }
 }

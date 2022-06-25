@@ -69,7 +69,7 @@ use nom::Parser;
 use nom_supreme::error::ErrorTree;
 use sqlx::postgres::PgTypeInfo;
 use cosmic_nom::{new_span, Res, Span};
-use mesh_portal_versions::version::v0_0_1::id::id::{KindBase, RouteSeg, ToPoint, ToPort};
+use mesh_portal_versions::version::v0_0_1::id::id::{BaseKind, RouteSeg, ToPoint, ToPort};
 use mesh_portal_versions::version::v0_0_1::parse::lowercase_alphanumeric;
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 use crate::registry::RegistryApi;
@@ -189,101 +189,101 @@ impl StarKind {
         )
     }
 
-    pub fn manages(&self) -> HashSet<KindBase> {
+    pub fn manages(&self) -> HashSet<BaseKind> {
         HashSet::from_iter(
             match self {
-                StarKind::Central => vec![KindBase::Space],
+                StarKind::Central => vec![BaseKind::Space],
                 StarKind::Space => vec![
-                    KindBase::App,
-                    KindBase::FileSystem,
-                    KindBase::Database,
+                    BaseKind::App,
+                    BaseKind::FileSystem,
+                    BaseKind::Database,
                 ],
                 StarKind::Relay => vec![],
                 StarKind::App => vec![
-                    KindBase::Mechtron,
-                    KindBase::FileSystem,
-                    KindBase::Database,
+                    BaseKind::Mechtron,
+                    BaseKind::FileSystem,
+                    BaseKind::Database,
                 ],
                 StarKind::Exe => vec![],
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
                 StarKind::Client => vec![],
                 StarKind::Web => vec![],
-                StarKind::FileStore => vec![KindBase::File],
-                StarKind::ArtifactStore => vec![KindBase::Artifact],
-                StarKind::K8s => vec![KindBase::Database],
-                StarKind::Portal => vec![KindBase::Control]
+                StarKind::FileStore => vec![BaseKind::File],
+                StarKind::ArtifactStore => vec![BaseKind::Artifact],
+                StarKind::K8s => vec![BaseKind::Database],
+                StarKind::Portal => vec![BaseKind::Control]
             }
             .iter()
             .cloned(),
         )
     }
 
-    pub fn registry(rt: &KindBase) -> StarKind {
+    pub fn registry(rt: &BaseKind) -> StarKind {
         match rt {
-            KindBase::Root => Self::Central,
-            KindBase::Space => Self::Central,
-            KindBase::User => Self::Space,
-            KindBase::App => Self::Space,
-            KindBase::Mechtron => Self::App,
-            KindBase::FileSystem => Self::Space,
-            KindBase::File => Self::Space,
-            KindBase::Database => Self::K8s,
-            KindBase::BundleSeries => Self::Space,
-            KindBase::Bundle => Self::ArtifactStore,
-            KindBase::Artifact => Self::ArtifactStore,
-            KindBase::Base => Self::Space,
-            KindBase::Control => Self::Portal,
-            KindBase::UserBase => Self::Space
+            BaseKind::Root => Self::Central,
+            BaseKind::Space => Self::Central,
+            BaseKind::User => Self::Space,
+            BaseKind::App => Self::Space,
+            BaseKind::Mechtron => Self::App,
+            BaseKind::FileSystem => Self::Space,
+            BaseKind::File => Self::Space,
+            BaseKind::Database => Self::K8s,
+            BaseKind::BundleSeries => Self::Space,
+            BaseKind::Bundle => Self::ArtifactStore,
+            BaseKind::Artifact => Self::ArtifactStore,
+            BaseKind::Base => Self::Space,
+            BaseKind::Control => Self::Portal,
+            BaseKind::UserBase => Self::Space
         }
     }
 
-    pub fn hosts(rt: &KindBase) -> StarKind {
+    pub fn hosts(rt: &BaseKind) -> StarKind {
         match rt {
-            KindBase::Root => Self::Central,
-            KindBase::Space => Self::Space,
-            KindBase::User => Self::Space,
-            KindBase::App => Self::App,
-            KindBase::Mechtron => Self::Exe,
-            KindBase::FileSystem => Self::FileStore,
-            KindBase::File => Self::FileStore,
-            KindBase::Database => Self::K8s,
-            KindBase::BundleSeries => Self::ArtifactStore,
-            KindBase::Bundle => Self::ArtifactStore,
-            KindBase::Artifact => Self::ArtifactStore,
-            KindBase::Base => Self::Space,
-            KindBase::Control => Self::Portal,
-            KindBase::UserBase => Self::Space
+            BaseKind::Root => Self::Central,
+            BaseKind::Space => Self::Space,
+            BaseKind::User => Self::Space,
+            BaseKind::App => Self::App,
+            BaseKind::Mechtron => Self::Exe,
+            BaseKind::FileSystem => Self::FileStore,
+            BaseKind::File => Self::FileStore,
+            BaseKind::Database => Self::K8s,
+            BaseKind::BundleSeries => Self::ArtifactStore,
+            BaseKind::Bundle => Self::ArtifactStore,
+            BaseKind::Artifact => Self::ArtifactStore,
+            BaseKind::Base => Self::Space,
+            BaseKind::Control => Self::Portal,
+            BaseKind::UserBase => Self::Space
         }
     }
 
-    pub fn hosted(&self) -> HashSet<KindBase> {
+    pub fn hosted(&self) -> HashSet<BaseKind> {
         HashSet::from_iter(
             match self {
-                StarKind::Central => vec![KindBase::Root],
+                StarKind::Central => vec![BaseKind::Root],
                 StarKind::Space => vec![
-                    KindBase::Space,
-                    KindBase::User,
-                    KindBase::Base,
-                    KindBase::UserBase,
+                    BaseKind::Space,
+                    BaseKind::User,
+                    BaseKind::Base,
+                    BaseKind::UserBase,
                 ],
                 StarKind::Relay => vec![],
-                StarKind::App => vec![KindBase::App],
-                StarKind::Exe => vec![KindBase::Mechtron],
+                StarKind::App => vec![BaseKind::App],
+                StarKind::Exe => vec![BaseKind::Mechtron],
                 StarKind::Gateway => vec![],
                 StarKind::Link => vec![],
-                StarKind::Client => vec![KindBase::Mechtron],
+                StarKind::Client => vec![BaseKind::Mechtron],
                 StarKind::Web => vec![],
-                StarKind::FileStore => vec![KindBase::FileSystem, KindBase::File],
+                StarKind::FileStore => vec![BaseKind::FileSystem, BaseKind::File],
                 StarKind::ArtifactStore => {
                     vec![
-                        KindBase::BundleSeries,
-                        KindBase::Bundle,
-                        KindBase::Artifact,
+                        BaseKind::BundleSeries,
+                        BaseKind::Bundle,
+                        BaseKind::Artifact,
                     ]
                 }
-                StarKind::K8s => vec![KindBase::Database],
-                StarKind::Portal => vec![KindBase::Control]
+                StarKind::K8s => vec![BaseKind::Database],
+                StarKind::Portal => vec![BaseKind::Control]
             }
             .iter()
             .cloned(),

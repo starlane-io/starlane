@@ -1,6 +1,6 @@
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::id::Point;
-use mesh_portal_versions::version::v0_0_1::id::id::KindBase;
+use mesh_portal_versions::version::v0_0_1::id::id::BaseKind;
 use mesh_portal_versions::version::v0_0_1::sys::Assign;
 
 use crate::error::Error;
@@ -11,11 +11,11 @@ use crate::star::StarSkel;
 #[derive(Debug)]
 pub struct StatelessCoreDriver {
     skel: StarSkel,
-    resource_type: KindBase
+    resource_type: BaseKind
 }
 
 impl StatelessCoreDriver {
-    pub async fn new(skel: StarSkel, resource_type: KindBase) -> Self {
+    pub async fn new(skel: StarSkel, resource_type: BaseKind) -> Self {
         StatelessCoreDriver {
             skel: skel.clone(),
             resource_type
@@ -26,7 +26,7 @@ impl StatelessCoreDriver {
 #[async_trait]
 impl ParticleCoreDriver for StatelessCoreDriver {
 
-    fn kind(&self) -> KindBase {
+    fn kind(&self) -> BaseKind {
         self.resource_type.clone()
     }
 

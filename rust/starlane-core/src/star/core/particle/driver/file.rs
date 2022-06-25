@@ -21,7 +21,7 @@ use mesh_portal::version::latest::id::{AddressAndKind, KindParts, Point};
 use mesh_portal::version::latest::messaging::ReqShell;
 use mesh_portal::version::latest::sys::Assign;
 use mesh_portal_versions::version::v0_0_1::id::{ArtifactSubKind, FileSubKind};
-use mesh_portal_versions::version::v0_0_1::id::id::{Kind, KindBase};
+use mesh_portal_versions::version::v0_0_1::id::id::{Kind, BaseKind};
 use mesh_portal_versions::version::v0_0_1::wave::ReqProto;
 
 #[derive(Debug)]
@@ -82,8 +82,8 @@ impl ParticleCoreDriver for FileCoreManager {
     }
 
 
-    fn kind(&self) -> KindBase {
-        KindBase::File
+    fn kind(&self) -> BaseKind {
+        BaseKind::File
     }
 
 }
@@ -106,8 +106,8 @@ impl FileSystemManager {
 
 #[async_trait]
 impl ParticleCoreDriver for FileSystemManager {
-    fn kind(&self) -> KindBase {
-        KindBase::FileSystem
+    fn kind(&self) -> BaseKind {
+        BaseKind::FileSystem
     }
 
     async fn assign(

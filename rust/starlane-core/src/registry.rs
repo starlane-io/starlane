@@ -45,7 +45,8 @@ use mesh_portal_versions::version::v0_0_1::command::request::select::{SelectKind
 use tokio::sync::mpsc;
 use mesh_portal::version::latest::payload::{Payload, PayloadMap, PrimitiveList};
 use mesh_portal_versions::version::v0_0_1::id::{ArtifactSubKind, BaseSubKind, FileSubKind, UserBaseSubKind};
-use mesh_portal_versions::version::v0_0_1::id::id::{Kind, KindBase, Tks};
+use mesh_portal_versions::version::v0_0_1::id::id::{Kind, BaseKind, Tks};
+use mesh_portal_versions::version::v0_0_1::parse::{CamelCase, Domain, SkewerCase};
 use mesh_portal_versions::version::v0_0_1::sys::{Location, ParticleRecord};
 use crate::databases::lookup_registry_db;
 use crate::particle::properties_config;
@@ -93,8 +94,9 @@ impl Registry {
          point TEXT NOT NULL,
          point_segment TEXT NOT NULL,
          parent TEXT NOT NULL,
-         resource_type TEXT NOT NULL,
-         kind TEXT,
+         base TEXT NOT NULL,
+         sub TEXT,
+         provider TEXT,
          vendor TEXT,
          product TEXT,
          variant TEXT,
@@ -222,7 +224,7 @@ impl Registry {
             return Err(RegError::Dupe);
         }
 
-        let statement = format!("INSERT INTO particles (point,point_segment,resource_type,kind,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.resource_type, opt(&params.kind), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
+        let statement = format!("INSERT INTO particles (point,point_segment,base,kind,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.base, opt(&params.kind), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
         trans.execute(statement.as_str()).await?;
 
         for (_, property_mod) in registration.properties.iter() {
@@ -245,7 +247,7 @@ impl Registry {
         Ok(Details {
             stub: Stub {
                 point: registration.point.clone(),
-                kind: registration.kind.clone().into(),
+                kind: registration.kind.clone(),
                 status: Status::Pending,
             },
             properties: Default::default(),
@@ -530,7 +532,7 @@ impl Registry {
 
             match &hop.kind_selector.kind {
                 GenericKindSelector::Any => {}
-                GenericKindSelector::Exact(kind) => match &hop.kind_selector.sub_kind {
+                GenericKindSelector::Exact(kind) => match &hop.kind_selector.sub {
                     SubKindSelector::Any => {}
                     SubKindSelector::Exact(sub_kind) => {
                         index = index + 1;
@@ -1068,8 +1070,16 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
         fn wrap(row: &PgRow) -> Result<StarlaneParticleRecord, Error> {
             let parent: String = row.get("parent");
             let point_segment: String = row.get("point_segment");
-            let resource_type: String = row.get("resource_type");
-            let kind: Option<String> = row.get("kind");
+            let base: String = row.get("base");
+            let sub : Option<CamelCase> = match row.get("sub") {
+                Some(sub) => {
+                    let sub: String = sub;
+                    Some(CamelCase::from_str(sub.as_str())?)
+                }
+                None => None
+            };
+
+            let provider: Option<String> = row.get("provider");
             let vendor: Option<String> = row.get("vendor");
             let product: Option<String> = row.get("product");
             let variant: Option<String> = row.get("variant");
@@ -1080,25 +1090,40 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
 
             let point = Point::from_str(parent.as_str())?;
             let point = point.push(point_segment)?;
-            let resource_type = KindBase::from_str(resource_type.as_str())?;
+            let base = BaseKind::from_str(base.as_str())?;
 
-            let specific = if let Option::Some(vendor) = vendor {
-                if let Option::Some(product) = product {
-                    if let Option::Some(variant) = variant {
-                        if let Option::Some(version) = version {
-                            let version = if let Option::Some(version_variant) = version_variant {
-                                let version = format!("{}-{}", version, version_variant);
-                                Version::from_str(version.as_str())?
+            let specific =
+
+                if let Option::Some(provider) = provider {
+                    if let Option::Some(vendor) = vendor {
+                        if let Option::Some(product) = product {
+                            if let Option::Some(variant) = variant {
+                                if let Option::Some(version) = version {
+                                    let version = if let Option::Some(version_variant) = version_variant {
+                                        let version = format!("{}-{}", version, version_variant);
+                                        Version::from_str(version.as_str())?
+                                    } else {
+                                        Version::from_str(version.as_str())?
+                                    };
+
+                                    let provider = Domain::from_str(provider.as_str())?;
+                                    let vendor = Domain::from_str(vendor.as_str())?;
+                                    let product = SkewerCase::from_str(product.as_str())?;
+                                    let variant = SkewerCase::from_str(variant.as_str())?;
+
+                                    Some(Specific {
+                                        provider,
+                                        vendor,
+                                        product,
+                                        variant,
+                                        version,
+                                    })
+                                } else {
+                                    Option::None
+                                }
                             } else {
-                                Version::from_str(version.as_str())?
-                            };
-
-                            Option::Some(Specific {
-                                vendor,
-                                product,
-                                variant,
-                                version,
-                            })
+                                Option::None
+                            }
                         } else {
                             Option::None
                         }
@@ -1107,12 +1132,11 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
                     }
                 } else {
                     Option::None
-                }
-            } else {
-                Option::None
-            };
+                };
 
-            let kind = Kind::from(resource_type, kind, specific)?;
+            let kind = KindParts::new(base , sub, specific);
+            let kind:Kind = kind.try_into()?;
+
             let location = match location {
                 Some(location) => Location::Somewhere(Point::from_str(location.as_str())?),
                 None => Location::Nowhere,
@@ -1121,7 +1145,7 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
 
             let stub = Stub {
                 point,
-                kind: kind.into(),
+                kind,
                 status,
             };
 
@@ -1164,7 +1188,7 @@ pub mod test {
     use std::convert::TryInto;
     use std::str::FromStr;
     use mesh_portal_versions::version::v0_0_1::command::request::select::SelectKind;
-    use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
+    use mesh_portal_versions::version::v0_0_1::id::id::{Kind, ToPoint};
     use mesh_portal_versions::version::v0_0_1::id::UserBaseSubKind;
 
     #[tokio::test]
@@ -1530,7 +1554,7 @@ pub struct Registration {
 pub struct RegistryParams {
     pub point: String,
     pub point_segment: String,
-    pub resource_type: String,
+    pub base: String,
     pub kind: Option<String>,
     pub vendor: Option<String>,
     pub product: Option<String>,
@@ -1552,8 +1576,8 @@ impl RegistryParams {
             Some(parent) => parent.to_string(),
         };
 
-        let resource_type = registration.kind.base().to_string();
-        let kind = registration.kind.sub();
+        let base = registration.kind.base().to_string();
+        let sub = registration.kind.sub();
         let vendor = match &registration.kind.specific() {
             None => Option::None,
             Some(specific) => Option::Some(specific.vendor.clone()),
@@ -1596,8 +1620,8 @@ impl RegistryParams {
             point: registration.point.to_string(),
             point_segment: point_segment,
             parent,
-            resource_type,
-            kind,
+            base,
+            kind: sub,
             vendor,
             product,
             variant,
@@ -1609,11 +1633,11 @@ impl RegistryParams {
 }
 
 pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
-    let resource_type: KindBase = KindBase::from_str(template.base.to_string().as_str())?;
-    Ok(match resource_type {
-        KindBase::Root => Kind::Root,
-        KindBase::Space => Kind::Space,
-        KindBase::Base => match &template.sub {
+    let base: BaseKind = BaseKind::from_str(template.base.to_string().as_str())?;
+    Ok(match base {
+        BaseKind::Root => Kind::Root,
+        BaseKind::Space => Kind::Space,
+        BaseKind::Base => match &template.sub {
             None => {
                 return Err("kind must be set for Base".into());
             }
@@ -1625,23 +1649,23 @@ pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
                 return Ok(Kind::Base(kind));
             }
         },
-        KindBase::User => Kind::User,
-        KindBase::App => Kind::App,
-        KindBase::Mechtron => Kind::Mechtron,
-        KindBase::FileSystem => Kind::FileSystem,
-        KindBase::File => match &template.sub {
+        BaseKind::User => Kind::User,
+        BaseKind::App => Kind::App,
+        BaseKind::Mechtron => Kind::Mechtron,
+        BaseKind::FileSystem => Kind::FileSystem,
+        BaseKind::File => match &template.sub {
             None => return Err("expected kind for File".into()),
             Some(kind) => {
                 let file_kind = FileSubKind::from_str(kind.as_str())?;
                 return Ok(Kind::File(file_kind));
             }
         },
-        KindBase::Database => {
+        BaseKind::Database => {
             unimplemented!("need to write a SpecificPattern matcher...")
         }
-        KindBase::BundleSeries => Kind::BundleSeries,
-        KindBase::Bundle => Kind::Bundle,
-        KindBase::Artifact => match &template.sub {
+        BaseKind::BundleSeries => Kind::BundleSeries,
+        BaseKind::Bundle => Kind::Bundle,
+        BaseKind::Artifact => match &template.sub {
             None => {
                 return Err("expected kind for Artirtact".into());
             }
@@ -1650,8 +1674,8 @@ pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
                 return Ok(Kind::Artifact(artifact_kind));
             }
         },
-        KindBase::Control => Kind::Control,
-        KindBase::UserBase => match &template.sub {
+        BaseKind::Control => Kind::Control,
+        BaseKind::UserBase => match &template.sub {
             None => {
                 return Err("kind must be set for UserBase".into());
             }
@@ -1712,9 +1736,9 @@ impl Registry {
                 }
                 let point = point?;
 
-                let properties = properties_config(child_kind)
+                let properties = properties_config(&child_kind)
                     .fill_create_defaults(&create.properties)?;
-                properties_config(child_kind).check_create(&properties)?;
+                properties_config(&child_kind).check_create(&properties)?;
 
                 let registration = Registration {
                     point: point.clone(),

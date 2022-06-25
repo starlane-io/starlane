@@ -19,7 +19,7 @@ use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 use mesh_portal_versions::version::v0_0_1::id::ArtifactSubKind;
-use mesh_portal_versions::version::v0_0_1::id::id::KindBase;
+use mesh_portal_versions::version::v0_0_1::id::id::BaseKind;
 use mesh_portal_versions::version::v0_0_1::sys::Assign;
 
 #[derive(Debug)]
@@ -64,8 +64,8 @@ impl ParticleCoreDriver for PortalCoreDriver {
     }
 
 
-    fn kind(&self) -> KindBase {
-        KindBase::File
+    fn kind(&self) -> BaseKind {
+        BaseKind::File
     }
 
 }

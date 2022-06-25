@@ -27,7 +27,7 @@ use nom_supreme::final_parser::final_parser;
 use serde_json::{json, Value};
 use validator::validate_email;
 use mesh_portal_versions::version::v0_0_1::command::Command;
-use mesh_portal_versions::version::v0_0_1::id::id::{Kind, KindBase};
+use mesh_portal_versions::version::v0_0_1::id::id::{Kind, BaseKind};
 use mesh_portal_versions::version::v0_0_1::sys::Assign;
 use crate::error::Error;
 use crate::particle::property::{PointPattern, AnythingPattern, BoolPattern, EmailPattern, PropertiesConfig, PropertyPattern, PropertyPermit, PropertySource};
@@ -80,8 +80,8 @@ impl UserBaseKeycloakCoreDriver {
 #[async_trait]
 impl ParticleCoreDriver for UserBaseKeycloakCoreDriver {
 
-    fn kind(&self) -> KindBase {
-        KindBase::UserBase
+    fn kind(&self) -> BaseKind {
+        BaseKind::UserBase
     }
 
 
@@ -488,8 +488,8 @@ impl UserCoreDriver {
 #[async_trait]
 impl ParticleCoreDriver for UserCoreDriver {
 
-    fn kind(&self) -> KindBase {
-        KindBase::User
+    fn kind(&self) -> BaseKind {
+        BaseKind::User
     }
 
 

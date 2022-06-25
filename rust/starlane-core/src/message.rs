@@ -11,7 +11,7 @@ use mesh_portal::version::latest::particle::Stub;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use uuid::Uuid;
-use mesh_portal_versions::version::v0_0_1::id::id::{KindBase, ToPoint};
+use mesh_portal_versions::version::v0_0_1::id::id::{BaseKind, ToPoint};
 use mesh_portal_versions::version::v0_0_1::wave::{AsyncTransmitter, Wave};
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 
@@ -335,7 +335,7 @@ impl Reply{
     }
 }
 
-fn hash_to_string(hash: &HashSet<KindBase>) -> String {
+fn hash_to_string(hash: &HashSet<BaseKind>) -> String {
     let mut rtn = String::new();
     for i in hash.iter() {
         rtn.push_str(i.to_string().as_str());
