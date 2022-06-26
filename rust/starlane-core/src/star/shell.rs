@@ -2,11 +2,12 @@ use futures::channel::oneshot;
 use lru::LruCache;
 use tokio::sync::mpsc;
 use tokio::time::Duration;
+use mesh_portal_versions::version::v0_0_1::id::StarKey;
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 
 use crate::frame::{ResourceRegistryRequest, SimpleReply, StarMessagePayload};
 use crate::message::ProtoStarMessage;
-use crate::star::{LogId, Set, Star, StarCommand, StarKey, StarKind, StarSkel};
+use crate::star::{LogId, Set, Star, StarCommand, StarKind, StarSkel};
 use crate::star::Request;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 

@@ -26,7 +26,7 @@ use cosmic_nom::new_span;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::config::{ParticleConfigBody, PointConfig};
 use mesh_portal_versions::version::v0_0_1::id::id::{BaseKind, ToBaseKind, ToPoint};
-use mesh_portal_versions::version::v0_0_1::id::{ArtifactSubKind, BaseSubKind, FileSubKind, UserBaseSubKind};
+use mesh_portal_versions::version::v0_0_1::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, UserBaseSubKind};
 use mesh_portal_versions::version::v0_0_1::sys::{AssignmentKind, ChildRegistry, Location};
 
 use crate::{error, logger, util};
@@ -40,7 +40,7 @@ use crate::logger::{elog, LogInfo, StaticLogInfo};
 use crate::message::{MessageExpect, ProtoStarMessage, ReplyKind};
 use crate::names::Name;
 use crate::particle::property::{AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit, PropertySource, U64Pattern};
-use crate::star::{StarInfo, StarKey, StarSkel};
+use crate::star::{StarInfo, StarSkel};
 use crate::star::core::particle::driver::user::UsernamePattern;
 use crate::util::AsyncHashMap;
 

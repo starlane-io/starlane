@@ -44,7 +44,7 @@ use crate::star::shell::watch::WatchApi;
 use crate::star::surface::SurfaceApi;
 use crate::star::variant::{FrameVerdict, VariantApi};
 use crate::starlane::StarlaneMachine;
-use crate::template::{ConstellationName, StarHandle};
+use crate::template::StarHandle;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 use std::cmp;
 use std::fmt;
@@ -69,6 +69,7 @@ use nom::Parser;
 use nom_supreme::error::ErrorTree;
 use sqlx::postgres::PgTypeInfo;
 use cosmic_nom::{new_span, Res, Span};
+use mesh_portal_versions::version::v0_0_1::id::{ConstellationName, StarKey};
 use mesh_portal_versions::version::v0_0_1::id::id::{BaseKind, RouteSeg, ToPoint, ToPort};
 use mesh_portal_versions::version::v0_0_1::parse::lowercase_alphanumeric;
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
@@ -1011,90 +1012,8 @@ impl FrameHold {
 }
 
 
-#[derive(PartialEq, Eq, Ord, PartialOrd, Hash, Debug, Clone, Serialize, Deserialize)]
-pub struct StarKey {
-    constellation: ConstellationName,
-    name: String,
-    index: u16
-}
-
-impl Into<Point> for StarKey {
-    fn into(self) -> Point {
-        self.to_point()
-    }
-}
-impl Into<Port> for StarKey {
-    fn into(self) -> Port {
-        self.to_port()
-    }
-}
-
-impl TryFrom<Point> for StarKey {
-    type Error = Error;
-
-    fn try_from(point: Point) -> Result<Self, Self::Error> {
-        match point.route {
-            RouteSeg::Mesh(star) => {
-                StarKey::from_str(star.as_str())
-            }
-            _ => {
-                Err("can only extract StarKey from Mesh point routes".into())
-            }
-        }
-    }
-}
-
-impl ToPoint for StarKey {
-    fn to_point(self) -> mesh_portal_versions::version::v0_0_1::id::id::Point {
-        Point::from_str(format!("<<{}>>::star", self.to_string()).as_str() ).unwrap()
-    }
-}
-
-impl ToPort for StarKey {
-    fn to_port(self) -> Port {
-        self.to_point().to_port()
-    }
-}
-
-impl StarKey {
-
-    pub fn new(constellation:&ConstellationName, handle: &StarHandle) -> Self {
-        Self {
-            constellation: constellation.clone(),
-            name: handle.name.clone(),
-            index: handle.index.clone()
-        }
-    }
-
-    pub fn central() -> Self {
-        StarKey {
-            constellation: "standalone".to_string(),
-            name: "central".to_string(),
-            index: 0,
-        }
-    }
-}
-
-
-
-
-
-impl ToString for StarKey {
-    fn to_string(&self) -> String {
-        format!("{}:{}[{}]", self.constellation, self.name, self.index)
-    }
-}
-
-impl StarKey {
-    pub fn to_sql_name(&self) -> String {
-       format!("{}_{}_{}", self.constellation, self.name, self.index )
-    }
-}
-
-
-
 fn parse_star_key<I:Span>( input: I) -> Res<I,StarKey> {
-    let (next,(constelation,_,name,index)) = tuple((lowercase_alphanumeric,tag(":"),lowercase_alphanumeric,delimited(tag("["),digit1,tag("]"))) )(input.clone())?;
+    let (next,(_,constelation,_,name,index)) = tuple((tag("STAR::"),lowercase_alphanumeric,tag(":"),lowercase_alphanumeric,delimited(tag("["),digit1,tag("]"))) )(input.clone())?;
     let constelation = constelation.to_string();
     let name = name.to_string();
     let index = match index.to_string().parse::<u16>() {
@@ -1109,15 +1028,6 @@ fn parse_star_key<I:Span>( input: I) -> Res<I,StarKey> {
         name,
         index
     }))
-}
-
-
-impl FromStr for StarKey {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(result(all_consuming(parse_star_key)(new_span(s)))?)
-    }
 }
 
 #[derive(Eq, PartialEq, Hash, Clone)]

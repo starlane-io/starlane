@@ -6,10 +6,11 @@ use std::sync::Arc;
 use sqlx::postgres::{PgArguments, PgColumn, PgPoolOptions, PgRow};
 use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
 use sqlx::error::DatabaseError;
+use mesh_portal_versions::version::v0_0_1::id::StarKey;
 use crate::databases::lookup_db_for_star;
 use crate::error;
 use crate::error::Error;
-use crate::star::{StarKey, StarKind, StarWrangleKind};
+use crate::star::{StarKind, StarWrangleKind};
 
 
 pub type StarDBApi = Arc<StarDB>;

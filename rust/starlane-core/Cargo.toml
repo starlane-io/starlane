@@ -15,6 +15,7 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 oneshot = "0.1.3"
 anyhow = "1.0.44"
+dashmap = "4.0.2"
 tokio = { version = "1.15.0", features = ["full"] }
 serde = { version="1.0.69", features=['derive','rc'] }
 serde_yaml = "0.8.19"
@@ -77,6 +78,7 @@ cosmic-nom={ path="../cosmic-nom"}
 cosmic-portal-cli={ path="../cosmic-portal-cli"}
 cosmic-portal-cli-exe={ path="../cosmic-portal-cli-exe"}
 cosmic-macros={ path="../cosmic-macros"}
+cosmic-locality={ path="../cosmic-locality"}
 mesh-portal={ path="../mesh-portal"}
 mesh-portal-versions= { path="../mesh-portal-versions"}
 mesh-portal-api-client= { path="../mesh-portal-api-client"}
@@ -84,7 +86,6 @@ mesh-portal-api-server= { path="../mesh-portal-api-server"}
 mesh-artifact-api ={ path="../mesh-artifact-api", default-features=true }
 
 async-recursion = "1.0.0"
-dashmap = "4.0.2"
 
 keycloak="13.0.102"
 reqwest = "0.11.9"

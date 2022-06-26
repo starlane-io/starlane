@@ -7,10 +7,10 @@ use tokio::time::error::Elapsed;
 use tokio::time::Instant;
 
 use crate::error::Error;
-use crate::frame::{ SimpleReply, StarMessage, StarMessagePayload};
-use crate::message::{MessageExpect, ProtoStarMessage, ProtoStarMessageTo, MessageId, ReplyKind, Reply};
+use crate::frame::{SimpleReply, StarMessage, StarMessagePayload};
+use crate::message::{MessageExpect, MessageId, ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
-use crate::star::{StarSkel, StarKey};
+use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::fail::{Fail, StarlaneFailure};
 use mysql::uuid::Uuid;
@@ -24,6 +24,7 @@ use mesh_portal::version::latest::util::uuid;
 use mesh_portal::version::latest::parse::Res;
 use mesh_portal_versions::version::v0_0_1::id::id::{ToPoint, ToPort};
 use tokio::sync::oneshot::Sender;
+use mesh_portal_versions::version::v0_0_1::id::StarKey;
 
 #[derive(Clone)]
 pub struct MessagingApi {

@@ -17,12 +17,13 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{broadcast, mpsc};
 
 use tokio::time::Duration;
+use mesh_portal_versions::version::v0_0_1::id::StarKey;
 
 use crate::error::Error;
 use crate::frame::{Frame, StarPattern};
 
 use crate::proto::{local_tunnels, ProtoTunnel};
-use crate::star::{StarCommand, StarKey};
+use crate::star::StarCommand;
 
 use crate::template::StarInConstellationTemplateSelector;
 use crate::star::shell::lanes::LaneMuxerCall;

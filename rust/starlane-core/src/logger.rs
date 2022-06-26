@@ -3,8 +3,9 @@ use std::sync::{Arc, RwLock};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
+use mesh_portal_versions::version::v0_0_1::id::StarKey;
 
-use crate::star::{StarInfo, StarKey, StarKind};
+use crate::star::{StarInfo, StarKind};
 
 #[derive(Clone)]
 pub struct Logger {

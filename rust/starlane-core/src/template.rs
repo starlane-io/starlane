@@ -2,12 +2,13 @@ use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 
 use serde::{Deserialize, Serialize};
+use mesh_portal_versions::version::v0_0_1::id::{ConstellationName, MachineName, StarKey};
 
 use crate::error::Error;
 
 use crate::proto::ProtoStarKey;
 
-use crate::star::{ServerKindExt, StarKey, StarKind, StarTemplateId};
+use crate::star::{ServerKindExt, StarKind, StarTemplateId};
 
 pub type StarKeyConstellationIndex = u16;
 
@@ -326,11 +327,6 @@ pub struct StarKeyTemplate {
     pub subgraph: StarKeySubgraphTemplate,
     pub index: StarKeyConstellationIndexTemplate,
 }
-
-
-
-pub type MachineName = String;
-pub type ConstellationName = String;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Serialize, Deserialize)]
 pub enum StarKeySubgraphTemplate {

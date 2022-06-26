@@ -81,7 +81,7 @@ impl AsyncProcessor<SysCall> for SysComponent {
         match call {
             SysCall::Create{ mut template, messenger, tx }  => {
 
-                    template.point.parent.route = RouteSegment::Mesh(self.skel.info.key.to_string());
+                    template.point.parent.route = RouteSegment::Fabric(self.skel.info.key.to_string());
 
                     tx.send(handle(self, template, messenger ));
 

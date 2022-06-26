@@ -9,12 +9,13 @@ use futures::FutureExt;
 use lru::LruCache;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
+use mesh_portal_versions::version::v0_0_1::id::StarKey;
 
 use crate::error::Error;
 use crate::frame::{Frame, ProtoFrame, StarMessage, StarPattern};
-use crate::lane::{AbstractLaneEndpoint, LaneCommand, LaneEnd, LaneIndex, LaneKey, LaneMeta, LaneSession, LaneWrapper, ProtoLaneEnd, UltimaLaneKey, OnCloseAction};
+use crate::lane::{AbstractLaneEndpoint, LaneCommand, LaneEnd, LaneIndex, LaneKey, LaneMeta, LaneSession, LaneWrapper, OnCloseAction, ProtoLaneEnd, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
-use crate::star::{ForwardFrame, StarCommand, StarKey, StarSkel};
+use crate::star::{ForwardFrame, StarCommand, StarSkel};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::shell::router::RouterCall;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};

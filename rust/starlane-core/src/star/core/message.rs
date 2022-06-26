@@ -13,7 +13,7 @@ use crate::frame::{
 
 use crate::message::delivery::Delivery;
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
-use crate::star::{StarCommand, StarKey, StarKind, StarSkel};
+use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use mesh_portal::version::latest::fail::BadRequest;
 use std::future::Future;
@@ -27,7 +27,7 @@ use mesh_portal::version::latest::entity::request::get::Get;
 use mesh_portal::version::latest::fail;
 use mesh_portal::version::latest::id::{Meta, Point};
 use mesh_portal::version::latest::messaging::{Agent, CmdMethod, Message, ReqShell, RespShell};
-use mesh_portal::version::latest::payload::{Substance, PayloadMap,  };
+use mesh_portal::version::latest::payload::{PayloadMap, Substance,  };
 use mesh_portal::version::latest::particle::{Status, Stub};
 use mesh_portal::version::latest::entity::request::get::GetOp;
 use mesh_portal::version::latest::entity::request::query::Query;
@@ -40,11 +40,11 @@ use mesh_portal_versions::version::v0_0_1::particle::particle::Details;
 use regex::Regex;
 use mesh_portal::version::latest::config::bind::BindConfig;
 use mesh_portal_versions::version::v0_0_1::command::Command;
-use mesh_portal_versions::version::v0_0_1::id::{ArtifactSubKind, FileSubKind, UserBaseSubKind};
-use mesh_portal_versions::version::v0_0_1::id::id::{Kind, BaseKind, Tks, ToPoint};
+use mesh_portal_versions::version::v0_0_1::id::{ArtifactSubKind, FileSubKind, StarKey, UserBaseSubKind};
+use mesh_portal_versions::version::v0_0_1::id::id::{BaseKind, Kind, Tks, ToPoint};
 use mesh_portal_versions::version::v0_0_1::sys::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
 use crate::artifact::ArtifactRef;
-use crate::bindex::{BindConfigCache, BindEx, BindExRouter, RegistryApi};
+use cosmic_locality::field::{BindConfigCache, FieldEx, FieldRouter, RegistryApi};
 use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
 use crate::config::config::{ContextualConfig, ParticleConfig};
 use crate::registry::{RegError, Registration};
@@ -81,7 +81,7 @@ pub struct MessagingEndpointComponent {
 #[derive(Clone)]
 pub struct MessagingEndpointComponentInner {
     skel: StarSkel,
-    bindex: BindEx,
+    bindex: FieldEx,
     resource_core_driver_api: ResourceCoreDriverApi
 }
 
@@ -110,7 +110,7 @@ impl MessagingEndpointComponent {
             }
         }
 
-        let bindex = BindEx {
+        let bindex = FieldEx {
             bind_config_cache,
             router: Arc::new(router),
             pipeline_executors: Arc::new(Default::default()),
@@ -314,12 +314,12 @@ pub struct EndpointRouter {
   pub core_driver_api: ResourceCoreDriverApi
 }
 
-impl BindExRouter for EndpointRouter {
-    fn route_to_mesh(&self, message: Message) {
+impl FieldRouter for EndpointRouter {
+    fn route_to_fabric(&self, message: Message) {
         self.skel.messaging_api.message(message);
     }
 
-    fn route_to_particle_core(&self, message: Message) {
+    fn route_to_core(&self, message: Message) {
         match message {
             Message::Req(request) => {
                 self.core_driver_api.request(request);

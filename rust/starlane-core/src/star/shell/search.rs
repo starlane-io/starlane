@@ -4,12 +4,13 @@ use std::iter::FromIterator;
 
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
+use mesh_portal_versions::version::v0_0_1::id::StarKey;
 
 use crate::error::Error;
 use crate::frame::{Frame, SearchHit, SearchResults, SearchTraversal, SearchWindDown, SearchWindUp, StarMessage, StarPattern, TraversalAction};
 use crate::lane::{LaneCommand, LaneKey, LaneWrapper, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
-use crate::star::{StarCommand, StarKey, StarKind, StarSkel};
+use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::shell::lanes::LanePattern;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};

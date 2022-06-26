@@ -1,4 +1,4 @@
-use crate::star::StarKey;
+use mesh_portal_versions::version::v0_0_1::id::StarKey;
 lazy_static! {
     pub static ref REGISTRY_URL: String =
         std::env::var("REGISTRY_URL").unwrap_or("localhost".to_string());

@@ -82,7 +82,7 @@ impl RouterComponent {
                                                                 point,
                 )) = &message.payload
                 {
-                    if let RouteSegment::Mesh(_) = &point.route {
+                    if let RouteSegment::Fabric(_) = &point.route {
                         let result = skel.sys_api.get_record(point.clone()).await;
                         match result {
                             Ok(record) => {

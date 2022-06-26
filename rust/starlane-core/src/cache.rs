@@ -22,7 +22,7 @@ use mesh_portal::version::latest::payload::Substance;
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 
 use crate::artifact::ArtifactRef;
-use crate::bindex::BindConfigCache;
+use cosmic_locality::field::BindConfigCache;
 use crate::config::bind::BindConfigParser;
 use crate::config::config::ParticleConfig;
 use crate::config::parse::ParticleConfigParser;
