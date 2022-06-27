@@ -1,31 +1,31 @@
-use std::collections::HashSet;
-use std::convert::{Infallible, TryFrom, TryInto};
-use std::string::FromUtf8Error;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
-use mesh_portal::version::latest::selector::PointKindHierarchy;
-use mesh_portal::version::latest::payload::Substance;
 use mesh_portal::version::latest::particle::Stub;
+use mesh_portal::version::latest::payload::Substance;
+use mesh_portal::version::latest::selector::PointKindHierarchy;
+use std::collections::HashSet;
+use std::convert::{Infallible, TryFrom, TryInto};
+use std::string::FromUtf8Error;
 
+use mesh_portal_versions::version::v0_0_1::id::id::{BaseKind, ToPoint};
+use mesh_portal_versions::version::v0_0_1::id::StarKey;
+use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
+use mesh_portal_versions::version::v0_0_1::wave::{AsyncTransmitter, Wave};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use uuid::Uuid;
-use mesh_portal_versions::version::v0_0_1::id::id::{BaseKind, ToPoint};
-use mesh_portal_versions::version::v0_0_1::id::StarKey;
-use mesh_portal_versions::version::v0_0_1::wave::{AsyncTransmitter, Wave};
-use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 
 use crate::error::Error;
-use crate::star::StarCommand;
-use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
 use crate::frame::{MessageAck, SimpleReply, StarMessage, StarMessagePayload};
+use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
 use crate::star::surface::SurfaceApi;
+use crate::star::StarCommand;
 use crate::starlane::StarlaneCommand;
 
 pub mod delivery;
 
-pub type MessageId=String;
+pub type MessageId = String;
 
 #[derive(Clone)]
 pub enum ProtoStarMessageTo {
@@ -37,9 +37,9 @@ pub enum ProtoStarMessageTo {
 impl ToString for ProtoStarMessageTo {
     fn to_string(&self) -> String {
         match self {
-            ProtoStarMessageTo::None => {"None".to_string()}
-            ProtoStarMessageTo::Star(star) => {star.to_string()}
-            ProtoStarMessageTo::Point(address) => {address.to_string()}
+            ProtoStarMessageTo::None => "None".to_string(),
+            ProtoStarMessageTo::Star(star) => star.to_string(),
+            ProtoStarMessageTo::Point(address) => address.to_string(),
         }
     }
 }
@@ -135,8 +135,6 @@ impl ProtoStarMessage {
         return Ok(());
     }
 }
-
-
 
 pub struct MessageReplyTracker {
     pub reply_to: MessageId,
@@ -301,37 +299,35 @@ pub enum RejectKind {
     BadRequest,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display, Eq, PartialEq)]
-pub enum ReplyKind{
+#[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display, Eq, PartialEq)]
+pub enum ReplyKind {
     Empty,
     Record,
     Records,
     Stubs,
     AddressTksPath,
-    Payload
+    Payload,
 }
 
-
-
 #[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
-pub enum Reply{
+pub enum Reply {
     Empty,
     Record(ParticleRecord),
     Records(Vec<ParticleRecord>),
     Stubs(Vec<Stub>),
     AddressTksPath(PointKindHierarchy),
-    Payload(Substance)
+    Payload(Substance),
 }
 
-impl Reply{
-    pub fn kind(&self)-> ReplyKind {
+impl Reply {
+    pub fn kind(&self) -> ReplyKind {
         match self {
             Reply::Empty => ReplyKind::Empty,
             Reply::Record(_) => ReplyKind::Record,
             Reply::Records(_) => ReplyKind::Records,
             Reply::Stubs(_) => ReplyKind::Stubs,
             Reply::AddressTksPath(_) => ReplyKind::AddressTksPath,
-            Reply::Payload(_) => ReplyKind::Payload
+            Reply::Payload(_) => ReplyKind::Payload,
         }
     }
 }
@@ -362,52 +358,63 @@ impl From<RespShell> for ProtoStarMessage {
     }
 }
 
-
 #[derive(Clone)]
 pub struct StarlaneMessenger {
     tx: mpsc::Sender<StarlaneCommand>,
 }
 
 impl StarlaneMessenger {
-    pub fn new( tx: mpsc::Sender<StarlaneCommand>) -> Self {
-        Self {
-            tx
-        }
+    pub fn new(tx: mpsc::Sender<StarlaneCommand>) -> Self {
+        Self { tx }
     }
 }
 
 #[async_trait]
 impl AsyncTransmitter for StarlaneMessenger {
-    async fn send(&self, request: mesh_portal_versions::version::v0_0_1::wave::ReqShell) -> mesh_portal_versions::version::v0_0_1::wave::RespShell {
-        let (tx,rx) = oneshot::channel();
-        self.tx.send( StarlaneCommand::Request { request: request.clone(), tx }).await;
+    async fn req(
+        &self,
+        request: mesh_portal_versions::version::v0_0_1::wave::ReqShell,
+    ) -> mesh_portal_versions::version::v0_0_1::wave::RespShell {
+        let (tx, rx) = oneshot::channel();
+        self.tx
+            .send(StarlaneCommand::Request {
+                request: request.clone(),
+                tx,
+            })
+            .await;
         match rx.await {
             Ok(response) => response,
             Err(err) => {
-                error!("{}",err.to_string() );
+                error!("{}", err.to_string());
                 request.status(503)
             }
         }
     }
 
-    fn send_sync(&self, request: mesh_portal_versions::version::v0_0_1::wave::ReqShell) -> mesh_portal_versions::version::v0_0_1::wave::RespShell {
+    fn send_sync(
+        &self,
+        request: mesh_portal_versions::version::v0_0_1::wave::ReqShell,
+    ) -> mesh_portal_versions::version::v0_0_1::wave::RespShell {
         let starlane_tx = self.tx.clone();
-        tokio::runtime::Handle::current().block_on( async move {
-            let (tx,rx) = oneshot::channel();
-            starlane_tx.send( StarlaneCommand::Request { request: request.clone(), tx }).await;
+        tokio::runtime::Handle::current().block_on(async move {
+            let (tx, rx) = oneshot::channel();
+            starlane_tx
+                .send(StarlaneCommand::Request {
+                    request: request.clone(),
+                    tx,
+                })
+                .await;
             match rx.await {
                 Ok(response) => response,
                 Err(err) => {
-                    error!("{}",err.to_string() );
+                    error!("{}", err.to_string());
                     request.status(503)
                 }
             }
-        } )
+        })
     }
 
     async fn route(&self, wave: Wave) {
         todo!()
     }
 }
-
-

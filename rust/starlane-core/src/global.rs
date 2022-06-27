@@ -1,25 +1,29 @@
-use std::str::FromStr;
-use std::sync::Arc;
+use crate::error::Error;
+use crate::registry::RegistryApi;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Agent, ReqProto, ReqShell, RespShell};
 use mesh_portal::version::latest::msg::MsgMethod;
-use mesh_portal::version::latest::payload::{Substance, PayloadType};
+use mesh_portal::version::latest::payload::{PayloadType, Substance};
 use mesh_portal_versions::version::v0_0_1::command::Command;
 use mesh_portal_versions::version::v0_0_1::id::id::Port;
 use mesh_portal_versions::version::v0_0_1::id::id::ToPort;
-use mesh_portal_versions::version::v0_0_1::wave::{AsyncTransmitter, AsyncTransmitterWithAgent,  Method};
 use mesh_portal_versions::version::v0_0_1::service::Global;
-use crate::error::Error;
-use crate::registry::RegistryApi;
+use mesh_portal_versions::version::v0_0_1::wave::{
+    AsyncTransmitter, AsyncTransmitterWithAgent, Method,
+};
+use std::str::FromStr;
+use std::sync::Arc;
 
 lazy_static! {
-    static ref COMMAND_SERVICE_PORT: Port = Point::from_str("GLOBAL::command-service").unwrap().to_port();
+    static ref COMMAND_SERVICE_PORT: Port = Point::from_str("GLOBAL::command-service")
+        .unwrap()
+        .to_port();
 }
 
 #[derive(Clone)]
 pub struct GlobalApi {
     registry: RegistryApi,
-    transmitter: Arc<dyn AsyncTransmitter>
+    transmitter: Arc<dyn AsyncTransmitter>,
 }
 
 #[async_trait]
@@ -33,17 +37,16 @@ impl Global for GlobalApi {
     }
 }
 impl GlobalApi {
-
-    pub fn new(registry: RegistryApi, transmitter: Arc<dyn AsyncTransmitter> ) -> Self {
+    pub fn new(registry: RegistryApi, transmitter: Arc<dyn AsyncTransmitter>) -> Self {
         //let transmitter = AsyncTransmitterWithAgent::new( Agent::Point(Point::global_executor()), Point::global_executor().to_port(), transmitter );
         Self {
             registry,
-            transmitter
+            transmitter,
         }
     }
 
     async fn handle_command_service_request(&self, request: ReqShell) -> RespShell {
-        async fn handle(global: &GlobalApi, request: ReqShell) -> Result<RespShell,Error> {
+        async fn handle(global: &GlobalApi, request: ReqShell) -> Result<RespShell, Error> {
             match &request.core.method {
                 Method::Msg(method) if method.as_str() == "Command" && request.core.body.kind() == PayloadType::Command => {
                     if let Substance::Command(command) = &request.core.body {
@@ -52,7 +55,7 @@ impl GlobalApi {
                                 let mut response = {
                                     let mut request = request.clone();
                                     request.to = create.template.point.parent.clone().to_port();
-                                    global.transmitter.send(request).await
+                                    global.transmitter.req(request).await
                                 };
                                 response.from = Point::global_executor().to_port();
                                 Ok(response)
@@ -92,7 +95,7 @@ impl GlobalApi {
 
         match handle(self, request.clone()).await {
             Ok(response) => response,
-            Err(error) => request.fail(error.to_string().as_str() )
+            Err(error) => request.fail(error.to_string().as_str()),
         }
     }
 }
