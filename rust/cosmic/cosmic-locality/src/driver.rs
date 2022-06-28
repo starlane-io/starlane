@@ -17,17 +17,17 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
-use tokio::sync::{mpsc, oneshot};
-use mesh_portal::version::latest::id::Port;
+use tokio::sync::{broadcast, mpsc, oneshot};
+use mesh_portal::version::latest::id::{Point, Port};
 
 #[derive(AsyncRequestHandler)]
 pub struct Drivers {
     pub skel: StarSkel,
-    pub drivers: HashMap<Kind, Arc<dyn Driver>>,
+    pub drivers: HashMap<Kind, Arc<dyn DriverCore>>,
 }
 
 impl Drivers {
-    pub fn new(skel: StarSkel, drivers: HashMap<Kind, Arc<dyn Driver>>) -> Self {
+    pub fn new(skel: StarSkel, drivers: HashMap<Kind, Arc<dyn DriverCore>>) -> Self {
         Self { skel, drivers }
     }
 
@@ -37,7 +37,7 @@ impl Drivers {
             if driver.status() != DriverStatus::Ready
                 && driver.status() != DriverStatus::Initializing
             {
-                driver.lifecycle(DriverLifecycleEvent::Init);
+                driver.lifecycle(DriverLifecycleCall::Init);
             }
 
             if driver.status() != DriverStatus::Ready {
@@ -64,6 +64,7 @@ impl Drivers {
                 )
                 .into()),
                 Some(driver) => {
+                    let ctx = ctx.push_input_ref( assign );
                     let state = tokio::time::timeout(
                         Duration::from_secs(self.skel.machine.timeouts.high),
                         driver.assign(assign),
@@ -95,7 +96,7 @@ impl Drivers {
                     ));
                 }
                 Some(driver) => {
-                    driver.towards_core_router(traversal).await;
+                    driver.visit(traversal).await;
                 }
             }
         } else {
@@ -132,7 +133,27 @@ impl DriversBuilder {
 
 pub trait DriverFactory {
     fn kind(&self) -> Kind;
-    fn create(&self, skel: DriverSkel) -> Arc<dyn Driver>;
+    fn create(&self, skel: DriverSkel) -> Box<dyn DriverCore>;
+}
+
+enum DriverCall {
+    LifecycleCall(DriverLifecycleCall),
+    Traversal(Traversal<Wave>),
+    Handle(ReqShell)
+}
+
+pub struct DriverApi {
+    pub skel: StarSkel,
+    pub kind: Kind,
+    driver_tx: mpsc::Sender<DriverCall>
+}
+
+impl DriverApi {
+    pub fn new(skel: StarSkel, point: Point, factory: Arc<dyn DriverFactory> ) -> DriverApi {
+        let driver_skel = DriverSkel::new(point,skel.clone());
+        let core = factory.create(driver_skel);
+        let shell = DriverShell::new(core);
+    }
 }
 
 pub struct DriverEx {
@@ -161,18 +182,104 @@ impl TraversalLayer for DriverEx {
     }
 }
 
+#[derive(AsyncRequestHandler)]
+pub struct DriverShell {
+    skel: StarSkel,
+    status: DriverStatus,
+    states: HashMap<Point,Arc<DriverState>>,
+    core: Box<dyn DriverCore>,
+    tx: mpsc::Sender<DriverCall>,
+    rx: mpsc::Receiver<DriverCall>
+}
+
+#[routes_async]
+impl DriverShell {
+
+    pub fn new(skel: StarSkel, core: Box<dyn DriverCore>) -> mpsc::Sender<DriverCall>{
+        let (tx,rx) = mpsc::channel(1024);
+        let driver = Self {
+            skel,
+            status: DriverStatus::Started,
+            core,
+            tx: tx.clone(),
+            rx
+        };
+
+        driver.start();
+
+        tx
+    }
+
+    fn start( mut self ) {
+        tokio::spawn(async move {
+            while let Some(call) = self.rx.recv().await {
+                match call {
+                    DriverCall::LifecycleCall(lifecycle) => {
+                        self.lifecycle(lifecycle);
+                    }
+                    DriverCall::Traversal(traversal) => {
+                        self.traverse(traversal);
+                    }
+                    DriverCall::Handle(req) => {
+                        self.handle(req).await;
+                    }
+                }
+            }
+        });
+    }
+
+    fn lifecycle(&self, event: DriverLifecycleCall) {
+        self.core.lifecycle(event);
+    }
+
+    fn traverse( &mut self, traversal: Traversal<Wave> ) {
+        let point = &traversal.to().point;
+        match self.states.get(point) {
+            None => {
+                let state = Arc::new(self.core.new_state());
+                self.states.insert( point.clone(), state.clone() );
+                state
+            }
+            Some(state) => {
+                state.clone()
+            }
+        }
+        let driver = self.core.ex(point.clone(), state );
+        driver.visit(traversal).await;
+    }
+
+    #[route("Sys<Assign>")]
+    async fn assign(&self, ctx: InCtx<'_,Sys>) -> Result<RespCore, MsgErr> {
+        match ctx.input {
+            Sys::Assign(assign) => {
+                let ctx = ctx.push_input_ref(assign);
+                self.core.assign(ctx).await
+            }
+            _ => {
+                Err(MsgErr::bad_request())
+            }
+        }
+    }
+
+    fn status(&self) -> &DriverStatus {
+        & self.status
+    }
+
+}
+
+
 
 
 #[async_trait]
-pub trait Driver: AsyncRequestHandler {
-    fn skel(&self) -> DriverSkel;
-    fn ex(&self, port: Port, state: DriverState ) -> DriverEx;
-    async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<RespCore, MsgErr>;
-    fn status(&self) -> DriverStatus;
+pub trait DriverCore: AsyncRequestHandler {
+    fn lifecycle(&self, event: DriverLifecycleCall);
+    fn new_state(&self) -> DriverState;
+    fn ex(&self, point: Point, state: DriverState ) -> DriverEx;
+    async fn assign(&self, ctx: InCtx<'_,Assign>) -> Result<RespCore, MsgErr>;
 }
 
 #[derive(Clone, Eq, PartialEq, Hash)]
-pub enum DriverLifecycleEvent {
+pub enum DriverLifecycleCall {
     Init,
     Shutdown,
 }
@@ -185,8 +292,15 @@ pub enum DriverStatus {
     Unavailable,
 }
 
+#[derive(Clone, Eq, PartialEq, Hash)]
+pub struct DriverStatusEvent {
+    pub driver: Point,
+    pub status: DriverStatus
+}
+
 #[derive(Clone)]
 pub struct DriverSkel {
+    pub point: Point,
     pub star: StarKey,
     pub logger: PointLogger,
     pub registry: Arc<dyn RegistryApi>,
@@ -196,11 +310,14 @@ pub struct DriverSkel {
     pub fabric: mpsc::Sender<Wave>,
     pub machine: MachineSkel,
     pub exchange: Arc<DashMap<Uuid, oneshot::Sender<RespShell>>>,
+    pub status_tx: broadcast::Sender<DriverStatusEvent>,
 }
 
-impl From<StarSkel> for DriverSkel {
-    fn from(skel: StarSkel) -> Self {
+impl  DriverSkel {
+    fn new(point:Point, skel: StarSkel) -> Self {
+        let (status_tx,_) = broadcast::channel(16);
         Self {
+            point,
             star: skel.key,
             logger: skel.logger.push("driver").unwrap(),
             registry: skel.registry,
@@ -209,7 +326,8 @@ impl From<StarSkel> for DriverSkel {
             fabric: skel.fabric,
             machine: skel.machine,
             exchange: skel.exchange,
-            inject_tx: skel.inject_tx
+            inject_tx: skel.inject_tx,
+            status_tx
         }
     }
 }

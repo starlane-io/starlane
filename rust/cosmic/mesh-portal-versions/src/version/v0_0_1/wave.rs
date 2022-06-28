@@ -211,6 +211,27 @@ impl<'a, I> InCtx<'a, I> {
         }
     }
 
+    pub fn push_input<I2>(self, input: I2) -> InCtx<'a,I2> {
+        InCtx {
+            root: self.root,
+            input: & input,
+            logger: self.logger.clone(),
+            tx,
+            parent: Some(Box::new(self)),
+        }
+    }
+
+    pub fn push_input_ref<I2>(self, input: &'a I2) -> InCtx<'a,I2> {
+        InCtx {
+            root: self.root,
+            input,
+            logger: self.logger.clone(),
+            tx,
+            parent: Some(Box::new(self)),
+        }
+    }
+
+
     pub fn pop(self) -> Option<InCtx<'a, I>> {
         match self.parent {
             None => None,

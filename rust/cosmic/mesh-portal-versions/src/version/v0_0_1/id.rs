@@ -1354,21 +1354,25 @@ pub mod id {
     }
 
         // override if you want to track outgoing requests
-        async fn request_fabric_bound(&self, traversal: Traversal<ReqShell>) {
+        async fn request_fabric_bound(&self, traversal: Traversal<ReqShell>) -> Result<(), MsgErr>{
             self.traverse_next(traversal.wrap()).await;
+            Ok(())
         }
 
-        async fn request_core_bound(&self, traversal: Traversal<ReqShell>) {
+        async fn request_core_bound(&self, traversal: Traversal<ReqShell>) -> Result<(), MsgErr>{
             self.traverse_next(traversal.wrap()).await;
+            Ok(())
         }
 
         // override if you want to track incoming responses
-        async fn response_core_bound(&self, traversal: Traversal<RespShell>) {
+        async fn response_core_bound(&self, traversal: Traversal<RespShell>) -> Result<(), MsgErr>{
             self.traverse_next(traversal.wrap()).await;
+            Ok(())
         }
 
-        async fn response_fabric_bound(&self, traversal: Traversal<RespShell>) {
+        async fn response_fabric_bound(&self, traversal: Traversal<RespShell>) -> Result<(), MsgErr>{
             self.traverse_next(traversal.wrap()).await;
+            Ok(())
         }
 
     }
