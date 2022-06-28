@@ -12,7 +12,36 @@
       <sourceFolder url="file://$MODULE_DIR$/wasm_membrane_guest/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/wasm_membrane_host/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/starlane-operator/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-core/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-locality/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-macros-primitive/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-macros/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-nom/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-portal-cli-exe/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-portal-cli/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/hyperlane-quic/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/hyperlane/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/mechtron-common/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/mechtron/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/mesh-artifact-api/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/mesh-binder/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/mesh-portal-api-client/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/mesh-portal-api-server/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/mesh-portal-api-test/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/mesh-portal-tcp-client/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/mesh-portal-tcp-common/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/mesh-portal-tcp-server/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/mesh-portal-versions/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/mesh-portal/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/wasm-membrane-guest/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/wasm-membrane-host/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/starlane/starlane-core/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/starlane/starlane-macros-test/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/starlane/starlane-macros/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/starlane/starlane/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
+      <excludeFolder url="file://$MODULE_DIR$/cosmic/wasm-membrane-guest/target" />
+      <excludeFolder url="file://$MODULE_DIR$/cosmic/wasm-membrane-host/target" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

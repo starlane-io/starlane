@@ -1,0 +1,22 @@
+[package]
+name = "cosmic-locality"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cosmic-macros = { path="../cosmic-macros"}
+mesh-portal ={ path="../mesh-portal"}
+mesh-portal-versions = { path="../mesh-portal-versions"}
+cosmic-nom = { path="../cosmic-nom"}
+cosmic-hyperlane = { path= "../hyperlane" }
+anyhow = "1.0.44"
+dashmap = "4.0.2"
+tokio = { version = "1.15.0", features = ["full"] }
+serde = { version="1.0.69", features=['derive','rc'] }
+lazy_static = "1.4.0"
+async-trait = "0.1.48"
+regex = "1.5.4"
+http = "0.2.6"
+

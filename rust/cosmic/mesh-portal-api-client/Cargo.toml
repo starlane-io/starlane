@@ -1,0 +1,25 @@
+[package]
+name = "mesh-portal-api-client"
+version = "0.2.0-rc1"
+edition = "2021"
+license = "MIT"
+homepage ="http://starlane.io/"
+readme="README.md"
+repository = "https://github.com/mechtronium/mesh-portal"
+description = "A client library for the Resource Mesh Portal API."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cosmic-macros= { path="../cosmic-macros"}
+cosmic-macros-primitive= { path="../cosmic-macros-primitive"}
+mesh-portal = { path="../mesh-portal"}
+mesh-portal-versions = { path="../mesh-portal-versions"}
+tokio = { version = "1.15.0", features = ["full"] }
+uuid = { version = "0.8.2", features = ["serde", "v4", "wasm-bindgen"] }
+async-trait = "0.1.48"
+dashmap = "4.0.2"
+anyhow = "1.0.44"
+thiserror = "1.0.30"
+
+lazy_static = "1.4.0"
