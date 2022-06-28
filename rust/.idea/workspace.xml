@@ -6,12 +6,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/Makefile" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/Makefile" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/api/v1alpha1/starlane_types.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/api/v1alpha1/starlane_types.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../go/starlane-operator/controllers/starlane_controller.go" beforeDir="false" afterPath="$PROJECT_DIR$/../go/starlane-operator/controllers/starlane_controller.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../kubernetes/starlane-docker-desktop.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../kubernetes/starlane-docker-desktop.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane-core/src/star/variant/web.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane-core/src/star/variant/web.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/driver.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-locality/src/driver.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/id.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/id.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/wave.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/wave.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -61,15 +59,15 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "WebServerToolWindowFactoryState": "false",
-    "last_opened_file_path": "/Users/scott/cosmic/starlane/rust",
-    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/scott/cosmic/starlane/rust&quot;,
+    &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/starlane-core/src/star" />
@@ -100,13 +98,30 @@
         <env name="RUST_BACKTRACE" value="full" />
         <env name="STARLANE_DELETE_CACHE_ON_START" value="true" />
         <env name="STARLANE_DELETE_DATA_ON_START" value="true" />
-        <env name="STARLANE_KEYCLOAK_URL" value="http://localhost:8080" />
+        <env name="STARLANE_KEYCLOAK_URL" value="http://localhost:8001" />
         <env name="STARLANE_PASSWORD" value="password" />
         <env name="STARLANE_POSTGRES_PASSWORD" value="password" />
         <env name="STARLANE_POSTGRES_URL" value="localhost:5432" />
         <env name="STARLANE_POSTGRES_USER" value="postgres" />
         <env name="STARLANE_WEB_PORT" value="8000" />
       </envs>
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Test command::parse::test::test_kind" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package starlane-core --lib command::parse::test::test_kind -- --exact" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
+      <option name="backtrace" value="SHORT" />
+      <envs />
       <option name="isRedirectInput" value="false" />
       <option name="redirectInputPath" value="" />
       <method v="2">
@@ -164,23 +179,6 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test version::v0_0_1::test::test_inclusive" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package mesh-portal-versions --lib version::v0_0_1::test::test_inclusive -- --exact" />
-      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
-      <option name="channel" value="DEFAULT" />
-      <option name="requiredFeatures" value="true" />
-      <option name="allFeatures" value="false" />
-      <option name="emulateTerminal" value="false" />
-      <option name="withSudo" value="false" />
-      <option name="buildTarget" value="REMOTE" />
-      <option name="backtrace" value="SHORT" />
-      <envs />
-      <option name="isRedirectInput" value="false" />
-      <option name="redirectInputPath" value="" />
-      <method v="2">
-        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
-      </method>
-    </configuration>
     <configuration name="Test version::v0_0_1::test::test_query_root" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
       <option name="command" value="test --package mesh-portal-versions --lib version::v0_0_1::test::test_query_root -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -218,19 +216,19 @@
     <list>
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Test" />
+      <item itemvalue="Cargo.Test command::parse::test::test_kind" />
       <item itemvalue="Cargo.Test star::shell::db::test::test" />
       <item itemvalue="Cargo.Test tests::it_works" />
       <item itemvalue="Cargo.Test registry::test::test_access" />
-      <item itemvalue="Cargo.Test version::v0_0_1::test::test_inclusive" />
       <item itemvalue="Cargo.Test version::v0_0_1::test::test_query_root" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Cargo.Test command::parse::test::test_kind" />
         <item itemvalue="Cargo.Test star::shell::db::test::test" />
         <item itemvalue="Cargo.Test tests::it_works" />
         <item itemvalue="Cargo.Test registry::test::test_access" />
         <item itemvalue="Cargo.Test version::v0_0_1::test::test_query_root" />
-        <item itemvalue="Cargo.Test version::v0_0_1::test::test_inclusive" />
       </list>
     </recent_temporary>
   </component>
@@ -311,7 +309,10 @@
       <workItem from="1653580708083" duration="14123000" />
       <workItem from="1653635904752" duration="2705000" />
       <workItem from="1653679144144" duration="1799000" />
-      <workItem from="1653721677382" duration="6657000" />
+      <workItem from="1653721677382" duration="35012000" />
+      <workItem from="1653892671774" duration="973000" />
+      <workItem from="1654008805063" duration="8426000" />
+      <workItem from="1654349986636" duration="611000" />
     </task>
     <servers />
   </component>

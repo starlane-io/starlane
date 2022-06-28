@@ -1,7 +1,9 @@
 [workspace]
 members = [
-  "starlane",
-  "starlane-core",
-  "starlane-macros",
-  "starlane-macros-test",
+  "starlane/*",
+  "cosmic/*",
   ]
+
+exclude = [
+  "cosmic/src", "cosmic/target"
+]

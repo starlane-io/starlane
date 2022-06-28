@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="RUST_MODULE" version="4">
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/resource-mesh-portal-serde/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/resource-mesh-portal-api-client/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/resource-mesh-portal-api-server/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/resource-mesh-portal-api-test/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/resource-mesh-portal-tcp-server/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/mesh-portal-api-client/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/mesh-portal-api-server/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/mesh-portal-api-test/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/mesh-portal-tcp-client/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/mesh-portal-tcp-common/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/mesh-portal-tcp-server/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/mesh-portal-parse/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/mesh-portal-versions/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/mesh-portal/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/mesh-binder/src" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/target" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>

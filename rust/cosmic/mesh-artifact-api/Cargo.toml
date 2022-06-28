@@ -1,0 +1,17 @@
+[package]
+name = "mesh-artifact-api"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default=["local-filesystem"]
+std=[]
+local-filesystem=["std"]
+
+[dependencies]
+mesh-portal = { path="../mesh-portal", default-features=false}
+mesh-portal-versions = { path="../mesh-portal-versions", default-features=false}
+anyhow = {version="1.0.56", default-features=false}
+zip = { version="0.6.2", default-features=false }

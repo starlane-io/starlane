@@ -1,0 +1,6 @@
+
+
+
+pub enum LifeEvent {
+    Create
+}
