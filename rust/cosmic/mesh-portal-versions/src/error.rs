@@ -22,6 +22,7 @@ use std::num::ParseIntError;
 use std::ops::Range;
 use std::rc::Rc;
 use std::sync::{Arc, PoisonError};
+use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 
 pub enum MsgErr {
@@ -303,6 +304,15 @@ impl From<strum::ParseError> for MsgErr {
             status: 500,
             message: error.to_string(),
         }
+    }
+}
+
+impl From<tokio::sync::oneshot::error::RecvError> for MsgErr {
+    fn from(err: RecvError) -> Self {
+         Self::Status{
+             status: 500,
+             message: err.to_string()
+         }
     }
 }
 

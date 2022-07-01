@@ -10,10 +10,9 @@ use mesh_portal::version::latest::messaging::{
 };
 use mesh_portal::version::latest::msg::MsgMethod;
 use mesh_portal_versions::version::v0_0_1::id::id::{Layer, ToPort};
-use mesh_portal_versions::version::v0_0_1::wave::{
-    Transmitter, ProtoTransmitter, SetStrategy,
-};
 use std::sync::Arc;
+use mesh_portal_versions::version::v0_0_1::quota::Timeouts;
+use mesh_portal_versions::version::v0_0_1::wave::{Exchanger, Pong, ProtoTransmitter, Router, SetStrategy, ToRecipients, Wave};
 
 #[macro_use]
 extern crate cosmic_macros;
@@ -28,11 +27,12 @@ pub struct Cli {
 
 impl Cli {
     pub fn new(
-        transmitter: Arc<dyn Transmitter>,
+        router: Arc<dyn Router>,
         cli_session_factory: Port,
         mut from: Port,
+        exchanger: Exchanger
     ) -> Self {
-        let mut tx = ProtoTransmitter::new(transmitter);
+        let mut tx = ProtoTransmitter::new(router, exchanger);
         from = from.with_topic(Topic::Cli);
         tx.from = SetStrategy::Override(from);
 
@@ -55,16 +55,16 @@ impl Cli {
     }
 
     pub async fn session(&self) -> Result<CliSession<'_>, MsgErr> {
-        let mut req = ReqProto::new();
-        req.to(self.cli_session_factory.clone());
-        req.method(MsgMethod::new("NewCliSession").unwrap());
+        let mut ping = ReqProto::new();
+        ping.to(self.cli_session_factory.clone());
+        ping.method(MsgMethod::new("NewCliSession").unwrap());
 
-        let response = self.tx.direct(req).await?;
+        let pong: Wave<Pong> = self.tx.direct(ping).await?;
 
-        if response.core.is_ok() {
-            let session: Port = response.core.body.try_into()?;
+        if pong.core.is_ok() {
+            let session: Port = pong.core.body.clone().try_into()?;
             let mut tx = self.tx.clone();
-            tx.to = SetStrategy::Override(session);
+            tx.to = SetStrategy::Override(session.to_recipients());
             tx.from_topic(Topic::Cli)?;
             Ok(CliSession::new(self, tx))
         } else {
@@ -87,7 +87,7 @@ impl<'a> CliSession<'a> {
         }
     }
 
-    pub async fn exec<R: ToString>(&self, raw: R) -> Result<RespShell, MsgErr> {
+    pub async fn exec<R: ToString>(&self, raw: R) -> Result<Wave<Pong>, MsgErr> {
         self.exec_with_transfers(raw, vec![]).await
     }
 
@@ -95,7 +95,7 @@ impl<'a> CliSession<'a> {
         &self,
         raw: R,
         transfers: Vec<Transfer>,
-    ) -> Result<RespShell, MsgErr>
+    ) -> Result<Wave<Pong>, MsgErr>
     where
         R: ToString,
     {
@@ -120,7 +120,7 @@ impl<'a> Drop for CliSession<'a> {
                 let request = ReqProto::msg(to, MsgMethod::new("DropSession").unwrap());
                 let tx = self.tx.clone();
                 tokio::spawn(async move {
-                    tx.direct(request).await;
+                    let reflect:Result<Wave<Pong>,MsgErr> = tx.direct(request).await;
                 });
             }
             Err(_) => {}

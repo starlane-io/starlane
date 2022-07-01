@@ -1,7 +1,7 @@
 use mesh_portal_versions::RegistryApi;
 use crate::machine::MachineSkel;
-use crate::star::StarSkel;
-use mesh_portal_versions::DriverState;
+use crate::star::{StarSkel, StateCall};
+use mesh_portal_versions::State;
 use dashmap::DashMap;
 use mesh_portal_versions::error::MsgErr;
 use mesh_portal_versions::version::v0_0_1::id::id::{Kind, Layer, ToPoint, TraversalLayer, Uuid};
@@ -10,17 +10,15 @@ use mesh_portal_versions::version::v0_0_1::log::PointLogger;
 use mesh_portal_versions::version::v0_0_1::particle::particle::Status;
 use mesh_portal_versions::version::v0_0_1::substance::substance::Substance;
 use mesh_portal_versions::version::v0_0_1::sys::{Assign, Sys};
-use mesh_portal_versions::version::v0_0_1::wave::{
-    DirectedHandler, InCtx, Ping, ReflectedCore, Pong, Wave,
-};
+use mesh_portal_versions::version::v0_0_1::wave::{DirectedHandler, DirectedHandlerSelector, RecipientSelector, RootInCtx, InCtx, Ping, ReflectedCore, Pong, Wave, UltraWave, Exchanger};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use mesh_portal::version::latest::id::{Point, Port};
 
-#[derive(AsyncRequestHandler)]
+#[derive(DirectedHandler)]
 pub struct Drivers {
     pub skel: StarSkel,
     pub drivers: HashMap<Kind, mpsc::Sender<DriverCall>>,
@@ -29,6 +27,14 @@ pub struct Drivers {
 impl Drivers {
     pub fn new(skel: StarSkel, drivers: HashMap<Kind, mpsc::Sender<DriverCall>>) -> Self {
         Self { skel, drivers }
+    }
+
+    pub fn kinds(&self) -> Vec<Kind> {
+        let mut rtn = vec![];
+        for (kind,_) in &self.drivers {
+            rtn.push(kind.clone())
+        }
+        rtn
     }
 
     pub async fn init(&self) -> Result<(), MsgErr> {
@@ -79,15 +85,15 @@ impl Drivers {
         }
     }
 
-    async fn start_outer_traversal(&self, traversal: Traversal<Wave>) {
+    async fn start_outer_traversal(&self, traversal: Traversal<UltraWave>) {
         self.skel.traverse_to_next.send(traversal).await;
     }
 
-    async fn start_inner_traversal(&self, traversal: Traversal<Wave>) {
+    async fn start_inner_traversal(&self, traversal: Traversal<UltraWave>) {
     }
 
 
-    pub async fn visit(&self, traversal: Traversal<Wave>) {
+    pub async fn visit(&self, traversal: Traversal<UltraWave>) {
         if traversal.dir.is_core() {
             match self.drivers.get(&traversal.record.details.stub.kind) {
                 None => {
@@ -97,7 +103,7 @@ impl Drivers {
                     ));
                 }
                 Some(driver) => {
-                    let driver_ex = driver.ex(&traversal.to().point, DriverState::None );
+                    let driver_ex = driver.ex(&traversal.to().point, State::None );
                     driver_ex.visit(traversal).await;
                 }
             }
@@ -144,53 +150,54 @@ pub trait DriverFactory {
 
 enum DriverCall {
     LifecycleCall(DriverLifecycleCall),
-    Traversal(Traversal<Wave>),
+    Traversal(Traversal<UltraWave>),
     Handle(Ping)
 }
 
-pub struct DriverEx {
+
+pub struct Core {
    pub port: Port,
    pub skel: DriverSkel,
-   pub state: DriverState,
+   pub state: Arc<RwLock<dyn State>>,
 }
 
 #[async_trait]
-impl TraversalLayer for DriverEx {
+impl TraversalLayer for Core {
     fn port(&self) -> &mesh_portal_versions::version::v0_0_1::id::id::Port {
         &self.port
     }
 
-    async fn traverse_next(&self, traversal: Traversal<Wave>) {
+    async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
         self.skel.traversal_router.send(traversal).await;
     }
 
-    async fn inject(&self, wave: Wave) {
+    async fn inject(&self, wave: UltraWave) {
         let inject = TraversalInjection::new(self.port().clone(),wave);
         self.skel.inject_tx.send(inject).await;
     }
 
-    fn exchange(&self) -> &Arc<DashMap<Uuid, oneshot::Sender<Pong>>> {
-        &self.skel.exchange
+    fn exchanger(&self) -> &Exchanger {
+        &self.skel.exchanger
     }
 }
 
-#[derive(AsyncRequestHandler)]
+#[derive(DirectedHandler)]
 pub struct DriverShell {
     skel: StarSkel,
     status: DriverStatus,
-    states: Arc<DashMap<Point,DriverState>>,
     tx: mpsc::Sender<DriverCall>,
     rx: mpsc::Receiver<DriverCall>,
+    states_tx: mpsc::Sender<StateCall>,
     core: Box<dyn DriverCore>
 }
 
-#[routes_async]
+#[routes]
 impl DriverShell {
 
     pub fn new(skel: StarSkel, core: Box<dyn DriverCore>) -> mpsc::Sender<DriverCall>{
         let kind = core.kind().clone();
         let states = Arc::new(DashMap::new());
-        skel.state.driver.insert(kind.clone(),states.clone());
+        skel.state.core.insert(kind.clone(), states.clone());
         let (tx,rx) = mpsc::channel(1024);
         let driver = Self {
             skel,
@@ -228,26 +235,14 @@ impl DriverShell {
         self.core.lifecycle(event);
     }
 
-    fn get_state( &self, point: &Point ) -> DriverState {
-        match self.states.get(point) {
-            None => {
-                let state = self.core.new_state();
-                self.states.insert( point.clone(), state.clone() );
-                state
-            }
-            Some(state) => {
-                state.clone()
-            }
-        }
-    }
 
-    fn ex( &self, point: &Point ) -> DriverEx {
+    fn ex( &self, point: &Point ) -> Core {
         self.core.ex(point, self.get_state(point))
     }
 
-    fn traverse( &self, traversal: Traversal<Wave> ) {
-        let driver_ex = self.ex(&traversal.to().point);
-        driver_ex.visit(traversal).await;
+    async fn traverse( &self, traversal: Traversal<UltraWave> ) {
+        let core_ex = self.ex(&traversal.to().point);
+        core_ex.visit(traversal).await;
     }
 
     #[route("Sys<Assign>")]
@@ -277,8 +272,7 @@ pub trait DriverCore: DirectedHandler {
     fn kind(&self) -> &Kind;
     async fn status(&self) -> DriverStatus;
     fn lifecycle(&self, event: DriverLifecycleCall);
-    fn new_state(&self) -> DriverState;
-    fn ex(&self, point: &Point, state: DriverState ) -> DriverEx;
+    fn ex(&self, point: &Point, state: Arc<RwLock<dyn State>>) -> Core;
     async fn assign(&self, ctx: InCtx<'_,Assign>) -> Result<ReflectedCore, MsgErr>;
 }
 
@@ -308,14 +302,13 @@ pub struct DriverSkel {
     pub star: StarKey,
     pub logger: PointLogger,
     pub registry: Arc<dyn RegistryApi>,
-    pub surface: mpsc::Sender<Wave>,
-    pub traversal_router: mpsc::Sender<Traversal<Wave>>,
+    pub surface: mpsc::Sender<UltraWave>,
+    pub traversal_router: mpsc::Sender<Traversal<UltraWave>>,
     pub inject_tx: mpsc::Sender<TraversalInjection>,
-    pub fabric: mpsc::Sender<Wave>,
+    pub fabric: mpsc::Sender<UltraWave>,
     pub machine: MachineSkel,
-    pub exchange: Arc<DashMap<Uuid, oneshot::Sender<Pong>>>,
+    pub exchanger: Exchanger,
     pub status_tx: broadcast::Sender<DriverStatusEvent>,
-    pub states: Arc<DashMap<Point,DriverState>>,
     pub point: Point
 }
 
@@ -334,7 +327,7 @@ impl  DriverSkel {
             traversal_router: skel.traverse_to_next,
             fabric: skel.fabric,
             machine: skel.machine,
-            exchange: skel.exchange,
+            exchanger: skel.exchanger,
             inject_tx: skel.inject_tx,
             status_tx,
             states,

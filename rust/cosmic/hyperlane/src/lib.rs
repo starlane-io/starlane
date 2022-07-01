@@ -15,7 +15,7 @@ use mesh_portal_versions::version::v0_0_1::substance::substance::{
 };
 use mesh_portal_versions::version::v0_0_1::sys::{EntryReq, InterchangeKind, Sys};
 use mesh_portal_versions::version::v0_0_1::util::uuid;
-use mesh_portal_versions::version::v0_0_1::wave::{Agent, HyperWave, Method, Ping, Reflectable, Pong, SysMethod, Wave};
+use mesh_portal_versions::version::v0_0_1::wave::{Agent, HyperWave, Method, Ping, Reflectable, Pong, SysMethod, Wave, UltraWave};
 use mesh_portal_versions::VERSION;
 use std::collections::HashMap;
 use std::future::Future;
@@ -74,13 +74,13 @@ pub struct HyperwayIn {
 }
 
 impl HyperwayOut {
-    pub async fn outbound(&self, wave: Wave) {
+    pub async fn outbound(&self, wave: UltraWave) {
         self.outbound.send(wave).await;
     }
 }
 
 impl HyperwayIn {
-    pub async fn inbound(&mut self) -> Option<Wave> {
+    pub async fn inbound(&mut self) -> Option<UltraWave> {
         self.inbound.receive().await
     }
 
@@ -127,18 +127,18 @@ pub enum HyperwayCall {
 /// doesn't do much now, but the eventual idea is to have it handle multiple lanes
 /// and send to them based on priority
 pub struct OutboundLanes {
-    pub tx: mpsc::Sender<Wave>,
+    pub tx: mpsc::Sender<UltraWave>,
 }
 
 impl OutboundLanes {
-    pub fn new() -> (Self, mpsc::Receiver<Wave>) {
+    pub fn new() -> (Self, mpsc::Receiver<UltraWave>) {
         let (tx, rx) = mpsc::channel(1024);
         (Self { tx }, rx)
     }
 }
 
 impl OutboundLanes {
-    async fn send(&self, wave: Wave) {
+    async fn send(&self, wave: UltraWave) {
         self.tx.send(wave).await;
     }
 }
@@ -146,18 +146,18 @@ impl OutboundLanes {
 /// doesn't do much now, but the eventual idea is to have it handle multiple lanes
 /// and draw from them based on priority
 pub struct InboundLanes {
-    pub rx: mpsc::Receiver<Wave>,
+    pub rx: mpsc::Receiver<UltraWave>,
 }
 
 impl InboundLanes {
-    pub fn new() -> (Self, mpsc::Sender<Wave>) {
+    pub fn new() -> (Self, mpsc::Sender<UltraWave>) {
         let (tx, rx) = mpsc::channel(1024);
         (Self { rx }, tx)
     }
 }
 
 impl InboundLanes {
-    async fn receive(&mut self) -> Option<Wave> {
+    async fn receive(&mut self) -> Option<UltraWave> {
         self.rx.recv().await
     }
 }
@@ -247,11 +247,12 @@ impl HyperwayInterchange {
         });
     }
 
-    pub async fn outbound(&self, wave: Wave) {
-        let point = wave.to().clone().to_point();
+    pub async fn outbound(&self, wave: UltraWave) {
+        // hacked for now, this will break when we introduce Ripples
+        let point = wave.to().unwrap_single().point.clone();
         match self.hyperways.get(&point) {
             None => {
-                self.logger.error(format!("attempt to send wave from '{}' to hyperway '{}' which is not present in this HyperwayInterchange", wave.from().to_string(), wave.to().to_string()) );
+                self.logger.error(format!("attempt to send wave from '{}' to hyperway '{}' which is not present in this HyperwayInterchange", wave.from().to_string(), wave.to().unwrap_single().to_string()) );
             }
             Some(hyperway) => {
                 hyperway.value().outbound(wave).await;
@@ -436,7 +437,7 @@ impl InterchangeEntryRouter {
     pub async fn enter(
         &self,
         req: EntryReq,
-    ) -> Result<(mpsc::Sender<Wave>, mpsc::Receiver<Wave>), MsgErr> {
+    ) -> Result<(mpsc::Sender<UltraWave>, mpsc::Receiver<UltraWave>), MsgErr> {
         if let Some(gate) = self.map.get(&req.interchange) {
             gate.enter(req).await
         } else {
@@ -472,7 +473,7 @@ impl HyperGate {
     pub async fn enter(
         &self,
         req: EntryReq,
-    ) -> Result<(mpsc::Sender<Wave>, mpsc::Receiver<Wave>), MsgErr> {
+    ) -> Result<(mpsc::Sender<UltraWave>, mpsc::Receiver<UltraWave>), MsgErr> {
         let stub = {
             let mut auth = self.auth.lock().await;
             auth.auth(req).await?

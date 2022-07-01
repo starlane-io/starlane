@@ -20,7 +20,7 @@ pub mod substance {
     use crate::version::v0_0_1::selector::selector::{KindSelector, Selector};
     use crate::version::v0_0_1::sys::Sys;
     use crate::version::v0_0_1::util::{uuid, ToResolved, ValueMatcher, ValuePattern};
-    use crate::version::v0_0_1::wave::{HyperWave, Method, DirectedCore, ReflectedCore, Pong, Wave};
+    use crate::version::v0_0_1::wave::{HyperWave, Method, DirectedCore, ReflectedCore, Pong, Wave, UltraWave};
     use cosmic_macros_primitive::Autobox;
     use cosmic_nom::Tw;
     use http::header::CONTENT_TYPE;
@@ -62,12 +62,12 @@ pub mod substance {
         RespCore,
         Sys,
         Token,
-        Wave,
+        UltraWave,
         HyperWave
     }
 
     #[derive(
-        Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Autobox,
+        Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Autobox, cosmic_macros_primitive::ToSubstance
     )]
     pub enum Substance {
         Empty,
@@ -92,9 +92,16 @@ pub mod substance {
         RespCore(Box<ReflectedCore>),
         Sys(Sys),
         Token(Token),
-        Wave(Box<Wave>),
+        UltraWave(Box<UltraWave>),
         HyperWave(Box<HyperWave>),
     }
+
+    pub trait ToSubstance<S>{
+        fn to_substance(self) -> Result<S,MsgErr>;
+        fn to_substance_ref(&self) -> Result<&S,MsgErr>;
+    }
+
+    pub trait ChildSubstance{}
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
     pub struct Token {
@@ -199,7 +206,7 @@ pub mod substance {
                 Substance::Sys(_) => SubstanceKind::Sys,
                 Substance::MultipartForm(_) => SubstanceKind::MultipartForm,
                 Substance::Token(_) => SubstanceKind::Token,
-                Substance::Wave(_) => SubstanceKind::Wave,
+                Substance::UltraWave(_) => SubstanceKind::UltraWave,
                 Substance::HyperWave(_) => SubstanceKind::HyperWave,
             }
         }

@@ -15,6 +15,7 @@ use crate::version::v0_0_1::command::request::read::{Read, ReadCtx, ReadVar};
 use crate::version::v0_0_1::command::request::update::{Update, UpdateCtx, UpdateVar};
 use crate::version::v0_0_1::wave::CmdMethod;
 use cosmic_macros_primitive::Autobox;
+use crate::version::v0_0_1::substance::substance::ChildSubstance;
 
 pub mod command {
     use serde::{Deserialize, Serialize};
@@ -990,6 +991,8 @@ pub enum Command{
     Update(Update),
     Read(Read),
 }
+
+impl ChildSubstance for Command {}
 
 impl Command {
     pub fn matches( &self, method: &CmdMethod ) -> Result<(),()>{

@@ -389,7 +389,7 @@ pub mod config {
             pub fn is_match<'a>(&self, select: &'a RecipientSelector) -> Result<(), ()> {
                 if let Some(topic) = &self.topic {
                     topic.is_match(&select.to.topic)?;
-                } else if Topic::None != select.wave.from.topic {
+                } else if Topic::None != select.wave.from().topic {
                     return Err(());
                 }
 

@@ -93,13 +93,9 @@ pub mod messaging {
     use mesh_portal_versions::version::v0_0_1::wave;
 
     pub type RequestHandler = dyn wave::DirectedHandler;
-    pub type ReqCtx<'a, I, R> = wave::InCtx<'a,I, R>;
-    pub type RootRequestCtx<R> = wave::RootInCtx<R>;
     pub type ReqShell = wave::Ping;
     pub type RespShell = wave::Pong;
-    pub type RequestBuilder = wave::ReqBuilder;
     pub type ReqProto = wave::PingProto;
-    pub type Message = wave::Wave;
     pub type Agent = wave::Agent;
     pub type Session = wave::Session;
     pub type Scope = wave::Scope;
@@ -443,7 +439,6 @@ pub mod cli {
 pub mod service {
     use mesh_portal_versions::version::{v0_0_1 as current, v0_0_1};
 
-    pub type Router = dyn v0_0_1::wave::AsyncRouter;
     pub type Global = dyn current::service::Global;
     pub type AccessProvider = dyn current::service::AccessProvider;
     pub type AllAccessProvider = current::service::AllAccessProvider;

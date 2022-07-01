@@ -8,7 +8,7 @@ use crate::version::v0_0_1::parse::{CamelCase, parse_star_key};
 use crate::version::v0_0_1::particle::particle::Stub;
 use crate::version::v0_0_1::substance::substance::Substance;
 use crate::version::v0_0_1::sys::{ChildRegistry, ParticleRecord};
-use crate::version::v0_0_1::wave::{Ping, Pong, Wave};
+use crate::version::v0_0_1::wave::{DirectedWave, Ping, Pong, ReflectedWave, UltraWave, Wave};
 use core::str::FromStr;
 use cosmic_nom::new_span;
 use nom::combinator::all_consuming;
@@ -42,7 +42,7 @@ pub mod id {
     use tokio::sync::{mpsc, oneshot};
 
     use crate::error::{MsgErr, ParseErrs};
-    use crate::{DriverState, RegistryApi};
+    use crate::{State, RegistryApi};
     use crate::version::v0_0_1::config::config::bind::RouteSelector;
     use crate::version::v0_0_1::id::id::PointSegCtx::Working;
     use crate::version::v0_0_1::id::{ArtifactSubKind, BaseSubKind, DatabaseSubKind, FileSubKind, StarSub, Traversal, TraversalDirection, TraversalInjection, UserBaseSubKind};
@@ -60,7 +60,7 @@ pub mod id {
     };
     use crate::version::v0_0_1::sys::Location::Central;
     use crate::version::v0_0_1::util::{ToResolved, ValueMatcher, ValuePattern};
-    use crate::version::v0_0_1::wave::{Recipients, Ping, Pong, ToRecipients, Wave};
+    use crate::version::v0_0_1::wave::{Recipients, Ping, Pong, ToRecipients, Wave, UltraWave, DirectedWave, ReflectedWave, Exchanger};
 
     lazy_static! {
         pub static ref GLOBAL_CENTRAL: Point = Point::from_str("GLOBAL::central").unwrap();
@@ -1436,7 +1436,7 @@ pub mod id {
             } else {
                 // finally we handle the case where we traverse towards another point within this Star
                 // in this case it just depends upon if we are Requesting or Responding
-                if wave.is_req() {
+                if wave.is_ping() {
                     TraversalDirection::Core
                 } else {
                     TraversalDirection::Fabric
@@ -1469,14 +1469,14 @@ pub mod id {
 
 
         async fn visit_layer(&self, traversal: Traversal<Wave>) {
-            if traversal.is_req()
+            if traversal.is_ping()
                 && self.skel.state.topic.contains_key(traversal.to())
             {
                 let topic = self.skel.state.find_topic(traversal.to(), traversal.from());
                 match topic {
                     None => {
                         // send some sort of Not_found
-                        let mut traversal = traversal.unwrap_req();
+                        let mut traversal = traversal.unwrap_directed();
                         let mut traversal = traversal.with(traversal.not_found());
                         traversal.reverse();
                         let traversal = traversal.wrap();
@@ -1488,7 +1488,7 @@ pub mod id {
                             Ok(topic_handler) => {
                                 let transmitter = StarInjectTransmitter::new( self.skel.clone(), traversal.to().clone() );
                                 let transmitter = ProtoTransmitter::new(Arc::new(transmitter));
-                                let req = traversal.unwrap_req().payload;
+                                let req = traversal.unwrap_directed().payload;
                                 let ctx = RootInCtx::new(
                                     req,
                                     self.skel.logger.span(),
@@ -1568,61 +1568,56 @@ pub mod id {
     #[async_trait]
     pub trait TraversalLayer {
         fn port(&self) -> &Port;
-        async fn traverse_next(&self, traversal: Traversal<Wave>);
-        async fn inject(&self, wave: Wave );
+        async fn traverse_next(&self, traversal: Traversal<UltraWave>);
+        async fn inject(&self, wave: UltraWave);
 
-        fn exchange(&self) -> &Arc<DashMap<Uuid, oneshot::Sender<Pong>>>;
+        fn exchanger(&self) -> &Exchanger;
 
-        async fn deliver_request(&self, req: Traversal<Ping> ) {
-            // do something?
+        async fn delivery_directed(&self, direct: Traversal<DirectedWave> ) {
         }
 
-        async fn deliver_response(&self, resp: Traversal<Pong>) {
-            if let Some((_,tx)) = self.exchange().remove(&resp.response_to) {
-                tx.send(resp.payload );
-            } else {
-                resp.logger.error("exchange does not have a record of a request that was responded to");
-            }
+        async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) {
+            self.exchanger().reflected(reflect.payload).await;
         }
 
-        async fn visit(&self, traversal: Traversal<Wave>) {
+        async fn visit(&self, traversal: Traversal<UltraWave>) {
             if let Some(dest) = &traversal.dest {
                 if self.port().layer == *dest  {
-                    if traversal.is_req() {
-                        self.deliver_request(traversal.unwrap_req()).await;
+                    if traversal.is_ping() {
+                        self.delivery_directed(traversal.unwrap_directed()).await;
                     } else {
-                        self.deliver_response(traversal.unwrap_resp()).await;
+                        self.deliver_reflected(traversal.unwrap_reflected()).await;
                     }
                 }
-            } else if traversal.is_req() && traversal.dir == TraversalDirection::Fabric {
-                self.request_fabric_bound(traversal.unwrap_req()).await;
-            } else if traversal.is_resp() && traversal.dir == TraversalDirection::Core {
-                self.response_core_bound(traversal.unwrap_resp()).await;
-            } else if traversal.is_req() && traversal.dir == TraversalDirection::Core{
-                self.request_core_bound(traversal.unwrap_req()).await;
-            } else if traversal.is_resp() && traversal.dir == TraversalDirection::Fabric{
-                self.response_fabric_bound(traversal.unwrap_resp()).await;
+            } else if traversal.is_ping() && traversal.dir == TraversalDirection::Fabric {
+                self.directed_fabric_bound(traversal.unwrap_directed()).await;
+            } else if traversal.is_pong() && traversal.dir == TraversalDirection::Core {
+                self.reflected_core_bound(traversal.unwrap_reflected()).await;
+            } else if traversal.is_ping() && traversal.dir == TraversalDirection::Core{
+                self.directed_core_bound(traversal.unwrap_directed()).await;
+            } else if traversal.is_pong() && traversal.dir == TraversalDirection::Fabric{
+                self.reflected_fabric_bound(traversal.unwrap_reflected()).await;
             }
     }
 
         // override if you want to track outgoing requests
-        async fn request_fabric_bound(&self, traversal: Traversal<Ping>) -> Result<(), MsgErr>{
+        async fn directed_fabric_bound(&self, traversal: Traversal<DirectedWave>) -> Result<(), MsgErr>{
             self.traverse_next(traversal.wrap()).await;
             Ok(())
         }
 
-        async fn request_core_bound(&self, traversal: Traversal<Ping>) -> Result<(), MsgErr>{
+        async fn directed_core_bound(&self, traversal: Traversal<DirectedWave>) -> Result<(), MsgErr>{
             self.traverse_next(traversal.wrap()).await;
             Ok(())
         }
 
         // override if you want to track incoming responses
-        async fn response_core_bound(&self, traversal: Traversal<Pong>) -> Result<(), MsgErr>{
+        async fn reflected_core_bound(&self, traversal: Traversal<ReflectedWave>) -> Result<(), MsgErr>{
             self.traverse_next(traversal.wrap()).await;
             Ok(())
         }
 
-        async fn response_fabric_bound(&self, traversal: Traversal<Pong>) -> Result<(), MsgErr>{
+        async fn reflected_fabric_bound(&self, traversal: Traversal<ReflectedWave>) -> Result<(), MsgErr>{
             self.traverse_next(traversal.wrap()).await;
             Ok(())
         }
@@ -2974,13 +2969,13 @@ impl FromStr for StarKey {
     }
 }
 
-pub struct TraversalInjection<V> {
+pub struct TraversalInjection {
     pub injector: Port,
-    pub wave: Wave<V>
+    pub wave: UltraWave
 }
 
-impl <V> TraversalInjection<V>{
-    pub fn new( injector: Port, wave: Wave<V> ) -> Self {
+impl TraversalInjection{
+    pub fn new( injector: Port, wave: UltraWave ) -> Self {
         Self {
             injector,
             wave
@@ -2997,6 +2992,7 @@ pub struct Traversal<W> {
     pub logger: SpanLogger,
     pub location: Point,
     pub dir: TraversalDirection,
+    pub to: Port
 }
 
 #[derive(Clone,Eq,PartialEq,Hash)]
@@ -3049,7 +3045,8 @@ impl<W> Traversal<W> {
         layer: Layer,
         logger: SpanLogger,
         dir: TraversalDirection,
-        dest: Option<Layer>
+        dest: Option<Layer>,
+        to: Port
     ) -> Self {
         Self {
             payload,
@@ -3058,7 +3055,8 @@ impl<W> Traversal<W> {
             location,
             logger,
             dir,
-            dest
+            dest,
+            to
         }
     }
 
@@ -3071,6 +3069,7 @@ impl<W> Traversal<W> {
             location: self.location,
             dir: self.dir,
             dest: self.dest,
+            to: self.to
         }
     }
 
@@ -3105,12 +3104,14 @@ impl<W> Traversal<W> {
         }
         next
     }
+
+    pub fn is_inter_layer(&self) -> bool {
+        self.to.point == *self.logger.point()
+    }
+
 }
 
-impl Traversal<Wave> {
-    pub fn is_inter_layer(&self) -> bool {
-        self.to().point == *self.logger.point()
-    }
+impl Traversal<UltraWave> {
 
     pub fn is_fabric_bound(&self) -> bool {
         match self.dir {
@@ -3126,56 +3127,80 @@ impl Traversal<Wave> {
         }
     }
 
-    pub fn is_req(&self) -> bool {
+    pub fn is_ping(&self) -> bool {
         match &self.payload {
-            Wave::Req(_) => true,
-            Wave::Resp(_) => false,
+            UltraWave::Ping(_) => true,
+            UltraWave::Pong(_) => false,
         }
     }
 
-    pub fn is_resp(&self) -> bool {
+    pub fn is_pong(&self) -> bool {
         match &self.payload {
-            Wave::Req(_) => false,
-            Wave::Resp(_) => true,
+            UltraWave::Ping(_) => false,
+            UltraWave::Pong(_) => true,
         }
     }
 
-    pub fn unwrap_req(self) -> Traversal<Ping> {
-        if let Wave::Req(req) = self.payload.clone() {
-            self.with(req)
+    pub fn unwrap_directed(self) -> Traversal<DirectedWave> {
+        if let UltraWave::Ping(ping) = self.payload.clone() {
+            self.with(ping.to_directed())
         } else {
-            panic!("cannot call this unless you are sure it's a Req")
+            panic!("cannot call this unless you are sure it's a Ping")
         }
     }
 
-    pub fn unwrap_resp(self) -> Traversal<Pong> {
-        if let Wave::Resp(resp) = self.payload.clone() {
-            self.with(resp)
+    pub fn unwrap_reflected(self) -> Traversal<ReflectedWave> {
+        if let UltraWave::Pong(pong) = self.payload.clone() {
+            self.with(pong.to_reflected())
         } else {
-            panic!("cannot call this unless you are sure it's a Resp")
+            panic!("cannot call this unless you are sure it's a Pong")
+        }
+    }
+
+
+    pub fn unwrap_ping(self) -> Traversal<Wave<Ping>> {
+        if let UltraWave::Ping(ping) = self.payload.clone() {
+            self.with(ping)
+        } else {
+            panic!("cannot call this unless you are sure it's a Ping")
+        }
+    }
+
+    pub fn unwrap_pong(self) -> Traversal<Wave<Pong>> {
+        if let UltraWave::Pong(pong) = self.payload.clone() {
+            self.with(pong)
+        } else {
+            panic!("cannot call this unless you are sure it's a Pong")
         }
     }
 }
 
-impl Traversal<Ping> {
-    pub fn wrap(self) -> Traversal<Wave> {
-        let req = self.payload.clone();
-        self.with(Wave::Req(req))
-    }
 
-    pub fn is_inter_layer(&self) -> bool {
-        self.to.point == *self.logger.point()
+impl Traversal<DirectedWave> {
+    pub fn wrap(self) -> Traversal<UltraWave> {
+        let ping= self.payload.clone();
+        self.with(ping.to_ultra())
     }
 }
 
-impl Traversal<Pong> {
-    pub fn wrap(self) -> Traversal<Wave> {
-        let resp = self.payload.clone();
-        self.with(Wave::Resp(resp))
+impl Traversal<ReflectedWave> {
+    pub fn wrap(self) -> Traversal<UltraWave> {
+        let pong= self.payload.clone();
+        self.with(pong.to_ultra())
     }
+}
 
-    pub fn is_inter_layer(&self) -> bool {
-        self.to.point == *self.logger.point()
+impl Traversal<Wave<Ping>> {
+    pub fn wrap(self) -> Traversal<UltraWave> {
+        let ping= self.payload.clone();
+        self.with(ping.to_ultra())
+    }
+}
+
+impl Traversal<Wave<Pong>> {
+    pub fn wrap(self) -> Traversal<UltraWave> {
+        let pong = self.payload.clone();
+        self.with(pong.to_ultra())
     }
 }
 

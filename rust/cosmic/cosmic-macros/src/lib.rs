@@ -41,24 +41,14 @@ pub(crate) extern "C" fn mesh_portal_timestamp() -> DateTime<Utc>{
 }
 
 // this is just to make the user realize he needs to import RequestHandler
-#[proc_macro_derive(RequestHandler)]
-pub fn request_handler(item: TokenStream) -> TokenStream {
+#[proc_macro_derive(DirectedHandler)]
+pub fn directed_handler(item: TokenStream) -> TokenStream {
     TokenStream::from(quote!{})
-}
-
-#[proc_macro_derive(AsyncRequestHandler)]
-pub fn async_request_handler(item: TokenStream) -> TokenStream {
-    TokenStream::from(quote!{})
-}
-
-#[proc_macro_attribute]
-pub fn routes_async(attr: TokenStream, item: TokenStream ) -> TokenStream {
-    _routes(attr, item, true)
 }
 
 #[proc_macro_attribute]
 pub fn routes(attr: TokenStream, item: TokenStream ) -> TokenStream {
-    _routes(attr, item, false)
+    _routes(attr, item, true)
 }
 
 fn _routes(attr: TokenStream, item: TokenStream, _async: bool  ) -> TokenStream {
@@ -126,46 +116,28 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool  ) -> TokenStream 
         rtn
     };
 
-    let request_handler = match _async {
-        true => Ident::new("AsyncRequestHandler", impl_name.span() ),
-        false => Ident::new( "RequestHandler", impl_name.span() )
-    };
-
-    let __async = match _async {
-        true => quote!{async},
-        false => quote!{}
-    };
-
-    let __await = match _async {
-        true => quote!{.await},
-        false => quote!{}
-    };
-
-    let __async_trait = match _async {
-        true => quote!{#[async_trait]},
-        false => quote!{}
-    };
 
     let rtn = quote!{
-        #__async_trait
-        impl #request_handler for #self_ty {
-
-            #__async fn select( &self, request: & mesh_portal::version::latest::messaging::ReqShell ) -> Result<(),()> {
-                 #(
-                    if #static_selector_keys.is_match(&request).is_ok() {
-                        return Ok(());
-                    }
-                )*
-                #select
-            }
-
-            #__async fn handle( &self, request: mesh_portal::version::latest::messaging::RootRequestCtx<mesh_portal::version::latest::messaging::ReqShell>) -> Result<RespCore,MsgErr> {
+        impl DirectedHandlerSelector for #self_ty {
+              fn select<'a>( &self, select: &'a RecipientSelector<'a>, ) -> Result<&dyn DirectedHandler, ()> {
                 #(
-                    if #static_selector_keys.is_match(&request.request).is_ok() {
-                       return self.#idents( request )#__await;
+                    if #static_selector_keys.is_match(&select.wave).is_ok() {
+                        return Ok(self);
                     }
                 )*
-                #rtn
+                Err(())
+              }
+        }
+
+        #[async_trait]
+        impl DirectedHandler for #self_ty {
+            async fn handle( &self, ctx: RootInCtx) -> ReflectedCore {
+                #(
+                    if #static_selector_keys.is_match(&ctx.request).is_ok() {
+                       return self.#idents( ctx ).await;
+                    }
+                )*
+                ctx.not_found()
              }
         }
 
@@ -239,9 +211,8 @@ pub fn route(attr: TokenStream, input: TokenStream ) -> TokenStream {
   let item = ctx.item;
 
   let expanded = quote! {
-      #__async fn #ident( &self, mut ctx: mesh_portal::version::latest::messaging::RootRequestCtx<mesh_portal::version::latest::messaging::ReqShell> ) -> Result<mesh_portal::version::latest::entity::response::RespCore,MsgErr> {
-          let mut ctx : mesh_portal::version::latest::messaging::RootRequestCtx<#item> = ctx.transform_input()?;
-          let ctx = ctx.push();
+      #__async fn #ident( &self, mut ctx: RootInCtx ) -> Result<ReflectedCore,MsgErr> {
+          let ctx: InCtx<'_,#item> = ctx.push();
 
           match self.#orig(ctx)#__await {
               Ok(rtn) => Ok(rtn.into()),

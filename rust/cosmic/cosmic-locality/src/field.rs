@@ -22,9 +22,7 @@ use mesh_portal_versions::version::v0_0_1::selector::{PayloadBlock, PayloadBlock
 use mesh_portal_versions::version::v0_0_1::substance::substance::{Call, CallKind, Substance};
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 use mesh_portal_versions::version::v0_0_1::util::{ToResolved, ValueMatcher};
-use mesh_portal_versions::version::v0_0_1::wave::{
-    Agent, CmdMethod, Method, DirectedCore, Ping, Reflectable, ReflectedCore, Pong, Wave,
-};
+use mesh_portal_versions::version::v0_0_1::wave::{Agent, CmdMethod, Method, DirectedCore, Ping, Reflectable, ReflectedCore, Pong, Wave, Exchanger, UltraWave, DirectedWave, ReflectedWave};
 use regex::{CaptureMatches, Regex};
 
 use std::collections::HashMap;
@@ -74,7 +72,7 @@ impl FieldEx {
                         self.logger.error(format!("no pipeline set for request_id: {}", action.request_id));
                     }
                     Some((_, mut pipex)) => {
-                        self.skel.traverse_to_next.send(pipex.respond()).await;
+                        self.skel.traverse_to_next.send(pipex.reflect()).await;
                     }
                 }
             }
@@ -90,59 +88,59 @@ impl TraversalLayer for FieldEx {
         &self.state.port
     }
 
-    async fn traverse_next(&self, traversal: Traversal<Wave>) {
+    async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
         self.skel.traverse_to_next.send(traversal).await;
     }
 
-    fn exchange(&self) -> &Arc<DashMap<Uuid, tokio::sync::oneshot::Sender<Pong>>> {
-        &self.skel.exchange
+    fn exchanger(&self) -> &Exchanger {
+        &self.skel.exchanger
     }
 
-    async fn request_core_bound(&self, mut request: Traversal<Ping>) -> Result<(), MsgErr> {
-        request.logger.set_span_attr("message-id", &request.id);
-        let access = self.skel.registry.access(&request.agent, &request.to).await;
+    async fn directed_core_bound(&self, mut directed: Traversal<DirectedWave>) -> Result<(), MsgErr> {
+        directed.logger.set_span_attr("message-id", &directed.id);
+        let access = self.skel.registry.access(&directed.agent, &directed.to).await;
 
         match access {
             Ok(access) => {
                 if !access.permissions().particle.execute {
                     let err_msg = format!(
                         "execute permission required to send requests to {}",
-                        request.to.to_string()
+                        directed.to.to_string()
                     );
-                    request.logger.error(err_msg.as_str());
+                    directed.logger.error(err_msg.as_str());
                     self.skel
                         .fabric
-                        .send(Wave::Resp(request.err(err_msg.into())));
+                        .send(Wave::Resp(directed.err(err_msg.into())));
                     return Ok(());
                 }
             }
             Err(err) => {
-                request.logger.error(format!("{}", err.to_string()));
+                directed.logger.error(format!("{}", err.to_string()));
             }
         }
 
-        let bind = self.skel.machine.artifacts.bind(&request.to).await?;
-        let route = bind.select(&request.item)?;
+        let bind = self.skel.machine.artifacts.bind(&directed.to).await?;
+        let route = bind.select(&directed.item)?;
 
         let regex = route.selector.path.clone();
 
         let env = {
             let path_regex_capture_resolver =
-                RegexCapturesResolver::new(regex, request.item.core.uri.path().to_string())?;
-            let mut env = Env::new(request.item.to.clone().to_point());
+                RegexCapturesResolver::new(regex, directed.item.core.uri.path().to_string())?;
+            let mut env = Env::new(directed.item.to.clone().to_point());
             env.add_var_resolver(Arc::new(path_regex_capture_resolver));
             env.set_var("self.bundle", bind.bundle()?.to_string().as_str());
             env.set_var("self.bind", bind.point().clone().to_string().as_str());
             env
         };
 
-        let request_id = request_id(&request.item);
+        let request_id = request_id(&directed.item);
 
         let pipeline = route.block.clone();
 
-        let call = request.to_call()?;
-        let logger = request.logger.span();
-        let mut pipex = PipeEx::new(request, self.clone(), pipeline, env, logger.clone());
+        let call = directed.to_call()?;
+        let logger = directed.logger.span();
+        let mut pipex = PipeEx::new(directed, self.clone(), pipeline, env, logger.clone());
         let action = match pipex.next() {
             Ok(action) => action,
             Err(err) => {
@@ -157,7 +155,7 @@ impl TraversalLayer for FieldEx {
         };
 
         if let PipeAction::Respond = action {
-            self.skel.traverse_to_next.send(pipex.respond()).await;
+            self.skel.traverse_to_next.send(pipex.reflect()).await;
             return Ok(());
         }
 
@@ -169,7 +167,7 @@ impl TraversalLayer for FieldEx {
         Ok(())
     }
 
-    async fn response_core_bound(&self, mut traversal: Traversal<Pong>) -> Result<(), MsgErr> {
+    async fn reflected_core_bound(&self, mut traversal: Traversal<Pong>) -> Result<(), MsgErr> {
         let request_id = request_id_from_response(&traversal);
         let mut pipex = self.state.pipe_exes.remove(&request_id);
 
@@ -184,10 +182,10 @@ impl TraversalLayer for FieldEx {
 
         let (_, mut pipex) = pipex.expect("pipeline executor");
 
-        let action = pipex.handle_response(traversal.payload)?;
+        let action = pipex.handle_reflected(traversal.payload)?;
 
         if let PipeAction::Respond = action {
-            self.skel.traverse_to_next.send(pipex.respond()).await;
+            self.skel.traverse_to_next.send(pipex.reflect()).await;
             return Ok(());
         }
 
@@ -215,7 +213,7 @@ pub struct PipeEx {
 
 impl PipeEx {
     pub fn new(
-        traversal: Traversal<Ping>,
+        traversal: Traversal<DirectedWave>,
         binder: FieldEx,
         pipeline: PipelineVar,
         env: Env,
@@ -243,16 +241,16 @@ impl PipeEx {
         }
     }
 
-    pub fn handle_response(&mut self, response: Pong) -> anyhow::Result<PipeAction> {
-        self.traversal.push(Wave::Resp(response));
+    pub fn handle_reflected(&mut self, reflected: ReflectedWave ) -> anyhow::Result<PipeAction> {
+        self.traversal.push(reflected.to_ultra() );
         self.next()
     }
 
-    fn respond(self) -> Traversal<Wave> {
-        self.traversal.respond()
+    fn reflect(self) -> Traversal<ReflectedWave> {
+        self.traversal.reflect()
     }
 
-    fn fail(self, status: u16, error: &str) -> Traversal<Wave> {
+    fn fail(self, status: u16, error: &str) -> Traversal<ReflectedWave> {
         self.traversal.fail(status, error)
     }
 
@@ -330,7 +328,7 @@ impl PipeEx {
 }
 
 pub struct PipeTraversal {
-    pub initial: Traversal<Ping>,
+    pub initial: Traversal<DirectedWave>,
     pub method: Method,
     pub body: Substance,
     pub uri: Uri,
@@ -339,7 +337,7 @@ pub struct PipeTraversal {
 }
 
 impl PipeTraversal {
-    pub fn new(initial_request: Traversal<Ping>) -> Self {
+    pub fn new(initial_request: Traversal<DirectedWave>) -> Self {
         Self {
             method: initial_request.core.method.clone(),
             body: initial_request.core.body.clone(),
@@ -390,29 +388,33 @@ impl PipeTraversal {
         )
     }
 
-    pub fn push(&mut self, wave: Wave) {
+    pub fn push(&mut self, wave: UltraWave) {
         match wave {
-            Wave::Req(request) => {
-                self.method = request.core.method;
-                self.uri = request.core.uri;
-                self.headers = request.core.headers;
-                self.body = request.core.body;
+            UltraWave::Ping(ping) => {
+                let ping = ping.variant;;
+                let core = ping.core;
+                self.method = core.method;
+                self.uri = core.uri;
+                self.headers = core.headers;
+                self.body = core.body;
             }
-            Wave::Resp(response) => {
-                self.headers = response.core.headers;
-                self.body = response.core.body;
-                self.status = response.core.status;
+            UltraWave::Pong(pong) => {
+                let pong = pong.variant;;
+                let core = pong.core;
+                self.headers = core.headers;
+                self.body = core.body;
+                self.status = core.status;
             }
         }
     }
 
-    pub fn respond(self) -> Traversal<Wave> {
+    pub fn reflect(self) -> Traversal<ReflectedWave> {
         let core = self.response_core();
         let response = self.initial.core(core);
         self.initial.with(Wave::Resp(response))
     }
 
-    pub fn fail(self, status: u16, error: &str) -> Traversal<Wave> {
+    pub fn fail(self, status: u16, error: &str) -> Traversal<ReflectedWave> {
         let response = self.initial.fail(status, error);
         self.initial.with(Wave::Resp(response))
     }

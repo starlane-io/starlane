@@ -8,7 +8,7 @@ pub mod frame {
 
     use crate::error::MsgErr;
     use crate::version::v0_0_1::sys::EntryReq;
-    use crate::version::v0_0_1::wave::{Ping, Pong, Wave};
+    use crate::version::v0_0_1::wave::{Ping, Pong, UltraWave, Wave};
 
     pub struct PrimitiveFrame {
         pub data: Vec<u8>,
@@ -103,7 +103,7 @@ pub mod frame {
     }
 
 
-    impl TryInto<PrimitiveFrame> for Wave{
+    impl TryInto<PrimitiveFrame> for UltraWave{
         type Error = MsgErr;
 
         fn try_into(self) -> Result<PrimitiveFrame, Self::Error> {
@@ -112,10 +112,10 @@ pub mod frame {
         }
     }
 
-    impl TryInto<Wave> for PrimitiveFrame {
+    impl TryInto<UltraWave> for PrimitiveFrame {
         type Error = MsgErr;
 
-        fn try_into(self) -> Result<Wave, Self::Error> {
+        fn try_into(self) -> Result<UltraWave, Self::Error> {
             Ok(bincode::deserialize(self.data.as_bytes())?)
         }
     }

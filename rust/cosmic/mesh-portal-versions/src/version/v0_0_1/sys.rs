@@ -167,14 +167,14 @@ pub struct EntryReq {
     pub remote: Option<Point>,
 }
 
-impl Into<Ping> for EntryReq {
-    fn into(self) -> Ping {
+impl Into<Wave<Ping>> for EntryReq {
+    fn into(self) -> Wave<Ping> {
         let mut core = DirectedCore::new(SysMethod::EntryReq.into());
         core.body = Sys::EntryReq(self).into();
-        let req = Ping::new(
+        let req = Wave::new( Ping::new(
             core,
-            Point::local_hypergate(),
-            Point::remote_entry_requester(),
+            Point::local_hypergate()),
+            Point::remote_entry_requester().to_port()
         );
         req
     }

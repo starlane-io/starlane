@@ -1,4 +1,4 @@
-use crate::star::{StarInjectTransmitter, StarSkel, TopicHandler};
+use crate::star::{LayerInjectionRouter, StarSkel, TopicHandler};
 use crate::state::ShellState;
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
@@ -12,18 +12,19 @@ use mesh_portal_versions::version::v0_0_1::id::{Traversal, TraversalInjection};
 use mesh_portal_versions::version::v0_0_1::log::RootLogger;
 use mesh_portal_versions::version::v0_0_1::parse::{command_line, Env};
 use mesh_portal_versions::version::v0_0_1::quota::Timeouts;
-use mesh_portal_versions::version::v0_0_1::wave::{Agent, PointRequestHandler, PointDirectedHandlerSelector, DirectedHandler, AsyncRequestHandlerRelay, AsyncRouter, Transmitter, InCtx, Ping, WaveXtra, DirectedHandler, Reflectable, ReflectedCore, Pong, RespXtra, RootInCtx, Wave, WaveXtra, ProtoTransmitter, DirectedCore, PingProto, SetStrategy};
+use mesh_portal_versions::version::v0_0_1::wave::{Agent, Ping, DirectedHandlerSelector, RecipientSelector, DirectedHandler, Reflectable, ReflectedCore, Pong, RootInCtx, Wave, ProtoTransmitter, DirectedCore, PingProto, SetStrategy, UltraWave, InCtx};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use cosmic_nom::new_span;
+use mesh_portal::version::latest::payload::Substance;
 use mesh_portal_versions::version::v0_0_1::command::Command;
 use mesh_portal_versions::version::v0_0_1::parse::error::result;
 use mesh_portal_versions::version::v0_0_1::util::ToResolved;
 
-#[derive(AsyncRequestHandler)]
+#[derive(DirectedHandler)]
 pub struct ShellEx {
     skel: StarSkel,
     state: ShellState,
@@ -41,7 +42,7 @@ impl TraversalLayer for ShellEx {
         &self.state.port
     }
 
-    async fn traverse_next(&self, traversal: Traversal<Wave>) {
+    async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
         self.skel.traverse_to_next.send(traversal).await;
     }
 
@@ -49,14 +50,14 @@ impl TraversalLayer for ShellEx {
         self.skel.inject_tx.send(inject).await;
     }
 
-    fn exchange(&self) -> &Arc<DashMap<Uuid, oneshot::Sender<Pong>>> {
-        &self.skel.exchange
+    fn exchanger(&self) -> &Arc<DashMap<Uuid, oneshot::Sender<Pong>>> {
+        &self.skel.exchanger
     }
 
-    async fn deliver_request(&self, request: Ping) {
+    async fn delivery_directed(&self, request: Ping) {
         let logger = self.skel.logger.point(request.to.point.clone()).span();
         let injector = request.from.clone().with_topic(Topic::None).with_layer(self.layer().clone());
-        let transmitter = Arc::new(StarInjectTransmitter::new(
+        let transmitter = Arc::new(LayerInjectionRouter::new(
             self.skel.clone(),
           injector.clone()
         ));
@@ -69,12 +70,12 @@ impl TraversalLayer for ShellEx {
         self.inject( TraversalInjection::new(injector,wave)).await;
     }
 
-    async fn request_fabric_bound(&self, traversal: Traversal<Ping>) {
+    async fn directed_fabric_bound(&self, traversal: Traversal<Ping>) {
         self.state.fabric_requests.insert(traversal.id.clone());
         self.traverse_next(traversal.wrap()).await;
     }
 
-    async fn response_core_bound(&self, traversal: Traversal<Pong>) {
+    async fn reflected_core_bound(&self, traversal: Traversal<Pong>) {
         if let Some(_) = self.state.fabric_requests.remove(&traversal.response_to) {
             self.traverse_next(traversal.wrap()).await;
         } else {
@@ -88,7 +89,7 @@ impl TraversalLayer for ShellEx {
 #[routes]
 impl ShellEx {
     #[route("Msg<NewCli>")]
-    pub async fn new_session(&self, ctx: InCtx<'_, Ping>) -> Result<Port, MsgErr> {
+    pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Port, MsgErr> {
         // only allow a cli session to be created by any layer of THIS particle
         if ctx.from.clone().to_point() != ctx.to.clone().to_point() {
             return Err(MsgErr::forbidden());
@@ -117,7 +118,7 @@ impl ShellEx {
     }
 }
 
-#[routes_async]
+#[routes]
 impl CliSession {
     #[route("Msg<Exec>")]
     pub async fn exec(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, MsgErr> {
@@ -135,7 +136,7 @@ impl CliSession {
     }
 }
 
-#[derive(AsyncRequestHandler)]
+#[derive(DirectedHandler)]
 pub struct CliSession {
     pub source_selector: PortSelector,
     pub env: Env,
@@ -149,14 +150,14 @@ impl TopicHandler for CliSession {
 }
 
 
-#[derive(AsyncRequestHandler)]
+#[derive(DirectedHandler)]
 pub struct CommandExecutor {
     port: Port,
     source: Port,
     env: Env,
 }
 
-#[routes_async]
+#[routes]
 impl CommandExecutor {
     pub fn new(port: Port, source: Port, env: Env) -> Self {
         Self {
@@ -179,6 +180,6 @@ impl CommandExecutor {
         let request: DirectedCore = command.into();
         let request = PingProto::from_core(request);
 
-        Pong::core_result(ctx.req(request).await)
+        Pong::core_result(ctx.ping(request).await)
     }
 }

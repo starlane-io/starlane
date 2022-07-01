@@ -25,7 +25,7 @@ use crate::version::v0_0_1::config::config::Document;
 use crate::version::v0_0_1::id::id::{Point, Port, Uuid};
 use core::str::FromStr;
 use std::ops::Deref;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use dashmap::{DashMap, DashSet};
 use crate::version::v0_0_1::security::Access;
 use crate::version::v0_0_1::substance::substance::Substance;
@@ -78,8 +78,19 @@ pub trait RegistryApi: Send + Sync {
     async fn locate(&self, particle: &Point) -> Result<ParticleRecord,MsgErr>;
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub enum DriverState {
-    None,
-    Substance(Substance)
+pub struct StateCache<C> where C: State {
+    pub states: Arc<DashMap<Point,Arc<RwLock<C>>>>
+}
+
+impl <C> StateCache<C> where C: State{
+
+}
+
+pub trait StateFactory{
+    fn create(&self) -> Box<dyn State>;
+}
+
+pub trait State {
+    fn deserialize<DS>( from: Vec<u8>) -> Result<DS,MsgErr> where DS: State, Self:Sized;
+    fn serialize( self ) -> Vec<u8>;
 }

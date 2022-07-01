@@ -4,7 +4,7 @@ use crate::star::StarSkel;
 use dashmap::DashMap;
 use mesh_portal_versions::version::v0_0_1::id::id::{Layer, Port, TraversalLayer, Uuid};
 use mesh_portal_versions::version::v0_0_1::id::Traversal;
-use mesh_portal_versions::version::v0_0_1::wave::{Ping, Pong, Wave};
+use mesh_portal_versions::version::v0_0_1::wave::{Exchanger, Ping, Pong, UltraWave, Wave};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot::Sender;
@@ -29,19 +29,19 @@ impl TraversalLayer for PortalInlet {
         todo!()
     }
 
-    async fn traverse_next(&self, traversal: Traversal<Wave>) {
+    async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
         todo!()
     }
 
-    async fn inject(&self, wave: Wave) {
+    async fn inject(&self, wave: UltraWave) {
         todo!()
     }
 
-    fn exchange(&self) -> &Arc<DashMap<Uuid, Sender<Pong>>> {
+    fn exchanger(&self) -> &Arc<DashMap<Uuid, Sender<Pong>>> {
         todo!()
     }
 
-    async fn deliver_request(&self, request: Ping) {
+    async fn delivery_directed(&self, request: Ping) {
         todo!()
     }
 }
@@ -69,15 +69,15 @@ impl TraversalLayer for TunnelOutlet {
         todo!()
     }
 
-    async fn traverse_next(&self, traversal: Traversal<Wave>) {
+    async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
         todo!()
     }
 
-    async fn inject(&self, wave: Wave) {
+    async fn inject(&self, wave: UltraWave) {
         todo!()
     }
 
-    fn exchange(&self) -> &Arc<DashMap<Uuid, Sender<Pong>>> {
+    fn exchanger(&self) -> &Arc<DashMap<Uuid, Sender<Pong>>> {
         todo!()
     }
 
@@ -100,19 +100,19 @@ impl TraversalLayer for TunnelInlet {
         todo!()
     }
 
-    async fn traverse_next(&self, traversal: Traversal<Wave>) {
+    async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
         todo!()
     }
 
-    async fn inject(&self, wave: Wave) {
+    async fn inject(&self, wave: UltraWave) {
         todo!()
     }
 
-    fn exchange(&self) -> &Arc<DashMap<Uuid, Sender<Pong>>> {
+    fn exchanger(&self) -> &Arc<DashMap<Uuid, Sender<Pong>>> {
         todo!()
     }
 
-    async fn deliver_request(&self, request: Ping) {
+    async fn delivery_directed(&self, request: Ping) {
         todo!()
     }
 }
@@ -124,6 +124,7 @@ pub struct PortalOutlet {
 
 impl PortalOutlet {
     pub fn new(skel: StarSkel, state: PortalOutletState) -> Self {
+        let skel = GuestSkel::from_star_skel(&skel);
         Self { skel, state }
     }
 }
@@ -134,19 +135,19 @@ impl TraversalLayer for PortalOutlet {
         todo!()
     }
 
-    async fn traverse_next(&self, traversal: Traversal<Wave>) {
+    async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
         todo!()
     }
 
-    async fn inject(&self, wave: Wave) {
+    async fn inject(&self, wave: UltraWave) {
         todo!()
     }
 
-    fn exchange(&self) -> &Arc<DashMap<Uuid, Sender<Pong>>> {
+    fn exchanger(&self) -> &Exchanger {
         todo!()
     }
 
-    async fn deliver_request(&self, request: Ping) {
+    async fn delivery_directed(&self, request: Ping) {
         todo!()
     }
 }
@@ -168,19 +169,19 @@ impl TraversalLayer for PortalShell {
         todo!()
     }
 
-    async fn traverse_next(&self, traversal: Traversal<Wave>) {
+    async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
         todo!()
     }
 
-    async fn inject(&self, wave: Wave) {
+    async fn inject(&self, wave: UltraWave) {
         todo!()
     }
 
-    fn exchange(&self) -> &Arc<DashMap<Uuid, Sender<Pong>>> {
+    fn exchanger(&self) -> &Exchanger {
         todo!()
     }
 
-    async fn deliver_request(&self, request: Ping) {
+    async fn delivery_directed(&self, request: Ping) {
         todo!()
     }
 }
