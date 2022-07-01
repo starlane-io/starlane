@@ -3,7 +3,7 @@ use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::id::{Point, Port, TargetLayer};
 use mesh_portal::version::latest::messaging::{Agent, RespShell};
-use mesh_portal_versions::version::v0_0_1::wave::{AsyncTransmitter, AsyncTransmitterWithAgent};
+use mesh_portal_versions::version::v0_0_1::wave::{Transmitter, AsyncTransmitterWithAgent};
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 use cosmic_portal_cli::Cli;
 use cosmic_portal_cli::CliSession;

@@ -24,9 +24,9 @@ use mesh_portal::version::latest::sys::{Assign, Sys};
 use mesh_portal_versions::version::v0_0_1::id::id::{Layer, ToPoint, ToPort};
 use mesh_portal_versions::version::v0_0_1::quota::Timeouts;
 use mesh_portal_versions::version::v0_0_1::wave::{
-    AsyncInternalRequestHandlers, AsyncPointRequestHandlers, AsyncRequestHandler,
-    AsyncRequestHandlerRelay, AsyncRouter, AsyncTransmitter, ProtoTransmitter, ReqShell, ReqXtra,
-    RequestHandlerRelay, Requestable, RespShell, RespXtra, WaitTime, Wave, WaveXtra,
+    PointRequestHandler, PointDirectedHandlerSelector, DirectedHandler,
+    AsyncRequestHandlerRelay, AsyncRouter, Transmitter, ProtoTransmitter, Ping, WaveXtra,
+    RequestHandlerRelay, Reflectable, Pong, RespXtra, WaitTime, Wave, WaveXtra,
 };
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -37,8 +37,8 @@ use tokio::sync::oneshot;
 pub struct PortalCore {
     pub port: Port,
     pub assigned: Arc<DashSet<Point>>,
-    pub transmitter: Arc<dyn AsyncTransmitter>,
-    pub handlers: AsyncInternalRequestHandlers<AsyncRequestHandlerRelay>,
+    pub transmitter: Arc<dyn Transmitter>,
+    pub handlers: PointRequestHandler<AsyncRequestHandlerRelay>,
 }
 
 impl PortalCore {
@@ -77,7 +77,7 @@ impl PortalCore {
         let (point, mut outlet_rx) = listen_for_point(outlet_rx).await?;
         assigned.insert(point.clone());
 
-        let handlers = AsyncInternalRequestHandlers::new();
+        let handlers = PointRequestHandler::new();
 
         let mut port = point.to_port().with_layer(Layer::Core);
 
@@ -112,7 +112,7 @@ impl PortalCore {
 
 pub struct PortalTransmitter {
     inlet_tx: mpsc::Sender<Wave>,
-    exchanges: Arc<DashMap<Uuid, oneshot::Sender<RespShell>>>,
+    exchanges: Arc<DashMap<Uuid, oneshot::Sender<Pong>>>,
     assigned: Arc<DashSet<Point>>,
     timeouts: Timeouts,
 }
@@ -129,8 +129,8 @@ impl PortalTransmitter {
 }
 
 #[async_trait]
-impl AsyncTransmitter for PortalTransmitter {
-    async fn req(&self, request: ReqShell) -> RespShell {
+impl Transmitter for PortalTransmitter {
+    async fn direct(&self, request: Ping) -> Pong {
         if !self.assigned.contains(&request.from.clone().to_point()) {
             return request.forbidden();
         }
@@ -163,25 +163,25 @@ pub trait PortalCtrlFactory: Send + Sync {
         &self,
         assign: Assign,
         tx: ProtoTransmitter,
-    ) -> Result<Box<dyn AsyncRequestHandler>, MsgErr>;
+    ) -> Result<Box<dyn DirectedHandler>, MsgErr>;
 }
 
 #[derive(AsyncRequestHandler)]
 pub struct PortalRequestHandler {
     factory: Box<dyn PortalCtrlFactory>,
-    handlers: AsyncPointRequestHandlers,
-    messenger: Arc<dyn AsyncTransmitter>,
+    handlers: PointDirectedHandlerSelector,
+    messenger: Arc<dyn Transmitter>,
 }
 
 #[routes_async(self.handlers)]
 impl PortalRequestHandler {
     pub fn new(
-        transmitter: Arc<dyn AsyncTransmitter>,
+        transmitter: Arc<dyn Transmitter>,
         factory: Box<dyn PortalCtrlFactory>,
     ) -> Self {
         Self {
             factory,
-            handlers: AsyncPointRequestHandlers::new(),
+            handlers: PointDirectedHandlerSelector::new(),
             messenger: transmitter,
         }
     }

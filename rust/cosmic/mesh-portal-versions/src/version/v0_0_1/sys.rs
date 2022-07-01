@@ -6,7 +6,7 @@ use cosmic_macros_primitive::Autobox;
 
 use crate::version::v0_0_1::command::command::common::StateSrc;
 use crate::version::v0_0_1::log::Log;
-use crate::version::v0_0_1::wave::{ReqCore, ReqShell, SysMethod, Wave};
+use crate::version::v0_0_1::wave::{DirectedCore, Ping, SysMethod, Wave};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
@@ -119,10 +119,10 @@ pub enum Sys {
     EntryReq(EntryReq),
 }
 
-impl TryFrom<ReqShell> for Assign {
+impl TryFrom<Ping> for Assign {
     type Error = MsgErr;
 
-    fn try_from(request: ReqShell) -> Result<Self, Self::Error> {
+    fn try_from(request: Ping) -> Result<Self, Self::Error> {
         if let Substance::Sys(Sys::Assign(assign)) = request.core.body {
             Ok(assign)
         } else {
@@ -137,9 +137,9 @@ impl Into<Substance> for Assign {
     }
 }
 
-impl Into<ReqCore> for Assign {
-    fn into(self) -> ReqCore {
-        ReqCore::new(SysMethod::Assign.into()).with_body(Substance::Sys(Sys::Assign(self)))
+impl Into<DirectedCore> for Assign {
+    fn into(self) -> DirectedCore {
+        DirectedCore::new(SysMethod::Assign.into()).with_body(Substance::Sys(Sys::Assign(self)))
     }
 }
 
@@ -167,11 +167,11 @@ pub struct EntryReq {
     pub remote: Option<Point>,
 }
 
-impl Into<ReqShell> for EntryReq {
-    fn into(self) -> ReqShell {
-        let mut core = ReqCore::new(SysMethod::EntryReq.into());
+impl Into<Ping> for EntryReq {
+    fn into(self) -> Ping {
+        let mut core = DirectedCore::new(SysMethod::EntryReq.into());
         core.body = Sys::EntryReq(self).into();
-        let req = ReqShell::new(
+        let req = Ping::new(
             core,
             Point::local_hypergate(),
             Point::remote_entry_requester(),

@@ -22,7 +22,7 @@ use mesh_portal::version::latest::messaging::ReqShell;
 use mesh_portal::version::latest::sys::Assign;
 use mesh_portal_versions::version::v0_0_1::id::{ArtifactSubKind, FileSubKind};
 use mesh_portal_versions::version::v0_0_1::id::id::{Kind, BaseKind};
-use mesh_portal_versions::version::v0_0_1::wave::ReqProto;
+use mesh_portal_versions::version::v0_0_1::wave::PingProto;
 
 #[derive(Debug)]
 pub struct FileCoreManager {

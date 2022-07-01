@@ -1,12 +1,14 @@
-use crate::field::FieldState;
+use mesh_portal_versions::DriverState;
 use crate::portal::PortalInlet;
 use dashmap::DashSet;
 use mesh_portal_versions::version::v0_0_1::id::id::{Point, Uuid};
 use mesh_portal_versions::version::v0_0_1::particle::particle::Details;
 use std::sync::Arc;
 use mesh_portal::version::latest::payload::Substance;
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
 use mesh_portal::version::latest::id::Port;
+use mesh_portal_versions::version::v0_0_1::id::id;
+use crate::field::FieldState;
 
 /// includes states for layers [ Field, Shell & Driver ]
 #[derive(Clone)]
@@ -43,25 +45,19 @@ impl ParticleStates {
 
 #[derive(Clone)]
 pub struct ShellState {
-    pub port: Port,
+    pub port: id::Port,
     pub core_requests: Arc<DashSet<Uuid>>,
     pub fabric_requests: Arc<DashSet<Uuid>>,
 }
 
 impl ShellState {
-    pub fn new(port: Port) -> Self {
+    pub fn new(port: id::Port) -> Self {
         Self {
             port,
             core_requests: Arc::new(DashSet::new()),
             fabric_requests: Arc::new(DashSet::new()),
         }
     }
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub enum DriverState {
-    None,
-    Substance(Substance)
 }
 
 #[derive(Clone)]

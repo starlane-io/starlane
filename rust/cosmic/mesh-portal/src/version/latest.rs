@@ -54,7 +54,7 @@ pub mod selector {
 
     pub type GenericKindSelector = selector::selector::KindBaseSelector;
     pub type GenericSubKindSelector = selector::selector::SubKindSelector;
-    pub type PointSelector = selector::selector::PointSelector;
+    pub type PointSelector = selector::selector::Selector;
     pub type KindSelector = selector::selector::KindSelector;
     pub type VersionReq = selector::selector::VersionReq;
     pub type PointSegSelector = selector::selector::PointSegSelector;
@@ -92,13 +92,13 @@ pub mod messaging {
     use mesh_portal_versions::version::v0_0_1 as current;
     use mesh_portal_versions::version::v0_0_1::wave;
 
-    pub type RequestHandler = dyn wave::RequestHandler;
-    pub type ReqCtx<'a, R> = wave::InCtx<'a, R>;
+    pub type RequestHandler = dyn wave::DirectedHandler;
+    pub type ReqCtx<'a, I, R> = wave::InCtx<'a,I, R>;
     pub type RootRequestCtx<R> = wave::RootInCtx<R>;
-    pub type ReqShell = wave::ReqShell;
-    pub type RespShell = wave::RespShell;
+    pub type ReqShell = wave::Ping;
+    pub type RespShell = wave::Pong;
     pub type RequestBuilder = wave::ReqBuilder;
-    pub type ReqProto = wave::ReqProto;
+    pub type ReqProto = wave::PingProto;
     pub type Message = wave::Wave;
     pub type Agent = wave::Agent;
     pub type Session = wave::Session;
@@ -263,7 +263,7 @@ pub mod entity {
         use mesh_portal_versions::version::{v0_0_1 as current, v0_0_1};
 
         pub type Method = v0_0_1::wave::Method;
-        pub type ReqCore = v0_0_1::wave::ReqCore;
+        pub type ReqCore = v0_0_1::wave::DirectedCore;
         pub type Rc = command::request::Rc;
         pub type RcCommandType = command::request::RcCommandType;
 
@@ -329,7 +329,7 @@ pub mod entity {
         use mesh_portal_versions::version::v0_0_1::entity;
         use mesh_portal_versions::version::{v0_0_1 as current, v0_0_1};
 
-        pub type RespCore = v0_0_1::wave::RespCore;
+        pub type RespCore = v0_0_1::wave::ReflectedCore;
     }
 }
 

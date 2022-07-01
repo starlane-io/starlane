@@ -22,10 +22,15 @@ pub mod version;
 use crate::error::MsgErr;
 use crate::version::v0_0_1::config::config::bind::BindConfig;
 use crate::version::v0_0_1::config::config::Document;
-use crate::version::v0_0_1::id::id::Point;
+use crate::version::v0_0_1::id::id::{Point, Port, Uuid};
 use core::str::FromStr;
 use std::ops::Deref;
 use std::sync::Arc;
+use dashmap::{DashMap, DashSet};
+use crate::version::v0_0_1::security::Access;
+use crate::version::v0_0_1::substance::substance::Substance;
+use crate::version::v0_0_1::sys::ParticleRecord;
+use crate::version::v0_0_1::wave::Agent;
 
 lazy_static! {
     pub static ref VERSION: semver::Version = semver::Version::from_str("1.0.0").unwrap();
@@ -65,4 +70,16 @@ impl<A> Drop for ArtRef<A> {
 mod tests {
     #[test]
     fn it_works() {}
+}
+
+#[async_trait]
+pub trait RegistryApi: Send + Sync {
+    async fn access(&self, to: &Agent, on: &Point) -> Result<Access,MsgErr>;
+    async fn locate(&self, particle: &Point) -> Result<ParticleRecord,MsgErr>;
+}
+
+#[derive(Clone,Serialize,Deserialize)]
+pub enum DriverState {
+    None,
+    Substance(Substance)
 }

@@ -5,7 +5,7 @@
     pub mod response {
         use crate::error::{MsgErr, StatusErr};
         use crate::version::v0_0_1::bin::Bin;
-        use crate::version::v0_0_1::wave::ReqCore;
+        use crate::version::v0_0_1::wave::DirectedCore;
         use crate::version::v0_0_1::fail;
         use crate::version::v0_0_1::fail::Fail;
         use crate::version::v0_0_1::id::id::{KindParts, Meta, Point, ToPort};

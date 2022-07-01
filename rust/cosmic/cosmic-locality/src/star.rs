@@ -1,19 +1,15 @@
 use crate::driver::Drivers;
-use crate::field::{FieldEx, FieldState, RegistryApi};
+use crate::field::{FieldEx, FieldState};
 use crate::machine::MachineSkel;
 use crate::portal::{PortalInlet, PortalShell};
 use crate::shell::ShellEx;
-use crate::state::{
-    DriverState, ParticleStates, PortalInletState, PortalShellState, ShellState,
-};
-use mesh_portal_versions::version::v0_0_1::wave::{HyperWave, ReqCore, SysMethod};
+use crate::state::{ParticleStates, PortalInletState, PortalShellState, ShellState};
+use mesh_portal_versions::version::v0_0_1::wave::{HyperWave, DirectedCore, SysMethod};
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
 use mesh_portal_versions::error::MsgErr;
 use mesh_portal_versions::version::v0_0_1::cli::RawCommand;
-use mesh_portal_versions::version::v0_0_1::id::id::{
-    Layer, Point, Port, PortSelector, RouteSeg, ToPoint, ToPort, Topic, TraversalLayer, Uuid,
-};
+use mesh_portal_versions::version::v0_0_1::id::id::{Kind, Layer, Point, Port, PortSelector, RouteSeg, Topic, ToPoint, ToPort, TraversalLayer, Uuid};
 use mesh_portal_versions::version::v0_0_1::id::{StarKey, StarSub, TraversalInjection};
 use mesh_portal_versions::version::v0_0_1::id::{Traversal, TraversalDirection};
 use mesh_portal_versions::version::v0_0_1::log::PointLogger;
@@ -22,7 +18,7 @@ use mesh_portal_versions::version::v0_0_1::quota::Timeouts;
 use mesh_portal_versions::version::v0_0_1::substance::substance::Substance;
 use mesh_portal_versions::version::v0_0_1::sys::{Assign, Sys};
 use mesh_portal_versions::version::v0_0_1::util::ValueMatcher;
-use mesh_portal_versions::version::v0_0_1::wave::{Agent, AsyncRequestHandler, AsyncTransmitter, InCtx, ProtoTransmitter, ReqShell, Requestable, RespCore, RespShell, RootInCtx, Router, SetStrategy, Wave};
+use mesh_portal_versions::version::v0_0_1::wave::{Agent, DirectedHandler, Transmitter, InCtx, ProtoTransmitter, Ping, Reflectable, ReflectedCore, Pong, RootInCtx, Router, SetStrategy, Wave};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
@@ -33,13 +29,14 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::time::error::Elapsed;
 use mesh_portal::version::latest::messaging::Scope;
 use mesh_portal::version::latest::util::uuid;
+use mesh_portal_versions::{DriverState, RegistryApi};
 use mesh_portal_versions::version::v0_0_1::bin::Bin;
 
 #[derive(Clone)]
 pub struct StarState {
     pub field: Arc<DashMap<Point, FieldState>>,
     pub shell: Arc<DashMap<Point, ShellState>>,
-    pub driver: Arc<DashMap<Point, DriverState>>,
+    pub driver: Arc<DashMap<Kind,Arc<DashMap<Point, DriverState>>>>,
     pub portal_inlet: Arc<DashMap<Point, PortalInletState>>,
     pub portal_shell: Arc<DashMap<Point, PortalShellState>>,
     pub topic: Arc<DashMap<Port, Box<dyn TopicHandler>>>,
@@ -142,12 +139,12 @@ pub struct StarSkel {
     pub inject_tx: mpsc::Sender<TraversalInjection>,
     pub fabric: mpsc::Sender<Wave>,
     pub machine: MachineSkel,
-    pub exchange: Arc<DashMap<Uuid, oneshot::Sender<RespShell>>>,
+    pub exchange: Arc<DashMap<Uuid, oneshot::Sender<Pong>>>,
     pub state: StarState,
 }
 
 impl StarSkel {
-    pub fn point(&self) -> &Point {
+    pub fn location(&self) -> &Point {
         &self.logger.point
     }
 }
@@ -220,12 +217,7 @@ pub struct Star {
 
 impl Star {
     pub fn new(skel: StarSkel, mut call_rx: mpsc::Receiver<StarCall>, drivers: Drivers) {
-        // not sure I should be using this Transmitter
-        let mut transmitter = ProtoTransmitter::new(Arc::new(StarInjectTransmitter::new(skel.clone(), Layer::Field )));
-        transmitter.from=SetStrategy::Fill(skel.point().clone().to_port());
-        transmitter.agent=SetStrategy::Fill(Agent::Anonymous);
-
-        let mut injector = skel.point().clone().push("injector").unwrap().to_port();
+        let mut injector = skel.location().clone().push("injector").unwrap().to_port();
         injector.layer = Layer::Surface;
 
         let star = Self {
@@ -268,7 +260,7 @@ impl Star {
             }
         };
 
-        if record.location != *self.skel.point() {
+        if record.location != *self.skel.location() {
             // need to send a not_found to sender... even if the wave type was Response!
             self.skel.logger.warn("attempt to send a wave to a point that is not hosted by this star");
             return;
@@ -276,16 +268,16 @@ impl Star {
 
         // first check if this wave was intended for the star itself... if it was
         // we will need to keep the HyperWave data
-        let wave = if wave.to().point == *self.skel.point() {
+        let wave = if wave.to().point == *self.skel.location() {
             if wave.wave.is_req() {
-                let req = ReqShell {
+                let req = Ping {
                     id: uuid(),
-                    agent: Agent::Point(self.skel.point().clone()),
+                    agent: Agent::Point(self.skel.location().clone()),
                     scope: Scope::Full,
                     handling: Default::default(),
-                    from: self.skel.point().clone().to_port().with_layer(Layer::Surface),
-                    to: self.skel.point().clone().to_port().with_layer(Layer::Core),
-                    core: ReqCore {
+                    from: self.skel.location().clone().to_port().with_layer(Layer::Surface),
+                    to: self.skel.location().clone().to_port().with_layer(Layer::Core),
+                    core: DirectedCore {
                         headers: Default::default(),
                         method: SysMethod::HyperWave.into(),
                         uri: Default::default(),
@@ -317,6 +309,7 @@ impl Star {
             Ok(record) => record,
             Err(err) => {
                 self.skel.logger.error( err.to_string() );
+                return;
             }
         };
 
@@ -326,7 +319,7 @@ impl Star {
         let mut dest = None;
         let mut dir = TraversalDirection::Core;
         // determine layer destination. A dest of None will send all the way to the Fabric or Core
-        if location == *self.skel.point()  {
+        if location == *self.skel.location()  {
 
             // now we check if we are doing an inter point delivery (from one layer to another in the same Particle)
             if wave.to().point == wave.from().point {
@@ -371,7 +364,7 @@ impl Star {
         // next we determine the direction of the traversal
 
         // if the recipient is not even in this star, traverse towards fabric
-        if location != *self.skel.point() {
+        if location != *self.skel.location() {
             TraversalDirection::Fabric
         }
         // if the recipient and from are the same perform a normal traversal
@@ -517,7 +510,7 @@ impl Star {
 #[routes_async]
 impl Star {
     #[route("Sys<Assign>")]
-    pub async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<RespCore, MsgErr> {
+    pub async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, MsgErr> {
         self.drivers.assign(ctx).await
     }
 }
@@ -535,8 +528,8 @@ impl StarInjectTransmitter {
 }
 
 #[async_trait]
-impl AsyncTransmitter for StarInjectTransmitter {
-    async fn req(&self, request: ReqShell) -> Result<RespShell,MsgErr> {
+impl Transmitter for StarInjectTransmitter {
+    async fn direct(&self, request: Ping) -> Result<Pong,MsgErr> {
         let (tx,mut rx) = oneshot::channel();
         self.skel.exchange.insert( request.id.clone(), tx );
         Ok(tokio::time::timeout(Duration::from_secs(self.skel.machine.timeouts.from(&request.handling.wait) ), rx).await??)
@@ -548,7 +541,7 @@ impl AsyncTransmitter for StarInjectTransmitter {
     }
 }
 
-pub trait TopicHandler: Send + Sync + AsyncRequestHandler {
+pub trait TopicHandler: Send + Sync + DirectedHandler {
     fn source_selector(&self) -> &PortSelector;
 }
 

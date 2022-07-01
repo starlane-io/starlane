@@ -82,7 +82,7 @@ pub mod config {
         use crate::version::v0_0_1::id::id::{Point, PointCtx, PointVar, Topic};
         use crate::version::v0_0_1::substance::substance::{Call, CallDef};
         use crate::version::v0_0_1::substance::substance::{Substance, SubstancePattern};
-        use crate::version::v0_0_1::wave::{MethodKind, MethodPattern, ReqCore, ReqShell};
+        use crate::version::v0_0_1::wave::{MethodKind, MethodPattern, DirectedCore, Ping, RecipientSelector};
 
         use crate::version::v0_0_1::parse::model::{
             BindScope, MessageScope, MethodScope, PipelineSegment, PipelineSegmentDef, PipelineVar,
@@ -119,7 +119,7 @@ pub mod config {
                 scopes
             }
 
-            pub fn select(&self, request: &ReqShell) -> Result<&MethodScope, MsgErr> {
+            pub fn select(&self, request: &Ping) -> Result<&MethodScope, MsgErr> {
                 for route_scope in self.route_scopes() {
                     if route_scope.selector.is_match(request).is_ok() {
                         for message_scope in &route_scope.block {
@@ -386,15 +386,15 @@ pub mod config {
                 }
             }
 
-            pub fn is_match(&self, request: &ReqShell) -> Result<(), ()> {
+            pub fn is_match<'a>(&self, select: &'a RecipientSelector) -> Result<(), ()> {
                 if let Some(topic) = &self.topic {
-                    topic.is_match(&request.from.topic)?;
-                } else if Topic::None != request.from.topic {
+                    topic.is_match(&select.to.topic)?;
+                } else if Topic::None != select.wave.from.topic {
                     return Err(());
                 }
 
-                self.method.is_match(&request.core.method)?;
-                match self.path.is_match(request.core.uri.path()) {
+                self.method.is_match(&select.wave.core().method)?;
+                match self.path.is_match(&select.wave.core().uri.path()) {
                     true => Ok(()),
                     false => Err(()),
                 }

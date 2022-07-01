@@ -5,7 +5,7 @@ use std::string::FromUtf8Error;
 
 use crate::version::v0_0_1::parse::error::find_parse_err;
 use crate::version::v0_0_1::substance::substance::{Errors, Substance};
-use crate::version::v0_0_1::wave::RespCore;
+use crate::version::v0_0_1::wave::ReflectedCore;
 use ariadne::{Label, Report, ReportBuilder, ReportKind, Source};
 use cosmic_nom::Span;
 use cosmic_nom::SpanExtra;
@@ -29,15 +29,15 @@ pub enum MsgErr {
     ParseErrs(ParseErrs),
 }
 
-impl Into<RespCore> for MsgErr {
-    fn into(self) -> RespCore {
+impl Into<ReflectedCore> for MsgErr {
+    fn into(self) -> ReflectedCore {
         match self {
-            MsgErr::Status { status, message } => RespCore {
+            MsgErr::Status { status, message } => ReflectedCore {
                 headers: Default::default(),
                 status: StatusCode::from_u16(status).unwrap_or(StatusCode::from_u16(500).unwrap()),
                 body: Substance::Errors(Errors::default(message.as_str())),
             },
-            MsgErr::ParseErrs(_) => RespCore {
+            MsgErr::ParseErrs(_) => ReflectedCore {
                 headers: Default::default(),
                 status: StatusCode::from_u16(500u16).unwrap_or(StatusCode::from_u16(500).unwrap()),
                 body: Substance::Errors(Errors::default("parsing error...")),

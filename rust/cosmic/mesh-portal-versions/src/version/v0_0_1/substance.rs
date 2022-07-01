@@ -17,10 +17,10 @@ pub mod substance {
     use crate::version::v0_0_1::parse::model::Subst;
     use crate::version::v0_0_1::parse::{CtxResolver, Env};
     use crate::version::v0_0_1::particle::particle::{Particle, Status, Stub};
-    use crate::version::v0_0_1::selector::selector::{KindSelector, PointSelector};
+    use crate::version::v0_0_1::selector::selector::{KindSelector, Selector};
     use crate::version::v0_0_1::sys::Sys;
     use crate::version::v0_0_1::util::{uuid, ToResolved, ValueMatcher, ValuePattern};
-    use crate::version::v0_0_1::wave::{HyperWave, Method, ReqCore, RespCore, RespShell, Wave};
+    use crate::version::v0_0_1::wave::{HyperWave, Method, DirectedCore, ReflectedCore, Pong, Wave};
     use cosmic_macros_primitive::Autobox;
     use cosmic_nom::Tw;
     use http::header::CONTENT_TYPE;
@@ -88,8 +88,8 @@ pub mod substance {
         Errors(Errors),
         Json(Value),
         MultipartForm(MultipartForm),
-        ReqCore(Box<ReqCore>),
-        RespCore(Box<RespCore>),
+        ReqCore(Box<DirectedCore>),
+        RespCore(Box<ReflectedCore>),
         Sys(Sys),
         Token(Token),
         Wave(Box<Wave>),
@@ -135,17 +135,17 @@ pub mod substance {
         }
     }
 
-    impl TryFrom<RespShell> for Token {
+    impl TryFrom<Pong> for Token {
         type Error = MsgErr;
 
-        fn try_from(response: RespShell) -> Result<Self, Self::Error> {
+        fn try_from(response: Pong) -> Result<Self, Self::Error> {
             response.core.body.try_into()
         }
     }
 
     pub trait ToRequestCore {
         type Method;
-        fn to_request_core(self) -> ReqCore;
+        fn to_request_core(self) -> DirectedCore;
     }
 
     impl Default for Substance {
@@ -1036,7 +1036,7 @@ pub mod substance {
     impl ToRequestCore for MultipartForm {
         type Method = HttpMethod;
 
-        fn to_request_core(self) -> ReqCore {
+        fn to_request_core(self) -> DirectedCore {
             let mut headers = HeaderMap::new();
 
             headers.insert(
@@ -1044,7 +1044,7 @@ pub mod substance {
                 HeaderValue::from_static("application/x-www-form-urlencoded"),
             );
 
-            ReqCore {
+            DirectedCore {
                 headers,
                 method: HttpMethod::Post.into(),
                 uri: Default::default(),

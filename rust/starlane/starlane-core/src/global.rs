@@ -9,7 +9,7 @@ use mesh_portal_versions::version::v0_0_1::id::id::Port;
 use mesh_portal_versions::version::v0_0_1::id::id::ToPort;
 use mesh_portal_versions::version::v0_0_1::service::Global;
 use mesh_portal_versions::version::v0_0_1::wave::{
-    AsyncTransmitter, AsyncTransmitterWithAgent, Method,
+    Transmitter, AsyncTransmitterWithAgent, Method,
 };
 use std::str::FromStr;
 use std::sync::Arc;
@@ -23,7 +23,7 @@ lazy_static! {
 #[derive(Clone)]
 pub struct GlobalApi {
     registry: RegistryApi,
-    transmitter: Arc<dyn AsyncTransmitter>,
+    transmitter: Arc<dyn Transmitter>,
 }
 
 #[async_trait]
@@ -37,7 +37,7 @@ impl Global for GlobalApi {
     }
 }
 impl GlobalApi {
-    pub fn new(registry: RegistryApi, transmitter: Arc<dyn AsyncTransmitter>) -> Self {
+    pub fn new(registry: RegistryApi, transmitter: Arc<dyn Transmitter>) -> Self {
         //let transmitter = AsyncTransmitterWithAgent::new( Agent::Point(Point::global_executor()), Point::global_executor().to_port(), transmitter );
         Self {
             registry,
@@ -55,7 +55,7 @@ impl GlobalApi {
                                 let mut response = {
                                     let mut request = request.clone();
                                     request.to = create.template.point.parent.clone().to_port();
-                                    global.transmitter.req(request).await
+                                    global.transmitter.direct(request).await
                                 };
                                 response.from = Point::global_executor().to_port();
                                 Ok(response)

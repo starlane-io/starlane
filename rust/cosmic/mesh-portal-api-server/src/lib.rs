@@ -36,7 +36,7 @@ use mesh_portal::version::latest::sys::{Assign, Sys};
 use mesh_portal_versions::error::MsgErr;
 use mesh_portal_versions::version::v0_0_1::id::id::{Layer, ToPoint, ToPort};
 use mesh_portal_versions::version::v0_0_1::wave::{
-    AsyncRequestHandler, AsyncRouter, AsyncTransmitter, MethodKind, Requestable, RespCore,
+    DirectedHandler, AsyncRouter, Transmitter, MethodKind, Reflectable, ReflectedCore,
     RespXtra, RootInCtx, Wave, WaveXtra,
 };
 use std::fmt::Debug;
@@ -70,7 +70,7 @@ pub struct Portal {
     pub logger: RootLogger,
     broadcast_tx: broadcast::Sender<PortalEvent>,
     point: Point,
-    transmitter: Arc<dyn AsyncTransmitter>,
+    transmitter: Arc<dyn Transmitter>,
     assigned: Arc<DashSet<Point>>,
 }
 
@@ -82,7 +82,7 @@ impl Portal {
         broadcast_tx: broadcast::Sender<PortalEvent>,
         logger: RootLogger,
         point: Point,
-        transmitter: Arc<dyn AsyncTransmitter>,
+        transmitter: Arc<dyn Transmitter>,
     ) -> (Self, mpsc::Sender<WaveXtra>) {
         let (inlet_tx, mut inlet_rx): (mpsc::Sender<WaveXtra>, mpsc::Receiver<WaveXtra>) =
             mpsc::channel(1024);
@@ -102,7 +102,7 @@ impl Portal {
                                     let stub = request.as_stub();
                                     match tokio::time::timeout(
                                         Duration::from_secs(config.response_timeout),
-                                        transmitter.req(request),
+                                        transmitter.direct(request),
                                     )
                                     .await
                                     {
@@ -174,7 +174,7 @@ impl Portal {
         let stub = request.as_stub();
         match tokio::time::timeout(
             Duration::from_secs(self.config.response_timeout),
-            self.transmitter.req(request),
+            self.transmitter.direct(request),
         )
         .await
         {

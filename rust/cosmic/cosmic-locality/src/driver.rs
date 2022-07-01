@@ -1,7 +1,7 @@
-use crate::field::RegistryApi;
+use mesh_portal_versions::RegistryApi;
 use crate::machine::MachineSkel;
 use crate::star::StarSkel;
-use crate::state::DriverState;
+use mesh_portal_versions::DriverState;
 use dashmap::DashMap;
 use mesh_portal_versions::error::MsgErr;
 use mesh_portal_versions::version::v0_0_1::id::id::{Kind, Layer, ToPoint, TraversalLayer, Uuid};
@@ -11,7 +11,7 @@ use mesh_portal_versions::version::v0_0_1::particle::particle::Status;
 use mesh_portal_versions::version::v0_0_1::substance::substance::Substance;
 use mesh_portal_versions::version::v0_0_1::sys::{Assign, Sys};
 use mesh_portal_versions::version::v0_0_1::wave::{
-    AsyncRequestHandler, InCtx, ReqShell, RespCore, RespShell, Wave,
+    DirectedHandler, InCtx, Ping, ReflectedCore, Pong, Wave,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -23,24 +23,25 @@ use mesh_portal::version::latest::id::{Point, Port};
 #[derive(AsyncRequestHandler)]
 pub struct Drivers {
     pub skel: StarSkel,
-    pub drivers: HashMap<Kind, Arc<dyn DriverCore>>,
+    pub drivers: HashMap<Kind, mpsc::Sender<DriverCall>>,
 }
 
 impl Drivers {
-    pub fn new(skel: StarSkel, drivers: HashMap<Kind, Arc<dyn DriverCore>>) -> Self {
+    pub fn new(skel: StarSkel, drivers: HashMap<Kind, mpsc::Sender<DriverCall>>) -> Self {
         Self { skel, drivers }
     }
 
-    pub fn init(&self) -> Result<(), MsgErr> {
+    pub async fn init(&self) -> Result<(), MsgErr> {
         let mut errs = vec![];
         for driver in self.drivers.values() {
-            if driver.status() != DriverStatus::Ready
-                && driver.status() != DriverStatus::Initializing
+            let status = driver.status().await;
+            if status != DriverStatus::Ready
+                && status != DriverStatus::Initializing
             {
                 driver.lifecycle(DriverLifecycleCall::Init);
             }
 
-            if driver.status() != DriverStatus::Ready {
+            if driver.status().await != DriverStatus::Ready {
                 errs.push(MsgErr::server_error());
             }
         }
@@ -55,7 +56,7 @@ impl Drivers {
 }
 
 impl Drivers {
-    pub async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<RespCore, MsgErr> {
+    pub async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, MsgErr> {
         if let Sys::Assign(assign) = &ctx.input {
             match self.drivers.get(&assign.details.stub.kind) {
                 None => Err(format!(
@@ -67,14 +68,10 @@ impl Drivers {
                     let ctx = ctx.push_input_ref( assign );
                     let state = tokio::time::timeout(
                         Duration::from_secs(self.skel.machine.timeouts.high),
-                        driver.assign(assign),
+                        driver.assign(ctx).await,
                     )
                     .await??;
-                    self.skel
-                        .state
-                        .driver
-                        .insert(ctx.get_request().to.clone().to_point(), state);
-                    Ok(ctx.get_request().core.ok())
+                   Ok(ctx.wave().core.ok())
                 }
             }
         } else {
@@ -82,11 +79,15 @@ impl Drivers {
         }
     }
 
-    async fn traverse_next(&self, traversal: Traversal<Wave>) {
+    async fn start_outer_traversal(&self, traversal: Traversal<Wave>) {
         self.skel.traverse_to_next.send(traversal).await;
     }
 
-    async fn visit(&self, traversal: Traversal<Wave>) {
+    async fn start_inner_traversal(&self, traversal: Traversal<Wave>) {
+    }
+
+
+    pub async fn visit(&self, traversal: Traversal<Wave>) {
         if traversal.dir.is_core() {
             match self.drivers.get(&traversal.record.details.stub.kind) {
                 None => {
@@ -96,11 +97,12 @@ impl Drivers {
                     ));
                 }
                 Some(driver) => {
-                    driver.visit(traversal).await;
+                    let driver_ex = driver.ex(&traversal.to().point, DriverState::None );
+                    driver_ex.visit(traversal).await;
                 }
             }
         } else {
-            self.traverse_next(traversal).await;
+            self.start_outer_traversal(traversal).await;
         }
     }
 }
@@ -112,48 +114,38 @@ pub struct DriversBuilder {
 
 impl DriversBuilder {
     pub fn add(&mut self, factory: Box<dyn DriverFactory>) {
-        self.factories.insert(factory.kind(), factory);
+        self.factories.insert(factory.kind().clone(), factory);
     }
 
     pub fn logger(&mut self, logger: PointLogger) {
         self.logger.replace(logger);
     }
 
-    pub fn build(self, skel: DriverSkel) -> Result<Drivers, MsgErr> {
+    pub fn build(self, skel: StarSkel) -> Result<Drivers, MsgErr> {
         if self.logger.is_none() {
             return Err("expected point logger to be set".into());
         }
         let mut drivers = HashMap::new();
         for factory in self.factories.values() {
-            drivers.insert(factory.kind(), factory.create(skel.clone()));
+            let point = skel.location().clone().push(factory.kind().as_point_segments() ).unwrap();
+            let driver_skel = DriverSkel::new( skel.clone(), point );
+            let core = factory.create(driver_skel);
+            let shell = DriverShell::new(skel.clone(), core);
+            drivers.insert(factory.kind().clone(), shell);
         }
         Ok(Drivers::new(skel, drivers))
     }
 }
 
 pub trait DriverFactory {
-    fn kind(&self) -> Kind;
+    fn kind(&self) -> &Kind;
     fn create(&self, skel: DriverSkel) -> Box<dyn DriverCore>;
 }
 
 enum DriverCall {
     LifecycleCall(DriverLifecycleCall),
     Traversal(Traversal<Wave>),
-    Handle(ReqShell)
-}
-
-pub struct DriverApi {
-    pub skel: StarSkel,
-    pub kind: Kind,
-    driver_tx: mpsc::Sender<DriverCall>
-}
-
-impl DriverApi {
-    pub fn new(skel: StarSkel, point: Point, factory: Arc<dyn DriverFactory> ) -> DriverApi {
-        let driver_skel = DriverSkel::new(point,skel.clone());
-        let core = factory.create(driver_skel);
-        let shell = DriverShell::new(core);
-    }
+    Handle(Ping)
 }
 
 pub struct DriverEx {
@@ -177,7 +169,7 @@ impl TraversalLayer for DriverEx {
         self.skel.inject_tx.send(inject).await;
     }
 
-    fn exchange(&self) -> &Arc<DashMap<Uuid, oneshot::Sender<RespShell>>> {
+    fn exchange(&self) -> &Arc<DashMap<Uuid, oneshot::Sender<Pong>>> {
         &self.skel.exchange
     }
 }
@@ -186,23 +178,27 @@ impl TraversalLayer for DriverEx {
 pub struct DriverShell {
     skel: StarSkel,
     status: DriverStatus,
-    states: HashMap<Point,Arc<DriverState>>,
-    core: Box<dyn DriverCore>,
+    states: Arc<DashMap<Point,DriverState>>,
     tx: mpsc::Sender<DriverCall>,
-    rx: mpsc::Receiver<DriverCall>
+    rx: mpsc::Receiver<DriverCall>,
+    core: Box<dyn DriverCore>
 }
 
 #[routes_async]
 impl DriverShell {
 
     pub fn new(skel: StarSkel, core: Box<dyn DriverCore>) -> mpsc::Sender<DriverCall>{
+        let kind = core.kind().clone();
+        let states = Arc::new(DashMap::new());
+        skel.state.driver.insert(kind.clone(),states.clone());
         let (tx,rx) = mpsc::channel(1024);
         let driver = Self {
             skel,
             status: DriverStatus::Started,
-            core,
+            states,
             tx: tx.clone(),
-            rx
+            rx,
+            core
         };
 
         driver.start();
@@ -232,11 +228,10 @@ impl DriverShell {
         self.core.lifecycle(event);
     }
 
-    fn traverse( &mut self, traversal: Traversal<Wave> ) {
-        let point = &traversal.to().point;
+    fn get_state( &self, point: &Point ) -> DriverState {
         match self.states.get(point) {
             None => {
-                let state = Arc::new(self.core.new_state());
+                let state = self.core.new_state();
                 self.states.insert( point.clone(), state.clone() );
                 state
             }
@@ -244,12 +239,19 @@ impl DriverShell {
                 state.clone()
             }
         }
-        let driver = self.core.ex(point.clone(), state );
-        driver.visit(traversal).await;
+    }
+
+    fn ex( &self, point: &Point ) -> DriverEx {
+        self.core.ex(point, self.get_state(point))
+    }
+
+    fn traverse( &self, traversal: Traversal<Wave> ) {
+        let driver_ex = self.ex(&traversal.to().point);
+        driver_ex.visit(traversal).await;
     }
 
     #[route("Sys<Assign>")]
-    async fn assign(&self, ctx: InCtx<'_,Sys>) -> Result<RespCore, MsgErr> {
+    async fn assign(&self, ctx: InCtx<'_,Sys>) -> Result<ReflectedCore, MsgErr> {
         match ctx.input {
             Sys::Assign(assign) => {
                 let ctx = ctx.push_input_ref(assign);
@@ -271,11 +273,13 @@ impl DriverShell {
 
 
 #[async_trait]
-pub trait DriverCore: AsyncRequestHandler {
+pub trait DriverCore: DirectedHandler {
+    fn kind(&self) -> &Kind;
+    async fn status(&self) -> DriverStatus;
     fn lifecycle(&self, event: DriverLifecycleCall);
     fn new_state(&self) -> DriverState;
-    fn ex(&self, point: Point, state: DriverState ) -> DriverEx;
-    async fn assign(&self, ctx: InCtx<'_,Assign>) -> Result<RespCore, MsgErr>;
+    fn ex(&self, point: &Point, state: DriverState ) -> DriverEx;
+    async fn assign(&self, ctx: InCtx<'_,Assign>) -> Result<ReflectedCore, MsgErr>;
 }
 
 #[derive(Clone, Eq, PartialEq, Hash)]
@@ -300,7 +304,7 @@ pub struct DriverStatusEvent {
 
 #[derive(Clone)]
 pub struct DriverSkel {
-    pub point: Point,
+    pub location: Point,
     pub star: StarKey,
     pub logger: PointLogger,
     pub registry: Arc<dyn RegistryApi>,
@@ -309,17 +313,22 @@ pub struct DriverSkel {
     pub inject_tx: mpsc::Sender<TraversalInjection>,
     pub fabric: mpsc::Sender<Wave>,
     pub machine: MachineSkel,
-    pub exchange: Arc<DashMap<Uuid, oneshot::Sender<RespShell>>>,
+    pub exchange: Arc<DashMap<Uuid, oneshot::Sender<Pong>>>,
     pub status_tx: broadcast::Sender<DriverStatusEvent>,
+    pub states: Arc<DashMap<Point,DriverState>>,
+    pub point: Point
 }
 
 impl  DriverSkel {
-    fn new(point:Point, skel: StarSkel) -> Self {
+    fn new(skel: StarSkel, point: Point) -> Self {
+        let location = skel.location().clone();
         let (status_tx,_) = broadcast::channel(16);
+        let states = Arc::new(DashMap::new());
+        let logger = skel.logger.point(point.clone());
         Self {
-            point,
+            location,
             star: skel.key,
-            logger: skel.logger.push("driver").unwrap(),
+            logger,
             registry: skel.registry,
             surface: skel.surface,
             traversal_router: skel.traverse_to_next,
@@ -327,7 +336,9 @@ impl  DriverSkel {
             machine: skel.machine,
             exchange: skel.exchange,
             inject_tx: skel.inject_tx,
-            status_tx
+            status_tx,
+            states,
+            point
         }
     }
 }

@@ -1,15 +1,15 @@
 use crate::guest::GuestSkel;
 use crate::host::HostSkel;
 use crate::star::StarSkel;
-use crate::state::{PortalInletState, PortalOutletState, PortalShellState, TunnelState};
 use dashmap::DashMap;
 use mesh_portal_versions::version::v0_0_1::id::id::{Layer, Port, TraversalLayer, Uuid};
 use mesh_portal_versions::version::v0_0_1::id::Traversal;
-use mesh_portal_versions::version::v0_0_1::wave::{ReqShell, RespShell, Wave};
+use mesh_portal_versions::version::v0_0_1::wave::{Ping, Pong, Wave};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot::Sender;
 use cosmic_hyperlane::HyperwayInterchange;
+use crate::state::{PortalInletState, PortalOutletState, PortalShellState, TunnelState};
 
 /// the portal endpoint that is within the Fabric
 pub struct PortalInlet {
@@ -37,11 +37,11 @@ impl TraversalLayer for PortalInlet {
         todo!()
     }
 
-    fn exchange(&self) -> &Arc<DashMap<Uuid, Sender<RespShell>>> {
+    fn exchange(&self) -> &Arc<DashMap<Uuid, Sender<Pong>>> {
         todo!()
     }
 
-    async fn deliver_request(&self, request: ReqShell) {
+    async fn deliver_request(&self, request: Ping) {
         todo!()
     }
 }
@@ -77,7 +77,7 @@ impl TraversalLayer for TunnelOutlet {
         todo!()
     }
 
-    fn exchange(&self) -> &Arc<DashMap<Uuid, Sender<RespShell>>> {
+    fn exchange(&self) -> &Arc<DashMap<Uuid, Sender<Pong>>> {
         todo!()
     }
 
@@ -108,11 +108,11 @@ impl TraversalLayer for TunnelInlet {
         todo!()
     }
 
-    fn exchange(&self) -> &Arc<DashMap<Uuid, Sender<RespShell>>> {
+    fn exchange(&self) -> &Arc<DashMap<Uuid, Sender<Pong>>> {
         todo!()
     }
 
-    async fn deliver_request(&self, request: ReqShell) {
+    async fn deliver_request(&self, request: Ping) {
         todo!()
     }
 }
@@ -142,11 +142,11 @@ impl TraversalLayer for PortalOutlet {
         todo!()
     }
 
-    fn exchange(&self) -> &Arc<DashMap<Uuid, Sender<RespShell>>> {
+    fn exchange(&self) -> &Arc<DashMap<Uuid, Sender<Pong>>> {
         todo!()
     }
 
-    async fn deliver_request(&self, request: ReqShell) {
+    async fn deliver_request(&self, request: Ping) {
         todo!()
     }
 }
@@ -176,11 +176,11 @@ impl TraversalLayer for PortalShell {
         todo!()
     }
 
-    fn exchange(&self) -> &Arc<DashMap<Uuid, Sender<RespShell>>> {
+    fn exchange(&self) -> &Arc<DashMap<Uuid, Sender<Pong>>> {
         todo!()
     }
 
-    async fn deliver_request(&self, request: ReqShell) {
+    async fn deliver_request(&self, request: Ping) {
         todo!()
     }
 }

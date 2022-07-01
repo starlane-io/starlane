@@ -12,7 +12,7 @@ use mesh_portal_versions::version::v0_0_1::id::{Traversal, TraversalInjection};
 use mesh_portal_versions::version::v0_0_1::log::RootLogger;
 use mesh_portal_versions::version::v0_0_1::parse::{command_line, Env};
 use mesh_portal_versions::version::v0_0_1::quota::Timeouts;
-use mesh_portal_versions::version::v0_0_1::wave::{Agent, AsyncInternalRequestHandlers, AsyncPointRequestHandlers, AsyncRequestHandler, AsyncRequestHandlerRelay, AsyncRouter, AsyncTransmitter, InCtx, ReqShell, ReqXtra, RequestHandler, Requestable, RespCore, RespShell, RespXtra, RootInCtx, Wave, WaveXtra, ProtoTransmitter, ReqCore, ReqProto, SetStrategy};
+use mesh_portal_versions::version::v0_0_1::wave::{Agent, PointRequestHandler, PointDirectedHandlerSelector, DirectedHandler, AsyncRequestHandlerRelay, AsyncRouter, Transmitter, InCtx, Ping, WaveXtra, DirectedHandler, Reflectable, ReflectedCore, Pong, RespXtra, RootInCtx, Wave, WaveXtra, ProtoTransmitter, DirectedCore, PingProto, SetStrategy};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -49,11 +49,11 @@ impl TraversalLayer for ShellEx {
         self.skel.inject_tx.send(inject).await;
     }
 
-    fn exchange(&self) -> &Arc<DashMap<Uuid, oneshot::Sender<RespShell>>> {
+    fn exchange(&self) -> &Arc<DashMap<Uuid, oneshot::Sender<Pong>>> {
         &self.skel.exchange
     }
 
-    async fn deliver_request(&self, request: ReqShell) {
+    async fn deliver_request(&self, request: Ping) {
         let logger = self.skel.logger.point(request.to.point.clone()).span();
         let injector = request.from.clone().with_topic(Topic::None).with_layer(self.layer().clone());
         let transmitter = Arc::new(StarInjectTransmitter::new(
@@ -64,17 +64,17 @@ impl TraversalLayer for ShellEx {
         let mut transmitter = ProtoTransmitter::new(transmitter);
         transmitter.from = SetStrategy::Fill(request.from.with_layer(self.layer().clone() ).with_topic(Topic::None));
         let ctx = RootInCtx::new(request, logger, transmitter.clone());
-        let response: Result<RespShell, MsgErr> = self.handle(ctx).await;
+        let response: Result<Pong, MsgErr> = self.handle(ctx).await;
         let wave: Wave = response.into();
         self.inject( TraversalInjection::new(injector,wave)).await;
     }
 
-    async fn request_fabric_bound(&self, traversal: Traversal<ReqShell>) {
+    async fn request_fabric_bound(&self, traversal: Traversal<Ping>) {
         self.state.fabric_requests.insert(traversal.id.clone());
         self.traverse_next(traversal.wrap()).await;
     }
 
-    async fn response_core_bound(&self, traversal: Traversal<RespShell>) {
+    async fn response_core_bound(&self, traversal: Traversal<Pong>) {
         if let Some(_) = self.state.fabric_requests.remove(&traversal.response_to) {
             self.traverse_next(traversal.wrap()).await;
         } else {
@@ -88,7 +88,7 @@ impl TraversalLayer for ShellEx {
 #[routes]
 impl ShellEx {
     #[route("Msg<NewCli>")]
-    pub async fn new_session(&self, ctx: InCtx<'_, ReqShell>) -> Result<Port, MsgErr> {
+    pub async fn new_session(&self, ctx: InCtx<'_, Ping>) -> Result<Port, MsgErr> {
         // only allow a cli session to be created by any layer of THIS particle
         if ctx.from.clone().to_point() != ctx.to.clone().to_point() {
             return Err(MsgErr::forbidden());
@@ -120,12 +120,12 @@ impl ShellEx {
 #[routes_async]
 impl CliSession {
     #[route("Msg<Exec>")]
-    pub async fn exec(&self, ctx: InCtx<'_, RawCommand>) -> Result<RespCore, MsgErr> {
+    pub async fn exec(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, MsgErr> {
         let exec_topic = Topic::uuid();
         let exec_port = self.port.clone().with_topic(exec_topic.clone());
         let mut exec = CommandExecutor::new(
             exec_port,
-            ctx.get_request().from.clone(),
+            ctx.wave().from.clone(),
             self.env.clone(),
         );
 
@@ -166,7 +166,7 @@ impl CommandExecutor {
         }
     }
 
-    pub async fn execute(&self, ctx: InCtx<'_, RawCommand>) -> Result<RespCore, MsgErr> {
+    pub async fn execute(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, MsgErr> {
         // make sure everything is coming from this command executor topic
         let ctx = ctx.push_from( self.port.clone() );
 
@@ -176,9 +176,9 @@ impl CommandExecutor {
             env.set_file(transfer.id.clone(), transfer.content.clone())
         }
         let command: Command = command.to_resolved(&self.env)?;
-        let request: ReqCore = command.into();
-        let request = ReqProto::from_core(request);
+        let request: DirectedCore = command.into();
+        let request = PingProto::from_core(request);
 
-        RespShell::core_result(ctx.req(request).await)
+        Pong::core_result(ctx.req(request).await)
     }
 }

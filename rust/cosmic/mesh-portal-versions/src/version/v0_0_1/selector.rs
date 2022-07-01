@@ -21,7 +21,7 @@ pub mod selector {
     use crate::error::MsgErr;
 
     use crate::version::v0_0_1::command::request::{Rc, RcCommandType};
-    use crate::version::v0_0_1::id::id::{KindParts, BaseKind, Layer, Point, PointCtx, PointSeg, PointSegKind, PointVar, Port, RouteSeg, Specific, Tks, Topic, Variable, VarVal, Version, Kind, SubKind};
+    use crate::version::v0_0_1::id::id::{KindParts, BaseKind, Layer, Point, PointCtx, PointSeg, PointSegKind, PointVar, Port, RouteSeg, Specific, Tks, Topic, Variable, VarVal, Version, Kind, Sub};
     use crate::version::v0_0_1::parse::{camel_case_chars, camel_case_to_string_matcher, CamelCase, consume_hierarchy, Env, file_chars, path, path_regex, point_segment_selector, point_selector};
     use crate::version::v0_0_1::substance::substance::{Call, CallKind, CallWithConfig, CallWithConfigDef, HttpCall, ListPattern, MapPattern, MsgCall, NumRange, Substance, SubstanceFormat, SubstancePattern, SubstancePatternDef, SubstanceKind, SubstanceTypePatternDef};
     use crate::version::v0_0_1::selector::selector::specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
@@ -43,7 +43,7 @@ pub mod selector {
     use regex::Regex;
     use std::collections::HashMap;
     use cosmic_nom::{new_span, Res, Span, Trace};
-    use crate::version::v0_0_1::wave::{Method, ReqCore};
+    use crate::version::v0_0_1::wave::{Method, DirectedCore};
     use crate::version::v0_0_1::parse::error::result;
     use crate::version::v0_0_1::parse::model::Var;
 
@@ -110,21 +110,21 @@ pub mod selector {
     pub type SubKindSelector = Pattern<Option<CamelCase>>;
 
     #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq,Hash)]
-    pub struct PointSelectorDef<Hop> {
+    pub struct SelectorDef<Hop> {
         pub hops: Vec<Hop>,
     }
 
-    pub type PointSelector = PointSelectorDef<Hop>;
-    pub type PointSelectorCtx = PointSelectorDef<Hop>;
-    pub type PointSelectorVar = PointSelectorDef<Hop>;
+    pub type Selector = SelectorDef<Hop>;
+    pub type SelectorCtx = SelectorDef<Hop>;
+    pub type SelectorVar = SelectorDef<Hop>;
 
-    impl ToResolved<PointSelector> for PointSelector {
-        fn to_resolved(self, env: &Env) -> Result<PointSelector, MsgErr> {
+    impl ToResolved<Selector> for Selector {
+        fn to_resolved(self, env: &Env) -> Result<Selector, MsgErr> {
             Ok(self)
         }
     }
 
-    impl FromStr for PointSelector{
+    impl FromStr for Selector {
         type Err = MsgErr;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -133,14 +133,14 @@ pub mod selector {
         }
     }
 
-    impl PointSelector {
-        fn consume(&self) -> Option<PointSelector> {
+    impl Selector {
+        fn consume(&self) -> Option<Selector> {
             if self.hops.is_empty() {
                 Option::None
             } else {
                 let mut hops = self.hops.clone();
                 hops.remove(0);
-                Option::Some(PointSelector { hops })
+                Option::Some(Selector { hops })
             }
         }
 
@@ -285,7 +285,7 @@ pub mod selector {
         }
     }
 
-    impl ToString for PointSelector {
+    impl ToString for Selector {
         fn to_string(&self) -> String {
             let mut rtn = String::new();
             for (index, hop) in self.hops.iter().enumerate() {

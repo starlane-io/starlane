@@ -1,4 +1,4 @@
-use crate::version::v0_0_1::wave::{ReqShell, WaitTime};
+use crate::version::v0_0_1::wave::{Ping, WaitTime};
 
 // measured in seconds
 #[derive(Clone)]

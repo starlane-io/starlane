@@ -14,7 +14,7 @@ use mesh_portal_versions::version::v0_0_1::id::id::{Point, ToPort};
 use mesh_portal_versions::version::v0_0_1::log::PointLogger;
 use mesh_portal_versions::version::v0_0_1::substance::substance::Substance;
 use mesh_portal_versions::version::v0_0_1::sys::{EntryReq, Sys};
-use mesh_portal_versions::version::v0_0_1::wave::{ReqCore, ReqProto, RespShell, SysMethod, Wave};
+use mesh_portal_versions::version::v0_0_1::wave::{DirectedCore, PingProto, Pong, SysMethod, Wave};
 
 fn generate_self_signed_cert() -> Result<(rustls::Certificate, rustls::PrivateKey), MsgErr>
 {
@@ -201,7 +201,7 @@ impl HyperClientQuic {
 
         let recv = tokio::time::timeout(Duration::from_secs(30), new_connection.uni_streams.next()).await?.ok_or(MsgErr::server_error())??;
         let resp = recv.read_to_end(1024).await?;
-        let resp : RespShell = resp.try_into()?;
+        let resp : Pong = resp.try_into()?;
 
         if !resp.core.is_ok()  {
             Err(MsgErr::from_status( resp.core.status.as_u16() ))

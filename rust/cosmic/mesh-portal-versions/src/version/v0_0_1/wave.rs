@@ -1,25 +1,28 @@
-use alloc::borrow::Cow;
 use crate::error::{MsgErr, StatusErr};
 use crate::version::v0_0_1::bin::Bin;
 use crate::version::v0_0_1::cli::RawCommand;
 use crate::version::v0_0_1::command::Command;
 use crate::version::v0_0_1::config::config::bind::RouteSelector;
 use crate::version::v0_0_1::http::HttpMethod;
-use crate::version::v0_0_1::id::id::{Layer, Point, Port, Topic, ToPoint, ToPort, Uuid};
-use crate::version::v0_0_1::log::{LogSpan, LogSpanEvent, PointLogger, SpanLogger};
+use crate::version::v0_0_1::id::id::{
+    Layer, Point, Port, PortSelector, Sub, ToPoint, ToPort, Topic, Uuid,
+};
+use crate::version::v0_0_1::log::{LogSpan, LogSpanEvent, PointLogger, SpanLogger, TrailSpanId};
 use crate::version::v0_0_1::msg::MsgMethod;
 use crate::version::v0_0_1::parse::model::Subst;
 use crate::version::v0_0_1::parse::sub;
-use crate::version::v0_0_1::particle::particle::Details;
+use crate::version::v0_0_1::particle::particle::{Details, Status};
 use crate::version::v0_0_1::security::{Permissions, Privilege, Privileges};
-use crate::version::v0_0_1::selector::selector::PointSelector;
+use crate::version::v0_0_1::selector::selector::Selector;
 use crate::version::v0_0_1::substance::substance::Substance;
 use crate::version::v0_0_1::substance::substance::{
-    Call, CallKind, Errors, HttpCall, MsgCall, MultipartFormBuilder, SubstanceKind, Token,
-    ToRequestCore,
+    Call, CallKind, Errors, HttpCall, MsgCall, MultipartFormBuilder, SubstanceKind, ToRequestCore,
+    Token,
 };
 use crate::version::v0_0_1::sys::AssignmentKind;
 use crate::version::v0_0_1::util::{uuid, ValueMatcher, ValuePattern};
+use alloc::borrow::Cow;
+use core::borrow::Borrow;
 use cosmic_macros_primitive::Autobox;
 use cosmic_nom::{Res, SpanExtra};
 use dashmap::DashMap;
@@ -27,140 +30,177 @@ use http::{HeaderMap, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
+use std::marker::PhantomData;
 use std::ops;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use std::time::Duration;
+use tokio::sync::{oneshot, RwLock};
+use tokio::time::Instant;
+use crate::version::v0_0_1::quota::Timeouts;
 
 #[derive(
-    Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display, strum_macros::EnumString,
+    Clone,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    Hash,
+    strum_macros::Display,
+    strum_macros::EnumString,
 )]
 pub enum WaveKind {
-    Req,
-    Res,
+    Ping, // Request
+    Pong, // Response
+          /*Ripple,  // Broadcast
+           Echo,    // Broadcast Response (optional)
+           Reverb,  // Ack
+           Signal   // Notification
+          */
+}
+#[derive(Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub enum UltraWave {
+    Ping(Wave<Ping>),
+    Pong(Wave<Pong>),
 }
 
-#[derive(Serialize, Deserialize, Eq, PartialEq, Hash)]
+impl UltraWave {
+    pub fn to(&self) -> Recipients {
+        match self {
+            UltraWave::Ping(ping) => ping.to(),
+            UltraWave::Pong(pong) => pong.to(),
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct WaveId {
-    port: Port,
     uuid: Uuid,
     kind: WaveKind,
 }
 
 impl WaveId {
-    pub fn new(port: Port, kind: WaveKind) -> Self {
+    pub fn new(kind: WaveKind) -> Self {
         let uuid = uuid();
-        Self::with_uuid(port, kind, uuid)
+        Self::with_uuid(kind, uuid)
     }
 
-    pub fn with_uuid(port: Port, kind: WaveKind, uuid: Uuid) -> Self {
-        Self { port, uuid, kind }
+    pub fn with_uuid(kind: WaveKind, uuid: Uuid) -> Self {
+        Self { uuid, kind }
     }
 }
 
 impl ToString for WaveId {
     fn to_string(&self) -> String {
-        format!(
-            "{}<Wave<{}>>/{}",
-            self.port.to_string(),
-            self.kind.to_string(),
-            self.uuid
-        )
+        format!("<Wave<{}>>/{}", self.kind.to_string(), self.uuid)
     }
 }
 
-#[derive(Serialize, Deserialize, Autobox)]
-pub enum WaveXtra {
-    Req(ReqXtra),
-    Resp(RespXtra),
-}
-
-impl WaveXtra {
-    pub fn id(&self) -> &Uuid {
-        match self {
-            WaveXtra::Req(request) => request.id(),
-            WaveXtra::Resp(response) => response.id(),
-        }
-    }
-
-    pub fn to(&self) -> &Port {
-        match self {
-            WaveXtra::Req(request) => request.to(),
-            WaveXtra::Resp(response) => response.to(),
-        }
-    }
-
-    pub fn from(&self) -> &Port {
-        match self {
-            WaveXtra::Req(request) => request.from(),
-            WaveXtra::Resp(response) => response.from(),
-        }
-    }
-
-    pub fn span(&self) -> Option<&LogSpan> {
-        match self {
-            WaveXtra::Req(req) => req.span.as_ref(),
-            WaveXtra::Resp(res) => res.span.as_ref(),
-        }
-    }
-}
-
-pub struct RootInCtx<I> {
-    pub input: I,
-    pub request: ReqShell,
-    session: Option<Session>,
-    logger: SpanLogger,
+pub struct RootInCtx {
+    pub to: Port,
+    pub wave: DirectedWave,
+    pub session: Option<Session>,
+    pub logger: SpanLogger,
     pub tx: ProtoTransmitter,
 }
 
-impl<I> Deref for RootInCtx<I> {
-    type Target = I;
-
-    fn deref(&self) -> &Self::Target {
-        &self.input
-    }
-}
-
-impl RootInCtx<ReqShell> {
-    pub fn new(request: ReqShell, logger: SpanLogger, tx: ProtoTransmitter) -> Self {
+impl RootInCtx {
+    pub fn new(wave: DirectedWave, to: Port, logger: SpanLogger, tx: ProtoTransmitter) -> Self {
         Self {
-            request: request.clone(),
-            input: request.clone(),
+            wave,
+            to,
             logger,
             session: None,
             tx,
         }
     }
+
+    pub fn status(self, status: u16) -> ReflectedWave {
+        match self.wave {
+            DirectedWave::Ping(ping) => ReflectedWave::Pong(Wave::new(
+                Pong::new(
+                    ReflectedCore::status(status),
+                    self.to.clone(),
+                    ping.id.clone(),
+                ),
+                self.to.clone(),
+            )),
+        }
+    }
+
+    pub fn not_found(self) -> ReflectedWave {
+        self.status(404)
+    }
+
+    pub fn timeout(self) -> ReflectedWave {
+        self.status(408)
+    }
+
+    pub fn bad_request(self) -> ReflectedWave {
+        self.status(400)
+    }
+
+    pub fn server_error(self) -> ReflectedWave {
+        self.status(500)
+    }
+
+    pub fn forbidden(self) -> ReflectedWave {
+        self.status(401)
+    }
+
+    pub fn unavailable(self) -> ReflectedWave {
+        self.status(503)
+    }
+
+    pub fn unauthorized(self) -> ReflectedWave {
+        self.status(403)
+    }
 }
 
-impl<I> RootInCtx<I> {
-    pub fn transform_input<I2, E>(self) -> Result<RootInCtx<I2>, MsgErr>
+impl RootInCtx {
+    pub fn push<'a, I, E>(&self) -> Result<InCtx<I>, MsgErr>
     where
-        I2: TryFrom<I, Error = E>,
+        I: TryFrom<Substance, Error = E>,
         E: Into<MsgErr>,
     {
-        let input = match I2::try_from(self.input) {
+        let input = match I::try_from(self.wave.body().clone()) {
             Ok(input) => input,
             Err(err) => return Err(err.into()),
         };
-        Ok(RootInCtx {
-            logger: self.logger,
-            request: self.request,
+        Ok(InCtx {
+            root: self,
             input,
-            session: self.session,
-            tx: self.tx,
+            logger: self.logger.clone(),
+            tx: Cow::Borrowed(&self.tx),
         })
     }
+}
 
-    pub fn push<'a>(&'a self) -> InCtx<'a, I> {
-        InCtx::new(self, &self.input, Cow::Borrowed(&self.tx), self.logger.clone())
+impl RootInCtx {
+    pub fn ok_body(self, substance: Substance) {
+        self.tx.try_route(self.wave.ok_body(substance));
+    }
+
+    pub fn not_found(self) {
+        self.tx.try_route(self.wave.not_found());
+    }
+
+    pub fn forbidden(self) {
+        self.tx.try_route(self.root.wave.forbidden());
+    }
+
+    pub fn bad_request(self) {
+        self.tx.try_route(self.root.wave.bad_request());
+    }
+
+    pub fn err(self, err: MsgErr) {
+        self.tx.try_route(self.root.wave.err(err));
     }
 }
 
 pub struct InCtx<'a, I> {
-    root: &'a RootInCtx<I>,
+    root: &'a RootInCtx,
     pub tx: Cow<'a, ProtoTransmitter>,
-    parent: Option<Box<InCtx<'a, I>>>,
     pub input: &'a I,
     pub logger: SpanLogger,
 }
@@ -175,14 +215,13 @@ impl<'a, I> Deref for InCtx<'a, I> {
 
 impl<'a, I> InCtx<'a, I> {
     pub fn new(
-        root: &'a RootInCtx<I>,
+        root: &'a RootInCtx,
         input: &'a I,
-        tx: Cow<'a,ProtoTransmitter>,
+        tx: Cow<'a, ProtoTransmitter>,
         logger: SpanLogger,
     ) -> Self {
         Self {
             root,
-            parent: None,
             input,
             logger,
             tx,
@@ -195,11 +234,10 @@ impl<'a, I> InCtx<'a, I> {
             input: self.input,
             logger: self.logger.span(),
             tx: self.tx.clone(),
-            parent: Some(Box::new(self)),
         }
     }
 
-    pub fn push_from(self, from: Port) -> InCtx<'a,I> {
+    pub fn push_from(self, from: Port) -> InCtx<'a, I> {
         let mut tx = self.tx.clone();
         tx.to_mut().from = SetStrategy::Override(from);
         InCtx {
@@ -207,333 +245,165 @@ impl<'a, I> InCtx<'a, I> {
             input: self.input,
             logger: self.logger.clone(),
             tx,
-            parent: Some(Box::new(self)),
         }
     }
 
-    pub fn push_input<I2>(self, input: I2) -> InCtx<'a,I2> {
-        InCtx {
-            root: self.root,
-            input: & input,
-            logger: self.logger.clone(),
-            tx,
-            parent: Some(Box::new(self)),
-        }
-    }
-
-    pub fn push_input_ref<I2>(self, input: &'a I2) -> InCtx<'a,I2> {
+    pub fn push_input_ref<I2>(self, input: &'a I2) -> InCtx<'a, I2> {
         InCtx {
             root: self.root,
             input,
             logger: self.logger.clone(),
-            tx,
-            parent: Some(Box::new(self)),
+            tx: self.tx.clone(),
         }
     }
 
-
-    pub fn pop(self) -> Option<InCtx<'a, I>> {
-        match self.parent {
-            None => None,
-            Some(parent) => Some(*parent),
-        }
+    pub fn wave(&self) -> &DirectedWave {
+        &self.root.wave
     }
 
-    pub fn get_request(&self) -> &ReqShell {
-        &self.root.request
-    }
-
-    pub async fn req(&self, req: ReqProto) -> Result<RespShell, MsgErr> {
-        self.tx.req(req).await
+    pub async fn req(&self, req: PingProto) -> Result<Pong, MsgErr> {
+        self.tx.direct(req).await
     }
 }
 
-impl<'a> InCtx<'a, &mut ReqShell> {
-    pub fn ok_body(self, substance: Substance) -> RespCore {
-        self.input.core.ok_body(substance)
+impl<'a, I> InCtx<'a, I> {
+    pub fn ok_body(self, substance: Substance) -> ReflectedCore {
+        self.root.wave.core().ok_body(substance)
     }
 
-    pub fn not_found(self) -> RespCore {
-        self.input.core.not_found()
+    pub fn not_found(self) -> ReflectedCore {
+        self.root.wave.core().not_found()
     }
 
-    pub fn forbidden(self) -> RespCore {
-        self.input.core.forbidden()
+    pub fn forbidden(self) -> ReflectedCore {
+        self.root.core().forbidden()
     }
 
-    pub fn bad_request(self) -> RespCore {
-        self.input.core.bad_request()
+    pub fn bad_request(self) -> ReflectedCore {
+        self.input.core().bad_request()
     }
 
-    pub fn err(self, err: MsgErr) -> RespCore {
+    pub fn err(self, err: MsgErr) -> ReflectedCore {
         self.input.core.err(err)
     }
 }
 
-impl<'a> InCtx<'a, RespShell> {
-    pub fn pass(self) -> RespCore {
-        self.input.core.clone()
-    }
-
-    pub fn not_found(self) -> RespCore {
-        let mut core = self.input.core.clone();
-        core.status = StatusCode::from_u16(404).unwrap();
-        core
-    }
-
-    pub fn err(self, err: MsgErr) -> RespCore {
-        let mut core = self.input.core.clone();
-        let status = match StatusCode::from_u16(err.status()) {
-            Ok(status) => status,
-            Err(_) => StatusCode::from_u16(500).unwrap(),
-        };
-        core.status = status;
-        // somehow set the body to a proper Err
-        //            core.body =
-        core
-    }
-}
-
-pub trait Requestable<R> {
-    fn forbidden(self) -> R
+pub trait Reflectable<R> {
+    fn forbidden(self, responder: Port) -> R
     where
         Self: Sized,
     {
-        self.status(403)
+        self.status(403, responder)
     }
 
-    fn bad_request(self) -> R
+    fn bad_request(self, responder: Port) -> R
     where
         Self: Sized,
     {
-        self.status(400)
+        self.status(400, responder)
     }
 
-    fn not_found(self) -> R
+    fn not_found(self, responder: Port) -> R
     where
         Self: Sized,
     {
-        self.status(404)
+        self.status(404, responder)
     }
 
-    fn timeout(self) -> R
+    fn timeout(self, responder: Port) -> R
     where
         Self: Sized,
     {
-        self.status(408)
+        self.status(408, responder)
     }
 
-    fn server_error(self) -> R
+    fn server_error(self, responder: Port) -> R
     where
         Self: Sized,
     {
-        self.status(500)
+        self.status(500, responder)
     }
 
-    fn status(self, status: u16) -> R
+    fn status(self, status: u16, responder: Port) -> R
     where
         Self: Sized;
 
-    fn fail<M: ToString>(self, status: u16, message: M) -> R
+    fn fail<M: ToString>(self, status: u16, message: M, responder: Port) -> R
     where
         Self: Sized;
 
-    fn err(self, err: MsgErr) -> R
+    fn err(self, err: MsgErr, responder: Port) -> R
     where
         Self: Sized;
 
-    fn ok(self) -> R
+    fn ok(self, responder: Port) -> R
+    where
+        Self: Sized,
+    {
+        self.status(200, responder)
+    }
+
+    fn ok_body(self, body: Substance, responder: Port) -> R
     where
         Self: Sized;
 
-    fn body(self, body: Substance) -> R
+    fn core(self, core: ReflectedCore, responder: Port) -> R
     where
         Self: Sized;
 
-    fn core(self, core: RespCore) -> R
-    where
-        Self: Sized;
-
-    fn result<C: Into<RespCore>>(self, result: Result<C, MsgErr>) -> R
+    fn result<C: Into<ReflectedCore>>(self, result: Result<C, MsgErr>, responder: Port) -> R
     where
         Self: Sized,
     {
         match result {
-            Ok(core) => self.core(core.into()),
-            Err(err) => self.core(err.into()),
+            Ok(core) => self.core(core.into(), responder),
+            Err(err) => self.core(err.into(), responder),
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReqStub {
-    pub id: String,
+pub struct DirectWaveStub {
+    pub id: WaveId,
     pub agent: Agent,
     pub handling: Handling,
     pub from: Port,
-    pub to: Port,
-    pub span: Option<LogSpan>,
+    pub to: Recipients,
+    pub span: Option<TrailSpanId>,
 }
 
-impl Into<WaitTime> for &ReqStub {
+impl Into<WaitTime> for &DirectWaveStub {
     fn into(self) -> WaitTime {
         self.handling.wait.clone()
     }
 }
 
-impl Requestable<RespShell> for ReqStub {
-    fn status(self, status: u16) -> RespShell {
-        RespShell {
-            id: uuid(),
-            to: self.from,
-            from: self.to,
-            core: RespCore::status(status),
-            response_to: self.id,
-        }
-    }
-
-    fn fail<M: ToString>(self, status: u16, message: M) -> RespShell
-    where
-        Self: Sized,
-    {
-        RespShell {
-            id: uuid(),
-            to: self.from,
-            from: self.to,
-            core: RespCore::fail(status, message.to_string().as_str()),
-            response_to: self.id,
-        }
-    }
-
-    fn err(self, err: MsgErr) -> RespShell {
-        RespShell {
-            id: uuid(),
-            to: self.from,
-            from: self.to,
-            core: RespCore::err(err),
-            response_to: self.id,
-        }
-    }
-
-    fn ok(self) -> RespShell {
-        RespShell {
-            id: uuid(),
-            to: self.from,
-            from: self.to,
-            core: RespCore::ok(Substance::Empty),
-            response_to: self.id,
-        }
-    }
-
-    fn body(self, body: Substance) -> RespShell {
-        RespShell {
-            id: uuid(),
-            to: self.from,
-            from: self.to,
-            core: RespCore::ok(body),
-            response_to: self.id,
-        }
-    }
-
-    fn core(self, core: RespCore) -> RespShell {
-        RespShell {
-            id: uuid(),
-            to: self.from,
-            from: self.to,
-            core,
-            response_to: self.id,
-        }
-    }
-}
-
-impl Requestable<RespXtra> for ReqStub {
-    fn status(self, status: u16) -> RespXtra {
-        RespShell {
-            id: uuid(),
-            to: self.from,
-            from: self.to,
-            core: RespCore::status(status),
-            response_to: self.id,
-        }
-        .to_xtra(self.span)
-    }
-
-    fn fail<M: ToString>(self, status: u16, message: M) -> RespXtra
-    where
-        Self: Sized,
-    {
-        RespShell {
-            id: uuid(),
-            to: self.from,
-            from: self.to,
-            core: RespCore::fail(status, message.to_string().as_str()),
-            response_to: self.id,
-        }
-        .to_xtra(self.span)
-    }
-
-    fn err(self, err: MsgErr) -> RespXtra {
-        RespShell {
-            id: uuid(),
-            to: self.from,
-            from: self.to,
-            core: RespCore::err(err),
-            response_to: self.id,
-        }
-        .to_xtra(self.span)
-    }
-
-    fn ok(self) -> RespXtra {
-        RespShell {
-            id: uuid(),
-            to: self.from,
-            from: self.to,
-            core: RespCore::ok(Substance::Empty),
-            response_to: self.id,
-        }
-        .to_xtra(self.span)
-    }
-
-    fn body(self, body: Substance) -> RespXtra {
-        RespShell {
-            id: uuid(),
-            to: self.from,
-            from: self.to,
-            core: RespCore::ok(body),
-            response_to: self.id,
-        }
-        .to_xtra(self.span)
-    }
-
-    fn core(self, core: RespCore) -> RespXtra {
-        RespShell {
-            id: uuid(),
-            to: self.from,
-            from: self.to,
-            core,
-            response_to: self.id,
-        }
-        .to_xtra(self.span)
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct ReqShell {
-    pub id: String,
-    pub agent: Agent,
-    pub scope: Scope,
-    pub handling: Handling,
-    pub from: Port,
+pub struct Ping {
     pub to: Port,
-    pub core: ReqCore,
+    pub core: DirectedCore,
 }
 
-impl Into<ReqProto> for ReqShell {
-    fn into(self) -> ReqProto {
-        ReqProto {
+impl Deref for Ping {
+    type Target = DirectedCore;
+
+    fn deref(&self) -> &Self::Target {
+        &self.core
+    }
+}
+
+impl DerefMut for Ping {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.core
+    }
+}
+
+impl Into<PingProto> for Ping {
+    fn into(self) -> PingProto {
+        PingProto {
             id: self.id,
             from: Some(self.from),
-            to: Some(self.to),
+            to: Some(self.to.to_recipients()),
             core: Some(self.core),
             handling: Some(self.handling),
             scope: Some(self.scope),
@@ -542,7 +412,25 @@ impl Into<ReqProto> for ReqShell {
     }
 }
 
-impl ReqShell {
+impl WaveVariant for Ping {
+    fn kind(&self) -> &WaveKind {
+        &WaveKind::Ping
+    }
+
+    fn to(&self) -> Recipients {
+        Recipients::Single(self.to.clone())
+    }
+
+    fn is_directed(&self) -> bool {
+        true
+    }
+
+    fn body(&self) -> &Substance {
+        &self.core.body
+    }
+}
+
+impl Ping {
     pub fn to_call(&self) -> Result<Call, MsgErr> {
         let kind = match &self.core.method {
             Method::Cmd(_) => {
@@ -568,85 +456,20 @@ impl ReqShell {
     }
 }
 
-impl Into<WaitTime> for &ReqShell {
+impl Into<WaitTime> for &Ping {
     fn into(self) -> WaitTime {
         self.handling.wait.clone()
     }
 }
 
-impl Requestable<RespShell> for ReqShell {
-    fn status(self, status: u16) -> RespShell {
-        RespShell {
-            id: uuid(),
-            to: self.from,
-            from: self.to,
-            core: RespCore::status(status),
-            response_to: self.id,
-        }
-    }
-
-    fn fail<M: ToString>(self, status: u16, message: M) -> RespShell
-    where
-        Self: Sized,
-    {
-        RespShell {
-            id: uuid(),
-            to: self.from,
-            from: self.to,
-            core: self.core.fail(status, message),
-            response_to: self.id,
-        }
-    }
-
-    fn err(self, err: MsgErr) -> RespShell {
-        RespShell {
-            id: uuid(),
-            to: self.from,
-            from: self.to,
-            core: RespCore::err(err),
-            response_to: self.id,
-        }
-    }
-
-    fn ok(self) -> RespShell {
-        RespShell {
-            id: uuid(),
-            to: self.from,
-            from: self.to,
-            core: RespCore::ok(Substance::Empty),
-            response_to: self.id,
-        }
-    }
-
-    fn body(self, body: Substance) -> RespShell {
-        RespShell {
-            id: uuid(),
-            to: self.from,
-            from: self.to,
-            core: RespCore::ok(body),
-            response_to: self.id,
-        }
-    }
-
-    fn core(self, core: RespCore) -> RespShell {
-        RespShell {
-            id: uuid(),
-            to: self.from,
-            from: self.to,
-            core,
-            response_to: self.id,
-        }
-    }
-}
-
-impl ReqShell {
-    pub fn as_stub(&self) -> ReqStub {
-        ReqStub {
+impl Ping {
+    pub fn as_stub(&self) -> DirectWaveStub {
+        DirectWaveStub {
             id: self.id.clone(),
             agent: self.agent.clone(),
             handling: self.handling.clone(),
             from: self.from.clone(),
-            to: self.to.clone(),
+            to: Recipients::Single(self.to.clone()),
             span: None,
         }
     }
@@ -654,7 +477,7 @@ impl ReqShell {
     pub fn require_method<M: Into<Method> + ToString + Clone>(
         self,
         method: M,
-    ) -> Result<ReqShell, MsgErr> {
+    ) -> Result<Ping, MsgErr> {
         if self.core.method == method.clone().into() {
             Ok(self)
         } else {
@@ -674,175 +497,38 @@ impl ReqShell {
             Err(err) => Err(MsgErr::bad_request()),
         }
     }
-
-    pub fn server_error(&self) -> RespShell {
-        self.as_stub().server_error()
-    }
-
-    pub fn timeout(&self) -> RespShell {
-        self.as_stub().timeout()
-    }
-
-    pub fn not_found(&self) -> RespShell {
-        self.as_stub().not_found()
-    }
-
-    pub fn forbidden(&self) -> RespShell {
-        self.as_stub().forbidden()
-    }
-
-    pub fn bad_request(&self) -> RespShell {
-        self.as_stub().bad_request()
-    }
-
-    pub fn status(&self, status: u16) -> RespShell {
-        self.as_stub().status(status)
-    }
-
-    pub fn to_frame(self, span: Option<LogSpan>) -> ReqXtra {
-        ReqXtra {
-            session: None,
-            request: self,
-            span,
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ReqXtra {
-    pub session: Option<Session>,
-    pub request: ReqShell,
-    pub span: Option<LogSpan>,
+pub struct WaveXtra<V> {
+    pub wave: Wave<V>,
+    pub session: Session,
 }
 
-impl ReqXtra {
-    pub fn from(&self) -> &Port {
-        &self.request.from
-    }
-
-    pub fn to(&self) -> &Port {
-        &self.request.to
+impl<V> WaveXtra<V> {
+    pub fn new(wave: Wave<V>, session: Session) -> Self {
+        Self { wave, session }
     }
 }
 
-impl ReqXtra {
-    pub fn id(&self) -> &Uuid {
-        &self.request.id
-    }
 
-    pub fn as_stub(&self) -> ReqStub {
-        let mut stub = self.request.as_stub();
-        stub.span = self.span.clone();
-        stub
-    }
-}
-
-impl Into<WaitTime> for &ReqXtra {
-    fn into(self) -> WaitTime {
-        (&self.request).into()
-    }
-}
-
-impl Requestable<RespXtra> for ReqXtra {
-    fn status(self, status: u16) -> RespXtra {
-        RespXtra {
-            session: None,
-            response: self.request.status(status),
-            span: self.span,
-        }
-    }
-
-    fn fail<M: ToString>(self, status: u16, message: M) -> RespXtra
-    where
-        Self: Sized,
-    {
-        RespXtra {
-            session: None,
-            response: self.request.fail(status, message.to_string().as_str()),
-            span: self.span,
-        }
-    }
-
-    fn err(self, err: MsgErr) -> RespXtra {
-        RespXtra {
-            session: None,
-            response: self.request.err(err),
-            span: self.span,
-        }
-    }
-
-    fn ok(self) -> RespXtra {
-        RespXtra {
-            session: None,
-            response: self.request.ok(),
-            span: self.span,
-        }
-    }
-
-    fn body(self, body: Substance) -> RespXtra {
-        RespXtra {
-            session: None,
-            response: self.request.body(body),
-            span: self.span,
-        }
-    }
-
-    fn core(self, core: RespCore) -> RespXtra {
-        let response = RespShell::new(core, self.request.to, self.request.from, self.request.id);
-        RespXtra {
-            session: None,
-            response,
-            span: self.span,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct RespXtra {
-    pub session: Option<Session>,
-    pub response: RespShell,
-    pub span: Option<LogSpan>,
-}
-
-impl RespXtra {
-    pub fn new(response: RespShell) -> Self {
-        Self {
-            response,
-            session: None,
-            span: None,
-        }
-    }
-    pub fn id(&self) -> &Uuid {
-        &self.response.id
-    }
-    pub fn from(&self) -> &Port {
-        &self.response.from
-    }
-    pub fn to(&self) -> &Port {
-        &self.response.to
-    }
-    pub fn response_to(&self) -> &Uuid {
-        &self.response.response_to
-    }
-}
-
-impl TryFrom<ReqShell> for RawCommand {
+impl TryFrom<Ping> for RawCommand {
     type Error = MsgErr;
 
-    fn try_from(request: ReqShell) -> Result<Self, Self::Error> {
+    fn try_from(request: Ping) -> Result<Self, Self::Error> {
         request.core.body.try_into()
     }
 }
 
-impl TryFrom<RespShell> for Substance {
+impl TryFrom<Pong> for Substance {
     type Error = MsgErr;
 
-    fn try_from(response: RespShell) -> Result<Self, Self::Error> {
+    fn try_from(response: Pong) -> Result<Self, Self::Error> {
         Ok(response.core.body)
     }
 }
 
-impl TryInto<Bin> for RespShell {
+impl TryInto<Bin> for Pong {
     type Error = MsgErr;
 
     fn try_into(self) -> Result<Bin, Self::Error> {
@@ -853,272 +539,314 @@ impl TryInto<Bin> for RespShell {
     }
 }
 
-impl Into<ReqCore> for RawCommand {
-    fn into(self) -> ReqCore {
-        ReqCore::substance(
+impl Into<DirectedCore> for RawCommand {
+    fn into(self) -> DirectedCore {
+        DirectedCore::substance(
             MsgMethod::new("ExecCommand").unwrap().into(),
             Substance::RawCommand(self),
         )
     }
 }
 
-impl ReqShell {
-    pub fn result<E: StatusErr>(self, result: Result<RespCore, E>) -> RespShell {
-        match result {
-            Ok(core) => RespShell {
-                id: uuid(),
-                to: self.from,
-                from: self.to,
-                core,
-                response_to: self.id,
-            },
-            Err(err) => {
-                let core = self.core.err(err);
-                RespShell {
-                    id: uuid(),
-                    to: self.from,
-                    from: self.to,
-                    core,
-                    response_to: self.id,
-                }
-            }
-        }
-    }
-
-    pub fn body_result<E: StatusErr>(self, result: Result<Substance, E>) -> RespShell {
-        match result {
-            Ok(substance) => self.ok_body(substance),
-            Err(err) => {
-                let core = self.core.err(err);
-                RespShell {
-                    id: uuid(),
-                    to: self.from,
-                    from: self.to,
-                    core,
-                    response_to: self.id,
-                }
-            }
-        }
-    }
-
-    pub fn err(self, err: MsgErr) -> RespShell {
-        let core = self.core.err(err);
-        RespShell {
-            id: uuid(),
-            to: self.from,
-            from: self.to,
-            core,
-            response_to: self.id,
-        }
-    }
-}
-
-impl ReqShell {
-    pub fn new<P: ToPort>(core: ReqCore, from: P, to: P) -> Self {
+impl Ping {
+    pub fn new<P: ToPort>(core: DirectedCore, to: P) -> Self {
         Self {
-            id: uuid(),
-            agent: Agent::Anonymous,
-            scope: Scope::Full,
-            handling: Default::default(),
-            from: from.to_port(),
             to: to.to_port(),
             core,
-        }
-    }
-
-    /*
-    pub fn result<E>(self, result: Result<ResponseCore,E> ) -> Response where E: ToString {
-        match result {
-            Ok(core) => {
-                Response {
-                    id: uuid(),
-                    to: self.from,
-                    from: self.to,
-                    core,
-                    response_to: self.id
-                }
-            }
-            Err(err) => {
-                self.fail(err.to_string().as_str())
-            }
-        }
-    }
-
-    pub fn substance_result<E>(self, result: Result<Payload,E> ) -> Response where E: ToString {
-        match result {
-            Ok(substance) => {
-                self.ok_substance(substance)
-            }
-            Err(err) => {
-                self.fail(err.to_string().as_str())
-            }
-        }
-    }
-
-     */
-
-    pub fn ok(self) -> RespShell {
-        let core = RespCore {
-            headers: Default::default(),
-            status: StatusCode::from_u16(200u16).unwrap(),
-            body: Substance::Empty,
-        };
-        let response = RespShell {
-            id: uuid(),
-            from: self.to,
-            to: self.from,
-            core,
-            response_to: self.id,
-        };
-        response
-    }
-
-    pub fn ok_body(self, body: Substance) -> RespShell {
-        let core = RespCore {
-            headers: Default::default(),
-            status: StatusCode::from_u16(200u16).unwrap(),
-            body,
-        };
-        let response = RespShell {
-            id: uuid(),
-            from: self.to,
-            to: self.from,
-            core,
-            response_to: self.id,
-        };
-        response
-    }
-
-    pub fn fail(self, status: u16, error: &str) -> RespShell {
-        let core = RespCore {
-            headers: Default::default(),
-            status: StatusCode::from_u16(status)
-                .or_else(|_| StatusCode::from_u16(500u16))
-                .unwrap(),
-            body: Substance::Errors(Errors::default(error.to_string().as_str())),
-        };
-        let response = RespShell {
-            id: uuid(),
-            from: self.to,
-            to: self.from,
-            core,
-            response_to: self.id,
-        };
-        response
-    }
-}
-
-pub struct ReqBuilder {
-    pub to: Option<Port>,
-    pub from: Option<Port>,
-    pub core: Option<ReqCore>,
-    pub agent: Agent,
-    pub session: Option<Session>,
-    pub scope: Scope,
-    pub handling: Handling,
-}
-
-impl ReqBuilder {
-    pub fn new() -> Self {
-        Self {
-            ..Default::default()
-        }
-    }
-
-    pub fn to<P: ToPort>(mut self, point: P) -> Self {
-        self.to = Some(point.to_port());
-        self
-    }
-
-    pub fn from<P: ToPort>(mut self, point: P) -> Self {
-        self.from = Some(point.to_port());
-        self
-    }
-
-    pub fn core(mut self, core: ReqCore) -> Self {
-        self.core = Some(core);
-        self
-    }
-
-    pub fn agent(mut self, agent: Agent) -> Self {
-        self.agent = agent;
-        self
-    }
-
-    pub fn session(mut self, session: Session) -> Self {
-        self.session = Some(session);
-        self
-    }
-
-    pub fn scope(mut self, scope: Scope) -> Self {
-        self.scope = scope;
-        self
-    }
-
-    pub fn handling(mut self, handling: Handling) -> Self {
-        self.handling = handling;
-        self
-    }
-
-    pub fn build(self) -> Result<ReqShell, MsgErr> {
-        Ok(ReqShell {
-            id: uuid(),
-            to: self.to.ok_or("RequestBuilder: 'to' must be set")?,
-            from: self.from.ok_or("RequestBuilder: 'from' must be set")?,
-            core: self.core.ok_or("RequestBuilder: 'core' must be set")?,
-            agent: self.agent,
-            scope: self.scope,
-            handling: self.handling,
-        })
-    }
-}
-
-impl Default for ReqBuilder {
-    fn default() -> Self {
-        Self {
-            to: None,
-            from: None,
-            core: None,
-            agent: Default::default(),
-            session: None,
-            scope: Default::default(),
-            handling: Default::default(),
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct ReqProto {
-    pub id: String,
+pub enum ReflectedProto {
+    Pong(PongProto),
+}
+
+impl ReflectedProto {
+    pub fn fill_to(&mut self, to: &Port) {
+        match self {
+            ReflectedProto::Pong(pong) => pong.fill_to(to),
+        }
+    }
+
+    pub fn fill_from(&mut self, from: &Port) {
+        match self {
+            ReflectedProto::Pong(pong) => pong.fill_from(from),
+        }
+    }
+
+    pub fn fill_scope(&mut self, scope: &Scope) {
+        match self {
+            ReflectedProto::Pong(pong) => pong.fill_scope(scope),
+        }
+    }
+
+    pub fn fill_agent(&mut self, agent: &Agent) {
+        match self {
+            ReflectedProto::Pong(pong) => pong.fill_agent(agent),
+        }
+    }
+
+    pub fn fill_handling(&mut self, handling: &Handlong) {
+        match self {
+            ReflectedProto::Pong(pong) => pong.fill_handling(handling),
+        }
+    }
+
+    pub fn body(&mut self, body: Substance) -> Result<(), MsgErr> {
+        match self {
+            ReflectedProto::Pong(pong) => pong.body(body),
+        }
+    }
+
+    pub fn to(&mut self, to: Port) {
+        match self {
+            ReflectedProto::Pong(pong) => pong.to(to),
+        }
+    }
+
+    pub fn from(&mut self, from: Port) {
+        match self {
+            ReflectedProto::Pong(pong) => pong.from(from),
+        }
+    }
+
+    pub fn build(self) -> Result<ReflectedWave, MsgErr> {
+        match self {
+            ReflectedWave::Pong(pong) => Ok(ReflectedWave::Pong(pong.build()?)),
+        }
+    }
+
+
+}
+
+
+
+
+pub struct PongProto {
+    pub id: WaveId,
+    pub intended: Option<Port>,
     pub from: Option<Port>,
     pub to: Option<Port>,
-    pub core: Option<ReqCore>,
+    pub body: Option<Substance>,
+    pub status: Option<StatusCode>,
+    pub handling: Option<Handling>,
+    pub scope: Option<Scope>,
+    pub agent: Option<Agent>,
+    pub response_to: Option<WaveId>
+}
+
+impl PongProto {
+
+    pub fn new() -> Self {
+        Self {
+            id: WaveId::new(WaveKind::Pong),
+            intended: None,
+            from: None,
+            to: None,
+            body: None,
+            status: None,
+            handling: None,
+            scope: None,
+            agent: None,
+            response_to: None
+        }
+    }
+
+    pub fn fill<V>( &mut self, wave: &Wave<V>) where V: WaveVariant {
+        self.fill_to(&wave.from);
+        self.fill_handling( &wave.handling );
+        self.fill_scope( &wave.scope);
+        self.fill_agent( &wave.agent );
+        self.response_to = Some( wave.id.clone() );
+    }
+
+    pub fn fill_intended(&mut self, intended: &Port) {
+        if self.intended.is_none() {
+            self.intended.replace(intended.clone());
+        }
+    }
+
+    pub fn fill_to(&mut self, to: &Port) {
+        if self.to.is_none() {
+            self.to.replace(to.clone());
+        }
+    }
+
+    pub fn fill_from(&mut self, from: &Port) {
+        if self.from.is_none() {
+            self.from.replace(from.clone());
+        }
+    }
+
+    pub fn fill_scope(&mut self, scope: &Scope) {
+        match self {
+            DirectedProto::Ping(ping) => ping.fill_scope(scope.clone()),
+        }
+    }
+
+    pub fn fill_agent(&mut self, agent: &Agent) {
+        match self {
+            DirectedProto::Ping(ping) => ping.fill_agent(agent.clone()),
+        }
+    }
+
+    pub fn fill_handling(&mut self, handling: &Handling) {
+        if self.handling.is_none() {
+            self.handling.replace(handling.clone())
+        }
+    }
+
+    pub fn fill_status(&mut self, status: &StatusCode ) {
+        if self.status.is_none() {
+            self.status.replace(status.clone())
+        }
+    }
+
+    pub fn body(&mut self, body: Substance) -> Result<(), MsgErr> {
+        self.body.replace(body);
+        Ok(())
+    }
+
+    pub fn to(&mut self, to: Port) {
+        self.to.replace(to.clone());
+    }
+
+    pub fn from(&mut self, from: Port) {
+        self.from.replace(from.clone());
+    }
+
+    pub fn build(self) -> Result<Wave<Pong>, MsgErr> {
+        let mut core = ReflectedCore::new();
+        core.body = self.body.or_else( || Some(Surface::Empty) ).unwrap();
+        core.status = self.status.or_else( || Some(StatusCode::from_u16(200u16).unwrap()) ).unwrap();
+        let pong = Wave::new( Pong::new(core, self.intended.ok_or("intended")?, self.response_to.ok_or("response to expectefd")? ), self.from.ok_or("expected from")? );
+        Ok(pong)
+    }
+}
+
+
+
+#[derive(Debug, Clone)]
+pub enum DirectedProto {
+    Ping(PingProto),
+}
+
+impl DirectedProto {
+    pub fn fill_to<R: ToRecipients>(&mut self, to: R) {
+        match self {
+            DirectedProto::Ping(ping) => ping.fill_to(to),
+        }
+    }
+
+    pub fn fill_from<P: ToPort>(&mut self, from: P) {
+        match self {
+            DirectedProto::Ping(ping) => ping.fill_from(from),
+        }
+    }
+
+    pub fn fill_core(&mut self, core: DirectedCore) {
+        match self {
+            DirectedProto::Ping(ping) => ping.fill_core(core),
+        }
+    }
+
+    pub fn fill_scope(&mut self, scope: Scope) {
+        match self {
+            DirectedProto::Ping(ping) => ping.fill_scope(scope),
+        }
+    }
+
+    pub fn fill_agent(&mut self, agent: Agent) {
+        match self {
+            DirectedProto::Ping(ping) => ping.fill_agent(agent),
+        }
+    }
+
+    pub fn fill_handling(&mut self, handling: Handling) {
+        match self {
+            DirectedProto::Ping(ping) => ping.fill_handling(handling),
+        }
+    }
+
+    pub fn body(&mut self, body: Substance) -> Result<(), MsgErr> {
+        match self {
+            DirectedProto::Ping(ping) => ping.body(body),
+        }
+    }
+
+    pub fn core(&mut self, core: DirectedCore) -> Result<(), MsgErr> {
+        match self {
+            DirectedProto::Ping(ping) => ping.core(core),
+        }
+    }
+
+    pub fn method<M: Into<Method>>(&mut self, method: M) -> Result<(), MsgErr> {
+        match self {
+            DirectedProto::Ping(ping) => ping.method(method),
+        }
+    }
+    pub fn to<P: ToRecipients>(&mut self, to: P) {
+        match self {
+            DirectedProto::Ping(ping) => ping.to(to),
+        }
+    }
+
+    pub fn from<P: ToPort>(&mut self, from: P) {
+        match self {
+            DirectedProto::Ping(ping) => ping.from(from),
+        }
+    }
+
+    pub fn build(self) -> Result<DirectedWave, MsgErr> {
+        match self {
+            DirectedProto::Ping(ping) => Ok(DirectedWave::Ping(ping.build()?)),
+        }
+    }
+}
+
+impl Into<DirectedProto> for PingProto {
+    fn into(self) -> DirectedProto {
+        DirectedProto::Ping(self)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PingProto {
+    pub id: WaveId,
+    pub from: Option<Port>,
+    pub to: Option<Recipients>,
+    pub core: Option<DirectedCore>,
     pub handling: Option<Handling>,
     pub scope: Option<Scope>,
     pub agent: Option<Agent>,
 }
 
-impl ReqProto {
-    pub fn build(self) -> Result<ReqShell, MsgErr> {
-        let request = ReqShell {
-            id: self.id,
-            from: self.from.ok_or(MsgErr::new(500u16, "must set 'from'"))?,
-            to: self.to.ok_or(MsgErr::new(500u16, "must set 'to'"))?,
-            core: self
-                .core
-                .ok_or(MsgErr::new(500u16, "request core must be set"))?,
-            agent: self.agent.ok_or(MsgErr::new(500u16, "must set 'agent'"))?,
-            handling: self
-                .handling
-                .ok_or(MsgErr::new(500u16, "must set 'handling'"))?,
-            scope: self.scope.ok_or(MsgErr::new(500u16, "must set 'scope'"))?,
-        };
-        Ok(request)
+impl PingProto {
+    pub fn build(self) -> Result<Wave<Ping>, MsgErr> {
+        let mut req = Wave::new(
+            Ping {
+                to: self
+                    .to
+                    .ok_or(MsgErr::new(500u16, "must set 'to'"))?
+                    .single_or()?,
+                core: self
+                    .core
+                    .ok_or(MsgErr::new(500u16, "request core must be set"))?,
+            },
+            self.from.ok_or(MsgErr::new(500u16, "must set 'from'"))?,
+        );
+
+        req.agent = self.agent.unwrap_or_else(|| Agent::Anonymous)?;
+        req.handling = self.handling.unwrap_or_else(|| Handling::default());
+
+        req.scope = self.scope.unwrap_or_else(|| Scope::None);
+        Ok(req)
     }
 
-    pub fn fill_to<P: ToPort>(&mut self, to: P) {
+    pub fn fill_to<R: ToRecipients>(&mut self, to: R) {
         if self.to.is_none() {
-            self.to.replace(to.to_port());
+            self.to.replace(to.to_recipients());
         }
     }
 
@@ -1128,7 +856,7 @@ impl ReqProto {
         }
     }
 
-    pub fn fill_core(&mut self, core: ReqCore) {
+    pub fn fill_core(&mut self, core: DirectedCore) {
         if self.core.is_none() {
             self.core.replace(core);
         }
@@ -1160,11 +888,10 @@ impl ReqProto {
         Ok(())
     }
 
-    pub fn core(&mut self, core: ReqCore) -> Result<(), MsgErr> {
+    pub fn core(&mut self, core: DirectedCore) -> Result<(), MsgErr> {
         self.core.replace(core);
         Ok(())
     }
-
 
     pub fn method<M: Into<Method>>(&mut self, method: M) -> Result<(), MsgErr> {
         let method: Method = method.into();
@@ -1176,8 +903,8 @@ impl ReqProto {
         Ok(())
     }
 
-    pub fn to<P: ToPort>(&mut self, to: P) {
-        self.to.replace(to.to_port());
+    pub fn to<P: ToRecipients>(&mut self, to: P) {
+        self.to.replace(to.to_recipients());
     }
 
     pub fn from<P: ToPort>(&mut self, from: P) {
@@ -1185,34 +912,35 @@ impl ReqProto {
     }
 }
 
-impl ReqProto {
+impl PingProto {
     pub fn new() -> Self {
         Self {
-            id: uuid(),
+            id: WaveId::new(WaveKind::Ping),
             from: None,
             to: None,
             core: None,
             handling: None,
             scope: None,
             agent: None,
+            kind: WaveKind::Ping,
         }
     }
 
-    pub fn to_with_method<P: ToPort>(to: P, method: Method) -> Self {
+    pub fn to_with_method<P: ToRecipients>(to: P, method: Method) -> Self {
         Self {
-            id: uuid(),
+            id: WaveKind::new(WaveKind::Ping),
             from: None,
-            to: Some(to.to_port()),
-            core: Some(ReqCore::new(method)),
+            to: Some(to.to_recipients()),
+            core: Some(DirectedCore::new(method)),
             handling: None,
             scope: None,
             agent: None,
         }
     }
 
-    pub fn from_core(core: ReqCore) -> Self {
+    pub fn from_core(core: DirectedCore) -> Self {
         Self {
-            id: uuid(),
+            id: WaveKind::new(WaveKind::Ping),
             from: None,
             to: None,
             core: Some(core),
@@ -1245,43 +973,44 @@ impl ReqProto {
         let method: Method = method.into();
         Self::to_with_method(to, method)
     }
-
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct RespShell {
-    pub id: Uuid,
-    pub from: Port,
-    pub to: Port,
-    pub core: RespCore,
-    pub response_to: Uuid,
+pub struct Pong {
+    /// this is meant to be the intended request recipient, which may not be the point responding
+    /// to this message in the case it was intercepted and filtered at some point
+    pub intended: Port,
+    pub core: ReflectedCore,
+    pub response_to: WaveId,
 }
 
-impl RespShell {
+impl WaveVariant for Pong {
+    fn kind(&self) -> &WaveKind {
+        &WaveKind::Pong
+    }
+
+    fn to(&self) -> Recipients {
+        Recipients::Single(self.to.clone(()))
+    }
+
+    fn is_directed(&self) -> bool {
+        false
+    }
+
+    fn body(&self) -> &Substance {
+        &self.core.body
+    }
+}
+
+impl Pong {
     pub fn is_ok(&self) -> bool {
         self.core.is_ok()
     }
 
-    pub fn core_result<E>(result: Result<RespShell, E>) -> Result<RespCore, E> {
+    pub fn core_result<E>(result: Result<Pong, E>) -> Result<ReflectedCore, E> {
         match result {
             Ok(response) => Ok(response.core),
             Err(err) => Err(err),
-        }
-    }
-
-    pub fn to_xtra(self, span: Option<LogSpan>) -> RespXtra {
-        RespXtra {
-            session: None,
-            response: self,
-            span,
-        }
-    }
-
-    pub fn to_span_frame(self, span: LogSpan) -> RespXtra {
-        RespXtra {
-            session: None,
-            response: self,
-            span: Some(span),
         }
     }
 
@@ -1290,12 +1019,28 @@ impl RespShell {
     }
 }
 
-impl RespShell {
-    pub fn new(core: RespCore, from: Port, to: Port, response_to: String) -> Self {
+impl WaveVariant for Pong {
+    fn kind(&self) -> &WaveKind {
+        &WaveKind::Pong
+    }
+
+    fn to(&self) -> Recipients {
+        Recipients::Single(self.to.clone())
+    }
+
+    fn is_directed(&self) -> bool {
+        false
+    }
+
+    fn body(&self) -> &Substance {
+        &self.core.body
+    }
+}
+
+impl Pong {
+    pub fn new(core: ReflectedCore, intended: Port, response_to: WaveId) -> Self {
         Self {
-            id: uuid(),
-            to: to.into(),
-            from: from.into(),
+            intended,
             core,
             response_to,
         }
@@ -1315,75 +1060,383 @@ impl RespShell {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Autobox, Eq, PartialEq)]
-pub enum Wave {
-    Req(ReqShell),
-    Resp(RespShell),
+pub enum WaveDoppler {
+    Directed(DirectedWave),
+    Reflected(ReflectedWave),
 }
 
-impl Wave {
-    pub fn is_req(&self) -> bool {
+impl WaveVariant for WaveDoppler {
+    fn kind(&self) -> &WaveKind {
+        todo!()
+    }
+
+    fn to(&self) -> Recipients {
         match self {
-            Wave::Req(_) => true,
-            Wave::Resp(_) => false,
+            WaveDoppler::Directed(w) => w.to(),
+            WaveDoppler::Reflected(w) => w.to(),
         }
     }
 
-    pub fn is_resp(&self) -> bool {
+    fn is_directed(&self) -> bool {
         match self {
-            Wave::Req(_) => false,
-            Wave::Resp(_) => true,
+            WaveDoppler::Directed(_) => true,
+            WaveDoppler::Reflected(_) => false,
         }
     }
 
-    pub fn unwrap_req(self) -> ReqShell {
-        if let Wave::Req(req) = self {
-            req
+    fn body(&self) -> &Substance {
+        match self {
+            WaveDoppler::Directed(v) => v.body(),
+            WaveDoppler::Reflected(v) => v.body(),
+        }
+    }
+}
+
+pub struct RecipientSelector<'a> {
+    pub to: &'a Port,
+    pub wave: &'a Wave<DirectedWave>,
+}
+
+impl<'a> RecipientSelector<'a> {
+    pub fn new(to: &'a Port, wave: &'a Wave<DirectedWave>) -> Self {
+        Self { to, wave }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Autobox, Eq, PartialEq)]
+pub enum DirectedWave {
+    Ping(Wave<Ping>),
+}
+
+impl DirectedWave {
+    pub fn to_ultra(self) -> UltraWave {
+        match self {
+            DirectedWave::Ping(ping) => UltraWave::Ping(ping)
+        }
+    }
+}
+
+impl Deref for DirectedWave {
+    type Target = dyn DirectedWaveVariant;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            DirectedWave::Ping(req) => req,
+        }
+    }
+}
+
+pub trait DirectedWaveVariant: WaveVariant {
+    fn core(&self) -> &DirectedCore;
+
+    fn body(&self) -> &Substance {
+        &self.core().body
+    }
+}
+
+pub trait ReflectedWaveVariant: WaveVariant {
+    fn is_pong(self) -> bool;
+    fn to_pong(self) -> Result<Wave<Pong>, MsgErr>;
+
+    fn status(&self) -> &StatusCode;
+    fn success_or(&self) -> Result<(), MsgErr> {
+        if self.status().is_success() {
+            Ok(())
         } else {
-            panic!("call Wave.is_req() next time!");
+            MsgErr::Status {
+                status: self.status().status,
+                message: "fail".to_string(),
+            }
         }
     }
 
-    pub fn unwrap_resp(self) -> RespShell {
-        if let Wave::Resp(resp) = self {
-            resp
+    fn ok_or(&self) -> Result<(), MsgErr> {
+        if self.status().status == 200 {
+            Ok(())
         } else {
-            panic!("call Wave.is_resp() next time!");
+            MsgErr::Status {
+                status: self.status().status,
+                message: "fail".to_string(),
+            }
+        }
+    }
+    fn intended(&self) -> &Port;
+    fn responder(&self) -> &Port;
+}
+
+impl WaveVariant for DirectedWave {
+    fn kind(&self) -> &WaveKind {
+        match self {
+            DirectedWave::Ping(_) => &WaveKind::Ping,
         }
     }
 
-    pub fn id(&self) -> Uuid {
+    fn to(&self) -> Recipients {
         match self {
-            Wave::Req(request) => request.id.clone(),
-            Wave::Resp(response) => response.id.clone(),
+            DirectedWave::Ping(req) => req.to(),
         }
     }
 
-    pub fn substance(&self) -> Substance {
+    fn is_directed(&self) -> bool {
+        true
+    }
+
+    fn body(&self) -> &Substance {
+        &self.core().body
+    }
+}
+
+impl DirectedWaveVariant for DirectedWave {
+    fn core(&self) -> &DirectedCore {
         match self {
-            Wave::Req(request) => request.core.body.clone(),
-            Wave::Resp(response) => response.core.body.clone(),
+            DirectedWave::Ping(req) => &req.core,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Autobox, Eq, PartialEq)]
+pub enum ReflectedWave {
+    Pong(Wave<Pong>),
+}
+
+impl ReflectedWave {
+    pub fn to_ultra(self) -> UltraWave {
+        match self {
+            ReflectedWave::Pong(pong) => UltraWave::Pong(pong)
+        }
+    }
+}
+
+impl ReflectedWave {
+    pub fn is_success(&self) -> bool {
+        match self {
+            ReflectedWave::Pong(pong) => return pong.core.status.is_success(),
         }
     }
 
-    pub fn to(&self) -> &Port {
-        match self {
-            Wave::Req(request) => &request.to,
-            Wave::Resp(response) => &response.to,
+    pub fn success_or(&self) -> Result<(), MsgErr> {
+        if self.is_success() {
+            Ok(())
+        } else {
+            match self {
+                ReflectedWave::Pong(pong) => Err(MsgErr::Status {
+                    status: pong.core.status.as_u16(),
+                    message: "error".to_string(),
+                }),
+            }
         }
+    }
+}
+
+impl WaveVariant for ReflectedWave {
+    fn kind(&self) -> &WaveKind {
+        match self {
+            ReflectedWave::Pong(_) => &WaveKind::Ping,
+        }
+    }
+
+    fn to(&self) -> Recipients {
+        match self {
+            ReflectedWave::Pong(resp) => resp.to(),
+        }
+    }
+
+    fn is_directed(&self) -> bool {
+        true
+    }
+
+    fn body(&self) -> &Substance {
+        match self {
+            ReflectedWave::Pong(resp) => &resp.core.body,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Autobox, Eq, PartialEq)]
+pub enum Recipients {
+    Single(Port),
+    Multi(Vec<Port>),
+}
+
+impl ToRecipients for Recipients {
+    fn to_recipients(self) -> Recipients {
+        self
+    }
+}
+
+pub trait ToRecipients {
+    fn to_recipients(self) -> Recipients;
+}
+
+impl Recipients {
+    pub fn select_ports(&self, point: &Point) -> Vec<&Port> {
+        let mut rtn = vec![];
+        match self {
+            Recipients::Single(port) => {
+                if port.point == *point {
+                    rtn.push(port);
+                }
+            }
+            Recipients::Multi(ports) => {
+                for port in ports {
+                    if port.point == *point {
+                        rtn.push(port);
+                    }
+                }
+            }
+        }
+        rtn
+    }
+
+    pub fn is_single(&self) -> bool {
+        match self {
+            Recipients::Single(_) => true,
+            Recipients::Multi(_) => false,
+        }
+    }
+
+    pub fn is_multi(&self) -> bool {
+        match self {
+            Recipients::Single(_) => false,
+            Recipients::Multi(_) => true,
+        }
+    }
+
+    pub fn unwrap_single(self) -> Port {
+        self.single_or().expect("single")
+    }
+
+    pub fn unwrap_multi(self) -> Vec<Port> {
+        match self {
+            Recipients::Single(port) => vec![port],
+            Recipients::Multi(ports) => ports,
+        }
+    }
+
+    pub fn single_or(self) -> Result<Port, MsgErr> {
+        if let Recipients::Single(rtn) = self {
+            Ok(rtn)
+        } else {
+            Err("not a single".into())
+        }
+    }
+}
+
+pub type IpAddr = String;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub enum Origin {
+    Ip(IpAddr),
+    Point(Point),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Crypt<S> {
+    pub payload: S,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct SessionId {
+    pub origin: Crypt<Origin>,
+    pub uuid: Uuid,
+}
+
+pub trait WaveVariant {
+    fn kind(&self) -> &WaveKind;
+    fn to(&self) -> Recipients;
+    fn is_directed(&self) -> bool;
+    fn body(&self) -> &Substance;
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Wave<V> {
+    pub id: WaveId,
+    pub session: Option<SessionId>,
+    pub variant: V,
+    pub agent: Agent,
+    pub handling: Handling,
+    pub scope: Scope,
+    pub from: Port,
+}
+
+impl<V> Wave<V>
+where
+    V: WaveVariant,
+{
+    pub fn is_directed(&self) -> bool {
+        self.variant.is_directed()
+    }
+
+    pub fn is_reflected(&self) -> bool {
+        !self.variant.is_directed()
+    }
+
+    pub fn body(&self) -> &Substance {
+        self.variant.body()
+    }
+
+    pub fn to(&self) -> Recipients {
+        self.variant.to()
     }
 
     pub fn from(&self) -> &Port {
-        match self {
-            Wave::Req(request) => &request.from,
-            Wave::Resp(response) => &response.from,
+        &self.from
+    }
+
+    pub fn new(variant: V, from: Port) -> Self {
+        Self {
+            id: WaveId::new(variant.kind().clone()),
+            session: None,
+            agent: Default::default(),
+            handling: Default::default(),
+            scope: Default::default(),
+            variant,
+            from,
         }
+    }
+}
+
+impl Wave<Ping> {
+    pub fn pong(&self) -> PongProto {
+        let mut pong = PongProto::new();
+        pong.fill( self );
+        pong.response_to(self.id.clone());
+        pong
+    }
+}
+
+impl Wave<Pong> {
+    pub fn to_reflected(self) -> ReflectedWave {
+        ReflectedWave::Pong(self)
+    }
+}
+
+impl DirectedWave {
+    pub fn reflected(&self) -> ReflectedProto {
+        match self {
+            DirectedWave::Ping(ping) => ReflectedProto::Pong(ping.pong())
+        }
+    }
+}
+
+impl<V> Deref for Wave<V> {
+    type Target = V;
+
+    fn deref(&self) -> &Self::Target {
+        &self.variant
+    }
+}
+
+impl<V> DerefMut for Wave<V> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.variant
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RequestTransform {
-    Request(ReqCore),
-    Response(RespCore),
+    Request(DirectedCore),
+    Response(ReflectedCore),
 }
 
 pub enum ResponseKindExpected {
@@ -1411,6 +1464,12 @@ pub struct Session {
 }
 
 impl Session {
+    pub fn new() -> Self {
+        Self {
+            id: uuid(),
+            attributes: HashMap::new(),
+        }
+    }
     pub fn get_preferred_username(&self) -> Option<String> {
         self.attributes
             .get(&"preferred_username".to_string())
@@ -1517,7 +1576,7 @@ impl Default for Scope {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct ScopeGrant {
-    pub on: PointSelector,
+    pub on: Selector,
     pub kind: ScopeGrantKind,
     pub aspect: ScopeGrantAspect,
 }
@@ -1631,28 +1690,23 @@ impl Default for Karma {
 }
 
 #[async_trait]
-pub trait AsyncRouter: Send + Sync {
-    async fn route(&self, wave: Wave);
-}
-
-#[async_trait]
 pub trait Router: Send + Sync {
-    async fn route(&self, wave: Wave);
+    async fn route(&self, wave: UltraWave );
 }
 
 #[derive(Clone)]
-pub struct AsyncPointRequestHandlers {
-    pub handlers: Arc<DashMap<Point, Box<dyn AsyncRequestHandler>>>,
+pub struct PointDirectedHandlerSelector {
+    pub handlers: Arc<DashMap<Point, Box<dyn DirectedHandler>>>,
 }
 
-impl AsyncPointRequestHandlers {
+impl PointDirectedHandlerSelector {
     pub fn new() -> Self {
         Self {
             handlers: Arc::new(DashMap::new()),
         }
     }
 
-    pub fn add(&self, point: Point, handler: Box<dyn AsyncRequestHandler>) {
+    pub fn add(&self, point: Point, handler: Box<dyn DirectedHandler>) {
         self.handlers.insert(point, handler);
     }
 
@@ -1662,22 +1716,28 @@ impl AsyncPointRequestHandlers {
 }
 
 #[async_trait]
-impl AsyncRequestHandler for AsyncPointRequestHandlers {
-    async fn select(&self, request: &ReqShell) -> Result<(), ()> {
-        if let Some(handler) = self.handlers.get(&request.to.clone().to_point()) {
-            handler.select(request).await
+impl DirectedHandlerSelector for PointDirectedHandlerSelector {
+    async fn select<'a>(
+        &self,
+        select: &'a RecipientSelector<'a>,
+    ) -> Result<&dyn DirectedHandler, ()> {
+        if let Some(handler) = self.handlers.get(&select.to.point) {
+            Ok(handler.value().as_ref())
         } else {
             Err(())
         }
     }
 
-    async fn handle(&self, request: RootInCtx<ReqShell>) -> Result<RespCore, MsgErr> {
-        if let Some(handler) = self.handlers.get(&request.to) {
-            handler.handle(request).await
+    /*
+    async fn handle(&self, ctx: RootInCtx) -> ReflectedWave {
+        if let Some(handler) = self.handlers.get(&ctx.to) {
+            handler.value().handle(ctx).await
         } else {
-            Err(MsgErr::not_found())
+            Ok(ctx.not_found())
         }
     }
+
+     */
 }
 
 pub trait TransportPlanner {
@@ -1693,7 +1753,7 @@ pub struct SyncTransmitRelay {
 }
 
 impl SyncTransmitter for SyncTransmitRelay {
-    fn send(&self, request: ReqShell) -> RespShell {
+    fn send(&self, request: Ping) -> Pong {
         let mut request = request;
         if let Some(topic) = &self.topic {
             request.from.topic = topic.clone();
@@ -1746,14 +1806,8 @@ impl SyncTransmitRelay {
     }
 }
 
-#[async_trait]
-pub trait AsyncTransmitter: Send + Sync {
-    async fn req(&self, request: ReqShell) -> Result<RespShell, MsgErr>;
-    async fn route(&self, wave: Wave);
-}
-
 pub trait SyncTransmitter: Send + Sync {
-    fn send(&self, request: ReqShell) -> RespShell;
+    fn send(&self, request: Ping) -> Pong;
 }
 
 pub struct InternalPipeline<H> {
@@ -1767,57 +1821,30 @@ impl<H> InternalPipeline<H> {
     }
 }
 
-pub trait RequestHandler {
-    fn select(&self, request: &ReqShell) -> Result<(), ()>;
-    fn handle(&self, request: RootInCtx<ReqShell>) -> Result<RespCore, MsgErr>;
+#[async_trait]
+pub trait DirectedHandlerSelector: Sync + Send {
+    async fn select<'a>(
+        &self,
+        select: &'a RecipientSelector<'a>,
+    ) -> Result<&dyn DirectedHandler, ()>;
 }
 
 #[async_trait]
-pub trait AsyncRequestHandler: Sync + Send {
-    async fn select(&self, request: &ReqShell) -> Result<(), ()>;
-    async fn handle(&self, request: RootInCtx<ReqShell>) -> Result<RespCore, MsgErr>;
+pub trait DirectedHandler: Sync + Send {
+    async fn handle(&self, ctx: RootInCtx) -> ReflectedWave;
 }
 
-impl RequestHandler for RequestHandlerRelay {
-    fn select(&self, request: &ReqShell) -> Result<(), ()> {
-        self.relay.select(request)
-    }
-
-    fn handle(&self, request: RootInCtx<ReqShell>) -> Result<RespCore, MsgErr> {
-        self.relay.handle(request)
-    }
-}
-
+/*
 #[derive(Clone)]
-pub struct AsyncRequestHandlerRelay {
-    pub relay: Arc<dyn AsyncRequestHandler>,
-}
-
-impl AsyncRequestHandlerRelay {
-    pub fn new(handler: Arc<dyn AsyncRequestHandler>) -> Self {
-        Self { relay: handler }
-    }
-}
-
-#[async_trait]
-impl AsyncRequestHandler for AsyncRequestHandlerRelay {
-    async fn select(&self, request: &ReqShell) -> Result<(), ()> {
-        self.relay.select(request).await
-    }
-
-    async fn handle(&self, ctx: RootInCtx<ReqShell>) -> Result<RespCore, MsgErr> {
-        self.relay.handle(ctx).await
-    }
-}
-
-#[derive(Clone)]
-pub struct AsyncInternalRequestHandlers<H> {
+pub struct PointRequestHandler<H> {
+    point: Point,
     pipelines: Arc<RwLock<Vec<InternalPipeline<H>>>>,
 }
 
-impl<H> AsyncInternalRequestHandlers<H> {
-    pub fn new() -> Self {
+impl<H> PointRequestHandler<H> {
+    pub fn new(point: Point) -> Self {
         Self {
+            point,
             pipelines: Arc::new(RwLock::new(vec![])),
         }
     }
@@ -1835,37 +1862,42 @@ impl<H> AsyncInternalRequestHandlers<H> {
 }
 
 #[async_trait]
-impl AsyncRequestHandler for AsyncInternalRequestHandlers<AsyncRequestHandlerRelay> {
-    async fn select(&self, request: &ReqShell) -> Result<(), ()> {
+impl DirectedHandlerSelector for PointRequestHandler<AsyncRequestHandlerRelay> {
+    async fn select<'a>(
+        &self,
+        select: &'a RecipientSelector<'a>,
+    ) -> Result<&dyn DirectedHandler, ()> {
         let read = self.pipelines.read().await;
         for pipeline in read.iter() {
-            if pipeline.selector.is_match(&request).is_ok() {
+            if pipeline.selector.is_match(select).is_ok() {
                 return pipeline.handler.select(request).await;
             }
         }
         Err(())
     }
 
-    async fn handle(&self, ctx: RootInCtx<ReqShell>) -> Result<RespCore, MsgErr> {
-        let read = self.pipelines.read().await;
-        for pipeline in read.iter() {
-            if pipeline.selector.is_match(&ctx.request).is_ok() {
-                return pipeline.handler.handle(ctx).await;
+    /*
+    async fn handle(&self, ctx: RootInCtx) -> ReflectedWave
+    where
+        V: DirectedWaveVariant,
+    {
+        for port in ctx.wave.to().select_ports(&self.point) {
+            let select = RecipientSelector::new(port, &ctx.wave);
+            let read = self.pipelines.read().await;
+            for pipeline in read.iter() {
+                if pipeline.selector.is_match(&ctx.wave).is_ok() {
+                    return pipeline.handler.handle(ctx).await;
+                }
             }
         }
-        Ok(RespCore::not_found())
+        ctx.not_found()
     }
+
+     */
 }
 
-pub struct RequestHandlerRelay {
-    pub relay: Box<dyn RequestHandler>,
-}
 
-impl RequestHandlerRelay {
-    pub fn new(handler: Box<dyn RequestHandler>) -> Self {
-        Self { relay: handler }
-    }
-}
+ */
 
 #[derive(
     Debug,
@@ -1894,8 +1926,8 @@ impl ValueMatcher<MethodKind> for MethodKind {
     }
 }
 
-impl From<Result<RespCore, MsgErr>> for RespCore {
-    fn from(result: Result<RespCore, MsgErr>) -> Self {
+impl From<Result<ReflectedCore, MsgErr>> for ReflectedCore {
+    fn from(result: Result<ReflectedCore, MsgErr>) -> Self {
         match result {
             Ok(response) => response,
             Err(err) => err.into(),
@@ -1904,7 +1936,7 @@ impl From<Result<RespCore, MsgErr>> for RespCore {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct RespCore {
+pub struct ReflectedCore {
     #[serde(with = "http_serde::header_map")]
     pub headers: HeaderMap,
 
@@ -1914,14 +1946,14 @@ pub struct RespCore {
     pub body: Substance,
 }
 
-impl RespCore {
+impl ReflectedCore {
     pub fn ok_html(html: &str) -> Self {
         let bin = Arc::new(html.to_string().into_bytes());
-        RespCore::ok(Substance::Bin(bin))
+        ReflectedCore::ok(Substance::Bin(bin))
     }
 
     pub fn new() -> Self {
-        RespCore {
+        ReflectedCore {
             headers: HeaderMap::new(),
             status: StatusCode::from_u16(200u16).unwrap(),
             body: Substance::Empty,
@@ -2017,11 +2049,11 @@ impl RespCore {
         return self.status.is_success();
     }
 
-    pub fn into_response<P>(self, from: P, to: P, response_to: String) -> RespShell
+    pub fn into_response<P>(self, from: P, to: P, response_to: String) -> Pong
     where
         P: ToPort,
     {
-        RespShell {
+        Pong {
             id: uuid(),
             from: from.to_port(),
             to: to.to_port(),
@@ -2031,7 +2063,7 @@ impl RespCore {
     }
 }
 
-impl RespCore {
+impl ReflectedCore {
     pub fn as_result<E: From<&'static str>, P: TryFrom<Substance>>(self) -> Result<P, E> {
         if self.status.is_success() {
             match P::try_from(self.body) {
@@ -2044,7 +2076,7 @@ impl RespCore {
     }
 }
 
-impl TryInto<http::response::Builder> for RespCore {
+impl TryInto<http::response::Builder> for ReflectedCore {
     type Error = MsgErr;
 
     fn try_into(self) -> Result<http::response::Builder, Self::Error> {
@@ -2063,7 +2095,7 @@ impl TryInto<http::response::Builder> for RespCore {
     }
 }
 
-impl TryInto<http::Response<Bin>> for RespCore {
+impl TryInto<http::Response<Bin>> for ReflectedCore {
     type Error = MsgErr;
 
     fn try_into(self) -> Result<http::Response<Bin>, Self::Error> {
@@ -2185,9 +2217,9 @@ impl ToString for Method {
     }
 }
 
-impl Into<ReqCore> for Method {
-    fn into(self) -> ReqCore {
-        ReqCore {
+impl Into<DirectedCore> for Method {
+    fn into(self) -> DirectedCore {
+        DirectedCore {
             headers: Default::default(),
             method: self,
             uri: Uri::from_static("/"),
@@ -2197,7 +2229,7 @@ impl Into<ReqCore> for Method {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct ReqCore {
+pub struct DirectedCore {
     #[serde(with = "http_serde::header_map")]
     pub headers: HeaderMap,
     pub method: Method,
@@ -2206,7 +2238,7 @@ pub struct ReqCore {
     pub body: Substance,
 }
 
-impl ReqCore {
+impl DirectedCore {
     pub fn new(method: Method) -> Self {
         Self {
             method,
@@ -2235,23 +2267,23 @@ impl ReqCore {
     }
 }
 
-impl TryFrom<ReqShell> for ReqCore {
+impl TryFrom<Ping> for DirectedCore {
     type Error = MsgErr;
 
-    fn try_from(request: ReqShell) -> Result<Self, Self::Error> {
+    fn try_from(request: Ping) -> Result<Self, Self::Error> {
         Ok(request.core)
     }
 }
 
-impl ReqCore {
+impl DirectedCore {
     pub fn kind(&self) -> MethodKind {
         self.method.kind()
     }
 }
 
-impl Into<ReqCore> for Command {
-    fn into(self) -> ReqCore {
-        ReqCore {
+impl Into<DirectedCore> for Command {
+    fn into(self) -> DirectedCore {
+        DirectedCore {
             body: Substance::Command(Box::new(self)),
             method: Method::Msg(MsgMethod::new("Command").unwrap()),
             ..Default::default()
@@ -2259,7 +2291,7 @@ impl Into<ReqCore> for Command {
     }
 }
 
-impl TryFrom<http::Request<Bin>> for ReqCore {
+impl TryFrom<http::Request<Bin>> for DirectedCore {
     type Error = MsgErr;
 
     fn try_from(request: http::Request<Bin>) -> Result<Self, Self::Error> {
@@ -2272,7 +2304,7 @@ impl TryFrom<http::Request<Bin>> for ReqCore {
     }
 }
 
-impl TryInto<http::Request<Bin>> for ReqCore {
+impl TryInto<http::Request<Bin>> for DirectedCore {
     type Error = MsgErr;
 
     fn try_into(self) -> Result<http::Request<Bin>, MsgErr> {
@@ -2295,7 +2327,7 @@ impl TryInto<http::Request<Bin>> for ReqCore {
     }
 }
 
-impl Default for ReqCore {
+impl Default for DirectedCore {
     fn default() -> Self {
         Self {
             headers: Default::default(),
@@ -2306,7 +2338,7 @@ impl Default for ReqCore {
     }
 }
 
-impl ReqCore {
+impl DirectedCore {
     pub fn with_body(self, body: Substance) -> Self {
         Self {
             headers: self.headers,
@@ -2316,73 +2348,73 @@ impl ReqCore {
         }
     }
 
-    pub fn server_error(&self) -> RespCore {
-        RespCore {
+    pub fn server_error(&self) -> ReflectedCore {
+        ReflectedCore {
             headers: Default::default(),
             status: StatusCode::from_u16(500u16).unwrap(),
             body: Substance::Empty,
         }
     }
 
-    pub fn timeout(&self) -> RespCore {
-        RespCore {
+    pub fn timeout(&self) -> ReflectedCore {
+        ReflectedCore {
             headers: Default::default(),
             status: StatusCode::from_u16(408u16).unwrap(),
             body: Substance::Empty,
         }
     }
 
-    pub fn not_found(&self) -> RespCore {
-        RespCore {
+    pub fn not_found(&self) -> ReflectedCore {
+        ReflectedCore {
             headers: Default::default(),
             status: StatusCode::from_u16(404u16).unwrap(),
             body: Substance::Empty,
         }
     }
 
-    pub fn forbidden(&self) -> RespCore {
-        RespCore {
+    pub fn forbidden(&self) -> ReflectedCore {
+        ReflectedCore {
             headers: Default::default(),
             status: StatusCode::from_u16(403u16).unwrap(),
             body: Substance::Empty,
         }
     }
 
-    pub fn bad_request(&self) -> RespCore {
-        RespCore {
+    pub fn bad_request(&self) -> ReflectedCore {
+        ReflectedCore {
             headers: Default::default(),
             status: StatusCode::from_u16(400u16).unwrap(),
             body: Substance::Empty,
         }
     }
 
-    pub fn substance(method: Method, body: Substance) -> ReqCore {
-        ReqCore {
+    pub fn substance(method: Method, body: Substance) -> DirectedCore {
+        DirectedCore {
             method,
             body,
             ..Default::default()
         }
     }
 
-    pub fn ok(&self) -> RespCore {
-        RespCore {
+    pub fn ok(&self) -> ReflectedCore {
+        ReflectedCore {
             headers: Default::default(),
             status: StatusCode::from_u16(200u16).unwrap(),
             body: Substance::Empty,
         }
     }
 
-    pub fn ok_body(&self, body: Substance) -> RespCore {
-        RespCore {
+    pub fn ok_body(&self, body: Substance) -> ReflectedCore {
+        ReflectedCore {
             headers: Default::default(),
             status: StatusCode::from_u16(200u16).unwrap(),
             body,
         }
     }
 
-    pub fn fail<M: ToString>(&self, status: u16, message: M) -> RespCore {
+    pub fn fail<M: ToString>(&self, status: u16, message: M) -> ReflectedCore {
         let errors = Errors::default(message.to_string().as_str());
-        RespCore {
+        ReflectedCore {
             headers: Default::default(),
             status: StatusCode::from_u16(status)
                 .or_else(|_| StatusCode::from_u16(500u16))
@@ -2391,14 +2423,14 @@ impl ReqCore {
         }
     }
 
-    pub fn err<E: StatusErr>(&self, error: E) -> RespCore {
+    pub fn err<E: StatusErr>(&self, error: E) -> ReflectedCore {
         let errors = Errors::default(error.message().as_str());
         let status = match StatusCode::from_u16(error.status()) {
             Ok(status) => status,
             Err(_) => StatusCode::from_u16(500u16).unwrap(),
         };
         println!("----->   returning STATUS of {}", status.as_str());
-        RespCore {
+        ReflectedCore {
             headers: Default::default(),
             status,
             body: Substance::Errors(errors),
@@ -2406,16 +2438,16 @@ impl ReqCore {
     }
 }
 
-impl Into<RespCore> for Port {
-    fn into(self) -> RespCore {
-        RespCore::ok(Substance::Port(self))
+impl Into<ReflectedCore> for Port {
+    fn into(self) -> ReflectedCore {
+        ReflectedCore::ok(Substance::Port(self))
     }
 }
 
-impl TryFrom<RespCore> for Port {
+impl TryFrom<ReflectedCore> for Port {
     type Error = MsgErr;
 
-    fn try_from(core: RespCore) -> Result<Self, Self::Error> {
+    fn try_from(core: ReflectedCore) -> Result<Self, Self::Error> {
         if !core.status.is_success() {
             Err(MsgErr::new(core.status.as_u16(), "error"))
         } else {
@@ -2472,7 +2504,7 @@ pub enum SysMethod {
     AssignPort,
     EntryReq,
     Transport,
-    HyperWave
+    HyperWave,
 }
 
 impl ValueMatcher<SysMethod> for SysMethod {
@@ -2492,24 +2524,64 @@ pub enum SetStrategy<T> {
     Override(T),
 }
 
-impl <T> SetStrategy<T> {
-    pub fn unwrap(self) -> Result<T,MsgErr>{
+impl<T> SetStrategy<T> {
+    pub fn unwrap(self) -> Result<T, MsgErr> {
         match self {
             SetStrategy::None => Err("cannot unwrap a SetStrategy::None".into()),
             SetStrategy::Fill(t) => Ok(t),
-            SetStrategy::Override(t) => Ok(t)
+            SetStrategy::Override(t) => Ok(t),
         }
     }
 }
 
 impl SetStrategy<Port> {
-    pub fn with_topic( self, topic: Topic ) -> Result<Self,MsgErr> {
+    pub fn with_topic(self, topic: Topic) -> Result<Self, MsgErr> {
         match self {
             SetStrategy::None => Err("cannot set topic if Strategy is None".into()),
-            SetStrategy::Fill(port) => {Ok(SetStrategy::Fill(port.with_topic(topic)))}
-            SetStrategy::Override(port) => {Ok(SetStrategy::Override(port.with_topic(topic)))}
+            SetStrategy::Fill(port) => Ok(SetStrategy::Fill(port.with_topic(topic))),
+            SetStrategy::Override(port) => Ok(SetStrategy::Override(port.with_topic(topic))),
         }
     }
+}
+
+#[derive(Clone)]
+pub struct Exchanger {
+    pub port: Port,
+    pub ping_pong: Arc<DashMap<WaveId,oneshot::Sender<Wave<Pong>>>>,
+    pub timeouts: Timeouts
+}
+
+impl Exchanger{
+    pub fn new( port: Port, map: Arc<DashMap<WaveId,oneshot::Sender<ReflectedWave>>>, timeouts: Timeouts) -> Self {
+        Self {
+            port,
+            ping_pong,
+            timeouts
+        }
+    }
+
+    pub async fn ping_pong( &self, ping: &Wave<Ping> ) -> oneshot::Receiver<Wave<Pong>> {
+        let (tx,rx) = oneshot::channel();
+        self.ping_pong.insert(ping.id.clone(),tx);
+        let ping_pong = self.ping_pong.clone();
+        let timeout = self.timeouts.from( &ping.handling.wait);
+        let mut pong = PongProto::new();
+        pong.fill(ping);
+        pong.from(self.port.clone());
+        tokio::spawn( async move {
+          tokio::time::sleep_until(Instant::now() + Duration::from_millis(timeout)).await;
+           let id = pong.response_to.as_ref().unwrap();
+            if let Some((_,tx)) = ping_pong.remove(id)  {
+                pong.status = Some(StatusCode::from_u16(408).unwrap());
+                pong.body = Some(Substance::Empty);
+                let pong = pong.build().unwrap();
+                tx.send( pong );
+            }
+        });
+
+        rx
+    }
+
 }
 
 #[derive(Clone)]
@@ -2518,19 +2590,21 @@ pub struct ProtoTransmitter {
     pub scope: SetStrategy<Scope>,
     pub handling: SetStrategy<Handling>,
     pub from: SetStrategy<Port>,
-    pub to: SetStrategy<Port>,
-    pub transmitter: Arc<dyn AsyncTransmitter>,
+    pub to: SetStrategy<Recipients>,
+    pub router: Arc<dyn Router>,
+    pub exchanger: Exchanger
 }
 
 impl ProtoTransmitter {
-    pub fn new(transmitter: Arc<dyn AsyncTransmitter>) -> ProtoTransmitter {
+    pub fn new(router: Arc<dyn Router>, exchanger :Exchanger) -> ProtoTransmitter {
         Self {
             from: SetStrategy::None,
             to: SetStrategy::None,
             agent: SetStrategy::Fill(Agent::Anonymous),
             scope: SetStrategy::Fill(Scope::None),
             handling: SetStrategy::Fill(Handling::default()),
-            transmitter,
+            router,
+            exchanger
         }
     }
 
@@ -2547,50 +2621,101 @@ impl ProtoTransmitter {
         Ok(())
     }
 
-    pub async fn req(&self, mut req: ReqProto) -> Result<RespShell, MsgErr> {
+    pub async fn direct<D, W>(&self, wave: D) -> Result<W, MsgErr>
+    where
+        W: TryFrom<ReflectedWave>,
+        D: Into<DirectedProto>,
+    {
+        let mut wave: DirectedProto = wave.into();
+
         match &self.from {
             SetStrategy::None => {}
-            SetStrategy::Fill(from) => req.fill_from(from.clone()),
-            SetStrategy::Override(from) => req.from = Some(from.clone()),
+            SetStrategy::Fill(from) => wave.fill_from(from.clone()),
+            SetStrategy::Override(from) => wave.from = Some(from.clone()),
         }
 
         match &self.to {
             SetStrategy::None => {}
-            SetStrategy::Fill(to) => req.fill_to(to.clone()),
-            SetStrategy::Override(to) => req.to = Some(to.clone()),
+            SetStrategy::Fill(to) => wave.fill_to(to.clone()),
+            SetStrategy::Override(to) => wave.to(to),
         }
 
         match &self.agent {
             SetStrategy::None => {}
-            SetStrategy::Fill(agent) => req.fill_agent(agent.clone()),
-            SetStrategy::Override(agent) => req.agent = Some(agent.clone()),
+            SetStrategy::Fill(agent) => wave.fill_agent(agent.clone()),
+            SetStrategy::Override(agent) => wave.agent = Some(agent.clone()),
         }
 
         match &self.scope {
             SetStrategy::None => {}
-            SetStrategy::Fill(scope) => req.fill_scope(scope.clone()),
-            SetStrategy::Override(scope) => req.scope = Some(scope.clone()),
+            SetStrategy::Fill(scope) => wave.fill_scope(scope.clone()),
+            SetStrategy::Override(scope) => wave.scope = Some(scope.clone()),
         }
 
         match &self.handling {
             SetStrategy::None => {}
-            SetStrategy::Fill(handling) => req.fill_handling(handling.clone()),
-            SetStrategy::Override(handling) => req.handling = Some(handling.clone()),
+            SetStrategy::Fill(handling) => wave.fill_handling(handling.clone()),
+            SetStrategy::Override(handling) => wave.handling = Some(handling.clone()),
         }
 
-        let req = req.build()?;
-        self.transmitter.req(req).await
+        let directed = wave.build()?;
+        let reflected = self.transmitter.direct(directed).await;
+
+        let reflected = match &directed {
+            DirectedWave::Ping(ping) => {
+                let rx = self.exchanger.ping_pong(ping).await;
+                let wave = directed.to_ultra();
+                self.router.route(wave).await;
+                rx.await?.to_reflected()
+            }
+        };
+
+        Ok(reflected.try_into()?)
+    }
+
+    pub async fn reflect<W>(&self, wave: W ) -> Result<(),MsgErr> where W: Into<ReflectedProto>{
+        let mut wave:ReflectedProto  = wave.into();
+
+        match &self.from {
+            SetStrategy::None => {}
+            SetStrategy::Fill(from) => wave.fill_from(from),
+            SetStrategy::Override(from) => wave.from= Some(from.clone()),
+        }
+
+        match &self.agent {
+            SetStrategy::None => {}
+            SetStrategy::Fill(agent) => wave.fill_agent(agent),
+            SetStrategy::Override(agent) => wave.agent = Some(agent.clone()),
+        }
+
+        match &self.scope {
+            SetStrategy::None => {}
+            SetStrategy::Fill(scope) => wave.fill_scope(scope),
+            SetStrategy::Override(scope) => wave.scope = Some(scope.clone()),
+        }
+
+        match &self.handling {
+            SetStrategy::None => {}
+            SetStrategy::Fill(handling) => wave.fill_handling(handling),
+            SetStrategy::Override(handling) => wave.handling = Some(handling.clone()),
+        }
+
+        let wave = wave.build()?;
+        let wave = wave.to_ultra();
+        self.router.route(wave).await;
+
+        Ok(())
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct HyperWave {
     pub from: Point,
-    pub wave: Wave,
+    pub wave: Wave<UltraWave>,
 }
 
 impl HyperWave {
-    pub fn to(&self) -> &Port {
+    pub fn to(&self) -> Recipients {
         self.wave.to()
     }
 

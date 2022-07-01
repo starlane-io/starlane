@@ -11,7 +11,7 @@ use mesh_portal::version::latest::messaging::{
 use mesh_portal::version::latest::msg::MsgMethod;
 use mesh_portal_versions::version::v0_0_1::id::id::{Layer, ToPort};
 use mesh_portal_versions::version::v0_0_1::wave::{
-    AsyncTransmitter, ProtoTransmitter, SetStrategy,
+    Transmitter, ProtoTransmitter, SetStrategy,
 };
 use std::sync::Arc;
 
@@ -28,7 +28,7 @@ pub struct Cli {
 
 impl Cli {
     pub fn new(
-        transmitter: Arc<dyn AsyncTransmitter>,
+        transmitter: Arc<dyn Transmitter>,
         cli_session_factory: Port,
         mut from: Port,
     ) -> Self {
@@ -59,7 +59,7 @@ impl Cli {
         req.to(self.cli_session_factory.clone());
         req.method(MsgMethod::new("NewCliSession").unwrap());
 
-        let response = self.tx.req(req).await?;
+        let response = self.tx.direct(req).await?;
 
         if response.core.is_ok() {
             let session: Port = response.core.body.try_into()?;
@@ -105,7 +105,7 @@ impl<'a> CliSession<'a> {
         };
         let mut req: ReqProto = ReqProto::new();
         req.core(raw.into())?;
-        self.tx.req(req.clone()).await
+        self.tx.direct(req.clone()).await
     }
 
     pub fn template<R: ToString>(&self, raw: R) -> Result<CommandTemplate, MsgErr> {
@@ -120,7 +120,7 @@ impl<'a> Drop for CliSession<'a> {
                 let request = ReqProto::msg(to, MsgMethod::new("DropSession").unwrap());
                 let tx = self.tx.clone();
                 tokio::spawn(async move {
-                    tx.req(request).await;
+                    tx.direct(request).await;
                 });
             }
             Err(_) => {}
@@ -136,7 +136,7 @@ pub mod test {
     use mesh_portal::version::latest::messaging::{ReqShell, RootRequestCtx};
     use mesh_portal::version::latest::payload::Substance;
     use mesh_portal_versions::version::v0_0_1::wave::{
-        AsyncRequestHandler, InCtx, RequestHandler, RequestHandlerRelay,
+        DirectedHandler, InCtx, DirectedHandler, RequestHandlerRelay,
     };
     use std::marker::PhantomData;
     use std::sync::{Arc, RwLock};

@@ -164,7 +164,7 @@ pub mod request {
     use crate::version::v0_0_1::command::request::select::Select;
     use crate::version::v0_0_1::command::request::set::Set;
     use crate::version::v0_0_1::command::request::update::Update;
-    use crate::version::v0_0_1::wave::RespCore;
+    use crate::version::v0_0_1::wave::ReflectedCore;
     use crate::version::v0_0_1::fail;
     use crate::version::v0_0_1::fail::{BadRequest, Fail, NotFound};
     use crate::version::v0_0_1::id::id::{KindParts, BaseKind, Meta, Point};
@@ -365,7 +365,7 @@ pub mod request {
         use crate::version::v0_0_1::command::Command;
         use crate::version::v0_0_1::command::command::common::{SetProperties, SetRegistry, StateSrc, StateSrcVar};
         use crate::version::v0_0_1::id::id::{KindParts, BaseKind, HostKey, Point, PointCtx, PointSeg, PointVar, ToPort};
-        use crate::version::v0_0_1::wave::{CmdMethod, ReqProto, ReqCore, SysMethod};
+        use crate::version::v0_0_1::wave::{CmdMethod, PingProto, DirectedCore, SysMethod};
         use crate::version::v0_0_1::msg::MsgMethod;
         use crate::version::v0_0_1::parse::{CamelCase, Env, ResolverErr};
         use crate::version::v0_0_1::substance::substance::Substance;
@@ -553,18 +553,18 @@ pub mod request {
             }
         }
 
-        impl Into<ReqCore> for Create {
-            fn into(self) -> ReqCore {
-                let mut request = ReqCore::msg(MsgMethod::new("Command").unwrap() );
+        impl Into<DirectedCore> for Create {
+            fn into(self) -> DirectedCore {
+                let mut request = DirectedCore::msg(MsgMethod::new("Command").unwrap() );
                 request.body = Substance::Command(Box::new(Command::Create(self)));
                 request
             }
         }
 
 
-        impl Into<ReqProto> for Create {
-            fn into(self) -> ReqProto {
-                let mut request = ReqProto::sys(Point::global_executor().to_port(), SysMethod::Command);
+        impl Into<PingProto> for Create {
+            fn into(self) -> PingProto {
+                let mut request = PingProto::sys(Point::global_executor().to_port(), SysMethod::Command);
                 request.body(Substance::Command(Box::new(Command::Create(self))));
                 request
             }
@@ -667,7 +667,7 @@ pub mod request {
         use crate::version::v0_0_1::substance::substance::{
             MapPattern, Substance, SubstanceList,
         };
-        use crate::version::v0_0_1::selector::selector::{Hop, HopCtx, HopVar, PointHierarchy, PointSelector, PointSelectorDef};
+        use crate::version::v0_0_1::selector::selector::{Hop, HopCtx, HopVar, PointHierarchy, Selector, SelectorDef};
         use crate::version::v0_0_1::util::{ConvertFrom, ToResolved};
 
         #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq)]
@@ -711,7 +711,7 @@ pub mod request {
 
         #[derive(Debug, Clone,Serialize,Deserialize,Eq,PartialEq)]
         pub struct SelectDef<Hop> {
-            pub pattern: PointSelectorDef<Hop>,
+            pub pattern: SelectorDef<Hop>,
             pub properties: PropertiesPattern,
             pub into_payload: SelectIntoSubstance,
             pub kind: SelectKind,
@@ -772,7 +772,7 @@ pub mod request {
         #[derive(Debug, Clone )]
         pub struct SubSelect {
             pub point: Point,
-            pub pattern: PointSelector,
+            pub pattern: Selector,
             pub properties: PropertiesPattern,
             pub into_payload: SelectIntoSubstance,
             pub hops: Vec<Hop>,
@@ -813,7 +813,7 @@ pub mod request {
         }
 
         impl Select {
-            pub fn new(pattern: PointSelector) -> Self {
+            pub fn new(pattern: Selector) -> Self {
                 Self {
                     pattern,
                     properties: Default::default(),
@@ -830,7 +830,7 @@ pub mod request {
         use crate::error::MsgErr;
         use crate::version::v0_0_1::command::request::select::{PropertiesPattern, Select, SelectIntoSubstance};
         use crate::version::v0_0_1::parse::Env;
-        use crate::version::v0_0_1::selector::selector::{Hop, PointSelectorDef};
+        use crate::version::v0_0_1::selector::selector::{Hop, SelectorDef};
         use crate::version::v0_0_1::util::ToResolved;
         use serde::{Deserialize, Serialize};
 
@@ -846,7 +846,7 @@ pub mod request {
 
         #[derive(Debug, Clone,Serialize,Deserialize,Eq,PartialEq)]
         pub struct DeleteDef<Hop> {
-            pub selector: PointSelectorDef<Hop>,
+            pub selector: SelectorDef<Hop>,
         }
 
         impl Into<Select> for Delete {

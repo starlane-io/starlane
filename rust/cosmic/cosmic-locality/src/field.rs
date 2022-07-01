@@ -4,7 +4,7 @@ use dashmap::DashMap;
 
 use mesh_portal_versions::error::MsgErr;
 use mesh_portal_versions::version::v0_0_1::config::config::bind::{
-    BindConfig, WaveKind, PipelineStepVar, PipelineStopVar,
+    BindConfig, PipelineStepVar, PipelineStopVar, WaveKind,
 };
 use mesh_portal_versions::version::v0_0_1::id::id::{
     Layer, Point, ToPoint, ToPort, TraversalLayer, Uuid,
@@ -23,7 +23,7 @@ use mesh_portal_versions::version::v0_0_1::substance::substance::{Call, CallKind
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
 use mesh_portal_versions::version::v0_0_1::util::{ToResolved, ValueMatcher};
 use mesh_portal_versions::version::v0_0_1::wave::{
-    Agent, CmdMethod, Method, ReqCore, ReqShell, Requestable, RespCore, RespShell, Wave,
+    Agent, CmdMethod, Method, DirectedCore, Ping, Reflectable, ReflectedCore, Pong, Wave,
 };
 use regex::{CaptureMatches, Regex};
 
@@ -36,24 +36,7 @@ use tokio::io::AsyncBufReadExt;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, Mutex};
 use mesh_portal::version::latest::id::Port;
-
-/// The idea here is to eventually move this funcitionality into it's own crate 'mesh-bindex'
-/// this mod basically enforces the bind
-
-#[derive(Clone)]
-pub struct FieldState {
-    port: Port,
-    pipe_exes: Arc<DashMap<String, PipeEx>>,
-}
-
-impl FieldState {
-    pub fn new(port: Port) -> Self {
-        Self {
-            port,
-            pipe_exes: Arc::new(DashMap::new()),
-        }
-    }
-}
+use mesh_portal_versions::RegistryApi;
 
 #[derive(Clone)]
 pub struct FieldEx {
@@ -62,11 +45,11 @@ pub struct FieldEx {
     pub logger: SpanLogger
 }
 
-fn request_id(request: &ReqShell) -> String {
+fn request_id(request: &Ping) -> String {
     format!("{}{}", request.to.to_string(), request.id)
 }
 
-fn request_id_from_response(response: &Traversal<RespShell>) -> String {
+fn request_id_from_response(response: &Traversal<Pong>) -> String {
     format!("{}{}", response.from.to_string(), response.response_to)
 }
 
@@ -111,11 +94,11 @@ impl TraversalLayer for FieldEx {
         self.skel.traverse_to_next.send(traversal).await;
     }
 
-    fn exchange(&self) -> &Arc<DashMap<Uuid, tokio::sync::oneshot::Sender<RespShell>>> {
+    fn exchange(&self) -> &Arc<DashMap<Uuid, tokio::sync::oneshot::Sender<Pong>>> {
         &self.skel.exchange
     }
 
-    async fn request_core_bound(&self, mut request: Traversal<ReqShell>) -> Result<(), MsgErr> {
+    async fn request_core_bound(&self, mut request: Traversal<Ping>) -> Result<(), MsgErr> {
         request.logger.set_span_attr("message-id", &request.id);
         let access = self.skel.registry.access(&request.agent, &request.to).await;
 
@@ -186,7 +169,7 @@ impl TraversalLayer for FieldEx {
         Ok(())
     }
 
-    async fn response_core_bound(&self, mut traversal: Traversal<RespShell>) -> Result<(), MsgErr> {
+    async fn response_core_bound(&self, mut traversal: Traversal<Pong>) -> Result<(), MsgErr> {
         let request_id = request_id_from_response(&traversal);
         let mut pipex = self.state.pipe_exes.remove(&request_id);
 
@@ -232,7 +215,7 @@ pub struct PipeEx {
 
 impl PipeEx {
     pub fn new(
-        traversal: Traversal<ReqShell>,
+        traversal: Traversal<Ping>,
         binder: FieldEx,
         pipeline: PipelineVar,
         env: Env,
@@ -260,7 +243,7 @@ impl PipeEx {
         }
     }
 
-    pub fn handle_response(&mut self, response: RespShell) -> anyhow::Result<PipeAction> {
+    pub fn handle_response(&mut self, response: Pong) -> anyhow::Result<PipeAction> {
         self.traversal.push(Wave::Resp(response));
         self.next()
     }
@@ -291,11 +274,11 @@ impl PipeEx {
                         (Method::Http(http.method.clone()), path)
                     }
                 };
-                let mut core: ReqCore = method.into();
+                let mut core: DirectedCore = method.into();
                 core.body = self.traversal.body.clone();
                 core.headers = self.traversal.headers.clone();
                 core.uri = Uri::from_str(path.as_str())?;
-                let request = self.traversal.initial.clone().with(ReqShell::new(
+                let request = self.traversal.initial.clone().with(Ping::new(
                     core,
                     self.traversal.to(),
                     call.point,
@@ -310,7 +293,7 @@ impl PipeEx {
                 let mut core = method.into();
                 core.uri = uri;
 
-                let request = self.traversal.initial.clone().with(ReqShell::new(
+                let request = self.traversal.initial.clone().with(Ping::new(
                     core,
                     self.traversal.to(),
                     point,
@@ -347,7 +330,7 @@ impl PipeEx {
 }
 
 pub struct PipeTraversal {
-    pub initial: Traversal<ReqShell>,
+    pub initial: Traversal<Ping>,
     pub method: Method,
     pub body: Substance,
     pub uri: Uri,
@@ -356,7 +339,7 @@ pub struct PipeTraversal {
 }
 
 impl PipeTraversal {
-    pub fn new(initial_request: Traversal<ReqShell>) -> Self {
+    pub fn new(initial_request: Traversal<Ping>) -> Self {
         Self {
             method: initial_request.core.method.clone(),
             body: initial_request.core.body.clone(),
@@ -367,8 +350,8 @@ impl PipeTraversal {
         }
     }
 
-    pub fn request_core(&self) -> ReqCore {
-        ReqCore {
+    pub fn request_core(&self) -> DirectedCore {
+        DirectedCore {
             headers: self.headers.clone(),
             method: self.method.clone(),
             uri: self.uri.clone(),
@@ -384,22 +367,22 @@ impl PipeTraversal {
         self.initial.from.clone().to_point()
     }
 
-    pub fn request(&self) -> Traversal<ReqShell> {
+    pub fn request(&self) -> Traversal<Ping> {
         self.initial
             .clone()
-            .with(ReqShell::new(self.request_core(), self.from(), self.to()))
+            .with(Ping::new(self.request_core(), self.from(), self.to()))
     }
 
-    pub fn response_core(&self) -> RespCore {
-        RespCore {
+    pub fn response_core(&self) -> ReflectedCore {
+        ReflectedCore {
             headers: self.headers.clone(),
             body: self.body.clone(),
             status: self.status.clone(),
         }
     }
 
-    pub fn response(&self) -> RespShell {
-        RespShell::new(
+    pub fn response(&self) -> Pong {
+        Pong::new(
             self.response_core(),
             self.to().to_port(),
             self.from().to_port(),
@@ -435,19 +418,31 @@ impl PipeTraversal {
     }
 }
 
-#[async_trait]
-pub trait RegistryApi: Send + Sync {
-    async fn access(&self, to: &Agent, on: &Point) -> anyhow::Result<Access>;
-    async fn locate(&self, particle: &Point) -> anyhow::Result<ParticleRecord>;
-}
-
 struct RequestAction {
     pub request_id: String,
     pub action: PipeAction,
 }
 
 pub enum PipeAction {
-    CoreRequest(Traversal<ReqShell>),
-    FabricRequest(Traversal<ReqShell>),
+    CoreRequest(Traversal<Ping>),
+    FabricRequest(Traversal<Ping>),
     Respond,
+}
+
+/// The idea here is to eventually move this funcitionality into it's own crate 'mesh-bindex'
+/// this mod basically enforces the bind
+
+#[derive(Clone)]
+pub struct FieldState {
+    port: Port,
+    pipe_exes: Arc<DashMap<String, PipeEx>>,
+}
+
+impl FieldState {
+    pub fn new(port: Port) -> Self {
+        Self {
+            port,
+            pipe_exes: Arc::new(DashMap::new()),
+        }
+    }
 }

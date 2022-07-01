@@ -15,7 +15,7 @@ use mesh_portal_versions::version::v0_0_1::substance::substance::{
 };
 use mesh_portal_versions::version::v0_0_1::sys::{EntryReq, InterchangeKind, Sys};
 use mesh_portal_versions::version::v0_0_1::util::uuid;
-use mesh_portal_versions::version::v0_0_1::wave::{Agent, HyperWave, Method, ReqShell, Requestable, RespShell, SysMethod, Wave};
+use mesh_portal_versions::version::v0_0_1::wave::{Agent, HyperWave, Method, Ping, Reflectable, Pong, SysMethod, Wave};
 use mesh_portal_versions::VERSION;
 use std::collections::HashMap;
 use std::future::Future;

@@ -44,7 +44,8 @@ use mesh_portal_versions::version::v0_0_1::id::{ArtifactSubKind, FileSubKind, St
 use mesh_portal_versions::version::v0_0_1::id::id::{BaseKind, Kind, Tks, ToPoint};
 use mesh_portal_versions::version::v0_0_1::sys::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
 use crate::artifact::ArtifactRef;
-use cosmic_locality::field::{BindConfigCache, FieldEx, FieldRouter, RegistryApi};
+use cosmic_locality::field::{BindConfigCache, FieldEx, FieldRouter};
+use mesh_portal_versions::RegistryApi;
 use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
 use crate::config::config::{ContextualConfig, ParticleConfig};
 use crate::registry::{RegError, Registration};

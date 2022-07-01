@@ -1,6 +1,6 @@
 use std::ops::Deref;
 use crate::error::MsgErr;
-use crate::version::v0_0_1::wave::{Method, ReqCore, RespCore};
+use crate::version::v0_0_1::wave::{Method, DirectedCore, ReflectedCore};
 use crate::version::v0_0_1::id::id::Meta;
 use crate::version::v0_0_1::substance::substance::{Errors, Substance};
 use http::{HeaderMap, StatusCode, Uri};
@@ -123,17 +123,17 @@ impl MsgRequest {
         self
     }
 
-    pub fn ok(&self, payload: Substance) -> RespCore {
-        RespCore {
+    pub fn ok(&self, payload: Substance) -> ReflectedCore {
+        ReflectedCore {
             headers: Default::default(),
             status: StatusCode::from_u16(200u16).unwrap(),
             body: payload,
         }
     }
 
-    pub fn fail(&self, error: &str) -> RespCore {
+    pub fn fail(&self, error: &str) -> ReflectedCore {
         let errors = Errors::default(error);
-        RespCore {
+        ReflectedCore {
             headers: Default::default(),
             status: StatusCode::from_u16(500u16).unwrap(),
             body: Substance::Errors(errors),
@@ -141,10 +141,10 @@ impl MsgRequest {
     }
 }
 
-impl TryFrom<ReqCore> for MsgRequest {
+impl TryFrom<DirectedCore> for MsgRequest {
     type Error = MsgErr;
 
-    fn try_from(core: ReqCore) -> Result<Self, Self::Error> {
+    fn try_from(core: DirectedCore) -> Result<Self, Self::Error> {
         if let Method::Msg(action) = core.method {
             Ok(Self {
                 method: action,

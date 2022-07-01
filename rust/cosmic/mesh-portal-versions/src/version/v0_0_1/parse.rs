@@ -36,7 +36,7 @@ use crate::version::v0_0_1::security::{
     PermissionsMaskKind, Privilege,
 };
 use crate::version::v0_0_1::selector::selector::{
-    MapEntryPatternCtx, MapEntryPatternVar, PointHierarchy, PointKindSeg, PointSelectorDef,
+    MapEntryPatternCtx, MapEntryPatternVar, PointHierarchy, PointKindSeg, SelectorDef,
 };
 use crate::version::v0_0_1::util::{HttpMethodPattern, StringMatcher, ToResolved, ValuePattern};
 use nom::bytes::complete::take;
@@ -3465,7 +3465,7 @@ pub mod model {
     use crate::version::v0_0_1::util::{
         HttpMethodPattern, StringMatcher, ToResolved, ValueMatcher, ValuePattern,
     };
-    use crate::version::v0_0_1::wave::{Method, MethodKind, ReqCore, ReqShell};
+    use crate::version::v0_0_1::wave::{Method, MethodKind, DirectedCore, Ping};
     use bincode::Options;
     use cosmic_nom::{new_span, Res, Span, Trace, Tw};
     use nom::bytes::complete::tag;
@@ -3591,7 +3591,7 @@ pub mod model {
     }
 
     impl RouteScope {
-        pub fn select(&self, request: &ReqShell) -> Vec<&MessageScope> {
+        pub fn select(&self, request: &Ping) -> Vec<&MessageScope> {
             let mut scopes = vec![];
             for scope in &self.block {
                 if scope.selector.is_match(request).is_ok() {
@@ -3648,8 +3648,8 @@ pub mod model {
         pub path: P,
     }
 
-    impl ValueMatcher<ReqShell> for RouteScopeSelector {
-        fn is_match(&self, request: &ReqShell) -> Result<(), ()> {
+    impl ValueMatcher<Ping> for RouteScopeSelector {
+        fn is_match(&self, request: &Ping) -> Result<(), ()> {
             if self.name.as_str() != "Route" {
                 return Err(());
             }
@@ -3660,8 +3660,8 @@ pub mod model {
         }
     }
 
-    impl ValueMatcher<ReqShell> for MessageScopeSelector {
-        fn is_match(&self, request: &ReqShell) -> Result<(), ()> {
+    impl ValueMatcher<Ping> for MessageScopeSelector {
+        fn is_match(&self, request: &Ping) -> Result<(), ()> {
             self.name.is_match(&request.core.method.kind())?;
             match self.path.is_match(&request.core.uri.path()) {
                 true => Ok(()),
@@ -3688,7 +3688,7 @@ pub mod model {
             Ok(Self { selector, block })
         }
 
-        pub fn select(&self, request: &ReqShell) -> Vec<&MethodScope> {
+        pub fn select(&self, request: &Ping) -> Vec<&MethodScope> {
             let mut scopes = vec![];
             for scope in &self.block {
                 if scope.selector.is_match(request).is_ok() {
@@ -3719,22 +3719,22 @@ pub mod model {
         }
     }
 
-    impl ValueMatcher<ReqShell> for RouteScopeSelectorAndFilters {
-        fn is_match(&self, request: &ReqShell) -> Result<(), ()> {
+    impl ValueMatcher<Ping> for RouteScopeSelectorAndFilters {
+        fn is_match(&self, request: &Ping) -> Result<(), ()> {
             // nothing for filters at this time...
             self.selector.is_match(request)
         }
     }
 
-    impl ValueMatcher<ReqShell> for MessageScopeSelectorAndFilters {
-        fn is_match(&self, request: &ReqShell) -> Result<(), ()> {
+    impl ValueMatcher<Ping> for MessageScopeSelectorAndFilters {
+        fn is_match(&self, request: &Ping) -> Result<(), ()> {
             // nothing for filters at this time...
             self.selector.is_match(request)
         }
     }
 
-    impl ValueMatcher<ReqShell> for MethodScopeSelectorAndFilters {
-        fn is_match(&self, request: &ReqShell) -> Result<(), ()> {
+    impl ValueMatcher<Ping> for MethodScopeSelectorAndFilters {
+        fn is_match(&self, request: &Ping) -> Result<(), ()> {
             // nothing for filters at this time...
             self.selector.is_match(request)
         }
@@ -3775,8 +3775,8 @@ pub mod model {
         }
     }
 
-    impl ValueMatcher<ReqShell> for MethodScopeSelector {
-        fn is_match(&self, request: &ReqShell) -> Result<(), ()> {
+    impl ValueMatcher<Ping> for MethodScopeSelector {
+        fn is_match(&self, request: &Ping) -> Result<(), ()> {
             self.name.is_match(&request.core.method)?;
             match self.path.is_match(&request.core.uri.path()) {
                 true => Ok(()),
@@ -4963,7 +4963,7 @@ use crate::version::v0_0_1::selector::selector::specific::{
 };
 use crate::version::v0_0_1::selector::selector::{
     ExactPointSeg, Hop, KindBaseSelector, KindSelector, LabeledPrimitiveTypeDef, MapEntryPattern,
-    Pattern, PayloadType2Def, PointSegSelector, PointSelector, SpecificSelector, SubKindSelector,
+    Pattern, PayloadType2Def, PointSegSelector, Selector, SpecificSelector, SubKindSelector,
     VersionReq,
 };
 use crate::version::v0_0_1::selector::{
@@ -5681,7 +5681,7 @@ fn version_hop<I: Span>(input: I) -> Res<I, Hop> {
     )
 }
 
-pub fn point_selector<I: Span>(input: I) -> Res<I, PointSelector> {
+pub fn point_selector<I: Span>(input: I) -> Res<I, Selector> {
     context(
         "point_kind_pattern",
         tuple((
@@ -5722,7 +5722,7 @@ pub fn point_selector<I: Span>(input: I) -> Res<I, PointSelector> {
                 }
             }
 
-            let rtn = PointSelector { hops };
+            let rtn = Selector { hops };
 
             (next, rtn)
         },
@@ -8215,7 +8215,7 @@ pub type PortSelectorCtx = PortSelectorDef<Hop, Topic, ValuePattern<Layer>>;
 pub type PortSelector = PortSelectorDef<Hop, Topic, ValuePattern<Layer>>;
 
 pub struct PortSelectorDef<Hop, Topic, Layer> {
-    point: PointSelectorDef<Hop>,
+    point: SelectorDef<Hop>,
     topic: Topic,
     layer: Layer,
 }

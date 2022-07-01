@@ -8,7 +8,7 @@ pub mod frame {
 
     use crate::error::MsgErr;
     use crate::version::v0_0_1::sys::EntryReq;
-    use crate::version::v0_0_1::wave::{ReqShell, RespShell, Wave};
+    use crate::version::v0_0_1::wave::{Ping, Pong, Wave};
 
     pub struct PrimitiveFrame {
         pub data: Vec<u8>,
@@ -67,7 +67,7 @@ pub mod frame {
     }
 
 
-    impl TryInto<PrimitiveFrame> for ReqShell{
+    impl TryInto<PrimitiveFrame> for Ping {
         type Error = MsgErr;
 
         fn try_into(self) -> Result<PrimitiveFrame, Self::Error> {
@@ -76,16 +76,16 @@ pub mod frame {
         }
     }
 
-    impl TryInto<ReqShell> for PrimitiveFrame {
+    impl TryInto<Ping> for PrimitiveFrame {
         type Error = MsgErr;
 
-        fn try_into(self) -> Result<ReqShell, Self::Error> {
+        fn try_into(self) -> Result<Ping, Self::Error> {
             Ok(bincode::deserialize(self.data.as_bytes())?)
         }
     }
 
 
-    impl TryInto<PrimitiveFrame> for RespShell{
+    impl TryInto<PrimitiveFrame> for Pong {
         type Error = MsgErr;
 
         fn try_into(self) -> Result<PrimitiveFrame, Self::Error> {
@@ -94,10 +94,10 @@ pub mod frame {
         }
     }
 
-    impl TryInto<RespShell> for PrimitiveFrame {
+    impl TryInto<Pong> for PrimitiveFrame {
         type Error = MsgErr;
 
-        fn try_into(self) -> Result<RespShell, Self::Error> {
+        fn try_into(self) -> Result<Pong, Self::Error> {
             Ok(bincode::deserialize(self.data.as_bytes())?)
         }
     }

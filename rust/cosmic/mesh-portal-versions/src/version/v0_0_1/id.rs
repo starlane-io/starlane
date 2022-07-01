@@ -1,14 +1,14 @@
 use crate::error::MsgErr;
 use crate::version::v0_0_1::id::id::{
-    BaseKind, Kind, KindParts, Layer, Point, Port, RouteSeg, Specific, SubKind, ToPoint, ToPort,
+    BaseKind, Kind, KindParts, Layer, Point, Port, RouteSeg, Specific, Sub, ToPoint, ToPort,
 };
 use crate::version::v0_0_1::log::SpanLogger;
 use crate::version::v0_0_1::parse::error::result;
-use crate::version::v0_0_1::parse::{parse_star_key, CamelCase};
+use crate::version::v0_0_1::parse::{CamelCase, parse_star_key};
 use crate::version::v0_0_1::particle::particle::Stub;
 use crate::version::v0_0_1::substance::substance::Substance;
 use crate::version::v0_0_1::sys::{ChildRegistry, ParticleRecord};
-use crate::version::v0_0_1::wave::{ReqShell, RespShell, Wave};
+use crate::version::v0_0_1::wave::{Ping, Pong, Wave};
 use core::str::FromStr;
 use cosmic_nom::new_span;
 use nom::combinator::all_consuming;
@@ -33,30 +33,34 @@ pub mod id {
     use std::ops::{Deref, Range};
     use std::str::FromStr;
     use std::sync::Arc;
+    use convert_case::{Case, Casing};
+    use dashmap::mapref::one::Ref;
 
-    use cosmic_nom::{new_span, tw, Res, Span, SpanExtra, Trace, Tw};
+    use cosmic_nom::{new_span, Res, Span, SpanExtra, Trace, tw, Tw};
     use serde::de::Visitor;
     use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
     use tokio::sync::{mpsc, oneshot};
 
     use crate::error::{MsgErr, ParseErrs};
+    use crate::{DriverState, RegistryApi};
     use crate::version::v0_0_1::config::config::bind::RouteSelector;
     use crate::version::v0_0_1::id::id::PointSegCtx::Working;
     use crate::version::v0_0_1::id::{ArtifactSubKind, BaseSubKind, DatabaseSubKind, FileSubKind, StarSub, Traversal, TraversalDirection, TraversalInjection, UserBaseSubKind};
     use crate::version::v0_0_1::parse::{
-        camel_case, camel_case_chars, consume_point, consume_point_ctx, kind_lex, kind_parts,
-        parse_uuid, point_and_kind, point_route_segment, point_selector, point_var, uuid_chars,
-        CamelCase, Ctx, CtxResolver, Domain, Env, ResolverErr, SkewerCase, VarResolver,
+        camel_case, camel_case_chars, CamelCase, consume_point, consume_point_ctx, Ctx,
+        CtxResolver, Domain, Env, kind_lex, kind_parts, parse_uuid,
+        point_and_kind, point_route_segment, point_selector, point_var, ResolverErr, SkewerCase, uuid_chars, VarResolver,
     };
     use crate::version::v0_0_1::{mesh_portal_uuid, parse};
+    use crate::version::v0_0_1::log::PointLogger;
 
     use crate::version::v0_0_1::parse::error::result;
     use crate::version::v0_0_1::selector::selector::{
-        Pattern, PointHierarchy, PointSelector, SpecificSelector, VersionReq,
+        Pattern, PointHierarchy, Selector, SpecificSelector, VersionReq,
     };
     use crate::version::v0_0_1::sys::Location::Central;
     use crate::version::v0_0_1::util::{ToResolved, ValueMatcher, ValuePattern};
-    use crate::version::v0_0_1::wave::{ReqShell, RespShell, Wave};
+    use crate::version::v0_0_1::wave::{Recipients, Ping, Pong, ToRecipients, Wave};
 
     lazy_static! {
         pub static ref GLOBAL_CENTRAL: Point = Point::from_str("GLOBAL::central").unwrap();
@@ -69,20 +73,16 @@ pub mod id {
             TraversalPlan::new(vec![Layer::Field, Layer::Shell, Layer::Driver, Layer::Core]);
         pub static ref MECHTRON_WAVE_TRAVERSAL_PLAN: TraversalPlan = TraversalPlan::new(vec![
             Layer::Field,
-            Layer::PortalInlet,
             Layer::Shell,
-            Layer::Driver,
-            Layer::Tunnel,
+            Layer::Portal,
             Layer::Host,
             Layer::Guest,
-            Layer::PortalOutlet,
             Layer::Core
         ]);
         pub static ref PORTAL_WAVE_TRAVERSAL_PLAN: TraversalPlan = TraversalPlan::new(vec![
             Layer::Field,
             Layer::Shell,
-            Layer::Driver,
-            Layer::Tunnel,
+            Layer::Portal,
             Layer::Host,
             Layer::Guest,
             Layer::Core
@@ -124,8 +124,14 @@ pub mod id {
         Star,
     }
 
+    impl BaseKind {
+        pub fn to_skewer(&self) -> SkewerCase {
+            SkewerCase::from_str(self.to_string().to_case(Case::Kebab).as_str()).unwrap()
+        }
+    }
+
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
-    pub enum SubKind {
+    pub enum Sub {
         None,
         Database(DatabaseSubKind),
         File(FileSubKind),
@@ -135,40 +141,47 @@ pub mod id {
         Star(StarSub),
     }
 
-    impl SubKind {
+
+    impl Sub {
         pub fn specific(&self) -> Option<&Specific> {
             match self {
-                SubKind::Database(sub) => sub.specific(),
-                SubKind::UserBase(sub) => sub.specific(),
+                Sub::Database(sub) => sub.specific(),
+                Sub::UserBase(sub) => sub.specific(),
                 _ => None,
             }
         }
     }
 
-    impl Into<Option<CamelCase>> for SubKind {
+    impl Sub {
+        pub fn to_skewer(&self) -> SkewerCase {
+            SkewerCase::from_str(self.to_string().to_case(Case::Kebab).as_str()).unwrap()
+        }
+    }
+
+    impl Into<Option<CamelCase>> for Sub {
         fn into(self) -> Option<CamelCase> {
             match self {
-                SubKind::None => None,
-                SubKind::Database(d) => d.into(),
-                SubKind::File(f) => f.into(),
-                SubKind::Artifact(a) => a.into(),
-                SubKind::Base(b) => b.into(),
-                SubKind::UserBase(u) => u.into(),
-                SubKind::Star(s) => s.into(),
+                Sub::None => None,
+                Sub::Database(d) => d.into(),
+                Sub::File(f) => f.into(),
+                Sub::Artifact(a) => a.into(),
+                Sub::Base(b) => b.into(),
+                Sub::UserBase(u) => u.into(),
+                Sub::Star(s) => s.into(),
             }
         }
     }
 
-    impl Into<Option<String>> for SubKind {
+    impl Into<Option<String>> for Sub {
         fn into(self) -> Option<String> {
             match self {
-                SubKind::None => None,
-                SubKind::Database(d) => d.into(),
-                SubKind::File(f) => f.into(),
-                SubKind::Artifact(a) => a.into(),
-                SubKind::Base(b) => b.into(),
-                SubKind::UserBase(u) => u.into(),
-                SubKind::Star(s) => s.into(),
+                Sub::None => None,
+                Sub::Database(d) => d.into(),
+                Sub::File(f) => f.into(),
+                Sub::Artifact(a) => a.into(),
+                Sub::Base(b) => b.into(),
+                Sub::UserBase(u) => u.into(),
+                Sub::Star(s) => s.into(),
             }
         }
     }
@@ -235,13 +248,26 @@ pub mod id {
             }
         }
 
-        pub fn sub(&self) -> SubKind {
+        pub fn as_point_segments(&self) -> String {
+            if Sub::None != self.sub() {
+                if let Some(specific) = self.specific() {
+                    format!("{}:{}:{}", self.base().to_skewer().to_string(), self.sub().to_skewer().to_string(), specific.to_string() )
+
+                } else {
+                    format!("{}:{}", self.base().to_skewer().to_string(), self.sub().to_skewer().to_string())
+                }
+            } else {
+                format!("{}", self.base().to_skewer().to_string() )
+            }
+        }
+
+        pub fn sub(&self) -> Sub {
             match self {
                 Kind::File(s) => s.clone().into(),
                 Kind::Artifact(s) => s.clone().into(),
                 Kind::Database(s) => s.clone().into(),
                 Kind::Base(s) => s.clone().into(),
-                _ => SubKind::None,
+                _ => Sub::None,
             }
         }
 
@@ -1290,15 +1316,28 @@ pub mod id {
     #[repr(u8)]
     pub enum Layer {
         Surface = 0,
-        PortalInlet,
         Field,
         Shell,
         Driver,
-        Tunnel,
+        Portal,
         Host,
         Guest,
-        PortalOutlet,
         Core,
+    }
+
+    impl Layer {
+        pub fn has_state(&self)-> bool {
+            match self {
+                Layer::Surface => false,
+                Layer::Field => true,
+                Layer::Shell => true,
+                Layer::Driver => true,
+                Layer::Portal => false,
+                Layer::Host => false,
+                Layer::Guest => false,
+                Layer::Core => false
+            }
+        }
     }
 
     impl Default for Layer {
@@ -1313,19 +1352,232 @@ pub mod id {
         }
     }
 
+    /*
+    pub struct TraversalStack {
+        pub logger: PointLogger,
+        pub location: Point,
+        pub inject_tx: mpsc::Sender<TraversalInjection>,
+        pub traverse_next_tx: mpsc::Sender<Traversal<Wave>>,
+        pub registry: Arc<dyn RegistryApi>,
+        pub states: LayerStates
+    }
+
+    impl TraversalStack {
+
+        async fn start_traversal(&self, wave: Wave, injector: &Port ) -> Result<(),MsgErr>{
+            let record = match self
+                .registry
+                .locate(&wave.to().point)
+                .await {
+                Ok(record) => record,
+                Err(err) => {
+                    self.skel.logger.error( err.to_string() );
+                    return Err(MsgErr::not_found());
+                }
+            };
+
+            let location = record.location.clone().ok_or()?;
+            let plan = record.details.stub.kind.wave_traversal_plan();
+
+            let mut dest = None;
+            let mut dir = TraversalDirection::Core;
+            // determine layer destination. A dest of None will send all the way to the Fabric or Core
+            if location == *self.skel.point()  {
+
+                // now we check if we are doing an inter point delivery (from one layer to another in the same Particle)
+                if wave.to().point == wave.from().point {
+                    // it's the SAME point, so the to layer becomes our dest
+                    dest.replace(wave.to().layer.clone() );
+
+                    // make sure we have this layer in the plan
+                    let plan = record.details.stub.kind.wave_traversal_plan();
+                    if !plan.has_layer(&wave.to().layer) {
+                        self.skel.logger.warn("attempt to send wave to layer that the recipient Kind does not have in its traversal plan");
+                        return Err(MsgErr::bad_request());
+                    }
+
+                    // dir is from inject_layer to dest
+                    dir = match TraversalDirection::new(&injector.layer, &wave.to().layer) {
+                        Ok(dir) => dir,
+                        Err(_) => {
+                            // looks like we are already on the dest layer...
+                            // that means it doesn't matter what the TraversalDirection is
+                            TraversalDirection::Fabric
+                        }
+                    }
+                } else {
+                    // if this wave was injected by the from Particle, then we need to first
+                    // traverse towards the fabric
+                    if injector.point == *wave.from() {
+                        dir = TraversalDirection::Fabric;
+                    } else {
+                        // if this was injected by something else (like the Star)
+                        // then it needs to traverse towards the Core
+                        dir = TraversalDirection::Core;
+                        // and dest will be the to layer
+                        dest.replace(wave.to().layer.clone());
+                    }
+                }
+            } else {
+                // location is outside of this Star, so dest is None and direction if Fabric
+                dir = TraversalDirection::Fabric;
+                dest = None;
+            }
+
+            // next we determine the direction of the traversal
+
+            // if the recipient is not even in this star, traverse towards fabric
+            if location != *self.skel.point() {
+                TraversalDirection::Fabric
+            }
+            // if the recipient and from are the same perform a normal traversal
+            else if wave.to().point == wave.from().point {
+                TraversalDirection::new( &self.layer, &wave.to().layer ).unwrap()
+            } else {
+                // finally we handle the case where we traverse towards another point within this Star
+                // in this case it just depends upon if we are Requesting or Responding
+                if wave.is_req() {
+                    TraversalDirection::Core
+                } else {
+                    TraversalDirection::Fabric
+                }
+            }
+
+            let logger = self.skel.logger.point(wave.to().clone().to_point());
+            let logger = logger.span();
+
+            let mut traversal = Traversal::new(
+                wave,
+                record,
+                location,
+                injector.layer.clone(),
+                logger,
+                dir,
+                dest
+            );
+
+            // in the case that we injected into a layer that is not part
+            // of this plan, we need to send the traversal to the next layer
+            if !plan.has_layer(&injector) {
+                traversal.next();
+            }
+
+            // alright, let's visit the injection layer first...
+            self.visit_layer(traversal).await;
+            Ok(())
+        }
+
+
+        async fn visit_layer(&self, traversal: Traversal<Wave>) {
+            if traversal.is_req()
+                && self.skel.state.topic.contains_key(traversal.to())
+            {
+                let topic = self.skel.state.find_topic(traversal.to(), traversal.from());
+                match topic {
+                    None => {
+                        // send some sort of Not_found
+                        let mut traversal = traversal.unwrap_req();
+                        let mut traversal = traversal.with(traversal.not_found());
+                        traversal.reverse();
+                        let traversal = traversal.wrap();
+                        self.traverse_to_next(traversal).await;
+                        return;
+                    }
+                    Some(result) => {
+                        match result {
+                            Ok(topic_handler) => {
+                                let transmitter = StarInjectTransmitter::new( self.skel.clone(), traversal.to().clone() );
+                                let transmitter = ProtoTransmitter::new(Arc::new(transmitter));
+                                let req = traversal.unwrap_req().payload;
+                                let ctx = RootInCtx::new(
+                                    req,
+                                    self.skel.logger.span(),
+                                    transmitter
+                                );
+
+                                topic_handler.handle(ctx).await;
+                            }
+                            Err(err) => {
+                                // some some 'forbidden' error message sending towards_core...
+                            }
+                        }
+                    }
+                }
+            } else {
+                match traversal.layer {
+                    Layer::PortalInlet => {
+                        let inlet = PortalInlet::new(
+                            self.skel.clone(),
+                            self.skel.state.find_portal_inlet(&traversal.location),
+                        );
+                        inlet.visit(traversal).await;
+                    }
+                    Layer::Field => {
+                        let field = FieldEx::new(
+                            self.skel.clone(),
+                            self.skel.state.find_field(traversal.payload.to()),
+                            traversal.logger.clone()
+                        );
+                        field.visit(traversal).await;
+                    }
+                    Layer::Shell => {
+                        let shell = ShellEx::new(
+                            self.skel.clone(),
+                            self.skel.state.find_shell(traversal.payload.to()),
+                        );
+                        shell.visit(traversal).await;
+                    }
+                    Layer::Driver => {
+                        self.drivers.visit(traversal).await;
+                    }
+                    _ => {
+                        self.skel.logger.warn("attempt to traverse wave in the inner layers which the Star does not manage");
+                    }
+                }
+            }
+        }
+
+        async fn traverse_to_next(&self, mut traversal: Traversal<Wave>) {
+            if traversal.dest.is_some() && traversal.layer == *traversal.dest.as_ref().unwrap() {
+                self.visit_layer(traversal).await;
+                return;
+            }
+
+            let next = traversal.next();
+            match next {
+                None => match traversal.dir {
+                    TraversalDirection::Fabric => {
+                        self.skel.fabric.send(traversal.payload);
+                    }
+                    TraversalDirection::Core => {
+                        self.skel
+                            .logger
+                            .warn("should not have traversed a wave all the way to the core in Star");
+                    }
+                },
+                Some(_) => {
+                    self.visit_layer(traversal).await;
+                }
+            }
+        }
+
+    }
+
+     */
+
     #[async_trait]
     pub trait TraversalLayer {
         fn port(&self) -> &Port;
         async fn traverse_next(&self, traversal: Traversal<Wave>);
         async fn inject(&self, wave: Wave );
 
-        fn exchange(&self) -> &Arc<DashMap<Uuid, oneshot::Sender<RespShell>>>;
+        fn exchange(&self) -> &Arc<DashMap<Uuid, oneshot::Sender<Pong>>>;
 
-        async fn deliver_request(&self, req: Traversal<ReqShell> ) {
+        async fn deliver_request(&self, req: Traversal<Ping> ) {
             // do something?
         }
 
-        async fn deliver_response(&self, resp: Traversal<RespShell>) {
+        async fn deliver_response(&self, resp: Traversal<Pong>) {
             if let Some((_,tx)) = self.exchange().remove(&resp.response_to) {
                 tx.send(resp.payload );
             } else {
@@ -1354,23 +1606,23 @@ pub mod id {
     }
 
         // override if you want to track outgoing requests
-        async fn request_fabric_bound(&self, traversal: Traversal<ReqShell>) -> Result<(), MsgErr>{
+        async fn request_fabric_bound(&self, traversal: Traversal<Ping>) -> Result<(), MsgErr>{
             self.traverse_next(traversal.wrap()).await;
             Ok(())
         }
 
-        async fn request_core_bound(&self, traversal: Traversal<ReqShell>) -> Result<(), MsgErr>{
+        async fn request_core_bound(&self, traversal: Traversal<Ping>) -> Result<(), MsgErr>{
             self.traverse_next(traversal.wrap()).await;
             Ok(())
         }
 
         // override if you want to track incoming responses
-        async fn response_core_bound(&self, traversal: Traversal<RespShell>) -> Result<(), MsgErr>{
+        async fn response_core_bound(&self, traversal: Traversal<Pong>) -> Result<(), MsgErr>{
             self.traverse_next(traversal.wrap()).await;
             Ok(())
         }
 
-        async fn response_fabric_bound(&self, traversal: Traversal<RespShell>) -> Result<(), MsgErr>{
+        async fn response_fabric_bound(&self, traversal: Traversal<Pong>) -> Result<(), MsgErr>{
             self.traverse_next(traversal.wrap()).await;
             Ok(())
         }
@@ -1433,6 +1685,12 @@ pub mod id {
                 layer,
                 topic,
             }
+        }
+    }
+
+    impl ToRecipients for Port {
+        fn to_recipients(self) -> Recipients {
+            Recipients::Single(self)
         }
     }
 
@@ -1565,6 +1823,12 @@ pub mod id {
         }
     }
 
+    impl ToRecipients for Point {
+        fn to_recipients(self) -> Recipients {
+            self.to_port().to_recipients()
+        }
+    }
+
     pub type Point = PointDef<RouteSeg, PointSeg>;
     pub type PointCtx = PointDef<RouteSeg, PointSegCtx>;
     pub type PointVar = PointDef<RouteSegVar, PointSegVar>;
@@ -1598,8 +1862,8 @@ pub mod id {
         }
     }
 
-    impl Into<PointSelector> for Point {
-        fn into(self) -> PointSelector {
+    impl Into<Selector> for Point {
+        fn into(self) -> Selector {
             let string = self.to_string();
             let rtn = result(all_consuming(point_selector)(new_span(string.as_str()))).unwrap();
             string;
@@ -2426,9 +2690,9 @@ pub enum StarSub {
     Fold, // exit from the Mesh.. maintains connections etc to Databases, Keycloak, etc.... Like A Space Fold out of the Fabric..
 }
 
-impl Into<SubKind> for StarSub {
-    fn into(self) -> SubKind {
-        SubKind::Star(self)
+impl Into<Sub> for StarSub {
+    fn into(self) -> Sub {
+        Sub::Star(self)
     }
 }
 
@@ -2462,9 +2726,9 @@ pub enum BaseSubKind {
     Any,
 }
 
-impl Into<SubKind> for BaseSubKind {
-    fn into(self) -> SubKind {
-        SubKind::Base(self)
+impl Into<Sub> for BaseSubKind {
+    fn into(self) -> Sub {
+        Sub::Base(self)
     }
 }
 
@@ -2493,9 +2757,9 @@ impl UserBaseSubKind {
     }
 }
 
-impl Into<SubKind> for UserBaseSubKind {
-    fn into(self) -> SubKind {
-        SubKind::UserBase(self)
+impl Into<Sub> for UserBaseSubKind {
+    fn into(self) -> Sub {
+        Sub::UserBase(self)
     }
 }
 
@@ -2527,9 +2791,9 @@ pub enum FileSubKind {
     Dir,
 }
 
-impl Into<SubKind> for FileSubKind {
-    fn into(self) -> SubKind {
-        SubKind::File(self)
+impl Into<Sub> for FileSubKind {
+    fn into(self) -> Sub {
+        Sub::File(self)
     }
 }
 
@@ -2564,9 +2828,9 @@ pub enum ArtifactSubKind {
     Dir,
 }
 
-impl Into<SubKind> for ArtifactSubKind {
-    fn into(self) -> SubKind {
-        SubKind::Artifact(self)
+impl Into<Sub> for ArtifactSubKind {
+    fn into(self) -> Sub {
+        Sub::Artifact(self)
     }
 }
 
@@ -2595,9 +2859,9 @@ impl DatabaseSubKind {
     }
 }
 
-impl Into<SubKind> for DatabaseSubKind {
-    fn into(self) -> SubKind {
-        SubKind::Database(self)
+impl Into<Sub> for DatabaseSubKind {
+    fn into(self) -> Sub {
+        Sub::Database(self)
     }
 }
 
@@ -2710,13 +2974,13 @@ impl FromStr for StarKey {
     }
 }
 
-pub struct TraversalInjection {
+pub struct TraversalInjection<V> {
     pub injector: Port,
-    pub wave: Wave
+    pub wave: Wave<V>
 }
 
-impl TraversalInjection{
-    pub fn new( injector: Port, wave: Wave ) -> Self {
+impl <V> TraversalInjection<V>{
+    pub fn new( injector: Port, wave: Wave<V> ) -> Self {
         Self {
             injector,
             wave
@@ -2876,7 +3140,7 @@ impl Traversal<Wave> {
         }
     }
 
-    pub fn unwrap_req(self) -> Traversal<ReqShell> {
+    pub fn unwrap_req(self) -> Traversal<Ping> {
         if let Wave::Req(req) = self.payload.clone() {
             self.with(req)
         } else {
@@ -2884,7 +3148,7 @@ impl Traversal<Wave> {
         }
     }
 
-    pub fn unwrap_resp(self) -> Traversal<RespShell> {
+    pub fn unwrap_resp(self) -> Traversal<Pong> {
         if let Wave::Resp(resp) = self.payload.clone() {
             self.with(resp)
         } else {
@@ -2893,7 +3157,7 @@ impl Traversal<Wave> {
     }
 }
 
-impl Traversal<ReqShell> {
+impl Traversal<Ping> {
     pub fn wrap(self) -> Traversal<Wave> {
         let req = self.payload.clone();
         self.with(Wave::Req(req))
@@ -2904,7 +3168,7 @@ impl Traversal<ReqShell> {
     }
 }
 
-impl Traversal<RespShell> {
+impl Traversal<Pong> {
     pub fn wrap(self) -> Traversal<Wave> {
         let resp = self.payload.clone();
         self.with(Wave::Resp(resp))

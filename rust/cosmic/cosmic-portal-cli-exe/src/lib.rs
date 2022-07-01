@@ -32,8 +32,8 @@ use mesh_portal_versions::version::v0_0_1::parse::model::MethodScopeSelector;
 use mesh_portal_versions::version::v0_0_1::parse::{command, command_line, Env};
 use mesh_portal_versions::version::v0_0_1::util::{ToResolved, ValuePattern};
 use mesh_portal_versions::version::v0_0_1::wave::{
-    AsyncInternalRequestHandlers, AsyncRequestHandler, AsyncRequestHandlerRelay, AsyncRouter,
-    AsyncTransmitter, InternalPipeline, RequestHandler, RequestHandlerRelay, SyncTransmitRelay,
+    PointRequestHandler, DirectedHandler, AsyncRequestHandlerRelay, AsyncRouter,
+    Transmitter, InternalPipeline, DirectedHandler, RequestHandlerRelay, SyncTransmitRelay,
     SyncTransmitter,
 };
 use std::collections::{HashMap, HashSet};
@@ -53,13 +53,13 @@ extern crate async_trait;
 pub struct CliRelay {
     pub port: Port,
     pub messenger: AsyncTransmitterWithAgent,
-    pub handlers: RwLock<AsyncInternalRequestHandlers<AsyncRequestHandlerRelay>>,
+    pub handlers: RwLock<PointRequestHandler<AsyncRequestHandlerRelay>>,
 }
 
 #[routes_async(self.handlers.read().await)]
 impl CliRelay {
     pub fn new(port: Port, messenger: AsyncTransmitterWithAgent) -> Self {
-        let handlers = RwLock::new(AsyncInternalRequestHandlers::new());
+        let handlers = RwLock::new(PointRequestHandler::new());
 
         let rtn = Self {
             port,
@@ -76,12 +76,12 @@ impl CliRelay {
 
     #[route("Msg<NewSession>")]
     pub async fn new_session(&self, ctx: ReqCtx<'_, ReqShell>) -> Result<Port, MsgErr> {
-        if !self.filter(ctx.get_request()) {
+        if !self.filter(ctx.wave()) {
             return Err(MsgErr::forbidden());
         }
 
         let mut session_port = self.port.clone().with_topic(Topic::uuid());
-        let mut source = ctx.get_request().from.clone();
+        let mut source = ctx.wave().from.clone();
 
         let messenger = self.messenger.clone().with_from(session_port.clone());
 
@@ -104,7 +104,7 @@ impl CliRelay {
 
     #[route("Msg<EndSession>")]
     pub async fn end_session(&self, ctx: ReqCtx<'_, ReqShell>) -> Result<RespCore, MsgErr> {
-        if !self.filter(ctx.get_request()) {
+        if !self.filter(ctx.wave()) {
             return Err(MsgErr::new(403, "forbidden"));
         }
 
@@ -149,7 +149,7 @@ impl CliSession {
 
     #[route("Msg<ExecCommand>")]
     pub async fn exec(&self, ctx: ReqCtx<'_, RawCommand>) -> Result<RespCore, MsgErr> {
-        if !self.filter(ctx.get_request()) {
+        if !self.filter(ctx.wave()) {
             return Err(MsgErr::forbidden());
         }
 

@@ -33,5 +33,6 @@ tokio = { version = "1.15.0", features = ["full"] }
 dashmap = "4.0.2"
 serde_urlencoded = "0.7.1"
 enum-ordinalize = "3.1.11"
+convert_case = "0.5.0"
 
 #tailcall = "0.1.6"

@@ -75,7 +75,7 @@ pub struct LogSpanEvent {
 impl LogSpanEvent {
     pub fn new( span: &LogSpan, kind: LogSpanEventKind, attributes: HashMap<String,String> ) -> LogSpanEvent {
         LogSpanEvent {
-            span: span.uuid.clone(),
+            span: span.id.clone(),
             kind,
             attributes,
             timestamp: Utc::now()
@@ -83,9 +83,11 @@ impl LogSpanEvent {
     }
 }
 
+pub type TrailSpanId = Uuid;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogSpan{
-    pub uuid: Uuid,
+    pub id: TrailSpanId,
     pub point: Point,
     pub parent: Option<String>,
     pub attributes: HashMap<String,String>,
@@ -96,7 +98,7 @@ pub struct LogSpan{
 impl LogSpan {
     pub fn new( point: Point ) -> Self {
         Self {
-            uuid: uuid(),
+            id: uuid(),
             point,
             parent: None,
             attributes: Default::default(),
@@ -106,7 +108,7 @@ impl LogSpan {
 
     pub fn parent( point: Point, parent: Uuid ) -> Self {
         Self {
-            uuid: uuid(),
+            id: uuid(),
             point,
             parent: Some(parent),
             attributes: Default::default(),
@@ -117,7 +119,7 @@ impl LogSpan {
     pub fn opt(point: Point, span: Option<Self>) -> Self {
         let mut span = span.unwrap_or(
         Self {
-            uuid: uuid(),
+            id: uuid(),
             point: point.clone(),
             parent: None,
             attributes: Default::default(),
@@ -543,7 +545,7 @@ pub struct SpanLogger {
 
 impl SpanLogger {
     pub fn span_uuid(&self) -> String {
-        self.span.uuid.clone()
+        self.span.id.clone()
     }
 
     pub fn point(&self) -> &Point {
@@ -632,7 +634,7 @@ impl SpanLogger {
         AuditLogBuilder {
             logger: self.root_logger.clone(),
             point: self.point().clone(),
-            span: self.span.uuid.clone(),
+            span: self.span.id.clone(),
             attributes: HashMap::new(),
         }
     }
