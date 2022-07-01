@@ -131,7 +131,7 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool  ) -> TokenStream 
 
         #[async_trait]
         impl DirectedHandler for #self_ty {
-            async fn handle( &self, ctx: RootInCtx) -> ReflectedCore {
+            async fn handle( &self, ctx: RootInCtx) -> Bounce {
                 #(
                     if #static_selector_keys.is_match(&ctx.request).is_ok() {
                        return self.#idents( ctx ).await;

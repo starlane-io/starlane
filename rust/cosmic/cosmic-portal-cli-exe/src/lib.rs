@@ -193,7 +193,7 @@ impl CommandExecutor {
         let request: ReqCore = command.into();
         let request = ReqProto::from_core(request);
 
-        RespShell::core_result(self.tx.send(request).await)
+        RespShell::core(self.tx.send(request).await)
     }
 }
 

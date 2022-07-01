@@ -43,13 +43,7 @@ pub struct FieldEx {
     pub logger: SpanLogger
 }
 
-fn request_id(request: &Ping) -> String {
-    format!("{}{}", request.to.to_string(), request.id)
-}
 
-fn request_id_from_response(response: &Traversal<Pong>) -> String {
-    format!("{}{}", response.from.to_string(), response.response_to)
-}
 
 impl FieldEx {
     pub fn new(skel: StarSkel, state: FieldState, logger: SpanLogger ) -> Self {
@@ -72,7 +66,7 @@ impl FieldEx {
                         self.logger.error(format!("no pipeline set for request_id: {}", action.request_id));
                     }
                     Some((_, mut pipex)) => {
-                        self.skel.traverse_to_next.send(pipex.reflect()).await;
+                        self.skel.traverse_to_next.send(pipex.reflect().wrap() ).await;
                     }
                 }
             }
@@ -134,7 +128,7 @@ impl TraversalLayer for FieldEx {
             env
         };
 
-        let request_id = request_id(&directed.item);
+        let directed_id = directed.id().to_string();
 
         let pipeline = route.block.clone();
 
@@ -159,17 +153,17 @@ impl TraversalLayer for FieldEx {
             return Ok(());
         }
 
-        self.state.pipe_exes.insert(request_id.clone(), pipex);
+        self.state.pipe_exes.insert(directed_id.clone(), pipex);
 
-        let action = RequestAction { request_id, action };
+        let action = RequestAction { request_id: directed_id, action };
 
         self.handle_action(action);
         Ok(())
     }
 
-    async fn reflected_core_bound(&self, mut traversal: Traversal<Pong>) -> Result<(), MsgErr> {
-        let request_id = request_id_from_response(&traversal);
-        let mut pipex = self.state.pipe_exes.remove(&request_id);
+    async fn reflected_core_bound(&self, mut traversal: Traversal<ReflectedWave>) -> Result<(), MsgErr> {
+        let reflected_id = traversal.reflection_of().to_string();
+        let mut pipex = self.state.pipe_exes.remove(&reflected_id);
 
         if let None = pipex {
             let err_msg = format!(
@@ -189,16 +183,17 @@ impl TraversalLayer for FieldEx {
             return Ok(());
         }
 
-        self.state.pipe_exes.insert(request_id.clone(), pipex);
+        self.state.pipe_exes.insert(reflected_id.clone(), pipex);
 
-        let action = RequestAction { request_id, action };
+        let action = RequestAction { request_id: reflected_id, action };
 
         self.handle_action(action);
 
         Ok(())
     }
 
-    async fn inject(&self, inject: TraversalInjection) {
+    async fn inject(&self, wave: UltraWave) {
+        let inject = TraversalInjection::new( self.state.port.clone(), wave );
         self.skel.inject_tx.send(inject).await;
     }
 }
@@ -257,7 +252,7 @@ impl PipeEx {
     fn execute_stop(&mut self, stop: &PipelineStopVar) -> Result<PipeAction, MsgErr> {
         match stop {
             PipelineStopVar::Internal => {
-                let request = self.traversal.request();
+                let request = self.traversal.direct();
                 Ok(PipeAction::CoreRequest(request))
             }
             PipelineStopVar::Call(call) => {
@@ -276,12 +271,11 @@ impl PipeEx {
                 core.body = self.traversal.body.clone();
                 core.headers = self.traversal.headers.clone();
                 core.uri = Uri::from_str(path.as_str())?;
-                let request = self.traversal.initial.clone().with(Ping::new(
+                let ping = self.traversal.initial.clone().with(Wave::new(Ping::new(
                     core,
                     self.traversal.to(),
-                    call.point,
-                ));
-                Ok(PipeAction::FabricRequest(request))
+                ), self.);
+                Ok(PipeAction::FabricRequest(ping))
             }
             PipelineStopVar::Respond => Ok(PipeAction::Respond),
             PipelineStopVar::Point(point) => {
@@ -365,10 +359,10 @@ impl PipeTraversal {
         self.initial.from.clone().to_point()
     }
 
-    pub fn request(&self) -> Traversal<Ping> {
+    pub fn direct(&self) -> Traversal<Ping> {
         self.initial
             .clone()
-            .with(Ping::new(self.request_core(), self.from(), self.to()))
+            .with(Ping::new(self.request_core(), self.from()), self.from()))
     }
 
     pub fn response_core(&self) -> ReflectedCore {
@@ -426,8 +420,8 @@ struct RequestAction {
 }
 
 pub enum PipeAction {
-    CoreRequest(Traversal<Ping>),
-    FabricRequest(Traversal<Ping>),
+    CoreRequest(Traversal<DirectedWave>),
+    FabricRequest(Traversal<DirectedWave>),
     Respond,
 }
 

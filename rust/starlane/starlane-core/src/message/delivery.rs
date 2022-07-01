@@ -114,7 +114,7 @@ impl Delivery<ReqShell>
             to: self.item.from,
             from: self.item.to,
             core,
-            response_to: self.item.id
+            reflection_of: self.item.id
         };
         let proto = self
             .star_message

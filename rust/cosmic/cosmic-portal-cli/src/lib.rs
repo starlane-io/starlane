@@ -12,7 +12,7 @@ use mesh_portal::version::latest::msg::MsgMethod;
 use mesh_portal_versions::version::v0_0_1::id::id::{Layer, ToPort};
 use std::sync::Arc;
 use mesh_portal_versions::version::v0_0_1::quota::Timeouts;
-use mesh_portal_versions::version::v0_0_1::wave::{Exchanger, Pong, ProtoTransmitter, Router, SetStrategy, ToRecipients, Wave};
+use mesh_portal_versions::version::v0_0_1::wave::{Exchanger, Ping, Pong, ProtoTransmitter, Router, SetStrategy, ToRecipients, Wave};
 
 #[macro_use]
 extern crate cosmic_macros;
@@ -117,11 +117,14 @@ impl<'a> Drop for CliSession<'a> {
     fn drop(&mut self) {
         match self.tx.to.clone().unwrap() {
             Ok(to) => {
-                let request = ReqProto::msg(to, MsgMethod::new("DropSession").unwrap());
+                let ping = ReqProto::msg(to, MsgMethod::new("DropSession").unwrap());
                 let tx = self.tx.clone();
-                tokio::spawn(async move {
-                    let reflect:Result<Wave<Pong>,MsgErr> = tx.direct(request).await;
-                });
+                match ping.build() {
+                    Ok(ping) => {
+                        tx.route_sync(ping.to_ultra() );
+                    }
+                    Err(_) => {}
+                }
             }
             Err(_) => {}
         }

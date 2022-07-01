@@ -17,9 +17,9 @@ use mesh_portal_versions::version::v0_0_1::log::PointLogger;
 use mesh_portal_versions::version::v0_0_1::parse::Env;
 use mesh_portal_versions::version::v0_0_1::quota::Timeouts;
 use mesh_portal_versions::version::v0_0_1::substance::substance::Substance;
-use mesh_portal_versions::version::v0_0_1::sys::{Assign, Sys};
+use mesh_portal_versions::version::v0_0_1::sys::{Assign, Location, Sys};
 use mesh_portal_versions::version::v0_0_1::util::ValueMatcher;
-use mesh_portal_versions::version::v0_0_1::wave::{Agent, DirectedHandler, DirectedHandlerSelector, RecipientSelector,  InCtx, ProtoTransmitter, Ping, Reflectable, ReflectedCore, Pong, RootInCtx, Router, SetStrategy, Wave};
+use mesh_portal_versions::version::v0_0_1::wave::{Bounce,Agent, DirectedHandler, DirectedHandlerSelector, RecipientSelector,  InCtx, ProtoTransmitter, Ping, Reflectable, ReflectedCore, Pong, RootInCtx, Router, SetStrategy, Wave};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
@@ -36,12 +36,15 @@ use mesh_portal_versions::version::v0_0_1::bin::Bin;
 #[derive(Clone)]
 pub struct StarState {
     states: Arc<DashMap<Port,Arc<RwLock<dyn State>>>>,
-    tx: mpsc::Sender<StateCall>
+    topic: Arc<DashMap<Port,Arc<dyn TopicHandler>>>,
+    tx: mpsc::Sender<StateCall>,
+    field: Arc<DashMap<Port,FieldState>>,
+    shell: Arc<DashMap<Port,ShellState>>,
 }
 
 impl StarState {
     pub fn new() -> Self {
-        let states = Arc::new(DashMap::new());
+        let states : Arc<DashMap<Port,Arc<RwLock<dyn State>>>>= Arc::new(DashMap::new());
 
         let (tx,mut rx) = mpsc::channel(32*1024);
 
@@ -67,8 +70,15 @@ impl StarState {
 
         Self {
             states,
+            topic: Arc::new(DashMap::new()),
+            field: Arc::new( DashMap::new() ),
+            shell: Arc::new( DashMap::new() ),
             tx,
         }
+    }
+
+    pub fn topic_handler( &self, port: Port, handler: Arc<dyn TopicHandler>) {
+        self.topic.insert(port, handler);
     }
 
     pub async fn find_state<S>(&self, port: &Port ) -> Result<Arc<RwLock<dyn State>>,MsgErr> {
@@ -79,11 +89,11 @@ impl StarState {
         &self,
         port: &Port,
         source: &Port,
-    ) -> Option<Result<&Box<dyn TopicHandler>, MsgErr>> {
+    ) -> Option<Result<Arc<dyn TopicHandler>, MsgErr>> {
         match self.topic.get(port) {
             None => None,
             Some(topic) => {
-                let topic = topic.value();
+                let topic = topic.value().clone();
                 if topic.source_selector().is_match(source).is_ok() {
                     Some(Ok(topic))
                 } else {
@@ -93,70 +103,12 @@ impl StarState {
         }
     }
 
-    pub fn find_field(&self, point: &Point) -> FieldState {
-        match self.field.get(point) {
-            None => {
-                let rtn = FieldState::new();
-                self.field.insert(point.clone(), rtn.clone());
-                rtn
-            }
-            Some(rtn) => rtn.value().clone(),
-        }
+    pub fn find_field(&self, port: &Port ) -> Result<FieldState,MsgErr> {
+        Ok(self.field.get(port).ok_or("expected field state")?.value().clone())
     }
 
-    pub fn find_shell(&self, point: &Point) -> ShellState {
-        match self.shell.get(point) {
-            None => {
-                let rtn = ShellState::new();
-                self.shell.insert(point.clone(), rtn.clone());
-                rtn
-            }
-            Some(rtn) => rtn.value().clone(),
-        }
-    }
-
-    pub fn find_portal_inlet(&self, point: &Point) -> PortalInletState {
-        match self.portal_inlet.get(point) {
-            None => {
-                let rtn = PortalInletState::new();
-                self.portal_inlet.insert(point.clone(), rtn.clone());
-                rtn
-            }
-            Some(rtn) => rtn.value().clone(),
-        }
-    }
-
-    pub fn find_portal_shell(&self, point: &Point) -> PortalShellState {
-        match self.portal_shell.get(point) {
-            None => {
-                let rtn = PortalShellState::new();
-                self.portal_shell.insert(point.clone(), rtn.clone());
-                rtn
-            }
-            Some(rtn) => rtn.value().clone(),
-        }
-    }
-
-    pub fn find_core(&self, kind: &Kind, point: &Point) -> Arc<RwLock<dyn State>> {
-        match self.core.get(kind) {
-            None => {
-                let rtn = State::None;
-                self.core.insert(kind.clone(), Arc::new(rtn.clone()));
-                rtn
-            }
-            Some(states) => {
-                match states.value().get(point) {
-                    None => {
-                        let rtn = State::None;
-                        states.value().insert(point.clone(), rtn.clone());
-                        rtn
-                    }
-                    Some(rtn) => {
-                        rtn.clone()
-                    }
-                }
-            }
-        }
+    pub fn find_shell(&self, port: &Port) -> Result<ShellState,MsgErr> {
+        Ok(self.shell.get(port).ok_or("expected shell state")?.value().clone())
     }
 }
 
@@ -287,50 +239,40 @@ impl Star {
 
     async fn hyperwave(&self, wave: HyperWave) {
 
+        let wave = wave.wave;
+
         let record = match self
             .skel
             .registry
-            .locate(&wave.wave.to().clone().to_point())
+            .locate(&wave.to().clone().unwrap_single())
             .await{
             Ok(record) => record,
             Err(err) => {
                 self.skel.logger.error(err.to_string());
+                return;
             }
         };
 
-        if record.location != *self.skel.location() {
-            // need to send a not_found to sender... even if the wave type was Response!
-            self.skel.logger.warn("attempt to send a wave to a point that is not hosted by this star");
-            return;
+        match record.location {
+            Location::Central => {
+                self.skel.logger.error("attempt to send a wave to a point that is Nowhere");
+                return;
+            }
+            Location::Nowhere => {
+                self.skel.logger.error("attempt to send a wave to a point that is Nowhere");
+                return;
+            }
+            Location::Somewhere(location) => {
+                if location != *self.skel.location() {
+                    // need to send a not_found to sender... even if the wave type was Response!
+                    self.skel.logger.warn("attempt to send a wave to a point that is not hosted by this star");
+                    return;
+                }
+            }
         }
 
-        // first check if this wave was intended for the star itself... if it was
-        // we will need to keep the HyperWave data
-        let wave = if wave.to().point == *self.skel.location() {
-            if wave.wave.is_req() {
-                let req = Ping {
-                    id: uuid(),
-                    agent: Agent::Point(self.skel.location().clone()),
-                    scope: Scope::Full,
-                    handling: Default::default(),
-                    from: self.skel.location().clone().to_port().with_layer(Layer::Surface),
-                    to: self.skel.location().clone().to_port().with_layer(Layer::Core),
-                    core: DirectedCore {
-                        headers: Default::default(),
-                        method: SysMethod::HyperWave.into(),
-                        uri: Default::default(),
-                        body: Substance::HyperWave(Box::new(wave))
-                    }
-                };
-                Wave::Req(req)
-            } else {
-                wave.wave
-            }
-        } else {
-            wave.wave
-        };
 
-        if wave.to().point == self.injector.point {
+        if wave.to().unwrap_single().point == self.injector.point {
             self.skel.logger.warn("attempt to spoof Star injector");
             return;
         }
@@ -338,21 +280,21 @@ impl Star {
         self.start_traversal(wave,&self.injector).await;
     }
 
-    async fn start_traversal(&self, wave: UltraWave, injector: &Port ) {
+    async fn start_traversal(&self, wave: UltraWave, injector: &Port ) -> Result<(),MsgErr> {
         let record = match self
             .skel
             .registry
-            .locate(&wave.to().clone().to_point())
+            .locate(&wave.to().clone().unwrap_single().to_point())
             .await {
             Ok(record) => record,
             Err(err) => {
                 self.skel.logger.error( err.to_string() );
-                return;
+                return Err(err);
             }
         };
 
         let location = record.location.clone().ok_or()?;
-        let plan = record.details.stub.kind.wave_traversal_plan();
+        let plan = record.details.stub.kind.wave_traversal_plan().clone();
 
         let mut dest = None;
         let mut dir = TraversalDirection::Core;
@@ -360,19 +302,18 @@ impl Star {
         if location == *self.skel.location()  {
 
             // now we check if we are doing an inter point delivery (from one layer to another in the same Particle)
-            if wave.to().point == wave.from().point {
+            if wave.to().clone().unwrap_single().point == wave.from().point {
                 // it's the SAME point, so the to layer becomes our dest
-                dest.replace(wave.to().layer.clone() );
+                dest.replace(wave.to().clone().unwrap_single().layer );
 
                 // make sure we have this layer in the plan
-                let plan = record.details.stub.kind.wave_traversal_plan();
-                if !plan.has_layer(&wave.to().layer) {
+                if !plan.has_layer(&wave.to().clone().unwrap_single().layer ) {
                     self.skel.logger.warn("attempt to send wave to layer that the recipient Kind does not have in its traversal plan");
-                    return;
+                    return Err(MsgErr::forbidden());
                 }
 
                 // dir is from inject_layer to dest
-                dir = match TraversalDirection::new(&injector.layer, &wave.to().layer) {
+                dir = match TraversalDirection::new(&injector.layer, &wave.to().clone().unwrap_single().layer) {
                     Ok(dir) => dir,
                     Err(_) => {
                         // looks like we are already on the dest layer...
@@ -383,14 +324,14 @@ impl Star {
             } else {
                 // if this wave was injected by the from Particle, then we need to first
                 // traverse towards the fabric
-                if injector.point == *wave.from() {
+                if injector.point == wave.from().point {
                     dir = TraversalDirection::Fabric;
                 } else {
                     // if this was injected by something else (like the Star)
                     // then it needs to traverse towards the Core
                     dir = TraversalDirection::Core;
                     // and dest will be the to layer
-                    dest.replace(wave.to().layer.clone());
+                    dest.replace(wave.to().clone().unwrap_single().layer);
                 }
             }
         } else {
@@ -399,27 +340,9 @@ impl Star {
            dest = None;
         }
 
-        // next we determine the direction of the traversal
-
-        // if the recipient is not even in this star, traverse towards fabric
-        if location != *self.skel.location() {
-            TraversalDirection::Fabric
-        }
-        // if the recipient and from are the same perform a normal traversal
-        else if wave.to().point == wave.from().point {
-            TraversalDirection::new( &self.layer, &wave.to().layer ).unwrap()
-        } else {
-            // finally we handle the case where we traverse towards another point within this Star
-            // in this case it just depends upon if we are Requesting or Responding
-            if wave.is_req() {
-                TraversalDirection::Core
-            } else {
-                TraversalDirection::Fabric
-            }
-        }
-
-        let logger = self.skel.logger.point(wave.to().clone().to_point());
+        let logger = self.skel.logger.point(wave.to().clone().unwrap_single().to_point());
         let logger = logger.span();
+        let to = wave.to().clone().unwrap_single();
 
         let mut traversal = Traversal::new(
             wave,
@@ -428,7 +351,8 @@ impl Star {
             injector.layer.clone(),
             logger,
             dir,
-            dest
+            dest,
+            to
         );
 
         // in the case that we injected into a layer that is not part
@@ -439,32 +363,38 @@ impl Star {
 
         // alright, let's visit the injection layer first...
         self.visit_layer(traversal).await;
+        Ok(())
     }
 
 
-    async fn visit_layer(&self, traversal: Traversal<UltraWave>) {
-        if traversal.is_req()
-            && self.skel.state.topic.contains_key(traversal.to())
+    async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(),MsgErr>{
+        if traversal.is_directed()
+            && self.skel.state.topic.contains_key(&traversal.to )
         {
-            let topic = self.skel.state.find_topic(traversal.to(), traversal.from());
+            let topic = self.skel.state.find_topic(&traversal.to, traversal.from());
             match topic {
                 None => {
                     // send some sort of Not_found
-                    let mut traversal = traversal.unwrap_req();
+                    /*
+                    let mut traversal = traversal.unwrap_directed();
                     let mut traversal = traversal.with(traversal.not_found());
                     traversal.reverse();
                     let traversal = traversal.wrap();
                     self.traverse_to_next(traversal).await;
-                    return;
+
+                     */
+                    return Err(MsgErr::not_found());
                 }
                 Some(result) => {
                     match result {
                         Ok(topic_handler) => {
-                            let transmitter = LayerInjectionRouter::new(self.skel.clone(), traversal.to().clone() );
-                            let transmitter = ProtoTransmitter::new(Arc::new(transmitter));
-                            let req = traversal.unwrap_req().payload;
+                            let transmitter = LayerInjectionRouter::new(self.skel.clone(), traversal.to.clone() );
+                            let transmitter = ProtoTransmitter::new(Arc::new(transmitter), self.skel.exchanger.clone() );
+                            let to = traversal.to.clone();
+                            let directed = traversal.unwrap_directed().payload;
                             let ctx = RootInCtx::new(
-                                req,
+                                directed,
+                                to,
                                 self.skel.logger.span(),
                                 transmitter
                             );
@@ -479,17 +409,11 @@ impl Star {
             }
         } else {
             match traversal.layer {
-                Layer::PortalInlet => {
-                    let inlet = PortalInlet::new(
-                        self.skel.clone(),
-                        self.skel.state.find_portal_inlet(&traversal.location),
-                    );
-                    inlet.visit(traversal).await;
-                }
+
                 Layer::Field => {
                     let field = FieldEx::new(
                         self.skel.clone(),
-                        self.skel.state.find_field(traversal.payload.to()),
+                        self.skel.state.find_field(&traversal.to)?,
                         traversal.logger.clone()
                     );
                     field.visit(traversal).await;
@@ -497,7 +421,7 @@ impl Star {
                 Layer::Shell => {
                     let shell = ShellEx::new(
                         self.skel.clone(),
-                        self.skel.state.find_shell(traversal.payload.to()),
+                        self.skel.state.find_shell(&traversal.to)?,
                     );
                     shell.visit(traversal).await;
                 }
@@ -509,6 +433,7 @@ impl Star {
                 }
             }
         }
+        Ok(())
     }
 
     async fn traverse_to_next(&self, mut traversal: Traversal<UltraWave>) {
@@ -570,6 +495,11 @@ impl Router for LayerInjectionRouter {
     async fn route(&self, wave: UltraWave ) {
         let inject = TraversalInjection::new(self.injector.clone(), wave );
         self.skel.inject_tx.send(inject).await;
+    }
+
+    fn route_sync(&self, wave: UltraWave) {
+        let inject = TraversalInjection::new(self.injector.clone(), wave );
+        self.skel.inject_tx.try_send(inject);
     }
 }
 

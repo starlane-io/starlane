@@ -86,11 +86,11 @@ impl <C> StateCache<C> where C: State{
 
 }
 
-pub trait StateFactory{
+pub trait StateFactory: Send+Sync{
     fn create(&self) -> Box<dyn State>;
 }
 
-pub trait State {
+pub trait State: Send+Sync {
     fn deserialize<DS>( from: Vec<u8>) -> Result<DS,MsgErr> where DS: State, Self:Sized;
     fn serialize( self ) -> Vec<u8>;
 }

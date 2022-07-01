@@ -9,27 +9,19 @@
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/driver.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-locality/src/driver.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/field.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-locality/src/field.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/guest.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-locality/src/guest.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/host.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-locality/src/host.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/guest.rs" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/portal.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-locality/src/portal.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/shell.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-locality/src/shell.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/star.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-locality/src/star.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/state.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-locality/src/state.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-macros-primitive/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-macros-primitive/src/lib.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-macros/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-macros/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-portal-cli-exe/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-portal-cli-exe/src/lib.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-portal-cli/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-portal-cli/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/hyperlane/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/hyperlane/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/error.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/error.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/command.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/command.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/config.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/config.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/frame.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/frame.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/id.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/id.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/portal.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/portal.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/substance.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/substance.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/sys.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/sys.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/wave.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/wave.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal/src/version/latest.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/mesh-portal/src/version/latest.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/starlane-core/src/message/delivery.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/starlane-core/src/message/delivery.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/starlane-core/src/star/shell/message.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/starlane-core/src/star/shell/message.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

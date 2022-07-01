@@ -1624,6 +1624,7 @@ pub mod id {
 
     }
 
+    #[derive(Clone)]
     pub struct TraversalPlan {
         pub stack: Vec<Layer>,
     }

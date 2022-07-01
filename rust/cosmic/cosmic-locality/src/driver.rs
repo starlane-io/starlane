@@ -10,7 +10,7 @@ use mesh_portal_versions::version::v0_0_1::log::PointLogger;
 use mesh_portal_versions::version::v0_0_1::particle::particle::Status;
 use mesh_portal_versions::version::v0_0_1::substance::substance::Substance;
 use mesh_portal_versions::version::v0_0_1::sys::{Assign, Sys};
-use mesh_portal_versions::version::v0_0_1::wave::{DirectedHandler, DirectedHandlerSelector, RecipientSelector, RootInCtx, InCtx, Ping, ReflectedCore, Pong, Wave, UltraWave, Exchanger};
+use mesh_portal_versions::version::v0_0_1::wave::{Bounce,DirectedHandler, DirectedHandlerSelector, RecipientSelector, RootInCtx, InCtx, Ping, ReflectedCore, Pong, Wave, UltraWave, Exchanger};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;

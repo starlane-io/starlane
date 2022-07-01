@@ -1,15 +1,17 @@
 use crate::guest::GuestSkel;
 use crate::host::HostSkel;
 use crate::star::StarSkel;
+use crate::state::{PortalInletState, PortalOutletState, PortalShellState, TunnelState};
+use cosmic_hyperlane::HyperwayInterchange;
 use dashmap::DashMap;
 use mesh_portal_versions::version::v0_0_1::id::id::{Layer, Port, TraversalLayer, Uuid};
 use mesh_portal_versions::version::v0_0_1::id::Traversal;
-use mesh_portal_versions::version::v0_0_1::wave::{Exchanger, Ping, Pong, UltraWave, Wave};
+use mesh_portal_versions::version::v0_0_1::wave::{
+    DirectedWave, Exchanger, Ping, Pong, UltraWave, Wave,
+};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot::Sender;
-use cosmic_hyperlane::HyperwayInterchange;
-use crate::state::{PortalInletState, PortalOutletState, PortalShellState, TunnelState};
 
 /// the portal endpoint that is within the Fabric
 pub struct PortalInlet {
@@ -37,13 +39,11 @@ impl TraversalLayer for PortalInlet {
         todo!()
     }
 
-    fn exchanger(&self) -> &Arc<DashMap<Uuid, Sender<Pong>>> {
+    fn exchanger(&self) -> &Exchanger {
         todo!()
     }
 
-    async fn delivery_directed(&self, request: Ping) {
-        todo!()
-    }
+    async fn delivery_directed(&self, direct: Traversal<DirectedWave>) {}
 }
 
 /// The mid-portion of the Portal [Between Inlet & Outlet]
@@ -77,10 +77,9 @@ impl TraversalLayer for TunnelOutlet {
         todo!()
     }
 
-    fn exchanger(&self) -> &Arc<DashMap<Uuid, Sender<Pong>>> {
+    fn exchanger(&self) -> &Exchanger{
         todo!()
     }
-
 }
 
 pub struct TunnelInlet {
@@ -108,11 +107,11 @@ impl TraversalLayer for TunnelInlet {
         todo!()
     }
 
-    fn exchanger(&self) -> &Arc<DashMap<Uuid, Sender<Pong>>> {
+    fn exchanger(&self) -> &Exchanger {
         todo!()
     }
 
-    async fn delivery_directed(&self, request: Ping) {
+    async fn delivery_directed(&self, traversal: Traversal<DirectedWave>) {
         todo!()
     }
 }
@@ -147,7 +146,8 @@ impl TraversalLayer for PortalOutlet {
         todo!()
     }
 
-    async fn delivery_directed(&self, request: Ping) {
+
+    async fn delivery_directed(&self, traversal: Traversal<DirectedWave>) {
         todo!()
     }
 }
@@ -181,7 +181,7 @@ impl TraversalLayer for PortalShell {
         todo!()
     }
 
-    async fn delivery_directed(&self, request: Ping) {
+    async fn delivery_directed(&self, traversal: Traversal<DirectedWave>) {
         todo!()
     }
 }

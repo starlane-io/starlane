@@ -8,13 +8,14 @@ use mesh_portal::version::latest::payload::Substance;
 use serde::{Deserialize, Serialize};
 use mesh_portal::version::latest::id::Port;
 use mesh_portal_versions::version::v0_0_1::id::id;
+use mesh_portal_versions::version::v0_0_1::wave::WaveId;
 use crate::field::FieldState;
 
 #[derive(Clone)]
 pub struct ShellState {
     pub port: id::Port,
-    pub core_requests: Arc<DashSet<Uuid>>,
-    pub fabric_requests: Arc<DashSet<Uuid>>,
+    pub core_requests: Arc<DashSet<WaveId>>,
+    pub fabric_requests: Arc<DashSet<WaveId>>,
 }
 
 impl ShellState {

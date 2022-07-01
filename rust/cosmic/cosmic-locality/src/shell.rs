@@ -12,7 +12,7 @@ use mesh_portal_versions::version::v0_0_1::id::{Traversal, TraversalInjection};
 use mesh_portal_versions::version::v0_0_1::log::RootLogger;
 use mesh_portal_versions::version::v0_0_1::parse::{command_line, Env};
 use mesh_portal_versions::version::v0_0_1::quota::Timeouts;
-use mesh_portal_versions::version::v0_0_1::wave::{Agent, Ping, DirectedHandlerSelector, RecipientSelector, DirectedHandler, Reflectable, ReflectedCore, Pong, RootInCtx, Wave, ProtoTransmitter, DirectedCore, PingProto, SetStrategy, UltraWave, InCtx};
+use mesh_portal_versions::version::v0_0_1::wave::{Agent, Ping, DirectedHandlerSelector, RecipientSelector, DirectedHandler, Reflectable, ReflectedCore, Pong, RootInCtx, Wave, ProtoTransmitter, DirectedCore, PingProto, SetStrategy, UltraWave, InCtx, Exchanger, DirectedWave, Bounce, Router, ReflectedWave};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -46,41 +46,51 @@ impl TraversalLayer for ShellEx {
         self.skel.traverse_to_next.send(traversal).await;
     }
 
-    async fn inject(&self, inject: TraversalInjection) {
+    async fn inject(&self, wave: UltraWave) {
+        let inject = TraversalInjection::new( self.port().clone(), wave);
         self.skel.inject_tx.send(inject).await;
     }
 
-    fn exchanger(&self) -> &Arc<DashMap<Uuid, oneshot::Sender<Pong>>> {
+    fn exchanger(&self) -> &Exchanger {
         &self.skel.exchanger
     }
 
-    async fn delivery_directed(&self, request: Ping) {
-        let logger = self.skel.logger.point(request.to.point.clone()).span();
-        let injector = request.from.clone().with_topic(Topic::None).with_layer(self.layer().clone());
-        let transmitter = Arc::new(LayerInjectionRouter::new(
+    async fn delivery_directed(&self, directed: Traversal<DirectedWave> ) {
+        let logger = self.skel.logger.point(directed.to.point.clone()).span();
+        let injector = directed.from().clone().with_topic(Topic::None).with_layer(self.port().layer().clone());
+        let router = Arc::new(LayerInjectionRouter::new(
             self.skel.clone(),
           injector.clone()
         ));
 
-        let mut transmitter = ProtoTransmitter::new(transmitter);
-        transmitter.from = SetStrategy::Fill(request.from.with_layer(self.layer().clone() ).with_topic(Topic::None));
-        let ctx = RootInCtx::new(request, logger, transmitter.clone());
-        let response: Result<Pong, MsgErr> = self.handle(ctx).await;
-        let wave: Wave = response.into();
-        self.inject( TraversalInjection::new(injector,wave)).await;
+        let mut transmitter = ProtoTransmitter::new(router.clone(), self.exchanger().clone());
+        transmitter.from = SetStrategy::Fill(directed.from().with_layer(self.port().layer().clone() ).with_topic(Topic::None));
+        let reflection = directed.reflection();
+        let ctx = RootInCtx::new(directed.payload, self.port().clone(), logger, transmitter.clone());
+        let bounce: Bounce = self.handle(ctx).await;
+        match bounce {
+            Bounce::Absorbed => {}
+            Bounce::Relect(core) => {
+                let reflected = reflection.make(core, self.port().clone(),self.port().clone() );
+                self.inject( reflected.to_ultra() ).await;
+            }
+        }
     }
 
-    async fn directed_fabric_bound(&self, traversal: Traversal<Ping>) {
-        self.state.fabric_requests.insert(traversal.id.clone());
+
+    async fn directed_fabric_bound(&self, traversal: Traversal<DirectedWave>) -> Result<(), MsgErr>{
+        self.state.fabric_requests.insert(traversal.id().clone());
         self.traverse_next(traversal.wrap()).await;
+        Ok(())
     }
 
-    async fn reflected_core_bound(&self, traversal: Traversal<Pong>) {
-        if let Some(_) = self.state.fabric_requests.remove(&traversal.response_to) {
+    async fn reflected_core_bound(&self, traversal: Traversal<ReflectedWave>) -> Result<(),MsgErr>{
+        if let Some(_) = self.state.fabric_requests.remove(&traversal.reflection_of()) {
             self.traverse_next(traversal.wrap()).await;
         } else {
             traversal.logger.warn("filtered a response to a request of which the Shell has no record");
         }
+        Ok(())
     }
 
 
@@ -91,28 +101,27 @@ impl ShellEx {
     #[route("Msg<NewCli>")]
     pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Port, MsgErr> {
         // only allow a cli session to be created by any layer of THIS particle
-        if ctx.from.clone().to_point() != ctx.to.clone().to_point() {
+        if ctx.from().clone().to_point() != ctx.to().clone().to_point() {
             return Err(MsgErr::forbidden());
         }
 
         let mut session_port = ctx
-            .to
+            .to()
             .clone()
             .with_topic(Topic::uuid())
             .with_layer(Layer::Shell);
 
-        let env = Env::new(ctx.to.clone().to_point());
+        let env = Env::new(ctx.to().clone().to_point());
 
         let session = CliSession {
-            source_selector: ctx.from.clone().into(),
+            source_selector: ctx.from().clone().into(),
             env,
             port: session_port.clone()
         };
 
         self.skel
             .state
-            .topic
-            .insert(session_port.clone(), Box::new(session));
+            .topic_handler( session_port.clone(), Arc::new(session));
 
         Ok(session_port)
     }
@@ -126,13 +135,11 @@ impl CliSession {
         let exec_port = self.port.clone().with_topic(exec_topic.clone());
         let mut exec = CommandExecutor::new(
             exec_port,
-            ctx.wave().from.clone(),
+            ctx.from().clone(),
             self.env.clone(),
         );
 
-        let result = exec.execute(ctx).await;
-
-        result
+        Ok(exec.execute(ctx).await?)
     }
 }
 
@@ -167,7 +174,7 @@ impl CommandExecutor {
         }
     }
 
-    pub async fn execute(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, MsgErr> {
+    pub async fn execute(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore,MsgErr> {
         // make sure everything is coming from this command executor topic
         let ctx = ctx.push_from( self.port.clone() );
 
@@ -180,6 +187,6 @@ impl CommandExecutor {
         let request: DirectedCore = command.into();
         let request = PingProto::from_core(request);
 
-        Pong::core_result(ctx.ping(request).await)
+        Ok(ctx.ping(request).await?.variant.core)
     }
 }

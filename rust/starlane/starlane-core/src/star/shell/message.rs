@@ -206,7 +206,7 @@ impl AsyncProcessor<MessagingCall> for MessagingComponent {
                     inner.send(proto).await;
                 }
                 MessagingCall::Response(response) => {
-                    match inner.resource_exchange.remove(&response.response_to) {
+                    match inner.resource_exchange.remove(&response.reflection_of) {
                         None => {}
                         Some((_, tx)) => {
                             tx.send(response);
@@ -283,7 +283,7 @@ impl MessagingComponentInner {
                     to: request.from.clone(),
                     from: self.skel.info.point.clone().to_port(),
                     core: request.core.not_found(),
-                    response_to: request.id.clone()
+                    reflection_of: request.id.clone()
                 };
                 exchanger.send(response);
             }
