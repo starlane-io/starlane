@@ -7,7 +7,7 @@ use std::convert::TryInto;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::id::Point;
 use wasmer::{Cranelift, Module, Store, Universal};
-use cosmic_api::version::v0_0_1::id::ArtifactSubKind;
+use cosmic_api::id::ArtifactSubKind;
 use crate::particle::config::Parser;
 
 pub struct Wasm {

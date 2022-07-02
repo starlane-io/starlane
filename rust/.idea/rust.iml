@@ -18,11 +18,8 @@
       <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-nom/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-portal-cli-exe/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-portal-cli/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/cosmic/hyperlane-quic/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/cosmic/hyperlane/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/mechtron-common/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/mechtron/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/cosmic/mesh-artifact-api/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/mesh-binder/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/mesh-portal-api-client/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/mesh-portal-api-server/src" isTestSource="false" />
@@ -38,7 +35,10 @@
       <sourceFolder url="file://$MODULE_DIR$/starlane/starlane-macros/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/starlane/starlane/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-api/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-hyperlane-quic/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-hyperlane/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-star/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-store/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/cosmic/wasm-membrane-guest/target" />
       <excludeFolder url="file://$MODULE_DIR$/cosmic/wasm-membrane-host/target" />

@@ -25,9 +25,9 @@ use tokio::net::tcp::OwnedReadHalf;
 use tokio::sync::oneshot;
 use tokio::sync::{broadcast, mpsc};
 use mesh_portal::version::latest::messaging::{Agent, RespShell};
-use cosmic_api::version::v0_0_1::id::id::ToPort;
-use cosmic_api::version::v0_0_1::id::{MachineName, StarKey};
-use cosmic_api::version::v0_0_1::wave::AsyncTransmitterWithAgent;
+use cosmic_api::id::id::ToPort;
+use cosmic_api::id::{MachineName, StarKey};
+use cosmic_api::wave::AsyncTransmitterWithAgent;
 use crate::artifact::ArtifactRef;
 
 use crate::cache::{ArtifactBundleSrc, ArtifactCaches, ProtoArtifactCachesFactory};

@@ -1,24 +1,18 @@
 #![allow(warnings)]
 
-use mesh_portal::error::MsgErr;
-use mesh_portal::version::latest::cli::{CommandTemplate, RawCommand, Transfer};
-use mesh_portal::version::latest::entity::request::ReqCore;
-use mesh_portal::version::latest::entity::response::RespCore;
-use mesh_portal::version::latest::id::{Point, Port, Topic};
-use mesh_portal::version::latest::messaging::{
-    Agent, Handling, ReqProto, ReqShell, RespShell, Scope,
-};
-use mesh_portal::version::latest::msg::MsgMethod;
-use cosmic_api::version::v0_0_1::id::id::{Layer, ToPort};
-use std::sync::Arc;
-use cosmic_api::version::v0_0_1::quota::Timeouts;
-use cosmic_api::version::v0_0_1::wave::{Exchanger, Ping, Pong, ProtoTransmitter, Router, SetStrategy, ToRecipients, Wave};
 
 #[macro_use]
 extern crate cosmic_macros;
 
 #[macro_use]
 extern crate async_trait;
+
+use std::sync::Arc;
+use cosmic_api::cli::{CommandTemplate, RawCommand, Transfer};
+use cosmic_api::error::MsgErr;
+use cosmic_api::id::id::{Port, Topic};
+use cosmic_api::msg::MsgMethod;
+use cosmic_api::wave::{Agent, Exchanger, Handling, PingProto, Pong, ProtoTransmitter, Router, Scope, SetStrategy, ToRecipients, Wave};
 
 pub struct Cli {
     cli_session_factory: Port,
@@ -55,7 +49,7 @@ impl Cli {
     }
 
     pub async fn session(&self) -> Result<CliSession<'_>, MsgErr> {
-        let mut ping = ReqProto::new();
+        let mut ping = PingProto::new();
         ping.to(self.cli_session_factory.clone());
         ping.method(MsgMethod::new("NewCliSession").unwrap());
 
@@ -103,7 +97,7 @@ impl<'a> CliSession<'a> {
             line: raw.to_string(),
             transfers,
         };
-        let mut req: ReqProto = ReqProto::new();
+        let mut req: PingProto = PingProto::new();
         req.core(raw.into())?;
         self.tx.direct(req.clone()).await
     }
@@ -117,7 +111,7 @@ impl<'a> Drop for CliSession<'a> {
     fn drop(&mut self) {
         match self.tx.to.clone().unwrap() {
             Ok(to) => {
-                let ping = ReqProto::msg(to, MsgMethod::new("DropSession").unwrap());
+                let ping = PingProto::msg(to, MsgMethod::new("DropSession").unwrap());
                 let tx = self.tx.clone();
                 match ping.build() {
                     Ok(ping) => {
@@ -138,7 +132,7 @@ pub mod test {
     use mesh_portal::version::latest::entity::response::RespCore;
     use mesh_portal::version::latest::messaging::{ReqShell, RootRequestCtx};
     use mesh_portal::version::latest::payload::Substance;
-    use cosmic_api::version::v0_0_1::wave::{
+    use cosmic_api::wave::{
         DirectedHandler, InCtx, DirectedHandler, RequestHandlerRelay,
     };
     use std::marker::PhantomData;

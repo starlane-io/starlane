@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
-use cosmic_api::version::v0_0_1::id::ArtifactSubKind;
-use cosmic_api::version::v0_0_1::id::id::Kind;
+use cosmic_api::id::ArtifactSubKind;
+use cosmic_api::id::id::Kind;
 
 #[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub struct ParticleConfig {

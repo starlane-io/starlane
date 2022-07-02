@@ -3,7 +3,7 @@ use std::ops::Deref;
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::payload::{Substance, PayloadPattern};
-use cosmic_api::version::v0_0_1::util::ValueMatcher;
+use cosmic_api::util::ValueMatcher;
 use validator::validate_email;
 use crate::error::Error;
 

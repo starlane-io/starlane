@@ -7,10 +7,9 @@ edition = "2021"
 
 [dependencies]
 cosmic-macros = { path="../cosmic-macros"}
-mesh-portal ={ path="../mesh-portal"}
 cosmic-api = { path= "../cosmic-api" }
 cosmic-nom = { path="../cosmic-nom"}
-cosmic-hyperlane = { path= "../hyperlane" }
+cosmic-hyperlane = { path= "../cosmic-hyperlane" }
 anyhow = "1.0.44"
 dashmap = "4.0.2"
 tokio = { version = "1.15.0", features = ["full"] }

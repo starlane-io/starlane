@@ -21,22 +21,19 @@ use syn::parse::{Parse, ParseBuffer, ParseStream};
 use syn::parse_quote::ParseQuote;
 use syn::spanned::Spanned;
 use syn::token::Async;
-use mesh_portal::version::latest::config::bind::{BindConfig, RouteSelector};
-use mesh_portal::version::latest::id::Uuid;
-use mesh_portal::version::latest::messaging::{CmdMethod, MethodPattern};
-use mesh_portal::version::latest::parse::{route_attribute, route_attribute_value};
-use mesh_portal::version::latest::parse::model::ScopeFilters;
-use mesh_portal::version::latest::util::{log, ValuePattern};
+use cosmic_api::parse::route_attribute_value;
+use cosmic_api::util::log;
+
 
 #[no_mangle]
-pub(crate) extern "C" fn mesh_portal_uuid() -> String
+pub(crate) extern "C" fn cosmic_uuid() -> String
 {
     "Uuid".to_string()
 }
 
 
 #[no_mangle]
-pub(crate) extern "C" fn mesh_portal_timestamp() -> DateTime<Utc>{
+pub(crate) extern "C" fn cosmic_timestamp() -> DateTime<Utc>{
     Utc::now()
 }
 
@@ -72,7 +69,7 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool  ) -> TokenStream 
                 let route_selector = attr.to_token_stream().to_string();
                 static_selector_keys.push(selector_ident.clone());
                 let static_selector= quote!{
-                    static ref #selector_ident : RouteSelector = mesh_portal::version::latest::parse::route_attribute(#route_selector).unwrap();
+                    static ref #selector_ident : RouteSelector = route_attribute(#route_selector).unwrap();
                 };
                 static_selectors.push(static_selector );
 //println!(" ~~ ROUTE {}", attr.tokens.to_string() );

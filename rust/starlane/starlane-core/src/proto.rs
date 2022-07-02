@@ -9,11 +9,11 @@ use futures::prelude::*;
 use futures::FutureExt;
 use log::Level;
 use mesh_portal::version::latest::log::RootLogger;
-use cosmic_api::version::v0_0_1::log::LogSource;
+use cosmic_api::log::LogSource;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{broadcast, mpsc};
 use tokio::time::{Duration, Instant};
-use cosmic_api::version::v0_0_1::id::StarKey;
+use cosmic_api::id::StarKey;
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::constellation::ConstellationStatus;

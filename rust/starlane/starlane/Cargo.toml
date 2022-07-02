@@ -32,7 +32,6 @@ tablestream = "0.1.3"
 anyhow = "1.0.44"
 reqwest = { version = "0.11.10", features = ["json"] }
 
-mesh-portal={ path="../../cosmic/mesh-portal"}
 cosmic-api = { path= "../../cosmic/cosmic-api" }
 
 

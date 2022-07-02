@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
-use cosmic_api::version::v0_0_1::id::StarKey;
+use cosmic_api::id::StarKey;
 
 use crate::star::{StarInfo, StarKind};
 

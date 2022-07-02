@@ -14,7 +14,7 @@ use tokio::time::Duration;
 use walkdir::WalkDir;
 
 use crate::error::Error;
-use cosmic_api::version::v0_0_1::id::FileSubKind;
+use cosmic_api::id::FileSubKind;
 
 use crate::util;
 use std::convert::TryFrom;

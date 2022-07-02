@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use cosmic_api::Artifacts;
-use cosmic_api::version::v0_0_1::quota::Timeouts;
+use cosmic_api::quota::Timeouts;
 
 #[derive(Clone)]
 pub struct MachineSkel {

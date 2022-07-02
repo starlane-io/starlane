@@ -29,19 +29,19 @@ use starlane_core::starlane::api::StarlaneApi;
 use std::convert::TryInto;
 use mesh_portal::version::latest::entity::request::create::Require;
 use mesh_portal::version::latest::id::Point;
-use cosmic_api::version::v0_0_1::span::new_span;
+use cosmic_api::span::new_span;
 use reqwest::StatusCode;
 use tokio::io::AsyncReadExt;
 use tracing::error;
 use starlane_core::command::cli::TcpCliClient;
-use cosmic_api::version::v0_0_1::cli::outlet::Frame;
-use cosmic_api::version::v0_0_1::cli::CommandOp;
+use cosmic_api::cli::outlet::Frame;
+use cosmic_api::cli::CommandOp;
 use starlane_core::mechtron::portal_client::launch_mechtron_client;
 use starlane_core::mechtron::process::launch_mechtron_process;
 use starlane_core::star::shell::sys::SysCall::Create;
 use serde::{Deserialize, Serialize};
-use cosmic_api::version::v0_0_1::cli::outlet;
-use cosmic_api::version::v0_0_1::parse::{command_line, rec_script_line};
+use cosmic_api::cli::outlet;
+use cosmic_api::parse::{command_line, rec_script_line};
 
 
 pub mod cli;

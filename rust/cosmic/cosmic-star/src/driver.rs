@@ -4,20 +4,21 @@ use crate::star::{LayerInjectionRouter, StarSkel, StarState, StateCall};
 use cosmic_api::State;
 use dashmap::DashMap;
 use cosmic_api::error::MsgErr;
-use cosmic_api::version::v0_0_1::id::id::{Kind, Layer, ToPoint, ToPort, TraversalLayer, Uuid};
-use cosmic_api::version::v0_0_1::id::{StarKey, Traversal, TraversalInjection};
-use cosmic_api::version::v0_0_1::log::PointLogger;
-use cosmic_api::version::v0_0_1::particle::particle::Status;
-use cosmic_api::version::v0_0_1::substance::substance::Substance;
-use cosmic_api::version::v0_0_1::sys::{Assign, Sys};
-use cosmic_api::version::v0_0_1::wave::{Bounce, DirectedHandler, DirectedHandlerSelector, RecipientSelector, RootInCtx, InCtx, Ping, ReflectedCore, Pong, Wave, UltraWave, Exchanger, DirectedWave, ReflectedWave, Router, ProtoTransmitter};
+use cosmic_api::id::id::{Kind, Layer, Point, Port, ToPoint, ToPort, TraversalLayer, Uuid};
+use cosmic_api::id::{StarKey, Traversal, TraversalInjection};
+use cosmic_api::log::PointLogger;
+use cosmic_api::particle::particle::Status;
+use cosmic_api::substance::substance::Substance;
+use cosmic_api::sys::{Assign, Sys};
+use cosmic_api::wave::{Bounce, DirectedHandler, DirectedHandlerSelector, RecipientSelector, RootInCtx, InCtx, Ping, ReflectedCore, Pong, Wave, UltraWave, Exchanger, DirectedWave, ReflectedWave, Router, ProtoTransmitter};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
-use mesh_portal::version::latest::config::bind::RouteSelector;
-use mesh_portal::version::latest::id::{Point, Port};
+use cosmic_api::config::config::bind::RouteSelector;
+use cosmic_api::parse::route_attribute;
+use cosmic_api::util::ValuePattern;
 
 #[derive(DirectedHandler)]
 pub struct Drivers {
@@ -218,7 +219,7 @@ pub struct Core {
 
 #[async_trait]
 impl TraversalLayer for Core {
-    fn port(&self) -> &cosmic_api::version::v0_0_1::id::id::Port {
+    fn port(&self) -> &cosmic_api::id::id::Port {
         &self.port
     }
 

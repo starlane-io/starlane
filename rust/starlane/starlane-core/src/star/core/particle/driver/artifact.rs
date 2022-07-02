@@ -24,9 +24,9 @@ use mesh_portal::version::latest::id::{AddressAndKind, KindParts, Point, RouteSe
 use mesh_portal::version::latest::messaging::ReqShell;
 use mesh_portal::version::latest::payload::Substance;
 use zip::result::ZipResult;
-use cosmic_api::version::v0_0_1::id::ArtifactSubKind;
-use cosmic_api::version::v0_0_1::id::id::{Kind, BaseKind};
-use cosmic_api::version::v0_0_1::sys::Assign;
+use cosmic_api::id::ArtifactSubKind;
+use cosmic_api::id::id::{Kind, BaseKind};
+use cosmic_api::sys::Assign;
 use crate::file_access::FileAccess;
 
 

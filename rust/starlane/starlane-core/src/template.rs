@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 
 use serde::{Deserialize, Serialize};
-use cosmic_api::version::v0_0_1::id::{ConstellationName, MachineName, StarKey};
+use cosmic_api::id::{ConstellationName, MachineName, StarKey};
 
 use crate::error::Error;
 

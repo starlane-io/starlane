@@ -4,7 +4,7 @@ use std::iter::FromIterator;
 
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
-use cosmic_api::version::v0_0_1::id::StarKey;
+use cosmic_api::id::StarKey;
 
 use crate::error::Error;
 use crate::frame::{Frame, SearchHit, SearchResults, SearchTraversal, SearchWindDown, SearchWindUp, StarMessage, StarPattern, TraversalAction};

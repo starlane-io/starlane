@@ -18,9 +18,9 @@ use std::sync::atomic::AtomicU32;
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
-use cosmic_api::version::v0_0_1::id::ArtifactSubKind;
-use cosmic_api::version::v0_0_1::id::id::BaseKind;
-use cosmic_api::version::v0_0_1::sys::Assign;
+use cosmic_api::id::ArtifactSubKind;
+use cosmic_api::id::id::BaseKind;
+use cosmic_api::sys::Assign;
 
 #[derive(Debug)]
 pub struct PortalCoreDriver {

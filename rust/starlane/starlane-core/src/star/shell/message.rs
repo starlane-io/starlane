@@ -9,7 +9,7 @@ use tokio::time::Instant;
 use crate::error::Error;
 use crate::frame::{SimpleReply, StarMessage, StarMessagePayload};
 use crate::message::{MessageExpect, MessageId, ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
-use cosmic_api::version::v0_0_1::sys::ParticleRecord;
+use cosmic_api::sys::ParticleRecord;
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::fail::{Fail, StarlaneFailure};
@@ -22,9 +22,9 @@ use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Message, ReqShell, RespShell};
 use mesh_portal::version::latest::util::uuid;
 use mesh_portal::version::latest::parse::Res;
-use cosmic_api::version::v0_0_1::id::id::{ToPoint, ToPort};
+use cosmic_api::id::id::{ToPoint, ToPort};
 use tokio::sync::oneshot::Sender;
-use cosmic_api::version::v0_0_1::id::StarKey;
+use cosmic_api::id::StarKey;
 
 #[derive(Clone)]
 pub struct MessagingApi {

@@ -24,8 +24,8 @@ use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 use mesh_portal::version::latest::payload::Substance;
 use mesh_portal::version::latest::particle::Stub;
 use mesh_portal::version::latest::sys::Assign;
-use cosmic_api::version::v0_0_1::command::Command;
-use cosmic_api::version::v0_0_1::id::id::BaseKind;
+use cosmic_api::command::Command;
+use cosmic_api::id::id::BaseKind;
 use crate::star::core::particle::driver::artifact::ArtifactManager;
 use crate::star::core::particle::driver::user::UserBaseKeycloakCoreDriver;
 

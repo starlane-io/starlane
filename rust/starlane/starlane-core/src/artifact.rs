@@ -3,7 +3,7 @@ use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::path::Path;
 
 use serde::{Deserialize, Serialize};
-use cosmic_api::version::v0_0_1::id::ArtifactSubKind;
+use cosmic_api::id::ArtifactSubKind;
 
 use crate::error::Error;
 

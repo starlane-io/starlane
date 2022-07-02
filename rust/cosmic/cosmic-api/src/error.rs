@@ -3,9 +3,9 @@ use std::fmt::{Debug, Display, Formatter};
 use std::io;
 use std::string::FromUtf8Error;
 
-use crate::version::v0_0_1::parse::error::find_parse_err;
-use crate::version::v0_0_1::substance::substance::{Errors, Substance};
-use crate::version::v0_0_1::wave::ReflectedCore;
+use crate::parse::error::find_parse_err;
+use crate::substance::substance::{Errors, Substance};
+use crate::wave::ReflectedCore;
 use ariadne::{Label, Report, ReportBuilder, ReportKind, Source};
 use cosmic_nom::Span;
 use cosmic_nom::SpanExtra;

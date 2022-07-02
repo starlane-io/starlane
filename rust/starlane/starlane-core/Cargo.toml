@@ -78,9 +78,8 @@ cosmic-nom={ path="../../cosmic/cosmic-nom"}
 cosmic-portal-cli={ path="../../cosmic/cosmic-portal-cli"}
 cosmic-macros={ path="../../cosmic/cosmic-macros"}
 cosmic-star={ path= "../../cosmic/cosmic-star" }
-mesh-portal={ path="../../cosmic/mesh-portal"}
 cosmic-api = { path= "../../cosmic/cosmic-api" }
-mesh-artifact-api ={ path="../../cosmic/mesh-artifact-api", default-features=true }
+cosmic-store ={ path= "../../cosmic/cosmic-store", default-features=true }
 
 async-recursion = "1.0.0"
 

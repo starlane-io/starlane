@@ -2,7 +2,7 @@ use std::convert::TryInto;
 use std::sync::Arc;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::config::bind::BindConfig;
-use cosmic_api::version::v0_0_1::parse::{bind_config, doc};
+use cosmic_api::parse::{bind_config, doc};
 use crate::artifact::ArtifactRef;
 use crate::cache::{CachedConfig};
 use crate::error::Error;

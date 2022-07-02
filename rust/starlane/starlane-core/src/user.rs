@@ -4,7 +4,7 @@ use mesh_portal::version::latest::id::{Point, RouteSegment};
 use mesh_portal::version::latest::messaging::{Message, ReqShell};
 use tokio::sync::mpsc;
 use crate::message::delivery::Delivery;
-use cosmic_api::version::v0_0_1::id::StarKey;
+use cosmic_api::id::StarKey;
 
 lazy_static! {
     pub static ref HYPERUSER: &'static Point = &Point::from_str("hyperspace:users:hyperuser").unwrap();

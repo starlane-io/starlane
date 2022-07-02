@@ -4,7 +4,7 @@ use crate::error::Error;
 use crate::particle::config::Parser;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::command::common::SetProperties;
-use cosmic_api::version::v0_0_1::parse::{camel_case_chars, domain, kind, script, script_line, set_properties};
+use cosmic_api::parse::{camel_case_chars, domain, kind, script, script_line, set_properties};
 use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag, take_until};
 use nom::character::complete::multispace0;
@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
 use cosmic_nom::{new_span, Res, Span};
-use cosmic_api::version::v0_0_1::id::id::Kind;
+use cosmic_api::id::id::Kind;
 
 pub struct ParticleConfigParser;
 
@@ -126,13 +126,13 @@ pub mod test {
         properties_section, rec_command_line, rec_command_lines, particle_config,
     };
     use crate::error::Error;
-    use cosmic_api::version::v0_0_1::id::ArtifactSubKind;
+    use cosmic_api::id::ArtifactSubKind;
     use mesh_portal::version::latest::command::common::PropertyMod;
     use mesh_portal::version::latest::id::Point;
-    use cosmic_api::version::v0_0_1::parse::{
+    use cosmic_api::parse::{
         property_mod, property_value, property_value_not_space_or_comma, set_properties,
     };
-    use cosmic_api::version::v0_0_1::span::new_span;
+    use cosmic_api::span::new_span;
     use nom::combinator::{all_consuming, recognize};
     use std::collections::HashMap;
     use std::str::FromStr;
