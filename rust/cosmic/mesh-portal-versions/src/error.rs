@@ -307,6 +307,16 @@ impl From<strum::ParseError> for MsgErr {
     }
 }
 
+impl From<()> for MsgErr {
+    fn from(err: ()) -> Self {
+        Self::Status{
+            status: 500,
+            message: "Empty Error".to_string()
+        }
+    }
+}
+
+
 impl From<tokio::sync::oneshot::error::RecvError> for MsgErr {
     fn from(err: RecvError) -> Self {
          Self::Status{

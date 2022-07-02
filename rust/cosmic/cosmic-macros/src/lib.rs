@@ -67,12 +67,12 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool  ) -> TokenStream 
         if let ImplItem::Method(call) = item_impl {
             if let Some(attr) = find_route_attr(&call.attrs) {
                 let internal = attr.tokens.to_token_stream().to_string();
-                 idents.push(format_ident!("_{}",call.sig.ident.clone()));
+                 idents.push(format_ident!("__{}__route",call.sig.ident.clone()));
                 let selector_ident = format_ident!("__{}_{}__", impl_name, call.sig.ident );
                 let route_selector = attr.to_token_stream().to_string();
                 static_selector_keys.push(selector_ident.clone());
                 let static_selector= quote!{
-                    static ref #selector_ident : mesh_portal::version::latest::config::bind::RouteSelector = mesh_portal::version::latest::parse::route_attribute(#route_selector).unwrap();
+                    static ref #selector_ident : RouteSelector = mesh_portal::version::latest::parse::route_attribute(#route_selector).unwrap();
                 };
                 static_selectors.push(static_selector );
 //println!(" ~~ ROUTE {}", attr.tokens.to_string() );
@@ -93,16 +93,7 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool  ) -> TokenStream 
 
     let self_ty = impl_item.self_ty.clone();
 
-    let input = LocatedSpan::new("blah");
-
     let attr : TokenStream2 = attr.into();
-    let select = if attr.is_empty() {
-        quote!{Err(())}
-    } else {
-        quote!{ #attr.select(request) }
-    };
-
-    let select = quote!{Err(())};
 
     let rtn= if attr.is_empty() {
         quote!{Ok(RespCore::not_found())}
@@ -133,11 +124,11 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool  ) -> TokenStream 
         impl DirectedHandler for #self_ty {
             async fn handle( &self, ctx: RootInCtx) -> Bounce {
                 #(
-                    if #static_selector_keys.is_match(&ctx.request).is_ok() {
+                    if #static_selector_keys.is_match(&ctx.wave).is_ok() {
                        return self.#idents( ctx ).await;
                     }
                 )*
-                ctx.not_found()
+                Bounce::Reflect(*ctx.not_found().core())
              }
         }
 
@@ -206,17 +197,22 @@ pub fn route(attr: TokenStream, input: TokenStream ) -> TokenStream {
         Some(_) => quote!{async}
     };
   let orig=  input.sig.ident.clone();
-  let ident = format_ident!("_{}", input.sig.ident);
+  let ident = format_ident!("__{}__route", input.sig.ident);
   let rtn_type = rtn_type( &input.sig.output );
   let item = ctx.item;
 
   let expanded = quote! {
-      #__async fn #ident( &self, mut ctx: RootInCtx ) -> Result<ReflectedCore,MsgErr> {
-          let ctx: InCtx<'_,#item> = ctx.push();
+      #__async fn #ident( &self, mut ctx: RootInCtx ) -> Bounce {
+          let ctx: InCtx<'_,#item> = match ctx.push::<#item>() {
+              Ok(ctx) => ctx,
+              Err(err) => {
+                  return Bounce::Reflect(ReflectedCore::server_error());
+              }
+          };
 
           match self.#orig(ctx)#__await {
-              Ok(rtn) => Ok(rtn.into()),
-              Err(err) => Err(err)
+              Ok(rtn) => Bounce::Reflect(rtn.into()),
+              Err(err) => Bounce::Reflect(ReflectedCore::server_error())
           }
       }
 

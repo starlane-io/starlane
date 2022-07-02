@@ -191,9 +191,8 @@ impl RootInCtx {
 }
 
 impl RootInCtx {
-    pub fn push<'a, I, E>(&self) -> Result<InCtx<I>, MsgErr>
+    pub fn push<'a, I>(&self) -> Result<InCtx<I>, MsgErr>
     where
-        E: Into<MsgErr>,
         Substance: ToSubstance<I>
     {
         let input = match self.wave.to_substance_ref() {
@@ -1095,7 +1094,23 @@ impl DirectedWave {
         }
     }
 
+    pub fn agent(&self) -> &Agent {
+        match self {
+            DirectedWave::Ping(ping) => &ping.agent
+        }
+    }
 
+    pub fn scope(&self) -> &Scope{
+        match self {
+            DirectedWave::Ping(ping) => &ping.scope
+        }
+    }
+
+    pub fn handling(&self) -> &Handling{
+        match self {
+            DirectedWave::Ping(ping) => &ping.handling
+        }
+    }
 
     pub fn to(&self) -> Recipients {
         match self {
@@ -1108,6 +1123,18 @@ impl DirectedWave {
             from: self.from().clone(),
             to: self.to(),
             reflection_of: self.id().clone()
+        }
+    }
+
+    pub fn err(&self, err: MsgErr, responder: Port) -> ReflectedWave {
+        match self {
+            DirectedWave::Ping(ping) => ping.err( err, responder ).to_reflected()
+        }
+    }
+
+    pub fn to_call(&self) -> Result<Call,MsgErr> {
+        match self {
+            DirectedWave::Ping(ping) => ping.to_call()
         }
     }
 }
@@ -1206,6 +1233,12 @@ impl ReflectedWave {
     pub fn reflection_of(&self) -> &WaveId {
         match self {
             ReflectedWave::Pong(pong) => &pong.reflection_of
+        }
+    }
+
+    pub fn core(&self) -> &ReflectedCore {
+        match self {
+            ReflectedWave::Pong(pong) => &pong.core
         }
     }
 }
@@ -1356,6 +1389,10 @@ impl Wave<Ping> {
 
     pub fn to_directed(self) -> DirectedWave {
         DirectedWave::Ping(self)
+    }
+
+    pub fn err(&self, err: MsgErr, responder: Port ) -> Wave<Pong> {
+        Wave::new( Pong::new( self.variant.err(err), self.from.clone(), self.to.clone(), self.id.clone() ), responder )
     }
 }
 
@@ -1748,7 +1785,7 @@ pub trait DirectedHandler{
 
 pub enum Bounce {
     Absorbed,
-    Relect(ReflectedCore)
+    Reflect(ReflectedCore)
 }
 
 

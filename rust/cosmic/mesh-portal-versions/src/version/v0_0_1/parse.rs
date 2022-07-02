@@ -1824,6 +1824,11 @@ pub struct Env {
     pub point: Point,
     pub vars: HashMap<String, Substance>,
     pub file_resolver: FileResolver,
+
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+    #[serde(default)]
+    pub var_resolvers: MultiVarResolver
 }
 
 impl Env {
@@ -1833,6 +1838,7 @@ impl Env {
             point: working,
             vars: HashMap::new(),
             file_resolver: FileResolver::new(),
+            var_resolvers: MultiVarResolver::new()
         }
     }
 
@@ -1847,6 +1853,7 @@ impl Env {
             parent: Some(Box::new(self)),
             vars: HashMap::new(),
             file_resolver: FileResolver::new(),
+            var_resolvers: MultiVarResolver::new()
         }
     }
 
@@ -1856,6 +1863,7 @@ impl Env {
             parent: Some(Box::new(self)),
             vars: HashMap::new(),
             file_resolver: FileResolver::new(),
+            var_resolvers: MultiVarResolver::new()
         })
     }
 
@@ -1869,16 +1877,22 @@ impl Env {
             .ok_or::<MsgErr>("expected parent scopedVars".into())?)
     }
 
-    pub fn val<K: ToString>(&self, var: K) -> Result<&Substance, ResolverErr> {
+    pub fn add_var_resolver( &mut self, var_resolver: Arc<dyn VarResolver>) {
+        self.var_resolvers.push(var_resolver);
+    }
+
+    pub fn val<K: ToString>(&self, var: K) -> Result<Substance, ResolverErr> {
         match self.vars.get(&var.to_string()) {
             None => {
-                if let Some(parent) = self.parent.as_ref() {
+                if let Ok(val) = self.var_resolvers.val(var.to_string().as_str() ) {
+                    Ok(val.clone())
+                } else if let Some(parent) = self.parent.as_ref() {
                     parent.val(var.to_string())
                 } else {
                     Err(ResolverErr::NotFound)
                 }
             }
-            Some(val) => Ok(val),
+            Some(val) => Ok(val.clone()),
         }
     }
 
@@ -1888,6 +1902,11 @@ impl Env {
 
     pub fn working(&self) -> &Point {
         &self.point
+    }
+
+
+    pub fn set_var_str<V: ToString>(&mut self, key: V, value: V) {
+        self.vars.insert(key.to_string(), Substance::Text(value.to_string()));
     }
 
     pub fn set_var<V: ToString>(&mut self, key: V, value: Substance) {
@@ -1919,6 +1938,7 @@ impl Default for Env {
             point: Point::root(),
             vars: HashMap::new(),
             file_resolver: FileResolver::new(),
+            var_resolvers: MultiVarResolver::new()
         }
     }
 }
@@ -2040,17 +2060,17 @@ impl CompositeResolver {
         }
     }
 
-    pub fn set<S>(&mut self, key: S, value: S)
+    pub fn set<S>(&mut self, key: S, value: Substance)
     where
         S: ToString,
     {
         self.scope_resolver
-            .insert(key.to_string(), value.to_string());
+            .insert(key.to_string(), value);
     }
 }
 
 impl VarResolver for CompositeResolver {
-    fn val(&self, var: &str) -> Result<String, ResolverErr> {
+    fn val(&self, var: &str) -> Result<Substance, ResolverErr> {
         if let Ok(val) = self.scope_resolver.val(var) {
             Ok(val)
         } else if let Ok(val) = self.scope_resolver.val(var) {
@@ -2081,7 +2101,7 @@ pub enum ResolverErr {
 }
 
 pub trait VarResolver: Send + Sync {
-    fn val(&self, var: &str) -> Result<String, ResolverErr> {
+    fn val(&self, var: &str) -> Result<Substance, ResolverErr> {
         Err(ResolverErr::NotFound)
     }
 }
@@ -2099,7 +2119,7 @@ impl VarResolver for NoResolver {}
 
 #[derive(Clone)]
 pub struct MapResolver {
-    pub map: HashMap<String, String>,
+    pub map: HashMap<String, Substance>,
 }
 
 impl MapResolver {
@@ -2109,14 +2129,14 @@ impl MapResolver {
         }
     }
 
-    pub fn insert<K: ToString, V: ToString>(&mut self, key: K, value: V) {
-        self.map.insert(key.to_string(), value.to_string());
+    pub fn insert<K: ToString>(&mut self, key: K, value: Substance) {
+        self.map.insert(key.to_string(), value);
     }
 }
 
 impl VarResolver for MapResolver {
-    fn val(&self, id: &str) -> Result<String, ResolverErr> {
-        self.map.get(id).cloned().ok_or(ResolverErr::NotFound)
+    fn val(&self, var: &str) -> Result<Substance, ResolverErr> {
+        self.map.get(&var.to_string()).cloned().ok_or(ResolverErr::NotFound)
     }
 }
 
@@ -2134,20 +2154,26 @@ impl RegexCapturesResolver {
 }
 
 impl VarResolver for RegexCapturesResolver {
-    fn val(&self, id: &str) -> Result<String, ResolverErr> {
+    fn val(&self, id: &str) -> Result<Substance, ResolverErr> {
         let captures = self
             .regex
             .captures(self.text.as_str())
             .expect("expected captures");
         match captures.name(id) {
             None => Err(ResolverErr::NotFound),
-            Some(m) => Ok(m.as_str().to_string()),
+            Some(m) => Ok(Substance::Text(m.as_str().to_string())),
         }
     }
 }
 
 #[derive(Clone)]
 pub struct MultiVarResolver(Vec<Arc<dyn VarResolver>>);
+
+impl Default for MultiVarResolver {
+    fn default() -> Self {
+        MultiVarResolver::new()
+    }
+}
 
 impl MultiVarResolver {
     pub fn new() -> Self {
@@ -2160,9 +2186,9 @@ impl MultiVarResolver {
 }
 
 impl VarResolver for MultiVarResolver {
-    fn val(&self, id: &str) -> Result<String, ResolverErr> {
+    fn val(&self, var: &str) -> Result<Substance, ResolverErr> {
         for resolver in &self.0 {
-            match resolver.val(id) {
+            match resolver.val(&var.to_string()) {
                 Ok(ok) => return Ok(ok),
                 Err(_) => {}
             }
@@ -3465,7 +3491,7 @@ pub mod model {
     use crate::version::v0_0_1::util::{
         HttpMethodPattern, StringMatcher, ToResolved, ValueMatcher, ValuePattern,
     };
-    use crate::version::v0_0_1::wave::{Method, MethodKind, DirectedCore, Ping};
+    use crate::version::v0_0_1::wave::{Method, MethodKind, DirectedCore, Ping, DirectedWave};
     use bincode::Options;
     use cosmic_nom::{new_span, Res, Span, Trace, Tw};
     use nom::bytes::complete::tag;
@@ -3591,10 +3617,10 @@ pub mod model {
     }
 
     impl RouteScope {
-        pub fn select(&self, request: &Ping) -> Vec<&MessageScope> {
+        pub fn select(&self, directed: &DirectedWave) -> Vec<&MessageScope> {
             let mut scopes = vec![];
             for scope in &self.block {
-                if scope.selector.is_match(request).is_ok() {
+                if scope.selector.is_match(directed).is_ok() {
                     scopes.push(scope);
                 }
             }
@@ -3648,22 +3674,22 @@ pub mod model {
         pub path: P,
     }
 
-    impl ValueMatcher<Ping> for RouteScopeSelector {
-        fn is_match(&self, request: &Ping) -> Result<(), ()> {
+    impl ValueMatcher<DirectedWave> for RouteScopeSelector {
+        fn is_match(&self, directed: &DirectedWave) -> Result<(), ()> {
             if self.name.as_str() != "Route" {
                 return Err(());
             }
-            match self.selector.path.is_match(&request.core.uri.path()) {
+            match self.selector.path.is_match(&directed.core().uri.path()) {
                 true => Ok(()),
                 false => Err(()),
             }
         }
     }
 
-    impl ValueMatcher<Ping> for MessageScopeSelector {
-        fn is_match(&self, request: &Ping) -> Result<(), ()> {
-            self.name.is_match(&request.core.method.kind())?;
-            match self.path.is_match(&request.core.uri.path()) {
+    impl ValueMatcher<DirectedWave> for MessageScopeSelector {
+        fn is_match(&self, directed: &DirectedWave) -> Result<(), ()> {
+            self.name.is_match(&directed.core().method.kind())?;
+            match self.path.is_match(&directed.core().uri.path()) {
                 true => Ok(()),
                 false => Err(()),
             }
@@ -3688,10 +3714,10 @@ pub mod model {
             Ok(Self { selector, block })
         }
 
-        pub fn select(&self, request: &Ping) -> Vec<&MethodScope> {
+        pub fn select(&self, directed: &DirectedWave) -> Vec<&MethodScope> {
             let mut scopes = vec![];
             for scope in &self.block {
-                if scope.selector.is_match(request).is_ok() {
+                if scope.selector.is_match(directed).is_ok() {
                     scopes.push(scope);
                 }
             }
@@ -3719,24 +3745,24 @@ pub mod model {
         }
     }
 
-    impl ValueMatcher<Ping> for RouteScopeSelectorAndFilters {
-        fn is_match(&self, request: &Ping) -> Result<(), ()> {
+    impl ValueMatcher<DirectedWave> for RouteScopeSelectorAndFilters {
+        fn is_match(&self, request: &DirectedWave) -> Result<(), ()> {
             // nothing for filters at this time...
             self.selector.is_match(request)
         }
     }
 
-    impl ValueMatcher<Ping> for MessageScopeSelectorAndFilters {
-        fn is_match(&self, request: &Ping) -> Result<(), ()> {
+    impl ValueMatcher<DirectedWave> for MessageScopeSelectorAndFilters {
+        fn is_match(&self, request: &DirectedWave) -> Result<(), ()> {
             // nothing for filters at this time...
             self.selector.is_match(request)
         }
     }
 
-    impl ValueMatcher<Ping> for MethodScopeSelectorAndFilters {
-        fn is_match(&self, request: &Ping) -> Result<(), ()> {
+    impl ValueMatcher<DirectedWave> for MethodScopeSelectorAndFilters {
+        fn is_match(&self, directed: &DirectedWave) -> Result<(), ()> {
             // nothing for filters at this time...
-            self.selector.is_match(request)
+            self.selector.is_match(directed)
         }
     }
 
@@ -3775,10 +3801,10 @@ pub mod model {
         }
     }
 
-    impl ValueMatcher<Ping> for MethodScopeSelector {
-        fn is_match(&self, request: &Ping) -> Result<(), ()> {
-            self.name.is_match(&request.core.method)?;
-            match self.path.is_match(&request.core.uri.path()) {
+    impl ValueMatcher<DirectedWave> for MethodScopeSelector {
+        fn is_match(&self, directed: &DirectedWave) -> Result<(), ()> {
+            self.name.is_match(&directed.core().method)?;
+            match self.path.is_match(&directed.core().uri.path()) {
                 true => Ok(()),
                 false => Err(()),
             }

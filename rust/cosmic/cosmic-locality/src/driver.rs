@@ -16,6 +16,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
+use mesh_portal::version::latest::config::bind::RouteSelector;
 use mesh_portal::version::latest::id::{Point, Port};
 
 #[derive(DirectedHandler)]

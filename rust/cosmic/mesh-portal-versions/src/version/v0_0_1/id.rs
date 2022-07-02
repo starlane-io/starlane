@@ -1613,12 +1613,12 @@ pub mod id {
 
         // override if you want to track incoming responses
         async fn reflected_core_bound(&self, traversal: Traversal<ReflectedWave>) -> Result<(), MsgErr>{
-            self.traverse_next(traversal.wrap()).await;
+            self.traverse_next(traversal.to_ultra()).await;
             Ok(())
         }
 
         async fn reflected_fabric_bound(&self, traversal: Traversal<ReflectedWave>) -> Result<(), MsgErr>{
-            self.traverse_next(traversal.wrap()).await;
+            self.traverse_next(traversal.to_ultra()).await;
             Ok(())
         }
 
@@ -3185,23 +3185,33 @@ impl Traversal<DirectedWave> {
 }
 
 impl Traversal<ReflectedWave> {
-    pub fn wrap(self) -> Traversal<UltraWave> {
+    pub fn to_ultra(self) -> Traversal<UltraWave> {
         let pong= self.payload.clone();
         self.with(pong.to_ultra())
     }
 }
 
 impl Traversal<Wave<Ping>> {
-    pub fn wrap(self) -> Traversal<UltraWave> {
+    pub fn to_ultra(self) -> Traversal<UltraWave> {
         let ping= self.payload.clone();
         self.with(ping.to_ultra())
+    }
+
+    pub fn to_directed(self) -> Traversal<DirectedWave> {
+        let ping= self.payload.clone();
+        self.with(ping.to_directed())
     }
 }
 
 impl Traversal<Wave<Pong>> {
-    pub fn wrap(self) -> Traversal<UltraWave> {
+    pub fn to_ultra(self) -> Traversal<UltraWave> {
         let pong = self.payload.clone();
         self.with(pong.to_ultra())
+    }
+
+    pub fn to_reflected(self) -> Traversal<ReflectedWave> {
+        let pong= self.payload.clone();
+        self.with(pong.to_reflected())
     }
 }
 

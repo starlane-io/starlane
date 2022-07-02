@@ -82,7 +82,7 @@ pub mod config {
         use crate::version::v0_0_1::id::id::{Point, PointCtx, PointVar, Topic};
         use crate::version::v0_0_1::substance::substance::{Call, CallDef};
         use crate::version::v0_0_1::substance::substance::{Substance, SubstancePattern};
-        use crate::version::v0_0_1::wave::{MethodKind, MethodPattern, DirectedCore, Ping, RecipientSelector};
+        use crate::version::v0_0_1::wave::{MethodKind, MethodPattern, DirectedCore, Ping, RecipientSelector, Wave, DirectedWave};
 
         use crate::version::v0_0_1::parse::model::{
             BindScope, MessageScope, MethodScope, PipelineSegment, PipelineSegmentDef, PipelineVar,
@@ -119,13 +119,13 @@ pub mod config {
                 scopes
             }
 
-            pub fn select(&self, request: &Ping) -> Result<&MethodScope, MsgErr> {
+            pub fn select(&self, directed: &DirectedWave) -> Result<&MethodScope, MsgErr> {
                 for route_scope in self.route_scopes() {
-                    if route_scope.selector.is_match(request).is_ok() {
+                    if route_scope.selector.is_match(directed).is_ok() {
                         for message_scope in &route_scope.block {
-                            if message_scope.selector.is_match(request).is_ok() {
+                            if message_scope.selector.is_match(directed).is_ok() {
                                 for method_scope in &message_scope.block {
-                                    if method_scope.selector.is_match(request).is_ok() {
+                                    if method_scope.selector.is_match(directed).is_ok() {
                                         return Ok(method_scope);
                                     }
                                 }
@@ -386,15 +386,9 @@ pub mod config {
                 }
             }
 
-            pub fn is_match<'a>(&self, select: &'a RecipientSelector) -> Result<(), ()> {
-                if let Some(topic) = &self.topic {
-                    topic.is_match(&select.to.topic)?;
-                } else if Topic::None != select.wave.from().topic {
-                    return Err(());
-                }
-
-                self.method.is_match(&select.wave.core().method)?;
-                match self.path.is_match(&select.wave.core().uri.path()) {
+            pub fn is_match<'a>(&self, wave: &'a DirectedWave) -> Result<(), ()> {
+                self.method.is_match(&wave.core().method)?;
+                match self.path.is_match(&wave.core().uri.path()) {
                     true => Ok(()),
                     false => Err(()),
                 }

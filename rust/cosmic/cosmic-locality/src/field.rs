@@ -38,6 +38,7 @@ use mesh_portal_versions::RegistryApi;
 
 #[derive(Clone)]
 pub struct FieldEx {
+    pub port: Port,
     pub skel: StarSkel,
     pub state: FieldState,
     pub logger: SpanLogger
@@ -46,16 +47,16 @@ pub struct FieldEx {
 
 
 impl FieldEx {
-    pub fn new(skel: StarSkel, state: FieldState, logger: SpanLogger ) -> Self {
-        Self { skel, state, logger }
+    pub fn new(port: Port, skel: StarSkel, state: FieldState, logger: SpanLogger ) -> Self {
+        Self { port, skel, state, logger }
     }
 
     async fn handle_action(&self, action: RequestAction) -> anyhow::Result<()> {
         match action.action {
-            PipeAction::CoreRequest(mut request) => {
+            PipeAction::CoreDirected(mut request) => {
                 self.traverse_next(request.wrap() ).await;
             }
-            PipeAction::FabricRequest(mut request) => {
+            PipeAction::FabricDirected(mut request) => {
                 self.traverse_next(request.wrap() ).await;
             }
             PipeAction::Respond => {
@@ -66,7 +67,7 @@ impl FieldEx {
                         self.logger.error(format!("no pipeline set for request_id: {}", action.request_id));
                     }
                     Some((_, mut pipex)) => {
-                        self.skel.traverse_to_next.send(pipex.reflect().wrap() ).await;
+                        self.skel.traverse_to_next.send(pipex.reflect().to_ultra() ).await;
                     }
                 }
             }
@@ -91,8 +92,8 @@ impl TraversalLayer for FieldEx {
     }
 
     async fn directed_core_bound(&self, mut directed: Traversal<DirectedWave>) -> Result<(), MsgErr> {
-        directed.logger.set_span_attr("message-id", &directed.id);
-        let access = self.skel.registry.access(&directed.agent, &directed.to).await;
+        directed.logger.set_span_attr("message-id", &directed.id().to_string() );
+        let access = self.skel.registry.access(directed.agent(), &directed.to).await;
 
         match access {
             Ok(access) => {
@@ -104,7 +105,7 @@ impl TraversalLayer for FieldEx {
                     directed.logger.error(err_msg.as_str());
                     self.skel
                         .fabric
-                        .send(Wave::Resp(directed.err(err_msg.into())));
+                        .send(directed.err(err_msg.into(), self.port().clone() ).to_ultra() );
                     return Ok(());
                 }
             }
@@ -114,17 +115,17 @@ impl TraversalLayer for FieldEx {
         }
 
         let bind = self.skel.machine.artifacts.bind(&directed.to).await?;
-        let route = bind.select(&directed.item)?;
+        let route = bind.select(&directed.payload )?;
 
         let regex = route.selector.path.clone();
 
         let env = {
             let path_regex_capture_resolver =
-                RegexCapturesResolver::new(regex, directed.item.core.uri.path().to_string())?;
-            let mut env = Env::new(directed.item.to.clone().to_point());
+                RegexCapturesResolver::new(regex, directed.core().uri.path().to_string())?;
+            let mut env = Env::new(directed.to.clone().to_point());
             env.add_var_resolver(Arc::new(path_regex_capture_resolver));
-            env.set_var("self.bundle", bind.bundle()?.to_string().as_str());
-            env.set_var("self.bind", bind.point().clone().to_string().as_str());
+            env.set_var("self.bundle", bind.bundle().clone().into());
+            env.set_var("self.bind", bind.point().clone().into());
             env
         };
 
@@ -134,7 +135,7 @@ impl TraversalLayer for FieldEx {
 
         let call = directed.to_call()?;
         let logger = directed.logger.span();
-        let mut pipex = PipeEx::new(directed, self.clone(), pipeline, env, logger.clone());
+        let mut pipex = PipeEx::new(directed,self.clone(),  pipeline, env, logger.clone());
         let action = match pipex.next() {
             Ok(action) => action,
             Err(err) => {
@@ -142,14 +143,14 @@ impl TraversalLayer for FieldEx {
                 logger.error(err_msg.as_str());
                 self.skel
                     .traverse_to_next
-                    .send(pipex.fail(500, err_msg.as_str()))
+                    .send(pipex.fail(500, err_msg.as_str()).to_ultra())
                     .await;
                 return Ok(());
             }
         };
 
         if let PipeAction::Respond = action {
-            self.skel.traverse_to_next.send(pipex.reflect()).await;
+            self.skel.traverse_to_next.send(pipex.reflect().to_ultra()).await;
             return Ok(());
         }
 
@@ -168,7 +169,7 @@ impl TraversalLayer for FieldEx {
         if let None = pipex {
             let err_msg = format!(
                 "Binder: cannot locate a pipeline executor for processing request: {}",
-                traversal.response_to
+                traversal.reflection_of().to_string()
             );
             traversal.logger.span().error(err_msg.clone());
             return Err(err_msg.into());
@@ -179,7 +180,7 @@ impl TraversalLayer for FieldEx {
         let action = pipex.handle_reflected(traversal.payload)?;
 
         if let PipeAction::Respond = action {
-            self.skel.traverse_to_next.send(pipex.reflect()).await;
+            self.skel.traverse_to_next.send(pipex.reflect().to_ultra() ).await;
             return Ok(());
         }
 
@@ -201,7 +202,7 @@ impl TraversalLayer for FieldEx {
 pub struct PipeEx {
     pub logger: SpanLogger,
     pub traversal: PipeTraversal,
-    pub binder: FieldEx,
+    pub field: FieldEx,
     pub pipeline: PipelineVar,
     pub env: Env,
 }
@@ -214,10 +215,10 @@ impl PipeEx {
         env: Env,
         logger: SpanLogger,
     ) -> Self {
-        let traversal = PipeTraversal::new(traversal);
+        let traversal = PipeTraversal::new(binder.port.clone(), traversal);
         Self {
             traversal: traversal,
-            binder,
+            field: binder,
             pipeline,
             env,
             logger,
@@ -226,7 +227,7 @@ impl PipeEx {
 }
 
 impl PipeEx {
-    pub fn next(&mut self) -> anyhow::Result<PipeAction> {
+    pub fn next(&mut self) -> Result<PipeAction,MsgErr> {
         match self.pipeline.consume() {
             Some(segment) => {
                 self.execute_step(&segment.step)?;
@@ -236,7 +237,7 @@ impl PipeEx {
         }
     }
 
-    pub fn handle_reflected(&mut self, reflected: ReflectedWave ) -> anyhow::Result<PipeAction> {
+    pub fn handle_reflected(&mut self, reflected: ReflectedWave ) -> Result<PipeAction,MsgErr> {
         self.traversal.push(reflected.to_ultra() );
         self.next()
     }
@@ -253,7 +254,7 @@ impl PipeEx {
         match stop {
             PipelineStopVar::Internal => {
                 let request = self.traversal.direct();
-                Ok(PipeAction::CoreRequest(request))
+                Ok(PipeAction::CoreDirected(request))
             }
             PipelineStopVar::Call(call) => {
                 let call: Call = call.clone().to_resolved(&self.env)?;
@@ -273,24 +274,23 @@ impl PipeEx {
                 core.uri = Uri::from_str(path.as_str())?;
                 let ping = self.traversal.initial.clone().with(Wave::new(Ping::new(
                     core,
-                    self.traversal.to(),
-                ), self.);
-                Ok(PipeAction::FabricRequest(ping))
+                    self.traversal.to().clone(),
+                ), self.field.port.clone() ));
+                Ok(PipeAction::FabricDirected(ping.to_directed()))
             }
             PipelineStopVar::Respond => Ok(PipeAction::Respond),
             PipelineStopVar::Point(point) => {
                 let uri = self.traversal.uri.clone();
                 let point: Point = point.clone().to_resolved(&self.env)?;
                 let method = Method::Cmd(CmdMethod::Read);
-                let mut core = method.into();
+                let mut core:DirectedCore = method.into();
                 core.uri = uri;
 
-                let request = self.traversal.initial.clone().with(Ping::new(
+                let request = self.traversal.initial.clone().with(Wave::new(Ping::new(
                     core,
-                    self.traversal.to(),
-                    point,
-                ));
-                Ok(PipeAction::FabricRequest(request))
+                    self.traversal.to().clone(),
+                ),point.to_port()));
+                Ok(PipeAction::FabricDirected(request.to_directed()))
             }
         }
     }
@@ -322,6 +322,7 @@ impl PipeEx {
 }
 
 pub struct PipeTraversal {
+    pub port: Port,
     pub initial: Traversal<DirectedWave>,
     pub method: Method,
     pub body: Substance,
@@ -331,12 +332,13 @@ pub struct PipeTraversal {
 }
 
 impl PipeTraversal {
-    pub fn new(initial_request: Traversal<DirectedWave>) -> Self {
+    pub fn new(port: Port, initial_request: Traversal<DirectedWave>) -> Self {
         Self {
-            method: initial_request.core.method.clone(),
-            body: initial_request.core.body.clone(),
-            uri: initial_request.core.uri.clone(),
-            headers: initial_request.core.headers.clone(),
+            port,
+            method: initial_request.core().method.clone(),
+            body: initial_request.core().body.clone(),
+            uri: initial_request.core().uri.clone(),
+            headers: initial_request.core().headers.clone(),
             initial: initial_request,
             status: StatusCode::from_u16(200).unwrap(),
         }
@@ -351,18 +353,18 @@ impl PipeTraversal {
         }
     }
 
-    pub fn to(&self) -> Point {
-        self.initial.to.clone().to_point()
+    pub fn to(&self) -> &Port{
+        &self.initial.to
     }
 
-    pub fn from(&self) -> Point {
-        self.initial.from.clone().to_point()
+    pub fn from(&self) -> &Port{
+        self.initial.from()
     }
 
-    pub fn direct(&self) -> Traversal<Ping> {
+    pub fn direct(&self) -> Traversal<DirectedWave> {
         self.initial
             .clone()
-            .with(Ping::new(self.request_core(), self.from()), self.from()))
+            .with(Wave::new(Ping::new(self.request_core(), self.from().clone()), self.port.clone() )).to_directed()
     }
 
     pub fn response_core(&self) -> ReflectedCore {
@@ -378,7 +380,7 @@ impl PipeTraversal {
             self.response_core(),
             self.to().to_port(),
             self.from().to_port(),
-            self.initial.id.clone(),
+            self.initial.id().clone(),
         )
     }
 
@@ -404,13 +406,16 @@ impl PipeTraversal {
 
     pub fn reflect(self) -> Traversal<ReflectedWave> {
         let core = self.response_core();
-        let response = self.initial.core(core);
-        self.initial.with(Wave::Resp(response))
+        let reflection = self.initial.payload.reflection();
+        let reflected = reflection.make( core, self.port.clone(), self.initial.to.clone() );
+        self.initial.with(reflected)
     }
 
     pub fn fail(self, status: u16, error: &str) -> Traversal<ReflectedWave> {
-        let response = self.initial.fail(status, error);
-        self.initial.with(Wave::Resp(response))
+        let core = ReflectedCore::status(status);
+        let reflection = self.initial.payload.reflection();
+        let reflected = reflection.make( core, self.port.clone(), self.initial.to.clone() );
+        self.initial.with(reflected )
     }
 }
 
@@ -420,8 +425,8 @@ struct RequestAction {
 }
 
 pub enum PipeAction {
-    CoreRequest(Traversal<DirectedWave>),
-    FabricRequest(Traversal<DirectedWave>),
+    CoreDirected(Traversal<DirectedWave>),
+    FabricDirected(Traversal<DirectedWave>),
     Respond,
 }
 

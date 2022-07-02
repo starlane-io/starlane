@@ -38,17 +38,22 @@ lazy_static! {
 
 #[async_trait]
 pub trait Artifacts: Send+Sync {
-    async fn bind(&self, point: &Point) -> Result<ArtRef<BindConfig>, MsgErr>;
+    async fn bind(&self, artifact: &Point) -> Result<ArtRef<BindConfig>, MsgErr>;
 }
 
 pub struct ArtRef<A> {
     artifact: Arc<A>,
-    bundle: Point
+    bundle: Point,
+    point: Point
 }
 
 impl <A> ArtRef<A>  {
     pub fn bundle(&self) -> &Point {
         &self.bundle
+    }
+
+    pub fn point(&self) -> &Point {
+        &self.point
     }
 }
 

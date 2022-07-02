@@ -57,20 +57,20 @@ impl TraversalLayer for ShellEx {
 
     async fn delivery_directed(&self, directed: Traversal<DirectedWave> ) {
         let logger = self.skel.logger.point(directed.to.point.clone()).span();
-        let injector = directed.from().clone().with_topic(Topic::None).with_layer(self.port().layer().clone());
+        let injector = directed.from().clone().with_topic(Topic::None).with_layer(self.port().layer.clone());
         let router = Arc::new(LayerInjectionRouter::new(
             self.skel.clone(),
           injector.clone()
         ));
 
         let mut transmitter = ProtoTransmitter::new(router.clone(), self.exchanger().clone());
-        transmitter.from = SetStrategy::Fill(directed.from().with_layer(self.port().layer().clone() ).with_topic(Topic::None));
+        transmitter.from = SetStrategy::Fill(directed.from().with_layer(self.port().layer.clone() ).with_topic(Topic::None));
         let reflection = directed.reflection();
         let ctx = RootInCtx::new(directed.payload, self.port().clone(), logger, transmitter.clone());
         let bounce: Bounce = self.handle(ctx).await;
         match bounce {
             Bounce::Absorbed => {}
-            Bounce::Relect(core) => {
+            Bounce::Reflect(core) => {
                 let reflected = reflection.make(core, self.port().clone(),self.port().clone() );
                 self.inject( reflected.to_ultra() ).await;
             }
@@ -86,7 +86,7 @@ impl TraversalLayer for ShellEx {
 
     async fn reflected_core_bound(&self, traversal: Traversal<ReflectedWave>) -> Result<(),MsgErr>{
         if let Some(_) = self.state.fabric_requests.remove(&traversal.reflection_of()) {
-            self.traverse_next(traversal.wrap()).await;
+            self.traverse_next(traversal.to_ultra()).await;
         } else {
             traversal.logger.warn("filtered a response to a request of which the Shell has no record");
         }

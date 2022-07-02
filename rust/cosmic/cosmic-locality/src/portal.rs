@@ -1,4 +1,3 @@
-use crate::guest::GuestSkel;
 use crate::host::HostSkel;
 use crate::star::StarSkel;
 use crate::state::{PortalInletState, PortalOutletState, PortalShellState, TunnelState};
@@ -117,13 +116,12 @@ impl TraversalLayer for TunnelInlet {
 }
 
 pub struct PortalOutlet {
-    pub skel: GuestSkel,
+    pub skel: StarSkel,
     pub state: PortalOutletState,
 }
 
 impl PortalOutlet {
     pub fn new(skel: StarSkel, state: PortalOutletState) -> Self {
-        let skel = GuestSkel::from_star_skel(&skel);
         Self { skel, state }
     }
 }

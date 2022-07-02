@@ -28,6 +28,7 @@ use std::time::Duration;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{mpsc, oneshot, RwLock};
 use tokio::time::error::Elapsed;
+use mesh_portal::version::latest::config::bind::RouteSelector;
 use mesh_portal::version::latest::messaging::Scope;
 use mesh_portal::version::latest::util::uuid;
 use mesh_portal_versions::{State, RegistryApi, StateFactory};
