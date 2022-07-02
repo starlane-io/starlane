@@ -1779,7 +1779,7 @@ pub trait DirectedHandlerSelector{
 }
 
 #[async_trait]
-pub trait DirectedHandler{
+pub trait DirectedHandler {
     async fn handle(&self, ctx: RootInCtx) -> Bounce;
 }
 

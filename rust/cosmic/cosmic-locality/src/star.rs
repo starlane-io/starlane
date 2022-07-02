@@ -19,7 +19,7 @@ use mesh_portal_versions::version::v0_0_1::quota::Timeouts;
 use mesh_portal_versions::version::v0_0_1::substance::substance::Substance;
 use mesh_portal_versions::version::v0_0_1::sys::{Assign, Location, Sys};
 use mesh_portal_versions::version::v0_0_1::util::ValueMatcher;
-use mesh_portal_versions::version::v0_0_1::wave::{Bounce,Agent, DirectedHandler, DirectedHandlerSelector, RecipientSelector,  InCtx, ProtoTransmitter, Ping, Reflectable, ReflectedCore, Pong, RootInCtx, Router, SetStrategy, Wave};
+use mesh_portal_versions::version::v0_0_1::wave::{Bounce, Agent, DirectedHandler, DirectedHandlerSelector, RecipientSelector, InCtx, ProtoTransmitter, Ping, Reflectable, ReflectedCore, Pong, RootInCtx, Router, SetStrategy, Wave};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
@@ -76,6 +76,10 @@ impl StarState {
             shell: Arc::new( DashMap::new() ),
             tx,
         }
+    }
+
+    pub fn states_tx(&self) -> mpsc::Sender<StateCall> {
+        self.tx.clone()
     }
 
     pub fn topic_handler( &self, port: Port, handler: Arc<dyn TopicHandler>) {
@@ -485,7 +489,7 @@ impl Star {
 impl Star {
     #[route("Sys<Assign>")]
     pub async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, MsgErr> {
-        self.drivers.assign(ctx).await
+        self.drivers.handle(ctx.wave().clone()).await
     }
 }
 
@@ -498,6 +502,13 @@ pub struct LayerInjectionRouter {
 impl LayerInjectionRouter {
     pub fn new(skel: StarSkel, injector: Port) -> Self {
         Self { skel, injector }
+    }
+
+    pub fn with(&self, injector: Port) -> Self {
+        Self {
+            skel: self.skel.clone(),
+            injector
+        }
     }
 }
 
