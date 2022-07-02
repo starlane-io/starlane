@@ -13,7 +13,6 @@
       <sourceFolder url="file://$MODULE_DIR$/wasm_membrane_host/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/starlane-operator/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-core/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-locality/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-macros-primitive/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-macros/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-nom/src" isTestSource="false" />
@@ -39,6 +38,7 @@
       <sourceFolder url="file://$MODULE_DIR$/starlane/starlane-macros-test/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/starlane/starlane-macros/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/starlane/starlane/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-star/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/cosmic/wasm-membrane-guest/target" />
       <excludeFolder url="file://$MODULE_DIR$/cosmic/wasm-membrane-host/target" />

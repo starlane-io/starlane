@@ -6,10 +6,22 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/rust.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/rust.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/driver.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-locality/src/driver.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/field.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-locality/src/field.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-macros/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-macros/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/driver.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/driver.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/field.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/field.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/host.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/host.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/lifecycle.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/lifecycle.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/machine.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/machine.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/portal.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/portal.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/scratch.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/scratch.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/shell.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/shell.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/star.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/star.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/state.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/state.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/traversal.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/traversal.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/starlane-core/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/starlane-core/Cargo.toml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

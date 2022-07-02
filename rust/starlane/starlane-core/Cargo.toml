@@ -77,7 +77,7 @@ base64 = "0.13.0"
 cosmic-nom={ path="../../cosmic/cosmic-nom"}
 cosmic-portal-cli={ path="../../cosmic/cosmic-portal-cli"}
 cosmic-macros={ path="../../cosmic/cosmic-macros"}
-cosmic-locality={ path="../../cosmic/cosmic-locality"}
+cosmic-star={ path= "../../cosmic/cosmic-star" }
 mesh-portal={ path="../../cosmic/mesh-portal"}
 mesh-portal-versions= { path="../../cosmic/mesh-portal-versions"}
 mesh-artifact-api ={ path="../../cosmic/mesh-artifact-api", default-features=true }
