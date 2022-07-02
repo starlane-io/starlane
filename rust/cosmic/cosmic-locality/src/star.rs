@@ -345,6 +345,14 @@ impl Star {
         let logger = logger.span();
         let to = wave.to().clone().unwrap_single();
 
+        let point = if *injector == self.injector {
+            // if injected by the star then the destination is the point that this traversal belongs to
+            to.clone().to_point()
+        } else {
+            // if injected by any other point then the injector is the point that this traversal belongs to
+            injector.clone().to_point()
+        };
+
         let mut traversal = Traversal::new(
             wave,
             record,
@@ -353,7 +361,8 @@ impl Star {
             logger,
             dir,
             dest,
-            to
+            to,
+            point
         );
 
         // in the case that we injected into a layer that is not part
@@ -413,6 +422,7 @@ impl Star {
 
                 Layer::Field => {
                     let field = FieldEx::new(
+                        traversal.point.clone(),
                         self.skel.clone(),
                         self.skel.state.find_field(&traversal.to)?,
                         traversal.logger.clone()

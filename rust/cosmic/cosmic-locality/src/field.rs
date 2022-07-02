@@ -47,7 +47,8 @@ pub struct FieldEx {
 
 
 impl FieldEx {
-    pub fn new(port: Port, skel: StarSkel, state: FieldState, logger: SpanLogger ) -> Self {
+    pub fn new(point: Point, skel: StarSkel, state: FieldState, logger: SpanLogger ) -> Self {
+        let port = point.to_port().with_layer(Layer::Field);
         Self { port, skel, state, logger }
     }
 

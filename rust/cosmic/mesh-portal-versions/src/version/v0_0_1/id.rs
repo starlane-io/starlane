@@ -2986,6 +2986,7 @@ impl TraversalInjection{
 
 #[derive(Clone)]
 pub struct Traversal<W> {
+    pub point: Point,
     pub payload: W,
     pub record: ParticleRecord,
     pub layer: Layer,
@@ -3047,7 +3048,8 @@ impl<W> Traversal<W> {
         logger: SpanLogger,
         dir: TraversalDirection,
         dest: Option<Layer>,
-        to: Port
+        to: Port,
+        point: Point
     ) -> Self {
         Self {
             payload,
@@ -3057,7 +3059,8 @@ impl<W> Traversal<W> {
             logger,
             dir,
             dest,
-            to
+            to,
+            point,
         }
     }
 
@@ -3070,7 +3073,8 @@ impl<W> Traversal<W> {
             location: self.location,
             dir: self.dir,
             dest: self.dest,
-            to: self.to
+            to: self.to,
+            point: self.point
         }
     }
 
