@@ -8,9 +8,9 @@ use std::collections::HashSet;
 use std::convert::{Infallible, TryFrom, TryInto};
 use std::string::FromUtf8Error;
 
-use mesh_portal_versions::version::v0_0_1::id::id::{BaseKind, ToPoint};
-use mesh_portal_versions::version::v0_0_1::id::StarKey;
-use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
+use cosmic_api::version::v0_0_1::id::id::{BaseKind, ToPoint};
+use cosmic_api::version::v0_0_1::id::StarKey;
+use cosmic_api::version::v0_0_1::sys::ParticleRecord;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use uuid::Uuid;
@@ -372,8 +372,8 @@ impl StarlaneMessenger {
 impl Transmitter for StarlaneMessenger {
     async fn direct(
         &self,
-        request: mesh_portal_versions::version::v0_0_1::wave::Ping,
-    ) -> mesh_portal_versions::version::v0_0_1::wave::Pong {
+        request: cosmic_api::version::v0_0_1::wave::Ping,
+    ) -> cosmic_api::version::v0_0_1::wave::Pong {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(StarlaneCommand::Request {
@@ -392,8 +392,8 @@ impl Transmitter for StarlaneMessenger {
 
     fn send_sync(
         &self,
-        request: mesh_portal_versions::version::v0_0_1::wave::Ping,
-    ) -> mesh_portal_versions::version::v0_0_1::wave::Pong {
+        request: cosmic_api::version::v0_0_1::wave::Ping,
+    ) -> cosmic_api::version::v0_0_1::wave::Pong {
         let starlane_tx = self.tx.clone();
         tokio::runtime::Handle::current().block_on(async move {
             let (tx, rx) = oneshot::channel();

@@ -11,8 +11,8 @@ use std::ops::Deref;
 use std::prelude::rust_2021::Vec;
 use mesh_portal::version::latest::config::bind::BindConfig;
 use mesh_portal::version::latest::id::Point;
-use mesh_portal_versions::version::v0_0_1::id::id::PointSegKind;
-use mesh_portal_versions::error::MsgErr;
+use cosmic_api::version::v0_0_1::id::id::PointSegKind;
+use cosmic_api::error::MsgErr;
 
 pub mod file;
 

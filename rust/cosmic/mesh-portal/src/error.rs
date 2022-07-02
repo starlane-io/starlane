@@ -6,6 +6,6 @@ use nom::error::VerboseError;
 use semver::{ReqParseError, SemVerError};
 use std::num::ParseIntError;
 
-pub type MsgErr = mesh_portal_versions::error::MsgErr;
-pub type StatusErr = dyn mesh_portal_versions::error::StatusErr;
+pub type MsgErr = cosmic_api::error::MsgErr;
+pub type StatusErr = dyn cosmic_api::error::StatusErr;
 

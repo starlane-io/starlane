@@ -2,8 +2,8 @@ use futures::channel::oneshot;
 use lru::LruCache;
 use tokio::sync::mpsc;
 use tokio::time::Duration;
-use mesh_portal_versions::version::v0_0_1::id::StarKey;
-use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
+use cosmic_api::version::v0_0_1::id::StarKey;
+use cosmic_api::version::v0_0_1::sys::ParticleRecord;
 
 use crate::frame::{ResourceRegistryRequest, SimpleReply, StarMessagePayload};
 use crate::message::ProtoStarMessage;

@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use crate::star::shell::watch::WatchApi;
-use mesh_portal_versions::version::v0_0_1::id::StarKey;
+use cosmic_api::version::v0_0_1::id::StarKey;
 use std::hash::Hash;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::payload::Substance;

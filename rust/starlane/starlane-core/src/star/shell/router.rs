@@ -1,5 +1,5 @@
 use mesh_portal::version::latest::id::RouteSegment;
-use mesh_portal_versions::version::v0_0_1::service::Global;
+use cosmic_api::version::v0_0_1::service::Global;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
 
@@ -11,7 +11,7 @@ use crate::frame::{
 };
 use crate::lane::{LaneKey, LaneSession, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply};
-use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
+use cosmic_api::version::v0_0_1::sys::ParticleRecord;
 use crate::star::core::message::CoreMessageCall;
 use crate::star::variant::FrameVerdict;
 use crate::star::StarSkel;

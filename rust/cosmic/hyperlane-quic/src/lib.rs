@@ -7,14 +7,14 @@ use tokio::sync::mpsc;
 use quinn::{ClientConfig, Connecting, Connection, Endpoint, NewConnection, RecvStream, ServerConfig, VarInt};
 use tokio::sync::mpsc::{Receiver, Sender};
 use cosmic_hyperlane::{VersionGate, InterchangeEntryRouter};
-use mesh_portal_versions::error::{MsgErr, StatusErr};
-use mesh_portal_versions::VERSION;
-use mesh_portal_versions::version::v0_0_1::frame::frame::PrimitiveFrame;
-use mesh_portal_versions::version::v0_0_1::id::id::{Point, ToPort};
-use mesh_portal_versions::version::v0_0_1::log::PointLogger;
-use mesh_portal_versions::version::v0_0_1::substance::substance::Substance;
-use mesh_portal_versions::version::v0_0_1::sys::{EntryReq, Sys};
-use mesh_portal_versions::version::v0_0_1::wave::{DirectedCore, PingProto, Pong, SysMethod, Wave};
+use cosmic_api::error::{MsgErr, StatusErr};
+use cosmic_api::VERSION;
+use cosmic_api::version::v0_0_1::frame::frame::PrimitiveFrame;
+use cosmic_api::version::v0_0_1::id::id::{Point, ToPort};
+use cosmic_api::version::v0_0_1::log::PointLogger;
+use cosmic_api::version::v0_0_1::substance::substance::Substance;
+use cosmic_api::version::v0_0_1::sys::{EntryReq, Sys};
+use cosmic_api::version::v0_0_1::wave::{DirectedCore, PingProto, Pong, SysMethod, Wave};
 
 fn generate_self_signed_cert() -> Result<(rustls::Certificate, rustls::PrivateKey), MsgErr>
 {

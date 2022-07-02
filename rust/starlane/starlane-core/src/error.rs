@@ -27,7 +27,7 @@ use http::status::InvalidStatusCode;
 use http::uri::InvalidUri;
 use keycloak::KeycloakError;
 use mesh_portal::error::MsgErr;
-use mesh_portal_versions::error::StatusErr;
+use cosmic_api::error::StatusErr;
 use nom_supreme::error::ErrorTree;
 use sqlx::error::DatabaseError;
 use tokio::task::JoinError;

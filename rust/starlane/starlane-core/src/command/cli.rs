@@ -14,7 +14,7 @@ use mesh_portal_tcp_common::{PrimitiveFrameReader, PrimitiveFrameWriter};
 use mesh_portal::version::latest::entity::request::create::{Fulfillment, PointTemplate};
 use mesh_portal::version::latest::entity::request::ReqCore;
 use mesh_portal::version::latest::id::RouteSegment;
-use mesh_portal_versions::version::v0_0_1::mesh_portal_uuid;
+use cosmic_api::version::v0_0_1::mesh_portal_uuid;
 use serde::Serialize;
 use tokio::io::AsyncWriteExt;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};

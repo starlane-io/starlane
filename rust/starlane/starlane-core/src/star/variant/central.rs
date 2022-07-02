@@ -6,9 +6,9 @@ use mesh_portal::version::latest::entity::request::create::Strategy;
 
 use tokio::sync::{mpsc, oneshot};
 use mesh_portal::version::latest::cli::Transfer;
-use mesh_portal_versions::version::v0_0_1::id::id::ToPort;
-use mesh_portal_versions::version::v0_0_1::id::StarKey;
-use mesh_portal_versions::version::v0_0_1::sys::{Location, ParticleRecord};
+use cosmic_api::version::v0_0_1::id::id::ToPort;
+use cosmic_api::version::v0_0_1::id::StarKey;
+use cosmic_api::version::v0_0_1::sys::{Location, ParticleRecord};
 
 
 use crate::error::Error;

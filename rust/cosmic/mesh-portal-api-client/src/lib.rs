@@ -21,9 +21,9 @@ use mesh_portal::version::latest::id::{Point, Port, Uuid};
 use mesh_portal::version::latest::messaging::{Agent, ReqCtx, SysMethod};
 use mesh_portal::version::latest::payload::Substance;
 use mesh_portal::version::latest::sys::{Assign, Sys};
-use mesh_portal_versions::version::v0_0_1::id::id::{Layer, ToPoint, ToPort};
-use mesh_portal_versions::version::v0_0_1::quota::Timeouts;
-use mesh_portal_versions::version::v0_0_1::wave::{
+use cosmic_api::version::v0_0_1::id::id::{Layer, ToPoint, ToPort};
+use cosmic_api::version::v0_0_1::quota::Timeouts;
+use cosmic_api::version::v0_0_1::wave::{
     PointRequestHandler, PointDirectedHandlerSelector, DirectedHandler,
     AsyncRequestHandlerRelay, AsyncRouter, Transmitter, ProtoTransmitter, Ping, WaveXtra,
     RequestHandlerRelay, Reflectable, Pong, RespXtra, WaitTime, Wave, WaveXtra,

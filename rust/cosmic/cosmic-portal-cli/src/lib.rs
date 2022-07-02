@@ -9,10 +9,10 @@ use mesh_portal::version::latest::messaging::{
     Agent, Handling, ReqProto, ReqShell, RespShell, Scope,
 };
 use mesh_portal::version::latest::msg::MsgMethod;
-use mesh_portal_versions::version::v0_0_1::id::id::{Layer, ToPort};
+use cosmic_api::version::v0_0_1::id::id::{Layer, ToPort};
 use std::sync::Arc;
-use mesh_portal_versions::version::v0_0_1::quota::Timeouts;
-use mesh_portal_versions::version::v0_0_1::wave::{Exchanger, Ping, Pong, ProtoTransmitter, Router, SetStrategy, ToRecipients, Wave};
+use cosmic_api::version::v0_0_1::quota::Timeouts;
+use cosmic_api::version::v0_0_1::wave::{Exchanger, Ping, Pong, ProtoTransmitter, Router, SetStrategy, ToRecipients, Wave};
 
 #[macro_use]
 extern crate cosmic_macros;
@@ -138,7 +138,7 @@ pub mod test {
     use mesh_portal::version::latest::entity::response::RespCore;
     use mesh_portal::version::latest::messaging::{ReqShell, RootRequestCtx};
     use mesh_portal::version::latest::payload::Substance;
-    use mesh_portal_versions::version::v0_0_1::wave::{
+    use cosmic_api::version::v0_0_1::wave::{
         DirectedHandler, InCtx, DirectedHandler, RequestHandlerRelay,
     };
     use std::marker::PhantomData;

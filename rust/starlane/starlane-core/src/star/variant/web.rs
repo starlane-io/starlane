@@ -35,12 +35,12 @@ use crate::artifact::ArtifactRef;
 use crate::cache::ArtifactItem;
 use crate::html::HTML;
 use regex::Regex;
-use mesh_portal_versions::version::v0_0_1::id::ArtifactSubKind;
+use cosmic_api::version::v0_0_1::id::ArtifactSubKind;
 use serde::{Serialize,Deserialize};
 use tiny_http::{HeaderField, Server, StatusCode};
 use mesh_portal::version::latest::http::HttpMethod;
 use mesh_portal::version::latest::payload::Substance;
-use mesh_portal_versions::version::v0_0_1::wave::AsyncTransmitterWithAgent;
+use cosmic_api::version::v0_0_1::wave::AsyncTransmitterWithAgent;
 use crate::message::StarlaneMessenger;
 use crate::star::variant::web::parse::host_and_port;
 
@@ -204,7 +204,7 @@ mod tests {
 }
 #[cfg(test)]
 mod test {
-    use mesh_portal_versions::version::v0_0_1::span::new_span;
+    use cosmic_api::version::v0_0_1::span::new_span;
     use crate::error::Error;
     use regex::Regex;
     use crate::star::variant::web::HostAndPort;
@@ -247,15 +247,15 @@ pub struct HostAndPort {
 pub mod parse {
     use std::num::ParseIntError;
     use std::str::FromStr;
-    use mesh_portal_versions::error::MsgErr;
-    use mesh_portal_versions::version::v0_0_1::parse::error::result;
+    use cosmic_api::error::MsgErr;
+    use cosmic_api::version::v0_0_1::parse::error::result;
     use nom::bytes::complete::{is_a, tag, take_while};
     use nom::character::is_digit;
     use nom::error::{ErrorKind, ParseError, VerboseError};
     use nom::sequence::tuple;
     use nom_supreme::error::ErrorTree;
     use cosmic_nom::Span;
-    use mesh_portal_versions::version::v0_0_1::parse::domain;
+    use cosmic_api::version::v0_0_1::parse::domain;
     use crate::star::variant::web::HostAndPort;
 
     pub fn host_and_port<I:Span>(input: I ) -> Result<HostAndPort,MsgErr> {

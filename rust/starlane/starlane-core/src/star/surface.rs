@@ -6,12 +6,12 @@ use mesh_portal::version::latest::entity::request::create::{PointTemplate, Templ
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Message, ReqShell, RespShell};
 use mesh_portal::version::latest::particle::Stub;
-use mesh_portal_versions::version::v0_0_1::wave::SyncTransmitter;
+use cosmic_api::version::v0_0_1::wave::SyncTransmitter;
 
 use tokio::sync::mpsc;
 use tokio::time::Duration;
 use tokio::sync::oneshot;
-use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
+use cosmic_api::version::v0_0_1::sys::ParticleRecord;
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;

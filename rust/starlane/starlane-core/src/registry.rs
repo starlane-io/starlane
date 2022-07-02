@@ -24,12 +24,12 @@ use mesh_portal::version::latest::selector::{
     PointSegSelector, PointSelector,
 };
 use mesh_portal::version::latest::util::ValuePattern;
-use mesh_portal_versions::version::v0_0_1::particle::particle::Details;
-use mesh_portal_versions::version::v0_0_1::security::{
+use cosmic_api::version::v0_0_1::particle::particle::Details;
+use cosmic_api::version::v0_0_1::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask,
     PermissionsMaskKind, Privilege, Privileges,
 };
-use mesh_portal_versions::version::v0_0_1::selector::selector::SubKindSelector;
+use cosmic_api::version::v0_0_1::selector::selector::SubKindSelector;
 use mysql::prelude::TextQuery;
 use sqlx::postgres::{PgArguments, PgPoolOptions, PgRow};
 use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
@@ -40,14 +40,14 @@ use std::num::ParseIntError;
 use std::ops::{Deref, Index};
 use std::str::FromStr;
 use std::sync::Arc;
-use mesh_portal_versions::version::v0_0_1::command::request::delete::Delete;
-use mesh_portal_versions::version::v0_0_1::command::request::select::{SelectKind, SubSelect};
+use cosmic_api::version::v0_0_1::command::request::delete::Delete;
+use cosmic_api::version::v0_0_1::command::request::select::{SelectKind, SubSelect};
 use tokio::sync::mpsc;
 use mesh_portal::version::latest::payload::{Substance, PayloadMap, PrimitiveList};
-use mesh_portal_versions::version::v0_0_1::id::{ArtifactSubKind, BaseSubKind, FileSubKind, UserBaseSubKind};
-use mesh_portal_versions::version::v0_0_1::id::id::{Kind, BaseKind, Tks};
-use mesh_portal_versions::version::v0_0_1::parse::{CamelCase, Domain, SkewerCase};
-use mesh_portal_versions::version::v0_0_1::sys::{Location, ParticleRecord};
+use cosmic_api::version::v0_0_1::id::{ArtifactSubKind, BaseSubKind, FileSubKind, UserBaseSubKind};
+use cosmic_api::version::v0_0_1::id::id::{Kind, BaseKind, Tks};
+use cosmic_api::version::v0_0_1::parse::{CamelCase, Domain, SkewerCase};
+use cosmic_api::version::v0_0_1::sys::{Location, ParticleRecord};
 use crate::databases::lookup_registry_db;
 use crate::particle::properties_config;
 
@@ -1193,16 +1193,16 @@ pub mod test {
     use mesh_portal::version::latest::particle::Status;
     use mesh_portal::version::latest::payload::Primitive;
     use mesh_portal::version::latest::selector::{PointKindHierarchy, PointSelector};
-    use mesh_portal_versions::version::v0_0_1::entity::request::select::SelectKind;
-    use mesh_portal_versions::version::v0_0_1::security::{
+    use cosmic_api::version::v0_0_1::entity::request::select::SelectKind;
+    use cosmic_api::version::v0_0_1::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
         Privilege,
     };
     use std::convert::TryInto;
     use std::str::FromStr;
-    use mesh_portal_versions::version::v0_0_1::command::request::select::SelectKind;
-    use mesh_portal_versions::version::v0_0_1::id::id::{Kind, ToPoint};
-    use mesh_portal_versions::version::v0_0_1::id::UserBaseSubKind;
+    use cosmic_api::version::v0_0_1::command::request::select::SelectKind;
+    use cosmic_api::version::v0_0_1::id::id::{Kind, ToPoint};
+    use cosmic_api::version::v0_0_1::id::UserBaseSubKind;
 
     #[tokio::test]
     pub async fn test_nuke() -> Result<(), Error> {

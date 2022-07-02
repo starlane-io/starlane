@@ -33,9 +33,9 @@ use mesh_portal::version::latest::messaging::{
 use mesh_portal::version::latest::particle::Stub;
 use mesh_portal::version::latest::payload::Substance;
 use mesh_portal::version::latest::sys::{Assign, Sys};
-use mesh_portal_versions::error::MsgErr;
-use mesh_portal_versions::version::v0_0_1::id::id::{Layer, ToPoint, ToPort};
-use mesh_portal_versions::version::v0_0_1::wave::{
+use cosmic_api::error::MsgErr;
+use cosmic_api::version::v0_0_1::id::id::{Layer, ToPoint, ToPort};
+use cosmic_api::version::v0_0_1::wave::{
     DirectedHandler, AsyncRouter, Transmitter, MethodKind, Reflectable, ReflectedCore,
     RespXtra, RootInCtx, Wave, WaveXtra,
 };

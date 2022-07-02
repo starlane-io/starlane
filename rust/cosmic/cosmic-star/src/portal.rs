@@ -3,9 +3,9 @@ use crate::star::StarSkel;
 use crate::state::{PortalInletState, PortalOutletState, PortalShellState, TunnelState};
 use cosmic_hyperlane::HyperwayInterchange;
 use dashmap::DashMap;
-use mesh_portal_versions::version::v0_0_1::id::id::{Layer, Port, TraversalLayer, Uuid};
-use mesh_portal_versions::version::v0_0_1::id::Traversal;
-use mesh_portal_versions::version::v0_0_1::wave::{
+use cosmic_api::version::v0_0_1::id::id::{Layer, Port, TraversalLayer, Uuid};
+use cosmic_api::version::v0_0_1::id::Traversal;
+use cosmic_api::version::v0_0_1::wave::{
     DirectedWave, Exchanger, Ping, Pong, UltraWave, Wave,
 };
 use std::sync::Arc;

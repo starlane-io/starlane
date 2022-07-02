@@ -4,7 +4,7 @@ use std::collections::hash_map::RandomState;
 use lru::LruCache;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
-use mesh_portal_versions::version::v0_0_1::id::StarKey;
+use cosmic_api::version::v0_0_1::id::StarKey;
 
 use crate::error::Error;
 use crate::frame::{Frame, StarMessage, StarPattern};

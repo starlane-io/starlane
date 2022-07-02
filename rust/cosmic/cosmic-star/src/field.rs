@@ -2,27 +2,27 @@ use crate::star::StarSkel;
 use anyhow::anyhow;
 use dashmap::DashMap;
 
-use mesh_portal_versions::error::MsgErr;
-use mesh_portal_versions::version::v0_0_1::config::config::bind::{
+use cosmic_api::error::MsgErr;
+use cosmic_api::version::v0_0_1::config::config::bind::{
     BindConfig, PipelineStepVar, PipelineStopVar, WaveKind,
 };
-use mesh_portal_versions::version::v0_0_1::id::id::{
+use cosmic_api::version::v0_0_1::id::id::{
     Layer, Point, ToPoint, ToPort, TraversalLayer, Uuid,
 };
-use mesh_portal_versions::version::v0_0_1::id::{ArtifactSubKind, TraversalInjection};
-use mesh_portal_versions::version::v0_0_1::id::Traversal;
-use mesh_portal_versions::version::v0_0_1::log::{PointLogger, RootLogger, SpanLogger};
-use mesh_portal_versions::version::v0_0_1::parse::model::PipelineVar;
-use mesh_portal_versions::version::v0_0_1::parse::{
+use cosmic_api::version::v0_0_1::id::{ArtifactSubKind, TraversalInjection};
+use cosmic_api::version::v0_0_1::id::Traversal;
+use cosmic_api::version::v0_0_1::log::{PointLogger, RootLogger, SpanLogger};
+use cosmic_api::version::v0_0_1::parse::model::PipelineVar;
+use cosmic_api::version::v0_0_1::parse::{
     Env, MapResolver, MultiVarResolver, PointCtxResolver, RegexCapturesResolver,
 };
-use mesh_portal_versions::version::v0_0_1::security::Access;
-use mesh_portal_versions::version::v0_0_1::selector::selector::PipelineKind;
-use mesh_portal_versions::version::v0_0_1::selector::{PayloadBlock, PayloadBlockVar};
-use mesh_portal_versions::version::v0_0_1::substance::substance::{Call, CallKind, Substance};
-use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
-use mesh_portal_versions::version::v0_0_1::util::{ToResolved, ValueMatcher};
-use mesh_portal_versions::version::v0_0_1::wave::{Agent, CmdMethod, Method, DirectedCore, Ping, Reflectable, ReflectedCore, Pong, Wave, Exchanger, UltraWave, DirectedWave, ReflectedWave};
+use cosmic_api::version::v0_0_1::security::Access;
+use cosmic_api::version::v0_0_1::selector::selector::PipelineKind;
+use cosmic_api::version::v0_0_1::selector::{PayloadBlock, PayloadBlockVar};
+use cosmic_api::version::v0_0_1::substance::substance::{Call, CallKind, Substance};
+use cosmic_api::version::v0_0_1::sys::ParticleRecord;
+use cosmic_api::version::v0_0_1::util::{ToResolved, ValueMatcher};
+use cosmic_api::version::v0_0_1::wave::{Agent, CmdMethod, Method, DirectedCore, Ping, Reflectable, ReflectedCore, Pong, Wave, Exchanger, UltraWave, DirectedWave, ReflectedWave};
 use regex::{CaptureMatches, Regex};
 
 use std::collections::HashMap;
@@ -34,7 +34,7 @@ use tokio::io::AsyncBufReadExt;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, Mutex};
 use mesh_portal::version::latest::id::Port;
-use mesh_portal_versions::RegistryApi;
+use cosmic_api::RegistryApi;
 
 #[derive(Clone)]
 pub struct FieldEx {

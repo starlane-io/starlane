@@ -7,8 +7,8 @@ use semver::SemVerError;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time::error::Elapsed;
-use mesh_portal_versions::version::v0_0_1::id::StarKey;
-use mesh_portal_versions::version::v0_0_1::sys::{Assign, ParticleRecord};
+use cosmic_api::version::v0_0_1::id::StarKey;
+use cosmic_api::version::v0_0_1::sys::{Assign, ParticleRecord};
 
 
 use crate::error::Error;

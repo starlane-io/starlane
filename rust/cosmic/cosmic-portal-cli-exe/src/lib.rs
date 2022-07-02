@@ -24,14 +24,14 @@ use mesh_portal::version::latest::messaging::{
 use mesh_portal::version::latest::particle::Stub;
 use mesh_portal::version::latest::payload::{PayloadType, Substance};
 use mesh_portal::version::latest::util::uuid;
-use mesh_portal_versions::version::v0_0_1::command::Command;
-use mesh_portal_versions::version::v0_0_1::id::id::{ToPoint, ToPort};
-use mesh_portal_versions::version::v0_0_1::msg::MsgMethod;
-use mesh_portal_versions::version::v0_0_1::parse::error::result;
-use mesh_portal_versions::version::v0_0_1::parse::model::MethodScopeSelector;
-use mesh_portal_versions::version::v0_0_1::parse::{command, command_line, Env};
-use mesh_portal_versions::version::v0_0_1::util::{ToResolved, ValuePattern};
-use mesh_portal_versions::version::v0_0_1::wave::{
+use cosmic_api::version::v0_0_1::command::Command;
+use cosmic_api::version::v0_0_1::id::id::{ToPoint, ToPort};
+use cosmic_api::version::v0_0_1::msg::MsgMethod;
+use cosmic_api::version::v0_0_1::parse::error::result;
+use cosmic_api::version::v0_0_1::parse::model::MethodScopeSelector;
+use cosmic_api::version::v0_0_1::parse::{command, command_line, Env};
+use cosmic_api::version::v0_0_1::util::{ToResolved, ValuePattern};
+use cosmic_api::version::v0_0_1::wave::{
     PointRequestHandler, DirectedHandler, AsyncRequestHandlerRelay, AsyncRouter,
     Transmitter, InternalPipeline, DirectedHandler, RequestHandlerRelay, SyncTransmitRelay,
     SyncTransmitter,

@@ -24,11 +24,11 @@ use mesh_portal::version::latest::entity::response::RespCore;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 use mesh_portal::version::latest::payload::{Call, CallKind, Errors, MsgCall, Substance};
-use mesh_portal_versions::version::v0_0_1::id::id::ToPoint;
-use mesh_portal_versions::version::v0_0_1::wave::Method;
-use mesh_portal_versions::version::v0_0_1::parse::model::Subst;
-use mesh_portal_versions::version::v0_0_1::substance::substance::HttpCall;
-use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
+use cosmic_api::version::v0_0_1::id::id::ToPoint;
+use cosmic_api::version::v0_0_1::wave::Method;
+use cosmic_api::version::v0_0_1::parse::model::Subst;
+use cosmic_api::version::v0_0_1::substance::substance::HttpCall;
+use cosmic_api::version::v0_0_1::sys::ParticleRecord;
 
 pub struct Delivery<M>
 where

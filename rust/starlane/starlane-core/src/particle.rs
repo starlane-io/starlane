@@ -16,8 +16,8 @@ use mesh_portal::version::latest::id::{KindParts, Point, ResourceKind, Specific}
 use mesh_portal::version::latest::payload::Substance;
 use mesh_portal::version::latest::particle::{Status, Stub};
 use mesh_portal::version::latest::security::Permissions;
-use mesh_portal_versions::version::v0_0_1::parse::{CamelCase, consume_kind};
-use mesh_portal_versions::version::v0_0_1::particle::particle::{Details, Property};
+use cosmic_api::version::v0_0_1::parse::{CamelCase, consume_kind};
+use cosmic_api::version::v0_0_1::particle::particle::{Details, Property};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
 use tokio::sync::oneshot::Receiver;
@@ -25,9 +25,9 @@ use tracing_futures::WithSubscriber;
 use cosmic_nom::new_span;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::config::{ParticleConfigBody, PointConfig};
-use mesh_portal_versions::version::v0_0_1::id::id::{BaseKind, ToBaseKind, ToPoint};
-use mesh_portal_versions::version::v0_0_1::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, UserBaseSubKind};
-use mesh_portal_versions::version::v0_0_1::sys::{AssignmentKind, ChildRegistry, Location};
+use cosmic_api::version::v0_0_1::id::id::{BaseKind, ToBaseKind, ToPoint};
+use cosmic_api::version::v0_0_1::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, UserBaseSubKind};
+use cosmic_api::version::v0_0_1::sys::{AssignmentKind, ChildRegistry, Location};
 
 use crate::{error, logger, util};
 use crate::config::config::ParticleConfig;

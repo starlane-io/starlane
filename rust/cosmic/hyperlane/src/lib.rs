@@ -3,20 +3,20 @@
 use dashmap::DashMap;
 use futures::future::select_all;
 use futures::FutureExt;
-use mesh_portal_versions::error::MsgErr;
-use mesh_portal_versions::version::v0_0_1::command::request::create::{
+use cosmic_api::error::MsgErr;
+use cosmic_api::version::v0_0_1::command::request::create::{
     PointFactory, PointFactoryU128, PointSegTemplate,
 };
-use mesh_portal_versions::version::v0_0_1::frame::frame::PrimitiveFrame;
-use mesh_portal_versions::version::v0_0_1::id::id::{Point, ToPoint, ToPort, Version};
-use mesh_portal_versions::version::v0_0_1::log::{PointLogger, RootLogger};
-use mesh_portal_versions::version::v0_0_1::substance::substance::{
+use cosmic_api::version::v0_0_1::frame::frame::PrimitiveFrame;
+use cosmic_api::version::v0_0_1::id::id::{Point, ToPoint, ToPort, Version};
+use cosmic_api::version::v0_0_1::log::{PointLogger, RootLogger};
+use cosmic_api::version::v0_0_1::substance::substance::{
     Errors, Substance, SubstanceKind, Token,
 };
-use mesh_portal_versions::version::v0_0_1::sys::{EntryReq, InterchangeKind, Sys};
-use mesh_portal_versions::version::v0_0_1::util::uuid;
-use mesh_portal_versions::version::v0_0_1::wave::{Agent, HyperWave, Method, Ping, Reflectable, Pong, SysMethod, Wave, UltraWave};
-use mesh_portal_versions::VERSION;
+use cosmic_api::version::v0_0_1::sys::{EntryReq, InterchangeKind, Sys};
+use cosmic_api::version::v0_0_1::util::uuid;
+use cosmic_api::version::v0_0_1::wave::{Agent, HyperWave, Method, Ping, Reflectable, Pong, SysMethod, Wave, UltraWave};
+use cosmic_api::VERSION;
 use std::collections::HashMap;
 use std::future::Future;
 use std::ops::{Deref, DerefMut};

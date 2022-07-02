@@ -2,17 +2,17 @@ use crate::star::{LayerInjectionRouter, StarSkel, TopicHandler};
 use crate::state::ShellState;
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
-use mesh_portal_versions::error::MsgErr;
-use mesh_portal_versions::version::v0_0_1::cli::RawCommand;
-use mesh_portal_versions::version::v0_0_1::config::config::bind::RouteSelector;
-use mesh_portal_versions::version::v0_0_1::id::id::{
+use cosmic_api::error::MsgErr;
+use cosmic_api::version::v0_0_1::cli::RawCommand;
+use cosmic_api::version::v0_0_1::config::config::bind::RouteSelector;
+use cosmic_api::version::v0_0_1::id::id::{
     Layer, Point, Port, PortSelector, ToPoint, ToPort, Topic, TraversalLayer, Uuid,
 };
-use mesh_portal_versions::version::v0_0_1::id::{Traversal, TraversalInjection};
-use mesh_portal_versions::version::v0_0_1::log::RootLogger;
-use mesh_portal_versions::version::v0_0_1::parse::{command_line, Env};
-use mesh_portal_versions::version::v0_0_1::quota::Timeouts;
-use mesh_portal_versions::version::v0_0_1::wave::{Agent, Ping, DirectedHandlerSelector, RecipientSelector, DirectedHandler, Reflectable, ReflectedCore, Pong, RootInCtx, Wave, ProtoTransmitter, DirectedCore, PingProto, SetStrategy, UltraWave, InCtx, Exchanger, DirectedWave, Bounce, Router, ReflectedWave};
+use cosmic_api::version::v0_0_1::id::{Traversal, TraversalInjection};
+use cosmic_api::version::v0_0_1::log::RootLogger;
+use cosmic_api::version::v0_0_1::parse::{command_line, Env};
+use cosmic_api::version::v0_0_1::quota::Timeouts;
+use cosmic_api::version::v0_0_1::wave::{Agent, Ping, DirectedHandlerSelector, RecipientSelector, DirectedHandler, Reflectable, ReflectedCore, Pong, RootInCtx, Wave, ProtoTransmitter, DirectedCore, PingProto, SetStrategy, UltraWave, InCtx, Exchanger, DirectedWave, Bounce, Router, ReflectedWave};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -20,9 +20,9 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use cosmic_nom::new_span;
 use mesh_portal::version::latest::payload::Substance;
-use mesh_portal_versions::version::v0_0_1::command::Command;
-use mesh_portal_versions::version::v0_0_1::parse::error::result;
-use mesh_portal_versions::version::v0_0_1::util::ToResolved;
+use cosmic_api::version::v0_0_1::command::Command;
+use cosmic_api::version::v0_0_1::parse::error::result;
+use cosmic_api::version::v0_0_1::util::ToResolved;
 
 #[derive(DirectedHandler)]
 pub struct ShellEx {

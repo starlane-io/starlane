@@ -7,20 +7,20 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use mesh_portal_versions::version::v0_0_1 as current;
+use cosmic_api::version::v0_0_1 as current;
 
 pub type State = current::State;
 
 pub mod artifact {
-    use mesh_portal_versions::version::v0_0_1 as current;
+    use cosmic_api::version::v0_0_1 as current;
     pub type Artifact = current::artifact::Artifact;
     pub type ArtifactRequest = current::artifact::ArtifactRequest;
     pub type ArtifactResponse = current::artifact::ArtifactResponse;
 }
 
 pub mod id {
-    use mesh_portal_versions::version::v0_0_1 as current;
-    use mesh_portal_versions::version::v0_0_1::id;
+    use cosmic_api::version::v0_0_1 as current;
+    use cosmic_api::version::v0_0_1::id;
 
     pub type Uuid = id::id::Uuid;
     pub type ResourceType = id::id::BaseKind;
@@ -44,13 +44,13 @@ pub mod id {
 }
 
 pub mod path {
-    use mesh_portal_versions::version::v0_0_1 as current;
+    use cosmic_api::version::v0_0_1 as current;
     pub type Path = current::path::Path;
 }
 
 pub mod selector {
-    use mesh_portal_versions::version::v0_0_1::selector;
-    use mesh_portal_versions::version::{v0_0_1 as current, v0_0_1};
+    use cosmic_api::version::v0_0_1::selector;
+    use cosmic_api::version::{v0_0_1 as current, v0_0_1};
 
     pub type GenericKindSelector = selector::selector::KindBaseSelector;
     pub type GenericSubKindSelector = selector::selector::SubKindSelector;
@@ -77,8 +77,8 @@ pub mod selector {
     pub type PointKindSeg = selector::selector::PointKindSeg;
 
     pub mod specific {
-        use mesh_portal_versions::version::v0_0_1 as current;
-        use mesh_portal_versions::version::v0_0_1::selector;
+        use cosmic_api::version::v0_0_1 as current;
+        use cosmic_api::version::v0_0_1::selector;
 
         pub type VersionReq = selector::selector::specific::VersionReq;
         pub type VendorSelector = selector::selector::specific::VendorSelector;
@@ -89,8 +89,8 @@ pub mod selector {
 }
 
 pub mod messaging {
-    use mesh_portal_versions::version::v0_0_1 as current;
-    use mesh_portal_versions::version::v0_0_1::wave;
+    use cosmic_api::version::v0_0_1 as current;
+    use cosmic_api::version::v0_0_1::wave;
 
     pub type RequestHandler = dyn wave::DirectedHandler;
     pub type ReqShell = wave::Ping;
@@ -111,32 +111,32 @@ pub mod messaging {
 }
 
 pub mod frame {
-    use mesh_portal_versions::version::v0_0_1 as current;
-    use mesh_portal_versions::version::v0_0_1::frame;
+    use cosmic_api::version::v0_0_1 as current;
+    use cosmic_api::version::v0_0_1::frame;
 
     pub type PrimitiveFrame = frame::frame::PrimitiveFrame;
     pub type CloseReason = frame::frame::CloseReason;
 }
 
 pub mod bin {
-    use mesh_portal_versions::version::v0_0_1 as current;
+    use cosmic_api::version::v0_0_1 as current;
 
     pub type Bin = current::bin::Bin;
 }
 
 pub mod parse {
-    use mesh_portal_versions::version::v0_0_1 as current;
+    use cosmic_api::version::v0_0_1 as current;
 
     pub type Res<I, O> = cosmic_nom::Res<I, O>;
     pub type Env = current::parse::Env;
 
     pub mod model {
-        use mesh_portal_versions::version::v0_0_1 as current;
+        use cosmic_api::version::v0_0_1 as current;
         pub type ScopeFilter = current::parse::model::ScopeFilter;
         pub type ScopeFilters = current::parse::model::ScopeFilters;
     }
-    use mesh_portal_versions::error::MsgErr;
-    use mesh_portal_versions::version::v0_0_1::config::config::bind::RouteSelector;
+    use cosmic_api::error::MsgErr;
+    use cosmic_api::version::v0_0_1::config::config::bind::RouteSelector;
 
     pub fn route_attribute(s: &str) -> Result<RouteSelector, MsgErr> {
         current::parse::route_attribute(s)
@@ -148,8 +148,8 @@ pub mod parse {
 }
 
 pub mod payload {
-    use mesh_portal_versions::version::v0_0_1 as current;
-    use mesh_portal_versions::version::v0_0_1::substance;
+    use cosmic_api::version::v0_0_1 as current;
+    use cosmic_api::version::v0_0_1::substance;
 
     pub type Substance = substance::substance::Substance;
     pub type PayloadMap = substance::substance::SubstanceMap;
@@ -169,17 +169,17 @@ pub mod payload {
 }
 
 pub mod command {
-    use mesh_portal_versions::version::v0_0_1 as current;
-    use mesh_portal_versions::version::v0_0_1::command;
+    use cosmic_api::version::v0_0_1 as current;
+    use cosmic_api::version::v0_0_1::command;
 
     pub mod request {
-        use mesh_portal_versions::version;
-        use mesh_portal_versions::version::v0_0_1 as current;
+        use cosmic_api::version;
+        use cosmic_api::version::v0_0_1 as current;
     }
 
     pub mod common {
-        use mesh_portal_versions::version::v0_0_1 as current;
-        use mesh_portal_versions::version::v0_0_1::command;
+        use cosmic_api::version::v0_0_1 as current;
+        use cosmic_api::version::v0_0_1::command;
 
         pub type StateSrc = command::command::common::StateSrc;
         pub type SetLabel = command::command::common::SetLabel;
@@ -190,7 +190,7 @@ pub mod command {
 }
 
 pub mod security {
-    use mesh_portal_versions::version::v0_0_1 as current;
+    use cosmic_api::version::v0_0_1 as current;
 
     pub type Access = current::security::Access;
     pub type Privileges = current::security::EnumeratedPrivileges;
@@ -205,24 +205,24 @@ pub mod security {
 }
 
 pub mod msg {
-    use mesh_portal_versions::version::v0_0_1 as current;
-    use mesh_portal_versions::version::v0_0_1::msg;
+    use cosmic_api::version::v0_0_1 as current;
+    use cosmic_api::version::v0_0_1::msg;
 
     pub type MsgRequest = msg::MsgRequest;
     pub type MsgMethod = msg::MsgMethod;
 }
 
 pub mod http {
-    use mesh_portal_versions::version::v0_0_1 as current;
-    use mesh_portal_versions::version::v0_0_1::http;
+    use cosmic_api::version::v0_0_1 as current;
+    use cosmic_api::version::v0_0_1::http;
 
     pub type HttpRequest = http::HttpRequest;
     pub type HttpMethod = http::HttpMethod;
 }
 
 pub mod config {
-    use mesh_portal_versions::version::v0_0_1 as current;
-    use mesh_portal_versions::version::v0_0_1::config;
+    use cosmic_api::version::v0_0_1 as current;
+    use cosmic_api::version::v0_0_1::config;
 
     pub type PortalKind = config::config::PortalKind;
     pub type Info = config::config::Info;
@@ -232,8 +232,8 @@ pub mod config {
     pub type ParticleConfigBody = config::config::ParticleConfigBody;
 
     pub mod bind {
-        use mesh_portal_versions::version::v0_0_1 as current;
-        use mesh_portal_versions::version::v0_0_1::config;
+        use cosmic_api::version::v0_0_1 as current;
+        use cosmic_api::version::v0_0_1::config;
 
         pub type RouteSelector = config::config::bind::RouteSelector;
         pub type BindConfig = config::config::bind::BindConfig;
@@ -249,14 +249,14 @@ pub mod config {
 }
 
 pub mod entity {
-    use mesh_portal_versions::version::v0_0_1 as current;
-    use mesh_portal_versions::version::v0_0_1::{entity, wave};
+    use cosmic_api::version::v0_0_1 as current;
+    use cosmic_api::version::v0_0_1::{entity, wave};
 
     pub type EntityType = wave::MethodKind;
 
     pub mod request {
-        use mesh_portal_versions::version::v0_0_1::{command, entity};
-        use mesh_portal_versions::version::{v0_0_1 as current, v0_0_1};
+        use cosmic_api::version::v0_0_1::{command, entity};
+        use cosmic_api::version::{v0_0_1 as current, v0_0_1};
 
         pub type Method = v0_0_1::wave::Method;
         pub type ReqCore = v0_0_1::wave::DirectedCore;
@@ -264,8 +264,8 @@ pub mod entity {
         pub type RcCommandType = command::request::RcCommandType;
 
         pub mod create {
-            use mesh_portal_versions::version::v0_0_1 as current;
-            use mesh_portal_versions::version::v0_0_1::{command, entity};
+            use cosmic_api::version::v0_0_1 as current;
+            use cosmic_api::version::v0_0_1::{command, entity};
 
             pub type Create = command::request::create::Create;
             pub type Template = command::request::create::Template;
@@ -280,8 +280,8 @@ pub mod entity {
         }
 
         pub mod select {
-            use mesh_portal_versions::version::v0_0_1 as current;
-            use mesh_portal_versions::version::v0_0_1::{command, entity};
+            use cosmic_api::version::v0_0_1 as current;
+            use cosmic_api::version::v0_0_1::{command, entity};
 
             pub type SelectIntoPayload = command::request::select::SelectIntoSubstance;
             pub type Select = command::request::select::Select;
@@ -291,47 +291,47 @@ pub mod entity {
         }
 
         pub mod update {
-            use mesh_portal_versions::version::v0_0_1 as current;
-            use mesh_portal_versions::version::v0_0_1::{command, entity};
+            use cosmic_api::version::v0_0_1 as current;
+            use cosmic_api::version::v0_0_1::{command, entity};
 
             pub type Update = command::request::update::Update;
         }
 
         pub mod query {
-            use mesh_portal_versions::version::v0_0_1 as current;
-            use mesh_portal_versions::version::v0_0_1::{command, entity};
+            use cosmic_api::version::v0_0_1 as current;
+            use cosmic_api::version::v0_0_1::{command, entity};
 
             pub type Query = command::request::query::Query;
             pub type QueryResult = command::request::query::QueryResult;
         }
 
         pub mod get {
-            use mesh_portal_versions::version::v0_0_1 as current;
-            use mesh_portal_versions::version::v0_0_1::{command, entity};
+            use cosmic_api::version::v0_0_1 as current;
+            use cosmic_api::version::v0_0_1::{command, entity};
 
             pub type Get = command::request::get::Get;
             pub type GetOp = command::request::get::GetOp;
         }
 
         pub mod set {
-            use mesh_portal_versions::version::v0_0_1 as current;
-            use mesh_portal_versions::version::v0_0_1::{command, entity};
+            use cosmic_api::version::v0_0_1 as current;
+            use cosmic_api::version::v0_0_1::{command, entity};
 
             pub type Set = command::request::set::Set;
         }
     }
 
     pub mod response {
-        use mesh_portal_versions::version::v0_0_1::entity;
-        use mesh_portal_versions::version::{v0_0_1 as current, v0_0_1};
+        use cosmic_api::version::v0_0_1::entity;
+        use cosmic_api::version::{v0_0_1 as current, v0_0_1};
 
         pub type RespCore = v0_0_1::wave::ReflectedCore;
     }
 }
 
 pub mod particle {
-    use mesh_portal_versions::version::v0_0_1 as current;
-    use mesh_portal_versions::version::v0_0_1::particle;
+    use cosmic_api::version::v0_0_1 as current;
+    use cosmic_api::version::v0_0_1::particle;
 
     pub type StatusUpdate = particle::particle::StatusUpdate;
     pub type Status = particle::particle::Status;
@@ -346,7 +346,7 @@ pub mod particle {
 
 pub mod util {
     use crate::error::MsgErr;
-    use mesh_portal_versions::version::v0_0_1 as current;
+    use cosmic_api::version::v0_0_1 as current;
 
     pub type ValuePattern<T> = current::util::ValuePattern<T>;
     pub type ValueMatcher<T> = dyn current::util::ValueMatcher<T>;
@@ -365,22 +365,22 @@ pub mod util {
 }
 
 pub mod fail {
-    use mesh_portal_versions::version::v0_0_1 as current;
+    use cosmic_api::version::v0_0_1 as current;
 
     pub mod mesh {
-        use mesh_portal_versions::version::v0_0_1 as current;
+        use cosmic_api::version::v0_0_1 as current;
 
         pub type Fail = current::fail::mesh::Fail;
     }
 
     pub mod portal {
-        use mesh_portal_versions::version::v0_0_1 as current;
+        use cosmic_api::version::v0_0_1 as current;
 
         pub type Fail = current::fail::portal::Fail;
     }
 
     pub mod resource {
-        use mesh_portal_versions::version::v0_0_1 as current;
+        use cosmic_api::version::v0_0_1 as current;
 
         pub type Fail = current::fail::resource::Fail;
         pub type Create = current::fail::resource::Create;
@@ -389,13 +389,13 @@ pub mod fail {
     }
 
     pub mod msg {
-        use mesh_portal_versions::version::v0_0_1 as current;
+        use cosmic_api::version::v0_0_1 as current;
 
         pub type Fail = current::fail::msg::Fail;
     }
 
     pub mod http {
-        use mesh_portal_versions::version::v0_0_1 as current;
+        use cosmic_api::version::v0_0_1 as current;
 
         pub type Fail = current::fail::http::Error;
     }
@@ -414,7 +414,7 @@ pub mod fail {
 }
 
 pub mod log {
-    use mesh_portal_versions::version::v0_0_1 as current;
+    use cosmic_api::version::v0_0_1 as current;
     pub type Log = current::log::Log;
     pub type LogSpan = current::log::LogSpanEvent;
     pub type LogSpanKind = current::log::LogSpanEventKind;
@@ -430,14 +430,14 @@ pub mod log {
 }
 
 pub mod cli {
-    use mesh_portal_versions::version::v0_0_1 as current;
+    use cosmic_api::version::v0_0_1 as current;
     pub type CommandTemplate = current::cli::CommandTemplate;
     pub type RawCommand = current::cli::RawCommand;
     pub type Transfer = current::cli::Transfer;
 }
 
 pub mod service {
-    use mesh_portal_versions::version::{v0_0_1 as current, v0_0_1};
+    use cosmic_api::version::{v0_0_1 as current, v0_0_1};
 
     pub type Global = dyn current::service::Global;
     pub type AccessProvider = dyn current::service::AccessProvider;
@@ -445,7 +445,7 @@ pub mod service {
 }
 
 pub mod sys {
-    use mesh_portal_versions::version::{v0_0_1 as current, v0_0_1};
+    use cosmic_api::version::{v0_0_1 as current, v0_0_1};
     pub type Assign = current::sys::Assign;
     pub type AssignmentKind = current::sys::AssignmentKind;
     pub type Sys = current::sys::Sys;

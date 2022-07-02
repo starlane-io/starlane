@@ -1,4 +1,4 @@
-use mesh_portal_versions::version::v0_0_1::id::StarKey;
+use cosmic_api::version::v0_0_1::id::StarKey;
 use serde::{Serialize,Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
