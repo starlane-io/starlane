@@ -26,7 +26,7 @@ use mesh_portal::version::latest::entity::request::{Method, Rc, ReqCore};
 use mesh_portal::version::latest::entity::request::get::Get;
 use mesh_portal::version::latest::fail;
 use mesh_portal::version::latest::id::{Meta, Point};
-use mesh_portal::version::latest::messaging::{Agent, CmdMethod, Message, ReqShell, RespShell};
+use mesh_portal::version::latest::messaging::{Agent, CmdMethod, };
 use mesh_portal::version::latest::payload::{PayloadMap, Substance,  };
 use mesh_portal::version::latest::particle::{Status, Stub};
 use mesh_portal::version::latest::entity::request::get::GetOp;
@@ -44,7 +44,7 @@ use mesh_portal_versions::version::v0_0_1::id::{ArtifactSubKind, FileSubKind, St
 use mesh_portal_versions::version::v0_0_1::id::id::{BaseKind, Kind, Tks, ToPoint};
 use mesh_portal_versions::version::v0_0_1::sys::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
 use crate::artifact::ArtifactRef;
-use cosmic_locality::field::{BindConfigCache, FieldEx, FieldRouter};
+use cosmic_locality::field::{FieldEx};
 use mesh_portal_versions::RegistryApi;
 use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
 use crate::config::config::{ContextualConfig, ParticleConfig};

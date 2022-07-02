@@ -11,7 +11,6 @@ use std::string::FromUtf8Error;
 use mesh_portal_versions::version::v0_0_1::id::id::{BaseKind, ToPoint};
 use mesh_portal_versions::version::v0_0_1::id::StarKey;
 use mesh_portal_versions::version::v0_0_1::sys::ParticleRecord;
-use mesh_portal_versions::version::v0_0_1::wave::{Transmitter, Wave};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use uuid::Uuid;

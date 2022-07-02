@@ -128,7 +128,7 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool  ) -> TokenStream 
                        return self.#idents( ctx ).await;
                     }
                 )*
-                Bounce::Reflect(*ctx.not_found().core())
+                Bounce::Reflect(ctx.not_found().core().clone())
              }
         }
 

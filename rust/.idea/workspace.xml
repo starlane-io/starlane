@@ -8,8 +8,8 @@
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/driver.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-locality/src/driver.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/star.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-locality/src/star.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/wave.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/wave.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/field.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-locality/src/field.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-macros/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-macros/src/lib.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

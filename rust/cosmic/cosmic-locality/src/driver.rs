@@ -202,7 +202,7 @@ pub trait DriverFactory {
     fn create(&self, skel: DriverSkel) -> Box<dyn DriverCore>;
 }
 
-enum DriverCall {
+pub enum DriverCall {
     LifecycleCall{ call: DriverLifecycleCall, tx: oneshot::Sender<Result<DriverStatus,MsgErr>>},
     Status(oneshot::Sender<DriverStatus>),
     Traversal(Traversal<UltraWave>),

@@ -378,9 +378,9 @@ impl PipeTraversal {
 
     pub fn response(&self) -> Pong {
         Pong::new(
-            self.response_core(),
-            self.to().to_port(),
-            self.from().to_port(),
+            self.response_core().clone(),
+            self.to().clone().to_port(),
+            self.from().clone().to_port(),
             self.initial.id().clone(),
         )
     }
