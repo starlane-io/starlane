@@ -30,7 +30,6 @@
       <sourceFolder url="file://$MODULE_DIR$/cosmic/mesh-portal-tcp-client/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/mesh-portal-tcp-common/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/mesh-portal-tcp-server/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/cosmic/mesh-portal-versions/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/mesh-portal/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/wasm-membrane-guest/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/wasm-membrane-host/src" isTestSource="false" />
@@ -38,6 +37,7 @@
       <sourceFolder url="file://$MODULE_DIR$/starlane/starlane-macros-test/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/starlane/starlane-macros/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/starlane/starlane/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-api/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-star/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/cosmic/wasm-membrane-guest/target" />

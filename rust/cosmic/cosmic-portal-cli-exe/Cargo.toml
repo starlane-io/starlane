@@ -9,7 +9,7 @@ edition = "2021"
 cosmic-macros= { path="../cosmic-macros"}
 cosmic-nom= { path="../cosmic-nom"}
 mesh-portal= { path="../mesh-portal"}
-mesh-portal-versions = { path="../mesh-portal-versions"}
+cosmic-api = { path= "../cosmic-api" }
 
 lazy_static = "1.4.0"
 async-trait = "0.1.48"

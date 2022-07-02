@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-mesh-portal-versions = { path="../mesh-portal-versions"}
+cosmic-api = { path= "../cosmic-api" }
 async-trait = "0.1.48"
 futures = {version = "0.3.21", default-features = true }
 tokio = { version = "1.15.0", features = ["full"] }

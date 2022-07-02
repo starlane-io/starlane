@@ -8,20 +8,44 @@
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/rust.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/rust.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/driver.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/driver.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/field.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/field.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/host.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/host.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/lifecycle.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/lifecycle.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/machine.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/machine.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/portal.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/portal.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/scratch.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/scratch.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/shell.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/shell.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/star.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/star.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/state.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/state.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-locality/src/traversal.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/traversal.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-macros/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-macros/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-portal-cli-exe/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-portal-cli-exe/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-portal-cli/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-portal-cli/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/hyperlane-quic/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/hyperlane-quic/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/hyperlane/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/hyperlane/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-artifact-api/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/mesh-artifact-api/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-api-client/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/mesh-portal-api-client/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-api-server/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/mesh-portal-api-server/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/error.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/error.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/cli.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/cli.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/command.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/command.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/config.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/config.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/entity.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/entity.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/frame.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/frame.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/http.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/http.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/id.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/id.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/log.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/log.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/msg.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/msg.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/parse.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/parse.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/particle.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/particle.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/portal.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/portal.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/quota.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/quota.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/security.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/security.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/selector.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/selector.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/service.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/service.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/substance.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/substance.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/sys.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/sys.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/util.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/util.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal-versions/src/version/v0_0_1/wave.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/version/v0_0_1/wave.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/mesh-portal/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/mesh-portal/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane/starlane-core/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/starlane-core/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/starlane/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/starlane/Cargo.toml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

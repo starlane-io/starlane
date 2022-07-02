@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 cosmic-hyperlane= { path= "../hyperlane" }
-mesh-portal-versions= { path="../mesh-portal-versions"}
+cosmic-api = { path= "../cosmic-api" }
 quinn = "0.8.3"
 rustls = { version = "0.20.6", features = ["dangerous_configuration", "quic"] }
 semver = { version="1.0.10", features=['serde'] }

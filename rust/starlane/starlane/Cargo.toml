@@ -33,7 +33,7 @@ anyhow = "1.0.44"
 reqwest = { version = "0.11.10", features = ["json"] }
 
 mesh-portal={ path="../../cosmic/mesh-portal"}
-mesh-portal-versions= { path="../../cosmic/mesh-portal-versions"}
+cosmic-api = { path= "../../cosmic/cosmic-api" }
 
 
 

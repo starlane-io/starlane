@@ -12,6 +12,6 @@ local-filesystem=["std"]
 
 [dependencies]
 mesh-portal = { path="../mesh-portal", default-features=false}
-mesh-portal-versions = { path="../mesh-portal-versions", default-features=false}
+cosmic-api  = { path= "../cosmic-api", default-features=false}
 anyhow = {version="1.0.56", default-features=false}
 zip = { version="0.6.2", default-features=false }
