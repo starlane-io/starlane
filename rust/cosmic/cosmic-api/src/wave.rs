@@ -52,7 +52,7 @@ pub enum WaveKind {
     Ping,   // Request
     Pong,   // Response
     Ripple, // Broadcast
-    Echo,   // Broadcast Response (optional)
+    Echo,   // Broadcast Response
             /*
             Photon, // Ack
                    Reverb,  // Ack
@@ -1626,6 +1626,7 @@ pub struct Wave<V> {
     pub handling: Handling,
     pub scope: Scope,
     pub from: Port,
+    pub star_hops: u16
 }
 
 impl<S, V> ToSubstance<S> for Wave<V>
@@ -1759,6 +1760,7 @@ impl<V> Wave<V> {
             scope: Default::default(),
             variant,
             from,
+            star_hops: 0
         }
     }
 }
