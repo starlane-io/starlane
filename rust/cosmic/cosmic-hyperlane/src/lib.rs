@@ -8,14 +8,14 @@ use cosmic_api::command::request::create::{
     PointFactory, PointFactoryU128, PointSegTemplate,
 };
 use cosmic_api::frame::frame::PrimitiveFrame;
-use cosmic_api::id::id::{Point, ToPoint, ToPort, Version};
+use cosmic_api::id::id::{Point, Port, ToPoint, ToPort, Version};
 use cosmic_api::log::{PointLogger, RootLogger};
 use cosmic_api::substance::substance::{
     Errors, Substance, SubstanceKind, Token,
 };
 use cosmic_api::sys::{EntryReq, InterchangeKind, Sys};
 use cosmic_api::util::uuid;
-use cosmic_api::wave::{Agent, HyperWave, Method, Ping, Reflectable, Pong, SysMethod, Wave, UltraWave};
+use cosmic_api::wave::{Agent, HyperWave, Method, Ping, Reflectable, Pong, SysMethod, Wave, UltraWave, Router};
 use cosmic_api::VERSION;
 use std::collections::HashMap;
 use std::future::Future;
@@ -119,6 +119,7 @@ impl Hyperway {
 }
 
 pub enum HyperwayCall {
+    Out(UltraWave),
     Wave(HyperWave),
     Add(HyperwayIn),
     Remove(Point),
@@ -162,6 +163,7 @@ impl InboundLanes {
     }
 }
 
+
 pub struct HyperwayInterchange {
     hyperways: Arc<DashMap<Point, HyperwayOut>>,
     call_tx: mpsc::Sender<HyperwayCall>,
@@ -174,6 +176,8 @@ impl HyperwayInterchange {
         let hyperways: Arc<DashMap<Point, HyperwayOut>> = Arc::new(DashMap::new());
 
         {
+            let logger = logger.clone();
+            let hyperways = hyperways.clone();
             let hyperway_outs = hyperways.clone();
             tokio::spawn(async move {
                 let mut hyperway_ins: HashMap<Point, HyperwayIn> = HashMap::new();
@@ -201,6 +205,23 @@ impl HyperwayInterchange {
                         Some(HyperwayCall::Wave(wave)) => {
                             router.route(wave).await;
                         }
+                        Some(HyperwayCall::Out(wave)) => {
+                            let point = match wave.to().single_or() {
+                                Ok(port) => {
+                                    match hyperways.get(&port.point) {
+                                        None => {
+                                            logger.error(format!("attempt to send wave from '{}' to hyperway '{}' which is not present in this HyperwayInterchange", wave.from().to_string(), wave.to().unwrap_single().to_string()) );
+                                        }
+                                        Some(hyperway) => {
+                                            hyperway.value().outbound(wave).await;
+                                        }
+                                    }
+                                }
+                                Err(err) => {
+                                    logger.error( err.to_string() );
+                                }
+                            };
+                        }
                         None => {
                             match index_to_point.get(&index) {
                                 Some(hyperway) => {
@@ -213,6 +234,7 @@ impl HyperwayInterchange {
                                 }
                             }
                         }
+
                     }
                 }
             });
@@ -223,6 +245,10 @@ impl HyperwayInterchange {
             call_tx,
             logger,
         }
+    }
+
+    pub fn router(&self) -> Box<dyn Router> {
+        Box::new( OutboundRouter::new(self.call_tx.clone()))
     }
 
     pub fn point(&self) -> &Point {
@@ -248,22 +274,36 @@ impl HyperwayInterchange {
     }
 
     pub async fn outbound(&self, wave: UltraWave) {
-        // hacked for now, this will break when we introduce Ripples
-        let point = wave.to().unwrap_single().point.clone();
-        match self.hyperways.get(&point) {
-            None => {
-                self.logger.error(format!("attempt to send wave from '{}' to hyperway '{}' which is not present in this HyperwayInterchange", wave.from().to_string(), wave.to().unwrap_single().to_string()) );
-            }
-            Some(hyperway) => {
-                hyperway.value().outbound(wave).await;
-            }
-        }
+        self.call_tx.send( HyperwayCall::Out(wave)).await;
     }
 }
 
 #[async_trait]
 pub trait HyperRouter: Send + Sync {
     async fn route(&self, wave: HyperWave);
+}
+
+pub struct OutboundRouter {
+    pub call_tx: mpsc::Sender<HyperwayCall>
+}
+
+impl OutboundRouter {
+    pub fn new( call_tx: mpsc::Sender<HyperwayCall>) -> Self {
+        Self {
+            call_tx
+        }
+    }
+}
+
+#[async_trait]
+impl Router for OutboundRouter {
+    async fn route(&self, wave: UltraWave ) {
+        self.call_tx.send( HyperwayCall::Out(wave)).await;
+    }
+
+    fn route_sync(&self, wave: UltraWave) {
+        self.call_tx.try_send( HyperwayCall::Out(wave));
+    }
 }
 
 #[async_trait]
@@ -495,6 +535,8 @@ impl HyperGate {
         Ok((tx, rx))
     }
 }
+
+
 
 #[cfg(test)]
 mod tests {

@@ -10,7 +10,7 @@ use cosmic_api::log::PointLogger;
 use cosmic_api::particle::particle::Status;
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{Assign, Sys};
-use cosmic_api::wave::{Bounce, DirectedHandler, DirectedHandlerSelector, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, UltraWave, Wave};
+use cosmic_api::wave::{CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, UltraWave, Wave};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -330,10 +330,10 @@ impl DriverShell {
                         let transmitter = ProtoTransmitter::new( self.router.clone(), self.skel.exchanger.clone() );
                         let ctx = RootInCtx::new( wave, port.clone(), logger, transmitter );
                         match self.handle(ctx).await {
-                            Bounce::Absorbed => {
+                            CoreBounce::Absorbed => {
                                 tx.send(Err(MsgErr::server_error()));
                             }
-                            Bounce::Reflect(reflect) => {
+                            CoreBounce::Reflect(reflect) => {
                                 tx.send(Ok(reflect));
                             }
                         }

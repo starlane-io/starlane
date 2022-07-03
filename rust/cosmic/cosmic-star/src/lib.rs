@@ -12,7 +12,6 @@ extern crate async_trait;
 pub mod driver;
 pub mod field;
 pub mod host;
-pub mod lifecycle;
 pub mod machine;
 pub mod portal;
 pub mod shell;

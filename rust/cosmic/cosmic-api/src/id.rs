@@ -3151,7 +3151,8 @@ impl Traversal<UltraWave> {
             UltraWave::Ping(_) => true,
             UltraWave::Pong(_) => false,
             UltraWave::Ripple(_) => true,
-            UltraWave::Echo(_) => false
+            UltraWave::Echo(_) => false,
+            UltraWave::Signal(_) => true
         }
     }
 

@@ -53,10 +53,10 @@ pub enum WaveKind {
     Pong,   // Response
     Ripple, // Broadcast
     Echo,   // Broadcast Response
+    Signal, // Notification
             /*
             Photon, // Ack
                    Reverb,  // Ack
-                   Signal   // Notification
                   */
 }
 
@@ -76,6 +76,7 @@ pub enum UltraWave {
     Pong(Wave<Pong>),
     Ripple(Wave<Ripple>),
     Echo(Wave<Echo>),
+    Signal(Wave<Signal>),
 }
 
 impl UltraWave {
@@ -85,6 +86,7 @@ impl UltraWave {
             UltraWave::Pong(_) => false,
             UltraWave::Ripple(_) => true,
             UltraWave::Echo(_) => false,
+            UltraWave::Signal(_) => true
         }
     }
 
@@ -94,6 +96,7 @@ impl UltraWave {
             UltraWave::Pong(pong) => pong.to.clone().to_recipients(),
             UltraWave::Ripple(ripple) => ripple.to.clone(),
             UltraWave::Echo(echo) => echo.to.clone().to_recipients(),
+            UltraWave::Signal(signal) => signal.to.clone().to_recipients()
         }
     }
 
@@ -103,6 +106,7 @@ impl UltraWave {
             UltraWave::Pong(pong) => &pong.from,
             UltraWave::Ripple(ripple) => &ripple.from,
             UltraWave::Echo(echo) => &echo.from,
+            UltraWave::Signal(signal) => &signal.from
         }
     }
 }
@@ -117,6 +121,7 @@ where
             UltraWave::Pong(pong) => pong.to_substance(),
             UltraWave::Ripple(ripple) => ripple.to_substance(),
             UltraWave::Echo(echo) => echo.to_substance(),
+            UltraWave::Signal(signal) => signal.to_substance()
         }
     }
 
@@ -126,6 +131,7 @@ where
             UltraWave::Pong(pong) => pong.to_substance_ref(),
             UltraWave::Ripple(ripple) => ripple.to_substance_ref(),
             UltraWave::Echo(echo) => echo.to_substance_ref(),
+            UltraWave::Signal(signal) => signal.to_substance_ref()
         }
     }
 }
@@ -172,9 +178,9 @@ impl RootInCtx {
         }
     }
 
-    pub fn status(self, status: u16, from: Port) -> ReflectedWave {
+    pub fn status(self, status: u16, from: Port) -> Bounce {
         match self.wave {
-            DirectedWave::Ping(ping) => ReflectedWave::Pong(Wave::new(
+            DirectedWave::Ping(ping) => Bounce::Reflected(ReflectedWave::Pong(Wave::new(
                 Pong::new(
                     ReflectedCore::status(status),
                     ping.from.clone(),
@@ -182,8 +188,8 @@ impl RootInCtx {
                     ping.id.clone(),
                 ),
                 from,
-            )),
-            DirectedWave::Ripple(ripple) => ReflectedWave::Echo(Wave::new(
+            ))),
+            DirectedWave::Ripple(ripple) => Bounce::Reflected(ReflectedWave::Echo(Wave::new(
                 Echo::new(
                     ReflectedCore::status(status),
                     ripple.from.clone(),
@@ -191,41 +197,42 @@ impl RootInCtx {
                     ripple.id.clone(),
                 ),
                 from,
-            )),
+            ))),
+            DirectedWave::Signal(_) => Bounce::Absorbed
         }
     }
 
-    pub fn not_found(self) -> ReflectedWave {
+    pub fn not_found(self) -> Bounce {
         let to = self.to.clone();
         self.status(404,to)
     }
 
-    pub fn timeout(self) -> ReflectedWave {
+    pub fn timeout(self) -> Bounce {
         let to = self.to.clone();
         self.status(408, to)
     }
 
-    pub fn bad_request(self) -> ReflectedWave {
+    pub fn bad_request(self) -> Bounce{
         let to = self.to.clone();
         self.status(400, to)
     }
 
-    pub fn server_error(self) -> ReflectedWave {
+    pub fn server_error(self) -> Bounce {
         let to = self.to.clone();
         self.status(500, to)
     }
 
-    pub fn forbidden(self) -> ReflectedWave {
+    pub fn forbidden(self) -> Bounce {
         let to = self.to.clone();
         self.status(401, to)
     }
 
-    pub fn unavailable(self) -> ReflectedWave {
+    pub fn unavailable(self) -> Bounce {
         let to = self.to.clone();
         self.status(503, to)
     }
 
-    pub fn unauthorized(self) -> ReflectedWave {
+    pub fn unauthorized(self) -> Bounce {
         let to = self.to.clone();
         self.status(403, to)
     }
@@ -500,6 +507,32 @@ impl Deref for Ripple {
 }
 
 impl DerefMut for Ripple {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.core
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Signal {
+    pub to: Port,
+    pub core: DirectedCore,
+}
+
+impl Signal {
+    pub fn bounce_backs(&self) -> BounceBacks {
+        BounceBacks::None
+    }
+}
+
+impl Deref for Signal {
+    type Target = DirectedCore;
+
+    fn deref(&self) -> &Self::Target {
+        &self.core
+    }
+}
+
+impl DerefMut for Signal{
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.core
     }
@@ -1295,6 +1328,7 @@ impl<'a> RecipientSelector<'a> {
 pub enum DirectedWave {
     Ping(Wave<Ping>),
     Ripple(Wave<Ripple>),
+    Signal(Wave<Signal>),
 }
 
 impl DirectedWave {
@@ -1302,6 +1336,7 @@ impl DirectedWave {
         match self {
             DirectedWave::Ping(ping) => &ping.id,
             DirectedWave::Ripple(ripple) => &ripple.id,
+            DirectedWave::Signal(signal) => &signal.id
         }
     }
 
@@ -1309,6 +1344,7 @@ impl DirectedWave {
         match self {
             DirectedWave::Ping(ping) => &ping.agent,
             DirectedWave::Ripple(ripple) => &ripple.agent,
+            DirectedWave::Signal(signal) => &signal.agent
         }
     }
 
@@ -1316,6 +1352,7 @@ impl DirectedWave {
         match self {
             DirectedWave::Ping(ping) => &ping.scope,
             DirectedWave::Ripple(ripple) => &ripple.scope,
+            DirectedWave::Signal(signal) => &signal.scope
         }
     }
 
@@ -1323,6 +1360,7 @@ impl DirectedWave {
         match self {
             DirectedWave::Ping(ping) => &ping.handling,
             DirectedWave::Ripple(ripple) => &ripple.handling,
+            DirectedWave::Signal(signal) => &signal.handling
         }
     }
 
@@ -1330,6 +1368,7 @@ impl DirectedWave {
         match self {
             DirectedWave::Ping(ping) => ping.to.clone().to_recipients(),
             DirectedWave::Ripple(ripple) => ripple.to.clone(),
+            DirectedWave::Signal(signal) => signal.to.clone().to_recipients()
         }
     }
 
@@ -1341,10 +1380,11 @@ impl DirectedWave {
         }
     }
 
-    pub fn err(&self, err: MsgErr, responder: Port) -> ReflectedWave {
+    pub fn err(&self, err: MsgErr, responder: Port) -> Bounce{
         match self {
-            DirectedWave::Ping(ping) => ping.err(err, responder).to_reflected(),
-            DirectedWave::Ripple(ripple) => ripple.err(err, responder).to_reflected(),
+            DirectedWave::Ping(ping) => Bounce::Reflected(ping.err(err, responder).to_reflected()),
+            DirectedWave::Ripple(ripple) => Bounce::Reflected(ripple.err(err, responder).to_reflected()),
+            DirectedWave::Signal(_) => Bounce::Absorbed
         }
     }
 
@@ -1358,7 +1398,8 @@ impl DirectedWave {
     pub fn bounce_backs(&self) -> BounceBacks {
         match self {
             DirectedWave::Ping(ping) => ping.bounce_backs(),
-            DirectedWave::Ripple(ripple) => ripple.bounce_backs()
+            DirectedWave::Ripple(ripple) => ripple.bounce_backs(),
+            DirectedWave::Signal(signal) => signal.bounce_backs()
         }
     }
 }
@@ -1387,6 +1428,7 @@ where
         match self {
             DirectedWave::Ping(ping) => ping.to_substance(),
             DirectedWave::Ripple(ripple) => ripple.to_substance(),
+            DirectedWave::Signal(signal) => signal.to_substance()
         }
     }
 
@@ -1394,6 +1436,7 @@ where
         match self {
             DirectedWave::Ping(ping) => ping.to_substance_ref(),
             DirectedWave::Ripple(ripple) => ripple.to_substance_ref(),
+            DirectedWave::Signal(signal) => signal.to_substance_ref()
         }
     }
 }
@@ -1403,12 +1446,14 @@ impl DirectedWave {
         match self {
             DirectedWave::Ping(ping) => &ping.from,
             DirectedWave::Ripple(ripple) => &ripple.from,
+            DirectedWave::Signal(signal) => &signal.from
         }
     }
     pub fn to_ultra(self) -> UltraWave {
         match self {
             DirectedWave::Ping(ping) => UltraWave::Ping(ping),
             DirectedWave::Ripple(ripple) => UltraWave::Ripple(ripple),
+            DirectedWave::Signal(signal) => UltraWave::Signal(signal),
         }
     }
 
@@ -1416,6 +1461,7 @@ impl DirectedWave {
         match self {
             DirectedWave::Ping(ping) => &ping.core.body,
             DirectedWave::Ripple(ripple) => &ripple.core.body,
+            DirectedWave::Signal(signal) => &signal.core.body,
         }
     }
 
@@ -1423,6 +1469,7 @@ impl DirectedWave {
         match self {
             DirectedWave::Ping(ping) => &ping.core,
             DirectedWave::Ripple(ripple) => &ripple.core,
+            DirectedWave::Signal(signal) => &signal.core
         }
     }
 }
@@ -1670,6 +1717,31 @@ impl Wave<Ripple> {
     }
 }
 
+impl Wave<Signal> {
+    pub fn to_ultra(self) -> UltraWave {
+        UltraWave::Signal(self)
+    }
+
+    pub fn to_directed(self) -> DirectedWave {
+        DirectedWave::Signal(self)
+    }
+}
+
+impl <S> ToSubstance<S> for Signal
+    where
+        Substance: ToSubstance<S>,
+
+{
+    fn to_substance(self) -> Result<S, MsgErr> {
+        self.core.to_substance()
+    }
+
+    fn to_substance_ref(&self) -> Result<&S, MsgErr> {
+        self.core.to_substance_ref()
+    }
+}
+
+
 impl Wave<Ping> {
     pub fn to_ultra(self) -> UltraWave {
         UltraWave::Ping(self)
@@ -1823,10 +1895,11 @@ impl Wave<Ripple> {
 }
 
 impl DirectedWave {
-    pub fn reflected_proto(&self) -> ReflectedProto {
+    pub fn reflected_proto(&self) -> BounceProto {
         match self {
-            DirectedWave::Ping(ping) => ping.pong(),
-            DirectedWave::Ripple(ripple) => ripple.echo(),
+            DirectedWave::Ping(ping) => BounceProto::Reflected(ping.pong()),
+            DirectedWave::Ripple(ripple) => BounceProto::Reflected(ripple.echo()),
+            DirectedWave::Signal(_) => BounceProto::Absorbed
         }
     }
 }
@@ -2111,12 +2184,22 @@ pub trait DirectedHandlerSelector {
 
 #[async_trait]
 pub trait DirectedHandler {
-    async fn handle(&self, ctx: RootInCtx) -> Bounce;
+    async fn handle(&self, ctx: RootInCtx) -> CoreBounce;
+}
+
+pub enum CoreBounce {
+    Absorbed,
+    Reflect(ReflectedCore),
 }
 
 pub enum Bounce {
     Absorbed,
-    Reflect(ReflectedCore),
+    Reflected(ReflectedWave)
+}
+
+pub enum BounceProto {
+    Absorbed,
+    Reflected(ReflectedProto)
 }
 
 /*
@@ -2926,10 +3009,13 @@ impl Exchanger {
     pub async fn exchange(&self, directed: &DirectedWave) -> oneshot::Receiver<ReflectedAggregate> {
         let (tx, rx) = oneshot::channel();
 
-        if let BounceBacks::None = directed.bounce_backs() {
-            return rx;
-        }
-        let mut reflected = directed.reflected_proto();
+        let mut reflected = match directed.reflected_proto() {
+            BounceProto::Absorbed => {
+                return rx;
+            }
+            BounceProto::Reflected(reflected) => reflected
+        };
+
         reflected.from(self.port.clone());
 
         let timeout = self.timeouts.from(directed.handling().wait.clone());

@@ -6,6 +6,7 @@ use crate::shell::ShellEx;
 use crate::state::{PortalInletState, PortalShellState, ShellState};
 use cosmic_api::bin::Bin;
 use cosmic_api::cli::RawCommand;
+use cosmic_api::command::request::set::Set;
 use cosmic_api::config::config::bind::RouteSelector;
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{
@@ -20,15 +21,18 @@ use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{Assign, Location, Sys};
 use cosmic_api::util::{ValueMatcher, ValuePattern};
 use cosmic_api::wave::{
-    Agent, Bounce, DirectedHandler, DirectedHandlerSelector, InCtx, Ping, Pong, ProtoTransmitter,
-    RecipientSelector, Reflectable, ReflectedCore, RootInCtx, Router, SetStrategy, Wave,
+    Agent, CoreBounce, DirectedHandler, DirectedHandlerSelector, InCtx, Ping, Pong, ProtoTransmitter,
+    RecipientSelector, Recipients, Reflectable, ReflectedCore, RootInCtx, Router, SetStrategy,
+    Wave,
 };
 use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
 use cosmic_api::{RegistryApi, State, StateFactory};
+use cosmic_driver::DriverFactory;
+use cosmic_hyperlane::HyperRouter;
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -36,7 +40,6 @@ use std::time::Duration;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{mpsc, oneshot, RwLock};
 use tokio::time::error::Elapsed;
-use cosmic_driver::DriverFactory;
 
 #[derive(Clone)]
 pub struct StarState {
@@ -159,17 +162,27 @@ pub struct StarSkel {
     pub machine: MachineSkel,
     pub exchanger: Exchanger,
     pub state: StarState,
-    pub connections: Vec<StarCon>
+    pub connections: Vec<StarCon>,
+    pub searcher: StarSearcher,
 }
 
 impl StarSkel {
-
-    pub fn new( template: StarTemplate, machine: MachineSkel, fabric_tx: mpsc::Sender<UltraWave>) -> Self {
+    pub fn new(
+        template: StarTemplate,
+        machine: MachineSkel,
+        fabric_tx: mpsc::Sender<UltraWave>,
+    ) -> Self {
         let point = template.key.clone().to_point();
         let logger = machine.logger.point(point.clone());
         let star_tx = StarTx::new(point.clone());
-        let exchanger = Exchanger::new(point.to_port(), machine.timeouts.clone() );
+        let exchanger = Exchanger::new(point.to_port(), machine.timeouts.clone());
         let state = StarState::new();
+        let mut searcher = StarSearcher::new(fabric_tx.clone());
+
+        // prime the searcher by mapping the immediate lanes
+        for hyperway in template.hyperway {
+            searcher.add(hyperway.key().clone(), hyperway.key().clone());
+        }
 
         Self {
             key: template.key,
@@ -178,15 +191,15 @@ impl StarSkel {
             surface_tx: star_tx.surface.clone(),
             traverse_to_next_tx: star_tx.traverse_to_next.clone(),
             inject_tx: star_tx.inject_tx.clone(),
-            fabric_tx: fabric_tx,
-            machine: machine,
+            fabric_tx,
+            machine,
             exchanger,
             state,
-            connections: template.connections,
-            registry: machine.registry.clone()
+            connections: template.hyperway,
+            registry: machine.registry.clone(),
+            searcher,
         }
     }
-
 
     pub fn location(&self) -> &Point {
         &self.logger.point
@@ -195,8 +208,8 @@ impl StarSkel {
 
 pub enum StarCall {
     HyperWave(HyperWave),
-    TraverseToNext(Traversal<UltraWave>),
-    Inject(TraversalInjection),
+    TraverseToNextLayer(Traversal<UltraWave>),
+    LayerTraversalInjection(TraversalInjection),
 }
 
 pub struct StarTx {
@@ -220,7 +233,7 @@ impl StarTx {
                 while let Some(wave) = surface_rx.recv().await {
                     let wave = HyperWave {
                         wave,
-                        from: point.clone()
+                        from: point.clone(),
                     };
                     call_tx.send(StarCall::HyperWave(wave)).await;
                 }
@@ -231,7 +244,7 @@ impl StarTx {
             let call_tx = call_tx.clone();
             tokio::spawn(async move {
                 while let Some(traversal) = traverse_to_next_rx.recv().await {
-                    call_tx.send(StarCall::TraverseToNext(traversal)).await;
+                    call_tx.send(StarCall::TraverseToNextLayer(traversal)).await;
                 }
             });
         }
@@ -240,7 +253,9 @@ impl StarTx {
             let call_tx = call_tx.clone();
             tokio::spawn(async move {
                 while let Some(inject) = inject_rx.recv().await {
-                    call_tx.send(StarCall::Inject(inject)).await;
+                    call_tx
+                        .send(StarCall::LayerTraversalInjection(inject))
+                        .await;
                 }
             });
         }
@@ -256,25 +271,25 @@ impl StarTx {
 
 #[derive(Clone)]
 pub struct StarApi {
-    tx: mpsc::Sender<StarCall>
+    tx: mpsc::Sender<StarCall>,
 }
 
 impl StarApi {
-    pub fn new( tx: mpsc::Sender<StarCall>) -> Self {
-        Self {
-            tx
-        }
+    pub fn new(tx: mpsc::Sender<StarCall>) -> Self {
+        Self { tx }
     }
-    pub async fn hyperwave( &self, hyperwave: HyperWave ) {
-        self.tx.send( StarCall::HyperWave(hyperwave)).await;
+    pub async fn surface(&self, hyperwave: HyperWave) {
+        self.tx.send(StarCall::HyperWave(hyperwave)).await;
     }
 
-    pub async fn traverse_to_next( &self, traversal: Traversal<UltraWave>) {
-        self.tx.send( StarCall::TraverseToNext(traversal)).await;
+    pub async fn traverse_to_next(&self, traversal: Traversal<UltraWave>) {
+        self.tx.send(StarCall::TraverseToNextLayer(traversal)).await;
     }
 
-    pub async fn inject( &self, inject: TraversalInjection) {
-        self.tx.send( StarCall::Inject(inject)).await;
+    pub async fn inject(&self, inject: TraversalInjection) {
+        self.tx
+            .send(StarCall::LayerTraversalInjection(inject))
+            .await;
     }
 }
 
@@ -288,7 +303,7 @@ pub struct Star {
 
 impl Star {
     pub fn new(skel: StarSkel, drivers: Drivers) -> StarApi {
-        let (star_tx,star_rx) = mpsc::channel(32*1024);
+        let (star_tx, star_rx) = mpsc::channel(32 * 1024);
         let mut injector = skel.location().clone().push("injector").unwrap().to_port();
         injector.layer = Layer::Surface;
 
@@ -309,20 +324,21 @@ impl Star {
             while let Some(call) = self.star_rx.recv().await {
                 match call {
                     StarCall::HyperWave(wave) => {
-                        self.hyperwave(wave).await;
+                        self.surface(wave).await;
                     }
-                    StarCall::TraverseToNext(traversal) => {
-                        self.traverse_to_next(traversal).await;
+                    StarCall::TraverseToNextLayer(traversal) => {
+                        self.traverse_to_next_layer(traversal).await;
                     }
-                    StarCall::Inject(inject) => {
-                        self.start_traversal(inject.wave, &inject.injector).await;
+                    StarCall::LayerTraversalInjection(inject) => {
+                        self.star_layer_traversal(inject.wave, &inject.injector)
+                            .await;
                     }
                 }
             }
         });
     }
 
-    async fn hyperwave(&self, wave: HyperWave) {
+    async fn surface(&self, wave: HyperWave) {
         let wave = wave.wave;
 
         let record = match self
@@ -367,10 +383,10 @@ impl Star {
             return;
         }
 
-        self.start_traversal(wave, &self.injector).await;
+        self.star_layer_traversal(wave, &self.injector).await;
     }
 
-    async fn start_traversal(&self, wave: UltraWave, injector: &Port) -> Result<(), MsgErr> {
+    async fn star_layer_traversal(&self, wave: UltraWave, injector: &Port) -> Result<(), MsgErr> {
         let record = match self
             .skel
             .registry
@@ -538,7 +554,7 @@ impl Star {
         Ok(())
     }
 
-    async fn traverse_to_next(&self, mut traversal: Traversal<UltraWave>) {
+    async fn traverse_to_next_layer(&self, mut traversal: Traversal<UltraWave>) {
         if traversal.dest.is_some() && traversal.layer == *traversal.dest.as_ref().unwrap() {
             self.visit_layer(traversal).await;
             return;
@@ -688,7 +704,7 @@ pub enum StateCall {
 pub struct StarTemplate {
     pub key: StarKey,
     pub kind: StarSub,
-    pub connections: Vec<StarCon>,
+    pub hyperway: Vec<StarCon>,
 }
 
 #[derive(Clone)]
@@ -706,4 +722,120 @@ impl StarCon {
     }
 }
 
+pub struct StarRouter {
+    pub star_api: StarApi,
+}
 
+impl StarRouter {
+    pub fn new(star_api: StarApi) -> Self {
+        Self { star_api }
+    }
+}
+
+#[async_trait]
+impl HyperRouter for StarRouter {
+    async fn route(&self, wave: HyperWave) {
+        self.star_api.surface(wave).await;
+    }
+}
+
+// searches for stars and maintains the golden_path...
+#[derive(Clone)]
+pub struct StarSearcher {
+    fabric_tx: mpsc::Sender<UltraWave>,
+    golden_path: Arc<DashMap<StarKey, StarKey>>,
+}
+
+impl StarSearcher {
+    pub fn new(fabric_tx: mpsc::Sender<UltraWave>) -> Self {
+        Self {
+            fabric_tx,
+            golden_path: Arc::new(DashMap::new()),
+        }
+    }
+
+    pub fn add(&mut self, dest: StarKey, way: StarKey) {
+        self.golden_path.insert(dest, way);
+    }
+
+    pub async fn way(&self, dest: &StarKey) -> Result<StarKey, MsgErr> {
+        let path = self.golden_path.get(dest).ok_or("could not find".into())?;
+        Ok(path.value().clone())
+    }
+}
+
+// gets messages from the star and distributes to the fabric
+pub struct StarFabricDistributor {
+    skel: StarSkel,
+    from_star_rx: mpsc::Receiver<UltraWave>,
+    fabric_router: Box<dyn Router>,
+}
+
+impl StarFabricDistributor {
+    pub fn new(
+        skel: StarSkel,
+        from_star_rx: mpsc::Receiver<UltraWave>,
+        fabric_router: Box<dyn Router>,
+    ) {
+        let dist = Self {
+            skel,
+            from_star_rx,
+            fabric_router,
+        };
+        dist.start();
+    }
+
+    fn start(mut self) {
+        tokio::spawn(async move {
+            while let Some(wave) = self.from_star_rx.recv().await {
+                match wave.to() {
+                    Recipients::Single(port) => {
+                        let key = match self.find_way(port) {
+                            Ok(key) => {
+                                let point = key.to_point();
+                                let
+                            }
+                            Err(err) => { logger.error( "could not distribute to way....")}
+                        };
+                    },
+                    Recipients::Multi(ports) => self.find_ways(ports),
+                }
+                self.skel.registry.locate()
+            }
+        });
+    }
+
+    fn find_way(&self, port: Port) -> Result<StarKey, MsgErr> {
+        let record = self.skel.registry.locate(&port.point).await?;
+        let location = record.location.ok_or()?;
+        let way = self
+            .skel
+            .searcher
+            .way(&StarKey::try_from(location)?)
+            .await?;
+        Ok(way)
+    }
+
+    fn find_ways(&self, ports: Vec<Port>) -> Result<HashMap<StarKey, Vec<Port>>, MsgErr> {
+        let mut rtn = HashMap::new();
+        for port in ports {
+            let record = self.skel.registry.locate(&port.point).await?;
+            let location = record.location.ok_or()?;
+            let way = self
+                .skel
+                .searcher
+                .way(&StarKey::try_from(location)?)
+                .await?;
+            match rtn.get_mut(&way) {
+                None => {
+                    let ports = vec![port];
+                    rtn.insert(way, ports);
+                }
+                Some(ports) => {
+                    ports.push(port);
+                }
+            }
+        }
+        Ok(rtn)
+    }
+}
