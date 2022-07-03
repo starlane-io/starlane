@@ -7,14 +7,8 @@
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/command.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/command.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/wave.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/wave.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-hyperlane-quic/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-hyperlane-quic/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-portal-cli/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-portal-cli/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/field.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/field.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/shell.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/shell.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/star.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/star.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane/starlane-core/src/star/core/particle/driver/file.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/starlane-core/src/star/core/particle/driver/file.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

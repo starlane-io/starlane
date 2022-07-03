@@ -15,10 +15,10 @@ use cosmic_api::id::{Traversal, TraversalDirection};
 use cosmic_api::log::{PointLogger, RootLogger};
 use cosmic_api::parse::{route_attribute, Env};
 use cosmic_api::quota::Timeouts;
-use cosmic_api::substance::substance::Substance;
+use cosmic_api::substance::substance::{Substance, ToSubstance};
 use cosmic_api::sys::{Assign, Location, Sys};
 use cosmic_api::util::{ValueMatcher, ValuePattern};
-use cosmic_api::wave::{Agent, CoreBounce, DirectedHandler, DirectedHandlerSelector, InCtx, Ping, Pong, ProtoTransmitter, RecipientSelector, Recipients, Reflectable, ReflectedCore, RootInCtx, Router, SetStrategy, Wave, Bounce, Signal, DirectedProto, DirectedKind};
+use cosmic_api::wave::{Agent, CoreBounce, DirectedHandler, DirectedHandlerSelector, InCtx, Ping, Pong, ProtoTransmitter, RecipientSelector, Recipients, Reflectable, ReflectedCore, RootInCtx, Router, SetStrategy, Wave, Bounce, Signal, DirectedProto, DirectedKind, Method};
 use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
 use cosmic_api::{RegistryApi, State, StateFactory};
 use cosmic_driver::DriverFactory;
@@ -335,7 +335,30 @@ impl Star {
     }
 
     async fn surface(&self, wave: HyperWave) {
-        let wave = wave.wave;
+        let mut wave = wave.wave;
+
+        let wave = if wave.to().is_single() && wave.to().unwrap_single().point == self.skel.point {
+            if let Some(&Method::Sys(SysMethod::Transport)) = wave.method() {
+                match wave.to_signal() {
+                    Ok(wave) => {
+                        if let Substance::UltraWave(wave) = wave.core.body {
+                            *wave
+                        } else {
+                            self.skel.logger.error("expecting an UltraWave Substance body when receiving a transport signal");
+                            return;
+                        }
+                    }
+                    Err(_) => {
+                        self.skel.logger.error("expecting a wave of kind Signal when receiving a Transport");
+                        return;
+                    }
+                }
+            } else {
+                wave
+            }
+        } else {
+            wave
+        };
 
         let record = match self
             .skel

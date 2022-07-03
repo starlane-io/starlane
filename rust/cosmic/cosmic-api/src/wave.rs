@@ -84,6 +84,32 @@ impl UltraWave {
         Substance::UltraWave(Box::new(self))
     }
 
+    pub fn to_directed(self) -> Result<DirectedWave,MsgErr> {
+        match self {
+            UltraWave::Ping(ping) => Ok(ping.to_directed()),
+            UltraWave::Ripple(ripple) => Ok(ripple.to_directed()),
+            UltraWave::Signal(signal) => Ok(signal.to_directed()),
+            _ => Err(MsgErr::bad_request())
+        }
+    }
+
+    pub fn to_signal(self) -> Result<Wave<Signal>,MsgErr> {
+        match self {
+            UltraWave::Signal(signal) => Ok(signal),
+            _ => Err(MsgErr::bad_request())
+        }
+    }
+
+
+    pub fn method(&self) -> Option<&Method> {
+        match self {
+            UltraWave::Ping(ping) => Some(&ping.method),
+            UltraWave::Ripple(ripple) =>  Some(&ripple.method),
+            UltraWave::Signal(signal) =>  Some(&signal.method),
+            _ => None
+        }
+    }
+
     pub fn is_directed(&self) -> bool {
         match self {
             UltraWave::Ping(_) => true,
