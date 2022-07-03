@@ -12,7 +12,7 @@ use cosmic_api::id::{Traversal, TraversalInjection};
 use cosmic_api::log::RootLogger;
 use cosmic_api::parse::{command_line, Env, route_attribute};
 use cosmic_api::quota::Timeouts;
-use cosmic_api::wave::{Agent, Ping, DirectedHandlerSelector, RecipientSelector, DirectedHandler, Reflectable, ReflectedCore, Pong, RootInCtx, Wave, ProtoTransmitter, DirectedCore, PingProto, SetStrategy, UltraWave, InCtx, Exchanger, DirectedWave, CoreBounce, Router, ReflectedWave, Bounce};
+use cosmic_api::wave::{Agent, Ping, DirectedHandlerSelector, RecipientSelector, DirectedHandler, Reflectable, ReflectedCore, Pong, RootInCtx, Wave, ProtoTransmitter, DirectedCore, DirectedProto, SetStrategy, UltraWave, InCtx, Exchanger, DirectedWave, CoreBounce, Router, ReflectedWave, Bounce};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -184,7 +184,7 @@ impl CommandExecutor {
         }
         let command: Command = command.to_resolved(&self.env)?;
         let request: DirectedCore = command.into();
-        let request = PingProto::from_core(request);
+        let request = DirectedProto::from_core(request);
 
         Ok(ctx.ping(request).await?.variant.core)
     }

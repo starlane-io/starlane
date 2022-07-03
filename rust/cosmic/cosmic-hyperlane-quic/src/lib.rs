@@ -14,7 +14,7 @@ use cosmic_api::id::id::{Point, ToPort};
 use cosmic_api::log::PointLogger;
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{EntryReq, Sys};
-use cosmic_api::wave::{DirectedCore, PingProto, Pong, SysMethod, Wave};
+use cosmic_api::wave::{DirectedCore, DirectedProto, Pong, SysMethod, Wave};
 
 fn generate_self_signed_cert() -> Result<(rustls::Certificate, rustls::PrivateKey), MsgErr>
 {

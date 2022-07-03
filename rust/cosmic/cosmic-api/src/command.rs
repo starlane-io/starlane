@@ -366,7 +366,7 @@ pub mod request {
         use crate::command::Command;
         use crate::command::command::common::{SetProperties, SetRegistry, StateSrc, StateSrcVar};
         use crate::id::id::{KindParts, BaseKind, HostKey, Point, PointCtx, PointSeg, PointVar, ToPort};
-        use crate::wave::{CmdMethod, PingProto, DirectedCore, SysMethod};
+        use crate::wave::{CmdMethod, DirectedProto, DirectedCore, SysMethod};
         use crate::msg::MsgMethod;
         use crate::parse::{CamelCase, Env, ResolverErr};
         use crate::substance::substance::Substance;
@@ -563,9 +563,9 @@ pub mod request {
         }
 
 
-        impl Into<PingProto> for Create {
-            fn into(self) -> PingProto {
-                let mut request = PingProto::sys(Point::global_executor().to_port(), SysMethod::Command);
+        impl Into<DirectedProto> for Create {
+            fn into(self) -> DirectedProto {
+                let mut request = DirectedProto::sys(Point::global_executor().to_port(), SysMethod::Command);
                 request.body(Substance::Command(Box::new(Command::Create(self))));
                 request
             }

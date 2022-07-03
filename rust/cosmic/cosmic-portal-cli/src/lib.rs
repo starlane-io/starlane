@@ -12,7 +12,7 @@ use cosmic_api::cli::{CommandTemplate, RawCommand, Transfer};
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{Port, Topic};
 use cosmic_api::msg::MsgMethod;
-use cosmic_api::wave::{Agent, Exchanger, Handling, PingProto, Pong, ProtoTransmitter, Router, Scope, SetStrategy, ToRecipients, Wave};
+use cosmic_api::wave::{Agent, Exchanger, Handling, DirectedProto, Pong, ProtoTransmitter, Router, Scope, SetStrategy, ToRecipients, Wave};
 
 pub struct Cli {
     cli_session_factory: Port,
@@ -49,7 +49,7 @@ impl Cli {
     }
 
     pub async fn session(&self) -> Result<CliSession<'_>, MsgErr> {
-        let mut ping = PingProto::new();
+        let mut ping = DirectedProto::new();
         ping.to(self.cli_session_factory.clone());
         ping.method(MsgMethod::new("NewCliSession").unwrap());
 
@@ -97,7 +97,7 @@ impl<'a> CliSession<'a> {
             line: raw.to_string(),
             transfers,
         };
-        let mut req: PingProto = PingProto::new();
+        let mut req: DirectedProto = DirectedProto::new();
         req.core(raw.into())?;
         self.tx.direct(req.clone()).await
     }
@@ -111,7 +111,7 @@ impl<'a> Drop for CliSession<'a> {
     fn drop(&mut self) {
         match self.tx.to.clone().unwrap() {
             Ok(to) => {
-                let ping = PingProto::msg(to, MsgMethod::new("DropSession").unwrap());
+                let ping = DirectedProto::msg(to, MsgMethod::new("DropSession").unwrap());
                 let tx = self.tx.clone();
                 match ping.build() {
                     Ok(ping) => {

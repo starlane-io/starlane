@@ -22,7 +22,7 @@ use mesh_portal::version::latest::messaging::ReqShell;
 use mesh_portal::version::latest::sys::Assign;
 use cosmic_api::id::{ArtifactSubKind, FileSubKind};
 use cosmic_api::id::id::{Kind, BaseKind};
-use cosmic_api::wave::PingProto;
+use cosmic_api::wave::DirectedProto;
 
 #[derive(Debug)]
 pub struct FileCoreManager {

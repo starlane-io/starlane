@@ -420,6 +420,14 @@ impl PipeTraversal {
                 self.body = core.body;
                 self.status = core.status;
             }
+            UltraWave::Signal(signal) => {
+                let signal = signal.variant;;
+                let core = signal.core;
+                self.method = core.method;
+                self.uri = core.uri;
+                self.headers = core.headers;
+                self.body = core.body;
+            }
         }
     }
 
