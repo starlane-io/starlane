@@ -35,6 +35,7 @@
       <sourceFolder url="file://$MODULE_DIR$/starlane/starlane-macros/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/starlane/starlane/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-api/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-driver/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-hyperlane-quic/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-hyperlane/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-star/src" isTestSource="false" />

@@ -90,6 +90,14 @@ impl MsgErr {
         MsgErr::err403()
     }
 
+    pub fn forbidden_msg<S:ToString>(msg: S) -> Self {
+        MsgErr::Status {
+            status: 403,
+            message: msg.to_string()
+        }
+    }
+
+
     pub fn not_found() -> Self {
         MsgErr::err404()
     }

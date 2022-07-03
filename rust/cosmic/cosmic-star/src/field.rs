@@ -65,7 +65,7 @@ impl FieldEx {
                         self.logger.error(format!("no pipeline set for request_id: {}", action.request_id));
                     }
                     Some((_, mut pipex)) => {
-                        self.skel.traverse_to_next.send(pipex.reflect().to_ultra() ).await;
+                        self.skel.traverse_to_next_tx.send(pipex.reflect().to_ultra() ).await;
                     }
                 }
             }
@@ -82,7 +82,7 @@ impl TraversalLayer for FieldEx {
     }
 
     async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
-        self.skel.traverse_to_next.send(traversal).await;
+        self.skel.traverse_to_next_tx.send(traversal).await;
     }
 
     fn exchanger(&self) -> &Exchanger {
@@ -102,7 +102,7 @@ impl TraversalLayer for FieldEx {
                     );
                     directed.logger.error(err_msg.as_str());
                     self.skel
-                        .fabric
+                        .fabric_tx
                         .send(directed.err(err_msg.into(), self.port().clone() ).to_ultra() );
                     return Ok(());
                 }
@@ -140,7 +140,7 @@ impl TraversalLayer for FieldEx {
                 let err_msg = format!("Binder: pipeline error for call {}", call.to_string());
                 logger.error(err_msg.as_str());
                 self.skel
-                    .traverse_to_next
+                    .traverse_to_next_tx
                     .send(pipex.fail(500, err_msg.as_str()).to_ultra())
                     .await;
                 return Ok(());
@@ -148,7 +148,7 @@ impl TraversalLayer for FieldEx {
         };
 
         if let PipeAction::Respond = action {
-            self.skel.traverse_to_next.send(pipex.reflect().to_ultra()).await;
+            self.skel.traverse_to_next_tx.send(pipex.reflect().to_ultra()).await;
             return Ok(());
         }
 
@@ -178,7 +178,7 @@ impl TraversalLayer for FieldEx {
         let action = pipex.handle_reflected(traversal.payload)?;
 
         if let PipeAction::Respond = action {
-            self.skel.traverse_to_next.send(pipex.reflect().to_ultra() ).await;
+            self.skel.traverse_to_next_tx.send(pipex.reflect().to_ultra() ).await;
             return Ok(());
         }
 

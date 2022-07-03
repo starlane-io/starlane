@@ -42,7 +42,7 @@ impl TraversalLayer for ShellEx {
     }
 
     async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
-        self.skel.traverse_to_next.send(traversal).await;
+        self.skel.traverse_to_next_tx.send(traversal).await;
     }
 
     async fn inject(&self, wave: UltraWave) {

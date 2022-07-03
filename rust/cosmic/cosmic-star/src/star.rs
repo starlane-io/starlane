@@ -1,26 +1,34 @@
-use std::collections::HashMap;
 use crate::driver::Drivers;
 use crate::field::{FieldEx, FieldState};
 use crate::machine::MachineSkel;
 use crate::portal::{PortalInlet, PortalShell};
 use crate::shell::ShellEx;
 use crate::state::{PortalInletState, PortalShellState, ShellState};
-use cosmic_api::wave::{HyperWave, DirectedCore, SysMethod, UltraWave, Exchanger};
-use dashmap::mapref::one::Ref;
-use dashmap::DashMap;
-use cosmic_api::error::MsgErr;
+use cosmic_api::bin::Bin;
 use cosmic_api::cli::RawCommand;
-use cosmic_api::id::id::{Kind, Layer, Point, Port, PortSelector, RouteSeg, Topic, ToPoint, ToPort, TraversalLayer, Uuid};
+use cosmic_api::config::config::bind::RouteSelector;
+use cosmic_api::error::MsgErr;
+use cosmic_api::id::id::{
+    Kind, Layer, Point, Port, PortSelector, RouteSeg, ToPoint, ToPort, Topic, TraversalLayer, Uuid,
+};
 use cosmic_api::id::{StarKey, StarSub, TraversalInjection};
 use cosmic_api::id::{Traversal, TraversalDirection};
-use cosmic_api::log::PointLogger;
-use cosmic_api::parse::{Env, route_attribute};
+use cosmic_api::log::{PointLogger, RootLogger};
+use cosmic_api::parse::{route_attribute, Env};
 use cosmic_api::quota::Timeouts;
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{Assign, Location, Sys};
 use cosmic_api::util::{ValueMatcher, ValuePattern};
-use cosmic_api::wave::{Bounce, Agent, DirectedHandler, DirectedHandlerSelector, RecipientSelector, InCtx, ProtoTransmitter, Ping, Reflectable, ReflectedCore, Pong, RootInCtx, Router, SetStrategy, Wave};
+use cosmic_api::wave::{
+    Agent, Bounce, DirectedHandler, DirectedHandlerSelector, InCtx, Ping, Pong, ProtoTransmitter,
+    RecipientSelector, Reflectable, ReflectedCore, RootInCtx, Router, SetStrategy, Wave,
+};
+use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
+use cosmic_api::{RegistryApi, State, StateFactory};
+use dashmap::mapref::one::Ref;
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -28,38 +36,42 @@ use std::time::Duration;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{mpsc, oneshot, RwLock};
 use tokio::time::error::Elapsed;
-use cosmic_api::{State, RegistryApi, StateFactory};
-use cosmic_api::bin::Bin;
-use cosmic_api::config::config::bind::RouteSelector;
+use cosmic_driver::DriverFactory;
 
 #[derive(Clone)]
 pub struct StarState {
-    states: Arc<DashMap<Port,Arc<RwLock<dyn State>>>>,
-    topic: Arc<DashMap<Port,Arc<dyn TopicHandler>>>,
+    states: Arc<DashMap<Port, Arc<RwLock<dyn State>>>>,
+    topic: Arc<DashMap<Port, Arc<dyn TopicHandler>>>,
     tx: mpsc::Sender<StateCall>,
-    field: Arc<DashMap<Port,FieldState>>,
-    shell: Arc<DashMap<Port,ShellState>>,
+    field: Arc<DashMap<Port, FieldState>>,
+    shell: Arc<DashMap<Port, ShellState>>,
 }
 
 impl StarState {
     pub fn new() -> Self {
-        let states : Arc<DashMap<Port,Arc<RwLock<dyn State>>>>= Arc::new(DashMap::new());
+        let states: Arc<DashMap<Port, Arc<RwLock<dyn State>>>> = Arc::new(DashMap::new());
 
-        let (tx,mut rx) = mpsc::channel(32*1024);
+        let (tx, mut rx) = mpsc::channel(32 * 1024);
 
         {
             let states = states.clone();
             tokio::spawn(async move {
                 while let Some(call) = rx.recv().await {
                     match call {
-                        StateCall::Get { port, tx } => {
-                            match states.get(&port) {
-                                None => {
-                                    tx.send(Err(MsgErr::not_found()));
-                                }
-                                Some(state) => {
-                                    tx.send(Ok(state.value().clone()));
-                                }
+                        StateCall::Get { port, tx } => match states.get(&port) {
+                            None => {
+                                tx.send(Ok(None));
+                            }
+                            Some(state) => {
+                                tx.send(Ok(Some(state.value().clone())));
+                            }
+                        },
+                        StateCall::Put { port, state, tx } => {
+                            if states.contains_key(&port) {
+                                tx.send(Err(MsgErr::bad_request()));
+                            } else {
+                                states.insert(port, state);
+                                tx.send(Ok(()));
                             }
                         }
                     }
@@ -70,22 +82,31 @@ impl StarState {
         Self {
             states,
             topic: Arc::new(DashMap::new()),
-            field: Arc::new( DashMap::new() ),
-            shell: Arc::new( DashMap::new() ),
+            field: Arc::new(DashMap::new()),
+            shell: Arc::new(DashMap::new()),
             tx,
         }
+    }
+
+    pub fn api(&self) -> StateApi {
+        StateApi::new(self.tx.clone())
     }
 
     pub fn states_tx(&self) -> mpsc::Sender<StateCall> {
         self.tx.clone()
     }
 
-    pub fn topic_handler( &self, port: Port, handler: Arc<dyn TopicHandler>) {
+    pub fn topic_handler(&self, port: Port, handler: Arc<dyn TopicHandler>) {
         self.topic.insert(port, handler);
     }
 
-    pub async fn find_state<S>(&self, port: &Port ) -> Result<Arc<RwLock<dyn State>>,MsgErr> {
-        Ok(self.states.get(port).ok_or(format!("could not find state for: {}",port.to_string()))?.value().clone())
+    pub async fn find_state<S>(&self, port: &Port) -> Result<Arc<RwLock<dyn State>>, MsgErr> {
+        Ok(self
+            .states
+            .get(port)
+            .ok_or(format!("could not find state for: {}", port.to_string()))?
+            .value()
+            .clone())
     }
 
     pub fn find_topic(
@@ -106,12 +127,22 @@ impl StarState {
         }
     }
 
-    pub fn find_field(&self, port: &Port ) -> Result<FieldState,MsgErr> {
-        Ok(self.field.get(port).ok_or("expected field state")?.value().clone())
+    pub fn find_field(&self, port: &Port) -> Result<FieldState, MsgErr> {
+        Ok(self
+            .field
+            .get(port)
+            .ok_or("expected field state")?
+            .value()
+            .clone())
     }
 
-    pub fn find_shell(&self, port: &Port) -> Result<ShellState,MsgErr> {
-        Ok(self.shell.get(port).ok_or("expected shell state")?.value().clone())
+    pub fn find_shell(&self, port: &Port) -> Result<ShellState, MsgErr> {
+        Ok(self
+            .shell
+            .get(port)
+            .ok_or("expected shell state")?
+            .value()
+            .clone())
     }
 }
 
@@ -121,16 +152,42 @@ pub struct StarSkel {
     pub kind: StarSub,
     pub logger: PointLogger,
     pub registry: Arc<dyn RegistryApi>,
-    pub surface: mpsc::Sender<UltraWave>,
-    pub traverse_to_next: mpsc::Sender<Traversal<UltraWave>>,
+    pub surface_tx: mpsc::Sender<UltraWave>,
+    pub traverse_to_next_tx: mpsc::Sender<Traversal<UltraWave>>,
     pub inject_tx: mpsc::Sender<TraversalInjection>,
-    pub fabric: mpsc::Sender<UltraWave>,
+    pub fabric_tx: mpsc::Sender<UltraWave>,
     pub machine: MachineSkel,
     pub exchanger: Exchanger,
     pub state: StarState,
+    pub connections: Vec<StarCon>
 }
 
 impl StarSkel {
+
+    pub fn new( template: StarTemplate, machine: MachineSkel, fabric_tx: mpsc::Sender<UltraWave>) -> Self {
+        let point = template.key.clone().to_point();
+        let logger = machine.logger.point(point.clone());
+        let star_tx = StarTx::new(point.clone());
+        let exchanger = Exchanger::new(point.to_port(), machine.timeouts.clone() );
+        let state = StarState::new();
+
+        Self {
+            key: template.key,
+            kind: template.kind,
+            logger,
+            surface_tx: star_tx.surface.clone(),
+            traverse_to_next_tx: star_tx.traverse_to_next.clone(),
+            inject_tx: star_tx.inject_tx.clone(),
+            fabric_tx: fabric_tx,
+            machine: machine,
+            exchanger,
+            state,
+            connections: template.connections,
+            registry: machine.registry.clone()
+        }
+    }
+
+
     pub fn location(&self) -> &Point {
         &self.logger.point
     }
@@ -139,18 +196,18 @@ impl StarSkel {
 pub enum StarCall {
     HyperWave(HyperWave),
     TraverseToNext(Traversal<UltraWave>),
-    Inject(TraversalInjection)
+    Inject(TraversalInjection),
 }
 
 pub struct StarTx {
-    surface: mpsc::Sender<HyperWave>,
+    surface: mpsc::Sender<UltraWave>,
     traverse_to_next: mpsc::Sender<Traversal<UltraWave>>,
     inject_tx: mpsc::Sender<TraversalInjection>,
     call_rx: mpsc::Receiver<StarCall>,
 }
 
 impl StarTx {
-    pub fn new() -> Self {
+    pub fn new(point: Point) -> Self {
         let (surface_tx, mut surface_rx) = mpsc::channel(1024);
         let (inject_tx, mut inject_rx) = mpsc::channel(1024);
         let (traverse_to_next_tx, mut traverse_to_next_rx) = mpsc::channel(1024);
@@ -161,6 +218,10 @@ impl StarTx {
             let call_tx = call_tx.clone();
             tokio::spawn(async move {
                 while let Some(wave) = surface_rx.recv().await {
+                    let wave = HyperWave {
+                        wave,
+                        from: point.clone()
+                    };
                     call_tx.send(StarCall::HyperWave(wave)).await;
                 }
             });
@@ -184,7 +245,6 @@ impl StarTx {
             });
         }
 
-
         Self {
             surface: surface_tx,
             traverse_to_next: traverse_to_next_tx,
@@ -194,37 +254,59 @@ impl StarTx {
     }
 }
 
-pub enum StateCall {
-    Get{ port: Port, tx: oneshot::Sender<Result<Arc<RwLock<dyn State>>,MsgErr>> }
+#[derive(Clone)]
+pub struct StarApi {
+    tx: mpsc::Sender<StarCall>
+}
+
+impl StarApi {
+    pub fn new( tx: mpsc::Sender<StarCall>) -> Self {
+        Self {
+            tx
+        }
+    }
+    pub async fn hyperwave( &self, hyperwave: HyperWave ) {
+        self.tx.send( StarCall::HyperWave(hyperwave)).await;
+    }
+
+    pub async fn traverse_to_next( &self, traversal: Traversal<UltraWave>) {
+        self.tx.send( StarCall::TraverseToNext(traversal)).await;
+    }
+
+    pub async fn inject( &self, inject: TraversalInjection) {
+        self.tx.send( StarCall::Inject(inject)).await;
+    }
 }
 
 #[derive(DirectedHandler)]
 pub struct Star {
     skel: StarSkel,
-    call_rx: mpsc::Receiver<StarCall>,
+    star_rx: mpsc::Receiver<StarCall>,
     drivers: Drivers,
-    injector: Port
+    injector: Port,
 }
 
 impl Star {
-    pub fn new(skel: StarSkel, mut call_rx: mpsc::Receiver<StarCall>, drivers: Drivers) {
-
-
+    pub fn new(skel: StarSkel, drivers: Drivers) -> StarApi {
+        let (star_tx,star_rx) = mpsc::channel(32*1024);
         let mut injector = skel.location().clone().push("injector").unwrap().to_port();
         injector.layer = Layer::Surface;
 
-        let star = Self {
-            skel,
-            call_rx,
-            drivers,
-            injector
-        };
-        star.start();
+        {
+            let star = Self {
+                skel,
+                star_rx,
+                drivers,
+                injector,
+            };
+            star.start();
+        }
+        StarApi::new(star_tx)
     }
 
     fn start(mut self) {
         tokio::spawn(async move {
-            while let Some(call) = self.call_rx.recv().await {
+            while let Some(call) = self.star_rx.recv().await {
                 match call {
                     StarCall::HyperWave(wave) => {
                         self.hyperwave(wave).await;
@@ -233,7 +315,7 @@ impl Star {
                         self.traverse_to_next(traversal).await;
                     }
                     StarCall::Inject(inject) => {
-                        self.start_traversal(inject.wave,&inject.injector).await;
+                        self.start_traversal(inject.wave, &inject.injector).await;
                     }
                 }
             }
@@ -241,14 +323,14 @@ impl Star {
     }
 
     async fn hyperwave(&self, wave: HyperWave) {
-
         let wave = wave.wave;
 
         let record = match self
             .skel
             .registry
             .locate(&wave.to().clone().unwrap_single())
-            .await{
+            .await
+        {
             Ok(record) => record,
             Err(err) => {
                 self.skel.logger.error(err.to_string());
@@ -258,40 +340,46 @@ impl Star {
 
         match record.location {
             Location::Central => {
-                self.skel.logger.error("attempt to send a wave to a point that is Nowhere");
+                self.skel
+                    .logger
+                    .error("attempt to send a wave to a point that is Nowhere");
                 return;
             }
             Location::Nowhere => {
-                self.skel.logger.error("attempt to send a wave to a point that is Nowhere");
+                self.skel
+                    .logger
+                    .error("attempt to send a wave to a point that is Nowhere");
                 return;
             }
             Location::Somewhere(location) => {
                 if location != *self.skel.location() {
                     // need to send a not_found to sender... even if the wave type was Response!
-                    self.skel.logger.warn("attempt to send a wave to a point that is not hosted by this star");
+                    self.skel
+                        .logger
+                        .warn("attempt to send a wave to a point that is not hosted by this star");
                     return;
                 }
             }
         }
-
 
         if wave.to().unwrap_single().point == self.injector.point {
             self.skel.logger.warn("attempt to spoof Star injector");
             return;
         }
 
-        self.start_traversal(wave,&self.injector).await;
+        self.start_traversal(wave, &self.injector).await;
     }
 
-    async fn start_traversal(&self, wave: UltraWave, injector: &Port ) -> Result<(),MsgErr> {
+    async fn start_traversal(&self, wave: UltraWave, injector: &Port) -> Result<(), MsgErr> {
         let record = match self
             .skel
             .registry
             .locate(&wave.to().clone().unwrap_single().to_point())
-            .await {
+            .await
+        {
             Ok(record) => record,
             Err(err) => {
-                self.skel.logger.error( err.to_string() );
+                self.skel.logger.error(err.to_string());
                 return Err(err);
             }
         };
@@ -302,21 +390,23 @@ impl Star {
         let mut dest = None;
         let mut dir = TraversalDirection::Core;
         // determine layer destination. A dest of None will send all the way to the Fabric or Core
-        if location == *self.skel.location()  {
-
+        if location == *self.skel.location() {
             // now we check if we are doing an inter point delivery (from one layer to another in the same Particle)
             if wave.to().clone().unwrap_single().point == wave.from().point {
                 // it's the SAME point, so the to layer becomes our dest
-                dest.replace(wave.to().clone().unwrap_single().layer );
+                dest.replace(wave.to().clone().unwrap_single().layer);
 
                 // make sure we have this layer in the plan
-                if !plan.has_layer(&wave.to().clone().unwrap_single().layer ) {
+                if !plan.has_layer(&wave.to().clone().unwrap_single().layer) {
                     self.skel.logger.warn("attempt to send wave to layer that the recipient Kind does not have in its traversal plan");
                     return Err(MsgErr::forbidden());
                 }
 
                 // dir is from inject_layer to dest
-                dir = match TraversalDirection::new(&injector.layer, &wave.to().clone().unwrap_single().layer) {
+                dir = match TraversalDirection::new(
+                    &injector.layer,
+                    &wave.to().clone().unwrap_single().layer,
+                ) {
                     Ok(dir) => dir,
                     Err(_) => {
                         // looks like we are already on the dest layer...
@@ -338,12 +428,15 @@ impl Star {
                 }
             }
         } else {
-           // location is outside of this Star, so dest is None and direction if Fabric
-           dir = TraversalDirection::Fabric;
-           dest = None;
+            // location is outside of this Star, so dest is None and direction if Fabric
+            dir = TraversalDirection::Fabric;
+            dest = None;
         }
 
-        let logger = self.skel.logger.point(wave.to().clone().unwrap_single().to_point());
+        let logger = self
+            .skel
+            .logger
+            .point(wave.to().clone().unwrap_single().to_point());
         let logger = logger.span();
         let to = wave.to().clone().unwrap_single();
 
@@ -364,12 +457,12 @@ impl Star {
             dir,
             dest,
             to,
-            point
+            point,
         );
 
         // in the case that we injected into a layer that is not part
         // of this plan, we need to send the traversal to the next layer
-        if !plan.has_layer(&injector.layer ) {
+        if !plan.has_layer(&injector.layer) {
             traversal.next();
         }
 
@@ -378,11 +471,8 @@ impl Star {
         Ok(())
     }
 
-
-    async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(),MsgErr>{
-        if traversal.is_directed()
-            && self.skel.state.topic.contains_key(&traversal.to )
-        {
+    async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(), MsgErr> {
+        if traversal.is_directed() && self.skel.state.topic.contains_key(&traversal.to) {
             let topic = self.skel.state.find_topic(&traversal.to, traversal.from());
             match topic {
                 None => {
@@ -400,16 +490,16 @@ impl Star {
                 Some(result) => {
                     match result {
                         Ok(topic_handler) => {
-                            let transmitter = LayerInjectionRouter::new(self.skel.clone(), traversal.to.clone() );
-                            let transmitter = ProtoTransmitter::new(Arc::new(transmitter), self.skel.exchanger.clone() );
+                            let transmitter =
+                                LayerInjectionRouter::new(self.skel.clone(), traversal.to.clone());
+                            let transmitter = ProtoTransmitter::new(
+                                Arc::new(transmitter),
+                                self.skel.exchanger.clone(),
+                            );
                             let to = traversal.to.clone();
                             let directed = traversal.unwrap_directed().payload;
-                            let ctx = RootInCtx::new(
-                                directed,
-                                to,
-                                self.skel.logger.span(),
-                                transmitter
-                            );
+                            let ctx =
+                                RootInCtx::new(directed, to, self.skel.logger.span(), transmitter);
 
                             topic_handler.handle(ctx).await;
                         }
@@ -421,13 +511,12 @@ impl Star {
             }
         } else {
             match traversal.layer {
-
                 Layer::Field => {
                     let field = FieldEx::new(
                         traversal.point.clone(),
                         self.skel.clone(),
                         self.skel.state.find_field(&traversal.to)?,
-                        traversal.logger.clone()
+                        traversal.logger.clone(),
                     );
                     field.visit(traversal).await;
                 }
@@ -459,7 +548,7 @@ impl Star {
         match next {
             None => match traversal.dir {
                 TraversalDirection::Fabric => {
-                    self.skel.fabric.send(traversal.payload);
+                    self.skel.fabric_tx.send(traversal.payload);
                 }
                 TraversalDirection::Core => {
                     self.skel
@@ -473,12 +562,10 @@ impl Star {
         }
     }
 
-
-
     async fn to_fabric(&self, wave: UltraWave) {
         let skel = self.skel.clone();
         tokio::spawn(async move {
-            skel.fabric.send(wave).await;
+            skel.fabric_tx.send(wave).await;
         });
     }
 }
@@ -494,7 +581,7 @@ impl Star {
 #[derive(Clone)]
 pub struct LayerInjectionRouter {
     pub skel: StarSkel,
-    pub injector: Port
+    pub injector: Port,
 }
 
 impl LayerInjectionRouter {
@@ -505,20 +592,20 @@ impl LayerInjectionRouter {
     pub fn with(&self, injector: Port) -> Self {
         Self {
             skel: self.skel.clone(),
-            injector
+            injector,
         }
     }
 }
 
 #[async_trait]
 impl Router for LayerInjectionRouter {
-    async fn route(&self, wave: UltraWave ) {
-        let inject = TraversalInjection::new(self.injector.clone(), wave );
+    async fn route(&self, wave: UltraWave) {
+        let inject = TraversalInjection::new(self.injector.clone(), wave);
         self.skel.inject_tx.send(inject).await;
     }
 
     fn route_sync(&self, wave: UltraWave) {
-        let inject = TraversalInjection::new(self.injector.clone(), wave );
+        let inject = TraversalInjection::new(self.injector.clone(), wave);
         self.skel.inject_tx.try_send(inject);
     }
 }
@@ -529,5 +616,94 @@ pub trait TopicHandler: Send + Sync + DirectedHandler {
 
 pub trait TopicHandlerSerde<T: TopicHandler> {
     fn serialize(&self, handler: T) -> Substance;
-    fn deserialize(&self, ser: Substance ) -> T;
+    fn deserialize(&self, ser: Substance) -> T;
 }
+
+impl StateApi {
+    pub fn new(tx: mpsc::Sender<StateCall>) -> Self {
+        Self {
+            tx,
+            layer_filter: None,
+        }
+    }
+
+    pub fn with_layer(self, layer: Layer) -> Self {
+        Self {
+            tx: self.tx,
+            layer_filter: Some(layer),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct StateApi {
+    pub tx: mpsc::Sender<StateCall>,
+    layer_filter: Option<Layer>,
+}
+
+impl StateApi {
+    pub async fn get_state(&self, port: Port) -> Result<Option<Arc<RwLock<dyn State>>>, MsgErr> {
+        if let Some(layer) = &self.layer_filter {
+            if port.layer != *layer {
+                return Err(MsgErr::forbidden_msg(format!(
+                    "not allowed to get state from Port Layer {} try layer {}",
+                    port.layer.to_string(),
+                    layer.to_string()
+                )));
+            }
+        }
+        let (tx, rx) = oneshot::channel();
+        self.tx.send(StateCall::Get { port, tx }).await;
+        rx.await?
+    }
+
+    pub async fn put_state(&self, port: Port, state: Arc<RwLock<dyn State>>) -> Result<(), MsgErr> {
+        if let Some(layer) = &self.layer_filter {
+            if port.layer != *layer {
+                return Err(MsgErr::forbidden_msg(format!(
+                    "not allowed to put state on Port Layer {} try layer {}",
+                    port.layer.to_string(),
+                    layer.to_string()
+                )));
+            }
+        }
+        let (tx, rx) = oneshot::channel();
+        self.tx.send(StateCall::Put { port, state, tx }).await;
+        rx.await?
+    }
+}
+
+pub enum StateCall {
+    Get {
+        port: Port,
+        tx: oneshot::Sender<Result<Option<Arc<RwLock<dyn State>>>, MsgErr>>,
+    },
+    Put {
+        port: Port,
+        state: Arc<RwLock<dyn State>>,
+        tx: oneshot::Sender<Result<(), MsgErr>>,
+    },
+}
+
+pub struct StarTemplate {
+    pub key: StarKey,
+    pub kind: StarSub,
+    pub connections: Vec<StarCon>,
+}
+
+#[derive(Clone)]
+pub enum StarCon {
+    Receive(StarKey),
+    Connect(StarKey),
+}
+
+impl StarCon {
+    pub fn key(&self) -> &StarKey {
+        match self {
+            StarCon::Receive(key) => key,
+            StarCon::Connect(key) => key,
+        }
+    }
+}
+
+
