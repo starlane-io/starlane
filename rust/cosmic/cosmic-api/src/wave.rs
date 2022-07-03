@@ -2189,12 +2189,22 @@ pub trait DirectedHandler {
 
 pub enum CoreBounce {
     Absorbed,
-    Reflect(ReflectedCore),
+    Reflected(ReflectedCore),
 }
+
 
 pub enum Bounce {
     Absorbed,
     Reflected(ReflectedWave)
+}
+
+impl Into<CoreBounce> for Bounce {
+    fn into(self) -> CoreBounce {
+        match self {
+            Bounce::Absorbed => CoreBounce::Absorbed,
+            Bounce::Reflected(reflected) => CoreBounce::Reflected(reflected.core().clone())
+        }
+    }
 }
 
 pub enum BounceProto {

@@ -12,7 +12,7 @@ use cosmic_api::id::{Traversal, TraversalInjection};
 use cosmic_api::log::RootLogger;
 use cosmic_api::parse::{command_line, Env, route_attribute};
 use cosmic_api::quota::Timeouts;
-use cosmic_api::wave::{Agent, Ping, DirectedHandlerSelector, RecipientSelector, DirectedHandler, Reflectable, ReflectedCore, Pong, RootInCtx, Wave, ProtoTransmitter, DirectedCore, PingProto, SetStrategy, UltraWave, InCtx, Exchanger, DirectedWave, CoreBounce, Router, ReflectedWave};
+use cosmic_api::wave::{Agent, Ping, DirectedHandlerSelector, RecipientSelector, DirectedHandler, Reflectable, ReflectedCore, Pong, RootInCtx, Wave, ProtoTransmitter, DirectedCore, PingProto, SetStrategy, UltraWave, InCtx, Exchanger, DirectedWave, CoreBounce, Router, ReflectedWave, Bounce};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -69,7 +69,7 @@ impl TraversalLayer for ShellEx {
         let bounce: CoreBounce = self.handle(ctx).await;
         match bounce {
             CoreBounce::Absorbed => {}
-            CoreBounce::Reflect(core) => {
+            CoreBounce::Reflected(core) => {
                 let reflected = reflection.make(core, self.port().clone(),self.port().clone() );
                 self.inject( reflected.to_ultra() ).await;
             }

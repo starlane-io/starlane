@@ -10,7 +10,7 @@ use cosmic_api::log::PointLogger;
 use cosmic_api::particle::particle::Status;
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{Assign, Sys};
-use cosmic_api::wave::{CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, UltraWave, Wave};
+use cosmic_api::wave::{Bounce,CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, UltraWave, Wave};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -253,7 +253,7 @@ impl TraversalLayer for Core {
 
 
     async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
-        self.skel.traversal_router.send(traversal).await;
+        self.skel.traverse_to_next_tx.send(traversal).await;
     }
 
     async fn inject(&self, wave: UltraWave) {
@@ -333,7 +333,7 @@ impl DriverShell {
                             CoreBounce::Absorbed => {
                                 tx.send(Err(MsgErr::server_error()));
                             }
-                            CoreBounce::Reflect(reflect) => {
+                            CoreBounce::Reflected(reflect) => {
                                 tx.send(Ok(reflect));
                             }
                         }

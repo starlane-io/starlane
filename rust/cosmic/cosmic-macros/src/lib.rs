@@ -119,13 +119,13 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool  ) -> TokenStream 
 
         #[async_trait]
         impl DirectedHandler for #self_ty {
-            async fn handle( &self, ctx: RootInCtx) -> Bounce {
+            async fn handle( &self, ctx: RootInCtx) -> CoreBounce {
                 #(
                     if #static_selector_keys.is_match(&ctx.wave).is_ok() {
                        return self.#idents( ctx ).await;
                     }
                 )*
-                Bounce::Reflect(ctx.not_found().core().clone())
+                ctx.not_found().into()
              }
         }
 
@@ -199,17 +199,17 @@ pub fn route(attr: TokenStream, input: TokenStream ) -> TokenStream {
   let item = ctx.item;
 
   let expanded = quote! {
-      #__async fn #ident( &self, mut ctx: RootInCtx ) -> Bounce {
+      #__async fn #ident( &self, mut ctx: RootInCtx ) -> CoreBounce {
           let ctx: InCtx<'_,#item> = match ctx.push::<#item>() {
               Ok(ctx) => ctx,
               Err(err) => {
-                  return Bounce::Reflect(ReflectedCore::server_error());
+                  return CoreBounce::Reflected(ReflectedCore::server_error());
               }
           };
 
           match self.#orig(ctx)#__await {
-              Ok(rtn) => Bounce::Reflect(rtn.into()),
-              Err(err) => Bounce::Reflect(ReflectedCore::server_error())
+              Ok(rtn) => CoreBounce::Reflected(rtn.into()),
+              Err(err) => CoreBounce::Reflected(ReflectedCore::server_error())
           }
       }
 

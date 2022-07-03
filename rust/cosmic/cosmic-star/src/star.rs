@@ -20,11 +20,7 @@ use cosmic_api::quota::Timeouts;
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{Assign, Location, Sys};
 use cosmic_api::util::{ValueMatcher, ValuePattern};
-use cosmic_api::wave::{
-    Agent, CoreBounce, DirectedHandler, DirectedHandlerSelector, InCtx, Ping, Pong, ProtoTransmitter,
-    RecipientSelector, Recipients, Reflectable, ReflectedCore, RootInCtx, Router, SetStrategy,
-    Wave,
-};
+use cosmic_api::wave::{Agent, CoreBounce, DirectedHandler, DirectedHandlerSelector, InCtx, Ping, Pong, ProtoTransmitter, RecipientSelector, Recipients, Reflectable, ReflectedCore, RootInCtx, Router, SetStrategy, Wave, Bounce};
 use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
 use cosmic_api::{RegistryApi, State, StateFactory};
 use cosmic_driver::DriverFactory;
@@ -759,7 +755,7 @@ impl StarSearcher {
     }
 
     pub async fn way(&self, dest: &StarKey) -> Result<StarKey, MsgErr> {
-        let path = self.golden_path.get(dest).ok_or("could not find".into())?;
+        let path = self.golden_path.get(dest).ok_or::<MsgErr>("could not find".into())?;
         Ok(path.value().clone())
     }
 }
@@ -790,12 +786,11 @@ impl StarFabricDistributor {
             while let Some(wave) = self.from_star_rx.recv().await {
                 match wave.to() {
                     Recipients::Single(port) => {
-                        let key = match self.find_way(port) {
+                        match self.find_way(port) {
                             Ok(key) => {
                                 let point = key.to_point();
-                                let
                             }
-                            Err(err) => { logger.error( "could not distribute to way....")}
+                            Err(err) => { self.skel.logger.error( "could not distribute to way....")}
                         };
                     },
                     Recipients::Multi(ports) => self.find_ways(ports),
@@ -805,7 +800,7 @@ impl StarFabricDistributor {
         });
     }
 
-    fn find_way(&self, port: Port) -> Result<StarKey, MsgErr> {
+    async fn find_way(&self, port: Port) -> Result<StarKey, MsgErr> {
         let record = self.skel.registry.locate(&port.point).await?;
         let location = record.location.ok_or()?;
         let way = self
@@ -816,7 +811,7 @@ impl StarFabricDistributor {
         Ok(way)
     }
 
-    fn find_ways(&self, ports: Vec<Port>) -> Result<HashMap<StarKey, Vec<Port>>, MsgErr> {
+    async fn find_ways(&self, ports: Vec<Port>) -> Result<HashMap<StarKey, Vec<Port>>, MsgErr> {
         let mut rtn = HashMap::new();
         for port in ports {
             let record = self.skel.registry.locate(&port.point).await?;

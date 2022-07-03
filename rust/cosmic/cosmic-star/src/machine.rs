@@ -51,12 +51,7 @@ impl Machine {
 
             let router = interchange.router();
             let registry = skel.registry.clone();
-            tokio::spawn( async move {
-               while let Some(wave) =  fabric_rx.recv().await {
-                   registry.locate( wave.to() )
-                   router.route(wave).await;
-               }
-            });
+
 
 /*            for hyperway in star_template.hyperway {
 

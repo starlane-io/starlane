@@ -20,7 +20,7 @@ use cosmic_api::selector::{PayloadBlock, PayloadBlockVar};
 use cosmic_api::substance::substance::{Call, CallKind, Substance};
 use cosmic_api::sys::ParticleRecord;
 use cosmic_api::util::{ToResolved, ValueMatcher};
-use cosmic_api::wave::{Agent, CmdMethod, Method, DirectedCore, Ping, Reflectable, ReflectedCore, Pong, Wave, Exchanger, UltraWave, DirectedWave, ReflectedWave};
+use cosmic_api::wave::{Agent, CmdMethod, Method, DirectedCore, Ping, Reflectable, ReflectedCore, Pong, Wave, Exchanger, UltraWave, DirectedWave, ReflectedWave, Bounce};
 use regex::{CaptureMatches, Regex};
 
 use std::collections::HashMap;
@@ -101,9 +101,15 @@ impl TraversalLayer for FieldEx {
                         directed.to.to_string()
                     );
                     directed.logger.error(err_msg.as_str());
-                    self.skel
-                        .fabric_tx
-                        .send(directed.err(err_msg.into(), self.port().clone() ).to_ultra() );
+                    match directed.err(err_msg.into(), self.port().clone() ) {
+                        Bounce::Absorbed => {}
+                        Bounce::Reflected(reflected) => {
+                            self.skel
+                                .fabric_tx
+                                .send(reflected.to_ultra() ).await;
+                        }
+                    }
+
                     return Ok(());
                 }
             }
