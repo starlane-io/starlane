@@ -3135,30 +3135,55 @@ impl Traversal<UltraWave> {
     pub fn is_ping(&self) -> bool {
         match &self.payload {
             UltraWave::Ping(_) => true,
-            UltraWave::Pong(_) => false,
+            _ => false
         }
     }
 
     pub fn is_pong(&self) -> bool {
         match &self.payload {
-            UltraWave::Ping(_) => false,
             UltraWave::Pong(_) => true,
+            _ => false
         }
     }
 
+    pub fn is_directed(&self) -> bool {
+        match self.payload {
+            UltraWave::Ping(_) => true,
+            UltraWave::Pong(_) => false,
+            UltraWave::Ripple(_) => true,
+            UltraWave::Echo(_) => false
+        }
+    }
+
+    pub fn is_reflected(&self) -> bool {
+        !self.is_directed()
+    }
+
     pub fn unwrap_directed(self) -> Traversal<DirectedWave> {
-        if let UltraWave::Ping(ping) = self.payload.clone() {
-            self.with(ping.to_directed())
-        } else {
-            panic!("cannot call this unless you are sure it's a Ping")
+        match self.payload {
+            UltraWave::Ping(ping) => {
+                self.with(ping.to_directed())
+            }
+            UltraWave::Ripple(ripple) => {
+                self.with(ripple.to_directed())
+            }
+            _ => {
+                panic!("cannot call this unless you are sure it's a DirectedWave")
+            }
         }
     }
 
     pub fn unwrap_reflected(self) -> Traversal<ReflectedWave> {
-        if let UltraWave::Pong(pong) = self.payload.clone() {
-            self.with(pong.to_reflected())
-        } else {
-            panic!("cannot call this unless you are sure it's a Pong")
+        match self.payload {
+            UltraWave::Pong(pong) => {
+                self.with(pong.to_reflected())
+            }
+            UltraWave::Echo(echo) => {
+                self.with(echo.to_reflected())
+            }
+            _ => {
+                panic!("cannot call this unless you are sure it's a ReflectedWave")
+            }
         }
     }
 
