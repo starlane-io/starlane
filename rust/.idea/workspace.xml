@@ -7,7 +7,9 @@
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/id.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/id.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/wave.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/wave.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/field.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/field.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

@@ -399,6 +399,21 @@ impl PipeTraversal {
                 self.body = core.body;
                 self.status = core.status;
             }
+            UltraWave::Ripple(ripple) => {
+                let ripple = ripple.variant;;
+                let core = ripple.core;
+                self.method = core.method;
+                self.uri = core.uri;
+                self.headers = core.headers;
+                self.body = core.body;
+            }
+            UltraWave::Echo(echo) => {
+                let echo = echo.variant;
+                let core = echo.core;
+                self.headers = core.headers;
+                self.body = core.body;
+                self.status = core.status;
+            }
         }
     }
 

@@ -3160,12 +3160,13 @@ impl Traversal<UltraWave> {
     }
 
     pub fn unwrap_directed(self) -> Traversal<DirectedWave> {
+        let clone = self.clone();
         match self.payload {
             UltraWave::Ping(ping) => {
-                self.with(ping.to_directed())
+                clone.with(ping.to_directed().clone())
             }
             UltraWave::Ripple(ripple) => {
-                self.with(ripple.to_directed())
+                clone.with(ripple.to_directed())
             }
             _ => {
                 panic!("cannot call this unless you are sure it's a DirectedWave")
@@ -3174,12 +3175,13 @@ impl Traversal<UltraWave> {
     }
 
     pub fn unwrap_reflected(self) -> Traversal<ReflectedWave> {
+        let clone = self.clone();
         match self.payload {
             UltraWave::Pong(pong) => {
-                self.with(pong.to_reflected())
+                clone.with(pong.to_reflected())
             }
             UltraWave::Echo(echo) => {
-                self.with(echo.to_reflected())
+                clone.with(echo.to_reflected())
             }
             _ => {
                 panic!("cannot call this unless you are sure it's a ReflectedWave")

@@ -196,31 +196,38 @@ impl RootInCtx {
     }
 
     pub fn not_found(self) -> ReflectedWave {
-        self.status(404, self.to.clone())
+        let to = self.to.clone();
+        self.status(404,to)
     }
 
     pub fn timeout(self) -> ReflectedWave {
-        self.status(408, self.to.clone())
+        let to = self.to.clone();
+        self.status(408, to)
     }
 
     pub fn bad_request(self) -> ReflectedWave {
-        self.status(400, self.to.clone())
+        let to = self.to.clone();
+        self.status(400, to)
     }
 
     pub fn server_error(self) -> ReflectedWave {
-        self.status(500, self.to.clone())
+        let to = self.to.clone();
+        self.status(500, to)
     }
 
     pub fn forbidden(self) -> ReflectedWave {
-        self.status(401, self.to.clone())
+        let to = self.to.clone();
+        self.status(401, to)
     }
 
     pub fn unavailable(self) -> ReflectedWave {
-        self.status(503, self.to.clone())
+        let to = self.to.clone();
+        self.status(503, to)
     }
 
     pub fn unauthorized(self) -> ReflectedWave {
-        self.status(403, self.to.clone())
+        let to = self.to.clone();
+        self.status(403, to)
     }
 }
 
@@ -712,9 +719,9 @@ impl ReflectedProto {
         }
     }
 
-    pub fn fill_intended<I: ToRecipients>(&mut self, intended: &I) {
+    pub fn fill_intended<I: ToRecipients>(&mut self, intended: I) {
         if self.intended.is_none() {
-            self.intended.replace(intended.clone().to_recipients());
+            self.intended.replace(intended.to_recipients());
         }
     }
 
@@ -1811,7 +1818,7 @@ impl Wave<Ripple> {
     }
 
     pub fn bounce_backs(&self) -> BounceBacks {
-        self.bounce_backs
+        self.bounce_backs.clone()
     }
 }
 
