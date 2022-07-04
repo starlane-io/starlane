@@ -340,8 +340,8 @@ impl Star {
         let wave = if wave.to().is_single() && wave.to().unwrap_single().point == self.skel.point {
             if let Some(&Method::Sys(SysMethod::Transport)) = wave.method() {
                 match wave.to_signal() {
-                    Ok(wave) => {
-                        if let Substance::UltraWave(wave) = wave.core.body {
+                    Ok(signal) => {
+                        if let Substance::UltraWave(wave) = signal.variant.core.body{
                             *wave
                         } else {
                             self.skel.logger.error("expecting an UltraWave Substance body when receiving a transport signal");
@@ -377,7 +377,7 @@ impl Star {
             Location::Central => {
                 self.skel
                     .logger
-                    .error("attempt to send a wave to a point that is Nowhere");
+                    .error("attempt to send a wave to a point that is Central");
                 return;
             }
             Location::Nowhere => {

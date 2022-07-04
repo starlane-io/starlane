@@ -328,6 +328,12 @@ pub struct RootLogger {
    appender: Arc<dyn LogAppender>
 }
 
+impl Default for RootLogger {
+    fn default() -> Self {
+        RootLogger::new( LogSource::Core, Arc::new(StdOutAppender::new()) )
+    }
+}
+
 impl RootLogger {
 
     pub fn new( source: LogSource, appender: Arc<dyn LogAppender>) -> Self {
@@ -377,6 +383,12 @@ impl RootLogger {
 
 pub struct StdOutAppender();
 
+impl StdOutAppender {
+    pub fn new() -> Self {
+        StdOutAppender()
+    }
+}
+
 impl LogAppender for StdOutAppender {
     fn log(&self, log: Log) {
         println!("{}",log.payload.to_string() )
@@ -395,14 +407,6 @@ impl LogAppender for StdOutAppender {
     }
 }
 
-impl Default for RootLogger {
-    fn default() -> Self {
-        Self {
-            appender: Arc::new(StdOutAppender()),
-            source: LogSource::Core
-        }
-    }
-}
 
 #[derive(Clone)]
 pub struct PointLogger {

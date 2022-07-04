@@ -8,6 +8,7 @@ use crate::command::command::common::StateSrc;
 use crate::log::Log;
 use crate::wave::{DirectedCore, Ping, SysMethod, Wave};
 use serde::{Deserialize, Serialize};
+use crate::id::StarKey;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {
@@ -157,7 +158,8 @@ pub struct Created {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Hash)]
 pub enum InterchangeKind {
     Cli,
-    Portal,
+    Portal(Option<Point>),
+    Star(StarKey),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]

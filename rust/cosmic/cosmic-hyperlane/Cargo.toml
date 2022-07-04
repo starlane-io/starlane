@@ -13,3 +13,5 @@ tokio = { version = "1.15.0", features = ["full"] }
 dashmap = "5.3.4"
 semver = { version="1.0.10", features=['serde'] }
 
+[dev-dependencies]
+chrono = { version="0.4.19", features=["serde"] }

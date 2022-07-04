@@ -12,7 +12,7 @@ cosmic-nom = { path="../cosmic-nom"}
 cosmic-hyperlane = { path= "../cosmic-hyperlane" }
 cosmic-driver = { path= "../cosmic-driver" }
 anyhow = "1.0.44"
-dashmap = "4.0.2"
+dashmap = "5.3.4"
 tokio = { version = "1.15.0", features = ["full"] }
 serde = { version="1.0.69", features=['derive','rc'] }
 lazy_static = "1.4.0"

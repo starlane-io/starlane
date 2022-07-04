@@ -7,8 +7,17 @@
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/log.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/log.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/sys.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/sys.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/wave.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/wave.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-hyperlane-quic/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-hyperlane-quic/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-hyperlane/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-hyperlane/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-hyperlane/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-hyperlane/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/implementation.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/implementation.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/machine.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/machine.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/star.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/star.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/starlane-core/src/star/surface.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/starlane-core/src/star/surface.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -83,7 +92,7 @@
       <recent name="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Run">
+  <component name="RunManager" selected="Cargo.Test tests::it_works (2)">
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
       <option name="command" value="run  --bin starlane -- serve " />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -128,23 +137,6 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test registry::test::test_access" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib registry::test::test_access -- --exact" />
-      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
-      <option name="channel" value="DEFAULT" />
-      <option name="requiredFeatures" value="true" />
-      <option name="allFeatures" value="false" />
-      <option name="emulateTerminal" value="false" />
-      <option name="withSudo" value="false" />
-      <option name="buildTarget" value="REMOTE" />
-      <option name="backtrace" value="SHORT" />
-      <envs />
-      <option name="isRedirectInput" value="false" />
-      <option name="redirectInputPath" value="" />
-      <method v="2">
-        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
-      </method>
-    </configuration>
     <configuration name="Test star::shell::db::test::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
       <option name="command" value="test --package starlane-core --lib star::shell::db::test::test -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -162,8 +154,8 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test tests::it_works" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane --bin starlane tests::it_works -- --exact" />
+    <configuration name="Test tests::hyper_test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package cosmic-hyperlane --lib tests::hyper_test -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -179,8 +171,25 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <configuration name="Test version::v0_0_1::test::test_query_root" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package mesh-portal-versions --lib version::v0_0_1::test::test_query_root -- --exact" />
+    <configuration name="Test tests::it_works (1)" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package cosmic-hyperlane --lib tests::it_works -- --exact" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
+      <option name="backtrace" value="SHORT" />
+      <envs />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Test tests::it_works (2)" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package cosmic-star --lib tests::it_works -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -216,19 +225,19 @@
     <list>
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Test" />
+      <item itemvalue="Cargo.Test tests::hyper_test" />
+      <item itemvalue="Cargo.Test tests::it_works (2)" />
+      <item itemvalue="Cargo.Test tests::it_works (1)" />
       <item itemvalue="Cargo.Test command::parse::test::test_kind" />
       <item itemvalue="Cargo.Test star::shell::db::test::test" />
-      <item itemvalue="Cargo.Test tests::it_works" />
-      <item itemvalue="Cargo.Test registry::test::test_access" />
-      <item itemvalue="Cargo.Test version::v0_0_1::test::test_query_root" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Cargo.Test tests::it_works (2)" />
+        <item itemvalue="Cargo.Test tests::hyper_test" />
+        <item itemvalue="Cargo.Test tests::it_works (1)" />
         <item itemvalue="Cargo.Test command::parse::test::test_kind" />
         <item itemvalue="Cargo.Test star::shell::db::test::test" />
-        <item itemvalue="Cargo.Test tests::it_works" />
-        <item itemvalue="Cargo.Test registry::test::test_access" />
-        <item itemvalue="Cargo.Test version::v0_0_1::test::test_query_root" />
       </list>
     </recent_temporary>
   </component>

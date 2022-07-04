@@ -1961,6 +1961,7 @@ impl<V> DerefMut for Wave<V> {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum Agent {
     Anonymous,
+    HyperUser,
     Point(Point),
 }
 

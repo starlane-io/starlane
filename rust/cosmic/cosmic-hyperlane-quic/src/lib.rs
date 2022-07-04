@@ -14,7 +14,7 @@ use cosmic_api::id::id::{Point, ToPort};
 use cosmic_api::log::PointLogger;
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{EntryReq, Sys};
-use cosmic_api::wave::{DirectedCore, DirectedProto, Pong, SysMethod, Wave};
+use cosmic_api::wave::{DirectedCore, DirectedProto, Pong, SysMethod, UltraWave, Wave};
 
 fn generate_self_signed_cert() -> Result<(rustls::Certificate, rustls::PrivateKey), MsgErr>
 {
@@ -78,7 +78,7 @@ impl HyperServerQuic {
            while let Some(conn) = incoming.next().await {
                let gate = gate.clone();
                tokio::spawn( async move {
-                   async fn connect(conn: Connecting, gate: Arc<VersionGate> ) -> Result<(NewConnection, mpsc::Sender<Wave>, mpsc::Receiver<Wave>), ConErr>{
+                   async fn connect(conn: Connecting, gate: Arc<VersionGate> ) -> Result<(NewConnection, mpsc::Sender<UltraWave>, mpsc::Receiver<UltraWave>), ConErr>{
                        let mut connection: NewConnection = conn.await?;
                        let recv = tokio::time::timeout(Duration::from_secs(30), connection.uni_streams.next()).await?.ok_or(MsgErr::server_error())??;
                        let version = recv.read_to_end(2*1024).await?;
@@ -176,7 +176,7 @@ impl HyperClientQuic {
     pub async fn new(endpoint: Endpoint,
                      server_addr: SocketAddr,
                      connect_req: EntryReq,
-                     deliver_tx: mpsc::Sender<Wave>,
+                     deliver_tx: mpsc::Sender<UltraWave>,
                      logger: PointLogger ) -> Result<Self,MsgErr> {
 
 
@@ -212,7 +212,7 @@ impl HyperClientQuic {
 
             tokio::spawn( async move {
                 while let Some(Ok(recv)) = uni_streams.next().await {
-                    async fn process( recv: RecvStream, delivery_tx: mpsc::Sender<Wave> ) -> Result<(),MsgErr> {
+                    async fn process( recv: RecvStream, delivery_tx: mpsc::Sender<UltraWave> ) -> Result<(),MsgErr> {
                         let wave = recv.read_to_end(32 * 1024).await?;
                         let wave = PrimitiveFrame::from(wave);
                         let wave = wave.try_into()?;
@@ -228,7 +228,7 @@ impl HyperClientQuic {
         }
     }
 
-    pub async fn send( &self, wave: Wave ) -> Result<(),MsgErr> {
+    pub async fn send( &self, wave: UltraWave ) -> Result<(),MsgErr> {
         let wave: PrimitiveFrame = wave.try_into()?;
         let mut send = new_connection.connection.open_uni().await?;
         send.write_all(wave.data.as_bytes() ).await?;
