@@ -720,6 +720,7 @@ pub enum StateCall {
     },
 }
 
+#[derive(Clone)]
 pub struct StarTemplate {
     pub key: StarKey,
     pub kind: StarSub,

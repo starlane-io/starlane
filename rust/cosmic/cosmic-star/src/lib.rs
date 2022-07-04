@@ -18,7 +18,7 @@ pub mod shell;
 pub mod star;
 pub mod state;
 pub mod traversal;
-pub mod implementation;
+pub mod platform;
 
 pub fn add(left: usize, right: usize) -> usize {
     left + right

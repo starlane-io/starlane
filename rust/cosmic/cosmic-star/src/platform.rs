@@ -5,7 +5,7 @@ use cosmic_api::substance::substance::Token;
 use cosmic_driver::DriverFactory;
 use crate::driver::DriversBuilder;
 
-pub trait Implementation {
+pub trait Platform: Send+Sync {
     fn drivers_builder( &self, kind: &StarSub ) -> DriversBuilder;
     fn token(&self) -> Token;
     fn registry(&self) -> Arc<dyn RegistryApi>;

@@ -562,6 +562,10 @@ impl InterchangeEntryRouter {
             ))
         }
     }
+
+    pub async fn add(&self, kind: InterchangeKind, hyperway: Hyperway ) {
+        self.map.get(kind).ok_or("expected kind to be available").add(hyperway);
+    }
 }
 
 #[derive(Clone)]
@@ -612,20 +616,40 @@ impl HyperGate {
 
         Ok((tx, rx))
     }
+
+    pub fn add( &self, hyperway: Hyperway )  {
+       self.interchange.add(hyperway);
+    }
 }
 
 pub struct HyperClient {
+    pub agent: Agent,
+    pub point: Point,
     pub factory: Box<dyn HyperClientConnectionFactory>,
     pub receiver_tx: mpsc::Sender<UltraWave>,
     pub sender_rx: mpsc::Receiver<UltraWave>,
 }
 
 impl HyperClient {
-    pub fn new(factory: Box<dyn HyperClientConnectionFactory>) -> Result<(mpsc::Sender<UltraWave>, mpsc::Receiver<UltraWave>),MsgErr> {
+    pub fn new(agent: Agent, point: Point, factory: Box<dyn HyperClientConnectionFactory>, logger: PointLogger ) -> Result<Hyperway,MsgErr> {
         let (sender_tx,sender_rx) = mpsc::channel(32*1024);
         let (receiver_tx,receiver_rx) = mpsc::channel(32*1024);
 
+
+        let outbound = OutboundLanes{ tx: sender_tx };
+        let inbound = InboundLanes{ rx: receiver_rx };
+
+        let hyperway = Hyperway {
+            inbound,
+            outbound,
+            agent: agent.clone(),
+            remote: point.clone(),
+            logger
+        };
+
         let mut client = Self {
+            agent,
+            point,
             factory,
             sender_rx,
             receiver_tx,
@@ -633,14 +657,14 @@ impl HyperClient {
 
         client.start();
 
-        Ok((sender_tx,receiver_rx))
+        Ok(hyperway)
     }
 
     pub fn start(mut self) {
         tokio::spawn(async move {
             loop {
                 if let Ok((sender_tx,mut receiver_rx)) = self.factory.connect().await {
-                    while let (wave,index,_)= select_all( vec![self.sender_rx.recv(),receiver_rx.recv()] ).await
+                    while let (Some(wave),index,_)= select_all( vec![self.sender_rx.recv().boxed(),receiver_rx.recv().boxed()] ).await
                     {
                         if index == 0 {
                             sender_tx.send(wave).await;
@@ -649,7 +673,7 @@ impl HyperClient {
                         }
                     }
                 } else {
-                    Tokio::time::sleep(Duration::from_secs(5)).await;
+                    tokio::time::sleep(Duration::from_secs(5)).await;
                 }
             }
         });
@@ -657,7 +681,8 @@ impl HyperClient {
 }
 
 
-pub trait HyperClientConnectionFactory {
+#[async_trait]
+pub trait HyperClientConnectionFactory: Send+Sync {
   async fn connect(&self) -> Result<(mpsc::Sender<UltraWave>, mpsc::Receiver<UltraWave>),MsgErr>;
 }
 
@@ -675,6 +700,7 @@ impl LocalClientConnectionFactory {
     }
 }
 
+#[async_trait]
 impl HyperClientConnectionFactory for LocalClientConnectionFactory {
     async fn connect(&self) -> Result<(mpsc::Sender<UltraWave>, mpsc::Receiver<UltraWave>), MsgErr> {
         self.entry_router.enter( self.entry_req.clone() ).await
