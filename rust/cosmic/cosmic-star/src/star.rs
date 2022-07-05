@@ -19,7 +19,7 @@ use cosmic_api::log::{PointLogger, RootLogger};
 use cosmic_api::parse::{route_attribute, Env};
 use cosmic_api::quota::Timeouts;
 use cosmic_api::substance::substance::{Substance, ToSubstance};
-use cosmic_api::sys::{Assign, Location, Sys};
+use cosmic_api::sys::{Assign, AssignmentKind, Location, Sys};
 use cosmic_api::util::{ValueMatcher, ValuePattern};
 use cosmic_api::wave::{
     Agent, Bounce, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedKind,
@@ -27,7 +27,7 @@ use cosmic_api::wave::{
     Reflectable, ReflectedCore, RootInCtx, Router, SetStrategy, Signal, Wave,
 };
 use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
-use cosmic_api::{RegErr, RegistryApi, State, StateFactory};
+use cosmic_api::{MountKind, RegErr, Registration, RegistryApi, State, StateFactory};
 use cosmic_driver::DriverFactory;
 use cosmic_hyperlane::HyperRouter;
 use dashmap::mapref::one::Ref;
@@ -42,6 +42,8 @@ use std::time::Duration;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{mpsc, oneshot, RwLock};
 use tokio::time::error::Elapsed;
+use cosmic_api::command::command::common::StateSrc;
+use cosmic_api::particle::particle::{Details, Status, Stub};
 
 #[derive(Clone)]
 pub struct StarState {
@@ -222,6 +224,7 @@ pub enum StarCall {
     HyperWave(HyperWave),
     TraverseToNextLayer(Traversal<UltraWave>),
     LayerTraversalInjection(TraversalInjection),
+    CreateMount { agent: Agent, kind: MountKind, tx: oneshot::Sender<(mpsc::Sender<UltraWave>, mpsc::Receiver<UltraWave>)>}
 }
 
 pub struct StarTx {
@@ -311,12 +314,13 @@ impl StarApi {
 pub struct Star<E> where E: RegErr {
     skel: StarSkel<E>,
     star_rx: mpsc::Receiver<StarCall>,
-    drivers: Drivers,
+    drivers: Drivers<E>,
     injector: Port,
+    mounts: HashMap<Point,StarMount>
 }
 
 impl <E> Star<E> where E: RegErr{
-    pub fn new(skel: StarSkel<E>, drivers: Drivers) -> StarApi {
+    pub fn new(skel: StarSkel<E>, drivers: Drivers<E>) -> StarApi {
         let (star_tx, star_rx) = mpsc::channel(32 * 1024);
         let mut injector = skel.location().clone().push("injector").unwrap().to_port();
         injector.layer = Layer::Surface;
@@ -327,6 +331,7 @@ impl <E> Star<E> where E: RegErr{
                 star_rx,
                 drivers,
                 injector,
+                mounts: HashMap::new()
             };
             star.start();
         }
@@ -346,6 +351,9 @@ impl <E> Star<E> where E: RegErr{
                     StarCall::LayerTraversalInjection(inject) => {
                         self.star_layer_traversal(inject.wave, &inject.injector)
                             .await;
+                    }
+                    StarCall::CreateMount { agent, kind, tx } => {
+                        self.create_mount(agent, kind, tx).await;
                     }
                 }
             }
@@ -612,6 +620,55 @@ impl <E> Star<E> where E: RegErr{
     async fn to_fabric(&self, wave: UltraWave) {
         self.skel.fabric_tx.send(wave).await;
     }
+
+    async fn create_mount(&mut self, agent: Agent, kind: MountKind, tx: oneshot::Sender<(mpsc::Sender<UltraWave>, mpsc::Receiver<UltraWave>)> ) -> Result<(),MsgErr> {
+        let point = self.skel.point.clone().push("controls").unwrap();
+        let index = self.skel.registry.sequence(&point).await?;
+        let point = point.push( format!("control-{}",index)).unwrap();
+        let registration = Registration {
+            point:point.clone(),
+            kind: kind.kind(),
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: agent.point()
+        };
+        self.skel.registry.register(&registration).await?;
+        self.skel.registry.assign(&point, self.skel.location()).await?;
+
+        let (in_mount_tx,mut in_mount_rx) = mpsc::channel(32*1024);
+        let (out_mount_tx,out_mount_rx) = mpsc::channel(32*1024);
+
+        tx.send( (in_mount_tx,out_mount_rx) );
+
+        let inject_tx = self.skel.inject_tx.clone();
+        {
+            let point = point.clone();
+            tokio::spawn(async move {
+                let port = point.to_port().with_layer(Layer::Core);
+                while let Some(wave) = in_mount_rx.recv().await {
+                    let inject = TraversalInjection::new(port.clone(), wave);
+                    inject_tx.send(inject).await;
+                }
+            });
+        }
+
+        let mount = StarMount {
+            point: point.clone(),
+            kind,
+            tx: out_mount_tx
+        };
+
+        self.mounts.insert( point, mount );
+        Ok(())
+    }
+
+
+}
+
+pub struct StarMount {
+    pub point: Point,
+    pub kind: MountKind,
+    pub tx: mpsc::Sender<UltraWave>
 }
 
 #[routes]

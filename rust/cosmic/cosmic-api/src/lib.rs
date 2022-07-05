@@ -41,13 +41,13 @@ pub mod wave;
 use crate::error::MsgErr;
 use crate::config::config::bind::BindConfig;
 use crate::config::config::Document;
-use crate::id::id::{Point, Port, Uuid};
+use crate::id::id::{Kind, Point, Port, Uuid};
 use core::str::FromStr;
 use std::ops::Deref;
 use std::sync::{Arc, RwLock};
 use chrono::{DateTime, Utc};
 use dashmap::{DashMap, DashSet};
-use crate::command::command::common::SetProperties;
+use crate::command::command::common::{SetProperties, SetRegistry};
 use crate::command::request::delete::Delete;
 use crate::command::request::query::{Query, QueryResult};
 use crate::command::request::select::{Select, SubSelect};
@@ -59,6 +59,8 @@ use crate::wave::Agent;
 
 lazy_static! {
     pub static ref VERSION: semver::Version = semver::Version::from_str("1.0.0").unwrap();
+    pub static ref HYPERUSER: Point = Point::from_str("hyperspace:users:hyperuser").expect("point");
+    pub static ref ANONYMOUS: Point = Point::from_str("hyperspace:users:anonymous").expect("point");
 }
 
 
@@ -506,3 +508,27 @@ pub mod fail {
     */
 }
 
+#[derive(Clone)]
+pub struct Registration {
+    pub point: Point,
+    pub kind: Kind,
+    pub registry: SetRegistry,
+    pub properties: SetProperties,
+    pub owner: Point,
+}
+
+
+#[derive(Clone)]
+pub enum MountKind{
+    Control,
+    Portal
+}
+
+impl MountKind {
+    pub fn kind(&self) -> Kind {
+        match self {
+            MountKind::Control => Kind::Control,
+            MountKind::Portal => Kind::Portal
+        }
+    }
+}

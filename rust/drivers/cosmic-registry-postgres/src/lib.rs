@@ -13,20 +13,18 @@ use cosmic_api::command::request::get::{Get, GetOp};
 use cosmic_api::command::request::query::{Query, QueryResult};
 use cosmic_api::command::request::select::{Select, SelectKind, SubSelect};
 use cosmic_api::command::request::set::Set;
-use cosmic_api::id::{ArtifactSubKind, FileSubKind, UserBaseSubKind};
+use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, UserBaseSubKind};
 use cosmic_api::id::id::{BaseKind, Kind, KindParts, Point, Specific, Version};
 use cosmic_api::parse::{CamelCase, Domain, SkewerCase};
 use cosmic_api::particle::particle::{Details, Properties, Property, Status, Stub};
-use cosmic_api::RegistryApi;
+use cosmic_api::{Registration, RegistryApi};
 use cosmic_api::security::{Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask, PermissionsMaskKind, Privilege, Privileges};
 use cosmic_api::selector::selector::{PointKindSeg, PointSegSelector, SubKindSelector};
 use cosmic_api::selector::selector::specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{Location, ParticleRecord};
 use cosmic_api::util::ValuePattern;
-lazy_static! {
-    pub static ref HYPERUSER: Point = Point::from_str("hyperspace:users:hyperuser").expect("point");
-}
+
 
 pub struct Registry {
     pool: Pool<Postgres>,
@@ -1179,7 +1177,8 @@ pub mod test {
     use cosmic_api::id::id::{Kind, Point, ToPoint};
     use cosmic_api::id::{StarKey, UserBaseSubKind};
     use cosmic_api::particle::particle::Status;
-    use crate::{RegErr, Registration, Registry};
+    use cosmic_api::Registration;
+    use crate::{RegErr, Registry};
 
     #[tokio::test]
     pub async fn test_nuke() -> Result<(), RegErr> {
@@ -1536,15 +1535,6 @@ impl From<RegErr> for RegErr {
     fn from(r: RegErr) -> Self {
         RegErr::new(r.to_string().as_str())
     }
-}
-
-#[derive(Clone)]
-pub struct Registration {
-    pub point: Point,
-    pub kind: Kind,
-    pub registry: SetRegistry,
-    pub properties: SetProperties,
-    pub owner: Point,
 }
 
 pub struct RegistryParams {

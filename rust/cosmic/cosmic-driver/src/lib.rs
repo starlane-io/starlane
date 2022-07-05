@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{Kind, Layer, Point, Port};
 use cosmic_api::State;
-use cosmic_api::wave::{DirectedHandler, InCtx, ReflectedCore, Router};
+use cosmic_api::wave::{DirectedHandler, InCtx, ReflectedCore, Router, UltraWave};
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, RwLock};
 use cosmic_api::sys::Assign;
@@ -21,7 +21,7 @@ pub struct DriverSkel {
 }
 
 impl DriverSkel {
-    pub async fn ex( &self, point: Point ) -> Result<Box<dyn CoreEx>,MsgErr> {
+    pub async fn ex( &self, point: Point ) -> Result<Box<dyn Core>,MsgErr> {
         let (tx,rx) = oneshot::channel();
         self.shell_tx.send(DriverShellRequest::Ex { point, tx }).await;
         Ok(rx.await??)
@@ -40,16 +40,16 @@ impl DriverSkel {
 
 pub trait DriverFactory {
     fn kind(&self) -> &Kind;
-    fn create(&self, skel: DriverSkel) -> Box<dyn DriverCore>;
+    fn create(&self, skel: DriverSkel) -> Box<dyn Driver>;
 }
 
 #[async_trait]
-pub trait DriverCore: DirectedHandler+Send+Sync {
+pub trait Driver: DirectedHandler+Send+Sync {
     fn kind(&self) -> &Kind;
     async fn status(&self) -> DriverStatus;
-    async fn lifecycle(&self, event: DriverLifecycleCall) -> Result<DriverStatus,MsgErr>;
-    fn ex(&self, point: &Point, state: Option<Arc<RwLock<dyn State>>>) -> Box<dyn CoreEx>;
-    async fn assign(&self, ctx: InCtx<'_,Assign>) -> Result<ReflectedCore, MsgErr>;
+    async fn lifecycle(&mut self, event: DriverLifecycleCall) -> Result<DriverStatus,MsgErr>;
+    fn ex(&self, point: &Point, state: Option<Arc<RwLock<dyn State>>>) -> Box<dyn Core>;
+    async fn assign(&mut self, ctx: InCtx<'_,Assign>) -> Result<Option<Arc<RwLock<dyn State>>>, MsgErr>;
 }
 
 #[derive(Clone, Eq, PartialEq, Hash)]
@@ -73,11 +73,10 @@ pub struct DriverStatusEvent {
     pub status: DriverStatus
 }
 
-pub trait CoreEx: DirectedHandler+Send+Sync {
-    fn create(&self) -> Option<Arc<RwLock<dyn State>>>;
+pub trait Core: DirectedHandler+Send+Sync {
 }
 
 
 pub enum DriverShellRequest {
-  Ex{ point: Point, tx: oneshot::Sender<Result<Box<dyn CoreEx>,MsgErr>>}
+  Ex{ point: Point, tx: oneshot::Sender<Result<Box<dyn Core>,MsgErr>>}
 }

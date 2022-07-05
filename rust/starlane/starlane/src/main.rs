@@ -42,6 +42,15 @@ pub struct Starlane {
 
 impl Platform for Starlane {
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder {
+        match kind {
+            StarSub::Central => {}
+            StarSub::Super => {}
+            StarSub::Nexus => {}
+            StarSub::Maelstrom => {}
+            StarSub::Scribe => {}
+            StarSub::Jump => {}
+            StarSub::Fold => {}
+        }
         DriversBuilder::new()
     }
 
@@ -55,5 +64,9 @@ impl Platform for Starlane {
 
     fn artifacts(&self) -> Arc<dyn ArtifactApi> {
        self.artifacts.clone()
+    }
+
+    fn start_services(&self, entry_router: &mut cosmic_hyperlane::InterchangeEntryRouter) {
+        todo!()
     }
 }

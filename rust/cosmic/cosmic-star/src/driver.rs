@@ -1,4 +1,4 @@
-use cosmic_api::RegistryApi;
+use cosmic_api::{RegErr, RegistryApi};
 use crate::machine::MachineSkel;
 use crate::star::{LayerInjectionRouter, StarSkel, StarState, StateApi, StateCall};
 use cosmic_api::State;
@@ -19,16 +19,16 @@ use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use cosmic_api::config::config::bind::RouteSelector;
 use cosmic_api::parse::route_attribute;
 use cosmic_api::util::ValuePattern;
-use cosmic_driver::{CoreEx, DriverCore, DriverFactory, DriverLifecycleCall, DriverShellRequest, DriverSkel, DriverStatus, DriverStatusEvent};
+use cosmic_driver::{Core, Driver, DriverFactory, DriverLifecycleCall, DriverShellRequest, DriverSkel, DriverStatus, DriverStatusEvent};
 
 #[derive(DirectedHandler)]
-pub struct Drivers {
-    pub skel: StarSkel,
+pub struct Drivers<E> where E: RegErr {
+    pub skel: StarSkel<E>,
     pub drivers: HashMap<Kind,DriverApi>,
 }
 
-impl Drivers {
-    pub fn new(skel: StarSkel, drivers: HashMap<Kind, DriverApi>) -> Self {
+impl <E> Drivers<E> where E: RegErr {
+    pub fn new(skel: StarSkel<E>, drivers: HashMap<Kind, DriverApi>) -> Self {
         Self { skel, drivers }
     }
 
@@ -69,7 +69,7 @@ impl Drivers {
     }
 }
 
-impl Drivers {
+impl <E> Drivers<E> where E: RegErr{
 
     pub async fn handle( &self, wave: DirectedWave ) -> Result<ReflectedCore,MsgErr> {
         let record = self.skel.registry.locate(&wave.to().single_or()?.point).await?;
@@ -190,7 +190,7 @@ impl DriversBuilder {
         self.logger.replace(logger);
     }
 
-    pub fn build(self, drivers_port: Port, skel: StarSkel) -> Result<Drivers, MsgErr> {
+    pub fn build<E>(self, drivers_port: Port, skel: StarSkel<E>) -> Result<Drivers<E>, MsgErr> where E: RegErr{
         if self.logger.is_none() {
             return Err("expected point logger to be set".into());
         }
@@ -229,19 +229,19 @@ pub enum DriverShellCall {
     Status(oneshot::Sender<DriverStatus>),
     Traversal(Traversal<UltraWave>),
     Handle{ wave: DirectedWave, tx:oneshot::Sender<Result<ReflectedCore,MsgErr>>},
-    Ex{ point: Point, tx: oneshot::Sender<Result<Box<dyn CoreEx>,MsgErr>>}
+    Ex{ point: Point, tx: oneshot::Sender<Result<Box<dyn Core>,MsgErr>>},
 }
 
-pub struct Core {
+pub struct OuterCore<E> where E:RegErr {
    pub port: Port,
-   pub skel: StarSkel,
+   pub skel: StarSkel<E>,
    pub state: Option<Arc<RwLock<dyn State>>>,
-   pub ex: Box<dyn CoreEx>,
+   pub ex: Box<dyn Core>,
    pub router: Arc<dyn Router>
 }
 
 #[async_trait]
-impl TraversalLayer for Core {
+impl <E> TraversalLayer for OuterCore<E> where E: RegErr {
     fn port(&self) -> &cosmic_api::id::id::Port {
         &self.port
     }
@@ -275,21 +275,21 @@ impl TraversalLayer for Core {
 }
 
 #[derive(DirectedHandler)]
-pub struct DriverShell {
+pub struct DriverShell<E> where E:RegErr {
     point: Point,
-    skel: StarSkel,
+    skel: StarSkel<E>,
     status: DriverStatus,
     tx: mpsc::Sender<DriverShellCall>,
     rx: mpsc::Receiver<DriverShellCall>,
     state: StateApi,
-    core: Box<dyn DriverCore>,
-    router: Arc<LayerInjectionRouter>
+    driver: Box<dyn Driver>,
+    router: Arc<LayerInjectionRouter<E>>
 }
 
 #[routes]
-impl DriverShell {
+impl <E> DriverShell<E> where E: RegErr {
 
-    pub fn new( point: Point, skel: StarSkel, core: Box<dyn DriverCore>, states: StateApi, tx: mpsc::Sender<DriverShellCall>, rx: mpsc::Receiver<DriverShellCall>) -> mpsc::Sender<DriverShellCall>{
+    pub fn new(point: Point, skel: StarSkel<E>, driver: Box<dyn Driver>, states: StateApi, tx: mpsc::Sender<DriverShellCall>, rx: mpsc::Receiver<DriverShellCall>) -> mpsc::Sender<DriverShellCall>{
 
         let router = Arc::new(LayerInjectionRouter::new(skel.clone(), point.clone().to_port().with_layer(Layer::Driver) ));
 
@@ -300,7 +300,7 @@ impl DriverShell {
             tx: tx.clone(),
             rx,
             state: states,
-            core,
+            driver,
             router
         };
 
@@ -349,12 +349,16 @@ impl DriverShell {
                     DriverShellCall::Ex { point, tx } => {
                         match self.state.get_state(point.clone().to_port().with_layer(Layer::Core)).await {
                             Ok(state) => {
-                                tx.send(Ok(self.core.ex(&point,state)));
+                                tx.send(Ok(self.driver.ex(&point, state)));
                             }
                             Err(err) => {
                                 tx.send(Err(err));
                             }
                         }
+                    }
+                    DriverShellCall::Connect { tx, rx } => {
+
+
                     }
                 }
             }
@@ -365,20 +369,20 @@ impl DriverShell {
 
     }
 
-    async fn lifecycle(&self, call: DriverLifecycleCall) -> Result<DriverStatus,MsgErr> {
-        self.core.lifecycle(call).await
+    async fn lifecycle(&mut self, call: DriverLifecycleCall) -> Result<DriverStatus,MsgErr> {
+        self.driver.lifecycle(call).await
     }
 
-    async fn core(&self, point: &Point ) -> Result<Core,MsgErr> {
+    async fn core(&self, point: &Point ) -> Result<OuterCore<E>,MsgErr> {
         let port = point.clone().to_port().with_layer(Layer::Core);
         let (tx,mut rx) = oneshot::channel();
         self.skel.state.states_tx().send(StateCall::Get{ port: port.clone(), tx }).await;
         let state = rx.await??;
-        Ok(Core {
+        Ok(OuterCore {
             port,
             skel: self.skel.clone(),
             state: state.clone(),
-            ex: self.core.ex(point,state),
+            ex: self.driver.ex(point, state),
             router: self.router.clone(),
         })
     }
@@ -388,7 +392,14 @@ impl DriverShell {
         match ctx.input {
             Sys::Assign(assign) => {
                 let ctx = ctx.push_input_ref(assign);
-                self.core.assign(ctx).await
+                let state = self.driver.assign(ctx).await?;
+
+                if let Some(state) = state {
+                    let port = self.point.clone().to_port().with_layer(Layer::Core);
+                    self.skel.state.api().put_state( port, state ).await;
+                }
+
+                Ok(ReflectedCore::ok(Substance::Empty))
             }
             _ => {
                 Err(MsgErr::bad_request())

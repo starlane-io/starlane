@@ -21,7 +21,7 @@ use crate::substance::substance::{
 use crate::substance::substance::{Substance, ToSubstance};
 use crate::sys::AssignmentKind;
 use crate::util::{uuid, ValueMatcher, ValuePattern};
-use crate::RegistryApi;
+use crate::{ANONYMOUS, HYPERUSER, RegistryApi};
 use alloc::borrow::Cow;
 use core::borrow::Borrow;
 use cosmic_macros_primitive::Autobox;
@@ -2166,6 +2166,16 @@ pub enum Agent {
     Anonymous,
     HyperUser,
     Point(Point),
+}
+
+impl Agent {
+    pub fn point(&self) -> Point {
+        match self {
+            Agent::Anonymous => ANONYMOUS.clone(),
+            Agent::HyperUser => HYPERUSER.clone(),
+            Agent::Point(point) => point.clone()
+        }
+    }
 }
 
 impl Default for Agent {

@@ -41,6 +41,7 @@
       <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-star/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-store/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cosmic/cosmic-artifact/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/drivers/cosmic-driver-control/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/drivers/cosmic-registry-postgres/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/cosmic/wasm-membrane-guest/target" />
