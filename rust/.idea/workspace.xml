@@ -6,12 +6,29 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/rust.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/rust.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/id.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/id.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/particle.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/particle.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/sys.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/sys.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/wave.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/wave.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-hyperlane/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-hyperlane/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/implementation.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/platform.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/driver.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/driver.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/machine.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/machine.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/platform.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/platform.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/star.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/star.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/starlane/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/starlane/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/starlane/kill-my-instances.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/starlane/kill.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/starlane/src/cli.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/starlane/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/starlane/src/main.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/starlane/src/resource.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/starlane/src/resources.rs/lib.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/starlane/src/resources/parse.rs/parse.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/starlane/src/resources/property.rs/property.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/starlane/starlane/starlane.iml" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -62,15 +79,16 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/Users/scott/cosmic/starlane/rust&quot;,
-    &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "WebServerToolWindowFactoryState": "false",
+    "last_opened_file_path": "/Users/scott/cosmic/starlane/rust",
+    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
+    "org.rust.disableDetachedFileInspection/Users/scott/cosmic/starlane/rust/cosmic/cosmic-artifact/src/lib.rs": "true"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/starlane-core/src/star" />
@@ -86,7 +104,24 @@
       <recent name="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Test tests::it_works (2)">
+  <component name="RunManager" selected="Cargo.Run starlane">
+    <configuration name="Run starlane" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="run --package starlane --bin starlane" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
+      <option name="backtrace" value="SHORT" />
+      <envs />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
     <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
       <option name="command" value="run  --bin starlane -- serve " />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -116,23 +151,6 @@
     </configuration>
     <configuration name="Test command::parse::test::test_kind" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
       <option name="command" value="test --package starlane-core --lib command::parse::test::test_kind -- --exact" />
-      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
-      <option name="channel" value="DEFAULT" />
-      <option name="requiredFeatures" value="true" />
-      <option name="allFeatures" value="false" />
-      <option name="emulateTerminal" value="false" />
-      <option name="withSudo" value="false" />
-      <option name="buildTarget" value="REMOTE" />
-      <option name="backtrace" value="SHORT" />
-      <envs />
-      <option name="isRedirectInput" value="false" />
-      <option name="redirectInputPath" value="" />
-      <method v="2">
-        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
-      </method>
-    </configuration>
-    <configuration name="Test star::shell::db::test::test" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="test --package starlane-core --lib star::shell::db::test::test -- --exact" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
       <option name="channel" value="DEFAULT" />
       <option name="requiredFeatures" value="true" />
@@ -219,19 +237,19 @@
     <list>
       <item itemvalue="Cargo.Run" />
       <item itemvalue="Cargo.Test" />
+      <item itemvalue="Cargo.Run starlane" />
       <item itemvalue="Cargo.Test tests::hyper_test" />
       <item itemvalue="Cargo.Test tests::it_works (2)" />
       <item itemvalue="Cargo.Test tests::it_works (1)" />
       <item itemvalue="Cargo.Test command::parse::test::test_kind" />
-      <item itemvalue="Cargo.Test star::shell::db::test::test" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Cargo.Run starlane" />
         <item itemvalue="Cargo.Test tests::it_works (2)" />
         <item itemvalue="Cargo.Test tests::hyper_test" />
         <item itemvalue="Cargo.Test tests::it_works (1)" />
         <item itemvalue="Cargo.Test command::parse::test::test_kind" />
-        <item itemvalue="Cargo.Test star::shell::db::test::test" />
       </list>
     </recent_temporary>
   </component>

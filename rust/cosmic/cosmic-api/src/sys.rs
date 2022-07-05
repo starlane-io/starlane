@@ -57,7 +57,7 @@ impl Location {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParticleRecord {
     pub details: Details,
-    pub location: Location,
+    pub location: Point,
 }
 
 impl Default for ParticleRecord {
@@ -70,7 +70,7 @@ impl ParticleRecord {
     pub fn new(details: Details, point: Point) -> Self {
         ParticleRecord {
             details,
-            location: Location::new(point),
+            location: point
         }
     }
 
@@ -84,7 +84,7 @@ impl ParticleRecord {
                 },
                 properties: Default::default(),
             },
-            location: Location::Central,
+            location: Point::central()
         }
     }
 }

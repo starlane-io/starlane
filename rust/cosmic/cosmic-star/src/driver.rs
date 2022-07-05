@@ -174,6 +174,14 @@ pub struct DriversBuilder {
 }
 
 impl DriversBuilder {
+
+    pub fn new() -> Self {
+        Self {
+            factories: HashMap::new(),
+            logger: None
+        }
+    }
+
     pub fn add(&mut self, factory: Box<dyn DriverFactory>) {
         self.factories.insert(factory.kind().clone(), factory);
     }

@@ -191,3 +191,17 @@ impl Particle {
         self.state.clone()
     }
 }
+
+#[derive(Debug,Clone,Eq,PartialEq,Hash, Serialize,Deserialize)]
+pub struct Watch {
+    pub point: Point,
+    pub aspect: Aspect
+}
+
+#[derive(Debug,Clone,Eq,PartialEq,Hash,Serialize,Deserialize,strum_macros::Display)]
+pub enum Aspect {
+    Log,
+    State,
+    Property,
+    Child
+}

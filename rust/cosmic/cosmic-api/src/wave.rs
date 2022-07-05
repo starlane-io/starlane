@@ -10,6 +10,7 @@ use crate::msg::MsgMethod;
 use crate::parse::model::Subst;
 use crate::parse::sub;
 use crate::particle::particle::{Details, Status};
+use crate::particle::Watch;
 use crate::quota::Timeouts;
 use crate::security::{Permissions, Privilege, Privileges};
 use crate::selector::selector::Selector;
@@ -20,6 +21,7 @@ use crate::substance::substance::{
 use crate::substance::substance::{Substance, ToSubstance};
 use crate::sys::AssignmentKind;
 use crate::util::{uuid, ValueMatcher, ValuePattern};
+use crate::RegistryApi;
 use alloc::borrow::Cow;
 use core::borrow::Borrow;
 use cosmic_macros_primitive::Autobox;
@@ -29,6 +31,7 @@ use http::{HeaderMap, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
+use std::env::var;
 use std::marker::PhantomData;
 use std::ops;
 use std::ops::{Deref, DerefMut};
@@ -70,43 +73,63 @@ impl WaveKind {
     }
 }
 
+pub type UltraWave = UltraWaveDef<Recipients>;
+pub type SingularUltraWave = UltraWaveDef<Port>;
+
+impl SingularUltraWave {
+    pub fn to_ultra(self) -> Result<UltraWave,MsgErr> {
+       match self {
+           SingularUltraWave::Ping(ping) => Ok(UltraWave::Ping(ping)),
+           SingularUltraWave::Pong(pong) => Ok(UltraWave::Pong(pong)),
+           SingularUltraWave::Echo(echo) => Ok(UltraWave::Echo(echo)),
+           SingularUltraWave::Signal(signal) => Ok(UltraWave::Signal(signal)),
+           SingularUltraWave::Ripple(ripple) => {
+               ripple.
+
+               Ok(UltraWave::Ripple(ripple))
+           }
+       }
+    }
+}
+
+
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub enum UltraWave {
+pub enum UltraWaveDef<T> where T:ToRecipients+Clone{
     Ping(Wave<Ping>),
     Pong(Wave<Pong>),
-    Ripple(Wave<Ripple>),
+    Ripple(Wave<RippleDef<T>>),
     Echo(Wave<Echo>),
     Signal(Wave<Signal>),
 }
 
 impl UltraWave {
+
     pub fn to_substance(self) -> Substance {
         Substance::UltraWave(Box::new(self))
     }
 
-    pub fn to_directed(self) -> Result<DirectedWave,MsgErr> {
+    pub fn to_directed(self) -> Result<DirectedWave, MsgErr> {
         match self {
             UltraWave::Ping(ping) => Ok(ping.to_directed()),
             UltraWave::Ripple(ripple) => Ok(ripple.to_directed()),
             UltraWave::Signal(signal) => Ok(signal.to_directed()),
-            _ => Err(MsgErr::bad_request())
+            _ => Err(MsgErr::bad_request()),
         }
     }
 
-    pub fn to_signal(self) -> Result<Wave<Signal>,MsgErr> {
+    pub fn to_signal(self) -> Result<Wave<Signal>, MsgErr> {
         match self {
             UltraWave::Signal(signal) => Ok(signal),
-            _ => Err(MsgErr::bad_request())
+            _ => Err(MsgErr::bad_request()),
         }
     }
-
 
     pub fn method(&self) -> Option<&Method> {
         match self {
             UltraWave::Ping(ping) => Some(&ping.method),
-            UltraWave::Ripple(ripple) =>  Some(&ripple.method),
-            UltraWave::Signal(signal) =>  Some(&signal.method),
-            _ => None
+            UltraWave::Ripple(ripple) => Some(&ripple.method),
+            UltraWave::Signal(signal) => Some(&signal.method),
+            _ => None,
         }
     }
 
@@ -140,10 +163,10 @@ impl UltraWave {
         }
     }
 
-    pub fn to_ripple(self) -> Result<Wave<Ripple>,MsgErr> {
+    pub fn to_ripple(self) -> Result<Wave<Ripple>, MsgErr> {
         match self {
             UltraWave::Ripple(ripple) => Ok(ripple),
-            _ => Err("not a ripple".into())
+            _ => Err("not a ripple".into()),
         }
     }
 }
@@ -481,11 +504,61 @@ impl Into<WaitTime> for &DirectWaveStub {
     }
 }
 
+pub type Ripple = RippleDef<Recipients>;
+pub type SingularRipple = RippleDef<Port>;
+
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct Ripple {
-    pub to: Recipients,
+pub struct RippleDef<T: ToRecipients+Clone> {
+    pub to: T,
     pub core: DirectedCore,
     pub bounce_backs: BounceBacks,
+}
+
+impl <T> RippleDef<T> where T:ToRecipients+Clone{
+   pub fn replace_to<T2:ToRecipients+Clone>( self, to: T2 ) -> RippleDef<T2> {
+       RippleDef {
+           to,
+           core,
+           bounce_backs
+       }
+   }
+}
+
+impl Wave<SingularRipple> {
+    pub fn to_singular_ultra(self) -> SingularUltraWave{
+        SingularUltraWave::Ripple(self)
+    }
+
+    pub fn to_multiple( self) -> Wave<Ripple> {
+        let ripple = self.variant.clone().replace_to( self.variant.to.clone().to_recipients());
+        self.replace(ripple)
+    }
+}
+
+impl Wave<Ripple> {
+    pub async fn shard_by_location(self, adjacent: &HashSet<Point>, registry: &Arc<dyn RegistryApi>) -> Result<HashMap<Point,Wave<Ripple>>,MsgErr> {
+        let mut map = HashMap::new();
+        for (point,recipients) in self.to.clone().shard_by_location(adjacent, registry).await? {
+            let mut ripple = self.clone();
+            ripple.variant.to = recipients;
+            map.insert( point, ripple );
+        }
+        Ok(map)
+    }
+
+    pub async fn to_singulars(self, adjacent: &HashSet<Point>, registry: &Arc<dyn RegistryApi>) -> Result<Vec<Wave<SingularRipple>>,MsgErr> {
+        let mut rtn = vec![];
+        for port in self.to.clone().to_ports(adjacent,registry).await? {
+            let wave = self.as_single(port);
+            rtn.push(wave)
+        }
+        Ok(rtn)
+    }
+
+    fn as_single( &self, port: Port ) -> Wave<SingularRipple> {
+        let ripple = self.variant.clone().replace_to( port );
+        self.replace(ripple)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -496,9 +569,9 @@ pub enum BounceBacks {
     Timer(WaitTime),
 }
 
-impl<S> ToSubstance<S> for Ripple
+impl<S,T> ToSubstance<S> for RippleDef<T>
 where
-    Substance: ToSubstance<S>,
+    Substance: ToSubstance<S>,T:ToRecipients+Clone
 {
     fn to_substance(self) -> Result<S, MsgErr> {
         self.core.to_substance()
@@ -509,11 +582,11 @@ where
     }
 }
 
-impl Ripple {
+impl <T> RippleDef<T> where T: ToRecipients+Clone{
     pub fn require_method<M: Into<Method> + ToString + Clone>(
         self,
         method: M,
-    ) -> Result<Ripple, MsgErr> {
+    ) -> Result<RippleDef<T>, MsgErr> {
         if self.core.method == method.clone().into() {
             Ok(self)
         } else {
@@ -528,14 +601,14 @@ impl Ripple {
     where
         B: TryFrom<Substance, Error = MsgErr>,
     {
-        match B::try_from(self.clone().core.body) {
+        match B::try_from(self.body.clone()) {
             Ok(body) => Ok(body),
             Err(err) => Err(MsgErr::bad_request()),
         }
     }
 }
 
-impl Deref for Ripple {
+impl <T> Deref for RippleDef<T> where T:ToRecipients+Clone{
     type Target = DirectedCore;
 
     fn deref(&self) -> &Self::Target {
@@ -543,7 +616,7 @@ impl Deref for Ripple {
     }
 }
 
-impl DerefMut for Ripple {
+impl <T> DerefMut for RippleDef<T> where T:ToRecipients+Clone{
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.core
     }
@@ -629,7 +702,7 @@ impl Into<DirectedProto> for Wave<Ping> {
             scope: Some(self.scope),
             agent: Some(self.agent),
             kind: None,
-            bounce_backs: None
+            bounce_backs: None,
         }
     }
 }
@@ -807,7 +880,7 @@ impl ReflectedProto {
         }
     }
 
-    pub fn fill_intended<I: ToRecipients>(&mut self, intended: I) {
+    pub fn fill_intended<I: ToRecipients+Clone>(&mut self, intended: I) {
         if self.intended.is_none() {
             self.intended.replace(intended.to_recipients());
         }
@@ -912,7 +985,6 @@ impl ReflectedProto {
     }
 }
 
-
 #[derive(Clone)]
 pub struct DirectedProto {
     pub id: WaveId,
@@ -928,9 +1000,9 @@ pub struct DirectedProto {
 
 impl DirectedProto {
     pub fn build(self) -> Result<DirectedWave, MsgErr> {
-        let kind = self
-            .kind
-            .ok_or::<MsgErr>("kind must be set for DirectedProto to create the proper DirectedWave".into())?;
+        let kind = self.kind.ok_or::<MsgErr>(
+            "kind must be set for DirectedProto to create the proper DirectedWave".into(),
+        )?;
 
         let mut wave = match kind {
             DirectedKind::Ping => {
@@ -996,7 +1068,7 @@ impl DirectedProto {
         }
     }
 
-    pub fn fill_to<R: ToRecipients>(&mut self, to: R) {
+    pub fn fill_to<R: ToRecipients+Clone>(&mut self, to: R) {
         if self.to.is_none() {
             self.to.replace(to.to_recipients());
         }
@@ -1071,7 +1143,7 @@ impl DirectedProto {
         Ok(())
     }
 
-    pub fn to<P: ToRecipients>(&mut self, to: P) {
+    pub fn to<P: ToRecipients+Clone>(&mut self, to: P) {
         self.to.replace(to.to_recipients());
     }
 
@@ -1091,11 +1163,11 @@ impl DirectedProto {
             scope: None,
             agent: None,
             kind: None,
-            bounce_backs: None
+            bounce_backs: None,
         }
     }
 
-    pub fn to_with_method<P: ToRecipients>(to: P, method: Method) -> Self {
+    pub fn to_with_method<P: ToRecipients+Clone>(to: P, method: Method) -> Self {
         Self {
             id: WaveId::new(WaveKind::Ping),
             from: None,
@@ -1105,7 +1177,7 @@ impl DirectedProto {
             scope: None,
             agent: None,
             kind: None,
-            bounce_backs: None
+            bounce_backs: None,
         }
     }
 
@@ -1119,29 +1191,29 @@ impl DirectedProto {
             scope: None,
             agent: None,
             kind: None,
-            bounce_backs: None
+            bounce_backs: None,
         }
     }
 
-    pub fn sys<M: Into<SysMethod>, P: ToRecipients>(to: P, method: M) -> Self {
+    pub fn sys<M: Into<SysMethod>, P: ToRecipients+Clone>(to: P, method: M) -> Self {
         let method: SysMethod = method.into();
         let method: Method = method.into();
         Self::to_with_method(to, method)
     }
 
-    pub fn msg<M: Into<MsgMethod>, P: ToRecipients>(to: P, method: M) -> Self {
+    pub fn msg<M: Into<MsgMethod>, P: ToRecipients+Clone>(to: P, method: M) -> Self {
         let method: MsgMethod = method.into();
         let method: Method = method.into();
         Self::to_with_method(to, method)
     }
 
-    pub fn http<M: Into<HttpMethod>, P: ToRecipients>(to: P, method: M) -> Self {
+    pub fn http<M: Into<HttpMethod>, P: ToRecipients+Clone>(to: P, method: M) -> Self {
         let method: HttpMethod = method.into();
         let method: Method = method.into();
         Self::to_with_method(to, method)
     }
 
-    pub fn cmd<M: Into<CmdMethod>, P: ToRecipients>(to: P, method: M) -> Self {
+    pub fn cmd<M: Into<CmdMethod>, P: ToRecipients+Clone>(to: P, method: M) -> Self {
         let method: CmdMethod = method.into();
         let method: Method = method.into();
         Self::to_with_method(to, method)
@@ -1172,12 +1244,14 @@ impl DerefMut for Echoes {
     }
 }
 
-
-impl FromReflectedAggregate for (){
-    fn from_reflected_aggregate(agg: ReflectedAggregate) -> Result<Self, MsgErr> where Self: Sized {
+impl FromReflectedAggregate for () {
+    fn from_reflected_aggregate(agg: ReflectedAggregate) -> Result<Self, MsgErr>
+    where
+        Self: Sized,
+    {
         match agg {
             ReflectedAggregate::None => Ok(()),
-            _ => Err(MsgErr::bad_request())
+            _ => Err(MsgErr::bad_request()),
         }
     }
 }
@@ -1353,51 +1427,22 @@ impl<'a> RecipientSelector<'a> {
     }
 }
 
+pub type DirectedWave = DirectedWaveDef<Recipients>;
+pub type SingularDirectedWave = DirectedWaveDef<Port>;
+
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub enum DirectedWave {
+pub enum DirectedWaveDef<T> where T: ToRecipients+Clone{
     Ping(Wave<Ping>),
-    Ripple(Wave<Ripple>),
+    Ripple(Wave<RippleDef<T>>),
     Signal(Wave<Signal>),
 }
 
 impl DirectedWave {
-    pub fn id(&self) -> &WaveId {
-        match self {
-            DirectedWave::Ping(ping) => &ping.id,
-            DirectedWave::Ripple(ripple) => &ripple.id,
-            DirectedWave::Signal(signal) => &signal.id,
-        }
-    }
-
-    pub fn agent(&self) -> &Agent {
-        match self {
-            DirectedWave::Ping(ping) => &ping.agent,
-            DirectedWave::Ripple(ripple) => &ripple.agent,
-            DirectedWave::Signal(signal) => &signal.agent,
-        }
-    }
-
-    pub fn scope(&self) -> &Scope {
-        match self {
-            DirectedWave::Ping(ping) => &ping.scope,
-            DirectedWave::Ripple(ripple) => &ripple.scope,
-            DirectedWave::Signal(signal) => &signal.scope,
-        }
-    }
-
-    pub fn handling(&self) -> &Handling {
-        match self {
-            DirectedWave::Ping(ping) => &ping.handling,
-            DirectedWave::Ripple(ripple) => &ripple.handling,
-            DirectedWave::Signal(signal) => &signal.handling,
-        }
-    }
-
     pub fn to(&self) -> Recipients {
         match self {
-            DirectedWave::Ping(ping) => ping.to.clone().to_recipients(),
-            DirectedWave::Ripple(ripple) => ripple.to.clone(),
-            DirectedWave::Signal(signal) => signal.to.clone().to_recipients(),
+            Self::Ping(ping) => ping.to.clone().to_recipients(),
+            Self::Ripple(ripple) => ripple.to.clone(),
+            Self::Signal(signal) => signal.to.clone().to_recipients(),
         }
     }
 
@@ -1408,29 +1453,109 @@ impl DirectedWave {
             reflection_of: self.id().clone(),
         }
     }
+}
+
+impl SingularDirectedWave {
+    pub fn to(&self) -> Port {
+        match self {
+            Self::Ping(ping) => ping.to.clone(),
+            Self::Ripple(ripple) => ripple.to.clone(),
+            Self::Signal(signal) => signal.to.clone(),
+        }
+    }
+
+    pub fn reflection(&self) -> Reflection {
+        Reflection {
+            from: self.from().clone(),
+            to: self.to().to_recipients(),
+            reflection_of: self.id().clone(),
+        }
+    }
+
+}
+
+
+impl <T> DirectedWaveDef<T> where T:ToRecipients+Clone{
+    pub fn id(&self) -> &WaveId {
+        match self {
+            DirectedWaveDef::Ping(ping) => &ping.id,
+            DirectedWaveDef::Ripple(ripple) => &ripple.id,
+            DirectedWaveDef::Signal(signal) => &signal.id,
+        }
+    }
+
+    pub fn agent(&self) -> &Agent {
+        match self {
+            DirectedWaveDef::Ping(ping) => &ping.agent,
+            DirectedWaveDef::Ripple(ripple) => &ripple.agent,
+            DirectedWaveDef::Signal(signal) => &signal.agent,
+        }
+    }
+
+    pub fn scope(&self) -> &Scope {
+        match self {
+            DirectedWaveDef::Ping(ping) => &ping.scope,
+            DirectedWaveDef::Ripple(ripple) => &ripple.scope,
+            DirectedWaveDef::Signal(signal) => &signal.scope,
+        }
+    }
+
+    pub fn handling(&self) -> &Handling {
+        match self {
+            DirectedWaveDef::Ping(ping) => &ping.handling,
+            DirectedWaveDef::Ripple(ripple) => &ripple.handling,
+            DirectedWaveDef::Signal(signal) => &signal.handling,
+        }
+    }
+
+
 
     pub fn err(&self, err: MsgErr, responder: Port) -> Bounce<ReflectedWave> {
         match self {
-            DirectedWave::Ping(ping) => Bounce::Reflected(ping.err(err, responder).to_reflected()),
-            DirectedWave::Ripple(ripple) => {
+            DirectedWaveDef::Ping(ping) => Bounce::Reflected(ping.err(err, responder).to_reflected()),
+            DirectedWaveDef::Ripple(ripple) => {
                 Bounce::Reflected(ripple.err(err, responder).to_reflected())
             }
-            DirectedWave::Signal(_) => Bounce::Absorbed,
+            DirectedWaveDef::Signal(_) => Bounce::Absorbed,
         }
     }
 
     pub fn to_call(&self) -> Result<Call, MsgErr> {
         match self {
-            DirectedWave::Ping(ping) => ping.to_call(),
+            DirectedWaveDef::Ping(ping) => ping.to_call(),
             _ => Err(MsgErr::not_found()),
         }
     }
 
     pub fn bounce_backs(&self) -> BounceBacks {
         match self {
-            DirectedWave::Ping(ping) => ping.bounce_backs(),
-            DirectedWave::Ripple(ripple) => ripple.bounce_backs(),
-            DirectedWave::Signal(signal) => signal.bounce_backs(),
+            DirectedWaveDef::Ping(ping) => ping.bounce_backs(),
+            DirectedWaveDef::Ripple(ripple) => ripple.bounce_backs(),
+            DirectedWaveDef::Signal(signal) => signal.bounce_backs(),
+        }
+    }
+
+    pub fn from(&self) -> &Port {
+        match self {
+            DirectedWaveDef::Ping(ping) => &ping.from,
+            DirectedWaveDef::Ripple(ripple) => &ripple.from,
+            DirectedWaveDef::Signal(signal) => &signal.from
+        }
+    }
+
+    pub fn body(&self) -> &Substance {
+        match self {
+            DirectedWaveDef::Ping(ping) => &ping.core.body,
+            DirectedWaveDef::Ripple(ripple) => &ripple.core.body,
+            DirectedWaveDef::Signal(signal) => &signal.core.body,
+        }
+    }
+
+    pub fn core(&self) -> &DirectedCore {
+        match self {
+            DirectedWaveDef::Ping(ping) => &ping.core,
+            DirectedWaveDef::Ripple(ripple) => &ripple.core,
+            DirectedWaveDef::Signal(signal) => &signal.core,
         }
     }
 }
@@ -1473,13 +1598,7 @@ where
 }
 
 impl DirectedWave {
-    pub fn from(&self) -> &Port {
-        match self {
-            DirectedWave::Ping(ping) => &ping.from,
-            DirectedWave::Ripple(ripple) => &ripple.from,
-            DirectedWave::Signal(signal) => &signal.from,
-        }
-    }
+
     pub fn to_ultra(self) -> UltraWave {
         match self {
             DirectedWave::Ping(ping) => UltraWave::Ping(ping),
@@ -1488,21 +1607,7 @@ impl DirectedWave {
         }
     }
 
-    pub fn body(&self) -> &Substance {
-        match self {
-            DirectedWave::Ping(ping) => &ping.core.body,
-            DirectedWave::Ripple(ripple) => &ripple.core.body,
-            DirectedWave::Signal(signal) => &signal.core.body,
-        }
-    }
 
-    pub fn core(&self) -> &DirectedCore {
-        match self {
-            DirectedWave::Ping(ping) => &ping.core,
-            DirectedWave::Ripple(ripple) => &ripple.core,
-            DirectedWave::Signal(signal) => &signal.core,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -1611,21 +1716,21 @@ impl ReflectedWave {
 pub enum Recipients {
     Single(Port),
     Multi(Vec<Port>),
+    Watchers(Watch),
+    Stars,
 }
 
 impl ToRecipients for Recipients {
     fn to_recipients(self) -> Recipients {
         self
     }
-
-
 }
 
 impl Recipients {
-    pub fn split(map: HashMap<Point, Vec<Port>> ) -> HashMap<Point,Recipients> {
+    pub fn split(map: HashMap<Point, Vec<Port>>) -> HashMap<Point, Recipients> {
         let mut rtn = HashMap::new();
-        for (point,value) in map {
-            rtn.insert( point, Recipients::Multi(value) );
+        for (point, value) in map {
+            rtn.insert(point, Recipients::Multi(value));
         }
         rtn
     }
@@ -1642,6 +1747,68 @@ pub trait ToRecipients {
 }
 
 impl Recipients {
+    pub async fn shard_by_location(
+        self,
+        adjacent: &HashSet<Point>,
+        registry: &Arc<dyn RegistryApi>,
+    ) -> Result<HashMap<Point, Recipients>, MsgErr> {
+        match self {
+            Recipients::Single(single) => {
+                let mut map = HashMap::new();
+                let record = registry.locate(&single.point).await?;
+                map.insert(record.location, Recipients::Single(single));
+                Ok(map)
+            }
+            Recipients::Multi(multi) => {
+                let mut map:HashMap<Point,Vec<Port>> = HashMap::new();
+                for p in multi {
+                    let record = registry.locate(&p).await?;
+                    if let Some(found) = map.get_mut(&record.location) {
+                        found.push(p);
+                    } else {
+                        map.insert(record.location, vec![p]);
+                    }
+                }
+
+                let mut map2 = HashMap::new();
+                for (location,points) in map {
+                    map2.insert( location, Recipients::Multi(points));
+                }
+                Ok(map2)
+            }
+            Recipients::Watchers(_) => {
+                let mut map = HashMap::new();
+                // todo
+                Ok(map)
+            }
+            Recipients::Stars => {
+                let mut map = HashMap::new();
+                for star in adjacent {
+                    map.insert( star.clone(), Recipients::Stars );
+                }
+                Ok(map)
+            }
+        }
+    }
+
+
+
+    pub async fn to_ports(self,adjacent: &HashSet<Point>, registry: &Arc<dyn RegistryApi>,) -> Result<Vec<Port>,MsgErr> {
+        match self {
+            Recipients::Single(single) => Ok(vec![single]),
+            Recipients::Multi(multi) => {
+                Ok(multi.into_iter().map(|p| p).collect())
+            }
+            Recipients::Watchers(watch) => {
+                unimplemented!();
+            }
+            Recipients::Stars => {
+                let stars :Vec<Port> = adjacent.clone().into_iter().map(|p|p.to_port()).collect();
+                Ok(stars)
+            }
+        }
+    }
+
     pub fn select_ports(&self, point: &Point) -> Vec<&Port> {
         let mut rtn = vec![];
         match self {
@@ -1657,6 +1824,8 @@ impl Recipients {
                     }
                 }
             }
+            Recipients::Watchers(_) => {}
+            Recipients::Stars => {}
         }
         rtn
     }
@@ -1665,6 +1834,8 @@ impl Recipients {
         match self {
             Recipients::Single(_) => true,
             Recipients::Multi(_) => false,
+            Recipients::Watchers(_) => false,
+            Recipients::Stars => false,
         }
     }
 
@@ -1672,18 +1843,32 @@ impl Recipients {
         match self {
             Recipients::Single(_) => false,
             Recipients::Multi(_) => true,
+            Recipients::Watchers(_) => false,
+            Recipients::Stars => false,
         }
     }
+
+    pub fn is_stars(&self) -> bool {
+        match self {
+            Recipients::Single(_) => false,
+            Recipients::Multi(_) => false,
+            Recipients::Watchers(_) => false,
+            Recipients::Stars => true
+        }
+    }
+
+    pub fn is_watch(&self) -> bool {
+        match self {
+            Recipients::Single(_) => false,
+            Recipients::Multi(_) => false,
+            Recipients::Watchers(_) => true,
+            Recipients::Stars => false
+        }
+    }
+
 
     pub fn unwrap_single(self) -> Port {
         self.single_or().expect("single")
-    }
-
-    pub fn unwrap_multi(self) -> Vec<Port> {
-        match self {
-            Recipients::Single(port) => vec![port],
-            Recipients::Multi(ports) => ports,
-        }
     }
 
     pub fn single_or(self) -> Result<Port, MsgErr> {
@@ -1746,13 +1931,15 @@ impl Wave<Ripple> {
     pub fn to_directed(self) -> DirectedWave {
         DirectedWave::Ripple(self)
     }
+}
 
+impl <T> Wave<RippleDef<T>> where T: ToRecipients+Clone {
     pub fn err(&self, err: MsgErr, responder: Port) -> Wave<Echo> {
         Wave::new(
             Echo::new(
                 self.variant.err(err),
                 self.from.clone(),
-                self.to.clone(),
+                self.to.clone().to_recipients(),
                 self.id.clone(),
             ),
             responder,
@@ -1882,6 +2069,22 @@ impl<V> Wave<V> {
             star_hops: 0,
         }
     }
+
+    pub fn replace<V2>(self, variant: V2) -> Wave<V2>
+        where
+            V2: WaveVariant,
+    {
+        Wave {
+            id: self.id,
+            session: self.session,
+            agent: self.agent,
+            handling: self.handing,
+            scope: self.scope,
+            variant,
+            from: self.from,
+            star_hops: self.star_hops,
+        }
+    }
 }
 
 pub trait WaveVariant {
@@ -1900,7 +2103,7 @@ impl WaveVariant for Pong {
     }
 }
 
-impl WaveVariant for Ripple {
+impl <T> WaveVariant for RippleDef<T> where T: ToRecipients+Clone {
     fn kind(&self) -> WaveKind {
         WaveKind::Ripple
     }
@@ -1921,7 +2124,7 @@ impl Wave<Ping> {
     }
 }
 
-impl Wave<Ripple> {
+impl <T> Wave<RippleDef<T>> where T:ToRecipients+Clone{
     pub fn echo(&self) -> ReflectedProto {
         let mut echo = ReflectedProto::new();
         echo.kind(ReflectedKind::Echo);
@@ -3227,7 +3430,9 @@ impl ProtoTransmitter {
         let directed = wave.build()?;
 
         match directed.bounce_backs() {
-            BounceBacks::None => FromReflectedAggregate::from_reflected_aggregate(ReflectedAggregate::None),
+            BounceBacks::None => {
+                FromReflectedAggregate::from_reflected_aggregate(ReflectedAggregate::None)
+            }
             _ => {
                 let reflected_rx = self.exchanger.exchange(&directed).await;
                 let reflected_agg = reflected_rx.await?;
@@ -3297,3 +3502,28 @@ impl HyperWave {
         self.wave.from()
     }
 }
+
+
+#[derive(Clone)]
+pub struct Delivery {
+    pub to: Port,
+    pub wave: DirectedWave,
+}
+
+impl Delivery {
+    pub fn new( to: Port, wave: DirectedWave ) -> Self {
+        Self {
+            to,
+            wave
+        }
+    }
+}
+
+impl Deref for Delivery  {
+    type Target =DirectedWave;
+
+    fn deref(&self) -> &Self::Target {
+        &self.wave
+    }
+}
+

@@ -47,7 +47,12 @@ use std::ops::Deref;
 use std::sync::{Arc, RwLock};
 use chrono::{DateTime, Utc};
 use dashmap::{DashMap, DashSet};
-use crate::security::Access;
+use crate::command::command::common::SetProperties;
+use crate::command::request::delete::Delete;
+use crate::command::request::query::{Query, QueryResult};
+use crate::command::request::select::{Select, SubSelect};
+use crate::particle::particle::{Details, Properties, Status, Stub};
+use crate::security::{Access, AccessGrant};
 use crate::substance::substance::Substance;
 use crate::sys::ParticleRecord;
 use crate::wave::Agent;
@@ -64,7 +69,7 @@ extern "C" {
 
 
 #[async_trait]
-pub trait Artifacts: Send+Sync {
+pub trait ArtifactApi: Send+Sync {
     async fn bind(&self, artifact: &Point) -> Result<ArtRef<BindConfig>, MsgErr>;
 }
 
@@ -105,10 +110,59 @@ pub mod tests {
 }
 
 #[async_trait]
-pub trait RegistryApi: Send + Sync {
-    async fn access(&self, to: &Agent, on: &Point) -> Result<Access,MsgErr>;
-    async fn locate(&self, particle: &Point) -> Result<ParticleRecord,MsgErr>;
+pub trait RegistryApi<E>: Send + Sync where E: RegErr{
+    async fn register(&self, registration: &Registration) -> Result<Details, E>;
+
+    async fn assign(&self, point: &Point, location: &Point) -> Result<(), E>;
+
+    async fn set_status(&self, point: &Point, status: &Status) -> Result<(), E>;
+
+    async fn set_properties(
+        &self,
+        point: &Point,
+        properties: &SetProperties,
+    ) -> Result<(), E>;
+
+    async fn sequence(&self, point: &Point) -> Result<u64, E>;
+
+    async fn get_properties( &self, point:&Point ) -> Result<Properties, E>;
+
+    async fn locate(&self, point: &Point) -> Result<ParticleRecord, E>;
+
+    async fn query(&self, point: &Point, query: &Query) -> Result<QueryResult, E>;
+
+    async fn delete(&self, delete: &Delete ) -> Result<PrimitiveList, E>;
+
+    async fn select(&self, select: &mut Select) -> Result<PrimitiveList, E>;
+
+    async fn sub_select(&self, sub_select: &SubSelect) -> Result<Vec<Stub>, E>;
+
+    async fn grant(&self, access_grant: &AccessGrant) -> Result<(), E>;
+
+    async fn access(&self, to: &Point, on: &Point) -> Result<Access, E>;
+
+    async fn chown(&self, on: &PointSelector, owner: &Point, by: &Point) -> Result<(), E>;
+
+    async fn list_access(
+        &self,
+        to: &Option<&Point>,
+        on: &PointSelector,
+    ) -> Result<Vec<IndexedAccessGrant>, E>;
+
+    async fn remove_access(&self, id: i32, to: &Point) -> Result<(), E>;
 }
+
+pub trait RegErr {
+    fn message(&self) -> String;
+}
+
+impl Into<MsgErr> for RegErr where RegErr:Sized{
+    fn into(self) -> MsgErr {
+        MsgErr::from_500(self.message())
+    }
+}
+
+
 
 pub struct StateCache<C> where C: State {
     pub states: Arc<DashMap<Point,Arc<RwLock<C>>>>

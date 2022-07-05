@@ -1684,6 +1684,12 @@ pub mod id {
         }
     }
 
+    impl Into<Recipients> for Port {
+        fn into(self) -> Recipients {
+            Recipients::Single(self)
+        }
+    }
+
     impl ToRecipients for Port {
         fn to_recipients(self) -> Recipients {
             Recipients::Single(self)

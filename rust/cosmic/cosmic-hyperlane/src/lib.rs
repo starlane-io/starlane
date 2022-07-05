@@ -563,8 +563,9 @@ impl InterchangeEntryRouter {
         }
     }
 
-    pub async fn add(&self, kind: InterchangeKind, hyperway: Hyperway ) {
-        self.map.get(kind).ok_or("expected kind to be available").add(hyperway);
+    pub async fn add(&self, kind: InterchangeKind, hyperway: Hyperway ) -> Result<(),MsgErr> {
+        self.map.get(&kind).ok_or("expected kind to be available")?.value().jump_the_gate(hyperway);
+        Ok(())
     }
 }
 
@@ -617,7 +618,7 @@ impl HyperGate {
         Ok((tx, rx))
     }
 
-    pub fn add( &self, hyperway: Hyperway )  {
+    pub fn jump_the_gate(&self, hyperway: Hyperway )  {
        self.interchange.add(hyperway);
     }
 }

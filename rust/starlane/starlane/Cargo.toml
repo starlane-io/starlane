@@ -1,38 +1,15 @@
 [package]
 name = "starlane"
-version = "0.2.0"
-authors = ["Scott Williams <scott@mightydevco.com>"]
-edition = "2018"
-
-description = "Starlane - a Resource Mesh"
-homepage = "http://starlane.io"
-repository = "https://github.com/mechtronium/starlane"
-license = "MIT OR Apache-2.0"
+version = "0.1.0"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[[bin]]
-name = "starlane"
-
 [dependencies]
-starlane-core = { path="../starlane-core" }
-tokio = { version = "1.15.0", features = ["full"] }
-dirs = "3.0.2"
-serde_json = "1.0"
-serde = { version="1.0.69", features=['derive','rc'] }
+cosmic-api={ path="../../cosmic/cosmic-api"}
+cosmic-star={ path="../../cosmic/cosmic-star"}
+cosmic-registry-postgres={ path="../../drivers/cosmic-registry-postgres"}
+cosmic-artifact={ path="../../cosmic/cosmic-artifact"}
 lazy_static = "1.4.0"
-tempfile = "3.2.0"
-zip = "0.5.13"
-tracing = "0.1.26"
-tracing-subscriber = '0.2.19'
-tracing-futures = "0.2.5"
-ctrlc = { version="3.1.9", features=["termination"] }
-clap = { version="2.33", features=["yaml"] }
-tablestream = "0.1.3"
-anyhow = "1.0.44"
-reqwest = { version = "0.11.10", features = ["json"] }
-
-cosmic-api = { path= "../../cosmic/cosmic-api" }
-
-
-
+uuid = { version="1.1.2", features=["v4"] }
+chrono = { version="0.4.19", features=["serde"] }

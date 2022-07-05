@@ -5,35 +5,35 @@ use cosmic_api::id::id::{Point, ToPoint, ToPort};
 use cosmic_api::id::StarKey;
 use cosmic_api::log::RootLogger;
 use cosmic_api::quota::Timeouts;
-use cosmic_api::sys::InterchangeKind;
+use cosmic_api::sys::{EntryReq, InterchangeKind};
 use cosmic_api::wave::{Agent, HyperWave};
-use cosmic_api::{Artifacts, RegistryApi};
-use cosmic_hyperlane::{HyperClient, HyperGate, HyperRouter, Hyperway, HyperwayInterchange, InterchangeEntryRouter, LocalClientConnectionFactory, TokenAuthenticatorWithRemoteWhitelist};
+use cosmic_api::{ArtifactApi, RegErr, RegistryApi};
+use cosmic_hyperlane::{HyperClient, HyperGate, HyperRouter, Hyperway, HyperwayIn, HyperwayInterchange, InterchangeEntryRouter, LocalClientConnectionFactory, TokenAuthenticatorWithRemoteWhitelist};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use dashmap::DashMap;
 use tokio::sync::{mpsc, oneshot};
 use cosmic_api::substance::substance::Substance;
-use cosmic_api::wave::SysMethod::EntryReq;
 
 #[derive(Clone)]
-pub struct MachineSkel {
-    pub registry: Arc<dyn RegistryApi>,
-    pub artifacts: Arc<dyn Artifacts>,
+pub struct MachineSkel<E> where E: RegErr{
+    pub registry: Arc<dyn RegistryApi<E>>,
+    pub artifacts: Arc<dyn ArtifactApi>,
     pub logger: RootLogger,
     pub timeouts: Timeouts,
     pub tx: mpsc::Sender<MachineCall>
 }
 
-pub struct Machine {
-    pub skel: MachineSkel,
+pub struct Machine<E> where E: RegErr{
+    pub skel: MachineSkel<E>,
     pub stars: Arc<HashMap<Point, StarApi>>,
     pub entry_router: InterchangeEntryRouter,
+    pub interchanges: HashMap<StarKey,Arc<HyperwayInterchange>>,
     pub platform: Box<dyn Platform>,
     pub rx: mpsc::Receiver<MachineCall>
 }
 
-impl Machine {
+impl <E> Machine<E> where E: RegErr{
     pub fn new(
         platform: Box<dyn Platform>,
         template: MachineTemplate,
@@ -50,6 +50,7 @@ impl Machine {
         let mut stars = HashMap::new();
         let mut gates = Arc::new(DashMap::new());
         let mut clients = vec![];
+        let mut interchanges = HashMap::new();
         for star_template in template.stars {
             let star_point = star_template.key.clone().to_point();
             let (fabric_tx, mut fabric_rx) = mpsc::channel(32 * 1024);
@@ -62,12 +63,13 @@ impl Machine {
             let star_api = Star::new(star_skel.clone(), drivers);
             stars.insert(star_point.clone(), star_api.clone());
 
-            let interchange = HyperwayInterchange::new(Box::new(StarRouter::new(star_api)), logger.push("interchange").unwrap());
+            let interchange = Arc::new(HyperwayInterchange::new(Box::new(StarRouter::new(star_api)), logger.push("interchange").unwrap()));
+            interchanges.insert( star_template.key.clone(), interchange.clone() );
             let mut connect_whitelist = HashSet::new();
             for con in &star_template.hyperway {
                 match con {
                     StarCon::Receive(key) => {
-                        connect_whitelist.insert(key.clone().to_poin());
+                        connect_whitelist.insert(key.clone().to_point());
                     }
                     StarCon::Connect(key) => {
                         clients.push( (star_point.clone(),key.clone()) )
@@ -80,14 +82,17 @@ impl Machine {
                 platform.token(),
                 connect_whitelist,
             );
+
             let gate = HyperGate::new(
                 Box::new(auth),
-                Arc::new(interchange),
+                interchange,
                 logger.point(star_point.clone()).push("gate").unwrap(),
             );
+
             gates.insert(InterchangeKind::Star(star_template.key.clone()), gate);
         }
-        let entry_router = InterchangeEntryRouter::new(gates);
+
+        let mut entry_router = InterchangeEntryRouter::new(gates);
 
         // now lets make the clients
         for (from,to) in clients {
@@ -97,18 +102,21 @@ impl Machine {
                 remote: Some(from.clone())
             };
 
-            let logger = skel.logger.point(star_point);
+            let logger = skel.logger.point(from.clone());
             let factory = LocalClientConnectionFactory::new( entry_req, entry_router.clone() );
             let hyperway = HyperClient::new( Agent::HyperUser, to.to_point(), Box::new(factory), logger)?;
-            entry_router.add( InterchangeKind::Star(StarKey::try_from(from).unwrap()), hyperway );
+            interchanges.get(&StarKey::try_from(from).unwrap()).add( hyperway );
         }
+
+        platform.start_services(& mut entry_router);
 
         let mut machine = Self {
             skel,
             stars: Arc::new(stars),
             entry_router,
-            platform: platform,
-            rx
+            platform,
+            rx,
+            interchanges
         };
 
         machine.start();
