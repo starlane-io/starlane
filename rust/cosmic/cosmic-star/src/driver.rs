@@ -404,7 +404,7 @@ impl <E> DriverShell<E> where E: RegErr {
                     self.skel.state.api().put_state( port, state ).await;
                 }
 
-                Ok(ReflectedCore::ok(Substance::Empty))
+                Ok(ReflectedCore::ok_body(Substance::Empty))
             }
             _ => {
                 Err(MsgErr::bad_request())

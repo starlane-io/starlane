@@ -2693,7 +2693,7 @@ where
 impl ReflectedCore {
     pub fn ok_html(html: &str) -> Self {
         let bin = Arc::new(html.to_string().into_bytes());
-        ReflectedCore::ok(Substance::Bin(bin))
+        ReflectedCore::ok_body(Substance::Bin(bin))
     }
 
     pub fn new() -> Self {
@@ -2704,7 +2704,11 @@ impl ReflectedCore {
         }
     }
 
-    pub fn ok(body: Substance) -> Self {
+    pub fn ok() -> Self {
+        Self::ok_body(Substance::Empty)
+    }
+
+    pub fn ok_body(body: Substance) -> Self {
         Self {
             headers: HeaderMap::new(),
             status: StatusCode::from_u16(200u16).unwrap(),
@@ -3196,7 +3200,7 @@ impl DirectedCore {
 
 impl Into<ReflectedCore> for Port {
     fn into(self) -> ReflectedCore {
-        ReflectedCore::ok(Substance::Port(self))
+        ReflectedCore::ok_body(Substance::Port(self))
     }
 }
 

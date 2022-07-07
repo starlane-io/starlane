@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use crate::driver::Drivers;
 use crate::field::{FieldEx, FieldState};
 use crate::machine::MachineSkel;
@@ -24,7 +25,7 @@ use cosmic_api::util::{ValueMatcher, ValuePattern};
 use cosmic_api::wave::{Agent, Bounce, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, InCtx, Method, Ping, Pong, ProtoTransmitter, RecipientSelector, Recipients, Reflectable, ReflectedCore, RootInCtx, Router, SetStrategy, Signal, Wave, TxRouter, BounceBacks, Echo, Ripple, Handling, HandlingKind, Retries, WaitTime, Priority, Scope, ReflectedWave};
 use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
 use cosmic_api::{MountKind, RegErr, Registration, RegistryApi, State, StateFactory};
-use cosmic_driver::DriverFactory;
+use cosmic_driver::{Core, Driver, DriverFactory, DriverLifecycleCall, DriverSkel, DriverStatus};
 use cosmic_hyperlane::HyperRouter;
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
@@ -35,8 +36,11 @@ use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use futures::future::{BoxFuture, join_all};
+use futures::FutureExt;
+use http::StatusCode;
 use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{mpsc, oneshot, RwLock};
+use tokio::sync::{mpsc, Mutex, oneshot, RwLock};
 use tokio::time::error::Elapsed;
 use cosmic_api::command::command::common::StateSrc;
 use cosmic_api::particle::particle::{Details, Status, Stub};
@@ -719,9 +723,6 @@ impl <E> Star<E> where E: RegErr{
         Ok(())
     }
 
-
-
-
     async fn route_to_fabric(&self, wave: UltraWave, star: Point) -> Result<(), MsgErr> {
         let mut proto = DirectedProto::new();
         proto.to(star.to_port());
@@ -737,28 +738,6 @@ impl <E> Star<E> where E: RegErr{
     }
 
 
-    async fn search_for_stars(&self, search: Search) -> Result<Vec<Discovery>,MsgErr> {
-        let mut ripple = DirectedProto::new();
-        ripple.kind(DirectedKind::Ripple);
-        ripple.method(SysMethod::Search.into());
-        ripple.bounce_backs = Option::new(BounceBacks::Count(self.skel.adjacents.len()));
-        ripple.body(Substance::Sys(Sys::Search(search)));
-        ripple.to(Recipients::Stars);
-        let echoes:Vec<ReflectedWave> = self.transmitter.direct(ripple).await?;
-
-        let mut rtn = vec![];
-        for echo in echoes {
-            if let Substance::Sys(Sys::Discoveries(discoveries)) = &echo.core().body {
-                for discovery in discoveries {
-                    rtn.push(discovery.clone());
-                }
-            } else {
-                self.skel.logger.warn("unexpected reflected core substance from search echo");
-            }
-        }
-
-        Ok(rtn)
-    }
 
     async fn find_golden_way(&self, star_key: &StarKey ) -> Result<Option<StarKey>,MsgErr> {
         if let Some(adjacent) = self.golden_path.get(star_key) {
@@ -1062,6 +1041,14 @@ pub struct StarDiscovery {
     pub discovery: Discovery
 }
 
+impl Deref for StarDiscovery {
+    type Target = Discovery;
+
+    fn deref(&self) -> &Self::Target {
+        &self.discovery
+    }
+}
+
 impl StarDiscovery {
    pub fn new( pair: StarPair, discovery: Discovery ) -> Self {
        Self {
@@ -1095,33 +1082,80 @@ impl PartialOrd for StarDiscovery {
 
 
 
-pub struct StarDriver {
-    pub star_skel: StarSkel,
+#[derive(DirectedHandler)]
+pub struct StarDriver<E>  {
+    pub status: DriverStatus,
+    pub star_skel: StarSkel<E>,
     pub driver_skel: DriverSkel
 }
 
-impl StarDriver {
-    pub fn new( star_skel:StarSkel, driver_skel: DriverSkel ) -> Self {
+impl <E> StarDriver<E> {
+    pub fn new( star_skel:StarSkel<E>, driver_skel: DriverSkel ) -> Self {
         Self {
+            status: DriverStatus::Started,
             star_skel,
             driver_skel
         }
     }
+
+    async fn search_for_stars(&self, search: Search) -> Result<Vec<Discovery>,MsgErr> {
+        let mut ripple = DirectedProto::new();
+        ripple.kind(DirectedKind::Ripple);
+        ripple.method(SysMethod::Search.into());
+        ripple.bounce_backs = Option::new(BounceBacks::Count(self.skel.adjacents.len()));
+        ripple.body(Substance::Sys(Sys::Search(search)));
+        ripple.to(Recipients::Stars);
+        let echoes:Vec<ReflectedWave> = self.transmitter.direct(ripple).await?;
+
+        let mut rtn = vec![];
+        for echo in echoes {
+            if let Substance::Sys(Sys::Discoveries(discoveries)) = &echo.core().body {
+                for discovery in discoveries {
+                    rtn.push(discovery.clone());
+                }
+            } else {
+                self.skel.logger.warn("unexpected reflected core substance from search echo");
+            }
+        }
+
+        Ok(rtn)
+    }
 }
 
+
+
 #[async_trait]
-impl Driver for StarDriver {
+impl <E> Driver for StarDriver<E> {
 
     fn kind(&self) -> &Kind {
         &Kind::Star(self.star_skel.kind.clone())
     }
 
     async fn status(&self) -> DriverStatus {
-
+        self.status.clone()
     }
 
     async fn lifecycle(&mut self, event: DriverLifecycleCall) -> Result<DriverStatus,MsgErr> {
+        match event {
+            DriverLifecycleCall::Init => {
+                if self.status == DriverStatus::Ready {
+                    return Ok(self.status.clone())
+                }
 
+                self.status = DriverStatus::Initializing;
+
+                let mut discoveries = vec![];
+                for discovery in self.search_for_stars(Search::Kinds).await? {
+                    let discovery = StarDiscovery::new( StarPair::new( self.star_skel.key.clone(), discovery.star_key.clone() ), discovery );
+                    discoveries.push(discovery);
+                }
+                discoveries.sort();
+
+            }
+            DriverLifecycleCall::Shutdown => {}
+        }
+
+        Ok(self.status.clone())
     }
 
     fn ex(&self, point: &Point, state: Option<Arc<RwLock<dyn State>>>) -> Box<dyn Core> {
@@ -1129,47 +1163,131 @@ impl Driver for StarDriver {
     }
 
     async fn assign(&mut self, ctx: InCtx<'_,Assign>) -> Result<Option<Arc<RwLock<dyn State>>>, MsgErr> {
-        self.driver_skel.assign( ctx.input.clone() ).await
+        Err("only allowed one Star per StarDriver".into())
     }
 }
 
 #[routes]
-impl StarDriver {
+impl <E> StarDriver<E> {
 
-    pub async fn handle_assign( ctx: InCtx<'_,Assign> ) -> CoreBounce {
 
+
+}
+
+#[derive(DirectedHandler)]
+pub struct StarCore<E> {
+   pub skel: StarSkel<E>
+}
+
+impl <E> Core for StarCore<E> {
+
+}
+
+#[routes]
+impl <E> StarCore<E> {
+
+    pub fn new( skel: StarSkel<E> ) -> Self {
+        Self {
+            skel
+        }
+    }
+
+    #[route(Sys<Assign>)]
+    pub async fn handle_assign( &self, ctx: InCtx<'_,Assign> ) -> Result<ReflectedCore,MsgErr>{
+        self.driver_skel.assign(ctx.input.clone()).await?;
+        Ok(ReflectedCore::ok())
     }
 
 }
 
 #[derive(Clone)]
 pub struct StarWrangles {
-    pub kinds: Arc<DashMap<StarSub,RoundRobinWrangler>>
+    pub wrangles: Arc<DashMap<StarSub, RoundRobinWrangleSelector>>
 }
 
 impl StarWrangles {
-  pub async fn wrangle( &self, kind: &StarSub ) -> Result<&StarKey,MsgErr>{
-      self.kinds.get(kind).ok_or(format!("could not find wrangles for kind {}",kind.to_string()))?.value().wrangle()
+
+  pub fn new() -> Self {
+      Self {
+          wrangles: Arc::new(DashMap::new())
+      }
   }
+
+  pub fn add( &self, discoveries: Vec<StarDiscovery> ) {
+      let mut map = HashMap::new();
+      for discovery in discoveries {
+          match map.get_mut(&discovery.star_kind) {
+              None => {
+                  map.insert( discovery.star_kind.clone(), vec![discovery]);
+              }
+              Some(discoveries) => {
+                  discoveries.push(discovery)
+              }
+          }
+      }
+
+      for (kind,discoveries) in map {
+          let wrangler = RoundRobinWrangleSelector::new(kind, discoveries );
+          self.wrangles.insert(wrangler.kind.clone(), wrangler );
+      }
+  }
+
+  pub fn verify( &self, kinds: &[&StarSub] ) -> Result<(),MsgErr> {
+      for kind in kinds {
+          if !self.wrangles.contains_key(*kind) {
+              Err(format!("star must be able to wrangle at least one {}", kind.to_string()).into())
+          }
+      }
+      Ok(())
+  }
+
+  pub async fn wrangle( &self, kind: &StarSub ) -> Result<&StarKey,MsgErr>{
+      self.wrangles.get(kind).ok_or(format!("could not find wrangles for kind {}", kind.to_string()))?.value().wrangle()
+  }
+
+
 }
 
-pub struct RoundRobinWrangler {
+pub struct RoundRobinWrangleSelector {
     pub kind: StarSub,
     pub stars: Vec<StarDiscovery>,
     pub index: Mutex<usize>,
     pub step_index: usize
 }
 
-impl RoundRobinWrangler {
+impl RoundRobinWrangleSelector {
+
+   pub fn new( kind: StarSub, mut stars: Vec<StarDiscovery> ) -> Self {
+       stars.sort();
+       let mut step_index = 0;
+       let mut hops = -1;
+       for discovery in &stars {
+           if hops < 0 {
+               hops = discovery.hops;
+           }
+           else if discovery.hops > hops {
+               break;
+           }
+           step_index += 1;
+       }
+       Self {
+           kind,
+           stars,
+           index: Mutex::new(0),
+           step_index
+       }
+   }
+
+
    pub async fn wrangle( &self ) -> Result<&StarKey,MsgErr>{
 
        if self.stars.is_empty() {
-           return Err(format!("cannot find wrangle for kind: {}",self.kind.to_string()));
+           return Err(format!("cannot find wrangle for kind: {}",self.kind.to_string()).into());
        }
 
        let index = {
            let mut lock = self.index.lock().await;
-           let index:usize = lock;
+           let index:usize = *lock;
            lock += 1;
            index
        };
@@ -1179,7 +1297,7 @@ impl RoundRobinWrangler {
        if let Some(discovery) = self.stars.get(index) {
            Ok(&discovery.value().key)
        } else {
-           Err(format!("cannot find wrangle for kind: {}",self.kind.to_string()))
+           Err(format!("cannot find wrangle for kind: {}",self.kind.to_string()).into())
        }
 
    }

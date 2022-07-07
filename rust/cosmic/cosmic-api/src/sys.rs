@@ -136,6 +136,7 @@ pub enum Search {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Discovery {
+    pub star_kind: StarSub,
     pub hops: u16,
     pub star_key: StarKey,
     pub kinds: Vec<Kind>

@@ -9,9 +9,8 @@
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/sys.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/sys.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/wave.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/wave.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/driver.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/driver.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/star.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/star.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane/starlane/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/starlane/Cargo.toml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
