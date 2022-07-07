@@ -8,7 +8,7 @@ use crate::command::command::common::StateSrc;
 use crate::log::Log;
 use crate::wave::{DirectedCore, Ping, SysMethod, Wave};
 use serde::{Deserialize, Serialize};
-use crate::id::StarKey;
+use crate::id::{StarKey, StarSub};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {
@@ -118,6 +118,22 @@ pub enum Sys {
     Event(SysEvent),
     Log(Log),
     EntryReq(EntryReq),
+    Search(Search),
+    Discoveries(Vec<Discovery>)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub enum Search {
+    Star(StarKey),
+    StarKind(StarSub),
+    Kinds
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Discovery {
+    pub hops: u16,
+    pub star_key: StarKey,
+    pub kinds: Vec<Kind>
 }
 
 impl TryFrom<Ping> for Assign {
@@ -181,3 +197,5 @@ impl Into<Wave<Ping>> for EntryReq {
         req
     }
 }
+
+

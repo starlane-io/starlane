@@ -6,18 +6,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/rust.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/rust.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/sys.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/sys.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/wave.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/wave.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-driver/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-driver/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/driver.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/driver.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/shell.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/shell.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/star.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/star.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/drivers/cosmic-registry-postgres/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/cosmic-registry-postgres/src/lib.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane/starlane/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/starlane/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane/starlane/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/starlane/src/main.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -68,16 +62,16 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "WebServerToolWindowFactoryState": "false",
-    "last_opened_file_path": "/Users/scott/cosmic/starlane/rust",
-    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
-    "org.rust.disableDetachedFileInspection/Users/scott/cosmic/starlane/rust/cosmic/cosmic-artifact/src/lib.rs": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/scott/cosmic/starlane/rust&quot;,
+    &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;,
+    &quot;org.rust.disableDetachedFileInspection/Users/scott/cosmic/starlane/rust/cosmic/cosmic-artifact/src/lib.rs&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/starlane-core/src/star" />
@@ -93,7 +87,7 @@
       <recent name="$PROJECT_DIR$/starlane-core/src/star/core/resource/manager" />
     </key>
   </component>
-  <component name="RunManager" selected="Cargo.Test tests::it_works">
+  <component name="RunManager" selected="Cargo.Test tests::it_works (2)">
     <configuration name="Run starlane" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
       <option name="command" value="run --package starlane --bin starlane" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />
@@ -234,9 +228,9 @@
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Cargo.Test tests::it_works (2)" />
         <item itemvalue="Cargo.Test tests::it_works" />
         <item itemvalue="Cargo.Run starlane" />
-        <item itemvalue="Cargo.Test tests::it_works (2)" />
         <item itemvalue="Cargo.Test tests::hyper_test" />
         <item itemvalue="Cargo.Test tests::it_works (1)" />
       </list>

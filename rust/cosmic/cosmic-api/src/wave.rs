@@ -4,7 +4,7 @@ use crate::command::Command;
 use crate::config::config::bind::RouteSelector;
 use crate::error::{MsgErr, StatusErr};
 use crate::http::HttpMethod;
-use crate::id::id::{Layer, Point, Port, PortSelector, Sub, ToPoint, ToPort, Topic, Uuid};
+use crate::id::id::{Layer, Point, Port, PortSelector, Sub, ToPoint, ToPort, Topic, Uuid, RouteSeg, PointSeg};
 use crate::log::{LogSpan, LogSpanEvent, PointLogger, SpanLogger, TrailSpanId};
 use crate::msg::MsgMethod;
 use crate::parse::model::Subst;
@@ -114,6 +114,42 @@ impl UltraWave {
             UltraWave::Ripple(ripple) => Ok(ripple.to_directed()),
             UltraWave::Signal(signal) => Ok(signal.to_directed()),
             _ => Err(MsgErr::bad_request()),
+        }
+    }
+
+    pub fn as_wave<V>(&self) -> &Wave<V> {
+        match self {
+            UltraWave::Ping(ping) => ping,
+            UltraWave::Pong(pong) => pong,
+            UltraWave::Ripple(ripple) => ripple,
+            UltraWave::Echo(echo) => echo,
+            UltraWave::Signal(signal) => signal
+        }
+    }
+
+    pub fn as_wave_mut<V>(&mut self) -> &mut Wave<V> {
+        match self {
+            UltraWave::Ping(ping) => ping,
+            UltraWave::Pong(pong) => pong,
+            UltraWave::Ripple(ripple) => ripple,
+            UltraWave::Echo(echo) => echo,
+            UltraWave::Signal(signal) => signal
+        }
+    }
+
+    pub fn hops(&self) -> u16 {
+        self.as_wave().hops.clone()
+    }
+
+    pub fn inc_hops(&mut self) {
+//        let mut hops = self.as_wave().hops + 1;
+        self.as_wave_mut().hops += 1;
+    }
+
+    pub fn add_to_history( &mut self, star: Point ) {
+        match self {
+            UltraWave::Ripple(ripple) => {ripple.history.insert(star);},
+            _ => {}
         }
     }
 
@@ -512,14 +548,16 @@ pub struct RippleDef<T: ToRecipients+Clone> {
     pub to: T,
     pub core: DirectedCore,
     pub bounce_backs: BounceBacks,
+    pub history: HashSet<Point>
 }
 
 impl <T> RippleDef<T> where T:ToRecipients+Clone{
    pub fn replace_to<T2:ToRecipients+Clone>( self, to: T2 ) -> RippleDef<T2> {
        RippleDef {
            to,
-           core,
-           bounce_backs
+           core: self.core,
+           bounce_backs: self.bounce_backs,
+           history: self.history
        }
    }
 }
@@ -536,7 +574,7 @@ impl Wave<SingularRipple> {
 }
 
 impl Wave<Ripple> {
-    pub async fn shard_by_location(self, adjacent: &HashSet<Point>, registry: &Arc<dyn RegistryApi>) -> Result<HashMap<Point,Wave<Ripple>>,MsgErr> {
+    pub async fn shard_by_location<E>(self, adjacent: &HashSet<Point>, registry: &Arc<dyn RegistryApi<E>>) -> Result<HashMap<Point,Wave<Ripple>>,MsgErr>{
         let mut map = HashMap::new();
         for (point,recipients) in self.to.clone().shard_by_location(adjacent, registry).await? {
             let mut ripple = self.clone();
@@ -546,7 +584,7 @@ impl Wave<Ripple> {
         Ok(map)
     }
 
-    pub async fn to_singulars(self, adjacent: &HashSet<Point>, registry: &Arc<dyn RegistryApi>) -> Result<Vec<Wave<SingularRipple>>,MsgErr> {
+    pub async fn to_singulars<E>(self, adjacent: &HashSet<Point>, registry: &Arc<dyn RegistryApi<E>>) -> Result<Vec<Wave<SingularRipple>>,MsgErr> {
         let mut rtn = vec![];
         for port in self.to.clone().to_ports(adjacent,registry).await? {
             let wave = self.as_single(port);
@@ -1446,6 +1484,14 @@ impl DirectedWave {
         }
     }
 
+    pub fn hops(&self) -> u16 {
+        match self {
+            DirectedWave::Ping(ping) => ping.hops.clone(),
+            DirectedWave::Ripple(ripple) => ripple.hops.clone(),
+            DirectedWave::Signal(signal) => signal.hops.clone()
+        }
+    }
+
     pub fn reflection(&self) -> Reflection {
         Reflection {
             from: self.from().clone(),
@@ -1720,6 +1766,7 @@ pub enum Recipients {
     Stars,
 }
 
+
 impl ToRecipients for Recipients {
     fn to_recipients(self) -> Recipients {
         self
@@ -1727,6 +1774,35 @@ impl ToRecipients for Recipients {
 }
 
 impl Recipients {
+    pub fn is_match( &self, point: &Point ) -> bool {
+        match self {
+            Recipients::Single(port) => {
+                port.point ==  *point
+            }
+            Recipients::Multi(ports) => {
+                for port in ports {
+                    if port.point == *point {
+                        return true;
+                    }
+                    false
+                }
+            }
+            Recipients::Watchers(_) => false,
+            Recipients::Stars =>
+            {
+                if let RouteSeg::Fabric(_) = point.route {
+                    if point.segments.len() == 1 && point.segments.first().unwrap() == PointSeg::Space("star") {
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
     pub fn split(map: HashMap<Point, Vec<Port>>) -> HashMap<Point, Recipients> {
         let mut rtn = HashMap::new();
         for (point, value) in map {
@@ -1747,10 +1823,10 @@ pub trait ToRecipients {
 }
 
 impl Recipients {
-    pub async fn shard_by_location(
+    pub async fn shard_by_location<E>(
         self,
         adjacent: &HashSet<Point>,
-        registry: &Arc<dyn RegistryApi>,
+        registry: &Arc<dyn RegistryApi<E>>,
     ) -> Result<HashMap<Point, Recipients>, MsgErr> {
         match self {
             Recipients::Single(single) => {
@@ -1793,7 +1869,7 @@ impl Recipients {
 
 
 
-    pub async fn to_ports(self,adjacent: &HashSet<Point>, registry: &Arc<dyn RegistryApi>,) -> Result<Vec<Port>,MsgErr> {
+    pub async fn to_ports<E>(self,adjacent: &HashSet<Point>, registry: &Arc<dyn RegistryApi<E>>,) -> Result<Vec<Port>,MsgErr> {
         match self {
             Recipients::Single(single) => Ok(vec![single]),
             Recipients::Multi(multi) => {
@@ -1908,7 +1984,7 @@ pub struct Wave<V> {
     pub handling: Handling,
     pub scope: Scope,
     pub from: Port,
-    pub star_hops: u16,
+    pub hops: u16,
 }
 
 impl<S, V> ToSubstance<S> for Wave<V>
@@ -2066,7 +2142,7 @@ impl<V> Wave<V> {
             scope: Default::default(),
             variant,
             from,
-            star_hops: 0,
+            hops: 0,
         }
     }
 
@@ -2082,7 +2158,7 @@ impl<V> Wave<V> {
             scope: self.scope,
             variant,
             from: self.from,
-            star_hops: self.star_hops,
+            hops: self.hops,
         }
     }
 }
@@ -2414,6 +2490,30 @@ pub enum Urgency {
 pub trait Router: Send + Sync {
     async fn route(&self, wave: UltraWave);
     fn route_sync(&self, wave: UltraWave);
+}
+
+#[derive(Clone)]
+pub struct TxRouter {
+    pub tx: mpsc::Sender<UltraWave>
+}
+
+impl TxRouter {
+    pub fn new( tx: mpsc::Sender<UltraWave> ) -> Self {
+        Self {
+            tx
+        }
+    }
+}
+
+#[async_trait]
+impl Router for TxRouter {
+    async fn route(&self, wave: UltraWave) {
+        self.tx.send(wave).await;
+    }
+
+    fn route_sync(&self, wave: UltraWave) {
+        self.tx.try_send(wave);
+    }
 }
 
 pub trait TransportPlanner {
@@ -3161,6 +3261,7 @@ pub enum SysMethod {
     EntryReq,
     Transport,
     HyperWave,
+    Search
 }
 
 impl ValueMatcher<SysMethod> for SysMethod {

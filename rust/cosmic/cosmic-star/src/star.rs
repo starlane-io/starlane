@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use crate::driver::Drivers;
 use crate::field::{FieldEx, FieldState};
 use crate::machine::MachineSkel;
@@ -19,13 +20,9 @@ use cosmic_api::log::{PointLogger, RootLogger};
 use cosmic_api::parse::{route_attribute, Env};
 use cosmic_api::quota::Timeouts;
 use cosmic_api::substance::substance::{Substance, ToSubstance};
-use cosmic_api::sys::{Assign, AssignmentKind, Location, Sys};
+use cosmic_api::sys::{Assign, AssignmentKind, Discovery, Location, Search, Sys};
 use cosmic_api::util::{ValueMatcher, ValuePattern};
-use cosmic_api::wave::{
-    Agent, Bounce, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedKind,
-    DirectedProto, InCtx, Method, Ping, Pong, ProtoTransmitter, RecipientSelector, Recipients,
-    Reflectable, ReflectedCore, RootInCtx, Router, SetStrategy, Signal, Wave,
-};
+use cosmic_api::wave::{Agent, Bounce, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, InCtx, Method, Ping, Pong, ProtoTransmitter, RecipientSelector, Recipients, Reflectable, ReflectedCore, RootInCtx, Router, SetStrategy, Signal, Wave, TxRouter, BounceBacks, Echo, Ripple, Handling, HandlingKind, Retries, WaitTime, Priority, Scope, ReflectedWave};
 use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
 use cosmic_api::{MountKind, RegErr, Registration, RegistryApi, State, StateFactory};
 use cosmic_driver::DriverFactory;
@@ -39,10 +36,14 @@ use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use futures::future::{BoxFuture, join_all};
+use futures::FutureExt;
+use http::StatusCode;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{mpsc, oneshot, RwLock};
 use tokio::time::error::Elapsed;
 use cosmic_api::command::command::common::StateSrc;
+use cosmic_api::parse::model::Subst;
 use cosmic_api::particle::particle::{Details, Status, Stub};
 
 #[derive(Clone)]
@@ -160,15 +161,13 @@ pub struct StarSkel<E> where E: RegErr {
     pub kind: StarSub,
     pub logger: PointLogger,
     pub registry: Arc<dyn RegistryApi<E>>,
-    pub surface_tx: mpsc::Sender<UltraWave>,
+    pub field_tx: mpsc::Sender<UltraWave>,
     pub traverse_to_next_tx: mpsc::Sender<Traversal<UltraWave>>,
     pub inject_tx: mpsc::Sender<TraversalInjection>,
-    pub fabric_tx: mpsc::Sender<UltraWave>,
     pub machine: MachineSkel<E>,
     pub exchanger: Exchanger,
     pub state: StarState,
     pub connections: Vec<StarCon>,
-    pub searcher: StarSearcher,
     pub adjacents: HashSet<Point>,
 }
 
@@ -176,14 +175,12 @@ impl <E> StarSkel<E> where E: RegErr {
     pub fn new(
         template: StarTemplate,
         machine: MachineSkel<E>,
-        fabric_tx: mpsc::Sender<UltraWave>,
     ) -> Self {
         let point = template.key.clone().to_point();
         let logger = machine.logger.point(point.clone());
         let star_tx = StarTx::new(point.clone());
         let exchanger = Exchanger::new(point.clone().to_port(), machine.timeouts.clone());
         let state = StarState::new();
-        let mut searcher = StarSearcher::new(fabric_tx.clone());
 
         let mut adjacents = HashSet::new();
         // prime the searcher by mapping the immediate lanes
@@ -201,16 +198,14 @@ impl <E> StarSkel<E> where E: RegErr {
             point,
             kind: template.kind,
             logger,
-            surface_tx: star_tx.surface.clone(),
+            field_tx: star_tx.surface.clone(),
             traverse_to_next_tx: star_tx.traverse_to_next.clone(),
             inject_tx: star_tx.inject_tx.clone(),
-            fabric_tx,
             exchanger,
             state,
             connections: template.hyperway,
             registry: machine.registry.clone(),
             machine,
-            searcher,
             adjacents,
         }
     }
@@ -316,7 +311,10 @@ pub struct Star<E> where E: RegErr {
     star_rx: mpsc::Receiver<StarCall>,
     drivers: Drivers<E>,
     injector: Port,
-    mounts: HashMap<Point,StarMount>
+    mounts: HashMap<Point,StarMount>,
+    field_router: TxRouter,
+    transmitter: ProtoTransmitter,
+    golden_path: DashMap<StarKey,StarKey>
 }
 
 impl <E> Star<E> where E: RegErr{
@@ -325,13 +323,48 @@ impl <E> Star<E> where E: RegErr{
         let mut injector = skel.location().clone().push("injector").unwrap().to_port();
         injector.layer = Layer::Surface;
 
+        let mut golden_path = DashMap::new();
+        for con in skel.connections {
+            golden_path.insert( con.key().clone(), con.key.clone() );
+        }
+
+        let (field_tx,mut field_rx) = mpsc::channel(32*1024);
+        {
+            let star_tx = star_tx.clone();
+            let from = skel.point.clone();
+            tokio::spawn(async move {
+                while let Some(wave) = field_rx.recv().await {
+                    let wave = HyperWave {
+                        wave,
+                        from: from.clone()
+                    };
+                    star_tx.send( StarCall::HyperWave(wave) ).await;
+                }
+            }
+            );
+        }
+        let field_router = TxRouter::new(field_tx);
+        let mut transmitter = ProtoTransmitter::new(Arc::new(field_router.clone()), skel.exchanger.clone() );
+        transmitter.from = SetStrategy::Override(skel.point.clone().to_port());
+        transmitter.handling = SetStrategy::Fill(Handling{
+            kind: HandlingKind::Immediate,
+            priority: Priority::High,
+            retries: Retries::None,
+            wait: WaitTime::High
+        });
+        transmitter.agent = SetStrategy::Fill(Agent::HyperUser);
+        transmitter.scope = SetStrategy::Fill(Scope::Full);
+
         {
             let star = Self {
                 skel,
                 star_rx,
                 drivers,
                 injector,
-                mounts: HashMap::new()
+                mounts: HashMap::new(),
+                field_router,
+                transmitter,
+                golden_path
             };
             star.start();
         }
@@ -343,7 +376,7 @@ impl <E> Star<E> where E: RegErr{
             while let Some(call) = self.star_rx.recv().await {
                 match call {
                     StarCall::HyperWave(wave) => {
-                        self.surface(wave).await;
+                        self.field(wave).await;
                     }
                     StarCall::TraverseToNextLayer(traversal) => {
                         self.traverse_to_next_layer(traversal).await;
@@ -360,10 +393,10 @@ impl <E> Star<E> where E: RegErr{
         });
     }
 
-    async fn surface(&self, wave: HyperWave) -> Result<(), MsgErr> {
+    async fn field(&self, wave: HyperWave) -> Result<(), MsgErr> {
         let mut wave = wave.wave;
 
-        let wave = if wave.to().is_single() && wave.to().unwrap_single().point == self.skel.point {
+        let mut wave = if wave.to().is_single() && wave.to().unwrap_single().point == self.skel.point {
             if let Some(&Method::Sys(SysMethod::Transport)) = wave.method() {
                 let signal = wave.to_signal()?;
                 if let Substance::UltraWave(wave) = signal.variant.core.body {
@@ -381,45 +414,65 @@ impl <E> Star<E> where E: RegErr{
             wave
         };
 
-        if let UltraWave::Ripple(ripple) = wave {
-            let mut ripples = ripple .shard_by_location(&self.skel.adjacents, &self.skel.registry) .await?;
-            if let Some(ripple) = ripples.remove(self.skel.location()) {
-                // this shard of the ripple is targeted towards this star, so
-                // send to layer traversal
-                for singular in ripple
-                    .to_singulars(&self.skel.adjacents, &self.skel.registry)
-                    .await?
-                {
-                    self.star_layer_traversal(singular.to_multiple().to_ultra(), &self.injector)
-                        .await;
-                }
-            }
-            // the rest of the shards must belong to other star locations
-            for (location,ripple) in ripples {
-                self.to_fabric()
-            }
-        } else {
+        wave.inc_hops();
+        if wave.hops() > 255 {
+            self.skel.logger.warn( "wave went over the hop limit of 255!");
+            return Ok(());
         }
 
-        // now we get a record for every recipient
-        for to in wave.to().unwrap_multi() {
-            let record = match self
-                .skel
-                .registry
-                .locate(&wave.to().clone().unwrap_single())
-                .await
+        wave.add_to_history(self.skel.point.clone());
+
+        if wave.is_directed() && wave.to().is_match( & self.skel.point) {
+            let wave = wave.to_directed()?;
+            let reflection = wave.reflection();
+            let ctx = RootInCtx::new(wave.to_directed()?, self.skel.point.clone().to_port(), self.skel.logger.span(), self.transmitter.clone() );
+            match self.handle(ctx).await {
+                CoreBounce::Absorbed => {
+                    return Ok(());
+                }
+                CoreBounce::Reflected(core) => {
+                    let reflected = reflection.make( core, self.skel.point.clone().to_port(),self.skel.point.clone().to_port() );
+                    self.skel.field_tx.send(reflected.to_ultra() ).await;
+                    return Ok(());
+                }
+            }
+        }
+
+        if let UltraWave::Ripple(mut ripple) = wave {
             {
-                Ok(record) => record,
-                Err(err) => {
-                    self.skel.logger.error(err.to_string());
-                    return;
+                let mut ripples = ripple.shard_by_location(&self.skel.adjacents, &self.skel.registry).await?;
+                if let Some(ripple) = ripples.remove(self.skel.location()) {
+                    // this shard of the ripple is targeted towards this star, so
+                    // send to layer traversal
+                    for singular in ripple
+                        .to_singulars(&self.skel.adjacents, &self.skel.registry)
+                        .await?
+                    {
+                        self.star_layer_traversal(singular.to_multiple().to_ultra(), &self.injector)
+                            .await;
+                    }
                 }
-            };
-        }
+                let mut routes = 0;
+                // the rest of the shards must belong to other star locations
+                for (location, ripple) in ripples {
+                    if !ripple.history.contains(&location) {
+                        self.route_to_fabric(ripple.to_ultra(), location).await;
+                        routes = routes + 1;
+                    }
+                }
+            }
 
-        if wave.to().unwrap_single().point == self.injector.point {
-            self.skel.logger.warn("attempt to spoof Star injector");
-            return;
+            if routes == 0 && ripple.method == SysMethod::Search.into() {
+                if BounceBacks::None != ripple.bounce_backs {
+                    let echo = Wave::new( Echo::new( ))
+                }
+            }
+
+            return Ok(());
+        } else {
+
+
+
         }
 
         self.star_layer_traversal(wave, &self.injector).await;
@@ -663,6 +716,114 @@ impl <E> Star<E> where E: RegErr{
     }
 
 
+
+
+    async fn route_to_fabric(&self, wave: UltraWave, star: Point) -> Result<(), MsgErr> {
+        let mut proto = DirectedProto::new();
+        proto.to(star.to_port());
+        proto.from(self.skel.point.clone().to_port());
+        proto.kind(DirectedKind::Signal);
+        let mut core = DirectedCore::new(SysMethod::Transport.into());
+        core.body = wave.to_substance();
+        proto.core(core);
+        let directed = proto.build()?;
+        let wave = directed.to_ultra();
+        self.field_router.route(wave).await;
+        Ok(())
+    }
+
+
+    async fn search_for_stars(&self, search: Search) -> Result<Vec<Discovery>,MsgErr> {
+        let mut ripple = DirectedProto::new();
+        ripple.kind(DirectedKind::Ripple);
+        ripple.method(SysMethod::Search.into());
+        ripple.bounce_backs = Option::new(BounceBacks::Count(self.skel.adjacents.len()));
+        ripple.body(Substance::Sys(Sys::Search(search)));
+        ripple.to(Recipients::Stars);
+        let echoes:Vec<ReflectedWave> = self.transmitter.direct(ripple).await?;
+
+        let mut rtn = vec![];
+        for echo in echoes {
+            if let Substance::Sys(Sys::Discoveries(discoveries)) = &echo.core().body {
+                for discovery in discoveries {
+                    rtn.push(discovery.clone());
+                }
+            } else {
+                self.skel.logger.warn("unexpected reflected core substance from search echo");
+            }
+        }
+
+        Ok(rtn)
+    }
+
+    async fn find_golden_way(&self, star_key: &StarKey ) -> Result<Option<StarKey>,MsgErr> {
+        if let Some(adjacent) = self.golden_path.get(star_key) {
+            Ok(Some(adjacent.value().clone()))
+        } else {
+            let mut ripple = DirectedProto::new();
+            ripple.kind(DirectedKind::Ripple);
+            ripple.method(SysMethod::Search.into());
+            ripple.body(Substance::Sys(Sys::Search(Search::Star(star_key.clone()))));
+            ripple.bounce_backs = Option::new(BounceBacks::Count(self.skel.adjacents.len()));
+            ripple.to(Recipients::Stars);
+            let echoes:Vec<ReflectedWave> = self.transmitter.direct(ripple).await?;
+
+            let mut colated = vec![];
+            for echo in echoes {
+                let echo = echo.to_echo()?;
+                if let Substance::Sys(Sys::Discoveries(discoveries)) = &echo.core().body {
+                    for discovery in discoveries {
+                        colated.push(StarDiscovery::new(StarPair::new(self.skel.key.clone(), StarKey::try_from(echo.from.point.clone())?), discovery.clone()));
+                    }
+                } else {
+                    self.skel.logger.warn("unexpected reflected core substance from search echo");
+                }
+            }
+
+            colated.sort();
+
+            match colated.first() {
+                None => {
+                    Ok(None)
+                }
+                Some(discovery) => {
+                    let key = discovery.pair.not(&self.skel.key).clone();
+                    self.golden_path.insert( star_key.clone(), key.clone() );
+                    Ok(Some(key))
+                }
+            }
+        }
+    }
+
+
+    async fn re_ripple( &self, ripple: Wave<Ripple> ) -> Result<Vec<Wave<Echo>>,MsgErr> {
+        let mut reflections: Vec<BoxFuture<Wave<Echo>>> = vec![];
+
+        for (location, ripple) in ripple.shard_by_location(&self.skel.adjacents, &self.skel.registry ).await?
+        {
+           if !ripple.history.contains(&location) {
+               let key = StarKey::try_from(location)?;
+               let adjacent = self.find_golden_way(&key).await?.ok_or("could not find golden way")?.to_port();
+               let mut wave = DirectedProto::new();
+               wave.kind(DirectedKind::Signal);
+               wave.to(adjacent);
+               wave.method(SysMethod::Transport.into());
+               wave.handling(ripple.handling.clone());
+               wave.agent(Agent::HyperUser);
+               wave.body(Substance::UltraWave(Box::new(ripple.to_ultra())));
+               reflections.push(self.transmitter.direct(wave).boxed());
+           }
+        }
+
+        if reflections.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let echoes = join_all(reflections).await?;
+
+        Ok(echoes)
+    }
+
 }
 
 pub struct StarMount {
@@ -676,6 +837,42 @@ impl <E> Star<E> where E: RegErr {
     #[route("Sys<Assign>")]
     pub async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, MsgErr> {
         self.drivers.handle(ctx.wave().clone()).await
+    }
+
+    #[route("Sys<Search>")]
+    pub async fn search_discovery(&self, ctx: InCtx<'_, Sys>) -> CoreBounce {
+        fn reflect(star: &Star<E>) -> ReflectedCore where E: RegErr{
+            let discovery = Discovery {
+                hops: ctx.wave().hops(),
+                star_key: star.skel.key.clone(),
+                kinds: star.drivers.kinds().clone()
+            };
+            let mut core = ReflectedCore::new();
+            core.body = Substance::Sys(Sys::Discoveries(vec![discovery]));
+            core.status = StatusCode::from_u16(200).unwrap();
+            core
+        }
+
+        if let Sys::Search(search) = ctx.input {
+            match search {
+                Search::Star(star) => {
+                    if self.skel.key == *star {
+                        CoreBounce::Reflected(reflect(self))
+                    }
+                }
+                Search::StarKind(kind) => {
+                    if *kind == self.skel.kind {
+                        CoreBounce::Reflected(reflect(self))
+                    }
+                }
+                Search::Kinds => {
+                    CoreBounce::Reflected(reflect(self))
+                }
+            }
+            CoreBounce::Absorbed
+        } else {
+            CoreBounce::Reflected(ctx.bad_request())
+        }
     }
 }
 
@@ -825,132 +1022,69 @@ impl HyperRouter for StarRouter {
     }
 }
 
-// searches for stars and maintains the golden_path...
-#[derive(Clone)]
-pub struct StarSearcher {
-    fabric_tx: mpsc::Sender<UltraWave>,
-    golden_path: Arc<DashMap<Point, Point>>,
+#[derive(Clone,Eq,PartialEq,Hash,Ord,PartialOrd)]
+pub struct StarPair {
+    pub a: StarKey,
+    pub b: StarKey,
 }
 
-impl StarSearcher {
-    pub fn new(fabric_tx: mpsc::Sender<UltraWave>) -> Self {
-        Self {
-            fabric_tx,
-            golden_path: Arc::new(DashMap::new()),
+impl StarPair {
+   pub fn new( a: StarKey, b: StarKey ) -> Self {
+       if a < b {
+           Self {
+               a,
+               b
+           }
+       } else {
+           Self {
+               a: b,
+               b: a
+           }
+       }
+   }
+
+   pub fn not( &self, this: &StarKey ) -> &StarKey {
+       if self.a == *this {
+           &self.b
+       } else {
+           &self.a
+       }
+   }
+}
+
+#[derive(Clone,Eq,PartialEq)]
+pub struct StarDiscovery {
+    pub pair: StarPair,
+    pub discovery: Discovery
+}
+
+impl StarDiscovery {
+   pub fn new( pair: StarPair, discovery: Discovery ) -> Self {
+       Self {
+           pair,
+           discovery
+       }
+   }
+}
+
+impl Ord for StarDiscovery {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.discovery.hops != other.discovery.hops {
+            self.discovery.hops.cmp(&other.discovery.hops)
+        } else {
+            self.pair.cmp(&other.pair)
         }
     }
-
-    pub fn add(&mut self, dest: Point, way: Point) {
-        self.golden_path.insert(dest, way);
-    }
-
-    pub async fn way(&self, dest: &Point) -> Result<Point, MsgErr> {
-        let path = self
-            .golden_path
-            .get(dest)
-            .ok_or::<MsgErr>("could not find".into())?;
-        Ok(path.value().clone())
-    }
 }
 
-// gets messages from the star and distributes to the fabric
-pub struct StarFabricDistributor<E> where E: RegErr{
-    skel: StarSkel<E>,
-    from_star_rx: mpsc::Receiver<UltraWave>,
-    fabric_router: Box<dyn Router>,
-}
-
-impl <E> StarFabricDistributor<E> where E: RegErr{
-    pub fn new(
-        skel: StarSkel<E>,
-        from_star_rx: mpsc::Receiver<UltraWave>,
-        fabric_router: Box<dyn Router>,
-    ) {
-        let dist = Self {
-            skel,
-            from_star_rx,
-            fabric_router,
-        };
-        dist.start();
-    }
-
-    fn start(mut self) {
-        tokio::spawn(async move {
-            while let Some(wave) = self.from_star_rx.recv().await {
-                match wave.to() {
-                    Recipients::Single(port) => {
-                        match self.find_way(port).await {
-                            Ok(star) => {
-                                self.route(wave, star).await;
-                            }
-                            Err(err) => self.skel.logger.error("could not distribute to way...."),
-                        };
-                    }
-                    Recipients::Multi(ports) => {
-                        match self.find_ways(ports).await {
-                            Ok(stars) => {
-                                self.distribute(wave, stars).await;
-                            }
-                            Err(err) => self.skel.logger.error("could not distribute to ways...."),
-                        };
-                    }
-                }
-            }
-        });
-    }
-
-    async fn distribute(
-        &self,
-        wave: UltraWave,
-        stars: HashMap<Point, Vec<Port>>,
-    ) -> Result<(), MsgErr> {
-        let map = Recipients::split(stars);
-        let wave = wave.to_ripple()?;
-        for (star, recipients) in map {
-            let mut wave = wave.clone();
-            wave.to = recipients;
-            self.route(wave.to_ultra(), star).await;
+impl PartialOrd for StarDiscovery {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.discovery.hops != other.discovery.hops {
+            self.discovery.hops.partial_cmp(&other.discovery.hops)
+        } else {
+            self.pair.partial_cmp(&other.pair)
         }
-        Ok(())
-    }
-
-    async fn route(&self, wave: UltraWave, star: Point) -> Result<(), MsgErr> {
-        let mut proto = DirectedProto::new();
-        proto.to(star.to_port());
-        proto.from(self.skel.point.clone().to_port());
-        proto.kind(DirectedKind::Signal);
-        let mut core = DirectedCore::new(SysMethod::Transport.into());
-        core.body = wave.to_substance();
-        proto.core(core);
-        let directed = proto.build()?;
-        let wave = directed.to_ultra();
-        self.fabric_router.route(wave).await;
-        Ok(())
-    }
-
-    async fn find_way(&self, port: Port) -> Result<Point, MsgErr> {
-        let record = self.skel.registry.locate(&port.point).await?;
-        let location = record.location.ok_or()?;
-        let way = self.skel.searcher.way(&location).await?;
-        Ok(way)
-    }
-
-    async fn find_ways(&self, ports: Vec<Port>) -> Result<HashMap<Point, Vec<Port>>, MsgErr> {
-        let mut rtn = HashMap::new();
-        for port in ports {
-            let record = self.skel.registry.locate(&port.point).await?;
-            let location = record.location.ok_or()?;
-            let way = self.skel.searcher.way(&location).await?;
-            match rtn.get_mut(&way) {
-                None => {
-                    let ports = vec![port];
-                    rtn.insert(way, ports);
-                }
-                Some(ports) => {
-                    ports.push(port);
-                }
-            }
-        }
-        Ok(rtn)
     }
 }
+
+
