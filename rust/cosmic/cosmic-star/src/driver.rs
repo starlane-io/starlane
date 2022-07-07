@@ -208,6 +208,10 @@ impl DriversBuilder {
                                 let call = DriverShellCall::Ex { point, tx };
                                 shell_tx.send(call).await;
                             }
+                            DriverShellRequest::Assign{ assign, tx } => {
+                                let call = DriverShellCall::Ex { point, tx };
+                                shell_tx.send(call).await;
+                            }
                         }
                     }
                 });
@@ -230,6 +234,7 @@ pub enum DriverShellCall {
     Traversal(Traversal<UltraWave>),
     Handle{ wave: DirectedWave, tx:oneshot::Sender<Result<ReflectedCore,MsgErr>>},
     Ex{ point: Point, tx: oneshot::Sender<Result<Box<dyn Core>,MsgErr>>},
+    Assign{ assign: Assign, tx: oneshot::Sender<Result<(),MsgErr>>},
 }
 
 pub struct OuterCore<E> where E:RegErr {

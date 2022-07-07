@@ -103,6 +103,11 @@ pub struct Assign {
 }
 
 impl Assign {
+
+    pub fn kind(&self) -> &Kind {
+        &self.details.stub.kind
+    }
+
     pub fn new(kind: AssignmentKind, details: Details, state: StateSrc) -> Self {
         Self {
             kind,
