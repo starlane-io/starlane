@@ -39,6 +39,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot, RwLock};
 use tokio::time::Instant;
+use crate::id::StarKey;
 
 #[derive(
     Debug,
@@ -84,8 +85,7 @@ impl SingularUltraWave {
            SingularUltraWave::Echo(echo) => Ok(UltraWave::Echo(echo)),
            SingularUltraWave::Signal(signal) => Ok(UltraWave::Signal(signal)),
            SingularUltraWave::Ripple(ripple) => {
-               ripple.
-
+               let ripple = ripple.to_multiple();
                Ok(UltraWave::Ripple(ripple))
            }
        }
@@ -102,7 +102,41 @@ pub enum UltraWaveDef<T> where T:ToRecipients+Clone{
     Signal(Wave<Signal>),
 }
 
+impl <T> UltraWaveDef<T> where T:ToRecipients+Clone{
+
+    pub fn has_visited( &self, star: &Point ) -> bool {
+        match self {
+            UltraWaveDef::Ripple(ripple) => {
+                ripple.history.contains(star)
+            }
+            _ => false
+        }
+    }
+
+}
+
 impl UltraWave {
+    pub async fn can_shard(&self) -> bool {
+        match self {
+            UltraWave::Ripple(_) => true,
+            _ => false
+        }
+
+    }
+
+    pub async fn shard_by_location(self, adjacent: &HashSet<Point>, registry: &Arc<dyn RegistryApi<E>>) -> Result<HashMap<Point,UltraWave>,MsgErr>{
+        match &self {
+            _ => {
+                let mut map = HashMap::new();
+                map.insert(registry.locate(&self.to().unwrap_single().point ), self );
+                Ok(map)
+            }
+            UltraWave::Ripple(ripple) => {
+                let mut map = ripple.shard_by_location(adjacent,registry).await?;
+                Ok(map.into_iter().map( |(point,ripple)| (point,ripple.to_ultra()) ).collect())
+            }
+        }
+    }
 
     pub fn to_substance(self) -> Substance {
         Substance::UltraWave(Box::new(self))
@@ -198,6 +232,8 @@ impl UltraWave {
             UltraWave::Signal(signal) => &signal.from,
         }
     }
+
+
 
     pub fn to_ripple(self) -> Result<Wave<Ripple>, MsgErr> {
         match self {
@@ -1098,6 +1134,12 @@ impl DirectedProto {
         };
 
         Ok(wave)
+    }
+
+    pub fn fill( &mut self, wave: &UltraWave ) {
+        self.fill_handling(wave.as_wave().handling.clone());
+        self.fill_scope(wave.as_wave().scope.clone());
+        self.fill_agent(wave.as_wave().agent.clone());
     }
 
     pub fn fill_kind(&mut self, kind: DirectedKind) {

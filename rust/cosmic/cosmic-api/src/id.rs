@@ -724,7 +724,7 @@ pub mod id {
                     true => "",
                     false => ":",
                 },
-                PointSegKind::Var => match post_fileroot {
+                Self::Var => match post_fileroot {
                     true => "",
                     false => ":",
                 },

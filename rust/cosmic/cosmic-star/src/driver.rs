@@ -23,13 +23,14 @@ use cosmic_driver::{Core, Driver, DriverFactory, DriverLifecycleCall, DriverShel
 
 #[derive(DirectedHandler)]
 pub struct Drivers<E> where E: RegErr {
+    pub port: Port,
     pub skel: StarSkel<E>,
     pub drivers: HashMap<Kind,DriverApi>,
 }
 
 impl <E> Drivers<E> where E: RegErr {
-    pub fn new(skel: StarSkel<E>, drivers: HashMap<Kind, DriverApi>) -> Self {
-        Self { skel, drivers }
+    pub fn new(port: Port, skel: StarSkel<E>, drivers: HashMap<Kind, DriverApi>) -> Self {
+        Self { port, skel, drivers }
     }
 
     pub fn kinds(&self) -> Vec<Kind> {
@@ -66,6 +67,12 @@ impl <E> Drivers<E> where E: RegErr {
         } else {
             Ok(())
         }
+    }
+
+    pub fn add( &mut self, factory: Box<dyn DriverFactory> ) -> Result<(),MsgErr> {
+        let api = create_driver( factory, self.port.clone(), self.skel.clone() )?;
+        self.drivers.insert(factory.kind().clone(),api);
+        Ok(())
     }
 }
 
@@ -195,37 +202,42 @@ impl DriversBuilder {
             return Err("expected point logger to be set".into());
         }
         let mut drivers = HashMap::new();
-        for (kind,factory) in self.factories {
-            let point = drivers_port.point.push( kind.as_point_segments() )?;
-            let (shell_tx,shell_rx) = mpsc::channel(1024);
-            let (tx, mut rx) = mpsc::channel(1024);
-            {
-                let shell_tx = shell_tx.clone();
-                tokio::spawn(async move {
-                    while let Some(call) = rx.recv().await {
-                        match call {
-                            DriverShellRequest::Ex { point, tx } => {
-                                let call = DriverShellCall::Ex { point, tx };
-                                shell_tx.send(call).await;
-                            }
-                            DriverShellRequest::Assign{ assign, tx } => {
-                                let call = DriverShellCall::Ex { point, tx };
-                                shell_tx.send(call).await;
-                            }
-                        }
-                    }
-                });
-            }
-            let router = Arc::new(LayerInjectionRouter::new( skel.clone(), point.clone().to_port().with_layer(Layer::Core)));
-            let driver_skel = DriverSkel::new( point.clone(), router, tx );
-            let core = factory.create(driver_skel);
-            let state = skel.state.api().with_layer(Layer::Core);
-            let shell = DriverShell::new(point, skel.clone(), core, state, shell_tx, shell_rx);
-            let shell = DriverApi::new(shell);
-            drivers.insert(factory.kind().clone(), shell);
+        for (_,factory) in self.factories {
+            let api = create_driver(factory, drivers_port.clone(), skel.clone() )?;
+            drivers.insert(factory.kind().clone(), api);
         }
-        Ok(Drivers::new(skel, drivers))
+        Ok(Drivers::new(drivers_port, skel, drivers))
     }
+}
+
+fn create_driver<E>( factory: Box<dyn DriverFactory>, drivers_port: Port, skel: StarSkel<E> )  -> Result<DriverApi,MsgErr> {
+    let point = drivers_port.point.push( factory.kind().as_point_segments() )?;
+    let (shell_tx,shell_rx) = mpsc::channel(1024);
+    let (tx, mut rx) = mpsc::channel(1024);
+    {
+        let shell_tx = shell_tx.clone();
+        tokio::spawn(async move {
+            while let Some(call) = rx.recv().await {
+                match call {
+                    DriverShellRequest::Ex { point, tx } => {
+                        let call = DriverShellCall::Ex { point, tx };
+                        shell_tx.send(call).await;
+                    }
+                    DriverShellRequest::Assign{ assign, tx } => {
+                        let call = DriverShellCall::Assign{ assign, tx };
+                        shell_tx.send(call).await;
+                    }
+                }
+            }
+        });
+    }
+    let router = Arc::new(LayerInjectionRouter::new( skel.clone(), point.clone().to_port().with_layer(Layer::Core)));
+    let driver_skel = DriverSkel::new( point.clone(), router, tx );
+    let core = factory.create(driver_skel);
+    let state = skel.state.api().with_layer(Layer::Core);
+    let shell = DriverShell::new(point, skel.clone(), core, state, shell_tx, shell_rx);
+    let api = DriverApi::new(shell);
+    Ok(api)
 }
 
 pub enum DriverShellCall {
