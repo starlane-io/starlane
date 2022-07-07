@@ -3,26 +3,25 @@
   <component name="CargoProjects">
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
     <cargoProject FILE="$PROJECT_DIR$/mechtron-core/Cargo.toml" />
+    <cargoProject FILE="$PROJECT_DIR$/starlane/starlane/Cargo.toml" />
+    <cargoProject FILE="$PROJECT_DIR$/cosmic/mechtron/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
     <list default="true" id="abbc63d5-3645-4487-8e02-e014c242d321" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/rust.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/rust.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/wave.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/wave.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-api/src/sys.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-api/src/sys.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-driver/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-driver/src/lib.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/driver.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/driver.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/shell.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/shell.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cosmic/cosmic-star/src/star.rs" beforeDir="false" afterPath="$PROJECT_DIR$/cosmic/cosmic-star/src/star.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/drivers/cosmic-registry-postgres/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/drivers/cosmic-registry-postgres/src/lib.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/starlane/starlane/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/starlane/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/starlane/starlane/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/starlane/starlane/src/main.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ComposerSettings">
+    <execution />
   </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
@@ -43,10 +42,8 @@
     </file-type-list>
   </component>
   <component name="HighlightingSettingsPerFile">
-    <setting file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/http-0.2.6/src/status.rs" root0="SKIP_INSPECTION" />
-    <setting file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/tracing-core-0.1.23/src/dispatcher.rs" root0="SKIP_INSPECTION" />
-    <setting file="file://$PROJECT_DIR$/../../mesh-portal/rust/mesh-portal-versions/src/version/v0_0_1/mod.rs" root0="SKIP_INSPECTION" />
     <setting file="file://$PROJECT_DIR$/../../mesh-portal/rust/mesh-portal-versions/src/version/v0_0_1/parse.rs" root0="SKIP_INSPECTION" />
+    <setting file="file://$PROJECT_DIR$/../../mesh-portal/rust/mesh-portal-versions/src/version/v0_0_1/mod.rs" root0="SKIP_INSPECTION" />
     <setting file="file://$PROJECT_DIR$/../../mesh-portal/rust/mesh-portal/src/lib.rs" root0="SKIP_INSPECTION" />
   </component>
   <component name="KotlinMultiplatform">
@@ -68,16 +65,11 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "WebServerToolWindowFactoryState": "false",
-    "last_opened_file_path": "/Users/scott/cosmic/starlane/rust",
-    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
-    "org.rust.disableDetachedFileInspection/Users/scott/cosmic/starlane/rust/cosmic/cosmic-artifact/src/lib.rs": "true"
-  }
-}]]></component>
+  <component name="PropertiesComponent">
+    <property name="dart.analysis.tool.window.visible" value="false" />
+    <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
+    <property name="settings.editor.selected.configurable" value="editor.preferences.fonts.default" />
+  </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/starlane-core/src/star" />

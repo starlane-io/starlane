@@ -26,6 +26,12 @@ impl DriverSkel {
         self.shell_tx.send(DriverShellRequest::Ex { point, tx }).await;
         Ok(rx.await??)
     }
+
+    pub async fn assign( &self, assign: Assign) -> Result<(),MsgErr> {
+        let (tx,rx) = oneshot::channel();
+        self.shell_tx.send(DriverShellRequest::Assign{ assign, tx }).await;
+        Ok(rx.await??)
+    }
 }
 
 impl DriverSkel {
@@ -78,5 +84,6 @@ pub trait Core: DirectedHandler+Send+Sync {
 
 
 pub enum DriverShellRequest {
-  Ex{ point: Point, tx: oneshot::Sender<Result<Box<dyn Core>,MsgErr>>}
+  Ex{ point: Point, tx: oneshot::Sender<Result<Box<dyn Core>,MsgErr>>},
+  Assign{ assign: Assign, tx: oneshot::Sender<Result<(),MsgErr>>}
 }

@@ -170,6 +170,7 @@ pub struct StarSkel<E> where E: RegErr {
     pub connections: Vec<StarCon>,
     pub searcher: StarSearcher,
     pub adjacents: HashSet<Point>,
+    pub wrangles: Arc<DashMap<StarSub,StarWrangle>>
 }
 
 impl <E> StarSkel<E> where E: RegErr {
@@ -217,6 +218,12 @@ impl <E> StarSkel<E> where E: RegErr {
 
     pub fn location(&self) -> &Point {
         &self.logger.point
+    }
+
+    pub fn create_star_drivers(&self, driver_skel: DriverSkel) -> HashMap<Kind,Box<dyn Driver>> {
+        let mut rtn = HashMap::new();
+        let star_driver = StarDriver::new( self.clone(), driver_skel );
+        rtn.insert( star_driver.kind().clone(), Box::new(star_driver) );
     }
 }
 
@@ -954,3 +961,97 @@ impl <E> StarFabricDistributor<E> where E: RegErr{
         Ok(rtn)
     }
 }
+
+
+
+pub struct StarDriver {
+    pub star_skel: StarSkel,
+    pub driver_skel: DriverSkel
+}
+
+impl StarDriver {
+    pub fn new( star_skel:StarSkel, driver_skel: DriverSkel ) -> Self {
+        Self {
+            star_skel,
+            driver_skel
+        }
+    }
+}
+
+#[async_trait]
+impl Driver for StarDriver {
+
+    fn kind(&self) -> &Kind {
+        &Kind::Star(self.star_skel.kind.clone())
+    }
+
+    async fn status(&self) -> DriverStatus {
+
+    }
+
+    async fn lifecycle(&mut self, event: DriverLifecycleCall) -> Result<DriverStatus,MsgErr> {
+
+    }
+
+    fn ex(&self, point: &Point, state: Option<Arc<RwLock<dyn State>>>) -> Box<dyn Core> {
+
+    }
+
+    async fn assign(&mut self, ctx: InCtx<'_,Assign>) -> Result<Option<Arc<RwLock<dyn State>>>, MsgErr> {
+        self.driver_skel.assign( ctx.input.clone() ).await
+    }
+}
+
+#[routes]
+impl StarDriver {
+
+    pub async fn handle_assign( ctx: InCtx<'_,Assign> ) -> CoreBounce {
+
+    }
+
+}
+
+#[derive(Clone)]
+pub struct StarWrangles {
+    pub kinds: Arc<DashMap<StarSub,RoundRobinWrangler>>
+}
+
+impl StarWrangles {
+  pub async fn wrangle( &self, kind: &StarSub ) -> Result<&StarKey,MsgErr>{
+      self.kinds.get(kind).ok_or(format!("could not find wrangles for kind {}",kind.to_string()))?.value().wrangle()
+  }
+}
+
+pub struct RoundRobinWrangler {
+    pub kind: StarSub,
+    pub stars: Vec<StarDiscovery>,
+    pub index: Mutex<usize>,
+    pub step_index: usize
+}
+
+impl RoundRobinWrangler {
+   pub async fn wrangle( &self ) -> Result<&StarKey,MsgErr>{
+
+       if self.stars.is_empty() {
+           return Err(format!("cannot find wrangle for kind: {}",self.kind.to_string()));
+       }
+
+       let index = {
+           let mut lock = self.index.lock().await;
+           let index:usize = lock;
+           lock += 1;
+           index
+       };
+
+       let index = index % self.step_index;
+
+       if let Some(discovery) = self.stars.get(index) {
+           Ok(&discovery.value().key)
+       } else {
+           Err(format!("cannot find wrangle for kind: {}",self.kind.to_string()))
+       }
+
+   }
+}
+
+
