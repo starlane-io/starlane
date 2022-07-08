@@ -24,6 +24,7 @@ use std::rc::Rc;
 use std::sync::{Arc, PoisonError};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
+use crate::CosmicErr;
 
 pub enum MsgErr {
     Status { status: u16, message: String },
@@ -44,6 +45,34 @@ impl Into<ReflectedCore> for MsgErr {
                 body: Substance::Errors(Errors::default("parsing error...")),
             },
         }
+    }
+}
+
+impl CosmicErr for MsgErr {
+
+    fn to_cosmic_err(&self) -> MsgErr {
+        MsgErr::Status { status: self.status(), message: self.to_string() }
+    }
+
+    fn new<S>(message: S) -> Self where S: ToString {
+        MsgErr::Status { status: 500u16, message: message.to_string() }
+    }
+
+    fn status_msg<S>(status: u16, message: S) -> Self where S: ToString {
+        MsgErr::Status { status, message: message.to_string() }
+    }
+
+    fn status(&self) -> u16 {
+        match self {
+            MsgErr::Status { status, message } => status.clone(),
+            MsgErr::ParseErrs(_) => 500u16,
+        }
+    }
+}
+
+impl Clone for MsgErr {
+    fn clone(&self) -> Self {
+        MsgErr::Status { status: self.status(), message: self.message() }
     }
 }
 
@@ -174,13 +203,6 @@ impl MsgErr {
 }
 
 impl StatusErr for MsgErr {
-    fn status(&self) -> u16 {
-        match self {
-            MsgErr::Status { status, message } => status.clone(),
-            MsgErr::ParseErrs(_) => 500u16,
-        }
-    }
-
     fn message(&self) -> String {
         match self {
             MsgErr::Status { status, message } => message.clone(),
@@ -189,8 +211,7 @@ impl StatusErr for MsgErr {
     }
 }
 
-pub trait StatusErr {
-    fn status(&self) -> u16;
+pub trait StatusErr : CosmicErr{
     fn message(&self) -> String;
 }
 

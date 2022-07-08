@@ -1,5 +1,4 @@
 #![allow(warnings)]
-#![feature(integer_atomics)]
 //# ! [feature(unboxed_closures)]
 #[no_std]
 #[macro_use]
@@ -47,13 +46,15 @@ use std::ops::Deref;
 use std::sync::{Arc, RwLock};
 use chrono::{DateTime, Utc};
 use dashmap::{DashMap, DashSet};
+use std::cmp::Ordering;
 use crate::command::command::common::{SetProperties, SetRegistry};
 use crate::command::request::delete::Delete;
 use crate::command::request::query::{Query, QueryResult};
 use crate::command::request::select::{Select, SubSelect};
 use crate::particle::particle::{Details, Properties, Status, Stub};
 use crate::security::{Access, AccessGrant};
-use crate::substance::substance::Substance;
+use crate::selector::selector::Selector;
+use crate::substance::substance::{Substance, SubstanceList, ToSubstance};
 use crate::sys::ParticleRecord;
 use crate::wave::Agent;
 
@@ -112,7 +113,7 @@ pub mod tests {
 }
 
 #[async_trait]
-pub trait RegistryApi<E>: Send + Sync where E: RegErr{
+pub trait RegistryApi<E>: Send + Sync where E: CosmicErr {
     async fn register(&self, registration: &Registration) -> Result<Details, E>;
 
     async fn assign(&self, point: &Point, location: &Point) -> Result<(), E>;
@@ -133,9 +134,9 @@ pub trait RegistryApi<E>: Send + Sync where E: RegErr{
 
     async fn query(&self, point: &Point, query: &Query) -> Result<QueryResult, E>;
 
-    async fn delete(&self, delete: &Delete ) -> Result<PrimitiveList, E>;
+    async fn delete(&self, delete: &Delete ) -> Result<SubstanceList, E>;
 
-    async fn select(&self, select: &mut Select) -> Result<PrimitiveList, E>;
+    async fn select(&self, select: &mut Select) -> Result<SubstanceList, E>;
 
     async fn sub_select(&self, sub_select: &SubSelect) -> Result<Vec<Stub>, E>;
 
@@ -143,26 +144,35 @@ pub trait RegistryApi<E>: Send + Sync where E: RegErr{
 
     async fn access(&self, to: &Point, on: &Point) -> Result<Access, E>;
 
-    async fn chown(&self, on: &PointSelector, owner: &Point, by: &Point) -> Result<(), E>;
+    async fn chown(&self, on: &Selector, owner: &Point, by: &Point) -> Result<(), E>;
 
     async fn list_access(
         &self,
         to: &Option<&Point>,
-        on: &PointSelector,
+        on: &Selector,
     ) -> Result<Vec<IndexedAccessGrant>, E>;
 
     async fn remove_access(&self, id: i32, to: &Point) -> Result<(), E>;
 }
 
-pub trait RegErr {
-    fn message(&self) -> String;
+pub trait CosmicErr: Sized+Send+Sync+ToString+Clone{
+    fn to_cosmic_err(&self) -> MsgErr;
+
+    fn new<S>(message:S) -> Self where S: ToString;
+
+    fn status_msg<S>(status:u16, message:S) -> Self where S: ToString;
+
+    fn not_found() -> Self {
+        Self::not_found_msg("Not Found")
+    }
+
+    fn not_found_msg<S>(message:S) -> Self where S: ToString {
+        Self::status_msg(404, message )
+    }
+
+    fn status(&self) -> u16;
 }
 
-impl Into<MsgErr> for RegErr where RegErr:Sized{
-    fn into(self) -> MsgErr {
-        MsgErr::from_500(self.message())
-    }
-}
 
 
 
@@ -530,5 +540,57 @@ impl MountKind {
             MountKind::Control => Kind::Control,
             MountKind::Portal => Kind::Portal
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct IndexedAccessGrant {
+    pub id: i32,
+    pub access_grant: AccessGrant,
+}
+
+impl Eq for IndexedAccessGrant {}
+
+impl PartialEq<Self> for IndexedAccessGrant {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Ord for IndexedAccessGrant {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.id < other.id {
+            Ordering::Greater
+        } else if self.id < other.id {
+            Ordering::Less
+        } else {
+            Ordering::Equal
+        }
+    }
+}
+
+impl PartialOrd<Self> for IndexedAccessGrant {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.id < other.id {
+            Some(Ordering::Greater)
+        } else if self.id < other.id {
+            Some(Ordering::Less)
+        } else {
+            Some(Ordering::Equal)
+        }
+    }
+}
+
+impl Deref for IndexedAccessGrant {
+    type Target = AccessGrant;
+
+    fn deref(&self) -> &Self::Target {
+        &self.access_grant
+    }
+}
+
+impl Into<AccessGrant> for IndexedAccessGrant {
+    fn into(self) -> AccessGrant {
+        self.access_grant
     }
 }

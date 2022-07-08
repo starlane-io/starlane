@@ -17,7 +17,7 @@ use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, UserBaseSubKind}
 use cosmic_api::id::id::{BaseKind, Kind, KindParts, Point, Specific, Version};
 use cosmic_api::parse::{CamelCase, Domain, SkewerCase};
 use cosmic_api::particle::particle::{Details, Properties, Property, Status, Stub};
-use cosmic_api::{Registration, RegistryApi};
+use cosmic_api::{IndexedAccessGrant, Registration, RegistryApi};
 use cosmic_api::security::{Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask, PermissionsMaskKind, Privilege, Privileges};
 use cosmic_api::selector::selector::{PointKindSeg, PointSegSelector, SubKindSelector};
 use cosmic_api::selector::selector::specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
@@ -936,58 +936,6 @@ impl Into<IndexedAccessGrant> for WrappedIndexedAccessGrant {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct IndexedAccessGrant {
-    pub id: i32,
-    pub access_grant: AccessGrant,
-}
-
-impl Eq for IndexedAccessGrant {}
-
-impl PartialEq<Self> for IndexedAccessGrant {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
-impl Ord for IndexedAccessGrant {
-    fn cmp(&self, other: &Self) -> Ordering {
-        if self.id < other.id {
-            Ordering::Greater
-        } else if self.id < other.id {
-            Ordering::Less
-        } else {
-            Ordering::Equal
-        }
-    }
-}
-
-impl PartialOrd<Self> for IndexedAccessGrant {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.id < other.id {
-            Some(Ordering::Greater)
-        } else if self.id < other.id {
-            Some(Ordering::Less)
-        } else {
-            Some(Ordering::Equal)
-        }
-    }
-}
-
-impl Deref for IndexedAccessGrant {
-    type Target = AccessGrant;
-
-    fn deref(&self) -> &Self::Target {
-        &self.access_grant
-    }
-}
-
-impl Into<AccessGrant> for IndexedAccessGrant {
-    fn into(self) -> AccessGrant {
-        self.access_grant
-    }
-}
-
 impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
         fn wrap(row: &PgRow) -> Result<IndexedAccessGrant, RegErr> {
@@ -1486,7 +1434,7 @@ pub enum RegErr {
     RegErr(RegErr),
 }
 
-impl cosmic_api::RegErr for RegErr {
+impl cosmic_api::CosmicErr for RegErr {
     fn message(&self) -> String {
         self.to_string()
     }

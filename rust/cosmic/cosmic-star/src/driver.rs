@@ -1,4 +1,4 @@
-use cosmic_api::{RegErr, RegistryApi};
+use cosmic_api::{CosmicErr, RegistryApi};
 use crate::machine::MachineSkel;
 use crate::star::{LayerInjectionRouter, StarSkel, StarState, StateApi, StateCall};
 use cosmic_api::State;
@@ -22,13 +22,13 @@ use cosmic_api::util::ValuePattern;
 use cosmic_driver::{Core, Driver, DriverFactory, DriverLifecycleCall, DriverShellRequest, DriverSkel, DriverStatus, DriverStatusEvent};
 
 #[derive(DirectedHandler)]
-pub struct Drivers<E> where E: RegErr {
+pub struct Drivers<E> where E: CosmicErr {
     pub port: Port,
     pub skel: StarSkel<E>,
     pub drivers: HashMap<Kind,DriverApi>,
 }
 
-impl <E> Drivers<E> where E: RegErr {
+impl <E> Drivers<E> where E: CosmicErr {
     pub fn new(port: Port, skel: StarSkel<E>, drivers: HashMap<Kind, DriverApi>) -> Self {
         Self { port, skel, drivers }
     }
@@ -76,7 +76,7 @@ impl <E> Drivers<E> where E: RegErr {
     }
 }
 
-impl <E> Drivers<E> where E: RegErr{
+impl <E> Drivers<E> where E: CosmicErr {
 
     pub async fn handle( &self, wave: DirectedWave ) -> Result<ReflectedCore,MsgErr> {
         let record = self.skel.registry.locate(&wave.to().single_or()?.point).await?;
@@ -197,7 +197,7 @@ impl DriversBuilder {
         self.logger.replace(logger);
     }
 
-    pub fn build<E>(self, drivers_port: Port, skel: StarSkel<E>) -> Result<Drivers<E>, MsgErr> where E: RegErr{
+    pub fn build<E>(self, drivers_port: Port, skel: StarSkel<E>) -> Result<Drivers<E>, MsgErr> where E: CosmicErr {
         if self.logger.is_none() {
             return Err("expected point logger to be set".into());
         }
@@ -249,7 +249,7 @@ pub enum DriverShellCall {
     Assign{ assign: Assign, tx: oneshot::Sender<Result<(),MsgErr>>},
 }
 
-pub struct OuterCore<E> where E:RegErr {
+pub struct OuterCore<E> where E: CosmicErr {
    pub port: Port,
    pub skel: StarSkel<E>,
    pub state: Option<Arc<RwLock<dyn State>>>,
@@ -258,7 +258,7 @@ pub struct OuterCore<E> where E:RegErr {
 }
 
 #[async_trait]
-impl <E> TraversalLayer for OuterCore<E> where E: RegErr {
+impl <E> TraversalLayer for OuterCore<E> where E: CosmicErr {
     fn port(&self) -> &cosmic_api::id::id::Port {
         &self.port
     }
@@ -292,7 +292,7 @@ impl <E> TraversalLayer for OuterCore<E> where E: RegErr {
 }
 
 #[derive(DirectedHandler)]
-pub struct DriverShell<E> where E:RegErr {
+pub struct DriverShell<E> where E: CosmicErr {
     point: Point,
     skel: StarSkel<E>,
     status: DriverStatus,
@@ -304,7 +304,7 @@ pub struct DriverShell<E> where E:RegErr {
 }
 
 #[routes]
-impl <E> DriverShell<E> where E: RegErr {
+impl <E> DriverShell<E> where E: CosmicErr {
 
     pub fn new(point: Point, skel: StarSkel<E>, driver: Box<dyn Driver>, states: StateApi, tx: mpsc::Sender<DriverShellCall>, rx: mpsc::Receiver<DriverShellCall>) -> mpsc::Sender<DriverShellCall>{
 

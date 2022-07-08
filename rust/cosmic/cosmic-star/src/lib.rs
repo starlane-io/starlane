@@ -13,7 +13,6 @@ pub mod driver;
 pub mod field;
 pub mod host;
 pub mod machine;
-pub mod portal;
 pub mod shell;
 pub mod star;
 pub mod state;

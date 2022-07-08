@@ -21,7 +21,7 @@ use crate::substance::substance::{
 use crate::substance::substance::{Substance, ToSubstance};
 use crate::sys::AssignmentKind;
 use crate::util::{uuid, ValueMatcher, ValuePattern};
-use crate::{ANONYMOUS, HYPERUSER, RegistryApi};
+use crate::{ANONYMOUS, HYPERUSER, CosmicErr, RegistryApi};
 use alloc::borrow::Cow;
 use core::borrow::Borrow;
 use cosmic_macros_primitive::Autobox;
@@ -124,11 +124,11 @@ impl UltraWave {
 
     }
 
-    pub async fn shard_by_location(self, adjacent: &HashSet<Point>, registry: &Arc<dyn RegistryApi<E>>) -> Result<HashMap<Point,UltraWave>,MsgErr>{
-        match &self {
+    pub async fn shard_by_location<E>(self, adjacent: &HashSet<Point>, registry: &Arc<dyn RegistryApi<E>>) -> Result<HashMap<Point,UltraWave>,E> where E: CosmicErr {
+        match self {
             _ => {
                 let mut map = HashMap::new();
-                map.insert(registry.locate(&self.to().unwrap_single().point ), self );
+                map.insert(registry.locate(&self.to().unwrap_single().point ).await?.location, self );
                 Ok(map)
             }
             UltraWave::Ripple(ripple) => {
@@ -151,33 +151,24 @@ impl UltraWave {
         }
     }
 
-    pub fn as_wave<V>(&self) -> &Wave<V> {
-        match self {
-            UltraWave::Ping(ping) => ping,
-            UltraWave::Pong(pong) => pong,
-            UltraWave::Ripple(ripple) => ripple,
-            UltraWave::Echo(echo) => echo,
-            UltraWave::Signal(signal) => signal
-        }
-    }
-
-    pub fn as_wave_mut<V>(&mut self) -> &mut Wave<V> {
-        match self {
-            UltraWave::Ping(ping) => ping,
-            UltraWave::Pong(pong) => pong,
-            UltraWave::Ripple(ripple) => ripple,
-            UltraWave::Echo(echo) => echo,
-            UltraWave::Signal(signal) => signal
-        }
-    }
-
     pub fn hops(&self) -> u16 {
-        self.as_wave().hops.clone()
+        match self {
+            UltraWave::Ping(w) => w.hops,
+            UltraWave::Pong(w) => w.hops,
+            UltraWave::Ripple(w) => w.hops,
+            UltraWave::Echo(w) => w.hops,
+            UltraWave::Signal(w) =>w.hops,
+        }
     }
 
     pub fn inc_hops(&mut self) {
-//        let mut hops = self.as_wave().hops + 1;
-        self.as_wave_mut().hops += 1;
+        match self {
+            UltraWave::Ping(w) => w.hops += 1,
+            UltraWave::Pong(w) => w.hops += 1,
+            UltraWave::Ripple(w) => w.hops += 1,
+            UltraWave::Echo(w) => w.hops += 1,
+            UltraWave::Signal(w) =>w.hops += 1,
+        };
     }
 
     pub fn add_to_history( &mut self, star: Point ) {
@@ -233,8 +224,35 @@ impl UltraWave {
         }
     }
 
+    pub fn agent(&self) -> &Agent{
+        match self {
+            UltraWave::Ping(ping) => &ping.agent,
+            UltraWave::Pong(pong) => &pong.agent,
+            UltraWave::Ripple(ripple) => &ripple.agent,
+            UltraWave::Echo(echo) => &echo.agent,
+            UltraWave::Signal(signal) => &signal.agent,
+        }
+    }
 
+    pub fn handling(&self) -> &Handling{
+        match self {
+            UltraWave::Ping(ping) => &ping.handling,
+            UltraWave::Pong(pong) => &pong.handling,
+            UltraWave::Ripple(ripple) => &ripple.handling,
+            UltraWave::Echo(echo) => &echo.handling,
+            UltraWave::Signal(signal) => &signal.handling,
+        }
+    }
 
+    pub fn scope(&self) -> &Scope{
+        match self {
+            UltraWave::Ping(ping) => &ping.scope,
+            UltraWave::Pong(pong) => &pong.scope,
+            UltraWave::Ripple(ripple) => &ripple.scope,
+            UltraWave::Echo(echo) => &echo.scope,
+            UltraWave::Signal(signal) => &signal.scope,
+        }
+    }
     pub fn to_ripple(self) -> Result<Wave<Ripple>, MsgErr> {
         match self {
             UltraWave::Ripple(ripple) => Ok(ripple),
@@ -610,7 +628,7 @@ impl Wave<SingularRipple> {
 }
 
 impl Wave<Ripple> {
-    pub async fn shard_by_location<E>(self, adjacent: &HashSet<Point>, registry: &Arc<dyn RegistryApi<E>>) -> Result<HashMap<Point,Wave<Ripple>>,MsgErr>{
+    pub async fn shard_by_location<E>(self, adjacent: &HashSet<Point>, registry: &Arc<dyn RegistryApi<E>>) -> Result<HashMap<Point,Wave<Ripple>>,E> where E: CosmicErr {
         let mut map = HashMap::new();
         for (point,recipients) in self.to.clone().shard_by_location(adjacent, registry).await? {
             let mut ripple = self.clone();
@@ -631,7 +649,7 @@ impl Wave<Ripple> {
 
     fn as_single( &self, port: Port ) -> Wave<SingularRipple> {
         let ripple = self.variant.clone().replace_to( port );
-        self.replace(ripple)
+        self.clone().replace(ripple)
     }
 }
 
@@ -1105,6 +1123,7 @@ impl DirectedProto {
                             .core
                             .ok_or(MsgErr::new(500u16, "request core must be set"))?,
                         bounce_backs: self.bounce_backs.ok_or("BounceBacks must be set")?,
+                        history: Default::default()
                     },
                     self.from.ok_or(MsgErr::new(500u16, "must set 'from'"))?,
                 );
@@ -1137,9 +1156,9 @@ impl DirectedProto {
     }
 
     pub fn fill( &mut self, wave: &UltraWave ) {
-        self.fill_handling(wave.as_wave().handling.clone());
-        self.fill_scope(wave.as_wave().scope.clone());
-        self.fill_agent(wave.as_wave().agent.clone());
+        self.fill_handling(wave.handling());
+        self.fill_scope(wave.scope());
+        self.fill_agent(wave.agent());
     }
 
     pub fn fill_kind(&mut self, kind: DirectedKind) {
@@ -1166,21 +1185,21 @@ impl DirectedProto {
         }
     }
 
-    pub fn fill_scope(&mut self, scope: Scope) {
+    pub fn fill_scope(&mut self, scope: &Scope) {
         if self.scope.is_none() {
-            self.scope.replace(scope);
+            self.scope.replace(scope.clone());
         }
     }
 
-    pub fn fill_agent(&mut self, agent: Agent) {
+    pub fn fill_agent(&mut self, agent: &Agent) {
         if self.agent.is_none() {
-            self.agent.replace(agent);
+            self.agent.replace(agent.clone());
         }
     }
 
-    pub fn fill_handling(&mut self, handling: Handling) {
+    pub fn fill_handling(&mut self, handling: &Handling) {
         if self.handling.is_none() {
-            self.handling.replace(handling);
+            self.handling.replace(handling.clone());
         }
     }
 
@@ -1826,14 +1845,14 @@ impl Recipients {
                     if port.point == *point {
                         return true;
                     }
-                    false
                 }
+                false
             }
             Recipients::Watchers(_) => false,
             Recipients::Stars =>
             {
                 if let RouteSeg::Fabric(_) = point.route {
-                    if point.segments.len() == 1 && point.segments.first().unwrap() == PointSeg::Space("star") {
+                    if point.segments.len() == 1 && *point.segments.first().unwrap() == PointSeg::Space("star".to_string()) {
                         true
                     } else {
                         false
@@ -1869,7 +1888,7 @@ impl Recipients {
         self,
         adjacent: &HashSet<Point>,
         registry: &Arc<dyn RegistryApi<E>>,
-    ) -> Result<HashMap<Point, Recipients>, MsgErr> {
+    ) -> Result<HashMap<Point, Recipients>, E>  where E: CosmicErr {
         match self {
             Recipients::Single(single) => {
                 let mut map = HashMap::new();
@@ -2196,7 +2215,7 @@ impl<V> Wave<V> {
             id: self.id,
             session: self.session,
             agent: self.agent,
-            handling: self.handing,
+            handling: self.handling,
             scope: self.scope,
             variant,
             from: self.from,
@@ -3568,19 +3587,19 @@ impl ProtoTransmitter {
 
         match &self.agent {
             SetStrategy::None => {}
-            SetStrategy::Fill(agent) => wave.fill_agent(agent.clone()),
+            SetStrategy::Fill(agent) => wave.fill_agent(agent),
             SetStrategy::Override(agent) => wave.agent(agent.clone()),
         }
 
         match &self.scope {
             SetStrategy::None => {}
-            SetStrategy::Fill(scope) => wave.fill_scope(scope.clone()),
+            SetStrategy::Fill(scope) => wave.fill_scope(scope),
             SetStrategy::Override(scope) => wave.scope(scope.clone()),
         }
 
         match &self.handling {
             SetStrategy::None => {}
-            SetStrategy::Fill(handling) => wave.fill_handling(handling.clone()),
+            SetStrategy::Fill(handling) => wave.fill_handling(handling),
             SetStrategy::Override(handling) => wave.handling(handling.clone()),
         }
 
@@ -3647,7 +3666,7 @@ impl ProtoTransmitter {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct HyperWave {
     pub from: Point,
-    pub wave: UltraWave,
+    pub wave: UltraWave
 }
 
 impl HyperWave {

@@ -1,5 +1,4 @@
 use cosmic_api::State;
-use crate::portal::PortalInlet;
 use dashmap::DashSet;
 use cosmic_api::id::id::{Point, Uuid};
 use cosmic_api::particle::particle::Details;
@@ -23,41 +22,5 @@ impl ShellState {
             core_requests: Arc::new(DashSet::new()),
             fabric_requests: Arc::new(DashSet::new()),
         }
-    }
-}
-
-#[derive(Clone)]
-pub struct TunnelState {}
-
-impl TunnelState {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-#[derive(Clone)]
-pub struct PortalInletState {}
-
-impl PortalInletState {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-#[derive(Clone)]
-pub struct PortalOutletState {}
-
-impl PortalOutletState {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-#[derive(Clone)]
-pub struct PortalShellState {}
-
-impl PortalShellState {
-    pub fn new() -> Self {
-        Self {}
     }
 }

@@ -1,3 +1,4 @@
+use std::ops::{Deref, DerefMut};
 use crate::error::MsgErr;
 use crate::id::id::{Kind, KindParts, Point, ToPoint, ToPort};
 use crate::particle::particle::{Details, Status, Stub};
@@ -124,7 +125,7 @@ pub enum Sys {
     Log(Log),
     EntryReq(EntryReq),
     Search(Search),
-    Discoveries(Vec<Discovery>)
+    Discoveries(Discoveries)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -141,6 +142,34 @@ pub struct Discovery {
     pub star_key: StarKey,
     pub kinds: Vec<Kind>
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Discoveries {
+    vec: Vec<Discovery>
+}
+
+impl Discoveries {
+    pub fn new() -> Self {
+        Self {
+            vec: vec![]
+        }
+    }
+}
+
+impl Deref for Discoveries {
+    type Target = Vec<Discovery>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.vec
+    }
+}
+
+impl DerefMut for Discoveries {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        & mut self.vec
+    }
+}
+
 
 impl TryFrom<Ping> for Assign {
     type Error = MsgErr;

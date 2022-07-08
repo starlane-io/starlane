@@ -6,8 +6,8 @@ use cosmic_api::id::StarKey;
 use cosmic_api::log::RootLogger;
 use cosmic_api::quota::Timeouts;
 use cosmic_api::sys::{EntryReq, InterchangeKind};
-use cosmic_api::wave::{Agent, HyperWave};
-use cosmic_api::{ArtifactApi, RegErr, RegistryApi};
+use cosmic_api::wave::{Agent, HyperWave, UltraWave};
+use cosmic_api::{ArtifactApi, CosmicErr, RegistryApi};
 use cosmic_hyperlane::{HyperClient, HyperGate, HyperRouter, Hyperway, HyperwayIn, HyperwayInterchange, InterchangeEntryRouter, LocalClientConnectionFactory, TokenAuthenticatorWithRemoteWhitelist};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -16,7 +16,7 @@ use tokio::sync::{mpsc, oneshot};
 use cosmic_api::substance::substance::Substance;
 
 #[derive(Clone)]
-pub struct MachineSkel<E> where E: RegErr{
+pub struct MachineSkel<E> where E: CosmicErr {
     pub registry: Arc<dyn RegistryApi<E>>,
     pub artifacts: Arc<dyn ArtifactApi>,
     pub logger: RootLogger,
@@ -24,18 +24,18 @@ pub struct MachineSkel<E> where E: RegErr{
     pub tx: mpsc::Sender<MachineCall>
 }
 
-pub struct Machine<E> where E: RegErr{
+pub struct Machine<E> where E: CosmicErr {
     pub skel: MachineSkel<E>,
     pub stars: Arc<HashMap<Point, StarApi>>,
     pub entry_router: InterchangeEntryRouter,
     pub interchanges: HashMap<StarKey,Arc<HyperwayInterchange>>,
-    pub platform: Box<dyn Platform>,
+    pub platform: Box<dyn Platform<E>>,
     pub rx: mpsc::Receiver<MachineCall>
 }
 
-impl <E> Machine<E> where E: RegErr{
+impl <E> Machine<E> where E: CosmicErr {
     pub fn new(
-        platform: Box<dyn Platform>,
+        platform: Box<dyn Platform<E>>,
         template: MachineTemplate,
     ) -> Result<(), MsgErr> {
         let (tx,rx) = mpsc::channel(32*1024);
@@ -58,9 +58,9 @@ impl <E> Machine<E> where E: RegErr{
             let drivers_point = star_point.push("drivers".to_string()).unwrap();
             let logger = skel.logger.point(drivers_point.clone());
             builder.logger.replace(logger.clone());
-            let star_skel = StarSkel::new(star_template.clone(), skel.clone(), fabric_tx);
+            let star_skel = StarSkel::new(star_template.clone(), skel.clone() );
             let drivers = builder.build(drivers_point.to_port(), star_skel.clone())?;
-            let star_api = Star::new(star_skel.clone(), drivers);
+            let star_api = Star::new(star_skel.clone(), drivers, fabric_tx )?;
             stars.insert(star_point.clone(), star_api.clone());
 
             let interchange = Arc::new(HyperwayInterchange::new(Box::new(StarRouter::new(star_api)), logger.push("interchange").unwrap()));
@@ -75,6 +75,15 @@ impl <E> Machine<E> where E: RegErr{
                         clients.push( (star_point.clone(),key.clone()) )
                     }
                 }
+            }
+
+            {
+                let router = interchange.router();
+                tokio::spawn( async move {
+                   while let Some(wave) = fabric_rx.recv().await {
+                       router.route(wave).await;
+                   }
+                });
             }
 
             let auth = TokenAuthenticatorWithRemoteWhitelist::new(

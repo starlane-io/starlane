@@ -31,20 +31,20 @@ use http::{HeaderMap, StatusCode, Uri};
 use tokio::io::AsyncBufReadExt;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, Mutex};
-use cosmic_api::RegistryApi;
+use cosmic_api::{CosmicErr, RegistryApi};
 
 #[derive(Clone)]
-pub struct FieldEx {
+pub struct FieldEx<E> where E: CosmicErr {
     pub port: Port,
-    pub skel: StarSkel,
-    pub state: FieldState,
+    pub skel: StarSkel<E>,
+    pub state: FieldState<E>,
     pub logger: SpanLogger
 }
 
 
 
-impl FieldEx {
-    pub fn new(point: Point, skel: StarSkel, state: FieldState, logger: SpanLogger ) -> Self {
+impl <E> FieldEx<E> where E: CosmicErr {
+    pub fn new(point: Point, skel: StarSkel<E>, state: FieldState<E>, logger: SpanLogger ) -> Self {
         let port = point.to_port().with_layer(Layer::Field);
         Self { port, skel, state, logger }
     }
@@ -75,7 +75,7 @@ impl FieldEx {
 }
 
 #[async_trait]
-impl TraversalLayer for FieldEx {
+impl <E> TraversalLayer for FieldEx<E> where E: CosmicErr {
 
     fn port(&self) -> &Port{
         &self.state.port
@@ -203,18 +203,18 @@ impl TraversalLayer for FieldEx {
     }
 }
 
-pub struct PipeEx {
+pub struct PipeEx<E> where E: CosmicErr {
     pub logger: SpanLogger,
     pub traversal: PipeTraversal,
-    pub field: FieldEx,
+    pub field: FieldEx<E>,
     pub pipeline: PipelineVar,
     pub env: Env,
 }
 
-impl PipeEx {
+impl <E> PipeEx<E> where E: CosmicErr {
     pub fn new(
         traversal: Traversal<DirectedWave>,
-        binder: FieldEx,
+        binder: FieldEx<E>,
         pipeline: PipelineVar,
         env: Env,
         logger: SpanLogger,
@@ -228,9 +228,7 @@ impl PipeEx {
             logger,
         }
     }
-}
 
-impl PipeEx {
     pub fn next(&mut self) -> Result<PipeAction,MsgErr> {
         match self.pipeline.consume() {
             Some(segment) => {
@@ -461,12 +459,12 @@ pub enum PipeAction {
 /// this mod basically enforces the bind
 
 #[derive(Clone)]
-pub struct FieldState {
+pub struct FieldState<E> where E: CosmicErr {
     port: Port,
-    pipe_exes: Arc<DashMap<String, PipeEx>>,
+    pipe_exes: Arc<DashMap<String, PipeEx<E>>>,
 }
 
-impl FieldState {
+impl <E> FieldState<E> where E: CosmicErr {
     pub fn new(port: Port) -> Self {
         Self {
             port,

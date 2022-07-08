@@ -21,23 +21,23 @@ use tokio::sync::oneshot;
 use cosmic_nom::new_span;
 use cosmic_api::command::Command;
 use cosmic_api::parse::error::result;
-use cosmic_api::RegErr;
+use cosmic_api::CosmicErr;
 use cosmic_api::util::ToResolved;
 
 #[derive(DirectedHandler)]
-pub struct ShellEx<E> where E: RegErr {
+pub struct ShellEx<E> where E: CosmicErr {
     skel: StarSkel<E>,
     state: ShellState,
 }
 
-impl <E> ShellEx<E> where E: RegErr {
+impl <E> ShellEx<E> where E: CosmicErr {
     pub fn new(skel: StarSkel<E>, state: ShellState) -> Self {
         Self { skel, state }
     }
 }
 
 #[async_trait]
-impl <E> TraversalLayer for ShellEx<E> where E: RegErr {
+impl <E> TraversalLayer for ShellEx<E> where E: CosmicErr {
     fn port(&self) -> &Port{
         &self.state.port
     }
@@ -97,7 +97,7 @@ impl <E> TraversalLayer for ShellEx<E> where E: RegErr {
 }
 
 #[routes]
-impl <E> ShellEx<E> where E: RegErr {
+impl <E> ShellEx<E> where E: CosmicErr {
     #[route("Msg<NewCli>")]
     pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Port, MsgErr> {
         // only allow a cli session to be created by any layer of THIS particle

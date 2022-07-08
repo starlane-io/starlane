@@ -357,9 +357,9 @@ pub mod request {
 
     pub mod create {
         use std::convert::TryInto;
-        use std::sync::atomic::{AtomicU128, Ordering};
 
         use serde::{Deserialize, Serialize};
+        use tokio::sync::Mutex;
 
         use crate::error::{MsgErr, ParseErrs};
         use crate::bin::Bin;
@@ -585,7 +585,7 @@ pub mod request {
         pub struct PointFactoryU128 {
             parent: Point,
             prefix: String,
-            atomic: AtomicU128
+            atomic: Mutex<u128>
         }
 
         impl PointFactoryU128 {
@@ -593,7 +593,7 @@ pub mod request {
                 Self {
                     parent,
                     prefix,
-                    atomic: AtomicU128::new(0u128 )
+                    atomic: Mutex::new(0u128 )
                 }
             }
         }
@@ -601,8 +601,9 @@ pub mod request {
 
         impl PointFactory for PointFactoryU128 {
             fn create(&mut self) -> Result<Point, MsgErr> {
-                let index = self.atomic.fetch_add( 1u128,Ordering::Relaxed );
-                self.parent.push( format!("{}{}", self.prefix, index))
+                let mut index = self.atomic.blocking_lock();
+                *index += 1;
+                self.parent.push( format!("{}{}", self.prefix, *index))
             }
         }
 
