@@ -15,7 +15,7 @@ use proc_macro2::Ident;
 use quote::{format_ident, quote, TokenStreamExt, ToTokens};
 use quote::__private::ext::RepToTokensExt;
 use regex::Regex;
-use syn::{parse_macro_input, DataEnum, DataUnion, DeriveInput, FieldsNamed, FieldsUnnamed, ItemStruct, FnArg, Type, PathArguments, GenericArgument, ReturnType, PathSegment, ImplItem, Signature, Attribute, ItemImpl, Visibility, Data};
+use syn::{parse_macro_input, DataEnum, DataUnion, DeriveInput, FieldsNamed, FieldsUnnamed, ItemStruct, FnArg, Type, PathArguments, GenericArgument, ReturnType, PathSegment, ImplItem, Signature, Attribute, ItemImpl, Visibility, Data, AngleBracketedGenericArguments};
 use syn::__private::TokenStream2;
 use syn::parse::{Parse, ParseBuffer, ParseStream};
 use syn::parse_quote::ParseQuote;
@@ -37,7 +37,7 @@ pub(crate) extern "C" fn cosmic_timestamp() -> DateTime<Utc>{
     Utc::now()
 }
 
-// this is just to make the user realize he needs to import RequestHandler
+// this is just to make the user realize he needs to import DirectedHandler
 #[proc_macro_derive(DirectedHandler)]
 pub fn directed_handler(item: TokenStream) -> TokenStream {
     TokenStream::from(quote!{})
@@ -89,6 +89,8 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool  ) -> TokenStream 
 //    impl_item.items.append( & mut output );
 
     let self_ty = impl_item.self_ty.clone();
+    let generics = impl_item.generics.clone();
+    let where_clause = impl_item.generics.where_clause.clone();
 
     let attr : TokenStream2 = attr.into();
 
@@ -106,7 +108,7 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool  ) -> TokenStream 
 
 
     let rtn = quote!{
-        impl DirectedHandlerSelector for #self_ty {
+        impl #generics DirectedHandlerSelector for #self_ty #where_clause{
               fn select<'a>( &self, select: &'a RecipientSelector<'a>, ) -> Result<&dyn DirectedHandler, ()> {
                 #(
                     if #static_selector_keys.is_match(&select.wave).is_ok() {
@@ -118,7 +120,7 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool  ) -> TokenStream 
         }
 
         #[async_trait]
-        impl DirectedHandler for #self_ty {
+        impl #generics DirectedHandler for #self_ty #where_clause{
             async fn handle( &self, ctx: RootInCtx) -> CoreBounce {
                 #(
                     if #static_selector_keys.is_match(&ctx.wave).is_ok() {
@@ -181,8 +183,8 @@ pub fn route(attr: TokenStream, input: TokenStream ) -> TokenStream {
   //log(wrapped_route_selector(attr.tokens.to_string().as_str())).expect("properly formatted route selector");
 
   let params :Vec<FnArg> = input.sig.inputs.clone().into_iter().collect();
-  let ctx = params.get(1).expect("route expected RequestCtx<I,M> as first parameter");
-  let ctx = messsage_ctx(ctx).expect("route expected RequestCtx<I,M> as first parameter");
+  let ctx = params.get(1).expect("route expected InCtx<I,M> as first parameter");
+  let ctx = messsage_ctx(ctx).expect("route expected InCtx<I,M> as first parameter");
 
   let __await= match input.sig.asyncness {
       None => quote!{},
@@ -207,10 +209,8 @@ pub fn route(attr: TokenStream, input: TokenStream ) -> TokenStream {
               }
           };
 
-          match self.#orig(ctx)#__await {
-              Ok(rtn) => CoreBounce::Reflected(rtn.into()),
-              Err(err) => CoreBounce::Reflected(ReflectedCore::server_error())
-          }
+          let result = self.#orig(ctx)#__await;
+          #rtn_type
       }
 
       #input
@@ -263,19 +263,51 @@ fn messsage_ctx( input: &FnArg )  -> Result<RequestCtx,String>{
     Err("Parameter is not a RequestCtx".to_string())
 }
 
-fn rtn_type( output: &ReturnType ) -> GenericArgument {
+fn rtn_type( output: &ReturnType ) -> TokenStream2{
 
-        if let ReturnType::Type(_, t) = output {
-            if let Type::Path(path) = &**t {
-                if let PathSegment{arguments,..} = path.path.segments.last().expect("expecting Result") {
-                    if let PathArguments::AngleBracketed(args) = arguments {
-                        return args.args.first().expect("expected Result Ok to be RespCore::from(...) compatible").clone()
+        match output {
+            ReturnType::Default => {
+                quote!{Bounce::Absorbed}
+            }
+            ReturnType::Type(_, path) => {
+                if let Type::Path(path) = &**path {
+                    let PathSegment{ ident, arguments } = path.path.segments.last().unwrap();
+                    match ident.to_string().as_str() {
+                        "Result" => {
+                            quote!{
+                                match result {
+                                    Ok(rtn) => CoreBounce::Reflected(rtn.into()),
+                                    Err(err) => CoreBounce::Reflected(err.as_reflected_core())
+                                }
+                            }
+                        }
+                        "Bounce" => {
+                            quote! {
+                                let rtn : CoreBounce = result.to_core_bounce();
+                                rtn
+                            }
+                        }
+                        "CoreBounce" => {
+                            quote! {
+                               result
+                            }
+                        }
+                        "ReflectedCore" => {
+                            quote! {
+                               CoreBounce::Reflected(result)
+                            }
+                        }
+                        what => {
+                            panic!("unknown return type: {}", what);
+                        }
                     }
+
+                } else {
+                    panic!("expecting a path segment")
                 }
             }
         }
 
-        panic!("route must return Result<R,MsgErr>")
 }
 
 struct RouteAttr {

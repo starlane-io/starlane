@@ -18,7 +18,7 @@ use cosmic_api::log::{PointLogger, RootLogger};
 use cosmic_api::parse::{route_attribute, Env};
 use cosmic_api::quota::Timeouts;
 use cosmic_api::substance::substance::{Substance, ToSubstance};
-use cosmic_api::sys::{Assign, AssignmentKind, Discovery, Location, Search, Sys};
+use cosmic_api::sys::{Assign, AssignmentKind, Discoveries, Discovery, Location, Search, Sys};
 use cosmic_api::util::{ValueMatcher, ValuePattern};
 use cosmic_api::wave::{Agent, Bounce, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, InCtx, Method, Ping, Pong, ProtoTransmitter, RecipientSelector, Recipients, Reflectable, ReflectedCore, RootInCtx, Router, SetStrategy, Signal, Wave, TxRouter, BounceBacks, Echo, Ripple, Handling, HandlingKind, Retries, WaitTime, Priority, Scope, ReflectedWave, ToRecipients};
 use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
@@ -190,9 +190,9 @@ impl <E> StarSkel<E> where E: CosmicErr {
             adjacents.insert(hyperway.key().clone().to_point());
         }
 
-        let gravity_well_router = TxRouter::new(skel.gravity_well_tx.clone());
-        let mut gravity_well_transmitter = ProtoTransmitter::new(Box::new(gravity_well_router.clone()), skel.exchanger.clone() );
-        gravity_well_transmitter.from = SetStrategy::Override(skel.point.clone().to_port());
+        let gravity_well_router = TxRouter::new(star_tx.gravity_well_tx.clone());
+        let mut gravity_well_transmitter = ProtoTransmitter::new(Arc::new(gravity_well_router.clone()), exchanger.clone() );
+        gravity_well_transmitter.from = SetStrategy::Override(point.clone().to_port());
         gravity_well_transmitter.handling = SetStrategy::Fill(Handling{
             kind: HandlingKind::Immediate,
             priority: Priority::High,
@@ -202,7 +202,6 @@ impl <E> StarSkel<E> where E: CosmicErr {
         gravity_well_transmitter.agent = SetStrategy::Fill(Agent::HyperUser);
         gravity_well_transmitter.scope = SetStrategy::Fill(Scope::Full);
 
-
         Self {
             key: template.key,
             point,
@@ -210,6 +209,7 @@ impl <E> StarSkel<E> where E: CosmicErr {
             logger,
             gravity_well_tx: star_tx.gravity_well_tx.clone(),
             gravity_well_router,
+            gravity_well_transmitter,
             traverse_to_next_tx: star_tx.traverse_to_next.clone(),
             inject_tx: star_tx.inject_tx.clone(),
             exchanger,
@@ -219,7 +219,6 @@ impl <E> StarSkel<E> where E: CosmicErr {
             machine,
             adjacents,
             wrangles: StarWrangles::new(),
-            gravity_well_transmitter
         }
     }
 
@@ -764,10 +763,7 @@ pub struct StarMount {
     pub tx: mpsc::Sender<UltraWave>
 }
 
-#[routes]
-impl <E> Star<E> where E: CosmicErr {
 
-}
 
 #[derive(Clone)]
 pub struct LayerInjectionRouter<E> where E: CosmicErr {
@@ -1016,13 +1012,13 @@ impl <E> DriverFactory for StarDriverFactory<E> where E: CosmicErr {
 
 
 #[derive(DirectedHandler)]
-pub struct StarDriver<E>  {
+pub struct StarDriver<E> where E: CosmicErr {
     pub status: DriverStatus,
     pub star_skel: StarSkel<E>,
     pub driver_skel: DriverSkel
 }
 
-impl <E> StarDriver<E> {
+impl <E> StarDriver<E> where E: CosmicErr{
     pub fn new( star_skel: StarSkel<E>, driver_skel: DriverSkel ) -> Self {
         Self {
             status: DriverStatus::Started,
@@ -1058,7 +1054,7 @@ impl <E> StarDriver<E> {
 
 
 #[async_trait]
-impl <E> Driver for StarDriver<E> {
+impl <E> Driver for StarDriver<E> where E: CosmicErr{
 
     fn kind(&self) -> &Kind {
         &Kind::Star(self.star_skel.kind.clone())
@@ -1101,23 +1097,23 @@ impl <E> Driver for StarDriver<E> {
 }
 
 #[routes]
-impl <E> StarDriver<E> {
+impl <E> StarDriver<E> where E: CosmicErr{
 
 
 
 }
 
 #[derive(DirectedHandler)]
-pub struct StarCore<E> {
+pub struct StarCore<E> where E: CosmicErr{
    pub skel: StarSkel<E>
 }
 
-impl <E> Core for StarCore<E> where E: RegErr{
+impl <E> Core for StarCore<E> where E: CosmicErr{
 
 }
 
 #[routes]
-impl <E> StarCore<E> {
+impl <E> StarCore<E> where E: CosmicErr{
 
     pub fn new( skel: StarSkel<E> ) -> Self {
         Self {
@@ -1125,30 +1121,21 @@ impl <E> StarCore<E> {
         }
     }
 
-    #[route(Sys<Assign>)]
+    #[route("Sys<Assign>")]
     pub async fn handle_assign( &self, ctx: InCtx<'_,Assign> ) -> Result<ReflectedCore,MsgErr>{
         self.driver_skel.assign(ctx.input.clone()).await?;
         Ok(ReflectedCore::ok())
     }
 
-    #[route(Sys<Transport>)]
+    #[route("Sys<Transport>")]
     pub async fn transport(&self, ctx: InCtx<'_,UltraWave> ) {
-        let signal = wave.to_signal()?;
-        if let Substance::UltraWave(wave) = signal.variant.core.body {
-            self.skel.gravity_well_tx.send( *wave ).await;
-        } else {
-            self.skel.logger.error( "expecting an UltraWave Substance body when receiving a transport signal" );
-        }
+        self.skel.gravity_well_tx.send( ctx.wave().clone().to_ultra() ).await;
     }
 
-    #[route("Sys<Assign>")]
-    pub async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, MsgErr> {
-        self.skeldrivers.handle(ctx.wave().clone()).await
-    }
 
     #[route("Sys<Search>")]
     pub async fn handle_search_request(&self, ctx: InCtx<'_, Sys>) -> CoreBounce {
-        fn reflect(star: &StarCore<E>) -> ReflectedCore where E: CosmicErr {
+        fn reflect<'a,E>(star: &StarCore<E>, ctx: &'a InCtx<'a,Sys>) -> ReflectedCore where E: CosmicErr {
             let discovery = Discovery {
                 star_kind: star.skel.kind.clone(),
                 hops: ctx.wave().hops(),
@@ -1156,7 +1143,9 @@ impl <E> StarCore<E> {
                 kinds: star.drivers.kinds().clone()
             };
             let mut core = ReflectedCore::new();
-            core.body = Substance::Sys(Sys::Discoveries(vec![discovery]));
+            let mut discoveries = Discoveries::new();
+            discoveries.push(discovery);
+            core.body = Substance::Sys(Sys::Discoveries(discoveries));
             core.status = StatusCode::from_u16(200).unwrap();
             core
         }
@@ -1165,16 +1154,16 @@ impl <E> StarCore<E> {
             match search {
                 Search::Star(star) => {
                     if self.skel.key == *star {
-                        CoreBounce::Reflected(reflect(self))
+                        CoreBounce::Reflected(reflect(self, &ctx))
                     }
                 }
                 Search::StarKind(kind) => {
                     if *kind == self.skel.kind {
-                        CoreBounce::Reflected(reflect(self))
+                        CoreBounce::Reflected(reflect(self, &ctx))
                     }
                 }
                 Search::Kinds => {
-                    CoreBounce::Reflected(reflect(self))
+                    CoreBounce::Reflected(reflect(self, &ctx ))
                 }
             }
             CoreBounce::Absorbed

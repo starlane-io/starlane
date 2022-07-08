@@ -436,6 +436,7 @@ impl<'a, I> InCtx<'a, I> {
         }
     }
 
+
     pub fn from(&self) -> &Port {
         self.root.wave.from()
     }
@@ -2602,15 +2603,27 @@ pub trait DirectedHandler {
     async fn handle(&self, ctx: RootInCtx) -> CoreBounce;
 }
 
-pub enum CoreBounce {
-    Absorbed,
-    Reflected(ReflectedCore),
-}
+pub type CoreBounce = Bounce<ReflectedCore>;
 
 pub enum Bounce<W> {
     Absorbed,
     Reflected(W),
 }
+
+impl <W> Bounce<W> {
+    pub fn to_core_bounce(self) -> CoreBounce where W:TryInto<ReflectedCore,Error=MsgErr>{
+        match self {
+            Bounce::Absorbed => Bounce::Absorbed,
+            Bounce::Reflected(reflected) => {
+                match reflected.try_into() {
+                    Ok(reflected) => CoreBounce::Reflected(reflected),
+                    Err(err) => CoreBounce::Reflected(err.as_reflected_core())
+                }
+            }
+        }
+    }
+}
+
 
 impl Into<CoreBounce> for Bounce<ReflectedWave> {
     fn into(self) -> CoreBounce {

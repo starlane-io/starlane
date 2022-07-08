@@ -5,7 +5,7 @@ use cosmic_api::State;
 use cosmic_api::wave::{DirectedHandler, InCtx, ReflectedCore, Router, UltraWave};
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, RwLock};
-use cosmic_api::sys::Assign;
+use cosmic_api::sys::{Assign, Sys};
 
 #[macro_use]
 extern crate lazy_static;
@@ -55,7 +55,7 @@ pub trait Driver: DirectedHandler+Send+Sync {
     async fn status(&self) -> DriverStatus;
     async fn lifecycle(&mut self, event: DriverLifecycleCall) -> Result<DriverStatus,MsgErr>;
     fn ex(&self, point: &Point, state: Option<Arc<RwLock<dyn State>>>) -> Box<dyn Core>;
-    async fn assign(&mut self, ctx: InCtx<'_,Assign>) -> Result<Option<Arc<RwLock<dyn State>>>, MsgErr>;
+    async fn assign(&self, ctx: InCtx<'_,Assign>) -> Result<Option<Arc<RwLock<dyn State>>>, MsgErr>;
 }
 
 #[derive(Clone, Eq, PartialEq, Hash)]

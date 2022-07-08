@@ -47,6 +47,7 @@ use std::sync::{Arc, RwLock};
 use chrono::{DateTime, Utc};
 use dashmap::{DashMap, DashSet};
 use std::cmp::Ordering;
+use ::http::StatusCode;
 use crate::command::command::common::{SetProperties, SetRegistry};
 use crate::command::request::delete::Delete;
 use crate::command::request::query::{Query, QueryResult};
@@ -56,7 +57,7 @@ use crate::security::{Access, AccessGrant};
 use crate::selector::selector::Selector;
 use crate::substance::substance::{Substance, SubstanceList, ToSubstance};
 use crate::sys::ParticleRecord;
-use crate::wave::Agent;
+use crate::wave::{Agent, ReflectedCore};
 
 lazy_static! {
     pub static ref VERSION: semver::Version = semver::Version::from_str("1.0.0").unwrap();
@@ -171,6 +172,13 @@ pub trait CosmicErr: Sized+Send+Sync+ToString+Clone{
     }
 
     fn status(&self) -> u16;
+
+    fn as_reflected_core(&self) -> ReflectedCore {
+        let mut core = ReflectedCore::new();
+        core.status = StatusCode::from_u16(self.status()).unwrap_or(StatusCode::from_u16(500u16).unwrap());
+        core.body = Substance::Empty;
+        core
+    }
 }
 
 
