@@ -1,4 +1,4 @@
-use crate::platform::Platform;
+use crate::Platform;
 use crate::star::{Star, StarApi, StarCon, StarRouter, StarSkel, StarTemplate};
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{Point, ToPoint, ToPort};

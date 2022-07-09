@@ -17,9 +17,10 @@ use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, UserBaseSubKind}
 use cosmic_api::id::id::{BaseKind, Kind, KindParts, Point, Specific, Version};
 use cosmic_api::parse::{CamelCase, Domain, SkewerCase};
 use cosmic_api::particle::particle::{Details, Properties, Property, Status, Stub};
-use cosmic_api::{IndexedAccessGrant, Registration, RegistryApi};
+use cosmic_api::{HYPERUSER, IndexedAccessGrant, PlatformErr, Registration, RegistryApi};
+use cosmic_api::error::MsgErr;
 use cosmic_api::security::{Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask, PermissionsMaskKind, Privilege, Privileges};
-use cosmic_api::selector::selector::{PointKindSeg, PointSegSelector, SubKindSelector};
+use cosmic_api::selector::selector::{PointKindSeg, PointSegSelector, Selector, SubKindSelector};
 use cosmic_api::selector::selector::specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{Location, ParticleRecord};
@@ -31,7 +32,7 @@ pub struct Registry {
 }
 
 impl Registry {
-    pub async fn new() -> Result<Self, RegErr> {
+    pub async fn new() -> Result<Self, PostErr> {
         let db = lookup_registry_db();
         let pool = PgPoolOptions::new()
             .max_connections(5)
@@ -145,7 +146,7 @@ impl Registry {
         Ok(())
     }
 
-    async fn nuke(&self) -> Result<(), RegErr> {
+    async fn nuke(&self) -> Result<(), PostErr> {
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
         trans.execute("DROP TABLE particles CASCADE").await;
@@ -157,7 +158,7 @@ impl Registry {
     }
 }
 
-impl RegistryApi<RegErr> for Registry {
+impl RegistryApi<PostErr> for Registry {
 
     async fn register(&self, registration: &Registration) -> Result<Details, RegError> {
         /*
@@ -226,7 +227,7 @@ impl RegistryApi<RegErr> for Registry {
         })
     }
 
-    async fn assign(&self, point: &Point, location: &Point) -> Result<(), RegErr> {
+    async fn assign(&self, point: &Point, location: &Point) -> Result<(), PostErr> {
         let parent = point
             .parent()
             .ok_or("expecting parent since we have already established the segments are >= 2")?;
@@ -246,7 +247,7 @@ impl RegistryApi<RegErr> for Registry {
         Ok(())
     }
 
-    async fn set_status(&self, point: &Point, status: &Status) -> Result<(), RegErr> {
+    async fn set_status(&self, point: &Point, status: &Status) -> Result<(), PostErr> {
         let parent = point
             .parent()
             .ok_or("particle must have a parent")?
@@ -273,7 +274,7 @@ impl RegistryApi<RegErr> for Registry {
         &self,
         point: &Point,
         properties: &SetProperties,
-    ) -> Result<(), RegErr> {
+    ) -> Result<(), PostErr> {
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
         let parent = point
@@ -306,7 +307,7 @@ impl RegistryApi<RegErr> for Registry {
         Ok(())
     }
 
-    async fn sequence(&self, point: &Point) -> Result<u64, RegErr> {
+    async fn sequence(&self, point: &Point) -> Result<u64, PostErr> {
         struct Sequence(u64);
 
         impl sqlx::FromRow<'_, PgRow> for Sequence {
@@ -343,7 +344,7 @@ impl RegistryApi<RegErr> for Registry {
         Ok(sequence.0)
     }
 
-    async fn get_properties( &self, point:&Point ) -> Result<Properties, RegErr> {
+    async fn get_properties( &self, point:&Point ) -> Result<Properties, PostErr> {
         let parent = point.parent().ok_or("expected a parent")?;
         let point_segment = point
             .last_segment()
@@ -359,7 +360,7 @@ impl RegistryApi<RegErr> for Registry {
         Ok(map)
     }
 
-    async fn locate(&self, point: &Point) -> Result<ParticleRecord, RegErr> {
+    async fn locate(&self, point: &Point) -> Result<ParticleRecord, PostErr> {
 
         if point.is_local_root() {
             return Ok(ParticleRecord::root());
@@ -390,7 +391,7 @@ impl RegistryApi<RegErr> for Registry {
         Ok(record)
     }
 
-    async fn query(&self, point: &Point, query: &Query) -> Result<QueryResult, RegErr> {
+    async fn query(&self, point: &Point, query: &Query) -> Result<QueryResult, PostErr> {
         let mut kind_path = PointKindHierarchy::new(point.route.clone(), vec![]);
         let route = point.route.clone();
 
@@ -416,7 +417,7 @@ impl RegistryApi<RegErr> for Registry {
         return Ok(QueryResult::PointKindHierarchy(kind_path));
     }
 
-    async fn delete(&self, delete: &Delete ) -> Result<PrimitiveList, RegErr> {
+    async fn delete(&self, delete: &Delete ) -> Result<PrimitiveList, PostErr> {
         let select = delete.clone().into();
         let list = self.select(&select).await?;
         if !list.is_empty() {
@@ -439,7 +440,7 @@ impl RegistryApi<RegErr> for Registry {
     }
 
     #[async_recursion]
-    async fn select(&self, select: &Select) -> Result<PrimitiveList, RegErr> {
+    async fn select(&self, select: &Select) -> Result<PrimitiveList, PostErr> {
         let point = select.pattern.query_root();
 
         let hierarchy = self
@@ -466,7 +467,7 @@ impl RegistryApi<RegErr> for Registry {
     }
 
     #[async_recursion]
-    async fn sub_select(&self, sub_select: &SubSelect) -> Result<Vec<Stub>, RegErr> {
+    async fn sub_select(&self, sub_select: &SubSelect) -> Result<Vec<Stub>, PostErr> {
         // build a 'matching so far' query.  Here we will find every child that matches the subselect
         // these matches are used to then query children for additional matches if there are more hops.
         // all of these matches will be filtered to see if they match the ENTIRE select before returning results.
@@ -632,7 +633,7 @@ impl RegistryApi<RegErr> for Registry {
         Ok(stubs)
     }
 
-    async fn grant(&self, access_grant: &AccessGrant) -> Result<(), RegErr> {
+    async fn grant(&self, access_grant: &AccessGrant) -> Result<(), PostErr> {
         let mut conn = self.pool.acquire().await?;
         match &access_grant.kind {
             AccessGrantKind::Super => {
@@ -664,7 +665,7 @@ impl RegistryApi<RegErr> for Registry {
     }
 
     #[async_recursion]
-    async fn access(&self, to: &Point, on: &Point) -> Result<Access, RegErr> {
+    async fn access(&self, to: &Point, on: &Point) -> Result<Access, PostErr> {
         let mut conn = self.pool.acquire().await?;
 
         struct Owner(bool);
@@ -797,7 +798,7 @@ impl RegistryApi<RegErr> for Registry {
         Ok(access)
     }
 
-    async fn chown(&self, on: &PointSelector, owner: &Point, by: &Point) -> Result<(), RegErr> {
+    async fn chown(&self, on: &Selector, owner: &Point, by: &Point) -> Result<(), PostErr> {
         let select = Select {
             pattern: on.clone(),
             properties: Default::default(),
@@ -829,8 +830,8 @@ impl RegistryApi<RegErr> for Registry {
     async fn list_access(
         &self,
         to: &Option<&Point>,
-        on: &PointSelector,
-    ) -> Result<Vec<IndexedAccessGrant>, RegErr> {
+        on: &Selector,
+    ) -> Result<Vec<IndexedAccessGrant>, PostErr> {
         let select = Select {
             pattern: on.clone(),
             properties: Default::default(),
@@ -876,7 +877,7 @@ impl RegistryApi<RegErr> for Registry {
         Ok(all_access_grants)
     }
 
-    async fn remove_access(&self, id: i32, to: &Point) -> Result<(), RegErr> {
+    async fn remove_access(&self, id: i32, to: &Point) -> Result<(), PostErr> {
         let mut conn = self.pool.acquire().await?;
         let access_grant: IndexedAccessGrant = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.id=$1 AND particles.id=access_grants.by_particle").bind(id ).fetch_one(& mut conn).await?.into();
         let access = self.access(to, &access_grant.by_particle).await?;
@@ -938,7 +939,7 @@ impl Into<IndexedAccessGrant> for WrappedIndexedAccessGrant {
 
 impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
-        fn wrap(row: &PgRow) -> Result<IndexedAccessGrant, RegErr> {
+        fn wrap(row: &PgRow) -> Result<IndexedAccessGrant, PostErr> {
             let id: i32 = row.get("id");
             let kind: &str = row.get("kind");
             let kind = match kind {
@@ -966,8 +967,8 @@ impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
 
             let access_grant = AccessGrant {
                 kind,
-                on_point: PointSelector::from_str(on_point)?,
-                to_point: PointSelector::from_str(to_point)?,
+                on_point: Selector::from_str(on_point)?,
+                to_point: Selector::from_str(to_point)?,
                 by_particle: Point::from_str(by_particle)?,
             };
             Ok(IndexedAccessGrant { id, access_grant })
@@ -977,7 +978,7 @@ impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
             Ok(record) => Ok(WrappedIndexedAccessGrant(record)),
             Err(err) => {
                 error!("{}", err.to_string());
-                Err(sqlx::error::Error::Decode(err.into()))
+                Err(sqlx::error::Error::PoolClosed)
             }
         }
     }
@@ -985,7 +986,7 @@ impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
 
 struct StarlaneParticleRecord {
     pub details: Details,
-    pub location: Location,
+    pub location: Point,
 }
 
 impl Into<ParticleRecord> for StarlaneParticleRecord {
@@ -1000,7 +1001,7 @@ impl Into<ParticleRecord> for StarlaneParticleRecord {
 
 impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
-        fn wrap(row: &PgRow) -> Result<StarlaneParticleRecord, RegErr> {
+        fn wrap(row: &PgRow) -> Result<StarlaneParticleRecord, PostErr> {
             let parent: String = row.get("parent");
             let point_segment: String = row.get("point_segment");
             let base: String = row.get("base");
@@ -1018,7 +1019,7 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
             let variant: Option<String> = row.get("variant");
             let version: Option<String> = row.get("version");
             let version_variant: Option<String> = row.get("version_variant");
-            let location: Option<String> = row.get("location");
+            let location: String = row.get("location");
             let status: String = row.get("status");
 
             let point = Point::from_str(parent.as_str())?;
@@ -1070,10 +1071,8 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
             let kind = KindParts::new(base , sub, specific);
             let kind:Kind = kind.try_into()?;
 
-            let location = match location {
-                Some(location) => Location::Somewhere(Point::from_str(location.as_str())?),
-                None => Location::Nowhere,
-            };
+            let location = Point::from_str(location.as_str() )?;
+
             let status = Status::from_str(status.as_str())?;
 
             let stub = Stub {
@@ -1112,7 +1111,7 @@ pub mod test {
     use mesh_portal::version::latest::id::Point;
     use mesh_portal::version::latest::particle::Status;
     use mesh_portal::version::latest::payload::Primitive;
-    use mesh_portal::version::latest::selector::{PointKindHierarchy, PointSelector};
+    use mesh_portal::version::latest::selector::{PointKindHierarchy, Selector};
     use cosmic_api::entity::request::select::SelectKind;
     use cosmic_api::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
@@ -1125,18 +1124,19 @@ pub mod test {
     use cosmic_api::id::id::{Kind, Point, ToPoint};
     use cosmic_api::id::{StarKey, UserBaseSubKind};
     use cosmic_api::particle::particle::Status;
-    use cosmic_api::Registration;
-    use crate::{RegErr, Registry};
+    use cosmic_api::{Registration, RegistryApi};
+    use cosmic_api::selector::selector::Selector;
+    use crate::{PostErr, Registry};
 
     #[tokio::test]
-    pub async fn test_nuke() -> Result<(), RegErr> {
+    pub async fn test_nuke() -> Result<(), PostErr> {
         let registry = Registry::new().await?;
         registry.nuke().await?;
         Ok(())
     }
 
     #[tokio::test]
-    pub async fn test_create() -> Result<(), RegErr> {
+    pub async fn test_create() -> Result<(), PostErr> {
         let registry = Registry::new().await?;
         registry.nuke().await?;
 
@@ -1170,7 +1170,7 @@ pub mod test {
         let result = registry.query(&point, &Query::PointKindHierarchy).await?;
         let kind_path: PointKindHierarchy = result.try_into()?;
 
-        let pattern = PointSelector::from_str("**")?;
+        let pattern = Selector::from_str("**")?;
         let select = Select {
             pattern,
             properties: Default::default(),
@@ -1186,7 +1186,7 @@ pub mod test {
     }
 
     #[tokio::test]
-    pub async fn test_access() -> Result<(), RegErr> {
+    pub async fn test_access() -> Result<(), PostErr> {
         let registry = Registry::new().await?;
         registry.nuke().await?;
 
@@ -1300,7 +1300,7 @@ pub mod test {
 
         let grant = AccessGrant {
             kind: AccessGrantKind::Super,
-            on_point: PointSelector::from_str("localhost+:**")?,
+            on_point: Selector::from_str("localhost+:**")?,
             to_point: superuser.clone().try_into()?,
             by_particle: hyperuser.clone(),
         };
@@ -1308,23 +1308,23 @@ pub mod test {
 
         let grant = AccessGrant {
             kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("+csd-Rwx")?),
-            on_point: PointSelector::from_str("localhost:app+:**")?,
-            to_point: PointSelector::from_str("localhost:app:users:**<User>")?,
+            on_point: Selector::from_str("localhost:app+:**")?,
+            to_point: Selector::from_str("localhost:app:users:**<User>")?,
             by_particle: app.clone(),
         };
         registry.grant(&grant).await?;
 
         let grant = AccessGrant {
             kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("+csd-rwX")?),
-            on_point: PointSelector::from_str("localhost:app:**<Mechtron>")?,
-            to_point: PointSelector::from_str("localhost:app:users:**<User>")?,
+            on_point: Selector::from_str("localhost:app:**<Mechtron>")?,
+            to_point: Selector::from_str("localhost:app:users:**<User>")?,
             by_particle: app.clone(),
         };
         registry.grant(&grant).await?;
 
         let grant = AccessGrant {
             kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("+CSD-RWX")?),
-            on_point: PointSelector::from_str("localhost:users:superuser")?,
+            on_point: Selector::from_str("localhost:users:superuser")?,
             to_point: scott.clone().try_into()?,
             by_particle: app.clone(),
         };
@@ -1332,8 +1332,8 @@ pub mod test {
 
         let grant = AccessGrant {
             kind: AccessGrantKind::Privilege(Privilege::Single("property:email:read".to_string())),
-            on_point: PointSelector::from_str("localhost:app:users:**<User>")?,
-            to_point: PointSelector::from_str("localhost:app:**<Mechtron>")?,
+            on_point: Selector::from_str("localhost:app:users:**<User>")?,
+            to_point: Selector::from_str("localhost:app:**<Mechtron>")?,
             by_particle: app.clone(),
         };
         registry.grant(&grant).await?;
@@ -1363,7 +1363,7 @@ pub mod test {
         assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
 
         // must have super to chagne ownership
-        let app_pattern = PointSelector::from_str("localhost:app+:**")?;
+        let app_pattern = Selector::from_str("localhost:app+:**")?;
         assert!(registry.chown(&app_pattern, &app, &scott).await.is_err());
         // this should work:
         assert!(registry.chown(&app_pattern, &app, &superuser).await.is_ok());
@@ -1385,8 +1385,8 @@ pub mod test {
         // now test AND permissions (masking Read)
         let grant = AccessGrant {
             kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("&csd-rwX")?),
-            on_point: PointSelector::from_str("localhost:app:**<Mechtron>")?,
-            to_point: PointSelector::from_str("localhost:app:users:**<User>")?,
+            on_point: Selector::from_str("localhost:app:**<Mechtron>")?,
+            to_point: Selector::from_str("localhost:app:users:**<User>")?,
             by_particle: app.clone(),
         };
         registry.grant(&grant).await?;
@@ -1401,7 +1401,7 @@ pub mod test {
         assert!(access.check_privilege("property:email:read").is_ok());
 
         let access_grants = registry
-            .list_access(&None, &PointSelector::from_str("+:**")?)
+            .list_access(&None, &Selector::from_str("+:**")?)
             .await?;
 
         println!(
@@ -1429,59 +1429,79 @@ pub mod test {
     }
 }
 
-pub enum RegErr {
+#[derive(Clone)]
+pub enum PostErr {
     Dupe,
-    RegErr(RegErr),
+    RegErr(PostErr),
 }
 
-impl cosmic_api::PlatformErr for RegErr {
-    fn message(&self) -> String {
-        self.to_string()
+impl Into<MsgErr> for PostErr {
+    fn into(self) -> MsgErr {
+        MsgErr::new( 500u16, "Post Err")
     }
 }
 
-impl ToString for RegErr {
+impl cosmic_api::PlatformErr for PostErr {
+
+    fn to_cosmic_err(&self) -> MsgErr {
+        MsgErr::new( 500u16, "Post Err")
+    }
+
+    fn new<S>(message: S) -> Self where S: ToString {
+        unimplemented!()
+    }
+
+    fn status_msg<S>(status: u16, message: S) -> Self where S: ToString {
+        unimplemented!()
+    }
+
+    fn status(&self) -> u16 {
+        500u16
+    }
+}
+
+impl ToString for PostErr {
     fn to_string(&self) -> String {
         match self {
-            RegErr::Dupe => "Dupe".to_string(),
-            RegErr::RegErr(error) => error.to_string(),
+            PostErr::Dupe => "Dupe".to_string(),
+            PostErr::RegErr(error) => error.to_string(),
         }
     }
 }
-impl From<sqlx::RegErr> for RegErr {
+impl From<sqlx::RegErr> for PostErr {
     fn from(e: sqlx::RegErr) -> Self {
-        RegErr::RegErr(e.into())
+        PostErr::RegErr(e.into())
     }
 }
 
-impl From<tokio::sync::oneshot::error::RecvRegErr> for RegErr {
+impl From<tokio::sync::oneshot::error::RecvRegErr> for PostErr {
     fn from(e: tokio::sync::oneshot::error::RecvRegErr) -> Self {
-        RegErr::RegErr(RegErr::from_internal(format!("{}", e.to_string())))
+        PostErr::RegErr(PostErr::from_internal(format!("{}", e.to_string())))
     }
 }
-impl From<RegErr> for RegErr {
-    fn from(e: RegErr) -> Self {
-        RegErr::RegErr(e)
+impl From<PostErr> for PostErr {
+    fn from(e: PostErr) -> Self {
+        PostErr::RegErr(e)
     }
 }
 
 
-impl<T> From<mpsc::error::SendRegErr<T>> for RegErr {
+impl<T> From<mpsc::error::SendRegErr<T>> for PostErr {
     fn from(e: mpsc::error::SendRegErr<T>) -> Self {
-        RegErr::RegErr(e.into())
+        PostErr::RegErr(e.into())
     }
 }
 
-impl From<&str> for RegErr {
+impl From<&str> for PostErr {
     fn from(e: &str) -> Self {
-        RegErr::RegErr(e.into())
+        PostErr::RegErr(e.into())
     }
 }
 
 
-impl From<RegErr> for RegErr {
-    fn from(r: RegErr) -> Self {
-        RegErr::new(r.to_string().as_str())
+impl From<PostErr> for PostErr {
+    fn from(r: PostErr) -> Self {
+        PostErr::new(r.to_string().as_str())
     }
 }
 
@@ -1501,7 +1521,7 @@ pub struct RegistryParams {
 }
 
 impl RegistryParams {
-    pub fn from_registration(registration: &Registration) -> Result<Self, RegErr> {
+    pub fn from_registration(registration: &Registration) -> Result<Self, PostErr> {
         let point_segment = match registration.point.segments.last() {
             None => "".to_string(),
             Some(segment) => segment.to_string(),
@@ -1575,68 +1595,14 @@ impl RegistryParams {
     }
 }
 
-pub fn match_kind(template: &KindTemplate) -> Result<Kind, RegErr> {
-    let base: BaseKind = BaseKind::from_str(template.base.to_string().as_str())?;
-    Ok(match base {
-        BaseKind::Root => Kind::Root,
-        BaseKind::Space => Kind::Space,
-        BaseKind::Base => match &template.sub {
-            None => {
-                return Err("kind must be set for Base".into());
-            }
-            Some(sub_kind) => {
-                let kind = BaseSubKind::from_str(sub_kind.as_str())?;
-                if template.specific.is_some() {
-                    return Err("BaseKind cannot have a Specific".into());
-                }
-                return Ok(Kind::Base(kind));
-            }
-        },
-        BaseKind::User => Kind::User,
-        BaseKind::App => Kind::App,
-        BaseKind::Mechtron => Kind::Mechtron,
-        BaseKind::FileSystem => Kind::FileSystem,
-        BaseKind::File => match &template.sub {
-            None => return Err("expected kind for File".into()),
-            Some(kind) => {
-                let file_kind = FileSubKind::from_str(kind.as_str())?;
-                return Ok(Kind::File(file_kind));
-            }
-        },
-        BaseKind::Database => {
-            unimplemented!("need to write a SpecificPattern matcher...")
-        }
-        BaseKind::BundleSeries => Kind::BundleSeries,
-        BaseKind::Bundle => Kind::Bundle,
-        BaseKind::Artifact => match &template.sub {
-            None => {
-                return Err("expected Sub for Artirtact".into());
-            }
-            Some(sub ) => {
-                let artifact_kind = ArtifactSubKind::from_str(sub.as_str())?;
-                return Ok(Kind::Artifact(artifact_kind));
-            }
-        },
-        BaseKind::Control => Kind::Control,
-        BaseKind::UserBase => match &template.sub {
-            None => {
-                return Err("SubKind must be set for UserBase<?>".into());
-            }
-            Some(sub) => {
-                let specific = Specific::from_str("starlane.io:redhat.com:keycloak:community:18.0.0")?;
-                let sub = UserBaseSubKind::OAuth(specific);
-                Kind::UserBase(sub)
-            }
-        },
-    })
-}
+
 
 impl Registry {
-    pub async fn set(&self, set: &Set) -> Result<(), RegErr> {
+    pub async fn set(&self, set: &Set) -> Result<(), PostErr> {
         self.set_properties(&set.point, &set.properties).await
     }
 
-    pub async fn get(&self, get: &Get) -> Result<Substance, RegErr> {
+    pub async fn get(&self, get: &Get) -> Result<Substance, PostErr> {
         match &get.op {
             GetOp::State => {
                 return Err("Registry does not handle GetOp::State operations".into());
@@ -1667,8 +1633,8 @@ impl Registry {
         }
     }
 
-    pub async fn create(&self, create: &Create) -> Result<Details, RegErr> {
-        let child_kind = match_kind(&create.template.kind)?;
+    pub async fn create(&self, create: &Create) -> Result<Details, PostErr> {
+        let child_kind = default_implementation(&create.template.kind)?;
         let stub = match &create.template.point.child_segment_template {
             PointSegFactory::Exact(child_segment) => {
                 let point = create.template.point.parent.push(child_segment.clone());
@@ -1696,7 +1662,7 @@ impl Registry {
 
                 // if strategy is ensure then a dupe is GOOD!
                 if create.strategy == Strategy::Ensure {
-                    if let Err(RegErr::Dupe) = result {
+                    if let Err(PostErr::Dupe) = result {
                         result = Ok(self.locate(&point).await?.details);
                     }
                 }
@@ -1724,10 +1690,10 @@ impl Registry {
                         Ok(stub) => {
                             return Ok(stub)
                         }
-                        Err(RegErr::Dupe) => {
+                        Err(PostErr::Dupe) => {
                             // continue loop
                         }
-                        Err(RegErr::RegErr(error)) => {
+                        Err(PostErr::RegErr(error)) => {
                             return Err(error);
                         }
                     }
@@ -1737,12 +1703,12 @@ impl Registry {
         Ok(stub)
     }
 
-    pub async fn cmd_select(&self, select: &Select) -> Result<Substance, RegErr> {
+    pub async fn cmd_select(&self, select: &Select) -> Result<Substance, PostErr> {
         let list = Substance::List(self.select(select).await?);
         Ok(list)
     }
 
-    pub async fn cmd_query(&self, to: &Point, query: &Query) -> Result<Substance, RegErr> {
+    pub async fn cmd_query(&self, to: &Point, query: &Query) -> Result<Substance, PostErr> {
         let result = Substance::Text(self.query(to, query).await?.to_string());
         Ok(result)
     }

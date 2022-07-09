@@ -69,4 +69,65 @@ impl Platform for Starlane {
     fn start_services(&self, entry_router: &mut cosmic_hyperlane::InterchangeEntryRouter) {
         todo!()
     }
+
+    fn default_implementation(template: &KindTemplate) -> Result<Kind, PostErr> {
+        let base: BaseKind = BaseKind::from_str(template.base.to_string().as_str())?;
+        Ok(match base {
+            BaseKind::Root => Kind::Root,
+            BaseKind::Space => Kind::Space,
+            BaseKind::Base => match &template.sub {
+                None => {
+                    return Err("kind must be set for Base".into());
+                }
+                Some(sub_kind) => {
+                    let kind = BaseSubKind::from_str(sub_kind.as_str())?;
+                    if template.specific.is_some() {
+                        return Err("BaseKind cannot have a Specific".into());
+                    }
+                    return Ok(Kind::Base(kind));
+                }
+            },
+            BaseKind::User => Kind::User,
+            BaseKind::App => Kind::App,
+            BaseKind::Mechtron => Kind::Mechtron,
+            BaseKind::FileSystem => Kind::FileSystem,
+            BaseKind::File => match &template.sub {
+                None => return Err("expected kind for File".into()),
+                Some(kind) => {
+                    let file_kind = FileSubKind::from_str(kind.as_str())?;
+                    return Ok(Kind::File(file_kind));
+                }
+            },
+            BaseKind::Database => {
+                unimplemented!("need to write a SpecificPattern matcher...")
+            }
+            BaseKind::BundleSeries => Kind::BundleSeries,
+            BaseKind::Bundle => Kind::Bundle,
+            BaseKind::Artifact => match &template.sub {
+                None => {
+                    return Err("expected Sub for Artirtact".into());
+                }
+                Some(sub ) => {
+                    let artifact_kind = ArtifactSubKind::from_str(sub.as_str())?;
+                    return Ok(Kind::Artifact(artifact_kind));
+                }
+            },
+            BaseKind::Control => Kind::Control,
+            BaseKind::UserBase => match &template.sub {
+                None => {
+                    return Err("SubKind must be set for UserBase<?>".into());
+                }
+                Some(sub) => {
+                    let specific = Specific::from_str("starlane.io:redhat.com:keycloak:community:18.0.0")?;
+                    let sub = UserBaseSubKind::OAuth(specific);
+                    Kind::UserBase(sub)
+                }
+            },
+            BaseKind::Repo => Kind::Repo,
+            BaseKind::Portal => Kind::Portal,
+            BaseKind::Star =>  {
+                unimplemented!()
+            }
+        })
+    }
 }

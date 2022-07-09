@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 cosmic-api={ path="../../cosmic/cosmic-api"}
-cosmic-star={ path="../../cosmic/cosmic-star"}
+cosmic-platform={ path= "../../cosmic/cosmic-platform" }
 cosmic-registry-postgres={ path="../../drivers/cosmic-registry-postgres"}
 cosmic-artifact={ path="../../cosmic/cosmic-artifact"}
 lazy_static = "1.4.0"

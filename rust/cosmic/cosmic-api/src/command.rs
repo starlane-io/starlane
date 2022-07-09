@@ -503,7 +503,7 @@ pub mod request {
                         })?;
                         StateSrc::Substance(Box::new(Substance::Bin(env.file(val.clone()).map_err(|e|{ match e{
                             ResolverErr::NotAvailable => MsgErr::from_500("files are not available in this context"),
-                            ResolverErr::NotFound => MsgErr::from_500(format!("cannot find file '{}'",val))
+                            ResolverErr::NotFound => MsgErr::from_500(format!("cannot find file '{}'",val.to_text()?))
                         }})?.content)))
                     }
                 };
