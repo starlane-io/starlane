@@ -21,7 +21,7 @@ use crate::substance::substance::{
 use crate::substance::substance::{Substance, ToSubstance};
 use crate::sys::AssignmentKind;
 use crate::util::{uuid, ValueMatcher, ValuePattern};
-use crate::{ANONYMOUS, HYPERUSER, CosmicErr, RegistryApi};
+use crate::{ANONYMOUS, HYPERUSER, PlatformErr, RegistryApi, RegistryErr};
 use alloc::borrow::Cow;
 use core::borrow::Borrow;
 use cosmic_macros_primitive::Autobox;
@@ -116,7 +116,7 @@ impl <T> UltraWaveDef<T> where T:ToRecipients+Clone{
 }
 
 impl UltraWave {
-    pub async fn can_shard(&self) -> bool {
+    pub fn can_shard(&self) -> bool {
         match self {
             UltraWave::Ripple(_) => true,
             _ => false
@@ -124,7 +124,7 @@ impl UltraWave {
 
     }
 
-    pub async fn shard_by_location<E>(self, adjacent: &HashSet<Point>, registry: &Arc<dyn RegistryApi<E>>) -> Result<HashMap<Point,UltraWave>,E> where E: CosmicErr {
+    pub async fn shard_by_location<E>(self, adjacent: &HashSet<Point>, registry: &RegistryErr<E>) -> Result<HashMap<Point,UltraWave>,MsgErr> where E: PlatformErr {
         match self {
             _ => {
                 let mut map = HashMap::new();
@@ -629,7 +629,7 @@ impl Wave<SingularRipple> {
 }
 
 impl Wave<Ripple> {
-    pub async fn shard_by_location<E>(self, adjacent: &HashSet<Point>, registry: &Arc<dyn RegistryApi<E>>) -> Result<HashMap<Point,Wave<Ripple>>,E> where E: CosmicErr {
+    pub async fn shard_by_location<E>(self, adjacent: &HashSet<Point>, registry: &RegistryErr<E>) -> Result<HashMap<Point,Wave<Ripple>>,MsgErr> where E: PlatformErr {
         let mut map = HashMap::new();
         for (point,recipients) in self.to.clone().shard_by_location(adjacent, registry).await? {
             let mut ripple = self.clone();
@@ -639,7 +639,7 @@ impl Wave<Ripple> {
         Ok(map)
     }
 
-    pub async fn to_singulars<E>(self, adjacent: &HashSet<Point>, registry: &Arc<dyn RegistryApi<E>>) -> Result<Vec<Wave<SingularRipple>>,MsgErr> {
+    pub async fn to_singulars<E>(self, adjacent: &HashSet<Point>, registry: &RegistryErr<E>) -> Result<Vec<Wave<SingularRipple>>,MsgErr> where E: PlatformErr{
         let mut rtn = vec![];
         for port in self.to.clone().to_ports(adjacent,registry).await? {
             let wave = self.as_single(port);
@@ -1320,29 +1320,8 @@ impl DirectedProto {
     }
 }
 
-pub struct Echoes {
-    vec: Vec<Wave<Echo>>,
-}
+pub type Echoes = Vec<Wave<Echo>>;
 
-impl Echoes {
-    pub fn new() -> Self {
-        Self { vec: vec![] }
-    }
-}
-
-impl Deref for Echoes {
-    type Target = Vec<Wave<Echo>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.vec
-    }
-}
-
-impl DerefMut for Echoes {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.vec
-    }
-}
 
 impl FromReflectedAggregate for () {
     fn from_reflected_aggregate(agg: ReflectedAggregate) -> Result<Self, MsgErr>
@@ -1888,8 +1867,8 @@ impl Recipients {
     pub async fn shard_by_location<E>(
         self,
         adjacent: &HashSet<Point>,
-        registry: &Arc<dyn RegistryApi<E>>,
-    ) -> Result<HashMap<Point, Recipients>, E>  where E: CosmicErr {
+        registry: &RegistryErr<E>,
+    ) -> Result<HashMap<Point, Recipients>, MsgErr>  where E: PlatformErr {
         match self {
             Recipients::Single(single) => {
                 let mut map = HashMap::new();
@@ -1931,7 +1910,7 @@ impl Recipients {
 
 
 
-    pub async fn to_ports<E>(self,adjacent: &HashSet<Point>, registry: &Arc<dyn RegistryApi<E>>,) -> Result<Vec<Port>,MsgErr> {
+    pub async fn to_ports<E>(self,adjacent: &HashSet<Point>, registry: &RegistryErr<E>,) -> Result<Vec<Port>,MsgErr> where E: PlatformErr{
         match self {
             Recipients::Single(single) => Ok(vec![single]),
             Recipients::Multi(multi) => {
@@ -2306,12 +2285,12 @@ pub enum Agent {
     Point(Point),
 }
 
-impl Agent {
-    pub fn point(&self) -> Point {
+impl ToPoint for Agent{
+    fn to_point(self) -> Point {
         match self {
             Agent::Anonymous => ANONYMOUS.clone(),
             Agent::HyperUser => HYPERUSER.clone(),
-            Agent::Point(point) => point.clone()
+            Agent::Point(point) => point
         }
     }
 }
@@ -3400,6 +3379,26 @@ impl TryInto<Wave<Pong>> for ReflectedAggregate {
                 _ => Err(MsgErr::bad_request()),
             },
             _ => Err(MsgErr::bad_request()),
+        }
+    }
+}
+
+impl TryInto<Vec<Wave<Echo>>> for ReflectedAggregate {
+    type Error = MsgErr;
+    fn try_into(self) -> Result<Vec<Wave<Echo>>, Self::Error> {
+        match self {
+            Self::Single(reflected) => match reflected {
+                ReflectedWave::Echo(echo) => Ok(vec![echo]),
+                _ => Err(MsgErr::bad_request()),
+            },
+            ReflectedAggregate::None => Ok(vec![]),
+            ReflectedAggregate::Multi(waves) => {
+                let mut echoes = vec![];
+                for w in waves {
+                    echoes.push(w.to_echo()?);
+                }
+                Ok(echoes)
+            }
         }
     }
 }

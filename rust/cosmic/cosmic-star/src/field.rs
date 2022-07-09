@@ -31,10 +31,10 @@ use http::{HeaderMap, StatusCode, Uri};
 use tokio::io::AsyncBufReadExt;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, Mutex};
-use cosmic_api::{CosmicErr, RegistryApi};
+use cosmic_api::{PlatformErr, RegistryApi};
 
 #[derive(Clone)]
-pub struct FieldEx<E> where E: CosmicErr {
+pub struct FieldEx<E> where E: PlatformErr+'static {
     pub port: Port,
     pub skel: StarSkel<E>,
     pub state: FieldState<E>,
@@ -43,7 +43,7 @@ pub struct FieldEx<E> where E: CosmicErr {
 
 
 
-impl <E> FieldEx<E> where E: CosmicErr {
+impl <E> FieldEx<E> where E: PlatformErr+'static {
     pub fn new(point: Point, skel: StarSkel<E>, state: FieldState<E>, logger: SpanLogger ) -> Self {
         let port = point.to_port().with_layer(Layer::Field);
         Self { port, skel, state, logger }
@@ -75,7 +75,7 @@ impl <E> FieldEx<E> where E: CosmicErr {
 }
 
 #[async_trait]
-impl <E> TraversalLayer for FieldEx<E> where E: CosmicErr {
+impl <E> TraversalLayer for FieldEx<E> where E: PlatformErr+'static {
 
     fn port(&self) -> &Port{
         &self.state.port
@@ -91,7 +91,7 @@ impl <E> TraversalLayer for FieldEx<E> where E: CosmicErr {
 
     async fn directed_core_bound(&self, mut directed: Traversal<DirectedWave>) -> Result<(), MsgErr> {
         directed.logger.set_span_attr("message-id", &directed.id().to_string() );
-        let access = self.skel.registry.access(directed.agent(), &directed.to).await;
+        let access = self.skel.registry.access(&directed.agent().clone().to_point(), &directed.to).await;
 
         match access {
             Ok(access) => {
@@ -105,7 +105,7 @@ impl <E> TraversalLayer for FieldEx<E> where E: CosmicErr {
                         Bounce::Absorbed => {}
                         Bounce::Reflected(reflected) => {
                             self.skel
-                                .fabric_tx
+                                .gravity_well_tx
                                 .send(reflected.to_ultra() ).await;
                         }
                     }
@@ -203,7 +203,7 @@ impl <E> TraversalLayer for FieldEx<E> where E: CosmicErr {
     }
 }
 
-pub struct PipeEx<E> where E: CosmicErr {
+pub struct PipeEx<E> where E: PlatformErr+'static {
     pub logger: SpanLogger,
     pub traversal: PipeTraversal,
     pub field: FieldEx<E>,
@@ -211,7 +211,7 @@ pub struct PipeEx<E> where E: CosmicErr {
     pub env: Env,
 }
 
-impl <E> PipeEx<E> where E: CosmicErr {
+impl <E> PipeEx<E> where E: PlatformErr+'static {
     pub fn new(
         traversal: Traversal<DirectedWave>,
         binder: FieldEx<E>,
@@ -459,12 +459,12 @@ pub enum PipeAction {
 /// this mod basically enforces the bind
 
 #[derive(Clone)]
-pub struct FieldState<E> where E: CosmicErr {
+pub struct FieldState<E> where E: PlatformErr+'static {
     port: Port,
     pipe_exes: Arc<DashMap<String, PipeEx<E>>>,
 }
 
-impl <E> FieldState<E> where E: CosmicErr {
+impl <E> FieldState<E> where E: PlatformErr+'static {
     pub fn new(port: Port) -> Self {
         Self {
             port,

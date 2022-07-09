@@ -58,7 +58,7 @@ impl Platform for Starlane {
         Token::new(STARLANE_TOKEN.to_string())
     }
 
-    fn registry<E>(&self) -> Arc<dyn RegistryApi<E>> where E: cosmic_api::CosmicErr {
+    fn registry(&self) -> Arc<dyn RegistryApi<E>>  {
         self.registry.clone()
     }
 

@@ -24,7 +24,7 @@ use std::rc::Rc;
 use std::sync::{Arc, PoisonError};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
-use crate::CosmicErr;
+use crate::PlatformErr;
 
 pub enum MsgErr {
     Status { status: u16, message: String },
@@ -48,7 +48,7 @@ impl Into<ReflectedCore> for MsgErr {
     }
 }
 
-impl CosmicErr for MsgErr {
+impl PlatformErr for MsgErr {
 
     fn to_cosmic_err(&self) -> MsgErr {
         MsgErr::Status { status: self.status(), message: self.to_string() }
@@ -211,7 +211,7 @@ impl StatusErr for MsgErr {
     }
 }
 
-pub trait StatusErr : CosmicErr{
+pub trait StatusErr : PlatformErr {
     fn message(&self) -> String;
 }
 

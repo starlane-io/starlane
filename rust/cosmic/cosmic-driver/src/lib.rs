@@ -45,13 +45,13 @@ impl DriverSkel {
 }
 
 pub trait DriverFactory {
-    fn kind(&self) -> &Kind;
+    fn kind(&self) -> Kind;
     fn create(&self, skel: DriverSkel) -> Box<dyn Driver>;
 }
 
 #[async_trait]
 pub trait Driver: DirectedHandler+Send+Sync {
-    fn kind(&self) -> &Kind;
+    fn kind(&self) -> Kind;
     async fn status(&self) -> DriverStatus;
     async fn lifecycle(&mut self, event: DriverLifecycleCall) -> Result<DriverStatus,MsgErr>;
     fn ex(&self, point: &Point, state: Option<Arc<RwLock<dyn State>>>) -> Box<dyn Core>;

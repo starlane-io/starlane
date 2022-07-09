@@ -18,13 +18,13 @@ use cosmic_api::wave::{
     ReflectedWave, RootInCtx, Router, SetStrategy, SysMethod, UltraWave, Wave, WaveKind,
 };
 use cosmic_api::State;
-use cosmic_api::{CosmicErr, RegistryApi};
+use cosmic_api::{PlatformErr, RegistryApi};
 use cosmic_driver::{
     Core, Driver, DriverFactory, DriverLifecycleCall, DriverShellRequest, DriverSkel, DriverStatus,
     DriverStatusEvent,
 };
 use dashmap::DashMap;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
@@ -33,7 +33,7 @@ use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 #[derive(DirectedHandler)]
 pub struct Drivers<E>
 where
-    E: CosmicErr,
+    E: PlatformErr+  'static,
 {
     pub port: Port,
     pub skel: StarSkel<E>,
@@ -42,7 +42,7 @@ where
 
 impl<E> Drivers<E>
 where
-    E: CosmicErr,
+    E: PlatformErr + 'static,
 {
     pub fn new(port: Port, skel: StarSkel<E>, drivers: HashMap<Kind, DriverApi>) -> Self {
         Self {
@@ -87,15 +87,16 @@ where
     }
 
     pub fn add(&mut self, factory: Box<dyn DriverFactory>) -> Result<(), MsgErr> {
+        let kind = factory.kind().clone();
         let api = create_driver(factory, self.port.clone(), self.skel.clone())?;
-        self.drivers.insert(factory.kind().clone(), api);
+        self.drivers.insert(kind, api);
         Ok(())
     }
 }
 
 impl<E> Drivers<E>
 where
-    E: CosmicErr,
+    E: PlatformErr,
 {
     pub async fn handle(&self, wave: DirectedWave) -> Result<ReflectedCore, MsgErr> {
         let record = self
@@ -211,6 +212,14 @@ impl DriversBuilder {
         }
     }
 
+    pub fn kinds(&self) -> HashSet<Kind> {
+        let mut rtn = HashSet::new();
+        for kind in self.factories.keys() {
+            rtn.insert( kind.clone() );
+        }
+        rtn
+    }
+
     pub fn add(&mut self, factory: Box<dyn DriverFactory>) {
         self.factories.insert(factory.kind().clone(), factory);
     }
@@ -221,15 +230,16 @@ impl DriversBuilder {
 
     pub fn build<E>(self, drivers_port: Port, skel: StarSkel<E>) -> Result<Drivers<E>, MsgErr>
     where
-        E: CosmicErr,
+        E: PlatformErr+'static,
     {
         if self.logger.is_none() {
             return Err("expected point logger to be set".into());
         }
         let mut drivers = HashMap::new();
         for (_, factory) in self.factories {
+            let kind = factory.kind().clone();
             let api = create_driver(factory, drivers_port.clone(), skel.clone())?;
-            drivers.insert(factory.kind().clone(), api);
+            drivers.insert(kind, api);
         }
         Ok(Drivers::new(drivers_port, skel, drivers))
     }
@@ -241,7 +251,7 @@ fn create_driver<E>(
     skel: StarSkel<E>,
 ) -> Result<DriverApi, MsgErr>
 where
-    E: CosmicErr,
+    E: PlatformErr + 'static,
 {
     let point = drivers_port
         .point
@@ -300,7 +310,7 @@ pub enum DriverShellCall {
 
 pub struct OuterCore<E>
 where
-    E: CosmicErr,
+    E: PlatformErr+'static,
 {
     pub port: Port,
     pub skel: StarSkel<E>,
@@ -312,7 +322,7 @@ where
 #[async_trait]
 impl<E> TraversalLayer for OuterCore<E>
 where
-    E: CosmicErr,
+    E: PlatformErr,
 {
     fn port(&self) -> &cosmic_api::id::id::Port {
         &self.port
@@ -353,7 +363,7 @@ where
 #[derive(DirectedHandler)]
 pub struct DriverShell<E>
 where
-    E: CosmicErr,
+    E: PlatformErr+'static,
 {
     point: Point,
     skel: StarSkel<E>,
@@ -369,7 +379,7 @@ where
 #[routes]
 impl<E> DriverShell<E>
 where
-    E: CosmicErr,
+    E: PlatformErr +'static,
 {
     pub fn new(
         point: Point,
@@ -464,23 +474,23 @@ where
                             .with_layer(Layer::Core);
                         let mut wave = DirectedProto::new();
                         wave.kind(DirectedKind::Ping);
-                        wave.from(self.point.to_port().with_layer(Layer::Shell));
-                        wave.method(SysMethod::Assign.into());
-                            let assign_ref = &assign;
-                            wave.body(Substance::Sys(Sys::Assign(assign)));
-                            let to = self.point.to_port().with_layer(Layer::Core);
-                            wave.to(to.clone());
-                            let wave = wave.build().unwrap();
-                            let router = LayerInjectionRouter::new(
-                                self.skel.clone(),
-                                self.point.clone().to_port().with_layer(Layer::Driver),
-                            );
-                            let transmitter =
-                                ProtoTransmitter::new(Arc::new(router), self.skel.exchanger.clone());
-                            let ctx = RootInCtx::new(wave, to, self.logger.span(), transmitter);
-                            match ctx.push() {
+                        wave.from(self.point.clone().to_port().with_layer(Layer::Shell));
+                        wave.method(SysMethod::Assign);
+                        let assign_ref = &assign;
+                        wave.body(Substance::Sys(Sys::Assign(assign.clone())));
+                        let to = self.point.clone().to_port().with_layer(Layer::Core);
+                        wave.to(to.clone());
+                        let wave = wave.build().unwrap();
+                        let router = LayerInjectionRouter::new(
+                            self.skel.clone(),
+                            self.point.clone().to_port().with_layer(Layer::Driver),
+                        );
+                        let transmitter =
+                            ProtoTransmitter::new(Arc::new(router), self.skel.exchanger.clone());
+                        let ctx = RootInCtx::new(wave, to, self.logger.span(), transmitter);
+                        match ctx.push() {
                             Ok(ctx) => {
-                                let ctx : InCtx<'_,Sys> = ctx;
+                                let ctx: InCtx<'_, Sys> = ctx;
                                 let ctx = ctx.push_input_ref(assign_ref);
                                 let state = self.driver.assign(ctx).await;
                                 match state {
@@ -490,11 +500,7 @@ where
                                         }
                                         Some(state) => {
                                             tx.send(
-                                                self.skel
-                                                    .state
-                                                    .api()
-                                                    .put_state(port, self.assign.state)
-                                                    .await,
+                                                self.skel.state.api().put_state(port, state).await,
                                             );
                                         }
                                     },
@@ -503,7 +509,9 @@ where
                                     }
                                 }
                             }
-                            Err(err) => tx.send(Err(err)),
+                            Err(err) => {
+                                tx.send(Err(err));
+                            }
                         }
                     }
                 }

@@ -1434,7 +1434,7 @@ pub enum RegErr {
     RegErr(RegErr),
 }
 
-impl cosmic_api::CosmicErr for RegErr {
+impl cosmic_api::PlatformErr for RegErr {
     fn message(&self) -> String {
         self.to_string()
     }

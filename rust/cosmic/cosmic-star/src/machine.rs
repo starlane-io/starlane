@@ -7,7 +7,7 @@ use cosmic_api::log::RootLogger;
 use cosmic_api::quota::Timeouts;
 use cosmic_api::sys::{EntryReq, InterchangeKind};
 use cosmic_api::wave::{Agent, HyperWave, UltraWave};
-use cosmic_api::{ArtifactApi, CosmicErr, RegistryApi};
+use cosmic_api::{ArtifactApi, PlatformErr, RegistryApi, RegistryErr};
 use cosmic_hyperlane::{HyperClient, HyperGate, HyperRouter, Hyperway, HyperwayIn, HyperwayInterchange, InterchangeEntryRouter, LocalClientConnectionFactory, TokenAuthenticatorWithRemoteWhitelist};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -16,15 +16,15 @@ use tokio::sync::{mpsc, oneshot};
 use cosmic_api::substance::substance::Substance;
 
 #[derive(Clone)]
-pub struct MachineSkel<E> where E: CosmicErr {
-    pub registry: Arc<dyn RegistryApi<E>>,
+pub struct MachineSkel<E> where E: PlatformErr+'static {
+    pub registry: RegistryErr<E>,
     pub artifacts: Arc<dyn ArtifactApi>,
     pub logger: RootLogger,
     pub timeouts: Timeouts,
     pub tx: mpsc::Sender<MachineCall>
 }
 
-pub struct Machine<E> where E: CosmicErr {
+pub struct Machine<E> where E: PlatformErr+'static {
     pub skel: MachineSkel<E>,
     pub stars: Arc<HashMap<Point, StarApi>>,
     pub entry_router: InterchangeEntryRouter,
@@ -33,14 +33,14 @@ pub struct Machine<E> where E: CosmicErr {
     pub rx: mpsc::Receiver<MachineCall>
 }
 
-impl <E> Machine<E> where E: CosmicErr {
+impl <E> Machine<E> where E: PlatformErr+'static{
     pub fn new(
         platform: Box<dyn Platform<E>>,
         template: MachineTemplate,
     ) -> Result<(), MsgErr> {
         let (tx,rx) = mpsc::channel(32*1024);
         let skel = MachineSkel {
-            registry: platform.registry(),
+            registry: RegistryErr::new(platform.registry()),
             artifacts: platform.artifacts(),
             logger: RootLogger::default(),
             timeouts: Timeouts::default(),
@@ -58,7 +58,7 @@ impl <E> Machine<E> where E: CosmicErr {
             let drivers_point = star_point.push("drivers".to_string()).unwrap();
             let logger = skel.logger.point(drivers_point.clone());
             builder.logger.replace(logger.clone());
-            let star_skel = StarSkel::new(star_template.clone(), skel.clone() );
+            let star_skel = StarSkel::new(star_template.clone(), skel.clone(), builder.kinds() );
             let drivers = builder.build(drivers_point.to_port(), star_skel.clone())?;
             let star_api = Star::new(star_skel.clone(), drivers, fabric_tx )?;
             stars.insert(star_point.clone(), star_api.clone());
@@ -114,7 +114,7 @@ impl <E> Machine<E> where E: CosmicErr {
             let logger = skel.logger.point(from.clone());
             let factory = LocalClientConnectionFactory::new( entry_req, entry_router.clone() );
             let hyperway = HyperClient::new( Agent::HyperUser, to.to_point(), Box::new(factory), logger)?;
-            interchanges.get(&StarKey::try_from(from).unwrap()).add( hyperway );
+            interchanges.get(&StarKey::try_from(from).unwrap()).unwrap().add( hyperway );
         }
 
         platform.start_services(& mut entry_router);

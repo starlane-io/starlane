@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 use crate::error::MsgErr;
 use crate::id::id::{Kind, KindParts, Point, ToPoint, ToPort};
@@ -140,12 +141,12 @@ pub struct Discovery {
     pub star_kind: StarSub,
     pub hops: u16,
     pub star_key: StarKey,
-    pub kinds: Vec<Kind>
+    pub kinds: HashSet<Kind>
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Discoveries {
-    vec: Vec<Discovery>
+    pub vec: Vec<Discovery>
 }
 
 impl Discoveries {

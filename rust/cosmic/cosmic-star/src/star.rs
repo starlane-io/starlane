@@ -20,9 +20,9 @@ use cosmic_api::quota::Timeouts;
 use cosmic_api::substance::substance::{Substance, ToSubstance};
 use cosmic_api::sys::{Assign, AssignmentKind, Discoveries, Discovery, Location, Search, Sys};
 use cosmic_api::util::{ValueMatcher, ValuePattern};
-use cosmic_api::wave::{Agent, Bounce, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, InCtx, Method, Ping, Pong, ProtoTransmitter, RecipientSelector, Recipients, Reflectable, ReflectedCore, RootInCtx, Router, SetStrategy, Signal, Wave, TxRouter, BounceBacks, Echo, Ripple, Handling, HandlingKind, Retries, WaitTime, Priority, Scope, ReflectedWave, ToRecipients};
+use cosmic_api::wave::{Agent, Bounce, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, InCtx, Method, Ping, Pong, ProtoTransmitter, RecipientSelector, Recipients, Reflectable, ReflectedCore, RootInCtx, Router, SetStrategy, Signal, Wave, TxRouter, BounceBacks, Echo, Ripple, Handling, HandlingKind, Retries, WaitTime, Priority, Scope, ReflectedWave, ToRecipients, Echoes};
 use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
-use cosmic_api::{MountKind, CosmicErr, Registration, RegistryApi, State, StateFactory};
+use cosmic_api::{MountKind, PlatformErr, Registration, RegistryApi, RegistryErr, State, StateFactory};
 use cosmic_driver::{Core, Driver, DriverFactory, DriverLifecycleCall, DriverSkel, DriverStatus};
 use cosmic_hyperlane::HyperRouter;
 use dashmap::mapref::one::Ref;
@@ -30,7 +30,7 @@ use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
-use std::ops::{Deref, DerefMut};
+use std::ops::{Add, Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -45,7 +45,7 @@ use cosmic_api::particle::particle::{Details, Status, Stub};
 use crate::state::ShellState;
 
 #[derive(Clone)]
-pub struct StarState<E> where E: CosmicErr {
+pub struct StarState<E> where E: PlatformErr+'static {
     states: Arc<DashMap<Port, Arc<RwLock<dyn State>>>>,
     topic: Arc<DashMap<Port, Arc<dyn TopicHandler>>>,
     tx: mpsc::Sender<StateCall>,
@@ -53,7 +53,7 @@ pub struct StarState<E> where E: CosmicErr {
     shell: Arc<DashMap<Port, ShellState>>,
 }
 
-impl <E> StarState<E> where E:CosmicErr{
+impl <E> StarState<E> where E: PlatformErr+'static {
     pub fn new() -> Self {
         let states: Arc<DashMap<Port, Arc<RwLock<dyn State>>>> = Arc::new(DashMap::new());
 
@@ -140,7 +140,7 @@ impl <E> StarState<E> where E:CosmicErr{
             .ok_or("expected field state")?
             .value()
             .clone();
-        Ok()
+        Ok(rtn)
     }
 
     pub fn find_shell(&self, port: &Port) -> Result<ShellState, MsgErr> {
@@ -154,12 +154,13 @@ impl <E> StarState<E> where E:CosmicErr{
 }
 
 #[derive(Clone)]
-pub struct StarSkel<E> where E: CosmicErr {
+pub struct StarSkel<E> where E: PlatformErr+'static {
     pub key: StarKey,
     pub point: Point,
     pub kind: StarSub,
+    pub kinds: HashSet<Kind>,
     pub logger: PointLogger,
-    pub registry: Arc<dyn RegistryApi<E>>,
+    pub registry: RegistryErr<E>,
     pub traverse_to_next_tx: mpsc::Sender<Traversal<UltraWave>>,
     pub inject_tx: mpsc::Sender<TraversalInjection>,
     pub machine: MachineSkel<E>,
@@ -173,10 +174,11 @@ pub struct StarSkel<E> where E: CosmicErr {
     pub gravity_well_transmitter: ProtoTransmitter,
 }
 
-impl <E> StarSkel<E> where E: CosmicErr {
+impl <E> StarSkel<E> where E: PlatformErr {
     pub fn new(
         template: StarTemplate,
         machine: MachineSkel<E>,
+        kinds: HashSet<Kind>
     ) -> Self {
         let point = template.key.clone().to_point();
         let logger = machine.logger.point(point.clone());
@@ -206,6 +208,7 @@ impl <E> StarSkel<E> where E: CosmicErr {
             key: template.key,
             point,
             kind: template.kind,
+            kinds,
             logger,
             gravity_well_tx: star_tx.gravity_well_tx.clone(),
             gravity_well_router,
@@ -227,9 +230,10 @@ impl <E> StarSkel<E> where E: CosmicErr {
     }
 
     pub fn create_star_drivers(&self, driver_skel: DriverSkel) -> HashMap<Kind,Box<dyn Driver>> {
-        let mut rtn = HashMap::new();
+        let mut rtn :HashMap<Kind,Box<dyn Driver>> = HashMap::new();
         let star_driver = StarDriver::new( self.clone(), driver_skel );
         rtn.insert( star_driver.kind().clone(), Box::new(star_driver) );
+        rtn
     }
 }
 
@@ -323,7 +327,7 @@ impl StarApi {
     }
 }
 
-pub struct Star<E> where E: CosmicErr {
+pub struct Star<E> where E: PlatformErr + 'static{
     skel: StarSkel<E>,
     star_rx: mpsc::Receiver<StarCall>,
     drivers: Drivers<E>,
@@ -334,7 +338,7 @@ pub struct Star<E> where E: CosmicErr {
     fabric_tx: mpsc::Sender<UltraWave>
 }
 
-impl <E> Star<E> where E: CosmicErr {
+impl <E> Star<E> where E: PlatformErr {
     pub fn new(skel: StarSkel<E>, mut drivers: Drivers<E>, fabric_tx: mpsc::Sender<UltraWave>) -> Result<StarApi,MsgErr> {
         let star_driver_factory = Box::new(StarDriverFactory::new( skel.clone() ));
         drivers.add(star_driver_factory)?;
@@ -344,11 +348,11 @@ impl <E> Star<E> where E: CosmicErr {
         injector.layer = Layer::Surface;
 
         let mut golden_path = DashMap::new();
-        for con in skel.connections {
-            golden_path.insert( con.key().clone(), con.key.clone() );
+        for con in skel.connections.iter() {
+            golden_path.insert( con.key().clone(), con.key().clone() );
         }
 
-
+        let kind = skel.kind.clone();
         {
             let star = Self {
                 skel,
@@ -361,7 +365,7 @@ impl <E> Star<E> where E: CosmicErr {
             };
             star.start();
         }
-        Ok(StarApi::new(skel.kind.clone(), star_tx))
+        Ok(StarApi::new(kind, star_tx))
     }
 
     fn start(mut self) {
@@ -402,7 +406,7 @@ impl <E> Star<E> where E: CosmicErr {
         if wave.to().is_match(&self.skel.point) {
             self.start_layer_traversal(wave, &self.injector).await;
         } else if wave.can_shard() {
-            for (location, wave) in wave.shard_by_location(&self.skel.adjacents, &self.skel.registry).await? {
+            for (location, wave) in wave.shard_by_location(&self.skel.adjacents, &self.skel.registry).await.map_err(|e|e.to_cosmic_err())? {
                 if location == self.skel.point {
                     self.start_layer_traversal(wave, &self.injector).await;
                 } else {
@@ -410,23 +414,23 @@ impl <E> Star<E> where E: CosmicErr {
                 }
             }
         } else {
-            let location = self.skel.registry.locate(&wave.to().clone().unwrap_single().point).await?.location;
+            let location = self.skel.registry.locate(&wave.to().clone().unwrap_single().point).await.map_err(|e|e.to_cosmic_err())?.location;
             fling_to_fabric(self, location, wave).await?;
         }
 
-        async fn fling_to_fabric<E>(star: &Star<E>, location: Point, wave: UltraWave) -> Result<(), MsgErr> where E: CosmicErr {
-            let hop = star.find_next_hop(&StarKey::try_from(location)?).await?.ok_or("expected a next hop".into())?.to_port();
+        async fn fling_to_fabric<E>(star: &Star<E>, location: Point, wave: UltraWave) -> Result<(), MsgErr> where E: PlatformErr {
+            let hop = star.find_next_hop(&StarKey::try_from(location)?).await?.ok_or::<MsgErr>("expected a next hop".into())?.to_port();
             if !wave.has_visited(&hop.point ) {
                 let mut proto = DirectedProto::new();
                 proto.kind(DirectedKind::Signal);
-                proto.method(SysMethod::Transport.into());
+                proto.method(SysMethod::Transport);
                 proto.fill(&wave);
                 proto.agent(Agent::HyperUser);
                 proto.scope(Scope::Full);
                 proto.to(hop.to_recipients());
                 proto.body(Substance::UltraWave(Box::new(wave)));
                 let wave = proto.build()?.to_ultra();
-                star.fabric_tx.send(wave ).await?;
+                star.fabric_tx.send(wave ).await;
             }
             Ok(())
         }
@@ -444,11 +448,11 @@ impl <E> Star<E> where E: CosmicErr {
             Ok(record) => record,
             Err(err) => {
                 self.skel.logger.error(err.to_string());
-                return Err(err);
+                return Err(err.to_cosmic_err());
             }
         };
 
-        let location = record.location.clone().ok_or()?;
+        let location = record.location.clone();
         let plan = record.details.stub.kind.wave_traversal_plan().clone();
 
         let mut dest = None;
@@ -612,7 +616,7 @@ impl <E> Star<E> where E: CosmicErr {
         match next {
             None => match traversal.dir {
                 TraversalDirection::Fabric => {
-                    self.skel.fabric_tx.send(traversal.payload);
+                    self.skel.gravity_well_tx.send(traversal.payload);
                 }
                 TraversalDirection::Core => {
                     self.skel
@@ -626,9 +630,6 @@ impl <E> Star<E> where E: CosmicErr {
         }
     }
 
-    async fn to_fabric(&self, wave: UltraWave) {
-        self.skel.fabric_tx.send(wave).await;
-    }
 
     async fn create_mount(&mut self, agent: Agent, kind: MountKind, tx: oneshot::Sender<(mpsc::Sender<UltraWave>, mpsc::Receiver<UltraWave>)> ) -> Result<(),MsgErr> {
         let point = self.skel.point.clone().push("controls").unwrap();
@@ -639,10 +640,10 @@ impl <E> Star<E> where E: CosmicErr {
             kind: kind.kind(),
             registry: Default::default(),
             properties: Default::default(),
-            owner: agent.point()
+            owner: agent.clone().to_point()
         };
-        self.skel.registry.register(&registration).await?;
-        self.skel.registry.assign(&point, self.skel.location()).await?;
+        self.skel.registry.register(&registration).await.map_err(|e|e.to_cosmic_err())?;
+        self.skel.registry.assign(&point, self.skel.location()).await.map_err(|e|e.to_cosmic_err())?;
 
         let (in_mount_tx,mut in_mount_rx) = mpsc::channel(32*1024);
         let (out_mount_tx,out_mount_rx) = mpsc::channel(32*1024);
@@ -671,39 +672,22 @@ impl <E> Star<E> where E: CosmicErr {
         Ok(())
     }
 
-    async fn route_to_fabric(&self, wave: UltraWave, star: Point) -> Result<(), MsgErr> {
-        let mut proto = DirectedProto::new();
-        proto.to(star.to_port());
-        proto.from(self.skel.point.clone().to_port());
-        proto.kind(DirectedKind::Signal);
-        let mut core = DirectedCore::new(SysMethod::Transport.into());
-        core.body = wave.to_substance();
-        proto.core(core);
-        let directed = proto.build()?;
-        let wave = directed.to_ultra();
-        self.gravity_well_router.route(wave).await;
-        Ok(())
-    }
-
-
-
     async fn find_next_hop(&self, star_key: &StarKey ) -> Result<Option<StarKey>,MsgErr> {
         if let Some(adjacent) = self.golden_path.get(star_key) {
             Ok(Some(adjacent.value().clone()))
         } else {
             let mut ripple = DirectedProto::new();
             ripple.kind(DirectedKind::Ripple);
-            ripple.method(SysMethod::Search.into());
+            ripple.method(SysMethod::Search);
             ripple.body(Substance::Sys(Sys::Search(Search::Star(star_key.clone()))));
-            ripple.bounce_backs = Option::new(BounceBacks::Count(self.skel.adjacents.len()));
+            ripple.bounce_backs = Option::Some(BounceBacks::Count(self.skel.adjacents.len()));
             ripple.to(Recipients::Stars);
-            let echoes:Vec<ReflectedWave> = self.gravity_well_transmitter.direct(ripple).await?;
+            let echoes:Echoes = self.skel.gravity_well_transmitter.direct(ripple).await?;
 
             let mut colated = vec![];
             for echo in echoes {
-                let echo = echo.to_echo()?;
-                if let Substance::Sys(Sys::Discoveries(discoveries)) = &echo.core().body {
-                    for discovery in discoveries {
+                if let Substance::Sys(Sys::Discoveries(discoveries)) = &echo.core.body {
+                    for discovery in discoveries.iter() {
                         colated.push(StarDiscovery::new(StarPair::new(self.skel.key.clone(), StarKey::try_from(echo.from.point.clone())?), discovery.clone()));
                     }
                 } else {
@@ -727,8 +711,9 @@ impl <E> Star<E> where E: CosmicErr {
     }
 
 
-    async fn re_ripple( &self, ripple: Wave<Ripple> ) -> Result<Vec<Wave<Echo>>,MsgErr> {
-        let mut reflections: Vec<BoxFuture<Wave<Echo>>> = vec![];
+    /*
+    async fn re_ripple( &self, ripple: Wave<Ripple> ) -> Result<Vec<Echoes>,MsgErr> {
+        let mut reflections: Vec<BoxFuture<Echoes>> = vec![];
 
         for (location, ripple) in ripple.shard_by_location(&self.skel.adjacents, &self.skel.registry ).await?
         {
@@ -742,7 +727,7 @@ impl <E> Star<E> where E: CosmicErr {
                wave.handling(ripple.handling.clone());
                wave.agent(Agent::HyperUser);
                wave.body(Substance::UltraWave(Box::new(ripple.to_ultra())));
-               reflections.push(self.gravity_well_transmitter.direct(wave).boxed());
+               reflections.push(self.skel.gravity_well_transmitter.direct(wave).boxed());
            }
         }
 
@@ -754,6 +739,7 @@ impl <E> Star<E> where E: CosmicErr {
 
         Ok(echoes)
     }
+     */
 
 }
 
@@ -766,12 +752,12 @@ pub struct StarMount {
 
 
 #[derive(Clone)]
-pub struct LayerInjectionRouter<E> where E: CosmicErr {
+pub struct LayerInjectionRouter<E> where E: PlatformErr+'static {
     pub skel: StarSkel<E>,
     pub injector: Port,
 }
 
-impl <E> LayerInjectionRouter<E> where E: CosmicErr {
+impl <E> LayerInjectionRouter<E> where E: PlatformErr+'static {
     pub fn new(skel: StarSkel<E>, injector: Port) -> Self {
         Self { skel, injector }
     }
@@ -785,7 +771,7 @@ impl <E> LayerInjectionRouter<E> where E: CosmicErr {
 }
 
 #[async_trait]
-impl <E> Router for LayerInjectionRouter<E> where E: CosmicErr {
+impl <E> Router for LayerInjectionRouter<E> where E: PlatformErr+'static {
     async fn route(&self, wave: UltraWave) {
         let inject = TraversalInjection::new(self.injector.clone(), wave);
         self.skel.inject_tx.send(inject).await;
@@ -986,11 +972,11 @@ impl PartialOrd for StarDiscovery {
 
 
 
-pub struct StarDriverFactory<E> where E: CosmicErr {
+pub struct StarDriverFactory<E> where E: PlatformErr+'static {
     pub skel: StarSkel<E>,
 }
 
-impl <E> StarDriverFactory<E> where E: CosmicErr {
+impl <E> StarDriverFactory<E> where E: PlatformErr+'static {
     pub fn new( skel: StarSkel<E>) -> Self {
         Self {
             skel
@@ -998,9 +984,9 @@ impl <E> StarDriverFactory<E> where E: CosmicErr {
     }
 }
 
-impl <E> DriverFactory for StarDriverFactory<E> where E: CosmicErr {
-    fn kind(&self) -> &Kind {
-        &Kind::Star(self.skel.kind.clone())
+impl <E> DriverFactory for StarDriverFactory<E> where E: PlatformErr+'static {
+    fn kind(&self) -> Kind {
+        Kind::Star(self.skel.kind.clone())
     }
 
     fn create(&self, driver_skel: DriverSkel) -> Box<dyn Driver> {
@@ -1012,13 +998,13 @@ impl <E> DriverFactory for StarDriverFactory<E> where E: CosmicErr {
 
 
 #[derive(DirectedHandler)]
-pub struct StarDriver<E> where E: CosmicErr {
+pub struct StarDriver<E> where E: PlatformErr+'static {
     pub status: DriverStatus,
     pub star_skel: StarSkel<E>,
     pub driver_skel: DriverSkel
 }
 
-impl <E> StarDriver<E> where E: CosmicErr{
+impl <E> StarDriver<E> where E: PlatformErr+'static {
     pub fn new( star_skel: StarSkel<E>, driver_skel: DriverSkel ) -> Self {
         Self {
             status: DriverStatus::Started,
@@ -1030,20 +1016,20 @@ impl <E> StarDriver<E> where E: CosmicErr{
     async fn search_for_stars(&self, search: Search) -> Result<Vec<Discovery>,MsgErr> {
         let mut ripple = DirectedProto::new();
         ripple.kind(DirectedKind::Ripple);
-        ripple.method(SysMethod::Search.into());
-        ripple.bounce_backs = Option::new(BounceBacks::Count(self.skel.adjacents.len()));
+        ripple.method(SysMethod::Search);
+        ripple.bounce_backs = Some(BounceBacks::Count(self.star_skel.adjacents.len()));
         ripple.body(Substance::Sys(Sys::Search(search)));
         ripple.to(Recipients::Stars);
-        let echoes:Vec<ReflectedWave> = self.transmitter.direct(ripple).await?;
+        let echoes:Echoes = self.star_skel.gravity_well_transmitter.direct(ripple).await?;
 
         let mut rtn = vec![];
         for echo in echoes {
-            if let Substance::Sys(Sys::Discoveries(discoveries)) = &echo.core().body {
-                for discovery in discoveries {
-                    rtn.push(discovery.clone());
+            if let Substance::Sys(Sys::Discoveries(discoveries)) = echo.variant.core.body{
+                for discovery in discoveries.vec.into_iter(){
+                    rtn.push(discovery);
                 }
             } else {
-                self.skel.logger.warn("unexpected reflected core substance from search echo");
+                self.star_skel.logger.warn("unexpected reflected core substance from search echo");
             }
         }
 
@@ -1054,10 +1040,10 @@ impl <E> StarDriver<E> where E: CosmicErr{
 
 
 #[async_trait]
-impl <E> Driver for StarDriver<E> where E: CosmicErr{
+impl <E> Driver for StarDriver<E> where E: PlatformErr {
 
-    fn kind(&self) -> &Kind {
-        &Kind::Star(self.star_skel.kind.clone())
+    fn kind(&self) -> Kind {
+        Kind::Star(self.star_skel.kind.clone())
     }
 
     async fn status(&self) -> DriverStatus {
@@ -1088,59 +1074,65 @@ impl <E> Driver for StarDriver<E> where E: CosmicErr{
     }
 
     fn ex(&self, point: &Point, state: Option<Arc<RwLock<dyn State>>>) -> Box<dyn Core> {
-
+        Box::new(StarCore::new( self.star_skel.clone(), self.driver_skel.clone() ))
     }
 
-    async fn assign(&mut self, ctx: InCtx<'_,Assign>) -> Result<Option<Arc<RwLock<dyn State>>>, MsgErr> {
+    async fn assign(&self, ctx: InCtx<'_,Assign>) -> Result<Option<Arc<RwLock<dyn State>>>, MsgErr> {
         Err("only allowed one Star per StarDriver".into())
     }
 }
 
 #[routes]
-impl <E> StarDriver<E> where E: CosmicErr{
+impl <E> StarDriver<E> where E: PlatformErr {
 
 
 
 }
 
 #[derive(DirectedHandler)]
-pub struct StarCore<E> where E: CosmicErr{
-   pub skel: StarSkel<E>
+pub struct StarCore<E> where E: PlatformErr+'static {
+   pub star_skel: StarSkel<E>,
+   pub driver_skel: DriverSkel
 }
 
-impl <E> Core for StarCore<E> where E: CosmicErr{
+impl <E> Core for StarCore<E> where E: PlatformErr+'static {
 
 }
 
 #[routes]
-impl <E> StarCore<E> where E: CosmicErr{
+impl <E> StarCore<E> where E: PlatformErr+'static {
 
-    pub fn new( skel: StarSkel<E> ) -> Self {
+    pub fn new(star_skel: StarSkel<E>, driver_skel: DriverSkel ) -> Self {
         Self {
-            skel
+            star_skel,
+            driver_skel
         }
     }
 
     #[route("Sys<Assign>")]
-    pub async fn handle_assign( &self, ctx: InCtx<'_,Assign> ) -> Result<ReflectedCore,MsgErr>{
-        self.driver_skel.assign(ctx.input.clone()).await?;
-        Ok(ReflectedCore::ok())
+    pub async fn handle_assign( &self, ctx: InCtx<'_,Sys> ) -> Result<ReflectedCore,MsgErr>{
+        if let Sys::Assign(assign) = ctx.input {
+            self.driver_skel.assign(assign.clone()).await?;
+            Ok(ReflectedCore::ok())
+        } else {
+            Err("expected Sys<Assign>".into())
+        }
     }
 
     #[route("Sys<Transport>")]
     pub async fn transport(&self, ctx: InCtx<'_,UltraWave> ) {
-        self.skel.gravity_well_tx.send( ctx.wave().clone().to_ultra() ).await;
+        self.star_skel.gravity_well_tx.send( ctx.wave().clone().to_ultra() ).await;
     }
 
 
     #[route("Sys<Search>")]
     pub async fn handle_search_request(&self, ctx: InCtx<'_, Sys>) -> CoreBounce {
-        fn reflect<'a,E>(star: &StarCore<E>, ctx: &'a InCtx<'a,Sys>) -> ReflectedCore where E: CosmicErr {
+        fn reflect<'a,E>(core: &StarCore<E>, ctx: &'a InCtx<'a,Sys>) -> ReflectedCore where E: PlatformErr {
             let discovery = Discovery {
-                star_kind: star.skel.kind.clone(),
+                star_kind: core.star_skel.kind.clone(),
                 hops: ctx.wave().hops(),
-                star_key: star.skel.key.clone(),
-                kinds: star.drivers.kinds().clone()
+                star_key: core.star_skel.key.clone(),
+                kinds: core.star_skel.kinds.clone()
             };
             let mut core = ReflectedCore::new();
             let mut discoveries = Discoveries::new();
@@ -1153,22 +1145,22 @@ impl <E> StarCore<E> where E: CosmicErr{
         if let Sys::Search(search) = ctx.input {
             match search {
                 Search::Star(star) => {
-                    if self.skel.key == *star {
-                        CoreBounce::Reflected(reflect(self, &ctx))
+                    if self.star_skel.key == *star {
+                        return CoreBounce::Reflected(reflect(self, &ctx));
                     }
                 }
                 Search::StarKind(kind) => {
-                    if *kind == self.skel.kind {
-                        CoreBounce::Reflected(reflect(self, &ctx))
+                    if *kind == self.star_skel.kind {
+                        return CoreBounce::Reflected(reflect(self, &ctx));
                     }
                 }
                 Search::Kinds => {
-                    CoreBounce::Reflected(reflect(self, &ctx ))
+                    return CoreBounce::Reflected(reflect(self, &ctx ));
                 }
             }
-            CoreBounce::Absorbed
+            return CoreBounce::Absorbed;
         } else {
-            CoreBounce::Reflected(ctx.bad_request())
+            return CoreBounce::Reflected(ctx.bad_request());
         }
     }
 }
@@ -1208,14 +1200,14 @@ impl StarWrangles {
   pub fn verify( &self, kinds: &[&StarSub] ) -> Result<(),MsgErr> {
       for kind in kinds {
           if !self.wrangles.contains_key(*kind) {
-              Err(format!("star must be able to wrangle at least one {}", kind.to_string()).into())
+              return Err(format!("star must be able to wrangle at least one {}", kind.to_string()).into());
           }
       }
       Ok(())
   }
 
-  pub async fn wrangle( &self, kind: &StarSub ) -> Result<&StarKey,MsgErr>{
-      self.wrangles.get(kind).ok_or(format!("could not find wrangles for kind {}", kind.to_string()))?.value().wrangle()
+  pub async fn wrangle( &self, kind: &StarSub ) -> Result<StarKey,MsgErr>{
+      self.wrangles.get(kind).ok_or(format!("could not find wrangles for kind {}", kind.to_string()))?.value().wrangle().await
   }
 
 
@@ -1231,18 +1223,22 @@ pub struct RoundRobinWrangleSelector {
 impl RoundRobinWrangleSelector {
 
    pub fn new( kind: StarSub, mut stars: Vec<StarDiscovery> ) -> Self {
+
+
        stars.sort();
        let mut step_index = 0;
-       let mut hops = -1;
+       let mut hops:i32 = -1;
        for discovery in &stars {
            if hops < 0 {
-               hops = discovery.hops;
+               hops = discovery.hops as i32;
            }
-           else if discovery.hops > hops {
+           else if discovery.hops as i32 > hops {
                break;
            }
            step_index += 1;
        }
+
+
        Self {
            kind,
            stars,
@@ -1252,7 +1248,7 @@ impl RoundRobinWrangleSelector {
    }
 
 
-   pub async fn wrangle( &self ) -> Result<&StarKey,MsgErr>{
+   pub async fn wrangle( &self ) -> Result<StarKey,MsgErr>{
 
        if self.stars.is_empty() {
            return Err(format!("cannot find wrangle for kind: {}",self.kind.to_string()).into());
@@ -1260,15 +1256,15 @@ impl RoundRobinWrangleSelector {
 
        let index = {
            let mut lock = self.index.lock().await;
-           let index:usize = *lock;
-           lock += 1;
+           let index = *lock;
+           lock.add(1);
            index
        };
 
        let index = index % self.step_index;
 
        if let Some(discovery) = self.stars.get(index) {
-           Ok(&discovery.value().key)
+           Ok(discovery.discovery.star_key.clone())
        } else {
            Err(format!("cannot find wrangle for kind: {}",self.kind.to_string()).into())
        }
