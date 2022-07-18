@@ -1,5 +1,5 @@
 [package]
-name = "cosmic-artifact"
+name = "cosmic-artifact-memory"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 cosmic-api={ path="../../cosmic/cosmic-api"}
+cosmic-artifact={ path="../../cosmic/cosmic-artifact"}
 lru = "0.7.7"

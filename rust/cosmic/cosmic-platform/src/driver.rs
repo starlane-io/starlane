@@ -18,7 +18,7 @@ use cosmic_api::wave::{
     ReflectedWave, RootInCtx, Router, SetStrategy, SysMethod, UltraWave, Wave, WaveKind,
 };
 use cosmic_api::State;
-use cosmic_api::{PlatformErr, RegistryApi};
+use cosmic_api::{};
 use cosmic_driver::{
     Core, Driver, DriverFactory, DriverLifecycleCall, DriverShellRequest, DriverSkel, DriverStatus,
     DriverStatusEvent,
@@ -29,22 +29,23 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
+use crate::{PlatErr, Platform, RegistryApi};
 
 #[derive(DirectedHandler)]
-pub struct Drivers<E>
+pub struct Drivers<P>
 where
-    E: PlatformErr+  'static,
+    P: Platform+  'static,
 {
     pub port: Port,
-    pub skel: StarSkel<E>,
+    pub skel: StarSkel<P>,
     pub drivers: HashMap<Kind, DriverApi>,
 }
 
-impl<E> Drivers<E>
+impl<P> Drivers<P>
 where
-    E: PlatformErr + 'static,
+    P: Platform+ 'static,
 {
-    pub fn new(port: Port, skel: StarSkel<E>, drivers: HashMap<Kind, DriverApi>) -> Self {
+    pub fn new(port: Port, skel: StarSkel<P>, drivers: HashMap<Kind, DriverApi>) -> Self {
         Self {
             port,
             skel,
@@ -94,15 +95,15 @@ where
     }
 }
 
-impl<E> Drivers<E>
+impl<P> Drivers<P>
 where
-    E: PlatformErr,
+    P: Platform,
 {
     pub async fn handle(&self, wave: DirectedWave) -> Result<ReflectedCore, MsgErr> {
         let record = self
             .skel
             .registry
-            .locate(&wave.to().single_or().map_err(|e| e.to_cosmic_err())?.point)
+            .locate(&wave.to().single_or()?.point)
             .await
             .map_err(|e| e.to_cosmic_err())?;
         let driver = self
@@ -228,9 +229,9 @@ impl DriversBuilder {
         self.logger.replace(logger);
     }
 
-    pub fn build<E>(self, drivers_port: Port, skel: StarSkel<E>) -> Result<Drivers<E>, MsgErr>
+    pub fn build<P>(self, drivers_port: Port, skel: StarSkel<P>) -> Result<Drivers<P>, MsgErr>
     where
-        E: PlatformErr+'static,
+        P: Platform +'static,
     {
         if self.logger.is_none() {
             return Err("expected point logger to be set".into());
@@ -245,13 +246,13 @@ impl DriversBuilder {
     }
 }
 
-fn create_driver<E>(
+fn create_driver<P>(
     factory: Box<dyn DriverFactory>,
     drivers_port: Port,
-    skel: StarSkel<E>,
+    skel: StarSkel<P>,
 ) -> Result<DriverApi, MsgErr>
 where
-    E: PlatformErr + 'static,
+    P: Platform + 'static,
 {
     let point = drivers_port
         .point
@@ -308,21 +309,21 @@ pub enum DriverShellCall {
     },
 }
 
-pub struct OuterCore<E>
+pub struct OuterCore<P>
 where
-    E: PlatformErr+'static,
+    P: Platform +'static,
 {
     pub port: Port,
-    pub skel: StarSkel<E>,
+    pub skel: StarSkel<P>,
     pub state: Option<Arc<RwLock<dyn State>>>,
     pub ex: Box<dyn Core>,
     pub router: Arc<dyn Router>,
 }
 
 #[async_trait]
-impl<E> TraversalLayer for OuterCore<E>
+impl<P> TraversalLayer for OuterCore<P>
 where
-    E: PlatformErr,
+    P: Platform ,
 {
     fn port(&self) -> &cosmic_api::id::id::Port {
         &self.port
@@ -361,29 +362,29 @@ where
 }
 
 #[derive(DirectedHandler)]
-pub struct DriverShell<E>
+pub struct DriverShell<P>
 where
-    E: PlatformErr+'static,
+    P: Platform +'static,
 {
     point: Point,
-    skel: StarSkel<E>,
+    skel: StarSkel<P>,
     status: DriverStatus,
     tx: mpsc::Sender<DriverShellCall>,
     rx: mpsc::Receiver<DriverShellCall>,
     state: StateApi,
     driver: Box<dyn Driver>,
-    router: Arc<LayerInjectionRouter<E>>,
+    router: Arc<LayerInjectionRouter<P>>,
     logger: PointLogger,
 }
 
 #[routes]
-impl<E> DriverShell<E>
+impl<P> DriverShell<P>
 where
-    E: PlatformErr +'static,
+    P: Platform +'static,
 {
     pub fn new(
         point: Point,
-        skel: StarSkel<E>,
+        skel: StarSkel<P>,
         driver: Box<dyn Driver>,
         states: StateApi,
         tx: mpsc::Sender<DriverShellCall>,
@@ -525,7 +526,7 @@ where
         self.driver.lifecycle(call).await
     }
 
-    async fn core(&self, point: &Point) -> Result<OuterCore<E>, MsgErr> {
+    async fn core(&self, point: &Point) -> Result<OuterCore<P>, MsgErr> {
         let port = point.clone().to_port().with_layer(Layer::Core);
         let (tx, mut rx) = oneshot::channel();
         self.skel

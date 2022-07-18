@@ -8,9 +8,12 @@ edition = "2021"
 [dependencies]
 cosmic-api={ path="../../cosmic/cosmic-api"}
 cosmic-platform={ path= "../../cosmic/cosmic-platform" }
-cosmic-registry-postgres={ path="../../drivers/cosmic-registry-postgres"}
+cosmic-registry-postgres={ path="../../impl/cosmic-registry-postgres"}
 cosmic-artifact={ path="../../cosmic/cosmic-artifact"}
+cosmic-hyperlane={ path="../../cosmic/cosmic-hyperlane"}
 lazy_static = "1.4.0"
 uuid = { version="1.1.2", features=["v4"] }
 chrono = { version="0.4.19", features=["serde"] }
 tokio = { version = "1.15.0", features = ["full"] }
+
+

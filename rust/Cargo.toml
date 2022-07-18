@@ -2,9 +2,10 @@
 members = [
   "starlane/*",
   "cosmic/*",
-  "drivers/*",
+  "impl/*",
   ]
 
 exclude = [
-  "cosmic/src", "cosmic/target", "starlane/starlane-old"
+  "cosmic/src", "cosmic/target", "starlane/starlane-old", "starlane/starlane-core"
 ]
+

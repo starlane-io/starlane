@@ -1,6 +1,5 @@
 #![allow(warnings)]
 //# ! [feature(unboxed_closures)]
-#[no_std]
 #[macro_use]
 extern crate lazy_static;
 
@@ -15,11 +14,10 @@ extern crate async_trait;
 
 use serde::{Deserialize, Serialize};
 
-pub mod error;
-pub mod command;
 pub mod cli;
+pub mod command;
 pub mod config;
-pub mod entity;
+pub mod error;
 pub mod frame;
 pub mod http;
 pub mod id;
@@ -36,28 +34,36 @@ pub mod substance;
 pub mod sys;
 pub mod util;
 pub mod wave;
+pub mod property;
 
-use crate::error::MsgErr;
-use crate::config::config::bind::BindConfig;
-use crate::config::config::Document;
-use crate::id::id::{Kind, Point, Port, Uuid};
-use core::str::FromStr;
-use std::ops::Deref;
-use std::sync::{Arc, RwLock};
-use chrono::{DateTime, Utc};
-use dashmap::{DashMap, DashSet};
-use std::cmp::Ordering;
-use ::http::StatusCode;
+use crate::bin::Bin;
 use crate::command::command::common::{SetProperties, SetRegistry};
 use crate::command::request::delete::Delete;
 use crate::command::request::query::{Query, QueryResult};
 use crate::command::request::select::{Select, SubSelect};
+use crate::config::config::bind::BindConfig;
+use crate::config::config::Document;
+use crate::error::MsgErr;
+use crate::id::id::{BaseKind, Kind, Point, Port, Specific, Uuid};
+use crate::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarSub, UserBaseSubKind};
 use crate::particle::particle::{Details, Properties, Status, Stub};
 use crate::security::{Access, AccessGrant};
 use crate::selector::selector::Selector;
-use crate::substance::substance::{Substance, SubstanceList, ToSubstance};
+use crate::substance::substance::{Substance, SubstanceList, Token, ToSubstance};
 use crate::sys::ParticleRecord;
 use crate::wave::{Agent, ReflectedCore};
+use ::http::StatusCode;
+use chrono::{DateTime, Utc};
+use core::str::FromStr;
+use dashmap::{DashMap, DashSet};
+use lru::LruCache;
+use std::cmp::Ordering;
+use std::ops::Deref;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use crate::command::request::create::KindTemplate;
+
+
 
 lazy_static! {
     pub static ref VERSION: semver::Version = semver::Version::from_str("1.0.0").unwrap();
@@ -65,29 +71,63 @@ lazy_static! {
     pub static ref ANONYMOUS: Point = Point::from_str("hyperspace:users:anonymous").expect("point");
 }
 
-
 extern "C" {
     pub fn cosmic_uuid() -> Uuid;
     pub fn cosmic_timestamp() -> DateTime<Utc>;
 }
 
+#[derive(Clone)]
+pub struct ArtifactApi {
+    pub binds: Arc<RwLock<LruCache<Point, Arc<BindConfig>>>>,
+    pub fetcher: Arc<dyn ArtifactFetcher>,
+}
 
-#[async_trait]
-pub trait ArtifactApi: Send+Sync {
-    async fn bind(&self, artifact: &Point) -> Result<ArtRef<BindConfig>, MsgErr>;
+impl ArtifactApi {
+    pub async fn bind(&self, point: &Point) -> Result<ArtRef<BindConfig>, MsgErr> {
+        {
+            let read = self.binds.read().await;
+            if read.contains(point) {
+                let mut write = self.binds.write().await;
+                let bind = write.get(point).unwrap().clone();
+                return Ok(ArtRef::new(bind, point.clone()));
+            }
+        }
+
+        let bind: Arc<BindConfig> = Arc::new(self.get(point).await?);
+        {
+            let mut write = self.binds.write().await;
+            write.put(point.clone(), bind.clone());
+        }
+        return Ok(ArtRef::new(bind, point.clone()));
+    }
+
+    async fn get<A>(&self, point: &Point) -> Result<A, MsgErr>
+    where
+        A: TryFrom<Vec<u8>,Error=MsgErr>,
+    {
+        if !point.has_bundle() {
+            return Err("point is not from a bundle".into());
+        }
+        let bin = self.fetcher.fetch(point).await;
+        Ok(A::try_from(bin)?)
+    }
 }
 
 pub struct ArtRef<A> {
     artifact: Arc<A>,
-    bundle: Point,
-    point: Point
+    point: Point,
 }
 
-impl <A> ArtRef<A>  {
-    pub fn bundle(&self) -> &Point {
-        &self.bundle
+impl<A> ArtRef<A> {
+    fn new(artifact: Arc<A>, point: Point) -> Self {
+        Self { artifact, point }
     }
+}
 
+impl<A> ArtRef<A> {
+    pub fn bundle(&self) -> Point {
+        self.point.clone().to_bundle().unwrap()
+    }
     pub fn point(&self) -> &Point {
         &self.point
     }
@@ -107,178 +147,37 @@ impl<A> Drop for ArtRef<A> {
     }
 }
 
+#[async_trait]
+pub trait ArtifactFetcher: Send+Sync {
+    async fn stub(&self, point: &Point) -> Stub;
+    async fn fetch(&self, point: &Point) -> Vec<u8>;
+}
+
 #[cfg(test)]
 pub mod tests {
     #[test]
     fn it_works() {}
 }
 
-#[async_trait]
-pub trait RegistryApi<E>: Send + Sync where E: PlatformErr {
-    async fn register(&self, registration: &Registration) -> Result<Details, E>;
-
-    async fn assign(&self, point: &Point, location: &Point) -> Result<(), E>;
-
-    async fn set_status(&self, point: &Point, status: &Status) -> Result<(), E>;
-
-    async fn set_properties(
-        &self,
-        point: &Point,
-        properties: &SetProperties,
-    ) -> Result<(), E>;
-
-    async fn sequence(&self, point: &Point) -> Result<u64, E>;
-
-    async fn get_properties( &self, point:&Point ) -> Result<Properties, E>;
-
-    async fn locate(&self, point: &Point) -> Result<ParticleRecord, E>;
-
-    async fn query(&self, point: &Point, query: &Query) -> Result<QueryResult, E>;
-
-    async fn delete(&self, delete: &Delete ) -> Result<SubstanceList, E>;
-
-    async fn select(&self, select: &mut Select) -> Result<SubstanceList, E>;
-
-    async fn sub_select(&self, sub_select: &SubSelect) -> Result<Vec<Stub>, E>;
-
-    async fn grant(&self, access_grant: &AccessGrant) -> Result<(), E>;
-
-    async fn access(&self, to: &Point, on: &Point) -> Result<Access, E>;
-
-    async fn chown(&self, on: &Selector, owner: &Point, by: &Point) -> Result<(), E>;
-
-    async fn list_access(
-        &self,
-        to: &Option<&Point>,
-        on: &Selector,
-    ) -> Result<Vec<IndexedAccessGrant>, E>;
-
-    async fn remove_access(&self, id: i32, to: &Point) -> Result<(), E>;
+pub struct StateCache<C>
+where
+    C: State,
+{
+    pub states: Arc<DashMap<Point, Arc<RwLock<C>>>>,
 }
 
-#[derive(Clone)]
-pub struct RegistryErr <E> where E : PlatformErr {
-    registry : Arc<dyn RegistryApi<E>>
-}
+impl<C> StateCache<C> where C: State {}
 
-impl <E> RegistryErr<E> where E: PlatformErr{
-    pub fn new( registry: Arc<dyn RegistryApi<E>>) -> Self {
-        Self {
-            registry
-        }
-    }
-}
-
-#[async_trait]
-impl <E> RegistryApi<MsgErr> for RegistryErr<E> where E:PlatformErr {
-    async fn register(&self, registration: &Registration) -> Result<Details, MsgErr> {
-        self.registry.register(registration).await.map_err(|e|e.to_cosmic_err())
-    }
-
-    async fn assign(&self, point: &Point, location: &Point) -> Result<(), MsgErr> {
-        self.registry.assign(point,location).await.map_err(|e|e.to_cosmic_err())
-    }
-
-    async fn set_status(&self, point: &Point, status: &Status) -> Result<(), MsgErr> {
-        self.registry.set_status(point,status).await.map_err(|e|e.to_cosmic_err())
-    }
-
-    async fn set_properties(&self, point: &Point, properties: &SetProperties) -> Result<(), MsgErr> {
-        self.registry.set_properties(point,properties).await.map_err(|e|e.to_cosmic_err())
-    }
-
-    async fn sequence(&self, point: &Point) -> Result<u64, MsgErr> {
-        self.registry.sequence(point).await.map_err(|e|e.to_cosmic_err())
-    }
-
-    async fn get_properties(&self, point: &Point) -> Result<Properties, MsgErr> {
-        self.registry.get_properties(point).await.map_err(|e|e.to_cosmic_err())
-    }
-
-    async fn locate(&self, point: &Point) -> Result<ParticleRecord, MsgErr> {
-        self.registry.locate(point).await.map_err(|e|e.to_cosmic_err())
-    }
-
-    async fn query(&self, point: &Point, query: &Query) -> Result<QueryResult, MsgErr> {
-        self.registry.query(point,query).await.map_err(|e|e.to_cosmic_err())
-    }
-
-    async fn delete(&self, delete: &Delete) -> Result<SubstanceList, MsgErr> {
-        self.registry.delete(delete).await.map_err(|e|e.to_cosmic_err())
-    }
-
-    async fn select(&self, select: &mut Select) -> Result<SubstanceList, MsgErr> {
-        self.registry.select(select).await.map_err(|e|e.to_cosmic_err())
-    }
-
-    async fn sub_select(&self, sub_select: &SubSelect) -> Result<Vec<Stub>, MsgErr> {
-        self.registry.sub_select(sub_select).await.map_err(|e|e.to_cosmic_err())
-    }
-
-    async fn grant(&self, access_grant: &AccessGrant) -> Result<(), MsgErr> {
-        self.registry.grant(access_grant).await.map_err(|e|e.to_cosmic_err())
-    }
-
-    async fn access(&self, to: &Point, on: &Point) -> Result<Access, MsgErr> {
-        self.registry.access(to,on).await.map_err(|e|e.to_cosmic_err())
-    }
-
-    async fn chown(&self, on: &Selector, owner: &Point, by: &Point) -> Result<(), MsgErr> {
-        self.registry.chown(on,owner,by).await.map_err(|e|e.to_cosmic_err())
-    }
-
-    async fn list_access(&self, to: &Option<&Point>, on: &Selector) -> Result<Vec<IndexedAccessGrant>, MsgErr> {
-        self.registry.list_access(to,on).await.map_err(|e|e.to_cosmic_err())
-    }
-
-    async fn remove_access(&self, id: i32, to: &Point) -> Result<(), MsgErr> {
-        self.registry.remove_access(id,to).await.map_err(|e|e.to_cosmic_err())
-    }
-}
-
-pub trait PlatformErr: Sized+Send+Sync+ToString+Clone+Into<MsgErr>{
-    fn to_cosmic_err(&self) -> MsgErr;
-
-    fn new<S>(message:S) -> Self where S: ToString;
-
-    fn status_msg<S>(status:u16, message:S) -> Self where S: ToString;
-
-    fn not_found() -> Self {
-        Self::not_found_msg("Not Found")
-    }
-
-    fn not_found_msg<S>(message:S) -> Self where S: ToString {
-        Self::status_msg(404, message )
-    }
-
-    fn status(&self) -> u16;
-
-    fn as_reflected_core(&self) -> ReflectedCore {
-        let mut core = ReflectedCore::new();
-        core.status = StatusCode::from_u16(self.status()).unwrap_or(StatusCode::from_u16(500u16).unwrap());
-        core.body = Substance::Empty;
-        core
-    }
-}
-
-
-
-
-pub struct StateCache<C> where C: State {
-    pub states: Arc<DashMap<Point,Arc<RwLock<C>>>>
-}
-
-impl <C> StateCache<C> where C: State{
-
-}
-
-pub trait StateFactory: Send+Sync{
+pub trait StateFactory: Send + Sync {
     fn create(&self) -> Box<dyn State>;
 }
 
-pub trait State: Send+Sync{
-    fn deserialize<DS>( from: Vec<u8>) -> Result<DS,MsgErr> where DS: State, Self:Sized;
-    fn serialize( self ) -> Vec<u8>;
+pub trait State: Send + Sync {
+    fn deserialize<DS>(from: Vec<u8>) -> Result<DS, MsgErr>
+    where
+        DS: State,
+        Self: Sized;
+    fn serialize(self) -> Vec<u8>;
 }
 
 pub mod artifact {
@@ -307,10 +206,10 @@ pub mod artifact {
 pub mod path {
     use crate::error::MsgErr;
     use crate::parse::consume_path;
-    use cosmic_nom::new_span;
     use alloc::format;
     use alloc::string::{String, ToString};
     use alloc::vec::Vec;
+    use cosmic_nom::new_span;
     use serde::{Deserialize, Serialize};
     use std::str::FromStr;
 
@@ -413,7 +312,6 @@ pub mod bin {
     pub type Bin = Arc<Vec<u8>>;
 }
 
-
 pub mod fail {
     use alloc::string::String;
     use serde::{Deserialize, Serialize};
@@ -460,9 +358,7 @@ pub mod fail {
         use alloc::string::String;
         use serde::{Deserialize, Serialize};
 
-        use crate::fail::{
-            Bad, BadCoercion, BadRequest, Conditional, Messaging, NotFound,
-        };
+        use crate::fail::{Bad, BadCoercion, BadRequest, Conditional, Messaging, NotFound};
         use crate::id::id::Point;
 
         #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -615,18 +511,17 @@ pub struct Registration {
     pub owner: Point,
 }
 
-
 #[derive(Clone)]
-pub enum MountKind{
+pub enum MountKind {
     Control,
-    Portal
+    Portal,
 }
 
 impl MountKind {
     pub fn kind(&self) -> Kind {
         match self {
             MountKind::Control => Kind::Control,
-            MountKind::Portal => Kind::Portal
+            MountKind::Portal => Kind::Portal,
         }
     }
 }
@@ -645,18 +540,6 @@ impl PartialEq<Self> for IndexedAccessGrant {
     }
 }
 
-impl Ord for IndexedAccessGrant {
-    fn cmp(&self, other: &Self) -> Ordering {
-        if self.id < other.id {
-            Ordering::Greater
-        } else if self.id < other.id {
-            Ordering::Less
-        } else {
-            Ordering::Equal
-        }
-    }
-}
-
 impl PartialOrd<Self> for IndexedAccessGrant {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         if self.id < other.id {
@@ -669,6 +552,17 @@ impl PartialOrd<Self> for IndexedAccessGrant {
     }
 }
 
+impl Ord for IndexedAccessGrant {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.id < other.id {
+            Ordering::Greater
+        } else if self.id < other.id {
+            Ordering::Less
+        } else {
+            Ordering::Equal
+        }
+    }
+}
 impl Deref for IndexedAccessGrant {
     type Target = AccessGrant;
 

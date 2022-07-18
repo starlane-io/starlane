@@ -88,7 +88,7 @@ pub mod config {
             BindScope, MessageScope, MethodScope, PipelineSegment, PipelineSegmentDef, PipelineVar,
             RouteScope, ScopeFilters,
         };
-        use crate::parse::Env;
+        use crate::parse::{bind_config, Env};
         use crate::selector::{PayloadBlock, PayloadBlockDef};
         use crate::util::{ToResolved, ValueMatcher, ValuePattern};
         use regex::Regex;
@@ -134,6 +134,15 @@ pub mod config {
                     }
                 }
                 Err(MsgErr::err404())
+            }
+        }
+
+        impl TryFrom<Vec<u8>> for BindConfig {
+            type Error = MsgErr;
+
+            fn try_from(doc: Vec<u8>) -> Result<Self, Self::Error> {
+                let doc = String::from_utf8(doc)?;
+                bind_config(doc.as_str())
             }
         }
 

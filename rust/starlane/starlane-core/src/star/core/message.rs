@@ -45,7 +45,7 @@ use cosmic_api::id::id::{BaseKind, Kind, Tks, ToPoint};
 use cosmic_api::sys::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
 use crate::artifact::ArtifactRef;
 use cosmic_locality::field::{FieldEx};
-use cosmic_api::RegistryApi;
+use cosmic_platform::RegistryApi;
 use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
 use crate::config::config::{ContextualConfig, ParticleConfig};
 use crate::registry::{RegError, Registration};
@@ -229,7 +229,7 @@ impl MessagingEndpointComponentInner {
                     return Err(format!("CmdMethod {} does not match body Command", method.to_string()).into());
                 }
 
-                match kind.base().child_resource_registry_handler() {
+                match kind.to_base().child_resource_registry_handler() {
                     ChildRegistry::Shell => {
                         match &command{
                             Command::Create(create) => {
@@ -243,7 +243,7 @@ impl MessagingEndpointComponentInner {
                                     state: StateSrc,
                                 ) -> Result<(), Error> {
 
-                                    let star_kind = StarKind::hosts(&BaseKind::from_str(details.stub.kind.base().to_string().as_str())?);
+                                    let star_kind = StarKind::hosts(&BaseKind::from_str(details.stub.kind.to_base().to_string().as_str())?);
                                     let key = if skel.info.kind == star_kind {
                                         skel.info.key.clone()
                                     }

@@ -1590,7 +1590,7 @@ impl RegistryParams {
             Some(parent) => parent.to_string(),
         };
 
-        let base = registration.kind.base().to_string();
+        let base = registration.kind.to_base().to_string();
         let sub = registration.kind.sub();
 
         let provider = match &registration.kind.specific() {

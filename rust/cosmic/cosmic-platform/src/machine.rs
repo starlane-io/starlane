@@ -1,13 +1,13 @@
-use crate::Platform;
+use crate::{PlatErr, Platform,  RegistryApi};
 use crate::star::{Star, StarApi, StarCon, StarRouter, StarSkel, StarTemplate};
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{Point, ToPoint, ToPort};
-use cosmic_api::id::StarKey;
+use cosmic_api::id::{ConstellationName, StarHandle, StarKey, StarSub};
 use cosmic_api::log::RootLogger;
 use cosmic_api::quota::Timeouts;
 use cosmic_api::sys::{EntryReq, InterchangeKind};
 use cosmic_api::wave::{Agent, HyperWave, UltraWave};
-use cosmic_api::{ArtifactApi, PlatformErr, RegistryApi, RegistryErr};
+use cosmic_api::{ArtifactApi};
 use cosmic_hyperlane::{HyperClient, HyperGate, HyperRouter, Hyperway, HyperwayIn, HyperwayInterchange, InterchangeEntryRouter, LocalClientConnectionFactory, TokenAuthenticatorWithRemoteWhitelist};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -16,34 +16,35 @@ use tokio::sync::{mpsc, oneshot};
 use cosmic_api::substance::substance::Substance;
 
 #[derive(Clone)]
-pub struct MachineSkel<E> where E: PlatformErr+'static {
-    pub registry: RegistryErr<E>,
-    pub artifacts: Arc<dyn ArtifactApi>,
+pub struct MachineSkel<P> where P: Platform{
+    pub platform: Arc<P>,
+    pub registry: Arc<dyn RegistryApi<P>>,
+    pub artifacts: ArtifactApi,
     pub logger: RootLogger,
     pub timeouts: Timeouts,
     pub tx: mpsc::Sender<MachineCall>
 }
 
-pub struct Machine<E> where E: PlatformErr+'static {
-    pub skel: MachineSkel<E>,
+pub struct Machine<P> where P: Platform+'static{
+    pub skel: MachineSkel<P>,
     pub stars: Arc<HashMap<Point, StarApi>>,
     pub entry_router: InterchangeEntryRouter,
     pub interchanges: HashMap<StarKey,Arc<HyperwayInterchange>>,
-    pub platform: Box<dyn Platform<E>>,
     pub rx: mpsc::Receiver<MachineCall>
 }
 
-impl <E> Machine<E> where E: PlatformErr+'static{
+impl <P> Machine<P> where P: Platform+'static{
     pub fn new(
-        platform: Box<dyn Platform<E>>,
-        template: MachineTemplate,
+        platform: P
     ) -> Result<(), MsgErr> {
+        let template = platform.machine_template();
         let (tx,rx) = mpsc::channel(32*1024);
         let skel = MachineSkel {
-            registry: RegistryErr::new(platform.registry()),
+            registry: platform.registry(),
             artifacts: platform.artifacts(),
             logger: RootLogger::default(),
             timeouts: Timeouts::default(),
+            platform: Arc::new(platform),
             tx
         };
 
@@ -54,7 +55,7 @@ impl <E> Machine<E> where E: PlatformErr+'static{
         for star_template in template.stars {
             let star_point = star_template.key.clone().to_point();
             let (fabric_tx, mut fabric_rx) = mpsc::channel(32 * 1024);
-            let mut builder = platform.drivers_builder(&star_template.kind);
+            let mut builder = skel.platform.drivers_builder(&star_template.kind);
             let drivers_point = star_point.push("drivers".to_string()).unwrap();
             let logger = skel.logger.point(drivers_point.clone());
             builder.logger.replace(logger.clone());
@@ -88,7 +89,7 @@ impl <E> Machine<E> where E: PlatformErr+'static{
 
             let auth = TokenAuthenticatorWithRemoteWhitelist::new(
                 Agent::HyperUser,
-                platform.token(),
+                skel.platform.token(),
                 connect_whitelist,
             );
 
@@ -107,7 +108,7 @@ impl <E> Machine<E> where E: PlatformErr+'static{
         for (from,to) in clients {
             let entry_req = EntryReq {
                 interchange: InterchangeKind::Star(to.clone()),
-                auth: Box::new(Substance::Token(platform.token())),
+                auth: Box::new(Substance::Token(skel.platform.token())),
                 remote: Some(from.clone())
             };
 
@@ -117,13 +118,12 @@ impl <E> Machine<E> where E: PlatformErr+'static{
             interchanges.get(&StarKey::try_from(from).unwrap()).unwrap().add( hyperway );
         }
 
-        platform.start_services(& mut entry_router);
+        skel.platform.start_services(& mut entry_router);
 
         let mut machine = Self {
             skel,
             stars: Arc::new(stars),
             entry_router,
-            platform,
             rx,
             interchanges
         };
@@ -151,4 +151,45 @@ pub enum MachineCall {
 
 pub struct MachineTemplate {
     pub stars: Vec<StarTemplate>,
+}
+
+impl Default for MachineTemplate {
+    fn default() -> Self {
+        let constellation = "central".to_string();
+
+        let mut central= StarTemplate::new (StarKey::central(), StarSub::Central);
+        let mut nexus = StarTemplate::new (StarKey::new(&constellation, &StarHandle::name("nexus")), StarSub::Nexus);
+        let mut supe= StarTemplate::new (StarKey::new(&constellation, &StarHandle::name("super")), StarSub::Super);
+        let mut maelstrom= StarTemplate::new (StarKey::new(&constellation, &StarHandle::name("maelstrom")), StarSub::Maelstrom);
+        let mut scribe= StarTemplate::new (StarKey::new(&constellation, &StarHandle::name("scribe")), StarSub::Scribe);
+        let mut jump = StarTemplate::new (StarKey::new(&constellation, &StarHandle::name("jump")), StarSub::Jump);
+        let mut fold = StarTemplate::new (StarKey::new(&constellation, &StarHandle::name("fold")), StarSub::Fold);
+
+        nexus.receive(central.key.clone() );
+        nexus.receive(supe.key.clone() );
+        nexus.receive(maelstrom.key.clone() );
+        nexus.receive(scribe.key.clone() );
+        nexus.receive(jump.key.clone() );
+        nexus.receive(fold.key.clone() );
+
+        central.connect(nexus.key.clone());
+        supe.connect(nexus.key.clone());
+        maelstrom.connect(nexus.key.clone());
+        scribe.connect(nexus.key.clone());
+        jump.connect(nexus.key.clone());
+        fold.connect(nexus.key.clone());
+
+        let mut stars = vec![];
+        stars.push(central);
+        stars.push(nexus);
+        stars.push(supe);
+        stars.push(maelstrom);
+        stars.push(scribe);
+        stars.push(jump);
+        stars.push(fold);
+
+        Self {
+            stars
+        }
+    }
 }

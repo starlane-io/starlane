@@ -5,42 +5,54 @@ use std::str::FromStr;
 use std::sync::Arc;
 use sqlx::{Acquire, Executor, Pool, Postgres, Row};
 use sqlx::postgres::{PgPoolOptions, PgRow};
+use strum::ParseError;
 use tokio::sync::mpsc;
 use cosmic_api::command::command::common::{PropertyMod, SetProperties, SetRegistry};
-use cosmic_api::command::request::create::{Create, KindTemplate, Strategy};
+use cosmic_api::command::request::create::{Create, KindTemplate, PointSegTemplate, Strategy};
 use cosmic_api::command::request::delete::Delete;
 use cosmic_api::command::request::get::{Get, GetOp};
 use cosmic_api::command::request::query::{Query, QueryResult};
-use cosmic_api::command::request::select::{Select, SelectKind, SubSelect};
+use cosmic_api::command::request::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
 use cosmic_api::command::request::set::Set;
-use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, UserBaseSubKind};
-use cosmic_api::id::id::{BaseKind, Kind, KindParts, Point, Specific, Version};
+use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, UserBaseSubKind};
+use cosmic_api::id::id::{BaseKind, Kind, KindParts, Point, PointSeg, Specific, ToBaseKind, Version};
 use cosmic_api::parse::{CamelCase, Domain, SkewerCase};
 use cosmic_api::particle::particle::{Details, Properties, Property, Status, Stub};
-use cosmic_api::{HYPERUSER, IndexedAccessGrant, PlatformErr, Registration, RegistryApi};
+use cosmic_api::{HYPERUSER, IndexedAccessGrant, Registration};
 use cosmic_api::error::MsgErr;
 use cosmic_api::security::{Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask, PermissionsMaskKind, Privilege, Privileges};
-use cosmic_api::selector::selector::{PointKindSeg, PointSegSelector, Selector, SubKindSelector};
+use cosmic_api::selector::selector::{ExactPointSeg, KindBaseSelector, PointHierarchy, PointKindSeg, PointSegSelector, Selector, SubKindSelector};
 use cosmic_api::selector::selector::specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
-use cosmic_api::substance::substance::Substance;
+use cosmic_api::substance::substance::{Substance, SubstanceList, SubstanceMap};
 use cosmic_api::sys::{Location, ParticleRecord};
 use cosmic_api::util::ValuePattern;
+use cosmic_platform::Platform;
+use cosmic_platform::{PlatErr, RegistryApi};
 
+#[macro_use]
+extern crate lazy_static;
+#[macro_use]
+extern crate async_trait;
+#[macro_use]
+extern crate async_recursion;
+#[macro_use]
+extern crate tracing;
 
-pub struct Registry {
+pub struct PostgresRegistry<P> where P: PostgresPlatform+Platform<Err=PostErr>+'static {
     pool: Pool<Postgres>,
+    platform: P
 }
 
-impl Registry {
-    pub async fn new() -> Result<Self, PostErr> {
-        let db = lookup_registry_db();
+impl <P> PostgresRegistry<P> where P: PostgresPlatform+Platform<Err=PostErr>+'static {
+    pub async fn new(platform: P) -> Result<Self, PostErr> {
+        let db = platform.lookup_registry_db();
         let pool = PgPoolOptions::new()
             .max_connections(5)
             .connect(
                 db.to_uri().as_str(),
             )
             .await?;
-        let registry = Self { pool };
+        let registry = Self { pool, platform };
 
         match registry.setup().await {
             Ok(_) => {
@@ -158,15 +170,16 @@ impl Registry {
     }
 }
 
-impl RegistryApi<PostErr> for Registry {
+#[async_trait]
+impl <P> RegistryApi<P> for PostgresRegistry<P> where P: PostgresPlatform+Platform<Err=PostErr>+'static {
 
-    async fn register(&self, registration: &Registration) -> Result<Details, RegError> {
+    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, PostErr> {
         /*
-        async fn check<'a>( registration: &Registration,  trans:&mut Transaction<Postgres>, ) -> Result<(),RegError> {
+        async fn check<'a>( registration: &Registration,  trans:&mut Transaction<Postgres>, ) -> Result<(),Erroror> {
             let params = RegistryParams::from_registration(registration)?;
             let count:u64 = sqlx::query_as("SELECT count(*) as count from particles WHERE parent=? AND point_segment=?").bind(params.parent).bind(params.point_segment).fetch_one(trans).await?;
             if count > 0 {
-                Err(RegError::Dupe)
+                Err(Erroror::Dupe)
             } else {
                 Ok(())
             }
@@ -194,7 +207,7 @@ impl RegistryApi<PostErr> for Registry {
             .await?;
 
         if count.0 > 0 {
-            return Err(RegError::Dupe);
+            return Err(PostErr::Dupe);
         }
 
         let statement = format!("INSERT INTO particles (point,point_segment,base,kind,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.base, opt(&params.sub), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
@@ -227,7 +240,7 @@ impl RegistryApi<PostErr> for Registry {
         })
     }
 
-    async fn assign(&self, point: &Point, location: &Point) -> Result<(), PostErr> {
+    async fn assign<'a>(&'a self, point: &'a Point, location: &'a Point) -> Result<(), PostErr> {
         let parent = point
             .parent()
             .ok_or("expecting parent since we have already established the segments are >= 2")?;
@@ -247,7 +260,7 @@ impl RegistryApi<PostErr> for Registry {
         Ok(())
     }
 
-    async fn set_status(&self, point: &Point, status: &Status) -> Result<(), PostErr> {
+    async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), PostErr> {
         let parent = point
             .parent()
             .ok_or("particle must have a parent")?
@@ -270,10 +283,10 @@ impl RegistryApi<PostErr> for Registry {
         Ok(())
     }
 
-    async fn set_properties(
-        &self,
-        point: &Point,
-        properties: &SetProperties,
+    async fn set_properties<'a>(
+        &'a self,
+        point: &'a Point,
+        properties: &'a SetProperties,
     ) -> Result<(), PostErr> {
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
@@ -307,7 +320,7 @@ impl RegistryApi<PostErr> for Registry {
         Ok(())
     }
 
-    async fn sequence(&self, point: &Point) -> Result<u64, PostErr> {
+    async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, PostErr> {
         struct Sequence(u64);
 
         impl sqlx::FromRow<'_, PgRow> for Sequence {
@@ -344,7 +357,7 @@ impl RegistryApi<PostErr> for Registry {
         Ok(sequence.0)
     }
 
-    async fn get_properties( &self, point:&Point ) -> Result<Properties, PostErr> {
+    async fn get_properties<'a>( &'a self, point:&'a Point ) -> Result<Properties, PostErr> {
         let parent = point.parent().ok_or("expected a parent")?;
         let point_segment = point
             .last_segment()
@@ -360,7 +373,7 @@ impl RegistryApi<PostErr> for Registry {
         Ok(map)
     }
 
-    async fn locate(&self, point: &Point) -> Result<ParticleRecord, PostErr> {
+    async fn locate<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, PostErr> {
 
         if point.is_local_root() {
             return Ok(ParticleRecord::root());
@@ -391,8 +404,8 @@ impl RegistryApi<PostErr> for Registry {
         Ok(record)
     }
 
-    async fn query(&self, point: &Point, query: &Query) -> Result<QueryResult, PostErr> {
-        let mut kind_path = PointKindHierarchy::new(point.route.clone(), vec![]);
+    async fn query<'a>(&'a self, point: &'a Point, query: &'a Query) -> Result<QueryResult, PostErr> {
+        let mut kind_path = PointHierarchy::new(point.route.clone(), vec![]);
         let route = point.route.clone();
 
         let mut segments = vec![];
@@ -414,12 +427,12 @@ impl RegistryApi<PostErr> for Registry {
             };
             kind_path = kind_path.push(kind_segment);
         }
-        return Ok(QueryResult::PointKindHierarchy(kind_path));
+        return Ok(QueryResult::PointHierarchy(kind_path));
     }
 
-    async fn delete(&self, delete: &Delete ) -> Result<PrimitiveList, PostErr> {
-        let select = delete.clone().into();
-        let list = self.select(&select).await?;
+    async fn delete<'a>(&'a self, delete: &'a Delete ) -> Result<SubstanceList, PostErr> {
+        let mut select = delete.clone().into();
+        let list = self.select(&mut select).await?;
         if !list.is_empty() {
             let mut points = String::new();
             for (index, point) in list.iter().enumerate() {
@@ -439,12 +452,12 @@ impl RegistryApi<PostErr> for Registry {
         Ok(list)
     }
 
-    #[async_recursion]
-    async fn select(&self, select: &Select) -> Result<PrimitiveList, PostErr> {
+//    #[async_recursion]
+    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, PostErr> {
         let point = select.pattern.query_root();
 
         let hierarchy = self
-            .query(&point, &Query::PointKindHierarchy)
+            .query(&point, &Query::PointHierarchy)
             .await?
             .try_into()?;
 
@@ -466,8 +479,8 @@ impl RegistryApi<PostErr> for Registry {
         Ok(list)
     }
 
-    #[async_recursion]
-    async fn sub_select(&self, sub_select: &SubSelect) -> Result<Vec<Stub>, PostErr> {
+//    #[async_recursion]
+    async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, PostErr> {
         // build a 'matching so far' query.  Here we will find every child that matches the subselect
         // these matches are used to then query children for additional matches if there are more hops.
         // all of these matches will be filtered to see if they match the ENTIRE select before returning results.
@@ -483,10 +496,10 @@ impl RegistryApi<PostErr> for Registry {
                     index = index + 1;
                     where_clause.push_str(format!(" AND point_segment=${}", index).as_str());
                     match exact {
-                        ExactSegment::PointSeg(point) => {
+                        ExactPointSeg::PointSeg(point) => {
                             params.push(point.to_string());
                         }
-                        ExactSegment::Version(version) => {
+                        ExactPointSeg::Version(version) => {
                             params.push(version.to_string());
                         }
                     }
@@ -495,8 +508,8 @@ impl RegistryApi<PostErr> for Registry {
             }
 
             match &hop.kind_selector.kind {
-                GenericKindSelector::Any => {}
-                GenericKindSelector::Exact(kind) => {
+                KindBaseSelector::Any => {}
+                KindBaseSelector::Exact(kind) => {
                     index = index + 1;
                     where_clause.push_str(format!(" AND base=${}", index).as_str());
                     params.push(kind.to_string());
@@ -504,8 +517,8 @@ impl RegistryApi<PostErr> for Registry {
             }
 
             match &hop.kind_selector.kind {
-                GenericKindSelector::Any => {}
-                GenericKindSelector::Exact(kind) => match &hop.kind_selector.sub {
+                KindBaseSelector::Any => {}
+                KindBaseSelector::Exact(kind) => match &hop.kind_selector.sub {
                     SubKindSelector::Any => {}
                     SubKindSelector::Exact(sub) => {
                         match sub {
@@ -633,7 +646,7 @@ impl RegistryApi<PostErr> for Registry {
         Ok(stubs)
     }
 
-    async fn grant(&self, access_grant: &AccessGrant) -> Result<(), PostErr> {
+    async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), PostErr> {
         let mut conn = self.pool.acquire().await?;
         match &access_grant.kind {
             AccessGrantKind::Super => {
@@ -664,8 +677,8 @@ impl RegistryApi<PostErr> for Registry {
         Ok(())
     }
 
-    #[async_recursion]
-    async fn access(&self, to: &Point, on: &Point) -> Result<Access, PostErr> {
+//    #[async_recursion]
+    async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, PostErr> {
         let mut conn = self.pool.acquire().await?;
 
         struct Owner(bool);
@@ -698,12 +711,12 @@ impl RegistryApi<PostErr> for Registry {
             return Ok(Access::Owner);
         }
 
-        let to_kind_path: PointKindHierarchy = self
-            .query(&to, &Query::PointKindHierarchy)
+        let to_kind_path: PointHierarchy = self
+            .query(&to, &Query::PointHierarchy)
             .await?
             .try_into()?;
-        let on_kind_path: PointKindHierarchy = self
-            .query(&on, &Query::PointKindHierarchy)
+        let on_kind_path: PointHierarchy = self
+            .query(&on, &Query::PointHierarchy)
             .await?
             .try_into()?;
 
@@ -798,15 +811,15 @@ impl RegistryApi<PostErr> for Registry {
         Ok(access)
     }
 
-    async fn chown(&self, on: &Selector, owner: &Point, by: &Point) -> Result<(), PostErr> {
-        let select = Select {
+    async fn chown<'a>(&'a self, on: &'a Selector, owner: &'a Point, by: &'a Point) -> Result<(), PostErr> {
+        let mut select = Select {
             pattern: on.clone(),
             properties: Default::default(),
-            into_payload: SelectIntoPayload::Points,
+            into_substance: SelectIntoSubstance::Points,
             kind: SelectKind::Initial,
         };
 
-        let selection = self.select(&select).await?;
+        let selection = self.select(&mut select).await?;
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
         for on in selection.list {
@@ -827,28 +840,28 @@ impl RegistryApi<PostErr> for Registry {
         Ok(())
     }
 
-    async fn list_access(
-        &self,
-        to: &Option<&Point>,
-        on: &Selector,
+    async fn list_access<'a>(
+        &'a self,
+        to: &'a Option<&'a Point>,
+        on: &'a Selector,
     ) -> Result<Vec<IndexedAccessGrant>, PostErr> {
-        let select = Select {
+        let mut select = Select {
             pattern: on.clone(),
             properties: Default::default(),
-            into_payload: SelectIntoPayload::Points,
+            into_substance: SelectIntoSubstance::Points,
             kind: SelectKind::Initial,
         };
 
         let to = match to.as_ref() {
             None => None,
             Some(to) => Some(
-                self.query(to, &Query::PointKindHierarchy)
+                self.query(to, &Query::PointHierarchy)
                     .await?
                     .try_into()?,
             ),
         };
 
-        let selection = self.select(&select).await?;
+        let selection = self.select(&mut select).await?;
         let mut all_access_grants = HashMap::new();
         let mut conn = self.pool.acquire().await?;
         for on in selection.list {
@@ -877,7 +890,7 @@ impl RegistryApi<PostErr> for Registry {
         Ok(all_access_grants)
     }
 
-    async fn remove_access(&self, id: i32, to: &Point) -> Result<(), PostErr> {
+    async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), PostErr> {
         let mut conn = self.pool.acquire().await?;
         let access_grant: IndexedAccessGrant = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.id=$1 AND particles.id=access_grants.by_particle").bind(id ).fetch_one(& mut conn).await?.into();
         let access = self.access(to, &access_grant.by_particle).await?;
@@ -954,10 +967,10 @@ impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
                     AccessGrantKind::PermissionsMask(mask)
                 }
                 what => {
-                    panic!(format!(
+                    panic!(
                         "don't know how to handle access grant kind {}",
                         what
-                    ))
+                    )
                 }
             };
 
@@ -1107,11 +1120,11 @@ pub mod test {
     use crate::particle::Kind;
     use crate::registry::{Registration, Registry};
     use mesh_portal::version::latest::entity::request::query::Query;
-    use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoPayload};
+    use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoSubstance};
     use mesh_portal::version::latest::id::Point;
     use mesh_portal::version::latest::particle::Status;
     use mesh_portal::version::latest::payload::Primitive;
-    use mesh_portal::version::latest::selector::{PointKindHierarchy, Selector};
+    use mesh_portal::version::latest::selector::{PointHierarchy, Selector};
     use cosmic_api::entity::request::select::SelectKind;
     use cosmic_api::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
@@ -1120,24 +1133,25 @@ pub mod test {
     use std::convert::TryInto;
     use std::str::FromStr;
     use cosmic_api::command::request::query::Query;
-    use cosmic_api::command::request::select::{Select, SelectKind};
+    use cosmic_api::command::request::select::{Select, SelectIntoSubstance, SelectKind};
     use cosmic_api::id::id::{Kind, Point, ToPoint};
     use cosmic_api::id::{StarKey, UserBaseSubKind};
     use cosmic_api::particle::particle::Status;
-    use cosmic_api::{Registration, RegistryApi};
-    use cosmic_api::selector::selector::Selector;
-    use crate::{PostErr, Registry};
+    use cosmic_api::{Registration};
+    use cosmic_api::selector::selector::{PointHierarchy, Selector};
+    use cosmic_platform::RegistryApi;
+    use crate::{PostErr, PostgresRegistry};
 
     #[tokio::test]
     pub async fn test_nuke() -> Result<(), PostErr> {
-        let registry = Registry::new().await?;
+        let registry = PostgresRegistry::new().await?;
         registry.nuke().await?;
         Ok(())
     }
 
     #[tokio::test]
     pub async fn test_create() -> Result<(), PostErr> {
-        let registry = Registry::new().await?;
+        let registry = PostgresRegistry::new().await?;
         registry.nuke().await?;
 
         let point = Point::from_str("localhost")?;
@@ -1167,18 +1181,18 @@ pub mod test {
         registry.sequence(&point).await?;
         let record = registry.locate(&point).await?;
 
-        let result = registry.query(&point, &Query::PointKindHierarchy).await?;
-        let kind_path: PointKindHierarchy = result.try_into()?;
+        let result = registry.query(&point, &Query::PointHierarchy).await?;
+        let kind_path: PointHierarchy = result.try_into()?;
 
         let pattern = Selector::from_str("**")?;
-        let select = Select {
+        let mut select = Select {
             pattern,
             properties: Default::default(),
-            into_payload: SelectIntoPayload::Points,
+            into_substance: SelectIntoSubstance::Points,
             kind: SelectKind::Initial,
         };
 
-        let points = registry.select(&select).await?;
+        let points = registry.select(& mut select).await?;
 
         assert_eq!(points.len(), 2);
 
@@ -1187,7 +1201,7 @@ pub mod test {
 
     #[tokio::test]
     pub async fn test_access() -> Result<(), PostErr> {
-        let registry = Registry::new().await?;
+        let registry = PostgresRegistry::new().await?;
         registry.nuke().await?;
 
         let hyperuser = Point::from_str("hyperspace:users:hyperuser")?;
@@ -1432,7 +1446,13 @@ pub mod test {
 #[derive(Clone)]
 pub enum PostErr {
     Dupe,
-    RegErr(PostErr),
+    Error(String),
+}
+
+impl From<strum::ParseError> for PostErr {
+    fn from(x: ParseError) -> Self {
+        PostErr::Error("strum parse error".to_string())
+    }
 }
 
 impl Into<MsgErr> for PostErr {
@@ -1441,18 +1461,24 @@ impl Into<MsgErr> for PostErr {
     }
 }
 
-impl cosmic_api::PlatformErr for PostErr {
+impl From<MsgErr> for PostErr {
+    fn from(e: MsgErr) -> Self {
+        PostErr::Error(e.to_string())
+    }
+}
+
+impl PlatErr for PostErr {
 
     fn to_cosmic_err(&self) -> MsgErr {
         MsgErr::new( 500u16, "Post Err")
     }
 
     fn new<S>(message: S) -> Self where S: ToString {
-        unimplemented!()
+        PostErr::Error(message.to_string())
     }
 
     fn status_msg<S>(status: u16, message: S) -> Self where S: ToString {
-        unimplemented!()
+        PostErr::Error(message.to_string())
     }
 
     fn status(&self) -> u16 {
@@ -1464,46 +1490,44 @@ impl ToString for PostErr {
     fn to_string(&self) -> String {
         match self {
             PostErr::Dupe => "Dupe".to_string(),
-            PostErr::RegErr(error) => error.to_string(),
+            PostErr::Error(error) => error.to_string(),
         }
     }
 }
-impl From<sqlx::RegErr> for PostErr {
-    fn from(e: sqlx::RegErr) -> Self {
-        PostErr::RegErr(e.into())
-    }
-}
-
-impl From<tokio::sync::oneshot::error::RecvRegErr> for PostErr {
-    fn from(e: tokio::sync::oneshot::error::RecvRegErr) -> Self {
-        PostErr::RegErr(PostErr::from_internal(format!("{}", e.to_string())))
-    }
-}
-impl From<PostErr> for PostErr {
-    fn from(e: PostErr) -> Self {
-        PostErr::RegErr(e)
+impl From<sqlx::Error> for PostErr {
+    fn from(e: sqlx::Error) -> Self {
+        PostErr::Error(e.to_string())
     }
 }
 
 
-impl<T> From<mpsc::error::SendRegErr<T>> for PostErr {
-    fn from(e: mpsc::error::SendRegErr<T>) -> Self {
-        PostErr::RegErr(e.into())
+impl From<tokio::sync::oneshot::error::RecvError> for PostErr {
+    fn from(e: tokio::sync::oneshot::error::RecvError) -> Self {
+        PostErr::Error(format!("{}", e.to_string()))
+    }
+}
+
+
+
+impl<T> From<mpsc::error::SendError<T>> for PostErr {
+    fn from(e: mpsc::error::SendError<T>) -> Self {
+        PostErr::Error(e.to_string())
     }
 }
 
 impl From<&str> for PostErr {
     fn from(e: &str) -> Self {
-        PostErr::RegErr(e.into())
+        PostErr::Error(e.into())
     }
 }
 
 
-impl From<PostErr> for PostErr {
-    fn from(r: PostErr) -> Self {
-        PostErr::new(r.to_string().as_str())
+impl From<String> for PostErr {
+    fn from(e: String) -> Self {
+        PostErr::Error(e)
     }
 }
+
 
 pub struct RegistryParams {
     pub point: String,
@@ -1531,7 +1555,7 @@ impl RegistryParams {
             Some(parent) => parent.to_string(),
         };
 
-        let base = registration.kind.base().to_string();
+        let base = registration.kind.to_base().to_string();
         let sub = registration.kind.sub();
 
         let provider = match &registration.kind.specific() {
@@ -1597,7 +1621,8 @@ impl RegistryParams {
 
 
 
-impl Registry {
+impl <P> PostgresRegistry<P> where P: PostgresPlatform+Platform<Err=PostErr>+'static{
+
     pub async fn set(&self, set: &Set) -> Result<(), PostErr> {
         self.set_properties(&set.point, &set.properties).await
     }
@@ -1609,9 +1634,9 @@ impl Registry {
                 /*
                 let mut proto = ProtoStarMessage::new();
                 proto.to(ProtoStarMessageTo::Resource(get.point.clone()));
-                proto.payload = StarMessagePayload::ResourceHost(ResourceHostAction::GetState(get.point.clone()));
-                if let Ok(Reply::Payload(payload)) = self.skel.messaging_api
-                    .star_exchange(proto, ReplyKind::Payload, "get state from driver")
+                proto.payload = StarMessageSubstance::ResourceHost(ResourceHostAction::GetState(get.point.clone()));
+                if let Ok(Reply::Substance(payload)) = self.skel.messaging_api
+                    .star_exchange(proto, ReplyKind::Substance, "get state from driver")
                     .await {
                     Ok(payload)
                 } else {
@@ -1622,7 +1647,7 @@ impl Registry {
             GetOp::Properties(keys) => {
                 println!("GET PROPERTIES for {}", get.point.to_string());
                 let properties = self.get_properties(&get.point ).await?;
-                let mut map = PayloadMap::new();
+                let mut map = SubstanceMap::new();
                 for (index, property) in properties.iter().enumerate() {
                     println!("\tprop{}", property.0.clone());
                     map.insert(property.0.clone(), Substance::Text(property.1.value.clone()));
@@ -1634,9 +1659,9 @@ impl Registry {
     }
 
     pub async fn create(&self, create: &Create) -> Result<Details, PostErr> {
-        let child_kind = default_implementation(&create.template.kind)?;
+        let child_kind = self.platform.default_implementation(&create.template.kind)?;
         let stub = match &create.template.point.child_segment_template {
-            PointSegFactory::Exact(child_segment) => {
+            PointSegTemplate::Exact(child_segment) => {
                 let point = create.template.point.parent.push(child_segment.clone());
                 match &point {
                     Ok(_) => {}
@@ -1646,9 +1671,9 @@ impl Registry {
                 }
                 let point = point?;
 
-                let properties = properties_config(&child_kind)
+                let properties = self.platform.properties_config(&child_kind)
                     .fill_create_defaults(&create.properties)?;
-                properties_config(&child_kind).check_create(&properties)?;
+                self.platform.properties_config(&child_kind).check_create(&properties)?;
 
                 let registration = Registration {
                     point: point.clone(),
@@ -1670,7 +1695,7 @@ impl Registry {
                 println!("result {}? {}", point.to_string(), result.is_ok());
                 result?
             }
-            PointSegFactory::Pattern(pattern) => {
+            PointSegTemplate::Pattern(pattern) => {
                 if !pattern.contains("%") {
                     return Err("AddressSegmentTemplate::Pattern must have at least one '%' char for substitution".into());
                 }
@@ -1693,8 +1718,8 @@ impl Registry {
                         Err(PostErr::Dupe) => {
                             // continue loop
                         }
-                        Err(PostErr::RegErr(error)) => {
-                            return Err(error);
+                        Err(err) => {
+                            return Err(err);
                         }
                     }
                 }
@@ -1703,12 +1728,12 @@ impl Registry {
         Ok(stub)
     }
 
-    pub async fn cmd_select(&self, select: &Select) -> Result<Substance, PostErr> {
+    pub async fn cmd_select<'a>(&'a self, select: &'a mut Select) -> Result<Substance, PostErr> {
         let list = Substance::List(self.select(select).await?);
         Ok(list)
     }
 
-    pub async fn cmd_query(&self, to: &Point, query: &Query) -> Result<Substance, PostErr> {
+    pub async fn cmd_query<'a>(&'a self, to: &'a Point, query: &'a Query) -> Result<Substance, PostErr> {
         let result = Substance::Text(self.query(to, query).await?.to_string());
         Ok(result)
     }
@@ -1717,11 +1742,57 @@ impl Registry {
 
 
 
-#[cfg(test)]
-mod tests {
-    use super::*;
 
-    #[test]
-    fn it_works() {
+
+
+pub struct DBInfo {
+    pub url: String,
+    pub user: String,
+    pub password: String,
+    pub database: String,
+}
+
+impl DBInfo {
+    pub fn to_uri(&self) -> String {
+        format!(
+            "postgres://{}:{}@{}/{}",
+            self.user,
+            self.password,
+            self.url,
+            self.database
+        )
     }
+}
+
+pub trait PostgresPlatform: Platform<Err=PostErr> {
+
+    fn lookup_registry_db(&self) -> DBInfo {
+        DBInfo {
+            url: REGISTRY_URL.to_string(),
+            database: REGISTRY_DATABASE.to_string(),
+            user: REGISTRY_USER.to_string(),
+            password: REGISTRY_PASSWORD.to_string(),
+        }
+    }
+}
+
+pub fn lookup_db_for_star( star_key: &StarKey ) -> DBInfo {
+    // future versions need a way to lookup this info
+    DBInfo {
+        url: REGISTRY_URL.to_string(),
+        database: REGISTRY_DATABASE.to_string(),
+        user: REGISTRY_USER.to_string(),
+        password: REGISTRY_PASSWORD.to_string(),
+    }
+}
+
+lazy_static! {
+    pub static ref REGISTRY_URL: String =
+        std::env::var("REGISTRY_URL").unwrap_or("localhost".to_string());
+    pub static ref REGISTRY_USER: String =
+        std::env::var("REGISTRY_USER").unwrap_or("postgres".to_string());
+    pub static ref REGISTRY_PASSWORD: String =
+        std::env::var("REGISTRY_PASSWORD").unwrap_or("password".to_string());
+    pub static ref REGISTRY_DATABASE: String =
+        std::env::var("REGISTRY_DATABASE").unwrap_or("postgres".to_string());
 }

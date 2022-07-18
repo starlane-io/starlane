@@ -42,7 +42,7 @@ pub mod id {
     use tokio::sync::{mpsc, oneshot};
 
     use crate::error::{MsgErr, ParseErrs};
-    use crate::{State, RegistryApi};
+    use crate::{State};
     use crate::config::config::bind::RouteSelector;
     use crate::id::id::PointSegCtx::Working;
     use crate::id::{ArtifactSubKind, BaseSubKind, DatabaseSubKind, FileSubKind, StarSub, Traversal, TraversalDirection, TraversalInjection, UserBaseSubKind};
@@ -225,8 +225,8 @@ pub mod id {
         Star(StarSub),
     }
 
-    impl Kind {
-        pub fn base(&self) -> BaseKind {
+    impl ToBaseKind for Kind {
+        fn to_base(&self) -> BaseKind {
             match self {
                 Kind::Root => BaseKind::Root,
                 Kind::Space => BaseKind::Space,
@@ -247,17 +247,20 @@ pub mod id {
                 Kind::Star(_) => BaseKind::Star,
             }
         }
+    }
+
+    impl Kind {
 
         pub fn as_point_segments(&self) -> String {
             if Sub::None != self.sub() {
                 if let Some(specific) = self.specific() {
-                    format!("{}:{}:{}", self.base().to_skewer().to_string(), self.sub().to_skewer().to_string(), specific.to_string() )
+                    format!("{}:{}:{}", self.to_base().to_skewer().to_string(), self.sub().to_skewer().to_string(), specific.to_string() )
 
                 } else {
-                    format!("{}:{}", self.base().to_skewer().to_string(), self.sub().to_skewer().to_string())
+                    format!("{}:{}", self.to_base().to_skewer().to_string(), self.sub().to_skewer().to_string())
                 }
             } else {
-                format!("{}", self.base().to_skewer().to_string() )
+                format!("{}", self.to_base().to_skewer().to_string() )
             }
         }
 
@@ -283,12 +286,6 @@ pub mod id {
                 Kind::Star(_) => &STAR_WAVE_TRAVERSAL_PLAN,
                 _ => &STD_WAVE_TRAVERSAL_PLAN,
             }
-        }
-    }
-
-    impl ToBaseKind for Kind {
-        fn to_base(&self) -> BaseKind {
-            self.base()
         }
     }
 
@@ -2263,6 +2260,18 @@ pub mod id {
             return self.parent().expect("expected parent").to_bundle();
         }
 
+        pub fn has_bundle(&self) -> bool {
+            if self.segments.is_empty() {
+                return false;
+            }
+
+            if let Some(PointSeg::Version(_)) = self.segments.last() {
+                return true;
+            }
+
+            return self.parent().expect("expected parent").to_bundle().is_ok();
+        }
+
         pub fn to_safe_filename(&self) -> String {
             self.to_string()
         }
@@ -2938,6 +2947,23 @@ pub struct StarHandle {
     pub index: u16,
 }
 
+impl StarHandle {
+    pub fn name<S:ToString>(name: S) -> Self {
+        Self {
+            name: name.to_string(),
+            index: 0
+        }
+    }
+
+    pub fn new<S:ToString>(name: S, index: u16) -> Self {
+        Self {
+            name: name.to_string(),
+            index
+        }
+    }
+
+}
+
 impl StarKey {
     pub fn new(constellation: &ConstellationName, handle: &StarHandle) -> Self {
         Self {
@@ -2949,7 +2975,7 @@ impl StarKey {
 
     pub fn central() -> Self {
         StarKey {
-            constellation: "standalone".to_string(),
+            constellation: "central".to_string(),
             name: "central".to_string(),
             index: 0,
         }

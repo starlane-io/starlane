@@ -7,6 +7,12 @@ edition = "2021"
 
 [dependencies]
 cosmic-api={ path="../../cosmic/cosmic-api"}
+cosmic-platform={ path="../../cosmic/cosmic-platform"}
 sqlx = { version = "0.5.11", features = [ "runtime-tokio-rustls", "postgres", "macros", "any" ] }
 tokio = { version = "1.15.0", features = ["full"] }
 serde = { version="1.0.69", features=['derive','rc'] }
+async-trait = "0.1.48"
+tracing = "0.1.26"
+async-recursion = "1.0.0"
+lazy_static = "1.4.0"
+strum = "0.24.1"

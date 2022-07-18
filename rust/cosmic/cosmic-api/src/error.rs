@@ -24,7 +24,6 @@ use std::rc::Rc;
 use std::sync::{Arc, PoisonError};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
-use crate::PlatformErr;
 
 pub enum MsgErr {
     Status { status: u16, message: String },
@@ -48,7 +47,8 @@ impl Into<ReflectedCore> for MsgErr {
     }
 }
 
-impl PlatformErr for MsgErr {
+/*
+impl PlatErr for MsgErr {
 
     fn to_cosmic_err(&self) -> MsgErr {
         MsgErr::Status { status: self.status(), message: self.to_string() }
@@ -70,13 +70,26 @@ impl PlatformErr for MsgErr {
     }
 }
 
+ */
+
 impl Clone for MsgErr {
     fn clone(&self) -> Self {
-        MsgErr::Status { status: self.status(), message: self.message() }
+        MsgErr::Status { status: 500, message: self.message() }
     }
 }
 
+
+
 impl MsgErr {
+
+
+    pub fn as_reflected_core(self) -> ReflectedCore {
+        ReflectedCore {
+            headers: Default::default(),
+            status: StatusCode::from_u16(500u16).unwrap(),
+            body: Substance::Text(self.message().to_string())
+        }
+    }
     pub fn from_status(status: u16) -> MsgErr {
         let message = match status {
             400 => "Bad Request".to_string(),
@@ -203,6 +216,17 @@ impl MsgErr {
 }
 
 impl StatusErr for MsgErr {
+    fn status(&self) -> u16 {
+        match self {
+            MsgErr::Status { status, .. } => {
+                status.clone()
+            }
+            MsgErr::ParseErrs(_) => {
+                500u16
+            }
+        }
+    }
+
     fn message(&self) -> String {
         match self {
             MsgErr::Status { status, message } => message.clone(),
@@ -211,9 +235,11 @@ impl StatusErr for MsgErr {
     }
 }
 
-pub trait StatusErr : PlatformErr {
+pub trait StatusErr {
+    fn status(&self) -> u16;
     fn message(&self) -> String;
 }
+
 
 impl Display for MsgErr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

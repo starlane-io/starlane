@@ -158,7 +158,7 @@ pub mod command {
 }
 
 pub mod request {
-    use crate::error::{MsgErr, StatusErr};
+    use crate::error::{MsgErr, };
     use crate::bin::Bin;
     use crate::command::request::create::Create;
     use crate::command::request::get::Get;
@@ -503,7 +503,7 @@ pub mod request {
                         })?;
                         StateSrc::Substance(Box::new(Substance::Bin(env.file(val.clone()).map_err(|e|{ match e{
                             ResolverErr::NotAvailable => MsgErr::from_500("files are not available in this context"),
-                            ResolverErr::NotFound => MsgErr::from_500(format!("cannot find file '{}'",val.to_text()?))
+                            ResolverErr::NotFound => MsgErr::from_500(format!("cannot find file '{}'",val.to_text().unwrap_or("err".to_string())))
                         }})?.content)))
                     }
                 };
@@ -715,7 +715,7 @@ pub mod request {
         pub struct SelectDef<Hop> {
             pub pattern: SelectorDef<Hop>,
             pub properties: PropertiesPattern,
-            pub into_payload: SelectIntoSubstance,
+            pub into_substance: SelectIntoSubstance,
             pub kind: SelectKind,
         }
 
@@ -740,7 +740,7 @@ pub mod request {
                     point,
                     pattern: self.pattern,
                     properties: self.properties,
-                    into_payload: self.into_payload,
+                    into_payload: self.into_substance,
                     hops,
                     hierarchy,
                 }
@@ -761,7 +761,7 @@ pub mod request {
                         point,
                         pattern: self.pattern,
                         properties: self.properties,
-                        into_payload: self.into_payload,
+                        into_payload: self.into_substance,
                         hops: hops,
                         hierarchy,
                     })
@@ -786,7 +786,7 @@ pub mod request {
                 Select {
                     pattern: self.pattern,
                     properties: self.properties,
-                    into_payload: self.into_payload,
+                    into_substance: self.into_payload,
                     kind: SelectKind::SubSelect {
                         point: self.point,
                         hops: self.hops,
@@ -819,7 +819,7 @@ pub mod request {
                 Self {
                     pattern,
                     properties: Default::default(),
-                    into_payload: SelectIntoSubstance::Stubs,
+                    into_substance: SelectIntoSubstance::Stubs,
                     kind: SelectKind::Initial,
                 }
             }
@@ -854,7 +854,7 @@ pub mod request {
         impl Into<Select> for Delete {
             fn into(self) -> Select {
                 let mut select = Select::new(self.selector );
-                select.into_payload = SelectIntoSubstance::Points;
+                select.into_substance = SelectIntoSubstance::Points;
                 select
             }
         }
@@ -953,12 +953,12 @@ pub mod request {
 
         #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq)]
         pub enum Query {
-            PointKindHierarchy,
+            PointHierarchy,
         }
 
         #[derive(Debug, Clone, Serialize, Deserialize)]
         pub enum QueryResult {
-            PointKindHierarchy(PointHierarchy),
+            PointHierarchy(PointHierarchy),
         }
 
         impl TryInto<PointHierarchy> for QueryResult {
@@ -966,7 +966,7 @@ pub mod request {
 
             fn try_into(self) -> Result<PointHierarchy, MsgErr> {
                 match self {
-                    QueryResult::PointKindHierarchy(hierarchy) => Ok(hierarchy),
+                    QueryResult::PointHierarchy(hierarchy) => Ok(hierarchy),
                 }
             }
         }
@@ -974,7 +974,7 @@ pub mod request {
         impl ToString for QueryResult {
             fn to_string(&self) -> String {
                 match self {
-                    QueryResult::PointKindHierarchy(hierarchy) => hierarchy.to_string(),
+                    QueryResult::PointHierarchy(hierarchy) => hierarchy.to_string(),
                 }
             }
         }

@@ -31,20 +31,21 @@ use http::{HeaderMap, StatusCode, Uri};
 use tokio::io::AsyncBufReadExt;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, Mutex};
-use cosmic_api::{PlatformErr, RegistryApi};
+use cosmic_api::{};
+use crate::{PlatErr, Platform, RegistryApi};
 
 #[derive(Clone)]
-pub struct FieldEx<E> where E: PlatformErr+'static {
+pub struct FieldEx<P> where P: Platform+'static {
     pub port: Port,
-    pub skel: StarSkel<E>,
-    pub state: FieldState<E>,
+    pub skel: StarSkel<P>,
+    pub state: FieldState<P>,
     pub logger: SpanLogger
 }
 
 
 
-impl <E> FieldEx<E> where E: PlatformErr+'static {
-    pub fn new(point: Point, skel: StarSkel<E>, state: FieldState<E>, logger: SpanLogger ) -> Self {
+impl <P> FieldEx<P> where P: Platform+'static {
+    pub fn new(point: Point, skel: StarSkel<P>, state: FieldState<P>, logger: SpanLogger ) -> Self {
         let port = point.to_port().with_layer(Layer::Field);
         Self { port, skel, state, logger }
     }
@@ -75,7 +76,7 @@ impl <E> FieldEx<E> where E: PlatformErr+'static {
 }
 
 #[async_trait]
-impl <E> TraversalLayer for FieldEx<E> where E: PlatformErr+'static {
+impl <P> TraversalLayer for FieldEx<P> where P: Platform +'static {
 
     fn port(&self) -> &Port{
         &self.state.port
@@ -203,18 +204,18 @@ impl <E> TraversalLayer for FieldEx<E> where E: PlatformErr+'static {
     }
 }
 
-pub struct PipeEx<E> where E: PlatformErr+'static {
+pub struct PipeEx<P> where P: Platform +'static {
     pub logger: SpanLogger,
     pub traversal: PipeTraversal,
-    pub field: FieldEx<E>,
+    pub field: FieldEx<P>,
     pub pipeline: PipelineVar,
     pub env: Env,
 }
 
-impl <E> PipeEx<E> where E: PlatformErr+'static {
+impl <P> PipeEx<P> where P: Platform +'static {
     pub fn new(
         traversal: Traversal<DirectedWave>,
-        binder: FieldEx<E>,
+        binder: FieldEx<P>,
         pipeline: PipelineVar,
         env: Env,
         logger: SpanLogger,
@@ -459,12 +460,12 @@ pub enum PipeAction {
 /// this mod basically enforces the bind
 
 #[derive(Clone)]
-pub struct FieldState<E> where E: PlatformErr+'static {
+pub struct FieldState<P> where P: Platform +'static {
     port: Port,
-    pipe_exes: Arc<DashMap<String, PipeEx<E>>>,
+    pipe_exes: Arc<DashMap<String, PipeEx<P>>>,
 }
 
-impl <E> FieldState<E> where E: PlatformErr+'static {
+impl <P> FieldState<P> where P: Platform+'static {
     pub fn new(port: Port) -> Self {
         Self {
             port,

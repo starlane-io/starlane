@@ -21,7 +21,7 @@ pub mod selector {
     use crate::error::MsgErr;
 
     use crate::command::request::{Rc, RcCommandType};
-    use crate::id::id::{KindParts, BaseKind, Layer, Point, PointCtx, PointSeg, PointSegKind, PointVar, Port, RouteSeg, Specific, Tks, Topic, Variable, VarVal, Version, Kind, Sub};
+    use crate::id::id::{KindParts, BaseKind, Layer, Point, PointCtx, PointSeg, PointSegKind, PointVar, Port, RouteSeg, Specific, Tks, Topic, Variable, VarVal, Version, Kind, Sub, ToBaseKind};
     use crate::parse::{camel_case_chars, camel_case_to_string_matcher, CamelCase, consume_hierarchy, Env, file_chars, path, path_regex, point_segment_selector, point_selector};
     use crate::substance::substance::{Call, CallKind, CallWithConfig, CallWithConfigDef, HttpCall, ListPattern, MapPattern, MsgCall, NumRange, Substance, SubstanceFormat, SubstancePattern, SubstancePatternDef, SubstanceKind, SubstanceTypePatternDef};
     use crate::selector::selector::specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
@@ -74,7 +74,7 @@ pub mod selector {
         where
             KindParts: Eq + PartialEq,
         {
-            self.kind.matches(&kind.base())
+            self.kind.matches(&kind.to_base())
                 && self.sub.matches(&kind.sub().into() )
                 && self.specific.is_match_opt(kind.specific().as_ref()).is_ok()
         }

@@ -21,7 +21,7 @@ use crate::substance::substance::{
 use crate::substance::substance::{Substance, ToSubstance};
 use crate::sys::AssignmentKind;
 use crate::util::{uuid, ValueMatcher, ValuePattern};
-use crate::{ANONYMOUS, HYPERUSER, PlatformErr, RegistryApi, RegistryErr};
+use crate::{ANONYMOUS, HYPERUSER};
 use alloc::borrow::Cow;
 use core::borrow::Borrow;
 use cosmic_macros_primitive::Autobox;
@@ -124,19 +124,6 @@ impl UltraWave {
 
     }
 
-    pub async fn shard_by_location<E>(self, adjacent: &HashSet<Point>, registry: &RegistryErr<E>) -> Result<HashMap<Point,UltraWave>,MsgErr> where E: PlatformErr {
-        match self {
-            _ => {
-                let mut map = HashMap::new();
-                map.insert(registry.locate(&self.to().unwrap_single().point ).await?.location, self );
-                Ok(map)
-            }
-            UltraWave::Ripple(ripple) => {
-                let mut map = ripple.shard_by_location(adjacent,registry).await?;
-                Ok(map.into_iter().map( |(point,ripple)| (point,ripple.to_ultra()) ).collect())
-            }
-        }
-    }
 
     pub fn to_substance(self) -> Substance {
         Substance::UltraWave(Box::new(self))
@@ -629,26 +616,8 @@ impl Wave<SingularRipple> {
 }
 
 impl Wave<Ripple> {
-    pub async fn shard_by_location<E>(self, adjacent: &HashSet<Point>, registry: &RegistryErr<E>) -> Result<HashMap<Point,Wave<Ripple>>,MsgErr> where E: PlatformErr {
-        let mut map = HashMap::new();
-        for (point,recipients) in self.to.clone().shard_by_location(adjacent, registry).await? {
-            let mut ripple = self.clone();
-            ripple.variant.to = recipients;
-            map.insert( point, ripple );
-        }
-        Ok(map)
-    }
 
-    pub async fn to_singulars<E>(self, adjacent: &HashSet<Point>, registry: &RegistryErr<E>) -> Result<Vec<Wave<SingularRipple>>,MsgErr> where E: PlatformErr{
-        let mut rtn = vec![];
-        for port in self.to.clone().to_ports(adjacent,registry).await? {
-            let wave = self.as_single(port);
-            rtn.push(wave)
-        }
-        Ok(rtn)
-    }
-
-    fn as_single( &self, port: Port ) -> Wave<SingularRipple> {
+    pub fn as_single( &self, port: Port ) -> Wave<SingularRipple> {
         let ripple = self.variant.clone().replace_to( port );
         self.clone().replace(ripple)
     }
@@ -1864,67 +1833,6 @@ pub trait ToRecipients {
 }
 
 impl Recipients {
-    pub async fn shard_by_location<E>(
-        self,
-        adjacent: &HashSet<Point>,
-        registry: &RegistryErr<E>,
-    ) -> Result<HashMap<Point, Recipients>, MsgErr>  where E: PlatformErr {
-        match self {
-            Recipients::Single(single) => {
-                let mut map = HashMap::new();
-                let record = registry.locate(&single.point).await?;
-                map.insert(record.location, Recipients::Single(single));
-                Ok(map)
-            }
-            Recipients::Multi(multi) => {
-                let mut map:HashMap<Point,Vec<Port>> = HashMap::new();
-                for p in multi {
-                    let record = registry.locate(&p).await?;
-                    if let Some(found) = map.get_mut(&record.location) {
-                        found.push(p);
-                    } else {
-                        map.insert(record.location, vec![p]);
-                    }
-                }
-
-                let mut map2 = HashMap::new();
-                for (location,points) in map {
-                    map2.insert( location, Recipients::Multi(points));
-                }
-                Ok(map2)
-            }
-            Recipients::Watchers(_) => {
-                let mut map = HashMap::new();
-                // todo
-                Ok(map)
-            }
-            Recipients::Stars => {
-                let mut map = HashMap::new();
-                for star in adjacent {
-                    map.insert( star.clone(), Recipients::Stars );
-                }
-                Ok(map)
-            }
-        }
-    }
-
-
-
-    pub async fn to_ports<E>(self,adjacent: &HashSet<Point>, registry: &RegistryErr<E>,) -> Result<Vec<Port>,MsgErr> where E: PlatformErr{
-        match self {
-            Recipients::Single(single) => Ok(vec![single]),
-            Recipients::Multi(multi) => {
-                Ok(multi.into_iter().map(|p| p).collect())
-            }
-            Recipients::Watchers(watch) => {
-                unimplemented!();
-            }
-            Recipients::Stars => {
-                let stars :Vec<Port> = adjacent.clone().into_iter().map(|p|p.to_port()).collect();
-                Ok(stars)
-            }
-        }
-    }
 
     pub fn select_ports(&self, point: &Point) -> Vec<&Port> {
         let mut rtn = vec![];

@@ -1700,7 +1700,7 @@ pub fn select<I: Span>(input: I) -> Res<I, SelectVar> {
         let select = SelectVar {
             pattern: point_kind_pattern,
             properties: Default::default(),
-            into_payload: SelectIntoSubstance::Stubs,
+            into_substance: SelectIntoSubstance::Stubs,
             kind: SelectKind::Initial,
         };
         (next, select)
