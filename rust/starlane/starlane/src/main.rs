@@ -1,3 +1,5 @@
+#![allow(warnings)]
+
 use std::str::FromStr;
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
@@ -16,6 +18,7 @@ use cosmic_platform::machine::MachineTemplate;
 use cosmic_platform::Platform;
 use cosmic_platform::{Registry, RegistryApi};
 use cosmic_registry_postgres::{PostErr, PostgresRegistry};
+
 
 #[macro_use]
 extern crate lazy_static;
@@ -93,7 +96,6 @@ impl Platform for Starlane {
     }
 
     fn start_services(&self, entry_router: &mut InterchangeEntryRouter) {
-        todo!()
     }
 
     fn default_implementation(&self, template: &KindTemplate) -> Result<Kind, MsgErr> {

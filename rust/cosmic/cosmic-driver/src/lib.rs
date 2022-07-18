@@ -1,3 +1,5 @@
+#![allow(warnings)]
+
 use async_trait::async_trait;
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{Kind, Layer, Point, Port};

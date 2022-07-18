@@ -1,3 +1,5 @@
+#![allow(warnings)]
+
 use cosmic_api::ArtifactApi;
 
 

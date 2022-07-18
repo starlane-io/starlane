@@ -1,3 +1,5 @@
+#![allow(warnings)]
+
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ops::Deref;
