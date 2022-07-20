@@ -1,3 +1,4 @@
+use alloc::fmt::format;
 use crate::error::MsgErr;
 use crate::id::id::{
     BaseKind, Kind, KindParts, Layer, Point, Port, RouteSeg, Specific, Sub, ToPoint, ToPort,
@@ -2905,6 +2906,12 @@ pub struct StarKey {
     pub constellation: ConstellationName,
     pub name: String,
     pub index: u16,
+}
+
+impl StarKey {
+    pub fn sql_name(&self) -> String {
+        format!("star_{}_{}_{}", self.constellation.to_lowercase().replace("-","_"), self.name.to_lowercase().replace("-","_"), self.index )
+    }
 }
 
 impl Into<Point> for StarKey {

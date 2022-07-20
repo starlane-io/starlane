@@ -1,72 +1,122 @@
 #![allow(warnings)]
 
-use std::str::FromStr;
-use std::sync::Arc;
+use std::collections::HashSet;
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
-use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarSub, UserBaseSubKind};
-use cosmic_api::{ArtifactApi};
 use cosmic_api::command::request::create::KindTemplate;
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{BaseKind, Kind, Specific, ToBaseKind};
-use cosmic_api::property::{AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit, PropertySource, U64Pattern, UsernamePattern};
+use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, StarSub, UserBaseSubKind};
+use cosmic_api::property::{
+    AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit,
+    PropertySource, U64Pattern, UsernamePattern,
+};
 use cosmic_api::substance::substance::Token;
+use cosmic_api::{ArtifactApi, NoDiceArtifactFetcher};
 use cosmic_artifact::Artifacts;
 use cosmic_hyperlane::InterchangeEntryRouter;
 use cosmic_platform::driver::DriversBuilder;
-use cosmic_platform::machine::MachineTemplate;
+use cosmic_platform::machine::{Machine, MachineTemplate};
 use cosmic_platform::Platform;
 use cosmic_platform::{Registry, RegistryApi};
-use cosmic_registry_postgres::{PostErr, PostgresRegistry};
-
+use cosmic_registry_postgres::{PostgresDbInfo, PostErr, PostgresPlatform, PostgresRegistry, PostgresRegistryContextHandle, PostgresRegistryContext};
+use std::str::FromStr;
+use std::sync::Arc;
+use uuid::Uuid;
 
 #[macro_use]
 extern crate lazy_static;
 
 lazy_static! {
-    pub static ref STARLANE_PORT: usize = std::env::var("STARLANE_PORT").unwrap_or("4343".to_string()).parse::<usize>().unwrap_or(4343);
-    pub static ref STARLANE_DATA_DIR: String= std::env::var("STARLANE_DATA_DIR").unwrap_or("data".to_string());
-    pub static ref STARLANE_CACHE_DIR: String = std::env::var("STARLANE_CACHE_DIR").unwrap_or("data".to_string());
-    pub static ref STARLANE_TOKEN: String = std::env::var("STARLANE_TOKEN").unwrap_or(Uuid::new_v4().to_string());
+    pub static ref STARLANE_PORT: usize = std::env::var("STARLANE_PORT")
+        .unwrap_or("4343".to_string())
+        .parse::<usize>()
+        .unwrap_or(4343);
+    pub static ref STARLANE_DATA_DIR: String =
+        std::env::var("STARLANE_DATA_DIR").unwrap_or("data".to_string());
+    pub static ref STARLANE_CACHE_DIR: String =
+        std::env::var("STARLANE_CACHE_DIR").unwrap_or("data".to_string());
+    pub static ref STARLANE_TOKEN: String =
+        std::env::var("STARLANE_TOKEN").unwrap_or(Uuid::new_v4().to_string());
+    pub static ref STARLANE_REGISTRY_URL: String =
+        std::env::var("STARLANE_REGISTRY_URL").unwrap_or("localhost".to_string());
+    pub static ref STARLANE_REGISTRY_USER: String =
+        std::env::var("STARLANE_REGISTRY_USER").unwrap_or("postgres".to_string());
+    pub static ref STARLANE_REGISTRY_PASSWORD: String =
+        std::env::var("STARLANE_REGISTRY_PASSWORD").unwrap_or("password".to_string());
+    pub static ref STARLANE_REGISTRY_DATABASE: String =
+        std::env::var("STARLANE_REGISTRY_DATABASE").unwrap_or("postgres".to_string());
 }
 #[no_mangle]
-pub extern "C" fn cosmic_uuid() -> String
-{
+pub extern "C" fn cosmic_uuid() -> String {
     Uuid::new_v4().to_string()
 }
 
-
 #[no_mangle]
-pub extern "C" fn cosmic_timestamp() -> DateTime<Utc>{
+pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
     Utc::now()
 }
 
-
-fn main() {
-    println!("Hello, world!");
+fn main() -> Result<(), MsgErr> {
+    Machine::new(Starlane::new())?;
+    Ok(())
 }
 
 #[derive(Clone)]
-pub struct Starlane {
-   registry: Registry<Self>,
-   artifacts: ArtifactApi
+pub struct Starlane {}
+
+impl Starlane {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl PostgresPlatform for Starlane {
+
+    fn lookup_registry_db(&self) -> Result<PostgresDbInfo,Self::Err> {
+        Ok(PostgresDbInfo::new(
+            STARLANE_REGISTRY_URL.to_string(),
+            STARLANE_REGISTRY_DATABASE.to_string(),
+            STARLANE_REGISTRY_USER.to_string(),
+            STARLANE_REGISTRY_PASSWORD.to_string(),
+        ))
+    }
+
+    fn lookup_star_db(&self, star: &StarKey ) -> Result<PostgresDbInfo,Self::Err> {
+        Ok(PostgresDbInfo::new_with_schema(
+            STARLANE_REGISTRY_URL.to_string(),
+            STARLANE_REGISTRY_DATABASE.to_string(),
+            STARLANE_REGISTRY_USER.to_string(),
+            STARLANE_REGISTRY_PASSWORD.to_string(),
+            star.to_sql_name()
+        ))
+    }
 }
 
 impl Platform for Starlane {
     type Err = PostErr;
+    type RegistryContext = PostgresRegistryContext;
+
+    fn create_registry_context(&self, stars: HashSet<StarKey>) -> Result<Self::RegistryContext, Self::Err> {
+        let mut dbs = HashSet::new();
+        dbs.insert(self.lookup_registry_db()? );
+        for star in stars {
+            dbs.insert( self.lookup_star_db(&star)?);
+        }
+        PostgresRegistryContext::new(dbs)
+    }
 
     fn machine_template(&self) -> MachineTemplate {
         MachineTemplate::default()
     }
 
-    fn properties_config<K: ToBaseKind>(&self, base:&K) -> &'static PropertiesConfig {
-        match base.to_base(){
+    fn properties_config<K: ToBaseKind>(&self, base: &K) -> &'static PropertiesConfig {
+        match base.to_base() {
             BaseKind::Space => &UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG,
             BaseKind::UserBase => &USER_BASE_PROPERTIES_CONFIG,
             BaseKind::User => &USER_PROPERTIES_CONFIG,
             BaseKind::App => &MECHTRON_PROERTIES_CONFIG,
             BaseKind::Mechtron => &MECHTRON_PROERTIES_CONFIG,
-            _ => &DEFAULT_PROPERTIES_CONFIG
+            _ => &DEFAULT_PROPERTIES_CONFIG,
         }
     }
 
@@ -87,51 +137,53 @@ impl Platform for Starlane {
         Token::new(STARLANE_TOKEN.to_string())
     }
 
-    fn registry(&self) -> Registry<Self>  {
-        self.registry.clone()
+    fn global_registry(&self, ctx: Arc<Self::RegistryContext>) -> Registry<Self> {
+        let pool = PostgresRegistryContextHandle::new(&self.lookup_registry_db(), ctx);
+        PostgresRegistry::new(pool)
     }
 
-    fn artifacts(&self) -> ArtifactApi {
-       self.artifacts.clone()
+    fn star_registry(&self, star: &StarKey, ctx: Arc<Self::RegistryContext>) -> Registry<Self> {
+        let pool = PostgresRegistryContextHandle::new(&self.lookup_star_db(star), ctx);
+        PostgresRegistry::new(pool)
     }
 
-    fn start_services(&self, entry_router: &mut InterchangeEntryRouter) {
+
+    fn artifact_hub(&self) -> ArtifactApi {
+        let fetcher = Arc::new(NoDiceArtifactFetcher{});
+        ArtifactApi::new( fetcher )
     }
+
+    fn start_services(&self, entry_router: &mut InterchangeEntryRouter) {}
 
     fn default_implementation(&self, template: &KindTemplate) -> Result<Kind, MsgErr> {
         let base: BaseKind = BaseKind::from_str(template.base.to_string().as_str())?;
         match base {
-            BaseKind::UserBase => match &template.sub{
+            BaseKind::UserBase => match &template.sub {
                 None => {
                     return Err("SubKind must be set for UserBase<?>".into());
                 }
-                Some(sub) => {
-                    match sub.as_str() {
-                        "OAuth" => {
-                            let specific = Specific::from_str("starlane.io:redhat.com:keycloak:community:18.0.0")?;
-                            let sub = UserBaseSubKind::OAuth(specific);
-                            Ok(Kind::UserBase(sub))
-                        }
-                        what => {
-                            return Err(format!("unrecognized UserBase sub: '{}'", what ).into())
-                        }
+                Some(sub) => match sub.as_str() {
+                    "OAuth" => {
+                        let specific =
+                            Specific::from_str("starlane.io:redhat.com:keycloak:community:18.0.0")?;
+                        let sub = UserBaseSubKind::OAuth(specific);
+                        Ok(Kind::UserBase(sub))
                     }
-                }
+                    what => return Err(format!("unrecognized UserBase sub: '{}'", what).into()),
+                },
             },
-            _ => {
-                Platform::default_implementation(self, template )
-            }
+            _ => Platform::default_implementation(self, template),
         }
     }
 }
-
 
 lazy_static! {
     pub static ref DEFAULT_PROPERTIES_CONFIG: PropertiesConfig = default_properties_config();
     pub static ref USER_PROPERTIES_CONFIG: PropertiesConfig = user_properties_config();
     pub static ref USER_BASE_PROPERTIES_CONFIG: PropertiesConfig = userbase_properties_config();
     pub static ref MECHTRON_PROERTIES_CONFIG: PropertiesConfig = mechtron_properties_config();
-    pub static ref UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG: PropertiesConfig = unrequired_bind_and_config_properties_config();
+    pub static ref UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG: PropertiesConfig =
+        unrequired_bind_and_config_properties_config();
 }
 
 fn default_properties_config() -> PropertiesConfig {
@@ -141,46 +193,161 @@ fn default_properties_config() -> PropertiesConfig {
 
 fn mechtron_properties_config() -> PropertiesConfig {
     let mut builder = PropertiesConfig::builder();
-    builder.add("bind", Box::new(PointPattern {}), true, false, PropertySource::Shell, None, false, vec![] );
-    builder.add("config", Box::new(PointPattern {}), true, false, PropertySource::Shell, None, false, vec![] );
+    builder.add(
+        "bind",
+        Box::new(PointPattern {}),
+        true,
+        false,
+        PropertySource::Shell,
+        None,
+        false,
+        vec![],
+    );
+    builder.add(
+        "config",
+        Box::new(PointPattern {}),
+        true,
+        false,
+        PropertySource::Shell,
+        None,
+        false,
+        vec![],
+    );
     builder.build()
 }
 
-
 fn unrequired_bind_and_config_properties_config() -> PropertiesConfig {
     let mut builder = PropertiesConfig::builder();
-    builder.add("bind", Box::new(PointPattern {}), false, false, PropertySource::Shell, None, false, vec![] );
-    builder.add("config", Box::new(PointPattern {}), false, false, PropertySource::Shell, None, false, vec![] );
+    builder.add(
+        "bind",
+        Box::new(PointPattern {}),
+        false,
+        false,
+        PropertySource::Shell,
+        None,
+        false,
+        vec![],
+    );
+    builder.add(
+        "config",
+        Box::new(PointPattern {}),
+        false,
+        false,
+        PropertySource::Shell,
+        None,
+        false,
+        vec![],
+    );
     builder.build()
 }
 
 fn user_properties_config() -> PropertiesConfig {
     let mut builder = PropertiesConfig::builder();
-    builder.add("bind", Box::new(PointPattern {}), true, false, PropertySource::Shell, Some("hyperspace:repo:boot:1.0.0:/bind/user.bind".to_string()), true, vec![] );
-    builder.add("username", Box::new(UsernamePattern{}), false, false, PropertySource::Core, None, false, vec![] );
-    builder.add("email", Box::new(EmailPattern{}), false, true, PropertySource::Core, None, false, vec![PropertyPermit::Read] );
-    builder.add("password", Box::new(AnythingPattern{}), false, true, PropertySource::CoreSecret, None, false, vec![] );
+    builder.add(
+        "bind",
+        Box::new(PointPattern {}),
+        true,
+        false,
+        PropertySource::Shell,
+        Some("hyperspace:repo:boot:1.0.0:/bind/user.bind".to_string()),
+        true,
+        vec![],
+    );
+    builder.add(
+        "username",
+        Box::new(UsernamePattern {}),
+        false,
+        false,
+        PropertySource::Core,
+        None,
+        false,
+        vec![],
+    );
+    builder.add(
+        "email",
+        Box::new(EmailPattern {}),
+        false,
+        true,
+        PropertySource::Core,
+        None,
+        false,
+        vec![PropertyPermit::Read],
+    );
+    builder.add(
+        "password",
+        Box::new(AnythingPattern {}),
+        false,
+        true,
+        PropertySource::CoreSecret,
+        None,
+        false,
+        vec![],
+    );
     builder.build()
 }
 
 fn userbase_properties_config() -> PropertiesConfig {
     let mut builder = PropertiesConfig::builder();
-    builder.add("bind", Box::new(PointPattern {}), true, false, PropertySource::Shell, Some("hyperspace:repo:boot:1.0.0:/bind/userbase.bind".to_string()), true, vec![] );
-    builder.add("config", Box::new(PointPattern {}), false, true, PropertySource::Shell, None, false, vec![] );
-    builder.add("registration-email-as-username", Box::new(BoolPattern{}), false, false, PropertySource::Shell, Some("true".to_string()), false, vec![] );
-    builder.add("verify-email", Box::new(BoolPattern{}), false, false, PropertySource::Shell, Some("false".to_string()), false, vec![] );
-    builder.add("sso-session-max-lifespan", Box::new(U64Pattern{}), false, true, PropertySource::Core, Some("315360000".to_string()), false, vec![] );
+    builder.add(
+        "bind",
+        Box::new(PointPattern {}),
+        true,
+        false,
+        PropertySource::Shell,
+        Some("hyperspace:repo:boot:1.0.0:/bind/userbase.bind".to_string()),
+        true,
+        vec![],
+    );
+    builder.add(
+        "config",
+        Box::new(PointPattern {}),
+        false,
+        true,
+        PropertySource::Shell,
+        None,
+        false,
+        vec![],
+    );
+    builder.add(
+        "registration-email-as-username",
+        Box::new(BoolPattern {}),
+        false,
+        false,
+        PropertySource::Shell,
+        Some("true".to_string()),
+        false,
+        vec![],
+    );
+    builder.add(
+        "verify-email",
+        Box::new(BoolPattern {}),
+        false,
+        false,
+        PropertySource::Shell,
+        Some("false".to_string()),
+        false,
+        vec![],
+    );
+    builder.add(
+        "sso-session-max-lifespan",
+        Box::new(U64Pattern {}),
+        false,
+        true,
+        PropertySource::Core,
+        Some("315360000".to_string()),
+        false,
+        vec![],
+    );
     builder.build()
 }
 
-
-pub fn properties_config<K: ToBaseKind>(base:&K) -> &'static PropertiesConfig {
-    match base.to_base(){
+pub fn properties_config<K: ToBaseKind>(base: &K) -> &'static PropertiesConfig {
+    match base.to_base() {
         BaseKind::Space => &UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG,
         BaseKind::UserBase => &USER_BASE_PROPERTIES_CONFIG,
         BaseKind::User => &USER_PROPERTIES_CONFIG,
         BaseKind::App => &MECHTRON_PROERTIES_CONFIG,
         BaseKind::Mechtron => &MECHTRON_PROERTIES_CONFIG,
-        _ => &DEFAULT_PROPERTIES_CONFIG
+        _ => &DEFAULT_PROPERTIES_CONFIG,
     }
 }

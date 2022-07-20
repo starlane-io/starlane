@@ -1,11 +1,13 @@
 #![allow(warnings)]
 
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
-use sqlx::{Acquire, Executor, Pool, Postgres, Row};
+use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
+use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use strum::ParseError;
 use tokio::sync::mpsc;
@@ -30,6 +32,7 @@ use cosmic_api::sys::{Location, ParticleRecord};
 use cosmic_api::util::ValuePattern;
 use cosmic_platform::Platform;
 use cosmic_platform::{PlatErr, RegistryApi};
+use cosmic_platform::machine::MachineTemplate;
 
 #[macro_use]
 extern crate lazy_static;
@@ -41,20 +44,21 @@ extern crate async_recursion;
 extern crate tracing;
 
 pub struct PostgresRegistry<P> where P: PostgresPlatform+Platform<Err=PostErr>+'static {
-    pool: Pool<Postgres>,
-    platform: P
+    ctx: PostgresRegistryContextHandle,
+    platform: PhantomData<P>
 }
 
 impl <P> PostgresRegistry<P> where P: PostgresPlatform+Platform<Err=PostErr>+'static {
-    pub async fn new(platform: P) -> Result<Self, PostErr> {
-        let db = platform.lookup_registry_db();
+    pub async fn new(ctx: PostgresRegistryContextHandle) -> Result<Self, PostErr> {
+        /*
         let pool = PgPoolOptions::new()
             .max_connections(5)
             .connect(
                 db.to_uri().as_str(),
             )
             .await?;
-        let registry = Self { pool, platform };
+         */
+        let registry = Self { ctx, platform: Default::default() };
 
         match registry.setup().await {
             Ok(_) => {
@@ -143,7 +147,7 @@ impl <P> PostgresRegistry<P> where P: PostgresPlatform+Platform<Err=PostErr>+'st
         let access_grants_index =
             "CREATE INDEX IF NOT EXISTS query_root_index ON access_grants(query_root)";
 
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.ctx.acquire().await?;
         let mut transaction = conn.begin().await?;
         transaction.execute(particles).await?;
         transaction.execute(access_grants).await?;
@@ -161,7 +165,7 @@ impl <P> PostgresRegistry<P> where P: PostgresPlatform+Platform<Err=PostErr>+'st
     }
 
     async fn nuke(&self) -> Result<(), PostErr> {
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
         trans.execute("DROP TABLE particles CASCADE").await;
         trans.execute("DROP TABLE access_grants CASCADE").await;
@@ -196,7 +200,7 @@ impl <P> RegistryApi<P> for PostgresRegistry<P> where P: PostgresPlatform+Platfo
             }
         }
 
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
         let params = RegistryParams::from_registration(registration)?;
 
@@ -255,7 +259,7 @@ impl <P> RegistryApi<P> for PostgresRegistry<P> where P: PostgresPlatform+Platfo
             parent.to_string(),
             point_segment.to_string()
         );
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
         trans.execute(statement.as_str()).await?;
         trans.commit().await?;
@@ -278,7 +282,7 @@ impl <P> RegistryApi<P> for PostgresRegistry<P> where P: PostgresPlatform+Platfo
             parent,
             point_segment
         );
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
         trans.execute(statement.as_str()).await?;
         trans.commit().await?;
@@ -290,7 +294,7 @@ impl <P> RegistryApi<P> for PostgresRegistry<P> where P: PostgresPlatform+Platfo
         point: &'a Point,
         properties: &'a SetProperties,
     ) -> Result<(), PostErr> {
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
         let parent = point
             .parent()
@@ -332,7 +336,7 @@ impl <P> RegistryApi<P> for PostgresRegistry<P> where P: PostgresPlatform+Platfo
             }
         }
 
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
         let parent = point
             .parent()
@@ -366,7 +370,7 @@ impl <P> RegistryApi<P> for PostgresRegistry<P> where P: PostgresPlatform+Platfo
             .ok_or("expected last point_segment")?
             .to_string();
 
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.ctx.acquire().await?;
         let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut conn).await?;
         let mut map = HashMap::new();
         for p in properties {
@@ -381,7 +385,7 @@ impl <P> RegistryApi<P> for PostgresRegistry<P> where P: PostgresPlatform+Platfo
             return Ok(ParticleRecord::root());
         }
 
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.ctx.acquire().await?;
         let parent = point.parent().ok_or("expected a parent")?;
         let point_segment = point
             .last_segment()
@@ -446,7 +450,7 @@ impl <P> RegistryApi<P> for PostgresRegistry<P> where P: PostgresPlatform+Platfo
                 }
             }
 
-            let mut conn = self.pool.acquire().await?;
+            let mut conn = self.ctx.acquire().await?;
             let statement = format!("DELETE FROM particles WHERE point IN [{}]", points);
             sqlx::query(statement.as_str()).execute(&mut conn).await?;
         }
@@ -586,7 +590,7 @@ impl <P> RegistryApi<P> for PostgresRegistry<P> where P: PostgresPlatform+Platfo
             query = query.bind(param);
         }
 
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.ctx.acquire().await?;
         let mut matching_so_far = query.fetch_all(&mut conn).await?;
 
         let mut matching_so_far:Vec<ParticleRecord> = matching_so_far.into_iter().map(|m|m.into()).collect();
@@ -649,7 +653,7 @@ impl <P> RegistryApi<P> for PostgresRegistry<P> where P: PostgresPlatform+Platfo
     }
 
     async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), PostErr> {
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.ctx.acquire().await?;
         match &access_grant.kind {
             AccessGrantKind::Super => {
                 sqlx::query("INSERT INTO access_grants (kind,query_root,on_point,to_point,by_particle) VALUES ('super',$1,$2,$3,(SELECT id FROM particles WHERE point=$4))")
@@ -681,7 +685,7 @@ impl <P> RegistryApi<P> for PostgresRegistry<P> where P: PostgresPlatform+Platfo
 
 //    #[async_recursion]
     async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, PostErr> {
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.ctx.acquire().await?;
 
         struct Owner(bool);
 
@@ -822,7 +826,7 @@ impl <P> RegistryApi<P> for PostgresRegistry<P> where P: PostgresPlatform+Platfo
         };
 
         let selection = self.select(&mut select).await?;
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
         for on in selection.list {
             let on = (*on).try_into()?;
@@ -865,7 +869,7 @@ impl <P> RegistryApi<P> for PostgresRegistry<P> where P: PostgresPlatform+Platfo
 
         let selection = self.select(&mut select).await?;
         let mut all_access_grants = HashMap::new();
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.ctx.acquire().await?;
         for on in selection.list {
             let on: Point = (*on).try_into()?;
             let access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(on.to_string() ).fetch_all(& mut conn).await?;
@@ -893,7 +897,7 @@ impl <P> RegistryApi<P> for PostgresRegistry<P> where P: PostgresPlatform+Platfo
     }
 
     async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), PostErr> {
-        let mut conn = self.pool.acquire().await?;
+        let mut conn = self.ctx.acquire().await?;
         let access_grant: IndexedAccessGrant = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.id=$1 AND particles.id=access_grants.by_particle").bind(id ).fetch_one(& mut conn).await?.into();
         let access = self.access(to, &access_grant.by_particle).await?;
         if access.has_full() {
@@ -1742,19 +1746,107 @@ impl <P> PostgresRegistry<P> where P: PostgresPlatform+Platform<Err=PostErr>+'st
 }
 
 
+pub struct PostgresRegistryContextHandle {
+    key: PostgresDbKey,
+    pool: Arc<PostgresRegistryContext>,
+    pub schema: String,
+}
+
+
+impl PostgresRegistryContextHandle {
+    pub fn new(db: &PostgresDbInfo, pool: Arc<PostgresRegistryContext>) -> Self {
+        Self {
+            key: db.to_key(),
+            schema: db.schema.clone(),
+            pool
+        }
+    }
+
+    pub async fn acquire(&self) -> Result<PoolConnection<Postgres>,PostErr> {
+        self.pool.acquire(&self.key).await
+    }
+
+    pub async fn begin(&self) -> Result<Transaction<Postgres>,PostErr> {
+        self.pool.begin(&self.key).await
+    }
+}
+
+
+pub struct PostgresRegistryContext {
+    pools: HashMap<PostgresDbKey, Pool<Postgres>>
+}
+
+impl PostgresRegistryContext {
+
+    pub async fn new(dbs: HashSet<PostgresDbInfo>) -> Result<Self,PostErr> {
+        let mut pools = HashMap::new();
+        for db in dbs {
+            let pool = PgPoolOptions::new()
+                .max_connections(5)
+                .connect(
+                    db.to_uri().as_str(),
+                )
+                .await?;
+            pools.insert( db.to_key(), pool );
+        }
+        Ok(Self {
+            pools
+        })
+    }
+
+    pub async fn acquire(&self, key: &PostgresDbKey ) -> Result<PoolConnection<Postgres>,PostErr> {
+        Ok(self.pools.get(key).ok_or("could not acquire db connection".into())?.acquire().await?)
+    }
+
+    pub async fn begin(&self, key: &PostgresDbKey ) -> Result<Transaction<Postgres>,PostErr> {
+        Ok(self.pools.get(key).ok_or("could not begin db transaction".into())?.begin().await?)
+    }
+}
+
+
+#[derive(Eq,PartialEq,Hash)]
+pub struct PostgresDbKey {
+    pub url: String,
+    pub user: String,
+    pub database: String
+}
 
 
 
-
-
-pub struct DBInfo {
+#[derive(Eq,PartialEq,Hash)]
+pub struct PostgresDbInfo {
     pub url: String,
     pub user: String,
     pub password: String,
     pub database: String,
+    pub schema: String,
 }
 
-impl DBInfo {
+
+
+impl PostgresDbInfo {
+    pub fn new( url: String, user: String, password: String, database: String ) -> Self {
+        Self::new_with_schema(url,user,password,database,"PUBLIC".to_string() )
+    }
+
+    pub fn new_with_schema( url: String, user: String, password: String, database: String, schema: String ) -> Self {
+        Self {
+            url,
+            user,
+            password,
+            database,
+            schema
+        }
+    }
+
+    pub fn to_key(&self) -> PostgresDbKey {
+        PostgresDbKey {
+            url: self.url.clone(),
+            user: self.user.clone(),
+            database: self.database.clone()
+        }
+    }
+
     pub fn to_uri(&self) -> String {
         format!(
             "postgres://{}:{}@{}/{}",
@@ -1767,34 +1859,10 @@ impl DBInfo {
 }
 
 pub trait PostgresPlatform: Platform<Err=PostErr> {
-
-    fn lookup_registry_db(&self) -> DBInfo {
-        DBInfo {
-            url: REGISTRY_URL.to_string(),
-            database: REGISTRY_DATABASE.to_string(),
-            user: REGISTRY_USER.to_string(),
-            password: REGISTRY_PASSWORD.to_string(),
-        }
-    }
+    fn lookup_registry_db(&self) -> Result<PostgresDbInfo,Self::Err>;
+    fn lookup_star_db(&self, star: &StarKey) -> Result<PostgresDbInfo,Self::Err>;
 }
 
-pub fn lookup_db_for_star( star_key: &StarKey ) -> DBInfo {
-    // future versions need a way to lookup this info
-    DBInfo {
-        url: REGISTRY_URL.to_string(),
-        database: REGISTRY_DATABASE.to_string(),
-        user: REGISTRY_USER.to_string(),
-        password: REGISTRY_PASSWORD.to_string(),
-    }
-}
 
-lazy_static! {
-    pub static ref REGISTRY_URL: String =
-        std::env::var("REGISTRY_URL").unwrap_or("localhost".to_string());
-    pub static ref REGISTRY_USER: String =
-        std::env::var("REGISTRY_USER").unwrap_or("postgres".to_string());
-    pub static ref REGISTRY_PASSWORD: String =
-        std::env::var("REGISTRY_PASSWORD").unwrap_or("password".to_string());
-    pub static ref REGISTRY_DATABASE: String =
-        std::env::var("REGISTRY_DATABASE").unwrap_or("postgres".to_string());
-}
+
+

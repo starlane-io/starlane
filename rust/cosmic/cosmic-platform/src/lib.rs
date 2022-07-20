@@ -10,11 +10,12 @@ extern crate lazy_static;
 extern crate async_trait;
 
 use std::cmp::Ordering;
+use std::collections::HashSet;
 use crate::driver::DriversBuilder;
 use crate::machine::{Machine, MachineTemplate};
 use cosmic_api::command::request::create::KindTemplate;
 use cosmic_api::id::id::{BaseKind, Kind, Point, Specific, ToBaseKind};
-use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarSub, UserBaseSubKind};
+use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, StarSub, UserBaseSubKind};
 use cosmic_api::substance::substance::{Substance, SubstanceList, Token};
 use cosmic_api::{ArtifactApi, IndexedAccessGrant, Registration,  };
 use cosmic_hyperlane::InterchangeEntryRouter;
@@ -274,17 +275,21 @@ pub trait PlatErr: Sized + Send + Sync + ToString + Clone + Into<MsgErr> + From<
 pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'static
 {
     type Err;
+    type RegistryContext;
 
-    fn create(self) {
-        Machine::new(self);
+    fn create(self) -> Result<(),Self::Err>{
+        Machine::new(self)
     }
+
+    fn create_registry_context(&self, stars: HashSet<StarKey>) -> Result<Self::RegistryContext,Self::Err>;
 
     fn machine_template(&self) -> MachineTemplate;
     fn properties_config<K: ToBaseKind>(&self, base:&K) -> &'static PropertiesConfig;
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder;
     fn token(&self) -> Token;
-    fn registry(&self) -> Registry<Self>;
-    fn artifacts(&self) -> ArtifactApi;
+    fn global_registry(&self, ctx: Arc<Self::RegistryContext>) -> Registry<Self>;
+    fn star_registry(&self, star: &StarKey, ctx: Arc<Self::RegistryContext>) -> Registry<Self>;
+    fn artifact_hub(&self) -> ArtifactApi;
     fn start_services(&self, entry_router: &mut InterchangeEntryRouter);
     fn default_implementation(&self, template: &KindTemplate) -> Result<Kind, MsgErr> {
         let base: BaseKind = BaseKind::from_str(template.base.to_string().as_str())?;

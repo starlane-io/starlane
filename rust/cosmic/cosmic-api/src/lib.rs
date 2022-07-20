@@ -78,11 +78,19 @@ extern "C" {
 
 #[derive(Clone)]
 pub struct ArtifactApi {
-    pub binds: Arc<RwLock<LruCache<Point, Arc<BindConfig>>>>,
-    pub fetcher: Arc<dyn ArtifactFetcher>,
+    binds: Arc<RwLock<LruCache<Point, Arc<BindConfig>>>>,
+    fetcher: Arc<dyn ArtifactFetcher>,
 }
 
 impl ArtifactApi {
+
+    pub fn new( fetcher: Arc<dyn ArtifactFetcher> ) -> Self {
+        Self {
+            binds: Arc::new(RwLock::new(LruCache::new(1024))),
+            fetcher
+        }
+    }
+
     pub async fn bind(&self, point: &Point) -> Result<ArtRef<BindConfig>, MsgErr> {
         {
             let read = self.binds.read().await;
@@ -108,8 +116,22 @@ impl ArtifactApi {
         if !point.has_bundle() {
             return Err("point is not from a bundle".into());
         }
-        let bin = self.fetcher.fetch(point).await;
+        let bin = self.fetcher.fetch(point).await?;
         Ok(A::try_from(bin)?)
+    }
+}
+
+pub struct NoDiceArtifactFetcher {
+
+}
+
+impl ArtifactFetcher for NoDiceArtifactFetcher {
+    async fn stub(&self, point: &Point) -> Result<Stub, MsgErr> {
+        Err(MsgErr::from_status(404u16))
+    }
+
+    async fn fetch(&self, point: &Point) -> Result<Vec<u8>, MsgErr> {
+        Err(MsgErr::from_status(404u16))
     }
 }
 
@@ -149,8 +171,12 @@ impl<A> Drop for ArtRef<A> {
 
 #[async_trait]
 pub trait ArtifactFetcher: Send+Sync {
-    async fn stub(&self, point: &Point) -> Stub;
-    async fn fetch(&self, point: &Point) -> Vec<u8>;
+    async fn stub(&self, point: &Point) -> Result<Stub,MsgErr>;
+    async fn fetch(&self, point: &Point) -> Result<Vec<u8>,MsgErr>;
+}
+
+pub struct FetchErr {
+
 }
 
 #[cfg(test)]

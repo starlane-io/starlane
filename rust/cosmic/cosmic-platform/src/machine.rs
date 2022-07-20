@@ -17,7 +17,7 @@ use cosmic_api::substance::substance::Substance;
 
 #[derive(Clone)]
 pub struct MachineSkel<P> where P: Platform{
-    pub platform: Arc<P>,
+    pub platform: P,
     pub registry: Arc<dyn RegistryApi<P>>,
     pub artifacts: ArtifactApi,
     pub logger: RootLogger,
@@ -36,15 +36,18 @@ pub struct Machine<P> where P: Platform+'static{
 impl <P> Machine<P> where P: Platform+'static{
     pub fn new(
         platform: P
-    ) -> Result<(), MsgErr> {
+    ) -> Result<(), P::Err> {
         let template = platform.machine_template();
+
+        let pool = Arc::new(platform.create_registry_context(template.star_set())?);
+
         let (tx,rx) = mpsc::channel(32*1024);
         let skel = MachineSkel {
-            registry: platform.registry(),
-            artifacts: platform.artifacts(),
+            registry: platform.global_registry(pool.clone()),
+            artifacts: platform.artifact_hub(),
             logger: RootLogger::default(),
             timeouts: Timeouts::default(),
-            platform: Arc::new(platform),
+            platform,
             tx
         };
 
@@ -151,6 +154,16 @@ pub enum MachineCall {
 
 pub struct MachineTemplate {
     pub stars: Vec<StarTemplate>,
+}
+
+impl MachineTemplate {
+    pub fn star_set(&self) -> HashSet<StarKey> {
+        let mut rtn = HashSet::new();
+        for star in self.stars.iter() {
+            rtn.insert( star.key.clone() );
+        }
+        rtn
+    }
 }
 
 impl Default for MachineTemplate {
