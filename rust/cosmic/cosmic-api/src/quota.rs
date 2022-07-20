@@ -24,7 +24,7 @@ impl Default for Timeouts {
         Self {
             high: 5*60, // 5 minutes
             med: 1*60,  // 1 minute
-            low: 1     // 1 seconds
+            low: 15     // 15 seconds
         }
     }
 }

@@ -124,6 +124,16 @@ impl UltraWave {
 
     }
 
+    pub fn id(&self) -> WaveId {
+        match self {
+            UltraWave::Ping(w) => w.id.clone(),
+            UltraWave::Pong(w) => w.id.clone(),
+            UltraWave::Ripple(w) => w.id.clone(),
+            UltraWave::Echo(w) => w.id.clone(),
+            UltraWave::Signal(w) =>w.id.clone(),
+        }
+    }
+
 
     pub fn to_substance(self) -> Substance {
         Substance::UltraWave(Box::new(self))
@@ -137,6 +147,15 @@ impl UltraWave {
             _ => Err(MsgErr::bad_request()),
         }
     }
+
+    pub fn to_reflected(self) -> Result<ReflectedWave, MsgErr> {
+        match self {
+            UltraWave::Pong(pong) => Ok(pong.to_reflected()),
+            UltraWave::Echo(echo) => Ok(echo.to_reflected()),
+            _ => Err(MsgErr::bad_request()),
+        }
+    }
+
 
     pub fn hops(&self) -> u16 {
         match self {
@@ -190,6 +209,17 @@ impl UltraWave {
             UltraWave::Signal(_) => true,
         }
     }
+
+    pub fn is_reflected(&self) -> bool {
+        match self {
+            UltraWave::Ping(_) => false,
+            UltraWave::Pong(_) => true,
+            UltraWave::Ripple(_) => false,
+            UltraWave::Echo(_) => true,
+            UltraWave::Signal(_) => false,
+        }
+    }
+
 
     pub fn to(&self) -> Recipients {
         match self {
@@ -987,6 +1017,19 @@ impl ReflectedProto {
     pub fn body(&mut self, body: Substance) -> Result<(), MsgErr> {
         self.body.replace(body);
         Ok(())
+    }
+
+
+    pub fn intended<I: ToRecipients+Clone>(&mut self, intended: I) {
+        self.intended.replace(intended.to_recipients());
+    }
+
+    pub fn reflection_of(&mut self, id: WaveId) {
+        self.reflection_of.replace(id);
+    }
+
+    pub fn status(&mut self, status: u16) {
+        self.status.replace( StatusCode::from_u16(status).unwrap_or(StatusCode::from_u16(500).unwrap()));
     }
 
     pub fn to(&mut self, to: Port) {

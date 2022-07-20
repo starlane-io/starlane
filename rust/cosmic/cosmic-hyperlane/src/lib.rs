@@ -169,7 +169,7 @@ pub struct HyperwayInterchange {
 }
 
 impl HyperwayInterchange {
-    pub fn new(router: Box<dyn HyperRouter>, logger: PointLogger) -> Self {
+    pub fn new(logger: PointLogger) -> Self {
         let (call_tx, mut call_rx) = mpsc::channel(1024);
         let hyperways: Arc<DashMap<Point, HyperwayOut>> = Arc::new(DashMap::new());
 
@@ -200,35 +200,40 @@ impl HyperwayInterchange {
                             hyperway_outs.remove(&hyperway);
                         }
                         Some(HyperwayCall::Wave(wave)) => {
-println!("Routing Wave...");
                             match wave.to().single_or() {
                                 Ok(to) => {
-                                    match hyperway_outs.get(&to.clone().to_point()) {
-                                        None => {
-println!("could not find Hyperway {}", to.to_string());
+                                    if to.point != wave.from {
+                                        match hyperway_outs.get(&to.clone().to_point()) {
+                                            None => {
+                                                logger.warn(format!("hyperway not found in interchange: {}", to.point.to_string()));
+                                            }
+                                            Some(hyperway_out) => {
+                                                hyperway_out.value().outbound(wave.wave).await;
+                                            }
                                         }
-                                        Some(hyperway_out) => {
-                                            hyperway_out.value().outbound(wave.wave).await;
-                                        }
+                                    } else {
+                                        logger.warn("illegal attempt to route a wave back to it's origin (cannot have same 'to' and 'from' points)");
                                     }
                                 }
-                                Err(_) => {}
+                                Err(_) => {
+                                    logger.warn("interchange can only route to single recipients (no ripples)");
+                                }
                             }
-
-//                            router.route(wave).await;
                         }
                         Some(HyperwayCall::Out(wave)) => {
-                            let point = match wave.to().single_or() {
-                                Ok(port) => match hyperways.get(&port.point) {
-                                    None => {
-                                        logger.error(format!("attempt to send wave from '{}' to hyperway '{}' which is not present in this HyperwayInterchange", wave.from().to_string(), wave.to().unwrap_single().to_string()) );
-                                    }
-                                    Some(hyperway) => {
-                                        hyperway.value().outbound(wave).await;
+                            match wave.to().single_or() {
+                                Ok(port) => {
+                                    match hyperways.get(&port.point) {
+                                        None => {
+                                            logger.warn(format!("hyperway not found in interchange: {}", port.point.to_string()));
+                                        }
+                                        Some(hyperway) => {
+                                            hyperway.value().outbound(wave).await;
+                                        }
                                     }
                                 },
                                 Err(err) => {
-                                    logger.error(err.to_string());
+                                    logger.warn("interchange can only route to single recipients (no ripples)");
                                 }
                             };
                         }
@@ -501,7 +506,7 @@ impl TokenDispensingHyperwayInterchange {
             tokens.clone(),
             logger.logger.clone(),
         ));
-        let interchange = HyperwayInterchange::new(router, logger.clone());
+        let interchange = HyperwayInterchange::new( logger.clone());
         Self {
             agent,
             tokens,
@@ -763,9 +768,7 @@ mod tests {
     async fn hyper_test() {
         let point = Point::from_str("test").unwrap();
         let logger = RootLogger::default().point(point.clone());
-        let router = Box::new(DummyRouter {});
         let interchange = Arc::new(HyperwayInterchange::new(
-            router,
             logger.push("interchange").unwrap(),
         ));
 
@@ -799,12 +802,13 @@ pub mod test {
     use std::str::FromStr;
     use std::sync::Arc;
     use cosmic_api::command::request::create::PointFactoryU128;
+    use cosmic_api::error::MsgErr;
     use cosmic_api::id::id::{Point, ToPort};
     use cosmic_api::log::RootLogger;
     use cosmic_api::msg::MsgMethod;
     use cosmic_api::substance::substance::{Substance, Token};
     use cosmic_api::sys::{EntryReq, InterchangeKind};
-    use cosmic_api::wave::{Agent, DirectedKind, DirectedProto, Exchanger, HyperWave, Pong, ProtoTransmitter, TxRouter, Wave};
+    use cosmic_api::wave::{Agent, DirectedKind, DirectedProto, Exchanger, HyperWave, Pong, ProtoTransmitter, ReflectedKind, ReflectedProto, ReflectedWave, Router, TxRouter, Wave};
     use crate::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, HyperGate, HyperRouter, HyperwayInterchange, TokenAuthenticatorWithRemoteWhitelist};
 
     pub struct TestRouter {
@@ -824,7 +828,6 @@ println!("Test Router routing!");
         let root_logger = RootLogger::default();
         let logger = root_logger.point( Point::from_str("point").unwrap());
         let interchange = Arc::new(HyperwayInterchange::new(
-            Box::new(TestRouter{}),
             logger.push("interchange").unwrap(),
         ));
 
@@ -849,18 +852,39 @@ println!("Test Router routing!");
 
         let less_router = TxRouter::new(less_tx);
         let less_exchanger = Exchanger::new( less.clone().to_port(), Default::default() );
-        let less_transmitter = ProtoTransmitter::new( Arc::new(less_router), less_exchanger );
+        let less_transmitter = ProtoTransmitter::new( Arc::new(less_router), less_exchanger.clone() );
+
+        let fae_router = TxRouter::new(fae_tx);
+        let fae_exchanger = Exchanger::new( fae.clone().to_port(), Default::default() );
+        let fae_transmitter = ProtoTransmitter::new( Arc::new(fae_router), fae_exchanger );
 
 
-        tokio::spawn( async move {
-            let wave = fae_rx.recv().await.unwrap();
-println!("FAE RECEIVED A WAVE!");
-        });
+        {
+            let fae = fae.clone();
+            tokio::spawn(async move {
+                let wave = fae_rx.recv().await.unwrap();
+                let mut reflected = ReflectedProto::new();
+                reflected.kind(ReflectedKind::Pong);
+                reflected.status(200u16);
+                reflected.to(wave.from().clone());
+                reflected.from(fae.to_port());
+                reflected.intended(wave.to());
+                reflected.reflection_of(wave.id());
+                let wave = reflected.build().unwrap();
+                let wave = wave.to_ultra();
+                fae_transmitter.route(wave).await;
+            });
+        }
 
-        tokio::spawn( async move {
-            let wave = less_rx.recv().await.unwrap();
-            println!("LESS RECEIVED A WAVE!");
-        });
+        {
+            let less_exchanger = less_exchanger.clone();
+            tokio::spawn(async move {
+                let wave = less_rx.recv().await.unwrap();
+                if !wave.is_directed() {
+                    less_exchanger.reflected(wave.to_reflected().unwrap()).await;
+                }
+            });
+        }
 
         let mut hello = DirectedProto::new();
         hello.kind(DirectedKind::Ping);
@@ -868,13 +892,7 @@ println!("FAE RECEIVED A WAVE!");
         hello.from(less.clone());
         hello.method(MsgMethod::new("Hello").unwrap());
         hello.body(Substance::Empty);
-        println!("got here...");
         let pong: Wave<Pong> = less_transmitter.direct(hello).await.unwrap();
-
-        println!("PONG STATUS IS: {}", pong.core.status.as_str() );
-
-        println!("AND got here...");
-
         assert_eq!(pong.core.status.as_u16(), 200u16);
 
     }
