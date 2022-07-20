@@ -22,7 +22,7 @@ use cosmic_api::quota::Timeouts;
 use cosmic_api::substance::substance::{Substance, ToSubstance};
 use cosmic_api::sys::{Assign, AssignmentKind, Discoveries, Discovery, Location, Search, Sys};
 use cosmic_api::util::{ValueMatcher, ValuePattern};
-use cosmic_api::wave::{Agent, Bounce, BounceBacks, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, Echo, Echoes, Handling, HandlingKind, InCtx, Method, Ping, Pong, Priority, ProtoTransmitter, RecipientSelector, Recipients, Reflectable, ReflectedCore, ReflectedWave, Retries, Ripple, RootInCtx, Router, Scope, SetStrategy, Signal, ToRecipients, TxRouter, WaitTime, Wave, SingularRipple};
+use cosmic_api::wave::{Agent, Bounce, BounceBacks, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, Echo, Echoes, Handling, HandlingKind, InCtx, Method, Ping, Pong, Priority, ProtoTransmitter, RecipientSelector, Recipients, Reflectable, ReflectedCore, ReflectedWave, Retries, Ripple, RootInCtx, Router, Scope, SetStrategy, Signal, ToRecipients, TxRouter, WaitTime, Wave, SingularRipple, ProtoTransmitterBuilder};
 use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
 use cosmic_api::{
     MountKind, Registration, State, StateFactory,
@@ -205,7 +205,7 @@ where
 
         let gravity_well_router = TxRouter::new(star_tx.gravity_well_tx.clone());
         let mut gravity_well_transmitter =
-            ProtoTransmitter::new(Arc::new(gravity_well_router.clone()), exchanger.clone());
+            ProtoTransmitterBuilder::new(Arc::new(gravity_well_router.clone()), exchanger.clone());
         gravity_well_transmitter.from = SetStrategy::Override(point.clone().to_port());
         gravity_well_transmitter.handling = SetStrategy::Fill(Handling {
             kind: HandlingKind::Immediate,
@@ -215,6 +215,8 @@ where
         });
         gravity_well_transmitter.agent = SetStrategy::Fill(Agent::HyperUser);
         gravity_well_transmitter.scope = SetStrategy::Fill(Scope::Full);
+
+        let gravity_well_transmitter = gravity_well_transmitter.build();
 
         Self {
             key: template.key,

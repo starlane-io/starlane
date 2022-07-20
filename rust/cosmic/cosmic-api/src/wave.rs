@@ -331,17 +331,17 @@ pub struct RootInCtx {
     pub wave: DirectedWave,
     pub session: Option<Session>,
     pub logger: SpanLogger,
-    pub tx: ProtoTransmitter,
+    pub transmitter: ProtoTransmitter,
 }
 
 impl RootInCtx {
-    pub fn new(wave: DirectedWave, to: Port, logger: SpanLogger, tx: ProtoTransmitter) -> Self {
+    pub fn new(wave: DirectedWave, to: Port, logger: SpanLogger, transmitter: ProtoTransmitter) -> Self {
         Self {
             wave,
             to,
             logger,
             session: None,
-            tx,
+            transmitter: transmitter,
         }
     }
 
@@ -418,7 +418,7 @@ impl RootInCtx {
             root: self,
             input,
             logger: self.logger.clone(),
-            transmitter: Cow::Borrowed(&self.tx),
+            transmitter: Cow::Borrowed(&self.transmitter),
         })
     }
 }
@@ -3495,6 +3495,43 @@ impl Exchanger {
         rx
     }
 }
+
+pub struct ProtoTransmitterBuilder {
+    pub agent: SetStrategy<Agent>,
+    pub scope: SetStrategy<Scope>,
+    pub handling: SetStrategy<Handling>,
+    pub from: SetStrategy<Port>,
+    pub to: SetStrategy<Recipients>,
+    pub router: Arc<dyn Router>,
+    pub exchanger: Exchanger,
+}
+
+impl ProtoTransmitterBuilder {
+    pub fn new(router: Arc<dyn Router>, exchanger: Exchanger) -> ProtoTransmitterBuilder {
+        Self {
+            from: SetStrategy::None,
+            to: SetStrategy::None,
+            agent: SetStrategy::Fill(Agent::Anonymous),
+            scope: SetStrategy::Fill(Scope::None),
+            handling: SetStrategy::Fill(Handling::default()),
+            router,
+            exchanger,
+        }
+    }
+
+    pub fn build(self) -> ProtoTransmitter {
+        ProtoTransmitter {
+            agent: self.agent,
+            scope: self.scope,
+            handling: self.handling,
+            from: self.from,
+            to: self.to,
+            router: self.router,
+            exchanger: self.exchanger,
+        }
+    }
+}
+
 
 #[derive(Clone)]
 pub struct ProtoTransmitter {

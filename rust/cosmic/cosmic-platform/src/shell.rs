@@ -12,7 +12,7 @@ use cosmic_api::id::{Traversal, TraversalInjection};
 use cosmic_api::log::RootLogger;
 use cosmic_api::parse::{command_line, Env, route_attribute};
 use cosmic_api::quota::Timeouts;
-use cosmic_api::wave::{Agent, Ping, DirectedHandlerSelector, RecipientSelector, DirectedHandler, Reflectable, ReflectedCore, Pong, RootInCtx, Wave, ProtoTransmitter, DirectedCore, DirectedProto, SetStrategy, UltraWave, InCtx, Exchanger, DirectedWave, CoreBounce, Router, ReflectedWave, Bounce};
+use cosmic_api::wave::{Agent, Ping, DirectedHandlerSelector, RecipientSelector, DirectedHandler, Reflectable, ReflectedCore, Pong, RootInCtx, Wave, ProtoTransmitter, DirectedCore, DirectedProto, SetStrategy, UltraWave, InCtx, Exchanger, DirectedWave, CoreBounce, Router, ReflectedWave, Bounce, ProtoTransmitterBuilder};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -63,8 +63,9 @@ impl <P> TraversalLayer for ShellEx<P> where P: Platform +'static {
           injector.clone()
         ));
 
-        let mut transmitter = ProtoTransmitter::new(router.clone(), self.exchanger().clone());
+        let mut transmitter = ProtoTransmitterBuilder::new(router.clone(), self.exchanger().clone());
         transmitter.from = SetStrategy::Fill(directed.from().with_layer(self.port().layer.clone() ).with_topic(Topic::None));
+        let transmitter = transmitter.build();
         let reflection = directed.reflection();
         let ctx = RootInCtx::new(directed.payload, self.port().clone(), logger, transmitter.clone());
         let bounce: CoreBounce = self.handle(ctx).await;

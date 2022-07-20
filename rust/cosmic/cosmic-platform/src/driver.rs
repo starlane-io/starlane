@@ -12,11 +12,7 @@ use cosmic_api::particle::particle::Status;
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{Assign, Sys};
 use cosmic_api::util::ValuePattern;
-use cosmic_api::wave::{
-    Bounce, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto,
-    DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter, RecipientSelector, ReflectedCore,
-    ReflectedWave, RootInCtx, Router, SetStrategy, SysMethod, UltraWave, Wave, WaveKind,
-};
+use cosmic_api::wave::{Bounce, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, SysMethod, UltraWave, Wave, WaveKind};
 use cosmic_api::State;
 use cosmic_api::{};
 use cosmic_driver::{
@@ -336,8 +332,9 @@ where
             .point(self.port().clone().to_point())
             .span();
         let mut transmitter =
-            ProtoTransmitter::new(self.router.clone(), self.skel.exchanger.clone());
+            ProtoTransmitterBuilder::new(self.router.clone(), self.skel.exchanger.clone());
         transmitter.from = SetStrategy::Override(self.port.clone());
+        let transmitter = transmitter.build();
         let to = direct.to().clone().unwrap_single();
         let ctx = RootInCtx::new(direct.payload, to, logger, transmitter);
         self.ex.handle(ctx).await;

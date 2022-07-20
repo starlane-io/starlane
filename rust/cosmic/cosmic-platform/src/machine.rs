@@ -97,7 +97,6 @@ where
             stars.insert(star_point.clone(), star_api.clone());
 
             let interchange = Arc::new(HyperwayInterchange::new(
-                Box::new(StarRouter::new(star_api)),
                 logger.push("interchange").unwrap(),
             ));
             interchanges.insert(star_template.key.clone(), interchange.clone());
