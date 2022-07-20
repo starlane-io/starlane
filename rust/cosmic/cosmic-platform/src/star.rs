@@ -250,6 +250,7 @@ where
 }
 
 pub enum StarCall {
+    PreInit(oneshot::Sender<Result<(),MsgErr>>),
     HyperWave(HyperWave),
     TraverseToNextLayer(Traversal<UltraWave>),
     LayerTraversalInjection(TraversalInjection),
@@ -328,6 +329,12 @@ impl StarApi {
         Self { kind, tx }
     }
 
+    pub async fn pre_init(&self) -> Result<(),MsgErr>{
+        let (tx,mut rx) = oneshot::channel();
+        self.tx.send(StarCall::PreInit(tx) ).await;
+        rx.await?
+    }
+
     pub async fn gravity_well(&self, hyperwave: HyperWave) {
         self.tx.send(StarCall::HyperWave(hyperwave)).await;
     }
@@ -398,6 +405,9 @@ where
         tokio::spawn(async move {
             while let Some(call) = self.star_rx.recv().await {
                 match call {
+                    StarCall::PreInit(tx) => {
+                        tx.send(self.pre_init().await);
+                    }
                     StarCall::HyperWave(wave) => {
                         self.gravity_well(wave).await;
                     }
@@ -414,6 +424,10 @@ where
                 }
             }
         });
+    }
+
+    async fn pre_init(&self) -> Result<(),MsgErr> {
+        self.drivers.init().await
     }
 
     // HyperWave will either be flung out to it's next hop in the fabric, or

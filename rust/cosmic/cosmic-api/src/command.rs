@@ -578,8 +578,9 @@ pub mod request {
             Ensure,
         }
 
+        #[async_trait]
         pub trait PointFactory: Send+Sync {
-            fn create(&mut self) -> Result<Point,MsgErr>;
+            async fn create(&mut self) -> Result<Point,MsgErr>;
         }
 
         pub struct PointFactoryU128 {
@@ -599,9 +600,10 @@ pub mod request {
         }
 
 
+        #[async_trait]
         impl PointFactory for PointFactoryU128 {
-            fn create(&mut self) -> Result<Point, MsgErr> {
-                let mut index = self.atomic.blocking_lock();
+            async fn create(&mut self) -> Result<Point, MsgErr> {
+                let mut index = self.atomic.lock().await;
                 *index += 1;
                 self.parent.push( format!("{}{}", self.prefix, *index))
             }

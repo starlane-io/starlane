@@ -191,7 +191,6 @@ impl HyperwayInterchange {
                     rx.push(call_rx.recv().boxed());
 
                     let (result, index, _) = select_all(rx).await;
-
                     match result {
                         Some(HyperwayCall::Add(hyperway_in)) => {
                             hyperway_ins.insert(hyperway_in.remote.clone(), hyperway_in);
@@ -427,7 +426,7 @@ impl AnonHyperAuthenticatorAssignEndPoint {
 #[async_trait]
 impl HyperAuthenticator for AnonHyperAuthenticatorAssignEndPoint {
     async fn auth(&mut self, req: EntryReq) -> Result<HyperwayStub, MsgErr> {
-        let remote = self.remote_point_factory.create()?;
+        let remote = self.remote_point_factory.create().await?;
 
         Ok(HyperwayStub {
             agent: Agent::Anonymous,
@@ -498,10 +497,10 @@ impl TokenDispensingHyperwayInterchange {
         }
     }
 
-    pub fn dispense(&mut self) -> Result<(Token, HyperwayStub), MsgErr> {
+    pub async fn dispense(&mut self) -> Result<(Token, HyperwayStub), MsgErr> {
         let token = Token::new_uuid();
-        let remote_point = self.remote_point_factory.create()?;
-        let lane_point = self.lane_point_factory.create()?;
+        let remote_point = self.remote_point_factory.create().await?;
+        let lane_point = self.lane_point_factory.create().await?;
         let logger = self.logger.point(lane_point);
         let stub = HyperwayStub {
             agent: self.agent.clone(),
@@ -554,11 +553,11 @@ impl InterchangeEntryRouter {
         &self,
         req: EntryReq,
     ) -> Result<(mpsc::Sender<UltraWave>, mpsc::Receiver<UltraWave>), MsgErr> {
-        if let Some(gate) = self.map.get(&req.interchange) {
+        if let Some(gate) = self.map.get(&req.kind) {
             gate.enter(req).await
         } else {
             Err(MsgErr::from(
-                format!("interchange not available: {}", req.interchange.to_string()).as_str(),
+                format!("interchange not available: {}", req.kind.to_string()).as_str(),
             ))
         }
     }
@@ -571,9 +570,9 @@ impl InterchangeEntryRouter {
 
 #[derive(Clone)]
 pub struct HyperGate {
-    pub logger: PointLogger,
-    pub auth: Arc<Mutex<Box<dyn HyperAuthenticator>>>,
-    pub interchange: Arc<HyperwayInterchange>,
+    logger: PointLogger,
+    auth: Arc<Mutex<Box<dyn HyperAuthenticator>>>,
+    interchange: Arc<HyperwayInterchange>,
 }
 
 impl HyperGate {
@@ -770,11 +769,98 @@ mod tests {
         let entry_router = InterchangeEntryRouter::new(map);
 
         let entry = EntryReq {
-            interchange: InterchangeKind::Cli,
+            kind: InterchangeKind::Cli,
             auth: Box::new(Substance::Empty),
             remote: Some(point.push("portal").unwrap()),
         };
 
         entry_router.enter(entry).await.unwrap();
+    }
+}
+
+
+pub mod test {
+    use std::collections::HashSet;
+    use std::str::FromStr;
+    use std::sync::Arc;
+    use cosmic_api::command::request::create::PointFactoryU128;
+    use cosmic_api::id::id::{Point, ToPort};
+    use cosmic_api::log::RootLogger;
+    use cosmic_api::msg::MsgMethod;
+    use cosmic_api::substance::substance::{Substance, Token};
+    use cosmic_api::sys::{EntryReq, InterchangeKind};
+    use cosmic_api::wave::{Agent, DirectedKind, DirectedProto, Exchanger, HyperWave, Pong, ProtoTransmitter, TxRouter, Wave};
+    use crate::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, HyperGate, HyperRouter, HyperwayInterchange, TokenAuthenticatorWithRemoteWhitelist};
+
+    pub struct TestRouter {
+
+    }
+
+    #[async_trait]
+    impl HyperRouter for TestRouter {
+        async fn route(&self, wave: HyperWave) {
+println!("Test Router routing!");
+        //    todo!()
+        }
+    }
+
+    #[tokio::test]
+    pub async fn test_interchange() {
+        let root_logger = RootLogger::default();
+        let logger = root_logger.point( Point::from_str("point").unwrap());
+        let interchange = Arc::new(HyperwayInterchange::new(
+            Box::new(TestRouter{}),
+            logger.push("interchange").unwrap(),
+        ));
+
+        let lane_point_factory = Box::new(PointFactoryU128::new(Point::from_str("point:lanes").unwrap(), "lane-".to_string() ));
+
+        let auth = AnonHyperAuthenticator::new(
+            lane_point_factory,
+            root_logger.clone(),
+        );
+
+        let gate = HyperGate::new(
+            Box::new(auth),
+            interchange,
+            logger.push("gate").unwrap(),
+        );
+
+        let less = Point::from_str("less").unwrap();
+        let fae  = Point::from_str("fae").unwrap();
+
+        let (less_tx, mut less_rx) = gate.enter(EntryReq::new(InterchangeKind::Cli, less.clone(), Substance::Empty )).await.unwrap();
+        let (fae_tx, mut fae_rx) = gate.enter(EntryReq::new(InterchangeKind::Cli, fae.clone(), Substance::Empty )).await.unwrap();
+
+        let less_router = TxRouter::new(less_tx);
+        let less_exchanger = Exchanger::new( less.clone().to_port(), Default::default() );
+        let less_transmitter = ProtoTransmitter::new( Arc::new(less_router), less_exchanger );
+
+
+        tokio::spawn( async move {
+            let wave = fae_rx.recv().await.unwrap();
+println!("FAE RECEIVED A WAVE!");
+        });
+
+        tokio::spawn( async move {
+            let wave = less_rx.recv().await.unwrap();
+            println!("LESS RECEIVED A WAVE!");
+        });
+
+        let mut hello = DirectedProto::new();
+        hello.kind(DirectedKind::Ping);
+        hello.to( fae.clone() );
+        hello.from(less.clone());
+        hello.method(MsgMethod::new("Hello").unwrap());
+        hello.body(Substance::Empty);
+        println!("got here...");
+        let pong: Wave<Pong> = less_transmitter.direct(hello).await.unwrap();
+
+        println!("PONG STATUS IS: {}", pong.core.status.as_str() );
+
+        println!("AND got here...");
+
+        assert_eq!(pong.core.status.as_u16(), 200u16);
+
     }
 }

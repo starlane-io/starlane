@@ -3,7 +3,7 @@ use crate::{PlatErr, Platform, RegistryApi};
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{Point, ToPoint, ToPort};
 use cosmic_api::id::{ConstellationName, MachineName, StarHandle, StarKey, StarSub};
-use cosmic_api::log::RootLogger;
+use cosmic_api::log::{PointLogger, RootLogger};
 use cosmic_api::quota::Timeouts;
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{EntryReq, InterchangeKind};
@@ -18,6 +18,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use tracing::info;
+use futures::future::join_all;
 
 #[derive(Clone)]
 pub struct MachineSkel<P>
@@ -43,6 +44,7 @@ where
     pub entry_router: InterchangeEntryRouter,
     pub interchanges: HashMap<StarKey, Arc<HyperwayInterchange>>,
     pub rx: mpsc::Receiver<MachineCall>,
+    pub logger: PointLogger
 }
 
 impl<P> Machine<P>
@@ -138,7 +140,7 @@ where
         // now lets make the clients
         for (from, to) in clients {
             let entry_req = EntryReq {
-                interchange: InterchangeKind::Star(to.clone()),
+                kind: InterchangeKind::Star(to.clone()),
                 auth: Box::new(Substance::Token(skel.platform.token())),
                 remote: Some(from.clone()),
             };
@@ -155,13 +157,11 @@ where
 
         skel.platform.start_services(&mut entry_router);
 
-        let machine_star = stars
+        let (machine_point,machine_star) = stars
             .iter()
-            .map(|(_, v)| v)
-            .find(|v| v.kind == StarSub::Machine)
-            .map(|v| v.clone())
+            .find(|(k,v)| v.kind == StarSub::Machine)
+            .map(|(k,v)| (k.clone(),v.clone()))
             .expect("expected Machine Star");
-
 
         {
             let tx= skel.tx.clone();
@@ -170,8 +170,11 @@ where
             });
         }
 
+        let logger = skel.logger.point(machine_point);
+
         let mut machine = Self {
             skel,
+            logger,
             machine_star,
             stars: Arc::new(stars),
             entry_router,
@@ -184,25 +187,40 @@ where
         Ok(())
     }
 
-    async fn start(mut self) {
+    async fn pre_init(&self) -> Result<(),MsgErr> {
+        let logger = self.logger.span();
+        logger.info("Machine::pre_init()");
+        let mut pre_inits = vec![];
+        for star in self.stars.values() {
+            pre_inits.push(star.pre_init());
+        }
+        let results: Vec<Result<(),MsgErr>> = join_all(pre_inits).await;
+        for result in results {
+            if result.is_err() {
+                logger.error("init error in star" );
+                result?;
+            }
+        }
+        // for now we don't really check or do anything with Drivers
+        Ok(())
+    }
+
+    async fn start(mut self) -> Result<(),P::Err> {
+
+        self.pre_init().await?;
+
          while let Some(call) = self.rx.recv().await {
              match call {
-                 MachineCall::StarConnectTo { star, tx } => {
-                     info!("connect to: {} ", star.to_string());
-                 }
                  MachineCall::Terminate => {
                      break
                  }
              }
          }
+        Ok(())
     }
 }
 
 pub enum MachineCall {
-    StarConnectTo {
-        star: StarKey,
-        tx: oneshot::Sender<Hyperway>,
-    },
     Terminate
 }
 

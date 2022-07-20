@@ -216,9 +216,29 @@ pub enum InterchangeKind {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct EntryReq {
-    pub interchange: InterchangeKind,
+    pub kind: InterchangeKind,
     pub auth: Box<Substance>,
     pub remote: Option<Point>,
+}
+
+impl EntryReq {
+    pub fn new(kind: InterchangeKind, remote: Point, auth: Substance ) -> Self {
+        Self {
+            kind,
+            remote: Some(remote),
+            auth: Box::new(auth)
+        }
+    }
+}
+
+impl Default for EntryReq {
+    fn default() -> Self {
+        Self {
+            kind: InterchangeKind::Cli,
+            auth: Box::new(Substance::Empty),
+            remote: None
+        }
+    }
 }
 
 impl Into<Wave<Ping>> for EntryReq {

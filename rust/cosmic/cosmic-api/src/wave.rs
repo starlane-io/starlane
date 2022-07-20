@@ -388,14 +388,14 @@ impl RootInCtx {
             root: self,
             input,
             logger: self.logger.clone(),
-            tx: Cow::Borrowed(&self.tx),
+            transmitter: Cow::Borrowed(&self.tx),
         })
     }
 }
 
 pub struct InCtx<'a, I> {
     root: &'a RootInCtx,
-    pub tx: Cow<'a, ProtoTransmitter>,
+    pub transmitter: Cow<'a, ProtoTransmitter>,
     pub input: &'a I,
     pub logger: SpanLogger,
 }
@@ -419,7 +419,7 @@ impl<'a, I> InCtx<'a, I> {
             root,
             input,
             logger,
-            tx,
+            transmitter: tx,
         }
     }
 
@@ -437,18 +437,18 @@ impl<'a, I> InCtx<'a, I> {
             root: self.root,
             input: self.input,
             logger: self.logger.span(),
-            tx: self.tx.clone(),
+            transmitter: self.transmitter.clone(),
         }
     }
 
     pub fn push_from(self, from: Port) -> InCtx<'a, I> {
-        let mut tx = self.tx.clone();
-        tx.to_mut().from = SetStrategy::Override(from);
+        let mut transmitter = self.transmitter.clone();
+        transmitter.to_mut().from = SetStrategy::Override(from);
         InCtx {
             root: self.root,
             input: self.input,
             logger: self.logger.clone(),
-            tx,
+            transmitter,
         }
     }
 
@@ -457,7 +457,7 @@ impl<'a, I> InCtx<'a, I> {
             root: self.root,
             input,
             logger: self.logger.clone(),
-            tx: self.tx.clone(),
+            transmitter: self.transmitter.clone(),
         }
     }
 
@@ -466,7 +466,7 @@ impl<'a, I> InCtx<'a, I> {
     }
 
     pub async fn ping(&self, req: DirectedProto) -> Result<Wave<Pong>, MsgErr> {
-        self.tx.direct(req).await
+        self.transmitter.direct(req).await
     }
 }
 
@@ -3358,6 +3358,8 @@ impl Exchanger {
 
         reflected.from(self.port.clone());
 
+        let reflection = directed.reflection();
+
         let timeout = self.timeouts.from(directed.handling().wait.clone());
         self.singles.insert(directed.id().clone(), tx);
         match directed.bounce_backs() {
@@ -3367,11 +3369,12 @@ impl Exchanger {
             BounceBacks::Single => {
                 let singles = self.singles.clone();
                 tokio::spawn(async move {
-                    tokio::time::sleep_until(Instant::now() + Duration::from_millis(timeout)).await;
+                    tokio::time::sleep_until(Instant::now() + Duration::from_secs(timeout)).await;
                     let id = reflected.reflection_of.as_ref().unwrap();
                     if let Some((_, tx)) = singles.remove(id) {
                         reflected.status = Some(StatusCode::from_u16(408).unwrap());
                         reflected.body = Some(Substance::Empty);
+                        reflected.intended = Some(reflection.to);
                         let reflected = reflected.build().unwrap();
                         tx.send(ReflectedAggregate::Single(reflected));
                     }
@@ -3398,6 +3401,7 @@ impl Exchanger {
                             if let Some((_, tx)) = singles.remove(&id) {
                                 reflected.status = Some(StatusCode::from_u16(408).unwrap());
                                 reflected.body = Some(Substance::Empty);
+                                reflected.intended = Some(reflection.to);
                                 let reflected = reflected.build().unwrap();
                                 tx.send(ReflectedAggregate::Multi(vec![reflected]));
                                 break;
@@ -3438,7 +3442,7 @@ impl Exchanger {
                 let multis = self.multis.clone();
                 let timeout = self.timeouts.from(wait);
                 tokio::spawn(async move {
-                    tokio::time::sleep_until(Instant::now() + Duration::from_millis(timeout)).await;
+                    tokio::time::sleep_until(Instant::now() + Duration::from_secs(timeout)).await;
                     // all we have to do is remove it, the multi loop will take care of the rest
                     multis.remove(&id);
                 });
@@ -3451,13 +3455,13 @@ impl Exchanger {
 
 #[derive(Clone)]
 pub struct ProtoTransmitter {
-    pub agent: SetStrategy<Agent>,
-    pub scope: SetStrategy<Scope>,
-    pub handling: SetStrategy<Handling>,
-    pub from: SetStrategy<Port>,
-    pub to: SetStrategy<Recipients>,
-    pub router: Arc<dyn Router>,
-    pub exchanger: Exchanger,
+    agent: SetStrategy<Agent>,
+    scope: SetStrategy<Scope>,
+    handling: SetStrategy<Handling>,
+    from: SetStrategy<Port>,
+    to: SetStrategy<Recipients>,
+    router: Arc<dyn Router>,
+    exchanger: Exchanger,
 }
 
 impl ProtoTransmitter {
@@ -3527,10 +3531,12 @@ impl ProtoTransmitter {
 
         match directed.bounce_backs() {
             BounceBacks::None => {
+                self.router.route(directed.to_ultra() ).await;
                 FromReflectedAggregate::from_reflected_aggregate(ReflectedAggregate::None)
             }
             _ => {
                 let reflected_rx = self.exchanger.exchange(&directed).await;
+                self.router.route(directed.to_ultra() ).await;
                 let reflected_agg = reflected_rx.await?;
                 FromReflectedAggregate::from_reflected_aggregate(reflected_agg)
             }
