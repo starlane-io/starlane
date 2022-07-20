@@ -161,6 +161,14 @@ where
             .map(|v| v.clone())
             .expect("expected Machine Star");
 
+
+        {
+            let tx= skel.tx.clone();
+            ctrlc::set_handler(move || {
+                tx.try_send(MachineCall::Terminate);
+            });
+        }
+
         let mut machine = Self {
             skel,
             machine_star,
@@ -170,13 +178,21 @@ where
             interchanges,
         };
 
-        machine.start();
+
+        machine.start().await;
 
         Ok(())
     }
 
-    fn start(mut self) {
-        tokio::spawn(async move { while let Some(call) = self.rx.recv().await {} });
+    async fn start(mut self) {
+         while let Some(call) = self.rx.recv().await {
+             match call {
+                 MachineCall::StarConnectTo { .. } => {}
+                 MachineCall::Terminate => {
+                     break
+                 }
+             }
+         }
     }
 }
 
@@ -185,6 +201,7 @@ pub enum MachineCall {
         star: StarKey,
         tx: oneshot::Sender<Hyperway>,
     },
+    Terminate
 }
 
 pub struct MachineTemplate {
@@ -210,6 +227,9 @@ impl MachineTemplate {
             star.connect(machine.key.clone());
             machine.receive(star.key.clone());
         }
+
+        stars.push(machine);
+
         stars
     }
 }

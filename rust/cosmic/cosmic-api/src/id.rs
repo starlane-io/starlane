@@ -559,7 +559,7 @@ pub mod id {
         Global,
         Domain(String),
         Tag(String),
-        Fabric(String),
+        Sys(String),
     }
 
     impl RouteSegQuery for RouteSeg {
@@ -586,7 +586,7 @@ pub mod id {
         Global,
         Domain(String),
         Tag(String),
-        Mesh(String),
+        Sys(String),
         Var(Variable),
     }
 
@@ -616,7 +616,7 @@ pub mod id {
                 RouteSegVar::Global => Ok(RouteSeg::Global),
                 RouteSegVar::Domain(domain) => Ok(RouteSeg::Domain(domain)),
                 RouteSegVar::Tag(tag) => Ok(RouteSeg::Tag(tag)),
-                RouteSegVar::Mesh(mesh) => Ok(RouteSeg::Fabric(mesh)),
+                RouteSegVar::Sys(mesh) => Ok(RouteSeg::Sys(mesh)),
                 RouteSegVar::Var(var) => Err(ParseErrs::from_range(
                     "variables not allowed in this context",
                     "variable not allowed here",
@@ -637,7 +637,7 @@ pub mod id {
                 RouteSeg::Global => RouteSegVar::Global,
                 RouteSeg::Domain(domain) => RouteSegVar::Domain(domain),
                 RouteSeg::Tag(tag) => RouteSegVar::Tag(tag),
-                RouteSeg::Fabric(mesh) => RouteSegVar::Mesh(mesh),
+                RouteSeg::Sys(mesh) => RouteSegVar::Sys(mesh),
             }
         }
     }
@@ -653,8 +653,8 @@ pub mod id {
                 Self::Tag(tag) => {
                     format!("[{}]", tag)
                 }
-                Self::Mesh(mesh) => {
-                    format!("[<{}>]", mesh)
+                Self::Sys(mesh) => {
+                    format!("<<{}>>", mesh)
                 }
                 Self::Var(var) => {
                     format!("${{{}}}", var.name)
@@ -680,8 +680,8 @@ pub mod id {
                 RouteSeg::Tag(tag) => {
                     format!("[{}]", tag)
                 }
-                RouteSeg::Fabric(mesh) => {
-                    format!("[<{}>]", mesh)
+                RouteSeg::Sys(sys) => {
+                    format!("<<{}>>", sys)
                 }
                 RouteSeg::Global => "GLOBAL".to_string(),
                 RouteSeg::Local => "LOCAL".to_string(),
@@ -1930,7 +1930,7 @@ pub mod id {
                 RouteSegVar::Tag(tag) => {
                     rtn.push_str(format!("[{}]::", tag).as_str());
                 }
-                RouteSegVar::Mesh(mesh) => {
+                RouteSegVar::Sys(mesh) => {
                     rtn.push_str(format!("<{}>::", mesh).as_str());
                 }
                 RouteSegVar::Global => {
@@ -2450,6 +2450,7 @@ pub mod id {
 
             if show_route {
                 rtn.push_str(self.route.to_string().as_str());
+                rtn.push_str("::");
             }
 
             let mut post_fileroot = false;
@@ -2932,7 +2933,7 @@ impl TryFrom<Point> for StarKey {
 
     fn try_from(point: Point) -> Result<Self, Self::Error> {
         match point.route {
-            RouteSeg::Fabric(star) => StarKey::from_str(star.as_str()),
+            RouteSeg::Sys(star) => StarKey::from_str(star.as_str()),
             _ => Err("can only extract StarKey from Mesh point routes".into()),
         }
     }

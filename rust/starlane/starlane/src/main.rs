@@ -40,7 +40,7 @@ lazy_static! {
     pub static ref STARLANE_DATA_DIR: String =
         std::env::var("STARLANE_DATA_DIR").unwrap_or("data".to_string());
     pub static ref STARLANE_CACHE_DIR: String =
-        std::env::var("STARLANE_CACHE_DIR").unwrap_or("data".to_string());
+        std::env::var("STARLANE_CACHE_DIR").unwrap_or("cache".to_string());
     pub static ref STARLANE_TOKEN: String =
         std::env::var("STARLANE_TOKEN").unwrap_or(Uuid::new_v4().to_string());
     pub static ref STARLANE_REGISTRY_URL: String =
@@ -81,18 +81,18 @@ impl PostgresPlatform for Starlane {
     fn lookup_registry_db(&self) -> Result<PostgresDbInfo,Self::Err> {
         Ok(PostgresDbInfo::new(
             STARLANE_REGISTRY_URL.to_string(),
-            STARLANE_REGISTRY_DATABASE.to_string(),
             STARLANE_REGISTRY_USER.to_string(),
             STARLANE_REGISTRY_PASSWORD.to_string(),
+            STARLANE_REGISTRY_DATABASE.to_string(),
         ))
     }
 
     fn lookup_star_db(&self, star: &StarKey ) -> Result<PostgresDbInfo,Self::Err> {
         Ok(PostgresDbInfo::new_with_schema(
             STARLANE_REGISTRY_URL.to_string(),
-            STARLANE_REGISTRY_DATABASE.to_string(),
             STARLANE_REGISTRY_USER.to_string(),
             STARLANE_REGISTRY_PASSWORD.to_string(),
+            STARLANE_REGISTRY_DATABASE.to_string(),
             star.to_sql_name()
         ))
     }
