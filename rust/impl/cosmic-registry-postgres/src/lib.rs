@@ -45,11 +45,11 @@ extern crate tracing;
 
 pub struct PostgresRegistry<P> where P: PostgresPlatform+Platform<Err=PostErr>+'static {
     ctx: PostgresRegistryContextHandle,
-    platform: PhantomData<P>
+    platform: P
 }
 
 impl <P> PostgresRegistry<P> where P: PostgresPlatform+Platform<Err=PostErr>+'static {
-    pub async fn new(ctx: PostgresRegistryContextHandle) -> Result<Self, PostErr> {
+    pub async fn new(ctx: PostgresRegistryContextHandle, platform: P ) -> Result<Self, PostErr> {
         /*
         let pool = PgPoolOptions::new()
             .max_connections(5)
@@ -58,14 +58,14 @@ impl <P> PostgresRegistry<P> where P: PostgresPlatform+Platform<Err=PostErr>+'st
             )
             .await?;
          */
-        let registry = Self { ctx, platform: Default::default() };
+        let registry = Self { ctx, platform };
 
         match registry.setup().await {
             Ok(_) => {
                 info!("registry setup complete.");
             }
             Err(err) => {
-                let message = err.into_database_error().unwrap().message().to_string();
+                let message = err.to_string();
                 error!("database setup failed {} ", message);
                 return Err(message.into());
             }
@@ -74,7 +74,7 @@ impl <P> PostgresRegistry<P> where P: PostgresPlatform+Platform<Err=PostErr>+'st
         Ok(registry)
     }
 
-    async fn setup(&self) -> Result<(), sqlx::Error> {
+    async fn setup(&self) -> Result<(), P::Err> {
         //        let database= format!("CREATE DATABASE IF NOT EXISTS {}", REGISTRY_DATABASE );
 
         let particles = r#"CREATE TABLE IF NOT EXISTS particles (
@@ -1449,7 +1449,7 @@ pub mod test {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug,Clone)]
 pub enum PostErr {
     Dupe,
     Error(String),
@@ -1794,12 +1794,12 @@ impl PostgresRegistryContext {
         })
     }
 
-    pub async fn acquire(&self, key: &PostgresDbKey ) -> Result<PoolConnection<Postgres>,PostErr> {
-        Ok(self.pools.get(key).ok_or("could not acquire db connection".into())?.acquire().await?)
+    pub async fn acquire<'a>(&'a self, key: &'a PostgresDbKey ) -> Result<PoolConnection<Postgres>,PostErr> {
+        Ok(self.pools.get(key).ok_or(PostErr::Error("could not acquire db connection".to_string()))?.acquire().await?)
     }
 
-    pub async fn begin(&self, key: &PostgresDbKey ) -> Result<Transaction<Postgres>,PostErr> {
-        Ok(self.pools.get(key).ok_or("could not begin db transaction".into())?.begin().await?)
+    pub async fn begin<'a>(&'a self, key: &'a PostgresDbKey ) -> Result<Transaction<Postgres>,PostErr> {
+        Ok(self.pools.get(key).ok_or(PostErr::Error("could not begin db transaction".to_string()))?.begin().await?)
     }
 }
 

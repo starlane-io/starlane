@@ -125,6 +125,7 @@ pub struct NoDiceArtifactFetcher {
 
 }
 
+#[async_trait]
 impl ArtifactFetcher for NoDiceArtifactFetcher {
     async fn stub(&self, point: &Point) -> Result<Stub, MsgErr> {
         Err(MsgErr::from_status(404u16))

@@ -15,7 +15,7 @@ use crate::driver::DriversBuilder;
 use crate::machine::{Machine, MachineTemplate};
 use cosmic_api::command::request::create::KindTemplate;
 use cosmic_api::id::id::{BaseKind, Kind, Point, Specific, ToBaseKind};
-use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, StarSub, UserBaseSubKind};
+use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, MachineName, StarKey, StarSub, UserBaseSubKind};
 use cosmic_api::substance::substance::{Substance, SubstanceList, Token};
 use cosmic_api::{ArtifactApi, IndexedAccessGrant, Registration,  };
 use cosmic_hyperlane::InterchangeEntryRouter;
@@ -24,6 +24,8 @@ use std::sync::Arc;
 use cosmic_api::error::MsgErr;
 use cosmic_api::wave::ReflectedCore;
 use http::StatusCode;
+use tokio::io;
+use tokio::runtime::Runtime;
 use cosmic_api::command::command::common::SetProperties;
 use cosmic_api::command::request::delete::Delete;
 use cosmic_api::command::request::query::{Query, QueryResult};
@@ -272,6 +274,7 @@ pub trait PlatErr: Sized + Send + Sync + ToString + Clone + Into<MsgErr> + From<
     }
 }
 
+#[async_trait]
 pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'static
 {
     type Err;
@@ -281,14 +284,16 @@ pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'st
         Machine::new(self)
     }
 
-    fn create_registry_context(&self, stars: HashSet<StarKey>) -> Result<Self::RegistryContext,Self::Err>;
+    async fn create_registry_context(&self, stars: HashSet<StarKey>) -> Result<Self::RegistryContext,Self::Err>;
 
+    fn runtime(&self) -> io::Result<Runtime>;
     fn machine_template(&self) -> MachineTemplate;
+    fn machine_name(&self) -> MachineName;
     fn properties_config<K: ToBaseKind>(&self, base:&K) -> &'static PropertiesConfig;
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder;
     fn token(&self) -> Token;
-    fn global_registry(&self, ctx: Arc<Self::RegistryContext>) -> Registry<Self>;
-    fn star_registry(&self, star: &StarKey, ctx: Arc<Self::RegistryContext>) -> Registry<Self>;
+    async fn global_registry(&self, ctx: Arc<Self::RegistryContext>) -> Result<Registry<Self>,Self::Err>;
+    async fn star_registry(&self, star: &StarKey, ctx: Arc<Self::RegistryContext>) -> Result<Registry<Self>,Self::Err>;
     fn artifact_hub(&self) -> ArtifactApi;
     fn start_services(&self, entry_router: &mut InterchangeEntryRouter);
     fn default_implementation(&self, template: &KindTemplate) -> Result<Kind, MsgErr> {

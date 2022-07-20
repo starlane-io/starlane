@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use cosmic_api::command::request::create::KindTemplate;
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{BaseKind, Kind, Specific, ToBaseKind};
-use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, StarSub, UserBaseSubKind};
+use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, MachineName, StarKey, StarSub, UserBaseSubKind};
 use cosmic_api::property::{
     AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit,
     PropertySource, U64Pattern, UsernamePattern,
@@ -21,10 +21,16 @@ use cosmic_platform::{Registry, RegistryApi};
 use cosmic_registry_postgres::{PostgresDbInfo, PostErr, PostgresPlatform, PostgresRegistry, PostgresRegistryContextHandle, PostgresRegistryContext};
 use std::str::FromStr;
 use std::sync::Arc;
+use tokio::io;
+use tokio::runtime::Runtime;
 use uuid::Uuid;
 
 #[macro_use]
 extern crate lazy_static;
+
+#[macro_use]
+extern crate async_trait;
+
 
 lazy_static! {
     pub static ref STARLANE_PORT: usize = std::env::var("STARLANE_PORT")
@@ -56,7 +62,7 @@ pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
     Utc::now()
 }
 
-fn main() -> Result<(), MsgErr> {
+fn main() -> Result<(), PostErr> {
     Machine::new(Starlane::new())?;
     Ok(())
 }
@@ -92,21 +98,32 @@ impl PostgresPlatform for Starlane {
     }
 }
 
+#[async_trait]
 impl Platform for Starlane {
     type Err = PostErr;
     type RegistryContext = PostgresRegistryContext;
 
-    fn create_registry_context(&self, stars: HashSet<StarKey>) -> Result<Self::RegistryContext, Self::Err> {
+    async fn create_registry_context(&self, stars: HashSet<StarKey>) -> Result<Self::RegistryContext, Self::Err> {
         let mut dbs = HashSet::new();
         dbs.insert(self.lookup_registry_db()? );
         for star in stars {
             dbs.insert( self.lookup_star_db(&star)?);
         }
-        PostgresRegistryContext::new(dbs)
+        PostgresRegistryContext::new(dbs).await
+    }
+
+    fn runtime(&self) -> io::Result<Runtime> {
+        let mut builder = tokio::runtime::Builder::new_multi_thread();
+        builder.enable_all();
+        builder.build()
     }
 
     fn machine_template(&self) -> MachineTemplate {
         MachineTemplate::default()
+    }
+
+    fn machine_name(&self) -> MachineName {
+        "standalone".to_string()
     }
 
     fn properties_config<K: ToBaseKind>(&self, base: &K) -> &'static PropertiesConfig {
@@ -129,6 +146,7 @@ impl Platform for Starlane {
             StarSub::Scribe => {}
             StarSub::Jump => {}
             StarSub::Fold => {}
+            StarSub::Machine => {}
         }
         DriversBuilder::new()
     }
@@ -137,14 +155,14 @@ impl Platform for Starlane {
         Token::new(STARLANE_TOKEN.to_string())
     }
 
-    fn global_registry(&self, ctx: Arc<Self::RegistryContext>) -> Registry<Self> {
-        let pool = PostgresRegistryContextHandle::new(&self.lookup_registry_db(), ctx);
-        PostgresRegistry::new(pool)
+    async fn global_registry(&self, ctx: Arc<Self::RegistryContext>) -> Result<Registry<Self>,Self::Err> {
+        let ctx = PostgresRegistryContextHandle::new(&self.lookup_registry_db()?, ctx);
+        Ok(Arc::new(PostgresRegistry::new(ctx,self.clone()).await?))
     }
 
-    fn star_registry(&self, star: &StarKey, ctx: Arc<Self::RegistryContext>) -> Registry<Self> {
-        let pool = PostgresRegistryContextHandle::new(&self.lookup_star_db(star), ctx);
-        PostgresRegistry::new(pool)
+    async fn star_registry(&self, star: &StarKey, ctx: Arc<Self::RegistryContext>) -> Result<Registry<Self>,Self::Err> {
+        let ctx = PostgresRegistryContextHandle::new(&self.lookup_star_db(star)?, ctx);
+        Ok(Arc::new(PostgresRegistry::new(ctx,self.clone()).await?))
     }
 
 

@@ -2698,8 +2698,9 @@ pub enum StarSub {
     Nexus, // Relays Waves from Star to Star
     Maelstrom, // Where executables are run
     Scribe, // requires durable filesystem (Artifact Bundles, Files...)
-    Jump,  // for entry into the Mesh/Fabric for an external connection (client ingress)
+    Jump,  // for entry into the Mesh/Fabric for an external connection (client ingress... http for example)
     Fold, // exit from the Mesh.. maintains connections etc to Databases, Keycloak, etc.... Like A Space Fold out of the Fabric..
+    Machine, // every Machine has one and only one Machine star... it handles messaging for the Machine
 }
 
 impl Into<Sub> for StarSub {
