@@ -200,7 +200,22 @@ impl HyperwayInterchange {
                             hyperway_outs.remove(&hyperway);
                         }
                         Some(HyperwayCall::Wave(wave)) => {
-                            router.route(wave).await;
+println!("Routing Wave...");
+                            match wave.to().single_or() {
+                                Ok(to) => {
+                                    match hyperway_outs.get(&to.clone().to_point()) {
+                                        None => {
+println!("could not find Hyperway {}", to.to_string());
+                                        }
+                                        Some(hyperway_out) => {
+                                            hyperway_out.value().outbound(wave.wave).await;
+                                        }
+                                    }
+                                }
+                                Err(_) => {}
+                            }
+
+//                            router.route(wave).await;
                         }
                         Some(HyperwayCall::Out(wave)) => {
                             let point = match wave.to().single_or() {
