@@ -17,6 +17,7 @@ use dashmap::DashMap;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
+use tracing::info;
 
 #[derive(Clone)]
 pub struct MachineSkel<P>
@@ -178,7 +179,6 @@ where
             interchanges,
         };
 
-
         machine.start().await;
 
         Ok(())
@@ -187,7 +187,9 @@ where
     async fn start(mut self) {
          while let Some(call) = self.rx.recv().await {
              match call {
-                 MachineCall::StarConnectTo { .. } => {}
+                 MachineCall::StarConnectTo { star, tx } => {
+                     info!("connect to: {} ", star.to_string());
+                 }
                  MachineCall::Terminate => {
                      break
                  }
