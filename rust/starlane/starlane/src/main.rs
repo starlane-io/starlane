@@ -63,7 +63,10 @@ pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
 }
 
 fn main() -> Result<(), PostErr> {
-    Machine::new(Starlane::new())?;
+    let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
+    runtime.block_on( async move {
+    Starlane::new().create();
+        });
     Ok(())
 }
 
@@ -112,11 +115,6 @@ impl Platform for Starlane {
         PostgresRegistryContext::new(dbs).await
     }
 
-    fn runtime(&self) -> io::Result<Runtime> {
-        let mut builder = tokio::runtime::Builder::new_multi_thread();
-        builder.enable_all();
-        builder.build()
-    }
 
     fn machine_template(&self) -> MachineTemplate {
         MachineTemplate::default()

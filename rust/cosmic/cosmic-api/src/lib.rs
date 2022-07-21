@@ -125,6 +125,12 @@ pub struct NoDiceArtifactFetcher {
 
 }
 
+impl NoDiceArtifactFetcher {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 #[async_trait]
 impl ArtifactFetcher for NoDiceArtifactFetcher {
     async fn stub(&self, point: &Point) -> Result<Stub, MsgErr> {

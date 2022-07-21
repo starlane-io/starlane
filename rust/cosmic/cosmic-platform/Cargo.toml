@@ -22,3 +22,6 @@ http = "0.2.6"
 futures = "0.3.21"
 ctrlc = "3.2.2"
 tracing = "0.1.35"
+
+chrono = { version="0.4.19", features=["serde"] }
+uuid = { version="1.1.2", features=["v4"] }

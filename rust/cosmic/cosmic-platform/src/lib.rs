@@ -12,7 +12,7 @@ extern crate async_trait;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use crate::driver::DriversBuilder;
-use crate::machine::{Machine, MachineTemplate};
+use crate::machine::{Machine, MachineApi, MachineTemplate};
 use cosmic_api::command::request::create::KindTemplate;
 use cosmic_api::id::id::{BaseKind, Kind, Point, Specific, ToBaseKind};
 use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, MachineName, StarKey, StarSub, UserBaseSubKind};
@@ -21,11 +21,13 @@ use cosmic_api::{ArtifactApi, IndexedAccessGrant, Registration,  };
 use cosmic_hyperlane::InterchangeEntryRouter;
 use std::str::FromStr;
 use std::sync::Arc;
+use chrono::{DateTime, Utc};
 use cosmic_api::error::MsgErr;
 use cosmic_api::wave::ReflectedCore;
 use http::StatusCode;
 use tokio::io;
-use tokio::runtime::Runtime;
+use tokio::runtime::{Handle, Runtime};
+use uuid::Uuid;
 use cosmic_api::command::command::common::SetProperties;
 use cosmic_api::command::request::delete::Delete;
 use cosmic_api::command::request::query::{Query, QueryResult};
@@ -44,10 +46,17 @@ pub mod shell;
 pub mod star;
 pub mod state;
 pub mod traversal;
-#[cfg(test)]
 pub mod tests;
 
+#[no_mangle]
+pub extern "C" fn cosmic_uuid() -> String {
+    Uuid::new_v4().to_string()
+}
 
+#[no_mangle]
+pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
+    Utc::now()
+}
 
 pub type Registry<P> =Arc<dyn RegistryApi<P>>;
 
@@ -270,18 +279,17 @@ pub trait PlatErr: Sized + Send + Sync + ToString + Clone + Into<MsgErr> + From<
 }
 
 #[async_trait]
-pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'static
+pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'static, Self::RegistryContext : Send+Sync
 {
     type Err;
     type RegistryContext;
 
-    fn create(self) -> Result<(),Self::Err>{
+    fn create(self) -> MachineApi {
         Machine::new(self)
     }
 
     async fn create_registry_context(&self, stars: HashSet<StarKey>) -> Result<Self::RegistryContext,Self::Err>;
 
-    fn runtime(&self) -> io::Result<Runtime>;
     fn machine_template(&self) -> MachineTemplate;
     fn machine_name(&self) -> MachineName;
     fn properties_config<K: ToBaseKind>(&self, base:&K) -> &'static PropertiesConfig;

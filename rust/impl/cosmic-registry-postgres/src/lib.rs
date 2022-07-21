@@ -2,6 +2,7 @@
 
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
+use std::io::Error;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
@@ -1453,6 +1454,12 @@ pub mod test {
 pub enum PostErr {
     Dupe,
     Error(String),
+}
+
+impl From<std::io::Error> for PostErr {
+    fn from(e: Error) -> Self {
+        PostErr::Error(e.to_string())
+    }
 }
 
 impl From<strum::ParseError> for PostErr {

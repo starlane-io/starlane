@@ -16,9 +16,34 @@ use cosmic_hyperlane::{
 use dashmap::DashMap;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{broadcast, mpsc, oneshot};
 use tracing::info;
 use futures::future::join_all;
+
+#[derive(Clone)]
+pub struct MachineApi {
+    tx: mpsc::Sender<MachineCall>
+}
+
+impl MachineApi {
+    pub fn new( tx: mpsc::Sender<MachineCall>) -> Self {
+        Self {
+            tx
+        }
+    }
+
+    pub fn terminate(&self) {
+        self.tx.try_send(MachineCall::Terminate);
+    }
+
+    pub async fn wait( &self ) -> Result<(),()> {
+        let (tx,mut rx) = oneshot::channel();
+        self.tx.send(MachineCall::Wait(tx)).await;
+        let mut rx = rx.await.map_err(|_|())?;
+        rx.recv().await.map_err(|_|())?;
+        Ok(())
+    }
+}
 
 #[derive(Clone)]
 pub struct MachineSkel<P>
@@ -31,7 +56,7 @@ where
     pub artifacts: ArtifactApi,
     pub logger: RootLogger,
     pub timeouts: Timeouts,
-    pub tx: mpsc::Sender<MachineCall>,
+    pub api: MachineApi
 }
 
 pub struct Machine<P>
@@ -44,6 +69,7 @@ where
     pub entry_router: InterchangeEntryRouter,
     pub interchanges: HashMap<StarKey, Arc<HyperwayInterchange>>,
     pub rx: mpsc::Receiver<MachineCall>,
+    pub termination_broadcast_tx: broadcast::Sender<()>,
     pub logger: PointLogger
 }
 
@@ -51,22 +77,23 @@ impl<P> Machine<P>
 where
     P: Platform + 'static,
 {
-    pub fn new(platform: P) -> Result<(), P::Err> {
-        match platform.runtime() {
-            Ok(runtime) => {
-                runtime.block_on(async move { Self::init(platform).await })
-            }
-            Err(err) => Err(P::Err::new(err.to_string())),
-        }
+    pub fn new(platform: P) -> MachineApi {
+        let (tx,rx) = mpsc::channel(1024);
+        let machine_api = MachineApi::new(tx.clone());
+        tokio::spawn( async move {
+           Machine::init(platform, tx, rx ).await
+        });
+
+        machine_api
     }
 
-    async fn init(platform: P) -> Result<(),P::Err>{
+    async fn init(platform: P, tx: mpsc::Sender<MachineCall>, rx: mpsc::Receiver<MachineCall>) -> Result<MachineApi, P::Err> {
         let template = platform.machine_template();
         let machine_name = platform.machine_name();
 
         let ctx = Arc::new(platform.create_registry_context(template.star_set()).await?);
 
-        let (tx, rx) = mpsc::channel(32 * 1024);
+        let machine_api = MachineApi::new(tx);
         let skel = MachineSkel {
             name: machine_name.clone(),
             registry: platform.global_registry(ctx.clone()).await?,
@@ -74,7 +101,7 @@ where
             logger: RootLogger::default(),
             timeouts: Timeouts::default(),
             platform,
-            tx,
+            api: machine_api.clone(),
         };
 
         let mut stars = HashMap::new();
@@ -163,13 +190,15 @@ println!("ROUTING TO FABRIC!");
             .expect("expected Machine Star");
 
         {
-            let tx= skel.tx.clone();
+            let machine_api = skel.api.clone();
             ctrlc::set_handler(move || {
-                tx.try_send(MachineCall::Terminate);
+                machine_api.terminate();
             });
         }
 
         let logger = skel.logger.point(machine_point);
+
+        let( term_tx, _) = broadcast::channel(1);
 
         let mut machine = Self {
             skel,
@@ -179,11 +208,11 @@ println!("ROUTING TO FABRIC!");
             entry_router,
             rx,
             interchanges,
+            termination_broadcast_tx: term_tx
         };
 
-        machine.start().await;
-
-        Ok(())
+            machine.start().await;
+        Ok(machine_api)
     }
 
     async fn pre_init(&self) -> Result<(),MsgErr> {
@@ -206,21 +235,26 @@ println!("ROUTING TO FABRIC!");
 
     async fn start(mut self) -> Result<(),P::Err> {
 
-        self.pre_init().await?;
+//        self.pre_init().await?;
 
          while let Some(call) = self.rx.recv().await {
              match call {
                  MachineCall::Terminate => {
                      break
                  }
+                 MachineCall::Wait(tx) => {
+                     tx.send(self.termination_broadcast_tx.subscribe());
+                 }
              }
          }
+        self.termination_broadcast_tx.send(());
         Ok(())
     }
 }
 
 pub enum MachineCall {
-    Terminate
+    Terminate,
+    Wait(oneshot::Sender<broadcast::Receiver<()>>)
 }
 
 pub struct MachineTemplate {

@@ -1,11 +1,26 @@
+#![cfg(test)]
+
+use std::io::Error;
 use std::sync::atomic::AtomicU64;
+use std::time::Duration;
+use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use tokio::sync::Mutex;
+use cosmic_api::id::id::Uuid;
+use cosmic_api::NoDiceArtifactFetcher;
 use super::*;
+
+
 
 #[derive(Clone)]
 pub struct TestPlatform {
 
+}
+
+impl TestPlatform {
+    pub fn new() -> Self {
+        Self {}
+    }
 }
 
 #[async_trait]
@@ -15,10 +30,6 @@ impl Platform for TestPlatform {
 
     async fn create_registry_context(&self, stars: HashSet<StarKey>) -> Result<Self::RegistryContext, Self::Err> {
         Ok(TestRegistryContext::new())
-    }
-
-    fn runtime(&self) -> std::io::Result<Runtime> {
-        tokio::runtime::Builder::new_multi_thread().build()
     }
 
     fn machine_template(&self) -> MachineTemplate {
@@ -50,7 +61,7 @@ impl Platform for TestPlatform {
     }
 
     fn artifact_hub(&self) -> ArtifactApi {
-        todo!()
+        ArtifactApi::new( Arc::new(NoDiceArtifactFetcher::new()) )
     }
 
     fn start_services(&self, entry_router: &mut InterchangeEntryRouter) {
@@ -153,7 +164,7 @@ impl RegistryApi<TestPlatform> for TestRegistryApi where{
 }
 
 
-#[derive(Clone)]
+#[derive(Debug,Clone)]
 pub struct TestErr {
     pub message: String
 }
@@ -187,6 +198,14 @@ impl From<MsgErr> for TestErr {
     }
 }
 
+impl From<io::Error> for TestErr {
+    fn from(err: Error) -> Self {
+        Self {
+            message: err.to_string()
+        }
+    }
+}
+
 impl PlatErr for TestErr {
     fn to_cosmic_err(&self) -> MsgErr {
         MsgErr::from_500(self.to_string())
@@ -211,4 +230,24 @@ impl PlatErr for TestErr {
 
 
 #[test]
-fn it_works() {}
+fn it_works() -> Result<(),TestErr>{
+
+    let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
+    runtime.block_on( async move {
+        let platform = TestPlatform::new();
+        let machine_api = platform.create();
+
+        {
+            let machine_api = machine_api.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                machine_api.terminate();
+            });
+        }
+
+        machine_api.wait().await;
+    });
+
+    Ok(())
+
+}
