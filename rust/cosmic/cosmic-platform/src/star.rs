@@ -13,7 +13,7 @@ use cosmic_api::id::id::{
     Kind, Layer, Point, Port, PortSelector, RouteSeg, Sub, ToPoint, ToPort, Topic, TraversalLayer,
     Uuid,
 };
-use cosmic_api::id::{StarKey, StarSub, TraversalInjection};
+use cosmic_api::id::{StarKey, StarStub, StarSub, TraversalInjection};
 use cosmic_api::id::{Traversal, TraversalDirection};
 use cosmic_api::log::{PointLogger, RootLogger};
 use cosmic_api::parse::{route_attribute, Env};
@@ -22,7 +22,7 @@ use cosmic_api::quota::Timeouts;
 use cosmic_api::substance::substance::{Substance, ToSubstance};
 use cosmic_api::sys::{Assign, AssignmentKind, Discoveries, Discovery, Location, Search, Sys};
 use cosmic_api::util::{ValueMatcher, ValuePattern};
-use cosmic_api::wave::{Agent, Bounce, BounceBacks, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, Echo, Echoes, Handling, HandlingKind, InCtx, Method, Ping, Pong, Priority, ProtoTransmitter, RecipientSelector, Recipients, Reflectable, ReflectedCore, ReflectedWave, Retries, Ripple, RootInCtx, Router, Scope, SetStrategy, Signal, ToRecipients, TxRouter, WaitTime, Wave, SingularRipple, ProtoTransmitterBuilder};
+use cosmic_api::wave::{Agent, Bounce, BounceBacks, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, Echo, Echoes, Handling, HandlingKind, InCtx, Method, Ping, Pong, Priority, ProtoTransmitter, RecipientSelector, Recipients, Reflectable, ReflectedCore, ReflectedWave, Retries, Ripple, RootInCtx, Router, Scope, SetStrategy, Signal, ToRecipients, TxRouter, WaitTime, Wave, SingularRipple, ProtoTransmitterBuilder, DirectedWave};
 use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
 use cosmic_api::{
     MountKind, Registration, State, StateFactory,
@@ -179,7 +179,7 @@ where
     pub exchanger: Exchanger,
     pub state: StarState<P>,
     pub connections: Vec<StarCon>,
-    pub adjacents: HashSet<Point>,
+    pub adjacents: HashMap<Point,StarStub>,
     pub wrangles: StarWrangles,
     pub gravity_well_tx: mpsc::Sender<UltraWave>,
     pub gravity_well_router: TxRouter,
@@ -197,10 +197,10 @@ where
         let exchanger = Exchanger::new(point.clone().to_port(), machine.timeouts.clone());
         let state = StarState::new();
 
-        let mut adjacents = HashSet::new();
+        let mut adjacents = HashMap::new();
         // prime the searcher by mapping the immediate lanes
         for hyperway in template.hyperway.clone() {
-            adjacents.insert(hyperway.key().clone().to_point());
+            adjacents.insert(hyperway.key().clone().to_point(), hyperway.stub().clone() );
         }
 
         let gravity_well_router = TxRouter::new(star_tx.gravity_well_tx.clone());
@@ -211,7 +211,7 @@ where
             kind: HandlingKind::Immediate,
             priority: Priority::High,
             retries: Retries::None,
-            wait: WaitTime::High,
+            wait: WaitTime::Low,
         });
         gravity_well_transmitter.agent = SetStrategy::Fill(Agent::HyperUser);
         gravity_well_transmitter.scope = SetStrategy::Fill(Scope::Full);
@@ -237,6 +237,11 @@ where
             adjacents,
             wrangles: StarWrangles::new(),
         }
+    }
+
+    pub fn err<M:ToString>(&self, message: M) -> Result<(),P::Err> {
+        self.logger.warn(message.to_string());
+        return Err(P::Err::new(message.to_string()));
     }
 
     pub fn location(&self) -> &Point {
@@ -352,6 +357,8 @@ impl StarApi {
     }
 }
 
+
+
 pub struct Star<P>
 where
     P: Platform + 'static,
@@ -361,9 +368,9 @@ where
     drivers: Drivers<P>,
     injector: Port,
     mounts: HashMap<Point, StarMount>,
-
+    forwarders: Vec<Point>,
     golden_path: DashMap<StarKey, StarKey>,
-    fabric_tx: mpsc::Sender<UltraWave>,
+    hyperway_transmitter: ProtoTransmitter
 }
 
 impl<P> Star<P>
@@ -373,10 +380,23 @@ where
     pub fn new(
         skel: StarSkel<P>,
         mut drivers: Drivers<P>,
-        fabric_tx: mpsc::Sender<UltraWave>,
+        hyperway_tx: mpsc::Sender<UltraWave>,
     ) -> Result<StarApi, MsgErr> {
         let star_driver_factory = Box::new(StarDriverFactory::new(skel.clone()));
         drivers.add(star_driver_factory)?;
+
+        let mut forwarders = vec![];
+        for (point,stub) in skel.adjacents.iter() {
+            if stub.kind.is_forwarder() {
+                forwarders.push(point.clone());
+            }
+        }
+
+        let hyperway_router = Arc::new(TxRouter::new(hyperway_tx));
+        let mut hyperway_transmitter = ProtoTransmitterBuilder::new( hyperway_router, skel.exchanger.clone() );
+        hyperway_transmitter.agent = SetStrategy::Override(Agent::HyperUser);
+        hyperway_transmitter.scope = SetStrategy::Override(Scope::Full);
+        let hyperway_transmitter = hyperway_transmitter.build();
 
         let (star_tx, star_rx) = mpsc::channel(32 * 1024);
         let mut injector = skel.location().clone().push("injector").unwrap().to_port();
@@ -396,12 +416,14 @@ where
                 injector,
                 mounts: HashMap::new(),
                 golden_path,
-                fabric_tx,
+                hyperway_transmitter,
+                forwarders
             };
             star.start();
         }
         Ok(StarApi::new(kind, star_tx))
     }
+
 
     fn start(mut self) {
         tokio::spawn(async move {
@@ -411,7 +433,7 @@ where
                         tx.send(self.pre_init().await);
                     }
                     StarCall::HyperWave(wave) => {
-                        self.gravity_well(wave).await;
+                        self.from_hyperway(wave.wave).await;
                     }
                     StarCall::TraverseToNextLayer(traversal) => {
                         self.traverse_to_next_layer(traversal).await;
@@ -432,9 +454,47 @@ where
         self.drivers.init().await
     }
 
-    // HyperWave will either be flung out to it's next hop in the fabric, or
-    // if the to location is this star gravity will suck it down to the core layer
-    async fn gravity_well(&self, wave: HyperWave) -> Result<(), P::Err> {
+    // receive a wave from the hyperlane... this wave should always be
+    // a Wave<Signal> of the SysMethod<Hop> which should in turn contain a SysMethod<Transport> Signal
+    async fn from_hyperway(&self, wave: UltraWave) -> Result<(), P::Err> {
+        if let Ok(signal) = wave.to_signal() {
+            if signal.core.method != Method::Sys(SysMethod::Hop) {
+                self.skel.err("expected signal wave of method Hop")
+            } else if let Substance::UltraWave(transport) = &signal.core.body {
+                let transport = *transport.clone();
+                if transport.is_directed() {
+                    match transport.to_directed().unwrap() {
+                        DirectedWave::Signal(mut transport) => {
+                            transport.inc_hops();
+                            if transport.hops > 255 {
+                                self.skel.err("transport signal exceeded max hops")
+                            } else if signal.core.method != Method::Sys(SysMethod::Transport) {
+                                self.skel.err("expected transport signal wave of method SysMethod<Transport>")
+                            } else if transport.to.point == self.skel.point {
+                                // this signal is to be sent through the layer traversal to be handled by the Star Core
+                                let wave = transport.to_ultra();
+                                self.start_layer_traversal(wave, &self.injector).await
+                            } else {
+                                Ok(self.forward(transport).await?)
+                            }
+                        }
+                        _ => {
+                            self.skel.err("expected transport to be a directed signal wave")
+                        }
+                    }
+                } else {
+                    self.skel.err("expected transport to be a directed wave")
+                }
+            } else {
+                self.skel.err("expected signal hop to have an UltraWave for body")
+            }
+        } else {
+            self.skel.err("expected wave to be a signal")
+        }
+    }
+
+    /*
+
         let mut wave = wave.wave;
 
         wave.inc_hops();
@@ -485,7 +545,7 @@ where
             if !wave.has_visited(&hop.point) {
                 let mut proto = DirectedProto::new();
                 proto.kind(DirectedKind::Signal);
-                proto.method(SysMethod::Transport);
+                proto.method(SysMethod::Hop);
                 proto.fill(&wave);
                 proto.agent(Agent::HyperUser);
                 proto.scope(Scope::Full);
@@ -500,7 +560,56 @@ where
         Ok(())
     }
 
-    async fn start_layer_traversal(&self, wave: UltraWave, injector: &Port) -> Result<(), MsgErr> {
+     */
+
+    // send this transport signal towards it's destination
+    async fn forward(&self, transport: Wave<Signal>) -> Result<(), P::Err> {
+        if self.skel.kind.is_forwarder() {
+            self.to_hyperway(transport).await
+        } else {
+            self.skel.err(format!("attempt to forward a transport on a non forwarding Star Kind: {}", self.skel.kind.to_string()))
+        }
+    }
+
+    async fn to_fabric(&self, wave: UltraWave) -> Result<(), P::Err> {
+        let waves = shard_ultrawave_by_location(wave, &self.skel.adjacents, &self.skel.registry).await?;
+        for (to,wave) in waves {
+            let mut transport = wave.wrap_in_transport(to.to_port());
+            transport.from(self.skel.point.clone().to_port());
+            let transport = transport.build()?;
+            let transport = transport.to_signal()?;
+            self.to_hyperway(transport).await?;
+        }
+        Ok(())
+    }
+
+    // send this transport signal into the hyperway
+    async fn to_hyperway(&self, transport: Wave<Signal>) -> Result<(), P::Err> {
+        if self.skel.point == transport.to.point {
+            // it's a bit of a strange case, but even if this star is sending a transport message
+            // to itself, it still makes use of the Hyperway Interchange, which will bounce it back
+            // The reason for this is that it is the Hyperway that handles things like Priority, Urgency
+            // and hopefully in the future durability, whereas within the star itself all waves are
+            // treated equally.
+            self.hyperway_transmitter.direct(transport.wrap_in_hop(self.skel.point.clone().to_port()) ).await?;
+            Ok(())
+        }
+        else if self.skel.adjacents.contains_key(&transport.to.point) {
+            let to = transport.to.clone();
+            self.hyperway_transmitter.direct(transport.wrap_in_hop( to) ).await?;
+            Ok(())
+        } else if self.forwarders.len() == 1 {
+            let to = self.forwarders.first().unwrap().clone().to_port();
+            self.hyperway_transmitter.direct(transport.wrap_in_hop(to) ).await?;
+            Ok(())
+        } else if self.forwarders.is_empty() {
+            self.skel.err("this star needs to send a transport to a non-adjacent star yet does not have any adjacent forwarders")
+        } else {
+            unimplemented!("need to now send out a ripple search for the star being transported to")
+        }
+    }
+
+    async fn start_layer_traversal(&self, wave: UltraWave, injector: &Port) -> Result<(), P::Err> {
         let record = match self
             .skel
             .registry
@@ -510,7 +619,7 @@ where
             Ok(record) => record,
             Err(err) => {
                 self.skel.logger.error(err.to_string());
-                return Err(err.to_cosmic_err());
+                return Err(err);
             }
         };
 
@@ -528,8 +637,7 @@ where
 
                 // make sure we have this layer in the plan
                 if !plan.has_layer(&wave.to().clone().unwrap_single().layer) {
-                    self.skel.logger.warn("attempt to send wave to layer that the recipient Kind does not have in its traversal plan");
-                    return Err(MsgErr::forbidden());
+                    return self.skel.err("attempt to send wave to layer that the recipient Kind does not have in its traversal plan");
                 }
 
                 // dir is from inject_layer to dest
@@ -754,15 +862,15 @@ where
             ripple.kind(DirectedKind::Ripple);
             ripple.method(SysMethod::Search);
             ripple.body(Substance::Sys(Sys::Search(Search::Star(star_key.clone()))));
-            ripple.bounce_backs = Option::Some(BounceBacks::Count(self.skel.adjacents.len()));
+            ripple.bounce_backs = Some(BounceBacks::Count(self.skel.adjacents.len()));
             ripple.to(Recipients::Stars);
             let echoes: Echoes = self.skel.gravity_well_transmitter.direct(ripple).await?;
 
-            let mut colated = vec![];
+            let mut coalated = vec![];
             for echo in echoes {
                 if let Substance::Sys(Sys::Discoveries(discoveries)) = &echo.core.body {
                     for discovery in discoveries.iter() {
-                        colated.push(StarDiscovery::new(
+                        coalated.push(StarDiscovery::new(
                             StarPair::new(
                                 self.skel.key.clone(),
                                 StarKey::try_from(echo.from.point.clone())?,
@@ -777,9 +885,9 @@ where
                 }
             }
 
-            colated.sort();
+            coalated.sort();
 
-            match colated.first() {
+            match coalated.first() {
                 None => Ok(None),
                 Some(discovery) => {
                     let key = discovery.pair.not(&self.skel.key).clone();
@@ -950,6 +1058,8 @@ pub struct StarTemplate {
     pub hyperway: Vec<StarCon>,
 }
 
+
+
 impl StarTemplate {
     pub fn new(key: StarKey, kind: StarSub) -> Self {
         Self {
@@ -959,26 +1069,44 @@ impl StarTemplate {
         }
     }
 
-    pub fn receive(&mut self, key: StarKey) {
-        self.hyperway.push(StarCon::Receive(key));
+    pub fn to_stub(&self) -> StarStub {
+        StarStub::new( self.key.clone(), self.kind.clone() )
     }
 
-    pub fn connect(&mut self, key: StarKey) {
-        self.hyperway.push(StarCon::Connect(key));
+    pub fn receive(&mut self, stub: StarStub) {
+        self.hyperway.push(StarCon::Receive(stub));
+    }
+
+    pub fn connect(&mut self, stub: StarStub) {
+        self.hyperway.push(StarCon::Connect(stub));
     }
 }
 
 #[derive(Clone)]
 pub enum StarCon {
-    Receive(StarKey),
-    Connect(StarKey),
+    Receive(StarStub),
+    Connect(StarStub),
 }
 
 impl StarCon {
+    pub fn stub(&self) -> &StarStub {
+        match self {
+            StarCon::Receive(stub) => stub,
+            StarCon::Connect(stub) => stub
+        }
+    }
+
     pub fn key(&self) -> &StarKey {
         match self {
-            StarCon::Receive(key) => key,
-            StarCon::Connect(key) => key,
+            StarCon::Receive(stub) => &stub.key,
+            StarCon::Connect(stub) => &stub.key,
+        }
+    }
+
+    pub fn kind(&self) -> &StarSub {
+        match self {
+            StarCon::Receive(stub) => &stub.kind,
+            StarCon::Connect(stub) => &stub.kind,
         }
     }
 }
@@ -1116,6 +1244,7 @@ where
     }
 
     async fn search_for_stars(&self, search: Search) -> Result<Vec<Discovery>, MsgErr> {
+println!("Search for stars!");
         let mut ripple = DirectedProto::new();
         ripple.kind(DirectedKind::Ripple);
         ripple.method(SysMethod::Search);
@@ -1130,6 +1259,8 @@ where
 
         let mut rtn = vec![];
         for echo in echoes {
+
+println!("echo {}", echo.core.status.to_string());
             if let Substance::Sys(Sys::Discoveries(discoveries)) = echo.variant.core.body {
                 for discovery in discoveries.vec.into_iter() {
                     rtn.push(discovery);
@@ -1391,7 +1522,7 @@ impl RoundRobinWrangleSelector {
     }
 }
 
-pub async fn shard_ultrawave_by_location<E>(wave: UltraWave, adjacent: &HashSet<Point>, registry: &Registry<E>) -> Result<HashMap<Point,UltraWave>,E::Err> where E: Platform {
+pub async fn shard_ultrawave_by_location<E>(wave: UltraWave, adjacent: &HashMap<Point,StarStub>, registry: &Registry<E>) -> Result<HashMap<Point,UltraWave>,E::Err> where E: Platform {
     match wave{
         _ => {
             let mut map = HashMap::new();
@@ -1406,7 +1537,7 @@ pub async fn shard_ultrawave_by_location<E>(wave: UltraWave, adjacent: &HashSet<
 }
 
 
-pub async fn shard_ripple_by_location<E>(ripple: Wave<Ripple>, adjacent: &HashSet<Point>, registry: &Registry<E>) -> Result<HashMap<Point,Wave<Ripple>>,E::Err> where E: Platform{
+pub async fn shard_ripple_by_location<E>(ripple: Wave<Ripple>, adjacent: &HashMap<Point,StarStub>, registry: &Registry<E>) -> Result<HashMap<Point,Wave<Ripple>>,E::Err> where E: Platform{
     let mut map = HashMap::new();
     for (point,recipients) in shard_by_location(ripple.to.clone(),adjacent, registry).await? {
         let mut ripple = ripple.clone();
@@ -1428,7 +1559,7 @@ pub async fn ripple_to_singulars<E>(ripple: Wave<Ripple>, adjacent: &HashSet<Poi
 
 pub async fn shard_by_location<E>(
     recipients: Recipients,
-    adjacent: &HashSet<Point>,
+    adjacent: &HashMap<Point,StarStub>,
     registry: &Registry<E>,
 ) -> Result<HashMap<Point, Recipients>, E::Err>  where E: Platform{
     match recipients{
@@ -1462,7 +1593,7 @@ pub async fn shard_by_location<E>(
         }
         Recipients::Stars => {
             let mut map = HashMap::new();
-            for star in adjacent {
+            for (star,_) in adjacent {
                 map.insert( star.clone(), Recipients::Stars );
             }
             Ok(map)

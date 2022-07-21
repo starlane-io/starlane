@@ -52,7 +52,6 @@ where
     P: Platform + 'static,
 {
     pub fn new(platform: P) -> Result<(), P::Err> {
-
         match platform.runtime() {
             Ok(runtime) => {
                 runtime.block_on(async move { Self::init(platform).await })
@@ -103,10 +102,10 @@ where
             let mut connect_whitelist = HashSet::new();
             for con in &star_template.hyperway {
                 match con {
-                    StarCon::Receive(key) => {
-                        connect_whitelist.insert(key.clone().to_point());
+                    StarCon::Receive(stub) => {
+                        connect_whitelist.insert(stub.key.clone().to_point());
                     }
-                    StarCon::Connect(key) => clients.push((star_point.clone(), key.clone())),
+                    StarCon::Connect(stub) => clients.push((star_point.clone(), stub.key.clone())),
                 }
             }
 
@@ -114,6 +113,7 @@ where
                 let router = interchange.router();
                 tokio::spawn(async move {
                     while let Some(wave) = fabric_rx.recv().await {
+println!("ROUTING TO FABRIC!");
                         router.route(wave).await;
                     }
                 });
@@ -243,8 +243,8 @@ impl MachineTemplate {
             StarSub::Machine,
         );
         for star in stars.iter_mut() {
-            star.connect(machine.key.clone());
-            machine.receive(star.key.clone());
+            star.connect(machine.to_stub());
+            machine.receive(star.to_stub());
         }
 
         stars.push(machine);
@@ -283,19 +283,19 @@ impl Default for MachineTemplate {
             StarSub::Fold,
         );
 
-        nexus.receive(central.key.clone());
-        nexus.receive(supe.key.clone());
-        nexus.receive(maelstrom.key.clone());
-        nexus.receive(scribe.key.clone());
-        nexus.receive(jump.key.clone());
-        nexus.receive(fold.key.clone());
+        nexus.receive(central.to_stub());
+        nexus.receive(supe.to_stub());
+        nexus.receive(maelstrom.to_stub());
+        nexus.receive(scribe.to_stub());
+        nexus.receive(jump.to_stub());
+        nexus.receive(fold.to_stub());
 
-        central.connect(nexus.key.clone());
-        supe.connect(nexus.key.clone());
-        maelstrom.connect(nexus.key.clone());
-        scribe.connect(nexus.key.clone());
-        jump.connect(nexus.key.clone());
-        fold.connect(nexus.key.clone());
+        central.connect(nexus.to_stub());
+        supe.connect(nexus.to_stub());
+        maelstrom.connect(nexus.to_stub());
+        scribe.connect(nexus.to_stub());
+        jump.connect(nexus.to_stub());
+        fold.connect(nexus.to_stub());
 
         let mut stars = vec![];
         stars.push(central);

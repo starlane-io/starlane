@@ -1,15 +1,15 @@
-use alloc::fmt::format;
 use crate::error::MsgErr;
 use crate::id::id::{
     BaseKind, Kind, KindParts, Layer, Point, Port, RouteSeg, Specific, Sub, ToPoint, ToPort,
 };
 use crate::log::SpanLogger;
 use crate::parse::error::result;
-use crate::parse::{CamelCase, parse_star_key};
+use crate::parse::{parse_star_key, CamelCase};
 use crate::particle::particle::Stub;
 use crate::substance::substance::Substance;
 use crate::sys::{ChildRegistry, ParticleRecord};
 use crate::wave::{DirectedWave, Ping, Pong, ReflectedWave, UltraWave, Wave};
+use alloc::fmt::format;
 use core::str::FromStr;
 use cosmic_nom::new_span;
 use nom::combinator::all_consuming;
@@ -18,6 +18,8 @@ use std::ops::{Deref, DerefMut};
 use tokio::sync::oneshot;
 
 pub mod id {
+    use convert_case::{Case, Casing};
+    use dashmap::mapref::one::Ref;
     use dashmap::DashMap;
     use nom::branch::alt;
     use nom::bytes::complete::tag;
@@ -34,26 +36,27 @@ pub mod id {
     use std::ops::{Deref, Range};
     use std::str::FromStr;
     use std::sync::Arc;
-    use convert_case::{Case, Casing};
-    use dashmap::mapref::one::Ref;
 
-    use cosmic_nom::{new_span, Res, Span, SpanExtra, Trace, tw, Tw};
+    use cosmic_nom::{new_span, tw, Res, Span, SpanExtra, Trace, Tw};
     use serde::de::Visitor;
     use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
     use tokio::sync::{mpsc, oneshot};
 
-    use crate::error::{MsgErr, ParseErrs};
-    use crate::{State};
     use crate::config::config::bind::RouteSelector;
+    use crate::error::{MsgErr, ParseErrs};
     use crate::id::id::PointSegCtx::Working;
-    use crate::id::{ArtifactSubKind, BaseSubKind, DatabaseSubKind, FileSubKind, StarSub, Traversal, TraversalDirection, TraversalInjection, UserBaseSubKind};
-    use crate::parse::{
-        camel_case, camel_case_chars, CamelCase, consume_point, consume_point_ctx, Ctx,
-        CtxResolver, Domain, Env, kind_lex, kind_parts, parse_uuid,
-        point_and_kind, point_route_segment, point_selector, point_var, ResolverErr, SkewerCase, uuid_chars, VarResolver,
+    use crate::id::{
+        ArtifactSubKind, BaseSubKind, DatabaseSubKind, FileSubKind, StarSub, Traversal,
+        TraversalDirection, TraversalInjection, UserBaseSubKind,
     };
-    use crate::{cosmic_uuid, parse};
     use crate::log::PointLogger;
+    use crate::parse::{
+        camel_case, camel_case_chars, consume_point, consume_point_ctx, kind_lex, kind_parts,
+        parse_uuid, point_and_kind, point_route_segment, point_selector, point_var, uuid_chars,
+        CamelCase, Ctx, CtxResolver, Domain, Env, ResolverErr, SkewerCase, VarResolver,
+    };
+    use crate::State;
+    use crate::{cosmic_uuid, parse};
 
     use crate::parse::error::result;
     use crate::selector::selector::{
@@ -61,7 +64,10 @@ pub mod id {
     };
     use crate::sys::Location::Central;
     use crate::util::{ToResolved, ValueMatcher, ValuePattern};
-    use crate::wave::{Recipients, Ping, Pong, ToRecipients, Wave, UltraWave, DirectedWave, ReflectedWave, Exchanger};
+    use crate::wave::{
+        DirectedWave, Exchanger, Ping, Pong, Recipients, ReflectedWave, ToRecipients, UltraWave,
+        Wave,
+    };
 
     lazy_static! {
         pub static ref GLOBAL_CENTRAL: Point = Point::from_str("GLOBAL::central").unwrap();
@@ -141,7 +147,6 @@ pub mod id {
         UserBase(UserBaseSubKind),
         Star(StarSub),
     }
-
 
     impl Sub {
         pub fn specific(&self) -> Option<&Specific> {
@@ -251,17 +256,24 @@ pub mod id {
     }
 
     impl Kind {
-
         pub fn as_point_segments(&self) -> String {
             if Sub::None != self.sub() {
                 if let Some(specific) = self.specific() {
-                    format!("{}:{}:{}", self.to_base().to_skewer().to_string(), self.sub().to_skewer().to_string(), specific.to_string() )
-
+                    format!(
+                        "{}:{}:{}",
+                        self.to_base().to_skewer().to_string(),
+                        self.sub().to_skewer().to_string(),
+                        specific.to_string()
+                    )
                 } else {
-                    format!("{}:{}", self.to_base().to_skewer().to_string(), self.sub().to_skewer().to_string())
+                    format!(
+                        "{}:{}",
+                        self.to_base().to_skewer().to_string(),
+                        self.sub().to_skewer().to_string()
+                    )
                 }
             } else {
-                format!("{}", self.to_base().to_skewer().to_string() )
+                format!("{}", self.to_base().to_skewer().to_string())
             }
         }
 
@@ -1324,7 +1336,7 @@ pub mod id {
     }
 
     impl Layer {
-        pub fn has_state(&self)-> bool {
+        pub fn has_state(&self) -> bool {
             match self {
                 Layer::Surface => false,
                 Layer::Field => true,
@@ -1333,7 +1345,7 @@ pub mod id {
                 Layer::Portal => false,
                 Layer::Host => false,
                 Layer::Guest => false,
-                Layer::Core => false
+                Layer::Core => false,
             }
         }
     }
@@ -1571,8 +1583,7 @@ pub mod id {
 
         fn exchanger(&self) -> &Exchanger;
 
-        async fn delivery_directed(&self, direct: Traversal<DirectedWave> ) {
-        }
+        async fn delivery_directed(&self, direct: Traversal<DirectedWave>) {}
 
         async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) {
             self.exchanger().reflected(reflect.payload).await;
@@ -1580,7 +1591,7 @@ pub mod id {
 
         async fn visit(&self, traversal: Traversal<UltraWave>) {
             if let Some(dest) = &traversal.dest {
-                if self.port().layer == *dest  {
+                if self.port().layer == *dest {
                     if traversal.is_ping() {
                         self.delivery_directed(traversal.unwrap_directed()).await;
                     } else {
@@ -1588,38 +1599,52 @@ pub mod id {
                     }
                 }
             } else if traversal.is_ping() && traversal.dir == TraversalDirection::Fabric {
-                self.directed_fabric_bound(traversal.unwrap_directed()).await;
+                self.directed_fabric_bound(traversal.unwrap_directed())
+                    .await;
             } else if traversal.is_pong() && traversal.dir == TraversalDirection::Core {
-                self.reflected_core_bound(traversal.unwrap_reflected()).await;
-            } else if traversal.is_ping() && traversal.dir == TraversalDirection::Core{
+                self.reflected_core_bound(traversal.unwrap_reflected())
+                    .await;
+            } else if traversal.is_ping() && traversal.dir == TraversalDirection::Core {
                 self.directed_core_bound(traversal.unwrap_directed()).await;
-            } else if traversal.is_pong() && traversal.dir == TraversalDirection::Fabric{
-                self.reflected_fabric_bound(traversal.unwrap_reflected()).await;
+            } else if traversal.is_pong() && traversal.dir == TraversalDirection::Fabric {
+                self.reflected_fabric_bound(traversal.unwrap_reflected())
+                    .await;
             }
-    }
+        }
 
         // override if you want to track outgoing requests
-        async fn directed_fabric_bound(&self, traversal: Traversal<DirectedWave>) -> Result<(), MsgErr>{
+        async fn directed_fabric_bound(
+            &self,
+            traversal: Traversal<DirectedWave>,
+        ) -> Result<(), MsgErr> {
             self.traverse_next(traversal.wrap()).await;
             Ok(())
         }
 
-        async fn directed_core_bound(&self, traversal: Traversal<DirectedWave>) -> Result<(), MsgErr>{
+        async fn directed_core_bound(
+            &self,
+            traversal: Traversal<DirectedWave>,
+        ) -> Result<(), MsgErr> {
             self.traverse_next(traversal.wrap()).await;
             Ok(())
         }
 
         // override if you want to track incoming responses
-        async fn reflected_core_bound(&self, traversal: Traversal<ReflectedWave>) -> Result<(), MsgErr>{
+        async fn reflected_core_bound(
+            &self,
+            traversal: Traversal<ReflectedWave>,
+        ) -> Result<(), MsgErr> {
             self.traverse_next(traversal.to_ultra()).await;
             Ok(())
         }
 
-        async fn reflected_fabric_bound(&self, traversal: Traversal<ReflectedWave>) -> Result<(), MsgErr>{
+        async fn reflected_fabric_bound(
+            &self,
+            traversal: Traversal<ReflectedWave>,
+        ) -> Result<(), MsgErr> {
             self.traverse_next(traversal.to_ultra()).await;
             Ok(())
         }
-
     }
 
     #[derive(Clone)]
@@ -1660,7 +1685,7 @@ pub mod id {
             }
         }
 
-        pub fn has_layer(&self, layer: &Layer ) -> bool {
+        pub fn has_layer(&self, layer: &Layer) -> bool {
             self.stack.contains(layer)
         }
     }
@@ -2318,7 +2343,7 @@ pub mod id {
             }
         }
 
-        pub fn push<S:ToString>(&self, segment: S) -> Result<Self, MsgErr> {
+        pub fn push<S: ToString>(&self, segment: S) -> Result<Self, MsgErr> {
             let segment = segment.to_string();
             if self.segments.is_empty() {
                 Self::from_str(segment.as_str())
@@ -2699,9 +2724,24 @@ pub enum StarSub {
     Nexus, // Relays Waves from Star to Star
     Maelstrom, // Where executables are run
     Scribe, // requires durable filesystem (Artifact Bundles, Files...)
-    Jump,  // for entry into the Mesh/Fabric for an external connection (client ingress... http for example)
+    Jump, // for entry into the Mesh/Fabric for an external connection (client ingress... http for example)
     Fold, // exit from the Mesh.. maintains connections etc to Databases, Keycloak, etc.... Like A Space Fold out of the Fabric..
     Machine, // every Machine has one and only one Machine star... it handles messaging for the Machine
+}
+
+impl StarSub {
+    pub fn is_forwarder(&self) -> bool {
+        match self {
+            StarSub::Nexus => true,
+            StarSub::Central => false,
+            StarSub::Super => true,
+            StarSub::Maelstrom => true,
+            StarSub::Scribe => true,
+            StarSub::Jump => true,
+            StarSub::Fold => true,
+            StarSub::Machine => false,
+        }
+    }
 }
 
 impl Into<Sub> for StarSub {
@@ -2903,6 +2943,21 @@ impl BaseKind {
 pub type MachineName = String;
 pub type ConstellationName = String;
 
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct StarStub {
+    pub key: StarKey,
+    pub kind: StarSub,
+}
+
+impl StarStub {
+    pub fn new( key: StarKey, kind: StarSub ) -> Self {
+        Self {
+            key,
+            kind
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Ord, PartialOrd, Hash, Debug, Clone, Serialize, Deserialize)]
 pub struct StarKey {
     pub constellation: ConstellationName,
@@ -2912,7 +2967,12 @@ pub struct StarKey {
 
 impl StarKey {
     pub fn sql_name(&self) -> String {
-        format!("star_{}_{}_{}", self.constellation.to_lowercase().replace("-","_"), self.name.to_lowercase().replace("-","_"), self.index )
+        format!(
+            "star_{}_{}_{}",
+            self.constellation.to_lowercase().replace("-", "_"),
+            self.name.to_lowercase().replace("-", "_"),
+            self.index
+        )
     }
 }
 
@@ -2957,20 +3017,19 @@ pub struct StarHandle {
 }
 
 impl StarHandle {
-    pub fn name<S:ToString>(name: S) -> Self {
+    pub fn name<S: ToString>(name: S) -> Self {
         Self {
             name: name.to_string(),
-            index: 0
+            index: 0,
         }
     }
 
-    pub fn new<S:ToString>(name: S, index: u16) -> Self {
+    pub fn new<S: ToString>(name: S, index: u16) -> Self {
         Self {
             name: name.to_string(),
-            index
+            index,
         }
     }
-
 }
 
 impl StarKey {
@@ -3013,15 +3072,12 @@ impl FromStr for StarKey {
 
 pub struct TraversalInjection {
     pub injector: Port,
-    pub wave: UltraWave
+    pub wave: UltraWave,
 }
 
-impl TraversalInjection{
-    pub fn new( injector: Port, wave: UltraWave ) -> Self {
-        Self {
-            injector,
-            wave
-        }
+impl TraversalInjection {
+    pub fn new(injector: Port, wave: UltraWave) -> Self {
+        Self { injector, wave }
     }
 }
 
@@ -3035,10 +3091,10 @@ pub struct Traversal<W> {
     pub logger: SpanLogger,
     pub location: Point,
     pub dir: TraversalDirection,
-    pub to: Port
+    pub to: Port,
 }
 
-#[derive(Clone,Eq,PartialEq,Hash)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub enum TraversalDirection {
     Fabric,
     Core,
@@ -3090,7 +3146,7 @@ impl<W> Traversal<W> {
         dir: TraversalDirection,
         dest: Option<Layer>,
         to: Port,
-        point: Point
+        point: Point,
     ) -> Self {
         Self {
             payload,
@@ -3115,7 +3171,7 @@ impl<W> Traversal<W> {
             dir: self.dir,
             dest: self.dest,
             to: self.to,
-            point: self.point
+            point: self.point,
         }
     }
 
@@ -3154,11 +3210,9 @@ impl<W> Traversal<W> {
     pub fn is_inter_layer(&self) -> bool {
         self.to.point == *self.logger.point()
     }
-
 }
 
 impl Traversal<UltraWave> {
-
     pub fn is_fabric_bound(&self) -> bool {
         match self.dir {
             TraversalDirection::Fabric => true,
@@ -3176,14 +3230,14 @@ impl Traversal<UltraWave> {
     pub fn is_ping(&self) -> bool {
         match &self.payload {
             UltraWave::Ping(_) => true,
-            _ => false
+            _ => false,
         }
     }
 
     pub fn is_pong(&self) -> bool {
         match &self.payload {
             UltraWave::Pong(_) => true,
-            _ => false
+            _ => false,
         }
     }
 
@@ -3193,7 +3247,7 @@ impl Traversal<UltraWave> {
             UltraWave::Pong(_) => false,
             UltraWave::Ripple(_) => true,
             UltraWave::Echo(_) => false,
-            UltraWave::Signal(_) => true
+            UltraWave::Signal(_) => true,
         }
     }
 
@@ -3204,12 +3258,8 @@ impl Traversal<UltraWave> {
     pub fn unwrap_directed(self) -> Traversal<DirectedWave> {
         let clone = self.clone();
         match self.payload {
-            UltraWave::Ping(ping) => {
-                clone.with(ping.to_directed().clone())
-            }
-            UltraWave::Ripple(ripple) => {
-                clone.with(ripple.to_directed())
-            }
+            UltraWave::Ping(ping) => clone.with(ping.to_directed().clone()),
+            UltraWave::Ripple(ripple) => clone.with(ripple.to_directed()),
             _ => {
                 panic!("cannot call this unless you are sure it's a DirectedWave")
             }
@@ -3219,18 +3269,13 @@ impl Traversal<UltraWave> {
     pub fn unwrap_reflected(self) -> Traversal<ReflectedWave> {
         let clone = self.clone();
         match self.payload {
-            UltraWave::Pong(pong) => {
-                clone.with(pong.to_reflected())
-            }
-            UltraWave::Echo(echo) => {
-                clone.with(echo.to_reflected())
-            }
+            UltraWave::Pong(pong) => clone.with(pong.to_reflected()),
+            UltraWave::Echo(echo) => clone.with(echo.to_reflected()),
             _ => {
                 panic!("cannot call this unless you are sure it's a ReflectedWave")
             }
         }
     }
-
 
     pub fn unwrap_ping(self) -> Traversal<Wave<Ping>> {
         if let UltraWave::Ping(ping) = self.payload.clone() {
@@ -3249,29 +3294,28 @@ impl Traversal<UltraWave> {
     }
 }
 
-
 impl Traversal<DirectedWave> {
     pub fn wrap(self) -> Traversal<UltraWave> {
-        let ping= self.payload.clone();
+        let ping = self.payload.clone();
         self.with(ping.to_ultra())
     }
 }
 
 impl Traversal<ReflectedWave> {
     pub fn to_ultra(self) -> Traversal<UltraWave> {
-        let pong= self.payload.clone();
+        let pong = self.payload.clone();
         self.with(pong.to_ultra())
     }
 }
 
 impl Traversal<Wave<Ping>> {
     pub fn to_ultra(self) -> Traversal<UltraWave> {
-        let ping= self.payload.clone();
+        let ping = self.payload.clone();
         self.with(ping.to_ultra())
     }
 
     pub fn to_directed(self) -> Traversal<DirectedWave> {
-        let ping= self.payload.clone();
+        let ping = self.payload.clone();
         self.with(ping.to_directed())
     }
 }
@@ -3283,7 +3327,7 @@ impl Traversal<Wave<Pong>> {
     }
 
     pub fn to_reflected(self) -> Traversal<ReflectedWave> {
-        let pong= self.payload.clone();
+        let pong = self.payload.clone();
         self.with(pong.to_reflected())
     }
 }

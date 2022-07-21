@@ -135,6 +135,17 @@ impl UltraWave {
     }
 
 
+    pub fn wrap_in_transport(self, to: Port ) -> DirectedProto {
+        let mut signal = DirectedProto::new();
+        signal.kind(DirectedKind::Signal);
+        signal.handling(self.handling().clone());
+        signal.method(SysMethod::Transport);
+        signal.body(Substance::UltraWave(Box::new(self)));
+        signal.to(to);
+        signal
+    }
+
+
     pub fn to_substance(self) -> Substance {
         Substance::UltraWave(Box::new(self))
     }
@@ -1552,6 +1563,13 @@ impl DirectedWave {
             reflection_of: self.id().clone(),
         }
     }
+
+    pub fn to_signal(self) -> Result<Wave<Signal>,MsgErr> {
+        match self {
+            DirectedWave::Signal(signal) => Ok(signal),
+            _ => Err("not a signal wave".into())
+        }
+    }
 }
 
 impl SingularDirectedWave {
@@ -1991,6 +2009,13 @@ where
         self.variant.to_substance_ref()
     }
 }
+
+impl <V> Wave<V> {
+    pub fn inc_hops(&mut self)  {
+        self.hops = self.hops + 1;
+    }
+}
+
 impl Wave<Ripple> {
     pub fn to_ultra(self) -> UltraWave {
         UltraWave::Ripple(self)
@@ -2023,6 +2048,17 @@ impl Wave<Signal> {
     pub fn to_directed(self) -> DirectedWave {
         DirectedWave::Signal(self)
     }
+
+    pub fn wrap_in_hop(self, to: Port ) -> DirectedProto {
+        let mut signal = DirectedProto::new();
+        signal.kind(DirectedKind::Signal);
+        signal.handling(self.handling.clone());
+        signal.method(SysMethod::Hop);
+        signal.body(Substance::UltraWave(Box::new(self.to_ultra())));
+        signal.to(to);
+        signal
+    }
+
 }
 
 impl<S> ToSubstance<S> for Signal
@@ -3267,6 +3303,7 @@ pub enum SysMethod {
     Assign,
     AssignPort,
     EntryReq,
+    Hop,
     Transport,
     HyperWave,
     Search
@@ -3424,7 +3461,7 @@ impl Exchanger {
                 });
             }
             BounceBacks::Count(count) => {
-                let (tx, mut rx) = mpsc::channel(32);
+                let (tx, mut rx) = mpsc::channel(count);
                 self.multis.insert(directed.id().clone(), tx);
                 let singles = self.singles.clone();
                 let id = directed.id().clone();
@@ -3456,7 +3493,7 @@ impl Exchanger {
                 let id = directed.id().clone();
                 let multis = self.multis.clone();
                 tokio::spawn(async move {
-                    tokio::time::sleep_until(Instant::now() + Duration::from_millis(timeout)).await;
+                    tokio::time::sleep_until(Instant::now() + Duration::from_secs(timeout)).await;
                     // all we have to do is remove it, the multi loop will take care of the rest
                     multis.remove(&id);
                 });

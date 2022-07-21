@@ -44,14 +44,10 @@ pub mod shell;
 pub mod star;
 pub mod state;
 pub mod traversal;
-
 #[cfg(test)]
-mod tests {
-    use super::*;
+pub mod tests;
 
-    #[test]
-    fn it_works() {}
-}
+
 
 pub type Registry<P> =Arc<dyn RegistryApi<P>>;
 
@@ -67,7 +63,6 @@ where
     async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), P::Err>;
 
     async fn set_properties<'a>(&'a self, point: &'a Point, properties: &'a SetProperties) -> Result<(), P::Err>;
-
 
     async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, P::Err>;
 
@@ -358,5 +353,6 @@ pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'st
         })
     }
 }
+
 
 
