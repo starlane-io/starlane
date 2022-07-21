@@ -284,19 +284,17 @@ pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'st
     type Err;
     type RegistryContext;
 
-    fn create(&self) -> MachineApi<Self> {
+    fn machine(&self) -> MachineApi<Self> {
         Machine::new(self.clone())
     }
-
-    async fn create_registry_context(&self, stars: HashSet<StarKey>) -> Result<Self::RegistryContext,Self::Err>;
 
     fn machine_template(&self) -> MachineTemplate;
     fn machine_name(&self) -> MachineName;
     fn properties_config<K: ToBaseKind>(&self, base:&K) -> &'static PropertiesConfig;
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder;
     fn token(&self) -> Token;
-    async fn global_registry(&self, ctx: Arc<Self::RegistryContext>) -> Result<Registry<Self>,Self::Err>;
-    async fn star_registry(&self, star: &StarKey, ctx: Arc<Self::RegistryContext>) -> Result<Registry<Self>,Self::Err>;
+    async fn global_registry(&self) -> Result<Registry<Self>,Self::Err>;
+    async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>,Self::Err>;
     fn artifact_hub(&self) -> ArtifactApi;
     fn start_services(&self, entry_router: &mut InterchangeEntryRouter);
     fn default_implementation(&self, template: &KindTemplate) -> Result<Kind, MsgErr> {

@@ -394,6 +394,7 @@ impl <P> StarApi<P> where P: Platform {
        Ok(rx.await?)
     }
 
+    #[cfg(test)]
     pub async fn get_skel(&self) -> Result<StarSkel<P>,MsgErr> {
         let(tx,rx) = oneshot::channel();
         self.tx.send(StarCall::GetSkel(tx)).await;
@@ -422,9 +423,6 @@ where
     golden_path: DashMap<StarKey, StarKey>,
     hyperway_transmitter: ProtoTransmitter,
     surface: Port,
-
-    #[cfg(test)]
-    interceptor_start_layer_traversal: broadcast::Sender<Traversal<UltraWave>>
 }
 
 impl<P> Star<P>
@@ -464,8 +462,6 @@ where
         let surface = skel.point.clone().to_port().with_layer(Layer::Surface);
 
         // test interceptors
-        #[cfg(test)]
-        let (interceptor_start_layer_traversal,_) = broadcast::channel(1024);
 
         let kind = skel.kind.clone();
         {
@@ -479,8 +475,6 @@ where
                 hyperway_transmitter,
                 forwarders,
                 surface,
-                #[cfg(test)]
-                interceptor_start_layer_traversal
             };
             star.start();
         }

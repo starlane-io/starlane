@@ -1866,8 +1866,8 @@ impl PostgresDbInfo {
 }
 
 pub trait PostgresPlatform: Platform<Err=PostErr> {
-    fn lookup_registry_db(&self) -> Result<PostgresDbInfo,Self::Err>;
-    fn lookup_star_db(&self, star: &StarKey) -> Result<PostgresDbInfo,Self::Err>;
+    fn lookup_registry_db() -> Result<PostgresDbInfo,Self::Err>;
+    fn lookup_star_db(star: &StarKey) -> Result<PostgresDbInfo,Self::Err>;
 }
 
 

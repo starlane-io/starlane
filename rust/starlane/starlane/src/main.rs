@@ -65,23 +65,32 @@ pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
 fn main() -> Result<(), PostErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
     runtime.block_on( async move {
-    Starlane::new().create();
-        });
-    Ok(())
+    let machine = Starlane::new().await.unwrap().machine();
+        machine.wait().await
+        })
 }
 
 #[derive(Clone)]
-pub struct Starlane {}
+pub struct Starlane {
+    ctx: PostgresRegistryContext
+}
 
 impl Starlane {
-    pub fn new() -> Self {
-        Self {}
+    pub async fn new() -> Result<Self,Self::Err> {
+            let mut dbs = HashSet::new();
+            dbs.insert(Self::lookup_registry_db()? );
+            for star in stars {
+                dbs.insert( Self::lookup_star_db(&star)?);
+            }
+            let ctx = PostgresRegistryContext::new(dbs).await?;
+
+        Ok(Self {ctx})
     }
 }
 
 impl PostgresPlatform for Starlane {
 
-    fn lookup_registry_db(&self) -> Result<PostgresDbInfo,Self::Err> {
+    fn lookup_registry_db() -> Result<PostgresDbInfo,Self::Err> {
         Ok(PostgresDbInfo::new(
             STARLANE_REGISTRY_URL.to_string(),
             STARLANE_REGISTRY_USER.to_string(),
@@ -90,7 +99,7 @@ impl PostgresPlatform for Starlane {
         ))
     }
 
-    fn lookup_star_db(&self, star: &StarKey ) -> Result<PostgresDbInfo,Self::Err> {
+    fn lookup_star_db(star: &StarKey ) -> Result<PostgresDbInfo,Self::Err> {
         Ok(PostgresDbInfo::new_with_schema(
             STARLANE_REGISTRY_URL.to_string(),
             STARLANE_REGISTRY_USER.to_string(),
@@ -106,14 +115,6 @@ impl Platform for Starlane {
     type Err = PostErr;
     type RegistryContext = PostgresRegistryContext;
 
-    async fn create_registry_context(&self, stars: HashSet<StarKey>) -> Result<Self::RegistryContext, Self::Err> {
-        let mut dbs = HashSet::new();
-        dbs.insert(self.lookup_registry_db()? );
-        for star in stars {
-            dbs.insert( self.lookup_star_db(&star)?);
-        }
-        PostgresRegistryContext::new(dbs).await
-    }
 
 
     fn machine_template(&self) -> MachineTemplate {

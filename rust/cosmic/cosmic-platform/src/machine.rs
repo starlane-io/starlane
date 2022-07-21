@@ -20,6 +20,8 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tracing::info;
 use futures::future::join_all;
+use tokio::sync::broadcast::Receiver;
+use tokio::sync::oneshot::error::RecvError;
 
 #[derive(Clone)]
 pub struct MachineApi<P> where P: Platform {
@@ -39,17 +41,24 @@ impl <P> MachineApi<P> where P: Platform {
 
     pub async fn wait_ready( &self ) {
         let (tx,mut rx) = oneshot::channel();
-        self.tx.send(MachineCall::WaitReady(tx)).await;
+        self.tx.send(MachineCall::WaitForReady(tx)).await;
         rx.await;
     }
 
 
-    pub async fn wait( &self ) -> Result<(),()> {
+    pub async fn wait( &self ) -> Result<(),P::Err> {
         let (tx,mut rx) = oneshot::channel();
         self.tx.send(MachineCall::Wait(tx)).await;
-        let mut rx = rx.await.map_err(|_|())?;
-        rx.recv().await.map_err(|_|())?;
-        Ok(())
+        let mut rx = match rx.await {
+            Ok(rx) => rx,
+            Err(err) => { return Err(P::Err::new(err.to_string()));}
+        };
+        match rx.recv().await {
+            Ok(result) => {
+                result
+            }
+            Err(err) => { return Err(P::Err::new(err.to_string()));}
+        }
     }
 
     #[cfg(test)]
@@ -84,7 +93,7 @@ where
     pub entry_router: InterchangeEntryRouter,
     pub interchanges: HashMap<StarKey, Arc<HyperwayInterchange>>,
     pub rx: mpsc::Receiver<MachineCall<P>>,
-    pub termination_broadcast_tx: broadcast::Sender<()>,
+    pub termination_broadcast_tx: broadcast::Sender<Result<(),P::Err>>,
     pub logger: PointLogger
 }
 
@@ -106,12 +115,10 @@ where
         let template = platform.machine_template();
         let machine_name = platform.machine_name();
 
-        let ctx = Arc::new(platform.create_registry_context(template.star_set()).await?);
-
         let machine_api = MachineApi::new(tx);
         let skel = MachineSkel {
             name: machine_name.clone(),
-            registry: platform.global_registry(ctx.clone()).await?,
+            registry: platform.global_registry().await?,
             artifacts: platform.artifact_hub(),
             logger: RootLogger::default(),
             timeouts: Timeouts::default(),
@@ -172,6 +179,8 @@ println!("ROUTING TO FABRIC!");
                 interchange,
                 logger.point(star_point.clone()).push("gate").unwrap(),
             );
+
+            gate.jump_the_gate()
 
             gates.insert(InterchangeKind::Star(star_template.key.clone()), gate);
         }
@@ -255,13 +264,14 @@ println!("ROUTING TO FABRIC!");
          while let Some(call) = self.rx.recv().await {
              match call {
                  MachineCall::Terminate => {
-                     break;
+                     self.termination_broadcast_tx.send(Ok(()));
+                     return Ok(())
                  }
                  MachineCall::Wait(tx) => {
                      tx.send(self.termination_broadcast_tx.subscribe());
                  }
 
-                 MachineCall::WaitReady(tx) => {
+                 MachineCall::WaitForReady(tx) => {
                      // right now we don't know what Ready means other than the Call loop has started
                      // so we return Ready in every case
                      tx.send(());
@@ -276,9 +286,11 @@ println!("ROUTING TO FABRIC!");
                  #[cfg(test)]
                  MachineCall::GetRegistry(tx) => {}
              }
+
+             self.termination_broadcast_tx.send(Err(P::Err::new("machine quit unexpectedly.")));
+
          }
 
-        self.termination_broadcast_tx.send(());
 
         Ok(())
     }
@@ -286,8 +298,8 @@ println!("ROUTING TO FABRIC!");
 
 pub enum MachineCall<P> where P: Platform{
     Terminate,
-    Wait(oneshot::Sender<broadcast::Receiver<()>>),
-    WaitReady(oneshot::Sender<()>),
+    Wait(oneshot::Sender<broadcast::Receiver<Result<(),P::Err>>>),
+    WaitForReady(oneshot::Sender<()>),
     Phantom(PhantomData<P>),
     #[cfg(test)]
     GetMachineStar(oneshot::Sender<StarApi<P>>),

@@ -35,12 +35,6 @@ impl Platform for TestPlatform {
     type Err = TestErr;
     type RegistryContext = TestRegistryContext;
 
-    async fn create_registry_context(
-        &self,
-        stars: HashSet<StarKey>,
-    ) -> Result<Self::RegistryContext, Self::Err> {
-        Ok(self.ctx.clone())
-    }
 
     fn machine_template(&self) -> MachineTemplate {
         MachineTemplate::default()
@@ -62,17 +56,13 @@ impl Platform for TestPlatform {
         Token::new("__token__")
     }
 
-    async fn global_registry(
-        &self,
-        ctx: Arc<Self::RegistryContext>,
-    ) -> Result<Registry<Self>, Self::Err> {
-        Ok(Arc::new(TestRegistryApi::new(ctx)))
+    async fn global_registry(&self) -> Result<Registry<Self>,Self::Err> {
+        Ok(Arc::new(TestRegistryApi::new(self.ctx.clone())))
     }
 
     async fn star_registry(
         &self,
-        star: &StarKey,
-        ctx: Arc<Self::RegistryContext>,
+        star: &StarKey
     ) -> Result<Registry<Self>, Self::Err> {
         todo!()
     }
@@ -87,28 +77,28 @@ impl Platform for TestPlatform {
 #[derive(Clone)]
 pub struct TestRegistryContext {
     pub sequence: Arc<AtomicU64>,
-    pub particles: DashMap<Point, ParticleRecord>,
+    pub particles: Arc<DashMap<Point, ParticleRecord>>,
 }
 
 impl TestRegistryContext {
     pub fn new() -> Self {
         Self {
             sequence: Arc::new(AtomicU64::new(0u64)),
-            particles: DashMap::new(),
+            particles: Arc::new(DashMap::new()),
         }
     }
 }
 
 pub struct TestRegistryApi {
-    ctx: Arc<TestRegistryContext>,
+    ctx: TestRegistryContext,
 }
 
 impl TestRegistryApi {
-    pub fn new(ctx: Arc<TestRegistryContext>) -> Self {
+    fn new(ctx: TestRegistryContext) -> Self {
         Self { ctx }
     }
 
-    pub fn ctx(&self) -> &Arc<TestRegistryContext> {
+    fn ctx(&self) -> &TestRegistryContext {
         &self.ctx
     }
 }
@@ -299,7 +289,7 @@ fn it_works() -> Result<(), TestErr> {
         .build()?;
     runtime.block_on(async move {
         let platform = TestPlatform::new();
-        let machine_api = platform.create();
+        let machine_api = platform.machine();
         machine_api.wait_ready().await;
 
         let star_api = machine_api.get_machine_star().await.unwrap();
@@ -307,6 +297,9 @@ fn it_works() -> Result<(), TestErr> {
         let location = stub.key.clone().to_point();
         create(&platform.ctx, LESS.clone(), location.clone() );
         create(&platform.ctx, FAE.clone(), location.clone() );
+
+        let record = platform.global_registry().await.unwrap().locate(&LESS).await.expect("IS LESS THERE?");
+println!("location for LESS: {}", record.location.to_string());
 
         let skel = star_api.get_skel().await.unwrap();
 
