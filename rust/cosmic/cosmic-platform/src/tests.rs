@@ -1,25 +1,32 @@
 #![cfg(test)]
 
+use super::*;
+use chrono::{DateTime, Utc};
+use cosmic_api::id::id::{Layer, ToPoint, ToPort, Uuid};
+use cosmic_api::msg::MsgMethod;
+use cosmic_api::wave::{DirectedKind, DirectedProto, HyperWave};
+use cosmic_api::{NoDiceArtifactFetcher, HYPERUSER};
+use dashmap::DashMap;
 use std::io::Error;
+use std::sync::atomic;
 use std::sync::atomic::AtomicU64;
 use std::time::Duration;
-use chrono::{DateTime, Utc};
-use dashmap::DashMap;
-use tokio::sync::Mutex;
-use cosmic_api::id::id::Uuid;
-use cosmic_api::NoDiceArtifactFetcher;
-use super::*;
+use tokio::join;
+use tokio::sync::{Mutex, oneshot};
 
-
+lazy_static! {
+    pub static ref LESS: Point = Point::from_str("space:users:less").expect("point");
+    pub static ref FAE: Point = Point::from_str("space:users:fae").expect("point");
+}
 
 #[derive(Clone)]
 pub struct TestPlatform {
-
+    pub ctx: TestRegistryContext,
 }
 
 impl TestPlatform {
     pub fn new() -> Self {
-        Self {}
+        Self { ctx: TestRegistryContext::new() }
     }
 }
 
@@ -28,8 +35,11 @@ impl Platform for TestPlatform {
     type Err = TestErr;
     type RegistryContext = TestRegistryContext;
 
-    async fn create_registry_context(&self, stars: HashSet<StarKey>) -> Result<Self::RegistryContext, Self::Err> {
-        Ok(TestRegistryContext::new())
+    async fn create_registry_context(
+        &self,
+        stars: HashSet<StarKey>,
+    ) -> Result<Self::RegistryContext, Self::Err> {
+        Ok(self.ctx.clone())
     }
 
     fn machine_template(&self) -> MachineTemplate {
@@ -52,52 +62,59 @@ impl Platform for TestPlatform {
         Token::new("__token__")
     }
 
-    async fn global_registry(&self, ctx: Arc<Self::RegistryContext>) -> Result<Registry<Self>, Self::Err> {
+    async fn global_registry(
+        &self,
+        ctx: Arc<Self::RegistryContext>,
+    ) -> Result<Registry<Self>, Self::Err> {
         Ok(Arc::new(TestRegistryApi::new(ctx)))
     }
 
-    async fn star_registry(&self, star: &StarKey, ctx: Arc<Self::RegistryContext>) -> Result<Registry<Self>, Self::Err> {
+    async fn star_registry(
+        &self,
+        star: &StarKey,
+        ctx: Arc<Self::RegistryContext>,
+    ) -> Result<Registry<Self>, Self::Err> {
         todo!()
     }
 
     fn artifact_hub(&self) -> ArtifactApi {
-        ArtifactApi::new( Arc::new(NoDiceArtifactFetcher::new()) )
+        ArtifactApi::new(Arc::new(NoDiceArtifactFetcher::new()))
     }
 
-    fn start_services(&self, entry_router: &mut InterchangeEntryRouter) {
-    }
+    fn start_services(&self, entry_router: &mut InterchangeEntryRouter) {}
 }
 
+#[derive(Clone)]
 pub struct TestRegistryContext {
-   pub sequence: AtomicU64,
-   pub particles: DashMap<Point,Details>
+    pub sequence: Arc<AtomicU64>,
+    pub particles: DashMap<Point, ParticleRecord>,
 }
 
 impl TestRegistryContext {
     pub fn new() -> Self {
         Self {
-            sequence: AtomicU64::new(0u64),
-            particles: DashMap::new()
+            sequence: Arc::new(AtomicU64::new(0u64)),
+            particles: DashMap::new(),
         }
     }
 }
 
-
 pub struct TestRegistryApi {
-    context: Arc<TestRegistryContext>
+    ctx: Arc<TestRegistryContext>,
 }
 
 impl TestRegistryApi {
+    pub fn new(ctx: Arc<TestRegistryContext>) -> Self {
+        Self { ctx }
+    }
 
-    pub fn new( context: Arc<TestRegistryContext> ) -> Self {
-        Self {
-            context
-        }
+    pub fn ctx(&self) -> &Arc<TestRegistryContext> {
+        &self.ctx
     }
 }
 
 #[async_trait]
-impl RegistryApi<TestPlatform> for TestRegistryApi where{
+impl RegistryApi<TestPlatform> for TestRegistryApi {
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, TestErr> {
         todo!()
     }
@@ -110,12 +127,16 @@ impl RegistryApi<TestPlatform> for TestRegistryApi where{
         Ok(())
     }
 
-    async fn set_properties<'a>(&'a self, point: &'a Point, properties: &'a SetProperties) -> Result<(), TestErr> {
+    async fn set_properties<'a>(
+        &'a self,
+        point: &'a Point,
+        properties: &'a SetProperties,
+    ) -> Result<(), TestErr> {
         Ok(())
     }
 
     async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, TestErr> {
-        todo!()
+        Ok(self.ctx.sequence.fetch_add(1, atomic::Ordering::Relaxed))
     }
 
     async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, TestErr> {
@@ -123,10 +144,21 @@ impl RegistryApi<TestPlatform> for TestRegistryApi where{
     }
 
     async fn locate<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, TestErr> {
-        todo!()
+println!("registry locating:::> {}",point.to_string());
+        Ok(self
+            .ctx
+            .particles
+            .get(&point)
+            .ok_or(TestErr::new("not found"))?
+            .value()
+            .clone())
     }
 
-    async fn query<'a>(&'a self, point: &'a Point, query: &'a Query) -> Result<QueryResult, TestErr> {
+    async fn query<'a>(
+        &'a self,
+        point: &'a Point,
+        query: &'a Query,
+    ) -> Result<QueryResult, TestErr> {
         todo!()
     }
 
@@ -150,11 +182,20 @@ impl RegistryApi<TestPlatform> for TestRegistryApi where{
         todo!()
     }
 
-    async fn chown<'a>(&'a self, on: &'a Selector, owner: &'a Point, by: &'a Point) -> Result<(), TestErr> {
+    async fn chown<'a>(
+        &'a self,
+        on: &'a Selector,
+        owner: &'a Point,
+        by: &'a Point,
+    ) -> Result<(), TestErr> {
         todo!()
     }
 
-    async fn list_access<'a>(&'a self, to: &'a Option<&'a Point>, on: &'a Selector) -> Result<Vec<IndexedAccessGrant>, TestErr> {
+    async fn list_access<'a>(
+        &'a self,
+        to: &'a Option<&'a Point>,
+        on: &'a Selector,
+    ) -> Result<Vec<IndexedAccessGrant>, TestErr> {
         todo!()
     }
 
@@ -163,26 +204,24 @@ impl RegistryApi<TestPlatform> for TestRegistryApi where{
     }
 }
 
-
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct TestErr {
-    pub message: String
+    pub message: String,
 }
 
 impl TestErr {
-    pub fn new<S:ToString>(message: S) -> Self {
+    pub fn new<S: ToString>(message: S) -> Self {
         Self {
-            message: message.to_string()
+            message: message.to_string(),
         }
     }
 }
 
 impl ToString for TestErr {
     fn to_string(&self) -> String {
-       self.message.clone()
+        self.message.clone()
     }
 }
-
 
 impl Into<MsgErr> for TestErr {
     fn into(self) -> MsgErr {
@@ -193,7 +232,7 @@ impl Into<MsgErr> for TestErr {
 impl From<MsgErr> for TestErr {
     fn from(err: MsgErr) -> Self {
         Self {
-            message: err.to_string()
+            message: err.to_string(),
         }
     }
 }
@@ -201,7 +240,7 @@ impl From<MsgErr> for TestErr {
 impl From<io::Error> for TestErr {
     fn from(err: Error) -> Self {
         Self {
-            message: err.to_string()
+            message: err.to_string(),
         }
     }
 }
@@ -211,15 +250,21 @@ impl PlatErr for TestErr {
         MsgErr::from_500(self.to_string())
     }
 
-    fn new<S>(message: S) -> Self where S: ToString {
+    fn new<S>(message: S) -> Self
+    where
+        S: ToString,
+    {
         Self {
-            message: message.to_string()
+            message: message.to_string(),
         }
     }
 
-    fn status_msg<S>(status: u16, message: S) -> Self where S: ToString {
+    fn status_msg<S>(status: u16, message: S) -> Self
+    where
+        S: ToString,
+    {
         Self {
-            message: message.to_string()
+            message: message.to_string(),
         }
     }
 
@@ -228,26 +273,100 @@ impl PlatErr for TestErr {
     }
 }
 
+fn create(ctx: &TestRegistryContext, particle: Point, location: Point) {
+
+println!("ADDING PARTICLE: {}",particle.to_string());
+    ctx.particles.insert(
+        particle.clone(),
+        ParticleRecord::new(
+            Details::new(
+                Stub {
+                    point: particle,
+                    kind: Kind::Control,
+                    status: Status::Ready,
+                },
+                Properties::new(),
+            ),
+            location
+        ),
+    );
+}
 
 #[test]
-fn it_works() -> Result<(),TestErr>{
-
-    let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
-    runtime.block_on( async move {
+fn it_works() -> Result<(), TestErr> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async move {
         let platform = TestPlatform::new();
         let machine_api = platform.create();
+        machine_api.wait_ready().await;
 
+        let star_api = machine_api.get_machine_star().await.unwrap();
+        let stub = star_api.stub().await.unwrap();
+        let location = stub.key.clone().to_point();
+        create(&platform.ctx, LESS.clone(), location.clone() );
+        create(&platform.ctx, FAE.clone(), location.clone() );
+
+        let skel = star_api.get_skel().await.unwrap();
+
+        let mut to_fabric_rx = skel.diagnostic_interceptors.to_fabric.subscribe();
+        let mut from_hyperway_rx = skel.diagnostic_interceptors.from_hyperway.subscribe();
+
+
+        // send a 'nice' wave from Fae to Less
+        let mut wave = DirectedProto::new();
+        wave.kind(DirectedKind::Ping);
+        wave.from(FAE.clone().to_port());
+        wave.to(LESS.clone().to_port());
+        wave.method(MsgMethod::new("DieTacEng").unwrap());
+        let wave = wave.build().unwrap();
+        let wave = wave.to_ultra();
+
+        let (check_to_fabric_tx, check_to_fabric_rx):(oneshot::Sender<Result<(),()>>,oneshot::Receiver<Result<(),()>>) = oneshot::channel();
+        let (check_from_hyperway_tx,check_from_hyperway_rx):(oneshot::Sender<Result<(),()>>,oneshot::Receiver<Result<(),()>>) = oneshot::channel();
+
+        let wave_id = wave.id();
         {
-            let machine_api = machine_api.clone();
             tokio::spawn(async move {
-                tokio::time::sleep(Duration::from_secs(5)).await;
-                machine_api.terminate();
+                while let Ok(hop) = from_hyperway_rx.recv().await {
+                    let transport = hop.unwrap_from_hop().unwrap();
+                    let wave = transport.unwrap_from_transport().unwrap();
+                    if wave.id() == wave_id {
+                        println!("intercepted from_hyperway event");
+                        check_from_hyperway_tx.send(Ok(()));
+                        break;
+                    } else {
+                        println!("RECEIVED WAVE: {}", wave.id().to_string())
+                    }
+                }
             });
         }
 
-        machine_api.wait().await;
-    });
+        let wave_id = wave.id();
+        {
+            tokio::spawn(async move {
+                while let Ok(wave) = to_fabric_rx.recv().await {
+                    if wave.id() == wave_id {
+                        println!("intercepted to_fabric event!");
+                        check_to_fabric_tx.send(Ok(()));
+                        break;
+                    } else {
+                        println!("RECEIVED WAVE: {}", wave.id().to_string())
+                    }
+                }
+            });
+        }
 
-    Ok(())
+
+        // send straight out of the star (circumvent layer traversal)
+        star_api.to_fabric(wave).await;
+
+        tokio::time::timeout(Duration::from_secs(5), check_from_hyperway_rx).await.unwrap();
+        tokio::time::timeout(Duration::from_secs(5), check_to_fabric_rx).await.unwrap();
+
+        Ok(())
+
+    })
 
 }

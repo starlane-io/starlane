@@ -221,6 +221,7 @@ impl HyperwayInterchange {
                             }
                         }
                         Some(HyperwayCall::Out(wave)) => {
+println!("Hyperway sending Out... ");
                             match wave.to().single_or() {
                                 Ok(port) => {
                                     match hyperways.get(&port.point) {
@@ -228,6 +229,7 @@ impl HyperwayInterchange {
                                             logger.warn(format!("hyperway not found in interchange: {}", port.point.to_string()));
                                         }
                                         Some(hyperway) => {
+println!("wave matched to hyperway..." );
                                             hyperway.value().outbound(wave).await;
                                         }
                                     }

@@ -1,5 +1,5 @@
-use crate::star::{Star, StarApi, StarCon, StarRouter, StarSkel, StarTemplate};
-use crate::{PlatErr, Platform, RegistryApi};
+use crate::star::{Star, StarApi, StarCon,  StarSkel, StarTemplate};
+use crate::{PlatErr, Platform, Registry, RegistryApi};
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{Point, ToPoint, ToPort};
 use cosmic_api::id::{ConstellationName, MachineName, StarHandle, StarKey, StarSub};
@@ -15,18 +15,19 @@ use cosmic_hyperlane::{
 };
 use dashmap::DashMap;
 use std::collections::{HashMap, HashSet};
+use std::marker::PhantomData;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tracing::info;
 use futures::future::join_all;
 
 #[derive(Clone)]
-pub struct MachineApi {
-    tx: mpsc::Sender<MachineCall>
+pub struct MachineApi<P> where P: Platform {
+    tx: mpsc::Sender<MachineCall<P>>
 }
 
-impl MachineApi {
-    pub fn new( tx: mpsc::Sender<MachineCall>) -> Self {
+impl <P> MachineApi<P> where P: Platform {
+    pub fn new( tx: mpsc::Sender<MachineCall<P>>) -> Self {
         Self {
             tx
         }
@@ -36,12 +37,26 @@ impl MachineApi {
         self.tx.try_send(MachineCall::Terminate);
     }
 
+    pub async fn wait_ready( &self ) {
+        let (tx,mut rx) = oneshot::channel();
+        self.tx.send(MachineCall::WaitReady(tx)).await;
+        rx.await;
+    }
+
+
     pub async fn wait( &self ) -> Result<(),()> {
         let (tx,mut rx) = oneshot::channel();
         self.tx.send(MachineCall::Wait(tx)).await;
         let mut rx = rx.await.map_err(|_|())?;
         rx.recv().await.map_err(|_|())?;
         Ok(())
+    }
+
+    #[cfg(test)]
+    pub async fn get_machine_star( &self ) -> Result<StarApi<P>,MsgErr> {
+        let (tx,mut rx) = oneshot::channel();
+        self.tx.send(MachineCall::GetMachineStar(tx)).await;
+        Ok(rx.await?)
     }
 }
 
@@ -56,7 +71,7 @@ where
     pub artifacts: ArtifactApi,
     pub logger: RootLogger,
     pub timeouts: Timeouts,
-    pub api: MachineApi
+    pub api: MachineApi<P>
 }
 
 pub struct Machine<P>
@@ -64,11 +79,11 @@ where
     P: Platform + 'static,
 {
     pub skel: MachineSkel<P>,
-    pub stars: Arc<HashMap<Point, StarApi>>,
-    pub machine_star: StarApi,
+    pub stars: Arc<HashMap<Point, StarApi<P>>>,
+    pub machine_star: StarApi<P>,
     pub entry_router: InterchangeEntryRouter,
     pub interchanges: HashMap<StarKey, Arc<HyperwayInterchange>>,
-    pub rx: mpsc::Receiver<MachineCall>,
+    pub rx: mpsc::Receiver<MachineCall<P>>,
     pub termination_broadcast_tx: broadcast::Sender<()>,
     pub logger: PointLogger
 }
@@ -77,7 +92,7 @@ impl<P> Machine<P>
 where
     P: Platform + 'static,
 {
-    pub fn new(platform: P) -> MachineApi {
+    pub fn new(platform: P) -> MachineApi<P> {
         let (tx,rx) = mpsc::channel(1024);
         let machine_api = MachineApi::new(tx.clone());
         tokio::spawn( async move {
@@ -87,7 +102,7 @@ where
         machine_api
     }
 
-    async fn init(platform: P, tx: mpsc::Sender<MachineCall>, rx: mpsc::Receiver<MachineCall>) -> Result<MachineApi, P::Err> {
+    async fn init(platform: P, tx: mpsc::Sender<MachineCall<P>>, rx: mpsc::Receiver<MachineCall<P>>) -> Result<MachineApi<P>, P::Err> {
         let template = platform.machine_template();
         let machine_name = platform.machine_name();
 
@@ -240,21 +255,44 @@ println!("ROUTING TO FABRIC!");
          while let Some(call) = self.rx.recv().await {
              match call {
                  MachineCall::Terminate => {
-                     break
+                     break;
                  }
                  MachineCall::Wait(tx) => {
                      tx.send(self.termination_broadcast_tx.subscribe());
                  }
+
+                 MachineCall::WaitReady(tx) => {
+                     // right now we don't know what Ready means other than the Call loop has started
+                     // so we return Ready in every case
+                     tx.send(());
+                 }
+                 MachineCall::Phantom(_) => {
+                     // do nothing, it is just here to carry the 'P'
+                 }
+                 #[cfg(test)]
+                 MachineCall::GetMachineStar(tx) => {
+                     tx.send(self.machine_star.clone());
+                 }
+                 #[cfg(test)]
+                 MachineCall::GetRegistry(tx) => {}
              }
          }
+
         self.termination_broadcast_tx.send(());
+
         Ok(())
     }
 }
 
-pub enum MachineCall {
+pub enum MachineCall<P> where P: Platform{
     Terminate,
-    Wait(oneshot::Sender<broadcast::Receiver<()>>)
+    Wait(oneshot::Sender<broadcast::Receiver<()>>),
+    WaitReady(oneshot::Sender<()>),
+    Phantom(PhantomData<P>),
+    #[cfg(test)]
+    GetMachineStar(oneshot::Sender<StarApi<P>>),
+    #[cfg(test)]
+    GetRegistry(oneshot::Sender<Registry<P>>)
 }
 
 pub struct MachineTemplate {

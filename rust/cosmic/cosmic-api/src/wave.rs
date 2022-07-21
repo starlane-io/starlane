@@ -135,14 +135,28 @@ impl UltraWave {
     }
 
 
-    pub fn wrap_in_transport(self, to: Port ) -> DirectedProto {
+    pub fn wrap_in_transport(self, from: Port, to: Port ) -> DirectedProto {
         let mut signal = DirectedProto::new();
         signal.kind(DirectedKind::Signal);
+        signal.from(from);
         signal.handling(self.handling().clone());
         signal.method(SysMethod::Transport);
         signal.body(Substance::UltraWave(Box::new(self)));
         signal.to(to);
         signal
+    }
+
+
+    pub fn unwrap_from_hop(self) -> Result<Wave<Signal>,MsgErr>
+    {
+        let signal = self.to_signal()?;
+        signal.unwrap_from_hop()
+    }
+
+    pub fn unwrap_from_transport(self) -> Result<UltraWave,MsgErr>
+    {
+        let signal = self.to_signal()?;
+        signal.unwrap_from_transport()
     }
 
 
@@ -2049,15 +2063,42 @@ impl Wave<Signal> {
         DirectedWave::Signal(self)
     }
 
-    pub fn wrap_in_hop(self, to: Port ) -> DirectedProto {
+    pub fn wrap_in_hop(self, from: Port, to: Port ) -> DirectedProto {
         let mut signal = DirectedProto::new();
         signal.kind(DirectedKind::Signal);
+        signal.from(from);
         signal.handling(self.handling.clone());
         signal.method(SysMethod::Hop);
         signal.body(Substance::UltraWave(Box::new(self.to_ultra())));
         signal.to(to);
         signal
     }
+
+    pub fn unwrap_from_hop(self) -> Result<Wave<Signal>,MsgErr>
+    {
+        if self.method != Method::Sys(SysMethod::Hop) {
+            return Err(MsgErr::from_500("expected signal wave to have method Hop"))
+        }
+        if let Substance::UltraWave(wave) = &self.body {
+            Ok((*wave.clone()).to_signal()?)
+        } else {
+            Err(MsgErr::from_500("expected body substance to be of type UltraWave for a transport signal"))
+        }
+    }
+
+    pub fn unwrap_from_transport(self) -> Result<UltraWave,MsgErr>
+    {
+        if self.method != Method::Sys(SysMethod::Transport) {
+            return Err(MsgErr::from_500("expected signal wave to have method Transport"))
+        }
+        if let Substance::UltraWave(wave) = &self.body {
+            Ok(*wave.clone())
+        } else {
+            Err(MsgErr::from_500("expected body substance to be of type UltraWave for a transport signal"))
+        }
+    }
+
+
 
 }
 

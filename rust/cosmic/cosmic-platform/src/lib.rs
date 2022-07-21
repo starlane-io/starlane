@@ -284,8 +284,8 @@ pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'st
     type Err;
     type RegistryContext;
 
-    fn create(self) -> MachineApi {
-        Machine::new(self)
+    fn create(&self) -> MachineApi<Self> {
+        Machine::new(self.clone())
     }
 
     async fn create_registry_context(&self, stars: HashSet<StarKey>) -> Result<Self::RegistryContext,Self::Err>;
