@@ -360,10 +360,11 @@ impl Router for OutboundRouter {
 }
 
 #[async_trait]
-pub trait HyperAuthenticator: Send + Sync {
-    async fn auth(&self, req: Knock) -> Result<HyperwayStub, MsgErr>;
+pub trait HyperAuthenticator: Send + Sync + Clone + Sized {
+    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, MsgErr>;
 }
 
+#[derive(Clone)]
 pub struct TokenAuthenticator {
     pub token: Token,
     pub agent: Agent,
@@ -395,13 +396,14 @@ impl HyperAuthenticator for TokenAuthenticator {
     }
 }
 
+#[derive(Clone)]
 pub struct AnonHyperAuthenticator {
     pub logger: RootLogger,
-    pub lane_point_factory: Box<dyn PointFactory>,
+    pub lane_point_factory: Arc<dyn PointFactory>,
 }
 
 impl AnonHyperAuthenticator {
-    pub fn new(lane_point_factory: Box<dyn PointFactory>, logger: RootLogger) -> Self {
+    pub fn new(lane_point_factory: Arc<dyn PointFactory>, logger: RootLogger) -> Self {
         Self {
             logger,
             lane_point_factory,
@@ -409,6 +411,7 @@ impl AnonHyperAuthenticator {
     }
 }
 
+#[derive(Clone)]
 pub struct TokenAuthenticatorWithRemoteWhitelist {
     pub token: Token,
     pub agent: Agent,
@@ -464,16 +467,17 @@ impl HyperAuthenticator for AnonHyperAuthenticator {
     }
 }
 
+#[derive(Clone)]
 pub struct AnonHyperAuthenticatorAssignEndPoint {
     pub logger: RootLogger,
-    pub lane_point_factory: Box<dyn PointFactory>,
-    pub remote_point_factory: Box<dyn PointFactory>,
+    pub lane_point_factory: Arc<dyn PointFactory>,
+    pub remote_point_factory: Arc<dyn PointFactory>,
 }
 
 impl AnonHyperAuthenticatorAssignEndPoint {
     pub fn new(
-        lane_point_factory: Box<dyn PointFactory>,
-        remote_point_factory: Box<dyn PointFactory>,
+        lane_point_factory: Arc<dyn PointFactory>,
+        remote_point_factory: Arc<dyn PointFactory>,
         logger: RootLogger,
     ) -> Self {
         Self {
@@ -486,7 +490,7 @@ impl AnonHyperAuthenticatorAssignEndPoint {
 
 #[async_trait]
 impl HyperAuthenticator for AnonHyperAuthenticatorAssignEndPoint {
-    async fn auth(&self, req: Knock) -> Result<HyperwayStub, MsgErr> {
+    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, MsgErr> {
         let remote = self.remote_point_factory.create().await?;
 
         Ok(HyperwayStub {
@@ -496,6 +500,7 @@ impl HyperAuthenticator for AnonHyperAuthenticatorAssignEndPoint {
     }
 }
 
+#[derive(Clone)]
 pub struct TokensFromHeavenHyperAuthenticatorAssignEndPoint {
     pub logger: RootLogger,
     pub tokens: Arc<DashMap<Token, HyperwayStub>>,
@@ -604,7 +609,7 @@ impl VersionGate {
 pub trait HyperGate: Send+Sync {
     async fn knock(
         &self,
-        req: Knock,
+        knock: Knock,
     ) -> Result<HyperwayExt, MsgErr>;
 
     async fn jump(&self, kind: InterchangeKind, stub: HyperwayStub ) -> Result<HyperwayExt,MsgErr>;
@@ -653,9 +658,8 @@ pub struct InterchangeGate<A> where A: HyperAuthenticator {
     auth: A,
     interchange: Arc<HyperwayInterchange>,
 }
-
 impl <A> InterchangeGate<A> where A: HyperAuthenticator {
-    pub fn new(
+    fn new(
         auth: A,
         interchange: Arc<HyperwayInterchange>,
         logger: PointLogger,
@@ -666,7 +670,10 @@ impl <A> InterchangeGate<A> where A: HyperAuthenticator {
             logger,
         }
     }
-    async fn enter(&self, stub: HyperwayStub) -> Result<HyperwayExt, MsgErr> {
+}
+
+impl <A> InterchangeGate<A> where A: HyperAuthenticator {
+    async fn enter(&self, stub: HyperwayStub ) -> Result<HyperwayExt, MsgErr> {
         let hyperway= Hyperway::new( stub.remote.clone(), stub.agent.clone() );
 
         let (drop_tx,drop_rx) = oneshot::channel();
@@ -681,15 +688,16 @@ impl <A> InterchangeGate<A> where A: HyperAuthenticator {
 
         Ok(ext)
     }
+
 }
 
 #[async_trait]
 impl <A> HyperGate for InterchangeGate<A> where A:HyperAuthenticator {
     async fn knock(
         &self,
-        req: Knock,
+        knock: Knock,
     ) -> Result<HyperwayExt, MsgErr> {
-        let stub = self.auth.auth(req).await?;
+        let stub = self.auth.auth(knock).await?;
         self.enter(stub).await
     }
 
@@ -699,13 +707,13 @@ impl <A> HyperGate for InterchangeGate<A> where A:HyperAuthenticator {
 }
 
 #[derive(Clone)]
-pub struct MountInterchangeGate<A> where A: HyperAuthenticator {
+pub struct MountInterchangeGate<A> where A: HyperAuthenticator{
     logger: PointLogger,
     auth: A,
     interchange: Arc<HyperwayInterchange>,
 }
 
-impl <A> MountInterchangeGate<A> where A: HyperAuthenticator {
+impl <A> MountInterchangeGate<A> where A: HyperAuthenticator{
     pub fn new(
         auth: A,
         interchange: Arc<HyperwayInterchange>,
@@ -720,13 +728,13 @@ impl <A> MountInterchangeGate<A> where A: HyperAuthenticator {
 }
 
 #[async_trait]
-impl <A> HyperGate for MountInterchangeGate<A> where A:HyperAuthenticator {
+impl <A> HyperGate for MountInterchangeGate<A> where A: HyperAuthenticator  {
     async fn knock(
         &self,
-        req: Knock,
+        knock: Knock,
     ) -> Result<HyperwayExt, MsgErr> {
 
-        let stub = self.auth.auth(req).await?;
+        let stub = self.auth.auth(knock).await?;
 
         let ext = self.interchange.mount(stub).await?;
 
@@ -980,6 +988,7 @@ mod tests {
         }
     }
 
+    /*
     #[tokio::test]
     async fn hyper_test() {
         let point = Point::from_str("test").unwrap();
@@ -990,10 +999,10 @@ mod tests {
 
         let point_factory =
             PointFactoryU64::new(point.push("portals").unwrap(), "portal-".to_string());
-        let auth = Box::new(AnonHyperAuthenticator::new(
-            Box::new(point_factory),
+        let auth = AnonHyperAuthenticator::new(
+            Arc::new(point_factory),
             logger.logger.clone(),
-        ));
+        );
 
         let gate = InterchangeGate::new(auth, interchange, logger.push("gate").unwrap());
 
@@ -1010,6 +1019,8 @@ mod tests {
 
         entry_router.knock(knock).await.unwrap();
     }
+
+     */
 }
 
 pub mod test {
@@ -1059,14 +1070,14 @@ pub mod test {
         interchange.add(Hyperway::new(LESS.clone(), LESS.to_agent() ));
         interchange.add(Hyperway::new(FAE.clone(), FAE.to_agent() ));
 
-        let lane_point_factory = Box::new(PointFactoryU64::new(
+        let lane_point_factory = Arc::new(PointFactoryU64::new(
             Point::from_str("point:lanes").unwrap(),
             "lane-".to_string(),
         ));
 
         let auth = AnonHyperAuthenticator::new(lane_point_factory, root_logger.clone());
-        let gate = MountInterchangeGate::new(Box::new(auth), interchange, logger.push("gate").unwrap());
-        let mut gates = Arc::new(DashMap::new());
+        let gate = MountInterchangeGate::new(auth, interchange.clone(), logger.push("gate").unwrap());
+        let mut gates : Arc<DashMap<InterchangeKind,Box<dyn HyperGate>>>= Arc::new(DashMap::new());
         gates.insert( InterchangeKind::Cli, Box::new(gate) );
         let gate = Arc::new(HyperGateSelector::new( gates ));
 
