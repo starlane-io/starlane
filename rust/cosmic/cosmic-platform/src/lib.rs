@@ -18,15 +18,16 @@ use cosmic_api::id::id::{BaseKind, Kind, Point, Specific, ToBaseKind};
 use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, MachineName, StarKey, StarSub, UserBaseSubKind};
 use cosmic_api::substance::substance::{Substance, SubstanceList, Token};
 use cosmic_api::{ArtifactApi, IndexedAccessGrant, Registration,  };
-use cosmic_hyperlane::InterchangeEntryRouter;
+use cosmic_hyperlane::HyperGate;
 use std::str::FromStr;
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use cosmic_api::error::MsgErr;
-use cosmic_api::wave::ReflectedCore;
+use cosmic_api::wave::{ReflectedCore, UltraWave};
 use http::StatusCode;
 use tokio::io;
 use tokio::runtime::{Handle, Runtime};
+use tokio::sync::mpsc;
 use uuid::Uuid;
 use cosmic_api::command::command::common::SetProperties;
 use cosmic_api::command::request::delete::Delete;
@@ -292,11 +293,13 @@ pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'st
     fn machine_name(&self) -> MachineName;
     fn properties_config<K: ToBaseKind>(&self, base:&K) -> &'static PropertiesConfig;
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder;
-    fn token(&self) -> Token;
     async fn global_registry(&self) -> Result<Registry<Self>,Self::Err>;
     async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>,Self::Err>;
     fn artifact_hub(&self) -> ArtifactApi;
-    fn start_services(&self, entry_router: &mut InterchangeEntryRouter);
+    fn start_services(&self, entry_router: &mut HyperGate);
+
+    async fn connect(&self, from: StarKey, to: StarKey ) -> Result<(mpsc::Sender<UltraWave>,mpsc::Receiver<UltraWave>),Self::Err>;
+
     fn default_implementation(&self, template: &KindTemplate) -> Result<Kind, MsgErr> {
         let base: BaseKind = BaseKind::from_str(template.base.to_string().as_str())?;
         Ok(match base {

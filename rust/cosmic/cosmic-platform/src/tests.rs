@@ -71,7 +71,7 @@ impl Platform for TestPlatform {
         ArtifactApi::new(Arc::new(NoDiceArtifactFetcher::new()))
     }
 
-    fn start_services(&self, entry_router: &mut InterchangeEntryRouter) {}
+    fn start_services(&self, entry_router: &mut HyperGate) {}
 }
 
 #[derive(Clone)]

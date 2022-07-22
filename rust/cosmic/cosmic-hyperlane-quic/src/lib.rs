@@ -6,7 +6,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use quinn::{ClientConfig, Connecting, Connection, Endpoint, NewConnection, RecvStream, ServerConfig, VarInt};
 use tokio::sync::mpsc::{Receiver, Sender};
-use cosmic_hyperlane::{VersionGate, InterchangeEntryRouter};
+use cosmic_hyperlane::{VersionGate, HyperGate};
 use cosmic_api::error::{MsgErr, StatusErr};
 use cosmic_api::VERSION;
 use cosmic_api::frame::frame::PrimitiveFrame;

@@ -13,7 +13,7 @@ use cosmic_api::property::{
 use cosmic_api::substance::substance::Token;
 use cosmic_api::{ArtifactApi, NoDiceArtifactFetcher};
 use cosmic_artifact::Artifacts;
-use cosmic_hyperlane::InterchangeEntryRouter;
+use cosmic_hyperlane::HyperGate;
 use cosmic_platform::driver::DriversBuilder;
 use cosmic_platform::machine::{Machine, MachineTemplate};
 use cosmic_platform::Platform;
@@ -170,7 +170,7 @@ impl Platform for Starlane {
         ArtifactApi::new( fetcher )
     }
 
-    fn start_services(&self, entry_router: &mut InterchangeEntryRouter) {}
+    fn start_services(&self, entry_router: &mut HyperGate) {}
 
     fn default_implementation(&self, template: &KindTemplate) -> Result<Kind, MsgErr> {
         let base: BaseKind = BaseKind::from_str(template.base.to_string().as_str())?;
