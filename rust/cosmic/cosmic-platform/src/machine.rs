@@ -6,12 +6,12 @@ use cosmic_api::id::{ConstellationName, MachineName, StarHandle, StarKey, StarSu
 use cosmic_api::log::{PointLogger, RootLogger};
 use cosmic_api::quota::Timeouts;
 use cosmic_api::substance::substance::Substance;
-use cosmic_api::sys::{EntryReq, InterchangeKind};
+use cosmic_api::sys::{Knock, InterchangeKind};
 use cosmic_api::wave::{Agent, HyperWave, UltraWave};
 use cosmic_api::ArtifactApi;
 use cosmic_hyperlane::{
-    HyperClient, InterchangeGate, HyperRouter, Hyperway, HyperwayIn, HyperwayInterchange,
-    HyperGate, LocalClientConnectionFactory, TokenAuthenticatorWithRemoteWhitelist,
+    HyperClient, InterchangeGate, HyperRouter, Hyperway,  HyperwayInterchange,
+    HyperGateSelector, LocalHyperwayExtFactory, TokenAuthenticatorWithRemoteWhitelist,
 };
 use dashmap::DashMap;
 use std::collections::{HashMap, HashSet};
@@ -90,7 +90,7 @@ where
     pub skel: MachineSkel<P>,
     pub stars: Arc<HashMap<Point, StarApi<P>>>,
     pub machine_star: StarApi<P>,
-    pub entry_router: HyperGate,
+    pub entry_router: HyperGateSelector,
     pub interchanges: HashMap<StarKey, Arc<HyperwayInterchange>>,
     pub rx: mpsc::Receiver<MachineCall<P>>,
     pub termination_broadcast_tx: broadcast::Sender<Result<(),P::Err>>,
@@ -168,6 +168,7 @@ println!("ROUTING TO FABRIC!");
                 });
             }
 
+            /*
             let auth = TokenAuthenticatorWithRemoteWhitelist::new(
                 Agent::HyperUser,
                 skel.platform.token(),
@@ -180,22 +181,23 @@ println!("ROUTING TO FABRIC!");
                 logger.point(star_point.clone()).push("gate").unwrap(),
             );
 
-
             gates.insert(InterchangeKind::Star(star_template.key.clone()), gate);
+             */
         }
 
-        let mut entry_router = HyperGate::new(gates);
+        let mut entry_router = HyperGateSelector::new(gates);
 
+        /*
         // now lets make the clients
         for (from, to) in clients {
-            let entry_req = EntryReq {
+            let entry_req = Knock {
                 kind: InterchangeKind::Star(to.clone()),
                 auth: Box::new(Substance::Token(skel.platform.token())),
                 remote: Some(from.clone()),
             };
 
             let logger = skel.logger.point(from.clone());
-            let factory = LocalClientConnectionFactory::new(entry_req, entry_router.clone());
+            let factory = LocalHyperwayExtFactory::new(entry_req, entry_router.clone());
             let hyperway =
                 HyperClient::new(Agent::HyperUser, to.to_point(), Box::new(factory), logger)?;
             interchanges
@@ -203,6 +205,8 @@ println!("ROUTING TO FABRIC!");
                 .unwrap()
                 .add(hyperway);
         }
+
+         */
 
         skel.platform.start_services(&mut entry_router);
 

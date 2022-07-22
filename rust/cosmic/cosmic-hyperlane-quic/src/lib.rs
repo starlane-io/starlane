@@ -6,14 +6,14 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use quinn::{ClientConfig, Connecting, Connection, Endpoint, NewConnection, RecvStream, ServerConfig, VarInt};
 use tokio::sync::mpsc::{Receiver, Sender};
-use cosmic_hyperlane::{VersionGate, HyperGate};
+use cosmic_hyperlane::{VersionGate, HyperGateSelector};
 use cosmic_api::error::{MsgErr, StatusErr};
 use cosmic_api::VERSION;
 use cosmic_api::frame::frame::PrimitiveFrame;
 use cosmic_api::id::id::{Point, ToPort};
 use cosmic_api::log::PointLogger;
 use cosmic_api::substance::substance::Substance;
-use cosmic_api::sys::{EntryReq, Sys};
+use cosmic_api::sys::{Knock, Sys};
 use cosmic_api::wave::{DirectedCore, DirectedProto, Pong, SysMethod, UltraWave, Wave};
 
 fn generate_self_signed_cert() -> Result<(rustls::Certificate, rustls::PrivateKey), MsgErr>
@@ -107,7 +107,7 @@ impl HyperServerQuic {
                        let req = PrimitiveFrame::from(req);
                        let req = req.try_into()?;
                        let stub = req.as_stub();
-                       match entry_router.enter(req).await {
+                       match entry_router.knock(req).await {
                            Ok((tx,rx)) => {
                                let mut send = connection.connection.open_uni().await?;
                                let resp = stub.ok();
@@ -175,7 +175,7 @@ pub struct HyperClientQuic {
 impl HyperClientQuic {
     pub async fn new(endpoint: Endpoint,
                      server_addr: SocketAddr,
-                     connect_req: EntryReq,
+                     connect_req: Knock,
                      deliver_tx: mpsc::Sender<UltraWave>,
                      logger: PointLogger ) -> Result<Self,MsgErr> {
 

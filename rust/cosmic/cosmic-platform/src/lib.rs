@@ -18,7 +18,7 @@ use cosmic_api::id::id::{BaseKind, Kind, Point, Specific, ToBaseKind};
 use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, MachineName, StarKey, StarSub, UserBaseSubKind};
 use cosmic_api::substance::substance::{Substance, SubstanceList, Token};
 use cosmic_api::{ArtifactApi, IndexedAccessGrant, Registration,  };
-use cosmic_hyperlane::HyperGate;
+use cosmic_hyperlane::HyperGateSelector;
 use std::str::FromStr;
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
@@ -296,9 +296,8 @@ pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'st
     async fn global_registry(&self) -> Result<Registry<Self>,Self::Err>;
     async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>,Self::Err>;
     fn artifact_hub(&self) -> ArtifactApi;
-    fn start_services(&self, entry_router: &mut HyperGate);
+    fn start_services(&self, entry_router: &mut HyperGateSelector);
 
-    async fn connect(&self, from: StarKey, to: StarKey ) -> Result<(mpsc::Sender<UltraWave>,mpsc::Receiver<UltraWave>),Self::Err>;
 
     fn default_implementation(&self, template: &KindTemplate) -> Result<Kind, MsgErr> {
         let base: BaseKind = BaseKind::from_str(template.base.to_string().as_str())?;

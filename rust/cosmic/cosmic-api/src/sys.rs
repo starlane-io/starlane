@@ -124,7 +124,7 @@ pub enum Sys {
     Assign(Assign),
     Event(SysEvent),
     Log(Log),
-    EntryReq(EntryReq),
+    Knock(Knock),
     Search(Search),
     Discoveries(Discoveries)
 }
@@ -215,13 +215,13 @@ pub enum InterchangeKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct EntryReq {
+pub struct Knock {
     pub kind: InterchangeKind,
     pub auth: Box<Substance>,
     pub remote: Option<Point>,
 }
 
-impl EntryReq {
+impl Knock {
     pub fn new(kind: InterchangeKind, remote: Point, auth: Substance ) -> Self {
         Self {
             kind,
@@ -231,7 +231,7 @@ impl EntryReq {
     }
 }
 
-impl Default for EntryReq {
+impl Default for Knock {
     fn default() -> Self {
         Self {
             kind: InterchangeKind::Cli,
@@ -241,10 +241,10 @@ impl Default for EntryReq {
     }
 }
 
-impl Into<Wave<Ping>> for EntryReq {
+impl Into<Wave<Ping>> for Knock {
     fn into(self) -> Wave<Ping> {
-        let mut core = DirectedCore::new(SysMethod::EntryReq.into());
-        core.body = Sys::EntryReq(self).into();
+        let mut core = DirectedCore::new(SysMethod::Knock.into());
+        core.body = Sys::Knock(self).into();
         let req = Wave::new( Ping::new(
             core,
             Point::local_hypergate()),

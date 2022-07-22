@@ -13,6 +13,7 @@ use std::sync::atomic::AtomicU64;
 use std::time::Duration;
 use tokio::join;
 use tokio::sync::{Mutex, oneshot};
+use tokio::sync::mpsc::{Receiver, Sender};
 
 lazy_static! {
     pub static ref LESS: Point = Point::from_str("space:users:less").expect("point");
@@ -52,10 +53,6 @@ impl Platform for TestPlatform {
         DriversBuilder::new()
     }
 
-    fn token(&self) -> Token {
-        Token::new("__token__")
-    }
-
     async fn global_registry(&self) -> Result<Registry<Self>,Self::Err> {
         Ok(Arc::new(TestRegistryApi::new(self.ctx.clone())))
     }
@@ -71,7 +68,9 @@ impl Platform for TestPlatform {
         ArtifactApi::new(Arc::new(NoDiceArtifactFetcher::new()))
     }
 
-    fn start_services(&self, entry_router: &mut HyperGate) {}
+    fn start_services(&self, entry_router: &mut HyperGateSelector) {}
+
+
 }
 
 #[derive(Clone)]

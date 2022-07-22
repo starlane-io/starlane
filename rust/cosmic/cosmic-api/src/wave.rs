@@ -3343,7 +3343,7 @@ pub enum SysMethod {
     Command,
     Assign,
     AssignPort,
-    EntryReq,
+    Knock,
     Hop,
     Transport,
     HyperWave,

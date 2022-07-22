@@ -357,6 +357,8 @@ pub mod request {
 
     pub mod create {
         use std::convert::TryInto;
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicU64, Ordering};
 
         use serde::{Deserialize, Serialize};
         use tokio::sync::Mutex;
@@ -580,32 +582,31 @@ pub mod request {
 
         #[async_trait]
         pub trait PointFactory: Send+Sync {
-            async fn create(&mut self) -> Result<Point,MsgErr>;
+            async fn create(&self) -> Result<Point,MsgErr>;
         }
 
-        pub struct PointFactoryU128 {
+        pub struct PointFactoryU64 {
             parent: Point,
             prefix: String,
-            atomic: Mutex<u128>
+            atomic: Arc<AtomicU64>
         }
 
-        impl PointFactoryU128 {
+        impl PointFactoryU64 {
             pub fn new( parent: Point, prefix: String ) -> Self {
                 Self {
                     parent,
                     prefix,
-                    atomic: Mutex::new(0u128 )
+                    atomic: Arc::new(AtomicU64::new(0))
                 }
             }
         }
 
 
         #[async_trait]
-        impl PointFactory for PointFactoryU128 {
-            async fn create(&mut self) -> Result<Point, MsgErr> {
-                let mut index = self.atomic.lock().await;
-                *index += 1;
-                self.parent.push( format!("{}{}", self.prefix, *index))
+        impl PointFactory for PointFactoryU64 {
+            async fn create(&self) -> Result<Point, MsgErr> {
+                let index = self.atomic.fetch_add(1u64, Ordering::Relaxed );
+                self.parent.push( format!("{}{}", self.prefix, index))
             }
         }
 
