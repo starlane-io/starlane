@@ -55,7 +55,7 @@ pub mod id {
         parse_uuid, point_and_kind, point_route_segment, point_selector, point_var, uuid_chars,
         CamelCase, Ctx, CtxResolver, Domain, Env, ResolverErr, SkewerCase, VarResolver,
     };
-    use crate::State;
+    use crate::{Agent, ANONYMOUS, HYPERUSER, State};
     use crate::{cosmic_uuid, parse};
 
     use crate::parse::error::result;
@@ -2192,6 +2192,16 @@ pub mod id {
     }
 
     impl Point {
+        pub fn to_agent(&self) -> Agent {
+            if *self == *HYPERUSER {
+                Agent::HyperUser
+            } else if *self == *ANONYMOUS {
+                Agent::Anonymous
+            } else {
+                Agent::Point(self.clone())
+            }
+        }
+
         pub fn central() -> Self {
             GLOBAL_CENTRAL.clone()
         }

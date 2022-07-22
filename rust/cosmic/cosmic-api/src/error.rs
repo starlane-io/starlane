@@ -22,7 +22,7 @@ use std::num::ParseIntError;
 use std::ops::Range;
 use std::rc::Rc;
 use std::sync::{Arc, PoisonError};
-use tokio::sync::mpsc::error::SendTimeoutError;
+use tokio::sync::mpsc::error::{SendError, SendTimeoutError};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 
@@ -262,6 +262,12 @@ impl <C> From<SendTimeoutError<C>> for MsgErr {
             status: 500,
             message: e.to_string()
         }
+    }
+}
+
+impl <C> From<tokio::sync::mpsc::error::SendError<C>> for MsgErr {
+    fn from(e: SendError<C>) -> Self {
+        MsgErr::from_500(e.to_string())
     }
 }
 

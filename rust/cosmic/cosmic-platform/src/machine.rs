@@ -10,8 +10,8 @@ use cosmic_api::sys::{Knock, InterchangeKind};
 use cosmic_api::wave::{Agent, HyperWave, UltraWave};
 use cosmic_api::ArtifactApi;
 use cosmic_hyperlane::{
-    HyperClient, InterchangeGate, HyperRouter, Hyperway,  HyperwayInterchange,
-    HyperGateSelector, LocalHyperwayExtFactory, TokenAuthenticatorWithRemoteWhitelist,
+    HyperClient, InterchangeGate, HyperRouter, Hyperway, HyperwayInterchange,
+    HyperGateSelector, LocalHyperwayGateUnlocker, TokenAuthenticatorWithRemoteWhitelist,
 };
 use dashmap::DashMap;
 use std::collections::{HashMap, HashSet};
