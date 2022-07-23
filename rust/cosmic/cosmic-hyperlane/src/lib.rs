@@ -60,8 +60,8 @@ impl Hyperway {
         Self {
             remote,
             agent,
-            outbound: Hyperlane::new(#[cfg(test)] "outbound"),
-            inbound: Hyperlane::new(#[cfg(test)] "inbound"),
+            outbound: Hyperlane::new("outbound"),
+            inbound: Hyperlane::new("inbound"),
             #[cfg(test)]
             diagnostic: HyperwayDiagnostic::new(),
         }
