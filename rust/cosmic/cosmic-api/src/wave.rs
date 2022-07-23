@@ -37,7 +37,7 @@ use std::ops;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, oneshot, RwLock};
+use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use tokio::time::Instant;
 use crate::id::StarKey;
 
@@ -2584,6 +2584,35 @@ impl Router for TxRouter {
         self.tx.try_send(wave);
     }
 }
+
+#[async_trait]
+impl Router for BroadTxRouter {
+    async fn route(&self, wave: UltraWave) {
+        self.tx.send(wave);
+    }
+
+    fn route_sync(&self, wave: UltraWave) {
+        self.tx.send(wave);
+    }
+}
+
+
+#[derive(Clone)]
+pub struct BroadTxRouter {
+    pub tx: broadcast::Sender<UltraWave>
+}
+
+impl BroadTxRouter {
+    pub fn new( tx: broadcast::Sender<UltraWave> ) -> Self {
+        Self {
+            tx
+        }
+    }
+}
+
+
+
+
 
 pub trait TransportPlanner {
     fn dest(&self, port: Port) -> Port;

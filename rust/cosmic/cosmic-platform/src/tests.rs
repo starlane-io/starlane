@@ -316,7 +316,6 @@ println!("location for LESS: {}", record.location.to_string());
         let mut to_fabric_rx = skel.diagnostic_interceptors.to_fabric.subscribe();
         let mut from_hyperway_rx = skel.diagnostic_interceptors.from_hyperway.subscribe();
 
-
         // send a 'nice' wave from Fae to Less
         let mut wave = DirectedProto::new();
         wave.kind(DirectedKind::Ping);

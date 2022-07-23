@@ -787,19 +787,19 @@ where
     }
 }
 
-#[derive(Clone)]
 pub struct HyperClient {
     pub stub: HyperwayStub,
     tx: mpsc::Sender<UltraWave>,
     status_tx: broadcast::Sender<HyperClientStatus>,
+    to_client_listener_tx: broadcast::Sender<UltraWave>
 }
 
 impl HyperClient {
     pub fn new(
         stub: HyperwayStub,
-        factory: Box<dyn HyperwayExtFactory>,
-        to_client_listener_tx: mpsc::Sender<UltraWave>,
+        factory: Box<dyn HyperwayExtFactory>
     ) -> Result<HyperClient, MsgErr> {
+        let (to_client_listener_tx,_) = broadcast::channel(1024);
         let (to_hyperway_tx, from_client_rx) = mpsc::channel(1024);
         let (status_tx, mut status_rx) = broadcast::channel(1);
 
@@ -809,15 +809,16 @@ impl HyperClient {
             stub,
             tx: to_hyperway_tx,
             status_tx: status_tx.clone(),
+            to_client_listener_tx: to_client_listener_tx.clone()
         };
 
         tokio::spawn(async move {
             async fn relay(
                 mut from_runner_rx: mpsc::Receiver<UltraWave>,
-                to_client_listener_tx: mpsc::Sender<UltraWave>,
+                to_client_listener_tx: broadcast::Sender<UltraWave>,
             ) -> Result<(), MsgErr> {
                 while let Some(wave) = from_runner_rx.recv().await {
-                    to_client_listener_tx.send(wave).await?;
+                    to_client_listener_tx.send(wave)?;
                 }
                 Ok(())
             }
@@ -843,6 +844,10 @@ impl HyperClient {
 
     pub fn router(&self) -> TxRouter {
         TxRouter::new(self.tx.clone())
+    }
+
+    pub fn rx(&self) -> broadcast::Receiver<UltraWave> {
+        self.to_client_listener_tx.subscribe()
     }
 }
 
@@ -1280,15 +1285,15 @@ pub mod test {
         }
 
         {
-            let (client_listener_tx, mut client_listener_rx) = mpsc::channel(1024);
             let factory = TestFactory::new();
             let mut inbound_rx = factory.inbound_rx().await;
             let client = HyperClient::new(
                 HyperwayStub::new(LESS.clone(), LESS.to_agent()),
                 Box::new(factory),
-                client_listener_tx,
             )
                 .unwrap();
+
+            let client_listener_rx = client.rx();
 
             client.reset();
 
@@ -1304,15 +1309,15 @@ pub mod test {
         }
 
         {
-            let (client_listener_tx, mut client_listener_rx) = mpsc::channel(1024);
             let factory = TestFactory::new();
             let outbound_tx = factory.outbound_tx();
             let client = HyperClient::new(
                 HyperwayStub::new(LESS.clone(), LESS.to_agent()),
                 Box::new(factory),
-                client_listener_tx,
             )
                 .unwrap();
+
+            let mut client_listener_rx = client.rx();
 
             let wave = hello_wave();
             let wave_id = wave.id().clone();
@@ -1343,9 +1348,9 @@ pub mod test {
 
         let auth = AnonHyperAuthenticator::new();
         let gate =
-            MountInterchangeGate::new(auth, interchange.clone(), logger.push("gate").unwrap());
-        let mut gates: Arc<DashMap<InterchangeKind, Box<dyn HyperGate>>> = Arc::new(DashMap::new());
-        gates.insert(InterchangeKind::Cli, Box::new(gate));
+            Arc::new(MountInterchangeGate::new(auth, interchange.clone(), logger.push("gate").unwrap()));
+        let mut gates: Arc<DashMap<InterchangeKind, Arc<dyn HyperGate>>> = Arc::new(DashMap::new());
+        gates.insert(InterchangeKind::Cli, gate);
         let gate = Arc::new(HyperGateSelector::new(gates));
 
         let less_stub = HyperwayStub::from_point(LESS.clone());
@@ -1358,21 +1363,19 @@ pub mod test {
         let fae_factory =
             DirectInterchangeMountHyperwayExtFactory::new(fae_stub.clone(), interchange.clone());
 
-        let (less_client_listener_tx, mut less_rx) = mpsc::channel(1024);
-        let (fae_client_listener_tx, mut fae_rx) = mpsc::channel(1024);
-
         let less_client = HyperClient::new(
             less_stub.clone(),
-            Box::new(less_factory),
-            less_client_listener_tx,
+            Box::new(less_factory)
         )
         .unwrap();
         let fae_client = HyperClient::new(
             fae_stub.clone(),
-            Box::new(fae_factory),
-            fae_client_listener_tx,
+            Box::new(fae_factory)
         )
         .unwrap();
+
+        let mut less_rx = less_client.rx();
+        let mut fae_rx = fae_client.rx();
 
         let less_router = less_client.router();
         let less_exchanger = Exchanger::new(LESS.clone().to_port(), Default::default());

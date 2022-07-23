@@ -271,6 +271,13 @@ impl <C> From<tokio::sync::mpsc::error::SendError<C>> for MsgErr {
     }
 }
 
+
+impl <C> From<tokio::sync::broadcast::error::SendError<C>> for MsgErr {
+    fn from(e: tokio::sync::broadcast::error::SendError<C>) -> Self {
+        MsgErr::from_500(e.to_string())
+    }
+}
+
 impl From<String> for MsgErr {
     fn from(message: String) -> Self {
         Self::Status {
