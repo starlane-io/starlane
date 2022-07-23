@@ -404,7 +404,7 @@ impl Router for OutboundRouter {
 
 #[async_trait]
 pub trait HyperAuthenticator: Send + Sync + Clone + Sized {
-    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, MsgErr>;
+    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, HyperConnectionErr>;
 }
 
 #[derive(Clone)]
@@ -421,20 +421,20 @@ impl TokenAuthenticator {
 
 #[async_trait]
 impl HyperAuthenticator for TokenAuthenticator {
-    async fn auth(&self, req: Knock) -> Result<HyperwayStub, MsgErr> {
-        if let Substance::Token(token) = &*req.auth {
+    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, HyperConnectionErr> {
+        if let Substance::Token(token) = &*knock.auth {
             if *token == self.token {
                 Ok(HyperwayStub {
                     agent: self.agent.clone(),
-                    remote: req
+                    remote: knock
                         .remote
                         .ok_or::<MsgErr>("expected a remote entry selection".into())?,
                 })
             } else {
-                Err(MsgErr::forbidden())
+                Err(HyperConnectionErr::Fatal("invalid token".to_string()))
             }
         } else {
-            Err(MsgErr::forbidden())
+            Err(HyperConnectionErr::Fatal("expected Subtance: Token".to_string()))
         }
     }
 }
@@ -473,35 +473,35 @@ impl TokenAuthenticatorWithRemoteWhitelist {
 
 #[async_trait]
 impl HyperAuthenticator for TokenAuthenticatorWithRemoteWhitelist {
-    async fn auth(&self, req: Knock) -> Result<HyperwayStub, MsgErr> {
+    async fn auth(&self, req: Knock) -> Result<HyperwayStub, HyperConnectionErr> {
         if let Substance::Token(token) = &*req.auth {
             if *token == self.token {
                 let remote = req
                     .remote
-                    .ok_or::<MsgErr>("expected a remote entry selection".into())?;
+                    .ok_or(HyperConnectionErr::Fatal("expected a remote entry selection".to_string()))?;
                 if self.whitelist.contains(&remote) {
                     Ok(HyperwayStub {
                         agent: self.agent.clone(),
                         remote,
                     })
                 } else {
-                    Err(MsgErr::forbidden_msg("remote is not part of the whitelist"))
+                    Err(HyperConnectionErr::Fatal("remote is not part of the whitelist".to_string()))
                 }
             } else {
-                Err(MsgErr::forbidden())
+                Err(HyperConnectionErr::Fatal("invalid token".to_string()))
             }
         } else {
-            Err(MsgErr::forbidden())
+            Err(HyperConnectionErr::Fatal("expecting Substance: Token".to_string()))
         }
     }
 }
 
 #[async_trait]
 impl HyperAuthenticator for AnonHyperAuthenticator {
-    async fn auth(&self, req: Knock) -> Result<HyperwayStub, MsgErr> {
+    async fn auth(&self, req: Knock) -> Result<HyperwayStub, HyperConnectionErr> {
         let remote = req
             .remote
-            .ok_or::<MsgErr>("required remote point request".into())?;
+            .ok_or(HyperConnectionErr::Fatal("required remote point request".to_string()))?;
 
         Ok(HyperwayStub {
             agent: Agent::Anonymous,
@@ -533,7 +533,7 @@ impl AnonHyperAuthenticatorAssignEndPoint {
 
 #[async_trait]
 impl HyperAuthenticator for AnonHyperAuthenticatorAssignEndPoint {
-    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, MsgErr> {
+    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, HyperConnectionErr> {
         let remote = self.remote_point_factory.create().await?;
 
         Ok(HyperwayStub {
@@ -557,17 +557,17 @@ impl TokensFromHeavenHyperAuthenticatorAssignEndPoint {
 
 #[async_trait]
 impl HyperAuthenticator for TokensFromHeavenHyperAuthenticatorAssignEndPoint {
-    async fn auth(&self, auth_req: Knock) -> Result<HyperwayStub, MsgErr> {
+    async fn auth(&self, auth_req: Knock) -> Result<HyperwayStub, HyperConnectionErr> {
         match &*auth_req.auth {
             Substance::Token(token) => {
                 if let Some((_, stub)) = self.tokens.remove(token) {
                     return Ok(stub);
                 } else {
-                    return Err(MsgErr::forbidden());
+                    return Err(HyperConnectionErr::Fatal("invalid token".to_string()));
                 }
             }
             _ => {
-                return Err(MsgErr::bad_request());
+                return Err(HyperConnectionErr::Fatal("expected Substance: Token".to_string()));
             }
         }
     }
@@ -650,9 +650,9 @@ impl VersionGate {
 
 #[async_trait]
 pub trait HyperGate: Send + Sync {
-    async fn knock(&self, knock: Knock) -> Result<HyperwayExt, MsgErr>;
+    async fn knock(&self, knock: Knock) -> Result<HyperwayExt, HyperConnectionErr>;
 
-    async fn jump(&self, kind: InterchangeKind, stub: HyperwayStub) -> Result<HyperwayExt, MsgErr>;
+    async fn jump(&self, kind: InterchangeKind, stub: HyperwayStub) -> Result<HyperwayExt, HyperConnectionErr>;
 }
 
 #[derive(Clone)]
@@ -668,20 +668,20 @@ impl HyperGateSelector {
 
 #[async_trait]
 impl HyperGate for HyperGateSelector {
-    async fn knock(&self, req: Knock) -> Result<HyperwayExt, MsgErr> {
+    async fn knock(&self, req: Knock) -> Result<HyperwayExt, HyperConnectionErr> {
         if let Some(gate) = self.map.get(&req.kind) {
             gate.value().knock(req).await
         } else {
-            Err(MsgErr::from(
-                format!("interchange not available: {}", req.kind.to_string()).as_str(),
+            Err(HyperConnectionErr::Fatal(
+                format!("interchange not available: {}", req.kind.to_string())
             ))
         }
     }
 
-    async fn jump(&self, kind: InterchangeKind, stub: HyperwayStub) -> Result<HyperwayExt, MsgErr> {
+    async fn jump(&self, kind: InterchangeKind, stub: HyperwayStub) -> Result<HyperwayExt, HyperConnectionErr> {
         self.map
             .get(&kind)
-            .ok_or("expected kind to be available")?
+            .ok_or(HyperConnectionErr::Fatal(format!("interchange kind not available: {}", kind.to_string() )))?
             .value()
             .jump(kind, stub)
             .await
@@ -714,7 +714,7 @@ impl<A> InterchangeGate<A>
 where
     A: HyperAuthenticator,
 {
-    async fn enter(&self, stub: HyperwayStub) -> Result<HyperwayExt, MsgErr> {
+    async fn enter(&self, stub: HyperwayStub) -> Result<HyperwayExt, HyperConnectionErr> {
         let hyperway = Hyperway::new(stub.remote.clone(), stub.agent.clone());
 
         let (drop_tx, drop_rx) = oneshot::channel();
@@ -736,7 +736,7 @@ impl<A> HyperGate for InterchangeGate<A>
 where
     A: HyperAuthenticator,
 {
-    async fn knock(&self, knock: Knock) -> Result<HyperwayExt, MsgErr> {
+    async fn knock(&self, knock: Knock) -> Result<HyperwayExt, HyperConnectionErr> {
         let stub = self.auth.auth(knock).await?;
         self.enter(stub).await
     }
@@ -745,7 +745,7 @@ where
         &self,
         _kind: InterchangeKind,
         stub: HyperwayStub,
-    ) -> Result<HyperwayExt, MsgErr> {
+    ) -> Result<HyperwayExt, HyperConnectionErr> {
         self.enter(stub).await
     }
 }
@@ -778,7 +778,7 @@ impl<A> HyperGate for MountInterchangeGate<A>
 where
     A: HyperAuthenticator,
 {
-    async fn knock(&self, knock: Knock) -> Result<HyperwayExt, MsgErr> {
+    async fn knock(&self, knock: Knock) -> Result<HyperwayExt, HyperConnectionErr> {
         let stub = self.auth.auth(knock).await?;
 
         let ext = self.interchange.mount(stub).await?;
@@ -790,7 +790,7 @@ where
         &self,
         _kind: InterchangeKind,
         stub: HyperwayStub,
-    ) -> Result<HyperwayExt, MsgErr> {
+    ) -> Result<HyperwayExt, HyperConnectionErr> {
         Ok(self.interchange.mount(stub).await?)
     }
 }
@@ -865,6 +865,17 @@ pub enum HyperClientCall {
     Wave(UltraWave),
 }
 
+pub enum HyperConnectionErr {
+   Fatal(String),
+   Retry
+}
+
+impl From<MsgErr> for HyperConnectionErr {
+    fn from(_: MsgErr) -> Self {
+        HyperConnectionErr::Retry
+    }
+}
+
 pub struct HyperClientRunner {
     ext: Option<HyperwayExt>,
     factory: Box<dyn HyperwayExtFactory>,
@@ -898,7 +909,7 @@ impl HyperClientRunner {
     async fn start(mut self) {
         self.status_tx.send(HyperClientStatus::Unknown);
         loop {
-            async fn connect(runner: &mut HyperClientRunner) -> Result<(), MsgErr> {
+            async fn connect(runner: &mut HyperClientRunner) -> Result<(), HyperConnectionErr> {
                 runner.status_tx.send(HyperClientStatus::Connecting);
                 loop {
                     match tokio::time::timeout(Duration::from_secs(30), runner.factory.create())
@@ -963,12 +974,14 @@ impl HyperClientRunner {
             loop {
                 match connect(&mut self).await {
                     Ok(_) => {}
-                    Err(_) => {
+                    Err(HyperConnectionErr::Fatal(message)) => {
+                        // need to log the fatal error message somehow
                         self.status_tx.send(HyperClientStatus::Panic);
                         return;
                     }
+                    Err(HyperConnectionErr::Retry) => {
+                    }
                 }
-
 
                 match relay(&mut self).await {
                     Ok(_) => {
@@ -987,7 +1000,7 @@ impl HyperClientRunner {
 
 #[async_trait]
 pub trait HyperwayExtFactory: Send + Sync {
-    async fn create(&self) -> Result<HyperwayExt, MsgErr>;
+    async fn create(&self) -> Result<HyperwayExt, HyperConnectionErr>;
 }
 
 pub struct LocalHyperwayGateUnlocker {
@@ -1003,7 +1016,7 @@ impl LocalHyperwayGateUnlocker {
 
 #[async_trait]
 impl HyperwayExtFactory for LocalHyperwayGateUnlocker {
-    async fn create(&self) -> Result<HyperwayExt, MsgErr> {
+    async fn create(&self) -> Result<HyperwayExt, HyperConnectionErr> {
         self.gate.knock(self.knock.clone()).await
     }
 }
@@ -1021,8 +1034,11 @@ impl DirectInterchangeMountHyperwayExtFactory {
 
 #[async_trait]
 impl HyperwayExtFactory for DirectInterchangeMountHyperwayExtFactory {
-    async fn create(&self) -> Result<HyperwayExt, MsgErr> {
-        self.interchange.mount(self.stub.clone()).await
+    async fn create(&self) -> Result<HyperwayExt, HyperConnectionErr> {
+        match self.interchange.mount(self.stub.clone()).await {
+            Ok(mount) => Ok(mount),
+            Err(_) => Err(HyperConnectionErr::Fatal(format!("invalid mount point '{}'",self.stub.remote.to_string())))
+        }
     }
 }
 
@@ -1099,13 +1115,7 @@ mod tests {
 }
 
 pub mod test {
-    use crate::{
-        AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint,
-        DirectInterchangeMountHyperwayExtFactory, HyperClient, HyperGate, HyperGateSelector,
-        HyperRouter, Hyperlane, Hyperway, HyperwayExt, HyperwayExtFactory, HyperwayInterchange,
-        HyperwayStub, InterchangeGate, LocalHyperwayGateUnlocker, MountInterchangeGate,
-        TokenAuthenticatorWithRemoteWhitelist,
-    };
+    use crate::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, DirectInterchangeMountHyperwayExtFactory, HyperClient, HyperGate, HyperGateSelector, HyperRouter, Hyperlane, Hyperway, HyperwayExt, HyperwayExtFactory, HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist, HyperConnectionErr};
     use cosmic_api::command::request::create::PointFactoryU64;
     use cosmic_api::error::MsgErr;
     use cosmic_api::id::id::{Point, ToPort};
@@ -1250,7 +1260,7 @@ pub mod test {
 
         #[async_trait]
         impl HyperwayExtFactory for TestFactory {
-            async fn create(&self) -> Result<HyperwayExt, MsgErr> {
+            async fn create(&self) -> Result<HyperwayExt, HyperConnectionErr> {
                 Ok(self.hyperway.mount().await)
             }
         }
