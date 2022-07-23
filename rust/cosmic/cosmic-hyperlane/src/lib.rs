@@ -125,6 +125,10 @@ impl HyperwayExt {
     pub fn add_drop_tx(&mut self, drop_tx: oneshot::Sender<()>) {
         self.drop_tx.replace(drop_tx);
     }
+
+    pub fn router(&self) -> TxRouter{
+        TxRouter::new(self.tx.clone())
+    }
 }
 
 impl Drop for HyperwayExt {
@@ -137,6 +141,7 @@ impl Drop for HyperwayExt {
         }
     }
 }
+
 
 #[derive(Clone)]
 pub struct HyperwayStub {

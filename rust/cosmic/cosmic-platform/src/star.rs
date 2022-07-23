@@ -28,7 +28,7 @@ use cosmic_api::{
     MountKind, Registration, State, StateFactory,
 };
 use cosmic_driver::{Core, Driver, DriverFactory, DriverLifecycleCall, DriverSkel, DriverStatus};
-use cosmic_hyperlane::{HyperClient, HyperRouter};
+use cosmic_hyperlane::{HyperClient, HyperRouter, HyperwayExt};
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
 use futures::future::{join_all, BoxFuture};
@@ -429,8 +429,7 @@ where
     pub fn new(
         skel: StarSkel<P>,
         mut drivers: Drivers<P>,
-        hyper_client: HyperClient,
-        mut from_hyperway_rx: mpsc::Receiver<UltraWave>
+        mut hyperway_ext: HyperwayExt,
     ) -> Result<StarApi<P>, MsgErr> {
         let star_driver_factory = Box::new(StarDriverFactory::new(skel.clone()));
         drivers.add(star_driver_factory)?;
@@ -442,7 +441,7 @@ where
             }
         }
 
-        let hyperway_router = Arc::new(hyper_client.router());
+        let hyperway_router = Arc::new(hyperway_ext.router());
         let mut hyperway_transmitter = ProtoTransmitterBuilder::new( hyperway_router.clone(), skel.exchanger.clone() );
         hyperway_transmitter.agent = SetStrategy::Override(Agent::HyperUser);
         hyperway_transmitter.scope = SetStrategy::Override(Scope::Full);
@@ -459,7 +458,15 @@ where
 
         let surface = skel.point.clone().to_port().with_layer(Layer::Surface);
 
-        // test interceptors
+        // relay from hyperway_ext
+        {
+            let star_tx = star_tx.clone();
+            tokio::spawn(async move {
+                while let Some(wave) = hyperway_ext.rx.recv().await {
+                    star_tx.send(StarCall::FromHyperway {wave, tx: None}).await;
+                }
+            });
+        }
 
         let kind = skel.kind.clone();
         {
@@ -473,19 +480,12 @@ where
                 hyperway_transmitter,
                 forwarders,
                 surface,
+                hyperway_ext,
                 hyper_router: hyper_client.router(),
             };
             star.start();
         }
 
-        {
-            let star_tx = star_tx.clone();
-            tokio::spawn(async move {
-                while let Some(wave) = from_hyperway_rx.recv().await {
-                    star_tx.send(StarCall::FromHyperway {wave, tx: None}).await;
-                }
-            });
-        }
 
         Ok(StarApi::new(kind, star_tx))
     }

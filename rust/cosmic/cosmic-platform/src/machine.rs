@@ -162,10 +162,8 @@ where
             let auth = skel.platform.star_auth(&star_template.key)?;
             let gate: Arc<dyn HyperGate> = Arc::new(MountInterchangeGate::new(auth, interchange.clone(), logger.clone()));
             let hyperway = Hyperway::new(star_point.clone(), Agent::HyperUser );
+            let hyperway_ext = hyperway.mount().await;
             interchange.add(hyperway);
-            let (to_star_tx,from_hyperway_rx) = mpsc::channel(1024);
-            let stub = HyperwayStub::new(star_point.clone(),Agent::HyperUser);
-            let hyper_client = HyperClient::new(stub.clone(), Box::new(LocalHyperwayGateJumper::new(InterchangeKind::Star(star_template.key.clone()), stub, gate.clone())), to_star_tx)?;
 
             for con in star_template.connections.iter() {
                 match con {
@@ -187,7 +185,7 @@ where
                 gate,
             );
 
-            let star_api = Star::new(star_skel.clone(), drivers, hyper_client, from_hyperway_rx)?;
+            let star_api = Star::new(star_skel.clone(), drivers, hyperway_ext)?;
             stars.insert(star_point.clone(), star_api);
 
         }
