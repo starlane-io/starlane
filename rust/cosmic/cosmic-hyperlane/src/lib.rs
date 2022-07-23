@@ -43,6 +43,9 @@ pub struct Hyperway {
     pub agent: Agent,
     outbound: Hyperlane,
     inbound: Hyperlane,
+
+    #[cfg(test)]
+    pub diagnostic: HyperwayDiagnostic
 }
 
 impl Hyperway {
@@ -56,6 +59,8 @@ impl Hyperway {
             agent,
             outbound: Hyperlane::new(),
             inbound: Hyperlane::new(),
+            #[cfg(test)]
+            diagnostic: HyperwayDiagnostic::new()
         }
     }
 
@@ -80,6 +85,21 @@ impl Hyperway {
     }
 
 
+}
+
+#[cfg(test)]
+pub struct HyperwayDiagnostic {
+   pub replaced_ext: broadcast::Sender<Result<(),MsgErr>>
+}
+
+#[cfg(test)]
+impl HyperwayDiagnostic {
+    pub fn new() -> Self {
+        let (replaced_ext,_) = broadcast::channel(128);
+        Self {
+            replaced_ext
+        }
+    }
 }
 
 pub struct HyperwayExt {
@@ -159,6 +179,7 @@ pub enum HyperlaneCall {
     Wave(UltraWave),
 }
 
+#[derive(Clone)]
 pub struct Hyperlane {
     tx: mpsc::Sender<HyperlaneCall>,
 }
@@ -190,11 +211,11 @@ impl Hyperlane {
                             ext = None;
                         }
                     }
-
                     if let Some(ext_tx) = ext.as_mut() {
                         for wave in queue.drain(..) {
                             match ext_tx.send(wave).await {
-                                Ok(_) => {}
+                                Ok(_) => {
+                                }
                                 Err(err) => {
                                     tx.send(HyperlaneCall::ResetExt).await;
                                     tx.try_send(HyperlaneCall::Wave(err.0));
@@ -776,11 +797,13 @@ impl HyperClient {
         tokio::spawn( async move {
            async fn relay( mut from_runner_rx: mpsc::Receiver<UltraWave>, to_client_listener_tx: mpsc::Sender<UltraWave>) -> Result<(),MsgErr> {
                while let Some(wave) = from_runner_rx.recv().await {
+println!("GOT WAVE...");
                    to_client_listener_tx.send(wave).await?;
                }
                Ok(())
            }
            relay(from_runner_rx, to_client_listener_tx).await;
+println!("CLIENT RELAY TERMIANTED...");
         });
 
         Ok(client)
@@ -822,20 +845,27 @@ impl HyperClientRunner {
             from_client_rx,
             status_tx,
         };
-        runner.start();
+
+        tokio::spawn( async move {
+           runner.start().await;
+        });
+
         from_runner_rx
     }
 
     async fn start(mut self) {
+println!("START RUNNER!");
         self.status_tx.send(HyperClientStatus::Unknown );
         loop {
             async fn connect(runner: &mut HyperClientRunner ) -> Result<(),MsgErr> {
+println!("Connecting...");
                 runner.status_tx.send(HyperClientStatus::Connecting);
                 loop {
                     match tokio::time::timeout( Duration::from_secs(30),runner.factory.create()).await {
                         Ok(Ok(ext)) => {
                             runner.ext.replace(ext);
                             runner.status_tx.send(HyperClientStatus::Ready);
+                            println!("Ext replaced...");
                             return Ok(())
                         }
                         _ => {
@@ -851,6 +881,7 @@ impl HyperClientRunner {
             }
 
             async fn relay(runner: &mut HyperClientRunner) -> Result<(),MsgErr> {
+                println!("RELAY!");
                 let ext = runner.ext.as_mut().ok_or::<MsgErr>("must reconnect".into() )?;
                 while let (Some(wave),index,_) = futures::future::select_all(vec![runner.from_client_rx.recv().boxed(), ext.rx.recv().boxed()]).await {
                     match index {
@@ -887,6 +918,8 @@ impl HyperClientRunner {
                     }
                 }
 
+                println!("CONECTED!");
+
                 match relay(& mut self).await {
                     Ok(_) => {
                         // natural end... this runner is ready to be dropped
@@ -897,6 +930,7 @@ impl HyperClientRunner {
                         self.ext = None;
                     }
                 }
+                println!("RELAY TERMIANTED");
             }
         }
     }
@@ -1024,7 +1058,7 @@ mod tests {
 }
 
 pub mod test {
-    use crate::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, DirectInterchangeMountHyperwayExtFactory, HyperClient, HyperGate, HyperGateSelector, HyperRouter, Hyperway, HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist};
+    use crate::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, DirectInterchangeMountHyperwayExtFactory, HyperClient, HyperGate, HyperGateSelector, Hyperlane, HyperRouter, Hyperway, HyperwayExt, HyperwayExtFactory, HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist};
     use cosmic_api::command::request::create::PointFactoryU64;
     use cosmic_api::error::MsgErr;
     use cosmic_api::id::id::{Point, ToPort};
@@ -1032,13 +1066,11 @@ pub mod test {
     use cosmic_api::msg::MsgMethod;
     use cosmic_api::substance::substance::{Substance, Token};
     use cosmic_api::sys::{Knock, InterchangeKind};
-    use cosmic_api::wave::{
-        Agent, DirectedKind, DirectedProto, Exchanger, HyperWave, Pong, ProtoTransmitter,
-        ReflectedKind, ReflectedProto, ReflectedWave, Router, TxRouter, Wave,
-    };
+    use cosmic_api::wave::{Agent, DirectedKind, DirectedProto, Exchanger, HyperWave, Pong, ProtoTransmitter, ReflectedKind, ReflectedProto, ReflectedWave, Router, TxRouter, UltraWave, Wave};
     use std::collections::{HashMap, HashSet};
     use std::str::FromStr;
     use std::sync::{Arc};
+    use std::time::Duration;
     use dashmap::DashMap;
     use lazy_static::lazy_static;
     use tokio::sync::mpsc;
@@ -1058,6 +1090,120 @@ pub mod test {
             //    todo!()
         }
     }
+
+    fn hello_wave() -> UltraWave {
+        let mut hello = DirectedProto::new();
+        hello.kind(DirectedKind::Ping);
+        hello.to(FAE.clone().to_port());
+        hello.from(LESS.clone().to_port());
+        hello.method(MsgMethod::new("Hello").unwrap());
+        hello.body(Substance::Empty);
+        let directed = hello.build().unwrap();
+        let wave = directed.to_ultra();
+        wave
+    }
+
+    #[tokio::test]
+    pub async fn test_hyperlane() {
+        let hyperlane = Hyperlane::new();
+        let mut rx = hyperlane.rx().await;
+        let wave = hello_wave();
+        let wave_id = wave.id().clone();
+        hyperlane.send(wave).await.unwrap();
+        let wave = tokio::time::timeout( Duration::from_secs(5u64), rx.recv()).await.unwrap().unwrap();
+        assert_eq!(wave.id(),wave_id);
+    }
+
+    #[tokio::test]
+    pub async fn test_hyperway() {
+        let hyperway = Hyperway::new( LESS.clone(), LESS.to_agent() );
+        let wave = hello_wave();
+        let wave_id = wave.id().clone();
+        hyperway.outbound.send(wave).await;
+        let wave = tokio::time::timeout( Duration::from_secs(5u64), hyperway.outbound.rx().await.recv()).await.unwrap().unwrap();
+        assert_eq!(wave.id(),wave_id);
+    }
+
+    #[tokio::test]
+    pub async fn test_hyperway_ext() {
+        let hyperway = Hyperway::new( LESS.clone(), LESS.to_agent() );
+        let mut ext = hyperway.mount().await;
+        let wave = hello_wave();
+        let wave_id = wave.id().clone();
+        ext.tx.send(wave).await;
+        let wave = tokio::time::timeout( Duration::from_secs(5u64), hyperway.outbound.rx().await.recv()).await.unwrap().unwrap();
+        assert_eq!(wave.id(),wave_id);
+
+        let wave = hello_wave();
+        let wave_id = wave.id().clone();
+        hyperway.inbound.send(wave).await;
+        let wave = tokio::time::timeout( Duration::from_secs(5u64), ext.rx.recv()).await.unwrap().unwrap();
+        assert_eq!(wave.id(),wave_id);
+    }
+
+    #[tokio::test]
+    pub async fn test_hyperclient() {
+        pub struct TestFactory {
+            pub hyperway: Hyperway
+        }
+
+        impl TestFactory {
+            pub fn new() -> Self {
+                let hyperway = Hyperway::new( LESS.clone(), LESS.to_agent() );
+                Self { hyperway }
+            }
+
+            pub fn inbound_tx(&self) -> mpsc::Sender<UltraWave> {
+                self.hyperway.inbound.tx()
+            }
+
+            pub async fn inbound_rx(&self) -> mpsc::Receiver<UltraWave> {
+                self.hyperway.inbound.rx().await
+            }
+
+
+            pub async fn outbound_rx(&self) -> mpsc::Receiver<UltraWave> {
+                self.hyperway.outbound.rx().await
+            }
+
+            pub fn outbound_tx(&self) -> mpsc::Sender<UltraWave> {
+                self.hyperway.outbound.tx()
+            }
+        }
+
+        #[async_trait]
+        impl HyperwayExtFactory for TestFactory{
+            async fn create(&self) -> Result<HyperwayExt, MsgErr> {
+                Ok(self.hyperway.mount().await)
+            }
+        }
+
+        let (tx,mut rx) = mpsc::channel(1024);
+        let factory = TestFactory::new();
+        let outbound_tx = factory.outbound_tx();
+        let client = HyperClient::new( HyperwayStub::new(LESS.clone(),LESS.to_agent()), Box::new(factory), tx ).unwrap();
+
+        let wave = hello_wave();
+        let wave_id = wave.id().clone();
+        outbound_tx.send(wave).await.unwrap();
+        let wave = tokio::time::timeout( Duration::from_secs(5u64), rx.recv()).await.unwrap().unwrap();
+        assert_eq!(wave.id(),wave_id);
+
+        println!("=======OK!=========");
+
+        /*
+        let router = client.router();
+        let wave = hello_wave();
+        let wave_id = wave.id().clone();
+        router.route(wave);
+        let wave = tokio::time::timeout( Duration::from_secs(5u64), outbound_rx.recv()).await.unwrap().unwrap();
+        assert_eq!(wave.id(),wave_id);
+
+         */
+
+    }
+
+
 
     #[tokio::test]
     pub async fn test() {
