@@ -913,7 +913,6 @@ impl HyperClientRunner {
                 ])
                 .await
                 {
-                    let index = 0;
                     match index {
                         0 => {
                             // message comes from client, therefore it should go towards ext
@@ -1234,36 +1233,48 @@ pub mod test {
             }
         }
 
-        let (client_listener_tx, mut client_listener_rx) = mpsc::channel(1024);
-        let factory = TestFactory::new();
-        let outbound_tx= factory.outbound_tx();
-        let mut outbound_rx = factory.outbound_rx().await;
-        let mut inbound_rx = factory.inbound_rx().await;
-        let client = HyperClient::new(
-            HyperwayStub::new(LESS.clone(), LESS.to_agent()),
-            Box::new(factory),
-            client_listener_tx,
-        )
-        .unwrap();
+        {
+            let (client_listener_tx, mut client_listener_rx) = mpsc::channel(1024);
+            let factory = TestFactory::new();
+            let mut inbound_rx = factory.inbound_rx().await;
+            let client = HyperClient::new(
+                HyperwayStub::new(LESS.clone(), LESS.to_agent()),
+                Box::new(factory),
+                client_listener_tx,
+            )
+                .unwrap();
 
-        let router = client.router();
-        let wave = hello_wave();
-        let wave_id = wave.id().clone();
-        router.route(wave).await;
-        let wave = tokio::time::timeout(Duration::from_secs(5u64), inbound_rx.recv())
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(wave.id(), wave_id);
+            let router = client.router();
+            let wave = hello_wave();
+            let wave_id = wave.id().clone();
+            router.route(wave).await;
+            let wave = tokio::time::timeout(Duration::from_secs(5u64), inbound_rx.recv())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(wave.id(), wave_id);
+        }
 
-        let wave = hello_wave();
-        let wave_id = wave.id().clone();
-        outbound_tx.send(wave).await.unwrap();
-        let wave = tokio::time::timeout(Duration::from_secs(5u64), client_listener_rx.recv())
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(wave.id(), wave_id);
+        {
+            let (client_listener_tx, mut client_listener_rx) = mpsc::channel(1024);
+            let factory = TestFactory::new();
+            let outbound_tx = factory.outbound_tx();
+            let client = HyperClient::new(
+                HyperwayStub::new(LESS.clone(), LESS.to_agent()),
+                Box::new(factory),
+                client_listener_tx,
+            )
+                .unwrap();
+
+            let wave = hello_wave();
+            let wave_id = wave.id().clone();
+            outbound_tx.send(wave).await.unwrap();
+            let wave = tokio::time::timeout(Duration::from_secs(5u64), client_listener_rx.recv())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(wave.id(), wave_id);
+        }
     }
 
     #[tokio::test]
