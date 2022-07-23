@@ -440,16 +440,11 @@ impl HyperAuthenticator for TokenAuthenticator {
 }
 
 #[derive(Clone)]
-pub struct AnonHyperAuthenticator {
-    pub logger: RootLogger,
-    pub lane_point_factory: Arc<dyn PointFactory>,
-}
+pub struct AnonHyperAuthenticator;
 
 impl AnonHyperAuthenticator {
-    pub fn new(lane_point_factory: Arc<dyn PointFactory>, logger: RootLogger) -> Self {
+    pub fn new() -> Self {
         Self {
-            logger,
-            lane_point_factory,
         }
     }
 }
@@ -513,19 +508,16 @@ impl HyperAuthenticator for AnonHyperAuthenticator {
 #[derive(Clone)]
 pub struct AnonHyperAuthenticatorAssignEndPoint {
     pub logger: RootLogger,
-    pub lane_point_factory: Arc<dyn PointFactory>,
     pub remote_point_factory: Arc<dyn PointFactory>,
 }
 
 impl AnonHyperAuthenticatorAssignEndPoint {
     pub fn new(
-        lane_point_factory: Arc<dyn PointFactory>,
         remote_point_factory: Arc<dyn PointFactory>,
         logger: RootLogger,
     ) -> Self {
         Self {
             logger,
-            lane_point_factory,
             remote_point_factory,
         }
     }
@@ -657,11 +649,11 @@ pub trait HyperGate: Send + Sync {
 
 #[derive(Clone)]
 pub struct HyperGateSelector {
-    map: Arc<DashMap<InterchangeKind, Box<dyn HyperGate>>>,
+    map: Arc<DashMap<InterchangeKind, Arc<dyn HyperGate>>>,
 }
 
 impl HyperGateSelector {
-    pub fn new(map: Arc<DashMap<InterchangeKind, Box<dyn HyperGate>>>) -> Self {
+    pub fn new(map: Arc<DashMap<InterchangeKind, Arc<dyn HyperGate>>>) -> Self {
         Self { map }
     }
 }
@@ -795,6 +787,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct HyperClient {
     pub stub: HyperwayStub,
     tx: mpsc::Sender<UltraWave>,
@@ -1020,6 +1013,27 @@ impl HyperwayExtFactory for LocalHyperwayGateUnlocker {
         self.gate.knock(self.knock.clone()).await
     }
 }
+
+
+pub struct LocalHyperwayGateJumper {
+    pub kind: InterchangeKind,
+    pub stub: HyperwayStub,
+    pub gate: Arc<dyn HyperGate>
+}
+
+impl LocalHyperwayGateJumper {
+    pub fn new(kind: InterchangeKind, stub: HyperwayStub, gate: Arc<dyn HyperGate>) -> Self {
+        Self { kind,stub,gate }
+    }
+}
+
+#[async_trait]
+impl HyperwayExtFactory for LocalHyperwayGateJumper {
+    async fn create(&self) -> Result<HyperwayExt, HyperConnectionErr> {
+        self.gate.jump(self.kind.clone(), self.stub.clone()).await
+    }
+}
+
 
 pub struct DirectInterchangeMountHyperwayExtFactory {
     pub stub: HyperwayStub,
@@ -1327,7 +1341,7 @@ pub mod test {
             "lane-".to_string(),
         ));
 
-        let auth = AnonHyperAuthenticator::new(lane_point_factory, root_logger.clone());
+        let auth = AnonHyperAuthenticator::new();
         let gate =
             MountInterchangeGate::new(auth, interchange.clone(), logger.push("gate").unwrap());
         let mut gates: Arc<DashMap<InterchangeKind, Box<dyn HyperGate>>> = Arc::new(DashMap::new());

@@ -1,4 +1,4 @@
-use crate::star::{Star, StarApi, StarCon,  StarSkel, StarTemplate};
+use crate::star::{Star, StarApi, StarCon, StarSkel, StarTemplate};
 use crate::{PlatErr, Platform, Registry, RegistryApi};
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{Point, ToPoint, ToPort};
@@ -6,64 +6,66 @@ use cosmic_api::id::{ConstellationName, MachineName, StarHandle, StarKey, StarSu
 use cosmic_api::log::{PointLogger, RootLogger};
 use cosmic_api::quota::Timeouts;
 use cosmic_api::substance::substance::Substance;
-use cosmic_api::sys::{Knock, InterchangeKind};
+use cosmic_api::sys::{InterchangeKind, Knock};
 use cosmic_api::wave::{Agent, HyperWave, UltraWave};
 use cosmic_api::ArtifactApi;
-use cosmic_hyperlane::{
-    HyperClient, InterchangeGate, HyperRouter, Hyperway, HyperwayInterchange,
-    HyperGateSelector, LocalHyperwayGateUnlocker, TokenAuthenticatorWithRemoteWhitelist,
-};
+use cosmic_hyperlane::{HyperClient, HyperGate, HyperGateSelector, HyperRouter, Hyperway, HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist};
 use dashmap::DashMap;
+use futures::future::join_all;
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::sync::Arc;
-use tokio::sync::{broadcast, mpsc, oneshot};
-use tracing::info;
-use futures::future::join_all;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::error::RecvError;
+use tokio::sync::{broadcast, mpsc, oneshot};
+use tracing::info;
 
 #[derive(Clone)]
-pub struct MachineApi<P> where P: Platform {
-    tx: mpsc::Sender<MachineCall<P>>
+pub struct MachineApi<P>
+where
+    P: Platform,
+{
+    tx: mpsc::Sender<MachineCall<P>>,
 }
 
-impl <P> MachineApi<P> where P: Platform {
-    pub fn new( tx: mpsc::Sender<MachineCall<P>>) -> Self {
-        Self {
-            tx
-        }
+impl<P> MachineApi<P>
+where
+    P: Platform,
+{
+    pub fn new(tx: mpsc::Sender<MachineCall<P>>) -> Self {
+        Self { tx }
     }
 
     pub fn terminate(&self) {
         self.tx.try_send(MachineCall::Terminate);
     }
 
-    pub async fn wait_ready( &self ) {
-        let (tx,mut rx) = oneshot::channel();
+    pub async fn wait_ready(&self) {
+        let (tx, mut rx) = oneshot::channel();
         self.tx.send(MachineCall::WaitForReady(tx)).await;
         rx.await;
     }
 
-
-    pub async fn wait( &self ) -> Result<(),P::Err> {
-        let (tx,mut rx) = oneshot::channel();
+    pub async fn wait(&self) -> Result<(), P::Err> {
+        let (tx, mut rx) = oneshot::channel();
         self.tx.send(MachineCall::Wait(tx)).await;
         let mut rx = match rx.await {
             Ok(rx) => rx,
-            Err(err) => { return Err(P::Err::new(err.to_string()));}
+            Err(err) => {
+                return Err(P::Err::new(err.to_string()));
+            }
         };
         match rx.recv().await {
-            Ok(result) => {
-                result
+            Ok(result) => result,
+            Err(err) => {
+                return Err(P::Err::new(err.to_string()));
             }
-            Err(err) => { return Err(P::Err::new(err.to_string()));}
         }
     }
 
     #[cfg(test)]
-    pub async fn get_machine_star( &self ) -> Result<StarApi<P>,MsgErr> {
-        let (tx,mut rx) = oneshot::channel();
+    pub async fn get_machine_star(&self) -> Result<StarApi<P>, MsgErr> {
+        let (tx, mut rx) = oneshot::channel();
         self.tx.send(MachineCall::GetMachineStar(tx)).await;
         Ok(rx.await?)
     }
@@ -80,7 +82,7 @@ where
     pub artifacts: ArtifactApi,
     pub logger: RootLogger,
     pub timeouts: Timeouts,
-    pub api: MachineApi<P>
+    pub api: MachineApi<P>,
 }
 
 pub struct Machine<P>
@@ -90,11 +92,10 @@ where
     pub skel: MachineSkel<P>,
     pub stars: Arc<HashMap<Point, StarApi<P>>>,
     pub machine_star: StarApi<P>,
-    pub entry_router: HyperGateSelector,
-    pub interchanges: HashMap<StarKey, Arc<HyperwayInterchange>>,
+    pub gate_selector: HyperGateSelector,
     pub rx: mpsc::Receiver<MachineCall<P>>,
-    pub termination_broadcast_tx: broadcast::Sender<Result<(),P::Err>>,
-    pub logger: PointLogger
+    pub termination_broadcast_tx: broadcast::Sender<Result<(), P::Err>>,
+    pub logger: PointLogger,
 }
 
 impl<P> Machine<P>
@@ -102,16 +103,18 @@ where
     P: Platform + 'static,
 {
     pub fn new(platform: P) -> MachineApi<P> {
-        let (tx,rx) = mpsc::channel(1024);
+        let (tx, rx) = mpsc::channel(1024);
         let machine_api = MachineApi::new(tx.clone());
-        tokio::spawn( async move {
-           Machine::init(platform, tx, rx ).await
-        });
+        tokio::spawn(async move { Machine::init(platform, tx, rx).await });
 
         machine_api
     }
 
-    async fn init(platform: P, tx: mpsc::Sender<MachineCall<P>>, rx: mpsc::Receiver<MachineCall<P>>) -> Result<MachineApi<P>, P::Err> {
+    async fn init(
+        platform: P,
+        tx: mpsc::Sender<MachineCall<P>>,
+        rx: mpsc::Receiver<MachineCall<P>>,
+    ) -> Result<MachineApi<P>, P::Err> {
         let template = platform.machine_template();
         let machine_name = platform.machine_name();
 
@@ -128,61 +131,65 @@ where
 
         let mut stars = HashMap::new();
         let mut gates = Arc::new(DashMap::new());
-        let mut clients = vec![];
-        let mut interchanges = HashMap::new();
         let star_templates = template.with_machine_star(machine_name);
 
         for star_template in star_templates {
             let star_point = star_template.key.clone().to_point();
-            let (fabric_tx, mut fabric_rx) = mpsc::channel(32 * 1024);
             let mut builder = skel.platform.drivers_builder(&star_template.kind);
             let drivers_point = star_point.push("drivers".to_string()).unwrap();
             let logger = skel.logger.point(drivers_point.clone());
             builder.logger.replace(logger.clone());
             let star_skel = StarSkel::new(star_template.clone(), skel.clone(), builder.kinds());
             let drivers = builder.build(drivers_point.to_port(), star_skel.clone())?;
-            let star_api = Star::new(star_skel.clone(), drivers, fabric_tx)?;
-            stars.insert(star_point.clone(), star_api.clone());
 
             let interchange = Arc::new(HyperwayInterchange::new(
                 logger.push("interchange").unwrap(),
             ));
-            interchanges.insert(star_template.key.clone(), interchange.clone());
-            let mut connect_whitelist = HashSet::new();
-            for con in &star_template.hyperway {
-                match con {
-                    StarCon::Receive(stub) => {
-                        connect_whitelist.insert(stub.key.clone().to_point());
-                    }
-                    StarCon::Connect(stub) => clients.push((star_point.clone(), stub.key.clone())),
-                }
-            }
 
+
+                /*
             {
                 let router = interchange.router();
                 tokio::spawn(async move {
                     while let Some(wave) = fabric_rx.recv().await {
-println!("ROUTING TO FABRIC!");
+                        println!("ROUTING TO FABRIC!");
                         router.route(wave).await;
                     }
                 });
             }
+                 */
 
-            /*
-            let auth = TokenAuthenticatorWithRemoteWhitelist::new(
-                Agent::HyperUser,
-                skel.platform.token(),
-                connect_whitelist,
+            let auth = skel.platform.star_auth(&star_template.key)?;
+            let gate: Arc<dyn HyperGate> = Arc::new(MountInterchangeGate::new(auth, interchange.clone(), logger.clone()));
+            let hyperway = Hyperway::new(star_point.clone(), Agent::HyperUser );
+            interchange.add(hyperway);
+            let (to_star_tx,from_hyperway_rx) = mpsc::channel(1024);
+            let stub = HyperwayStub::new(star_point.clone(),Agent::HyperUser);
+            let hyper_client = HyperClient::new(stub.clone(), Box::new(LocalHyperwayGateJumper::new(InterchangeKind::Star(star_template.key.clone()), stub, gate.clone())), to_star_tx)?;
+
+            for con in star_template.connections.iter() {
+                match con {
+                    StarCon::Receiver(remote) => {
+                        let star = remote.key.clone().to_point();
+                        let hyperway = Hyperway::new(star, Agent::HyperUser);
+                        interchange.add(hyperway);
+                    }
+                    StarCon::Connector(remote) => {
+                        let star = remote.key.clone().to_point();
+                        let hyperway = Hyperway::new(star, Agent::HyperUser);
+                        interchange.add(hyperway);
+                    }
+                }
+            }
+
+            gates.insert(
+                InterchangeKind::Star(star_template.key.clone()),
+                gate,
             );
 
-            let gate = InterchangeGate::new(
-                Box::new(auth),
-                interchange,
-                logger.point(star_point.clone()).push("gate").unwrap(),
-            );
+            let star_api = Star::new(star_skel.clone(), drivers, hyper_client, from_hyperway_rx)?;
+            stars.insert(star_point.clone(), star_api);
 
-            gates.insert(InterchangeKind::Star(star_template.key.clone()), gate);
-             */
         }
 
         let mut entry_router = HyperGateSelector::new(gates);
@@ -210,10 +217,10 @@ println!("ROUTING TO FABRIC!");
 
         skel.platform.start_services(&mut entry_router);
 
-        let (machine_point,machine_star) = stars
+        let (machine_point, machine_star) = stars
             .iter()
-            .find(|(k,v)| v.kind == StarSub::Machine)
-            .map(|(k,v)| (k.clone(),v.clone()))
+            .find(|(k, v)| v.kind == StarSub::Machine)
+            .map(|(k, v)| (k.clone(), v.clone()))
             .expect("expected Machine Star");
 
         {
@@ -225,34 +232,33 @@ println!("ROUTING TO FABRIC!");
 
         let logger = skel.logger.point(machine_point);
 
-        let( term_tx, _) = broadcast::channel(1);
+        let (term_tx, _) = broadcast::channel(1);
 
         let mut machine = Self {
             skel,
             logger,
             machine_star,
             stars: Arc::new(stars),
-            entry_router,
+            gate_selector: entry_router,
             rx,
-            interchanges,
-            termination_broadcast_tx: term_tx
+            termination_broadcast_tx: term_tx,
         };
 
-            machine.start().await;
+        machine.start().await;
         Ok(machine_api)
     }
 
-    async fn pre_init(&self) -> Result<(),MsgErr> {
+    async fn pre_init(&self) -> Result<(), MsgErr> {
         let logger = self.logger.span();
         logger.info("Machine::pre_init()");
         let mut pre_inits = vec![];
         for star in self.stars.values() {
             pre_inits.push(star.pre_init());
         }
-        let results: Vec<Result<(),MsgErr>> = join_all(pre_inits).await;
+        let results: Vec<Result<(), MsgErr>> = join_all(pre_inits).await;
         for result in results {
             if result.is_err() {
-                logger.error("init error in star" );
+                logger.error("init error in star");
                 result?;
             }
         }
@@ -260,54 +266,55 @@ println!("ROUTING TO FABRIC!");
         Ok(())
     }
 
-    async fn start(mut self) -> Result<(),P::Err> {
+    async fn start(mut self) -> Result<(), P::Err> {
+        //        self.pre_init().await?;
 
-//        self.pre_init().await?;
+        while let Some(call) = self.rx.recv().await {
+            match call {
+                MachineCall::Terminate => {
+                    self.termination_broadcast_tx.send(Ok(()));
+                    return Ok(());
+                }
+                MachineCall::Wait(tx) => {
+                    tx.send(self.termination_broadcast_tx.subscribe());
+                }
 
-         while let Some(call) = self.rx.recv().await {
-             match call {
-                 MachineCall::Terminate => {
-                     self.termination_broadcast_tx.send(Ok(()));
-                     return Ok(())
-                 }
-                 MachineCall::Wait(tx) => {
-                     tx.send(self.termination_broadcast_tx.subscribe());
-                 }
+                MachineCall::WaitForReady(tx) => {
+                    // right now we don't know what Ready means other than the Call loop has started
+                    // so we return Ready in every case
+                    tx.send(());
+                }
+                MachineCall::Phantom(_) => {
+                    // do nothing, it is just here to carry the 'P'
+                }
+                #[cfg(test)]
+                MachineCall::GetMachineStar(tx) => {
+                    tx.send(self.machine_star.clone());
+                }
+                #[cfg(test)]
+                MachineCall::GetRegistry(tx) => {}
+            }
 
-                 MachineCall::WaitForReady(tx) => {
-                     // right now we don't know what Ready means other than the Call loop has started
-                     // so we return Ready in every case
-                     tx.send(());
-                 }
-                 MachineCall::Phantom(_) => {
-                     // do nothing, it is just here to carry the 'P'
-                 }
-                 #[cfg(test)]
-                 MachineCall::GetMachineStar(tx) => {
-                     tx.send(self.machine_star.clone());
-                 }
-                 #[cfg(test)]
-                 MachineCall::GetRegistry(tx) => {}
-             }
-
-             self.termination_broadcast_tx.send(Err(P::Err::new("machine quit unexpectedly.")));
-
-         }
-
+            self.termination_broadcast_tx
+                .send(Err(P::Err::new("machine quit unexpectedly.")));
+        }
 
         Ok(())
     }
 }
 
-pub enum MachineCall<P> where P: Platform{
+pub enum MachineCall<P>
+where
+    P: Platform,
+{
     Terminate,
-    Wait(oneshot::Sender<broadcast::Receiver<Result<(),P::Err>>>),
+    Wait(oneshot::Sender<broadcast::Receiver<Result<(), P::Err>>>),
     WaitForReady(oneshot::Sender<()>),
     Phantom(PhantomData<P>),
     #[cfg(test)]
     GetMachineStar(oneshot::Sender<StarApi<P>>),
     #[cfg(test)]
-    GetRegistry(oneshot::Sender<Registry<P>>)
+    GetRegistry(oneshot::Sender<Registry<P>>),
 }
 
 pub struct MachineTemplate {

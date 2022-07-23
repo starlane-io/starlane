@@ -28,7 +28,7 @@ use cosmic_api::{
     MountKind, Registration, State, StateFactory,
 };
 use cosmic_driver::{Core, Driver, DriverFactory, DriverLifecycleCall, DriverSkel, DriverStatus};
-use cosmic_hyperlane::HyperRouter;
+use cosmic_hyperlane::{HyperClient, HyperRouter};
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
 use futures::future::{join_all, BoxFuture};
@@ -204,7 +204,7 @@ where
 
         let mut adjacents = HashMap::new();
         // prime the searcher by mapping the immediate lanes
-        for hyperway in template.hyperway.clone() {
+        for hyperway in template.connections.clone() {
             adjacents.insert(hyperway.key().clone().to_point(), hyperway.stub().clone() );
         }
 
@@ -238,7 +238,7 @@ where
             inject_tx: star_tx.inject_tx.clone(),
             exchanger,
             state,
-            connections: template.hyperway,
+            connections: template.connections,
             registry: machine.registry.clone(),
             machine,
             adjacents,
@@ -275,7 +275,7 @@ where
 pub enum StarCall<P> where P: Platform {
     PreInit(oneshot::Sender<Result<(),MsgErr>>),
     Stub(oneshot::Sender<StarStub>),
-    FromHyperway{wave: HyperWave, tx: Option<oneshot::Sender<Result<(),MsgErr>>>},
+    FromHyperway{wave: UltraWave, tx: Option<oneshot::Sender<Result<(),MsgErr>>>},
     TraverseToNextLayer(Traversal<UltraWave>),
     LayerTraversalInjection(TraversalInjection),
     CreateMount {
@@ -309,11 +309,7 @@ impl <P> StarTx<P> where P: Platform {
             let call_tx = call_tx.clone();
             tokio::spawn(async move {
                 while let Some(wave) = gravity_well_rx.recv().await {
-                    let wave = HyperWave {
-                        wave,
-                        from: point.clone(),
-                    };
-                    call_tx.send(StarCall::FromHyperway{wave, tx: None}).await;
+                   call_tx.send(StarCall::FromHyperway{wave, tx: None}).await;
                 }
             });
         }
@@ -364,7 +360,7 @@ impl <P> StarApi<P> where P: Platform {
         rx.await?
     }
 
-    pub async fn from_hyperway(&self, wave: HyperWave, results: bool ) -> Result<(),MsgErr> {
+    pub async fn from_hyperway(&self, wave: UltraWave, results: bool ) -> Result<(),MsgErr> {
         match results {
             true => {
                 let (tx,mut rx) = oneshot::channel();
@@ -423,6 +419,7 @@ where
     golden_path: DashMap<StarKey, StarKey>,
     hyperway_transmitter: ProtoTransmitter,
     surface: Port,
+    hyper_router: TxRouter
 }
 
 impl<P> Star<P>
@@ -432,7 +429,8 @@ where
     pub fn new(
         skel: StarSkel<P>,
         mut drivers: Drivers<P>,
-        hyperway_tx: mpsc::Sender<UltraWave>,
+        hyper_client: HyperClient,
+        mut from_hyperway_rx: mpsc::Receiver<UltraWave>
     ) -> Result<StarApi<P>, MsgErr> {
         let star_driver_factory = Box::new(StarDriverFactory::new(skel.clone()));
         drivers.add(star_driver_factory)?;
@@ -444,8 +442,8 @@ where
             }
         }
 
-        let hyperway_router = Arc::new(TxRouter::new(hyperway_tx));
-        let mut hyperway_transmitter = ProtoTransmitterBuilder::new( hyperway_router, skel.exchanger.clone() );
+        let hyperway_router = Arc::new(hyper_client.router());
+        let mut hyperway_transmitter = ProtoTransmitterBuilder::new( hyperway_router.clone(), skel.exchanger.clone() );
         hyperway_transmitter.agent = SetStrategy::Override(Agent::HyperUser);
         hyperway_transmitter.scope = SetStrategy::Override(Scope::Full);
         let hyperway_transmitter = hyperway_transmitter.build();
@@ -475,9 +473,20 @@ where
                 hyperway_transmitter,
                 forwarders,
                 surface,
+                hyper_router: hyper_client.router(),
             };
             star.start();
         }
+
+        {
+            let star_tx = star_tx.clone();
+            tokio::spawn(async move {
+                while let Some(wave) = from_hyperway_rx.recv().await {
+                    star_tx.send(StarCall::FromHyperway {wave, tx: None}).await;
+                }
+            });
+        }
+
         Ok(StarApi::new(kind, star_tx))
     }
 
@@ -490,7 +499,7 @@ where
                         tx.send(self.pre_init().await);
                     }
                     StarCall::FromHyperway{wave, tx} => {
-                        let result = self.from_hyperway(wave.wave).await.map_err(|e|e.to_cosmic_err());
+                        let result = self.from_hyperway(wave).await.map_err(|e|e.to_cosmic_err());
                         if let Some(tx) = tx {
                             tx.send(result);
                         }
@@ -1127,7 +1136,7 @@ pub enum StateCall {
 pub struct StarTemplate {
     pub key: StarKey,
     pub kind: StarSub,
-    pub hyperway: Vec<StarCon>,
+    pub connections: Vec<StarCon>,
 }
 
 
@@ -1137,7 +1146,7 @@ impl StarTemplate {
         Self {
             key,
             kind,
-            hyperway: vec![],
+            connections: vec![],
         }
     }
 
@@ -1146,39 +1155,54 @@ impl StarTemplate {
     }
 
     pub fn receive(&mut self, stub: StarStub) {
-        self.hyperway.push(StarCon::Receive(stub));
+        self.connections.push(StarCon::Receiver(stub));
     }
 
     pub fn connect(&mut self, stub: StarStub) {
-        self.hyperway.push(StarCon::Connect(stub));
+        self.connections.push(StarCon::Connector(stub));
     }
 }
 
 #[derive(Clone)]
 pub enum StarCon {
-    Receive(StarStub),
-    Connect(StarStub),
+    Receiver(StarStub),
+    Connector(StarStub),
 }
 
 impl StarCon {
+
+    pub fn is_connector(&self) -> bool {
+        match self {
+            StarCon::Receiver(_) => false,
+            StarCon::Connector(_) => true
+        }
+    }
+
+    pub fn is_receiver(&self) -> bool {
+        match self {
+            StarCon::Receiver(_) => true,
+            StarCon::Connector(_) => false
+        }
+    }
+
     pub fn stub(&self) -> &StarStub {
         match self {
-            StarCon::Receive(stub) => stub,
-            StarCon::Connect(stub) => stub
+            StarCon::Receiver(stub) => stub,
+            StarCon::Connector(stub) => stub
         }
     }
 
     pub fn key(&self) -> &StarKey {
         match self {
-            StarCon::Receive(stub) => &stub.key,
-            StarCon::Connect(stub) => &stub.key,
+            StarCon::Receiver(stub) => &stub.key,
+            StarCon::Connector(stub) => &stub.key,
         }
     }
 
     pub fn kind(&self) -> &StarSub {
         match self {
-            StarCon::Receive(stub) => &stub.kind,
-            StarCon::Connect(stub) => &stub.kind,
+            StarCon::Receiver(stub) => &stub.kind,
+            StarCon::Connector(stub) => &stub.kind,
         }
     }
 }

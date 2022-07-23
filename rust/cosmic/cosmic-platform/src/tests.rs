@@ -14,6 +14,7 @@ use std::time::Duration;
 use tokio::join;
 use tokio::sync::{Mutex, oneshot};
 use tokio::sync::mpsc::{Receiver, Sender};
+use cosmic_hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
 
 lazy_static! {
     pub static ref LESS: Point = Point::from_str("space:users:less").expect("point");
@@ -35,6 +36,16 @@ impl TestPlatform {
 impl Platform for TestPlatform {
     type Err = TestErr;
     type RegistryContext = TestRegistryContext;
+    type StarAuth = AnonHyperAuthenticator;
+    type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
+
+    fn star_auth(&self, star: &StarKey) -> Result<Self::StarAuth, Self::Err> {
+        Ok(AnonHyperAuthenticator::new())
+    }
+
+    fn remote_connection_factory_for_star(&self, star: &StarKey) -> Result<Self::RemoteStarConnectionFactory, Self::Err> {
+        todo!()
+    }
 
 
     fn machine_template(&self) -> MachineTemplate {
@@ -282,7 +293,7 @@ println!("ADDING PARTICLE: {}",particle.to_string());
 }
 
 #[test]
-fn it_works() -> Result<(), TestErr> {
+fn test_outer_wave_routing() -> Result<(), TestErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;

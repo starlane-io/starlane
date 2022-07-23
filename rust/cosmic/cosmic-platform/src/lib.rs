@@ -18,7 +18,7 @@ use cosmic_api::id::id::{BaseKind, Kind, Point, Specific, ToBaseKind};
 use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, MachineName, StarKey, StarSub, UserBaseSubKind};
 use cosmic_api::substance::substance::{Substance, SubstanceList, Token};
 use cosmic_api::{ArtifactApi, IndexedAccessGrant, Registration,  };
-use cosmic_hyperlane::HyperGateSelector;
+use cosmic_hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayExtFactory};
 use std::str::FromStr;
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
@@ -280,14 +280,19 @@ pub trait PlatErr: Sized + Send + Sync + ToString + Clone + Into<MsgErr> + From<
 }
 
 #[async_trait]
-pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'static, Self::RegistryContext : Send+Sync
-{
+pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'static, Self::RegistryContext : Send+Sync, Self::StarAuth: HyperAuthenticator, Self::RemoteStarConnectionFactory: HyperwayExtFactory {
+
     type Err;
     type RegistryContext;
+    type StarAuth;
+    type RemoteStarConnectionFactory;
 
     fn machine(&self) -> MachineApi<Self> {
         Machine::new(self.clone())
     }
+
+    fn star_auth(&self, star: &StarKey) -> Result<Self::StarAuth,Self::Err>;
+    fn remote_connection_factory_for_star(&self, star: &StarKey ) -> Result<Self::RemoteStarConnectionFactory,Self::Err>;
 
     fn machine_template(&self) -> MachineTemplate;
     fn machine_name(&self) -> MachineName;
