@@ -46,7 +46,7 @@ impl DriverSkel {
     }
 }
 
-pub trait DriverFactory {
+pub trait DriverFactory: Send+Sync {
     fn kind(&self) -> Kind;
     fn create(&self, skel: DriverSkel) -> Box<dyn Driver>;
 }

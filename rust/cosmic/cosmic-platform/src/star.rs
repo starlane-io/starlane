@@ -419,7 +419,7 @@ where
     golden_path: DashMap<StarKey, StarKey>,
     hyperway_transmitter: ProtoTransmitter,
     surface: Port,
-    hyper_router: TxRouter
+    hyper_router: Arc< dyn Router >
 }
 
 impl<P> Star<P>
@@ -441,8 +441,8 @@ where
             }
         }
 
-        let hyperway_router = Arc::new(hyperway_ext.router());
-        let mut hyperway_transmitter = ProtoTransmitterBuilder::new( hyperway_router.clone(), skel.exchanger.clone() );
+        let hyper_router = Arc::new(hyperway_ext.router());
+        let mut hyperway_transmitter = ProtoTransmitterBuilder::new( hyper_router.clone(), skel.exchanger.clone() );
         hyperway_transmitter.agent = SetStrategy::Override(Agent::HyperUser);
         hyperway_transmitter.scope = SetStrategy::Override(Scope::Full);
         let hyperway_transmitter = hyperway_transmitter.build();
@@ -480,8 +480,7 @@ where
                 hyperway_transmitter,
                 forwarders,
                 surface,
-                hyperway_ext,
-                hyper_router: hyper_client.router(),
+                hyper_router
             };
             star.start();
         }
