@@ -9,9 +9,7 @@ use cosmic_api::particle::particle::Status;
 use cosmic_api::substance::substance::{Errors, Substance, SubstanceKind, Token};
 use cosmic_api::sys::{InterchangeKind, Knock, Sys};
 use cosmic_api::util::uuid;
-use cosmic_api::wave::{
-    Agent, HyperWave, Method, Ping, Pong, Reflectable, Router, SysMethod, TxRouter, UltraWave, Wave,
-};
+use cosmic_api::wave::{Agent, DirectedKind, DirectedProto, HyperWave, Method, Ping, Pong, Reflectable, Router, SysMethod, TxRouter, UltraWave, Wave};
 use cosmic_api::VERSION;
 use dashmap::DashMap;
 use futures::future::select_all;
@@ -20,6 +18,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::ops::{Deref, DerefMut};
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
@@ -28,12 +27,18 @@ use tokio::sync::mpsc::error::{SendError, SendTimeoutError, TrySendError};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{broadcast, mpsc, oneshot, Mutex, RwLock};
+use cosmic_api::msg::MsgMethod;
 
 #[macro_use]
 extern crate async_trait;
 
 #[macro_use]
 extern crate lazy_static;
+
+lazy_static! {
+        pub static ref LOCAL_CLIENT: Point = Point::from_str("LOCAL::client").expect("point");
+        pub static ref LOCAL_CLIENT_RUNNER: Point = Point::from_str("LOCAL::client:runner").expect("point");
+    }
 
 pub enum HyperwayKind {
     Mount,
@@ -829,6 +834,20 @@ impl HyperClient {
         Ok(client)
     }
 
+    pub fn reset(&self) {
+        let mut wave = DirectedProto::new();
+        wave.kind(DirectedKind::Signal);
+        wave.from(LOCAL_CLIENT.clone().to_port());
+        wave.to(LOCAL_CLIENT_RUNNER.clone().to_port());
+        wave.method(MsgMethod::new("Reset").unwrap()).unwrap();
+        let wave = wave.build().unwrap();
+        let wave = wave.to_ultra();
+        let tx = self.tx.clone();
+        tokio::spawn( async move {
+            tx.send(wave).await.unwrap_or_default();
+        });
+    }
+
     pub fn router(&self) -> TxRouter {
         TxRouter::new(self.tx.clone())
     }
@@ -915,14 +934,17 @@ impl HyperClientRunner {
                 {
                     match index {
                         0 => {
-                            // message comes from client, therefore it should go towards ext
-                            match ext.tx.send(wave).await {
-                                Ok(_) => {
-                                }
-                                Err(err) => {
-                                    // wave gets lost... need to requeue it somehow...
-                                    //                                    runner.to_client_tx.try_send(err.0);
-                                    return Err(MsgErr::from_500("ext failure"));
+                            // message comes from client, therefore it should go towards ext (unless it's pointed to the runner)
+                            if wave.to().is_single() && wave.to().unwrap_single().point == *LOCAL_CLIENT_RUNNER {
+                                return Err(MsgErr::from_500("reset"));
+                            } else {
+                                match ext.tx.send(wave).await {
+                                    Ok(_) => {}
+                                    Err(err) => {
+                                        // wave gets lost... need to requeue it somehow...
+                                        //                                    runner.to_client_tx.try_send(err.0);
+                                        return Err(MsgErr::from_500("ext failure"));
+                                    }
                                 }
                             }
                         }
@@ -1243,6 +1265,8 @@ pub mod test {
                 client_listener_tx,
             )
                 .unwrap();
+
+            client.reset();
 
             let router = client.router();
             let wave = hello_wave();
