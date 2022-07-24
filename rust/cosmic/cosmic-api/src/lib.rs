@@ -142,13 +142,14 @@ impl ArtifactFetcher for NoDiceArtifactFetcher {
     }
 }
 
+#[derive(Clone)]
 pub struct ArtRef<A> {
     artifact: Arc<A>,
     point: Point,
 }
 
 impl<A> ArtRef<A> {
-    fn new(artifact: Arc<A>, point: Point) -> Self {
+    pub fn new(artifact: Arc<A>, point: Point) -> Self {
         Self { artifact, point }
     }
 }

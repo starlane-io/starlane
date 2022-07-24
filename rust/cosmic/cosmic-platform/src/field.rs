@@ -6,14 +6,12 @@ use cosmic_api::error::MsgErr;
 use cosmic_api::config::config::bind::{
     BindConfig, PipelineStepVar, PipelineStopVar, WaveKind,
 };
-use cosmic_api::id::id::{Layer, Point, Port, ToPoint, ToPort, TraversalLayer, Uuid};
+use cosmic_api::id::id::{BaseKind, Kind, Layer, Point, Port, ToBaseKind, ToPoint, ToPort, TraversalLayer, Uuid};
 use cosmic_api::id::{ArtifactSubKind, TraversalInjection};
 use cosmic_api::id::Traversal;
 use cosmic_api::log::{PointLogger, RootLogger, SpanLogger};
 use cosmic_api::parse::model::PipelineVar;
-use cosmic_api::parse::{
-    Env, MapResolver, MultiVarResolver, PointCtxResolver, RegexCapturesResolver,
-};
+use cosmic_api::parse::{bind_config, Env, MapResolver, MultiVarResolver, PointCtxResolver, RegexCapturesResolver};
 use cosmic_api::security::Access;
 use cosmic_api::selector::selector::PipelineKind;
 use cosmic_api::selector::{PayloadBlock, PayloadBlockVar};
@@ -31,8 +29,26 @@ use http::{HeaderMap, StatusCode, Uri};
 use tokio::io::AsyncBufReadExt;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, Mutex};
-use cosmic_api::{};
+use cosmic_api::{ArtRef};
 use crate::{PlatErr, Platform, RegistryApi};
+
+
+lazy_static! {
+    static ref STAR_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new( Arc::new(star_bind_config()), Point::from_str("GLOBAL::repo:bind:star").unwrap());
+}
+
+fn star_bind_config() -> BindConfig
+{
+    bind_config(r#"
+    Bind(version=1.0.0)
+    {
+        Route {
+          Msg<Transport> -> {{}};
+        }
+    }
+
+    "#).unwrap()
+}
 
 #[derive(Clone)]
 pub struct FieldEx<P> where P: Platform+'static {
@@ -73,6 +89,16 @@ impl <P> FieldEx<P> where P: Platform+'static {
         }
         Ok(())
     }
+
+    fn static_bind(&self, kind: &Kind ) -> Option<ArtRef<BindConfig>> {
+        match kind.to_base() {
+            BaseKind::Star => {
+                Some(STAR_BIND_CONFIG.clone())
+            }
+            _ => None
+        }
+    }
+
 }
 
 #[async_trait]
@@ -120,7 +146,9 @@ println!("FieldEx directed_core_bound!");
             }
         }
 
-        let bind = self.skel.machine.artifacts.bind(&directed.to).await?;
+println!("PRE BIND");
+        let bind = self.static_bind(&directed.record.details.stub.kind).unwrap_or(self.skel.machine.artifacts.bind(&directed.to).await?);
+println!("GOT BIND!");
         let route = bind.select(&directed.payload )?;
 
         let regex = route.selector.path.clone();
@@ -167,6 +195,7 @@ println!("FieldEx directed_core_bound!");
         self.handle_action(action);
         Ok(())
     }
+
 
     async fn reflected_core_bound(&self, mut traversal: Traversal<ReflectedWave>) -> Result<(), MsgErr> {
         let reflected_id = traversal.reflection_of().to_string();

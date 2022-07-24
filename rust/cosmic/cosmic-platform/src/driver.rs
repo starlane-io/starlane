@@ -325,7 +325,7 @@ where
         &self.port
     }
 
-    async fn delivery_directed(&self, direct: Traversal<DirectedWave>) {
+    async fn deliver_directed(&self, direct: Traversal<DirectedWave>) {
         let logger = self
             .skel
             .logger

@@ -71,7 +71,10 @@ where
 {
 
     pub fn create_field(&self, port: Port ) {
+
+        println!("create field: {}",port.to_string() );
         self.field.insert(port.clone(),FieldState::new(port) );
+
     }
 
     pub fn create_shell(&self, port: Port ) {
@@ -159,6 +162,7 @@ where
     }
 
     pub fn find_field(&self, port: &Port) -> Result<FieldState<P>, MsgErr> {
+println!("port: {}",port.to_string() );
         let rtn = self
             .field
             .get(port)
@@ -477,6 +481,8 @@ where
         skel.registry.register(&registration).await?;
         skel.registry.assign( &skel.point, &skel.point ).await?;
         skel.registry.set_status( &skel.point, &Status::Initializing ).await?;
+        skel.state.create_field( skel.point.clone().to_port().with_layer( Layer::Field ));
+        skel.state.create_shell( skel.point.clone().to_port().with_layer( Layer::Shell));
 
         let star_driver_factory = Box::new(StarDriverFactory::new(skel.clone()));
         drivers.add(star_driver_factory)?;
@@ -853,7 +859,7 @@ println!("...field traversal layer...");
                     let field = FieldEx::new(
                         traversal.point.clone(),
                         self.skel.clone(),
-                        self.skel.state.find_field(&traversal.to)?,
+                        self.skel.state.find_field(&traversal.to.clone().with_layer(Layer::Field))?,
                         traversal.logger.clone(),
                     );
                     field.visit(traversal).await;
@@ -861,7 +867,7 @@ println!("...field traversal layer...");
                 Layer::Shell => {
                     let shell = ShellEx::new(
                         self.skel.clone(),
-                        self.skel.state.find_shell(&traversal.to)?,
+                        self.skel.state.find_shell(&traversal.to.clone().with_layer(Layer::Shell))?,
                     );
                     shell.visit(traversal).await;
                 }

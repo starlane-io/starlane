@@ -1583,7 +1583,7 @@ pub mod id {
 
         fn exchanger(&self) -> &Exchanger;
 
-        async fn delivery_directed(&self, direct: Traversal<DirectedWave>) {}
+        async fn deliver_directed(&self, direct: Traversal<DirectedWave>) {}
 
         async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) {
             self.exchanger().reflected(reflect.payload).await;
@@ -1594,20 +1594,20 @@ println!("VISIT LAYER: {}", self.port().layer.to_string() );
             if let Some(dest) = &traversal.dest {
                 if self.port().layer == *dest {
                     if traversal.is_ping() {
-                        self.delivery_directed(traversal.unwrap_directed()).await;
+                        self.deliver_directed(traversal.unwrap_directed()).await;
                     } else {
                         self.deliver_reflected(traversal.unwrap_reflected()).await;
                     }
                 }
-            } else if traversal.is_ping() && traversal.dir == TraversalDirection::Fabric {
+            } else if traversal.is_directed() && traversal.dir == TraversalDirection::Fabric {
                 self.directed_fabric_bound(traversal.unwrap_directed())
                     .await;
-            } else if traversal.is_pong() && traversal.dir == TraversalDirection::Core {
+            } else if traversal.is_reflected() && traversal.dir == TraversalDirection::Core {
                 self.reflected_core_bound(traversal.unwrap_reflected())
                     .await;
-            } else if traversal.is_ping() && traversal.dir == TraversalDirection::Core {
+            } else if traversal.is_directed() && traversal.dir == TraversalDirection::Core {
                 self.directed_core_bound(traversal.unwrap_directed()).await;
-            } else if traversal.is_pong() && traversal.dir == TraversalDirection::Fabric {
+            } else if traversal.is_reflected() && traversal.dir == TraversalDirection::Fabric {
                 self.reflected_fabric_bound(traversal.unwrap_reflected())
                     .await;
             }
@@ -3267,6 +3267,7 @@ impl Traversal<UltraWave> {
         match self.payload {
             UltraWave::Ping(ping) => clone.with(ping.to_directed().clone()),
             UltraWave::Ripple(ripple) => clone.with(ripple.to_directed()),
+            UltraWave::Signal(signal) => clone.with(signal.to_directed()),
             _ => {
                 panic!("cannot call this unless you are sure it's a DirectedWave")
             }

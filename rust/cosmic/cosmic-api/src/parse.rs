@@ -7044,7 +7044,7 @@ pub mod test {
         space_no_dupe_dots, space_point_segment, strip_comments, subst, var_seg, variable_name,
         version, version_point_segment, wrapper, Env, MapResolver, SubstParser, VarResolver,
     };
-    use crate::util;
+    use crate::{Substance, util};
     use crate::util::ToResolved;
     use bincode::config;
     use cosmic_nom::{new_span, span_with_extra, Res};
@@ -7159,8 +7159,8 @@ pub mod test {
         }
 
         let mut env = Env::new(Point::from_str("my-domain.com")?);
-        env.set_var("route", "[hub]");
-        env.set_var("name", "zophis");
+        env.set_var("route", Substance::Text("[hub]".to_string()));
+        env.set_var("name", Substance::Text("zophis".to_string()));
         let point: Point = point.to_resolved(&env)?;
         println!("point.to_string(): {}", point.to_string());
 
@@ -7185,8 +7185,8 @@ pub mod test {
 
         let point = util::log(result(point_var(new_span("${route}::${root}:base1"))))?;
         let mut env = Env::new(Point::from_str("my-domain.com:blah")?);
-        env.set_var("route", "[hub]");
-        env.set_var("root", "..");
+        env.set_var("route", Substance::Text("[hub]".to_string()));
+        env.set_var("root", Substance::Text("..".to_string()));
 
         let point: PointCtx = util::log(point.to_resolved(&env))?;
 

@@ -55,7 +55,7 @@ impl <P> TraversalLayer for ShellEx<P> where P: Platform +'static {
         &self.skel.exchanger
     }
 
-    async fn delivery_directed(&self, directed: Traversal<DirectedWave> ) {
+    async fn deliver_directed(&self, directed: Traversal<DirectedWave> ) {
         let logger = self.skel.logger.point(directed.to.point.clone()).span();
         let injector = directed.from().clone().with_topic(Topic::None).with_layer(self.port().layer.clone());
         let router = Arc::new(LayerInjectionRouter::new(

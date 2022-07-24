@@ -196,7 +196,7 @@ impl RegistryApi<TestPlatform> for TestRegistryApi {
     }
 
     async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, TestErr> {
-        todo!()
+        Ok(Access::Super)
     }
 
     async fn chown<'a>(
