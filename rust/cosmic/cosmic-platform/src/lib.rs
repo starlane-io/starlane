@@ -14,7 +14,7 @@ use std::collections::HashSet;
 use crate::driver::DriversBuilder;
 use crate::machine::{Machine, MachineApi, MachineTemplate};
 use cosmic_api::command::request::create::KindTemplate;
-use cosmic_api::id::id::{BaseKind, Kind, Point, Specific, ToBaseKind};
+use cosmic_api::id::id::{BaseKind, Kind, Point, RouteSeg, Specific, ToBaseKind};
 use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, MachineName, StarKey, StarSub, UserBaseSubKind};
 use cosmic_api::substance::substance::{Substance, SubstanceList, Token};
 use cosmic_api::{ArtifactApi, IndexedAccessGrant, Registration,  };

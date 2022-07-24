@@ -1875,7 +1875,7 @@ impl Recipients {
             Recipients::Watchers(_) => false,
             Recipients::Stars =>
             {
-                if let RouteSeg::Sys(_) = point.route {
+                if let RouteSeg::Star(_) = point.route {
                     if point.segments.len() == 1 && *point.segments.first().unwrap() == PointSeg::Space("star".to_string()) {
                         true
                     } else {

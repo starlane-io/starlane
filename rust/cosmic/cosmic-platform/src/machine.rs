@@ -185,7 +185,7 @@ where
                 gate,
             );
 
-            let star_api = Star::new(star_skel.clone(), drivers, hyperway_ext)?;
+            let star_api = Star::new(star_skel.clone(), drivers, hyperway_ext).await?;
             stars.insert(star_point.clone(), star_api);
 
         }

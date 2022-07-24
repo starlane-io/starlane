@@ -126,7 +126,7 @@ pub fn tag_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
 
 pub fn sys_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
     delimited(tag("<<"), sys_route_chars, tag(">>"))(input)
-        .map(|(next, tag)| (next, RouteSeg::Sys(tag.to_string())))
+        .map(|(next, tag)| (next, RouteSeg::Star(tag.to_string())))
 }
 
 pub fn other_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
