@@ -1590,6 +1590,7 @@ pub mod id {
         }
 
         async fn visit(&self, traversal: Traversal<UltraWave>) {
+println!("VISIT LAYER: {}", self.port().layer.to_string() );
             if let Some(dest) = &traversal.dest {
                 if self.port().layer == *dest {
                     if traversal.is_ping() {

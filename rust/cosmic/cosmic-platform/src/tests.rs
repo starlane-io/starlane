@@ -14,6 +14,7 @@ use std::time::Duration;
 use tokio::join;
 use tokio::sync::{Mutex, oneshot};
 use tokio::sync::mpsc::{Receiver, Sender};
+use cosmic_api::id::TraversalDirection;
 use cosmic_hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
 
 lazy_static! {
@@ -161,7 +162,6 @@ impl RegistryApi<TestPlatform> for TestRegistryApi {
     }
 
     async fn locate<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, TestErr> {
-println!("registry locating:::> {}",point.to_string());
         Ok(self
             .ctx
             .particles
@@ -486,7 +486,19 @@ fn test_layer_traversal() -> Result<(), TestErr> {
                         Ok(wave) => {
                             if wave.id() == wave_id {
                                 println!("intercepted start_layer_traversal!");
-                                check_start_traversal_tx.send(Ok(()));
+                                if traversal.dir != TraversalDirection::Core {
+                                    println!("Bad Traversal Direction");
+                                    check_start_traversal_tx.send(Err(()));
+                                } else if traversal.dest.is_some() {
+                                    println!("Bad Traversal Dest ");
+                                    check_start_traversal_tx.send(Err(()));
+                                } else if traversal.layer != Layer::Field {
+                                    println!("Bad Traversal Layer");
+                                    check_start_traversal_tx.send(Err(()));
+                                } else {
+println!("traversal layer {}", traversal.layer.to_string());
+                                    check_start_traversal_tx.send(Ok(()));
+                                }
                                 break;
                             } else {
                                 println!("intercepted start_layer_traversal RECEIVED WAVE: {}", wave.id().to_string())

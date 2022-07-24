@@ -91,6 +91,7 @@ impl <P> TraversalLayer for FieldEx<P> where P: Platform +'static {
     }
 
     async fn directed_core_bound(&self, mut directed: Traversal<DirectedWave>) -> Result<(), MsgErr> {
+println!("FieldEx directed_core_bound!");
         directed.logger.set_span_attr("message-id", &directed.id().to_string() );
         let access = self.skel.registry.access(&directed.agent().clone().to_point(), &directed.to).await;
 

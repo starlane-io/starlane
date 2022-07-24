@@ -69,6 +69,16 @@ impl<P> StarState<P>
 where
     P: Platform + 'static,
 {
+
+    pub fn create_field(&self, port: Port ) {
+        self.field.insert(port.clone(),FieldState::new(port) );
+    }
+
+    pub fn create_shell(&self, port: Port ) {
+        self.shell.insert(port.clone(),ShellState::new(port) );
+    }
+
+
     pub fn new() -> Self {
         let states: Arc<DashMap<Port, Arc<RwLock<dyn State>>>> = Arc::new(DashMap::new());
 
@@ -486,8 +496,7 @@ where
         let hyperway_transmitter = hyperway_transmitter.build();
 
         let (star_tx, star_rx) = mpsc::channel(32 * 1024);
-        let mut injector = skel.location().clone().push("injector").unwrap().to_port();
-        injector.layer = Layer::Gravity;
+        let mut injector = skel.location().clone().push("injector").unwrap().to_port().with_layer(Layer::Gravity);
 
         let mut golden_path = DashMap::new();
         for con in skel.connections.iter() {
@@ -542,13 +551,20 @@ where
                             .map_err(|e| e.to_cosmic_err());
                         if let Some(tx) = rtn {
                             tx.send(result);
+                        } else {
+                            match result {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    self.skel.err(e.to_string());
+                                }
+                            }
                         }
                     }
                     StarCall::TraverseToNextLayer(traversal) => {
                         self.traverse_to_next_layer(traversal).await;
                     }
                     StarCall::LayerTraversalInjection(inject) => {
-                        self.start_layer_traversal(inject.wave, &inject.injector)
+                        self.start_layer_traversal(inject.wave, &inject.injector, false)
                             .await;
                     }
                     StarCall::CreateMount {
@@ -566,7 +582,12 @@ where
                     }
                     #[cfg(test)]
                     StarCall::ToGravity(wave) => {
-                        self.to_gravity(wave).await;
+                        match self.to_gravity(wave).await {
+                            Ok(_) => {}
+                            Err(err) => {
+                                self.skel.err(err.to_string());
+                            }
+                        }
                     }
                     #[cfg(test)]
                     StarCall::GetSkel(rtn) => {
@@ -599,7 +620,7 @@ where
         if transport.to.point == self.skel.point {
             // we are now going to send this transport down the layers to the StarCore
             // where it's contents will be unwrapped from transport and routed to the appropriate particle
-            self.start_layer_traversal(transport.to_ultra(), &self.injector)
+            self.start_layer_traversal(transport.to_ultra(), &self.injector, true )
                 .await
         } else {
             self.forward(transport).await
@@ -673,7 +694,7 @@ where
         }
     }
 
-    async fn start_layer_traversal(&self, wave: UltraWave, injector: &Port) -> Result<(), P::Err> {
+    async fn start_layer_traversal(&self, wave: UltraWave, injector: &Port, from_hyperway: bool) -> Result<(), P::Err> {
         #[cfg(test)]
         self.skel
             .diagnostic_interceptors
@@ -698,7 +719,9 @@ where
         let mut dest = None;
         let mut dir = TraversalDirection::Core;
             // now we check if we are doing an inter point delivery (from one layer to another in the same Particle)
-            if wave.to().clone().unwrap_single().point == wave.from().point {
+            // if this delivery was from_hyperway, then it was certainly a message being routed back to the star
+            // and is not considered an inter point delivery
+            if !from_hyperway && wave.to().clone().unwrap_single().point == wave.from().point {
                 // it's the SAME point, so the to layer becomes our dest
                 dest.replace(wave.to().clone().unwrap_single().layer);
 
@@ -729,7 +752,9 @@ where
                     // then it needs to traverse towards the Core
                     dir = TraversalDirection::Core;
                     // and dest will be the to layer
-                    dest.replace(wave.to().clone().unwrap_single().layer);
+                    if !from_hyperway {
+                        dest.replace(wave.to().clone().unwrap_single().layer);
+                    }
                 }
             }
 
@@ -749,6 +774,9 @@ where
             injector.clone().to_point()
         };
 
+
+
+
         let mut traversal = Traversal::new(
             wave,
             record,
@@ -760,11 +788,6 @@ where
             point,
         );
 
-        #[cfg(test)]
-        self.skel
-            .diagnostic_interceptors
-            .start_layer_traversal
-            .send(traversal.clone());
 
         // in the case that we injected into a layer that is not part
         // of this plan, we need to send the traversal to the next layer
@@ -772,13 +795,21 @@ where
             traversal.next();
         }
 
+        #[cfg(test)]
+        self.skel
+            .diagnostic_interceptors
+            .start_layer_traversal
+            .send(traversal.clone());
+
         // alright, let's visit the injection layer first...
-        self.visit_layer(traversal).await;
+        self.visit_layer(traversal).await?;
         Ok(())
     }
 
     async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(), MsgErr> {
+println!("VISIT layer called : {}", traversal.layer.to_string() );
         if traversal.is_directed() && self.skel.state.topic.contains_key(&traversal.to) {
+println!("TOPIC?");
             let topic = self.skel.state.find_topic(&traversal.to, traversal.from());
             match topic {
                 None => {
@@ -818,6 +849,7 @@ where
         } else {
             match traversal.layer {
                 Layer::Field => {
+println!("...field traversal layer...");
                     let field = FieldEx::new(
                         traversal.point.clone(),
                         self.skel.clone(),

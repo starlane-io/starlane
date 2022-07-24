@@ -399,7 +399,6 @@ impl LogAppender for StdOutAppender {
     }
 
     fn span_event(&self, log: LogSpanEvent) {
-        println!("span..." )
     }
 
     fn pointless(&self, log: PointlessLog) {
