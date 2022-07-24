@@ -1325,7 +1325,7 @@ pub mod id {
     )]
     #[repr(u8)]
     pub enum Layer {
-        Surface = 0,
+        Gravity = 0,
         Field,
         Shell,
         Driver,
@@ -1338,7 +1338,7 @@ pub mod id {
     impl Layer {
         pub fn has_state(&self) -> bool {
             match self {
-                Layer::Surface => false,
+                Layer::Gravity => false,
                 Layer::Field => true,
                 Layer::Shell => true,
                 Layer::Driver => true,

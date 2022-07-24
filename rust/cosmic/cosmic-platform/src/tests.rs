@@ -293,7 +293,7 @@ println!("ADDING PARTICLE: {}",particle.to_string());
 }
 
 #[test]
-fn test_outer_wave_routing() -> Result<(), TestErr> {
+fn test_gravity_routing() -> Result<(), TestErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -308,12 +308,11 @@ fn test_outer_wave_routing() -> Result<(), TestErr> {
         create(&platform.ctx, LESS.clone(), location.clone() );
         create(&platform.ctx, FAE.clone(), location.clone() );
 
-        let record = platform.global_registry().await.unwrap().locate(&LESS).await.expect("IS LESS THERE?");
-println!("location for LESS: {}", record.location.to_string());
+//        let record = platform.global_registry().await.unwrap().locate(&LESS).await.expect("IS LESS THERE?");
 
         let skel = star_api.get_skel().await.unwrap();
 
-        let mut to_fabric_rx = skel.diagnostic_interceptors.to_fabric.subscribe();
+        let mut to_fabric_rx = skel.diagnostic_interceptors.to_gravity.subscribe();
         let mut from_hyperway_rx = skel.diagnostic_interceptors.from_hyperway.subscribe();
 
         // send a 'nice' wave from Fae to Less
@@ -321,7 +320,7 @@ println!("location for LESS: {}", record.location.to_string());
         wave.kind(DirectedKind::Ping);
         wave.from(FAE.clone().to_port());
         wave.to(LESS.clone().to_port());
-        wave.method(MsgMethod::new("DieTacEng").unwrap());
+        wave.method(MsgMethod::new("DieTacEng").unwrap()).unwrap();
         let wave = wave.build().unwrap();
         let wave = wave.to_ultra();
 
@@ -360,15 +359,95 @@ println!("location for LESS: {}", record.location.to_string());
             });
         }
 
-
         // send straight out of the star (circumvent layer traversal)
-        star_api.to_fabric(wave).await;
+        star_api.to_gravity(wave).await;
 
-        tokio::time::timeout(Duration::from_secs(5), check_from_hyperway_rx).await.unwrap();
-        tokio::time::timeout(Duration::from_secs(5), check_to_fabric_rx).await.unwrap();
+        tokio::time::timeout(Duration::from_secs(5), check_from_hyperway_rx).await.unwrap().unwrap().unwrap();
+        tokio::time::timeout(Duration::from_secs(5), check_to_fabric_rx).await.unwrap().unwrap().unwrap();
 
         Ok(())
 
     })
 
 }
+#[test]
+fn test_layer_traversal() -> Result<(), TestErr> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async move {
+        let platform = TestPlatform::new();
+        let machine_api = platform.machine();
+        machine_api.wait_ready().await;
+
+        let star_api = machine_api.get_machine_star().await.unwrap();
+        let stub = star_api.stub().await.unwrap();
+        let location = stub.key.clone().to_point();
+        create(&platform.ctx, LESS.clone(), location.clone() );
+        create(&platform.ctx, FAE.clone(), location.clone() );
+
+//        let record = platform.global_registry().await.unwrap().locate(&LESS).await.expect("IS LESS THERE?");
+
+        let skel = star_api.get_skel().await.unwrap();
+
+        let mut to_fabric_rx = skel.diagnostic_interceptors.to_gravity.subscribe();
+        let mut from_hyperway_rx = skel.diagnostic_interceptors.from_hyperway.subscribe();
+
+        // send a 'nice' wave from Fae to Less
+        let mut wave = DirectedProto::new();
+        wave.kind(DirectedKind::Ping);
+        wave.from(FAE.clone().to_port());
+        wave.to(LESS.clone().to_port());
+        wave.method(MsgMethod::new("DieTacEng").unwrap()).unwrap();
+        let wave = wave.build().unwrap();
+        let wave = wave.to_ultra();
+
+        let (check_to_fabric_tx, check_to_fabric_rx):(oneshot::Sender<Result<(),()>>,oneshot::Receiver<Result<(),()>>) = oneshot::channel();
+        let (check_from_hyperway_tx,check_from_hyperway_rx):(oneshot::Sender<Result<(),()>>,oneshot::Receiver<Result<(),()>>) = oneshot::channel();
+
+        let wave_id = wave.id();
+        {
+            tokio::spawn(async move {
+                while let Ok(hop) = from_hyperway_rx.recv().await {
+                    let transport = hop.unwrap_from_hop().unwrap();
+                    let wave = transport.unwrap_from_transport().unwrap();
+                    if wave.id() == wave_id {
+                        println!("intercepted from_hyperway event");
+                        check_from_hyperway_tx.send(Ok(()));
+                        break;
+                    } else {
+                        println!("RECEIVED WAVE: {}", wave.id().to_string())
+                    }
+                }
+            });
+        }
+
+        let wave_id = wave.id();
+        {
+            tokio::spawn(async move {
+                while let Ok(wave) = to_fabric_rx.recv().await {
+                    if wave.id() == wave_id {
+                        println!("intercepted to_fabric event!");
+                        check_to_fabric_tx.send(Ok(()));
+                        break;
+                    } else {
+                        println!("RECEIVED WAVE: {}", wave.id().to_string())
+                    }
+                }
+            });
+        }
+
+        // send straight out of the star (circumvent layer traversal)
+        star_api.to_gravity(wave).await;
+
+        tokio::time::timeout(Duration::from_secs(5), check_from_hyperway_rx).await.unwrap().unwrap().unwrap();
+        tokio::time::timeout(Duration::from_secs(5), check_to_fabric_rx).await.unwrap().unwrap().unwrap();
+
+        Ok(())
+
+    })
+
+}
+
+
+

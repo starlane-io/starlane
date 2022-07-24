@@ -106,7 +106,7 @@ impl <P> TraversalLayer for FieldEx<P> where P: Platform +'static {
                         Bounce::Absorbed => {}
                         Bounce::Reflected(reflected) => {
                             self.skel
-                                .gravity_well_tx
+                                .gravity_tx
                                 .send(reflected.to_ultra() ).await;
                         }
                     }
