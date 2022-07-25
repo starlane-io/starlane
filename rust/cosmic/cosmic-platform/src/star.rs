@@ -1110,6 +1110,8 @@ where
                 }
                 _ => {
                     self.skel.logger.warn("attempt to traverse wave in the inner layers which the Star does not manage");
+                    // without this panic the thread will hang
+                    panic!("attempt to traverse wave in the inner layers which the Star does not manage");
                 }
             }
         }
@@ -1573,11 +1575,12 @@ where
         self.star_skel
             .diagnostic_interceptors
             .transport_endpoint
-            .send(ctx.wave().clone().to_ultra());
-        println!("received Transport");
-        self.star_skel
-            .gravity_tx
-            .send(ctx.wave().clone().to_ultra())
+            .send(ctx.wave().clone().to_ultra() );
+        println!("@@@ !!!  received Transport !!! @@@");
+        let wave = ctx.input.clone();
+        let injection = TraversalInjection::new(self.star_skel.point.clone().to_port().with_layer(Layer::Field), wave);
+        self.star_skel.inject_tx.
+            send(injection)
             .await;
     }
 

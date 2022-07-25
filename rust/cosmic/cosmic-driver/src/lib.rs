@@ -7,6 +7,7 @@ use cosmic_api::State;
 use cosmic_api::wave::{DirectedHandler, InCtx, ReflectedCore, Router, UltraWave};
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, RwLock};
+use cosmic_api::id::Traversal;
 use cosmic_api::sys::{Assign, Sys};
 
 #[macro_use]
@@ -51,9 +52,19 @@ pub trait DriverFactory: Send+Sync {
     fn create(&self, skel: DriverSkel) -> Box<dyn Driver>;
 }
 
+pub enum DeliveryOpts {
+    Traverse,
+    Core
+}
+
 #[async_trait]
 pub trait Driver: DirectedHandler+Send+Sync {
     fn kind(&self) -> Kind;
+
+    fn delivery_opts(&self) -> DeliveryOpts {
+        DeliveryOpts::Core
+    }
+
     async fn status(&self) -> DriverStatus;
     async fn lifecycle(&mut self, event: DriverLifecycleCall) -> Result<DriverStatus,MsgErr>;
     fn ex(&self, point: &Point, state: Option<Arc<RwLock<dyn State>>>) -> Box<dyn Core>;

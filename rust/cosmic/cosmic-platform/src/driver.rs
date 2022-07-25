@@ -142,6 +142,7 @@ where
     async fn start_inner_traversal(&self, traversal: Traversal<UltraWave>) {}
 
     pub async fn visit(&self, traversal: Traversal<UltraWave>) {
+println!("Visiting Drivers...");
         if traversal.dir.is_core() {
             match self.drivers.get(&traversal.record.details.stub.kind) {
                 None => {
@@ -163,11 +164,12 @@ where
 #[derive(Clone)]
 pub struct DriverApi {
     pub tx: mpsc::Sender<DriverShellCall>,
+    pub kind: Kind
 }
 
 impl DriverApi {
-    pub fn new(tx: mpsc::Sender<DriverShellCall>) -> Self {
-        Self { tx }
+    pub fn new(tx: mpsc::Sender<DriverShellCall>, kind: Kind) -> Self {
+        Self { tx, kind}
     }
 
     pub async fn status(&self) -> Result<DriverStatus, MsgErr> {
@@ -186,6 +188,7 @@ impl DriverApi {
     }
 
     pub async fn traversal(&self, traversal: Traversal<UltraWave>) {
+println!("sending along driver: {}", self.kind.to_string());
         self.tx.send(DriverShellCall::Traversal(traversal)).await;
     }
 
@@ -280,7 +283,7 @@ where
     let core = factory.create(driver_skel);
     let state = skel.state.api().with_layer(Layer::Core);
     let shell = DriverShell::new(point, skel.clone(), core, state, shell_tx, shell_rx);
-    let api = DriverApi::new(shell);
+    let api = DriverApi::new(shell, factory.kind() );
     Ok(api)
 }
 
@@ -370,7 +373,7 @@ where
     rx: mpsc::Receiver<DriverShellCall>,
     state: StateApi,
     driver: Box<dyn Driver>,
-    router: Arc<LayerInjectionRouter<P>>,
+    router: LayerInjectionRouter<P>,
     logger: PointLogger,
 }
 
@@ -388,10 +391,10 @@ where
         rx: mpsc::Receiver<DriverShellCall>,
     ) -> mpsc::Sender<DriverShellCall> {
         let logger = skel.logger.point(point.clone());
-        let router = Arc::new(LayerInjectionRouter::new(
+        let router = LayerInjectionRouter::new(
             skel.clone(),
             point.clone().to_port().with_layer(Layer::Driver),
-        ));
+        );
 
         let driver = Self {
             point,
@@ -413,6 +416,7 @@ where
     fn start(mut self) {
         tokio::spawn(async move {
             while let Some(call) = self.rx.recv().await {
+println!("received Driver Shell Call!");
                 match call {
                     DriverShellCall::LifecycleCall { call, tx } => {
                         let result = self.lifecycle(call).await;
@@ -431,13 +435,15 @@ where
                         tx.send(self.status.clone());
                     }
                     DriverShellCall::Traversal(traversal) => {
+println!("Driver Shell Traversal:  ");
                         self.traverse(traversal).await;
                     }
                     DriverShellCall::Handle { wave, tx } => {
+println!("Handle wave! {}", wave.core().method.to_string() );
                         let port = wave.to().clone().unwrap_single();
                         let logger = self.skel.logger.point(port.clone().to_point()).span();
-                        let transmitter =
-                            ProtoTransmitter::new(self.router.clone(), self.skel.exchanger.clone());
+                        let router = Arc::new(self.router.clone() );
+                        let transmitter = ProtoTransmitter::new(router, self.skel.exchanger.clone());
                         let ctx = RootInCtx::new(wave, port.clone(), logger, transmitter);
                         match self.handle(ctx).await {
                             CoreBounce::Absorbed => {
@@ -517,7 +523,15 @@ where
         });
     }
 
-    async fn traverse(&self, traversal: Traversal<UltraWave>) {}
+    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(),MsgErr> {
+        let core = self.core(&traversal.to.point ).await?;
+        if traversal.is_directed() {
+            core.deliver_directed(traversal.unwrap_directed() ).await;
+        } else {
+            core.deliver_reflected(traversal.unwrap_reflected()).await;
+        }
+        Ok(())
+    }
 
     async fn lifecycle(&mut self, call: DriverLifecycleCall) -> Result<DriverStatus, MsgErr> {
         self.driver.lifecycle(call).await
@@ -536,11 +550,11 @@ where
             .await;
         let state = rx.await??;
         Ok(OuterCore {
-            port,
+            port: port.clone(),
             skel: self.skel.clone(),
             state: state.clone(),
             ex: self.driver.ex(point, state),
-            router: self.router.clone(),
+            router: Arc::new(self.router.clone().with(port)),
         })
     }
 
