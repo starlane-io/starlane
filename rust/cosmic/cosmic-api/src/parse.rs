@@ -3456,15 +3456,11 @@ pub mod model {
     use crate::http::HttpMethod;
     use crate::id::id::{Point, PointCtx, PointVar, Version};
     use crate::parse::error::result;
-    use crate::parse::{
-        camel_case_chars, filepath_chars, http_method, lex_child_scopes, method_kind, pipeline,
-        rc_command_type, value_pattern, wrapped_http_method, wrapped_msg_method, CtxResolver, Env,
-        ResolverErr, SubstParser,
-    };
+    use crate::parse::{camel_case_chars, filepath_chars, http_method, lex_child_scopes, method_kind, pipeline, rc_command_type, value_pattern, wrapped_http_method, wrapped_msg_method, CtxResolver, Env, ResolverErr, SubstParser, wrapped_cmd_method, wrapped_sys_method};
     use crate::util::{
         HttpMethodPattern, StringMatcher, ToResolved, ValueMatcher, ValuePattern,
     };
-    use crate::wave::{Method, MethodKind, DirectedCore, Ping, DirectedWave};
+    use crate::wave::{Method, MethodKind, DirectedCore, Ping, DirectedWave, SingularDirectedWave};
     use bincode::Options;
     use cosmic_nom::{new_span, Res, Span, Trace, Tw};
     use nom::bytes::complete::tag;
@@ -3659,6 +3655,19 @@ pub mod model {
         }
     }
 
+    impl ValueMatcher<SingularDirectedWave> for RouteScopeSelector {
+        fn is_match(&self, directed: &SingularDirectedWave) -> Result<(), ()> {
+            if self.name.as_str() != "Route" {
+                return Err(());
+            }
+            match self.selector.path.is_match(&directed.core().uri.path()) {
+                true => Ok(()),
+                false => Err(()),
+            }
+        }
+    }
+
+
     impl ValueMatcher<DirectedWave> for MessageScopeSelector {
         fn is_match(&self, directed: &DirectedWave) -> Result<(), ()> {
             self.name.is_match(&directed.core().method.kind())?;
@@ -3668,6 +3677,17 @@ pub mod model {
             }
         }
     }
+
+    impl ValueMatcher<SingularDirectedWave> for MessageScopeSelector {
+        fn is_match(&self, directed: &SingularDirectedWave) -> Result<(), ()> {
+            self.name.is_match(&directed.core().method.kind())?;
+            match self.path.is_match(&directed.core().uri.path()) {
+                true => Ok(()),
+                false => Err(()),
+            }
+        }
+    }
+
 
     fn default_path<I: ToString>(path: Option<I>) -> Result<Regex, MsgErr> {
         match path {
@@ -3726,6 +3746,14 @@ pub mod model {
         }
     }
 
+    impl ValueMatcher<SingularDirectedWave> for RouteScopeSelectorAndFilters {
+        fn is_match(&self, wave: &SingularDirectedWave) -> Result<(), ()> {
+            // nothing for filters at this time...
+            self.selector.is_match(wave)
+        }
+    }
+
+
     impl ValueMatcher<DirectedWave> for MessageScopeSelectorAndFilters {
         fn is_match(&self, request: &DirectedWave) -> Result<(), ()> {
             // nothing for filters at this time...
@@ -3733,12 +3761,28 @@ pub mod model {
         }
     }
 
+    impl ValueMatcher<SingularDirectedWave> for MessageScopeSelectorAndFilters {
+        fn is_match(&self, request: &SingularDirectedWave) -> Result<(), ()> {
+            // nothing for filters at this time...
+            self.selector.is_match(request)
+        }
+    }
+
+
     impl ValueMatcher<DirectedWave> for MethodScopeSelectorAndFilters {
         fn is_match(&self, directed: &DirectedWave) -> Result<(), ()> {
             // nothing for filters at this time...
             self.selector.is_match(directed)
         }
     }
+
+    impl ValueMatcher<SingularDirectedWave> for MethodScopeSelectorAndFilters {
+        fn is_match(&self, directed: &SingularDirectedWave) -> Result<(), ()> {
+            // nothing for filters at this time...
+            self.selector.is_match(directed)
+        }
+    }
+
 
     impl MethodScope {
         pub fn from_scope<I: Span>(
@@ -3784,6 +3828,16 @@ pub mod model {
             }
         }
     }
+
+    impl ValueMatcher<SingularDirectedWave> for MethodScopeSelector {
+        fn is_match(&self, directed: &SingularDirectedWave) -> Result<(), ()> {
+            self.name.is_match(&directed.core().method)?;
+            match self.path.is_match(&directed.core().uri.path()) {
+                true => Ok(()),
+                false => Err(()),
+            }
+        }
+    }
     impl MethodScopeSelectorAndFilters {
         pub fn from_selector<I: Span>(
             parent: &ValuePattern<MethodKind>,
@@ -3805,18 +3859,38 @@ pub mod model {
                 ValuePattern::None => ValuePattern::None,
                 ValuePattern::Pattern(message_kind) => match message_kind {
                     MethodKind::Sys => {
-                        return Err(ParseErrs::from_loc_span(
-                            format!("Sys not implemented '{}'", selector.name.to_string()).as_str(),
-                            "Sys not implemented",
-                            selector.name,
-                        ))
+                        match result(value_pattern(wrapped_sys_method)(selector.name.clone())) {
+                            Ok(r) => r,
+                            Err(_) => {
+                                return Err(ParseErrs::from_loc_span(
+                                    format!(
+                                        "invalid Sys method '{}'.  Sys should be CamelCase",
+                                        selector.name.to_string()
+                                    )
+                                        .as_str(),
+                                    "invalid Sys",
+                                    selector.name,
+                                ))
+                            }
+                        }
+
                     }
                     MethodKind::Cmd => {
-                        return Err(ParseErrs::from_loc_span(
-                            format!("Cmd not implemented '{}'", selector.name.to_string()).as_str(),
-                            "Cmd not implemented",
-                            selector.name,
-                        ))
+                        match result(value_pattern(wrapped_cmd_method)(selector.name.clone())) {
+                            Ok(r) => r,
+                            Err(_) => {
+                                return Err(ParseErrs::from_loc_span(
+                                    format!(
+                                        "invalid Cmd method '{}'.  Cmd should be CamelCase",
+                                        selector.name.to_string()
+                                    )
+                                        .as_str(),
+                                    "invalid Cmd",
+                                    selector.name,
+                                ))
+                            }
+                        }
+
                     }
                     MethodKind::Msg => {
                         match result(value_pattern(wrapped_msg_method)(selector.name.clone())) {
@@ -4978,7 +5052,7 @@ use crate::substance::substance::{
     SubstanceFormat, SubstanceKind, SubstancePattern, SubstancePatternCtx, SubstancePatternVar,
     SubstanceTypePatternCtx, SubstanceTypePatternDef, SubstanceTypePatternVar,
 };
-use crate::wave::{Method, MethodKind, MethodPattern, SysMethod};
+use crate::wave::{CmdMethod, Method, MethodKind, MethodPattern, SysMethod};
 use cosmic_nom::{new_span, span_with_extra, Trace};
 use cosmic_nom::{trim, tw, Res, Span, Wrap};
 use nom_supreme::error::ErrorTree;
@@ -6217,6 +6291,18 @@ pub fn sys_method<I: Span>(input: I) -> Res<I, SysMethod> {
     }
 }
 
+pub fn cmd_method<I: Span>(input: I) -> Res<I, CmdMethod> {
+    let (next, method) = camel_case_chars(input.clone())?;
+
+    match CmdMethod::from_str(method.to_string().as_str()) {
+        Ok(method) => Ok((next, method)),
+        Err(err) => Err(nom::Err::Error(ErrorTree::from_error_kind(
+            input,
+            ErrorKind::Fail,
+        ))),
+    }
+}
+
 pub fn wrapped_msg_method<I: Span>(input: I) -> Res<I, Method> {
     let (next, msg_method) = msg_method(input.clone())?;
 
@@ -6231,6 +6317,14 @@ pub fn wrapped_msg_method<I: Span>(input: I) -> Res<I, Method> {
 
 pub fn wrapped_http_method<I: Span>(input: I) -> Res<I, Method> {
     http_method(input).map(|(next, method)| (next, Method::Http(method)))
+}
+
+pub fn wrapped_sys_method<I: Span>(input: I) -> Res<I, Method> {
+    sys_method(input).map(|(next, method)| (next, Method::Sys(method)))
+}
+
+pub fn wrapped_cmd_method<I: Span>(input: I) -> Res<I, Method> {
+    cmd_method(input).map(|(next, method)| (next, Method::Cmd(method)))
 }
 
 pub fn rc_command_type<I: Span>(input: I) -> Res<I, RcCommandType> {

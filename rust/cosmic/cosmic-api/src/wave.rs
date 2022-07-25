@@ -14,10 +14,7 @@ use crate::particle::Watch;
 use crate::quota::Timeouts;
 use crate::security::{Permissions, Privilege, Privileges};
 use crate::selector::selector::Selector;
-use crate::substance::substance::{
-    Call, CallKind, Errors, HttpCall, MsgCall, MultipartFormBuilder, SubstanceKind, ToRequestCore,
-    Token,
-};
+use crate::substance::substance::{Call, CallKind, Errors, HttpCall, MsgCall, MultipartFormBuilder, SubstanceKind, ToRequestCore, Token, CmdCall, SysCall};
 use crate::substance::substance::{Substance, ToSubstance};
 use crate::sys::AssignmentKind;
 use crate::util::{uuid, ValueMatcher, ValuePattern};
@@ -122,6 +119,26 @@ impl UltraWave {
             _ => false
         }
 
+    }
+
+    pub fn to_singular(self) -> Result<SingularUltraWave,MsgErr> {
+        match self {
+            UltraWave::Ping(ping) => {
+                Ok(SingularUltraWave::Ping(ping))
+            }
+            UltraWave::Pong(pong) => {
+                Ok(SingularUltraWave::Pong(pong))
+            }
+            UltraWave::Echo(echo) => {
+                Ok(SingularUltraWave::Echo(echo))
+            }
+            UltraWave::Signal(signal) => {
+                Ok(SingularUltraWave::Signal(signal))
+            }
+            UltraWave::Ripple(_) => {
+                Err(MsgErr::from_500("cannot change Ripple into a singular"))
+            }
+        }
     }
 
     pub fn id(&self) -> WaveId {
@@ -657,6 +674,7 @@ impl <T> RippleDef<T> where T:ToRecipients+Clone{
            history: self.history
        }
    }
+
 }
 
 impl Wave<SingularRipple> {
@@ -670,11 +688,24 @@ impl Wave<SingularRipple> {
     }
 }
 
+impl Wave<SingularRipple> {
+    pub fn as_multi( &self, recipients: Recipients ) -> Wave<Ripple> {
+        let ripple = self.variant.clone().replace_to( recipients );
+        self.clone().replace(ripple)
+    }
+
+}
+
 impl Wave<Ripple> {
 
     pub fn as_single( &self, port: Port ) -> Wave<SingularRipple> {
         let ripple = self.variant.clone().replace_to( port );
         self.clone().replace(ripple)
+    }
+
+    pub fn to_singular_directed(self) -> Result<SingularDirectedWave,MsgErr> {
+        let to = self.to.clone().to_single()?;
+        Ok(self.as_single(to).to_singular_directed())
     }
 }
 
@@ -781,6 +812,12 @@ pub struct Ping {
     pub core: DirectedCore,
 }
 
+impl Wave<Ping> {
+    pub fn to_singular_directed(self) -> SingularDirectedWave {
+        SingularDirectedWave::Ping(self)
+    }
+}
+
 impl<S> ToSubstance<S> for Ping
 where
     Substance: ToSubstance<S>,
@@ -824,31 +861,7 @@ impl Into<DirectedProto> for Wave<Ping> {
     }
 }
 
-impl Ping {
-    pub fn to_call(&self) -> Result<Call, MsgErr> {
-        let kind = match &self.core.method {
-            Method::Cmd(_) => {
-                unimplemented!()
-            }
-            Method::Sys(_) => {
-                unimplemented!()
-            }
-            Method::Http(method) => CallKind::Http(HttpCall::new(
-                method.clone(),
-                Subst::new(self.core.uri.path())?,
-            )),
-            Method::Msg(method) => CallKind::Msg(MsgCall::new(
-                method.clone(),
-                Subst::new(self.core.uri.path())?,
-            )),
-        };
 
-        Ok(Call {
-            point: self.to.clone().to_point(),
-            kind: kind.clone(),
-        })
-    }
-}
 
 impl Ping {
     pub fn require_method<M: Into<Method> + ToString + Clone>(
@@ -1553,6 +1566,16 @@ pub enum DirectedWaveDef<T> where T: ToRecipients+Clone{
     Signal(Wave<Signal>),
 }
 
+impl <T> DirectedWaveDef<T> where T: ToRecipients+Clone {
+    pub fn kind(&self) -> WaveKind {
+        match self {
+            DirectedWaveDef::Ping(_) => WaveKind::Ping,
+            DirectedWaveDef::Ripple(_) => WaveKind::Ripple,
+            DirectedWaveDef::Signal(_) => WaveKind::Signal
+        }
+    }
+}
+
 impl DirectedWave {
     pub fn to(&self) -> Recipients {
         match self {
@@ -1561,6 +1584,8 @@ impl DirectedWave {
             Self::Signal(signal) => signal.to.clone().to_recipients(),
         }
     }
+
+
 
     pub fn hops(&self) -> u16 {
         match self {
@@ -1584,6 +1609,32 @@ impl DirectedWave {
             _ => Err("not a signal wave".into())
         }
     }
+
+    pub fn to_call(&self, to: Port) -> Result<Call, MsgErr> {
+        let kind = match &self.core().method {
+            Method::Cmd(method) => { CallKind::Cmd(CmdCall::new(
+                method.clone(),
+                Subst::new(self.core().uri.path())?))
+            }
+            Method::Sys(method) => CallKind::Sys(SysCall::new(
+                method.clone(),
+                Subst::new(self.core().uri.path())?,
+            )),
+            Method::Http(method) => CallKind::Http(HttpCall::new(
+                method.clone(),
+                Subst::new(self.core().uri.path())?,
+            )),
+            Method::Msg(method) => CallKind::Msg(MsgCall::new(
+                method.clone(),
+                Subst::new(self.core().uri.path())?,
+            )),
+        };
+
+        Ok(Call {
+            point: to.point,
+            kind
+        })
+    }
 }
 
 impl SingularDirectedWave {
@@ -1595,6 +1646,32 @@ impl SingularDirectedWave {
         }
     }
 
+    pub fn to_call(&self) -> Result<Call, MsgErr> {
+        let kind = match &self.core().method {
+            Method::Cmd(method) => { CallKind::Cmd(CmdCall::new(
+                method.clone(),
+                Subst::new(self.core().uri.path())?))
+            }
+            Method::Sys(method) => CallKind::Sys(SysCall::new(
+                method.clone(),
+                Subst::new(self.core().uri.path())?,
+            )),
+            Method::Http(method) => CallKind::Http(HttpCall::new(
+                method.clone(),
+                Subst::new(self.core().uri.path())?,
+            )),
+            Method::Msg(method) => CallKind::Msg(MsgCall::new(
+                method.clone(),
+                Subst::new(self.core().uri.path())?,
+            )),
+        };
+
+        Ok(Call {
+            point: self.to().clone().to_point(),
+            kind
+        })
+    }
+
     pub fn reflection(&self) -> Reflection {
         Reflection {
             from: self.from().clone(),
@@ -1603,6 +1680,15 @@ impl SingularDirectedWave {
         }
     }
 
+    pub fn to_ultra(self) -> UltraWave {
+        match self {
+            SingularDirectedWave::Ping(ping) => UltraWave::Ping(ping),
+            SingularDirectedWave::Signal(signal) => UltraWave::Signal(signal),
+            SingularDirectedWave::Ripple(ripple) => {
+                UltraWave::Ripple(ripple.to_multiple())
+            }
+        }
+    }
 }
 
 
@@ -1651,12 +1737,6 @@ impl <T> DirectedWaveDef<T> where T:ToRecipients+Clone{
         }
     }
 
-    pub fn to_call(&self) -> Result<Call, MsgErr> {
-        match self {
-            DirectedWaveDef::Ping(ping) => ping.to_call(),
-            _ => Err(MsgErr::not_found()),
-        }
-    }
 
     pub fn bounce_backs(&self) -> BounceBacks {
         match self {
@@ -1859,6 +1939,14 @@ impl ToRecipients for Recipients {
 }
 
 impl Recipients {
+    pub fn to_single(self) -> Result<Port,MsgErr> {
+        match self {
+            Recipients::Single(port) => Ok(port),
+            _ => {
+                Err(MsgErr::from_500("cannot convert a multiple recipient into a single"))
+            }
+        }
+    }
     pub fn is_match( &self, point: &Point ) -> bool {
         match self {
             Recipients::Single(port) => {
@@ -2098,7 +2186,9 @@ impl Wave<Signal> {
         }
     }
 
-
+        pub fn to_singular_directed(self) -> SingularDirectedWave {
+            SingularDirectedWave::Signal(self)
+        }
 
 }
 
@@ -2279,6 +2369,14 @@ impl <T> Wave<RippleDef<T>> where T:ToRecipients+Clone{
 
     pub fn bounce_backs(&self) -> BounceBacks {
         self.bounce_backs.clone()
+    }
+
+
+}
+
+impl Wave<SingularRipple> {
+    pub fn to_singular_directed(self) -> SingularDirectedWave {
+        SingularDirectedWave::Ripple(self)
     }
 }
 

@@ -20,7 +20,7 @@ pub mod substance {
     use crate::selector::selector::{KindSelector, Selector};
     use crate::sys::Sys;
     use crate::util::{uuid, ToResolved, ValueMatcher, ValuePattern};
-    use crate::wave::{HyperWave, Method, DirectedCore, ReflectedCore, Pong, Wave, UltraWave};
+    use crate::wave::{HyperWave, Method, DirectedCore, ReflectedCore, Pong, Wave, UltraWave, SysMethod, CmdMethod};
     use cosmic_macros_primitive::Autobox;
     use cosmic_nom::Tw;
     use http::header::CONTENT_TYPE;
@@ -704,6 +704,8 @@ pub mod substance {
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
     pub enum CallKind {
+        Cmd(CmdCall),
+        Sys(SysCall),
         Msg(MsgCall),
         Http(HttpCall),
     }
@@ -750,6 +752,44 @@ pub mod substance {
     impl ToString for MsgCall {
         fn to_string(&self) -> String {
             format!("Msg<{}>{}", self.method.to_string(), self.path.to_string())
+        }
+    }
+
+
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+    pub struct CmdCall {
+        pub path: Subst<Tw<String>>,
+        pub method: CmdMethod,
+    }
+
+    impl CmdCall {
+        pub fn new(method: CmdMethod, path: Subst<Tw<String>>) -> Self {
+            Self { method, path }
+        }
+    }
+
+    impl ToString for CmdCall {
+        fn to_string(&self) -> String {
+            format!("Cmd<{}>{}", self.method.to_string(), self.path.to_string())
+        }
+    }
+
+
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+    pub struct SysCall {
+        pub path: Subst<Tw<String>>,
+        pub method: SysMethod,
+    }
+
+    impl SysCall {
+        pub fn new(method: SysMethod, path: Subst<Tw<String>>) -> Self {
+            Self { method, path }
+        }
+    }
+
+    impl ToString for SysCall {
+        fn to_string(&self) -> String {
+            format!("Sys<{}>{}", self.method.to_string(), self.path.to_string())
         }
     }
 
@@ -810,6 +850,8 @@ pub mod substance {
             match self {
                 CallKind::Msg(msg) => msg.to_string(),
                 CallKind::Http(http) => http.to_string(),
+                CallKind::Cmd(cmd) => cmd.to_string(),
+                CallKind::Sys(sys) => sys.to_string()
             }
         }
     }

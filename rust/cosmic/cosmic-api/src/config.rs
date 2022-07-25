@@ -82,7 +82,7 @@ pub mod config {
         use crate::id::id::{Point, PointCtx, PointVar, Topic};
         use crate::substance::substance::{Call, CallDef};
         use crate::substance::substance::{Substance, SubstancePattern};
-        use crate::wave::{MethodKind, MethodPattern, DirectedCore, Ping, RecipientSelector, Wave, DirectedWave};
+        use crate::wave::{MethodKind, MethodPattern, DirectedCore, Ping, RecipientSelector, Wave, DirectedWave, SingularDirectedWave};
 
         use crate::parse::model::{
             BindScope, WaveScope, MethodScope, PipelineSegment, PipelineSegmentDef, PipelineVar,

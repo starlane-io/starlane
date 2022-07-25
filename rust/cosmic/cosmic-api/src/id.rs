@@ -8,7 +8,7 @@ use crate::parse::{parse_star_key, CamelCase};
 use crate::particle::particle::Stub;
 use crate::substance::substance::Substance;
 use crate::sys::{ChildRegistry, ParticleRecord};
-use crate::wave::{DirectedWave, Ping, Pong, ReflectedWave, UltraWave, Wave};
+use crate::wave::{DirectedWave, Ping, Pong, ReflectedWave, SingularDirectedWave, UltraWave, Wave};
 use alloc::fmt::format;
 use core::str::FromStr;
 use cosmic_nom::new_span;
@@ -64,10 +64,7 @@ pub mod id {
     };
     use crate::sys::Location::Central;
     use crate::util::{ToResolved, ValueMatcher, ValuePattern};
-    use crate::wave::{
-        DirectedWave, Exchanger, Ping, Pong, Recipients, ReflectedWave, ToRecipients, UltraWave,
-        Wave,
-    };
+    use crate::wave::{DirectedWave, Exchanger, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave, ToRecipients, UltraWave, Wave};
 
     lazy_static! {
         pub static ref GLOBAL_CENTRAL: Point = Point::from_str("GLOBAL::central").unwrap();
@@ -2287,7 +2284,7 @@ println!("VISIT LAYER: {}", self.port().layer.to_string() );
 
         pub fn to_bundle(self) -> Result<Point, MsgErr> {
             if self.segments.is_empty() {
-                return Err("Address does not contain a bundle".into());
+                return Err("Point does not contain a bundle".into());
             }
 
             if let Some(PointSeg::Version(_)) = self.segments.last() {
@@ -3274,6 +3271,19 @@ impl Traversal<UltraWave> {
         }
     }
 
+    pub fn unwrap_singular_directed(self) -> Traversal<SingularDirectedWave> {
+        let clone = self.clone();
+        match self.payload {
+            UltraWave::Ping(ping) => clone.with(ping.to_singular_directed()),
+            UltraWave::Ripple(ripple) => clone.with(ripple.to_singular_directed().expect("singular directed")),
+            UltraWave::Signal(signal) => clone.with(signal.to_singular_directed()),
+            _ => {
+                panic!("cannot call this unless you are sure it's a DirectedWave")
+            }
+        }
+    }
+
+
     pub fn unwrap_reflected(self) -> Traversal<ReflectedWave> {
         let clone = self.clone();
         match self.payload {
@@ -3303,6 +3313,13 @@ impl Traversal<UltraWave> {
 }
 
 impl Traversal<DirectedWave> {
+    pub fn wrap(self) -> Traversal<UltraWave> {
+        let ping = self.payload.clone();
+        self.with(ping.to_ultra())
+    }
+}
+
+impl Traversal<SingularDirectedWave> {
     pub fn wrap(self) -> Traversal<UltraWave> {
         let ping = self.payload.clone();
         self.with(ping.to_ultra())

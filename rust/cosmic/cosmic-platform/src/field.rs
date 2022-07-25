@@ -18,7 +18,7 @@ use cosmic_api::selector::{PayloadBlock, PayloadBlockVar};
 use cosmic_api::substance::substance::{Call, CallKind, Substance};
 use cosmic_api::sys::ParticleRecord;
 use cosmic_api::util::{log, ToResolved, ValueMatcher};
-use cosmic_api::wave::{Agent, CmdMethod, Method, DirectedCore, Ping, Reflectable, ReflectedCore, Pong, Wave, Exchanger, UltraWave, DirectedWave, ReflectedWave, Bounce};
+use cosmic_api::wave::{Agent, CmdMethod, Method, DirectedCore, Ping, Reflectable, ReflectedCore, Pong, Wave, Exchanger, UltraWave, DirectedWave, ReflectedWave, Bounce, SingularDirectedWave};
 use regex::{CaptureMatches, Regex};
 
 use std::collections::HashMap;
@@ -34,7 +34,7 @@ use crate::{PlatErr, Platform, RegistryApi};
 
 
 lazy_static! {
-    static ref STAR_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new( Arc::new(star_bind_config()), Point::from_str("GLOBAL::repo:bind:star").unwrap());
+    static ref STAR_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new( Arc::new(star_bind_config()), Point::from_str("GLOBAL::repo:1.0.0:/bind/star.bind").unwrap());
 }
 
 fn star_bind_config() -> BindConfig
@@ -42,7 +42,7 @@ fn star_bind_config() -> BindConfig
     log(bind_config(r#"
     Bind(version=1.0.0)
     {
-       Route<Msg<Transport>> -> (());
+       Route<Sys<Transport>> -> (());
     }
     "#)).unwrap()
 
@@ -64,9 +64,11 @@ impl <P> FieldEx<P> where P: Platform+'static {
         Self { port, skel, state, logger }
     }
 
-    async fn handle_action(&self, action: RequestAction) -> anyhow::Result<()> {
+    async fn handle_action(&self, action: RequestAction) -> Result<(),MsgErr> {
+println!("HANDLE ACTION");
         match action.action {
             PipeAction::CoreDirected(mut request) => {
+println!("CORE DIRECTED");
                 self.traverse_next(request.wrap() ).await;
             }
             PipeAction::FabricDirected(mut request) => {
@@ -108,6 +110,7 @@ impl <P> TraversalLayer for FieldEx<P> where P: Platform +'static {
     }
 
     async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
+println!("FIELD TRAVERSING NEXT!");
         self.skel.traverse_to_next_tx.send(traversal).await;
     }
 
@@ -156,7 +159,7 @@ println!("PRE BIND");
         //let bind = self.static_bind(&directed.record.details.stub.kind).expect("Bind");
 println!("GOT BIND!");
         let route = bind.select(&directed.payload )?;
-
+println!("ROUTE SELECTED");
         let regex = route.selector.path.clone();
 
         let env = {
@@ -169,11 +172,13 @@ println!("GOT BIND!");
             env
         };
 
+println!("got HERE");
         let directed_id = directed.id().to_string();
 
         let pipeline = route.block.clone();
 
-        let call = directed.to_call()?;
+        let to = directed.to.clone();
+        let call = directed.to_call(to)?;
         let logger = directed.logger.span();
         let mut pipex = PipeEx::new(directed,self.clone(),  pipeline, env, logger.clone());
         let action = match pipex.next() {
@@ -189,6 +194,7 @@ println!("GOT BIND!");
             }
         };
 
+println!("NOW HERE");
         if let PipeAction::Respond = action {
             self.skel.traverse_to_next_tx.send(pipex.reflect().to_ultra()).await;
             return Ok(());
@@ -198,7 +204,9 @@ println!("GOT BIND!");
 
         let action = RequestAction { request_id: directed_id, action };
 
-        self.handle_action(action);
+println!("HANDLE ACTION...");
+        self.handle_action(action).await?;
+println!("ACTION HANDLED.");
         Ok(())
     }
 
@@ -229,7 +237,7 @@ println!("GOT BIND!");
 
         let action = RequestAction { request_id: reflected_id, action };
 
-        self.handle_action(action);
+        self.handle_action(action).await?;
 
         Ok(())
     }
@@ -305,6 +313,14 @@ impl <P> PipeEx<P> where P: Platform +'static {
                     CallKind::Http(http) => {
                         let path = http.path.clone().to_resolved(&self.env)?;
                         (Method::Http(http.method.clone()), path)
+                    }
+                    CallKind::Cmd(cmd) => {
+                        let path = cmd.path.clone().to_resolved(&self.env)?;
+                        (Method::Cmd(cmd.method.clone()), path)
+                    }
+                    CallKind::Sys(sys) => {
+                        let path = sys.path.clone().to_resolved(&self.env)?;
+                        (Method::Sys(sys.method.clone()), path)
                     }
                 };
                 let mut core: DirectedCore = method.into();
