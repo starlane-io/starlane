@@ -7032,12 +7032,13 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, MsgErr> {
                 ValuePattern::Pattern(MethodPattern::Sys(method))
             }
             MethodKind::Cmd => {
-                return Err(ParseErrs::from_loc_span(
-                    "Cmd not supported yet",
-                    "not supported (yet)",
+                let method = names.pop().ok_or(ParseErrs::from_loc_span(
+                    "Cmd method requires a sub kind i.e. Cmd<Bounce>",
+                    "sub kind required",
                     method_kind_span,
-                )
-                .into());
+                ))?;
+                let method = result(value_pattern(cmd_method)(method))?;
+                ValuePattern::Pattern(MethodPattern::Cmd(method))
             }
             MethodKind::Msg => {
                 let method = names.pop().ok_or(ParseErrs::from_loc_span(

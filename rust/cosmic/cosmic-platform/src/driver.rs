@@ -400,7 +400,7 @@ where
     }
     let router = Arc::new(LayerInjectionRouter::new(
         skel.clone(),
-        point.clone().to_port().with_layer(Layer::Core),
+        point.clone().to_port().with_layer(Layer::Guest),
     ));
     let driver_skel = DriverSkel::new(point.clone(), router, tx, skel.clone() );
     let core = factory.create(driver_skel);
@@ -491,7 +491,7 @@ where
     }
 
     async fn inject(&self, wave: UltraWave) {
-        let inject = TraversalInjection::new(self.port().clone(), wave);
+        let inject = TraversalInjection::new(self.port().clone().with_layer(Layer::Guest), wave);
         self.skel.inject_tx.send(inject).await;
     }
 
@@ -532,7 +532,7 @@ where
         let logger = skel.logger.point(point.clone());
         let router = LayerInjectionRouter::new(
             skel.clone(),
-            point.clone().to_port().with_layer(Layer::Driver),
+            point.clone().to_port().with_layer(Layer::Guest),
         );
 
         let driver = Self {

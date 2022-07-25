@@ -25,6 +25,7 @@ use dashmap::DashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
+use cosmic_api::substance::substance::Substance;
 
 pub struct ControlDriverFactory<P>
 where
@@ -63,6 +64,9 @@ where
     skel: DriverSkel<P>,
     runner_tx: mpsc::Sender<ControlCall<P>>,
 }
+use cosmic_api::config::config::bind::RouteSelector;
+use cosmic_api::parse::route_attribute;
+use cosmic_api::wave::ReflectedCore;
 
 #[routes]
 impl<P> ControlDriver<P>
@@ -77,6 +81,13 @@ where
             states,
             runner_tx,
         }
+    }
+
+    #[route("Cmd<Bounce>")]
+    pub async fn bounce( &self, ctx: InCtx<'_,()> ) -> Result<ReflectedCore,MsgErr> {
+println!("........!!!!!!!!! BOUNCE !!!!!!!!!!...........");
+        let mut core = ReflectedCore::new();
+        Ok(core)
     }
 }
 

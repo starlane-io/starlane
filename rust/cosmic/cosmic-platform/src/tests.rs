@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use cosmic_api::id::id::{Layer, ToPoint, ToPort, Uuid};
 use cosmic_api::id::TraversalDirection;
 use cosmic_api::msg::MsgMethod;
-use cosmic_api::wave::{Agent, DirectedKind, DirectedProto, HyperWave, SysMethod};
+use cosmic_api::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, HyperWave, SysMethod};
 use cosmic_api::{MountKind, NoDiceArtifactFetcher, HYPERUSER};
 use cosmic_hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
 use dashmap::DashMap;
@@ -562,7 +562,7 @@ fn test_layer_traversal() -> Result<(), TestErr> {
         wave.kind(DirectedKind::Ping);
         wave.from(FAE.clone().to_port());
         wave.to(LESS.clone().to_port());
-        wave.method(MsgMethod::new("DieTacEng").unwrap()).unwrap();
+        wave.method(CmdMethod::Bounce).unwrap();
         let wave = wave.build().unwrap();
         let wave = wave.to_ultra();
 

@@ -95,6 +95,12 @@ impl <P> TraversalLayer for ShellEx<P> where P: Platform +'static {
         Ok(())
     }
 
+    async fn reflected_fabric_bound(&self, traversal: Traversal<ReflectedWave>) -> Result<(), MsgErr>{
+        panic!("STOP")
+    }
+
+
+
 
 }
 

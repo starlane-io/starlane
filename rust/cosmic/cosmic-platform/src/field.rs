@@ -67,6 +67,7 @@ fn control_bind_config() -> BindConfig {
     Bind(version=1.0.0)
     {
        Route<Msg<*>> -> ((*));
+       Route<Cmd<*>> -> ((*));
     }
     "#,
     ))

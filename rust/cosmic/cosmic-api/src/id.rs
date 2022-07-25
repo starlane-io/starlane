@@ -74,7 +74,7 @@ pub mod id {
         pub static ref REMOTE_ENTRY_REQUESTER: Point =
             Point::from_str("REMOTE::entry-requester").unwrap();
         pub static ref STD_WAVE_TRAVERSAL_PLAN: TraversalPlan =
-            TraversalPlan::new(vec![Layer::Field, Layer::Shell, Layer::Driver, Layer::Core]);
+            TraversalPlan::new(vec![Layer::Field, Layer::Shell, Layer::Core]);
         pub static ref MECHTRON_WAVE_TRAVERSAL_PLAN: TraversalPlan = TraversalPlan::new(vec![
             Layer::Field,
             Layer::Shell,
@@ -92,7 +92,7 @@ pub mod id {
             Layer::Core
         ]);
         pub static ref STAR_WAVE_TRAVERSAL_PLAN: TraversalPlan =
-            TraversalPlan::new(vec![Layer::Field, Layer::Shell, Layer::Driver, Layer::Core]);
+            TraversalPlan::new(vec![Layer::Field, Layer::Shell, Layer::Core]);
     }
 
     pub type Uuid = String;
@@ -1325,7 +1325,6 @@ pub mod id {
         Gravity = 0,
         Field,
         Shell,
-        Driver,
         Portal,
         Host,
         Guest,
@@ -1338,7 +1337,6 @@ pub mod id {
                 Layer::Gravity => false,
                 Layer::Field => true,
                 Layer::Shell => true,
-                Layer::Driver => true,
                 Layer::Portal => false,
                 Layer::Host => false,
                 Layer::Guest => false,
@@ -1667,12 +1665,14 @@ println!("reflected fabric bound for: {}", self.port().layer.to_string() );
 
         pub fn towards_fabric(&self, layer: &Layer) -> Option<Layer> {
             let mut layer = layer.clone();
+            let mut index:i32 =layer.ordinal() as i32;
             loop {
-                let layer = layer.ordinal() - 1;
-                if layer < 0u8 {
+                index = index -1;
+
+                if index < 0i32 {
                     return None;
-                } else if self.stack.contains(&Layer::from_ordinal(layer).unwrap()) {
-                    return Some(Layer::from_ordinal(layer).unwrap());
+                } else if self.stack.contains(&Layer::from_ordinal(index as u8).unwrap()) {
+                    return Some(Layer::from_ordinal(index as u8).unwrap());
                 }
             }
         }

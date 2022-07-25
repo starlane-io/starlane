@@ -3458,6 +3458,7 @@ impl TryFrom<ReflectedCore> for Port {
 pub enum CmdMethod {
     Read,
     Update,
+    Bounce
 }
 
 impl ValueMatcher<CmdMethod> for CmdMethod {

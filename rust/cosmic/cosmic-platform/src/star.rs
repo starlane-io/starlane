@@ -1064,12 +1064,18 @@ where
             to,
             point,
         );
+println!(">>START LAYER: {}", traversal.layer.to_string());
+
 
         // in the case that we injected into a layer that is not part
         // of this plan, we need to send the traversal to the next layer
         if !plan.has_layer(&injector.layer) {
             traversal.next();
         }
+
+        println!(">>CRANKED UP TO LAYER: {}", traversal.layer.to_string());
+
+
 
         #[cfg(test)]
         self.skel
