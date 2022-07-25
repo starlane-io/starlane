@@ -69,7 +69,7 @@ impl Platform for TestPlatform {
         todo!()
     }
 
-    fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder {
+    fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
         DriversBuilder::new()
     }
 

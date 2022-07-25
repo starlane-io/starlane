@@ -1,4 +1,4 @@
-use crate::driver::{Drivers, DriversApi};
+use crate::driver::{Core, Driver, DriverFactory, DriverLifecycleCall, Drivers, DriversApi, DriverSkel, DriverStatus};
 use crate::field::{FieldEx, FieldState};
 use crate::machine::MachineSkel;
 use crate::shell::ShellEx;
@@ -11,13 +11,13 @@ use cosmic_api::command::request::set::Set;
 use cosmic_api::config::config::bind::RouteSelector;
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{
-    Kind, Layer, Point, Port, PortSelector, RouteSeg, Sub, ToPoint, ToPort, Topic, TraversalLayer,
+    Kind, Layer, Point, Port, PortSelector, RouteSeg, Sub, Topic, ToPoint, ToPort, TraversalLayer,
     Uuid,
 };
 use cosmic_api::id::{StarKey, StarStub, StarSub, TraversalInjection};
 use cosmic_api::id::{Traversal, TraversalDirection};
 use cosmic_api::log::{PointLogger, RootLogger};
-use cosmic_api::parse::{route_attribute, Env};
+use cosmic_api::parse::{Env, route_attribute};
 use cosmic_api::particle::particle::{Details, Status, Stub};
 use cosmic_api::quota::Timeouts;
 use cosmic_api::substance::substance::{Substance, ToSubstance};
@@ -26,17 +26,16 @@ use cosmic_api::util::{ValueMatcher, ValuePattern};
 use cosmic_api::wave::{
     Agent, Bounce, BounceBacks, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedKind,
     DirectedProto, DirectedWave, Echo, Echoes, Handling, HandlingKind, InCtx, Method, Ping, Pong,
-    Priority, ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, Recipients,
+    Priority, ProtoTransmitter, ProtoTransmitterBuilder, Recipients, RecipientSelector,
     Reflectable, ReflectedCore, ReflectedWave, Retries, Ripple, RootInCtx, Router, Scope,
     SetStrategy, Signal, SingularRipple, ToRecipients, TxRouter, WaitTime, Wave,
 };
 use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
-use cosmic_api::{MountKind, Registration, State, StateFactory, HYPERUSER};
-use cosmic_driver::{Core, Driver, DriverFactory, DriverLifecycleCall, DriverSkel, DriverStatus};
+use cosmic_api::{HYPERUSER, MountKind, Registration, State, StateFactory};
 use cosmic_hyperlane::{HyperClient, HyperRouter, HyperwayExt};
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
-use futures::future::{join_all, BoxFuture};
+use futures::future::{BoxFuture, join_all};
 use futures::FutureExt;
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -50,7 +49,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{broadcast, mpsc, oneshot, Mutex, RwLock};
+use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock};
 use tokio::time::error::Elapsed;
 use tracing::info;
 
@@ -278,7 +277,7 @@ where
         &self.logger.point
     }
 
-    pub fn create_star_drivers(&self, driver_skel: DriverSkel, drivers_api: DriversApi<P>) -> HashMap<Kind, Box<dyn Driver>> {
+    pub fn create_star_drivers(&self, driver_skel: DriverSkel<P>, drivers_api: DriversApi<P>) -> HashMap<Kind, Box<dyn Driver>> {
         let mut rtn: HashMap<Kind, Box<dyn Driver>> = HashMap::new();
         let star_driver = StarDriver::new(self.clone(), driver_skel, drivers_api);
         rtn.insert(star_driver.kind().clone(), Box::new(star_driver));
@@ -516,7 +515,7 @@ where
 {
     pub async fn new(
         skel: StarSkel<P>,
-        mut drivers: DriversBuilder,
+        mut drivers: DriversBuilder<P>,
         mut hyperway_ext: HyperwayExt,
         star_tx: mpsc::Sender<StarCall<P>>,
         star_rx: mpsc::Receiver<StarCall<P>>,
@@ -1474,7 +1473,7 @@ where
     }
 }
 
-impl<P> DriverFactory for StarDriverFactory<P>
+impl<P> DriverFactory<P> for StarDriverFactory<P>
 where
     P: Platform + 'static,
 {
@@ -1482,7 +1481,7 @@ where
         Kind::Star(self.skel.kind.clone())
     }
 
-    fn create(&self, driver_skel: DriverSkel) -> Box<dyn Driver> {
+    fn create(&self, driver_skel: DriverSkel<P>) -> Box<dyn Driver> {
         Box::new(StarDriver::new(self.skel.clone(), driver_skel, self.drivers_api.clone() ))
     }
 }
@@ -1494,7 +1493,7 @@ where
 {
     pub status: DriverStatus,
     pub star_skel: StarSkel<P>,
-    pub driver_skel: DriverSkel,
+    pub driver_skel: DriverSkel<P>,
     pub drivers_api: DriversApi<P>
 }
 
@@ -1502,9 +1501,9 @@ impl<P> StarDriver<P>
 where
     P: Platform,
 {
-    pub fn new(star_skel: StarSkel<P>, driver_skel: DriverSkel, drivers_api: DriversApi<P>) -> Self {
+    pub fn new(star_skel: StarSkel<P>, driver_skel: DriverSkel<P>, drivers_api: DriversApi<P>) -> Self {
         Self {
-            status: DriverStatus::Started,
+            status: DriverStatus::Pending,
             star_skel,
             driver_skel,
             drivers_api
@@ -1575,18 +1574,18 @@ where
         Ok(self.status.clone())
     }
 
-    fn ex(&self, point: &Point, state: Option<Arc<RwLock<dyn State>>>) -> Box<dyn Core> {
-        Box::new(StarCore::new(
+    async fn ex(&self, point: &Point) -> Result<Box<dyn Core>,MsgErr> {
+        Ok(Box::new(StarCore::new(
             self.star_skel.clone(),
             self.driver_skel.clone(),
             self.drivers_api.clone()
-        ))
+        )))
     }
 
     async fn assign(
         &self,
-        ctx: InCtx<'_, Assign>,
-    ) -> Result<Option<Arc<RwLock<dyn State>>>, MsgErr> {
+        assign: Assign,
+    ) -> Result<(),MsgErr>{
         Err("only allowed one Star per StarDriver".into())
     }
 }
@@ -1600,7 +1599,7 @@ where
     P: Platform + 'static,
 {
     pub star_skel: StarSkel<P>,
-    pub driver_skel: DriverSkel,
+    pub driver_skel: DriverSkel<P>,
     pub drivers_api: DriversApi<P>
 }
 
@@ -1611,7 +1610,7 @@ impl<P> StarCore<P>
 where
     P: Platform + 'static,
 {
-    pub fn new(star_skel: StarSkel<P>, driver_skel: DriverSkel, drivers_api: DriversApi<P>) -> Self {
+    pub fn new(star_skel: StarSkel<P>, driver_skel: DriverSkel<P>, drivers_api: DriversApi<P>) -> Self {
         Self {
             star_skel,
             driver_skel,

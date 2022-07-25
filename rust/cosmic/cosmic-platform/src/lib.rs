@@ -48,6 +48,7 @@ pub mod star;
 pub mod state;
 pub mod traversal;
 pub mod tests;
+pub mod control;
 
 #[no_mangle]
 pub extern "C" fn cosmic_uuid() -> String {
@@ -297,7 +298,7 @@ pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'st
     fn machine_template(&self) -> MachineTemplate;
     fn machine_name(&self) -> MachineName;
     fn properties_config<K: ToBaseKind>(&self, base:&K) -> &'static PropertiesConfig;
-    fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder;
+    fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self>;
     async fn global_registry(&self) -> Result<Registry<Self>,Self::Err>;
     async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>,Self::Err>;
     fn artifact_hub(&self) -> ArtifactApi;

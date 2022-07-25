@@ -164,7 +164,7 @@ impl HyperwayStub {
 
 pub enum HyperwayInterchangeCall {
     Wave(UltraWave),
-    Add(Hyperway),
+    Internal(Hyperway),
     Remove(Point),
     Mount {
         stub: HyperwayStub,
@@ -298,7 +298,7 @@ impl HyperwayInterchange {
                 let mut hyperways = HashMap::new();
                 while let Some(call) = call_rx.recv().await {
                     match call {
-                        HyperwayInterchangeCall::Add(hyperway) => {
+                        HyperwayInterchangeCall::Internal(hyperway) => {
                             let mut rx = hyperway.inbound.rx().await;
                             hyperways.insert(hyperway.remote.clone(), hyperway);
                             let call_tx = call_tx.clone();
@@ -360,10 +360,10 @@ impl HyperwayInterchange {
         Ok(rx.await?)
     }
 
-    pub fn add(&self, hyperway: Hyperway) {
+    pub fn internal(&self, hyperway: Hyperway) {
         let call_tx = self.call_tx.clone();
         tokio::spawn(async move {
-            call_tx.send(HyperwayInterchangeCall::Add(hyperway)).await;
+            call_tx.send(HyperwayInterchangeCall::Internal(hyperway)).await;
         });
     }
 
@@ -512,17 +512,14 @@ impl HyperAuthenticator for AnonHyperAuthenticator {
 
 #[derive(Clone)]
 pub struct AnonHyperAuthenticatorAssignEndPoint {
-    pub logger: RootLogger,
     pub remote_point_factory: Arc<dyn PointFactory>,
 }
 
 impl AnonHyperAuthenticatorAssignEndPoint {
     pub fn new(
         remote_point_factory: Arc<dyn PointFactory>,
-        logger: RootLogger,
     ) -> Self {
         Self {
-            logger,
             remote_point_factory,
         }
     }
@@ -661,6 +658,15 @@ impl HyperGateSelector {
     pub fn new(map: Arc<DashMap<InterchangeKind, Arc<dyn HyperGate>>>) -> Self {
         Self { map }
     }
+
+    pub fn add( &self, kind: InterchangeKind, gate: Arc<dyn HyperGate>) -> Result<(),MsgErr> {
+        if self.map.contains_key(&kind) {
+            Err(format!("already have an interchange of kind: {}",kind.to_string()).into())
+        } else {
+            self.map.insert(kind,gate);
+            Ok(())
+        }
+    }
 }
 
 #[async_trait]
@@ -698,7 +704,7 @@ impl<A> InterchangeGate<A>
 where
     A: HyperAuthenticator,
 {
-    fn new(auth: A, interchange: Arc<HyperwayInterchange>, logger: PointLogger) -> Self {
+    pub fn new(auth: A, interchange: Arc<HyperwayInterchange>, logger: PointLogger) -> Self {
         Self {
             auth,
             interchange,
@@ -716,7 +722,7 @@ where
 
         let (drop_tx, drop_rx) = oneshot::channel();
         let ext = hyperway.ephemeral(drop_tx).await;
-        self.interchange.add(hyperway);
+        self.interchange.internal(hyperway);
 
         let interchange = self.interchange.clone();
         tokio::spawn(async move {
@@ -1343,8 +1349,8 @@ pub mod test {
             logger.push("interchange").unwrap(),
         ));
 
-        interchange.add(Hyperway::new(LESS.clone(), LESS.to_agent()));
-        interchange.add(Hyperway::new(FAE.clone(), FAE.to_agent()));
+        interchange.internal(Hyperway::new(LESS.clone(), LESS.to_agent()));
+        interchange.internal(Hyperway::new(FAE.clone(), FAE.to_agent()));
 
         let lane_point_factory = Arc::new(PointFactoryU64::new(
             Point::from_str("point:lanes").unwrap(),

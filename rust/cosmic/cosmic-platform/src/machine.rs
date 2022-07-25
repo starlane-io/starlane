@@ -9,11 +9,12 @@ use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{InterchangeKind, Knock};
 use cosmic_api::wave::{Agent, HyperWave, UltraWave};
 use cosmic_api::ArtifactApi;
-use cosmic_hyperlane::{HyperClient, HyperGate, HyperGateSelector, HyperRouter, Hyperway, HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist};
+use cosmic_hyperlane::{HyperClient, HyperConnectionErr, HyperGate, HyperGateSelector, HyperRouter, Hyperway, HyperwayExt, HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist};
 use dashmap::DashMap;
 use futures::future::join_all;
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
+use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::error::RecvError;
@@ -35,6 +36,12 @@ where
 {
     pub fn new(tx: mpsc::Sender<MachineCall<P>>) -> Self {
         Self { tx }
+    }
+
+    pub async fn add_interchange( &self, kind: InterchangeKind, gate: Arc<dyn HyperGate> ) -> Result<(),MsgErr> {
+        let (rtn,rtn_rx) = oneshot::channel();
+        self.tx.send( MachineCall::AddInterchange {kind, gate, rtn }).await;
+        rtn_rx.await?
     }
 
     pub fn terminate(&self) {
@@ -168,19 +175,19 @@ where
             let gate: Arc<dyn HyperGate> = Arc::new(MountInterchangeGate::new(auth, interchange.clone(), logger.clone()));
             let hyperway = Hyperway::new(star_point.clone(), Agent::HyperUser );
             let hyperway_ext = hyperway.mount().await;
-            interchange.add(hyperway);
+            interchange.internal(hyperway);
 
             for con in star_template.connections.iter() {
                 match con {
                     StarCon::Receiver(remote) => {
                         let star = remote.key.clone().to_point();
                         let hyperway = Hyperway::new(star, Agent::HyperUser);
-                        interchange.add(hyperway);
+                        interchange.internal(hyperway);
                     }
                     StarCon::Connector(remote) => {
                         let star = remote.key.clone().to_point();
                         let hyperway = Hyperway::new(star, Agent::HyperUser);
-                        interchange.add(hyperway);
+                        interchange.internal(hyperway);
                     }
                 }
             }
@@ -196,30 +203,9 @@ where
 
         }
 
-        let mut entry_router = HyperGateSelector::new(gates);
+        let mut gate_selector = HyperGateSelector::new(gates);
 
-        /*
-        // now lets make the clients
-        for (from, to) in clients {
-            let entry_req = Knock {
-                kind: InterchangeKind::Star(to.clone()),
-                auth: Box::new(Substance::Token(skel.platform.token())),
-                remote: Some(from.clone()),
-            };
-
-            let logger = skel.logger.point(from.clone());
-            let factory = LocalHyperwayExtFactory::new(entry_req, entry_router.clone());
-            let hyperway =
-                HyperClient::new(Agent::HyperUser, to.to_point(), Box::new(factory), logger)?;
-            interchanges
-                .get(&StarKey::try_from(from).unwrap())
-                .unwrap()
-                .add(hyperway);
-        }
-
-         */
-
-        skel.platform.start_services(&mut entry_router);
+        skel.platform.start_services(&mut gate_selector);
 
         let (machine_point, machine_star) = stars
             .iter()
@@ -243,7 +229,7 @@ where
             logger,
             machine_star,
             stars: Arc::new(stars),
-            gate_selector: entry_router,
+            gate_selector,
             rx,
             termination_broadcast_tx: term_tx,
         };
@@ -291,6 +277,9 @@ where
                 MachineCall::Phantom(_) => {
                     // do nothing, it is just here to carry the 'P'
                 }
+                MachineCall::AddInterchange { kind, gate, rtn } => {
+                    rtn.send(self.gate_selector.add(kind.clone(),gate));
+                }
                 #[cfg(test)]
                 MachineCall::GetMachineStar(tx) => {
                     tx.send(self.machine_star.clone());
@@ -314,6 +303,7 @@ where
     Terminate,
     Wait(oneshot::Sender<broadcast::Receiver<Result<(), P::Err>>>),
     WaitForReady(oneshot::Sender<()>),
+    AddInterchange{ kind: InterchangeKind, gate: Arc<dyn HyperGate>, rtn: oneshot::Sender<Result<(),MsgErr>> },
     Phantom(PhantomData<P>),
     #[cfg(test)]
     GetMachineStar(oneshot::Sender<StarApi<P>>),

@@ -20,12 +20,9 @@ use cosmic_api::wave::{
     UltraWave, Wave, WaveKind,
 };
 use cosmic_api::State;
-use cosmic_driver::{
-    Core, Driver, DriverFactory, DriverLifecycleCall, DriverShellRequest, DriverSkel, DriverStatus,
-    DriverStatusEvent,
-};
 use dashmap::DashMap;
 use std::collections::{HashMap, HashSet};
+use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
@@ -313,12 +310,12 @@ impl DriverApi {
     }
 }
 
-pub struct DriversBuilder {
-    pub factories: HashMap<Kind, Box<dyn DriverFactory>>,
+pub struct DriversBuilder<P> where P: Platform {
+    pub factories: HashMap<Kind, Box<dyn DriverFactory<P>>>,
     pub logger: Option<PointLogger>,
 }
 
-impl DriversBuilder {
+impl <P> DriversBuilder<P> where P: Platform {
     pub fn new() -> Self {
         Self {
             factories: HashMap::new(),
@@ -334,7 +331,7 @@ impl DriversBuilder {
         rtn
     }
 
-    pub fn add(&mut self, factory: Box<dyn DriverFactory>) {
+    pub fn add(&mut self, factory: Box<dyn DriverFactory<P>>) {
         self.factories.insert(factory.kind().clone(), factory);
     }
 
@@ -342,7 +339,7 @@ impl DriversBuilder {
         self.logger.replace(logger);
     }
 
-    pub fn build<P>(
+    pub fn build(
         self,
         drivers_port: Port,
         skel: StarSkel<P>,
@@ -372,7 +369,7 @@ impl DriversBuilder {
 }
 
 fn create_driver<P>(
-    factory: Box<dyn DriverFactory>,
+    factory: Box<dyn DriverFactory<P>>,
     drivers_port: Port,
     skel: StarSkel<P>,
 ) -> Result<DriverApi, MsgErr>
@@ -405,7 +402,7 @@ where
         skel.clone(),
         point.clone().to_port().with_layer(Layer::Core),
     ));
-    let driver_skel = DriverSkel::new(point.clone(), router, tx);
+    let driver_skel = DriverSkel::new(point.clone(), router, tx, skel.clone() );
     let core = factory.create(driver_skel);
     let state = skel.state.api().with_layer(Layer::Core);
     let shell = DriverShell::new(point, skel.clone(), core, state, shell_tx, shell_rx);
@@ -541,7 +538,7 @@ where
         let driver = Self {
             point,
             skel,
-            status: DriverStatus::Started,
+            status: DriverStatus::Pending,
             tx: tx.clone(),
             rx,
             state: states,
@@ -598,68 +595,10 @@ where
                         }
                     }
                     DriverShellCall::Ex { point, tx } => {
-                        match self
-                            .state
-                            .get_state(point.clone().to_port().with_layer(Layer::Core))
-                            .await
-                        {
-                            Ok(state) => {
-                                tx.send(Ok(self.driver.ex(&point, state)));
-                            }
-                            Err(err) => {
-                                tx.send(Err(err));
-                            }
-                        }
+                       tx.send(self.driver.ex(&point).await);
                     }
                     DriverShellCall::Assign { assign, rtn } => {
-                        let port = assign
-                            .details
-                            .stub
-                            .point
-                            .clone()
-                            .to_port()
-                            .with_layer(Layer::Core);
-                        let mut wave = DirectedProto::new();
-                        wave.kind(DirectedKind::Ping);
-                        wave.from(self.point.clone().to_port().with_layer(Layer::Shell));
-                        wave.method(SysMethod::Assign);
-                        let assign_ref = &assign;
-                        wave.body(Substance::Sys(Sys::Assign(assign.clone())));
-                        let to = self.point.clone().to_port().with_layer(Layer::Core);
-                        wave.to(to.clone());
-                        let wave = wave.build().unwrap();
-                        let router = LayerInjectionRouter::new(
-                            self.skel.clone(),
-                            self.point.clone().to_port().with_layer(Layer::Driver),
-                        );
-                        let transmitter =
-                            ProtoTransmitter::new(Arc::new(router), self.skel.exchanger.clone());
-                        let ctx = RootInCtx::new(wave, to, self.logger.span(), transmitter);
-                        match ctx.push() {
-                            Ok(ctx) => {
-                                let ctx: InCtx<'_, Sys> = ctx;
-                                let ctx = ctx.push_input_ref(assign_ref);
-                                let state = self.driver.assign(ctx).await;
-                                match state {
-                                    Ok(state) => match state {
-                                        None => {
-                                            rtn.send(Ok(()));
-                                        }
-                                        Some(state) => {
-                                            rtn.send(
-                                                self.skel.state.api().put_state(port, state).await,
-                                            );
-                                        }
-                                    },
-                                    Err(err) => {
-                                        rtn.send(Err(err));
-                                    }
-                                }
-                            }
-                            Err(err) => {
-                                rtn.send(Err(err));
-                            }
-                        }
+                        rtn.send(self.driver.assign(assign).await);
                     }
                 }
             }
@@ -696,7 +635,7 @@ where
             port: port.clone(),
             skel: self.skel.clone(),
             state: state.clone(),
-            ex: self.driver.ex(point, state),
+            ex: self.driver.ex(point).await?,
             router: Arc::new(self.router.clone().with(port)),
         })
     }
@@ -705,13 +644,7 @@ where
     async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, MsgErr> {
         match ctx.input {
             Sys::Assign(assign) => {
-                let ctx = ctx.push_input_ref(assign);
-                let state = self.driver.assign(ctx).await?;
-
-                if let Some(state) = state {
-                    let port = self.point.clone().to_port().with_layer(Layer::Core);
-                    self.skel.state.api().put_state(port, state).await;
-                }
+                self.driver.assign(assign.clone()).await?;
 
                 Ok(ReflectedCore::ok_body(Substance::Empty))
             }
@@ -723,3 +656,96 @@ where
         &self.status
     }
 }
+
+#[derive(Clone)]
+pub struct DriverSkel<P> where P: Platform {
+    pub point: Point,
+    pub router: Arc<dyn Router>,
+    pub shell_tx: mpsc::Sender<DriverShellRequest>,
+    pub star_skel: StarSkel<P>,
+    pub logger: PointLogger
+}
+
+impl <P> DriverSkel<P> where P: Platform {
+    pub async fn ex( &self, point: Point ) -> Result<Box<dyn Core>,MsgErr> {
+        let (tx,rx) = oneshot::channel();
+        self.shell_tx.send(DriverShellRequest::Ex { point, tx }).await;
+        Ok(rx.await??)
+    }
+
+
+    pub fn new(point:Point, router: Arc<dyn Router>, shell_tx: mpsc::Sender<DriverShellRequest>, star_skel: StarSkel<P>) -> Self {
+        let logger = star_skel.logger.clone();
+        Self {
+            point,
+            router,
+            shell_tx,
+            star_skel,
+            logger
+        }
+    }
+}
+
+pub trait DriverFactory<P>: Send+Sync where P: Platform{
+    fn kind(&self) -> Kind;
+    fn create(&self, skel: DriverSkel<P>) -> Box<dyn Driver>;
+}
+
+#[async_trait]
+pub trait Driver: DirectedHandler+Send+Sync {
+    fn kind(&self) -> Kind;
+    async fn status(&self) -> DriverStatus;
+    async fn lifecycle(&mut self, event: DriverLifecycleCall) -> Result<DriverStatus,MsgErr>;
+    async fn ex(&self, point: &Point) -> Result<Box<dyn Core>,MsgErr>;
+    async fn assign(&self, assign: Assign ) -> Result<(), MsgErr>;
+}
+
+#[derive(Clone, Eq, PartialEq, Hash)]
+pub enum DriverLifecycleCall {
+    Init,
+    Shutdown,
+}
+
+#[derive(Clone, Eq, PartialEq, Hash)]
+pub enum DriverStatus {
+    Unknown,
+    Pending,
+    Initializing,
+    Ready,
+    Unavailable,
+    Shutdown
+}
+
+#[derive(Clone, Eq, PartialEq, Hash)]
+pub struct DriverStatusEvent {
+    pub driver: Point,
+    pub status: DriverStatus
+}
+
+pub trait Core: DirectedHandler+Send+Sync {
+}
+
+
+pub enum DriverShellRequest {
+  Ex{ point: Point, tx: oneshot::Sender<Result<Box<dyn Core>,MsgErr>>},
+  Assign{ assign: Assign, rtn: oneshot::Sender<Result<(),MsgErr>>}
+}
+
+
+#[derive(Clone)]
+pub struct CoreSkel<P> where P: Platform {
+   pub point: Point,
+   pub transmitter: ProtoTransmitter,
+   phantom: PhantomData<P>
+}
+
+impl <P> CoreSkel<P> where P: Platform {
+    pub fn new( point: Point, transmitter: ProtoTransmitter ) -> Self {
+        Self {
+            point,
+            transmitter,
+            phantom: Default::default()
+        }
+    }
+}
+

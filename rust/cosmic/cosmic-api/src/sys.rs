@@ -209,7 +209,7 @@ pub struct Created {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Hash)]
 pub enum InterchangeKind {
-    Cli,
+    Control,
     Portal(Option<Point>),
     Star(StarKey),
 }
@@ -234,7 +234,7 @@ impl Knock {
 impl Default for Knock {
     fn default() -> Self {
         Self {
-            kind: InterchangeKind::Cli,
+            kind: InterchangeKind::Control,
             auth: Box::new(Substance::Empty),
             remote: None
         }
