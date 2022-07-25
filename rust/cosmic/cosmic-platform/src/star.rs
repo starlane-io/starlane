@@ -278,9 +278,9 @@ where
         &self.logger.point
     }
 
-    pub fn create_star_drivers(&self, driver_skel: DriverSkel) -> HashMap<Kind, Box<dyn Driver>> {
+    pub fn create_star_drivers(&self, driver_skel: DriverSkel, drivers_api: DriversApi<P>) -> HashMap<Kind, Box<dyn Driver>> {
         let mut rtn: HashMap<Kind, Box<dyn Driver>> = HashMap::new();
-        let star_driver = StarDriver::new(self.clone(), driver_skel);
+        let star_driver = StarDriver::new(self.clone(), driver_skel, drivers_api);
         rtn.insert(star_driver.kind().clone(), Box::new(star_driver));
         rtn
     }
@@ -539,10 +539,12 @@ where
         skel.state
             .create_shell(skel.point.clone().to_port().with_layer(Layer::Shell));
 
-        let star_driver_factory = Box::new(StarDriverFactory::new(skel.clone()));
+        let (drivers_tx,drivers_rx) = mpsc::channel(1024);
+        let drivers_api = DriversApi::new(drivers_tx.clone());
+        let star_driver_factory = Box::new(StarDriverFactory::new(skel.clone(), drivers_api));
         drivers.add(star_driver_factory);
 
-        let drivers = drivers.build( skel.point.push("drivers")?.to_port(), skel.clone() )?;
+        let drivers = drivers.build( skel.point.push("drivers")?.to_port(), skel.clone(), drivers_tx.clone(), drivers_rx)?;
 
         let mut forwarders = vec![];
         for (point, stub) in skel.adjacents.iter() {
@@ -1454,19 +1456,21 @@ impl PartialOrd for StarDiscovery {
     }
 }
 
+#[derive(Clone)]
 pub struct StarDriverFactory<P>
 where
     P: Platform + 'static,
 {
     pub skel: StarSkel<P>,
+    pub drivers_api: DriversApi<P>
 }
 
 impl<P> StarDriverFactory<P>
 where
     P: Platform + 'static,
 {
-    pub fn new(skel: StarSkel<P>) -> Self {
-        Self { skel }
+    pub fn new(skel: StarSkel<P>, drivers_api: DriversApi<P>) -> Self {
+        Self { skel, drivers_api }
     }
 }
 
@@ -1479,7 +1483,7 @@ where
     }
 
     fn create(&self, driver_skel: DriverSkel) -> Box<dyn Driver> {
-        Box::new(StarDriver::new(self.skel.clone(), driver_skel))
+        Box::new(StarDriver::new(self.skel.clone(), driver_skel, self.drivers_api.clone() ))
     }
 }
 
@@ -1491,17 +1495,19 @@ where
     pub status: DriverStatus,
     pub star_skel: StarSkel<P>,
     pub driver_skel: DriverSkel,
+    pub drivers_api: DriversApi<P>
 }
 
 impl<P> StarDriver<P>
 where
     P: Platform,
 {
-    pub fn new(star_skel: StarSkel<P>, driver_skel: DriverSkel) -> Self {
+    pub fn new(star_skel: StarSkel<P>, driver_skel: DriverSkel, drivers_api: DriversApi<P>) -> Self {
         Self {
             status: DriverStatus::Started,
             star_skel,
             driver_skel,
+            drivers_api
         }
     }
 
@@ -1573,6 +1579,7 @@ where
         Box::new(StarCore::new(
             self.star_skel.clone(),
             self.driver_skel.clone(),
+            self.drivers_api.clone()
         ))
     }
 
@@ -1594,6 +1601,7 @@ where
 {
     pub star_skel: StarSkel<P>,
     pub driver_skel: DriverSkel,
+    pub drivers_api: DriversApi<P>
 }
 
 impl<P> Core for StarCore<P> where P: Platform + 'static {}
@@ -1603,10 +1611,11 @@ impl<P> StarCore<P>
 where
     P: Platform + 'static,
 {
-    pub fn new(star_skel: StarSkel<P>, driver_skel: DriverSkel) -> Self {
+    pub fn new(star_skel: StarSkel<P>, driver_skel: DriverSkel, drivers_api: DriversApi<P>) -> Self {
         Self {
             star_skel,
             driver_skel,
+            drivers_api
         }
     }
 
@@ -1618,7 +1627,14 @@ println!("...*** >>>>>  HANDLE ASSIGN!!!!!!")  ;
             #[cfg(test)]
             self.star_skel.diagnostic_interceptors.assignment.send(assign.clone() ).unwrap_or_default();
 
-            self.driver_skel.assign(assign.clone()).await?;
+            // create field and shell
+            self.star_skel.state
+                .create_field(assign.details.stub.point.clone().to_port().with_layer(Layer::Field));
+            self.star_skel.state
+                .create_shell(assign.details.stub.point.clone().to_port().with_layer(Layer::Shell));
+
+            println!("sending....");
+            self.drivers_api.assign(assign.clone()).await?;
 println!("Assigned...");
             Ok(ReflectedCore::ok())
         } else {

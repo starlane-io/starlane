@@ -1,6 +1,7 @@
 use crate::machine::MachineSkel;
 use crate::star::StarCall::LayerTraversalInjection;
 use crate::star::{LayerInjectionRouter, StarSkel, StarState, StateApi, StateCall};
+use crate::{PlatErr, Platform, RegistryApi};
 use cosmic_api::config::config::bind::RouteSelector;
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{Kind, Layer, Point, Port, ToPoint, ToPort, TraversalLayer, Uuid};
@@ -12,9 +13,13 @@ use cosmic_api::particle::particle::Status;
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{Assign, Sys};
 use cosmic_api::util::ValuePattern;
-use cosmic_api::wave::{Bounce, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, SysMethod, UltraWave, Wave, WaveKind};
+use cosmic_api::wave::{
+    Bounce, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto,
+    DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder,
+    RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, SysMethod,
+    UltraWave, Wave, WaveKind,
+};
 use cosmic_api::State;
-use cosmic_api::{};
 use cosmic_driver::{
     Core, Driver, DriverFactory, DriverLifecycleCall, DriverShellRequest, DriverSkel, DriverStatus,
     DriverStatusEvent,
@@ -25,83 +30,113 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
-use crate::{PlatErr, Platform, RegistryApi};
 
-pub enum DriversCall<P> where P: Platform {
-    Init(oneshot::Sender<Result<Status,P::Err>>),
+pub enum DriversCall<P>
+where
+    P: Platform,
+{
+    Init(oneshot::Sender<Result<Status, P::Err>>),
     Visit(Traversal<UltraWave>),
-    Kinds(oneshot::Sender<Vec<Kind>>)
+    Kinds(oneshot::Sender<Vec<Kind>>),
+    Assign {
+        assign: Assign,
+        rtn: oneshot::Sender<Result<(), MsgErr>>,
+    },
 }
 
-pub struct DriversApi<P> where
-    P: Platform{
-    tx: mpsc::Sender<DriversCall<P>>
+#[derive(Clone)]
+pub struct DriversApi<P>
+where
+    P: Platform,
+{
+    tx: mpsc::Sender<DriversCall<P>>,
 }
 
-impl <P> DriversApi <P> where P: Platform{
-    pub async fn visit(&self, traversal: Traversal<UltraWave>) {
-        self.tx.send( DriversCall::Visit(traversal)).await;
+impl<P> DriversApi<P>
+where
+    P: Platform,
+{
+    pub fn new(tx: mpsc::Sender<DriversCall<P>>) -> Self {
+        Self { tx }
     }
 
-    pub async fn kinds(&self) -> Result<Vec<Kind>,MsgErr> {
-        let (rtn,mut rtn_rx) = oneshot::channel();
+    pub async fn visit(&self, traversal: Traversal<UltraWave>) {
+        self.tx.send(DriversCall::Visit(traversal)).await;
+    }
+
+    pub async fn kinds(&self) -> Result<Vec<Kind>, MsgErr> {
+        let (rtn, mut rtn_rx) = oneshot::channel();
         self.tx.send(DriversCall::Kinds(rtn)).await;
         Ok(rtn_rx.await?)
     }
 
-    pub async fn init(&self) -> Result<Status,P::Err> where <P as Platform>::Err: From<tokio::sync::oneshot::error::RecvError>{
-        let (rtn,mut rtn_rx) = oneshot::channel();
+    pub async fn init(&self) -> Result<Status, P::Err>
+    where
+        <P as Platform>::Err: From<tokio::sync::oneshot::error::RecvError>,
+    {
+        let (rtn, mut rtn_rx) = oneshot::channel();
         self.tx.send(DriversCall::Init(rtn)).await;
         rtn_rx.await?
+    }
+    pub async fn assign(&self, assign: Assign) -> Result<(), MsgErr> {
+        let (rtn, rtn_rx) = oneshot::channel();
+        self.tx.send(DriversCall::Assign { assign, rtn }).await;
+        Ok(rtn_rx.await??)
     }
 }
 
 #[derive(DirectedHandler)]
 pub struct Drivers<P>
 where
-    P: Platform+  'static,
+    P: Platform + 'static,
 {
-    pub port: Port,
-    pub skel: StarSkel<P>,
-    pub drivers: HashMap<Kind, DriverApi>,
-    pub rx: mpsc::Receiver<DriversCall<P>>
+    port: Port,
+    skel: StarSkel<P>,
+    drivers: HashMap<Kind, DriverApi>,
+    rx: mpsc::Receiver<DriversCall<P>>,
 }
 
 impl<P> Drivers<P>
 where
-    P: Platform+ 'static,
+    P: Platform + 'static,
 {
-    pub fn new(port: Port, skel: StarSkel<P>, drivers: HashMap<Kind, DriverApi>) -> DriversApi<P> {
-        let (tx,rx) = mpsc::channel(1024);
+    pub fn new(
+        port: Port,
+        skel: StarSkel<P>,
+        drivers: HashMap<Kind, DriverApi>,
+        tx: mpsc::Sender<DriversCall<P>>,
+        rx: mpsc::Receiver<DriversCall<P>>,
+    ) -> DriversApi<P> {
         let mut drivers = Self {
             port,
             skel,
             drivers,
-            rx
+            rx,
         };
 
         drivers.start();
 
-        DriversApi {
-            tx
-        }
+        DriversApi::new(tx)
     }
 
-    fn start( mut self ) {
-        tokio::spawn( async move {
-           while let Some(call) = self.rx.recv().await {
-               match call {
-                   DriversCall::Init(rtn) => {
-                       rtn.send(self.init().await);
-                   }
-                   DriversCall::Visit(traversal) => {
-                       self.visit(traversal).await;
-                   }
-                   DriversCall::Kinds(rtn) => {
-                       rtn.send(self.kinds());
-                   }
-               }
-           }
+    fn start(mut self) {
+        tokio::spawn(async move {
+            while let Some(call) = self.rx.recv().await {
+                match call {
+                    DriversCall::Init(rtn) => {
+                        rtn.send(self.init().await);
+                    }
+                    DriversCall::Visit(traversal) => {
+                        self.visit(traversal).await;
+                    }
+                    DriversCall::Kinds(rtn) => {
+                        rtn.send(self.kinds());
+                    }
+                    DriversCall::Assign { assign, rtn } => {
+                        rtn.send(self.assign(assign).await);
+                    }
+                }
+            }
         });
     }
 
@@ -154,6 +189,20 @@ impl<P> Drivers<P>
 where
     P: Platform,
 {
+    pub async fn assign(&self, assign: Assign) -> Result<(), MsgErr> {
+        let driver = self
+            .drivers
+            .get(&assign.details.stub.kind)
+            .ok_or::<MsgErr>(
+                format!(
+                    "kind not supported by these Drivers: {}",
+                    assign.details.stub.kind.to_string()
+                )
+                .into(),
+            )?;
+        driver.assign(assign).await
+    }
+
     pub async fn handle(&self, wave: DirectedWave) -> Result<ReflectedCore, MsgErr> {
         let record = self
             .skel
@@ -201,7 +250,7 @@ where
     async fn start_inner_traversal(&self, traversal: Traversal<UltraWave>) {}
 
     pub async fn visit(&self, traversal: Traversal<UltraWave>) {
-println!("Visiting Drivers...");
+        println!("Visiting Drivers...");
         if traversal.dir.is_core() {
             match self.drivers.get(&traversal.record.details.stub.kind) {
                 None => {
@@ -223,12 +272,18 @@ println!("Visiting Drivers...");
 #[derive(Clone)]
 pub struct DriverApi {
     pub tx: mpsc::Sender<DriverShellCall>,
-    pub kind: Kind
+    pub kind: Kind,
 }
 
 impl DriverApi {
     pub fn new(tx: mpsc::Sender<DriverShellCall>, kind: Kind) -> Self {
-        Self { tx, kind}
+        Self { tx, kind }
+    }
+
+    pub async fn assign(&self, assign: Assign) -> Result<(), MsgErr> {
+        let (rtn, rtn_rx) = oneshot::channel();
+        self.tx.send(DriverShellCall::Assign { assign, rtn }).await;
+        Ok(rtn_rx.await??)
     }
 
     pub async fn status(&self) -> Result<DriverStatus, MsgErr> {
@@ -247,7 +302,7 @@ impl DriverApi {
     }
 
     pub async fn traversal(&self, traversal: Traversal<UltraWave>) {
-println!("sending along driver: {}", self.kind.to_string());
+        println!("sending along driver: {}", self.kind.to_string());
         self.tx.send(DriverShellCall::Traversal(traversal)).await;
     }
 
@@ -274,7 +329,7 @@ impl DriversBuilder {
     pub fn kinds(&self) -> HashSet<Kind> {
         let mut rtn = HashSet::new();
         for kind in self.factories.keys() {
-            rtn.insert( kind.clone() );
+            rtn.insert(kind.clone());
         }
         rtn
     }
@@ -287,9 +342,15 @@ impl DriversBuilder {
         self.logger.replace(logger);
     }
 
-    pub fn build<P>(self, drivers_port: Port, skel: StarSkel<P>) -> Result<DriversApi<P>, MsgErr>
+    pub fn build<P>(
+        self,
+        drivers_port: Port,
+        skel: StarSkel<P>,
+        drivers_tx: mpsc::Sender<DriversCall<P>>,
+        drivers_rx: mpsc::Receiver<DriversCall<P>>,
+    ) -> Result<DriversApi<P>, MsgErr>
     where
-        P: Platform +'static,
+        P: Platform + 'static,
     {
         if self.logger.is_none() {
             return Err("expected point logger to be set".into());
@@ -300,7 +361,13 @@ impl DriversBuilder {
             let api = create_driver(factory, drivers_port.clone(), skel.clone())?;
             drivers.insert(kind, api);
         }
-        Ok(Drivers::new(drivers_port, skel, drivers))
+        Ok(Drivers::new(
+            drivers_port,
+            skel,
+            drivers,
+            drivers_tx,
+            drivers_rx,
+        ))
     }
 }
 
@@ -326,8 +393,8 @@ where
                         let call = DriverShellCall::Ex { point, tx };
                         shell_tx.send(call).await;
                     }
-                    DriverShellRequest::Assign { assign, tx } => {
-                        let call = DriverShellCall::Assign { assign, tx };
+                    DriverShellRequest::Assign { assign, rtn } => {
+                        let call = DriverShellCall::Assign { assign, rtn };
                         shell_tx.send(call).await;
                     }
                 }
@@ -342,7 +409,7 @@ where
     let core = factory.create(driver_skel);
     let state = skel.state.api().with_layer(Layer::Core);
     let shell = DriverShell::new(point, skel.clone(), core, state, shell_tx, shell_rx);
-    let api = DriverApi::new(shell, factory.kind() );
+    let api = DriverApi::new(shell, factory.kind());
     Ok(api)
 }
 
@@ -363,13 +430,13 @@ pub enum DriverShellCall {
     },
     Assign {
         assign: Assign,
-        tx: oneshot::Sender<Result<(), MsgErr>>,
+        rtn: oneshot::Sender<Result<(), MsgErr>>,
     },
 }
 
 pub struct OuterCore<P>
 where
-    P: Platform +'static,
+    P: Platform + 'static,
 {
     pub port: Port,
     pub skel: StarSkel<P>,
@@ -381,7 +448,7 @@ where
 #[async_trait]
 impl<P> TraversalLayer for OuterCore<P>
 where
-    P: Platform ,
+    P: Platform,
 {
     fn port(&self) -> &cosmic_api::id::id::Port {
         &self.port
@@ -402,15 +469,18 @@ where
         let ctx = RootInCtx::new(direct.payload, to, logger, transmitter);
         match self.ex.handle(ctx).await {
             CoreBounce::Absorbed => {
-println!("---> ABSORBED <----");
+                println!("---> ABSORBED <----");
             }
             CoreBounce::Reflected(reflected) => {
-                let wave = reflection.unwrap().make(reflected, self.port.clone() );
+                let wave = reflection.unwrap().make(reflected, self.port.clone());
                 let wave = wave.to_ultra();
-println!("---> RELFECTED <-----");
+                println!("---> RELFECTED <-----");
                 #[cfg(test)]
-                self.skel.diagnostic_interceptors.reflected_endpoint.send(wave.clone());
-                self.inject( wave ).await;
+                self.skel
+                    .diagnostic_interceptors
+                    .reflected_endpoint
+                    .send(wave.clone());
+                self.inject(wave).await;
             }
         }
     }
@@ -436,7 +506,7 @@ println!("---> RELFECTED <-----");
 #[derive(DirectedHandler)]
 pub struct DriverShell<P>
 where
-    P: Platform +'static,
+    P: Platform + 'static,
 {
     point: Point,
     skel: StarSkel<P>,
@@ -452,7 +522,7 @@ where
 #[routes]
 impl<P> DriverShell<P>
 where
-    P: Platform +'static,
+    P: Platform + 'static,
 {
     pub fn new(
         point: Point,
@@ -488,7 +558,7 @@ where
     fn start(mut self) {
         tokio::spawn(async move {
             while let Some(call) = self.rx.recv().await {
-println!("received Driver Shell Call!");
+                println!("received Driver Shell Call!");
                 match call {
                     DriverShellCall::LifecycleCall { call, tx } => {
                         let result = self.lifecycle(call).await;
@@ -507,15 +577,16 @@ println!("received Driver Shell Call!");
                         tx.send(self.status.clone());
                     }
                     DriverShellCall::Traversal(traversal) => {
-println!("Driver Shell Traversal:  ");
+                        println!("Driver Shell Traversal:  ");
                         self.traverse(traversal).await;
                     }
                     DriverShellCall::Handle { wave, tx } => {
-println!("Handle wave! {}", wave.core().method.to_string() );
+                        println!("Handle wave! {}", wave.core().method.to_string());
                         let port = wave.to().clone().unwrap_single();
                         let logger = self.skel.logger.point(port.clone().to_point()).span();
-                        let router = Arc::new(self.router.clone() );
-                        let transmitter = ProtoTransmitter::new(router, self.skel.exchanger.clone());
+                        let router = Arc::new(self.router.clone());
+                        let transmitter =
+                            ProtoTransmitter::new(router, self.skel.exchanger.clone());
                         let ctx = RootInCtx::new(wave, port.clone(), logger, transmitter);
                         match self.handle(ctx).await {
                             CoreBounce::Absorbed => {
@@ -540,7 +611,7 @@ println!("Handle wave! {}", wave.core().method.to_string() );
                             }
                         }
                     }
-                    DriverShellCall::Assign { assign, tx } => {
+                    DriverShellCall::Assign { assign, rtn } => {
                         let port = assign
                             .details
                             .stub
@@ -572,21 +643,21 @@ println!("Handle wave! {}", wave.core().method.to_string() );
                                 match state {
                                     Ok(state) => match state {
                                         None => {
-                                            tx.send(Ok(()));
+                                            rtn.send(Ok(()));
                                         }
                                         Some(state) => {
-                                            tx.send(
+                                            rtn.send(
                                                 self.skel.state.api().put_state(port, state).await,
                                             );
                                         }
                                     },
                                     Err(err) => {
-                                        tx.send(Err(err));
+                                        rtn.send(Err(err));
                                     }
                                 }
                             }
                             Err(err) => {
-                                tx.send(Err(err));
+                                rtn.send(Err(err));
                             }
                         }
                     }
@@ -595,10 +666,10 @@ println!("Handle wave! {}", wave.core().method.to_string() );
         });
     }
 
-    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(),MsgErr> {
-        let core = self.core(&traversal.to.point ).await?;
+    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), MsgErr> {
+        let core = self.core(&traversal.to.point).await?;
         if traversal.is_directed() {
-            core.deliver_directed(traversal.unwrap_directed() ).await;
+            core.deliver_directed(traversal.unwrap_directed()).await;
         } else {
             core.deliver_reflected(traversal.unwrap_reflected()).await;
         }
