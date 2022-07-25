@@ -342,10 +342,13 @@ where
         let reflection = direct.reflection();
         let ctx = RootInCtx::new(direct.payload, to, logger, transmitter);
         match self.ex.handle(ctx).await {
-            CoreBounce::Absorbed => {}
+            CoreBounce::Absorbed => {
+println!("---> ABSORBED <----");
+            }
             CoreBounce::Reflected(reflected) => {
                 let wave = reflection.unwrap().make(reflected, self.port.clone() );
                 let wave = wave.to_ultra();
+println!("---> RELFECTED <-----");
                 #[cfg(test)]
                 self.skel.diagnostic_interceptors.reflected_endpoint.send(wave.clone());
                 self.inject( wave ).await;

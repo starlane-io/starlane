@@ -1640,6 +1640,7 @@ println!("VISIT LAYER: {}", self.port().layer.to_string() );
             &self,
             traversal: Traversal<ReflectedWave>,
         ) -> Result<(), MsgErr> {
+println!("reflected fabric bound for: {}", self.port().layer.to_string() );
             self.traverse_next(traversal.to_ultra()).await;
             Ok(())
         }

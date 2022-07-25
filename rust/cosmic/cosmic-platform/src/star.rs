@@ -1612,7 +1612,7 @@ where
         self.star_skel
             .diagnostic_interceptors
             .transport_endpoint
-            .send(ctx.wave().clone().to_ultra());
+            .send(ctx.wave().clone().to_ultra()).unwrap_or_default();
         println!("@@@ !!!  received Transport !!! @@@");
         let wave = ctx.input.clone();
         let injection = TraversalInjection::new(
@@ -1620,7 +1620,7 @@ where
                 .point
                 .clone()
                 .to_port()
-                .with_layer(Layer::Field),
+                .with_layer(Layer::Gravity),
             wave,
         );
         self.star_skel.inject_tx.send(injection).await;
