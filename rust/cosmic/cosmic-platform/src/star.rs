@@ -1,9 +1,9 @@
-use crate::driver::Drivers;
+use crate::driver::{Drivers, DriversApi};
 use crate::field::{FieldEx, FieldState};
 use crate::machine::MachineSkel;
 use crate::shell::ShellEx;
 use crate::state::ShellState;
-use crate::{PlatErr, Platform, Registry, RegistryApi};
+use crate::{DriversBuilder, PlatErr, Platform, Registry, RegistryApi};
 use cosmic_api::bin::Bin;
 use cosmic_api::cli::RawCommand;
 use cosmic_api::command::command::common::StateSrc;
@@ -294,7 +294,7 @@ pub enum StarCall<P>
 where
     P: Platform,
 {
-    PreInit(oneshot::Sender<Result<(), MsgErr>>),
+    PreInit(oneshot::Sender<Result<Status, P::Err>>),
     Stub(oneshot::Sender<StarStub>),
     FromHyperway {
         wave: UltraWave,
@@ -383,8 +383,14 @@ where
             tokio::spawn(async move {
                 while let Some(inject) = drivers_rx.recv().await {
                     println!("TO DRIVER....");
-                    call_tx.send(StarCall::ToDriver(inject)).await;
+                    match call_tx.send(StarCall::ToDriver(inject)).await {
+                        Ok(_) => {}
+                        Err(_) => {
+                            panic!("driveres not working");
+                        }
+                    }
                 }
+panic!("======== DRIVERS RX STOPPED")                ;
             });
         }
 
@@ -420,7 +426,7 @@ where
         Self { kind, tx }
     }
 
-    pub async fn pre_init(&self) -> Result<(), MsgErr> {
+    pub async fn pre_init(&self) -> Result<Status, P::Err> {
         let (tx, mut rx) = oneshot::channel();
         self.tx.send(StarCall::PreInit(tx)).await;
         rx.await?
@@ -493,7 +499,7 @@ where
 {
     skel: StarSkel<P>,
     star_rx: mpsc::Receiver<StarCall<P>>,
-    drivers: Drivers<P>,
+    drivers: DriversApi<P>,
     injector: Port,
     mounts: HashMap<Point, StarMount>,
     forwarders: Vec<Point>,
@@ -510,7 +516,7 @@ where
 {
     pub async fn new(
         skel: StarSkel<P>,
-        mut drivers: Drivers<P>,
+        mut drivers: DriversBuilder,
         mut hyperway_ext: HyperwayExt,
         star_tx: mpsc::Sender<StarCall<P>>,
         star_rx: mpsc::Receiver<StarCall<P>>,
@@ -534,7 +540,9 @@ where
             .create_shell(skel.point.clone().to_port().with_layer(Layer::Shell));
 
         let star_driver_factory = Box::new(StarDriverFactory::new(skel.clone()));
-        drivers.add(star_driver_factory)?;
+        drivers.add(star_driver_factory);
+
+        let drivers = drivers.build( skel.point.push("drivers")?.to_port(), skel.clone() )?;
 
         let mut forwarders = vec![];
         for (point, stub) in skel.adjacents.iter() {
@@ -696,7 +704,7 @@ where
         });
     }
 
-    async fn pre_init(&self) -> Result<(), MsgErr> {
+    async fn pre_init(&self) -> Result<Status, P::Err> {
         self.drivers.init().await
     }
 
@@ -752,7 +760,7 @@ where
             .diagnostic_interceptors
             .to_gravity
             .send(wave.clone())
-            .unwrap();
+            .unwrap_or_default();
 
         let waves =
             shard_ultrawave_by_location(wave, &self.skel.adjacents, &self.skel.registry).await?;
@@ -1070,8 +1078,13 @@ where
             .unwrap_or_default();
 
         // alright, let's visit the injection layer first...
-        self.visit_layer(traversal).await?;
-        Ok(())
+        match self.visit_layer(traversal).await{
+            Ok(_) => {Ok(())}
+            Err(err) => {
+                self.skel.logger.error( format!("{}",err.to_string()));
+                Err(err.into())
+            }
+        }
     }
 
     async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(), MsgErr> {
@@ -1126,6 +1139,7 @@ where
                             .find_field(&traversal.to.clone().with_layer(Layer::Field))?,
                         traversal.logger.clone(),
                     );
+println!("visiting field.... for: {}", traversal.to.to_string());
                     field.visit(traversal).await;
                 }
                 Layer::Shell => {
@@ -1598,8 +1612,14 @@ where
 
     #[route("Sys<Assign>")]
     pub async fn handle_assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, MsgErr> {
+println!("...*** >>>>>  HANDLE ASSIGN!!!!!!")  ;
         if let Sys::Assign(assign) = ctx.input {
+
+            #[cfg(test)]
+            self.star_skel.diagnostic_interceptors.assignment.send(assign.clone() ).unwrap_or_default();
+
             self.driver_skel.assign(assign.clone()).await?;
+println!("Assigned...");
             Ok(ReflectedCore::ok())
         } else {
             Err("expected Sys<Assign>".into())
@@ -1613,8 +1633,9 @@ where
             .diagnostic_interceptors
             .transport_endpoint
             .send(ctx.wave().clone().to_ultra()).unwrap_or_default();
-        println!("@@@ !!!  received Transport !!! @@@");
         let wave = ctx.input.clone();
+
+println!("@@@ !!!  received Transport ::> {}", ctx.input.clone().to_directed().unwrap().core().method.to_string());
         let injection = TraversalInjection::new(
             self.star_skel
                 .point
@@ -1915,6 +1936,7 @@ where
     pub start_layer_traversal: broadcast::Sender<Traversal<UltraWave>>,
     pub transport_endpoint: broadcast::Sender<UltraWave>,
     pub reflected_endpoint: broadcast::Sender<UltraWave>,
+    pub assignment: broadcast::Sender<Assign>,
     pub err: broadcast::Sender<P::Err>,
 }
 
@@ -1931,6 +1953,7 @@ where
         let (err, _) = broadcast::channel(1024);
         let (transport_endpoint, _) = broadcast::channel(1024);
         let (reflected_endpoint, _) = broadcast::channel(1024);
+        let (assignment, _) = broadcast::channel(1024);
         Self {
             from_hyperway,
             to_hyperway,
@@ -1940,6 +1963,7 @@ where
             err,
             transport_endpoint,
             reflected_endpoint,
+            assignment
         }
     }
 }

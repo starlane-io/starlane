@@ -27,6 +27,35 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use crate::{PlatErr, Platform, RegistryApi};
 
+pub enum DriversCall<P> where P: Platform {
+    Init(oneshot::Sender<Result<Status,P::Err>>),
+    Visit(Traversal<UltraWave>),
+    Kinds(oneshot::Sender<Vec<Kind>>)
+}
+
+pub struct DriversApi<P> where
+    P: Platform{
+    tx: mpsc::Sender<DriversCall<P>>
+}
+
+impl <P> DriversApi <P> where P: Platform{
+    pub async fn visit(&self, traversal: Traversal<UltraWave>) {
+        self.tx.send( DriversCall::Visit(traversal)).await;
+    }
+
+    pub async fn kinds(&self) -> Result<Vec<Kind>,MsgErr> {
+        let (rtn,mut rtn_rx) = oneshot::channel();
+        self.tx.send(DriversCall::Kinds(rtn)).await;
+        Ok(rtn_rx.await?)
+    }
+
+    pub async fn init(&self) -> Result<Status,P::Err> where <P as Platform>::Err: From<tokio::sync::oneshot::error::RecvError>{
+        let (rtn,mut rtn_rx) = oneshot::channel();
+        self.tx.send(DriversCall::Init(rtn)).await;
+        rtn_rx.await?
+    }
+}
+
 #[derive(DirectedHandler)]
 pub struct Drivers<P>
 where
@@ -35,18 +64,45 @@ where
     pub port: Port,
     pub skel: StarSkel<P>,
     pub drivers: HashMap<Kind, DriverApi>,
+    pub rx: mpsc::Receiver<DriversCall<P>>
 }
 
 impl<P> Drivers<P>
 where
     P: Platform+ 'static,
 {
-    pub fn new(port: Port, skel: StarSkel<P>, drivers: HashMap<Kind, DriverApi>) -> Self {
-        Self {
+    pub fn new(port: Port, skel: StarSkel<P>, drivers: HashMap<Kind, DriverApi>) -> DriversApi<P> {
+        let (tx,rx) = mpsc::channel(1024);
+        let mut drivers = Self {
             port,
             skel,
             drivers,
+            rx
+        };
+
+        drivers.start();
+
+        DriversApi {
+            tx
         }
+    }
+
+    fn start( mut self ) {
+        tokio::spawn( async move {
+           while let Some(call) = self.rx.recv().await {
+               match call {
+                   DriversCall::Init(rtn) => {
+                       rtn.send(self.init().await);
+                   }
+                   DriversCall::Visit(traversal) => {
+                       self.visit(traversal).await;
+                   }
+                   DriversCall::Kinds(rtn) => {
+                       rtn.send(self.kinds());
+                   }
+               }
+           }
+        });
     }
 
     pub fn kinds(&self) -> Vec<Kind> {
@@ -57,7 +113,7 @@ where
         rtn
     }
 
-    pub async fn init(&self) -> Result<(), MsgErr> {
+    pub async fn init(&self) -> Result<Status, P::Err> {
         let mut errs = vec![];
         for driver in self.drivers.values() {
             let status = driver.status().await?;
@@ -77,18 +133,21 @@ where
 
         if !errs.is_empty() {
             // need to fold these errors into one
-            Err(MsgErr::server_error())
+            Err(MsgErr::server_error().into())
         } else {
-            Ok(())
+            Ok(Status::Ready)
         }
     }
 
+    /*
     pub fn add(&mut self, factory: Box<dyn DriverFactory>) -> Result<(), MsgErr> {
         let kind = factory.kind().clone();
         let api = create_driver(factory, self.port.clone(), self.skel.clone())?;
         self.drivers.insert(kind, api);
         Ok(())
+
     }
+     */
 }
 
 impl<P> Drivers<P>
@@ -228,7 +287,7 @@ impl DriversBuilder {
         self.logger.replace(logger);
     }
 
-    pub fn build<P>(self, drivers_port: Port, skel: StarSkel<P>) -> Result<Drivers<P>, MsgErr>
+    pub fn build<P>(self, drivers_port: Port, skel: StarSkel<P>) -> Result<DriversApi<P>, MsgErr>
     where
         P: Platform +'static,
     {

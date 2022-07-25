@@ -2,87 +2,127 @@ use crate::star::StarSkel;
 use anyhow::anyhow;
 use dashmap::DashMap;
 
+use cosmic_api::config::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar, WaveKind};
 use cosmic_api::error::MsgErr;
-use cosmic_api::config::config::bind::{
-    BindConfig, PipelineStepVar, PipelineStopVar, WaveKind,
+use cosmic_api::id::id::{
+    BaseKind, Kind, Layer, Point, Port, ToBaseKind, ToPoint, ToPort, TraversalLayer, Uuid,
 };
-use cosmic_api::id::id::{BaseKind, Kind, Layer, Point, Port, ToBaseKind, ToPoint, ToPort, TraversalLayer, Uuid};
-use cosmic_api::id::{ArtifactSubKind, TraversalInjection};
 use cosmic_api::id::Traversal;
+use cosmic_api::id::{ArtifactSubKind, TraversalInjection};
 use cosmic_api::log::{PointLogger, RootLogger, SpanLogger};
 use cosmic_api::parse::model::PipelineVar;
-use cosmic_api::parse::{bind_config, Env, MapResolver, MultiVarResolver, PointCtxResolver, RegexCapturesResolver};
+use cosmic_api::parse::{
+    bind_config, Env, MapResolver, MultiVarResolver, PointCtxResolver, RegexCapturesResolver,
+};
 use cosmic_api::security::Access;
 use cosmic_api::selector::selector::PipelineKind;
 use cosmic_api::selector::{PayloadBlock, PayloadBlockVar};
 use cosmic_api::substance::substance::{Call, CallKind, Substance};
 use cosmic_api::sys::ParticleRecord;
 use cosmic_api::util::{log, ToResolved, ValueMatcher};
-use cosmic_api::wave::{Agent, CmdMethod, Method, DirectedCore, Ping, Reflectable, ReflectedCore, Pong, Wave, Exchanger, UltraWave, DirectedWave, ReflectedWave, Bounce, SingularDirectedWave, ToRecipients};
+use cosmic_api::wave::{
+    Agent, Bounce, CmdMethod, DirectedCore, DirectedWave, Exchanger, Method, Ping, Pong,
+    Reflectable, ReflectedCore, ReflectedWave, SingularDirectedWave, ToRecipients, UltraWave, Wave,
+};
 use regex::{CaptureMatches, Regex};
 
+use crate::{PlatErr, Platform, RegistryApi};
+use cosmic_api::ArtRef;
+use http::{HeaderMap, StatusCode, Uri};
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
-use http::{HeaderMap, StatusCode, Uri};
 use tokio::io::AsyncBufReadExt;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, Mutex};
-use cosmic_api::{ArtRef};
-use crate::{PlatErr, Platform, RegistryApi};
-
 
 lazy_static! {
-    static ref STAR_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new( Arc::new(star_bind_config()), Point::from_str("GLOBAL::repo:1.0.0:/bind/star.bind").unwrap());
+    static ref STAR_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
+        Arc::new(star_bind_config()),
+        Point::from_str("GLOBAL::repo:1.0.0:/bind/star.bind").unwrap()
+    );
+    static ref CONTROL_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
+        Arc::new(control_bind_config()),
+        Point::from_str("GLOBAL::repo:1.0.0:/bind/control.bind").unwrap()
+    );
 }
 
-fn star_bind_config() -> BindConfig
-{
-    log(bind_config(r#"
+fn star_bind_config() -> BindConfig {
+    log(bind_config(
+        r#"
     Bind(version=1.0.0)
     {
        Route<Sys<Transport>> -> (());
+       Route<Sys<Assign>> -> (()) => &;
     }
-    "#)).unwrap()
+    "#,
+    ))
+    .unwrap()
+}
 
+fn control_bind_config() -> BindConfig {
+    log(bind_config(
+        r#"
+    Bind(version=1.0.0)
+    {
+       Route<*> -> ((*));
+    }
+    "#,
+    ))
+    .unwrap()
 }
 
 #[derive(Clone)]
-pub struct FieldEx<P> where P: Platform+'static {
+pub struct FieldEx<P>
+where
+    P: Platform + 'static,
+{
     pub port: Port,
     pub skel: StarSkel<P>,
     pub state: FieldState<P>,
-    pub logger: SpanLogger
+    pub logger: SpanLogger,
 }
 
-
-
-impl <P> FieldEx<P> where P: Platform+'static {
-    pub fn new(point: Point, skel: StarSkel<P>, state: FieldState<P>, logger: SpanLogger ) -> Self {
+impl<P> FieldEx<P>
+where
+    P: Platform + 'static,
+{
+    pub fn new(point: Point, skel: StarSkel<P>, state: FieldState<P>, logger: SpanLogger) -> Self {
         let port = point.to_port().with_layer(Layer::Field);
-        Self { port, skel, state, logger }
+        Self {
+            port,
+            skel,
+            state,
+            logger,
+        }
     }
 
-    async fn handle_action(&self, action: RequestAction) -> Result<(),MsgErr> {
-println!("HANDLE ACTION");
+    async fn handle_action(&self, action: RequestAction) -> Result<(), MsgErr> {
+        println!("HANDLE ACTION");
         match action.action {
             PipeAction::CoreDirected(mut request) => {
-println!("CORE DIRECTED");
-                self.traverse_next(request.wrap() ).await;
+                println!("CORE DIRECTED");
+                self.traverse_next(request.wrap()).await;
             }
             PipeAction::FabricDirected(mut request) => {
-                self.traverse_next(request.wrap() ).await;
+                self.traverse_next(request.wrap()).await;
             }
             PipeAction::Respond => {
                 let pipex = self.state.pipe_exes.remove(&action.request_id);
 
                 match pipex {
                     None => {
-                        self.logger.error(format!("no pipeline set for request_id: {}", action.request_id));
+                        self.logger.error(format!(
+                            "no pipeline set for request_id: {}",
+                            action.request_id
+                        ));
                     }
                     Some((_, mut pipex)) => {
-                        self.skel.traverse_to_next_tx.send(pipex.reflect().to_ultra() ).await;
+                        self.skel
+                            .traverse_to_next_tx
+                            .send(pipex.reflect().to_ultra())
+                            .await;
                     }
                 }
             }
@@ -90,27 +130,32 @@ println!("CORE DIRECTED");
         Ok(())
     }
 
-    fn static_bind(&self, kind: &Kind ) -> Option<ArtRef<BindConfig>> {
+    fn static_bind(&self, kind: &Kind) -> Option<ArtRef<BindConfig>> {
         match kind.to_base() {
             BaseKind::Star => {
-println!("RETURN STAR BIND");
+                println!("RETURN STAR BIND");
                 Some(STAR_BIND_CONFIG.clone())
             }
-            _ => None
+            BaseKind::Control => {
+                println!("RETURN CONTROL BIND");
+                Some(CONTROL_BIND_CONFIG.clone())
+            }
+            _ => None,
         }
     }
-
 }
 
 #[async_trait]
-impl <P> TraversalLayer for FieldEx<P> where P: Platform +'static {
-
-    fn port(&self) -> &Port{
+impl<P> TraversalLayer for FieldEx<P>
+where
+    P: Platform + 'static,
+{
+    fn port(&self) -> &Port {
         &self.state.port
     }
 
     async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
-println!("FIELD TRAVERSING NEXT!");
+        println!("FIELD TRAVERSING NEXT!");
         self.skel.traverse_to_next_tx.send(traversal).await;
     }
 
@@ -118,10 +163,19 @@ println!("FIELD TRAVERSING NEXT!");
         &self.skel.exchanger
     }
 
-    async fn directed_core_bound(&self, mut directed: Traversal<DirectedWave>) -> Result<(), MsgErr> {
-println!("FieldEx directed_core_bound!");
-        directed.logger.set_span_attr("message-id", &directed.id().to_string() );
-        let access = self.skel.registry.access(&directed.agent().clone().to_point(), &directed.to).await;
+    async fn directed_core_bound(
+        &self,
+        mut directed: Traversal<DirectedWave>,
+    ) -> Result<(), MsgErr> {
+        println!("FieldEx directed_core_bound!");
+        directed
+            .logger
+            .set_span_attr("message-id", &directed.id().to_string());
+        let access = self
+            .skel
+            .registry
+            .access(&directed.agent().clone().to_point(), &directed.to)
+            .await;
 
         match access {
             Ok(access) => {
@@ -131,12 +185,10 @@ println!("FieldEx directed_core_bound!");
                         directed.to.to_string()
                     );
                     directed.logger.error(err_msg.as_str());
-                    match directed.err(err_msg.into(), self.port().clone() ) {
+                    match directed.err(err_msg.into(), self.port().clone()) {
                         Bounce::Absorbed => {}
                         Bounce::Reflected(reflected) => {
-                            self.skel
-                                .gravity_tx
-                                .send(reflected.to_ultra() ).await;
+                            self.skel.gravity_tx.send(reflected.to_ultra()).await;
                         }
                     }
 
@@ -148,18 +200,16 @@ println!("FieldEx directed_core_bound!");
             }
         }
 
-println!("PRE BIND");
-        let bind = match self.static_bind(&directed.record.details.stub.kind){
-            None => {
-                self.skel.machine.artifacts.bind(&directed.to).await?
-            }
-            Some(bind) => bind
+        println!("PRE BIND");
+        let bind = match self.static_bind(&directed.record.details.stub.kind) {
+            None => self.skel.machine.artifacts.bind(&directed.to).await?,
+            Some(bind) => bind,
         };
 
         //let bind = self.static_bind(&directed.record.details.stub.kind).expect("Bind");
-println!("GOT BIND!");
-        let route = bind.select(&directed.payload )?;
-println!("ROUTE SELECTED");
+        println!("GOT BIND!");
+        let route = bind.select(&directed.payload)?;
+        println!("ROUTE SELECTED");
         let regex = route.selector.path.clone();
 
         let env = {
@@ -172,7 +222,7 @@ println!("ROUTE SELECTED");
             env
         };
 
-println!("got HERE");
+        println!("got HERE");
         let directed_id = directed.id().to_string();
 
         let pipeline = route.block.clone();
@@ -180,7 +230,7 @@ println!("got HERE");
         let to = directed.to.clone();
         let call = directed.to_call(to)?;
         let logger = directed.logger.span();
-        let mut pipex = PipeEx::new(directed,self.clone(),  pipeline, env, logger.clone());
+        let mut pipex = PipeEx::new(directed, self.clone(), pipeline, env, logger.clone());
         let action = match pipex.next() {
             Ok(action) => action,
             Err(err) => {
@@ -194,24 +244,32 @@ println!("got HERE");
             }
         };
 
-println!("NOW HERE");
+        println!("NOW HERE");
         if let PipeAction::Respond = action {
-            self.skel.traverse_to_next_tx.send(pipex.reflect().to_ultra()).await;
+            self.skel
+                .traverse_to_next_tx
+                .send(pipex.reflect().to_ultra())
+                .await;
             return Ok(());
         }
 
         self.state.pipe_exes.insert(directed_id.clone(), pipex);
 
-        let action = RequestAction { request_id: directed_id, action };
+        let action = RequestAction {
+            request_id: directed_id,
+            action,
+        };
 
-println!("HANDLE ACTION...");
+        println!("HANDLE ACTION...");
         self.handle_action(action).await?;
-println!("ACTION HANDLED.");
+        println!("ACTION HANDLED.");
         Ok(())
     }
 
-
-    async fn reflected_core_bound(&self, mut traversal: Traversal<ReflectedWave>) -> Result<(), MsgErr> {
+    async fn reflected_core_bound(
+        &self,
+        mut traversal: Traversal<ReflectedWave>,
+    ) -> Result<(), MsgErr> {
         let reflected_id = traversal.reflection_of().to_string();
         let mut pipex = self.state.pipe_exes.remove(&reflected_id);
 
@@ -229,13 +287,19 @@ println!("ACTION HANDLED.");
         let action = pipex.handle_reflected(traversal.payload)?;
 
         if let PipeAction::Respond = action {
-            self.skel.traverse_to_next_tx.send(pipex.reflect().to_ultra() ).await;
+            self.skel
+                .traverse_to_next_tx
+                .send(pipex.reflect().to_ultra())
+                .await;
             return Ok(());
         }
 
         self.state.pipe_exes.insert(reflected_id.clone(), pipex);
 
-        let action = RequestAction { request_id: reflected_id, action };
+        let action = RequestAction {
+            request_id: reflected_id,
+            action,
+        };
 
         self.handle_action(action).await?;
 
@@ -243,12 +307,15 @@ println!("ACTION HANDLED.");
     }
 
     async fn inject(&self, wave: UltraWave) {
-        let inject = TraversalInjection::new( self.state.port.clone(), wave );
+        let inject = TraversalInjection::new(self.state.port.clone(), wave);
         self.skel.inject_tx.send(inject).await;
     }
 }
 
-pub struct PipeEx<P> where P: Platform +'static {
+pub struct PipeEx<P>
+where
+    P: Platform + 'static,
+{
     pub logger: SpanLogger,
     pub traversal: PipeTraversal,
     pub field: FieldEx<P>,
@@ -256,7 +323,10 @@ pub struct PipeEx<P> where P: Platform +'static {
     pub env: Env,
 }
 
-impl <P> PipeEx<P> where P: Platform +'static {
+impl<P> PipeEx<P>
+where
+    P: Platform + 'static,
+{
     pub fn new(
         traversal: Traversal<DirectedWave>,
         binder: FieldEx<P>,
@@ -274,7 +344,7 @@ impl <P> PipeEx<P> where P: Platform +'static {
         }
     }
 
-    pub fn next(&mut self) -> Result<PipeAction,MsgErr> {
+    pub fn next(&mut self) -> Result<PipeAction, MsgErr> {
         match self.pipeline.consume() {
             Some(segment) => {
                 self.execute_step(&segment.step)?;
@@ -284,8 +354,8 @@ impl <P> PipeEx<P> where P: Platform +'static {
         }
     }
 
-    pub fn handle_reflected(&mut self, reflected: ReflectedWave ) -> Result<PipeAction,MsgErr> {
-        self.traversal.push(reflected.to_ultra() );
+    pub fn handle_reflected(&mut self, reflected: ReflectedWave) -> Result<PipeAction, MsgErr> {
+        self.traversal.push(reflected.to_ultra());
         self.next()
     }
 
@@ -327,10 +397,10 @@ impl <P> PipeEx<P> where P: Platform +'static {
                 core.body = self.traversal.body.clone();
                 core.headers = self.traversal.headers.clone();
                 core.uri = Uri::from_str(path.as_str())?;
-                let ping = self.traversal.initial.clone().with(Wave::new(Ping::new(
-                    core,
-                    self.traversal.to().clone(),
-                ), self.field.port.clone() ));
+                let ping = self.traversal.initial.clone().with(Wave::new(
+                    Ping::new(core, self.traversal.to().clone()),
+                    self.field.port.clone(),
+                ));
                 Ok(PipeAction::FabricDirected(ping.to_directed()))
             }
             PipelineStopVar::Respond => Ok(PipeAction::Respond),
@@ -338,13 +408,13 @@ impl <P> PipeEx<P> where P: Platform +'static {
                 let uri = self.traversal.uri.clone();
                 let point: Point = point.clone().to_resolved(&self.env)?;
                 let method = Method::Cmd(CmdMethod::Read);
-                let mut core:DirectedCore = method.into();
+                let mut core: DirectedCore = method.into();
                 core.uri = uri;
 
-                let request = self.traversal.initial.clone().with(Wave::new(Ping::new(
-                    core,
-                    self.traversal.to().clone(),
-                ),point.to_port()));
+                let request = self.traversal.initial.clone().with(Wave::new(
+                    Ping::new(core, self.traversal.to().clone()),
+                    point.to_port(),
+                ));
                 Ok(PipeAction::FabricDirected(request.to_directed()))
             }
         }
@@ -408,18 +478,22 @@ impl PipeTraversal {
         }
     }
 
-    pub fn to(&self) -> &Port{
+    pub fn to(&self) -> &Port {
         &self.initial.to
     }
 
-    pub fn from(&self) -> &Port{
+    pub fn from(&self) -> &Port {
         self.initial.from()
     }
 
     pub fn direct(&self) -> Traversal<DirectedWave> {
         self.initial
             .clone()
-            .with(Wave::new(Ping::new(self.request_core(), self.from().clone()), self.port.clone() )).to_directed()
+            .with(Wave::new(
+                Ping::new(self.request_core(), self.from().clone()),
+                self.port.clone(),
+            ))
+            .to_directed()
     }
 
     pub fn response_core(&self) -> ReflectedCore {
@@ -442,7 +516,7 @@ impl PipeTraversal {
     pub fn push(&mut self, wave: UltraWave) {
         match wave {
             UltraWave::Ping(ping) => {
-                let ping = ping.variant;;
+                let ping = ping.variant;
                 let core = ping.core;
                 self.method = core.method;
                 self.uri = core.uri;
@@ -450,14 +524,14 @@ impl PipeTraversal {
                 self.body = core.body;
             }
             UltraWave::Pong(pong) => {
-                let pong = pong.variant;;
+                let pong = pong.variant;
                 let core = pong.core;
                 self.headers = core.headers;
                 self.body = core.body;
                 self.status = core.status;
             }
             UltraWave::Ripple(ripple) => {
-                let ripple = ripple.variant;;
+                let ripple = ripple.variant;
                 let core = ripple.core;
                 self.method = core.method;
                 self.uri = core.uri;
@@ -472,7 +546,7 @@ impl PipeTraversal {
                 self.status = core.status;
             }
             UltraWave::Signal(signal) => {
-                let signal = signal.variant;;
+                let signal = signal.variant;
                 let core = signal.core;
                 self.method = core.method;
                 self.uri = core.uri;
@@ -485,15 +559,15 @@ impl PipeTraversal {
     pub fn reflect(self) -> Traversal<ReflectedWave> {
         let core = self.response_core();
         let reflection = self.initial.payload.reflection().unwrap();
-        let reflected = reflection.make( core, self.port.clone() );
+        let reflected = reflection.make(core, self.port.clone());
         self.initial.with(reflected)
     }
 
     pub fn fail(self, status: u16, error: &str) -> Traversal<ReflectedWave> {
         let core = ReflectedCore::status(status);
         let reflection = self.initial.payload.reflection().unwrap();
-        let reflected = reflection.make( core, self.port.clone() );
-        self.initial.with(reflected )
+        let reflected = reflection.make(core, self.port.clone());
+        self.initial.with(reflected)
     }
 }
 
@@ -512,12 +586,18 @@ pub enum PipeAction {
 /// this mod basically enforces the bind
 
 #[derive(Clone)]
-pub struct FieldState<P> where P: Platform +'static {
+pub struct FieldState<P>
+where
+    P: Platform + 'static,
+{
     port: Port,
     pipe_exes: Arc<DashMap<String, PipeEx<P>>>,
 }
 
-impl <P> FieldState<P> where P: Platform+'static {
+impl<P> FieldState<P>
+where
+    P: Platform + 'static,
+{
     pub fn new(port: Port) -> Self {
         Self {
             port,

@@ -1587,22 +1587,31 @@ pub mod id {
         }
 
         async fn visit(&self, traversal: Traversal<UltraWave>) {
-println!("VISIT LAYER: {}", self.port().layer.to_string() );
+println!("VISIT LAYER: {} -> method {}", self.port().layer.to_string(), traversal.payload.clone().to_directed().unwrap().core().method.to_string() );
             if let Some(dest) = &traversal.dest {
+println!("dest: {}", dest.to_string());
                 if self.port().layer == *dest {
-                    if traversal.is_ping() {
+                    if traversal.is_directed() {
+println!("DELIVERY DIRECTED");
                         self.deliver_directed(traversal.unwrap_directed()).await;
                     } else {
                         self.deliver_reflected(traversal.unwrap_reflected()).await;
                     }
+                    return;
+                } else {
+                    println!("HUH???");
                 }
-            } else if traversal.is_directed() && traversal.dir == TraversalDirection::Fabric {
+            }
+
+            if traversal.is_directed() && traversal.dir == TraversalDirection::Fabric {
+println!("DIRECTED FABRIC BOUND {} {}", self.port().layer.to_string(), traversal.payload.clone().to_directed().unwrap().core().method.to_string() );
                 self.directed_fabric_bound(traversal.unwrap_directed())
                     .await;
             } else if traversal.is_reflected() && traversal.dir == TraversalDirection::Core {
                 self.reflected_core_bound(traversal.unwrap_reflected())
                     .await;
             } else if traversal.is_directed() && traversal.dir == TraversalDirection::Core {
+println!("DIRECTED CORE BOUND");
                 self.directed_core_bound(traversal.unwrap_directed()).await;
             } else if traversal.is_reflected() && traversal.dir == TraversalDirection::Fabric {
                 self.reflected_fabric_bound(traversal.unwrap_reflected())

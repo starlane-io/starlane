@@ -19,6 +19,7 @@ use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tracing::info;
+use cosmic_api::particle::particle::Status;
 
 #[derive(Clone)]
 pub struct MachineApi<P>
@@ -135,16 +136,16 @@ where
 
         for star_template in star_templates {
             let star_point = star_template.key.clone().to_point();
-            let mut builder = skel.platform.drivers_builder(&star_template.kind);
+            let mut drivers = skel.platform.drivers_builder(&star_template.kind);
             let drivers_point = star_point.push("drivers".to_string()).unwrap();
             let logger = skel.logger.point(drivers_point.clone());
-            builder.logger.replace(logger.clone());
+            drivers.logger.replace(logger.clone());
 
             let mut star_tx: StarTx<P> = StarTx::new(star_point.clone());
             let call_tx = star_tx.call_tx.clone();
             let call_rx = star_tx.star_rx().unwrap();
-            let star_skel = StarSkel::new(star_template.clone(), skel.clone(), builder.kinds(), star_tx );
-            let drivers = builder.build(drivers_point.to_port(), star_skel.clone())?;
+            let star_skel = StarSkel::new(star_template.clone(), skel.clone(), drivers.kinds(), star_tx );
+//            let drivers = builder.build(drivers_point.to_port(), star_skel.clone())?;
 
             let interchange = Arc::new(HyperwayInterchange::new(
                 logger.push("interchange").unwrap(),
@@ -251,14 +252,14 @@ where
         Ok(machine_api)
     }
 
-    async fn pre_init(&self) -> Result<(), MsgErr> {
+    async fn pre_init(&self) -> Result<(), P::Err> {
         let logger = self.logger.span();
         logger.info("Machine::pre_init()");
         let mut pre_inits = vec![];
         for star in self.stars.values() {
             pre_inits.push(star.pre_init());
         }
-        let results: Vec<Result<(), MsgErr>> = join_all(pre_inits).await;
+        let results: Vec<Result<Status, P::Err>> = join_all(pre_inits).await;
         for result in results {
             if result.is_err() {
                 logger.error("init error in star");

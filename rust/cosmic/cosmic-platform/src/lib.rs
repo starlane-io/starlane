@@ -280,7 +280,7 @@ pub trait PlatErr: Sized + Send + Sync + ToString + Clone + Into<MsgErr> + From<
 }
 
 #[async_trait]
-pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'static, Self::RegistryContext : Send+Sync, Self::StarAuth: HyperAuthenticator, Self::RemoteStarConnectionFactory: HyperwayExtFactory {
+pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'static, Self::RegistryContext : Send+Sync, Self::StarAuth: HyperAuthenticator, Self::RemoteStarConnectionFactory: HyperwayExtFactory, Self::Err: From<tokio::sync::oneshot::error::RecvError>{
 
     type Err;
     type RegistryContext;
