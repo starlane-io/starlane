@@ -471,7 +471,7 @@ where
             CoreBounce::Reflected(reflected) => {
                 let wave = reflection.unwrap().make(reflected, self.port.clone());
                 let wave = wave.to_ultra();
-                println!("---> RELFECTED <-----");
+                println!("---> REFLECTED <-----");
                 #[cfg(test)]
                 self.skel
                     .diagnostic_interceptors

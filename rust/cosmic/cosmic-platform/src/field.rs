@@ -168,6 +168,7 @@ where
         &self,
         mut directed: Traversal<DirectedWave>,
     ) -> Result<(), MsgErr> {
+
         println!("FieldEx directed_core_bound!");
         directed
             .logger

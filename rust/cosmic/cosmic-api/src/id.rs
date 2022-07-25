@@ -1585,7 +1585,6 @@ pub mod id {
         }
 
         async fn visit(&self, traversal: Traversal<UltraWave>) {
-println!("VISIT LAYER: {} -> method {}", self.port().layer.to_string(), traversal.payload.clone().to_directed().unwrap().core().method.to_string() );
             if let Some(dest) = &traversal.dest {
 println!("dest: {}", dest.to_string());
                 if self.port().layer == *dest {
@@ -1679,8 +1678,10 @@ println!("reflected fabric bound for: {}", self.port().layer.to_string() );
 
         pub fn towards_core(&self, layer: &Layer) -> Option<Layer> {
             let mut layer = layer.clone();
+            let mut index = layer.ordinal();
             loop {
-                let layer = match Layer::from_ordinal(layer.ordinal() + 1) {
+                index = index + 1;
+                let layer = match Layer::from_ordinal(index) {
                     Some(layer) => layer,
                     None => {
                         return None;
