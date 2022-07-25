@@ -86,6 +86,7 @@ impl <P> TraversalLayer for ShellEx<P> where P: Platform +'static {
     }
 
     async fn reflected_core_bound(&self, traversal: Traversal<ReflectedWave>) -> Result<(),MsgErr>{
+
         if let Some(_) = self.state.fabric_requests.remove(&traversal.reflection_of()) {
             self.traverse_next(traversal.to_ultra()).await;
         } else {

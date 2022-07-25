@@ -92,7 +92,7 @@ pub mod id {
             Layer::Core
         ]);
         pub static ref STAR_WAVE_TRAVERSAL_PLAN: TraversalPlan =
-            TraversalPlan::new(vec![Layer::Field, Layer::Shell, Layer::Core]);
+            TraversalPlan::new(vec![Layer::Field, Layer::Shell, Layer::Driver, Layer::Core]);
     }
 
     pub type Uuid = String;

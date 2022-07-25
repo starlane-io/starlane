@@ -393,6 +393,24 @@ fn test_layer_traversal() -> Result<(), TestErr> {
         .enable_all()
         .build()?;
     runtime.block_on(async move {
+
+        let (check_to_gravity_tx, check_to_gravity_rx):(oneshot::Sender<Result<(),()>>, oneshot::Receiver<Result<(),()>>) = oneshot::channel();
+        let (check_from_hyperway_tx,check_from_hyperway_rx):(oneshot::Sender<Result<(),()>>,oneshot::Receiver<Result<(),()>>) = oneshot::channel();
+        let (check_start_traversal_wave_tx,check_start_traversal_wave_rx):(oneshot::Sender<Result<(),()>>,oneshot::Receiver<Result<(),()>>) = oneshot::channel();
+        let (check_start_traversal_tx,check_start_traversal_rx):(oneshot::Sender<Result<(),()>>,oneshot::Receiver<Result<(),()>>) = oneshot::channel();
+        let (check_transport_endpoint_tx,check_transport_endpoint_rx):(oneshot::Sender<Result<(),()>>,oneshot::Receiver<Result<(),()>>) = oneshot::channel();
+
+        let (final_tx,final_rx) = oneshot::channel();
+
+        tokio::spawn( async move {
+            tokio::time::timeout(Duration::from_secs(5), check_from_hyperway_rx).await.expect("check_from_hyperway").unwrap().unwrap();
+            tokio::time::timeout(Duration::from_secs(5), check_to_gravity_rx).await.unwrap().unwrap().unwrap();
+            tokio::time::timeout(Duration::from_secs(5), check_start_traversal_wave_rx).await.expect("check_start_traversal_wave").unwrap().unwrap();
+            tokio::time::timeout(Duration::from_secs(5), check_start_traversal_rx).await.expect("check_start_traversal").unwrap().unwrap();
+            tokio::time::timeout(Duration::from_secs(5), check_transport_endpoint_rx).await.expect("check_transport_endpoint").unwrap().unwrap();
+            final_tx.send(());
+        });
+
         let platform = TestPlatform::new();
         let machine_api = platform.machine();
         machine_api.wait_ready().await;
@@ -422,11 +440,6 @@ fn test_layer_traversal() -> Result<(), TestErr> {
         let wave = wave.build().unwrap();
         let wave = wave.to_ultra();
 
-        let (check_to_gravity_tx, check_to_gravity_rx):(oneshot::Sender<Result<(),()>>, oneshot::Receiver<Result<(),()>>) = oneshot::channel();
-        let (check_from_hyperway_tx,check_from_hyperway_rx):(oneshot::Sender<Result<(),()>>,oneshot::Receiver<Result<(),()>>) = oneshot::channel();
-        let (check_start_traversal_wave_tx,check_start_traversal_wave_rx):(oneshot::Sender<Result<(),()>>,oneshot::Receiver<Result<(),()>>) = oneshot::channel();
-        let (check_start_traversal_tx,check_start_traversal_rx):(oneshot::Sender<Result<(),()>>,oneshot::Receiver<Result<(),()>>) = oneshot::channel();
-        let (check_transport_endpoint_tx,check_transport_endpoint_rx):(oneshot::Sender<Result<(),()>>,oneshot::Receiver<Result<(),()>>) = oneshot::channel();
 
         let wave_id = wave.id();
         {
@@ -537,11 +550,9 @@ println!("traversal layer {}", traversal.layer.to_string());
         // send straight out of the star (circumvent layer traversal)
         star_api.to_gravity(wave).await;
 
-        tokio::time::timeout(Duration::from_secs(5), check_from_hyperway_rx).await.expect("check_from_hyperway").unwrap().unwrap();
-        tokio::time::timeout(Duration::from_secs(5), check_to_gravity_rx).await.unwrap().unwrap().unwrap();
-        tokio::time::timeout(Duration::from_secs(5), check_start_traversal_wave_rx).await.expect("check_start_traversal_wave").unwrap().unwrap();
-        tokio::time::timeout(Duration::from_secs(5), check_start_traversal_rx).await.expect("check_start_traversal").unwrap().unwrap();
-        tokio::time::timeout(Duration::from_secs(5), check_transport_endpoint_rx).await.expect("check_transport_endpoint").unwrap().unwrap();
+
+
+        final_rx.await;
 
         Ok(())
 

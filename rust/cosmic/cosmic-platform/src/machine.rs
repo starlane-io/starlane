@@ -1,4 +1,4 @@
-use crate::star::{Star, StarApi, StarCon, StarSkel, StarTemplate};
+use crate::star::{Star, StarApi, StarCon, StarSkel, StarTemplate, StarTx};
 use crate::{PlatErr, Platform, Registry, RegistryApi};
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{Point, ToPoint, ToPort};
@@ -139,7 +139,11 @@ where
             let drivers_point = star_point.push("drivers".to_string()).unwrap();
             let logger = skel.logger.point(drivers_point.clone());
             builder.logger.replace(logger.clone());
-            let star_skel = StarSkel::new(star_template.clone(), skel.clone(), builder.kinds());
+
+            let mut star_tx: StarTx<P> = StarTx::new(star_point.clone());
+            let call_tx = star_tx.call_tx.clone();
+            let call_rx = star_tx.star_rx().unwrap();
+            let star_skel = StarSkel::new(star_template.clone(), skel.clone(), builder.kinds(), star_tx );
             let drivers = builder.build(drivers_point.to_port(), star_skel.clone())?;
 
             let interchange = Arc::new(HyperwayInterchange::new(
@@ -185,7 +189,8 @@ where
                 gate,
             );
 
-            let star_api = Star::new(star_skel.clone(), drivers, hyperway_ext).await?;
+
+            let star_api = Star::new(star_skel.clone(), drivers, hyperway_ext, call_tx, call_rx ).await?;
             stars.insert(star_point.clone(), star_api);
 
         }
