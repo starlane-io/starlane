@@ -17,7 +17,7 @@ use cosmic_api::selector::selector::PipelineKind;
 use cosmic_api::selector::{PayloadBlock, PayloadBlockVar};
 use cosmic_api::substance::substance::{Call, CallKind, Substance};
 use cosmic_api::sys::ParticleRecord;
-use cosmic_api::util::{ToResolved, ValueMatcher};
+use cosmic_api::util::{log, ToResolved, ValueMatcher};
 use cosmic_api::wave::{Agent, CmdMethod, Method, DirectedCore, Ping, Reflectable, ReflectedCore, Pong, Wave, Exchanger, UltraWave, DirectedWave, ReflectedWave, Bounce};
 use regex::{CaptureMatches, Regex};
 
@@ -39,15 +39,13 @@ lazy_static! {
 
 fn star_bind_config() -> BindConfig
 {
-    bind_config(r#"
+    log(bind_config(r#"
     Bind(version=1.0.0)
     {
-        Route {
-          Msg<Transport> -> {{}};
-        }
+       Route<Msg<Transport>> -> (());
     }
+    "#)).unwrap()
 
-    "#).unwrap()
 }
 
 #[derive(Clone)]
@@ -93,6 +91,7 @@ impl <P> FieldEx<P> where P: Platform+'static {
     fn static_bind(&self, kind: &Kind ) -> Option<ArtRef<BindConfig>> {
         match kind.to_base() {
             BaseKind::Star => {
+println!("RETURN STAR BIND");
                 Some(STAR_BIND_CONFIG.clone())
             }
             _ => None
@@ -147,7 +146,14 @@ println!("FieldEx directed_core_bound!");
         }
 
 println!("PRE BIND");
-        let bind = self.static_bind(&directed.record.details.stub.kind).unwrap_or(self.skel.machine.artifacts.bind(&directed.to).await?);
+        let bind = match self.static_bind(&directed.record.details.stub.kind){
+            None => {
+                self.skel.machine.artifacts.bind(&directed.to).await?
+            }
+            Some(bind) => bind
+        };
+
+        //let bind = self.static_bind(&directed.record.details.stub.kind).expect("Bind");
 println!("GOT BIND!");
         let route = bind.select(&directed.payload )?;
 

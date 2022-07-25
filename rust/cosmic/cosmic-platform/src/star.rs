@@ -1461,6 +1461,8 @@ where
 
     #[route("Sys<Transport>")]
     pub async fn transport(&self, ctx: InCtx<'_, UltraWave>) {
+        #[cfg(test)]
+        self.star_skel.diagnostic_interceptors.transport_endpoint.send(ctx.wave().clone().to_ultra());
 println!("received Transport");
         self.star_skel
             .gravity_tx
@@ -1755,6 +1757,7 @@ where
     pub to_hyperway: broadcast::Sender<Wave<Signal>>,
     pub start_layer_traversal_wave: broadcast::Sender<UltraWave>,
     pub start_layer_traversal: broadcast::Sender<Traversal<UltraWave>>,
+    pub transport_endpoint: broadcast::Sender<UltraWave>,
     pub err: broadcast::Sender<P::Err>,
 }
 
@@ -1769,6 +1772,7 @@ where
         let (start_layer_traversal, _) = broadcast::channel(1024);
         let (start_layer_traversal_wave, _) = broadcast::channel(1024);
         let (err, _) = broadcast::channel(1024);
+        let (transport_endpoint, _) = broadcast::channel(1024);
         Self {
             from_hyperway,
             to_hyperway,
@@ -1776,6 +1780,7 @@ where
             start_layer_traversal,
             start_layer_traversal_wave,
             err,
+            transport_endpoint
         }
     }
 }

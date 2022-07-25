@@ -411,6 +411,7 @@ fn test_layer_traversal() -> Result<(), TestErr> {
         let mut from_hyperway_rx = skel.diagnostic_interceptors.from_hyperway.subscribe();
         let mut start_layer_traversal= skel.diagnostic_interceptors.start_layer_traversal.subscribe();
         let mut start_layer_traversal_wave = skel.diagnostic_interceptors.start_layer_traversal_wave.subscribe();
+        let mut transport_endpoint= skel.diagnostic_interceptors.transport_endpoint.subscribe();
 
         // send a 'nice' wave from Fae to Less
         let mut wave = DirectedProto::new();
@@ -425,6 +426,7 @@ fn test_layer_traversal() -> Result<(), TestErr> {
         let (check_from_hyperway_tx,check_from_hyperway_rx):(oneshot::Sender<Result<(),()>>,oneshot::Receiver<Result<(),()>>) = oneshot::channel();
         let (check_start_traversal_wave_tx,check_start_traversal_wave_rx):(oneshot::Sender<Result<(),()>>,oneshot::Receiver<Result<(),()>>) = oneshot::channel();
         let (check_start_traversal_tx,check_start_traversal_rx):(oneshot::Sender<Result<(),()>>,oneshot::Receiver<Result<(),()>>) = oneshot::channel();
+        let (check_transport_endpoint_tx,check_transport_endpoint_rx):(oneshot::Sender<Result<(),()>>,oneshot::Receiver<Result<(),()>>) = oneshot::channel();
 
         let wave_id = wave.id();
         {
@@ -513,6 +515,24 @@ println!("traversal layer {}", traversal.layer.to_string());
             });
         }
 
+        let wave_id = wave.id();
+        {
+            tokio::spawn(async move {
+                while let Ok(transport) = transport_endpoint.recv().await {
+                    if let Ok(wave) = transport.clone().unwrap_from_transport() {
+                        if wave.id() == wave_id {
+                            println!("intercepted transport_endpoint!");
+                            check_transport_endpoint_tx.send(Ok(()));
+                            break;
+                        } else {
+                            println!("transport_endpoint RECEIVED WAVE: {}", wave.id().to_string())
+                        }
+                    } else {
+                        println!("transport_endpoint RECEIVED TRANSPORT: {}", transport.id().to_string())
+                    }
+                }
+            });
+        }
 
         // send straight out of the star (circumvent layer traversal)
         star_api.to_gravity(wave).await;
@@ -521,6 +541,7 @@ println!("traversal layer {}", traversal.layer.to_string());
         tokio::time::timeout(Duration::from_secs(5), check_to_gravity_rx).await.unwrap().unwrap().unwrap();
         tokio::time::timeout(Duration::from_secs(5), check_start_traversal_wave_rx).await.expect("check_start_traversal_wave").unwrap().unwrap();
         tokio::time::timeout(Duration::from_secs(5), check_start_traversal_rx).await.expect("check_start_traversal").unwrap().unwrap();
+        tokio::time::timeout(Duration::from_secs(5), check_transport_endpoint_rx).await.expect("check_transport_endpoint").unwrap().unwrap();
 
         Ok(())
 

@@ -7,7 +7,7 @@ pub mod config {
 
     use crate::config::config::bind::BindConfig;
     use crate::id::id::{KindParts, Point};
-    use crate::parse::model::{MessageScope, MethodScope, RouteScope};
+    use crate::parse::model::{WaveScope, MethodScope, RouteScope};
     use crate::particle::particle;
     use crate::particle::particle::{Details, Stub};
     use crate::util::ValueMatcher;
@@ -85,7 +85,7 @@ pub mod config {
         use crate::wave::{MethodKind, MethodPattern, DirectedCore, Ping, RecipientSelector, Wave, DirectedWave};
 
         use crate::parse::model::{
-            BindScope, MessageScope, MethodScope, PipelineSegment, PipelineSegmentDef, PipelineVar,
+            BindScope, WaveScope, MethodScope, PipelineSegment, PipelineSegmentDef, PipelineVar,
             RouteScope, ScopeFilters,
         };
         use crate::parse::{bind_config, Env};

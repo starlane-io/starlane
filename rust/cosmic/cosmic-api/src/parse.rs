@@ -2971,10 +2971,9 @@ where
 }
 
 pub fn lex_child_scopes<I: Span>(parent: LexScope<I>) -> Result<LexParentScope<I>, MsgErr> {
-    if parent.selector.selector.children.is_some() {
+    if parent.selector.children.is_some() {
         let (_, child_selector) = all_consuming(lex_scope_selector)(
             parent
-                .selector
                 .selector
                 .children
                 .as_ref()
@@ -2983,15 +2982,12 @@ pub fn lex_child_scopes<I: Span>(parent: LexScope<I>) -> Result<LexParentScope<I
         )?;
 
         let child = LexScope::new(
-            ScopeSelectorAndFiltersDef::new(child_selector.into(), parent.selector.filters),
+            child_selector.into(),
             parent.block,
         );
 
         Ok(LexParentScope {
-            selector: LexScopeSelectorAndFilters::new(
-                parent.selector.selector.clone(),
-                ScopeFiltersDef::empty(),
-            ),
+            selector: parent.selector.clone(),
             pipeline_step: None,
             block: vec![child],
         })
@@ -3011,7 +3007,7 @@ pub fn lex_scope<I: Span>(input: I) -> Res<I, LexScope<I>> {
         "scope",
         tuple((
             peek(alt((tag("*"), alpha1, tag("<")))),
-            lex_scope_selector_and_filters,
+            lex_scope_selector,
             multispace1,
             lex_scope_pipeline_step_and_block,
         )),
@@ -3180,35 +3176,12 @@ pub fn next_stacked_name<I: Span>(input: I) -> Res<I, (I, Option<I>)> {
     )(input)
 }
 
-pub fn lex_scope_selector_and_filters<I: Span>(
-    input: I,
-) -> Res<I, ScopeSelectorAndFiltersDef<LexScopeSelector<I>, I>> {
-    context(
-        "parsed-scope-selector-and-filter",
-        pair(lex_scope_selector, scope_filters),
-    )(input)
-    .map(|(next, (selector, filters))| (next, ScopeSelectorAndFiltersDef::new(selector, filters)))
-}
 
 pub fn lex_scope_selector<I: Span>(input: I) -> Res<I, LexScopeSelector<I>> {
-    let (next, (name, children)) =
-        context("parsed-scope-selector", next_stacked_name)(input.clone())?;
+    let (next, ((name, children),filters, path)) =
+        context("parsed-scope-selector", tuple((next_stacked_name, scope_filters, opt(path_regex))))(input.clone())?;
 
-    let (next, path) = if children.is_none() {
-        println!("children... is none...");
-        opt(path_regex)(next)?
-    } else {
-        println!("NO PATH");
-        (next, None)
-    };
-
-    println!(
-        "opt path: {} on input: {}",
-        path.is_some(),
-        input.to_string()
-    );
-
-    Ok((next, LexScopeSelector::new(name, path, children)))
+    Ok((next, LexScopeSelector::new(name, filters, path, children)))
 }
 
 pub fn lex_name_stack<I: Span>(mut input: I) -> Res<I, Vec<I>> {
@@ -3617,7 +3590,7 @@ pub mod model {
     }
 
     impl RouteScope {
-        pub fn select(&self, directed: &DirectedWave) -> Vec<&MessageScope> {
+        pub fn select(&self, directed: &DirectedWave) -> Vec<&WaveScope> {
             let mut scopes = vec![];
             for scope in &self.block {
                 if scope.selector.is_match(directed).is_ok() {
@@ -3702,13 +3675,14 @@ pub mod model {
             Some(path) => Ok(Regex::new(path.to_string().as_str())?),
         }
     }
-    impl MessageScope {
+    impl WaveScope {
         pub fn from_scope<I: Span>(scope: LexParentScope<I>) -> Result<Self, MsgErr> {
             let selector = MessageScopeSelectorAndFilters::from_selector(scope.selector)?;
             let mut block = vec![];
 
             for scope in scope.block.into_iter() {
-                block.push(MethodScope::from_scope(&selector.selector.name, scope)?)
+                let method = MethodScope::from_scope(&selector.selector.name, scope)?;
+                block.push(method);
             }
 
             Ok(Self { selector, block })
@@ -3727,17 +3701,17 @@ pub mod model {
 
     impl MessageScopeSelectorAndFilters {
         pub fn from_selector<I: Span>(
-            selector: ScopeSelectorAndFiltersDef<LexScopeSelector<I>, I>,
+            selector: LexScopeSelector<I>,
         ) -> Result<Self, MsgErr> {
-            let filters = selector.filters.to_scope_filters();
-            let selector = MessageScopeSelector::from_selector(selector.selector)?;
+            let filters = selector.filters.clone().to_scope_filters();
+            let selector = MessageScopeSelector::from_selector(selector)?;
             Ok(Self { selector, filters })
         }
     }
 
     impl RouteScopeSelectorAndFilters {
         pub fn from_selector<I: Span>(
-            selector: LexScopeSelectorAndFilters<I>,
+            selector: LexScopeSelector<I>,
         ) -> Result<Self, MsgErr> {
             let filters = selector.filters.clone().to_scope_filters();
             let selector = RouteScopeSelector::new(selector.path.clone())?;
@@ -3813,10 +3787,10 @@ pub mod model {
     impl MethodScopeSelectorAndFilters {
         pub fn from_selector<I: Span>(
             parent: &ValuePattern<MethodKind>,
-            selector: ScopeSelectorAndFiltersDef<LexScopeSelector<I>, I>,
+            selector: LexScopeSelector<I>,
         ) -> Result<Self, MsgErr> {
-            let filters = selector.filters.to_scope_filters();
-            let selector = MethodScopeSelector::from_selector(parent, selector.selector)?;
+            let filters = selector.filters.clone().to_scope_filters();
+            let selector = MethodScopeSelector::from_selector(parent, selector)?;
             Ok(Self { selector, filters })
         }
     }
@@ -3887,16 +3861,18 @@ pub mod model {
     #[derive(Clone)]
     pub struct LexScopeSelector<I> {
         pub name: I,
-        pub path: Option<I>,
+        pub filters: ScopeFiltersDef<I>,
         pub children: Option<I>,
+        pub path: Option<I>
     }
 
     impl<I: ToString> LexScopeSelector<I> {
-        pub fn new(name: I, path: Option<I>, children: Option<I>) -> Self {
+        pub fn new(name: I, filters: ScopeFiltersDef<I>, path: Option<I>, children: Option<I>) -> Self {
             Self {
                 name,
-                path,
+                filters,
                 children,
+                path
             }
         }
     }
@@ -3976,8 +3952,8 @@ pub mod model {
     pub type LexBlock<I> = Block<I, ()>;
     pub type LexRootScope<I> = Scope<RootScopeSelector<I, Spanned<I, Version>>, Block<I, ()>, I>;
     pub type LexScope<I> =
-        Scope<ScopeSelectorAndFiltersDef<LexScopeSelector<I>, I>, Block<I, ()>, I>;
-    pub type LexParentScope<I> = Scope<LexScopeSelectorAndFilters<I>, Vec<LexScope<I>>, I>;
+        Scope<LexScopeSelector<I>, Block<I, ()>, I>;
+    pub type LexParentScope<I> = Scope<LexScopeSelector<I>, Vec<LexScope<I>>, I>;
 
     //pub type LexPipelineScope<I> = PipelineScopeDef<I, VarPipeline>;
     pub type PipelineSegmentCtx = PipelineSegmentDef<PointCtx>;
@@ -4046,8 +4022,8 @@ pub mod model {
      */
 
     pub type PipelineSegment = PipelineSegmentDef<Point>;
-    pub type RouteScope = ScopeDef<RouteScopeSelectorAndFilters, Vec<MessageScope>>;
-    pub type MessageScope = ScopeDef<MessageScopeSelectorAndFilters, Vec<MethodScope>>;
+    pub type RouteScope = ScopeDef<RouteScopeSelectorAndFilters, Vec<WaveScope>>;
+    pub type WaveScope = ScopeDef<MessageScopeSelectorAndFilters, Vec<MethodScope>>;
     pub type MethodScope = ScopeDef<MethodScopeSelectorAndFilters, PipelineVar>;
     //    pub type ValuePatternScopeSelector = ScopeSelectorDef<ValuePattern<String>, String,Regex>;
     pub type MessageScopeSelector = ScopeSelectorDef<ValuePattern<MethodKind>, Regex>;
@@ -4074,7 +4050,7 @@ pub mod model {
             let route_selector = RouteScopeSelectorAndFilters::from_selector(scope.selector)?;
             for message_scope in scope.block {
                 match lex_child_scopes(message_scope) {
-                    Ok(message_scope) => match MessageScope::from_scope(message_scope) {
+                    Ok(message_scope) => match WaveScope::from_scope(message_scope) {
                         Ok(message_scope) => message_scopes.push(message_scope),
                         Err(err) => errs.push(err),
                     },
@@ -6232,7 +6208,6 @@ pub fn msg_method<I: Span>(input: I) -> Res<I, MsgMethod> {
 pub fn sys_method<I: Span>(input: I) -> Res<I, SysMethod> {
     let (next, sys_method) = camel_case_chars(input.clone())?;
 
-    println!("sys_method: {}", sys_method.to_string());
     match SysMethod::from_str(sys_method.to_string().as_str()) {
         Ok(method) => Ok((next, method)),
         Err(err) => Err(nom::Err::Error(ErrorTree::from_error_kind(
@@ -6581,7 +6556,7 @@ fn parse_bind_config<I: Span>(input: I) -> Result<BindConfig, MsgErr> {
 }
 
 fn semantic_bind_scope<I: Span>(scope: LexScope<I>) -> Result<BindScope, MsgErr> {
-    let selector_name = scope.selector.selector.name.to_string();
+    let selector_name = scope.selector.name.to_string();
     match selector_name.as_str() {
         "Route" => {
             let scope = lex_child_scopes(scope)?;
@@ -6593,13 +6568,13 @@ fn semantic_bind_scope<I: Span>(scope: LexScope<I>) -> Result<BindScope, MsgErr>
             let report = builder
                 .with_message(format!(
                     "Unrecognized BindConfig selector: '{}'",
-                    scope.selector.selector.name.to_string()
+                    scope.selector.name.to_string()
                 ))
                 .with_label(
                     Label::new(
-                        scope.selector.selector.name.location_offset()
-                            ..scope.selector.selector.name.location_offset()
-                                + scope.selector.selector.name.len(),
+                        scope.selector.name.location_offset()
+                            ..scope.selector.name.location_offset()
+                                + scope.selector.name.len(),
                     )
                     .with_message("Unrecognized Selector"),
                 )
@@ -6707,9 +6682,9 @@ pub fn core_pipeline_stop<I: Span>(input: I) -> Res<I, PipelineStopVar> {
     context(
         "Core",
         delimited(
-            tag("{{"),
+            tag("(("),
             delimited(multispace0, opt(tag("*")), multispace0),
-            tag("}}"),
+            tag("))"),
         ),
     )(input)
     .map(|(next, _)| (next, PipelineStopVar::Internal))
@@ -6734,7 +6709,7 @@ pub fn pipeline_stop_var<I: Span>(input: I) -> Res<I, PipelineStopVar> {
         pair(
             context(
                 "pipeline:stop:expecting",
-                cut(peek(alt((tag("."), alpha1, tag("&"))))),
+                cut(peek(alt((tag("(("),tag("."), alpha1, tag("&"))))),
             ),
             alt((
                 core_pipeline_stop,
@@ -6862,7 +6837,6 @@ pub fn unwrap_route_selector(input: &str ) -> Result<RouteSelector,MsgErr> {
 
  */
 pub fn route_attribute(input: &str) -> Result<RouteSelector, MsgErr> {
-    println!("route_attribute: '{}'", input);
     let input = new_span(input);
     let (_, (_, lex_route)) = result(pair(
         tag("#"),
@@ -7035,7 +7009,7 @@ pub mod test {
         args, base_point_segment, comment, consume_point_var, ctx_seg, doc,
         expected_block_terminator_or_non_terminator, lex_block, lex_child_scopes, lex_nested_block,
         lex_scope, lex_scope_pipeline_step_and_block, lex_scope_selector,
-        lex_scope_selector_and_filters, lex_scopes, lowercase1, mesh_eos, nested_block,
+        lex_scopes, lowercase1, mesh_eos, nested_block,
         nested_block_content, next_stacked_name, no_comment, parse_bind_config,
         parse_include_blocks, parse_inner_block, path_regex, pipeline, pipeline_segment,
         pipeline_step_var, pipeline_stop_var, point_non_root_var, point_template, point_var, pop,
@@ -7258,7 +7232,7 @@ pub mod test {
     }
     #[test]
     pub fn test_bind_config() -> Result<(), MsgErr> {
-        let bind_config_str = r#"Bind(version=1.0.0)  { Route<Http> -> { <Get> -> localhost:app => &; } }
+        let bind_config_str = r#"Bind(version=1.0.0)  { Route<Http> -> { <Get> -> ((*)) => &; } }
         "#;
 
         util::log(doc(bind_config_str))?;
@@ -7272,10 +7246,10 @@ pub mod test {
                 message_scope.selector.selector.name.to_string().as_str(),
                 "Http"
             );
-            let action_scope = message_scope.block.first().unwrap();
+            let method_scope = message_scope.block.first().unwrap();
             assert_eq!(
-                action_scope.selector.selector.name.to_string().as_str(),
-                "Get"
+                method_scope.selector.selector.name.to_string().as_str(),
+                "Http<Get>"
             );
         } else {
             assert!(false);
@@ -7298,7 +7272,7 @@ pub mod test {
             let action_scope = message_scope.block.first().unwrap();
             assert_eq!(
                 action_scope.selector.selector.name.to_string().as_str(),
-                "Create"
+                "Msg<Create>"
             );
         } else {
             assert!(false);
@@ -7397,31 +7371,31 @@ pub mod test {
     #[test]
     pub fn test_rough_bind_config() -> Result<(), MsgErr> {
         let unknown_config_kind = r#"
-Unknown(version=1.0.0)-> # test unknown config kind
+Unknown(version=1.0.0) # test unknown config kind
 {
     Route{
     }
 }"#;
         let unsupported_bind_version = r#"
-Bind(version=100.0.0)-> # test unsupported version
+Bind(version=100.0.0) # test unsupported version
 {
     Route{
     }
 }"#;
         let multiple_unknown_sub_selectors = r#"
-Bind(version=1.0.0)->
+Bind(version=1.0.0)
 {
     Whatever -> { # Someone doesn't care what sub selectors he creates
     }
 
-    Dude(filter $(value))->{}  # he doesn't care one bit!
+    Dude(filter $(value)) -> {}  # he doesn't care one bit!
 
 }"#;
 
         let now_we_got_rows_to_parse = r#"
-Bind(version=1.0.0)->
+Bind(version=1.0.0)
 {
-    Route(auth)-> {
+    Route(auth) -> {
        Http {
           <$(method=.*)>/users/$(user=.*)/$(path=.*)-> localhost:app:users:$(user)^Http<$(method)>/$(path) => &;
           <Get>/logout -> localhost:app:mechtrons:logout-handler => &;
@@ -7728,7 +7702,7 @@ Hello my friend
 
         //        let pipes = log(result(lex_scope(create_span("Pipes {}"))));
 
-        assert_eq!(pipes.selector.selector.name.to_string().as_str(), "Pipes");
+        assert_eq!(pipes.selector.name.to_string().as_str(), "Pipes");
         assert_eq!(pipes.block.kind, BlockKind::Nested(NestedBlockKind::Curly));
         assert_eq!(pipes.block.content.len(), 0);
         assert!(pipes.selector.filters.is_empty());
@@ -7737,7 +7711,7 @@ Hello my friend
         assert!(util::log(result(lex_scope(new_span("Pipes {}")))).is_err());
 
         let pipes = util::log(result(lex_scope(new_span("Pipes -> 12345;"))))?;
-        assert_eq!(pipes.selector.selector.name.to_string().as_str(), "Pipes");
+        assert_eq!(pipes.selector.name.to_string().as_str(), "Pipes");
         assert_eq!(pipes.block.content.to_string().as_str(), "-> 12345");
         assert_eq!(
             pipes.block.kind,
@@ -7749,7 +7723,7 @@ Hello my friend
             //This time adding a space before the 12345... there should be one space in the content, not two
             r#"Pipes ->  12345;"#,
         ))))?;
-        assert_eq!(pipes.selector.selector.name.to_string().as_str(), "Pipes");
+        assert_eq!(pipes.selector.name.to_string().as_str(), "Pipes");
         assert_eq!(pipes.block.content.to_string().as_str(), "->  12345");
         assert_eq!(
             pipes.block.kind,
@@ -7760,7 +7734,7 @@ Hello my friend
 
         let pipes = util::log(result(lex_scope(new_span("Pipes(auth) -> {}"))))?;
 
-        assert_eq!(pipes.selector.selector.name.to_string().as_str(), "Pipes");
+        assert_eq!(pipes.selector.name.to_string().as_str(), "Pipes");
         assert_eq!(pipes.block.content.len(), 0);
         assert_eq!(pipes.block.kind, BlockKind::Nested(NestedBlockKind::Curly));
         assert_eq!(pipes.selector.filters.len(), 1);
@@ -7768,11 +7742,10 @@ Hello my friend
 
         let pipes = util::log(result(lex_scope(new_span("Route<Msg> -> {}"))))?;
 
-        assert_eq!(pipes.selector.selector.name.to_string().as_str(), "Route");
+        assert_eq!(pipes.selector.name.to_string().as_str(), "Route");
         assert_eq!(
             Some(
                 pipes
-                    .selector
                     .selector
                     .children
                     .as_ref()
@@ -7791,11 +7764,10 @@ Hello my friend
         let pipes = util::log(result(lex_scope(new_span(
             "Route<Http>(noauth) -> {zoink!{}}",
         ))))?;
-        assert_eq!(pipes.selector.selector.name.to_string().as_str(), "Route");
+        assert_eq!(pipes.selector.name.to_string().as_str(), "Route");
         assert_eq!(
             Some(
                 pipes
-                    .selector
                     .selector
                     .children
                     .as_ref()
@@ -7814,7 +7786,7 @@ Hello my friend
         let parseme = format!("<Http<Get>> -> {};", msg);
         let pipes = util::log(result(lex_scope(new_span(parseme.as_str()))))?;
 
-        assert_eq!(pipes.selector.selector.name.to_string().as_str(), "Http");
+        assert_eq!(pipes.selector.name.to_string().as_str(), "Http");
         assert_eq!(
             pipes.block.content.to_string().as_str(),
             format!("-> {}", msg)
@@ -7826,14 +7798,21 @@ Hello my friend
         assert_eq!(pipes.selector.filters.len(), 0);
         assert!(pipes.pipeline_step.is_none());
 
+        assert_eq!(lex_scope_selector(new_span(
+            "<Route<Http>>/users/",
+        )).unwrap().0.len(), 0);
+
+        util::log(result(lex_scope_selector(new_span(
+            "Route<Http<Get>>/users/",
+        )))).unwrap();
+
         let pipes = util::log(result(lex_scope(new_span(
-            "Route<Http<Get>>/users/ -[Text ]-> {}",
-        ))))?;
-        assert_eq!(pipes.selector.selector.name.to_string().as_str(), "Route");
+            "Route<Http<Get>>/blah -[Text ]-> {}",
+        )))).unwrap();
+        assert_eq!(pipes.selector.name.to_string().as_str(), "Route");
         assert_eq!(
             Some(
                 pipes
-                    .selector
                     .selector
                     .children
                     .as_ref()
@@ -7851,13 +7830,12 @@ Hello my friend
         );
 
         let pipes = util::log(result(lex_scope(new_span(
-            "Route<Http<Get>>/users/(auth) -[Text ]-> {}",
+            "Route<Http<Get>>(auth)/users/ -[Text ]-> {}",
         ))))?;
-        assert_eq!(pipes.selector.selector.name.to_string().as_str(), "Route");
+        assert_eq!(pipes.selector.name.to_string().as_str(), "Route");
         assert_eq!(
             Some(
                 pipes
-                    .selector
                     .selector
                     .children
                     .as_ref()
@@ -7875,13 +7853,12 @@ Hello my friend
         );
 
         let pipes = util::log(result(lex_scope(new_span(
-            "Route<Http<Get>>/users/(auth)-(blah xyz) -[Text ]-> {}",
+            "Route<Http<Get>>(auth)-(blah xyz)/users/ -[Text ]-> {}",
         ))))?;
-        assert_eq!(pipes.selector.selector.name.to_string().as_str(), "Route");
+        assert_eq!(pipes.selector.name.to_string().as_str(), "Route");
         assert_eq!(
             Some(
                 pipes
-                    .selector
                     .selector
                     .children
                     .as_ref()
@@ -7899,7 +7876,7 @@ Hello my friend
         );
 
         let (next, stripped) = strip_comments(new_span(
-            r#"Route<Http>/users/$(auth)(blah xyz) -[Text]-> {
+            r#"Route<Http>(auth)-(blah xyz)/users/ -[Text]-> {
 
             Get -> {}
             <Put>(superuser) -> localhost:app => &;
@@ -8087,9 +8064,10 @@ pub fn rec_script_line<I: Span>(input: I) -> Res<I, I> {
 
 #[cfg(test)]
 pub mod cmd_test {
+    use core::str::FromStr;
     use crate::error::MsgErr;
     use crate::command::{Command, CommandVar};
-    use crate::parse::{command, script};
+    use crate::parse::{CamelCase, command, script};
     use cosmic_nom::{new_span, Res};
     use nom::error::{VerboseError, VerboseErrorKind};
     use nom_supreme::final_parser::{final_parser, ExtractContext};
@@ -8134,7 +8112,7 @@ pub mod cmd_test {
         let (_, command) = command(new_span(input))?;
         match command {
             CommandVar::Create(create) => {
-                assert_eq!(create.template.kind.sub, Some("Keycloak".to_string()));
+                assert_eq!(create.template.kind.sub, Some(CamelCase::from_str("Keycloak").unwrap()));
             }
             _ => {
                 panic!("expected create command")
