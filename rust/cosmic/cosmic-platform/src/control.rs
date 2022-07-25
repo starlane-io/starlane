@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use crate::driver::{
     Core, CoreSkel, Driver, DriverFactory, DriverLifecycleCall, DriverSkel, DriverStatus,
 };
@@ -29,7 +30,7 @@ pub struct ControlDriverFactory<P>
 where
     P: Platform,
 {
-    pub star_skel: StarSkel<P>,
+    phantom: PhantomData<P>
 }
 
 impl<P> DriverFactory<P> for ControlDriverFactory<P>
@@ -42,6 +43,14 @@ where
 
     fn create(&self, skel: DriverSkel<P>) -> Box<dyn Driver> {
         Box::new(ControlDriver::new(skel))
+    }
+}
+
+impl <P> ControlDriverFactory<P> where P: Platform {
+    pub fn new() -> Self {
+        Self {
+            phantom: Default::default()
+        }
     }
 }
 
