@@ -48,9 +48,9 @@ use std::ops::{Add, Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{broadcast, mpsc, oneshot, Mutex, RwLock};
-use tokio::sync::mpsc::error::SendError;
 use tokio::time::error::Elapsed;
 use tracing::info;
 
@@ -211,7 +211,12 @@ impl<P> StarSkel<P>
 where
     P: Platform,
 {
-    pub fn new(template: StarTemplate, machine: MachineSkel<P>, kinds: HashSet<Kind>, star_tx: StarTx<P>) -> Self {
+    pub fn new(
+        template: StarTemplate,
+        machine: MachineSkel<P>,
+        kinds: HashSet<Kind>,
+        star_tx: StarTx<P>,
+    ) -> Self {
         let point = template.key.clone().to_point();
         let logger = machine.logger.point(point.clone());
         let exchanger = Exchanger::new(point.clone().to_port(), machine.timeouts.clone());
@@ -300,7 +305,7 @@ where
     CreateMount {
         agent: Agent,
         kind: MountKind,
-        rtn: oneshot::Sender<(mpsc::Sender<UltraWave>, mpsc::Receiver<UltraWave>)>,
+        rtn: oneshot::Sender<Result<HyperwayExt, P::Err>>,
     },
     ToDriver(Traversal<UltraWave>),
     Phantom(PhantomData<P>),
@@ -350,15 +355,12 @@ where
             tokio::spawn(async move {
                 while let Some(traversal) = traverse_to_next_rx.recv().await {
                     println!("TRAVERSE TO NEXT TX.... ");
-                    match call_tx
-                        .send(StarCall::TraverseToNextLayer(traversal))
-                        .await  {
+                    match call_tx.send(StarCall::TraverseToNextLayer(traversal)).await {
                         Ok(_) => {
-
                             println!("CALL TX SENT.... ");
                         }
                         Err(err) => {
-                            println!("CALL TX ERR: {}",err.to_string());
+                            println!("CALL TX ERR: {}", err.to_string());
                         }
                     }
                 }
@@ -422,6 +424,17 @@ where
         let (tx, mut rx) = oneshot::channel();
         self.tx.send(StarCall::PreInit(tx)).await;
         rx.await?
+    }
+
+    pub async fn create_mount(&self, agent: Agent, kind: MountKind) -> Result<HyperwayExt, P::Err>
+    where
+        <P as Platform>::Err: From<tokio::sync::oneshot::error::RecvError>,
+    {
+        let (rtn, mut rtn_rx) = oneshot::channel();
+        self.tx
+            .send(StarCall::CreateMount { agent, kind, rtn })
+            .await;
+        rtn_rx.await?
     }
 
     pub async fn from_hyperway(&self, wave: UltraWave, results: bool) -> Result<(), MsgErr> {
@@ -544,8 +557,26 @@ where
             .unwrap()
             .to_port()
             .with_layer(Layer::Gravity);
-        let layer_engine =
-            LayerTraversalEngine::new(skel.clone(), injector.clone(), skel.drivers_tx.clone());
+
+        let (to_gravity_traversal_tx, mut to_gravity_traversal_rx): (
+            mpsc::Sender<Traversal<UltraWave>>,
+            mpsc::Receiver<Traversal<UltraWave>>,
+        ) = mpsc::channel(1024);
+        {
+            let skel = skel.clone();
+            tokio::spawn(async move {
+                while let Some(traversal) = to_gravity_traversal_rx.recv().await {
+                    skel.gravity_tx.send(traversal.payload).await;
+                }
+            });
+        }
+
+        let layer_engine = LayerTraversalEngine::new(
+            skel.clone(),
+            injector.clone(),
+            skel.drivers_tx.clone(),
+            to_gravity_traversal_tx,
+        );
 
         let mut golden_path = DashMap::new();
         for con in skel.connections.iter() {
@@ -590,7 +621,6 @@ where
     fn start(mut self) {
         tokio::spawn(async move {
             while let Some(call) = self.star_rx.recv().await {
-
                 println!("CALL...OPEN");
                 match call {
                     StarCall::PreInit(rtn) => {
@@ -635,7 +665,7 @@ where
                         kind,
                         rtn: rtn,
                     } => {
-                        self.create_mount(agent, kind, rtn).await;
+                        rtn.send(self.create_mount(agent, kind).await);
                     }
                     StarCall::Stub(rtn) => {
                         rtn.send(self.skel.stub());
@@ -770,12 +800,7 @@ where
         }
     }
 
-    async fn create_mount(
-        &mut self,
-        agent: Agent,
-        kind: MountKind,
-        tx: oneshot::Sender<(mpsc::Sender<UltraWave>, mpsc::Receiver<UltraWave>)>,
-    ) -> Result<(), P::Err> {
+    async fn create_mount(&mut self, agent: Agent, kind: MountKind) -> Result<HyperwayExt, P::Err> {
         let point = self.skel.point.clone().push("controls").unwrap();
         let index = self.skel.registry.sequence(&point).await?;
         let point = point.push(format!("control-{}", index)).unwrap();
@@ -800,7 +825,7 @@ where
         let (in_mount_tx, mut in_mount_rx) = mpsc::channel(32 * 1024);
         let (out_mount_tx, out_mount_rx) = mpsc::channel(32 * 1024);
 
-        tx.send((in_mount_tx, out_mount_rx));
+        let hyperway = HyperwayExt::new(in_mount_tx, out_mount_rx);
 
         let inject_tx = self.skel.inject_tx.clone();
         {
@@ -821,7 +846,7 @@ where
         };
 
         self.mounts.insert(point, mount);
-        Ok(())
+        Ok(hyperway)
     }
 
     async fn find_next_hop(&self, star_key: &StarKey) -> Result<Option<StarKey>, MsgErr> {
@@ -906,7 +931,9 @@ where
 {
     pub skel: StarSkel<P>,
     pub injector: Port,
+    pub exit_up: mpsc::Sender<Traversal<UltraWave>>,
     pub exit_down: mpsc::Sender<Traversal<UltraWave>>,
+    pub layers: HashSet<Layer>,
 }
 
 impl<P> LayerTraversalEngine<P>
@@ -916,12 +943,18 @@ where
     pub fn new(
         skel: StarSkel<P>,
         injector: Port,
-        core_exit: mpsc::Sender<Traversal<UltraWave>>,
+        exit_down: mpsc::Sender<Traversal<UltraWave>>,
+        exit_up: mpsc::Sender<Traversal<UltraWave>>,
     ) -> Self {
+        let mut layers = HashSet::new();
+        layers.insert(Layer::Field);
+        layers.insert(Layer::Shell);
         Self {
             skel,
             injector,
-            exit_down: core_exit,
+            exit_down,
+            exit_up,
+            layers,
         }
     }
 
@@ -936,7 +969,7 @@ where
             .diagnostic_interceptors
             .start_layer_traversal_wave
             .send(wave.clone())
-            .unwrap();
+            .unwrap_or_default();
 
         let record = match self
             .skel
@@ -1033,7 +1066,8 @@ where
         self.skel
             .diagnostic_interceptors
             .start_layer_traversal
-            .send(traversal.clone());
+            .send(traversal.clone())
+            .unwrap_or_default();
 
         // alright, let's visit the injection layer first...
         self.visit_layer(traversal).await?;
@@ -1095,7 +1129,6 @@ where
                     field.visit(traversal).await;
                 }
                 Layer::Shell => {
-
                     println!("...Shell traversal layer...");
                     let shell = ShellEx::new(
                         self.skel.clone(),
@@ -1105,14 +1138,18 @@ where
                     );
                     shell.visit(traversal).await;
                 }
-                Layer::Driver => {
-                    self.exit_down.send(traversal).await;
-                }
-                _ => {
-                    self.skel.logger.warn("attempt to traverse wave in the inner layers which the Star does not manage");
-                    // without this panic the thread will hang
-                    panic!("attempt to traverse wave in the inner layers which the Star does not manage");
-                }
+                _ => match traversal.dir {
+                    TraversalDirection::Fabric => {
+println!("SENDING TO FABRIC!");
+                        self.exit_up.send(traversal).await;
+                        return Ok(());
+                    }
+                    TraversalDirection::Core => {
+                        println!("SENDING TO DRIVERS!");
+                        self.exit_down.send(traversal).await;
+                        return Ok(());
+                    }
+                },
             }
         }
         Ok(())
@@ -1575,13 +1612,18 @@ where
         self.star_skel
             .diagnostic_interceptors
             .transport_endpoint
-            .send(ctx.wave().clone().to_ultra() );
+            .send(ctx.wave().clone().to_ultra());
         println!("@@@ !!!  received Transport !!! @@@");
         let wave = ctx.input.clone();
-        let injection = TraversalInjection::new(self.star_skel.point.clone().to_port().with_layer(Layer::Field), wave);
-        self.star_skel.inject_tx.
-            send(injection)
-            .await;
+        let injection = TraversalInjection::new(
+            self.star_skel
+                .point
+                .clone()
+                .to_port()
+                .with_layer(Layer::Field),
+            wave,
+        );
+        self.star_skel.inject_tx.send(injection).await;
     }
 
     #[route("Sys<Search>")]
@@ -1872,6 +1914,7 @@ where
     pub start_layer_traversal_wave: broadcast::Sender<UltraWave>,
     pub start_layer_traversal: broadcast::Sender<Traversal<UltraWave>>,
     pub transport_endpoint: broadcast::Sender<UltraWave>,
+    pub reflected_endpoint: broadcast::Sender<UltraWave>,
     pub err: broadcast::Sender<P::Err>,
 }
 
@@ -1887,6 +1930,7 @@ where
         let (start_layer_traversal_wave, _) = broadcast::channel(1024);
         let (err, _) = broadcast::channel(1024);
         let (transport_endpoint, _) = broadcast::channel(1024);
+        let (reflected_endpoint, _) = broadcast::channel(1024);
         Self {
             from_hyperway,
             to_hyperway,
@@ -1895,6 +1939,7 @@ where
             start_layer_traversal_wave,
             err,
             transport_endpoint,
+            reflected_endpoint,
         }
     }
 }

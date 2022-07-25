@@ -393,7 +393,7 @@ impl RootInCtx {
                 Pong::new(
                     ReflectedCore::status(status),
                     ping.from.clone(),
-                    self.to.clone(),
+                    self.to.clone().to_recipients(),
                     ping.id.clone(),
                 ),
                 from,
@@ -1104,8 +1104,7 @@ impl ReflectedProto {
                         core,
                         self.to.ok_or("ReflectedProto missing to")?,
                         self.intended
-                            .ok_or("Reflected Proto Missing intended")?
-                            .single_or()?,
+                            .ok_or("Reflected Proto Missing intended")?,
                         self.reflection_of.ok_or("response to expected")?,
                     ),
                     self.from.ok_or("expected from")?,
@@ -1472,7 +1471,7 @@ pub struct Pong {
     /// this is meant to be the intended request recipient, which may not be the point responding
     /// to this message in the case it was intercepted and filtered at some point
     pub to: Port,
-    pub intended: Port,
+    pub intended: Recipients,
     pub core: ReflectedCore,
     pub reflection_of: WaveId,
 }
@@ -1523,7 +1522,7 @@ impl Pong {
 }
 
 impl Pong {
-    pub fn new(core: ReflectedCore, to: Port, intended: Port, reflection_of: WaveId) -> Self {
+    pub fn new(core: ReflectedCore, to: Port, intended: Recipients, reflection_of: WaveId) -> Self {
         Self {
             to,
             intended,
@@ -1595,12 +1594,19 @@ impl DirectedWave {
         }
     }
 
-    pub fn reflection(&self) -> Reflection {
-        Reflection {
-            from: self.from().clone(),
-            to: self.to(),
+    pub fn reflection(&self) -> Result<Reflection,MsgErr> {
+        Ok(Reflection {
+            kind: match self {
+                DirectedWave::Ping(_) => ReflectedKind::Pong,
+                DirectedWave::Ripple(_) => ReflectedKind::Echo,
+                DirectedWave::Signal(_) => {
+                    return Err("signals do not have a reflected".into())
+                }
+            },
+            to: self.from().clone(),
+            intended: self.to(),
             reflection_of: self.id().clone(),
-        }
+        })
     }
 
     pub fn to_signal(self) -> Result<Wave<Signal>,MsgErr> {
@@ -1672,12 +1678,19 @@ impl SingularDirectedWave {
         })
     }
 
-    pub fn reflection(&self) -> Reflection {
-        Reflection {
-            from: self.from().clone(),
-            to: self.to().to_recipients(),
+    pub fn reflection(&self) -> Result<Reflection,MsgErr> {
+        Ok(Reflection {
+            kind: match self {
+                SingularDirectedWave::Ping(_) => ReflectedKind::Pong,
+                SingularDirectedWave::Ripple(_) => ReflectedKind::Echo,
+                SingularDirectedWave::Signal(_) => {
+                    return Err("signals do not have a reflected".into())
+                }
+            },
+            to: self.from().clone(),
+            intended: self.to().to_recipients(),
             reflection_of: self.id().clone(),
-        }
+        })
     }
 
     pub fn to_ultra(self) -> UltraWave {
@@ -1772,15 +1785,17 @@ impl <T> DirectedWaveDef<T> where T:ToRecipients+Clone{
 }
 
 pub struct Reflection {
-    pub from: Port,
-    pub to: Recipients,
+    pub kind: ReflectedKind,
+    pub to: Port,
+    pub intended: Recipients,
     pub reflection_of: WaveId,
 }
 
 impl Reflection {
-    pub fn make(self, core: ReflectedCore, from: Port, intended: Port) -> ReflectedWave {
+    pub fn make(self, core: ReflectedCore, from: Port) -> ReflectedWave {
+
         Wave::new(
-            Pong::new(core, self.from, intended, self.reflection_of),
+            Pong::new(core, self.to, self.intended, self.reflection_of),
             from,
         )
         .to_reflected()
@@ -2219,7 +2234,7 @@ impl Wave<Ping> {
             Pong::new(
                 self.variant.err(err),
                 self.from.clone(),
-                self.to.clone(),
+                self.to.clone().to_recipients(),
                 self.id.clone(),
             ),
             responder,
@@ -3011,7 +3026,7 @@ impl ReflectedCore {
     {
         Pong {
             to: to.to_port(),
-            intended,
+            intended: intended.to_recipients(),
             core: self,
             reflection_of: reflection_of,
         }
@@ -3606,7 +3621,7 @@ impl Exchanger {
 
         reflected.from(self.port.clone());
 
-        let reflection = directed.reflection();
+        let reflection = directed.reflection().unwrap();
 
         let timeout = self.timeouts.from(directed.handling().wait.clone());
         self.singles.insert(directed.id().clone(), tx);
@@ -3622,7 +3637,7 @@ impl Exchanger {
                     if let Some((_, tx)) = singles.remove(id) {
                         reflected.status = Some(StatusCode::from_u16(408).unwrap());
                         reflected.body = Some(Substance::Empty);
-                        reflected.intended = Some(reflection.to);
+                        reflected.intended = Some(reflection.intended);
                         let reflected = reflected.build().unwrap();
                         tx.send(ReflectedAggregate::Single(reflected));
                     }
@@ -3649,7 +3664,7 @@ impl Exchanger {
                             if let Some((_, tx)) = singles.remove(&id) {
                                 reflected.status = Some(StatusCode::from_u16(408).unwrap());
                                 reflected.body = Some(Substance::Empty);
-                                reflected.intended = Some(reflection.to);
+                                reflected.intended = Some(reflection.intended);
                                 let reflected = reflected.build().unwrap();
                                 tx.send(ReflectedAggregate::Multi(vec![reflected]));
                                 break;

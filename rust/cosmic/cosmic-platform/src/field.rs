@@ -18,7 +18,7 @@ use cosmic_api::selector::{PayloadBlock, PayloadBlockVar};
 use cosmic_api::substance::substance::{Call, CallKind, Substance};
 use cosmic_api::sys::ParticleRecord;
 use cosmic_api::util::{log, ToResolved, ValueMatcher};
-use cosmic_api::wave::{Agent, CmdMethod, Method, DirectedCore, Ping, Reflectable, ReflectedCore, Pong, Wave, Exchanger, UltraWave, DirectedWave, ReflectedWave, Bounce, SingularDirectedWave};
+use cosmic_api::wave::{Agent, CmdMethod, Method, DirectedCore, Ping, Reflectable, ReflectedCore, Pong, Wave, Exchanger, UltraWave, DirectedWave, ReflectedWave, Bounce, SingularDirectedWave, ToRecipients};
 use regex::{CaptureMatches, Regex};
 
 use std::collections::HashMap;
@@ -434,7 +434,7 @@ impl PipeTraversal {
         Pong::new(
             self.response_core().clone(),
             self.to().clone().to_port(),
-            self.from().clone().to_port(),
+            self.from().clone().to_port().to_recipients(),
             self.initial.id().clone(),
         )
     }
@@ -484,15 +484,15 @@ impl PipeTraversal {
 
     pub fn reflect(self) -> Traversal<ReflectedWave> {
         let core = self.response_core();
-        let reflection = self.initial.payload.reflection();
-        let reflected = reflection.make( core, self.port.clone(), self.initial.to.clone() );
+        let reflection = self.initial.payload.reflection().unwrap();
+        let reflected = reflection.make( core, self.port.clone() );
         self.initial.with(reflected)
     }
 
     pub fn fail(self, status: u16, error: &str) -> Traversal<ReflectedWave> {
         let core = ReflectedCore::status(status);
-        let reflection = self.initial.payload.reflection();
-        let reflected = reflection.make( core, self.port.clone(), self.initial.to.clone() );
+        let reflection = self.initial.payload.reflection().unwrap();
+        let reflected = reflection.make( core, self.port.clone() );
         self.initial.with(reflected )
     }
 }

@@ -339,8 +339,18 @@ where
         transmitter.from = SetStrategy::Override(self.port.clone());
         let transmitter = transmitter.build();
         let to = direct.to().clone().unwrap_single();
+        let reflection = direct.reflection();
         let ctx = RootInCtx::new(direct.payload, to, logger, transmitter);
-        self.ex.handle(ctx).await;
+        match self.ex.handle(ctx).await {
+            CoreBounce::Absorbed => {}
+            CoreBounce::Reflected(reflected) => {
+                let wave = reflection.unwrap().make(reflected, self.port.clone() );
+                let wave = wave.to_ultra();
+                #[cfg(test)]
+                self.skel.diagnostic_interceptors.reflected_endpoint.send(wave.clone());
+                self.inject( wave ).await;
+            }
+        }
     }
 
     async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) {

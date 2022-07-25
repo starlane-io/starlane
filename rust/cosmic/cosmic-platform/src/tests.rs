@@ -4,8 +4,8 @@ use super::*;
 use chrono::{DateTime, Utc};
 use cosmic_api::id::id::{Layer, ToPoint, ToPort, Uuid};
 use cosmic_api::msg::MsgMethod;
-use cosmic_api::wave::{DirectedKind, DirectedProto, HyperWave};
-use cosmic_api::{NoDiceArtifactFetcher, HYPERUSER};
+use cosmic_api::wave::{Agent, DirectedKind, DirectedProto, HyperWave};
+use cosmic_api::{NoDiceArtifactFetcher, HYPERUSER, MountKind};
 use dashmap::DashMap;
 use std::io::Error;
 use std::sync::atomic;
@@ -14,6 +14,7 @@ use std::time::Duration;
 use tokio::join;
 use tokio::sync::{Mutex, oneshot};
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::oneshot::error::RecvError;
 use cosmic_api::id::TraversalDirection;
 use cosmic_hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
 
@@ -246,6 +247,14 @@ impl Into<MsgErr> for TestErr {
     }
 }
 
+impl From<oneshot::error::RecvError> for TestErr{
+    fn from(err: RecvError) -> Self {
+        TestErr {
+            message: err.to_string()
+        }
+    }
+}
+
 impl From<MsgErr> for TestErr {
     fn from(err: MsgErr) -> Self {
         Self {
@@ -399,8 +408,9 @@ fn test_layer_traversal() -> Result<(), TestErr> {
         let (check_start_traversal_wave_tx,check_start_traversal_wave_rx):(oneshot::Sender<Result<(),()>>,oneshot::Receiver<Result<(),()>>) = oneshot::channel();
         let (check_start_traversal_tx,check_start_traversal_rx):(oneshot::Sender<Result<(),()>>,oneshot::Receiver<Result<(),()>>) = oneshot::channel();
         let (check_transport_endpoint_tx,check_transport_endpoint_rx):(oneshot::Sender<Result<(),()>>,oneshot::Receiver<Result<(),()>>) = oneshot::channel();
+        let (check_reflect_tx,check_reflect_rx):(oneshot::Sender<UltraWave>,oneshot::Receiver<UltraWave>) = oneshot::channel();
 
-        let (final_tx,final_rx) = oneshot::channel();
+        let (final_tx, direct_rx) = oneshot::channel();
 
         tokio::spawn( async move {
             tokio::time::timeout(Duration::from_secs(5), check_from_hyperway_rx).await.expect("check_from_hyperway").unwrap().unwrap();
@@ -408,6 +418,7 @@ fn test_layer_traversal() -> Result<(), TestErr> {
             tokio::time::timeout(Duration::from_secs(5), check_start_traversal_wave_rx).await.expect("check_start_traversal_wave").unwrap().unwrap();
             tokio::time::timeout(Duration::from_secs(5), check_start_traversal_rx).await.expect("check_start_traversal").unwrap().unwrap();
             tokio::time::timeout(Duration::from_secs(5), check_transport_endpoint_rx).await.expect("check_transport_endpoint").unwrap().unwrap();
+
             final_tx.send(());
         });
 
@@ -430,6 +441,7 @@ fn test_layer_traversal() -> Result<(), TestErr> {
         let mut start_layer_traversal= skel.diagnostic_interceptors.start_layer_traversal.subscribe();
         let mut start_layer_traversal_wave = skel.diagnostic_interceptors.start_layer_traversal_wave.subscribe();
         let mut transport_endpoint= skel.diagnostic_interceptors.transport_endpoint.subscribe();
+        let mut refelected_endpoint= skel.diagnostic_interceptors.reflected_endpoint.subscribe();
 
         // send a 'nice' wave from Fae to Less
         let mut wave = DirectedProto::new();
@@ -547,18 +559,66 @@ println!("traversal layer {}", traversal.layer.to_string());
             });
         }
 
+
+
         // send straight out of the star (circumvent layer traversal)
         star_api.to_gravity(wave).await;
 
+        let wave = tokio::time::timeout(Duration::from_secs(5), check_reflect_rx).await.expect("check_reflect_rx").unwrap();
 
+        let (check_to_gravity_tx, check_to_gravity_rx):(oneshot::Sender<Result<(),()>>, oneshot::Receiver<Result<(),()>>) = oneshot::channel();
+        let mut to_gravity_rx = skel.diagnostic_interceptors.to_gravity.subscribe();
+        let wave_id = wave.id();
+        {
+            tokio::spawn(async move {
+                while let Ok(hop) = to_gravity_rx.recv().await {
+                    let transport = hop.unwrap_from_hop().unwrap();
+                    let wave = transport.unwrap_from_transport().unwrap();
+                    if wave.id() == wave_id {
+                        println!("intercepted to_gravity reflection event");
+                        check_to_gravity_tx.send(Ok(()));
+                        break;
+                    } else {
+                        println!("RECEIVED WAVE: {}", wave.id().to_string())
+                    }
+                }
+            });
+        }
 
-        final_rx.await;
+        direct_rx.await;
 
         Ok(())
 
     })
 
 }
+
+
+#[test]
+fn test_control() -> Result<(), TestErr> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async move {
+       // let (final_tx, final_rx) = oneshot::channel();
+
+        let platform = TestPlatform::new();
+        let machine_api = platform.machine();
+        machine_api.wait_ready().await;
+
+        let star_api = machine_api.get_machine_star().await.unwrap();
+        let less = star_api.create_mount(Agent::HyperUser, MountKind::Control).await.unwrap();
+        let fae = star_api.create_mount(Agent::HyperUser, MountKind::Control).await.unwrap();
+
+
+       // final_rx.await;
+
+        let stub = star_api.stub().await.unwrap();
+        Ok(())
+    })
+
+}
+
 
 
 

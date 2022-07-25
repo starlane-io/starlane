@@ -72,7 +72,7 @@ impl <P> TraversalLayer for ShellEx<P> where P: Platform +'static {
         match bounce {
             CoreBounce::Absorbed => {}
             CoreBounce::Reflected(core) => {
-                let reflected = reflection.make(core, self.port().clone(),self.port().clone() );
+                let reflected = reflection.unwrap().make(core, self.port().clone());
                 self.inject( reflected.to_ultra() ).await;
             }
         }
