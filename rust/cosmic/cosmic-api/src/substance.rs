@@ -18,7 +18,7 @@ pub mod substance {
     use crate::parse::{CtxResolver, Env};
     use crate::particle::particle::{Particle, Status, Stub};
     use crate::selector::selector::{KindSelector, Selector};
-    use crate::sys::Sys;
+    use crate::sys::{Greet, Knock, Sys};
     use crate::util::{uuid, ToResolved, ValueMatcher, ValuePattern};
     use crate::wave::{HyperWave, Method, DirectedCore, ReflectedCore, Pong, Wave, UltraWave, SysMethod, CmdMethod};
     use cosmic_macros_primitive::Autobox;
@@ -63,7 +63,9 @@ pub mod substance {
         Sys,
         Token,
         UltraWave,
-        HyperWave
+        HyperWave,
+        Knock,
+        Greet
     }
 
     #[derive(
@@ -94,6 +96,8 @@ pub mod substance {
         Token(Token),
         UltraWave(Box<UltraWave>),
         HyperWave(Box<HyperWave>),
+        Knock(Knock),
+        Greet(Greet)
     }
 
     pub trait ToSubstance<S>{
@@ -208,6 +212,8 @@ pub mod substance {
                 Substance::Token(_) => SubstanceKind::Token,
                 Substance::UltraWave(_) => SubstanceKind::UltraWave,
                 Substance::HyperWave(_) => SubstanceKind::HyperWave,
+                Substance::Knock(_) => SubstanceKind::Knock,
+                Substance::Greet(_) => SubstanceKind::Greet
             }
         }
 

@@ -26,6 +26,15 @@ pub struct RawCommand {
    pub transfers: Vec<Transfer>
 }
 
+impl RawCommand {
+    pub fn new( line: String ) -> Self {
+        Self {
+            line,
+            transfers: vec![]
+        }
+    }
+}
+
 
 #[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub struct Transfer {

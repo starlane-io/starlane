@@ -1,4 +1,4 @@
-use crate::driver::{Core, Driver, DriverFactory, DriverLifecycleCall, Drivers, DriversApi, DriverSkel, DriverStatus};
+use crate::driver::{Core, Driver, DriverDriver, DriverDriverFactory, DriverFactory, DriverLifecycleCall, Drivers, DriversApi, DriverSkel, DriverStatus};
 use crate::field::{FieldEx, FieldState};
 use crate::machine::MachineSkel;
 use crate::shell::ShellEx;
@@ -277,12 +277,6 @@ where
         &self.logger.point
     }
 
-    pub fn create_star_drivers(&self, driver_skel: DriverSkel<P>, drivers_api: DriversApi<P>) -> HashMap<Kind, Box<dyn Driver>> {
-        let mut rtn: HashMap<Kind, Box<dyn Driver>> = HashMap::new();
-        let star_driver = StarDriver::new(self.clone(), driver_skel, drivers_api);
-        rtn.insert(star_driver.kind().clone(), Box::new(star_driver));
-        rtn
-    }
 
     pub fn stub(&self) -> StarStub {
         StarStub::new(self.key.clone(), self.kind.clone())
@@ -539,8 +533,11 @@ where
 
         let (drivers_tx,drivers_rx) = mpsc::channel(1024);
         let drivers_api = DriversApi::new(drivers_tx.clone());
-        let star_driver_factory = Box::new(StarDriverFactory::new(skel.clone(), drivers_api));
+        let star_driver_factory = Box::new(StarDriverFactory::new(skel.clone(), drivers_api.clone() ));
         drivers.add(star_driver_factory);
+
+        let driver_driver_factory = Box::new( DriverDriverFactory::new(skel.clone(), drivers_api ));
+        drivers.add(driver_driver_factory);
 
         let drivers = drivers.build( skel.point.push("drivers")?.to_port(), skel.clone(), drivers_tx.clone(), drivers_rx)?;
 

@@ -4,22 +4,17 @@ use crate::star::{LayerInjectionRouter, StarSkel, StarState, StateApi, StateCall
 use crate::{PlatErr, Platform, RegistryApi};
 use cosmic_api::config::config::bind::RouteSelector;
 use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{Kind, Layer, Point, Port, ToPoint, ToPort, TraversalLayer, Uuid};
-use cosmic_api::id::{StarKey, Traversal, TraversalInjection};
+use cosmic_api::id::id::{BaseKind, Kind, Layer, Point, Port, ToBaseKind, ToPoint, ToPort, TraversalLayer, Uuid};
+use cosmic_api::id::{BaseSubKind, StarKey, Traversal, TraversalInjection};
 use cosmic_api::log::PointLogger;
 use cosmic_api::parse::model::Subst;
 use cosmic_api::parse::route_attribute;
-use cosmic_api::particle::particle::Status;
+use cosmic_api::particle::particle::{Details, Status, Stub};
 use cosmic_api::substance::substance::Substance;
-use cosmic_api::sys::{Assign, Sys};
-use cosmic_api::util::ValuePattern;
-use cosmic_api::wave::{
-    Bounce, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto,
-    DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder,
-    RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, SysMethod,
-    UltraWave, Wave, WaveKind,
-};
-use cosmic_api::State;
+use cosmic_api::sys::{Assign, AssignmentKind, Sys};
+use cosmic_api::util::{log, ValuePattern};
+use cosmic_api::wave::{Bounce, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, SysMethod, UltraWave, Wave, WaveKind};
+use cosmic_api::{HYPERUSER, Registration, State};
 use dashmap::DashMap;
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
@@ -27,6 +22,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
+use cosmic_api::command::command::common::StateSrc;
 
 pub enum DriversCall<P>
 where
@@ -39,6 +35,7 @@ where
         assign: Assign,
         rtn: oneshot::Sender<Result<(), MsgErr>>,
     },
+    Drivers(oneshot::Sender<HashMap<Kind,DriverApi>>)
 }
 
 #[derive(Clone)]
@@ -66,6 +63,13 @@ where
         self.tx.send(DriversCall::Kinds(rtn)).await;
         Ok(rtn_rx.await?)
     }
+
+    pub async fn drivers(&self) -> Result<HashMap<Kind,DriverApi>, MsgErr> {
+        let (rtn, mut rtn_rx) = oneshot::channel();
+        self.tx.send(DriversCall::Drivers(rtn)).await;
+        Ok(rtn_rx.await?)
+    }
+
 
     pub async fn init(&self) -> Result<Status, P::Err>
     where
@@ -130,7 +134,10 @@ where
                         rtn.send(self.kinds());
                     }
                     DriversCall::Assign { assign, rtn } => {
-                        rtn.send(self.assign(assign).await);
+                        rtn.send(self.assign(assign).await).unwrap_or_default();
+                    }
+                    DriversCall::Drivers(rtn) => {
+                        rtn.send(self.drivers.clone()).unwrap_or_default();
                     }
                 }
             }
@@ -752,5 +759,153 @@ impl <P> CoreSkel<P> where P: Platform {
             phantom: Default::default()
         }
     }
+}
+
+pub struct DriverDriverFactory<P> where P: Platform {
+    skel: StarSkel<P>,
+    drivers_api: DriversApi<P>
+}
+
+impl <P> DriverDriverFactory<P> where P: Platform {
+    pub fn new( skel:StarSkel<P>, drivers_api: DriversApi<P> )-> Self {
+        Self {
+            skel,
+            drivers_api
+        }
+    }
+}
+
+impl <P> DriverFactory<P> for DriverDriverFactory<P> where P: Platform {
+    fn kind(&self) -> Kind {
+        Kind::Driver
+    }
+
+    fn create(&self, skel: DriverSkel<P>) -> Box<dyn Driver> {
+        Box::new(DriverDriver::new( self.skel.clone(), self.drivers_api.clone() ))
+    }
+}
+
+
+#[derive(DirectedHandler)]
+pub struct DriverDriver<P> where P: Platform {
+   skel: StarSkel<P>,
+   drivers_api: DriversApi<P>
+}
+
+impl <P> DriverDriver<P> where P: Platform {
+    pub fn new(skel: StarSkel<P>, drivers_api: DriversApi<P>) -> Self {
+        Self {
+            skel,
+            drivers_api
+        }
+    }
+}
+
+#[routes]
+impl <P> DriverDriver<P> where P: Platform {
+   async fn init(&self) -> Result<DriverStatus,P::Err> {
+       let drivers_point = self.skel.point.push("drivers")?;
+       let registration = Registration {
+           point: drivers_point.clone(),
+           kind: Kind::Base(BaseSubKind::Drivers),
+           registry: Default::default(),
+           properties: Default::default(),
+           owner: HYPERUSER.clone(),
+       };
+
+       self.skel.registry.register(&registration).await?;
+
+       for (kind,driver) in self.drivers_api.drivers().await? {
+          if kind.to_base() != BaseKind::Star {
+              let driver_point = drivers_point.push(kind.as_point_segments())?;
+              // now we must assign each driver to the star so the Field and Shell are created
+              let registration = Registration {
+                  point: driver_point.clone(),
+                  kind: Kind::Driver,
+                  registry: Default::default(),
+                  properties: Default::default(),
+                  owner: HYPERUSER.clone(),
+              };
+
+              self.skel.registry.register(&registration).await?;
+              self.skel.registry.assign(&driver_point, &self.skel.point).await?;
+              self.skel.registry
+                  .set_status(&driver_point, &Status::Initializing)
+                  .await?;
+
+              let details = Details {
+                  stub: Stub {
+                      point: driver_point.clone(),
+                      kind: kind.clone(),
+                      status: Status::Unknown
+                  },
+                  properties: Default::default()
+              };
+              let assign = Assign::new( AssignmentKind::Create, details, StateSrc::None );
+              let mut ping = DirectedProto::new();
+              ping.kind(DirectedKind::Ping);
+              ping.body(assign.into());
+              ping.method(SysMethod::Assign);
+              let pong: Wave<Pong> = self.skel.gravity_transmitter.direct(ping).await?;
+              if !pong.core.status.is_success() {
+                  return Err(MsgErr::from_500(format!("failed to assign driver: {}", kind.to_string())).into());
+              }
+              self.skel.registry
+                  .set_status(&driver_point, &Status::Ready)
+                  .await?;
+          }
+       }
+       Ok(DriverStatus::Ready)
+   }
+}
+
+#[async_trait]
+impl <P> Driver for DriverDriver<P> where P: Platform {
+    fn kind(&self) -> Kind {
+       Kind::Driver
+    }
+
+    async fn status(&self) -> DriverStatus {
+        DriverStatus::Ready
+    }
+
+    async fn lifecycle(&mut self, event: DriverLifecycleCall) -> Result<DriverStatus, MsgErr> {
+        match event {
+            DriverLifecycleCall::Init => {
+                P::log_ctx("init DriversDriver", self.init().await).map_err(|e|e.into())
+            }
+            DriverLifecycleCall::Shutdown => {
+                Ok(DriverStatus::Shutdown)
+            }
+        }
+    }
+
+    async fn ex(&self, point: &Point) -> Result<Box<dyn Core>, MsgErr> {
+        Ok(Box::new(DriverCore::new(point.clone(),self.skel.clone())))
+    }
+
+    async fn assign(&self, assign: Assign) -> Result<(), MsgErr> {
+        Ok(())
+    }
+}
+
+#[derive(DirectedHandler)]
+pub struct DriverCore<P> where P: Platform {
+    point: Point,
+    skel: StarSkel<P>
+}
+
+#[routes]
+impl <P> DriverCore<P> where P: Platform {
+    pub fn new(point: Point, skel: StarSkel<P>) -> Self {
+        Self {
+            point,
+            skel
+        }
+    }
+}
+
+impl <P> Core for DriverCore<P> where P: Platform {
+
 }
 

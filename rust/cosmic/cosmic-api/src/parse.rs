@@ -5613,6 +5613,7 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
             BaseKind::Control => Ok((next, Kind::Control)),
             BaseKind::Portal => Ok((next, Kind::Portal)),
             BaseKind::Repo => Ok((next, Kind::Repo)),
+            BaseKind::Driver=> Ok((next, Kind::Driver)),
         }
     }
 }

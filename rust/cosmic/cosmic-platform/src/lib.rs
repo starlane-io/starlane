@@ -54,6 +54,7 @@ pub mod state;
 pub mod traversal;
 pub mod tests;
 pub mod control;
+pub mod global;
 
 #[no_mangle]
 pub extern "C" fn cosmic_uuid() -> String {
@@ -369,6 +370,7 @@ pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'st
             BaseKind::Star => {
                 unimplemented!()
             }
+            BaseKind::Driver => Kind::Driver
         })
 
 

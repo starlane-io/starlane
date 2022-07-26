@@ -727,7 +727,7 @@ fn test_control() -> Result<(), TestErr> {
 
         let platform = TestPlatform::new();
         let machine_api = platform.machine();
-        machine_api.wait_ready().await;
+        tokio::time::timeout( Duration::from_secs(5), machine_api.wait_ready()).await;
 
         let star_api = machine_api.get_machine_star().await.unwrap();
         /*

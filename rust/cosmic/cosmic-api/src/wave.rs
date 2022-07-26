@@ -155,7 +155,9 @@ impl UltraWave {
     pub fn wrap_in_transport(self, from: Port, to: Port ) -> DirectedProto {
         let mut signal = DirectedProto::new();
         signal.kind(DirectedKind::Signal);
+        signal.fill(&self);
         signal.from(from);
+        signal.agent(self.agent().clone());
         signal.handling(self.handling().clone());
         signal.method(SysMethod::Transport);
         signal.body(Substance::UltraWave(Box::new(self)));
@@ -282,6 +284,37 @@ impl UltraWave {
             UltraWave::Signal(signal) => &signal.from,
         }
     }
+
+    pub fn set_agent(& mut self, agent: Agent)  {
+        match self {
+            UltraWave::Ping(ping) => ping.agent=agent,
+            UltraWave::Pong(pong) => pong.agent=agent,
+            UltraWave::Ripple(ripple) => ripple.agent=agent,
+            UltraWave::Echo(echo) => echo.agent=agent,
+            UltraWave::Signal(signal) => signal.agent=agent,
+        }
+    }
+
+    pub fn set_to(& mut self, to: Port )  {
+        match self {
+            UltraWave::Ping(ping) => ping.to=to,
+            UltraWave::Pong(pong) => pong.to=to,
+            UltraWave::Ripple(ripple) => ripple.to=to.to_recipients(),
+            UltraWave::Echo(echo) => echo.to=to,
+            UltraWave::Signal(signal) => signal.to=to,
+        }
+    }
+
+    pub fn set_from(& mut self, from: Port )  {
+        match self {
+            UltraWave::Ping(ping) => ping.from=from,
+            UltraWave::Pong(pong) => pong.from=from,
+            UltraWave::Ripple(ripple) => ripple.from=from,
+            UltraWave::Echo(echo) => echo.from=from,
+            UltraWave::Signal(signal) => signal.from=from,
+        }
+    }
+
 
     pub fn agent(&self) -> &Agent{
         match self {
@@ -2170,6 +2203,7 @@ impl Wave<Signal> {
         let mut signal = DirectedProto::new();
         signal.kind(DirectedKind::Signal);
         signal.from(from);
+        signal.agent(self.agent.clone());
         signal.handling(self.handling.clone());
         signal.method(SysMethod::Hop);
         signal.body(Substance::UltraWave(Box::new(self.to_ultra())));
@@ -3458,7 +3492,10 @@ impl TryFrom<ReflectedCore> for Port {
 pub enum CmdMethod {
     Read,
     Update,
-    Bounce
+    Bounce,
+    Knock,
+    Greet,
+    Command
 }
 
 impl ValueMatcher<CmdMethod> for CmdMethod {
@@ -3584,7 +3621,7 @@ pub struct Exchanger {
 }
 
 impl Exchanger {
-    pub fn new(port: Port, timeouts: Timeouts) -> Self {
+    pub fn new(port: Port,timeouts: Timeouts) -> Self {
         Self {
             port,
             singles: Arc::new(DashMap::new()),
@@ -3593,13 +3630,13 @@ impl Exchanger {
         }
     }
 
-    pub fn with_port(&self, port: Port) -> Exchanger {
-        Exchanger {
-            port,
-            singles: self.singles.clone(),
-            multis: self.multis.clone(),
-            timeouts: self.timeouts.clone(),
-        }
+    pub fn with_port( &self, port: Port ) -> Self{
+       Self {
+           port,
+           singles: self.singles.clone(),
+           multis: self.multis.clone(),
+           timeouts: self.timeouts.clone()
+       }
     }
 
     pub async fn reflected(&self, reflect: ReflectedWave) {
@@ -3714,6 +3751,12 @@ impl Exchanger {
         }
 
         rx
+    }
+}
+
+impl Default for Exchanger {
+    fn default() -> Self {
+        Self::new(Point::root().to_port(), Default::default())
     }
 }
 

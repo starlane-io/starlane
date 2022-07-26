@@ -8,8 +8,9 @@ use cosmic_macros_primitive::Autobox;
 
 use crate::command::command::common::StateSrc;
 use crate::log::Log;
-use crate::wave::{DirectedCore, Ping, SysMethod, Wave};
+use crate::wave::{CmdMethod, DirectedCore, Ping, Pong, SysMethod, ToRecipients, Wave};
 use serde::{Deserialize, Serialize};
+use crate::{Agent, Port, ReflectedCore};
 use crate::id::{StarKey, StarSub};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
@@ -124,7 +125,6 @@ pub enum Sys {
     Assign(Assign),
     Event(SysEvent),
     Log(Log),
-    Knock(Knock),
     Search(Search),
     Discoveries(Discoveries)
 }
@@ -210,26 +210,26 @@ pub struct Created {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Hash)]
 pub enum InterchangeKind {
     DefaultControl,
-    Control(InterchangeSpecific),
-    Portal(InterchangeSpecific),
+    Control(ControlPattern),
+    Portal(ControlPattern),
     Star(StarKey),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Hash)]
-pub enum InterchangeSpecific {
+pub enum ControlPattern {
     Any,
-    Exact(Point)
+    Star(Point)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Knock {
     pub kind: InterchangeKind,
     pub auth: Box<Substance>,
-    pub remote: Option<Point>,
+    pub remote: Option<Port>,
 }
 
 impl Knock {
-    pub fn new(kind: InterchangeKind, remote: Point, auth: Substance ) -> Self {
+    pub fn new(kind: InterchangeKind, remote: Port, auth: Substance ) -> Self {
         Self {
             kind,
             remote: Some(remote),
@@ -241,7 +241,7 @@ impl Knock {
 impl Default for Knock {
     fn default() -> Self {
         Self {
-            kind: InterchangeKind::Control(InterchangeSpecific::Any),
+            kind: InterchangeKind::Control(ControlPattern::Any),
             auth: Box::new(Substance::Empty),
             remote: None
         }
@@ -251,14 +251,31 @@ impl Default for Knock {
 impl Into<Wave<Ping>> for Knock {
     fn into(self) -> Wave<Ping> {
         let mut core = DirectedCore::new(SysMethod::Knock.into());
-        core.body = Sys::Knock(self).into();
-        let req = Wave::new( Ping::new(
+        core.body = Substance::Knock(self);
+        let wave = Wave::new(Ping::new(
             core,
-            Point::local_hypergate()),
-            Point::remote_entry_requester().to_port()
+            Point::local_endpoint().to_port()),
+                             Point::remote_endpoint().to_port()
         );
-        req
+        wave
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Greet {
+    pub port: Port,
+    pub agent: Agent,
+    pub hop: Port,
+    pub transport: Port
+}
 
+impl Greet {
+    pub fn new( agent: Agent, port: Port, hop: Port, transport: Port ) -> Self {
+        Self {
+            agent,
+            port,
+            hop,
+            transport
+        }
+    }
+}

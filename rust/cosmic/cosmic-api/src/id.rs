@@ -55,8 +55,8 @@ pub mod id {
         parse_uuid, point_and_kind, point_route_segment, point_selector, point_var, uuid_chars,
         CamelCase, Ctx, CtxResolver, Domain, Env, ResolverErr, SkewerCase, VarResolver,
     };
-    use crate::{Agent, ANONYMOUS, HYPERUSER, State};
     use crate::{cosmic_uuid, parse};
+    use crate::{Agent, State, ANONYMOUS, HYPERUSER};
 
     use crate::parse::error::result;
     use crate::selector::selector::{
@@ -64,15 +64,18 @@ pub mod id {
     };
     use crate::sys::Location::Central;
     use crate::util::{ToResolved, ValueMatcher, ValuePattern};
-    use crate::wave::{DirectedWave, Exchanger, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave, ToRecipients, UltraWave, Wave};
+    use crate::wave::{
+        DirectedWave, Exchanger, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave,
+        ToRecipients, UltraWave, Wave,
+    };
 
     lazy_static! {
         pub static ref GLOBAL_CENTRAL: Point = Point::from_str("GLOBAL::central").unwrap();
         pub static ref GLOBAL_EXEC: Point = Point::from_str("GLOBAL::executor").unwrap();
         pub static ref LOCAL_PORTAL: Point = Point::from_str("LOCAL::portal").unwrap();
         pub static ref LOCAL_HYPERGATE: Point = Point::from_str("LOCAL::hypergate").unwrap();
-        pub static ref REMOTE_ENTRY_REQUESTER: Point =
-            Point::from_str("REMOTE::entry-requester").unwrap();
+        pub static ref LOCAL_ENDPOINT: Point = Point::from_str("LOCAL::endpoint").unwrap();
+        pub static ref REMOTE_ENDPOINT: Point = Point::from_str("REMOTE::endpoint").unwrap();
         pub static ref STD_WAVE_TRAVERSAL_PLAN: TraversalPlan =
             TraversalPlan::new(vec![Layer::Field, Layer::Shell, Layer::Core]);
         pub static ref MECHTRON_WAVE_TRAVERSAL_PLAN: TraversalPlan = TraversalPlan::new(vec![
@@ -126,6 +129,7 @@ pub mod id {
         Control,
         Portal,
         Star,
+        Driver
     }
 
     impl BaseKind {
@@ -220,6 +224,7 @@ pub mod id {
         Bundle,
         Control,
         Portal,
+        Driver,
         File(FileSubKind),
         Artifact(ArtifactSubKind),
         Database(DatabaseSubKind),
@@ -248,6 +253,7 @@ pub mod id {
                 Kind::Base(_) => BaseKind::Base,
                 Kind::Repo => BaseKind::Repo,
                 Kind::Star(_) => BaseKind::Star,
+                Kind::Driver => BaseKind::Driver
             }
         }
     }
@@ -360,6 +366,9 @@ pub mod id {
                 BaseKind::Control => Kind::Control,
                 BaseKind::Portal => Kind::Portal,
                 BaseKind::Repo => Kind::Repo,
+                BaseKind::Driver => {
+                    Kind::Driver
+                }
             })
         }
     }
@@ -1586,10 +1595,10 @@ pub mod id {
 
         async fn visit(&self, traversal: Traversal<UltraWave>) {
             if let Some(dest) = &traversal.dest {
-println!("dest: {}", dest.to_string());
+                println!("dest: {}", dest.to_string());
                 if self.port().layer == *dest {
                     if traversal.is_directed() {
-println!("DELIVERY DIRECTED");
+                        println!("DELIVERY DIRECTED");
                         self.deliver_directed(traversal.unwrap_directed()).await;
                     } else {
                         self.deliver_reflected(traversal.unwrap_reflected()).await;
@@ -1601,14 +1610,25 @@ println!("DELIVERY DIRECTED");
             }
 
             if traversal.is_directed() && traversal.dir == TraversalDirection::Fabric {
-println!("DIRECTED FABRIC BOUND {} {}", self.port().layer.to_string(), traversal.payload.clone().to_directed().unwrap().core().method.to_string() );
+                println!(
+                    "DIRECTED FABRIC BOUND {} {}",
+                    self.port().layer.to_string(),
+                    traversal
+                        .payload
+                        .clone()
+                        .to_directed()
+                        .unwrap()
+                        .core()
+                        .method
+                        .to_string()
+                );
                 self.directed_fabric_bound(traversal.unwrap_directed())
                     .await;
             } else if traversal.is_reflected() && traversal.dir == TraversalDirection::Core {
                 self.reflected_core_bound(traversal.unwrap_reflected())
                     .await;
             } else if traversal.is_directed() && traversal.dir == TraversalDirection::Core {
-println!("DIRECTED CORE BOUND");
+                println!("DIRECTED CORE BOUND");
                 self.directed_core_bound(traversal.unwrap_directed()).await;
             } else if traversal.is_reflected() && traversal.dir == TraversalDirection::Fabric {
                 self.reflected_fabric_bound(traversal.unwrap_reflected())
@@ -1646,7 +1666,10 @@ println!("DIRECTED CORE BOUND");
             &self,
             traversal: Traversal<ReflectedWave>,
         ) -> Result<(), MsgErr> {
-println!("reflected fabric bound for: {}", self.port().layer.to_string() );
+            println!(
+                "reflected fabric bound for: {}",
+                self.port().layer.to_string()
+            );
             self.traverse_next(traversal.to_ultra()).await;
             Ok(())
         }
@@ -1664,13 +1687,16 @@ println!("reflected fabric bound for: {}", self.port().layer.to_string() );
 
         pub fn towards_fabric(&self, layer: &Layer) -> Option<Layer> {
             let mut layer = layer.clone();
-            let mut index:i32 =layer.ordinal() as i32;
+            let mut index: i32 = layer.ordinal() as i32;
             loop {
-                index = index -1;
+                index = index - 1;
 
                 if index < 0i32 {
                     return None;
-                } else if self.stack.contains(&Layer::from_ordinal(index as u8).unwrap()) {
+                } else if self
+                    .stack
+                    .contains(&Layer::from_ordinal(index as u8).unwrap())
+                {
                     return Some(Layer::from_ordinal(index as u8).unwrap());
                 }
             }
@@ -2227,8 +2253,12 @@ println!("reflected fabric bound for: {}", self.port().layer.to_string() );
             LOCAL_HYPERGATE.clone()
         }
 
-        pub fn remote_entry_requester() -> Self {
-            REMOTE_ENTRY_REQUESTER.clone()
+        pub fn local_endpoint() -> Self {
+            LOCAL_ENDPOINT.clone()
+        }
+
+        pub fn remote_endpoint() -> Self {
+            REMOTE_ENDPOINT.clone()
         }
 
         pub fn normalize(self) -> Result<Point, MsgErr> {
@@ -2797,6 +2827,7 @@ pub enum BaseSubKind {
     Mechtron,
     Database,
     Any,
+    Drivers
 }
 
 impl Into<Sub> for BaseSubKind {
@@ -2969,11 +3000,8 @@ pub struct StarStub {
 }
 
 impl StarStub {
-    pub fn new( key: StarKey, kind: StarSub ) -> Self {
-        Self {
-            key,
-            kind
-        }
+    pub fn new(key: StarKey, kind: StarSub) -> Self {
+        Self { key, kind }
     }
 }
 
@@ -3286,14 +3314,15 @@ impl Traversal<UltraWave> {
         let clone = self.clone();
         match self.payload {
             UltraWave::Ping(ping) => clone.with(ping.to_singular_directed()),
-            UltraWave::Ripple(ripple) => clone.with(ripple.to_singular_directed().expect("singular directed")),
+            UltraWave::Ripple(ripple) => {
+                clone.with(ripple.to_singular_directed().expect("singular directed"))
+            }
             UltraWave::Signal(signal) => clone.with(signal.to_singular_directed()),
             _ => {
                 panic!("cannot call this unless you are sure it's a DirectedWave")
             }
         }
     }
-
 
     pub fn unwrap_reflected(self) -> Traversal<ReflectedWave> {
         let clone = self.clone();

@@ -2,30 +2,28 @@ use crate::driver::{
     Core, CoreSkel, Driver, DriverFactory, DriverLifecycleCall, DriverSkel, DriverStatus,
 };
 use crate::star::{LayerInjectionRouter, StarSkel};
-use crate::Platform;
-use cosmic_api::command::request::create::PointFactoryU64;
+use crate::{Platform, Registry};
+use cosmic_api::command::request::create::{Create, PointFactoryU64, TemplateDef};
 use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{Kind, Layer, Point, ToPoint, ToPort};
+use cosmic_api::id::id::{Kind, Layer, Point, Port, ToPoint, ToPort};
 use cosmic_api::id::{StarSub, TraversalInjection};
 use cosmic_api::substance::substance::Substance;
-use cosmic_api::sys::{Assign, InterchangeKind, InterchangeSpecific};
+use cosmic_api::sys::{Assign, InterchangeKind, ControlPattern, Greet, Knock, AssignmentKind};
 use cosmic_api::wave::Agent::Anonymous;
-use cosmic_api::wave::RecipientSelector;
+use cosmic_api::wave::{DirectedProto, RecipientSelector};
 use cosmic_api::wave::{
     Agent, CoreBounce, DirectedHandler, InCtx, ProtoTransmitter, ProtoTransmitterBuilder,
     RootInCtx, Signal, UltraWave, Wave,
 };
 use cosmic_api::wave::{DirectedHandlerSelector, SetStrategy, TxRouter};
-use cosmic_api::State;
-use cosmic_hyperlane::{
-    AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, HyperGate, Hyperway, HyperwayExt,
-    HyperwayInterchange, InterchangeGate,
-};
+use cosmic_api::{Registration, State};
+use cosmic_hyperlane::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, HyperAuthenticator, HyperConnectionErr, HyperGate, HyperGreeter, Hyperway, HyperwayExt, HyperwayInterchange, HyperwayStub, InterchangeGate};
 use dashmap::DashMap;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
+use cosmic_api::command::command::common::StateSrc;
 
 pub struct ControlDriverFactory<P>
 where
@@ -69,6 +67,7 @@ where
 }
 use cosmic_api::config::config::bind::RouteSelector;
 use cosmic_api::parse::route_attribute;
+use cosmic_api::particle::particle::{Details, Status, Stub};
 use cosmic_api::util::log;
 use cosmic_api::wave::ReflectedCore;
 
@@ -247,18 +246,22 @@ println!("post logger.... ");
         let remote_point_factory =
             Arc::new(PointFactoryU64::new(point.clone(), "control-".to_string()));
         let auth = AnonHyperAuthenticatorAssignEndPoint::new(remote_point_factory);
-        let interchange = Arc::new(HyperwayInterchange::new(logger.clone()));
+        let mut interchange = HyperwayInterchange::new(logger.clone());
 println!("creating Hyperway");
-        let hyperway = Hyperway::new(Point::from_str("LOCAL::control")?, Agent::HyperUser);
+        let hyperway = Hyperway::new(Point::remote_endpoint().to_port(), Agent::HyperUser);
 println!("mounting hyperway_ext.... ");
         let mut hyperway_ext = hyperway.mount().await;
 println!("adding INTERNAL.... ");
-        interchange.internal(hyperway);
+        interchange.add(hyperway);
+        interchange.singular_to(Point::remote_endpoint().to_port());
+        let interchange = Arc::new(interchange);
         let external_router = Arc::new(TxRouter::new(hyperway_ext.tx.clone()));
         self.external_router = Some(external_router.clone());
 
+        let greeter = ControlGreeter {};
+
 println!("NOW TO CREATE TEH GATE...");
-        let gate = Arc::new(InterchangeGate::new(auth, interchange, logger));
+        let gate = Arc::new(InterchangeGate::new(auth, greeter,interchange, logger));
         {
             let runner_tx = self.runner_tx.clone();
             tokio::spawn(async move {
@@ -273,7 +276,7 @@ println!("NOW TO CREATE TEH GATE...");
             .machine
             .api
             .add_interchange(
-                InterchangeKind::Control(InterchangeSpecific::Exact(self.skel.point.clone())),
+                InterchangeKind::Control(ControlPattern::Star(self.skel.point.clone())),
                 gate.clone(),
             )
             .await?;
@@ -283,7 +286,7 @@ println!("NOW TO CREATE TEH GATE...");
                 .star_skel
                 .machine
                 .api
-                .add_interchange(InterchangeKind::Control(InterchangeSpecific::Any), gate)
+                .add_interchange(InterchangeKind::Control(ControlPattern::Any), gate)
                 .await?;
         }
 
@@ -369,5 +372,69 @@ pub struct ControlState {}
 impl ControlState {
     pub fn new() -> Self {
         Self {}
+    }
+}
+
+
+#[derive(Clone)]
+pub struct ControlAuth<P> where P: Platform{
+    star: Port,
+    point: Point,
+    registry: Registry<P>,
+    call_tx: mpsc::Sender<ControlCall<P>>
+}
+
+impl <P> ControlAuth<P> where P: Platform {
+    async fn create(&self, agent: Agent) -> Result<Point,P::Err> {
+        let index = self.registry.sequence(&self.point).await?;
+        let point = self.point.push(format!("control-{}",index) )?;
+        let registration = Registration {
+            point: point.clone(),
+            kind: Kind::Control,
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: agent.to_point()
+        };
+        self.registry.register(&registration).await?;
+
+        let assign = Assign {
+            kind: AssignmentKind::Create,
+
+            details: Details {
+                stub: Stub {
+                    point: point.clone(),
+                    kind: Kind::Control,
+                    status: Status::Ready
+                },
+                properties: Default::default()
+            },
+            state: StateSrc::None
+        };
+        let mut ping = DirectedProto::new();
+        ping.agent(Agent::HyperUser);
+        ping.to(self.star.clone());
+        ping.from(self.point.clone().to_port());
+
+        Ok(point.clone())
+    }
+}
+
+#[async_trait]
+impl <P> HyperAuthenticator for ControlAuth<P> where P: Platform {
+    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, HyperConnectionErr> {
+        unimplemented!()
+    }
+}
+
+#[derive(Clone)]
+pub struct ControlGreeter{
+}
+
+
+
+#[async_trait]
+impl HyperGreeter for ControlGreeter {
+    async fn greet(&self, stub: HyperwayStub) -> Result<Greet,MsgErr> {
+        unimplemented!()
     }
 }
