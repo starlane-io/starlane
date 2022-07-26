@@ -158,12 +158,11 @@ where
         let drivers = self.drivers.clone();
         tokio::spawn( async move {
             for driver in drivers.values() {
+                // gotta get rid of this Unwrap here:
                 let status = driver.status().await.unwrap();
                 if status != DriverStatus::Ready && status != DriverStatus::Initializing {
-                    println!("init0 : > {}", driver.kind.to_string());
                     match driver.lifecycle(DriverLifecycleCall::Init).await {
                         Ok(status) => {
-                            println!("status: {} ", status.to_string());
                             if status != DriverStatus::Ready {
                                 errs.push(MsgErr::from_500(format!("driver '{}' is not in the Ready state after Init", driver.kind.to_string())));
                             }
@@ -264,7 +263,6 @@ where
     async fn start_inner_traversal(&self, traversal: Traversal<UltraWave>) {}
 
     pub async fn visit(&self, traversal: Traversal<UltraWave>) {
-        println!("Visiting Drivers...");
         if traversal.dir.is_core() {
             match self.drivers.get(&traversal.record.details.stub.kind) {
                 None => {
@@ -316,7 +314,6 @@ impl DriverApi {
     }
 
     pub async fn traversal(&self, traversal: Traversal<UltraWave>) {
-        println!("sending along driver: {}", self.kind.to_string());
         self.tx.send(DriverShellCall::Traversal(traversal)).await;
     }
 
@@ -483,12 +480,10 @@ where
         let ctx = RootInCtx::new(direct.payload, to, logger, transmitter);
         match self.ex.handle(ctx).await {
             CoreBounce::Absorbed => {
-                println!("---> ABSORBED <----");
             }
             CoreBounce::Reflected(reflected) => {
                 let wave = reflection.unwrap().make(reflected, self.port.clone());
                 let wave = wave.to_ultra();
-                println!("---> REFLECTED <-----");
                 #[cfg(test)]
                 self.skel
                     .diagnostic_interceptors
@@ -572,10 +567,8 @@ where
     fn start(mut self) {
         tokio::spawn(async move {
             while let Some(call) = self.rx.recv().await {
-                println!("received Driver Shell Call! ");
                 match call {
                     DriverShellCall::LifecycleCall { call, tx } => {
-println!("LIFECYCLE CALL");
                         let result = self.lifecycle(call).await;
                         match result {
                             Ok(status) => {
@@ -589,15 +582,12 @@ println!("LIFECYCLE CALL");
                         }
                     }
                     DriverShellCall::Status(tx) => {
-println!("STAtus call");
                         tx.send(self.status.clone());
                     }
                     DriverShellCall::Traversal(traversal) => {
-                        println!("Driver Shell Traversal:  ");
                         self.traverse(traversal).await;
                     }
                     DriverShellCall::Handle { wave, tx } => {
-                        println!("Handle wave! {}", wave.core().method.to_string());
                         let port = wave.to().clone().unwrap_single();
                         let logger = self.skel.logger.point(port.clone().to_point()).span();
                         let router = Arc::new(self.router.clone());
@@ -910,7 +900,6 @@ impl <P> DriverDriverRunner<P> where P: Platform {
     }
 
     async fn create(&self, point: Point, kind: Kind ) -> Result<(),P::Err> {
-println!("===> CREATING {}", kind.to_string() );
         let registration = Registration {
             point: point.clone(),
             kind: Kind::Base(BaseSubKind::Drivers),
@@ -941,17 +930,13 @@ println!("===> CREATING {}", kind.to_string() );
         ping.to(self.skel.point.clone().to_port());
         ping.from(self.point.clone().to_port());
 
-println!("~~GOT HERE!");
         let pong: Wave<Pong> = self.skel.gravity_transmitter.direct(ping).await?;
-println!("~~AND HERE!");
         if !pong.core.status.is_success() {
             return Err(MsgErr::from_500(format!("failed to assign driver: {}", kind.to_string())).into());
         }
         self.skel.registry
             .set_status(&point, &Status::Ready)
             .await?;
-
-        println!("===> CREATED!  {}", kind.to_string() );
 
         Ok(())
     }

@@ -70,7 +70,6 @@ where
     P: Platform + 'static,
 {
     pub fn create_field(&self, port: Port) {
-        println!("create field: {}", port.to_string());
         self.field.insert(port.clone(), FieldState::new(port));
     }
 
@@ -158,7 +157,6 @@ where
     }
 
     pub fn find_field(&self, port: &Port) -> Result<FieldState<P>, MsgErr> {
-        println!("port: {}", port.to_string());
         let rtn = self
             .field
             .get(port)
@@ -346,10 +344,8 @@ where
             let call_tx = call_tx.clone();
             tokio::spawn(async move {
                 while let Some(traversal) = traverse_to_next_rx.recv().await {
-                    println!("TRAVERSE TO NEXT TX.... ");
                     match call_tx.send(StarCall::TraverseToNextLayer(traversal)).await {
                         Ok(_) => {
-                            println!("CALL TX SENT.... ");
                         }
                         Err(err) => {
                             println!("CALL TX ERR: {}", err.to_string());
@@ -374,7 +370,6 @@ where
             let call_tx = call_tx.clone();
             tokio::spawn(async move {
                 while let Some(inject) = drivers_rx.recv().await {
-                    println!("TO DRIVER....");
                     match call_tx.send(StarCall::ToDriver(inject)).await {
                         Ok(_) => {}
                         Err(_) => {
@@ -626,7 +621,6 @@ where
     fn start(mut self) {
         tokio::spawn(async move {
             while let Some(call) = self.star_rx.recv().await {
-                println!("CALL...OPEN");
                 match call {
                     StarCall::Init0(rtn) => {
                         rtn.send(self.init0().await);
@@ -648,8 +642,6 @@ where
                         }
                     }
                     StarCall::TraverseToNextLayer(traversal) => {
-                        println!("CALL TRAVERSE TO NEXT LAYER");
-
                         let layer_engine = self.layer_engine.clone();
                         tokio::spawn(async move {
                             layer_engine.traverse_to_next_layer(traversal).await;
@@ -657,13 +649,11 @@ where
                     }
                     StarCall::LayerTraversalInjection(inject) => {
                         let layer_engine = self.layer_engine.clone();
-                        println!("CALL start layer traversal...");
                         tokio::spawn(async move {
                             layer_engine
                                 .start_layer_traversal(inject.wave, &inject.injector, false)
                                 .await;
                         });
-                        println!("RTN from start later traversal!");
                     }
                     StarCall::CreateMount {
                         agent,
@@ -679,7 +669,6 @@ where
                         // phantom literally does nothing but hold the P in not test mode
                     }
                     StarCall::ToDriver(traversal) => {
-                        println!("TO DRIVER");
                         self.drivers.visit(traversal).await;
                     }
                     StarCall::ToGravity(wave) => match self.to_gravity(wave).await {
@@ -694,9 +683,7 @@ where
                     }
                 }
 
-                println!("CALL...CLOSE");
             }
-            println!("STAR SHUTDOWN");
         });
     }
 
@@ -724,13 +711,11 @@ where
             // where it's contents will be unwrapped from transport and routed to the appropriate particle
             let layer_engine = self.layer_engine.clone();
             let injector = self.injector.clone();
-            println!("FROM_HYPERWAY start layer traversal...");
             tokio::spawn(async move {
                 layer_engine
                     .start_layer_traversal(transport.to_ultra(), &injector, true)
                     .await
             });
-            println!("RTN from HYPERWAY start layer traversal...");
             Ok(())
         } else {
             self.forward(transport).await
@@ -758,7 +743,6 @@ where
             .send(wave.clone())
             .unwrap_or_default();
 
-println!("TO GRAVITY!");
         let waves =
             shard_ultrawave_by_location(wave, &self.skel.adjacents, &self.skel.registry).await?;
         for (to, wave) in waves {
@@ -768,7 +752,6 @@ println!("TO GRAVITY!");
             let transport = transport.to_signal()?;
             self.to_hyperway(transport).await?;
         }
-        println!("SHARDED TO_GRAVITY!");
         Ok(())
     }
 
@@ -1061,7 +1044,6 @@ where
             to,
             point,
         );
-println!(">>START LAYER: {}", traversal.layer.to_string());
 
 
         // in the case that we injected into a layer that is not part
@@ -1076,7 +1058,6 @@ println!(">>START LAYER: {}", traversal.layer.to_string());
             }
         }
 
-        println!(">>CRANKED UP TO LAYER: {}", traversal.layer.to_string());
 
         #[cfg(test)]
         self.skel
@@ -1098,12 +1079,10 @@ println!(">>START LAYER: {}", traversal.layer.to_string());
     async fn exit(&self, traversal: Traversal<UltraWave>) -> Result<(),MsgErr> {
         match traversal.dir {
             TraversalDirection::Fabric => {
-                println!("SENDING TO FABRIC!");
                 self.exit_up.send(traversal).await;
                 return Ok(());
             }
             TraversalDirection::Core => {
-                println!("SENDING TO DRIVERS!");
                 self.exit_down.send(traversal).await;
                 return Ok(());
             }
@@ -1111,9 +1090,7 @@ println!(">>START LAYER: {}", traversal.layer.to_string());
     }
 
     async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(), MsgErr> {
-        println!("VISIT layer called : {}", traversal.layer.to_string());
         if traversal.is_directed() && self.skel.state.topic.contains_key(&traversal.to) {
-            println!("TOPIC?");
             let topic = self.skel.state.find_topic(&traversal.to, traversal.from());
             match topic {
                 None => {
@@ -1153,7 +1130,6 @@ println!(">>START LAYER: {}", traversal.layer.to_string());
         } else {
             match traversal.layer {
                 Layer::Field => {
-                    println!("...field traversal layer...");
                     let field = FieldEx::new(
                         traversal.point.clone(),
                         self.skel.clone(),
@@ -1162,11 +1138,9 @@ println!(">>START LAYER: {}", traversal.layer.to_string());
                             .find_field(&traversal.to.clone().with_layer(Layer::Field))?,
                         traversal.logger.clone(),
                     );
-println!("visiting field.... for: {}", traversal.to.to_string());
                     field.visit(traversal).await;
                 }
                 Layer::Shell => {
-                    println!("...Shell traversal layer...");
                     let shell = ShellEx::new(
                         self.skel.clone(),
                         self.skel
@@ -1184,8 +1158,6 @@ println!("visiting field.... for: {}", traversal.to.to_string());
     }
 
     async fn traverse_to_next_layer(&self, mut traversal: Traversal<UltraWave>) {
-        println!("TRAVERSE TO NEXT LAYER:: {} ", traversal.dir.to_string());
-        println!("dest?:: {} ", traversal.dest.is_some());
         if traversal.dest.is_some() && traversal.layer == *traversal.dest.as_ref().unwrap() {
             self.visit_layer(traversal).await;
             return;
@@ -1195,7 +1167,6 @@ println!("visiting field.... for: {}", traversal.to.to_string());
         match next {
             None => match traversal.dir {
                 TraversalDirection::Fabric => {
-println!("GRAVITY");
                     self.exit_up.send(traversal).await;
                 }
                 TraversalDirection::Core => {
@@ -1205,7 +1176,6 @@ println!("GRAVITY");
                 }
             },
             Some(next) => {
-                println!("NEXT LAYER IS : {}", next.to_string());
                 self.visit_layer(traversal).await;
             }
         }
@@ -1638,7 +1608,6 @@ where
 
     #[route("Sys<Assign>")]
     pub async fn handle_assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, MsgErr> {
-println!("...*** >>>>>  HANDLE ASSIGN!!!!!!")  ;
         if let Sys::Assign(assign) = ctx.input {
 
             #[cfg(test)]
@@ -1650,9 +1619,7 @@ println!("...*** >>>>>  HANDLE ASSIGN!!!!!!")  ;
             self.star_skel.state
                 .create_shell(assign.details.stub.point.clone().to_port().with_layer(Layer::Shell));
 
-            println!("sending....");
             self.drivers_api.assign(assign.clone()).await?;
-println!("Assigned...");
             Ok(ReflectedCore::ok())
         } else {
             Err("expected Sys<Assign>".into())

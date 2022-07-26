@@ -3,7 +3,7 @@
 use cosmic_api::command::request::create::{PointFactory, PointFactoryU64, PointSegTemplate};
 use cosmic_api::error::MsgErr;
 use cosmic_api::frame::frame::PrimitiveFrame;
-use cosmic_api::id::id::{Point, Port, ToPoint, ToPort, Version};
+use cosmic_api::id::id::{Layer, Point, Port, ToPoint, ToPort, Version};
 use cosmic_api::log::{PointLogger, RootLogger};
 use cosmic_api::particle::particle::Status;
 use cosmic_api::substance::substance::{Errors, Substance, SubstanceKind, Token};
@@ -69,7 +69,12 @@ impl Hyperway {
         }
     }
 
-    pub fn filter_to( &mut self, to: Port ) {
+    pub fn transform_inbound(&mut self, transform: Box<dyn HyperTransform> ) {
+        self.inbound.tx.try_send(HyperlaneCall::Transform(transform));
+    }
+
+
+    pub fn transform_to(&mut self, to: Port ) {
         self.inbound.tx.try_send(HyperlaneCall::Transform(Box::new(ToTransform::new(to))));
     }
 
@@ -217,6 +222,27 @@ impl HyperTransform for AgentTransform {
         wave
     }
 }
+
+pub struct LayerTransform {
+    layer: Layer
+}
+
+impl LayerTransform {
+    pub fn new(layer: Layer) -> Self {
+        Self {
+            layer
+        }
+    }
+}
+
+impl HyperTransform for LayerTransform {
+    fn filter(&self, mut wave: UltraWave) -> UltraWave {
+        let to = wave.to().clone().to_single().unwrap().with_layer(self.layer.clone());
+        wave.set_to(to);
+        wave
+    }
+}
+
 
 pub struct ToTransform {
     to: Port
@@ -402,15 +428,18 @@ impl HyperwayInterchange {
                         HyperwayInterchangeCall::Remove(point) => {
                             hyperways.remove(&point);
                         }
-                        HyperwayInterchangeCall::Wave(wave) => match wave.to().single_or() {
-                            Ok(to) => match hyperways.get(&to) {
-                                None => {}
-                                Some(hyperway) => {
-                                    hyperway.outbound.send(wave).await;
+                        HyperwayInterchangeCall::Wave(wave) => {
+                            match wave.to().single_or() {
+                                Ok(to) => match hyperways.get(&to) {
+                                    None => {
+                                    }
+                                    Some(hyperway) => {
+                                        hyperway.outbound.send(wave).await;
+                                    }
+                                },
+                                Err(_) => {
+                                    logger.warn("Hyperway Interchange cannot route Ripples, instead wrap in a Hop or Transport");
                                 }
-                            },
-                            Err(_) => {
-                                logger.warn("Hyperway Interchange cannot route Ripples, instead wrap in a Hop or Transport");
                             }
                         },
                         HyperwayInterchangeCall::Mount { stub, tx } => {
@@ -448,7 +477,7 @@ impl HyperwayInterchange {
 
     pub fn add(&self, mut hyperway: Hyperway) {
         if let Some(to) = self.singular_to.as_ref() {
-            hyperway.filter_to(to.clone());
+            hyperway.transform_to(to.clone());
         }
         let call_tx = self.call_tx.clone();
         tokio::spawn(async move {

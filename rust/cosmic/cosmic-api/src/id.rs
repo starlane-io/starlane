@@ -1595,40 +1595,24 @@ pub mod id {
 
         async fn visit(&self, traversal: Traversal<UltraWave>) {
             if let Some(dest) = &traversal.dest {
-                println!("dest: {}", dest.to_string());
                 if self.port().layer == *dest {
                     if traversal.is_directed() {
-                        println!("DELIVERY DIRECTED");
                         self.deliver_directed(traversal.unwrap_directed()).await;
                     } else {
                         self.deliver_reflected(traversal.unwrap_reflected()).await;
                     }
                     return;
                 } else {
-                    println!("HUH???");
                 }
             }
 
             if traversal.is_directed() && traversal.dir == TraversalDirection::Fabric {
-                println!(
-                    "DIRECTED FABRIC BOUND {} {}",
-                    self.port().layer.to_string(),
-                    traversal
-                        .payload
-                        .clone()
-                        .to_directed()
-                        .unwrap()
-                        .core()
-                        .method
-                        .to_string()
-                );
                 self.directed_fabric_bound(traversal.unwrap_directed())
                     .await;
             } else if traversal.is_reflected() && traversal.dir == TraversalDirection::Core {
                 self.reflected_core_bound(traversal.unwrap_reflected())
                     .await;
             } else if traversal.is_directed() && traversal.dir == TraversalDirection::Core {
-                println!("DIRECTED CORE BOUND");
                 self.directed_core_bound(traversal.unwrap_directed()).await;
             } else if traversal.is_reflected() && traversal.dir == TraversalDirection::Fabric {
                 self.reflected_fabric_bound(traversal.unwrap_reflected())
@@ -1666,10 +1650,7 @@ pub mod id {
             &self,
             traversal: Traversal<ReflectedWave>,
         ) -> Result<(), MsgErr> {
-            println!(
-                "reflected fabric bound for: {}",
-                self.port().layer.to_string()
-            );
+
             self.traverse_next(traversal.to_ultra()).await;
             Ok(())
         }

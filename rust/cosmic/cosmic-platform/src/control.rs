@@ -88,7 +88,6 @@ where
 
     #[route("Cmd<Bounce>")]
     pub async fn bounce(&self, ctx: InCtx<'_, ()>) -> Result<ReflectedCore, MsgErr> {
-        println!("........!!!!!!!!! BOUNCE !!!!!!!!!!...........");
         let mut core = ReflectedCore::new();
         Ok(core)
     }
@@ -237,21 +236,15 @@ where
 
     async fn init(&mut self) -> Result<(), MsgErr> {
         self.status = DriverStatus::Initializing;
-println!("time to INIT controls");
         let point = self.skel.star_skel.point.push("controls").unwrap();
-println!("point is {}",point.to_string());
         let logger = self.skel.star_skel.logger.point(point.clone());
         //let logger = self.skel.star_skel.logger.clone();
-println!("post logger.... ");
         let remote_point_factory =
             Arc::new(PointFactoryU64::new(point.clone(), "control-".to_string()));
         let auth = AnonHyperAuthenticatorAssignEndPoint::new(remote_point_factory);
         let mut interchange = HyperwayInterchange::new(logger.clone());
-println!("creating Hyperway");
         let hyperway = Hyperway::new(Point::remote_endpoint().to_port(), Agent::HyperUser);
-println!("mounting hyperway_ext.... ");
         let mut hyperway_ext = hyperway.mount().await;
-println!("adding INTERNAL.... ");
         interchange.add(hyperway);
         interchange.singular_to(Point::remote_endpoint().to_port());
         let interchange = Arc::new(interchange);
@@ -260,7 +253,6 @@ println!("adding INTERNAL.... ");
 
         let greeter = ControlGreeter {};
 
-println!("NOW TO CREATE TEH GATE...");
         let gate = Arc::new(InterchangeGate::new(auth, greeter,interchange, logger));
         {
             let runner_tx = self.runner_tx.clone();

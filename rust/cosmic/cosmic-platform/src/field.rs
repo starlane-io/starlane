@@ -100,10 +100,8 @@ where
     }
 
     async fn handle_action(&self, action: RequestAction) -> Result<(), MsgErr> {
-        println!("HANDLE ACTION");
         match action.action {
             PipeAction::CoreDirected(mut request) => {
-                println!("CORE DIRECTED");
                 self.traverse_next(request.wrap()).await;
             }
             PipeAction::FabricDirected(mut request) => {
@@ -134,11 +132,9 @@ where
     fn static_bind(&self, kind: &Kind) -> Option<ArtRef<BindConfig>> {
         match kind.to_base() {
             BaseKind::Star => {
-                println!("RETURN STAR BIND");
                 Some(STAR_BIND_CONFIG.clone())
             }
             BaseKind::Control => {
-                println!("RETURN CONTROL BIND");
                 Some(CONTROL_BIND_CONFIG.clone())
             }
             _ => None,
@@ -156,7 +152,6 @@ where
     }
 
     async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
-        println!("FIELD TRAVERSING NEXT!");
         self.skel.traverse_to_next_tx.send(traversal).await;
     }
 
@@ -169,7 +164,6 @@ where
         mut directed: Traversal<DirectedWave>,
     ) -> Result<(), MsgErr> {
 
-        println!("FieldEx directed_core_bound!");
         directed
             .logger
             .set_span_attr("message-id", &directed.id().to_string());
@@ -202,16 +196,13 @@ where
             }
         }
 
-        println!("PRE BIND");
         let bind = match self.static_bind(&directed.record.details.stub.kind) {
             None => self.skel.machine.artifacts.bind(&directed.to).await?,
             Some(bind) => bind,
         };
 
         //let bind = self.static_bind(&directed.record.details.stub.kind).expect("Bind");
-        println!("GOT BIND!");
         let route = bind.select(&directed.payload)?;
-        println!("ROUTE SELECTED");
         let regex = route.selector.path.clone();
 
         let env = {
@@ -224,7 +215,6 @@ where
             env
         };
 
-        println!("got HERE");
         let directed_id = directed.id().to_string();
 
         let pipeline = route.block.clone();
@@ -246,7 +236,6 @@ where
             }
         };
 
-        println!("NOW HERE");
         if let PipeAction::Respond = action {
             self.skel
                 .traverse_to_next_tx
@@ -262,9 +251,7 @@ where
             action,
         };
 
-        println!("HANDLE ACTION...");
         self.handle_action(action).await?;
-        println!("ACTION HANDLED.");
         Ok(())
     }
 

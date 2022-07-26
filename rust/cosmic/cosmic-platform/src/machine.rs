@@ -9,7 +9,7 @@ use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{InterchangeKind, Knock};
 use cosmic_api::wave::{Agent, HyperWave, UltraWave};
 use cosmic_api::ArtifactApi;
-use cosmic_hyperlane::{HyperClient, HyperConnectionErr, HyperGate, HyperGateSelector, HyperRouter, Hyperway, HyperwayExt, HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, SimpleGreeter, TokenAuthenticatorWithRemoteWhitelist};
+use cosmic_hyperlane::{HyperClient, HyperConnectionErr, HyperGate, HyperGateSelector, HyperRouter, Hyperway, HyperwayExt, HyperwayInterchange, HyperwayStub, InterchangeGate, LayerTransform, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, SimpleGreeter, TokenAuthenticatorWithRemoteWhitelist};
 use dashmap::DashMap;
 use futures::future::{BoxFuture, join_all};
 use std::collections::{HashMap, HashSet};
@@ -167,7 +167,9 @@ where
 
             let star_hop = star_point.clone().to_port().with_layer(Layer::Gravity);
 
-            let hyperway = Hyperway::new(star_hop.clone(), Agent::HyperUser );
+            let mut hyperway = Hyperway::new(star_hop.clone(), Agent::HyperUser );
+            hyperway.transform_inbound(Box::new(LayerTransform::new(Layer::Gravity)));
+
             let hyperway_ext = hyperway.mount().await;
             interchange.add(hyperway);
             interchange.singular_to(star_port.clone() );

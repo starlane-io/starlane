@@ -1979,6 +1979,16 @@ pub enum Recipients {
     Stars,
 }
 
+impl ToString for Recipients {
+    fn to_string(&self) -> String {
+        match self {
+            Recipients::Single(port) => port.to_string(),
+            Recipients::Multi(_) => "Multi".to_string(),
+            Recipients::Watchers(_) => "Watchers".to_string(),
+            Recipients::Stars => "Stars".to_string()
+        }
+    }
+}
 
 impl ToRecipients for Recipients {
     fn to_recipients(self) -> Recipients {
