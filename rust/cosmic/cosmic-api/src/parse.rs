@@ -111,6 +111,11 @@ pub fn local_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
     tag("LOCAL")(input).map(|(next, _)| (next, RouteSeg::Local))
 }
 
+pub fn remote_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
+    tag("REMOTE")(input).map(|(next, _)| (next, RouteSeg::Remote))
+}
+
+
 pub fn global_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
     tag("GLOBAL")(input).map(|(next, _)| (next, RouteSeg::Global))
 }
@@ -136,6 +141,7 @@ pub fn other_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
         domain_route_segment,
         global_route_segment,
         local_route_segment,
+        remote_route_segment,
     ))(input)
 }
 
