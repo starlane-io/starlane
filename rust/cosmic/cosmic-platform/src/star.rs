@@ -293,7 +293,7 @@ pub enum StarCall<P>
 where
     P: Platform,
 {
-    PreInit(oneshot::Sender<Result<Status, P::Err>>),
+    Init0(oneshot::Sender<Result<Status, P::Err>>),
     Stub(oneshot::Sender<StarStub>),
     FromHyperway {
         wave: UltraWave,
@@ -424,10 +424,10 @@ where
         Self { kind, tx }
     }
 
-    pub async fn pre_init(&self) -> Result<Status, P::Err> {
+    pub async fn init0(&self) -> Result<Status, P::Err> {
         let (tx, mut rx) = oneshot::channel();
-        self.tx.send(StarCall::PreInit(tx)).await;
-        rx.await?
+        self.tx.send(StarCall::Init0(tx)).await;
+        P::log_deep("Star::init0",rx.await)?
     }
 
     pub async fn create_mount(&self, agent: Agent, kind: MountKind) -> Result<HyperwayExt, P::Err>
@@ -631,8 +631,8 @@ where
             while let Some(call) = self.star_rx.recv().await {
                 println!("CALL...OPEN");
                 match call {
-                    StarCall::PreInit(rtn) => {
-                        rtn.send(self.pre_init().await);
+                    StarCall::Init0(rtn) => {
+                        rtn.send(self.init0().await);
                     }
                     StarCall::FromHyperway { wave, rtn } => {
                         let result = self
@@ -703,7 +703,7 @@ where
         });
     }
 
-    async fn pre_init(&self) -> Result<Status, P::Err> {
+    async fn init0(&self) -> Result<Status, P::Err> {
         self.drivers.init().await
     }
 
@@ -1576,6 +1576,8 @@ where
 
                 self.status = DriverStatus::Initializing;
 
+                self.status = DriverStatus::Ready;
+/*
                 let mut discoveries = vec![];
                 for discovery in self.search_for_stars(Search::Kinds).await? {
                     let discovery = StarDiscovery::new(
@@ -1585,6 +1587,7 @@ where
                     discoveries.push(discovery);
                 }
                 discoveries.sort();
+ */
             }
             DriverLifecycleCall::Shutdown => {}
         }

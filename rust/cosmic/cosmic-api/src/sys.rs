@@ -209,9 +209,16 @@ pub struct Created {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Hash)]
 pub enum InterchangeKind {
-    Control,
-    Portal(Option<Point>),
+    DefaultControl,
+    Control(InterchangeSpecific),
+    Portal(InterchangeSpecific),
     Star(StarKey),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Hash)]
+pub enum InterchangeSpecific {
+    Any,
+    Exact(Point)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -234,7 +241,7 @@ impl Knock {
 impl Default for Knock {
     fn default() -> Self {
         Self {
-            kind: InterchangeKind::Control,
+            kind: InterchangeKind::Control(InterchangeSpecific::Any),
             auth: Box::new(Substance::Empty),
             remote: None
         }

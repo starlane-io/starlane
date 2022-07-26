@@ -238,18 +238,19 @@ where
         Ok(machine_api)
     }
 
-    async fn pre_init(&self) -> Result<(), P::Err> {
+    async fn init0(&self) -> Result<(), P::Err> {
         let logger = self.logger.span();
-        logger.info("Machine::pre_init()");
-        let mut pre_inits = vec![];
+        logger.info("Machine::init0()");
+        let mut inits0 = vec![];
         for star in self.stars.values() {
-            pre_inits.push(star.pre_init());
+            inits0.push(star.init0());
         }
-        let results: Vec<Result<Status, P::Err>> = join_all(pre_inits).await;
+        let results: Vec<Result<Status, P::Err>> = join_all(inits0).await;
         for result in results {
             if result.is_err() {
-                logger.error("init error in star");
-                result?;
+                let err = result.unwrap_err();
+                logger.error(format!("init error in star: {}", err.to_string()));
+                return Err(err);
             }
         }
         // for now we don't really check or do anything with Drivers
@@ -257,7 +258,7 @@ where
     }
 
     async fn start(mut self) -> Result<(), P::Err> {
-        //        self.pre_init().await?;
+        self.init0().await?;
 
         while let Some(call) = self.rx.recv().await {
             match call {

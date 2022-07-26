@@ -9,6 +9,10 @@ extern crate lazy_static;
 #[macro_use]
 extern crate async_trait;
 
+#[macro_use]
+extern crate strum_macros;
+
+
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use crate::driver::DriversBuilder;
@@ -28,6 +32,7 @@ use http::StatusCode;
 use tokio::io;
 use tokio::runtime::{Handle, Runtime};
 use tokio::sync::mpsc;
+use tracing::error;
 use uuid::Uuid;
 use cosmic_api::command::command::common::SetProperties;
 use cosmic_api::command::request::delete::Delete;
@@ -365,6 +370,40 @@ pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'st
                 unimplemented!()
             }
         })
+
+
+    }
+
+    fn log<R>( result: Result<R,Self::Err> ) -> Result<R,Self::Err> {
+        if let Err(err) = result {
+            println!("ERR: {}",err.to_string());
+            Err(err)
+        } else {
+            result
+        }
+    }
+
+    fn log_ctx<R>( ctx: &str, result: Result<R,Self::Err> ) -> Result<R,Self::Err> {
+        if let Err(err) = result {
+            println!("{}: {}",ctx, err.to_string());
+            Err(err)
+        } else {
+            result
+        }
+    }
+
+    fn log_deep<R,E:ToString>( ctx: &str, result: Result<Result<R,Self::Err>,E> ) -> Result<Result<R,Self::Err>,E> {
+        match &result {
+            Ok(Err(err)) => {
+                println!("{}: {}",ctx, err.to_string());
+            }
+            Err(err) => {
+                println!("{}: {}",ctx, err.to_string());
+            }
+            Ok(_) => {
+            }
+        }
+        result
     }
 }
 

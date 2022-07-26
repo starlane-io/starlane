@@ -150,10 +150,12 @@ where
         for driver in self.drivers.values() {
             let status = driver.status().await?;
             if status != DriverStatus::Ready && status != DriverStatus::Initializing {
+println!("init0 : > {}", driver.kind.to_string());
                 match driver.lifecycle(DriverLifecycleCall::Init).await {
                     Ok(status) => {
+println!("status: {} ", status.to_string());
                         if status != DriverStatus::Ready {
-                            errs.push(MsgErr::server_error());
+                            errs.push(MsgErr::from_500(format!("driver '{}' is not in the Ready state after Init", driver.kind.to_string())));
                         }
                     }
                     Err(err) => {
@@ -165,7 +167,7 @@ where
 
         if !errs.is_empty() {
             // need to fold these errors into one
-            Err(MsgErr::server_error().into())
+            Err(errs.remove(0).into())
         } else {
             Ok(Status::Ready)
         }
@@ -555,9 +557,10 @@ where
     fn start(mut self) {
         tokio::spawn(async move {
             while let Some(call) = self.rx.recv().await {
-                println!("received Driver Shell Call!");
+                println!("received Driver Shell Call! ");
                 match call {
                     DriverShellCall::LifecycleCall { call, tx } => {
+println!("LIFECYCLE CALL");
                         let result = self.lifecycle(call).await;
                         match result {
                             Ok(status) => {
@@ -571,6 +574,7 @@ where
                         }
                     }
                     DriverShellCall::Status(tx) => {
+println!("STAtus call");
                         tx.send(self.status.clone());
                     }
                     DriverShellCall::Traversal(traversal) => {
@@ -706,14 +710,15 @@ pub enum DriverLifecycleCall {
     Shutdown,
 }
 
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum DriverStatus {
     Unknown,
     Pending,
     Initializing,
     Ready,
     Unavailable,
-    Shutdown
+    Shutdown,
+    Panic
 }
 
 #[derive(Clone, Eq, PartialEq, Hash)]

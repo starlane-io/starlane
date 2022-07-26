@@ -711,7 +711,7 @@ fn test_layer_traversal() -> Result<(), TestErr> {
             });
         }
 
-        tokio::time::timeout(Duration::from_secs(6),check_to_gravity_rx).await.expect("check_to_gravity_rx").expect("check_to_gravity_rx");
+        tokio::time::timeout(Duration::from_secs(5),check_to_gravity_rx).await.expect("check_to_gravity_rx").expect("check_to_gravity_rx");
 
         Ok(())
     })

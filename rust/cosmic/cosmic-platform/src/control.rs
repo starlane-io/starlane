@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use crate::driver::{
     Core, CoreSkel, Driver, DriverFactory, DriverLifecycleCall, DriverSkel, DriverStatus,
 };
@@ -7,8 +6,9 @@ use crate::Platform;
 use cosmic_api::command::request::create::PointFactoryU64;
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{Kind, Layer, Point, ToPoint, ToPort};
-use cosmic_api::id::TraversalInjection;
-use cosmic_api::sys::{Assign, InterchangeKind};
+use cosmic_api::id::{StarSub, TraversalInjection};
+use cosmic_api::substance::substance::Substance;
+use cosmic_api::sys::{Assign, InterchangeKind, InterchangeSpecific};
 use cosmic_api::wave::Agent::Anonymous;
 use cosmic_api::wave::RecipientSelector;
 use cosmic_api::wave::{
@@ -22,16 +22,16 @@ use cosmic_hyperlane::{
     HyperwayInterchange, InterchangeGate,
 };
 use dashmap::DashMap;
+use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
-use cosmic_api::substance::substance::Substance;
 
 pub struct ControlDriverFactory<P>
 where
     P: Platform,
 {
-    phantom: PhantomData<P>
+    phantom: PhantomData<P>,
 }
 
 impl<P> DriverFactory<P> for ControlDriverFactory<P>
@@ -47,10 +47,13 @@ where
     }
 }
 
-impl <P> ControlDriverFactory<P> where P: Platform {
+impl<P> ControlDriverFactory<P>
+where
+    P: Platform,
+{
     pub fn new() -> Self {
         Self {
-            phantom: Default::default()
+            phantom: Default::default(),
         }
     }
 }
@@ -66,6 +69,7 @@ where
 }
 use cosmic_api::config::config::bind::RouteSelector;
 use cosmic_api::parse::route_attribute;
+use cosmic_api::util::log;
 use cosmic_api::wave::ReflectedCore;
 
 #[routes]
@@ -84,8 +88,8 @@ where
     }
 
     #[route("Cmd<Bounce>")]
-    pub async fn bounce( &self, ctx: InCtx<'_,()> ) -> Result<ReflectedCore,MsgErr> {
-println!("........!!!!!!!!! BOUNCE !!!!!!!!!!...........");
+    pub async fn bounce(&self, ctx: InCtx<'_, ()>) -> Result<ReflectedCore, MsgErr> {
+        println!("........!!!!!!!!! BOUNCE !!!!!!!!!!...........");
         let mut core = ReflectedCore::new();
         Ok(core)
     }
@@ -148,7 +152,7 @@ where
         assign: Assign,
         rtn: oneshot::Sender<Result<(), MsgErr>>,
     },
-GetStatus(oneshot::Sender<DriverStatus>)
+    GetStatus(oneshot::Sender<DriverStatus>),
 }
 
 pub struct ControlDriverRunner<P>
@@ -200,14 +204,21 @@ where
         tokio::spawn(async move {
             while let Some(call) = self.runner_rx.recv().await {
                 match call {
-                    ControlCall::Lifecycle(call)=> {
-                        match call {
-                            DriverLifecycleCall::Init => {
-                                self.init().await;
+                    ControlCall::Lifecycle(call) => match call {
+                        DriverLifecycleCall::Init => {
+                            self.status = DriverStatus::Initializing;
+                            match log(self.init().await) {
+                                Ok(_) => {
+                                    self.status = DriverStatus::Ready;
+                                }
+                                Err(err) => {
+                                    self.status = DriverStatus::Panic;
+                                    self.skel.logger.error(err.to_string());
+                                }
                             }
-                            DriverLifecycleCall::Shutdown => {}
                         }
-                    }
+                        DriverLifecycleCall::Shutdown => {}
+                    },
                     ControlCall::GetCore { point, rtn } => {
                         rtn.send(self.log(self.core(&point)));
                     }
@@ -218,7 +229,7 @@ where
                         rtn.send(self.log(self.assign(assign)));
                     }
                     ControlCall::GetStatus(rtn) => {
-                        rtn.send( self.status.clone() );
+                        rtn.send(self.status.clone());
                     }
                 }
             }
@@ -227,18 +238,26 @@ where
 
     async fn init(&mut self) -> Result<(), MsgErr> {
         self.status = DriverStatus::Initializing;
+println!("time to INIT controls");
         let point = self.skel.star_skel.point.push("controls").unwrap();
+println!("point is {}",point.to_string());
         let logger = self.skel.star_skel.logger.point(point.clone());
+        //let logger = self.skel.star_skel.logger.clone();
+println!("post logger.... ");
         let remote_point_factory =
             Arc::new(PointFactoryU64::new(point.clone(), "control-".to_string()));
         let auth = AnonHyperAuthenticatorAssignEndPoint::new(remote_point_factory);
         let interchange = Arc::new(HyperwayInterchange::new(logger.clone()));
-        let hyperway = Hyperway::new(Point::from_str("REMOTE::control")?, Agent::HyperUser);
+println!("creating Hyperway");
+        let hyperway = Hyperway::new(Point::from_str("LOCAL::control")?, Agent::HyperUser);
+println!("mounting hyperway_ext.... ");
         let mut hyperway_ext = hyperway.mount().await;
+println!("adding INTERNAL.... ");
         interchange.internal(hyperway);
         let external_router = Arc::new(TxRouter::new(hyperway_ext.tx.clone()));
         self.external_router = Some(external_router.clone());
 
+println!("NOW TO CREATE TEH GATE...");
         let gate = Arc::new(InterchangeGate::new(auth, interchange, logger));
         {
             let runner_tx = self.runner_tx.clone();
@@ -249,18 +268,25 @@ where
             });
         }
 
-        match self
-            .skel
+        self.skel
             .star_skel
             .machine
             .api
-            .add_interchange(InterchangeKind::Control, gate)
-            .await
-        {
-            Ok(_) => {}
-            Err(_) => {}
+            .add_interchange(
+                InterchangeKind::Control(InterchangeSpecific::Exact(self.skel.point.clone())),
+                gate.clone(),
+            )
+            .await?;
+
+        if self.skel.star_skel.kind == StarSub::Machine {
+            self.skel
+                .star_skel
+                .machine
+                .api
+                .add_interchange(InterchangeKind::Control(InterchangeSpecific::Any), gate)
+                .await?;
         }
-        self.status = DriverStatus::Ready;
+
         Ok(())
     }
 
