@@ -3112,7 +3112,7 @@ pub struct Traversal<W> {
     pub to: Port,
 }
 
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum TraversalDirection {
     Fabric,
     Core,

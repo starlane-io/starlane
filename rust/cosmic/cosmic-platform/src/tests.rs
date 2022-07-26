@@ -479,12 +479,8 @@ fn test_layer_traversal() -> Result<(), TestErr> {
             oneshot::Sender<Result<(), ()>>,
             oneshot::Receiver<Result<(), ()>>,
         ) = oneshot::channel();
-        let (check_reflect_tx, check_reflect_rx): (
-            oneshot::Sender<UltraWave>,
-            oneshot::Receiver<UltraWave>,
-        ) = oneshot::channel();
 
-        let (final_tx, direct_rx) = oneshot::channel();
+        let (direct_tx, direct_rx) = oneshot::channel();
 
         tokio::spawn(async move {
             tokio::time::timeout(Duration::from_secs(5), check_from_hyperway_rx)
@@ -513,7 +509,7 @@ fn test_layer_traversal() -> Result<(), TestErr> {
                 .unwrap()
                 .unwrap();
 
-            final_tx.send(());
+            direct_tx.send(());
         });
 
         let platform = TestPlatform::new();
@@ -555,7 +551,7 @@ fn test_layer_traversal() -> Result<(), TestErr> {
             .start_layer_traversal_wave
             .subscribe();
         let mut transport_endpoint = skel.diagnostic_interceptors.transport_endpoint.subscribe();
-        let mut refelected_endpoint = skel.diagnostic_interceptors.reflected_endpoint.subscribe();
+        let mut reflected_endpoint = skel.diagnostic_interceptors.reflected_endpoint.subscribe();
 
         // send a 'nice' wave from Fae to Less
         let mut wave = DirectedProto::new();
@@ -689,25 +685,21 @@ fn test_layer_traversal() -> Result<(), TestErr> {
             });
         }
 
+
         // send straight out of the star (circumvent layer traversal)
         star_api.to_gravity(wave).await;
 
-        let wave = tokio::time::timeout(Duration::from_secs(5), check_reflect_rx)
-            .await
-            .expect("check_reflect_rx")
-            .unwrap();
+        let mut to_gravity_rx = skel.diagnostic_interceptors.to_gravity.subscribe();
+        let wave = tokio::time::timeout(Duration::from_secs(5), reflected_endpoint.recv()).await.expect("reflected_endpoint").expect("reflected_endpoint");
 
         let (check_to_gravity_tx, check_to_gravity_rx): (
             oneshot::Sender<Result<(), ()>>,
             oneshot::Receiver<Result<(), ()>>,
         ) = oneshot::channel();
-        let mut to_gravity_rx = skel.diagnostic_interceptors.to_gravity.subscribe();
         let wave_id = wave.id();
         {
             tokio::spawn(async move {
-                while let Ok(hop) = to_gravity_rx.recv().await {
-                    let transport = hop.unwrap_from_hop().unwrap();
-                    let wave = transport.unwrap_from_transport().unwrap();
+                while let Ok(wave) = to_gravity_rx.recv().await {
                     if wave.id() == wave_id {
                         println!("intercepted to_gravity reflection event");
                         check_to_gravity_tx.send(Ok(()));
@@ -719,7 +711,7 @@ fn test_layer_traversal() -> Result<(), TestErr> {
             });
         }
 
-        direct_rx.await;
+        tokio::time::timeout(Duration::from_secs(6),check_to_gravity_rx).await.expect("check_to_gravity_rx").expect("check_to_gravity_rx");
 
         Ok(())
     })

@@ -308,7 +308,6 @@ where
     },
     ToDriver(Traversal<UltraWave>),
     Phantom(PhantomData<P>),
-    #[cfg(test)]
     ToGravity(UltraWave),
     #[cfg(test)]
     GetSkel(oneshot::Sender<StarSkel<P>>),
@@ -343,7 +342,7 @@ where
             tokio::spawn(async move {
                 while let Some(wave) = gravity_rx.recv().await {
                     call_tx
-                        .send(StarCall::FromHyperway { wave, rtn: None })
+                        .send(StarCall::ToGravity(wave))
                         .await;
                 }
             });
@@ -686,7 +685,6 @@ where
                         println!("TO DRIVER");
                         self.drivers.visit(traversal).await;
                     }
-                    #[cfg(test)]
                     StarCall::ToGravity(wave) => match self.to_gravity(wave).await {
                         Ok(_) => {}
                         Err(err) => {
@@ -763,6 +761,7 @@ where
             .send(wave.clone())
             .unwrap_or_default();
 
+println!("TO GRAVITY!");
         let waves =
             shard_ultrawave_by_location(wave, &self.skel.adjacents, &self.skel.registry).await?;
         for (to, wave) in waves {
@@ -772,6 +771,7 @@ where
             let transport = transport.to_signal()?;
             self.to_hyperway(transport).await?;
         }
+        println!("SHARDED TO_GRAVITY!");
         Ok(())
     }
 
@@ -1070,12 +1070,16 @@ println!(">>START LAYER: {}", traversal.layer.to_string());
         // in the case that we injected into a layer that is not part
         // of this plan, we need to send the traversal to the next layer
         if !plan.has_layer(&injector.layer) {
-            traversal.next();
+            match traversal.next() {
+                None => {
+                    self.exit(traversal).await;
+                    return Ok(());
+                }
+                Some(_) => {}
+            }
         }
 
         println!(">>CRANKED UP TO LAYER: {}", traversal.layer.to_string());
-
-
 
         #[cfg(test)]
         self.skel
@@ -1090,6 +1094,21 @@ println!(">>START LAYER: {}", traversal.layer.to_string());
             Err(err) => {
                 self.skel.logger.error( format!("{}",err.to_string()));
                 Err(err.into())
+            }
+        }
+    }
+
+    async fn exit(&self, traversal: Traversal<UltraWave>) -> Result<(),MsgErr> {
+        match traversal.dir {
+            TraversalDirection::Fabric => {
+                println!("SENDING TO FABRIC!");
+                self.exit_up.send(traversal).await;
+                return Ok(());
+            }
+            TraversalDirection::Core => {
+                println!("SENDING TO DRIVERS!");
+                self.exit_down.send(traversal).await;
+                return Ok(());
             }
         }
     }
@@ -1159,25 +1178,17 @@ println!("visiting field.... for: {}", traversal.to.to_string());
                     );
                     shell.visit(traversal).await;
                 }
-                _ => match traversal.dir {
-                    TraversalDirection::Fabric => {
-println!("SENDING TO FABRIC!");
-                        self.exit_up.send(traversal).await;
-                        return Ok(());
-                    }
-                    TraversalDirection::Core => {
-                        println!("SENDING TO DRIVERS!");
-                        self.exit_down.send(traversal).await;
-                        return Ok(());
-                    }
-                },
+                _ =>{
+                    self.exit(traversal).await;
+                }
             }
         }
         Ok(())
     }
 
     async fn traverse_to_next_layer(&self, mut traversal: Traversal<UltraWave>) {
-        println!("TRAVERSE TO NEXT LAYER!");
+        println!("TRAVERSE TO NEXT LAYER:: {} ", traversal.dir.to_string());
+        println!("dest?:: {} ", traversal.dest.is_some());
         if traversal.dest.is_some() && traversal.layer == *traversal.dest.as_ref().unwrap() {
             self.visit_layer(traversal).await;
             return;
@@ -1187,7 +1198,8 @@ println!("SENDING TO FABRIC!");
         match next {
             None => match traversal.dir {
                 TraversalDirection::Fabric => {
-                    self.skel.gravity_tx.send(traversal.payload);
+println!("GRAVITY");
+                    self.exit_up.send(traversal).await;
                 }
                 TraversalDirection::Core => {
                     self.skel
@@ -1656,7 +1668,6 @@ println!("Assigned...");
             .send(ctx.wave().clone().to_ultra()).unwrap_or_default();
         let wave = ctx.input.clone();
 
-println!("@@@ !!!  received Transport ::> {}", ctx.input.clone().to_directed().unwrap().core().method.to_string());
         let injection = TraversalInjection::new(
             self.star_skel
                 .point
