@@ -424,10 +424,10 @@ where
         Self { kind, tx }
     }
 
-    pub async fn init0(&self) -> Result<Status, P::Err> {
+    pub async fn init0(&self) -> Result<Status, MsgErr> {
         let (tx, mut rx) = oneshot::channel();
         self.tx.send(StarCall::Init0(tx)).await;
-        P::log_deep("Star::init0",rx.await)?
+        P::log_deep("Star::init0",rx.await)?.map_err(|e|e.into())
     }
 
     pub async fn create_mount(&self, agent: Agent, kind: MountKind) -> Result<HyperwayExt, P::Err>

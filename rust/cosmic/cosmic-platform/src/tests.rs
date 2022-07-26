@@ -730,6 +730,7 @@ fn test_control() -> Result<(), TestErr> {
         machine_api.wait_ready().await;
 
         let star_api = machine_api.get_machine_star().await.unwrap();
+        /*
         let less = star_api
             .create_mount(Agent::HyperUser, MountKind::Control)
             .await
@@ -738,6 +739,8 @@ fn test_control() -> Result<(), TestErr> {
             .create_mount(Agent::HyperUser, MountKind::Control)
             .await
             .unwrap();
+
+         */
 
         // final_rx.await;
 
