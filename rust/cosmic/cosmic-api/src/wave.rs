@@ -5,7 +5,7 @@ use crate::config::config::bind::RouteSelector;
 use crate::error::{MsgErr, StatusErr};
 use crate::http::HttpMethod;
 use crate::id::id::{Layer, Point, Port, PortSelector, Sub, ToPoint, ToPort, Topic, Uuid, RouteSeg, PointSeg};
-use crate::log::{LogSpan, LogSpanEvent, PointLogger, SpanLogger, TrailSpanId};
+use crate::log::{LogSpan, LogSpanEvent, PointLogger, SpanLogger, Trackable, TrailSpanId};
 use crate::msg::MsgMethod;
 use crate::parse::model::Subst;
 use crate::parse::sub;
@@ -99,6 +99,59 @@ pub enum UltraWaveDef<T> where T:ToRecipients+Clone{
     Signal(Wave<Signal>),
 }
 
+impl Trackable for UltraWave {
+    fn track_id(&self) -> String {
+        self.id().to_short_string()
+    }
+
+    fn track_method(&self) -> String {
+        match self {
+            UltraWave::Ping(ping) => {ping.core.method.to_string()}
+            UltraWave::Pong(pong) => {pong.core.status.to_string()}
+            UltraWave::Ripple(ripple) => {ripple.core.method.to_string()}
+            UltraWave::Echo(echo) => {echo.core.status.to_string()}
+            UltraWave::Signal(signal) => {signal.core.method.to_string()}
+        }
+    }
+
+    fn track_payload(&self) -> String {
+        match self {
+            UltraWave::Ping(ping) => {ping.core.body.kind().to_string()}
+            UltraWave::Pong(pong) => {pong.core.body.kind().to_string()}
+            UltraWave::Ripple(ripple) => {ripple.core.body.kind().to_string()}
+            UltraWave::Echo(echo) => {echo.core.body.kind().to_string()}
+            UltraWave::Signal(signal) => {signal.core.body.kind().to_string()}
+        }
+    }
+
+    fn track_from(&self) -> String {
+        self.from().to_string()
+    }
+
+    fn track_to(&self) -> String {
+        self.to().to_string()
+    }
+
+    fn track(&self) -> bool {
+        match self {
+            UltraWave::Ping(ping) => {ping.track}
+            UltraWave::Pong(pong) => {pong.track}
+            UltraWave::Ripple(ripple) => {ripple.track}
+            UltraWave::Echo(echo) => {echo.track}
+            UltraWave::Signal(signal) => {signal.track}
+        }
+    }
+    fn track_payload_fmt(&self) -> String {
+        match self {
+            UltraWave::Signal(signal) => {signal.track_payload_fmt()}
+            UltraWave::Ping(_) => {self.track_payload()}
+            UltraWave::Pong(_) => {self.track_payload()}
+            UltraWave::Ripple(_) => {self.track_payload()}
+            UltraWave::Echo(_) => {self.track_payload()}
+        }
+    }
+}
+
 impl <T> UltraWaveDef<T> where T:ToRecipients+Clone{
 
     pub fn has_visited( &self, star: &Point ) -> bool {
@@ -153,13 +206,14 @@ impl UltraWave {
 
 
     pub fn wrap_in_transport(self, from: Port, to: Port ) -> DirectedProto {
-        let mut signal = DirectedProto::new();
+        let mut signal = DirectedProto::ping();
         signal.kind(DirectedKind::Signal);
         signal.fill(&self);
         signal.from(from);
         signal.agent(self.agent().clone());
         signal.handling(self.handling().clone());
         signal.method(SysMethod::Transport);
+        signal.track = self.track();
         signal.body(Substance::UltraWave(Box::new(self)));
         signal.to(to);
         signal
@@ -336,6 +390,17 @@ impl UltraWave {
         }
     }
 
+    pub fn track(&self) -> bool{
+        match self {
+            UltraWave::Ping(ping) => ping.track,
+            UltraWave::Pong(pong) => pong.track,
+            UltraWave::Ripple(ripple) => ripple.track,
+            UltraWave::Echo(echo) => echo.track,
+            UltraWave::Signal(signal) => signal.track,
+        }
+    }
+
+
     pub fn scope(&self) -> &Scope{
         match self {
             UltraWave::Ping(ping) => &ping.scope,
@@ -393,11 +458,15 @@ impl WaveId {
     pub fn with_uuid(kind: WaveKind, uuid: Uuid) -> Self {
         Self { uuid, kind }
     }
+
+    pub fn to_short_string(&self) -> String {
+        format!("<Wave<{}>>::{}", self.kind.to_string(), self.uuid[..8].to_string())
+    }
 }
 
 impl ToString for WaveId {
     fn to_string(&self) -> String {
-        format!("<Wave<{}>>/{}", self.kind.to_string(), self.uuid)
+        format!("<Wave<{}>>::{}", self.kind.to_string(), self.uuid)
     }
 }
 
@@ -882,7 +951,7 @@ impl Into<DirectedProto> for Wave<Ping> {
     fn into(self) -> DirectedProto {
         DirectedProto {
             to: Some(self.to.clone().to_recipients()),
-            core: Some(self.core.clone()),
+            core: DirectedCore::default(),
             id: self.id,
             from: Some(self.from),
             handling: Some(self.handling),
@@ -890,6 +959,7 @@ impl Into<DirectedProto> for Wave<Ping> {
             agent: Some(self.agent),
             kind: None,
             bounce_backs: None,
+            track: self.track
         }
     }
 }
@@ -1005,6 +1075,7 @@ pub struct ReflectedProto {
     pub agent: Option<Agent>,
     pub reflection_of: Option<WaveId>,
     pub kind: Option<ReflectedKind>,
+    pub track: bool
 }
 
 impl ReflectedProto {
@@ -1021,6 +1092,7 @@ impl ReflectedProto {
             agent: None,
             reflection_of: None,
             kind: None,
+            track: false
         }
     }
 
@@ -1132,7 +1204,7 @@ impl ReflectedProto {
             .unwrap();
         match self.kind.ok_or("missing ReflectedWave Kind")? {
             ReflectedKind::Pong => {
-                let pong = Wave::new(
+                let mut pong = Wave::new(
                     Pong::new(
                         core,
                         self.to.ok_or("ReflectedProto missing to")?,
@@ -1142,10 +1214,11 @@ impl ReflectedProto {
                     ),
                     self.from.ok_or("expected from")?,
                 );
+                pong.track = self.track;
                 Ok(pong.to_reflected())
             }
             ReflectedKind::Echo => {
-                let echo = Wave::new(
+                let mut echo = Wave::new(
                     Echo::new(
                         core,
                         self.to.ok_or("ReflectedProto missing to")?,
@@ -1154,6 +1227,7 @@ impl ReflectedProto {
                     ),
                     self.from.ok_or("expected from")?,
                 );
+                echo.track = self.track;
                 Ok(echo.to_reflected())
             }
         }
@@ -1165,12 +1239,44 @@ pub struct DirectedProto {
     pub id: WaveId,
     pub from: Option<Port>,
     pub to: Option<Recipients>,
-    pub core: Option<DirectedCore>,
+    pub core: DirectedCore,
     pub handling: Option<Handling>,
     pub scope: Option<Scope>,
     pub agent: Option<Agent>,
     pub kind: Option<DirectedKind>,
     pub bounce_backs: Option<BounceBacks>,
+    pub track: bool
+}
+impl Trackable for DirectedProto {
+    fn track_id(&self) -> String {
+        self.id.to_short_string()
+    }
+
+    fn track_method(&self) -> String {
+        self.core.method.to_string()
+    }
+
+    fn track_payload(&self) -> String {
+        self.core.body.to_string()
+    }
+
+    fn track_from(&self) -> String {
+        match &self.from{
+            None => "None".to_string(),
+            Some(from) => from.to_string()
+        }
+    }
+
+    fn track_to(&self) -> String {
+        match &self.to{
+            None => "None".to_string(),
+            Some(to) => to.to_string()
+        }
+    }
+
+    fn track(&self) -> bool {
+        self.track
+    }
 }
 
 impl DirectedProto {
@@ -1188,14 +1294,15 @@ impl DirectedProto {
                             .ok_or(MsgErr::new(500u16, "must set 'to'"))?
                             .single_or()?,
                         core: self
-                            .core
-                            .ok_or(MsgErr::new(500u16, "request core must be set"))?,
+                            .core,
+
                     },
                     self.from.ok_or(MsgErr::new(500u16, "must set 'from'"))?,
                 );
                 wave.agent = self.agent.unwrap_or_else(|| Agent::Anonymous);
                 wave.handling = self.handling.unwrap_or_else(|| Handling::default());
                 wave.scope = self.scope.unwrap_or_else(|| Scope::None);
+                wave.track = self.track;
                 wave.to_directed()
             }
             DirectedKind::Ripple => {
@@ -1203,16 +1310,16 @@ impl DirectedProto {
                     Ripple {
                         to: self.to.ok_or(MsgErr::new(500u16, "must set 'to'"))?,
                         core: self
-                            .core
-                            .ok_or(MsgErr::new(500u16, "request core must be set"))?,
+                            .core,
                         bounce_backs: self.bounce_backs.ok_or("BounceBacks must be set")?,
-                        history: Default::default()
+                        history: HashSet::default()
                     },
                     self.from.ok_or(MsgErr::new(500u16, "must set 'from'"))?,
                 );
                 wave.agent = self.agent.unwrap_or_else(|| Agent::Anonymous);
                 wave.handling = self.handling.unwrap_or_else(|| Handling::default());
                 wave.scope = self.scope.unwrap_or_else(|| Scope::None);
+                wave.track = self.track;
                 wave.to_directed()
             }
             DirectedKind::Signal => {
@@ -1223,14 +1330,14 @@ impl DirectedProto {
                             .ok_or(MsgErr::new(500u16, "must set 'to'"))?
                             .single_or()?,
                         core: self
-                            .core
-                            .ok_or(MsgErr::new(500u16, "request core must be set"))?,
+                            .core,
                     },
                     self.from.ok_or(MsgErr::new(500u16, "must set 'from'"))?,
                 );
                 wave.agent = self.agent.unwrap_or_else(|| Agent::Anonymous);
                 wave.handling = self.handling.unwrap_or_else(|| Handling::default());
                 wave.scope = self.scope.unwrap_or_else(|| Scope::None);
+                wave.track = self.track;
                 wave.to_directed()
             }
         };
@@ -1259,12 +1366,6 @@ impl DirectedProto {
     pub fn fill_from<P: ToPort>(&mut self, from: P) {
         if self.from.is_none() {
             self.from.replace(from.to_port());
-        }
-    }
-
-    pub fn fill_core(&mut self, core: DirectedCore) {
-        if self.core.is_none() {
-            self.core.replace(core);
         }
     }
 
@@ -1303,25 +1404,17 @@ impl DirectedProto {
     }
 
     pub fn body(&mut self, body: Substance) -> Result<(), MsgErr> {
-        self.core
-            .as_mut()
-            .ok_or(MsgErr::new(500u16, "core must be set before body"))?
-            .body = body;
+        self.core.body = body;
         Ok(())
     }
 
     pub fn core(&mut self, core: DirectedCore) -> Result<(), MsgErr> {
-        self.core.replace(core);
+        self.core = core;
         Ok(())
     }
 
     pub fn method<M: Into<Method>>(&mut self, method: M) -> Result<(), MsgErr> {
-        let method: Method = method.into();
-        if self.core.is_none() {
-            self.core = Some(method.into());
-        } else {
-            self.core.as_mut().unwrap().method = method;
-        }
+        self.core.method = method.into();
         Ok(())
     }
 
@@ -1335,45 +1428,47 @@ impl DirectedProto {
 }
 
 impl DirectedProto {
-    pub fn new() -> Self {
+    pub fn ping() -> Self {
         Self {
             id: WaveId::new(WaveKind::Ping),
-            from: None,
-            to: None,
-            core: None,
-            handling: None,
-            scope: None,
-            agent: None,
-            kind: None,
-            bounce_backs: None,
+            kind: Some(DirectedKind::Ping),
+            ..DirectedProto::default()
         }
     }
+
+    pub fn signal() -> Self {
+        Self {
+            id: WaveId::new(WaveKind::Signal),
+            kind: Some(DirectedKind::Signal),
+            ..DirectedProto::default()
+        }
+    }
+
+    pub fn ripple() -> Self {
+        Self {
+            id: WaveId::new(WaveKind::Ripple),
+            kind: Some(DirectedKind::Ripple),
+            ..DirectedProto::default()
+        }
+    }
+
+
 
     pub fn to_with_method<P: ToRecipients+Clone>(to: P, method: Method) -> Self {
         Self {
             id: WaveId::new(WaveKind::Ping),
-            from: None,
             to: Some(to.to_recipients()),
-            core: Some(DirectedCore::new(method)),
-            handling: None,
-            scope: None,
-            agent: None,
-            kind: None,
-            bounce_backs: None,
+            kind: Some(DirectedKind::Ping),
+            ..DirectedProto::default()
         }
     }
 
     pub fn from_core(core: DirectedCore) -> Self {
         Self {
             id: WaveId::new(WaveKind::Ping),
-            from: None,
-            to: None,
-            core: Some(core),
-            handling: None,
-            scope: None,
-            agent: None,
-            kind: None,
-            bounce_backs: None,
+            kind: Some(DirectedKind::Ping),
+            core,
+            ..DirectedProto::default()
         }
     }
 
@@ -1399,6 +1494,23 @@ impl DirectedProto {
         let method: CmdMethod = method.into();
         let method: Method = method.into();
         Self::to_with_method(to, method)
+    }
+}
+
+impl Default for DirectedProto {
+    fn default() -> Self {
+        Self {
+            id: WaveId::new(WaveKind::Ping),
+            core: DirectedCore::default(),
+            from: None,
+            to: None,
+            handling: None,
+            scope: None,
+            agent: None,
+            kind: None,
+            bounce_backs: None,
+            track: false
+        }
     }
 }
 
@@ -1591,6 +1703,51 @@ impl<'a> RecipientSelector<'a> {
 pub type DirectedWave = DirectedWaveDef<Recipients>;
 pub type SingularDirectedWave = DirectedWaveDef<Port>;
 
+impl Trackable for DirectedWave {
+    fn track_id(&self) -> String {
+        self.id().to_short_string()
+    }
+
+    fn track_method(&self) -> String {
+        match self {
+            Self::Ping(ping) => {ping.core.method.to_string()}
+            Self::Ripple(ripple) => {ripple.core.method.to_string()}
+            Self::Signal(signal) => {signal.core.method.to_string()}
+        }
+    }
+
+    fn track_payload(&self) -> String {
+        match self {
+            Self::Ping(ping) => {ping.core.body.kind().to_string()}
+            Self::Ripple(ripple) => {ripple.core.body.kind().to_string()}
+            Self::Signal(signal) => {signal.core.body.kind().to_string()}
+        }
+    }
+
+    fn track_from(&self) -> String {
+        self.from().to_string()
+    }
+
+    fn track_to(&self) -> String {
+        self.to().to_string()
+    }
+
+    fn track(&self) -> bool {
+        match self {
+            Self::Ping(ping) => {ping.track}
+            Self::Ripple(ripple) => {ripple.track}
+            Self::Signal(signal) => {signal.track}
+        }
+    }
+    fn track_payload_fmt(&self) -> String {
+        match self {
+            Self::Signal(signal) => {signal.track_payload_fmt()}
+            Self::Ping(ping) => {ping.track_payload_fmt()}
+            Self::Ripple(_) => {self.track_payload()}
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum DirectedWaveDef<T> where T: ToRecipients+Clone{
     Ping(Wave<Ping>),
@@ -1639,6 +1796,7 @@ impl DirectedWave {
             to: self.from().clone(),
             intended: self.to(),
             reflection_of: self.id().clone(),
+            track: self.track()
         })
     }
 
@@ -1676,6 +1834,50 @@ impl DirectedWave {
     }
 }
 
+impl Trackable for SingularDirectedWave {
+    fn track_id(&self) -> String {
+        self.id().to_short_string()
+    }
+
+    fn track_method(&self) -> String {
+        match self {
+            Self::Ping(ping) => {ping.core.method.to_string()}
+            Self::Ripple(ripple) => {ripple.core.method.to_string()}
+            Self::Signal(signal) => {signal.core.method.to_string()}
+        }
+    }
+
+    fn track_payload(&self) -> String {
+        match self {
+            Self::Ping(ping) => {ping.core.body.kind().to_string()}
+            Self::Ripple(ripple) => {ripple.core.body.kind().to_string()}
+            Self::Signal(signal) => {signal.core.body.kind().to_string()}
+        }
+    }
+
+    fn track_from(&self) -> String {
+        self.from().to_string()
+    }
+
+    fn track_to(&self) -> String {
+        self.to().to_string()
+    }
+
+    fn track(&self) -> bool {
+        match self {
+            Self::Ping(ping) => {ping.track}
+            Self::Ripple(ripple) => {ripple.track}
+            Self::Signal(signal) => {signal.track}
+        }
+    }
+    fn track_payload_fmt(&self) -> String {
+        match self {
+            Self::Signal(signal) => {signal.track_payload_fmt()}
+            Self::Ping(ping) => {ping.track_payload_fmt()}
+            Self::Ripple(_) => {self.track_payload()}
+        }
+    }
+}
 impl SingularDirectedWave {
     pub fn to(&self) -> Port {
         match self {
@@ -1723,6 +1925,7 @@ impl SingularDirectedWave {
             to: self.from().clone(),
             intended: self.to().to_recipients(),
             reflection_of: self.id().clone(),
+            track: self.track()
         })
     }
 
@@ -1822,16 +2025,18 @@ pub struct Reflection {
     pub to: Port,
     pub intended: Recipients,
     pub reflection_of: WaveId,
+    pub track: bool
 }
 
 impl Reflection {
     pub fn make(self, core: ReflectedCore, from: Port) -> ReflectedWave {
 
-        Wave::new(
+        let mut wave = Wave::new(
             Pong::new(core, self.to, self.intended, self.reflection_of),
             from,
-        )
-        .to_reflected()
+        );
+        wave.track = self.track;
+        wave.to_reflected()
     }
 }
 
@@ -2155,7 +2360,9 @@ pub struct Wave<V> {
     pub scope: Scope,
     pub from: Port,
     pub hops: u16,
+    pub track: bool
 }
+
 
 impl<S, V> ToSubstance<S> for Wave<V>
 where
@@ -2200,6 +2407,43 @@ impl <T> Wave<RippleDef<T>> where T: ToRecipients+Clone {
     }
 }
 
+impl Trackable for Wave<Signal> {
+    fn track_id(&self) -> String {
+        self.id.to_short_string()
+    }
+
+    fn track_method(&self) -> String {
+        self.method.to_string()
+    }
+
+    fn track_payload(&self) -> String {
+        self.core.body.kind().to_string()
+    }
+
+    fn track_from(&self) -> String {
+        self.from.to_string()
+    }
+
+    fn track_to(&self) -> String {
+        self.to.to_string()
+    }
+
+    fn track(&self) -> bool {
+        self.track
+    }
+
+    fn track_payload_fmt(&self) -> String {
+        match &self.core.body {
+            Substance::UltraWave(wave) => {
+                format!("UltraWave({})",wave.track_key_fmt())
+            }
+            _ => {
+                self.track_payload()
+            }
+        }
+    }
+}
+
 impl Wave<Signal> {
     pub fn to_ultra(self) -> UltraWave {
         UltraWave::Signal(self)
@@ -2210,12 +2454,13 @@ impl Wave<Signal> {
     }
 
     pub fn wrap_in_hop(self, from: Port, to: Port ) -> DirectedProto {
-        let mut signal = DirectedProto::new();
+        let mut signal = DirectedProto::ping();
         signal.kind(DirectedKind::Signal);
         signal.from(from);
         signal.agent(self.agent.clone());
         signal.handling(self.handling.clone());
         signal.method(SysMethod::Hop);
+        signal.track = self.track;
         signal.body(Substance::UltraWave(Box::new(self.to_ultra())));
         signal.to(to);
         signal
@@ -2261,6 +2506,43 @@ where
 
     fn to_substance_ref(&self) -> Result<&S, MsgErr> {
         self.core.to_substance_ref()
+    }
+}
+
+impl Trackable for Wave<Ping> {
+    fn track_id(&self) -> String {
+        self.id.to_short_string()
+    }
+
+    fn track_method(&self) -> String {
+        self.method.to_string()
+    }
+
+    fn track_payload(&self) -> String {
+        self.core.body.kind().to_string()
+    }
+
+    fn track_from(&self) -> String {
+        self.from.to_string()
+    }
+
+    fn track_to(&self) -> String {
+        self.to.to_string()
+    }
+
+    fn track(&self) -> bool {
+        self.track
+    }
+
+    fn track_payload_fmt(&self) -> String {
+        match &self.core.body {
+            Substance::UltraWave(wave) => {
+                format!("UltraWave({})",wave.track_key_fmt())
+            }
+            _ => {
+                self.track_payload()
+            }
+        }
     }
 }
 
@@ -2361,6 +2643,7 @@ impl<V> Wave<V> {
             variant,
             from,
             hops: 0,
+            track: false
         }
     }
 
@@ -2377,6 +2660,7 @@ impl<V> Wave<V> {
             variant,
             from: self.from,
             hops: self.hops,
+            track: false
         }
     }
 }
@@ -3358,7 +3642,7 @@ impl Default for DirectedCore {
     fn default() -> Self {
         Self {
             headers: Default::default(),
-            method: Method::Msg(Default::default()),
+            method: Method::Http(HttpMethod::Get),
             uri: Uri::from_static("/"),
             body: Substance::Empty,
         }
@@ -3680,7 +3964,7 @@ impl Exchanger {
             BounceBacks::Single => {
                 let singles = self.singles.clone();
                 tokio::spawn(async move {
-                    tokio::time::sleep_until(Instant::now() + Duration::from_secs(timeout)).await;
+                    tokio::time::sleep(Duration::from_secs(timeout)).await;
                     let id = reflected.reflection_of.as_ref().unwrap();
                     if let Some((_, tx)) = singles.remove(id) {
                         reflected.status = Some(StatusCode::from_u16(408).unwrap());
@@ -3724,7 +4008,7 @@ impl Exchanger {
                 let id = directed.id().clone();
                 let multis = self.multis.clone();
                 tokio::spawn(async move {
-                    tokio::time::sleep_until(Instant::now() + Duration::from_secs(timeout)).await;
+                    tokio::time::sleep(Duration::from_secs(timeout)).await;
                     // all we have to do is remove it, the multi loop will take care of the rest
                     multis.remove(&id);
                 });
@@ -3753,7 +4037,7 @@ impl Exchanger {
                 let multis = self.multis.clone();
                 let timeout = self.timeouts.from(wait);
                 tokio::spawn(async move {
-                    tokio::time::sleep_until(Instant::now() + Duration::from_secs(timeout)).await;
+                    tokio::time::sleep( Duration::from_secs(timeout)).await;
                     // all we have to do is remove it, the multi loop will take care of the rest
                     multis.remove(&id);
                 });

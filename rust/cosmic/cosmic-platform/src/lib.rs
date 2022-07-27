@@ -38,8 +38,10 @@ use cosmic_api::command::command::common::SetProperties;
 use cosmic_api::command::request::delete::Delete;
 use cosmic_api::command::request::query::{Query, QueryResult};
 use cosmic_api::command::request::select::{Select, SubSelect};
+use cosmic_api::fail::Timeout;
 use cosmic_api::particle::particle::{Details, Properties, Status, Stub};
 use cosmic_api::property::PropertiesConfig;
+use cosmic_api::quota::Timeouts;
 use cosmic_api::security::{Access, AccessGrant};
 use cosmic_api::selector::selector::Selector;
 use cosmic_api::sys::ParticleRecord;
@@ -410,4 +412,21 @@ pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'st
 }
 
 
+pub struct Settings {
+    pub timeouts: Timeouts
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            timeouts: Default::default()
+        }
+    }
+}
+
+#[derive(strum_macros::Display)]
+pub enum Anatomy {
+   FromHyperlane,
+   ToGravity,
+}
 

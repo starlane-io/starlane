@@ -6,7 +6,7 @@ use cosmic_api::config::config::bind::RouteSelector;
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{BaseKind, Kind, Layer, Point, Port, ToBaseKind, ToPoint, ToPort, TraversalLayer, Uuid};
 use cosmic_api::id::{BaseSubKind, StarKey, Traversal, TraversalInjection};
-use cosmic_api::log::PointLogger;
+use cosmic_api::log::{PointLogger, Tracker};
 use cosmic_api::parse::model::Subst;
 use cosmic_api::parse::route_attribute;
 use cosmic_api::particle::particle::{Details, Status, Stub};
@@ -466,6 +466,8 @@ where
     }
 
     async fn deliver_directed(&self, direct: Traversal<DirectedWave>) {
+
+        self.skel.logger.track(&direct,||Tracker::new("core:outer", "DeliverDirected"));
         let logger = self
             .skel
             .logger
@@ -588,6 +590,7 @@ where
                         self.traverse(traversal).await;
                     }
                     DriverShellCall::Handle { wave, tx } => {
+                        self.logger.track(&wave,||Tracker::new("driver:shell", "Handle"));
                         let port = wave.to().clone().unwrap_single();
                         let logger = self.skel.logger.point(port.clone().to_point()).span();
                         let router = Arc::new(self.router.clone());
@@ -900,6 +903,8 @@ impl <P> DriverDriverRunner<P> where P: Platform {
     }
 
     async fn create(&self, point: Point, kind: Kind ) -> Result<(),P::Err> {
+println!("creating {}",point.to_string());
+        let logger = self.skel.logger.push("drivers")?.push(kind.as_point_segments())?;
         let registration = Registration {
             point: point.clone(),
             kind: Kind::Base(BaseSubKind::Drivers),
@@ -923,15 +928,21 @@ impl <P> DriverDriverRunner<P> where P: Platform {
         };
 
         let assign = Assign::new( AssignmentKind::Create, details, StateSrc::None );
-        let mut ping = DirectedProto::new();
+        let mut ping = DirectedProto::ping();
         ping.kind(DirectedKind::Ping);
-        ping.body(assign.into());
         ping.method(SysMethod::Assign);
+        ping.body(Substance::Sys(Sys::Assign(assign)))?;
         ping.to(self.skel.point.clone().to_port());
         ping.from(self.point.clone().to_port());
+        ping.track = true;
 
-        let pong: Wave<Pong> = self.skel.gravity_transmitter.direct(ping).await?;
+        logger.track(&ping, || Tracker::new("init:create", "SendToStarAssign"));
+
+        let pong: Wave<Pong> = log(self.skel.gravity_transmitter.direct(ping).await)?;
+
+
         if !pong.core.status.is_success() {
+println!("Status code: {}",pong.core.status.to_string());
             return Err(MsgErr::from_500(format!("failed to assign driver: {}", kind.to_string())).into());
         }
         self.skel.registry

@@ -1113,7 +1113,7 @@ impl HyperClient {
     }
 
     pub fn reset(&self) {
-        let mut wave = DirectedProto::new();
+        let mut wave = DirectedProto::ping();
         wave.kind(DirectedKind::Signal);
         wave.from(LOCAL_CLIENT.clone().to_port());
         wave.to(LOCAL_CLIENT_RUNNER.clone().to_port());
@@ -1454,7 +1454,7 @@ pub mod test {
     }
 
     fn hello_wave() -> UltraWave {
-        let mut hello = DirectedProto::new();
+        let mut hello = DirectedProto::ping();
         hello.kind(DirectedKind::Ping);
         hello.to(FAE.clone().to_port());
         hello.from(LESS.clone().to_port());
@@ -1696,7 +1696,7 @@ pub mod test {
             });
         }
 
-        let mut hello = DirectedProto::new();
+        let mut hello = DirectedProto::ping();
         hello.kind(DirectedKind::Ping);
         hello.to(FAE.clone().to_port());
         hello.from(LESS.clone().to_port());

@@ -402,7 +402,7 @@ impl <P> ControlAuth<P> where P: Platform {
             },
             state: StateSrc::None
         };
-        let mut ping = DirectedProto::new();
+        let mut ping = DirectedProto::ping();
         ping.agent(Agent::HyperUser);
         ping.to(self.star.clone());
         ping.from(self.point.clone().to_port());

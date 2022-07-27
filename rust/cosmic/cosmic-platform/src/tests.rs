@@ -333,7 +333,7 @@ async fn create(ctx: &TestRegistryContext, particle: Point, location: Point, sta
         ),
     );
 
-    let mut wave = DirectedProto::new();
+    let mut wave = DirectedProto::ping();
     wave.kind(DirectedKind::Ping);
     wave.to(star_api.get_skel().await?.point.clone().to_port());
     wave.from(HYPERUSER.clone());
@@ -387,7 +387,7 @@ fn test_gravity_routing() -> Result<(), TestErr> {
         let mut from_hyperway_rx = skel.diagnostic_interceptors.from_hyperway.subscribe();
 
         // send a 'nice' wave from Fae to Less
-        let mut wave = DirectedProto::new();
+        let mut wave = DirectedProto::ping();
         wave.kind(DirectedKind::Ping);
         wave.from(FAE.clone().to_port());
         wave.to(LESS.clone().to_port());
@@ -554,7 +554,7 @@ fn test_layer_traversal() -> Result<(), TestErr> {
         let mut reflected_endpoint = skel.diagnostic_interceptors.reflected_endpoint.subscribe();
 
         // send a 'nice' wave from Fae to Less
-        let mut wave = DirectedProto::new();
+        let mut wave = DirectedProto::ping();
         wave.kind(DirectedKind::Ping);
         wave.from(FAE.clone().to_port());
         wave.to(LESS.clone().to_port());
@@ -732,6 +732,8 @@ fn test_control() -> Result<(), TestErr> {
         machine_api.wait_ready().await;
 
         let star_api = machine_api.get_machine_star().await.unwrap();
+
+        tokio::time::sleep(Duration::from_secs(8)).await;
         /*
         let less = star_api
             .create_mount(Agent::HyperUser, MountKind::Control)

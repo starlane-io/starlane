@@ -2,7 +2,7 @@ use crate::error::MsgErr;
 use crate::id::id::{
     BaseKind, Kind, KindParts, Layer, Point, Port, RouteSeg, Specific, Sub, ToPoint, ToPort,
 };
-use crate::log::SpanLogger;
+use crate::log::{SpanLogger, Trackable};
 use crate::parse::error::result;
 use crate::parse::{parse_star_key, CamelCase};
 use crate::particle::particle::Stub;
@@ -3119,6 +3119,32 @@ pub struct Traversal<W> {
     pub logger: SpanLogger,
     pub dir: TraversalDirection,
     pub to: Port,
+}
+
+impl <W> Trackable for Traversal<W> where W: Trackable{
+    fn track_id(&self) -> String {
+        self.payload.track_id()
+    }
+
+    fn track_method(&self) -> String {
+        self.payload.track_method()
+    }
+
+    fn track_payload(&self) -> String {
+        self.payload.track_payload()
+    }
+
+    fn track_from(&self) -> String {
+        self.payload.track_from()
+    }
+
+    fn track_to(&self) -> String {
+        self.payload.track_to()
+    }
+
+    fn track(&self) -> bool {
+        self.payload.track()
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, strum_macros::Display)]

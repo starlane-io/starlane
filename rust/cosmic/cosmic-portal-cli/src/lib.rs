@@ -49,7 +49,7 @@ impl Cli {
     }
 
     pub async fn session(&self) -> Result<CliSession<'_>, MsgErr> {
-        let mut ping = DirectedProto::new();
+        let mut ping = DirectedProto::ping();
         ping.to(self.cli_session_factory.clone());
         ping.method(MsgMethod::new("NewCliSession").unwrap());
 
@@ -97,7 +97,7 @@ impl<'a> CliSession<'a> {
             line: raw.to_string(),
             transfers,
         };
-        let mut req: DirectedProto = DirectedProto::new();
+        let mut req: DirectedProto = DirectedProto::ping();
         req.core(raw.into())?;
         self.tx.direct(req.clone()).await
     }

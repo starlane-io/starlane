@@ -1,16 +1,20 @@
+use core::str::FromStr;
 use crate::error::MsgErr;
 use crate::id::id::{Point, ToPoint, Uuid};
 use crate::util::{timestamp, uuid};
-use crate::{cosmic_timestamp};
+use crate::{cosmic_timestamp, Selector};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::ops::Deref;
+use std::process::Output;
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use serde::{Serialize,Deserialize};
 use serde;
 use crate::command::command::common::StateSrc::Substance;
 use chrono::serde::ts_milliseconds;
+use regex::Regex;
+use crate::parse::to_string;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq,PartialEq,strum_macros::Display)]
 pub enum Level {
@@ -391,7 +395,7 @@ impl StdOutAppender {
 
 impl LogAppender for StdOutAppender {
     fn log(&self, log: Log) {
-        println!("{}",log.payload.to_string() )
+        println!("{} {}",log.point.to_string(), log.payload.to_string() )
     }
 
     fn audit(&self, log: AuditLog) {
@@ -521,6 +525,43 @@ impl PointLogger {
         self.msg(Level::Error, message );
     }
 
+    pub fn result<R,E>( &self, result: Result<R,E>) -> Result<R,E> where E: ToString {
+        match &result {
+            Ok(_) => {}
+            Err(err) => {
+                self.error(err.to_string());
+            }
+        }
+        result
+    }
+
+    pub fn result_ctx<R,E>( &self, ctx: &str, result: Result<R,E>) -> Result<R,E> where E: ToString {
+        match &result {
+            Ok(_) => {}
+            Err(err) => {
+                self.error(format!("{} {}", ctx, err.to_string()));
+            }
+        }
+        result
+    }
+
+
+    pub fn track<T,F>(&self, trackable: &T, f: F) where T: Trackable, F: FnOnce() -> Tracker
+    {
+        if trackable.track() {
+            let tracker = f();
+            self.msg( tracker.level.clone(), trackable.track_fmt(&tracker) );
+        }
+    }
+
+    pub fn track_msg<T,F,M,S>(&self, trackable: &T, f: F, m: M) where T: Trackable, F: FnOnce() -> Tracker, M: FnOnce() -> S, S: ToString
+    {
+        if trackable.track() {
+            let tracker = f();
+            let message = m().to_string();
+            self.msg( tracker.level.clone(), format!("{} {}",trackable.track_fmt(&tracker), message));
+        }
+    }
 }
 
 
@@ -776,3 +817,91 @@ pub struct AuditLog {
     pub timestamp: DateTime<Utc>,
     pub metrics: HashMap<String, String>,
 }
+
+
+pub trait Trackable {
+    fn track_id(&self) -> String;
+    fn track_method(&self) -> String;
+    fn track_payload(&self) -> String;
+    fn track_from(&self) -> String;
+    fn track_to(&self) -> String;
+    fn track(&self) -> bool;
+
+    fn track_payload_fmt(&self) -> String {
+        self.track_payload()
+    }
+
+    fn track_key_fmt(&self) -> String {
+        format!("{}::<{}>::[{}]", self.track_id(), self.track_method(), self.track_payload_fmt())
+    }
+
+    fn track_fmt(&self, tracker: &Tracker) -> String {
+        format!("{}<{}> : {} : ({} -> {})", tracker.stop, tracker.action, self.track_key_fmt(), self.track_from(), self.track_to())
+    }
+}
+
+pub struct Tracker {
+    pub stop: String,
+    pub action: String,
+    pub level: Level
+}
+
+impl Tracker {
+    pub fn new<S:ToString>( id: S, action: S) -> Self {
+        Self {
+            stop: id.to_string(),
+            action: action.to_string(),
+            level: Level::Info
+        }
+    }
+}
+
+pub type Track = TrackDef<String>;
+pub type TrackRegex = TrackDef<Regex>;
+
+#[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq,Hash)]
+pub struct TrackDef<R> {
+  selector: Selector,
+  stop: R,
+  action: R
+}
+
+impl TrackRegex {
+  pub fn new<S:ToString>(selector: S, stop: S, action: S ) -> Result<Self,MsgErr> {
+      let selector = Selector::from_str(selector.to_string().as_str())?;
+      let stop = Regex::from_str(stop.to_string().as_str())?;
+      let action = Regex::from_str(action.to_string().as_str())?;
+
+      Ok(Self {
+          selector,
+          stop,
+          action
+      })
+  }
+}
+
+impl TrackDef<String> {
+    pub fn new<S:ToString>(selector: S, stop: S, action: S ) -> Result<Self,MsgErr> {
+        let selector = Selector::from_str(selector.to_string().as_str())?;
+        Regex::from_str(stop.to_string().as_str())?;
+        Regex::from_str(action.to_string().as_str())?;
+
+        let stop = stop.to_string();
+        let action = action.to_string();
+
+        Ok(Self {
+            selector,
+            stop,
+            action
+        })
+    }
+
+    pub fn to_regex(&self) -> Result<TrackRegex,MsgErr> {
+        Ok(TrackRegex {
+            selector: self.selector.clone(),
+            stop: Regex::from_str(self.stop.as_str())?,
+            action: Regex::from_str(self.action.as_str())?
+        })
+    }
+}
+

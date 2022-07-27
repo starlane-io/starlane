@@ -10,13 +10,10 @@ use cosmic_api::command::command::common::StateSrc;
 use cosmic_api::command::request::set::Set;
 use cosmic_api::config::config::bind::RouteSelector;
 use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{
-    Kind, Layer, Point, Port, PortSelector, RouteSeg, Sub, Topic, ToPoint, ToPort, TraversalLayer,
-    Uuid,
-};
+use cosmic_api::id::id::{Kind, Layer, Point, Port, PortSelector, RouteSeg, Sub, ToBaseKind, Topic, ToPoint, ToPort, TraversalLayer, Uuid};
 use cosmic_api::id::{StarKey, StarStub, StarSub, TraversalInjection};
 use cosmic_api::id::{Traversal, TraversalDirection};
-use cosmic_api::log::{PointLogger, RootLogger};
+use cosmic_api::log::{PointLogger, RootLogger, Tracker};
 use cosmic_api::parse::{Env, route_attribute};
 use cosmic_api::particle::particle::{Details, Status, Stub};
 use cosmic_api::quota::Timeouts;
@@ -694,6 +691,7 @@ where
     // receive a wave from the hyperlane... this wave should always be
     // a Wave<Signal> of the SysMethod<Hop> which should in turn contain a SysMethod<Transport> Signal
     async fn from_hyperway(&self, wave: UltraWave) -> Result<(), P::Err> {
+        self.skel.logger.track(&wave, ||Tracker::new("from_hyperway", "Receive"));
         #[cfg(test)]
         {
             let wave = wave.clone();
@@ -703,6 +701,7 @@ where
         let mut transport = wave.unwrap_from_hop()?;
         transport.inc_hops();
         if transport.hops > 255 {
+            self.skel.logger.track_msg(&transport, ||Tracker::new("from_hyperway", "HopsExceeded"),||"transport hops exceeded");
             return self.skel.err("transport signal exceeded max hops");
         }
 
@@ -711,6 +710,8 @@ where
             // where it's contents will be unwrapped from transport and routed to the appropriate particle
             let layer_engine = self.layer_engine.clone();
             let injector = self.injector.clone();
+
+            self.skel.logger.track(&transport, ||Tracker::new("from_hyperway", "SendToStartLayerTraversal"));
             tokio::spawn(async move {
                 layer_engine
                     .start_layer_traversal(transport.to_ultra(), &injector, true)
@@ -842,7 +843,7 @@ where
         if let Some(adjacent) = self.golden_path.get(star_key) {
             Ok(Some(adjacent.value().clone()))
         } else {
-            let mut ripple = DirectedProto::new();
+            let mut ripple = DirectedProto::ping();
             ripple.kind(DirectedKind::Ripple);
             ripple.method(SysMethod::Search);
             ripple.body(Substance::Sys(Sys::Search(Search::Star(star_key.clone()))));
@@ -1496,7 +1497,7 @@ where
     }
 
     async fn search_for_stars(&self, search: Search) -> Result<Vec<Discovery>, MsgErr> {
-        let mut ripple = DirectedProto::new();
+        let mut ripple = DirectedProto::ping();
         ripple.kind(DirectedKind::Ripple);
         ripple.method(SysMethod::Search);
         ripple.bounce_backs = Some(BounceBacks::Count(self.star_skel.adjacents.len()));
@@ -1619,7 +1620,10 @@ where
             self.star_skel.state
                 .create_shell(assign.details.stub.point.clone().to_port().with_layer(Layer::Shell));
 
-            self.drivers_api.assign(assign.clone()).await?;
+println!("ASSIGN {}", assign.details.stub.kind.to_string());
+            self.driver_skel.logger.result(self.drivers_api.assign(assign.clone()).await)?;
+println!("driver assign worked...");
+
             Ok(ReflectedCore::ok())
         } else {
             Err("expected Sys<Assign>".into())
