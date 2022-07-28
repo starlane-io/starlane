@@ -1,4 +1,4 @@
-use crate::driver::{Core, Driver, DriverDriver, DriverDriverFactory, DriverFactory, DriverLifecycleCall, Drivers, DriversApi, DriverSkel, DriverStatus};
+use crate::driver::{Item, Driver, DriverDriver, DriverDriverFactory, DriverFactory, DriverLifecycleCall, Drivers, DriversApi, DriverSkel, DriverStatus};
 use crate::field::{FieldEx, FieldState};
 use crate::machine::MachineSkel;
 use crate::shell::ShellEx;
@@ -10,7 +10,7 @@ use cosmic_api::command::command::common::StateSrc;
 use cosmic_api::command::request::set::Set;
 use cosmic_api::config::config::bind::RouteSelector;
 use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{Kind, Layer, Point, Port, PortSelector, RouteSeg, Sub, ToBaseKind, Topic, ToPoint, ToPort, TraversalLayer, Uuid};
+use cosmic_api::id::id::{GLOBAL_EXEC, Kind, Layer, Point, Port, PortSelector, RouteSeg, Sub, ToBaseKind, Topic, ToPoint, ToPort, TraversalLayer, Uuid};
 use cosmic_api::id::{StarKey, StarStub, StarSub, TraversalInjection};
 use cosmic_api::id::{Traversal, TraversalDirection};
 use cosmic_api::log::{PointLogger, RootLogger, Tracker};
@@ -49,6 +49,7 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock};
 use tokio::time::error::Elapsed;
 use tracing::info;
+use crate::global::Global;
 
 #[derive(Clone)]
 pub struct StarState<P>
@@ -196,6 +197,7 @@ where
     pub gravity_router: TxRouter,
     pub gravity_transmitter: ProtoTransmitter,
     pub drivers_tx: mpsc::Sender<Traversal<UltraWave>>,
+    pub global: Global<P>,
 
     #[cfg(test)]
     pub diagnostic_interceptors: DiagnosticInterceptors<P>,
@@ -239,6 +241,8 @@ where
 
         let drivers_tx = star_tx.drivers_tx.clone();
 
+        let global = Global::new( machine.registry.clone() );
+
         Self {
             key: template.key,
             point,
@@ -258,6 +262,7 @@ where
             adjacents,
             wrangles: StarWrangles::new(),
             drivers_tx,
+            global,
             #[cfg(test)]
             diagnostic_interceptors: DiagnosticInterceptors::new(),
         }
@@ -718,6 +723,15 @@ where
                     .await
             });
             Ok(())
+        } else if transport.to.point.is_global() {
+            let wave = transport.unwrap_from_transport()?;
+            match self.skel.global.handle(wave).await {
+                CoreBounce::Absorbed => {}
+                CoreBounce::Reflected(reflected) => {
+                    reflected.
+                }
+            }
+            Ok(())
         } else {
             self.forward(transport).await
         }
@@ -735,7 +749,8 @@ where
         }
     }
     // sending a wave that is from and to a particle into the fabric...
-    // here it will be wrapped into a transport for star to star delivery
+    // here it will be wrapped into a transport for star to star delivery or
+    // sent to GLOBAL::registry if addressed in such a way
     async fn to_gravity(&self, wave: UltraWave) -> Result<(), P::Err> {
         #[cfg(test)]
         self.skel
@@ -747,11 +762,15 @@ where
         let waves =
             shard_ultrawave_by_location(wave, &self.skel.adjacents, &self.skel.registry).await?;
         for (to, wave) in waves {
-            let mut transport = wave.wrap_in_transport(self.gravity.clone(), to.to_port());
-            transport.from(self.skel.point.clone().to_port());
-            let transport = transport.build()?;
-            let transport = transport.to_signal()?;
-            self.to_hyperway(transport).await?;
+            if to == *GLOBAL_EXEC {
+                self.skel.logger.result(self.skel.global.handle(wave).await)?;
+            } else {
+                let mut transport = wave.wrap_in_transport(self.gravity.clone(), to.to_port());
+                transport.from(self.skel.point.clone().to_port());
+                let transport = transport.build()?;
+                let transport = transport.to_signal()?;
+                self.to_hyperway(transport).await?;
+            }
         }
         Ok(())
     }
@@ -1563,7 +1582,7 @@ where
         Ok(self.status.clone())
     }
 
-    async fn ex(&self, point: &Point) -> Result<Box<dyn Core>,MsgErr> {
+    async fn item(&self, point: &Point) -> Result<Box<dyn Item>,MsgErr> {
         Ok(Box::new(StarCore::new(
             self.star_skel.clone(),
             self.driver_skel.clone(),
@@ -1592,7 +1611,7 @@ where
     pub drivers_api: DriversApi<P>
 }
 
-impl<P> Core for StarCore<P> where P: Platform + 'static {}
+impl<P> Item for StarCore<P> where P: Platform + 'static {}
 
 #[routes]
 impl<P> StarCore<P>

@@ -2,9 +2,12 @@ use crate::machine::MachineSkel;
 use crate::star::StarCall::LayerTraversalInjection;
 use crate::star::{LayerInjectionRouter, StarSkel, StarState, StateApi, StateCall};
 use crate::{PlatErr, Platform, RegistryApi};
+use cosmic_api::command::command::common::StateSrc;
 use cosmic_api::config::config::bind::RouteSelector;
 use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{BaseKind, Kind, Layer, Point, Port, ToBaseKind, ToPoint, ToPort, TraversalLayer, Uuid};
+use cosmic_api::id::id::{
+    BaseKind, Kind, Layer, Point, Port, ToBaseKind, ToPoint, ToPort, TraversalLayer, Uuid,
+};
 use cosmic_api::id::{BaseSubKind, StarKey, Traversal, TraversalInjection};
 use cosmic_api::log::{PointLogger, Tracker};
 use cosmic_api::parse::model::Subst;
@@ -13,29 +16,78 @@ use cosmic_api::particle::particle::{Details, Status, Stub};
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{Assign, AssignmentKind, Sys};
 use cosmic_api::util::{log, ValuePattern};
-use cosmic_api::wave::{Bounce, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, SysMethod, UltraWave, Wave, WaveKind};
-use cosmic_api::{HYPERUSER, Registration, State};
+use cosmic_api::wave::{
+    Bounce, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector, DirectedKind,
+    DirectedProto, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter,
+    ProtoTransmitterBuilder, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router,
+    SetStrategy, SysMethod, UltraWave, Wave, WaveKind,
+};
+use cosmic_api::{Registration, State, HYPERUSER};
 use dashmap::DashMap;
+use futures::future::select_all;
+use futures::FutureExt;
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
-use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
-use cosmic_api::command::command::common::StateSrc;
+use tokio::sync::oneshot::Receiver;
+use tokio::sync::watch::Ref;
+use tokio::sync::{broadcast, mpsc, oneshot, watch, RwLock};
+
+#[derive(Clone,Eq,PartialEq)]
+pub enum BootPhase {
+    Star,
+    DriverDriver,
+    Final,
+    Cross,
+}
+
+impl BootPhase {
+    pub fn init(&self, kind: &Kind) -> bool {
+        match self {
+            BootPhase::Star => kind.to_base() == BaseKind::Star,
+            BootPhase::DriverDriver => kind.to_base() == BaseKind::Driver,
+            BootPhase::Final => {
+                kind.to_base() != BaseKind::Star && kind.to_base() != BaseKind::Driver
+            }
+            BootPhase::Cross => false,
+        }
+    }
+}
+
+pub enum BootPhaseStatus {
+    Pending,
+    Initializing,
+    Ready,
+    Retry,
+    Fatal,
+}
 
 pub enum DriversCall<P>
 where
     P: Platform,
 {
-    Init(oneshot::Sender<Result<Status, P::Err>>),
+    Init {
+        phase: BootPhase,
+        watch: watch::Sender<BootPhaseStatus>,
+    },
+    AddDriver {
+        kind: Kind,
+        driver: DriverApi,
+    },
     Visit(Traversal<UltraWave>),
     Kinds(oneshot::Sender<Vec<Kind>>),
     Assign {
         assign: Assign,
         rtn: oneshot::Sender<Result<(), MsgErr>>,
     },
-    Drivers(oneshot::Sender<HashMap<Kind,DriverApi>>)
+    Drivers(oneshot::Sender<HashMap<Kind, DriverApi>>),
+    Status {
+        kind: Kind,
+        rtn: oneshot::Sender<DriverStatus>,
+    },
 }
 
 #[derive(Clone)]
@@ -64,25 +116,25 @@ where
         Ok(rtn_rx.await?)
     }
 
-    pub async fn drivers(&self) -> Result<HashMap<Kind,DriverApi>, MsgErr> {
+    pub async fn drivers(&self) -> Result<HashMap<Kind, DriverApi>, MsgErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.tx.send(DriversCall::Drivers(rtn)).await;
         Ok(rtn_rx.await?)
     }
 
-
-    pub async fn init(&self) -> Result<Status, P::Err>
-    where
-        <P as Platform>::Err: From<tokio::sync::oneshot::error::RecvError>,
-    {
-        let (rtn, mut rtn_rx) = oneshot::channel();
-        self.tx.send(DriversCall::Init(rtn)).await;
-        rtn_rx.await?
+    pub async fn init(&self, phase: BootPhase) -> watch::Receiver<BootPhaseStatus> {
+        let (watch, watch_rx) = watch::channel(BootPhaseStatus::Pending);
+        self.tx.send(DriversCall::Init { phase, watch }).await;
+        watch_rx
     }
+
     pub async fn assign(&self, assign: Assign) -> Result<(), MsgErr> {
+        println!("DriversApi ENTERING ASSIGN");
         let (rtn, rtn_rx) = oneshot::channel();
         self.tx.send(DriversCall::Assign { assign, rtn }).await;
-        Ok(rtn_rx.await??)
+        let rtn = Ok(rtn_rx.await??);
+        println!("DriversApi RETURNING FROM ASSIGN");
+        rtn
     }
 }
 
@@ -93,8 +145,11 @@ where
 {
     port: Port,
     skel: StarSkel<P>,
+    factories: HashMap<Kind, Box<dyn DriverFactory<P>>>,
     drivers: HashMap<Kind, DriverApi>,
-    rx: mpsc::Receiver<DriversCall<P>>,
+    call_rx: mpsc::Receiver<DriversCall<P>>,
+    call_tx: mpsc::Sender<DriversCall<P>>,
+    statuses_rx: Arc<DashMap<Kind, watch::Receiver<DriverStatus>>>,
 }
 
 impl<P> Drivers<P>
@@ -104,29 +159,36 @@ where
     pub fn new(
         port: Port,
         skel: StarSkel<P>,
-        drivers: HashMap<Kind, DriverApi>,
-        tx: mpsc::Sender<DriversCall<P>>,
-        rx: mpsc::Receiver<DriversCall<P>>,
+        factories: HashMap<Kind, Box<dyn DriverFactory<P>>>,
+        call_tx: mpsc::Sender<DriversCall<P>>,
+        call_rx: mpsc::Receiver<DriversCall<P>>,
     ) -> DriversApi<P> {
+        let statuses_rx = Arc::new(DashMap::new());
+        let drivers = HashMap::new();
         let mut drivers = Self {
             port,
             skel,
             drivers,
-            rx,
+            call_rx,
+            call_tx: call_tx.clone(),
+            statuses_rx,
+            factories,
         };
 
         drivers.start();
 
-        DriversApi::new(tx)
+        DriversApi::new(call_tx)
     }
 
     fn start(mut self) {
         tokio::spawn(async move {
-            while let Some(call) = self.rx.recv().await {
+            while let Some(call) = self.call_rx.recv().await {
                 match call {
-                    DriversCall::Init(rtn) => {
-                        self.init().await;
-                        rtn.send(Ok(Status::Initializing));
+                    DriversCall::Init { phase, watch } => {
+                        self.boot(phase, watch).await;
+                    }
+                    DriversCall::AddDriver { kind, driver } => {
+                        self.drivers.insert(kind, driver);
                     }
                     DriversCall::Visit(traversal) => {
                         self.visit(traversal).await;
@@ -140,62 +202,131 @@ where
                     DriversCall::Drivers(rtn) => {
                         rtn.send(self.drivers.clone()).unwrap_or_default();
                     }
+                    DriversCall::Status { .. } => {}
                 }
             }
         });
     }
 
     pub fn kinds(&self) -> Vec<Kind> {
-        let mut rtn = vec![];
-        for (kind, _) in &self.drivers {
-            rtn.push(kind.clone())
-        }
-        rtn
+        self.factories.keys().cloned().collect_vec()
     }
 
-    pub async fn init(&self){
-        let mut errs = vec![];
-        let drivers = self.drivers.clone();
-        tokio::spawn( async move {
-            for driver in drivers.values() {
-                // gotta get rid of this Unwrap here:
-                let status = driver.status().await.unwrap();
-                if status != DriverStatus::Ready && status != DriverStatus::Initializing {
-                    match driver.lifecycle(DriverLifecycleCall::Init).await {
-                        Ok(status) => {
-                            if status != DriverStatus::Ready {
-                                errs.push(MsgErr::from_500(format!("driver '{}' is not in the Ready state after Init", driver.kind.to_string())));
-                            }
+    pub async fn boot(&self, phase: BootPhase, watch: watch::Sender<BootPhaseStatus>) {
+
+        for driver in self.drivers.values() {
+            driver.signal_boot_phase(phase.clone()).await;
+        }
+
+        let mut factories = self.factories.clone();
+        factories.retain(|kind| !self.drivers.contains_key(kind));
+        factories.retain(|kind| phase.init(kind));
+
+        let call_tx = self.call_tx.clone();
+        let skel = self.skel.clone();
+        let logger = self.skel.logger.clone();
+        let statuses_rx = self.statuses_rx.clone();
+        let point = self.skel.point.push("drivers").unwrap();
+        tokio::spawn(async move {
+            watch.send(BootPhaseStatus::Initializing);
+            let mut statuses = HashMap::new();
+            for (kind, factory) in factories {
+                let point = point.push(kind.as_point_segments()).unwrap();
+                let router = Arc::new(LayerInjectionRouter::new(
+                    skel.clone(),
+                    point.clone().to_port().with_layer(Layer::Guest),
+                ));
+                let (shell_request_tx, shell_request_rx) = mpsc::channel(1024);
+                let (shell_tx, shell_rx) = mpsc::channel(1024);
+                let driver_skel = DriverSkel::new(
+                    point.clone(),
+                    router,
+                    shell_request_tx,
+                    skel.clone(),
+                    logger.point(point.clone()),
+                );
+                let (status_tx, status_rx) = watch::channel(DriverStatus::Pending);
+                statuses.insert(kind.clone(), status_rx.clone());
+                statuses_rx.insert(kind.clone(), status_rx.clone());
+
+                let call_tx = call_tx.clone();
+                let logger = logger.clone();
+                tokio::spawn(async move {
+                    let driver = factory.create(driver_skel, status_tx).await;
+                    match driver {
+                        Ok(driver) => {
+                            let shell = DriverRunner::new(
+                                point,
+                                skel.clone(),
+                                driver,
+                                shell_tx,
+                                shell_rx,
+                                status_rx.clone()
+                            );
+                            let driver = DriverApi::new(shell, factory.kind());
+                            call_tx
+                                .send(DriversCall::AddDriver { kind, driver })
+                                .await
+                                .unwrap_or_default();
                         }
                         Err(err) => {
-                            errs.push(err);
+                            logger.error(err.to_string());
+                        }
+                    }
+                });
+            }
+
+            loop {
+                let mut fatals = 0;
+                let mut retries = 0;
+                let mut readies = 0;
+
+                if statuses.is_empty() {
+                    break;
+                }
+
+                for (kind, status_rx) in statuses.iter() {
+                    match status_rx.borrow().clone() {
+                        DriverStatus::Ready => {
+                            readies = readies + 1;
+                        }
+                        DriverStatus::Retry(msg) => {
+                            logger.warn(format!("DRIVER RETRY: {} {}", kind.to_string(), msg));
+                            retries = retries + 1;
+                        }
+                        DriverStatus::Fatal(msg) => {
+                            logger.error(format!("DRIVER FATAL: {} {}", kind.to_string(), msg));
+                            fatals = fatals + 1;
+                        }
+                        _ => {
+                            break;
                         }
                     }
                 }
+
+                if readies == statuses.len() {
+                    watch.send(BootPhaseStatus::Ready);
+                    break;
+                } else if fatals > 0 {
+                    watch.send(BootPhaseStatus::Fatal);
+                    break;
+                } else if retries > 0 {
+                    watch.send(BootPhaseStatus::Retry);
+                } else {
+                    watch.send(BootPhaseStatus::Initializing);
+                }
+
+                for status_rx in statuses.iter_mut() {
+                    let mut rx = vec![];
+                    rx.push(status_rx.changed().boxed());
+                    let (result, _, _) = select_all(rx).await;
+                    if logger.result(result).is_err() {
+                        break;
+                    }
+                }
             }
-
-
-            /*
-            if !errs.is_empty() {
-                // need to fold these errors into one
-                Err(errs.remove(0).into())
-            } else {
-                Ok(Status::Ready)
-            }
-
-             */
         });
     }
-
-    /*
-    pub fn add(&mut self, factory: Box<dyn DriverFactory>) -> Result<(), MsgErr> {
-        let kind = factory.kind().clone();
-        let api = create_driver(factory, self.port.clone(), self.skel.clone())?;
-        self.drivers.insert(kind, api);
-        Ok(())
-
-    }
-     */
 }
 
 impl<P> Drivers<P>
@@ -257,7 +388,10 @@ where
      */
 
     async fn start_outer_traversal(&self, traversal: Traversal<UltraWave>) {
-        self.skel.traverse_to_next_tx.send(traversal).await;
+        let traverse_to_next_tx = self.skel.traverse_to_next_tx.clone();
+        tokio::spawn(async move {
+            traverse_to_next_tx.send(traversal).await;
+        });
     }
 
     async fn start_inner_traversal(&self, traversal: Traversal<UltraWave>) {}
@@ -272,7 +406,10 @@ where
                     ));
                 }
                 Some(driver) => {
-                    driver.traversal(traversal).await;
+                    let driver = driver.clone();
+                    tokio::spawn(async move {
+                        driver.traversal(traversal).await;
+                    });
                 }
             }
         } else {
@@ -317,71 +454,17 @@ impl DriverApi {
         self.tx.send(DriverShellCall::Traversal(traversal)).await;
     }
 
+    pub async fn signal_boot_phase(&self, phase: BootPhase ) {
+        self.tx.send(DriverShellCall::BootPhase(phase)).await;
+    }
+
     pub async fn handle(&self, wave: DirectedWave) -> Result<ReflectedCore, MsgErr> {
         let (tx, mut rx) = oneshot::channel();
         self.tx.send(DriverShellCall::Handle { wave, tx }).await;
         tokio::time::timeout(Duration::from_secs(30), rx).await??
     }
 }
-
-pub struct DriversBuilder<P> where P: Platform {
-    pub factories: HashMap<Kind, Box<dyn DriverFactory<P>>>,
-    pub logger: Option<PointLogger>,
-}
-
-impl <P> DriversBuilder<P> where P: Platform {
-    pub fn new() -> Self {
-        Self {
-            factories: HashMap::new(),
-            logger: None,
-        }
-    }
-
-    pub fn kinds(&self) -> HashSet<Kind> {
-        let mut rtn = HashSet::new();
-        for kind in self.factories.keys() {
-            rtn.insert(kind.clone());
-        }
-        rtn
-    }
-
-    pub fn add(&mut self, factory: Box<dyn DriverFactory<P>>) {
-        self.factories.insert(factory.kind().clone(), factory);
-    }
-
-    pub fn logger(&mut self, logger: PointLogger) {
-        self.logger.replace(logger);
-    }
-
-    pub fn build(
-        self,
-        drivers_port: Port,
-        skel: StarSkel<P>,
-        drivers_tx: mpsc::Sender<DriversCall<P>>,
-        drivers_rx: mpsc::Receiver<DriversCall<P>>,
-    ) -> Result<DriversApi<P>, MsgErr>
-    where
-        P: Platform + 'static,
-    {
-        if self.logger.is_none() {
-            return Err("expected point logger to be set".into());
-        }
-        let mut drivers = HashMap::new();
-        for (_, factory) in self.factories {
-            let kind = factory.kind().clone();
-            let api = create_driver(factory, drivers_port.clone(), skel.clone())?;
-            drivers.insert(kind, api);
-        }
-        Ok(Drivers::new(
-            drivers_port,
-            skel,
-            drivers,
-            drivers_tx,
-            drivers_rx,
-        ))
-    }
-}
-
+/*
 fn create_driver<P>(
     factory: Box<dyn DriverFactory<P>>,
     drivers_port: Port,
@@ -401,7 +484,7 @@ where
             while let Some(call) = rx.recv().await {
                 match call {
                     DriverShellRequest::Ex { point, tx } => {
-                        let call = DriverShellCall::Ex { point, tx };
+                        let call = DriverShellCall::Item { point, tx };
                         shell_tx.send(call).await;
                     }
                     DriverShellRequest::Assign { assign, rtn } => {
@@ -416,13 +499,15 @@ where
         skel.clone(),
         point.clone().to_port().with_layer(Layer::Guest),
     ));
-    let driver_skel = DriverSkel::new(point.clone(), router, tx, skel.clone() );
-    let core = factory.create(driver_skel);
+    let (driver_skel,status_tx,status_ctx_tx) = DriverSkel::new(point.clone(), router, tx, skel.clone());
+    let driver = factory.create(driver_skel, status_tx);
     let state = skel.state.api().with_layer(Layer::Core);
-    let shell = DriverShell::new(point, skel.clone(), core, state, shell_tx, shell_rx);
+    let shell = DriverShell::new(point, skel.clone(), driver, state, shell_tx, shell_rx);
     let api = DriverApi::new(shell, factory.kind());
     Ok(api)
 }
+
+ */
 
 pub enum DriverShellCall {
     LifecycleCall {
@@ -431,13 +516,14 @@ pub enum DriverShellCall {
     },
     Status(oneshot::Sender<DriverStatus>),
     Traversal(Traversal<UltraWave>),
+    BootPhase(BootPhase),
     Handle {
         wave: DirectedWave,
         tx: oneshot::Sender<Result<ReflectedCore, MsgErr>>,
     },
-    Ex {
+    Item {
         point: Point,
-        tx: oneshot::Sender<Result<Box<dyn Core>, MsgErr>>,
+        tx: oneshot::Sender<Result<Box<dyn Item>, MsgErr>>,
     },
     Assign {
         assign: Assign,
@@ -445,19 +531,19 @@ pub enum DriverShellCall {
     },
 }
 
-pub struct OuterCore<P>
+pub struct ItemShell<P>
 where
     P: Platform + 'static,
 {
     pub port: Port,
     pub skel: StarSkel<P>,
     pub state: Option<Arc<RwLock<dyn State>>>,
-    pub ex: Box<dyn Core>,
+    pub ex: Box<dyn Item>,
     pub router: Arc<dyn Router>,
 }
 
 #[async_trait]
-impl<P> TraversalLayer for OuterCore<P>
+impl<P> TraversalLayer for ItemShell<P>
 where
     P: Platform,
 {
@@ -466,8 +552,9 @@ where
     }
 
     async fn deliver_directed(&self, direct: Traversal<DirectedWave>) {
-
-        self.skel.logger.track(&direct,||Tracker::new("core:outer", "DeliverDirected"));
+        self.skel
+            .logger
+            .track(&direct, || Tracker::new("core:outer", "DeliverDirected"));
         let logger = self
             .skel
             .logger
@@ -481,8 +568,7 @@ where
         let reflection = direct.reflection();
         let ctx = RootInCtx::new(direct.payload, to, logger, transmitter);
         match self.ex.handle(ctx).await {
-            CoreBounce::Absorbed => {
-            }
+            CoreBounce::Absorbed => {}
             CoreBounce::Reflected(reflected) => {
                 let wave = reflection.unwrap().make(reflected, self.port.clone());
                 let wave = wave.to_ultra();
@@ -515,33 +601,33 @@ where
 }
 
 #[derive(DirectedHandler)]
-pub struct DriverShell<P>
+pub struct DriverRunner<P>
 where
     P: Platform + 'static,
 {
     point: Point,
     skel: StarSkel<P>,
     status: DriverStatus,
-    tx: mpsc::Sender<DriverShellCall>,
-    rx: mpsc::Receiver<DriverShellCall>,
-    state: StateApi,
-    driver: Box<dyn Driver>,
+    call_tx: mpsc::Sender<DriverShellCall>,
+    call_rx: mpsc::Receiver<DriverShellCall>,
+    driver: Box<dyn Driver<P>>,
     router: LayerInjectionRouter<P>,
     logger: PointLogger,
+    status_rx: watch::Receiver<DriverStatus>,
 }
 
 #[routes]
-impl<P> DriverShell<P>
+impl<P> DriverRunner<P>
 where
     P: Platform + 'static,
 {
     pub fn new(
         point: Point,
         skel: StarSkel<P>,
-        driver: Box<dyn Driver>,
-        states: StateApi,
-        tx: mpsc::Sender<DriverShellCall>,
-        rx: mpsc::Receiver<DriverShellCall>,
+        driver: Box<dyn Driver<P>>,
+        call_tx: mpsc::Sender<DriverShellCall>,
+        call_rx: mpsc::Receiver<DriverShellCall>,
+        status_rx: watch::Receiver<DriverStatus>
     ) -> mpsc::Sender<DriverShellCall> {
         let logger = skel.logger.point(point.clone());
         let router = LayerInjectionRouter::new(
@@ -553,22 +639,22 @@ where
             point,
             skel,
             status: DriverStatus::Pending,
-            tx: tx.clone(),
-            rx,
-            state: states,
+            call_tx: call_tx.clone(),
+            call_rx: call_rx,
             driver,
             router,
             logger,
+            status_rx
         };
 
         driver.start();
 
-        tx
+        call_tx
     }
 
     fn start(mut self) {
         tokio::spawn(async move {
-            while let Some(call) = self.rx.recv().await {
+            while let Some(call) = self.call_rx.recv().await {
                 match call {
                     DriverShellCall::LifecycleCall { call, tx } => {
                         let result = self.lifecycle(call).await;
@@ -590,7 +676,8 @@ where
                         self.traverse(traversal).await;
                     }
                     DriverShellCall::Handle { wave, tx } => {
-                        self.logger.track(&wave,||Tracker::new("driver:shell", "Handle"));
+                        self.logger
+                            .track(&wave, || Tracker::new("driver:shell", "Handle"));
                         let port = wave.to().clone().unwrap_single();
                         let logger = self.skel.logger.point(port.clone().to_point()).span();
                         let router = Arc::new(self.router.clone());
@@ -606,15 +693,55 @@ where
                             }
                         }
                     }
-                    DriverShellCall::Ex { point, tx } => {
-                       tx.send(self.driver.ex(&point).await);
+                    DriverShellCall::Item { point, tx } => {
+                        tx.send(self.driver.item(&point).await);
                     }
                     DriverShellCall::Assign { assign, rtn } => {
                         rtn.send(self.driver.assign(assign).await);
                     }
+                    DriverShellCall::BootPhase(phase) => {
+                        self.skel.logger.result(self.boot_phase(phase).await);
+                    }
                 }
             }
         });
+    }
+
+    async fn boot_phase( &self, phase: BootPhase ) -> Result<(),MsgErr>{
+        if phase == BootPhase::Cross {
+            let kind = self.driver.kind();
+            let details = Details {
+                stub: Stub {
+                    point: point.clone(),
+                    kind: self.driver.kind(),
+                    status: Status::Pending,
+                },
+                properties: Default::default(),
+            };
+
+            let assign = Assign::new(AssignmentKind::Create, details, StateSrc::None);
+            let mut ping = DirectedProto::ping();
+            ping.kind(DirectedKind::Ping);
+            ping.method(SysMethod::Assign);
+            ping.body(Substance::Sys(Sys::Assign(assign)))?;
+            ping.to(self.skel.point.clone().to_port());
+            ping.from(self.skel.point.clone().to_port());
+            ping.track = true;
+
+            self.logger.track(&ping, || Tracker::new("init:create", "SendToStarAssign"));
+
+            let pong: Wave<Pong> = log(self.skel.gravity_transmitter.direct(ping).await)?;
+
+            if !pong.core.status.is_success() {
+                println!("Status code: {}", pong.core.status.to_string());
+                return Err(MsgErr::from_500(format!(
+                    "failed to assign driver: {}",
+                    kind.to_string()
+                ))
+                    .into());
+            }
+        }
+        Ok(())
     }
 
     async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), MsgErr> {
@@ -631,7 +758,7 @@ where
         self.driver.lifecycle(call).await
     }
 
-    async fn core(&self, point: &Point) -> Result<OuterCore<P>, MsgErr> {
+    async fn core(&self, point: &Point) -> Result<ItemShell<P>, MsgErr> {
         let port = point.clone().to_port().with_layer(Layer::Core);
         let (tx, mut rx) = oneshot::channel();
         self.skel
@@ -643,11 +770,11 @@ where
             })
             .await;
         let state = rx.await??;
-        Ok(OuterCore {
+        Ok(ItemShell {
             port: port.clone(),
             skel: self.skel.clone(),
             state: state.clone(),
-            ex: self.driver.ex(point).await?,
+            ex: self.driver.item(point).await?,
             router: Arc::new(self.router.clone().with(port)),
         })
     }
@@ -670,46 +797,101 @@ where
 }
 
 #[derive(Clone)]
-pub struct DriverSkel<P> where P: Platform {
+pub struct DriverSkel<P>
+where
+    P: Platform,
+{
     pub point: Point,
     pub router: Arc<dyn Router>,
     pub shell_tx: mpsc::Sender<DriverShellRequest>,
     pub star_skel: StarSkel<P>,
-    pub logger: PointLogger
+    pub logger: PointLogger,
 }
 
-impl <P> DriverSkel<P> where P: Platform {
-    pub async fn ex( &self, point: Point ) -> Result<Box<dyn Core>,MsgErr> {
-        let (tx,rx) = oneshot::channel();
-        self.shell_tx.send(DriverShellRequest::Ex { point, tx }).await;
+impl<P> DriverSkel<P>
+where
+    P: Platform,
+{
+    pub fn status(&self) -> DriverStatus {
+        self.driver_status_rx.borrow().clone()
+    }
+
+    pub fn ctx_status(&self) -> DriverConStatus {
+        self.driver_ctx_status_rx.borrow().clone()
+    }
+    pub async fn item(&self, point: Point) -> Result<Box<dyn Item>, MsgErr> {
+        let (tx, rx) = oneshot::channel();
+        self.shell_tx
+            .send(DriverShellRequest::Ex { point, tx })
+            .await;
         Ok(rx.await??)
     }
 
-
-    pub fn new(point:Point, router: Arc<dyn Router>, shell_tx: mpsc::Sender<DriverShellRequest>, star_skel: StarSkel<P>) -> Self {
-        let logger = star_skel.logger.clone();
+    pub fn new(
+        point: Point,
+        router: Arc<dyn Router>,
+        shell_tx: mpsc::Sender<DriverShellRequest>,
+        star_skel: StarSkel<P>,
+        logger: PointLogger,
+    ) -> Self {
         Self {
             point,
             router,
             shell_tx,
             star_skel,
-            logger
+            logger,
         }
     }
 }
 
-pub trait DriverFactory<P>: Send+Sync where P: Platform{
+pub trait DriverFactory<P>: Send + Sync
+where
+    P: Platform,
+{
+    type Driver;
     fn kind(&self) -> Kind;
-    fn create(&self, skel: DriverSkel<P>) -> Box<dyn Driver>;
+    async fn create(
+        &self,
+        skel: DriverSkel<P>,
+        status_tx: watch::Sender<DriverStatus>,
+    ) -> Result<Box<dyn Driver<P>>, MsgErr>;
 }
 
 #[async_trait]
-pub trait Driver: DirectedHandler+Send+Sync {
+pub trait Driver<P>: DirectedHandler + Send + Sync
+where
+    P: Platform,
+    Self::Item: Item,
+{
+    type Item;
+    type Ctx;
+    type State;
+
     fn kind(&self) -> Kind;
-    async fn status(&self) -> DriverStatus;
-    async fn lifecycle(&mut self, event: DriverLifecycleCall) -> Result<DriverStatus,MsgErr>;
-    async fn ex(&self, point: &Point) -> Result<Box<dyn Core>,MsgErr>;
-    async fn assign(&self, assign: Assign ) -> Result<(), MsgErr>;
+
+    async fn init(skel: DriverSkel<P>, status_tx: watch::Sender<DriverStatus>) -> Box<dyn Self>;
+
+    async fn item(&self, point: &Point) -> Result<Box<dyn Item>, MsgErr>;
+    async fn assign(&self, assign: Assign) -> Result<(), MsgErr>;
+}
+
+pub trait States: Sync + Sync
+where
+    Self::ItemState: ItemState,
+{
+    type ItemState;
+    fn new() -> Self;
+
+    fn create(assign: Assign) -> Arc<RwLock<Self::ItemState>>;
+    fn get(point: &Point) -> Option<&Arc<RwLock<Self::ItemState>>>;
+    fn remove(point: &Point) -> Option<Arc<RwLock<Self::ItemState>>>;
+}
+
+pub trait DriverCons<P>
+where
+    P: Platform,
+{
+    fn new(skel: DriverSkel<P>, ctx_status_tx: watch::Sender<DriverConStatus>) -> Self;
 }
 
 #[derive(Clone, Eq, PartialEq, Hash)]
@@ -724,16 +906,24 @@ pub enum DriverStatus {
     Pending,
     Initializing,
     Ready,
-    Unavailable,
-    Shutdown,
-    Panic
+    Retry(String),
+    Fatal(String),
 }
 
-impl <E> From<Result<DriverStatus,E>> for DriverStatus {
+#[derive(Clone, Eq, PartialEq, Hash, strum_macros::Display)]
+pub enum DriverConStatus {
+    Pending,
+    Initializing,
+    Ready,
+    Retry(String),
+    Fatal(String),
+}
+
+impl<E> From<Result<DriverStatus, E>> for DriverStatus {
     fn from(result: Result<DriverStatus, E>) -> Self {
         match result {
             Ok(status) => status,
-            Err(_) => DriverStatus::Panic
+            Err(_) => DriverStatus::Panic,
         }
     }
 }
@@ -741,92 +931,289 @@ impl <E> From<Result<DriverStatus,E>> for DriverStatus {
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub struct DriverStatusEvent {
     pub driver: Point,
-    pub status: DriverStatus
+    pub status: DriverStatus,
 }
 
-pub trait Core: DirectedHandler+Send+Sync {
-}
+pub trait ItemState: Send + Sync {}
 
+pub trait Item: DirectedHandler + Send + Sync
+{
+    type State;
+    type Ctx;
+}
 
 pub enum DriverShellRequest {
-  Ex{ point: Point, tx: oneshot::Sender<Result<Box<dyn Core>,MsgErr>>},
-  Assign{ assign: Assign, rtn: oneshot::Sender<Result<(),MsgErr>>}
+    Ex {
+        point: Point,
+        tx: oneshot::Sender<Result<Box<dyn Item>, MsgErr>>,
+    },
+    Assign {
+        assign: Assign,
+        rtn: oneshot::Sender<Result<(), MsgErr>>,
+    },
 }
-
 
 #[derive(Clone)]
-pub struct CoreSkel<P> where P: Platform {
-   pub point: Point,
-   pub transmitter: ProtoTransmitter,
-   phantom: PhantomData<P>
+pub struct CoreSkel<P>
+where
+    P: Platform,
+{
+    pub point: Point,
+    pub transmitter: ProtoTransmitter,
+    phantom: PhantomData<P>,
 }
 
-impl <P> CoreSkel<P> where P: Platform {
-    pub fn new( point: Point, transmitter: ProtoTransmitter ) -> Self {
+impl<P> CoreSkel<P>
+where
+    P: Platform,
+{
+    pub fn new(point: Point, transmitter: ProtoTransmitter) -> Self {
         Self {
             point,
             transmitter,
-            phantom: Default::default()
+            phantom: Default::default(),
         }
     }
 }
 
-pub struct DriverDriverFactory<P> where P: Platform {
+pub struct DriverDriverFactory<P>
+where
+    P: Platform,
+{
     skel: StarSkel<P>,
-    drivers_api: DriversApi<P>
+    drivers_api: DriversApi<P>,
 }
 
-impl <P> DriverDriverFactory<P> where P: Platform {
-    pub fn new( skel:StarSkel<P>, drivers_api: DriversApi<P> )-> Self {
-        Self {
-            skel,
-            drivers_api
-        }
+impl<P> DriverDriverFactory<P>
+where
+    P: Platform,
+{
+    pub fn new(skel: StarSkel<P>, drivers_api: DriversApi<P>) -> Self {
+        Self { skel, drivers_api }
     }
 }
 
-impl <P> DriverFactory<P> for DriverDriverFactory<P> where P: Platform {
+impl<P> DriverFactory<P> for DriverDriverFactory<P>
+where
+    P: Platform,
+{
+    type Driver = DriverDriver<P>;
+
     fn kind(&self) -> Kind {
         Kind::Driver
     }
 
-    fn create(&self, skel: DriverSkel<P>) -> Box<dyn Driver> {
-        Box::new(DriverDriver::new( self.skel.clone(), self.drivers_api.clone() ))
+    fn create(
+        &self,
+        skel: DriverSkel<P>,
+        status_tx: watch::Sender<DriverStatus>,
+    ) -> Box<dyn DriverProxy> {
+        Box::new(DriverProxyWrapper::new(DriverDriverInit::new(
+            skel,
+            self.drivers_api.clone(),
+            status_tx,
+        )))
     }
 }
 
-
-#[derive(DirectedHandler)]
-pub struct DriverDriver<P> where P: Platform {
-   skel: StarSkel<P>,
-   drivers_api: DriversApi<P>,
-   call_tx: mpsc::Sender<DriverDriverCall>
+pub struct DriverDriverInit<P>
+where
+    P: Platform,
+{
+    skel: StarSkel<P>,
+    drivers_api: DriversApi<P>,
+    call_tx: mpsc::Sender<DriverDriverCall>,
 }
 
-impl <P> DriverDriver<P> where P: Platform {
-    pub fn new(skel: StarSkel<P>, drivers_api: DriversApi<P>) -> Self {
-        let call_tx = DriverDriverRunner::new(skel.clone(),drivers_api.clone());
+impl<P> DriverProxy for DriverDriverInit<P>
+where
+    P: Platform,
+{
+    fn kind(&self) -> Kind {
+        Kind::Driver
+    }
+
+    async fn item(&self, point: &Point) -> Result<Box<dyn Item>, MsgErr> {
+        Err(MsgErr::not_found())
+    }
+
+    async fn assign(&self, assign: Assign) -> Result<(), MsgErr> {
+        Err(MsgErr::not_found())
+    }
+}
+
+impl<P> DriverInit<P> for DriverDriverInit<P> where P: Platform {}
+
+#[derive(DirectedHandler)]
+pub struct DriverDriver<P>
+where
+    P: Platform,
+{
+    skel: DriverSkel<P>,
+    drivers_api: DriversApi<P>,
+    call_tx: mpsc::Sender<DriverDriverCall>,
+    status_tx: mpsc::Sender<DriverStatus>,
+}
+
+impl<P> DriverDriver<P>
+where
+    P: Platform,
+{
+    pub fn new(
+        skel: DriverSkel<P>,
+        drivers_api: DriversApi<P>,
+        status_tx: watch::Sender<DriverStatus>,
+    ) -> Self {
+        let call_tx = DriverDriverRunner::new(skel.clone(), drivers_api.clone());
         Self {
             skel,
             drivers_api,
-            call_tx
+            call_tx,
         }
     }
 }
 
 #[routes]
-impl <P> DriverDriver<P> where P: Platform {
-
-}
+impl<P> DriverDriver<P> where P: Platform {}
 
 #[async_trait]
-impl <P> Driver for DriverDriver<P> where P: Platform {
+impl<P> Driver for DriverDriver<P>
+where
+    P: Platform,
+{
+    type Item = DriverCore<P>;
+    type Ctx = ();
+    type State = ();
+
     fn kind(&self) -> Kind {
-       Kind::Driver
+        Kind::Driver
+    }
+
+    async fn init(
+        skel: DriverSkel<P>,
+        status_tx: watch::Sender<DriverStatus>,
+    ) -> Receiver<Result<Box<dyn DriverProxy>, P::Err>> {
+        let (rtn, rtn_rx) = oneshot::channel();
+        tokio::spawn(async move {
+            async fn create<P>(skel: &DriverSkel<P>, point: Point, kind: Kind) -> Result<(), P::Err>
+            where
+                P: Platform,
+            {
+                println!("creating {}", point.to_string());
+                let logger = skel
+                    .logger
+                    .push("drivers")?
+                    .push(kind.as_point_segments())?;
+                let registration = Registration {
+                    point: point.clone(),
+                    kind: Kind::Base(BaseSubKind::Drivers),
+                    registry: Default::default(),
+                    properties: Default::default(),
+                    owner: HYPERUSER.clone(),
+                };
+                skel.registry.register(&registration).await?;
+                skel.registry.assign(&point, &skel.point).await?;
+                skel.registry
+                    .set_status(&point, &Status::Initializing)
+                    .await?;
+
+                let details = Details {
+                    stub: Stub {
+                        point: point.clone(),
+                        kind: kind.clone(),
+                        status: Status::Unknown,
+                    },
+                    properties: Default::default(),
+                };
+
+                let assign = Assign::new(AssignmentKind::Create, details, StateSrc::None);
+                let mut ping = DirectedProto::ping();
+                ping.kind(DirectedKind::Ping);
+                ping.method(SysMethod::Assign);
+                ping.body(Substance::Sys(Sys::Assign(assign)))?;
+                ping.to(skel.point.clone().to_port());
+                ping.from(skel.star_skel.point.clone().to_port());
+                ping.track = true;
+
+                logger.track(&ping, || Tracker::new("init:create", "SendToStarAssign"));
+
+                let pong: Wave<Pong> = log(skel.star_skel.gravity_transmitter.direct(ping).await)?;
+
+                if !pong.core.status.is_success() {
+                    println!("Status code: {}", pong.core.status.to_string());
+                    return Err(MsgErr::from_500(format!(
+                        "failed to assign driver: {}",
+                        kind.to_string()
+                    ))
+                    .into());
+                }
+
+                Ok(())
+            }
+
+            async fn init<P>(
+                skel: &DriverSkel<P>,
+                drivers_api: &DriversApi<P>,
+            ) -> Result<(), P::Err>
+            where
+                P: Platform,
+            {
+                let drivers_point = skel.star_skel.point.push("drivers")?;
+                let registration = Registration {
+                    point: drivers_point.clone(),
+                    kind: Kind::Base(BaseSubKind::Drivers),
+                    registry: Default::default(),
+                    properties: Default::default(),
+                    owner: HYPERUSER.clone(),
+                };
+
+                skel.star_skel.registry.register(&registration).await?;
+
+                create(
+                    skel,
+                    drivers_point.clone(),
+                    Kind::Base(BaseSubKind::Drivers),
+                )
+                .await?;
+
+                for (kind, driver) in drivers_api.drivers().await? {
+                    if kind.to_base() != BaseKind::Star && kind.to_base() != BaseKind::Driver {
+                        let point = drivers_point.push(kind.as_point_segments())?;
+                        create(skel, point, kind).await?;
+                    }
+                }
+                Ok(())
+            }
+
+            let result = skel
+                .logger
+                .result_ctx("init", init(&skel, &drivers_api).await);
+            match result {
+                Ok(_) => {
+                    rtn.send(Ok(Box::new(DriverDriver::new(
+                        skel,
+                        drivers_api,
+                        status_tx,
+                    ))))
+                    .unwrap_or_default();
+                    status_tx.send(DriverStatus::Ready).unwrap_or_default();
+                }
+                Err(err) => {
+                    rtn.send(Err(err)).unwrap_or_default();
+                    status_tx
+                        .send(DriverStatus::Fatal(format!(
+                            "DriverDriverInit: {}",
+                            err.to_string()
+                        )))
+                        .unwrap_or_default();
+                }
+            }
+        });
+        rtn_rx
     }
 
     async fn status(&self) -> DriverStatus {
-        let (rtn,mut rtn_rx) = oneshot::channel();
+        let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx.send(DriverDriverCall::Status(rtn)).await;
         rtn_rx.await.into()
     }
@@ -834,44 +1221,54 @@ impl <P> Driver for DriverDriver<P> where P: Platform {
     async fn lifecycle(&mut self, event: DriverLifecycleCall) -> Result<DriverStatus, MsgErr> {
         match event {
             DriverLifecycleCall::Init => {
-                let (rtn,mut rtn_rx) = oneshot::channel();
+                let (rtn, mut rtn_rx) = oneshot::channel();
                 self.call_tx.send(DriverDriverCall::Init(rtn)).await;
                 Ok(rtn_rx.await.into())
             }
-            DriverLifecycleCall::Shutdown => {
-                Ok(DriverStatus::Shutdown)
-            }
+            DriverLifecycleCall::Shutdown => Ok(DriverStatus::Shutdown),
         }
     }
 
-    async fn ex(&self, point: &Point) -> Result<Box<dyn Core>, MsgErr> {
-        Ok(Box::new(DriverCore::new(point.clone(),self.skel.clone())))
+    async fn item(&self, point: &Point) -> Result<Box<dyn Item>, MsgErr> {
+        Ok(Box::new(DriverCore::new(point.clone(), self.skel.clone())))
     }
 
     async fn assign(&self, assign: Assign) -> Result<(), MsgErr> {
+        println!("DriverDriver Assign!");
         Ok(())
     }
 }
 
 pub enum DriverDriverCall {
     Init(oneshot::Sender<DriverStatus>),
-    Status(oneshot::Sender<DriverStatus>)
+    Status(oneshot::Sender<DriverStatus>),
 }
 
-pub struct DriverDriverRunner<P> where P: Platform {
+pub struct DriverDriverRunner<P>
+where
+    P: Platform,
+{
     skel: StarSkel<P>,
     drivers_api: DriversApi<P>,
     call_tx: mpsc::Sender<DriverDriverCall>,
     call_rx: mpsc::Receiver<DriverDriverCall>,
     status: DriverStatus,
-    point: Point
+    point: Point,
 }
 
-impl <P> DriverDriverRunner<P> where P: Platform {
-    pub fn new(skel: StarSkel<P>, drivers_api: DriversApi<P> ) -> mpsc::Sender<DriverDriverCall> {
+impl<P> DriverDriverRunner<P>
+where
+    P: Platform,
+{
+    pub fn new(skel: StarSkel<P>, drivers_api: DriversApi<P>) -> mpsc::Sender<DriverDriverCall> {
         let (call_tx, call_rx) = mpsc::channel(1024);
 
-        let point = skel.point.push("drivers").unwrap().push(Kind::Driver.as_point_segments()).unwrap();
+        let point = skel
+            .point
+            .push("drivers")
+            .unwrap()
+            .push(Kind::Driver.as_point_segments())
+            .unwrap();
 
         let runner = Self {
             skel,
@@ -879,7 +1276,7 @@ impl <P> DriverDriverRunner<P> where P: Platform {
             call_tx: call_tx.clone(),
             call_rx,
             status: DriverStatus::Pending,
-            point
+            point,
         };
 
         runner.start();
@@ -888,11 +1285,12 @@ impl <P> DriverDriverRunner<P> where P: Platform {
     }
 
     fn start(mut self) {
-        tokio::spawn( async move {
+        tokio::spawn(async move {
             while let Some(call) = self.call_rx.recv().await {
                 match call {
                     DriverDriverCall::Init(rtn) => {
-                        rtn.send(P::log_ctx("DriverDriverRunner::init()", self.init().await ).into());
+                        rtn.send(DriverStatus::Ready);
+                        P::log_ctx("DriverDriverRunner::init()", self.init().await);
                     }
                     DriverDriverCall::Status(rtn) => {
                         rtn.send(self.status.clone());
@@ -901,102 +1299,28 @@ impl <P> DriverDriverRunner<P> where P: Platform {
             }
         });
     }
-
-    async fn create(&self, point: Point, kind: Kind ) -> Result<(),P::Err> {
-println!("creating {}",point.to_string());
-        let logger = self.skel.logger.push("drivers")?.push(kind.as_point_segments())?;
-        let registration = Registration {
-            point: point.clone(),
-            kind: Kind::Base(BaseSubKind::Drivers),
-            registry: Default::default(),
-            properties: Default::default(),
-            owner: HYPERUSER.clone(),
-        };
-        self.skel.registry.register(&registration).await?;
-        self.skel.registry.assign(&point, &self.skel.point).await?;
-        self.skel.registry
-            .set_status(&point, &Status::Initializing)
-            .await?;
-
-        let details = Details {
-            stub: Stub {
-                point: point.clone(),
-                kind:  kind.clone(),
-                status: Status::Unknown
-            },
-            properties: Default::default()
-        };
-
-        let assign = Assign::new( AssignmentKind::Create, details, StateSrc::None );
-        let mut ping = DirectedProto::ping();
-        ping.kind(DirectedKind::Ping);
-        ping.method(SysMethod::Assign);
-        ping.body(Substance::Sys(Sys::Assign(assign)))?;
-        ping.to(self.skel.point.clone().to_port());
-        ping.from(self.point.clone().to_port());
-        ping.track = true;
-
-        logger.track(&ping, || Tracker::new("init:create", "SendToStarAssign"));
-
-        let pong: Wave<Pong> = log(self.skel.gravity_transmitter.direct(ping).await)?;
-
-
-        if !pong.core.status.is_success() {
-println!("Status code: {}",pong.core.status.to_string());
-            return Err(MsgErr::from_500(format!("failed to assign driver: {}", kind.to_string())).into());
-        }
-        self.skel.registry
-            .set_status(&point, &Status::Ready)
-            .await?;
-
-        Ok(())
-    }
-
-    async fn init(&mut self) -> Result<DriverStatus,P::Err> {
-        self.status = DriverStatus::Initializing;
-        let drivers_point = self.skel.point.push("drivers")?;
-        let registration = Registration {
-            point: drivers_point.clone(),
-            kind: Kind::Base(BaseSubKind::Drivers),
-            registry: Default::default(),
-            properties: Default::default(),
-            owner: HYPERUSER.clone(),
-        };
-
-        self.skel.registry.register(&registration).await?;
-
-        self.create(self.point.clone(), Kind::Driver).await?;
-
-        for (kind,driver) in self.drivers_api.drivers().await? {
-            if kind.to_base() != BaseKind::Star &&
-                kind.to_base() != BaseKind::Driver {
-                let point = drivers_point.push(kind.as_point_segments())?;
-                self.create(point, kind).await?;
-           }
-        }
-        self.status = DriverStatus::Ready;
-        Ok(DriverStatus::Ready)
-    }
-
 }
 
 #[derive(DirectedHandler)]
-pub struct DriverCore<P> where P: Platform {
+pub struct DriverCore<P>
+where
+    P: Platform,
+{
     point: Point,
-    skel: StarSkel<P>
+    skel: StarSkel<P>,
 }
 
 #[routes]
-impl <P> DriverCore<P> where P: Platform {
+impl<P> DriverCore<P>
+where
+    P: Platform,
+{
     pub fn new(point: Point, skel: StarSkel<P>) -> Self {
-        Self {
-            point,
-            skel
-        }
+        Self { point, skel }
     }
 }
 
-impl <P> Core for DriverCore<P> where P: Platform {
-
+impl<P> Item for DriverCore<P> where P: Platform {
+    type State = ();
+    type Ctx = ();
 }
-

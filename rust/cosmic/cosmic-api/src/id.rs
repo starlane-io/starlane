@@ -2218,6 +2218,13 @@ pub mod id {
             }
         }
 
+        pub fn is_global(&self) -> bool {
+            match self.route {
+                RouteSeg::Global => true
+                _ => false
+            }
+        }
+
         pub fn central() -> Self {
             GLOBAL_CENTRAL.clone()
         }

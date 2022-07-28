@@ -3051,7 +3051,37 @@ impl BroadTxRouter {
     }
 }
 
+pub struct DirectedHandlerWrapper {
+    logger: PointLogger,
+    handler: Box<dyn DirectedHandler>,
+    builder: ProtoTransmitterBuilder
+}
 
+impl DirectedHandlerWrapper {
+    pub async fn handle( &self, wave: UltraWave ) {
+        let logger = self
+            .logger
+            .point(self.port().clone().to_point())
+            .span();
+        let mut transmitter = self.builder.clone().build();
+        let to = direct.to().clone().unwrap_single();
+        let reflection = direct.reflection();
+        let ctx = RootInCtx::new(direct.payload, to, logger, transmitter);
+        match self.ex.handle(ctx).await {
+            CoreBounce::Absorbed => {}
+            CoreBounce::Reflected(reflected) => {
+                let wave = reflection.unwrap().make(reflected, self.port.clone());
+                let wave = wave.to_ultra();
+                #[cfg(test)]
+                self.skel
+                    .diagnostic_interceptors
+                    .reflected_endpoint
+                    .send(wave.clone());
+                self.inject(wave).await;
+            }
+        }
+    }
+}
 
 
 
@@ -3789,7 +3819,8 @@ pub enum CmdMethod {
     Bounce,
     Knock,
     Greet,
-    Command
+    Command,
+    RawCommand
 }
 
 impl ValueMatcher<CmdMethod> for CmdMethod {
@@ -4054,6 +4085,7 @@ impl Default for Exchanger {
     }
 }
 
+#[derive(Clone)]
 pub struct ProtoTransmitterBuilder {
     pub agent: SetStrategy<Agent>,
     pub scope: SetStrategy<Scope>,

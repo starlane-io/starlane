@@ -1,5 +1,5 @@
 use crate::driver::{
-    Core, CoreSkel, Driver, DriverFactory, DriverLifecycleCall, DriverSkel, DriverStatus,
+    Item, CoreSkel, Driver, DriverFactory, DriverLifecycleCall, DriverSkel, DriverStatus,
 };
 use crate::star::{LayerInjectionRouter, StarSkel};
 use crate::{Platform, Registry};
@@ -113,7 +113,7 @@ where
         Ok(self.status().await)
     }
 
-    async fn ex(&self, point: &Point) -> Result<Box<dyn Core>, MsgErr> {
+    async fn item(&self, point: &Point) -> Result<Box<dyn Item>, MsgErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.runner_tx
             .send(ControlCall::GetCore {
@@ -357,7 +357,7 @@ where
 }
 
 #[routes]
-impl<P> Core for ControlCore<P> where P: Platform {}
+impl<P> Item for ControlCore<P> where P: Platform {}
 
 pub struct ControlState {}
 
