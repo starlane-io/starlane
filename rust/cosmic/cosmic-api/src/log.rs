@@ -475,6 +475,15 @@ impl PointLogger {
         span
     }
 
+    pub fn spanner<S>(&self, spannable: &S) -> SpanLogger where S: Spannable {
+        let logger = self.span();
+        let mut attrs = HashMap::new();
+        attrs.insert( "type".to_string(), spannable.span_type().to_string() );
+        attrs.insert( "id".to_string(), spannable.span_id().to_string() );
+        logger.span_attr(attrs);
+        logger
+    }
+
 
     pub fn point(&self, point: Point) -> PointLogger {
         PointLogger {
@@ -605,6 +614,15 @@ impl SpanLogger {
         }
     }
 
+    pub fn spanner<S>(&self, spannable: &S) -> SpanLogger where S: Spannable {
+       let logger = self.span();
+       let mut attrs = HashMap::new();
+       attrs.insert( "type".to_string(), spannable.span_type().to_string() );
+       attrs.insert( "id".to_string(), spannable.span_id().to_string() );
+       logger.span_attr(attrs);
+       logger
+    }
+
     pub fn span_attr(&self, attr: HashMap<String,String>) -> SpanLogger {
         let mut span = LogSpan::new(self.point().clone() );
         span.attributes = attr;
@@ -692,6 +710,27 @@ impl SpanLogger {
     pub fn log_audit(&self, log: AuditLog) {
         self.root_logger.audit(log);
     }
+
+    pub fn result<R,E>( &self, result: Result<R,E>) -> Result<R,E> where E: ToString {
+        match &result {
+            Ok(_) => {}
+            Err(err) => {
+                self.error(err.to_string());
+            }
+        }
+        result
+    }
+
+    pub fn result_ctx<R,E>( &self, ctx: &str, result: Result<R,E>) -> Result<R,E> where E: ToString {
+        match &result {
+            Ok(_) => {}
+            Err(err) => {
+                self.error(format!("{} {}", ctx, err.to_string()));
+            }
+        }
+        result
+    }
+
 }
 
 impl Drop for SpanLogger {
@@ -819,6 +858,11 @@ pub struct AuditLog {
 }
 
 
+pub trait Spannable {
+    fn span_id(&self) -> String;
+    fn span_type(&self) -> &'static str;
+}
+
 pub trait Trackable {
     fn track_id(&self) -> String;
     fn track_method(&self) -> String;
@@ -836,20 +880,20 @@ pub trait Trackable {
     }
 
     fn track_fmt(&self, tracker: &Tracker) -> String {
-        format!("{}<{}> : {} : ({} -> {})", tracker.stop, tracker.action, self.track_key_fmt(), self.track_from(), self.track_to())
+        format!("{}<{}> : {} : ({} -> {})", tracker.parsec, tracker.action, self.track_key_fmt(), self.track_from(), self.track_to())
     }
 }
 
 pub struct Tracker {
-    pub stop: String,
+    pub parsec: String,
     pub action: String,
     pub level: Level
 }
 
 impl Tracker {
-    pub fn new<S:ToString>( id: S, action: S) -> Self {
+    pub fn new<S:ToString>(parsec: S, action: S) -> Self {
         Self {
-            stop: id.to_string(),
+            parsec: parsec.to_string(),
             action: action.to_string(),
             level: Level::Info
         }

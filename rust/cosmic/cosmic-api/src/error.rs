@@ -278,6 +278,14 @@ impl <C> From<tokio::sync::broadcast::error::SendError<C>> for MsgErr {
     }
 }
 
+
+impl From<tokio::sync::watch::error::RecvError> for MsgErr {
+    fn from(e: tokio::sync::watch::error::RecvError) -> Self {
+        MsgErr::from_500(e.to_string())
+    }
+}
+
+
 impl From<String> for MsgErr {
     fn from(message: String) -> Self {
         Self::Status {

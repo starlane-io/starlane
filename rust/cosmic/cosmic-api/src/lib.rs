@@ -543,6 +543,13 @@ pub struct Registration {
     pub registry: SetRegistry,
     pub properties: SetProperties,
     pub owner: Point,
+    pub strategy: RegistrationStrategy
+}
+
+#[derive(Clone)]
+pub enum RegistrationStrategy{
+    FailOnDupe,
+    Overwrite
 }
 
 #[derive(Clone)]

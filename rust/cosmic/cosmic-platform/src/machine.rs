@@ -153,12 +153,9 @@ where
             let mut drivers = skel.platform.drivers_builder(&star_template.kind);
             let drivers_point = star_point.push("drivers".to_string()).unwrap();
             let logger = skel.logger.point(drivers_point.clone());
-            drivers.logger.replace(logger.clone());
 
             let mut star_tx: StarTx<P> = StarTx::new(star_point.clone());
-            let call_tx = star_tx.call_tx.clone();
-            let call_rx = star_tx.star_rx().unwrap();
-            let star_skel = StarSkel::new(star_template.clone(), skel.clone(), drivers.kinds(), star_tx );
+            let star_skel = StarSkel::new(star_template.clone(), skel.clone(), drivers.kinds(), &mut star_tx ).await;
 //            let drivers = builder.build(drivers_point.to_port(), star_skel.clone())?;
 
             let mut interchange = HyperwayInterchange::new(
@@ -200,7 +197,7 @@ where
             );
 
 
-            let star_api = Star::new(star_skel.clone(), drivers, hyperway_ext, call_tx, call_rx ).await?;
+            let star_api = Star::new(star_skel.clone(), drivers, hyperway_ext, star_tx ).await?;
             stars.insert(star_point.clone(), star_api);
 
         }
@@ -244,92 +241,24 @@ where
         Ok(machine_api)
     }
 
-    async fn init0(&self)  {
+    async fn init_drivers(&self) {
         let logger = self.logger.span();
         logger.info("Machine::init0()");
-        let mut inits0 = vec![];
+        let mut inits = vec![];
         for star in self.stars.values() {
-            inits0.push(star.init0().boxed());
+            inits.push(star.init().boxed());
         }
 
-        /*
-        struct Init0<'a,P> where P: Platform+'static {
-            pub inits: Vec<BoxFuture<'a, Result<Status,<P as Platform>::Err>>>,
-            pub logger: PointLogger,
-            pub call_tx: mpsc::Sender<MachineCall<P>>
-        }
-
-        impl <'a,P> Init0<'a,P> where P:Platform+'static{
-            pub fn new( inits: Vec<BoxFuture<'a, Result<Status,P::Err>>>, logger: PointLogger, call_tx: mpsc::Sender<MachineCall<P>> ) -> Self {
-                Self {
-                    inits,
-                    logger,
-                    call_tx
-                }
-            }
-
-            pub async fn join_all(mut self){
-                let results = join_all(self.inits).await;
-                for result in results {
-                    if result.is_err() {
-                        let err = result.unwrap_err();
-                        self.logger.error(format!("init error in star: {}", err.to_string()));
-                        self.call_tx.send(MachineCall::SetStatus(MachineStatus::Panic)).await.unwrap_or_default();
-                        return;
-                    }
-                }
-                self.call_tx.send( MachineCall::SetStatus(MachineStatus::Ready)).await.unwrap_or_default();
-            }
-        }
-
-
-        let mut inits = Init0::new(inits0, self.logger.clone(), self.call_tx.clone() );
-         */
-
-        let call_tx = self.call_tx.clone();
-        let logger = self.logger.clone();
-        tokio::spawn( async move {
-//            let results = join_all(inits0).await;
-/*            for result in results {
-                if result.is_err() {
-                    let err = result.unwrap_err();
-                    logger.error(format!("init error in star: {}", err.to_string()));
-                    call_tx.send(MachineCall::SetStatus(MachineStatus::Panic)).await.unwrap_or_default();
-                    return;
-                }
-            }
-
- */
-        });
+        join_all(inits).await;
     }
 
     async fn start(mut self) -> Result<(), P::Err> {
-        self.call_tx.send(MachineCall::Init0).await.unwrap_or_default();
+        self.call_tx.send(MachineCall::Init).await.unwrap_or_default();
 
         while let Some(call) = self.call_rx.recv().await {
             match call {
-                MachineCall::Init0 => {
-
-                    let stars = self.stars.clone();
-                    let call_tx = self.call_tx.clone();
-                    let logger = self.logger.clone();
-
-                    tokio::spawn( async move {
-                        let mut inits0= vec![];
-                        for (_,star) in stars.iter() {
-                            inits0.push(star.init0().boxed());
-                        }
-                        let results = join_all(inits0).await;
-                        for result in results {
-                            if result.is_err() {
-                                let err = result.unwrap_err();
-                                logger.error(format!("init error in star: {}", err.to_string()));
-                                call_tx.send(MachineCall::SetStatus(MachineStatus::Panic)).await.unwrap_or_default();
-                                return;
-                            }
-                        }
-                        call_tx.send(MachineCall::SetStatus(MachineStatus::Ready)).await.unwrap_or_default();
-                    });
+                MachineCall::Init => {
+                    self.init_drivers().await;
                 }
                 MachineCall::Terminate => {
                     self.termination_broadcast_tx.send(Ok(()));
@@ -355,9 +284,6 @@ where
                             }
                         });
                     }
-                }
-                MachineCall::Phantom(_) => {
-                    // do nothing, it is just here to carry the 'P'
                 }
                 MachineCall::AddGate { kind, gate, rtn } => {
                     rtn.send(self.gate_selector.add(kind.clone(),gate));
@@ -392,13 +318,12 @@ pub enum MachineCall<P>
 where
     P: Platform,
 {
-    Init0,
+    Init,
     Terminate,
     Wait(oneshot::Sender<broadcast::Receiver<Result<(), P::Err>>>),
     WaitForReady(oneshot::Sender<()>),
     AddGate { kind: InterchangeKind, gate: Arc<dyn HyperGate>, rtn: oneshot::Sender<Result<(),MsgErr>> },
     Knock{ knock: Knock, rtn: oneshot::Sender<Result<HyperwayExt,HyperConnectionErr>> },
-    Phantom(PhantomData<P>),
     SetStatus(MachineStatus),
     #[cfg(test)]
     GetMachineStar(oneshot::Sender<StarApi<P>>),

@@ -44,7 +44,6 @@ pub mod particle {
     pub enum Status {
         Unknown,      // initial status or when we status cannot be determined
         Pending,      // particle is now registered but not assigned to a host
-        Assigning,    // particle is being assigned to at least one host
         Initializing, // assigned to a host and undergoing custom initialization...This particle can send requests but not receive requests.
         Ready,        // ready to take requests
         Paused, // can not receive requests (probably because it is waiting for some other particle to make updates)...

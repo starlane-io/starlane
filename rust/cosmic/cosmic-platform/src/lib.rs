@@ -14,8 +14,7 @@ extern crate strum_macros;
 
 
 use std::cmp::Ordering;
-use std::collections::HashSet;
-use crate::driver::DriversBuilder;
+use std::collections::{HashMap, HashSet};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
 use cosmic_api::command::request::create::KindTemplate;
 use cosmic_api::id::id::{BaseKind, Kind, Point, RouteSeg, Specific, ToBaseKind};
@@ -45,6 +44,7 @@ use cosmic_api::quota::Timeouts;
 use cosmic_api::security::{Access, AccessGrant};
 use cosmic_api::selector::selector::Selector;
 use cosmic_api::sys::ParticleRecord;
+use crate::driver::{DriverFactory, DriversBuilder};
 
 pub mod driver;
 pub mod field;

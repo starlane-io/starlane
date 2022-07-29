@@ -19,7 +19,7 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{oneshot, Mutex};
 use cosmic_api::command::command::common::StateSrc;
 use cosmic_api::sys::{Assign, AssignmentKind, Sys};
-use crate::control::ControlDriverFactory;
+//use crate::control::ControlDriverFactory;
 use crate::driver::DriverFactory;
 use crate::star::StarApi;
 
@@ -73,7 +73,7 @@ impl Platform for TestPlatform {
 
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
         let mut builder = DriversBuilder::new();
-        builder.add( Box::new(ControlDriverFactory::new()));
+       // builder.add( Box::new(ControlDriverFactory::new()));
         builder
     }
 

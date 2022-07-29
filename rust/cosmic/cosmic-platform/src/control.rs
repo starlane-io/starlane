@@ -1,6 +1,4 @@
-use crate::driver::{
-    Item, CoreSkel, Driver, DriverFactory, DriverLifecycleCall, DriverSkel, DriverStatus,
-};
+use crate::driver::{Item, ItemSkel, Driver, DriverFactory,  DriverSkel, DriverStatus, DriverInitCtx};
 use crate::star::{LayerInjectionRouter, StarSkel};
 use crate::{Platform, Registry};
 use cosmic_api::command::request::create::{Create, PointFactoryU64, TemplateDef};
@@ -25,6 +23,7 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 use cosmic_api::command::command::common::StateSrc;
 
+/*
 pub struct ControlDriverFactory<P>
 where
     P: Platform,
@@ -40,8 +39,8 @@ where
         Kind::Control
     }
 
-    fn create(&self, skel: DriverSkel<P>) -> Box<dyn Driver> {
-        Box::new(ControlDriver::new(skel))
+    async fn init(&self, skel: DriverSkel<P>, ctx: &DriverInitCtx) -> Result<Box<dyn Driver<P>>, MsgErr> {
+        todo!()
     }
 }
 
@@ -94,7 +93,7 @@ where
 }
 
 #[async_trait]
-impl<P> Driver for ControlDriver<P>
+impl<P> Driver<P> for ControlDriver<P>
 where
     P: Platform,
 {
@@ -102,18 +101,7 @@ where
         Kind::Control
     }
 
-    async fn status(&self) -> DriverStatus {
-        let (rtn, rtn_rx) = oneshot::channel();
-        self.runner_tx.send(ControlCall::GetStatus(rtn)).await;
-        rtn_rx.await.unwrap_or(DriverStatus::Unknown)
-    }
-
-    async fn lifecycle(&mut self, event: DriverLifecycleCall) -> Result<DriverStatus, MsgErr> {
-        self.runner_tx.send(ControlCall::Lifecycle(event)).await;
-        Ok(self.status().await)
-    }
-
-    async fn item(&self, point: &Point) -> Result<Box<dyn Item>, MsgErr> {
+    async fn item(&self, point: &Point) -> Result<Box<dyn Item<P>>, MsgErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.runner_tx
             .send(ControlCall::GetCore {
@@ -327,7 +315,7 @@ where
             ProtoTransmitterBuilder::new(Arc::new(router), self.skel.star_skel.exchanger.clone());
         transmitter.from = SetStrategy::Override(point.clone().to_port().with_layer(Layer::Core));
 
-        let skel = CoreSkel::new(point.clone(), transmitter.build());
+        let skel = ItemSkel::new(point.clone(), transmitter.build());
         Ok(ControlCore::new(skel, state))
     }
 }
@@ -339,7 +327,7 @@ pub struct ControlCore<P>
 where
     P: Platform,
 {
-    skel: CoreSkel<P>,
+    skel: ItemSkel<P>,
     state: Arc<RwLock<ControlState>>,
 }
 
@@ -347,7 +335,7 @@ impl<P> ControlCore<P>
 where
     P: Platform,
 {
-    pub fn new(skel: CoreSkel<P>, state: Arc<RwLock<ControlState>>) -> Self {
+    pub fn new(skel: ItemSkel<P>, state: Arc<RwLock<ControlState>>) -> Self {
         Self { skel, state }
     }
 
@@ -357,7 +345,23 @@ where
 }
 
 #[routes]
-impl<P> Item for ControlCore<P> where P: Platform {}
+impl<P> Item<P> for ControlCore<P> where P: Platform {
+    type Skel = ();
+    type State = ();
+    type Ctx = ();
+
+    fn restore(skel: ItemSkel<P>, ctx: Self::Ctx, state: Self::State) -> Self {
+        todo!()
+    }
+}
+
+pub struct ControlContext<P> where P: Platform {
+
+}
+
+impl <P> ControlContext<P> where P: Platform  {
+
+}
 
 pub struct ControlState {}
 
@@ -430,3 +434,5 @@ impl HyperGreeter for ControlGreeter {
         unimplemented!()
     }
 }
+
+ */

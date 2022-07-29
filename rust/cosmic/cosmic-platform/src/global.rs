@@ -1,35 +1,53 @@
+use std::sync::Arc;
 use cosmic_api::cli::RawCommand;
 use cosmic_api::command::Command;
 use cosmic_api::command::request::create::{Create, PointSegTemplate, Strategy};
 use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::Point;
+use cosmic_api::id::id::{Point, Port, ToPort};
+use cosmic_api::log::{PointLogger, RootLogger};
 use cosmic_api::parse::command_line;
 use cosmic_api::parse::error::result;
 use cosmic_api::particle::particle::Details;
 use cosmic_api::Registration;
 use cosmic_api::util::{log, ToResolved};
-use cosmic_api::wave::{InCtx, ProtoTransmitter, ReflectedCore};
+use cosmic_api::wave::{Agent, DirectedHandlerShell, Exchanger, Handling, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedCore, Router, Scope, SetStrategy};
 use cosmic_nom::new_span;
 use crate::{PlatErr, Platform, Registry};
 
+/*
 #[derive(DirectedHandler,Clone)]
 pub struct Global<P> where P: Platform {
+    pub logger: PointLogger,
     pub registry: Registry<P>,
 }
+
+ */
 
 
 use cosmic_api::wave::DirectedHandlerSelector;
 use cosmic_api::wave::RecipientSelector;
 use cosmic_api::wave::RootInCtx;
 use cosmic_api::wave::CoreBounce;
-
+use cosmic_api::wave::DirectedHandler;
+use cosmic_api::config::config::bind::RouteSelector;
+use cosmic_api::parse::route_attribute;
+/*
 #[routes]
 impl <P> Global<P> where P: Platform {
 
-    pub fn new(registry: Registry<P>) -> Self {
-        Self {
-            registry
-        }
+    pub fn new(registry: Registry<P>, router: Arc<dyn Router>, exchanger: Exchanger, port: Port, logger: PointLogger ) -> DirectedHandlerShell<Global<P>> {
+        let mut builder = ProtoTransmitterBuilder::new( router, exchanger );
+        builder.from = SetStrategy::Override(port.clone());
+        builder.agent = SetStrategy::Fill(Agent::HyperUser);
+        builder.scope = SetStrategy::Fill(Scope::Full);
+        builder.handling= SetStrategy::Fill(Handling::default());
+
+        let global = Self{
+            registry,
+            logger: logger.clone()
+        };
+
+        DirectedHandlerShell::new( Box::new(global), builder, port, logger.logger  )
     }
 
     #[route("Cmd<RawCommand>")]
@@ -121,4 +139,9 @@ impl <P> Global<P> where P: Platform {
             }
         };
         Ok(stub)
-    }}
+    }
+
+
+    }
+ */
+

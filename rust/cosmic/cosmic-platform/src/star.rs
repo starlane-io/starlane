@@ -1,4 +1,4 @@
-use crate::driver::{Item, Driver, DriverDriver, DriverDriverFactory, DriverFactory, DriverLifecycleCall, Drivers, DriversApi, DriverSkel, DriverStatus};
+use crate::driver::{Item, Driver, DriverDriver, DriverDriverFactory, DriverFactory, Drivers, DriversApi, DriverSkel, DriverStatus, DriverInitCtx, ItemSkel, ItemHandler, DriversCall};
 use crate::field::{FieldEx, FieldState};
 use crate::machine::MachineSkel;
 use crate::shell::ShellEx;
@@ -10,7 +10,7 @@ use cosmic_api::command::command::common::StateSrc;
 use cosmic_api::command::request::set::Set;
 use cosmic_api::config::config::bind::RouteSelector;
 use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{GLOBAL_EXEC, Kind, Layer, Point, Port, PortSelector, RouteSeg, Sub, ToBaseKind, Topic, ToPoint, ToPort, TraversalLayer, Uuid};
+use cosmic_api::id::id::{BaseKind, GLOBAL_EXEC, Kind, Layer, Point, Port, PortSelector, RouteSeg, Sub, ToBaseKind, Topic, ToPoint, ToPort, TraversalLayer, Uuid};
 use cosmic_api::id::{StarKey, StarStub, StarSub, TraversalInjection};
 use cosmic_api::id::{Traversal, TraversalDirection};
 use cosmic_api::log::{PointLogger, RootLogger, Tracker};
@@ -20,15 +20,9 @@ use cosmic_api::quota::Timeouts;
 use cosmic_api::substance::substance::{Substance, ToSubstance};
 use cosmic_api::sys::{Assign, AssignmentKind, Discoveries, Discovery, Location, Search, Sys};
 use cosmic_api::util::{ValueMatcher, ValuePattern};
-use cosmic_api::wave::{
-    Agent, Bounce, BounceBacks, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedKind,
-    DirectedProto, DirectedWave, Echo, Echoes, Handling, HandlingKind, InCtx, Method, Ping, Pong,
-    Priority, ProtoTransmitter, ProtoTransmitterBuilder, Recipients, RecipientSelector,
-    Reflectable, ReflectedCore, ReflectedWave, Retries, Ripple, RootInCtx, Router, Scope,
-    SetStrategy, Signal, SingularRipple, ToRecipients, TxRouter, WaitTime, Wave,
-};
+use cosmic_api::wave::{Agent, Bounce, BounceBacks, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedHandlerShell, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling, HandlingKind, InCtx, Method, Ping, Pong, Priority, ProtoTransmitter, ProtoTransmitterBuilder, Recipients, RecipientSelector, Reflectable, ReflectedCore, ReflectedWave, Retries, Ripple, RootInCtx, Router, Scope, SetStrategy, Signal, SingularRipple, ToRecipients, TxRouter, WaitTime, Wave};
 use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
-use cosmic_api::{HYPERUSER, MountKind, Registration, State, StateFactory};
+use cosmic_api::{HYPERUSER, MountKind, Registration, RegistrationStrategy, State, StateFactory};
 use cosmic_hyperlane::{HyperClient, HyperRouter, HyperwayExt};
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
@@ -49,7 +43,6 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock};
 use tokio::time::error::Elapsed;
 use tracing::info;
-use crate::global::Global;
 
 #[derive(Clone)]
 pub struct StarState<P>
@@ -179,6 +172,7 @@ pub struct StarSkel<P>
 where
     P: Platform + 'static,
 {
+    pub api: StarApi<P>,
     pub key: StarKey,
     pub point: Point,
     pub kind: StarSub,
@@ -196,8 +190,8 @@ where
     pub gravity_tx: mpsc::Sender<UltraWave>,
     pub gravity_router: TxRouter,
     pub gravity_transmitter: ProtoTransmitter,
-    pub drivers_tx: mpsc::Sender<Traversal<UltraWave>>,
-    pub global: Global<P>,
+    pub drivers: DriversApi<P>,
+    pub drivers_traversal_tx: mpsc::Sender<Traversal<UltraWave>>,
 
     #[cfg(test)]
     pub diagnostic_interceptors: DiagnosticInterceptors<P>,
@@ -207,16 +201,17 @@ impl<P> StarSkel<P>
 where
     P: Platform,
 {
-    pub fn new(
+    pub async fn new(
         template: StarTemplate,
         machine: MachineSkel<P>,
         kinds: HashSet<Kind>,
-        star_tx: StarTx<P>,
+        star_tx: &mut StarTx<P>,
     ) -> Self {
         let point = template.key.clone().to_point();
         let logger = machine.logger.point(point.clone());
         let exchanger = Exchanger::new(point.clone().to_port(), machine.timeouts.clone());
         let state = StarState::new();
+        let api = StarApi::new( template.kind.clone(), star_tx.call_tx.clone() );
 
         let mut adjacents = HashMap::new();
         // prime the searcher by mapping the immediate lanes
@@ -224,34 +219,33 @@ where
             adjacents.insert(hyperway.key().clone().to_point(), hyperway.stub().clone());
         }
 
-        let gravity_well_router = TxRouter::new(star_tx.gravity_tx.clone());
-        let mut gravity_well_transmitter =
-            ProtoTransmitterBuilder::new(Arc::new(gravity_well_router.clone()), exchanger.clone());
-        gravity_well_transmitter.from = SetStrategy::Override(point.clone().to_port());
-        gravity_well_transmitter.handling = SetStrategy::Fill(Handling {
+        let gravity_router = TxRouter::new(star_tx.gravity_tx.clone());
+        let mut gravity_transmitter =
+            ProtoTransmitterBuilder::new(Arc::new(gravity_router.clone()), exchanger.clone());
+        gravity_transmitter.from = SetStrategy::Override(point.clone().to_port());
+        gravity_transmitter.handling = SetStrategy::Fill(Handling {
             kind: HandlingKind::Immediate,
             priority: Priority::High,
             retries: Retries::None,
             wait: WaitTime::Low,
         });
-        gravity_well_transmitter.agent = SetStrategy::Fill(Agent::HyperUser);
-        gravity_well_transmitter.scope = SetStrategy::Fill(Scope::Full);
+        gravity_transmitter.agent = SetStrategy::Fill(Agent::HyperUser);
+        gravity_transmitter.scope = SetStrategy::Fill(Scope::Full);
 
-        let gravity_well_transmitter = gravity_well_transmitter.build();
+        let gravity_transmitter = gravity_transmitter.build();
 
-        let drivers_tx = star_tx.drivers_tx.clone();
-
-        let global = Global::new( machine.registry.clone() );
+        let drivers = DriversApi::new_no_status(star_tx.drivers_call_tx.clone()).await.unwrap();
 
         Self {
+            api,
             key: template.key,
             point,
             kind: template.kind,
             kinds,
             logger,
             gravity_tx: star_tx.gravity_tx.clone(),
-            gravity_router: gravity_well_router,
-            gravity_transmitter: gravity_well_transmitter,
+            gravity_router,
+            gravity_transmitter,
             traverse_to_next_tx: star_tx.traverse_to_next_tx.clone(),
             inject_tx: star_tx.inject_tx.clone(),
             exchanger,
@@ -261,8 +255,8 @@ where
             machine,
             adjacents,
             wrangles: StarWrangles::new(),
-            drivers_tx,
-            global,
+            drivers,
+            drivers_traversal_tx: star_tx.drivers_traversal_tx.clone(),
             #[cfg(test)]
             diagnostic_interceptors: DiagnosticInterceptors::new(),
         }
@@ -287,7 +281,8 @@ pub enum StarCall<P>
 where
     P: Platform,
 {
-    Init0(oneshot::Sender<Result<Status, P::Err>>),
+    Init,
+    CreateStates{  point: Point, rtn: oneshot::Sender<()> },
     Stub(oneshot::Sender<StarStub>),
     FromHyperway {
         wave: UltraWave,
@@ -314,9 +309,11 @@ where
     pub gravity_tx: mpsc::Sender<UltraWave>,
     pub traverse_to_next_tx: mpsc::Sender<Traversal<UltraWave>>,
     pub inject_tx: mpsc::Sender<TraversalInjection>,
-    pub drivers_tx: mpsc::Sender<Traversal<UltraWave>>,
+    pub drivers_traversal_tx: mpsc::Sender<Traversal<UltraWave>>,
     pub call_tx: mpsc::Sender<StarCall<P>>,
     pub call_rx: Option<mpsc::Receiver<StarCall<P>>>,
+    pub drivers_call_tx: mpsc::Sender<DriversCall<P>>,
+    pub drivers_call_rx: Option<mpsc::Receiver<DriversCall<P>>,>
 }
 
 impl<P> StarTx<P>
@@ -328,6 +325,7 @@ where
         let (inject_tx, mut inject_rx) = mpsc::channel(1024);
         let (traverse_to_next_tx, mut traverse_to_next_rx) = mpsc::channel(1024);
         let (drivers_tx, mut drivers_rx) = mpsc::channel(1024);
+        let (drivers_call_tx, mut drivers_call_rx) = mpsc::channel(1024);
 
         let (call_tx, call_rx) = mpsc::channel(1024);
 
@@ -387,9 +385,11 @@ panic!("======== DRIVERS RX STOPPED")                ;
             gravity_tx: gravity_tx,
             traverse_to_next_tx: traverse_to_next_tx,
             inject_tx,
-            drivers_tx,
+            drivers_traversal_tx: drivers_tx,
             call_tx,
             call_rx: Some(call_rx),
+            drivers_call_tx,
+            drivers_call_rx: Option::Some(drivers_call_rx)
         }
     }
 
@@ -415,10 +415,8 @@ where
         Self { kind, tx }
     }
 
-    pub async fn init0(&self) -> Result<Status, MsgErr> {
-        let (tx, mut rx) = oneshot::channel();
-        self.tx.send(StarCall::Init0(tx)).await;
-        P::log_deep("Star::init0",rx.await)?.map_err(|e|e.into())
+    pub async fn init(&self) {
+        self.tx.send(StarCall::Init).await;
     }
 
     pub async fn create_mount(&self, agent: Agent, kind: MountKind) -> Result<HyperwayExt, P::Err>
@@ -469,6 +467,13 @@ where
         Ok(rx.await?)
     }
 
+    pub async fn create_states(&self, point: Point ) -> Result<(),MsgErr> {
+        let (rtn, rtn_rx) = oneshot::channel();
+        self.tx.send(StarCall::CreateStates{point, rtn}).await;
+        rtn_rx.await?;
+        Ok(())
+    }
+
     #[cfg(test)]
     pub async fn get_skel(&self) -> Result<StarSkel<P>, MsgErr> {
         let (tx, rx) = oneshot::channel();
@@ -507,36 +512,17 @@ where
         skel: StarSkel<P>,
         mut drivers: DriversBuilder<P>,
         mut hyperway_ext: HyperwayExt,
-        star_tx: mpsc::Sender<StarCall<P>>,
-        star_rx: mpsc::Receiver<StarCall<P>>,
+        mut star_tx: StarTx<P>
     ) -> Result<StarApi<P>, P::Err> {
-        let registration = Registration {
-            point: skel.point.clone(),
-            kind: Kind::Star(skel.kind.clone()),
-            registry: Default::default(),
-            properties: Default::default(),
-            owner: HYPERUSER.clone(),
-        };
 
-        skel.registry.register(&registration).await?;
-        skel.registry.assign(&skel.point, &skel.point).await?;
-        skel.registry
-            .set_status(&skel.point, &Status::Initializing)
-            .await?;
-        skel.state
-            .create_field(skel.point.clone().to_port().with_layer(Layer::Field));
-        skel.state
-            .create_shell(skel.point.clone().to_port().with_layer(Layer::Shell));
-
-        let (drivers_tx,drivers_rx) = mpsc::channel(1024);
-        let drivers_api = DriversApi::new(drivers_tx.clone());
-        let star_driver_factory = Box::new(StarDriverFactory::new(skel.clone(), drivers_api.clone() ));
+        let star_driver_factory = Arc::new(StarDriverFactory::new(skel.clone() ));
         drivers.add(star_driver_factory);
 
-        let driver_driver_factory = Box::new( DriverDriverFactory::new(skel.clone(), drivers_api ));
-        drivers.add(driver_driver_factory);
 
-        let drivers = drivers.build( skel.point.push("drivers")?.to_port(), skel.clone(), drivers_tx.clone(), drivers_rx)?;
+        let drivers = drivers.build(skel.clone(), star_tx.drivers_call_tx.clone(),star_tx.drivers_call_rx.take().unwrap() );
+
+        let star_rx = star_tx.call_rx.take().unwrap();
+        let star_tx = star_tx.call_tx;
 
         let mut forwarders = vec![];
         for (point, stub) in skel.adjacents.iter() {
@@ -576,7 +562,7 @@ where
         let layer_engine = LayerTraversalEngine::new(
             skel.clone(),
             injector.clone(),
-            skel.drivers_tx.clone(),
+            skel.drivers_traversal_tx.clone(),
             to_gravity_traversal_tx,
         );
 
@@ -624,8 +610,8 @@ where
         tokio::spawn(async move {
             while let Some(call) = self.star_rx.recv().await {
                 match call {
-                    StarCall::Init0(rtn) => {
-                        rtn.send(self.init0().await);
+                    StarCall::Init => {
+                        self.drivers.init().await;
                     }
                     StarCall::FromHyperway { wave, rtn } => {
                         let result = self
@@ -683,14 +669,25 @@ where
                     StarCall::GetSkel(rtn) => {
                         rtn.send(self.skel.clone());
                     }
+                    StarCall::CreateStates { point, rtn } => {
+                        self.create_states(point).await;
+                        rtn.send(());
+                    }
                 }
 
             }
         });
     }
 
-    async fn init0(&self) -> Result<Status, P::Err> {
-        self.drivers.init().await
+    async fn create_states(&self, point: Point ) {
+        self.skel.state
+            .create_field(self.skel.point.clone().to_port().with_layer(Layer::Field));
+        self.skel.state
+            .create_shell(self.skel.point.clone().to_port().with_layer(Layer::Shell));
+    }
+
+    async fn init_drivers(&self) {
+        self.drivers.init().await;
     }
 
     // receive a wave from the hyperlane... this wave should always be
@@ -723,15 +720,6 @@ where
                     .await
             });
             Ok(())
-        } else if transport.to.point.is_global() {
-            let wave = transport.unwrap_from_transport()?;
-            match self.skel.global.handle(wave).await {
-                CoreBounce::Absorbed => {}
-                CoreBounce::Reflected(reflected) => {
-                    reflected.
-                }
-            }
-            Ok(())
         } else {
             self.forward(transport).await
         }
@@ -762,15 +750,11 @@ where
         let waves =
             shard_ultrawave_by_location(wave, &self.skel.adjacents, &self.skel.registry).await?;
         for (to, wave) in waves {
-            if to == *GLOBAL_EXEC {
-                self.skel.logger.result(self.skel.global.handle(wave).await)?;
-            } else {
                 let mut transport = wave.wrap_in_transport(self.gravity.clone(), to.to_port());
                 transport.from(self.skel.point.clone().to_port());
                 let transport = transport.build()?;
                 let transport = transport.to_signal()?;
                 self.to_hyperway(transport).await?;
-            }
         }
         Ok(())
     }
@@ -819,6 +803,7 @@ where
             registry: Default::default(),
             properties: Default::default(),
             owner: agent.clone().to_point(),
+            strategy: RegistrationStrategy::FailOnDupe
         };
         self.skel
             .registry
@@ -1466,18 +1451,18 @@ where
     P: Platform + 'static,
 {
     pub skel: StarSkel<P>,
-    pub drivers_api: DriversApi<P>
 }
 
 impl<P> StarDriverFactory<P>
 where
     P: Platform + 'static,
 {
-    pub fn new(skel: StarSkel<P>, drivers_api: DriversApi<P>) -> Self {
-        Self { skel, drivers_api }
+    pub fn new(skel: StarSkel<P>) -> Self {
+        Self { skel }
     }
 }
 
+#[async_trait]
 impl<P> DriverFactory<P> for StarDriverFactory<P>
 where
     P: Platform + 'static,
@@ -1486,8 +1471,12 @@ where
         Kind::Star(self.skel.kind.clone())
     }
 
-    fn create(&self, driver_skel: DriverSkel<P>) -> Box<dyn Driver> {
-        Box::new(StarDriver::new(self.skel.clone(), driver_skel, self.drivers_api.clone() ))
+    async fn init(
+        &self,
+        skel: DriverSkel<P>,
+        ctx: &DriverInitCtx
+    ) -> Result<Box<dyn Driver<P>>, P::Err> {
+        Ok(Box::new(StarDriver::new(self.skel.clone(), skel, )))
     }
 }
 
@@ -1496,22 +1485,18 @@ pub struct StarDriver<P>
 where
     P: Platform + 'static,
 {
-    pub status: DriverStatus,
     pub star_skel: StarSkel<P>,
     pub driver_skel: DriverSkel<P>,
-    pub drivers_api: DriversApi<P>
 }
 
 impl<P> StarDriver<P>
 where
     P: Platform,
 {
-    pub fn new(star_skel: StarSkel<P>, driver_skel: DriverSkel<P>, drivers_api: DriversApi<P>) -> Self {
+    pub fn new(star_skel: StarSkel<P>, driver_skel: DriverSkel<P>) -> Self {
         Self {
-            status: DriverStatus::Pending,
             star_skel,
             driver_skel,
-            drivers_api
         }
     }
 
@@ -1542,7 +1527,7 @@ where
 }
 
 #[async_trait]
-impl<P> Driver for StarDriver<P>
+impl<P> Driver<P> for StarDriver<P>
 where
     P: Platform,
 {
@@ -1550,44 +1535,8 @@ where
         Kind::Star(self.star_skel.kind.clone())
     }
 
-    async fn status(&self) -> DriverStatus {
-        self.status.clone()
-    }
-
-    async fn lifecycle(&mut self, event: DriverLifecycleCall) -> Result<DriverStatus, MsgErr> {
-        match event {
-            DriverLifecycleCall::Init => {
-                if self.status == DriverStatus::Ready {
-                    return Ok(self.status.clone());
-                }
-
-                self.status = DriverStatus::Initializing;
-
-                self.status = DriverStatus::Ready;
-/*
-                let mut discoveries = vec![];
-                for discovery in self.search_for_stars(Search::Kinds).await? {
-                    let discovery = StarDiscovery::new(
-                        StarPair::new(self.star_skel.key.clone(), discovery.star_key.clone()),
-                        discovery,
-                    );
-                    discoveries.push(discovery);
-                }
-                discoveries.sort();
- */
-            }
-            DriverLifecycleCall::Shutdown => {}
-        }
-
-        Ok(self.status.clone())
-    }
-
-    async fn item(&self, point: &Point) -> Result<Box<dyn Item>,MsgErr> {
-        Ok(Box::new(StarCore::new(
-            self.star_skel.clone(),
-            self.driver_skel.clone(),
-            self.drivers_api.clone()
-        )))
+    async fn item(&self, point: &Point) -> Result<Box<dyn ItemHandler<P>>,P::Err> {
+        Ok(Box::new(StarCore::restore( self.star_skel.clone(), (), () )))
     }
 
     async fn assign(
@@ -1606,41 +1555,44 @@ pub struct StarCore<P>
 where
     P: Platform + 'static,
 {
-    pub star_skel: StarSkel<P>,
-    pub driver_skel: DriverSkel<P>,
-    pub drivers_api: DriversApi<P>
+    pub skel: StarSkel<P>
 }
 
-impl<P> Item for StarCore<P> where P: Platform + 'static {}
+impl<P> ItemHandler<P> for StarCore<P> where P: 'static + Platform {}
+
+impl<P> Item<P> for StarCore<P> where P: Platform + 'static {
+    type Skel = StarSkel<P>;
+    type Ctx = ();
+    type State = ();
+
+    fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self {
+        StarCore {
+            skel
+        }
+    }
+}
 
 #[routes]
 impl<P> StarCore<P>
 where
-    P: Platform + 'static,
+    P: Platform
 {
-    pub fn new(star_skel: StarSkel<P>, driver_skel: DriverSkel<P>, drivers_api: DriversApi<P>) -> Self {
-        Self {
-            star_skel,
-            driver_skel,
-            drivers_api
-        }
-    }
 
     #[route("Sys<Assign>")]
-    pub async fn handle_assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, MsgErr> {
+    pub async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, MsgErr> {
         if let Sys::Assign(assign) = ctx.input {
 
             #[cfg(test)]
-            self.star_skel.diagnostic_interceptors.assignment.send(assign.clone() ).unwrap_or_default();
+            self.skel.diagnostic_interceptors.assignment.send(assign.clone() ).unwrap_or_default();
 
             // create field and shell
-            self.star_skel.state
+            self.skel.state
                 .create_field(assign.details.stub.point.clone().to_port().with_layer(Layer::Field));
-            self.star_skel.state
+            self.skel.state
                 .create_shell(assign.details.stub.point.clone().to_port().with_layer(Layer::Shell));
 
 println!("ASSIGN {}", assign.details.stub.kind.to_string());
-            self.driver_skel.logger.result(self.drivers_api.assign(assign.clone()).await)?;
+            self.skel.logger.result(self.skel.drivers.assign(assign.clone()).await)?;
 println!("driver assign worked...");
 
             Ok(ReflectedCore::ok())
@@ -1652,21 +1604,20 @@ println!("driver assign worked...");
     #[route("Sys<Transport>")]
     pub async fn transport(&self, ctx: InCtx<'_, UltraWave>) {
         #[cfg(test)]
-        self.star_skel
+        self.skel
             .diagnostic_interceptors
             .transport_endpoint
             .send(ctx.wave().clone().to_ultra()).unwrap_or_default();
         let wave = ctx.input.clone();
 
         let injection = TraversalInjection::new(
-            self.star_skel
-                .point
+            self.skel.point
                 .clone()
                 .to_port()
                 .with_layer(Layer::Gravity),
             wave,
         );
-        self.star_skel.inject_tx.send(injection).await;
+        self.skel.inject_tx.send(injection).await;
     }
 
     #[route("Sys<Search>")]
@@ -1676,10 +1627,10 @@ println!("driver assign worked...");
             E: Platform,
         {
             let discovery = Discovery {
-                star_kind: core.star_skel.kind.clone(),
+                star_kind: core.skel.kind.clone(),
                 hops: ctx.wave().hops(),
-                star_key: core.star_skel.key.clone(),
-                kinds: core.star_skel.kinds.clone(),
+                star_key: core.skel.key.clone(),
+                kinds: core.skel.kinds.clone(),
             };
             let mut core = ReflectedCore::new();
             let mut discoveries = Discoveries::new();
@@ -1692,12 +1643,12 @@ println!("driver assign worked...");
         if let Sys::Search(search) = ctx.input {
             match search {
                 Search::Star(star) => {
-                    if self.star_skel.key == *star {
+                    if self.skel.key == *star {
                         return CoreBounce::Reflected(reflect(self, &ctx));
                     }
                 }
                 Search::StarKind(kind) => {
-                    if *kind == self.star_skel.kind {
+                    if *kind == self.skel.kind {
                         return CoreBounce::Reflected(reflect(self, &ctx));
                     }
                 }
