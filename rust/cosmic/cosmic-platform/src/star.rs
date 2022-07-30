@@ -812,14 +812,19 @@ where
             .send(wave.clone())
             .unwrap_or_default();
 
-        let waves =
-            shard_ultrawave_by_location(wave, &self.skel.adjacents, &self.skel.registry).await?;
-        for (to, wave) in waves {
+        if wave.to().is_single() && wave.to().to_single().unwrap().point == *GLOBAL_EXEC {
+
+        }
+        else {
+            let waves =
+                shard_ultrawave_by_location(wave, &self.skel.adjacents, &self.skel.registry).await?;
+            for (to, wave) in waves {
                 let mut transport = wave.wrap_in_transport(self.gravity.clone(), to.to_port());
                 transport.from(self.skel.point.clone().to_port());
                 let transport = transport.build()?;
                 let transport = transport.to_signal()?;
                 self.to_hyperway(transport).await?;
+            }
         }
         Ok(())
     }

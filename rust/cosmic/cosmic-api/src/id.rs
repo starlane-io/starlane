@@ -3080,6 +3080,10 @@ impl StarKey {
         }
     }
 
+    pub fn machine( machine_name: MachineName) -> Self {
+        StarKey::new(&"machine".to_string(), &StarHandle::name(machine_name.as_str()))
+    }
+
     pub fn central() -> Self {
         StarKey {
             constellation: "central".to_string(),

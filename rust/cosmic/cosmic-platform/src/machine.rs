@@ -1,7 +1,7 @@
 use crate::star::{Star, StarApi, StarCon, StarSkel, StarTemplate, StarTx};
 use crate::{DriversBuilder, PlatErr, Platform, Registry, RegistryApi};
 use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{Layer, Point, ToPoint, ToPort};
+use cosmic_api::id::id::{Layer, Point, Port, ToPoint, ToPort};
 use cosmic_api::id::{ConstellationName, MachineName, StarHandle, StarKey, StarSub};
 use cosmic_api::log::{PointLogger, RootLogger};
 use cosmic_api::particle::particle::Status;
@@ -107,6 +107,7 @@ where
     pub api: MachineApi<P>,
     pub status_rx: watch::Receiver<MachineStatus>,
     pub status_tx: mpsc::Sender<MachineStatus>,
+    pub machine_star: Port
 }
 
 pub struct Machine<P>
@@ -151,8 +152,10 @@ where
             }
         });
 
+        let machine_star = StarKey::machine(machine_name.clone()).to_point().to_port().with_layer(Layer::Gravity);
         let skel = MachineSkel {
             name: machine_name.clone(),
+            machine_star,
             registry: platform.global_registry().await?,
             artifacts: platform.artifact_hub(),
             logger: RootLogger::default(),
@@ -458,7 +461,7 @@ impl MachineTemplate {
     pub fn with_machine_star(&self, machine: MachineName) -> Vec<StarTemplate> {
         let mut stars = self.stars.clone();
         let mut machine = StarTemplate::new(
-            StarKey::new(&"machine".to_string(), &StarHandle::name(machine.as_str())),
+            StarKey::machine(machine),
             StarSub::Machine,
         );
         for star in stars.iter_mut() {
