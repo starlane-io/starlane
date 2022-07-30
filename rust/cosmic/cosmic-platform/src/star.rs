@@ -177,7 +177,6 @@ where
     pub key: StarKey,
     pub point: Point,
     pub kind: StarSub,
-    pub kinds: HashSet<Kind>,
     pub logger: PointLogger,
     pub registry: Registry<P>,
     pub traverse_to_next_tx: mpsc::Sender<Traversal<UltraWave>>,
@@ -207,7 +206,6 @@ where
     pub async fn new(
         template: StarTemplate,
         machine: MachineSkel<P>,
-        kinds: HashSet<Kind>,
         star_tx: &mut StarTx<P>,
     ) -> Self {
         let point = template.key.clone().to_point();
@@ -244,7 +242,6 @@ where
             key: template.key,
             point,
             kind: template.kind,
-            kinds,
             logger,
             gravity_tx: star_tx.gravity_tx.clone(),
             gravity_router,
@@ -1694,6 +1691,8 @@ println!("driver assign worked...");
         where
             E: Platform,
         {
+            unimplemented!()
+            /*
             let discovery = Discovery {
                 star_kind: core.skel.kind.clone(),
                 hops: ctx.wave().hops(),
@@ -1706,6 +1705,7 @@ println!("driver assign worked...");
             core.body = Substance::Sys(Sys::Discoveries(discoveries));
             core.status = StatusCode::from_u16(200).unwrap();
             core
+             */
         }
 
         if let Sys::Search(search) = ctx.input {

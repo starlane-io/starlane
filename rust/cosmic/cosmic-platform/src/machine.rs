@@ -1,5 +1,5 @@
 use crate::star::{Star, StarApi, StarCon, StarSkel, StarTemplate, StarTx};
-use crate::{PlatErr, Platform, Registry, RegistryApi};
+use crate::{DriversBuilder, PlatErr, Platform, Registry, RegistryApi};
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{Layer, Point, ToPoint, ToPort};
 use cosmic_api::id::{ConstellationName, MachineName, StarHandle, StarKey, StarSub};
@@ -30,6 +30,7 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::watch::Ref;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use tracing::info;
+use crate::global::GlobalDriverFactory;
 
 #[derive(Clone)]
 pub struct MachineApi<P>
@@ -156,7 +157,7 @@ where
             artifacts: platform.artifact_hub(),
             logger: RootLogger::default(),
             timeouts: Timeouts::default(),
-            platform,
+            platform: platform.clone(),
             api: machine_api.clone(),
             status_tx: mpsc_status_tx,
             status_rx: watch_status_rx,
@@ -169,7 +170,8 @@ where
         for star_template in star_templates {
             let star_point = star_template.key.clone().to_point();
             let star_port = star_point.clone().to_port().with_layer(Layer::Core);
-            let mut drivers = skel.platform.drivers_builder(&star_template.kind);
+
+
             let drivers_point = star_point.push("drivers".to_string()).unwrap();
             let logger = skel.logger.point(drivers_point.clone());
 
@@ -177,10 +179,21 @@ where
             let star_skel = StarSkel::new(
                 star_template.clone(),
                 skel.clone(),
-                drivers.kinds(),
                 &mut star_tx,
             )
             .await;
+
+            let mut drivers = match star_template.kind {
+                StarSub::Machine => {
+                    let mut drivers = DriversBuilder::new();
+                    drivers.add( Arc::new(GlobalDriverFactory::new(star_skel.clone())) );
+                    drivers
+                }
+                _ => {
+                    platform.drivers_builder(&star_template.kind)
+                }
+            };
+
             //            let drivers = builder.build(drivers_point.to_port(), star_skel.clone())?;
 
             let mut interchange = HyperwayInterchange::new(logger.push("interchange").unwrap());

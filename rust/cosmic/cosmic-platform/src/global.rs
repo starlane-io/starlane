@@ -12,7 +12,7 @@ use cosmic_api::Registration;
 use cosmic_api::util::{log, ToResolved};
 use cosmic_api::wave::{Agent, DirectedHandlerShell, Exchanger, Handling, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedCore, Router, Scope, SetStrategy};
 use cosmic_nom::new_span;
-use crate::{PlatErr, Platform, Registry};
+use crate::{DriverFactory, PlatErr, Platform, Registry};
 
 /*
 #[derive(DirectedHandler,Clone)]
@@ -32,8 +32,32 @@ use cosmic_api::wave::DirectedHandler;
 use cosmic_api::config::config::bind::RouteSelector;
 use cosmic_api::parse::route_attribute;
 use cosmic_api::sys::Assign;
-use crate::driver::{Driver, Item, ItemHandler};
+use crate::driver::{Driver, DriverInitCtx, DriverSkel, Item, ItemHandler};
 use crate::star::StarSkel;
+
+pub struct GlobalDriverFactory<P> where P: Platform {
+    pub skel: StarSkel<P>
+}
+
+#[async_trait]
+impl <P> DriverFactory<P> for GlobalDriverFactory<P> where P: Platform
+{
+    fn kind(&self) -> Kind {
+        Kind::Global
+    }
+
+    async fn init(&self, skel: DriverSkel<P>, ctx: &DriverInitCtx) -> Result<Box<dyn Driver<P>>, P::Err> {
+        Ok(Box::new(GlobalDriver::new(self.skel.clone())))
+    }
+}
+
+impl <P> GlobalDriverFactory<P> where P: Platform {
+    pub fn new(skel: StarSkel<P>) -> Self {
+        Self {
+            skel
+        }
+    }
+}
 
 
 #[derive(DirectedHandler)]
