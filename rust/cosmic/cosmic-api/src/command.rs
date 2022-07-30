@@ -578,6 +578,7 @@ pub mod request {
         pub enum Strategy {
             Commit,
             Ensure,
+            Override
         }
 
         #[async_trait]

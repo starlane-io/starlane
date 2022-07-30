@@ -22,7 +22,7 @@ use cosmic_api::sys::{Assign, AssignmentKind, Discoveries, Discovery, Location, 
 use cosmic_api::util::{ValueMatcher, ValuePattern};
 use cosmic_api::wave::{Agent, Bounce, BounceBacks, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedHandlerShell, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling, HandlingKind, InCtx, Method, Ping, Pong, Priority, ProtoTransmitter, ProtoTransmitterBuilder, Recipients, RecipientSelector, Reflectable, ReflectedCore, ReflectedWave, Retries, Ripple, RootInCtx, Router, Scope, SetStrategy, Signal, SingularRipple, ToRecipients, TxRouter, WaitTime, Wave};
 use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
-use cosmic_api::{HYPERUSER, MountKind, Registration, RegistrationStrategy, State, StateFactory};
+use cosmic_api::{HYPERUSER, MountKind, Registration, State, StateFactory};
 use cosmic_hyperlane::{HyperClient, HyperRouter, HyperwayExt};
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
@@ -43,6 +43,7 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock, watch};
 use tokio::time::error::Elapsed;
 use tracing::info;
+use cosmic_api::command::request::create::Strategy;
 
 #[derive(Clone)]
 pub struct StarState<P>
@@ -870,7 +871,7 @@ where
             registry: Default::default(),
             properties: Default::default(),
             owner: agent.clone().to_point(),
-            strategy: RegistrationStrategy::FailOnDupe
+            strategy: Strategy::Commit
         };
         self.skel
             .registry

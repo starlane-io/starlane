@@ -77,6 +77,7 @@ where
 {
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, P::Err>;
 
+
     async fn assign<'a>(&'a self, point: &'a Point, location: &'a Point) -> Result<(), P::Err>;
 
     async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), P::Err>;
@@ -111,6 +112,8 @@ where
 
     async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), P::Err>;
 }
+
+
 
 /*
 #[derive(Clone)]
@@ -372,7 +375,8 @@ pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'st
             BaseKind::Star => {
                 unimplemented!()
             }
-            BaseKind::Driver => Kind::Driver
+            BaseKind::Driver => Kind::Driver,
+            BaseKind::Global => Kind::Global
         })
 
 

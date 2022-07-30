@@ -129,7 +129,8 @@ pub mod id {
         Control,
         Portal,
         Star,
-        Driver
+        Driver,
+        Global,
     }
 
     impl BaseKind {
@@ -231,6 +232,7 @@ pub mod id {
         Base(BaseSubKind),
         UserBase(UserBaseSubKind),
         Star(StarSub),
+        Global,
     }
 
     impl ToBaseKind for Kind {
@@ -253,7 +255,8 @@ pub mod id {
                 Kind::Base(_) => BaseKind::Base,
                 Kind::Repo => BaseKind::Repo,
                 Kind::Star(_) => BaseKind::Star,
-                Kind::Driver => BaseKind::Driver
+                Kind::Driver => BaseKind::Driver,
+                Kind::Global => BaseKind::Global
             }
         }
     }
@@ -369,6 +372,7 @@ pub mod id {
                 BaseKind::Driver => {
                     Kind::Driver
                 }
+                BaseKind::Global => {Kind::Global}
             })
         }
     }

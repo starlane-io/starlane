@@ -61,7 +61,7 @@ use std::cmp::Ordering;
 use std::ops::Deref;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::command::request::create::KindTemplate;
+use crate::command::request::create::{KindTemplate, Strategy};
 
 
 
@@ -543,14 +543,9 @@ pub struct Registration {
     pub registry: SetRegistry,
     pub properties: SetProperties,
     pub owner: Point,
-    pub strategy: RegistrationStrategy
+    pub strategy: Strategy
 }
 
-#[derive(Clone)]
-pub enum RegistrationStrategy{
-    FailOnDupe,
-    Overwrite
-}
 
 #[derive(Clone)]
 pub enum MountKind {

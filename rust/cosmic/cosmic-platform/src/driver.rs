@@ -22,7 +22,7 @@ use cosmic_api::wave::{
     ProtoTransmitterBuilder, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router,
     SetStrategy, SysMethod, UltraWave, Wave, WaveKind,
 };
-use cosmic_api::{Registration, RegistrationStrategy, State, HYPERUSER};
+use cosmic_api::{Registration, State, HYPERUSER};
 use dashmap::DashMap;
 use futures::future::select_all;
 use futures::FutureExt;
@@ -35,6 +35,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::watch::Ref;
 use tokio::sync::{broadcast, mpsc, oneshot, watch, RwLock};
+use cosmic_api::command::request::create::Strategy;
 
 pub struct DriversBuilder<P>
 where
@@ -393,7 +394,7 @@ where
                     registry: Default::default(),
                     properties: Default::default(),
                     owner: HYPERUSER.clone(),
-                    strategy: RegistrationStrategy::Overwrite,
+                    strategy: Strategy::Override,
                 };
 
                 skel.registry.register(&registration).await?;
