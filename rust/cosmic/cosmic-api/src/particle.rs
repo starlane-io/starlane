@@ -39,16 +39,17 @@ pub mod particle {
         Eq,
         PartialEq,
         strum_macros::Display,
-        strum_macros::EnumString,
+        strum_macros::EnumString
     )]
     pub enum Status {
         Unknown,      // initial status or when we status cannot be determined
-        Pending,      // particle is now registered but not assigned to a host
-        Initializing, // assigned to a host and undergoing custom initialization...This particle can send requests but not receive requests.
+        Pending,      // initial status
+        Init,         // undergoing custom initialization...This particle can send requests but not receive requests.
         Ready,        // ready to take requests
         Paused, // can not receive requests (probably because it is waiting for some other particle to make updates)...
         Resuming, // like Initializing but triggered after a pause is lifted, the particle may be doing something before it is ready to accept requests again.
         Panic,    // something is wrong... all requests are blocked and responses are cancelled.
+        Fatal,    // unrecoverable panic
         Done, // this particle had a life span and has now completed succesfully it can no longer receive requests.
     }
 

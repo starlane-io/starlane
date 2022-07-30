@@ -4,26 +4,32 @@ use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{Layer, Point, ToPoint, ToPort};
 use cosmic_api::id::{ConstellationName, MachineName, StarHandle, StarKey, StarSub};
 use cosmic_api::log::{PointLogger, RootLogger};
+use cosmic_api::particle::particle::Status;
 use cosmic_api::quota::Timeouts;
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{InterchangeKind, Knock};
 use cosmic_api::wave::{Agent, HyperWave, UltraWave};
 use cosmic_api::ArtifactApi;
-use cosmic_hyperlane::{HyperClient, HyperConnectionErr, HyperGate, HyperGateSelector, HyperRouter, Hyperway, HyperwayExt, HyperwayInterchange, HyperwayStub, InterchangeGate, LayerTransform, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, SimpleGreeter, TokenAuthenticatorWithRemoteWhitelist};
+use cosmic_hyperlane::{
+    HyperClient, HyperConnectionErr, HyperGate, HyperGateSelector, HyperRouter, Hyperway,
+    HyperwayExt, HyperwayInterchange, HyperwayStub, InterchangeGate, LayerTransform,
+    LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, SimpleGreeter,
+    TokenAuthenticatorWithRemoteWhitelist,
+};
 use dashmap::DashMap;
-use futures::future::{BoxFuture, join_all};
+use futures::future::{join_all, select_all, BoxFuture};
+use futures::FutureExt;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::marker::PhantomData;
 use std::process::Output;
 use std::str::FromStr;
 use std::sync::Arc;
-use futures::FutureExt;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::watch::Ref;
+use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use tracing::info;
-use cosmic_api::particle::particle::Status;
 
 #[derive(Clone)]
 pub struct MachineApi<P>
@@ -41,9 +47,13 @@ where
         Self { tx }
     }
 
-    pub async fn add_interchange( &self, kind: InterchangeKind, gate: Arc<dyn HyperGate> ) -> Result<(),MsgErr> {
-        let (rtn,rtn_rx) = oneshot::channel();
-        self.tx.send( MachineCall::AddGate {kind, gate, rtn }).await;
+    pub async fn add_interchange(
+        &self,
+        kind: InterchangeKind,
+        gate: Arc<dyn HyperGate>,
+    ) -> Result<(), MsgErr> {
+        let (rtn, rtn_rx) = oneshot::channel();
+        self.tx.send(MachineCall::AddGate { kind, gate, rtn }).await;
         rtn_rx.await?
     }
 
@@ -94,6 +104,8 @@ where
     pub logger: RootLogger,
     pub timeouts: Timeouts,
     pub api: MachineApi<P>,
+    pub status_rx: watch::Receiver<MachineStatus>,
+    pub status_tx: mpsc::Sender<MachineStatus>,
 }
 
 pub struct Machine<P>
@@ -102,8 +114,6 @@ where
 {
     pub skel: MachineSkel<P>,
     pub stars: Arc<HashMap<Point, StarApi<P>>>,
-    pub status: MachineStatus,
-    pub status_broadcast: broadcast::Sender<MachineStatus>,
     pub machine_star: StarApi<P>,
     pub gate_selector: HyperGateSelector,
     pub call_tx: mpsc::Sender<MachineCall<P>>,
@@ -117,9 +127,9 @@ where
     P: Platform + 'static,
 {
     pub fn new(platform: P) -> MachineApi<P> {
-        let (tx, rx) = mpsc::channel(1024);
-        let machine_api = MachineApi::new(tx.clone());
-        tokio::spawn(async move { Machine::init(platform, tx, rx).await });
+        let (call_tx, call_rx) = mpsc::channel(1024);
+        let machine_api = MachineApi::new(call_tx.clone());
+        tokio::spawn(async move { Machine::init(platform, call_tx, call_rx).await });
 
         machine_api
     }
@@ -131,8 +141,15 @@ where
     ) -> Result<MachineApi<P>, P::Err> {
         let template = platform.machine_template();
         let machine_name = platform.machine_name();
-
         let machine_api = MachineApi::new(call_tx.clone());
+        let (mpsc_status_tx, mut mpsc_status_rx) = mpsc::channel(128);
+        let (watch_status_tx, watch_status_rx) = watch::channel(MachineStatus::Init);
+        tokio::spawn(async move {
+            while let Some(status) = mpsc_status_rx.recv().await {
+                watch_status_tx.send(status);
+            }
+        });
+
         let skel = MachineSkel {
             name: machine_name.clone(),
             registry: platform.global_registry().await?,
@@ -141,6 +158,8 @@ where
             timeouts: Timeouts::default(),
             platform,
             api: machine_api.clone(),
+            status_tx: mpsc_status_tx,
+            status_rx: watch_status_rx,
         };
 
         let mut stars = HashMap::new();
@@ -155,51 +174,65 @@ where
             let logger = skel.logger.point(drivers_point.clone());
 
             let mut star_tx: StarTx<P> = StarTx::new(star_point.clone());
-            let star_skel = StarSkel::new(star_template.clone(), skel.clone(), drivers.kinds(), &mut star_tx ).await;
-//            let drivers = builder.build(drivers_point.to_port(), star_skel.clone())?;
+            let star_skel = StarSkel::new(
+                star_template.clone(),
+                skel.clone(),
+                drivers.kinds(),
+                &mut star_tx,
+            )
+            .await;
+            //            let drivers = builder.build(drivers_point.to_port(), star_skel.clone())?;
 
-            let mut interchange = HyperwayInterchange::new(
-                logger.push("interchange").unwrap(),
-            );
+            let mut interchange = HyperwayInterchange::new(logger.push("interchange").unwrap());
 
             let star_hop = star_point.clone().to_port().with_layer(Layer::Gravity);
 
-            let mut hyperway = Hyperway::new(star_hop.clone(), Agent::HyperUser );
+            let mut hyperway = Hyperway::new(star_hop.clone(), Agent::HyperUser);
             hyperway.transform_inbound(Box::new(LayerTransform::new(Layer::Gravity)));
 
             let hyperway_ext = hyperway.mount().await;
             interchange.add(hyperway);
-            interchange.singular_to(star_port.clone() );
+            interchange.singular_to(star_port.clone());
 
             let interchange = Arc::new(interchange);
             let auth = skel.platform.star_auth(&star_template.key)?;
-            let greeter = SimpleGreeter::new(star_hop, star_port.clone() );
-            let gate: Arc<dyn HyperGate> = Arc::new(MountInterchangeGate::new(auth, greeter, interchange.clone(), logger.clone()));
+            let greeter = SimpleGreeter::new(star_hop, star_port.clone());
+            let gate: Arc<dyn HyperGate> = Arc::new(MountInterchangeGate::new(
+                auth,
+                greeter,
+                interchange.clone(),
+                logger.clone(),
+            ));
 
             for con in star_template.connections.iter() {
                 match con {
                     StarCon::Receiver(remote) => {
-                        let star = remote.key.clone().to_point().to_port().with_layer(Layer::Gravity);
+                        let star = remote
+                            .key
+                            .clone()
+                            .to_point()
+                            .to_port()
+                            .with_layer(Layer::Gravity);
                         let hyperway = Hyperway::new(star, Agent::HyperUser);
                         interchange.add(hyperway);
                     }
                     StarCon::Connector(remote) => {
-                        let star = remote.key.clone().to_point().to_port().with_layer(Layer::Gravity);
+                        let star = remote
+                            .key
+                            .clone()
+                            .to_point()
+                            .to_port()
+                            .with_layer(Layer::Gravity);
                         let hyperway = Hyperway::new(star, Agent::HyperUser);
                         interchange.add(hyperway);
                     }
                 }
             }
 
-            gates.insert(
-                InterchangeKind::Star(star_template.key.clone()),
-                gate,
-            );
+            gates.insert(InterchangeKind::Star(star_template.key.clone()), gate);
 
-
-            let star_api = Star::new(star_skel.clone(), drivers, hyperway_ext, star_tx ).await?;
+            let star_api = Star::new(star_skel.clone(), drivers, hyperway_ext, star_tx).await?;
             stars.insert(star_point.clone(), star_api);
-
         }
 
         let mut gate_selector = HyperGateSelector::new(gates);
@@ -222,28 +255,78 @@ where
         let logger = skel.logger.point(machine_point);
 
         let (term_tx, _) = broadcast::channel(1);
+        let stars = Arc::new(stars);
+        {
+            let mut star_statuses_rx: Vec<watch::Receiver<Status>> =
+                stars.values().map(|s| s.status_rx.clone()).collect();
+            let status_tx = skel.status_tx.clone();
+            let star_count = stars.len();
+            tokio::spawn(async move {
+                loop {
+                    let mut readies = 0;
+                    let mut inits = 0;
+                    let mut panics = 0;
+                    let mut fatals = 0;
+                    for status_rx in star_statuses_rx.iter_mut() {
+                        match status_rx.borrow().clone() {
+                            Status::Unknown => {}
+                            Status::Pending => {}
+                            Status::Init => {
+                                inits = inits + 1;
+                            }
+                            Status::Ready => {
+                                readies = readies + 1;
+                            }
+                            Status::Paused => {}
+                            Status::Resuming => {}
+                            Status::Panic => {
+                                panics = panics + 1;
+                            }
+                            Status::Fatal => {
+                                fatals = fatals + 1;
+                            }
+                            Status::Done => {}
+                        }
+                    }
 
-        let (status_broadcast,_) = broadcast::channel(128);
+                    if readies == star_count {
+                        status_tx.send(MachineStatus::Ready).await;
+                    } else if fatals > 0 {
+                        status_tx.send(MachineStatus::Fatal).await;
+                    } else if panics > 0 {
+                        status_tx.send(MachineStatus::Panic).await;
+                    } else if inits > 0 {
+                        status_tx.send(MachineStatus::Init).await;
+                    }
+
+                    let boxed_status_rx: Vec<BoxFuture<Result<(), watch::error::RecvError>>> =
+                        star_statuses_rx
+                            .iter_mut()
+                            .map(|s| s.changed().boxed())
+                            .collect();
+                    select_all(boxed_status_rx).await;
+                }
+            });
+        }
+
         let mut machine = Self {
             skel,
             logger,
             machine_star,
-            stars: Arc::new(stars),
+            stars,
             gate_selector,
             call_tx,
             call_rx,
             termination_broadcast_tx: term_tx,
-            status: MachineStatus::Pending,
-            status_broadcast
         };
 
         machine.start().await;
         Ok(machine_api)
     }
 
-    async fn init_drivers(&self) {
+    async fn init0(&self) {
         let logger = self.logger.span();
-        logger.info("Machine::init0()");
+        logger.info("Machine::init_drivers()");
         let mut inits = vec![];
         for star in self.stars.values() {
             inits.push(star.init().boxed());
@@ -253,12 +336,15 @@ where
     }
 
     async fn start(mut self) -> Result<(), P::Err> {
-        self.call_tx.send(MachineCall::Init).await.unwrap_or_default();
+        self.call_tx
+            .send(MachineCall::Init)
+            .await
+            .unwrap_or_default();
 
         while let Some(call) = self.call_rx.recv().await {
             match call {
                 MachineCall::Init => {
-                    self.init_drivers().await;
+                    self.init0().await;
                 }
                 MachineCall::Terminate => {
                     self.termination_broadcast_tx.send(Ok(()));
@@ -267,35 +353,32 @@ where
                 MachineCall::Wait(tx) => {
                     tx.send(self.termination_broadcast_tx.subscribe());
                 }
-
-                MachineCall::WaitForReady(tx) => {
-                    // right now we don't know what Ready means other than the Call loop has started
-                    // so we return Ready in every case
-                    if self.status == MachineStatus::Ready {
-                        tx.send(());
-                    } else {
-                        let mut rx = self.status_broadcast.subscribe();
-                        tokio::spawn(async move {
-                            while let Ok(status) = rx.recv().await {
-                                if status == MachineStatus::Ready {
-                                    tx.send(());
+                MachineCall::WaitForReady(rtn) => {
+                    let mut status_rx = self.skel.status_rx.clone();
+                    tokio::spawn(async move {
+                        loop {
+                            if MachineStatus::Ready == status_rx.borrow().clone() {
+                                rtn.send(());
+                                break;
+                            }
+                            match status_rx.changed().await {
+                                Ok(_) => {}
+                                Err(err) => {
+                                    rtn.send(());
                                     break;
                                 }
                             }
-                        });
-                    }
+                        }
+                    });
                 }
                 MachineCall::AddGate { kind, gate, rtn } => {
-                    rtn.send(self.gate_selector.add(kind.clone(),gate));
-                }
-                MachineCall::SetStatus(status) => {
-                    self.status = status.clone();
-                    self.status_broadcast.send(status);
+                    rtn.send(self.gate_selector.add(kind.clone(), gate));
                 }
                 MachineCall::Knock { knock, rtn } => {
                     let gate_selector = self.gate_selector.clone();
-                    tokio::spawn( async move {
-                        rtn.send(gate_selector.knock(knock).await).unwrap_or_default();
+                    tokio::spawn(async move {
+                        rtn.send(gate_selector.knock(knock).await)
+                            .unwrap_or_default();
                     });
                 }
                 #[cfg(test)]
@@ -322,21 +405,28 @@ where
     Terminate,
     Wait(oneshot::Sender<broadcast::Receiver<Result<(), P::Err>>>),
     WaitForReady(oneshot::Sender<()>),
-    AddGate { kind: InterchangeKind, gate: Arc<dyn HyperGate>, rtn: oneshot::Sender<Result<(),MsgErr>> },
-    Knock{ knock: Knock, rtn: oneshot::Sender<Result<HyperwayExt,HyperConnectionErr>> },
-    SetStatus(MachineStatus),
+    AddGate {
+        kind: InterchangeKind,
+        gate: Arc<dyn HyperGate>,
+        rtn: oneshot::Sender<Result<(), MsgErr>>,
+    },
+    Knock {
+        knock: Knock,
+        rtn: oneshot::Sender<Result<HyperwayExt, HyperConnectionErr>>,
+    },
     #[cfg(test)]
     GetMachineStar(oneshot::Sender<StarApi<P>>),
     #[cfg(test)]
     GetRegistry(oneshot::Sender<Registry<P>>),
 }
 
-#[derive(Clone,Eq,PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum MachineStatus {
     Pending,
-    Init0,
+    Init,
     Ready,
     Panic,
+    Fatal,
 }
 
 pub struct MachineTemplate {

@@ -727,13 +727,14 @@ fn test_control() -> Result<(), TestErr> {
 
         let platform = TestPlatform::new();
         let machine_api = platform.machine();
+        tokio::time::timeout(Duration::from_secs(10), machine_api.wait_ready() ).await.unwrap();
         //tokio::time::timeout( Duration::from_secs(15), machine_api.wait_ready()).await;
         //tokio::time::timeout( Duration::from_secs(15), machine_api.wait_ready()).await;
-        machine_api.wait_ready().await;
+//        machine_api.wait_ready().await;
 
         let star_api = machine_api.get_machine_star().await.unwrap();
 
-        tokio::time::sleep(Duration::from_secs(8)).await;
+       // tokio::time::sleep(Duration::from_secs(8)).await;
         /*
         let less = star_api
             .create_mount(Agent::HyperUser, MountKind::Control)
@@ -748,7 +749,7 @@ fn test_control() -> Result<(), TestErr> {
 
         // final_rx.await;
 
-        let stub = star_api.stub().await.unwrap();
+        //let stub = star_api.stub().await.unwrap();
         Ok(())
     })
 }

@@ -40,7 +40,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock};
+use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock, watch};
 use tokio::time::error::Elapsed;
 use tracing::info;
 
@@ -192,6 +192,8 @@ where
     pub gravity_transmitter: ProtoTransmitter,
     pub drivers: DriversApi<P>,
     pub drivers_traversal_tx: mpsc::Sender<Traversal<UltraWave>>,
+    pub status_tx: mpsc::Sender<Status>,
+    pub status_rx: watch::Receiver<Status>,
 
     #[cfg(test)]
     pub diagnostic_interceptors: DiagnosticInterceptors<P>,
@@ -211,7 +213,7 @@ where
         let logger = machine.logger.point(point.clone());
         let exchanger = Exchanger::new(point.clone().to_port(), machine.timeouts.clone());
         let state = StarState::new();
-        let api = StarApi::new( template.kind.clone(), star_tx.call_tx.clone() );
+        let api = StarApi::new( template.kind.clone(), star_tx.call_tx.clone(), star_tx.status_rx.clone() );
 
         let mut adjacents = HashMap::new();
         // prime the searcher by mapping the immediate lanes
@@ -234,7 +236,7 @@ where
 
         let gravity_transmitter = gravity_transmitter.build();
 
-        let drivers = DriversApi::new_no_status(star_tx.drivers_call_tx.clone()).await.unwrap();
+        let drivers = DriversApi::new(star_tx.drivers_call_tx.clone(), star_tx.drivers_status_rx.clone() );
 
         Self {
             api,
@@ -257,6 +259,8 @@ where
             wrangles: StarWrangles::new(),
             drivers,
             drivers_traversal_tx: star_tx.drivers_traversal_tx.clone(),
+            status_tx: star_tx.status_tx.clone(),
+            status_rx: star_tx.status_rx.clone(),
             #[cfg(test)]
             diagnostic_interceptors: DiagnosticInterceptors::new(),
         }
@@ -313,7 +317,11 @@ where
     pub call_tx: mpsc::Sender<StarCall<P>>,
     pub call_rx: Option<mpsc::Receiver<StarCall<P>>>,
     pub drivers_call_tx: mpsc::Sender<DriversCall<P>>,
-    pub drivers_call_rx: Option<mpsc::Receiver<DriversCall<P>>,>
+    pub drivers_call_rx: Option<mpsc::Receiver<DriversCall<P>>>,
+    pub drivers_status_tx: Option<watch::Sender<DriverStatus>>,
+    pub drivers_status_rx: watch::Receiver<DriverStatus>,
+    pub status_tx: mpsc::Sender<Status>,
+    pub status_rx: watch::Receiver<Status>,
 }
 
 impl<P> StarTx<P>
@@ -324,8 +332,17 @@ where
         let (gravity_tx, mut gravity_rx) = mpsc::channel(1024);
         let (inject_tx, mut inject_rx) = mpsc::channel(1024);
         let (traverse_to_next_tx, mut traverse_to_next_rx) = mpsc::channel(1024);
-        let (drivers_tx, mut drivers_rx) = mpsc::channel(1024);
+        let (drivers_traversal_tx, mut drivers_rx) = mpsc::channel(1024);
         let (drivers_call_tx, mut drivers_call_rx) = mpsc::channel(1024);
+        let (drivers_status_tx, drivers_status_rx) = watch::channel(DriverStatus::Pending );
+        let (mpsc_status_tx, mut mpsc_status_rx) = mpsc::channel(128);
+        let (watch_status_tx, watch_status_rx) = watch::channel(Status::Pending);
+
+        tokio::spawn( async move {
+            while let Some(status) = mpsc_status_rx.recv().await {
+                watch_status_tx.send(status);
+            }
+        });
 
         let (call_tx, call_rx) = mpsc::channel(1024);
 
@@ -382,14 +399,18 @@ panic!("======== DRIVERS RX STOPPED")                ;
         }
 
         Self {
-            gravity_tx: gravity_tx,
-            traverse_to_next_tx: traverse_to_next_tx,
+            gravity_tx,
+            traverse_to_next_tx,
             inject_tx,
-            drivers_traversal_tx: drivers_tx,
+            drivers_traversal_tx,
             call_tx,
             call_rx: Some(call_rx),
             drivers_call_tx,
-            drivers_call_rx: Option::Some(drivers_call_rx)
+            drivers_call_rx: Option::Some(drivers_call_rx),
+            drivers_status_tx: Some(drivers_status_tx),
+            drivers_status_rx,
+            status_tx: mpsc_status_tx,
+            status_rx: watch_status_rx
         }
     }
 
@@ -405,14 +426,28 @@ where
 {
     pub kind: StarSub,
     tx: mpsc::Sender<StarCall<P>>,
+    pub status_rx: watch::Receiver<Status>
 }
 
 impl<P> StarApi<P>
 where
     P: Platform,
 {
-    pub fn new(kind: StarSub, tx: mpsc::Sender<StarCall<P>>) -> Self {
-        Self { kind, tx }
+    pub fn new(kind: StarSub, tx: mpsc::Sender<StarCall<P>>, status_rx: watch::Receiver<Status>) -> Self {
+        Self { kind, tx, status_rx  }
+    }
+
+    pub fn status(&self) -> Status {
+        self.status_rx.borrow().clone()
+    }
+
+    pub async fn wait_for_status(&mut self, status: Status) {
+        loop {
+            if self.status_rx.borrow().clone() == status {
+                break;
+            }
+            self.status_rx.changed().await.unwrap();
+        }
     }
 
     pub async fn init(&self) {
@@ -518,8 +553,7 @@ where
         let star_driver_factory = Arc::new(StarDriverFactory::new(skel.clone() ));
         drivers.add(star_driver_factory);
 
-
-        let drivers = drivers.build(skel.clone(), star_tx.drivers_call_tx.clone(),star_tx.drivers_call_rx.take().unwrap() );
+        let drivers = drivers.build(skel.clone(), star_tx.drivers_call_tx.clone(),star_tx.drivers_call_rx.take().unwrap(), star_tx.drivers_status_tx.take().unwrap(), star_tx.drivers_status_rx.clone() );
 
         let star_rx = star_tx.call_rx.take().unwrap();
         let star_tx = star_tx.call_tx;
@@ -585,6 +619,38 @@ where
             });
         }
 
+        {
+            let mut drivers = drivers.clone();
+            let status_tx = skel.status_tx.clone();
+            tokio::spawn(async move {
+                loop {
+                    match drivers.status() {
+                        DriverStatus::Unknown => {
+                            status_tx.send(Status::Unknown).await;
+                        }
+                        DriverStatus::Pending => {
+                            status_tx.send(Status::Pending).await;
+                        }
+                        DriverStatus::Initializing => {
+                            status_tx.send(Status::Init).await;
+                        }
+                        DriverStatus::Ready => {
+                            status_tx.send(Status::Ready).await;
+                        }
+                        DriverStatus::Retrying(_) => {
+                            status_tx.send(Status::Panic).await;
+                        }
+                        DriverStatus::Fatal(_) => {
+                            status_tx.send(Status::Fatal).await;
+                        }
+                    }
+                    drivers.status_changed().await.unwrap();
+                }
+            });
+        }
+
+        let status_rx = skel.status_rx.clone();
+
         let kind = skel.kind.clone();
         {
             let star = Self {
@@ -603,7 +669,7 @@ where
             star.start();
         }
 
-        Ok(StarApi::new(kind, star_tx))
+        Ok(StarApi::new(kind, star_tx, status_rx))
     }
 
     fn start(mut self) {
@@ -687,6 +753,7 @@ where
     }
 
     async fn init_drivers(&self) {
+        self.skel.logger.info("Star::init_drivers()");
         self.drivers.init().await;
     }
 
