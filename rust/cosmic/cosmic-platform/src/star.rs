@@ -38,7 +38,7 @@ use cosmic_api::wave::{
 use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
 use cosmic_api::{MountKind, Registration, State, StateFactory, HYPERUSER};
 use cosmic_hyperlane::{HyperClient, HyperRouter, HyperwayExt};
-use dashmap::mapref::one::Ref;
+use dashmap::mapref::one::{Ref, RefMut};
 use dashmap::DashMap;
 use futures::future::{join_all, BoxFuture};
 use futures::FutureExt;
@@ -1703,31 +1703,36 @@ where
                 .send(assign.clone())
                 .unwrap_or_default();
 
-            // create field and shell
-            self.skel.state.create_field(
-                assign
-                    .details
-                    .stub
-                    .point
-                    .clone()
-                    .to_port()
-                    .with_layer(Layer::Field),
-            );
-            self.skel.state.create_shell(
-                assign
-                    .details
-                    .stub
-                    .point
-                    .clone()
-                    .to_port()
-                    .with_layer(Layer::Shell),
-            );
+            if self.skel.drivers.kinds().await?.contains(&assign.details.stub.kind) {
 
-            println!("ASSIGN {}", assign.details.stub.kind.to_string());
-            self.skel
-                .logger
-                .result(self.skel.drivers.assign(assign.clone()).await)?;
-            println!("driver assign worked...");
+                // create field and shell
+                self.skel.state.create_field(
+                    assign
+                        .details
+                        .stub
+                        .point
+                        .clone()
+                        .to_port()
+                        .with_layer(Layer::Field),
+                );
+                self.skel.state.create_shell(
+                    assign
+                        .details
+                        .stub
+                        .point
+                        .clone()
+                        .to_port()
+                        .with_layer(Layer::Shell),
+                );
+
+                println!("ASSIGN {}", assign.details.stub.kind.to_string());
+                self.skel
+                    .logger
+                    .result(self.skel.drivers.assign(assign.clone()).await)?;
+                println!("driver assign worked...");
+            } else {
+
+            }
 
             Ok(ReflectedCore::ok())
         } else {
@@ -1800,7 +1805,7 @@ where
 
 #[derive(Clone)]
 pub struct StarWrangles {
-    pub wrangles: Arc<DashMap<StarSub, RoundRobinWrangleSelector>>,
+    pub wrangles: Arc<DashMap<Kind, RoundRobinWrangleSelector>>,
 }
 
 impl StarWrangles {
@@ -1811,23 +1816,26 @@ impl StarWrangles {
     }
 
     pub fn add(&self, discoveries: Vec<StarDiscovery>) {
-        let mut map = HashMap::new();
         for discovery in discoveries {
-            match map.get_mut(&discovery.star_kind) {
-                None => {
-                    map.insert(discovery.star_kind.clone(), vec![discovery]);
+            for kind in discovery.kinds.clone() {
+                match self.wrangles.get_mut(&kind) {
+                    None => {
+                        let mut wrangler = RoundRobinWrangleSelector::new(kind.clone());
+                        wrangler.stars.push( discovery.clone() );
+                        wrangler.sort();
+                    }
+                    Some(mut wrangler) => {
+                        let mut wrangler = wrangler.value_mut();
+                        wrangler.stars.push(discovery.clone() );
+                        wrangler.sort();
+                    }
                 }
-                Some(discoveries) => discoveries.push(discovery),
             }
         }
 
-        for (kind, discoveries) in map {
-            let wrangler = RoundRobinWrangleSelector::new(kind, discoveries);
-            self.wrangles.insert(wrangler.kind.clone(), wrangler);
-        }
     }
 
-    pub fn verify(&self, kinds: &[&StarSub]) -> Result<(), MsgErr> {
+    pub fn verify(&self, kinds: &[&Kind]) -> Result<(), MsgErr> {
         for kind in kinds {
             if !self.wrangles.contains_key(*kind) {
                 return Err(format!(
@@ -1840,7 +1848,7 @@ impl StarWrangles {
         Ok(())
     }
 
-    pub async fn wrangle(&self, kind: &StarSub) -> Result<StarKey, MsgErr> {
+    pub async fn wrangle(&self, kind: &Kind ) -> Result<StarKey, MsgErr> {
         self.wrangles
             .get(kind)
             .ok_or(format!(
@@ -1854,31 +1862,34 @@ impl StarWrangles {
 }
 
 pub struct RoundRobinWrangleSelector {
-    pub kind: StarSub,
+    pub kind: Kind,
     pub stars: Vec<StarDiscovery>,
     pub index: Mutex<usize>,
     pub step_index: usize,
 }
 
 impl RoundRobinWrangleSelector {
-    pub fn new(kind: StarSub, mut stars: Vec<StarDiscovery>) -> Self {
-        stars.sort();
-        let mut step_index = 0;
+    pub fn new(kind: Kind) -> Self {
+
+        Self {
+            kind,
+            stars: vec![],
+            index: Mutex::new(0),
+            step_index:0,
+        }
+    }
+
+    pub fn sort(&mut self)  {
+        self.stars.sort();
+        self.step_index = 0;
         let mut hops: i32 = -1;
-        for discovery in &stars {
+        for discovery in &self.stars {
             if hops < 0 {
                 hops = discovery.hops as i32;
             } else if discovery.hops as i32 > hops {
                 break;
             }
-            step_index += 1;
-        }
-
-        Self {
-            kind,
-            stars,
-            index: Mutex::new(0),
-            step_index,
+            self.step_index += 1;
         }
     }
 
