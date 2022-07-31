@@ -1,17 +1,17 @@
 use crate::artifact::ArtifactRef;
 use crate::cache::{ArtifactItem, Cacheable};
 use crate::error::Error;
+use cosmic_api::id::id::Kind;
+use cosmic_api::id::ArtifactSubKind;
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::particle::Property;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::str::FromStr;
-use serde::{Deserialize, Serialize};
-use cosmic_api::id::ArtifactSubKind;
-use cosmic_api::id::id::Kind;
 
-#[derive(Clone,Serialize,Deserialize,Eq,PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ParticleConfig {
     pub artifact_ref: ArtifactRef,
     pub kind: Kind,
@@ -49,7 +49,10 @@ pub struct ContextualConfig {
 
 impl ContextualConfig {
     pub fn new(config: ArtifactItem<ParticleConfig>, address: Point) -> Self {
-        Self { config, point: address }
+        Self {
+            config,
+            point: address,
+        }
     }
 
     pub fn substitution_map(&self) -> Result<HashMap<String, String>, Error> {

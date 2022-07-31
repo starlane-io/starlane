@@ -1,13 +1,13 @@
 use std::env;
 use std::sync::Arc;
 
+use cosmic_api::id::id::BaseKind;
+use cosmic_api::sys::Assign;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use kube::api::{ListParams, PostParams};
 use kube::Api;
 use mesh_portal::version::latest::id::Point;
 use serde::{Deserialize, Serialize};
-use cosmic_api::id::id::BaseKind;
-use cosmic_api::sys::Assign;
 
 use crate::error::Error;
 use crate::star::core::particle::driver::ParticleCoreDriver;
@@ -19,39 +19,43 @@ pub struct K8sCoreDriver {
     starlane_meta: ObjectMeta,
     namespace: String,
     api_version: String,
-    resource_type: BaseKind
+    resource_type: BaseKind,
 }
 
 impl K8sCoreDriver {
     pub async fn new(skel: StarSkel, resource_type: BaseKind) -> Result<Self, Error> {
-
         let client = kube::Client::try_default().await?;
 
-        let kubernetes_instance_name = match env::var("STARLANE_KUBERNETES_INSTANCE_NAME"){
-            Ok(kubernetes_instance_name) => {kubernetes_instance_name}
+        let kubernetes_instance_name = match env::var("STARLANE_KUBERNETES_INSTANCE_NAME") {
+            Ok(kubernetes_instance_name) => kubernetes_instance_name,
             Err(_err) => {
                 error!("FATAL: env variable 'STARLANE_KUBERNETES_INSTANCE_NAME' must be set to a valid Starlane Kubernetes particle");
                 return Err("FATAL: env variable 'STARLANE_KUBERNETES_INSTANCE_NAME' must be set to a valid Starlane Kubernetes particle".into());
             }
         };
 
-        let namespace = match env::var("NAMESPACE"){
-            Ok(namespace) => {namespace}
+        let namespace = match env::var("NAMESPACE") {
+            Ok(namespace) => namespace,
             Err(_err) => {
                 warn!("NAMESPACE environment variable is not set, defaulting to 'default'");
                 "default".to_string()
             }
         };
 
-        let starlane_api: Api<crate::star::core::particle::driver::k8s::Starlane> = Api::namespaced(client.clone(), namespace.as_str() );
-        let starlane: crate::star::core::particle::driver::k8s::Starlane =  match starlane_api.get(kubernetes_instance_name.as_str()).await {
-            Ok(starlane) => starlane,
-            Err(_err) => {
-                let message = format!("FATAL: could not access Kubernetes starlane instance named '{}'", kubernetes_instance_name);
-                error!("{}",message);
-                return Err(message.into());
-            }
-        };
+        let starlane_api: Api<crate::star::core::particle::driver::k8s::Starlane> =
+            Api::namespaced(client.clone(), namespace.as_str());
+        let starlane: crate::star::core::particle::driver::k8s::Starlane =
+            match starlane_api.get(kubernetes_instance_name.as_str()).await {
+                Ok(starlane) => starlane,
+                Err(_err) => {
+                    let message = format!(
+                        "FATAL: could not access Kubernetes starlane instance named '{}'",
+                        kubernetes_instance_name
+                    );
+                    error!("{}", message);
+                    return Err(message.into());
+                }
+            };
         let starlane_meta: ObjectMeta = starlane.metadata.clone();
 
         let rtn = K8sCoreDriver {
@@ -60,24 +64,18 @@ impl K8sCoreDriver {
             namespace: namespace,
             starlane_meta: starlane_meta,
             api_version: starlane.api_version.clone(),
-            resource_type
+            resource_type,
         };
 
         Ok(rtn)
     }
 }
 
-
 #[async_trait]
 impl ParticleCoreDriver for K8sCoreDriver {
-
-     async fn assign(
-         &mut self,
-         assign: Assign,
-        ) -> Result<(), Error> {
-
-println!("Assigning Kube Resource Host....");
-         /*
+    async fn assign(&mut self, assign: Assign) -> Result<(), Error> {
+        println!("Assigning Kube Resource Host....");
+        /*
         let provisioners: Api<StarlaneProvisioner> = Api::default_namespaced(self.client.clone() );
         let parts: KindParts = assign.stub.kind.into();
         let mut list_params = ListParams::default();
@@ -126,27 +124,31 @@ println!("Assigning Kube Resource Host....");
         Ok(Payload::Empty)
 
           */
-         unimplemented!()
+        unimplemented!()
     }
-
 
     fn kind(&self) -> BaseKind {
         self.resource_type.clone()
     }
 }
 
-
+#[derive(kube::CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
+#[kube(
+    group = "starlane.starlane.io",
+    version = "v1alpha1",
+    kind = "Starlane",
+    namespaced
+)]
+struct StarlaneSpec {}
 
 #[derive(kube::CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
-#[kube(group = "starlane.starlane.io", version = "v1alpha1", kind = "Starlane", namespaced)]
-struct StarlaneSpec{
-}
-
-
-
-#[derive(kube::CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
-#[kube(group = "starlane.starlane.io", version = "v1alpha1", kind = "StarlaneResource", namespaced)]
-struct StarlaneResourceSpec{
+#[kube(
+    group = "starlane.starlane.io",
+    version = "v1alpha1",
+    kind = "StarlaneResource",
+    namespaced
+)]
+struct StarlaneResourceSpec {
     pub snakeKey: String,
     pub address: String,
     pub provisioner: String,
@@ -155,29 +157,10 @@ struct StarlaneResourceSpec{
 }
 
 #[derive(CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
-#[kube(group = "starlane.starlane.io", version = "v1alpha1", kind = "StarlaneProvisioner", namespaced)]
-struct StarlaneProvisionerSpec{
-
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#[kube(
+    group = "starlane.starlane.io",
+    version = "v1alpha1",
+    kind = "StarlaneProvisioner",
+    namespaced
+)]
+struct StarlaneProvisionerSpec {}

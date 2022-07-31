@@ -1,23 +1,13 @@
-
-
 pub struct ArtifactMemory {
-  pub map: LruCache<Point,Artifact>
+    pub map: LruCache<Point, Artifact>,
 }
 
-impl ArtifactApi for ArtifactMemory {
-
-}
-
-
-
-
-
+impl ArtifactApi for ArtifactMemory {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
-    }
+    fn it_works() {}
 }

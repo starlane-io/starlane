@@ -20,6 +20,8 @@ use crate::fail::Fail;
 use actix_web::ResponseError;
 use alcoholic_jwt::ValidationError;
 use ascii::FromAsciiError;
+use cosmic_api::error::StatusErr;
+use cosmic_nom::Span;
 use handlebars::RenderError;
 use http::header::{InvalidHeaderName, InvalidHeaderValue, ToStrError};
 use http::method::InvalidMethod;
@@ -27,12 +29,10 @@ use http::status::InvalidStatusCode;
 use http::uri::InvalidUri;
 use keycloak::KeycloakError;
 use mesh_portal::error::MsgErr;
-use cosmic_api::error::StatusErr;
 use nom_supreme::error::ErrorTree;
 use sqlx::error::DatabaseError;
 use tokio::task::JoinError;
 use wasmer::{CompileError, ExportError, RuntimeError};
-use cosmic_nom::Span;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Error {
@@ -66,10 +66,10 @@ impl Error {
         Self::from_internal(message)
     }
 
-    pub fn with_status( status: u16, message: &str ) -> Self {
-        Self{
+    pub fn with_status(status: u16, message: &str) -> Self {
+        Self {
             status,
-            message: message.to_string()
+            message: message.to_string(),
         }
     }
 }
@@ -141,7 +141,7 @@ impl From<nom::Err<ErrorTree<&str>>> for Error {
 
  */
 
-impl <I:Span+core::fmt::Debug> From<nom::Err<ErrorTree<I>>> for Error {
+impl<I: Span + core::fmt::Debug> From<nom::Err<ErrorTree<I>>> for Error {
     fn from(err: nom::Err<ErrorTree<I>>) -> Self {
         Error::from_internal(err)
     }
@@ -261,7 +261,6 @@ impl From<SemVerError> for Error {
     }
 }
 
-
 impl From<tokio::sync::oneshot::error::RecvError> for Error {
     fn from(err: tokio::sync::oneshot::error::RecvError) -> Self {
         Error::from_internal(err)
@@ -328,7 +327,6 @@ impl From<RuntimeError> for Error {
     }
 }
 
-
 impl Into<mesh_portal::version::latest::fail::Fail> for Error {
     fn into(self) -> mesh_portal::version::latest::fail::Fail {
         mesh_portal::version::latest::fail::Fail::Error(self.to_string())
@@ -392,13 +390,20 @@ impl From<reqwest::Error> for Error {
 impl From<alcoholic_jwt::ValidationError> for Error {
     fn from(err: alcoholic_jwt::ValidationError) -> Self {
         match err {
-            ValidationError::InvalidComponents => Self::with_status( 400, "Invalid Jwt Components"),
-            ValidationError::InvalidBase64(err) => Self::with_status( 400, format!("Invalid Jwt Base64: {}", err.to_string()).as_str() ),
-            ValidationError::InvalidJWK =>Self::with_status( 500, "Invalid Jwk"),
-            ValidationError::InvalidSignature => Self::with_status( 400, "Invalid Signature"),
-            ValidationError::OpenSSL(err) => Self::with_status( 500, format!("OpenSSL: {}",err.to_string()).as_str()),
-            ValidationError::JSON(json) => Self::with_status( 400, format!("JSON : {}",json.to_string()).as_str()),
-            ValidationError::InvalidClaims(claim) => {Self::with_status( 400, "Invalid claims")}
+            ValidationError::InvalidComponents => Self::with_status(400, "Invalid Jwt Components"),
+            ValidationError::InvalidBase64(err) => Self::with_status(
+                400,
+                format!("Invalid Jwt Base64: {}", err.to_string()).as_str(),
+            ),
+            ValidationError::InvalidJWK => Self::with_status(500, "Invalid Jwk"),
+            ValidationError::InvalidSignature => Self::with_status(400, "Invalid Signature"),
+            ValidationError::OpenSSL(err) => {
+                Self::with_status(500, format!("OpenSSL: {}", err.to_string()).as_str())
+            }
+            ValidationError::JSON(json) => {
+                Self::with_status(400, format!("JSON : {}", json.to_string()).as_str())
+            }
+            ValidationError::InvalidClaims(claim) => Self::with_status(400, "Invalid claims"),
         }
     }
 }
@@ -431,7 +436,7 @@ impl From<FromAsciiError<&str>> for Error {
 
 impl Into<MsgErr> for Error {
     fn into(self) -> MsgErr {
-        MsgErr::new( 500, self.message.as_str() )
+        MsgErr::new(500, self.message.as_str())
     }
 }
 
@@ -440,23 +445,17 @@ impl From<MsgErr> for Error {
         Error::from_internal(err)
     }
 }
-impl From<InvalidStatusCode> for Error{
+impl From<InvalidStatusCode> for Error {
     fn from(error: InvalidStatusCode) -> Self {
         Error::from_internal(error)
     }
 }
 
-
-impl From<sqlx::Error> for Error{
+impl From<sqlx::Error> for Error {
     fn from(error: sqlx::Error) -> Self {
         match error.as_database_error() {
-            None => {
-                Error::from_internal(format!("{:?}",error) )
-            }
-            Some(err) => {
-                Error::from_internal(err.message() )
-            }
+            None => Error::from_internal(format!("{:?}", error)),
+            Some(err) => Error::from_internal(err.message()),
         }
     }
 }
-

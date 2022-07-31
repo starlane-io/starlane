@@ -1,10 +1,10 @@
-use bincode::ErrorKind;
-use std::sync::{PoisonError, RwLockReadGuard, Arc, RwLockWriteGuard};
-use std::collections::HashMap;
 use crate::{MechtronFactory, MechtronWrapper};
+use bincode::ErrorKind;
+use std::collections::HashMap;
+use std::sync::{Arc, PoisonError, RwLockReadGuard, RwLockWriteGuard};
 
 pub struct Error {
-    pub message: String
+    pub message: String,
 }
 
 impl ToString for Error {
@@ -16,24 +16,21 @@ impl ToString for Error {
 impl From<&str> for Error {
     fn from(error: &str) -> Self {
         Self {
-            message: error.to_string()
+            message: error.to_string(),
         }
     }
 }
 
 impl From<String> for Error {
     fn from(error: String) -> Self {
-        Self {
-            message: error
-        }
+        Self { message: error }
     }
 }
-
 
 impl From<mesh_portal::error::MsgErr> for Error {
     fn from(error: mesh_portal::error::MsgErr) -> Self {
         Self {
-            message: error.to_string()
+            message: error.to_string(),
         }
     }
 }
@@ -41,7 +38,7 @@ impl From<mesh_portal::error::MsgErr> for Error {
 impl From<wasm_membrane_guest::error::Error> for Error {
     fn from(error: wasm_membrane_guest::error::Error) -> Self {
         Self {
-            message: error.to_string()
+            message: error.to_string(),
         }
     }
 }
@@ -49,15 +46,15 @@ impl From<wasm_membrane_guest::error::Error> for Error {
 impl From<Box<bincode::ErrorKind>> for Error {
     fn from(error: Box<ErrorKind>) -> Self {
         Self {
-            message: error.to_string()
+            message: error.to_string(),
         }
     }
 }
 
-impl <T> From<PoisonError<T>> for Error {
+impl<T> From<PoisonError<T>> for Error {
     fn from(_: PoisonError<T>) -> Self {
         Self {
-            message: "Poison error".to_string()
+            message: "Poison error".to_string(),
         }
     }
 }

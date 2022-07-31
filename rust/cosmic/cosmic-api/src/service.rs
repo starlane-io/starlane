@@ -1,16 +1,16 @@
 use crate::error::MsgErr;
-use crate::wave::{Agent, Method, Ping, DirectedCore, Pong, ReflectedCore};
 use crate::id::id::{Point, Topic};
+use crate::wave::{Agent, DirectedCore, Method, Ping, Pong, ReflectedCore};
 
+use crate::config::config::bind::RouteSelector;
 use crate::parse::model::MethodScopeSelector;
 use crate::security::Access;
 use crate::util::ValueMatcher;
+use crate::wave::DirectedHandler;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, RwLock};
-use crate::config::config::bind::RouteSelector;
-use crate::wave::DirectedHandler;
 
 pub trait AccessProvider: Send + Sync {
     fn access(&self, to: &Agent, on: &Point) -> Result<Access, MsgErr>;
@@ -28,6 +28,3 @@ impl AccessProvider for AllAccessProvider {
 pub trait Global: Send + Sync {
     async fn handle(&self, request: Ping) -> Pong;
 }
-
-
-

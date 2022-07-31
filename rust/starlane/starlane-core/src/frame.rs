@@ -1,26 +1,25 @@
-use std::fmt;
-use std::fmt::{Debug, Formatter};
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
+use std::fmt;
+use std::fmt::{Debug, Formatter};
 
+use cosmic_api::id::StarKey;
+use cosmic_api::sys::{Assign, ParticleRecord};
 use semver::SemVerError;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time::error::Elapsed;
-use cosmic_api::id::StarKey;
-use cosmic_api::sys::{Assign, ParticleRecord};
-
 
 use crate::error::Error;
+use crate::fail::{Fail, StarlaneFailure};
 use crate::id::Id;
 use crate::logger::Flags;
-use crate::message::{MessageExpect, MessageId, MessageUpdate, ProtoStarMessage, Reply};
 use crate::message::delivery::ActorMessage;
+use crate::message::{MessageExpect, MessageId, MessageUpdate, ProtoStarMessage, Reply};
 use crate::star::{Star, StarCommand, StarInfo, StarKind, StarNotify};
 use crate::watch::{Notification, Watch, WatchKey};
-use crate::fail::{Fail, StarlaneFailure};
 
-#[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
+#[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
 pub enum Frame {
     Proto(ProtoFrame),
     Diagnose(Diagnose),
@@ -30,15 +29,12 @@ pub enum Frame {
     Close,
 }
 
-
-#[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
+#[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
 pub enum WatchFrame {
     Watch(Watch),
     UnWatch(WatchKey),
-    Notify(Notification)
+    Notify(Notification),
 }
-
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SearchTraversal {
@@ -51,8 +47,6 @@ pub enum ProtoFrame {
     StarLaneProtocolVersion(i32),
     ReportStarKey(StarKey),
 }
-
-
 
 /*
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -147,12 +141,12 @@ impl SearchWindUp {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize,strum_macros::Display)]
+#[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
 pub enum StarPattern {
     Any,
     None,
     StarKey(StarKey),
-    StarKind(StarKind)
+    StarKind(StarKind),
 }
 
 impl StarPattern {
@@ -160,9 +154,7 @@ impl StarPattern {
         match self {
             StarPattern::Any => true,
             StarPattern::None => false,
-            StarPattern::StarKey(_) => {
-                self.key_match(&info.key)
-            }
+            StarPattern::StarKey(_) => self.key_match(&info.key),
             StarPattern::StarKind(pattern) => *pattern == info.kind,
         }
     }
@@ -175,7 +167,6 @@ impl StarPattern {
             StarPattern::StarKind(_) => false,
         }
     }
-
 
     pub fn is_single_match(&self) -> bool {
         match self {
@@ -297,7 +288,9 @@ impl StarMessage {
         let mut proto = ProtoStarMessage::new();
         proto.to = self.from.clone().into();
         proto.reply_to = Option::Some(self.id.clone());
-        proto.payload = StarMessagePayload::Reply(SimpleReply::Fail(Fail::Starlane(StarlaneFailure::Error(err))));
+        proto.payload = StarMessagePayload::Reply(SimpleReply::Fail(Fail::Starlane(
+            StarlaneFailure::Error(err),
+        )));
         proto
     }
 
@@ -329,7 +322,7 @@ pub enum StarMessagePayload {
     Response(RespShell),
     ResourceRegistry(ResourceRegistryRequest),
     ResourceHost(ResourceHostAction),
-//    Space(SpaceMessage),
+    //    Space(SpaceMessage),
     Reply(SimpleReply),
 }
 
@@ -341,7 +334,7 @@ impl Debug for StarMessagePayload {
             StarMessagePayload::ResourceRegistry(_) => "ResourceRegistry",
             StarMessagePayload::ResourceHost(_) => "ResourceHost",
             StarMessagePayload::Reply(_) => "Reply",
-            StarMessagePayload::Response(_) => "Response"
+            StarMessagePayload::Response(_) => "Response",
         });
         Ok(())
     }
@@ -363,13 +356,13 @@ pub enum ResourceHostAction {
     //IsHosting(Address),
     Assign(Assign),
     Init(Point),
-    GetState(Point)
+    GetState(Point),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResourceRegistryRequest {
     Location(ParticleRecord),
-    Find(Point)
+    Find(Point),
 }
 
 impl ToString for ResourceRegistryRequest {
@@ -380,10 +373,6 @@ impl ToString for ResourceRegistryRequest {
         }
     }
 }
-
-
-
-
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum SimpleReply {
@@ -512,7 +501,6 @@ pub enum SpacePayload {
 
  */
 
-
 #[derive(Clone, Serialize, Deserialize)]
 pub enum StarEvent {
     Lane(LaneEvent),
@@ -553,12 +541,11 @@ impl fmt::Display for StarMessagePayload {
             StarMessagePayload::ResourceRegistry(_) => "ResourceManager".to_string(),
             StarMessagePayload::ResourceHost(_) => "ResourceHost".to_string(),
             StarMessagePayload::Request(_) => "Request".to_string(),
-            StarMessagePayload::Response(_) => "Response".to_string()
+            StarMessagePayload::Response(_) => "Response".to_string(),
         };
         write!(f, "{}", r)
     }
 }
-
 
 impl fmt::Display for SearchTraversal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -569,8 +556,6 @@ impl fmt::Display for SearchTraversal {
         write!(f, "{}", r)
     }
 }
-
-
 
 impl fmt::Display for ProtoFrame {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -585,7 +570,3 @@ impl fmt::Display for ProtoFrame {
         write!(f, "{}", r)
     }
 }
-
-
-
-

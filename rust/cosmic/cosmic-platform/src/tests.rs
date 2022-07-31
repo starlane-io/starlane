@@ -2,9 +2,11 @@
 
 use super::*;
 use chrono::{DateTime, Utc};
+use cosmic_api::command::command::common::StateSrc;
 use cosmic_api::id::id::{Layer, ToPoint, ToPort, Uuid};
 use cosmic_api::id::TraversalDirection;
 use cosmic_api::msg::MsgMethod;
+use cosmic_api::sys::{Assign, AssignmentKind, Sys};
 use cosmic_api::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, HyperWave, SysMethod};
 use cosmic_api::{MountKind, NoDiceArtifactFetcher, HYPERUSER};
 use cosmic_hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
@@ -17,8 +19,6 @@ use tokio::join;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{oneshot, Mutex};
-use cosmic_api::command::command::common::StateSrc;
-use cosmic_api::sys::{Assign, AssignmentKind, Sys};
 //use crate::control::ControlDriverFactory;
 use crate::driver::DriverFactory;
 use crate::star::StarApi;
@@ -73,7 +73,7 @@ impl Platform for TestPlatform {
 
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
         let mut builder = DriversBuilder::new();
-       // builder.add( Box::new(ControlDriverFactory::new()));
+        // builder.add( Box::new(ControlDriverFactory::new()));
         builder
     }
 
@@ -315,7 +315,12 @@ impl PlatErr for TestErr {
     }
 }
 
-async fn create(ctx: &TestRegistryContext, particle: Point, location: Point, star_api: StarApi<TestPlatform> ) -> Result<(),TestErr>{
+async fn create(
+    ctx: &TestRegistryContext,
+    particle: Point,
+    location: Point,
+    star_api: StarApi<TestPlatform>,
+) -> Result<(), TestErr> {
     println!("ADDING PARTICLE: {}", particle.to_string());
     let details = Details::new(
         Stub {
@@ -327,10 +332,7 @@ async fn create(ctx: &TestRegistryContext, particle: Point, location: Point, sta
     );
     ctx.particles.insert(
         particle.clone(),
-        ParticleRecord::new(details.clone()
-            ,
-            location,
-        ),
+        ParticleRecord::new(details.clone(), location),
     );
 
     let mut wave = DirectedProto::ping();
@@ -339,7 +341,11 @@ async fn create(ctx: &TestRegistryContext, particle: Point, location: Point, sta
     wave.from(HYPERUSER.clone());
     wave.agent(Agent::HyperUser);
     wave.method(SysMethod::Assign);
-    wave.body(Substance::Sys(Sys::Assign(Assign::new(AssignmentKind::Create, details, StateSrc::None ))));
+    wave.body(Substance::Sys(Sys::Assign(Assign::new(
+        AssignmentKind::Create,
+        details,
+        StateSrc::None,
+    ))));
     let wave = wave.build()?;
     let wave = wave.to_ultra();
     star_api.to_gravity(wave).await;
@@ -365,23 +371,32 @@ fn test_gravity_routing() -> Result<(), TestErr> {
         let skel = star_api.get_skel().await.unwrap();
 
         let mut assign_rx = skel.diagnostic_interceptors.assignment.subscribe();
-        let (assign_rtn_tx,assign_rtn_rx) = oneshot::channel();
+        let (assign_rtn_tx, assign_rtn_rx) = oneshot::channel();
 
-        tokio::spawn( async move {
+        tokio::spawn(async move {
             assign_rx.recv().await;
             assign_rx.recv().await;
             assign_rtn_tx.send(());
         });
 
-        create(&platform.ctx, LESS.clone(), location.clone(), star_api.clone()).await?;
-        create(&platform.ctx, FAE.clone(), location.clone(), star_api.clone()).await?;
+        create(
+            &platform.ctx,
+            LESS.clone(),
+            location.clone(),
+            star_api.clone(),
+        )
+        .await?;
+        create(
+            &platform.ctx,
+            FAE.clone(),
+            location.clone(),
+            star_api.clone(),
+        )
+        .await?;
 
-
-        tokio::time::timeout( Duration::from_secs(5), assign_rtn_rx).await;
+        tokio::time::timeout(Duration::from_secs(5), assign_rtn_rx).await;
 
         panic!("far enough");
-
-
 
         let mut to_fabric_rx = skel.diagnostic_interceptors.to_gravity.subscribe();
         let mut from_hyperway_rx = skel.diagnostic_interceptors.from_hyperway.subscribe();
@@ -520,25 +535,37 @@ fn test_layer_traversal() -> Result<(), TestErr> {
         let stub = star_api.stub().await.unwrap();
         let location = stub.key.clone().to_point();
 
-
         //        let record = platform.global_registry().await.unwrap().locate(&LESS).await.expect("IS LESS THERE?");
 
         let skel = star_api.get_skel().await.unwrap();
 
         let mut assign_rx = skel.diagnostic_interceptors.assignment.subscribe();
-        let (assign_rtn_tx,assign_rtn_rx) = oneshot::channel();
+        let (assign_rtn_tx, assign_rtn_rx) = oneshot::channel();
 
-        tokio::spawn( async move {
+        tokio::spawn(async move {
             assign_rx.recv().await;
             assign_rx.recv().await;
             assign_rtn_tx.send(());
         });
 
-        create(&platform.ctx, LESS.clone(), location.clone(), star_api.clone()).await?;
-        create(&platform.ctx, FAE.clone(), location.clone(), star_api.clone()).await?;
+        create(
+            &platform.ctx,
+            LESS.clone(),
+            location.clone(),
+            star_api.clone(),
+        )
+        .await?;
+        create(
+            &platform.ctx,
+            FAE.clone(),
+            location.clone(),
+            star_api.clone(),
+        )
+        .await?;
 
-
-        tokio::time::timeout( Duration::from_secs(5), assign_rtn_rx).await.unwrap();
+        tokio::time::timeout(Duration::from_secs(5), assign_rtn_rx)
+            .await
+            .unwrap();
 
         let mut to_gravity_rx = skel.diagnostic_interceptors.to_gravity.subscribe();
         let mut from_hyperway_rx = skel.diagnostic_interceptors.from_hyperway.subscribe();
@@ -685,12 +712,14 @@ fn test_layer_traversal() -> Result<(), TestErr> {
             });
         }
 
-
         // send straight out of the star (circumvent layer traversal)
         star_api.to_gravity(wave).await;
 
         let mut to_gravity_rx = skel.diagnostic_interceptors.to_gravity.subscribe();
-        let wave = tokio::time::timeout(Duration::from_secs(5), reflected_endpoint.recv()).await.expect("reflected_endpoint").expect("reflected_endpoint");
+        let wave = tokio::time::timeout(Duration::from_secs(5), reflected_endpoint.recv())
+            .await
+            .expect("reflected_endpoint")
+            .expect("reflected_endpoint");
 
         let (check_to_gravity_tx, check_to_gravity_rx): (
             oneshot::Sender<Result<(), ()>>,
@@ -711,7 +740,10 @@ fn test_layer_traversal() -> Result<(), TestErr> {
             });
         }
 
-        tokio::time::timeout(Duration::from_secs(5),check_to_gravity_rx).await.expect("check_to_gravity_rx").expect("check_to_gravity_rx");
+        tokio::time::timeout(Duration::from_secs(5), check_to_gravity_rx)
+            .await
+            .expect("check_to_gravity_rx")
+            .expect("check_to_gravity_rx");
 
         Ok(())
     })
@@ -727,14 +759,16 @@ fn test_control() -> Result<(), TestErr> {
 
         let platform = TestPlatform::new();
         let machine_api = platform.machine();
-        tokio::time::timeout(Duration::from_secs(10), machine_api.wait_ready() ).await.unwrap();
+        tokio::time::timeout(Duration::from_secs(10), machine_api.wait_ready())
+            .await
+            .unwrap();
         //tokio::time::timeout( Duration::from_secs(15), machine_api.wait_ready()).await;
         //tokio::time::timeout( Duration::from_secs(15), machine_api.wait_ready()).await;
-//        machine_api.wait_ready().await;
+        //        machine_api.wait_ready().await;
 
         let star_api = machine_api.get_machine_star().await.unwrap();
 
-       // tokio::time::sleep(Duration::from_secs(8)).await;
+        // tokio::time::sleep(Duration::from_secs(8)).await;
         /*
         let less = star_api
             .create_mount(Agent::HyperUser, MountKind::Control)

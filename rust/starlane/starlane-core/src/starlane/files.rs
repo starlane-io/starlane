@@ -1,4 +1,3 @@
-
 use crate::error::Error;
 use crate::file_access::FileAccess;
 use cosmic_api::id::StarKey;
@@ -29,4 +28,3 @@ impl MachineFileSystem {
         self.data_access.clone()
     }
 }
-

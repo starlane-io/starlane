@@ -176,24 +176,23 @@ pub fn to_substance(item: TokenStream) -> TokenStream {
                     }
                 }
             } else {
-
                 xforms.push(quote! {
-                            impl ToSubstance<()> for #ident {
-                                fn to_substance(self) -> Result<(),MsgErr> {
-                                    match self {
-                                    Self::#variant_ident => Ok(()),
-                                    _ => Err(format!("expected Empty").into())
-                                    }
-                                }
-                                 fn to_substance_ref(&self) -> Result<&(),MsgErr> {
-                                    match self {
-                                    Self::#variant_ident => Ok(&()),
-                                    _ => Err(format!("expected Empty").into())
-                                    }
-                                }
-                            }
+                impl ToSubstance<()> for #ident {
+                    fn to_substance(self) -> Result<(),MsgErr> {
+                        match self {
+                        Self::#variant_ident => Ok(()),
+                        _ => Err(format!("expected Empty").into())
+                        }
+                    }
+                     fn to_substance_ref(&self) -> Result<&(),MsgErr> {
+                        match self {
+                        Self::#variant_ident => Ok(&()),
+                        _ => Err(format!("expected Empty").into())
+                        }
+                    }
+                }
 
-                            });
+                });
             }
         }
     } else {
@@ -204,7 +203,6 @@ pub fn to_substance(item: TokenStream) -> TokenStream {
 
     rtn.into()
 }
-
 
 #[cfg(test)]
 mod tests {

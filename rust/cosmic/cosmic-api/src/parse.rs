@@ -14,19 +14,15 @@ use nom::character::complete::{
 };
 use nom::combinator::{cut, eof, fail, not, peek, recognize, success, value, verify};
 
-use crate::error::{MsgErr, ParseErrs};
-use crate::command::command::common::{
-    PropertyMod, SetProperties, StateSrc, StateSrcVar,
-};
+use crate::command::command::common::{PropertyMod, SetProperties, StateSrc, StateSrcVar};
 use crate::command::request::create::{
     Create, CreateVar, KindTemplate, PointSegTemplate, PointTemplate, PointTemplateSeg,
     PointTemplateVar, Require, Strategy, Template, TemplateVar,
 };
 use crate::command::request::get::{Get, GetOp, GetVar};
-use crate::command::request::select::{
-    Select, SelectIntoSubstance, SelectKind, SelectVar,
-};
+use crate::command::request::select::{Select, SelectIntoSubstance, SelectKind, SelectVar};
 use crate::command::request::set::{Set, SetVar};
+use crate::error::{MsgErr, ParseErrs};
 use crate::id::id::{
     Kind, KindLex, Layer, Point, PointCtx, PointKindVar, PointSegCtx, PointSegDelim, PointSegVar,
     PointSegment, PointVar, Port, RouteSeg, RouteSegVar, Topic, Uuid, VarVal, Variable, Version,
@@ -114,7 +110,6 @@ pub fn local_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
 pub fn remote_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
     tag("REMOTE")(input).map(|(next, _)| (next, RouteSeg::Remote))
 }
-
 
 pub fn global_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
     tag("GLOBAL")(input).map(|(next, _)| (next, RouteSeg::Global))
@@ -1834,7 +1829,7 @@ pub struct Env {
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
     #[serde(default)]
-    pub var_resolvers: MultiVarResolver
+    pub var_resolvers: MultiVarResolver,
 }
 
 impl Env {
@@ -1844,7 +1839,7 @@ impl Env {
             point: working,
             vars: HashMap::new(),
             file_resolver: FileResolver::new(),
-            var_resolvers: MultiVarResolver::new()
+            var_resolvers: MultiVarResolver::new(),
         }
     }
 
@@ -1852,14 +1847,13 @@ impl Env {
         Self::new(Point::root())
     }
 
-
     pub fn push(self) -> Self {
         Self {
             point: self.point.clone(),
             parent: Some(Box::new(self)),
             vars: HashMap::new(),
             file_resolver: FileResolver::new(),
-            var_resolvers: MultiVarResolver::new()
+            var_resolvers: MultiVarResolver::new(),
         }
     }
 
@@ -1869,11 +1863,11 @@ impl Env {
             parent: Some(Box::new(self)),
             vars: HashMap::new(),
             file_resolver: FileResolver::new(),
-            var_resolvers: MultiVarResolver::new()
+            var_resolvers: MultiVarResolver::new(),
         })
     }
 
-    pub fn point_or(&self) -> Result<Point,MsgErr> {
+    pub fn point_or(&self) -> Result<Point, MsgErr> {
         Ok(self.point.clone())
     }
 
@@ -1883,14 +1877,14 @@ impl Env {
             .ok_or::<MsgErr>("expected parent scopedVars".into())?)
     }
 
-    pub fn add_var_resolver( &mut self, var_resolver: Arc<dyn VarResolver>) {
+    pub fn add_var_resolver(&mut self, var_resolver: Arc<dyn VarResolver>) {
         self.var_resolvers.push(var_resolver);
     }
 
     pub fn val<K: ToString>(&self, var: K) -> Result<Substance, ResolverErr> {
         match self.vars.get(&var.to_string()) {
             None => {
-                if let Ok(val) = self.var_resolvers.val(var.to_string().as_str() ) {
+                if let Ok(val) = self.var_resolvers.val(var.to_string().as_str()) {
                     Ok(val.clone())
                 } else if let Some(parent) = self.parent.as_ref() {
                     parent.val(var.to_string())
@@ -1910,9 +1904,9 @@ impl Env {
         &self.point
     }
 
-
     pub fn set_var_str<V: ToString>(&mut self, key: V, value: V) {
-        self.vars.insert(key.to_string(), Substance::Text(value.to_string()));
+        self.vars
+            .insert(key.to_string(), Substance::Text(value.to_string()));
     }
 
     pub fn set_var<V: ToString>(&mut self, key: V, value: Substance) {
@@ -1944,7 +1938,7 @@ impl Default for Env {
             point: Point::root(),
             vars: HashMap::new(),
             file_resolver: FileResolver::new(),
-            var_resolvers: MultiVarResolver::new()
+            var_resolvers: MultiVarResolver::new(),
         }
     }
 }
@@ -2070,8 +2064,7 @@ impl CompositeResolver {
     where
         S: ToString,
     {
-        self.scope_resolver
-            .insert(key.to_string(), value);
+        self.scope_resolver.insert(key.to_string(), value);
     }
 }
 
@@ -2142,7 +2135,10 @@ impl MapResolver {
 
 impl VarResolver for MapResolver {
     fn val(&self, var: &str) -> Result<Substance, ResolverErr> {
-        self.map.get(&var.to_string()).cloned().ok_or(ResolverErr::NotFound)
+        self.map
+            .get(&var.to_string())
+            .cloned()
+            .ok_or(ResolverErr::NotFound)
     }
 }
 
@@ -2987,10 +2983,7 @@ pub fn lex_child_scopes<I: Span>(parent: LexScope<I>) -> Result<LexParentScope<I
                 .clone(),
         )?;
 
-        let child = LexScope::new(
-            child_selector.into(),
-            parent.block,
-        );
+        let child = LexScope::new(child_selector.into(), parent.block);
 
         Ok(LexParentScope {
             selector: parent.selector.clone(),
@@ -3182,10 +3175,11 @@ pub fn next_stacked_name<I: Span>(input: I) -> Res<I, (I, Option<I>)> {
     )(input)
 }
 
-
 pub fn lex_scope_selector<I: Span>(input: I) -> Res<I, LexScopeSelector<I>> {
-    let (next, ((name, children),filters, path)) =
-        context("parsed-scope-selector", tuple((next_stacked_name, scope_filters, opt(path_regex))))(input.clone())?;
+    let (next, ((name, children), filters, path)) = context(
+        "parsed-scope-selector",
+        tuple((next_stacked_name, scope_filters, opt(path_regex))),
+    )(input.clone())?;
 
     Ok((next, LexScopeSelector::new(name, filters, path, children)))
 }
@@ -3453,20 +3447,22 @@ pub fn method_kind<I: Span>(input: I) -> Res<I, MethodKind> {
 }
 
 pub mod model {
-    use crate::error::{MsgErr, ParseErrs};
     use crate::command::request::RcCommandType;
     use crate::config::config::bind::{
-        BindConfig, WaveKind, PipelineStepCtx, PipelineStepDef, PipelineStepVar,
-        PipelineStopCtx, PipelineStopDef, PipelineStopVar,
+        BindConfig, PipelineStepCtx, PipelineStepDef, PipelineStepVar, PipelineStopCtx,
+        PipelineStopDef, PipelineStopVar, WaveKind,
     };
+    use crate::error::{MsgErr, ParseErrs};
     use crate::http::HttpMethod;
     use crate::id::id::{Point, PointCtx, PointVar, Version};
     use crate::parse::error::result;
-    use crate::parse::{camel_case_chars, filepath_chars, http_method, lex_child_scopes, method_kind, pipeline, rc_command_type, value_pattern, wrapped_http_method, wrapped_msg_method, CtxResolver, Env, ResolverErr, SubstParser, wrapped_cmd_method, wrapped_sys_method};
-    use crate::util::{
-        HttpMethodPattern, StringMatcher, ToResolved, ValueMatcher, ValuePattern,
+    use crate::parse::{
+        camel_case_chars, filepath_chars, http_method, lex_child_scopes, method_kind, pipeline,
+        rc_command_type, value_pattern, wrapped_cmd_method, wrapped_http_method,
+        wrapped_msg_method, wrapped_sys_method, CtxResolver, Env, ResolverErr, SubstParser,
     };
-    use crate::wave::{Method, MethodKind, DirectedCore, Ping, DirectedWave, SingularDirectedWave};
+    use crate::util::{HttpMethodPattern, StringMatcher, ToResolved, ValueMatcher, ValuePattern};
+    use crate::wave::{DirectedCore, DirectedWave, Method, MethodKind, Ping, SingularDirectedWave};
     use bincode::Options;
     use cosmic_nom::{new_span, Res, Span, Trace, Tw};
     use nom::bytes::complete::tag;
@@ -3673,7 +3669,6 @@ pub mod model {
         }
     }
 
-
     impl ValueMatcher<DirectedWave> for MessageScopeSelector {
         fn is_match(&self, directed: &DirectedWave) -> Result<(), ()> {
             self.name.is_match(&directed.core().method.kind())?;
@@ -3693,7 +3688,6 @@ pub mod model {
             }
         }
     }
-
 
     fn default_path<I: ToString>(path: Option<I>) -> Result<Regex, MsgErr> {
         match path {
@@ -3726,9 +3720,7 @@ pub mod model {
     }
 
     impl MessageScopeSelectorAndFilters {
-        pub fn from_selector<I: Span>(
-            selector: LexScopeSelector<I>,
-        ) -> Result<Self, MsgErr> {
+        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, MsgErr> {
             let filters = selector.filters.clone().to_scope_filters();
             let selector = MessageScopeSelector::from_selector(selector)?;
             Ok(Self { selector, filters })
@@ -3736,9 +3728,7 @@ pub mod model {
     }
 
     impl RouteScopeSelectorAndFilters {
-        pub fn from_selector<I: Span>(
-            selector: LexScopeSelector<I>,
-        ) -> Result<Self, MsgErr> {
+        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, MsgErr> {
             let filters = selector.filters.clone().to_scope_filters();
             let selector = RouteScopeSelector::new(selector.path.clone())?;
             Ok(Self { selector, filters })
@@ -3759,7 +3749,6 @@ pub mod model {
         }
     }
 
-
     impl ValueMatcher<DirectedWave> for MessageScopeSelectorAndFilters {
         fn is_match(&self, request: &DirectedWave) -> Result<(), ()> {
             // nothing for filters at this time...
@@ -3774,7 +3763,6 @@ pub mod model {
         }
     }
 
-
     impl ValueMatcher<DirectedWave> for MethodScopeSelectorAndFilters {
         fn is_match(&self, directed: &DirectedWave) -> Result<(), ()> {
             // nothing for filters at this time...
@@ -3788,7 +3776,6 @@ pub mod model {
             self.selector.is_match(directed)
         }
     }
-
 
     impl MethodScope {
         pub fn from_scope<I: Span>(
@@ -3873,13 +3860,12 @@ pub mod model {
                                         "invalid Sys method '{}'.  Sys should be CamelCase",
                                         selector.name.to_string()
                                     )
-                                        .as_str(),
+                                    .as_str(),
                                     "invalid Sys",
                                     selector.name,
                                 ))
                             }
                         }
-
                     }
                     MethodKind::Cmd => {
                         match result(value_pattern(wrapped_cmd_method)(selector.name.clone())) {
@@ -3890,13 +3876,12 @@ pub mod model {
                                         "invalid Cmd method '{}'.  Cmd should be CamelCase",
                                         selector.name.to_string()
                                     )
-                                        .as_str(),
+                                    .as_str(),
                                     "invalid Cmd",
                                     selector.name,
                                 ))
                             }
                         }
-
                     }
                     MethodKind::Msg => {
                         match result(value_pattern(wrapped_msg_method)(selector.name.clone())) {
@@ -3943,16 +3928,21 @@ pub mod model {
         pub name: I,
         pub filters: ScopeFiltersDef<I>,
         pub children: Option<I>,
-        pub path: Option<I>
+        pub path: Option<I>,
     }
 
     impl<I: ToString> LexScopeSelector<I> {
-        pub fn new(name: I, filters: ScopeFiltersDef<I>, path: Option<I>, children: Option<I>) -> Self {
+        pub fn new(
+            name: I,
+            filters: ScopeFiltersDef<I>,
+            path: Option<I>,
+            children: Option<I>,
+        ) -> Self {
             Self {
                 name,
                 filters,
                 children,
-                path
+                path,
             }
         }
     }
@@ -4031,8 +4021,7 @@ pub mod model {
     pub type ScopeFilters = ScopeFiltersDef<String>;
     pub type LexBlock<I> = Block<I, ()>;
     pub type LexRootScope<I> = Scope<RootScopeSelector<I, Spanned<I, Version>>, Block<I, ()>, I>;
-    pub type LexScope<I> =
-        Scope<LexScopeSelector<I>, Block<I, ()>, I>;
+    pub type LexScope<I> = Scope<LexScopeSelector<I>, Block<I, ()>, I>;
     pub type LexParentScope<I> = Scope<LexScopeSelector<I>, Vec<LexScope<I>>, I>;
 
     //pub type LexPipelineScope<I> = PipelineScopeDef<I, VarPipeline>;
@@ -5021,8 +5010,8 @@ use crate::cli::RawCommand;
 use crate::command::request::RcCommandType;
 use crate::command::CommandVar;
 use crate::config::config::bind::{
-    BindConfig, WaveKind, Pipeline, PipelineStep, PipelineStepCtx, PipelineStepVar,
-    PipelineStop, PipelineStopCtx, PipelineStopVar, RouteSelector,
+    BindConfig, Pipeline, PipelineStep, PipelineStepCtx, PipelineStepVar, PipelineStop,
+    PipelineStopCtx, PipelineStopVar, RouteSelector, WaveKind,
 };
 use crate::config::config::Document;
 use crate::http::HttpMethod;
@@ -5040,9 +5029,7 @@ use crate::parse::model::{
     ScopeFilterDef, ScopeFilters, ScopeFiltersDef, ScopeSelectorAndFiltersDef, Spanned, Subst,
     TerminatedBlockKind, TextType, Var, VarParser,
 };
-use crate::selector::selector::specific::{
-    ProductSelector, VariantSelector, VendorSelector,
-};
+use crate::selector::selector::specific::{ProductSelector, VariantSelector, VendorSelector};
 use crate::selector::selector::{
     ExactPointSeg, Hop, KindBaseSelector, KindSelector, LabeledPrimitiveTypeDef, MapEntryPattern,
     Pattern, PayloadType2Def, PointSegSelector, Selector, SpecificSelector, SubKindSelector,
@@ -5619,8 +5606,8 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
             BaseKind::Control => Ok((next, Kind::Control)),
             BaseKind::Portal => Ok((next, Kind::Portal)),
             BaseKind::Repo => Ok((next, Kind::Repo)),
-            BaseKind::Driver=> Ok((next, Kind::Driver)),
-            BaseKind::Global => Ok((next,Kind::Global))
+            BaseKind::Driver => Ok((next, Kind::Driver)),
+            BaseKind::Global => Ok((next, Kind::Global)),
         }
     }
 }
@@ -6675,8 +6662,7 @@ fn semantic_bind_scope<I: Span>(scope: LexScope<I>) -> Result<BindScope, MsgErr>
                 .with_label(
                     Label::new(
                         scope.selector.name.location_offset()
-                            ..scope.selector.name.location_offset()
-                                + scope.selector.name.len(),
+                            ..scope.selector.name.location_offset() + scope.selector.name.len(),
                     )
                     .with_message("Unrecognized Selector"),
                 )
@@ -6811,7 +6797,7 @@ pub fn pipeline_stop_var<I: Span>(input: I) -> Res<I, PipelineStopVar> {
         pair(
             context(
                 "pipeline:stop:expecting",
-                cut(peek(alt((tag("(("),tag("."), alpha1, tag("&"))))),
+                cut(peek(alt((tag("(("), tag("."), alpha1, tag("&"))))),
             ),
             alt((
                 core_pipeline_stop,
@@ -7098,11 +7084,9 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, MsgErr> {
 
 #[cfg(test)]
 pub mod test {
-    use crate::error::{MsgErr, ParseErrs};
-    use crate::command::request::create::{
-        PointSegTemplate, PointTemplate, PointTemplateCtx,
-    };
+    use crate::command::request::create::{PointSegTemplate, PointTemplate, PointTemplateCtx};
     use crate::config::config::Document;
+    use crate::error::{MsgErr, ParseErrs};
     use crate::id::id::{Point, PointCtx, PointSegVar, RouteSegVar};
     use crate::parse::error::result;
     use crate::parse::model::{
@@ -7111,18 +7095,17 @@ pub mod test {
     use crate::parse::{
         args, base_point_segment, comment, consume_point_var, ctx_seg, doc,
         expected_block_terminator_or_non_terminator, lex_block, lex_child_scopes, lex_nested_block,
-        lex_scope, lex_scope_pipeline_step_and_block, lex_scope_selector,
-        lex_scopes, lowercase1, mesh_eos, nested_block,
-        nested_block_content, next_stacked_name, no_comment, parse_bind_config,
-        parse_include_blocks, parse_inner_block, path_regex, pipeline, pipeline_segment,
-        pipeline_step_var, pipeline_stop_var, point_non_root_var, point_template, point_var, pop,
-        rec_version, root_scope, root_scope_selector, route_attribute, route_selector,
-        scope_filter, scope_filters, skewer_case_chars, skewer_dot, space_chars,
+        lex_scope, lex_scope_pipeline_step_and_block, lex_scope_selector, lex_scopes, lowercase1,
+        mesh_eos, nested_block, nested_block_content, next_stacked_name, no_comment,
+        parse_bind_config, parse_include_blocks, parse_inner_block, path_regex, pipeline,
+        pipeline_segment, pipeline_step_var, pipeline_stop_var, point_non_root_var, point_template,
+        point_var, pop, rec_version, root_scope, root_scope_selector, route_attribute,
+        route_selector, scope_filter, scope_filters, skewer_case_chars, skewer_dot, space_chars,
         space_no_dupe_dots, space_point_segment, strip_comments, subst, var_seg, variable_name,
         version, version_point_segment, wrapper, Env, MapResolver, SubstParser, VarResolver,
     };
-    use crate::{Substance, util};
     use crate::util::ToResolved;
+    use crate::{util, Substance};
     use bincode::config;
     use cosmic_nom::{new_span, span_with_extra, Res};
     use nom::branch::alt;
@@ -7901,17 +7884,23 @@ Hello my friend
         assert_eq!(pipes.selector.filters.len(), 0);
         assert!(pipes.pipeline_step.is_none());
 
-        assert_eq!(lex_scope_selector(new_span(
-            "<Route<Http>>/users/",
-        )).unwrap().0.len(), 0);
+        assert_eq!(
+            lex_scope_selector(new_span("<Route<Http>>/users/",))
+                .unwrap()
+                .0
+                .len(),
+            0
+        );
 
         util::log(result(lex_scope_selector(new_span(
             "Route<Http<Get>>/users/",
-        )))).unwrap();
+        ))))
+        .unwrap();
 
         let pipes = util::log(result(lex_scope(new_span(
             "Route<Http<Get>>/blah -[Text ]-> {}",
-        )))).unwrap();
+        ))))
+        .unwrap();
         assert_eq!(pipes.selector.name.to_string().as_str(), "Route");
         assert_eq!(
             Some(
@@ -8167,10 +8156,10 @@ pub fn rec_script_line<I: Span>(input: I) -> Res<I, I> {
 
 #[cfg(test)]
 pub mod cmd_test {
-    use core::str::FromStr;
-    use crate::error::MsgErr;
     use crate::command::{Command, CommandVar};
-    use crate::parse::{CamelCase, command, script};
+    use crate::error::MsgErr;
+    use crate::parse::{command, script, CamelCase};
+    use core::str::FromStr;
     use cosmic_nom::{new_span, Res};
     use nom::error::{VerboseError, VerboseErrorKind};
     use nom_supreme::final_parser::{final_parser, ExtractContext};
@@ -8215,7 +8204,10 @@ pub mod cmd_test {
         let (_, command) = command(new_span(input))?;
         match command {
             CommandVar::Create(create) => {
-                assert_eq!(create.template.kind.sub, Some(CamelCase::from_str("Keycloak").unwrap()));
+                assert_eq!(
+                    create.template.kind.sub,
+                    Some(CamelCase::from_str("Keycloak").unwrap())
+                );
             }
             _ => {
                 panic!("expected create command")

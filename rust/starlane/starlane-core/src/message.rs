@@ -370,10 +370,7 @@ impl StarlaneMessenger {
 
 #[async_trait]
 impl Transmitter for StarlaneMessenger {
-    async fn direct(
-        &self,
-        request: cosmic_api::wave::Ping,
-    ) -> cosmic_api::wave::Pong {
+    async fn direct(&self, request: cosmic_api::wave::Ping) -> cosmic_api::wave::Pong {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(StarlaneCommand::Request {
@@ -390,10 +387,7 @@ impl Transmitter for StarlaneMessenger {
         }
     }
 
-    fn send_sync(
-        &self,
-        request: cosmic_api::wave::Ping,
-    ) -> cosmic_api::wave::Pong {
+    fn send_sync(&self, request: cosmic_api::wave::Ping) -> cosmic_api::wave::Pong {
         let starlane_tx = self.tx.clone();
         tokio::runtime::Handle::current().block_on(async move {
             let (tx, rx) = oneshot::channel();

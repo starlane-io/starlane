@@ -10,9 +10,9 @@ use nom::multi::{many0, many1, separated_list0};
 use nom::sequence::{delimited, preceded, terminated, tuple};
 use nom::{AsChar, InputTakeAtPosition};
 use nom_supreme::parse_from_str;
-use std::str::FromStr;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize,Deserialize};
+use std::str::FromStr;
 /*
 
 pub fn parse_star_kind(input: &str) -> Res<&str, Result<StarKind, Error>> {

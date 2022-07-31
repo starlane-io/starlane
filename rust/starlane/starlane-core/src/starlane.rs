@@ -8,27 +8,27 @@ use std::str::FromStr;
 
 use std::sync::{Arc, Mutex};
 
-use std::time::Duration;
 use dashmap::DashMap;
+use std::time::Duration;
 
 use futures::future::join_all;
 use futures::{FutureExt, StreamExt, TryFutureExt};
 use mesh_portal::version::latest::frame::PrimitiveFrame;
-use mesh_portal_api_server::Portal;
 use mesh_portal::version::latest::id::{Point, Port};
 use mesh_portal::version::latest::path;
+use mesh_portal_api_server::Portal;
 
-use serde::{Deserialize, Serialize};
-use tokio::io::AsyncReadExt;
-use tokio::net::{TcpListener, TcpStream};
-use tokio::net::tcp::OwnedReadHalf;
-use tokio::sync::oneshot;
-use tokio::sync::{broadcast, mpsc};
-use mesh_portal::version::latest::messaging::{Agent, RespShell};
+use crate::artifact::ArtifactRef;
 use cosmic_api::id::id::ToPort;
 use cosmic_api::id::{MachineName, StarKey};
 use cosmic_api::wave::AsyncTransmitterWithAgent;
-use crate::artifact::ArtifactRef;
+use mesh_portal::version::latest::messaging::{Agent, RespShell};
+use serde::{Deserialize, Serialize};
+use tokio::io::AsyncReadExt;
+use tokio::net::tcp::OwnedReadHalf;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::oneshot;
+use tokio::sync::{broadcast, mpsc};
 
 use crate::cache::{ArtifactBundleSrc, ArtifactCaches, ProtoArtifactCachesFactory};
 use crate::constellation::{Constellation, ConstellationStatus};
@@ -36,11 +36,16 @@ use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::global::GlobalApi;
 
-use crate::lane::{ClientSideTunnelConnector, LocalTunnelConnector, OnCloseAction, ProtoLaneEnd, ServerSideTunnelConnector};
+use crate::lane::{
+    ClientSideTunnelConnector, LocalTunnelConnector, OnCloseAction, ProtoLaneEnd,
+    ServerSideTunnelConnector,
+};
 use crate::logger::{Flags, Logger};
 use crate::message::StarlaneMessenger;
 
-use crate::proto::{local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoStarKey, ProtoTunnel};
+use crate::proto::{
+    local_tunnels, ProtoStar, ProtoStarController, ProtoStarEvolution, ProtoStarKey, ProtoTunnel,
+};
 use crate::registry::{Registry, RegistryApi};
 
 use crate::star::surface::SurfaceApi;
@@ -50,15 +55,15 @@ use crate::starlane::api::StarlaneApi;
 use crate::starlane::files::MachineFileSystem;
 use crate::template::{
     ConstellationData, ConstellationLayout, ConstellationSelector, ConstellationTemplate,
-    ConstellationTemplateHandle, StarHandle,
-    StarInConstellationTemplateHandle, StarInConstellationTemplateSelector,
-    StarKeyConstellationIndexTemplate, StarKeySubgraphTemplate, StarKeyTemplate, StarSelector, StarTemplate,
+    ConstellationTemplateHandle, StarHandle, StarInConstellationTemplateHandle,
+    StarInConstellationTemplateSelector, StarKeyConstellationIndexTemplate,
+    StarKeySubgraphTemplate, StarKeyTemplate, StarSelector, StarTemplate,
 };
 use crate::user::HyperUser;
 use crate::util::{AsyncHashMap, JwksCache};
 
-pub mod files;
 pub mod api;
+pub mod files;
 
 lazy_static! {
 //    pub static ref DATA_DIR: Mutex<String> = Mutex::new("data".to_string());
@@ -75,9 +80,9 @@ pub struct StarlaneMachine {
     pub tx: mpsc::Sender<StarlaneCommand>,
     run_complete_signal_tx: broadcast::Sender<()>,
     machine_filesystem: Arc<MachineFileSystem>,
-    portals: Arc<DashMap<String,Portal>>,
+    portals: Arc<DashMap<String, Portal>>,
     pub registry: RegistryApi,
-    pub global: GlobalApi
+    pub global: GlobalApi,
 }
 
 impl StarlaneMachine {
@@ -87,23 +92,28 @@ impl StarlaneMachine {
 
     pub async fn new_with_artifact_caches(
         name: MachineName,
-        artifact_caches: Option<Arc<ProtoArtifactCachesFactory>>
+        artifact_caches: Option<Arc<ProtoArtifactCachesFactory>>,
     ) -> Result<Self, Error> {
-
         // presently we favor deletion since the persistence is not really working
-        let delete_cache_on_start = std::env::var("STARLANE_DELETE_CACHE_ON_START").unwrap_or("true".to_string()).parse::<bool>().unwrap_or(true);
-        let delete_data_on_start = std::env::var("STARLANE_DELETE_DATA_ON_START").unwrap_or("true".to_string()).parse::<bool>().unwrap_or(true);
+        let delete_cache_on_start = std::env::var("STARLANE_DELETE_CACHE_ON_START")
+            .unwrap_or("true".to_string())
+            .parse::<bool>()
+            .unwrap_or(true);
+        let delete_data_on_start = std::env::var("STARLANE_DELETE_DATA_ON_START")
+            .unwrap_or("true".to_string())
+            .parse::<bool>()
+            .unwrap_or(true);
 
         if delete_cache_on_start {
-            match fs::remove_dir_all(STARLANE_CACHE_DIR.to_string() ) {
+            match fs::remove_dir_all(STARLANE_CACHE_DIR.to_string()) {
                 Ok(_) => {}
                 Err(err) => {
-                    error!("{}",err.to_string());
+                    error!("{}", err.to_string());
                 }
             }
         }
         if delete_data_on_start {
-            fs::remove_dir_all(STARLANE_DATA_DIR.to_string() ).unwrap_or_default();
+            fs::remove_dir_all(STARLANE_DATA_DIR.to_string()).unwrap_or_default();
         }
 
         let runner = StarlaneMachineRunner::new_with_artifact_caches(name, artifact_caches)?;
@@ -111,20 +121,23 @@ impl StarlaneMachine {
         let run_complete_signal_tx = runner.run();
         let registry = Registry::new().await?;
         let registry = Arc::new(registry);
-        let global = GlobalApi::new( registry.clone(), Arc::new(StarlaneMessenger::new(tx.clone())) );
+        let global = GlobalApi::new(
+            registry.clone(),
+            Arc::new(StarlaneMessenger::new(tx.clone())),
+        );
         let starlane = Self {
             tx: tx,
             run_complete_signal_tx: run_complete_signal_tx,
             machine_filesystem: Arc::new(MachineFileSystem::new()?),
             portals: Arc::new(DashMap::new()),
             registry,
-            global
+            global,
         };
 
         Result::Ok(starlane)
     }
 
-    pub async fn cache( &self, artifact: &ArtifactRef)  -> Result<ArtifactCaches,Error> {
+    pub async fn cache(&self, artifact: &ArtifactRef) -> Result<ArtifactCaches, Error> {
         let mut cache = self.get_proto_artifact_caches_factory().await?.create();
         cache.cache(vec![artifact.clone()]).await?;
         Ok(cache.to_caches().await?)
@@ -132,15 +145,13 @@ impl StarlaneMachine {
 
     pub async fn get_proto_artifact_caches_factory(
         &self,
-    ) -> Result<Arc<ProtoArtifactCachesFactory>,Error> {
+    ) -> Result<Arc<ProtoArtifactCachesFactory>, Error> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(StarlaneCommand::GetProtoArtifactCachesFactory(tx))
             .await?;
         Ok(rx.await?.ok_or("expected proto artifact cache")?)
     }
-
-
 
     pub fn machine_filesystem(&self) -> Arc<MachineFileSystem> {
         self.machine_filesystem.clone()
@@ -176,7 +187,7 @@ impl StarlaneMachine {
     pub async fn get_starlane_api(&self, port: Port) -> Result<StarlaneApi, Error> {
         let (tx, rx) = oneshot::channel();
         self.tx
-            .send(StarlaneCommand::StarlaneApiSelectBest{port,tx})
+            .send(StarlaneCommand::StarlaneApiSelectBest { port, tx })
             .await?;
         rx.await?
     }
@@ -205,7 +216,6 @@ pub struct StarlaneMachineRunner {
 
 impl StarlaneMachineRunner {
     pub fn new(machine: String, api: StarlaneMessenger) -> Result<Self, Error> {
-
         Self::new_with_artifact_caches(machine, Option::None)
     }
 
@@ -213,15 +223,11 @@ impl StarlaneMachineRunner {
         machine: String,
         artifact_caches: Option<Arc<ProtoArtifactCachesFactory>>,
     ) -> Result<Self, Error> {
-
         let (command_tx, command_rx) = mpsc::channel(32);
-        let data_access = FileAccess::new(
-            std::env::var("STARLANE_DATA_DIR").unwrap_or("data".to_string()),
-        )?;
-        let cache_access = FileAccess::new(
-            std::env::var("STARLANE_CACHE_DIR").unwrap_or("cache".to_string()),
-        )?;
-
+        let data_access =
+            FileAccess::new(std::env::var("STARLANE_DATA_DIR").unwrap_or("data".to_string()))?;
+        let cache_access =
+            FileAccess::new(std::env::var("STARLANE_CACHE_DIR").unwrap_or("cache".to_string()))?;
 
         Ok(StarlaneMachineRunner {
             name: machine,
@@ -240,17 +246,14 @@ impl StarlaneMachineRunner {
         })
     }
 
-    pub async fn get_starlane_api(&self, port: Port ) -> Result<StarlaneApi, Error> {
-        let messenger = StarlaneMessenger::new(
-            self.command_tx.clone()
-        );
-        let messenger = AsyncTransmitterWithAgent::new(Agent::Anonymous, port, Arc::new(messenger)  );
+    pub async fn get_starlane_api(&self, port: Port) -> Result<StarlaneApi, Error> {
+        let messenger = StarlaneMessenger::new(self.command_tx.clone());
+        let messenger = AsyncTransmitterWithAgent::new(Agent::Anonymous, port, Arc::new(messenger));
         let api = StarlaneApi::new(messenger);
         Ok(api)
     }
 
     async fn get_best_surface_api(&self) -> Result<SurfaceApi, Error> {
-
         let map = match self.star_controllers.clone().into_map().await {
             Ok(map) => map,
             Err(err) => {
@@ -258,13 +261,9 @@ impl StarlaneMachineRunner {
             }
         };
         if map.is_empty() {
-            return Err(
-                "ERROR: cannot create StarlaneApi: no StarControllers available."
-                    .into(),
-            );
+            return Err("ERROR: cannot create StarlaneApi: no StarControllers available.".into());
         }
-        let values: Vec<StarController> =
-            map.into_iter().map(|(_k, v)| v).collect();
+        let values: Vec<StarController> = map.into_iter().map(|(_k, v)| v).collect();
 
         let mut best = Option::None;
 
@@ -293,7 +292,6 @@ impl StarlaneMachineRunner {
         Ok(star_ctrl.surface_api.clone())
     }
 
-
     pub fn run(mut self) -> broadcast::Sender<()> {
         let command_tx = self.command_tx.clone();
         tokio::spawn(async move {
@@ -306,18 +304,17 @@ impl StarlaneMachineRunner {
         let run_complete_signal_tx_rtn = run_complete_signal_tx.clone();
 
         tokio::spawn(async move {
-
             while let Option::Some(command) = self.command_rx.recv().await {
                 match command {
                     StarlaneCommand::Request { request, tx } => {
                         match self.get_best_surface_api().await {
                             Ok(surface_api) => {
-                                tokio::spawn( async move {
+                                tokio::spawn(async move {
                                     tx.send(surface_api.exchange(request).await);
                                 });
                             }
                             Err(err) => {
-                                error!("{}",err.to_string());
+                                error!("{}", err.to_string());
                                 tx.send(request.status(503));
                             }
                         }
@@ -333,7 +330,7 @@ impl StarlaneMachineRunner {
                         }
                         command.tx.send(result);
                     }
-                    StarlaneCommand::StarlaneApiSelectBest{ port, tx} =>{
+                    StarlaneCommand::StarlaneApiSelectBest { port, tx } => {
                         tx.send(self.get_starlane_api(port).await);
                     }
                     StarlaneCommand::Shutdown => {
@@ -344,11 +341,11 @@ impl StarlaneMachineRunner {
                             mut_flags.listening
                         };
 
-/*                        if listening {
-                            Self::unlisten(self.inner_flags.clone(), self.port.clone());
-                        }
+                        /*                        if listening {
+                                                   Self::unlisten(self.inner_flags.clone(), self.port.clone());
+                                               }
 
- */
+                        */
 
                         for (_, star_ctrl) in self
                             .star_controllers
@@ -380,7 +377,6 @@ impl StarlaneMachineRunner {
         });
         run_complete_signal_tx_rtn
     }
-
 
     async fn select_star_kind(&self, kind: &StarKind) -> Result<Option<StarController>, Error> {
         let map = self.star_controllers.clone().into_map().await?;
@@ -431,7 +427,7 @@ impl StarlaneMachineRunner {
                     star_template.handle.to_string()
                 ))?;
             if self.name == *machine {
-                let star_key = StarKey::new(&name, &star_template.handle ) ;
+                let star_key = StarKey::new(&name, &star_template.handle);
                 // hacking to ProtoStarKey so we don't have to trouble with fixing the old setup yet
                 let proto_star_key = ProtoStarKey::Key(star_key.clone());
 
@@ -450,13 +446,17 @@ impl StarlaneMachineRunner {
 
                 if self.artifact_caches.is_none() {
                     let messenger = Arc::new(StarlaneMessenger::new(self.command_tx.clone()));
-                    let messenger = AsyncTransmitterWithAgent::new(Agent::Anonymous, star_key.into(), messenger );
+                    let messenger = AsyncTransmitterWithAgent::new(
+                        Agent::Anonymous,
+                        star_key.into(),
+                        messenger,
+                    );
                     let api = StarlaneApi::new(messenger);
 
                     let caches = Arc::new(ProtoArtifactCachesFactory::new(
                         ArtifactBundleSrc::STARLANE_API(api),
                         self.cache_access.clone(),
-                        starlane_machine.clone()
+                        starlane_machine.clone(),
                     )?);
                     self.artifact_caches = Option::Some(caches);
                 }
@@ -541,10 +541,8 @@ impl StarlaneMachineRunner {
                             proto_lane_evolution_rxs.append(&mut evolution_rxs);
                         }
                         ConstellationSelector::Named(constellation_name) => {
-                            let constellation = self
-                                .constellations
-                                .get(constellation_name)
-                                .ok_or(format!(
+                            let constellation =
+                                self.constellations.get(constellation_name).ok_or(format!(
                                 "cannot select constellation named '{}' on this StarlaneMachine",
                                 constellation_name
                             ))?;
@@ -637,7 +635,6 @@ impl StarlaneMachineRunner {
         Ok(())
     }
 
-
     pub fn caches(&self) -> Result<Arc<ProtoArtifactCachesFactory>, Error> {
         Ok(self
             .artifact_caches
@@ -689,8 +686,8 @@ impl StarlaneMachineRunner {
         high_star_ctrl: StarController,
         low_star_ctrl: StarController,
     ) -> Result<Vec<broadcast::Receiver<Result<(), Error>>>, Error> {
-        let high_lane = ProtoLaneEnd::new(Option::None, OnCloseAction::Remove );
-        let low_lane = ProtoLaneEnd::new(Option::None, OnCloseAction::Remove );
+        let high_lane = ProtoLaneEnd::new(Option::None, OnCloseAction::Remove);
+        let low_lane = ProtoLaneEnd::new(Option::None, OnCloseAction::Remove);
         let rtn = vec![high_lane.get_evoltion_rx(), low_lane.get_evoltion_rx()];
         let connector = LocalTunnelConnector::new(&high_lane, &low_lane).await?;
         high_star_ctrl
@@ -713,9 +710,9 @@ impl StarlaneMachineRunner {
         &mut self,
         low_star_ctrl: StarController,
         stream: TcpStream,
-        on_close_action: OnCloseAction
+        on_close_action: OnCloseAction,
     ) -> Result<broadcast::Receiver<Result<(), Error>>, Error> {
-        let low_lane = ProtoLaneEnd::new(Option::None, on_close_action  );
+        let low_lane = ProtoLaneEnd::new(Option::None, on_close_action);
         let rtn = low_lane.get_evoltion_rx();
 
         let connector_ctrl = ServerSideTunnelConnector::new(&low_lane, stream).await?;
@@ -739,8 +736,7 @@ impl StarlaneMachineRunner {
         host_address: String,
         selector: StarInConstellationTemplateSelector,
         key_requestor: bool,
-        on_close_action: OnCloseAction
-
+        on_close_action: OnCloseAction,
     ) -> Result<broadcast::Receiver<Result<(), Error>>, Error> {
         let mut lane = ProtoLaneEnd::new(Option::None, on_close_action);
         lane.key_requestor = key_requestor;
@@ -761,8 +757,6 @@ impl StarlaneMachineRunner {
 
         Ok(rtn)
     }
-
-
 }
 
 impl Drop for StarlaneMachineRunner {
@@ -775,8 +769,6 @@ impl Drop for StarlaneMachineRunner {
             if !flags_mut.shutdown {
                 warn!("dropping Starlane( {} ) unexpectedly", self.name);
             }
-
-
         }
     }
 }
@@ -790,9 +782,15 @@ pub struct VersionFrame {
 #[derive(strum_macros::Display)]
 pub enum StarlaneCommand {
     ConstellationCreate(ConstellationCreate),
-    StarlaneApiSelectBest{port: Port, tx: oneshot::Sender<Result<StarlaneApi, Error>>},
+    StarlaneApiSelectBest {
+        port: Port,
+        tx: oneshot::Sender<Result<StarlaneApi, Error>>,
+    },
     GetProtoArtifactCachesFactory(oneshot::Sender<Option<Arc<ProtoArtifactCachesFactory>>>),
-    Request{ request: mesh_portal::version::latest::messaging::ReqShell, tx: oneshot::Sender<mesh_portal::version::latest::messaging::RespShell>},
+    Request {
+        request: mesh_portal::version::latest::messaging::ReqShell,
+        tx: oneshot::Sender<mesh_portal::version::latest::messaging::RespShell>,
+    },
     Shutdown,
 }
 
@@ -864,10 +862,9 @@ impl StarlaneInnerFlags {
     }
 }
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct UsernameAndPasswordAuth {
     pub userbase: String,
     pub username: String,
-    pub password: String
+    pub password: String,
 }
-

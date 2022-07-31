@@ -12,7 +12,7 @@ pub static VERSION: i32 = 1;
 pub struct WasmMembrane {
     pub instance: Instance,
     init: String,
-    name: String
+    name: String,
 }
 
 impl WasmMembrane {
@@ -379,7 +379,11 @@ impl WasmMembrane {
     pub fn new(module: Arc<Module>, name: String) -> Result<Arc<Self>, Error> {
         Self::new_with_init(module, name, "membrane_guest_init".to_string())
     }
-    pub fn new_with_init(module: Arc<Module>, init: String, name: String) -> Result<Arc<Self>, Error> {
+    pub fn new_with_init(
+        module: Arc<Module>,
+        init: String,
+        name: String,
+    ) -> Result<Arc<Self>, Error> {
         Self::new_with_init_and_imports(module, init, name, Option::None)
     }
 
@@ -436,7 +440,7 @@ impl WasmMembrane {
         let membrane = Arc::new(WasmMembrane {
             instance: instance,
             init,
-            name
+            name,
         });
 
         {

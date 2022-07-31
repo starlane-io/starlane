@@ -1,12 +1,12 @@
-use cosmic_api::State;
-use dashmap::DashSet;
+use crate::field::FieldState;
+use cosmic_api::id::id;
 use cosmic_api::id::id::{Point, Uuid};
 use cosmic_api::particle::particle::Details;
-use std::sync::Arc;
-use serde::{Deserialize, Serialize};
-use cosmic_api::id::id;
 use cosmic_api::wave::WaveId;
-use crate::field::FieldState;
+use cosmic_api::State;
+use dashmap::DashSet;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct ShellState {

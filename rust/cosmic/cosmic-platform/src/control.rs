@@ -1,27 +1,33 @@
-use crate::driver::{Item, ItemSkel, Driver, DriverFactory,  DriverSkel, DriverStatus, DriverInitCtx};
+use crate::driver::{
+    Driver, DriverFactory, DriverInitCtx, DriverSkel, DriverStatus, Item, ItemSkel,
+};
 use crate::star::{LayerInjectionRouter, StarSkel};
 use crate::{Platform, Registry};
+use cosmic_api::command::command::common::StateSrc;
 use cosmic_api::command::request::create::{Create, PointFactoryU64, TemplateDef};
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{Kind, Layer, Point, Port, ToPoint, ToPort};
 use cosmic_api::id::{StarSub, TraversalInjection};
 use cosmic_api::substance::substance::Substance;
-use cosmic_api::sys::{Assign, InterchangeKind, ControlPattern, Greet, Knock, AssignmentKind};
+use cosmic_api::sys::{Assign, AssignmentKind, ControlPattern, Greet, InterchangeKind, Knock};
 use cosmic_api::wave::Agent::Anonymous;
-use cosmic_api::wave::{DirectedProto, RecipientSelector};
 use cosmic_api::wave::{
     Agent, CoreBounce, DirectedHandler, InCtx, ProtoTransmitter, ProtoTransmitterBuilder,
     RootInCtx, Signal, UltraWave, Wave,
 };
 use cosmic_api::wave::{DirectedHandlerSelector, SetStrategy, TxRouter};
+use cosmic_api::wave::{DirectedProto, RecipientSelector};
 use cosmic_api::{Registration, State};
-use cosmic_hyperlane::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, HyperAuthenticator, HyperConnectionErr, HyperGate, HyperGreeter, Hyperway, HyperwayExt, HyperwayInterchange, HyperwayStub, InterchangeGate};
+use cosmic_hyperlane::{
+    AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, HyperAuthenticator,
+    HyperConnectionErr, HyperGate, HyperGreeter, Hyperway, HyperwayExt, HyperwayInterchange,
+    HyperwayStub, InterchangeGate,
+};
 use dashmap::DashMap;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
-use cosmic_api::command::command::common::StateSrc;
 
 /*
 pub struct ControlDriverFactory<P>

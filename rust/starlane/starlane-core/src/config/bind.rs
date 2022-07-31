@@ -1,12 +1,12 @@
-use std::convert::TryInto;
-use std::sync::Arc;
-use mesh_portal::version::latest::bin::Bin;
-use mesh_portal::version::latest::config::bind::BindConfig;
-use cosmic_api::parse::{bind_config, doc};
 use crate::artifact::ArtifactRef;
-use crate::cache::{CachedConfig};
+use crate::cache::CachedConfig;
 use crate::error::Error;
 use crate::particle::config::Parser;
+use cosmic_api::parse::{bind_config, doc};
+use mesh_portal::version::latest::bin::Bin;
+use mesh_portal::version::latest::config::bind::BindConfig;
+use std::convert::TryInto;
+use std::sync::Arc;
 
 pub struct BindConfigParser;
 
@@ -17,14 +17,18 @@ impl BindConfigParser {
 }
 
 impl Parser<CachedConfig<BindConfig>> for BindConfigParser {
-    fn parse(&self, artifact: ArtifactRef, _data: Bin ) -> Result<Arc<CachedConfig<BindConfig>>, Error> {
-        let raw = String::from_utf8(_data.to_vec() )?;
-println!("\n{}\n",raw);
+    fn parse(
+        &self,
+        artifact: ArtifactRef,
+        _data: Bin,
+    ) -> Result<Arc<CachedConfig<BindConfig>>, Error> {
+        let raw = String::from_utf8(_data.to_vec())?;
+        println!("\n{}\n", raw);
         let bind = bind_config(raw.as_str())?;
         let config = CachedConfig {
-            artifact_ref : artifact,
+            artifact_ref: artifact,
             item: bind,
-            references: vec![]
+            references: vec![],
         };
         Ok(Arc::new(config))
     }

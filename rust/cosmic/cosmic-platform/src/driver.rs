@@ -3,6 +3,7 @@ use crate::star::StarCall::LayerTraversalInjection;
 use crate::star::{LayerInjectionRouter, StarSkel, StarState, StateApi, StateCall};
 use crate::{PlatErr, Platform, RegistryApi};
 use cosmic_api::command::command::common::{SetProperties, StateSrc};
+use cosmic_api::command::request::create::{Create, Strategy};
 use cosmic_api::config::config::bind::RouteSelector;
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{
@@ -35,7 +36,6 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::watch::Ref;
 use tokio::sync::{broadcast, mpsc, oneshot, watch, RwLock};
-use cosmic_api::command::request::create::Strategy;
 
 pub struct DriversBuilder<P>
 where
@@ -68,10 +68,18 @@ where
         call_tx: mpsc::Sender<DriversCall<P>>,
         call_rx: mpsc::Receiver<DriversCall<P>>,
         status_tx: watch::Sender<DriverStatus>,
-        status_rx: watch::Receiver<DriverStatus>
+        status_rx: watch::Receiver<DriverStatus>,
     ) -> DriversApi<P> {
         let port = skel.point.push("drivers").unwrap().to_port();
-        Drivers::new(port, skel.clone(), self.map, call_tx, call_rx, status_tx, status_rx )
+        Drivers::new(
+            port,
+            skel.clone(),
+            self.map,
+            call_tx,
+            call_rx,
+            status_tx,
+            status_rx,
+        )
     }
 }
 
@@ -84,7 +92,7 @@ where
     AddDriver {
         kind: Kind,
         driver: DriverApi<P>,
-        rtn: oneshot::Sender<()>
+        rtn: oneshot::Sender<()>,
     },
     Visit(Traversal<UltraWave>),
     Kinds(oneshot::Sender<Vec<Kind>>),
@@ -187,7 +195,7 @@ where
         call_tx: mpsc::Sender<DriversCall<P>>,
         call_rx: mpsc::Receiver<DriversCall<P>>,
         watch_status_tx: watch::Sender<DriverStatus>,
-        watch_status_rx: watch::Receiver<DriverStatus>
+        watch_status_rx: watch::Receiver<DriverStatus>,
     ) -> DriversApi<P> {
         let statuses_rx = Arc::new(DashMap::new());
         let drivers = HashMap::new();
@@ -233,7 +241,7 @@ where
                     DriversCall::Init1 => {
                         self.init1().await;
                     }
-                    DriversCall::AddDriver { kind, driver, rtn} => {
+                    DriversCall::AddDriver { kind, driver, rtn } => {
                         self.drivers.insert(kind, driver);
                         rtn.send(());
                     }
@@ -269,23 +277,23 @@ where
         self.factories.keys().cloned().into_iter().collect()
     }
     pub async fn init0(&mut self) {
-
         let (status_tx, mut status_rx) = watch::channel(DriverStatus::Pending);
         self.statuses_rx.insert(Kind::Driver, status_rx.clone());
 
         let driver_driver_factory = Arc::new(DriverDriverFactory::new());
-        self.create(Kind::Driver, driver_driver_factory, status_tx).await;
+        self.create(Kind::Driver, driver_driver_factory, status_tx)
+            .await;
 
         // wait for DriverDriver to be ready
         let call_tx = self.call_tx.clone();
-        tokio::spawn( async move {
+        tokio::spawn(async move {
             loop {
                 if status_rx.borrow().clone() == DriverStatus::Ready {
                     break;
                 }
                 status_rx.changed().await.unwrap();
             }
-            call_tx.send( DriversCall::Init1).await;
+            call_tx.send(DriversCall::Init1).await;
         });
     }
 
@@ -301,7 +309,7 @@ where
 
         for (kind, status_tx) in statuses_tx {
             let factory = self.factories.get(&kind).unwrap().clone();
-            self.create(kind,factory, status_tx).await;
+            self.create(kind, factory, status_tx).await;
         }
     }
 
@@ -347,14 +355,18 @@ where
                 if readies == statuses_rx.len() {
                     status_tx.send(DriverStatus::Ready).await;
                 } else if fatals > 0 {
-                    status_tx.send(DriverStatus::Fatal(
-                        "One or more Drivers have a Fatal condition".to_string(),
-                    )).await;
+                    status_tx
+                        .send(DriverStatus::Fatal(
+                            "One or more Drivers have a Fatal condition".to_string(),
+                        ))
+                        .await;
                     break;
                 } else if retries > 0 {
-                    status_tx.send(DriverStatus::Fatal(
-                        "One or more Drivers is Retrying initialization".to_string(),
-                    )).await;
+                    status_tx
+                        .send(DriverStatus::Fatal(
+                            "One or more Drivers is Retrying initialization".to_string(),
+                        ))
+                        .await;
                 } else if inits > 0 {
                     status_tx.send(DriverStatus::Initializing).await;
                 } else {
@@ -374,7 +386,12 @@ where
         });
     }
 
-    async fn create( &self, kind: Kind, factory: Arc<dyn DriverFactory<P>>, status_tx: watch::Sender<DriverStatus>) {
+    async fn create(
+        &self,
+        kind: Kind,
+        factory: Arc<dyn DriverFactory<P>>,
+        status_tx: watch::Sender<DriverStatus>,
+    ) {
         {
             let skel = self.skel.clone();
             let call_tx = self.call_tx.clone();
@@ -385,8 +402,8 @@ where
                 point: &Point,
                 logger: &PointLogger,
             ) -> Result<(), P::Err>
-                where
-                    P: Platform,
+            where
+                P: Platform,
             {
                 let registration = Registration {
                     point: point.clone(),
@@ -399,9 +416,7 @@ where
 
                 skel.registry.register(&registration).await?;
                 skel.registry.assign(&point, &skel.point).await?;
-                skel.registry
-                    .set_status(&point, &Status::Init)
-                    .await?;
+                skel.registry.set_status(&point, &Status::Init).await?;
                 skel.api.create_states(point.clone()).await;
                 Ok(())
             }
@@ -416,7 +431,7 @@ where
                 tokio::spawn(async move {
                     loop {
                         let status = status_rx.borrow().clone();
-                        logger.info(format!("{} {}", kind.to_string(), status.to_string() ));
+                        logger.info(format!("{} {}", kind.to_string(), status.to_string()));
                         status_rx.changed().await.unwrap();
                     }
                 });
@@ -441,14 +456,32 @@ where
                 SetStrategy::Override(point.clone().to_port().with_layer(Layer::Core));
             let transmitter = transmitter.build();
 
-            let (shell_tx, shell_rx) = mpsc::channel(1024);
+            let (runner_tx, runner_rx) = mpsc::channel(1024);
+            let (request_tx, mut request_rx) = mpsc::channel(1024);
             let driver_skel = DriverSkel::new(
                 kind.clone(),
                 point.clone(),
                 transmitter,
                 logger.clone(),
                 status_tx,
+                request_tx,
             );
+
+            {
+                let runner_tx = runner_tx.clone();
+                let logger = logger.clone();
+                tokio::spawn(async move {
+                    while let Some(request) = request_rx.recv().await {
+                        logger
+                            .result(
+                                runner_tx
+                                    .send(DriverRunnerCall::DriverRunnerRequest(request))
+                                    .await,
+                            )
+                            .unwrap_or_default();
+                    }
+                });
+            }
 
             {
                 let skel = self.skel.clone();
@@ -471,22 +504,27 @@ where
                                 driver_skel.clone(),
                                 skel.clone(),
                                 driver,
-                                shell_tx,
-                                shell_rx,
+                                runner_tx,
+                                runner_rx,
                                 status_rx.clone(),
                             );
                             let driver = DriverApi::new(runner.clone(), factory.kind());
-                            let (rtn,rtn_rx) = oneshot::channel();
+                            let (rtn, rtn_rx) = oneshot::channel();
                             call_tx
                                 .send(DriversCall::AddDriver { kind, driver, rtn })
                                 .await
                                 .unwrap_or_default();
                             rtn_rx.await;
-                            runner.send( DriverRunnerCall::OnAdded ).await;
+                            runner.send(DriverRunnerCall::OnAdded).await;
                         }
                         Err(err) => {
                             logger.error(err.to_string());
-                            driver_skel.status_tx.send(DriverStatus::Fatal("Driver Factory creation error".to_string())).await;
+                            driver_skel
+                                .status_tx
+                                .send(DriverStatus::Fatal(
+                                    "Driver Factory creation error".to_string(),
+                                ))
+                                .await;
                         }
                     }
                 });
@@ -601,12 +639,9 @@ where
         Self { call_tx: tx, kind }
     }
 
-
     pub fn on_added(&self) {
-        self.call_tx
-            .try_send(DriverRunnerCall::OnAdded);
+        self.call_tx.try_send(DriverRunnerCall::OnAdded);
     }
-
 
     pub async fn assign(&self, assign: Assign) -> Result<(), MsgErr> {
         let (rtn, rtn_rx) = oneshot::channel();
@@ -692,7 +727,18 @@ where
         assign: Assign,
         rtn: oneshot::Sender<Result<(), MsgErr>>,
     },
-    OnAdded
+    OnAdded,
+    DriverRunnerRequest(DriverRunnerRequest<P>),
+}
+
+pub enum DriverRunnerRequest<P>
+where
+    P: Platform,
+{
+    Create {
+        create: Create,
+        rtn: oneshot::Sender<Result<(), P::Err>>,
+    },
 }
 
 pub struct ItemShell<P>
@@ -819,10 +865,17 @@ where
             while let Some(call) = self.call_rx.recv().await {
                 match call {
                     DriverRunnerCall::OnAdded => {
-                        let router = Arc::new(LayerInjectionRouter::new( self.star_skel.clone(), self.skel.point.clone().to_port().with_layer(Layer::Core)));
-                        let transmitter = ProtoTransmitter::new( router, self.star_skel.exchanger.clone() );
+                        let router = Arc::new(LayerInjectionRouter::new(
+                            self.star_skel.clone(),
+                            self.skel.point.clone().to_port().with_layer(Layer::Core),
+                        ));
+                        let transmitter =
+                            ProtoTransmitter::new(router, self.star_skel.exchanger.clone());
                         let ctx = DriverInitCtx::new(transmitter);
-                        self.driver.init(self.skel.clone(), ctx ).await;
+                        self.skel
+                            .logger
+                            .result(self.driver.init(self.skel.clone(), ctx).await)
+                            .unwrap_or_default();
                     }
                     DriverRunnerCall::Traversal(traversal) => {
                         self.traverse(traversal).await;
@@ -851,6 +904,9 @@ where
                     DriverRunnerCall::Assign { assign, rtn } => {
                         rtn.send(self.driver.assign(assign).await);
                     }
+                    DriverRunnerCall::DriverRunnerRequest(request) => match request {
+                        DriverRunnerRequest::Create { create, rtn } => {}
+                    },
                 }
             }
         });
@@ -898,8 +954,6 @@ where
             _ => Err(MsgErr::bad_request()),
         }
     }
-
-
 }
 
 pub struct DriverInitCtx {
@@ -922,6 +976,7 @@ where
     pub logger: PointLogger,
     pub status_rx: watch::Receiver<DriverStatus>,
     pub status_tx: mpsc::Sender<DriverStatus>,
+    pub request_tx: mpsc::Sender<DriverRunnerRequest<P>>,
     pub phantom: PhantomData<P>,
 }
 
@@ -939,6 +994,7 @@ where
         transmitter: ProtoTransmitter,
         logger: PointLogger,
         status_tx: watch::Sender<DriverStatus>,
+        request_tx: mpsc::Sender<DriverRunnerRequest<P>>,
     ) -> Self {
         let (mpsc_status_tx, mut mpsc_status_rx): (
             tokio::sync::mpsc::Sender<DriverStatus>,
@@ -962,7 +1018,20 @@ where
             status_tx: mpsc_status_tx,
             status_rx: watch_status_rx,
             phantom: Default::default(),
+            request_tx,
         }
+    }
+
+    pub async fn create(&self, create: Create) -> Result<(), P::Err> {
+        let (rtn, rtn_rx) = oneshot::channel();
+        self.logger
+            .result(
+                self.request_tx
+                    .send(DriverRunnerRequest::Create { create, rtn })
+                    .await,
+            )
+            .unwrap_or_default();
+        rtn_rx.await?
     }
 }
 
@@ -991,8 +1060,11 @@ where
 {
     fn kind(&self) -> Kind;
 
-    async fn init(&self, skel: DriverSkel<P>, ctx: DriverInitCtx ) {
-        skel.logger.result(skel.status_tx.send( DriverStatus::Ready ).await).unwrap_or_default();
+    async fn init(&self, skel: DriverSkel<P>, ctx: DriverInitCtx) -> Result<(), P::Err> {
+        skel.logger
+            .result(skel.status_tx.send(DriverStatus::Ready).await)
+            .unwrap_or_default();
+        Ok(())
     }
 
     async fn item(&self, point: &Point) -> Result<Box<dyn ItemHandler<P>>, P::Err>;

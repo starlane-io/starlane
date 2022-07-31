@@ -1,5 +1,5 @@
-use mesh_portal::version::latest::id::RouteSegment;
 use cosmic_api::service::Global;
+use mesh_portal::version::latest::id::RouteSegment;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
 
@@ -11,11 +11,11 @@ use crate::frame::{
 };
 use crate::lane::{LaneKey, LaneSession, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply};
-use cosmic_api::sys::ParticleRecord;
 use crate::star::core::message::CoreMessageCall;
 use crate::star::variant::FrameVerdict;
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
+use cosmic_api::sys::ParticleRecord;
 
 #[derive(Clone)]
 pub struct RouterApi {
@@ -78,9 +78,8 @@ impl RouterComponent {
         let skel = self.skel.clone();
         tokio::spawn(async move {
             if message.to == skel.info.key {
-                if let StarMessagePayload::ResourceRegistry(ResourceRegistryRequest::Find(
-                                                                point,
-                )) = &message.payload
+                if let StarMessagePayload::ResourceRegistry(ResourceRegistryRequest::Find(point)) =
+                    &message.payload
                 {
                     if let RouteSegment::Fabric(_) = &point.route {
                         let result = skel.sys_api.get_record(point.clone()).await;

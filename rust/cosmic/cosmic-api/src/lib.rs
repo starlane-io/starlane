@@ -26,6 +26,7 @@ pub mod msg;
 pub mod parse;
 pub mod particle;
 pub mod portal;
+pub mod property;
 pub mod quota;
 pub mod security;
 pub mod selector;
@@ -34,10 +35,10 @@ pub mod substance;
 pub mod sys;
 pub mod util;
 pub mod wave;
-pub mod property;
 
 use crate::bin::Bin;
 use crate::command::command::common::{SetProperties, SetRegistry};
+use crate::command::request::create::{KindTemplate, Strategy};
 use crate::command::request::delete::Delete;
 use crate::command::request::query::{Query, QueryResult};
 use crate::command::request::select::{Select, SubSelect};
@@ -49,7 +50,7 @@ use crate::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarSub, UserBaseSubK
 use crate::particle::particle::{Details, Properties, Status, Stub};
 use crate::security::{Access, AccessGrant};
 use crate::selector::selector::Selector;
-use crate::substance::substance::{Substance, SubstanceList, Token, ToSubstance};
+use crate::substance::substance::{Substance, SubstanceList, ToSubstance, Token};
 use crate::sys::ParticleRecord;
 use crate::wave::{Agent, ReflectedCore};
 use ::http::StatusCode;
@@ -61,9 +62,6 @@ use std::cmp::Ordering;
 use std::ops::Deref;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::command::request::create::{KindTemplate, Strategy};
-
-
 
 lazy_static! {
     pub static ref VERSION: semver::Version = semver::Version::from_str("1.0.0").unwrap();
@@ -83,11 +81,10 @@ pub struct ArtifactApi {
 }
 
 impl ArtifactApi {
-
-    pub fn new( fetcher: Arc<dyn ArtifactFetcher> ) -> Self {
+    pub fn new(fetcher: Arc<dyn ArtifactFetcher>) -> Self {
         Self {
             binds: Arc::new(RwLock::new(LruCache::new(1024))),
-            fetcher
+            fetcher,
         }
     }
 
@@ -111,7 +108,7 @@ impl ArtifactApi {
 
     async fn get<A>(&self, point: &Point) -> Result<A, MsgErr>
     where
-        A: TryFrom<Vec<u8>,Error=MsgErr>,
+        A: TryFrom<Vec<u8>, Error = MsgErr>,
     {
         if !point.has_bundle() {
             return Err("point is not from a bundle".into());
@@ -121,9 +118,7 @@ impl ArtifactApi {
     }
 }
 
-pub struct NoDiceArtifactFetcher {
-
-}
+pub struct NoDiceArtifactFetcher {}
 
 impl NoDiceArtifactFetcher {
     pub fn new() -> Self {
@@ -178,14 +173,12 @@ impl<A> Drop for ArtRef<A> {
 }
 
 #[async_trait]
-pub trait ArtifactFetcher: Send+Sync {
-    async fn stub(&self, point: &Point) -> Result<Stub,MsgErr>;
-    async fn fetch(&self, point: &Point) -> Result<Vec<u8>,MsgErr>;
+pub trait ArtifactFetcher: Send + Sync {
+    async fn stub(&self, point: &Point) -> Result<Stub, MsgErr>;
+    async fn fetch(&self, point: &Point) -> Result<Vec<u8>, MsgErr>;
 }
 
-pub struct FetchErr {
-
-}
+pub struct FetchErr {}
 
 #[cfg(test)]
 pub mod tests {
@@ -543,9 +536,8 @@ pub struct Registration {
     pub registry: SetRegistry,
     pub properties: SetProperties,
     pub owner: Point,
-    pub strategy: Strategy
+    pub strategy: Strategy,
 }
-
 
 #[derive(Clone)]
 pub enum MountKind {

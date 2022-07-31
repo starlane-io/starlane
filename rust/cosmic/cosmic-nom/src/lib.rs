@@ -1,14 +1,17 @@
 #![allow(warnings)]
-use std::ops::{Deref, Range, RangeFrom, RangeTo};
-use nom::{AsBytes, AsChar, Compare, CompareResult, FindSubstring, InputIter, InputLength, InputTake, InputTakeAtPosition, IResult, Needed, Offset, Slice};
-use nom_locate::LocatedSpan;
-use std::sync::Arc;
-use nom::error::{ErrorKind, ParseError};
-use serde::{Deserialize, Serialize};
-use nom_supreme::error::ErrorTree;
-use nom::combinator::recognize;
-use nom::sequence::delimited;
 use nom::character::complete::multispace0;
+use nom::combinator::recognize;
+use nom::error::{ErrorKind, ParseError};
+use nom::sequence::delimited;
+use nom::{
+    AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength,
+    InputTake, InputTakeAtPosition, Needed, Offset, Slice,
+};
+use nom_locate::LocatedSpan;
+use nom_supreme::error::ErrorTree;
+use serde::{Deserialize, Serialize};
+use std::ops::{Deref, Range, RangeFrom, RangeTo};
+use std::sync::Arc;
 
 #[cfg(test)]
 mod tests {
@@ -88,17 +91,17 @@ impl<'a> Span for Wrap<LocatedSpan<&'a str, Arc<String>>> {
 }
 
 // TraceWrap
-#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Tw<W> {
     pub trace: Trace,
-    pub w: W
+    pub w: W,
 }
 
-impl <W> Tw<W> {
-    pub fn new<I:Span>( span: I, w: W ) -> Self {
+impl<W> Tw<W> {
+    pub fn new<I: Span>(span: I, w: W) -> Self {
         Self {
             trace: span.trace(),
-            w
+            w,
         }
     }
 
@@ -107,13 +110,16 @@ impl <W> Tw<W> {
     }
 }
 
-impl <W> ToString for Tw<W> where W:ToString {
+impl<W> ToString for Tw<W>
+where
+    W: ToString,
+{
     fn to_string(&self) -> String {
         self.w.to_string()
     }
 }
 
-impl <W> Deref for Tw<W> {
+impl<W> Deref for Tw<W> {
     type Target = W;
 
     fn deref(&self) -> &Self::Target {
@@ -122,68 +128,65 @@ impl <W> Deref for Tw<W> {
 }
 
 pub fn tw<I, F, O>(mut f: F) -> impl FnMut(I) -> Res<I, Tw<O>>
-    where
-        I: Span,
-        F: FnMut(I) -> Res<I, O> ,
+where
+    I: Span,
+    F: FnMut(I) -> Res<I, O>,
 {
     move |input: I| {
-        let (next,output) = f(input.clone())?;
+        let (next, output) = f(input.clone())?;
 
-        let span = input.slice( 0..next.len() );
-        let tw = Tw::new( span, output);
+        let span = input.slice(0..next.len());
+        let tw = Tw::new(span, output);
 
-        Ok((next,tw))
+        Ok((next, tw))
     }
 }
-
 
 //pub type OwnedSpan<'a> = LocatedSpan<&'a str, SpanExtra>;
 pub type SpanExtra = Arc<String>;
 
-pub fn new_span<'a>(s: &'a str) -> Wrap<LocatedSpan<&'a str,Arc<String>>>{
+pub fn new_span<'a>(s: &'a str) -> Wrap<LocatedSpan<&'a str, Arc<String>>> {
     let extra = Arc::new(s.to_string());
     let span = LocatedSpan::new_extra(s, extra);
-    Wrap::new(span )
+    Wrap::new(span)
 }
 
-pub fn span_with_extra<'a>(s: &'a str, extra: Arc<String>) -> Wrap<LocatedSpan<&'a str,Arc<String>>>{
+pub fn span_with_extra<'a>(
+    s: &'a str,
+    extra: Arc<String>,
+) -> Wrap<LocatedSpan<&'a str, Arc<String>>> {
     Wrap::new(LocatedSpan::new_extra(s, extra))
 }
 
-
-#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq,Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct Trace {
     pub range: Range<usize>,
-    pub extra: SpanExtra
+    pub extra: SpanExtra,
 }
 
 impl Trace {
-    pub fn new( range: Range<usize>, extra: SpanExtra) -> Self {
-        Self {
-            range,
-            extra
-        }
+    pub fn new(range: Range<usize>, extra: SpanExtra) -> Self {
+        Self { range, extra }
     }
 
-    pub fn at_offset( offset: usize, extra: SpanExtra ) -> Self {
+    pub fn at_offset(offset: usize, extra: SpanExtra) -> Self {
         Self {
             range: offset..offset,
-            extra
+            extra,
         }
     }
 
-    pub fn scan<F,I:Span,O>( f: F, input: I ) -> Self where F: FnMut(I) -> Res<I,O>+Copy {
+    pub fn scan<F, I: Span, O>(f: F, input: I) -> Self
+    where
+        F: FnMut(I) -> Res<I, O> + Copy,
+    {
         let extra = input.extra();
         let range = input.location_offset()..len(f)(input);
-        Self {
-            range,
-            extra
-        }
+        Self { range, extra }
     }
 }
 
-
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct SliceStr {
     location_offset: usize,
     len: usize,
@@ -192,11 +195,14 @@ pub struct SliceStr {
 
 impl ToString for SliceStr {
     fn to_string(&self) -> String {
-        self.string.as_str().slice(self.location_offset..self.location_offset+self.len ).to_string()
+        self.string
+            .as_str()
+            .slice(self.location_offset..self.location_offset + self.len)
+            .to_string()
     }
 }
 
-impl  SliceStr {
+impl SliceStr {
     pub fn new(string: String) -> Self {
         Self::from_arc(Arc::new(string))
     }
@@ -206,20 +212,24 @@ impl  SliceStr {
             len: string.len(),
             string,
             location_offset: 0,
-            }
+        }
     }
 
-
     pub fn from(string: Arc<String>, location_offset: usize, len: usize) -> Self {
-        Self { string,
+        Self {
+            string,
             location_offset,
-            len }
+            len,
+        }
     }
 }
 
 impl SliceStr {
     pub fn as_str(&self) -> &str {
-        &self.string.as_str().slice(self.location_offset..self.location_offset+self.len)
+        &self
+            .string
+            .as_str()
+            .slice(self.location_offset..self.location_offset + self.len)
     }
 }
 
@@ -233,37 +243,39 @@ impl Deref for SliceStr {
 
 impl AsBytes for SliceStr {
     fn as_bytes(&self) -> &[u8] {
-println!("AS BYTES: {}",self.string.as_bytes().len());
-        self.string.as_bytes().slice(self.location_offset..self.location_offset+self.len)
+        println!("AS BYTES: {}", self.string.as_bytes().len());
+        self.string
+            .as_bytes()
+            .slice(self.location_offset..self.location_offset + self.len)
     }
 }
 
 impl Slice<Range<usize>> for SliceStr {
     fn slice(&self, range: Range<usize>) -> Self {
-        SliceStr{
-            location_offset: self.location_offset+range.start,
-            len: range.end-range.start,
-            string: self.string.clone()
+        SliceStr {
+            location_offset: self.location_offset + range.start,
+            len: range.end - range.start,
+            string: self.string.clone(),
         }
     }
 }
 
 impl Slice<RangeFrom<usize>> for SliceStr {
     fn slice(&self, range: RangeFrom<usize>) -> Self {
-        SliceStr{
-            location_offset: self.location_offset+range.start,
-            len: self.len-range.start,
-            string: self.string.clone()
+        SliceStr {
+            location_offset: self.location_offset + range.start,
+            len: self.len - range.start,
+            string: self.string.clone(),
         }
     }
 }
 
 impl Slice<RangeTo<usize>> for SliceStr {
     fn slice(&self, range: RangeTo<usize>) -> Self {
-        SliceStr{
+        SliceStr {
             location_offset: self.location_offset,
             len: range.end,
-            string: self.string.clone()
+            string: self.string.clone(),
         }
     }
 }
@@ -290,35 +302,29 @@ impl Offset for SliceStr {
     }
 }
 
-pub struct MyCharIterator {
-
-}
+pub struct MyCharIterator {}
 
 pub struct MyChars {
-    index:usize,
-    slice:SliceStr
+    index: usize,
+    slice: SliceStr,
 }
 
 impl MyChars {
-    pub fn new( slice: SliceStr ) -> Self {
-        Self {
-            index: 0,
-            slice
-        }
+    pub fn new(slice: SliceStr) -> Self {
+        Self { index: 0, slice }
     }
 }
-
 
 impl Iterator for MyChars {
     type Item = char;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut chars = self.slice.as_str().chars();
-        let next = chars.nth(self.index );
+        let next = chars.nth(self.index);
         match next {
             None => None,
             Some(next) => {
-                self.index = self.index +1;
+                self.index = self.index + 1;
                 Some(next)
             }
         }
@@ -326,39 +332,35 @@ impl Iterator for MyChars {
 }
 
 pub struct CharIterator {
-    index:usize,
-    slice:SliceStr
+    index: usize,
+    slice: SliceStr,
 }
 
 impl CharIterator {
-    pub fn new( slice: SliceStr ) -> Self {
-        Self {
-            index: 0,
-            slice
-        }
+    pub fn new(slice: SliceStr) -> Self {
+        Self { index: 0, slice }
     }
 }
 
 impl Iterator for CharIterator {
-    type Item = (usize,char);
+    type Item = (usize, char);
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut chars = self.slice.as_str().chars();
-        let next = chars.nth(self.index );
+        let next = chars.nth(self.index);
         match next {
             None => None,
             Some(next) => {
                 //let byte_index = self.index * std::mem::size_of::<char>();
                 let byte_index = self.index;
-                self.index = self.index +1;
-                Some((byte_index,next))
+                self.index = self.index + 1;
+                Some((byte_index, next))
             }
         }
     }
 }
 
-
-impl  InputIter for SliceStr {
+impl InputIter for SliceStr {
     type Item = char;
     type Iter = CharIterator;
     type IterElem = MyChars;
@@ -373,8 +375,8 @@ impl  InputIter for SliceStr {
     }
     #[inline]
     fn position<P>(&self, predicate: P) -> Option<usize>
-        where
-            P: Fn(Self::Item) -> bool,
+    where
+        P: Fn(Self::Item) -> bool,
     {
         self.as_str().position(predicate)
     }
@@ -383,21 +385,29 @@ impl  InputIter for SliceStr {
     fn slice_index(&self, count: usize) -> Result<usize, nom::Needed> {
         self.as_str().slice_index(count)
     }
-
 }
 
-
-impl  InputTakeAtPosition for SliceStr{
+impl InputTakeAtPosition for SliceStr {
     type Item = char;
 
-    fn split_at_position<P, E: ParseError<Self>>(&self, predicate: P) -> IResult<Self, Self, E> where P: Fn(Self::Item) -> bool {
+    fn split_at_position<P, E: ParseError<Self>>(&self, predicate: P) -> IResult<Self, Self, E>
+    where
+        P: Fn(Self::Item) -> bool,
+    {
         match self.split_at_position(predicate) {
             Err(nom::Err::Incomplete(_)) => Ok(self.take_split(self.input_len())),
             res => res,
         }
     }
 
-    fn split_at_position1<P, E: ParseError<Self>>(&self, predicate: P, e: ErrorKind) -> IResult<Self, Self, E> where P: Fn(Self::Item) -> bool {
+    fn split_at_position1<P, E: ParseError<Self>>(
+        &self,
+        predicate: P,
+        e: ErrorKind,
+    ) -> IResult<Self, Self, E>
+    where
+        P: Fn(Self::Item) -> bool,
+    {
         match self.as_str().position(predicate) {
             Some(0) => Err(nom::Err::Error(E::from_error_kind(self.clone(), e))),
             Some(n) => Ok(self.take_split(n)),
@@ -405,14 +415,27 @@ impl  InputTakeAtPosition for SliceStr{
         }
     }
 
-    fn split_at_position_complete<P, E: ParseError<Self>>(&self, predicate: P) -> IResult<Self, Self, E> where P: Fn(Self::Item) -> bool {
+    fn split_at_position_complete<P, E: ParseError<Self>>(
+        &self,
+        predicate: P,
+    ) -> IResult<Self, Self, E>
+    where
+        P: Fn(Self::Item) -> bool,
+    {
         match self.split_at_position(predicate) {
             Err(nom::Err::Incomplete(_)) => Ok(self.take_split(self.input_len())),
             res => res,
         }
     }
 
-    fn split_at_position1_complete<P, E: ParseError<Self>>(&self, predicate: P, e: ErrorKind) -> IResult<Self, Self, E> where P: Fn(Self::Item) -> bool {
+    fn split_at_position1_complete<P, E: ParseError<Self>>(
+        &self,
+        predicate: P,
+        e: ErrorKind,
+    ) -> IResult<Self, Self, E>
+    where
+        P: Fn(Self::Item) -> bool,
+    {
         match self.as_str().position(predicate) {
             Some(0) => Err(nom::Err::Error(E::from_error_kind(self.clone(), e))),
             Some(n) => Ok(self.take_split(n)),
@@ -433,7 +456,7 @@ impl InputTake for SliceStr {
     }
 
     fn take_split(&self, count: usize) -> (Self, Self) {
-         (self.slice(count..), self.slice(..count))
+        (self.slice(count..), self.slice(..count))
     }
 }
 
@@ -443,33 +466,31 @@ impl FindSubstring<&str> for SliceStr {
     }
 }
 
-
 #[cfg(test)]
 pub mod test {
-    use nom::Slice;
-    use cosmic_nom::SliceStr;
     use crate::SliceStr;
+    use cosmic_nom::SliceStr;
+    use nom::Slice;
 
     #[test]
-    pub fn test () {
-        let s = SliceStr::new("abc123".to_string() );
-        assert_eq!( 6, s.len() );
+    pub fn test() {
+        let s = SliceStr::new("abc123".to_string());
+        assert_eq!(6, s.len());
 
         let s = s.slice(0..3);
-        assert_eq!( 3, s.len() );
-        assert_eq!( "abc", s.as_str() );
+        assert_eq!(3, s.len());
+        assert_eq!("abc", s.as_str());
 
         println!("bytes: {}", s.as_bytes().len());
         println!("chars: {}", s.chars().count());
 
-        let s = SliceStr::new("abc123".to_string() );
-        assert_eq!( "123", s.slice(3..).as_str());
-        assert_eq!( "abc", s.slice(..3).as_str());
+        let s = SliceStr::new("abc123".to_string());
+        assert_eq!("123", s.slice(3..).as_str());
+        assert_eq!("abc", s.slice(..3).as_str());
     }
-
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct Wrap<I>
 where
     I: Clone
@@ -847,10 +868,10 @@ where
     }
 }
 
-pub fn trim<I, F, O>(f: F) -> impl FnMut(I) -> Res<I,O>
-    where
-        I: Span,
-        F: FnMut(I) -> Res<I, O> + Copy,
+pub fn trim<I, F, O>(f: F) -> impl FnMut(I) -> Res<I, O>
+where
+    I: Span,
+    F: FnMut(I) -> Res<I, O> + Copy,
 {
-    move |input: I| delimited(multispace0,f,multispace0)(input)
+    move |input: I| delimited(multispace0, f, multispace0)(input)
 }

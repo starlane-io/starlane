@@ -7,19 +7,19 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
 
+use cosmic_api::id::id::PointSegKind;
+use cosmic_api::sys::ParticleRecord;
 use futures::FutureExt;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::config::bind::BindConfig;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::path::Path;
-use cosmic_api::id::id::PointSegKind;
+use mesh_portal::version::latest::payload::Substance;
 use tokio::io::AsyncReadExt;
 use tokio::runtime::Handle;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use wasmer::{Cranelift, Store, Universal};
-use mesh_portal::version::latest::payload::Substance;
-use cosmic_api::sys::ParticleRecord;
 
 use crate::artifact::ArtifactRef;
 use crate::config::bind::BindConfigParser;
@@ -30,10 +30,10 @@ use crate::error::Error;
 use crate::file_access::FileAccess;
 use crate::message::StarlaneMessenger;
 use crate::particle::config::Parser;
-use cosmic_api::id::{ArtifactSubKind, BaseSubKind};
 use crate::starlane::api::StarlaneApi;
 use crate::starlane::StarlaneMachine;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
+use cosmic_api::id::{ArtifactSubKind, BaseSubKind};
 
 pub type ZipFile = Point;
 
@@ -463,10 +463,8 @@ impl ArtifactBundleCacheRunner {
 
         let zip = src.get_bundle_zip(bundle.clone()).await?;
 
-        let mut file_access = ArtifactBundleCache::with_bundle_path(
-            file_access,
-            record.details.stub.point.clone()
-        )?;
+        let mut file_access =
+            ArtifactBundleCache::with_bundle_path(file_access, record.details.stub.point.clone())?;
         let bundle_zip_path = Path::from_str("/bundle.zip")?;
         let key_file = Path::from_str("/key.ser")?;
         file_access.write(
@@ -548,17 +546,10 @@ impl ArtifactBundleSrc {
         Ok(match self {
             ArtifactBundleSrc::STARLANE_API(api) => {
                 match api.get_state(point).await.as_result::<Error, Substance>() {
-                    Ok(payload) => {
-                        match payload {
-                            Substance::Bin(bin) => {
-                                bin
-                            }
-                            _ => {
-                                return Err("bad data".into())
-                            }
-                        }
-
-                    }
+                    Ok(payload) => match payload {
+                        Substance::Bin(bin) => bin,
+                        _ => return Err("bad data".into()),
+                    },
                     Err(_) => {
                         return Err("err".into());
                     }

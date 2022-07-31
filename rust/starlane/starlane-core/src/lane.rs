@@ -16,8 +16,8 @@ use tokio::net::TcpStream;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{broadcast, mpsc};
 
-use tokio::time::Duration;
 use cosmic_api::id::StarKey;
+use tokio::time::Duration;
 
 use crate::error::Error;
 use crate::frame::{Frame, StarPattern};
@@ -25,8 +25,8 @@ use crate::frame::{Frame, StarPattern};
 use crate::proto::{local_tunnels, ProtoTunnel};
 use crate::star::StarCommand;
 
-use crate::template::StarInConstellationTemplateSelector;
 use crate::star::shell::lanes::LaneMuxerCall;
+use crate::template::StarInConstellationTemplateSelector;
 
 pub static STARLANE_PROTOCOL_VERSION: i32 = 1;
 pub static LANE_QUEUE_SIZE: usize = 32;
@@ -38,10 +38,9 @@ pub struct OutgoingSide {
 }
 
 #[derive(Clone)]
-pub enum OnCloseAction
-{
+pub enum OnCloseAction {
     Reestablish,
-    Remove
+    Remove,
 }
 
 pub struct IncomingSide {
@@ -153,26 +152,17 @@ pub enum LaneWrapper {
 }
 
 impl LaneWrapper {
-
-    pub fn on_close_action(&self) -> OnCloseAction{
+    pub fn on_close_action(&self) -> OnCloseAction {
         match self {
-            LaneWrapper::Proto(proto) => {
-                proto.on_close_action.clone()
-            }
-            LaneWrapper::Lane(lane) => {
-                lane.on_close_action.clone()
-            }
+            LaneWrapper::Proto(proto) => proto.on_close_action.clone(),
+            LaneWrapper::Lane(lane) => lane.on_close_action.clone(),
         }
     }
 
-    pub fn pattern(&self) -> StarPattern{
+    pub fn pattern(&self) -> StarPattern {
         match self {
-            LaneWrapper::Proto(meta) => {
-                meta.pattern.clone()
-            }
-            LaneWrapper::Lane(meta) => {
-                meta.pattern.clone()
-            }
+            LaneWrapper::Proto(meta) => meta.pattern.clone(),
+            LaneWrapper::Lane(meta) => meta.pattern.clone(),
         }
     }
 
@@ -224,17 +214,11 @@ impl LaneWrapper {
         }
     }
 
-
     pub fn is_proto(&self) -> bool {
         match self {
-            LaneWrapper::Proto(_) => {
-                true
-            }
-            LaneWrapper::Lane(_) => {
-                false
-            }
+            LaneWrapper::Proto(_) => true,
+            LaneWrapper::Lane(_) => false,
         }
-
     }
 }
 
@@ -245,7 +229,7 @@ pub struct ProtoLaneEnd {
     tunnel_receiver_tx: Sender<TunnelInState>,
     evolution_tx: broadcast::Sender<Result<(), Error>>,
     pub key_requestor: bool,
-    pub on_close_action: OnCloseAction
+    pub on_close_action: OnCloseAction,
 }
 
 impl ProtoLaneEnd {
@@ -277,7 +261,7 @@ impl ProtoLaneEnd {
             outgoing: OutgoingSide { out_tx: mid_tx },
             evolution_tx,
             key_requestor: false,
-            on_close_action
+            on_close_action,
         }
     }
 
@@ -311,7 +295,7 @@ impl TryInto<LaneEnd> for ProtoLaneEnd {
                 incoming: self.incoming,
                 outgoing: self.outgoing,
                 tunnel_receiver_tx: self.tunnel_receiver_tx,
-                on_close_action: self.on_close_action
+                on_close_action: self.on_close_action,
             })
         } else {
             self.evolution_tx.send(Err(
@@ -331,7 +315,7 @@ pub struct LaneEnd {
     pub incoming: IncomingSide,
     pub outgoing: OutgoingSide,
     tunnel_receiver_tx: Sender<TunnelInState>,
-    pub on_close_action: OnCloseAction
+    pub on_close_action: OnCloseAction,
 }
 
 impl LaneEnd {
@@ -673,19 +657,13 @@ impl<L: AbstractLaneEndpoint> DerefMut for LaneMeta<L> {
 }
 
 impl<L: AbstractLaneEndpoint> LaneMeta<L> {
-
     pub fn unwrap(self) -> L {
         self.lane
     }
 
     pub fn new(lane: L, pattern: StarPattern) -> Self {
-        LaneMeta {
-            pattern,
-            lane
-        }
+        LaneMeta { pattern, lane }
     }
-
-
 }
 
 impl TryInto<LaneMeta<LaneEnd>> for LaneMeta<ProtoLaneEnd> {
@@ -693,9 +671,9 @@ impl TryInto<LaneMeta<LaneEnd>> for LaneMeta<ProtoLaneEnd> {
 
     fn try_into(self) -> Result<LaneMeta<LaneEnd>, Self::Error> {
         let lane: LaneEnd = self.lane.try_into()?;
-        Ok(LaneMeta{
-           pattern: self.pattern,
-           lane
+        Ok(LaneMeta {
+            pattern: self.pattern,
+            lane,
         })
     }
 }
@@ -812,21 +790,17 @@ impl LaneIndex {
     }
 }
 
-
-
-#[derive(Clone,Hash,Eq,PartialEq,strum_macros::Display)]
+#[derive(Clone, Hash, Eq, PartialEq, strum_macros::Display)]
 pub enum LaneKey {
     Proto(u64),
-    Ultima(UltimaLaneKey)
+    Ultima(UltimaLaneKey),
 }
-
-
 
 impl LaneKey {
     pub fn is_proto(&self) -> bool {
         match self {
             Self::Proto(_) => true,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -836,30 +810,21 @@ impl TryInto<UltimaLaneKey> for LaneKey {
 
     fn try_into(self) -> Result<UltimaLaneKey, Self::Error> {
         match self {
-            LaneKey::Proto(_) => {
-                Err("cannot turn a proto id into a laneKey".into())
-            }
-            LaneKey::Ultima(lane) => {
-                Ok(lane)
-            }
+            LaneKey::Proto(_) => Err("cannot turn a proto id into a laneKey".into()),
+            LaneKey::Ultima(lane) => Ok(lane),
         }
     }
 }
 
-
 #[derive(Clone)]
-pub struct LaneSession{
+pub struct LaneSession {
     pub lane: LaneKey,
     pub pattern: StarPattern,
-    pub tx: mpsc::Sender<LaneCommand>
+    pub tx: mpsc::Sender<LaneCommand>,
 }
 
 impl LaneSession {
-    pub fn new(lane: LaneKey, pattern: StarPattern, tx: mpsc::Sender<LaneCommand> ) -> Self {
-        Self {
-            lane,
-            pattern,
-            tx
-        }
+    pub fn new(lane: LaneKey, pattern: StarPattern, tx: mpsc::Sender<LaneCommand>) -> Self {
+        Self { lane, pattern, tx }
     }
 }

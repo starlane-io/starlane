@@ -1,3 +1,4 @@
+use crate::global::GlobalDriverFactory;
 use crate::star::{Star, StarApi, StarCon, StarSkel, StarTemplate, StarTx};
 use crate::{DriversBuilder, PlatErr, Platform, Registry, RegistryApi};
 use cosmic_api::error::MsgErr;
@@ -30,7 +31,6 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::watch::Ref;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use tracing::info;
-use crate::global::GlobalDriverFactory;
 
 #[derive(Clone)]
 pub struct MachineApi<P>
@@ -100,14 +100,15 @@ where
 {
     pub name: MachineName,
     pub platform: P,
-    pub registry: Arc<dyn RegistryApi<P>>,
+    pub registry: Registry<P>,
     pub artifacts: ArtifactApi,
     pub logger: RootLogger,
     pub timeouts: Timeouts,
     pub api: MachineApi<P>,
     pub status_rx: watch::Receiver<MachineStatus>,
     pub status_tx: mpsc::Sender<MachineStatus>,
-    pub machine_star: Port
+    pub machine_star: Port,
+    pub global: Port,
 }
 
 pub struct Machine<P>
@@ -152,7 +153,16 @@ where
             }
         });
 
-        let machine_star = StarKey::machine(machine_name.clone()).to_point().to_port().with_layer(Layer::Gravity);
+        let machine_star = StarKey::machine(machine_name.clone())
+            .to_point()
+            .to_port()
+            .with_layer(Layer::Gravity);
+        let global = machine_star
+            .point
+            .push("global")
+            .unwrap()
+            .to_port()
+            .with_layer(Layer::Core);
         let skel = MachineSkel {
             name: machine_name.clone(),
             machine_star,
@@ -164,6 +174,7 @@ where
             api: machine_api.clone(),
             status_tx: mpsc_status_tx,
             status_rx: watch_status_rx,
+            global,
         };
 
         let mut stars = HashMap::new();
@@ -174,27 +185,19 @@ where
             let star_point = star_template.key.clone().to_point();
             let star_port = star_point.clone().to_port().with_layer(Layer::Core);
 
-
             let drivers_point = star_point.push("drivers".to_string()).unwrap();
             let logger = skel.logger.point(drivers_point.clone());
 
             let mut star_tx: StarTx<P> = StarTx::new(star_point.clone());
-            let star_skel = StarSkel::new(
-                star_template.clone(),
-                skel.clone(),
-                &mut star_tx,
-            )
-            .await;
+            let star_skel = StarSkel::new(star_template.clone(), skel.clone(), &mut star_tx).await;
 
             let mut drivers = match star_template.kind {
                 StarSub::Machine => {
                     let mut drivers = DriversBuilder::new();
-                    drivers.add( Arc::new(GlobalDriverFactory::new(star_skel.clone())) );
+                    drivers.add(Arc::new(GlobalDriverFactory::new(star_skel.clone())));
                     drivers
                 }
-                _ => {
-                    platform.drivers_builder(&star_template.kind)
-                }
+                _ => platform.drivers_builder(&star_template.kind),
             };
 
             //            let drivers = builder.build(drivers_point.to_port(), star_skel.clone())?;
@@ -460,10 +463,7 @@ impl MachineTemplate {
 
     pub fn with_machine_star(&self, machine: MachineName) -> Vec<StarTemplate> {
         let mut stars = self.stars.clone();
-        let mut machine = StarTemplate::new(
-            StarKey::machine(machine),
-            StarSub::Machine,
-        );
+        let mut machine = StarTemplate::new(StarKey::machine(machine), StarSub::Machine);
         for star in stars.iter_mut() {
             star.connect(machine.to_stub());
             machine.receive(star.to_stub());

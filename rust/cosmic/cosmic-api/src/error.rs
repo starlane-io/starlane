@@ -75,20 +75,19 @@ impl PlatErr for MsgErr {
 
 impl Clone for MsgErr {
     fn clone(&self) -> Self {
-        MsgErr::Status { status: 500, message: self.message() }
+        MsgErr::Status {
+            status: 500,
+            message: self.message(),
+        }
     }
 }
 
-
-
 impl MsgErr {
-
-
     pub fn as_reflected_core(self) -> ReflectedCore {
         ReflectedCore {
             headers: Default::default(),
             status: StatusCode::from_u16(500u16).unwrap(),
-            body: Substance::Text(self.message().to_string())
+            body: Substance::Text(self.message().to_string()),
         }
     }
     pub fn from_status(status: u16) -> MsgErr {
@@ -133,13 +132,12 @@ impl MsgErr {
         MsgErr::err403()
     }
 
-    pub fn forbidden_msg<S:ToString>(msg: S) -> Self {
+    pub fn forbidden_msg<S: ToString>(msg: S) -> Self {
         MsgErr::Status {
             status: 403,
-            message: msg.to_string()
+            message: msg.to_string(),
         }
     }
-
 
     pub fn not_found() -> Self {
         MsgErr::err404()
@@ -219,12 +217,8 @@ impl MsgErr {
 impl StatusErr for MsgErr {
     fn status(&self) -> u16 {
         match self {
-            MsgErr::Status { status, .. } => {
-                status.clone()
-            }
-            MsgErr::ParseErrs(_) => {
-                500u16
-            }
+            MsgErr::Status { status, .. } => status.clone(),
+            MsgErr::ParseErrs(_) => 500u16,
         }
     }
 
@@ -241,7 +235,6 @@ pub trait StatusErr {
     fn message(&self) -> String;
 }
 
-
 impl Display for MsgErr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -255,36 +248,32 @@ impl Display for MsgErr {
 
 impl std::error::Error for MsgErr {}
 
-
-impl <C> From<SendTimeoutError<C>> for MsgErr {
+impl<C> From<SendTimeoutError<C>> for MsgErr {
     fn from(e: SendTimeoutError<C>) -> Self {
         MsgErr::Status {
             status: 500,
-            message: e.to_string()
+            message: e.to_string(),
         }
     }
 }
 
-impl <C> From<tokio::sync::mpsc::error::SendError<C>> for MsgErr {
+impl<C> From<tokio::sync::mpsc::error::SendError<C>> for MsgErr {
     fn from(e: SendError<C>) -> Self {
         MsgErr::from_500(e.to_string())
     }
 }
 
-
-impl <C> From<tokio::sync::broadcast::error::SendError<C>> for MsgErr {
+impl<C> From<tokio::sync::broadcast::error::SendError<C>> for MsgErr {
     fn from(e: tokio::sync::broadcast::error::SendError<C>) -> Self {
         MsgErr::from_500(e.to_string())
     }
 }
-
 
 impl From<tokio::sync::watch::error::RecvError> for MsgErr {
     fn from(e: tokio::sync::watch::error::RecvError) -> Self {
         MsgErr::from_500(e.to_string())
     }
 }
-
 
 impl From<String> for MsgErr {
     fn from(message: String) -> Self {
@@ -396,20 +385,19 @@ impl From<strum::ParseError> for MsgErr {
 
 impl From<()> for MsgErr {
     fn from(err: ()) -> Self {
-        Self::Status{
+        Self::Status {
             status: 500,
-            message: "Empty Error".to_string()
+            message: "Empty Error".to_string(),
         }
     }
 }
 
-
 impl From<tokio::sync::oneshot::error::RecvError> for MsgErr {
     fn from(err: RecvError) -> Self {
-         Self::Status{
-             status: 500,
-             message: err.to_string()
-         }
+        Self::Status {
+            status: 500,
+            message: err.to_string(),
+        }
     }
 }
 

@@ -1,18 +1,20 @@
 #![allow(warnings)]
 
-
 #[macro_use]
 extern crate cosmic_macros;
 
 #[macro_use]
 extern crate async_trait;
 
-use std::sync::Arc;
 use cosmic_api::cli::{CommandTemplate, RawCommand, Transfer};
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{Port, Topic};
 use cosmic_api::msg::MsgMethod;
-use cosmic_api::wave::{Agent, Exchanger, Handling, DirectedProto, Pong, ProtoTransmitter, Router, Scope, SetStrategy, ToRecipients, Wave};
+use cosmic_api::wave::{
+    Agent, DirectedProto, Exchanger, Handling, Pong, ProtoTransmitter, Router, Scope, SetStrategy,
+    ToRecipients, Wave,
+};
+use std::sync::Arc;
 
 pub struct Cli {
     cli_session_factory: Port,
@@ -24,7 +26,7 @@ impl Cli {
         router: Arc<dyn Router>,
         cli_session_factory: Port,
         mut from: Port,
-        exchanger: Exchanger
+        exchanger: Exchanger,
     ) -> Self {
         let mut tx = ProtoTransmitter::new(router, exchanger);
         from = from.with_topic(Topic::Cli);
@@ -115,7 +117,7 @@ impl<'a> Drop for CliSession<'a> {
                 let tx = self.tx.clone();
                 match ping.build() {
                     Ok(ping) => {
-                        tx.route_sync(ping.to_ultra() );
+                        tx.route_sync(ping.to_ultra());
                     }
                     Err(_) => {}
                 }
@@ -127,14 +129,12 @@ impl<'a> Drop for CliSession<'a> {
 
 #[cfg(test)]
 pub mod test {
+    use cosmic_api::wave::{DirectedHandler, DirectedHandler, InCtx, RequestHandlerRelay};
     use mesh_portal::error::MsgErr;
     use mesh_portal::version::latest::entity::request::ReqCore;
     use mesh_portal::version::latest::entity::response::RespCore;
     use mesh_portal::version::latest::messaging::{ReqShell, RootRequestCtx};
     use mesh_portal::version::latest::payload::Substance;
-    use cosmic_api::wave::{
-        DirectedHandler, InCtx, DirectedHandler, RequestHandlerRelay,
-    };
     use std::marker::PhantomData;
     use std::sync::{Arc, RwLock};
 

@@ -1,17 +1,17 @@
-use std::collections::HashSet;
-use std::ops::{Deref, DerefMut};
 use crate::error::MsgErr;
 use crate::id::id::{Kind, KindParts, Point, ToPoint, ToPort};
 use crate::particle::particle::{Details, Status, Stub};
 use crate::substance::substance::Substance;
 use cosmic_macros_primitive::Autobox;
+use std::collections::HashSet;
+use std::ops::{Deref, DerefMut};
 
 use crate::command::command::common::StateSrc;
+use crate::id::{StarKey, StarSub};
 use crate::log::Log;
 use crate::wave::{CmdMethod, DirectedCore, Ping, Pong, SysMethod, ToRecipients, Wave};
-use serde::{Deserialize, Serialize};
 use crate::{Agent, Port, ReflectedCore};
-use crate::id::{StarKey, StarSub};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {
@@ -73,7 +73,7 @@ impl ParticleRecord {
     pub fn new(details: Details, point: Point) -> Self {
         ParticleRecord {
             details,
-            location: point
+            location: point,
         }
     }
 
@@ -87,7 +87,7 @@ impl ParticleRecord {
                 },
                 properties: Default::default(),
             },
-            location: Point::central()
+            location: Point::central(),
         }
     }
 }
@@ -106,7 +106,6 @@ pub struct Assign {
 }
 
 impl Assign {
-
     pub fn kind(&self) -> &Kind {
         &self.details.stub.kind
     }
@@ -126,14 +125,14 @@ pub enum Sys {
     Event(SysEvent),
     Log(Log),
     Search(Search),
-    Discoveries(Discoveries)
+    Discoveries(Discoveries),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum Search {
     Star(StarKey),
     StarKind(StarSub),
-    Kinds
+    Kinds,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -141,19 +140,17 @@ pub struct Discovery {
     pub star_kind: StarSub,
     pub hops: u16,
     pub star_key: StarKey,
-    pub kinds: HashSet<Kind>
+    pub kinds: HashSet<Kind>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Discoveries {
-    pub vec: Vec<Discovery>
+    pub vec: Vec<Discovery>,
 }
 
 impl Discoveries {
     pub fn new() -> Self {
-        Self {
-            vec: vec![]
-        }
+        Self { vec: vec![] }
     }
 }
 
@@ -167,10 +164,9 @@ impl Deref for Discoveries {
 
 impl DerefMut for Discoveries {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        & mut self.vec
+        &mut self.vec
     }
 }
-
 
 impl TryFrom<Ping> for Assign {
     type Error = MsgErr;
@@ -218,7 +214,7 @@ pub enum InterchangeKind {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Hash)]
 pub enum ControlPattern {
     Any,
-    Star(Point)
+    Star(Point),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -229,11 +225,11 @@ pub struct Knock {
 }
 
 impl Knock {
-    pub fn new(kind: InterchangeKind, remote: Port, auth: Substance ) -> Self {
+    pub fn new(kind: InterchangeKind, remote: Port, auth: Substance) -> Self {
         Self {
             kind,
             remote: Some(remote),
-            auth: Box::new(auth)
+            auth: Box::new(auth),
         }
     }
 }
@@ -243,7 +239,7 @@ impl Default for Knock {
         Self {
             kind: InterchangeKind::Control(ControlPattern::Any),
             auth: Box::new(Substance::Empty),
-            remote: None
+            remote: None,
         }
     }
 }
@@ -252,10 +248,9 @@ impl Into<Wave<Ping>> for Knock {
     fn into(self) -> Wave<Ping> {
         let mut core = DirectedCore::new(SysMethod::Knock.into());
         core.body = Substance::Knock(self);
-        let wave = Wave::new(Ping::new(
-            core,
-            Point::local_endpoint().to_port()),
-                             Point::remote_endpoint().to_port()
+        let wave = Wave::new(
+            Ping::new(core, Point::local_endpoint().to_port()),
+            Point::remote_endpoint().to_port(),
         );
         wave
     }
@@ -266,16 +261,16 @@ pub struct Greet {
     pub port: Port,
     pub agent: Agent,
     pub hop: Port,
-    pub transport: Port
+    pub transport: Port,
 }
 
 impl Greet {
-    pub fn new( agent: Agent, port: Port, hop: Port, transport: Port ) -> Self {
+    pub fn new(agent: Agent, port: Port, hop: Port, transport: Port) -> Self {
         Self {
             agent,
             port,
             hop,
-            transport
+            transport,
         }
     }
 }

@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 
-use serde::{Deserialize, Serialize};
 use cosmic_api::id::{ConstellationName, MachineName, StarKey};
+use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 
@@ -29,40 +29,17 @@ impl ConstellationTemplate {
     pub fn new_basic() -> Self {
         let mut template = ConstellationTemplate { stars: vec![] };
 
-        let mut central = StarTemplate::new(
-            StarKind::Central,
-            StarHandle::central(),
-        );
+        let mut central = StarTemplate::new(StarKind::Central, StarHandle::central());
 
-        let mut relay = StarTemplate::new(
-            StarKind::Relay,
-            StarHandle::new("mesh"),
-        );
-        let mut space = StarTemplate::new(
-            StarKind::Space,
-            StarHandle::new("space")
-        );
-        let mut app = StarTemplate::new(
-            StarKind::App,
-            StarHandle::new("app"),
-        );
-        let mut exe = StarTemplate::new(
-            StarKind::Exe,
-            StarHandle::new("exe"),
-        );
-        let mut file_store = StarTemplate::new(
-            StarKind::FileStore,
-            StarHandle::new("file_store"),
-        );
-        let mut web = StarTemplate::new(
-            StarKind::Web,
-            StarHandle::new("web"),
-        );
+        let mut relay = StarTemplate::new(StarKind::Relay, StarHandle::new("mesh"));
+        let mut space = StarTemplate::new(StarKind::Space, StarHandle::new("space"));
+        let mut app = StarTemplate::new(StarKind::App, StarHandle::new("app"));
+        let mut exe = StarTemplate::new(StarKind::Exe, StarHandle::new("exe"));
+        let mut file_store = StarTemplate::new(StarKind::FileStore, StarHandle::new("file_store"));
+        let mut web = StarTemplate::new(StarKind::Web, StarHandle::new("web"));
 
-        let mut artifact_store = StarTemplate::new(
-            StarKind::ArtifactStore,
-            StarHandle::new("artifact_store"),
-        );
+        let mut artifact_store =
+            StarTemplate::new(StarKind::ArtifactStore, StarHandle::new("artifact_store"));
 
         ConstellationTemplate::connect(&mut central, &mut relay);
         ConstellationTemplate::connect(&mut space, &mut relay);
@@ -71,7 +48,7 @@ impl ConstellationTemplate {
         ConstellationTemplate::connect(&mut file_store, &mut relay);
         ConstellationTemplate::connect(&mut web, &mut relay);
         ConstellationTemplate::connect(&mut artifact_store, &mut relay);
-//        ConstellationTemplate::connect(&mut portal, &mut mesh);
+        //        ConstellationTemplate::connect(&mut portal, &mut mesh);
 
         template.add_star(central);
         template.add_star(relay);
@@ -81,7 +58,7 @@ impl ConstellationTemplate {
         template.add_star(file_store);
         template.add_star(web);
         template.add_star(artifact_store);
-//        template.add_star(portal );
+        //        template.add_star(portal );
 
         template
     }
@@ -198,21 +175,20 @@ impl StarHandle {
     pub fn central() -> Self {
         Self {
             name: "central".to_string(),
-            index: 0
+            index: 0,
         }
     }
-    pub fn new<S:ToString>(name: S) -> Self {
+    pub fn new<S: ToString>(name: S) -> Self {
         Self {
             name: name.to_string(),
-            index: 0
+            index: 0,
         }
     }
 
-    pub fn with_index<S:ToString>(name: S , index: u16) -> Self {
-
+    pub fn with_index<S: ToString>(name: S, index: u16) -> Self {
         Self {
             name: name.to_string(),
-            index
+            index,
         }
     }
 }
@@ -266,7 +242,6 @@ pub struct ConstellationLayout {
 }
 
 impl ConstellationLayout {
-
     pub fn standalone() -> Result<Self, Error> {
         let mut standalone = ProtoConstellationLayout::new(ConstellationTemplate::new_basic());
         standalone.set_default_machine("server".to_string());

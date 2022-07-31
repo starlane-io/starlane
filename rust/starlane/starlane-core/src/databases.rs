@@ -10,27 +10,23 @@ lazy_static! {
         std::env::var("REGISTRY_DATABASE").unwrap_or("postgres".to_string());
 }
 
-
 pub struct DBInfo {
-   pub url: String,
-   pub user: String,
-   pub password: String,
-   pub database: String,
+    pub url: String,
+    pub user: String,
+    pub password: String,
+    pub database: String,
 }
 
 impl DBInfo {
     pub fn to_uri(&self) -> String {
         format!(
             "postgres://{}:{}@{}/{}",
-            self.user,
-            self.password,
-            self.url,
-            self.database
+            self.user, self.password, self.url, self.database
         )
     }
 }
 
-pub fn lookup_registry_db( ) -> DBInfo {
+pub fn lookup_registry_db() -> DBInfo {
     DBInfo {
         url: REGISTRY_URL.to_string(),
         database: REGISTRY_DATABASE.to_string(),
@@ -39,12 +35,12 @@ pub fn lookup_registry_db( ) -> DBInfo {
     }
 }
 
-pub fn lookup_db_for_star( star_key: &StarKey ) -> DBInfo {
-  // future versions need a way to lookup this info
-  DBInfo {
-      url: REGISTRY_URL.to_string(),
-      database: REGISTRY_DATABASE.to_string(),
-      user: REGISTRY_USER.to_string(),
-      password: REGISTRY_PASSWORD.to_string(),
-  }
+pub fn lookup_db_for_star(star_key: &StarKey) -> DBInfo {
+    // future versions need a way to lookup this info
+    DBInfo {
+        url: REGISTRY_URL.to_string(),
+        database: REGISTRY_DATABASE.to_string(),
+        user: REGISTRY_USER.to_string(),
+        password: REGISTRY_PASSWORD.to_string(),
+    }
 }

@@ -1,10 +1,12 @@
-use alloc::string::String;
-use crate::substance::substance::{Substance, SubstancePattern, SubstancePatternCtx, SubstancePatternDef};
-use crate::util::{ToResolved, ValuePattern};
-use serde::{Deserialize, Serialize};
 use crate::error::MsgErr;
 use crate::id::id::{Point, PointCtx, PointVar};
 use crate::parse::{CtxResolver, Env};
+use crate::substance::substance::{
+    Substance, SubstancePattern, SubstancePatternCtx, SubstancePatternDef,
+};
+use crate::util::{ToResolved, ValuePattern};
+use alloc::string::String;
+use serde::{Deserialize, Serialize};
 
 pub mod selector {
     use alloc::format;
@@ -14,20 +16,35 @@ pub mod selector {
     use core::ops::Deref;
     use core::str::FromStr;
 
-
     use serde::de::Visitor;
     use serde::{de, Deserializer, Serializer};
 
     use crate::error::MsgErr;
 
     use crate::command::request::{Rc, RcCommandType};
-    use crate::id::id::{KindParts, BaseKind, Layer, Point, PointCtx, PointSeg, PointSegKind, PointVar, Port, RouteSeg, Specific, Tks, Topic, Variable, VarVal, Version, Kind, Sub, ToBaseKind};
-    use crate::parse::{camel_case_chars, camel_case_to_string_matcher, CamelCase, consume_hierarchy, Env, file_chars, path, path_regex, point_segment_selector, point_selector};
-    use crate::substance::substance::{Call, CallKind, CallWithConfig, CallWithConfigDef, HttpCall, ListPattern, MapPattern, MsgCall, NumRange, Substance, SubstanceFormat, SubstancePattern, SubstancePatternDef, SubstanceKind, SubstanceTypePatternDef};
-    use crate::selector::selector::specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
-    use crate::util::{HttpMethodPattern, StringMatcher, ToResolved, ValueMatcher, ValuePattern};
+    use crate::id::id::{
+        BaseKind, Kind, KindParts, Layer, Point, PointCtx, PointSeg, PointSegKind, PointVar, Port,
+        RouteSeg, Specific, Sub, Tks, ToBaseKind, Topic, VarVal, Variable, Version,
+    };
     use crate::parse;
+    use crate::parse::error::result;
+    use crate::parse::model::Var;
+    use crate::parse::{
+        camel_case_chars, camel_case_to_string_matcher, consume_hierarchy, file_chars, path,
+        path_regex, point_segment_selector, point_selector, CamelCase, Env,
+    };
+    use crate::selector::selector::specific::{
+        ProductSelector, ProviderSelector, VariantSelector, VendorSelector,
+    };
+    use crate::substance::substance::{
+        Call, CallKind, CallWithConfig, CallWithConfigDef, HttpCall, ListPattern, MapPattern,
+        MsgCall, NumRange, Substance, SubstanceFormat, SubstanceKind, SubstancePattern,
+        SubstancePatternDef, SubstanceTypePatternDef,
+    };
+    use crate::util::{HttpMethodPattern, StringMatcher, ToResolved, ValueMatcher, ValuePattern};
+    use crate::wave::{DirectedCore, Method};
     use crate::{Deserialize, Serialize};
+    use cosmic_nom::{new_span, Res, Span, Trace};
     use nom::branch::alt;
     use nom::bytes::complete::tag;
     use nom::character::complete::{alpha1, alphanumeric1, digit1, multispace0, one_of};
@@ -35,23 +52,23 @@ pub mod selector {
     use nom::error::{context, ErrorKind, FromExternalError, ParseError, VerboseError};
     use nom::multi::separated_list0;
     use nom::sequence::{delimited, preceded, terminated, tuple};
-    use nom::{AsChar, Compare, InputLength, InputTake, InputTakeAtPosition, IResult, Parser};
+    use nom::{AsChar, Compare, IResult, InputLength, InputTake, InputTakeAtPosition, Parser};
     use nom_locate::LocatedSpan;
     use nom_supreme::error::ErrorTree;
     use nom_supreme::parser_ext::FromStrParser;
     use nom_supreme::{parse_from_str, ParserExt};
     use regex::Regex;
     use std::collections::HashMap;
-    use cosmic_nom::{new_span, Res, Span, Trace};
-    use crate::wave::{Method, DirectedCore};
-    use crate::parse::error::result;
-    use crate::parse::model::Var;
 
-    pub type KindSelector =KindSelectorDef<KindBaseSelector, SubKindSelector,SpecificSelector>;
-    pub type KindSelectorVar =KindSelectorDef<VarVal<KindBaseSelector>,VarVal<SubKindSelector>,VarVal<SpecificSelector>>;
+    pub type KindSelector = KindSelectorDef<KindBaseSelector, SubKindSelector, SpecificSelector>;
+    pub type KindSelectorVar = KindSelectorDef<
+        VarVal<KindBaseSelector>,
+        VarVal<SubKindSelector>,
+        VarVal<SpecificSelector>,
+    >;
 
-    #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq,Hash)]
-    pub struct KindSelectorDef<GenericKindSelector,GenericSubKindSelector,SpecificSelector> {
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+    pub struct KindSelectorDef<GenericKindSelector, GenericSubKindSelector, SpecificSelector> {
         pub kind: GenericKindSelector,
         pub sub: GenericSubKindSelector,
         pub specific: ValuePattern<SpecificSelector>,
@@ -75,7 +92,7 @@ pub mod selector {
             KindParts: Eq + PartialEq,
         {
             self.kind.matches(&kind.to_base())
-                && self.sub.matches(&kind.sub().into() )
+                && self.sub.matches(&kind.sub().into())
                 && self.specific.is_match_opt(kind.specific().as_ref()).is_ok()
         }
     }
@@ -106,10 +123,9 @@ pub mod selector {
         }
     }
 
-
     pub type SubKindSelector = Pattern<Option<CamelCase>>;
 
-    #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq,Hash)]
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
     pub struct SelectorDef<Hop> {
         pub hops: Vec<Hop>,
     }
@@ -204,12 +220,11 @@ pub mod selector {
             hops
         }
 
-        pub fn matches(&self, hierarchy: &PointHierarchy ) -> bool
+        pub fn matches(&self, hierarchy: &PointHierarchy) -> bool
         where
             BaseKind: Clone,
             KindParts: Clone,
         {
-
             if hierarchy.is_root() && self.is_root() {
                 return true;
             }
@@ -375,7 +390,7 @@ pub mod selector {
         }
     }
 
-    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Hash)]
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
     pub enum PointSegSelector {
         InclusiveAny,       // +:*  // includes Root if it's the first segment
         InclusiveRecursive, // +:** // includes Root if its the first segment
@@ -385,7 +400,7 @@ pub mod selector {
         Version(VersionReq),
     }
 
-    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Hash)]
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
     pub enum PointSegSelectorVar {
         InclusiveAny,       // +:*  // includes Root if it's the first segment
         InclusiveRecursive, // +:** // includes Root if its the first segment
@@ -395,10 +410,10 @@ pub mod selector {
         Version(VersionReq),
         Var(Variable),
         Working(Trace),
-        Pop(Trace)
+        Pop(Trace),
     }
 
-    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Hash)]
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
     pub enum PointSegSelectorCtx {
         InclusiveAny,       // +:*  // includes Root if it's the first segment
         InclusiveRecursive, // +:** // includes Root if its the first segment
@@ -407,7 +422,7 @@ pub mod selector {
         Exact(ExactPointSeg),
         Version(VersionReq),
         Working(Trace),
-        Pop(Trace)
+        Pop(Trace),
     }
 
     impl FromStr for PointSegSelector {
@@ -479,7 +494,7 @@ pub mod selector {
 
     pub type KeySegment = String;
 
-    #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize,Hash)]
+    #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
     pub enum ExactPointSeg {
         PointSeg(PointSeg),
         Version(Version),
@@ -508,10 +523,22 @@ pub mod selector {
             }
         }
     }
-    pub type SpecificSelector = SpecificSelectorDef<ProviderSelector,VendorSelector,ProductSelector,VariantSelector,VersionReq>;
+    pub type SpecificSelector = SpecificSelectorDef<
+        ProviderSelector,
+        VendorSelector,
+        ProductSelector,
+        VariantSelector,
+        VersionReq,
+    >;
 
-    #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq,Hash)]
-    pub struct SpecificSelectorDef<ProviderSelector,VendorSelector,ProductSelector,VariantSelector,VersionReq> {
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+    pub struct SpecificSelectorDef<
+        ProviderSelector,
+        VendorSelector,
+        ProductSelector,
+        VariantSelector,
+        VersionReq,
+    > {
         pub provider: ProviderSelector,
         pub vendor: VendorSelector,
         pub product: ProductSelector,
@@ -521,8 +548,8 @@ pub mod selector {
 
     impl ValueMatcher<Specific> for SpecificSelector {
         fn is_match(&self, specific: &Specific) -> Result<(), ()> {
-            if self.provider.matches(&specific.provider ) &&
-                self.vendor.matches(&specific.vendor)
+            if self.provider.matches(&specific.provider)
+                && self.vendor.matches(&specific.vendor)
                 && self.product.matches(&specific.product)
                 && self.variant.matches(&specific.variant)
                 && self.version.matches(&specific.version)
@@ -546,12 +573,12 @@ pub mod selector {
         }
     }
     pub mod specific {
-        use alloc::string::String;
-        use core::ops::Deref;
-        use core::str::FromStr;
         use crate::error::MsgErr;
         use crate::parse::{Domain, SkewerCase};
         use crate::selector::selector::Pattern;
+        use alloc::string::String;
+        use core::ops::Deref;
+        use core::str::FromStr;
 
         pub struct VersionReq {
             pub req: semver::VersionReq,
@@ -575,7 +602,7 @@ pub mod selector {
             }
         }
 
-        pub type ProviderSelector= Pattern<Domain>;
+        pub type ProviderSelector = Pattern<Domain>;
         pub type VendorSelector = Pattern<Domain>;
         pub type ProductSelector = Pattern<SkewerCase>;
         pub type VariantSelector = Pattern<SkewerCase>;
@@ -584,7 +611,7 @@ pub mod selector {
 
     pub type LabeledPrimitiveType = LabeledPrimitiveTypeDef<Point>;
     pub type LabeledPrimitiveTypeCtx = LabeledPrimitiveTypeDef<PointCtx>;
-    pub type LabeledPrimitiveTypeVar= LabeledPrimitiveTypeDef<PointVar>;
+    pub type LabeledPrimitiveTypeVar = LabeledPrimitiveTypeDef<PointVar>;
 
     pub struct LabeledPrimitiveTypeDef<Pnt> {
         pub label: String,
@@ -613,15 +640,10 @@ pub mod selector {
     pub enum PipelineKind {
         Rc,
         Msg,
-        Http
+        Http,
     }
 
-
-
-    pub struct ParsedPipelineBlock {
-
-    }
-
+    pub struct ParsedPipelineBlock {}
 
     /*    pub fn primitive(input: Span) -> Res<Span, PrimitiveType> {
            let (next,primitive_type) = recognize(alpha1)(input)?;
@@ -808,13 +830,12 @@ pub mod selector {
     pub type HopCtx = HopDef<PointSegSelectorCtx, KindSelector>;
     pub type HopVar = HopDef<PointSegSelectorVar, KindSelectorVar>;
 
-    #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq,Hash)]
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
     pub struct HopDef<Segment, KindSelector> {
         pub inclusive: bool,
         pub segment_selector: Segment,
         pub kind_selector: KindSelector,
     }
-
 
     impl Hop {
         pub fn matches(&self, point_kind_segment: &PointKindSeg) -> bool {
@@ -849,17 +870,17 @@ pub mod selector {
         }
     }
 
-    #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq,Hash)]
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
     pub enum Pattern<P> {
         Any,
         Exact(P),
     }
 
-    impl <I:ToString> Pattern<I> {
+    impl<I: ToString> Pattern<I> {
         pub fn to_string_version(self) -> Pattern<String> {
             match self {
                 Pattern::Any => Pattern::Any,
-                Pattern::Exact(exact) => Pattern::Exact(exact.to_string())
+                Pattern::Exact(exact) => Pattern::Exact(exact.to_string()),
             }
         }
     }
@@ -919,7 +940,6 @@ pub mod selector {
     }
 
      */
-
 
     impl<P> ToString for Pattern<P>
     where
@@ -1000,19 +1020,18 @@ pub mod selector {
     pub struct PortHierarchy {
         pub topic: Topic,
         pub layer: Layer,
-        pub point_hierarchy: PointHierarchy
+        pub point_hierarchy: PointHierarchy,
     }
 
     impl PortHierarchy {
-        pub fn new( point_hierarchy: PointHierarchy, layer: Layer, topic: Topic ) -> Self {
+        pub fn new(point_hierarchy: PointHierarchy, layer: Layer, topic: Topic) -> Self {
             Self {
                 topic,
                 layer,
-                point_hierarchy
+                point_hierarchy,
             }
         }
     }
-
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
     pub struct PointHierarchy {
@@ -1028,9 +1047,9 @@ pub mod selector {
 
     impl PointHierarchy {
         pub fn push(&self, segment: PointKindSeg) -> PointHierarchy
-            where
-                KindParts: Clone,
-                BaseKind: Clone,
+        where
+            KindParts: Clone,
+            BaseKind: Clone,
         {
             if let PointSeg::Root = segment.segment {
                 println!("pushing ROOT");
@@ -1090,9 +1109,8 @@ pub mod selector {
         }
     }
 
-
     #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-    pub struct PointKindSeg{
+    pub struct PointKindSeg {
         pub segment: PointSeg,
         pub kind: Kind,
     }
@@ -1125,41 +1143,41 @@ pub enum PayloadBlockDef<Pnt> {
 impl ToResolved<PayloadBlock> for PayloadBlockCtx {
     fn to_resolved(self, env: &Env) -> Result<PayloadBlock, MsgErr> {
         match self {
-            PayloadBlockCtx::RequestPattern(block) => {
-               Ok(PayloadBlock::RequestPattern(block.modify(move |block| {
-                       let block : SubstancePattern = block.to_resolved(env)?;
-                       Ok(block)})? ))
-            }
-            PayloadBlockCtx::ResponsePattern(block) => {
-                Ok(PayloadBlock::ResponsePattern(block.modify(move |block| { block.to_resolved(env)})?))
-            }
+            PayloadBlockCtx::RequestPattern(block) => Ok(PayloadBlock::RequestPattern(
+                block.modify(move |block| {
+                    let block: SubstancePattern = block.to_resolved(env)?;
+                    Ok(block)
+                })?,
+            )),
+            PayloadBlockCtx::ResponsePattern(block) => Ok(PayloadBlock::ResponsePattern(
+                block.modify(move |block| block.to_resolved(env))?,
+            )),
         }
     }
 }
 
-impl ToResolved<PayloadBlockCtx> for PayloadBlockVar{
+impl ToResolved<PayloadBlockCtx> for PayloadBlockVar {
     fn to_resolved(self, env: &Env) -> Result<PayloadBlockCtx, MsgErr> {
         match self {
-            PayloadBlockVar::RequestPattern(block) => {
-                Ok(PayloadBlockCtx::RequestPattern(block.modify(move |block| {
-                    let block : SubstancePatternCtx = block.to_resolved(env)?;
-                    Ok(block)})? ))
-            }
-            PayloadBlockVar::ResponsePattern(block) => {
-                Ok(PayloadBlockCtx::ResponsePattern(block.modify(move |block| { block.to_resolved(env)})?))
-            }
+            PayloadBlockVar::RequestPattern(block) => Ok(PayloadBlockCtx::RequestPattern(
+                block.modify(move |block| {
+                    let block: SubstancePatternCtx = block.to_resolved(env)?;
+                    Ok(block)
+                })?,
+            )),
+            PayloadBlockVar::ResponsePattern(block) => Ok(PayloadBlockCtx::ResponsePattern(
+                block.modify(move |block| block.to_resolved(env))?,
+            )),
         }
     }
 }
 
-impl ToResolved<PayloadBlock> for PayloadBlockVar{
+impl ToResolved<PayloadBlock> for PayloadBlockVar {
     fn to_resolved(self, env: &Env) -> Result<PayloadBlock, MsgErr> {
         let block: PayloadBlockCtx = self.to_resolved(env)?;
         block.to_resolved(env)
     }
 }
-
-
 
 /*
 impl CtxSubst<PayloadBlock> for PayloadBlockCtx{
@@ -1176,7 +1194,7 @@ impl CtxSubst<PayloadBlock> for PayloadBlockCtx{
 }
  */
 
-    #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UploadBlock {
     pub name: String,
 }
@@ -1191,8 +1209,7 @@ pub type PatternBlockCtx = PatternBlockDef<PointCtx>;
 pub type PatternBlockVar = PatternBlockDef<PointVar>;
 pub type PatternBlockDef<Pnt> = ValuePattern<SubstancePatternDef<Pnt>>;
 
-
-impl ToResolved<PatternBlock> for PatternBlockCtx{
+impl ToResolved<PatternBlock> for PatternBlockCtx {
     fn to_resolved(self, env: &Env) -> Result<PatternBlock, MsgErr> {
         match self {
             PatternBlockCtx::Any => Ok(PatternBlock::Any),
@@ -1204,7 +1221,7 @@ impl ToResolved<PatternBlock> for PatternBlockCtx{
     }
 }
 
-impl ToResolved<PatternBlockCtx> for PatternBlockVar{
+impl ToResolved<PatternBlockCtx> for PatternBlockVar {
     fn to_resolved(self, env: &Env) -> Result<PatternBlockCtx, MsgErr> {
         match self {
             PatternBlockVar::Any => Ok(PatternBlockCtx::Any),
@@ -1215,5 +1232,3 @@ impl ToResolved<PatternBlockCtx> for PatternBlockVar{
         }
     }
 }
-
-

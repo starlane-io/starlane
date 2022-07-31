@@ -3,15 +3,14 @@ use std::iter::FromIterator;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use sqlx::postgres::{PgArguments, PgColumn, PgPoolOptions, PgRow};
-use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
-use sqlx::error::DatabaseError;
-use cosmic_api::id::StarKey;
 use crate::databases::lookup_db_for_star;
 use crate::error;
 use crate::error::Error;
 use crate::star::{StarKind, StarWrangleKind};
-
+use cosmic_api::id::StarKey;
+use sqlx::error::DatabaseError;
+use sqlx::postgres::{PgArguments, PgColumn, PgPoolOptions, PgRow};
+use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
 
 pub type StarDBApi = Arc<StarDB>;
 
@@ -160,7 +159,7 @@ impl StarDB {
 
             let f = match &field {
                 StarFieldSelection::Kind(_kind) => {
-                    format!("kind='{}'", _kind.to_string() )
+                    format!("kind='{}'", _kind.to_string())
                 }
                 StarFieldSelection::MinHops => {
                     format!("hops=MIN(hops)")
@@ -177,7 +176,10 @@ impl StarDB {
                 self.schema, where_clause
             )
         } else {
-            format!("SELECT key,kind,hops  FROM {}.wrangles ORDER BY selections", self.schema)
+            format!(
+                "SELECT key,kind,hops  FROM {}.wrangles ORDER BY selections",
+                self.schema
+            )
         };
         let mut conn = self.pool.acquire().await?;
         let mut trans = conn.begin().await?;
@@ -186,8 +188,12 @@ impl StarDB {
             .await?;
 
         trans.execute(
-            format!("UPDATE {}.wrangles SET selections=selections+1 WHERE key='{}'",
-            self.schema,wrangle.key.to_string()).as_str()
+            format!(
+                "UPDATE {}.wrangles SET selections=selections+1 WHERE key='{}'",
+                self.schema,
+                wrangle.key.to_string()
+            )
+            .as_str(),
         );
 
         trans.commit().await?;
@@ -199,39 +205,45 @@ impl StarDB {
         &self,
         mut kinds: HashSet<StarWrangleKind>,
     ) -> anyhow::Result<StarWrangleSatisfaction> {
-
-        let mut lacking: HashSet<StarKind> = kinds.iter().filter(|wk|wk.required).map(|wk|wk.kind.clone()).collect();
+        let mut lacking: HashSet<StarKind> = kinds
+            .iter()
+            .filter(|wk| wk.required)
+            .map(|wk| wk.kind.clone())
+            .collect();
 
         let mut conn = self.pool.acquire().await?;
-        let wrangles = sqlx::query_as::<Postgres, WrangleCount>(format!("SELECT kind,count(*) as count FROM {}.wrangles group by kind",self.schema).as_str())
-            .fetch_all(&mut conn)
-            .await?;
+        let wrangles = sqlx::query_as::<Postgres, WrangleCount>(
+            format!(
+                "SELECT kind,count(*) as count FROM {}.wrangles group by kind",
+                self.schema
+            )
+            .as_str(),
+        )
+        .fetch_all(&mut conn)
+        .await?;
 
-        let wrangles : Vec<StarKind> = wrangles.into_iter().map(|w|w.kind).collect();
+        let wrangles: Vec<StarKind> = wrangles.into_iter().map(|w| w.kind).collect();
 
-        lacking.retain( |k| !wrangles.contains(k));
+        lacking.retain(|k| !wrangles.contains(k));
 
         if lacking.is_empty() {
             Ok(StarWrangleSatisfaction::Ok)
         } else {
-            Ok( StarWrangleSatisfaction::Lacking(lacking) )
+            Ok(StarWrangleSatisfaction::Lacking(lacking))
         }
     }
 }
 
-impl sqlx::FromRow<'_, PgRow> for WrangleCount{
+impl sqlx::FromRow<'_, PgRow> for WrangleCount {
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
         let kind: String = row.get(0);
         let count: i64 = row.get(1);
         let count: u32 = count.abs() as u32;
         let kind = match StarKind::from_str(kind.as_str()) {
             Ok(kind) => kind,
-            Err(_) => {
-                return Err(sqlx::Error::RowNotFound)
-            }
-
+            Err(_) => return Err(sqlx::Error::RowNotFound),
         };
-        Ok(Self {  kind, count })
+        Ok(Self { kind, count })
     }
 }
 
@@ -239,23 +251,22 @@ impl sqlx::FromRow<'_, PgRow> for StarWrangle {
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
         let key: String = row.get(0);
         let kind: String = row.get(1);
-        let hops: i32= row.get(2);
+        let hops: i32 = row.get(2);
         let hops = hops.abs() as u32;
 
         let key = match StarKey::from_str(key.as_str()) {
             Ok(key) => key,
-            Err(_) => {
-                return Err(sqlx::Error::RowNotFound)
-            }
+            Err(_) => return Err(sqlx::Error::RowNotFound),
         };
         let kind = match StarKind::from_str(kind.as_str()) {
             Ok(kind) => kind,
-            Err(_) => {
-                return Err(sqlx::Error::RowNotFound)
-            }
-
+            Err(_) => return Err(sqlx::Error::RowNotFound),
         };
-        Ok(Self { key, kind, hops: hops as usize })
+        Ok(Self {
+            key,
+            kind,
+            hops: hops as usize,
+        })
     }
 }
 
@@ -263,12 +274,8 @@ impl sqlx::FromRow<'_, PgRow> for StarWrangle {
 pub mod test {
 
     #[test]
-    pub async fn test() {
-
-    }
-
+    pub async fn test() {}
 }
-
 
 pub struct StarWrangle {
     pub key: StarKey,
@@ -276,7 +283,7 @@ pub struct StarWrangle {
     pub hops: usize,
 }
 
-pub struct WrangleCount{
+pub struct WrangleCount {
     pub kind: StarKind,
     pub count: u32,
 }
@@ -329,7 +336,6 @@ impl ToString for StarFieldSelection {
         }
     }
 }
-
 
 impl StarFieldSelection {
     pub fn is_param(&self) -> bool {

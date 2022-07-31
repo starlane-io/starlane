@@ -2,56 +2,55 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 
-use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{mpsc, oneshot};
-use std::str::FromStr;
 use crate::error::Error;
 use crate::fail::{Fail, StarlaneFailure};
 use crate::frame::{
     ResourceHostAction, ResourceRegistryRequest, SimpleReply, StarMessage, StarMessagePayload,
 };
+use std::str::FromStr;
+use tokio::sync::oneshot::error::RecvError;
+use tokio::sync::{mpsc, oneshot};
 
+use crate::artifact::ArtifactRef;
+use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
+use crate::config::config::{ContextualConfig, ParticleConfig};
 use crate::message::delivery::Delivery;
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
+use crate::registry::{RegError, Registration};
+use crate::star::core::particle::driver::{ResourceCoreDriverApi, ResourceCoreDriverComponent};
+use crate::star::shell::db::{StarFieldSelection, StarSelector};
 use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use mesh_portal::version::latest::fail::BadRequest;
-use std::future::Future;
-use std::sync::Arc;
+use cosmic_api::command::Command;
+use cosmic_api::id::id::{BaseKind, Kind, Tks, ToPoint};
+use cosmic_api::id::{ArtifactSubKind, FileSubKind, StarKey, UserBaseSubKind};
+use cosmic_api::particle::particle::Details;
+use cosmic_api::sys::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
+use cosmic_locality::field::FieldEx;
+use cosmic_platform::RegistryApi;
 use futures::StreamExt;
 use http::{HeaderMap, StatusCode, Uri};
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
-use mesh_portal::version::latest::entity::request::{Method, Rc, ReqCore};
+use mesh_portal::version::latest::config::bind::BindConfig;
 use mesh_portal::version::latest::entity::request::get::Get;
-use mesh_portal::version::latest::fail;
-use mesh_portal::version::latest::id::{Meta, Point};
-use mesh_portal::version::latest::messaging::{Agent, CmdMethod, };
-use mesh_portal::version::latest::payload::{PayloadMap, Substance,  };
-use mesh_portal::version::latest::particle::{Status, Stub};
 use mesh_portal::version::latest::entity::request::get::GetOp;
 use mesh_portal::version::latest::entity::request::query::Query;
 use mesh_portal::version::latest::entity::request::select::Select;
 use mesh_portal::version::latest::entity::request::set::Set;
+use mesh_portal::version::latest::entity::request::{Method, Rc, ReqCore};
 use mesh_portal::version::latest::entity::response::RespCore;
+use mesh_portal::version::latest::fail;
+use mesh_portal::version::latest::fail::BadRequest;
+use mesh_portal::version::latest::id::{Meta, Point};
+use mesh_portal::version::latest::messaging::{Agent, CmdMethod};
+use mesh_portal::version::latest::particle::{Status, Stub};
 use mesh_portal::version::latest::payload::CallKind;
+use mesh_portal::version::latest::payload::{PayloadMap, Substance};
 use mesh_portal::version::latest::security::Access;
-use cosmic_api::particle::particle::Details;
 use regex::Regex;
-use mesh_portal::version::latest::config::bind::BindConfig;
-use cosmic_api::command::Command;
-use cosmic_api::id::{ArtifactSubKind, FileSubKind, StarKey, UserBaseSubKind};
-use cosmic_api::id::id::{BaseKind, Kind, Tks, ToPoint};
-use cosmic_api::sys::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
-use crate::artifact::ArtifactRef;
-use cosmic_locality::field::{FieldEx};
-use cosmic_platform::RegistryApi;
-use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
-use crate::config::config::{ContextualConfig, ParticleConfig};
-use crate::registry::{RegError, Registration};
-use crate::star::core::particle::driver::{ResourceCoreDriverApi, ResourceCoreDriverComponent};
-use crate::star::shell::db::{StarFieldSelection, StarSelector};
-
+use std::future::Future;
+use std::sync::Arc;
 
 /*
 lazy_static!{
@@ -76,14 +75,14 @@ pub enum CoreMessageCall {
 impl Call for CoreMessageCall {}
 
 pub struct MessagingEndpointComponent {
-  inner: MessagingEndpointComponentInner
+    inner: MessagingEndpointComponentInner,
 }
 
 #[derive(Clone)]
 pub struct MessagingEndpointComponentInner {
     skel: StarSkel,
     bindex: FieldEx,
-    resource_core_driver_api: ResourceCoreDriverApi
+    resource_core_driver_api: ResourceCoreDriverApi,
 }
 
 impl MessagingEndpointComponent {
@@ -93,15 +92,20 @@ impl MessagingEndpointComponent {
         {
             let skel = skel.clone();
             tokio::spawn(async move {
-                ResourceCoreDriverComponent::new(skel, resource_core_driver_tx, resource_core_driver_rx).await;
+                ResourceCoreDriverComponent::new(
+                    skel,
+                    resource_core_driver_tx,
+                    resource_core_driver_rx,
+                )
+                .await;
             });
         }
 
         let bind_config_cache = Arc::new(BindConfigCacheProxy::new(skel.clone()));
 
-        let router = EndpointRouter{
+        let router = EndpointRouter {
             skel: skel.clone(),
-            core_driver_api: resource_core_driver_api.clone()
+            core_driver_api: resource_core_driver_api.clone(),
         };
 
         pub struct MockRegistryApi();
@@ -116,19 +120,17 @@ impl MessagingEndpointComponent {
             router: Arc::new(router),
             pipeline_executors: Arc::new(Default::default()),
             logger: Default::default(),
-            registry: Arc::new(MockRegistryApi())
+            registry: Arc::new(MockRegistryApi()),
         };
 
         let inner = MessagingEndpointComponentInner {
             skel: skel.clone(),
             bindex,
-            resource_core_driver_api
+            resource_core_driver_api,
         };
 
         AsyncRunner::new(
-            Box::new(Self {
-                inner
-            }),
+            Box::new(Self { inner }),
             skel.core_messaging_endpoint_tx.clone(),
             rx,
         );
@@ -139,35 +141,37 @@ impl MessagingEndpointComponent {
 impl AsyncProcessor<CoreMessageCall> for MessagingEndpointComponent {
     async fn process(&mut self, call: CoreMessageCall) {
         let mut inner = self.inner.clone();
-        tokio::spawn( async move {
+        tokio::spawn(async move {
             match call {
-                CoreMessageCall::Message(message) => match inner.process_resource_message(message).await
-                {
-                    Ok(_) => {}
-                    Err(err) => {
-                        error!("{}", err);
+                CoreMessageCall::Message(message) => {
+                    match inner.process_resource_message(message).await {
+                        Ok(_) => {}
+                        Err(err) => {
+                            error!("{}", err);
+                        }
                     }
-                },
+                }
             }
         });
     }
 }
 
 impl MessagingEndpointComponentInner {
-
-    async fn handle_request(&mut self, delivery: Delivery<ReqShell>)
-    {
+    async fn handle_request(&mut self, delivery: Delivery<ReqShell>) {
         match self.bindex.handle_request(delivery).await {
             Ok(_) => {}
             Err(err) => {
-                error!("{}",err.to_string())
+                error!("{}", err.to_string())
             }
         }
     }
 
-    pub async fn process_resource_message(&mut self, star_message: StarMessage) -> Result<(), Error> {
+    pub async fn process_resource_message(
+        &mut self,
+        star_message: StarMessage,
+    ) -> Result<(), Error> {
         match &star_message.payload {
-            StarMessagePayload::Request(request) => match &request.core.method{
+            StarMessagePayload::Request(request) => match &request.core.method {
                 Method::Cmd(rc) => {
                     let delivery = Delivery::new(request.clone(), star_message, self.skel.clone());
                     self.process_particle_command(delivery).await;
@@ -178,47 +182,53 @@ impl MessagingEndpointComponentInner {
                 }
             },
 
-            StarMessagePayload::ResourceHost(action) => {
-                match action {
-                    ResourceHostAction::Assign(assign) => {
-                        self.resource_core_driver_api.assign(assign.clone()).await;
-                        let reply = star_message.ok(Reply::Empty);
-                        self.skel.messaging_api.star_notify(reply);
-                    }
-                    ResourceHostAction::Init(_) => {}
-                    ResourceHostAction::GetState(point) => {
-                        match self.resource_core_driver_api.get(point.clone()).await {
-                            Ok(payload) => {
-                                let reply = star_message.ok(Reply::Payload(payload));
-                                self.skel.messaging_api.star_notify(reply);
-                            }
-                            Err(err) => {
-                                let reply = star_message.fail(Fail::Starlane(StarlaneFailure::Error("could not get state".to_string())));
-                                self.skel.messaging_api.star_notify(reply);
-                            }
+            StarMessagePayload::ResourceHost(action) => match action {
+                ResourceHostAction::Assign(assign) => {
+                    self.resource_core_driver_api.assign(assign.clone()).await;
+                    let reply = star_message.ok(Reply::Empty);
+                    self.skel.messaging_api.star_notify(reply);
+                }
+                ResourceHostAction::Init(_) => {}
+                ResourceHostAction::GetState(point) => {
+                    match self.resource_core_driver_api.get(point.clone()).await {
+                        Ok(payload) => {
+                            let reply = star_message.ok(Reply::Payload(payload));
+                            self.skel.messaging_api.star_notify(reply);
+                        }
+                        Err(err) => {
+                            let reply = star_message.fail(Fail::Starlane(StarlaneFailure::Error(
+                                "could not get state".to_string(),
+                            )));
+                            self.skel.messaging_api.star_notify(reply);
                         }
                     }
                 }
-            }
+            },
             _ => {}
         }
         Ok(())
     }
 
-    async fn process_particle_command(&mut self, delivery: Delivery<ReqShell>)  {
+    async fn process_particle_command(&mut self, delivery: Delivery<ReqShell>) {
         let skel = self.skel.clone();
         let resource_core_driver_api = self.resource_core_driver_api.clone();
         tokio::spawn(async move {
-
-            let method = match &delivery.item.core.method{
-                Method::Cmd(rc) => {rc}
-                _ => { panic!("should not get requests that are not Cmd") }
+            let method = match &delivery.item.core.method {
+                Method::Cmd(rc) => rc,
+                _ => {
+                    panic!("should not get requests that are not Cmd")
+                }
             };
 
-
-            async fn process(skel: StarSkel, resource_core_driver_api: ResourceCoreDriverApi, method: &CmdMethod, to: Point, body: &Substance) -> Result<Substance, Error> {
+            async fn process(
+                skel: StarSkel,
+                resource_core_driver_api: ResourceCoreDriverApi,
+                method: &CmdMethod,
+                to: Point,
+                body: &Substance,
+            ) -> Result<Substance, Error> {
                 let record = skel.registry_api.locate(&to).await?;
-                let kind = Kind::try_from( record.details.stub.kind )?;
+                let kind = Kind::try_from(record.details.stub.kind)?;
 
                 // intelij IDE has a gripe with this transformation, but
                 // cargo build does not because The TryInto<Command> for Payload
@@ -226,77 +236,84 @@ impl MessagingEndpointComponentInner {
                 let command: Command = body.clone().try_into()?;
 
                 if command.matches(method).is_err() {
-                    return Err(format!("CmdMethod {} does not match body Command", method.to_string()).into());
+                    return Err(format!(
+                        "CmdMethod {} does not match body Command",
+                        method.to_string()
+                    )
+                    .into());
                 }
 
                 match kind.to_base().child_resource_registry_handler() {
-                    ChildRegistry::Shell => {
-                        match &command{
-                            Command::Create(create) => {
+                    ChildRegistry::Shell => match &command {
+                        Command::Create(create) => {
+                            let chamber = skel.registry_api.clone();
+                            let details = chamber.create(create).await?;
 
-                                let chamber = skel.registry_api.clone();
-                                let details= chamber.create(create).await?;
+                            async fn assign(
+                                skel: StarSkel,
+                                details: Details,
+                                state: StateSrc,
+                            ) -> Result<(), Error> {
+                                let star_kind = StarKind::hosts(&BaseKind::from_str(
+                                    details.stub.kind.to_base().to_string().as_str(),
+                                )?);
+                                let key = if skel.info.kind == star_kind {
+                                    skel.info.key.clone()
+                                } else {
+                                    let mut star_selector = StarSelector::new();
+                                    star_selector.add(StarFieldSelection::Kind(star_kind.clone()));
+                                    let wrangle = skel.star_db.next_wrangle(star_selector).await?;
+                                    wrangle.key
+                                };
+                                skel.registry_api
+                                    .assign(&details.stub.point, &key.clone().to_point())
+                                    .await?;
 
-                                async fn assign(
-                                    skel: StarSkel,
-                                    details: Details,
-                                    state: StateSrc,
-                                ) -> Result<(), Error> {
+                                let mut proto = ProtoStarMessage::new();
+                                proto.to(ProtoStarMessageTo::Star(key.clone()));
+                                let assign =
+                                    Assign::new(AssignmentKind::Create, details.clone(), state);
+                                proto.payload = StarMessagePayload::ResourceHost(
+                                    ResourceHostAction::Assign(assign),
+                                );
+                                let reply = skel
+                                    .messaging_api
+                                    .star_exchange(
+                                        proto,
+                                        ReplyKind::Empty,
+                                        "assign particle to host",
+                                    )
+                                    .await?;
 
-                                    let star_kind = StarKind::hosts(&BaseKind::from_str(details.stub.kind.to_base().to_string().as_str())?);
-                                    let key = if skel.info.kind == star_kind {
-                                        skel.info.key.clone()
-                                    }
-                                    else {
-                                        let mut star_selector = StarSelector::new();
-                                        star_selector.add(StarFieldSelection::Kind(star_kind.clone()));
-                                        let wrangle = skel.star_db.next_wrangle(star_selector).await?;
-                                        wrangle.key
-                                    };
-                                    skel.registry_api.assign(&details.stub.point, &key.clone().to_point()).await?;
+                                Ok(())
+                            }
 
-                                    let mut proto = ProtoStarMessage::new();
-                                    proto.to(ProtoStarMessageTo::Star(key.clone()));
-                                    let assign = Assign::new(AssignmentKind::Create, details.clone(), state);
-                                    proto.payload = StarMessagePayload::ResourceHost(
-                                        ResourceHostAction::Assign(assign),
-                                    );
-                                    let reply = skel.messaging_api
-                                        .star_exchange(proto, ReplyKind::Empty, "assign particle to host")
-                                        .await?;
-
-                                    Ok(())
+                            match assign(skel.clone(), details.clone(), create.state.clone()).await
+                            {
+                                Ok(_) => Ok(Substance::Stub(details.stub)),
+                                Err(fail) => {
+                                    eprintln!("FAIL {}", fail.to_string());
+                                    skel.registry_api.set_status(&to, &Status::Panic).await;
+                                    Err(fail.into())
                                 }
-
-                                match assign(skel.clone(), details.clone(), create.state.clone()).await {
-                                    Ok(_) => {
-                                        Ok(Substance::Stub(details.stub))
-                                    },
-                                    Err(fail) => {
-                                        eprintln!("FAIL {}",fail.to_string() );
-                                        skel.registry_api
-                                            .set_status(
-                                                &to,
-                                                &Status::Panic,
-                                            )
-                                            .await;
-                                        Err(fail.into())
-                                    }
-                                }
                             }
-                            Command::Update(update) => {
-                                unimplemented!()
-                            }
-                            Command::Read(point)  => {
-                                unimplemented!()
-                            }
-                            _ => {
-                                return Err("messaging end point no longer handles this type of command".into());
-                            }
-                       }
-                    }
+                        }
+                        Command::Update(update) => {
+                            unimplemented!()
+                        }
+                        Command::Read(point) => {
+                            unimplemented!()
+                        }
+                        _ => {
+                            return Err(
+                                "messaging end point no longer handles this type of command".into(),
+                            );
+                        }
+                    },
                     ChildRegistry::Core => {
-                        resource_core_driver_api.command(to.clone(), command.clone() ).await
+                        resource_core_driver_api
+                            .command(to.clone(), command.clone())
+                            .await
                     }
                 }
             }
@@ -305,14 +322,11 @@ impl MessagingEndpointComponentInner {
             delivery.result(result);
         });
     }
-
-
 }
 
-
 pub struct EndpointRouter {
-  pub skel: StarSkel,
-  pub core_driver_api: ResourceCoreDriverApi
+    pub skel: StarSkel,
+    pub core_driver_api: ResourceCoreDriverApi,
 }
 
 impl FieldRouter for EndpointRouter {
@@ -332,23 +346,28 @@ impl FieldRouter for EndpointRouter {
     }
 }
 
-
-
 pub struct BindConfigCacheProxy {
-   pub skel: StarSkel
+    pub skel: StarSkel,
 }
 
 impl BindConfigCacheProxy {
-    pub fn new( skel :StarSkel ) -> Self {
-        Self {
-            skel
-        }
+    pub fn new(skel: StarSkel) -> Self {
+        Self { skel }
     }
 }
 
 #[async_trait]
 impl BindConfigCache for BindConfigCacheProxy {
-    async fn get_bind_config(&self, particle: &Point) -> anyhow::Result<ArtifactItem<CachedConfig<BindConfig>>> {
-        self.skel.machine.get_proto_artifact_caches_factory().await?.root_caches().get_bind_config(particle).await
+    async fn get_bind_config(
+        &self,
+        particle: &Point,
+    ) -> anyhow::Result<ArtifactItem<CachedConfig<BindConfig>>> {
+        self.skel
+            .machine
+            .get_proto_artifact_caches_factory()
+            .await?
+            .root_caches()
+            .get_bind_config(particle)
+            .await
     }
 }

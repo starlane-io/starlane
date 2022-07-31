@@ -2,17 +2,20 @@ use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 
+use cosmic_api::id::StarKey;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
-use cosmic_api::id::StarKey;
 
 use crate::error::Error;
-use crate::frame::{Frame, SearchHit, SearchResults, SearchTraversal, SearchWindDown, SearchWindUp, StarMessage, StarPattern, TraversalAction};
+use crate::frame::{
+    Frame, SearchHit, SearchResults, SearchTraversal, SearchWindDown, SearchWindUp, StarMessage,
+    StarPattern, TraversalAction,
+};
 use crate::lane::{LaneCommand, LaneKey, LaneWrapper, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
-use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::shell::lanes::LanePattern;
+use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
 pub static MAX_HOPS: usize = 32;
@@ -27,34 +30,36 @@ impl StarSearchApi {
         Self { tx }
     }
 
-    pub async fn search(&self, pattern: StarPattern ) -> Result<SearchHits,Error> {
+    pub async fn search(&self, pattern: StarPattern) -> Result<SearchHits, Error> {
         let (tx, rx) = oneshot::channel();
-        let init = SearchInit::new(pattern, TraversalAction::SearchHits );
-        self.tx.try_send(StarSearchCall::Search { init , tx })?;
+        let init = SearchInit::new(pattern, TraversalAction::SearchHits);
+        self.tx.try_send(StarSearchCall::Search { init, tx })?;
         Ok(tokio::time::timeout(Duration::from_secs(15), rx).await??)
     }
 
-    pub async fn search_action(&self, init: SearchInit) -> Result<SearchHits,Error> {
+    pub async fn search_action(&self, init: SearchInit) -> Result<SearchHits, Error> {
         let (tx, rx) = oneshot::channel();
-        self.tx.try_send(StarSearchCall::Search { init , tx })?;
+        self.tx.try_send(StarSearchCall::Search { init, tx })?;
         Ok(tokio::time::timeout(Duration::from_secs(15), rx).await??)
     }
-
-
 
     pub fn on_traversal(&self, traversal: SearchTraversal, lane: UltimaLaneKey) {
-        self.tx.try_send(StarSearchCall::OnSearchTraversal {traversal, lane}).unwrap_or_default();
+        self.tx
+            .try_send(StarSearchCall::OnSearchTraversal { traversal, lane })
+            .unwrap_or_default();
     }
 }
 
 pub enum StarSearchCall {
-
-    Search{
+    Search {
         init: SearchInit,
         tx: oneshot::Sender<SearchHits>,
     },
 
-    OnSearchTraversal { traversal: SearchTraversal, lane: UltimaLaneKey }
+    OnSearchTraversal {
+        traversal: SearchTraversal,
+        lane: UltimaLaneKey,
+    },
 }
 
 impl Call for StarSearchCall {}
@@ -67,7 +72,10 @@ pub struct StarSearchComponent {
 impl StarSearchComponent {
     pub fn start(skel: StarSkel, rx: mpsc::Receiver<StarSearchCall>) {
         AsyncRunner::new(
-            Box::new(Self { skel: skel.clone(), transactions: HashMap::new() }),
+            Box::new(Self {
+                skel: skel.clone(),
+                transactions: HashMap::new(),
+            }),
             skel.star_search_api.tx.clone(),
             rx,
         );
@@ -81,7 +89,10 @@ impl AsyncProcessor<StarSearchCall> for StarSearchComponent {
             StarSearchCall::Search { init, tx } => {
                 self.search(init, tx).await;
             }
-            StarSearchCall::OnSearchTraversal { traversal, lane: lane_key } => {
+            StarSearchCall::OnSearchTraversal {
+                traversal,
+                lane: lane_key,
+            } => {
                 self.on_search_traversal(traversal, lane_key).await;
             }
         }
@@ -89,16 +100,12 @@ impl AsyncProcessor<StarSearchCall> for StarSearchComponent {
 }
 
 impl StarSearchComponent {
-
     async fn on_search_traversal(&mut self, traversal: SearchTraversal, lane_key: UltimaLaneKey) {
-
         match traversal {
             SearchTraversal::Up(up) => {
                 self.land_windup_hop(up, lane_key).await;
             }
-            SearchTraversal::Down(down) => {
-                self.process_search_transaction(down,lane_key)
-            }
+            SearchTraversal::Down(down) => self.process_search_transaction(down, lane_key),
             _ => {
                 return;
             }
@@ -107,9 +114,8 @@ impl StarSearchComponent {
 
     async fn search(&mut self, init: SearchInit, tx: oneshot::Sender<SearchHits>) {
         let wind_up = SearchWindUp::new(self.skel.info.key.clone(), init.pattern, init.action);
-        self.launch_windup_hop(wind_up, tx, HashSet::new() ).await;
+        self.launch_windup_hop(wind_up, tx, HashSet::new()).await;
     }
-
 
     async fn launch_windup_hop(
         &mut self,
@@ -117,7 +123,6 @@ impl StarSearchComponent {
         tx: oneshot::Sender<SearchHits>,
         exclude: HashSet<StarKey>,
     ) {
-
         let tid = self
             .skel
             .sequence
@@ -128,28 +133,29 @@ impl StarSearchComponent {
             false => Option::None,
         };
 
-        let mut lanes = self.skel.lane_muxer_api.lane_keys().await.expect("expected lanekeys");
+        let mut lanes = self
+            .skel
+            .lane_muxer_api
+            .lane_keys()
+            .await
+            .expect("expected lanekeys");
         let mut lanes = HashSet::from_iter(lanes);
-
 
         lanes.retain(|k| !exclude.contains(k));
 
-        let transaction = StarSearchTransaction::new(
-            wind.pattern.clone(),
-            tx,
-            lanes,
-            local_hit,
-        );
+        let transaction = StarSearchTransaction::new(wind.pattern.clone(), tx, lanes, local_hit);
         self.transactions.insert(tid.clone(), transaction);
 
         wind.transactions.push(tid.clone());
         wind.hops.push(self.skel.info.key.clone());
 
-        self.skel.lane_muxer_api.broadcast(Frame::SearchTraversal(SearchTraversal::Up(wind)), LanePattern::UltimasExcluding(exclude));
+        self.skel.lane_muxer_api.broadcast(
+            Frame::SearchTraversal(SearchTraversal::Up(wind)),
+            LanePattern::UltimasExcluding(exclude),
+        );
     }
 
     async fn land_windup_hop(&mut self, wind_up: SearchWindUp, lane_key: UltimaLaneKey) {
-
         if wind_up.pattern.info_match(&self.skel.info) {
             if wind_up.pattern.is_single_match() {
                 let hit = SearchHit {
@@ -169,7 +175,9 @@ impl StarSearchComponent {
 
                         let wind = Frame::SearchTraversal(SearchTraversal::Down(wind_down));
 
-                        self.skel.lane_muxer_api.forward_frame(LaneKey::Ultima(lane_key), wind);
+                        self.skel
+                            .lane_muxer_api
+                            .forward_frame(LaneKey::Ultima(lane_key), wind);
                     }
                     Err(error) => {
                         eprintln!(
@@ -187,7 +195,12 @@ impl StarSearchComponent {
 
         let hit = wind_up.pattern.info_match(&self.skel.info);
 
-        let lanes = self.skel.lane_muxer_api.lane_keys().await.expect("expected lanekeys");
+        let lanes = self
+            .skel
+            .lane_muxer_api
+            .lane_keys()
+            .await
+            .expect("expected lanekeys");
         if wind_up.hops.len() + 1 > min(wind_up.max_hops, MAX_HOPS)
             || lanes.len() <= 1
             || !self.skel.info.kind.relay()
@@ -216,7 +229,10 @@ impl StarSearchComponent {
 
                     let wind = Frame::SearchTraversal(SearchTraversal::Down(wind_down));
 
-                    self.skel.lane_muxer_api.forward_frame(LaneKey::Ultima(lane_key), wind).unwrap_or_default();
+                    self.skel
+                        .lane_muxer_api
+                        .forward_frame(LaneKey::Ultima(lane_key), wind)
+                        .unwrap_or_default();
                 }
                 Err(error) => {
                     eprintln!(
@@ -262,10 +278,15 @@ impl StarSearchComponent {
                                 transactions: wind_up.transactions.clone(),
                                 result: result,
                             };
-//                            command_tx.send(StarCommand::WindDown(wind_down)).await;
+                            //                            command_tx.send(StarCommand::WindDown(wind_down)).await;
 
                             let lane = wind_down.hops.last().unwrap();
-                            skel.lane_muxer_api.forward_frame(LaneKey::Ultima(lane.clone()), Frame::SearchTraversal(SearchTraversal::Down(wind_down))).unwrap_or_default();
+                            skel.lane_muxer_api
+                                .forward_frame(
+                                    LaneKey::Ultima(lane.clone()),
+                                    Frame::SearchTraversal(SearchTraversal::Down(wind_down)),
+                                )
+                                .unwrap_or_default();
                         }
                         Err(error) => {
                             eprintln!("{}", error);
@@ -278,9 +299,6 @@ impl StarSearchComponent {
             }
         });
     }
-
-
-
 
     /*
     async fn find_lane_for_star(
@@ -315,17 +333,16 @@ impl StarSearchComponent {
     }
     */
 
-
-
     fn process_search_transaction(&mut self, down: SearchWindDown, lane_key: UltimaLaneKey) {
         let tid = down.transactions.last().cloned();
 
         if let Option::Some(tid) = tid {
             let transaction = self.transactions.get_mut(&tid);
             if let Option::Some(transaction) = transaction {
-
-                match transaction.on_frame(Frame::SearchTraversal(SearchTraversal::Down(down)), lane_key)
-                {
+                match transaction.on_frame(
+                    Frame::SearchTraversal(SearchTraversal::Down(down)),
+                    lane_key,
+                ) {
                     TransactionResult::Continue => {}
                     TransactionResult::Done => {
                         let transaction = self.transactions.remove(&tid);
@@ -333,15 +350,11 @@ impl StarSearchComponent {
                         transaction.commit();
                     }
                 }
-
             }
         } else {
-println!("TRANSACTION NOT FOUND");
+            println!("TRANSACTION NOT FOUND");
         }
     }
-
-
-
 }
 
 pub struct StarSearchTransaction {
@@ -394,12 +407,12 @@ impl StarSearchTransaction {
     }
 
     pub fn commit(mut self) {
-            let hits = SearchHits {
-                    pattern: self.pattern.clone(),
-                    hits: self.collapse(),
-                    lane_hits: self.hits.clone(),
-                };
-            self.tx.send(hits).unwrap_or_default();
+        let hits = SearchHits {
+            pattern: self.pattern.clone(),
+            hits: self.collapse(),
+            lane_hits: self.hits.clone(),
+        };
+        self.tx.send(hits).unwrap_or_default();
     }
 }
 
@@ -415,12 +428,7 @@ impl StarSearchTransaction {
         }
     }
 
-    fn on_frame(
-        &mut self,
-        frame: Frame,
-        lane_key: UltimaLaneKey
-    ) -> TransactionResult {
-
+    fn on_frame(&mut self, frame: Frame, lane_key: UltimaLaneKey) -> TransactionResult {
         if let Frame::SearchTraversal(SearchTraversal::Down(wind_down)) = frame {
             if let SearchResults::Hits(hits) = &wind_down.result {
                 let mut lane_hits = HashMap::new();
@@ -440,7 +448,7 @@ impl StarSearchTransaction {
             }
         }
 
-        self.reported_lanes.insert( lane_key );
+        self.reported_lanes.insert(lane_key);
 
         if self.reported_lanes == self.lanes {
             TransactionResult::Done
@@ -449,7 +457,6 @@ impl StarSearchTransaction {
         }
     }
 }
-
 
 pub struct LaneHit {
     lane: StarKey,
@@ -491,7 +498,6 @@ pub enum TransactionResult {
     Done,
 }
 
-
 pub struct ShortestPathStarKey {
     pub to: StarKey,
     pub next_lane: StarKey,
@@ -506,9 +512,9 @@ pub struct SearchInit {
 
 impl SearchInit {
     pub fn new(pattern: StarPattern, action: TraversalAction) -> Self {
-            Self{
-                pattern: pattern,
-                action: action,
-            }
+        Self {
+            pattern: pattern,
+            action: action,
+        }
     }
 }

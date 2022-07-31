@@ -6,23 +6,25 @@ use yaml_rust::Yaml;
 
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
+use crate::frame::{StarMessage, StarMessagePayload};
+use crate::message::delivery::Delivery;
 use crate::star::core::particle::driver::ParticleCoreDriver;
 use crate::star::core::particle::state::StateStore;
 use crate::star::StarSkel;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
-use crate::message::delivery::Delivery;
-use crate::frame::{StarMessage, StarMessagePayload};
 
-use std::str::FromStr;
+use cosmic_api::id::id::{BaseKind, Kind};
+use cosmic_api::id::{ArtifactSubKind, FileSubKind};
+use cosmic_api::wave::DirectedProto;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
-use mesh_portal::version::latest::entity::request::create::{Create, KindTemplate, PointSegFactory, PointTemplate, Strategy, Template};
+use mesh_portal::version::latest::entity::request::create::{
+    Create, KindTemplate, PointSegFactory, PointTemplate, Strategy, Template,
+};
 use mesh_portal::version::latest::entity::request::{Method, Rc, ReqCore};
 use mesh_portal::version::latest::id::{AddressAndKind, KindParts, Point};
 use mesh_portal::version::latest::messaging::ReqShell;
 use mesh_portal::version::latest::sys::Assign;
-use cosmic_api::id::{ArtifactSubKind, FileSubKind};
-use cosmic_api::id::id::{Kind, BaseKind};
-use cosmic_api::wave::DirectedProto;
+use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct FileCoreManager {
@@ -41,52 +43,42 @@ impl FileCoreManager {
 
 #[async_trait]
 impl ParticleCoreDriver for FileCoreManager {
-    async fn assign(
-        &mut self,
-        assign: Assign,
-    ) -> Result<(), Error> {
-
-        if let Kind::File(file_kind) = &assign.details.stub.kind
-        {
+    async fn assign(&mut self, assign: Assign) -> Result<(), Error> {
+        if let Kind::File(file_kind) = &assign.details.stub.kind {
             match file_kind {
                 FileSubKind::Dir => {
                     // stateless
                 }
                 _ => {
                     let state = match &assign.state {
-                        StateSrc::Substance(data) => {
-                            data.clone()
-                        },
-                        StateSrc::None => {
-                            return Err("Artifact cannot be stateless".into())
-                        },
+                        StateSrc::Substance(data) => data.clone(),
+                        StateSrc::None => return Err("Artifact cannot be stateless".into()),
                     };
-                    self.store.put(assign.details.stub.point.clone(), *state.clone() ).await?;
+                    self.store
+                        .put(assign.details.stub.point.clone(), *state.clone())
+                        .await?;
 
-                    let selector = WatchSelector{
+                    let selector = WatchSelector {
                         topic: Topic::Point(assign.details.stub.point),
-                        property: Property::State
+                        property: Property::State,
                     };
 
-                    self.skel.watch_api.fire( Notification::new(selector, Change::State(*state) ));
-
+                    self.skel
+                        .watch_api
+                        .fire(Notification::new(selector, Change::State(*state)));
                 }
             }
         } else {
-            return Err("File Manager unexpected kind".into() );
+            return Err("File Manager unexpected kind".into());
         }
-
 
         Ok(())
     }
 
-
     fn kind(&self) -> BaseKind {
         BaseKind::File
     }
-
 }
-
 
 pub struct FileSystemManager {
     skel: StarSkel,
@@ -94,8 +86,7 @@ pub struct FileSystemManager {
 }
 
 impl FileSystemManager {
-    pub async fn new( skel: StarSkel ) -> Self {
-
+    pub async fn new(skel: StarSkel) -> Self {
         FileSystemManager {
             skel: skel.clone(),
             store: StateStore::new(skel),
@@ -109,10 +100,7 @@ impl ParticleCoreDriver for FileSystemManager {
         BaseKind::FileSystem
     }
 
-    async fn assign(
-        &mut self,
-        assign: Assign,
-    ) -> Result<(), Error> {
+    async fn assign(&mut self, assign: Assign) -> Result<(), Error> {
         match assign.state {
             StateSrc::None => {}
             _ => {
@@ -120,32 +108,47 @@ impl ParticleCoreDriver for FileSystemManager {
             }
         };
 
-
         let root_point_and_kind = AddressAndKind {
-            point: Point::from_str( format!("{}:/", assign.details.stub.point.to_string()).as_str())?,
-            kind: Kind::File(FileSubKind::Dir)
+            point: Point::from_str(
+                format!("{}:/", assign.details.stub.point.to_string()).as_str(),
+            )?,
+            kind: Kind::File(FileSubKind::Dir),
         };
 
         let skel = self.skel.clone();
-        tokio::spawn( async move {
+        tokio::spawn(async move {
             let create = Create {
                 template: Template {
-                    point: PointTemplate { parent: assign.details.stub.point.clone(), child_segment_template: PointSegFactory::Exact(root_point_and_kind.point.last_segment().expect("expected final segment").to_string()) },
-                    kind: KindTemplate { base: root_point_and_kind.kind.base(), sub: root_point_and_kind.kind.sub().into(), specific: None }
+                    point: PointTemplate {
+                        parent: assign.details.stub.point.clone(),
+                        child_segment_template: PointSegFactory::Exact(
+                            root_point_and_kind
+                                .point
+                                .last_segment()
+                                .expect("expected final segment")
+                                .to_string(),
+                        ),
+                    },
+                    kind: KindTemplate {
+                        base: root_point_and_kind.kind.base(),
+                        sub: root_point_and_kind.kind.sub().into(),
+                        specific: None,
+                    },
                 },
                 state: StateSrc::None,
                 properties: SetProperties::new(),
                 strategy: Strategy::Commit,
-                registry: Default::default()
+                registry: Default::default(),
             };
 
-            let request : ReqCore = create.into();
-            let request = ReqShell::new(request, assign.details.stub.point.clone(), Point::global_executor() );
+            let request: ReqCore = create.into();
+            let request = ReqShell::new(
+                request,
+                assign.details.stub.point.clone(),
+                Point::global_executor(),
+            );
             skel.messaging_api.request(request).await;
         });
         Ok(())
     }
-
-
-
 }

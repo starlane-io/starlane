@@ -1,24 +1,23 @@
-use std::sync::PoisonError;
 use std::string::FromUtf8Error;
+use std::sync::PoisonError;
 
 #[derive(Debug, Clone)]
-pub struct Error{
-    pub error: String
+pub struct Error {
+    pub error: String,
 }
 
-
-impl From<&str> for Error{
+impl From<&str> for Error {
     fn from(e: &str) -> Self {
-        Error{
-            error: format!("{:?}",e)
+        Error {
+            error: format!("{:?}", e),
         }
     }
 }
 
-impl From<String> for Error{
+impl From<String> for Error {
     fn from(e: String) -> Self {
-        Error{
-            error: format!("{:?}",e)
+        Error {
+            error: format!("{:?}", e),
         }
     }
 }
@@ -26,16 +25,15 @@ impl From<String> for Error{
 impl<T> From<PoisonError<T>> for Error {
     fn from(e: PoisonError<T>) -> Self {
         Error {
-            error: format!("{:?}", e)
+            error: format!("{:?}", e),
         }
     }
 }
 
 impl From<FromUtf8Error> for Error {
-
-    fn from(e:FromUtf8Error) -> Self {
+    fn from(e: FromUtf8Error) -> Self {
         Error {
-            error: format!("{:?}", e)
+            error: format!("{:?}", e),
         }
     }
 }

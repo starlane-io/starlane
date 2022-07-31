@@ -1,12 +1,22 @@
 use crate::error::MsgErr;
-use crate::wave::{Method, DirectedCore, ReflectedCore};
 use crate::id::id::Meta;
 use crate::substance::substance::{Errors, Substance};
+use crate::util::ValueMatcher;
+use crate::wave::{DirectedCore, Method, ReflectedCore};
 use http::{HeaderMap, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
-use crate::util::ValueMatcher;
 
-#[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display, strum_macros::EnumString, Eq, PartialEq,Hash)]
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    strum_macros::Display,
+    strum_macros::EnumString,
+    Eq,
+    PartialEq,
+    Hash,
+)]
 pub enum HttpMethod {
     Options,
     Get,

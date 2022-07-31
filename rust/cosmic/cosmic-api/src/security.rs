@@ -1,8 +1,10 @@
 use crate::error::MsgErr;
 use crate::id::id::Point;
 use crate::parse::error::result;
-use crate::parse::{MapResolver, particle_perms, permissions, permissions_mask, privilege};
+use crate::parse::{particle_perms, permissions, permissions_mask, privilege, MapResolver};
 use crate::selector::selector::{PointHierarchy, Selector};
+use crate::wave::ScopeGrant;
+use cosmic_nom::new_span;
 use nom::combinator::all_consuming;
 use nom_supreme::parser_ext::MapRes;
 use serde::{Deserialize, Serialize};
@@ -10,8 +12,6 @@ use std::collections::{HashMap, HashSet};
 use std::ops;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
-use cosmic_nom::new_span;
-use crate::wave::ScopeGrant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Access {
@@ -27,7 +27,7 @@ impl Access {
     pub fn has_super(&self) -> bool {
         match self {
             Access::Super => true,
-            Access::SuperOwner=> true,
+            Access::SuperOwner => true,
             _ => false,
         }
     }
@@ -35,7 +35,7 @@ impl Access {
     pub fn has_owner(&self) -> bool {
         match self {
             Access::Owner => true,
-            Access::SuperOwner=> true,
+            Access::SuperOwner => true,
             _ => false,
         }
     }
@@ -67,12 +67,10 @@ impl Access {
             Access::Super => Ok(()),
             Access::Owner => Ok(()),
             Access::SuperOwner => Ok(()),
-            Access::Enumerated(enumerated) => {
-                match enumerated.privileges.has(privilege).is_ok() {
-                    true => Ok(()),
-                    false => Err(format!("'{}'", privilege).into()),
-                }
-            }
+            Access::Enumerated(enumerated) => match enumerated.privileges.has(privilege).is_ok() {
+                true => Ok(()),
+                false => Err(format!("'{}'", privilege).into()),
+            },
         }
     }
 }
@@ -116,8 +114,6 @@ impl Privileges {
             },
         }
     }
-
-
 }
 
 impl ops::BitOr<&Privilege> for &Privileges {
@@ -126,16 +122,14 @@ impl ops::BitOr<&Privilege> for &Privileges {
     fn bitor(self, rhs: &Privilege) -> Self::Output {
         match rhs {
             Privilege::Full => Privileges::Full,
-            Privilege::Single(p) => {
-                match self {
-                    Privileges::Full => Privileges::Full,
-                    Privileges::Enumerated(enumerated) => {
-                        let mut enumerated = enumerated.clone();
-                        enumerated.set.insert( p.to_string() );
-                        Privileges::Enumerated(enumerated)
-                    }
+            Privilege::Single(p) => match self {
+                Privileges::Full => Privileges::Full,
+                Privileges::Enumerated(enumerated) => {
+                    let mut enumerated = enumerated.clone();
+                    enumerated.set.insert(p.to_string());
+                    Privileges::Enumerated(enumerated)
                 }
-            }
+            },
         }
     }
 }
@@ -146,16 +140,14 @@ impl ops::BitOr<&Privilege> for Privileges {
     fn bitor(self, rhs: &Privilege) -> Self::Output {
         match rhs {
             Privilege::Full => Privileges::Full,
-            Privilege::Single(p) => {
-                match self {
-                    Privileges::Full => Privileges::Full,
-                    Privileges::Enumerated(enumerated) => {
-                        let mut enumerated = enumerated.clone();
-                        enumerated.set.insert( p.to_string() );
-                        Privileges::Enumerated(enumerated)
-                    }
+            Privilege::Single(p) => match self {
+                Privileges::Full => Privileges::Full,
+                Privileges::Enumerated(enumerated) => {
+                    let mut enumerated = enumerated.clone();
+                    enumerated.set.insert(p.to_string());
+                    Privileges::Enumerated(enumerated)
                 }
-            }
+            },
         }
     }
 }
@@ -269,7 +261,7 @@ impl EnumeratedAccess {
             }
             AccessGrantKindDef::Privilege(prv) => {
                 self.privileges = self.privileges.clone() | prv;
-            },
+            }
             AccessGrantKindDef::PermissionsMask(mask) => match mask.kind {
                 PermissionsMaskKind::Or => self.permissions.or(&mask.permissions),
                 PermissionsMaskKind::And => self.permissions.and(&mask.permissions),
@@ -302,7 +294,7 @@ impl ToString for PermissionsMask {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct Permissions {
     pub child: ChildPerms,
     pub particle: ParticlePerms,
@@ -342,14 +334,13 @@ impl Permissions {
     }
 }
 
-
 impl ToString for Permissions {
     fn to_string(&self) -> String {
         format!("{}-{}", self.child.to_string(), self.particle.to_string())
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct ChildPerms {
     pub create: bool,
     pub select: bool,
@@ -412,7 +403,7 @@ impl ToString for ChildPerms {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct ParticlePerms {
     pub read: bool,
     pub write: bool,
@@ -501,26 +492,23 @@ pub struct AccessGrantDef<Priv, PermMask, PointSelector, Point> {
 pub type GrantTo = GrantToDef<Selector>;
 pub enum GrantToDef<PointSelector> {
     World,
-    PointSelector(PointSelector)
+    PointSelector(PointSelector),
 }
 
 impl GrantTo {
-    pub fn is_match(&self, hierarchy: &PointHierarchy) -> Result<(),()> {
+    pub fn is_match(&self, hierarchy: &PointHierarchy) -> Result<(), ()> {
         match self {
             GrantTo::World => Ok(()),
-            GrantTo::PointSelector(selector) => {
-                match selector.matches(hierarchy) {
-                    true => Ok(()),
-                    false => Err(())
-                }
-            }
+            GrantTo::PointSelector(selector) => match selector.matches(hierarchy) {
+                true => Ok(()),
+                false => Err(()),
+            },
         }
     }
 }
 
 pub type AccessGrant = AccessGrantDef<Privilege, PermissionsMask, Selector, Point>;
 pub type AccessGrantKind = AccessGrantKindDef<Privilege, PermissionsMask>;
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AccessGrantKindDef<Priv, PermMask> {

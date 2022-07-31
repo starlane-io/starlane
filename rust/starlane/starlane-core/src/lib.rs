@@ -1,6 +1,5 @@
 #![allow(warnings)]
 
-
 #[macro_use]
 extern crate actix_web;
 #[macro_use]
@@ -37,10 +36,9 @@ extern crate cosmic_macros;
 extern crate async_recursion;
 extern crate core;
 
-
+use chrono::{DateTime, Utc};
 use std::str::FromStr;
 use std::time::SystemTime;
-use chrono::{DateTime, Utc};
 
 use semver;
 use uuid::Uuid;
@@ -48,39 +46,39 @@ use uuid::Uuid;
 pub mod actor;
 pub mod artifact;
 pub mod cache;
+pub mod command;
 pub mod config;
 pub mod constellation;
 pub mod crypt;
 pub mod data;
+pub mod databases;
 pub mod error;
+pub mod fail;
 pub mod file_access;
 pub mod filesystem;
 pub mod frame;
+pub mod global;
+pub mod html;
 pub mod id;
 pub mod lane;
 pub mod logger;
+pub mod mechtron;
 pub mod message;
 pub mod names;
-pub mod proto;
+pub mod parse;
 pub mod particle;
+pub mod pattern;
+pub mod proto;
+pub mod registry;
 pub mod server;
 pub mod service;
 pub mod space;
 pub mod star;
 pub mod starlane;
 pub mod template;
+pub mod user;
 pub mod util;
 pub mod watch;
-pub mod parse;
-pub mod html;
-pub mod pattern;
-pub mod fail;
-pub mod command;
-pub mod user;
-pub mod mechtron;
-pub mod registry;
-pub mod databases;
-pub mod global;
 
 lazy_static! {
     static ref VERSION: semver::Version = {
@@ -90,13 +88,11 @@ lazy_static! {
 }
 
 #[no_mangle]
-pub extern "C" fn mesh_portal_uuid() -> String
-{
+pub extern "C" fn mesh_portal_uuid() -> String {
     Uuid::new_v4().to_string()
 }
 
-
 #[no_mangle]
-pub extern "C" fn mesh_portal_timestamp() -> DateTime<Utc>{
+pub extern "C" fn mesh_portal_timestamp() -> DateTime<Utc> {
     Utc::now()
 }

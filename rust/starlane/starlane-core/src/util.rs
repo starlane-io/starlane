@@ -2,21 +2,21 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fs::File;
 
+use alcoholic_jwt::{token_kid, validate, ValidJWT, JWK, JWKS};
+use lru::LruCache;
+use mesh_portal::version::latest::entity::request::Method;
+use mesh_portal::version::latest::id::Point;
+use mesh_portal::version::latest::messaging::{ReqProto, ReqShell};
+use mesh_portal::version::latest::msg::MsgMethod;
 use std::hash::Hash;
 use std::io::{Read, Seek, Write};
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
-use alcoholic_jwt::{JWK, JWKS, token_kid, validate, ValidJWT};
-use lru::LruCache;
-use mesh_portal::version::latest::entity::request::Method;
-use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::messaging::{ReqProto, ReqShell};
-use mesh_portal::version::latest::msg::MsgMethod;
 
-use tokio::sync::{broadcast, RwLock};
 use tokio::sync::mpsc::Receiver;
+use tokio::sync::{broadcast, RwLock};
 use tokio::sync::{mpsc, oneshot};
 
 use tokio::time::Duration;
@@ -26,10 +26,9 @@ use zip::result::ZipError;
 use zip::write::FileOptions;
 
 use crate::error::Error;
-use serde::Deserialize;
-use cosmic_api::id::id::ToPort;
 use crate::starlane::api::StarlaneApi;
-
+use cosmic_api::id::id::ToPort;
+use serde::Deserialize;
 
 lazy_static! {
     pub static ref SHUTDOWN_TX: broadcast::Sender<()> = { broadcast::channel(1).0 };
@@ -184,11 +183,11 @@ pub async fn wait_for_it<R>(rx: oneshot::Receiver<Result<R, Error>>) -> Result<R
         Ok(result) => match result {
             Ok(result) => match result {
                 Ok(result) => Ok(result),
-                Err(error) => Err(error.into())
+                Err(error) => Err(error.into()),
             },
-            Err(error) => Err(error.into())
+            Err(error) => Err(error.into()),
         },
-        Err(_err) => Err("timeout".into())
+        Err(_err) => Err("timeout".into()),
     }
 }
 
@@ -220,9 +219,7 @@ pub async fn wait_for_it_for<R>(
 
 #[async_trait]
 pub trait AsyncProcessor<C>: Send + Sync + 'static {
-    async fn init(&mut self) {
-
-    }
+    async fn init(&mut self) {}
     async fn process(&mut self, call: C);
 }
 
@@ -342,62 +339,62 @@ pub fn shutdown() {
     });
 }
 
-
 #[derive(Clone)]
-pub struct ServiceChamber<S> where S: Clone{
+pub struct ServiceChamber<S>
+where
+    S: Clone,
+{
     name: String,
-    service: Option<S>
+    service: Option<S>,
 }
 
-impl <S> ServiceChamber<S> where S: Clone{
-    pub fn new( name: &str ) -> Self {
+impl<S> ServiceChamber<S>
+where
+    S: Clone,
+{
+    pub fn new(name: &str) -> Self {
         let name = name.to_string();
         Self {
             name,
-            service: None
+            service: None,
         }
     }
 
-    pub fn set( &mut self, service: S ) {
+    pub fn set(&mut self, service: S) {
         self.service = Option::Some(service);
     }
 
-    pub fn get( &self ) -> Result<S,Error> {
+    pub fn get(&self) -> Result<S, Error> {
         match &self.service {
-            None => {
-                Err(format!("Service Unavalable: {}", self.name).into())
-            }
-            Some(service) => {
-                Ok(service.clone())
-            }
+            None => Err(format!("Service Unavalable: {}", self.name).into()),
+            Some(service) => Ok(service.clone()),
         }
     }
 }
-
 
 #[derive(Clone)]
 pub struct JwksCache {
     api: StarlaneApi,
-    map: Arc<RwLock<LruCache<Point,JWKS>>>
+    map: Arc<RwLock<LruCache<Point, JWKS>>>,
 }
 
 impl JwksCache {
     pub fn new(api: StarlaneApi) -> Self {
         Self {
             api,
-            map: Arc::new(RwLock::new(LruCache::new(1024)))
+            map: Arc::new(RwLock::new(LruCache::new(1024))),
         }
     }
 
-    pub async fn validate( &self, token: &str ) -> Result<ValidJWT,Error>{
+    pub async fn validate(&self, token: &str) -> Result<ValidJWT, Error> {
         let jwt = UntrustedJwt(token.to_string());
-        let claims = serde_json::from_str::<JwtClaims>(jwt.claims()?.as_str() )?;
-        let userbase_address=  Point::from_str(claims.userbase_ref.as_str() )?;
+        let claims = serde_json::from_str::<JwtClaims>(jwt.claims()?.as_str())?;
+        let userbase_address = Point::from_str(claims.userbase_ref.as_str())?;
         let kid = token_kid(token)?.ok_or("token 'kid' (key id) not found")?;
 
         let jwks = {
             let mut lock = self.map.write().await;
-            if let Some(jwks) = lock.get( &userbase_address ) {
+            if let Some(jwks) = lock.get(&userbase_address) {
                 Some(jwks.clone())
             } else {
                 None
@@ -407,14 +404,10 @@ impl JwksCache {
         let validations = vec![];
 
         match jwks {
-            Some(jwks) => {
-                match jwks.find(kid.as_str()) {
-                    None => {}
-                    Some(jwk) => {
-                        return Ok(validate( token, jwk, validations )?)
-                    }
-                }
-            }
+            Some(jwks) => match jwks.find(kid.as_str()) {
+                None => {}
+                Some(jwk) => return Ok(validate(token, jwk, validations)?),
+            },
             None => {}
         }
 
@@ -429,41 +422,46 @@ impl JwksCache {
         {
             let jwks = jwks.clone();
             let mut lock = self.map.write().await;
-            lock.put( userbase_address, jwks );
+            lock.put(userbase_address, jwks);
         }
 
-        let jwk = jwks.find(kid.as_str()).ok_or("cannot find keyId to validate token")?;
-        Ok(validate( token, jwk, validations )?)
+        let jwk = jwks
+            .find(kid.as_str())
+            .ok_or("cannot find keyId to validate token")?;
+        Ok(validate(token, jwk, validations)?)
     }
 }
 
 pub struct UntrustedJwt(String);
 
 impl UntrustedJwt {
-    pub fn headers(&self) -> Result<String,Error>{
-        Ok(String::from_utf8(base64::decode(self.0.split(".").next().ok_or("invalid Jwt" )?)?)?)
+    pub fn headers(&self) -> Result<String, Error> {
+        Ok(String::from_utf8(base64::decode(
+            self.0.split(".").next().ok_or("invalid Jwt")?,
+        )?)?)
     }
 
-    pub fn claims(&self) -> Result<String,Error>{
+    pub fn claims(&self) -> Result<String, Error> {
         let mut split = self.0.split(".");
         split.next().ok_or("invalid Jwt")?;
-        Ok(String::from_utf8(base64::decode(split.next().ok_or("invalid Jwt" )?)?)?)
+        Ok(String::from_utf8(base64::decode(
+            split.next().ok_or("invalid Jwt")?,
+        )?)?)
     }
 }
 
-#[derive(Clone,Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct JwtClaims {
-  pub exp: u64,
-  pub typ: String,
-  pub jti: String,
-  pub iss: String,
-  pub sub: String,
-  pub session_state: String,
-  pub acr: String,
-  pub azp: String,
-  pub scope: String,
-  pub email_verified: Option<bool>,
-  pub userbase_ref: String,
-  pub preferred_username: String
+    pub exp: u64,
+    pub typ: String,
+    pub jti: String,
+    pub iss: String,
+    pub sub: String,
+    pub session_state: String,
+    pub acr: String,
+    pub azp: String,
+    pub scope: String,
+    pub email_verified: Option<bool>,
+    pub userbase_ref: String,
+    pub preferred_username: String,
 }
-

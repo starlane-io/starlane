@@ -1,4 +1,4 @@
-pub mod wasm;
 pub mod bind;
-pub mod parse;
 pub mod config;
+pub mod parse;
+pub mod wasm;

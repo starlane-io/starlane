@@ -1,19 +1,20 @@
-use std::str::FromStr;
-use mesh_portal::version::latest::entity::request::create::{PointTemplate, KindTemplate, Template, PointSegFactory};
-use mesh_portal::version::latest::id::{Point, RouteSegment};
-use mesh_portal::version::latest::messaging::{Message, ReqShell};
-use tokio::sync::mpsc;
 use crate::message::delivery::Delivery;
 use cosmic_api::id::StarKey;
+use mesh_portal::version::latest::entity::request::create::{
+    KindTemplate, PointSegFactory, PointTemplate, Template,
+};
+use mesh_portal::version::latest::id::{Point, RouteSegment};
+use mesh_portal::version::latest::messaging::{Message, ReqShell};
+use std::str::FromStr;
+use tokio::sync::mpsc;
 
 lazy_static! {
-    pub static ref HYPERUSER: &'static Point = &Point::from_str("hyperspace:users:hyperuser").unwrap();
+    pub static ref HYPERUSER: &'static Point =
+        &Point::from_str("hyperspace:users:hyperuser").unwrap();
     pub static ref HYPER_USERBASE: &'static Point = &Point::from_str("hyperspace:users").unwrap();
 }
 
-pub struct HyperUser {
-
-}
+pub struct HyperUser {}
 
 impl HyperUser {
     pub fn point() -> Point {
@@ -36,8 +37,8 @@ impl HyperUser {
      */
 
     pub fn messenger() -> mpsc::Sender<Message> {
-        let (messenger_tx,mut messenger_rx) = mpsc::channel(1024);
-        tokio::spawn( async move {
+        let (messenger_tx, mut messenger_rx) = mpsc::channel(1024);
+        tokio::spawn(async move {
             // right now we basically ignore messages to HyperUser
             while let Option::Some(_) = messenger_rx.recv().await {}
         });

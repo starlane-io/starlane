@@ -1,17 +1,17 @@
 use alloc::string::{String, ToString};
+use chrono::{DateTime, Utc};
 use core::marker::Sized;
 use core::option::Option;
 use core::option::Option::{None, Some};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
-use chrono::{DateTime, Utc};
 
 use crate::error::MsgErr;
 use crate::http::HttpMethod;
-use crate::{cosmic_timestamp, cosmic_uuid};
-use crate::parse::Env;
-use serde::{Deserialize, Serialize};
 use crate::id::id::Uuid;
+use crate::parse::Env;
+use crate::{cosmic_timestamp, cosmic_uuid};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum HttpMethodPattern {
@@ -51,8 +51,7 @@ impl ToString for HttpMethodPattern {
     }
 }
 
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum ValuePattern<T> {
     Any,
     None,
@@ -72,12 +71,15 @@ where
     }
 }
 
-impl <T> ToString for ValuePattern<T> where T:ToString {
+impl<T> ToString for ValuePattern<T>
+where
+    T: ToString,
+{
     fn to_string(&self) -> String {
         match self {
             ValuePattern::Any => "*".to_string(),
             ValuePattern::None => "!".to_string(),
-            ValuePattern::Pattern(pattern) => pattern.to_string()
+            ValuePattern::Pattern(pattern) => pattern.to_string(),
         }
     }
 }
@@ -127,7 +129,6 @@ impl<T> ValuePattern<T> {
         }
     }
 }
-
 
 pub trait ValueMatcher<X> {
     fn is_match(&self, x: &X) -> Result<(), ()>;
@@ -202,7 +203,7 @@ pub fn uuid() -> Uuid {
     unsafe { cosmic_uuid() }
 }
 
-pub fn timestamp() -> DateTime<Utc>{
+pub fn timestamp() -> DateTime<Utc> {
     unsafe { cosmic_timestamp() }
 }
 

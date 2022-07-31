@@ -1,11 +1,12 @@
 #![allow(warnings)]
 
-use std::collections::HashSet;
 use chrono::{DateTime, Utc};
 use cosmic_api::command::request::create::KindTemplate;
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{BaseKind, Kind, Specific, ToBaseKind};
-use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, MachineName, StarKey, StarSub, UserBaseSubKind};
+use cosmic_api::id::{
+    ArtifactSubKind, BaseSubKind, FileSubKind, MachineName, StarKey, StarSub, UserBaseSubKind,
+};
 use cosmic_api::property::{
     AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit,
     PropertySource, U64Pattern, UsernamePattern,
@@ -18,7 +19,11 @@ use cosmic_platform::driver::DriversBuilder;
 use cosmic_platform::machine::{Machine, MachineTemplate};
 use cosmic_platform::Platform;
 use cosmic_platform::{Registry, RegistryApi};
-use cosmic_registry_postgres::{PostgresDbInfo, PostErr, PostgresPlatform, PostgresRegistry, PostgresRegistryContextHandle, PostgresRegistryContext};
+use cosmic_registry_postgres::{
+    PostErr, PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
+    PostgresRegistryContextHandle,
+};
+use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::io;
@@ -30,7 +35,6 @@ extern crate lazy_static;
 
 #[macro_use]
 extern crate async_trait;
-
 
 lazy_static! {
     pub static ref STARLANE_PORT: usize = std::env::var("STARLANE_PORT")
@@ -63,34 +67,35 @@ pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
 }
 
 fn main() -> Result<(), PostErr> {
-    let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
-    runtime.block_on( async move {
-    let machine = Starlane::new().await.unwrap().machine();
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async move {
+        let machine = Starlane::new().await.unwrap().machine();
         machine.wait().await
-        })
+    })
 }
 
 #[derive(Clone)]
 pub struct Starlane {
-    ctx: PostgresRegistryContext
+    ctx: PostgresRegistryContext,
 }
 
 impl Starlane {
-    pub async fn new() -> Result<Self,Self::Err> {
-            let mut dbs = HashSet::new();
-            dbs.insert(Self::lookup_registry_db()? );
-            for star in stars {
-                dbs.insert( Self::lookup_star_db(&star)?);
-            }
-            let ctx = PostgresRegistryContext::new(dbs).await?;
+    pub async fn new() -> Result<Self, Self::Err> {
+        let mut dbs = HashSet::new();
+        dbs.insert(Self::lookup_registry_db()?);
+        for star in stars {
+            dbs.insert(Self::lookup_star_db(&star)?);
+        }
+        let ctx = PostgresRegistryContext::new(dbs).await?;
 
-        Ok(Self {ctx})
+        Ok(Self { ctx })
     }
 }
 
 impl PostgresPlatform for Starlane {
-
-    fn lookup_registry_db() -> Result<PostgresDbInfo,Self::Err> {
+    fn lookup_registry_db() -> Result<PostgresDbInfo, Self::Err> {
         Ok(PostgresDbInfo::new(
             STARLANE_REGISTRY_URL.to_string(),
             STARLANE_REGISTRY_USER.to_string(),
@@ -99,13 +104,13 @@ impl PostgresPlatform for Starlane {
         ))
     }
 
-    fn lookup_star_db(star: &StarKey ) -> Result<PostgresDbInfo,Self::Err> {
+    fn lookup_star_db(star: &StarKey) -> Result<PostgresDbInfo, Self::Err> {
         Ok(PostgresDbInfo::new_with_schema(
             STARLANE_REGISTRY_URL.to_string(),
             STARLANE_REGISTRY_USER.to_string(),
             STARLANE_REGISTRY_PASSWORD.to_string(),
             STARLANE_REGISTRY_DATABASE.to_string(),
-            star.to_sql_name()
+            star.to_sql_name(),
         ))
     }
 }
@@ -114,8 +119,6 @@ impl PostgresPlatform for Starlane {
 impl Platform for Starlane {
     type Err = PostErr;
     type RegistryContext = PostgresRegistryContext;
-
-
 
     fn machine_template(&self) -> MachineTemplate {
         MachineTemplate::default()
@@ -154,20 +157,26 @@ impl Platform for Starlane {
         Token::new(STARLANE_TOKEN.to_string())
     }
 
-    async fn global_registry(&self, ctx: Arc<Self::RegistryContext>) -> Result<Registry<Self>,Self::Err> {
+    async fn global_registry(
+        &self,
+        ctx: Arc<Self::RegistryContext>,
+    ) -> Result<Registry<Self>, Self::Err> {
         let ctx = PostgresRegistryContextHandle::new(&self.lookup_registry_db()?, ctx);
-        Ok(Arc::new(PostgresRegistry::new(ctx,self.clone()).await?))
+        Ok(Arc::new(PostgresRegistry::new(ctx, self.clone()).await?))
     }
 
-    async fn star_registry(&self, star: &StarKey, ctx: Arc<Self::RegistryContext>) -> Result<Registry<Self>,Self::Err> {
+    async fn star_registry(
+        &self,
+        star: &StarKey,
+        ctx: Arc<Self::RegistryContext>,
+    ) -> Result<Registry<Self>, Self::Err> {
         let ctx = PostgresRegistryContextHandle::new(&self.lookup_star_db(star)?, ctx);
-        Ok(Arc::new(PostgresRegistry::new(ctx,self.clone()).await?))
+        Ok(Arc::new(PostgresRegistry::new(ctx, self.clone()).await?))
     }
-
 
     fn artifact_hub(&self) -> ArtifactApi {
-        let fetcher = Arc::new(NoDiceArtifactFetcher{});
-        ArtifactApi::new( fetcher )
+        let fetcher = Arc::new(NoDiceArtifactFetcher {});
+        ArtifactApi::new(fetcher)
     }
 
     fn start_services(&self, entry_router: &mut HyperGateSelector) {}

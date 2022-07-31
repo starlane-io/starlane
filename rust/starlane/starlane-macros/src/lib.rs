@@ -261,7 +261,6 @@ fn to_idents(list: &MetaList) -> Vec<Ident> {
     idents
 }
 
-
 #[proc_macro]
 pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let parsed = parse_macro_input!(input as ResourceParser);
@@ -275,9 +274,13 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let requires_kind: Vec<Ident> = parsed
         .resources
         .iter()
-        .map(|resource| Ident::new(format!("{}",parsed.kind_for(resource).is_some()).as_str(), resource.get_ident().span())  )
+        .map(|resource| {
+            Ident::new(
+                format!("{}", parsed.kind_for(resource).is_some()).as_str(),
+                resource.get_ident().span(),
+            )
+        })
         .collect();
-
 
     let resource_type_enum_def = quote! {
         #[derive(Clone,Debug,Eq,PartialEq,Hash,Serialize,Deserialize)]
@@ -342,14 +345,19 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         let _ident = resource.get_ident();
         pathways.push_str(format!("Self::{} => {{", resource.get_ident().to_string()).as_str());
         pathways.push_str("ResourcePathSegmentKind::");
-        pathways.push_str(resource.path_part.as_ref().expect("expected a path part").to_string().as_str());
+        pathways.push_str(
+            resource
+                .path_part
+                .as_ref()
+                .expect("expected a path part")
+                .to_string()
+                .as_str(),
+        );
         pathways.push_str("}");
     }
     pathways.push_str("}");
 
-
-
-        pathways.push_str("}");
+    pathways.push_str("}");
     pathways.push_str("pub fn parent_path_matcher( &self, path: Vec<ResourcePathSegmentKind> ) -> Result<ResourceType,Error> {");
     pathways.push_str("match self { ");
     pathways.push_str("Self::Root => Err(\"Root does not have a parent to match\".into()),");
@@ -468,12 +476,12 @@ pub fn resources(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     println!("resources_def.len() {}", resources_def.len());
 
     let keys = keys(&parsed);
-//    let identifiers = identifiers(&parsed);
+    //    let identifiers = identifiers(&parsed);
     let ids = ids(&parsed);
 
     let kinds = kinds(&parsed);
 
-//    let paths = paths(&parsed);
+    //    let paths = paths(&parsed);
     /*
     proc_macro::TokenStream::from( quote!{
        #extras
@@ -890,9 +898,7 @@ fn kinds(parsed: &ResourceParser) -> TokenStream {
             } else {
                 from_parts.push_str(format!("if parts.kind.is_some() {{  return Err(\"particle type <{}> does not have a kind\".into());}}", resource.get_ident().to_string() ).as_str() );
 
-                from_parts.push_str(format!("Self::{}",resource.get_ident().to_string()).as_str() );
-
-
+                from_parts.push_str(format!("Self::{}", resource.get_ident().to_string()).as_str());
             }
 
             let mut into_parts = String::new();

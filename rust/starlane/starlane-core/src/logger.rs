@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
+use cosmic_api::id::StarKey;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
-use cosmic_api::id::StarKey;
 
 use crate::star::{StarInfo, StarKind};
 

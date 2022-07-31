@@ -1,11 +1,10 @@
-
-use std::sync::Arc;
-use serde_json::json;
-use handlebars::Handlebars;
 use crate::error::Error;
+use handlebars::Handlebars;
+use serde_json::json;
+use std::sync::Arc;
 
 lazy_static! {
-  pub static ref HTML: Handlebars<'static> = {
+    pub static ref HTML: Handlebars<'static> = {
         let mut reg = Handlebars::new();
         reg.register_template_string("error-code-page", r#"
 
@@ -82,7 +81,4 @@ section{
   "#);
         reg
     };
-
 }
-
-

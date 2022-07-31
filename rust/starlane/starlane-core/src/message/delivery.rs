@@ -10,25 +10,25 @@ use tokio::sync::oneshot;
 use tokio::time::Duration;
 
 use crate::error::Error;
-use crate::message::ProtoStarMessage;
-use crate::star::{StarCommand, StarSkel};
-use crate::util;
 use crate::fail::Fail;
 use crate::frame::{SimpleReply, StarMessage, StarMessagePayload};
-use mesh_portal::version::latest::util::uuid;
+use crate::message::ProtoStarMessage;
 use crate::message::Reply;
-use std::ops::Deref;
+use crate::star::{StarCommand, StarSkel};
+use crate::util;
+use cosmic_api::id::id::ToPoint;
+use cosmic_api::parse::model::Subst;
+use cosmic_api::substance::substance::HttpCall;
+use cosmic_api::sys::ParticleRecord;
+use cosmic_api::wave::Method;
 use http::StatusCode;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::entity::response::RespCore;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 use mesh_portal::version::latest::payload::{Call, CallKind, Errors, MsgCall, Substance};
-use cosmic_api::id::id::ToPoint;
-use cosmic_api::wave::Method;
-use cosmic_api::parse::model::Subst;
-use cosmic_api::substance::substance::HttpCall;
-use cosmic_api::sys::ParticleRecord;
+use mesh_portal::version::latest::util::uuid;
+use std::ops::Deref;
 
 pub struct Delivery<M>
 where
@@ -37,7 +37,7 @@ where
     skel: StarSkel,
     star_message: StarMessage,
     pub item: M,
-    responded: bool
+    responded: bool,
 }
 
 impl<M> Delivery<M>
@@ -49,24 +49,22 @@ where
             item,
             star_message: star_message,
             skel: skel,
-            responded: false
+            responded: false,
         }
     }
 
-    pub fn to(&self) -> Result<Point,Error> {
+    pub fn to(&self) -> Result<Point, Error> {
         match &self.star_message.payload {
-            StarMessagePayload::Request(request) => {
-                Ok(request.to.clone().to_point())
-            }
-            _ => {
-                Err("this type of Delivery does not support to() resolution".into())
-            }
+            StarMessagePayload::Request(request) => Ok(request.to.clone().to_point()),
+            _ => Err("this type of Delivery does not support to() resolution".into()),
         }
     }
 }
 
-impl<M> Deref for Delivery<M> where
-    M: Clone + Send + Sync + 'static{
+impl<M> Deref for Delivery<M>
+where
+    M: Clone + Send + Sync + 'static,
+{
     type Target = M;
 
     fn deref(&self) -> &Self::Target {
@@ -74,29 +72,28 @@ impl<M> Deref for Delivery<M> where
     }
 }
 
-impl<M> Into<StarMessage> for Delivery<M> where
-    M: Clone + Send + Sync + 'static{
+impl<M> Into<StarMessage> for Delivery<M>
+where
+    M: Clone + Send + Sync + 'static,
+{
     fn into(self) -> StarMessage {
         self.star_message
     }
 }
-impl <M> Delivery<M> where M: Clone + Send + Sync + 'static
+impl<M> Delivery<M>
+where
+    M: Clone + Send + Sync + 'static,
 {
-  pub fn get_request(&self) -> Result<ReqShell,Error> {
-      match &self.star_message.payload {
-          StarMessagePayload::Request(request) => {
-              Ok(request.clone())
-          }
-          _ => {
-              Err("not a request delivery".into())
-          }
-      }
-  }
+    pub fn get_request(&self) -> Result<ReqShell, Error> {
+        match &self.star_message.payload {
+            StarMessagePayload::Request(request) => Ok(request.clone()),
+            _ => Err("not a request delivery".into()),
+        }
+    }
 }
 
-impl Delivery<ReqShell>
-{
-    pub fn result( self, result: Result<Substance,Error>) {
+impl Delivery<ReqShell> {
+    pub fn result(self, result: Result<Substance, Error>) {
         match result {
             Ok(payload) => {
                 let request = self.item.core.clone();
@@ -114,7 +111,7 @@ impl Delivery<ReqShell>
             to: self.item.from,
             from: self.item.to,
             core,
-            reflection_of: self.item.id
+            reflection_of: self.item.id,
         };
         let proto = self
             .star_message
@@ -124,70 +121,69 @@ impl Delivery<ReqShell>
         self.responded = true;
     }
 
-   pub fn ok(self, payload: Substance) -> Result<(),Error> {
+    pub fn ok(self, payload: Substance) -> Result<(), Error> {
         let core = RespCore {
             headers: Default::default(),
             status: StatusCode::from_u16(200).unwrap(),
-            body: payload
+            body: payload,
         };
         self.respond(core);
         Ok(())
     }
 
-    pub fn fail(self, fail: String ) ->Result<(),Error> {
-
+    pub fn fail(self, fail: String) -> Result<(), Error> {
         let core = RespCore {
             headers: Default::default(),
             status: StatusCode::from_u16(500).unwrap(),
-            body: Substance::Text(fail)
+            body: Substance::Text(fail),
         };
         self.respond(core);
         Ok(())
     }
 
-    pub fn not_found(self) ->Result<(),Error> {
-
+    pub fn not_found(self) -> Result<(), Error> {
         let request = self.get_request()?;
         let core = RespCore {
             headers: Default::default(),
             status: StatusCode::from_u16(404).unwrap(),
-            body: Substance::Empty
+            body: Substance::Empty,
         };
         self.respond(core);
         Ok(())
     }
 
-    pub fn err(self, status: u16, message: &str ) ->Result<(),Error> {
-
+    pub fn err(self, status: u16, message: &str) -> Result<(), Error> {
         let request = self.get_request()?;
 
         let core = RespCore {
             headers: Default::default(),
             status: StatusCode::from_u16(status)?,
-            body: Substance::Errors(Errors::default(message))
+            body: Substance::Errors(Errors::default(message)),
         };
         self.respond(core);
 
         Ok(())
     }
 
-    pub fn to_call(&self) -> Result<Call,MsgErr> {
+    pub fn to_call(&self) -> Result<Call, MsgErr> {
         let kind = match &self.item.core.method {
             Method::Cmd(_) => {
                 unimplemented!()
             }
-            Method::Http(method) => {
-                CallKind::Http(HttpCall::new(method.clone(), Subst::new(self.item.core.uri.path())? ))
-            }
-            Method::Msg(method) => {
-                CallKind::Msg(MsgCall::new(method.clone(), Subst::new(self.item.core.uri.path())? ))
-            }
+            Method::Http(method) => CallKind::Http(HttpCall::new(
+                method.clone(),
+                Subst::new(self.item.core.uri.path())?,
+            )),
+            Method::Msg(method) => CallKind::Msg(MsgCall::new(
+                method.clone(),
+                Subst::new(self.item.core.uri.path())?,
+            )),
         };
 
-       Ok(Call {
-           point: self.item.to.clone().to_point(),
-           kind: kind.clone()
-       })
+        Ok(Call {
+            point: self.item.to.clone().to_point(),
+            kind: kind.clone(),
+        })
     }
 }
 
@@ -306,23 +302,18 @@ pub enum Reply {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum ActorMessage {}
 
-pub struct DeliverySelector{
-    selections: Vec<DeliverySelection>
+pub struct DeliverySelector {
+    selections: Vec<DeliverySelection>,
 }
 
-pub enum DeliverySelection{
- Any
+pub enum DeliverySelection {
+    Any,
 }
 
 impl DeliverySelector {
-    pub fn any() ->Self {
+    pub fn any() -> Self {
         Self {
-            selections: vec![DeliverySelection::Any]
+            selections: vec![DeliverySelection::Any],
         }
     }
 }
-
-
-
-
-

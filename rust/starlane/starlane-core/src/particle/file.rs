@@ -1,7 +1,7 @@
-use std::convert::{TryFrom, TryInto};
-use std::sync::Arc;
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::id::Point;
+use std::convert::{TryFrom, TryInto};
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
@@ -10,7 +10,7 @@ use crate::error::Error;
 #[derive(Clone)]
 pub struct File {
     address: Point,
-    state_src: StateSrc
+    state_src: StateSrc,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

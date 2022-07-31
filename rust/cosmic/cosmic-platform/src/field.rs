@@ -131,12 +131,8 @@ where
 
     fn static_bind(&self, kind: &Kind) -> Option<ArtRef<BindConfig>> {
         match kind.to_base() {
-            BaseKind::Star => {
-                Some(STAR_BIND_CONFIG.clone())
-            }
-            BaseKind::Control => {
-                Some(CONTROL_BIND_CONFIG.clone())
-            }
+            BaseKind::Star => Some(STAR_BIND_CONFIG.clone()),
+            BaseKind::Control => Some(CONTROL_BIND_CONFIG.clone()),
             _ => None,
         }
     }
@@ -163,7 +159,6 @@ where
         &self,
         mut directed: Traversal<DirectedWave>,
     ) -> Result<(), MsgErr> {
-
         directed
             .logger
             .set_span_attr("message-id", &directed.id().to_string());

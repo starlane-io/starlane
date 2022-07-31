@@ -8,7 +8,9 @@ use crate::id::id::{
     Layer, Point, PointSeg, Port, PortSelector, RouteSeg, Sub, ToPoint, ToPort, Topic, Uuid,
 };
 use crate::id::StarKey;
-use crate::log::{LogSpan, LogSpanEvent, PointLogger, RootLogger, SpanLogger, Spannable, Trackable, TrailSpanId};
+use crate::log::{
+    LogSpan, LogSpanEvent, PointLogger, RootLogger, SpanLogger, Spannable, Trackable, TrailSpanId,
+};
 use crate::msg::MsgMethod;
 use crate::parse::model::Subst;
 use crate::parse::sub;
@@ -106,8 +108,9 @@ where
     Signal(Wave<Signal>),
 }
 
-impl <W> Spannable for UltraWaveDef<W>
-    where W: ToRecipients + Clone,
+impl<W> Spannable for UltraWaveDef<W>
+where
+    W: ToRecipients + Clone,
 {
     fn span_id(&self) -> String {
         self.id().to_string()
@@ -191,7 +194,6 @@ where
             UltraWaveDef::Signal(w) => w.id.clone(),
         }
     }
-
 }
 
 impl UltraWave {
@@ -211,7 +213,6 @@ impl UltraWave {
             UltraWave::Ripple(_) => Err(MsgErr::from_500("cannot change Ripple into a singular")),
         }
     }
-
 
     pub fn wrap_in_transport(self, from: Port, to: Port) -> DirectedProto {
         let mut signal = DirectedProto::ping();
@@ -1419,9 +1420,8 @@ impl DirectedProto {
         self.kind.replace(kind);
     }
 
-    pub fn body(&mut self, body: Substance) -> Result<(), MsgErr> {
+    pub fn body(&mut self, body: Substance) {
         self.core.body = body;
-        Ok(())
     }
 
     pub fn core(&mut self, core: DirectedCore) -> Result<(), MsgErr> {
@@ -1429,9 +1429,8 @@ impl DirectedProto {
         Ok(())
     }
 
-    pub fn method<M: Into<Method>>(&mut self, method: M) -> Result<(), MsgErr> {
+    pub fn method<M: Into<Method>>(&mut self, method: M) {
         self.core.method = method.into();
-        Ok(())
     }
 
     pub fn to<P: ToRecipients + Clone>(&mut self, to: P) {
@@ -1784,9 +1783,10 @@ where
     }
 }
 
-impl <W> Spannable for DirectedWaveDef<W>
-    where
-    W: ToRecipients + Clone {
+impl<W> Spannable for DirectedWaveDef<W>
+where
+    W: ToRecipients + Clone,
+{
     fn span_id(&self) -> String {
         self.id().to_string()
     }
@@ -1795,7 +1795,6 @@ impl <W> Spannable for DirectedWaveDef<W>
         "Wave"
     }
 }
-
 
 impl DirectedWave {
     pub fn to(&self) -> Recipients {
@@ -3101,7 +3100,10 @@ where
     }
 
     pub async fn handle(&self, wave: DirectedWave) {
-        let logger = self.logger.point(self.port.clone().to_point()).spanner(&wave);
+        let logger = self
+            .logger
+            .point(self.port.clone().to_point())
+            .spanner(&wave);
         let mut transmitter = self.builder.clone().build();
         let reflection = wave.reflection();
         let ctx = RootInCtx::new(wave, self.port.clone(), logger, transmitter);

@@ -4,7 +4,7 @@ use std::{fs, thread};
 use std::fs::{DirBuilder, File};
 
 use std::io::{Read, Write};
-use std::path::{PathBuf };
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{mpsc, Arc};
 
@@ -17,9 +17,9 @@ use crate::error::Error;
 use cosmic_api::id::FileSubKind;
 
 use crate::util;
+use mesh_portal::version::latest::path::Path;
 use std::convert::TryFrom;
 use std::convert::TryInto;
-use mesh_portal::version::latest::path::Path;
 use tokio::fs::ReadDir;
 use tokio::sync::mpsc::Sender;
 
@@ -58,10 +58,10 @@ pub enum FileCommand {
         tx: tokio::sync::oneshot::Sender<Result<(), Error>>,
     },
     Shutdown,
-    Exists{
+    Exists {
         path: Path,
-        tx: tokio::sync::oneshot::Sender<Result<bool, Error>>
-    }
+        tx: tokio::sync::oneshot::Sender<Result<bool, Error>>,
+    },
 }
 
 #[derive(Clone)]
@@ -77,9 +77,9 @@ impl FileAccess {
 
     pub fn new(path: String) -> Result<Self, Error> {
         let tx = match LocalFileAccess::new(path.clone()) {
-            Ok(tx) => {tx}
+            Ok(tx) => tx,
             Err(err) => {
-               error!("could not create base_dir: {}", path );
+                error!("could not create base_dir: {}", path);
                 return Err(err);
             }
         };
@@ -100,7 +100,6 @@ impl FileAccess {
             .await?;
         Ok(util::wait_for_it(rx).await?)
     }
-
 
     pub async fn list(&self, path: &Path) -> Result<Vec<Path>, Error> {
         let (tx, rx) = tokio::sync::oneshot::channel();
@@ -184,7 +183,12 @@ impl FileAccess {
 
     pub async fn exists(&self, path: &Path) -> Result<bool, Error> {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        self.tx.send(FileCommand::Exists{ path: path.clone(), tx }).await?;
+        self.tx
+            .send(FileCommand::Exists {
+                path: path.clone(),
+                tx,
+            })
+            .await?;
         Ok(util::wait_for_it(rx).await?)
     }
 
@@ -293,10 +297,10 @@ impl LocalFileAccess {
                 // do nothing
             }
             FileCommand::Exists { path, tx } => {
-                tx.send( self.exists(&path));
+                tx.send(self.exists(&path));
             }
             FileCommand::RemoveDir { path, tx } => {
-                tx.send( self.remove_dir(&path) );
+                tx.send(self.remove_dir(&path));
             }
         }
         Ok(())
@@ -336,12 +340,11 @@ impl LocalFileAccess {
 
     pub fn exists(&self, path: &Path) -> Result<bool, Error> {
         let path = self.cat_path(path.to_relative().as_str())?;
-        Ok( match File::open(&path) {
-            Ok(_) => {true}
-            Err(_) => { false } }
-        )
+        Ok(match File::open(&path) {
+            Ok(_) => true,
+            Err(_) => false,
+        })
     }
-
 }
 
 impl LocalFileAccess {
@@ -356,13 +359,15 @@ impl LocalFileAccess {
                 let path = Path::from_str(format!("/{}/{}", target, zip_file.name()).as_str())?;
                 self.mkdir(&path)?;
             } else {
-
-                let path = Path::from_str(format!("{}/{}/{}", self.base_dir, target, zip_file.name()).as_str())?;
-                let parent = Path::from_str(format!("/{}/{}", target, zip_file.name()).as_str())?.parent();
+                let path = Path::from_str(
+                    format!("{}/{}/{}", self.base_dir, target, zip_file.name()).as_str(),
+                )?;
+                let parent =
+                    Path::from_str(format!("/{}/{}", target, zip_file.name()).as_str())?.parent();
                 match parent {
                     None => {}
                     Some(parent) => {
-                        self.mkdir(&parent )?;
+                        self.mkdir(&parent)?;
                     }
                 }
 
@@ -374,15 +379,15 @@ impl LocalFileAccess {
         Ok(())
     }
 
-
-
     pub fn read(&self, path: &Path) -> Result<Arc<Vec<u8>>, Error> {
         let path = self.cat_path(path.to_relative().as_str())?;
         let mut buf = vec![];
         let mut file = match File::open(&path) {
-            Ok(file) => {file}
+            Ok(file) => file,
             Err(error) => {
-                return Result::Err(format!("{} PATH: {}", error.to_string(), path.to_string() ).into());
+                return Result::Err(
+                    format!("{} PATH: {}", error.to_string(), path.to_string()).into(),
+                );
             }
         };
         file.read_to_end(&mut buf)?;
@@ -430,7 +435,6 @@ impl LocalFileAccess {
         fs::remove_dir_all(path)?;
         Ok(())
     }
-
 
     fn walk(&mut self) -> Result<tokio::sync::mpsc::Receiver<FileEvent>, Error> {
         let (event_tx, event_rx) = tokio::sync::mpsc::channel(128);

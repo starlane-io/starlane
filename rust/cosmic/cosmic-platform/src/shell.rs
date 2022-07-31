@@ -1,44 +1,58 @@
 use crate::star::{LayerInjectionRouter, StarSkel, TopicHandler};
 use crate::state::ShellState;
-use dashmap::mapref::one::Ref;
-use dashmap::DashMap;
-use cosmic_api::error::MsgErr;
+use crate::{PlatErr, Platform};
 use cosmic_api::cli::RawCommand;
+use cosmic_api::command::Command;
 use cosmic_api::config::config::bind::RouteSelector;
+use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{
     Layer, Point, Port, PortSelector, ToPoint, ToPort, Topic, TraversalLayer, Uuid,
 };
 use cosmic_api::id::{Traversal, TraversalInjection};
 use cosmic_api::log::RootLogger;
-use cosmic_api::parse::{command_line, Env, route_attribute};
+use cosmic_api::parse::error::result;
+use cosmic_api::parse::{command_line, route_attribute, Env};
 use cosmic_api::quota::Timeouts;
-use cosmic_api::wave::{Agent, Ping, DirectedHandlerSelector, RecipientSelector, DirectedHandler, Reflectable, ReflectedCore, Pong, RootInCtx, Wave, ProtoTransmitter, DirectedCore, DirectedProto, SetStrategy, UltraWave, InCtx, Exchanger, DirectedWave, CoreBounce, Router, ReflectedWave, Bounce, ProtoTransmitterBuilder};
+use cosmic_api::util::ToResolved;
+use cosmic_api::wave::{
+    Agent, Bounce, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector,
+    DirectedProto, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter,
+    ProtoTransmitterBuilder, RecipientSelector, Reflectable, ReflectedCore, ReflectedWave,
+    RootInCtx, Router, SetStrategy, UltraWave, Wave,
+};
+use cosmic_nom::new_span;
+use dashmap::mapref::one::Ref;
+use dashmap::DashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
-use cosmic_nom::new_span;
-use cosmic_api::command::Command;
-use cosmic_api::parse::error::result;
-use crate::{PlatErr, Platform};
-use cosmic_api::util::ToResolved;
 
 #[derive(DirectedHandler)]
-pub struct ShellEx<P> where P: Platform +'static {
+pub struct ShellEx<P>
+where
+    P: Platform + 'static,
+{
     skel: StarSkel<P>,
     state: ShellState,
 }
 
-impl <P> ShellEx<P> where P: Platform +'static {
+impl<P> ShellEx<P>
+where
+    P: Platform + 'static,
+{
     pub fn new(skel: StarSkel<P>, state: ShellState) -> Self {
         Self { skel, state }
     }
 }
 
 #[async_trait]
-impl <P> TraversalLayer for ShellEx<P> where P: Platform +'static {
-    fn port(&self) -> &Port{
+impl<P> TraversalLayer for ShellEx<P>
+where
+    P: Platform + 'static,
+{
+    fn port(&self) -> &Port {
         &self.state.port
     }
 
@@ -47,7 +61,7 @@ impl <P> TraversalLayer for ShellEx<P> where P: Platform +'static {
     }
 
     async fn inject(&self, wave: UltraWave) {
-        let inject = TraversalInjection::new( self.port().clone(), wave);
+        let inject = TraversalInjection::new(self.port().clone(), wave);
         self.skel.inject_tx.send(inject).await;
     }
 
@@ -55,51 +69,77 @@ impl <P> TraversalLayer for ShellEx<P> where P: Platform +'static {
         &self.skel.exchanger
     }
 
-    async fn deliver_directed(&self, directed: Traversal<DirectedWave> ) {
+    async fn deliver_directed(&self, directed: Traversal<DirectedWave>) {
         let logger = self.skel.logger.point(directed.to.point.clone()).span();
-        let injector = directed.from().clone().with_topic(Topic::None).with_layer(self.port().layer.clone());
+        let injector = directed
+            .from()
+            .clone()
+            .with_topic(Topic::None)
+            .with_layer(self.port().layer.clone());
         let router = Arc::new(LayerInjectionRouter::new(
             self.skel.clone(),
-          injector.clone()
+            injector.clone(),
         ));
 
-        let mut transmitter = ProtoTransmitterBuilder::new(router.clone(), self.exchanger().clone());
-        transmitter.from = SetStrategy::Fill(directed.from().with_layer(self.port().layer.clone() ).with_topic(Topic::None));
+        let mut transmitter =
+            ProtoTransmitterBuilder::new(router.clone(), self.exchanger().clone());
+        transmitter.from = SetStrategy::Fill(
+            directed
+                .from()
+                .with_layer(self.port().layer.clone())
+                .with_topic(Topic::None),
+        );
         let transmitter = transmitter.build();
         let reflection = directed.reflection();
-        let ctx = RootInCtx::new(directed.payload, self.port().clone(), logger, transmitter.clone());
+        let ctx = RootInCtx::new(
+            directed.payload,
+            self.port().clone(),
+            logger,
+            transmitter.clone(),
+        );
         let bounce: CoreBounce = self.handle(ctx).await;
         match bounce {
             CoreBounce::Absorbed => {}
             CoreBounce::Reflected(core) => {
                 let reflected = reflection.unwrap().make(core, self.port().clone());
-                self.inject( reflected.to_ultra() ).await;
+                self.inject(reflected.to_ultra()).await;
             }
         }
     }
 
-
-    async fn directed_fabric_bound(&self, traversal: Traversal<DirectedWave>) -> Result<(), MsgErr>{
+    async fn directed_fabric_bound(
+        &self,
+        traversal: Traversal<DirectedWave>,
+    ) -> Result<(), MsgErr> {
         self.state.fabric_requests.insert(traversal.id().clone());
         self.traverse_next(traversal.wrap()).await;
         Ok(())
     }
 
-    async fn reflected_core_bound(&self, traversal: Traversal<ReflectedWave>) -> Result<(),MsgErr>{
-
-        if let Some(_) = self.state.fabric_requests.remove(&traversal.reflection_of()) {
+    async fn reflected_core_bound(
+        &self,
+        traversal: Traversal<ReflectedWave>,
+    ) -> Result<(), MsgErr> {
+        if let Some(_) = self
+            .state
+            .fabric_requests
+            .remove(&traversal.reflection_of())
+        {
             self.traverse_next(traversal.to_ultra()).await;
         } else {
-            traversal.logger.warn("filtered a response to a request of which the Shell has no record");
+            traversal
+                .logger
+                .warn("filtered a response to a request of which the Shell has no record");
         }
         Ok(())
     }
-
-
 }
 
 #[routes]
-impl <P> ShellEx<P> where P: Platform +'static {
+impl<P> ShellEx<P>
+where
+    P: Platform + 'static,
+{
     #[route("Msg<NewCli>")]
     pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Port, MsgErr> {
         // only allow a cli session to be created by any layer of THIS particle
@@ -118,12 +158,12 @@ impl <P> ShellEx<P> where P: Platform +'static {
         let session = CliSession {
             source_selector: ctx.from().clone().into(),
             env,
-            port: session_port.clone()
+            port: session_port.clone(),
         };
 
         self.skel
             .state
-            .topic_handler( session_port.clone(), Arc::new(session));
+            .topic_handler(session_port.clone(), Arc::new(session));
 
         Ok(session_port)
     }
@@ -135,11 +175,7 @@ impl CliSession {
     pub async fn exec(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, MsgErr> {
         let exec_topic = Topic::uuid();
         let exec_port = self.port.clone().with_topic(exec_topic.clone());
-        let mut exec = CommandExecutor::new(
-            exec_port,
-            ctx.from().clone(),
-            self.env.clone(),
-        );
+        let mut exec = CommandExecutor::new(exec_port, ctx.from().clone(), self.env.clone());
 
         Ok(exec.execute(ctx).await?)
     }
@@ -158,7 +194,6 @@ impl TopicHandler for CliSession {
     }
 }
 
-
 #[derive(DirectedHandler)]
 pub struct CommandExecutor {
     port: Port,
@@ -169,16 +204,12 @@ pub struct CommandExecutor {
 #[routes]
 impl CommandExecutor {
     pub fn new(port: Port, source: Port, env: Env) -> Self {
-        Self {
-            port,
-            source,
-            env,
-        }
+        Self { port, source, env }
     }
 
-    pub async fn execute(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore,MsgErr> {
+    pub async fn execute(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, MsgErr> {
         // make sure everything is coming from this command executor topic
-        let ctx = ctx.push_from( self.port.clone() );
+        let ctx = ctx.push_from(self.port.clone());
 
         let command = result(command_line(new_span(ctx.line.as_str())))?;
         let mut env = self.env.clone();

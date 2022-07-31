@@ -12,51 +12,52 @@ extern crate async_trait;
 #[macro_use]
 extern crate strum_macros;
 
-
-use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use crate::driver::{DriverFactory, DriversBuilder};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
-use cosmic_api::command::request::create::KindTemplate;
-use cosmic_api::id::id::{BaseKind, Kind, Point, RouteSeg, Specific, ToBaseKind};
-use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, MachineName, StarKey, StarSub, UserBaseSubKind};
-use cosmic_api::substance::substance::{Substance, SubstanceList, Token};
-use cosmic_api::{ArtifactApi, IndexedAccessGrant, Registration,  };
-use cosmic_hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayExtFactory};
-use std::str::FromStr;
-use std::sync::Arc;
 use chrono::{DateTime, Utc};
-use cosmic_api::error::MsgErr;
-use cosmic_api::wave::{ReflectedCore, UltraWave};
-use http::StatusCode;
-use tokio::io;
-use tokio::runtime::{Handle, Runtime};
-use tokio::sync::mpsc;
-use tracing::error;
-use uuid::Uuid;
 use cosmic_api::command::command::common::SetProperties;
+use cosmic_api::command::request::create::KindTemplate;
 use cosmic_api::command::request::delete::Delete;
 use cosmic_api::command::request::query::{Query, QueryResult};
 use cosmic_api::command::request::select::{Select, SubSelect};
+use cosmic_api::error::MsgErr;
 use cosmic_api::fail::Timeout;
+use cosmic_api::id::id::{BaseKind, Kind, Point, RouteSeg, Specific, ToBaseKind};
+use cosmic_api::id::{
+    ArtifactSubKind, BaseSubKind, FileSubKind, MachineName, StarKey, StarSub, UserBaseSubKind,
+};
 use cosmic_api::particle::particle::{Details, Properties, Status, Stub};
 use cosmic_api::property::PropertiesConfig;
 use cosmic_api::quota::Timeouts;
 use cosmic_api::security::{Access, AccessGrant};
 use cosmic_api::selector::selector::Selector;
+use cosmic_api::substance::substance::{Substance, SubstanceList, Token};
 use cosmic_api::sys::ParticleRecord;
-use crate::driver::{DriverFactory, DriversBuilder};
+use cosmic_api::wave::{ReflectedCore, UltraWave};
+use cosmic_api::{ArtifactApi, IndexedAccessGrant, Registration};
+use cosmic_hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayExtFactory};
+use http::StatusCode;
+use std::cmp::Ordering;
+use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
+use std::sync::Arc;
+use tokio::io;
+use tokio::runtime::{Handle, Runtime};
+use tokio::sync::mpsc;
+use tracing::error;
+use uuid::Uuid;
 
+pub mod control;
 pub mod driver;
 pub mod field;
+pub mod global;
 pub mod host;
 pub mod machine;
 pub mod shell;
 pub mod star;
 pub mod state;
-pub mod traversal;
 pub mod tests;
-pub mod control;
-pub mod global;
+pub mod traversal;
 
 #[no_mangle]
 pub extern "C" fn cosmic_uuid() -> String {
@@ -68,7 +69,7 @@ pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
     Utc::now()
 }
 
-pub type Registry<P> =Arc<dyn RegistryApi<P>>;
+pub type Registry<P> = Arc<dyn RegistryApi<P>>;
 
 #[async_trait]
 pub trait RegistryApi<P>: Send + Sync
@@ -77,12 +78,15 @@ where
 {
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, P::Err>;
 
-
     async fn assign<'a>(&'a self, point: &'a Point, location: &'a Point) -> Result<(), P::Err>;
 
     async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), P::Err>;
 
-    async fn set_properties<'a>(&'a self, point: &'a Point, properties: &'a SetProperties) -> Result<(), P::Err>;
+    async fn set_properties<'a>(
+        &'a self,
+        point: &'a Point,
+        properties: &'a SetProperties,
+    ) -> Result<(), P::Err>;
 
     async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, P::Err>;
 
@@ -90,7 +94,8 @@ where
 
     async fn locate<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, P::Err>;
 
-    async fn query<'a>(&'a self, point: &'a Point, query: &'a Query) -> Result<QueryResult, P::Err>;
+    async fn query<'a>(&'a self, point: &'a Point, query: &'a Query)
+        -> Result<QueryResult, P::Err>;
 
     async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, P::Err>;
 
@@ -102,7 +107,12 @@ where
 
     async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, P::Err>;
 
-    async fn chown<'a>(&'a self, on: &'a Selector, owner: &'a Point, by: &'a Point) -> Result<(), P::Err>;
+    async fn chown<'a>(
+        &'a self,
+        on: &'a Selector,
+        owner: &'a Point,
+        by: &'a Point,
+    ) -> Result<(), P::Err>;
 
     async fn list_access<'a>(
         &'a self,
@@ -112,8 +122,6 @@ where
 
     async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), P::Err>;
 }
-
-
 
 /*
 #[derive(Clone)]
@@ -292,8 +300,15 @@ pub trait PlatErr: Sized + Send + Sync + ToString + Clone + Into<MsgErr> + From<
 }
 
 #[async_trait]
-pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'static, Self::RegistryContext : Send+Sync, Self::StarAuth: HyperAuthenticator, Self::RemoteStarConnectionFactory: HyperwayExtFactory, Self::Err: From<tokio::sync::oneshot::error::RecvError>{
-
+pub trait Platform: Send + Sync + Sized + Clone
+where
+    Self::Err: PlatErr,
+    Self: 'static,
+    Self::RegistryContext: Send + Sync,
+    Self::StarAuth: HyperAuthenticator,
+    Self::RemoteStarConnectionFactory: HyperwayExtFactory,
+    Self::Err: From<tokio::sync::oneshot::error::RecvError>,
+{
     type Err;
     type RegistryContext;
     type StarAuth;
@@ -303,18 +318,20 @@ pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'st
         Machine::new(self.clone())
     }
 
-    fn star_auth(&self, star: &StarKey) -> Result<Self::StarAuth,Self::Err>;
-    fn remote_connection_factory_for_star(&self, star: &StarKey ) -> Result<Self::RemoteStarConnectionFactory,Self::Err>;
+    fn star_auth(&self, star: &StarKey) -> Result<Self::StarAuth, Self::Err>;
+    fn remote_connection_factory_for_star(
+        &self,
+        star: &StarKey,
+    ) -> Result<Self::RemoteStarConnectionFactory, Self::Err>;
 
     fn machine_template(&self) -> MachineTemplate;
     fn machine_name(&self) -> MachineName;
-    fn properties_config<K: ToBaseKind>(&self, base:&K) -> &'static PropertiesConfig;
+    fn properties_config<K: ToBaseKind>(&self, base: &K) -> &'static PropertiesConfig;
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self>;
-    async fn global_registry(&self) -> Result<Registry<Self>,Self::Err>;
-    async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>,Self::Err>;
+    async fn global_registry(&self) -> Result<Registry<Self>, Self::Err>;
+    async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>, Self::Err>;
     fn artifact_hub(&self) -> ArtifactApi;
     fn start_services(&self, entry_router: &mut HyperGateSelector);
-
 
     fn default_implementation(&self, template: &KindTemplate) -> Result<Kind, MsgErr> {
         let base: BaseKind = BaseKind::from_str(template.base.to_string().as_str())?;
@@ -376,61 +393,59 @@ pub trait Platform: Send + Sync +Sized+Clone where Self::Err: PlatErr, Self: 'st
                 unimplemented!()
             }
             BaseKind::Driver => Kind::Driver,
-            BaseKind::Global => Kind::Global
+            BaseKind::Global => Kind::Global,
         })
-
-
     }
 
-    fn log<R>( result: Result<R,Self::Err> ) -> Result<R,Self::Err> {
+    fn log<R>(result: Result<R, Self::Err>) -> Result<R, Self::Err> {
         if let Err(err) = result {
-            println!("ERR: {}",err.to_string());
+            println!("ERR: {}", err.to_string());
             Err(err)
         } else {
             result
         }
     }
 
-    fn log_ctx<R>( ctx: &str, result: Result<R,Self::Err> ) -> Result<R,Self::Err> {
+    fn log_ctx<R>(ctx: &str, result: Result<R, Self::Err>) -> Result<R, Self::Err> {
         if let Err(err) = result {
-            println!("{}: {}",ctx, err.to_string());
+            println!("{}: {}", ctx, err.to_string());
             Err(err)
         } else {
             result
         }
     }
 
-    fn log_deep<R,E:ToString>( ctx: &str, result: Result<Result<R,Self::Err>,E> ) -> Result<Result<R,Self::Err>,E> {
+    fn log_deep<R, E: ToString>(
+        ctx: &str,
+        result: Result<Result<R, Self::Err>, E>,
+    ) -> Result<Result<R, Self::Err>, E> {
         match &result {
             Ok(Err(err)) => {
-                println!("{}: {}",ctx, err.to_string());
+                println!("{}: {}", ctx, err.to_string());
             }
             Err(err) => {
-                println!("{}: {}",ctx, err.to_string());
+                println!("{}: {}", ctx, err.to_string());
             }
-            Ok(_) => {
-            }
+            Ok(_) => {}
         }
         result
     }
 }
 
-
 pub struct Settings {
-    pub timeouts: Timeouts
+    pub timeouts: Timeouts,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            timeouts: Default::default()
+            timeouts: Default::default(),
         }
     }
 }
 
 #[derive(strum_macros::Display)]
 pub enum Anatomy {
-   FromHyperlane,
-   ToGravity,
+    FromHyperlane,
+    ToGravity,
 }
-

@@ -256,7 +256,7 @@ pub mod id {
                 Kind::Repo => BaseKind::Repo,
                 Kind::Star(_) => BaseKind::Star,
                 Kind::Driver => BaseKind::Driver,
-                Kind::Global => BaseKind::Global
+                Kind::Global => BaseKind::Global,
             }
         }
     }
@@ -369,10 +369,8 @@ pub mod id {
                 BaseKind::Control => Kind::Control,
                 BaseKind::Portal => Kind::Portal,
                 BaseKind::Repo => Kind::Repo,
-                BaseKind::Driver => {
-                    Kind::Driver
-                }
-                BaseKind::Global => {Kind::Global}
+                BaseKind::Driver => Kind::Driver,
+                BaseKind::Global => Kind::Global,
             })
         }
     }
@@ -1654,7 +1652,6 @@ pub mod id {
             &self,
             traversal: Traversal<ReflectedWave>,
         ) -> Result<(), MsgErr> {
-
             self.traverse_next(traversal.to_ultra()).await;
             Ok(())
         }
@@ -2225,7 +2222,7 @@ pub mod id {
         pub fn is_global(&self) -> bool {
             match self.route {
                 RouteSeg::Global => true,
-                _ => false
+                _ => false,
             }
         }
 
@@ -2819,7 +2816,7 @@ pub enum BaseSubKind {
     Mechtron,
     Database,
     Any,
-    Drivers
+    Drivers,
 }
 
 impl Into<Sub> for BaseSubKind {
@@ -3080,8 +3077,11 @@ impl StarKey {
         }
     }
 
-    pub fn machine( machine_name: MachineName) -> Self {
-        StarKey::new(&"machine".to_string(), &StarHandle::name(machine_name.as_str()))
+    pub fn machine(machine_name: MachineName) -> Self {
+        StarKey::new(
+            &"machine".to_string(),
+            &StarHandle::name(machine_name.as_str()),
+        )
     }
 
     pub fn central() -> Self {
@@ -3136,7 +3136,10 @@ pub struct Traversal<W> {
     pub to: Port,
 }
 
-impl <W> Trackable for Traversal<W> where W: Trackable{
+impl<W> Trackable for Traversal<W>
+where
+    W: Trackable,
+{
     fn track_id(&self) -> String {
         self.payload.track_id()
     }

@@ -4,16 +4,16 @@ use std::convert::TryInto;
 use std::sync::atomic::{AtomicI32, AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
 
+use cosmic_api::id::StarKey;
+use cosmic_api::log::LogSource;
 use futures::future::select_all;
 use futures::prelude::*;
 use futures::FutureExt;
 use log::Level;
 use mesh_portal::version::latest::log::RootLogger;
-use cosmic_api::log::LogSource;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{broadcast, mpsc};
 use tokio::time::{Duration, Instant};
-use cosmic_api::id::StarKey;
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::constellation::ConstellationStatus;
@@ -24,27 +24,30 @@ use crate::frame::{
     StarMessagePayload, StarPattern,
 };
 use crate::lane::{
-    ConnectorController, LaneCommand, LaneEnd, LaneIndex, LaneMeta, LaneWrapper,
-    ProtoLaneEnd, STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelIn, TunnelOut,
-    TunnelOutState,
+    ConnectorController, LaneCommand, LaneEnd, LaneIndex, LaneMeta, LaneWrapper, ProtoLaneEnd,
+    TunnelConnector, TunnelIn, TunnelOut, TunnelOutState, STARLANE_PROTOCOL_VERSION,
 };
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
 use crate::star::core::message::MessagingEndpointComponent;
-use crate::star::shell::lanes::{LaneMuxer, LaneMuxerApi, LanePattern};
-use crate::star::shell::search::{ShortestPathStarKey, StarSearchApi, StarSearchComponent, StarSearchTransaction};
-use crate::star::shell::message::{MessagingApi, MessagingComponent};
-use crate::star::shell::router::{RouterApi, RouterCall, RouterComponent};
-use crate::star::shell::sys::{SysApi, SysComponent};
-use crate::star::surface::{SurfaceApi, SurfaceCall, SurfaceComponent};
-use crate::star::variant::{start_variant, VariantApi};
-use crate::star::{ConstellationBroadcast, FrameHold, FrameTimeoutInner, Persistence, Star, StarCommand, StarController, StarInfo, StarKernel, StarKind, StarSkel};
-use crate::starlane::StarlaneMachine;
-use crate::template::StarKeyConstellationIndex;
-use crate::star::shell::golden::{GoldenPathApi, GoldenPathComponent};
-use crate::star::shell::watch::{WatchApi, WatchComponent};
 use crate::star::core::particle::driver::ResourceCoreDriverApi;
 use crate::star::shell::db::StarDB;
-
+use crate::star::shell::golden::{GoldenPathApi, GoldenPathComponent};
+use crate::star::shell::lanes::{LaneMuxer, LaneMuxerApi, LanePattern};
+use crate::star::shell::message::{MessagingApi, MessagingComponent};
+use crate::star::shell::router::{RouterApi, RouterCall, RouterComponent};
+use crate::star::shell::search::{
+    ShortestPathStarKey, StarSearchApi, StarSearchComponent, StarSearchTransaction,
+};
+use crate::star::shell::sys::{SysApi, SysComponent};
+use crate::star::shell::watch::{WatchApi, WatchComponent};
+use crate::star::surface::{SurfaceApi, SurfaceCall, SurfaceComponent};
+use crate::star::variant::{start_variant, VariantApi};
+use crate::star::{
+    ConstellationBroadcast, FrameHold, FrameTimeoutInner, Persistence, Star, StarCommand,
+    StarController, StarInfo, StarKernel, StarKind, StarSkel,
+};
+use crate::starlane::StarlaneMachine;
+use crate::template::StarKeyConstellationIndex;
 
 pub struct ProtoStar {
     star_key: ProtoStarKey,
@@ -85,11 +88,10 @@ impl ProtoStar {
         logger: Logger,
         machine: StarlaneMachine,
     ) -> (Self, StarController) {
-        let (router_tx,router_rx) = mpsc::channel(1024);
+        let (router_tx, router_rx) = mpsc::channel(1024);
         let router_booster_rx = RouterCallBooster { router_rx };
         let lane_muxer_api = LaneMuxer::start(router_tx.clone());
         (
-
             ProtoStar {
                 star_key: key,
                 sequence: Arc::new(AtomicU64::new(0)),
@@ -138,19 +140,16 @@ impl ProtoStar {
         });
 
         loop {
-
             let mut futures = vec![];
-            futures.push(self.star_rx.recv().boxed() );
+            futures.push(self.star_rx.recv().boxed());
             futures.push(self.router_booster_rx.boost().boxed());
-            let (call,_,_) = select_all(futures).await;
+            let (call, _, _) = select_all(futures).await;
 
-            if let Some(call) = call{
+            if let Some(call) = call {
                 match call {
                     StarCommand::GetStarInfo(tx) => match &self.star_key {
                         ProtoStarKey::Key(key) => {
-                            tx.send(Option::Some(StarInfo::new(
-                                key.clone(),
-                                self.kind.clone())));
+                            tx.send(Option::Some(StarInfo::new(key.clone(), self.kind.clone())));
                         }
                     },
                     StarCommand::ConstellationBroadcast(broadcast) => match broadcast {
@@ -166,9 +165,7 @@ impl ProtoStar {
                             _ => panic!("proto star not ready for proto star evolution because it does not have a star_key yet assigned")
                         };
 
-                        let info = StarInfo::new(
-                             star_key.clone(),
-                            self.kind.clone() );
+                        let info = StarInfo::new(star_key.clone(), self.kind.clone());
 
                         let (core_messaging_endpoint_tx, core_messaging_endpoint_rx) =
                             mpsc::channel(1024);
@@ -186,7 +183,6 @@ impl ProtoStar {
                         let variant_api = VariantApi::new(variant_tx);
                         let watch_api = WatchApi::new(watch_tx);
                         let sys_api = SysApi::new(sys_tx);
-
 
                         let data_access = self
                             .data_access
@@ -215,19 +211,20 @@ impl ProtoStar {
                             variant_api,
                             watch_api,
                             sys_api,
-                            particle_logger: RootLogger::stdout(LogSource::Shell)
+                            particle_logger: RootLogger::stdout(LogSource::Shell),
                         };
 
-                        start_variant(skel.clone(), variant_rx );
+                        start_variant(skel.clone(), variant_rx);
 
-                        MessagingEndpointComponent::start(skel.clone(), core_messaging_endpoint_rx).await;
+                        MessagingEndpointComponent::start(skel.clone(), core_messaging_endpoint_rx)
+                            .await;
                         StarSearchComponent::start(skel.clone(), star_locator_rx);
                         RouterComponent::start(skel.clone(), self.router_booster_rx.router_rx);
                         MessagingComponent::start(skel.clone(), messaging_rx);
                         SurfaceComponent::start(skel.clone(), self.surface_rx);
                         GoldenPathComponent::start(skel.clone(), golden_path_rx);
                         WatchComponent::start(skel.clone(), watch_rx);
-                        SysComponent::start( skel.clone(), sys_rx );
+                        SysComponent::start(skel.clone(), sys_rx);
 
                         return Ok(Star::from_proto(
                             skel,
@@ -252,9 +249,7 @@ impl ProtoStar {
                             }
                         }
 
-                        self.lane_muxer_api.add_proto_lane(lane, StarPattern::Any );
-
-
+                        self.lane_muxer_api.add_proto_lane(lane, StarPattern::Any);
                     }
                     StarCommand::AddConnectorController(connector_ctrl) => {
                         self.connector_ctrls.push(connector_ctrl);
@@ -280,8 +275,6 @@ impl ProtoStar {
             });
         }
     }
-
-
 }
 
 pub struct ProtoStarEvolution {
@@ -488,7 +481,7 @@ impl ProtoStarKey {
 }
 
 struct RouterCallBooster {
-    router_rx: mpsc::Receiver<RouterCall>
+    router_rx: mpsc::Receiver<RouterCall>,
 }
 
 impl RouterCallBooster {
@@ -499,10 +492,13 @@ impl RouterCallBooster {
             match call {
                 None => {
                     return Option::None;
-                },
+                }
                 Some(call) => {
                     match call {
-                        RouterCall::Frame { frame, session: lane } => {
+                        RouterCall::Frame {
+                            frame,
+                            session: lane,
+                        } => {
                             return Option::Some(StarCommand::Frame(frame));
                         }
                         _ => {
@@ -514,5 +510,3 @@ impl RouterCallBooster {
         }
     }
 }
-
-

@@ -19,10 +19,10 @@ pub mod particle {
     use serde::{Deserialize, Serialize};
 
     use crate::error::MsgErr;
-    use crate::id::id::{KindParts, BaseKind, Point, PointKind, Kind};
-    use crate::substance::substance::{Substance, SubstanceMap};
+    use crate::id::id::{BaseKind, Kind, KindParts, Point, PointKind};
     use crate::parse::parse_alpha1_str;
     use crate::security::Permissions;
+    use crate::substance::substance::{Substance, SubstanceMap};
     use cosmic_nom::{Res, Span};
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,13 +39,13 @@ pub mod particle {
         Eq,
         PartialEq,
         strum_macros::Display,
-        strum_macros::EnumString
+        strum_macros::EnumString,
     )]
     pub enum Status {
-        Unknown,      // initial status or when we status cannot be determined
-        Pending,      // initial status
-        Init,         // undergoing custom initialization...This particle can send requests but not receive requests.
-        Ready,        // ready to take requests
+        Unknown,  // initial status or when we status cannot be determined
+        Pending,  // initial status
+        Init, // undergoing custom initialization...This particle can send requests but not receive requests.
+        Ready, // ready to take requests
         Paused, // can not receive requests (probably because it is waiting for some other particle to make updates)...
         Resuming, // like Initializing but triggered after a pause is lifted, the particle may be doing something before it is ready to accept requests again.
         Panic,    // something is wrong... all requests are blocked and responses are cancelled.
@@ -82,7 +82,7 @@ pub mod particle {
         }
     }
 
-    pub fn ok_code<I:Span>(input: I) -> Res<I, Code> {
+    pub fn ok_code<I: Span>(input: I) -> Res<I, Code> {
         tag("Ok")(input).map(|(next, code)| (next, Code::Ok))
     }
 
@@ -109,7 +109,7 @@ pub mod particle {
     }
      */
 
-    pub fn status<I:Span>(input: I) -> Res<I, Status> {
+    pub fn status<I: Span>(input: I) -> Res<I, Status> {
         parse_alpha1_str(input)
     }
 
@@ -128,7 +128,6 @@ pub mod particle {
         pub properties: Properties,
     }
 
-
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
     pub struct Details {
         pub stub: Stub,
@@ -136,11 +135,8 @@ pub mod particle {
     }
 
     impl Details {
-        pub fn new(stub: Stub, properties: Properties ) -> Self {
-            Self {
-                stub,
-                properties,
-            }
+        pub fn new(stub: Stub, properties: Properties) -> Self {
+            Self { stub, properties }
         }
     }
 
@@ -167,7 +163,7 @@ pub mod particle {
     }
 }
 
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Particle {
@@ -177,10 +173,7 @@ pub struct Particle {
 
 impl Particle {
     pub fn new(stub: Stub, state: Substance) -> Particle {
-        Particle {
-            stub,
-            state
-        }
+        Particle { stub, state }
     }
 
     pub fn point(&self) -> Point {
@@ -192,16 +185,16 @@ impl Particle {
     }
 }
 
-#[derive(Debug,Clone,Eq,PartialEq,Hash, Serialize,Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct Watch {
     pub point: Point,
-    pub aspect: Aspect
+    pub aspect: Aspect,
 }
 
-#[derive(Debug,Clone,Eq,PartialEq,Hash,Serialize,Deserialize,strum_macros::Display)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, strum_macros::Display)]
 pub enum Aspect {
     Log,
     State,
     Property,
-    Child
+    Child,
 }

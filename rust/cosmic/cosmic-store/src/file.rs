@@ -1,17 +1,17 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use std::io;
-use std::prelude::rust_2021::String;
-use std::io::Error;
 use anyhow::anyhow;
 use cosmic_api::error::MsgErr;
+use std::io;
+use std::io::Error;
+use std::prelude::rust_2021::String;
 
-pub type Res<R>=Result<R,MsgErr>;
+pub type Res<R> = Result<R, MsgErr>;
 
 pub trait FileAccess {
-    fn rmdir(&self, path: &str ) -> Res<()>;
-    fn list(&self, path: &str ) -> Res<Vec<String>>;
-    fn read(&self, path: &str ) -> Res<Vec<u8>>;
+    fn rmdir(&self, path: &str) -> Res<()>;
+    fn list(&self, path: &str) -> Res<Vec<String>>;
+    fn read(&self, path: &str) -> Res<Vec<u8>>;
     fn write(&self, path: &str, data: Vec<u8>) -> Res<()>;
     fn unzip(&self, source: &str, targer: &str) -> Res<()>;
     fn mkdir(&self, path: &str) -> Res<()>;
@@ -20,24 +20,24 @@ pub trait FileAccess {
 }
 
 #[cfg(feature = "local-filesystem")]
-pub mod local{
+pub mod local {
+    use crate::file::{FileAccess, Res};
     use alloc::vec::Vec;
     use core::fmt::Error;
-    use std::{format, fs, io, vec};
-    use crate::file::{FileAccess, Res};
+    use cosmic_api::error::MsgErr;
     use std::path::Path;
     use std::path::PathBuf;
     use std::prelude::rust_2021::{String, ToString};
-    use cosmic_api::error::MsgErr;
+    use std::{format, fs, io, vec};
 
     pub struct LocalFileAccess {
-        root: PathBuf
+        root: PathBuf,
     }
 
     impl LocalFileAccess {
-        fn path( &self, with: &str ) -> Res<PathBuf> {
+        fn path(&self, with: &str) -> Res<PathBuf> {
             let mut path = self.root.clone();
-            path.push( with );
+            path.push(with);
             let path = path.as_path();
             Ok(path.to_path_buf())
         }
@@ -52,7 +52,13 @@ pub mod local{
             let path = self.path(path)?;
             let mut rtn = vec![];
             for entry in fs::read_dir(path)? {
-                rtn.push(entry?.path().to_str().ok_or("expected to be able to convert path to str")?.to_string());
+                rtn.push(
+                    entry?
+                        .path()
+                        .to_str()
+                        .ok_or("expected to be able to convert path to str")?
+                        .to_string(),
+                );
             }
             Ok(rtn)
         }
@@ -64,24 +70,30 @@ pub mod local{
 
         fn write(&self, path: &str, data: Vec<u8>) -> Res<()> {
             let path = self.path(path)?;
-            Ok(fs::write(path,data)?)
+            Ok(fs::write(path, data)?)
         }
 
         fn unzip(&self, source: &str, target: &str) -> Res<()> {
             let source = self.path(source)?;
             let target = self.path(target)?;
             let source = fs::File::open(source)?;
-            let mut archive = zip::ZipArchive::new(source).map_err( |r| MsgErr::new(500,r.to_string().as_str()))?;
+            let mut archive = zip::ZipArchive::new(source)
+                .map_err(|r| MsgErr::new(500, r.to_string().as_str()))?;
 
             for i in 0..archive.len() {
-                let mut zip_file = archive.by_index(i).map_err( |r| MsgErr::new(500,r.to_string().as_str()))?;
+                let mut zip_file = archive
+                    .by_index(i)
+                    .map_err(|r| MsgErr::new(500, r.to_string().as_str()))?;
                 let mut target = target.to_path_buf();
-                target.push(zip_file.name() );
+                target.push(zip_file.name());
                 if zip_file.is_dir() {
                     fs::create_dir_all(target)?;
                 } else {
-                    target.push(zip_file.name() );
-                    let parent = target.parent().ok_or("expected path").map_err( |r| MsgErr::new(500,r.to_string().as_str()))?;
+                    target.push(zip_file.name());
+                    let parent = target
+                        .parent()
+                        .ok_or("expected path")
+                        .map_err(|r| MsgErr::new(500, r.to_string().as_str()))?;
                     fs::create_dir_all(parent)?;
                     let mut file = fs::File::create(target)?;
                     std::io::copy(&mut zip_file, &mut file)?;
@@ -109,5 +121,3 @@ pub mod local{
         }
     }
 }
-
-

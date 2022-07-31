@@ -1,26 +1,24 @@
-use core::str::FromStr;
-use nom::combinator::all_consuming;
-use crate::error::MsgErr;
 use crate::command::request::create::{Create, CreateCtx, CreateVar, Strategy};
 use crate::command::request::delete::{Delete, DeleteCtx, DeleteVar};
 use crate::command::request::get::{Get, GetCtx, GetVar};
+use crate::command::request::read::{Read, ReadCtx, ReadVar};
 use crate::command::request::select::{Select, SelectCtx, SelectVar};
 use crate::command::request::set::{Set, SetCtx, SetVar};
-use crate::parse::{command_line, Env};
-use crate::parse::error::result;
-use cosmic_nom::new_span;
-use crate::util::ToResolved;
-use serde::{Deserialize, Serialize};
-use crate::command::request::read::{Read, ReadCtx, ReadVar};
 use crate::command::request::update::{Update, UpdateCtx, UpdateVar};
-use crate::wave::CmdMethod;
-use cosmic_macros_primitive::Autobox;
+use crate::error::MsgErr;
+use crate::parse::error::result;
+use crate::parse::{command_line, Env};
 use crate::substance::substance::ChildSubstance;
+use crate::util::ToResolved;
+use crate::wave::CmdMethod;
+use core::str::FromStr;
+use cosmic_macros_primitive::Autobox;
+use cosmic_nom::new_span;
+use nom::combinator::all_consuming;
+use serde::{Deserialize, Serialize};
 
 pub mod command {
     use serde::{Deserialize, Serialize};
-
-
 
     pub mod common {
         use std::collections::HashMap;
@@ -34,14 +32,12 @@ pub mod command {
         use crate::parse::model::Var;
         use crate::substance::substance::{Substance, SubstanceMap};
 
-
         #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
         pub enum StateSrcVar {
             None,
             FileRef(String),
-            Var(Variable)
+            Var(Variable),
         }
-
 
         #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
         pub enum StateSrc {
@@ -49,7 +45,7 @@ pub mod command {
             Substance(Box<Substance>),
         }
 
-        #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq)]
+        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub enum PropertyMod {
             Set {
                 key: String,
@@ -75,7 +71,7 @@ pub mod command {
             }
         }
 
-        #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq)]
+        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub struct SetProperties {
             pub map: HashMap<String, PropertyMod>,
         }
@@ -128,7 +124,7 @@ pub mod command {
             Unset(String),
         }
 
-        #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq)]
+        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub struct SetRegistry {
             pub labels: Vec<SetLabel>,
         }
@@ -158,28 +154,28 @@ pub mod command {
 }
 
 pub mod request {
-    use crate::error::{MsgErr, };
     use crate::bin::Bin;
     use crate::command::request::create::Create;
     use crate::command::request::get::Get;
     use crate::command::request::select::Select;
     use crate::command::request::set::Set;
     use crate::command::request::update::Update;
-    use crate::wave::ReflectedCore;
+    use crate::error::MsgErr;
     use crate::fail;
     use crate::fail::{BadRequest, Fail, NotFound};
-    use crate::id::id::{KindParts, BaseKind, Meta, Point};
-    use crate::substance::substance::{Errors, Substance, };
+    use crate::http::HttpMethod;
+    use crate::id::id::{BaseKind, KindParts, Meta, Point};
+    use crate::msg::MsgMethod;
     use crate::selector::selector::KindSelector;
+    use crate::substance::substance::{Errors, Substance};
     use crate::util::{ValueMatcher, ValuePattern};
+    use crate::wave::MethodKind;
+    use crate::wave::ReflectedCore;
     use http::status::InvalidStatusCode;
     use http::{HeaderMap, Request, StatusCode, Uri};
     use serde::{Deserialize, Serialize};
-    use crate::wave::MethodKind;
-    use crate::http::HttpMethod;
-    use crate::msg::MsgMethod;
 
-    #[derive(Debug, Clone,Serialize,Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub enum Rc {
         Create(Create),
         Select(Select),
@@ -194,9 +190,7 @@ pub mod request {
         }
     }
 
-    impl Eq for Rc {
-
-    }
+    impl Eq for Rc {}
 
     impl Rc {
         pub fn get_type(&self) -> RcCommandType {
@@ -262,18 +256,18 @@ pub mod request {
     }
 
     pub mod set {
-        use crate::error::MsgErr;
         use crate::command::command::common::SetProperties;
+        use crate::error::MsgErr;
         use crate::id::id::{Point, PointCtx, PointVar};
         use crate::parse::Env;
-        use serde::{Deserialize, Serialize};
         use crate::util::ToResolved;
+        use serde::{Deserialize, Serialize};
 
         pub type Set = SetDef<Point>;
         pub type SetCtx = SetDef<PointCtx>;
         pub type SetVar = SetDef<PointVar>;
 
-        #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq)]
+        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub struct SetDef<Pnt> {
             pub point: Pnt,
             pub properties: SetProperties,
@@ -306,18 +300,18 @@ pub mod request {
     }
 
     pub mod get {
-        use crate::error::MsgErr;
         use crate::command::command::common::SetProperties;
+        use crate::error::MsgErr;
         use crate::id::id::{Point, PointCtx, PointVar};
         use crate::parse::Env;
-        use serde::{Deserialize, Serialize};
         use crate::util::ToResolved;
+        use serde::{Deserialize, Serialize};
 
         pub type Get = GetDef<Point>;
         pub type GetCtx = GetDef<PointCtx>;
         pub type GetVar = GetDef<PointVar>;
 
-        #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq)]
+        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub struct GetDef<Pnt> {
             pub point: Pnt,
             pub op: GetOp,
@@ -348,7 +342,7 @@ pub mod request {
             }
         }
 
-        #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq)]
+        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub enum GetOp {
             State,
             Properties(Vec<String>),
@@ -357,23 +351,25 @@ pub mod request {
 
     pub mod create {
         use std::convert::TryInto;
-        use std::sync::Arc;
         use std::sync::atomic::{AtomicU64, Ordering};
+        use std::sync::Arc;
 
         use serde::{Deserialize, Serialize};
         use tokio::sync::Mutex;
 
-        use crate::error::{MsgErr, ParseErrs};
         use crate::bin::Bin;
-        use crate::command::Command;
         use crate::command::command::common::{SetProperties, SetRegistry, StateSrc, StateSrcVar};
-        use crate::id::id::{KindParts, BaseKind, HostKey, Point, PointCtx, PointSeg, PointVar, ToPort};
-        use crate::wave::{CmdMethod, DirectedProto, DirectedCore, SysMethod};
+        use crate::command::Command;
+        use crate::error::{MsgErr, ParseErrs};
+        use crate::id::id::{
+            BaseKind, HostKey, KindParts, Point, PointCtx, PointSeg, PointVar, ToPort,
+        };
         use crate::msg::MsgMethod;
         use crate::parse::{CamelCase, Env, ResolverErr};
-        use crate::substance::substance::Substance;
         use crate::selector::selector::SpecificSelector;
+        use crate::substance::substance::Substance;
         use crate::util::{ConvertFrom, ToResolved};
+        use crate::wave::{CmdMethod, DirectedCore, DirectedProto, SysMethod};
 
         pub enum PointTemplateSeg {
             ExactSeg(PointSeg),
@@ -393,7 +389,7 @@ pub mod request {
         pub type TemplateCtx = TemplateDef<PointTemplateCtx>;
         pub type TemplateVar = TemplateDef<PointTemplateVar>;
 
-        #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq)]
+        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub struct TemplateDef<Pnt> {
             pub point: Pnt,
             pub kind: KindTemplate,
@@ -408,7 +404,7 @@ pub mod request {
 
         impl ToResolved<TemplateCtx> for TemplateVar {
             fn to_resolved(self, env: &Env) -> Result<TemplateCtx, MsgErr> {
-                let point : PointTemplateCtx = self.point.to_resolved(env)?;
+                let point: PointTemplateCtx = self.point.to_resolved(env)?;
 
                 let template = TemplateCtx {
                     point,
@@ -443,7 +439,7 @@ pub mod request {
             }
         }
 
-        #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq)]
+        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub struct KindTemplate {
             pub base: BaseKind,
             pub sub: Option<CamelCase>,
@@ -477,9 +473,9 @@ pub mod request {
             Complete,
         }
 
-        pub type Create = CreateDef<Point,StateSrc>;
-        pub type CreateVar = CreateDef<PointVar,StateSrcVar>;
-        pub type CreateCtx = CreateDef<PointCtx,StateSrc>;
+        pub type Create = CreateDef<Point, StateSrc>;
+        pub type CreateVar = CreateDef<PointVar, StateSrcVar>;
+        pub type CreateCtx = CreateDef<PointCtx, StateSrc>;
 
         impl ToResolved<Create> for CreateVar {
             fn to_resolved(self, env: &Env) -> Result<Create, MsgErr> {
@@ -488,25 +484,45 @@ pub mod request {
             }
         }
 
-
         impl ToResolved<CreateCtx> for CreateVar {
             fn to_resolved(self, env: &Env) -> Result<CreateCtx, MsgErr> {
                 let template = self.template.to_resolved(env)?;
                 let state = match &self.state {
                     StateSrcVar::None => StateSrc::None,
-                    StateSrcVar::FileRef(name) => StateSrc::Substance(Box::new(Substance::Bin(env.file(name).map_err(|e|{ match e{
-                        ResolverErr::NotAvailable => MsgErr::from_500("files are not available in this context"),
-                        ResolverErr::NotFound => MsgErr::from_500(format!("cannot find file '{}'",name))
-                    }})?.content))),
+                    StateSrcVar::FileRef(name) => StateSrc::Substance(Box::new(Substance::Bin(
+                        env.file(name)
+                            .map_err(|e| match e {
+                                ResolverErr::NotAvailable => {
+                                    MsgErr::from_500("files are not available in this context")
+                                }
+                                ResolverErr::NotFound => {
+                                    MsgErr::from_500(format!("cannot find file '{}'", name))
+                                }
+                            })?
+                            .content,
+                    ))),
                     StateSrcVar::Var(var) => {
-                        let val = env.val(var.name.as_str() ).map_err(|e|match e{
-                            ResolverErr::NotAvailable => MsgErr::from_500("variable are not available in this context"),
-                            ResolverErr::NotFound => MsgErr::from_500(format!("cannot find variable '{}'", var.name ))
+                        let val = env.val(var.name.as_str()).map_err(|e| match e {
+                            ResolverErr::NotAvailable => {
+                                MsgErr::from_500("variable are not available in this context")
+                            }
+                            ResolverErr::NotFound => {
+                                MsgErr::from_500(format!("cannot find variable '{}'", var.name))
+                            }
                         })?;
-                        StateSrc::Substance(Box::new(Substance::Bin(env.file(val.clone()).map_err(|e|{ match e{
-                            ResolverErr::NotAvailable => MsgErr::from_500("files are not available in this context"),
-                            ResolverErr::NotFound => MsgErr::from_500(format!("cannot find file '{}'",val.to_text().unwrap_or("err".to_string())))
-                        }})?.content)))
+                        StateSrc::Substance(Box::new(Substance::Bin(
+                            env.file(val.clone())
+                                .map_err(|e| match e {
+                                    ResolverErr::NotAvailable => {
+                                        MsgErr::from_500("files are not available in this context")
+                                    }
+                                    ResolverErr::NotFound => MsgErr::from_500(format!(
+                                        "cannot find file '{}'",
+                                        val.to_text().unwrap_or("err".to_string())
+                                    )),
+                                })?
+                                .content,
+                        )))
                     }
                 };
                 Ok(CreateCtx {
@@ -532,11 +548,8 @@ pub mod request {
             }
         }
 
-
-
-
-        #[derive(Debug, Clone,Serialize,Deserialize,Eq,PartialEq)]
-        pub struct CreateDef<Pnt,StateSrc> {
+        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+        pub struct CreateDef<Pnt, StateSrc> {
             pub template: TemplateDef<PointTemplateDef<Pnt>>,
             pub properties: SetProperties,
             pub strategy: Strategy,
@@ -558,65 +571,62 @@ pub mod request {
 
         impl Into<DirectedCore> for Create {
             fn into(self) -> DirectedCore {
-                let mut request = DirectedCore::msg(MsgMethod::new("Command").unwrap() );
+                let mut request = DirectedCore::msg(MsgMethod::new("Command").unwrap());
                 request.body = Substance::Command(Box::new(Command::Create(self)));
                 request
             }
         }
 
-
         impl Into<DirectedProto> for Create {
             fn into(self) -> DirectedProto {
-                let mut request = DirectedProto::sys(Point::global_executor().to_port(), SysMethod::Command);
+                let mut request =
+                    DirectedProto::sys(Point::global_executor().to_port(), SysMethod::Command);
                 request.body(Substance::Command(Box::new(Command::Create(self))));
                 request
             }
         }
 
-
         #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub enum Strategy {
             Commit,
             Ensure,
-            Override
+            Override,
         }
 
         #[async_trait]
-        pub trait PointFactory: Send+Sync {
-            async fn create(&self) -> Result<Point,MsgErr>;
+        pub trait PointFactory: Send + Sync {
+            async fn create(&self) -> Result<Point, MsgErr>;
         }
 
         pub struct PointFactoryU64 {
             parent: Point,
             prefix: String,
-            atomic: Arc<AtomicU64>
+            atomic: Arc<AtomicU64>,
         }
 
         impl PointFactoryU64 {
-            pub fn new( parent: Point, prefix: String ) -> Self {
+            pub fn new(parent: Point, prefix: String) -> Self {
                 Self {
                     parent,
                     prefix,
-                    atomic: Arc::new(AtomicU64::new(0))
+                    atomic: Arc::new(AtomicU64::new(0)),
                 }
             }
         }
 
-
         #[async_trait]
         impl PointFactory for PointFactoryU64 {
             async fn create(&self) -> Result<Point, MsgErr> {
-                let index = self.atomic.fetch_add(1u64, Ordering::Relaxed );
-                self.parent.push( format!("{}{}", self.prefix, index))
+                let index = self.atomic.fetch_add(1u64, Ordering::Relaxed);
+                self.parent.push(format!("{}{}", self.prefix, index))
             }
         }
-
 
         pub type PointTemplate = PointTemplateDef<Point>;
         pub type PointTemplateCtx = PointTemplateDef<PointCtx>;
         pub type PointTemplateVar = PointTemplateDef<PointVar>;
 
-        #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq)]
+        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub struct PointTemplateDef<Pnt> {
             pub parent: Pnt,
             pub child_segment_template: PointSegTemplate,
@@ -627,17 +637,17 @@ pub mod request {
                 let parent = self.parent.to_resolved(env)?;
                 Ok(PointTemplateCtx {
                     parent,
-                    child_segment_template: self.child_segment_template
+                    child_segment_template: self.child_segment_template,
                 })
             }
         }
 
-        impl ToResolved<PointTemplate> for PointTemplateCtx{
+        impl ToResolved<PointTemplate> for PointTemplateCtx {
             fn to_resolved(self, env: &Env) -> Result<PointTemplate, MsgErr> {
                 let parent = self.parent.to_resolved(env)?;
-                Ok(PointTemplate{
+                Ok(PointTemplate {
                     parent,
-                    child_segment_template: self.child_segment_template
+                    child_segment_template: self.child_segment_template,
                 })
             }
         }
@@ -649,9 +659,7 @@ pub mod request {
             }
         }
 
-
-
-        #[derive(Debug, Clone, strum_macros::Display, Serialize, Deserialize,Eq,PartialEq)]
+        #[derive(Debug, Clone, strum_macros::Display, Serialize, Deserialize, Eq, PartialEq)]
         pub enum PointSegTemplate {
             Exact(String),
             Pattern(String), // must have a '%'
@@ -670,13 +678,13 @@ pub mod request {
         use crate::id::id::Point;
         use crate::parse::Env;
         use crate::particle::particle::Stub;
-        use crate::substance::substance::{
-            MapPattern, Substance, SubstanceList,
+        use crate::selector::selector::{
+            Hop, HopCtx, HopVar, PointHierarchy, Selector, SelectorDef,
         };
-        use crate::selector::selector::{Hop, HopCtx, HopVar, PointHierarchy, Selector, SelectorDef};
+        use crate::substance::substance::{MapPattern, Substance, SubstanceList};
         use crate::util::{ConvertFrom, ToResolved};
 
-        #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq)]
+        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub enum SelectIntoSubstance {
             Stubs,
             Points,
@@ -709,13 +717,13 @@ pub mod request {
         pub type SelectCtx = SelectDef<Hop>;
         pub type SelectVar = SelectDef<Hop>;
 
-        impl ToResolved<Select> for Select{
+        impl ToResolved<Select> for Select {
             fn to_resolved(self, env: &Env) -> Result<Select, MsgErr> {
                 Ok(self)
             }
         }
 
-        #[derive(Debug, Clone,Serialize,Deserialize,Eq,PartialEq)]
+        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub struct SelectDef<Hop> {
             pub pattern: SelectorDef<Hop>,
             pub properties: PropertiesPattern,
@@ -723,7 +731,7 @@ pub mod request {
             pub kind: SelectKind,
         }
 
-        #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq)]
+        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub enum SelectKind {
             Initial,
             SubSelect {
@@ -775,7 +783,7 @@ pub mod request {
             }
         }
 
-        #[derive(Debug, Clone )]
+        #[derive(Debug, Clone)]
         pub struct SubSelect {
             pub point: Point,
             pub pattern: Selector,
@@ -833,8 +841,8 @@ pub mod request {
     }
 
     pub mod delete {
-        use crate::error::MsgErr;
         use crate::command::request::select::{PropertiesPattern, Select, SelectIntoSubstance};
+        use crate::error::MsgErr;
         use crate::parse::Env;
         use crate::selector::selector::{Hop, SelectorDef};
         use crate::util::ToResolved;
@@ -844,25 +852,24 @@ pub mod request {
         pub type DeleteCtx = DeleteDef<Hop>;
         pub type DeleteVar = DeleteDef<Hop>;
 
-        impl ToResolved<Delete> for Delete{
+        impl ToResolved<Delete> for Delete {
             fn to_resolved(self, env: &Env) -> Result<Delete, MsgErr> {
                 Ok(self)
             }
         }
 
-        #[derive(Debug, Clone,Serialize,Deserialize,Eq,PartialEq)]
+        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub struct DeleteDef<Hop> {
             pub selector: SelectorDef<Hop>,
         }
 
         impl Into<Select> for Delete {
             fn into(self) -> Select {
-                let mut select = Select::new(self.selector );
+                let mut select = Select::new(self.selector);
                 select.into_substance = SelectIntoSubstance::Points;
                 select
             }
         }
-
     }
 
     pub mod update {
@@ -870,8 +877,8 @@ pub mod request {
 
         use serde::{Deserialize, Serialize};
 
-        use crate::error::MsgErr;
         use crate::command::command::common::SetProperties;
+        use crate::error::MsgErr;
         use crate::id::id::{Point, PointCtx, PointVar};
         use crate::parse::Env;
         use crate::substance::substance::Substance;
@@ -881,7 +888,7 @@ pub mod request {
         pub type UpdateCtx = UpdateDef<PointCtx>;
         pub type UpdateVar = UpdateDef<PointVar>;
 
-        #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq)]
+        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub struct UpdateDef<Pnt> {
             pub point: Pnt,
             pub payload: Substance,
@@ -891,7 +898,7 @@ pub mod request {
             fn to_resolved(self, env: &Env) -> Result<UpdateCtx, MsgErr> {
                 Ok(UpdateCtx {
                     point: self.point.to_resolved(env)?,
-                    payload: self.payload
+                    payload: self.payload,
                 })
             }
         }
@@ -900,12 +907,10 @@ pub mod request {
             fn to_resolved(self, env: &Env) -> Result<Update, MsgErr> {
                 Ok(Update {
                     point: self.point.to_resolved(env)?,
-                    payload: self.payload
+                    payload: self.payload,
                 })
             }
         }
-
-
     }
 
     pub mod read {
@@ -914,13 +919,13 @@ pub mod request {
         use crate::parse::Env;
         use crate::substance::substance::Substance;
         use crate::util::ToResolved;
-        use serde::{Serialize,Deserialize};
+        use serde::{Deserialize, Serialize};
 
         pub type Read = ReadDef<Point>;
         pub type ReadCtx = ReadDef<PointCtx>;
         pub type ReadVar = ReadDef<PointVar>;
 
-        #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq)]
+        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub struct ReadDef<Pnt> {
             pub point: Pnt,
             pub payload: Substance,
@@ -930,7 +935,7 @@ pub mod request {
             fn to_resolved(self, env: &Env) -> Result<ReadCtx, MsgErr> {
                 Ok(ReadCtx {
                     point: self.point.to_resolved(env)?,
-                    payload: self.payload
+                    payload: self.payload,
                 })
             }
         }
@@ -939,11 +944,10 @@ pub mod request {
             fn to_resolved(self, env: &Env) -> Result<Read, MsgErr> {
                 Ok(Read {
                     point: self.point.to_resolved(env)?,
-                    payload: self.payload
+                    payload: self.payload,
                 })
             }
         }
-
     }
 
     pub mod query {
@@ -951,11 +955,11 @@ pub mod request {
 
         use serde::{Deserialize, Serialize};
 
-        use crate::error::MsgErr;
         use crate::command::request::Rc;
+        use crate::error::MsgErr;
         use crate::selector::selector::PointHierarchy;
 
-        #[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq)]
+        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub enum Query {
             PointHierarchy,
         }
@@ -985,9 +989,8 @@ pub mod request {
     }
 }
 
-
-#[derive(Debug, Clone,Serialize,Deserialize,Eq,PartialEq,Autobox)]
-pub enum Command{
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Autobox)]
+pub enum Command {
     Create(Create),
     Delete(Delete),
     Select(Select),
@@ -1000,20 +1003,20 @@ pub enum Command{
 impl ChildSubstance for Command {}
 
 impl Command {
-    pub fn matches( &self, method: &CmdMethod ) -> Result<(),()>{
+    pub fn matches(&self, method: &CmdMethod) -> Result<(), ()> {
         if match self {
             Command::Update(_) => *method == CmdMethod::Update,
             Command::Read(_) => *method == CmdMethod::Read,
-            _ => false
+            _ => false,
         } {
-          Ok(())
+            Ok(())
         } else {
-          Err(())
+            Err(())
         }
     }
 }
 
-pub enum CommandCtx{
+pub enum CommandCtx {
     Create(CreateCtx),
     Delete(DeleteCtx),
     Select(SelectCtx),
@@ -1030,9 +1033,8 @@ pub enum CommandVar {
     Set(SetVar),
     Get(GetVar),
     Update(UpdateVar),
-    Read(ReadVar)
+    Read(ReadVar),
 }
-
 
 impl FromStr for CommandVar {
     type Err = MsgErr;
@@ -1059,7 +1061,7 @@ impl ToResolved<CommandCtx> for CommandVar {
             CommandVar::Get(i) => CommandCtx::Get(i.to_resolved(env)?),
             CommandVar::Delete(i) => CommandCtx::Delete(i.to_resolved(env)?),
             CommandVar::Update(update) => CommandCtx::Update(update.to_resolved(env)?),
-            CommandVar::Read(read) => CommandCtx::Read(read.to_resolved(env)?)
+            CommandVar::Read(read) => CommandCtx::Read(read.to_resolved(env)?),
         })
     }
 }
@@ -1073,7 +1075,7 @@ impl ToResolved<Command> for CommandCtx {
             CommandCtx::Get(i) => Command::Get(i.to_resolved(env)?),
             CommandCtx::Delete(i) => Command::Delete(i.to_resolved(env)?),
             CommandCtx::Update(update) => Command::Update(update.to_resolved(env)?),
-            CommandCtx::Read(read) => Command::Read(read.to_resolved(env)?)
+            CommandCtx::Read(read) => Command::Read(read.to_resolved(env)?),
         })
     }
 }

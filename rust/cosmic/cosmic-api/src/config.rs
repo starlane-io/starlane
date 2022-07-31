@@ -7,7 +7,7 @@ pub mod config {
 
     use crate::config::config::bind::BindConfig;
     use crate::id::id::{KindParts, Point};
-    use crate::parse::model::{WaveScope, MethodScope, RouteScope};
+    use crate::parse::model::{MethodScope, RouteScope, WaveScope};
     use crate::particle::particle;
     use crate::particle::particle::{Details, Stub};
     use crate::util::ValueMatcher;
@@ -77,16 +77,19 @@ pub mod config {
     }
 
     pub mod bind {
-        use crate::error::{MsgErr, ParseErrs};
         use crate::command::request::Rc;
+        use crate::error::{MsgErr, ParseErrs};
         use crate::id::id::{Point, PointCtx, PointVar, Topic};
         use crate::substance::substance::{Call, CallDef};
         use crate::substance::substance::{Substance, SubstancePattern};
-        use crate::wave::{MethodKind, MethodPattern, DirectedCore, Ping, RecipientSelector, Wave, DirectedWave, SingularDirectedWave};
+        use crate::wave::{
+            DirectedCore, DirectedWave, MethodKind, MethodPattern, Ping, RecipientSelector,
+            SingularDirectedWave, Wave,
+        };
 
         use crate::parse::model::{
-            BindScope, WaveScope, MethodScope, PipelineSegment, PipelineSegmentDef, PipelineVar,
-            RouteScope, ScopeFilters,
+            BindScope, MethodScope, PipelineSegment, PipelineSegmentDef, PipelineVar, RouteScope,
+            ScopeFilters, WaveScope,
         };
         use crate::parse::{bind_config, Env};
         use crate::selector::{PayloadBlock, PayloadBlockDef};

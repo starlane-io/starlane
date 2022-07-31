@@ -1,8 +1,8 @@
 pub mod frame {
     use core::str::FromStr;
-    use std::convert::TryInto;
     use nom::AsBytes;
     use semver::Version;
+    use std::convert::TryInto;
 
     use serde::{Deserialize, Serialize};
 
@@ -48,24 +48,22 @@ pub mod frame {
 
         fn try_into(self) -> Result<semver::Version, Self::Error> {
             let data = String::from_utf8(self.data)?;
-            Ok(semver::Version::from_str(data.as_str() )? )
+            Ok(semver::Version::from_str(data.as_str())?)
         }
     }
 
-    impl From<semver::Version> for PrimitiveFrame  {
+    impl From<semver::Version> for PrimitiveFrame {
         fn from(version: Version) -> Self {
             let data = version.to_string();
             PrimitiveFrame::from(data)
         }
     }
 
-
     #[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
     pub enum CloseReason {
         Done,
         Error(String),
     }
-
 
     impl TryInto<PrimitiveFrame> for Ping {
         type Error = MsgErr;
@@ -84,7 +82,6 @@ pub mod frame {
         }
     }
 
-
     impl TryInto<PrimitiveFrame> for Pong {
         type Error = MsgErr;
 
@@ -102,8 +99,7 @@ pub mod frame {
         }
     }
 
-
-    impl TryInto<PrimitiveFrame> for UltraWave{
+    impl TryInto<PrimitiveFrame> for UltraWave {
         type Error = MsgErr;
 
         fn try_into(self) -> Result<PrimitiveFrame, Self::Error> {
@@ -119,7 +115,6 @@ pub mod frame {
             Ok(bincode::deserialize(self.data.as_bytes())?)
         }
     }
-
 
     impl TryInto<PrimitiveFrame> for Knock {
         type Error = MsgErr;
@@ -137,5 +132,4 @@ pub mod frame {
             Ok(bincode::deserialize(self.data.as_bytes())?)
         }
     }
-
 }

@@ -1,16 +1,14 @@
 use crate::error::Error;
 use crate::registry::RegistryApi;
-use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::messaging::{Agent, ReqProto, ReqShell, RespShell};
-use mesh_portal::version::latest::msg::MsgMethod;
-use mesh_portal::version::latest::payload::{PayloadType, Substance};
 use cosmic_api::command::Command;
 use cosmic_api::id::id::Port;
 use cosmic_api::id::id::ToPort;
 use cosmic_api::service::Global;
-use cosmic_api::wave::{
-    Transmitter, AsyncTransmitterWithAgent, Method,
-};
+use cosmic_api::wave::{AsyncTransmitterWithAgent, Method, Transmitter};
+use mesh_portal::version::latest::id::Point;
+use mesh_portal::version::latest::messaging::{Agent, ReqProto, ReqShell, RespShell};
+use mesh_portal::version::latest::msg::MsgMethod;
+use mesh_portal::version::latest::payload::{PayloadType, Substance};
 use std::str::FromStr;
 use std::sync::Arc;
 

@@ -3,15 +3,13 @@ pub mod substance {
     use std::collections::HashMap;
     use std::ops::{Deref, DerefMut};
 
-    use crate::error::{MsgErr, ParseErrs};
     use crate::bin::Bin;
     use crate::cli::RawCommand;
     use crate::command::request::{Rc, RcCommandType};
     use crate::command::Command;
+    use crate::error::{MsgErr, ParseErrs};
     use crate::http::HttpMethod;
-    use crate::id::id::{
-        BaseKind, KindParts, Meta, Point, PointCtx, PointVar, Port,
-    };
+    use crate::id::id::{BaseKind, KindParts, Meta, Point, PointCtx, PointVar, Port};
     use crate::log::Log;
     use crate::msg::MsgMethod;
     use crate::parse::model::Subst;
@@ -20,7 +18,9 @@ pub mod substance {
     use crate::selector::selector::{KindSelector, Selector};
     use crate::sys::{Greet, Knock, Sys};
     use crate::util::{uuid, ToResolved, ValueMatcher, ValuePattern};
-    use crate::wave::{HyperWave, Method, DirectedCore, ReflectedCore, Pong, Wave, UltraWave, SysMethod, CmdMethod};
+    use crate::wave::{
+        CmdMethod, DirectedCore, HyperWave, Method, Pong, ReflectedCore, SysMethod, UltraWave, Wave,
+    };
     use cosmic_macros_primitive::Autobox;
     use cosmic_nom::Tw;
     use http::header::CONTENT_TYPE;
@@ -65,11 +65,19 @@ pub mod substance {
         UltraWave,
         HyperWave,
         Knock,
-        Greet
+        Greet,
     }
 
     #[derive(
-        Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Autobox, cosmic_macros_primitive::ToSubstance
+        Debug,
+        Clone,
+        Serialize,
+        Deserialize,
+        Eq,
+        PartialEq,
+        strum_macros::Display,
+        Autobox,
+        cosmic_macros_primitive::ToSubstance,
     )]
     pub enum Substance {
         Empty,
@@ -97,15 +105,15 @@ pub mod substance {
         UltraWave(Box<UltraWave>),
         HyperWave(Box<HyperWave>),
         Knock(Knock),
-        Greet(Greet)
+        Greet(Greet),
     }
 
-    pub trait ToSubstance<S>{
-        fn to_substance(self) -> Result<S,MsgErr>;
-        fn to_substance_ref(&self) -> Result<&S,MsgErr>;
+    pub trait ToSubstance<S> {
+        fn to_substance(self) -> Result<S, MsgErr>;
+        fn to_substance_ref(&self) -> Result<&S, MsgErr>;
     }
 
-    pub trait ChildSubstance{}
+    pub trait ChildSubstance {}
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
     pub struct Token {
@@ -213,7 +221,7 @@ pub mod substance {
                 Substance::UltraWave(_) => SubstanceKind::UltraWave,
                 Substance::HyperWave(_) => SubstanceKind::HyperWave,
                 Substance::Knock(_) => SubstanceKind::Knock,
-                Substance::Greet(_) => SubstanceKind::Greet
+                Substance::Greet(_) => SubstanceKind::Greet,
             }
         }
 
@@ -761,7 +769,6 @@ pub mod substance {
         }
     }
 
-
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
     pub struct CmdCall {
         pub path: Subst<Tw<String>>,
@@ -779,7 +786,6 @@ pub mod substance {
             format!("Cmd<{}>{}", self.method.to_string(), self.path.to_string())
         }
     }
-
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
     pub struct SysCall {
@@ -857,7 +863,7 @@ pub mod substance {
                 CallKind::Msg(msg) => msg.to_string(),
                 CallKind::Http(http) => http.to_string(),
                 CallKind::Cmd(cmd) => cmd.to_string(),
-                CallKind::Sys(sys) => sys.to_string()
+                CallKind::Sys(sys) => sys.to_string(),
             }
         }
     }

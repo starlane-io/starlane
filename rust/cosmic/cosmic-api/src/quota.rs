@@ -5,28 +5,25 @@ use crate::wave::{Ping, WaitTime};
 pub struct Timeouts {
     pub high: u64,
     pub med: u64,
-    pub low: u64
+    pub low: u64,
 }
 
-impl Timeouts{
-    pub fn from<W:Into<WaitTime>>(&self, wait: W) -> u64 {
+impl Timeouts {
+    pub fn from<W: Into<WaitTime>>(&self, wait: W) -> u64 {
         match wait.into() {
             WaitTime::High => self.high,
             WaitTime::Med => self.med,
-            WaitTime::Low => self.low
+            WaitTime::Low => self.low,
         }
     }
 }
-
 
 impl Default for Timeouts {
     fn default() -> Self {
         Self {
-            high: 5*60, // 5 minutes
-            med: 1*60,  // 1 minute
-            low: 2     // 15 seconds
+            high: 5 * 60, // 5 minutes
+            med: 1 * 60,  // 1 minute
+            low: 2,       // 15 seconds
         }
     }
 }
-
-

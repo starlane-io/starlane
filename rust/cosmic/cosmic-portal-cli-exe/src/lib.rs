@@ -5,6 +5,17 @@ mod scratch;
 use core::option::Option;
 use core::option::Option::None;
 use core::result::Result::{Err, Ok};
+use cosmic_api::command::Command;
+use cosmic_api::id::id::{ToPoint, ToPort};
+use cosmic_api::msg::MsgMethod;
+use cosmic_api::parse::error::result;
+use cosmic_api::parse::model::MethodScopeSelector;
+use cosmic_api::parse::{command, command_line, Env};
+use cosmic_api::util::{ToResolved, ValuePattern};
+use cosmic_api::wave::{
+    AsyncRequestHandlerRelay, AsyncRouter, DirectedHandler, DirectedHandler, InternalPipeline,
+    PointRequestHandler, RequestHandlerRelay, SyncTransmitRelay, SyncTransmitter, Transmitter,
+};
 use cosmic_nom::new_span;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::cli::{RawCommand, Transfer};
@@ -24,18 +35,6 @@ use mesh_portal::version::latest::messaging::{
 use mesh_portal::version::latest::particle::Stub;
 use mesh_portal::version::latest::payload::{PayloadType, Substance};
 use mesh_portal::version::latest::util::uuid;
-use cosmic_api::command::Command;
-use cosmic_api::id::id::{ToPoint, ToPort};
-use cosmic_api::msg::MsgMethod;
-use cosmic_api::parse::error::result;
-use cosmic_api::parse::model::MethodScopeSelector;
-use cosmic_api::parse::{command, command_line, Env};
-use cosmic_api::util::{ToResolved, ValuePattern};
-use cosmic_api::wave::{
-    PointRequestHandler, DirectedHandler, AsyncRequestHandlerRelay, AsyncRouter,
-    Transmitter, InternalPipeline, DirectedHandler, RequestHandlerRelay, SyncTransmitRelay,
-    SyncTransmitter,
-};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;

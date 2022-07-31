@@ -1,34 +1,30 @@
-use std::ops::Deref;
 use crate::error::MsgErr;
-use crate::wave::{Method, DirectedCore, ReflectedCore};
 use crate::id::id::Meta;
+use crate::parse::camel_case_chars;
+use crate::parse::error::result;
+use crate::parse::model::MethodScopeSelector;
 use crate::substance::substance::{Errors, Substance};
+use crate::util::{ValueMatcher, ValuePattern};
+use crate::wave::{DirectedCore, Method, ReflectedCore};
+use cosmic_nom::new_span;
 use http::{HeaderMap, StatusCode, Uri};
 use nom::combinator::all_consuming;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use crate::parse::camel_case_chars;
-use crate::parse::error::result;
-use crate::parse::model::MethodScopeSelector;
-use cosmic_nom::new_span;
-use crate::util::{ValueMatcher, ValuePattern};
+use std::ops::Deref;
 
-#[derive(Debug, Clone, Serialize, Deserialize,Eq,PartialEq,Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct MsgMethod {
-    string: String
+    string: String,
 }
 
 impl MsgMethod {
-    pub fn new<S:ToString>( string: S) -> Result<Self,MsgErr> {
+    pub fn new<S: ToString>(string: S) -> Result<Self, MsgErr> {
         let tmp = string.to_string();
         let string = result(all_consuming(camel_case_chars)(new_span(tmp.as_str())))?.to_string();
-        Ok(Self {
-            string
-        })
+        Ok(Self { string })
     }
 }
-
-
 
 impl ToString for MsgMethod {
     fn to_string(&self) -> String {
@@ -46,14 +42,14 @@ impl ValueMatcher<MsgMethod> for MsgMethod {
     }
 }
 
-
-
 impl Into<MethodScopeSelector> for MsgMethod {
-    fn into(self) -> MethodScopeSelector{
-        MethodScopeSelector::new( ValuePattern::Pattern(Method::Msg(self)), Regex::new(".*").unwrap() )
+    fn into(self) -> MethodScopeSelector {
+        MethodScopeSelector::new(
+            ValuePattern::Pattern(Method::Msg(self)),
+            Regex::new(".*").unwrap(),
+        )
     }
 }
-
 
 impl TryFrom<String> for MsgMethod {
     type Error = MsgErr;
@@ -71,7 +67,6 @@ impl TryFrom<&str> for MsgMethod {
     }
 }
 
-
 impl Deref for MsgMethod {
     type Target = String;
 
@@ -83,7 +78,7 @@ impl Deref for MsgMethod {
 impl Default for MsgMethod {
     fn default() -> Self {
         Self {
-            string: "Def".to_string()
+            string: "Def".to_string(),
         }
     }
 }
@@ -106,14 +101,16 @@ impl Default for MsgRequest {
             method: Default::default(),
             headers: Default::default(),
             uri: Default::default(),
-            body: Default::default()
+            body: Default::default(),
         }
     }
 }
 
 impl MsgRequest {
-
-    pub fn new<M>(method: M) -> Result<Self,MsgErr> where M: TryInto<MsgMethod,Error=MsgErr>{
+    pub fn new<M>(method: M) -> Result<Self, MsgErr>
+    where
+        M: TryInto<MsgMethod, Error = MsgErr>,
+    {
         Ok(MsgRequest {
             method: method.try_into()?,
             ..Default::default()

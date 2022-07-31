@@ -1,12 +1,11 @@
-use std::str::{FromStr, Split};
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::path::Path;
+use std::str::{FromStr, Split};
 
-use serde::{Deserialize, Serialize};
 use cosmic_api::id::ArtifactSubKind;
+use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
-
 
 #[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct ArtifactBundle {
@@ -183,7 +182,6 @@ impl SubSpaceName {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct ArtifactRef {
     pub point: Point,
@@ -198,7 +196,14 @@ impl ArtifactRef {
         }
     }
 
-    pub fn trailing_path(&self) -> Result<Path,Error> {
-        Ok(Path::from_str(self.point.segments.last().ok_or("expected one ResourcePath segment")?.to_string().as_str())?)
+    pub fn trailing_path(&self) -> Result<Path, Error> {
+        Ok(Path::from_str(
+            self.point
+                .segments
+                .last()
+                .ok_or("expected one ResourcePath segment")?
+                .to_string()
+                .as_str(),
+        )?)
     }
 }

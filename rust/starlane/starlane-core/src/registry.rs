@@ -2,6 +2,20 @@ use crate::error::Error;
 use crate::frame::{ResourceHostAction, StarMessagePayload};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
 
+use crate::databases::lookup_registry_db;
+use crate::particle::properties_config;
+use cosmic_api::command::request::delete::Delete;
+use cosmic_api::command::request::select::{SelectKind, SubSelect};
+use cosmic_api::id::id::{BaseKind, Kind, Tks};
+use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, UserBaseSubKind};
+use cosmic_api::parse::{CamelCase, Domain, SkewerCase};
+use cosmic_api::particle::particle::Details;
+use cosmic_api::security::{
+    Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask,
+    PermissionsMaskKind, Privilege, Privileges,
+};
+use cosmic_api::selector::selector::SubKindSelector;
+use cosmic_api::sys::{Location, ParticleRecord};
 use futures::{FutureExt, StreamExt};
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties, SetRegistry};
@@ -16,6 +30,7 @@ use mesh_portal::version::latest::entity::request::{Method, Rc};
 use mesh_portal::version::latest::id::{KindParts, Point, Specific, Version};
 use mesh_portal::version::latest::messaging::ReqShell;
 use mesh_portal::version::latest::particle::{Properties, Property, Status, Stub};
+use mesh_portal::version::latest::payload::{PayloadMap, PrimitiveList, Substance};
 use mesh_portal::version::latest::selector::specific::{
     ProductSelector, VariantSelector, VendorSelector,
 };
@@ -24,12 +39,6 @@ use mesh_portal::version::latest::selector::{
     PointSegSelector, PointSelector,
 };
 use mesh_portal::version::latest::util::ValuePattern;
-use cosmic_api::particle::particle::Details;
-use cosmic_api::security::{
-    Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask,
-    PermissionsMaskKind, Privilege, Privileges,
-};
-use cosmic_api::selector::selector::SubKindSelector;
 use mysql::prelude::TextQuery;
 use sqlx::postgres::{PgArguments, PgPoolOptions, PgRow};
 use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
@@ -40,16 +49,7 @@ use std::num::ParseIntError;
 use std::ops::{Deref, Index};
 use std::str::FromStr;
 use std::sync::Arc;
-use cosmic_api::command::request::delete::Delete;
-use cosmic_api::command::request::select::{SelectKind, SubSelect};
 use tokio::sync::mpsc;
-use mesh_portal::version::latest::payload::{Substance, PayloadMap, PrimitiveList};
-use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, UserBaseSubKind};
-use cosmic_api::id::id::{Kind, BaseKind, Tks};
-use cosmic_api::parse::{CamelCase, Domain, SkewerCase};
-use cosmic_api::sys::{Location, ParticleRecord};
-use crate::databases::lookup_registry_db;
-use crate::particle::properties_config;
 
 lazy_static! {
     pub static ref HYPERUSER: Point = Point::from_str("hyperspace:users:hyperuser").expect("point");
@@ -66,9 +66,7 @@ impl Registry {
         let db = lookup_registry_db();
         let pool = PgPoolOptions::new()
             .max_connections(5)
-            .connect(
-               db.to_uri().as_str(),
-            )
+            .connect(db.to_uri().as_str())
             .await?;
         let registry = Self { pool };
 
@@ -371,7 +369,7 @@ impl Registry {
         Ok(sequence.0)
     }
 
-    pub async fn get_properties( &self, point:&Point ) -> Result<Properties,Error> {
+    pub async fn get_properties(&self, point: &Point) -> Result<Properties, Error> {
         let parent = point.parent().ok_or("expected a parent")?;
         let point_segment = point
             .last_segment()
@@ -388,7 +386,6 @@ impl Registry {
     }
 
     pub async fn locate(&self, point: &Point) -> Result<ParticleRecord, Error> {
-
         if point.is_local_root() {
             return Ok(ParticleRecord::root());
         }
@@ -407,7 +404,7 @@ impl Registry {
         .bind(point_segment.clone())
         .fetch_one(&mut conn)
         .await?;
-        let mut record:ParticleRecord = record.into();
+        let mut record: ParticleRecord = record.into();
         let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut conn).await?;
         let mut map = HashMap::new();
         for p in properties {
@@ -444,7 +441,7 @@ impl Registry {
         return Ok(QueryResult::PointKindHierarchy(kind_path));
     }
 
-    pub async fn delete(&self, delete: &Delete ) -> Result<PrimitiveList, Error> {
+    pub async fn delete(&self, delete: &Delete) -> Result<PrimitiveList, Error> {
         let select = delete.clone().into();
         let list = self.select(&select).await?;
         if !list.is_empty() {
@@ -534,16 +531,14 @@ impl Registry {
                 GenericKindSelector::Any => {}
                 GenericKindSelector::Exact(kind) => match &hop.kind_selector.sub {
                     SubKindSelector::Any => {}
-                    SubKindSelector::Exact(sub) => {
-                        match sub {
-                            None => {}
-                            Some(sub) => {
-                                index = index + 1;
-                                where_clause.push_str(format!(" AND sub=${}", index).as_str());
-                                params.push(sub.to_string());
-                            }
+                    SubKindSelector::Exact(sub) => match sub {
+                        None => {}
+                        Some(sub) => {
+                            index = index + 1;
+                            where_clause.push_str(format!(" AND sub=${}", index).as_str());
+                            params.push(sub.to_string());
                         }
-                    }
+                    },
                 },
             }
 
@@ -553,7 +548,7 @@ impl Registry {
                 ValuePattern::Pattern(specific) => {
                     match &specific.provider {
                         VendorSelector::Any => {}
-                        VendorSelector::Exact(provider ) => {
+                        VendorSelector::Exact(provider) => {
                             index = index + 1;
                             where_clause.push_str(format!(" AND provider=${}", index).as_str());
                             params.push(provider.to_string());
@@ -601,7 +596,8 @@ impl Registry {
         let mut conn = self.pool.acquire().await?;
         let mut matching_so_far = query.fetch_all(&mut conn).await?;
 
-        let mut matching_so_far:Vec<ParticleRecord> = matching_so_far.into_iter().map(|m|m.into()).collect();
+        let mut matching_so_far: Vec<ParticleRecord> =
+            matching_so_far.into_iter().map(|m| m.into()).collect();
         let mut matching_so_far: Vec<Stub> =
             matching_so_far.into_iter().map(|r| r.into()).collect();
 
@@ -922,7 +918,7 @@ impl Registry {
     }
 }
 
-fn opt<S:ToString>(opt: &Option<S>) -> String {
+fn opt<S: ToString>(opt: &Option<S>) -> String {
     match opt {
         None => "null".to_string(),
         Some(value) => {
@@ -1072,11 +1068,10 @@ impl Into<ParticleRecord> for StarlaneParticleRecord {
     fn into(self) -> ParticleRecord {
         ParticleRecord {
             details: self.details,
-            location: self.location
+            location: self.location,
         }
     }
 }
-
 
 impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
@@ -1084,12 +1079,12 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
             let parent: String = row.get("parent");
             let point_segment: String = row.get("point_segment");
             let base: String = row.get("base");
-            let sub : Option<CamelCase> = match row.get("sub") {
+            let sub: Option<CamelCase> = match row.get("sub") {
                 Some(sub) => {
                     let sub: String = sub;
                     Some(CamelCase::from_str(sub.as_str())?)
                 }
-                None => None
+                None => None,
             };
 
             let provider: Option<String> = row.get("provider");
@@ -1105,35 +1100,31 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
             let point = point.push(point_segment)?;
             let base = BaseKind::from_str(base.as_str())?;
 
-            let specific =
-
-                if let Option::Some(provider) = provider {
-                    if let Option::Some(vendor) = vendor {
-                        if let Option::Some(product) = product {
-                            if let Option::Some(variant) = variant {
-                                if let Option::Some(version) = version {
-                                    let version = if let Option::Some(version_variant) = version_variant {
-                                        let version = format!("{}-{}", version, version_variant);
-                                        Version::from_str(version.as_str())?
-                                    } else {
-                                        Version::from_str(version.as_str())?
-                                    };
-
-                                    let provider = Domain::from_str(provider.as_str())?;
-                                    let vendor = Domain::from_str(vendor.as_str())?;
-                                    let product = SkewerCase::from_str(product.as_str())?;
-                                    let variant = SkewerCase::from_str(variant.as_str())?;
-
-                                    Some(Specific {
-                                        provider,
-                                        vendor,
-                                        product,
-                                        variant,
-                                        version,
-                                    })
+            let specific = if let Option::Some(provider) = provider {
+                if let Option::Some(vendor) = vendor {
+                    if let Option::Some(product) = product {
+                        if let Option::Some(variant) = variant {
+                            if let Option::Some(version) = version {
+                                let version = if let Option::Some(version_variant) = version_variant
+                                {
+                                    let version = format!("{}-{}", version, version_variant);
+                                    Version::from_str(version.as_str())?
                                 } else {
-                                    Option::None
-                                }
+                                    Version::from_str(version.as_str())?
+                                };
+
+                                let provider = Domain::from_str(provider.as_str())?;
+                                let vendor = Domain::from_str(vendor.as_str())?;
+                                let product = SkewerCase::from_str(product.as_str())?;
+                                let variant = SkewerCase::from_str(variant.as_str())?;
+
+                                Some(Specific {
+                                    provider,
+                                    vendor,
+                                    product,
+                                    variant,
+                                    version,
+                                })
                             } else {
                                 Option::None
                             }
@@ -1145,10 +1136,13 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
                     }
                 } else {
                     Option::None
-                };
+                }
+            } else {
+                Option::None
+            };
 
-            let kind = KindParts::new(base , sub, specific);
-            let kind:Kind = kind.try_into()?;
+            let kind = KindParts::new(base, sub, specific);
+            let kind: Kind = kind.try_into()?;
 
             let location = match location {
                 Some(location) => Location::Somewhere(Point::from_str(location.as_str())?),
@@ -1187,22 +1181,22 @@ pub mod test {
     use crate::error::Error;
     use crate::particle::Kind;
     use crate::registry::{Registration, Registry};
+    use cosmic_api::command::request::select::SelectKind;
+    use cosmic_api::entity::request::select::SelectKind;
+    use cosmic_api::id::id::{Kind, ToPoint};
+    use cosmic_api::id::UserBaseSubKind;
+    use cosmic_api::security::{
+        Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
+        Privilege,
+    };
     use mesh_portal::version::latest::entity::request::query::Query;
     use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoPayload};
     use mesh_portal::version::latest::id::Point;
     use mesh_portal::version::latest::particle::Status;
     use mesh_portal::version::latest::payload::Primitive;
     use mesh_portal::version::latest::selector::{PointKindHierarchy, PointSelector};
-    use cosmic_api::entity::request::select::SelectKind;
-    use cosmic_api::security::{
-        Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
-        Privilege,
-    };
     use std::convert::TryInto;
     use std::str::FromStr;
-    use cosmic_api::command::request::select::SelectKind;
-    use cosmic_api::id::id::{Kind, ToPoint};
-    use cosmic_api::id::UserBaseSubKind;
 
     #[tokio::test]
     pub async fn test_nuke() -> Result<(), Error> {
@@ -1238,7 +1232,7 @@ pub mod test {
         registry.register(&registration).await?;
 
         let location = StarKey::central().to_point();
-        registry.assign(&point, &location ).await?;
+        registry.assign(&point, &location).await?;
         registry.set_status(&point, &Status::Ready).await?;
         registry.sequence(&point).await?;
         let record = registry.locate(&point).await?;
@@ -1535,7 +1529,6 @@ impl From<Error> for RegError {
     }
 }
 
-
 impl<T> From<mpsc::error::SendError<T>> for RegError {
     fn from(e: mpsc::error::SendError<T>) -> Self {
         RegError::Error(e.into())
@@ -1547,7 +1540,6 @@ impl From<&str> for RegError {
         RegError::Error(e.into())
     }
 }
-
 
 impl From<RegError> for Error {
     fn from(r: RegError) -> Self {
@@ -1597,7 +1589,6 @@ impl RegistryParams {
             None => Option::None,
             Some(specific) => Option::Some(specific.provider.clone()),
         };
-
 
         let vendor = match &registration.kind.specific() {
             None => Option::None,
@@ -1691,7 +1682,7 @@ pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
             None => {
                 return Err("expected Sub for Artirtact".into());
             }
-            Some(sub ) => {
+            Some(sub) => {
                 let artifact_kind = ArtifactSubKind::from_str(sub.as_str())?;
                 return Ok(Kind::Artifact(artifact_kind));
             }
@@ -1702,7 +1693,8 @@ pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
                 return Err("SubKind must be set for UserBase<?>".into());
             }
             Some(sub) => {
-                let specific = Specific::from_str("starlane.io:redhat.com:keycloak:community:18.0.0")?;
+                let specific =
+                    Specific::from_str("starlane.io:redhat.com:keycloak:community:18.0.0")?;
                 let sub = UserBaseSubKind::OAuth(specific);
                 Kind::UserBase(sub)
             }
@@ -1734,11 +1726,14 @@ impl Registry {
             }
             GetOp::Properties(keys) => {
                 println!("GET PROPERTIES for {}", get.point.to_string());
-                let properties = self.get_properties(&get.point ).await?;
+                let properties = self.get_properties(&get.point).await?;
                 let mut map = PayloadMap::new();
                 for (index, property) in properties.iter().enumerate() {
                     println!("\tprop{}", property.0.clone());
-                    map.insert(property.0.clone(), Substance::Text(property.1.value.clone()));
+                    map.insert(
+                        property.0.clone(),
+                        Substance::Text(property.1.value.clone()),
+                    );
                 }
 
                 Ok(Substance::Map(map))
@@ -1759,8 +1754,8 @@ impl Registry {
                 }
                 let point = point?;
 
-                let properties = properties_config(&child_kind)
-                    .fill_create_defaults(&create.properties)?;
+                let properties =
+                    properties_config(&child_kind).fill_create_defaults(&create.properties)?;
                 properties_config(&child_kind).check_create(&properties)?;
 
                 let registration = Registration {
@@ -1800,9 +1795,7 @@ impl Registry {
                     };
 
                     match self.register(&registration).await {
-                        Ok(stub) => {
-                            return Ok(stub)
-                        }
+                        Ok(stub) => return Ok(stub),
                         Err(RegError::Dupe) => {
                             // continue loop
                         }
