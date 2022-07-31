@@ -1,18 +1,15 @@
-use crate::driver::{Driver, DriverFactory, DriverCtx, DriverSkel, DriverStatus, Item, ItemHandler, ItemSkel, HyperDriverFactory, HyperSkel};
+use crate::driver::{Driver, DriverFactory, DriverCtx, DriverSkel, DriverStatus, ItemDirectedHandler, ItemHandler, ItemSkel, HyperDriverFactory, HyperSkel, DriverRunnerRequest, Item};
 use crate::star::{LayerInjectionRouter, StarSkel};
-use crate::{Platform, Registry};
+use crate::{PlatErr, Platform, Registry};
 use cosmic_api::command::command::common::StateSrc;
-use cosmic_api::command::request::create::{Create, PointFactoryU64, TemplateDef};
+use cosmic_api::command::request::create::{Create, KindTemplate, PointFactory, PointFactoryU64, PointSegTemplate, PointTemplate, Strategy, Template, TemplateDef};
 use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{Kind, Layer, Point, Port, ToPoint, ToPort};
+use cosmic_api::id::id::{BaseKind, Kind, Layer, Point, Port, ToPoint, ToPort};
 use cosmic_api::id::{StarSub, TraversalInjection};
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{Assign, AssignmentKind, ControlPattern, Greet, InterchangeKind, Knock};
 use cosmic_api::wave::Agent::Anonymous;
-use cosmic_api::wave::{
-    Agent, CoreBounce, DirectedHandler, InCtx, ProtoTransmitter, ProtoTransmitterBuilder,
-    RootInCtx, Signal, UltraWave, Wave,
-};
+use cosmic_api::wave::{Agent, CoreBounce, DirectedHandler, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, Signal, UltraWave, Wave};
 use cosmic_api::wave::{DirectedHandlerSelector, SetStrategy, TxRouter};
 use cosmic_api::wave::{DirectedProto, RecipientSelector};
 use cosmic_api::{Registration, State};
@@ -25,6 +22,7 @@ use dashmap::DashMap;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
+use dashmap::mapref::one::Ref;
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 
 pub struct ControlDriverFactory<P>
@@ -46,7 +44,10 @@ where
     async fn create(&self, star: StarSkel<P>, driver: DriverSkel<P>, ctx: DriverCtx) -> Result<Box<dyn Driver<P>>, P::Err> {
         let skel = HyperSkel::new( star, driver );
         Ok(Box::new(ControlDriver {
-            skel
+            skel,
+            external_router: None,
+            ctxs: Arc::new(Default::default()),
+            fabric_routers: Arc::new(Default::default())
         }))
     }
 }
@@ -90,13 +91,17 @@ impl <P> HyperDriverFactory<P> for ControlFactory<P> where P: Platform{
     async fn create(&self, star: StarSkel<P>, driver: DriverSkel<P>, ctx: DriverCtx) -> Result<Box<dyn Driver<P>>, P::Err> {
         let skel = HyperSkel::new(star,driver);
 
-        Ok(Box::new(ControlDriver { skel }))
+        Ok(Box::new(ControlDriver { skel, external_router: None, ctxs: Arc::new(Default::default()), fabric_routers: Arc::new(Default::default()) }))
     }
 }
 
 #[derive(DirectedHandler)]
 pub struct ControlDriver<P> where P: Platform {
     pub skel: HyperSkel<P>,
+    pub external_router: Option<TxRouter>,
+    pub ctxs: Arc<DashMap<Point,ControlCtx<P>>>,
+    pub fabric_routers: Arc<DashMap<Point,LayerInjectionRouter<P>>>
+
 }
 
 #[derive(Clone)]
@@ -128,38 +133,206 @@ where
         Kind::Control
     }
 
-    async fn item(&self, point: &Point) -> Result<Box<dyn ItemHandler<P>>, P::Err> {
+    async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
+        self.skel.driver.status_tx.send(DriverStatus::Init).await;
+        let point = skel.point.clone();
+        let remote_point_factory =
+            Arc::new(ControlCreator::new( self.skel.clone(), self.fabric_routers.clone() ));
+        let auth = AnonHyperAuthenticatorAssignEndPoint::new(remote_point_factory);
+        let mut interchange = HyperwayInterchange::new(self.skel.driver.logger.clone());
+        let hyperway = Hyperway::new(Point::remote_endpoint().to_port(), Agent::HyperUser);
+        let ( tx, mut rx ) = hyperway.channel().await;
+        interchange.add(hyperway);
+        interchange.singular_to(Point::remote_endpoint().to_port());
+        let interchange = Arc::new(interchange);
+        let greeter = ControlGreeter::new(self.skel.clone(), self.skel.driver.point.push("controls".to_string()).unwrap());
+        self.external_router  = Some(TxRouter::new(tx));
+        let gate = Arc::new(InterchangeGate::new(auth, greeter, interchange, self.skel.driver.logger.clone() ));
+        {
+            let logger = self.skel.driver.logger.clone();
+            let fabric_routers = self.fabric_routers.clone();
+            tokio::spawn(async move {
+                while let Some(hop) = rx.recv().await {
+                    let remote = hop.from().clone().with_layer(Layer::Core);
+                    match fabric_routers.get(&remote.point)
+                    {
+                        None => {
+                            logger.warn("control not found");
+                        }
+                        Some(router) => {
+                            let router = router.value();
+                            match hop.unwrap_from_hop() {
+                                Ok(transport) => {
+                                    if transport.to.point == remote.point {
+                                        match transport.unwrap_from_transport()
+                                        {
+                                            Ok(wave) => {
+                                                router.route(wave).await;
+                                            }
+                                            Err(err) => {
+                                                logger.warn(format!("could not unwrap from Transport: {}", err.to_string()));
+                                            }
+                                        }
+                                    } else {
+                                        logger.warn("remote control cannot transport  to any other point than its remote self".to_string());
+                                    }
+                                }
+                                Err(err) => {
+                                    logger.warn(format!("could not unwrap from Hop: {}", err.to_string()));
+                                }
+                            }
+                        }
+                    }
+
+                }
+            });
+        }
+
+        self.skel
+            .star
+            .machine
+            .api
+            .add_interchange(
+                InterchangeKind::Control(ControlPattern::Star(self.skel.star.point.clone())),
+                gate.clone(),
+            )
+            .await?;
+
+        if self.skel.star.kind == StarSub::Machine {
+            self.skel
+                .star
+                .machine
+                .api
+                .add_interchange(InterchangeKind::Control(ControlPattern::Any), gate)
+                .await?;
+        }
+
+        self.skel.driver.status_tx.send(DriverStatus::Ready).await;
+
+        Ok(())
+    }
+
+    async fn item(&self, point: &Point) -> Result<ItemHandler<P>, P::Err> {
         todo!()
     }
 
-    async fn assign(&self, assign: Assign) -> Result<(), MsgErr> {
-        todo!()
-    }
+
 }
 
-#[derive(DirectedHandler)]
-pub struct Control<P> where P:Platform{
-   pub skel: HyperSkel<P>
+pub struct ControlCreator<P> where P: Platform {
+   pub skel: HyperSkel<P>,
+   pub fabric_routers: Arc<DashMap<Point,LayerInjectionRouter<P>>>,
+   pub controls: Point
 }
 
-impl<P> ItemHandler<P> for Control<P> where P: Platform {}
-
-impl <P> Item<P> for Control<P> where P: Platform{
-    type Skel = HyperSkel<P>;
-    type Ctx = ();
-    type State = ();
-
-    fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self {
+impl <P> ControlCreator<P> where P: Platform {
+    pub fn new(skel: HyperSkel<P>, fabric_routers: Arc<DashMap<Point,LayerInjectionRouter<P>>>) -> Self {
+        let controls = skel.driver.point.push("controls").unwrap();
         Self {
-            skel
+            skel,
+            fabric_routers,
+            controls
         }
     }
 }
 
-#[routes]
-impl <P> Control<P> where P: Platform {
-
+#[async_trait]
+impl <P> PointFactory for ControlCreator<P> where P: Platform {
+    async fn create(&self) -> Result<Point, MsgErr> {
+        let create = Create {
+            template: Template::new( PointTemplate { parent:self.controls.clone(), child_segment_template: PointSegTemplate::Pattern("control-%".to_string())}, KindTemplate{ base: BaseKind::Control, sub: None, specific: None }),
+            properties: Default::default(),
+            strategy: Strategy::Commit,
+            registry: Default::default(),
+            state: StateSrc::None,
+        };
+        let ctrl_stub = self.skel.driver.create(create).await.map_err(|e|e.to_cosmic_err())?;
+        let point = ctrl_stub.point;
+        let fabric_router = LayerInjectionRouter::new(self.skel.star.clone(), point.clone().to_port().with_layer(Layer::Core) );
+        self.fabric_routers.insert(point.clone(),fabric_router);
+        Ok(point)
+    }
 }
+
+
+#[derive(Clone)]
+pub struct ControlGreeter<P> where P: Platform{
+    pub skel: HyperSkel<P>,
+    pub controls: Point
+}
+
+impl <P> ControlGreeter<P> where P: Platform {
+    pub fn new( skel: HyperSkel<P>, controls: Point ) -> Self {
+        Self {
+            skel,
+            controls
+        }
+    }
+}
+
+
+
+#[async_trait]
+impl <P> HyperGreeter for ControlGreeter<P> where P: Platform{
+    async fn greet(&self, stub: HyperwayStub) -> Result<Greet,MsgErr> {
+
+        Ok(Greet {
+            port: stub.remote.clone(),
+            agent: stub.agent.clone(),
+            hop: Point::remote_endpoint().to_port().with_layer(Layer::Core),
+            transport: stub.remote.clone()
+        })
+    }
+}
+
+
+pub struct Control<P> where P:Platform{
+   pub skel: HyperSkel<P>,
+   pub ctx: ControlCtx<P>
+}
+
+impl <P> Item<P> for Control<P> where P: Platform{
+    type Skel = HyperSkel<P>;
+    type Ctx = ControlCtx<P>;
+    type State = ();
+
+    fn restore(skel: Self::Skel, ctx: Self::Ctx, _: Self::State) -> Self {
+        Self {
+            skel,
+            ctx
+        }
+    }
+}
+
+#[async_trait]
+impl <P> Router for Control<P> where P: Platform {
+    async fn route(&self, wave: UltraWave) {
+        self.ctx.router.route(wave).await;
+    }
+
+    fn route_sync(&self, wave: UltraWave) {
+        self.ctx.router.route_sync(wave);
+    }
+}
+
+
+#[derive(Clone)]
+pub struct ControlCtx<P> where P: Platform {
+   pub phantom: PhantomData<P>,
+   pub router: TxRouter
+}
+
+impl <P> ControlCtx<P> where P: Platform {
+    pub fn new(tx: mpsc::Sender<UltraWave>) -> Self {
+        let router = TxRouter::new(tx);
+        Self {
+            phantom: Default::default(),
+            router
+        }
+    }
+}
+
+
 
 /*
 pub enum ControlCall<P>

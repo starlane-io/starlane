@@ -272,6 +272,21 @@ impl From<oneshot::error::RecvError> for TestErr {
     }
 }
 
+impl From<String> for TestErr {
+    fn from(err: String) -> Self {
+        TestErr {
+            message: err
+        }
+    }
+}
+
+impl From<&'static str> for TestErr {
+    fn from(err: &'static str) -> Self {
+        TestErr {
+            message: err.to_string()
+        }
+    }
+}
 impl From<MsgErr> for TestErr {
     fn from(err: MsgErr) -> Self {
         Self {

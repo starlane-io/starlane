@@ -113,6 +113,10 @@ impl Hyperway {
             drop_tx,
         }
     }
+
+    pub async fn channel(&self) -> (mpsc::Sender<UltraWave>, mpsc::Receiver<UltraWave>) {
+        (self.outbound.tx(),self.outbound.rx().await)
+    }
 }
 
 #[cfg(test)]

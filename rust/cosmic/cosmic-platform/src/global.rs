@@ -28,7 +28,7 @@ pub struct Global<P> where P: Platform {
 
  */
 
-use crate::driver::{Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler};
+use crate::driver::{Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item,  ItemHandler};
 use crate::star::StarSkel;
 use cosmic_api::config::config::bind::RouteSelector;
 use cosmic_api::parse::route_attribute;
@@ -94,7 +94,7 @@ where
         Kind::Global
     }
 
-    async fn init(&self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
+    async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
         let point = self.skel.machine.global.clone().point;
         let registration = Registration {
             point: point.clone(),
@@ -119,16 +119,16 @@ where
         Ok(())
     }
 
-    async fn item(&self, point: &Point) -> Result<Box<dyn ItemHandler<P>>, P::Err> {
+    async fn item(&self, point: &Point) -> Result<ItemHandler<P>, P::Err> {
         if *point == self.skel.machine.global.point {
-            Ok(Box::new(GlobalCore::restore(self.skel.clone(), (), ())))
+            Ok(ItemHandler::Handler(Box::new(GlobalCore::restore(self.skel.clone(), (), ()))))
         } else {
             Err(MsgErr::not_found().into())
         }
     }
 
-    async fn assign(&self, assign: Assign) -> Result<(), MsgErr> {
-        Err(MsgErr::forbidden())
+    async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
+        Err(MsgErr::forbidden().into())
     }
 }
 
@@ -150,7 +150,6 @@ where
     skel: StarSkel<P>,
 }
 
-impl<P> ItemHandler<P> for GlobalCore<P> where P: Platform {}
 
 impl<P> Item<P> for GlobalCore<P>
 where

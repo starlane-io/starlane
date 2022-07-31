@@ -1,4 +1,4 @@
-use crate::driver::{Driver, DriverDriver, DriverDriverFactory, DriverFactory, DriverCtx, DriverSkel, DriverStatus, Drivers, DriversApi, DriversCall, Item, ItemHandler, ItemSkel, HyperDriverFactory};
+use crate::driver::{Driver, DriverDriver, DriverDriverFactory, DriverFactory, DriverCtx, DriverSkel, DriverStatus, Drivers, DriversApi, DriversCall, ItemDirectedHandler, ItemHandler, ItemSkel, HyperDriverFactory, Item};
 use crate::field::{FieldEx, FieldState};
 use crate::machine::MachineSkel;
 use crate::shell::ShellEx;
@@ -668,7 +668,10 @@ where
                             status_tx.send(Status::Fatal).await;
                         }
                     }
-                    drivers.status_changed().await.unwrap();
+                    match drivers.status_changed().await {
+                        Ok(_) => {}
+                        Err(_) => {break;}
+                    }
                 }
             });
         }
@@ -1652,11 +1655,11 @@ where
         Kind::Star(self.star_skel.kind.clone())
     }
 
-    async fn item(&self, point: &Point) -> Result<Box<dyn ItemHandler<P>>, P::Err> {
-        Ok(Box::new(StarCore::restore(self.star_skel.clone(), (), ())))
+    async fn item(&self, point: &Point) -> Result<ItemHandler<P>, P::Err> {
+        Ok(ItemHandler::Handler(Box::new(StarCore::restore(self.star_skel.clone(), (), ()))))
     }
 
-    async fn assign(&self, assign: Assign) -> Result<(), MsgErr> {
+    async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
         Err("only allowed one Star per StarDriver".into())
     }
 }
@@ -1672,7 +1675,6 @@ where
     pub skel: StarSkel<P>,
 }
 
-impl<P> ItemHandler<P> for StarCore<P> where P: 'static + Platform {}
 
 impl<P> Item<P> for StarCore<P>
 where
@@ -1693,7 +1695,7 @@ where
     P: Platform,
 {
     #[route("Sys<Assign>")]
-    pub async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, MsgErr> {
+    pub async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, P::Err> {
         if let Sys::Assign(assign) = ctx.input {
             #[cfg(test)]
             self.skel

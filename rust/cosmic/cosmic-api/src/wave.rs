@@ -3119,6 +3119,9 @@ where
     }
 }
 
+
+
+
 pub trait TransportPlanner {
     fn dest(&self, port: Port) -> Port;
 }
@@ -3140,7 +3143,7 @@ pub trait DirectedHandlerSelector {
 }
 
 #[async_trait]
-pub trait DirectedHandler {
+pub trait DirectedHandler: Send+Sync {
     async fn handle(&self, ctx: RootInCtx) -> CoreBounce;
 }
 

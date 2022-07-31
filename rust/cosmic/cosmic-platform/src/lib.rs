@@ -266,7 +266,7 @@ where P: Platform, P::Err: PlatErr
 
  */
 
-pub trait PlatErr: Sized + Send + Sync + ToString + Clone + Into<MsgErr> + From<MsgErr> {
+pub trait PlatErr: Sized + Send + Sync + ToString + Clone + Into<MsgErr> + From<MsgErr> +From<String> +From<&'static str> {
     fn to_cosmic_err(&self) -> MsgErr;
 
     fn new<S>(message: S) -> Self
