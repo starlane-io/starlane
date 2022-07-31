@@ -35,7 +35,7 @@ use cosmic_api::substance::substance::{Substance, SubstanceList, Token};
 use cosmic_api::sys::ParticleRecord;
 use cosmic_api::wave::{ReflectedCore, UltraWave};
 use cosmic_api::{ArtifactApi, IndexedAccessGrant, Registration};
-use cosmic_hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayExtFactory};
+use cosmic_hyperlane::{HyperAuthenticator, HyperGate, HyperGateSelector, HyperwayExtFactory};
 use http::StatusCode;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
@@ -331,7 +331,7 @@ where
     async fn global_registry(&self) -> Result<Registry<Self>, Self::Err>;
     async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>, Self::Err>;
     fn artifact_hub(&self) -> ArtifactApi;
-    fn start_services(&self, entry_router: &mut HyperGateSelector);
+    fn start_services(&self, gate: &Arc<dyn HyperGate>);
 
     fn default_implementation(&self, template: &KindTemplate) -> Result<Kind, MsgErr> {
         let base: BaseKind = BaseKind::from_str(template.base.to_string().as_str())?;

@@ -59,6 +59,12 @@ where
         rtn_rx.await?
     }
 
+    pub async fn knock(&self, knock: Knock ) -> Result<HyperwayExt,HyperConnectionErr> {
+        let (rtn,rtn_rx) = oneshot::channel();
+        self.tx.send(MachineCall::Knock {knock, rtn}).await;
+        rtn_rx.await.map_err(|e|HyperConnectionErr::Retry(e.to_string().into()))?
+    }
+
     pub fn terminate(&self) {
         self.tx.try_send(MachineCall::Terminate);
     }
@@ -85,6 +91,7 @@ where
             }
         }
     }
+
 
     #[cfg(test)]
     pub async fn get_machine_star(&self) -> Result<StarApi<P>, MsgErr> {
@@ -119,7 +126,7 @@ where
     pub skel: MachineSkel<P>,
     pub stars: Arc<HashMap<Point, StarApi<P>>>,
     pub machine_star: StarApi<P>,
-    pub gate_selector: HyperGateSelector,
+    pub gate_selector: Arc<HyperGateSelector>,
     pub call_tx: mpsc::Sender<MachineCall<P>>,
     pub call_rx: mpsc::Receiver<MachineCall<P>>,
     pub termination_broadcast_tx: broadcast::Sender<Result<(), P::Err>>,
@@ -255,9 +262,9 @@ where
             stars.insert(star_point.clone(), star_api);
         }
 
-        let mut gate_selector = HyperGateSelector::new(gates);
-
-        skel.platform.start_services(&mut gate_selector);
+        let mut gate_selector = Arc::new(HyperGateSelector::new(gates));
+        let gate : Arc<dyn HyperGate> = gate_selector.clone();
+        skel.platform.start_services(&gate);
 
         let (machine_point, machine_star) = stars
             .iter()
@@ -401,6 +408,7 @@ where
                             .unwrap_or_default();
                     });
                 }
+
                 #[cfg(test)]
                 MachineCall::GetMachineStar(tx) => {
                     tx.send(self.machine_star.clone());

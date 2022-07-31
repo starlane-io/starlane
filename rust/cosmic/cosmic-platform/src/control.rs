@@ -138,7 +138,7 @@ where
         let point = skel.point.clone();
         let remote_point_factory =
             Arc::new(ControlCreator::new( self.skel.clone(), self.fabric_routers.clone() ));
-        let auth = AnonHyperAuthenticatorAssignEndPoint::new(remote_point_factory);
+        let auth = AnonHyperAuthenticatorAssignEndPoint::new(remote_point_factory, self.skel.driver.logger.clone() );
         let mut interchange = HyperwayInterchange::new(self.skel.driver.logger.clone());
         let hyperway = Hyperway::new(Point::remote_endpoint().to_port(), Agent::HyperUser);
         let ( tx, mut rx ) = hyperway.channel().await;
@@ -203,7 +203,7 @@ where
                 .star
                 .machine
                 .api
-                .add_interchange(InterchangeKind::Control(ControlPattern::Any), gate)
+                .add_interchange(InterchangeKind::DefaultControl, gate)
                 .await?;
         }
 
@@ -275,7 +275,7 @@ impl <P> ControlGreeter<P> where P: Platform {
 #[async_trait]
 impl <P> HyperGreeter for ControlGreeter<P> where P: Platform{
     async fn greet(&self, stub: HyperwayStub) -> Result<Greet,MsgErr> {
-
+println!("GREETING!");
         Ok(Greet {
             port: stub.remote.clone(),
             agent: stub.agent.clone(),

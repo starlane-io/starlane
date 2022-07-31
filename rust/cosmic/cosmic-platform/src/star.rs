@@ -311,11 +311,6 @@ where
     },
     TraverseToNextLayer(Traversal<UltraWave>),
     LayerTraversalInjection(TraversalInjection),
-    CreateMount {
-        agent: Agent,
-        kind: MountKind,
-        rtn: oneshot::Sender<Result<HyperwayExt, P::Err>>,
-    },
     ToDriver(Traversal<UltraWave>),
     Phantom(PhantomData<P>),
     ToGravity(UltraWave),
@@ -476,16 +471,6 @@ where
         self.tx.send(StarCall::Init).await;
     }
 
-    pub async fn create_mount(&self, agent: Agent, kind: MountKind) -> Result<HyperwayExt, P::Err>
-    where
-        <P as Platform>::Err: From<tokio::sync::oneshot::error::RecvError>,
-    {
-        let (rtn, mut rtn_rx) = oneshot::channel();
-        self.tx
-            .send(StarCall::CreateMount { agent, kind, rtn })
-            .await;
-        rtn_rx.await?
-    }
 
     pub async fn from_hyperway(&self, wave: UltraWave, results: bool) -> Result<(), MsgErr> {
         match results {
@@ -552,7 +537,6 @@ where
     star_rx: mpsc::Receiver<StarCall<P>>,
     drivers: DriversApi<P>,
     injector: Port,
-    mounts: HashMap<Point, StarMount>,
     forwarders: Vec<Point>,
     golden_path: DashMap<StarKey, StarKey>,
     hyperway_transmitter: ProtoTransmitter,
@@ -685,7 +669,6 @@ where
                 star_rx,
                 drivers,
                 injector,
-                mounts: HashMap::new(),
                 golden_path,
                 hyperway_transmitter,
                 forwarders,
@@ -736,13 +719,7 @@ where
                                 .await;
                         });
                     }
-                    StarCall::CreateMount {
-                        agent,
-                        kind,
-                        rtn: rtn,
-                    } => {
-                        rtn.send(self.create_mount(agent, kind).await);
-                    }
+
                     StarCall::Stub(rtn) => {
                         rtn.send(self.skel.stub());
                     }
@@ -908,56 +885,6 @@ where
         } else {
             unimplemented!("need to now send out a ripple search for the star being transported to")
         }
-    }
-
-    async fn create_mount(&mut self, agent: Agent, kind: MountKind) -> Result<HyperwayExt, P::Err> {
-        let point = self.skel.point.clone().push("controls").unwrap();
-        let index = self.skel.registry.sequence(&point).await?;
-        let point = point.push(format!("control-{}", index)).unwrap();
-        let registration = Registration {
-            point: point.clone(),
-            kind: kind.kind(),
-            registry: Default::default(),
-            properties: Default::default(),
-            owner: agent.clone().to_point(),
-            strategy: Strategy::Commit,
-        };
-        self.skel
-            .registry
-            .register(&registration)
-            .await
-            .map_err(|e| e.to_cosmic_err())?;
-        self.skel
-            .registry
-            .assign(&point, self.skel.location())
-            .await
-            .map_err(|e| e.to_cosmic_err())?;
-
-        let (in_mount_tx, mut in_mount_rx) = mpsc::channel(32 * 1024);
-        let (out_mount_tx, out_mount_rx) = mpsc::channel(32 * 1024);
-
-        let hyperway = HyperwayExt::new(in_mount_tx, out_mount_rx);
-
-        let inject_tx = self.skel.inject_tx.clone();
-        {
-            let point = point.clone();
-            tokio::spawn(async move {
-                let port = point.to_port().with_layer(Layer::Core);
-                while let Some(wave) = in_mount_rx.recv().await {
-                    let inject = TraversalInjection::new(port.clone(), wave);
-                    inject_tx.send(inject).await;
-                }
-            });
-        }
-
-        let mount = StarMount {
-            point: point.clone(),
-            kind,
-            tx: out_mount_tx,
-        };
-
-        self.mounts.insert(point, mount);
-        Ok(hyperway)
     }
 
     async fn find_next_hop(&self, star_key: &StarKey) -> Result<Option<StarKey>, MsgErr> {

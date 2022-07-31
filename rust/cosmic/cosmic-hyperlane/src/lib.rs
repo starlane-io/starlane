@@ -32,7 +32,7 @@ use tokio::select;
 use tokio::sync::mpsc::error::{SendError, SendTimeoutError, TrySendError};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot::Sender;
-use tokio::sync::{broadcast, mpsc, oneshot, Mutex, RwLock};
+use tokio::sync::{broadcast, mpsc, oneshot, Mutex, RwLock, watch};
 
 #[macro_use]
 extern crate async_trait;
@@ -681,13 +681,15 @@ impl HyperAuthenticator for AnonHyperAuthenticator {
 
 #[derive(Clone)]
 pub struct AnonHyperAuthenticatorAssignEndPoint {
+    pub logger: PointLogger,
     pub remote_point_factory: Arc<dyn PointFactory>,
 }
 
 impl AnonHyperAuthenticatorAssignEndPoint {
-    pub fn new(remote_point_factory: Arc<dyn PointFactory>) -> Self {
+    pub fn new(remote_point_factory: Arc<dyn PointFactory>, logger: PointLogger) -> Self {
         Self {
             remote_point_factory,
+            logger
         }
     }
 }
@@ -695,7 +697,9 @@ impl AnonHyperAuthenticatorAssignEndPoint {
 #[async_trait]
 impl HyperAuthenticator for AnonHyperAuthenticatorAssignEndPoint {
     async fn auth(&self, knock: Knock) -> Result<HyperwayStub, HyperConnectionErr> {
-        let remote = self.remote_point_factory.create().await?.to_port();
+println!("AUTH");
+        let remote = self.logger.result(self.remote_point_factory.create().await)?.to_port();
+println!("REMOTE: {}", remote.to_string());
 
         Ok(HyperwayStub {
             agent: Agent::Anonymous,
@@ -1115,39 +1119,65 @@ where
 pub struct HyperClient {
     pub stub: HyperwayStub,
     tx: mpsc::Sender<UltraWave>,
-    status_tx: broadcast::Sender<HyperClientStatus>,
+    status_rx: watch::Receiver<HyperClientStatus>,
     to_client_listener_tx: broadcast::Sender<UltraWave>,
+    logger: PointLogger
 }
 
 impl HyperClient {
     pub fn new(
         stub: HyperwayStub,
         factory: Box<dyn HyperwayExtFactory>,
+        logger: PointLogger
     ) -> Result<HyperClient, MsgErr> {
         let (to_client_listener_tx, _) = broadcast::channel(1024);
         let (to_hyperway_tx, from_client_rx) = mpsc::channel(1024);
-        let (status_tx, mut status_rx) = broadcast::channel(1);
+        let (status_tx, mut status_rx) = watch::channel(HyperClientStatus::Pending );
 
-        let mut from_runner_rx = HyperClientRunner::new(factory, from_client_rx, status_tx.clone());
+        let mut from_runner_rx = HyperClientRunner::new(factory, from_client_rx, status_tx, logger.clone());
 
         let mut client = Self {
             stub,
             tx: to_hyperway_tx,
-            status_tx: status_tx.clone(),
+            status_rx: status_rx.clone(),
             to_client_listener_tx: to_client_listener_tx.clone(),
+            logger: logger.clone()
         };
+
+        {
+            let logger = logger.clone();
+            tokio::spawn(async move {
+                while let Ok(_) = status_rx.changed().await {
+                    let status = status_rx.borrow().clone();
+                    logger.info(format!("status: {}", status.to_string()))
+                }
+            });
+        }
 
         tokio::spawn(async move {
             async fn relay(
                 mut from_runner_rx: mpsc::Receiver<UltraWave>,
                 to_client_listener_tx: broadcast::Sender<UltraWave>,
             ) -> Result<(), MsgErr> {
+println!("spawing relay...");
+
+                if let Some(wave) = from_runner_rx.recv().await {
+println!("GOT ULTRA WAVE...");
+                    let reflected = wave.to_reflected()?;
+                    if !reflected.core().status.is_success() {
+                        return Err(MsgErr::from_status(reflected.core().status.as_u16()));
+                    }
+                    if let Substance::Greet(greet) = &reflected.core().body {
+                        println!("GREET: {}", greet.port.to_string() );
+                    }
+                }
+
                 while let Some(wave) = from_runner_rx.recv().await {
                     to_client_listener_tx.send(wave)?;
                 }
                 Ok(())
             }
-            relay(from_runner_rx, to_client_listener_tx).await;
+            logger.result(relay(from_runner_rx, to_client_listener_tx).await).unwrap_or_default();
         });
 
         Ok(client)
@@ -1176,12 +1206,14 @@ impl HyperClient {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone,strum_macros::Display)]
 pub enum HyperClientStatus {
     Unknown,
+    Pending,
     Connecting,
     Ready,
     Panic,
+    Fatal
 }
 
 pub enum HyperClientCall {
@@ -1190,28 +1222,39 @@ pub enum HyperClientCall {
 
 pub enum HyperConnectionErr {
     Fatal(String),
-    Retry,
+    Retry(String),
+}
+
+impl ToString for HyperConnectionErr {
+    fn to_string(&self) -> String {
+        match self {
+            HyperConnectionErr::Fatal(m) => format!("Fatal({})",m),
+            HyperConnectionErr::Retry(m) => format!("Retry({})",m),
+        }
+    }
 }
 
 impl From<MsgErr> for HyperConnectionErr {
-    fn from(_: MsgErr) -> Self {
-        HyperConnectionErr::Retry
+    fn from(err: MsgErr) -> Self {
+        HyperConnectionErr::Retry(err.to_string())
     }
 }
 
 pub struct HyperClientRunner {
     ext: Option<HyperwayExt>,
     factory: Box<dyn HyperwayExtFactory>,
-    status_tx: broadcast::Sender<HyperClientStatus>,
+    status_tx: watch::Sender<HyperClientStatus>,
     to_client_tx: mpsc::Sender<UltraWave>,
     from_client_rx: mpsc::Receiver<UltraWave>,
+    logger: PointLogger
 }
 
 impl HyperClientRunner {
     pub fn new(
         factory: Box<dyn HyperwayExtFactory>,
         from_client_rx: mpsc::Receiver<UltraWave>,
-        status_tx: broadcast::Sender<HyperClientStatus>,
+        status_tx: watch::Sender<HyperClientStatus>,
+        logger: PointLogger
     ) -> mpsc::Receiver<UltraWave> {
         let (to_client_tx, from_runner_rx) = mpsc::channel(1024);
         let runner = Self {
@@ -1220,6 +1263,7 @@ impl HyperClientRunner {
             to_client_tx,
             from_client_rx,
             status_tx,
+            logger
         };
 
         tokio::spawn(async move {
@@ -1230,28 +1274,28 @@ impl HyperClientRunner {
     }
 
     async fn start(mut self) {
-        self.status_tx.send(HyperClientStatus::Unknown);
+        self.status_tx.send(HyperClientStatus::Pending);
         loop {
             async fn connect(runner: &mut HyperClientRunner) -> Result<(), HyperConnectionErr> {
                 runner.status_tx.send(HyperClientStatus::Connecting);
                 loop {
-                    match tokio::time::timeout(Duration::from_secs(30), runner.factory.create())
-                        .await
+                    match runner.logger.result(tokio::time::timeout(Duration::from_secs(30), runner.factory.create())
+                        .await)
                     {
                         Ok(Ok(ext)) => {
+                            runner.logger.info("replacing HyperwayExt");
                             runner.ext.replace(ext);
                             runner.status_tx.send(HyperClientStatus::Ready);
                             return Ok(());
                         }
-                        _ => {
-                            // we eventually need to know WHY it failed... if it was that
-                            // credentials were rejected, then this client must halt and
-                            // not attempt to reconnect... if it was a timeout we need to keep retrying
+                        Ok(Err(err)) => {
+                           runner.logger.error(format!("{}",err.to_string()));
                         }
-                    }
+                        _ => {}
+                   }
                     // wait a little while before attempting to reconnect
                     // maybe add exponential backoff later
-                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    tokio::time::sleep(Duration::from_secs(5)).await;
                 }
             }
 
@@ -1301,10 +1345,12 @@ impl HyperClientRunner {
                     Ok(_) => {}
                     Err(HyperConnectionErr::Fatal(message)) => {
                         // need to log the fatal error message somehow
-                        self.status_tx.send(HyperClientStatus::Panic);
+                        self.status_tx.send(HyperClientStatus::Fatal);
                         return;
                     }
-                    Err(HyperConnectionErr::Retry) => {}
+                    Err(HyperConnectionErr::Retry(m)) => {
+                        self.status_tx.send(HyperClientStatus::Panic);
+                    }
                 }
 
                 match relay(&mut self).await {

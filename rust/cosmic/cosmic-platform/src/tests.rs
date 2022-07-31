@@ -6,10 +6,10 @@ use cosmic_api::command::command::common::StateSrc;
 use cosmic_api::id::id::{Layer, ToPoint, ToPort, Uuid};
 use cosmic_api::id::TraversalDirection;
 use cosmic_api::msg::MsgMethod;
-use cosmic_api::sys::{Assign, AssignmentKind, Sys};
+use cosmic_api::sys::{Assign, AssignmentKind, InterchangeKind, Knock, Sys};
 use cosmic_api::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, HyperWave, SysMethod};
 use cosmic_api::{MountKind, NoDiceArtifactFetcher, HYPERUSER};
-use cosmic_hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
+use cosmic_hyperlane::{AnonHyperAuthenticator, HyperClient, HyperConnectionErr, HyperGate, HyperwayExt, HyperwayStub, LocalHyperwayGateJumper};
 use dashmap::DashMap;
 use std::io::Error;
 use std::sync::atomic;
@@ -19,6 +19,7 @@ use tokio::join;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{oneshot, Mutex};
+use cosmic_api::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
 use crate::control::ControlDriverFactory;
 //use crate::control::ControlDriverFactory;
 use crate::driver::DriverFactory;
@@ -90,7 +91,7 @@ impl Platform for TestPlatform {
         ArtifactApi::new(Arc::new(NoDiceArtifactFetcher::new()))
     }
 
-    fn start_services(&self, entry_router: &mut HyperGateSelector) {}
+    fn start_services(&self, gate: &Arc<dyn HyperGate>) {}
 }
 
 #[derive(Clone)]
@@ -775,14 +776,42 @@ fn test_control() -> Result<(), TestErr> {
 
         let platform = TestPlatform::new();
         let machine_api = platform.machine();
+        let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
+        let logger = logger.point( Point::from_str("client").unwrap());
+
         tokio::time::timeout(Duration::from_secs(10), machine_api.wait_ready())
             .await
             .unwrap();
+
+        let stub = HyperwayStub::new( Point::remote_endpoint().to_port(),  Agent::HyperUser );
+        pub struct MachineApiExtFactory<P> where P: Platform {
+            machine_api: MachineApi<P>,
+            logger: PointLogger
+        }
+
+        #[async_trait]
+        impl <P> HyperwayExtFactory for MachineApiExtFactory<P> where P:Platform {
+            async fn create(&self) -> Result<HyperwayExt, HyperConnectionErr> {
+                let knock = Knock {
+                    kind: InterchangeKind::DefaultControl,
+                    auth: Box::new(Substance::Empty),
+                    remote: None
+                };
+println!("SENDING KNOCK");
+                self.logger.result_ctx("machine_api.knock()",self.machine_api.knock(knock).await)
+            }
+        }
+        let factory = MachineApiExtFactory{
+            machine_api,
+            logger: logger.clone()
+        };
+        let client = HyperClient::new(stub,Box::new(factory), logger ).unwrap();
+
         //tokio::time::timeout( Duration::from_secs(15), machine_api.wait_ready()).await;
         //tokio::time::timeout( Duration::from_secs(15), machine_api.wait_ready()).await;
         //        machine_api.wait_ready().await;
 
-        let star_api = machine_api.get_machine_star().await.unwrap();
+
 
         // tokio::time::sleep(Duration::from_secs(8)).await;
         /*
@@ -800,6 +829,7 @@ fn test_control() -> Result<(), TestErr> {
         // final_rx.await;
 
         //let stub = star_api.stub().await.unwrap();
+        tokio::time::sleep(Duration::from_secs(10)).await;
         Ok(())
     })
 }
