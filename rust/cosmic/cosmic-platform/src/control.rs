@@ -1,6 +1,4 @@
-use crate::driver::{
-    Driver, DriverFactory, DriverInitCtx, DriverSkel, DriverStatus, Item, ItemSkel,
-};
+use crate::driver::{Driver, DriverFactory, DriverCtx, DriverSkel, DriverStatus, Item, ItemHandler, ItemSkel, HyperDriverFactory, HyperSkel};
 use crate::star::{LayerInjectionRouter, StarSkel};
 use crate::{Platform, Registry};
 use cosmic_api::command::command::common::StateSrc;
@@ -29,7 +27,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 
-/*
 pub struct ControlDriverFactory<P>
 where
     P: Platform,
@@ -37,7 +34,8 @@ where
     phantom: PhantomData<P>,
 }
 
-impl<P> DriverFactory<P> for ControlDriverFactory<P>
+#[async_trait]
+impl<P> HyperDriverFactory<P> for ControlDriverFactory<P>
 where
     P: Platform,
 {
@@ -45,8 +43,11 @@ where
         Kind::Control
     }
 
-    async fn init(&self, skel: DriverSkel<P>, ctx: &DriverInitCtx) -> Result<Box<dyn Driver<P>>, MsgErr> {
-        todo!()
+    async fn create(&self, star: StarSkel<P>, driver: DriverSkel<P>, ctx: DriverCtx) -> Result<Box<dyn Driver<P>>, P::Err> {
+        let skel = HyperSkel::new( star, driver );
+        Ok(Box::new(ControlDriver {
+            skel
+        }))
     }
 }
 
@@ -54,49 +55,69 @@ impl<P> ControlDriverFactory<P>
 where
     P: Platform,
 {
-    pub fn new() -> Self {
+    pub fn new(skel: StarSkel<P>) -> Self {
         Self {
             phantom: Default::default(),
         }
     }
 }
 
-#[derive(DirectedHandler)]
-pub struct ControlDriver<P>
-where
-    P: Platform,
-{
-    states: Arc<DashMap<Point, Arc<RwLock<ControlState>>>>,
-    skel: DriverSkel<P>,
-    runner_tx: mpsc::Sender<ControlCall<P>>,
-}
+
 use cosmic_api::config::config::bind::RouteSelector;
 use cosmic_api::parse::route_attribute;
 use cosmic_api::particle::particle::{Details, Status, Stub};
 use cosmic_api::util::log;
 use cosmic_api::wave::ReflectedCore;
 
+pub struct ControlFactory<P> where P: Platform {
+   phantom: PhantomData<P>
+}
+
+impl <P> ControlFactory<P> where P: Platform {
+    pub fn new() -> Self {
+        Self {
+            phantom: Default::default()
+        }
+    }
+}
+
+#[async_trait]
+impl <P> HyperDriverFactory<P> for ControlFactory<P> where P: Platform{
+    fn kind(&self) -> Kind {
+        Kind::Control
+    }
+
+    async fn create(&self, star: StarSkel<P>, driver: DriverSkel<P>, ctx: DriverCtx) -> Result<Box<dyn Driver<P>>, P::Err> {
+        let skel = HyperSkel::new(star,driver);
+
+        Ok(Box::new(ControlDriver { skel }))
+    }
+}
+
+#[derive(DirectedHandler)]
+pub struct ControlDriver<P> where P: Platform {
+    pub skel: HyperSkel<P>,
+}
+
+#[derive(Clone)]
+pub struct ControlSkel<P> where P: Platform {
+    pub star: StarSkel<P>,
+    pub driver: DriverSkel<P>
+}
+
 #[routes]
 impl<P> ControlDriver<P>
 where
     P: Platform,
 {
-    fn new(skel: DriverSkel<P>) -> Self {
-        let states = Arc::new(DashMap::new());
-        let runner_tx = ControlDriverRunner::new(skel.clone(), states.clone());
-        Self {
-            skel,
-            states,
-            runner_tx,
-        }
-    }
-
     #[route("Cmd<Bounce>")]
     pub async fn bounce(&self, ctx: InCtx<'_, ()>) -> Result<ReflectedCore, MsgErr> {
         let mut core = ReflectedCore::new();
         Ok(core)
     }
 }
+
+
 
 #[async_trait]
 impl<P> Driver<P> for ControlDriver<P>
@@ -107,29 +128,40 @@ where
         Kind::Control
     }
 
-    async fn item(&self, point: &Point) -> Result<Box<dyn Item<P>>, MsgErr> {
-        let (rtn, mut rtn_rx) = oneshot::channel();
-        self.runner_tx
-            .send(ControlCall::GetCore {
-                point: point.clone(),
-                rtn,
-            })
-            .await;
-        let core = rtn_rx.await??;
-        let core = Box::new(core);
-        Ok(core)
+    async fn item(&self, point: &Point) -> Result<Box<dyn ItemHandler<P>>, P::Err> {
+        todo!()
     }
 
     async fn assign(&self, assign: Assign) -> Result<(), MsgErr> {
-        let (rtn, mut rtn_rx) = oneshot::channel();
-        self.runner_tx
-            .send(ControlCall::Assign { assign, rtn })
-            .await;
-        rtn_rx.await??;
-        Ok(())
+        todo!()
     }
 }
 
+#[derive(DirectedHandler)]
+pub struct Control<P> where P:Platform{
+   pub skel: HyperSkel<P>
+}
+
+impl<P> ItemHandler<P> for Control<P> where P: Platform {}
+
+impl <P> Item<P> for Control<P> where P: Platform{
+    type Skel = HyperSkel<P>;
+    type Ctx = ();
+    type State = ();
+
+    fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self {
+        Self {
+            skel
+        }
+    }
+}
+
+#[routes]
+impl <P> Control<P> where P: Platform {
+
+}
+
+/*
 pub enum ControlCall<P>
 where
     P: Platform,

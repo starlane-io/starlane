@@ -1,7 +1,4 @@
-use crate::driver::{
-    Driver, DriverDriver, DriverDriverFactory, DriverFactory, DriverInitCtx, DriverSkel,
-    DriverStatus, Drivers, DriversApi, DriversCall, Item, ItemHandler, ItemSkel,
-};
+use crate::driver::{Driver, DriverDriver, DriverDriverFactory, DriverFactory, DriverCtx, DriverSkel, DriverStatus, Drivers, DriversApi, DriversCall, Item, ItemHandler, ItemSkel, HyperDriverFactory};
 use crate::field::{FieldEx, FieldState};
 use crate::machine::MachineSkel;
 use crate::shell::ShellEx;
@@ -575,7 +572,7 @@ where
         mut star_tx: StarTx<P>,
     ) -> Result<StarApi<P>, P::Err> {
         let star_driver_factory = Arc::new(StarDriverFactory::new(skel.clone()));
-        drivers.add(star_driver_factory);
+        drivers.add_hyper(star_driver_factory);
 
         let drivers = drivers.build(
             skel.clone(),
@@ -661,7 +658,7 @@ where
                         DriverStatus::Pending => {
                             status_tx.send(Status::Pending).await;
                         }
-                        DriverStatus::Initializing => {
+                        DriverStatus::Init => {
                             status_tx.send(Status::Init).await;
                         }
                         DriverStatus::Ready => {
@@ -1581,7 +1578,7 @@ where
 }
 
 #[async_trait]
-impl<P> DriverFactory<P> for StarDriverFactory<P>
+impl<P> HyperDriverFactory<P> for StarDriverFactory<P>
 where
     P: Platform + 'static,
 {
@@ -1589,12 +1586,13 @@ where
         Kind::Star(self.skel.kind.clone())
     }
 
-    async fn init(
+    async fn create(
         &self,
+        star: StarSkel<P>,
         skel: DriverSkel<P>,
-        ctx: &DriverInitCtx,
+        ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
-        Ok(Box::new(StarDriver::new(self.skel.clone(), skel)))
+        Ok(Box::new(StarDriver::new(star, skel)))
     }
 }
 

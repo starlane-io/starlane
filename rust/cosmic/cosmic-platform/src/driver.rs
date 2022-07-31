@@ -41,7 +41,7 @@ pub struct DriversBuilder<P>
 where
     P: Platform,
 {
-    map: HashMap<Kind, Arc<dyn DriverFactory<P>>>,
+    factories: HashMap<Kind, Arc<dyn HyperDriverFactory<P>>>,
 }
 
 impl<P> DriversBuilder<P>
@@ -50,17 +50,24 @@ where
 {
     pub fn new() -> Self {
         Self {
-            map: HashMap::new(),
+            factories: HashMap::new(),
         }
     }
 
     pub fn kinds(&self) -> HashSet<Kind> {
-        self.map.keys().cloned().into_iter().collect()
+        self.factories.keys().cloned().into_iter().collect()
     }
 
-    pub fn add(&mut self, factory: Arc<dyn DriverFactory<P>>) {
-        self.map.insert(factory.kind(), factory);
+    pub fn add(&mut self, factory: Box<dyn DriverFactory<P>>) {
+        self.factories.insert(factory.kind(), DriverFactoryWrapper::wrap( factory ));
     }
+
+
+    pub fn add_hyper(&mut self, factory: Arc<dyn HyperDriverFactory<P>>) {
+        self.factories.insert(factory.kind(), factory);
+    }
+
+
 
     pub fn build(
         self,
@@ -74,7 +81,7 @@ where
         Drivers::new(
             port,
             skel.clone(),
-            self.map,
+            self.factories,
             call_tx,
             call_rx,
             status_tx,
@@ -174,7 +181,7 @@ where
 {
     port: Port,
     skel: StarSkel<P>,
-    factories: HashMap<Kind, Arc<dyn DriverFactory<P>>>,
+    factories: HashMap<Kind, Arc<dyn HyperDriverFactory<P>>>,
     drivers: HashMap<Kind, DriverApi<P>>,
     call_rx: mpsc::Receiver<DriversCall<P>>,
     call_tx: mpsc::Sender<DriversCall<P>>,
@@ -191,7 +198,7 @@ where
     pub fn new(
         port: Port,
         skel: StarSkel<P>,
-        factories: HashMap<Kind, Arc<dyn DriverFactory<P>>>,
+        factories: HashMap<Kind, Arc<dyn HyperDriverFactory<P>>>,
         call_tx: mpsc::Sender<DriversCall<P>>,
         call_rx: mpsc::Receiver<DriversCall<P>>,
         watch_status_tx: watch::Sender<DriverStatus>,
@@ -280,7 +287,7 @@ where
         let (status_tx, mut status_rx) = watch::channel(DriverStatus::Pending);
         self.statuses_rx.insert(Kind::Driver, status_rx.clone());
 
-        let driver_driver_factory = Arc::new(DriverDriverFactory::new());
+        let driver_driver_factory = DriverFactoryWrapper::wrap(Box::new(DriverDriverFactory::new()));
         self.create(Kind::Driver, driver_driver_factory, status_tx)
             .await;
 
@@ -343,7 +350,7 @@ where
                             logger.error(format!("DRIVER FATAL: {} {}", kind.to_string(), msg));
                             fatals = fatals + 1;
                         }
-                        DriverStatus::Initializing => {
+                        DriverStatus::Init => {
                             inits = inits + 1;
                         }
                         _ => {
@@ -368,7 +375,7 @@ where
                         ))
                         .await;
                 } else if inits > 0 {
-                    status_tx.send(DriverStatus::Initializing).await;
+                    status_tx.send(DriverStatus::Init).await;
                 } else {
                     status_tx.send(DriverStatus::Unknown).await;
                 }
@@ -389,7 +396,7 @@ where
     async fn create(
         &self,
         kind: Kind,
-        factory: Arc<dyn DriverFactory<P>>,
+        factory: Arc<dyn HyperDriverFactory<P>>,
         status_tx: watch::Sender<DriverStatus>,
     ) {
         {
@@ -494,10 +501,10 @@ where
                     self.skel.point.clone().to_port().with_layer(Layer::Gravity),
                 );
                 transmitter.agent = SetStrategy::Override(Agent::HyperUser);
-                let ctx = DriverInitCtx::new(transmitter.build());
+                let ctx = DriverCtx::new(transmitter.build());
 
                 tokio::spawn(async move {
-                    let driver = logger.result(factory.init(driver_skel.clone(), &ctx).await);
+                    let driver = logger.result(factory.create(skel.clone(), driver_skel.clone(), ctx).await);
                     match driver {
                         Ok(driver) => {
                             let runner = DriverRunner::new(
@@ -871,7 +878,7 @@ where
                         ));
                         let transmitter =
                             ProtoTransmitter::new(router, self.star_skel.exchanger.clone());
-                        let ctx = DriverInitCtx::new(transmitter);
+                        let ctx = DriverCtx::new(transmitter);
                         self.skel
                             .logger
                             .result(self.driver.init(self.skel.clone(), ctx).await)
@@ -956,11 +963,11 @@ where
     }
 }
 
-pub struct DriverInitCtx {
+pub struct DriverCtx {
     pub transmitter: ProtoTransmitter,
 }
 
-impl DriverInitCtx {
+impl DriverCtx {
     pub fn new(transmitter: ProtoTransmitter) -> Self {
         Self { transmitter }
     }
@@ -1035,21 +1042,82 @@ where
     }
 }
 
+pub struct DriverFactoryWrapper<P> where P: Platform {
+   pub factory: Box<dyn DriverFactory<P>>
+}
+
+impl <P> DriverFactoryWrapper<P> where P: Platform {
+    pub fn wrap(factory: Box<dyn DriverFactory<P>>) -> Arc<dyn HyperDriverFactory<P>> {
+        Arc::new(Self {
+            factory
+        })
+    }
+}
+
+#[async_trait]
+impl <P> HyperDriverFactory<P> for DriverFactoryWrapper<P> where P: Platform {
+    fn kind(&self) -> Kind {
+        self.factory.kind()
+    }
+
+    async fn create(&self, star_skel: StarSkel<P>, driver_skel: DriverSkel<P>, ctx: DriverCtx) -> Result<Box<dyn Driver<P>>, P::Err> {
+        self.factory.create(driver_skel, ctx).await
+    }
+}
+
 #[async_trait]
 pub trait DriverFactory<P>: Send + Sync
 where
     P: Platform,
+
 {
+
     fn kind(&self) -> Kind;
 
-    async fn init(
+    async fn create(
         &self,
         skel: DriverSkel<P>,
-        ctx: &DriverInitCtx,
+        ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err>;
 
     fn properties(&self) -> SetProperties {
         SetProperties::default()
+    }
+
+
+}
+
+#[async_trait]
+pub trait HyperDriverFactory<P>: Send + Sync
+    where
+        P: Platform,
+{
+    fn kind(&self) -> Kind;
+
+    async fn create(
+        &self,
+        skel: StarSkel<P>,
+        driver_skel: DriverSkel<P>,
+        ctx: DriverCtx,
+    ) -> Result<Box<dyn Driver<P>>, P::Err>;
+
+    fn properties(&self) -> SetProperties {
+        SetProperties::default()
+    }
+}
+
+#[derive(Clone)]
+pub struct HyperSkel<P> where P: Platform {
+    pub star: StarSkel<P>,
+    pub driver: DriverSkel<P>
+}
+
+impl <P> HyperSkel<P> where P: Platform {
+    pub fn new(star: StarSkel<P>, driver: DriverSkel<P>) -> Self {
+        Self {
+            star,
+            driver
+        }
     }
 }
 
@@ -1060,7 +1128,7 @@ where
 {
     fn kind(&self) -> Kind;
 
-    async fn init(&self, skel: DriverSkel<P>, ctx: DriverInitCtx) -> Result<(), P::Err> {
+    async fn init(&self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
         skel.logger
             .result(skel.status_tx.send(DriverStatus::Ready).await)
             .unwrap_or_default();
@@ -1087,7 +1155,7 @@ where
 pub enum DriverStatus {
     Unknown,
     Pending,
-    Initializing,
+    Init,
     Ready,
     Retrying(String),
     Fatal(String),
@@ -1170,10 +1238,10 @@ where
         Kind::Driver
     }
 
-    async fn init(
+    async fn create(
         &self,
         skel: DriverSkel<P>,
-        ctx: &DriverInitCtx,
+        ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
         Ok(Box::new(DriverDriver::new(skel).await?))
     }

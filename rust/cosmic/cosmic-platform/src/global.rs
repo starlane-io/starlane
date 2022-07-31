@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use crate::{DriverFactory, PlatErr, Platform, Registry};
 use cosmic_api::cli::RawCommand;
 use cosmic_api::command::command::common::StateSrc;
@@ -27,7 +28,7 @@ pub struct Global<P> where P: Platform {
 
  */
 
-use crate::driver::{Driver, DriverInitCtx, DriverSkel, DriverStatus, Item, ItemHandler};
+use crate::driver::{Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler};
 use crate::star::StarSkel;
 use cosmic_api::config::config::bind::RouteSelector;
 use cosmic_api::parse::route_attribute;
@@ -43,11 +44,11 @@ pub struct GlobalDriverFactory<P>
 where
     P: Platform,
 {
-    pub skel: StarSkel<P>,
+    phantom: PhantomData<P>
 }
 
 #[async_trait]
-impl<P> DriverFactory<P> for GlobalDriverFactory<P>
+impl<P> HyperDriverFactory<P> for GlobalDriverFactory<P>
 where
     P: Platform,
 {
@@ -55,12 +56,13 @@ where
         Kind::Global
     }
 
-    async fn init(
+    async fn create(
         &self,
-        skel: DriverSkel<P>,
-        ctx: &DriverInitCtx,
+        star: StarSkel<P>,
+        driver: DriverSkel<P>,
+        ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
-        Ok(Box::new(GlobalDriver::new(self.skel.clone())))
+        Ok(Box::new(GlobalDriver::new(star)))
     }
 }
 
@@ -68,8 +70,10 @@ impl<P> GlobalDriverFactory<P>
 where
     P: Platform,
 {
-    pub fn new(skel: StarSkel<P>) -> Self {
-        Self { skel }
+    pub fn new() -> Self {
+        Self {
+            phantom: Default::default()
+        }
     }
 }
 
@@ -90,7 +94,7 @@ where
         Kind::Global
     }
 
-    async fn init(&self, skel: DriverSkel<P>, ctx: DriverInitCtx) -> Result<(), P::Err> {
+    async fn init(&self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
         let point = self.skel.machine.global.clone().point;
         let registration = Registration {
             point: point.clone(),
