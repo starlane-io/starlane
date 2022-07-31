@@ -406,7 +406,7 @@ fn test_gravity_routing() -> Result<(), TestErr> {
         wave.kind(DirectedKind::Ping);
         wave.from(FAE.clone().to_port());
         wave.to(LESS.clone().to_port());
-        wave.method(MsgMethod::new("DieTacEng").unwrap()).unwrap();
+        wave.method(MsgMethod::new("DieTacEng").unwrap());
         let wave = wave.build().unwrap();
         let wave = wave.to_ultra();
 
@@ -585,7 +585,7 @@ fn test_layer_traversal() -> Result<(), TestErr> {
         wave.kind(DirectedKind::Ping);
         wave.from(FAE.clone().to_port());
         wave.to(LESS.clone().to_port());
-        wave.method(CmdMethod::Bounce).unwrap();
+        wave.method(CmdMethod::Bounce);
         let wave = wave.build().unwrap();
         let wave = wave.to_ultra();
 

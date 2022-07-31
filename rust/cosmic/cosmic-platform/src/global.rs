@@ -116,7 +116,7 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<Box<dyn ItemHandler<P>>, P::Err> {
-        if *point == self.skel.machine.global {
+        if *point == self.skel.machine.global.point {
             Ok(Box::new(GlobalCore::restore(self.skel.clone(), (), ())))
         } else {
             Err(MsgErr::not_found().into())
@@ -134,8 +134,7 @@ where
     P: Platform,
 {
     pub fn new(skel: StarSkel<P>) -> Self {
-        let core_point = skel.point.push("global").unwrap();
-        Self { skel, core_point }
+        Self { skel }
     }
 }
 
@@ -179,8 +178,9 @@ where
 
     #[route("Cmd<Command>")]
     pub async fn command(&self, ctx: InCtx<'_, Command>) -> Result<ReflectedCore, P::Err> {
+        let global = Global::new( self.skel.clone(), self.skel.logger.clone() );
         match ctx.input {
-            Command::Create(create) => Ok(ctx.ok_body(self.create(&create).await?.stub.into())),
+            Command::Create(create) => Ok(ctx.ok_body(global.create(&create).await?.stub.into())),
             _ => Err(P::Err::new("not implemented")),
         }
     }
@@ -191,13 +191,19 @@ where
     P: Platform,
 {
     pub skel: StarSkel<P>,
-    pub logger: Logger,
+    pub logger: PointLogger,
 }
 
 impl<P> Global<P>
 where
     P: Platform,
 {
+    pub fn new( skel: StarSkel<P>, logger: PointLogger ) -> Self {
+        Self {
+            skel,
+            logger
+        }
+    }
     pub async fn create(&self, create: &Create) -> Result<Details, P::Err> {
         let child_kind = self
             .skel
@@ -288,7 +294,7 @@ where
             } else {
                 return self
                     .logger
-                    .result(Err("Assign result expected Substance Point".into()));
+                    .result(Err(P::Err::new("Assign result expected Substance Point")));
             }
         } else {
             self.logger
