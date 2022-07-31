@@ -55,7 +55,7 @@ impl<P> ControlDriverFactory<P>
 where
     P: Platform,
 {
-    pub fn new(skel: StarSkel<P>) -> Self {
+    pub fn new() -> Self {
         Self {
             phantom: Default::default(),
         }

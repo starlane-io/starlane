@@ -31,6 +31,7 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::watch::Ref;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use tracing::info;
+use crate::control::ControlDriverFactory;
 
 #[derive(Clone)]
 pub struct MachineApi<P>
@@ -193,7 +194,7 @@ where
 
             let mut drivers = match star_template.kind {
                 StarSub::Machine => {
-                    let mut drivers = DriversBuilder::new(StarSub::Machine);
+                    let mut drivers = platform.drivers_builder(&star_template.kind);
                     drivers.add_pre(Arc::new(GlobalDriverFactory::new()));
                     drivers
                 }

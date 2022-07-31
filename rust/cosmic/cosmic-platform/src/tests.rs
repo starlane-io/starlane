@@ -19,6 +19,7 @@ use tokio::join;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{oneshot, Mutex};
+use crate::control::ControlDriverFactory;
 //use crate::control::ControlDriverFactory;
 use crate::driver::DriverFactory;
 use crate::star::StarApi;
@@ -73,7 +74,7 @@ impl Platform for TestPlatform {
 
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
         let mut builder = DriversBuilder::new(kind.clone());
-        // builder.add( Box::new(ControlDriverFactory::new()));
+        builder.add_pre( Arc::new(ControlDriverFactory::new()));
         builder
     }
 
