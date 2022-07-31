@@ -72,7 +72,7 @@ impl Platform for TestPlatform {
     }
 
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
-        let mut builder = DriversBuilder::new();
+        let mut builder = DriversBuilder::new(kind.clone());
         // builder.add( Box::new(ControlDriverFactory::new()));
         builder
     }

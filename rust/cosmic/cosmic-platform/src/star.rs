@@ -571,9 +571,6 @@ where
         mut hyperway_ext: HyperwayExt,
         mut star_tx: StarTx<P>,
     ) -> Result<StarApi<P>, P::Err> {
-        let star_driver_factory = Arc::new(StarDriverFactory::new(skel.clone()));
-        drivers.add_hyper(star_driver_factory);
-
         let drivers = drivers.build(
             skel.clone(),
             star_tx.drivers_call_tx.clone(),
@@ -1565,15 +1562,19 @@ pub struct StarDriverFactory<P>
 where
     P: Platform + 'static,
 {
-    pub skel: StarSkel<P>,
+    pub kind: Kind,
+    pub phantom: PhantomData<P>,
 }
 
 impl<P> StarDriverFactory<P>
 where
     P: Platform + 'static,
 {
-    pub fn new(skel: StarSkel<P>) -> Self {
-        Self { skel }
+    pub fn new(kind: StarSub) -> Self {
+        Self {
+            kind: Kind::Star(kind),
+            phantom: Default::default()
+        }
     }
 }
 
@@ -1583,7 +1584,7 @@ where
     P: Platform + 'static,
 {
     fn kind(&self) -> Kind {
-        Kind::Star(self.skel.kind.clone())
+        self.kind.clone()
     }
 
     async fn create(

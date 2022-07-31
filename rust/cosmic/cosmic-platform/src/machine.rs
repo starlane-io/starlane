@@ -193,8 +193,8 @@ where
 
             let mut drivers = match star_template.kind {
                 StarSub::Machine => {
-                    let mut drivers = DriversBuilder::new();
-                    drivers.add_hyper(Arc::new(GlobalDriverFactory::new()));
+                    let mut drivers = DriversBuilder::new(StarSub::Machine);
+                    drivers.add_pre(Arc::new(GlobalDriverFactory::new()));
                     drivers
                 }
                 _ => platform.drivers_builder(&star_template.kind),

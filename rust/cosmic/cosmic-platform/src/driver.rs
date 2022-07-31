@@ -1,6 +1,6 @@
 use crate::machine::MachineSkel;
 use crate::star::StarCall::LayerTraversalInjection;
-use crate::star::{LayerInjectionRouter, StarSkel, StarState, StateApi, StateCall};
+use crate::star::{LayerInjectionRouter, StarDriver, StarDriverFactory, StarSkel, StarState, StateApi, StateCall};
 use crate::{PlatErr, Platform, RegistryApi};
 use cosmic_api::command::command::common::{SetProperties, StateSrc};
 use cosmic_api::command::request::create::{Create, Strategy};
@@ -9,7 +9,7 @@ use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{
     BaseKind, Kind, Layer, Point, Port, ToBaseKind, ToPoint, ToPort, TraversalLayer, Uuid,
 };
-use cosmic_api::id::{BaseSubKind, StarKey, Traversal, TraversalInjection};
+use cosmic_api::id::{BaseSubKind, StarKey, StarSub, Traversal, TraversalInjection};
 use cosmic_api::log::{PointLogger, Tracker};
 use cosmic_api::parse::model::Subst;
 use cosmic_api::parse::route_attribute;
@@ -41,6 +41,7 @@ pub struct DriversBuilder<P>
 where
     P: Platform,
 {
+    pre: Vec<Arc<dyn HyperDriverFactory<P>>>,
     factories: HashMap<Kind, Arc<dyn HyperDriverFactory<P>>>,
 }
 
@@ -48,14 +49,22 @@ impl<P> DriversBuilder<P>
 where
     P: Platform,
 {
-    pub fn new() -> Self {
+    pub fn new(kind: StarSub) -> Self {
+        let mut pre:Vec<Arc<dyn HyperDriverFactory<P>>> = vec![];
+        pre.push(Arc::new(DriverDriverFactory::new() ));
+        pre.push(Arc::new(StarDriverFactory::new(kind) ));
         Self {
+            pre,
             factories: HashMap::new(),
         }
     }
 
     pub fn kinds(&self) -> HashSet<Kind> {
         self.factories.keys().cloned().into_iter().collect()
+    }
+
+    pub fn add_pre(&mut self, factory: Arc<dyn HyperDriverFactory<P>>) {
+        self.pre.push(factory);
     }
 
     pub fn add(&mut self, factory: Box<dyn DriverFactory<P>>) {
@@ -81,6 +90,7 @@ where
         Drivers::new(
             port,
             skel.clone(),
+            self.pre,
             self.factories,
             call_tx,
             call_rx,
@@ -181,6 +191,7 @@ where
 {
     port: Port,
     skel: StarSkel<P>,
+    pre_factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
     factories: HashMap<Kind, Arc<dyn HyperDriverFactory<P>>>,
     drivers: HashMap<Kind, DriverApi<P>>,
     call_rx: mpsc::Receiver<DriversCall<P>>,
@@ -198,6 +209,7 @@ where
     pub fn new(
         port: Port,
         skel: StarSkel<P>,
+        pre_factories: Vec< Arc<dyn HyperDriverFactory<P>>>,
         factories: HashMap<Kind, Arc<dyn HyperDriverFactory<P>>>,
         call_tx: mpsc::Sender<DriversCall<P>>,
         call_rx: mpsc::Receiver<DriversCall<P>>,
@@ -228,6 +240,7 @@ where
             call_tx: call_tx.clone(),
             statuses_rx,
             factories,
+            pre_factories,
             status_tx: mpsc_status_tx,
             status_rx: watch_status_rx.clone(),
             init: false,
@@ -284,23 +297,27 @@ where
         self.factories.keys().cloned().into_iter().collect()
     }
     pub async fn init0(&mut self) {
-        let (status_tx, mut status_rx) = watch::channel(DriverStatus::Pending);
-        self.statuses_rx.insert(Kind::Driver, status_rx.clone());
 
-        let driver_driver_factory = DriverFactoryWrapper::wrap(Box::new(DriverDriverFactory::new()));
-        self.create(Kind::Driver, driver_driver_factory, status_tx)
-            .await;
+        for factory in &self.pre_factories {
+            let (status_tx, mut status_rx) = watch::channel(DriverStatus::Pending);
+            self.statuses_rx.insert(Kind::Driver, status_rx.clone());
+
+            self.create(factory.kind(), factory.clone(), status_tx)
+                .await;
+        }
+
+        let (rtn,mut rtn_rx) = oneshot::channel();
+        self.status_listen(Some(rtn)).await;
 
         // wait for DriverDriver to be ready
         let call_tx = self.call_tx.clone();
         tokio::spawn(async move {
-            loop {
-                if status_rx.borrow().clone() == DriverStatus::Ready {
-                    break;
-                }
-                status_rx.changed().await.unwrap();
+            let result = rtn_rx.await.unwrap();
+            if result.is_ok() {
+                call_tx.send(DriversCall::Init1).await;
+            } else {
+                // do not go on
             }
-            call_tx.send(DriversCall::Init1).await;
         });
     }
 
@@ -312,7 +329,7 @@ where
             self.statuses_rx.insert(kind.clone(), status_rx);
         }
 
-        self.status_listen().await;
+        self.status_listen(None).await;
 
         for (kind, status_tx) in statuses_tx {
             let factory = self.factories.get(&kind).unwrap().clone();
@@ -320,7 +337,7 @@ where
         }
     }
 
-    async fn status_listen(&self) {
+    async fn status_listen(&self, on_complete: Option<oneshot::Sender<Result<(),()>>>) {
         let logger = self.skel.logger.clone();
         let status_tx = self.status_tx.clone();
         let statuses_rx = self.statuses_rx.clone();
@@ -354,19 +371,26 @@ where
                             inits = inits + 1;
                         }
                         _ => {
-                            break;
                         }
                     }
                 }
 
                 if readies == statuses_rx.len() {
-                    status_tx.send(DriverStatus::Ready).await;
+                    if on_complete.is_some(){
+                        on_complete.unwrap().send(Ok(()));
+                        break;
+                    } else {
+                        status_tx.send(DriverStatus::Ready).await;
+                    }
                 } else if fatals > 0 {
                     status_tx
                         .send(DriverStatus::Fatal(
                             "One or more Drivers have a Fatal condition".to_string(),
                         ))
                         .await;
+                    if on_complete.is_some() {
+                        on_complete.unwrap().send(Err(()));
+                    }
                     break;
                 } else if retries > 0 {
                     status_tx
@@ -1230,7 +1254,7 @@ impl DriverDriverFactory {
 }
 
 #[async_trait]
-impl<P> DriverFactory<P> for DriverDriverFactory
+impl<P> HyperDriverFactory<P> for DriverDriverFactory
 where
     P: Platform,
 {
@@ -1240,10 +1264,11 @@ where
 
     async fn create(
         &self,
-        skel: DriverSkel<P>,
+        star: StarSkel<P>,
+        driver: DriverSkel<P>,
         ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
-        Ok(Box::new(DriverDriver::new(skel).await?))
+        Ok(Box::new(DriverDriver::new(driver).await?))
     }
 }
 
@@ -1264,6 +1289,8 @@ where
         Ok(Self { skel })
     }
 }
+
+
 
 #[async_trait]
 impl<P> Driver<P> for DriverDriver<P>
