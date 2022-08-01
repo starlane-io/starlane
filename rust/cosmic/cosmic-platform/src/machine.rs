@@ -165,6 +165,7 @@ where
             .to_point()
             .to_port()
             .with_layer(Layer::Gravity);
+        let logger = platform.logger().point(machine_star.point.clone());
         let global = machine_star
             .point
             .push("global")
@@ -176,7 +177,7 @@ where
             machine_star,
             registry: platform.global_registry().await?,
             artifacts: platform.artifact_hub(),
-            logger: RootLogger::default(),
+            logger: platform.logger(),
             timeouts: Timeouts::default(),
             platform: platform.clone(),
             api: machine_api.clone(),
@@ -207,8 +208,6 @@ where
                 }
                 _ => platform.drivers_builder(&star_template.kind),
             };
-
-            //            let drivers = builder.build(drivers_point.to_port(), star_skel.clone())?;
 
             let mut interchange = HyperwayInterchange::new(logger.push("interchange").unwrap());
 

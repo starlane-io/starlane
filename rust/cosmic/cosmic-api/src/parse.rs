@@ -1665,7 +1665,6 @@ pub fn create<I: Span>(input: I) -> Res<I, CreateVar> {
             state: StateSrcVar::None,
             properties,
             strategy,
-            registry: Default::default(),
         };
         (next, create)
     })
@@ -1748,7 +1747,6 @@ pub fn publish<I: Span>(input: I) -> Res<I, CreateVar> {
         state: StateSrcVar::None,
         properties: Default::default(),
         strategy: Strategy::Commit,
-        registry: Default::default(),
     };
 
     Ok((next, create))

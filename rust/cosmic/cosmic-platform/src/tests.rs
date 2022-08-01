@@ -145,12 +145,12 @@ impl RegistryApi<TestPlatform> for TestRegistryApi {
     }
 
     async fn assign<'a>(&'a self, point: &'a Point, location: &'a Point) -> Result<(), TestErr> {
-        let mut record = self
-            .ctx
-            .particles
-            .get_mut(point)
-            .ok_or(TestErr::new(format!("not found: {}", point.to_string())))?;
-        record.value_mut().location = point.clone();
+            let mut record = self
+                .ctx
+                .particles
+                .get_mut(point)
+                .ok_or(TestErr::new(format!("not found: {}", point.to_string())))?;
+            record.value_mut().location = location.clone();
         Ok(())
     }
 

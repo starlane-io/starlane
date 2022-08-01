@@ -998,7 +998,7 @@ where
 
     async fn start_layer_traversal(
         &self,
-        wave: UltraWave,
+        mut wave: UltraWave,
         injector: &Port,
         from_hyperway: bool,
     ) -> Result<(), P::Err> {
@@ -1009,17 +1009,24 @@ where
             .send(wave.clone())
             .unwrap_or_default();
 
+        let mut to = wave.to().clone().unwrap_single();
+        if to.point == *GLOBAL_EXEC {
+println!("forwarding to: {}", self.skel.machine.global.to_string());
+            wave.set_to(self.skel.machine.global.clone());
+            to = self.skel.machine.global.clone();
+        }
+
         let record = match self
             .skel
             .registry
-            .locate(&wave.to().clone().unwrap_single().to_point())
+            .locate(&to.point)
             .await
         {
             Ok(record) => record,
             Err(err) => {
                 return self.skel.err(format!(
                     "could not locate record for point {}",
-                    wave.to().clone().unwrap_single().to_point().to_string()
+                    to.to_string()
                 ));
             }
         };
@@ -1547,6 +1554,8 @@ where
         }
     }
 
+
+
     async fn search_for_stars(&self, search: Search) -> Result<Vec<Discovery>, MsgErr> {
         let mut ripple = DirectedProto::ping();
         ripple.kind(DirectedKind::Ripple);
@@ -1580,6 +1589,38 @@ where
 {
     fn kind(&self) -> Kind {
         Kind::Star(self.star_skel.kind.clone())
+    }
+
+    async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
+        self.star_skel
+            .logger
+            .result(self.driver_skel.status_tx.send(DriverStatus::Init).await)
+            .unwrap_or_default();
+
+        let point = self.star_skel.point.clone();
+        let registration = Registration {
+            point: point.clone(),
+            kind: Kind::Global,
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: HYPERUSER.clone(),
+            strategy: Strategy::Override,
+        };
+
+        self.star_skel.api.create_states(point.clone()).await?;
+        self.star_skel.registry.register(&registration).await?;
+        self.star_skel.registry.assign(&point, &self.star_skel.point).await?;
+
+        self.star_skel
+            .registry
+            .set_status(&point, &Status::Ready)
+            .await?;
+        self.star_skel
+            .logger
+            .result(skel.status_tx.send(DriverStatus::Ready).await)
+            .unwrap_or_default();
+
+        Ok(())
     }
 
     async fn item(&self, point: &Point) -> Result<ItemHandler<P>, P::Err> {

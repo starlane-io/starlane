@@ -5,7 +5,7 @@ use crate::star::{
 };
 use crate::{PlatErr, Platform, RegistryApi};
 use cosmic_api::command::command::common::{SetProperties, StateSrc};
-use cosmic_api::command::request::create::{Create, Strategy};
+use cosmic_api::command::request::create::{Create, PointSegTemplate, Strategy};
 use cosmic_api::config::config::bind::RouteSelector;
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{
@@ -32,6 +32,7 @@ use futures::FutureExt;
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
@@ -803,6 +804,7 @@ where
     P: Platform,
 {
     Create {
+        agent: Agent,
         create: Create,
         rtn: oneshot::Sender<Result<Stub, P::Err>>,
     },
@@ -988,12 +990,13 @@ where
                         rtn.send(self.driver.assign(assign).await);
                     }
                     DriverRunnerCall::DriverRunnerRequest(request) => match request {
-                        DriverRunnerRequest::Create { create, rtn } => {}
+                        DriverRunnerRequest::Create { .. } => {}
                     },
                 }
             }
         });
     }
+    
 
     async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), P::Err> {
         let core = self.item(&traversal.to.point).await?;
@@ -1105,17 +1108,6 @@ where
         }
     }
 
-    pub async fn create(&self, create: Create) -> Result<Stub, P::Err> {
-        let (rtn, rtn_rx) = oneshot::channel();
-        self.logger
-            .result(
-                self.request_tx
-                    .send(DriverRunnerRequest::Create { create, rtn })
-                    .await,
-            )
-            .unwrap_or_default();
-        rtn_rx.await?
-    }
 }
 
 pub struct DriverFactoryWrapper<P>

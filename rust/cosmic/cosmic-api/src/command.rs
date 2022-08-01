@@ -366,10 +366,11 @@ pub mod request {
         };
         use crate::msg::MsgMethod;
         use crate::parse::{CamelCase, Env, ResolverErr};
+        use crate::parse::model::Subst;
         use crate::selector::selector::SpecificSelector;
         use crate::substance::substance::Substance;
         use crate::util::{ConvertFrom, ToResolved};
-        use crate::wave::{CmdMethod, DirectedCore, DirectedProto, SysMethod};
+        use crate::wave::{CmdMethod, DirectedCore, DirectedProto, Ping, SysMethod, Wave};
 
         pub enum PointTemplateSeg {
             ExactSeg(PointSeg),
@@ -529,7 +530,6 @@ pub mod request {
                     template,
                     properties: self.properties,
                     strategy: self.strategy,
-                    registry: self.registry,
                     state,
                 })
             }
@@ -542,7 +542,6 @@ pub mod request {
                     template,
                     properties: self.properties,
                     strategy: self.strategy,
-                    registry: self.registry,
                     state: self.state,
                 })
             }
@@ -553,7 +552,6 @@ pub mod request {
             pub template: TemplateDef<PointTemplateDef<Pnt>>,
             pub properties: SetProperties,
             pub strategy: Strategy,
-            pub registry: SetRegistry,
             pub state: StateSrc,
         }
 
@@ -564,8 +562,15 @@ pub mod request {
                     state: StateSrc::Substance(Box::new(Substance::Bin(bin))),
                     properties: self.properties,
                     strategy: self.strategy,
-                    registry: self.registry,
                 }
+            }
+
+            pub fn to_wave_proto(self) -> DirectedProto{
+                let mut wave = DirectedProto::ping();
+                wave.method(CmdMethod::Command);
+                wave.body(Substance::Command(Box::new(Command::Create(self))));
+                wave.to(Point::global_executor());
+                wave
             }
         }
 

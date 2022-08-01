@@ -46,6 +46,7 @@ use tokio::runtime::{Handle, Runtime};
 use tokio::sync::mpsc;
 use tracing::error;
 use uuid::Uuid;
+use cosmic_api::log::RootLogger;
 
 pub mod control;
 pub mod driver;
@@ -332,6 +333,9 @@ where
     async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>, Self::Err>;
     fn artifact_hub(&self) -> ArtifactApi;
     fn start_services(&self, gate: &Arc<dyn HyperGate>);
+    fn logger(&self) -> RootLogger {
+        Default::default()
+    }
 
     fn default_implementation(&self, template: &KindTemplate) -> Result<Kind, MsgErr> {
         let base: BaseKind = BaseKind::from_str(template.base.to_string().as_str())?;

@@ -9,7 +9,7 @@ use cosmic_api::id::{StarSub, TraversalInjection};
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{Assign, AssignmentKind, ControlPattern, Greet, InterchangeKind, Knock};
 use cosmic_api::wave::Agent::Anonymous;
-use cosmic_api::wave::{Agent, CoreBounce, DirectedHandler, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, Signal, UltraWave, Wave};
+use cosmic_api::wave::{Agent, CoreBounce, DirectedHandler, InCtx, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, Signal, UltraWave, Wave};
 use cosmic_api::wave::{DirectedHandlerSelector, SetStrategy, TxRouter};
 use cosmic_api::wave::{DirectedProto, RecipientSelector};
 use cosmic_api::{Registration, State};
@@ -46,8 +46,9 @@ where
         Ok(Box::new(ControlDriver {
             skel,
             external_router: None,
-            ctxs: Arc::new(Default::default()),
-            fabric_routers: Arc::new(Default::default())
+            control_ctxs: Arc::new(Default::default()),
+            fabric_routers: Arc::new(Default::default()),
+            ctx,
         }))
     }
 }
@@ -91,17 +92,17 @@ impl <P> HyperDriverFactory<P> for ControlFactory<P> where P: Platform{
     async fn create(&self, star: StarSkel<P>, driver: DriverSkel<P>, ctx: DriverCtx) -> Result<Box<dyn Driver<P>>, P::Err> {
         let skel = HyperSkel::new(star,driver);
 
-        Ok(Box::new(ControlDriver { skel, external_router: None, ctxs: Arc::new(Default::default()), fabric_routers: Arc::new(Default::default()) }))
+        Ok(Box::new(ControlDriver { skel, external_router: None, control_ctxs: Arc::new(Default::default()), fabric_routers: Arc::new(Default::default()), ctx }))
     }
 }
 
 #[derive(DirectedHandler)]
 pub struct ControlDriver<P> where P: Platform {
+    pub ctx: DriverCtx,
     pub skel: HyperSkel<P>,
     pub external_router: Option<TxRouter>,
-    pub ctxs: Arc<DashMap<Point,ControlCtx<P>>>,
+    pub control_ctxs: Arc<DashMap<Point,ControlCtx<P>>>,
     pub fabric_routers: Arc<DashMap<Point,LayerInjectionRouter<P>>>
-
 }
 
 #[derive(Clone)]
@@ -137,7 +138,7 @@ where
         self.skel.driver.status_tx.send(DriverStatus::Init).await;
         let point = skel.point.clone();
         let remote_point_factory =
-            Arc::new(ControlCreator::new( self.skel.clone(), self.fabric_routers.clone() ));
+            Arc::new(ControlCreator::new( self.skel.clone(), self.fabric_routers.clone(), ctx ));
         let auth = AnonHyperAuthenticatorAssignEndPoint::new(remote_point_factory, self.skel.driver.logger.clone() );
         let mut interchange = HyperwayInterchange::new(self.skel.driver.logger.clone());
         let hyperway = Hyperway::new(Point::remote_endpoint().to_port(), Agent::HyperUser);
@@ -222,16 +223,18 @@ where
 pub struct ControlCreator<P> where P: Platform {
    pub skel: HyperSkel<P>,
    pub fabric_routers: Arc<DashMap<Point,LayerInjectionRouter<P>>>,
-   pub controls: Point
+   pub controls: Point,
+   pub ctx: DriverCtx,
 }
 
 impl <P> ControlCreator<P> where P: Platform {
-    pub fn new(skel: HyperSkel<P>, fabric_routers: Arc<DashMap<Point,LayerInjectionRouter<P>>>) -> Self {
+    pub fn new(skel: HyperSkel<P>, fabric_routers: Arc<DashMap<Point,LayerInjectionRouter<P>>>, ctx: DriverCtx) -> Self {
         let controls = skel.driver.point.push("controls").unwrap();
         Self {
             skel,
             fabric_routers,
-            controls
+            controls,
+            ctx,
         }
     }
 }
@@ -239,18 +242,33 @@ impl <P> ControlCreator<P> where P: Platform {
 #[async_trait]
 impl <P> PointFactory for ControlCreator<P> where P: Platform {
     async fn create(&self) -> Result<Point, MsgErr> {
+println!("POINT FACTORY CREATE");
         let create = Create {
             template: Template::new( PointTemplate { parent:self.controls.clone(), child_segment_template: PointSegTemplate::Pattern("control-%".to_string())}, KindTemplate{ base: BaseKind::Control, sub: None, specific: None }),
             properties: Default::default(),
             strategy: Strategy::Commit,
-            registry: Default::default(),
             state: StateSrc::None,
         };
-        let ctrl_stub = self.skel.driver.create(create).await.map_err(|e|e.to_cosmic_err())?;
-        let point = ctrl_stub.point;
-        let fabric_router = LayerInjectionRouter::new(self.skel.star.clone(), point.clone().to_port().with_layer(Layer::Core) );
-        self.fabric_routers.insert(point.clone(),fabric_router);
-        Ok(point)
+
+        let mut wave = create.to_wave_proto();
+        wave.from(self.skel.driver.point.clone());
+        wave.agent(Agent::Point(self.skel.driver.point.clone()));
+
+        let pong: Wave<Pong> = self.ctx.transmitter.direct(wave).await?;
+
+        if pong.core.status.is_success() {
+            if let Substance::Stub(ref stub) = pong.core.body {
+                let point = stub.point.clone();
+                let fabric_router = LayerInjectionRouter::new(self.skel.star.clone(), point.clone().to_port().with_layer(Layer::Core) );
+                self.fabric_routers.insert(point.clone(),fabric_router);
+                Ok(point)
+            }
+            else {
+                Err(MsgErr::bad_request())
+            }
+        } else {
+            Err(MsgErr::from_status(pong.core.status.as_u16()))
+        }
     }
 }
 

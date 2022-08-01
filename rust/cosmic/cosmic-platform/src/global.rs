@@ -5,7 +5,7 @@ use cosmic_api::command::command::common::StateSrc;
 use cosmic_api::command::request::create::{Create, PointSegTemplate, Strategy};
 use cosmic_api::command::Command;
 use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{Kind, Layer, Point, Port, ToPort, GLOBAL_EXEC};
+use cosmic_api::id::id::{Kind, Layer, Point, Port, ToPort, GLOBAL_EXEC, ToPoint};
 use cosmic_api::log::{PointLogger, RootLogger};
 use cosmic_api::parse::command_line;
 use cosmic_api::parse::error::result;
@@ -95,6 +95,11 @@ where
     }
 
     async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
+        self.skel
+            .logger
+            .result(skel.status_tx.send(DriverStatus::Init).await)
+            .unwrap_or_default();
+
         let point = self.skel.machine.global.clone().point;
         let registration = Registration {
             point: point.clone(),
@@ -105,9 +110,9 @@ where
             strategy: Strategy::Override,
         };
 
+        self.skel.api.create_states(point.clone()).await?;
         self.skel.registry.register(&registration).await?;
         self.skel.registry.assign(&point, &self.skel.point).await?;
-        self.skel.api.create_states(point.clone()).await?;
         self.skel
             .registry
             .set_status(&point, &Status::Ready)
@@ -116,6 +121,7 @@ where
             .logger
             .result(skel.status_tx.send(DriverStatus::Ready).await)
             .unwrap_or_default();
+
         Ok(())
     }
 
@@ -182,8 +188,9 @@ where
     #[route("Cmd<Command>")]
     pub async fn command(&self, ctx: InCtx<'_, Command>) -> Result<ReflectedCore, P::Err> {
         let global = Global::new( self.skel.clone(), self.skel.logger.clone() );
+        let agent = ctx.wave().agent().clone();
         match ctx.input {
-            Command::Create(create) => Ok(ctx.ok_body(global.create(&create).await?.stub.into())),
+            Command::Create(create) => Ok(ctx.ok_body(global.create(create,&agent).await?.stub.into())),
             _ => Err(P::Err::new("not implemented")),
         }
     }
@@ -207,7 +214,8 @@ where
             logger
         }
     }
-    pub async fn create(&self, create: &Create) -> Result<Details, P::Err> {
+    pub async fn create(&self, create: &Create, agent: &Agent) -> Result<Details, P::Err> {
+println!("GLOBAL CREATE!");
         let child_kind = self
             .skel
             .machine
@@ -239,9 +247,9 @@ where
                 let registration = Registration {
                     point: point.clone(),
                     kind: child_kind.clone(),
-                    registry: create.registry.clone(),
+                    registry: Default::default(),
                     properties,
-                    owner: Point::root(),
+                    owner: agent.clone().to_point(),
                     strategy: create.strategy.clone(),
                 };
                 let mut result = self.skel.registry.register(&registration).await;
@@ -262,7 +270,7 @@ where
                     let registration = Registration {
                         point: point.clone(),
                         kind: child_kind.clone(),
-                        registry: create.registry.clone(),
+                        registry: Default::default(),
                         properties: create.properties.clone(),
                         owner: Point::root(),
                         strategy: create.strategy.clone(),
