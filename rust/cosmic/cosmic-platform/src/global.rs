@@ -133,6 +133,7 @@ where
             strategy: Strategy::Override,
         };
 
+println!("CREATE STATES: {}", point.to_string());
         self.skel.api.create_states(point.clone()).await?;
         self.skel.registry.register(&registration).await?;
         self.skel.registry.assign(&point, &self.skel.point).await?;
@@ -181,8 +182,8 @@ where
 
 #[async_trait]
 impl <P> ItemDirectedHandler<P> for GlobalCore<P> where P: Platform {
-    async fn get_bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
-          self.bind().await
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+          <GlobalCore<P> as Item<P>>::bind(self).await
     }
 }
 

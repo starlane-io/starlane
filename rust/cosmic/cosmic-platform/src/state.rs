@@ -10,15 +10,15 @@ use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct ShellState {
-    pub port: id::Port,
+    pub point: Point,
     pub core_requests: Arc<DashSet<WaveId>>,
     pub fabric_requests: Arc<DashSet<WaveId>>,
 }
 
 impl ShellState {
-    pub fn new(port: id::Port) -> Self {
+    pub fn new(point: Point) -> Self {
         Self {
-            port,
+            point,
             core_requests: Arc::new(DashSet::new()),
             fabric_requests: Arc::new(DashSet::new()),
         }

@@ -1583,7 +1583,7 @@ pub mod id {
 
     #[async_trait]
     pub trait TraversalLayer {
-        fn port(&self) -> &Port;
+        fn port(&self) -> Port;
         async fn traverse_next(&self, traversal: Traversal<UltraWave>);
         async fn inject(&self, wave: UltraWave);
 

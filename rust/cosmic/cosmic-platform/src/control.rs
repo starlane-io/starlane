@@ -1,4 +1,4 @@
-use crate::driver::{Driver, DriverFactory, DriverCtx, DriverSkel, DriverStatus, ItemDirectedHandler, ItemHandler, ItemSkel, HyperDriverFactory, HyperSkel, DriverRunnerRequest, Item};
+use crate::driver::{Driver, DriverFactory, DriverCtx, DriverSkel, DriverStatus, ItemDirectedHandler, ItemHandler, ItemSkel, HyperDriverFactory, HyperSkel, DriverRunnerRequest, Item, ItemRouter};
 use crate::star::{LayerInjectionRouter, StarSkel};
 use crate::{PlatErr, Platform, Registry};
 use cosmic_api::command::command::common::StateSrc;
@@ -12,7 +12,7 @@ use cosmic_api::wave::Agent::Anonymous;
 use cosmic_api::wave::{Agent, CoreBounce, DirectedHandler, InCtx, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, Signal, UltraWave, Wave};
 use cosmic_api::wave::{DirectedHandlerSelector, SetStrategy, TxRouter};
 use cosmic_api::wave::{DirectedProto, RecipientSelector};
-use cosmic_api::{Registration, State};
+use cosmic_api::{ArtRef, Registration, State};
 use cosmic_hyperlane::{
     AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, HyperAuthenticator,
     HyperConnectionErr, HyperGate, HyperGreeter, Hyperway, HyperwayExt, HyperwayInterchange,
@@ -65,7 +65,7 @@ where
 }
 
 
-use cosmic_api::config::config::bind::RouteSelector;
+use cosmic_api::config::config::bind::{BindConfig, RouteSelector};
 use cosmic_api::parse::route_attribute;
 use cosmic_api::particle::particle::{Details, Status, Stub};
 use cosmic_api::util::log;
@@ -334,6 +334,12 @@ impl <P> Router for Control<P> where P: Platform {
     }
 }
 
+#[async_trait]
+impl <P> ItemRouter<P> for Control<P> where P: Platform {
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+        <Control<P> as Item<P>>::bind(self).await
+    }
+}
 
 #[derive(Clone)]
 pub struct ControlCtx<P> where P: Platform {

@@ -102,8 +102,8 @@ impl<P> TraversalLayer for FieldEx<P>
 where
     P: Platform + 'static,
 {
-    fn port(&self) -> &Port {
-        &self.state.port
+    fn port(&self) -> Port {
+        self.state.point.clone().to_port().with_layer(Layer::Field)
     }
 
     async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
@@ -308,7 +308,7 @@ println!("GOT HERE!");
     }
 
     async fn inject(&self, wave: UltraWave) {
-        let inject = TraversalInjection::new(self.state.port.clone(), wave);
+        let inject = TraversalInjection::new(self.state.point.clone().to_port().with_layer(Layer::Field), wave);
         self.skel.inject_tx.send(inject).await;
     }
 }
@@ -591,7 +591,7 @@ pub struct FieldState<P>
 where
     P: Platform + 'static,
 {
-    port: Port,
+    point: Point,
     pipe_exes: Arc<DashMap<String, PipeEx<P>>>,
 }
 
@@ -599,9 +599,9 @@ impl<P> FieldState<P>
 where
     P: Platform + 'static,
 {
-    pub fn new(port: Port) -> Self {
+    pub fn new(point : Point) -> Self {
         Self {
-            port,
+            point,
             pipe_exes: Arc::new(DashMap::new()),
         }
     }

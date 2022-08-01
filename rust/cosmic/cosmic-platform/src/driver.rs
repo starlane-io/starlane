@@ -894,8 +894,8 @@ impl<P> TraversalLayer for ItemShell<P>
 where
     P: Platform,
 {
-    fn port(&self) -> &cosmic_api::id::id::Port {
-        &self.port
+    fn port(&self) -> cosmic_api::id::id::Port {
+        self.port.clone()
     }
 
     async fn deliver_directed(&self, direct: Traversal<DirectedWave>) -> Result<(), MsgErr> {
@@ -1357,8 +1357,8 @@ where
 {
     pub async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         match self {
-            ItemHandler::Handler(handler) => handler.get_bind().await,
-            ItemHandler::Router(router) => router.get_bind().await,
+            ItemHandler::Handler(handler) => handler.bind().await,
+            ItemHandler::Router(router) => router.bind().await,
         }
     }
 }
@@ -1381,7 +1381,7 @@ pub trait ItemDirectedHandler<P>: DirectedHandler + Send + Sync
 where
     P: Platform,
 {
-    async fn get_bind(&self) -> Result<ArtRef<BindConfig>, P::Err>;
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err>;
 }
 
 #[async_trait]
@@ -1389,7 +1389,7 @@ pub trait ItemRouter<P>: Router + Send + Sync
 where
     P: Platform,
 {
-    async fn get_bind(&self) -> Result<ArtRef<BindConfig>, P::Err>;
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err>;
 }
 
 #[derive(Clone)]

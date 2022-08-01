@@ -52,8 +52,8 @@ impl<P> TraversalLayer for ShellEx<P>
 where
     P: Platform + 'static,
 {
-    fn port(&self) -> &Port {
-        &self.state.port
+    fn port(&self) -> Port {
+        self.state.point.clone().to_port().with_layer(Layer::Shell)
     }
 
     async fn traverse_next(&self, traversal: Traversal<UltraWave>) {

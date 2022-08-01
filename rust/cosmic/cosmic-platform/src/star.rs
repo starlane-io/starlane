@@ -63,20 +63,20 @@ where
     states: Arc<DashMap<Port, Arc<RwLock<dyn State>>>>,
     topic: Arc<DashMap<Port, Arc<dyn TopicHandler>>>,
     tx: mpsc::Sender<StateCall>,
-    field: Arc<DashMap<Port, FieldState<P>>>,
-    shell: Arc<DashMap<Port, ShellState>>,
+    field: Arc<DashMap<Point, FieldState<P>>>,
+    shell: Arc<DashMap<Point, ShellState>>,
 }
 
 impl<P> StarState<P>
 where
     P: Platform + 'static,
 {
-    pub fn create_field(&self, port: Port) {
-        self.field.insert(port.clone(), FieldState::new(port));
+    pub fn create_field(&self, point: Point ) {
+        self.field.insert(point.clone(), FieldState::new(point));
     }
 
-    pub fn create_shell(&self, port: Port) {
-        self.shell.insert(port.clone(), ShellState::new(port));
+    pub fn create_shell(&self, point: Point ) {
+        self.shell.insert(point.clone(), ShellState::new(point));
     }
 
     pub fn new() -> Self {
@@ -158,21 +158,21 @@ where
         }
     }
 
-    pub fn find_field(&self, port: &Port) -> Result<FieldState<P>, MsgErr> {
+    pub fn find_field(&self, point: &Point) -> Result<FieldState<P>, MsgErr> {
         let rtn = self
             .field
-            .get(port)
-            .ok_or("expected field state")?
+            .get(point)
+            .ok_or(format!("expected field state for point: {}", point.to_string()))?
             .value()
             .clone();
         Ok(rtn)
     }
 
-    pub fn find_shell(&self, port: &Port) -> Result<ShellState, MsgErr> {
+    pub fn find_shell(&self, point: &Point) -> Result<ShellState, MsgErr> {
         Ok(self
             .shell
-            .get(port)
-            .ok_or("expected shell state")?
+            .get(point)
+            .ok_or(format!("expected shell state for point: {}", point.to_string()))?
             .value()
             .clone())
     }
@@ -751,10 +751,10 @@ where
     async fn create_states(&self, point: Point) {
         self.skel
             .state
-            .create_field(self.skel.point.clone().to_port().with_layer(Layer::Field));
+            .create_field(point.clone());
         self.skel
             .state
-            .create_shell(self.skel.point.clone().to_port().with_layer(Layer::Shell));
+            .create_shell(point.clone());
     }
 
     async fn init_drivers(&self) {
@@ -1675,8 +1675,8 @@ where
 
 #[async_trait]
 impl <P> ItemDirectedHandler<P> for StarCore<P> where P: Platform{
-    async fn get_bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
-        self.bind().await
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+        <StarCore<P> as Item<P>>::bind(self).await
     }
 }
 
@@ -1722,8 +1722,6 @@ where
                         .stub
                         .point
                         .clone()
-                        .to_port()
-                        .with_layer(Layer::Field),
                 );
                 self.skel.state.create_shell(
                     assign
@@ -1731,8 +1729,6 @@ where
                         .stub
                         .point
                         .clone()
-                        .to_port()
-                        .with_layer(Layer::Shell),
                 );
 
                 println!("ASSIGN {}", assign.details.stub.kind.to_string());
