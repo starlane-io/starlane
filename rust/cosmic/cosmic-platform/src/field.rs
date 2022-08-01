@@ -164,18 +164,30 @@ where
             }
         }
 
-        self.skel.logger.track(&directed, || {
-            Tracker::new("field:directed_core_bound", "PreBind")
-        });
 
+        println!("DIRECTED TO : {}", directed.to.point.to_string());
         let record = self.skel.registry.locate(&directed.to.point).await.map_err(|e|e.to_cosmic_err())?;
+        println!("DIRECTED KIND : {}", record.details.stub.kind.to_string());
 
         let properties = self.skel.registry.get_properties(&directed.to.point ).await.map_err(|e|e.to_cosmic_err())?;
         let bind_property = properties.get("bind");
 
+        self.skel.logger.track(&directed, || {
+            Tracker::new("field:directed_core_bound", "PreBind")
+        });
+
         let bind = match bind_property {
             None => {
+                self.skel.logger.track(&directed, || {
+                    Tracker::new("field:directed_core_bound", "GetBindFromDriver")
+                });
+
+println!("...KIND {}", &record.details.stub.kind.to_string());
                 let driver = self.skel.drivers.get(&record.details.stub.kind).await?;
+
+                self.skel.logger.track(&directed, || {
+                    Tracker::new("field:directed_core_bound", "GetBindFromItem")
+                });
                 driver.bind(&directed.to.point).await.map_err(|e|e.to_cosmic_err())?
             }
             Some(bind) => {
@@ -190,6 +202,11 @@ where
         });
 
         let route = bind.select(&directed.payload)?;
+
+        self.skel.logger.track(&directed, || {
+            Tracker::new("field:directed_core_bound", "RouteSelected")
+        });
+
         let regex = route.selector.path.clone();
 
         let env = {
@@ -202,6 +219,7 @@ where
             env
         };
 
+println!("GOT HERE! (1)");
         let directed_id = directed.id().to_string();
 
         let pipeline = route.block.clone();
@@ -227,6 +245,8 @@ where
                 return Ok(());
             }
         };
+
+println!("GOT HERE!");
 
         if let PipeAction::Respond = action {
             self.skel

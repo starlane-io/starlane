@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use std::str::FromStr;
 use crate::{DriverFactory, PlatErr, Platform, Registry};
 use cosmic_api::cli::RawCommand;
 use cosmic_api::command::command::common::StateSrc;
@@ -7,7 +8,7 @@ use cosmic_api::command::Command;
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{Kind, Layer, Point, Port, ToPort, GLOBAL_EXEC, ToPoint};
 use cosmic_api::log::{PointLogger, RootLogger};
-use cosmic_api::parse::command_line;
+use cosmic_api::parse::{bind_config, command_line};
 use cosmic_api::parse::error::result;
 use cosmic_api::particle::particle::{Details, Status};
 use cosmic_api::util::{log, ToResolved};
@@ -39,6 +40,28 @@ use cosmic_api::wave::DirectedHandler;
 use cosmic_api::wave::DirectedHandlerSelector;
 use cosmic_api::wave::RecipientSelector;
 use cosmic_api::wave::RootInCtx;
+
+lazy_static! {
+    static ref GLOBAL_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
+        Arc::new(global_bind()),
+        Point::from_str("GLOBAL::repo:1.0.0:/bind/global.bind").unwrap()
+    );
+}
+
+
+fn global_bind() -> BindConfig {
+    log(bind_config(
+        r#"
+    Bind(version=1.0.0)
+    {
+       Route<Cmd<RawCommand>> -> (());
+       Route<Cmd<Command>> -> (()) => &;
+    }
+    "#,
+    ))
+        .unwrap()
+
+}
 
 pub struct GlobalDriverFactory<P>
 where
@@ -158,12 +181,13 @@ where
 
 #[async_trait]
 impl <P> ItemDirectedHandler<P> for GlobalCore<P> where P: Platform {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
-        Item::bind(self).await
+    async fn get_bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+          self.bind().await
     }
 }
 
 
+#[async_trait]
 impl<P> Item<P> for GlobalCore<P>
 where
     P: Platform,
@@ -174,6 +198,10 @@ where
 
     fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self {
         GlobalCore { skel }
+    }
+
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+        Ok(GLOBAL_BIND_CONFIG.clone())
     }
 }
 

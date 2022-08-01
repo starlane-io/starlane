@@ -120,7 +120,6 @@ where
     Init0,
     Init1,
     AddDriver {
-        kind: Kind,
         driver: DriverApi<P>,
         rtn: oneshot::Sender<()>,
     },
@@ -298,8 +297,8 @@ where
                     DriversCall::Init1 => {
                         self.init1().await;
                     }
-                    DriversCall::AddDriver { kind, driver, rtn } => {
-                        self.drivers.insert(kind, driver);
+                    DriversCall::AddDriver { driver, rtn } => {
+                        self.drivers.insert(driver.kind.clone(), driver);
                         rtn.send(());
                     }
                     DriversCall::Visit(traversal) => {
@@ -625,7 +624,7 @@ where
                             let driver = DriverApi::new(runner.clone(), factory.kind());
                             let (rtn, rtn_rx) = oneshot::channel();
                             call_tx
-                                .send(DriversCall::AddDriver { kind, driver, rtn })
+                                .send(DriversCall::AddDriver {  driver, rtn })
                                 .await
                                 .unwrap_or_default();
                             rtn_rx.await;
@@ -877,7 +876,6 @@ where
 {
     pub port: Port,
     pub skel: StarSkel<P>,
-    pub state: Option<Arc<RwLock<dyn State>>>,
     pub item: ItemHandler<P>,
     pub router: Arc<dyn Router>,
 }
@@ -1068,7 +1066,8 @@ where
                         DriverRunnerRequest::Create { .. } => {}
                     },
                     DriverRunnerCall::Bind { point, rtn } => {
-                        let item = self.item(&point).await;
+println!("POINT: {} KIND: {}", point.to_string(), self.driver.kind().to_string() );
+                        let item = self.driver.item(&point).await;
                         match item {
                             Ok(item) => {
                                 tokio::spawn(async move {
@@ -1076,6 +1075,7 @@ where
                                 });
                             }
                             Err(err) => {
+println!("{}",err.to_string());
                                 rtn.send(Err(err));
                             }
                         }
@@ -1086,35 +1086,26 @@ where
     }
 
     async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), P::Err> {
-        let core = self.item(&traversal.to.point).await?;
+        let item = self.item(&traversal.to.point).await?;
         if traversal.is_directed() {
-            core.deliver_directed(traversal.unwrap_directed()).await;
+            item.deliver_directed(traversal.unwrap_directed()).await?;
         } else {
-            core.deliver_reflected(traversal.unwrap_reflected()).await;
+            item.deliver_reflected(traversal.unwrap_reflected()).await?;
         }
         Ok(())
     }
 
     async fn item(&self, point: &Point) -> Result<ItemShell<P>, P::Err> {
         let port = point.clone().to_port().with_layer(Layer::Core);
-        let (tx, mut rx) = oneshot::channel();
-        self.star_skel
-            .state
-            .states_tx()
-            .send(StateCall::Get {
-                port: port.clone(),
-                tx,
-            })
-            .await;
-        let state = rx.await??;
+
         Ok(ItemShell {
             port: port.clone(),
             skel: self.star_skel.clone(),
-            state: state.clone(),
             item: self.driver.item(point).await?,
             router: Arc::new(self.router.clone().with(port)),
         })
     }
+
 
     #[route("Sys<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, P::Err> {
@@ -1366,8 +1357,8 @@ where
 {
     pub async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         match self {
-            ItemHandler::Handler(handler) => handler.bind().await,
-            ItemHandler::Router(router) => router.bind().await,
+            ItemHandler::Handler(handler) => handler.get_bind().await,
+            ItemHandler::Router(router) => router.get_bind().await,
         }
     }
 }
@@ -1390,7 +1381,7 @@ pub trait ItemDirectedHandler<P>: DirectedHandler + Send + Sync
 where
     P: Platform,
 {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err>;
+    async fn get_bind(&self) -> Result<ArtRef<BindConfig>, P::Err>;
 }
 
 #[async_trait]
@@ -1398,7 +1389,7 @@ pub trait ItemRouter<P>: Router + Send + Sync
 where
     P: Platform,
 {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err>;
+    async fn get_bind(&self) -> Result<ArtRef<BindConfig>, P::Err>;
 }
 
 #[derive(Clone)]

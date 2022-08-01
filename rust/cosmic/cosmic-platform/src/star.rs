@@ -1629,7 +1629,7 @@ where
         let point = self.star_skel.point.clone();
         let registration = Registration {
             point: point.clone(),
-            kind: Kind::Global,
+            kind: Kind::Star(self.star_skel.kind.clone()),
             registry: Default::default(),
             properties: Default::default(),
             owner: HYPERUSER.clone(),
@@ -1653,6 +1653,7 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemHandler<P>, P::Err> {
+println!("GET ITEM FROM STARDRIVER");
         Ok(ItemHandler::Handler(Box::new(StarCore::restore(self.star_skel.clone(), (), ()))))
     }
 
@@ -1674,11 +1675,12 @@ where
 
 #[async_trait]
 impl <P> ItemDirectedHandler<P> for StarCore<P> where P: Platform{
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
-        Item::bind(self).await
+    async fn get_bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+        self.bind().await
     }
 }
 
+#[async_trait]
 impl<P> Item<P> for StarCore<P>
 where
     P: Platform + 'static,
@@ -1689,6 +1691,10 @@ where
 
     fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self {
         StarCore { skel }
+    }
+
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+        Ok(STAR_BIND_CONFIG.clone())
     }
 }
 
