@@ -4001,12 +4001,15 @@ impl Exchanger {
         }
     }
 
-    pub async fn reflected(&self, reflect: ReflectedWave) {
+    pub async fn reflected(&self, reflect: ReflectedWave) -> Result<(),MsgErr>{
         if let Some(multi) = self.multis.get(reflect.reflection_of()) {
             multi.value().send(reflect).await;
         } else if let Some((_, tx)) = self.singles.remove(reflect.reflection_of()) {
             tx.send(ReflectedAggregate::Single(reflect));
+        } else {
+            return Err(MsgErr::from_500("Not expecting reflected message"));
         }
+        Ok(())
     }
 
     pub async fn exchange(&self, directed: &DirectedWave) -> oneshot::Receiver<ReflectedAggregate> {

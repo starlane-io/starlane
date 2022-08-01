@@ -69,7 +69,7 @@ where
         &self.skel.exchanger
     }
 
-    async fn deliver_directed(&self, directed: Traversal<DirectedWave>) {
+    async fn deliver_directed(&self, directed: Traversal<DirectedWave>) -> Result<(),MsgErr>{
         let logger = self.skel.logger.point(directed.to.point.clone()).span();
         let injector = directed
             .from()
@@ -105,6 +105,7 @@ where
                 self.inject(reflected.to_ultra()).await;
             }
         }
+        Ok(())
     }
 
     async fn directed_fabric_bound(

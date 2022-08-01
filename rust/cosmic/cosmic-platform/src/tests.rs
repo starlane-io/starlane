@@ -177,7 +177,7 @@ impl RegistryApi<TestPlatform> for TestRegistryApi {
     }
 
     async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, TestErr> {
-        todo!()
+        Ok(Default::default())
     }
 
     async fn locate<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, TestErr> {

@@ -9,7 +9,7 @@ use cosmic_api::id::id::{
 };
 use cosmic_api::id::Traversal;
 use cosmic_api::id::{ArtifactSubKind, TraversalInjection};
-use cosmic_api::log::{PointLogger, RootLogger, SpanLogger};
+use cosmic_api::log::{PointLogger, RootLogger, SpanLogger, Tracker};
 use cosmic_api::parse::model::PipelineVar;
 use cosmic_api::parse::{
     bind_config, Env, MapResolver, MultiVarResolver, PointCtxResolver, RegexCapturesResolver,
@@ -36,43 +36,8 @@ use std::sync::Arc;
 use tokio::io::AsyncBufReadExt;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, Mutex};
+use cosmic_api::particle::particle::Property;
 
-lazy_static! {
-    static ref STAR_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
-        Arc::new(star_bind_config()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/star.bind").unwrap()
-    );
-    static ref CONTROL_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
-        Arc::new(control_bind_config()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/control.bind").unwrap()
-    );
-}
-
-fn star_bind_config() -> BindConfig {
-    log(bind_config(
-        r#"
-    Bind(version=1.0.0)
-    {
-       Route<Sys<Transport>> -> (());
-       Route<Sys<Assign>> -> (()) => &;
-    }
-    "#,
-    ))
-    .unwrap()
-}
-
-fn control_bind_config() -> BindConfig {
-    log(bind_config(
-        r#"
-    Bind(version=1.0.0)
-    {
-       Route<Msg<*>> -> ((*));
-       Route<Cmd<*>> -> ((*));
-    }
-    "#,
-    ))
-    .unwrap()
-}
 
 #[derive(Clone)]
 pub struct FieldEx<P>
@@ -129,13 +94,7 @@ where
         Ok(())
     }
 
-    fn static_bind(&self, kind: &Kind) -> Option<ArtRef<BindConfig>> {
-        match kind.to_base() {
-            BaseKind::Star => Some(STAR_BIND_CONFIG.clone()),
-            BaseKind::Control => Some(CONTROL_BIND_CONFIG.clone()),
-            _ => None,
-        }
-    }
+
 }
 
 #[async_trait]
@@ -162,6 +121,12 @@ where
         directed
             .logger
             .set_span_attr("message-id", &directed.id().to_string());
+
+
+        self.skel.logger.track(&directed, || {
+            Tracker::new("field:directed_core_bound", "Receive")
+        });
+
         let access = self
             .skel
             .registry
@@ -177,8 +142,16 @@ where
                     );
                     directed.logger.error(err_msg.as_str());
                     match directed.err(err_msg.into(), self.port().clone()) {
-                        Bounce::Absorbed => {}
+                        Bounce::Absorbed => {
+                            self.skel.logger.track(&directed, || {
+                                Tracker::new("field:directed_core_bound", "Absorbed")
+                            });
+                        }
                         Bounce::Reflected(reflected) => {
+                            self.skel.logger.track(&directed, || {
+                                Tracker::new("field:directed_core_bound", "Bounced")
+                            });
+
                             self.skel.gravity_tx.send(reflected.to_ultra()).await;
                         }
                     }
@@ -191,12 +164,31 @@ where
             }
         }
 
-        let bind = match self.static_bind(&directed.record.details.stub.kind) {
-            None => self.skel.machine.artifacts.bind(&directed.to).await?,
-            Some(bind) => bind,
+        self.skel.logger.track(&directed, || {
+            Tracker::new("field:directed_core_bound", "PreBind")
+        });
+
+        let record = self.skel.registry.locate(&directed.to.point).await.map_err(|e|e.to_cosmic_err())?;
+
+        let properties = self.skel.registry.get_properties(&directed.to.point ).await.map_err(|e|e.to_cosmic_err())?;
+        let bind_property = properties.get("bind");
+
+        let bind = match bind_property {
+            None => {
+                let driver = self.skel.drivers.get(&record.details.stub.kind).await?;
+                driver.bind(&directed.to.point).await.map_err(|e|e.to_cosmic_err())?
+            }
+            Some(bind) => {
+                let bind = Point::from_str(bind.value.as_str())?;
+                self.skel.machine.artifacts.bind(&bind).await?
+            }
         };
 
-        //let bind = self.static_bind(&directed.record.details.stub.kind).expect("Bind");
+
+        self.skel.logger.track(&directed, || {
+            Tracker::new("field:directed_core_bound", "GotStaticBind")
+        });
+
         let route = bind.select(&directed.payload)?;
         let regex = route.selector.path.clone();
 
@@ -217,6 +209,11 @@ where
         let to = directed.to.clone();
         let call = directed.to_call(to)?;
         let logger = directed.logger.span();
+
+        self.skel.logger.track(&directed, || {
+            Tracker::new("field:directed_core_bound", "PipeEx")
+        });
+
         let mut pipex = PipeEx::new(directed, self.clone(), pipeline, env, logger.clone());
         let action = match pipex.next() {
             Ok(action) => action,

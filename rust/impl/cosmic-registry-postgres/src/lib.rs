@@ -1688,7 +1688,7 @@ where
     pub async fn create(&self, create: &Create) -> Result<Details, PostErr> {
         let child_kind = self
             .platform
-            .default_implementation(&create.template.kind)?;
+            .select_kind(&create.template.kind)?;
         let stub = match &create.template.point.child_segment_template {
             PointSegTemplate::Exact(child_segment) => {
                 let point = create.template.point.parent.push(child_segment.clone());

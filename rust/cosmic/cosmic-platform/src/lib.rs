@@ -267,7 +267,7 @@ where P: Platform, P::Err: PlatErr
 
  */
 
-pub trait PlatErr: Sized + Send + Sync + ToString + Clone + Into<MsgErr> + From<MsgErr> +From<String> +From<&'static str> {
+pub trait PlatErr: Sized + Send + Sync + ToString + Clone + Into<MsgErr> + From<MsgErr> +From<String> +From<&'static str>+From<tokio::sync::oneshot::error::RecvError>+Into<MsgErr> {
     fn to_cosmic_err(&self) -> MsgErr;
 
     fn new<S>(message: S) -> Self
@@ -308,7 +308,7 @@ where
     Self::RegistryContext: Send + Sync,
     Self::StarAuth: HyperAuthenticator,
     Self::RemoteStarConnectionFactory: HyperwayExtFactory,
-    Self::Err: From<tokio::sync::oneshot::error::RecvError>,
+    Self::Err: PlatErr,
 {
     type Err;
     type RegistryContext;
@@ -337,7 +337,7 @@ where
         Default::default()
     }
 
-    fn default_implementation(&self, template: &KindTemplate) -> Result<Kind, MsgErr> {
+    fn select_kind(&self, template: &KindTemplate) -> Result<Kind, MsgErr> {
         let base: BaseKind = BaseKind::from_str(template.base.to_string().as_str())?;
         Ok(match base {
             BaseKind::Root => Kind::Root,

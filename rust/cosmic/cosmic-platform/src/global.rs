@@ -15,7 +15,7 @@ use cosmic_api::wave::{
     Agent, DirectedHandlerShell, DirectedProto, Exchanger, Handling, InCtx, Pong, ProtoTransmitter,
     ProtoTransmitterBuilder, ReflectedCore, Router, Scope, SetStrategy, SysMethod, Wave,
 };
-use cosmic_api::{Registration, HYPERUSER};
+use cosmic_api::{Registration, HYPERUSER, ArtRef};
 use cosmic_nom::new_span;
 use std::sync::Arc;
 
@@ -28,9 +28,9 @@ pub struct Global<P> where P: Platform {
 
  */
 
-use crate::driver::{Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item,  ItemHandler};
+use crate::driver::{Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemDirectedHandler, ItemHandler};
 use crate::star::StarSkel;
-use cosmic_api::config::config::bind::RouteSelector;
+use cosmic_api::config::config::bind::{BindConfig, RouteSelector};
 use cosmic_api::parse::route_attribute;
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{Assign, AssignmentKind, Sys};
@@ -156,6 +156,13 @@ where
     skel: StarSkel<P>,
 }
 
+#[async_trait]
+impl <P> ItemDirectedHandler<P> for GlobalCore<P> where P: Platform {
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+        Item::bind(self).await
+    }
+}
+
 
 impl<P> Item<P> for GlobalCore<P>
 where
@@ -187,6 +194,7 @@ where
 
     #[route("Cmd<Command>")]
     pub async fn command(&self, ctx: InCtx<'_, Command>) -> Result<ReflectedCore, P::Err> {
+println!("~~~ GLOBAL RECEIVED COMMAND!");
         let global = Global::new( self.skel.clone(), self.skel.logger.clone() );
         let agent = ctx.wave().agent().clone();
         match ctx.input {
@@ -214,13 +222,14 @@ where
             logger
         }
     }
+
     pub async fn create(&self, create: &Create, agent: &Agent) -> Result<Details, P::Err> {
 println!("GLOBAL CREATE!");
         let child_kind = self
             .skel
             .machine
             .platform
-            .default_implementation(&create.template.kind)?;
+            .select_kind(&create.template.kind)?;
         let details = match &create.template.point.child_segment_template {
             PointSegTemplate::Exact(child_segment) => {
                 let point = create.template.point.parent.push(child_segment.clone());

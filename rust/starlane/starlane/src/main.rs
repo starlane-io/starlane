@@ -181,7 +181,7 @@ impl Platform for Starlane {
 
     fn start_services(&self, entry_router: &mut HyperGateSelector) {}
 
-    fn default_implementation(&self, template: &KindTemplate) -> Result<Kind, MsgErr> {
+    fn select_kind(&self, template: &KindTemplate) -> Result<Kind, MsgErr> {
         let base: BaseKind = BaseKind::from_str(template.base.to_string().as_str())?;
         match base {
             BaseKind::UserBase => match &template.sub {
@@ -198,7 +198,7 @@ impl Platform for Starlane {
                     what => return Err(format!("unrecognized UserBase sub: '{}'", what).into()),
                 },
             },
-            _ => Platform::default_implementation(self, template),
+            _ => Platform::select_kind(self, template),
         }
     }
 }

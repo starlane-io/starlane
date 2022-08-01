@@ -1589,37 +1589,41 @@ pub mod id {
 
         fn exchanger(&self) -> &Exchanger;
 
-        async fn deliver_directed(&self, direct: Traversal<DirectedWave>) {}
-
-        async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) {
-            self.exchanger().reflected(reflect.payload).await;
+        async fn deliver_directed(&self, direct: Traversal<DirectedWave>) -> Result<(),MsgErr>{
+            Err(MsgErr::from_500("this layer does not handle directed messages"))
         }
 
-        async fn visit(&self, traversal: Traversal<UltraWave>) {
+        async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) -> Result<(),MsgErr> {
+            self.exchanger().reflected(reflect.payload).await
+        }
+
+        async fn visit(&self, traversal: Traversal<UltraWave>) -> Result<(),MsgErr>{
             if let Some(dest) = &traversal.dest {
                 if self.port().layer == *dest {
                     if traversal.is_directed() {
-                        self.deliver_directed(traversal.unwrap_directed()).await;
+                        self.deliver_directed(traversal.unwrap_directed()).await?;
                     } else {
-                        self.deliver_reflected(traversal.unwrap_reflected()).await;
+                        self.deliver_reflected(traversal.unwrap_reflected()).await?;
                     }
-                    return;
+                    return Ok(());
                 } else {
                 }
             }
 
             if traversal.is_directed() && traversal.dir == TraversalDirection::Fabric {
                 self.directed_fabric_bound(traversal.unwrap_directed())
-                    .await;
+                    .await?;
             } else if traversal.is_reflected() && traversal.dir == TraversalDirection::Core {
                 self.reflected_core_bound(traversal.unwrap_reflected())
-                    .await;
+                    .await?;
             } else if traversal.is_directed() && traversal.dir == TraversalDirection::Core {
-                self.directed_core_bound(traversal.unwrap_directed()).await;
+                self.directed_core_bound(traversal.unwrap_directed()).await?;
             } else if traversal.is_reflected() && traversal.dir == TraversalDirection::Fabric {
                 self.reflected_fabric_bound(traversal.unwrap_reflected())
-                    .await;
+                    .await?;
             }
+
+            Ok(())
         }
 
         // override if you want to track outgoing requests
@@ -2816,7 +2820,7 @@ pub enum BaseSubKind {
     Mechtron,
     Database,
     Any,
-    Drivers,
+    Driver,
 }
 
 impl Into<Sub> for BaseSubKind {

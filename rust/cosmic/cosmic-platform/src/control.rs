@@ -251,6 +251,7 @@ println!("POINT FACTORY CREATE");
         };
 
         let mut wave = create.to_wave_proto();
+        wave.track = true;
         wave.from(self.skel.driver.point.clone());
         wave.agent(Agent::Point(self.skel.driver.point.clone()));
 

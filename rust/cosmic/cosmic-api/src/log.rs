@@ -953,7 +953,7 @@ pub struct Tracker {
 }
 
 impl Tracker {
-    pub fn new<S: ToString>(parsec: S, action: S) -> Self {
+    pub fn new<P: ToString,A:ToString>(parsec: P, action: A) -> Self {
         Self {
             parsec: parsec.to_string(),
             action: action.to_string(),

@@ -9,7 +9,7 @@ use cosmic_api::cli::RawCommand;
 use cosmic_api::command::command::common::StateSrc;
 use cosmic_api::command::request::create::Strategy;
 use cosmic_api::command::request::set::Set;
-use cosmic_api::config::config::bind::RouteSelector;
+use cosmic_api::config::config::bind::{BindConfig, RouteSelector};
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{
     BaseKind, Kind, Layer, Point, Port, PortSelector, RouteSeg, Sub, ToBaseKind, ToPoint, ToPort,
@@ -18,12 +18,12 @@ use cosmic_api::id::id::{
 use cosmic_api::id::{StarKey, StarStub, StarSub, TraversalInjection};
 use cosmic_api::id::{Traversal, TraversalDirection};
 use cosmic_api::log::{PointLogger, RootLogger, Tracker};
-use cosmic_api::parse::{route_attribute, Env};
+use cosmic_api::parse::{route_attribute, Env, bind_config};
 use cosmic_api::particle::particle::{Details, Status, Stub};
 use cosmic_api::quota::Timeouts;
 use cosmic_api::substance::substance::{Substance, ToSubstance};
 use cosmic_api::sys::{Assign, AssignmentKind, Discoveries, Discovery, Location, Search, Sys};
-use cosmic_api::util::{ValueMatcher, ValuePattern};
+use cosmic_api::util::{log, ValueMatcher, ValuePattern};
 use cosmic_api::wave::{
     Agent, Bounce, BounceBacks, CoreBounce, DirectedHandler, DirectedHandlerSelector,
     DirectedHandlerShell, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
@@ -54,7 +54,7 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 use tokio::time::error::Elapsed;
 use tracing::info;
-
+use cosmic_api::ArtRef;
 #[derive(Clone)]
 pub struct StarState<P>
 where
@@ -826,7 +826,9 @@ where
             .to_gravity
             .send(wave.clone())
             .unwrap_or_default();
-
+        self.skel.logger.track(&wave, || {
+            Tracker::new("to_gravity", "Receive")
+        });
         if wave.is_directed()
             && wave.to().is_single()
             && wave.to().to_single().unwrap().point == *GLOBAL_EXEC
@@ -1011,7 +1013,6 @@ where
 
         let mut to = wave.to().clone().unwrap_single();
         if to.point == *GLOBAL_EXEC {
-println!("forwarding to: {}", self.skel.machine.global.to_string());
             wave.set_to(self.skel.machine.global.clone());
             to = self.skel.machine.global.clone();
         }
@@ -1144,6 +1145,11 @@ println!("forwarding to: {}", self.skel.machine.global.to_string());
     }
 
     async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(), MsgErr> {
+
+        self.skel.logger.track(&traversal, || {
+            Tracker::new(format!("visit:layer@{}",traversal.layer.to_string()), "Visit")
+        });
+
         if traversal.is_directed() && self.skel.state.topic.contains_key(&traversal.to) {
             let topic = self.skel.state.find_topic(&traversal.to, traversal.from());
             match topic {
@@ -1192,7 +1198,7 @@ println!("forwarding to: {}", self.skel.machine.global.to_string());
                             .find_field(&traversal.to.clone().with_layer(Layer::Field))?,
                         traversal.logger.clone(),
                     );
-                    field.visit(traversal).await;
+                    self.skel.logger.result(field.visit(traversal).await).unwrap_or_default();
                 }
                 Layer::Shell => {
                     let shell = ShellEx::new(
@@ -1201,10 +1207,10 @@ println!("forwarding to: {}", self.skel.machine.global.to_string());
                             .state
                             .find_shell(&traversal.to.clone().with_layer(Layer::Shell))?,
                     );
-                    shell.visit(traversal).await;
+                    self.skel.logger.result(shell.visit(traversal).await).unwrap_or_default();
                 }
                 _ => {
-                    self.exit(traversal).await;
+                    self.skel.logger.result(self.exit(traversal).await).unwrap_or_default();
                 }
             }
         }
@@ -1230,7 +1236,7 @@ println!("forwarding to: {}", self.skel.machine.global.to_string());
                 }
             },
             Some(next) => {
-                self.visit_layer(traversal).await;
+                self.skel.logger.result(self.visit_layer(traversal).await).unwrap_or_default();
             }
         }
     }
@@ -1494,6 +1500,29 @@ impl PartialOrd for StarDiscovery {
     }
 }
 
+
+lazy_static! {
+    static ref STAR_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
+        Arc::new(star_bind()),
+        Point::from_str("GLOBAL::repo:1.0.0:/bind/star.bind").unwrap()
+    );
+}
+
+
+fn star_bind() -> BindConfig {
+    log(bind_config(
+        r#"
+    Bind(version=1.0.0)
+    {
+       Route<Sys<Transport>> -> (());
+       Route<Sys<Assign>> -> (()) => &;
+    }
+    "#,
+    ))
+        .unwrap()
+}
+
+
 #[derive(Clone)]
 pub struct StarDriverFactory<P>
 where
@@ -1643,6 +1672,12 @@ where
     pub skel: StarSkel<P>,
 }
 
+#[async_trait]
+impl <P> ItemDirectedHandler<P> for StarCore<P> where P: Platform{
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+        Item::bind(self).await
+    }
+}
 
 impl<P> Item<P> for StarCore<P>
 where
@@ -1717,6 +1752,11 @@ where
             .transport_endpoint
             .send(ctx.wave().clone().to_ultra())
             .unwrap_or_default();
+
+        self.skel.logger.track(ctx.wave(), || {
+            Tracker::new("star:core:transport", "Receive")
+        });
+
         let wave = ctx.input.clone();
 
         let injection = TraversalInjection::new(
