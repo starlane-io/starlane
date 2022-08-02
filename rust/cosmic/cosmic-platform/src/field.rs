@@ -9,7 +9,7 @@ use cosmic_api::id::id::{
 };
 use cosmic_api::id::Traversal;
 use cosmic_api::id::{ArtifactSubKind, TraversalInjection};
-use cosmic_api::log::{PointLogger, RootLogger, SpanLogger, Tracker};
+use cosmic_api::log::{PointLogger, RootLogger, SpanLogger, Trackable, Tracker};
 use cosmic_api::parse::model::PipelineVar;
 use cosmic_api::parse::{
     bind_config, Env, MapResolver, MultiVarResolver, PointCtxResolver, RegexCapturesResolver,
@@ -20,10 +20,7 @@ use cosmic_api::selector::{PayloadBlock, PayloadBlockVar};
 use cosmic_api::substance::substance::{Call, CallKind, Substance};
 use cosmic_api::sys::ParticleRecord;
 use cosmic_api::util::{log, ToResolved, ValueMatcher};
-use cosmic_api::wave::{
-    Agent, Bounce, CmdMethod, DirectedCore, DirectedWave, Exchanger, Method, Ping, Pong,
-    Reflectable, ReflectedCore, ReflectedWave, SingularDirectedWave, ToRecipients, UltraWave, Wave,
-};
+use cosmic_api::wave::{Agent, Bounce, CmdMethod, DirectedCore, DirectedWave, Exchanger, Method, Ping, Pong, Reflectable, ReflectedCore, ReflectedWave, Ripple, Signal, SingularDirectedWave, ToRecipients, UltraWave, Wave};
 use regex::{CaptureMatches, Regex};
 
 use crate::{PlatErr, Platform, RegistryApi};
@@ -40,7 +37,7 @@ use cosmic_api::particle::particle::Property;
 
 
 #[derive(Clone)]
-pub struct FieldEx<P>
+pub struct Field<P>
 where
     P: Platform + 'static,
 {
@@ -50,7 +47,7 @@ where
     pub logger: SpanLogger,
 }
 
-impl<P> FieldEx<P>
+impl<P> Field<P>
 where
     P: Platform + 'static,
 {
@@ -64,15 +61,34 @@ where
         }
     }
 
-    async fn handle_action(&self, action: RequestAction) -> Result<(), MsgErr> {
+    async fn handle_action(&self, action: DirectedAction) -> Result<(), MsgErr> {
+
+        let track = action.track();
+
         match action.action {
-            PipeAction::CoreDirected(mut request) => {
-                self.traverse_next(request.wrap()).await;
+            PipeAction::CoreDirected(mut directed) => {
+/*                if track {
+                    panic!("CoreDirected");
+                }
+
+ */
+                assert_eq!(track,directed.track());
+
+                self.traverse_next(directed.wrap()).await;
             }
-            PipeAction::FabricDirected(mut request) => {
-                self.traverse_next(request.wrap()).await;
+            PipeAction::FabricDirected(mut directed) => {
+                if track {
+                    panic!("FabricDirected");
+                }
+
+                self.traverse_next(directed.wrap()).await;
             }
             PipeAction::Respond => {
+
+                if track {
+                    panic!("Respond");
+                }
+
                 let pipex = self.state.pipe_exes.remove(&action.request_id);
 
                 match pipex {
@@ -98,7 +114,7 @@ where
 }
 
 #[async_trait]
-impl<P> TraversalLayer for FieldEx<P>
+impl<P> TraversalLayer for Field<P>
 where
     P: Platform + 'static,
 {
@@ -231,6 +247,7 @@ println!("GOT HERE! (1)");
         self.skel.logger.track(&directed, || {
             Tracker::new("field:directed_core_bound", "PipeEx")
         });
+        let track = directed.track();
 
         let mut pipex = PipeEx::new(directed, self.clone(), pipeline, env, logger.clone());
         let action = match pipex.next() {
@@ -258,12 +275,14 @@ println!("GOT HERE!");
 
         self.state.pipe_exes.insert(directed_id.clone(), pipex);
 
-        let action = RequestAction {
+        let action = DirectedAction {
             request_id: directed_id,
             action,
+            track
         };
 
         self.handle_action(action).await?;
+
         Ok(())
     }
 
@@ -271,6 +290,11 @@ println!("GOT HERE!");
         &self,
         mut traversal: Traversal<ReflectedWave>,
     ) -> Result<(), MsgErr> {
+
+        if traversal.track() {
+            panic!("REFLECTED CORE BOUND");
+        }
+
         let reflected_id = traversal.reflection_of().to_string();
         let mut pipex = self.state.pipe_exes.remove(&reflected_id);
 
@@ -285,6 +309,8 @@ println!("GOT HERE!");
 
         let (_, mut pipex) = pipex.expect("pipeline executor");
 
+        let track = traversal.track();
+
         let action = pipex.handle_reflected(traversal.payload)?;
 
         if let PipeAction::Respond = action {
@@ -297,9 +323,10 @@ println!("GOT HERE!");
 
         self.state.pipe_exes.insert(reflected_id.clone(), pipex);
 
-        let action = RequestAction {
+        let action = DirectedAction {
             request_id: reflected_id,
             action,
+            track
         };
 
         self.handle_action(action).await?;
@@ -319,7 +346,7 @@ where
 {
     pub logger: SpanLogger,
     pub traversal: PipeTraversal,
-    pub field: FieldEx<P>,
+    pub field: Field<P>,
     pub pipeline: PipelineVar,
     pub env: Env,
 }
@@ -330,7 +357,7 @@ where
 {
     pub fn new(
         traversal: Traversal<DirectedWave>,
-        binder: FieldEx<P>,
+        binder: Field<P>,
         pipeline: PipelineVar,
         env: Env,
         logger: SpanLogger,
@@ -470,7 +497,7 @@ impl PipeTraversal {
         }
     }
 
-    pub fn request_core(&self) -> DirectedCore {
+    pub fn directed_core(&self) -> DirectedCore {
         DirectedCore {
             headers: self.headers.clone(),
             method: self.method.clone(),
@@ -488,13 +515,37 @@ impl PipeTraversal {
     }
 
     pub fn direct(&self) -> Traversal<DirectedWave> {
-        self.initial
+
+        match &self.initial.payload.clone() {
+            DirectedWave::Ping(ping) => {
+                let mut wave = Wave::new(
+                    Ping::new(self.directed_core(), self.from().clone()),
+                    self.port.clone());
+                wave.track = self.initial.track();
+                self.initial.clone().with(wave.to_directed())
+            }
+            DirectedWave::Ripple(ripple) => {
+                let mut wave = Wave::new(Ripple::new(self.directed_core(), self.from().clone(), ripple.bounce_backs.clone()), self.port.clone());
+                wave.track = self.initial.track();
+                self.initial.clone().with(wave.to_directed())
+            }
+            DirectedWave::Signal(signal) => {
+                let mut wave = Wave::new(
+                    Signal::new( self.from().clone(), self.directed_core(),),
+                    self.port.clone());
+                wave.track = self.initial.track();
+                self.initial.clone().with(wave.to_directed())
+            }
+        }
+        /*self.initial
             .clone()
             .with(Wave::new(
-                Ping::new(self.request_core(), self.from().clone()),
+                Ping::new(self.directed_core(), self.from().clone()),
                 self.port.clone(),
             ))
             .to_directed()
+
+         */
     }
 
     pub fn response_core(&self) -> ReflectedCore {
@@ -561,6 +612,7 @@ impl PipeTraversal {
         let core = self.response_core();
         let reflection = self.initial.payload.reflection().unwrap();
         let reflected = reflection.make(core, self.port.clone());
+
         self.initial.with(reflected)
     }
 
@@ -572,11 +624,60 @@ impl PipeTraversal {
     }
 }
 
-struct RequestAction {
+struct DirectedAction {
     pub request_id: String,
     pub action: PipeAction,
+    pub track: bool
 }
 
+impl Trackable for DirectedAction {
+    fn track_id(&self) -> String {
+        self.request_id.clone()
+    }
+
+    fn track_method(&self) -> String {
+        self.action.to_string()
+    }
+
+    fn track_payload(&self) -> String {
+        "?".to_string()
+    }
+
+    fn track_from(&self) -> String {
+       match &self.action{
+           PipeAction::CoreDirected(w) => {
+               w.track_from()
+           }
+           PipeAction::FabricDirected(w) => {
+               w.track_from()
+           }
+           PipeAction::Respond => {
+               "?".to_string()
+           }
+       }
+    }
+
+    fn track_to(&self) -> String {
+
+        match &self.action{
+            PipeAction::CoreDirected(w) => {
+                w.track_to()
+            }
+            PipeAction::FabricDirected(w) => {
+                w.track_to()
+            }
+            PipeAction::Respond => {
+                "?".to_string()
+            }
+        }
+    }
+
+    fn track(&self) -> bool {
+        self.track
+    }
+}
+
+#[derive(strum_macros::Display)]
 pub enum PipeAction {
     CoreDirected(Traversal<DirectedWave>),
     FabricDirected(Traversal<DirectedWave>),

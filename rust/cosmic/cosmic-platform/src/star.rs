@@ -1,7 +1,7 @@
 use crate::driver::{Driver, DriverDriver, DriverDriverFactory, DriverFactory, DriverCtx, DriverSkel, DriverStatus, Drivers, DriversApi, DriversCall, ItemDirectedHandler, ItemHandler, ItemSkel, HyperDriverFactory, Item};
-use crate::field::{FieldEx, FieldState};
+use crate::field::{Field, FieldState};
 use crate::machine::MachineSkel;
-use crate::shell::ShellEx;
+use crate::shell::Shell;
 use crate::state::ShellState;
 use crate::{DriversBuilder, PlatErr, Platform, Registry, RegistryApi};
 use cosmic_api::bin::Bin;
@@ -343,7 +343,7 @@ where
     pub fn new(point: Point) -> Self {
         let (gravity_tx, mut gravity_rx) = mpsc::channel(1024);
         let (inject_tx, mut inject_rx) = mpsc::channel(1024);
-        let (traverse_to_next_tx, mut traverse_to_next_rx) = mpsc::channel(1024);
+        let (traverse_to_next_tx, mut traverse_to_next_rx) : (mpsc::Sender<Traversal<UltraWave>>,mpsc::Receiver<Traversal<UltraWave>>)= mpsc::channel(1024);
         let (drivers_traversal_tx, mut drivers_rx) = mpsc::channel(1024);
         let (drivers_call_tx, mut drivers_call_rx) = mpsc::channel(1024);
         let (drivers_status_tx, drivers_status_rx) = watch::channel(DriverStatus::Pending);
@@ -371,7 +371,9 @@ where
             let call_tx = call_tx.clone();
             tokio::spawn(async move {
                 while let Some(traversal) = traverse_to_next_rx.recv().await {
-                    match call_tx.send(StarCall::TraverseToNextLayer(traversal)).await {
+
+
+                    match call_tx.send(StarCall::TraverseToNextLayer(traversal.clone())).await {
                         Ok(_) => {}
                         Err(err) => {
                             println!("CALL TX ERR: {}", err.to_string());
@@ -706,6 +708,7 @@ where
                         }
                     }
                     StarCall::TraverseToNextLayer(traversal) => {
+
                         let layer_engine = self.layer_engine.clone();
                         tokio::spawn(async move {
                             layer_engine.traverse_to_next_layer(traversal).await;
@@ -1146,6 +1149,8 @@ where
 
     async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(), MsgErr> {
 
+
+
         self.skel.logger.track(&traversal, || {
             Tracker::new(format!("visit:layer@{}",traversal.layer.to_string()), "Visit")
         });
@@ -1190,7 +1195,7 @@ where
         } else {
             match traversal.layer {
                 Layer::Field => {
-                    let field = FieldEx::new(
+                    let field = Field::new(
                         traversal.point.clone(),
                         self.skel.clone(),
                         self.skel
@@ -1198,16 +1203,24 @@ where
                             .find_field(&traversal.to.clone().with_layer(Layer::Field))?,
                         traversal.logger.clone(),
                     );
-                    self.skel.logger.result(field.visit(traversal).await).unwrap_or_default();
+                    let logger = self.skel.logger.clone();
+                    tokio::spawn( async move {
+                        logger.result(field.visit(traversal).await).unwrap_or_default();
+                    });
                 }
                 Layer::Shell => {
-                    let shell = ShellEx::new(
+                    let shell = Shell::new(
                         self.skel.clone(),
                         self.skel
                             .state
                             .find_shell(&traversal.to.clone().with_layer(Layer::Shell))?,
                     );
-                    self.skel.logger.result(shell.visit(traversal).await).unwrap_or_default();
+
+
+                    let logger = self.skel.logger.clone();
+                    tokio::spawn( async move {
+                        logger.result(shell.visit(traversal).await).unwrap_or_default();
+                    });
                 }
                 _ => {
                     self.skel.logger.result(self.exit(traversal).await).unwrap_or_default();
@@ -1218,6 +1231,7 @@ where
     }
 
     async fn traverse_to_next_layer(&self, mut traversal: Traversal<UltraWave>) {
+
         if traversal.dest.is_some() && traversal.layer == *traversal.dest.as_ref().unwrap() {
             self.visit_layer(traversal).await;
             return;

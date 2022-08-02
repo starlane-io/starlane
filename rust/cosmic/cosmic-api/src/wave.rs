@@ -778,6 +778,12 @@ pub struct RippleDef<T: ToRecipients + Clone> {
     pub history: HashSet<Point>,
 }
 
+impl Ripple {
+    pub fn new<T>( core: DirectedCore, to: T,bounce_backs: BounceBacks) -> Self where T: ToRecipients {
+        Self { to: to.to_recipients(), core, bounce_backs, history: HashSet::new() }
+    }
+}
+
 impl<T> RippleDef<T>
 where
     T: ToRecipients + Clone,
@@ -2102,6 +2108,35 @@ pub enum ReflectedWave {
     Echo(Wave<Echo>),
 }
 
+impl Trackable for ReflectedWave {
+    fn track_id(&self) -> String {
+        self.id().to_string()
+    }
+
+    fn track_method(&self) -> String {
+        self.core().status.to_string()
+    }
+
+    fn track_payload(&self) -> String {
+        self.core().body.kind().to_string()
+    }
+
+    fn track_from(&self) -> String {
+        self.from().to_string()
+    }
+
+    fn track_to(&self) -> String {
+        self.to().to_string()
+    }
+
+    fn track(&self) -> bool {
+        match self {
+            ReflectedWave::Pong(pong) => pong.track,
+            ReflectedWave::Echo(echo) => echo.track
+        }
+    }
+}
+
 impl<S> ToSubstance<S> for ReflectedWave
 where
     Substance: ToSubstance<S>,
@@ -2129,6 +2164,22 @@ pub trait ToReflected {
 }
 
 impl ReflectedWave {
+
+    pub fn from(&self) -> &Port {
+        match self {
+            ReflectedWave::Pong(pong) => &pong.from,
+            ReflectedWave::Echo(echo) => &echo.from
+        }
+    }
+
+    pub fn to(&self) -> &Port {
+        match self {
+            ReflectedWave::Pong(pong) => &pong.to,
+            ReflectedWave::Echo(echo) => &echo.to
+        }
+    }
+
+
     pub fn id(&self) -> &WaveId {
         match self {
             ReflectedWave::Pong(pong) => &pong.id,

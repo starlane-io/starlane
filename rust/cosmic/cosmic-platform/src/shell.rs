@@ -9,7 +9,7 @@ use cosmic_api::id::id::{
     Layer, Point, Port, PortSelector, ToPoint, ToPort, Topic, TraversalLayer, Uuid,
 };
 use cosmic_api::id::{Traversal, TraversalInjection};
-use cosmic_api::log::RootLogger;
+use cosmic_api::log::{RootLogger, Trackable};
 use cosmic_api::parse::error::result;
 use cosmic_api::parse::{command_line, route_attribute, Env};
 use cosmic_api::quota::Timeouts;
@@ -30,7 +30,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
 #[derive(DirectedHandler)]
-pub struct ShellEx<P>
+pub struct Shell<P>
 where
     P: Platform + 'static,
 {
@@ -38,7 +38,7 @@ where
     state: ShellState,
 }
 
-impl<P> ShellEx<P>
+impl<P> Shell<P>
 where
     P: Platform + 'static,
 {
@@ -48,7 +48,7 @@ where
 }
 
 #[async_trait]
-impl<P> TraversalLayer for ShellEx<P>
+impl<P> TraversalLayer for Shell<P>
 where
     P: Platform + 'static,
 {
@@ -57,6 +57,10 @@ where
     }
 
     async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
+        if traversal.track() {
+            panic!("traverse next")
+        }
+
         self.skel.traverse_to_next_tx.send(traversal).await;
     }
 
@@ -70,6 +74,7 @@ where
     }
 
     async fn deliver_directed(&self, directed: Traversal<DirectedWave>) -> Result<(),MsgErr>{
+
         let logger = self.skel.logger.point(directed.to.point.clone()).span();
         let injector = directed
             .from()
@@ -112,7 +117,7 @@ where
         &self,
         traversal: Traversal<DirectedWave>,
     ) -> Result<(), MsgErr> {
-        self.state.fabric_requests.insert(traversal.id().clone());
+       self.state.fabric_requests.insert(traversal.id().clone());
         self.traverse_next(traversal.wrap()).await;
         Ok(())
     }
@@ -121,6 +126,8 @@ where
         &self,
         traversal: Traversal<ReflectedWave>,
     ) -> Result<(), MsgErr> {
+
+
         if let Some(_) = self
             .state
             .fabric_requests
@@ -137,7 +144,7 @@ where
 }
 
 #[routes]
-impl<P> ShellEx<P>
+impl<P> Shell<P>
 where
     P: Platform + 'static,
 {
