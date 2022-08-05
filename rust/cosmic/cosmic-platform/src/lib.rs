@@ -58,7 +58,6 @@ pub mod shell;
 pub mod star;
 pub mod state;
 pub mod tests;
-pub mod traversal;
 
 #[no_mangle]
 pub extern "C" fn cosmic_uuid() -> String {

@@ -57,11 +57,7 @@ where
     }
 
     async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
-        if traversal.track() {
-            panic!("traverse next")
-        }
-
-        self.skel.traverse_to_next_tx.send(traversal).await;
+        self.skel.traverse_to_next_tx.send(traversal.clone() ).await;
     }
 
     async fn inject(&self, wave: UltraWave) {

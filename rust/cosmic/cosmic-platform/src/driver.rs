@@ -1087,11 +1087,14 @@ println!("{}",err.to_string());
 
     async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), P::Err> {
         let item = self.item(&traversal.to.point).await?;
-        if traversal.is_directed() {
-            item.deliver_directed(traversal.unwrap_directed()).await?;
-        } else {
-            item.deliver_reflected(traversal.unwrap_reflected()).await?;
-        }
+        let logger = item.skel.logger.clone();
+        tokio::spawn(async move {
+            if traversal.is_directed() {
+                logger.result(item.deliver_directed(traversal.unwrap_directed()).await).unwrap_or_default();
+            } else {
+                logger.result(item.deliver_reflected(traversal.unwrap_reflected()).await).unwrap_or_default();
+            }
+        });
         Ok(())
     }
 

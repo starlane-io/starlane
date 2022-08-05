@@ -223,11 +223,12 @@ where
 
     #[route("Cmd<Command>")]
     pub async fn command(&self, ctx: InCtx<'_, Command>) -> Result<ReflectedCore, P::Err> {
-println!("~~~ GLOBAL RECEIVED COMMAND!");
         let global = Global::new( self.skel.clone(), self.skel.logger.clone() );
         let agent = ctx.wave().agent().clone();
         match ctx.input {
-            Command::Create(create) => Ok(ctx.ok_body(global.create(create,&agent).await?.stub.into())),
+            Command::Create(create) => {
+                Ok(ctx.ok_body(global.create(create,&agent).await?.stub.into()))
+            },
             _ => Err(P::Err::new("not implemented")),
         }
     }
@@ -297,7 +298,6 @@ println!("GLOBAL CREATE!");
                 if !pattern.contains("%") {
                     return Err(P::Err::status_msg(500u16, "AddressSegmentTemplate::Pattern must have at least one '%' char for substitution"));
                 }
-                loop {
                     let index = self
                         .skel
                         .registry
@@ -314,8 +314,7 @@ println!("GLOBAL CREATE!");
                         strategy: create.strategy.clone(),
                     };
 
-                    self.skel.registry.register(&registration).await?;
-                }
+                    self.skel.registry.register(&registration).await?
             }
         };
 

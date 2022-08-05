@@ -49,7 +49,7 @@ pub mod id {
         ArtifactSubKind, BaseSubKind, DatabaseSubKind, FileSubKind, StarSub, Traversal,
         TraversalDirection, TraversalInjection, UserBaseSubKind,
     };
-    use crate::log::PointLogger;
+    use crate::log::{PointLogger, Trackable};
     use crate::parse::{
         camel_case, camel_case_chars, consume_point, consume_point_ctx, kind_lex, kind_parts,
         parse_uuid, point_and_kind, point_route_segment, point_selector, point_var, uuid_chars,
@@ -1598,6 +1598,7 @@ pub mod id {
         }
 
         async fn visit(&self, traversal: Traversal<UltraWave>) -> Result<(),MsgErr>{
+
             if let Some(dest) = &traversal.dest {
                 if self.port().layer == *dest {
                     if traversal.is_directed() {

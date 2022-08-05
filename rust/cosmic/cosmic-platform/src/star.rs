@@ -17,7 +17,7 @@ use cosmic_api::id::id::{
 };
 use cosmic_api::id::{StarKey, StarStub, StarSub, TraversalInjection};
 use cosmic_api::id::{Traversal, TraversalDirection};
-use cosmic_api::log::{PointLogger, RootLogger, Tracker};
+use cosmic_api::log::{PointLogger, RootLogger, Trackable, Tracker};
 use cosmic_api::parse::{route_attribute, Env, bind_config};
 use cosmic_api::particle::particle::{Details, Status, Stub};
 use cosmic_api::quota::Timeouts;
@@ -53,7 +53,7 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 use tokio::time::error::Elapsed;
-use tracing::info;
+use tracing::{error, info};
 use cosmic_api::ArtRef;
 #[derive(Clone)]
 pub struct StarState<P>
@@ -1135,6 +1135,8 @@ where
     }
 
     async fn exit(&self, traversal: Traversal<UltraWave>) -> Result<(), MsgErr> {
+
+
         match traversal.dir {
             TraversalDirection::Fabric => {
                 self.exit_up.send(traversal).await;
@@ -1232,12 +1234,14 @@ where
 
     async fn traverse_to_next_layer(&self, mut traversal: Traversal<UltraWave>) {
 
-        if traversal.dest.is_some() && traversal.layer == *traversal.dest.as_ref().unwrap() {
+
+       if traversal.dest.is_some() && traversal.layer == *traversal.dest.as_ref().unwrap() {
             self.visit_layer(traversal).await;
             return;
         }
 
         let next = traversal.next();
+
         match next {
             None => match traversal.dir {
                 TraversalDirection::Fabric => {
@@ -1249,7 +1253,7 @@ where
                         .warn("should not have traversed a wave all the way to the core in Star");
                 }
             },
-            Some(next) => {
+            Some(_) => {
                 self.skel.logger.result(self.visit_layer(traversal).await).unwrap_or_default();
             }
         }
@@ -1668,7 +1672,9 @@ where
 
     async fn item(&self, point: &Point) -> Result<ItemHandler<P>, P::Err> {
 println!("GET ITEM FROM STARDRIVER");
-        Ok(ItemHandler::Handler(Box::new(StarCore::restore(self.star_skel.clone(), (), ()))))
+        let rtn =  Ok(ItemHandler::Handler(Box::new(StarCore::restore(self.star_skel.clone(), (), ()))));
+println!("RTN STARDRIVER ITEM");
+        rtn
     }
 
     async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
@@ -1751,7 +1757,7 @@ where
                     .result(self.skel.drivers.assign(assign.clone()).await)?;
                 println!("driver assign worked...");
             } else {
-
+                error!("do not have a driver for kind: {}", assign.details.stub.kind.to_string() );
             }
 
             Ok(ReflectedCore::ok())
@@ -1779,6 +1785,7 @@ where
             self.skel.point.clone().to_port().with_layer(Layer::Gravity),
             wave,
         );
+
         self.skel.inject_tx.send(injection).await;
     }
 
