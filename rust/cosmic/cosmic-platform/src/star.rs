@@ -836,6 +836,7 @@ where
             && wave.to().is_single()
             && wave.to().to_single().unwrap().point == *GLOBAL_EXEC
         {
+
             let mut wave = wave;
             wave.set_to(self.skel.machine.global.clone());
             let mut transport = wave
@@ -1173,7 +1174,7 @@ where
                     return Err(MsgErr::not_found());
                 }
                 Some(result) => {
-                    match result {
+                    match self.skel.logger.result(result) {
                         Ok(topic_handler) => {
                             let transmitter =
                                 LayerInjectionRouter::new(self.skel.clone(), traversal.to.clone());
@@ -1190,6 +1191,7 @@ where
                         }
                         Err(err) => {
                             // some some 'forbidden' error message sending towards_core...
+                            // we already logged this in the match statement
                         }
                     }
                 }
@@ -1671,10 +1673,7 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemHandler<P>, P::Err> {
-println!("GET ITEM FROM STARDRIVER");
-        let rtn =  Ok(ItemHandler::Handler(Box::new(StarCore::restore(self.star_skel.clone(), (), ()))));
-println!("RTN STARDRIVER ITEM");
-        rtn
+          Ok(ItemHandler::Handler(Box::new(StarCore::restore(self.star_skel.clone(), (), ()))))
     }
 
     async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
@@ -1751,11 +1750,9 @@ where
                         .clone()
                 );
 
-                println!("ASSIGN {}", assign.details.stub.kind.to_string());
                 self.skel
                     .logger
                     .result(self.skel.drivers.assign(assign.clone()).await)?;
-                println!("driver assign worked...");
             } else {
                 error!("do not have a driver for kind: {}", assign.details.stub.kind.to_string() );
             }

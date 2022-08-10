@@ -133,7 +133,6 @@ where
             strategy: Strategy::Override,
         };
 
-println!("CREATE STATES: {}", point.to_string());
         self.skel.api.create_states(point.clone()).await?;
         self.skel.registry.register(&registration).await?;
         self.skel.registry.assign(&point, &self.skel.point).await?;
@@ -227,7 +226,7 @@ where
         let agent = ctx.wave().agent().clone();
         match ctx.input {
             Command::Create(create) => {
-                Ok(ctx.ok_body(global.create(create,&agent).await?.stub.into()))
+                Ok(ctx.ok_body(self.skel.logger.result(global.create(create,&agent).await)?.stub.into()))
             },
             _ => Err(P::Err::new("not implemented")),
         }
@@ -254,7 +253,6 @@ where
     }
 
     pub async fn create(&self, create: &Create, agent: &Agent) -> Result<Details, P::Err> {
-println!("GLOBAL CREATE!");
         let child_kind = self
             .skel
             .machine
@@ -318,14 +316,17 @@ println!("GLOBAL CREATE!");
             }
         };
 
+
         let parent = self
             .skel
             .registry
             .locate(&create.template.point.parent)
             .await?;
+
         let assign = Assign::new(AssignmentKind::Create, details.clone(), StateSrc::None);
 
         let mut wave = DirectedProto::ping();
+wave.track = true;
         wave.method(SysMethod::Assign);
         wave.body(Sys::Assign(assign).into());
         wave.from(self.skel.point.clone().to_port().with_layer(Layer::Core));

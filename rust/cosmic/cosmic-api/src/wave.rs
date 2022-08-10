@@ -944,9 +944,18 @@ pub struct Ping {
     pub core: DirectedCore,
 }
 
+
+
+
+
 impl Wave<Ping> {
     pub fn to_singular_directed(self) -> SingularDirectedWave {
         SingularDirectedWave::Ping(self)
+    }
+
+    pub fn with_core(mut self, core: DirectedCore ) -> Self {
+        self.variant.core = core;
+        self
     }
 }
 
@@ -2460,6 +2469,11 @@ impl Wave<Ripple> {
     pub fn to_directed(self) -> DirectedWave {
         DirectedWave::Ripple(self)
     }
+
+    pub fn with_core(mut self, core: DirectedCore ) -> Self {
+        self.variant.core = core;
+        self
+    }
 }
 
 impl<T> Wave<RippleDef<T>>
@@ -2521,6 +2535,11 @@ impl Wave<Signal> {
 
     pub fn to_directed(self) -> DirectedWave {
         DirectedWave::Signal(self)
+    }
+
+    pub fn with_core(mut self, core: DirectedCore ) -> Self {
+        self.variant.core = core;
+        self
     }
 
     pub fn wrap_in_hop(self, from: Port, to: Port) -> DirectedProto {
@@ -4058,7 +4077,17 @@ impl Exchanger {
         } else if let Some((_, tx)) = self.singles.remove(reflect.reflection_of()) {
             tx.send(ReflectedAggregate::Single(reflect));
         } else {
-            return Err(MsgErr::from_500("Not expecting reflected message"));
+            let reflect = reflect.to_ultra();
+            let kind = match &reflect {
+                UltraWave::Ping(_) => "Ping",
+                UltraWave::Pong(_) => "Pong",
+                UltraWave::Ripple(_) => "Ripple",
+                UltraWave::Echo(_) => "Echo",
+                UltraWave::Signal(_) => "Signal"
+            };
+            let reflect = reflect.to_reflected()?;
+
+            return Err(MsgErr::from_500(format!("Not expecting reflected message from: {} to: {} KIND: {} STATUS: {}", reflect.from().to_string(), reflect.to().to_string(), kind, reflect.core().status.to_string())));
         }
         Ok(())
     }

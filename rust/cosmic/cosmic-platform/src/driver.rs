@@ -921,7 +921,9 @@ where
                 match item.handle(ctx).await {
                     CoreBounce::Absorbed => {}
                     CoreBounce::Reflected(reflected) => {
-                        let wave = reflection.unwrap().make(reflected, self.port.clone());
+                        let reflection = reflection.unwrap();
+
+                        let wave = reflection.make(reflected, self.port.clone());
                         let wave = wave.to_ultra();
                         #[cfg(test)]
                         self.skel
@@ -941,9 +943,6 @@ where
         Ok(())
     }
 
-    async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) -> Result<(), MsgErr> {
-        self.exchanger().reflected(reflect.payload).await
-    }
 
     async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
         self.skel.traverse_to_next_tx.send(traversal).await;

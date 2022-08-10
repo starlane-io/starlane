@@ -67,28 +67,12 @@ where
 
         match action.action {
             PipeAction::CoreDirected(mut directed) => {
-/*                if track {
-                    panic!("CoreDirected");
-                }
-
- */
-                assert_eq!(track,directed.track());
-
                 self.traverse_next(directed.wrap()).await;
             }
             PipeAction::FabricDirected(mut directed) => {
-                if track {
-                    panic!("FabricDirected");
-                }
-
                 self.traverse_next(directed.wrap()).await;
             }
             PipeAction::Respond => {
-
-                if track {
-                    panic!("Respond");
-                }
-
                 let pipex = self.state.pipe_exes.remove(&action.request_id);
 
                 match pipex {
@@ -181,9 +165,7 @@ where
         }
 
 
-        println!("DIRECTED TO : {}", directed.to.point.to_string());
         let record = self.skel.registry.locate(&directed.to.point).await.map_err(|e|e.to_cosmic_err())?;
-        println!("DIRECTED KIND : {}", record.details.stub.kind.to_string());
 
         let properties = self.skel.registry.get_properties(&directed.to.point ).await.map_err(|e|e.to_cosmic_err())?;
         let bind_property = properties.get("bind");
@@ -198,7 +180,6 @@ where
                     Tracker::new("field:directed_core_bound", "GetBindFromDriver")
                 });
 
-println!("...KIND {}", &record.details.stub.kind.to_string());
                 let driver = self.skel.drivers.get(&record.details.stub.kind).await?;
 
                 self.skel.logger.track(&directed, || {
@@ -235,7 +216,6 @@ println!("...KIND {}", &record.details.stub.kind.to_string());
             env
         };
 
-println!("GOT HERE! (1)");
         let directed_id = directed.id().to_string();
 
         let pipeline = route.block.clone();
@@ -263,7 +243,6 @@ println!("GOT HERE! (1)");
             }
         };
 
-println!("GOT HERE!");
 
         if let PipeAction::Respond = action {
             self.skel
@@ -290,10 +269,6 @@ println!("GOT HERE!");
         &self,
         mut traversal: Traversal<ReflectedWave>,
     ) -> Result<(), MsgErr> {
-
-        if traversal.track() {
-            panic!("REFLECTED CORE BOUND");
-        }
 
         let reflected_id = traversal.reflection_of().to_string();
         let mut pipex = self.state.pipe_exes.remove(&reflected_id);
@@ -516,25 +491,21 @@ impl PipeTraversal {
 
     pub fn direct(&self) -> Traversal<DirectedWave> {
 
-        match &self.initial.payload.clone() {
-            DirectedWave::Ping(ping) => {
-                let mut wave = Wave::new(
-                    Ping::new(self.directed_core(), self.from().clone()),
-                    self.port.clone());
-                wave.track = self.initial.track();
-                self.initial.clone().with(wave.to_directed())
+        match self.initial.payload.clone() {
+            DirectedWave::Ping(mut ping) => {
+                ping = ping.with_core(self.directed_core());
+                ping.track = self.initial.track();
+                self.initial.clone().with(ping.to_directed())
             }
-            DirectedWave::Ripple(ripple) => {
-                let mut wave = Wave::new(Ripple::new(self.directed_core(), self.from().clone(), ripple.bounce_backs.clone()), self.port.clone());
-                wave.track = self.initial.track();
-                self.initial.clone().with(wave.to_directed())
+            DirectedWave::Ripple(mut ripple) => {
+                ripple = ripple.with_core(self.directed_core());
+                ripple.track = self.initial.track();
+                self.initial.clone().with(ripple.to_directed())
             }
-            DirectedWave::Signal(signal) => {
-                let mut wave = Wave::new(
-                    Signal::new( self.from().clone(), self.directed_core(),),
-                    self.port.clone());
-                wave.track = self.initial.track();
-                self.initial.clone().with(wave.to_directed())
+            DirectedWave::Signal(mut signal) => {
+                signal = signal.with_core(self.directed_core());
+                signal.track = self.initial.track();
+                self.initial.clone().with(signal.to_directed())
             }
         }
         /*self.initial

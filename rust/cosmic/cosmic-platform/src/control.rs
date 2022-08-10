@@ -66,6 +66,7 @@ where
 
 
 use cosmic_api::config::config::bind::{BindConfig, RouteSelector};
+use cosmic_api::log::{Track, Tracker};
 use cosmic_api::parse::route_attribute;
 use cosmic_api::particle::particle::{Details, Status, Stub};
 use cosmic_api::util::log;
@@ -249,22 +250,26 @@ println!("POINT FACTORY CREATE");
             strategy: Strategy::Commit,
             state: StateSrc::None,
         };
-
         let mut wave = create.to_wave_proto();
-        wave.track = true;
-        wave.from(self.skel.driver.point.clone());
+        wave.from(self.skel.driver.point.clone().to_port().with_layer(Layer::Core ));
         wave.agent(Agent::Point(self.skel.driver.point.clone()));
 
+        self.skel.driver.logger.track(&wave, || Tracker::new("driver:control:creator", "Register"));
+
+
         let pong: Wave<Pong> = self.ctx.transmitter.direct(wave).await?;
+
 
         if pong.core.status.is_success() {
             if let Substance::Stub(ref stub) = pong.core.body {
                 let point = stub.point.clone();
+println!("~~ SUCCESS RTN STUB: {}",point.to_string());
                 let fabric_router = LayerInjectionRouter::new(self.skel.star.clone(), point.clone().to_port().with_layer(Layer::Core) );
                 self.fabric_routers.insert(point.clone(),fabric_router);
                 Ok(point)
             }
             else {
+println!("~~ FAIL .....STUB:" );
                 Err(MsgErr::bad_request())
             }
         } else {
