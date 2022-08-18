@@ -791,7 +791,7 @@ fn test_control() -> Result<(), TestErr> {
         let platform = TestPlatform::new();
         let machine_api = platform.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
-        let logger = logger.point( Point::from_str("client").unwrap());
+        let logger = logger.point( Point::from_str("test-client").unwrap());
 
         tokio::time::timeout(Duration::from_secs(10), machine_api.wait_ready())
             .await

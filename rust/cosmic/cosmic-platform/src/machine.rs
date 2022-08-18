@@ -402,18 +402,20 @@ where
                 }
                 MachineCall::Knock { knock, rtn } => {
                     let gate_selector = self.gate_selector.clone();
+                    let logger = self.skel.logger.point(self.skel.machine_star.point.clone());
                     tokio::spawn(async move {
-                        rtn.send(gate_selector.knock(knock).await)
+                        rtn.send(logger.result_ctx("MachineCall::Knock",gate_selector.knock(knock).await))
                             .unwrap_or_default();
                     });
                 }
-
                 #[cfg(test)]
-                MachineCall::GetMachineStar(tx) => {
-                    tx.send(self.machine_star.clone());
+                MachineCall::GetMachineStar(rtn) => {
+                        rtn.send(self.machine_star.clone());
+                    }
+                #[cfg(test)]
+                MachineCall::GetRegistry(rtn) => {
+                    rtn.send(self.skel.registry.clone());
                 }
-                #[cfg(test)]
-                MachineCall::GetRegistry(tx) => {}
             }
 
             self.termination_broadcast_tx

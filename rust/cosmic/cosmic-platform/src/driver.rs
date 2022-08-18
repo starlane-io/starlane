@@ -1066,7 +1066,6 @@ where
                         DriverRunnerRequest::Create { .. } => {}
                     },
                     DriverRunnerCall::Bind { point, rtn } => {
-println!("POINT: {} KIND: {}", point.to_string(), self.driver.kind().to_string() );
                         let item = self.driver.item(&point).await;
                         match item {
                             Ok(item) => {
@@ -1075,7 +1074,6 @@ println!("POINT: {} KIND: {}", point.to_string(), self.driver.kind().to_string()
                                 });
                             }
                             Err(err) => {
-println!("{}",err.to_string());
                                 rtn.send(Err(err));
                             }
                         }

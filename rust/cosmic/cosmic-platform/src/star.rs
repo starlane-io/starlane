@@ -930,7 +930,6 @@ where
             let assign = Assign::new(AssignmentKind::Create, details.clone(), StateSrc::None);
 
             let mut wave = DirectedProto::ping();
-//println!("parent.location == {}", parent.location.to_string());
             wave.method(SysMethod::Assign);
             wave.body(Sys::Assign(assign).into());
             wave.from(self.skel.point.clone().to_port().with_layer(Layer::Core));
@@ -1823,7 +1822,7 @@ where
 {
     #[route("Sys<Assign>")]
     pub async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, P::Err> {
-println!("***> ASSIGN!!!");
+self.skel.logger.info("***> ASSIGN!!!");
         if let Sys::Assign(assign) = ctx.input {
             #[cfg(test)]
             self.skel
@@ -1877,8 +1876,6 @@ println!("***> ASSIGN!!!");
         });
 
         let wave = ctx.input.clone();
-
-println!("INJECTING WAVE INTO GRAVITY: {}", wave.id().to_string());
 
         let injection = TraversalInjection::new(
             self.skel.point.clone().to_port().with_layer(Layer::Gravity),

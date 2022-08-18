@@ -146,6 +146,13 @@ impl MsgErr {
     pub fn bad_request() -> Self {
         MsgErr::from_status(400)
     }
+
+    pub fn bad_request_msg<M:ToString>(m:M) -> Self {
+        MsgErr::Status {
+            status: 400,
+            message: m.to_string()
+        }
+    }
 }
 
 impl Debug for MsgErr {

@@ -1594,7 +1594,6 @@ pub mod id {
         }
 
         async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) -> Result<(),MsgErr> {
-println!("DELIVER REFLECTED: {} reflection_of() {} from: {} to: {}", reflect.layer.to_string(), reflect.reflection_of().to_string(), reflect.from().to_string(), reflect.to().to_string() );
             self.exchanger().reflected(reflect.payload).await
         }
 

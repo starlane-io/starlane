@@ -10,11 +10,7 @@ use cosmic_api::particle::particle::Status;
 use cosmic_api::substance::substance::{Errors, Substance, SubstanceKind, Token};
 use cosmic_api::sys::{Greet, InterchangeKind, Knock, Sys};
 use cosmic_api::util::uuid;
-use cosmic_api::wave::{
-    Agent, DirectedKind, DirectedProto, Exchanger, Handling, HyperWave, Method, Ping, Pong,
-    ProtoTransmitter, ProtoTransmitterBuilder, Reflectable, ReflectedKind, ReflectedProto, Router,
-    SetStrategy, SysMethod, TxRouter, UltraWave, Wave,
-};
+use cosmic_api::wave::{Agent, DirectedKind, DirectedProto, Exchanger, Handling, HyperWave, Method, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder, Reflectable, ReflectedKind, ReflectedProto, Router, SetStrategy, SysMethod, TxRouter, UltraWave, Wave, WaveId, WaveKind};
 use cosmic_api::VERSION;
 use dashmap::DashMap;
 use futures::future::select_all;
@@ -697,10 +693,7 @@ impl AnonHyperAuthenticatorAssignEndPoint {
 #[async_trait]
 impl HyperAuthenticator for AnonHyperAuthenticatorAssignEndPoint {
     async fn auth(&self, knock: Knock) -> Result<HyperwayStub, HyperConnectionErr> {
-println!("AUTH");
         let remote = self.logger.result(self.remote_point_factory.create().await)?.to_port();
-println!("REMOTE: {}", remote.to_string());
-
         Ok(HyperwayStub {
             agent: Agent::Anonymous,
             remote,
@@ -1010,9 +1003,11 @@ where
         pong.agent(Agent::HyperUser);
         pong.from(greet.transport.clone());
         pong.to(greet.port.clone());
+        pong.intended(greet.hop.clone());
+        pong.reflection_of(WaveId::new(WaveKind::Ping)); // this is just randomly created since this pong reflection will not be traditionally handled on the receiving end
         pong.status(200u16);
         pong.body(greet.into());
-        let pong = pong.build()?;
+        let pong = self.logger.result_ctx("InterchangeGate::greet",pong.build())?;
         let pong = pong.to_ultra();
         ext.tx.send(pong).await;
 

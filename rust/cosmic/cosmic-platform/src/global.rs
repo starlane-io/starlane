@@ -315,15 +315,6 @@ where
             }
         };
 
-println!("$$$>>>   parent == {} ", create.template.point.parent.to_string() );
-
-        let parent = self
-            .skel
-            .registry
-            .locate(&create.template.point.parent)
-            .await?;
-
-
         Ok(details)
     }
 }

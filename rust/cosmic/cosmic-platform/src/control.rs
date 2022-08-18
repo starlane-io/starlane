@@ -244,7 +244,6 @@ impl <P> ControlCreator<P> where P: Platform {
 #[async_trait]
 impl <P> PointFactory for ControlCreator<P> where P: Platform {
     async fn create(&self) -> Result<Point, MsgErr> {
-println!("POINT FACTORY CREATE P{} ", self.controls.to_string());
 
         let create = Create {
             template: Template::new( PointTemplate { parent:self.controls.clone(), child_segment_template: PointSegTemplate::Pattern("control-%".to_string())}, KindTemplate{ base: BaseKind::Control, sub: None, specific: None }),
@@ -260,22 +259,17 @@ println!("POINT FACTORY CREATE P{} ", self.controls.to_string());
 
         self.skel.driver.logger.track(&wave, || Tracker::new("driver:control:creator", "Register"));
 
-
-println!("~~~ SENDING WAVE FROM CONTROL...");
         let pong: Wave<Pong> = self.ctx.transmitter.direct(wave).await?;
-
-println!("~~~ GOT RESPONSE...CONTROL...");
 
         if pong.core.status.is_success() {
             if let Substance::Stub(ref stub) = pong.core.body {
                 let point = stub.point.clone();
-println!("~~ SUCCESS RTN STUB: {}",point.to_string());
                 let fabric_router = LayerInjectionRouter::new(self.skel.star.clone(), point.clone().to_port().with_layer(Layer::Core) );
                 self.fabric_routers.insert(point.clone(),fabric_router);
                 Ok(point)
             }
             else {
-println!("~~ FAIL .....STUB:" );
+                self.skel.driver.logger.error("bad reflection: expected Substance::Stub(stub)" );
                 Err(MsgErr::bad_request())
             }
         } else {
@@ -303,7 +297,6 @@ impl <P> ControlGreeter<P> where P: Platform {
 #[async_trait]
 impl <P> HyperGreeter for ControlGreeter<P> where P: Platform{
     async fn greet(&self, stub: HyperwayStub) -> Result<Greet,MsgErr> {
-println!("GREETING!");
         Ok(Greet {
             port: stub.remote.clone(),
             agent: stub.agent.clone(),

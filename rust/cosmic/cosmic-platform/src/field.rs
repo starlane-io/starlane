@@ -255,7 +255,7 @@ let method = directed.payload.core().method.clone();
             return Ok(());
         }
 
-self.logger.info(format!("inserting pipeline executor for directed: {} & action {} & method {} pipex.traversal.method {} from: {} to: {}", directed_id.to_string(), action.to_string(), method.to_string(), pipex.traversal.method.to_string(), pipex.traversal.from().to_string(), pipex.traversal.to().to_string() ));
+//self.logger.info(format!("inserting pipeline executor for directed: {} & action {} & method {} pipex.traversal.method {} from: {} to: {}", directed_id.to_string(), action.to_string(), method.to_string(), pipex.traversal.method.to_string(), pipex.traversal.from().to_string(), pipex.traversal.to().to_string() ));
         self.state.pipe_exes.insert(directed_id.clone(), pipex);
 
         let action = Action {
