@@ -314,6 +314,8 @@ where
     ToDriver(Traversal<UltraWave>),
     Phantom(PhantomData<P>),
     ToGravity(UltraWave),
+    Shard(UltraWave),
+    Assign{details: Details, rtn: oneshot::Sender<Result<Point,MsgErr>>},
     #[cfg(test)]
     GetSkel(oneshot::Sender<StarSkel<P>>),
 }
@@ -536,6 +538,7 @@ where
     P: Platform + 'static,
 {
     skel: StarSkel<P>,
+    star_tx: mpsc::Sender<StarCall<P>>,
     star_rx: mpsc::Receiver<StarCall<P>>,
     drivers: DriversApi<P>,
     injector: Port,
@@ -668,6 +671,7 @@ where
         {
             let star = Self {
                 skel,
+                star_tx: star_tx.clone(),
                 star_rx,
                 drivers,
                 injector,
@@ -745,6 +749,12 @@ where
                     StarCall::CreateStates { point, rtn } => {
                         self.create_states(point).await;
                         rtn.send(());
+                    }
+                    StarCall::Shard(wave) => {
+                        self.shard(wave).await;
+                    }
+                    StarCall::Assign { details, rtn } => {
+                        rtn.send(self.assign(details).await);
                     }
                 }
             }
@@ -836,7 +846,6 @@ where
             && wave.to().is_single()
             && wave.to().to_single().unwrap().point == *GLOBAL_EXEC
         {
-
             let mut wave = wave;
             wave.set_to(self.skel.machine.global.clone());
             let mut transport = wave
@@ -845,8 +854,11 @@ where
             let transport = transport.to_signal()?;
             self.to_hyperway(transport).await?;
         } else {
-            let waves =
-                shard_ultrawave_by_location(wave, &self.skel.adjacents, &self.skel.registry)
+            self.skel.logger.result(self.star_tx.send(StarCall::Shard(wave)).await).unwrap_or_default();
+
+            // move to Shard
+/*            let waves =
+                self.shard(wave, &self.skel.adjacents, &self.skel.registry)
                     .await?;
             for (to, wave) in waves {
                 let mut transport = wave.wrap_in_transport(self.gravity.clone(), to.to_port());
@@ -855,9 +867,99 @@ where
                 let transport = transport.to_signal()?;
                 self.to_hyperway(transport).await?;
             }
+
+ */
         }
         Ok(())
     }
+
+    async fn shard(&self,
+                      wave: UltraWave,
+    ) -> Result<(),P::Err>
+    {
+        match wave {
+            _ => {
+                let to = wave.to().unwrap_single();
+                let point = &to.point;
+                let record = self.skel.registry.locate(point).await?;
+
+                if record.location.is_none() {
+                    let (rtn,mut rtn_rx) = oneshot::channel();
+                    let details = record.details;
+                    self.skel.logger.result(self.star_tx.send(StarCall::Assign{ details, rtn }).await).unwrap_or_default();
+                    let star_tx = self.star_tx.clone();
+                    let logger = self.skel.logger.clone();
+                    let registry = self.skel.registry.clone();
+                    let timeouts = self.skel.exchanger.timeouts.clone();
+                    let assign = registry.assign(&to.point);
+                    tokio::spawn( async move {
+
+                        async fn get( rtn_rx: oneshot::Receiver<Result<Point,MsgErr>>, assign: oneshot::Sender<Point>, timeouts: Timeouts) -> Result<(),MsgErr> {
+                            let point = tokio::time::timeout( Duration::from_secs(timeouts.from(WaitTime::High)), rtn_rx).await???;
+                            assign.send(point).unwrap();
+                            Ok(())
+                        }
+
+                        logger.result(get(rtn_rx,assign,timeouts).await).unwrap_or_default();
+                        logger.result(star_tx.send(StarCall::Shard(wave)).await).unwrap_or_default();
+                    });
+                } else {
+                    let mut transport = wave.wrap_in_transport(self.gravity.clone(), record.location.unwrap().to_port());
+                    transport.from(self.skel.point.clone().to_port());
+                    let transport = transport.build()?;
+                    let transport = transport.to_signal()?;
+                    self.skel.logger.result(self.to_hyperway(transport).await).unwrap_or_default();
+                }
+            }
+            /*
+            UltraWave::Ripple(ripple) => {
+                unimplemented!();
+                            let mut map = shard_ripple_by_location(ripple, adjacent, registry).await?;
+                            Ok(map
+                                .into_iter()
+                                .map(|(point, ripple)| (point, ripple.to_ultra()))
+                                .collect())
+
+            }
+             */
+        }
+        Ok(())
+    }
+
+    async fn assign(&self, details: Details) -> Result<Point,MsgErr> {
+            let assign = Assign::new(AssignmentKind::Create, details.clone(), StateSrc::None);
+
+            let mut wave = DirectedProto::ping();
+//println!("parent.location == {}", parent.location.to_string());
+            wave.method(SysMethod::Assign);
+            wave.body(Sys::Assign(assign).into());
+            wave.from(self.skel.point.clone().to_port().with_layer(Layer::Core));
+            wave.to(details.stub.point.parent().ok_or("expected parent for assignment")?.to_port().with_layer(Layer::Gravity));
+
+            let pong: Wave<Pong> = self.skel.gravity_transmitter.direct(wave).await?;
+
+            if pong.core.status.as_u16() == 200 {
+                if let Substance::Point(location) = &pong.core.body {
+                    Ok(location.clone())
+                } else {
+                    self.skel
+                        .logger
+                        .result(Err(P::Err::new("Assign result expected Substance Point").to_cosmic_err()))
+                }
+            } else {
+                self.skel.logger
+                    .result(
+                        self.skel
+                            .registry
+                            .set_status(&details.stub.point, &Status::Panic)
+                            .await,
+                    )
+                    .unwrap_or_default();
+                self.skel.logger.result(Err(P::Err::new("not success on assign").to_cosmic_err()))
+            }
+
+    }
+
 
     // send this transport signal into the hyperway
     // wrap the transport into a hop to go to one and only one star
@@ -1654,16 +1756,13 @@ where
             properties: Default::default(),
             owner: HYPERUSER.clone(),
             strategy: Strategy::Override,
+            status: Status::Ready
         };
 
         self.star_skel.api.create_states(point.clone()).await?;
         self.star_skel.registry.register(&registration).await?;
-        self.star_skel.registry.assign(&point, &self.star_skel.point).await?;
+        self.star_skel.registry.assign(&point).send(self.star_skel.point.clone());
 
-        self.star_skel
-            .registry
-            .set_status(&point, &Status::Ready)
-            .await?;
         self.star_skel
             .logger
             .result(skel.status_tx.send(DriverStatus::Ready).await)
@@ -1724,6 +1823,7 @@ where
 {
     #[route("Sys<Assign>")]
     pub async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, P::Err> {
+println!("***> ASSIGN!!!");
         if let Sys::Assign(assign) = ctx.input {
             #[cfg(test)]
             self.skel
@@ -1777,6 +1877,8 @@ where
         });
 
         let wave = ctx.input.clone();
+
+println!("INJECTING WAVE INTO GRAVITY: {}", wave.id().to_string());
 
         let injection = TraversalInjection::new(
             self.skel.point.clone().to_port().with_layer(Layer::Gravity),
@@ -1944,33 +2046,9 @@ impl RoundRobinWrangleSelector {
     }
 }
 
-pub async fn shard_ultrawave_by_location<E>(
-    wave: UltraWave,
-    adjacent: &HashMap<Point, StarStub>,
-    registry: &Registry<E>,
-) -> Result<HashMap<Point, UltraWave>, E::Err>
-where
-    E: Platform,
-{
-    match wave {
-        _ => {
-            let mut map = HashMap::new();
-            let point = &wave.to().unwrap_single().point;
-            let record = registry.locate(point).await;
-            let record = record?;
-            map.insert(record.location, wave);
-            Ok(map)
-        }
-        UltraWave::Ripple(ripple) => {
-            let mut map = shard_ripple_by_location(ripple, adjacent, registry).await?;
-            Ok(map
-                .into_iter()
-                .map(|(point, ripple)| (point, ripple.to_ultra()))
-                .collect())
-        }
-    }
-}
 
+
+/*
 pub async fn shard_ripple_by_location<E>(
     ripple: Wave<Ripple>,
     adjacent: &HashMap<Point, StarStub>,
@@ -1988,6 +2066,8 @@ where
     Ok(map)
 }
 
+ */
+
 pub async fn ripple_to_singulars<E>(
     ripple: Wave<Ripple>,
     adjacent: &HashSet<Point>,
@@ -2004,6 +2084,7 @@ where
     Ok(rtn)
 }
 
+/*
 pub async fn shard_by_location<E>(
     recipients: Recipients,
     adjacent: &HashMap<Point, StarStub>,
@@ -2021,6 +2102,8 @@ where
         }
         Recipients::Multi(multi) => {
             let mut map: HashMap<Point, Vec<Port>> = HashMap::new();
+            unimplemented!()
+            /*
             for p in multi {
                 let record = registry.locate(&p).await?;
                 if let Some(found) = map.get_mut(&record.location) {
@@ -2030,11 +2113,13 @@ where
                 }
             }
 
+
             let mut map2 = HashMap::new();
             for (location, points) in map {
                 map2.insert(location, Recipients::Multi(points));
             }
             Ok(map2)
+             */
         }
         Recipients::Watchers(_) => {
             let mut map = HashMap::new();
@@ -2050,6 +2135,8 @@ where
         }
     }
 }
+
+ */
 
 pub async fn to_ports<E>(
     recipients: Recipients,

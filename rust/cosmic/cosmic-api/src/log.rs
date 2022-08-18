@@ -384,7 +384,7 @@ impl StdOutAppender {
 
 impl LogAppender for StdOutAppender {
     fn log(&self, log: Log) {
-        println!("{} {}", log.point.to_string(), log.payload.to_string())
+        println!("{} | {}", log.point.to_string(), log.payload.to_string())
     }
 
     fn audit(&self, log: AuditLog) {

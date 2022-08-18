@@ -130,13 +130,13 @@ impl RegistryApi<TestPlatform> for TestRegistryApi {
             stub: Stub {
                 point: registration.point.clone(),
                 kind: registration.kind.clone(),
-                status: Status::Unknown,
+                status: Status::Pending,
             },
             properties: Default::default(),
         };
         let record = ParticleRecord {
             details: details.clone(),
-            location: Point::root(),
+            location: None,
         };
         self.ctx
             .particles
@@ -144,15 +144,29 @@ impl RegistryApi<TestPlatform> for TestRegistryApi {
         Ok(details)
     }
 
-    async fn assign<'a>(&'a self, point: &'a Point, location: &'a Point) -> Result<(), TestErr> {
-            let mut record = self
-                .ctx
-                .particles
-                .get_mut(point)
-                .ok_or(TestErr::new(format!("not found: {}", point.to_string())))?;
-            record.value_mut().location = location.clone();
-        Ok(())
+    fn assign<'a>(&'a self, point: &'a Point ) -> oneshot::Sender<Point> {
+        let (rtn,mut rtn_rx) = oneshot::channel();
+        let ctx = self.ctx.clone();
+        let point = point.clone();
+        tokio::spawn(async move {
+            match rtn_rx.await {
+                Ok(location) => {
+                    let mut record = ctx
+                        .particles
+                        .get_mut(&point).unwrap();
+
+                    let location : Point = location;
+                    record.value_mut().location = Some(location);
+                }
+                Err(_) => {
+                    // hopefully logged elsewhere
+                }
+            }
+        });
+
+        rtn
     }
+
 
     async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), TestErr> {
         let mut record = self

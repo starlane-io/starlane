@@ -537,6 +537,7 @@ pub struct Registration {
     pub properties: SetProperties,
     pub owner: Point,
     pub strategy: Strategy,
+    pub status: Status
 }
 
 #[derive(Clone)]

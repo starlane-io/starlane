@@ -131,15 +131,12 @@ where
             properties: Default::default(),
             owner: HYPERUSER.clone(),
             strategy: Strategy::Override,
+            status: Status::Ready
         };
 
         self.skel.api.create_states(point.clone()).await?;
         self.skel.registry.register(&registration).await?;
-        self.skel.registry.assign(&point, &self.skel.point).await?;
-        self.skel
-            .registry
-            .set_status(&point, &Status::Ready)
-            .await?;
+        self.skel.registry.assign(&point).send(self.skel.point.clone());
         self.skel
             .logger
             .result(skel.status_tx.send(DriverStatus::Ready).await)
@@ -288,6 +285,7 @@ where
                     properties,
                     owner: agent.clone().to_point(),
                     strategy: create.strategy.clone(),
+                    status: Status::Ready
                 };
                 let mut result = self.skel.registry.register(&registration).await;
                 result?
@@ -310,12 +308,14 @@ where
                         properties: create.properties.clone(),
                         owner: Point::root(),
                         strategy: create.strategy.clone(),
+                        status: Status::Ready
                     };
 
                     self.skel.registry.register(&registration).await?
             }
         };
 
+println!("$$$>>>   parent == {} ", create.template.point.parent.to_string() );
 
         let parent = self
             .skel
@@ -323,38 +323,6 @@ where
             .locate(&create.template.point.parent)
             .await?;
 
-        let assign = Assign::new(AssignmentKind::Create, details.clone(), StateSrc::None);
-
-        let mut wave = DirectedProto::ping();
-wave.track = true;
-        wave.method(SysMethod::Assign);
-        wave.body(Sys::Assign(assign).into());
-        wave.from(self.skel.point.clone().to_port().with_layer(Layer::Core));
-        wave.to(parent.location);
-
-        let pong: Wave<Pong> = self.skel.gravity_transmitter.direct(wave).await?;
-
-        if pong.core.status.as_u16() == 200 {
-            if let Substance::Point(location) = &pong.core.body {
-                self.skel
-                    .registry
-                    .assign(&details.stub.point, &location)
-                    .await?;
-            } else {
-                return self
-                    .logger
-                    .result(Err(P::Err::new("Assign result expected Substance Point")));
-            }
-        } else {
-            self.logger
-                .result(
-                    self.skel
-                        .registry
-                        .set_status(&details.stub.point, &Status::Panic)
-                        .await,
-                )
-                .unwrap_or_default();
-        }
 
         Ok(details)
     }

@@ -3,7 +3,7 @@ use crate::star::StarCall::LayerTraversalInjection;
 use crate::star::{
     LayerInjectionRouter, StarDriver, StarDriverFactory, StarSkel, StarState, StateApi, StateCall,
 };
-use crate::{PlatErr, Platform, RegistryApi};
+use crate::{PlatErr, Platform, Registry, RegistryApi};
 use cosmic_api::command::command::common::{SetProperties, StateSrc};
 use cosmic_api::command::request::create::{Create, PointSegTemplate, Strategy};
 use cosmic_api::config::config::bind::{BindConfig, RouteSelector};
@@ -490,12 +490,12 @@ where
                     properties: Default::default(),
                     owner: HYPERUSER.clone(),
                     strategy: Strategy::Override,
+                    status: Status::Init
                 };
 
                 skel.registry.register(&registration).await?;
-                skel.api.create_states(point.clone()).await;
-                skel.registry.assign(&point, &skel.point).await?;
-                skel.registry.set_status(&point, &Status::Init).await?;
+                skel.api.create_states(point.clone()).await?;
+                skel.registry.assign(&point).send(skel.point.clone());
                 Ok(())
             }
             let point = drivers_point.push(kind.as_point_segments()).unwrap();
@@ -571,6 +571,7 @@ where
             let (runner_tx, runner_rx) = mpsc::channel(1024);
             let (request_tx, mut request_rx) = mpsc::channel(1024);
             let driver_skel = DriverSkel::new(
+                skel,
                 kind.clone(),
                 point.clone(),
                 transmitter,
@@ -1137,6 +1138,7 @@ pub struct DriverSkel<P>
 where
     P: Platform,
 {
+    skel: StarSkel<P>,
     pub kind: Kind,
     pub point: Point,
     pub logger: PointLogger,
@@ -1155,6 +1157,7 @@ where
     }
 
     pub fn new(
+        skel: StarSkel<P>,
         kind: Kind,
         point: Point,
         transmitter: ProtoTransmitter,
@@ -1178,6 +1181,7 @@ where
         });
 
         Self {
+            skel,
             kind,
             point,
             logger,
@@ -1187,6 +1191,23 @@ where
             request_tx,
         }
     }
+
+    pub async fn create_driver_particle(&self, point: Point, kind: Kind ) -> Result<(),P::Err> {
+        let registration = Registration {
+            point: point.clone(),
+            kind: kind,
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: self.skel.point.clone(),
+            strategy: Strategy::Override,
+            status: Status::Ready
+        };
+
+        self.skel.registry.register(&registration).await?;
+//        self.skel.registry.assign(&point, self.skel.location() ).await?;
+        Ok(())
+    }
+
 }
 
 pub struct DriverFactoryWrapper<P>

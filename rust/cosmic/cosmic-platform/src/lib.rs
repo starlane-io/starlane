@@ -43,7 +43,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::io;
 use tokio::runtime::{Handle, Runtime};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tracing::error;
 use uuid::Uuid;
 use cosmic_api::log::RootLogger;
@@ -78,7 +78,7 @@ where
 {
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, P::Err>;
 
-    async fn assign<'a>(&'a self, point: &'a Point, location: &'a Point) -> Result<(), P::Err>;
+    fn assign<'a>(&'a self, point: &'a Point ) -> oneshot::Sender<Point>;
 
     async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), P::Err>;
 

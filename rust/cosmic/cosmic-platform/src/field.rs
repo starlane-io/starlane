@@ -61,7 +61,7 @@ where
         }
     }
 
-    async fn handle_action(&self, action: DirectedAction) -> Result<(), MsgErr> {
+    async fn handle_action(&self, action: Action) -> Result<(), MsgErr> {
 
         let track = action.track();
 
@@ -72,14 +72,14 @@ where
             PipeAction::FabricDirected(mut directed) => {
                 self.traverse_next(directed.wrap()).await;
             }
-            PipeAction::Respond => {
-                let pipex = self.state.pipe_exes.remove(&action.request_id);
+            PipeAction::Reflected => {
+                let pipex = self.state.pipe_exes.remove(&action.reflection_of);
 
                 match pipex {
                     None => {
                         self.logger.error(format!(
-                            "no pipeline set for request_id: {}",
-                            action.request_id
+                            "no pipeline set for directed_id: {}",
+                            action.reflection_of
                         ));
                     }
                     Some((_, mut pipex)) => {
@@ -122,7 +122,6 @@ where
             .logger
             .set_span_attr("message-id", &directed.id().to_string());
 
-
         self.skel.logger.track(&directed, || {
             Tracker::new("field:directed_core_bound", "Receive")
         });
@@ -164,10 +163,9 @@ where
             }
         }
 
-
         let record = self.skel.registry.locate(&directed.to.point).await.map_err(|e|e.to_cosmic_err())?;
 
-        let properties = self.skel.registry.get_properties(&directed.to.point ).await.map_err(|e|e.to_cosmic_err())?;
+        let properties = self.skel.registry.get_properties(&directed.to.point).await.map_err(|e|e.to_cosmic_err())?;
         let bind_property = properties.get("bind");
 
         self.skel.logger.track(&directed, || {
@@ -216,6 +214,7 @@ where
             env
         };
 
+let method = directed.payload.core().method.clone();
         let directed_id = directed.id().to_string();
 
         let pipeline = route.block.clone();
@@ -233,7 +232,7 @@ where
         let action = match pipex.next() {
             Ok(action) => action,
             Err(err) => {
-                let err_msg = format!("Binder: pipeline error for call {}", call.to_string());
+                let err_msg = format!("Field: pipeline error for call {}", call.to_string());
                 logger.error(err_msg.as_str());
                 self.skel
                     .traverse_to_next_tx
@@ -243,8 +242,7 @@ where
             }
         };
 
-
-        if let PipeAction::Respond = action {
+        if let PipeAction::Reflected = action {
             self.skel
                 .traverse_to_next_tx
                 .send(pipex.reflect().to_ultra())
@@ -252,10 +250,11 @@ where
             return Ok(());
         }
 
+self.logger.info(format!("inserting pipeline executor for directed: {} & action {} & method {} pipex.traversal.method {}", directed_id.to_string(), action.to_string(), method.to_string(), pipex.traversal.method.to_string() ));
         self.state.pipe_exes.insert(directed_id.clone(), pipex);
 
-        let action = DirectedAction {
-            request_id: directed_id,
+        let action = Action {
+            reflection_of: directed_id,
             action,
             track
         };
@@ -270,16 +269,19 @@ where
         mut traversal: Traversal<ReflectedWave>,
     ) -> Result<(), MsgErr> {
 
-        let reflected_id = traversal.reflection_of().to_string();
-        let mut pipex = self.state.pipe_exes.remove(&reflected_id);
+        let reflection_of = traversal.reflection_of().to_string();
+        let mut pipex = self.state.pipe_exes.remove(&reflection_of);
 
         if let None = pipex {
             let err_msg = format!(
-                "Binder: cannot locate a pipeline executor for processing request: {}",
+                "Field: cannot locate a pipeline executor for processing reflection of directed message: {}",
                 traversal.reflection_of().to_string()
             );
-            traversal.logger.span().error(err_msg.clone());
+            self.logger.error( err_msg.clone() );
+//            traversal.logger.span().error(err_msg.clone());
             return Err(err_msg.into());
+        } else {
+println!("~~FOUND reflected pipex!")
         }
 
         let (_, mut pipex) = pipex.expect("pipeline executor");
@@ -288,7 +290,7 @@ where
 
         let action = pipex.handle_reflected(traversal.payload)?;
 
-        if let PipeAction::Respond = action {
+        if let PipeAction::Reflected = action {
             self.skel
                 .traverse_to_next_tx
                 .send(pipex.reflect().to_ultra())
@@ -296,10 +298,10 @@ where
             return Ok(());
         }
 
-        self.state.pipe_exes.insert(reflected_id.clone(), pipex);
+        self.state.pipe_exes.insert(reflection_of.clone(), pipex);
 
-        let action = DirectedAction {
-            request_id: reflected_id,
+        let action = Action {
+            reflection_of,
             action,
             track
         };
@@ -353,7 +355,7 @@ where
                 self.execute_step(&segment.step)?;
                 Ok(self.execute_stop(&segment.stop)?)
             }
-            None => Ok(PipeAction::Respond),
+            None => Ok(PipeAction::Reflected),
         }
     }
 
@@ -406,7 +408,7 @@ where
                 ));
                 Ok(PipeAction::FabricDirected(ping.to_directed()))
             }
-            PipelineStopVar::Respond => Ok(PipeAction::Respond),
+            PipelineStopVar::Respond => Ok(PipeAction::Reflected),
             PipelineStopVar::Point(point) => {
                 let uri = self.traversal.uri.clone();
                 let point: Point = point.clone().to_resolved(&self.env)?;
@@ -595,15 +597,15 @@ impl PipeTraversal {
     }
 }
 
-struct DirectedAction {
-    pub request_id: String,
+struct Action {
+    pub reflection_of: String,
     pub action: PipeAction,
     pub track: bool
 }
 
-impl Trackable for DirectedAction {
+impl Trackable for Action {
     fn track_id(&self) -> String {
-        self.request_id.clone()
+        self.reflection_of.clone()
     }
 
     fn track_method(&self) -> String {
@@ -622,7 +624,7 @@ impl Trackable for DirectedAction {
            PipeAction::FabricDirected(w) => {
                w.track_from()
            }
-           PipeAction::Respond => {
+           PipeAction::Reflected => {
                "?".to_string()
            }
        }
@@ -637,7 +639,7 @@ impl Trackable for DirectedAction {
             PipeAction::FabricDirected(w) => {
                 w.track_to()
             }
-            PipeAction::Respond => {
+            PipeAction::Reflected => {
                 "?".to_string()
             }
         }
@@ -652,7 +654,7 @@ impl Trackable for DirectedAction {
 pub enum PipeAction {
     CoreDirected(Traversal<DirectedWave>),
     FabricDirected(Traversal<DirectedWave>),
-    Respond,
+    Reflected,
 }
 
 /// The idea here is to eventually move this funcitionality into it's own crate 'mesh-bindex'

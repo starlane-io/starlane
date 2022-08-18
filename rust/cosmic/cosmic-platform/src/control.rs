@@ -5,7 +5,7 @@ use cosmic_api::command::command::common::StateSrc;
 use cosmic_api::command::request::create::{Create, KindTemplate, PointFactory, PointFactoryU64, PointSegTemplate, PointTemplate, Strategy, Template, TemplateDef};
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{BaseKind, Kind, Layer, Point, Port, ToPoint, ToPort};
-use cosmic_api::id::{StarSub, TraversalInjection};
+use cosmic_api::id::{BaseSubKind, StarSub, TraversalInjection};
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{Assign, AssignmentKind, ControlPattern, Greet, InterchangeKind, Knock};
 use cosmic_api::wave::Agent::Anonymous;
@@ -67,7 +67,7 @@ where
 
 use cosmic_api::config::config::bind::{BindConfig, RouteSelector};
 use cosmic_api::log::{Track, Tracker};
-use cosmic_api::parse::route_attribute;
+use cosmic_api::parse::{CamelCase, route_attribute};
 use cosmic_api::particle::particle::{Details, Status, Stub};
 use cosmic_api::util::log;
 use cosmic_api::wave::ReflectedCore;
@@ -137,7 +137,9 @@ where
 
     async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
         self.skel.driver.status_tx.send(DriverStatus::Init).await;
-        let point = skel.point.clone();
+
+        skel.create_driver_particle(skel.point.push("controls")?, Kind::Base(BaseSubKind::Any)).await?;
+
         let remote_point_factory =
             Arc::new(ControlCreator::new( self.skel.clone(), self.fabric_routers.clone(), ctx ));
         let auth = AnonHyperAuthenticatorAssignEndPoint::new(remote_point_factory, self.skel.driver.logger.clone() );
@@ -185,7 +187,6 @@ where
                             }
                         }
                     }
-
                 }
             });
         }
@@ -243,22 +244,27 @@ impl <P> ControlCreator<P> where P: Platform {
 #[async_trait]
 impl <P> PointFactory for ControlCreator<P> where P: Platform {
     async fn create(&self) -> Result<Point, MsgErr> {
-println!("POINT FACTORY CREATE");
+println!("POINT FACTORY CREATE P{} ", self.controls.to_string());
+
         let create = Create {
             template: Template::new( PointTemplate { parent:self.controls.clone(), child_segment_template: PointSegTemplate::Pattern("control-%".to_string())}, KindTemplate{ base: BaseKind::Control, sub: None, specific: None }),
             properties: Default::default(),
             strategy: Strategy::Commit,
             state: StateSrc::None,
         };
+
         let mut wave = create.to_wave_proto();
         wave.from(self.skel.driver.point.clone().to_port().with_layer(Layer::Core ));
         wave.agent(Agent::Point(self.skel.driver.point.clone()));
+//        wave.track = true;
 
         self.skel.driver.logger.track(&wave, || Tracker::new("driver:control:creator", "Register"));
 
 
+println!("~~~ SENDING WAVE FROM CONTROL...");
         let pong: Wave<Pong> = self.ctx.transmitter.direct(wave).await?;
 
+println!("~~~ GOT RESPONSE...CONTROL...");
 
         if pong.core.status.is_success() {
             if let Substance::Stub(ref stub) = pong.core.body {
@@ -293,8 +299,6 @@ impl <P> ControlGreeter<P> where P: Platform {
         }
     }
 }
-
-
 
 #[async_trait]
 impl <P> HyperGreeter for ControlGreeter<P> where P: Platform{
