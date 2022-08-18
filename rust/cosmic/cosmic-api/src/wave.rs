@@ -1835,7 +1835,7 @@ impl DirectedWave {
                 DirectedWave::Ripple(_) => ReflectedKind::Echo,
                 DirectedWave::Signal(_) => return Err("signals do not have a reflected".into()),
             },
-            to: self.from().clone(),
+            to: self.reflect_to().clone(),
             intended: self.to(),
             reflection_of: self.id().clone(),
             track: self.track(),
@@ -2041,6 +2041,34 @@ where
             DirectedWaveDef::Ping(ping) => &ping.from,
             DirectedWaveDef::Ripple(ripple) => &ripple.from,
             DirectedWaveDef::Signal(signal) => &signal.from,
+        }
+    }
+
+    pub fn via(&self) -> &Option<Port> {
+        match self {
+            DirectedWaveDef::Ping(ping) => &ping.via,
+            DirectedWaveDef::Ripple(ripple) => &ripple.via,
+            DirectedWaveDef::Signal(signal) => &signal.via,
+        }
+    }
+
+    pub fn reflect_to(&self) -> &Port {
+        self.via().as_ref().unwrap_or(self.from())
+    }
+
+    pub fn take_via(&mut self) -> Option<Port> {
+        match self {
+            DirectedWaveDef::Ping(ping) => ping.via.take(),
+            DirectedWaveDef::Ripple(ripple) => ripple.via.take(),
+            DirectedWaveDef::Signal(signal) => signal.via.take(),
+        }
+    }
+
+    pub fn replace_via(&mut self, port: Port) -> Option<Port>{
+        match self {
+            DirectedWaveDef::Ping(ping) => ping.via.replace(port),
+            DirectedWaveDef::Ripple(ripple) => ripple.via.replace(port),
+            DirectedWaveDef::Signal(signal) => signal.via.replace(port),
         }
     }
 
@@ -2438,6 +2466,7 @@ pub struct Wave<V> {
     pub handling: Handling,
     pub scope: Scope,
     pub from: Port,
+    pub via: Option<Port>,
     pub hops: u16,
     pub track: bool,
 }
@@ -2734,6 +2763,7 @@ impl<V> Wave<V> {
             from,
             hops: 0,
             track: false,
+            via: None
         }
     }
 
@@ -2751,6 +2781,7 @@ impl<V> Wave<V> {
             from: self.from,
             hops: self.hops,
             track: false,
+            via: self.via
         }
     }
 }

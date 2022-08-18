@@ -228,6 +228,11 @@ let method = directed.payload.core().method.clone();
         });
         let track = directed.track();
 
+        if directed.point != self.port.point {
+            panic!("directed.point {} vs self.port.point {}", directed.point.to_string(), self.port.point.to_string() );
+        }
+
+        directed.replace_via(self.port.clone());
         let mut pipex = PipeEx::new(directed, self.clone(), pipeline, env, logger.clone());
         let action = match pipex.next() {
             Ok(action) => action,
@@ -250,7 +255,7 @@ let method = directed.payload.core().method.clone();
             return Ok(());
         }
 
-self.logger.info(format!("inserting pipeline executor for directed: {} & action {} & method {} pipex.traversal.method {}", directed_id.to_string(), action.to_string(), method.to_string(), pipex.traversal.method.to_string() ));
+self.logger.info(format!("inserting pipeline executor for directed: {} & action {} & method {} pipex.traversal.method {} from: {} to: {}", directed_id.to_string(), action.to_string(), method.to_string(), pipex.traversal.method.to_string(), pipex.traversal.from().to_string(), pipex.traversal.to().to_string() ));
         self.state.pipe_exes.insert(directed_id.clone(), pipex);
 
         let action = Action {
@@ -274,17 +279,18 @@ self.logger.info(format!("inserting pipeline executor for directed: {} & action 
 
         if let None = pipex {
             let err_msg = format!(
-                "Field: cannot locate a pipeline executor for processing reflection of directed message: {}",
-                traversal.reflection_of().to_string()
+                "Field: cannot locate a pipeline executor for processing reflection of directed message: {} with recipient: {}",
+                traversal.reflection_of().to_string(),
+                traversal.payload.to().to_string()
             );
             self.logger.error( err_msg.clone() );
 //            traversal.logger.span().error(err_msg.clone());
             return Err(err_msg.into());
-        } else {
-println!("~~FOUND reflected pipex!")
         }
 
         let (_, mut pipex) = pipex.expect("pipeline executor");
+
+        self.logger.info(format!("removed pipex for {}", reflection_of.to_string()));
 
         let track = traversal.track();
 
@@ -334,15 +340,15 @@ where
 {
     pub fn new(
         traversal: Traversal<DirectedWave>,
-        binder: Field<P>,
+        field: Field<P>,
         pipeline: PipelineVar,
         env: Env,
         logger: SpanLogger,
     ) -> Self {
-        let traversal = PipeTraversal::new(binder.port.clone(), traversal);
+        let traversal = PipeTraversal::new(field.port.clone(), traversal);
         Self {
             traversal: traversal,
-            field: binder,
+            field,
             pipeline,
             env,
             logger,
@@ -490,6 +496,11 @@ impl PipeTraversal {
     pub fn from(&self) -> &Port {
         self.initial.from()
     }
+
+    pub fn via(&self) -> &Option<Port> {
+        self.initial.via()
+    }
+
 
     pub fn direct(&self) -> Traversal<DirectedWave> {
 
