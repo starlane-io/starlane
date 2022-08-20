@@ -1106,6 +1106,7 @@ pub struct HyperClient {
     status_rx: watch::Receiver<HyperClientStatus>,
     to_client_listener_tx: broadcast::Sender<UltraWave>,
     logger: PointLogger,
+    greet_rx: watch::Receiver<Option<Greet>>
 }
 
 impl HyperClient {
@@ -1135,12 +1136,15 @@ impl HyperClient {
         let mut from_runner_rx =
             HyperClientRunner::new(factory, from_client_rx, status_mpsc_tx.clone(), logger.clone());
 
+        let (greet_tx,greet_rx) = watch::channel(None);
+
         let mut client = Self {
             stub,
             tx: to_hyperway_tx,
             status_rx: status_rx.clone(),
             to_client_listener_tx: to_client_listener_tx.clone(),
             logger: logger.clone(),
+            greet_rx
         };
 
         {
@@ -1148,7 +1152,7 @@ impl HyperClient {
             tokio::spawn(async move {
                 while let Ok(_) = status_rx.changed().await {
                     let status = status_rx.borrow().clone();
-                    logger.info(format!("status: {}", status.to_string()))
+                    logger.info(format!("HyperClient status: {}", status.to_string()))
                 }
             });
         }
@@ -1161,14 +1165,10 @@ impl HyperClient {
                     mut from_runner_rx: mpsc::Receiver<UltraWave>,
                     to_client_listener_tx: broadcast::Sender<UltraWave>,
                     status_tx: mpsc::Sender<HyperClientStatus>,
+                    greet_tx: watch::Sender<Option<Greet>>,
                     logger: PointLogger,
                 ) -> Result<(), MsgErr> {
                     if let Some(wave) = from_runner_rx.recv().await {
-                        logger.info(format!("received wave {} ", wave.id().to_string()));
-                        if wave.is_directed() {
-                            let directed = wave.clone().to_directed()?;
-                            logger.info(format!("directed method {} ", directed.core().method.to_string() ));
-                        }
                         match wave.to_reflected() {
                             Ok(reflected) => {
                                 if !reflected.core().status.is_success() {
@@ -1211,7 +1211,7 @@ impl HyperClient {
                                     }
                                 }
                                 if let Substance::Greet(greet) = &reflected.core().body {
-                                    logger.info(format!("GREET: {}", greet.port.to_string()));
+                                    greet_tx.send(Some(greet.clone()));
                                 } else {
                                     status_tx.send(HyperClientStatus::Fatal).await.unwrap_or_default();
                                     let err = "HyperClient expected first wave Substance to be a reflected Greeting";
@@ -1232,7 +1232,7 @@ impl HyperClient {
                     Ok(())
                 }
                 logger
-                    .result(relay(from_runner_rx, to_client_listener_tx, status_tx,logger.clone()).await)
+                    .result(relay(from_runner_rx, to_client_listener_tx, status_tx,greet_tx, logger.clone()).await)
                     .unwrap_or_default();
             });
         }
@@ -1260,6 +1260,46 @@ impl HyperClient {
 
     pub fn rx(&self) -> broadcast::Receiver<UltraWave> {
         self.to_client_listener_tx.subscribe()
+    }
+
+    pub fn get_greeting(&self) -> Option<Greet> {
+        self.greet_rx.borrow().clone()
+    }
+
+    pub async fn wait_for_greet(&self) -> Result<Greet,MsgErr> {
+        let mut greet_rx = self.greet_rx.clone();
+        loop {
+            let greet = greet_rx.borrow().clone();
+            if greet.is_some() {
+                return Ok(greet.unwrap());
+            } else {
+                greet_rx.changed().await?;
+            }
+        }
+    }
+
+    pub async fn wait_for_ready(self, duration: Duration) -> Result<Self,MsgErr> {
+        let mut status_rx = self.status_rx.clone();
+        let (rtn,mut rtn_rx) = oneshot::channel();
+
+        tokio::spawn(async move {
+            loop{
+                let status = status_rx.borrow().clone();
+                match status {
+                    HyperClientStatus::Ready => {
+                        rtn.send(Ok(self));
+                        break;
+                    },
+                    HyperClientStatus::Fatal => {
+                        rtn.send(Err(MsgErr::from_500("Fatal status from HyperClient while waiting for Ready")));
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+        });
+
+        tokio::time::timeout(duration,rtn_rx).await??
     }
 }
 
@@ -1614,7 +1654,7 @@ pub mod test {
     use std::str::FromStr;
     use std::sync::Arc;
     use std::time::Duration;
-    use tokio::sync::{broadcast, mpsc};
+    use tokio::sync::{broadcast, mpsc, oneshot};
 
     lazy_static! {
         pub static ref LESS: Point = Point::from_str("space:users:less").expect("point");
@@ -1643,7 +1683,6 @@ pub mod test {
     #[async_trait]
     impl HyperGreeter for TestGreeter {
         async fn greet(&self, stub: HyperwayStub) -> Result<Greet, MsgErr> {
-println!("GREETING: remote: {} agent: {}", stub.remote.point.to_string(), stub.agent.clone().to_point().to_string());
             Ok(Greet {
                 port: stub.remote.clone(),
                 agent: stub.agent.clone(),
@@ -1880,9 +1919,7 @@ println!("GREETING: remote: {} agent: {}", stub.remote.point.to_string(), stub.a
         {
             let fae = FAE.clone();
             tokio::spawn(async move {
-println!("FAE waiting...");
                 let wave = fae_rx.recv().await.unwrap();
-println!("FAE Recvd: waiting...");
                 let mut reflected = ReflectedProto::new();
                 reflected.kind(ReflectedKind::Pong);
                 reflected.status(200u16);
@@ -1907,6 +1944,7 @@ println!("FAE Recvd: waiting...");
         }
 
 
+        let (rtn,mut rtn_rx) = oneshot::channel();
         tokio::spawn( async move {
             let mut hello = DirectedProto::ping();
             hello.kind(DirectedKind::Ping);
@@ -1915,8 +1953,10 @@ println!("FAE Recvd: waiting...");
             hello.method(MsgMethod::new("Hello").unwrap());
             hello.body(Substance::Empty);
             let pong: Wave<Pong> = less_transmitter.direct(hello).await.unwrap();
-            assert_eq!(pong.core.status.as_u16(), 200u16);
+            rtn.send(pong.core.status.as_u16() == 200u16);
         });
-        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let result = tokio::time::timeout(Duration::from_secs(5),rtn_rx).await.unwrap().unwrap();
+        assert!(result);
     }
 }
