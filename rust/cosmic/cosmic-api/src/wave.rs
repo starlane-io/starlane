@@ -255,7 +255,28 @@ impl UltraWave {
         match self {
             UltraWave::Pong(pong) => Ok(pong.to_reflected()),
             UltraWave::Echo(echo) => Ok(echo.to_reflected()),
-            _ => Err(MsgErr::bad_request()),
+            _ => Err(MsgErr::bad_request_msg(format!("expected: ReflectedWave; encountered: {}", self.desc() ))),
+        }
+    }
+
+    pub fn kind(&self) -> WaveKind {
+        match self {
+            UltraWave::Ping(_) => WaveKind::Ping,
+            UltraWave::Pong(_) => WaveKind::Pong,
+            UltraWave::Ripple(_) => WaveKind::Ripple,
+            UltraWave::Echo(_) => WaveKind::Echo,
+            UltraWave::Signal(_) => WaveKind::Signal
+        }
+    }
+
+    /// return a description of this wave for debugging purposes
+    pub fn desc(&self) -> String {
+        if self.is_directed() {
+            let directed = self.clone().to_directed().unwrap();
+            format!("{}<{}>[{}]",self.kind().to_string(), directed.core().method.to_string(), directed.core().body.kind().to_string() )
+        } else {
+            let reflected = self.clone().to_reflected().unwrap();
+            format!("{}<{}>[{}]",self.kind().to_string(), reflected.core().status.to_string(), reflected.core().body.kind().to_string() )
         }
     }
 

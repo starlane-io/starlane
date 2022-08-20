@@ -404,8 +404,7 @@ where
                     let gate_selector = self.gate_selector.clone();
                     let logger = self.skel.logger.point(self.skel.machine_star.point.clone());
                     tokio::spawn(async move {
-                        rtn.send(logger.result_ctx("MachineCall::Knock",gate_selector.knock(knock).await))
-                            .unwrap_or_default();
+                       rtn.send(logger.result_ctx("MachineCall::Knock",gate_selector.knock(knock).await));
                     });
                 }
                 #[cfg(test)]

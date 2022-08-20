@@ -555,6 +555,19 @@ impl PointLogger {
         result
     }
 
+    pub fn eat<R, E>(&self, result: Result<R, E>)
+        where
+            E: ToString,
+    {
+        match &result {
+            Ok(_) => {}
+            Err(err) => {
+                self.error(err.to_string());
+            }
+        }
+    }
+
+
     pub fn result_ctx<R, E>(&self, ctx: &str, result: Result<R, E>) -> Result<R, E>
     where
         E: ToString,
@@ -566,6 +579,18 @@ impl PointLogger {
             }
         }
         result
+    }
+
+    pub fn eat_ctx<R, E>(&self, ctx: &str, result: Result<R, E>)
+        where
+            E: ToString,
+    {
+        match &result {
+            Ok(_) => {}
+            Err(err) => {
+                self.error(format!("{} {}", ctx, err.to_string()));
+            }
+        }
     }
 
     pub fn track<T, F>(&self, trackable: &T, f: F)

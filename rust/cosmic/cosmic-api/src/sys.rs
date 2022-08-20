@@ -9,7 +9,7 @@ use std::ops::{Deref, DerefMut};
 use crate::command::command::common::StateSrc;
 use crate::id::{StarKey, StarSub};
 use crate::log::Log;
-use crate::wave::{CmdMethod, DirectedCore, Ping, Pong, SysMethod, ToRecipients, Wave};
+use crate::wave::{CmdMethod, DirectedCore, Ping, Pong, ReflectedKind, ReflectedProto, SysMethod, ToRecipients, UltraWave, Wave, WaveId, WaveKind};
 use crate::{Agent, Port, ReflectedCore};
 use serde::{Deserialize, Serialize};
 
@@ -205,6 +205,7 @@ pub struct Created {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Hash)]
 pub enum InterchangeKind {
+    Singleton,
     DefaultControl,
     Control(ControlPattern),
     Portal(ControlPattern),
@@ -272,5 +273,20 @@ impl Greet {
             hop,
             transport,
         }
+    }
+}
+
+impl Into<UltraWave> for Greet {
+    fn into(self) -> UltraWave {
+        let mut proto = ReflectedProto::new();
+        proto.kind(ReflectedKind::Pong);
+        proto.agent(Agent::HyperUser);
+        proto.from(self.transport.clone());
+        proto.to(self.port.clone());
+        proto.intended(self.hop.clone());
+        proto.reflection_of(WaveId::new(WaveKind::Ping)); // this is just randomly created since this pong reflection will not be traditionally handled on the receiving end
+        proto.status(200u16);
+        proto.body(self.into());
+        proto.build().unwrap().to_ultra()
     }
 }
