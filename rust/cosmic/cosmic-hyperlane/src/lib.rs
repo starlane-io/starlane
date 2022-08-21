@@ -1159,6 +1159,9 @@ impl HyperClient {
                 if status == HyperClientStatus::Fatal {
                     break;
                 }
+                if status == HyperClientStatus::Closed {
+                    break;
+                }
                 if let Err(_) = result {
                     break;
                 }
@@ -1180,7 +1183,7 @@ impl HyperClient {
             status_rx: status_rx.clone(),
             to_client_listener_tx: to_client_listener_tx.clone(),
             logger: logger.clone(),
-            greet_rx,
+            greet_rx
         };
 
         {
@@ -1299,8 +1302,7 @@ impl HyperClient {
                     }
                     Ok(())
                 }
-                logger
-                    .result(
+
                         relay(
                             from_runner_rx,
                             to_client_listener_tx,
@@ -1308,9 +1310,7 @@ impl HyperClient {
                             greet_tx,
                             logger.clone(),
                         )
-                        .await,
-                    )
-                    .unwrap_or_default();
+                        .await.unwrap_or_default();
             });
         }
 
@@ -1329,6 +1329,18 @@ impl HyperClient {
         tokio::spawn(async move {
             tx.send(wave).await.unwrap_or_default();
         });
+    }
+
+    pub async fn close(&self) {
+        let mut wave = DirectedProto::ping();
+        wave.kind(DirectedKind::Signal);
+        wave.from(LOCAL_CLIENT.clone().to_port());
+        wave.to(LOCAL_CLIENT_RUNNER.clone().to_port());
+        wave.method(MsgMethod::new("Close").unwrap());
+        let wave = wave.build().unwrap();
+        let wave = wave.to_ultra();
+        let tx = self.tx.clone();
+        tx.send(wave).await.unwrap_or_default();
     }
 
     pub fn router(&self) -> TxRouter {
@@ -1390,10 +1402,10 @@ pub enum HyperClientStatus {
     Ready,
     Panic,
     Fatal,
+    Closed
 }
 
 pub enum HyperClientCall {
-    Wave(UltraWave),
     Close,
 }
 
@@ -1456,6 +1468,7 @@ impl HyperClientRunner {
             .send(HyperClientStatus::Pending)
             .await
             .unwrap_or_default();
+
         loop {
             async fn connect(runner: &mut HyperClientRunner) -> Result<(), HyperConnectionErr> {
                 if let Err(_) = runner.status_tx.send(HyperClientStatus::Connecting).await {
@@ -1482,7 +1495,7 @@ impl HyperClientRunner {
                     }
                     // wait a little while before attempting to reconnect
                     // maybe add exponential backoff later
-                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                 }
             }
 
@@ -1491,7 +1504,6 @@ impl HyperClientRunner {
                     .ext
                     .as_mut()
                     .ok_or::<MsgErr>("must reconnect".into())?;
-                //println!("runner.from_client_rx.try_recv().is_ok() {}", runner.from_client_rx.try_recv().is_ok());
 
                 loop {
                     tokio::select!(
@@ -1499,9 +1511,15 @@ impl HyperClientRunner {
                                 // message comes from client, therefore it should go towards ext (unless it's pointed to the runner)
                                 match wave {
                                   Some(wave) => {
-                                    if wave.to().is_single() && wave.to().unwrap_single().point == *LOCAL_CLIENT_RUNNER
+                                    if wave.is_directed() && wave.to().is_single() && wave.to().unwrap_single().point == *LOCAL_CLIENT_RUNNER
                                     {
-                                        return Err(MsgErr::from_500("reset"));
+                                        let method: MsgMethod = wave.to_directed().unwrap().core().method.clone().try_into().unwrap();
+                                        if method.to_string() == "Reset".to_string() {
+                                           return Err(MsgErr::from_500("reset"));
+                                        } else if method.to_string() == "Close".to_string(){
+                                            runner.status_tx.send(HyperClientStatus::Closed).await;
+                                            return Ok(());
+                                        }
                                     } else {
                                         match ext.tx.send(wave).await {
                                             Ok(_) => {}
@@ -1514,7 +1532,6 @@ impl HyperClientRunner {
                                     }
                                       }
                                       None => {
-                                        runner.logger.warn("NONE on Client");
                                         break;
                                       }
                                     }
@@ -1558,7 +1575,6 @@ impl HyperClientRunner {
                 match relay(&mut self).await {
                     Ok(_) => {
                         // natural end... this runner is ready to be dropped
-                        println!("Relay BREAK...");
                         break;
                     }
                     Err(err) => {
