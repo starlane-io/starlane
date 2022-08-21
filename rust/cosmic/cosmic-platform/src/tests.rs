@@ -824,7 +824,7 @@ fn test_control() -> Result<(), TestErr> {
         let router = client.router();
         let client = client.wait_for_ready(Duration::from_secs(5)).await?;
         client.close().await;
-        tokio::time::sleep(Duration::from_secs(5)).await;
+        tokio::time::sleep(Duration::from_millis(50)).await;
         Ok(())
     })
 }
