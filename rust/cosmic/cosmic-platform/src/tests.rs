@@ -815,10 +815,12 @@ println!("SENDING KNOCK");
                 self.logger.result_ctx("machine_api.knock()",self.machine_api.knock(knock).await)
             }
         }
+
         let factory = MachineApiExtFactory{
             machine_api,
             logger: logger.clone()
         };
+
         let client = HyperClient::new(stub,Box::new(factory), logger ).unwrap();
 
         //tokio::time::timeout( Duration::from_secs(15), machine_api.wait_ready()).await;

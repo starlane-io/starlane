@@ -146,7 +146,7 @@ where
         let mut interchange = HyperwayInterchange::new(self.skel.driver.logger.clone());
         let hyperway = Hyperway::new(Point::remote_endpoint().to_port(), Agent::HyperUser);
         let ( tx, mut rx ) = hyperway.channel().await;
-        interchange.add(hyperway);
+        interchange.add(hyperway).await;
         interchange.singular_to(Point::remote_endpoint().to_port());
         let interchange = Arc::new(interchange);
         let greeter = ControlGreeter::new(self.skel.clone(), self.skel.driver.point.push("controls".to_string()).unwrap());

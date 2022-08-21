@@ -216,8 +216,8 @@ where
             let mut hyperway = Hyperway::new(star_hop.clone(), Agent::HyperUser);
             hyperway.transform_inbound(Box::new(LayerTransform::new(Layer::Gravity)));
 
-            let hyperway_ext = hyperway.mount().await;
-            interchange.add(hyperway);
+            let hyperway_ext = hyperway.mount(None).await;
+            interchange.add(hyperway).await;
             interchange.singular_to(star_port.clone());
 
             let interchange = Arc::new(interchange);
@@ -240,7 +240,7 @@ where
                             .to_port()
                             .with_layer(Layer::Gravity);
                         let hyperway = Hyperway::new(star, Agent::HyperUser);
-                        interchange.add(hyperway);
+                        interchange.add(hyperway).await;
                     }
                     StarCon::Connector(remote) => {
                         let star = remote
@@ -250,7 +250,7 @@ where
                             .to_port()
                             .with_layer(Layer::Gravity);
                         let hyperway = Hyperway::new(star, Agent::HyperUser);
-                        interchange.add(hyperway);
+                        interchange.add(hyperway).await;
                     }
                 }
             }

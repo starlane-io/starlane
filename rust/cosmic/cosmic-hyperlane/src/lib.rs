@@ -10,7 +10,11 @@ use cosmic_api::particle::particle::Status;
 use cosmic_api::substance::substance::{Errors, Substance, SubstanceKind, Token};
 use cosmic_api::sys::{Greet, InterchangeKind, Knock, Sys};
 use cosmic_api::util::uuid;
-use cosmic_api::wave::{Agent, DirectedKind, DirectedProto, Exchanger, Handling, HyperWave, Method, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder, Reflectable, ReflectedKind, ReflectedProto, ReflectedWave, Router, SetStrategy, SysMethod, TxRouter, UltraWave, Wave, WaveId, WaveKind};
+use cosmic_api::wave::{
+    Agent, DirectedKind, DirectedProto, Exchanger, Handling, HyperWave, Method, Ping, Pong,
+    ProtoTransmitter, ProtoTransmitterBuilder, Reflectable, ReflectedKind, ReflectedProto,
+    ReflectedWave, Router, SetStrategy, SysMethod, TxRouter, UltraWave, Wave, WaveId, WaveKind,
+};
 use cosmic_api::VERSION;
 use dashmap::DashMap;
 use futures::future::select_all;
@@ -100,7 +104,11 @@ impl Hyperway {
         }
     }
 
-    pub async fn ephemeral(&self, drop_tx: oneshot::Sender<()>, init_wave: Option<UltraWave>) -> HyperwayExt {
+    pub async fn ephemeral(
+        &self,
+        drop_tx: oneshot::Sender<()>,
+        init_wave: Option<UltraWave>,
+    ) -> HyperwayExt {
         let drop_tx = Some(drop_tx);
 
         HyperwayExt {
@@ -110,11 +118,9 @@ impl Hyperway {
         }
     }
 
-/*    pub async fn channel(&self) -> (mpsc::Sender<UltraWave>, mpsc::Receiver<UltraWave>) {
-        (self.outbound.tx(), self.outbound.rx().await)
+    pub async fn channel(&self) -> (mpsc::Sender<UltraWave>, mpsc::Receiver<UltraWave>) {
+        (self.outbound.tx(), self.outbound.rx(None).await)
     }
-
- */
 }
 
 #[cfg(test)]
@@ -206,7 +212,7 @@ pub enum HyperwayInterchangeCall {
     Mount {
         stub: HyperwayStub,
         init_wave: UltraWave,
-        tx: oneshot::Sender<HyperwayExt>,
+        rtn: oneshot::Sender<Result<HyperwayExt, MsgErr>>,
     },
 }
 
@@ -451,11 +457,26 @@ impl HyperwayInterchange {
                                 logger.warn("Hyperway Interchange cannot route Ripples, instead wrap in a Hop or Transport");
                             }
                         },
-                        HyperwayInterchangeCall::Mount { stub, init_wave, tx } => {
+                        HyperwayInterchangeCall::Mount {
+                            stub,
+                            init_wave,
+                            rtn,
+                        } => {
+
                             match hyperways.get(&stub.remote) {
-                                None => {}
+                                None => {
+                                    logger.error(format!(
+                                        "hyperway {} not found",
+                                        stub.remote.to_string()
+                                    ));
+                                    rtn.send(Err(format!(
+                                        "hyperway {} not found",
+                                        stub.remote.to_string()
+                                    )
+                                    .into()));
+                                }
                                 Some(hyperway) => {
-                                    tx.send(hyperway.mount(Some(init_wave)).await);
+                                    rtn.send(Ok(hyperway.mount(Some(init_wave)).await));
                                 }
                             }
                         }
@@ -479,31 +500,30 @@ impl HyperwayInterchange {
         &self.logger.point
     }
 
-    pub async fn mount(&self, stub: HyperwayStub, init_wave: UltraWave ) -> Result<HyperwayExt, MsgErr> {
+    pub async fn mount(
+        &self,
+        stub: HyperwayStub,
+        init_wave: UltraWave,
+    ) -> Result<HyperwayExt, MsgErr> {
         let call_tx = self.call_tx.clone();
         let (tx, rx) = oneshot::channel();
         call_tx
             .send(HyperwayInterchangeCall::Mount {
                 stub: stub.clone(),
                 init_wave,
-                tx,
+                rtn: tx,
             })
             .await;
-        let ext = rx.await?;
-
-        Ok(ext)
+        rx.await?
     }
 
-    pub fn add(&self, mut hyperway: Hyperway) {
+    pub async fn add(&self, mut hyperway: Hyperway) {
         if let Some(to) = self.singular_to.as_ref() {
             hyperway.transform_to(to.clone());
         }
-        let call_tx = self.call_tx.clone();
-        tokio::spawn(async move {
-            call_tx
-                .send(HyperwayInterchangeCall::Internal(hyperway))
-                .await;
-        });
+        self.call_tx
+            .send(HyperwayInterchangeCall::Internal(hyperway))
+            .await;
     }
 
     pub fn singular_to(&mut self, to: Port) {
@@ -997,16 +1017,25 @@ where
     G: HyperGreeter,
 {
     async fn enter(&self, greet: Greet) -> Result<HyperwayExt, HyperConnectionErr> {
-        let hyperway = Hyperway::new(greet.hop.clone(), greet.agent.clone());
-        let (drop_tx,mut drop_rx) = oneshot::channel();
-
+        let hyperway = Hyperway::new(greet.port.clone(), greet.agent.clone());
+        self.interchange.add(hyperway).await;
 
         let port = greet.port.clone();
-        let ext = hyperway.ephemeral(drop_tx,Some(greet.into())).await;
-        self.interchange.add(hyperway);
+        let stub = HyperwayStub {
+            agent: greet.agent.clone(),
+            remote: greet.port.clone(),
+        };
+
+        let mut ext = self.logger.result_ctx(
+            "InterchangeGate.enter",
+            self.interchange.mount(stub, greet.into()).await,
+        )?;
+
+        let (drop_tx, drop_rx) = oneshot::channel();
+        ext.drop_tx = Some(drop_tx);
 
         let interchange = self.interchange.clone();
-        tokio::spawn( async move {
+        tokio::spawn(async move {
             drop_rx.await;
             interchange.remove(port);
         });
@@ -1069,7 +1098,7 @@ where
     }
 
     async fn enter(&self, greet: Greet) -> Result<HyperwayExt, HyperConnectionErr> {
-        let stub = HyperwayStub::new(greet.port.clone(), greet.agent.clone() );
+        let stub = HyperwayStub::new(greet.port.clone(), greet.agent.clone());
         let ext = self.interchange.mount(stub, greet.into()).await?;
 
         Ok(ext)
@@ -1106,7 +1135,7 @@ pub struct HyperClient {
     status_rx: watch::Receiver<HyperClientStatus>,
     to_client_listener_tx: broadcast::Sender<UltraWave>,
     logger: PointLogger,
-    greet_rx: watch::Receiver<Option<Greet>>
+    greet_rx: watch::Receiver<Option<Greet>>,
 }
 
 impl HyperClient {
@@ -1119,11 +1148,14 @@ impl HyperClient {
         let (to_hyperway_tx, from_client_rx) = mpsc::channel(1024);
         let (status_watch_tx, mut status_rx) = watch::channel(HyperClientStatus::Pending);
 
-        let (status_mpsc_tx,mut status_mpsc_rx) : (mpsc::Sender<HyperClientStatus>, mpsc::Receiver<HyperClientStatus>) = mpsc::channel(128);
+        let (status_mpsc_tx, mut status_mpsc_rx): (
+            mpsc::Sender<HyperClientStatus>,
+            mpsc::Receiver<HyperClientStatus>,
+        ) = mpsc::channel(128);
 
         tokio::spawn(async move {
             while let Some(status) = status_mpsc_rx.recv().await {
-                let result = status_watch_tx.send(status.clone() );
+                let result = status_watch_tx.send(status.clone());
                 if status == HyperClientStatus::Fatal {
                     break;
                 }
@@ -1133,10 +1165,14 @@ impl HyperClient {
             }
         });
 
-        let mut from_runner_rx =
-            HyperClientRunner::new(factory, from_client_rx, status_mpsc_tx.clone(), logger.clone());
+        let mut from_runner_rx = HyperClientRunner::new(
+            factory,
+            from_client_rx,
+            status_mpsc_tx.clone(),
+            logger.clone(),
+        );
 
-        let (greet_tx,greet_rx) = watch::channel(None);
+        let (greet_tx, greet_rx) = watch::channel(None);
 
         let mut client = Self {
             stub,
@@ -1144,7 +1180,7 @@ impl HyperClient {
             status_rx: status_rx.clone(),
             to_client_listener_tx: to_client_listener_tx.clone(),
             logger: logger.clone(),
-            greet_rx
+            greet_rx,
         };
 
         {
@@ -1174,38 +1210,64 @@ impl HyperClient {
                                 if !reflected.core().status.is_success() {
                                     match reflected.core().status.as_u16() {
                                         400 => {
-                                            status_tx.send(HyperClientStatus::Fatal).await.unwrap_or_default();
+                                            status_tx
+                                                .send(HyperClientStatus::Fatal)
+                                                .await
+                                                .unwrap_or_default();
                                             let err = "400: Bad Request: FATAL: something in the knock was incorrect";
                                             return Err(err.into());
                                         }
                                         401 => {
-                                            status_tx.send(HyperClientStatus::Fatal).await.unwrap_or_default();
+                                            status_tx
+                                                .send(HyperClientStatus::Fatal)
+                                                .await
+                                                .unwrap_or_default();
                                             let err = "401: Unauthorized: FATAL: authentication failed (bad credentials?)";
                                             return Err(err.into());
                                         }
                                         403 => {
-                                            status_tx.send(HyperClientStatus::Fatal).await.unwrap_or_default();
+                                            status_tx
+                                                .send(HyperClientStatus::Fatal)
+                                                .await
+                                                .unwrap_or_default();
                                             let err = "403: Forbidden: FATAL: authentication succeeded however the authenticated agent does not have permission to connect to this service";
                                             return Err(err.into());
                                         }
                                         408 => {
-                                            status_tx.send(HyperClientStatus::Panic).await.unwrap_or_default();
+                                            status_tx
+                                                .send(HyperClientStatus::Panic)
+                                                .await
+                                                .unwrap_or_default();
                                             let err = "408: Request Timeout: PANIC";
                                             return Err(err.into());
                                         }
                                         301 => {
-                                            status_tx.send(HyperClientStatus::Fatal).await.unwrap_or_default();
+                                            status_tx
+                                                .send(HyperClientStatus::Fatal)
+                                                .await
+                                                .unwrap_or_default();
                                             let err = "301: Moved Permanently: FATAL: please update to new connection address";
                                             return Err(err.into());
                                         }
                                         503 => {
-                                            status_tx.send(HyperClientStatus::Panic).await.unwrap_or_default();
-                                            let err = "503: Service Unavailable: PANIC: try again later";
+                                            status_tx
+                                                .send(HyperClientStatus::Panic)
+                                                .await
+                                                .unwrap_or_default();
+                                            let err =
+                                                "503: Service Unavailable: PANIC: try again later";
                                             return Err(err.into());
                                         }
                                         _ => {
-                                            status_tx.send(HyperClientStatus::Panic).await.unwrap_or_default();
-                                            let err = format!("{}: {}: PANIC: expected 200", reflected.core().status.as_u16(), reflected.core().status.to_string());
+                                            status_tx
+                                                .send(HyperClientStatus::Panic)
+                                                .await
+                                                .unwrap_or_default();
+                                            let err = format!(
+                                                "{}: {}: PANIC: expected 200",
+                                                reflected.core().status.as_u16(),
+                                                reflected.core().status.to_string()
+                                            );
                                             return Err(err.into());
                                         }
                                     }
@@ -1213,13 +1275,19 @@ impl HyperClient {
                                 if let Substance::Greet(greet) = &reflected.core().body {
                                     greet_tx.send(Some(greet.clone()));
                                 } else {
-                                    status_tx.send(HyperClientStatus::Fatal).await.unwrap_or_default();
+                                    status_tx
+                                        .send(HyperClientStatus::Fatal)
+                                        .await
+                                        .unwrap_or_default();
                                     let err = "HyperClient expected first wave Substance to be a reflected Greeting";
                                     return Err(err.into());
                                 }
                             }
                             Err(err) => {
-                                status_tx.send(HyperClientStatus::Fatal).await.unwrap_or_default();
+                                status_tx
+                                    .send(HyperClientStatus::Fatal)
+                                    .await
+                                    .unwrap_or_default();
                                 let err = format!("HyperClient expected first wave Substance to be a reflected Greeting. Instead when attempting to convert to a reflected wave err occured: {}", err.to_string());
                                 return Err(err.into());
                             }
@@ -1232,7 +1300,16 @@ impl HyperClient {
                     Ok(())
                 }
                 logger
-                    .result(relay(from_runner_rx, to_client_listener_tx, status_tx,greet_tx, logger.clone()).await)
+                    .result(
+                        relay(
+                            from_runner_rx,
+                            to_client_listener_tx,
+                            status_tx,
+                            greet_tx,
+                            logger.clone(),
+                        )
+                        .await,
+                    )
                     .unwrap_or_default();
             });
         }
@@ -1266,7 +1343,7 @@ impl HyperClient {
         self.greet_rx.borrow().clone()
     }
 
-    pub async fn wait_for_greet(&self) -> Result<Greet,MsgErr> {
+    pub async fn wait_for_greet(&self) -> Result<Greet, MsgErr> {
         let mut greet_rx = self.greet_rx.clone();
         loop {
             let greet = greet_rx.borrow().clone();
@@ -1278,20 +1355,22 @@ impl HyperClient {
         }
     }
 
-    pub async fn wait_for_ready(self, duration: Duration) -> Result<Self,MsgErr> {
+    pub async fn wait_for_ready(self, duration: Duration) -> Result<Self, MsgErr> {
         let mut status_rx = self.status_rx.clone();
-        let (rtn,mut rtn_rx) = oneshot::channel();
+        let (rtn, mut rtn_rx) = oneshot::channel();
 
         tokio::spawn(async move {
-            loop{
+            loop {
                 let status = status_rx.borrow().clone();
                 match status {
                     HyperClientStatus::Ready => {
                         rtn.send(Ok(self));
                         break;
-                    },
+                    }
                     HyperClientStatus::Fatal => {
-                        rtn.send(Err(MsgErr::from_500("Fatal status from HyperClient while waiting for Ready")));
+                        rtn.send(Err(MsgErr::from_500(
+                            "Fatal status from HyperClient while waiting for Ready",
+                        )));
                         break;
                     }
                     _ => {}
@@ -1299,7 +1378,7 @@ impl HyperClient {
             }
         });
 
-        tokio::time::timeout(duration,rtn_rx).await??
+        tokio::time::timeout(duration, rtn_rx).await??
     }
 }
 
@@ -1315,6 +1394,7 @@ pub enum HyperClientStatus {
 
 pub enum HyperClientCall {
     Wave(UltraWave),
+    Close,
 }
 
 pub enum HyperConnectionErr {
@@ -1372,11 +1452,14 @@ impl HyperClientRunner {
     }
 
     async fn start(mut self) {
-        self.status_tx.send(HyperClientStatus::Pending).await.unwrap_or_default();
+        self.status_tx
+            .send(HyperClientStatus::Pending)
+            .await
+            .unwrap_or_default();
         loop {
             async fn connect(runner: &mut HyperClientRunner) -> Result<(), HyperConnectionErr> {
                 if let Err(_) = runner.status_tx.send(HyperClientStatus::Connecting).await {
-                    return Err(HyperConnectionErr::Fatal("can no longer update HyperClient status (probably due to previous Fatal status)".to_string()))
+                    return Err(HyperConnectionErr::Fatal("can no longer update HyperClient status (probably due to previous Fatal status)".to_string()));
                 }
                 loop {
                     match runner.logger.result_ctx(
@@ -1388,7 +1471,7 @@ impl HyperClientRunner {
                             runner.ext.replace(ext);
                             if let Err(_) = runner.status_tx.send(HyperClientStatus::Ready).await {
                                 runner.ext.take();
-                                return Err(HyperConnectionErr::Fatal("can no longer update HyperClient status (probably due to previous Fatal status)".to_string()))
+                                return Err(HyperConnectionErr::Fatal("can no longer update HyperClient status (probably due to previous Fatal status)".to_string()));
                             }
                             return Ok(());
                         }
@@ -1458,11 +1541,17 @@ impl HyperClientRunner {
                     Ok(_) => {}
                     Err(HyperConnectionErr::Fatal(message)) => {
                         // need to log the fatal error message somehow
-                        self.status_tx.send(HyperClientStatus::Fatal).await.unwrap_or_default();
+                        self.status_tx
+                            .send(HyperClientStatus::Fatal)
+                            .await
+                            .unwrap_or_default();
                         return;
                     }
                     Err(HyperConnectionErr::Retry(m)) => {
-                        self.status_tx.send(HyperClientStatus::Panic).await.unwrap_or_default();
+                        self.status_tx
+                            .send(HyperClientStatus::Panic)
+                            .await
+                            .unwrap_or_default();
                     }
                 }
 
@@ -1495,7 +1584,7 @@ pub struct LocalHyperwayGateUnlocker {
 
 impl LocalHyperwayGateUnlocker {
     pub fn new(remote: Port, gate: Arc<dyn HyperGate>) -> Self {
-        let knock = Knock::new(InterchangeKind::Singleton, remote, Substance::Empty );
+        let knock = Knock::new(InterchangeKind::Singleton, remote, Substance::Empty);
         Self { knock, gate }
     }
 }
@@ -1635,8 +1724,15 @@ mod tests {
      */
 }
 
+#[cfg(test)]
 pub mod test {
-    use crate::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint,  HyperClient, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter, HyperRouter, Hyperlane, Hyperway, HyperwayExt, HyperwayExtFactory, HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist, LocalHyperwayGateJumper};
+    use crate::{
+        AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, HyperClient,
+        HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter, HyperRouter, Hyperlane,
+        Hyperway, HyperwayExt, HyperwayExtFactory, HyperwayInterchange, HyperwayStub,
+        InterchangeGate, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate,
+        TokenAuthenticatorWithRemoteWhitelist,
+    };
     use cosmic_api::command::request::create::PointFactoryU64;
     use cosmic_api::error::MsgErr;
     use cosmic_api::id::id::{Layer, Point, ToPoint, ToPort};
@@ -1871,8 +1967,8 @@ pub mod test {
             logger.push("interchange").unwrap(),
         ));
 
-        interchange.add(Hyperway::new(LESS.clone().to_port(), LESS.to_agent()));
-        interchange.add(Hyperway::new(FAE.clone().to_port(), FAE.to_agent()));
+        interchange.add(Hyperway::new(LESS.clone().to_port(), LESS.to_agent())).await;
+        interchange.add(Hyperway::new(FAE.clone().to_port(), FAE.to_agent())).await;
 
         let auth = AnonHyperAuthenticator::new();
         let gate = Arc::new(MountInterchangeGate::new(
@@ -1888,15 +1984,9 @@ pub mod test {
         let less_stub = HyperwayStub::from_port(LESS.clone().to_port());
         let fae_stub = HyperwayStub::from_port(FAE.clone().to_port());
 
-        let less_factory = LocalHyperwayGateUnlocker::new(
-                LESS.clone().to_port(),
-            gate.clone(),
-        );
+        let less_factory = LocalHyperwayGateUnlocker::new(LESS.clone().to_port(), gate.clone());
 
-        let fae_factory = LocalHyperwayGateUnlocker::new(
-            FAE.clone().to_port(),
-            gate.clone(),
-        );
+        let fae_factory = LocalHyperwayGateUnlocker::new(FAE.clone().to_port(), gate.clone());
 
         let root_logger = RootLogger::default();
         let logger = root_logger.point(Point::from_str("less-client").unwrap());
@@ -1943,9 +2033,8 @@ pub mod test {
             });
         }
 
-
-        let (rtn,mut rtn_rx) = oneshot::channel();
-        tokio::spawn( async move {
+        let (rtn, mut rtn_rx) = oneshot::channel();
+        tokio::spawn(async move {
             let mut hello = DirectedProto::ping();
             hello.kind(DirectedKind::Ping);
             hello.to(FAE.clone().to_port());
@@ -1956,7 +2045,10 @@ pub mod test {
             rtn.send(pong.core.status.as_u16() == 200u16);
         });
 
-        let result = tokio::time::timeout(Duration::from_secs(5),rtn_rx).await.unwrap().unwrap();
+        let result = tokio::time::timeout(Duration::from_secs(5), rtn_rx)
+            .await
+            .unwrap()
+            .unwrap();
         assert!(result);
     }
 }
