@@ -9,15 +9,11 @@ use cosmic_api::id::{BaseSubKind, StarSub, TraversalInjection};
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{Assign, AssignmentKind, ControlPattern, Greet, InterchangeKind, Knock};
 use cosmic_api::wave::Agent::Anonymous;
-use cosmic_api::wave::{Agent, CoreBounce, DirectedHandler, InCtx, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, Signal, UltraWave, Wave};
+use cosmic_api::wave::{Agent, Method,CmdMethod, CoreBounce, DirectedHandler, InCtx, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, Signal, UltraWave, Wave};
 use cosmic_api::wave::{DirectedHandlerSelector, SetStrategy, TxRouter};
 use cosmic_api::wave::{DirectedProto, RecipientSelector};
 use cosmic_api::{ArtRef, Registration, State};
-use cosmic_hyperlane::{
-    AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, HyperAuthenticator,
-    HyperConnectionErr, HyperGate, HyperGreeter, Hyperway, HyperwayExt, HyperwayInterchange,
-    HyperwayStub, InterchangeGate,
-};
+use cosmic_hyperlane::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, FromTransform, HopTransform, HyperAuthenticator, HyperConnectionErr, HyperGate, HyperGreeter, Hyperway, HyperwayConfigurator, HyperwayExt, HyperwayInterchange, HyperwayStub, InterchangeGate, TransportTransform};
 use dashmap::DashMap;
 use std::marker::PhantomData;
 use std::str::FromStr;
@@ -117,11 +113,7 @@ impl<P> ControlDriver<P>
 where
     P: Platform,
 {
-    #[route("Cmd<Bounce>")]
-    pub async fn bounce(&self, ctx: InCtx<'_, ()>) -> Result<ReflectedCore, MsgErr> {
-        let mut core = ReflectedCore::new();
-        Ok(core)
-    }
+
 }
 
 
@@ -133,6 +125,10 @@ where
 {
     fn kind(&self) -> Kind {
         Kind::Control
+    }
+
+    fn layer(&self) -> Layer {
+        Layer::Portal
     }
 
     async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
@@ -151,13 +147,24 @@ where
         let interchange = Arc::new(interchange);
         let greeter = ControlGreeter::new(self.skel.clone(), self.skel.driver.point.push("controls".to_string()).unwrap());
         self.external_router  = Some(TxRouter::new(tx));
-        let gate = Arc::new(InterchangeGate::new(auth, greeter, interchange, self.skel.driver.logger.clone() ));
+
+        pub struct ControlHyperwayConfigurator;
+
+        impl HyperwayConfigurator for ControlHyperwayConfigurator {
+            fn config(&self, greet: &Greet, hyperway: &mut Hyperway) {
+                hyperway.transform_inbound( Box::new(FromTransform::new(greet.port.clone())) );
+                hyperway.transform_inbound( Box::new(TransportTransform::new(greet.transport.clone())) );
+                hyperway.transform_inbound( Box::new(HopTransform::new(greet.hop.clone())) );
+            }
+        }
+        let configurator = ControlHyperwayConfigurator;
+        let gate = Arc::new(InterchangeGate::new(auth, greeter, configurator, interchange, self.skel.driver.logger.clone() ));
         {
             let logger = self.skel.driver.logger.clone();
             let fabric_routers = self.fabric_routers.clone();
             tokio::spawn(async move {
                 while let Some(hop) = rx.recv().await {
-                    let remote = hop.from().clone().with_layer(Layer::Core);
+                    let remote = hop.from().clone().with_layer(Layer::Portal);
                     match fabric_routers.get(&remote.point)
                     {
                         None => {
@@ -170,7 +177,9 @@ where
                                     if transport.to.point == remote.point {
                                         match transport.unwrap_from_transport()
                                         {
+
                                             Ok(wave) => {
+println!("routing wave to what: {}", wave.to().to_string());
                                                 router.route(wave).await;
                                             }
                                             Err(err) => {
@@ -264,7 +273,7 @@ impl <P> PointFactory for ControlCreator<P> where P: Platform {
         if pong.core.status.is_success() {
             if let Substance::Stub(ref stub) = pong.core.body {
                 let point = stub.point.clone();
-                let fabric_router = LayerInjectionRouter::new(self.skel.star.clone(), point.clone().to_port().with_layer(Layer::Core) );
+                let fabric_router = LayerInjectionRouter::new(self.skel.star.clone(), point.clone().to_port().with_layer(Layer::Portal) );
                 self.fabric_routers.insert(point.clone(),fabric_router);
                 Ok(point)
             }
@@ -298,10 +307,10 @@ impl <P> ControlGreeter<P> where P: Platform {
 impl <P> HyperGreeter for ControlGreeter<P> where P: Platform{
     async fn greet(&self, stub: HyperwayStub) -> Result<Greet,MsgErr> {
         Ok(Greet {
-            port: stub.remote.clone(),
+            port: stub.remote.clone().with_layer(Layer::Core),
             agent: stub.agent.clone(),
-            hop: Point::remote_endpoint().to_port().with_layer(Layer::Core),
-            transport: stub.remote.clone()
+            hop: self.skel.driver.point.clone().to_port(),
+            transport: stub.remote.clone().with_layer(Layer::Portal )
         })
     }
 }

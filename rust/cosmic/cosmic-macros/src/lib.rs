@@ -107,6 +107,11 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
     let rtn = quote! {
         impl #generics DirectedHandlerSelector for #self_ty #where_clause{
               fn select<'a>( &self, select: &'a RecipientSelector<'a>, ) -> Result<&dyn DirectedHandler, ()> {
+                use cosmic_api::wave::Method;
+                use cosmic_api::wave::CmdMethod;
+                if select.wave.core().method == Method::Cmd(CmdMethod::Bounce) {
+                    return Ok(self);
+                }
                 #(
                     if #static_selector_keys.is_match(&select.wave).is_ok() {
                         return Ok(self);
@@ -119,11 +124,16 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
         #[async_trait]
         impl #generics DirectedHandler for #self_ty #where_clause{
             async fn handle( &self, ctx: RootInCtx) -> CoreBounce {
+                use cosmic_api::wave::Method;
+                use cosmic_api::wave::CmdMethod;
                 #(
                     if #static_selector_keys.is_match(&ctx.wave).is_ok() {
                        return self.#idents( ctx ).await;
                     }
                 )*
+                if ctx.wave.core().method == Method::Cmd(CmdMethod::Bounce) {
+                    return CoreBounce::Reflected(ReflectedCore::new());
+                }
                 ctx.not_found().into()
              }
         }

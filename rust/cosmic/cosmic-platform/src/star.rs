@@ -954,7 +954,7 @@ where
                             .await,
                     )
                     .unwrap_or_default();
-                self.skel.logger.result(Err(P::Err::new("not success on assign").to_cosmic_err()))
+                self.skel.logger.result(Err(P::Err::new(format!("not success on assign {}", details.stub.point.to_string())).to_cosmic_err()))
             }
 
     }

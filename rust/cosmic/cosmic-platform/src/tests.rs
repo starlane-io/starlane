@@ -7,7 +7,7 @@ use cosmic_api::id::id::{Layer, ToPoint, ToPort, Uuid};
 use cosmic_api::id::TraversalDirection;
 use cosmic_api::msg::MsgMethod;
 use cosmic_api::sys::{Assign, AssignmentKind, InterchangeKind, Knock, Sys};
-use cosmic_api::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, HyperWave, SysMethod};
+use cosmic_api::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Pong, ProtoTransmitterBuilder, SysMethod, Wave};
 use cosmic_api::{MountKind, NoDiceArtifactFetcher, HYPERUSER};
 use cosmic_hyperlane::{AnonHyperAuthenticator, HyperClient, HyperConnectionErr, HyperGate, HyperwayExt, HyperwayStub, LocalHyperwayGateJumper};
 use dashmap::DashMap;
@@ -821,8 +821,16 @@ fn test_control() -> Result<(), TestErr> {
         };
 
         let client = HyperClient::new(stub,Box::new(factory), logger ).unwrap();
-        let router = client.router();
-        let client = client.wait_for_ready(Duration::from_secs(5)).await?;
+        let transmitter = client.proto_transmitter_builder().await?;
+        let greet = client.get_greeting().expect("expected greeting");
+        let transmitter = transmitter.build();
+        let bounce = DirectedProto::cmd(greet.transport.clone().with_layer(Layer::Shell), CmdMethod::Bounce);
+        let reflect: Wave<Pong> = transmitter.direct(bounce).await?;
+
+println!("reflected: {}", reflect.core.status.to_string());
+
+        assert!(reflect.core.status.is_success());
+
         client.close().await;
         tokio::time::sleep(Duration::from_millis(50)).await;
         Ok(())

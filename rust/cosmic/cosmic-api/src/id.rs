@@ -94,6 +94,17 @@ pub mod id {
             Layer::Guest,
             Layer::Core
         ]);
+
+        pub static ref CONTROL_WAVE_TRAVERSAL_PLAN: TraversalPlan = TraversalPlan::new(vec![
+            Layer::Field,
+            Layer::Shell,
+            Layer::Portal,
+            Layer::Host,
+            Layer::Guest,
+            Layer::Core
+        ]);
+
+
         pub static ref STAR_WAVE_TRAVERSAL_PLAN: TraversalPlan =
             TraversalPlan::new(vec![Layer::Field, Layer::Shell, Layer::Core]);
     }
@@ -302,6 +313,7 @@ pub mod id {
             match self {
                 Kind::Mechtron => &MECHTRON_WAVE_TRAVERSAL_PLAN,
                 Kind::Portal => &PORTAL_WAVE_TRAVERSAL_PLAN,
+                Kind::Control => &CONTROL_WAVE_TRAVERSAL_PLAN,
                 Kind::Star(_) => &STAR_WAVE_TRAVERSAL_PLAN,
                 _ => &STD_WAVE_TRAVERSAL_PLAN,
             }

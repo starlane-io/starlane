@@ -19,12 +19,7 @@ use cosmic_api::particle::particle::{Details, Status, Stub};
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{Assign, AssignmentKind, Sys};
 use cosmic_api::util::{log, ValuePattern};
-use cosmic_api::wave::{
-    Agent, Bounce, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector,
-    DirectedKind, DirectedProto, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter,
-    ProtoTransmitterBuilder, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router,
-    SetStrategy, SysMethod, UltraWave, Wave, WaveKind,
-};
+use cosmic_api::wave::{Agent, Bounce, CmdMethod, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, SysMethod, UltraWave, Wave, WaveKind};
 use cosmic_api::{ArtRef, Registration, State, HYPERUSER};
 use dashmap::DashMap;
 use futures::future::select_all;
@@ -1305,6 +1300,10 @@ where
 {
     fn kind(&self) -> Kind;
 
+    fn layer(&self) -> Layer {
+        Layer::Core
+    }
+
     async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
         skel.logger
             .result(skel.status_tx.send(DriverStatus::Ready).await)
@@ -1316,7 +1315,6 @@ where
     async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
         Ok(())
     }
-
     fn default_bind(&self) -> ArtRef<BindConfig> {
         DEFAULT_BIND.clone()
     }

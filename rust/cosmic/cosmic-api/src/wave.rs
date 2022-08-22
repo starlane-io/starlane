@@ -312,7 +312,7 @@ impl UltraWave {
     pub fn to_signal(self) -> Result<Wave<Signal>, MsgErr> {
         match self {
             UltraWave::Signal(signal) => Ok(signal),
-            _ => Err(MsgErr::bad_request()),
+            _ => Err(MsgErr::bad_request_msg(format!("expecting: Wave<Signal> encountered: Wave<{}>", self.kind().to_string()))),
         }
     }
 
