@@ -28,6 +28,7 @@ pub mod substance {
     use serde_json::Value;
     use std::str::FromStr;
     use std::sync::Arc;
+    use crate::Details;
 
     #[derive(
         Debug,
@@ -51,6 +52,7 @@ pub mod substance {
         Meta,
         Bin,
         Stub,
+        Details,
         Status,
         Particle,
         Errors,
@@ -87,6 +89,7 @@ pub mod substance {
         Port(Port),
         Text(String),
         Stub(Stub),
+        Details(Details),
         Meta(Meta),
         Bin(Bin),
         Boolean(bool),
@@ -222,6 +225,7 @@ pub mod substance {
                 Substance::HyperWave(_) => SubstanceKind::HyperWave,
                 Substance::Knock(_) => SubstanceKind::Knock,
                 Substance::Greet(_) => SubstanceKind::Greet,
+                Substance::Details(_) => SubstanceKind::Details
             }
         }
 

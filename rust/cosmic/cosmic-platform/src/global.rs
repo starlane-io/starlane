@@ -223,7 +223,7 @@ where
         let agent = ctx.wave().agent().clone();
         match ctx.input {
             Command::Create(create) => {
-                Ok(ctx.ok_body(self.skel.logger.result(global.create(create,&agent).await)?.stub.into()))
+                Ok(ctx.ok_body(self.skel.logger.result(global.create(create,&agent).await)?.into()))
             },
             _ => Err(P::Err::new("not implemented")),
         }

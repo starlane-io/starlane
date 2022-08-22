@@ -55,7 +55,7 @@ pub mod id {
         parse_uuid, point_and_kind, point_route_segment, point_selector, point_var, uuid_chars,
         CamelCase, Ctx, CtxResolver, Domain, Env, ResolverErr, SkewerCase, VarResolver,
     };
-    use crate::{cosmic_uuid, parse};
+    use crate::{cosmic_uuid, KindTemplate, parse};
     use crate::{Agent, State, ANONYMOUS, HYPERUSER};
 
     use crate::parse::error::result;
@@ -162,6 +162,15 @@ pub mod id {
     }
 
     impl Sub {
+
+        pub fn to_camel_case(&self) -> Option<CamelCase> {
+            if let Sub::None = self {
+                None
+            } else {
+                Some(CamelCase::from_str( self.to_string().as_str() ).unwrap())
+            }
+        }
+
         pub fn specific(&self) -> Option<&Specific> {
             match self {
                 Sub::Database(sub) => sub.specific(),
@@ -273,6 +282,13 @@ pub mod id {
     }
 
     impl Kind {
+        pub fn to_template(&self) -> KindTemplate {
+            KindTemplate{
+                base: self.to_base(),
+                sub: self.sub().to_camel_case(),
+                specific: self.specific_selector()
+            }
+        }
         pub fn as_point_segments(&self) -> String {
             if Sub::None != self.sub() {
                 if let Some(specific) = self.specific() {
@@ -308,6 +324,16 @@ pub mod id {
             let sub = self.sub();
             sub.specific().cloned()
         }
+
+        pub fn specific_selector(&self) -> Option<SpecificSelector> {
+            match self.specific() {
+                None => None,
+                Some(specific) => {
+                    Some(specific.to_selector())
+                }
+            }
+        }
+
 
         pub fn wave_traversal_plan(&self) -> &TraversalPlan {
             match self {
@@ -546,6 +572,12 @@ pub mod id {
         pub product: SkewerCase,
         pub variant: SkewerCase,
         pub version: Version,
+    }
+
+    impl Specific {
+        pub fn to_selector(&self) -> SpecificSelector {
+            SpecificSelector::from_str(self.to_string().as_str() ).unwrap()
+        }
     }
 
     impl ToString for Specific {
@@ -2241,6 +2273,23 @@ pub mod id {
                 RouteSeg::Global => true,
                 _ => false,
             }
+        }
+
+        pub fn is_parent_of( &self, point: &Point ) -> bool {
+            if self.segments.len() > point.segments.len() {
+                return false;
+            }
+
+            if self.route != point.route {
+                return false;
+            }
+
+            for i in 0..self.segments.len() {
+                if *self.segments.get(i).as_ref().unwrap() != *point.segments.get(i).as_ref().unwrap() {
+                    return false;
+                }
+            }
+            true
         }
 
         pub fn central() -> Self {

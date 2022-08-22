@@ -5,7 +5,7 @@ use crate::star::{
 };
 use crate::{PlatErr, Platform, Registry, RegistryApi};
 use cosmic_api::command::command::common::{SetProperties, StateSrc};
-use cosmic_api::command::request::create::{Create, PointSegTemplate, Strategy};
+use cosmic_api::command::request::create::{Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template};
 use cosmic_api::config::config::bind::{BindConfig, RouteSelector};
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{
@@ -51,8 +51,8 @@ pub struct DriversBuilder<P>
 where
     P: Platform,
 {
-    pre: Vec<Arc<dyn HyperDriverFactory<P>>>,
-    factories: HashMap<Kind, Arc<dyn HyperDriverFactory<P>>>,
+    factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
+    kinds: Vec<Kind>
 }
 
 impl<P> DriversBuilder<P>
@@ -61,30 +61,39 @@ where
 {
     pub fn new(kind: StarSub) -> Self {
         let mut pre: Vec<Arc<dyn HyperDriverFactory<P>>> = vec![];
-        pre.push(Arc::new(DriverDriverFactory::new()));
-        pre.push(Arc::new(StarDriverFactory::new(kind)));
+        let mut kinds = vec![];
+        let drivers_factory = Arc::new(DriverDriverFactory::new());
+        let star_factory = Arc::new(StarDriverFactory::new(kind.clone()));
+        kinds.push(<DriverDriverFactory as HyperDriverFactory<P>>::kind(&drivers_factory) );
+        pre.push(drivers_factory );
+        kinds.push(Kind::Star(kind));
+        pre.push(star_factory );
         Self {
-            pre,
-            factories: HashMap::new(),
+            factories: pre,
+            kinds
         }
     }
 
-    pub fn kinds(&self) -> HashSet<Kind> {
-        self.factories.keys().cloned().into_iter().collect()
+    pub fn kinds(&self) -> Vec<Kind> {
+        self.kinds.clone()
+    }
+
+    pub fn add_post(&mut self, factory: Arc<dyn HyperDriverFactory<P>>) {
+        self.kinds.push(factory.kind());
+        self.factories.push(factory);
     }
 
     pub fn add_pre(&mut self, factory: Arc<dyn HyperDriverFactory<P>>) {
-        self.pre.push(factory);
+        self.kinds.insert(0, factory.kind());
+        self.factories.insert(0, factory);
     }
 
-    pub fn add(&mut self, factory: Box<dyn DriverFactory<P>>) {
-        self.factories
-            .insert(factory.kind(), DriverFactoryWrapper::wrap(factory));
-    }
 
-    pub fn add_hyper(&mut self, factory: Arc<dyn HyperDriverFactory<P>>) {
+    /*pub fn add_hyper(&mut self, factory: Arc<dyn HyperDriverFactory<P>>) {
         self.factories.insert(factory.kind(), factory);
     }
+
+     */
 
     pub fn build(
         self,
@@ -98,8 +107,8 @@ where
         Drivers::new(
             port,
             skel.clone(),
-            self.pre,
             self.factories,
+            self.kinds,
             call_tx,
             call_rx,
             status_tx,
@@ -213,8 +222,7 @@ where
 {
     port: Port,
     skel: StarSkel<P>,
-    pre_factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
-    factories: HashMap<Kind, Arc<dyn HyperDriverFactory<P>>>,
+    factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
     drivers: HashMap<Kind, DriverApi<P>>,
     call_rx: mpsc::Receiver<DriversCall<P>>,
     call_tx: mpsc::Sender<DriversCall<P>>,
@@ -232,8 +240,8 @@ where
     pub fn new(
         port: Port,
         skel: StarSkel<P>,
-        pre_factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
-        factories: HashMap<Kind, Arc<dyn HyperDriverFactory<P>>>,
+        factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
+        kinds: Vec<Kind>,
         call_tx: mpsc::Sender<DriversCall<P>>,
         call_rx: mpsc::Receiver<DriversCall<P>>,
         watch_status_tx: watch::Sender<DriverStatus>,
@@ -246,13 +254,6 @@ where
             tokio::sync::mpsc::Receiver<DriverStatus>,
         ) = mpsc::channel(128);
 
-        let mut kinds: Vec<Kind> = factories.keys().cloned().into_iter().collect();
-        let mut pres = pre_factories
-            .clone()
-            .into_iter()
-            .map(|f| f.kind())
-            .collect();
-        kinds.append(&mut pres);
         tokio::spawn(async move {
             while let Some(status) = mpsc_status_rx.recv().await {
                 watch_status_tx.send(status.clone());
@@ -270,7 +271,6 @@ where
             call_tx: call_tx.clone(),
             statuses_rx,
             factories,
-            pre_factories,
             status_tx: mpsc_status_tx,
             status_rx: watch_status_rx.clone(),
             init: false,
@@ -337,10 +337,10 @@ where
         self.kinds.clone()
     }
     pub async fn init0(&mut self) {
-        if self.pre_factories.is_empty() {
+        if self.factories.is_empty() {
             self.status_listen(None).await;
         } else {
-            let factory = self.pre_factories.remove(0);
+            let factory = self.factories.remove(0);
             let (status_tx, mut status_rx) = watch::channel(DriverStatus::Pending);
             self.statuses_rx.insert(Kind::Driver, status_rx.clone());
 
@@ -365,15 +365,15 @@ where
 
     pub async fn init1(&mut self) {
         let mut statuses_tx = HashMap::new();
-        for kind in self.factories.keys() {
+        for kind in &self.kinds {
             let (status_tx, status_rx) = watch::channel(DriverStatus::Pending);
             statuses_tx.insert(kind.clone(), status_tx);
             self.statuses_rx.insert(kind.clone(), status_rx);
         }
 
-        for (kind, status_tx) in statuses_tx {
-            let factory = self.factories.get(&kind).unwrap().clone();
-            self.create(kind, factory, status_tx).await;
+        for factory in self.factories.clone() {
+            let status_tx = statuses_tx.remove(&factory.kind()).unwrap();
+            self.create(factory.kind(), factory, status_tx).await;
         }
 
         self.status_listen(None).await;
@@ -1185,20 +1185,14 @@ where
         }
     }
 
-    pub async fn create_driver_particle(&self, point: Point, kind: Kind ) -> Result<(),P::Err> {
-        let registration = Registration {
-            point: point.clone(),
-            kind: kind,
-            registry: Default::default(),
+    pub async fn create_driver_particle(&self, who: &str, child_segment_template: PointSegTemplate, kind: KindTemplate ) -> Result<Details,P::Err> {
+        let create = Create {
+            template: Template::new(PointTemplate { parent:self.point.clone(), child_segment_template }, kind ),
             properties: Default::default(),
-            owner: self.skel.point.clone(),
             strategy: Strategy::Override,
-            status: Status::Ready
+            state: StateSrc::None,
         };
-
-        self.skel.registry.register(&registration).await?;
-//        self.skel.registry.assign(&point, self.skel.location() ).await?;
-        Ok(())
+        self.skel.create_in_star(who, create).await
     }
 
 }

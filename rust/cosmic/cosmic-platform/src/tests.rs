@@ -75,7 +75,7 @@ impl Platform for TestPlatform {
 
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
         let mut builder = DriversBuilder::new(kind.clone());
-        builder.add_pre( Arc::new(ControlDriverFactory::new()));
+        builder.add_post( Arc::new(ControlDriverFactory::new()));
         builder
     }
 
@@ -824,7 +824,8 @@ fn test_control() -> Result<(), TestErr> {
         let transmitter = client.proto_transmitter_builder().await?;
         let greet = client.get_greeting().expect("expected greeting");
         let transmitter = transmitter.build();
-        let bounce = DirectedProto::cmd(greet.transport.clone().with_layer(Layer::Shell), CmdMethod::Bounce);
+        let mut bounce = DirectedProto::cmd(greet.transport.clone().with_layer(Layer::Shell), CmdMethod::Bounce);
+        bounce.track = true;
         let reflect: Wave<Pong> = transmitter.direct(bounce).await?;
 
 println!("reflected: {}", reflect.core.status.to_string());

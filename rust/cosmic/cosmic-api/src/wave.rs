@@ -1712,6 +1712,14 @@ impl Pong {
     pub fn as_result<E: From<&'static str>, P: TryFrom<Substance>>(self) -> Result<P, E> {
         self.core.as_result()
     }
+
+    pub fn as_ok<E: From<String>>(&self) -> Result<(), E> {
+        if self.is_ok() {
+            Ok(())
+        } else {
+            Err(self.core.status.to_string().into())
+        }
+    }
 }
 
 impl Pong {

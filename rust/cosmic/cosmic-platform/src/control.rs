@@ -134,7 +134,7 @@ where
     async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
         self.skel.driver.status_tx.send(DriverStatus::Init).await;
 
-        skel.create_driver_particle(skel.point.push("controls")?, Kind::Base(BaseSubKind::Any)).await?;
+        skel.create_driver_particle("controls", PointSegTemplate::Exact("controls".to_string()), Kind::Base(BaseSubKind::Any).to_template()).await?;
 
         let remote_point_factory =
             Arc::new(ControlCreator::new( self.skel.clone(), self.fabric_routers.clone(), ctx ));
@@ -261,28 +261,16 @@ impl <P> PointFactory for ControlCreator<P> where P: Platform {
             state: StateSrc::None,
         };
 
-        let mut wave = create.to_wave_proto();
-        wave.from(self.skel.driver.point.clone().to_port().with_layer(Layer::Core ));
-        wave.agent(Agent::Point(self.skel.driver.point.clone()));
-//        wave.track = true;
-
-        self.skel.driver.logger.track(&wave, || Tracker::new("driver:control:creator", "Register"));
-
-        let pong: Wave<Pong> = self.ctx.transmitter.direct(wave).await?;
-
-        if pong.core.status.is_success() {
-            if let Substance::Stub(ref stub) = pong.core.body {
-                let point = stub.point.clone();
-                let fabric_router = LayerInjectionRouter::new(self.skel.star.clone(), point.clone().to_port().with_layer(Layer::Portal) );
+        match self.skel.driver.logger.result_ctx("create-control",self.skel.star.create_in_star("create_control",create).await) {
+            Ok(details) => {
+                let point = details.stub.point;
+                let fabric_router = LayerInjectionRouter::new(self.skel.star.clone(), point.clone().to_port().with_layer(Layer::Shell) );
                 self.fabric_routers.insert(point.clone(),fabric_router);
                 Ok(point)
             }
-            else {
-                self.skel.driver.logger.error("bad reflection: expected Substance::Stub(stub)" );
-                Err(MsgErr::bad_request())
+            Err(err) => {
+                Err(err.into())
             }
-        } else {
-            Err(MsgErr::from_status(pong.core.status.as_u16()))
         }
     }
 }

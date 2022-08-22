@@ -99,6 +99,51 @@ impl Into<Stub> for ParticleRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Provision {
+    pub details: Details,
+    pub state: StateSrc,
+}
+
+impl Provision {
+    pub fn kind(&self) -> &Kind {
+        &self.details.stub.kind
+    }
+
+    pub fn new(details: Details, state: StateSrc) -> Self {
+        Self {
+            details,
+            state,
+        }
+    }
+}
+
+
+impl TryFrom<Ping> for Provision{
+    type Error = MsgErr;
+
+    fn try_from(request: Ping) -> Result<Self, Self::Error> {
+        if let Substance::Sys(Sys::Provision(provision)) = request.core.body {
+            Ok(provision)
+        } else {
+            Err(MsgErr::bad_request())
+        }
+    }
+}
+
+impl Into<Substance> for Provision{
+    fn into(self) -> Substance {
+        Substance::Sys(Sys::Provision(self))
+    }
+}
+
+impl Into<DirectedCore> for Provision{
+    fn into(self) -> DirectedCore {
+        DirectedCore::new(SysMethod::Assign.into()).with_body(Substance::Sys(Sys::Provision(self)))
+    }
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Assign {
     pub kind: AssignmentKind,
     pub details: Details,
@@ -121,6 +166,7 @@ impl Assign {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Autobox)]
 pub enum Sys {
+    Provision(Provision),
     Assign(Assign),
     Event(SysEvent),
     Log(Log),

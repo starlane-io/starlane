@@ -22,7 +22,7 @@ use cosmic_api::command::request::query::{Query, QueryResult};
 use cosmic_api::command::request::select::{Select, SubSelect};
 use cosmic_api::error::MsgErr;
 use cosmic_api::fail::Timeout;
-use cosmic_api::id::id::{BaseKind, Kind, Point, RouteSeg, Specific, ToBaseKind};
+use cosmic_api::id::id::{BaseKind, Kind, Layer, Point, Port, RouteSeg, Specific, ToBaseKind, ToPort};
 use cosmic_api::id::{
     ArtifactSubKind, BaseSubKind, FileSubKind, MachineName, StarKey, StarSub, UserBaseSubKind,
 };
@@ -121,6 +121,29 @@ where
     ) -> Result<Vec<IndexedAccessGrant>, P::Err>;
 
     async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), P::Err>;
+}
+
+#[derive(Clone)]
+pub struct SmartLocator<P> where P: Platform {
+    registry: Arc<dyn RegistryApi<P>>
+}
+
+impl <P> SmartLocator<P> where P: Platform {
+    pub fn new(registry: Arc<dyn RegistryApi<P>>) -> Self {
+        Self {
+            registry
+        }
+    }
+}
+
+impl <P> SmartLocator<P> where P: Platform {
+   pub async fn locate(&self, point: &Point ) -> Result<Port,P::Err> {
+       if let RouteSeg::Star(star) = &point.route  {
+           Ok(Point::from_str(format!("{}::star",star).as_str()).unwrap().to_port().with_layer(Layer::Core))
+       } else {
+           self.registry.locate(point).await.map( |record| record.details.stub.point.to_port().with_layer(Layer::Core))
+       }
+   }
 }
 
 /*

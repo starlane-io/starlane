@@ -29,10 +29,7 @@ pub mod selector {
     use crate::parse;
     use crate::parse::error::result;
     use crate::parse::model::Var;
-    use crate::parse::{
-        camel_case_chars, camel_case_to_string_matcher, consume_hierarchy, file_chars, path,
-        path_regex, point_segment_selector, point_selector, CamelCase, Env,
-    };
+    use crate::parse::{camel_case_chars, camel_case_to_string_matcher, consume_hierarchy, file_chars, path, path_regex, point_segment_selector, point_selector, CamelCase, Env, specific_selector};
     use crate::selector::selector::specific::{
         ProductSelector, ProviderSelector, VariantSelector, VendorSelector,
     };
@@ -530,6 +527,14 @@ pub mod selector {
         VariantSelector,
         VersionReq,
     >;
+
+    impl FromStr for SpecificSelector {
+        type Err = MsgErr;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            result(all_consuming(specific_selector)(new_span(s)))
+        }
+    }
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
     pub struct SpecificSelectorDef<
