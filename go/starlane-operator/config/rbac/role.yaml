@@ -88,6 +88,32 @@ rules:
 - apiGroups:
   - starlane.starlane.io
   resources:
+  - postgres
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - postgres/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - postgres/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - starlane.starlane.io
+  resources:
   - starlaneprovisioners
   verbs:
   - create

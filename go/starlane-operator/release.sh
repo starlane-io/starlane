@@ -10,6 +10,6 @@ kustomize edit set image controller=${IMG}
 
 cd ../..
 
-kustomize build config/default > starlane-operator.yml
+kustomize build config/default > ../../k8s/starlane-operator.yml
 
 

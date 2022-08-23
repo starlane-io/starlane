@@ -1,9 +1,0 @@
-#!/bin/sh
-
-COMMAND=$1
-
-NAME=$STARLANE_RESOURCE_NAME
-
-
-
-exit 0
