@@ -5,7 +5,7 @@ use cosmic_api::command::command::common::StateSrc;
 use cosmic_api::command::request::create::{Create, KindTemplate, PointFactory, PointFactoryU64, PointSegTemplate, PointTemplate, Strategy, Template, TemplateDef};
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{BaseKind, Kind, Layer, Point, Port, ToPoint, ToPort};
-use cosmic_api::id::{BaseSubKind, StarSub, TraversalInjection};
+use cosmic_api::id::{StarSub, TraversalInjection};
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{Assign, AssignmentKind, ControlPattern, Greet, InterchangeKind, Knock};
 use cosmic_api::wave::Agent::Anonymous;
@@ -134,7 +134,8 @@ where
     async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
         self.skel.driver.status_tx.send(DriverStatus::Init).await;
 
-        skel.create_driver_particle("controls", PointSegTemplate::Exact("controls".to_string()), Kind::Base(BaseSubKind::Any).to_template()).await?;
+println!(".... CREATING CONTROLS!!!");
+        skel.create_driver_particle("controls", PointSegTemplate::Exact("controls".to_string()), Kind::Base.to_template()).await?;
 
         let remote_point_factory =
             Arc::new(ControlCreator::new( self.skel.clone(), self.fabric_routers.clone(), ctx ));
@@ -261,7 +262,7 @@ impl <P> PointFactory for ControlCreator<P> where P: Platform {
             state: StateSrc::None,
         };
 
-        match self.skel.driver.logger.result_ctx("create-control",self.skel.star.create_in_star("create_control",create).await) {
+        match self.skel.driver.logger.result_ctx("create-control",self.skel.star.create("create_control", create).await) {
             Ok(details) => {
                 let point = details.stub.point;
                 let fabric_router = LayerInjectionRouter::new(self.skel.star.clone(), point.clone().to_port().with_layer(Layer::Shell) );

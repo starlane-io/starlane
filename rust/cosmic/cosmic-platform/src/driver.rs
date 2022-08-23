@@ -11,7 +11,7 @@ use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{
     BaseKind, Kind, Layer, Point, Port, ToBaseKind, ToPoint, ToPort, TraversalLayer, Uuid,
 };
-use cosmic_api::id::{BaseSubKind, StarKey, StarSub, Traversal, TraversalInjection};
+use cosmic_api::id::{StarKey, StarSub, Traversal, TraversalInjection};
 use cosmic_api::log::{PointLogger, Tracker};
 use cosmic_api::parse::model::Subst;
 use cosmic_api::parse::{bind_config, route_attribute};
@@ -87,13 +87,6 @@ where
         self.kinds.insert(0, factory.kind());
         self.factories.insert(0, factory);
     }
-
-
-    /*pub fn add_hyper(&mut self, factory: Arc<dyn HyperDriverFactory<P>>) {
-        self.factories.insert(factory.kind(), factory);
-    }
-
-     */
 
     pub fn build(
         self,
@@ -1192,7 +1185,7 @@ where
             strategy: Strategy::Override,
             state: StateSrc::None,
         };
-        self.skel.create_in_star(who, create).await
+        self.skel.create(who, create).await
     }
 
 }

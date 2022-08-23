@@ -5015,7 +5015,7 @@ use crate::config::config::Document;
 use crate::http::HttpMethod;
 use crate::id::id::{BaseKind, KindParts, PointKind, PointSeg, Specific};
 use crate::id::{
-    ArtifactSubKind, BaseSubKind, DatabaseSubKind, FileSubKind, StarKey, StarSub, UserBaseSubKind,
+    ArtifactSubKind,  DatabaseSubKind, FileSubKind, StarKey, StarSub, UserBaseSubKind,
 };
 use crate::msg::MsgMethod;
 use crate::parse::error::{find_parse_err, result};
@@ -5549,17 +5549,6 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
                     )))
                 }
             },
-            BaseKind::Base => match BaseSubKind::from_str(sub.as_str()) {
-                Ok(sub) => Ok((next, Kind::Base(sub))),
-                Err(err) => {
-                    let err = ErrorTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(ErrorTree::add_context(
-                        input,
-                        "kind-sub:not-accepted",
-                        err,
-                    )))
-                }
-            },
             BaseKind::Artifact => match ArtifactSubKind::from_str(sub.as_str()) {
                 Ok(sub) => Ok((next, Kind::Artifact(sub))),
                 Err(err) => {
@@ -5595,6 +5584,7 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
             },
             BaseKind::Root => Ok((next, Kind::Root)),
             BaseKind::Space => Ok((next, Kind::Space)),
+            BaseKind::Base => Ok((next, Kind::Base)),
             BaseKind::User => Ok((next, Kind::User)),
             BaseKind::App => Ok((next, Kind::App)),
             BaseKind::Mechtron => Ok((next, Kind::Mechtron)),

@@ -128,11 +128,11 @@ impl Trackable for UltraWave {
 
     fn track_method(&self) -> String {
         match self {
-            UltraWave::Ping(ping) => ping.core.method.to_string(),
+            UltraWave::Ping(ping) => ping.core.method.to_deep_string(),
             UltraWave::Pong(pong) => pong.core.status.to_string(),
-            UltraWave::Ripple(ripple) => ripple.core.method.to_string(),
+            UltraWave::Ripple(ripple) => ripple.core.method.to_deep_string(),
             UltraWave::Echo(echo) => echo.core.status.to_string(),
-            UltraWave::Signal(signal) => signal.core.method.to_string(),
+            UltraWave::Signal(signal) => signal.core.method.to_deep_string(),
         }
     }
 
@@ -1310,7 +1310,7 @@ impl Trackable for DirectedProto {
     }
 
     fn track_method(&self) -> String {
-        self.core.method.to_string()
+        self.core.method.to_deep_string()
     }
 
     fn track_payload(&self) -> String {
@@ -1766,9 +1766,9 @@ impl Trackable for DirectedWave {
 
     fn track_method(&self) -> String {
         match self {
-            Self::Ping(ping) => ping.core.method.to_string(),
-            Self::Ripple(ripple) => ripple.core.method.to_string(),
-            Self::Signal(signal) => signal.core.method.to_string(),
+            Self::Ping(ping) => ping.core.method.to_deep_string(),
+            Self::Ripple(ripple) => ripple.core.method.to_deep_string(),
+            Self::Signal(signal) => signal.core.method.to_deep_string(),
         }
     }
 
@@ -1912,9 +1912,9 @@ impl Trackable for SingularDirectedWave {
 
     fn track_method(&self) -> String {
         match self {
-            Self::Ping(ping) => ping.core.method.to_string(),
-            Self::Ripple(ripple) => ripple.core.method.to_string(),
-            Self::Signal(signal) => signal.core.method.to_string(),
+            Self::Ping(ping) => ping.core.method.to_deep_string(),
+            Self::Ripple(ripple) => ripple.core.method.to_deep_string(),
+            Self::Signal(signal) => signal.core.method.to_deep_string(),
         }
     }
 
@@ -2557,7 +2557,7 @@ impl Trackable for Wave<Signal> {
     }
 
     fn track_method(&self) -> String {
-        self.method.to_string()
+        self.method.to_deep_string()
     }
 
     fn track_payload(&self) -> String {
@@ -2665,7 +2665,7 @@ impl Trackable for Wave<Ping> {
     }
 
     fn track_method(&self) -> String {
-        self.method.to_string()
+        self.method.to_deep_string()
     }
 
     fn track_payload(&self) -> String {
@@ -3616,6 +3616,17 @@ pub enum Method {
     Cmd(CmdMethod),
     Http(HttpMethod),
     Msg(MsgMethod),
+}
+
+impl Method {
+    pub fn to_deep_string(&self) -> String {
+        match self {
+            Method::Sys(x) => format!("Sys<{}>",x.to_string()),
+            Method::Cmd(x) => format!("Cmd<{}>",x.to_string()),
+            Method::Http(x) => format!("Http<{}>",x.to_string()),
+            Method::Msg(x) => format!("Msg<{}>",x.to_string()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

@@ -447,6 +447,20 @@ pub mod request {
             pub specific: Option<SpecificSelector>,
         }
 
+        impl ToString for KindTemplate {
+            fn to_string(&self) -> String {
+                if self.sub.is_some() {
+                    if self.specific.is_some() {
+                        format!("{}<{}<{}>>",self.base.to_string(),self.sub.as_ref().unwrap().to_string(), self.specific.as_ref().unwrap().to_string())
+                    } else {
+                       format!("{}<{}>",self.base.to_string(),self.sub.as_ref().unwrap().to_string() )
+                    }
+                } else {
+                    self.base.to_string()
+                }
+            }
+        }
+
         impl TryInto<KindParts> for KindTemplate {
             type Error = MsgErr;
 

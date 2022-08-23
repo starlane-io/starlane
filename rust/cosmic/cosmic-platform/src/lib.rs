@@ -24,7 +24,7 @@ use cosmic_api::error::MsgErr;
 use cosmic_api::fail::Timeout;
 use cosmic_api::id::id::{BaseKind, Kind, Layer, Point, Port, RouteSeg, Specific, ToBaseKind, ToPort};
 use cosmic_api::id::{
-    ArtifactSubKind, BaseSubKind, FileSubKind, MachineName, StarKey, StarSub, UserBaseSubKind,
+    ArtifactSubKind, FileSubKind, MachineName, StarKey, StarSub, UserBaseSubKind,
 };
 use cosmic_api::particle::particle::{Details, Properties, Status, Stub};
 use cosmic_api::property::PropertiesConfig;
@@ -58,6 +58,7 @@ pub mod shell;
 pub mod star;
 pub mod state;
 pub mod tests;
+pub mod base;
 
 #[no_mangle]
 pub extern "C" fn cosmic_uuid() -> String {
@@ -364,18 +365,7 @@ where
         Ok(match base {
             BaseKind::Root => Kind::Root,
             BaseKind::Space => Kind::Space,
-            BaseKind::Base => match &template.sub {
-                None => {
-                    return Err("kind must be set for Base".into());
-                }
-                Some(sub_kind) => {
-                    let kind = BaseSubKind::from_str(sub_kind.as_str())?;
-                    if template.specific.is_some() {
-                        return Err("BaseKind cannot have a Specific".into());
-                    }
-                    return Ok(Kind::Base(kind));
-                }
-            },
+            BaseKind::Base => Kind::Base,
             BaseKind::User => Kind::User,
             BaseKind::App => Kind::App,
             BaseKind::Mechtron => Kind::Mechtron,

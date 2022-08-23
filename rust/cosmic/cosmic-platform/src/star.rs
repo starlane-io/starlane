@@ -52,6 +52,8 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 use tokio::time::error::Elapsed;
 use tracing::{error, info};
+use crate::global::GlobalExecutionChamber;
+
 #[derive(Clone)]
 pub struct StarState<P>
 where
@@ -313,34 +315,18 @@ where
 
      */
 
-    pub async fn create_in_star(&self, who: &str, create: Create ) -> Result<Details,P::Err>{
-println!("~~ CREATE IN STAR {}", who);
-        if self.point != create.template.point.parent && !self.point.is_parent_of(&create.template.point.parent) {
-           return Err(P::Err::new(format!("create_in_star requires that the created's parent must be either THIS star or a child of this star. expected: {}+:** encountered: {}",self.point.to_string(), create.template.point.parent.to_string() )) );
-        }
-
-        let mut register = create.to_wave_proto();
-        register.from(self.point.clone().to_port().with_layer(Layer::Core ));
-        register.agent(Agent::Point(self.point.clone()));
-        let registration: Wave<Pong> = self.gravity_transmitter.direct(register).await?;
-
-        if registration.core.status.is_success() {
-            if let Substance::Details(ref details) = registration.core.body {
-               let assign_body = Assign::new( AssignmentKind::Create, details.clone(), StateSrc::None );
-               let mut assign = DirectedProto::sys(self.point.clone().to_port().with_layer(Layer::Core), SysMethod::Assign);
-               assign.body(assign_body.into());
-               let assign_result: Wave<Pong> = self.gravity_transmitter.direct(assign).await?;
-               // as long as this doesn't throw an Err then we have a 200 case
-               assign_result.as_ok::<P::Err>()?;
-               Ok(details.clone())
-            }
-            else {
-                self.logger.error("bad reflection: expected Substance::Stub(stub)" );
-                Err(P::Err::from(MsgErr::bad_request()))
-            }
-        } else {
-            self.logger.result_ctx("StarSkel::create_in_star",Err(P::Err::from(MsgErr::from_status(registration.core.status.as_u16()))))
-        }
+    #[track_caller]
+    pub async fn create(&self, who: &str, create: Create ) -> Result<Details,P::Err>{
+        let global = GlobalExecutionChamber::new(self.clone());
+        let details = self.logger.result_ctx(format!("StarSkel::create_in_star(register({}))",create.template.kind.to_string()).as_str(),global.create(&create, &Agent::HyperUser).await)?;
+        let assign_body = Assign::new( AssignmentKind::Create, details.clone(), StateSrc::None );
+let kind = assign_body.kind.clone();
+        let mut assign = DirectedProto::sys(self.point.clone().to_port().with_layer(Layer::Core), SysMethod::Assign);
+        assign.body(assign_body.into());
+        assign.track = true;
+        let assign_result: Wave<Pong> = self.logger.result_ctx("StarSkel::create(assign_result)",self.gravity_transmitter.direct(assign).await)?;
+        self.logger.result_ctx(format!("StarSkel::create_in_star(assign({}))",kind.to_string()).as_str(), assign_result.as_ok::<P::Err>())?;
+        Ok(details)
     }
 
     pub fn err<M: ToString>(&self, message: M) -> Result<(), P::Err> {
@@ -842,6 +828,7 @@ where
 
     // receive a wave from the hyperlane... this wave should always be
     // a Wave<Signal> of the SysMethod<Hop> which should in turn contain a SysMethod<Transport> Signal
+    #[track_caller]
     async fn from_hyperway(&self, wave: UltraWave) -> Result<(), P::Err> {
         self.skel
             .logger
@@ -897,6 +884,7 @@ where
     // sending a wave that is from and to a particle into the fabric...
     // here it will be wrapped into a transport for star to star delivery or
     // sent to GLOBAL::registry if addressed in such a way
+    #[track_caller]
     async fn to_gravity(&self, wave: UltraWave) -> Result<(), P::Err> {
         #[cfg(test)]
         self.skel
@@ -941,6 +929,7 @@ where
         Ok(())
     }
 
+    #[track_caller]
     async fn shard(&self, wave: UltraWave) -> Result<(), P::Err> {
         match wave {
             _ => {
@@ -1010,6 +999,7 @@ where
         Ok(())
     }
 
+    #[track_caller]
     async fn assign(&self, details: Details) -> Result<Point, MsgErr> {
         let assign = Assign::new(AssignmentKind::Create, details.clone(), StateSrc::None);
 
@@ -1055,6 +1045,8 @@ where
 
     // send this transport signal into the hyperway
     // wrap the transport into a hop to go to one and only one star
+
+    #[track_caller]
     async fn to_hyperway(&self, transport: Wave<Signal>) -> Result<(), P::Err> {
         if self.skel.point == transport.to.point {
             // it's a bit of a strange case, but even if this star is sending a transport message
@@ -1087,6 +1079,7 @@ where
         }
     }
 
+    #[track_caller]
     async fn find_next_hop(&self, star_key: &StarKey) -> Result<Option<StarKey>, MsgErr> {
         if let Some(adjacent) = self.golden_path.get(star_key) {
             Ok(Some(adjacent.value().clone()))
@@ -1211,6 +1204,7 @@ where
 
         let mut to = wave.to().clone().unwrap_single();
         if to.point == *GLOBAL_EXEC {
+panic!("GLOBAL EXEC");
             wave.set_to(self.skel.machine.global.clone());
             to = self.skel.machine.global.clone();
         }
@@ -1812,7 +1806,6 @@ where
             .registry
             .assign(&point)
             .send(self.star_skel.point.clone());
-        println!("CREATED STAR in REGISTRY : {}", point.to_string());
 
         self.star_skel
             .logger
@@ -1879,6 +1872,7 @@ impl<P> StarCore<P>
 where
     P: Platform,
 {
+    #[track_caller]
     #[route("Sys<Assign>")]
     pub async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, P::Err> {
         self.skel.logger.info("***> ASSIGN!!!");

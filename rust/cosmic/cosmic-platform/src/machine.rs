@@ -1,4 +1,3 @@
-use crate::global::GlobalDriverFactory;
 use crate::star::{Star, StarApi, StarCon, StarSkel, StarTemplate, StarTx};
 use crate::{DriversBuilder, PlatErr, Platform, Registry, RegistryApi};
 use cosmic_api::error::MsgErr;
@@ -200,14 +199,7 @@ where
             let mut star_tx: StarTx<P> = StarTx::new(star_point.clone());
             let star_skel = StarSkel::new(star_template.clone(), skel.clone(), &mut star_tx).await;
 
-            let mut drivers = match star_template.kind {
-                StarSub::Machine => {
-                    let mut drivers = platform.drivers_builder(&star_template.kind);
-                    drivers.add_pre(Arc::new(GlobalDriverFactory::new()));
-                    drivers
-                }
-                _ => platform.drivers_builder(&star_template.kind),
-            };
+            let mut drivers = platform.drivers_builder(&star_template.kind);
 
             let mut interchange = HyperwayInterchange::new(logger.push("interchange").unwrap());
 

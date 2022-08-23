@@ -46,7 +46,7 @@ pub mod id {
     use crate::error::{MsgErr, ParseErrs};
     use crate::id::id::PointSegCtx::Working;
     use crate::id::{
-        ArtifactSubKind, BaseSubKind, DatabaseSubKind, FileSubKind, StarSub, Traversal,
+        ArtifactSubKind,  DatabaseSubKind, FileSubKind, StarSub, Traversal,
         TraversalDirection, TraversalInjection, UserBaseSubKind,
     };
     use crate::log::{PointLogger, Trackable};
@@ -156,7 +156,6 @@ pub mod id {
         Database(DatabaseSubKind),
         File(FileSubKind),
         Artifact(ArtifactSubKind),
-        Base(BaseSubKind),
         UserBase(UserBaseSubKind),
         Star(StarSub),
     }
@@ -164,10 +163,13 @@ pub mod id {
     impl Sub {
 
         pub fn to_camel_case(&self) -> Option<CamelCase> {
-            if let Sub::None = self {
-                None
-            } else {
-                Some(CamelCase::from_str( self.to_string().as_str() ).unwrap())
+            match self  {
+                Sub::None => None,
+                Sub::Database(d) => Some(CamelCase::from_str(d.to_string().as_str()).unwrap()),
+                Sub::File(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
+                Sub::Artifact(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
+                Sub::UserBase(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
+                Sub::Star(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
             }
         }
 
@@ -193,7 +195,6 @@ pub mod id {
                 Sub::Database(d) => d.into(),
                 Sub::File(f) => f.into(),
                 Sub::Artifact(a) => a.into(),
-                Sub::Base(b) => b.into(),
                 Sub::UserBase(u) => u.into(),
                 Sub::Star(s) => s.into(),
             }
@@ -207,7 +208,6 @@ pub mod id {
                 Sub::Database(d) => d.into(),
                 Sub::File(f) => f.into(),
                 Sub::Artifact(a) => a.into(),
-                Sub::Base(b) => b.into(),
                 Sub::UserBase(u) => u.into(),
                 Sub::Star(s) => s.into(),
             }
@@ -249,7 +249,7 @@ pub mod id {
         File(FileSubKind),
         Artifact(ArtifactSubKind),
         Database(DatabaseSubKind),
-        Base(BaseSubKind),
+        Base,
         UserBase(UserBaseSubKind),
         Star(StarSub),
         Global,
@@ -272,7 +272,7 @@ pub mod id {
                 Kind::File(_) => BaseKind::File,
                 Kind::Artifact(_) => BaseKind::Artifact,
                 Kind::Database(_) => BaseKind::Database,
-                Kind::Base(_) => BaseKind::Base,
+                Kind::Base => BaseKind::Base,
                 Kind::Repo => BaseKind::Repo,
                 Kind::Star(_) => BaseKind::Star,
                 Kind::Driver => BaseKind::Driver,
@@ -315,7 +315,6 @@ pub mod id {
                 Kind::File(s) => s.clone().into(),
                 Kind::Artifact(s) => s.clone().into(),
                 Kind::Database(s) => s.clone().into(),
-                Kind::Base(s) => s.clone().into(),
                 _ => Sub::None,
             }
         }
@@ -381,9 +380,7 @@ pub mod id {
                         }
                     }
                 }
-                BaseKind::Base => Kind::Base(BaseSubKind::from_str(
-                    value.sub.ok_or("Base<?> requires a Sub Kind")?.as_str(),
-                )?),
+                BaseKind::Base => Kind::Base,
                 BaseKind::File => Kind::File(FileSubKind::from_str(
                     value.sub.ok_or("File<?> requires a Sub Kind")?.as_str(),
                 )?),
@@ -2865,43 +2862,7 @@ impl Into<Option<String>> for StarSub {
         Some(self.to_string())
     }
 }
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    Hash,
-    Serialize,
-    Deserialize,
-    strum_macros::Display,
-    strum_macros::EnumString,
-)]
-pub enum BaseSubKind {
-    User,
-    App,
-    Mechtron,
-    Database,
-    Any,
-    Driver,
-}
 
-impl Into<Sub> for BaseSubKind {
-    fn into(self) -> Sub {
-        Sub::Base(self)
-    }
-}
-
-impl Into<Option<CamelCase>> for BaseSubKind {
-    fn into(self) -> Option<CamelCase> {
-        Some(CamelCase::from_str(self.to_string().as_str()).unwrap())
-    }
-}
-
-impl Into<Option<String>> for BaseSubKind {
-    fn into(self) -> Option<String> {
-        Some(self.to_string())
-    }
-}
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize, strum_macros::Display)]
 pub enum UserBaseSubKind {

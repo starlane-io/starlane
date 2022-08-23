@@ -384,7 +384,7 @@ impl StdOutAppender {
 
 impl LogAppender for StdOutAppender {
     fn log(&self, log: Log) {
-        println!("{} | {}", log.point.to_string(), log.payload.to_string())
+        println!("{} | {} | {}", log.point.to_string(), log.level.to_string(), log.payload.to_string())
     }
 
     fn audit(&self, log: AuditLog) {
@@ -539,7 +539,7 @@ impl PointLogger {
     where
         M: ToString,
     {
-        self.msg(Level::Error, message);
+        self.msg(Level::Error, format!("{} -> {}",std::panic::Location::caller().to_string(),message.to_string()));
     }
 
     pub fn result<R, E>(&self, result: Result<R, E>) -> Result<R, E>
@@ -549,7 +549,8 @@ impl PointLogger {
         match &result {
             Ok(_) => {}
             Err(err) => {
-                self.error(err.to_string());
+                //self.error(err.to_string());
+                self.msg(Level::Error, format!("{} -> {}",std::panic::Location::caller().to_string(),err.to_string()));
             }
         }
         result
@@ -575,7 +576,7 @@ impl PointLogger {
         match &result {
             Ok(_) => {}
             Err(err) => {
-                self.error(format!("{} {}", ctx, err.to_string()));
+                self.msg(Level::Error, format!("{} -> {}",std::panic::Location::caller().to_string(),err.to_string()));
             }
         }
         result

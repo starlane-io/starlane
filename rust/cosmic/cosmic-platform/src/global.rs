@@ -63,147 +63,24 @@ fn global_bind() -> BindConfig {
 
 }
 
-pub struct GlobalDriverFactory<P>
-where
-    P: Platform,
-{
-    phantom: PhantomData<P>
-}
-
-#[async_trait]
-impl<P> HyperDriverFactory<P> for GlobalDriverFactory<P>
-where
-    P: Platform,
-{
-    fn kind(&self) -> Kind {
-        Kind::Global
-    }
-
-    async fn create(
-        &self,
-        star: StarSkel<P>,
-        driver: DriverSkel<P>,
-        ctx: DriverCtx,
-    ) -> Result<Box<dyn Driver<P>>, P::Err> {
-        Ok(Box::new(GlobalDriver::new(star)))
-    }
-}
-
-impl<P> GlobalDriverFactory<P>
-where
-    P: Platform,
-{
-    pub fn new() -> Self {
-        Self {
-            phantom: Default::default()
-        }
-    }
-}
-
 #[derive(DirectedHandler)]
-pub struct GlobalDriver<P>
-where
-    P: Platform,
-{
-    pub skel: StarSkel<P>,
-}
-
-#[async_trait]
-impl<P> Driver<P> for GlobalDriver<P>
-where
-    P: Platform,
-{
-    fn kind(&self) -> Kind {
-        Kind::Global
-    }
-
-    async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
-        self.skel
-            .logger
-            .result(skel.status_tx.send(DriverStatus::Init).await)
-            .unwrap_or_default();
-
-        let point = self.skel.machine.global.clone().point;
-        let registration = Registration {
-            point: point.clone(),
-            kind: Kind::Global,
-            registry: Default::default(),
-            properties: Default::default(),
-            owner: HYPERUSER.clone(),
-            strategy: Strategy::Override,
-            status: Status::Ready
-        };
-
-        self.skel.api.create_states(point.clone()).await?;
-        self.skel.registry.register(&registration).await?;
-        self.skel.registry.assign(&point).send(self.skel.point.clone());
-        self.skel
-            .logger
-            .result(skel.status_tx.send(DriverStatus::Ready).await)
-            .unwrap_or_default();
-
-        Ok(())
-    }
-
-    async fn item(&self, point: &Point) -> Result<ItemHandler<P>, P::Err> {
-        if *point == self.skel.machine.global.point {
-            Ok(ItemHandler::Handler(Box::new(GlobalCore::restore(self.skel.clone(), (), ()))))
-        } else {
-            Err(MsgErr::not_found().into())
-        }
-    }
-
-    async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
-        Err(MsgErr::forbidden().into())
-    }
-}
-
-#[routes]
-impl<P> GlobalDriver<P>
-where
-    P: Platform,
-{
-    pub fn new(skel: StarSkel<P>) -> Self {
-        Self { skel }
-    }
-}
-
-#[derive(DirectedHandler)]
-pub struct GlobalCore<P>
+pub struct GlobalCommandExecutionHandler<P>
 where
     P: Platform,
 {
     skel: StarSkel<P>,
 }
 
-#[async_trait]
-impl <P> ItemDirectedHandler<P> for GlobalCore<P> where P: Platform {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
-          <GlobalCore<P> as Item<P>>::bind(self).await
-    }
-}
-
-
-#[async_trait]
-impl<P> Item<P> for GlobalCore<P>
-where
-    P: Platform,
-{
-    type Skel = StarSkel<P>;
-    type Ctx = ();
-    type State = ();
-
-    fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self {
-        GlobalCore { skel }
-    }
-
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
-        Ok(GLOBAL_BIND_CONFIG.clone())
+impl <P> GlobalCommandExecutionHandler<P> where P: Platform {
+    pub fn new(skel: StarSkel<P>) -> Self {
+        Self {
+            skel
+        }
     }
 }
 
 #[routes]
-impl<P> GlobalCore<P>
+impl<P> GlobalCommandExecutionHandler<P>
 where
     P: Platform,
 {
@@ -219,7 +96,7 @@ where
 
     #[route("Cmd<Command>")]
     pub async fn command(&self, ctx: InCtx<'_, Command>) -> Result<ReflectedCore, P::Err> {
-        let global = Global::new( self.skel.clone(), self.skel.logger.clone() );
+        let global = GlobalExecutionChamber::new(self.skel.clone() );
         let agent = ctx.wave().agent().clone();
         match ctx.input {
             Command::Create(create) => {
@@ -230,7 +107,7 @@ where
     }
 }
 
-pub struct Global<P>
+pub struct GlobalExecutionChamber<P>
 where
     P: Platform,
 {
@@ -238,23 +115,25 @@ where
     pub logger: PointLogger,
 }
 
-impl<P> Global<P>
+impl<P> GlobalExecutionChamber<P>
 where
     P: Platform,
 {
-    pub fn new( skel: StarSkel<P>, logger: PointLogger ) -> Self {
+    pub fn new( skel: StarSkel<P>) -> Self {
+        let logger = skel.logger.push("global").unwrap();
         Self {
             skel,
             logger
         }
     }
 
+    #[track_caller]
     pub async fn create(&self, create: &Create, agent: &Agent) -> Result<Details, P::Err> {
         let child_kind = self
             .skel
             .machine
             .platform
-            .select_kind(&create.template.kind)?;
+            .select_kind(&create.template.kind).map_err(|err|P::Err::new(format!("Kind {} is not available on this Platform", create.template.kind.to_string())))?;
         let details = match &create.template.point.child_segment_template {
             PointSegTemplate::Exact(child_segment) => {
                 let point = create.template.point.parent.push(child_segment.clone());

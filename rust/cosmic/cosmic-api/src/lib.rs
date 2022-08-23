@@ -46,7 +46,7 @@ use crate::config::config::bind::BindConfig;
 use crate::config::config::Document;
 use crate::error::MsgErr;
 use crate::id::id::{BaseKind, Kind, Point, Port, Specific, Uuid};
-use crate::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarSub, UserBaseSubKind};
+use crate::id::{ArtifactSubKind, FileSubKind, StarSub, UserBaseSubKind};
 use crate::particle::particle::{Details, Properties, Status, Stub};
 use crate::security::{Access, AccessGrant};
 use crate::selector::selector::Selector;

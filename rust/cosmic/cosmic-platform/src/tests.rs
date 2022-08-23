@@ -20,6 +20,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{oneshot, Mutex};
 use cosmic_api::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
+use crate::base::BaseDriverFactory;
 use crate::control::ControlDriverFactory;
 //use crate::control::ControlDriverFactory;
 use crate::driver::DriverFactory;
@@ -28,6 +29,10 @@ use crate::star::StarApi;
 lazy_static! {
     pub static ref LESS: Point = Point::from_str("space:users:less").expect("point");
     pub static ref FAE: Point = Point::from_str("space:users:fae").expect("point");
+}
+
+lazy_static! {
+           pub static ref PROPERTIES_CONFIG : PropertiesConfig = PropertiesConfig::new();
 }
 
 #[derive(Clone)]
@@ -70,12 +75,27 @@ impl Platform for TestPlatform {
     }
 
     fn properties_config<K: ToBaseKind>(&self, base: &K) -> &'static PropertiesConfig {
-        todo!()
+
+        &PROPERTIES_CONFIG
     }
 
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
         let mut builder = DriversBuilder::new(kind.clone());
         builder.add_post( Arc::new(ControlDriverFactory::new()));
+
+        match kind {
+            StarSub::Central => {}
+            StarSub::Super => {
+                builder.add_post(Arc::new(BaseDriverFactory::new()))
+            }
+            StarSub::Nexus => {}
+            StarSub::Maelstrom => {}
+            StarSub::Scribe => {}
+            StarSub::Jump => {}
+            StarSub::Fold => {}
+            StarSub::Machine => {}
+        }
+
         builder
     }
 
