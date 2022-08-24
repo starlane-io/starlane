@@ -2,7 +2,7 @@ use crate::star::StarSkel;
 use anyhow::anyhow;
 use dashmap::DashMap;
 
-use cosmic_api::config::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar, WaveKind};
+use cosmic_api::config::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar, WaveDirection};
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{
     BaseKind, Kind, Layer, Point, Port, ToBaseKind, ToPoint, ToPort, TraversalLayer, Uuid,
@@ -10,7 +10,7 @@ use cosmic_api::id::id::{
 use cosmic_api::id::Traversal;
 use cosmic_api::id::{ArtifactSubKind, TraversalInjection};
 use cosmic_api::log::{PointLogger, RootLogger, SpanLogger, Trackable, Tracker};
-use cosmic_api::parse::model::PipelineVar;
+use cosmic_api::parse::model::{MethodScope, PipelineVar};
 use cosmic_api::parse::{
     bind_config, Env, MapResolver, MultiVarResolver, PointCtxResolver, RegexCapturesResolver,
 };
@@ -20,7 +20,7 @@ use cosmic_api::selector::{PayloadBlock, PayloadBlockVar};
 use cosmic_api::substance::substance::{Call, CallKind, Substance};
 use cosmic_api::sys::ParticleRecord;
 use cosmic_api::util::{log, ToResolved, ValueMatcher};
-use cosmic_api::wave::{Agent, Bounce, CmdMethod, DirectedCore, DirectedWave, Exchanger, Method, Ping, Pong, Reflectable, ReflectedCore, ReflectedWave, Ripple, Signal, SingularDirectedWave, ToRecipients, UltraWave, Wave};
+use cosmic_api::wave::{Agent, Bounce, CmdMethod, DirectedCore, DirectedWave, Exchanger, Method, Ping, Pong, Reflectable, ReflectedCore, ReflectedWave, Ripple, Signal, SingularDirectedWave, ToRecipients, UltraWave, Wave, WaveKind};
 use regex::{CaptureMatches, Regex};
 
 use crate::{PlatErr, Platform, RegistryApi};
@@ -122,7 +122,8 @@ where
             .logger
             .set_span_attr("message-id", &directed.id().to_string());
 
-        self.skel.logger.track(&directed, || {
+        let logger = self.skel.logger.push_mark("field:directed-core-bound").unwrap();
+        logger.track(&directed, || {
             Tracker::new("field:directed_core_bound", "Receive")
         });
 
@@ -142,12 +143,12 @@ where
                     directed.logger.error(err_msg.as_str());
                     match directed.err(err_msg.into(), self.port().clone()) {
                         Bounce::Absorbed => {
-                            self.skel.logger.track(&directed, || {
+                            logger.track(&directed, || {
                                 Tracker::new("field:directed_core_bound", "Absorbed")
                             });
                         }
                         Bounce::Reflected(reflected) => {
-                            self.skel.logger.track(&directed, || {
+                            logger.track(&directed, || {
                                 Tracker::new("field:directed_core_bound", "Bounced")
                             });
 
@@ -163,42 +164,68 @@ where
             }
         }
 
-        let record = self.skel.registry.locate(&directed.to.point).await.map_err(|e|e.to_cosmic_err())?;
 
-        let properties = self.skel.registry.get_properties(&directed.to.point).await.map_err(|e|e.to_cosmic_err())?;
+        let logger = logger.push_mark("locate").unwrap();
+        let record = logger.result(self.skel.registry.locate(&directed.to.point).await.map_err(|e|e.to_cosmic_err()))?;
+        let logger = logger.pop_mark();
+
+        let logger = logger.push_mark("get-properties").unwrap();
+        let properties = logger.result(self.skel.registry.get_properties(&directed.to.point).await.map_err(|e|e.to_cosmic_err()))?;
+        let logger = logger.pop_mark();
+
         let bind_property = properties.get("bind");
 
-        self.skel.logger.track(&directed, || {
+        let logger = logger.pop_mark();
+
+        logger.track(&directed, || {
             Tracker::new("field:directed_core_bound", "PreBind")
         });
 
         let bind = match bind_property {
             None => {
-                self.skel.logger.track(&directed, || {
+                logger.track(&directed, || {
                     Tracker::new("field:directed_core_bound", "GetBindFromDriver")
                 });
 
+                let logger = logger.push_mark("get-driver").unwrap();
                 let driver = self.skel.drivers.get(&record.details.stub.kind).await?;
+                let logger = logger.pop_mark();
 
-                self.skel.logger.track(&directed, || {
+                logger.track(&directed, || {
                     Tracker::new("field:directed_core_bound", "GetBindFromItem")
                 });
-                driver.bind(&directed.to.point).await.map_err(|e|e.to_cosmic_err())?
+                let logger = logger.push_mark("bind").unwrap();
+                logger.result(driver.bind(&directed.to.point).await.map_err(|e|e.to_cosmic_err()))?
             }
             Some(bind) => {
-                let bind = Point::from_str(bind.value.as_str())?;
-                self.skel.machine.artifacts.bind(&bind).await?
+                let logger = logger.push_mark("bind-machine-artifact").unwrap();
+                let bind = logger.result(Point::from_str(bind.value.as_str()))?;
+                logger.result(self.skel.machine.artifacts.bind(&bind).await)?
             }
         };
 
 
-        self.skel.logger.track(&directed, || {
+        logger.track(&directed, || {
             Tracker::new("field:directed_core_bound", "GotStaticBind")
         });
 
-        let route = bind.select(&directed.payload)?;
+        let logger = logger.push_mark("select").unwrap();
+        let route = match bind.select(&directed.payload) {
+            Ok(route) => route,
+            Err(err) => {
+                logger.error( format!("{} from: {} to: {}", err.to_string(), directed.from().to_string(), directed.to().to_string()));
+                if directed.kind() != WaveKind::Signal {
+                    let reflection = directed.reflection()?;
+                    let core = ReflectedCore::status(404);
+                    let wave= reflection.make(core,self.port.clone());
+                    self.skel.gravity_transmitter.route( wave.to_ultra() ).await;
+                }
+                return Ok(());
+            }
+        };
+        let logger = logger.pop_mark();
 
-        self.skel.logger.track(&directed, || {
+        logger.track(&directed, || {
             Tracker::new("field:directed_core_bound", "RouteSelected")
         });
 
@@ -220,10 +247,10 @@ let method = directed.payload.core().method.clone();
         let pipeline = route.block.clone();
 
         let to = directed.to.clone();
-        let call = directed.to_call(to)?;
-        let logger = directed.logger.span();
+        let call = logger.result(directed.to_call(to))?;
+        let traversal_logger = directed.logger.span();
 
-        self.skel.logger.track(&directed, || {
+        logger.track(&directed, || {
             Tracker::new("field:directed_core_bound", "PipeEx")
         });
         let track = directed.track();
@@ -233,12 +260,12 @@ let method = directed.payload.core().method.clone();
         }
 
         directed.replace_via(self.port.clone());
-        let mut pipex = PipeEx::new(directed, self.clone(), pipeline, env, logger.clone());
+        let mut pipex = PipeEx::new(directed, self.clone(), pipeline, env, traversal_logger.clone());
         let action = match pipex.next() {
             Ok(action) => action,
             Err(err) => {
                 let err_msg = format!("Field: pipeline error for call {}", call.to_string());
-                logger.error(err_msg.as_str());
+                traversal_logger.error(err_msg.as_str());
                 self.skel
                     .traverse_to_next_tx
                     .send(pipex.fail(500, err_msg.as_str()).to_ultra())
@@ -264,7 +291,8 @@ let method = directed.payload.core().method.clone();
             track
         };
 
-        self.handle_action(action).await?;
+        let logger = logger.push_mark("handle-action").unwrap();
+        logger.result(self.handle_action(action).await)?;
 
         Ok(())
     }
@@ -273,6 +301,8 @@ let method = directed.payload.core().method.clone();
         &self,
         mut traversal: Traversal<ReflectedWave>,
     ) -> Result<(), MsgErr> {
+
+        let logger = self.skel.logger.push_mark("field:reflected-core-bound").unwrap();
 
         let reflection_of = traversal.reflection_of().to_string();
         let mut pipex = self.state.pipe_exes.remove(&reflection_of);
@@ -283,7 +313,7 @@ let method = directed.payload.core().method.clone();
                 traversal.reflection_of().to_string(),
                 traversal.payload.to().to_string()
             );
-            self.logger.error( err_msg.clone() );
+            logger.error( err_msg.clone() );
 //            traversal.logger.span().error(err_msg.clone());
             return Err(err_msg.into());
         }
@@ -433,12 +463,12 @@ where
 
     fn execute_step(&self, step: &PipelineStepVar) -> Result<(), MsgErr> {
         match &step.entry {
-            WaveKind::Request => {
+            WaveDirection::Direct=> {
                 for block in &step.blocks {
                     self.execute_block(block)?;
                 }
             }
-            WaveKind::Response => {}
+            WaveDirection::Reflect=> {}
         }
         Ok(())
     }

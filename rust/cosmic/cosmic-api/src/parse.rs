@@ -3448,7 +3448,7 @@ pub mod model {
     use crate::command::request::RcCommandType;
     use crate::config::config::bind::{
         BindConfig, PipelineStepCtx, PipelineStepDef, PipelineStepVar, PipelineStopCtx,
-        PipelineStopDef, PipelineStopVar, WaveKind,
+        PipelineStopDef, PipelineStopVar, WaveDirection,
     };
     use crate::error::{MsgErr, ParseErrs};
     use crate::http::HttpMethod;
@@ -5009,7 +5009,7 @@ use crate::command::request::RcCommandType;
 use crate::command::CommandVar;
 use crate::config::config::bind::{
     BindConfig, Pipeline, PipelineStep, PipelineStepCtx, PipelineStepVar, PipelineStop,
-    PipelineStopCtx, PipelineStopVar, RouteSelector, WaveKind,
+    PipelineStopCtx, PipelineStopVar, RouteSelector, WaveDirection,
 };
 use crate::config::config::Document;
 use crate::http::HttpMethod;
@@ -5549,6 +5549,7 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
                     )))
                 }
             },
+
             BaseKind::Artifact => match ArtifactSubKind::from_str(sub.as_str()) {
                 Ok(sub) => Ok((next, Kind::Artifact(sub))),
                 Err(err) => {
@@ -6708,13 +6709,14 @@ pub fn no_space_with_blocks<I: Span>(input: I) -> Res<I, I> {
     recognize(many1(alt((recognize(any_block), nospace1))))(input)
 }
 
+
 pub fn pipeline_step_var<I: Span>(input: I) -> Res<I, PipelineStepVar> {
     context(
         "pipeline:step",
         tuple((
             alt((
-                value(WaveKind::Request, tag("-")),
-                value(WaveKind::Response, tag("=")),
+                value(WaveDirection::Direct, tag("-")),
+                value(WaveDirection::Reflect, tag("=")),
             )),
             opt(pair(
                 delimited(
@@ -6725,8 +6727,8 @@ pub fn pipeline_step_var<I: Span>(input: I) -> Res<I, PipelineStepVar> {
                 context(
                     "pipeline:step:payload",
                     cut(alt((
-                        value(WaveKind::Request, tag("-")),
-                        value(WaveKind::Response, tag("=")),
+                        value(WaveDirection::Direct, tag("-")),
+                        value(WaveDirection::Reflect, tag("=")),
                     ))),
                 ),
             )),

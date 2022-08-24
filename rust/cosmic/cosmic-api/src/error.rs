@@ -161,7 +161,10 @@ impl Debug for MsgErr {
             MsgErr::Status { status, message } => {
                 f.write_str(format!("{}: {}", status, message).as_str())
             }
-            MsgErr::ParseErrs(_) => f.write_str("Error Report..."),
+            MsgErr::ParseErrs(errs) => {
+                errs.print();
+                f.write_str("Error Report...")
+            },
         }
     }
 }
@@ -248,7 +251,10 @@ impl Display for MsgErr {
             MsgErr::Status { status, message } => {
                 f.write_str(format!("{}: {}", status, message).as_str())
             }
-            MsgErr::ParseErrs(_) => f.write_str("Error Report..."),
+            MsgErr::ParseErrs(errs) => {
+                errs.print();
+                f.write_str("Error Report...")
+            },
         }
     }
 }

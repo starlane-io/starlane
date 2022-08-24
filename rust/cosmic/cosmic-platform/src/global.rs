@@ -120,7 +120,7 @@ where
     P: Platform,
 {
     pub fn new( skel: StarSkel<P>) -> Self {
-        let logger = skel.logger.push("global").unwrap();
+        let logger = skel.logger.push_point("global").unwrap();
         Self {
             skel,
             logger

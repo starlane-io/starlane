@@ -98,6 +98,12 @@ pub mod config {
         use serde::{Deserialize, Serialize};
         use std::convert::TryInto;
 
+        #[derive(Debug,Clone,Serialize,Deserialize)]
+        pub enum WaveDirection {
+            Direct,
+            Reflect
+        }
+
         #[derive(Clone)]
         pub struct BindConfig {
             scopes: Vec<BindScope>, /*pub msg: ConfigScope<EntityKind, Selector<MsgPipelineSelector>>,
@@ -136,7 +142,10 @@ pub mod config {
                         }
                     }
                 }
-                Err(MsgErr::err404())
+                Err(MsgErr::Status{
+                    status: 404,
+                    message: format!("no route matches {}<{}>{}", directed.kind().to_string(), directed.core().method.to_string(), directed.core().uri.path().to_string())
+                })
             }
         }
 
@@ -194,8 +203,8 @@ pub mod config {
 
         #[derive(Debug, Clone)]
         pub struct PipelineStepDef<Pnt> {
-            pub entry: WaveKind,
-            pub exit: WaveKind,
+            pub entry: WaveDirection,
+            pub exit: WaveDirection,
             pub blocks: Vec<PayloadBlockDef<Pnt>>,
         }
 
@@ -255,7 +264,7 @@ pub mod config {
          */
 
         impl PipelineStep {
-            pub fn new(entry: WaveKind, exit: WaveKind) -> Self {
+            pub fn new(entry: WaveDirection, exit: WaveDirection) -> Self {
                 Self {
                     entry,
                     exit,
@@ -342,11 +351,6 @@ pub mod config {
             Call,
         }
 
-        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-        pub enum WaveKind {
-            Request,
-            Response,
-        }
 
         #[derive(Clone)]
         pub struct RouteSelector {

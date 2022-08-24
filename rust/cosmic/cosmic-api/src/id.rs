@@ -2444,6 +2444,14 @@ pub mod id {
             }
         }
 
+        pub fn pop(&self) -> Self {
+            let mut segments = self.segments.clone();
+            segments.pop();
+            Point {
+                route: self.route.clone(),
+                segments
+            }
+        }
         pub fn push<S: ToString>(&self, segment: S) -> Result<Self, MsgErr> {
             let segment = segment.to_string();
             if self.segments.is_empty() {

@@ -3542,7 +3542,7 @@ impl ReflectedCore {
     }
 
     pub fn is_ok(&self) -> bool {
-        return self.status.is_success();
+        self.status.is_success()
     }
 
     pub fn into_reflection<P>(self, intended: Port, to: P, reflection_of: WaveId) -> Pong

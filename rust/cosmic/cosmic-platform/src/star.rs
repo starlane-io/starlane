@@ -317,15 +317,20 @@ where
 
     #[track_caller]
     pub async fn create(&self, who: &str, create: Create ) -> Result<Details,P::Err>{
+        let logger = self.logger.push_mark("create").unwrap();
         let global = GlobalExecutionChamber::new(self.clone());
         let details = self.logger.result_ctx(format!("StarSkel::create_in_star(register({}))",create.template.kind.to_string()).as_str(),global.create(&create, &Agent::HyperUser).await)?;
         let assign_body = Assign::new( AssignmentKind::Create, details.clone(), StateSrc::None );
 let kind = assign_body.kind.clone();
         let mut assign = DirectedProto::sys(self.point.clone().to_port().with_layer(Layer::Core), SysMethod::Assign);
         assign.body(assign_body.into());
-        assign.track = true;
-        let assign_result: Wave<Pong> = self.logger.result_ctx("StarSkel::create(assign_result)",self.gravity_transmitter.direct(assign).await)?;
-        self.logger.result_ctx(format!("StarSkel::create_in_star(assign({}))",kind.to_string()).as_str(), assign_result.as_ok::<P::Err>())?;
+//        assign.track = true;
+println!("SENDING ASSIGN to: {} method: {}", assign.to.as_ref().unwrap().to_string(), assign.core.method.to_string());
+
+        let assign_result: Wave<Pong> = logger.result_ctx("StarSkel::create(assign_result)",self.gravity_transmitter.direct(assign).await)?;
+println!("GOT ASSIGN RESULT! {}", assign_result.core.status.to_string());
+        let logger = logger.push_mark("result").unwrap();
+        logger.result(assign_result.as_ok::<P::Err>())?;
         Ok(details)
     }
 
@@ -892,9 +897,8 @@ where
             .to_gravity
             .send(wave.clone())
             .unwrap_or_default();
-        self.skel
-            .logger
-            .track(&wave, || Tracker::new("to_gravity", "Receive"));
+        let logger = self.skel.logger.push_mark("hyperstar:to-gravity").unwrap();
+        logger.track(&wave, || Tracker::new("to_gravity", "Receive"));
         if wave.is_directed()
             && wave.to().is_single()
             && wave.to().to_single().unwrap().point == *GLOBAL_EXEC
@@ -907,8 +911,7 @@ where
             let transport = transport.to_signal()?;
             self.to_hyperway(transport).await?;
         } else {
-            self.skel
-                .logger
+                logger
                 .result(self.star_tx.send(StarCall::Shard(wave)).await)
                 .unwrap_or_default();
 
@@ -931,6 +934,7 @@ where
 
     #[track_caller]
     async fn shard(&self, wave: UltraWave) -> Result<(), P::Err> {
+        let logger = self.skel.logger.push_mark("hyperstar:shard").unwrap();
         match wave {
             _ => {
                 let to = wave.to().unwrap_single();
@@ -938,14 +942,11 @@ where
                 let record = self.skel.registry.locate(point).await?;
 
                 if record.location.is_none() {
+                    let logger = logger.push_mark("provision").unwrap();
                     let (rtn, mut rtn_rx) = oneshot::channel();
                     let details = record.details;
-                    self.skel
-                        .logger
-                        .result(self.star_tx.send(StarCall::Assign { details, rtn }).await)
-                        .unwrap_or_default();
+                        logger.result(self.star_tx.send(StarCall::Assign { details, rtn }).await).unwrap_or_default();
                     let star_tx = self.star_tx.clone();
-                    let logger = self.skel.logger.clone();
                     let registry = self.skel.registry.clone();
                     let timeouts = self.skel.exchanger.timeouts.clone();
                     let assign = registry.assign(&to.point);
@@ -972,6 +973,7 @@ where
                             .unwrap_or_default();
                     });
                 } else {
+                    let logger = logger.push_mark("transport").unwrap();
                     let mut transport = wave.wrap_in_transport(
                         self.gravity.clone(),
                         record.location.unwrap().to_port(),
@@ -979,10 +981,7 @@ where
                     transport.from(self.skel.point.clone().to_port());
                     let transport = transport.build()?;
                     let transport = transport.to_signal()?;
-                    self.skel
-                        .logger
-                        .result(self.to_hyperway(transport).await)
-                        .unwrap_or_default();
+                        logger .result(self.to_hyperway(transport).await) .unwrap_or_default();
                 }
             } /*
               UltraWave::Ripple(ripple) => {
@@ -1001,6 +1000,7 @@ where
 
     #[track_caller]
     async fn assign(&self, details: Details) -> Result<Point, MsgErr> {
+        let logger = self.skel.logger.push_mark("assign")?;
         let assign = Assign::new(AssignmentKind::Create, details.clone(), StateSrc::None);
 
         let mut wave = DirectedProto::ping();
@@ -1015,19 +1015,19 @@ where
             .to_port()
             .with_layer(Layer::Gravity));
 
-        let pong: Wave<Pong> = self.skel.gravity_transmitter.direct(wave).await?;
+        let pong: Wave<Pong> = logger.result(self.skel.gravity_transmitter.direct(wave).await)?;
 
         if pong.core.status.as_u16() == 200 {
             if let Substance::Point(location) = &pong.core.body {
                 Ok(location.clone())
             } else {
-                self.skel.logger.result(Err(
+                logger.result(Err(
                     P::Err::new("Assign result expected Substance Point").to_cosmic_err()
                 ))
             }
         } else {
-            self.skel
-                .logger
+            let logger = logger.push_mark("assign-failure")?;
+                logger
                 .result(
                     self.skel
                         .registry
@@ -1035,7 +1035,7 @@ where
                         .await,
                 )
                 .unwrap_or_default();
-            self.skel.logger.result(Err(P::Err::new(format!(
+            logger.result(Err(P::Err::new(format!(
                 "not success on assign {}",
                 details.stub.point.to_string()
             ))
@@ -1048,29 +1048,30 @@ where
 
     #[track_caller]
     async fn to_hyperway(&self, transport: Wave<Signal>) -> Result<(), P::Err> {
+        let logger = self.skel.logger.push_mark("hyperstar:to-hyperway")?;
         if self.skel.point == transport.to.point {
             // it's a bit of a strange case, but even if this star is sending a transport message
             // to itself, it still makes use of the Hyperway Interchange, which will bounce it back
             // The reason for this is that it is the Hyperway that handles things like Priority, Urgency
             // and hopefully in the future durability, whereas within the star itself all waves are
             // treated equally.
-            self.hyperway_transmitter
+            logger.result(self.hyperway_transmitter
                 .direct(
                     transport.wrap_in_hop(self.gravity.clone(), self.skel.point.clone().to_port()),
                 )
-                .await?;
+                .await)?;
             Ok(())
         } else if self.skel.adjacents.contains_key(&transport.to.point) {
             let to = transport.to.clone();
-            self.hyperway_transmitter
+            logger.result(self.hyperway_transmitter
                 .direct(transport.wrap_in_hop(self.gravity.clone(), to))
-                .await?;
+                .await)?;
             Ok(())
         } else if self.forwarders.len() == 1 {
             let to = self.forwarders.first().unwrap().clone().to_port();
-            self.hyperway_transmitter
+            logger.result(self.hyperway_transmitter
                 .direct(transport.wrap_in_hop(self.gravity.clone(), to))
-                .await?;
+                .await)?;
             Ok(())
         } else if self.forwarders.is_empty() {
             self.skel.err("this star needs to send a transport to a non-adjacent star yet does not have any adjacent forwarders")
@@ -1081,9 +1082,11 @@ where
 
     #[track_caller]
     async fn find_next_hop(&self, star_key: &StarKey) -> Result<Option<StarKey>, MsgErr> {
+        let logger = self.skel.logger.push_mark("hyperstar:find_next_hop")?;
         if let Some(adjacent) = self.golden_path.get(star_key) {
             Ok(Some(adjacent.value().clone()))
         } else {
+println!("Find next hop...");
             let mut ripple = DirectedProto::ping();
             ripple.kind(DirectedKind::Ripple);
             ripple.method(SysMethod::Search);
@@ -1105,8 +1108,7 @@ where
                         ));
                     }
                 } else {
-                    self.skel
-                        .logger
+                        logger
                         .warn("unexpected reflected core substance from search echo");
                 }
             }
@@ -1202,6 +1204,8 @@ where
             .send(wave.clone())
             .unwrap_or_default();
 
+        let logger = self.skel.logger.push_mark("hyperstar:start-layer-traversal")?;
+
         let mut to = wave.to().clone().unwrap_single();
         if to.point == *GLOBAL_EXEC {
 panic!("GLOBAL EXEC");
@@ -1263,11 +1267,11 @@ panic!("GLOBAL EXEC");
             }
         }
 
-        let logger = self
+        let traversal_logger = self
             .skel
             .logger
             .point(wave.to().clone().unwrap_single().to_point());
-        let logger = logger.span();
+        let traversal_logger = traversal_logger.span();
         let to = wave.to().clone().unwrap_single();
 
         let point = if *injector == self.injector {
@@ -1282,7 +1286,7 @@ panic!("GLOBAL EXEC");
             wave,
             record,
             injector.layer.clone(),
-            logger,
+            traversal_logger,
             dir,
             dest,
             to,
@@ -1312,7 +1316,7 @@ panic!("GLOBAL EXEC");
         match self.visit_layer(traversal).await {
             Ok(_) => Ok(()),
             Err(err) => {
-                self.skel.logger.error(format!("{}", err.to_string()));
+                logger.error(format!("{}", err.to_string()));
                 Err(err.into())
             }
         }
@@ -1332,7 +1336,8 @@ panic!("GLOBAL EXEC");
     }
 
     async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(), MsgErr> {
-        self.skel.logger.track(&traversal, || {
+        let logger = self.skel.logger.push_mark("stack-traversal:visit")?;
+        logger.track(&traversal, || {
             Tracker::new(
                 format!("visit:layer@{}", traversal.layer.to_string()),
                 "Visit",
@@ -1349,8 +1354,8 @@ panic!("GLOBAL EXEC");
                         .find_field(&traversal.to.clone().with_layer(Layer::Field))?,
                     traversal.logger.clone(),
                 );
-                let logger = self.skel.logger.clone();
                 tokio::spawn(async move {
+                    let logger = logger.push_action("Field").unwrap();
                     logger
                         .result(field.visit(traversal).await)
                         .unwrap_or_default();
@@ -1364,16 +1369,17 @@ panic!("GLOBAL EXEC");
                         .find_shell(&traversal.to.clone().with_layer(Layer::Shell))?,
                 );
 
-                let logger = self.skel.logger.clone();
+                let logger = logger.clone();
                 tokio::spawn(async move {
+                    let logger = logger.push_action("Shell").unwrap();
                     logger
                         .result(shell.visit(traversal).await)
                         .unwrap_or_default();
                 });
             }
             _ => {
-                self.skel
-                    .logger
+
+                    logger
                     .result(self.exit(traversal).await)
                     .unwrap_or_default();
             }
@@ -1382,6 +1388,7 @@ panic!("GLOBAL EXEC");
     }
 
     async fn traverse_to_next_layer(&self, mut traversal: Traversal<UltraWave>) {
+        let logger = self.skel.logger.push_mark("stack-traversal:traverse-to-next-layer").unwrap();
         if traversal.dest.is_some() && traversal.layer == *traversal.dest.as_ref().unwrap() {
             self.visit_layer(traversal).await;
             return;
@@ -1395,14 +1402,12 @@ panic!("GLOBAL EXEC");
                     self.exit_up.send(traversal).await;
                 }
                 TraversalDirection::Core => {
-                    self.skel
-                        .logger
+                        logger
                         .warn("should not have traversed a wave all the way to the core in Star");
                 }
             },
             Some(_) => {
-                self.skel
-                    .logger
+                    logger
                     .result(self.visit_layer(traversal).await)
                     .unwrap_or_default();
             }
@@ -1784,8 +1789,8 @@ where
     }
 
     async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
-        self.star_skel
-            .logger
+        let logger = skel.logger.push_mark("init")?;
+            logger
             .result(self.driver_skel.status_tx.send(DriverStatus::Init).await)
             .unwrap_or_default();
 
@@ -1807,8 +1812,7 @@ where
             .assign(&point)
             .send(self.star_skel.point.clone());
 
-        self.star_skel
-            .logger
+            logger
             .result(skel.status_tx.send(DriverStatus::Ready).await)
             .unwrap_or_default();
 
