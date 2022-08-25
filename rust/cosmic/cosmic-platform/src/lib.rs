@@ -12,6 +12,9 @@ extern crate async_trait;
 #[macro_use]
 extern crate strum_macros;
 
+#[macro_use]
+extern crate async_recursion;
+
 use crate::driver::{DriverFactory, DriversBuilder};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
 use chrono::{DateTime, Utc};
@@ -59,6 +62,7 @@ pub mod star;
 pub mod state;
 pub mod tests;
 pub mod base;
+pub mod space;
 
 #[no_mangle]
 pub extern "C" fn cosmic_uuid() -> String {
@@ -124,28 +128,6 @@ where
     async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), P::Err>;
 }
 
-#[derive(Clone)]
-pub struct SmartLocator<P> where P: Platform {
-    registry: Arc<dyn RegistryApi<P>>
-}
-
-impl <P> SmartLocator<P> where P: Platform {
-    pub fn new(registry: Arc<dyn RegistryApi<P>>) -> Self {
-        Self {
-            registry
-        }
-    }
-}
-
-impl <P> SmartLocator<P> where P: Platform {
-   pub async fn locate(&self, point: &Point ) -> Result<Port,P::Err> {
-       if let RouteSeg::Star(star) = &point.route  {
-           Ok(Point::from_str(format!("{}::star",star).as_str()).unwrap().to_port().with_layer(Layer::Core))
-       } else {
-           self.registry.locate(point).await.map( |record| record.details.stub.point.to_port().with_layer(Layer::Core))
-       }
-   }
-}
 
 /*
 #[derive(Clone)]

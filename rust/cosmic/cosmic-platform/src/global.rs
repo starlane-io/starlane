@@ -29,7 +29,7 @@ pub struct Global<P> where P: Platform {
 
  */
 
-use crate::driver::{Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemDirectedHandler, ItemHandler};
+use crate::driver::{Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere};
 use crate::star::StarSkel;
 use cosmic_api::config::config::bind::{BindConfig, RouteSelector};
 use cosmic_api::parse::route_attribute;
@@ -63,7 +63,7 @@ fn global_bind() -> BindConfig {
 
 }
 
-#[derive(DirectedHandler)]
+#[derive(Clone,DirectedHandler)]
 pub struct GlobalCommandExecutionHandler<P>
 where
     P: Platform,

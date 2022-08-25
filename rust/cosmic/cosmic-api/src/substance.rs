@@ -332,6 +332,19 @@ pub mod substance {
         }
     }
 
+    impl From<MsgErr> for Errors {
+        fn from(err: MsgErr) -> Self {
+            match err {
+                MsgErr::Status { status, message } => {
+                    Self::default(format!("{} {}", status, message).as_str())
+                }
+                MsgErr::ParseErrs(_) => {
+                    Self::default("500: parse error")
+                }
+            }
+        }
+    }
+
     impl ToString for Errors {
         fn to_string(&self) -> String {
             let mut rtn = String::new();

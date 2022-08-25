@@ -10,14 +10,14 @@ use crate::{DriverFactory, Platform};
 use crate::driver::{Driver, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere};
 use crate::star::StarSkel;
 lazy_static! {
-    static ref BASE_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
-        Arc::new(base_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/base.bind").unwrap()
+    static ref SPACE_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
+        Arc::new(space_bind()),
+        Point::from_str("GLOBAL::repo:1.0.0:/bind/space.bind").unwrap()
     );
 }
 
 
-fn base_bind() -> BindConfig {
+fn space_bind() -> BindConfig {
     log(bind_config(
         r#"
     Bind(version=1.0.0)
@@ -28,53 +28,53 @@ fn base_bind() -> BindConfig {
         .unwrap()
 }
 
-pub struct BaseDriverFactory;
+pub struct SpaceDriverFactory;
 
-impl BaseDriverFactory {
+impl SpaceDriverFactory {
     pub fn new() -> Self {
         Self
     }
 }
 
 #[async_trait]
-impl <P> HyperDriverFactory<P> for BaseDriverFactory where P: Platform {
+impl <P> HyperDriverFactory<P> for SpaceDriverFactory where P: Platform {
     fn kind(&self) -> Kind {
-        Kind::Base
+        Kind::Space
     }
 
     async fn create(&self, skel: StarSkel<P>, driver_skel: DriverSkel<P>, ctx: DriverCtx) -> Result<Box<dyn Driver<P>>, P::Err> {
-        Ok(Box::new(BaseDriver))
+        Ok(Box::new(SpaceDriver))
     }
 
 }
 
-pub struct BaseDriver;
+pub struct SpaceDriver;
 
 #[routes]
-impl BaseDriver {}
+impl SpaceDriver {}
 
 
 #[async_trait]
-impl <P> Driver<P> for BaseDriver where P: Platform {
+impl <P> Driver<P> for SpaceDriver where P: Platform {
     fn kind(&self) -> Kind {
-        Kind::Base
+        Kind::Space
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
-        Ok(ItemSphere::Handler(Box::new(Base)))
+        Ok(ItemSphere::Handler(Box::new(Space)))
     }
 }
 
 
-pub struct Base;
+pub struct Space;
 
 #[routes]
-impl Base {}
+impl Space {}
 
 #[async_trait]
-impl <P> ItemHandler<P> for Base where P: Platform {
+impl <P> ItemHandler<P> for Space where P: Platform {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
-        Ok(BASE_BIND_CONFIG.clone())
+        Ok(SPACE_BIND_CONFIG.clone())
     }
 }
 

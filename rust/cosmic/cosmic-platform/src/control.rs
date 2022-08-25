@@ -1,4 +1,4 @@
-use crate::driver::{Driver, DriverFactory, DriverCtx, DriverSkel, DriverStatus, ItemDirectedHandler, ItemHandler, ItemSkel, HyperDriverFactory, HyperSkel, DriverRunnerRequest, Item, ItemRouter};
+use crate::driver::{Driver, DriverFactory, DriverCtx, DriverSkel, DriverStatus, ItemHandler, ItemSphere, ItemSkel, HyperDriverFactory, HyperSkel, DriverRunnerRequest, Item, ItemRouter};
 use crate::star::{LayerInjectionRouter, StarSkel};
 use crate::{PlatErr, Platform, Registry};
 use cosmic_api::command::command::common::StateSrc;
@@ -226,10 +226,10 @@ where
         Ok(())
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemHandler<P>, P::Err> {
+    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
         let router = self.external_router.as_ref().ok_or(P::Err::new("FATAL: router is not set") )?.clone();
         let ctx = ControlCtx::new(router);
-        Ok(ItemHandler::Router(Box::new(Control::restore( self.skel.clone(), ctx, ()))))
+        Ok(ItemSphere::Router(Box::new(Control::restore(self.skel.clone(), ctx, ()))))
     }
 }
 

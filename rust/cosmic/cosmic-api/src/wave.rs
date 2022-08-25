@@ -2131,12 +2131,25 @@ pub struct Reflection {
 
 impl Reflection {
     pub fn make(self, core: ReflectedCore, from: Port) -> ReflectedWave {
-        let mut wave = Wave::new(
-            Pong::new(core, self.to, self.intended, self.reflection_of),
-            from,
-        );
-        wave.track = self.track;
-        wave.to_reflected()
+        match self.kind {
+            ReflectedKind::Pong => {
+                let mut wave = Wave::new(
+                    Pong::new(core, self.to, self.intended, self.reflection_of),
+                    from,
+                );
+                wave.track = self.track;
+                wave.to_reflected()
+            }
+            ReflectedKind::Echo => {
+                let mut wave = Wave::new(
+                    Echo::new(core, self.to, self.intended, self.reflection_of),
+                    from,
+                );
+                wave.track = self.track;
+                wave.to_reflected()
+            }
+        }
+
     }
 }
 
@@ -3203,6 +3216,7 @@ impl BroadTxRouter {
     }
 }
 
+#[derive(Clone)]
 pub struct DirectedHandlerShell<D>
 where
     D: DirectedHandler,
@@ -3452,6 +3466,17 @@ impl ReflectedCore {
             headers: HeaderMap::new(),
             status: StatusCode::from_u16(200u16).unwrap(),
             body: Substance::Empty,
+        }
+    }
+
+    pub fn result( result: Result<ReflectedCore,MsgErr>) -> ReflectedCore {
+        match result {
+            Ok(core) => core,
+            Err(err) => {
+                let mut core = ReflectedCore::status(err.status());
+                core.body = Substance::Errors(Errors::from(err));
+                core
+            }
         }
     }
 
@@ -4028,7 +4053,7 @@ impl ValueMatcher<CmdMethod> for CmdMethod {
 pub enum SysMethod {
     Command,
     Assign,
-    AssignPort,
+    Provision,
     Knock,
     Hop,
     Transport,

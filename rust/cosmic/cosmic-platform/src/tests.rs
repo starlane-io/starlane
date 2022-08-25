@@ -1,15 +1,24 @@
 #![cfg(test)]
 
 use super::*;
+use crate::base::BaseDriverFactory;
+use crate::control::ControlDriverFactory;
 use chrono::{DateTime, Utc};
 use cosmic_api::command::command::common::StateSrc;
 use cosmic_api::id::id::{Layer, ToPoint, ToPort, Uuid};
 use cosmic_api::id::TraversalDirection;
+use cosmic_api::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
 use cosmic_api::msg::MsgMethod;
 use cosmic_api::sys::{Assign, AssignmentKind, InterchangeKind, Knock, Sys};
-use cosmic_api::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Method, Pong, ProtoTransmitterBuilder, SysMethod, Wave};
+use cosmic_api::wave::{
+    Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Method, Pong,
+    ProtoTransmitterBuilder, SysMethod, Wave,
+};
 use cosmic_api::{MountKind, NoDiceArtifactFetcher, HYPERUSER};
-use cosmic_hyperlane::{AnonHyperAuthenticator, HyperClient, HyperConnectionErr, HyperGate, HyperwayExt, HyperwayStub, LocalHyperwayGateJumper};
+use cosmic_hyperlane::{
+    AnonHyperAuthenticator, HyperClient, HyperConnectionErr, HyperGate, HyperwayExt, HyperwayStub,
+    LocalHyperwayGateJumper,
+};
 use dashmap::DashMap;
 use std::io::Error;
 use std::sync::atomic;
@@ -19,11 +28,10 @@ use tokio::join;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{oneshot, Mutex};
-use cosmic_api::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
-use crate::base::BaseDriverFactory;
-use crate::control::ControlDriverFactory;
+use tokio::time::error::Elapsed;
 //use crate::control::ControlDriverFactory;
 use crate::driver::DriverFactory;
+use crate::space::SpaceDriverFactory;
 use crate::star::StarApi;
 
 lazy_static! {
@@ -32,7 +40,7 @@ lazy_static! {
 }
 
 lazy_static! {
-           pub static ref PROPERTIES_CONFIG : PropertiesConfig = PropertiesConfig::new();
+    pub static ref PROPERTIES_CONFIG: PropertiesConfig = PropertiesConfig::new();
 }
 
 #[derive(Clone)]
@@ -75,24 +83,26 @@ impl Platform for TestPlatform {
     }
 
     fn properties_config<K: ToBaseKind>(&self, base: &K) -> &'static PropertiesConfig {
-
         &PROPERTIES_CONFIG
     }
 
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
         let mut builder = DriversBuilder::new(kind.clone());
         builder.add_post(Arc::new(BaseDriverFactory::new()));
-        builder.add_post( Arc::new(ControlDriverFactory::new()));
 
         match kind {
             StarSub::Central => {}
-            StarSub::Super => {}
+            StarSub::Super => {
+                builder.add_post(Arc::new(SpaceDriverFactory::new()));
+            }
             StarSub::Nexus => {}
             StarSub::Maelstrom => {}
             StarSub::Scribe => {}
             StarSub::Jump => {}
             StarSub::Fold => {}
-            StarSub::Machine => {}
+            StarSub::Machine => {
+                builder.add_post(Arc::new(ControlDriverFactory::new()));
+            }
         }
 
         builder
@@ -163,18 +173,16 @@ impl RegistryApi<TestPlatform> for TestRegistryApi {
         Ok(details)
     }
 
-    fn assign<'a>(&'a self, point: &'a Point ) -> oneshot::Sender<Point> {
-        let (rtn,mut rtn_rx) = oneshot::channel();
+    fn assign<'a>(&'a self, point: &'a Point) -> oneshot::Sender<Point> {
+        let (rtn, mut rtn_rx) = oneshot::channel();
         let ctx = self.ctx.clone();
         let point = point.clone();
         tokio::spawn(async move {
             match rtn_rx.await {
                 Ok(location) => {
-                    let mut record = ctx
-                        .particles
-                        .get_mut(&point).unwrap();
+                    let mut record = ctx.particles.get_mut(&point).unwrap();
 
-                    let location : Point = location;
+                    let location: Point = location;
                     record.value_mut().location = Some(location);
                 }
                 Err(_) => {
@@ -185,7 +193,6 @@ impl RegistryApi<TestPlatform> for TestRegistryApi {
 
         rtn
     }
-
 
     async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), TestErr> {
         let mut record = self
@@ -306,18 +313,25 @@ impl From<oneshot::error::RecvError> for TestErr {
     }
 }
 
+impl From<Elapsed> for TestErr {
+    fn from(err: Elapsed) -> Self {
+        TestErr {
+            message: err.to_string(),
+        }
+    }
+}
+
+
 impl From<String> for TestErr {
     fn from(err: String) -> Self {
-        TestErr {
-            message: err
-        }
+        TestErr { message: err }
     }
 }
 
 impl From<&'static str> for TestErr {
     fn from(err: &'static str) -> Self {
         TestErr {
-            message: err.to_string()
+            message: err.to_string(),
         }
     }
 }
@@ -810,36 +824,43 @@ fn test_control() -> Result<(), TestErr> {
         let platform = TestPlatform::new();
         let machine_api = platform.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
-        let logger = logger.point( Point::from_str("test-client").unwrap());
+        let logger = logger.point(Point::from_str("test-client").unwrap());
 
         tokio::time::timeout(Duration::from_secs(10), machine_api.wait_ready())
             .await
             .unwrap();
 
-        let stub = HyperwayStub::new( Point::remote_endpoint().to_port(),  Agent::HyperUser );
-        pub struct MachineApiExtFactory<P> where P: Platform {
+        let stub = HyperwayStub::new(Point::remote_endpoint().to_port(), Agent::HyperUser);
+        pub struct MachineApiExtFactory<P>
+        where
+            P: Platform,
+        {
             machine_api: MachineApi<P>,
-            logger: PointLogger
+            logger: PointLogger,
         }
 
         #[async_trait]
-        impl <P> HyperwayExtFactory for MachineApiExtFactory<P> where P:Platform {
+        impl<P> HyperwayExtFactory for MachineApiExtFactory<P>
+        where
+            P: Platform,
+        {
             async fn create(&self) -> Result<HyperwayExt, HyperConnectionErr> {
                 let knock = Knock {
                     kind: InterchangeKind::DefaultControl,
                     auth: Box::new(Substance::Empty),
-                    remote: None
+                    remote: None,
                 };
-                self.logger.result_ctx("machine_api.knock()",self.machine_api.knock(knock).await)
+                self.logger
+                    .result_ctx("machine_api.knock()", self.machine_api.knock(knock).await)
             }
         }
 
-        let factory = MachineApiExtFactory{
+        let factory = MachineApiExtFactory {
             machine_api,
-            logger: logger.clone()
+            logger: logger.clone(),
         };
 
-        let client = HyperClient::new(stub,Box::new(factory), logger ).unwrap();
+        let client = HyperClient::new(stub, Box::new(factory), logger).unwrap();
         let transmitter = client.proto_transmitter_builder().await?;
         let greet = client.get_greeting().expect("expected greeting");
         let transmitter = transmitter.build();
@@ -862,13 +883,45 @@ fn test_control() -> Result<(), TestErr> {
             });
         }
 
-        let mut bounce = DirectedProto::cmd(greet.transport.clone().with_layer(Layer::Shell ), CmdMethod::Bounce);
+        let mut bounce = DirectedProto::cmd(
+            greet.transport.clone().with_layer(Layer::Shell),
+            CmdMethod::Bounce,
+        );
         let reflect: Wave<Pong> = transmitter.direct(bounce).await?;
 
-       assert!(reflect.core.status.is_success());
+        assert!(reflect.core.status.is_success());
 
         client.close().await;
         tokio::time::sleep(Duration::from_millis(50)).await;
         Ok(())
     })
 }
+
+#[test]
+fn test_star_wrangle() -> Result<(), TestErr> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async move {
+        // let (final_tx, final_rx) = oneshot::channel();
+
+        let platform = TestPlatform::new();
+        let machine_api = platform.machine();
+        let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
+        let logger = logger.point(Point::from_str("test-client").unwrap());
+
+        tokio::time::timeout(Duration::from_secs(1), machine_api.wait_ready())
+            .await
+            .unwrap();
+
+        let star_api = machine_api.get_machine_star().await?;
+
+        let wrangles = tokio::time::timeout(Duration::from_secs(1), star_api.wrangle()).await??;
+
+        println!("wrangles: {}", wrangles.wrangles.len());
+
+        Ok(())
+    })
+}
+
+

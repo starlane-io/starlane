@@ -173,7 +173,7 @@ where
 
     pub async fn kinds(&self) -> Result<Vec<Kind>, MsgErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
-        self.call_tx.send(DriversCall::Kinds(rtn)).await;
+        self.call_tx.send(DriversCall::Kinds(rtn)).await?;
         Ok(rtn_rx.await?)
     }
 
@@ -835,7 +835,7 @@ where
     },
     Item {
         point: Point,
-        tx: oneshot::Sender<Result<ItemHandler<P>, P::Err>>,
+        tx: oneshot::Sender<Result<ItemSphere<P>, P::Err>>,
     },
     Assign {
         assign: Assign,
@@ -866,7 +866,7 @@ where
 {
     pub port: Port,
     pub skel: StarSkel<P>,
-    pub item: ItemHandler<P>,
+    pub item: ItemSphere<P>,
     pub router: Arc<dyn Router>,
 }
 
@@ -900,13 +900,14 @@ where
             .span();
 
         match &self.item {
-            ItemHandler::Handler(item) => {
+            ItemSphere::Handler(item) => {
                 let mut transmitter =
                     ProtoTransmitterBuilder::new(self.router.clone(), self.skel.exchanger.clone());
                 transmitter.from = SetStrategy::Override(self.port.clone());
                 let transmitter = transmitter.build();
-                let to = direct.to().clone().unwrap_single();
+                let to = direct.to.clone();
                 let reflection = direct.reflection();
+let kind = direct.kind();
                 let ctx = RootInCtx::new(direct.payload, to, logger, transmitter);
 
                 match item.handle(ctx).await {
@@ -916,6 +917,7 @@ where
 
                         let wave = reflection.make(reflected, self.port.clone());
                         let wave = wave.to_ultra();
+println!("reflecting: {} from {} sending to: {}", wave.kind().to_string(), kind.to_string(), wave.to().to_string());
                         #[cfg(test)]
                         self.skel
                             .diagnostic_interceptors
@@ -925,7 +927,7 @@ where
                     }
                 }
             }
-            ItemHandler::Router(router) => {
+            ItemSphere::Router(router) => {
                 let wave = direct.payload.to_ultra();
                 router.route(wave).await;
             }
@@ -939,11 +941,11 @@ where
             self.exchanger().reflected(reflect.payload).await
         } else {
             match &self.item {
-                ItemHandler::Router(router) => {
+                ItemSphere::Router(router) => {
                     router.route(reflect.payload.to_ultra()).await;
                     Ok(())
                 }
-                ItemHandler::Handler(_) => {
+                ItemSphere::Handler(_) => {
                     Err("cannot deliver a reflected to an ItemHandler::Handler, it must be an ItemHandler::Router".into())
                 }
             }
@@ -1319,7 +1321,7 @@ where
         Ok(())
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemHandler<P>, P::Err>;
+    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err>;
     async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
         Ok(())
     }
@@ -1370,22 +1372,22 @@ pub struct DriverStatusEvent {
 
 pub trait ItemState: Send + Sync {}
 
-pub enum ItemHandler<P>
+pub enum ItemSphere<P>
 where
     P: Platform,
 {
-    Handler(Box<dyn ItemDirectedHandler<P>>),
+    Handler(Box<dyn ItemHandler<P>>),
     Router(Box<dyn ItemRouter<P>>),
 }
 
-impl<P> ItemHandler<P>
+impl<P> ItemSphere<P>
 where
     P: Platform,
 {
     pub async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         match self {
-            ItemHandler::Handler(handler) => handler.bind().await,
-            ItemHandler::Router(router) => router.bind().await,
+            ItemSphere::Handler(handler) => handler.bind().await,
+            ItemSphere::Router(router) => router.bind().await,
         }
     }
 }
@@ -1404,7 +1406,7 @@ pub trait Item<P> where P: Platform{
 }
 
 #[async_trait]
-pub trait ItemDirectedHandler<P>: DirectedHandler + Send + Sync
+pub trait ItemHandler<P>: DirectedHandler + Send + Sync
 where
     P: Platform,
 {
@@ -1496,7 +1498,7 @@ where
         Kind::Driver
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemHandler<P>, P::Err> {
+    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
         todo!()
     }
 }

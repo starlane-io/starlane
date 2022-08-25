@@ -100,18 +100,14 @@ impl Into<Stub> for ParticleRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Provision {
-    pub details: Details,
+    pub point: Point,
     pub state: StateSrc,
 }
 
 impl Provision {
-    pub fn kind(&self) -> &Kind {
-        &self.details.stub.kind
-    }
-
-    pub fn new(details: Details, state: StateSrc) -> Self {
+    pub fn new(point: Point, state: StateSrc) -> Self {
         Self {
-            details,
+            point,
             state,
         }
     }
