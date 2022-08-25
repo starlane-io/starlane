@@ -1535,7 +1535,7 @@ impl HyperClientRunner {
         logger: PointLogger,
     ) -> mpsc::Receiver<UltraWave> {
         let (to_client_tx, from_runner_rx) = mpsc::channel(1024);
-        let logger = logger.push("runner").unwrap();
+        let logger = logger.push_point("runner").unwrap();
         let runner = Self {
             ext: None,
             factory,
@@ -2069,7 +2069,7 @@ pub mod test {
         let root_logger = RootLogger::default();
         let logger = root_logger.point(Point::from_str("point").unwrap());
         let interchange = Arc::new(HyperwayInterchange::new(
-            logger.push("interchange").unwrap(),
+            logger.push_point("interchange").unwrap(),
         ));
 
         interchange.add(Hyperway::new(LESS.clone().to_port(), LESS.to_agent())).await;
@@ -2080,7 +2080,7 @@ pub mod test {
             auth,
             TestGreeter::new(),
             interchange.clone(),
-            logger.push("gate").unwrap(),
+            logger.push_point("gate").unwrap(),
         ));
         let mut gates: Arc<DashMap<InterchangeKind, Arc<dyn HyperGate>>> = Arc::new(DashMap::new());
         gates.insert(InterchangeKind::Singleton, gate);

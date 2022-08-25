@@ -201,7 +201,7 @@ where
 
             let mut drivers = platform.drivers_builder(&star_template.kind);
 
-            let mut interchange = HyperwayInterchange::new(logger.push("interchange").unwrap());
+            let mut interchange = HyperwayInterchange::new(logger.push_point("interchange").unwrap());
 
             let star_hop = star_point.clone().to_port().with_layer(Layer::Gravity);
 

@@ -1508,6 +1508,7 @@ impl DirectedProto {
             id: WaveId::new(WaveKind::Ping),
             to: Some(to.to_recipients()),
             kind: Some(DirectedKind::Ping),
+            core: DirectedCore::new(method),
             ..DirectedProto::default()
         }
     }
@@ -2909,11 +2910,11 @@ pub enum Agent {
 }
 
 impl ToPoint for Agent {
-    fn to_point(self) -> Point {
+    fn to_point(&self) -> Point {
         match self {
             Agent::Anonymous => ANONYMOUS.clone(),
             Agent::HyperUser => HYPERUSER.clone(),
-            Agent::Point(point) => point,
+            Agent::Point(point) => point.clone(),
         }
     }
 }
@@ -3542,7 +3543,7 @@ impl ReflectedCore {
     }
 
     pub fn is_ok(&self) -> bool {
-        return self.status.is_success();
+        self.status.is_success()
     }
 
     pub fn into_reflection<P>(self, intended: Port, to: P, reflection_of: WaveId) -> Pong

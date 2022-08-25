@@ -4,4 +4,5 @@ resources:
 - starlane_v1alpha1_starlaneprovisioner.yaml
 - starlane_v1alpha1_starlaneprovisioningjob.yaml
 - starlane_v1alpha1_starlaneresource.yaml
+- starlane_v1alpha1_postgres.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

@@ -8,7 +8,7 @@ use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{
     Layer, Point, Port, PortSelector, ToPoint, ToPort, Topic, TraversalLayer, Uuid,
 };
-use cosmic_api::id::{Traversal, TraversalInjection};
+use cosmic_api::id::{Traversal, TraversalDirection, TraversalInjection};
 use cosmic_api::log::{RootLogger, Trackable};
 use cosmic_api::parse::error::result;
 use cosmic_api::parse::{command_line, route_attribute, Env};
@@ -52,6 +52,38 @@ impl<P> TraversalLayer for Shell<P>
 where
     P: Platform + 'static,
 {
+    async fn visit(&self, traversal: Traversal<UltraWave>) -> Result<(),MsgErr>{
+        if let Some(dest) = &traversal.dest {
+            if self.port().layer == *dest {
+                if traversal.is_directed() {
+                    self.deliver_directed(traversal.unwrap_directed()).await?;
+                } else {
+                    self.deliver_reflected(traversal.unwrap_reflected()).await?;
+                }
+                return Ok(());
+            } else {
+            }
+        }
+
+        if traversal.is_directed() && traversal.dir == TraversalDirection::Fabric {
+            self.directed_fabric_bound(traversal.unwrap_directed())
+                .await?;
+        } else if traversal.is_reflected() && traversal.dir == TraversalDirection::Core {
+            self.reflected_core_bound(traversal.unwrap_reflected())
+                .await?;
+        } else if traversal.is_directed() && traversal.dir == TraversalDirection::Core {
+            self.directed_core_bound(traversal.unwrap_directed()).await?;
+        } else if traversal.is_reflected() && traversal.dir == TraversalDirection::Fabric {
+            self.reflected_fabric_bound(traversal.unwrap_reflected())
+                .await?;
+        }
+
+        Ok(())
+    }
+
+
+
+
     fn port(&self) -> Port {
         self.state.point.clone().to_port().with_layer(Layer::Shell)
     }
@@ -133,7 +165,7 @@ where
         } else {
             traversal
                 .logger
-                .warn("filtered a response to a request of which the Shell has no record");
+                .warn(format!("filtered a response from {} to a request {} of which the Shell has no record", traversal.from().to_string(), traversal.reflection_of().to_short_string()));
         }
         Ok(())
     }

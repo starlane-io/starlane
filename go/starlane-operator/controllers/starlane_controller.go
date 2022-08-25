@@ -894,7 +894,6 @@ func (r *StarlaneReconciler) postgresDeployment(m *starlanev1alpha1.Starlane) *a
 	return dep
 }
 
-// deploymentForStarlane returns a memcached Deployment object
 func (r *StarlaneReconciler) postgresService(m *starlanev1alpha1.Starlane) *corev1.Service {
 
 	name := postgresName(m)

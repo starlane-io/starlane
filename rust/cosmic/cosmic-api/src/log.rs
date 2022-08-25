@@ -1,7 +1,7 @@
 use crate::command::command::common::StateSrc::Substance;
 use crate::error::MsgErr;
 use crate::id::id::{Point, ToPoint, Uuid};
-use crate::parse::to_string;
+use crate::parse::{CamelCase, to_string};
 use crate::util::{timestamp, uuid};
 use crate::{cosmic_timestamp, Selector};
 use chrono::serde::ts_milliseconds;
@@ -34,6 +34,8 @@ impl Default for Level {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Log {
     pub point: Point,
+    pub mark: Point,
+    pub action: Option<CamelCase>,
     pub source: LogSource,
     pub span: Option<Uuid>,
     pub timestamp: i64,
@@ -94,6 +96,8 @@ pub type TrailSpanId = Uuid;
 pub struct LogSpan {
     pub id: TrailSpanId,
     pub point: Point,
+    pub mark: Point,
+    pub action: Option<CamelCase>,
     pub parent: Option<String>,
     pub attributes: HashMap<String, String>,
     #[serde(with = "ts_milliseconds")]
@@ -105,6 +109,8 @@ impl LogSpan {
         Self {
             id: uuid(),
             point,
+            mark: Point::root(),
+            action: None,
             parent: None,
             attributes: Default::default(),
             entry_timestamp: Utc::now(),
@@ -115,6 +121,8 @@ impl LogSpan {
         Self {
             id: uuid(),
             point,
+            mark: Point::root(),
+            action: None,
             parent: Some(parent),
             attributes: Default::default(),
             entry_timestamp: Utc::now(),
@@ -125,6 +133,8 @@ impl LogSpan {
         let mut span = span.unwrap_or(Self {
             id: uuid(),
             point: point.clone(),
+            mark: Point::root(),
+            action: None,
             parent: None,
             attributes: Default::default(),
             entry_timestamp: Utc::now(),
@@ -298,6 +308,8 @@ impl RootLogBuilder {
         let point = self.point.expect("point");
         let log = Log {
             point,
+            mark: Point::root(),
+            action: None,
             level: self.level,
             timestamp: timestamp().timestamp_millis(),
             payload: content,
@@ -370,6 +382,8 @@ impl RootLogger {
         PointLogger {
             logger: self.clone(),
             point: point.to_point(),
+            mark: Point::root(),
+            action: None
         }
     }
 }
@@ -384,7 +398,11 @@ impl StdOutAppender {
 
 impl LogAppender for StdOutAppender {
     fn log(&self, log: Log) {
-        println!("{} | {} | {}", log.point.to_string(), log.level.to_string(), log.payload.to_string())
+        let action = match log.action {
+            None => "None".to_string(),
+            Some(action) => action.to_string()
+        };
+        println!("{} | {}<{}>[{}] {}", log.point.to_string(), log.mark.to_string(), action, log.level.to_string(), log.payload.to_string())
     }
 
     fn audit(&self, log: AuditLog) {
@@ -402,6 +420,8 @@ impl LogAppender for StdOutAppender {
 pub struct PointLogger {
     pub logger: RootLogger,
     pub point: Point,
+    pub mark: Point,
+    pub action: Option<CamelCase>
 }
 
 impl PointLogger {
@@ -483,15 +503,48 @@ impl PointLogger {
         PointLogger {
             logger: self.logger.clone(),
             point,
+            mark: Point::root(),
+            action: None
         }
     }
 
-    pub fn push<S: ToString>(&self, point_segs: S) -> Result<PointLogger, MsgErr> {
+    pub fn push_point<S: ToString>(&self, segs: S) -> Result<PointLogger, MsgErr> {
         Ok(PointLogger {
             logger: self.logger.clone(),
-            point: self.point.push(point_segs.to_string())?,
+            point: self.point.push(segs)?,
+            mark: Point::root(),
+            action: None
         })
     }
+
+    pub fn pop_mark(&self) -> PointLogger {
+        PointLogger {
+            logger: self.logger.clone(),
+            point: self.point.clone(),
+            mark: self.mark.pop(),
+            action:self.action.clone()
+        }
+    }
+
+
+    pub fn push_mark<S: ToString>(&self, segs: S) -> Result<PointLogger, MsgErr> {
+        Ok(PointLogger {
+            logger: self.logger.clone(),
+            point: self.point.clone(),
+            mark: self.mark.push(segs)?,
+            action: None
+        })
+    }
+
+    pub fn push_action<A:ToString>(&self, action: A) -> Result<PointLogger, MsgErr> {
+        Ok(PointLogger {
+            logger: self.logger.clone(),
+            point: self.point.clone(),
+            mark: self.mark.clone(),
+            action: Some(CamelCase::from_str(action.to_string().as_str())?)
+        })
+    }
+
 
     pub fn msg<M>(&self, level: Level, message: M)
     where
@@ -499,6 +552,8 @@ impl PointLogger {
     {
         self.logger.log(Log {
             point: self.point.clone(),
+            mark: self.mark.clone(),
+            action: self.action.clone(),
             level,
             timestamp: timestamp().timestamp_millis(),
             payload: LogPayload::Message(message.to_string()),
@@ -536,10 +591,10 @@ impl PointLogger {
     }
 
     pub fn error<M>(&self, message: M)
-    where
-        M: ToString,
+        where
+            M: ToString,
     {
-        self.msg(Level::Error, format!("{} -> {}",std::panic::Location::caller().to_string(),message.to_string()));
+        self.msg(Level::Error, message);
     }
 
     pub fn result<R, E>(&self, result: Result<R, E>) -> Result<R, E>
@@ -550,7 +605,7 @@ impl PointLogger {
             Ok(_) => {}
             Err(err) => {
                 //self.error(err.to_string());
-                self.msg(Level::Error, format!("{} -> {}",std::panic::Location::caller().to_string(),err.to_string()));
+                self.msg(Level::Error, err.to_string());
             }
         }
         result
@@ -576,7 +631,7 @@ impl PointLogger {
         match &result {
             Ok(_) => {}
             Err(err) => {
-                self.msg(Level::Error, format!("{} -> {}",std::panic::Location::caller().to_string(),err.to_string()));
+                self.msg(Level::Error, err.to_string());
             }
         }
         result
@@ -721,6 +776,8 @@ impl SpanLogger {
     {
         self.root_logger.log(Log {
             point: self.point().clone(),
+            mark: self.span.mark.clone(),
+            action: self.span.action.clone(),
             level,
             timestamp: timestamp().timestamp_millis(),
             payload: LogPayload::Message(message.to_string()),

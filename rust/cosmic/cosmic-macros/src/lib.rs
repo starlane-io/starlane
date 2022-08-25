@@ -1,6 +1,7 @@
 #![crate_type = "lib"]
 #![allow(warnings)]
 
+
 #[macro_use]
 extern crate strum_macros;
 
