@@ -53,6 +53,7 @@ use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 use tokio::time::error::Elapsed;
 use tracing::{error, info};
 use crate::global::GlobalExecutionChamber;
+use crate::star::StarCall::LayerTraversalInjection;
 
 #[derive(Clone)]
 pub struct StarState<P>
@@ -321,14 +322,17 @@ where
         let global = GlobalExecutionChamber::new(self.clone());
         let details = self.logger.result_ctx(format!("StarSkel::create_in_star(register({}))",create.template.kind.to_string()).as_str(),global.create(&create, &Agent::HyperUser).await)?;
         let assign_body = Assign::new( AssignmentKind::Create, details.clone(), StateSrc::None );
-let kind = assign_body.kind.clone();
         let mut assign = DirectedProto::sys(self.point.clone().to_port().with_layer(Layer::Core), SysMethod::Assign);
-        assign.body(assign_body.into());
-//        assign.track = true;
-println!("SENDING ASSIGN to: {} method: {}", assign.to.as_ref().unwrap().to_string(), assign.core.method.to_string());
 
-        let assign_result: Wave<Pong> = logger.result_ctx("StarSkel::create(assign_result)",self.gravity_transmitter.direct(assign).await)?;
-println!("GOT ASSIGN RESULT! {}", assign_result.core.status.to_string());
+        assign.body(assign_body.into());
+        assign.track = self.kind == StarSub::Central;
+        let router = Arc::new(LayerInjectionRouter::new(self.clone(), self.point.clone().to_port().with_layer(Layer::Shell)));
+        let mut transmitter = ProtoTransmitterBuilder::new(router, self.exchanger.clone() );
+        transmitter.from = SetStrategy::Override(self.point.to_port().with_layer(Layer::Core));
+        transmitter.agent = SetStrategy::Override(Agent::HyperUser);
+        let transmitter = transmitter.build();
+
+        let assign_result: Wave<Pong> = logger.result_ctx("StarSkel::create(assign_result)",transmitter.direct(assign).await)?;
         let logger = logger.push_mark("result").unwrap();
         logger.result(assign_result.as_ok::<P::Err>())?;
         Ok(details)
@@ -606,7 +610,7 @@ where
     hyperway_transmitter: ProtoTransmitter,
     gravity: Port,
     hyper_router: Arc<dyn Router>,
-    layer_engine: LayerTraversalEngine<P>,
+    layer_traversal_engine: LayerTraversalEngine<P>,
 }
 
 impl<P> Star<P>
@@ -665,7 +669,7 @@ where
             });
         }
 
-        let layer_engine = LayerTraversalEngine::new(
+        let layer_traversal_engine = LayerTraversalEngine::new(
             skel.clone(),
             injector.clone(),
             skel.drivers_traversal_tx.clone(),
@@ -741,7 +745,7 @@ where
                 forwarders,
                 gravity,
                 hyper_router,
-                layer_engine,
+                layer_traversal_engine,
             };
             star.start();
         }
@@ -773,20 +777,19 @@ where
                         }
                     }
                     StarCall::TraverseToNextLayer(traversal) => {
-                        let layer_engine = self.layer_engine.clone();
+                        let layer_traversal_engine = self.layer_traversal_engine.clone();
                         tokio::spawn(async move {
-                            layer_engine.traverse_to_next_layer(traversal).await;
+                            layer_traversal_engine.traverse_to_next_layer(traversal).await;
                         });
                     }
                     StarCall::LayerTraversalInjection(inject) => {
-                        let layer_engine = self.layer_engine.clone();
+                        let layer_traversal_engine = self.layer_traversal_engine.clone();
                         tokio::spawn(async move {
-                            layer_engine
+                            layer_traversal_engine
                                 .start_layer_traversal(inject.wave, &inject.injector, false)
                                 .await;
                         });
                     }
-
                     StarCall::Stub(rtn) => {
                         rtn.send(self.skel.stub());
                     }
@@ -858,7 +861,7 @@ where
         if transport.to.point == self.skel.point {
             // we are now going to send this transport down the layers to the StarCore
             // where it's contents will be unwrapped from transport and routed to the appropriate particle
-            let layer_engine = self.layer_engine.clone();
+            let layer_engine = self.layer_traversal_engine.clone();
             let injector = self.injector.clone();
 
             self.skel.logger.track(&transport, || {
@@ -1203,6 +1206,7 @@ where
             .start_layer_traversal_wave
             .send(wave.clone())
             .unwrap_or_default();
+
 
         let logger = self.skel.logger.push_mark("hyperstar:start-layer-traversal")?;
 
@@ -2252,3 +2256,5 @@ where
         }
     }
 }
+
+

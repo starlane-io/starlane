@@ -293,6 +293,7 @@ pub mod config {
             Call(CallDef<Pnt>),
             Respond,
             Point(Pnt),
+            Err{ status: u16, msg: String }
         }
 
         impl ToResolved<PipelineStop> for PipelineStopVar {
@@ -309,6 +310,7 @@ pub mod config {
                     PipelineStopCtx::Call(call) => PipelineStop::Call(call.to_resolved(env)?),
                     PipelineStopCtx::Respond => PipelineStop::Respond,
                     PipelineStopCtx::Point(point) => PipelineStop::Point(point.to_resolved(env)?),
+                    PipelineStopCtx::Err { status, msg } => PipelineStop::Err{ status, msg }
                 })
             }
         }
@@ -322,6 +324,7 @@ pub mod config {
                     PipelineStopVar::Point(point) => {
                         PipelineStopCtx::Point(point.to_resolved(env)?)
                     }
+                    PipelineStopVar::Err { status, msg } => PipelineStopCtx::Err{ status, msg }
                 })
             }
         }

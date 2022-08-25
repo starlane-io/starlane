@@ -1882,23 +1882,23 @@ pub mod id {
     }
 
     impl ToPoint for Port {
-        fn to_point(self) -> Point {
-            self.point
+        fn to_point(&self) -> Point {
+            self.point.clone()
         }
     }
 
     impl ToPort for Port {
-        fn to_port(self) -> Port {
-            self
+        fn to_port(&self) -> Port {
+            self.clone()
         }
     }
 
     pub trait ToPoint {
-        fn to_point(self) -> Point;
+        fn to_point(&self) -> Point;
     }
 
     pub trait ToPort {
-        fn to_port(self) -> Port;
+        fn to_port(&self) -> Port;
     }
 
     impl Into<Port> for Point {
@@ -1932,14 +1932,14 @@ pub mod id {
     }
 
     impl ToPoint for Point {
-        fn to_point(self) -> Point {
-            self
+        fn to_point(&self) -> Point {
+            self.clone()
         }
     }
 
     impl ToPort for Point {
-        fn to_port(self) -> Port {
-            self.into()
+        fn to_port(&self) -> Port {
+            self.clone().into()
         }
     }
 
@@ -3071,14 +3071,14 @@ impl TryFrom<Point> for StarKey {
 }
 
 impl ToPoint for StarKey {
-    fn to_point(self) -> crate::id::id::Point {
+    fn to_point(&self) -> crate::id::id::Point {
         Point::from_str(format!("<<{}>>::star", self.to_string()).as_str()).unwrap()
     }
 }
 
 impl ToPort for StarKey {
-    fn to_port(self) -> Port {
-        self.to_point().to_port()
+    fn to_port(&self) -> Port {
+        self.clone().to_point().to_port()
     }
 }
 
