@@ -852,7 +852,6 @@ fn test_control() -> Result<(), TestErr> {
                     if wave.is_directed() {
                         let directed = wave.to_directed().unwrap();
                         if directed.core().method == Method::Cmd(CmdMethod::Bounce) {
-println!("Bouncing!");
                             let reflection = directed.reflection().unwrap();
                             let reflect = reflection.make(ReflectedCore::ok(), greet.port.clone());
                             let wave = reflect.to_ultra();
@@ -863,10 +862,8 @@ println!("Bouncing!");
             });
         }
 
-        let mut bounce = DirectedProto::cmd(greet.transport.clone().with_layer(Layer::Core), CmdMethod::Bounce);
+        let mut bounce = DirectedProto::cmd(greet.transport.clone().with_layer(Layer::Shell ), CmdMethod::Bounce);
         let reflect: Wave<Pong> = transmitter.direct(bounce).await?;
-
-println!("reflected: {}", reflect.core.status.to_string());
 
        assert!(reflect.core.status.is_success());
 

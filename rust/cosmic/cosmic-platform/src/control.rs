@@ -135,7 +135,6 @@ where
     async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
         self.skel.driver.status_tx.send(DriverStatus::Init).await;
 
-println!(".... CREATING CONTROLS!!!");
         skel.create_driver_particle(PointSegTemplate::Exact("controls".to_string()), Kind::Base.to_template()).await?;
 
         let remote_point_factory =
@@ -175,7 +174,6 @@ println!(".... CREATING CONTROLS!!!");
                         }
                         Some(router) => {
                             let injector = remote.with_layer(Layer::Shell);
-println!("INJECTOR: {} method: {}", injector.to_string(), hop.method().unwrap().to_string());
                             let router = LayerInjectionRouter::new( skel.star.clone(), injector);
 
                             match hop.unwrap_from_hop() {
@@ -183,7 +181,6 @@ println!("INJECTOR: {} method: {}", injector.to_string(), hop.method().unwrap().
                                     if transport.to.point == remote.point {
                                         match transport.unwrap_from_transport()
                                         {
-
                                             Ok(mut wave) => {
                                                 router.route(wave).await;
                                             }

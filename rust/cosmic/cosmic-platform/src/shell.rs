@@ -72,7 +72,7 @@ where
 
     async fn deliver_directed(&self, directed: Traversal<DirectedWave>) -> Result<(),MsgErr>{
 
-        if directed.from().point == self.port().point && directed.from().layer.ordinal() > self.port().layer.ordinal() {
+        if directed.from().point == self.port().point && directed.from().layer.ordinal() >= self.port().layer.ordinal() {
             self.state.fabric_requests.insert(directed.id().clone());
         }
 
