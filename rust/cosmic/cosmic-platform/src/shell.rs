@@ -52,37 +52,6 @@ impl<P> TraversalLayer for Shell<P>
 where
     P: Platform + 'static,
 {
-    async fn visit(&self, traversal: Traversal<UltraWave>) -> Result<(),MsgErr>{
-        if let Some(dest) = &traversal.dest {
-            if self.port().layer == *dest {
-                if traversal.is_directed() {
-                    self.deliver_directed(traversal.unwrap_directed()).await?;
-                } else {
-                    self.deliver_reflected(traversal.unwrap_reflected()).await?;
-                }
-                return Ok(());
-            } else {
-            }
-        }
-
-        if traversal.is_directed() && traversal.dir == TraversalDirection::Fabric {
-            self.directed_fabric_bound(traversal.unwrap_directed())
-                .await?;
-        } else if traversal.is_reflected() && traversal.dir == TraversalDirection::Core {
-            self.reflected_core_bound(traversal.unwrap_reflected())
-                .await?;
-        } else if traversal.is_directed() && traversal.dir == TraversalDirection::Core {
-            self.directed_core_bound(traversal.unwrap_directed()).await?;
-        } else if traversal.is_reflected() && traversal.dir == TraversalDirection::Fabric {
-            self.reflected_fabric_bound(traversal.unwrap_reflected())
-                .await?;
-        }
-
-        Ok(())
-    }
-
-
-
 
     fn port(&self) -> Port {
         self.state.point.clone().to_port().with_layer(Layer::Shell)
@@ -102,6 +71,10 @@ where
     }
 
     async fn deliver_directed(&self, directed: Traversal<DirectedWave>) -> Result<(),MsgErr>{
+
+        if directed.from().point == self.port().point && directed.from().layer.ordinal() > self.port().layer.ordinal() {
+            self.state.fabric_requests.insert(directed.id().clone());
+        }
 
         let logger = self.skel.logger.point(directed.to.point.clone()).span();
         let injector = directed
@@ -163,6 +136,7 @@ where
         {
             self.traverse_next(traversal.to_ultra()).await;
         } else {
+
             traversal
                 .logger
                 .warn(format!("filtered a response from {} to a request {} of which the Shell has no record", traversal.from().to_string(), traversal.reflection_of().to_short_string()));

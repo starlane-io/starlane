@@ -67,6 +67,7 @@ use cosmic_api::parse::{CamelCase, route_attribute};
 use cosmic_api::particle::particle::{Details, Status, Stub};
 use cosmic_api::util::log;
 use cosmic_api::wave::ReflectedCore;
+use crate::star::StarCall::LayerTraversalInjection;
 
 pub struct ControlFactory<P> where P: Platform {
    phantom: PhantomData<P>
@@ -97,9 +98,9 @@ impl <P> HyperDriverFactory<P> for ControlFactory<P> where P: Platform{
 pub struct ControlDriver<P> where P: Platform {
     pub ctx: DriverCtx,
     pub skel: HyperSkel<P>,
-    pub external_router: Option<TxRouter>,
+    pub external_router: Option<Arc<dyn Router>>,
     pub control_ctxs: Arc<DashMap<Point,ControlCtx<P>>>,
-    pub fabric_routers: Arc<DashMap<Point,LayerInjectionRouter<P>>>
+    pub fabric_routers: Arc<DashMap<Point,LayerInjectionRouter<P>>>,
 }
 
 #[derive(Clone)]
@@ -135,7 +136,7 @@ where
         self.skel.driver.status_tx.send(DriverStatus::Init).await;
 
 println!(".... CREATING CONTROLS!!!");
-        skel.create_driver_particle("controls", PointSegTemplate::Exact("controls".to_string()), Kind::Base.to_template()).await?;
+        skel.create_driver_particle(PointSegTemplate::Exact("controls".to_string()), Kind::Base.to_template()).await?;
 
         let remote_point_factory =
             Arc::new(ControlCreator::new( self.skel.clone(), self.fabric_routers.clone(), ctx ));
@@ -147,7 +148,7 @@ println!(".... CREATING CONTROLS!!!");
         interchange.singular_to(Point::remote_endpoint().to_port());
         let interchange = Arc::new(interchange);
         let greeter = ControlGreeter::new(self.skel.clone(), self.skel.driver.point.push("controls".to_string()).unwrap());
-        self.external_router  = Some(TxRouter::new(tx));
+        self.external_router  = Some(interchange.router().into());
 
         pub struct ControlHyperwayConfigurator;
 
@@ -163,6 +164,7 @@ println!(".... CREATING CONTROLS!!!");
         {
             let logger = self.skel.driver.logger.clone();
             let fabric_routers = self.fabric_routers.clone();
+            let skel = self.skel.clone();
             tokio::spawn(async move {
                 while let Some(hop) = rx.recv().await {
                     let remote = hop.from().clone().with_layer(Layer::Portal);
@@ -172,15 +174,17 @@ println!(".... CREATING CONTROLS!!!");
                             logger.warn("control not found");
                         }
                         Some(router) => {
-                            let router = router.value();
+                            let injector = remote.with_layer(Layer::Shell);
+println!("INJECTOR: {} method: {}", injector.to_string(), hop.method().unwrap().to_string());
+                            let router = LayerInjectionRouter::new( skel.star.clone(), injector);
+
                             match hop.unwrap_from_hop() {
                                 Ok(transport) => {
                                     if transport.to.point == remote.point {
                                         match transport.unwrap_from_transport()
                                         {
 
-                                            Ok(wave) => {
-println!("routing wave to what: {}", wave.to().to_string());
+                                            Ok(mut wave) => {
                                                 router.route(wave).await;
                                             }
                                             Err(err) => {
@@ -226,10 +230,10 @@ println!("routing wave to what: {}", wave.to().to_string());
     }
 
     async fn item(&self, point: &Point) -> Result<ItemHandler<P>, P::Err> {
-        todo!()
+        let router = self.external_router.as_ref().ok_or(P::Err::new("FATAL: router is not set") )?.clone();
+        let ctx = ControlCtx::new(router);
+        Ok(ItemHandler::Router(Box::new(Control::restore( self.skel.clone(), ctx, ()))))
     }
-
-
 }
 
 pub struct ControlCreator<P> where P: Platform {
@@ -262,7 +266,7 @@ impl <P> PointFactory for ControlCreator<P> where P: Platform {
             state: StateSrc::None,
         };
 
-        match self.skel.driver.logger.result_ctx("create-control",self.skel.star.create("create_control", create).await) {
+        match self.skel.driver.logger.result_ctx("create-control",self.skel.star.create_in_star(create).await) {
             Ok(details) => {
                 let point = details.stub.point;
                 let fabric_router = LayerInjectionRouter::new(self.skel.star.clone(), point.clone().to_port().with_layer(Layer::Shell) );
@@ -344,19 +348,17 @@ impl <P> ItemRouter<P> for Control<P> where P: Platform {
 #[derive(Clone)]
 pub struct ControlCtx<P> where P: Platform {
    pub phantom: PhantomData<P>,
-   pub router: TxRouter
+   pub router: Arc<dyn Router>
 }
 
 impl <P> ControlCtx<P> where P: Platform {
-    pub fn new(tx: mpsc::Sender<UltraWave>) -> Self {
-        let router = TxRouter::new(tx);
+    pub fn new(router: Arc<dyn Router>) -> Self {
         Self {
             phantom: Default::default(),
             router
         }
     }
 }
-
 
 
 /*

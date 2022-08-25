@@ -1645,6 +1645,7 @@ pub mod id {
                     if traversal.is_directed() {
                         self.deliver_directed(traversal.unwrap_directed()).await?;
                     } else {
+println!("~~~~~~~~~ Port {} DEST: {}", self.port().to_string() , dest.to_string() );
                         self.deliver_reflected(traversal.unwrap_reflected()).await?;
                     }
                     return Ok(());

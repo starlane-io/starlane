@@ -7,7 +7,7 @@ use cosmic_api::id::id::{Layer, ToPoint, ToPort, Uuid};
 use cosmic_api::id::TraversalDirection;
 use cosmic_api::msg::MsgMethod;
 use cosmic_api::sys::{Assign, AssignmentKind, InterchangeKind, Knock, Sys};
-use cosmic_api::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Pong, ProtoTransmitterBuilder, SysMethod, Wave};
+use cosmic_api::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Method, Pong, ProtoTransmitterBuilder, SysMethod, Wave};
 use cosmic_api::{MountKind, NoDiceArtifactFetcher, HYPERUSER};
 use cosmic_hyperlane::{AnonHyperAuthenticator, HyperClient, HyperConnectionErr, HyperGate, HyperwayExt, HyperwayStub, LocalHyperwayGateJumper};
 use dashmap::DashMap;
@@ -843,9 +843,27 @@ fn test_control() -> Result<(), TestErr> {
         let transmitter = client.proto_transmitter_builder().await?;
         let greet = client.get_greeting().expect("expected greeting");
         let transmitter = transmitter.build();
-        let mut bounce = DirectedProto::cmd(greet.transport.clone().with_layer(Layer::Shell), CmdMethod::Bounce);
-//        bounce.track = true;
 
+        {
+            let transmitter = transmitter.clone();
+            let mut rx = client.rx();
+            tokio::spawn(async move {
+                while let Ok(wave) = rx.recv().await {
+                    if wave.is_directed() {
+                        let directed = wave.to_directed().unwrap();
+                        if directed.core().method == Method::Cmd(CmdMethod::Bounce) {
+println!("Bouncing!");
+                            let reflection = directed.reflection().unwrap();
+                            let reflect = reflection.make(ReflectedCore::ok(), greet.port.clone());
+                            let wave = reflect.to_ultra();
+                            transmitter.route(wave).await;
+                        }
+                    }
+                }
+            });
+        }
+
+        let mut bounce = DirectedProto::cmd(greet.transport.clone().with_layer(Layer::Core), CmdMethod::Bounce);
         let reflect: Wave<Pong> = transmitter.direct(bounce).await?;
 
 println!("reflected: {}", reflect.core.status.to_string());

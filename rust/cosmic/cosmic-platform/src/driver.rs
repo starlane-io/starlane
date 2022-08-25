@@ -199,11 +199,9 @@ where
     }
 
     pub async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
-        println!("DriversApi ENTERING ASSIGN");
         let (rtn, rtn_rx) = oneshot::channel();
         self.call_tx.send(DriversCall::Assign { assign, rtn }).await;
         let rtn = Ok(rtn_rx.await??);
-        println!("DriversApi RETURNING FROM ASSIGN");
         rtn
     }
 }
@@ -602,6 +600,7 @@ where
                         logger.result(factory.create(skel.clone(), driver_skel.clone(), ctx).await);
                     match driver {
                         Ok(driver) => {
+                            let layer = driver.layer();
                             let runner = DriverRunner::new(
                                 driver_skel.clone(),
                                 skel.clone(),
@@ -609,6 +608,7 @@ where
                                 runner_tx,
                                 runner_rx,
                                 status_rx.clone(),
+                                layer
                             );
                             let driver = DriverApi::new(runner.clone(), factory.kind());
                             let (rtn, rtn_rx) = oneshot::channel();
@@ -860,7 +860,7 @@ where
     },
 }
 
-pub struct ItemShell<P>
+pub struct ItemOuter<P>
 where
     P: Platform + 'static,
 {
@@ -870,7 +870,7 @@ where
     pub router: Arc<dyn Router>,
 }
 
-impl<P> ItemShell<P>
+impl<P> ItemOuter<P>
 where
     P: Platform + 'static,
 {
@@ -880,13 +880,14 @@ where
 }
 
 #[async_trait]
-impl<P> TraversalLayer for ItemShell<P>
+impl<P> TraversalLayer for ItemOuter<P>
 where
     P: Platform,
 {
     fn port(&self) -> cosmic_api::id::id::Port {
         self.port.clone()
     }
+
 
     async fn deliver_directed(&self, direct: Traversal<DirectedWave>) -> Result<(), MsgErr> {
         self.skel
@@ -933,6 +934,22 @@ where
         Ok(())
     }
 
+    async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) -> Result<(),MsgErr> {
+        if reflect.to().layer == self.port.layer {
+            self.exchanger().reflected(reflect.payload).await
+        } else {
+            match &self.item {
+                ItemHandler::Router(router) => {
+                    router.route(reflect.payload.to_ultra()).await;
+                    Ok(())
+                }
+                ItemHandler::Handler(_) => {
+                    Err("cannot deliver a reflected to an ItemHandler::Handler, it must be an ItemHandler::Router".into())
+                }
+            }
+        }
+    }
+
 
     async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
         self.skel.traverse_to_next_tx.send(traversal).await;
@@ -961,6 +978,7 @@ where
     router: LayerInjectionRouter<P>,
     logger: PointLogger,
     status_rx: watch::Receiver<DriverStatus>,
+    layer: Layer
 }
 
 #[routes]
@@ -975,6 +993,7 @@ where
         call_tx: mpsc::Sender<DriverRunnerCall<P>>,
         call_rx: mpsc::Receiver<DriverRunnerCall<P>>,
         status_rx: watch::Receiver<DriverStatus>,
+        layer: Layer
     ) -> mpsc::Sender<DriverRunnerCall<P>> {
         let logger = star_skel.logger.point(skel.point.clone());
         let router = LayerInjectionRouter::new(
@@ -991,6 +1010,7 @@ where
             router,
             logger,
             status_rx,
+            layer
         };
 
         driver.start();
@@ -1085,10 +1105,10 @@ where
         Ok(())
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemShell<P>, P::Err> {
-        let port = point.clone().to_port().with_layer(Layer::Core);
+    async fn item(&self, point: &Point) -> Result<ItemOuter<P>, P::Err> {
+        let port = point.clone().to_port().with_layer(self.layer.clone());
 
-        Ok(ItemShell {
+        Ok(ItemOuter {
             port: port.clone(),
             skel: self.star_skel.clone(),
             item: self.driver.item(point).await?,
@@ -1179,14 +1199,14 @@ where
         }
     }
 
-    pub async fn create_driver_particle(&self, who: &str, child_segment_template: PointSegTemplate, kind: KindTemplate ) -> Result<Details,P::Err> {
+    pub async fn create_driver_particle(&self, child_segment_template: PointSegTemplate, kind: KindTemplate ) -> Result<Details,P::Err> {
         let create = Create {
             template: Template::new(PointTemplate { parent:self.point.clone(), child_segment_template }, kind ),
             properties: Default::default(),
             strategy: Strategy::Override,
             state: StateSrc::None,
         };
-        self.skel.create(who, create).await
+        self.skel.create_in_star(create).await
     }
 
 }

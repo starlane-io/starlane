@@ -425,6 +425,16 @@ impl UltraWave {
         }
     }
 
+    pub fn set_track(&mut self, track: bool) {
+        match self {
+            UltraWave::Ping(ping) => ping.track = track,
+            UltraWave::Pong(pong) => pong.track = track,
+            UltraWave::Ripple(ripple) => ripple.track = track,
+            UltraWave::Echo(echo) => echo.track = track,
+            UltraWave::Signal(signal) => signal.track = track,
+        }
+    }
+
     pub fn scope(&self) -> &Scope {
         match self {
             UltraWave::Ping(ping) => &ping.scope,

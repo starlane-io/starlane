@@ -317,7 +317,12 @@ where
      */
 
     #[track_caller]
-    pub async fn create(&self, who: &str, create: Create ) -> Result<Details,P::Err>{
+    pub async fn create_in_star(&self, create: Create ) -> Result<Details,P::Err>{
+
+        if self.point != create.template.point.parent && !self.point.is_parent_of(&create.template.point.parent) {
+            return Err(P::Err::new(format!("cannot create_in_star in star {} for parent point {} since it is not a point within this star", self.point.to_string(), create.template.point.parent.to_string())));
+        }
+
         let logger = self.logger.push_mark("create").unwrap();
         let global = GlobalExecutionChamber::new(self.clone());
         let details = self.logger.result_ctx(format!("StarSkel::create_in_star(register({}))",create.template.kind.to_string()).as_str(),global.create(&create, &Agent::HyperUser).await)?;
@@ -1791,7 +1796,7 @@ where
         Kind::Star(self.star_skel.kind.clone())
     }
 
-    async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
+    async fn init(&mut self, skel: DriverSkel<P>, _: DriverCtx) -> Result<(), P::Err> {
         let logger = skel.logger.push_mark("init")?;
             logger
             .result(self.driver_skel.status_tx.send(DriverStatus::Init).await)
@@ -1882,7 +1887,6 @@ where
     #[track_caller]
     #[route("Sys<Assign>")]
     pub async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, P::Err> {
-        self.skel.logger.info("***> ASSIGN!!!");
         if let Sys::Assign(assign) = ctx.input {
             #[cfg(test)]
             self.skel
