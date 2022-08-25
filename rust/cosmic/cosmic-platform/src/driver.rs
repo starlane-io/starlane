@@ -645,8 +645,9 @@ where
             .get(&assign.details.stub.kind)
             .ok_or::<MsgErr>(
                 format!(
-                    "kind not supported by these Drivers: {}",
-                    assign.details.stub.kind.to_string()
+                    "Kind {} not supported by Drivers for Star: {}",
+                    assign.details.stub.kind.to_string(),
+                    self.skel.kind.to_string()
                 )
                 .into(),
             )?;

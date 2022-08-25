@@ -325,7 +325,6 @@ where
         let mut assign = DirectedProto::sys(self.point.clone().to_port().with_layer(Layer::Core), SysMethod::Assign);
 
         assign.body(assign_body.into());
-        assign.track = self.kind == StarSub::Central;
         let router = Arc::new(LayerInjectionRouter::new(self.clone(), self.point.clone().to_port().with_layer(Layer::Shell)));
         let mut transmitter = ProtoTransmitterBuilder::new(router, self.exchanger.clone() );
         transmitter.from = SetStrategy::Override(self.point.to_port().with_layer(Layer::Core));
@@ -334,7 +333,7 @@ where
 
         let assign_result: Wave<Pong> = logger.result_ctx("StarSkel::create(assign_result)",transmitter.direct(assign).await)?;
         let logger = logger.push_mark("result").unwrap();
-        logger.result(assign_result.as_ok::<P::Err>())?;
+        logger.result(assign_result.ok_or())?;
         Ok(details)
     }
 

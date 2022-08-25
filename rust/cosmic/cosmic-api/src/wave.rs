@@ -1714,11 +1714,15 @@ impl Pong {
         self.core.as_result()
     }
 
-    pub fn as_ok<E: From<String>>(&self) -> Result<(), E> {
+    pub fn ok_or(&self) -> Result<(), MsgErr> {
         if self.is_ok() {
             Ok(())
         } else {
-            Err(self.core.status.to_string().into())
+            if let Substance::Errors(errs) = &self.core.body  {
+                Err(format!("{} : {}", self.core.status.to_string(), errs.to_string()).into())
+            } else {
+                Err(self.core.status.to_string().into())
+            }
         }
     }
 }
@@ -1730,18 +1734,6 @@ impl Pong {
             intended,
             core,
             reflection_of,
-        }
-    }
-
-    pub fn ok_or(self) -> Result<Self, MsgErr> {
-        if self.core.status.is_success() {
-            Ok(self)
-        } else {
-            if let Substance::Text(error) = self.core.body {
-                Err(error.into())
-            } else {
-                Err(format!("error code: {}", self.core.status).into())
-            }
         }
     }
 }

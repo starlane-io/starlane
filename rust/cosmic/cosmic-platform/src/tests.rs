@@ -81,13 +81,12 @@ impl Platform for TestPlatform {
 
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
         let mut builder = DriversBuilder::new(kind.clone());
+        builder.add_post(Arc::new(BaseDriverFactory::new()));
         builder.add_post( Arc::new(ControlDriverFactory::new()));
 
         match kind {
             StarSub::Central => {}
-            StarSub::Super => {
-                builder.add_post(Arc::new(BaseDriverFactory::new()))
-            }
+            StarSub::Super => {}
             StarSub::Nexus => {}
             StarSub::Maelstrom => {}
             StarSub::Scribe => {}
@@ -845,13 +844,13 @@ fn test_control() -> Result<(), TestErr> {
         let greet = client.get_greeting().expect("expected greeting");
         let transmitter = transmitter.build();
         let mut bounce = DirectedProto::cmd(greet.transport.clone().with_layer(Layer::Shell), CmdMethod::Bounce);
-        bounce.track = true;
+//        bounce.track = true;
 
-//        let reflect: Wave<Pong> = transmitter.direct(bounce).await?;
+        let reflect: Wave<Pong> = transmitter.direct(bounce).await?;
 
-//println!("reflected: {}", reflect.core.status.to_string());
+println!("reflected: {}", reflect.core.status.to_string());
 
- //       assert!(reflect.core.status.is_success());
+       assert!(reflect.core.status.is_success());
 
         client.close().await;
         tokio::time::sleep(Duration::from_millis(50)).await;
