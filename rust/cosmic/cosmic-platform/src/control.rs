@@ -13,7 +13,7 @@ use cosmic_api::wave::{Agent, Method,CmdMethod, CoreBounce, DirectedHandler, InC
 use cosmic_api::wave::{DirectedHandlerSelector, SetStrategy, TxRouter};
 use cosmic_api::wave::{DirectedProto, RecipientSelector};
 use cosmic_api::{ArtRef, Registration, State};
-use cosmic_hyperlane::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, FromTransform, HopTransform, HyperAuthenticator, HyperConnectionErr, HyperGate, HyperGreeter, Hyperway, HyperwayConfigurator, HyperwayExt, HyperwayInterchange, HyperwayStub, InterchangeGate, TransportTransform};
+use cosmic_hyperlane::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, FromTransform, HopTransform, HyperAuthenticator, HyperConnectionErr, HyperGate, HyperGreeter, Hyperway, HyperwayConfigurator, HyperwayEndpoint, HyperwayInterchange, HyperwayStub, InterchangeGate, TransportTransform};
 use dashmap::DashMap;
 use std::marker::PhantomData;
 use std::str::FromStr;
@@ -142,7 +142,7 @@ where
         let auth = AnonHyperAuthenticatorAssignEndPoint::new(remote_point_factory, self.skel.driver.logger.clone() );
         let mut interchange = HyperwayInterchange::new(self.skel.driver.logger.clone());
         let hyperway = Hyperway::new(Point::remote_endpoint().to_port(), Agent::HyperUser);
-        let ( tx, mut rx ) = hyperway.channel().await;
+        let mut hyperway_endpoint = hyperway.hyperway_endpoint_far().await;
         interchange.add(hyperway).await;
         interchange.singular_to(Point::remote_endpoint().to_port());
         let interchange = Arc::new(interchange);
@@ -165,7 +165,7 @@ where
             let fabric_routers = self.fabric_routers.clone();
             let skel = self.skel.clone();
             tokio::spawn(async move {
-                while let Some(hop) = rx.recv().await {
+                while let Some(hop) = hyperway_endpoint.rx.recv().await {
                     let remote = hop.from().clone().with_layer(Layer::Portal);
                     match fabric_routers.get(&remote.point)
                     {

@@ -16,7 +16,7 @@ use cosmic_api::wave::{
 };
 use cosmic_api::{MountKind, NoDiceArtifactFetcher, HYPERUSER};
 use cosmic_hyperlane::{
-    AnonHyperAuthenticator, HyperClient, HyperConnectionErr, HyperGate, HyperwayExt, HyperwayStub,
+    AnonHyperAuthenticator, HyperClient, HyperConnectionErr, HyperGate, HyperwayEndpoint, HyperwayStub,
     LocalHyperwayGateJumper,
 };
 use dashmap::DashMap;
@@ -840,11 +840,11 @@ fn test_control() -> Result<(), TestErr> {
         }
 
         #[async_trait]
-        impl<P> HyperwayExtFactory for MachineApiExtFactory<P>
+        impl<P> HyperwayEndpointFactory for MachineApiExtFactory<P>
         where
             P: Platform,
         {
-            async fn create(&self) -> Result<HyperwayExt, HyperConnectionErr> {
+            async fn create(&self) -> Result<HyperwayEndpoint, HyperConnectionErr> {
                 let knock = Knock {
                     kind: InterchangeKind::DefaultControl,
                     auth: Box::new(Substance::Empty),
@@ -916,7 +916,7 @@ fn test_star_wrangle() -> Result<(), TestErr> {
 
         let star_api = machine_api.get_machine_star().await?;
 
-        let wrangles = tokio::time::timeout(Duration::from_secs(1), star_api.wrangle()).await??;
+        let wrangles = tokio::time::timeout(Duration::from_secs(5), star_api.wrangle()).await??;
 
         println!("wrangles: {}", wrangles.wrangles.len());
 

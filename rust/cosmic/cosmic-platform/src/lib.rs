@@ -38,7 +38,7 @@ use cosmic_api::substance::substance::{Substance, SubstanceList, Token};
 use cosmic_api::sys::ParticleRecord;
 use cosmic_api::wave::{ReflectedCore, UltraWave};
 use cosmic_api::{ArtifactApi, IndexedAccessGrant, Registration};
-use cosmic_hyperlane::{HyperAuthenticator, HyperGate, HyperGateSelector, HyperwayExtFactory};
+use cosmic_hyperlane::{HyperAuthenticator, HyperGate, HyperGateSelector, HyperwayEndpointFactory};
 use http::StatusCode;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
@@ -312,7 +312,7 @@ where
     Self: 'static,
     Self::RegistryContext: Send + Sync,
     Self::StarAuth: HyperAuthenticator,
-    Self::RemoteStarConnectionFactory: HyperwayExtFactory,
+    Self::RemoteStarConnectionFactory: HyperwayEndpointFactory,
     Self::Err: PlatErr,
 {
     type Err;

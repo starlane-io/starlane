@@ -64,10 +64,7 @@ pub mod id {
     };
     use crate::sys::Location::Central;
     use crate::util::{ToResolved, ValueMatcher, ValuePattern};
-    use crate::wave::{
-        DirectedWave, Exchanger, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave,
-        ToRecipients, UltraWave, Wave,
-    };
+    use crate::wave::{DirectedWave, Exchanger, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave, ToRecipients, UltraWave, Wave, WaveKind};
 
     lazy_static! {
         pub static ref GLOBAL_CENTRAL: Point = Point::from_str("GLOBAL::central").unwrap();
@@ -1639,7 +1636,9 @@ pub mod id {
         }
 
         async fn visit(&self, traversal: Traversal<UltraWave>) -> Result<(),MsgErr>{
-
+if traversal.kind() == WaveKind::Echo {
+   println!("Echo visted: {}", self.port().to_string());
+}
             if let Some(dest) = &traversal.dest {
                 if self.port().layer == *dest {
                     if traversal.is_directed() {
@@ -3305,6 +3304,7 @@ impl<W> Traversal<W> {
         match &next {
             None => {}
             Some(layer) => {
+println!("returning next layer: from {} to {}", self.layer.to_string(), layer.to_string()  );
                 self.layer = layer.clone();
             }
         }

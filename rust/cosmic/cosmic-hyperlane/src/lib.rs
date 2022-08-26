@@ -7,6 +7,7 @@ use cosmic_api::id::id::{Layer, Point, Port, ToPoint, ToPort, Version};
 use cosmic_api::log::{PointLogger, RootLogger};
 use cosmic_api::msg::MsgMethod;
 use cosmic_api::particle::particle::Status;
+use cosmic_api::quota::Timeouts;
 use cosmic_api::substance::substance::{Errors, Substance, SubstanceKind, Token};
 use cosmic_api::sys::{Greet, InterchangeKind, Knock, Sys};
 use cosmic_api::util::uuid;
@@ -33,7 +34,6 @@ use tokio::sync::mpsc::error::{SendError, SendTimeoutError, TrySendError};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
-use cosmic_api::quota::Timeouts;
 
 #[macro_use]
 extern crate async_trait;
@@ -95,32 +95,38 @@ impl Hyperway {
             .try_send(HyperlaneCall::Transform(Box::new(ToTransform::new(to))));
     }
 
-    pub async fn mount(&self, init_wave: Option<UltraWave>) -> HyperwayExt {
+    pub async fn hyperway_endpoint_near(&self, init_wave: Option<UltraWave>) -> HyperwayEndpoint {
         let drop_tx = None;
 
-        HyperwayExt {
+        HyperwayEndpoint {
             tx: self.inbound.tx(),
             rx: self.outbound.rx(init_wave).await,
             drop_tx,
         }
     }
 
-    pub async fn ephemeral(
+    pub async fn hyperway_endpoint_near_with_drop_event(
         &self,
         drop_tx: oneshot::Sender<()>,
         init_wave: Option<UltraWave>,
-    ) -> HyperwayExt {
+    ) -> HyperwayEndpoint {
         let drop_tx = Some(drop_tx);
 
-        HyperwayExt {
+        HyperwayEndpoint {
             tx: self.outbound.tx(),
             rx: self.inbound.rx(init_wave).await,
             drop_tx,
         }
     }
 
-    pub async fn channel(&self) -> (mpsc::Sender<UltraWave>, mpsc::Receiver<UltraWave>) {
-        (self.outbound.tx(), self.outbound.rx(None).await)
+    pub async fn hyperway_endpoint_far(
+        &self,
+    ) -> HyperwayEndpoint {
+        HyperwayEndpoint {
+            tx: self.inbound.tx(),
+            rx: self.outbound.rx(None).await,
+            drop_tx: None,
+        }
     }
 }
 
@@ -137,13 +143,13 @@ impl HyperwayDiagnostic {
     }
 }
 
-pub struct HyperwayExt {
+pub struct HyperwayEndpoint {
     drop_tx: Option<oneshot::Sender<()>>,
     pub tx: mpsc::Sender<UltraWave>,
     pub rx: mpsc::Receiver<UltraWave>,
 }
 
-impl HyperwayExt {
+impl HyperwayEndpoint {
     pub fn new(tx: mpsc::Sender<UltraWave>, rx: mpsc::Receiver<UltraWave>) -> Self {
         let drop_tx = None;
         Self { tx, rx, drop_tx }
@@ -167,7 +173,7 @@ impl HyperwayExt {
     }
 }
 
-impl Drop for HyperwayExt {
+impl Drop for HyperwayEndpoint {
     fn drop(&mut self) {
         match self.drop_tx.take() {
             None => {}
@@ -213,7 +219,7 @@ pub enum HyperwayInterchangeCall {
     Mount {
         stub: HyperwayStub,
         init_wave: UltraWave,
-        rtn: oneshot::Sender<Result<HyperwayExt, MsgErr>>,
+        rtn: oneshot::Sender<Result<HyperwayEndpoint, MsgErr>>,
     },
 }
 
@@ -233,7 +239,6 @@ pub trait HyperTransform: Send + Sync {
 pub struct AgentTransform {
     agent: Agent,
 }
-
 
 impl AgentTransform {
     pub fn new(agent: Agent) -> Self {
@@ -274,21 +279,19 @@ impl HyperTransform for LayerTransform {
 
 #[derive(Clone)]
 pub struct TransportTransform {
-    transport_to: Port
+    transport_to: Port,
 }
 
 impl TransportTransform {
     pub fn new(transport_to: Port) -> Self {
-        Self{
-            transport_to
-        }
+        Self { transport_to }
     }
 }
 
 impl HyperTransform for TransportTransform {
     fn filter(&self, wave: UltraWave) -> UltraWave {
         let from = wave.from().clone();
-        let transport = wave.wrap_in_transport(from,self.transport_to.clone());
+        let transport = wave.wrap_in_transport(from, self.transport_to.clone());
         let wave = transport.build().unwrap();
         wave.to_ultra()
     }
@@ -296,14 +299,12 @@ impl HyperTransform for TransportTransform {
 
 #[derive(Clone)]
 pub struct HopTransform {
-    hop_to: Port
+    hop_to: Port,
 }
 
 impl HopTransform {
     pub fn new(hop_to: Port) -> Self {
-        Self{
-            hop_to
-        }
+        Self { hop_to }
     }
 }
 
@@ -311,7 +312,7 @@ impl HyperTransform for HopTransform {
     fn filter(&self, wave: UltraWave) -> UltraWave {
         let signal = wave.to_signal().unwrap();
         let from = signal.from.clone();
-        let wave = signal.wrap_in_hop(from,self.hop_to.clone());
+        let wave = signal.wrap_in_hop(from, self.hop_to.clone());
         let wave = wave.build().unwrap();
         wave.to_ultra()
     }
@@ -375,13 +376,20 @@ impl Hyperlane {
                 let mut transforms = vec![];
                 while let Some(call) = rx.recv().await {
                     match call {
-                        HyperlaneCall::Ext(new) => {
-                            ext.replace(new);
+                        HyperlaneCall::Ext(ext_tx) => {
+                            println!("<{}> Ext added!", label);
+                            ext.replace(ext_tx);
                         }
                         HyperlaneCall::Transform(filter) => {
                             transforms.push(filter);
                         }
                         HyperlaneCall::Wave(mut wave) => {
+
+                                println!("<{}> Hyperlane received wave: from: {} to {}",
+                                    label,
+                                wave.from().to_string(),
+                                wave.to().to_string()
+                            );
                             while queue.len() > 1024 {
                                 // start dropping the oldest messages
                                 queue.remove(0);
@@ -398,22 +406,31 @@ impl Hyperlane {
                             ext = None;
                         }
                     }
-                    if let Some(ext_tx) = ext.as_mut() {
-                        for wave in queue.drain(..) {
-                            #[cfg(test)]
-                            let wave_cp = wave.clone();
-                            match ext_tx.send(wave).await {
-                                Ok(_) => {
-                                    #[cfg(test)]
-                                    eavesdrop_tx.send(wave_cp);
-                                }
-                                Err(err) => {
-                                    tx.send(HyperlaneCall::ResetExt).await;
-                                    tx.try_send(HyperlaneCall::Wave(err.0));
+                    if !queue.is_empty() {
+                        if let Some(ext_tx) = ext.as_mut() {
+                            for wave in queue.drain(..) {
+                                #[cfg(test)]
+                                let wave_cp = wave.clone();
+                                println!(
+                                    "<{}> Hyperlane relay wave... from: {} to: {}",
+                                    label,
+                                    wave.from().to_string(),
+                                    wave.to().to_string()
+                                );
+                                match ext_tx.send(wave).await {
+                                    Ok(_) => {
+                                        #[cfg(test)]
+                                        eavesdrop_tx.send(wave_cp);
+                                    }
+                                    Err(err) => {
+                                        tx.send(HyperlaneCall::ResetExt).await;
+                                        tx.try_send(HyperlaneCall::Wave(err.0));
+                                    }
                                 }
                             }
+                        } else {
+                            println!("no ext_tx...");
                         }
-                    } else {
                     }
                 }
             });
@@ -463,7 +480,7 @@ impl Hyperlane {
 pub struct HyperwayInterchange {
     call_tx: mpsc::Sender<HyperwayInterchangeCall>,
     logger: PointLogger,
-    singular_to: Option<Port>
+    singular_to: Option<Port>,
 }
 
 impl HyperwayInterchange {
@@ -481,8 +498,14 @@ impl HyperwayInterchange {
                             let mut rx = hyperway.inbound.rx(None).await;
                             hyperways.insert(hyperway.remote.clone(), hyperway);
                             let call_tx = call_tx.clone();
+                            let logger = logger.clone();
                             tokio::spawn(async move {
                                 while let Some(wave) = rx.recv().await {
+                                    logger.info(
+                                        format!("Receive wave from hyperway: from: {} to: {}",
+                                        wave.from().to_string(),
+                                        wave.to().to_string())
+                                    );
                                     call_tx
                                         .send_timeout(
                                             HyperwayInterchangeCall::Wave(wave),
@@ -495,40 +518,47 @@ impl HyperwayInterchange {
                         HyperwayInterchangeCall::Remove(point) => {
                             hyperways.remove(&point);
                         }
-                        HyperwayInterchangeCall::Wave(wave) => match wave.to().single_or() {
-                            Ok(to) => match hyperways.get(&to) {
-                                None => {}
-                                Some(hyperway) => {
-                                    hyperway.outbound.send(wave).await;
+                        HyperwayInterchangeCall::Wave(wave) => {
+
+                            match wave.to().single_or() {
+                                Ok(to) => match hyperways.get(&to) {
+                                    None => {}
+                                    Some(hyperway) => {
+
+                                        logger.info(
+                                            format!("Interchange wave sending to outbound from: {} to: {} ",
+                                                    wave.from().to_string(),
+                                                    wave.to().to_string()
+                                            )
+                                        );
+                                        hyperway.outbound.send(wave).await;
+                                    }
+                                },
+                                Err(_) => {
+                                    logger.warn("Hyperway Interchange cannot route Ripples, instead wrap in a Hop or Transport");
                                 }
-                            },
-                            Err(_) => {
-                                logger.warn("Hyperway Interchange cannot route Ripples, instead wrap in a Hop or Transport");
                             }
-                        },
+                        }
                         HyperwayInterchangeCall::Mount {
                             stub,
                             init_wave,
                             rtn,
-                        } => {
-
-                            match hyperways.get(&stub.remote) {
-                                None => {
-                                    logger.error(format!(
-                                        "hyperway {} not found",
-                                        stub.remote.to_string()
-                                    ));
-                                    rtn.send(Err(format!(
-                                        "hyperway {} not found",
-                                        stub.remote.to_string()
-                                    )
-                                    .into()));
-                                }
-                                Some(hyperway) => {
-                                    rtn.send(Ok(hyperway.mount(Some(init_wave)).await));
-                                }
+                        } => match hyperways.get(&stub.remote) {
+                            None => {
+                                logger.error(format!(
+                                    "hyperway {} not found",
+                                    stub.remote.to_string()
+                                ));
+                                rtn.send(Err(format!(
+                                    "hyperway {} not found",
+                                    stub.remote.to_string()
+                                )
+                                .into()));
                             }
-                        }
+                            Some(hyperway) => {
+                                rtn.send(Ok(hyperway.hyperway_endpoint_near(Some(init_wave)).await));
+                            }
+                        },
                     }
                 }
             });
@@ -537,7 +567,7 @@ impl HyperwayInterchange {
         Self {
             call_tx,
             logger,
-            singular_to: None
+            singular_to: None,
         }
     }
 
@@ -553,7 +583,7 @@ impl HyperwayInterchange {
         &self,
         stub: HyperwayStub,
         init_wave: UltraWave,
-    ) -> Result<HyperwayExt, MsgErr> {
+    ) -> Result<HyperwayEndpoint, MsgErr> {
         let call_tx = self.call_tx.clone();
         let (tx, rx) = oneshot::channel();
         call_tx
@@ -566,7 +596,7 @@ impl HyperwayInterchange {
         rx.await?
     }
 
-    pub fn singular_to( &mut self, to: Port ) {
+    pub fn singular_to(&mut self, to: Port) {
         self.singular_to.replace(to);
     }
 
@@ -574,6 +604,7 @@ impl HyperwayInterchange {
         if let Some(to) = self.singular_to.as_ref() {
             hyperway.transform_to(to.clone());
         }
+
         self.call_tx
             .send(HyperwayInterchangeCall::Internal(hyperway))
             .await;
@@ -894,13 +925,13 @@ impl VersionGate {
 
 #[async_trait]
 pub trait HyperGate: Send + Sync {
-    async fn knock(&self, knock: Knock) -> Result<HyperwayExt, HyperConnectionErr>;
+    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, HyperConnectionErr>;
 
     async fn jump(
         &self,
         kind: InterchangeKind,
         stub: HyperwayStub,
-    ) -> Result<HyperwayExt, HyperConnectionErr>;
+    ) -> Result<HyperwayEndpoint, HyperConnectionErr>;
 }
 
 pub struct HopRouter {
@@ -950,12 +981,12 @@ impl Router for HopRouter {
 
 pub struct HyperApi {
     greet: Greet,
-    hyperway: HyperwayExt,
+    hyperway: HyperwayEndpoint,
     exchanger: Exchanger,
 }
 
 impl HyperApi {
-    pub fn new(hyperway: HyperwayExt, greet: Greet) -> Self {
+    pub fn new(hyperway: HyperwayEndpoint, greet: Greet) -> Self {
         let exchanger = Exchanger::new(greet.port.clone(), Default::default());
         Self {
             greet,
@@ -1001,7 +1032,7 @@ impl HyperGateSelector {
 
 #[async_trait]
 impl HyperGate for HyperGateSelector {
-    async fn knock(&self, knock: Knock) -> Result<HyperwayExt, HyperConnectionErr> {
+    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, HyperConnectionErr> {
         if let Some(gate) = self.map.get(&knock.kind) {
             gate.value().knock(knock).await
         } else {
@@ -1016,7 +1047,7 @@ impl HyperGate for HyperGateSelector {
         &self,
         kind: InterchangeKind,
         stub: HyperwayStub,
-    ) -> Result<HyperwayExt, HyperConnectionErr> {
+    ) -> Result<HyperwayEndpoint, HyperConnectionErr> {
         self.map
             .get(&kind)
             .ok_or(HyperConnectionErr::Fatal(format!(
@@ -1029,16 +1060,14 @@ impl HyperGate for HyperGateSelector {
     }
 }
 
-pub trait HyperwayConfigurator:  Send + Sync {
+pub trait HyperwayConfigurator: Send + Sync {
     fn config(&self, greet: &Greet, hyperway: &mut Hyperway);
 }
 
 pub struct DefaultHyperwayConfigurator;
 
 impl HyperwayConfigurator for DefaultHyperwayConfigurator {
-    fn config(&self, greet: &Greet, hyperway: &mut Hyperway) {
-
-    }
+    fn config(&self, greet: &Greet, hyperway: &mut Hyperway) {}
 }
 
 #[derive(Clone)]
@@ -1046,19 +1075,19 @@ pub struct InterchangeGate<A, G, C>
 where
     A: HyperAuthenticator,
     G: HyperGreeter,
-    C: HyperwayConfigurator
+    C: HyperwayConfigurator,
 {
     logger: PointLogger,
     auth: A,
     greeter: G,
     interchange: Arc<HyperwayInterchange>,
-    configurator: C
+    configurator: C,
 }
 impl<A, G, C> InterchangeGate<A, G, C>
 where
     A: HyperAuthenticator,
     G: HyperGreeter,
-    C: HyperwayConfigurator
+    C: HyperwayConfigurator,
 {
     pub fn new(
         auth: A,
@@ -1081,11 +1110,11 @@ impl<A, G, C> InterchangeGate<A, G, C>
 where
     A: HyperAuthenticator,
     G: HyperGreeter,
-    C: HyperwayConfigurator
+    C: HyperwayConfigurator,
 {
-    async fn enter(&self, greet: Greet) -> Result<HyperwayExt, HyperConnectionErr> {
+    async fn enter(&self, greet: Greet) -> Result<HyperwayEndpoint, HyperConnectionErr> {
         let mut hyperway = Hyperway::new(greet.port.clone(), greet.agent.clone());
-        self.configurator.config(&greet, & mut hyperway );
+        self.configurator.config(&greet, &mut hyperway);
 
         self.interchange.add(hyperway).await;
 
@@ -1120,7 +1149,7 @@ where
     G: HyperGreeter,
     C: HyperwayConfigurator,
 {
-    async fn knock(&self, knock: Knock) -> Result<HyperwayExt, HyperConnectionErr> {
+    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, HyperConnectionErr> {
         let stub = self.auth.auth(knock).await?;
         let greet = self.greeter.greet(stub).await?;
         self.enter(greet).await
@@ -1130,7 +1159,7 @@ where
         &self,
         _kind: InterchangeKind,
         stub: HyperwayStub,
-    ) -> Result<HyperwayExt, HyperConnectionErr> {
+    ) -> Result<HyperwayEndpoint, HyperConnectionErr> {
         let greet = self.greeter.greet(stub).await?;
         self.enter(greet).await
     }
@@ -1167,7 +1196,7 @@ where
         }
     }
 
-    async fn enter(&self, greet: Greet) -> Result<HyperwayExt, HyperConnectionErr> {
+    async fn enter(&self, greet: Greet) -> Result<HyperwayEndpoint, HyperConnectionErr> {
         let stub = HyperwayStub::new(greet.port.clone(), greet.agent.clone());
         let ext = self.interchange.mount(stub, greet.into()).await?;
 
@@ -1181,7 +1210,7 @@ where
     A: HyperAuthenticator,
     G: HyperGreeter,
 {
-    async fn knock(&self, knock: Knock) -> Result<HyperwayExt, HyperConnectionErr> {
+    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, HyperConnectionErr> {
         let stub = self.auth.auth(knock).await?;
         let greet = self.greeter.greet(stub).await?;
         let ext = self.enter(greet).await?;
@@ -1192,7 +1221,7 @@ where
         &self,
         _kind: InterchangeKind,
         stub: HyperwayStub,
-    ) -> Result<HyperwayExt, HyperConnectionErr> {
+    ) -> Result<HyperwayEndpoint, HyperConnectionErr> {
         let greet = self.greeter.greet(stub).await?;
         let ext = self.enter(greet).await?;
         Ok(ext)
@@ -1206,13 +1235,13 @@ pub struct HyperClient {
     to_client_listener_tx: broadcast::Sender<UltraWave>,
     logger: PointLogger,
     greet_rx: watch::Receiver<Option<Greet>>,
-    exchanger: Exchanger
+    exchanger: Exchanger,
 }
 
 impl HyperClient {
     pub fn new(
         stub: HyperwayStub,
-        factory: Box<dyn HyperwayExtFactory>,
+        factory: Box<dyn HyperwayEndpointFactory>,
         logger: PointLogger,
     ) -> Result<HyperClient, MsgErr> {
         let (to_client_listener_tx, _) = broadcast::channel(1024);
@@ -1248,7 +1277,7 @@ impl HyperClient {
 
         let (greet_tx, greet_rx) = watch::channel(None);
 
-        let exchanger = Exchanger::new( stub.remote.clone(), Timeouts::default() );
+        let exchanger = Exchanger::new(stub.remote.clone(), Timeouts::default());
 
         let mut client = Self {
             stub,
@@ -1257,7 +1286,7 @@ impl HyperClient {
             to_client_listener_tx: to_client_listener_tx.clone(),
             logger: logger.clone(),
             greet_rx,
-            exchanger: exchanger.clone()
+            exchanger: exchanger.clone(),
         };
 
         {
@@ -1376,31 +1405,35 @@ impl HyperClient {
                         if wave.is_directed() {
                             to_client_listener_tx.send(wave)?;
                         } else {
-                            exchanger.reflected( wave.to_reflected()? ).await?;
+                            exchanger.reflected(wave.to_reflected()?).await?;
                         }
                     }
                     Ok(())
                 }
 
-                        relay(
-                            from_runner_rx,
-                            to_client_listener_tx,
-                            status_tx,
-                            greet_tx,
-                            exchanger,
-                            logger.clone(),
-                        )
-                        .await.unwrap_or_default();
+                relay(
+                    from_runner_rx,
+                    to_client_listener_tx,
+                    status_tx,
+                    greet_tx,
+                    exchanger,
+                    logger.clone(),
+                )
+                .await
+                .unwrap_or_default();
             });
         }
 
         Ok(client)
     }
 
-    pub async fn proto_transmitter_builder(&self) -> Result<ProtoTransmitterBuilder,MsgErr> {
+    pub async fn proto_transmitter_builder(&self) -> Result<ProtoTransmitterBuilder, MsgErr> {
         self.wait_for_ready(Duration::from_secs(30)).await?;
-        let mut builder = ProtoTransmitterBuilder::new( Arc::new(self.router()), self.exchanger.clone() );
-        let greet = self.get_greeting().ok_or::<MsgErr>("expected greeting to already be set in HyperClient".into())?;
+        let mut builder =
+            ProtoTransmitterBuilder::new(Arc::new(self.router()), self.exchanger.clone());
+        let greet = self
+            .get_greeting()
+            .ok_or::<MsgErr>("expected greeting to already be set in HyperClient".into())?;
         builder.agent = SetStrategy::Fill(greet.agent.clone());
         builder.from = SetStrategy::Fill(greet.port.clone());
         Ok(builder)
@@ -1491,7 +1524,7 @@ pub enum HyperClientStatus {
     Ready,
     Panic,
     Fatal,
-    Closed
+    Closed,
 }
 
 pub enum HyperClientCall {
@@ -1519,8 +1552,8 @@ impl From<MsgErr> for HyperConnectionErr {
 }
 
 pub struct HyperClientRunner {
-    ext: Option<HyperwayExt>,
-    factory: Box<dyn HyperwayExtFactory>,
+    ext: Option<HyperwayEndpoint>,
+    factory: Box<dyn HyperwayEndpointFactory>,
     status_tx: mpsc::Sender<HyperClientStatus>,
     to_client_tx: mpsc::Sender<UltraWave>,
     from_client_rx: mpsc::Receiver<UltraWave>,
@@ -1529,7 +1562,7 @@ pub struct HyperClientRunner {
 
 impl HyperClientRunner {
     pub fn new(
-        factory: Box<dyn HyperwayExtFactory>,
+        factory: Box<dyn HyperwayEndpointFactory>,
         from_client_rx: mpsc::Receiver<UltraWave>,
         status_tx: mpsc::Sender<HyperClientStatus>,
         logger: PointLogger,
@@ -1678,8 +1711,8 @@ impl HyperClientRunner {
 }
 
 #[async_trait]
-pub trait HyperwayExtFactory: Send + Sync {
-    async fn create(&self) -> Result<HyperwayExt, HyperConnectionErr>;
+pub trait HyperwayEndpointFactory: Send + Sync {
+    async fn create(&self) -> Result<HyperwayEndpoint, HyperConnectionErr>;
 }
 
 pub struct LocalHyperwayGateUnlocker {
@@ -1695,8 +1728,8 @@ impl LocalHyperwayGateUnlocker {
 }
 
 #[async_trait]
-impl HyperwayExtFactory for LocalHyperwayGateUnlocker {
-    async fn create(&self) -> Result<HyperwayExt, HyperConnectionErr> {
+impl HyperwayEndpointFactory for LocalHyperwayGateUnlocker {
+    async fn create(&self) -> Result<HyperwayEndpoint, HyperConnectionErr> {
         self.gate.knock(self.knock.clone()).await
     }
 }
@@ -1714,8 +1747,8 @@ impl LocalHyperwayGateJumper {
 }
 
 #[async_trait]
-impl HyperwayExtFactory for LocalHyperwayGateJumper {
-    async fn create(&self) -> Result<HyperwayExt, HyperConnectionErr> {
+impl HyperwayEndpointFactory for LocalHyperwayGateJumper {
+    async fn create(&self) -> Result<HyperwayEndpoint, HyperConnectionErr> {
         self.gate.jump(self.kind.clone(), self.stub.clone()).await
     }
 }
@@ -1834,7 +1867,7 @@ pub mod test {
     use crate::{
         AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, HyperClient,
         HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter, HyperRouter, Hyperlane,
-        Hyperway, HyperwayExt, HyperwayExtFactory, HyperwayInterchange, HyperwayStub,
+        Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub,
         InterchangeGate, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate,
         TokenAuthenticatorWithRemoteWhitelist,
     };
@@ -2006,9 +2039,9 @@ pub mod test {
         }
 
         #[async_trait]
-        impl HyperwayExtFactory for TestFactory {
-            async fn create(&self) -> Result<HyperwayExt, HyperConnectionErr> {
-                Ok(self.hyperway.mount(None).await)
+        impl HyperwayEndpointFactory for TestFactory {
+            async fn create(&self) -> Result<HyperwayEndpoint, HyperConnectionErr> {
+                Ok(self.hyperway.hyperway_endpoint_near(None).await)
             }
         }
 
@@ -2072,8 +2105,12 @@ pub mod test {
             logger.push_point("interchange").unwrap(),
         ));
 
-        interchange.add(Hyperway::new(LESS.clone().to_port(), LESS.to_agent())).await;
-        interchange.add(Hyperway::new(FAE.clone().to_port(), FAE.to_agent())).await;
+        interchange
+            .add(Hyperway::new(LESS.clone().to_port(), LESS.to_agent()))
+            .await;
+        interchange
+            .add(Hyperway::new(FAE.clone().to_port(), FAE.to_agent()))
+            .await;
 
         let auth = AnonHyperAuthenticator::new();
         let gate = Arc::new(MountInterchangeGate::new(
