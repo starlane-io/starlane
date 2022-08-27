@@ -33,7 +33,7 @@ use cosmic_api::wave::{Agent, Bounce, BounceBacks, CmdMethod, CoreBounce, Direct
 use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
 use cosmic_api::ArtRef;
 use cosmic_api::{MountKind, Registration, State, StateFactory, HYPERUSER};
-use cosmic_hyperlane::{HyperClient, HyperRouter, HyperwayEndpoint, HyperwayInterchange};
+use cosmic_hyperlane::{HyperClient, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayInterchange};
 use dashmap::mapref::one::{Ref, RefMut};
 use dashmap::DashMap;
 use futures::future::{join_all, BoxFuture};
@@ -786,10 +786,15 @@ println!("Hyperway Relay terminated!!!");
                 for con in &skel.template.connections {
                     if let StarCon::Connector(stub) = con {
                         let skel = skel.clone();
+                        let mut hyperway = Hyperway::new(stub.key.to_port().with_layer(Layer::Gravity), Agent::HyperUser);
+                        let endpoint = hyperway.hyperway_endpoint_far(None).await;
+                        interchange.add(hyperway).await;
+
                         match skel.machine.api.client(skel.key.clone(), stub.key.clone()).await{
                             Ok(client) => {
                                 while let Ok(wave) = client.rx().recv().await {
                                     logger.info(format!("CLIENT received wave from: {} to: {}", wave.from().to_string(), wave.to().to_string()));
+                                    endpoint.tx.send(wave).await.unwrap();
                                 }
                             }
                             Err(err) => {

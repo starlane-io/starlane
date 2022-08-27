@@ -63,7 +63,7 @@ pub struct Hyperway {
 
 impl Hyperway {
     pub fn new(remote: Port, agent: Agent) -> Self {
-        let mut inbound = Hyperlane::new("inbound");
+        let mut inbound = Hyperlane::new(format!("{}<Inbound>",remote.to_string()));
         inbound
             .tx
             .try_send(HyperlaneCall::Transform(Box::new(FromTransform::new(
@@ -75,8 +75,8 @@ impl Hyperway {
                 agent,
             ))));
         Self {
+            outbound: Hyperlane::new(format!("{}<Outbound>",remote.to_string())),
             remote,
-            outbound: Hyperlane::new("outbound"),
             inbound,
             #[cfg(test)]
             diagnostic: HyperwayDiagnostic::new(),
@@ -99,8 +99,8 @@ impl Hyperway {
         let drop_tx = None;
 
         HyperwayEndpoint {
-            tx: self.inbound.tx(),
-            rx: self.outbound.rx(init_wave).await,
+            tx: self.outbound.tx(),
+            rx: self.inbound.rx(init_wave).await,
             drop_tx,
         }
     }
@@ -121,11 +121,24 @@ impl Hyperway {
 
     pub async fn hyperway_endpoint_far(
         &self,
+        init_wave:Option<UltraWave>
     ) -> HyperwayEndpoint {
         HyperwayEndpoint {
             tx: self.inbound.tx(),
-            rx: self.outbound.rx(None).await,
+            rx: self.outbound.rx(init_wave).await,
             drop_tx: None,
+        }
+    }
+
+    pub async fn hyperway_endpoint_far_drop_event(
+        &self,
+        init_wave:Option<UltraWave>,
+        drop_tx: oneshot::Sender<()>,
+    ) -> HyperwayEndpoint {
+        HyperwayEndpoint {
+            tx: self.inbound.tx(),
+            rx: self.outbound.rx(init_wave).await,
+            drop_tx: Some(drop_tx),
         }
     }
 }
@@ -356,16 +369,18 @@ pub struct Hyperlane {
     tx: mpsc::Sender<HyperlaneCall>,
     #[cfg(test)]
     eavesdrop_tx: broadcast::Sender<UltraWave>,
-    label: &'static str,
+    label: String
 }
 
 impl Hyperlane {
-    pub fn new(label: &'static str) -> Self {
+    pub fn new<S:ToString>(label: S) -> Self {
         #[cfg(test)]
         let (eavesdrop_tx, _) = broadcast::channel(16);
+        let label = label.to_string();
 
         let (tx, mut rx) = mpsc::channel(1024);
         {
+            let label = label.clone();
             let tx = tx.clone();
             #[cfg(test)]
             let eavesdrop_tx = eavesdrop_tx.clone();
@@ -422,7 +437,9 @@ impl Hyperlane {
                                         #[cfg(test)]
                                         eavesdrop_tx.send(wave_cp);
                                     }
-                                    Err(err) => {
+                                    Err(err) =>
+                                        {
+println!("ERR:/// {}",err.to_string());
                                         tx.send(HyperlaneCall::ResetExt).await;
                                         tx.try_send(HyperlaneCall::Wave(err.0));
                                     }
@@ -556,7 +573,8 @@ impl HyperwayInterchange {
                                 .into()));
                             }
                             Some(hyperway) => {
-                                rtn.send(Ok(hyperway.hyperway_endpoint_near(Some(init_wave)).await));
+logger.warn(format!("~~~ Mouting hyperway: {}",hyperway.remote.to_string()));
+                                rtn.send(Ok(hyperway.hyperway_endpoint_far(Some(init_wave)).await));
                             }
                         },
                     }
@@ -1199,7 +1217,6 @@ where
     async fn enter(&self, greet: Greet) -> Result<HyperwayEndpoint, HyperConnectionErr> {
         let stub = HyperwayStub::new(greet.port.clone(), greet.agent.clone());
         let ext = self.interchange.mount(stub, greet.into()).await?;
-
         Ok(ext)
     }
 }
@@ -1380,6 +1397,7 @@ impl HyperClient {
                                     }
                                 }
                                 if let Substance::Greet(greet) = &reflected.core().body {
+logger.info("$$$ Received Greet!");
                                     greet_tx.send(Some(greet.clone()));
                                 } else {
                                     status_tx
@@ -1402,9 +1420,12 @@ impl HyperClient {
                     }
 
                     while let Some(wave) = from_runner_rx.recv().await {
+logger.info(format!("received wave on client : from: {} to: {}", wave.from().to_string(), wave.to().to_string()));
                         if wave.is_directed() {
                             to_client_listener_tx.send(wave)?;
                         } else {
+
+logger.info(format!("received REFLECTED on client : from: {} to: {}", wave.from().to_string(), wave.to().to_string()));
                             exchanger.reflected(wave.to_reflected()?).await?;
                         }
                     }
@@ -1425,6 +1446,10 @@ impl HyperClient {
         }
 
         Ok(client)
+    }
+
+    pub fn exchanger(&self) -> Exchanger {
+        self.exchanger.clone()
     }
 
     pub async fn proto_transmitter_builder(&self) -> Result<ProtoTransmitterBuilder, MsgErr> {
@@ -2041,7 +2066,7 @@ pub mod test {
         #[async_trait]
         impl HyperwayEndpointFactory for TestFactory {
             async fn create(&self) -> Result<HyperwayEndpoint, HyperConnectionErr> {
-                Ok(self.hyperway.hyperway_endpoint_near(None).await)
+                Ok(self.hyperway.hyperway_endpoint_far(None).await)
             }
         }
 
@@ -2141,11 +2166,11 @@ pub mod test {
         let mut fae_rx = fae_client.rx();
 
         let less_router = less_client.router();
-        let less_exchanger = Exchanger::new(LESS.clone().to_port(), Default::default());
+        let less_exchanger = less_client.exchanger();
         let less_transmitter = ProtoTransmitter::new(Arc::new(less_router), less_exchanger.clone());
 
         let fae_router = fae_client.router();
-        let fae_exchanger = Exchanger::new(FAE.clone().to_port(), Default::default());
+        let fae_exchanger = fae_client.exchanger();
         let fae_transmitter = ProtoTransmitter::new(Arc::new(fae_router), fae_exchanger.clone());
 
         {
@@ -2165,16 +2190,6 @@ pub mod test {
             });
         }
 
-        {
-            let less_exchanger = less_exchanger.clone();
-            tokio::spawn(async move {
-                let wave = less_rx.recv().await.unwrap();
-                if !wave.is_directed() {
-                    less_exchanger.reflected(wave.to_reflected().unwrap()).await;
-                }
-            });
-        }
-
         let (rtn, mut rtn_rx) = oneshot::channel();
         tokio::spawn(async move {
             let mut hello = DirectedProto::ping();
@@ -2184,6 +2199,7 @@ pub mod test {
             hello.method(MsgMethod::new("Hello").unwrap());
             hello.body(Substance::Empty);
             let pong: Wave<Pong> = less_transmitter.direct(hello).await.unwrap();
+   println!("LESS RECEIVED STATUS: {}", pong.core.status.to_string());
             rtn.send(pong.core.status.as_u16() == 200u16);
         });
 

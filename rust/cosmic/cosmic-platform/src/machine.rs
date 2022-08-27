@@ -46,7 +46,7 @@ where
 
     pub async fn client(&self, from: StarKey, to: StarKey ) -> Result<HyperClient,P::Err> {
        let (rtn, mut rtn_rx) = oneshot::channel();
-       self.tx.send( MachineCall::Client { from, to, rtn });
+       self.tx.send( MachineCall::Client { from, to, rtn }).await;
        rtn_rx.await?
     }
 
@@ -56,7 +56,7 @@ where
         gate: Arc<dyn HyperGate>,
     ) -> Result<(), MsgErr> {
         let (rtn, rtn_rx) = oneshot::channel();
-        self.tx.send(MachineCall::AddGate { kind, gate, rtn }).await;
+        self.tx.send(MachineCall::AddGate { kind, gate, rtn }).await?;
         rtn_rx.await?
     }
 
@@ -212,7 +212,7 @@ println!("STAR TEMPLATES CREATE!");
             let mut hyperway = Hyperway::new(star_hop.clone(), Agent::HyperUser);
             hyperway.transform_inbound(Box::new(LayerTransform::new(Layer::Gravity)));
 
-            let hyperway_endpoint = hyperway.hyperway_endpoint_far().await;
+            let hyperway_endpoint = hyperway.hyperway_endpoint_far(None).await;
             interchange.add(hyperway).await;
             interchange.singular_to(star_port.clone());
 
@@ -409,6 +409,7 @@ println!("STAR CREATED: {}", star_point.to_string());
                     let stub = HyperwayStub::new( to.to_port().with_layer(Layer::Gravity), Agent::HyperUser );
                     let logger = self.skel.logger.point( from.to_point() );
                     let factory = Box::new(MachineHyperwayEndpointFactory::new( from, to, self.call_tx.clone() ));
+println!("^^^Rtn HyperClient");
                     rtn.send(HyperClient::new(stub, factory, logger ).map_err(|e|P::Err::from(e))).unwrap_or_default();
                 }
                 #[cfg(test)]

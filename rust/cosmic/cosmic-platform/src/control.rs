@@ -142,7 +142,7 @@ where
         let auth = AnonHyperAuthenticatorAssignEndPoint::new(remote_point_factory, self.skel.driver.logger.clone() );
         let mut interchange = HyperwayInterchange::new(self.skel.driver.logger.clone());
         let hyperway = Hyperway::new(Point::remote_endpoint().to_port(), Agent::HyperUser);
-        let mut hyperway_endpoint = hyperway.hyperway_endpoint_far().await;
+        let mut hyperway_endpoint = hyperway.hyperway_endpoint_far(None).await;
         interchange.add(hyperway).await;
         interchange.singular_to(Point::remote_endpoint().to_port());
         let interchange = Arc::new(interchange);
