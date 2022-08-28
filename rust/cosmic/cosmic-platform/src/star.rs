@@ -33,7 +33,7 @@ use cosmic_api::wave::{Agent, Bounce, BounceBacks, CmdMethod, CoreBounce, Direct
 use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
 use cosmic_api::ArtRef;
 use cosmic_api::{MountKind, Registration, State, StateFactory, HYPERUSER};
-use cosmic_hyperlane::{HyperClient, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayInterchange};
+use cosmic_hyperlane::{HyperClient, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayInterchange, HyperwayStub};
 use dashmap::mapref::one::{Ref, RefMut};
 use dashmap::DashMap;
 use futures::future::{join_all, BoxFuture};
@@ -557,7 +557,7 @@ where
     pub async fn wrangle(&self) -> Result<StarWrangles, MsgErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.tx.send(StarCall::Wrangle(rtn)).await?;
-        tokio::time::timeout(Duration::from_secs(1), rtn_rx).await??
+        tokio::time::timeout(Duration::from_secs(5), rtn_rx).await??
     }
 
     pub async fn from_hyperway(&self, wave: UltraWave, results: bool) -> Result<(), MsgErr> {
@@ -657,6 +657,7 @@ where
             star_tx.drivers_status_tx.take().unwrap(),
             star_tx.drivers_status_rx.clone(),
         );
+
 
         let star_rx = star_tx.call_rx.take().unwrap();
         let star_tx = star_tx.call_tx;
@@ -779,30 +780,50 @@ println!("Hyperway Relay terminated!!!");
 
         let status_rx = skel.status_rx.clone();
 
+        if skel.kind == StarSub::Central
         {
             let skel = skel.clone();
             tokio::spawn(async move {
                 let logger = skel.logger.push_mark("client-connect").unwrap();
                 for con in &skel.template.connections {
                     if let StarCon::Connector(stub) = con {
-                        let skel = skel.clone();
-                        let mut hyperway = Hyperway::new(stub.key.to_port().with_layer(Layer::Gravity), Agent::HyperUser);
-                        let endpoint = hyperway.hyperway_endpoint_far(None).await;
-                        interchange.add(hyperway).await;
 
+                        let hyperstub = HyperwayStub {
+                            agent: Agent::HyperUser,
+                            remote: stub.key.to_port().with_layer(Layer::Gravity)
+                        };
+                        let mut endpoint = interchange.mount(hyperstub,None).await.unwrap();
+
+                        let skel = skel.clone();
                         match skel.machine.api.client(skel.key.clone(), stub.key.clone()).await{
                             Ok(client) => {
-                                while let Ok(wave) = client.rx().recv().await {
+logger.info("got hyper client...wait for ready");
+                                client.wait_for_ready(Duration::from_secs(60)).await;
+logger.info("CLIENT READY");
+                                let mut client_rx = client.rx();
+
+                                let endpoint_tx = endpoint.tx.clone();
+                                let router = client.router();
+                                {
+                                    let logger = logger.clone();
+                                    tokio::spawn(async move {
+                                        while let Some(wave) = endpoint.rx.recv().await {
+                                            logger.info(format!("CLIENT forwarding wave from {} to {}", wave.from().to_string(), wave.to().to_string()));
+                                            router.route(wave).await;
+                                        }
+                                    });
+                                }
+                                while let Ok(wave) = client_rx.recv().await {
                                     logger.info(format!("CLIENT received wave from: {} to: {}", wave.from().to_string(), wave.to().to_string()));
-                                    endpoint.tx.send(wave).await.unwrap();
+                                    endpoint_tx.send(wave).await.unwrap();
                                 }
                             }
                             Err(err) => {
                                 logger.error(format!("{}",err.to_string()));
                             }
                         };
-                        println!("Created CLIENT");
 
+                        println!("Created CLIENT");
                     }
                 }
             });
@@ -1042,9 +1063,10 @@ println!("~~~ SHARDING Ripple ...");
                             transport.from(skel.point.clone().to_port());
                             let transport = transport.build()?;
                             let transport = transport.to_signal()?;
-println!("Ripple To Hyperway: {}", transport.to.to_string());
-                            skel.api.to_hyperway(transport).await;
-break;
+if transport.to.to_string().contains("central:central") {
+    println!("Ripple To Hyperway: {}", transport.to.to_string());
+    skel.api.to_hyperway(transport).await;
+}
                         }
                     }
                     _ => {
@@ -2108,7 +2130,15 @@ where
         where
             E: Platform,
         {
-println!("Handle Search Request!!!");
+println!();
+println!();
+println!();
+println!();
+println!("--->   Handle Search Request!!!   <----");
+println!();
+println!();
+println!();
+println!();
             let discovery = Discovery {
                 star_kind: star.skel.kind.clone(),
                 hops: ctx.wave().hops(),
