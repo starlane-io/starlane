@@ -44,10 +44,10 @@ where
         Self { tx }
     }
 
-    pub async fn client(&self, from: StarKey, to: StarKey ) -> Result<HyperClient,P::Err> {
+    pub async fn endpoint_factory(&self, from: StarKey, to: StarKey ) -> Result<Box<dyn HyperwayEndpointFactory>,P::Err> {
        let (rtn, mut rtn_rx) = oneshot::channel();
-       self.tx.send( MachineCall::Client { from, to, rtn }).await;
-       rtn_rx.await?
+       self.tx.send( MachineCall::EndpointFactory { from, to, rtn }).await;
+       Ok(rtn_rx.await?)
     }
 
     pub async fn add_interchange(
@@ -214,11 +214,11 @@ println!("STAR TEMPLATES CREATE!");
 
             let hyperway_endpoint = hyperway.hyperway_endpoint_far(None).await;
             interchange.add(hyperway).await;
-            interchange.singular_to(star_port.clone());
+            interchange.singular_to(star_hop.clone() );
 
             let interchange = Arc::new(interchange);
             let auth = skel.platform.star_auth(&star_template.key)?;
-            let greeter = SimpleGreeter::new(star_hop, star_port.clone());
+            let greeter = SimpleGreeter::new(star_hop.clone(), star_port.clone());
             let gate: Arc<dyn HyperGate> = Arc::new(MountInterchangeGate::new(
                 auth,
                 greeter,
@@ -245,6 +245,7 @@ println!("STAR TEMPLATES CREATE!");
                             .to_point()
                             .to_port()
                             .with_layer(Layer::Gravity);
+println!("Adding Connection on {} for {}", star_hop.to_string(), star.to_string() );
                         let hyperway = Hyperway::new(star, Agent::HyperUser);
                         interchange.add(hyperway).await;
                     }
@@ -405,12 +406,10 @@ println!("STAR CREATED: {}", star_point.to_string());
                        rtn.send(logger.result_ctx("MachineCall::Knock",gate_selector.knock(knock).await));
                     });
                 }
-                MachineCall::Client { from, to, rtn } => {
-                    let stub = HyperwayStub::new( to.to_port().with_layer(Layer::Gravity), Agent::HyperUser );
-                    let logger = self.skel.logger.point( from.to_point() );
+                MachineCall::EndpointFactory { from, to, rtn } => {
                     let factory = Box::new(MachineHyperwayEndpointFactory::new( from, to, self.call_tx.clone() ));
 println!("^^^Rtn HyperClient");
-                    rtn.send(HyperClient::new(stub, factory, logger ).map_err(|e|P::Err::from(e))).unwrap_or_default();
+                    rtn.send(factory).unwrap_or_default();
                 }
                 #[cfg(test)]
                 MachineCall::GetMachineStar(rtn) => {
@@ -447,7 +446,7 @@ where
         knock: Knock,
         rtn: oneshot::Sender<Result<HyperwayEndpoint, HyperConnectionErr>>,
     },
-    Client { from: StarKey, to: StarKey, rtn: oneshot::Sender<Result<HyperClient,P::Err>> } ,
+    EndpointFactory { from: StarKey, to: StarKey, rtn: oneshot::Sender<Box<dyn HyperwayEndpointFactory>> } ,
     #[cfg(test)]
     GetMachineStar(oneshot::Sender<StarApi<P>>),
     #[cfg(test)]

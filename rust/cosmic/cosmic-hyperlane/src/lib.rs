@@ -205,6 +205,7 @@ pub struct HyperwayStub {
     pub remote: Port,
 }
 
+
 impl From<Greet> for HyperwayStub {
     fn from(greet: Greet) -> Self {
         Self {
@@ -517,7 +518,7 @@ impl HyperwayInterchange {
                 while let Some(call) = call_rx.recv().await {
                     match call {
                         HyperwayInterchangeCall::Internal(hyperway) => {
-println!("Adding internal : hyperway.remote {} ",hyperway.remote.to_string());
+logger.info(format!("Adding internal : hyperway.remote {} ",hyperway.remote.to_string()));
                             let mut rx = hyperway.inbound.rx(None).await;
                             hyperways.insert(hyperway.remote.clone(), hyperway);
                             let call_tx = call_tx.clone();
@@ -1261,29 +1262,28 @@ where
     }
 }
 
-pub struct HyperClient<F> where F: HyperwayEndpointFactory {
+pub struct HyperClient {
     tx: mpsc::Sender<UltraWave>,
     status_rx: watch::Receiver<HyperConnectionStatus>,
     to_client_listener_tx: broadcast::Sender<UltraWave>,
     logger: PointLogger,
     greet_rx: watch::Receiver<Option<Greet>>,
     exchanger: Option<Exchanger>,
-    phantom: PhantomData<F>
 }
 
-impl <F> HyperClient<F> where F: HyperwayEndpointFactory + 'static {
+impl HyperClient where{
     pub fn new(
-        factory: F,
+        factory:  Box<dyn HyperwayEndpointFactory>,
         logger: PointLogger,
-    ) -> Result<HyperClient<F>, MsgErr> {
+    ) -> Result<HyperClient, MsgErr> {
         Self::new_with_exchanger(factory,None,logger)
     }
 
     pub fn new_with_exchanger(
-        factory: F,
+        factory: Box<dyn HyperwayEndpointFactory>,
         exchanger: Option<Exchanger>,
         logger: PointLogger,
-    ) -> Result<HyperClient<F>, MsgErr> {
+    ) -> Result<HyperClient, MsgErr> {
         let (to_client_listener_tx, _) = broadcast::channel(1024);
         let (to_hyperway_tx, from_client_rx) = mpsc::channel(1024);
         let (status_watch_tx, mut status_rx) = watch::channel(HyperConnectionStatus::Pending);
@@ -1324,7 +1324,6 @@ impl <F> HyperClient<F> where F: HyperwayEndpointFactory + 'static {
             logger: logger.clone(),
             greet_rx,
             exchanger: exchanger.clone(),
-            phantom: PhantomData::default()
         };
 
         {
@@ -1598,18 +1597,18 @@ impl From<MsgErr> for HyperConnectionErr {
     }
 }
 
-pub struct HyperClientRunner<F> where F: HyperwayEndpointFactory {
+pub struct HyperClientRunner{
     ext: Option<HyperwayEndpoint>,
-    factory: F,
+    factory: Box<dyn HyperwayEndpointFactory>,
     status_tx: mpsc::Sender<HyperConnectionStatus>,
     to_client_tx: mpsc::Sender<UltraWave>,
     from_client_rx: mpsc::Receiver<UltraWave>,
     logger: PointLogger,
 }
 
-impl <F> HyperClientRunner<F> where F: HyperwayEndpointFactory+'static{
+impl HyperClientRunner{
     pub fn new(
-        factory: F,
+        factory: Box<dyn HyperwayEndpointFactory>,
         from_client_rx: mpsc::Receiver<UltraWave>,
         status_tx: mpsc::Sender<HyperConnectionStatus>,
         logger: PointLogger,
@@ -1639,7 +1638,7 @@ impl <F> HyperClientRunner<F> where F: HyperwayEndpointFactory+'static{
             .unwrap_or_default();
 
         loop {
-            async fn connect<F>(runner: &mut HyperClientRunner<F>) -> Result<(), HyperConnectionErr> where F: HyperwayEndpointFactory{
+            async fn connect(runner: &mut HyperClientRunner) -> Result<(), HyperConnectionErr> {
                 if let Err(_) = runner.status_tx.send(HyperConnectionStatus::Connecting).await {
                     return Err(HyperConnectionErr::Fatal("can no longer update HyperClient status (probably due to previous Fatal status)".to_string()));
                 }
@@ -1668,7 +1667,7 @@ impl <F> HyperClientRunner<F> where F: HyperwayEndpointFactory+'static{
                 }
             }
 
-            async fn relay<F>(runner: &mut HyperClientRunner<F>) -> Result<(), MsgErr> where F: HyperwayEndpointFactory{
+            async fn relay(runner: &mut HyperClientRunner) -> Result<(), MsgErr> {
                 let ext = runner
                     .ext
                     .as_mut()
@@ -1839,14 +1838,14 @@ impl HyperwayExtFactory for DirectInterchangeMountHyperwayExtFactory {
  */
 
 // connects two interchanges one local, the other via client
-pub struct Bridge<F> where F: HyperwayEndpointFactory {
-    client: HyperClient<F>
+pub struct Bridge{
+    client: HyperClient
 }
 
-impl <F> Bridge<F> where F: HyperwayEndpointFactory+'static {
+impl Bridge {
     pub fn new(
         mut local_hyperway_endpoint: HyperwayEndpoint,
-        remote_factory: F,
+        remote_factory: Box<dyn HyperwayEndpointFactory>,
         logger: PointLogger,
     ) -> Result<Self,MsgErr> {
 
@@ -1855,6 +1854,7 @@ impl <F> Bridge<F> where F: HyperwayEndpointFactory+'static {
         let local_hyperway_endpoint_tx = local_hyperway_endpoint.tx.clone();
         tokio::spawn( async move {
             while let Some(wave) = local_hyperway_endpoint.rx.recv().await {
+println!("BRIDGE routing from LOCAL -> CLIENT from: {} to {}", wave.from().to_string(), wave.to().to_string() );
                 client_router.route(wave).await;
             }
         });
@@ -1862,6 +1862,7 @@ impl <F> Bridge<F> where F: HyperwayEndpointFactory+'static {
         let mut rx = client.rx();
         tokio::spawn( async move {
             while let Ok(wave) = rx.recv().await {
+println!("BRIDGE routing from CLIENT -> LOCAL from: {} to {}", wave.from().to_string(), wave.to().to_string() );
                 local_hyperway_endpoint_tx.send(wave).await;
             }
         });
@@ -2132,7 +2133,7 @@ pub mod test {
         }
 
         {
-            let factory = TestFactory::new();
+            let factory = Box::new(TestFactory::new());
             let mut inbound_rx = factory.inbound_rx().await;
             let root_logger = RootLogger::default();
             let logger = root_logger.point(Point::from_str("client").unwrap());
@@ -2158,7 +2159,7 @@ pub mod test {
         }
 
         {
-            let factory = TestFactory::new();
+            let factory = Box::new(TestFactory::new());
             let outbound_tx = factory.outbound_tx();
             let root_logger = RootLogger::default();
             let logger = root_logger.point(Point::from_str("client").unwrap());
@@ -2207,9 +2208,9 @@ pub mod test {
         gates.insert(InterchangeKind::Singleton, gate);
         let gate = Arc::new(HyperGateSelector::new(gates));
 
-        let less_factory = LocalHyperwayGateUnlocker::new(LESS.clone().to_port(), gate.clone());
+        let less_factory = Box::new(LocalHyperwayGateUnlocker::new(LESS.clone().to_port(), gate.clone()));
 
-        let fae_factory = LocalHyperwayGateUnlocker::new(FAE.clone().to_port(), gate.clone());
+        let fae_factory = Box::new(LocalHyperwayGateUnlocker::new(FAE.clone().to_port(), gate.clone()));
 
         let less_exchanger = Exchanger::new( LESS.push("exchanger").unwrap().to_port(), Timeouts::default() );
         let fae_exchanger = Exchanger::new( FAE.push("exchanger").unwrap().to_port(), Timeouts::default() );
@@ -2307,7 +2308,7 @@ pub mod test {
         }
 
         let fae_endpoint_from_less = less_interchange.mount( HyperwayStub { remote: FAE.to_port().with_layer(Layer::Core), agent: Agent::HyperUser }, None ).await.unwrap();
-        let fae_factory = LocalHyperwayGateUnlocker::new(LESS.clone().to_port(), fae_gate.clone());
+        let fae_factory = Box::new(LocalHyperwayGateUnlocker::new(LESS.clone().to_port(), fae_gate.clone()));
         let logger = RootLogger::default().point( Point::from_str("bridge").unwrap());
         let bridge = Bridge::new(fae_endpoint_from_less, fae_factory, logger );
 

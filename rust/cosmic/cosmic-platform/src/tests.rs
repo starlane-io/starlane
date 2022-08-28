@@ -860,7 +860,7 @@ fn test_control() -> Result<(), TestErr> {
             logger: logger.clone(),
         };
 
-        let client = HyperClient::new(stub, Box::new(factory), logger).unwrap();
+        let client = HyperClient::new(Box::new(factory), logger).unwrap();
         let transmitter = client.proto_transmitter_builder().await?;
         let greet = client.get_greeting().expect("expected greeting");
         let transmitter = transmitter.build();

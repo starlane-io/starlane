@@ -33,7 +33,7 @@ use cosmic_api::wave::{Agent, Bounce, BounceBacks, CmdMethod, CoreBounce, Direct
 use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
 use cosmic_api::ArtRef;
 use cosmic_api::{MountKind, Registration, State, StateFactory, HYPERUSER};
-use cosmic_hyperlane::{HyperClient, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayInterchange, HyperwayStub};
+use cosmic_hyperlane::{Bridge, HyperClient, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub};
 use dashmap::mapref::one::{Ref, RefMut};
 use dashmap::DashMap;
 use futures::future::{join_all, BoxFuture};
@@ -787,43 +787,31 @@ println!("Hyperway Relay terminated!!!");
                 let logger = skel.logger.push_mark("client-connect").unwrap();
                 for con in &skel.template.connections {
                     if let StarCon::Connector(stub) = con {
-
-                        let hyperstub = HyperwayStub {
-                            agent: Agent::HyperUser,
-                            remote: stub.key.to_port().with_layer(Layer::Gravity)
-                        };
-                        let mut endpoint = interchange.mount(hyperstub,None).await.unwrap();
-
-                        let skel = skel.clone();
-                        match skel.machine.api.client(skel.key.clone(), stub.key.clone()).await{
-                            Ok(client) => {
-logger.info("got hyper client...wait for ready");
-                                client.wait_for_ready(Duration::from_secs(60)).await;
-logger.info("CLIENT READY");
-                                let mut client_rx = client.rx();
-
-                                let endpoint_tx = endpoint.tx.clone();
-                                let router = client.router();
-                                {
-                                    let logger = logger.clone();
-                                    tokio::spawn(async move {
-                                        while let Some(wave) = endpoint.rx.recv().await {
-                                            logger.info(format!("CLIENT forwarding wave from {} to {}", wave.from().to_string(), wave.to().to_string()));
-                                            router.route(wave).await;
+                        match interchange.mount( HyperwayStub::new(stub.key.to_point().to_port().with_layer(Layer::Gravity), Agent::HyperUser), None).await {
+                            Ok(local_endpoint) => {
+                                match skel.machine.api.endpoint_factory(skel.key.clone(), stub.key.clone() ).await  {
+                                    Ok(remote_factory) => {
+                                        match Bridge::new(local_endpoint, remote_factory, logger.push_point("endpoint").unwrap() ) {
+                                            Ok(_) => {
+                                                println!("BRIDGE CREATED!")
+                                            }
+                                            Err(err) => {
+                                                skel.logger.error(format!("could not create Bridge for remote connection: {} because {}", stub.key.to_string(), err.to_string()) );
+                                                skel.status_tx.send(Status::Fatal).await;
+                                            }
                                         }
-                                    });
-                                }
-                                while let Ok(wave) = client_rx.recv().await {
-                                    logger.info(format!("CLIENT received wave from: {} to: {}", wave.from().to_string(), wave.to().to_string()));
-                                    endpoint_tx.send(wave).await.unwrap();
+                                    }
+                                    Err(err) => {
+                                        skel.logger.error(format!("could not create endpoint factory for remote connection: {} because {}", stub.key.to_string(), err.to_string()) );
+                                        skel.status_tx.send(Status::Fatal).await;
+                                    }
                                 }
                             }
                             Err(err) => {
-                                logger.error(format!("{}",err.to_string()));
+                                skel.logger.error(format!("could not mount local connection: {} because {}", stub.key.to_string(), err.to_string()) );
+                                skel.status_tx.send(Status::Fatal).await;
                             }
-                        };
-
-                        println!("Created CLIENT");
+                        }
                     }
                 }
             });
