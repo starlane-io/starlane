@@ -128,6 +128,7 @@ where
         traversal: Traversal<ReflectedWave>,
     ) -> Result<(), MsgErr> {
 
+       // println!("Shell reflected_core_bound: {}", traversal.kind().to_string() );
 
         if let Some(_) = self
             .state

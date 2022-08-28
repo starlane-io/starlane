@@ -1356,7 +1356,7 @@ if wave.kind() == WaveKind::Echo {
                     Recipients::Watchers(_) => {}
                     Recipients::Stars => {
                         if wave.from().layer == Layer::Core {
-                            tos.push(self.skel.point.to_port().with_layer(Layer::Gravity ));
+                            tos.push(self.skel.point.to_port().with_layer(Layer::Core ));
                         } else {
                             tos.push(self.skel.point.to_port().with_layer(Layer::Core));
                         }
@@ -1491,12 +1491,10 @@ if wave.kind() == WaveKind::Echo {
                 .send(traversal.clone())
                 .unwrap_or_default();
 
-            if wave.kind() == WaveKind::Echo {
-                println!("Echo is visiting first layer {}", traversal.layer.to_string());
-            }
+                println!("{} is visiting first layer {}", traversal.kind().to_string(), traversal.layer.to_string());
 
                 // alright, let's visit the injection layer first...
-            self.visit_layer(traversal).await?;
+           self.visit_layer(traversal).await?;
         }
         Ok(())
     }
@@ -1519,7 +1517,9 @@ if wave.kind() == WaveKind::Echo {
     }
 
     async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(), MsgErr> {
+
         let logger = self.skel.logger.push_mark("stack-traversal:visit")?;
+        logger.info(format!("{} is visiting layer {} on its way to: {}", traversal.kind().to_string(), traversal.layer.to_string(), traversal.to.to_string() ));
         logger.track(&traversal, || {
             Tracker::new(
                 format!("visit:layer@{}", traversal.layer.to_string()),
@@ -1582,6 +1582,7 @@ if wave.kind() == WaveKind::Echo {
 
         let next = traversal.next();
 
+        logger.info(format!("{} is Traversing to the next layer from {}", traversal.kind().to_string(), traversal.layer.to_string()));
         match next {
             None => match traversal.dir {
                 TraversalDirection::Fabric => {
