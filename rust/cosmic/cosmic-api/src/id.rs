@@ -1636,6 +1636,9 @@ pub mod id {
         }
 
         async fn visit(&self, traversal: Traversal<UltraWave>) -> Result<(),MsgErr>{
+if traversal.kind() == WaveKind::Ripple{
+println!("Ripple visted: {}", self.port().to_string());
+}
 if traversal.kind() == WaveKind::Echo {
    println!("Echo visted: {}", self.port().to_string());
 }

@@ -25,11 +25,7 @@ use cosmic_api::selector::{PayloadBlock, PayloadBlockVar};
 use cosmic_api::substance::substance::{Call, CallKind, Errors, Substance};
 use cosmic_api::sys::ParticleRecord;
 use cosmic_api::util::{log, ToResolved, ValueMatcher, ValuePattern};
-use cosmic_api::wave::{
-    Agent, Bounce, CmdMethod, DirectedCore, DirectedWave, Exchanger, Method, Ping, Pong,
-    Reflectable, ReflectedCore, ReflectedWave, Ripple, Signal, SingularDirectedWave, ToRecipients,
-    UltraWave, Wave, WaveKind,
-};
+use cosmic_api::wave::{Agent, Bounce, CmdMethod, DirectedCore, DirectedWave, Exchanger, Method, Ping, Pong, Reflectable, ReflectedAggregate, ReflectedCore, ReflectedWave, Ripple, Router, Signal, SingularDirectedWave, ToRecipients, UltraWave, Wave, WaveKind};
 use regex::{CaptureMatches, Regex};
 
 use crate::{PlatErr, Platform, RegistryApi};
@@ -69,12 +65,30 @@ where
         }
     }
 
+    #[async_recursion]
     async fn handle_action(&self, action: Action) -> Result<(), MsgErr> {
         let track = action.track();
 
         match action.action {
             PipeAction::CoreDirected(mut directed) => {
+                let mut rtn_rx = self.exchanger().exchange(&directed.payload).await;
                 self.traverse_next(directed.wrap()).await;
+                let reflected = rtn_rx.await?;
+                match reflected {
+                    ReflectedAggregate::None => {}
+                    ReflectedAggregate::Single(reflected) => {
+println!("HANDLE REFLECTED");
+                        self.handle_reflected(reflected).await;
+                    }
+                    ReflectedAggregate::Multi(multi) => {
+println!("HANDLE REFLECTED(multi)");
+                        for reflected in multi {
+println!("handling...");
+                            self.handle_reflected(reflected).await;
+                        }
+                    }
+                }
+println!(" FIELD GOT HERE!");
             }
             PipeAction::FabricDirected(mut directed) => {
                 self.traverse_next(directed.wrap()).await;
@@ -90,14 +104,71 @@ where
                         ));
                     }
                     Some((_, mut pipex)) => {
+
                         self.skel
                             .traverse_to_next_tx
                             .send(pipex.reflect().to_ultra())
                             .await;
+
+                       // self.inject(pipex.reflect().payload.to_ultra()).await;
                     }
                 }
             }
         }
+        Ok(())
+    }
+
+    async fn handle_reflected(
+        &self,
+        mut wave: ReflectedWave,
+    ) -> Result<(), MsgErr> {
+        let logger = self
+            .skel
+            .logger
+            .push_mark("field:reflected-core-bound")
+            .unwrap();
+
+        let reflection_of = wave.reflection_of().to_string();
+        let mut pipex = self.state.pipe_exes.remove(&reflection_of);
+
+        if let None = pipex {
+            let err_msg = format!(
+                "Field: cannot locate a pipeline executor for processing reflection of directed message: {} with recipient: {}",
+                wave.reflection_of().to_string(),
+                wave.to().to_string()
+            );
+            logger.error(err_msg.clone());
+            //            traversal.logger.span().error(err_msg.clone());
+            return Err(err_msg.into());
+        }
+
+        let (_, mut pipex) = pipex.expect("pipeline executor");
+
+        self.logger
+            .info(format!("removed pipex for {}", reflection_of.to_string()));
+
+        let track = wave.track();
+
+        let action = pipex.handle_reflected(wave)?;
+
+        if let PipeAction::Reflected = action {
+            let wave = pipex.reflect().payload.to_ultra();
+            println!("!!! PipeAction::Reflected {}", wave.to().to_string());
+            self.skel.gravity_router.route(wave).await;
+            return Ok(());
+        }
+
+
+        self.state.pipe_exes.insert(reflection_of.clone(), pipex);
+
+        let action = Action {
+            reflection_of,
+            action,
+            track,
+        };
+
+        self.handle_action(action).await?;
+
         Ok(())
     }
 }
@@ -324,6 +395,8 @@ where
         }
 
         directed.replace_via(self.port.clone());
+
+
         let mut pipex = PipeEx::new(
             directed,
             self.clone(),
@@ -367,59 +440,7 @@ where
         Ok(())
     }
 
-    async fn reflected_core_bound(
-        &self,
-        mut traversal: Traversal<ReflectedWave>,
-    ) -> Result<(), MsgErr> {
-        let logger = self
-            .skel
-            .logger
-            .push_mark("field:reflected-core-bound")
-            .unwrap();
 
-        let reflection_of = traversal.reflection_of().to_string();
-        let mut pipex = self.state.pipe_exes.remove(&reflection_of);
-
-        if let None = pipex {
-            let err_msg = format!(
-                "Field: cannot locate a pipeline executor for processing reflection of directed message: {} with recipient: {}",
-                traversal.reflection_of().to_string(),
-                traversal.payload.to().to_string()
-            );
-            logger.error(err_msg.clone());
-            //            traversal.logger.span().error(err_msg.clone());
-            return Err(err_msg.into());
-        }
-
-        let (_, mut pipex) = pipex.expect("pipeline executor");
-
-        self.logger
-            .info(format!("removed pipex for {}", reflection_of.to_string()));
-
-        let track = traversal.track();
-
-        let action = pipex.handle_reflected(traversal.payload)?;
-
-        if let PipeAction::Reflected = action {
-            self.skel
-                .traverse_to_next_tx
-                .send(pipex.reflect().to_ultra())
-                .await;
-            return Ok(());
-        }
-
-        self.state.pipe_exes.insert(reflection_of.clone(), pipex);
-
-        let action = Action {
-            reflection_of,
-            action,
-            track,
-        };
-
-        self.handle_action(action).await?;
-
-        Ok(())
-    }
 
     async fn inject(&self, wave: UltraWave) {
         let inject = TraversalInjection::new(

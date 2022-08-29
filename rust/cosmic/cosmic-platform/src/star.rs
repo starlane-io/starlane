@@ -1222,6 +1222,7 @@ println!("Transporting to {}", transport.to.to_string() );
             ripple.body(Substance::Sys(Sys::Search(Search::Kinds)));
             ripple.bounce_backs = Some(BounceBacks::Count(skel.adjacents.len()));
             ripple.to(Recipients::Stars);
+ripple.track = true;
             let echoes: Echoes = match transmitter.direct(ripple).await {
                 Ok(echoes) => echoes,
                 Err(err) => {
@@ -1355,8 +1356,8 @@ if wave.kind() == WaveKind::Echo {
                     }
                     Recipients::Watchers(_) => {}
                     Recipients::Stars => {
-                        if wave.from().layer == Layer::Core {
-                            tos.push(self.skel.point.to_port().with_layer(Layer::Core ));
+                        if self.skel.point == wave.from().point {
+                            tos.push(self.skel.point.to_port().with_layer(Layer::Gravity));
                         } else {
                             tos.push(self.skel.point.to_port().with_layer(Layer::Core));
                         }
@@ -1439,8 +1440,12 @@ println!("Z OOO GOOO !")
                 }
             }
 
-if wave.kind() == WaveKind::Echo {
-    println!("Dir {} injector: {} from: {}", dir.to_string(), injector.to_string(), wave.from().to_string() );
+if wave.kind() == WaveKind::Ripple{
+println!("Dir: {} injector: {} to: {} && to: {} from: {}", dir.to_string(), injector.to_string(), wave.to().to_string(), to.to_string(), wave.from().to_string() );
+}
+
+            if wave.kind() == WaveKind::Echo {
+    println!("Dir: {} injector: {} to: {} && to: {} from: {}", dir.to_string(), injector.to_string(), wave.to().to_string(), to.to_string(), wave.from().to_string() );
 }
 
             let traversal_logger = self
@@ -1575,6 +1580,11 @@ if wave.kind() == WaveKind::Echo {
             .logger
             .push_mark("stack-traversal:traverse-to-next-layer")
             .unwrap();
+
+        self.skel.logger.track(&traversal, || {
+            Tracker::new("traverse", "NextLayer")
+        });
+
         if traversal.dest.is_some() && traversal.layer == *traversal.dest.as_ref().unwrap() {
             self.visit_layer(traversal).await;
             return;
@@ -1873,6 +1883,7 @@ fn star_bind() -> BindConfig {
     {
        Route<Sys<Transport>> -> (());
        Route<Sys<Assign>> -> (()) => &;
+       Route<Sys<Search>> -> (()) => &;
     }
     "#,
     ))
@@ -2363,6 +2374,7 @@ where
         Recipients::Stars => {
             let mut map = HashMap::new();
             for (star, _) in adjacent {
+println!("   ADDING ADJACENT!!!");
                 map.insert(star.clone(), Recipients::Stars);
             }
             Ok(map)
