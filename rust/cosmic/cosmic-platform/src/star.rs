@@ -1631,6 +1631,7 @@ where
 {
     async fn route(&self, wave: UltraWave) {
         let inject = TraversalInjection::new(self.injector.clone(), wave);
+println!("Injecting!");
         self.skel.inject_tx.send(inject).await;
     }
 

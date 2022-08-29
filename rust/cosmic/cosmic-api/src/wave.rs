@@ -1127,13 +1127,13 @@ impl Ping {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone,strum_macros::Display)]
 pub enum ReflectedKind {
     Pong,
     Echo,
 }
 
-#[derive(Clone)]
+#[derive(Clone, strum_macros::Display)]
 pub enum DirectedKind {
     Ping,
     Ripple,

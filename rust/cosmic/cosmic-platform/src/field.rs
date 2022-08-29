@@ -23,7 +23,7 @@ where
     pub port: Port,
     pub skel: StarSkel<P>,
     pub logger: PointLogger,
-    pub transmitter: ProtoTransmitter,
+    pub shell_transmitter: ProtoTransmitter,
 }
 
 impl<P> Field<P>
@@ -33,14 +33,15 @@ where
     pub fn new(point: Point, skel: StarSkel<P>) -> Self {
         let port = point.to_port().with_layer(Layer::Field);
         let logger = skel.logger.point(port.point.clone());
-        let router = Arc::new(LayerInjectionRouter::new(skel.clone(), port.clone()));
-        let transmitter = ProtoTransmitterBuilder::new(router, skel.exchanger.clone());
-        let transmitter = transmitter.build();
+        let shell_router = Arc::new(LayerInjectionRouter::new(skel.clone(), port.clone().with_layer(Layer::Shell)));
+        let shell_transmitter = ProtoTransmitterBuilder::new(shell_router, skel.exchanger.clone());
+        let shell_transmitter = shell_transmitter.build();
+
         Self {
             port,
             skel,
             logger,
-            transmitter,
+            shell_transmitter,
         }
     }
 
@@ -86,7 +87,7 @@ where
     }
 
     async fn inject(&self, wave: UltraWave) {
-        self.transmitter.route(wave).await;
+        self.shell_transmitter.route(wave).await;
     }
 
     fn exchanger(&self) -> &Exchanger {
@@ -106,9 +107,10 @@ where
             env.set_var("self.bind", bind.point().clone().into());
             env
         };
+println!("\n\nSTARTING PIPEX\n\n");
 
         // PipeEx will execute itself
-        PipeEx::new( self.port.clone(), directed, route.block.clone(), env, self.transmitter.clone(), self.logger.clone() );
+        PipeEx::new(self.port.clone(), directed, route.block.clone(), env, self.shell_transmitter.clone(),self.skel.gravity_transmitter.clone(),self.logger.clone() );
 
         Ok(())
     }
@@ -120,7 +122,8 @@ pub struct PipeEx {
   pub env: Env,
   pub reflection: Result<Reflection,MsgErr>,
   pub pipeline: PipelineVar,
-  pub transmitter: ProtoTransmitter,
+  pub shell_transmitter: ProtoTransmitter,
+  pub gravity_transmitter: ProtoTransmitter,
   pub traversal: Traversal<DirectedWave>,
 
   pub kind: DirectedKind,
@@ -131,7 +134,7 @@ pub struct PipeEx {
 }
 
 impl PipeEx {
-    pub fn new( port: Port, traversal: Traversal<DirectedWave>, pipeline: PipelineVar, env: Env, transmitter: ProtoTransmitter, logger: PointLogger ) {
+    pub fn new(port: Port, traversal: Traversal<DirectedWave>, pipeline: PipelineVar, env: Env, shell_transmitter: ProtoTransmitter, gravity_transmitter: ProtoTransmitter,logger: PointLogger ) {
         tokio::spawn( async move {
 
             let pipex = Self {
@@ -144,7 +147,8 @@ impl PipeEx {
                 traversal,
                 env,
                 pipeline,
-                transmitter,
+                shell_transmitter,
+                gravity_transmitter,
                 logger,
                 status: 200u16
             };
@@ -160,7 +164,7 @@ impl PipeEx {
                 match &self.reflection {
                     Ok(reflection) => {
                         let wave = reflection.clone().make(err.as_reflected_core(), self.port.clone() ).to_ultra();
-                        self.transmitter.route(wave).await;
+                        self.gravity_transmitter.route(wave).await;
                     }
                     Err(_) => {}
                 }
@@ -179,6 +183,7 @@ impl PipeEx {
         proto.agent(self.traversal.agent().clone());
         proto.bounce_backs(self.traversal.bounce_backs().clone());
         proto.scope(self.traversal.scope().clone());
+        proto.from(self.traversal.from().clone());
         proto.track = self.traversal.track();
         proto
     }
@@ -207,19 +212,21 @@ impl PipeEx {
     }
 
     async fn execute_stop( &mut self, stop: &PipelineStopVar) -> Result<(),MsgErr> {
-
         match stop {
             PipelineStopVar::Core => {
+println!("Executing CORE STOP! {} ", self.kind.to_string() );
                 let mut proto = self.proto();
+println!("SENDING TO: {}",self.port.with_layer(Layer::Core).to_string());
                 proto.to(self.port.with_layer(Layer::Core));
-                self.direct(proto).await
+                self.direct(proto, self.shell_transmitter.clone()).await
             }
             PipelineStopVar::Reflect => {
+println!("Executing CORE REFLECT! {}", self.kind.to_string());
                 let reflection = self.reflection.clone()?;
                 let mut core = ReflectedCore::status(self.status);
                 core.body = self.body.clone();
                 let reflected = reflection.make(core, self.traversal.to.clone() );
-                self.transmitter.route(reflected.to_ultra()).await;
+                self.gravity_transmitter.route(reflected.to_ultra()).await;
                 Ok(())
             }
             PipelineStopVar::Call(_) => {
@@ -229,7 +236,7 @@ impl PipeEx {
                 let point: Point = point.clone().to_resolved(&self.env)?;
                 let mut proto = self.proto();
                 proto.to(point.to_port().with_layer(Layer::Core));
-                self.direct(proto).await
+                self.direct(proto, self.gravity_transmitter.clone()).await
             }
             PipelineStopVar::Err { .. } => {
                 unimplemented!()
@@ -237,11 +244,11 @@ impl PipeEx {
         }
     }
 
-    async fn direct( &mut self, proto: DirectedProto ) -> Result<(),MsgErr> {
+    async fn direct(&mut self, proto: DirectedProto, transmitter: ProtoTransmitter ) -> Result<(),MsgErr> {
 
         match proto.kind.as_ref().unwrap() {
             DirectedKind::Ping => {
-                let pong: Wave<Pong> = self.transmitter.direct(proto).await?;
+                let pong: Wave<Pong> = transmitter.direct(proto).await?;
                 self.status = pong.core.status.as_u16();
                 if pong.core.status.is_success() {
                     self.body = pong.core.body.clone();
@@ -252,7 +259,7 @@ impl PipeEx {
             }
             DirectedKind::Ripple => {
                 // this should be a single echo since in traversal it is only going to a single target
-                let mut echoes: Vec<Wave<Echo>> = self.transmitter.direct(proto).await?;
+                let mut echoes: Vec<Wave<Echo>> = transmitter.direct(proto).await?;
                 if !echoes.is_empty()  {
                     let echo = echoes.remove(0);
                     self.status = echo.core.status.as_u16();
@@ -267,6 +274,7 @@ impl PipeEx {
                 }
             }
             DirectedKind::Signal => {
+                transmitter.direct(proto).await?;
                 Ok(())
             }
         }
