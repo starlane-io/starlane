@@ -1141,20 +1141,20 @@ pub type PayloadBlockVar = PayloadBlockDef<PointVar>;
 
 #[derive(Debug, Clone)]
 pub enum PayloadBlockDef<Pnt> {
-    RequestPattern(PatternBlockDef<Pnt>),
-    ResponsePattern(PatternBlockDef<Pnt>),
+    DirectPattern(PatternBlockDef<Pnt>),
+    ReflectPattern(PatternBlockDef<Pnt>),
 }
 
 impl ToResolved<PayloadBlock> for PayloadBlockCtx {
     fn to_resolved(self, env: &Env) -> Result<PayloadBlock, MsgErr> {
         match self {
-            PayloadBlockCtx::RequestPattern(block) => Ok(PayloadBlock::RequestPattern(
+            PayloadBlockCtx::DirectPattern(block) => Ok(PayloadBlock::DirectPattern(
                 block.modify(move |block| {
                     let block: SubstancePattern = block.to_resolved(env)?;
                     Ok(block)
                 })?,
             )),
-            PayloadBlockCtx::ResponsePattern(block) => Ok(PayloadBlock::ResponsePattern(
+            PayloadBlockCtx::ReflectPattern(block) => Ok(PayloadBlock::ReflectPattern(
                 block.modify(move |block| block.to_resolved(env))?,
             )),
         }
@@ -1164,13 +1164,13 @@ impl ToResolved<PayloadBlock> for PayloadBlockCtx {
 impl ToResolved<PayloadBlockCtx> for PayloadBlockVar {
     fn to_resolved(self, env: &Env) -> Result<PayloadBlockCtx, MsgErr> {
         match self {
-            PayloadBlockVar::RequestPattern(block) => Ok(PayloadBlockCtx::RequestPattern(
+            PayloadBlockVar::DirectPattern(block) => Ok(PayloadBlockCtx::DirectPattern(
                 block.modify(move |block| {
                     let block: SubstancePatternCtx = block.to_resolved(env)?;
                     Ok(block)
                 })?,
             )),
-            PayloadBlockVar::ResponsePattern(block) => Ok(PayloadBlockCtx::ResponsePattern(
+            PayloadBlockVar::ReflectPattern(block) => Ok(PayloadBlockCtx::ReflectPattern(
                 block.modify(move |block| block.to_resolved(env))?,
             )),
         }

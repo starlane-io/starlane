@@ -318,7 +318,13 @@ pub mod substance {
         map: HashMap<String, String>,
     }
 
+
+
     impl Errors {
+        pub fn to_cosmic_err(&self) -> MsgErr {
+            MsgErr::new(500, self.to_string().as_str() )
+        }
+
         pub fn empty() -> Self {
             Self {
                 map: HashMap::new(),

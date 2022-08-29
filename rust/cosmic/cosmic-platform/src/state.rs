@@ -1,4 +1,3 @@
-use crate::field::FieldState;
 use cosmic_api::id::id;
 use cosmic_api::id::id::{Point, Uuid};
 use cosmic_api::particle::particle::Details;

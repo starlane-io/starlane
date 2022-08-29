@@ -1,814 +1,275 @@
-use crate::star::StarSkel;
-use anyhow::anyhow;
-use dashmap::DashMap;
-
-use cosmic_api::config::config::bind::{
-    BindConfig, PipelineStepVar, PipelineStop, PipelineStopVar, WaveDirection,
-};
-use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{
-    BaseKind, Kind, Layer, Point, Port, ToBaseKind, ToPoint, ToPort, TraversalLayer, Uuid,
-};
+use crate::star::{LayerInjectionRouter, StarSkel};
+use crate::{PlatErr, Platform};
+use cosmic_api::config::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar, WaveDirection};
+use cosmic_api::error::{MsgErr, StatusErr};
+use cosmic_api::id::id::{Layer, Point, Port, ToPoint, ToPort, TraversalLayer};
 use cosmic_api::id::Traversal;
-use cosmic_api::id::{ArtifactSubKind, TraversalInjection};
-use cosmic_api::log::{PointLogger, RootLogger, SpanLogger, Trackable, Tracker};
-use cosmic_api::parse::model::{
-    MethodScope, MethodScopeSelectorAndFilters, PipelineSegmentVar, PipelineVar, ScopeFiltersDef,
-    ScopeSelectorDef,
-};
-use cosmic_api::parse::{
-    bind_config, Env, MapResolver, MultiVarResolver, PointCtxResolver, RegexCapturesResolver,
-};
-use cosmic_api::security::Access;
-use cosmic_api::selector::selector::PipelineKind;
-use cosmic_api::selector::{PayloadBlock, PayloadBlockVar};
-use cosmic_api::substance::substance::{Call, CallKind, Errors, Substance};
-use cosmic_api::sys::ParticleRecord;
-use cosmic_api::util::{log, ToResolved, ValueMatcher, ValuePattern};
-use cosmic_api::wave::{Agent, Bounce, CmdMethod, DirectedCore, DirectedWave, Exchanger, Method, Ping, Pong, Reflectable, ReflectedAggregate, ReflectedCore, ReflectedWave, Ripple, Router, Signal, SingularDirectedWave, ToRecipients, UltraWave, Wave, WaveKind};
-use regex::{CaptureMatches, Regex};
-
-use crate::{PlatErr, Platform, RegistryApi};
-use cosmic_api::particle::particle::Property;
+use cosmic_api::wave::{DirectedKind, DirectedProto, DirectedWave, Echo, Exchanger, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedAggregate, ReflectedCore, Reflection, UltraWave, Wave, WaveKind};
 use cosmic_api::ArtRef;
-use http::{HeaderMap, StatusCode, Uri};
-use std::collections::HashMap;
-use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
-use tokio::io::AsyncBufReadExt;
-use tokio::sync::mpsc::Sender;
-use tokio::sync::{mpsc, Mutex};
+use http::Uri;
+use cosmic_api::log::{PointLogger, Trackable};
+use cosmic_api::parse::model::{MethodScope, PipelineVar};
+use cosmic_api::parse::{Env, RegexCapturesResolver};
+use cosmic_api::selector::{PayloadBlock, PayloadBlockVar};
+use cosmic_api::substance::substance::Substance;
+use cosmic_api::util::ToResolved;
 
-#[derive(Clone)]
 pub struct Field<P>
 where
-    P: Platform + 'static,
+    P: Platform,
 {
     pub port: Port,
     pub skel: StarSkel<P>,
-    pub state: FieldState<P>,
-    pub logger: SpanLogger,
+    pub logger: PointLogger,
+    pub transmitter: ProtoTransmitter,
 }
 
 impl<P> Field<P>
 where
-    P: Platform + 'static,
+    P: Platform,
 {
-    pub fn new(point: Point, skel: StarSkel<P>, state: FieldState<P>, logger: SpanLogger) -> Self {
+    pub fn new(point: Point, skel: StarSkel<P>) -> Self {
         let port = point.to_port().with_layer(Layer::Field);
+        let logger = skel.logger.point(port.point.clone());
+        let router = Arc::new(LayerInjectionRouter::new(skel.clone(), port.clone()));
+        let transmitter = ProtoTransmitterBuilder::new(router, skel.exchanger.clone());
+        let transmitter = transmitter.build();
         Self {
             port,
             skel,
-            state,
             logger,
+            transmitter,
         }
     }
 
-    #[async_recursion]
-    async fn handle_action(&self, action: Action) -> Result<(), MsgErr> {
-        let track = action.track();
-
-        match action.action {
-            PipeAction::CoreDirected(mut directed) => {
-                let mut rtn_rx = self.exchanger().exchange(&directed.payload).await;
-                self.traverse_next(directed.wrap()).await;
-                let reflected = rtn_rx.await?;
-                match reflected {
-                    ReflectedAggregate::None => {}
-                    ReflectedAggregate::Single(reflected) => {
-println!("HANDLE REFLECTED");
-                        self.handle_reflected(reflected).await;
-                    }
-                    ReflectedAggregate::Multi(multi) => {
-println!("HANDLE REFLECTED(multi)");
-                        for reflected in multi {
-println!("handling...");
-                            self.handle_reflected(reflected).await;
-                        }
-                    }
-                }
-println!(" FIELD GOT HERE!");
-            }
-            PipeAction::FabricDirected(mut directed) => {
-                self.traverse_next(directed.wrap()).await;
-            }
-            PipeAction::Reflected => {
-                let pipex = self.state.pipe_exes.remove(&action.reflection_of);
-
-                match pipex {
-                    None => {
-                        self.logger.error(format!(
-                            "no pipeline set for directed_id: {}",
-                            action.reflection_of
-                        ));
-                    }
-                    Some((_, mut pipex)) => {
-
-                        self.skel
-                            .traverse_to_next_tx
-                            .send(pipex.reflect().to_ultra())
-                            .await;
-
-                       // self.inject(pipex.reflect().payload.to_ultra()).await;
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    async fn handle_reflected(
-        &self,
-        mut wave: ReflectedWave,
-    ) -> Result<(), MsgErr> {
-        let logger = self
+    async fn bind(&self, directed: &Traversal<DirectedWave>) -> Result<ArtRef<BindConfig>, MsgErr> {
+        let record = self.skel.registry.locate(&self.port.point).await.map_err(|e|e.to_cosmic_err())?;
+        let properties = self
             .skel
-            .logger
-            .push_mark("field:reflected-core-bound")
-            .unwrap();
+            .registry
+            .get_properties(&directed.to.point)
+            .await
+            .map_err(|e| e.to_cosmic_err())?;
 
-        let reflection_of = wave.reflection_of().to_string();
-        let mut pipex = self.state.pipe_exes.remove(&reflection_of);
-
-        if let None = pipex {
-            let err_msg = format!(
-                "Field: cannot locate a pipeline executor for processing reflection of directed message: {} with recipient: {}",
-                wave.reflection_of().to_string(),
-                wave.to().to_string()
-            );
-            logger.error(err_msg.clone());
-            //            traversal.logger.span().error(err_msg.clone());
-            return Err(err_msg.into());
-        }
-
-        let (_, mut pipex) = pipex.expect("pipeline executor");
-
-        self.logger
-            .info(format!("removed pipex for {}", reflection_of.to_string()));
-
-        let track = wave.track();
-
-        let action = pipex.handle_reflected(wave)?;
-
-        if let PipeAction::Reflected = action {
-            let wave = pipex.reflect().payload.to_ultra();
-            println!("!!! PipeAction::Reflected {}", wave.to().to_string());
-            self.skel.gravity_router.route(wave).await;
-            return Ok(());
-        }
-
-
-        self.state.pipe_exes.insert(reflection_of.clone(), pipex);
-
-        let action = Action {
-            reflection_of,
-            action,
-            track,
+        let bind_property = properties.get("bind");
+        let bind = match bind_property {
+            None => {
+                let driver = self.skel.drivers.get(&record.details.stub.kind).await?;
+                driver
+                    .bind(&directed.to.point)
+                    .await
+                    .map_err(|e| e.to_cosmic_err())?
+            }
+            Some(bind) => {
+                let bind = Point::from_str(bind.value.as_str())?;
+                self.skel.machine.artifacts.bind(&bind).await?
+            }
         };
-
-        self.handle_action(action).await?;
-
-        Ok(())
+        Ok(bind)
     }
 }
 
 #[async_trait]
 impl<P> TraversalLayer for Field<P>
 where
-    P: Platform + 'static,
+    P: Platform,
 {
     fn port(&self) -> Port {
-        self.state.point.clone().to_port().with_layer(Layer::Field)
+        self.port.clone()
     }
 
     async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
-        self.skel.traverse_to_next_tx.send(traversal).await;
+        self.logger
+            .eat(self.skel.traverse_to_next_tx.send(traversal).await);
+    }
+
+    async fn inject(&self, wave: UltraWave) {
+        self.transmitter.route(wave).await;
     }
 
     fn exchanger(&self) -> &Exchanger {
         &self.skel.exchanger
     }
 
-    async fn directed_core_bound(
-        &self,
-        mut directed: Traversal<DirectedWave>,
-    ) -> Result<(), MsgErr> {
-        directed
-            .logger
-            .set_span_attr("message-id", &directed.id().to_string());
-
-        let logger = self
-            .skel
-            .logger
-            .push_mark("field:directed-core-bound")
-            .unwrap();
-        logger.track(&directed, || {
-            Tracker::new("field:directed_core_bound", "Receive")
-        });
-
-        let access = self
-            .skel
-            .registry
-            .access(&directed.agent().clone().to_point(), &directed.to)
-            .await;
-
-        match access {
-            Ok(access) => {
-                if !access.permissions().particle.execute {
-                    let err_msg = format!(
-                        "execute permission required to send requests to {}",
-                        directed.to.to_string()
-                    );
-                    directed.logger.error(err_msg.as_str());
-                    match directed.err(err_msg.into(), self.port().clone()) {
-                        Bounce::Absorbed => {
-                            logger.track(&directed, || {
-                                Tracker::new("field:directed_core_bound", "Absorbed")
-                            });
-                        }
-                        Bounce::Reflected(reflected) => {
-                            logger.track(&directed, || {
-                                Tracker::new("field:directed_core_bound", "Bounced")
-                            });
-
-                            self.skel.gravity_tx.send(reflected.to_ultra()).await;
-                        }
-                    }
-
-                    return Ok(());
-                }
-            }
-            Err(err) => {
-                directed.logger.error(format!("{}", err.to_string()));
-            }
-        }
-
-        let logger = logger.push_mark("locate").unwrap();
-        let record = logger.result(
-            self.skel
-                .registry
-                .locate(&directed.to.point)
-                .await
-                .map_err(|e| e.to_cosmic_err()),
-        )?;
-        let logger = logger.pop_mark();
-
-        let logger = logger.push_mark("get-properties").unwrap();
-        let properties = logger.result(
-            self.skel
-                .registry
-                .get_properties(&directed.to.point)
-                .await
-                .map_err(|e| e.to_cosmic_err()),
-        )?;
-        let logger = logger.pop_mark();
-
-        let bind_property = properties.get("bind");
-
-        let logger = logger.pop_mark();
-
-        logger.track(&directed, || {
-            Tracker::new("field:directed_core_bound", "PreBind")
-        });
-
-        let bind = match bind_property {
-            None => {
-                logger.track(&directed, || {
-                    Tracker::new("field:directed_core_bound", "GetBindFromDriver")
-                });
-
-                let logger = logger.push_mark("get-driver").unwrap();
-                let driver = self.skel.drivers.get(&record.details.stub.kind).await?;
-                let logger = logger.pop_mark();
-
-                logger.track(&directed, || {
-                    Tracker::new("field:directed_core_bound", "GetBindFromItem")
-                });
-                let logger = logger.push_mark("bind").unwrap();
-                logger.result(
-                    driver
-                        .bind(&directed.to.point)
-                        .await
-                        .map_err(|e| e.to_cosmic_err()),
-                )?
-            }
-            Some(bind) => {
-                let logger = logger.push_mark("bind-machine-artifact").unwrap();
-                let bind = logger.result(Point::from_str(bind.value.as_str()))?;
-                logger.result(self.skel.machine.artifacts.bind(&bind).await)?
-            }
-        };
-
-        logger.track(&directed, || {
-            Tracker::new("field:directed_core_bound", "GotStaticBind")
-        });
-
-        let logger = logger.push_mark("select").unwrap();
-        let route = match bind.select(&directed.payload) {
-            Ok(route) => route.clone(),
-            Err(err) => {
-
-                /*  if directed.kind() != WaveKind::Signal {
-                     let reflection = directed.reflection()?;
-                     let core = ReflectedCore::status(404);
-                     let wave= reflection.make(core,self.port.clone());
-                     self.skel.gravity_transmitter.route( wave.to_ultra() ).await;
-                 }
-                */
-
-                if directed.payload.kind() == WaveKind::Signal {
-                    let msg = format!(
-                        "{} from: {} to: {}",
-                        err.to_string(),
-                        directed.from().to_string(),
-                        directed.to().to_string()
-                    );
-                    logger.warn(msg.clone());
-                    return Ok(())
-                } else {
-                    let msg = format!(
-                        "{} to: {}",
-                        err.to_string(),
-                        directed.to().to_string()
-                    );
-                    MethodScope {
-                        selector: MethodScopeSelectorAndFilters {
-                            selector: ScopeSelectorDef {
-                                name: ValuePattern::Pattern(directed.core().method.clone()),
-                                path: Regex::new(directed.core().uri.path().to_string().as_str())?,
-                            },
-                            filters: ScopeFiltersDef { filters: vec![] },
-                        },
-                        block: PipelineVar {
-                            segments: vec![PipelineSegmentVar {
-                                step: PipelineStepVar {
-                                    entry: WaveDirection::Direct,
-                                    exit: WaveDirection::Reflect,
-                                    blocks: vec![],
-                                },
-                                stop: PipelineStopVar::Err { status: 404, msg },
-                            }],
-                        },
-                    }
-                }
-            }
-        };
-        let logger = logger.pop_mark();
-
-        logger.track(&directed, || {
-            Tracker::new("field:directed_core_bound", "RouteSelected")
-        });
-
+    async fn directed_core_bound(&self, directed: Traversal<DirectedWave>) -> Result<(), MsgErr> {
+        let bind = self.bind(&directed).await?;
+        let route = bind.select(&directed.payload)?;
         let regex = route.selector.path.clone();
-
         let env = {
             let path_regex_capture_resolver =
                 RegexCapturesResolver::new(regex, directed.core().uri.path().to_string())?;
-            let mut env = Env::new(directed.to.clone().to_point());
+            let mut env = Env::new(self.port.point.clone());
             env.add_var_resolver(Arc::new(path_regex_capture_resolver));
             env.set_var("self.bundle", bind.bundle().clone().into());
             env.set_var("self.bind", bind.point().clone().into());
             env
         };
 
-        let method = directed.payload.core().method.clone();
-        let directed_id = directed.id().to_string();
-
-        let pipeline = route.block.clone();
-
-        let to = directed.to.clone();
-        let call = logger.result(directed.to_call(to))?;
-        let traversal_logger = directed.logger.span();
-
-        logger.track(&directed, || {
-            Tracker::new("field:directed_core_bound", "PipeEx")
-        });
-        let track = directed.track();
-
-        if directed.point != self.port.point {
-            panic!(
-                "directed.point {} vs self.port.point {}",
-                directed.point.to_string(),
-                self.port.point.to_string()
-            );
-        }
-
-        directed.replace_via(self.port.clone());
-
-
-        let mut pipex = PipeEx::new(
-            directed,
-            self.clone(),
-            pipeline,
-            env,
-            traversal_logger.clone(),
-        );
-        let action = match pipex.next() {
-            Ok(action) => action,
-            Err(err) => {
-                let err_msg = format!("Field: pipeline error for call {}", call.to_string());
-                traversal_logger.error(err_msg.as_str());
-                self.skel
-                    .traverse_to_next_tx
-                    .send(pipex.fail(500, err_msg.as_str()).to_ultra())
-                    .await;
-                return Ok(());
-            }
-        };
-
-        if let PipeAction::Reflected = action {
-            self.skel
-                .traverse_to_next_tx
-                .send(pipex.reflect().to_ultra())
-                .await;
-            return Ok(());
-        }
-
-        //self.logger.info(format!("inserting pipeline executor for directed: {} & action {} & method {} pipex.traversal.method {} from: {} to: {}", directed_id.to_string(), action.to_string(), method.to_string(), pipex.traversal.method.to_string(), pipex.traversal.from().to_string(), pipex.traversal.to().to_string() ));
-        self.state.pipe_exes.insert(directed_id.clone(), pipex);
-
-        let action = Action {
-            reflection_of: directed_id,
-            action,
-            track,
-        };
-
-        let logger = logger.push_mark("handle-action").unwrap();
-        logger.result(self.handle_action(action).await)?;
+        // PipeEx will execute itself
+        PipeEx::new( self.port.clone(), directed, route.block.clone(), env, self.transmitter.clone(), self.logger.clone() );
 
         Ok(())
     }
-
-
-
-    async fn inject(&self, wave: UltraWave) {
-        let inject = TraversalInjection::new(
-            self.state.point.clone().to_port().with_layer(Layer::Field),
-            wave,
-        );
-        self.skel.inject_tx.send(inject).await;
-    }
 }
 
-pub struct PipeEx<P>
-where
-    P: Platform + 'static,
-{
-    pub logger: SpanLogger,
-    pub traversal: PipeTraversal,
-    pub field: Field<P>,
-    pub pipeline: PipelineVar,
-    pub env: Env,
+pub struct PipeEx {
+  pub port: Port,
+  pub logger: PointLogger,
+  pub env: Env,
+  pub reflection: Result<Reflection,MsgErr>,
+  pub pipeline: PipelineVar,
+  pub transmitter: ProtoTransmitter,
+  pub traversal: Traversal<DirectedWave>,
+
+  pub kind: DirectedKind,
+  pub method: Method,
+  pub uri: Uri,
+  pub body: Substance,
+  pub status: u16
 }
 
-impl<P> PipeEx<P>
-where
-    P: Platform + 'static,
-{
-    pub fn new(
-        traversal: Traversal<DirectedWave>,
-        field: Field<P>,
-        pipeline: PipelineVar,
-        env: Env,
-        logger: SpanLogger,
-    ) -> Self {
-        let traversal = PipeTraversal::new(field.port.clone(), traversal);
-        Self {
-            traversal: traversal,
-            field,
-            pipeline,
-            env,
-            logger,
-        }
+impl PipeEx {
+    pub fn new( port: Port, traversal: Traversal<DirectedWave>, pipeline: PipelineVar, env: Env, transmitter: ProtoTransmitter, logger: PointLogger ) {
+        tokio::spawn( async move {
+
+            let pipex = Self {
+                kind: traversal.directed_kind(),
+                method: traversal.core().method.clone(),
+                uri: traversal.core().uri.clone(),
+                body: traversal.core().body.clone(),
+                reflection: traversal.reflection(),
+                port,
+                traversal,
+                env,
+                pipeline,
+                transmitter,
+                logger,
+                status: 200u16
+            };
+            pipex.start().await;
+        });
     }
 
-    pub fn next(&mut self) -> Result<PipeAction, MsgErr> {
-        match self.pipeline.consume() {
-            Some(segment) => {
-                self.execute_step(&segment.step)?;
-                Ok(self.execute_stop(&segment.stop)?)
-            }
-            None => Ok(PipeAction::Reflected),
-        }
-    }
-
-    pub fn handle_reflected(&mut self, reflected: ReflectedWave) -> Result<PipeAction, MsgErr> {
-        self.traversal.push(reflected.to_ultra());
-        self.next()
-    }
-
-    fn reflect(self) -> Traversal<ReflectedWave> {
-        self.traversal.reflect()
-    }
-
-    fn fail(self, status: u16, error: &str) -> Traversal<ReflectedWave> {
-        self.traversal.fail(status, error)
-    }
-
-    fn execute_stop(&mut self, stop: &PipelineStopVar) -> Result<PipeAction, MsgErr> {
-        match stop {
-            PipelineStopVar::Internal => {
-                let request = self.traversal.direct();
-                Ok(PipeAction::CoreDirected(request))
-            }
-            PipelineStopVar::Call(call) => {
-                let call: Call = call.clone().to_resolved(&self.env)?;
-                let (method, path) = match &call.kind {
-                    CallKind::Msg(msg) => {
-                        let path = msg.path.clone().to_resolved(&self.env)?;
-                        (Method::Msg(msg.method.clone()), path)
+    pub async fn start( mut self ) {
+        match self.execute().await {
+            Ok(_) => {}
+            Err(err) => {
+                self.logger.error(format!("{}",err.to_string()));
+                match &self.reflection {
+                    Ok(reflection) => {
+                        let wave = reflection.clone().make(err.as_reflected_core(), self.port.clone() ).to_ultra();
+                        self.transmitter.route(wave).await;
                     }
-                    CallKind::Http(http) => {
-                        let path = http.path.clone().to_resolved(&self.env)?;
-                        (Method::Http(http.method.clone()), path)
-                    }
-                    CallKind::Cmd(cmd) => {
-                        let path = cmd.path.clone().to_resolved(&self.env)?;
-                        (Method::Cmd(cmd.method.clone()), path)
-                    }
-                    CallKind::Sys(sys) => {
-                        let path = sys.path.clone().to_resolved(&self.env)?;
-                        (Method::Sys(sys.method.clone()), path)
-                    }
-                };
-                let mut core: DirectedCore = method.into();
-                core.body = self.traversal.body.clone();
-                core.headers = self.traversal.headers.clone();
-                core.uri = Uri::from_str(path.as_str())?;
-                let ping = self.traversal.initial.clone().with(Wave::new(
-                    Ping::new(core, self.traversal.to().clone()),
-                    self.field.port.clone(),
-                ));
-                Ok(PipeAction::FabricDirected(ping.to_directed()))
-            }
-            PipelineStopVar::Respond => Ok(PipeAction::Reflected),
-            PipelineStopVar::Point(point) => {
-                let uri = self.traversal.uri.clone();
-                let point: Point = point.clone().to_resolved(&self.env)?;
-                let method = Method::Cmd(CmdMethod::Read);
-                let mut core: DirectedCore = method.into();
-                core.uri = uri;
-
-                let request = self.traversal.initial.clone().with(Wave::new(
-                    Ping::new(core, self.traversal.to().clone()),
-                    point.to_port(),
-                ));
-                Ok(PipeAction::FabricDirected(request.to_directed()))
-            }
-            PipelineStopVar::Err { status, msg } => {
-                let errors = Errors::default(msg.as_str());
-                self.traversal.body = Substance::Errors(errors);
-                self.traversal.headers.clear();
-                self.traversal.status =
-                    StatusCode::from_u16(*status).unwrap_or(StatusCode::from_u16(500).unwrap());
-                Ok(PipeAction::Reflected)
-            }
-        }
-    }
-
-    fn execute_step(&self, step: &PipelineStepVar) -> Result<(), MsgErr> {
-        match &step.entry {
-            WaveDirection::Direct => {
-                for block in &step.blocks {
-                    self.execute_block(block)?;
+                    Err(_) => {}
                 }
             }
-            WaveDirection::Reflect => {}
+        }
+    }
+
+    fn proto(&self) -> DirectedProto {
+        let mut proto = DirectedProto::kind(&self.kind);
+        proto.id = self.traversal.id().clone();
+        proto.via(Some(self.port.clone()));
+        proto.method(self.method.clone());
+        proto.body(self.body.clone());
+        proto.uri(self.uri.clone());
+        proto.handling(self.traversal.handling().clone());
+        proto.agent(self.traversal.agent().clone());
+        proto.bounce_backs(self.traversal.bounce_backs().clone());
+        proto.scope(self.traversal.scope().clone());
+        proto.track = self.traversal.track();
+        proto
+    }
+
+    pub async fn execute( &mut self ) -> Result<(),MsgErr> {
+        while let Some( segment ) = self.pipeline.consume() {
+            self.execute_step(&segment.step)?;
+            self.execute_stop(&segment.stop).await?;
         }
         Ok(())
     }
 
-    fn execute_block(&self, block: &PayloadBlockVar) -> Result<(), MsgErr> {
-        let block: PayloadBlock = block.clone().to_resolved(&self.env)?;
-        match block {
-            PayloadBlock::RequestPattern(pattern) => {
-                pattern.is_match(&self.traversal.body)?;
-            }
-            PayloadBlock::ResponsePattern(pattern) => {
-                pattern.is_match(&self.traversal.body)?;
-            }
-        }
+
+    fn execute_step(&mut self, step: &PipelineStepVar) -> Result<(), MsgErr> {
+         for block in &step.blocks {
+             match block.clone().to_resolved(&self.env)? {
+                 PayloadBlock::DirectPattern(pattern) => {
+                     pattern.is_match(&self.body)?;
+                 }
+                 PayloadBlock::ReflectPattern(pattern) => {
+                     pattern.is_match(&self.body)?;
+                 }
+             }
+         }
         Ok(())
     }
-}
 
-pub struct PipeTraversal {
-    pub port: Port,
-    pub initial: Traversal<DirectedWave>,
-    pub method: Method,
-    pub body: Substance,
-    pub uri: Uri,
-    pub headers: HeaderMap,
-    pub status: StatusCode,
-}
+    async fn execute_stop( &mut self, stop: &PipelineStopVar) -> Result<(),MsgErr> {
 
-impl PipeTraversal {
-    pub fn new(port: Port, initial_request: Traversal<DirectedWave>) -> Self {
-        Self {
-            port,
-            method: initial_request.core().method.clone(),
-            body: initial_request.core().body.clone(),
-            uri: initial_request.core().uri.clone(),
-            headers: initial_request.core().headers.clone(),
-            initial: initial_request,
-            status: StatusCode::from_u16(200).unwrap(),
-        }
-    }
-
-    pub fn directed_core(&self) -> DirectedCore {
-        DirectedCore {
-            headers: self.headers.clone(),
-            method: self.method.clone(),
-            uri: self.uri.clone(),
-            body: self.body.clone(),
-        }
-    }
-
-    pub fn to(&self) -> &Port {
-        &self.initial.to
-    }
-
-    pub fn from(&self) -> &Port {
-        self.initial.from()
-    }
-
-    pub fn via(&self) -> &Option<Port> {
-        self.initial.via()
-    }
-
-    pub fn direct(&self) -> Traversal<DirectedWave> {
-        match self.initial.payload.clone() {
-            DirectedWave::Ping(mut ping) => {
-                ping = ping.with_core(self.directed_core());
-                ping.track = self.initial.track();
-                self.initial.clone().with(ping.to_directed())
+        match stop {
+            PipelineStopVar::Core => {
+                let mut proto = self.proto();
+                proto.to(self.port.with_layer(Layer::Core));
+                self.direct(proto).await
             }
-            DirectedWave::Ripple(mut ripple) => {
-                ripple = ripple.with_core(self.directed_core());
-                ripple.track = self.initial.track();
-                self.initial.clone().with(ripple.to_directed())
+            PipelineStopVar::Reflect => {
+                let reflection = self.reflection.clone()?;
+                let mut core = ReflectedCore::status(self.status);
+                core.body = self.body.clone();
+                let reflected = reflection.make(core, self.traversal.to.clone() );
+                self.transmitter.route(reflected.to_ultra()).await;
+                Ok(())
             }
-            DirectedWave::Signal(mut signal) => {
-                signal = signal.with_core(self.directed_core());
-                signal.track = self.initial.track();
-                self.initial.clone().with(signal.to_directed())
+            PipelineStopVar::Call(_) => {
+                unimplemented!()
             }
-        }
-        /*self.initial
-        .clone()
-        .with(Wave::new(
-        Ping::new(self.directed_core(), self.from().clone()),
-        self.port.clone(),
-        ))
-        .to_directed()
-
-        */
-    }
-
-    pub fn response_core(&self) -> ReflectedCore {
-        ReflectedCore {
-            headers: self.headers.clone(),
-            body: self.body.clone(),
-            status: self.status.clone(),
-        }
-    }
-
-    pub fn response(&self) -> Pong {
-        Pong::new(
-            self.response_core().clone(),
-            self.to().clone().to_port(),
-            self.from().clone().to_port().to_recipients(),
-            self.initial.id().clone(),
-        )
-    }
-
-    pub fn push(&mut self, wave: UltraWave) {
-        match wave {
-            UltraWave::Ping(ping) => {
-                let ping = ping.variant;
-                let core = ping.core;
-                self.method = core.method;
-                self.uri = core.uri;
-                self.headers = core.headers;
-                self.body = core.body;
+            PipelineStopVar::Point(point) => {
+                let point: Point = point.clone().to_resolved(&self.env)?;
+                let mut proto = self.proto();
+                proto.to(point.to_port().with_layer(Layer::Core));
+                self.direct(proto).await
             }
-            UltraWave::Pong(pong) => {
-                let pong = pong.variant;
-                let core = pong.core;
-                self.headers = core.headers;
-                self.body = core.body;
-                self.status = core.status;
-            }
-            UltraWave::Ripple(ripple) => {
-                let ripple = ripple.variant;
-                let core = ripple.core;
-                self.method = core.method;
-                self.uri = core.uri;
-                self.headers = core.headers;
-                self.body = core.body;
-            }
-            UltraWave::Echo(echo) => {
-                let echo = echo.variant;
-                let core = echo.core;
-                self.headers = core.headers;
-                self.body = core.body;
-                self.status = core.status;
-            }
-            UltraWave::Signal(signal) => {
-                let signal = signal.variant;
-                let core = signal.core;
-                self.method = core.method;
-                self.uri = core.uri;
-                self.headers = core.headers;
-                self.body = core.body;
+            PipelineStopVar::Err { .. } => {
+                unimplemented!()
             }
         }
     }
 
-    pub fn reflect(self) -> Traversal<ReflectedWave> {
-        let core = self.response_core();
-        let reflection = self.initial.payload.reflection().unwrap();
-        let reflected = reflection.make(core, self.port.clone());
+    async fn direct( &mut self, proto: DirectedProto ) -> Result<(),MsgErr> {
 
-        self.initial.with(reflected)
-    }
-
-    pub fn fail(self, status: u16, error: &str) -> Traversal<ReflectedWave> {
-        let core = ReflectedCore::status(status);
-        let reflection = self.initial.payload.reflection().unwrap();
-        let reflected = reflection.make(core, self.port.clone());
-        self.initial.with(reflected)
-    }
-}
-
-struct Action {
-    pub reflection_of: String,
-    pub action: PipeAction,
-    pub track: bool,
-}
-
-impl Trackable for Action {
-    fn track_id(&self) -> String {
-        self.reflection_of.clone()
-    }
-
-    fn track_method(&self) -> String {
-        self.action.to_string()
-    }
-
-    fn track_payload(&self) -> String {
-        "?".to_string()
-    }
-
-    fn track_from(&self) -> String {
-        match &self.action {
-            PipeAction::CoreDirected(w) => w.track_from(),
-            PipeAction::FabricDirected(w) => w.track_from(),
-            PipeAction::Reflected => "?".to_string(),
+        match proto.kind.as_ref().unwrap() {
+            DirectedKind::Ping => {
+                let pong: Wave<Pong> = self.transmitter.direct(proto).await?;
+                self.status = pong.core.status.as_u16();
+                if pong.core.status.is_success() {
+                    self.body = pong.core.body.clone();
+                    Ok(())
+                } else {
+                    Err(pong.core.to_err()?)
+                }
+            }
+            DirectedKind::Ripple => {
+                // this should be a single echo since in traversal it is only going to a single target
+                let mut echoes: Vec<Wave<Echo>> = self.transmitter.direct(proto).await?;
+                if !echoes.is_empty()  {
+                    let echo = echoes.remove(0);
+                    self.status = echo.core.status.as_u16();
+                    if echo.core.status.is_success() {
+                        self.body = echo.core.body.clone();
+                        Ok(())
+                    } else {
+                        Err(echo.core.to_err()?)
+                    }
+                } else {
+                    Ok(())
+                }
+            }
+            DirectedKind::Signal => {
+                Ok(())
+            }
         }
     }
 
-    fn track_to(&self) -> String {
-        match &self.action {
-            PipeAction::CoreDirected(w) => w.track_to(),
-            PipeAction::FabricDirected(w) => w.track_to(),
-            PipeAction::Reflected => "?".to_string(),
-        }
-    }
-
-    fn track(&self) -> bool {
-        self.track
-    }
-}
-
-#[derive(strum_macros::Display)]
-pub enum PipeAction {
-    CoreDirected(Traversal<DirectedWave>),
-    FabricDirected(Traversal<DirectedWave>),
-    Reflected,
-}
-
-/// The idea here is to eventually move this funcitionality into it's own crate 'mesh-bindex'
-/// this mod basically enforces the bind
-
-#[derive(Clone)]
-pub struct FieldState<P>
-where
-    P: Platform + 'static,
-{
-    point: Point,
-    pipe_exes: Arc<DashMap<String, PipeEx<P>>>,
-}
-
-impl<P> FieldState<P>
-where
-    P: Platform + 'static,
-{
-    pub fn new(point: Point) -> Self {
-        Self {
-            point,
-            pipe_exes: Arc::new(DashMap::new()),
-        }
-    }
 }

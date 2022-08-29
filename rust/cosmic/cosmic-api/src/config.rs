@@ -289,9 +289,9 @@ pub mod config {
 
         #[derive(Debug, Clone)]
         pub enum PipelineStopDef<Pnt> {
-            Internal,
+            Core,
             Call(CallDef<Pnt>),
-            Respond,
+            Reflect,
             Point(Pnt),
             Err{ status: u16, msg: String }
         }
@@ -306,9 +306,9 @@ pub mod config {
         impl ToResolved<PipelineStop> for PipelineStopCtx {
             fn to_resolved(self, env: &Env) -> Result<PipelineStop, MsgErr> {
                 Ok(match self {
-                    PipelineStopCtx::Internal => PipelineStop::Internal,
+                    PipelineStopCtx::Core => PipelineStop::Core,
                     PipelineStopCtx::Call(call) => PipelineStop::Call(call.to_resolved(env)?),
-                    PipelineStopCtx::Respond => PipelineStop::Respond,
+                    PipelineStopCtx::Reflect => PipelineStop::Reflect,
                     PipelineStopCtx::Point(point) => PipelineStop::Point(point.to_resolved(env)?),
                     PipelineStopCtx::Err { status, msg } => PipelineStop::Err{ status, msg }
                 })
@@ -318,9 +318,9 @@ pub mod config {
         impl ToResolved<PipelineStopCtx> for PipelineStopVar {
             fn to_resolved(self, env: &Env) -> Result<PipelineStopCtx, MsgErr> {
                 Ok(match self {
-                    PipelineStopVar::Internal => PipelineStopCtx::Internal,
+                    PipelineStopVar::Core => PipelineStopCtx::Core,
                     PipelineStopVar::Call(call) => PipelineStopCtx::Call(call.to_resolved(env)?),
-                    PipelineStopVar::Respond => PipelineStopCtx::Respond,
+                    PipelineStopVar::Reflect => PipelineStopCtx::Reflect,
                     PipelineStopVar::Point(point) => {
                         PipelineStopCtx::Point(point.to_resolved(env)?)
                     }

@@ -194,6 +194,16 @@ where
             UltraWaveDef::Signal(w) => w.id.clone(),
         }
     }
+
+    pub fn body(&self) -> &Substance {
+        match self {
+            UltraWaveDef::Ping(ping) => &ping.body,
+            UltraWaveDef::Pong(pong) => &pong.core.body,
+            UltraWaveDef::Ripple(ripple) => &ripple.body,
+            UltraWaveDef::Echo(echo) => &echo.core.body,
+            UltraWaveDef::Signal(signal) => &signal.core.body
+        }
+    }
 }
 
 impl UltraWave {
@@ -215,8 +225,7 @@ impl UltraWave {
     }
 
     pub fn wrap_in_transport(self, from: Port, to: Port) -> DirectedProto {
-        let mut signal = DirectedProto::ping();
-        signal.kind(DirectedKind::Signal);
+        let mut signal = DirectedProto::signal();
         signal.fill(&self);
         signal.from(from);
         signal.agent(self.agent().clone());
@@ -1030,6 +1039,7 @@ impl Into<DirectedProto> for Wave<Ping> {
             kind: None,
             bounce_backs: None,
             track: self.track,
+            via: self.via
         }
     }
 }
@@ -1312,6 +1322,7 @@ pub struct DirectedProto {
     pub agent: Option<Agent>,
     pub kind: Option<DirectedKind>,
     pub bounce_backs: Option<BounceBacks>,
+    pub via: Option<Port>,
     pub track: bool,
 }
 impl Trackable for DirectedProto {
@@ -1454,6 +1465,11 @@ impl DirectedProto {
         self.agent.replace(agent);
     }
 
+    pub fn bounce_backs(&mut self, bounce_backs: BounceBacks) {
+        self.bounce_backs.replace(bounce_backs);
+    }
+
+
     pub fn scope(&mut self, scope: Scope) {
         self.scope.replace(scope);
     }
@@ -1462,12 +1478,20 @@ impl DirectedProto {
         self.handling.replace(handling);
     }
 
-    pub fn kind(&mut self, kind: DirectedKind) {
-        self.kind.replace(kind);
+    pub fn kind(kind: &DirectedKind) -> Self {
+        match kind {
+            DirectedKind::Ping => Self::ping(),
+            DirectedKind::Ripple => Self::ripple(),
+            DirectedKind::Signal => Self::signal()
+        }
     }
 
     pub fn body(&mut self, body: Substance) {
         self.core.body = body;
+    }
+
+    pub fn uri(&mut self, uri: Uri) {
+        self.core.uri = uri;
     }
 
     pub fn core(&mut self, core: DirectedCore) -> Result<(), MsgErr> {
@@ -1485,6 +1509,17 @@ impl DirectedProto {
 
     pub fn from<P: ToPort>(&mut self, from: P) {
         self.from.replace(from.to_port());
+    }
+
+    pub fn via<P: ToPort>(&mut self, via: Option<P>) {
+        match via {
+            None => {
+                self.via = None;
+            }
+            Some(via) => {
+                self.via.replace(via.to_port());
+            }
+        }
     }
 }
 
@@ -1569,6 +1604,7 @@ impl Default for DirectedProto {
             agent: None,
             kind: None,
             bounce_backs: None,
+            via: None,
             track: false,
         }
     }
@@ -1761,6 +1797,28 @@ impl<'a> RecipientSelector<'a> {
 
 pub type DirectedWave = DirectedWaveDef<Recipients>;
 pub type SingularDirectedWave = DirectedWaveDef<Port>;
+
+impl Into<DirectedProto> for DirectedWave {
+    fn into(self) -> DirectedProto {
+        let mut proto = DirectedProto {
+            id: self.id().clone(),
+            kind: Some(self.directed_kind()),
+            ..DirectedProto::default()
+        };
+        proto.id = self.id().clone();
+        proto.core(self.core().clone());
+        proto.to(self.to());
+        proto.from(self.from().clone());
+        proto.agent(self.agent().clone());
+        proto.scope(self.scope().clone());
+        proto.handling(self.handling().clone());
+        proto.track = self.track();
+        proto.bounce_backs(self.bounce_backs());
+        proto.agent(self.agent().clone());
+        proto.via(self.via().clone());
+        proto
+    }
+}
 
 impl Trackable for DirectedWave {
     fn track_id(&self) -> String {
@@ -2112,6 +2170,15 @@ where
         }
     }
 
+    pub fn directed_kind(&self) -> DirectedKind{
+        match self {
+            DirectedWaveDef::Ping(_) => DirectedKind::Ping,
+            DirectedWaveDef::Ripple(_) => DirectedKind::Ripple,
+            DirectedWaveDef::Signal(_) => DirectedKind::Signal
+        }
+    }
+
+
     pub fn core(&self) -> &DirectedCore {
         match self {
             DirectedWaveDef::Ping(ping) => &ping.core,
@@ -2119,8 +2186,17 @@ where
             DirectedWaveDef::Signal(signal) => &signal.core,
         }
     }
+
+    pub fn core_mut(&mut self) -> &mut DirectedCore {
+        match self {
+            DirectedWaveDef::Ping(ping) => &mut ping.core,
+            DirectedWaveDef::Ripple(ripple) => &mut ripple.core,
+            DirectedWaveDef::Signal(signal) => &mut signal.core,
+        }
+    }
 }
 
+#[derive(Clone)]
 pub struct Reflection {
     pub kind: ReflectedKind,
     pub to: Port,
@@ -2189,6 +2265,7 @@ pub enum ReflectedWave {
     Pong(Wave<Pong>),
     Echo(Wave<Echo>),
 }
+
 
 impl Trackable for ReflectedWave {
     fn track_id(&self) -> String {
@@ -2617,8 +2694,7 @@ impl Wave<Signal> {
     }
 
     pub fn wrap_in_hop(self, from: Port, to: Port) -> DirectedProto {
-        let mut signal = DirectedProto::ping();
-        signal.kind(DirectedKind::Signal);
+        let mut signal = DirectedProto::signal();
         signal.from(from);
         signal.agent(self.agent.clone());
         signal.handling(self.handling.clone());
@@ -3456,6 +3532,20 @@ where
 }
 
 impl ReflectedCore {
+
+    pub fn to_err(&self) -> Result<MsgErr,MsgErr> {
+        if self.status.is_success() {
+            Err("cannot convert a success into an error".into())
+        } else {
+            if let Substance::Errors(errors) = &self.body {
+                Err(errors.to_cosmic_err())
+            } else {
+                Err(self.status.to_string().into())
+            }
+        }
+    }
+
+
     pub fn ok_html(html: &str) -> Self {
         let bin = Arc::new(html.to_string().into_bytes());
         ReflectedCore::ok_body(Substance::Bin(bin))

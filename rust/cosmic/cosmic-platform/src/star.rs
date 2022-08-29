@@ -2,7 +2,6 @@ use crate::driver::{
     Driver, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, DriverSkel, DriverStatus,
     Drivers, DriversApi, DriversCall, HyperDriverFactory, Item, ItemHandler, ItemSkel, ItemSphere,
 };
-use crate::field::{Field, FieldState};
 use crate::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
 use crate::machine::MachineSkel;
 use crate::shell::Shell;
@@ -54,16 +53,17 @@ use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 use tokio::time::error::Elapsed;
 use tracing::{error, info};
 use crate::driver::DriverRunnerCall::Handle;
+use crate::field::Field;
 
 #[derive(Clone)]
 pub struct StarState<P>
 where
     P: Platform + 'static,
 {
+    phantom: PhantomData<P>,
     states: Arc<DashMap<Port, Arc<RwLock<dyn State>>>>,
     topic: Arc<DashMap<Port, Arc<dyn TopicHandler>>>,
     tx: mpsc::Sender<StateCall>,
-    field: Arc<DashMap<Point, FieldState<P>>>,
     shell: Arc<DashMap<Point, ShellState>>,
 }
 
@@ -71,10 +71,6 @@ impl<P> StarState<P>
 where
     P: Platform + 'static,
 {
-    pub fn create_field(&self, point: Point) {
-        self.field.insert(point.clone(), FieldState::new(point));
-    }
-
     pub fn create_shell(&self, point: Point) {
         self.shell.insert(point.clone(), ShellState::new(point));
     }
@@ -113,9 +109,9 @@ where
         Self {
             states,
             topic: Arc::new(DashMap::new()),
-            field: Arc::new(DashMap::new()),
             shell: Arc::new(DashMap::new()),
             tx,
+            phantom: PhantomData::default()
         }
     }
 
@@ -158,18 +154,6 @@ where
         }
     }
 
-    pub fn find_field(&self, point: &Point) -> Result<FieldState<P>, MsgErr> {
-        let rtn = self
-            .field
-            .get(point)
-            .ok_or(format!(
-                "expected field state for point: {}",
-                point.to_string()
-            ))?
-            .value()
-            .clone();
-        Ok(rtn)
-    }
 
     pub fn find_shell(&self, point: &Point) -> Result<ShellState, MsgErr> {
         Ok(self
@@ -919,7 +903,6 @@ println!("Hyperway Relay terminated!!!");
     }
 
     async fn create_states(&self, point: Point) {
-        self.skel.state.create_field(point.clone());
         self.skel.state.create_shell(point.clone());
     }
 
@@ -1128,9 +1111,10 @@ println!("Transporting to {}", transport.to.to_string() );
         if let Some(adjacent) = self.golden_path.get(star_key) {
             Ok(Some(adjacent.value().clone()))
         } else {
-            println!("Find next hop...");
-            let mut ripple = DirectedProto::ping();
-            ripple.kind(DirectedKind::Ripple);
+
+            panic!("Find next hop...");
+            /*
+            let mut ripple = DirectedProto::ripple();
             ripple.method(SysMethod::Search);
             ripple.body(Substance::Sys(Sys::Search(Search::Star(star_key.clone()))));
             ripple.bounce_backs = Some(BounceBacks::Count(self.skel.adjacents.len()));
@@ -1165,6 +1149,8 @@ println!("Transporting to {}", transport.to.to_string() );
                     Ok(Some(key))
                 }
             }
+
+             */
         }
     }
 
@@ -1537,10 +1523,6 @@ println!("Dir: {} injector: {} to: {} && to: {} from: {}", dir.to_string(), inje
                 let field = Field::new(
                     traversal.point.clone(),
                     self.skel.clone(),
-                    self.skel
-                        .state
-                        .find_field(&traversal.to.clone().with_layer(Layer::Field))?,
-                    traversal.logger.clone(),
                 );
                 tokio::spawn(async move {
                     let logger = logger.push_action("Field").unwrap();
@@ -2074,10 +2056,6 @@ where
                 .await?
                 .contains(&assign.details.stub.kind)
             {
-                // create field and shell
-                self.skel
-                    .state
-                    .create_field(assign.details.stub.point.clone());
                 self.skel
                     .state
                     .create_shell(assign.details.stub.point.clone());

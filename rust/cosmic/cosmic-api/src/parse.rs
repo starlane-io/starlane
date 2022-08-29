@@ -6440,7 +6440,7 @@ pub fn request_payload_filter_block<I: Span>(input: I) -> Res<I, PayloadBlockVar
         )),
         multispace0,
     ))(input)
-    .map(|(next, (_, block, _))| (next, PayloadBlockVar::RequestPattern(block)))
+    .map(|(next, (_, block, _))| (next, PayloadBlockVar::DirectPattern(block)))
 }
 
 pub fn response_payload_filter_block<I: Span>(input: I) -> Res<I, PayloadBlockVar> {
@@ -6460,7 +6460,7 @@ pub fn response_payload_filter_block<I: Span>(input: I) -> Res<I, PayloadBlockVa
             tag("]"),
         ),
     )(input)
-    .map(|(next, (_, block, _))| (next, PayloadBlockVar::ResponsePattern(block)))
+    .map(|(next, (_, block, _))| (next, PayloadBlockVar::ReflectPattern(block)))
 }
 
 pub fn rough_pipeline_step<I: Span>(input: I) -> Res<I, I> {
@@ -6765,11 +6765,11 @@ pub fn core_pipeline_stop<I: Span>(input: I) -> Res<I, PipelineStopVar> {
             tag("))"),
         ),
     )(input)
-    .map(|(next, _)| (next, PipelineStopVar::Internal))
+    .map(|(next, _)| (next, PipelineStopVar::Core))
 }
 
 pub fn return_pipeline_stop<I: Span>(input: I) -> Res<I, PipelineStopVar> {
-    tag("&")(input).map(|(next, _)| (next, PipelineStopVar::Respond))
+    tag("&")(input).map(|(next, _)| (next, PipelineStopVar::Reflect))
 }
 
 pub fn call_pipeline_stop<I: Span>(input: I) -> Res<I, PipelineStopVar> {

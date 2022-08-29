@@ -400,7 +400,6 @@ async fn create(
     );
 
     let mut wave = DirectedProto::ping();
-    wave.kind(DirectedKind::Ping);
     wave.to(star_api.get_skel().await?.point.clone().to_port());
     wave.from(HYPERUSER.clone());
     wave.agent(Agent::HyperUser);
@@ -462,12 +461,12 @@ fn test_gravity_routing() -> Result<(), TestErr> {
 
         panic!("far enough");
 
+
         let mut to_fabric_rx = skel.diagnostic_interceptors.to_gravity.subscribe();
         let mut from_hyperway_rx = skel.diagnostic_interceptors.from_hyperway.subscribe();
 
         // send a 'nice' wave from Fae to Less
         let mut wave = DirectedProto::ping();
-        wave.kind(DirectedKind::Ping);
         wave.from(FAE.clone().to_port());
         wave.to(LESS.clone().to_port());
         wave.method(MsgMethod::new("DieTacEng").unwrap());
@@ -646,7 +645,6 @@ fn test_layer_traversal() -> Result<(), TestErr> {
 
         // send a 'nice' wave from Fae to Less
         let mut wave = DirectedProto::ping();
-        wave.kind(DirectedKind::Ping);
         wave.from(FAE.clone().to_port());
         wave.to(LESS.clone().to_port());
         wave.method(CmdMethod::Bounce);

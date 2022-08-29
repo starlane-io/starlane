@@ -53,7 +53,7 @@ use cosmic_api::log::RootLogger;
 
 pub mod control;
 pub mod driver;
-pub mod field;
+//pub mod field2;
 pub mod global;
 pub mod host;
 pub mod machine;
@@ -63,6 +63,7 @@ pub mod state;
 pub mod tests;
 pub mod base;
 pub mod space;
+pub mod field;
 
 #[no_mangle]
 pub extern "C" fn cosmic_uuid() -> String {
