@@ -397,7 +397,6 @@ impl Hyperlane {
                 while let Some(call) = rx.recv().await {
                     match call {
                         HyperlaneCall::Ext(ext_tx) => {
-                            println!("<{}> Ext added! ({})", label, ext.is_some());
                             ext.replace(ext_tx);
                         }
                         HyperlaneCall::Transform(filter) => {
@@ -405,11 +404,7 @@ impl Hyperlane {
                         }
                         HyperlaneCall::Wave(mut wave) => {
 
-                                println!("<{}> Hyperlane received wave: from: {} to {}",
-                                    label,
-                                wave.from().to_string(),
-                                wave.to().to_string()
-                            );
+
                             while queue.len() > 1024 {
                                 // start dropping the oldest messages
                                 queue.remove(0);
@@ -431,12 +426,7 @@ impl Hyperlane {
                             for wave in queue.drain(..) {
                                 #[cfg(test)]
                                 let wave_cp = wave.clone();
-                                println!(
-                                    "<{}> Hyperlane relay wave... from: {} to: {}",
-                                    label,
-                                    wave.from().to_string(),
-                                    wave.to().to_string()
-                                );
+
                                 match ext_tx.send(wave).await {
                                     Ok(_) => {
                                         #[cfg(test)]
@@ -444,14 +434,12 @@ impl Hyperlane {
                                     }
                                     Err(err) =>
                                         {
-println!("ERR:/// {}",err.to_string());
                                         tx.send(HyperlaneCall::ResetExt).await;
                                         tx.try_send(HyperlaneCall::Wave(err.0));
                                     }
                                 }
                             }
                         } else {
-                            println!("<{}> no ext", label);
 
                             }
                     }
@@ -518,18 +506,13 @@ impl HyperwayInterchange {
                 while let Some(call) = call_rx.recv().await {
                     match call {
                         HyperwayInterchangeCall::Internal(hyperway) => {
-logger.info(format!("Adding internal : hyperway.remote {} ",hyperway.remote.to_string()));
                             let mut rx = hyperway.inbound.rx(None).await;
                             hyperways.insert(hyperway.remote.clone(), hyperway);
                             let call_tx = call_tx.clone();
                             let logger = logger.clone();
                             tokio::spawn(async move {
                                 while let Some(wave) = rx.recv().await {
-                                    logger.info(
-                                        format!("Receive wave from hyperway: from: {} to: {}",
-                                        wave.from().to_string(),
-                                        wave.to().to_string())
-                                    );
+
                                     call_tx
                                         .send_timeout(
                                             HyperwayInterchangeCall::Wave(wave),
@@ -556,12 +539,6 @@ logger.info(format!("Adding internal : hyperway.remote {} ",hyperway.remote.to_s
                                     }
                                     Some(hyperway) => {
 
-                                        logger.info(
-                                            format!("Interchange wave sending to outbound from: {} to: {} ",
-                                                    wave.from().to_string(),
-                                                    wave.to().to_string()
-                                            )
-                                        );
                                         hyperway.outbound.send(wave).await;
                                     }
                                 },
@@ -588,7 +565,6 @@ logger.info(format!("Adding internal : hyperway.remote {} ",hyperway.remote.to_s
                                         .into()));
                                 }
                                 Some(hyperway) => {
-                                    logger.warn(format!("~~~ Mouting hyperway: {}", hyperway.remote.to_string()));
                                     let endpoint = hyperway.hyperway_endpoint_far(init_wave).await;
                                     rtn.send(Ok(endpoint));
                                 }
@@ -1439,12 +1415,10 @@ impl HyperClient where{
                     }
 
                     while let Some(wave) = from_runner_rx.recv().await {
-logger.info(format!("CLIENT received wave on client : from: {} to: {}", wave.from().to_string(), wave.to().to_string()));
                         if exchanger.is_some() {
                             if wave.is_directed() {
                                 to_client_listener_tx.send(wave)?;
                             } else {
-                                logger.info(format!("CLIENT received REFLECTED on client : from: {} to: {}", wave.from().to_string(), wave.to().to_string()));
                                 exchanger.as_ref().unwrap().reflected(wave.to_reflected()?).await?;
                             }
                         } else {
@@ -1707,7 +1681,6 @@ impl HyperClientRunner{
                         wave = ext.rx.recv() => {
                             match wave {
                                 Some( wave ) => {
-println!("Runner to_client_tx: from: {} to: {}", wave.from().to_string(), wave.to().to_string());
                                    runner.to_client_tx.send(wave).await;
                                 }
                                 None => {
@@ -1854,7 +1827,6 @@ impl Bridge {
         let local_hyperway_endpoint_tx = local_hyperway_endpoint.tx.clone();
         tokio::spawn( async move {
             while let Some(wave) = local_hyperway_endpoint.rx.recv().await {
-println!("BRIDGE routing from LOCAL -> CLIENT from: {} to {}", wave.from().to_string(), wave.to().to_string() );
                 client_router.route(wave).await;
             }
         });
@@ -1862,7 +1834,6 @@ println!("BRIDGE routing from LOCAL -> CLIENT from: {} to {}", wave.from().to_st
         let mut rx = client.rx();
         tokio::spawn( async move {
             while let Ok(wave) = rx.recv().await {
-println!("BRIDGE routing from CLIENT -> LOCAL from: {} to {}", wave.from().to_string(), wave.to().to_string() );
                 local_hyperway_endpoint_tx.send(wave).await;
             }
         });
@@ -2257,7 +2228,6 @@ pub mod test {
             hello.method(MsgMethod::new("Hello").unwrap());
             hello.body(Substance::Empty);
             let pong: Wave<Pong> = less_transmitter.direct(hello).await.unwrap();
-   println!("LESS RECEIVED STATUS: {}", pong.core.status.to_string());
             rtn.send(pong.core.status.as_u16() == 200u16);
         });
 

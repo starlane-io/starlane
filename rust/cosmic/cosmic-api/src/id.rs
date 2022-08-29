@@ -1636,18 +1636,12 @@ pub mod id {
         }
 
         async fn visit(&self, traversal: Traversal<UltraWave>) -> Result<(),MsgErr>{
-if traversal.kind() == WaveKind::Ripple{
-println!("Ripple visted: {}", self.port().to_string());
-}
-if traversal.kind() == WaveKind::Echo {
-   println!("Echo visted: {}", self.port().to_string());
-}
+
             if let Some(dest) = &traversal.dest {
                 if self.port().layer == *dest {
                     if traversal.is_directed() {
                         self.deliver_directed(traversal.unwrap_directed()).await?;
                     } else {
-println!("~~~~~~~~~ Port {} DEST: {}", self.port().to_string() , dest.to_string() );
                         self.deliver_reflected(traversal.unwrap_reflected()).await?;
                     }
                     return Ok(());
@@ -3307,7 +3301,6 @@ impl<W> Traversal<W> {
         match &next {
             None => {}
             Some(layer) => {
-println!("returning next layer: from {} to {}", self.layer.to_string(), layer.to_string()  );
                 self.layer = layer.clone();
             }
         }

@@ -191,8 +191,6 @@ where
         let mut gates = Arc::new(DashMap::new());
         let star_templates = template.with_machine_star(machine_name);
 
-println!("STAR TEMPLATES CREATE!");
-
         for star_template in star_templates {
             let star_point = star_template.key.clone().to_point();
             let star_port = star_point.clone().to_port().with_layer(Layer::Core);
@@ -245,7 +243,6 @@ println!("STAR TEMPLATES CREATE!");
                             .to_point()
                             .to_port()
                             .with_layer(Layer::Gravity);
-println!("Adding Connection on {} for {}", star_hop.to_string(), star.to_string() );
                         let hyperway = Hyperway::new(star, Agent::HyperUser);
                         interchange.add(hyperway).await;
                     }
@@ -253,11 +250,8 @@ println!("Adding Connection on {} for {}", star_hop.to_string(), star.to_string(
             }
 
             gates.insert(InterchangeKind::Star(star_template.key.clone()), gate);
-
-println!("creating STAR....");
             let star_api = Star::new(star_skel.clone(), drivers, hyperway_endpoint, interchange.clone(), star_tx).await?;
             stars.insert(star_point.clone(), star_api);
-println!("STAR CREATED: {}", star_point.to_string());
         }
 
         let mut gate_selector = Arc::new(HyperGateSelector::new(gates));
@@ -408,7 +402,6 @@ println!("STAR CREATED: {}", star_point.to_string());
                 }
                 MachineCall::EndpointFactory { from, to, rtn } => {
                     let factory = Box::new(MachineHyperwayEndpointFactory::new( from, to, self.call_tx.clone() ));
-println!("^^^Rtn HyperClient");
                     rtn.send(factory).unwrap_or_default();
                 }
                 #[cfg(test)]

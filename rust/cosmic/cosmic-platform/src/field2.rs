@@ -77,13 +77,10 @@ where
                 match reflected {
                     ReflectedAggregate::None => {}
                     ReflectedAggregate::Single(reflected) => {
-println!("HANDLE REFLECTED");
                         self.handle_reflected(reflected).await;
                     }
                     ReflectedAggregate::Multi(multi) => {
-println!("HANDLE REFLECTED(multi)");
                         for reflected in multi {
-println!("handling...");
                             self.handle_reflected(reflected).await;
                         }
                     }
@@ -153,7 +150,6 @@ println!(" FIELD GOT HERE!");
 
         if let PipeAction::Reflected = action {
             let wave = pipex.reflect().payload.to_ultra();
-            println!("!!! PipeAction::Reflected {}", wave.to().to_string());
             self.skel.gravity_router.route(wave).await;
             return Ok(());
         }

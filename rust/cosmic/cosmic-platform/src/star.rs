@@ -715,15 +715,12 @@ where
             let star_tx = star_tx.clone();
             let skel = skel.clone();
             tokio::spawn(async move {
-println!("Start Hyperway Relay!!!");
                 while let Some(wave) = hyperway_endpoint.rx.recv().await {
-println!("Received ultrawave from Hyperway...");
                     star_tx
                         .send(StarCall::FromHyperway { wave, rtn: None })
                         .await;
                 }
                 skel.status_tx.send(Status::Panic).await.unwrap_or_default();
-println!("Hyperway Relay terminated!!!");
             });
         }
 
@@ -777,7 +774,6 @@ println!("Hyperway Relay terminated!!!");
                                     Ok(remote_factory) => {
                                         match Bridge::new(local_endpoint, remote_factory, logger.push_point("endpoint").unwrap() ) {
                                             Ok(_) => {
-                                                println!("BRIDGE CREATED!")
                                             }
                                             Err(err) => {
                                                 skel.logger.error(format!("could not create Bridge for remote connection: {} because {}", stub.key.to_string(), err.to_string()) );
@@ -907,7 +903,6 @@ println!("Hyperway Relay terminated!!!");
     }
 
     async fn init_drivers(&self) {
-        self.skel.logger.info("Star::init_drivers()");
         self.drivers.init().await;
     }
 
@@ -915,7 +910,6 @@ println!("Hyperway Relay terminated!!!");
     // a Wave<Signal> of the SysMethod<Hop> which should in turn contain a SysMethod<Transport> Signal
     #[track_caller]
     async fn from_hyperway(&self, wave: UltraWave) -> Result<(), P::Err> {
-println!("from_hyperway...");
         self.skel
             .logger
             .track(&wave, || Tracker::new("from_hyperway", "Receive"));
@@ -936,7 +930,6 @@ println!("from_hyperway...");
             return self.skel.err("transport signal exceeded max hops");
         }
 
-println!("transport.to == {} & from == {} && this is: {}", transport.to.to_string(), transport.from.to_string(), self.skel.point.to_string()  );
         if transport.to.point == self.skel.point {
             // we are now going to send this transport down the layers to the StarCore
             // where it's contents will be unwrapped from transport and routed to the appropriate particle
@@ -974,9 +967,6 @@ println!("transport.to == {} & from == {} && this is: {}", transport.to.to_strin
     // sent to GLOBAL::registry if addressed in such a way
     #[track_caller]
     async fn to_gravity(&self, wave: UltraWave) -> Result<(), P::Err> {
-if wave.kind() == WaveKind::Ripple {
-    println!("%%%>   WaveKind::Ripple to_gravity");
-}
         #[cfg(test)]
         self.skel
             .diagnostic_interceptors
@@ -1020,7 +1010,6 @@ if wave.kind() == WaveKind::Ripple {
             {
                 match wave {
                     UltraWave::Ripple(ripple) => {
-println!("~~~ SHARDING Ripple ...");
                         let mut map =
                             shard_ripple_by_location(ripple, &skel.adjacents, &skel.registry)
                                 .await?;
@@ -1035,7 +1024,6 @@ println!("~~~ SHARDING Ripple ...");
                             let transport = transport.build()?;
                             let transport = transport.to_signal()?;
 if transport.to.to_string().contains("central:central") {
-    println!("Ripple To Hyperway: {}", transport.to.to_string());
     skel.api.to_hyperway(transport).await;
 }
                         }
@@ -1082,7 +1070,6 @@ if transport.to.to_string().contains("central:central") {
             )?;
             Ok(())
         } else if self.skel.adjacents.contains_key(&transport.to.point) {
-println!("Transporting to {}", transport.to.to_string() );
             let to = transport.to.clone();
             logger.result(
                 self.hyperway_transmitter
@@ -1185,7 +1172,6 @@ println!("Transporting to {}", transport.to.to_string() );
      */
 
     async fn wrangle(&self, rtn: oneshot::Sender<Result<StarWrangles, MsgErr>>) {
-        println!("Find next hop...");
         let skel = self.skel.clone();
         let router = LayerInjectionRouter::new( self.skel.clone(), self.skel.point.to_port().with_layer(Layer::Shell));
         let mut transmitter = ProtoTransmitterBuilder::new(
@@ -1208,7 +1194,6 @@ println!("Transporting to {}", transport.to.to_string() );
             ripple.body(Substance::Sys(Sys::Search(Search::Kinds)));
             ripple.bounce_backs = Some(BounceBacks::Count(skel.adjacents.len()));
             ripple.to(Recipients::Stars);
-ripple.track = true;
             let echoes: Echoes = match transmitter.direct(ripple).await {
                 Ok(echoes) => echoes,
                 Err(err) => {
@@ -1315,9 +1300,6 @@ where
             .start_layer_traversal_wave
             .send(wave.clone())
             .unwrap_or_default();
-if wave.kind() == WaveKind::Echo {
-    println!("Start layer traverseal for {} ", wave.kind().to_string());
-}
 
         let logger = self
             .skel
@@ -1357,9 +1339,6 @@ if wave.kind() == WaveKind::Echo {
         };
 
         for to in tos {
-if wave.kind() == WaveKind::Echo{
-    println!("Stack Sending Echo to: {} ",to.to_string() );
-}
             let record = match self.skel.registry.locate(&to.point).await {
                 Ok(record) => record,
                 Err(err) => {
@@ -1380,9 +1359,6 @@ if wave.kind() == WaveKind::Echo{
             // if this delivery was from_hyperway, then it was certainly a message being routed back to the star
             // and is not considered an inter point delivery
             if !from_hyperway && to.point == wave.from().point {
-if wave.kind() == WaveKind::Echo {
-println!(" Hyper SPAZ!")
-}
                 // it's the SAME point, so the to layer becomes our dest
                 dest.replace(to.layer.clone());
 
@@ -1407,14 +1383,8 @@ println!(" Hyper SPAZ!")
                 // if this wave was injected by the from Particle, then we need to first
                 // traverse towards the fabric
                 if injector.point == wave.from().point {
-if wave.kind() == WaveKind::Echo {
-println!("Z OOO GOOO !")
-}
                     dir = TraversalDirection::Fabric;
                 } else {
-                    if wave.kind() == WaveKind::Echo {
-                        println!("BOGO!")
-                    }
 
                     // if this was injected by something else (like the Star)
                     // then it needs to traverse towards the Core
@@ -1427,9 +1397,6 @@ println!("Z OOO GOOO !")
             }
 
 
-            if wave.kind() == WaveKind::Echo {
-    println!("Dir: {} injector: {} to: {} && to: {} from: {}", dir.to_string(), injector.to_string(), wave.to().to_string(), to.to_string(), wave.from().to_string() );
-}
 
             let traversal_logger = self
                 .skel
@@ -1456,10 +1423,6 @@ println!("Z OOO GOOO !")
                 point,
             );
 
-            if wave.kind() == WaveKind::Echo {
-                println!("Echo is a traversal {}", traversal.to.to_string() );
-            }
-
             // in the case that we injected into a layer that is not part
             // of this plan, we need to send the traversal to the next layer
             if !self.has_layer(&traversal.layer) {
@@ -1479,7 +1442,6 @@ println!("Z OOO GOOO !")
                 .send(traversal.clone())
                 .unwrap_or_default();
 
-                println!("{} is visiting first layer {}", traversal.kind().to_string(), traversal.layer.to_string());
 
                 // alright, let's visit the injection layer first...
            self.visit_layer(traversal).await?;
@@ -1507,7 +1469,6 @@ println!("Z OOO GOOO !")
     async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(), MsgErr> {
 
         let logger = self.skel.logger.push_mark("stack-traversal:visit")?;
-        logger.info(format!("{} is visiting layer {} on its way to: {}", traversal.kind().to_string(), traversal.layer.to_string(), traversal.to.to_string() ));
         logger.track(&traversal, || {
             Tracker::new(
                 format!("visit:layer@{}", traversal.layer.to_string()),
@@ -1539,7 +1500,6 @@ println!("Z OOO GOOO !")
                 let logger = logger.clone();
                 tokio::spawn(async move {
                     let logger = logger.push_action("Shell").unwrap();
-println!("Shell visit for {}",traversal.kind().to_string());
                     logger
                         .result(shell.visit(traversal).await)
                         .unwrap_or_default();
@@ -1572,7 +1532,6 @@ println!("Shell visit for {}",traversal.kind().to_string());
 
         let next = traversal.next();
 
-        logger.info(format!("{} is Traversing to the next layer from {}", traversal.kind().to_string(), traversal.layer.to_string()));
         match next {
             None => match traversal.dir {
                 TraversalDirection::Fabric => {
@@ -2106,14 +2065,9 @@ where
         where
             E: Platform,
         {
-println!();
-println!();
-println!();
+
 println!();
 println!("--->   Handle Search Request!!!   <----");
-println!();
-println!();
-println!();
 println!();
             let discovery = Discovery {
                 star_kind: star.skel.kind.clone(),
@@ -2146,7 +2100,6 @@ println!();
                     }
                 }
                 Search::Kinds => {
-println!("Returning Kinds: ");
                     return CoreBounce::Reflected(ReflectedCore::result(reflect(self, &ctx).await));
                 }
             }
@@ -2350,7 +2303,6 @@ where
         Recipients::Stars => {
             let mut map = HashMap::new();
             for (star, _) in adjacent {
-println!("   ADDING ADJACENT!!!");
                 map.insert(star.clone(), Recipients::Stars);
             }
             Ok(map)

@@ -907,8 +907,6 @@ where
                 let transmitter = transmitter.build();
                 let to = direct.to.clone();
                 let reflection = direct.reflection();
-let kind = direct.kind();
-println!("Handling: from: {} to: {}", direct.payload.from().to_string(), to.to_string() );
                 let ctx = RootInCtx::new(direct.payload, to, logger, transmitter);
 
                 match item.handle(ctx).await {
@@ -916,10 +914,8 @@ println!("Handling: from: {} to: {}", direct.payload.from().to_string(), to.to_s
                     CoreBounce::Reflected(reflected) => {
                         let reflection = reflection.unwrap();
 
-println!("Reflection: to: {}", reflection.to.to_string() );
                         let wave = reflection.make(reflected, self.port.clone());
                         let wave = wave.to_ultra();
-println!("reflecting: {} from {} sending to: {}", wave.kind().to_string(), kind.to_string(), wave.to().to_string());
                         #[cfg(test)]
                         self.skel
                             .diagnostic_interceptors
