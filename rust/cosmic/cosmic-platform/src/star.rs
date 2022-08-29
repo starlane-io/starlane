@@ -1023,9 +1023,7 @@ where
                             transport.from(skel.point.clone().to_port());
                             let transport = transport.build()?;
                             let transport = transport.to_signal()?;
-if transport.to.to_string().contains("central:central") {
-    skel.api.to_hyperway(transport).await;
-}
+                            skel.api.to_hyperway(transport).await;
                         }
                     }
                     _ => {
@@ -1202,9 +1200,12 @@ if transport.to.to_string().contains("central:central") {
                 }
             };
 
+            println!("Echoes: {}", echoes.len() );
+
             let mut coalated = vec![];
             for echo in echoes {
                 if let Substance::Sys(Sys::Discoveries(discoveries)) = &echo.core.body {
+println!("Discoveries: {}", discoveries.len() );
                     for discovery in discoveries.iter() {
                         coalated.push(StarDiscovery::new(
                             StarPair::new(
@@ -1215,13 +1216,15 @@ if transport.to.to_string().contains("central:central") {
                         ));
                     }
                 } else {
-                    // logger.warn("unexpected reflected core substance from search echo");
+                     skel.logger.warn("unexpected reflected core substance from search echo");
                 }
             }
 
             coalated.sort();
 
+println!("coalated: {}", coalated.len() );
             skel.wrangles.add(coalated);
+println!("skel.wrangles: {}", skel.wrangles.wrangles.len());
             rtn.send(Ok(skel.wrangles.clone())).unwrap_or_default();
         });
     }
@@ -2126,6 +2129,7 @@ impl StarWrangles {
                         let mut wrangler = RoundRobinWrangleSelector::new(kind.clone());
                         wrangler.stars.push(discovery.clone());
                         wrangler.sort();
+                        self.wrangles.insert(kind, wrangler);
                     }
                     Some(mut wrangler) => {
                         let mut wrangler = wrangler.value_mut();

@@ -487,7 +487,6 @@ impl Default for MachineTemplate {
         let constellation = "central".to_string();
 
         let mut central = StarTemplate::new(StarKey::central(), StarSub::Central);
-        /*
         let mut nexus = StarTemplate::new(
             StarKey::new(&constellation, &StarHandle::name("nexus")),
             StarSub::Nexus,
@@ -528,17 +527,14 @@ impl Default for MachineTemplate {
         fold.connect(nexus.to_stub());
 
 
-         */
         let mut stars = vec![];
         stars.push(central);
-        /*
         stars.push(nexus);
         stars.push(supe);
         stars.push(maelstrom);
         stars.push(scribe);
         stars.push(jump);
         stars.push(fold);
-         */
 
         Self { stars }
     }
