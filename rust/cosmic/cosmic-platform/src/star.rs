@@ -1426,9 +1426,6 @@ println!("Z OOO GOOO !")
                 }
             }
 
-if wave.kind() == WaveKind::Ripple{
-println!("Dir: {} injector: {} to: {} && to: {} from: {}", dir.to_string(), injector.to_string(), wave.to().to_string(), to.to_string(), wave.from().to_string() );
-}
 
             if wave.kind() == WaveKind::Echo {
     println!("Dir: {} injector: {} to: {} && to: {} from: {}", dir.to_string(), injector.to_string(), wave.to().to_string(), to.to_string(), wave.from().to_string() );
@@ -1536,12 +1533,13 @@ println!("Dir: {} injector: {} to: {} && to: {} from: {}", dir.to_string(), inje
                     self.skel.clone(),
                     self.skel
                         .state
-                        .find_shell(&traversal.to.clone().with_layer(Layer::Shell))?,
+                        .find_shell(&traversal.point.to_port().with_layer(Layer::Shell))?,
                 );
 
                 let logger = logger.clone();
                 tokio::spawn(async move {
                     let logger = logger.push_action("Shell").unwrap();
+println!("Shell visit for {}",traversal.kind().to_string());
                     logger
                         .result(shell.visit(traversal).await)
                         .unwrap_or_default();
@@ -1631,7 +1629,6 @@ where
 {
     async fn route(&self, wave: UltraWave) {
         let inject = TraversalInjection::new(self.injector.clone(), wave);
-println!("Injecting!");
         self.skel.inject_tx.send(inject).await;
     }
 

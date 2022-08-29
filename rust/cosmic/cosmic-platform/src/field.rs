@@ -107,7 +107,6 @@ where
             env.set_var("self.bind", bind.point().clone().into());
             env
         };
-println!("\n\nSTARTING PIPEX\n\n");
 
         // PipeEx will execute itself
         PipeEx::new(self.port.clone(), directed, route.block.clone(), env, self.shell_transmitter.clone(),self.skel.gravity_transmitter.clone(),self.logger.clone() );
@@ -214,14 +213,11 @@ impl PipeEx {
     async fn execute_stop( &mut self, stop: &PipelineStopVar) -> Result<(),MsgErr> {
         match stop {
             PipelineStopVar::Core => {
-println!("Executing CORE STOP! {} ", self.kind.to_string() );
                 let mut proto = self.proto();
-println!("SENDING TO: {}",self.port.with_layer(Layer::Core).to_string());
                 proto.to(self.port.with_layer(Layer::Core));
                 self.direct(proto, self.shell_transmitter.clone()).await
             }
             PipelineStopVar::Reflect => {
-println!("Executing CORE REFLECT! {}", self.kind.to_string());
                 let reflection = self.reflection.clone()?;
                 let mut core = ReflectedCore::status(self.status);
                 core.body = self.body.clone();
