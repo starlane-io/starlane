@@ -2065,10 +2065,6 @@ where
         where
             E: Platform,
         {
-
-println!();
-println!("--->   Handle Search Request!!!   <----");
-println!();
             let discovery = Discovery {
                 star_kind: star.skel.kind.clone(),
                 hops: ctx.wave().hops(),

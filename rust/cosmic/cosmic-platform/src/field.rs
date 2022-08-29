@@ -162,7 +162,9 @@ impl PipeEx {
                 self.logger.error(format!("{}",err.to_string()));
                 match &self.reflection {
                     Ok(reflection) => {
-                        let wave = reflection.clone().make(err.as_reflected_core(), self.port.clone() ).to_ultra();
+
+                        let wave = reflection.clone().make(err.as_reflected_core(), self.port.clone() );
+                        let wave = wave.to_ultra();
                         self.gravity_transmitter.route(wave).await;
                     }
                     Err(_) => {}

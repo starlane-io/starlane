@@ -18,7 +18,7 @@ use cosmic_api::wave::{
     Agent, Bounce, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector,
     DirectedProto, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter,
     ProtoTransmitterBuilder, RecipientSelector, Reflectable, ReflectedCore, ReflectedWave,
-    RootInCtx, Router, SetStrategy, UltraWave, Wave,
+    RootInCtx, Router, SetStrategy, UltraWave, Wave, WaveKind,
 };
 use cosmic_nom::new_span;
 use dashmap::mapref::one::Ref;
@@ -52,13 +52,12 @@ impl<P> TraversalLayer for Shell<P>
 where
     P: Platform + 'static,
 {
-
     fn port(&self) -> Port {
         self.state.point.clone().to_port().with_layer(Layer::Shell)
     }
 
     async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
-        self.skel.traverse_to_next_tx.send(traversal.clone() ).await;
+        self.skel.traverse_to_next_tx.send(traversal.clone()).await;
     }
 
     async fn inject(&self, wave: UltraWave) {
@@ -70,9 +69,10 @@ where
         &self.skel.exchanger
     }
 
-    async fn deliver_directed(&self, directed: Traversal<DirectedWave>) -> Result<(),MsgErr>{
-
-        if directed.from().point == self.port().point && directed.from().layer.ordinal() >= self.port().layer.ordinal() {
+    async fn deliver_directed(&self, directed: Traversal<DirectedWave>) -> Result<(), MsgErr> {
+        if directed.from().point == self.port().point
+            && directed.from().layer.ordinal() >= self.port().layer.ordinal()
+        {
             self.state.fabric_requests.insert(directed.id().clone());
         }
 
@@ -118,7 +118,7 @@ where
         &self,
         traversal: Traversal<DirectedWave>,
     ) -> Result<(), MsgErr> {
-       self.state.fabric_requests.insert(traversal.id().clone());
+        self.state.fabric_requests.insert(traversal.id().clone());
         self.traverse_next(traversal.wrap()).await;
         Ok(())
     }
@@ -127,8 +127,7 @@ where
         &self,
         traversal: Traversal<ReflectedWave>,
     ) -> Result<(), MsgErr> {
-
-       // println!("Shell reflected_core_bound: {}", traversal.kind().to_string() );
+        // println!("Shell reflected_core_bound: {}", traversal.kind().to_string() );
 
         if let Some(_) = self
             .state
@@ -137,10 +136,11 @@ where
         {
             self.traverse_next(traversal.to_ultra()).await;
         } else {
-
-            traversal
-                .logger
-                .warn(format!("filtered a response from {} to a request {} of which the Shell has no record", traversal.from().to_string(), traversal.reflection_of().to_short_string()));
+            traversal.logger.warn(format!(
+                "filtered a response from {} to a request {} of which the Shell has no record",
+                traversal.from().to_string(),
+                traversal.reflection_of().to_short_string()
+            ));
         }
         Ok(())
     }

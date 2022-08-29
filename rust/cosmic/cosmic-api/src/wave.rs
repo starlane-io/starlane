@@ -1378,6 +1378,7 @@ impl DirectedProto {
                 wave.agent = self.agent.unwrap_or_else(|| Agent::Anonymous);
                 wave.handling = self.handling.unwrap_or_else(|| Handling::default());
                 wave.scope = self.scope.unwrap_or_else(|| Scope::None);
+                wave.via = self.via;
                 wave.track = self.track;
                 wave.to_directed()
             }
@@ -1394,6 +1395,7 @@ impl DirectedProto {
                 wave.agent = self.agent.unwrap_or_else(|| Agent::Anonymous);
                 wave.handling = self.handling.unwrap_or_else(|| Handling::default());
                 wave.scope = self.scope.unwrap_or_else(|| Scope::None);
+                wave.via = self.via;
                 wave.track = self.track;
                 wave.to_directed()
             }
@@ -1411,6 +1413,7 @@ impl DirectedProto {
                 wave.agent = self.agent.unwrap_or_else(|| Agent::Anonymous);
                 wave.handling = self.handling.unwrap_or_else(|| Handling::default());
                 wave.scope = self.scope.unwrap_or_else(|| Scope::None);
+                wave.via = self.via;
                 wave.track = self.track;
                 wave.to_directed()
             }
