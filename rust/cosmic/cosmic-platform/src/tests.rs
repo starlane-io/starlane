@@ -6,7 +6,7 @@ use crate::control::ControlDriverFactory;
 use chrono::{DateTime, Utc};
 use cosmic_api::command::command::common::StateSrc;
 use cosmic_api::id::id::{Layer, ToPoint, ToPort, Uuid};
-use cosmic_api::id::TraversalDirection;
+use cosmic_api::id::{StarHandle, TraversalDirection};
 use cosmic_api::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
 use cosmic_api::msg::MsgMethod;
 use cosmic_api::sys::{Assign, AssignmentKind, InterchangeKind, Knock, Sys};
@@ -921,5 +921,39 @@ fn test_star_wrangle() -> Result<(), TestErr> {
         Ok(())
     })
 }
+
+
+#[test]
+fn test_golden_path() -> Result<(), TestErr> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async move {
+        // let (final_tx, final_rx) = oneshot::channel();
+
+        let platform = TestPlatform::new();
+        let machine_api = platform.machine();
+
+        tokio::time::timeout(Duration::from_secs(1), machine_api.wait_ready())
+            .await
+            .unwrap();
+
+        let fold = StarKey::new( &"central".to_string(), &StarHandle::new( "fold", 0));
+        let star_api = machine_api.get_star(fold).await?;
+
+        // first test if we can bounce nexus which fold should be directly connected too
+        let nexus = StarKey::new( &"central".to_string(), &StarHandle::new( "nexus", 0));
+        tokio::time::timeout(Duration::from_secs(5), star_api.bounce(nexus)).await??;
+        println!("Ok");
+
+        // this one should require a search operation in order to find
+        tokio::time::timeout(Duration::from_secs(5), star_api.bounce(StarKey::central())).await??;
+
+        println!("Ok");
+        Ok(())
+
+    })
+}
+
 
 

@@ -208,6 +208,24 @@ pub mod config {
             pub blocks: Vec<PayloadBlockDef<Pnt>>,
         }
 
+        impl <Pnt> PipelineStepDef<Pnt> {
+            pub fn direct() -> Self {
+                Self {
+                    entry: WaveDirection::Direct,
+                    exit: WaveDirection::Direct,
+                    blocks: vec![]
+                }
+            }
+
+            pub fn rtn() -> Self {
+                Self {
+                    entry: WaveDirection::Reflect,
+                    exit: WaveDirection::Reflect,
+                    blocks: vec![]
+                }
+            }
+        }
+
         impl ToResolved<PipelineStep> for PipelineStepCtx {
             fn to_resolved(self, env: &Env) -> Result<PipelineStep, MsgErr> {
                 let mut blocks = vec![];

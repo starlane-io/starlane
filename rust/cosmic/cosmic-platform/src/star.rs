@@ -5,7 +5,6 @@ use crate::driver::{
 use crate::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
 use crate::machine::MachineSkel;
 use crate::shell::Shell;
-use crate::star::StarCall::LayerTraversalInjection;
 use crate::state::ShellState;
 use crate::{DriversBuilder, PlatErr, Platform, Registry, RegistryApi};
 use cosmic_api::bin::Bin;
@@ -195,6 +194,7 @@ where
     pub status_tx: mpsc::Sender<Status>,
     pub status_rx: watch::Receiver<Status>,
     pub template: StarTemplate,
+    pub star_transmitter: ProtoTransmitter,
 
     #[cfg(test)]
     pub diagnostic_interceptors: DiagnosticInterceptors<P>,
@@ -247,6 +247,12 @@ where
             star_tx.drivers_status_rx.clone(),
         );
 
+        let star_router = LayerInjectionRouter::injector(star_tx.inject_tx.clone(), point.to_port().with_layer(Layer::Core));
+        let mut star_transmitter = ProtoTransmitterBuilder::new(Arc::new(star_router),exchanger.clone());
+        star_transmitter.from = SetStrategy::Override(point.to_port().with_layer(Layer::Core));
+        star_transmitter.agent = SetStrategy::Override(Agent::HyperUser);
+        let star_transmitter = star_transmitter.build();
+
         Self {
             api,
             key: template.key.clone(),
@@ -269,6 +275,7 @@ where
             drivers_traversal_tx: star_tx.drivers_traversal_tx.clone(),
             status_tx: star_tx.status_tx.clone(),
             status_rx: star_tx.status_rx.clone(),
+            star_transmitter,
             #[cfg(test)]
             diagnostic_interceptors: DiagnosticInterceptors::new(),
             template
@@ -379,6 +386,7 @@ where
     ToHyperway(Wave<Signal>),
     Shard(UltraWave),
     Wrangle(oneshot::Sender<Result<StarWrangles, MsgErr>>),
+    Bounce{key: StarKey, rtn:oneshot::Sender<Result<(), MsgErr>>},
     #[cfg(test)]
     GetSkel(oneshot::Sender<StarSkel<P>>),
 }
@@ -407,7 +415,7 @@ where
 {
     pub fn new(point: Point) -> Self {
         let (gravity_tx, mut gravity_rx) = mpsc::channel(1024);
-        let (inject_tx, mut inject_rx) = mpsc::channel(1024);
+        let (inject_tx, mut inject_rx): (mpsc::Sender<TraversalInjection>,mpsc::Receiver<TraversalInjection>) = mpsc::channel(1024);
         let (traverse_to_next_tx, mut traverse_to_next_rx): (
             mpsc::Sender<Traversal<UltraWave>>,
             mpsc::Receiver<Traversal<UltraWave>>,
@@ -547,6 +555,13 @@ where
         self.tx.send(StarCall::Wrangle(rtn)).await?;
         tokio::time::timeout(Duration::from_secs(5), rtn_rx).await??
     }
+
+    pub async fn bounce(&self, key: StarKey) -> Result<(), MsgErr> {
+        let (rtn, mut rtn_rx) = oneshot::channel();
+        self.tx.send(StarCall::Bounce{key,rtn}).await?;
+        tokio::time::timeout(Duration::from_secs(5), rtn_rx).await??
+    }
+
 
     pub async fn from_hyperway(&self, wave: UltraWave, results: bool) -> Result<(), MsgErr> {
         match results {
@@ -890,6 +905,9 @@ where
                     StarCall::Wrangle(rtn) => {
                         self.wrangle(rtn).await;
                     }
+                    StarCall::Bounce{key, rtn} => {
+                        self.bounce(key,rtn).await;
+                    }
                 }
             }
         });
@@ -1096,6 +1114,7 @@ where
     async fn find_next_hop(&self, star_key: &StarKey) -> Result<Option<StarKey>, MsgErr> {
         let logger = self.skel.logger.push_mark("hyperstar:find_next_hop")?;
         if let Some(adjacent) = self.skel.golden_path.get(star_key) {
+println!("Found next hop for: {}", star_key.to_string());
             Ok(Some(adjacent.value().clone()))
         } else {
 
@@ -1202,6 +1221,29 @@ where
         });
     }
 
+    async fn bounce(&self, key: StarKey, rtn: oneshot::Sender<Result<(),MsgErr>>) {
+        let transmitter = self.skel.star_transmitter.clone();
+        let logger = self.skel.logger.clone();
+        tokio::spawn(async move {
+            let mut proto = DirectedProto::ping();
+            proto.method(CmdMethod::Bounce);
+            proto.to(key.to_point().to_port().with_layer(Layer::Core));
+            let pong: Wave<Pong> = match transmitter.direct(proto).await {
+                Ok(pong) => pong,
+                Err(err) => {
+                    rtn.send(Err(err));
+                    return;
+                }
+            };
+
+            if pong.core.status.is_success() {
+                rtn.send(Ok(()));
+            } else {
+                rtn.send(Err(pong.core.to_err()));
+            }
+        });
+    }
+
     /*
     async fn search_for_stars(&self, search: Search) -> Result<Vec<Discovery>, MsgErr> {
         let mut ripple = DirectedProto::ping();
@@ -1270,7 +1312,6 @@ where
         injector: &Port,
         from_hyperway: bool,
     ) -> Result<(), P::Err> {
-
         #[cfg(test)]
         self.skel
             .diagnostic_interceptors
@@ -1534,43 +1575,44 @@ pub struct StarMount {
 }
 
 #[derive(Clone)]
-pub struct LayerInjectionRouter<P>
-where
-    P: Platform + 'static,
+pub struct LayerInjectionRouter
 {
-    pub skel: StarSkel<P>,
+    pub inject_tx: mpsc::Sender<TraversalInjection>,
     pub injector: Port,
 }
 
-impl<P> LayerInjectionRouter<P>
-where
-    P: Platform + 'static,
+impl LayerInjectionRouter
 {
-    pub fn new(skel: StarSkel<P>, injector: Port) -> Self {
-        Self { skel, injector }
+    pub fn new<P>(skel: StarSkel<P>, injector: Port) -> Self where P: Platform {
+        Self { inject_tx: skel.inject_tx.clone(), injector }
     }
 
     pub fn with(&self, injector: Port) -> Self {
         Self {
-            skel: self.skel.clone(),
+            inject_tx: self.inject_tx.clone(),
             injector,
+        }
+    }
+
+    pub fn injector(inject_tx: mpsc::Sender<TraversalInjection>, injector: Port) -> Self{
+        Self {
+            inject_tx,
+            injector
         }
     }
 }
 
 #[async_trait]
-impl<P> Router for LayerInjectionRouter<P>
-where
-    P: Platform,
+impl Router for LayerInjectionRouter
 {
     async fn route(&self, wave: UltraWave) {
         let inject = TraversalInjection::new(self.injector.clone(), wave);
-        self.skel.inject_tx.send(inject).await;
+        self.inject_tx.send(inject).await;
     }
 
     fn route_sync(&self, wave: UltraWave) {
         let inject = TraversalInjection::new(self.injector.clone(), wave);
-        self.skel.inject_tx.try_send(inject);
+        self.inject_tx.try_send(inject);
     }
 }
 
@@ -2514,7 +2556,7 @@ impl <P> Wrangler<P> where P: Platform{
                     self.skel.logger.warn(format!("unexpected reflected core substance from search echo : {}", echo.core.body.kind().to_string()));
                 }
             } else {
-                self.skel.logger.error(format!("search echo failure {}", echo.core.to_err().unwrap().to_string() ));
+                self.skel.logger.error(format!("search echo failure {}", echo.core.to_err().to_string() ));
             }
         }
         Ok(discoveries)

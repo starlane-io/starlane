@@ -4,13 +4,13 @@ use cosmic_api::config::config::bind::{BindConfig, PipelineStepVar, PipelineStop
 use cosmic_api::error::{MsgErr, StatusErr};
 use cosmic_api::id::id::{Layer, Point, Port, ToPoint, ToPort, TraversalLayer};
 use cosmic_api::id::Traversal;
-use cosmic_api::wave::{BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Exchanger, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedAggregate, ReflectedCore, Reflection, UltraWave, Wave, WaveKind};
+use cosmic_api::wave::{BounceBacks, CmdMethod, DirectedKind, DirectedProto, DirectedWave, Echo, Exchanger, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedAggregate, ReflectedCore, Reflection, UltraWave, Wave, WaveKind};
 use cosmic_api::ArtRef;
 use std::str::FromStr;
 use std::sync::Arc;
 use http::Uri;
 use cosmic_api::log::{PointLogger, Trackable};
-use cosmic_api::parse::model::{MethodScope, PipelineVar};
+use cosmic_api::parse::model::{MethodScope, PipelineSegmentVar, PipelineVar};
 use cosmic_api::parse::{Env, RegexCapturesResolver};
 use cosmic_api::selector::{PayloadBlock, PayloadBlockVar};
 use cosmic_api::substance::substance::Substance;
@@ -70,6 +70,10 @@ where
         };
         Ok(bind)
     }
+
+    pub fn to_pipe(&self, traversal: Traversal<DirectedWave>, pipeline: PipelineVar, env: Env)  {
+        PipeEx::new(self.port.clone(), traversal, pipeline, env, self.shell_transmitter.clone(),self.skel.gravity_transmitter.clone(),self.logger.clone() );
+    }
 }
 
 #[async_trait]
@@ -96,22 +100,40 @@ where
 
     async fn directed_core_bound(&self, directed: Traversal<DirectedWave>) -> Result<(), MsgErr> {
         let bind = self.bind(&directed).await?;
-        let route = bind.select(&directed.payload)?;
-        let regex = route.selector.path.clone();
-        let env = {
-            let path_regex_capture_resolver =
-                RegexCapturesResolver::new(regex, directed.core().uri.path().to_string())?;
-            let mut env = Env::new(self.port.point.clone());
-            env.add_var_resolver(Arc::new(path_regex_capture_resolver));
-            env.set_var("self.bundle", bind.bundle().clone().into());
-            env.set_var("self.bind", bind.point().clone().into());
-            env
-        };
+        match bind.select(&directed.payload) {
+            Ok(route) => {
+                let regex = route.selector.path.clone();
+                let env = {
+                    let path_regex_capture_resolver =
+                        RegexCapturesResolver::new(regex, directed.core().uri.path().to_string())?;
+                    let mut env = Env::new(self.port.point.clone());
+                    env.add_var_resolver(Arc::new(path_regex_capture_resolver));
+                    env.set_var("self.bundle", bind.bundle().clone().into());
+                    env.set_var("self.bind", bind.point().clone().into());
+                    env
+                };
+                self.to_pipe(directed, route.block.clone(), env);
+                Ok(())
+            },
+            Err(err) => {
+                if directed.core().method == Method::Cmd(CmdMethod::Bounce) {
+                    let mut pipeline = PipelineVar::new();
+                    pipeline.segments.push( PipelineSegmentVar{ step: PipelineStepVar::direct(), stop: PipelineStopVar::Core } );
+                    pipeline.segments.push( PipelineSegmentVar{ step: PipelineStepVar::rtn(), stop: PipelineStopVar::Reflect } );
+                    let env = {
+                        let mut env = Env::new(self.port.point.clone());
+                        env.set_var("self.bundle", bind.bundle().clone().into());
+                        env.set_var("self.bind", bind.point().clone().into());
+                        env
+                    };
+                    self.to_pipe(directed, pipeline, env);
+                    Ok(())
+                } else {
+                    Err(err)
+                }
+            }
+        }
 
-        // PipeEx will execute itself
-        PipeEx::new(self.port.clone(), directed, route.block.clone(), env, self.shell_transmitter.clone(),self.skel.gravity_transmitter.clone(),self.logger.clone() );
-
-        Ok(())
     }
 }
 
@@ -253,7 +275,7 @@ impl PipeEx {
                     self.body = pong.core.body.clone();
                     Ok(())
                 } else {
-                    Err(pong.core.to_err()?)
+                    Err(pong.core.to_err())
                 }
             }
             DirectedKind::Ripple => {
@@ -269,7 +291,7 @@ impl PipeEx {
                         self.body = echo.core.body.clone();
                         Ok(())
                     } else {
-                        Err(echo.core.to_err()?)
+                        Err(echo.core.to_err())
                     }
                 } else {
                     Ok(())

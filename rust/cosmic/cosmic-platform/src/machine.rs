@@ -100,6 +100,13 @@ where
         self.tx.send(MachineCall::GetMachineStar(tx)).await;
         Ok(rx.await?)
     }
+
+    #[cfg(test)]
+    pub async fn get_star(&self, key: StarKey) -> Result<StarApi<P>, MsgErr> {
+        let (rtn, mut rtn_rx) = oneshot::channel();
+        self.tx.send(MachineCall::GetStar{key, rtn}).await;
+        rtn_rx.await?
+    }
 }
 
 #[derive(Clone)]
@@ -409,6 +416,10 @@ where
                     rtn.send(self.machine_star.clone());
                 }
                 #[cfg(test)]
+                MachineCall::GetStar{ key, rtn } => {
+                    rtn.send(self.stars.get(&key.to_point()).ok_or(format!("could not find star: {}",key.to_string()).into()).cloned()).unwrap_or_default();
+                }
+                #[cfg(test)]
                 MachineCall::GetRegistry(rtn) => {
                     rtn.send(self.skel.registry.clone());
                 }
@@ -442,6 +453,8 @@ where
     EndpointFactory { from: StarKey, to: StarKey, rtn: oneshot::Sender<Box<dyn HyperwayEndpointFactory>> } ,
     #[cfg(test)]
     GetMachineStar(oneshot::Sender<StarApi<P>>),
+    #[cfg(test)]
+    GetStar{key: StarKey, rtn:oneshot::Sender<Result<StarApi<P>,MsgErr>>},
     #[cfg(test)]
     GetRegistry(oneshot::Sender<Registry<P>>),
 }

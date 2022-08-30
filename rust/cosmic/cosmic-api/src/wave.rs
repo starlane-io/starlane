@@ -3605,14 +3605,14 @@ where
 
 impl ReflectedCore {
 
-    pub fn to_err(&self) -> Result<MsgErr,MsgErr> {
+    pub fn to_err(&self) -> MsgErr {
         if self.status.is_success() {
-            Err("cannot convert a success into an error".into())
+            "cannot convert a success into an error".into()
         } else {
             if let Substance::Errors(errors) = &self.body {
-                Err(errors.to_cosmic_err())
+                errors.to_cosmic_err()
             } else {
-                Err(self.status.to_string().into())
+                self.status.to_string().into()
             }
         }
     }

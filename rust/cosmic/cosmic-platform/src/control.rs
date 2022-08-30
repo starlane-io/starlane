@@ -100,7 +100,7 @@ pub struct ControlDriver<P> where P: Platform {
     pub skel: HyperSkel<P>,
     pub external_router: Option<Arc<dyn Router>>,
     pub control_ctxs: Arc<DashMap<Point,ControlCtx<P>>>,
-    pub fabric_routers: Arc<DashMap<Point,LayerInjectionRouter<P>>>,
+    pub fabric_routers: Arc<DashMap<Point,LayerInjectionRouter>>,
 }
 
 #[derive(Clone)]
@@ -235,13 +235,13 @@ where
 
 pub struct ControlCreator<P> where P: Platform {
    pub skel: HyperSkel<P>,
-   pub fabric_routers: Arc<DashMap<Point,LayerInjectionRouter<P>>>,
+   pub fabric_routers: Arc<DashMap<Point,LayerInjectionRouter>>,
    pub controls: Point,
    pub ctx: DriverCtx,
 }
 
 impl <P> ControlCreator<P> where P: Platform {
-    pub fn new(skel: HyperSkel<P>, fabric_routers: Arc<DashMap<Point,LayerInjectionRouter<P>>>, ctx: DriverCtx) -> Self {
+    pub fn new(skel: HyperSkel<P>, fabric_routers: Arc<DashMap<Point,LayerInjectionRouter>>, ctx: DriverCtx) -> Self {
         let controls = skel.driver.point.push("controls").unwrap();
         Self {
             skel,

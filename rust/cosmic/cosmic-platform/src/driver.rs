@@ -974,7 +974,7 @@ where
     call_tx: mpsc::Sender<DriverRunnerCall<P>>,
     call_rx: mpsc::Receiver<DriverRunnerCall<P>>,
     driver: Box<dyn Driver<P>>,
-    router: LayerInjectionRouter<P>,
+    router: LayerInjectionRouter,
     logger: PointLogger,
     status_rx: watch::Receiver<DriverStatus>,
     layer: Layer
