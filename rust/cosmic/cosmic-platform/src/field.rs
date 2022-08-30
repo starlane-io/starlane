@@ -1,4 +1,4 @@
-use crate::star::{LayerInjectionRouter, StarSkel};
+use crate::star::{LayerInjectionRouter, HyperStarSkel};
 use crate::{PlatErr, Platform};
 use cosmic_api::config::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar, WaveDirection};
 use cosmic_api::error::{MsgErr, StatusErr};
@@ -21,7 +21,7 @@ where
     P: Platform,
 {
     pub port: Port,
-    pub skel: StarSkel<P>,
+    pub skel: HyperStarSkel<P>,
     pub logger: PointLogger,
     pub shell_transmitter: ProtoTransmitter,
 }
@@ -30,7 +30,7 @@ impl<P> Field<P>
 where
     P: Platform,
 {
-    pub fn new(point: Point, skel: StarSkel<P>) -> Self {
+    pub fn new(point: Point, skel: HyperStarSkel<P>) -> Self {
         let port = point.to_port().with_layer(Layer::Field);
         let logger = skel.logger.point(port.point.clone());
         let shell_router = Arc::new(LayerInjectionRouter::new(skel.clone(), port.clone().with_layer(Layer::Shell)));

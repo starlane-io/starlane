@@ -1,4 +1,4 @@
-use crate::star::{LayerInjectionRouter, StarSkel, TopicHandler};
+use crate::star::{LayerInjectionRouter, HyperStarSkel, TopicHandler};
 use crate::state::ShellState;
 use crate::{PlatErr, Platform};
 use cosmic_api::cli::RawCommand;
@@ -30,7 +30,7 @@ pub struct Shell<P>
 where
     P: Platform + 'static,
 {
-    skel: StarSkel<P>,
+    skel: HyperStarSkel<P>,
     state: ShellState,
 }
 
@@ -38,7 +38,7 @@ impl<P> Shell<P>
 where
     P: Platform + 'static,
 {
-    pub fn new(skel: StarSkel<P>, state: ShellState) -> Self {
+    pub fn new(skel: HyperStarSkel<P>, state: ShellState) -> Self {
         Self { skel, state }
     }
 }

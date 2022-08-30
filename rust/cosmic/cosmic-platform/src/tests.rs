@@ -32,7 +32,7 @@ use tokio::time::error::Elapsed;
 //use crate::control::ControlDriverFactory;
 use crate::driver::DriverFactory;
 use crate::space::SpaceDriverFactory;
-use crate::star::StarApi;
+use crate::star::HyperStarApi;
 
 lazy_static! {
     pub static ref LESS: Point = Point::from_str("space:users:less").expect("point");
@@ -383,7 +383,7 @@ async fn create(
     ctx: &TestRegistryContext,
     particle: Point,
     location: Point,
-    star_api: StarApi<TestPlatform>,
+    star_api: HyperStarApi<TestPlatform>,
 ) -> Result<(), TestErr> {
     println!("ADDING PARTICLE: {}", particle.to_string());
     let details = Details::new(
@@ -950,6 +950,7 @@ fn test_golden_path() -> Result<(), TestErr> {
         tokio::time::timeout(Duration::from_secs(5), star_api.bounce(StarKey::central())).await??;
 
         println!("Ok");
+
         Ok(())
 
     })

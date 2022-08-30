@@ -30,7 +30,7 @@ pub struct Global<P> where P: Platform {
  */
 
 use crate::driver::{Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere};
-use crate::star::StarSkel;
+use crate::star::HyperStarSkel;
 use cosmic_api::config::config::bind::{BindConfig, RouteSelector};
 use cosmic_api::parse::route_attribute;
 use cosmic_api::substance::substance::Substance;
@@ -68,11 +68,11 @@ pub struct GlobalCommandExecutionHandler<P>
 where
     P: Platform,
 {
-    skel: StarSkel<P>,
+    skel: HyperStarSkel<P>,
 }
 
 impl <P> GlobalCommandExecutionHandler<P> where P: Platform {
-    pub fn new(skel: StarSkel<P>) -> Self {
+    pub fn new(skel: HyperStarSkel<P>) -> Self {
         Self {
             skel
         }
@@ -111,7 +111,7 @@ pub struct GlobalExecutionChamber<P>
 where
     P: Platform,
 {
-    pub skel: StarSkel<P>,
+    pub skel: HyperStarSkel<P>,
     pub logger: PointLogger,
 }
 
@@ -119,7 +119,7 @@ impl<P> GlobalExecutionChamber<P>
 where
     P: Platform,
 {
-    pub fn new( skel: StarSkel<P>) -> Self {
+    pub fn new(skel: HyperStarSkel<P>) -> Self {
         let logger = skel.logger.push_point("global").unwrap();
         Self {
             skel,

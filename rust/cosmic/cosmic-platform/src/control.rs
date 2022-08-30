@@ -1,5 +1,5 @@
 use crate::driver::{Driver, DriverFactory, DriverCtx, DriverSkel, DriverStatus, ItemHandler, ItemSphere, ItemSkel, HyperDriverFactory, HyperSkel, DriverRunnerRequest, Item, ItemRouter};
-use crate::star::{LayerInjectionRouter, StarSkel};
+use crate::star::{LayerInjectionRouter, HyperStarSkel};
 use crate::{PlatErr, Platform, Registry};
 use cosmic_api::command::command::common::StateSrc;
 use cosmic_api::command::request::create::{Create, KindTemplate, PointFactory, PointFactoryU64, PointSegTemplate, PointTemplate, Strategy, Template, TemplateDef};
@@ -37,7 +37,7 @@ where
         Kind::Control
     }
 
-    async fn create(&self, star: StarSkel<P>, driver: DriverSkel<P>, ctx: DriverCtx) -> Result<Box<dyn Driver<P>>, P::Err> {
+    async fn create(&self, star: HyperStarSkel<P>, driver: DriverSkel<P>, ctx: DriverCtx) -> Result<Box<dyn Driver<P>>, P::Err> {
         let skel = HyperSkel::new( star, driver );
         Ok(Box::new(ControlDriver {
             skel,
@@ -67,7 +67,7 @@ use cosmic_api::parse::{CamelCase, route_attribute};
 use cosmic_api::particle::particle::{Details, Status, Stub};
 use cosmic_api::util::log;
 use cosmic_api::wave::ReflectedCore;
-use crate::star::StarCall::LayerTraversalInjection;
+use crate::star::HyperStarCall::LayerTraversalInjection;
 
 pub struct ControlFactory<P> where P: Platform {
    phantom: PhantomData<P>
@@ -87,7 +87,7 @@ impl <P> HyperDriverFactory<P> for ControlFactory<P> where P: Platform{
         Kind::Control
     }
 
-    async fn create(&self, star: StarSkel<P>, driver: DriverSkel<P>, ctx: DriverCtx) -> Result<Box<dyn Driver<P>>, P::Err> {
+    async fn create(&self, star: HyperStarSkel<P>, driver: DriverSkel<P>, ctx: DriverCtx) -> Result<Box<dyn Driver<P>>, P::Err> {
         let skel = HyperSkel::new(star,driver);
 
         Ok(Box::new(ControlDriver { skel, external_router: None, control_ctxs: Arc::new(Default::default()), fabric_routers: Arc::new(Default::default()), ctx }))
@@ -105,7 +105,7 @@ pub struct ControlDriver<P> where P: Platform {
 
 #[derive(Clone)]
 pub struct ControlSkel<P> where P: Platform {
-    pub star: StarSkel<P>,
+    pub star: HyperStarSkel<P>,
     pub driver: DriverSkel<P>
 }
 

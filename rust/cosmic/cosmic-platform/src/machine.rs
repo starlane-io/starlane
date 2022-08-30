@@ -1,4 +1,4 @@
-use crate::star::{Star, StarApi, StarCon, StarSkel, StarTemplate, StarTx};
+use crate::star::{HyperStar, HyperStarApi, StarCon, HyperStarSkel, StarTemplate, HyperStarTx};
 use crate::{DriversBuilder, PlatErr, Platform, Registry, RegistryApi};
 use cosmic_api::error::MsgErr;
 use cosmic_api::id::id::{Layer, Point, Port, ToPoint, ToPort};
@@ -95,14 +95,14 @@ where
 
 
     #[cfg(test)]
-    pub async fn get_machine_star(&self) -> Result<StarApi<P>, MsgErr> {
+    pub async fn get_machine_star(&self) -> Result<HyperStarApi<P>, MsgErr> {
         let (tx, mut rx) = oneshot::channel();
         self.tx.send(MachineCall::GetMachineStar(tx)).await;
         Ok(rx.await?)
     }
 
     #[cfg(test)]
-    pub async fn get_star(&self, key: StarKey) -> Result<StarApi<P>, MsgErr> {
+    pub async fn get_star(&self, key: StarKey) -> Result<HyperStarApi<P>, MsgErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.tx.send(MachineCall::GetStar{key, rtn}).await;
         rtn_rx.await?
@@ -132,8 +132,8 @@ where
     P: Platform + 'static,
 {
     pub skel: MachineSkel<P>,
-    pub stars: Arc<HashMap<Point, StarApi<P>>>,
-    pub machine_star: StarApi<P>,
+    pub stars: Arc<HashMap<Point, HyperStarApi<P>>>,
+    pub machine_star: HyperStarApi<P>,
     pub gate_selector: Arc<HyperGateSelector>,
     pub call_tx: mpsc::Sender<MachineCall<P>>,
     pub call_rx: mpsc::Receiver<MachineCall<P>>,
@@ -205,8 +205,8 @@ where
             let drivers_point = star_point.push("drivers".to_string()).unwrap();
             let logger = skel.logger.point(drivers_point.clone());
 
-            let mut star_tx: StarTx<P> = StarTx::new(star_point.clone());
-            let star_skel = StarSkel::new(star_template.clone(), skel.clone(), &mut star_tx).await;
+            let mut star_tx: HyperStarTx<P> = HyperStarTx::new(star_point.clone());
+            let star_skel = HyperStarSkel::new(star_template.clone(), skel.clone(), &mut star_tx).await;
 
             let mut drivers = platform.drivers_builder(&star_template.kind);
 
@@ -257,7 +257,7 @@ where
             }
 
             gates.insert(InterchangeKind::Star(star_template.key.clone()), gate);
-            let star_api = Star::new(star_skel.clone(), drivers, hyperway_endpoint, interchange.clone(), star_tx).await?;
+            let star_api = HyperStar::new(star_skel.clone(), drivers, hyperway_endpoint, interchange.clone(), star_tx).await?;
             stars.insert(star_point.clone(), star_api);
         }
 
@@ -452,9 +452,9 @@ where
     },
     EndpointFactory { from: StarKey, to: StarKey, rtn: oneshot::Sender<Box<dyn HyperwayEndpointFactory>> } ,
     #[cfg(test)]
-    GetMachineStar(oneshot::Sender<StarApi<P>>),
+    GetMachineStar(oneshot::Sender<HyperStarApi<P>>),
     #[cfg(test)]
-    GetStar{key: StarKey, rtn:oneshot::Sender<Result<StarApi<P>,MsgErr>>},
+    GetStar{key: StarKey, rtn:oneshot::Sender<Result<HyperStarApi<P>,MsgErr>>},
     #[cfg(test)]
     GetRegistry(oneshot::Sender<Registry<P>>),
 }

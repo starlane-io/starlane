@@ -1,7 +1,7 @@
 use crate::machine::MachineSkel;
-use crate::star::StarCall::LayerTraversalInjection;
+use crate::star::HyperStarCall::LayerTraversalInjection;
 use crate::star::{
-    LayerInjectionRouter, StarDriver, StarDriverFactory, StarSkel, StarState, StateApi, StateCall,
+    LayerInjectionRouter, StarDriver, StarDriverFactory, HyperStarSkel, StarState, StateApi, StateCall,
 };
 use crate::{PlatErr, Platform, Registry, RegistryApi};
 use cosmic_api::command::command::common::{SetProperties, StateSrc};
@@ -90,7 +90,7 @@ where
 
     pub fn build(
         self,
-        skel: StarSkel<P>,
+        skel: HyperStarSkel<P>,
         call_tx: mpsc::Sender<DriversCall<P>>,
         call_rx: mpsc::Receiver<DriversCall<P>>,
         status_tx: watch::Sender<DriverStatus>,
@@ -212,7 +212,7 @@ where
     P: Platform + 'static,
 {
     port: Port,
-    skel: StarSkel<P>,
+    skel: HyperStarSkel<P>,
     factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
     drivers: HashMap<Kind, DriverApi<P>>,
     call_rx: mpsc::Receiver<DriversCall<P>>,
@@ -230,7 +230,7 @@ where
 {
     pub fn new(
         port: Port,
-        skel: StarSkel<P>,
+        skel: HyperStarSkel<P>,
         factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
         kinds: Vec<Kind>,
         call_tx: mpsc::Sender<DriversCall<P>>,
@@ -461,7 +461,7 @@ where
             let drivers_point = self.skel.point.push("drivers").unwrap();
 
             async fn register<P>(
-                skel: &StarSkel<P>,
+                skel: &HyperStarSkel<P>,
                 point: &Point,
                 logger: &PointLogger,
             ) -> Result<(), P::Err>
@@ -864,7 +864,7 @@ where
     P: Platform + 'static,
 {
     pub port: Port,
-    pub skel: StarSkel<P>,
+    pub skel: HyperStarSkel<P>,
     pub item: ItemSphere<P>,
     pub router: Arc<dyn Router>,
 }
@@ -970,7 +970,7 @@ where
     P: Platform + 'static,
 {
     skel: DriverSkel<P>,
-    star_skel: StarSkel<P>,
+    star_skel: HyperStarSkel<P>,
     call_tx: mpsc::Sender<DriverRunnerCall<P>>,
     call_rx: mpsc::Receiver<DriverRunnerCall<P>>,
     driver: Box<dyn Driver<P>>,
@@ -987,7 +987,7 @@ where
 {
     pub fn new(
         skel: DriverSkel<P>,
-        star_skel: StarSkel<P>,
+        star_skel: HyperStarSkel<P>,
         driver: Box<dyn Driver<P>>,
         call_tx: mpsc::Sender<DriverRunnerCall<P>>,
         call_rx: mpsc::Receiver<DriverRunnerCall<P>>,
@@ -1144,7 +1144,7 @@ pub struct DriverSkel<P>
 where
     P: Platform,
 {
-    skel: StarSkel<P>,
+    skel: HyperStarSkel<P>,
     pub kind: Kind,
     pub point: Point,
     pub logger: PointLogger,
@@ -1163,7 +1163,7 @@ where
     }
 
     pub fn new(
-        skel: StarSkel<P>,
+        skel: HyperStarSkel<P>,
         kind: Kind,
         point: Point,
         transmitter: ProtoTransmitter,
@@ -1237,7 +1237,7 @@ where
 
     async fn create(
         &self,
-        star_skel: StarSkel<P>,
+        star_skel: HyperStarSkel<P>,
         driver_skel: DriverSkel<P>,
         ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
@@ -1272,7 +1272,7 @@ where
 
     async fn create(
         &self,
-        skel: StarSkel<P>,
+        skel: HyperStarSkel<P>,
         driver_skel: DriverSkel<P>,
         ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err>;
@@ -1287,7 +1287,7 @@ pub struct HyperSkel<P>
 where
     P: Platform,
 {
-    pub star: StarSkel<P>,
+    pub star: HyperStarSkel<P>,
     pub driver: DriverSkel<P>,
 }
 
@@ -1295,7 +1295,7 @@ impl<P> HyperSkel<P>
 where
     P: Platform,
 {
-    pub fn new(star: StarSkel<P>, driver: DriverSkel<P>) -> Self {
+    pub fn new(star: HyperStarSkel<P>, driver: DriverSkel<P>) -> Self {
         Self { star, driver }
     }
 }
@@ -1460,7 +1460,7 @@ where
 
     async fn create(
         &self,
-        star: StarSkel<P>,
+        star: HyperStarSkel<P>,
         driver: DriverSkel<P>,
         ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {

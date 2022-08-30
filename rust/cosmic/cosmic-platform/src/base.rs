@@ -8,7 +8,7 @@ use cosmic_api::util::log;
 use cosmic_api::wave::{CoreBounce, DirectedHandler, DirectedHandlerSelector, RecipientSelector, ReflectedCore, RootInCtx};
 use crate::{DriverFactory, Platform};
 use crate::driver::{Driver, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere};
-use crate::star::StarSkel;
+use crate::star::HyperStarSkel;
 lazy_static! {
     static ref BASE_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
         Arc::new(base_bind()),
@@ -42,7 +42,7 @@ impl <P> HyperDriverFactory<P> for BaseDriverFactory where P: Platform {
         Kind::Base
     }
 
-    async fn create(&self, skel: StarSkel<P>, driver_skel: DriverSkel<P>, ctx: DriverCtx) -> Result<Box<dyn Driver<P>>, P::Err> {
+    async fn create(&self, skel: HyperStarSkel<P>, driver_skel: DriverSkel<P>, ctx: DriverCtx) -> Result<Box<dyn Driver<P>>, P::Err> {
         Ok(Box::new(BaseDriver))
     }
 
