@@ -185,6 +185,7 @@ impl PipeEx {
         proto.bounce_backs(self.traversal.bounce_backs().clone());
         proto.scope(self.traversal.scope().clone());
         proto.from(self.traversal.from().clone());
+        proto.history(self.traversal.history());
         proto.track = self.traversal.track();
         proto
     }

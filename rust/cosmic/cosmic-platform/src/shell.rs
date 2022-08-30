@@ -119,7 +119,6 @@ where
                 self.state.fabric_requests.insert(traversal.id().clone(), AtomicU16::new(1));
             }
             DirectedKind::Ripple => {
-
                 match traversal.bounce_backs() {
                     BounceBacks::None => {}
                     BounceBacks::Single => {

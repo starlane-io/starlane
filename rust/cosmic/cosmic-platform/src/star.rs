@@ -965,7 +965,8 @@ where
     // here it will be wrapped into a transport for star to star delivery or
     // sent to GLOBAL::registry if addressed in such a way
     #[track_caller]
-    async fn to_gravity(&self, wave: UltraWave) -> Result<(), P::Err> {
+    async fn to_gravity(&self, mut wave: UltraWave) -> Result<(), P::Err> {
+        wave.add_to_history(self.skel.point.clone());
         #[cfg(test)]
         self.skel
             .diagnostic_interceptors
@@ -993,7 +994,10 @@ where
     }
 
     #[track_caller]
-    async fn shard(&self, wave: UltraWave) {
+    async fn shard(&self, mut wave: UltraWave) {
+
+        wave.add_to_history(self.skel.point.clone());
+
         let skel = self.skel.clone();
         let locator = SmartLocator::new(self.skel.clone());
         let gravity = self.gravity.clone();
@@ -1012,10 +1016,6 @@ where
                         let mut map =
                             shard_ripple_by_location(ripple, &skel.adjacents, &skel.registry)
                                 .await?;
-
-                        if ripple.to == Recipients::Stars {
-                            ripple.history.insert(skel.point.clone());
-                        }
 
                         for (star, mut wave) in map {
                             // add this star to history
@@ -1175,58 +1175,30 @@ where
 
     async fn wrangle(&self, rtn: oneshot::Sender<Result<StarWrangles, MsgErr>>) {
         let skel = self.skel.clone();
-        let router = LayerInjectionRouter::new( self.skel.clone(), self.skel.point.to_port().with_layer(Layer::Shell));
-        let mut transmitter = ProtoTransmitterBuilder::new(
-            Arc::new(router),
-            self.skel.exchanger.clone(),
-        );
-        transmitter.from = SetStrategy::Override(self.skel.point.to_port().with_layer(Layer::Core));
-        transmitter.agent = SetStrategy::Override(Agent::HyperUser);
-        transmitter.handling = SetStrategy::Override(Handling {
-            kind: HandlingKind::Immediate,
-            priority: Priority::Hyper,
-            retries: Retries::Max,
-            wait: WaitTime::High
-        });
-        let transmitter = transmitter.build();
-
         tokio::spawn( async move {
-            let mut ripple = DirectedProto::ripple();
-            ripple.method(SysMethod::Search);
-            ripple.body(Substance::Sys(Sys::Search(Search::Kinds)));
-            ripple.bounce_backs = Some(BounceBacks::Count(skel.adjacents.len()));
-            ripple.to(Recipients::Stars);
-            let echoes: Echoes = match transmitter.direct(ripple).await {
-                Ok(echoes) => echoes,
+            let mut wrangler = Wrangler::new(skel.clone());
+            let mut history = HashSet::new();
+            history.insert(skel.point.clone());
+            wrangler.history(history);
+
+            let discoveries = match wrangler.wrangle().await {
+                Ok(discoveries) => discoveries,
                 Err(err) => {
-                    rtn.send(Err(err));
+                    rtn.send(Err(err)).unwrap_or_default();
                     return;
                 }
             };
-
             let mut coalated = vec![];
-            for echo in echoes {
-                if echo.core.status.is_success() {
-                    if let Substance::Sys(Sys::Discoveries(discoveries)) = &echo.core.body {
-                        for discovery in discoveries.iter() {
-                            coalated.push(StarDiscovery::new(
-                                StarPair::new(
-                                    skel.key.clone(),
-                                    StarKey::try_from(echo.from.point.clone()).expect("expected star key"),
-                                ),
-                                discovery.clone(),
-                            ));
-                        }
-                    } else {
-                        skel.logger.warn(format!("unexpected reflected core substance from search echo : {}", echo.core.body.kind().to_string()));
-                    }
-                } else {
-                    skel.logger.error(format!("search echo failure {}", echo.core.to_err().unwrap().to_string() ));
-                }
+            for discovery in discoveries.iter() {
+                coalated.push(StarDiscovery::new(
+                    StarPair::new(
+                        skel.key.clone(),
+                        StarKey::try_from(discovery.star_key.to_point()).expect("expected star key"),
+                    ),
+                    discovery.clone(),
+                ));
             }
-
             coalated.sort();
-
             skel.wrangles.add(coalated);
             rtn.send(Ok(skel.wrangles.clone())).unwrap_or_default();
         });
@@ -1300,6 +1272,7 @@ where
         injector: &Port,
         from_hyperway: bool,
     ) -> Result<(), P::Err> {
+
         #[cfg(test)]
         self.skel
             .diagnostic_interceptors
@@ -2067,19 +2040,25 @@ where
         async fn reflect<'a, E>(
             star: &StarCore<E>,
             ctx: &'a InCtx<'a, Sys>,
+            mut history: HashSet<Point>
         ) -> Result<ReflectedCore, MsgErr>
         where
             E: Platform,
         {
+            let mut wrangler = Wrangler::new( star.skel.clone() );
+            history.insert(star.skel.point.clone());
+            wrangler.history(history);
+            let mut discoveries = wrangler.wrangle().await?;
+
             let discovery = Discovery {
                 star_kind: star.skel.kind.clone(),
                 hops: ctx.wave().hops(),
                 star_key: star.skel.key.clone(),
                 kinds: star.skel.drivers.kinds().await?.into_iter().collect(),
             };
-            let mut core = ReflectedCore::new();
-            let mut discoveries = Discoveries::new();
             discoveries.push(discovery);
+
+            let mut core = ReflectedCore::new();
             core.body = Substance::Sys(Sys::Discoveries(discoveries));
             core.status = StatusCode::from_u16(200).unwrap();
             Ok(core)
@@ -2091,19 +2070,19 @@ where
                 Search::Star(star) => {
                     if self.skel.key == *star {
                         return CoreBounce::Reflected(ReflectedCore::result(
-                            reflect(self, &ctx).await,
+                            reflect(self, &ctx, ctx.wave().history() ).await,
                         ));
                     };
                 }
                 Search::StarKind(kind) => {
                     if *kind == self.skel.kind {
                         return CoreBounce::Reflected(ReflectedCore::result(
-                            reflect(self, &ctx).await,
+                            reflect(self, &ctx, ctx.wave().history() ).await,
                         ));
                     }
                 }
                 Search::Kinds => {
-                    return CoreBounce::Reflected(ReflectedCore::result(reflect(self, &ctx).await));
+                    return CoreBounce::Reflected(ReflectedCore::result(reflect(self, &ctx, ctx.wave().history() ).await));
                 }
             }
             return CoreBounce::Absorbed;
@@ -2446,5 +2425,74 @@ where
                 point.to_string()
             )))
         }
+    }
+}
+
+pub struct Wrangler<P> where P: Platform {
+    pub skel: StarSkel<P>,
+    pub transmitter: ProtoTransmitter,
+    pub history: HashSet<Point>
+}
+
+
+impl <P> Wrangler<P> where P: Platform{
+
+    pub fn new( skel: StarSkel<P>) -> Self {
+        let router = LayerInjectionRouter::new( skel.clone(), skel.point.to_port().with_layer(Layer::Shell));
+        let mut transmitter = ProtoTransmitterBuilder::new(
+            Arc::new(router),
+            skel.exchanger.clone(),
+        );
+        transmitter.from = SetStrategy::Override(skel.point.to_port().with_layer(Layer::Core));
+        transmitter.agent = SetStrategy::Override(Agent::HyperUser);
+        transmitter.handling = SetStrategy::Override(Handling {
+            kind: HandlingKind::Immediate,
+            priority: Priority::Hyper,
+            retries: Retries::Max,
+            wait: WaitTime::High
+        });
+        let transmitter = transmitter.build();
+        Self {
+            skel,
+            transmitter,
+            history: HashSet::new()
+        }
+    }
+
+    pub fn history( & mut self, mut history: HashSet<Point>) {
+        for point in history {
+            self.history.insert(point);
+        }
+    }
+
+
+    pub async fn wrangle(&self) -> Result<Discoveries,MsgErr> {
+        let mut ripple = DirectedProto::ripple();
+        ripple.method(SysMethod::Search);
+        ripple.body(Substance::Sys(Sys::Search(Search::Kinds)));
+        ripple.history(self.history.clone());
+        let mut adjacents = self.skel.adjacents.clone();
+        adjacents.retain( |point,_| !self.history.contains(point));
+        if adjacents.is_empty() {
+            return Ok( Discoveries::new() );
+        }
+        ripple.bounce_backs = Some(BounceBacks::Count(adjacents.len()));
+        ripple.to(Recipients::Stars);
+        let echoes: Echoes = self.transmitter.direct(ripple).await?;
+        let mut discoveries = Discoveries::new();
+        for echo in echoes {
+            if echo.core.status.is_success() {
+                if let Substance::Sys(Sys::Discoveries(new)) = echo.variant.core.body {
+                    for discovery in new.vec.into_iter() {
+                        discoveries.push(discovery);
+                    }
+                } else {
+                    self.skel.logger.warn(format!("unexpected reflected core substance from search echo : {}", echo.core.body.kind().to_string()));
+                }
+            } else {
+                self.skel.logger.error(format!("search echo failure {}", echo.core.to_err().unwrap().to_string() ));
+            }
+        }
+        Ok(discoveries)
     }
 }

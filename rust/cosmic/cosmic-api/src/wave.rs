@@ -44,6 +44,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use tokio::time::Instant;
+use crate::sys::InterchangeKind::DefaultControl;
 
 #[derive(
     Debug,
@@ -197,7 +198,7 @@ where
         }
     }
 
-    pub fn history(&mut self) -> HashSet<Point> {
+    pub fn history(&self) -> HashSet<Point> {
         match self {
             UltraWaveDef::Ping(_) => HashSet::new(),
             UltraWaveDef::Pong(_) => HashSet::new(),
@@ -226,6 +227,14 @@ where
             UltraWaveDef::Ripple(ripple) => &ripple.body,
             UltraWaveDef::Echo(echo) => &echo.core.body,
             UltraWaveDef::Signal(signal) => &signal.core.body
+        }
+    }
+
+    pub fn payload(&self) -> Option<&UltraWave> {
+        if let Substance::UltraWave(wave) = self.body() {
+            Some(wave)
+        } else {
+            None
         }
     }
 }
@@ -1063,7 +1072,8 @@ impl Into<DirectedProto> for Wave<Ping> {
             kind: None,
             bounce_backs: None,
             track: self.track,
-            via: self.via
+            via: self.via,
+            history: HashSet::new()
         }
     }
 }
@@ -1348,6 +1358,7 @@ pub struct DirectedProto {
     pub bounce_backs: Option<BounceBacks>,
     pub via: Option<Port>,
     pub track: bool,
+    pub history: HashSet<Point>
 }
 impl Trackable for DirectedProto {
     fn track_id(&self) -> String {
@@ -1412,7 +1423,7 @@ impl DirectedProto {
                         to: self.to.ok_or(MsgErr::new(500u16, "must set 'to'"))?,
                         core: self.core,
                         bounce_backs: self.bounce_backs.ok_or("BounceBacks must be set")?,
-                        history: HashSet::default(),
+                        history: self.history
                     },
                     self.from.ok_or(MsgErr::new(500u16, "must set 'from'"))?,
                 );
@@ -1516,6 +1527,11 @@ impl DirectedProto {
     pub fn body(&mut self, body: Substance) {
         self.core.body = body;
     }
+
+    pub fn history(&mut self, history: HashSet<Point>) {
+        self.history = history;
+    }
+
 
     pub fn uri(&mut self, uri: Uri) {
         self.core.uri = uri;
@@ -1633,6 +1649,7 @@ impl Default for DirectedProto {
             bounce_backs: None,
             via: None,
             track: false,
+            history: Default::default()
         }
     }
 }
@@ -1931,7 +1948,7 @@ where
         }
     }
 
-    pub fn history(&mut self) -> HashSet<Point> {
+    pub fn history(&self) -> HashSet<Point> {
         match self {
             Self::Ping(_) => HashSet::new(),
             Self::Ripple(ripple) => {
