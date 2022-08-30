@@ -64,6 +64,7 @@ pub mod tests;
 pub mod base;
 pub mod space;
 pub mod field;
+pub mod root;
 
 #[no_mangle]
 pub extern "C" fn cosmic_uuid() -> String {

@@ -4182,6 +4182,7 @@ impl TryFrom<ReflectedCore> for Port {
     strum_macros::EnumString,
 )]
 pub enum CmdMethod {
+    Init,
     Read,
     Update,
     Bounce,

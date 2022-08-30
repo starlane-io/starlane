@@ -2863,6 +2863,14 @@ impl StarSub {
             StarSub::Machine => false,
         }
     }
+
+    pub fn can_be_wrangled(&self) -> bool {
+        match self {
+            StarSub::Nexus => false,
+            StarSub::Machine => false,
+            _ => true,
+        }
+    }
 }
 
 impl Into<Sub> for StarSub {

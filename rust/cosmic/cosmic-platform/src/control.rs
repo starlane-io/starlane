@@ -1,4 +1,4 @@
-use crate::driver::{Driver, DriverFactory, DriverCtx, DriverSkel, DriverStatus, ItemHandler, ItemSphere, ItemSkel, HyperDriverFactory, HyperSkel, DriverRunnerRequest, Item, ItemRouter};
+use crate::driver::{Driver, DriverFactory, DriverCtx, DriverSkel, DriverStatus, ItemHandler, ItemSphere, ItemSkel, HyperDriverFactory, HyperSkel, DriverRunnerRequest, Item, ItemRouter, DriverAvail};
 use crate::star::{LayerInjectionRouter, HyperStarSkel};
 use crate::{PlatErr, Platform, Registry};
 use cosmic_api::command::command::common::StateSrc;
@@ -35,6 +35,10 @@ where
 {
     fn kind(&self) -> Kind {
         Kind::Control
+    }
+
+    fn avail(&self) -> DriverAvail {
+        DriverAvail::Internal
     }
 
     async fn create(&self, star: HyperStarSkel<P>, driver: DriverSkel<P>, ctx: DriverCtx) -> Result<Box<dyn Driver<P>>, P::Err> {

@@ -30,7 +30,8 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{oneshot, Mutex};
 use tokio::time::error::Elapsed;
 //use crate::control::ControlDriverFactory;
-use crate::driver::DriverFactory;
+use crate::driver::{DriverAvail, DriverFactory};
+use crate::root::RootDriverFactory;
 use crate::space::SpaceDriverFactory;
 use crate::star::HyperStarApi;
 
@@ -88,17 +89,27 @@ impl Platform for TestPlatform {
 
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
         let mut builder = DriversBuilder::new(kind.clone());
-        builder.add_post(Arc::new(BaseDriverFactory::new()));
+
+        // only allow external Base wrangling external to Super
+        if *kind == StarSub::Super {
+            builder.add_post(Arc::new(BaseDriverFactory::new(DriverAvail::External)));
+        } else {
+            builder.add_post(Arc::new(BaseDriverFactory::new(DriverAvail::Internal)));
+        }
 
         match kind {
-            StarSub::Central => {}
+            StarSub::Central => {
+                builder.add_post(Arc::new(RootDriverFactory::new()));
+            }
             StarSub::Super => {
                 builder.add_post(Arc::new(SpaceDriverFactory::new()));
             }
             StarSub::Nexus => {}
             StarSub::Maelstrom => {}
             StarSub::Scribe => {}
-            StarSub::Jump => {}
+            StarSub::Jump => {
+                builder.add_post(Arc::new(ControlDriverFactory::new()));
+            }
             StarSub::Fold => {}
             StarSub::Machine => {
                 builder.add_post(Arc::new(ControlDriverFactory::new()));
@@ -917,6 +928,11 @@ fn test_star_wrangle() -> Result<(), TestErr> {
         let wrangles = tokio::time::timeout(Duration::from_secs(55), star_api.wrangle()).await??;
 
         println!("wrangles: {}", wrangles.wrangles.len());
+
+        for kind in wrangles.wrangles.iter()
+        {
+            println!("\tkind: {}", kind.kind.to_string() );
+        }
 
         Ok(())
     })

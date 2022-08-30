@@ -19,7 +19,7 @@ use cosmic_api::particle::particle::{Details, Status, Stub};
 use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{Assign, AssignmentKind, Sys};
 use cosmic_api::util::{log, ValuePattern};
-use cosmic_api::wave::{Agent, Bounce, CmdMethod, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, SysMethod, UltraWave, Wave, WaveKind};
+use cosmic_api::wave::{Agent, Bounce, CmdMethod, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, DirectedWave, Exchanger, InCtx, Method, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, SysMethod, UltraWave, Wave, WaveKind};
 use cosmic_api::{ArtRef, Registration, State, HYPERUSER};
 use dashmap::DashMap;
 use futures::future::select_all;
@@ -52,7 +52,8 @@ where
     P: Platform,
 {
     factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
-    kinds: Vec<Kind>
+    kinds: Vec<Kind>,
+    external_kinds: Vec<Kind>
 }
 
 impl<P> DriversBuilder<P>
@@ -62,15 +63,20 @@ where
     pub fn new(kind: StarSub) -> Self {
         let mut pre: Vec<Arc<dyn HyperDriverFactory<P>>> = vec![];
         let mut kinds = vec![];
+        let mut external_kinds = vec![];
         let drivers_factory = Arc::new(DriverDriverFactory::new());
         let star_factory = Arc::new(StarDriverFactory::new(kind.clone()));
         kinds.push(<DriverDriverFactory as HyperDriverFactory<P>>::kind(&drivers_factory) );
+        if <DriverDriverFactory as HyperDriverFactory<P>>::avail(&drivers_factory) == DriverAvail::External {
+            external_kinds.push(<DriverDriverFactory as HyperDriverFactory<P>>::kind(&drivers_factory) );
+        }
         pre.push(drivers_factory );
         kinds.push(Kind::Star(kind));
         pre.push(star_factory );
         Self {
             factories: pre,
-            kinds
+            kinds,
+            external_kinds
         }
     }
 
@@ -80,11 +86,18 @@ where
 
     pub fn add_post(&mut self, factory: Arc<dyn HyperDriverFactory<P>>) {
         self.kinds.push(factory.kind());
+        if factory.avail() == DriverAvail::External {
+            self.external_kinds.push(factory.kind());
+        }
         self.factories.push(factory);
+
     }
 
     pub fn add_pre(&mut self, factory: Arc<dyn HyperDriverFactory<P>>) {
         self.kinds.insert(0, factory.kind());
+        if factory.avail() == DriverAvail::External {
+            self.external_kinds.insert(0, factory.kind());
+        }
         self.factories.insert(0, factory);
     }
 
@@ -102,6 +115,7 @@ where
             skel.clone(),
             self.factories,
             self.kinds,
+            self.external_kinds,
             call_tx,
             call_rx,
             status_tx,
@@ -121,7 +135,8 @@ where
         rtn: oneshot::Sender<()>,
     },
     Visit(Traversal<UltraWave>),
-    Kinds(oneshot::Sender<Vec<Kind>>),
+    InternalKinds(oneshot::Sender<Vec<Kind>>),
+    ExternalKinds(oneshot::Sender<Vec<Kind>>),
     Assign {
         assign: Assign,
         rtn: oneshot::Sender<Result<(), P::Err>>,
@@ -171,9 +186,15 @@ where
         self.call_tx.send(DriversCall::Visit(traversal)).await;
     }
 
-    pub async fn kinds(&self) -> Result<Vec<Kind>, MsgErr> {
+    pub async fn internal_kinds(&self) -> Result<Vec<Kind>, MsgErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
-        self.call_tx.send(DriversCall::Kinds(rtn)).await?;
+        self.call_tx.send(DriversCall::InternalKinds(rtn)).await?;
+        Ok(rtn_rx.await?)
+    }
+
+    pub async fn external_kinds(&self) -> Result<Vec<Kind>, MsgErr> {
+        let (rtn, mut rtn_rx) = oneshot::channel();
+        self.call_tx.send(DriversCall::ExternalKinds(rtn)).await?;
         Ok(rtn_rx.await?)
     }
 
@@ -221,6 +242,7 @@ where
     status_tx: mpsc::Sender<DriverStatus>,
     status_rx: watch::Receiver<DriverStatus>,
     kinds: Vec<Kind>,
+    external_kinds: Vec<Kind>,
     init: bool,
 }
 
@@ -233,6 +255,7 @@ where
         skel: HyperStarSkel<P>,
         factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
         kinds: Vec<Kind>,
+        external_kinds: Vec<Kind>,
         call_tx: mpsc::Sender<DriversCall<P>>,
         call_rx: mpsc::Receiver<DriversCall<P>>,
         watch_status_tx: watch::Sender<DriverStatus>,
@@ -266,6 +289,7 @@ where
             status_rx: watch_status_rx.clone(),
             init: false,
             kinds,
+            external_kinds
         };
 
         drivers.start();
@@ -290,8 +314,8 @@ where
                     DriversCall::Visit(traversal) => {
                         self.visit(traversal).await;
                     }
-                    DriversCall::Kinds(rtn) => {
-                        rtn.send(self.kinds());
+                    DriversCall::InternalKinds(rtn) => {
+                        rtn.send(self.internal_kinds());
                     }
                     DriversCall::Assign { assign, rtn } => {
                         rtn.send(self.assign(assign).await).unwrap_or_default();
@@ -319,13 +343,20 @@ where
                             ),
                         );
                     }
+                    DriversCall::ExternalKinds(rtn) => {
+                        rtn.send(self.external_kinds.clone());
+                    }
                 }
             }
         });
     }
 
-    pub fn kinds(&self) -> Vec<Kind> {
+    pub fn internal_kinds(&self) -> Vec<Kind> {
         self.kinds.clone()
+    }
+
+    pub fn external_kinds(&self) -> Vec<Kind> {
+        self.external_kinds.clone()
     }
     pub async fn init0(&mut self) {
         if self.factories.is_empty() {
@@ -741,6 +772,12 @@ where
         Self { call_tx: tx, kind }
     }
 
+    pub async fn init_item(&self, point: Point ) -> Result<Status,MsgErr> {
+        let (rtn,mut rtn_rx) = oneshot::channel();
+        self.call_tx.try_send(DriverRunnerCall::InitItem{ point, rtn });
+        rtn_rx.await?
+    }
+
     pub fn on_added(&self) {
         self.call_tx.try_send(DriverRunnerCall::OnAdded);
     }
@@ -841,6 +878,7 @@ where
         rtn: oneshot::Sender<Result<(), P::Err>>,
     },
     OnAdded,
+    InitItem{ point: Point, rtn: oneshot::Sender<Result<Status,MsgErr>> },
     DriverRunnerRequest(DriverRunnerRequest<P>),
     Bind {
         point: Point,
@@ -900,27 +938,44 @@ where
 
         match &self.item {
             ItemSphere::Handler(item) => {
-                let mut transmitter =
-                    ProtoTransmitterBuilder::new(self.router.clone(), self.skel.exchanger.clone());
-                transmitter.from = SetStrategy::Override(self.port.clone());
-                let transmitter = transmitter.build();
-                let to = direct.to.clone();
-                let reflection = direct.reflection();
-                let ctx = RootInCtx::new(direct.payload, to, logger, transmitter);
+                if direct.core().method == Method::Cmd(CmdMethod::Init) {
+println!("RECEIVED INIT COMMAND!");
+                    let reflection = direct.reflection()?;
+                    match item.init().await {
+                        Ok(status) => {
+                            self.skel.registry.set_status(&self.port().point.clone(), &status).await;
+                            let reflect = reflection.make(ReflectedCore::ok(), self.port() );
+                            self.router.route(reflect.to_ultra()).await;
+                        }
+                        Err(err) => {
+                            self.skel.registry.set_status(&self.port().point.clone(), &Status::Panic).await;
+                            let reflect = reflection.make(ReflectedCore::err(err), self.port() );
+                            self.router.route(reflect.to_ultra()).await;
+                        }
+                    }
+                } else {
+                    let mut transmitter =
+                        ProtoTransmitterBuilder::new(self.router.clone(), self.skel.exchanger.clone());
+                    transmitter.from = SetStrategy::Override(self.port.clone());
+                    let transmitter = transmitter.build();
+                    let to = direct.to.clone();
+                    let reflection = direct.reflection();
+                    let ctx = RootInCtx::new(direct.payload, to, logger, transmitter);
 
-                match item.handle(ctx).await {
-                    CoreBounce::Absorbed => {}
-                    CoreBounce::Reflected(reflected) => {
-                        let reflection = reflection.unwrap();
+                    match item.handle(ctx).await {
+                        CoreBounce::Absorbed => {}
+                        CoreBounce::Reflected(reflected) => {
+                            let reflection = reflection.unwrap();
 
-                        let wave = reflection.make(reflected, self.port.clone());
-                        let wave = wave.to_ultra();
-                        #[cfg(test)]
-                        self.skel
-                            .diagnostic_interceptors
-                            .reflected_endpoint
-                            .send(wave.clone());
-                        self.inject(wave).await;
+                            let wave = reflection.make(reflected, self.port.clone());
+                            let wave = wave.to_ultra();
+                            #[cfg(test)]
+                            self.skel
+                                .diagnostic_interceptors
+                                .reflected_endpoint
+                                .send(wave.clone());
+                            self.inject(wave).await;
+                        }
                     }
                 }
             }
@@ -1083,6 +1138,17 @@ where
                             }
                             Err(err) => {
                                 rtn.send(Err(err));
+                            }
+                        }
+                    }
+                    DriverRunnerCall::InitItem{ point, rtn } => {
+                        let item = self.driver.item(&point).await;
+                        match item {
+                            Ok(item) => {
+                                rtn.send(item.init().await);
+                            }
+                            Err(err) => {
+                                rtn.send(Err(err.to_cosmic_err()));
                             }
                         }
                     }
@@ -1252,6 +1318,10 @@ where
 {
     fn kind(&self) -> Kind;
 
+    fn avail(&self) -> DriverAvail {
+        DriverAvail::External
+    }
+
     async fn create(
         &self,
         skel: DriverSkel<P>,
@@ -1269,6 +1339,10 @@ where
     P: Platform,
 {
     fn kind(&self) -> Kind;
+
+    fn avail(&self) -> DriverAvail {
+        DriverAvail::External
+    }
 
     async fn create(
         &self,
@@ -1309,6 +1383,10 @@ where
 
     fn layer(&self) -> Layer {
         Layer::Core
+    }
+
+    fn avail(&self) -> DriverAvail {
+        DriverAvail::External
     }
 
     async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
@@ -1381,12 +1459,28 @@ impl<P> ItemSphere<P>
 where
     P: Platform,
 {
+    pub async fn init(&self) -> Result<Status, MsgErr> {
+        match self {
+            ItemSphere::Handler(handler) => handler.init().await,
+            ItemSphere::Router(router) =>  {
+                // needs to convert to a message and forward to router
+                Ok(Status::Ready)
+            }
+        }
+    }
+
     pub async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         match self {
             ItemSphere::Handler(handler) => handler.bind().await,
             ItemSphere::Router(router) => router.bind().await,
         }
     }
+}
+
+#[derive(Clone,Eq,PartialEq)]
+pub enum DriverAvail {
+    Internal,
+    External
 }
 
 #[async_trait]
@@ -1408,6 +1502,9 @@ where
     P: Platform,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err>;
+    async fn init(&self) -> Result<Status, MsgErr> {
+        Ok(Status::Ready)
+    }
 }
 
 #[async_trait]
@@ -1456,6 +1553,10 @@ where
 {
     fn kind(&self) -> Kind {
         Kind::Driver
+    }
+
+    fn avail(&self) -> DriverAvail {
+        DriverAvail::Internal
     }
 
     async fn create(

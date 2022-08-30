@@ -1,7 +1,4 @@
-use crate::driver::{
-    Driver, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, DriverSkel, DriverStatus,
-    Drivers, DriversApi, DriversCall, HyperDriverFactory, Item, ItemHandler, ItemSkel, ItemSphere,
-};
+use crate::driver::{Driver, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, DriverSkel, DriverStatus, Drivers, DriversApi, DriversCall, HyperDriverFactory, Item, ItemHandler, ItemSkel, ItemSphere, DriverAvail};
 use crate::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
 use crate::machine::MachineSkel;
 use crate::shell::Shell;
@@ -739,28 +736,35 @@ where
         }
 
         {
+            let skel = skel.clone();
             let mut drivers = drivers.clone();
             let status_tx = skel.status_tx.clone();
             tokio::spawn(async move {
+                let mut previous= DriverStatus::Unknown;
                 loop {
-                    match drivers.status() {
-                        DriverStatus::Unknown => {
-                            status_tx.send(Status::Unknown).await;
-                        }
-                        DriverStatus::Pending => {
-                            status_tx.send(Status::Pending).await;
-                        }
-                        DriverStatus::Init => {
-                            status_tx.send(Status::Init).await;
-                        }
-                        DriverStatus::Ready => {
-                            status_tx.send(Status::Ready).await;
-                        }
-                        DriverStatus::Retrying(_) => {
-                            status_tx.send(Status::Panic).await;
-                        }
-                        DriverStatus::Fatal(_) => {
-                            status_tx.send(Status::Fatal).await;
+                    if previous != drivers.status() {
+                        previous = drivers.status();
+                        match drivers.status() {
+                            DriverStatus::Unknown => {
+                                status_tx.send(Status::Unknown).await;
+                            }
+                            DriverStatus::Pending => {
+                                status_tx.send(Status::Pending).await;
+                            }
+                            DriverStatus::Init => {
+                                status_tx.send(Status::Init).await;
+                            }
+                            DriverStatus::Ready => {
+                                let star_driver = drivers.get(&Kind::Star(skel.kind.clone())).await.unwrap();
+                                star_driver.init_item(skel.point.to_point()).await;
+                                status_tx.send(Status::Ready).await;
+                            }
+                            DriverStatus::Retrying(_) => {
+                                status_tx.send(Status::Panic).await;
+                            }
+                            DriverStatus::Fatal(_) => {
+                                status_tx.send(Status::Fatal).await;
+                            }
                         }
                     }
                     match drivers.status_changed().await {
@@ -1910,6 +1914,10 @@ where
         self.kind.clone()
     }
 
+    fn avail(&self) -> DriverAvail {
+        DriverAvail::Internal
+    }
+
     async fn create(
         &self,
         star: HyperStarSkel<P>,
@@ -2013,6 +2021,28 @@ where
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         <Star<P> as Item<P>>::bind(self).await
     }
+
+    async fn init(&self) -> Result<Status,MsgErr> {
+        match self.skel.kind {
+            StarSub::Central => {
+                let registration = Registration {
+                    point: Point::root(),
+                    kind: Kind::Root,
+                    registry: Default::default(),
+                    properties: Default::default(),
+                    owner: HYPERUSER.clone(),
+                    strategy: Strategy::Ensure,
+                    status: Status::Ready
+                };
+                self.skel.registry.register(&registration).await.map_err(|e|e.to_cosmic_err())?;
+                self.skel.registry.assign(&Point::root()).send(self.skel.point.clone());
+                Ok(Status::Ready)
+            }
+            _ => {
+                Ok(Status::Ready)
+            }
+        }
+    }
 }
 
 #[async_trait]
@@ -2031,6 +2061,8 @@ where
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(STAR_BIND_CONFIG.clone())
     }
+
+
 }
 
 #[routes]
@@ -2060,7 +2092,7 @@ where
             if self
                 .skel
                 .drivers
-                .kinds()
+                .internal_kinds()
                 .await?
                 .contains(&assign.details.stub.kind)
             {
@@ -2128,13 +2160,15 @@ where
                 Discoveries::new()
             };
 
-            let discovery = Discovery {
-                star_kind: star.skel.kind.clone(),
-                hops: ctx.wave().hops(),
-                star_key: star.skel.key.clone(),
-                kinds: star.skel.drivers.kinds().await?.into_iter().collect(),
-            };
-            discoveries.push(discovery);
+            if star.skel.kind.can_be_wrangled() {
+                let discovery = Discovery {
+                    star_kind: star.skel.kind.clone(),
+                    hops: ctx.wave().hops(),
+                    star_key: star.skel.key.clone(),
+                    kinds: star.skel.drivers.external_kinds().await?.into_iter().collect(),
+                };
+                discoveries.push(discovery);
+            }
 
             let mut core = ReflectedCore::new();
             core.body = Substance::Sys(Sys::Discoveries(discoveries));
@@ -2146,7 +2180,7 @@ where
             match search {
                 Search::Star(star) => {
                     if self.skel.key == *star {
-                        match self.skel.drivers.kinds().await {
+                        match self.skel.drivers.internal_kinds().await {
                             Ok(kinds) => {
                                 let discovery = Discovery {
                                     star_kind: self.skel.kind.clone(),

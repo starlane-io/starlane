@@ -116,7 +116,7 @@ where
                 Ok(())
             },
             Err(err) => {
-                if directed.core().method == Method::Cmd(CmdMethod::Bounce) {
+                if let Method::Cmd(_) = &directed.core().method {
                     let mut pipeline = PipelineVar::new();
                     pipeline.segments.push( PipelineSegmentVar{ step: PipelineStepVar::direct(), stop: PipelineStopVar::Core } );
                     pipeline.segments.push( PipelineSegmentVar{ step: PipelineStepVar::rtn(), stop: PipelineStopVar::Reflect } );

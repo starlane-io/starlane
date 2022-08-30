@@ -7,7 +7,7 @@ use cosmic_api::parse::bind_config;
 use cosmic_api::util::log;
 use cosmic_api::wave::{CoreBounce, DirectedHandler, DirectedHandlerSelector, RecipientSelector, ReflectedCore, RootInCtx};
 use crate::{DriverFactory, Platform};
-use crate::driver::{Driver, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere};
+use crate::driver::{Driver, DriverAvail, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere};
 use crate::star::HyperStarSkel;
 lazy_static! {
     static ref BASE_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -28,11 +28,15 @@ fn base_bind() -> BindConfig {
         .unwrap()
 }
 
-pub struct BaseDriverFactory;
+pub struct BaseDriverFactory{
+    pub avail: DriverAvail
+}
 
 impl BaseDriverFactory {
-    pub fn new() -> Self {
-        Self
+    pub fn new(avail: DriverAvail) -> Self {
+        Self {
+            avail
+        }
     }
 }
 
@@ -43,15 +47,24 @@ impl <P> HyperDriverFactory<P> for BaseDriverFactory where P: Platform {
     }
 
     async fn create(&self, skel: HyperStarSkel<P>, driver_skel: DriverSkel<P>, ctx: DriverCtx) -> Result<Box<dyn Driver<P>>, P::Err> {
-        Ok(Box::new(BaseDriver))
+        Ok(Box::new(BaseDriver::new(self.avail.clone())))
     }
 
 }
 
-pub struct BaseDriver;
+pub struct BaseDriver {
+    pub avail: DriverAvail
+}
 
 #[routes]
-impl BaseDriver {}
+impl BaseDriver {
+
+    pub fn new(avail: DriverAvail) -> Self {
+        Self {
+            avail
+        }
+    }
+}
 
 
 #[async_trait]
