@@ -822,6 +822,31 @@ fn test_layer_traversal() -> Result<(), TestErr> {
     })
 }
 
+pub struct MachineApiExtFactory<P>
+    where
+        P: Platform,
+{
+    machine_api: MachineApi<P>,
+    logger: PointLogger,
+}
+
+#[async_trait]
+impl<P> HyperwayEndpointFactory for MachineApiExtFactory<P>
+    where
+        P: Platform,
+{
+    async fn create(&self) -> Result<HyperwayEndpoint, HyperConnectionErr> {
+        let knock = Knock {
+            kind: InterchangeKind::DefaultControl,
+            auth: Box::new(Substance::Empty),
+            remote: None,
+        };
+        self.logger
+            .result_ctx("machine_api.knock()", self.machine_api.knock(knock).await)
+    }
+}
+
+
 #[test]
 fn test_control() -> Result<(), TestErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -839,37 +864,13 @@ fn test_control() -> Result<(), TestErr> {
             .await
             .unwrap();
 
-        let stub = HyperwayStub::new(Point::remote_endpoint().to_port(), Agent::HyperUser);
-        pub struct MachineApiExtFactory<P>
-        where
-            P: Platform,
-        {
-            machine_api: MachineApi<P>,
-            logger: PointLogger,
-        }
-
-        #[async_trait]
-        impl<P> HyperwayEndpointFactory for MachineApiExtFactory<P>
-        where
-            P: Platform,
-        {
-            async fn create(&self) -> Result<HyperwayEndpoint, HyperConnectionErr> {
-                let knock = Knock {
-                    kind: InterchangeKind::DefaultControl,
-                    auth: Box::new(Substance::Empty),
-                    remote: None,
-                };
-                self.logger
-                    .result_ctx("machine_api.knock()", self.machine_api.knock(knock).await)
-            }
-        }
-
         let factory = MachineApiExtFactory {
             machine_api,
             logger: logger.clone(),
         };
 
-        let client = HyperClient::new(Box::new(factory), logger).unwrap();
+        let exchanger = Exchanger::new( Point::from_str("client").unwrap().to_port(), Timeouts::default());
+        let client = HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger).unwrap();
         let transmitter = client.proto_transmitter_builder().await?;
         let greet = client.get_greeting().expect("expected greeting");
         let transmitter = transmitter.build();
@@ -971,6 +972,47 @@ fn test_golden_path() -> Result<(), TestErr> {
 
     })
 }
+
+#[test]
+fn test_provision_and_assign() -> Result<(), TestErr> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async move {
+        // let (final_tx, final_rx) = oneshot::channel();
+
+        let platform = TestPlatform::new();
+        let machine_api = platform.machine();
+        let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
+        let logger = logger.point(Point::from_str("test-client").unwrap());
+
+        tokio::time::timeout(Duration::from_secs(1), machine_api.wait_ready())
+            .await
+            .unwrap();
+
+        let factory = MachineApiExtFactory {
+            machine_api,
+            logger: logger.clone(),
+        };
+
+        let exchanger = Exchanger::new( Point::from_str("client").unwrap().to_port(), Timeouts::default());
+        let client = HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger).unwrap();
+        let transmitter = client.proto_transmitter_builder().await?;
+        let transmitter = transmitter.build();
+
+        let mut proto = DirectedProto::ping();
+        proto.method(CmdMethod::Bounce);
+        proto.to(Point::root().to_port());
+        let reflect: Wave<Pong> = transmitter.direct(proto).await?;
+        assert!(reflect.core.is_ok());
+
+        Ok(())
+
+    })
+}
+
+
+
 
 
 

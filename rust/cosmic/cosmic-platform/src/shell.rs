@@ -163,7 +163,7 @@ where
             }
         } else {
             traversal.logger.warn(format!(
-                "filtered a response from {} to a request {} of which the Shell has no record",
+                "blocked a reflected from {} to a directed id {} of which the Shell has no record",
                 traversal.from().to_string(),
                 traversal.reflection_of().to_short_string()
             ));

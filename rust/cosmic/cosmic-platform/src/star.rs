@@ -1,4 +1,10 @@
-use crate::driver::{Driver, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, DriverSkel, DriverStatus, Drivers, DriversApi, DriversCall, HyperDriverFactory, Item, ItemHandler, ItemSkel, ItemSphere, DriverAvail};
+use crate::driver::DriverRunnerCall::Handle;
+use crate::driver::{
+    Driver, DriverAvail, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, DriverSkel,
+    DriverStatus, Drivers, DriversApi, DriversCall, HyperDriverFactory, Item, ItemHandler,
+    ItemSkel, ItemSphere,
+};
+use crate::field::Field;
 use crate::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
 use crate::machine::MachineSkel;
 use crate::shell::Shell;
@@ -22,13 +28,26 @@ use cosmic_api::parse::{bind_config, route_attribute, Env};
 use cosmic_api::particle::particle::{Details, Status, Stub};
 use cosmic_api::quota::Timeouts;
 use cosmic_api::substance::substance::{Substance, ToSubstance};
-use cosmic_api::sys::{Assign, AssignmentKind, Discoveries, Discovery, Location, ParticleRecord, Provision, Search, Sys};
+use cosmic_api::sys::{
+    Assign, AssignmentKind, Discoveries, Discovery, Location, ParticleRecord, Provision, Search,
+    Sys,
+};
 use cosmic_api::util::{log, ValueMatcher, ValuePattern};
-use cosmic_api::wave::{Agent, Bounce, BounceBacks, CmdMethod, CoreBounce, DirectedHandler, DirectedHandlerSelector, DirectedHandlerShell, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling, HandlingKind, InCtx, Method, Ping, Pong, Priority, ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, Recipients, Reflectable, ReflectedCore, ReflectedWave, Retries, Ripple, RootInCtx, Router, Scope, SetStrategy, Signal, SingularRipple, ToRecipients, TxRouter, WaitTime, Wave, WaveKind};
+use cosmic_api::wave::{
+    Agent, Bounce, BounceBacks, CmdMethod, CoreBounce, DirectedHandler, DirectedHandlerSelector,
+    DirectedHandlerShell, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
+    HandlingKind, InCtx, Method, Ping, Pong, Priority, ProtoTransmitter, ProtoTransmitterBuilder,
+    RecipientSelector, Recipients, Reflectable, ReflectedCore, ReflectedWave, Retries, Ripple,
+    RootInCtx, Router, Scope, SetStrategy, Signal, SingularRipple, ToRecipients, TxRouter,
+    WaitTime, Wave, WaveKind,
+};
 use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
 use cosmic_api::ArtRef;
 use cosmic_api::{MountKind, Registration, State, StateFactory, HYPERUSER};
-use cosmic_hyperlane::{Bridge, HyperClient, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub};
+use cosmic_hyperlane::{
+    Bridge, HyperClient, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
+    HyperwayInterchange, HyperwayStub,
+};
 use dashmap::mapref::one::{Ref, RefMut};
 use dashmap::DashMap;
 use futures::future::{join_all, BoxFuture};
@@ -48,8 +67,6 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 use tokio::time::error::Elapsed;
 use tracing::{error, info};
-use crate::driver::DriverRunnerCall::Handle;
-use crate::field::Field;
 
 #[derive(Clone)]
 pub struct StarState<P>
@@ -107,7 +124,7 @@ where
             topic: Arc::new(DashMap::new()),
             shell: Arc::new(DashMap::new()),
             tx,
-            phantom: PhantomData::default()
+            phantom: PhantomData::default(),
         }
     }
 
@@ -150,7 +167,6 @@ where
         }
     }
 
-
     pub fn find_shell(&self, point: &Point) -> Result<ShellState, MsgErr> {
         Ok(self
             .shell
@@ -175,7 +191,7 @@ where
     pub kind: StarSub,
     pub logger: PointLogger,
     pub registry: Registry<P>,
-    pub golden_path: Arc<DashMap<StarKey,StarKey>>,
+    pub golden_path: Arc<DashMap<StarKey, StarKey>>,
     pub traverse_to_next_tx: mpsc::Sender<Traversal<UltraWave>>,
     pub inject_tx: mpsc::Sender<TraversalInjection>,
     pub machine: MachineSkel<P>,
@@ -221,7 +237,7 @@ where
         // prime the searcher by mapping the immediate lanes
         for hyperway in template.connections.clone() {
             adjacents.insert(hyperway.key().clone().to_point(), hyperway.stub().clone());
-            golden_path.insert( hyperway.key().clone(), hyperway.key().clone());
+            golden_path.insert(hyperway.key().clone(), hyperway.key().clone());
         }
 
         let gravity_router = TxRouter::new(star_tx.gravity_tx.clone());
@@ -244,8 +260,12 @@ where
             star_tx.drivers_status_rx.clone(),
         );
 
-        let star_router = LayerInjectionRouter::injector(star_tx.inject_tx.clone(), point.to_port().with_layer(Layer::Core));
-        let mut star_transmitter = ProtoTransmitterBuilder::new(Arc::new(star_router),exchanger.clone());
+        let star_router = LayerInjectionRouter::injector(
+            star_tx.inject_tx.clone(),
+            point.to_port().with_layer(Layer::Core),
+        );
+        let mut star_transmitter =
+            ProtoTransmitterBuilder::new(Arc::new(star_router), exchanger.clone());
         star_transmitter.from = SetStrategy::Override(point.to_port().with_layer(Layer::Core));
         star_transmitter.agent = SetStrategy::Override(Agent::HyperUser);
         let star_transmitter = star_transmitter.build();
@@ -275,7 +295,7 @@ where
             star_transmitter,
             #[cfg(test)]
             diagnostic_interceptors: DiagnosticInterceptors::new(),
-            template
+            template,
         }
     }
 
@@ -383,7 +403,10 @@ where
     ToHyperway(Wave<Signal>),
     Shard(UltraWave),
     Wrangle(oneshot::Sender<Result<StarWrangles, MsgErr>>),
-    Bounce{key: StarKey, rtn:oneshot::Sender<Result<(), MsgErr>>},
+    Bounce {
+        key: StarKey,
+        rtn: oneshot::Sender<Result<(), MsgErr>>,
+    },
     #[cfg(test)]
     GetSkel(oneshot::Sender<HyperStarSkel<P>>),
 }
@@ -412,7 +435,10 @@ where
 {
     pub fn new(point: Point) -> Self {
         let (gravity_tx, mut gravity_rx) = mpsc::channel(1024);
-        let (inject_tx, mut inject_rx): (mpsc::Sender<TraversalInjection>,mpsc::Receiver<TraversalInjection>) = mpsc::channel(1024);
+        let (inject_tx, mut inject_rx): (
+            mpsc::Sender<TraversalInjection>,
+            mpsc::Receiver<TraversalInjection>,
+        ) = mpsc::channel(1024);
         let (traverse_to_next_tx, mut traverse_to_next_rx): (
             mpsc::Sender<Traversal<UltraWave>>,
             mpsc::Receiver<Traversal<UltraWave>>,
@@ -555,10 +581,9 @@ where
 
     pub async fn bounce(&self, key: StarKey) -> Result<(), MsgErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
-        self.tx.send(HyperStarCall::Bounce{key,rtn}).await?;
+        self.tx.send(HyperStarCall::Bounce { key, rtn }).await?;
         tokio::time::timeout(Duration::from_secs(5), rtn_rx).await??
     }
-
 
     pub async fn from_hyperway(&self, wave: UltraWave, results: bool) -> Result<(), MsgErr> {
         match results {
@@ -582,7 +607,9 @@ where
     }
 
     pub async fn traverse_to_next_layer(&self, traversal: Traversal<UltraWave>) {
-        self.tx.send(HyperStarCall::TraverseToNextLayer(traversal)).await;
+        self.tx
+            .send(HyperStarCall::TraverseToNextLayer(traversal))
+            .await;
     }
 
     pub async fn inject_traversal(&self, inject: TraversalInjection) {
@@ -599,7 +626,9 @@ where
 
     pub async fn create_states(&self, point: Point) -> Result<(), MsgErr> {
         let (rtn, rtn_rx) = oneshot::channel();
-        self.tx.send(HyperStarCall::CreateStates { point, rtn }).await;
+        self.tx
+            .send(HyperStarCall::CreateStates { point, rtn })
+            .await;
         rtn_rx.await?;
         Ok(())
     }
@@ -647,7 +676,7 @@ where
         mut drivers: DriversBuilder<P>,
         mut hyperway_endpoint: HyperwayEndpoint,
         interchange: Arc<HyperwayInterchange>,
-        mut star_tx: HyperStarTx<P>
+        mut star_tx: HyperStarTx<P>,
     ) -> Result<HyperStarApi<P>, P::Err> {
         let drivers = drivers.build(
             skel.clone(),
@@ -656,7 +685,6 @@ where
             star_tx.drivers_status_tx.take().unwrap(),
             star_tx.drivers_status_rx.clone(),
         );
-
 
         let star_rx = star_tx.call_rx.take().unwrap();
         let star_tx = star_tx.call_tx;
@@ -718,7 +746,6 @@ where
             to_gravity_traversal_tx,
         );
 
-
         let gravity = skel.point.clone().to_port().with_layer(Layer::Gravity);
 
         // relay from hyper_rx
@@ -740,7 +767,7 @@ where
             let mut drivers = drivers.clone();
             let status_tx = skel.status_tx.clone();
             tokio::spawn(async move {
-                let mut previous= DriverStatus::Unknown;
+                let mut previous = DriverStatus::Unknown;
                 loop {
                     if previous != drivers.status() {
                         previous = drivers.status();
@@ -755,7 +782,8 @@ where
                                 status_tx.send(Status::Init).await;
                             }
                             DriverStatus::Ready => {
-                                let star_driver = drivers.get(&Kind::Star(skel.kind.clone())).await.unwrap();
+                                let star_driver =
+                                    drivers.get(&Kind::Star(skel.kind.clone())).await.unwrap();
                                 star_driver.init_item(skel.point.to_point()).await;
                                 status_tx.send(Status::Ready).await;
                             }
@@ -785,13 +813,30 @@ where
                 let logger = skel.logger.push_mark("client-connect").unwrap();
                 for con in &skel.template.connections {
                     if let StarCon::Connector(stub) = con {
-                        match interchange.mount( HyperwayStub::new(stub.key.to_point().to_port().with_layer(Layer::Gravity), Agent::HyperUser), None).await {
+                        match interchange
+                            .mount(
+                                HyperwayStub::new(
+                                    stub.key.to_point().to_port().with_layer(Layer::Gravity),
+                                    Agent::HyperUser,
+                                ),
+                                None,
+                            )
+                            .await
+                        {
                             Ok(local_endpoint) => {
-                                match skel.machine.api.endpoint_factory(skel.key.clone(), stub.key.clone() ).await  {
+                                match skel
+                                    .machine
+                                    .api
+                                    .endpoint_factory(skel.key.clone(), stub.key.clone())
+                                    .await
+                                {
                                     Ok(remote_factory) => {
-                                        match Bridge::new(local_endpoint, remote_factory, logger.push_point("endpoint").unwrap() ) {
-                                            Ok(_) => {
-                                            }
+                                        match Bridge::new(
+                                            local_endpoint,
+                                            remote_factory,
+                                            logger.push_point("endpoint").unwrap(),
+                                        ) {
+                                            Ok(_) => {}
                                             Err(err) => {
                                                 skel.logger.error(format!("could not create Bridge for remote connection: {} because {}", stub.key.to_string(), err.to_string()) );
                                                 skel.status_tx.send(Status::Fatal).await;
@@ -805,7 +850,11 @@ where
                                 }
                             }
                             Err(err) => {
-                                skel.logger.error(format!("could not mount local connection: {} because {}", stub.key.to_string(), err.to_string()) );
+                                skel.logger.error(format!(
+                                    "could not mount local connection: {} because {}",
+                                    stub.key.to_string(),
+                                    err.to_string()
+                                ));
                                 skel.status_tx.send(Status::Fatal).await;
                             }
                         }
@@ -817,19 +866,24 @@ where
         {
             let skel = skel.clone();
             tokio::spawn(async move {
-
                 let mut retries = 0;
                 tokio::time::sleep(Duration::from_secs(5)).await;
                 loop {
-                    match tokio::time::timeout( Duration::from_secs(60), skel.api.wrangle()).await {
+                    match tokio::time::timeout(Duration::from_secs(60), skel.api.wrangle()).await {
                         Ok(Ok(_)) => {
                             break;
                         }
                         Ok(Err(err)) => {
-                            skel.logger.error(format!("HyperStar Auto Wrangle failed: {}", err.to_string()) );
+                            skel.logger.error(format!(
+                                "HyperStar Auto Wrangle failed: {}",
+                                err.to_string()
+                            ));
                         }
                         Err(err) => {
-                            skel.logger.error(format!("HyperStar Auto Wrangle failed: {}", err.to_string()) );
+                            skel.logger.error(format!(
+                                "HyperStar Auto Wrangle failed: {}",
+                                err.to_string()
+                            ));
                         }
                     }
                     skel.logger.info("trying wrangle again in 5 seconds...");
@@ -941,8 +995,8 @@ where
                     HyperStarCall::Wrangle(rtn) => {
                         self.wrangle(rtn).await;
                     }
-                    HyperStarCall::Bounce{key, rtn} => {
-                        self.bounce(key,rtn).await;
+                    HyperStarCall::Bounce { key, rtn } => {
+                        self.bounce(key, rtn).await;
                     }
                 }
             }
@@ -1047,7 +1101,6 @@ where
 
     #[track_caller]
     async fn shard(&self, mut wave: UltraWave) {
-
         wave.add_to_history(self.skel.point.clone());
 
         let skel = self.skel.clone();
@@ -1063,7 +1116,7 @@ where
             where
                 P: Platform,
             {
-                match & mut wave {
+                match &mut wave {
                     UltraWave::Ripple(ripple) => {
                         let mut map =
                             shard_ripple_by_location(ripple, &skel.adjacents, &skel.registry)
@@ -1150,10 +1203,9 @@ where
     async fn find_next_hop(&self, star_key: &StarKey) -> Result<Option<StarKey>, MsgErr> {
         let logger = self.skel.logger.push_mark("hyperstar:find_next_hop")?;
         if let Some(adjacent) = self.skel.golden_path.get(star_key) {
-println!("Found next hop for: {}", star_key.to_string());
+            println!("Found next hop for: {}", star_key.to_string());
             Ok(Some(adjacent.value().clone()))
         } else {
-
             panic!("Find next hop...");
             /*
             let mut ripple = DirectedProto::ripple();
@@ -1228,8 +1280,8 @@ println!("Found next hop for: {}", star_key.to_string());
 
     async fn wrangle(&self, rtn: oneshot::Sender<Result<StarWrangles, MsgErr>>) {
         let skel = self.skel.clone();
-        tokio::spawn( async move {
-            let mut wrangler = Wrangler::new(skel.clone(), Search::Kinds );
+        tokio::spawn(async move {
+            let mut wrangler = Wrangler::new(skel.clone(), Search::Kinds);
             let mut history = HashSet::new();
             history.insert(skel.point.clone());
             wrangler.history(history);
@@ -1246,7 +1298,8 @@ println!("Found next hop for: {}", star_key.to_string());
                 coalated.push(StarDiscovery::new(
                     StarPair::new(
                         skel.key.clone(),
-                        StarKey::try_from(discovery.star_key.to_point()).expect("expected star key"),
+                        StarKey::try_from(discovery.star_key.to_point())
+                            .expect("expected star key"),
                     ),
                     discovery.clone(),
                 ));
@@ -1257,7 +1310,7 @@ println!("Found next hop for: {}", star_key.to_string());
         });
     }
 
-    async fn bounce(&self, key: StarKey, rtn: oneshot::Sender<Result<(),MsgErr>>) {
+    async fn bounce(&self, key: StarKey, rtn: oneshot::Sender<Result<(), MsgErr>>) {
         let transmitter = self.skel.star_transmitter.clone();
         let logger = self.skel.logger.clone();
         tokio::spawn(async move {
@@ -1422,10 +1475,7 @@ where
                 }
 
                 // dir is from inject_layer to dest
-                dir = match TraversalDirection::new(
-                    &injector.layer,
-                    &to.layer,
-                ) {
+                dir = match TraversalDirection::new(&injector.layer, &to.layer) {
                     Ok(dir) => dir,
                     Err(_) => {
                         // looks like we are already on the dest layer...
@@ -1439,7 +1489,6 @@ where
                 if injector.point == wave.from().point {
                     dir = TraversalDirection::Fabric;
                 } else {
-
                     // if this was injected by something else (like the Star)
                     // then it needs to traverse towards the Core
                     dir = TraversalDirection::Core;
@@ -1450,12 +1499,7 @@ where
                 }
             }
 
-
-
-            let traversal_logger = self
-                .skel
-                .logger
-                .point(to.to_point());
+            let traversal_logger = self.skel.logger.point(to.to_point());
             let traversal_logger = traversal_logger.span();
 
             let point = if *injector == self.injector {
@@ -1496,14 +1540,13 @@ where
                 .send(traversal.clone())
                 .unwrap_or_default();
 
-
-                // alright, let's visit the injection layer first...
-           self.visit_layer(traversal).await?;
+            // alright, let's visit the injection layer first...
+            self.visit_layer(traversal).await?;
         }
         Ok(())
     }
 
-    fn has_layer(&self, layer: &Layer ) -> bool {
+    fn has_layer(&self, layer: &Layer) -> bool {
         *layer == Layer::Shell || *layer == Layer::Field
     }
 
@@ -1521,7 +1564,6 @@ where
     }
 
     async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(), MsgErr> {
-
         let logger = self.skel.logger.push_mark("stack-traversal:visit")?;
         logger.track(&traversal, || {
             Tracker::new(
@@ -1532,10 +1574,7 @@ where
 
         match traversal.layer {
             Layer::Field => {
-                let field = Field::new(
-                    traversal.point.clone(),
-                    self.skel.clone(),
-                );
+                let field = Field::new(traversal.point.clone(), self.skel.clone());
                 tokio::spawn(async move {
                     let logger = logger.push_action("Field").unwrap();
                     logger
@@ -1575,9 +1614,9 @@ where
             .push_mark("stack-traversal:traverse-to-next-layer")
             .unwrap();
 
-        self.skel.logger.track(&traversal, || {
-            Tracker::new("traverse", "NextLayer")
-        });
+        self.skel
+            .logger
+            .track(&traversal, || Tracker::new("traverse", "NextLayer"));
 
         if traversal.dest.is_some() && traversal.layer == *traversal.dest.as_ref().unwrap() {
             self.visit_layer(traversal).await;
@@ -1611,16 +1650,20 @@ pub struct StarMount {
 }
 
 #[derive(Clone)]
-pub struct LayerInjectionRouter
-{
+pub struct LayerInjectionRouter {
     pub inject_tx: mpsc::Sender<TraversalInjection>,
     pub injector: Port,
 }
 
-impl LayerInjectionRouter
-{
-    pub fn new<P>(skel: HyperStarSkel<P>, injector: Port) -> Self where P: Platform {
-        Self { inject_tx: skel.inject_tx.clone(), injector }
+impl LayerInjectionRouter {
+    pub fn new<P>(skel: HyperStarSkel<P>, injector: Port) -> Self
+    where
+        P: Platform,
+    {
+        Self {
+            inject_tx: skel.inject_tx.clone(),
+            injector,
+        }
     }
 
     pub fn with(&self, injector: Port) -> Self {
@@ -1630,17 +1673,16 @@ impl LayerInjectionRouter
         }
     }
 
-    pub fn injector(inject_tx: mpsc::Sender<TraversalInjection>, injector: Port) -> Self{
+    pub fn injector(inject_tx: mpsc::Sender<TraversalInjection>, injector: Port) -> Self {
         Self {
             inject_tx,
-            injector
+            injector,
         }
     }
 }
 
 #[async_trait]
-impl Router for LayerInjectionRouter
-{
+impl Router for LayerInjectionRouter {
     async fn route(&self, wave: UltraWave) {
         let inject = TraversalInjection::new(self.injector.clone(), wave);
         self.inject_tx.send(inject).await;
@@ -1878,6 +1920,7 @@ fn star_bind() -> BindConfig {
        Route<Sys<Transport>> -> (());
        Route<Sys<Assign>> -> (()) => &;
        Route<Sys<Search>> -> (()) => &;
+       Route<Sys<Provision>> -> (()) => &;
     }
     "#,
     ))
@@ -2022,7 +2065,7 @@ where
         <Star<P> as Item<P>>::bind(self).await
     }
 
-    async fn init(&self) -> Result<Status,MsgErr> {
+    async fn init(&self) -> Result<Status, MsgErr> {
         match self.skel.kind {
             StarSub::Central => {
                 let registration = Registration {
@@ -2032,15 +2075,20 @@ where
                     properties: Default::default(),
                     owner: HYPERUSER.clone(),
                     strategy: Strategy::Ensure,
-                    status: Status::Ready
+                    status: Status::Ready,
                 };
-                self.skel.registry.register(&registration).await.map_err(|e|e.to_cosmic_err())?;
-                self.skel.registry.assign(&Point::root()).send(self.skel.point.clone());
+                self.skel
+                    .registry
+                    .register(&registration)
+                    .await
+                    .map_err(|e| e.to_cosmic_err())?;
+                self.skel
+                    .registry
+                    .assign(&Point::root())
+                    .send(self.skel.point.clone());
                 Ok(Status::Ready)
             }
-            _ => {
-                Ok(Status::Ready)
-            }
+            _ => Ok(Status::Ready),
         }
     }
 }
@@ -2061,8 +2109,6 @@ where
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(STAR_BIND_CONFIG.clone())
     }
-
-
 }
 
 #[routes]
@@ -2072,15 +2118,66 @@ where
 {
     #[route("Sys<Provision>")]
     pub async fn provision(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, P::Err> {
+        println!("RECEIVED PROVISION PING {}", self.skel.point.to_string());
         if let Sys::Provision(provision) = ctx.input {
-            Ok(ReflectedCore::ok())
+            let record = self.skel.registry.locate(&provision.point).await?;
+            match self.skel.wrangles.wrangles.get(&record.details.stub.kind) {
+                None => {
+println!("PROVISIONING LOCALLY");
+                    let kind = record.details.stub.kind.clone();
+                    let point = record.details.stub.point.clone();
+                    if self
+                        .skel
+                        .drivers
+                        .external_kinds()
+                        .await?
+                        .contains(&record.details.stub.kind)
+                    {
+                        let assign = Sys::Assign(Assign::new(
+                            AssignmentKind::Create,
+                            record.details,
+                            StateSrc::None,
+                        ));
+
+                        let ctx: InCtx<'_, Sys> = ctx.push_input_ref(&assign);
+println!("Assigning...{}<{}>", point.to_string(), kind.to_string());
+                        if self.assign(ctx).await?.is_ok() {
+                            Ok(ReflectedCore::ok_body(self.skel.point.clone().into()))
+                        } else {
+                            Err(
+                                format!("could not find assign kind {} to self", kind.to_string())
+                                    .into(),
+                            )
+                        }
+                    } else {
+                        Err(format!(
+                            "could not find a place to provision kind {}",
+                            kind.to_string()
+                        )
+                        .into())
+                    }
+                }
+                Some(selector) => {
+                    let key = selector.wrangle().await?;
+                    let assign =
+                        Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
+                    let assign: DirectedCore = assign.into();
+                    let mut proto = DirectedProto::ping();
+                    proto.core(assign);
+                    proto.to(key.to_port());
+                    let pong: Wave<Pong> = ctx.transmitter.direct(proto).await?;
+                    pong.ok_or()?;
+                    Ok(ReflectedCore::ok_body(key.to_point().into()))
+                }
+            }
         } else {
-            Err("expected Sys<Assign>".into())
+            Err("expected Sys<Provision>".into())
         }
     }
 
     #[route("Sys<Assign>")]
     pub async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, P::Err> {
+
         if let Sys::Assign(assign) = ctx.input {
             #[cfg(test)]
             self.skel
@@ -2089,6 +2186,7 @@ where
                 .send(assign.clone())
                 .unwrap_or_default();
 
+            let complete_tx = self.skel.registry.assign(&assign.details.stub.point);
             if self
                 .skel
                 .drivers
@@ -2109,6 +2207,10 @@ where
                     assign.details.stub.kind.to_string()
                 );
             }
+
+            complete_tx.send(self.skel.point.clone());
+
+println!("Assigned: {}<{}> to {}", assign.details.stub.point.to_string(),assign.details.stub.kind.to_string(), self.skel.point.to_string());
 
             Ok(ReflectedCore::ok())
         } else {
@@ -2145,7 +2247,7 @@ where
             star: &Star<E>,
             ctx: &'a InCtx<'a, Sys>,
             mut history: HashSet<Point>,
-            search: Search
+            search: Search,
         ) -> Result<ReflectedCore, MsgErr>
         where
             E: Platform,
@@ -2165,7 +2267,13 @@ where
                     star_kind: star.skel.kind.clone(),
                     hops: ctx.wave().hops(),
                     star_key: star.skel.key.clone(),
-                    kinds: star.skel.drivers.external_kinds().await?.into_iter().collect(),
+                    kinds: star
+                        .skel
+                        .drivers
+                        .external_kinds()
+                        .await?
+                        .into_iter()
+                        .collect(),
                 };
                 discoveries.push(discovery);
             }
@@ -2202,22 +2310,29 @@ where
                         }
                     } else {
                         return CoreBounce::Reflected(ReflectedCore::result(
-                            sub_search_and_reflect(self, &ctx, ctx.wave().history(), search.clone() ).await,
+                            sub_search_and_reflect(
+                                self,
+                                &ctx,
+                                ctx.wave().history(),
+                                search.clone(),
+                            )
+                            .await,
                         ));
                     }
                 }
-                Search::StarKind(kind) => {
-                    if *kind == self.skel.kind {
-
-                    }
-                }
+                Search::StarKind(kind) => if *kind == self.skel.kind {},
                 Search::Kinds => {
-                    return CoreBounce::Reflected(ReflectedCore::result(sub_search_and_reflect(self, &ctx, ctx.wave().history(), Search::Kinds ).await));
+                    return CoreBounce::Reflected(ReflectedCore::result(
+                        sub_search_and_reflect(self, &ctx, ctx.wave().history(), Search::Kinds)
+                            .await,
+                    ));
                 }
             }
             return CoreBounce::Absorbed;
         } else {
-            self.skel.logger.error(format!("expected Search got : {}", ctx.input.to_string()) );
+            self.skel
+                .logger
+                .error(format!("expected Search got : {}", ctx.input.to_string()));
             return CoreBounce::Reflected(ctx.bad_request());
         }
     }
@@ -2425,7 +2540,6 @@ where
     }
 }
 
-
 pub async fn to_ports<E>(
     recipients: Recipients,
     adjacent: &HashSet<Point>,
@@ -2558,55 +2672,57 @@ where
     }
 }
 
-pub struct Wrangler<P> where P: Platform {
+pub struct Wrangler<P>
+where
+    P: Platform,
+{
     pub skel: HyperStarSkel<P>,
     pub transmitter: ProtoTransmitter,
     pub history: HashSet<Point>,
-    pub search: Search
+    pub search: Search,
 }
 
-
-impl <P> Wrangler<P> where P: Platform{
-
+impl<P> Wrangler<P>
+where
+    P: Platform,
+{
     pub fn new(skel: HyperStarSkel<P>, search: Search) -> Self {
-        let router = LayerInjectionRouter::new( skel.clone(), skel.point.to_port().with_layer(Layer::Shell));
-        let mut transmitter = ProtoTransmitterBuilder::new(
-            Arc::new(router),
-            skel.exchanger.clone(),
-        );
+        let router =
+            LayerInjectionRouter::new(skel.clone(), skel.point.to_port().with_layer(Layer::Shell));
+        let mut transmitter =
+            ProtoTransmitterBuilder::new(Arc::new(router), skel.exchanger.clone());
         transmitter.from = SetStrategy::Override(skel.point.to_port().with_layer(Layer::Core));
         transmitter.agent = SetStrategy::Override(Agent::HyperUser);
         transmitter.handling = SetStrategy::Override(Handling {
             kind: HandlingKind::Immediate,
             priority: Priority::Hyper,
             retries: Retries::Max,
-            wait: WaitTime::High
+            wait: WaitTime::High,
         });
         let transmitter = transmitter.build();
         Self {
             skel,
             transmitter,
             history: HashSet::new(),
-            search
+            search,
         }
     }
 
-    pub fn history( & mut self, mut history: HashSet<Point>) {
+    pub fn history(&mut self, mut history: HashSet<Point>) {
         for point in history {
             self.history.insert(point);
         }
     }
 
-
-    pub async fn wrangle(&self) -> Result<Discoveries,MsgErr> {
+    pub async fn wrangle(&self) -> Result<Discoveries, MsgErr> {
         let mut ripple = DirectedProto::ripple();
         ripple.method(SysMethod::Search);
         ripple.body(Substance::Sys(Sys::Search(self.search.clone())));
         ripple.history(self.history.clone());
         let mut adjacents = self.skel.adjacents.clone();
-        adjacents.retain( |point,_| !self.history.contains(point));
+        adjacents.retain(|point, _| !self.history.contains(point));
         if adjacents.is_empty() {
-            return Ok( Discoveries::new() );
+            return Ok(Discoveries::new());
         }
         ripple.bounce_backs = Some(BounceBacks::Count(adjacents.len()));
         ripple.to(Recipients::Stars);
@@ -2619,10 +2735,16 @@ impl <P> Wrangler<P> where P: Platform{
                         discoveries.push(discovery);
                     }
                 } else {
-                    self.skel.logger.warn(format!("unexpected reflected core substance from search echo : {}", echo.core.body.kind().to_string()));
+                    self.skel.logger.warn(format!(
+                        "unexpected reflected core substance from search echo : {}",
+                        echo.core.body.kind().to_string()
+                    ));
                 }
             } else {
-                self.skel.logger.error(format!("search echo failure {}", echo.core.to_err().to_string() ));
+                self.skel.logger.error(format!(
+                    "search echo failure {}",
+                    echo.core.to_err().to_string()
+                ));
             }
         }
         Ok(discoveries)
