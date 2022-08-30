@@ -179,6 +179,7 @@ where
     pub kind: StarSub,
     pub logger: PointLogger,
     pub registry: Registry<P>,
+    pub golden_path: Arc<DashMap<StarKey,StarKey>>,
     pub traverse_to_next_tx: mpsc::Sender<Traversal<UltraWave>>,
     pub inject_tx: mpsc::Sender<TraversalInjection>,
     pub machine: MachineSkel<P>,
@@ -219,9 +220,11 @@ where
         );
 
         let mut adjacents = HashMap::new();
+        let mut golden_path = Arc::new(DashMap::new());
         // prime the searcher by mapping the immediate lanes
         for hyperway in template.connections.clone() {
             adjacents.insert(hyperway.key().clone().to_point(), hyperway.stub().clone());
+            golden_path.insert( hyperway.key().clone(), hyperway.key().clone());
         }
 
         let gravity_router = TxRouter::new(star_tx.gravity_tx.clone());
@@ -250,6 +253,7 @@ where
             point,
             kind: template.kind.clone(),
             logger,
+            golden_path,
             gravity_tx: star_tx.gravity_tx.clone(),
             gravity_router,
             gravity_transmitter,
@@ -615,7 +619,6 @@ where
     drivers: DriversApi<P>,
     injector: Port,
     forwarders: Vec<Point>,
-    golden_path: DashMap<StarKey, StarKey>,
     hyperway_transmitter: ProtoTransmitter,
     gravity: Port,
     hyper_router: Arc<dyn Router>,
@@ -703,10 +706,6 @@ where
             to_gravity_traversal_tx,
         );
 
-        let mut golden_path = DashMap::new();
-        for con in skel.template.connections.iter() {
-            golden_path.insert(con.key().clone(), con.key().clone());
-        }
 
         let gravity = skel.point.clone().to_port().with_layer(Layer::Gravity);
 
@@ -804,7 +803,6 @@ where
                 star_rx,
                 drivers,
                 injector,
-                golden_path,
                 hyperway_transmitter,
                 forwarders,
                 gravity,
@@ -1097,7 +1095,7 @@ where
     #[track_caller]
     async fn find_next_hop(&self, star_key: &StarKey) -> Result<Option<StarKey>, MsgErr> {
         let logger = self.skel.logger.push_mark("hyperstar:find_next_hop")?;
-        if let Some(adjacent) = self.golden_path.get(star_key) {
+        if let Some(adjacent) = self.skel.golden_path.get(star_key) {
             Ok(Some(adjacent.value().clone()))
         } else {
 
@@ -1176,7 +1174,7 @@ where
     async fn wrangle(&self, rtn: oneshot::Sender<Result<StarWrangles, MsgErr>>) {
         let skel = self.skel.clone();
         tokio::spawn( async move {
-            let mut wrangler = Wrangler::new(skel.clone());
+            let mut wrangler = Wrangler::new(skel.clone(), Search::Kinds );
             let mut history = HashSet::new();
             history.insert(skel.point.clone());
             wrangler.history(history);
@@ -2037,18 +2035,24 @@ where
 
     #[route("Sys<Search>")]
     pub async fn handle_search_request(&self, ctx: InCtx<'_, Sys>) -> CoreBounce {
-        async fn reflect<'a, E>(
+        async fn sub_search_and_reflect<'a, E>(
             star: &StarCore<E>,
             ctx: &'a InCtx<'a, Sys>,
-            mut history: HashSet<Point>
+            mut history: HashSet<Point>,
+            search: Search
         ) -> Result<ReflectedCore, MsgErr>
         where
             E: Platform,
         {
-            let mut wrangler = Wrangler::new( star.skel.clone() );
-            history.insert(star.skel.point.clone());
-            wrangler.history(history);
-            let mut discoveries = wrangler.wrangle().await?;
+            let mut discoveries = if star.skel.kind.is_forwarder() {
+                let mut wrangler = Wrangler::new(star.skel.clone(), search);
+                history.insert(star.skel.point.clone());
+                wrangler.history(history);
+                wrangler.wrangle().await?
+            } else {
+                // if not a forwarder, then we don't seek sub wrangles
+                Discoveries::new()
+            };
 
             let discovery = Discovery {
                 star_kind: star.skel.kind.clone(),
@@ -2064,25 +2068,43 @@ where
             Ok(core)
         }
 
-
         if let Sys::Search(search) = ctx.input {
             match search {
                 Search::Star(star) => {
                     if self.skel.key == *star {
+                        match self.skel.drivers.kinds().await {
+                            Ok(kinds) => {
+                                let discovery = Discovery {
+                                    star_kind: self.skel.kind.clone(),
+                                    hops: ctx.wave().hops(),
+                                    star_key: self.skel.key.clone(),
+                                    kinds: kinds.into_iter().collect(),
+                                };
+                                let mut discoveries = Discoveries::new();
+                                discoveries.push(discovery);
+
+                                let mut core = ReflectedCore::new();
+                                core.body = Substance::Sys(Sys::Discoveries(discoveries));
+                                core.status = StatusCode::from_u16(200).unwrap();
+                                return CoreBounce::Reflected(core);
+                            }
+                            Err(err) => {
+                                return CoreBounce::Reflected(err.as_reflected_core());
+                            }
+                        }
+                    } else {
                         return CoreBounce::Reflected(ReflectedCore::result(
-                            reflect(self, &ctx, ctx.wave().history() ).await,
-                        ));
-                    };
-                }
-                Search::StarKind(kind) => {
-                    if *kind == self.skel.kind {
-                        return CoreBounce::Reflected(ReflectedCore::result(
-                            reflect(self, &ctx, ctx.wave().history() ).await,
+                            sub_search_and_reflect(self, &ctx, ctx.wave().history(), search.clone() ).await,
                         ));
                     }
                 }
+                Search::StarKind(kind) => {
+                    if *kind == self.skel.kind {
+
+                    }
+                }
                 Search::Kinds => {
-                    return CoreBounce::Reflected(ReflectedCore::result(reflect(self, &ctx, ctx.wave().history() ).await));
+                    return CoreBounce::Reflected(ReflectedCore::result(sub_search_and_reflect(self, &ctx, ctx.wave().history(), Search::Kinds ).await));
                 }
             }
             return CoreBounce::Absorbed;
@@ -2431,13 +2453,14 @@ where
 pub struct Wrangler<P> where P: Platform {
     pub skel: StarSkel<P>,
     pub transmitter: ProtoTransmitter,
-    pub history: HashSet<Point>
+    pub history: HashSet<Point>,
+    pub search: Search
 }
 
 
 impl <P> Wrangler<P> where P: Platform{
 
-    pub fn new( skel: StarSkel<P>) -> Self {
+    pub fn new( skel: StarSkel<P>, search: Search) -> Self {
         let router = LayerInjectionRouter::new( skel.clone(), skel.point.to_port().with_layer(Layer::Shell));
         let mut transmitter = ProtoTransmitterBuilder::new(
             Arc::new(router),
@@ -2455,7 +2478,8 @@ impl <P> Wrangler<P> where P: Platform{
         Self {
             skel,
             transmitter,
-            history: HashSet::new()
+            history: HashSet::new(),
+            search
         }
     }
 
@@ -2469,7 +2493,7 @@ impl <P> Wrangler<P> where P: Platform{
     pub async fn wrangle(&self) -> Result<Discoveries,MsgErr> {
         let mut ripple = DirectedProto::ripple();
         ripple.method(SysMethod::Search);
-        ripple.body(Substance::Sys(Sys::Search(Search::Kinds)));
+        ripple.body(Substance::Sys(Sys::Search(self.search.clone())));
         ripple.history(self.history.clone());
         let mut adjacents = self.skel.adjacents.clone();
         adjacents.retain( |point,_| !self.history.contains(point));

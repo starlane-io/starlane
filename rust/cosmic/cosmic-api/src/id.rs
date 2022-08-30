@@ -229,6 +229,13 @@ pub mod id {
         }
     }
 
+
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
+    pub enum ProvisionAffinity {
+        Local,
+        Wrangle
+    }
+
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
     pub enum Kind {
         Root,
@@ -286,6 +293,14 @@ pub mod id {
                 specific: self.specific_selector()
             }
         }
+
+        pub fn provision_affinity(&self) -> ProvisionAffinity {
+            match self.to_base() {
+                BaseKind::Base => ProvisionAffinity::Local,
+                _ => ProvisionAffinity::Wrangle
+            }
+        }
+
         pub fn as_point_segments(&self) -> String {
             if Sub::None != self.sub() {
                 if let Some(specific) = self.specific() {
