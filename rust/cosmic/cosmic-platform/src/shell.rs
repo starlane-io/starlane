@@ -14,16 +14,12 @@ use cosmic_api::parse::error::result;
 use cosmic_api::parse::{command_line, route_attribute, Env};
 use cosmic_api::quota::Timeouts;
 use cosmic_api::util::ToResolved;
-use cosmic_api::wave::{
-    Agent, Bounce, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector,
-    DirectedProto, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter,
-    ProtoTransmitterBuilder, RecipientSelector, Reflectable, ReflectedCore, ReflectedWave,
-    RootInCtx, Router, SetStrategy, UltraWave, Wave, WaveKind,
-};
+use cosmic_api::wave::{Agent, Bounce, BounceBacks, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, Reflectable, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, UltraWave, Wave, WaveKind};
 use cosmic_nom::new_span;
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU16, Ordering};
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
@@ -73,7 +69,7 @@ where
         if directed.from().point == self.port().point
             && directed.from().layer.ordinal() >= self.port().layer.ordinal()
         {
-            self.state.fabric_requests.insert(directed.id().clone());
+            self.state.fabric_requests.insert(directed.id().clone(), AtomicU16::new(1));
         }
 
         let logger = self.skel.logger.point(directed.to.point.clone()).span();
@@ -116,9 +112,30 @@ where
 
     async fn directed_fabric_bound(
         &self,
-        traversal: Traversal<DirectedWave>,
+        mut traversal: Traversal<DirectedWave>,
     ) -> Result<(), MsgErr> {
-        self.state.fabric_requests.insert(traversal.id().clone());
+        match traversal.directed_kind() {
+            DirectedKind::Ping => {
+                self.state.fabric_requests.insert(traversal.id().clone(), AtomicU16::new(1));
+            }
+            DirectedKind::Ripple => {
+
+                match traversal.bounce_backs() {
+                    BounceBacks::None => {}
+                    BounceBacks::Single => {
+                        self.state.fabric_requests.insert(traversal.id().clone(), AtomicU16::new(1));
+                    }
+                    BounceBacks::Count(c) => {
+                        self.state.fabric_requests.insert(traversal.id().clone(), AtomicU16::new(c as u16));
+                    }
+                    BounceBacks::Timer(_) => {
+                        // not sure what to do in this case...
+                    }
+                }
+            }
+            DirectedKind::Signal => {}
+        }
+
         self.traverse_next(traversal.wrap()).await;
         Ok(())
     }
@@ -129,12 +146,22 @@ where
     ) -> Result<(), MsgErr> {
         // println!("Shell reflected_core_bound: {}", traversal.kind().to_string() );
 
-        if let Some(_) = self
+        if let Some(count) = self
             .state
             .fabric_requests
-            .remove(&traversal.reflection_of())
+            .get(traversal.reflection_of())
         {
-            self.traverse_next(traversal.to_ultra()).await;
+            let value = count.value().fetch_sub(1, Ordering::Relaxed);
+            if value > 0 {
+                self.traverse_next(traversal.to_ultra()).await;
+            }
+            else {
+                let id = traversal.reflection_of().clone();
+                let fabric_requests = self.state.fabric_requests.clone();
+                tokio::spawn(async move {
+                    fabric_requests.remove(&id);
+                });
+            }
         } else {
             traversal.logger.warn(format!(
                 "filtered a response from {} to a request {} of which the Shell has no record",

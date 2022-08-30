@@ -407,7 +407,6 @@ where
                     }
                 }
 
-                //println!("readies {} ({}) num: {} {}", readies, on_complete.is_some(), statuses_rx.len(), readies == statuses_rx.len());
                 if readies == statuses_rx.len() {
                     if on_complete.is_some() {
                         on_complete.unwrap().send(Ok(()));

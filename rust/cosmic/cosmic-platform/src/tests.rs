@@ -914,7 +914,7 @@ fn test_star_wrangle() -> Result<(), TestErr> {
 
         let star_api = machine_api.get_machine_star().await?;
 
-        let wrangles = tokio::time::timeout(Duration::from_secs(5), star_api.wrangle()).await??;
+        let wrangles = tokio::time::timeout(Duration::from_secs(55), star_api.wrangle()).await??;
 
         println!("wrangles: {}", wrangles.wrangles.len());
 

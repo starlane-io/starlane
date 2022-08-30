@@ -185,6 +185,30 @@ where
         }
     }
 
+    pub fn add_history(&mut self, point: &Point ) {
+        match self {
+            UltraWaveDef::Ping(_) => {}
+            UltraWaveDef::Pong(_) => {}
+            UltraWaveDef::Ripple(ripple) => {
+                ripple.history.insert(point.clone());
+            }
+            UltraWaveDef::Echo(_) => {}
+            UltraWaveDef::Signal(_) => {}
+        }
+    }
+
+    pub fn history(&mut self) -> HashSet<Point> {
+        match self {
+            UltraWaveDef::Ping(_) => HashSet::new(),
+            UltraWaveDef::Pong(_) => HashSet::new(),
+            UltraWaveDef::Ripple(ripple) => {
+                ripple.history.clone()
+            }
+            UltraWaveDef::Echo(_) => HashSet::new(),
+            UltraWaveDef::Signal(_) => HashSet::new()
+        }
+    }
+
     pub fn id(&self) -> WaveId {
         match self {
             UltraWaveDef::Ping(w) => w.id.clone(),
@@ -1889,6 +1913,33 @@ where
             DirectedWaveDef::Signal(_) => WaveKind::Signal,
         }
     }
+
+    pub fn has_visited(&self, star: &Point) -> bool {
+        match self {
+            Self::Ripple(ripple) => ripple.history.contains(star),
+            _ => false,
+        }
+    }
+
+    pub fn add_history(&mut self, point: &Point ) {
+        match self {
+            Self::Ping(_) => {}
+            Self::Ripple(ripple) => {
+                ripple.history.insert(point.clone());
+            }
+            Self::Signal(_) => {}
+        }
+    }
+
+    pub fn history(&mut self) -> HashSet<Point> {
+        match self {
+            Self::Ping(_) => HashSet::new(),
+            Self::Ripple(ripple) => {
+                ripple.history.clone()
+            }
+            Self::Signal(_) => HashSet::new()
+        }
+    }
 }
 
 impl<W> Spannable for DirectedWaveDef<W>
@@ -3337,6 +3388,7 @@ where
             CoreBounce::Absorbed => {}
             CoreBounce::Reflected(reflected) => {
                 let wave = reflection.unwrap().make(reflected, self.port.clone());
+println!("REflecting to: {};", wave.to().to_string() );
                 let wave = wave.to_ultra();
                 let transmitter = self.builder.clone().build();
                 transmitter.route(wave).await;

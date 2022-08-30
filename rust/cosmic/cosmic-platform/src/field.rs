@@ -4,7 +4,7 @@ use cosmic_api::config::config::bind::{BindConfig, PipelineStepVar, PipelineStop
 use cosmic_api::error::{MsgErr, StatusErr};
 use cosmic_api::id::id::{Layer, Point, Port, ToPoint, ToPort, TraversalLayer};
 use cosmic_api::id::Traversal;
-use cosmic_api::wave::{DirectedKind, DirectedProto, DirectedWave, Echo, Exchanger, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedAggregate, ReflectedCore, Reflection, UltraWave, Wave, WaveKind};
+use cosmic_api::wave::{BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Exchanger, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedAggregate, ReflectedCore, Reflection, UltraWave, Wave, WaveKind};
 use cosmic_api::ArtRef;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -242,7 +242,7 @@ impl PipeEx {
         }
     }
 
-    async fn direct(&mut self, proto: DirectedProto, transmitter: ProtoTransmitter ) -> Result<(),MsgErr> {
+    async fn direct(&mut self, mut proto: DirectedProto, transmitter: ProtoTransmitter ) -> Result<(),MsgErr> {
 
         match proto.kind.as_ref().unwrap() {
             DirectedKind::Ping => {
@@ -257,6 +257,9 @@ impl PipeEx {
             }
             DirectedKind::Ripple => {
                 // this should be a single echo since in traversal it is only going to a single target
+                if proto.bounce_backs.is_some() {
+                    proto.bounce_backs(BounceBacks::Count(1));
+                }
                 let mut echoes: Vec<Wave<Echo>> = transmitter.direct(proto).await?;
                 if !echoes.is_empty()  {
                     let echo = echoes.remove(0);

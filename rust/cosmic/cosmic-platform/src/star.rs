@@ -761,7 +761,6 @@ where
 
         let status_rx = skel.status_rx.clone();
 
-        if skel.kind == StarSub::Central
         {
             let skel = skel.clone();
             tokio::spawn(async move {
@@ -1000,7 +999,7 @@ where
         let gravity = self.gravity.clone();
         tokio::spawn(async move {
             async fn shard<P>(
-                wave: UltraWave,
+                mut wave: UltraWave,
                 skel: StarSkel<P>,
                 locator: SmartLocator<P>,
                 gravity: Port,
@@ -1008,11 +1007,16 @@ where
             where
                 P: Platform,
             {
-                match wave {
+                match & mut wave {
                     UltraWave::Ripple(ripple) => {
                         let mut map =
                             shard_ripple_by_location(ripple, &skel.adjacents, &skel.registry)
                                 .await?;
+
+                        if ripple.to == Recipients::Stars {
+                            ripple.history.insert(skel.point.clone());
+                        }
+
                         for (star, mut wave) in map {
                             // add this star to history
                             wave.history.insert(skel.point.clone());
@@ -1200,31 +1204,30 @@ where
                 }
             };
 
-            println!("Echoes: {}", echoes.len() );
-
             let mut coalated = vec![];
             for echo in echoes {
-                if let Substance::Sys(Sys::Discoveries(discoveries)) = &echo.core.body {
-println!("Discoveries: {}", discoveries.len() );
-                    for discovery in discoveries.iter() {
-                        coalated.push(StarDiscovery::new(
-                            StarPair::new(
-                                skel.key.clone(),
-                                StarKey::try_from(echo.from.point.clone()).expect("expected star key"),
-                            ),
-                            discovery.clone(),
-                        ));
+                if echo.core.status.is_success() {
+                    if let Substance::Sys(Sys::Discoveries(discoveries)) = &echo.core.body {
+                        for discovery in discoveries.iter() {
+                            coalated.push(StarDiscovery::new(
+                                StarPair::new(
+                                    skel.key.clone(),
+                                    StarKey::try_from(echo.from.point.clone()).expect("expected star key"),
+                                ),
+                                discovery.clone(),
+                            ));
+                        }
+                    } else {
+                        skel.logger.warn(format!("unexpected reflected core substance from search echo : {}", echo.core.body.kind().to_string()));
                     }
                 } else {
-                     skel.logger.warn("unexpected reflected core substance from search echo");
+                    skel.logger.error(format!("search echo failure {}", echo.core.to_err().unwrap().to_string() ));
                 }
             }
 
             coalated.sort();
 
-println!("coalated: {}", coalated.len() );
             skel.wrangles.add(coalated);
-println!("skel.wrangles: {}", skel.wrangles.wrangles.len());
             rtn.send(Ok(skel.wrangles.clone())).unwrap_or_default();
         });
     }
@@ -2082,6 +2085,7 @@ where
             Ok(core)
         }
 
+
         if let Sys::Search(search) = ctx.input {
             match search {
                 Search::Star(star) => {
@@ -2104,6 +2108,7 @@ where
             }
             return CoreBounce::Absorbed;
         } else {
+            self.skel.logger.error(format!("expected Search got : {}", ctx.input.to_string()) );
             return CoreBounce::Reflected(ctx.bad_request());
         }
     }
@@ -2221,7 +2226,7 @@ impl RoundRobinWrangleSelector {
 }
 
 async fn shard_ripple_by_location<E>(
-    ripple: Wave<Ripple>,
+    ripple: &Wave<Ripple>,
     adjacent: &HashMap<Point, StarStub>,
     registry: &Registry<E>,
 ) -> Result<HashMap<Point, Wave<Ripple>>, E::Err>
@@ -2234,6 +2239,7 @@ where
             let mut ripple = ripple.clone();
             ripple.variant.to = recipients;
             map.insert(star, ripple);
+        } else {
         }
     }
     Ok(map)

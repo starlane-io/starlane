@@ -1668,7 +1668,7 @@ pub mod id {
         // override if you want to track outgoing requests
         async fn directed_fabric_bound(
             &self,
-            traversal: Traversal<DirectedWave>,
+            mut traversal: Traversal<DirectedWave>,
         ) -> Result<(), MsgErr> {
             self.traverse_next(traversal.wrap()).await;
             Ok(())
@@ -1676,7 +1676,7 @@ pub mod id {
 
         async fn directed_core_bound(
             &self,
-            traversal: Traversal<DirectedWave>,
+            mut traversal: Traversal<DirectedWave>,
         ) -> Result<(), MsgErr> {
             self.traverse_next(traversal.wrap()).await;
             Ok(())
