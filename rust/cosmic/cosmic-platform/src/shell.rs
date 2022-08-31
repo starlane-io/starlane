@@ -189,7 +189,7 @@ impl<P> Shell<P>
 where
     P: Platform + 'static,
 {
-    #[route("Msg<NewCli>")]
+    #[route("Msg<NewCliSession>")]
     pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Port, MsgErr> {
         // only allow a cli session to be created by any layer of THIS particle
         if ctx.from().clone().to_point() != ctx.to().clone().to_point() {

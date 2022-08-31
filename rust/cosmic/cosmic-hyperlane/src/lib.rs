@@ -1448,7 +1448,7 @@ impl HyperClient where{
         self.exchanger.clone()
     }
 
-    pub async fn proto_transmitter_builder(&self) -> Result<ProtoTransmitterBuilder, MsgErr> {
+    pub async fn transmitter_builder(&self) -> Result<ProtoTransmitterBuilder, MsgErr> {
         self.wait_for_ready(Duration::from_secs(30)).await?;
         let mut builder =
             ProtoTransmitterBuilder::new(Arc::new(self.router()), self.exchanger.as_ref().ok_or(MsgErr::from_500("cannot create a transmitter on a client that does not have an exchanger"))?.clone());
