@@ -29,6 +29,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{oneshot, Mutex};
 use tokio::time::error::Elapsed;
+use cosmic_api::command::request::create::{Create, PointSegTemplate, PointTemplate, Strategy, Template};
 //use crate::control::ControlDriverFactory;
 use crate::driver::{DriverAvail, DriverFactory};
 use crate::root::RootDriverFactory;
@@ -231,7 +232,7 @@ impl RegistryApi<TestPlatform> for TestRegistryApi {
         Ok(Default::default())
     }
 
-    async fn locate<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, TestErr> {
+    async fn find_record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, TestErr> {
         Ok(self
             .ctx
             .particles
@@ -1003,6 +1004,17 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
         let mut proto = DirectedProto::ping();
         proto.method(CmdMethod::Bounce);
         proto.to(Point::root().to_port());
+        let reflect: Wave<Pong> = transmitter.direct(proto).await?;
+        println!("{}",reflect.core.status.to_string());
+        assert!(reflect.core.is_ok());
+
+        let create = Create {
+            template: Template::new(PointTemplate { parent: Point::root(), child_segment_template: PointSegTemplate::Exact("my-domain.com".to_string()) }, Kind::Space.to_template() ),
+            properties: Default::default(),
+            strategy: Strategy::Override,
+            state: StateSrc::None,
+        };
+        let proto : DirectedProto = create.into();
         let reflect: Wave<Pong> = transmitter.direct(proto).await?;
         println!("{}",reflect.core.status.to_string());
         assert!(reflect.core.is_ok());

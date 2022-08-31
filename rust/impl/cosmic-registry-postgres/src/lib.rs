@@ -398,7 +398,7 @@ where
         Ok(map)
     }
 
-    async fn locate<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, PostErr> {
+    async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, PostErr> {
         if point.is_local_root() {
             return Ok(ParticleRecord::root());
         }
@@ -443,7 +443,7 @@ where
                 route: route.clone(),
                 segments: segments.clone(),
             };
-            let record = self.locate(&point).await?;
+            let record = self.record(&point).await?;
             let kind_segment = PointKindSeg {
                 segment: record
                     .details
@@ -1198,7 +1198,7 @@ pub mod test {
         registry.assign(&point, &location).await?;
         registry.set_status(&point, &Status::Ready).await?;
         registry.sequence(&point).await?;
-        let record = registry.locate(&point).await?;
+        let record = registry.record(&point).await?;
 
         let result = registry.query(&point, &Query::PointHierarchy).await?;
         let kind_path: PointHierarchy = result.try_into()?;
@@ -1721,7 +1721,7 @@ where
                 // if strategy is ensure then a dupe is GOOD!
                 if create.strategy == Strategy::Ensure {
                     if let Err(PostErr::Dupe) = result {
-                        result = Ok(self.locate(&point).await?.details);
+                        result = Ok(self.record(&point).await?.details);
                     }
                 }
 

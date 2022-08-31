@@ -688,7 +688,7 @@ where
         let record = self
             .skel
             .registry
-            .locate(&wave.to().single_or()?.point)
+            .record(&wave.to().single_or()?.point)
             .await
             .map_err(|e| e.to_cosmic_err())?;
         let driver = self

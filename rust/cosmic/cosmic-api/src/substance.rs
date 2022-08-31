@@ -331,7 +331,7 @@ pub mod substance {
             }
         }
 
-        pub fn default(message: &str) -> Self {
+        pub fn default<S:ToString>(message: S) -> Self {
             let mut map = HashMap::new();
             map.insert("default".to_string(), message.to_string());
             Self { map }

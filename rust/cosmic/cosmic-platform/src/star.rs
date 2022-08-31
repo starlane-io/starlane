@@ -362,6 +362,7 @@ where
             "StarSkel::create(assign_result)",
             transmitter.direct(assign).await,
         )?;
+        self.registry.assign(&details.stub.point).send( self.point.clone() );
         let logger = logger.push_mark("result").unwrap();
         logger.result(assign_result.ok_or())?;
         Ok(details)
@@ -1073,6 +1074,8 @@ where
     #[track_caller]
     async fn to_gravity(&self, mut wave: UltraWave) -> Result<(), P::Err> {
         wave.add_to_history(self.skel.point.clone());
+
+
         #[cfg(test)]
         self.skel
             .diagnostic_interceptors
@@ -1422,7 +1425,7 @@ where
                     }
                     Recipients::Multi(ports) => {
                         for port in &ports {
-                            let record = self.skel.registry.locate(&port.point).await?;
+                            let record = self.skel.registry.record(&port.point).await?;
                             let loc = logger.result(record.location.ok_or(P::Err::new("multi port ripple has recipient that is not located, this should have been provisioned when the ripple was sent")))?;
                             if loc == self.skel.point {
                                 tos.push(port.clone());
@@ -1446,7 +1449,7 @@ where
         };
 
         for to in tos {
-            let record = match self.skel.registry.locate(&to.point).await {
+            let record = match self.skel.registry.record(&to.point).await {
                 Ok(record) => record,
                 Err(err) => {
                     // this needs to send a 404  or 30x (moved) status to the caller
@@ -1457,7 +1460,6 @@ where
                     ));
                 }
             };
-
             let plan = record.details.stub.kind.wave_traversal_plan().clone();
 
             let mut dest = None;
@@ -2097,7 +2099,7 @@ where
                     .await
                     .map_err(|e| e.to_cosmic_err())?;
 
-                let record = self.skel.registry.locate(&Point::root()).await.map_err(|e|e.to_cosmic_err())?;
+                let record = self.skel.registry.record(&Point::root()).await.map_err(|e|e.to_cosmic_err())?;
                 let assign = Assign::new( AssignmentKind::Create, record.details, StateSrc::None );
                 self.create(&assign).await.map_err(|e|e.to_cosmic_err())?;
 
@@ -2136,7 +2138,7 @@ where
     #[route("Sys<Provision>")]
     pub async fn provision(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, P::Err> {
         if let Sys::Provision(provision) = ctx.input {
-            let record = self.skel.registry.locate(&provision.point).await?;
+            let record = self.skel.registry.record(&provision.point).await?;
             match self.skel.wrangles.wrangles.get(&record.details.stub.kind) {
                 None => {
                     let kind = record.details.stub.kind.clone();
@@ -2628,7 +2630,7 @@ where
     }
 
     pub async fn locate(&self, point: &Point) -> Result<Point, P::Err> {
-        let record = self.skel.registry.locate(&point).await?;
+        let record = self.skel.registry.record(&point).await?;
         match record.location {
             Some(location) => Ok(location),
             None => {
@@ -2644,7 +2646,7 @@ where
         let parent = point
             .parent()
             .ok_or(P::Err::new("expected Root to be provisioned"))?;
-        let parent_record = self.skel.registry.locate(&parent).await?;
+        let parent_record = self.skel.registry.record(&parent).await?;
         if parent_record.location.is_none() {
             self.provision(&parent).await?;
         }

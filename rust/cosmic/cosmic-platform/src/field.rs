@@ -46,7 +46,7 @@ where
     }
 
     async fn bind(&self, directed: &Traversal<DirectedWave>) -> Result<ArtRef<BindConfig>, MsgErr> {
-        let record = self.skel.registry.locate(&self.port.point).await.map_err(|e|e.to_cosmic_err())?;
+        let record = self.skel.registry.record(&self.port.point).await.map_err(|e|e.to_cosmic_err())?;
         let properties = self
             .skel
             .registry

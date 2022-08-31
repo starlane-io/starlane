@@ -621,9 +621,34 @@ impl RootInCtx {
         }
     }
 
+    pub fn err(self, status: u16, from: Port, msg: String) -> Bounce<ReflectedWave> {
+        match self.wave {
+            DirectedWave::Ping(ping) => Bounce::Reflected(ReflectedWave::Pong(Wave::new(
+                Pong::new(
+                    ReflectedCore::fail(status, msg),
+                    ping.from.clone(),
+                    self.to.clone().to_recipients(),
+                    ping.id.clone(),
+                ),
+                from,
+            ))),
+            DirectedWave::Ripple(ripple) => Bounce::Reflected(ReflectedWave::Echo(Wave::new(
+                Echo::new(
+                    ReflectedCore::fail(status, msg),
+                    ripple.from.clone(),
+                    ripple.to.clone(),
+                    ripple.id.clone(),
+                ),
+                from,
+            ))),
+            DirectedWave::Signal(_) => Bounce::Absorbed,
+        }
+    }
+
     pub fn not_found(self) -> Bounce<ReflectedWave> {
         let to = self.to.clone();
-        self.status(404, to)
+        let msg = format!("<{}>{}",self.wave.core().method.to_string(),self.wave.core().uri.path().to_string());
+        self.err(404, to, msg )
     }
 
     pub fn timeout(self) -> Bounce<ReflectedWave> {
@@ -633,7 +658,8 @@ impl RootInCtx {
 
     pub fn bad_request(self) -> Bounce<ReflectedWave> {
         let to = self.to.clone();
-        self.status(400, to)
+        let msg = format!("<{}>{} -[ {} ]->",self.wave.core().method.to_string(),self.wave.core().uri.path().to_string(), self.wave.core().body.kind().to_string());
+        self.err(400, to, msg)
     }
 
     pub fn server_error(self) -> Bounce<ReflectedWave> {
@@ -643,7 +669,8 @@ impl RootInCtx {
 
     pub fn forbidden(self) -> Bounce<ReflectedWave> {
         let to = self.to.clone();
-        self.status(401, to)
+        let msg = format!("<{}>{} -[ {} ]->",self.wave.core().method.to_string(),self.wave.core().uri.path().to_string(), self.wave.core().body.kind().to_string());
+        self.err(401, to, msg)
     }
 
     pub fn unavailable(self) -> Bounce<ReflectedWave> {
@@ -3428,7 +3455,6 @@ where
             CoreBounce::Absorbed => {}
             CoreBounce::Reflected(reflected) => {
                 let wave = reflection.unwrap().make(reflected, self.port.clone());
-println!("REflecting to: {};", wave.to().to_string() );
                 let wave = wave.to_ultra();
                 let transmitter = self.builder.clone().build();
                 transmitter.route(wave).await;
@@ -3730,8 +3756,8 @@ impl ReflectedCore {
         }
     }
 
-    pub fn fail(status: u16, message: &str) -> Self {
-        let errors = Errors::default(message.clone());
+    pub fn fail<S:ToString>(status: u16, message: S) -> Self {
+        let errors = Errors::default(message);
         Self {
             headers: HeaderMap::new(),
             status: StatusCode::from_u16(status)
