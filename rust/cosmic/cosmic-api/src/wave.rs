@@ -179,6 +179,29 @@ impl<T> UltraWaveDef<T>
 where
     T: ToRecipients + Clone,
 {
+/*    pub fn desc(&self) -> String {
+        match self{
+            UltraWaveDef::Ping(ping) => {
+                format!("<Ping<{}>>{}", ping.method.to_string(), ping.uri.to_string() )
+            }
+            UltraWaveDef::Pong(pong) => {
+                format!("<Pong<{}>>({})", pong.core.status.as_u16(), pong.core.status.to_string() )
+            }
+            UltraWaveDef::Ripple(ripple) => {
+                format!("<Ripple<{}>>{}", ripple.method.to_string(), ripple.uri.to_string() )
+            }
+            UltraWaveDef::Echo(echo) => {
+                format!("<Echo<{}>>({})", echo.core.status.as_u16(), echo.core.status.to_string() )
+            }
+            UltraWaveDef::Signal(signal) => {
+                format!("<Signal<{}>>{}", signal.method.to_string(), signal.uri.to_string() )
+            }
+        }
+    }
+
+ */
+
+
     pub fn has_visited(&self, star: &Point) -> bool {
         match self {
             UltraWaveDef::Ripple(ripple) => ripple.history.contains(star),

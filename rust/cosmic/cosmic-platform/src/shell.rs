@@ -9,7 +9,7 @@ use cosmic_api::id::id::{
     Layer, Point, Port, PortSelector, ToPoint, ToPort, Topic, TraversalLayer, Uuid,
 };
 use cosmic_api::id::{Traversal, TraversalDirection, TraversalInjection};
-use cosmic_api::log::{RootLogger, Trackable};
+use cosmic_api::log::{PointLogger, RootLogger, Trackable};
 use cosmic_api::parse::error::result;
 use cosmic_api::parse::{command_line, route_attribute, Env};
 use cosmic_api::quota::Timeouts;
@@ -32,6 +32,7 @@ where
 {
     skel: HyperStarSkel<P>,
     state: ShellState,
+    logger: PointLogger
 }
 
 impl<P> Shell<P>
@@ -39,7 +40,8 @@ where
     P: Platform + 'static,
 {
     pub fn new(skel: HyperStarSkel<P>, state: ShellState) -> Self {
-        Self { skel, state }
+        let logger = skel.logger.point(state.point.clone());
+        Self { skel, state, logger }
     }
 }
 
@@ -151,10 +153,18 @@ where
             .get(traversal.reflection_of())
         {
             let value = count.value().fetch_sub(1, Ordering::Relaxed);
-            if value > 0 {
-                self.traverse_next(traversal.to_ultra()).await;
+            if value >= 0 {
+                self.traverse_next(traversal.clone().to_ultra()).await;
+            } else {
+                self.logger.warn(format!(
+                    "{} blocked a reflected from {} to a directed id {} of which the Shell has already received a reflected wave",
+                    self.port().to_string(),
+                    traversal.from().to_string(),
+                    traversal.reflection_of().to_short_string()
+                ));
             }
-            else {
+
+            if value <= 0 {
                 let id = traversal.reflection_of().clone();
                 let fabric_requests = self.state.fabric_requests.clone();
                 tokio::spawn(async move {
@@ -162,8 +172,9 @@ where
                 });
             }
         } else {
-            traversal.logger.warn(format!(
-                "blocked a reflected from {} to a directed id {} of which the Shell has no record",
+            self.logger.warn(format!(
+                "{} blocked a reflected from {} to a directed id {} of which the Shell has no record",
+                self.port().to_string(),
                 traversal.from().to_string(),
                 traversal.reflection_of().to_short_string()
             ));

@@ -1502,12 +1502,11 @@ where
             let traversal_logger = self.skel.logger.point(to.to_point());
             let traversal_logger = traversal_logger.span();
 
-            let point = if *injector == self.injector {
-                // if injected by the star then the destination is the point that this traversal belongs to
+            let point = if dir == TraversalDirection::Core {
                 to.clone().to_point()
             } else {
                 // if injected by any other point then the injector is the point that this traversal belongs to
-                injector.clone().to_point()
+                wave.from().to_point()
             };
 
             let mut traversal = Traversal::new(
@@ -1564,6 +1563,7 @@ where
     }
 
     async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(), MsgErr> {
+
         let logger = self.skel.logger.push_mark("stack-traversal:visit")?;
         logger.track(&traversal, || {
             Tracker::new(
@@ -2118,12 +2118,10 @@ where
 {
     #[route("Sys<Provision>")]
     pub async fn provision(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, P::Err> {
-        println!("RECEIVED PROVISION PING {}", self.skel.point.to_string());
         if let Sys::Provision(provision) = ctx.input {
             let record = self.skel.registry.locate(&provision.point).await?;
             match self.skel.wrangles.wrangles.get(&record.details.stub.kind) {
                 None => {
-println!("PROVISIONING LOCALLY");
                     let kind = record.details.stub.kind.clone();
                     let point = record.details.stub.point.clone();
                     if self
@@ -2140,7 +2138,6 @@ println!("PROVISIONING LOCALLY");
                         ));
 
                         let ctx: InCtx<'_, Sys> = ctx.push_input_ref(&assign);
-println!("Assigning...{}<{}>", point.to_string(), kind.to_string());
                         if self.assign(ctx).await?.is_ok() {
                             Ok(ReflectedCore::ok_body(self.skel.point.clone().into()))
                         } else {
@@ -2209,8 +2206,6 @@ println!("Assigning...{}<{}>", point.to_string(), kind.to_string());
             }
 
             complete_tx.send(self.skel.point.clone());
-
-println!("Assigned: {}<{}> to {}", assign.details.stub.point.to_string(),assign.details.stub.kind.to_string(), self.skel.point.to_string());
 
             Ok(ReflectedCore::ok())
         } else {

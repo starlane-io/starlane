@@ -89,11 +89,11 @@ impl <P> Item<P> for Root<P> where P: Platform {
     }
 }
 
-#[async_trait]
-impl <P> DirectedHandler for Root<P> where P: Platform {
-    async fn handle(&self, ctx: RootInCtx) -> CoreBounce {
-        CoreBounce::Reflected(ReflectedCore::status(404))
-    }
+use cosmic_api::wave::RecipientSelector;
+use cosmic_api::wave::DirectedHandlerSelector;
+#[routes]
+impl <P> Root<P> where P: Platform {
+
 }
 
 #[async_trait]

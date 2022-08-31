@@ -1004,6 +1004,7 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
         proto.method(CmdMethod::Bounce);
         proto.to(Point::root().to_port());
         let reflect: Wave<Pong> = transmitter.direct(proto).await?;
+        println!("{}",reflect.core.status.to_string());
         assert!(reflect.core.is_ok());
 
         Ok(())

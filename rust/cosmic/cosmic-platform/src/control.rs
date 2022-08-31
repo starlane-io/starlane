@@ -177,7 +177,7 @@ where
                             logger.warn("control not found");
                         }
                         Some(router) => {
-                            let injector = remote.with_layer(Layer::Shell);
+                            let injector = remote.with_layer(Layer::Core );
                             let router = LayerInjectionRouter::new( skel.star.clone(), injector);
 
                             match hop.unwrap_from_hop() {
@@ -186,6 +186,7 @@ where
                                         match transport.unwrap_from_transport()
                                         {
                                             Ok(mut wave) => {
+println!("INJECTING INTO SHELL ROUTER... {} && FROM: {} TO: {}",wave.desc(), wave.from().to_string(), wave.to().to_string());
                                                 router.route(wave).await;
                                             }
                                             Err(err) => {
