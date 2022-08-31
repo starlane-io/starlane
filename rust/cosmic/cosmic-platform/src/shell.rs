@@ -116,6 +116,7 @@ where
         &self,
         mut traversal: Traversal<DirectedWave>,
     ) -> Result<(), MsgErr> {
+
         match traversal.directed_kind() {
             DirectedKind::Ping => {
 //self.logger.info(format!("Shell tracking id: {} to: {}",traversal.id().to_short_string(), traversal.to.to_string()) );
@@ -222,6 +223,7 @@ where
 impl CliSession {
     #[route("Msg<Exec>")]
     pub async fn exec(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, MsgErr> {
+println!("---> Reached Msg<Exec> !!!!");
         let exec_topic = Topic::uuid();
         let exec_port = self.port.clone().with_topic(exec_topic.clone());
         let mut exec = CommandExecutor::new(exec_port, ctx.from().clone(), self.env.clone());

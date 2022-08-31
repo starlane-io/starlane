@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::base::BaseDriverFactory;
-use crate::control::ControlDriverFactory;
+use crate::control::{ControlClient, ControlCliSession, ControlDriverFactory};
 use chrono::{DateTime, Utc};
 use cosmic_api::command::command::common::StateSrc;
 use cosmic_api::id::id::{Layer, ToPoint, ToPort, Uuid};
@@ -1051,43 +1051,22 @@ fn test_control_cli() -> Result<(), TestErr> {
             .await
             .unwrap();
 
+        tokio::time::sleep(Duration::from_secs(5)).await;
+
         let factory = MachineApiExtFactory {
             machine_api,
             logger: logger.clone(),
         };
 
-        let exchanger = Exchanger::new( Point::from_str("client").unwrap().to_port(), Timeouts::default());
-        let client = HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger).unwrap();
-        let transmitter = client.transmitter_builder().await?;
-        let transmitter = transmitter.build();
+        let client = ControlClient::new(Box::new(factory))?;
+        client.wait_for_ready(Duration::from_secs(5)).await?;
 
-        let mut proto = DirectedProto::ping();
-        proto.method(CmdMethod::Bounce);
-        proto.to(Point::root().to_port());
-        let reflect: Wave<Pong> = transmitter.direct(proto).await?;
-        println!("{}",reflect.core.status.to_string());
-        assert!(reflect.core.is_ok());
+        let cli = client.new_cli_session().await?;
 
-        let create = Create {
-            template: Template::new(PointTemplate { parent: Point::root(), child_segment_template: PointSegTemplate::Exact("my-domain.com".to_string()) }, Kind::Space.to_template() ),
-            properties: Default::default(),
-            strategy: Strategy::Override,
-            state: StateSrc::None,
-        };
-        let proto : DirectedProto = create.into();
-        let reflect: Wave<Pong> = transmitter.direct(proto).await?;
-        println!("{}",reflect.core.status.to_string());
-        assert!(reflect.core.is_ok());
+        let core = cli.exec("create my-domain.com<Space>").await?;
 
-        tokio::time::sleep(Duration::from_secs(5)).await;
-
-        let point = Point::from_str("my-domain.com")?;
-        let mut proto = DirectedProto::ping();
-        proto.method(CmdMethod::Bounce);
-        proto.to(point.to_port());
-        let reflect: Wave<Pong> = transmitter.direct(proto).await?;
-        println!("{}",reflect.core.status.to_string());
-        assert!(reflect.core.is_ok());
+        println!("{}",core.to_err().to_string());
+        assert!(core.is_ok());
 
         Ok(())
 

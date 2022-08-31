@@ -181,7 +181,7 @@ where
                             logger.warn("control not found");
                         }
                         Some(router) => {
-                            let injector = remote.with_layer(Layer::Core );
+                            let injector = remote.with_layer(Layer::Shell );
                             let router = LayerInjectionRouter::new( skel.star.clone(), injector);
 
                             match hop.unwrap_from_hop() {
@@ -424,8 +424,12 @@ impl ControlCliSession {
             transmitter
         }
     }
+    pub async fn exec<C>( &self, command: C) -> Result<ReflectedCore,MsgErr> where C: ToString{
+        let command = RawCommand::new(command.to_string());
+        self.raw(command).await
+    }
 
-    pub async fn exec( &self, command: RawCommand ) -> Result<ReflectedCore,MsgErr> {
+    pub async fn raw( &self, command: RawCommand ) -> Result<ReflectedCore,MsgErr> {
         let mut proto = DirectedProto::ping();
         proto.method(MsgMethod::new("Exec".to_string())?);
         proto.body(Substance::RawCommand(command));
