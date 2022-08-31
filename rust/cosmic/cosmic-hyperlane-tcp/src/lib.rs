@@ -21,6 +21,7 @@ use cosmic_api::substance::substance::Substance;
 use cosmic_api::VERSION;
 use cosmic_api::wave::UltraWave;
 
+
 pub struct CertGenerator {
     certs: String,
     key: String,
@@ -91,7 +92,7 @@ impl Frame {
 
 
 
-  pub async fn from_stream(read: & mut OwnedReadHalf) -> Result<Frame,MsgErr> {
+  pub async fn from_stream<'a>(read: &'a mut SslStream<TcpStream>) -> Result<Frame,MsgErr> {
       let size = read.read_u32().await?;
       let mut data = Vec::with_capacity(size as usize);
       read.read_buf(&mut data).await?;
@@ -100,7 +101,7 @@ impl Frame {
       })
   }
 
-  pub async fn to_stream(&self, write: & mut OwnedWriteHalf) -> Result<(),MsgErr> {
+  pub async fn to_stream<'a>(&self, write: &'a mut SslStream<TcpStream>) -> Result<(),MsgErr> {
       write.write_u32(self.data.len() as u32).await?;
       write.write_all(self.data.as_slice()).await?;
       Ok(())
@@ -115,19 +116,19 @@ impl Frame {
   }
 }
 
-pub struct FrameReader {
-    reader: OwnedReadHalf
+pub struct FrameStream<'a> {
+    stream: &'a mut SslStream<TcpStream>
 }
 
-impl FrameReader {
-    pub fn new(reader: OwnedReadHalf) -> Self {
+impl <'a> FrameStream<'a> {
+    pub fn new(stream: &'a mut SslStream<TcpStream>) -> Self {
         Self {
-            reader
+           stream
         }
     }
 
     pub async fn frame(&mut self) -> Result<Frame,MsgErr> {
-        Frame::from_stream(& mut self.reader).await
+        Frame::from_stream(& mut self.stream).await
     }
     pub async fn read_version(&mut self) -> Result<semver::Version,MsgErr>{
         self.frame().await?.to_version()
@@ -140,21 +141,9 @@ impl FrameReader {
     pub async fn read_wave(&mut self) -> Result<UltraWave,MsgErr>{
         self.frame().await?.to_wave()
     }
-}
-
-pub struct FrameWriter {
-    writer: OwnedWriteHalf
-}
-
-impl  FrameWriter {
-    pub fn new( writer: OwnedWriteHalf) -> Self {
-        Self {
-            writer
-        }
-    }
 
     pub async fn write_frame(&mut self, frame: Frame ) -> Result<(),MsgErr>{
-        frame.to_stream(& mut self.writer).await
+        frame.to_stream(& mut self.stream).await
     }
 
     pub async fn write_string(&mut self, string: String ) -> Result<(),MsgErr> {
@@ -168,7 +157,6 @@ impl  FrameWriter {
     pub async fn write_wave(&mut self, wave: UltraWave) -> Result<(),MsgErr> {
         self.write_frame(Frame::from_wave(wave)?).await
     }
-
 
 }
 
@@ -218,53 +206,43 @@ impl HyperlaneTcpServer {
                 async fn serve(stream: TcpStream, ssl: Ssl, gate: Arc<HyperGateSelector>, logger: PointLogger) -> Result<(), MsgErr> {
                     logger.info("accepted new client");
                     let mut stream = SslStream::new(ssl, stream).unwrap();
+
                     Pin::new(&mut stream).accept().await.unwrap();
-                    let (mut reader,mut writer) = stream.get_mut().into_split();
-                    let mut reader = FrameReader::new(reader);
-                    let mut writer = FrameWriter::new(writer);
-                    writer.write_version(&VERSION.clone()).await?;
-                    let in_version = tokio::time::timeout(Duration::from_secs(30),reader.read_version()).await??;
+                    let mut stream = FrameStream::new(&mut stream);
+                    stream.write_version(&VERSION.clone()).await?;
+                    let in_version = tokio::time::timeout(Duration::from_secs(30), stream.read_version()).await??;
                     logger.info(format!("client version: {}", in_version.to_string()));
 
                     if in_version == *VERSION {
                         logger.info("version match");
-                        writer.write_string("Ok".to_string() ).await?;
+                        stream.write_string("Ok".to_string() ).await?;
                     } else {
                         logger.warn("version mismatch");
-                        writer.write_string(format!("Err(\"expected version {}. encountered version {}\")",VERSION.to_string(),in_version.to_string()) ).await?;
+                        stream.write_string(format!("Err(\"expected version {}. encountered version {}\")",VERSION.to_string(),in_version.to_string()) ).await?;
                     }
-                    let result = tokio::time::timeout(Duration::from_secs(30),reader.read_string()).await??;
+                    let result = tokio::time::timeout(Duration::from_secs(30), stream.read_string()).await??;
                     if "Ok".to_string() != result {
                        return logger.result(Err(format!("client did not indicate Ok. expected: 'Ok' encountered '{}'",result).into()));
                     }
 
                     logger.info("client signaled Ok");
 
-                    let knock= tokio::time::timeout(Duration::from_secs(30),reader.read_wave()).await??;
+                    let knock= tokio::time::timeout(Duration::from_secs(30), stream.read_wave()).await??;
                     let knock = knock.to_directed()?;
                     if let Substance::Knock(knock) = knock.body() {
                         let mut endpoint = gate.knock(knock.clone()).await?;
                         let tx = endpoint.tx.clone();
-                        tokio::spawn( async move {
-                            async fn read( tx: mpsc::Sender<UltraWave>, mut reader: FrameReader) -> Result<(),MsgErr> {
-                                while let Ok(wave) = reader.read_wave().await {
+                        loop {
+                            tokio::select! {
+                                Some(wave) = endpoint.rx.recv() => {
+                                    stream.write_wave(wave).await?;
+                                }
+                                Ok(wave) = stream.read_wave() => {
                                     tx.send(wave).await?;
                                 }
-                                Ok(())
                             }
-                            read(tx,reader).await.unwrap_or_default();
-                        });
-
-                        tokio::spawn( async move {
-                            async fn write( mut endpoint: HyperwayEndpoint, mut writer: FrameWriter) -> Result<(),MsgErr> {
-                                while let Some(wave) = endpoint.rx.recv().await {
-                                    writer.write_wave(wave).await?;
-                                }
-                                Ok(())
-                            }
-                            write(endpoint, writer).await.unwrap_or_default();
-                        });
-                    } else {
+                        }
+                   } else {
                         let msg = format!("expected client Substance::Knock(Knock) encountered '{}'",knock.body().kind().to_string());
                         return logger.result(Err(msg.into()));
                     }

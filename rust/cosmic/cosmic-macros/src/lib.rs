@@ -27,15 +27,6 @@ use syn::{
     ItemStruct, PathArguments, PathSegment, ReturnType, Signature, Type, Visibility,
 };
 
-#[no_mangle]
-pub(crate) extern "C" fn cosmic_uuid() -> String {
-    "Uuid".to_string()
-}
-
-#[no_mangle]
-pub(crate) extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
-    Utc::now()
-}
 
 // this is just to make the user realize he needs to import DirectedHandler
 #[proc_macro_derive(DirectedHandler)]

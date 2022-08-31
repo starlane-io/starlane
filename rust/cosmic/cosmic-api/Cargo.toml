@@ -36,4 +36,5 @@ enum-ordinalize = "3.1.11"
 convert_case = "0.5.0"
 lru="0.7.7"
 validator = "0.15.0"
+uuid = { version="1.1.2", features=["v4"] }
 #tailcall = "0.1.6"
