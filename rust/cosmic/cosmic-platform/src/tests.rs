@@ -232,7 +232,7 @@ impl RegistryApi<TestPlatform> for TestRegistryApi {
         Ok(Default::default())
     }
 
-    async fn find_record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, TestErr> {
+    async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, TestErr> {
         Ok(self
             .ctx
             .particles
@@ -1015,6 +1015,16 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
             state: StateSrc::None,
         };
         let proto : DirectedProto = create.into();
+        let reflect: Wave<Pong> = transmitter.direct(proto).await?;
+        println!("{}",reflect.core.status.to_string());
+        assert!(reflect.core.is_ok());
+
+        tokio::time::sleep(Duration::from_secs(5)).await;
+
+        let point = Point::from_str("my-domain.com")?;
+        let mut proto = DirectedProto::ping();
+        proto.method(CmdMethod::Bounce);
+        proto.to(point.to_port());
         let reflect: Wave<Pong> = transmitter.direct(proto).await?;
         println!("{}",reflect.core.status.to_string());
         assert!(reflect.core.is_ok());

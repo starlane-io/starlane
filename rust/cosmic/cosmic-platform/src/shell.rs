@@ -118,6 +118,7 @@ where
     ) -> Result<(), MsgErr> {
         match traversal.directed_kind() {
             DirectedKind::Ping => {
+//self.logger.info(format!("Shell tracking id: {} to: {}",traversal.id().to_short_string(), traversal.to.to_string()) );
                 self.state.fabric_requests.insert(traversal.id().clone(), AtomicU16::new(1));
             }
             DirectedKind::Ripple => {

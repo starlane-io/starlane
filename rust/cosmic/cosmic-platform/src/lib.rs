@@ -99,26 +99,7 @@ where
 
     async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, P::Err>;
 
-    async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, P::Err> {
-
-        if *point == *GLOBAL_EXEC {
-            return Ok(ParticleRecord {
-                details: Details {
-                    stub: Stub {
-                        point: GLOBAL_EXEC.clone(),
-                        kind: Kind::Global,
-                        status: Status::Ready
-                    },
-                    properties: Default::default()
-                },
-                location: Some(LOCAL_STAR.clone())
-            });
-        }
-
-        self.find_record(point).await
-    }
-
-    async fn find_record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, P::Err>;
+    async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, P::Err>;
 
     async fn query<'a>(&'a self, point: &'a Point, query: &'a Query)
         -> Result<QueryResult, P::Err>;

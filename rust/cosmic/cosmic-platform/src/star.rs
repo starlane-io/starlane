@@ -17,10 +17,7 @@ use cosmic_api::command::request::create::{Create, Strategy};
 use cosmic_api::command::request::set::Set;
 use cosmic_api::config::config::bind::{BindConfig, RouteSelector};
 use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{
-    BaseKind, Kind, Layer, Point, Port, PortSelector, RouteSeg, Sub, ToBaseKind, ToPoint, ToPort,
-    Topic, TraversalLayer, Uuid, GLOBAL_EXEC,
-};
+use cosmic_api::id::id::{BaseKind, Kind, Layer, Point, Port, PortSelector, RouteSeg, Sub, ToBaseKind, ToPoint, ToPort, Topic, TraversalLayer, Uuid, GLOBAL_EXEC, LOCAL_STAR};
 use cosmic_api::id::{StarKey, StarStub, StarSub, TraversalInjection};
 use cosmic_api::id::{Traversal, TraversalDirection};
 use cosmic_api::log::{PointLogger, RootLogger, Trackable, Tracker};
@@ -1202,84 +1199,6 @@ where
         }
     }
 
-    #[track_caller]
-    async fn find_next_hop(&self, star_key: &StarKey) -> Result<Option<StarKey>, MsgErr> {
-        let logger = self.skel.logger.push_mark("hyperstar:find_next_hop")?;
-        if let Some(adjacent) = self.skel.golden_path.get(star_key) {
-            println!("Found next hop for: {}", star_key.to_string());
-            Ok(Some(adjacent.value().clone()))
-        } else {
-            panic!("Find next hop...");
-            /*
-            let mut ripple = DirectedProto::ripple();
-            ripple.method(SysMethod::Search);
-            ripple.body(Substance::Sys(Sys::Search(Search::Star(star_key.clone()))));
-            ripple.bounce_backs = Some(BounceBacks::Count(self.skel.adjacents.len()));
-            ripple.to(Recipients::Stars);
-            ripple.track = true;
-            let echoes: Echoes = self.skel.gravity_transmitter.direct(ripple).await?;
-
-            let mut coalated = vec![];
-            for echo in echoes {
-                if let Substance::Sys(Sys::Discoveries(discoveries)) = &echo.core.body {
-                    for discovery in discoveries.iter() {
-                        coalated.push(StarDiscovery::new(
-                            StarPair::new(
-                                self.skel.key.clone(),
-                                StarKey::try_from(echo.from.point.clone())?,
-                            ),
-                            discovery.clone(),
-                        ));
-                    }
-                } else {
-                    // logger.warn("unexpected reflected core substance from search echo");
-                }
-            }
-
-            coalated.sort();
-
-            match coalated.first() {
-                None => Ok(None),
-                Some(discovery) => {
-                    let key = discovery.pair.not(&self.skel.key).clone();
-                    self.golden_path.insert(star_key.clone(), key.clone());
-                    Ok(Some(key))
-                }
-            }
-
-             */
-        }
-    }
-
-    /*
-    async fn re_ripple( &self, ripple: Wave<Ripple> ) -> Result<Vec<Echoes>,MsgErr> {
-        let mut reflections: Vec<BoxFuture<Echoes>> = vec![];
-
-        for (location, ripple) in ripple.shard_by_location(&self.skel.adjacents, &self.skel.registry ).await?
-        {
-           if !ripple.history.contains(&location) {
-               let key = StarKey::try_from(location)?;
-               let adjacent = self.find_next_hop(&key).await?.ok_or("could not find golden way")?.to_port();
-               let mut wave = DirectedProto::new();
-               wave.kind(DirectedKind::Signal);
-               wave.to(adjacent);
-               wave.method(SysMethod::Transport.into());
-               wave.handling(ripple.handling.clone());
-               wave.agent(Agent::HyperUser);
-               wave.body(Substance::UltraWave(Box::new(ripple.to_ultra())));
-               reflections.push(self.skel.gravity_well_transmitter.direct(wave).boxed());
-           }
-        }
-
-        if reflections.is_empty() {
-            return Ok(vec![]);
-        }
-
-        let echoes = join_all(reflections).await?;
-
-        Ok(echoes)
-    }
-     */
 
     async fn wrangle(&self, rtn: oneshot::Sender<Result<StarWrangles, MsgErr>>) {
         let skel = self.skel.clone();
@@ -2102,8 +2021,28 @@ where
                 let record = self.skel.registry.record(&Point::root()).await.map_err(|e|e.to_cosmic_err())?;
                 let assign = Assign::new( AssignmentKind::Create, record.details, StateSrc::None );
                 self.create(&assign).await.map_err(|e|e.to_cosmic_err())?;
-
                 self.skel.registry.assign(&Point::root()).send(self.skel.point.clone());
+
+
+                let registration = Registration {
+                    point: Point::global_executor(),
+                    kind: Kind::Global,
+                    registry: Default::default(),
+                    properties: Default::default(),
+                    owner: HYPERUSER.clone(),
+                    strategy: Strategy::Ensure,
+                    status: Status::Ready,
+                };
+                self.skel
+                    .registry
+                    .register(&registration)
+                    .await
+                    .map_err(|e| e.to_cosmic_err())?;
+
+                let record = self.skel.registry.record(&Point::global_executor()).await.map_err(|e|e.to_cosmic_err())?;
+                let assign = Assign::new( AssignmentKind::Create, record.details, StateSrc::None );
+                self.create(&assign).await.map_err(|e|e.to_cosmic_err())?;
+                self.skel.registry.assign(&Point::global_executor()).send(LOCAL_STAR.clone() );
 
                 Ok(Status::Ready)
             }
@@ -2658,8 +2597,7 @@ where
         wave.body(Sys::Provision(provision).into());
         wave.from(self.skel.point.clone().to_port().with_layer(Layer::Core));
         wave.to(parent_star.to_port().with_layer(Layer::Core));
-        let pong: Wave<Pong> = self.skel.gravity_transmitter.direct(wave).await?;
-
+        let pong: Wave<Pong> = self.skel.star_transmitter.direct(wave).await?;
         if pong.core.status.as_u16() == 200 {
             if let Substance::Point(location) = &pong.core.body {
                 Ok(location.clone())

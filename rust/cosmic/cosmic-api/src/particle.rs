@@ -3,7 +3,7 @@ use crate::particle::particle::Stub;
 use crate::substance::substance::Substance;
 
 pub mod particle {
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
     use std::str::FromStr;
 
     use nom::branch::alt;
@@ -45,13 +45,29 @@ pub mod particle {
         Unknown,  // initial status or when we status cannot be determined
         Pending,  // initial status
         Init, // undergoing custom initialization...This particle can send requests but not receive requests.
+        Panic, // something is wrong... all requests are blocked and responses are cancelled.
+        Fatal, // unrecoverable panic
         Ready, // ready to take requests
         Paused, // can not receive requests (probably because it is waiting for some other particle to make updates)...
         Resuming, // like Initializing but triggered after a pause is lifted, the particle may be doing something before it is ready to accept requests again.
-        Panic,    // something is wrong... all requests are blocked and responses are cancelled.
-        Fatal,    // unrecoverable panic
         Done, // this particle had a life span and has now completed succesfully it can no longer receive requests.
     }
+
+    /*
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+    pub struct StatusDetails<C>
+    where
+        C: Condition,
+    {
+        pub status: Status,
+        pub conditions: HashSet<C>,
+    }
+
+    pub trait Condition: ToString {
+        fn status(&self) -> Status;
+        fn desc(&self) -> String;
+    }
+     */
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
     pub enum Code {
