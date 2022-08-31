@@ -2036,23 +2036,27 @@ pub mod id {
                     rtn.push_str(format!("<{}>::", mesh).as_str());
                 }
                 RouteSegVar::Global => {
-                    rtn.push_str("GLOBAL");
+                    rtn.push_str("GLOBAL::");
                 }
                 RouteSegVar::Local => {
-                    rtn.push_str("LOCAL");
+                    rtn.push_str("LOCAL::");
                 }
                 RouteSegVar::Remote => {
-                    rtn.push_str("REMOTE");
+                    rtn.push_str("REMOTE::");
                 }
             };
 
+            if self.segments.len() == 0 {
+                rtn.push_str("ROOT");
+                return consume_point_ctx(rtn.as_str());
+            }
             for (index, segment) in self.segments.iter().enumerate() {
                 if let PointSegVar::Var(ref var) = segment {
                     match env.val(var.name.clone().as_str()) {
                         Ok(val) => {
                             if index > 1 {
                                 if after_fs {
-                                    rtn.push_str("/");
+//                                    rtn.push_str("/");
                                 } else {
                                     rtn.push_str(":");
                                 }
@@ -2093,7 +2097,7 @@ pub mod id {
                 } else {
                     if index > 0 {
                         if after_fs {
-                            rtn.push_str("/");
+                            //rtn.push_str("/");
                         } else {
                             rtn.push_str(":");
                         }
@@ -2102,14 +2106,13 @@ pub mod id {
                 }
             }
             if self.is_dir() {
-                rtn.push_str("/");
+                //rtn.push_str("/");
             }
 
             if !errs.is_empty() {
                 let errs = ParseErrs::fold(errs);
                 return Err(errs.into());
             }
-
             consume_point_ctx(rtn.as_str())
         }
     }
@@ -2487,9 +2490,9 @@ pub mod id {
                         format!("{}{}", self.to_string(), segment)
                     }
                     PointSeg::Version(_) => {
-                        if segment != "/" {
+                        if segment != ":/" {
                             return Err(
-                                "Root filesystem artifact dir required after version".into()
+                                format!("expected Root filesystem artifact ':/' encountered: {}", segment).into()
                             );
                         }
                         format!("{}:/", self.to_string())

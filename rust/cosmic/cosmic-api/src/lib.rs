@@ -64,7 +64,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 lazy_static! {
-    pub static ref VERSION: semver::Version = semver::Version::from_str("1.0.0").unwrap();
+    pub static ref VERSION: semver::Version = semver::Version::from_str("0.3.0").unwrap();
     pub static ref HYPERUSER: Point = Point::from_str("hyperspace:users:hyperuser").expect("point");
     pub static ref ANONYMOUS: Point = Point::from_str("hyperspace:users:anonymous").expect("point");
 }

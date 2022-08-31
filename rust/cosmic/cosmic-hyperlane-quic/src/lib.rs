@@ -1,5 +1,6 @@
 #![allow(warnings)]
 
+use std::io;
 use cosmic_api::error::{MsgErr, StatusErr};
 use cosmic_api::frame::frame::PrimitiveFrame;
 use cosmic_api::id::id::{Point, ToPort};
@@ -8,13 +9,15 @@ use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{Knock, Sys};
 use cosmic_api::wave::{DirectedCore, DirectedProto, Pong, SysMethod, UltraWave, Wave};
 use cosmic_api::VERSION;
-use cosmic_hyperlane::{HyperGateSelector, VersionGate};
+use cosmic_hyperlane::{HyperGate, HyperGateSelector, VersionGate};
 use quinn::{
     ClientConfig, Connecting, Connection, Endpoint, NewConnection, RecvStream, ServerConfig, VarInt,
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::task::Poll;
 use std::time::Duration;
+use rustls::Error;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -63,13 +66,13 @@ pub struct HyperServerQuic {
 }
 
 impl HyperServerQuic {
-    pub async fn new(addr: SocketAddr, gate: Arc<VersionGate>) -> Result<Self, MsgErr> {
+    pub async fn new(addr: SocketAddr, gate: Arc<VersionGate>) -> Result<Self, QuicErr> {
         let (cert, key) = generate_self_signed_cert()?;
         let server_config = ServerConfig::with_single_cert(vec![cert], key)?;
         let (endpoint, mut incoming) = Endpoint::server(server_config, addr)?;
 
         tokio::spawn(async move {
-            while let Some(conn) = incoming.next().await {
+            while let Poll::Ready(Some(conn)) = incoming.poll_next().await {
                 let gate = gate.clone();
                 tokio::spawn(async move {
                     async fn connect(
@@ -146,7 +149,7 @@ impl HyperServerQuic {
                             let uni_streams = connection.uni_streams;
                             let connection = connection.connection;
                             tokio::spawn(async move {
-                                while let Some(Ok(recv)) = uni_streams.next().await {
+                                while let Poll::Ready(Some(recv)) = uni_streams.next().await {
                                     let wave = recv.read_to_end(32 * 1024).await?;
                                     let wave = PrimitiveFrame::from(wave);
                                     let wave = wave.try_into()?;
@@ -183,6 +186,43 @@ impl HyperServerQuic {
     }
 }
 
+pub struct QuicErr {
+    pub message: String
+}
+
+impl QuicErr {
+    pub fn new<S:ToString>(m:S) -> Self {
+        Self {
+            message: m.to_string()
+        }
+    }
+}
+
+impl ToString for QuicErr {
+    fn to_string(&self) -> String {
+        self.message.clone()
+    }
+}
+
+impl From<rustls::Error> for QuicErr {
+    fn from(err: Error) -> Self {
+        QuicErr::new(err.to_string())
+    }
+}
+
+
+impl From<io::Error> for QuicErr {
+    fn from(err: io::Error) -> Self {
+        QuicErr::new(err.to_string())
+    }
+}
+
+impl From<MsgErr> for QuicErr {
+    fn from(err: MsgErr) -> Self {
+        QuicErr::new(err.to_string())
+    }
+}
+
 pub struct HyperClientQuic {
     endpoint: Endpoint,
     connection: Connection,
@@ -192,7 +232,7 @@ impl HyperClientQuic {
     pub async fn new(
         endpoint: Endpoint,
         server_addr: SocketAddr,
-        connect_req: Knock,
+        knock: Knock,
         deliver_tx: mpsc::Sender<UltraWave>,
         logger: PointLogger,
     ) -> Result<Self, MsgErr> {
@@ -210,7 +250,7 @@ impl HyperClientQuic {
         recv.read_to_end(1024).await?;
         // let's hope it said 'Ok' ...
 
-        let req = connect_req.into();
+        let req = knock.into();
         let req = req.try_into()?;
 
         let mut send = new_connection.connection.open_uni().await?;
@@ -238,7 +278,7 @@ impl HyperClientQuic {
                         let wave = recv.read_to_end(32 * 1024).await?;
                         let wave = PrimitiveFrame::from(wave);
                         let wave = wave.try_into()?;
-                        deliver_tx.send(wave).await;
+                        delivery_tx.send(wave).await;
                     }
                     if let Err(err) = process(recv, deliver_tx.clone()).await {
                         logger.error(err);
@@ -255,7 +295,7 @@ impl HyperClientQuic {
 
     pub async fn send(&self, wave: UltraWave) -> Result<(), MsgErr> {
         let wave: PrimitiveFrame = wave.try_into()?;
-        let mut send = new_connection.connection.open_uni().await?;
+        let mut send = self.connection.open_uni().await?;
         send.write_all(wave.data.as_bytes()).await?;
         send.finish().await?;
         Ok(())
@@ -272,9 +312,17 @@ impl ConErr {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use std::sync::Arc;
+    use dashmap::DashMap;
+    use cosmic_api::error::MsgErr;
+    use cosmic_hyperlane::{HyperGateSelector, VersionGate};
+    use crate::HyperServerQuic;
+
+    #[tokio::test]
+    pub async fn test() -> Result<(),MsgErr> {
+        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 4343);
+        let gate = Arc::new(VersionGate::new(HyperGateSelector::new(Arc::new(DashMap::new()))));
+        let server = HyperServerQuic::new( addr, gate).await?;
     }
 }

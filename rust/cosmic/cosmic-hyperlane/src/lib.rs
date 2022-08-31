@@ -921,13 +921,20 @@ impl DerefMut for TokenDispensingHyperwayInterchange {
 }
 
 pub struct VersionGate {
-    router: HyperGateSelector,
+    selector: HyperGateSelector,
 }
 
+
+
 impl VersionGate {
+    pub fn new( selector: HyperGateSelector ) -> Self {
+        Self {
+            selector
+        }
+    }
     pub async fn unlock(&self, version: semver::Version) -> Result<HyperGateSelector, String> {
         if version == *VERSION {
-            Ok(self.router.clone())
+            Ok(self.selector.clone())
         } else {
             Err("version mismatch".to_string())
         }

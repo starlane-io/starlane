@@ -13,7 +13,7 @@ use cosmic_api::log::{PointLogger, RootLogger, Trackable};
 use cosmic_api::parse::error::result;
 use cosmic_api::parse::{command_line, route_attribute, Env};
 use cosmic_api::quota::Timeouts;
-use cosmic_api::util::ToResolved;
+use cosmic_api::util::{log, ToResolved};
 use cosmic_api::wave::{Agent, Bounce, BounceBacks, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, Reflectable, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, UltraWave, Wave, WaveKind};
 use cosmic_nom::new_span;
 use dashmap::mapref::one::Ref;
@@ -78,7 +78,7 @@ where
         let injector = directed
             .from()
             .clone()
-            .with_topic(Topic::None)
+            .with_topic(directed.to.topic.clone())
             .with_layer(self.port().layer.clone());
         let router = Arc::new(LayerInjectionRouter::new(
             self.skel.clone(),
@@ -91,17 +91,26 @@ where
             directed
                 .from()
                 .with_layer(self.port().layer.clone())
-                .with_topic(Topic::None),
+                .with_topic(directed.to.topic.clone()),
         );
         let transmitter = transmitter.build();
         let reflection = directed.reflection();
         let ctx = RootInCtx::new(
-            directed.payload,
+            directed.payload.clone(),
             self.port().clone(),
             logger,
             transmitter.clone(),
         );
-        let bounce: CoreBounce = self.handle(ctx).await;
+
+        let bounce: CoreBounce = if directed.to.topic == Topic::None {
+            self.handle(ctx).await
+        } else {
+println!("Handling Topic");
+            let handler = self.skel.state.find_topic(&directed.to, directed.from() ).ok_or("expecting topic")??;
+            handler.handle(ctx).await
+        };
+
+
         match bounce {
             CoreBounce::Absorbed => {}
             CoreBounce::Reflected(core) => {
@@ -259,18 +268,26 @@ impl CommandExecutor {
     }
 
     pub async fn execute(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, MsgErr> {
+println!("CommadnExecutor...");
         // make sure everything is coming from this command executor topic
         let ctx = ctx.push_from(self.port.clone());
 
-        let command = result(command_line(new_span(ctx.line.as_str())))?;
+println!("Pre parse line... '{}'",ctx.line);
+        let command = log(result(command_line(new_span(ctx.line.as_str()))))?;
+println!("post parse line...");
         let mut env = self.env.clone();
         for transfer in &ctx.transfers {
             env.set_file(transfer.id.clone(), transfer.content.clone())
         }
+println!("Staring to work...");
         let command: Command = command.to_resolved(&self.env)?;
-        let request: DirectedCore = command.into();
-        let request = DirectedProto::from_core(request);
+println!("resolved?...");
 
-        Ok(ctx.ping(request).await?.variant.core)
+        let request: DirectedCore = command.into();
+        let mut directed = DirectedProto::from_core(request);
+        directed.to(Point::global_executor());
+println!("GOT HERE");
+        let pong : Wave<Pong> = ctx.transmitter.direct(directed).await?;
+        Ok(pong.variant.core)
     }
 }

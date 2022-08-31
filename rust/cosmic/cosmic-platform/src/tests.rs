@@ -1063,7 +1063,7 @@ fn test_control_cli() -> Result<(), TestErr> {
 
         let cli = client.new_cli_session().await?;
 
-        let core = cli.exec("create my-domain.com<Space>").await?;
+        let core = cli.exec("create localhost<Space>").await?;
 
         println!("{}",core.to_err().to_string());
         assert!(core.is_ok());

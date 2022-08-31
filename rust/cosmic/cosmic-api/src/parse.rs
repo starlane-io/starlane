@@ -179,6 +179,7 @@ pub fn eop<I: Span>(input: I) -> Res<I, I> {
     peek(alt((
         eof,
         multispace1,
+        tag("<"),
         tag("\""),
         tag("'"),
         tag("]"),
@@ -432,12 +433,12 @@ pub fn point_non_root_var<I: Span>(input: I) -> Res<I, PointVar> {
                 "point_route",
                 opt(terminated(var_route(point_route_segment), tag("::"))),
             ),
-            var_seg(ctx_seg(space_point_segment)),
-            many0(mesh_seg(var_seg(pop(base_point_segment)))),
-            opt(mesh_seg(var_seg(pop(version_point_segment)))),
+            var_seg(root_ctx_seg(space_point_segment)),
+            many0(base_seg(var_seg(pop(base_point_segment)))),
+            opt(base_seg(var_seg(pop(version_point_segment)))),
             opt(tuple((
                 root_dir_point_segment_var,
-                many0(terminated(var_seg(pop(dir_point_segment)), tag("/"))),
+                many0(recognize(tuple((var_seg(pop(dir_point_segment)), tag("/"))))),
                 opt(var_seg(pop(file_point_segment))),
                 eop,
             ))),
@@ -459,6 +460,7 @@ pub fn point_non_root_var<I: Span>(input: I) -> Res<I, PointVar> {
             }
 
             if let Option::Some((fsroot, mut dirs, file, _)) = filesystem {
+                let mut dirs:Vec<PointSegVar> = dirs.into_iter().map(|i|PointSegVar::Dir(i.to_string())).collect();
                 segments.push(fsroot);
                 segments.append(&mut dirs);
                 if let Some(file) = file {
@@ -2244,18 +2246,11 @@ pub trait SubstParser<T: Sized> {
     fn parse_span<I: Span>(&self, input: I) -> Res<I, T>;
 }
 
-pub fn ctx_seg<I: Span, E: ParseError<I>, F>(
+pub fn root_ctx_seg<I: Span, E: ParseError<I>, F>(
     mut f: F,
 ) -> impl FnMut(I) -> IResult<I, PointSegCtx, E> + Copy
 where
-    I: ToString
-        + InputLength
-        + InputTake
-        + Compare<&'static str>
-        + InputIter
-        + Clone
-        + InputTakeAtPosition,
-    <I as InputTakeAtPosition>::Item: AsChar + Clone,
+
     F: nom::Parser<I, PointSeg, E> + Copy,
     E: nom::error::ContextError<I>,
 {
@@ -2287,14 +2282,6 @@ pub fn working<I: Span, E: ParseError<I>, F>(
     mut f: F,
 ) -> impl FnMut(I) -> IResult<I, PointSegCtx, E>
 where
-    I: ToString
-        + InputLength
-        + InputTake
-        + Compare<&'static str>
-        + InputIter
-        + Clone
-        + InputTakeAtPosition,
-    <I as InputTakeAtPosition>::Item: AsChar + Clone,
     F: nom::Parser<I, PointSeg, E>,
     E: nom::error::ContextError<I>,
 {
@@ -2317,14 +2304,6 @@ pub fn pop<I: Span, E: ParseError<I>, F>(
     mut f: F,
 ) -> impl FnMut(I) -> IResult<I, PointSegCtx, E> + Copy
 where
-    I: ToString
-        + InputLength
-        + InputTake
-        + Compare<&'static str>
-        + InputIter
-        + Clone
-        + InputTakeAtPosition,
-    <I as InputTakeAtPosition>::Item: AsChar + Clone,
     F: nom::Parser<I, PointSeg, E> + Copy,
     E: nom::error::ContextError<I>,
 {
@@ -2341,6 +2320,16 @@ where
             Err(err) => Err(err),
         },
     }
+}
+
+pub fn base_seg<I, F, S, E>(mut f: F) -> impl FnMut(I) -> IResult<I, S, E>
+where
+    I: Span,
+    F: nom::Parser<I, S, E> + Copy,
+    E: nom::error::ContextError<I>+ nom::error::ParseError<I>,
+    S: PointSegment,
+{
+    move |input: I| preceded(tag(":"), f)(input)
 }
 
 pub fn mesh_seg<I: Span, E: ParseError<I>, F, S1, S2>(
@@ -2380,14 +2369,6 @@ where
 // end of segment
 pub fn eos<I: Span, E>(input: I) -> IResult<I, (), E>
 where
-    I: ToString
-        + Clone
-        + InputLength
-        + InputTake
-        + Compare<&'static str>
-        + InputIter
-        + InputTakeAtPosition,
-    <I as InputTakeAtPosition>::Item: AsChar + Clone,
     E: nom::error::ContextError<I> + nom::error::ParseError<I>,
 {
     peek(alt((tag("/"), tag(":"), tag("%"), space1, eof)))(input).map(|(next, _)| (next, ()))
@@ -5014,9 +4995,7 @@ use crate::config::config::bind::{
 use crate::config::config::Document;
 use crate::http::HttpMethod;
 use crate::id::id::{BaseKind, KindParts, PointKind, PointSeg, Specific};
-use crate::id::{
-    ArtifactSubKind,  DatabaseSubKind, FileSubKind, StarKey, StarSub, UserBaseSubKind,
-};
+use crate::id::{ArtifactSubKind, DatabaseSubKind, FileSubKind, StarKey, StarSub, UserBaseSubKind};
 use crate::msg::MsgMethod;
 use crate::parse::error::{find_parse_err, result};
 use crate::parse::model::{
@@ -6709,7 +6688,6 @@ pub fn no_space_with_blocks<I: Span>(input: I) -> Res<I, I> {
     recognize(many1(alt((recognize(any_block), nospace1))))(input)
 }
 
-
 pub fn pipeline_step_var<I: Span>(input: I) -> Res<I, PipelineStepVar> {
     context(
         "pipeline:step",
@@ -7074,7 +7052,10 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, MsgErr> {
 
 #[cfg(test)]
 pub mod test {
-    use crate::command::request::create::{PointSegTemplate, PointTemplate, PointTemplateCtx};
+    use crate::command::request::create::{
+        PointSegTemplate, PointTemplate, PointTemplateCtx, Template,
+    };
+    use crate::command::Command;
     use crate::config::config::Document;
     use crate::error::{MsgErr, ParseErrs};
     use crate::id::id::{Point, PointCtx, PointSegVar, RouteSegVar};
@@ -7082,19 +7063,8 @@ pub mod test {
     use crate::parse::model::{
         BlockKind, DelimitedBlockKind, LexScope, NestedBlockKind, TerminatedBlockKind,
     };
-    use crate::parse::{
-        args, base_point_segment, comment, consume_point_var, ctx_seg, doc,
-        expected_block_terminator_or_non_terminator, lex_block, lex_child_scopes, lex_nested_block,
-        lex_scope, lex_scope_pipeline_step_and_block, lex_scope_selector, lex_scopes, lowercase1,
-        mesh_eos, nested_block, nested_block_content, next_stacked_name, no_comment,
-        parse_bind_config, parse_include_blocks, parse_inner_block, path_regex, pipeline,
-        pipeline_segment, pipeline_step_var, pipeline_stop_var, point_non_root_var, point_template,
-        point_var, pop, rec_version, root_scope, root_scope_selector, route_attribute,
-        route_selector, scope_filter, scope_filters, skewer_case_chars, skewer_dot, space_chars,
-        space_no_dupe_dots, space_point_segment, strip_comments, subst, var_seg, variable_name,
-        version, version_point_segment, wrapper, Env, MapResolver, SubstParser, VarResolver,
-    };
-    use crate::util::ToResolved;
+    use crate::parse::{args, base_point_segment, comment, consume_point_var, create, create_command, root_ctx_seg, doc, expected_block_terminator_or_non_terminator, lex_block, lex_child_scopes, lex_nested_block, lex_scope, lex_scope_pipeline_step_and_block, lex_scope_selector, lex_scopes, lowercase1, mesh_eos, mesh_seg, nested_block, nested_block_content, next_stacked_name, no_comment, parse_bind_config, parse_include_blocks, parse_inner_block, path_regex, pipeline, pipeline_segment, pipeline_step_var, pipeline_stop_var, point_non_root_var, point_template, point_var, pop, rec_version, root_scope, root_scope_selector, route_attribute, route_selector, scope_filter, scope_filters, skewer_case_chars, skewer_dot, space_chars, space_no_dupe_dots, space_point_segment, strip_comments, subst, template, var_seg, variable_name, version, version_point_segment, wrapper, Env, MapResolver, SubstParser, VarResolver, base_seg};
+    use crate::util::{log, ToResolved};
     use crate::{util, Substance};
     use bincode::config;
     use cosmic_nom::{new_span, span_with_extra, Res};
@@ -7124,6 +7094,43 @@ pub mod test {
     }
 
     #[test]
+    pub fn test_create_command() -> Result<(), MsgErr> {
+        let command = util::log(result(create_command(new_span("create localhost<Space>"))))?;
+        let env = Env::new(Point::root());
+        let command: Command = util::log(command.to_resolved(&env))?;
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_template() -> Result<(), MsgErr> {
+        /*        let t= util::log(result(all_consuming(template)(new_span("localhost<Space>"))))?;
+               let env = Env::new(Point::root());
+               let t: Template = util::log(t.to_resolved(&env))?;
+
+        */
+        let t = util::log(result(base_point_segment(new_span(
+            "localhost:base<Space>",
+        ))))?;
+
+        let (space, bases): (PointSegVar, Vec<PointSegVar>) = util::log(result(tuple((
+            var_seg(root_ctx_seg(space_point_segment)),
+            many0(base_seg(var_seg(pop(base_point_segment)))),
+        ))(
+            new_span("localhost:base:nopo<Space>"),
+        )))?;
+        println!("space: {}", space.to_string());
+        for base in bases {
+            println!("\tbase: {}", base.to_string());
+        }
+        //let t= util::log(result(all_consuming(template)(new_span("localhost:base<Space>"))))?;
+        //        let env = Env::new(Point::root());
+        //       let t: Template = util::log(t.to_resolved(&env))?;
+
+
+        Ok(())
+    }
+
+    #[test]
     pub fn test_point_template() -> Result<(), MsgErr> {
         assert!(mesh_eos(new_span(":")).is_ok());
         assert!(mesh_eos(new_span("%")).is_ok());
@@ -7134,12 +7141,12 @@ pub mod test {
         util::log(result(all_consuming(point_template)(new_span("localhost"))))?;
 
         let template = util::log(result(point_template(new_span("localhost:other:some-%"))))?;
-
         let template: PointTemplate = util::log(template.collapse())?;
         if let PointSegTemplate::Pattern(child) = template.child_segment_template {
             assert_eq!(child.as_str(), "some-%")
         }
 
+        util::log(result(point_template(new_span("my-domain.com"))))?;
         Ok(())
     }
 
@@ -7274,6 +7281,40 @@ pub mod test {
             )))?
             .to_point(),
         )?;
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_simple_point_var() -> Result<(), MsgErr> {
+        /*
+        let point = util::log(result(point_var(new_span("localhost:base"))))?;
+        println!("point '{}'", point.to_string());
+        let point :Point = point.collapse()?;
+        assert_eq!("localhost:base", point.to_string().as_str());
+        let point = util::log(result(point_var(new_span("localhost:base<Kind>"))))?;
+        let point :Point = point.collapse()?;
+        assert_eq!("localhost:base", point.to_string().as_str());
+
+        let point = util::log(result(point_var(new_span("localhost:base:3.0.0<Kind>"))))?;
+        let point :Point = point.collapse()?;
+        assert_eq!("localhost:base:3.0.0", point.to_string().as_str());
+        let point = util::log(result(point_var(new_span("localhost:base:3.0.0:/some/file.txt<Kind>"))))?;
+        assert_eq!("localhost:base:3.0.0:/some/file.txt", point.to_string().as_str());
+        let point :Point = point.collapse()?;
+        println!("point: '{}'",point.to_string());
+
+        for seg in &point.segments {
+            println!("\tseg: '{}'",seg.to_string());
+        }
+        assert_eq!("some/",point.segments.get(4).unwrap().to_string().as_str());
+
+         */
+
+
+        let point = util::log(result(point_var(new_span("localhost:base:/fs/file.txt<Kind>"))))?;
+        let point :Point = point.collapse()?;
+        assert_eq!("localhost:base:/fs/file.txt", point.to_string().as_str());
 
         Ok(())
     }

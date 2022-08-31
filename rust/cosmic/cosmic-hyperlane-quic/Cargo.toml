@@ -8,7 +8,8 @@ edition = "2021"
 [dependencies]
 cosmic-hyperlane= { path= "../cosmic-hyperlane" }
 cosmic-api = { path= "../cosmic-api" }
-quinn = "0.8.3"
+dashmap = "5.3.4"
+quinn = "0.8.5"
 rustls = { version = "0.20.6", features = ["dangerous_configuration", "quic"] }
 semver = { version="1.0.10", features=['serde'] }
 tokio = { version = "1.15.0", features = ["full"] }
