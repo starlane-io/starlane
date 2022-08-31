@@ -2056,6 +2056,20 @@ where
     pub skel: HyperStarSkel<P>,
 }
 
+impl <P> Star<P> where P: Platform {
+    async fn create(&self, assign: &Assign) -> Result<(),P::Err> {
+        self.skel
+            .state
+            .create_shell(assign.details.stub.point.clone());
+
+        self.skel
+            .logger
+            .result(self.skel.drivers.assign(assign.clone()).await)?;
+
+        Ok(())
+    }
+}
+
 #[async_trait]
 impl<P> ItemHandler<P> for Star<P>
 where
@@ -2082,10 +2096,13 @@ where
                     .register(&registration)
                     .await
                     .map_err(|e| e.to_cosmic_err())?;
-                self.skel
-                    .registry
-                    .assign(&Point::root())
-                    .send(self.skel.point.clone());
+
+                let record = self.skel.registry.locate(&Point::root()).await.map_err(|e|e.to_cosmic_err())?;
+                let assign = Assign::new( AssignmentKind::Create, record.details, StateSrc::None );
+                self.create(&assign).await.map_err(|e|e.to_cosmic_err())?;
+
+                self.skel.registry.assign(&Point::root()).send(self.skel.point.clone());
+
                 Ok(Status::Ready)
             }
             _ => Ok(Status::Ready),
@@ -2191,13 +2208,7 @@ where
                 .await?
                 .contains(&assign.details.stub.kind)
             {
-                self.skel
-                    .state
-                    .create_shell(assign.details.stub.point.clone());
-
-                self.skel
-                    .logger
-                    .result(self.skel.drivers.assign(assign.clone()).await)?;
+                self.create(assign).await;
             } else {
                 error!(
                     "do not have a driver for kind: {}",

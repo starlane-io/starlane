@@ -3462,7 +3462,12 @@ pub trait DirectedHandlerSelector {
 
 #[async_trait]
 pub trait DirectedHandler: Send+Sync {
+
     async fn handle(&self, ctx: RootInCtx) -> CoreBounce;
+
+    async fn bounce(&self, ctx: RootInCtx) -> CoreBounce {
+        CoreBounce::Reflected(ReflectedCore::ok())
+    }
 }
 
 pub type CoreBounce = Bounce<ReflectedCore>;

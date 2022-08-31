@@ -133,7 +133,7 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
                     }
                 )*
                 if ctx.wave.core().method == Method::Cmd(CmdMethod::Bounce) {
-                    return CoreBounce::Reflected(ReflectedCore::new());
+                    return self.bounce(ctx).await;
                 }
                 ctx.not_found().into()
              }

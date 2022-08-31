@@ -186,7 +186,6 @@ where
                                         match transport.unwrap_from_transport()
                                         {
                                             Ok(mut wave) => {
-println!("INJECTING INTO SHELL ROUTER... {} && FROM: {} TO: {}",wave.desc(), wave.from().to_string(), wave.to().to_string());
                                                 router.route(wave).await;
                                             }
                                             Err(err) => {

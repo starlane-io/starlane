@@ -99,7 +99,6 @@ where
     }
 
     async fn directed_core_bound(&self, directed: Traversal<DirectedWave>) -> Result<(), MsgErr> {
-self.logger.info(format!("received directed_core_bound: from: {} to: {}", directed.from().to_string(),directed.to.to_string()));
         let bind = self.bind(&directed).await?;
         match bind.select(&directed.payload) {
             Ok(route) => {
@@ -127,7 +126,6 @@ self.logger.info(format!("received directed_core_bound: from: {} to: {}", direct
                         env.set_var("self.bind", bind.point().clone().into());
                         env
                     };
-println!("sending {} to {}", cmd.to_string(), directed.to.to_string() );
                     self.pipex(directed, pipeline, env);
                     Ok(())
                 } else {
@@ -250,7 +248,6 @@ impl PipeEx {
                 core.body = self.body.clone();
 
                 let reflected = reflection.make(core, self.traversal.to.clone() );
-self.logger.info(format!("Sending reflected to: {} method: {}", reflected.to().to_string(), self.method.to_string()) );
                 self.gravity_transmitter.route(reflected.to_ultra()).await;
                 Ok(())
             }
@@ -273,10 +270,7 @@ self.logger.info(format!("Sending reflected to: {} method: {}", reflected.to().t
 
         match proto.kind.as_ref().unwrap() {
             DirectedKind::Ping => {
-println!("Sending to: {}",proto.to.as_ref().unwrap().to_string());
-proto.track = true;
                 let pong: Wave<Pong> = transmitter.direct(proto).await?;
-println!("Pong from: {} success: {}",pong.from.to_string(), pong.core.status.is_success());
                 self.status = pong.core.status.as_u16();
                 if pong.core.status.is_success() {
                     self.body = pong.core.body.clone();
