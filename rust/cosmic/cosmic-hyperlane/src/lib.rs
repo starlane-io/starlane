@@ -1423,6 +1423,8 @@ impl HyperClient where{
                                     }
                                 }
                                 if let Substance::Greet(greet) = &reflected.core().body {
+logger.info("Received GREETING");
+
                                     greet_tx.send(Some(greet.clone()));
                                 } else {
                                     status_tx
@@ -1675,11 +1677,14 @@ impl HyperClientRunner{
                 loop {
                     match runner.logger.result_ctx(
                         "connect",
-                        tokio::time::timeout(Duration::from_secs(30), runner.factory.create(details_tx.clone()))
+                        tokio::time::timeout(Duration::from_secs(60), runner.factory.create(details_tx.clone()))
                             .await,
                     ) {
                         Ok(Ok(ext)) => {
+runner.logger.info("");
+runner.logger.info("Replacing Hyperway...");
                             runner.ext.replace(ext);
+runner.logger.info("Hyperway Replaced");
                             if let Err(_) = runner.status_tx.send(HyperConnectionStatus::Ready).await {
                                 runner.ext.take();
                                 return Err(HyperConnectionErr::Fatal("can no longer update HyperClient status (probably due to previous Fatal status)".to_string()));
@@ -1740,7 +1745,7 @@ impl HyperClientRunner{
                                    runner.to_client_tx.send(wave).await;
                                 }
                                 None => {
-                                    runner.logger.warn("NONE on Ext");
+                                    runner.logger.warn("client does not have a hyperway_endpoint");
                                     break;
                                 }
                             }
@@ -2136,6 +2141,7 @@ pub mod test_util {
     #[async_trait]
     impl HyperGreeter for TestGreeter {
         async fn greet(&self, stub: HyperwayStub) -> Result<Greet, MsgErr> {
+println!("Sending GREETING to {}",stub.remote.to_string());
             Ok(Greet {
                 port: stub.remote.clone(),
                 agent: stub.agent.clone(),

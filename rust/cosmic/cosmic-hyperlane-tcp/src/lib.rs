@@ -84,7 +84,8 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
         let wave = wave.to_ultra();
         endpoint.tx.send(wave).await.unwrap_or_default();
 
-        Ok(endpoint.into())
+println!("Returning HyperwayEndpoint");
+        Ok(endpoint)
     }
 }
 
@@ -241,9 +242,11 @@ impl FrameMuxer {
         loop {
             tokio::select! {
                 Some(wave) = self.rx.recv() => {
+self.logger.info(format!("Writing wave: {}", wave.desc()));
                     self.stream.write_wave(wave).await?;
                 }
                 Ok(wave) = self.stream.read_wave() => {
+self.logger.info(format!("Reading wave: {}", wave.desc()));
                     self.tx.send(wave).await?;
                 }
                 _ = self.kill_rx.recv() => {
