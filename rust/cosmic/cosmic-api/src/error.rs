@@ -83,6 +83,14 @@ impl Clone for MsgErr {
 }
 
 impl MsgErr {
+    pub fn str<S:ToString>(s:S) -> MsgErr {
+        MsgErr::new(500,s)
+    }
+
+    pub fn map<S>(s:S) -> Self where S:ToString{
+        MsgErr::new(500,s)
+    }
+
     pub fn as_reflected_core(self) -> ReflectedCore {
         ReflectedCore {
             headers: Default::default(),
@@ -181,7 +189,7 @@ impl MsgErr {
 }
 
 impl MsgErr {
-    pub fn new(status: u16, message: &str) -> Self {
+    pub fn new<S:ToString>(status: u16, message: S) -> Self {
         Self::Status {
             status,
             message: message.to_string(),
