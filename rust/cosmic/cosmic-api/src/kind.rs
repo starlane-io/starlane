@@ -332,6 +332,68 @@ impl IsMatch<Specific> for SpecificSelector {
 }
 
 pub type VariantFullSelector = ParentMatcherDef<Pattern<Variant>, OptPattern<SpecificFull>, OptPattern<CamelCase>>;
+pub type KindFullSelector = ParentMatcherDef<Pattern<Kind>, OptPattern<VariantFullSelector>, OptPattern<CamelCase>>;
+
+pub mod parse {
+    use nom::branch::alt;
+    use nom::bytes::complete::tag;
+    use nom::combinator::value;
+    use nom::sequence::tuple;
+    use cosmic_nom::{Res, Span};
+    use crate::kind::{Pattern, Specific, SpecificDef, SpecificSelector};
+    use crate::parse::{Domain, domain, skewer_case, version, version_req};
+
+    pub fn pattern<I,FnX,X>( mut f: FnX ) -> impl FnMut(I) -> Res<I,Pattern<X>>+Copy where I: Span, FnX: FnMut(I) -> Res<I,X> + Copy, X: Clone {
+        move | input | alt( (value(Pattern::Any,tag("*")),value(Pattern::None,tag("!")),|i|f(i).map(|(next,x)|(next,Pattern::Matches(x)))) )(input)
+    }
+
+    pub fn specific_def<I,FnDomain,FnSkewer,FnVersion,Domain,Skewer,Version>( fn_domain: FnDomain, fn_skewer: FnSkewer, fn_version: FnVersion ) -> impl FnMut(I) -> Res<I,SpecificDef<Domain,Skewer,Version>> where I: Span,
+           FnDomain: FnMut(I) -> Res<I,Domain>+Copy,
+           FnSkewer: FnMut(I) -> Res<I,Skewer>+Copy,
+           FnVersion: FnMut(I) -> Res<I,Version>+Copy
+    {
+        move | input: I | {
+            tuple((fn_domain,tag(":"),fn_domain,tag(":"),fn_skewer,tag(":"),fn_skewer,tag(":"),fn_version))(input).map( |(next,(provider,_,vendor,_,product,_,variant,_,version))| {
+                (next,SpecificDef {
+                    provider,
+                    vendor,
+                    product,
+                    variant,
+                    version
+                })
+            } )
+        }
+    }
+
+    pub fn specific<I>(input: I) -> Res<I,Specific> where I: Span {
+        specific_def(domain,skewer_case,version)(input)
+    }
+
+    pub fn specific_selector<I>(input: I) -> Res<I,SpecificSelector> where I: Span {
+        specific_def(pattern(domain),pattern(skewer_case),pattern(version_req))(input)
+    }
+
+
+    #[cfg(test)]
+    pub mod test {
+        use cosmic_nom::new_span;
+        use crate::kind::parse::{specific, specific_selector};
+        use crate::parse::error::result;
+        use crate::util::log;
+
+        #[test]
+        pub fn test_specific() {
+            let specific = result(specific(new_span("my-domain.io:vendor.io:product:variant:1.0.0"))).unwrap();
+        }
+
+        #[test]
+        pub fn test_specific_selector() {
+            let selector = log(result(specific_selector(new_span("my-domain.io:*:product:variant:1.0.0")))).unwrap();
+        }
+
+
+    }
+}
 
 #[cfg(test)]
 pub mod test {
