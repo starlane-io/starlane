@@ -237,8 +237,12 @@ pub type SpecificSubTypes = MatcherDef<Specific, Option<CamelCase>>;
 
 pub type VariantDef<Variant,Specific,Camel>= ParentMatcherDef<Variant, Specific, Camel>;
 pub type VariantFull = VariantDef<Variant, Option<SpecificSubTypes>, Option<CamelCase>>;
+pub type ProtoVariant= VariantDef<CamelCase, Option<SpecificSubTypes>, Option<CamelCase>>;
+pub type KindDef<Kind,Variant,Camel>= ParentMatcherDef<Kind,Variant,Camel>;
+pub type CamelCaseSubTypes = MatcherDef<CamelCase, Option<CamelCase>>;
 pub type KindSubTypes = MatcherDef<Kind, Option<CamelCase>>;
-pub type KindFull = ParentMatcherDef<Kind, Option<VariantFull>, Option<CamelCase>>;
+pub type KindFull = KindDef<Kind, Option<VariantFull>, Option<CamelCase>>;
+pub type ProtoKind = KindDef<CamelCase, Option<ProtoVariant>, Option<CamelCase>>;
 
 pub type MatcherDef<Matcher, SubTypeMatcher> = SubTypeDef<Matcher, SubTypeMatcher>;
 pub type ParentMatcherDef<Matcher, Child, SubTypeMatcher> =
