@@ -35,6 +35,7 @@ pub mod substance;
 pub mod sys;
 pub mod util;
 pub mod wave;
+pub mod kind;
 
 use crate::bin::Bin;
 use crate::command::command::common::{SetProperties, SetRegistry};
