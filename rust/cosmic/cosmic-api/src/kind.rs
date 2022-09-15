@@ -331,11 +331,12 @@ impl IsMatch<Specific> for SpecificSelector {
     }
 }
 
+pub type VariantFullSelector = ParentMatcherDef<Pattern<Variant>, OptPattern<SpecificFull>, OptPattern<CamelCase>>;
 
 #[cfg(test)]
 pub mod test {
     use crate::id::id::Version;
-    use crate::kind::{DomainSelector, IsMatch, Kind, OptPattern, SkewerSelector, Specific, SpecificFull, SpecificSelector, Variant, VariantFull, VersionSelector};
+    use crate::kind::{DomainSelector, IsMatch, Kind, OptPattern, ParentChildDef, Pattern, SkewerSelector, Specific, SpecificFull, SpecificSelector, SubTypeDef, Variant, VariantFull, VariantFullSelector, VersionSelector};
     use crate::parse::{CamelCase, Domain, SkewerCase};
     use core::str::FromStr;
     use crate::selector::selector::VersionReq;
@@ -417,6 +418,35 @@ pub mod test {
         let specific = create_specific();
 
         assert!(!selector.is_match(&specific));
+    }
+
+    #[test]
+    pub fn variant_selector() {
+        let variant = create_variant_full();
+        let mut selector = VariantFullSelector {
+            parent: SubTypeDef {
+                part: Pattern::Matches(Variant::Artifact),
+                sub: OptPattern::None,
+                r#type: OptPattern::None
+            },
+            child: OptPattern::None
+        };
+
+        assert!(!selector.is_match(&variant));
+
+
+        let mut selector = VariantFullSelector {
+            parent: SubTypeDef {
+                part: Pattern::Matches(Variant::Artifact),
+                sub: OptPattern::None,
+                r#type: OptPattern::None
+            },
+            child: OptPattern::Any
+        };
+
+        assert!(selector.is_match(&variant));
 
     }
+
+
 }
