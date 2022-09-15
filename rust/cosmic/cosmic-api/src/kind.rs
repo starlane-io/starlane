@@ -185,6 +185,14 @@ impl Specific {
         }
     }
 
+    pub fn to_full(self) -> SpecificFull {
+        SpecificFull {
+            part: self,
+            sub: None,
+            r#type: None,
+        }
+    }
+
     pub fn sub(self, sub: Option<CamelCase>) -> SpecificFull {
         SpecificFull {
             part: self,
@@ -252,6 +260,44 @@ where
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
+pub enum OptPattern<X> {
+    None,
+    Any,
+    Matches(X),
+}
+
+impl<X> IsMatch<Option<X>> for OptPattern<X>
+    where
+        X: Eq + PartialEq,
+{
+    fn is_match(&self, other: &Option<X>) -> bool {
+        match self {
+            Self::None => other.is_none(),
+            Self::Any => true,
+            Self::Matches(x) => match other {
+                None => false,
+                Some(o) => {
+                    *x == *o
+                }
+            },
+        }
+    }
+}
+
+impl<X> ToString for OptPattern<X>
+    where
+        X: ToString,
+{
+    fn to_string(&self) -> String {
+        match self {
+            Self::None => "!".to_string(),
+            Self::Any => "*".to_string(),
+            Self::Matches(x) => x.to_string(),
+        }
+    }
+}
+
 
 impl IsMatch<Version> for VersionReq {
     fn is_match(&self, other: &Version) -> bool {
@@ -263,6 +309,18 @@ pub type DomainSelector = Pattern<Domain>;
 pub type SkewerSelector = Pattern<SkewerCase>;
 pub type VersionSelector = Pattern<VersionReq>;
 pub type SpecificSelector = SpecificDef<DomainSelector,SkewerSelector,VersionSelector>;
+pub type SpecificFullSelector = MatcherDef<SpecificSelector, OptPattern<CamelCase>>;
+
+impl SpecificSelector {
+    pub fn to_full(self) -> SpecificFullSelector {
+        SpecificFullSelector {
+            part: self,
+            sub: OptPattern::None,
+            r#type: OptPattern::None
+        }
+    }
+
+}
 
 impl IsMatch<Specific> for SpecificSelector {
     fn is_match(&self, other: &Specific) -> bool {
@@ -273,10 +331,11 @@ impl IsMatch<Specific> for SpecificSelector {
     }
 }
 
+
 #[cfg(test)]
 pub mod test {
     use crate::id::id::Version;
-    use crate::kind::{DomainSelector, IsMatch, Kind, SkewerSelector, Specific, SpecificFull, SpecificSelector, Variant, VariantFull, VersionSelector};
+    use crate::kind::{DomainSelector, IsMatch, Kind, OptPattern, SkewerSelector, Specific, SpecificFull, SpecificSelector, Variant, VariantFull, VersionSelector};
     use crate::parse::{CamelCase, Domain, SkewerCase};
     use core::str::FromStr;
     use crate::selector::selector::VersionReq;
@@ -337,6 +396,15 @@ pub mod test {
 
         assert!(selector.is_match(&specific));
 
+        let mut specific = specific.to_full();
+        let mut selector = selector.to_full();
+
+        assert!(selector.is_match(&specific));
+
+        let specific = specific.with_sub(Some(CamelCase::from_str("Zophis").unwrap()));
+        assert!(!selector.is_match(&specific));
+        let selector = selector.with_sub(OptPattern::Any);
+        assert!(selector.is_match(&specific));
 
         let selector = SpecificSelector {
             provider: DomainSelector::None,
@@ -346,6 +414,9 @@ pub mod test {
             version: VersionSelector::Matches(VersionReq::from_str("^1.0.0").unwrap())
         };
 
+        let specific = create_specific();
+
         assert!(!selector.is_match(&specific));
+
     }
 }
