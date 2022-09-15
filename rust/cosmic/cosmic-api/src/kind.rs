@@ -1,9 +1,11 @@
 use crate::id::id::Version;
 use crate::parse::{CamelCase, Domain, SkewerCase};
+use crate::selector::selector::VersionReq;
 use http::uri::Parts;
 use serde::{Deserialize, Serialize};
 use strum::ParseError::VariantNotFound;
-use crate::selector::selector::VersionReq;
+use crate::MsgErr;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct SubTypeDef<Part, SubType> {
@@ -51,9 +53,16 @@ pub struct ParentChildDef<Parent, Child> {
     pub child: Child,
 }
 
-impl<Parent,Child,IsMatchParent,IsMatchChild> IsMatch<ParentChildDef<Parent,Child>> for ParentChildDef<IsMatchParent,IsMatchChild> where IsMatchParent: IsMatch<Parent>, IsMatchChild: IsMatch<Child>, Parent: Eq+PartialEq, Child: Eq+PartialEq {
+impl<Parent, Child, IsMatchParent, IsMatchChild> IsMatch<ParentChildDef<Parent, Child>>
+    for ParentChildDef<IsMatchParent, IsMatchChild>
+where
+    IsMatchParent: IsMatch<Parent>,
+    IsMatchChild: IsMatch<Child>,
+    Parent: Eq + PartialEq,
+    Child: Eq + PartialEq,
+{
     fn is_match(&self, other: &ParentChildDef<Parent, Child>) -> bool {
-        self.parent.is_match(&other.parent) && self.child.is_match(&other.child )
+        self.parent.is_match(&other.parent) && self.child.is_match(&other.child)
     }
 }
 
@@ -73,6 +82,17 @@ where
 pub enum Variant {
     Artifact,
     Db(Db),
+}
+
+impl Variant {
+    pub fn from( kind: &Kind, variant: &CamelCase ) -> Result<Self,MsgErr> {
+        match kind {
+            Kind::Db => {
+                Ok(Variant::Db(Db::from_str(variant.as_str())?))
+            }
+            what => Err(format!("kind '{}' does not have a variant '{}' ", kind.to_string(), variant.to_string()).into())
+        }
+    }
 }
 
 #[derive(
@@ -99,7 +119,7 @@ impl Variant {
         }
     }
 
-    pub fn with_specific(self, specific: Option<SpecificFull>) -> VariantFull {
+    pub fn with_specific(self, specific: Option<SpecificSubTypes>) -> VariantFull {
         VariantFull {
             parent: self.to_sub_types(),
             child: specific,
@@ -166,7 +186,9 @@ pub struct SpecificDef<Domain, Skewer, Version> {
     pub version: Version,
 }
 
+
 pub type Specific = SpecificDef<Domain, SkewerCase, Version>;
+
 
 impl Specific {
     pub fn new(
@@ -185,34 +207,36 @@ impl Specific {
         }
     }
 
-    pub fn to_full(self) -> SpecificFull {
-        SpecificFull {
+    pub fn to_full(self) -> SpecificSubTypes {
+        SpecificSubTypes {
             part: self,
             sub: None,
             r#type: None,
         }
     }
 
-    pub fn sub(self, sub: Option<CamelCase>) -> SpecificFull {
-        SpecificFull {
+    pub fn sub(self, sub: Option<CamelCase>) -> SpecificSubTypes {
+        SpecificSubTypes {
             part: self,
             sub,
             r#type: None,
         }
     }
 
-    pub fn sub_type(self, sub: Option<CamelCase>, r#type: Option<CamelCase>) -> SpecificFull {
-        SpecificFull {
+    pub fn sub_type(self, sub: Option<CamelCase>, r#type: Option<CamelCase>) -> SpecificSubTypes {
+        SpecificSubTypes {
             part: self,
             sub,
             r#type,
         }
     }
 }
-
-pub type SpecificFull = MatcherDef<Specific, Option<CamelCase>>;
 pub type VariantSubTypes = MatcherDef<Variant, Option<CamelCase>>;
-pub type VariantFull = ParentMatcherDef<Variant, Option<SpecificFull>, Option<CamelCase>>;
+
+pub type SpecificSubTypes = MatcherDef<Specific, Option<CamelCase>>;
+
+pub type VariantDef<Variant,Specific,Camel>= ParentMatcherDef<Variant, Specific, Camel>;
+pub type VariantFull = VariantDef<Variant, Option<SpecificSubTypes>, Option<CamelCase>>;
 pub type KindSubTypes = MatcherDef<Kind, Option<CamelCase>>;
 pub type KindFull = ParentMatcherDef<Kind, Option<VariantFull>, Option<CamelCase>>;
 
@@ -268,8 +292,8 @@ pub enum OptPattern<X> {
 }
 
 impl<X> IsMatch<Option<X>> for OptPattern<X>
-    where
-        X: Eq + PartialEq,
+where
+    X: Eq + PartialEq,
 {
     fn is_match(&self, other: &Option<X>) -> bool {
         match self {
@@ -277,17 +301,15 @@ impl<X> IsMatch<Option<X>> for OptPattern<X>
             Self::Any => true,
             Self::Matches(x) => match other {
                 None => false,
-                Some(o) => {
-                    *x == *o
-                }
+                Some(o) => *x == *o,
             },
         }
     }
 }
 
 impl<X> ToString for OptPattern<X>
-    where
-        X: ToString,
+where
+    X: ToString,
 {
     fn to_string(&self) -> String {
         match self {
@@ -298,7 +320,6 @@ impl<X> ToString for OptPattern<X>
     }
 }
 
-
 impl IsMatch<Version> for VersionReq {
     fn is_match(&self, other: &Version) -> bool {
         self.version.matches(&other.version)
@@ -308,7 +329,7 @@ impl IsMatch<Version> for VersionReq {
 pub type DomainSelector = Pattern<Domain>;
 pub type SkewerSelector = Pattern<SkewerCase>;
 pub type VersionSelector = Pattern<VersionReq>;
-pub type SpecificSelector = SpecificDef<DomainSelector,SkewerSelector,VersionSelector>;
+pub type SpecificSelector = SpecificDef<DomainSelector, SkewerSelector, VersionSelector>;
 pub type SpecificFullSelector = MatcherDef<SpecificSelector, OptPattern<CamelCase>>;
 
 impl SpecificSelector {
@@ -316,92 +337,273 @@ impl SpecificSelector {
         SpecificFullSelector {
             part: self,
             sub: OptPattern::None,
-            r#type: OptPattern::None
+            r#type: OptPattern::None,
         }
     }
-
 }
 
 impl IsMatch<Specific> for SpecificSelector {
     fn is_match(&self, other: &Specific) -> bool {
-        self.provider.is_match(&other.provider) &&
-        self.vendor.is_match(&other.vendor) &&
-            self.product.is_match(  &other.product ) &&
-            self.variant.is_match(&other.variant )
+        self.provider.is_match(&other.provider)
+            && self.vendor.is_match(&other.vendor)
+            && self.product.is_match(&other.product)
+            && self.variant.is_match(&other.variant)
     }
 }
 
-pub type VariantFullSelector = ParentMatcherDef<Pattern<Variant>, OptPattern<SpecificFull>, OptPattern<CamelCase>>;
-pub type KindFullSelector = ParentMatcherDef<Pattern<Kind>, OptPattern<VariantFullSelector>, OptPattern<CamelCase>>;
+pub type VariantFullSelector =
+    ParentMatcherDef<Pattern<Variant>, OptPattern<SpecificSubTypes>, OptPattern<CamelCase>>;
+pub type KindFullSelector =
+    ParentMatcherDef<Pattern<Kind>, OptPattern<VariantFullSelector>, OptPattern<CamelCase>>;
 
 pub mod parse {
+    use crate::kind::{Kind, OptPattern, ParentChildDef, Pattern, Specific, SpecificDef, SpecificFullSelector, SpecificSelector, SpecificSubTypes, SubTypeDef, Variant, VariantFull};
+    use crate::parse::{camel_case, domain, skewer_case, version, version_req, Domain, CamelCase};
+    use cosmic_nom::{Res, Span};
     use nom::branch::alt;
     use nom::bytes::complete::tag;
-    use nom::combinator::value;
-    use nom::sequence::tuple;
-    use cosmic_nom::{Res, Span};
-    use crate::kind::{Pattern, Specific, SpecificDef, SpecificSelector};
-    use crate::parse::{Domain, domain, skewer_case, version, version_req};
+    use nom::combinator::{fail, opt, success, value};
+    use nom::sequence::{delimited, pair, preceded, tuple};
+    use std::str::FromStr;
 
-    pub fn pattern<I,FnX,X>( mut f: FnX ) -> impl FnMut(I) -> Res<I,Pattern<X>>+Copy where I: Span, FnX: FnMut(I) -> Res<I,X> + Copy, X: Clone {
-        move | input | alt( (value(Pattern::Any,tag("*")),value(Pattern::None,tag("!")),|i|f(i).map(|(next,x)|(next,Pattern::Matches(x)))) )(input)
-    }
-
-    pub fn specific_def<I,FnDomain,FnSkewer,FnVersion,Domain,Skewer,Version>( fn_domain: FnDomain, fn_skewer: FnSkewer, fn_version: FnVersion ) -> impl FnMut(I) -> Res<I,SpecificDef<Domain,Skewer,Version>> where I: Span,
-           FnDomain: FnMut(I) -> Res<I,Domain>+Copy,
-           FnSkewer: FnMut(I) -> Res<I,Skewer>+Copy,
-           FnVersion: FnMut(I) -> Res<I,Version>+Copy
+    pub fn pattern<I, FnX, X>(mut f: FnX) -> impl FnMut(I) -> Res<I, Pattern<X>> + Copy
+    where
+        I: Span,
+        FnX: FnMut(I) -> Res<I, X> + Copy,
+        X: Clone,
     {
-        move | input: I | {
-            tuple((fn_domain,tag(":"),fn_domain,tag(":"),fn_skewer,tag(":"),fn_skewer,tag(":"),fn_version))(input).map( |(next,(provider,_,vendor,_,product,_,variant,_,version))| {
-                (next,SpecificDef {
-                    provider,
-                    vendor,
-                    product,
-                    variant,
-                    version
-                })
-            } )
+        move |input| {
+            alt((
+                value(Pattern::Any, tag("*")),
+                value(Pattern::None, tag("!")),
+                |i| f(i).map(|(next, x)| (next, Pattern::Matches(x))),
+            ))(input)
         }
     }
 
-    pub fn specific<I>(input: I) -> Res<I,Specific> where I: Span {
-        specific_def(domain,skewer_case,version)(input)
+    pub fn opt_pattern<I, FnX, X>(mut f: FnX) -> impl FnMut(I) -> Res<I, OptPattern<X>> + Copy
+    where
+        I: Span,
+        FnX: FnMut(I) -> Res<I, X> + Copy,
+        X: Clone,
+    {
+        move |input| {
+            alt((
+                value(OptPattern::Any, tag("*")),
+                value(OptPattern::None, tag("!")),
+                |i| f(i).map(|(next, x)| (next, OptPattern::Matches(x))),
+            ))(input)
+        }
     }
 
-    pub fn specific_selector<I>(input: I) -> Res<I,SpecificSelector> where I: Span {
-        specific_def(pattern(domain),pattern(skewer_case),pattern(version_req))(input)
+    pub fn preceded_opt_pattern<I, FnX, X, FnPrec>(
+        prec: FnPrec,
+        mut f: FnX,
+    ) -> impl FnMut(I) -> Res<I, OptPattern<X>> + Copy
+    where
+        I: Span,
+        FnX: FnMut(I) -> Res<I, X> + Copy,
+        X: Clone,
+        FnPrec: FnMut(I) -> Res<I, I> + Copy,
+    {
+        move |input| alt((preceded(prec, opt_pattern(f)), |i|Ok((i,OptPattern::None))))(input)
     }
+
+    fn sub_types<I, FnPart, Part, FnCamel, Camel>(
+        fn_part: FnPart,
+        fn_camel: FnCamel,
+    ) -> impl FnMut(I) -> Res<I, SubTypeDef<Part, Camel>>
+    where
+        FnPart: FnMut(I) -> Res<I, Part> + Copy,
+        FnCamel: FnMut(I) -> Res<I, Camel> + Copy,
+        I: Span,
+    {
+        move |input: I| {
+            tuple((fn_part, fn_camel, fn_camel))(input)
+                .map(|(next, (part, sub, r#type))| (next, SubTypeDef { part, sub, r#type }))
+        }
+    }
+
+    fn parent_child_def<I, FnParent, Parent, FnChild, Child>(
+        fn_parent: FnParent,
+        fn_child: FnChild,
+    ) -> impl FnMut(I) -> Res<I, ParentChildDef<Parent,Child>>
+        where
+            FnParent: FnMut(I) -> Res<I, Parent> + Copy,
+            FnChild: FnMut(I) -> Res<I, Child> + Copy,
+            I: Span,
+    {
+        move |input: I| {
+            pair(fn_parent,fn_child)(input).map( |(next,(parent,child))|{
+                (next,
+                ParentChildDef{
+                    parent,
+                    child
+                })
+            })
+        }
+    }
+
+
+    pub fn specific_def<I, FnDomain, FnSkewer, FnVersion, Domain, Skewer, Version>(
+        fn_domain: FnDomain,
+        fn_skewer: FnSkewer,
+        fn_version: FnVersion,
+    ) -> impl FnMut(I) -> Res<I, SpecificDef<Domain, Skewer, Version>> + Copy
+    where
+        I: Span,
+        FnDomain: FnMut(I) -> Res<I, Domain> + Copy,
+        FnSkewer: FnMut(I) -> Res<I, Skewer> + Copy,
+        FnVersion: FnMut(I) -> Res<I, Version> + Copy,
+    {
+        move |input: I| {
+            tuple((
+                fn_domain,
+                tag(":"),
+                fn_domain,
+                tag(":"),
+                fn_skewer,
+                tag(":"),
+                fn_skewer,
+                tag(":"),
+                fn_version,
+            ))(input)
+            .map(
+                |(next, (provider, _, vendor, _, product, _, variant, _, version))| {
+                    (
+                        next,
+                        SpecificDef {
+                            provider,
+                            vendor,
+                            product,
+                            variant,
+                            version,
+                        },
+                    )
+                },
+            )
+        }
+    }
+
+    pub fn specific<I>(input: I) -> Res<I, Specific>
+    where
+        I: Span,
+    {
+        specific_def(domain, skewer_case, version)(input)
+    }
+
+    pub fn specific_sub_types<I>(input: I) -> Res<I, SpecificSubTypes>
+    where
+        I: Span,
+    {
+        sub_types(specific, |i| opt(preceded(tag(":"), camel_case))(i))(input)
+    }
+
+    pub fn specific_selector<I>(input: I) -> Res<I, SpecificSelector>
+    where
+        I: Span,
+    {
+        specific_def(pattern(domain), pattern(skewer_case), pattern(version_req))(input)
+    }
+
+    pub fn specific_full_selector<I>(input: I) -> Res<I, SpecificFullSelector>
+    where
+        I: Span,
+    {
+        sub_types(
+            specific_selector,
+            preceded_opt_pattern(|i|tag(":")(i),camel_case )
+//                  preceded_opt_pattern(|i|tag(":")(i), camel_case),
+        )(input)
+    }
+
+    /*
+    pub fn variant_def<I,Kind,FnVariant,FnSelector,Variant,Selector>( kind: Kind, fn_variant: FnVariant, fn_selector: FnSelector ) -> impl Res<I,VariantFull>
+
+     */
 
 
     #[cfg(test)]
     pub mod test {
-        use cosmic_nom::new_span;
-        use crate::kind::parse::{specific, specific_selector};
+        use crate::kind::parse::{opt_pattern, preceded_opt_pattern, specific, specific_full_selector, specific_selector, specific_sub_types};
         use crate::parse::error::result;
+        use crate::parse::{camel_case, CamelCase};
         use crate::util::log;
+        use core::str::FromStr;
+        use nom::bytes::complete::tag;
+        use nom::combinator::all_consuming;
+        use nom::sequence::preceded;
+        use cosmic_nom::new_span;
+        use crate::id::id::Version;
+        use crate::kind::{OptPattern, Pattern};
+        use crate::selector::selector::VersionReq;
+
+        #[test]
+        pub fn test_my_sub() {
+            let sub = log(result(opt_pattern(camel_case )( new_span("MySub")))).unwrap();
+            assert_eq!(sub, OptPattern::Matches(CamelCase::from_str("MySub").unwrap()));
+
+            let sub = log(result(preceded_opt_pattern(|i|tag(":")(i),camel_case )( new_span(":MySub")))).unwrap();
+            assert_eq!(sub, OptPattern::Matches(CamelCase::from_str("MySub").unwrap()));
+        }
 
         #[test]
         pub fn test_specific() {
-            let specific = result(specific(new_span("my-domain.io:vendor.io:product:variant:1.0.0"))).unwrap();
+            let specific = result(specific(new_span(
+                "my-domain.io:vendor.io:product:variant:1.0.0",
+            )))
+            .unwrap();
         }
 
         #[test]
         pub fn test_specific_selector() {
-            let selector = log(result(specific_selector(new_span("my-domain.io:*:product:variant:1.0.0")))).unwrap();
+            let selector = log(result(specific_selector(new_span(
+                "my-domain.io:*:product:variant:1.0.0",
+            ))))
+            .unwrap();
         }
 
+        #[test]
+        pub fn test_specific_sub_types() {
+            let specific = result(specific_sub_types(new_span(
+                "my-domain.io:vendor.io:product:variant:1.0.0:Sub:Type",
+            )))
+            .unwrap();
+            assert_eq!(specific.sub, Some(CamelCase::from_str("Sub").unwrap()));
+            assert_eq!(specific.r#type, Some(CamelCase::from_str("Type").unwrap()));
+        }
 
+        #[test]
+        pub fn test_specific_full_selector() {
+            let selector = log(result(specific_full_selector(new_span(
+                "my-domain.io:*:product:variant:1.0.0",
+            ))))
+            .unwrap();
+            assert_eq!(selector.sub, OptPattern::None);
+            assert_eq!(selector.part.variant.to_string(),"variant".to_string());
+//            assert_eq!(selector.part.version,Pattern::Matches(VersionReq::from_str("1.0.0").unwrap()));
+
+            let selector = log(result(specific_full_selector(new_span(
+                "my-domain.io:*:product:variant:1.0.0:MySub",
+            ))))
+                .unwrap();
+
+            assert_eq!(selector.sub, OptPattern::Matches(CamelCase::from_str("MySub").unwrap()));
+        }
     }
 }
 
 #[cfg(test)]
 pub mod test {
     use crate::id::id::Version;
-    use crate::kind::{DomainSelector, IsMatch, Kind, OptPattern, ParentChildDef, Pattern, SkewerSelector, Specific, SpecificFull, SpecificSelector, SubTypeDef, Variant, VariantFull, VariantFullSelector, VersionSelector};
+    use crate::kind::{
+        DomainSelector, IsMatch, Kind, OptPattern, ParentChildDef, Pattern, SkewerSelector,
+        Specific, SpecificSelector, SpecificSubTypes, SubTypeDef, Variant, VariantFull,
+        VariantFullSelector, VersionSelector,
+    };
     use crate::parse::{CamelCase, Domain, SkewerCase};
-    use core::str::FromStr;
     use crate::selector::selector::VersionReq;
+    use core::str::FromStr;
 
     fn create_specific() -> Specific {
         Specific::new(
@@ -413,7 +615,7 @@ pub mod test {
         )
     }
 
-    fn create_specific_sub_type() -> SpecificFull {
+    fn create_specific_sub_type() -> SpecificSubTypes {
         create_specific().sub(Some(CamelCase::from_str("Blah").unwrap()))
     }
 
@@ -454,7 +656,7 @@ pub mod test {
             vendor: DomainSelector::Matches(Domain::from_str("my-domain.com").unwrap()),
             product: SkewerSelector::Any,
             variant: SkewerSelector::Matches(SkewerCase::from_str("variant").unwrap()),
-            version: VersionSelector::Matches(VersionReq::from_str("^1.0.0").unwrap())
+            version: VersionSelector::Matches(VersionReq::from_str("^1.0.0").unwrap()),
         };
 
         assert!(selector.is_match(&specific));
@@ -474,7 +676,7 @@ pub mod test {
             vendor: DomainSelector::Matches(Domain::from_str("my-domain.com").unwrap()),
             product: SkewerSelector::Any,
             variant: SkewerSelector::Matches(SkewerCase::from_str("variant").unwrap()),
-            version: VersionSelector::Matches(VersionReq::from_str("^1.0.0").unwrap())
+            version: VersionSelector::Matches(VersionReq::from_str("^1.0.0").unwrap()),
         };
 
         let specific = create_specific();
@@ -489,26 +691,22 @@ pub mod test {
             parent: SubTypeDef {
                 part: Pattern::Matches(Variant::Artifact),
                 sub: OptPattern::None,
-                r#type: OptPattern::None
+                r#type: OptPattern::None,
             },
-            child: OptPattern::None
+            child: OptPattern::None,
         };
 
         assert!(!selector.is_match(&variant));
-
 
         let mut selector = VariantFullSelector {
             parent: SubTypeDef {
                 part: Pattern::Matches(Variant::Artifact),
                 sub: OptPattern::None,
-                r#type: OptPattern::None
+                r#type: OptPattern::None,
             },
-            child: OptPattern::Any
+            child: OptPattern::Any,
         };
 
         assert!(selector.is_match(&variant));
-
     }
-
-
 }
