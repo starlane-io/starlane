@@ -810,6 +810,7 @@ where
         |item| {
             let char_item = item.as_char();
             !(char_item == '-')
+                && !(char_item == '.')
                 && !(char_item == '>')
                 && !(char_item == '<')
                 && !(char_item == '^')
