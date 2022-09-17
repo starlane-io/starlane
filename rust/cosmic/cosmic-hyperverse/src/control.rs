@@ -4,7 +4,7 @@ use crate::{PlatErr, Platform, Registry};
 use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::request::create::{Create, KindTemplate, PointFactory, PointFactoryU64, PointSegTemplate, PointTemplate, Strategy, Template, TemplateDef};
 use cosmic_universe::error::UniErr;
-use cosmic_universe::substance2::substance::Substance;
+use cosmic_universe::substance::Substance;
 use cosmic_universe::hyper::{Assign, AssignmentKind, ControlPattern, Greet, InterchangeKind, Knock};
 use cosmic_universe::wave::Agent::Anonymous;
 use cosmic_universe::wave::{Agent, CmdMethod, CoreBounce, DirectedHandler, Exchanger, InCtx, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, Signal, ToRecipients, UltraWave, Wave};

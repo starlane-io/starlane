@@ -3,7 +3,7 @@ use tokio::sync::RwLock;
 use lru::LruCache;
 use std::ops::Deref;
 use crate::{BindConfig, UniErr};
-use crate::substance2::Bin;
+use crate::substance::Bin;
 use serde::{Deserialize, Serialize};
 use crate::id::Point;
 use crate::particle::Stub;

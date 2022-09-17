@@ -1,5 +1,5 @@
 use crate::error::UniErr;
-use crate::substance2::substance::Substance;
+use crate::substance::Substance;
 use cosmic_macros_primitive::Autobox;
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};

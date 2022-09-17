@@ -13,7 +13,7 @@ use cosmic_universe::log::{PointLogger, Trackable};
 use cosmic_universe::parse::model::{MethodScope, PipelineSegmentVar, PipelineVar};
 use cosmic_universe::parse::{Env, RegexCapturesResolver};
 use cosmic_universe::selector::{PayloadBlock, PayloadBlockVar};
-use cosmic_universe::substance2::substance::Substance;
+use cosmic_universe::substance::Substance;
 use cosmic_universe::util::ToResolved;
 
 pub struct Field<P>

@@ -3,7 +3,6 @@ use crate::id::Meta;
 use crate::parse::camel_case_chars;
 use crate::parse::error::result;
 use crate::parse::model::MethodScopeSelector;
-use crate::substance2::substance::{Errors, Substance};
 use crate::util::{ValueMatcher, ValuePattern};
 use crate::wave::{DirectedCore, Method, ReflectedCore};
 use cosmic_nom::new_span;
@@ -12,6 +11,7 @@ use nom::combinator::all_consuming;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
+use crate::substance::{Errors, Substance};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct ExtMethod {

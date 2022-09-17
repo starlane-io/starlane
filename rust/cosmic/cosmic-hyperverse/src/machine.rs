@@ -4,7 +4,7 @@ use cosmic_universe::error::UniErr;
 use cosmic_universe::log::{PointLogger, RootLogger};
 use cosmic_universe::particle::Status;
 use cosmic_universe::quota::Timeouts;
-use cosmic_universe::substance2::substance::Substance;
+use cosmic_universe::substance::Substance;
 use cosmic_universe::hyper::{InterchangeKind, Knock};
 use cosmic_universe::wave::{Agent, HyperWave, UltraWave};
 use cosmic_universe::artifact::ArtifactApi;

@@ -29,7 +29,6 @@ use cosmic_universe::property::PropertiesConfig;
 use cosmic_universe::quota::Timeouts;
 use cosmic_universe::security::{Access, AccessGrant};
 use cosmic_universe::selector::Selector;
-use cosmic_universe::substance2::substance::{Substance, SubstanceList, Token};
 use cosmic_universe::hyper::ParticleRecord;
 use cosmic_universe::wave::{ReflectedCore, UltraWave};
 use cosmic_universe::security::IndexedAccessGrant;
@@ -49,6 +48,7 @@ use cosmic_universe::id::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Layer, M
 use cosmic_universe::log::RootLogger;
 use cosmic_universe::particle::{Details, Properties, Status, Stub};
 use cosmic_universe::reg::Registration;
+use cosmic_universe::substance::{Substance, SubstanceList, Token};
 
 pub mod control;
 pub mod driver;

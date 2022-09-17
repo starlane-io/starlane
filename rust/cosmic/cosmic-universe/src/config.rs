@@ -71,8 +71,6 @@ pub struct ParticleConfigBody {
 pub mod bind {
     use crate::command::request::Rc;
     use crate::error::{ParseErrs, UniErr};
-    use crate::substance2::substance::{Call, CallDef};
-    use crate::substance2::substance::{Substance, SubstancePattern};
     use crate::wave::{
         DirectedCore, DirectedWave, MethodKind, MethodPattern, Ping, RecipientSelector,
         SingularDirectedWave, Wave,
@@ -90,6 +88,7 @@ pub mod bind {
     use std::convert::TryInto;
     use crate::id::{Point, PointCtx, PointVar, Topic};
     use crate::selector::PayloadBlock;
+    use crate::substance::{Call, CallDef, Substance, SubstancePattern};
 
     #[derive(Debug,Clone,Serialize,Deserialize)]
     pub enum WaveDirection {

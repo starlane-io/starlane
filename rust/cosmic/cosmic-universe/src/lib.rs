@@ -24,7 +24,6 @@ pub mod property;
 pub mod quota;
 pub mod security;
 pub mod service;
-pub mod substance2;
 pub mod hyper;
 pub mod util;
 pub mod wave;
@@ -40,9 +39,10 @@ pub mod id;
 pub mod particle;
 pub mod frame;
 pub mod selector;
+pub mod substance;
 
 
-use substance2::Bin;
+use substance::Bin;
 use command::common::{SetProperties, SetRegistry};
 use command::request::create::{KindTemplate, Strategy};
 use command::request::delete::Delete;
@@ -53,7 +53,6 @@ use config::Document;
 use crate::error::UniErr;
 use crate::security::{Access, AccessGrant};
 use selector::Selector;
-use crate::substance2::substance::{Substance, SubstanceList, Token, ToSubstance};
 use crate::hyper::ParticleRecord;
 use crate::wave::{Agent, ReflectedCore};
 use ::http::StatusCode;
@@ -68,6 +67,7 @@ use tokio::sync::RwLock;
 use artifact::ArtifactFetcher;
 use id::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Point, Port, Specific, StarSub, UserBaseSubKind, Uuid};
 use particle::{Details, Properties, Status, Stub};
+use substance::{Substance, SubstanceList, Token, ToSubstance};
 
 lazy_static! {
     pub static ref VERSION: semver::Version = semver::Version::from_str("0.3.0").unwrap();

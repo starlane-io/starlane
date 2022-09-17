@@ -4,7 +4,6 @@ use std::io;
 use std::string::FromUtf8Error;
 
 use crate::parse::error::find_parse_err;
-use crate::substance2::substance::{Errors, Substance};
 use crate::wave::ReflectedCore;
 use ariadne::{Label, Report, ReportBuilder, ReportKind, Source};
 use cosmic_nom::Span;
@@ -25,6 +24,7 @@ use std::sync::{Arc, PoisonError};
 use tokio::sync::mpsc::error::{SendError, SendTimeoutError};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
+use crate::substance::{Errors, Substance};
 
 pub enum UniErr {
     Status { status: u16, message: String },

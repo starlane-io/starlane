@@ -14,7 +14,6 @@ use cosmic_universe::security::{Access, AccessGrant, AccessGrantKind, Enumerated
 use cosmic_universe::selector::specific::{
     ProductSelector, ProviderSelector, VariantSelector, VendorSelector,
 };
-use cosmic_universe::substance2::substance::{Substance, SubstanceList, SubstanceMap};
 use cosmic_universe::hyper::{Location, ParticleRecord};
 use cosmic_universe::util::ValuePattern;
 use cosmic_universe::HYPERUSER;
@@ -37,6 +36,7 @@ use cosmic_universe::id::{ArtifactSubKind, BaseKind, FileSubKind, Kind, KindPart
 use cosmic_universe::particle::{Details, Properties, Property, Status, Stub};
 use cosmic_universe::reg::Registration;
 use cosmic_universe::selector::{ExactPointSeg, KindBaseSelector, PointHierarchy, PointKindSeg, PointSegSelector, Selector, SubKindSelector};
+use cosmic_universe::substance::{Substance, SubstanceList, SubstanceMap};
 
 #[macro_use]
 extern crate lazy_static;

@@ -3,8 +3,9 @@ use nom::bytes::complete::tag;
 use std::collections::HashMap;
 use crate::id::{KindParts, PointKind};
 use crate::parse::parse_alpha1_str;
-use crate::{Kind, Point, Substance};
+use crate::{Kind, Point};
 use serde::{Deserialize, Serialize};
+use crate::substance::Substance;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StatusUpdate {
@@ -159,9 +160,9 @@ pub mod particle {
     use crate::error::UniErr;
     use crate::parse::parse_alpha1_str;
     use crate::security::Permissions;
-    use crate::substance2::substance::{Substance, SubstanceMap};
     use cosmic_nom::{Res, Span};
     use crate::id::{BaseKind, Kind, KindParts, Point, PointKind};
+    use crate::substance::{Substance, SubstanceMap};
 
     /*
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]

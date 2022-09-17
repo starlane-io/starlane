@@ -4976,7 +4976,7 @@ use nom::{
 use nom::{Err, IResult};
 use nom_locate::LocatedSpan;
 
-use crate::substance2::Bin;
+use crate::substance::Bin;
 use crate::cli;
 use crate::command::RawCommand;
 use crate::command::request::RcCommandType;
@@ -4999,12 +4999,6 @@ use crate::parse::model::{
     TerminatedBlockKind, TextType, Var, VarParser,
 };
 use crate::selector::specific::{ProductSelector, VariantSelector, VendorSelector};
-use crate::substance2::substance::{
-    Call, CallCtx, CallKind, CallVar, CallWithConfig, CallWithConfigCtx, CallWithConfigVar,
-    ExtCall, HttpCall, ListPattern, MapPattern, MapPatternCtx, MapPatternVar, NumRange, Substance,
-    SubstanceFormat, SubstanceKind, SubstancePattern, SubstancePatternCtx, SubstancePatternVar,
-    SubstanceTypePatternCtx, SubstanceTypePatternDef, SubstanceTypePatternVar,
-};
 use crate::wave::{CmdMethod, HypMethod, Method, MethodKind, MethodPattern};
 use cosmic_nom::{new_span, span_with_extra, Trace};
 use cosmic_nom::{Res, Span, trim, tw, Wrap};
@@ -5013,6 +5007,7 @@ use nom_supreme::parser_ext::MapRes;
 use nom_supreme::{parse_from_str, ParserExt};
 use crate::id::{BaseKind, Kind, KindLex, Layer, Point, PointCtx, PointKind, PointKindVar, PointSeg, PointSegCtx, PointSegDelim, PointSegment, PointSegVar, PointVar, Port, RouteSeg, RouteSegVar, Specific, Topic, Uuid, Variable, VarVal, Version};
 use crate::selector::{ExactPointSeg, Hop, KindBaseSelector, KindSelector, LabeledPrimitiveTypeDef, MapEntryPattern, MapEntryPatternCtx, MapEntryPatternVar, Pattern, PatternBlock, PatternBlockCtx, PatternBlockVar, PayloadBlock, PayloadBlockCtx, PayloadBlockVar, PayloadType2Def, PointHierarchy, PointKindSeg, PointSegSelector, Selector, SelectorDef, SpecificSelector, SubKindSelector, UploadBlock, VersionReq};
+use crate::substance::{Call, CallCtx, CallKind, CallVar, CallWithConfig, CallWithConfigCtx, CallWithConfigVar, ExtCall, HttpCall, ListPattern, MapPattern, MapPatternCtx, MapPatternVar, NumRange, Substance, SubstanceFormat, SubstanceKind, SubstancePattern, SubstancePatternCtx, SubstancePatternVar, SubstanceTypePatternCtx, SubstanceTypePatternDef, SubstanceTypePatternVar};
 
 fn inclusive_any_segment<I: Span>(input: I) -> Res<I, PointSegSelector> {
     alt((tag("+*"), tag("ROOT+*")))(input).map(|(next, _)| (next, PointSegSelector::InclusiveAny))
@@ -7049,7 +7044,7 @@ pub mod test {
     };
     use crate::parse::{args, base_point_segment, base_seg, comment, consume_point_var, create, create_command, doc, Env, expected_block_terminator_or_non_terminator, lex_block, lex_child_scopes, lex_nested_block, lex_scope, lex_scope_pipeline_step_and_block, lex_scope_selector, lex_scopes, lowercase1, MapResolver, mesh_eos, mesh_seg, nested_block, nested_block_content, next_stacked_name, no_comment, parse_bind_config, parse_include_blocks, parse_inner_block, path_regex, pipeline, pipeline_segment, pipeline_step_var, pipeline_stop_var, point_non_root_var, point_template, point_var, pop, rec_version, root_ctx_seg, root_scope, root_scope_selector, route_attribute, route_selector, scope_filter, scope_filters, skewer_case_chars, skewer_dot, space_chars, space_no_dupe_dots, space_point_segment, strip_comments, subst, SubstParser, template, var_seg, variable_name, VarResolver, version, version_point_segment, wrapper};
     use crate::util::{log, ToResolved};
-    use crate::{Substance, util};
+    use crate::util;
     use bincode::config;
     use cosmic_nom::{new_span, Res, span_with_extra};
     use nom::branch::alt;
@@ -7067,6 +7062,7 @@ pub mod test {
     use std::str::FromStr;
     use std::sync::Arc;
     use crate::id::{Point, PointCtx, PointSegVar, RouteSegVar};
+    use crate::substance::Substance;
 
     #[test]
     pub fn test_message_selector() {

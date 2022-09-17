@@ -19,7 +19,7 @@ use tokio::time::error::Elapsed;
 use tokio_openssl::SslStream;
 use cosmic_universe::error::UniErr;
 use cosmic_universe::log::PointLogger;
-use cosmic_universe::substance2::substance::Substance;
+use cosmic_universe::substance::Substance;
 use cosmic_universe::hyper::Knock;
 use cosmic_universe::VERSION;
 use cosmic_universe::wave::{Ping, UltraWave, Wave};

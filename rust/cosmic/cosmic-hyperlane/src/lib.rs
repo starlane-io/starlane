@@ -7,7 +7,6 @@ use cosmic_universe::log::{PointLogger, RootLogger};
 use cosmic_universe::ext::ExtMethod;
 use cosmic_universe::particle::Status;
 use cosmic_universe::quota::Timeouts;
-use cosmic_universe::substance2::substance::{Errors, Substance, SubstanceKind, Token};
 use cosmic_universe::hyper::{Greet, HyperSubstance, InterchangeKind, Knock};
 use cosmic_universe::util::uuid;
 use cosmic_universe::wave::{
@@ -35,6 +34,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock, watch};
 use cosmic_universe::id::{Layer, Point, Port, ToPoint, ToPort, Version};
+use cosmic_universe::substance::{Errors, Substance, SubstanceKind, Token};
 
 #[macro_use]
 extern crate async_trait;
@@ -1927,7 +1927,7 @@ mod tests {
     use cosmic_universe::command::request::create::PointFactoryU64;
     use cosmic_universe::id::Point;
     use cosmic_universe::log::RootLogger;
-    use cosmic_universe::substance2::substance::Substance;
+    use cosmic_universe::substance::Substance;
     use cosmic_universe::hyper::{InterchangeKind, Knock};
     use cosmic_universe::wave::HyperWave;
     use dashmap::DashMap;
@@ -2002,7 +2002,6 @@ pub mod test_util {
     use cosmic_universe::error::UniErr;
     use cosmic_universe::log::RootLogger;
     use cosmic_universe::ext::ExtMethod;
-    use cosmic_universe::substance2::substance::{Substance, Token};
     use cosmic_universe::hyper::{Greet, InterchangeKind, Knock};
     use cosmic_universe::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedCore, ReflectedKind, ReflectedProto, ReflectedWave, Router, SetStrategy, TxRouter, UltraWave, Wave};
     use dashmap::DashMap;
@@ -2014,6 +2013,7 @@ pub mod test_util {
     use tokio::sync::{broadcast, mpsc, oneshot};
     use cosmic_universe::id::{Layer, Point, Port, ToPoint, ToPort};
     use cosmic_universe::quota::Timeouts;
+    use cosmic_universe::substance::{Substance, Token};
 
     pub struct SingleInterchangePlatform {
         pub interchange: Arc<HyperwayInterchange>,
@@ -2158,10 +2158,8 @@ pub mod test {
     use crate::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, Bridge, HyperClient, HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter, Hyperlane, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist};
     use cosmic_universe::command::request::create::PointFactoryU64;
     use cosmic_universe::error::UniErr;
-    use cosmic_universe::id2::id::{};
     use cosmic_universe::log::RootLogger;
     use cosmic_universe::ext::ExtMethod;
-    use cosmic_universe::substance2::substance::{Substance, Token};
     use cosmic_universe::hyper::{Greet, InterchangeKind, Knock};
     use cosmic_universe::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedCore, ReflectedKind, ReflectedProto, ReflectedWave, Router, SetStrategy, TxRouter, UltraWave, Wave};
     use dashmap::DashMap;
@@ -2173,6 +2171,7 @@ pub mod test {
     use tokio::sync::{broadcast, mpsc, oneshot};
     use cosmic_universe::id::{Layer, Point, Port, ToPoint, ToPort};
     use cosmic_universe::quota::Timeouts;
+    use cosmic_universe::substance::{Substance, Token};
     use crate::test_util::{FAE, LESS, SingleInterchangePlatform, TestGreeter, WaveTest};
 
 

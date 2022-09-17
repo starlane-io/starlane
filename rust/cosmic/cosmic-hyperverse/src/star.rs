@@ -9,7 +9,7 @@ use crate::machine::MachineSkel;
 use crate::shell::Shell;
 use crate::state::ShellState;
 use crate::{DriversBuilder, PlatErr, Platform, Registry, RegistryApi};
-use cosmic_universe::substance2::Bin;
+use cosmic_universe::substance::Bin;
 use cosmic_universe::command::RawCommand;
 use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::request::create::{Create, Strategy};
@@ -19,7 +19,6 @@ use cosmic_universe::error::UniErr;
 use cosmic_universe::log::{PointLogger, RootLogger, Trackable, Tracker};
 use cosmic_universe::parse::{bind_config, Env, route_attribute};
 use cosmic_universe::quota::Timeouts;
-use cosmic_universe::substance2::substance::{Substance, ToSubstance};
 use cosmic_universe::hyper::{
     Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, Location, ParticleRecord, Provision,
     Search,
@@ -64,6 +63,7 @@ use cosmic_universe::mount::MountKind;
 use cosmic_universe::particle::{Details, Status, Stub};
 use cosmic_universe::reg::Registration;
 use cosmic_universe::state::{State, StateFactory};
+use cosmic_universe::substance::{Substance, ToSubstance};
 
 #[derive(Clone)]
 pub struct StarState<P>

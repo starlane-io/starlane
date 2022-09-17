@@ -12,8 +12,8 @@ use request::set::{Set, SetCtx, SetVar};
 use request::update::{Update, UpdateCtx, UpdateVar};
 use crate::parse::{command_line, Env};
 use crate::parse::error::result;
-use crate::substance2::substance::ChildSubstance;
-use crate::{Bin, Delete, Select, UniErr};
+use crate::substance::{Bin, ChildSubstance};
+use crate::{Delete, Select, UniErr};
 use crate::util::ToResolved;
 use crate::wave::CmdMethod;
 use serde::{Deserialize, Serialize};
@@ -28,7 +28,7 @@ pub mod common {
     use crate::error::UniErr;
     use crate::id::Variable;
     use crate::parse::model::Var;
-    use crate::substance2::substance::{Substance, SubstanceMap};
+    use crate::substance::{Substance, SubstanceMap};
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
     pub enum StateSrcVar {
@@ -152,7 +152,7 @@ pub mod common {
 
 
 pub mod request {
-    use crate::substance2::Bin;
+    use crate::substance::Bin;
     use crate::command::request::create::Create;
     use crate::command::request::get::Get;
     use crate::command::request::select::Select;
@@ -164,7 +164,6 @@ pub mod request {
     use crate::http::HttpMethod;
     use crate::ext::ExtMethod;
     use crate::selector::KindSelector;
-    use crate::substance2::substance::{Errors, Substance};
     use crate::util::{ValueMatcher, ValuePattern};
     use crate::wave::MethodKind;
     use crate::wave::ReflectedCore;
@@ -172,6 +171,7 @@ pub mod request {
     use http::{HeaderMap, Request, StatusCode, Uri};
     use serde::{Deserialize, Serialize};
     use crate::id::{BaseKind, KindParts, Meta, Point};
+    use crate::substance::{Errors, Substance};
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub enum Rc {
@@ -355,7 +355,7 @@ pub mod request {
         use serde::{Deserialize, Serialize};
         use tokio::sync::Mutex;
 
-        use crate::substance2::Bin;
+        use crate::substance::Bin;
         use crate::command::common::{SetProperties, SetRegistry, StateSrc, StateSrcVar};
         use crate::command::Command;
         use crate::error::{ParseErrs, UniErr};
@@ -364,7 +364,7 @@ pub mod request {
         use crate::parse::{CamelCase, Env, ResolverErr};
         use crate::parse::model::Subst;
         use crate::selector::SpecificSelector;
-        use crate::substance2::substance::Substance;
+        use crate::substance::Substance;
         use crate::util::{ConvertFrom, ToResolved};
         use crate::wave::{CmdMethod, DirectedCore, DirectedProto, HypMethod, Ping, Wave};
 
@@ -694,7 +694,7 @@ pub mod request {
         use crate::parse::Env;
         use crate::particle::Stub;
         use crate::selector::{Hop, HopCtx, HopVar, PointHierarchy, Selector, SelectorDef};
-        use crate::substance2::substance::{MapPattern, Substance, SubstanceList};
+        use crate::substance::{MapPattern, Substance, SubstanceList};
         use crate::util::{ConvertFrom, ToResolved};
 
         #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -894,7 +894,7 @@ pub mod request {
         use crate::error::UniErr;
         use crate::id::{Point, PointCtx, PointVar};
         use crate::parse::Env;
-        use crate::substance2::substance::Substance;
+        use crate::substance::Substance;
         use crate::util::ToResolved;
 
         pub type Update = UpdateDef<Point>;
@@ -929,7 +929,7 @@ pub mod request {
     pub mod read {
         use crate::error::UniErr;
         use crate::parse::Env;
-        use crate::substance2::substance::Substance;
+        use crate::substance::Substance;
         use crate::util::ToResolved;
         use serde::{Deserialize, Serialize};
         use crate::id::{Point, PointCtx, PointVar};

@@ -8,9 +8,9 @@ use std::ops::Deref;
 use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
 use crate::id::{KindParts, Layer, PointCtx, PointSeg, PointVar, RouteSeg, ToBaseKind, Topic, Variable, VarVal, Version};
 use crate::parse::{CamelCase, consume_hierarchy, Env, point_segment_selector, point_selector, specific_selector};
-use crate::substance2::substance::{CallWithConfigDef, SubstanceFormat, SubstanceKind, SubstancePattern, SubstancePatternCtx, SubstancePatternDef};
-use crate::{BaseKind, Kind, Point, Specific, Substance, UniErr};
+use crate::{BaseKind, Kind, Point, Specific, UniErr};
 use crate::parse::error::result;
+use crate::substance::{CallWithConfigDef, Substance, SubstanceFormat, SubstanceKind, SubstancePattern, SubstancePatternCtx, SubstancePatternDef};
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
 
 pub type KindSelector = KindSelectorDef<KindBaseSelector, SubKindSelector, SpecificSelector>;

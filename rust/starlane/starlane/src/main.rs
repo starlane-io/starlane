@@ -11,7 +11,7 @@ use cosmic_universe::property::{
     AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit,
     PropertySource, U64Pattern, UsernamePattern,
 };
-use cosmic_universe::substance2::substance::Token;
+use cosmic_universe::substance::Token;
 use cosmic_universe::artifact::NoDiceArtifactFetcher;
 use cosmic_artifact::Artifacts;
 use cosmic_hyperlane::HyperGateSelector;
