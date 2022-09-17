@@ -2,13 +2,13 @@
 
 use cosmic_universe::command::request::create::{PointFactory, PointFactoryU64, PointSegTemplate};
 use cosmic_universe::error::UniErr;
-use cosmic_universe::frame::frame::PrimitiveFrame;
-use cosmic_universe::id::id::{Layer, Point, Port, ToPoint, ToPort, Version};
+use cosmic_universe::frame2::frame::PrimitiveFrame;
+use cosmic_universe::id2::id::{Layer, Point, Port, ToPoint, ToPort, Version};
 use cosmic_universe::log::{PointLogger, RootLogger};
 use cosmic_universe::ext::ExtMethod;
-use cosmic_universe::particle::particle::Status;
+use cosmic_universe::particle2::particle::Status;
 use cosmic_universe::quota::Timeouts;
-use cosmic_universe::substance::substance::{Errors, Substance, SubstanceKind, Token};
+use cosmic_universe::substance2::substance::{Errors, Substance, SubstanceKind, Token};
 use cosmic_universe::hyper::{Greet, InterchangeKind, Knock, HyperSubstance};
 use cosmic_universe::util::uuid;
 use cosmic_universe::wave::{
@@ -1925,9 +1925,9 @@ mod tests {
     };
     use chrono::{DateTime, Utc};
     use cosmic_universe::command::request::create::PointFactoryU64;
-    use cosmic_universe::id::id::{Point, Uuid};
+    use cosmic_universe::id2::id::{Point, Uuid};
     use cosmic_universe::log::RootLogger;
-    use cosmic_universe::substance::substance::Substance;
+    use cosmic_universe::substance2::substance::Substance;
     use cosmic_universe::hyper::{InterchangeKind, Knock};
     use cosmic_universe::wave::HyperWave;
     use dashmap::DashMap;
@@ -1999,10 +1999,10 @@ pub mod test_util {
     use crate::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, HyperClient, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter, HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist, Bridge, HyperConnectionDetails};
     use cosmic_universe::command::request::create::PointFactoryU64;
     use cosmic_universe::error::UniErr;
-    use cosmic_universe::id::id::{Layer, Point, Port, ToPoint, ToPort};
+    use cosmic_universe::id2::id::{Layer, Point, Port, ToPoint, ToPort};
     use cosmic_universe::log::RootLogger;
     use cosmic_universe::ext::ExtMethod;
-    use cosmic_universe::substance::substance::{Substance, Token};
+    use cosmic_universe::substance2::substance::{Substance, Token};
     use cosmic_universe::hyper::{Greet, InterchangeKind, Knock};
     use cosmic_universe::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedCore, ReflectedKind, ReflectedProto, ReflectedWave, Router, SetStrategy, TxRouter, UltraWave, Wave};
     use dashmap::DashMap;
@@ -2157,10 +2157,10 @@ pub mod test {
     use crate::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, HyperClient, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter, HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist, Bridge, HyperConnectionDetails};
     use cosmic_universe::command::request::create::PointFactoryU64;
     use cosmic_universe::error::UniErr;
-    use cosmic_universe::id::id::{Layer, Point, Port, ToPoint, ToPort};
+    use cosmic_universe::id2::id::{Layer, Point, Port, ToPoint, ToPort};
     use cosmic_universe::log::RootLogger;
     use cosmic_universe::ext::ExtMethod;
-    use cosmic_universe::substance::substance::{Substance, Token};
+    use cosmic_universe::substance2::substance::{Substance, Token};
     use cosmic_universe::hyper::{Greet, InterchangeKind, Knock};
     use cosmic_universe::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedCore, ReflectedKind, ReflectedProto, ReflectedWave, Router, SetStrategy, TxRouter, UltraWave, Wave};
     use dashmap::DashMap;

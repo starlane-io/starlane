@@ -1,4 +1,4 @@
-use crate::command::command::common::PropertyMod;
+use crate::command::common::PropertyMod;
 use crate::parse::SkewerCase;
 use crate::{UniErr, Point, SetProperties};
 use core::str::FromStr;

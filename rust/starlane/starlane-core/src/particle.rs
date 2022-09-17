@@ -12,10 +12,10 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use cosmic_universe::id::id::{BaseKind, ToBaseKind, ToPoint};
-use cosmic_universe::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, UserBaseSubKind};
+use cosmic_universe::id2::id::{BaseKind, ToBaseKind, ToPoint};
+use cosmic_universe::id2::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, UserBaseSubKind};
 use cosmic_universe::parse::{consume_kind, CamelCase};
-use cosmic_universe::particle::particle::{Details, Property};
+use cosmic_universe::particle2::particle::{Details, Property};
 use cosmic_universe::hyper::{AssignmentKind, ChildRegistry, Location};
 use cosmic_nom::new_span;
 use mesh_portal::error::MsgErr;

@@ -2,15 +2,15 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use crate::{DriverFactory, PlatErr, Platform, Registry};
 use cosmic_universe::cli::RawCommand;
-use cosmic_universe::command::command::common::StateSrc;
+use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::request::create::{Create, PointSegTemplate, Strategy};
 use cosmic_universe::command::Command;
 use cosmic_universe::error::UniErr;
-use cosmic_universe::id::id::{GLOBAL_EXEC, Kind, Layer, Point, Port, ToPoint, ToPort};
+use cosmic_universe::id2::id::{GLOBAL_EXEC, Kind, Layer, Point, Port, ToPoint, ToPort};
 use cosmic_universe::log::{PointLogger, RootLogger};
 use cosmic_universe::parse::{bind_config, command_line};
 use cosmic_universe::parse::error::result;
-use cosmic_universe::particle::particle::{Details, Status};
+use cosmic_universe::particle2::particle::{Details, Status};
 use cosmic_universe::util::{log, ToResolved};
 use cosmic_universe::wave::{
     Agent, DirectedHandlerShell, DirectedProto, Exchanger, Handling, HypMethod, InCtx, Pong,
@@ -32,9 +32,9 @@ pub struct Global<P> where P: Platform {
 
 use crate::driver::{Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere};
 use crate::star::HyperStarSkel;
-use cosmic_universe::config::config::bind::{BindConfig, RouteSelector};
+use cosmic_universe::config2::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::parse::route_attribute;
-use cosmic_universe::substance::substance::Substance;
+use cosmic_universe::substance2::substance::Substance;
 use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance};
 use cosmic_universe::reg::Registration;
 use cosmic_universe::wave::CoreBounce;

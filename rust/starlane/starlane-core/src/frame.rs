@@ -3,7 +3,7 @@ use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 
-use cosmic_universe::id::StarKey;
+use cosmic_universe::id2::StarKey;
 use cosmic_universe::hyper::{Assign, ParticleRecord};
 use semver::SemVerError;
 use serde::{Deserialize, Serialize};

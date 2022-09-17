@@ -1,4 +1,4 @@
-use cosmic_universe::id::StarKey;
+use cosmic_universe::id2::StarKey;
 use cosmic_universe::hyper::ParticleRecord;
 use futures::channel::oneshot;
 use lru::LruCache;

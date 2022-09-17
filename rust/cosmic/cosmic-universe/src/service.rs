@@ -1,8 +1,8 @@
 use crate::error::UniErr;
-use crate::id::id::{Point, Topic};
+use crate::id2::id::{Point, Topic};
 use crate::wave::{Agent, DirectedCore, Method, Ping, Pong, ReflectedCore};
 
-use crate::config::config::bind::RouteSelector;
+use crate::config2::config::bind::RouteSelector;
 use crate::parse::model::MethodScopeSelector;
 use crate::security::Access;
 use crate::util::ValueMatcher;

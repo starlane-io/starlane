@@ -1,12 +1,12 @@
 use crate::error::UniErr;
-use crate::id::id::{
+use crate::id2::id::{
     BaseKind, Kind, KindParts, Layer, Point, Port, RouteSeg, Specific, Sub, ToPoint, ToPort,
 };
 use crate::log::{SpanLogger, Trackable};
 use crate::parse::error::result;
 use crate::parse::{CamelCase, parse_star_key};
-use crate::particle::particle::Stub;
-use crate::substance::substance::Substance;
+use crate::particle2::particle::Stub;
+use crate::substance2::substance::Substance;
 use crate::hyper::{ChildRegistry, ParticleRecord};
 use crate::wave::{DirectedWave, Ping, Pong, ReflectedWave, SingularDirectedWave, UltraWave, Wave};
 use alloc::fmt::format;
@@ -42,10 +42,10 @@ pub mod id {
     use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
     use tokio::sync::{mpsc, oneshot};
 
-    use crate::config::config::bind::RouteSelector;
+    use crate::config2::config::bind::RouteSelector;
     use crate::error::{ParseErrs, UniErr};
-    use crate::id::id::PointSegCtx::Working;
-    use crate::id::{
+    use crate::id2::id::PointSegCtx::Working;
+    use crate::id2::{
         ArtifactSubKind, DatabaseSubKind, FileSubKind, StarSub, Traversal,
         TraversalDirection, TraversalInjection, UserBaseSubKind,
     };
@@ -59,7 +59,7 @@ pub mod id {
     use crate::{Agent, ANONYMOUS, HYPERUSER};
 
     use crate::parse::error::result;
-    use crate::selector::selector::{
+    use crate::selector2::selector::{
         Pattern, PointHierarchy, Selector, SpecificSelector, VersionReq,
     };
     use crate::hyper::Location::Central;
@@ -3097,7 +3097,7 @@ impl TryFrom<Point> for StarKey {
 }
 
 impl ToPoint for StarKey {
-    fn to_point(&self) -> crate::id::id::Point {
+    fn to_point(&self) -> crate::id2::id::Point {
         Point::from_str(format!("<<{}>>::star", self.to_string()).as_str()).unwrap()
     }
 }

@@ -5,19 +5,19 @@ pub mod substance {
     use std::collections::HashMap;
     use std::ops::{Deref, DerefMut};
 
-    use crate::substance::Bin;
+    use crate::substance2::Bin;
     use crate::cli::RawCommand;
     use crate::command::request::{Rc, RcCommandType};
     use crate::command::Command;
     use crate::error::{ParseErrs, UniErr};
     use crate::http::HttpMethod;
-    use crate::id::id::{BaseKind, KindParts, Meta, Point, PointCtx, PointVar, Port};
+    use crate::id2::id::{BaseKind, KindParts, Meta, Point, PointCtx, PointVar, Port};
     use crate::log::Log;
     use crate::ext::ExtMethod;
     use crate::parse::model::Subst;
     use crate::parse::{CtxResolver, Env};
-    use crate::particle::particle::{Particle, Status, Stub};
-    use crate::selector::selector::{KindSelector, Selector};
+    use crate::particle2::particle::{Particle, Status, Stub};
+    use crate::selector2::selector::{KindSelector, Selector};
     use crate::hyper::{Greet, HyperSubstance, Knock};
     use crate::util::{ToResolved, uuid, ValueMatcher, ValuePattern};
     use crate::wave::{

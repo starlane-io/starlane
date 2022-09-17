@@ -3,15 +3,15 @@
 use chrono::{DateTime, Utc};
 use cosmic_universe::command::request::create::KindTemplate;
 use cosmic_universe::error::UniErr;
-use cosmic_universe::id::id::{BaseKind, Kind, Specific, ToBaseKind};
-use cosmic_universe::id::{
+use cosmic_universe::id2::id::{BaseKind, Kind, Specific, ToBaseKind};
+use cosmic_universe::id2::{
     ArtifactSubKind, BaseSubKind, FileSubKind, MachineName, StarKey, StarSub, UserBaseSubKind,
 };
 use cosmic_universe::property::{
     AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit,
     PropertySource, U64Pattern, UsernamePattern,
 };
-use cosmic_universe::substance::substance::Token;
+use cosmic_universe::substance2::substance::Token;
 use cosmic_universe::artifact::NoDiceArtifactFetcher;
 use cosmic_artifact::Artifacts;
 use cosmic_hyperlane::HyperGateSelector;

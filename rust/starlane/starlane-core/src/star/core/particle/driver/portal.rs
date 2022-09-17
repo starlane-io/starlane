@@ -13,8 +13,8 @@ use crate::star::core::particle::state::StateStore;
 use crate::star::StarSkel;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 
-use cosmic_universe::id::id::BaseKind;
-use cosmic_universe::id::ArtifactSubKind;
+use cosmic_universe::id2::id::BaseKind;
+use cosmic_universe::id2::ArtifactSubKind;
 use cosmic_universe::hyper::Assign;
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::id::Point;

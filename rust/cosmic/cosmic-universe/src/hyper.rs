@@ -1,13 +1,13 @@
 use crate::error::UniErr;
-use crate::id::id::{Kind, KindParts, Point, ToPoint, ToPort};
-use crate::particle::particle::{Details, Status, Stub};
-use crate::substance::substance::Substance;
+use crate::id2::id::{Kind, KindParts, Point, ToPoint, ToPort};
+use crate::particle2::particle::{Details, Status, Stub};
+use crate::substance2::substance::Substance;
 use cosmic_macros_primitive::Autobox;
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 
-use crate::command::command::common::StateSrc;
-use crate::id::{StarKey, StarSub};
+use crate::command::common::StateSrc;
+use crate::id2::{StarKey, StarSub};
 use crate::log::Log;
 use crate::wave::{CmdMethod, DirectedCore, Ping, Pong, ReflectedKind, ReflectedProto, HypMethod, ToRecipients, UltraWave, Wave, WaveId, WaveKind};
 use crate::{Agent, Port, ReflectedCore};

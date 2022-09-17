@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use cosmic_universe::id::StarKey;
+use cosmic_universe::id2::StarKey;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 

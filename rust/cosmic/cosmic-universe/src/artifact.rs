@@ -3,7 +3,7 @@ use tokio::sync::RwLock;
 use lru::LruCache;
 use std::ops::Deref;
 use crate::{BindConfig, Point, Stub, UniErr};
-use crate::substance::Bin;
+use crate::substance2::Bin;
 use serde::{Serialize,Deserialize};
 
 #[derive(Clone)]

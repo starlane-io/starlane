@@ -6,15 +6,15 @@ use crate::databases::lookup_registry_db;
 use crate::particle::properties_config;
 use cosmic_universe::command::request::delete::Delete;
 use cosmic_universe::command::request::select::{SelectKind, SubSelect};
-use cosmic_universe::id::id::{BaseKind, Kind, Tks};
-use cosmic_universe::id::{ArtifactSubKind, BaseSubKind, FileSubKind, UserBaseSubKind};
+use cosmic_universe::id2::id::{BaseKind, Kind, Tks};
+use cosmic_universe::id2::{ArtifactSubKind, BaseSubKind, FileSubKind, UserBaseSubKind};
 use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
-use cosmic_universe::particle::particle::Details;
+use cosmic_universe::particle2::particle::Details;
 use cosmic_universe::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask,
     PermissionsMaskKind, Privilege, Privileges,
 };
-use cosmic_universe::selector::selector::SubKindSelector;
+use cosmic_universe::selector2::selector::SubKindSelector;
 use cosmic_universe::hyper::{Location, ParticleRecord};
 use futures::{FutureExt, StreamExt};
 use mesh_portal::error::MsgErr;
@@ -1183,8 +1183,8 @@ pub mod test {
     use crate::registry::{Registration, Registry};
     use cosmic_universe::command::request::select::SelectKind;
     use cosmic_universe::entity::request::select::SelectKind;
-    use cosmic_universe::id::id::{Kind, ToPoint};
-    use cosmic_universe::id::UserBaseSubKind;
+    use cosmic_universe::id2::id::{Kind, ToPoint};
+    use cosmic_universe::id2::UserBaseSubKind;
     use cosmic_universe::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
         Privilege,

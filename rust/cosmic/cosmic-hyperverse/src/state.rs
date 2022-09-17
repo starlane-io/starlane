@@ -1,6 +1,6 @@
-use cosmic_universe::id::id;
-use cosmic_universe::id::id::{Point, Uuid};
-use cosmic_universe::particle::particle::Details;
+use cosmic_universe::id2::id;
+use cosmic_universe::id2::id::{Point, Uuid};
+use cosmic_universe::particle2::particle::Details;
 use cosmic_universe::wave::WaveId;
 use cosmic_universe::state::State;
 use dashmap::{DashMap, DashSet};

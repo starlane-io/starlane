@@ -8,7 +8,7 @@ use crate::star::core::particle::driver::ParticleCoreDriver;
 use crate::star::StarSkel;
 use alcoholic_jwt::{token_kid, JWKS};
 use cosmic_universe::command::Command;
-use cosmic_universe::id::id::{BaseKind, Kind};
+use cosmic_universe::id2::id::{BaseKind, Kind};
 use cosmic_universe::parse::skewer_or_snake;
 use cosmic_universe::hyper::Assign;
 use http::StatusCode;

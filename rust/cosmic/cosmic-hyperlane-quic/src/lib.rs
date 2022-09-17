@@ -2,10 +2,10 @@
 
 use std::io;
 use cosmic_universe::error::{UniErr, StatusErr};
-use cosmic_universe::frame::frame::PrimitiveFrame;
-use cosmic_universe::id::id::{Point, ToPort};
+use cosmic_universe::frame2::frame::PrimitiveFrame;
+use cosmic_universe::id2::id::{Point, ToPort};
 use cosmic_universe::log::PointLogger;
-use cosmic_universe::substance::substance::Substance;
+use cosmic_universe::substance2::substance::Substance;
 use cosmic_universe::hyper::{Knock, HyperSubstance};
 use cosmic_universe::wave::{DirectedCore, DirectedProto, Pong, HypMethod, UltraWave, Wave};
 use cosmic_universe::VERSION;

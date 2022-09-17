@@ -1,6 +1,6 @@
-use crate::command::command::common::StateSrc::Substance;
+use crate::command::common::StateSrc::Substance;
 use crate::error::UniErr;
-use crate::id::id::{Point, ToPoint, Uuid};
+use crate::id2::id::{Point, ToPoint, Uuid};
 use crate::parse::{CamelCase, to_string};
 use crate::util::{timestamp, uuid};
 use crate::{cosmic_timestamp, Selector};

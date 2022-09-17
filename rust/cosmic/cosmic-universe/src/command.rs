@@ -1,160 +1,158 @@
-use crate::command::request::create::{Create, CreateCtx, CreateVar, Strategy};
-use crate::command::request::delete::{Delete, DeleteCtx, DeleteVar};
-use crate::command::request::get::{Get, GetCtx, GetVar};
-use crate::command::request::read::{Read, ReadCtx, ReadVar};
-use crate::command::request::select::{Select, SelectCtx, SelectVar};
-use crate::command::request::set::{Set, SetCtx, SetVar};
-use crate::command::request::update::{Update, UpdateCtx, UpdateVar};
-use crate::error::UniErr;
-use crate::parse::error::result;
-use crate::parse::{command_line, Env};
-use crate::substance::substance::ChildSubstance;
-use crate::util::ToResolved;
-use crate::wave::CmdMethod;
 use core::str::FromStr;
+
 use cosmic_macros_primitive::Autobox;
 use cosmic_nom::new_span;
 use nom::combinator::all_consuming;
-use serde::{Deserialize, Serialize};
+use request::create::{Create, CreateCtx, CreateVar};
+use request::delete::{DeleteCtx, DeleteVar};
+use request::get::{Get, GetCtx, GetVar};
+use request::read::{Read, ReadCtx, ReadVar};
+use request::select::{SelectCtx, SelectVar};
+use request::set::{Set, SetCtx, SetVar};
+use request::update::{Update, UpdateCtx, UpdateVar};
+use crate::parse::{command_line, Env};
+use crate::parse::error::result;
+use crate::substance2::substance::ChildSubstance;
+use crate::{Delete, Select, UniErr};
+use crate::util::ToResolved;
+use crate::wave::CmdMethod;
+use serde::{Serialize,Deserialize};
 
-pub mod command {
+pub mod common {
+    use std::collections::HashMap;
+    use std::convert::{TryFrom, TryInto};
+    use std::ops::{Deref, DerefMut};
+
     use serde::{Deserialize, Serialize};
 
-    pub mod common {
-        use std::collections::HashMap;
-        use std::convert::{TryFrom, TryInto};
-        use std::ops::{Deref, DerefMut};
+    use crate::error::UniErr;
+    use crate::id2::id::Variable;
+    use crate::parse::model::Var;
+    use crate::substance2::substance::{Substance, SubstanceMap};
 
-        use serde::{Deserialize, Serialize};
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
+    pub enum StateSrcVar {
+        None,
+        FileRef(String),
+        Var(Variable),
+    }
 
-        use crate::error::UniErr;
-        use crate::id::id::Variable;
-        use crate::parse::model::Var;
-        use crate::substance::substance::{Substance, SubstanceMap};
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
+    pub enum StateSrc {
+        None,
+        Substance(Box<Substance>),
+    }
 
-        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
-        pub enum StateSrcVar {
-            None,
-            FileRef(String),
-            Var(Variable),
-        }
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+    pub enum PropertyMod {
+        Set {
+            key: String,
+            value: String,
+            lock: bool,
+        },
+        UnSet(String),
+    }
 
-        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
-        pub enum StateSrc {
-            None,
-            Substance(Box<Substance>),
-        }
-
-        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-        pub enum PropertyMod {
-            Set {
-                key: String,
-                value: String,
-                lock: bool,
-            },
-            UnSet(String),
-        }
-
-        impl PropertyMod {
-            pub fn set_or<E>(&self, err: E) -> Result<String, E> {
-                match self {
-                    Self::Set { key, value, lock } => Ok(value.clone()),
-                    Self::UnSet(_) => Err(err),
-                }
-            }
-
-            pub fn opt(&self) -> Option<String> {
-                match self {
-                    Self::Set { key, value, lock } => Some(value.clone()),
-                    Self::UnSet(_) => None,
-                }
+    impl PropertyMod {
+        pub fn set_or<E>(&self, err: E) -> Result<String, E> {
+            match self {
+                Self::Set { key, value, lock } => Ok(value.clone()),
+                Self::UnSet(_) => Err(err),
             }
         }
 
-        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-        pub struct SetProperties {
-            pub map: HashMap<String, PropertyMod>,
-        }
-
-        impl Default for SetProperties {
-            fn default() -> Self {
-                Self {
-                    map: Default::default(),
-                }
+        pub fn opt(&self) -> Option<String> {
+            match self {
+                Self::Set { key, value, lock } => Some(value.clone()),
+                Self::UnSet(_) => None,
             }
         }
+    }
 
-        impl SetProperties {
-            pub fn new() -> Self {
-                Self {
-                    map: HashMap::new(),
-                }
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+    pub struct SetProperties {
+        pub map: HashMap<String, PropertyMod>,
+    }
+
+    impl Default for SetProperties {
+        fn default() -> Self {
+            Self {
+                map: Default::default(),
             }
+        }
+    }
 
-            pub fn append(&mut self, properties: SetProperties) {
-                for (_, property) in properties.map.into_iter() {
-                    self.push(property);
-                }
+    impl SetProperties {
+        pub fn new() -> Self {
+            Self {
+                map: HashMap::new(),
             }
+        }
 
-            pub fn push(&mut self, property: PropertyMod) {
-                match &property {
-                    PropertyMod::Set { key, value, lock } => {
-                        self.map.insert(key.clone(), property);
-                    }
-                    PropertyMod::UnSet(key) => {
-                        self.map.insert(key.clone(), property);
-                    }
+        pub fn append(&mut self, properties: SetProperties) {
+            for (_, property) in properties.map.into_iter() {
+                self.push(property);
+            }
+        }
+
+        pub fn push(&mut self, property: PropertyMod) {
+            match &property {
+                PropertyMod::Set { key, value, lock } => {
+                    self.map.insert(key.clone(), property);
+                }
+                PropertyMod::UnSet(key) => {
+                    self.map.insert(key.clone(), property);
                 }
             }
         }
+    }
 
-        impl Deref for SetProperties {
-            type Target = HashMap<String, PropertyMod>;
+    impl Deref for SetProperties {
+        type Target = HashMap<String, PropertyMod>;
 
-            fn deref(&self) -> &Self::Target {
-                &self.map
-            }
+        fn deref(&self) -> &Self::Target {
+            &self.map
         }
+    }
 
-        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
-        pub enum SetLabel {
-            Set(String),
-            SetValue { key: String, value: String },
-            Unset(String),
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
+    pub enum SetLabel {
+        Set(String),
+        SetValue { key: String, value: String },
+        Unset(String),
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+    pub struct SetRegistry {
+        pub labels: Vec<SetLabel>,
+    }
+
+    impl Deref for SetRegistry {
+        type Target = Vec<SetLabel>;
+
+        fn deref(&self) -> &Self::Target {
+            &self.labels
         }
+    }
 
-        #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-        pub struct SetRegistry {
-            pub labels: Vec<SetLabel>,
+    impl DerefMut for SetRegistry {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.labels
         }
+    }
 
-        impl Deref for SetRegistry {
-            type Target = Vec<SetLabel>;
-
-            fn deref(&self) -> &Self::Target {
-                &self.labels
-            }
-        }
-
-        impl DerefMut for SetRegistry {
-            fn deref_mut(&mut self) -> &mut Self::Target {
-                &mut self.labels
-            }
-        }
-
-        impl Default for SetRegistry {
-            fn default() -> Self {
-                Self {
-                    labels: Default::default(),
-                }
+    impl Default for SetRegistry {
+        fn default() -> Self {
+            Self {
+                labels: Default::default(),
             }
         }
     }
 }
 
+
 pub mod request {
-    use crate::substance::Bin;
+    use crate::substance2::Bin;
     use crate::command::request::create::Create;
     use crate::command::request::get::Get;
     use crate::command::request::select::Select;
@@ -164,10 +162,10 @@ pub mod request {
     use crate::fail;
     use crate::fail::{BadRequest, Fail, NotFound};
     use crate::http::HttpMethod;
-    use crate::id::id::{BaseKind, KindParts, Meta, Point};
+    use crate::id2::id::{BaseKind, KindParts, Meta, Point};
     use crate::ext::ExtMethod;
-    use crate::selector::selector::KindSelector;
-    use crate::substance::substance::{Errors, Substance};
+    use crate::selector2::selector::KindSelector;
+    use crate::substance2::substance::{Errors, Substance};
     use crate::util::{ValueMatcher, ValuePattern};
     use crate::wave::MethodKind;
     use crate::wave::ReflectedCore;
@@ -256,9 +254,9 @@ pub mod request {
     }
 
     pub mod set {
-        use crate::command::command::common::SetProperties;
+        use crate::command::common::SetProperties;
         use crate::error::UniErr;
-        use crate::id::id::{Point, PointCtx, PointVar};
+        use crate::id2::id::{Point, PointCtx, PointVar};
         use crate::parse::Env;
         use crate::util::ToResolved;
         use serde::{Deserialize, Serialize};
@@ -300,9 +298,9 @@ pub mod request {
     }
 
     pub mod get {
-        use crate::command::command::common::SetProperties;
+        use crate::command::common::SetProperties;
         use crate::error::UniErr;
-        use crate::id::id::{Point, PointCtx, PointVar};
+        use crate::id2::id::{Point, PointCtx, PointVar};
         use crate::parse::Env;
         use crate::util::ToResolved;
         use serde::{Deserialize, Serialize};
@@ -357,20 +355,20 @@ pub mod request {
         use serde::{Deserialize, Serialize};
         use tokio::sync::Mutex;
 
-        use crate::substance::Bin;
-        use crate::command::command::common::{SetProperties, SetRegistry, StateSrc, StateSrcVar};
+        use crate::substance2::Bin;
+        use crate::command::common::{SetProperties, SetRegistry, StateSrc, StateSrcVar};
         use crate::command::Command;
-        use crate::error::{UniErr, ParseErrs};
-        use crate::id::id::{
+        use crate::error::{ParseErrs, UniErr};
+        use crate::id2::id::{
             BaseKind, HostKey, KindParts, Point, PointCtx, PointSeg, PointVar, ToPort,
         };
         use crate::ext::ExtMethod;
         use crate::parse::{CamelCase, Env, ResolverErr};
         use crate::parse::model::Subst;
-        use crate::selector::selector::SpecificSelector;
-        use crate::substance::substance::Substance;
+        use crate::selector2::selector::SpecificSelector;
+        use crate::substance2::substance::Substance;
         use crate::util::{ConvertFrom, ToResolved};
-        use crate::wave::{CmdMethod, DirectedCore, DirectedProto, Ping, HypMethod, Wave};
+        use crate::wave::{CmdMethod, DirectedCore, DirectedProto, HypMethod, Ping, Wave};
 
         pub enum PointTemplateSeg {
             ExactSeg(PointSeg),
@@ -694,13 +692,13 @@ pub mod request {
 
         use crate::error::UniErr;
         use crate::fail::{BadCoercion, Fail};
-        use crate::id::id::Point;
+        use crate::id2::id::Point;
         use crate::parse::Env;
-        use crate::particle::particle::Stub;
-        use crate::selector::selector::{
+        use crate::particle2::particle::Stub;
+        use crate::selector2::selector::{
             Hop, HopCtx, HopVar, PointHierarchy, Selector, SelectorDef,
         };
-        use crate::substance::substance::{MapPattern, Substance, SubstanceList};
+        use crate::substance2::substance::{MapPattern, Substance, SubstanceList};
         use crate::util::{ConvertFrom, ToResolved};
 
         #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -863,7 +861,7 @@ pub mod request {
         use crate::command::request::select::{PropertiesPattern, Select, SelectIntoSubstance};
         use crate::error::UniErr;
         use crate::parse::Env;
-        use crate::selector::selector::{Hop, SelectorDef};
+        use crate::selector2::selector::{Hop, SelectorDef};
         use crate::util::ToResolved;
         use serde::{Deserialize, Serialize};
 
@@ -896,11 +894,11 @@ pub mod request {
 
         use serde::{Deserialize, Serialize};
 
-        use crate::command::command::common::SetProperties;
+        use crate::command::common::SetProperties;
         use crate::error::UniErr;
-        use crate::id::id::{Point, PointCtx, PointVar};
+        use crate::id2::id::{Point, PointCtx, PointVar};
         use crate::parse::Env;
-        use crate::substance::substance::Substance;
+        use crate::substance2::substance::Substance;
         use crate::util::ToResolved;
 
         pub type Update = UpdateDef<Point>;
@@ -934,9 +932,9 @@ pub mod request {
 
     pub mod read {
         use crate::error::UniErr;
-        use crate::id::id::{Point, PointCtx, PointVar};
+        use crate::id2::id::{Point, PointCtx, PointVar};
         use crate::parse::Env;
-        use crate::substance::substance::Substance;
+        use crate::substance2::substance::Substance;
         use crate::util::ToResolved;
         use serde::{Deserialize, Serialize};
 
@@ -976,7 +974,7 @@ pub mod request {
 
         use crate::command::request::Rc;
         use crate::error::UniErr;
-        use crate::selector::selector::PointHierarchy;
+        use crate::selector2::selector::PointHierarchy;
 
         #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub enum Query {

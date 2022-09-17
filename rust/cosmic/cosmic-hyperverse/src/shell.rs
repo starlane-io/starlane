@@ -3,12 +3,12 @@ use crate::state::ShellState;
 use crate::{PlatErr, Platform};
 use cosmic_universe::cli::RawCommand;
 use cosmic_universe::command::Command;
-use cosmic_universe::config::config::bind::RouteSelector;
+use cosmic_universe::config2::config::bind::RouteSelector;
 use cosmic_universe::error::UniErr;
-use cosmic_universe::id::id::{
+use cosmic_universe::id2::id::{
     Layer, Point, Port, PortSelector, ToPoint, ToPort, Topic, TraversalLayer, Uuid,
 };
-use cosmic_universe::id::{Traversal, TraversalDirection, TraversalInjection};
+use cosmic_universe::id2::{Traversal, TraversalDirection, TraversalInjection};
 use cosmic_universe::log::{PointLogger, RootLogger, Trackable};
 use cosmic_universe::parse::error::result;
 use cosmic_universe::parse::{command_line, route_attribute, Env};

@@ -14,8 +14,8 @@ use crate::message::{
 };
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use cosmic_universe::id::id::{ToPoint, ToPort};
-use cosmic_universe::id::StarKey;
+use cosmic_universe::id2::id::{ToPoint, ToPort};
+use cosmic_universe::id2::StarKey;
 use cosmic_universe::hyper::ParticleRecord;
 use dashmap::DashMap;
 use mesh_portal::version::latest::id::Point;

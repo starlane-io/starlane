@@ -1,6 +1,6 @@
 #![allow(warnings)]
 
-use cosmic_universe::command::command::common::{PropertyMod, SetProperties, SetRegistry};
+use cosmic_universe::command::common::{PropertyMod, SetProperties, SetRegistry};
 use cosmic_universe::command::request::create::{Create, KindTemplate, PointSegTemplate, Strategy};
 use cosmic_universe::command::request::delete::Delete;
 use cosmic_universe::command::request::get::{Get, GetOp};
@@ -8,21 +8,21 @@ use cosmic_universe::command::request::query::{Query, QueryResult};
 use cosmic_universe::command::request::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
 use cosmic_universe::command::request::set::Set;
 use cosmic_universe::error::UniErr;
-use cosmic_universe::id::id::{
+use cosmic_universe::id2::id::{
     BaseKind, Kind, KindParts, Point, PointSeg, Specific, ToBaseKind, Version,
 };
-use cosmic_universe::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, UserBaseSubKind};
+use cosmic_universe::id2::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, UserBaseSubKind};
 use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
-use cosmic_universe::particle::particle::{Details, Properties, Property, Status, Stub};
+use cosmic_universe::particle2::particle::{Details, Properties, Property, Status, Stub};
 use cosmic_universe::security::{Access, AccessGrant, AccessGrantKind, EnumeratedAccess, IndexedAccessGrant, Permissions, PermissionsMask, PermissionsMaskKind, Privilege, Privileges};
-use cosmic_universe::selector::selector::specific::{
+use cosmic_universe::selector2::selector::specific::{
     ProductSelector, ProviderSelector, VariantSelector, VendorSelector,
 };
-use cosmic_universe::selector::selector::{
+use cosmic_universe::selector2::selector::{
     ExactPointSeg, KindBaseSelector, PointHierarchy, PointKindSeg, PointSegSelector, Selector,
     SubKindSelector,
 };
-use cosmic_universe::substance::substance::{Substance, SubstanceList, SubstanceMap};
+use cosmic_universe::substance2::substance::{Substance, SubstanceList, SubstanceMap};
 use cosmic_universe::hyper::{Location, ParticleRecord};
 use cosmic_universe::util::ValuePattern;
 use cosmic_universe::HYPERUSER;
@@ -1140,14 +1140,14 @@ pub mod test {
     use cosmic_universe::command::request::query::Query;
     use cosmic_universe::command::request::select::{Select, SelectIntoSubstance, SelectKind};
     use cosmic_universe::entity::request::select::SelectKind;
-    use cosmic_universe::id::id::{Kind, Point, ToPoint};
-    use cosmic_universe::id::{StarKey, UserBaseSubKind};
-    use cosmic_universe::particle::particle::Status;
+    use cosmic_universe::id2::id::{Kind, Point, ToPoint};
+    use cosmic_universe::id2::{StarKey, UserBaseSubKind};
+    use cosmic_universe::particle2::particle::Status;
     use cosmic_universe::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
         Privilege,
     };
-    use cosmic_universe::selector::selector::{PointHierarchy, Selector};
+    use cosmic_universe::selector2::selector::{PointHierarchy, Selector};
     use cosmic_universe::reg::Registration;
     use cosmic_hyperverse::RegistryApi;
     use mesh_portal::version::latest::entity::request::query::Query;

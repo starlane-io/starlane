@@ -1,8 +1,8 @@
 use crate::error::UniErr;
-use crate::id::id::Point;
+use crate::id2::id::Point;
 use crate::parse::error::result;
 use crate::parse::{MapResolver, particle_perms, permissions, permissions_mask, privilege};
-use crate::selector::selector::{PointHierarchy, Selector};
+use crate::selector2::selector::{PointHierarchy, Selector};
 use crate::wave::ScopeGrant;
 use cosmic_nom::new_span;
 use nom::combinator::all_consuming;

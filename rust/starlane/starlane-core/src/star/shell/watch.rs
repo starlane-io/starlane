@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::future::Future;
 
-use cosmic_universe::id::id::ToPoint;
-use cosmic_universe::id::StarKey;
+use cosmic_universe::id2::id::ToPoint;
+use cosmic_universe::id2::StarKey;
 use mysql::uuid::Uuid;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, oneshot};

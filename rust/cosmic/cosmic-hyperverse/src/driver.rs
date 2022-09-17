@@ -4,19 +4,19 @@ use crate::star::{
     HyperStarSkel, LayerInjectionRouter, StarDriver, StarDriverFactory, StarState, StateApi, StateCall,
 };
 use crate::{PlatErr, Platform, Registry, RegistryApi};
-use cosmic_universe::command::command::common::{SetProperties, StateSrc};
+use cosmic_universe::command::common::{SetProperties, StateSrc};
 use cosmic_universe::command::request::create::{Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template};
-use cosmic_universe::config::config::bind::{BindConfig, RouteSelector};
+use cosmic_universe::config2::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::error::UniErr;
-use cosmic_universe::id::id::{
+use cosmic_universe::id2::id::{
     BaseKind, Kind, Layer, Point, Port, ToBaseKind, ToPoint, ToPort, TraversalLayer, Uuid,
 };
-use cosmic_universe::id::{StarKey, StarSub, Traversal, TraversalInjection};
+use cosmic_universe::id2::{StarKey, StarSub, Traversal, TraversalInjection};
 use cosmic_universe::log::{PointLogger, Tracker};
 use cosmic_universe::parse::model::Subst;
 use cosmic_universe::parse::{bind_config, route_attribute};
-use cosmic_universe::particle::particle::{Details, Status, Stub};
-use cosmic_universe::substance::substance::Substance;
+use cosmic_universe::particle2::particle::{Details, Status, Stub};
+use cosmic_universe::substance2::substance::Substance;
 use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance};
 use cosmic_universe::util::{log, ValuePattern};
 use cosmic_universe::wave::{Agent, Bounce, CmdMethod, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, DirectedWave, Exchanger, HypMethod, InCtx, Method, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, UltraWave, Wave, WaveKind};
@@ -924,7 +924,7 @@ impl<P> TraversalLayer for ItemOuter<P>
 where
     P: Platform,
 {
-    fn port(&self) -> cosmic_universe::id::id::Port {
+    fn port(&self) -> cosmic_universe::id2::id::Port {
         self.port.clone()
     }
 

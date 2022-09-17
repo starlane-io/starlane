@@ -1,6 +1,6 @@
-use crate::id::id::Point;
-use crate::particle::particle::Stub;
-use crate::substance::substance::Substance;
+use crate::id2::id::Point;
+use crate::particle2::particle::Stub;
+use crate::substance2::substance::Substance;
 
 pub mod particle {
     use std::collections::{HashMap, HashSet};
@@ -19,10 +19,10 @@ pub mod particle {
     use serde::{Deserialize, Serialize};
 
     use crate::error::UniErr;
-    use crate::id::id::{BaseKind, Kind, KindParts, Point, PointKind};
+    use crate::id2::id::{BaseKind, Kind, KindParts, Point, PointKind};
     use crate::parse::parse_alpha1_str;
     use crate::security::Permissions;
-    use crate::substance::substance::{Substance, SubstanceMap};
+    use crate::substance2::substance::{Substance, SubstanceMap};
     use cosmic_nom::{Res, Span};
 
     #[derive(Debug, Clone, Serialize, Deserialize)]

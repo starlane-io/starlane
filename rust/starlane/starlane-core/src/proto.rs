@@ -4,7 +4,7 @@ use std::convert::TryInto;
 use std::sync::atomic::{AtomicI32, AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
 
-use cosmic_universe::id::StarKey;
+use cosmic_universe::id2::StarKey;
 use cosmic_universe::log::LogSource;
 use futures::future::select_all;
 use futures::prelude::*;

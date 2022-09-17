@@ -10,21 +10,21 @@ use crate::machine::MachineSkel;
 use crate::shell::Shell;
 use crate::state::ShellState;
 use crate::{DriversBuilder, PlatErr, Platform, Registry, RegistryApi};
-use cosmic_universe::substance::Bin;
+use cosmic_universe::substance2::Bin;
 use cosmic_universe::cli::RawCommand;
-use cosmic_universe::command::command::common::StateSrc;
+use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::request::create::{Create, Strategy};
 use cosmic_universe::command::request::set::Set;
-use cosmic_universe::config::config::bind::{BindConfig, RouteSelector};
+use cosmic_universe::config2::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::error::UniErr;
-use cosmic_universe::id::id::{BaseKind, GLOBAL_EXEC, Kind, Layer, LOCAL_STAR, Point, Port, PortSelector, RouteSeg, Sub, ToBaseKind, Topic, ToPoint, ToPort, TraversalLayer, Uuid};
-use cosmic_universe::id::{StarKey, StarStub, StarSub, TraversalInjection};
-use cosmic_universe::id::{Traversal, TraversalDirection};
+use cosmic_universe::id2::id::{BaseKind, GLOBAL_EXEC, Kind, Layer, LOCAL_STAR, Point, Port, PortSelector, RouteSeg, Sub, ToBaseKind, Topic, ToPoint, ToPort, TraversalLayer, Uuid};
+use cosmic_universe::id2::{StarKey, StarStub, StarSub, TraversalInjection};
+use cosmic_universe::id2::{Traversal, TraversalDirection};
 use cosmic_universe::log::{PointLogger, RootLogger, Trackable, Tracker};
 use cosmic_universe::parse::{bind_config, Env, route_attribute};
-use cosmic_universe::particle::particle::{Details, Status, Stub};
+use cosmic_universe::particle2::particle::{Details, Status, Stub};
 use cosmic_universe::quota::Timeouts;
-use cosmic_universe::substance::substance::{Substance, ToSubstance};
+use cosmic_universe::substance2::substance::{Substance, ToSubstance};
 use cosmic_universe::hyper::{
     Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, Location, ParticleRecord, Provision,
     Search,

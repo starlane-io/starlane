@@ -1,7 +1,7 @@
 use crate::error::UniErr;
-use crate::id::id::{Point, PointCtx, PointVar};
+use crate::id2::id::{Point, PointCtx, PointVar};
 use crate::parse::{CtxResolver, Env};
-use crate::substance::substance::{
+use crate::substance2::substance::{
     Substance, SubstancePattern, SubstancePatternCtx, SubstancePatternDef,
 };
 use crate::util::{ToResolved, ValuePattern};
@@ -22,7 +22,7 @@ pub mod selector {
     use crate::error::UniErr;
 
     use crate::command::request::{Rc, RcCommandType};
-    use crate::id::id::{
+    use crate::id2::id::{
         BaseKind, Kind, KindParts, Layer, Point, PointCtx, PointSeg, PointSegKind, PointVar, Port,
         RouteSeg, Specific, Sub, Tks, ToBaseKind, Topic, VarVal, Variable, Version,
     };
@@ -30,10 +30,10 @@ pub mod selector {
     use crate::parse::error::result;
     use crate::parse::model::Var;
     use crate::parse::{camel_case_chars, camel_case_to_string_matcher, consume_hierarchy, file_chars, path, path_regex, point_segment_selector, point_selector, CamelCase, Env, specific_selector};
-    use crate::selector::selector::specific::{
+    use crate::selector2::selector::specific::{
         ProductSelector, ProviderSelector, VariantSelector, VendorSelector,
     };
-    use crate::substance::substance::{
+    use crate::substance2::substance::{
         Call, CallKind, CallWithConfig, CallWithConfigDef, HttpCall, ListPattern, MapPattern,
         ExtCall, NumRange, Substance, SubstanceFormat, SubstanceKind, SubstancePattern,
         SubstancePatternDef, SubstanceTypePatternDef,
@@ -580,7 +580,7 @@ pub mod selector {
     pub mod specific {
         use crate::error::UniErr;
         use crate::parse::{Domain, SkewerCase};
-        use crate::selector::selector::Pattern;
+        use crate::selector2::selector::Pattern;
         use alloc::string::String;
         use core::ops::Deref;
         use core::str::FromStr;

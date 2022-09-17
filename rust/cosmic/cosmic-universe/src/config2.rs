@@ -5,11 +5,11 @@ pub mod config {
 
     use serde::{Deserialize, Serialize};
 
-    use crate::config::config::bind::BindConfig;
-    use crate::id::id::{KindParts, Point};
+    use crate::config2::config::bind::BindConfig;
+    use crate::id2::id::{KindParts, Point};
     use crate::parse::model::{MethodScope, RouteScope, WaveScope};
-    use crate::particle::particle;
-    use crate::particle::particle::{Details, Stub};
+    use crate::particle2::particle;
+    use crate::particle2::particle::{Details, Stub};
     use crate::util::ValueMatcher;
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,9 +79,9 @@ pub mod config {
     pub mod bind {
         use crate::command::request::Rc;
         use crate::error::{UniErr, ParseErrs};
-        use crate::id::id::{Point, PointCtx, PointVar, Topic};
-        use crate::substance::substance::{Call, CallDef};
-        use crate::substance::substance::{Substance, SubstancePattern};
+        use crate::id2::id::{Point, PointCtx, PointVar, Topic};
+        use crate::substance2::substance::{Call, CallDef};
+        use crate::substance2::substance::{Substance, SubstancePattern};
         use crate::wave::{
             DirectedCore, DirectedWave, MethodKind, MethodPattern, Ping, RecipientSelector,
             SingularDirectedWave, Wave,
@@ -92,7 +92,7 @@ pub mod config {
             ScopeFilters, WaveScope,
         };
         use crate::parse::{bind_config, Env};
-        use crate::selector::{PayloadBlock, PayloadBlockDef};
+        use crate::selector2::{PayloadBlock, PayloadBlockDef};
         use crate::util::{ToResolved, ValueMatcher, ValuePattern};
         use regex::Regex;
         use serde::{Deserialize, Serialize};
