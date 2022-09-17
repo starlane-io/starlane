@@ -78,7 +78,6 @@ cosmic-nom={ path="../../cosmic/cosmic-nom"}
 cosmic-macros={ path="../../cosmic/cosmic-macros"}
 cosmic-hyperverse={ path= "../../cosmic/cosmic-hyperverse" }
 cosmic-universe = { path= "../../cosmic/cosmic-universe" }
-cosmic-store ={ path= "../../cosmic/cosmic-store", default-features=true }
 
 async-recursion = "1.0.0"
 
