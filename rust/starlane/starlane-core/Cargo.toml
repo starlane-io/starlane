@@ -75,7 +75,6 @@ alcoholic_jwt = "1.0.1"
 base64 = "0.13.0"
 
 cosmic-nom={ path="../../cosmic/cosmic-nom"}
-cosmic-portal-cli={ path="../../cosmic/cosmic-portal-cli"}
 cosmic-macros={ path="../../cosmic/cosmic-macros"}
 cosmic-hyperverse={ path= "../../cosmic/cosmic-hyperverse" }
 cosmic-universe = { path= "../../cosmic/cosmic-universe" }
