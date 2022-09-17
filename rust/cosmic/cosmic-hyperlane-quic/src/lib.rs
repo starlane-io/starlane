@@ -2,7 +2,7 @@
 
 use std::io;
 use cosmic_universe::error::{UniErr, StatusErr};
-use cosmic_universe::frame2::frame::PrimitiveFrame;
+use cosmic_universe::frame::PrimitiveFrame;
 use cosmic_universe::id2::id::{};
 use cosmic_universe::log::PointLogger;
 use cosmic_universe::substance2::substance::Substance;

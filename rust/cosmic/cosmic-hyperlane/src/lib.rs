@@ -2,7 +2,7 @@
 
 use cosmic_universe::command::request::create::{PointFactory, PointFactoryU64, PointSegTemplate};
 use cosmic_universe::error::UniErr;
-use cosmic_universe::frame2::frame::PrimitiveFrame;
+use cosmic_universe::frame::PrimitiveFrame;
 use cosmic_universe::log::{PointLogger, RootLogger};
 use cosmic_universe::ext::ExtMethod;
 use cosmic_universe::particle::Status;

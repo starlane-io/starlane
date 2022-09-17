@@ -16,7 +16,6 @@ use serde::{Deserialize, Serialize};
 
 pub mod cli;
 pub mod error;
-pub mod frame2;
 pub mod http;
 pub mod log;
 pub mod ext;
@@ -40,6 +39,7 @@ pub mod command;
 pub mod config;
 pub mod id;
 pub mod particle;
+pub mod frame;
 
 
 use substance2::Bin;
