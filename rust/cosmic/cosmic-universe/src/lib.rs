@@ -38,14 +38,15 @@ pub mod particle;
 pub mod frame;
 pub mod selector;
 pub mod substance;
+pub mod kind;
 
 
 use substance::Bin;
 use command::common::{SetProperties, SetRegistry};
-use command::request::create::{KindTemplate, Strategy};
-use command::request::delete::Delete;
-use command::request::query::{Query, QueryResult};
-use command::request::select::{Select, SubSelect};
+use command::direct::create::{KindTemplate, Strategy};
+use command::direct::delete::Delete;
+use command::direct::query::{Query, QueryResult};
+use command::direct::select::{Select, SubSelect};
 use config::bind::BindConfig;
 use config::Document;
 use crate::error::UniErr;

@@ -5,7 +5,7 @@ use crate::star::{
 };
 use crate::{PlatErr, Platform, Registry, RegistryApi};
 use cosmic_universe::command::common::{SetProperties, StateSrc};
-use cosmic_universe::command::request::create::{Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template};
+use cosmic_universe::command::direct::create::{Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template};
 use cosmic_universe::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::error::UniErr;
 use cosmic_universe::log::{PointLogger, Tracker};

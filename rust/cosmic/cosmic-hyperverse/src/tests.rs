@@ -25,7 +25,7 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{Mutex, oneshot};
 use tokio::time::error::Elapsed;
 use cosmic_universe::artifact::NoDiceArtifactFetcher;
-use cosmic_universe::command::request::create::{Create, PointSegTemplate, PointTemplate, Strategy, Template};
+use cosmic_universe::command::direct::create::{Create, PointSegTemplate, PointTemplate, Strategy, Template};
 use cosmic_universe::id::{Layer, StarHandle, ToPoint, ToPort, TraversalDirection, Uuid};
 use cosmic_universe::mount::MountKind;
 //use crate::control::ControlDriverFactory;

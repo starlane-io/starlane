@@ -3093,3 +3093,8 @@ impl<W> DerefMut for Traversal<W> {
         &mut self.payload
     }
 }
+
+#[async_trait]
+pub trait PointFactory: Send + Sync {
+    async fn create(&self) -> Result<Point, UniErr>;
+}

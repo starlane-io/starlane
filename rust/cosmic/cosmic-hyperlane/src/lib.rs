@@ -1,6 +1,6 @@
 #![allow(warnings)]
 
-use cosmic_universe::command::request::create::{PointFactory, PointFactoryU64, PointSegTemplate};
+use cosmic_universe::command::direct::create::{PointFactoryU64, PointSegTemplate};
 use cosmic_universe::error::UniErr;
 use cosmic_universe::frame::PrimitiveFrame;
 use cosmic_universe::log::{PointLogger, RootLogger};
@@ -33,7 +33,7 @@ use tokio::sync::mpsc::error::{SendError, SendTimeoutError, TrySendError};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock, watch};
-use cosmic_universe::id::{Layer, Point, Port, ToPoint, ToPort, Version};
+use cosmic_universe::id::{Layer, Point, PointFactory, Port, ToPoint, ToPort, Version};
 use cosmic_universe::substance::{Errors, Substance, SubstanceKind, Token};
 
 #[macro_use]
@@ -1924,7 +1924,7 @@ mod tests {
         InterchangeGate,
     };
     use chrono::{DateTime, Utc};
-    use cosmic_universe::command::request::create::PointFactoryU64;
+    use cosmic_universe::command::direct::create::PointFactoryU64;
     use cosmic_universe::id::Point;
     use cosmic_universe::log::RootLogger;
     use cosmic_universe::substance::Substance;
@@ -1998,7 +1998,7 @@ pub mod test_util {
     }
 
     use crate::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, Bridge, HyperClient, HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter, Hyperlane, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist};
-    use cosmic_universe::command::request::create::PointFactoryU64;
+    use cosmic_universe::command::direct::create::PointFactoryU64;
     use cosmic_universe::error::UniErr;
     use cosmic_universe::log::RootLogger;
     use cosmic_universe::ext::ExtMethod;
@@ -2156,7 +2156,7 @@ println!("Sending GREETING to {}",stub.remote.to_string());
 #[cfg(test)]
 pub mod test {
     use crate::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, Bridge, HyperClient, HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter, Hyperlane, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist};
-    use cosmic_universe::command::request::create::PointFactoryU64;
+    use cosmic_universe::command::direct::create::PointFactoryU64;
     use cosmic_universe::error::UniErr;
     use cosmic_universe::log::RootLogger;
     use cosmic_universe::ext::ExtMethod;

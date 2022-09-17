@@ -299,7 +299,7 @@ impl MessagingEndpointComponentInner {
                                 }
                             }
                         }
-                        Command::Update(update) => {
+                        Command::Write(update) => {
                             unimplemented!()
                         }
                         Command::Read(point) => {

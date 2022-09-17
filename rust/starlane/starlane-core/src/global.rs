@@ -74,7 +74,7 @@ impl GlobalApi {
                                 let payload= global.registry.get(get).await?;
                                 Ok(request.ok_body(payload))
                             }
-                            Command::Update(_) => {
+                            Command::Write(_) => {
                                 Ok(request.status(400))
                             }
                             Command::Read(_) => {

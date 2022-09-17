@@ -15,13 +15,13 @@ use nom::character::complete::{
 use nom::combinator::{cut, eof, fail, not, peek, recognize, success, value, verify};
 
 use crate::command::common::{PropertyMod, SetProperties, StateSrc, StateSrcVar};
-use crate::command::request::create::{
+use crate::command::direct::create::{
     Create, CreateVar, KindTemplate, PointSegTemplate, PointTemplate, PointTemplateSeg,
     PointTemplateVar, Require, Strategy, Template, TemplateVar,
 };
-use crate::command::request::get::{Get, GetOp, GetVar};
-use crate::command::request::select::{Select, SelectIntoSubstance, SelectKind, SelectVar};
-use crate::command::request::set::{Set, SetVar};
+use crate::command::direct::get::{Get, GetOp, GetVar};
+use crate::command::direct::select::{Select, SelectIntoSubstance, SelectKind, SelectVar};
+use crate::command::direct::set::{Set, SetVar};
 use crate::error::{ParseErrs, UniErr};
 use crate::security::{
     AccessGrantKind, AccessGrantKindDef, ChildPerms, ParticlePerms, Permissions, PermissionsMask,
@@ -3419,7 +3419,7 @@ pub fn method_kind<I: Span>(input: I) -> Res<I, MethodKind> {
 }
 
 pub mod model {
-    use crate::command::request::RcCommandType;
+    use crate::command::direct::CmdKind;
     use crate::config::bind::{
         BindConfig, PipelineStepCtx, PipelineStepDef, PipelineStepVar, PipelineStopCtx,
         PipelineStopDef, PipelineStopVar, WaveDirection,
@@ -4978,7 +4978,7 @@ use nom_locate::LocatedSpan;
 
 use crate::substance::Bin;
 use crate::command::RawCommand;
-use crate::command::request::RcCommandType;
+use crate::command::direct::CmdKind;
 use crate::command::CommandVar;
 use crate::config::bind::{
     BindConfig, Pipeline, PipelineStep, PipelineStepCtx, PipelineStepVar, PipelineStop,
@@ -5944,7 +5944,7 @@ pub fn parse_alpha1_str<I: Span, O: FromStr>(input: I) -> Res<I, O> {
     }
 }
 
-pub fn rc_command<I: Span>(input: I) -> Res<I, RcCommandType> {
+pub fn rc_command<I: Span>(input: I) -> Res<I, CmdKind> {
     parse_alpha1_str(input)
 }
 
@@ -6269,7 +6269,7 @@ pub fn wrapped_cmd_method<I: Span>(input: I) -> Res<I, Method> {
     cmd_method(input).map(|(next, method)| (next, Method::Cmd(method)))
 }
 
-pub fn rc_command_type<I: Span>(input: I) -> Res<I, RcCommandType> {
+pub fn rc_command_type<I: Span>(input: I) -> Res<I, CmdKind> {
     parse_alpha1_str(input)
 }
 
@@ -7031,7 +7031,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, UniErr> {
 
 #[cfg(test)]
 pub mod test {
-    use crate::command::request::create::{
+    use crate::command::direct::create::{
         PointSegTemplate, PointTemplate, PointTemplateCtx, Template,
     };
     use crate::command::Command;

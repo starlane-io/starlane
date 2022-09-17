@@ -69,7 +69,7 @@ pub struct ParticleConfigBody {
 }
 
 pub mod bind {
-    use crate::command::request::Rc;
+    use crate::command::direct::Cmd;
     use crate::error::{ParseErrs, UniErr};
     use crate::wave::{
         DirectedCore, DirectedWave, MethodKind, MethodPattern, Ping, RecipientSelector,

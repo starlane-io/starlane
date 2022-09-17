@@ -1,12 +1,12 @@
 #![allow(warnings)]
 
 use cosmic_universe::command::common::{PropertyMod, SetProperties, SetRegistry};
-use cosmic_universe::command::request::create::{Create, KindTemplate, PointSegTemplate, Strategy};
-use cosmic_universe::command::request::delete::Delete;
-use cosmic_universe::command::request::get::{Get, GetOp};
-use cosmic_universe::command::request::query::{Query, QueryResult};
-use cosmic_universe::command::request::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
-use cosmic_universe::command::request::set::Set;
+use cosmic_universe::command::direct::create::{Create, KindTemplate, PointSegTemplate, Strategy};
+use cosmic_universe::command::direct::delete::Delete;
+use cosmic_universe::command::direct::get::{Get, GetOp};
+use cosmic_universe::command::direct::query::{Query, QueryResult};
+use cosmic_universe::command::direct::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
+use cosmic_universe::command::direct::set::Set;
 use cosmic_universe::error::UniErr;
 use cosmic_universe::id2::BaseSubKind;
 use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
@@ -1132,8 +1132,8 @@ pub mod test {
     use crate::particle::Kind;
     use crate::registry::{Registration, Registry};
     use crate::{PostErr, PostgresRegistry};
-    use cosmic_universe::command::request::query::Query;
-    use cosmic_universe::command::request::select::{Select, SelectIntoSubstance, SelectKind};
+    use cosmic_universe::command::direct::query::Query;
+    use cosmic_universe::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
     use cosmic_universe::entity::request::select::SelectKind;
     use cosmic_universe::particle::Status;
     use cosmic_universe::security::{

@@ -3,13 +3,13 @@ use core::str::FromStr;
 use cosmic_macros_primitive::Autobox;
 use cosmic_nom::{new_span, Trace};
 use nom::combinator::all_consuming;
-use request::create::{Create, CreateCtx, CreateVar};
-use request::delete::{DeleteCtx, DeleteVar};
-use request::get::{Get, GetCtx, GetVar};
-use request::read::{Read, ReadCtx, ReadVar};
-use request::select::{SelectCtx, SelectVar};
-use request::set::{Set, SetCtx, SetVar};
-use request::update::{Update, UpdateCtx, UpdateVar};
+use direct::create::{Create, CreateCtx, CreateVar};
+use direct::delete::{DeleteCtx, DeleteVar};
+use direct::get::{Get, GetCtx, GetVar};
+use direct::read::{Read, ReadCtx, ReadVar};
+use direct::select::{SelectCtx, SelectVar};
+use direct::set::{Set, SetCtx, SetVar};
+use direct::write::{Write, WriteCtx, WriteVar};
 use crate::parse::{command_line, Env};
 use crate::parse::error::result;
 use crate::substance::{Bin, ChildSubstance};
@@ -151,13 +151,13 @@ pub mod common {
 }
 
 
-pub mod request {
+pub mod direct {
     use crate::substance::Bin;
-    use crate::command::request::create::Create;
-    use crate::command::request::get::Get;
-    use crate::command::request::select::Select;
-    use crate::command::request::set::Set;
-    use crate::command::request::update::Update;
+    use crate::command::direct::create::Create;
+    use crate::command::direct::get::Get;
+    use crate::command::direct::select::Select;
+    use crate::command::direct::set::Set;
+    use crate::command::direct::write::Write;
     use crate::error::UniErr;
     use crate::fail;
     use crate::fail::{BadRequest, Fail, NotFound};
@@ -174,49 +174,33 @@ pub mod request {
     use crate::substance::{Errors, Substance};
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub enum Rc {
+    pub enum Cmd {
         Create(Create),
         Select(Select),
-        Update(Update),
+        Update(Write),
         Get(Get),
         Set(Set),
     }
 
-    impl PartialEq<Self> for Rc {
+    impl PartialEq<Self> for Cmd {
         fn eq(&self, other: &Self) -> bool {
             self.get_type() == other.get_type()
         }
     }
 
-    impl Eq for Rc {}
+    impl Eq for Cmd {}
 
-    impl Rc {
-        pub fn get_type(&self) -> RcCommandType {
+    impl Cmd {
+        pub fn get_type(&self) -> CmdKind {
             match self {
-                Rc::Create(_) => RcCommandType::Create,
-                Rc::Select(_) => RcCommandType::Select,
-                Rc::Update(_) => RcCommandType::Update,
-                Rc::Get(_) => RcCommandType::Get,
-                Rc::Set(_) => RcCommandType::Set,
+                Cmd::Create(_) => CmdKind::Create,
+                Cmd::Select(_) => CmdKind::Select,
+                Cmd::Update(_) => CmdKind::Update,
+                Cmd::Get(_) => CmdKind::Get,
+                Cmd::Set(_) => CmdKind::Set,
             }
         }
     }
-
-    /*
-    impl Rc {
-        pub fn command_handler(&self, request_to: &Address) -> Result<Address,Error> {
-            match self {
-                Rc::Create(create) => { Ok(create.template.point.parent.clone()) }
-                Rc::Select(select) => { Ok(select.pattern.query_root()) }
-                Rc::Update(_) => {request_to.clone()}
-                Rc::Query(_) => { request_to.clone()}
-                Rc::GET(_) => {request_to.parent().as_ref().ok_or("expected parent for get request").clone()}
-                Rc::Set(_) => {request_to.parent().as_ref().ok_or("expected parent for set request").clone()}
-            }
-        }
-    }
-
-     */
 
     #[derive(
         Debug,
@@ -228,7 +212,7 @@ pub mod request {
         Serialize,
         Deserialize,
     )]
-    pub enum RcCommandType {
+    pub enum CmdKind {
         Create,
         Select,
         Update,
@@ -237,8 +221,8 @@ pub mod request {
         Set,
     }
 
-    impl ValueMatcher<Rc> for Rc {
-        fn is_match(&self, x: &Rc) -> Result<(), ()> {
+    impl ValueMatcher<Cmd> for Cmd {
+        fn is_match(&self, x: &Cmd) -> Result<(), ()> {
             if self.get_type() == x.get_type() {
                 Ok(())
             } else {
@@ -247,7 +231,7 @@ pub mod request {
         }
     }
 
-    impl ToString for Rc {
+    impl ToString for Cmd {
         fn to_string(&self) -> String {
             format!("Rc<{}>", self.get_type().to_string())
         }
@@ -360,7 +344,7 @@ pub mod request {
         use crate::command::Command;
         use crate::error::{ParseErrs, UniErr};
         use crate::ext::ExtMethod;
-        use crate::id::{BaseKind, HostKey, KindParts, Point, PointCtx, PointSeg, PointVar, ToPort};
+        use crate::id::{BaseKind, HostKey, KindParts, Point, PointCtx, PointFactory, PointSeg, PointVar, ToPort};
         use crate::parse::{CamelCase, Env, ResolverErr};
         use crate::parse::model::Subst;
         use crate::selector::SpecificSelector;
@@ -608,11 +592,6 @@ pub mod request {
             Override,
         }
 
-        #[async_trait]
-        pub trait PointFactory: Send + Sync {
-            async fn create(&self) -> Result<Point, UniErr>;
-        }
-
         pub struct PointFactoryU64 {
             parent: Point,
             prefix: String,
@@ -854,7 +833,7 @@ pub mod request {
     }
 
     pub mod delete {
-        use crate::command::request::select::{PropertiesPattern, Select, SelectIntoSubstance};
+        use crate::command::direct::select::{PropertiesPattern, Select, SelectIntoSubstance};
         use crate::error::UniErr;
         use crate::parse::Env;
         use crate::util::ToResolved;
@@ -885,7 +864,7 @@ pub mod request {
         }
     }
 
-    pub mod update {
+    pub mod write {
         use std::convert::TryInto;
 
         use serde::{Deserialize, Serialize};
@@ -897,28 +876,28 @@ pub mod request {
         use crate::substance::Substance;
         use crate::util::ToResolved;
 
-        pub type Update = UpdateDef<Point>;
-        pub type UpdateCtx = UpdateDef<PointCtx>;
-        pub type UpdateVar = UpdateDef<PointVar>;
+        pub type Write = WriteDef<Point>;
+        pub type WriteCtx = WriteDef<PointCtx>;
+        pub type WriteVar = WriteDef<PointVar>;
 
         #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-        pub struct UpdateDef<Pnt> {
+        pub struct WriteDef<Pnt> {
             pub point: Pnt,
             pub payload: Substance,
         }
 
-        impl ToResolved<UpdateCtx> for UpdateVar {
-            fn to_resolved(self, env: &Env) -> Result<UpdateCtx, UniErr> {
-                Ok(UpdateCtx {
+        impl ToResolved<WriteCtx> for WriteVar {
+            fn to_resolved(self, env: &Env) -> Result<WriteCtx, UniErr> {
+                Ok(WriteCtx {
                     point: self.point.to_resolved(env)?,
                     payload: self.payload,
                 })
             }
         }
 
-        impl ToResolved<Update> for UpdateCtx {
-            fn to_resolved(self, env: &Env) -> Result<Update, UniErr> {
-                Ok(Update {
+        impl ToResolved<Write> for WriteCtx {
+            fn to_resolved(self, env: &Env) -> Result<Write, UniErr> {
+                Ok(Write {
                     point: self.point.to_resolved(env)?,
                     payload: self.payload,
                 })
@@ -968,7 +947,7 @@ pub mod request {
 
         use serde::{Deserialize, Serialize};
 
-        use crate::command::request::Rc;
+        use crate::command::direct::Cmd;
         use crate::error::UniErr;
         use crate::selector::PointHierarchy;
 
@@ -1009,7 +988,7 @@ pub enum Command {
     Select(Select),
     Set(Set),
     Get(Get),
-    Update(Update),
+    Write(Write),
     Read(Read),
 }
 
@@ -1018,7 +997,7 @@ impl ChildSubstance for Command {}
 impl Command {
     pub fn matches(&self, method: &CmdMethod) -> Result<(), ()> {
         if match self {
-            Command::Update(_) => *method == CmdMethod::Update,
+            Command::Write(_) => *method == CmdMethod::Update,
             Command::Read(_) => *method == CmdMethod::Read,
             _ => false,
         } {
@@ -1035,7 +1014,7 @@ pub enum CommandCtx {
     Select(SelectCtx),
     Set(SetCtx),
     Get(GetCtx),
-    Update(UpdateCtx),
+    Update(WriteCtx),
     Read(ReadCtx),
 }
 
@@ -1045,7 +1024,7 @@ pub enum CommandVar {
     Select(SelectVar),
     Set(SetVar),
     Get(GetVar),
-    Update(UpdateVar),
+    Update(WriteVar),
     Read(ReadVar),
 }
 
@@ -1087,7 +1066,7 @@ impl ToResolved<Command> for CommandCtx {
             CommandCtx::Set(i) => Command::Set(i.to_resolved(env)?),
             CommandCtx::Get(i) => Command::Get(i.to_resolved(env)?),
             CommandCtx::Delete(i) => Command::Delete(i.to_resolved(env)?),
-            CommandCtx::Update(update) => Command::Update(update.to_resolved(env)?),
+            CommandCtx::Update(update) => Command::Write(update.to_resolved(env)?),
             CommandCtx::Read(read) => Command::Read(read.to_resolved(env)?),
         })
     }
@@ -1102,7 +1081,7 @@ pub struct CommandTemplate {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct RawCommand {
     pub line: String,
-    pub transfers: Vec<Transfer>,
+    pub transfers: Vec<CmdTransfer>,
 }
 
 impl RawCommand {
@@ -1115,12 +1094,12 @@ impl RawCommand {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct Transfer {
+pub struct CmdTransfer {
     pub id: String,
     pub content: Bin,
 }
 
-impl Transfer {
+impl CmdTransfer {
     pub fn new<N: ToString>(id: N, content: Bin) -> Self {
         Self {
             id: id.to_string(),

@@ -1,7 +1,7 @@
 #![allow(warnings)]
 
 use chrono::{DateTime, Utc};
-use cosmic_universe::command::request::create::KindTemplate;
+use cosmic_universe::command::direct::create::KindTemplate;
 use cosmic_universe::error::UniErr;
 use cosmic_universe::id::{ArtifactSubKind, FileSubKind, MachineName, Specific, StarKey, StarSub, UserBaseSubKind};
 use cosmic_universe::id2::{
