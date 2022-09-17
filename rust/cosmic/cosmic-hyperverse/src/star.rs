@@ -62,7 +62,6 @@ use cosmic_universe::id::{BaseKind, GLOBAL_EXEC, Kind, Layer, LOCAL_STAR, Point,
 use cosmic_universe::mount::MountKind;
 use cosmic_universe::particle::{Details, Status, Stub};
 use cosmic_universe::reg::Registration;
-use cosmic_universe::state::{State, StateFactory};
 use cosmic_universe::substance::{Substance, ToSubstance};
 
 #[derive(Clone)]
@@ -71,9 +70,7 @@ where
     P: Platform + 'static,
 {
     phantom: PhantomData<P>,
-    states: Arc<DashMap<Port, Arc<RwLock<dyn State>>>>,
     topic: Arc<DashMap<Port, Arc<dyn TopicHandler>>>,
-    tx: mpsc::Sender<StateCall>,
     shell: Arc<DashMap<Point, ShellState>>,
 }
 
@@ -86,65 +83,17 @@ where
     }
 
     pub fn new() -> Self {
-        let states: Arc<DashMap<Port, Arc<RwLock<dyn State>>>> = Arc::new(DashMap::new());
-
-        let (tx, mut rx) = mpsc::channel(32 * 1024);
-
-        {
-            let states = states.clone();
-            tokio::spawn(async move {
-                while let Some(call) = rx.recv().await {
-                    match call {
-                        StateCall::Get { port, tx } => match states.get(&port) {
-                            None => {
-                                tx.send(Ok(None));
-                            }
-                            Some(state) => {
-                                tx.send(Ok(Some(state.value().clone())));
-                            }
-                        },
-                        StateCall::Put { port, state, tx } => {
-                            if states.contains_key(&port) {
-                                tx.send(Err(UniErr::bad_request()));
-                            } else {
-                                states.insert(port, state);
-                                tx.send(Ok(()));
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
         Self {
-            states,
             topic: Arc::new(DashMap::new()),
             shell: Arc::new(DashMap::new()),
-            tx,
             phantom: PhantomData::default(),
         }
-    }
-
-    pub fn api(&self) -> StateApi {
-        StateApi::new(self.tx.clone())
-    }
-
-    pub fn states_tx(&self) -> mpsc::Sender<StateCall> {
-        self.tx.clone()
     }
 
     pub fn topic_handler(&self, port: Port, handler: Arc<dyn TopicHandler>) {
         self.topic.insert(port, handler);
     }
 
-    pub async fn find_state<S>(&self, port: &Port) -> Result<Arc<RwLock<dyn State>>, UniErr> {
-        Ok(self
-            .states
-            .get(port)
-            .ok_or(format!("could not find state for: {}", port.to_string()))?
-            .value()
-            .clone())
-    }
 
     pub fn find_topic(
         &self,
@@ -1624,71 +1573,6 @@ pub trait TopicHandlerSerde<T: TopicHandler> {
     fn deserialize(&self, ser: Substance) -> T;
 }
 
-impl StateApi {
-    pub fn new(tx: mpsc::Sender<StateCall>) -> Self {
-        Self {
-            tx,
-            layer_filter: None,
-        }
-    }
-
-    pub fn with_layer(self, layer: Layer) -> Self {
-        Self {
-            tx: self.tx,
-            layer_filter: Some(layer),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct StateApi {
-    pub tx: mpsc::Sender<StateCall>,
-    layer_filter: Option<Layer>,
-}
-
-impl StateApi {
-    pub async fn get_state(&self, port: Port) -> Result<Option<Arc<RwLock<dyn State>>>, UniErr> {
-        if let Some(layer) = &self.layer_filter {
-            if port.layer != *layer {
-                return Err(UniErr::forbidden_msg(format!(
-                    "not allowed to get state from Port Layer {} try layer {}",
-                    port.layer.to_string(),
-                    layer.to_string()
-                )));
-            }
-        }
-        let (tx, rx) = oneshot::channel();
-        self.tx.send(StateCall::Get { port, tx }).await;
-        rx.await?
-    }
-
-    pub async fn put_state(&self, port: Port, state: Arc<RwLock<dyn State>>) -> Result<(), UniErr> {
-        if let Some(layer) = &self.layer_filter {
-            if port.layer != *layer {
-                return Err(UniErr::forbidden_msg(format!(
-                    "not allowed to put state on Port Layer {} try layer {}",
-                    port.layer.to_string(),
-                    layer.to_string()
-                )));
-            }
-        }
-        let (tx, rx) = oneshot::channel();
-        self.tx.send(StateCall::Put { port, state, tx }).await;
-        rx.await?
-    }
-}
-
-pub enum StateCall {
-    Get {
-        port: Port,
-        tx: oneshot::Sender<Result<Option<Arc<RwLock<dyn State>>>, UniErr>>,
-    },
-    Put {
-        port: Port,
-        state: Arc<RwLock<dyn State>>,
-        tx: oneshot::Sender<Result<(), UniErr>>,
-    },
-}
 
 #[derive(Clone)]
 pub struct StarTemplate {

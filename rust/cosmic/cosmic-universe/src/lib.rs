@@ -14,7 +14,6 @@ extern crate async_trait;
 
 use serde::{Deserialize, Serialize};
 
-pub mod cli;
 pub mod error;
 pub mod http;
 pub mod log;
@@ -28,7 +27,6 @@ pub mod hyper;
 pub mod util;
 pub mod wave;
 pub mod artifact;
-pub mod state;
 pub mod path;
 pub mod fail;
 pub mod reg;

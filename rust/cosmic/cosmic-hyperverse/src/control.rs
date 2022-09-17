@@ -73,7 +73,6 @@ use cosmic_universe::id::{BaseKind, Kind, Layer, Point, Port, StarSub, ToPoint, 
 use cosmic_universe::parse::{CamelCase, route_attribute};
 use cosmic_universe::particle::{Details, Status, Stub};
 use cosmic_universe::quota::Timeouts;
-use cosmic_universe::state::State;
 use cosmic_universe::util::log;
 use cosmic_universe::wave::ReflectedCore;
 use crate::star::HyperStarCall::LayerTraversalInjection;

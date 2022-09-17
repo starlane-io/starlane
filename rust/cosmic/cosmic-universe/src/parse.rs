@@ -4977,7 +4977,6 @@ use nom::{Err, IResult};
 use nom_locate::LocatedSpan;
 
 use crate::substance::Bin;
-use crate::cli;
 use crate::command::RawCommand;
 use crate::command::request::RcCommandType;
 use crate::command::CommandVar;

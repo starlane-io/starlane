@@ -1,7 +1,7 @@
 use crate::machine::MachineSkel;
 use crate::star::HyperStarCall::LayerTraversalInjection;
 use crate::star::{
-    HyperStarSkel, LayerInjectionRouter, StarDriver, StarDriverFactory, StarState, StateApi, StateCall,
+    HyperStarSkel, LayerInjectionRouter, StarDriver, StarDriverFactory, StarState,
 };
 use crate::{PlatErr, Platform, Registry, RegistryApi};
 use cosmic_universe::command::common::{SetProperties, StateSrc};
@@ -34,7 +34,6 @@ use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::id::{BaseKind, Kind, Layer, Point, Port, StarKey, StarSub, ToBaseKind, ToPoint, ToPort, Traversal, TraversalInjection, TraversalLayer, Uuid};
 use cosmic_universe::particle::{Details, Status, Stub};
 use cosmic_universe::reg::Registration;
-use cosmic_universe::state::State;
 
 lazy_static! {
     static ref DEFAULT_BIND: ArtRef<BindConfig> = ArtRef::new(
