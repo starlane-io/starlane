@@ -1,7 +1,7 @@
 use crate::machine::MachineSkel;
 use crate::star::HyperStarCall::LayerTraversalInjection;
 use crate::star::{HyperStarSkel, LayerInjectionRouter, StarDriver, StarDriverFactory, StarState};
-use crate::{PlatErr, Platform, Registry, RegistryApi};
+use crate::{HyperErr, Hyperverse, Registry, RegistryApi};
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::command::common::{SetProperties, StateSrc};
 use cosmic_universe::command::direct::create::{
@@ -18,7 +18,7 @@ use cosmic_universe::log::{PointLogger, Tracker};
 use cosmic_universe::parse::model::Subst;
 use cosmic_universe::parse::{bind_config, route_attribute};
 use cosmic_universe::particle::{Details, Status, Stub};
-use cosmic_universe::reg::Registration;
+use crate::Registration;
 use cosmic_universe::substance::Substance;
 use cosmic_universe::util::{log, ValuePattern};
 use cosmic_universe::wave::{
@@ -61,7 +61,7 @@ fn default_bind() -> BindConfig {
 
 pub struct DriversBuilder<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
     kinds: Vec<Kind>,
@@ -70,7 +70,7 @@ where
 
 impl<P> DriversBuilder<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn new(kind: StarSub) -> Self {
         let mut pre: Vec<Arc<dyn HyperDriverFactory<P>>> = vec![];
@@ -143,7 +143,7 @@ where
 
 pub enum DriversCall<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     Init0,
     Init1,
@@ -173,7 +173,7 @@ where
 #[derive(Clone)]
 pub struct DriversApi<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     call_tx: mpsc::Sender<DriversCall<P>>,
     status_rx: watch::Receiver<DriverStatus>,
@@ -181,7 +181,7 @@ where
 
 impl<P> DriversApi<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn new(tx: mpsc::Sender<DriversCall<P>>, status_rx: watch::Receiver<DriverStatus>) -> Self {
         Self {
@@ -247,7 +247,7 @@ where
 #[derive(DirectedHandler)]
 pub struct Drivers<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     port: Surface,
     skel: HyperStarSkel<P>,
@@ -265,7 +265,7 @@ where
 
 impl<P> Drivers<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     pub fn new(
         port: Surface,
@@ -514,7 +514,7 @@ where
                 logger: &PointLogger,
             ) -> Result<(), P::Err>
             where
-                P: Platform,
+                P: Hyperverse,
             {
                 let registration = Registration {
                     point: point.clone(),
@@ -684,7 +684,7 @@ where
 
 impl<P> Drivers<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
         let driver = self
@@ -775,7 +775,7 @@ where
 #[derive(Clone)]
 pub struct DriverApi<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub call_tx: mpsc::Sender<DriverRunnerCall<P>>,
     pub kind: Kind,
@@ -783,7 +783,7 @@ where
 
 impl<P> DriverApi<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn new(tx: mpsc::Sender<DriverRunnerCall<P>>, kind: Kind) -> Self {
         Self { call_tx: tx, kind }
@@ -880,7 +880,7 @@ where
 
 pub enum DriverRunnerCall<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     Traversal(Traversal<UltraWave>),
     Handle {
@@ -909,7 +909,7 @@ where
 
 pub enum DriverRunnerRequest<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     Create {
         agent: Agent,
@@ -920,7 +920,7 @@ where
 
 pub struct ItemOuter<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     pub port: Surface,
     pub skel: HyperStarSkel<P>,
@@ -930,7 +930,7 @@ where
 
 impl<P> ItemOuter<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     pub async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         self.item.bind().await
@@ -940,7 +940,7 @@ where
 #[async_trait]
 impl<P> TraversalLayer for ItemOuter<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     fn surface(&self) -> cosmic_universe::loc::Surface {
         self.port.clone()
@@ -1049,7 +1049,7 @@ where
 #[derive(DirectedHandler)]
 pub struct DriverRunner<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     skel: DriverSkel<P>,
     star_skel: HyperStarSkel<P>,
@@ -1065,7 +1065,7 @@ where
 #[routes]
 impl<P> DriverRunner<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     pub fn new(
         skel: DriverSkel<P>,
@@ -1238,7 +1238,7 @@ impl DriverCtx {
 #[derive(Clone)]
 pub struct DriverSkel<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     skel: HyperStarSkel<P>,
     pub kind: Kind,
@@ -1252,7 +1252,7 @@ where
 
 impl<P> DriverSkel<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn status(&self) -> DriverStatus {
         self.status_rx.borrow().clone()
@@ -1317,14 +1317,14 @@ where
 
 pub struct DriverFactoryWrapper<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub factory: Box<dyn DriverFactory<P>>,
 }
 
 impl<P> DriverFactoryWrapper<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn wrap(factory: Box<dyn DriverFactory<P>>) -> Arc<dyn HyperDriverFactory<P>> {
         Arc::new(Self { factory })
@@ -1334,7 +1334,7 @@ where
 #[async_trait]
 impl<P> HyperDriverFactory<P> for DriverFactoryWrapper<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     fn kind(&self) -> Kind {
         self.factory.kind()
@@ -1353,7 +1353,7 @@ where
 #[async_trait]
 pub trait DriverFactory<P>: Send + Sync
 where
-    P: Platform,
+    P: Hyperverse,
 {
     fn kind(&self) -> Kind;
 
@@ -1375,7 +1375,7 @@ where
 #[async_trait]
 pub trait HyperDriverFactory<P>: Send + Sync
 where
-    P: Platform,
+    P: Hyperverse,
 {
     fn kind(&self) -> Kind;
 
@@ -1398,7 +1398,7 @@ where
 #[derive(Clone)]
 pub struct HyperSkel<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub star: HyperStarSkel<P>,
     pub driver: DriverSkel<P>,
@@ -1406,7 +1406,7 @@ where
 
 impl<P> HyperSkel<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn new(star: HyperStarSkel<P>, driver: DriverSkel<P>) -> Self {
         Self { star, driver }
@@ -1416,7 +1416,7 @@ where
 #[async_trait]
 pub trait Driver<P>: DirectedHandler + Send + Sync
 where
-    P: Platform,
+    P: Hyperverse,
 {
     fn kind(&self) -> Kind;
 
@@ -1488,7 +1488,7 @@ pub trait ItemState: Send + Sync {}
 
 pub enum ItemSphere<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     Handler(Box<dyn ItemHandler<P>>),
     Router(Box<dyn ItemRouter<P>>),
@@ -1496,7 +1496,7 @@ where
 
 impl<P> ItemSphere<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub async fn init(&self) -> Result<Status, UniErr> {
         match self {
@@ -1525,7 +1525,7 @@ pub enum DriverAvail {
 #[async_trait]
 pub trait Item<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     type Skel;
     type Ctx;
@@ -1541,7 +1541,7 @@ where
 #[async_trait]
 pub trait ItemHandler<P>: DirectedHandler + Send + Sync
 where
-    P: Platform,
+    P: Hyperverse,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err>;
     async fn init(&self) -> Result<Status, UniErr> {
@@ -1552,7 +1552,7 @@ where
 #[async_trait]
 pub trait ItemRouter<P>: Router + Send + Sync
 where
-    P: Platform,
+    P: Hyperverse,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err>;
 }
@@ -1560,7 +1560,7 @@ where
 #[derive(Clone)]
 pub struct ItemSkel<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub point: Point,
     pub transmitter: ProtoTransmitter,
@@ -1569,7 +1569,7 @@ where
 
 impl<P> ItemSkel<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn new(point: Point, transmitter: ProtoTransmitter) -> Self {
         Self {
@@ -1591,7 +1591,7 @@ impl DriverDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for DriverDriverFactory
 where
-    P: Platform,
+    P: Hyperverse,
 {
     fn kind(&self) -> Kind {
         Kind::Driver
@@ -1614,7 +1614,7 @@ where
 #[derive(DirectedHandler)]
 pub struct DriverDriver<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     skel: DriverSkel<P>,
 }
@@ -1622,7 +1622,7 @@ where
 #[routes]
 impl<P> DriverDriver<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     async fn new(skel: DriverSkel<P>) -> Result<Self, P::Err> {
         Ok(Self { skel })
@@ -1632,7 +1632,7 @@ where
 #[async_trait]
 impl<P> Driver<P> for DriverDriver<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     fn kind(&self) -> Kind {
         Kind::Driver
@@ -1646,7 +1646,7 @@ where
 #[derive(DirectedHandler)]
 pub struct DriverCore<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     skel: ItemSkel<P>,
 }
@@ -1654,7 +1654,7 @@ where
 #[routes]
 impl<P> DriverCore<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn new(skel: ItemSkel<P>) -> Self {
         Self { skel }
@@ -1663,7 +1663,7 @@ where
 
 impl<P> Item<P> for DriverCore<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     type Skel = ItemSkel<P>;
     type Ctx = ();

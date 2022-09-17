@@ -1,6 +1,6 @@
 use crate::driver::{Driver, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere};
 use crate::star::HyperStarSkel;
-use crate::{DriverFactory, Platform};
+use crate::{DriverFactory, Hyperverse};
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::config::bind::BindConfig;
 use cosmic_universe::kind::Kind;
@@ -41,7 +41,7 @@ impl SpaceDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for SpaceDriverFactory
 where
-    P: Platform,
+    P: Hyperverse,
 {
     fn kind(&self) -> Kind {
         Kind::Space
@@ -65,7 +65,7 @@ impl SpaceDriver {}
 #[async_trait]
 impl<P> Driver<P> for SpaceDriver
 where
-    P: Platform,
+    P: Hyperverse,
 {
     fn kind(&self) -> Kind {
         Kind::Space
@@ -84,7 +84,7 @@ impl Space {}
 #[async_trait]
 impl<P> ItemHandler<P> for Space
 where
-    P: Platform,
+    P: Hyperverse,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(SPACE_BIND_CONFIG.clone())

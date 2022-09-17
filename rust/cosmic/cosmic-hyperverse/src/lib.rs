@@ -20,8 +20,8 @@ use crate::machine::{Machine, MachineApi, MachineTemplate};
 use chrono::{DateTime, Utc};
 use cosmic_hyperlane::{HyperAuthenticator, HyperGate, HyperGateSelector, HyperwayEndpointFactory};
 use cosmic_universe::artifact::ArtifactApi;
-use cosmic_universe::command::common::SetProperties;
-use cosmic_universe::command::direct::create::KindTemplate;
+use cosmic_universe::command::common::{SetProperties, SetRegistry};
+use cosmic_universe::command::direct::create::{KindTemplate, Strategy};
 use cosmic_universe::command::direct::delete::Delete;
 use cosmic_universe::command::direct::query::{Query, QueryResult};
 use cosmic_universe::command::direct::select::{Select, SubSelect};
@@ -36,7 +36,6 @@ use cosmic_universe::log::RootLogger;
 use cosmic_universe::particle::{Details, Properties, Status, Stub};
 use cosmic_universe::particle::property::PropertiesConfig;
 use cosmic_universe::settings::Timeouts;
-use cosmic_universe::reg::Registration;
 use cosmic_universe::security::IndexedAccessGrant;
 use cosmic_universe::security::{Access, AccessGrant};
 use cosmic_universe::selector::Selector;
@@ -85,7 +84,7 @@ pub type Registry<P> = Arc<dyn RegistryApi<P>>;
 #[async_trait]
 pub trait RegistryApi<P>: Send + Sync
 where
-    P: Platform,
+    P: Hyperverse,
 {
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, P::Err>;
 
@@ -277,7 +276,7 @@ where P: Platform, P::Err: PlatErr
 
  */
 
-pub trait PlatErr:
+pub trait HyperErr:
     Sized
     + Send
     + Sync
@@ -323,14 +322,14 @@ pub trait PlatErr:
 }
 
 #[async_trait]
-pub trait Platform: Send + Sync + Sized + Clone
+pub trait Hyperverse: Send + Sync + Sized + Clone
 where
-    Self::Err: PlatErr,
+    Self::Err: HyperErr,
     Self: 'static,
     Self::RegistryContext: Send + Sync,
     Self::StarAuth: HyperAuthenticator,
     Self::RemoteStarConnectionFactory: HyperwayEndpointFactory,
-    Self::Err: PlatErr,
+    Self::Err: HyperErr,
 {
     type Err;
     type RegistryContext;
@@ -463,4 +462,15 @@ impl Default for Settings {
 pub enum Anatomy {
     FromHyperlane,
     ToGravity,
+}
+
+#[derive(Clone)]
+pub struct Registration {
+    pub point: Point,
+    pub kind: Kind,
+    pub registry: SetRegistry,
+    pub properties: SetProperties,
+    pub owner: Point,
+    pub strategy: Strategy,
+    pub status: Status,
 }

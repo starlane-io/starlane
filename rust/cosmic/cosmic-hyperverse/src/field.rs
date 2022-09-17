@@ -1,5 +1,5 @@
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::{PlatErr, Platform};
+use crate::{HyperErr, Hyperverse};
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar, WaveDirection};
 use cosmic_universe::err::{StatusErr, UniErr};
@@ -25,7 +25,7 @@ use cosmic_universe::wave::exchange::{Exchanger, ProtoTransmitter, ProtoTransmit
 
 pub struct Field<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub port: Surface,
     pub skel: HyperStarSkel<P>,
@@ -35,7 +35,7 @@ where
 
 impl<P> Field<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn new(point: Point, skel: HyperStarSkel<P>) -> Self {
         let port = point.to_surface().with_layer(Layer::Field);
@@ -102,7 +102,7 @@ where
 #[async_trait]
 impl<P> TraversalLayer for Field<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     fn surface(&self) -> Surface {
         self.port.clone()

@@ -1,4 +1,4 @@
-use crate::{DriverFactory, PlatErr, Platform, Registry};
+use crate::{DriverFactory, HyperErr, Hyperverse, Registry};
 use cosmic_nom::new_span;
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::command::common::StateSrc;
@@ -38,7 +38,7 @@ use cosmic_universe::kind::Kind;
 use cosmic_universe::loc::{Layer, Point, Surface, ToPoint, ToSurface};
 use cosmic_universe::parse::route_attribute;
 use cosmic_universe::particle::{Details, Status};
-use cosmic_universe::reg::Registration;
+use crate::Registration;
 use cosmic_universe::substance::Substance;
 use cosmic_universe::wave::core::CoreBounce;
 use cosmic_universe::wave::exchange::{DirectedHandlerSelector, ProtoTransmitter, ProtoTransmitterBuilder, Router, SetStrategy};
@@ -71,14 +71,14 @@ fn global_bind() -> BindConfig {
 #[derive(Clone, DirectedHandler)]
 pub struct GlobalCommandExecutionHandler<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     skel: HyperStarSkel<P>,
 }
 
 impl<P> GlobalCommandExecutionHandler<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn new(skel: HyperStarSkel<P>) -> Self {
         Self { skel }
@@ -88,7 +88,7 @@ where
 #[routes]
 impl<P> GlobalCommandExecutionHandler<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     #[route("Cmd<RawCommand>")]
     pub async fn raw(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, P::Err> {
@@ -118,7 +118,7 @@ where
 
 pub struct GlobalExecutionChamber<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub skel: HyperStarSkel<P>,
     pub logger: PointLogger,
@@ -126,7 +126,7 @@ where
 
 impl<P> GlobalExecutionChamber<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn new(skel: HyperStarSkel<P>) -> Self {
         let logger = skel.logger.push_point("global").unwrap();

@@ -1,8 +1,8 @@
 #![allow(warnings)]
 
 use cosmic_hyperverse::machine::MachineTemplate;
-use cosmic_hyperverse::Platform;
-use cosmic_hyperverse::{PlatErr, RegistryApi};
+use cosmic_hyperverse::Hyperverse;
+use cosmic_hyperverse::{HyperErr, RegistryApi};
 use cosmic_universe::command::common::{PropertyMod, SetProperties, SetRegistry};
 use cosmic_universe::command::direct::create::{Create, KindTemplate, PointSegTemplate, Strategy};
 use cosmic_universe::command::direct::delete::Delete;
@@ -21,7 +21,7 @@ use cosmic_universe::loc::{
 use cosmic_universe::id2::BaseSubKind;
 use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
 use cosmic_universe::particle::{Details, Properties, Property, Status, Stub};
-use cosmic_universe::reg::Registration;
+use cosmic_hyperverse::Registration;
 use cosmic_universe::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, IndexedAccessGrant, Permissions,
     PermissionsMask, PermissionsMaskKind, Privilege, Privileges,
@@ -61,7 +61,7 @@ extern crate tracing;
 
 pub struct PostgresRegistry<P>
 where
-    P: PostgresPlatform + Platform<Err = PostErr> + 'static,
+    P: PostgresPlatform + Hyperverse<Err = PostErr> + 'static,
 {
     ctx: PostgresRegistryContextHandle,
     platform: P,
@@ -69,7 +69,7 @@ where
 
 impl<P> PostgresRegistry<P>
 where
-    P: PostgresPlatform + Platform<Err = PostErr> + 'static,
+    P: PostgresPlatform + Hyperverse<Err = PostErr> + 'static,
 {
     pub async fn new(ctx: PostgresRegistryContextHandle, platform: P) -> Result<Self, PostErr> {
         /*
@@ -201,7 +201,7 @@ where
 #[async_trait]
 impl<P> RegistryApi<P> for PostgresRegistry<P>
 where
-    P: PostgresPlatform + Platform<Err = PostErr> + 'static,
+    P: PostgresPlatform + Hyperverse<Err = PostErr> + 'static,
 {
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, PostErr> {
         /*
@@ -1150,7 +1150,7 @@ pub mod test {
     use cosmic_universe::entity::request::select::SelectKind;
     use cosmic_universe::loc::{Point, StarKey, ToPoint};
     use cosmic_universe::particle::Status;
-    use cosmic_universe::reg::Registration;
+    use cosmic_hyperverse::Registration;
     use cosmic_universe::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
         Privilege,
@@ -1497,7 +1497,7 @@ impl From<UniErr> for PostErr {
     }
 }
 
-impl PlatErr for PostErr {
+impl HyperErr for PostErr {
     fn to_cosmic_err(&self) -> UniErr {
         UniErr::new(500u16, "Post Err")
     }
@@ -1650,7 +1650,7 @@ impl RegistryParams {
 
 impl<P> PostgresRegistry<P>
 where
-    P: PostgresPlatform + Platform<Err = PostErr> + 'static,
+    P: PostgresPlatform + Hyperverse<Err = PostErr> + 'static,
 {
     pub async fn set(&self, set: &Set) -> Result<(), PostErr> {
         self.set_properties(&set.point, &set.properties).await
@@ -1898,7 +1898,7 @@ impl PostgresDbInfo {
     }
 }
 
-pub trait PostgresPlatform: Platform<Err = PostErr> {
+pub trait PostgresPlatform: Hyperverse<Err = PostErr> {
     fn lookup_registry_db() -> Result<PostgresDbInfo, Self::Err>;
     fn lookup_star_db(star: &StarKey) -> Result<PostgresDbInfo, Self::Err>;
 }

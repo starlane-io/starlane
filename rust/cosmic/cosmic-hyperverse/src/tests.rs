@@ -68,7 +68,7 @@ impl TestPlatform {
 }
 
 #[async_trait]
-impl Platform for TestPlatform {
+impl Hyperverse for TestPlatform {
     type Err = TestErr;
     type RegistryContext = TestRegistryContext;
     type StarAuth = AnonHyperAuthenticator;
@@ -371,7 +371,7 @@ impl From<io::Error> for TestErr {
     }
 }
 
-impl PlatErr for TestErr {
+impl HyperErr for TestErr {
     fn to_cosmic_err(&self) -> UniErr {
         UniErr::from_500(self.to_string())
     }
@@ -832,7 +832,7 @@ fn test_layer_traversal() -> Result<(), TestErr> {
 
 pub struct MachineApiExtFactory<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     machine_api: MachineApi<P>,
     logger: PointLogger,
@@ -841,7 +841,7 @@ where
 #[async_trait]
 impl<P> HyperwayEndpointFactory for MachineApiExtFactory<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     async fn create(
         &self,

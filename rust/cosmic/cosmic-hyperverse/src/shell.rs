@@ -1,6 +1,6 @@
 use crate::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
 use crate::state::ShellState;
-use crate::{PlatErr, Platform};
+use crate::{HyperErr, Hyperverse};
 use cosmic_nom::new_span;
 use cosmic_universe::command::Command;
 use cosmic_universe::command::RawCommand;
@@ -36,7 +36,7 @@ use cosmic_universe::wave::exchange::{DirectedHandler, DirectedHandlerSelector, 
 #[derive(DirectedHandler)]
 pub struct Shell<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     skel: HyperStarSkel<P>,
     state: ShellState,
@@ -45,7 +45,7 @@ where
 
 impl<P> Shell<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     pub fn new(skel: HyperStarSkel<P>, state: ShellState) -> Self {
         let logger = skel.logger.point(state.point.clone());
@@ -60,7 +60,7 @@ where
 #[async_trait]
 impl<P> TraversalLayer for Shell<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     fn surface(&self) -> Surface {
         self.state.point.clone().to_surface().with_layer(Layer::Shell)
@@ -215,7 +215,7 @@ where
 #[routes]
 impl<P> Shell<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     #[route("Ext<NewCliSession>")]
     pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Surface, UniErr> {

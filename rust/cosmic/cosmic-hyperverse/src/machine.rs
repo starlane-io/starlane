@@ -1,6 +1,6 @@
 use crate::control::ControlDriverFactory;
 use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
-use crate::{DriversBuilder, PlatErr, Platform, Registry, RegistryApi};
+use crate::{DriversBuilder, HyperErr, Hyperverse, Registry, RegistryApi};
 use cosmic_hyperlane::{
     HyperClient, HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector,
     HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange,
@@ -40,14 +40,14 @@ use cosmic_universe::kind::StarSub;
 #[derive(Clone)]
 pub struct MachineApi<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     tx: mpsc::Sender<MachineCall<P>>,
 }
 
 impl<P> MachineApi<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn new(tx: mpsc::Sender<MachineCall<P>>) -> Self {
         Self { tx }
@@ -128,7 +128,7 @@ where
 #[derive(Clone)]
 pub struct MachineSkel<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub name: MachineName,
     pub platform: P,
@@ -145,7 +145,7 @@ where
 
 pub struct Machine<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     pub skel: MachineSkel<P>,
     pub stars: Arc<HashMap<Point, HyperStarApi<P>>>,
@@ -159,7 +159,7 @@ where
 
 impl<P> Machine<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     pub fn new(platform: P) -> MachineApi<P> {
         let (call_tx, call_rx) = mpsc::channel(1024);
@@ -473,7 +473,7 @@ where
 
 pub enum MachineCall<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     Init,
     Terminate,
@@ -599,7 +599,7 @@ impl Default for MachineTemplate {
 
 pub struct MachineHyperwayEndpointFactory<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     from: StarKey,
     to: StarKey,
@@ -608,7 +608,7 @@ where
 
 impl<P> MachineHyperwayEndpointFactory<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn new(from: StarKey, to: StarKey, call_tx: mpsc::Sender<MachineCall<P>>) -> Self {
         Self { from, to, call_tx }
@@ -618,7 +618,7 @@ where
 #[async_trait]
 impl<P> HyperwayEndpointFactory for MachineHyperwayEndpointFactory<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     async fn create(
         &self,

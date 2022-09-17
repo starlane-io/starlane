@@ -2,7 +2,7 @@ use crate::driver::{
     Driver, DriverCtx, DriverSkel, HyperDriverFactory, Item, ItemHandler, ItemSphere,
 };
 use crate::star::HyperStarSkel;
-use crate::Platform;
+use crate::Hyperverse;
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::config::bind::BindConfig;
 use cosmic_universe::kind::Kind;
@@ -42,7 +42,7 @@ impl RootDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for RootDriverFactory
 where
-    P: Platform,
+    P: Hyperverse,
 {
     fn kind(&self) -> Kind {
         Kind::Root
@@ -70,7 +70,7 @@ impl DirectedHandler for RootDriver {
 #[async_trait]
 impl<P> Driver<P> for RootDriver
 where
-    P: Platform,
+    P: Hyperverse,
 {
     fn kind(&self) -> Kind {
         Kind::Root
@@ -83,14 +83,14 @@ where
 
 pub struct Root<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     phantom: PhantomData<P>,
 }
 
 impl<P> Root<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn new() -> Self {
         Self {
@@ -101,7 +101,7 @@ where
 
 impl<P> Item<P> for Root<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     type Skel = ();
     type Ctx = ();
@@ -115,12 +115,12 @@ where
 use cosmic_universe::wave::exchange::DirectedHandler;
 use cosmic_universe::wave::RecipientSelector;
 #[routes]
-impl<P> Root<P> where P: Platform {}
+impl<P> Root<P> where P: Hyperverse {}
 
 #[async_trait]
 impl<P> ItemHandler<P> for Root<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(ROOT_BIND_CONFIG.clone())

@@ -8,7 +8,7 @@ use crate::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
 use crate::machine::MachineSkel;
 use crate::shell::Shell;
 use crate::state::ShellState;
-use crate::{DriversBuilder, PlatErr, Platform, Registry, RegistryApi};
+use crate::{DriversBuilder, HyperErr, Hyperverse, Registry, RegistryApi};
 use cosmic_hyperlane::{
     Bridge, HyperClient, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
     HyperwayInterchange, HyperwayStub,
@@ -34,7 +34,7 @@ use cosmic_universe::hyper::MountKind;
 use cosmic_universe::parse::{bind_config, Env, route_attribute};
 use cosmic_universe::particle::{Details, Status, Stub};
 use cosmic_universe::settings::Timeouts;
-use cosmic_universe::reg::Registration;
+use crate::Registration;
 use cosmic_universe::substance::Bin;
 use cosmic_universe::substance::{Substance, ToSubstance};
 use cosmic_universe::util::{log, ValueMatcher, ValuePattern};
@@ -77,7 +77,7 @@ use cosmic_universe::wave::exchange::{DirectedHandler, DirectedHandlerSelector, 
 #[derive(Clone)]
 pub struct StarState<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     phantom: PhantomData<P>,
     topic: Arc<DashMap<Surface, Arc<dyn TopicHandler>>>,
@@ -86,7 +86,7 @@ where
 
 impl<P> StarState<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     pub fn create_shell(&self, point: Point) {
         self.shell.insert(point.clone(), ShellState::new(point));
@@ -138,7 +138,7 @@ where
 #[derive(Clone)]
 pub struct HyperStarSkel<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     pub api: HyperStarApi<P>,
     pub key: StarKey,
@@ -170,7 +170,7 @@ where
 
 impl<P> HyperStarSkel<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub async fn new(
         template: StarTemplate,
@@ -341,7 +341,7 @@ where
 
 pub enum HyperStarCall<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     Init,
     CreateStates {
@@ -371,7 +371,7 @@ where
 
 pub struct HyperStarTx<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub gravity_tx: mpsc::Sender<UltraWave>,
     pub traverse_to_next_tx: mpsc::Sender<Traversal<UltraWave>>,
@@ -389,7 +389,7 @@ where
 
 impl<P> HyperStarTx<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn new(point: Point) -> Self {
         let (gravity_tx, mut gravity_rx) = mpsc::channel(1024);
@@ -491,7 +491,7 @@ where
 #[derive(Clone)]
 pub struct HyperStarApi<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub kind: StarSub,
     tx: mpsc::Sender<HyperStarCall<P>>,
@@ -500,7 +500,7 @@ where
 
 impl<P> HyperStarApi<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn new(
         kind: StarSub,
@@ -610,7 +610,7 @@ where
 
 pub struct HyperStar<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     skel: HyperStarSkel<P>,
     star_tx: mpsc::Sender<HyperStarCall<P>>,
@@ -627,7 +627,7 @@ where
 
 impl<P> HyperStar<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub async fn new(
         skel: HyperStarSkel<P>,
@@ -1073,7 +1073,7 @@ where
                 gravity: Surface,
             ) -> Result<(), P::Err>
             where
-                P: Platform,
+                P: Hyperverse,
             {
                 match &mut wave {
                     UltraWave::Ripple(ripple) => {
@@ -1244,7 +1244,7 @@ where
 #[derive(Clone)]
 pub struct LayerTraversalEngine<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     pub skel: HyperStarSkel<P>,
     pub injector: Surface,
@@ -1255,7 +1255,7 @@ where
 
 impl<P> LayerTraversalEngine<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     pub fn new(
         skel: HyperStarSkel<P>,
@@ -1536,7 +1536,7 @@ pub struct LayerInjectionRouter {
 impl LayerInjectionRouter {
     pub fn new<P>(skel: HyperStarSkel<P>, injector: Surface) -> Self
     where
-        P: Platform,
+        P: Hyperverse,
     {
         Self {
             inject_tx: skel.inject_tx.clone(),
@@ -1742,7 +1742,7 @@ fn star_bind() -> BindConfig {
 #[derive(Clone)]
 pub struct StarDriverFactory<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     pub kind: Kind,
     pub phantom: PhantomData<P>,
@@ -1750,7 +1750,7 @@ where
 
 impl<P> StarDriverFactory<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     pub fn new(kind: StarSub) -> Self {
         Self {
@@ -1763,7 +1763,7 @@ where
 #[async_trait]
 impl<P> HyperDriverFactory<P> for StarDriverFactory<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     fn kind(&self) -> Kind {
         self.kind.clone()
@@ -1786,7 +1786,7 @@ where
 #[derive(DirectedHandler)]
 pub struct StarDriver<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     pub star_skel: HyperStarSkel<P>,
     pub driver_skel: DriverSkel<P>,
@@ -1794,7 +1794,7 @@ where
 
 impl<P> StarDriver<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn new(star_skel: HyperStarSkel<P>, driver_skel: DriverSkel<P>) -> Self {
         Self {
@@ -1807,7 +1807,7 @@ where
 #[async_trait]
 impl<P> Driver<P> for StarDriver<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     fn kind(&self) -> Kind {
         Kind::Star(self.star_skel.kind.clone())
@@ -1858,19 +1858,19 @@ where
 }
 
 #[routes]
-impl<P> StarDriver<P> where P: Platform {}
+impl<P> StarDriver<P> where P: Hyperverse {}
 
 #[derive(DirectedHandler)]
 pub struct Star<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     pub skel: HyperStarSkel<P>,
 }
 
 impl<P> Star<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     async fn create(&self, assign: &Assign) -> Result<(), P::Err> {
         self.skel
@@ -1888,7 +1888,7 @@ where
 #[async_trait]
 impl<P> ItemHandler<P> for Star<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         <Star<P> as Item<P>>::bind(self).await
@@ -1963,7 +1963,7 @@ where
 #[async_trait]
 impl<P> Item<P> for Star<P>
 where
-    P: Platform + 'static,
+    P: Hyperverse + 'static,
 {
     type Skel = HyperStarSkel<P>;
     type Ctx = ();
@@ -1981,7 +1981,7 @@ where
 #[routes]
 impl<P> Star<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     #[route("Hyp<Provision>")]
     pub async fn provision(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, P::Err> {
@@ -2105,7 +2105,7 @@ where
             search: Search,
         ) -> Result<ReflectedCore, UniErr>
         where
-            E: Platform,
+            E: Hyperverse,
         {
             let mut discoveries = if star.skel.kind.is_forwarder() {
                 let mut wrangler = Wrangler::new(star.skel.clone(), search);
@@ -2311,7 +2311,7 @@ async fn shard_ripple_by_location<E>(
     registry: &Registry<E>,
 ) -> Result<HashMap<Point, Wave<Ripple>>, E::Err>
 where
-    E: Platform,
+    E: Hyperverse,
 {
     let mut map = HashMap::new();
     for (star, recipients) in shard_by_location(ripple.to.clone(), adjacent, registry).await? {
@@ -2331,7 +2331,7 @@ pub async fn ripple_to_singulars<E>(
     registry: &Registry<E>,
 ) -> Result<Vec<Wave<SingularRipple>>, E::Err>
 where
-    E: Platform,
+    E: Hyperverse,
 {
     let mut rtn = vec![];
     for port in to_ports(ripple.to.clone(), adjacent, registry).await? {
@@ -2347,7 +2347,7 @@ pub async fn shard_by_location<E>(
     registry: &Registry<E>,
 ) -> Result<HashMap<Point, Recipients>, E::Err>
 where
-    E: Platform,
+    E: Hyperverse,
 {
     match recipients {
         Recipients::Single(single) => {
@@ -2402,7 +2402,7 @@ pub async fn to_ports<E>(
     registry: &Registry<E>,
 ) -> Result<Vec<Surface>, E::Err>
 where
-    E: Platform,
+    E: Hyperverse,
 {
     match recipients {
         Recipients::Single(single) => Ok(vec![single]),
@@ -2420,7 +2420,7 @@ where
 #[derive(Clone)]
 pub struct DiagnosticInterceptors<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub from_hyperway: broadcast::Sender<UltraWave>,
     pub to_gravity: broadcast::Sender<UltraWave>,
@@ -2435,7 +2435,7 @@ where
 
 impl<P> DiagnosticInterceptors<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn new() -> Self {
         let (from_hyperway, _) = broadcast::channel(1024);
@@ -2464,14 +2464,14 @@ where
 #[derive(Clone)]
 pub struct SmartLocator<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub skel: HyperStarSkel<P>,
 }
 
 impl<P> SmartLocator<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn new(skel: HyperStarSkel<P>) -> Self {
         Self { skel }
@@ -2529,7 +2529,7 @@ where
 
 pub struct Wrangler<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub skel: HyperStarSkel<P>,
     pub transmitter: ProtoTransmitter,
@@ -2539,7 +2539,7 @@ where
 
 impl<P> Wrangler<P>
 where
-    P: Platform,
+    P: Hyperverse,
 {
     pub fn new(skel: HyperStarSkel<P>, search: Search) -> Self {
         let router =
