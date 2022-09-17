@@ -1,376 +1,78 @@
-use convert_case::{Case, Casing};
-use core::str::FromStr;
-use serde::de::{Error, Visitor};
-use core::fmt::Formatter;
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use nom::combinator::all_consuming;
-use cosmic_nom::{new_span, Trace, Tw};
-use std::collections::HashMap;
-use std::ops::{Deref, DerefMut};
-use crate::parse::{CamelCase, consume_point, consume_point_ctx, Domain, Env, kind_parts, parse_star_key, point_and_kind, point_route_segment, point_selector, ResolverErr, SkewerCase};
-use crate::{Agent, ANONYMOUS, cosmic_uuid, HYPERUSER, KindTemplate, ParticleRecord, UniErr,};
 use crate::error::ParseErrs;
 use crate::hyper::ChildRegistry;
 use crate::log::{SpanLogger, Trackable};
 use crate::parse::error::result;
+use crate::parse::{
+    CamelCase, consume_point, consume_point_ctx, Domain, Env,
+    kind_parts, parse_star_key, point_and_kind, point_route_segment, point_selector, ResolverErr, SkewerCase,
+};
 use crate::selector::{Pattern, Selector, SpecificSelector, VersionReq};
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
-use crate::wave::{DirectedWave, Exchanger, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave, ToRecipients, UltraWave, Wave};
+use crate::wave::{
+    DirectedWave, Exchanger, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave,
+    ToRecipients, UltraWave, Wave,
+};
+use crate::{Agent, ANONYMOUS, BaseKind, cosmic_uuid, HYPERUSER, Kind, KindTemplate, ParticleRecord, UniErr};
+use convert_case::{Case, Casing};
+use core::fmt::Formatter;
+use core::str::FromStr;
+use cosmic_nom::{new_span, Trace, Tw};
+use nom::combinator::all_consuming;
+use serde::de::{Error, Visitor};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
+use crate::kind::KindParts;
+use crate::particle::traversal::TraversalPlan;
 lazy_static! {
-        pub static ref GLOBAL_CENTRAL: Point = Point::from_str("GLOBAL::central").unwrap();
-        pub static ref GLOBAL_EXEC: Point = Point::from_str("GLOBAL::executor").unwrap();
-        pub static ref LOCAL_STAR: Point = Point::from_str("LOCAL::star").unwrap();
-        pub static ref LOCAL_PORTAL: Point = Point::from_str("LOCAL::portal").unwrap();
-        pub static ref LOCAL_HYPERGATE: Point = Point::from_str("LOCAL::hypergate").unwrap();
-        pub static ref LOCAL_ENDPOINT: Point = Point::from_str("LOCAL::endpoint").unwrap();
-        pub static ref REMOTE_ENDPOINT: Point = Point::from_str("REMOTE::endpoint").unwrap();
-        pub static ref STD_WAVE_TRAVERSAL_PLAN: TraversalPlan =
-            TraversalPlan::new(vec![Layer::Field, Layer::Shell, Layer::Core]);
-        pub static ref MECHTRON_WAVE_TRAVERSAL_PLAN: TraversalPlan = TraversalPlan::new(vec![
-            Layer::Field,
-            Layer::Shell,
-            Layer::Portal,
-            Layer::Host,
-            Layer::Guest,
-            Layer::Core
-        ]);
-        pub static ref PORTAL_WAVE_TRAVERSAL_PLAN: TraversalPlan = TraversalPlan::new(vec![
-            Layer::Field,
-            Layer::Shell,
-            Layer::Portal,
-            Layer::Host,
-            Layer::Guest,
-            Layer::Core
-        ]);
-
-        pub static ref CONTROL_WAVE_TRAVERSAL_PLAN: TraversalPlan = TraversalPlan::new(vec![
-            Layer::Field,
-            Layer::Shell,
-            Layer::Portal,
-            Layer::Host,
-            Layer::Guest,
-            Layer::Core
-        ]);
-
-
-        pub static ref STAR_WAVE_TRAVERSAL_PLAN: TraversalPlan =
-            TraversalPlan::new(vec![Layer::Field, Layer::Shell, Layer::Core]);
-    }
+    pub static ref GLOBAL_CENTRAL: Point = Point::from_str("GLOBAL::central").unwrap();
+    pub static ref GLOBAL_EXEC: Point = Point::from_str("GLOBAL::executor").unwrap();
+    pub static ref LOCAL_STAR: Point = Point::from_str("LOCAL::star").unwrap();
+    pub static ref LOCAL_PORTAL: Point = Point::from_str("LOCAL::portal").unwrap();
+    pub static ref LOCAL_HYPERGATE: Point = Point::from_str("LOCAL::hypergate").unwrap();
+    pub static ref LOCAL_ENDPOINT: Point = Point::from_str("LOCAL::endpoint").unwrap();
+    pub static ref REMOTE_ENDPOINT: Point = Point::from_str("REMOTE::endpoint").unwrap();
+    pub static ref STD_WAVE_TRAVERSAL_PLAN: TraversalPlan =
+        TraversalPlan::new(vec![Layer::Field, Layer::Shell, Layer::Core]);
+    pub static ref MECHTRON_WAVE_TRAVERSAL_PLAN: TraversalPlan = TraversalPlan::new(vec![
+        Layer::Field,
+        Layer::Shell,
+        Layer::Portal,
+        Layer::Host,
+        Layer::Guest,
+        Layer::Core
+    ]);
+    pub static ref PORTAL_WAVE_TRAVERSAL_PLAN: TraversalPlan = TraversalPlan::new(vec![
+        Layer::Field,
+        Layer::Shell,
+        Layer::Portal,
+        Layer::Host,
+        Layer::Guest,
+        Layer::Core
+    ]);
+    pub static ref CONTROL_WAVE_TRAVERSAL_PLAN: TraversalPlan = TraversalPlan::new(vec![
+        Layer::Field,
+        Layer::Shell,
+        Layer::Portal,
+        Layer::Host,
+        Layer::Guest,
+        Layer::Core
+    ]);
+    pub static ref STAR_WAVE_TRAVERSAL_PLAN: TraversalPlan =
+        TraversalPlan::new(vec![Layer::Field, Layer::Shell, Layer::Core]);
+}
 
 pub type Uuid = String;
 
-#[derive(
-    Debug,
-    Clone,
-    Serialize,
-    Deserialize,
-    Eq,
-    PartialEq,
-    Hash,
-    strum_macros::Display,
-    strum_macros::EnumString,
-)]
-pub enum BaseKind {
-    Root,
-    Space,
-    UserBase,
-    Base,
-    User,
-    App,
-    Mechtron,
-    FileSystem,
-    File,
-    Database,
-    Repo,
-    BundleSeries,
-    Bundle,
-    Artifact,
-    Control,
-    Portal,
-    Star,
-    Driver,
-    Global,
-}
-
-impl BaseKind {
-    pub fn to_skewer(&self) -> SkewerCase {
-        SkewerCase::from_str(self.to_string().to_case(Case::Kebab).as_str()).unwrap()
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
-pub enum Sub {
-    None,
-    Database(DatabaseSubKind),
-    File(FileSubKind),
-    Artifact(ArtifactSubKind),
-    UserBase(UserBaseSubKind),
-    Star(StarSub),
-}
-
-impl Sub {
-
-    pub fn to_camel_case(&self) -> Option<CamelCase> {
-        match self  {
-            Sub::None => None,
-            Sub::Database(d) => Some(CamelCase::from_str(d.to_string().as_str()).unwrap()),
-            Sub::File(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
-            Sub::Artifact(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
-            Sub::UserBase(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
-            Sub::Star(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
-        }
-    }
-
-    pub fn specific(&self) -> Option<&Specific> {
-        match self {
-            Sub::Database(sub) => sub.specific(),
-            Sub::UserBase(sub) => sub.specific(),
-            _ => None,
-        }
-    }
-}
-
-impl Sub {
-    pub fn to_skewer(&self) -> SkewerCase {
-        SkewerCase::from_str(self.to_string().to_case(Case::Kebab).as_str()).unwrap()
-    }
-}
-
-impl Into<Option<CamelCase>> for Sub {
-    fn into(self) -> Option<CamelCase> {
-        match self {
-            Sub::None => None,
-            Sub::Database(d) => d.into(),
-            Sub::File(f) => f.into(),
-            Sub::Artifact(a) => a.into(),
-            Sub::UserBase(u) => u.into(),
-            Sub::Star(s) => s.into(),
-        }
-    }
-}
-
-impl Into<Option<String>> for Sub {
-    fn into(self) -> Option<String> {
-        match self {
-            Sub::None => None,
-            Sub::Database(d) => d.into(),
-            Sub::File(f) => f.into(),
-            Sub::Artifact(a) => a.into(),
-            Sub::UserBase(u) => u.into(),
-            Sub::Star(s) => s.into(),
-        }
-    }
-}
 
 pub trait ToBaseKind {
     fn to_base(&self) -> BaseKind;
 }
 
-impl ToBaseKind for BaseKind {
-    fn to_base(&self) -> BaseKind {
-        self.clone()
-    }
-}
-
-impl TryFrom<CamelCase> for BaseKind {
-    type Error = UniErr;
-
-    fn try_from(base: CamelCase) -> Result<Self, Self::Error> {
-        Ok(BaseKind::from_str(base.as_str())?)
-    }
-}
-
-
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum ProvisionAffinity {
     Local,
-    Wrangle
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
-pub enum Kind {
-    Root,
-    Space,
-    User,
-    App,
-    Mechtron,
-    FileSystem,
-    Repo,
-    BundleSeries,
-    Bundle,
-    Control,
-    Portal,
-    Driver,
-    File(FileSubKind),
-    Artifact(ArtifactSubKind),
-    Database(DatabaseSubKind),
-    Base,
-    UserBase(UserBaseSubKind),
-    Star(StarSub),
-    Global,
-}
-
-impl ToBaseKind for Kind {
-    fn to_base(&self) -> BaseKind {
-        match self {
-            Kind::Root => BaseKind::Root,
-            Kind::Space => BaseKind::Space,
-            Kind::User => BaseKind::User,
-            Kind::App => BaseKind::App,
-            Kind::Mechtron => BaseKind::Mechtron,
-            Kind::FileSystem => BaseKind::FileSystem,
-            Kind::BundleSeries => BaseKind::BundleSeries,
-            Kind::Bundle => BaseKind::Bundle,
-            Kind::Control => BaseKind::Control,
-            Kind::Portal => BaseKind::Portal,
-            Kind::UserBase(_) => BaseKind::UserBase,
-            Kind::File(_) => BaseKind::File,
-            Kind::Artifact(_) => BaseKind::Artifact,
-            Kind::Database(_) => BaseKind::Database,
-            Kind::Base => BaseKind::Base,
-            Kind::Repo => BaseKind::Repo,
-            Kind::Star(_) => BaseKind::Star,
-            Kind::Driver => BaseKind::Driver,
-            Kind::Global => BaseKind::Global,
-        }
-    }
-}
-
-impl Kind {
-    pub fn to_template(&self) -> KindTemplate {
-        KindTemplate{
-            base: self.to_base(),
-            sub: self.sub().to_camel_case(),
-            specific: self.specific_selector()
-        }
-    }
-
-    pub fn provision_affinity(&self) -> ProvisionAffinity {
-        match self.to_base() {
-            BaseKind::Base => ProvisionAffinity::Local,
-            _ => ProvisionAffinity::Wrangle
-        }
-    }
-
-    pub fn as_point_segments(&self) -> String {
-        if Sub::None != self.sub() {
-            if let Some(specific) = self.specific() {
-                format!(
-                    "{}:{}:{}",
-                    self.to_base().to_skewer().to_string(),
-                    self.sub().to_skewer().to_string(),
-                    specific.to_string()
-                )
-            } else {
-                format!(
-                    "{}:{}",
-                    self.to_base().to_skewer().to_string(),
-                    self.sub().to_skewer().to_string()
-                )
-            }
-        } else {
-            format!("{}", self.to_base().to_skewer().to_string())
-        }
-    }
-
-    pub fn sub(&self) -> Sub {
-        match self {
-            Kind::File(s) => s.clone().into(),
-            Kind::Artifact(s) => s.clone().into(),
-            Kind::Database(s) => s.clone().into(),
-            _ => Sub::None,
-        }
-    }
-
-    pub fn specific(&self) -> Option<Specific> {
-        let sub = self.sub();
-        sub.specific().cloned()
-    }
-
-    pub fn specific_selector(&self) -> Option<SpecificSelector> {
-        match self.specific() {
-            None => None,
-            Some(specific) => {
-                Some(specific.to_selector())
-            }
-        }
-    }
-
-
-    pub fn wave_traversal_plan(&self) -> &TraversalPlan {
-        match self {
-            Kind::Mechtron => &MECHTRON_WAVE_TRAVERSAL_PLAN,
-            Kind::Portal => &PORTAL_WAVE_TRAVERSAL_PLAN,
-            Kind::Control => &CONTROL_WAVE_TRAVERSAL_PLAN,
-            Kind::Star(_) => &STAR_WAVE_TRAVERSAL_PLAN,
-            _ => &STD_WAVE_TRAVERSAL_PLAN,
-        }
-    }
-}
-
-impl TryFrom<KindParts> for Kind {
-    type Error = UniErr;
-
-    fn try_from(value: KindParts) -> Result<Self, Self::Error> {
-        Ok(match value.base {
-            BaseKind::Database => {
-                match value.sub.ok_or("Database<?> requires a Sub Kind")?.as_str() {
-                    "Relational" => Kind::Database(DatabaseSubKind::Relational(
-                        value
-                            .specific
-                            .ok_or("Database<Relational<?>> requires a Specific")?,
-                    )),
-                    what => {
-                        return Err(UniErr::from(format!(
-                            "unexpected Database SubKind '{}'",
-                            what
-                        )));
-                    }
-                }
-            }
-            BaseKind::UserBase => {
-                match value.sub.ok_or("UserBase<?> requires a Sub Kind")?.as_str() {
-                    "OAuth" => Kind::UserBase(UserBaseSubKind::OAuth(
-                        value
-                            .specific
-                            .ok_or("UserBase<OAuth<?>> requires a Specific")?,
-                    )),
-                    what => {
-                        return Err(UniErr::from(format!(
-                            "unexpected Database SubKind '{}'",
-                            what
-                        )));
-                    }
-                }
-            }
-            BaseKind::Base => Kind::Base,
-            BaseKind::File => Kind::File(FileSubKind::from_str(
-                value.sub.ok_or("File<?> requires a Sub Kind")?.as_str(),
-            )?),
-            BaseKind::Artifact => Kind::Artifact(ArtifactSubKind::from_str(
-                value.sub.ok_or("Artifact<?> requires a sub kind")?.as_str(),
-            )?),
-
-            BaseKind::Star => Kind::Star(StarSub::from_str(
-                value.sub.ok_or("Star<?> requires a sub kind")?.as_str(),
-            )?),
-
-            BaseKind::Root => Kind::Root,
-            BaseKind::Space => Kind::Space,
-            BaseKind::User => Kind::User,
-            BaseKind::App => Kind::App,
-            BaseKind::Mechtron => Kind::Mechtron,
-            BaseKind::FileSystem => Kind::FileSystem,
-
-            BaseKind::BundleSeries => Kind::BundleSeries,
-            BaseKind::Bundle => Kind::Bundle,
-            BaseKind::Control => Kind::Control,
-            BaseKind::Portal => Kind::Portal,
-            BaseKind::Repo => Kind::Repo,
-            BaseKind::Driver => Kind::Driver,
-            BaseKind::Global => Kind::Global,
-        })
-    }
+    Wrangle,
 }
 
 pub type PointKind = PointKindDef<Point>;
@@ -518,20 +220,6 @@ impl FromStr for Version {
     }
 }
 
-impl ToBaseKind for KindParts {
-    fn to_base(&self) -> BaseKind {
-        self.base.clone()
-    }
-}
-
-/// Stands for "Type, Kind, Specific"
-pub trait Tks {
-    fn base(&self) -> BaseKind;
-    fn sub(&self) -> Option<CamelCase>;
-    fn specific(&self) -> Option<Specific>;
-    fn matches(&self, tks: &dyn Tks) -> bool;
-}
-
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct Specific {
     pub provider: Domain,
@@ -543,7 +231,7 @@ pub struct Specific {
 
 impl Specific {
     pub fn to_selector(&self) -> SpecificSelector {
-        SpecificSelector::from_str(self.to_string().as_str() ).unwrap()
+        SpecificSelector::from_str(self.to_string().as_str()).unwrap()
     }
 }
 
@@ -840,7 +528,7 @@ pub enum VarVal<V> {
 
 impl<V> ToResolved<V> for VarVal<V>
 where
-    V: FromStr<Err =UniErr>,
+    V: FromStr<Err = UniErr>,
 {
     fn to_resolved(self, env: &Env) -> Result<V, UniErr> {
         match self {
@@ -859,8 +547,7 @@ where
                             trace.extra,
                         )),
                         ResolverErr::NotFound => Err(ParseErrs::from_range(
-                            format!("variable '{}' not found", var.unwrap().to_string())
-                                .as_str(),
+                            format!("variable '{}' not found", var.unwrap().to_string()).as_str(),
                             "not found",
                             trace.range,
                             trace.extra,
@@ -1160,24 +847,6 @@ impl ToString for PointSeg {
     }
 }
 
-impl Tks for KindParts {
-    fn base(&self) -> BaseKind {
-        self.base.clone()
-    }
-
-    fn sub(&self) -> Option<CamelCase> {
-        self.sub.clone()
-    }
-
-    fn specific(&self) -> Option<Specific> {
-        self.specific.clone()
-    }
-
-    fn matches(&self, tks: &dyn Tks) -> bool {
-        self.base == tks.base() && self.sub == tks.sub() && self.specific == tks.specific()
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PointSegDelim {
     Empty,
@@ -1316,146 +985,14 @@ impl Default for Topic {
     }
 }
 
-#[async_trait]
-pub trait TraversalLayer {
-    fn port(&self) -> Port;
-
-    async fn traverse_next(&self, traversal: Traversal<UltraWave>);
-    async fn inject(&self, wave: UltraWave);
-
-    fn exchanger(&self) -> &Exchanger;
-
-    async fn deliver_directed(&self, direct: Traversal<DirectedWave>) -> Result<(), UniErr>{
-        Err(UniErr::from_500("this layer does not handle directed messages"))
-    }
-
-    async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) -> Result<(), UniErr> {
-        self.exchanger().reflected(reflect.payload).await
-    }
-
-    async fn visit(&self, traversal: Traversal<UltraWave>) -> Result<(), UniErr>{
-
-        if let Some(dest) = &traversal.dest {
-            if self.port().layer == *dest {
-                if traversal.is_directed() {
-                    self.deliver_directed(traversal.unwrap_directed()).await?;
-                } else {
-                    self.deliver_reflected(traversal.unwrap_reflected()).await?;
-                }
-                return Ok(());
-            } else {
-            }
-        }
-
-        if traversal.is_directed() && traversal.dir == TraversalDirection::Fabric {
-            self.directed_fabric_bound(traversal.unwrap_directed())
-                .await?;
-        } else if traversal.is_reflected() && traversal.dir == TraversalDirection::Core {
-            self.reflected_core_bound(traversal.unwrap_reflected())
-                .await?;
-        } else if traversal.is_directed() && traversal.dir == TraversalDirection::Core {
-            self.directed_core_bound(traversal.unwrap_directed()).await?;
-        } else if traversal.is_reflected() && traversal.dir == TraversalDirection::Fabric {
-            self.reflected_fabric_bound(traversal.unwrap_reflected())
-                .await?;
-        }
-
-        Ok(())
-    }
-
-    // override if you want to track outgoing requests
-    async fn directed_fabric_bound(
-        &self,
-        mut traversal: Traversal<DirectedWave>,
-    ) -> Result<(), UniErr> {
-        self.traverse_next(traversal.wrap()).await;
-        Ok(())
-    }
-
-    async fn directed_core_bound(
-        &self,
-        mut traversal: Traversal<DirectedWave>,
-    ) -> Result<(), UniErr> {
-        self.traverse_next(traversal.wrap()).await;
-        Ok(())
-    }
-
-    // override if you want to track incoming responses
-    async fn reflected_core_bound(
-        &self,
-        traversal: Traversal<ReflectedWave>,
-    ) -> Result<(), UniErr> {
-        self.traverse_next(traversal.to_ultra()).await;
-        Ok(())
-    }
-
-    async fn reflected_fabric_bound(
-        &self,
-        traversal: Traversal<ReflectedWave>,
-    ) -> Result<(), UniErr> {
-        self.traverse_next(traversal.to_ultra()).await;
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-pub struct TraversalPlan {
-    pub stack: Vec<Layer>,
-}
-
-impl TraversalPlan {
-    pub fn new(stack: Vec<Layer>) -> Self {
-        Self { stack }
-    }
-
-    pub fn towards_fabric(&self, layer: &Layer) -> Option<Layer> {
-        let mut layer = layer.clone();
-        let mut index: i32 = layer.ordinal() as i32;
-        loop {
-            index = index - 1;
-
-            if index < 0i32 {
-                return None;
-            } else if self
-                .stack
-                .contains(&Layer::from_ordinal(index as u8).unwrap())
-            {
-                return Some(Layer::from_ordinal(index as u8).unwrap());
-            }
-        }
-    }
-
-    pub fn towards_core(&self, layer: &Layer) -> Option<Layer> {
-        let mut layer = layer.clone();
-        let mut index = layer.ordinal();
-        loop {
-            index = index + 1;
-            let layer = match Layer::from_ordinal(index) {
-                Some(layer) => layer,
-                None => {
-                    return None;
-                }
-            };
-
-            if self.stack.contains(&layer) {
-                return Some(layer);
-            }
-        }
-    }
-
-    pub fn has_layer(&self, layer: &Layer) -> bool {
-        self.stack.contains(layer)
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub struct Port {
+pub struct Surface {
     pub point: Point,
     pub layer: Layer,
     pub topic: Topic,
 }
 
-impl Port {
+impl Surface {
     pub fn new(point: Point, layer: Layer, topic: Topic) -> Self {
         Self {
             point,
@@ -1465,19 +1002,19 @@ impl Port {
     }
 }
 
-impl Into<Recipients> for Port {
+impl Into<Recipients> for Surface {
     fn into(self) -> Recipients {
         Recipients::Single(self)
     }
 }
 
-impl ToRecipients for Port {
+impl ToRecipients for Surface {
     fn to_recipients(self) -> Recipients {
         Recipients::Single(self)
     }
 }
 
-impl ToString for Port {
+impl ToString for Surface {
     fn to_string(&self) -> String {
         let point = self.clone().to_point();
         match &self.topic {
@@ -1497,14 +1034,14 @@ impl ToString for Port {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct PortSelector {
+pub struct SurfaceSelector {
     pub point: ValuePattern<Point>,
     pub topic: ValuePattern<Topic>,
     pub layer: ValuePattern<Layer>,
 }
 
-impl Into<PortSelector> for Port {
-    fn into(self) -> PortSelector {
+impl Into<SurfaceSelector> for Surface {
+    fn into(self) -> SurfaceSelector {
         let point = ValuePattern::Pattern(self.point);
         let topic = match self.topic {
             Topic::None => ValuePattern::Any,
@@ -1515,7 +1052,7 @@ impl Into<PortSelector> for Port {
             Topic::Cli => ValuePattern::Pattern(Topic::Cli),
         };
         let layer = ValuePattern::Pattern(self.layer);
-        PortSelector {
+        SurfaceSelector {
             point,
             topic,
             layer,
@@ -1523,8 +1060,8 @@ impl Into<PortSelector> for Port {
     }
 }
 
-impl ValueMatcher<Port> for PortSelector {
-    fn is_match(&self, port: &Port) -> Result<(), ()> {
+impl ValueMatcher<Surface> for SurfaceSelector {
+    fn is_match(&self, port: &Surface) -> Result<(), ()> {
         match &self.point {
             ValuePattern::Any => {}
             ValuePattern::None => return Err(()),
@@ -1550,7 +1087,7 @@ impl ValueMatcher<Port> for PortSelector {
     }
 }
 
-impl Port {
+impl Surface {
     pub fn with_topic(&self, topic: Topic) -> Self {
         Self {
             point: self.point.clone(),
@@ -1568,7 +1105,7 @@ impl Port {
     }
 }
 
-impl Deref for Port {
+impl Deref for Surface {
     type Target = Point;
 
     fn deref(&self) -> &Self::Target {
@@ -1576,14 +1113,14 @@ impl Deref for Port {
     }
 }
 
-impl ToPoint for Port {
+impl ToPoint for Surface {
     fn to_point(&self) -> Point {
         self.point.clone()
     }
 }
 
-impl ToPort for Port {
-    fn to_port(&self) -> Port {
+impl ToSurface for Surface {
+    fn to_port(&self) -> Surface {
         self.clone()
     }
 }
@@ -1592,13 +1129,13 @@ pub trait ToPoint {
     fn to_point(&self) -> Point;
 }
 
-pub trait ToPort {
-    fn to_port(&self) -> Port;
+pub trait ToSurface {
+    fn to_port(&self) -> Surface;
 }
 
-impl Into<Port> for Point {
-    fn into(self) -> Port {
-        Port {
+impl Into<Surface> for Point {
+    fn into(self) -> Surface {
+        Surface {
             point: self,
             topic: Default::default(),
             layer: Default::default(),
@@ -1632,8 +1169,8 @@ impl ToPoint for Point {
     }
 }
 
-impl ToPort for Point {
-    fn to_port(&self) -> Port {
+impl ToSurface for Point {
+    fn to_port(&self) -> Surface {
         self.clone().into()
     }
 }
@@ -1737,7 +1274,7 @@ impl ToResolved<PointCtx> for PointVar {
                     Ok(val) => {
                         if index > 1 {
                             if after_fs {
-//                                    rtn.push_str("/");
+                                //                                    rtn.push_str("/");
                             } else {
                                 rtn.push_str(":");
                             }
@@ -1760,11 +1297,8 @@ impl ToResolved<PointCtx> for PointVar {
                         }
                         ResolverErr::NotFound => {
                             errs.push(ParseErrs::from_range(
-                                format!(
-                                    "variable could not be resolved '{}'",
-                                    var.name.clone()
-                                )
-                                .as_str(),
+                                format!("variable could not be resolved '{}'", var.name.clone())
+                                    .as_str(),
                                 "Not Found",
                                 var.trace.range.clone(),
                                 var.trace.extra.clone(),
@@ -1970,7 +1504,7 @@ impl Point {
         }
     }
 
-    pub fn is_parent_of( &self, point: &Point ) -> bool {
+    pub fn is_parent_of(&self, point: &Point) -> bool {
         if self.segments.len() > point.segments.len() {
             return false;
         }
@@ -2147,7 +1681,7 @@ impl Point {
         segments.pop();
         Point {
             route: self.route.clone(),
-            segments
+            segments,
         }
     }
     pub fn push<S: ToString>(&self, segment: S) -> Result<Self, UniErr> {
@@ -2172,9 +1706,11 @@ impl Point {
                 }
                 PointSeg::Version(_) => {
                     if segment != ":/" {
-                        return Err(
-                            format!("expected Root filesystem artifact ':/' encountered: {}", segment).into()
-                        );
+                        return Err(format!(
+                            "expected Root filesystem artifact ':/' encountered: {}",
+                            segment
+                        )
+                        .into());
                     }
                     format!("{}:/", self.to_string())
                 }
@@ -2189,9 +1725,7 @@ impl Point {
     }
 
     pub fn push_segment(&self, segment: PointSeg) -> Result<Self, UniErr> {
-        if (self.has_filesystem() && segment.is_filesystem_seg())
-            || segment.kind().is_mesh_seg()
-        {
+        if (self.has_filesystem() && segment.is_filesystem_seg()) || segment.kind().is_mesh_seg() {
             let mut point = self.clone();
             point.segments.push(segment);
             Ok(point)
@@ -2354,303 +1888,8 @@ impl PointCtx {
     }
 }
 
-pub struct KindLex {
-    pub base: CamelCase,
-    pub sub: Option<CamelCase>,
-    pub specific: Option<Specific>,
-}
-
-impl TryInto<KindParts> for KindLex {
-    type Error = UniErr;
-
-    fn try_into(self) -> Result<KindParts, Self::Error> {
-        Ok(KindParts {
-            base: BaseKind::try_from(self.base)?,
-            sub: self.sub,
-            specific: self.specific,
-        })
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub struct KindParts {
-    pub base: BaseKind,
-    pub sub: Option<CamelCase>,
-    pub specific: Option<Specific>,
-}
-
-impl KindParts {
-    pub fn root() -> Self {
-        Self {
-            base: BaseKind::Root,
-            sub: None,
-            specific: None,
-        }
-    }
-}
-
-impl ToString for KindParts {
-    fn to_string(&self) -> String {
-        if self.sub.is_some() && self.specific.is_some() {
-            format!(
-                "{}<{}<{}>>",
-                self.base.to_string(),
-                self.sub.as_ref().expect("sub").to_string(),
-                self.specific.as_ref().expect("specific").to_string()
-            )
-        } else if self.sub.is_some() {
-            format!(
-                "{}<{}>",
-                self.base.to_string(),
-                self.sub.as_ref().expect("sub").to_string()
-            )
-        } else {
-            self.base.to_string()
-        }
-    }
-}
-
-impl FromStr for KindParts {
-    type Err = UniErr;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (_, kind) = all_consuming(kind_parts)(new_span(s))?;
-
-        Ok(kind)
-    }
-}
-
-impl KindParts {
-    pub fn new(kind: BaseKind, sub: Option<CamelCase>, specific: Option<Specific>) -> Self {
-        Self {
-            base: kind,
-            sub,
-            specific,
-        }
-    }
-}
-
-
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    Hash,
-    Serialize,
-    Deserialize,
-    strum_macros::Display,
-    strum_macros::EnumString,
-)]
-pub enum StarSub {
-    Central,
-    Super, // Wrangles nearby Stars... manages Assigning Particles to Stars, Moving, Icing, etc.
-    Nexus, // Relays Waves from Star to Star
-    Maelstrom, // Where executables are run
-    Scribe, // requires durable filesystem (Artifact Bundles, Files...)
-    Jump, // for entry into the Mesh/Fabric for an external connection (client ingress... http for example)
-    Fold, // exit from the Mesh.. maintains connections etc to Databases, Keycloak, etc.... Like A Space Fold out of the Fabric..
-    Machine, // every Machine has one and only one Machine star... it handles messaging for the Machine
-}
-
-impl StarSub {
-    pub fn is_forwarder(&self) -> bool {
-        match self {
-            StarSub::Nexus => true,
-            StarSub::Central => false,
-            StarSub::Super => true,
-            StarSub::Maelstrom => true,
-            StarSub::Scribe => true,
-            StarSub::Jump => true,
-            StarSub::Fold => true,
-            StarSub::Machine => false,
-        }
-    }
-
-    pub fn can_be_wrangled(&self) -> bool {
-        match self {
-            StarSub::Nexus => false,
-            StarSub::Machine => false,
-            _ => true,
-        }
-    }
-}
-
-impl Into<Sub> for StarSub {
-    fn into(self) -> Sub {
-        Sub::Star(self)
-    }
-}
-
-impl Into<Option<CamelCase>> for StarSub {
-    fn into(self) -> Option<CamelCase> {
-        Some(CamelCase::from_str(self.to_string().as_str()).unwrap())
-    }
-}
-
-impl Into<Option<String>> for StarSub {
-    fn into(self) -> Option<String> {
-        Some(self.to_string())
-    }
-}
-
-
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize, strum_macros::Display)]
-pub enum UserBaseSubKind {
-    OAuth(Specific),
-}
-
-impl UserBaseSubKind {
-    pub fn specific(&self) -> Option<&Specific> {
-        match self {
-            UserBaseSubKind::OAuth(specific) => Option::Some(specific),
-        }
-    }
-}
-
-impl Into<Sub> for UserBaseSubKind {
-    fn into(self) -> Sub {
-        Sub::UserBase(self)
-    }
-}
-
-impl Into<Option<CamelCase>> for UserBaseSubKind {
-    fn into(self) -> Option<CamelCase> {
-        Some(CamelCase::from_str(self.to_string().as_str()).unwrap())
-    }
-}
-
-impl Into<Option<String>> for UserBaseSubKind {
-    fn into(self) -> Option<String> {
-        Some(self.to_string())
-    }
-}
-
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    Hash,
-    Serialize,
-    Deserialize,
-    strum_macros::Display,
-    strum_macros::EnumString,
-)]
-pub enum FileSubKind {
-    File,
-    Dir,
-}
-
-impl Into<Sub> for FileSubKind {
-    fn into(self) -> Sub {
-        Sub::File(self)
-    }
-}
-
-impl Into<Option<CamelCase>> for FileSubKind {
-    fn into(self) -> Option<CamelCase> {
-        Some(CamelCase::from_str(self.to_string().as_str()).unwrap())
-    }
-}
-
-impl Into<Option<String>> for FileSubKind {
-    fn into(self) -> Option<String> {
-        Some(self.to_string())
-    }
-}
-
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    Hash,
-    Serialize,
-    Deserialize,
-    strum_macros::Display,
-    strum_macros::EnumString,
-)]
-pub enum ArtifactSubKind {
-    Raw,
-    ParticleConfig,
-    Bind,
-    Wasm,
-    Dir,
-}
-
-impl Into<Sub> for ArtifactSubKind {
-    fn into(self) -> Sub {
-        Sub::Artifact(self)
-    }
-}
-
-impl Into<Option<CamelCase>> for ArtifactSubKind {
-    fn into(self) -> Option<CamelCase> {
-        Some(CamelCase::from_str(self.to_string().as_str()).unwrap())
-    }
-}
-
-impl Into<Option<String>> for ArtifactSubKind {
-    fn into(self) -> Option<String> {
-        Some(self.to_string())
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize, strum_macros::Display)]
-pub enum DatabaseSubKind {
-    Relational(Specific),
-}
-
-impl DatabaseSubKind {
-    pub fn specific(&self) -> Option<&Specific> {
-        match self {
-            DatabaseSubKind::Relational(specific) => Some(specific),
-        }
-    }
-}
-
-impl Into<Sub> for DatabaseSubKind {
-    fn into(self) -> Sub {
-        Sub::Database(self)
-    }
-}
-
-impl Into<Option<CamelCase>> for DatabaseSubKind {
-    fn into(self) -> Option<CamelCase> {
-        Some(CamelCase::from_str(self.to_string().as_str()).unwrap())
-    }
-}
-
-impl Into<Option<String>> for DatabaseSubKind {
-    fn into(self) -> Option<String> {
-        Some(self.to_string())
-    }
-}
-
-impl BaseKind {
-    pub fn child_resource_registry_handler(&self) -> ChildRegistry {
-        match self {
-            Self::UserBase => ChildRegistry::Core,
-            _ => ChildRegistry::Shell,
-        }
-    }
-}
-
 pub type MachineName = String;
 pub type ConstellationName = String;
-
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub struct StarStub {
-    pub key: StarKey,
-    pub kind: StarSub,
-}
-
-impl StarStub {
-    pub fn new(key: StarKey, kind: StarSub) -> Self {
-        Self { key, kind }
-    }
-}
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Hash, Debug, Clone, Serialize, Deserialize)]
 pub struct StarKey {
@@ -2676,8 +1915,8 @@ impl Into<Point> for StarKey {
     }
 }
 
-impl Into<Port> for StarKey {
-    fn into(self) -> Port {
+impl Into<Surface> for StarKey {
+    fn into(self) -> Surface {
         self.to_port()
     }
 }
@@ -2699,8 +1938,8 @@ impl ToPoint for StarKey {
     }
 }
 
-impl ToPort for StarKey {
-    fn to_port(&self) -> Port {
+impl ToSurface for StarKey {
+    fn to_port(&self) -> Surface {
         self.clone().to_point().to_port()
     }
 }
@@ -2768,329 +2007,6 @@ impl FromStr for StarKey {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(result(all_consuming(parse_star_key)(new_span(s)))?)
-    }
-}
-
-pub struct TraversalInjection {
-    pub injector: Port,
-    pub wave: UltraWave,
-}
-
-impl TraversalInjection {
-    pub fn new(injector: Port, wave: UltraWave) -> Self {
-        Self { injector, wave }
-    }
-}
-
-#[derive(Clone)]
-pub struct Traversal<W> {
-    pub point: Point,
-    pub payload: W,
-    pub record: ParticleRecord,
-    pub layer: Layer,
-    pub dest: Option<Layer>,
-    pub logger: SpanLogger,
-    pub dir: TraversalDirection,
-    pub to: Port,
-}
-
-impl<W> Trackable for Traversal<W>
-where
-    W: Trackable,
-{
-    fn track_id(&self) -> String {
-        self.payload.track_id()
-    }
-
-    fn track_method(&self) -> String {
-        self.payload.track_method()
-    }
-
-    fn track_payload(&self) -> String {
-        self.payload.track_payload()
-    }
-
-    fn track_from(&self) -> String {
-        self.payload.track_from()
-    }
-
-    fn track_to(&self) -> String {
-        self.payload.track_to()
-    }
-
-    fn track(&self) -> bool {
-        self.payload.track()
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Hash, strum_macros::Display)]
-pub enum TraversalDirection {
-    Fabric,
-    Core,
-}
-
-impl TraversalDirection {
-    pub fn new(from: &Layer, to: &Layer) -> Result<Self, UniErr> {
-        if from == to {
-            return Err(
-                "cannot determine traversal direction if from and to are the same layer".into(),
-            );
-        } else if from.ordinal() < to.ordinal() {
-            Ok(TraversalDirection::Core)
-        } else {
-            Ok(TraversalDirection::Fabric)
-        }
-    }
-
-    pub fn is_fabric(&self) -> bool {
-        match self {
-            TraversalDirection::Fabric => true,
-            TraversalDirection::Core => false,
-        }
-    }
-    pub fn is_core(&self) -> bool {
-        match self {
-            TraversalDirection::Fabric => false,
-            TraversalDirection::Core => true,
-        }
-    }
-}
-
-impl TraversalDirection {
-    pub fn reverse(&self) -> TraversalDirection {
-        match self {
-            Self::Fabric => Self::Core,
-            Self::Core => Self::Fabric,
-        }
-    }
-}
-
-impl<W> Traversal<W> {
-    pub fn new(
-        payload: W,
-        record: ParticleRecord,
-        layer: Layer,
-        logger: SpanLogger,
-        dir: TraversalDirection,
-        dest: Option<Layer>,
-        to: Port,
-        point: Point,
-    ) -> Self {
-        Self {
-            payload,
-            record,
-            layer,
-            logger,
-            dir,
-            dest,
-            to,
-            point,
-        }
-    }
-
-    pub fn with<N>(self, payload: N) -> Traversal<N> {
-        Traversal {
-            payload,
-            record: self.record,
-            layer: self.layer,
-            logger: self.logger,
-            dir: self.dir,
-            dest: self.dest,
-            to: self.to,
-            point: self.point,
-        }
-    }
-
-    pub fn reverse(&mut self) {
-        self.dir = self.dir.reverse();
-    }
-}
-
-impl<W> Traversal<W> {
-    pub fn next(&mut self) -> Option<Layer> {
-        let next = match self.dir {
-            TraversalDirection::Fabric => self
-                .record
-                .details
-                .stub
-                .kind
-                .wave_traversal_plan()
-                .towards_fabric(&self.layer),
-            TraversalDirection::Core => self
-                .record
-                .details
-                .stub
-                .kind
-                .wave_traversal_plan()
-                .towards_core(&self.layer),
-        };
-        match &next {
-            None => {}
-            Some(layer) => {
-                self.layer = layer.clone();
-            }
-        }
-        next
-    }
-
-    pub fn is_inter_layer(&self) -> bool {
-        self.to.point == *self.logger.point()
-    }
-}
-
-impl Traversal<UltraWave> {
-    pub fn is_fabric_bound(&self) -> bool {
-        match self.dir {
-            TraversalDirection::Fabric => true,
-            TraversalDirection::Core => false,
-        }
-    }
-
-    pub fn is_core_bound(&self) -> bool {
-        match self.dir {
-            TraversalDirection::Fabric => false,
-            TraversalDirection::Core => true,
-        }
-    }
-
-    pub fn is_ping(&self) -> bool {
-        match &self.payload {
-            UltraWave::Ping(_) => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_pong(&self) -> bool {
-        match &self.payload {
-            UltraWave::Pong(_) => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_directed(&self) -> bool {
-        match self.payload {
-            UltraWave::Ping(_) => true,
-            UltraWave::Pong(_) => false,
-            UltraWave::Ripple(_) => true,
-            UltraWave::Echo(_) => false,
-            UltraWave::Signal(_) => true,
-        }
-    }
-
-    pub fn is_reflected(&self) -> bool {
-        !self.is_directed()
-    }
-
-    pub fn unwrap_directed(self) -> Traversal<DirectedWave> {
-        let clone = self.clone();
-        match self.payload {
-            UltraWave::Ping(ping) => clone.with(ping.to_directed().clone()),
-            UltraWave::Ripple(ripple) => clone.with(ripple.to_directed()),
-            UltraWave::Signal(signal) => clone.with(signal.to_directed()),
-            _ => {
-                panic!("cannot call this unless you are sure it's a DirectedWave")
-            }
-        }
-    }
-
-    pub fn unwrap_singular_directed(self) -> Traversal<SingularDirectedWave> {
-        let clone = self.clone();
-        match self.payload {
-            UltraWave::Ping(ping) => clone.with(ping.to_singular_directed()),
-            UltraWave::Ripple(ripple) => {
-                clone.with(ripple.to_singular_directed().expect("singular directed"))
-            }
-            UltraWave::Signal(signal) => clone.with(signal.to_singular_directed()),
-            _ => {
-                panic!("cannot call this unless you are sure it's a DirectedWave")
-            }
-        }
-    }
-
-    pub fn unwrap_reflected(self) -> Traversal<ReflectedWave> {
-        let clone = self.clone();
-        match self.payload {
-            UltraWave::Pong(pong) => clone.with(pong.to_reflected()),
-            UltraWave::Echo(echo) => clone.with(echo.to_reflected()),
-            _ => {
-                panic!("cannot call this unless you are sure it's a ReflectedWave")
-            }
-        }
-    }
-
-    pub fn unwrap_ping(self) -> Traversal<Wave<Ping>> {
-        if let UltraWave::Ping(ping) = self.payload.clone() {
-            self.with(ping)
-        } else {
-            panic!("cannot call this unless you are sure it's a Ping")
-        }
-    }
-
-    pub fn unwrap_pong(self) -> Traversal<Wave<Pong>> {
-        if let UltraWave::Pong(pong) = self.payload.clone() {
-            self.with(pong)
-        } else {
-            panic!("cannot call this unless you are sure it's a Pong")
-        }
-    }
-}
-
-impl Traversal<DirectedWave> {
-    pub fn wrap(self) -> Traversal<UltraWave> {
-        let ping = self.payload.clone();
-        self.with(ping.to_ultra())
-    }
-}
-
-impl Traversal<SingularDirectedWave> {
-    pub fn wrap(self) -> Traversal<UltraWave> {
-        let ping = self.payload.clone();
-        self.with(ping.to_ultra())
-    }
-}
-
-impl Traversal<ReflectedWave> {
-    pub fn to_ultra(self) -> Traversal<UltraWave> {
-        let pong = self.payload.clone();
-        self.with(pong.to_ultra())
-    }
-}
-
-impl Traversal<Wave<Ping>> {
-    pub fn to_ultra(self) -> Traversal<UltraWave> {
-        let ping = self.payload.clone();
-        self.with(ping.to_ultra())
-    }
-
-    pub fn to_directed(self) -> Traversal<DirectedWave> {
-        let ping = self.payload.clone();
-        self.with(ping.to_directed())
-    }
-}
-
-impl Traversal<Wave<Pong>> {
-    pub fn to_ultra(self) -> Traversal<UltraWave> {
-        let pong = self.payload.clone();
-        self.with(pong.to_ultra())
-    }
-
-    pub fn to_reflected(self) -> Traversal<ReflectedWave> {
-        let pong = self.payload.clone();
-        self.with(pong.to_reflected())
-    }
-}
-
-impl<W> Deref for Traversal<W> {
-    type Target = W;
-
-    fn deref(&self) -> &Self::Target {
-        &self.payload
-    }
-}
-
-impl<W> DerefMut for Traversal<W> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.payload
     }
 }
 

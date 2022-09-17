@@ -1,24 +1,30 @@
-use serde::de::{Error, Visitor};
+use crate::loc::{
+    Layer, PointCtx, PointSeg, PointVar, RouteSeg, ToBaseKind, Topic, Variable, VarVal,
+    Version,
+};
+use crate::parse::error::result;
+use crate::parse::{
+    CamelCase, consume_hierarchy, Env, point_segment_selector, point_selector, specific_selector,
+};
+use crate::substance::{
+    CallWithConfigDef, Substance, SubstanceFormat, SubstanceKind, SubstancePattern,
+    SubstancePatternCtx, SubstancePatternDef,
+};
+use crate::util::{ToResolved, ValueMatcher, ValuePattern};
+use crate::{Point, Specific, UniErr};
 use core::fmt::Formatter;
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use core::str::FromStr;
 use cosmic_nom::{new_span, Trace};
 use nom::combinator::all_consuming;
-use std::ops::Deref;
+use serde::de::{Error, Visitor};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
-use crate::id::{KindParts, Layer, PointCtx, PointSeg, PointVar, RouteSeg, ToBaseKind, Topic, Variable, VarVal, Version};
-use crate::parse::{CamelCase, consume_hierarchy, Env, point_segment_selector, point_selector, specific_selector};
-use crate::{BaseKind, Kind, Point, Specific, UniErr};
-use crate::parse::error::result;
-use crate::substance::{CallWithConfigDef, Substance, SubstanceFormat, SubstanceKind, SubstancePattern, SubstancePatternCtx, SubstancePatternDef};
-use crate::util::{ToResolved, ValueMatcher, ValuePattern};
+use std::ops::Deref;
+use crate::kind::{BaseKind, Kind, KindParts};
 
 pub type KindSelector = KindSelectorDef<KindBaseSelector, SubKindSelector, SpecificSelector>;
-pub type KindSelectorVar = KindSelectorDef<
-    VarVal<KindBaseSelector>,
-    VarVal<SubKindSelector>,
-    VarVal<SpecificSelector>,
->;
+pub type KindSelectorVar =
+    KindSelectorDef<VarVal<KindBaseSelector>, VarVal<SubKindSelector>, VarVal<SpecificSelector>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct KindSelectorDef<GenericKindSelector, GenericSubKindSelector, SpecificSelector> {
@@ -709,7 +715,7 @@ where
 
     pub fn convert<To>(self) -> Result<Pattern<To>, UniErr>
     where
-        P: TryInto<To, Error =UniErr> + Eq + PartialEq,
+        P: TryInto<To, Error = UniErr> + Eq + PartialEq,
     {
         Ok(match self {
             Pattern::Any => Pattern::Any,
@@ -761,7 +767,7 @@ where
 
     pub fn convert<To>(self) -> Result<EmptyPattern<To>, UniErr>
     where
-        P: TryInto<To, Error =UniErr> + Eq + PartialEq,
+        P: TryInto<To, Error = UniErr> + Eq + PartialEq,
     {
         Ok(match self {
             EmptyPattern::Any => EmptyPattern::Any,
@@ -906,7 +912,6 @@ impl FromStr for PointHierarchy {
     }
 }
 
-
 pub type PayloadBlock = PayloadBlockDef<Point>;
 pub type PayloadBlockCtx = PayloadBlockDef<PointCtx>;
 pub type PayloadBlockVar = PayloadBlockDef<PointVar>;
@@ -975,12 +980,12 @@ pub enum PayloadBlockDef<Pnt> {
 impl ToResolved<PayloadBlock> for PayloadBlockCtx {
     fn to_resolved(self, env: &Env) -> Result<PayloadBlock, UniErr> {
         match self {
-            PayloadBlockCtx::DirectPattern(block) => Ok(PayloadBlock::DirectPattern(
-                block.modify(move |block| {
+            PayloadBlockCtx::DirectPattern(block) => {
+                Ok(PayloadBlock::DirectPattern(block.modify(move |block| {
                     let block: SubstancePattern = block.to_resolved(env)?;
                     Ok(block)
-                })?,
-            )),
+                })?))
+            }
             PayloadBlockCtx::ReflectPattern(block) => Ok(PayloadBlock::ReflectPattern(
                 block.modify(move |block| block.to_resolved(env))?,
             )),

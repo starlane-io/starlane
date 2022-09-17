@@ -431,7 +431,10 @@ pub fn point_non_root_var<I: Span>(input: I) -> Res<I, PointVar> {
             opt(base_seg(var_seg(pop(version_point_segment)))),
             opt(tuple((
                 root_dir_point_segment_var,
-                many0(recognize(tuple((var_seg(pop(dir_point_segment)), tag("/"))))),
+                many0(recognize(tuple((
+                    var_seg(pop(dir_point_segment)),
+                    tag("/"),
+                )))),
                 opt(var_seg(pop(file_point_segment))),
                 eop,
             ))),
@@ -453,7 +456,10 @@ pub fn point_non_root_var<I: Span>(input: I) -> Res<I, PointVar> {
             }
 
             if let Option::Some((fsroot, mut dirs, file, _)) = filesystem {
-                let mut dirs:Vec<PointSegVar> = dirs.into_iter().map(|i|PointSegVar::Dir(i.to_string())).collect();
+                let mut dirs: Vec<PointSegVar> = dirs
+                    .into_iter()
+                    .map(|i| PointSegVar::Dir(i.to_string()))
+                    .collect();
                 segments.push(fsroot);
                 segments.append(&mut dirs);
                 if let Some(file) = file {
@@ -2243,7 +2249,6 @@ pub fn root_ctx_seg<I: Span, E: ParseError<I>, F>(
     mut f: F,
 ) -> impl FnMut(I) -> IResult<I, PointSegCtx, E> + Copy
 where
-
     F: nom::Parser<I, PointSeg, E> + Copy,
     E: nom::error::ContextError<I>,
 {
@@ -2319,7 +2324,7 @@ pub fn base_seg<I, F, S, E>(mut f: F) -> impl FnMut(I) -> IResult<I, S, E>
 where
     I: Span,
     F: nom::Parser<I, S, E> + Copy,
-    E: nom::error::ContextError<I>+ nom::error::ParseError<I>,
+    E: nom::error::ContextError<I> + nom::error::ParseError<I>,
     S: PointSegment,
 {
     move |input: I| preceded(tag(":"), f)(input)
@@ -2451,7 +2456,7 @@ where
     <I as InputTakeAtPosition>::Item: AsChar,
     F: nom::Parser<I, O, E>,
     E: nom::error::ContextError<I>,
-    O: Clone + FromStr<Err =UniErr>,
+    O: Clone + FromStr<Err = UniErr>,
 {
     move |input: I| {
         let (next, element) = f.parse(input.clone())?;
@@ -3425,7 +3430,8 @@ pub mod model {
         PipelineStopDef, PipelineStopVar, WaveDirection,
     };
     use crate::error::{ParseErrs, UniErr};
-    use crate::http::HttpMethod;
+    use crate::wave::http2::HttpMethod;
+    use crate::loc::{Point, PointCtx, PointVar, Version};
     use crate::parse::error::result;
     use crate::parse::{
         camel_case_chars, CtxResolver, Env, filepath_chars, http_method, lex_child_scopes,
@@ -3449,7 +3455,6 @@ pub mod model {
     use std::ops::{Deref, DerefMut};
     use std::rc::Rc;
     use std::str::FromStr;
-    use crate::id::{Point, PointCtx, PointVar, Version};
 
     #[derive(Clone)]
     pub struct ScopeSelectorAndFiltersDef<S, I> {
@@ -4976,18 +4981,24 @@ use nom::{
 use nom::{Err, IResult};
 use nom_locate::LocatedSpan;
 
-use crate::substance::Bin;
-use crate::command::RawCommand;
 use crate::command::direct::CmdKind;
 use crate::command::CommandVar;
+use crate::command::RawCommand;
 use crate::config::bind::{
     BindConfig, Pipeline, PipelineStep, PipelineStepCtx, PipelineStepVar, PipelineStop,
     PipelineStopCtx, PipelineStopVar, RouteSelector, WaveDirection,
 };
 use crate::config::Document;
-use crate::http::HttpMethod;
-use crate::id::{ArtifactSubKind, DatabaseSubKind, FileSubKind, KindParts, StarKey, StarSub, UserBaseSubKind};
-use crate::ext::ExtMethod;
+use crate::wave::ext::ExtMethod;
+use crate::wave::http2::HttpMethod;
+use crate::loc::{
+    StarKey,
+};
+use crate::loc::{
+    Layer, Point, PointCtx, PointKind, PointKindVar, PointSeg,
+    PointSegCtx, PointSegDelim, PointSegment, PointSegVar, PointVar, RouteSeg, RouteSegVar, Specific,
+    Surface, Topic, Uuid, Variable, VarVal, Version,
+};
 use crate::parse::error::{find_parse_err, result};
 use crate::parse::model::{
     BindScope, BindScopeKind, Block, BlockKind, Chunk, DelimitedBlockKind, LexBlock,
@@ -4998,15 +5009,27 @@ use crate::parse::model::{
     TerminatedBlockKind, TextType, Var, VarParser,
 };
 use crate::selector::specific::{ProductSelector, VariantSelector, VendorSelector};
+use crate::selector::{
+    ExactPointSeg, Hop, KindBaseSelector, KindSelector, LabeledPrimitiveTypeDef, MapEntryPattern,
+    MapEntryPatternCtx, MapEntryPatternVar, Pattern, PatternBlock, PatternBlockCtx,
+    PatternBlockVar, PayloadBlock, PayloadBlockCtx, PayloadBlockVar, PayloadType2Def,
+    PointHierarchy, PointKindSeg, PointSegSelector, Selector, SelectorDef, SpecificSelector,
+    SubKindSelector, UploadBlock, VersionReq,
+};
+use crate::substance::Bin;
+use crate::substance::{
+    Call, CallCtx, CallKind, CallVar, CallWithConfig, CallWithConfigCtx, CallWithConfigVar,
+    ExtCall, HttpCall, ListPattern, MapPattern, MapPatternCtx, MapPatternVar, NumRange, Substance,
+    SubstanceFormat, SubstanceKind, SubstancePattern, SubstancePatternCtx, SubstancePatternVar,
+    SubstanceTypePatternCtx, SubstanceTypePatternDef, SubstanceTypePatternVar,
+};
 use crate::wave::{CmdMethod, HypMethod, Method, MethodKind, MethodPattern};
 use cosmic_nom::{new_span, span_with_extra, Trace};
 use cosmic_nom::{Res, Span, trim, tw, Wrap};
 use nom_supreme::error::ErrorTree;
 use nom_supreme::parser_ext::MapRes;
 use nom_supreme::{parse_from_str, ParserExt};
-use crate::id::{BaseKind, Kind, KindLex, Layer, Point, PointCtx, PointKind, PointKindVar, PointSeg, PointSegCtx, PointSegDelim, PointSegment, PointSegVar, PointVar, Port, RouteSeg, RouteSegVar, Specific, Topic, Uuid, Variable, VarVal, Version};
-use crate::selector::{ExactPointSeg, Hop, KindBaseSelector, KindSelector, LabeledPrimitiveTypeDef, MapEntryPattern, MapEntryPatternCtx, MapEntryPatternVar, Pattern, PatternBlock, PatternBlockCtx, PatternBlockVar, PayloadBlock, PayloadBlockCtx, PayloadBlockVar, PayloadType2Def, PointHierarchy, PointKindSeg, PointSegSelector, Selector, SelectorDef, SpecificSelector, SubKindSelector, UploadBlock, VersionReq};
-use crate::substance::{Call, CallCtx, CallKind, CallVar, CallWithConfig, CallWithConfigCtx, CallWithConfigVar, ExtCall, HttpCall, ListPattern, MapPattern, MapPatternCtx, MapPatternVar, NumRange, Substance, SubstanceFormat, SubstanceKind, SubstancePattern, SubstancePatternCtx, SubstancePatternVar, SubstanceTypePatternCtx, SubstanceTypePatternDef, SubstanceTypePatternVar};
+use crate::kind::{ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, StarSub, UserBaseSubKind};
 
 fn inclusive_any_segment<I: Span>(input: I) -> Res<I, PointSegSelector> {
     alt((tag("+*"), tag("ROOT+*")))(input).map(|(next, _)| (next, PointSegSelector::InclusiveAny))
@@ -7037,13 +7060,27 @@ pub mod test {
     use crate::command::Command;
     use crate::config::Document;
     use crate::error::{ParseErrs, UniErr};
+    use crate::loc::{Point, PointCtx, PointSegVar, RouteSegVar};
     use crate::parse::error::result;
     use crate::parse::model::{
         BlockKind, DelimitedBlockKind, LexScope, NestedBlockKind, TerminatedBlockKind,
     };
-    use crate::parse::{args, base_point_segment, base_seg, comment, consume_point_var, create, create_command, doc, Env, expected_block_terminator_or_non_terminator, lex_block, lex_child_scopes, lex_nested_block, lex_scope, lex_scope_pipeline_step_and_block, lex_scope_selector, lex_scopes, lowercase1, MapResolver, mesh_eos, mesh_seg, nested_block, nested_block_content, next_stacked_name, no_comment, parse_bind_config, parse_include_blocks, parse_inner_block, path_regex, pipeline, pipeline_segment, pipeline_step_var, pipeline_stop_var, point_non_root_var, point_template, point_var, pop, rec_version, root_ctx_seg, root_scope, root_scope_selector, route_attribute, route_selector, scope_filter, scope_filters, skewer_case_chars, skewer_dot, space_chars, space_no_dupe_dots, space_point_segment, strip_comments, subst, SubstParser, template, var_seg, variable_name, VarResolver, version, version_point_segment, wrapper};
-    use crate::util::{log, ToResolved};
+    use crate::parse::{
+        args, base_point_segment, base_seg, comment, consume_point_var, create, create_command,
+        doc, Env, expected_block_terminator_or_non_terminator, lex_block,
+        lex_child_scopes, lex_nested_block, lex_scope, lex_scope_pipeline_step_and_block,
+        lex_scope_selector, lex_scopes, lowercase1, MapResolver, mesh_eos, mesh_seg,
+        nested_block, nested_block_content, next_stacked_name, no_comment, parse_bind_config,
+        parse_include_blocks, parse_inner_block, path_regex, pipeline, pipeline_segment,
+        pipeline_step_var, pipeline_stop_var, point_non_root_var, point_template, point_var, pop, rec_version,
+        root_ctx_seg, root_scope, root_scope_selector, route_attribute, route_selector,
+        scope_filter, scope_filters, skewer_case_chars, skewer_dot, space_chars,
+        space_no_dupe_dots, space_point_segment, strip_comments, subst, SubstParser, template, var_seg,
+        variable_name, VarResolver, version, version_point_segment, wrapper,
+    };
+    use crate::substance::Substance;
     use crate::util;
+    use crate::util::{log, ToResolved};
     use bincode::config;
     use cosmic_nom::{new_span, Res, span_with_extra};
     use nom::branch::alt;
@@ -7060,8 +7097,6 @@ pub mod test {
     use std::rc::Rc;
     use std::str::FromStr;
     use std::sync::Arc;
-    use crate::id::{Point, PointCtx, PointSegVar, RouteSegVar};
-    use crate::substance::Substance;
 
     #[test]
     pub fn test_message_selector() {
@@ -7105,7 +7140,6 @@ pub mod test {
         //let t= util::log(result(all_consuming(template)(new_span("localhost:base<Space>"))))?;
         //        let env = Env::new(Point::root());
         //       let t: Template = util::log(t.to_resolved(&env))?;
-
 
         Ok(())
     }
@@ -7291,9 +7325,10 @@ pub mod test {
 
          */
 
-
-        let point = util::log(result(point_var(new_span("localhost:base:/fs/file.txt<Kind>"))))?;
-        let point :Point = point.collapse()?;
+        let point = util::log(result(point_var(new_span(
+            "localhost:base:/fs/file.txt<Kind>",
+        ))))?;
+        let point: Point = point.collapse()?;
         assert_eq!("localhost:base:/fs/file.txt", point.to_string().as_str());
 
         Ok(())
@@ -8167,13 +8202,13 @@ pub fn rec_script_line<I: Span>(input: I) -> Res<I, I> {
 
 #[cfg(test)]
 pub mod cmd_test {
+    use crate::command::{Command, CommandVar};
     use crate::error::UniErr;
     use crate::parse::{CamelCase, command, script};
     use core::str::FromStr;
     use cosmic_nom::{new_span, Res};
     use nom::error::{VerboseError, VerboseErrorKind};
     use nom_supreme::final_parser::{ExtractContext, final_parser};
-    use crate::command::{Command, CommandVar};
 
     /*
     #[test]
@@ -8296,7 +8331,7 @@ pub fn plus_topic_or_none<I: Span>(input: I) -> Res<I, Topic> {
     )(input)
 }
 
-pub fn port<I: Span>(input: I) -> Res<I, Port> {
+pub fn port<I: Span>(input: I) -> Res<I, Surface> {
     let (next, (point, layer, topic)) = context(
         "port",
         tuple((
@@ -8307,7 +8342,7 @@ pub fn port<I: Span>(input: I) -> Res<I, Port> {
     )(input.clone())?;
 
     match point.w.collapse() {
-        Ok(point) => Ok((next, Port::new(point, layer, topic))),
+        Ok(point) => Ok((next, Surface::new(point, layer, topic))),
         Err(err) => {
             let err = ErrorTree::from_error_kind(input.clone(), ErrorKind::Alpha);
             let loc = input.slice(point.trace.range);
@@ -8328,4 +8363,22 @@ pub struct PortSelectorDef<Hop, Topic, Layer> {
     point: SelectorDef<Hop>,
     topic: Topic,
     layer: Layer,
+}
+
+pub struct KindLex {
+    pub base: CamelCase,
+    pub sub: Option<CamelCase>,
+    pub specific: Option<Specific>,
+}
+
+impl TryInto<KindParts> for KindLex {
+    type Error = UniErr;
+
+    fn try_into(self) -> Result<KindParts, Self::Error> {
+        Ok(KindParts {
+            base: BaseKind::try_from(self.base)?,
+            sub: self.sub,
+            specific: self.specific,
+        })
+    }
 }

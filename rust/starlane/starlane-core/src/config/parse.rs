@@ -2,9 +2,9 @@ use crate::artifact::ArtifactRef;
 use crate::config::config::ParticleConfig;
 use crate::error::Error;
 use crate::particle::config::Parser;
-use cosmic_universe::id::Kind;
-use cosmic_universe::parse::{camel_case_chars, domain, kind, script, script_line, set_properties};
 use cosmic_nom::{new_span, Res, Span};
+use cosmic_universe::kind::Kind;
+use cosmic_universe::parse::{camel_case_chars, domain, kind, script, script_line, set_properties};
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::command::common::SetProperties;
 use nom::branch::alt;
@@ -125,13 +125,13 @@ pub mod test {
         particle_config, properties_section, rec_command_line, rec_command_lines,
     };
     use crate::error::Error;
-    use cosmic_universe::id::ArtifactSubKind;
+    use cosmic_nom::new_span;
+    use cosmic_nom::Span;
+    use cosmic_universe::kind::ArtifactSubKind;
     use cosmic_universe::parse::{
         property_mod, property_value, property_value_not_space_or_comma, set_properties,
     };
     use cosmic_universe::span::new_span;
-    use cosmic_nom::new_span;
-    use cosmic_nom::Span;
     use mesh_portal::version::latest::command::common::PropertyMod;
     use mesh_portal::version::latest::id::Point;
     use nom::combinator::{all_consuming, recognize};

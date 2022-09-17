@@ -13,9 +13,9 @@ use crate::star::core::particle::state::StateStore;
 use crate::star::StarSkel;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 
-use cosmic_universe::id::BaseKind;
-use cosmic_universe::id::ArtifactSubKind;
 use cosmic_universe::hyper::Assign;
+use cosmic_universe::kind::ArtifactSubKind;
+use cosmic_universe::kind::BaseKind;
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{ReqShell, RespShell};

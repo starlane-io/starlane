@@ -1,26 +1,25 @@
-use std::collections::HashMap;
-use std::ops::{Deref, DerefMut};
-use core::str::FromStr;
-use cosmic_nom::Tw;
-use serde_json::Value;
-use std::sync::Arc;
-use http::{HeaderMap, HeaderValue};
-use http::header::CONTENT_TYPE;
-use crate::error::ParseErrs;
-use crate::id::{Meta, PointCtx, PointVar};
-use crate::parse::Env;
-use crate::{Details, Point, Port, ReflectedCore, Status, Stub, UniErr, util};
 use crate::command::{Command, RawCommand};
-use crate::ext::ExtMethod;
-use crate::http::HttpMethod;
+use crate::error::ParseErrs;
+use crate::wave::ext::ExtMethod;
+use crate::wave::http2::HttpMethod;
 use crate::hyper::{Greet, HyperSubstance, Knock};
+use crate::loc::{Meta, PointCtx, PointVar};
 use crate::parse::model::Subst;
+use crate::parse::Env;
 use crate::particle::Particle;
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
-use crate::wave::{CmdMethod, DirectedCore, HyperWave, HypMethod, Pong, UltraWave};
-use serde::{Serialize,Deserialize};
+use crate::wave::{CmdMethod, DirectedCore, HypMethod, HyperWave, Pong, UltraWave};
+use crate::{util, Details, Point, Surface, ReflectedCore, Status, Stub, UniErr};
+use core::str::FromStr;
 use cosmic_macros_primitive::Autobox;
-
+use cosmic_nom::Tw;
+use http::header::CONTENT_TYPE;
+use http::{HeaderMap, HeaderValue};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
 
 #[derive(
     Debug,
@@ -37,7 +36,7 @@ pub enum SubstanceKind {
     List,
     Map,
     Point,
-    Port,
+    Surface,
     Text,
     Boolean,
     Int,
@@ -52,12 +51,11 @@ pub enum SubstanceKind {
     MultipartForm,
     RawCommand,
     Command,
-    ReqCore,
-    RespCore,
+    DirectedCore,
+    ReflectedCore,
     Hyp,
     Token,
     UltraWave,
-    HyperWave,
     Knock,
     Greet,
 }
@@ -78,7 +76,7 @@ pub enum Substance {
     List(SubstanceList),
     Map(SubstanceMap),
     Point(Point),
-    Port(Port),
+    Surface(Surface),
     Text(String),
     Stub(Stub),
     Details(Details),
@@ -93,12 +91,11 @@ pub enum Substance {
     Errors(Errors),
     Json(Value),
     MultipartForm(MultipartForm),
-    ReqCore(Box<DirectedCore>),
-    RespCore(Box<ReflectedCore>),
+    DirectedCore(Box<DirectedCore>),
+    ReflectedCore(Box<ReflectedCore>),
     Hyper(HyperSubstance),
     Token(Token),
     UltraWave(Box<UltraWave>),
-    HyperWave(Box<HyperWave>),
     Knock(Knock),
     Greet(Greet),
 }
@@ -206,18 +203,17 @@ impl Substance {
             Substance::Errors(_) => SubstanceKind::Errors,
             Substance::Json(_) => SubstanceKind::Json,
             Substance::RawCommand(_) => SubstanceKind::RawCommand,
-            Substance::Port(_) => SubstanceKind::Port,
+            Substance::Surface(_) => SubstanceKind::Surface,
             Substance::Command(_) => SubstanceKind::Command,
-            Substance::ReqCore(_) => SubstanceKind::ReqCore,
-            Substance::RespCore(_) => SubstanceKind::RespCore,
+            Substance::DirectedCore(_) => SubstanceKind::DirectedCore,
+            Substance::ReflectedCore(_) => SubstanceKind::ReflectedCore,
             Substance::Hyper(_) => SubstanceKind::Hyp,
             Substance::MultipartForm(_) => SubstanceKind::MultipartForm,
             Substance::Token(_) => SubstanceKind::Token,
             Substance::UltraWave(_) => SubstanceKind::UltraWave,
-            Substance::HyperWave(_) => SubstanceKind::HyperWave,
             Substance::Knock(_) => SubstanceKind::Knock,
             Substance::Greet(_) => SubstanceKind::Greet,
-            Substance::Details(_) => SubstanceKind::Details
+            Substance::Details(_) => SubstanceKind::Details,
         }
     }
 
@@ -296,10 +292,9 @@ pub struct Errors {
     map: HashMap<String, String>,
 }
 
-
 impl Errors {
     pub fn to_cosmic_err(&self) -> UniErr {
-        UniErr::new(500, self.to_string().as_str() )
+        UniErr::new(500, self.to_string().as_str())
     }
 
     pub fn empty() -> Self {
@@ -308,7 +303,7 @@ impl Errors {
         }
     }
 
-    pub fn default<S:ToString>(message: S) -> Self {
+    pub fn default<S: ToString>(message: S) -> Self {
         let mut map = HashMap::new();
         map.insert("default".to_string(), message.to_string());
         Self { map }
@@ -321,9 +316,7 @@ impl From<UniErr> for Errors {
             UniErr::Status { status, message } => {
                 Self::default(format!("{} {}", status, message).as_str())
             }
-            UniErr::ParseErrs(_) => {
-                Self::default("500: parse error")
-            }
+            UniErr::ParseErrs(_) => Self::default("500: parse error"),
         }
     }
 }

@@ -8,13 +8,13 @@ use std::collections::HashSet;
 use std::convert::{Infallible, TryFrom, TryInto};
 use std::string::FromUtf8Error;
 
-use cosmic_universe::id::ToPoint;
-use cosmic_universe::id::StarKey;
 use cosmic_universe::hyper::ParticleRecord;
+use cosmic_universe::kind::BaseKind;
+use cosmic_universe::loc::StarKey;
+use cosmic_universe::loc::ToPoint;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use uuid::Uuid;
-use cosmic_universe::id::BaseKind;
 
 use crate::error::Error;
 use crate::frame::{MessageAck, SimpleReply, StarMessage, StarMessagePayload};

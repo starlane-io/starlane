@@ -14,34 +14,35 @@ extern crate async_trait;
 
 use serde::{Deserialize, Serialize};
 
-pub mod error;
-pub mod http;
-pub mod log;
-pub mod ext;
-pub mod parse;
-pub mod property;
-pub mod quota;
-pub mod security;
-pub mod service;
-pub mod hyper;
-pub mod util;
-pub mod wave;
 pub mod artifact;
-pub mod path;
-pub mod fail;
-pub mod reg;
-pub mod mount;
 pub mod command;
 pub mod config;
-pub mod id;
-pub mod particle;
+pub mod error;
+pub mod fail;
 pub mod frame;
-pub mod selector;
-pub mod substance;
+pub mod hyper;
+pub mod loc;
 pub mod kind;
+pub mod log;
+pub mod parse;
+pub mod particle;
+pub mod path;
+pub mod quota;
+pub mod reg;
+pub mod security;
+pub mod selector;
+pub mod service;
+pub mod substance;
+pub mod util;
+pub mod wave;
 
-
-use substance::Bin;
+use crate::error::UniErr;
+use crate::hyper::ParticleRecord;
+use crate::security::{Access, AccessGrant};
+use crate::wave::{Agent, ReflectedCore};
+use ::http::StatusCode;
+use artifact::ArtifactFetcher;
+use chrono::{DateTime, Utc};
 use command::common::{SetProperties, SetRegistry};
 use command::direct::create::{KindTemplate, Strategy};
 use command::direct::delete::Delete;
@@ -49,24 +50,22 @@ use command::direct::query::{Query, QueryResult};
 use command::direct::select::{Select, SubSelect};
 use config::bind::BindConfig;
 use config::Document;
-use crate::error::UniErr;
-use crate::security::{Access, AccessGrant};
-use selector::Selector;
-use crate::hyper::ParticleRecord;
-use crate::wave::{Agent, ReflectedCore};
-use ::http::StatusCode;
-use chrono::{DateTime, Utc};
 use core::str::FromStr;
 use dashmap::{DashMap, DashSet};
+use loc::{
+    Point, Specific, Surface,
+    Uuid,
+};
 use lru::LruCache;
+use particle::{Details, Properties, Status, Stub};
+use selector::Selector;
 use std::cmp::Ordering;
 use std::ops::Deref;
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use artifact::ArtifactFetcher;
-use id::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Point, Port, Specific, StarSub, UserBaseSubKind, Uuid};
-use particle::{Details, Properties, Status, Stub};
+use substance::Bin;
 use substance::{Substance, SubstanceList, Token, ToSubstance};
+use tokio::sync::RwLock;
+use kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, StarSub, UserBaseSubKind};
 
 lazy_static! {
     pub static ref VERSION: semver::Version = semver::Version::from_str("0.3.0").unwrap();

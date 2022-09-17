@@ -1,6 +1,7 @@
-use crate::{SetProperties, SetRegistry, Strategy};
-use crate::id::{Kind, Point};
+use crate::loc::{Point};
 use crate::particle::Status;
+use crate::{SetProperties, SetRegistry, Strategy};
+use crate::kind::Kind;
 
 #[derive(Clone)]
 pub struct Registration {
@@ -10,5 +11,5 @@ pub struct Registration {
     pub properties: SetProperties,
     pub owner: Point,
     pub strategy: Strategy,
-    pub status: Status
+    pub status: Status,
 }

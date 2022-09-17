@@ -9,20 +9,34 @@ use crate::machine::MachineSkel;
 use crate::shell::Shell;
 use crate::state::ShellState;
 use crate::{DriversBuilder, PlatErr, Platform, Registry, RegistryApi};
-use cosmic_universe::substance::Bin;
-use cosmic_universe::command::RawCommand;
+use cosmic_hyperlane::{
+    Bridge, HyperClient, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
+    HyperwayInterchange, HyperwayStub,
+};
+use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::direct::create::{Create, Strategy};
 use cosmic_universe::command::direct::set::Set;
+use cosmic_universe::command::RawCommand;
 use cosmic_universe::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::error::UniErr;
-use cosmic_universe::log::{PointLogger, RootLogger, Trackable, Tracker};
-use cosmic_universe::parse::{bind_config, Env, route_attribute};
-use cosmic_universe::quota::Timeouts;
 use cosmic_universe::hyper::{
-    Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, Location, ParticleRecord, Provision,
-    Search,
+    Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, Location, ParticleRecord,
+    Provision, Search,
 };
+use cosmic_universe::loc::{
+    GLOBAL_EXEC, Layer, LOCAL_STAR, Point, RouteSeg, StarKey,
+    Surface, SurfaceSelector, ToBaseKind, Topic,
+    ToPoint, ToSurface, Uuid,
+};
+use cosmic_universe::log::{PointLogger, RootLogger, Trackable, Tracker};
+use cosmic_universe::hyper::MountKind;
+use cosmic_universe::parse::{bind_config, Env, route_attribute};
+use cosmic_universe::particle::{Details, Status, Stub};
+use cosmic_universe::quota::Timeouts;
+use cosmic_universe::reg::Registration;
+use cosmic_universe::substance::Bin;
+use cosmic_universe::substance::{Substance, ToSubstance};
 use cosmic_universe::util::{log, ValueMatcher, ValuePattern};
 use cosmic_universe::wave::{
     Agent, Bounce, BounceBacks, CmdMethod, CoreBounce, DirectedHandler, DirectedHandlerSelector,
@@ -33,12 +47,7 @@ use cosmic_universe::wave::{
     WaitTime, Wave, WaveKind,
 };
 use cosmic_universe::wave::{DirectedCore, Exchanger, HyperWave, HypMethod, UltraWave};
-use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::HYPERUSER;
-use cosmic_hyperlane::{
-    Bridge, HyperClient, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
-    HyperwayInterchange, HyperwayStub,
-};
 use dashmap::mapref::one::{Ref, RefMut};
 use dashmap::DashMap;
 use futures::future::{BoxFuture, join_all};
@@ -58,11 +67,8 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock, watch};
 use tokio::time::error::Elapsed;
 use tracing::{error, info};
-use cosmic_universe::id::{BaseKind, GLOBAL_EXEC, Kind, Layer, LOCAL_STAR, Point, Port, PortSelector, RouteSeg, StarKey, StarStub, StarSub, Sub, ToBaseKind, Topic, ToPoint, ToPort, Traversal, TraversalDirection, TraversalInjection, TraversalLayer, Uuid};
-use cosmic_universe::mount::MountKind;
-use cosmic_universe::particle::{Details, Status, Stub};
-use cosmic_universe::reg::Registration;
-use cosmic_universe::substance::{Substance, ToSubstance};
+use cosmic_universe::kind::{BaseKind, Kind, StarStub, StarSub, Sub};
+use cosmic_universe::particle::traversal::{Traversal, TraversalDirection, TraversalInjection, TraversalLayer};
 
 #[derive(Clone)]
 pub struct StarState<P>
@@ -70,7 +76,7 @@ where
     P: Platform + 'static,
 {
     phantom: PhantomData<P>,
-    topic: Arc<DashMap<Port, Arc<dyn TopicHandler>>>,
+    topic: Arc<DashMap<Surface, Arc<dyn TopicHandler>>>,
     shell: Arc<DashMap<Point, ShellState>>,
 }
 
@@ -90,15 +96,14 @@ where
         }
     }
 
-    pub fn topic_handler(&self, port: Port, handler: Arc<dyn TopicHandler>) {
+    pub fn topic_handler(&self, port: Surface, handler: Arc<dyn TopicHandler>) {
         self.topic.insert(port, handler);
     }
 
-
     pub fn find_topic(
         &self,
-        port: &Port,
-        source: &Port,
+        port: &Surface,
+        source: &Surface,
     ) -> Option<Result<Arc<dyn TopicHandler>, UniErr>> {
         match self.topic.get(port) {
             None => None,
@@ -308,7 +313,9 @@ where
             "StarSkel::create(assign_result)",
             transmitter.direct(assign).await,
         )?;
-        self.registry.assign(&details.stub.point).send( self.point.clone() );
+        self.registry
+            .assign(&details.stub.point)
+            .send(self.point.clone());
         let logger = logger.push_mark("result").unwrap();
         logger.result(assign_result.ok_or())?;
         Ok(details)
@@ -605,10 +612,10 @@ where
     star_tx: mpsc::Sender<HyperStarCall<P>>,
     star_rx: mpsc::Receiver<HyperStarCall<P>>,
     drivers: DriversApi<P>,
-    injector: Port,
+    injector: Surface,
     forwarders: Vec<Point>,
     hyperway_transmitter: ProtoTransmitter,
-    gravity: Port,
+    gravity: Surface,
     hyper_router: Arc<dyn Router>,
     layer_traversal_engine: LayerTraversalEngine<P>,
     global_handler: DirectedHandlerShell<GlobalCommandExecutionHandler<P>>,
@@ -1021,7 +1028,6 @@ where
     async fn to_gravity(&self, mut wave: UltraWave) -> Result<(), P::Err> {
         wave.add_to_history(self.skel.point.clone());
 
-
         #[cfg(test)]
         self.skel
             .diagnostic_interceptors
@@ -1060,7 +1066,7 @@ where
                 mut wave: UltraWave,
                 skel: HyperStarSkel<P>,
                 locator: SmartLocator<P>,
-                gravity: Port,
+                gravity: Surface,
             ) -> Result<(), P::Err>
             where
                 P: Platform,
@@ -1147,7 +1153,6 @@ where
             unimplemented!("need to now send out a ripple search for the star being transported to")
         }
     }
-
 
     async fn wrangle(&self, rtn: oneshot::Sender<Result<StarWrangles, UniErr>>) {
         let skel = self.skel.clone();
@@ -1238,7 +1243,7 @@ where
     P: Platform + 'static,
 {
     pub skel: HyperStarSkel<P>,
-    pub injector: Port,
+    pub injector: Surface,
     pub exit_up: mpsc::Sender<Traversal<UltraWave>>,
     pub exit_down: mpsc::Sender<Traversal<UltraWave>>,
     pub layers: HashSet<Layer>,
@@ -1250,7 +1255,7 @@ where
 {
     pub fn new(
         skel: HyperStarSkel<P>,
-        injector: Port,
+        injector: Surface,
         exit_down: mpsc::Sender<Traversal<UltraWave>>,
         exit_up: mpsc::Sender<Traversal<UltraWave>>,
     ) -> Self {
@@ -1269,7 +1274,7 @@ where
     async fn start_layer_traversal(
         &self,
         mut wave: UltraWave,
-        injector: &Port,
+        injector: &Surface,
         from_hyperway: bool,
     ) -> Result<(), P::Err> {
         #[cfg(test)]
@@ -1433,7 +1438,6 @@ where
     }
 
     async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(), UniErr> {
-
         let logger = self.skel.logger.push_mark("stack-traversal:visit")?;
         logger.track(&traversal, || {
             Tracker::new(
@@ -1522,11 +1526,11 @@ pub struct StarMount {
 #[derive(Clone)]
 pub struct LayerInjectionRouter {
     pub inject_tx: mpsc::Sender<TraversalInjection>,
-    pub injector: Port,
+    pub injector: Surface,
 }
 
 impl LayerInjectionRouter {
-    pub fn new<P>(skel: HyperStarSkel<P>, injector: Port) -> Self
+    pub fn new<P>(skel: HyperStarSkel<P>, injector: Surface) -> Self
     where
         P: Platform,
     {
@@ -1536,14 +1540,14 @@ impl LayerInjectionRouter {
         }
     }
 
-    pub fn with(&self, injector: Port) -> Self {
+    pub fn with(&self, injector: Surface) -> Self {
         Self {
             inject_tx: self.inject_tx.clone(),
             injector,
         }
     }
 
-    pub fn injector(inject_tx: mpsc::Sender<TraversalInjection>, injector: Port) -> Self {
+    pub fn injector(inject_tx: mpsc::Sender<TraversalInjection>, injector: Surface) -> Self {
         Self {
             inject_tx,
             injector,
@@ -1565,14 +1569,13 @@ impl Router for LayerInjectionRouter {
 }
 
 pub trait TopicHandler: Send + Sync + DirectedHandler {
-    fn source_selector(&self) -> &PortSelector;
+    fn source_selector(&self) -> &SurfaceSelector;
 }
 
 pub trait TopicHandlerSerde<T: TopicHandler> {
     fn serialize(&self, handler: T) -> Substance;
     fn deserialize(&self, ser: Substance) -> T;
 }
-
 
 #[derive(Clone)]
 pub struct StarTemplate {
@@ -1861,8 +1864,11 @@ where
     pub skel: HyperStarSkel<P>,
 }
 
-impl <P> Star<P> where P: Platform {
-    async fn create(&self, assign: &Assign) -> Result<(),P::Err> {
+impl<P> Star<P>
+where
+    P: Platform,
+{
+    async fn create(&self, assign: &Assign) -> Result<(), P::Err> {
         self.skel
             .state
             .create_shell(assign.details.stub.point.clone());
@@ -1902,11 +1908,18 @@ where
                     .await
                     .map_err(|e| e.to_cosmic_err())?;
 
-                let record = self.skel.registry.record(&Point::root()).await.map_err(|e|e.to_cosmic_err())?;
-                let assign = Assign::new( AssignmentKind::Create, record.details, StateSrc::None );
-                self.create(&assign).await.map_err(|e|e.to_cosmic_err())?;
-                self.skel.registry.assign(&Point::root()).send(self.skel.point.clone());
-
+                let record = self
+                    .skel
+                    .registry
+                    .record(&Point::root())
+                    .await
+                    .map_err(|e| e.to_cosmic_err())?;
+                let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
+                self.create(&assign).await.map_err(|e| e.to_cosmic_err())?;
+                self.skel
+                    .registry
+                    .assign(&Point::root())
+                    .send(self.skel.point.clone());
 
                 let registration = Registration {
                     point: Point::global_executor(),
@@ -1923,10 +1936,18 @@ where
                     .await
                     .map_err(|e| e.to_cosmic_err())?;
 
-                let record = self.skel.registry.record(&Point::global_executor()).await.map_err(|e|e.to_cosmic_err())?;
-                let assign = Assign::new( AssignmentKind::Create, record.details, StateSrc::None );
-                self.create(&assign).await.map_err(|e|e.to_cosmic_err())?;
-                self.skel.registry.assign(&Point::global_executor()).send(LOCAL_STAR.clone() );
+                let record = self
+                    .skel
+                    .registry
+                    .record(&Point::global_executor())
+                    .await
+                    .map_err(|e| e.to_cosmic_err())?;
+                let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
+                self.create(&assign).await.map_err(|e| e.to_cosmic_err())?;
+                self.skel
+                    .registry
+                    .assign(&Point::global_executor())
+                    .send(LOCAL_STAR.clone());
 
                 Ok(Status::Ready)
             }
@@ -2016,7 +2037,6 @@ where
 
     #[route("Hyp<Assign>")]
     pub async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, P::Err> {
-
         if let HyperSubstance::Assign(assign) = ctx.input {
             #[cfg(test)]
             self.skel
@@ -2131,7 +2151,8 @@ where
                                 discoveries.push(discovery);
 
                                 let mut core = ReflectedCore::new();
-                                core.body = Substance::Hyper(HyperSubstance::Discoveries(discoveries));
+                                core.body =
+                                    Substance::Hyper(HyperSubstance::Discoveries(discoveries));
                                 core.status = StatusCode::from_u16(200).unwrap();
                                 return CoreBounce::Reflected(core);
                             }
@@ -2375,7 +2396,7 @@ pub async fn to_ports<E>(
     recipients: Recipients,
     adjacent: &HashSet<Point>,
     registry: &Registry<E>,
-) -> Result<Vec<Port>, E::Err>
+) -> Result<Vec<Surface>, E::Err>
 where
     E: Platform,
 {
@@ -2386,7 +2407,7 @@ where
             unimplemented!();
         }
         Recipients::Stars => {
-            let stars: Vec<Port> = adjacent.clone().into_iter().map(|p| p.to_port()).collect();
+            let stars: Vec<Surface> = adjacent.clone().into_iter().map(|p| p.to_port()).collect();
             Ok(stars)
         }
     }
@@ -2547,7 +2568,9 @@ where
     pub async fn wrangle(&self) -> Result<Discoveries, UniErr> {
         let mut ripple = DirectedProto::ripple();
         ripple.method(HypMethod::Search);
-        ripple.body(Substance::Hyper(HyperSubstance::Search(self.search.clone())));
+        ripple.body(Substance::Hyper(HyperSubstance::Search(
+            self.search.clone(),
+        )));
         ripple.history(self.history.clone());
         let mut adjacents = self.skel.adjacents.clone();
         adjacents.retain(|point, _| !self.history.contains(point));

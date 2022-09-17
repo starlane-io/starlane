@@ -30,7 +30,7 @@ use crate::lane::{
     UltimaLaneKey,
 };
 
-use crate::logger::{Flags, Logger, LogInfo};
+use crate::logger::{Flags, LogInfo, Logger};
 use crate::message::{
     MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage,
     ProtoStarMessageTo, TrackerJob,
@@ -51,12 +51,11 @@ use crate::star::variant::{FrameVerdict, VariantApi};
 use crate::starlane::StarlaneMachine;
 use crate::template::StarHandle;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
-use cosmic_universe::id2::id::{};
-use cosmic_universe::id2::{};
+use cosmic_nom::{new_span, Res, Span};
+use cosmic_universe::hyper::ParticleRecord;
+use cosmic_universe::loc::{ConstellationName, RouteSeg, StarKey, ToPoint, ToSurface};
 use cosmic_universe::parse::error::result;
 use cosmic_universe::parse::lowercase_alphanumeric;
-use cosmic_universe::hyper::ParticleRecord;
-use cosmic_nom::{new_span, Res, Span};
 use mesh_portal::version::latest::id::{Point, Port};
 use mesh_portal::version::latest::log::{PointLogger, RootLogger};
 use mesh_portal::version::latest::particle::Status;
@@ -77,7 +76,7 @@ use std::fmt;
 use std::future::Future;
 use std::num::ParseIntError;
 use std::str::FromStr;
-use cosmic_universe::id::{BaseKind, ConstellationName, RouteSeg, StarKey, ToPoint, ToPort};
+use cosmic_universe::kind::BaseKind;
 
 pub mod core;
 pub mod shell;

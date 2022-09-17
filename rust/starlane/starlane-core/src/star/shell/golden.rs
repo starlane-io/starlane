@@ -1,7 +1,7 @@
 use std::collections::hash_map::RandomState;
 use std::collections::{HashMap, HashSet};
 
-use cosmic_universe::id::StarKey;
+use cosmic_universe::loc::StarKey;
 use lru::LruCache;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;

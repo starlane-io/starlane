@@ -5,12 +5,16 @@ use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 
 use crate::command::common::StateSrc;
+use crate::loc::{Point, StarKey, Surface, ToPoint, ToSurface};
 use crate::log::Log;
-use crate::wave::{CmdMethod, DirectedCore, HypMethod, Ping, Pong, ReflectedKind, ReflectedProto, ToRecipients, UltraWave, Wave, WaveId, WaveKind};
+use crate::particle::{Details, Status, Stub};
+use crate::wave::{
+    CmdMethod, DirectedCore, HypMethod, Ping, Pong, ReflectedKind, ReflectedProto, ToRecipients,
+    UltraWave, Wave, WaveId, WaveKind,
+};
 use crate::{Agent, ReflectedCore};
 use serde::{Deserialize, Serialize};
-use crate::id::{Kind, KindParts, Point, Port, StarKey, StarSub, ToPoint, ToPort};
-use crate::particle::{Details, Status, Stub};
+use crate::kind::{Kind, KindParts, StarSub};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {
@@ -105,15 +109,11 @@ pub struct Provision {
 
 impl Provision {
     pub fn new(point: Point, state: StateSrc) -> Self {
-        Self {
-            point,
-            state,
-        }
+        Self { point, state }
     }
 }
 
-
-impl TryFrom<Ping> for Provision{
+impl TryFrom<Ping> for Provision {
     type Error = UniErr;
 
     fn try_from(request: Ping) -> Result<Self, Self::Error> {
@@ -125,18 +125,18 @@ impl TryFrom<Ping> for Provision{
     }
 }
 
-impl Into<Substance> for Provision{
+impl Into<Substance> for Provision {
     fn into(self) -> Substance {
         Substance::Hyper(HyperSubstance::Provision(self))
     }
 }
 
-impl Into<DirectedCore> for Provision{
+impl Into<DirectedCore> for Provision {
     fn into(self) -> DirectedCore {
-        DirectedCore::new(HypMethod::Assign.into()).with_body(Substance::Hyper(HyperSubstance::Provision(self)))
+        DirectedCore::new(HypMethod::Assign.into())
+            .with_body(Substance::Hyper(HyperSubstance::Provision(self)))
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Assign {
@@ -229,7 +229,8 @@ impl Into<Substance> for Assign {
 
 impl Into<DirectedCore> for Assign {
     fn into(self) -> DirectedCore {
-        DirectedCore::new(HypMethod::Assign.into()).with_body(Substance::Hyper(HyperSubstance::Assign(self)))
+        DirectedCore::new(HypMethod::Assign.into())
+            .with_body(Substance::Hyper(HyperSubstance::Assign(self)))
     }
 }
 
@@ -263,11 +264,11 @@ pub enum ControlPattern {
 pub struct Knock {
     pub kind: InterchangeKind,
     pub auth: Box<Substance>,
-    pub remote: Option<Port>,
+    pub remote: Option<Surface>,
 }
 
 impl Knock {
-    pub fn new(kind: InterchangeKind, remote: Port, auth: Substance) -> Self {
+    pub fn new(kind: InterchangeKind, remote: Surface, auth: Substance) -> Self {
         Self {
             kind,
             remote: Some(remote),
@@ -300,14 +301,14 @@ impl Into<Wave<Ping>> for Knock {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Greet {
-    pub port: Port,
+    pub port: Surface,
     pub agent: Agent,
-    pub hop: Port,
-    pub transport: Port,
+    pub hop: Surface,
+    pub transport: Surface,
 }
 
 impl Greet {
-    pub fn new(agent: Agent, port: Port, hop: Port, transport: Port) -> Self {
+    pub fn new(agent: Agent, port: Surface, hop: Surface, transport: Surface) -> Self {
         Self {
             agent,
             port,
@@ -329,5 +330,20 @@ impl Into<UltraWave> for Greet {
         proto.status(200u16);
         proto.body(self.into());
         proto.build().unwrap().to_ultra()
+    }
+}
+
+#[derive(Clone)]
+pub enum MountKind {
+    Control,
+    Portal,
+}
+
+impl MountKind {
+    pub fn kind(&self) -> Kind {
+        match self {
+            MountKind::Control => Kind::Control,
+            MountKind::Portal => Kind::Portal,
+        }
     }
 }

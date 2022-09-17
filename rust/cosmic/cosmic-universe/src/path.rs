@@ -40,9 +40,7 @@ impl Path {
         if self.string.ends_with("/") {
             Path::from_str(format!("{}{}", self.string.as_str(), path.string.as_str()).as_str())
         } else {
-            Path::from_str(
-                format!("{}/{}", self.string.as_str(), path.string.as_str()).as_str(),
-            )
+            Path::from_str(format!("{}/{}", self.string.as_str(), path.string.as_str()).as_str())
         }
     }
 

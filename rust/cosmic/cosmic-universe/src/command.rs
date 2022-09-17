@@ -1,8 +1,13 @@
 use core::str::FromStr;
 
+use crate::parse::error::result;
+use crate::parse::{command_line, Env};
+use crate::substance::{Bin, ChildSubstance};
+use crate::util::ToResolved;
+use crate::wave::CmdMethod;
+use crate::{Delete, Select, UniErr};
 use cosmic_macros_primitive::Autobox;
 use cosmic_nom::{new_span, Trace};
-use nom::combinator::all_consuming;
 use direct::create::{Create, CreateCtx, CreateVar};
 use direct::delete::{DeleteCtx, DeleteVar};
 use direct::get::{Get, GetCtx, GetVar};
@@ -10,12 +15,7 @@ use direct::read::{Read, ReadCtx, ReadVar};
 use direct::select::{SelectCtx, SelectVar};
 use direct::set::{Set, SetCtx, SetVar};
 use direct::write::{Write, WriteCtx, WriteVar};
-use crate::parse::{command_line, Env};
-use crate::parse::error::result;
-use crate::substance::{Bin, ChildSubstance};
-use crate::{Delete, Select, UniErr};
-use crate::util::ToResolved;
-use crate::wave::CmdMethod;
+use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 
 pub mod common {
@@ -26,7 +26,7 @@ pub mod common {
     use serde::{Deserialize, Serialize};
 
     use crate::error::UniErr;
-    use crate::id::Variable;
+    use crate::loc::Variable;
     use crate::parse::model::Var;
     use crate::substance::{Substance, SubstanceMap};
 
@@ -150,28 +150,28 @@ pub mod common {
     }
 }
 
-
 pub mod direct {
-    use crate::substance::Bin;
     use crate::command::direct::create::Create;
     use crate::command::direct::get::Get;
     use crate::command::direct::select::Select;
     use crate::command::direct::set::Set;
     use crate::command::direct::write::Write;
     use crate::error::UniErr;
+    use crate::wave::ext::ExtMethod;
     use crate::fail;
     use crate::fail::{BadRequest, Fail, NotFound};
-    use crate::http::HttpMethod;
-    use crate::ext::ExtMethod;
+    use crate::wave::http2::HttpMethod;
+    use crate::loc::{Meta, Point};
     use crate::selector::KindSelector;
+    use crate::substance::Bin;
+    use crate::substance::{Errors, Substance};
     use crate::util::{ValueMatcher, ValuePattern};
     use crate::wave::MethodKind;
     use crate::wave::ReflectedCore;
     use http::status::InvalidStatusCode;
     use http::{HeaderMap, Request, StatusCode, Uri};
     use serde::{Deserialize, Serialize};
-    use crate::id::{BaseKind, KindParts, Meta, Point};
-    use crate::substance::{Errors, Substance};
+    use crate::kind::{BaseKind, KindParts};
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub enum Cmd {
@@ -240,10 +240,10 @@ pub mod direct {
     pub mod set {
         use crate::command::common::SetProperties;
         use crate::error::UniErr;
+        use crate::loc::{Point, PointCtx, PointVar};
         use crate::parse::Env;
         use crate::util::ToResolved;
         use serde::{Deserialize, Serialize};
-        use crate::id::{Point, PointCtx, PointVar};
 
         pub type Set = SetDef<Point>;
         pub type SetCtx = SetDef<PointCtx>;
@@ -284,10 +284,10 @@ pub mod direct {
     pub mod get {
         use crate::command::common::SetProperties;
         use crate::error::UniErr;
+        use crate::loc::{Point, PointCtx, PointVar};
         use crate::parse::Env;
         use crate::util::ToResolved;
         use serde::{Deserialize, Serialize};
-        use crate::id::{Point, PointCtx, PointVar};
 
         pub type Get = GetDef<Point>;
         pub type GetCtx = GetDef<PointCtx>;
@@ -339,15 +339,18 @@ pub mod direct {
         use serde::{Deserialize, Serialize};
         use tokio::sync::Mutex;
 
-        use crate::substance::Bin;
         use crate::command::common::{SetProperties, SetRegistry, StateSrc, StateSrcVar};
         use crate::command::Command;
         use crate::error::{ParseErrs, UniErr};
-        use crate::ext::ExtMethod;
-        use crate::id::{BaseKind, HostKey, KindParts, Point, PointCtx, PointFactory, PointSeg, PointVar, ToPort};
-        use crate::parse::{CamelCase, Env, ResolverErr};
+        use crate::kind::{BaseKind, KindParts};
+        use crate::wave::ext::ExtMethod;
+        use crate::loc::{
+            HostKey, Point, PointCtx, PointFactory, PointSeg, PointVar, ToSurface,
+        };
         use crate::parse::model::Subst;
+        use crate::parse::{CamelCase, Env, ResolverErr};
         use crate::selector::SpecificSelector;
+        use crate::substance::Bin;
         use crate::substance::Substance;
         use crate::util::{ConvertFrom, ToResolved};
         use crate::wave::{CmdMethod, DirectedCore, DirectedProto, HypMethod, Ping, Wave};
@@ -431,9 +434,18 @@ pub mod direct {
             fn to_string(&self) -> String {
                 if self.sub.is_some() {
                     if self.specific.is_some() {
-                        format!("{}<{}<{}>>",self.base.to_string(),self.sub.as_ref().unwrap().to_string(), self.specific.as_ref().unwrap().to_string())
+                        format!(
+                            "{}<{}<{}>>",
+                            self.base.to_string(),
+                            self.sub.as_ref().unwrap().to_string(),
+                            self.specific.as_ref().unwrap().to_string()
+                        )
                     } else {
-                       format!("{}<{}>",self.base.to_string(),self.sub.as_ref().unwrap().to_string() )
+                        format!(
+                            "{}<{}>",
+                            self.base.to_string(),
+                            self.sub.as_ref().unwrap().to_string()
+                        )
                     }
                 } else {
                     self.base.to_string()
@@ -559,7 +571,7 @@ pub mod direct {
                 }
             }
 
-            pub fn to_wave_proto(self) -> DirectedProto{
+            pub fn to_wave_proto(self) -> DirectedProto {
                 let mut wave = DirectedProto::ping();
                 wave.method(CmdMethod::Command);
                 wave.body(Substance::Command(Box::new(Command::Create(self))));
@@ -669,7 +681,7 @@ pub mod direct {
 
         use crate::error::UniErr;
         use crate::fail::{BadCoercion, Fail};
-        use crate::id::Point;
+        use crate::loc::Point;
         use crate::parse::Env;
         use crate::particle::Stub;
         use crate::selector::{Hop, HopCtx, HopVar, PointHierarchy, Selector, SelectorDef};
@@ -836,9 +848,9 @@ pub mod direct {
         use crate::command::direct::select::{PropertiesPattern, Select, SelectIntoSubstance};
         use crate::error::UniErr;
         use crate::parse::Env;
+        use crate::selector::{Hop, SelectorDef};
         use crate::util::ToResolved;
         use serde::{Deserialize, Serialize};
-        use crate::selector::{Hop, SelectorDef};
 
         pub type Delete = DeleteDef<Hop>;
         pub type DeleteCtx = DeleteDef<Hop>;
@@ -871,7 +883,7 @@ pub mod direct {
 
         use crate::command::common::SetProperties;
         use crate::error::UniErr;
-        use crate::id::{Point, PointCtx, PointVar};
+        use crate::loc::{Point, PointCtx, PointVar};
         use crate::parse::Env;
         use crate::substance::Substance;
         use crate::util::ToResolved;
@@ -907,11 +919,11 @@ pub mod direct {
 
     pub mod read {
         use crate::error::UniErr;
+        use crate::loc::{Point, PointCtx, PointVar};
         use crate::parse::Env;
         use crate::substance::Substance;
         use crate::util::ToResolved;
         use serde::{Deserialize, Serialize};
-        use crate::id::{Point, PointCtx, PointVar};
 
         pub type Read = ReadDef<Point>;
         pub type ReadCtx = ReadDef<PointCtx>;

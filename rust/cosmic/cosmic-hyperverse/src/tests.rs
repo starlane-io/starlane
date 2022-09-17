@@ -4,16 +4,25 @@ use super::*;
 use crate::base::BaseDriverFactory;
 use crate::control::{ControlClient, ControlCliSession, ControlDriverFactory};
 use chrono::{DateTime, Utc};
+use cosmic_hyperlane::{
+    AnonHyperAuthenticator, HyperClient, HyperConnectionDetails, HyperConnectionErr, HyperGate,
+    HyperwayEndpoint, HyperwayStub, LocalHyperwayGateJumper,
+};
+use cosmic_universe::artifact::NoDiceArtifactFetcher;
 use cosmic_universe::command::common::StateSrc;
-use cosmic_universe::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
-use cosmic_universe::ext::ExtMethod;
+use cosmic_universe::command::direct::create::{
+    Create, PointSegTemplate, PointTemplate, Strategy, Template,
+};
+use cosmic_universe::wave::ext::ExtMethod;
 use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance, InterchangeKind, Knock};
+use cosmic_universe::loc::{Layer, StarHandle, ToPoint, ToSurface, Uuid};
+use cosmic_universe::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
+use cosmic_universe::hyper::MountKind;
 use cosmic_universe::wave::{
-    Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, HypMethod, Method,
-    Pong, ProtoTransmitterBuilder, Wave,
+    Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, HypMethod, Method, Pong,
+    ProtoTransmitterBuilder, Wave,
 };
 use cosmic_universe::HYPERUSER;
-use cosmic_hyperlane::{AnonHyperAuthenticator, HyperClient, HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperwayEndpoint, HyperwayStub, LocalHyperwayGateJumper};
 use dashmap::DashMap;
 use std::io::Error;
 use std::sync::atomic;
@@ -24,10 +33,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{Mutex, oneshot};
 use tokio::time::error::Elapsed;
-use cosmic_universe::artifact::NoDiceArtifactFetcher;
-use cosmic_universe::command::direct::create::{Create, PointSegTemplate, PointTemplate, Strategy, Template};
-use cosmic_universe::id::{Layer, StarHandle, ToPoint, ToPort, TraversalDirection, Uuid};
-use cosmic_universe::mount::MountKind;
+use cosmic_universe::particle::traversal::TraversalDirection;
 //use crate::control::ControlDriverFactory;
 use crate::driver::{DriverAvail, DriverFactory};
 use crate::root::RootDriverFactory;
@@ -331,7 +337,6 @@ impl From<Elapsed> for TestErr {
     }
 }
 
-
 impl From<String> for TestErr {
     fn from(err: String) -> Self {
         TestErr { message: err }
@@ -470,7 +475,6 @@ fn test_gravity_routing() -> Result<(), TestErr> {
         tokio::time::timeout(Duration::from_secs(5), assign_rtn_rx).await;
 
         panic!("far enough");
-
 
         let mut to_fabric_rx = skel.diagnostic_interceptors.to_gravity.subscribe();
         let mut from_hyperway_rx = skel.diagnostic_interceptors.from_hyperway.subscribe();
@@ -822,8 +826,8 @@ fn test_layer_traversal() -> Result<(), TestErr> {
 }
 
 pub struct MachineApiExtFactory<P>
-    where
-        P: Platform,
+where
+    P: Platform,
 {
     machine_api: MachineApi<P>,
     logger: PointLogger,
@@ -831,10 +835,13 @@ pub struct MachineApiExtFactory<P>
 
 #[async_trait]
 impl<P> HyperwayEndpointFactory for MachineApiExtFactory<P>
-    where
-        P: Platform,
+where
+    P: Platform,
 {
-    async fn create(&self, status_tx:mpsc::Sender<HyperConnectionDetails>) -> Result<HyperwayEndpoint, UniErr> {
+    async fn create(
+        &self,
+        status_tx: mpsc::Sender<HyperConnectionDetails>,
+    ) -> Result<HyperwayEndpoint, UniErr> {
         let knock = Knock {
             kind: InterchangeKind::DefaultControl,
             auth: Box::new(Substance::Empty),
@@ -844,7 +851,6 @@ impl<P> HyperwayEndpointFactory for MachineApiExtFactory<P>
             .result_ctx("machine_api.knock()", self.machine_api.knock(knock).await)
     }
 }
-
 
 #[test]
 fn test_control() -> Result<(), TestErr> {
@@ -868,8 +874,12 @@ fn test_control() -> Result<(), TestErr> {
             logger: logger.clone(),
         };
 
-        let exchanger = Exchanger::new( Point::from_str("client").unwrap().to_port(), Timeouts::default());
-        let client = HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger).unwrap();
+        let exchanger = Exchanger::new(
+            Point::from_str("client").unwrap().to_port(),
+            Timeouts::default(),
+        );
+        let client =
+            HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger).unwrap();
         let transmitter = client.transmitter_builder().await?;
         let greet = client.get_greeting().expect("expected greeting");
         let transmitter = transmitter.build();
@@ -929,15 +939,13 @@ fn test_star_wrangle() -> Result<(), TestErr> {
 
         println!("wrangles: {}", wrangles.wrangles.len());
 
-        for kind in wrangles.wrangles.iter()
-        {
-            println!("\tkind: {}", kind.kind.to_string() );
+        for kind in wrangles.wrangles.iter() {
+            println!("\tkind: {}", kind.kind.to_string());
         }
 
         Ok(())
     })
 }
-
 
 #[test]
 fn test_golden_path() -> Result<(), TestErr> {
@@ -954,11 +962,11 @@ fn test_golden_path() -> Result<(), TestErr> {
             .await
             .unwrap();
 
-        let fold = StarKey::new( &"central".to_string(), &StarHandle::new( "fold", 0));
+        let fold = StarKey::new(&"central".to_string(), &StarHandle::new("fold", 0));
         let star_api = machine_api.get_star(fold).await?;
 
         // first test if we can bounce nexus which fold should be directly connected too
-        let nexus = StarKey::new( &"central".to_string(), &StarHandle::new( "nexus", 0));
+        let nexus = StarKey::new(&"central".to_string(), &StarHandle::new("nexus", 0));
         tokio::time::timeout(Duration::from_secs(5), star_api.bounce(nexus)).await??;
         println!("Ok");
 
@@ -968,7 +976,6 @@ fn test_golden_path() -> Result<(), TestErr> {
         println!("Ok");
 
         Ok(())
-
     })
 }
 
@@ -994,8 +1001,12 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
             logger: logger.clone(),
         };
 
-        let exchanger = Exchanger::new( Point::from_str("client").unwrap().to_port(), Timeouts::default());
-        let client = HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger).unwrap();
+        let exchanger = Exchanger::new(
+            Point::from_str("client").unwrap().to_port(),
+            Timeouts::default(),
+        );
+        let client =
+            HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger).unwrap();
         let transmitter = client.transmitter_builder().await?;
         let transmitter = transmitter.build();
 
@@ -1003,18 +1014,24 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
         proto.method(CmdMethod::Bounce);
         proto.to(Point::root().to_port());
         let reflect: Wave<Pong> = transmitter.direct(proto).await?;
-        println!("{}",reflect.core.status.to_string());
+        println!("{}", reflect.core.status.to_string());
         assert!(reflect.core.is_ok());
 
         let create = Create {
-            template: Template::new(PointTemplate { parent: Point::root(), child_segment_template: PointSegTemplate::Exact("my-domain.com".to_string()) }, Kind::Space.to_template() ),
+            template: Template::new(
+                PointTemplate {
+                    parent: Point::root(),
+                    child_segment_template: PointSegTemplate::Exact("my-domain.com".to_string()),
+                },
+                Kind::Space.to_template(),
+            ),
             properties: Default::default(),
             strategy: Strategy::Override,
             state: StateSrc::None,
         };
-        let proto : DirectedProto = create.into();
+        let proto: DirectedProto = create.into();
         let reflect: Wave<Pong> = transmitter.direct(proto).await?;
-        println!("{}",reflect.core.status.to_string());
+        println!("{}", reflect.core.status.to_string());
         assert!(reflect.core.is_ok());
 
         tokio::time::sleep(Duration::from_secs(5)).await;
@@ -1024,11 +1041,10 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
         proto.method(CmdMethod::Bounce);
         proto.to(point.to_port());
         let reflect: Wave<Pong> = transmitter.direct(proto).await?;
-        println!("{}",reflect.core.status.to_string());
+        println!("{}", reflect.core.status.to_string());
         assert!(reflect.core.is_ok());
 
         Ok(())
-
     })
 }
 
@@ -1063,14 +1079,9 @@ fn test_control_cli() -> Result<(), TestErr> {
 
         let core = cli.exec("create localhost<Space>").await?;
 
-        println!("{}",core.to_err().to_string());
+        println!("{}", core.to_err().to_string());
         assert!(core.is_ok());
 
         Ok(())
-
     })
 }
-
-
-
-

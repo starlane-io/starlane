@@ -1,26 +1,35 @@
 use crate::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
 use crate::state::ShellState;
 use crate::{PlatErr, Platform};
-use cosmic_universe::command::RawCommand;
+use cosmic_nom::new_span;
 use cosmic_universe::command::Command;
+use cosmic_universe::command::RawCommand;
 use cosmic_universe::config::bind::RouteSelector;
 use cosmic_universe::error::UniErr;
+use cosmic_universe::loc::{
+    Layer, Point, Surface, SurfaceSelector, Topic, ToPoint, ToSurface,
+    Uuid,
+};
 use cosmic_universe::log::{PointLogger, RootLogger, Trackable};
 use cosmic_universe::parse::error::result;
 use cosmic_universe::parse::{command_line, Env, route_attribute};
 use cosmic_universe::quota::Timeouts;
 use cosmic_universe::util::{log, ToResolved};
-use cosmic_universe::wave::{Agent, Bounce, BounceBacks, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, Reflectable, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, UltraWave, Wave, WaveKind};
-use cosmic_nom::new_span;
+use cosmic_universe::wave::{
+    Agent, Bounce, BounceBacks, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector,
+    DirectedKind, DirectedProto, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter,
+    ProtoTransmitterBuilder, RecipientSelector, Reflectable, ReflectedCore, ReflectedWave,
+    RootInCtx, Router, SetStrategy, UltraWave, Wave, WaveKind,
+};
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU16, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
-use cosmic_universe::id::{Layer, Point, Port, PortSelector, Topic, ToPoint, ToPort, Traversal, TraversalDirection, TraversalInjection, TraversalLayer, Uuid};
+use cosmic_universe::particle::traversal::{Traversal, TraversalDirection, TraversalInjection, TraversalLayer};
 
 #[derive(DirectedHandler)]
 pub struct Shell<P>
@@ -29,7 +38,7 @@ where
 {
     skel: HyperStarSkel<P>,
     state: ShellState,
-    logger: PointLogger
+    logger: PointLogger,
 }
 
 impl<P> Shell<P>
@@ -38,7 +47,11 @@ where
 {
     pub fn new(skel: HyperStarSkel<P>, state: ShellState) -> Self {
         let logger = skel.logger.point(state.point.clone());
-        Self { skel, state, logger }
+        Self {
+            skel,
+            state,
+            logger,
+        }
     }
 }
 
@@ -47,7 +60,7 @@ impl<P> TraversalLayer for Shell<P>
 where
     P: Platform + 'static,
 {
-    fn port(&self) -> Port {
+    fn port(&self) -> Surface {
         self.state.point.clone().to_port().with_layer(Layer::Shell)
     }
 
@@ -68,7 +81,9 @@ where
         if directed.from().point == self.port().point
             && directed.from().layer.ordinal() >= self.port().layer.ordinal()
         {
-            self.state.fabric_requests.insert(directed.id().clone(), AtomicU16::new(1));
+            self.state
+                .fabric_requests
+                .insert(directed.id().clone(), AtomicU16::new(1));
         }
 
         let logger = self.skel.logger.point(directed.to.point.clone()).span();
@@ -102,11 +117,14 @@ where
         let bounce: CoreBounce = if directed.to.topic == Topic::None {
             self.handle(ctx).await
         } else {
-println!("Handling Topic");
-            let handler = self.skel.state.find_topic(&directed.to, directed.from() ).ok_or("expecting topic")??;
+            println!("Handling Topic");
+            let handler = self
+                .skel
+                .state
+                .find_topic(&directed.to, directed.from())
+                .ok_or("expecting topic")??;
             handler.handle(ctx).await
         };
-
 
         match bounce {
             CoreBounce::Absorbed => {}
@@ -122,20 +140,25 @@ println!("Handling Topic");
         &self,
         mut traversal: Traversal<DirectedWave>,
     ) -> Result<(), UniErr> {
-
         match traversal.directed_kind() {
             DirectedKind::Ping => {
-//self.logger.info(format!("Shell tracking id: {} to: {}",traversal.id().to_short_string(), traversal.to.to_string()) );
-                self.state.fabric_requests.insert(traversal.id().clone(), AtomicU16::new(1));
+                //self.logger.info(format!("Shell tracking id: {} to: {}",traversal.id().to_short_string(), traversal.to.to_string()) );
+                self.state
+                    .fabric_requests
+                    .insert(traversal.id().clone(), AtomicU16::new(1));
             }
             DirectedKind::Ripple => {
                 match traversal.bounce_backs() {
                     BounceBacks::None => {}
                     BounceBacks::Single => {
-                        self.state.fabric_requests.insert(traversal.id().clone(), AtomicU16::new(1));
+                        self.state
+                            .fabric_requests
+                            .insert(traversal.id().clone(), AtomicU16::new(1));
                     }
                     BounceBacks::Count(c) => {
-                        self.state.fabric_requests.insert(traversal.id().clone(), AtomicU16::new(c as u16));
+                        self.state
+                            .fabric_requests
+                            .insert(traversal.id().clone(), AtomicU16::new(c as u16));
                     }
                     BounceBacks::Timer(_) => {
                         // not sure what to do in this case...
@@ -155,11 +178,7 @@ println!("Handling Topic");
     ) -> Result<(), UniErr> {
         // println!("Shell reflected_core_bound: {}", traversal.kind().to_string() );
 
-        if let Some(count) = self
-            .state
-            .fabric_requests
-            .get(traversal.reflection_of())
-        {
+        if let Some(count) = self.state.fabric_requests.get(traversal.reflection_of()) {
             let value = count.value().fetch_sub(1, Ordering::Relaxed);
             if value >= 0 {
                 self.traverse_next(traversal.clone().to_ultra()).await;
@@ -197,7 +216,7 @@ where
     P: Platform + 'static,
 {
     #[route("Ext<NewCliSession>")]
-    pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Port, UniErr> {
+    pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Surface, UniErr> {
         // only allow a cli session to be created by any layer of THIS particle
         if ctx.from().clone().to_point() != ctx.to().clone().to_point() {
             return Err(UniErr::forbidden());
@@ -229,7 +248,7 @@ where
 impl CliSession {
     #[route("Ext<Exec>")]
     pub async fn exec(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, UniErr> {
-println!("---> Reached Ext<Exec> !!!!");
+        println!("---> Reached Ext<Exec> !!!!");
         let exec_topic = Topic::uuid();
         let exec_port = self.port.clone().with_topic(exec_topic.clone());
         let mut exec = CommandExecutor::new(exec_port, ctx.from().clone(), self.env.clone());
@@ -240,51 +259,51 @@ println!("---> Reached Ext<Exec> !!!!");
 
 #[derive(DirectedHandler)]
 pub struct CliSession {
-    pub source_selector: PortSelector,
+    pub source_selector: SurfaceSelector,
     pub env: Env,
-    pub port: Port,
+    pub port: Surface,
 }
 
 impl TopicHandler for CliSession {
-    fn source_selector(&self) -> &PortSelector {
+    fn source_selector(&self) -> &SurfaceSelector {
         &self.source_selector
     }
 }
 
 #[derive(DirectedHandler)]
 pub struct CommandExecutor {
-    port: Port,
-    source: Port,
+    port: Surface,
+    source: Surface,
     env: Env,
 }
 
 #[routes]
 impl CommandExecutor {
-    pub fn new(port: Port, source: Port, env: Env) -> Self {
+    pub fn new(port: Surface, source: Surface, env: Env) -> Self {
         Self { port, source, env }
     }
 
     pub async fn execute(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, UniErr> {
-println!("CommadnExecutor...");
+        println!("CommadnExecutor...");
         // make sure everything is coming from this command executor topic
         let ctx = ctx.push_from(self.port.clone());
 
-println!("Pre parse line... '{}'",ctx.line);
+        println!("Pre parse line... '{}'", ctx.line);
         let command = log(result(command_line(new_span(ctx.line.as_str()))))?;
-println!("post parse line...");
+        println!("post parse line...");
         let mut env = self.env.clone();
         for transfer in &ctx.transfers {
             env.set_file(transfer.id.clone(), transfer.content.clone())
         }
-println!("Staring to work...");
+        println!("Staring to work...");
         let command: Command = command.to_resolved(&self.env)?;
-println!("resolved?...");
+        println!("resolved?...");
 
         let request: DirectedCore = command.into();
         let mut directed = DirectedProto::from_core(request);
         directed.to(Point::global_executor());
-println!("GOT HERE");
-        let pong : Wave<Pong> = ctx.transmitter.direct(directed).await?;
+        println!("GOT HERE");
+        let pong: Wave<Pong> = ctx.transmitter.direct(directed).await?;
         Ok(pong.variant.core)
     }
 }

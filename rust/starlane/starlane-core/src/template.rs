@@ -1,9 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 
-use cosmic_universe::id2::{};
+use cosmic_universe::loc::{ConstellationName, MachineName, StarKey};
 use serde::{Deserialize, Serialize};
-use cosmic_universe::id::{ConstellationName, MachineName, StarKey};
 
 use crate::error::Error;
 

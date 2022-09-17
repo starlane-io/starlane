@@ -18,6 +18,8 @@ extern crate async_recursion;
 use crate::driver::{DriverFactory, DriversBuilder};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
 use chrono::{DateTime, Utc};
+use cosmic_hyperlane::{HyperAuthenticator, HyperGate, HyperGateSelector, HyperwayEndpointFactory};
+use cosmic_universe::artifact::ArtifactApi;
 use cosmic_universe::command::common::SetProperties;
 use cosmic_universe::command::direct::create::KindTemplate;
 use cosmic_universe::command::direct::delete::Delete;
@@ -25,14 +27,21 @@ use cosmic_universe::command::direct::query::{Query, QueryResult};
 use cosmic_universe::command::direct::select::{Select, SubSelect};
 use cosmic_universe::error::UniErr;
 use cosmic_universe::fail::Timeout;
-use cosmic_universe::property::PropertiesConfig;
+use cosmic_universe::hyper::ParticleRecord;
+use cosmic_universe::loc::{
+    Layer, MachineName, Point, Surface, RouteSeg,
+    Specific, StarKey, ToBaseKind, ToSurface,
+};
+use cosmic_universe::log::RootLogger;
+use cosmic_universe::particle::{Details, Properties, Status, Stub};
+use cosmic_universe::particle::property::PropertiesConfig;
 use cosmic_universe::quota::Timeouts;
+use cosmic_universe::reg::Registration;
+use cosmic_universe::security::IndexedAccessGrant;
 use cosmic_universe::security::{Access, AccessGrant};
 use cosmic_universe::selector::Selector;
-use cosmic_universe::hyper::ParticleRecord;
+use cosmic_universe::substance::{Substance, SubstanceList, Token};
 use cosmic_universe::wave::{ReflectedCore, UltraWave};
-use cosmic_universe::security::IndexedAccessGrant;
-use cosmic_hyperlane::{HyperAuthenticator, HyperGate, HyperGateSelector, HyperwayEndpointFactory};
 use http::StatusCode;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
@@ -43,27 +52,22 @@ use tokio::runtime::{Handle, Runtime};
 use tokio::sync::{mpsc, oneshot};
 use tracing::error;
 use uuid::Uuid;
-use cosmic_universe::artifact::ArtifactApi;
-use cosmic_universe::id::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Layer, MachineName, Point, Port, RouteSeg, Specific, StarKey, StarSub, ToBaseKind, ToPort, UserBaseSubKind};
-use cosmic_universe::log::RootLogger;
-use cosmic_universe::particle::{Details, Properties, Status, Stub};
-use cosmic_universe::reg::Registration;
-use cosmic_universe::substance::{Substance, SubstanceList, Token};
+use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, StarSub, UserBaseSubKind};
 
 pub mod control;
 pub mod driver;
 //pub mod field2;
+pub mod base;
+pub mod field;
 pub mod global;
 pub mod host;
 pub mod machine;
+pub mod root;
 pub mod shell;
+pub mod space;
 pub mod star;
 pub mod state;
 pub mod tests;
-pub mod base;
-pub mod space;
-pub mod field;
-pub mod root;
 
 #[no_mangle]
 pub extern "C" fn cosmic_uuid() -> String {
@@ -84,7 +88,7 @@ where
 {
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, P::Err>;
 
-    fn assign<'a>(&'a self, point: &'a Point ) -> oneshot::Sender<Point>;
+    fn assign<'a>(&'a self, point: &'a Point) -> oneshot::Sender<Point>;
 
     async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), P::Err>;
 
@@ -128,7 +132,6 @@ where
 
     async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), P::Err>;
 }
-
 
 /*
 #[derive(Clone)]
@@ -273,7 +276,19 @@ where P: Platform, P::Err: PlatErr
 
  */
 
-pub trait PlatErr: Sized + Send + Sync + ToString + Clone + Into<UniErr> + From<UniErr> +From<String> +From<&'static str>+From<tokio::sync::oneshot::error::RecvError>+Into<UniErr> {
+pub trait PlatErr:
+    Sized
+    + Send
+    + Sync
+    + ToString
+    + Clone
+    + Into<UniErr>
+    + From<UniErr>
+    + From<String>
+    + From<&'static str>
+    + From<tokio::sync::oneshot::error::RecvError>
+    + Into<UniErr>
+{
     fn to_cosmic_err(&self) -> UniErr;
 
     fn new<S>(message: S) -> Self

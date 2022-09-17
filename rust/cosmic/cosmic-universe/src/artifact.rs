@@ -1,12 +1,12 @@
+use crate::loc::Point;
+use crate::particle::Stub;
+use crate::substance::Bin;
+use crate::{BindConfig, UniErr};
+use lru::LruCache;
+use serde::{Deserialize, Serialize};
+use std::ops::Deref;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use lru::LruCache;
-use std::ops::Deref;
-use crate::{BindConfig, UniErr};
-use crate::substance::Bin;
-use serde::{Deserialize, Serialize};
-use crate::id::Point;
-use crate::particle::Stub;
 
 #[derive(Clone)]
 pub struct ArtifactApi {
@@ -42,7 +42,7 @@ impl ArtifactApi {
 
     async fn get<A>(&self, point: &Point) -> Result<A, UniErr>
     where
-        A: TryFrom<Vec<u8>, Error =UniErr>,
+        A: TryFrom<Vec<u8>, Error = UniErr>,
     {
         if !point.has_bundle() {
             return Err("point is not from a bundle".into());

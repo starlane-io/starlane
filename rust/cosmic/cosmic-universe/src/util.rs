@@ -7,8 +7,8 @@ use core::result::Result;
 use core::result::Result::{Err, Ok};
 
 use crate::error::UniErr;
-use crate::http::HttpMethod;
-use crate::id::Uuid;
+use crate::wave::http2::HttpMethod;
+use crate::loc::Uuid;
 use crate::parse::Env;
 use crate::{cosmic_timestamp, cosmic_uuid};
 use serde::{Deserialize, Serialize};

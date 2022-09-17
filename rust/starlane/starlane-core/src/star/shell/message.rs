@@ -14,9 +14,9 @@ use crate::message::{
 };
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use cosmic_universe::id2::id::{};
-use cosmic_universe::id::StarKey;
 use cosmic_universe::hyper::ParticleRecord;
+use cosmic_universe::loc::StarKey;
+use cosmic_universe::loc::{ToPoint, ToSurface};
 use dashmap::DashMap;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Message, ReqShell, RespShell};
@@ -27,7 +27,6 @@ use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::oneshot::Sender;
-use cosmic_universe::id::{ToPoint, ToPort};
 
 #[derive(Clone)]
 pub struct MessagingApi {

@@ -16,7 +16,7 @@ use tokio::net::TcpStream;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{broadcast, mpsc};
 
-use cosmic_universe::id::StarKey;
+use cosmic_universe::loc::StarKey;
 use tokio::time::Duration;
 
 use crate::error::Error;

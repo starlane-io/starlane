@@ -1,14 +1,25 @@
-use crate::star::{HyperStar, HyperStarApi, StarCon, HyperStarSkel, StarTemplate, HyperStarTx};
+use crate::control::ControlDriverFactory;
+use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
 use crate::{DriversBuilder, PlatErr, Platform, Registry, RegistryApi};
+use cosmic_hyperlane::{
+    HyperClient, HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector,
+    HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange,
+    HyperwayStub, InterchangeGate, LayerTransform, LocalHyperwayGateJumper,
+    LocalHyperwayGateUnlocker, MountInterchangeGate, SimpleGreeter,
+    TokenAuthenticatorWithRemoteWhitelist,
+};
+use cosmic_universe::artifact::ArtifactApi;
 use cosmic_universe::error::UniErr;
+use cosmic_universe::hyper::{InterchangeKind, Knock};
+use cosmic_universe::loc::{
+    ConstellationName, Layer, MachineName, Point, Surface, StarHandle, StarKey, ToPoint,
+    ToSurface,
+};
 use cosmic_universe::log::{PointLogger, RootLogger};
 use cosmic_universe::particle::Status;
 use cosmic_universe::quota::Timeouts;
 use cosmic_universe::substance::Substance;
-use cosmic_universe::hyper::{InterchangeKind, Knock};
 use cosmic_universe::wave::{Agent, HyperWave, UltraWave};
-use cosmic_universe::artifact::ArtifactApi;
-use cosmic_hyperlane::{HyperClient, HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, InterchangeGate, LayerTransform, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, SimpleGreeter, TokenAuthenticatorWithRemoteWhitelist};
 use dashmap::DashMap;
 use futures::future::{join_all, select_all, BoxFuture};
 use futures::FutureExt;
@@ -24,8 +35,7 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::watch::Ref;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use tracing::info;
-use cosmic_universe::id::{ConstellationName, Layer, MachineName, Point, Port, StarHandle, StarKey, StarSub, ToPoint, ToPort};
-use crate::control::ControlDriverFactory;
+use cosmic_universe::kind::StarSub;
 
 #[derive(Clone)]
 pub struct MachineApi<P>
@@ -43,10 +53,16 @@ where
         Self { tx }
     }
 
-    pub async fn endpoint_factory(&self, from: StarKey, to: StarKey ) -> Result<Box<dyn HyperwayEndpointFactory>,P::Err> {
-       let (rtn, mut rtn_rx) = oneshot::channel();
-       self.tx.send( MachineCall::EndpointFactory { from, to, rtn }).await;
-       Ok(rtn_rx.await?)
+    pub async fn endpoint_factory(
+        &self,
+        from: StarKey,
+        to: StarKey,
+    ) -> Result<Box<dyn HyperwayEndpointFactory>, P::Err> {
+        let (rtn, mut rtn_rx) = oneshot::channel();
+        self.tx
+            .send(MachineCall::EndpointFactory { from, to, rtn })
+            .await;
+        Ok(rtn_rx.await?)
     }
 
     pub async fn add_interchange(
@@ -55,13 +71,15 @@ where
         gate: Arc<dyn HyperGate>,
     ) -> Result<(), UniErr> {
         let (rtn, rtn_rx) = oneshot::channel();
-        self.tx.send(MachineCall::AddGate { kind, gate, rtn }).await?;
+        self.tx
+            .send(MachineCall::AddGate { kind, gate, rtn })
+            .await?;
         rtn_rx.await?
     }
 
     pub async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, UniErr> {
-        let (rtn,rtn_rx) = oneshot::channel();
-        self.tx.send(MachineCall::Knock {knock, rtn}).await;
+        let (rtn, rtn_rx) = oneshot::channel();
+        self.tx.send(MachineCall::Knock { knock, rtn }).await;
         rtn_rx.await?
     }
 
@@ -92,7 +110,6 @@ where
         }
     }
 
-
     #[cfg(test)]
     pub async fn get_machine_star(&self) -> Result<HyperStarApi<P>, UniErr> {
         let (tx, mut rx) = oneshot::channel();
@@ -103,7 +120,7 @@ where
     #[cfg(test)]
     pub async fn get_star(&self, key: StarKey) -> Result<HyperStarApi<P>, UniErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
-        self.tx.send(MachineCall::GetStar{key, rtn}).await;
+        self.tx.send(MachineCall::GetStar { key, rtn }).await;
         rtn_rx.await?
     }
 }
@@ -122,8 +139,8 @@ where
     pub api: MachineApi<P>,
     pub status_rx: watch::Receiver<MachineStatus>,
     pub status_tx: mpsc::Sender<MachineStatus>,
-    pub machine_star: Port,
-    pub global: Port,
+    pub machine_star: Surface,
+    pub global: Surface,
 }
 
 pub struct Machine<P>
@@ -205,11 +222,13 @@ where
             let logger = skel.logger.point(drivers_point.clone());
 
             let mut star_tx: HyperStarTx<P> = HyperStarTx::new(star_point.clone());
-            let star_skel = HyperStarSkel::new(star_template.clone(), skel.clone(), &mut star_tx).await;
+            let star_skel =
+                HyperStarSkel::new(star_template.clone(), skel.clone(), &mut star_tx).await;
 
             let mut drivers = platform.drivers_builder(&star_template.kind);
 
-            let mut interchange = HyperwayInterchange::new(logger.push_point("interchange").unwrap());
+            let mut interchange =
+                HyperwayInterchange::new(logger.push_point("interchange").unwrap());
 
             let star_hop = star_point.clone().to_port().with_layer(Layer::Gravity);
 
@@ -218,7 +237,7 @@ where
 
             let hyperway_endpoint = hyperway.hyperway_endpoint_far(None).await;
             interchange.add(hyperway).await;
-            interchange.singular_to(star_hop.clone() );
+            interchange.singular_to(star_hop.clone());
 
             let interchange = Arc::new(interchange);
             let auth = skel.platform.star_auth(&star_template.key)?;
@@ -256,12 +275,19 @@ where
             }
 
             gates.insert(InterchangeKind::Star(star_template.key.clone()), gate);
-            let star_api = HyperStar::new(star_skel.clone(), drivers, hyperway_endpoint, interchange.clone(), star_tx).await?;
+            let star_api = HyperStar::new(
+                star_skel.clone(),
+                drivers,
+                hyperway_endpoint,
+                interchange.clone(),
+                star_tx,
+            )
+            .await?;
             stars.insert(star_point.clone(), star_api);
         }
 
         let mut gate_selector = Arc::new(HyperGateSelector::new(gates));
-        let gate : Arc<dyn HyperGate> = gate_selector.clone();
+        let gate: Arc<dyn HyperGate> = gate_selector.clone();
         skel.platform.start_services(&gate);
 
         let (machine_point, machine_star) = stars
@@ -403,11 +429,18 @@ where
                     let gate_selector = self.gate_selector.clone();
                     let logger = self.skel.logger.point(self.skel.machine_star.point.clone());
                     tokio::spawn(async move {
-                       rtn.send(logger.result_ctx("MachineCall::Knock",gate_selector.knock(knock).await));
+                        rtn.send(
+                            logger
+                                .result_ctx("MachineCall::Knock", gate_selector.knock(knock).await),
+                        );
                     });
                 }
                 MachineCall::EndpointFactory { from, to, rtn } => {
-                    let factory = Box::new(MachineHyperwayEndpointFactory::new( from, to, self.call_tx.clone() ));
+                    let factory = Box::new(MachineHyperwayEndpointFactory::new(
+                        from,
+                        to,
+                        self.call_tx.clone(),
+                    ));
                     rtn.send(factory).unwrap_or_default();
                 }
                 #[cfg(test)]
@@ -415,8 +448,14 @@ where
                     rtn.send(self.machine_star.clone());
                 }
                 #[cfg(test)]
-                MachineCall::GetStar{ key, rtn } => {
-                    rtn.send(self.stars.get(&key.to_point()).ok_or(format!("could not find star: {}",key.to_string()).into()).cloned()).unwrap_or_default();
+                MachineCall::GetStar { key, rtn } => {
+                    rtn.send(
+                        self.stars
+                            .get(&key.to_point())
+                            .ok_or(format!("could not find star: {}", key.to_string()).into())
+                            .cloned(),
+                    )
+                    .unwrap_or_default();
                 }
                 #[cfg(test)]
                 MachineCall::GetRegistry(rtn) => {
@@ -449,11 +488,18 @@ where
         knock: Knock,
         rtn: oneshot::Sender<Result<HyperwayEndpoint, UniErr>>,
     },
-    EndpointFactory { from: StarKey, to: StarKey, rtn: oneshot::Sender<Box<dyn HyperwayEndpointFactory>> } ,
+    EndpointFactory {
+        from: StarKey,
+        to: StarKey,
+        rtn: oneshot::Sender<Box<dyn HyperwayEndpointFactory>>,
+    },
     #[cfg(test)]
     GetMachineStar(oneshot::Sender<HyperStarApi<P>>),
     #[cfg(test)]
-    GetStar{key: StarKey, rtn:oneshot::Sender<Result<HyperStarApi<P>, UniErr>>},
+    GetStar {
+        key: StarKey,
+        rtn: oneshot::Sender<Result<HyperStarApi<P>, UniErr>>,
+    },
     #[cfg(test)]
     GetRegistry(oneshot::Sender<Registry<P>>),
 }
@@ -538,7 +584,6 @@ impl Default for MachineTemplate {
         jump.connect(nexus.to_stub());
         fold.connect(nexus.to_stub());
 
-
         let mut stars = vec![];
         stars.push(central);
         stars.push(nexus);
@@ -552,29 +597,44 @@ impl Default for MachineTemplate {
     }
 }
 
-
-pub struct MachineHyperwayEndpointFactory<P> where P: Platform {
+pub struct MachineHyperwayEndpointFactory<P>
+where
+    P: Platform,
+{
     from: StarKey,
     to: StarKey,
-    call_tx: mpsc::Sender<MachineCall<P>>
+    call_tx: mpsc::Sender<MachineCall<P>>,
 }
 
-impl <P> MachineHyperwayEndpointFactory<P> where P: Platform {
-    pub fn new( from: StarKey, to: StarKey, call_tx: mpsc::Sender<MachineCall<P>>) -> Self {
-        Self {
-            from,
-            to,
-            call_tx
-        }
+impl<P> MachineHyperwayEndpointFactory<P>
+where
+    P: Platform,
+{
+    pub fn new(from: StarKey, to: StarKey, call_tx: mpsc::Sender<MachineCall<P>>) -> Self {
+        Self { from, to, call_tx }
     }
 }
 
 #[async_trait]
-impl <P> HyperwayEndpointFactory for MachineHyperwayEndpointFactory<P> where P: Platform{
-    async fn create(&self, status_tx:mpsc::Sender<HyperConnectionDetails>) -> Result<HyperwayEndpoint, UniErr> {
-        let knock = Knock::new( InterchangeKind::Star(self.to.clone()), self.from.clone().to_point().to_port().with_layer(Layer::Gravity), Substance::Empty );
-        let (rtn,mut rtn_rx) = oneshot::channel();
+impl<P> HyperwayEndpointFactory for MachineHyperwayEndpointFactory<P>
+where
+    P: Platform,
+{
+    async fn create(
+        &self,
+        status_tx: mpsc::Sender<HyperConnectionDetails>,
+    ) -> Result<HyperwayEndpoint, UniErr> {
+        let knock = Knock::new(
+            InterchangeKind::Star(self.to.clone()),
+            self.from
+                .clone()
+                .to_point()
+                .to_port()
+                .with_layer(Layer::Gravity),
+            Substance::Empty,
+        );
+        let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx.send(MachineCall::Knock { knock, rtn }).await;
-        tokio::time::timeout(Duration::from_secs(60),rtn_rx).await??
+        tokio::time::timeout(Duration::from_secs(60), rtn_rx).await??
     }
 }

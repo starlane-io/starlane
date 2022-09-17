@@ -4,6 +4,7 @@ use std::io;
 use std::string::FromUtf8Error;
 
 use crate::parse::error::find_parse_err;
+use crate::substance::{Errors, Substance};
 use crate::wave::ReflectedCore;
 use ariadne::{Label, Report, ReportBuilder, ReportKind, Source};
 use cosmic_nom::Span;
@@ -24,7 +25,6 @@ use std::sync::{Arc, PoisonError};
 use tokio::sync::mpsc::error::{SendError, SendTimeoutError};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
-use crate::substance::{Errors, Substance};
 
 pub enum UniErr {
     Status { status: u16, message: String },
@@ -48,30 +48,6 @@ impl Into<ReflectedCore> for UniErr {
     }
 }
 
-/*
-impl PlatErr for ExtErr {
-
-    fn to_cosmic_err(&self) -> ExtErr {
-        ExtErr::Status { status: self.status(), message: self.to_string() }
-    }
-
-    fn new<S>(message: S) -> Self where S: ToString {
-        ExtErr::Status { status: 500u16, message: message.to_string() }
-    }
-
-    fn status_msg<S>(status: u16, message: S) -> Self where S: ToString {
-        ExtErr::Status { status, message: message.to_string() }
-    }
-
-    fn status(&self) -> u16 {
-        match self {
-            ExtErr::Status { status, message } => status.clone(),
-            ExtErr::ParseErrs(_) => 500u16,
-        }
-    }
-}
-
- */
 
 impl Clone for UniErr {
     fn clone(&self) -> Self {
@@ -83,11 +59,14 @@ impl Clone for UniErr {
 }
 
 impl UniErr {
-    pub fn str<S:ToString>(s:S) -> UniErr {
+    pub fn str<S: ToString>(s: S) -> UniErr {
         UniErr::new(500, s)
     }
 
-    pub fn map<S>(s:S) -> Self where S:ToString{
+    pub fn map<S>(s: S) -> Self
+    where
+        S: ToString,
+    {
         UniErr::new(500, s)
     }
 
@@ -155,10 +134,10 @@ impl UniErr {
         UniErr::from_status(400)
     }
 
-    pub fn bad_request_msg<M:ToString>(m:M) -> Self {
+    pub fn bad_request_msg<M: ToString>(m: M) -> Self {
         UniErr::Status {
             status: 400,
-            message: m.to_string()
+            message: m.to_string(),
         }
     }
 }
@@ -172,7 +151,7 @@ impl Debug for UniErr {
             UniErr::ParseErrs(errs) => {
                 errs.print();
                 f.write_str("Error Report...")
-            },
+            }
         }
     }
 }
@@ -189,7 +168,7 @@ impl UniErr {
 }
 
 impl UniErr {
-    pub fn new<S:ToString>(status: u16, message: S) -> Self {
+    pub fn new<S: ToString>(status: u16, message: S) -> Self {
         Self::Status {
             status,
             message: message.to_string(),
@@ -262,7 +241,7 @@ impl Display for UniErr {
             UniErr::ParseErrs(errs) => {
                 errs.print();
                 f.write_str("Error Report...")
-            },
+            }
         }
     }
 }

@@ -1,8 +1,8 @@
 use crate::error::Error;
 use crate::registry::RegistryApi;
 use cosmic_universe::command::Command;
-use cosmic_universe::id::Port;
-use cosmic_universe::id::ToPort;
+use cosmic_universe::loc::Surface;
+use cosmic_universe::loc::ToSurface;
 use cosmic_universe::service::Global;
 use cosmic_universe::wave::{AsyncTransmitterWithAgent, Method, Transmitter};
 use mesh_portal::version::latest::id::Point;
@@ -13,7 +13,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 lazy_static! {
-    static ref COMMAND_SERVICE_PORT: Port = Point::from_str("GLOBAL::command-service")
+    static ref COMMAND_SERVICE_PORT: Surface = Point::from_str("GLOBAL::command-service")
         .unwrap()
         .to_port();
 }

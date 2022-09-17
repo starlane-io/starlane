@@ -7,7 +7,7 @@ use crate::databases::lookup_db_for_star;
 use crate::error;
 use crate::error::Error;
 use crate::star::{StarKind, StarWrangleKind};
-use cosmic_universe::id::StarKey;
+use cosmic_universe::loc::StarKey;
 use sqlx::error::DatabaseError;
 use sqlx::postgres::{PgArguments, PgColumn, PgPoolOptions, PgRow};
 use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};

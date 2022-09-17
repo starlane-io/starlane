@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::file_access::FileAccess;
-use cosmic_universe::id::StarKey;
+use cosmic_universe::loc::StarKey;
 use std::collections::HashSet;
 use tokio::sync::RwLock;
 

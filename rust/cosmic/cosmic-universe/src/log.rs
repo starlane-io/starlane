@@ -1,8 +1,10 @@
 use crate::command::common::StateSrc::Substance;
-use crate::error::UniErr;
-use crate::parse::{CamelCase, to_string};
-use crate::util::{timestamp, uuid};
 use crate::cosmic_timestamp;
+use crate::error::UniErr;
+use crate::loc::{Point, ToPoint, Uuid};
+use crate::parse::{to_string, CamelCase};
+use crate::selector::Selector;
+use crate::util::{timestamp, uuid};
 use chrono::serde::ts_milliseconds;
 use chrono::{DateTime, Utc};
 use core::str::FromStr;
@@ -14,8 +16,6 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::process::Output;
 use std::sync::Arc;
-use crate::id::{Point, ToPoint, Uuid};
-use crate::selector::Selector;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum Level {
@@ -384,7 +384,7 @@ impl RootLogger {
             logger: self.clone(),
             point: point.to_point(),
             mark: Point::root(),
-            action: None
+            action: None,
         }
     }
 }
@@ -401,9 +401,16 @@ impl LogAppender for StdOutAppender {
     fn log(&self, log: Log) {
         let action = match log.action {
             None => "None".to_string(),
-            Some(action) => action.to_string()
+            Some(action) => action.to_string(),
         };
-        println!("{} | {}<{}>[{}] {}", log.point.to_string(), log.mark.to_string(), action, log.level.to_string(), log.payload.to_string())
+        println!(
+            "{} | {}<{}>[{}] {}",
+            log.point.to_string(),
+            log.mark.to_string(),
+            action,
+            log.level.to_string(),
+            log.payload.to_string()
+        )
     }
 
     fn audit(&self, log: AuditLog) {
@@ -422,7 +429,7 @@ pub struct PointLogger {
     pub logger: RootLogger,
     pub point: Point,
     pub mark: Point,
-    pub action: Option<CamelCase>
+    pub action: Option<CamelCase>,
 }
 
 impl PointLogger {
@@ -505,7 +512,7 @@ impl PointLogger {
             logger: self.logger.clone(),
             point,
             mark: Point::root(),
-            action: None
+            action: None,
         }
     }
 
@@ -514,7 +521,7 @@ impl PointLogger {
             logger: self.logger.clone(),
             point: self.point.push(segs)?,
             mark: Point::root(),
-            action: None
+            action: None,
         })
     }
 
@@ -523,29 +530,27 @@ impl PointLogger {
             logger: self.logger.clone(),
             point: self.point.clone(),
             mark: self.mark.pop(),
-            action:self.action.clone()
+            action: self.action.clone(),
         }
     }
-
 
     pub fn push_mark<S: ToString>(&self, segs: S) -> Result<PointLogger, UniErr> {
         Ok(PointLogger {
             logger: self.logger.clone(),
             point: self.point.clone(),
             mark: self.mark.push(segs)?,
-            action: None
+            action: None,
         })
     }
 
-    pub fn push_action<A:ToString>(&self, action: A) -> Result<PointLogger, UniErr> {
+    pub fn push_action<A: ToString>(&self, action: A) -> Result<PointLogger, UniErr> {
         Ok(PointLogger {
             logger: self.logger.clone(),
             point: self.point.clone(),
             mark: self.mark.clone(),
-            action: Some(CamelCase::from_str(action.to_string().as_str())?)
+            action: Some(CamelCase::from_str(action.to_string().as_str())?),
         })
     }
-
 
     pub fn msg<M>(&self, level: Level, message: M)
     where
@@ -592,8 +597,8 @@ impl PointLogger {
     }
 
     pub fn error<M>(&self, message: M)
-        where
-            M: ToString,
+    where
+        M: ToString,
     {
         self.msg(Level::Error, message);
     }
@@ -613,8 +618,8 @@ impl PointLogger {
     }
 
     pub fn eat<R, E>(&self, result: Result<R, E>)
-        where
-            E: ToString,
+    where
+        E: ToString,
     {
         match &result {
             Ok(_) => {}
@@ -623,7 +628,6 @@ impl PointLogger {
             }
         }
     }
-
 
     pub fn result_ctx<R, E>(&self, ctx: &str, result: Result<R, E>) -> Result<R, E>
     where
@@ -639,8 +643,8 @@ impl PointLogger {
     }
 
     pub fn eat_ctx<R, E>(&self, ctx: &str, result: Result<R, E>)
-        where
-            E: ToString,
+    where
+        E: ToString,
     {
         match &result {
             Ok(_) => {}
@@ -1037,7 +1041,7 @@ pub struct Tracker {
 }
 
 impl Tracker {
-    pub fn new<P: ToString,A:ToString>(parsec: P, action: A) -> Self {
+    pub fn new<P: ToString, A: ToString>(parsec: P, action: A) -> Self {
         Self {
             parsec: parsec.to_string(),
             action: action.to_string(),

@@ -1,16 +1,18 @@
-use std::marker::PhantomData;
-use std::str::FromStr;
-use std::sync::Arc;
+use crate::driver::{
+    Driver, DriverCtx, DriverSkel, HyperDriverFactory, Item, ItemHandler, ItemSphere,
+};
+use crate::star::HyperStarSkel;
+use crate::Platform;
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::config::bind::BindConfig;
-use cosmic_universe::id::Point;
-use cosmic_universe::id::Kind;
+use cosmic_universe::kind::Kind;
+use cosmic_universe::loc::Point;
 use cosmic_universe::parse::bind_config;
 use cosmic_universe::util::log;
 use cosmic_universe::wave::{CoreBounce, DirectedHandler, ReflectedCore, RootInCtx};
-use crate::driver::{Driver, DriverCtx, DriverSkel, HyperDriverFactory, Item, ItemHandler, ItemSphere};
-use crate::Platform;
-use crate::star::HyperStarSkel;
+use std::marker::PhantomData;
+use std::str::FromStr;
+use std::sync::Arc;
 
 lazy_static! {
     static ref ROOT_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -26,7 +28,7 @@ fn root_bind() -> BindConfig {
     { }
     "#,
     ))
-        .unwrap()
+    .unwrap()
 }
 pub struct RootDriverFactory;
 
@@ -37,14 +39,21 @@ impl RootDriverFactory {
 }
 
 #[async_trait]
-impl <P> HyperDriverFactory<P> for RootDriverFactory where P: Platform
+impl<P> HyperDriverFactory<P> for RootDriverFactory
+where
+    P: Platform,
 {
     fn kind(&self) -> Kind {
         Kind::Root
     }
 
-    async fn create(&self, skel: HyperStarSkel<P>, driver_skel: DriverSkel<P>, ctx: DriverCtx) -> Result<Box<dyn Driver<P>>, P::Err> {
-       Ok(Box::new(RootDriver{}))
+    async fn create(
+        &self,
+        skel: HyperStarSkel<P>,
+        driver_skel: DriverSkel<P>,
+        ctx: DriverCtx,
+    ) -> Result<Box<dyn Driver<P>>, P::Err> {
+        Ok(Box::new(RootDriver {}))
     }
 }
 
@@ -58,29 +67,41 @@ impl DirectedHandler for RootDriver {
 }
 
 #[async_trait]
-impl <P> Driver<P> for RootDriver where P: Platform {
+impl<P> Driver<P> for RootDriver
+where
+    P: Platform,
+{
     fn kind(&self) -> Kind {
         Kind::Root
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
-        Ok(ItemSphere::Handler(Box::new(Root::restore((),(),()))))
+        Ok(ItemSphere::Handler(Box::new(Root::restore((), (), ()))))
     }
 }
 
-pub struct Root<P> where P: Platform{
-    phantom: PhantomData<P>
+pub struct Root<P>
+where
+    P: Platform,
+{
+    phantom: PhantomData<P>,
 }
 
-impl <P> Root<P> where P:Platform {
+impl<P> Root<P>
+where
+    P: Platform,
+{
     pub fn new() -> Self {
         Self {
-            phantom: PhantomData::default()
+            phantom: PhantomData::default(),
         }
     }
 }
 
-impl <P> Item<P> for Root<P> where P: Platform {
+impl<P> Item<P> for Root<P>
+where
+    P: Platform,
+{
     type Skel = ();
     type Ctx = ();
     type State = ();
@@ -90,15 +111,16 @@ impl <P> Item<P> for Root<P> where P: Platform {
     }
 }
 
-use cosmic_universe::wave::RecipientSelector;
 use cosmic_universe::wave::DirectedHandlerSelector;
+use cosmic_universe::wave::RecipientSelector;
 #[routes]
-impl <P> Root<P> where P: Platform {
-
-}
+impl<P> Root<P> where P: Platform {}
 
 #[async_trait]
-impl <P> ItemHandler<P> for Root<P> where P: Platform {
+impl<P> ItemHandler<P> for Root<P>
+where
+    P: Platform,
+{
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(ROOT_BIND_CONFIG.clone())
     }

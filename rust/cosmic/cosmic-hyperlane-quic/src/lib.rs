@@ -1,26 +1,25 @@
 #![allow(warnings)]
 
-use std::io;
-use cosmic_universe::error::{UniErr, StatusErr};
+use cosmic_hyperlane::{HyperGate, HyperGateSelector, VersionGate};
+use cosmic_universe::error::{StatusErr, UniErr};
 use cosmic_universe::frame::PrimitiveFrame;
-use cosmic_universe::id2::id::{};
+use cosmic_universe::hyper::{HyperSubstance, Knock};
+use cosmic_universe::loc::{Point, ToSurface};
 use cosmic_universe::log::PointLogger;
 use cosmic_universe::substance::Substance;
-use cosmic_universe::hyper::{Knock, HyperSubstance};
-use cosmic_universe::wave::{DirectedCore, DirectedProto, Pong, HypMethod, UltraWave, Wave};
+use cosmic_universe::wave::{DirectedCore, DirectedProto, HypMethod, Pong, UltraWave, Wave};
 use cosmic_universe::VERSION;
-use cosmic_hyperlane::{HyperGate, HyperGateSelector, VersionGate};
 use quinn::{
     ClientConfig, Connecting, Connection, Endpoint, NewConnection, RecvStream, ServerConfig, VarInt,
 };
+use rustls::Error;
+use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::task::Poll;
 use std::time::Duration;
-use rustls::Error;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
-use cosmic_universe::id::{Point, ToPort};
 
 fn generate_self_signed_cert() -> Result<(rustls::Certificate, rustls::PrivateKey), UniErr> {
     let cert = rcgen::generate_simple_self_signed(vec!["cosmic-hyperlane".to_string()])?;
@@ -188,13 +187,13 @@ impl HyperServerQuic {
 }
 
 pub struct QuicErr {
-    pub message: String
+    pub message: String,
 }
 
 impl QuicErr {
-    pub fn new<S:ToString>(m:S) -> Self {
+    pub fn new<S: ToString>(m: S) -> Self {
         Self {
-            message: m.to_string()
+            message: m.to_string(),
         }
     }
 }
@@ -210,7 +209,6 @@ impl From<rustls::Error> for QuicErr {
         QuicErr::new(err.to_string())
     }
 }
-
 
 impl From<io::Error> for QuicErr {
     fn from(err: io::Error) -> Self {
@@ -313,17 +311,19 @@ impl ConErr {
 
 #[cfg(test)]
 mod tests {
+    use crate::HyperServerQuic;
+    use cosmic_hyperlane::{HyperGateSelector, VersionGate};
+    use cosmic_universe::error::UniErr;
+    use dashmap::DashMap;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use std::sync::Arc;
-    use dashmap::DashMap;
-    use cosmic_universe::error::UniErr;
-    use cosmic_hyperlane::{HyperGateSelector, VersionGate};
-    use crate::HyperServerQuic;
 
     #[tokio::test]
     pub async fn test() -> Result<(), UniErr> {
         let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 4343);
-        let gate = Arc::new(VersionGate::new(HyperGateSelector::new(Arc::new(DashMap::new()))));
-        let server = HyperServerQuic::new( addr, gate).await?;
+        let gate = Arc::new(VersionGate::new(HyperGateSelector::new(Arc::new(
+            DashMap::new(),
+        ))));
+        let server = HyperServerQuic::new(addr, gate).await?;
     }
 }

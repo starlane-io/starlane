@@ -21,13 +21,13 @@ use crate::star::core::particle::driver::{ResourceCoreDriverApi, ResourceCoreDri
 use crate::star::shell::db::{StarFieldSelection, StarSelector};
 use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use cosmic_universe::command::Command;
-use cosmic_universe::id::{ArtifactSubKind, FileSubKind, StarKey, ToPoint, UserBaseSubKind};
-use cosmic_universe::id2::{};
-use cosmic_universe::particle::Details;
-use cosmic_universe::hyper::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
-use cosmic_locality::field::FieldEx;
 use cosmic_hyperverse::RegistryApi;
+use cosmic_locality::field::FieldEx;
+use cosmic_universe::command::Command;
+use cosmic_universe::hyper::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
+use cosmic_universe::loc::{StarKey, ToPoint};
+use cosmic_universe::loc::{};
+use cosmic_universe::particle::Details;
 use futures::StreamExt;
 use http::{HeaderMap, StatusCode, Uri};
 use mesh_portal::error::MsgErr;
@@ -51,7 +51,7 @@ use mesh_portal::version::latest::security::Access;
 use regex::Regex;
 use std::future::Future;
 use std::sync::Arc;
-use cosmic_universe::id::{BaseKind, Kind, Tks};
+use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Tks, UserBaseSubKind};
 
 /*
 lazy_static!{

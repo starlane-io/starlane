@@ -1,18 +1,19 @@
 use crate::error::UniErr;
-use crate::id::Point;
+use crate::loc::Point;
 use crate::parse::error::result;
 use crate::parse::{MapResolver, particle_perms, permissions, permissions_mask, privilege};
+use crate::selector::{PointHierarchy, Selector};
 use crate::wave::ScopeGrant;
 use cosmic_nom::new_span;
 use nom::combinator::all_consuming;
 use nom_supreme::parser_ext::MapRes;
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::ops;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
-use std::cmp::Ordering;
-use crate::selector::{PointHierarchy, Selector};
+use crate::Agent;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Access {
@@ -577,5 +578,17 @@ impl Deref for IndexedAccessGrant {
 impl Into<AccessGrant> for IndexedAccessGrant {
     fn into(self) -> AccessGrant {
         self.access_grant
+    }
+}
+
+pub trait AccessProvider: Send + Sync {
+    fn access(&self, to: &Agent, on: &Point) -> Result<Access, UniErr>;
+}
+
+pub struct AllAccessProvider();
+
+impl AccessProvider for AllAccessProvider {
+    fn access(&self, _: &Agent, _: &Point) -> Result<Access, UniErr> {
+        Ok(Access::SuperOwner)
     }
 }

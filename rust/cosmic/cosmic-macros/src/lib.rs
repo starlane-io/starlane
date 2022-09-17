@@ -1,7 +1,6 @@
 #![crate_type = "lib"]
 #![allow(warnings)]
 
-
 #[macro_use]
 extern crate strum_macros;
 
@@ -26,7 +25,6 @@ use syn::{
     DeriveInput, FieldsNamed, FieldsUnnamed, FnArg, GenericArgument, ImplItem, ItemImpl,
     ItemStruct, PathArguments, PathSegment, ReturnType, Signature, Type, Visibility,
 };
-
 
 // this is just to make the user realize he needs to import DirectedHandler
 #[proc_macro_derive(DirectedHandler)]

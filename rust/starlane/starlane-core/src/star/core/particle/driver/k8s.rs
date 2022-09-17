@@ -1,8 +1,8 @@
 use std::env;
 use std::sync::Arc;
 
-use cosmic_universe::id::BaseKind;
 use cosmic_universe::hyper::Assign;
+use cosmic_universe::kind::BaseKind;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use kube::api::{ListParams, PostParams};
 use kube::Api;

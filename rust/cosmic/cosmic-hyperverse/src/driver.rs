@@ -1,20 +1,32 @@
 use crate::machine::MachineSkel;
 use crate::star::HyperStarCall::LayerTraversalInjection;
-use crate::star::{
-    HyperStarSkel, LayerInjectionRouter, StarDriver, StarDriverFactory, StarState,
-};
+use crate::star::{HyperStarSkel, LayerInjectionRouter, StarDriver, StarDriverFactory, StarState};
 use crate::{PlatErr, Platform, Registry, RegistryApi};
+use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::command::common::{SetProperties, StateSrc};
-use cosmic_universe::command::direct::create::{Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template};
+use cosmic_universe::command::direct::create::{
+    Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
+};
 use cosmic_universe::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::error::UniErr;
+use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance};
+use cosmic_universe::loc::{
+    Layer, Point, StarKey, Surface, ToBaseKind, ToPoint, ToSurface,
+    Uuid,
+};
 use cosmic_universe::log::{PointLogger, Tracker};
 use cosmic_universe::parse::model::Subst;
 use cosmic_universe::parse::{bind_config, route_attribute};
+use cosmic_universe::particle::{Details, Status, Stub};
+use cosmic_universe::reg::Registration;
 use cosmic_universe::substance::Substance;
-use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance};
 use cosmic_universe::util::{log, ValuePattern};
-use cosmic_universe::wave::{Agent, Bounce, CmdMethod, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, DirectedWave, Exchanger, HypMethod, InCtx, Method, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, UltraWave, Wave, WaveKind};
+use cosmic_universe::wave::{
+    Agent, Bounce, CmdMethod, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector,
+    DirectedKind, DirectedProto, DirectedWave, Exchanger, HypMethod, InCtx, Method, Ping, Pong,
+    ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, ReflectedCore, ReflectedWave,
+    RootInCtx, Router, SetStrategy, UltraWave, Wave, WaveKind,
+};
 use cosmic_universe::HYPERUSER;
 use dashmap::DashMap;
 use futures::future::select_all;
@@ -30,10 +42,8 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::watch::Ref;
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock, watch};
-use cosmic_universe::artifact::ArtRef;
-use cosmic_universe::id::{BaseKind, Kind, Layer, Point, Port, StarKey, StarSub, ToBaseKind, ToPoint, ToPort, Traversal, TraversalInjection, TraversalLayer, Uuid};
-use cosmic_universe::particle::{Details, Status, Stub};
-use cosmic_universe::reg::Registration;
+use cosmic_universe::kind::{BaseKind, Kind, StarSub};
+use cosmic_universe::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
 
 lazy_static! {
     static ref DEFAULT_BIND: ArtRef<BindConfig> = ArtRef::new(
@@ -52,7 +62,7 @@ where
 {
     factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
     kinds: Vec<Kind>,
-    external_kinds: Vec<Kind>
+    external_kinds: Vec<Kind>,
 }
 
 impl<P> DriversBuilder<P>
@@ -65,17 +75,23 @@ where
         let mut external_kinds = vec![];
         let drivers_factory = Arc::new(DriverDriverFactory::new());
         let star_factory = Arc::new(StarDriverFactory::new(kind.clone()));
-        kinds.push(<DriverDriverFactory as HyperDriverFactory<P>>::kind(&drivers_factory) );
-        if <DriverDriverFactory as HyperDriverFactory<P>>::avail(&drivers_factory) == DriverAvail::External {
-            external_kinds.push(<DriverDriverFactory as HyperDriverFactory<P>>::kind(&drivers_factory) );
+        kinds.push(<DriverDriverFactory as HyperDriverFactory<P>>::kind(
+            &drivers_factory,
+        ));
+        if <DriverDriverFactory as HyperDriverFactory<P>>::avail(&drivers_factory)
+            == DriverAvail::External
+        {
+            external_kinds.push(<DriverDriverFactory as HyperDriverFactory<P>>::kind(
+                &drivers_factory,
+            ));
         }
-        pre.push(drivers_factory );
+        pre.push(drivers_factory);
         kinds.push(Kind::Star(kind));
-        pre.push(star_factory );
+        pre.push(star_factory);
         Self {
             factories: pre,
             kinds,
-            external_kinds
+            external_kinds,
         }
     }
 
@@ -89,7 +105,6 @@ where
             self.external_kinds.push(factory.kind());
         }
         self.factories.push(factory);
-
     }
 
     pub fn add_pre(&mut self, factory: Arc<dyn HyperDriverFactory<P>>) {
@@ -231,7 +246,7 @@ pub struct Drivers<P>
 where
     P: Platform + 'static,
 {
-    port: Port,
+    port: Surface,
     skel: HyperStarSkel<P>,
     factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
     drivers: HashMap<Kind, DriverApi<P>>,
@@ -250,7 +265,7 @@ where
     P: Platform + 'static,
 {
     pub fn new(
-        port: Port,
+        port: Surface,
         skel: HyperStarSkel<P>,
         factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
         kinds: Vec<Kind>,
@@ -288,7 +303,7 @@ where
             status_rx: watch_status_rx.clone(),
             init: false,
             kinds,
-            external_kinds
+            external_kinds,
         };
 
         drivers.start();
@@ -505,7 +520,7 @@ where
                     properties: Default::default(),
                     owner: HYPERUSER.clone(),
                     strategy: Strategy::Override,
-                    status: Status::Init
+                    status: Status::Init,
                 };
 
                 skel.registry.register(&registration).await?;
@@ -637,12 +652,12 @@ where
                                 runner_tx,
                                 runner_rx,
                                 status_rx.clone(),
-                                layer
+                                layer,
                             );
                             let driver = DriverApi::new(runner.clone(), factory.kind());
                             let (rtn, rtn_rx) = oneshot::channel();
                             call_tx
-                                .send(DriversCall::AddDriver {  driver, rtn })
+                                .send(DriversCall::AddDriver { driver, rtn })
                                 .await
                                 .unwrap_or_default();
                             rtn_rx.await;
@@ -771,9 +786,10 @@ where
         Self { call_tx: tx, kind }
     }
 
-    pub async fn init_item(&self, point: Point ) -> Result<Status, UniErr> {
-        let (rtn,mut rtn_rx) = oneshot::channel();
-        self.call_tx.try_send(DriverRunnerCall::InitItem{ point, rtn });
+    pub async fn init_item(&self, point: Point) -> Result<Status, UniErr> {
+        let (rtn, mut rtn_rx) = oneshot::channel();
+        self.call_tx
+            .try_send(DriverRunnerCall::InitItem { point, rtn });
         rtn_rx.await?
     }
 
@@ -877,7 +893,10 @@ where
         rtn: oneshot::Sender<Result<(), P::Err>>,
     },
     OnAdded,
-    InitItem{ point: Point, rtn: oneshot::Sender<Result<Status, UniErr>> },
+    InitItem {
+        point: Point,
+        rtn: oneshot::Sender<Result<Status, UniErr>>,
+    },
     DriverRunnerRequest(DriverRunnerRequest<P>),
     Bind {
         point: Point,
@@ -900,7 +919,7 @@ pub struct ItemOuter<P>
 where
     P: Platform + 'static,
 {
-    pub port: Port,
+    pub port: Surface,
     pub skel: HyperStarSkel<P>,
     pub item: ItemSphere<P>,
     pub router: Arc<dyn Router>,
@@ -920,10 +939,9 @@ impl<P> TraversalLayer for ItemOuter<P>
 where
     P: Platform,
 {
-    fn port(&self) -> cosmic_universe::id::Port {
+    fn port(&self) -> cosmic_universe::loc::Surface {
         self.port.clone()
     }
-
 
     async fn deliver_directed(&self, direct: Traversal<DirectedWave>) -> Result<(), UniErr> {
         self.skel
@@ -938,23 +956,31 @@ where
         match &self.item {
             ItemSphere::Handler(item) => {
                 if direct.core().method == Method::Cmd(CmdMethod::Init) {
-println!("RECEIVED INIT COMMAND!");
+                    println!("RECEIVED INIT COMMAND!");
                     let reflection = direct.reflection()?;
                     match item.init().await {
                         Ok(status) => {
-                            self.skel.registry.set_status(&self.port().point.clone(), &status).await;
-                            let reflect = reflection.make(ReflectedCore::ok(), self.port() );
+                            self.skel
+                                .registry
+                                .set_status(&self.port().point.clone(), &status)
+                                .await;
+                            let reflect = reflection.make(ReflectedCore::ok(), self.port());
                             self.router.route(reflect.to_ultra()).await;
                         }
                         Err(err) => {
-                            self.skel.registry.set_status(&self.port().point.clone(), &Status::Panic).await;
-                            let reflect = reflection.make(ReflectedCore::err(err), self.port() );
+                            self.skel
+                                .registry
+                                .set_status(&self.port().point.clone(), &Status::Panic)
+                                .await;
+                            let reflect = reflection.make(ReflectedCore::err(err), self.port());
                             self.router.route(reflect.to_ultra()).await;
                         }
                     }
                 } else {
-                    let mut transmitter =
-                        ProtoTransmitterBuilder::new(self.router.clone(), self.skel.exchanger.clone());
+                    let mut transmitter = ProtoTransmitterBuilder::new(
+                        self.router.clone(),
+                        self.skel.exchanger.clone(),
+                    );
                     transmitter.from = SetStrategy::Override(self.port.clone());
                     let transmitter = transmitter.build();
                     let to = direct.to.clone();
@@ -1003,7 +1029,6 @@ println!("RECEIVED INIT COMMAND!");
         }
     }
 
-
     async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
         self.skel.traverse_to_next_tx.send(traversal).await;
     }
@@ -1031,7 +1056,7 @@ where
     router: LayerInjectionRouter,
     logger: PointLogger,
     status_rx: watch::Receiver<DriverStatus>,
-    layer: Layer
+    layer: Layer,
 }
 
 #[routes]
@@ -1046,7 +1071,7 @@ where
         call_tx: mpsc::Sender<DriverRunnerCall<P>>,
         call_rx: mpsc::Receiver<DriverRunnerCall<P>>,
         status_rx: watch::Receiver<DriverStatus>,
-        layer: Layer
+        layer: Layer,
     ) -> mpsc::Sender<DriverRunnerCall<P>> {
         let logger = star_skel.logger.point(skel.point.clone());
         let router = LayerInjectionRouter::new(
@@ -1063,7 +1088,7 @@ where
             router,
             logger,
             status_rx,
-            layer
+            layer,
         };
 
         driver.start();
@@ -1140,7 +1165,7 @@ where
                             }
                         }
                     }
-                    DriverRunnerCall::InitItem{ point, rtn } => {
+                    DriverRunnerCall::InitItem { point, rtn } => {
                         let item = self.driver.item(&point).await;
                         match item {
                             Ok(item) => {
@@ -1161,9 +1186,13 @@ where
         let logger = item.skel.logger.clone();
         tokio::spawn(async move {
             if traversal.is_directed() {
-                logger.result(item.deliver_directed(traversal.unwrap_directed()).await).unwrap_or_default();
+                logger
+                    .result(item.deliver_directed(traversal.unwrap_directed()).await)
+                    .unwrap_or_default();
             } else {
-                logger.result(item.deliver_reflected(traversal.unwrap_reflected()).await).unwrap_or_default();
+                logger
+                    .result(item.deliver_reflected(traversal.unwrap_reflected()).await)
+                    .unwrap_or_default();
             }
         });
         Ok(())
@@ -1179,7 +1208,6 @@ where
             router: Arc::new(self.router.clone().with(port)),
         })
     }
-
 
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, P::Err> {
@@ -1263,16 +1291,25 @@ where
         }
     }
 
-    pub async fn create_driver_particle(&self, child_segment_template: PointSegTemplate, kind: KindTemplate ) -> Result<Details,P::Err> {
+    pub async fn create_driver_particle(
+        &self,
+        child_segment_template: PointSegTemplate,
+        kind: KindTemplate,
+    ) -> Result<Details, P::Err> {
         let create = Create {
-            template: Template::new(PointTemplate { parent:self.point.clone(), child_segment_template }, kind ),
+            template: Template::new(
+                PointTemplate {
+                    parent: self.point.clone(),
+                    child_segment_template,
+                },
+                kind,
+            ),
             properties: Default::default(),
             strategy: Strategy::Override,
             state: StateSrc::None,
         };
         self.skel.create_in_star(create).await
     }
-
 }
 
 pub struct DriverFactoryWrapper<P>
@@ -1461,7 +1498,7 @@ where
     pub async fn init(&self) -> Result<Status, UniErr> {
         match self {
             ItemSphere::Handler(handler) => handler.init().await,
-            ItemSphere::Router(router) =>  {
+            ItemSphere::Router(router) => {
                 // needs to convert to a message and forward to router
                 Ok(Status::Ready)
             }
@@ -1476,14 +1513,17 @@ where
     }
 }
 
-#[derive(Clone,Eq,PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum DriverAvail {
     Internal,
-    External
+    External,
 }
 
 #[async_trait]
-pub trait Item<P> where P: Platform{
+pub trait Item<P>
+where
+    P: Platform,
+{
     type Skel;
     type Ctx;
     type State;

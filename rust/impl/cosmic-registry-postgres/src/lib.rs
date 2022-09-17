@@ -1,25 +1,41 @@
 #![allow(warnings)]
 
+use cosmic_hyperverse::machine::MachineTemplate;
+use cosmic_hyperverse::Platform;
+use cosmic_hyperverse::{PlatErr, RegistryApi};
 use cosmic_universe::command::common::{PropertyMod, SetProperties, SetRegistry};
 use cosmic_universe::command::direct::create::{Create, KindTemplate, PointSegTemplate, Strategy};
 use cosmic_universe::command::direct::delete::Delete;
 use cosmic_universe::command::direct::get::{Get, GetOp};
 use cosmic_universe::command::direct::query::{Query, QueryResult};
-use cosmic_universe::command::direct::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
+use cosmic_universe::command::direct::select::{
+    Select, SelectIntoSubstance, SelectKind, SubSelect,
+};
 use cosmic_universe::command::direct::set::Set;
 use cosmic_universe::error::UniErr;
+use cosmic_universe::hyper::{Location, ParticleRecord};
+use cosmic_universe::loc::{
+    Point, PointSeg, Specific, StarKey,
+    ToBaseKind, Version,
+};
 use cosmic_universe::id2::BaseSubKind;
 use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
-use cosmic_universe::security::{Access, AccessGrant, AccessGrantKind, EnumeratedAccess, IndexedAccessGrant, Permissions, PermissionsMask, PermissionsMaskKind, Privilege, Privileges};
+use cosmic_universe::particle::{Details, Properties, Property, Status, Stub};
+use cosmic_universe::reg::Registration;
+use cosmic_universe::security::{
+    Access, AccessGrant, AccessGrantKind, EnumeratedAccess, IndexedAccessGrant, Permissions,
+    PermissionsMask, PermissionsMaskKind, Privilege, Privileges,
+};
 use cosmic_universe::selector::specific::{
     ProductSelector, ProviderSelector, VariantSelector, VendorSelector,
 };
-use cosmic_universe::hyper::{Location, ParticleRecord};
+use cosmic_universe::selector::{
+    ExactPointSeg, KindBaseSelector, PointHierarchy, PointKindSeg, PointSegSelector, Selector,
+    SubKindSelector,
+};
+use cosmic_universe::substance::{Substance, SubstanceList, SubstanceMap};
 use cosmic_universe::util::ValuePattern;
 use cosmic_universe::HYPERUSER;
-use cosmic_hyperverse::machine::MachineTemplate;
-use cosmic_hyperverse::Platform;
-use cosmic_hyperverse::{PlatErr, RegistryApi};
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
@@ -32,11 +48,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use strum::ParseError;
 use tokio::sync::mpsc;
-use cosmic_universe::id::{ArtifactSubKind, BaseKind, FileSubKind, Kind, KindParts, Point, PointSeg, Specific, StarKey, ToBaseKind, UserBaseSubKind, Version};
-use cosmic_universe::particle::{Details, Properties, Property, Status, Stub};
-use cosmic_universe::reg::Registration;
-use cosmic_universe::selector::{ExactPointSeg, KindBaseSelector, PointHierarchy, PointKindSeg, PointSegSelector, Selector, SubKindSelector};
-use cosmic_universe::substance::{Substance, SubstanceList, SubstanceMap};
+use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, KindParts, UserBaseSubKind};
 
 #[macro_use]
 extern crate lazy_static;
@@ -1132,16 +1144,18 @@ pub mod test {
     use crate::particle::Kind;
     use crate::registry::{Registration, Registry};
     use crate::{PostErr, PostgresRegistry};
+    use cosmic_hyperverse::RegistryApi;
     use cosmic_universe::command::direct::query::Query;
     use cosmic_universe::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
     use cosmic_universe::entity::request::select::SelectKind;
+    use cosmic_universe::loc::{Point, StarKey, ToPoint};
     use cosmic_universe::particle::Status;
+    use cosmic_universe::reg::Registration;
     use cosmic_universe::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
         Privilege,
     };
-    use cosmic_universe::reg::Registration;
-    use cosmic_hyperverse::RegistryApi;
+    use cosmic_universe::selector::{PointHierarchy, Selector};
     use mesh_portal::version::latest::entity::request::query::Query;
     use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoSubstance};
     use mesh_portal::version::latest::id::Point;
@@ -1150,8 +1164,7 @@ pub mod test {
     use mesh_portal::version::latest::selector::{PointHierarchy, Selector};
     use std::convert::TryInto;
     use std::str::FromStr;
-    use cosmic_universe::id::{Kind, Point, StarKey, ToPoint, UserBaseSubKind};
-    use cosmic_universe::selector::{PointHierarchy, Selector};
+    use cosmic_universe::kind::{Kind, UserBaseSubKind};
 
     #[tokio::test]
     pub async fn test_nuke() -> Result<(), PostErr> {
@@ -1678,9 +1691,7 @@ where
     }
 
     pub async fn create(&self, create: &Create) -> Result<Details, PostErr> {
-        let child_kind = self
-            .platform
-            .select_kind(&create.template.kind)?;
+        let child_kind = self.platform.select_kind(&create.template.kind)?;
         let stub = match &create.template.point.child_segment_template {
             PointSegTemplate::Exact(child_segment) => {
                 let point = create.template.point.parent.push(child_segment.clone());

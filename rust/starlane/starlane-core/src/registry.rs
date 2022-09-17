@@ -6,8 +6,10 @@ use crate::databases::lookup_registry_db;
 use crate::particle::properties_config;
 use cosmic_universe::command::direct::delete::Delete;
 use cosmic_universe::command::direct::select::{SelectKind, SubSelect};
-use cosmic_universe::id::{ArtifactSubKind, FileSubKind, Tks, UserBaseSubKind};
-use cosmic_universe::id2::{BaseSubKind};
+use cosmic_universe::hyper::{Location, ParticleRecord};
+use cosmic_universe::loc::{};
+use cosmic_universe::loc::{};
+use cosmic_universe::id2::BaseSubKind;
 use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
 use cosmic_universe::particle::Details;
 use cosmic_universe::security::{
@@ -15,7 +17,6 @@ use cosmic_universe::security::{
     PermissionsMaskKind, Privilege, Privileges,
 };
 use cosmic_universe::selector::SubKindSelector;
-use cosmic_universe::hyper::{Location, ParticleRecord};
 use futures::{FutureExt, StreamExt};
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties, SetRegistry};
@@ -50,7 +51,7 @@ use std::ops::{Deref, Index};
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use cosmic_universe::id::{BaseKind, Kind};
+use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Tks, UserBaseSubKind};
 
 lazy_static! {
     pub static ref HYPERUSER: Point = Point::from_str("hyperspace:users:hyperuser").expect("point");
@@ -1184,8 +1185,9 @@ pub mod test {
     use crate::registry::{Registration, Registry};
     use cosmic_universe::command::direct::select::SelectKind;
     use cosmic_universe::entity::request::select::SelectKind;
-    use cosmic_universe::id::ToPoint;
-    use cosmic_universe::id::UserBaseSubKind;
+    use cosmic_universe::kind::Kind;
+    use cosmic_universe::loc::ToPoint;
+    use cosmic_universe::kind::UserBaseSubKind;
     use cosmic_universe::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
         Privilege,
@@ -1198,7 +1200,6 @@ pub mod test {
     use mesh_portal::version::latest::selector::{PointKindHierarchy, PointSelector};
     use std::convert::TryInto;
     use std::str::FromStr;
-    use cosmic_universe::id::Kind;
 
     #[tokio::test]
     pub async fn test_nuke() -> Result<(), Error> {
