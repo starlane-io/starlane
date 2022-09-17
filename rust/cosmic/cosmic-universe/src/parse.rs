@@ -22,7 +22,7 @@ use crate::command::request::create::{
 use crate::command::request::get::{Get, GetOp, GetVar};
 use crate::command::request::select::{Select, SelectIntoSubstance, SelectKind, SelectVar};
 use crate::command::request::set::{Set, SetVar};
-use crate::error::{MsgErr, ParseErrs};
+use crate::error::{UniErr, ParseErrs};
 use crate::id::id::{
     Kind, KindLex, Layer, Point, PointCtx, PointKindVar, PointSegCtx, PointSegDelim, PointSegVar,
     PointSegment, PointVar, Port, RouteSeg, RouteSegVar, Topic, Uuid, VarVal, Variable, Version,
@@ -50,7 +50,7 @@ impl Parser {
         point_subst(input)
     }
 
-    pub fn consume_point(input: Span) -> Result<Point, MsgErr> {
+    pub fn consume_point(input: Span) -> Result<Point, ExtErr> {
         let (_, point) = all_consuming(point_subst)(input)?;
         Ok(point)
     }
@@ -475,15 +475,15 @@ pub fn point_non_root_var<I: Span>(input: I) -> Res<I, PointVar> {
     )
 }
 
-pub fn consume_point(input: &str) -> Result<Point, MsgErr> {
+pub fn consume_point(input: &str) -> Result<Point, UniErr> {
     consume_point_ctx(input)?.collapse()
 }
 
-pub fn consume_point_ctx(input: &str) -> Result<PointCtx, MsgErr> {
+pub fn consume_point_ctx(input: &str) -> Result<PointCtx, UniErr> {
     consume_point_var(input)?.collapse()
 }
 
-pub fn consume_point_var(input: &str) -> Result<PointVar, MsgErr> {
+pub fn consume_point_var(input: &str) -> Result<PointVar, UniErr> {
     let span = new_span(input);
     let point = result(context("consume", all_consuming(point_var))(span))?;
     Ok(point)
@@ -640,7 +640,7 @@ pub fn version_point_kind_segment<I: Span>(input: I) -> Res<I, PointKindSeg> {
     })
 }
 
-pub fn consume_hierarchy<I: Span>(input: I) -> Result<PointHierarchy, MsgErr> {
+pub fn consume_hierarchy<I: Span>(input: I) -> Result<PointHierarchy, UniErr> {
     let (_, rtn) = all_consuming(point_kind_hierarchy)(input)?;
     Ok(rtn)
 }
@@ -1097,7 +1097,7 @@ impl CamelCase {
 }
 
 impl FromStr for CamelCase {
-    type Err = MsgErr;
+    type Err = UniErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(camel_case)(new_span(s)))
@@ -1172,7 +1172,7 @@ impl<'de> Deserialize<'de> for Domain {
 }
 
 impl FromStr for Domain {
-    type Err = MsgErr;
+    type Err = UniErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(domain)(new_span(s)))
@@ -1223,7 +1223,7 @@ impl<'de> Deserialize<'de> for SkewerCase {
 }
 
 impl FromStr for SkewerCase {
-    type Err = MsgErr;
+    type Err = UniErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(skewer_case)(new_span(s)))
@@ -1857,7 +1857,7 @@ impl Env {
         }
     }
 
-    pub fn push_working<S: ToString>(self, segs: S) -> Result<Self, MsgErr> {
+    pub fn push_working<S: ToString>(self, segs: S) -> Result<Self, UniErr> {
         Ok(Self {
             point: self.point.push(segs.to_string())?,
             parent: Some(Box::new(self)),
@@ -1867,14 +1867,14 @@ impl Env {
         })
     }
 
-    pub fn point_or(&self) -> Result<Point, MsgErr> {
+    pub fn point_or(&self) -> Result<Point, UniErr> {
         Ok(self.point.clone())
     }
 
-    pub fn pop(self) -> Result<Env, MsgErr> {
+    pub fn pop(self) -> Result<Env, UniErr> {
         Ok(*self
             .parent
-            .ok_or::<MsgErr>("expected parent scopedVars".into())?)
+            .ok_or::<UniErr>("expected parent scopedVars".into())?)
     }
 
     pub fn add_var_resolver(&mut self, var_resolver: Arc<dyn VarResolver>) {
@@ -1990,7 +1990,7 @@ impl Env {
         }
     }
 
-    pub fn point_or(&self) -> Result<&Point, MsgErr> {
+    pub fn point_or(&self) -> Result<&Point, ExtErr> {
         self.point
             .as_ref()
             .ok_or("cannot reference working point in this context".into())
@@ -2083,13 +2083,13 @@ impl VarResolver for CompositeResolver {
 }
 
 pub trait CtxResolver {
-    fn working_point(&self) -> Result<&Point, MsgErr>;
+    fn working_point(&self) -> Result<&Point, UniErr>;
 }
 
 pub struct PointCtxResolver(Point);
 
 impl CtxResolver for PointCtxResolver {
-    fn working_point(&self) -> Result<&Point, MsgErr> {
+    fn working_point(&self) -> Result<&Point, UniErr> {
         Ok(&self.0)
     }
 }
@@ -2149,7 +2149,7 @@ pub struct RegexCapturesResolver {
 }
 
 impl RegexCapturesResolver {
-    pub fn new(regex: Regex, text: String) -> Result<Self, MsgErr> {
+    pub fn new(regex: Regex, text: String) -> Result<Self, UniErr> {
         regex.captures(text.as_str()).ok_or("no regex captures")?;
         Ok(Self { regex, text })
     }
@@ -2204,7 +2204,7 @@ pub trait BruteResolver<Resolved>
 where
     Self: Sized + ToResolved<Resolved>,
 {
-    fn brute_resolve(self) -> Result<Resolved, MsgErr> {
+    fn brute_resolve(self) -> Result<Resolved, ExtErr> {
         let resolver = NoResolver::new().wrap();
         Ok(self.to_resolved(&resolver)?)
     }
@@ -2237,7 +2237,7 @@ where
 }
 
 pub trait SubstParser<T: Sized> {
-    fn parse_string(&self, string: String) -> Result<T, MsgErr> {
+    fn parse_string(&self, string: String) -> Result<T, UniErr> {
         let span = new_span(string.as_str());
         let output = result(self.parse_span(span))?;
         Ok(output)
@@ -2458,7 +2458,7 @@ where
     <I as InputTakeAtPosition>::Item: AsChar,
     F: nom::Parser<I, O, E>,
     E: nom::error::ContextError<I>,
-    O: Clone + FromStr<Err = MsgErr>,
+    O: Clone + FromStr<Err =UniErr>,
 {
     move |input: I| {
         let (next, element) = f.parse(input.clone())?;
@@ -2908,7 +2908,7 @@ where
 pub fn lex_hierarchy_scope<'a>(
     scope: LexScope<Span<'a>>,
     max_depth: usize,
-) -> Result<LexHierarchyScope<'a>, MsgErr> {
+) -> Result<LexHierarchyScope<'a>, ExtErr> {
     let mut errs = vec![];
     let scope = lex_child_scopes(scope)?;
     let mut children = vec![];
@@ -2951,7 +2951,7 @@ where
     }
 }
 
-pub fn lex_child_scopes<I: Span>(parent: LexScope<I>) -> Result<LexParentScope<I>, MsgErr> {
+pub fn lex_child_scopes<I: Span>(parent: LexScope<I>) -> Result<LexParentScope<I>, UniErr> {
     if parent.selector.children.is_some() {
         let (_, child_selector) = all_consuming(lex_scope_selector)(
             parent
@@ -3083,7 +3083,7 @@ pub fn root_scope<I: Span>(input: I) -> Res<I, LexRootScope<I>> {
     })
 }
 
-pub fn lex_scopes<I: Span>(input: I) -> Result<Vec<LexScope<I>>, MsgErr> {
+pub fn lex_scopes<I: Span>(input: I) -> Result<Vec<LexScope<I>>, UniErr> {
     if input.len() == 0 {
         return Ok(vec![]);
     }
@@ -3415,13 +3415,13 @@ pub fn root_scope_selector_name<I: Span>(input: I) -> Res<I, I> {
     .map(|(next, (_, name))| (next, name))
 }
 
-pub fn lex_root_scope<I: Span>(span: I) -> Result<LexRootScope<I>, MsgErr> {
+pub fn lex_root_scope<I: Span>(span: I) -> Result<LexRootScope<I>, UniErr> {
     let root_scope = result(delimited(multispace0, root_scope, multispace0)(span))?;
     Ok(root_scope)
 }
 
 pub fn method_kind<I: Span>(input: I) -> Res<I, MethodKind> {
-    let (next, v) = recognize(alt((tag("Cmd"), tag("Msg"), tag("Http"), tag("Sys"))))(input)?;
+    let (next, v) = recognize(alt((tag("Cmd"), tag("Ext"), tag("Http"), tag("Sys"))))(input)?;
     Ok((next, MethodKind::from_str(v.to_string().as_str()).unwrap()))
 }
 
@@ -3431,14 +3431,14 @@ pub mod model {
         BindConfig, PipelineStepCtx, PipelineStepDef, PipelineStepVar, PipelineStopCtx,
         PipelineStopDef, PipelineStopVar, WaveDirection,
     };
-    use crate::error::{MsgErr, ParseErrs};
+    use crate::error::{UniErr, ParseErrs};
     use crate::http::HttpMethod;
     use crate::id::id::{Point, PointCtx, PointVar, Version};
     use crate::parse::error::result;
     use crate::parse::{
         camel_case_chars, filepath_chars, http_method, lex_child_scopes, method_kind, pipeline,
         rc_command_type, value_pattern, wrapped_cmd_method, wrapped_http_method,
-        wrapped_msg_method, wrapped_sys_method, CtxResolver, Env, ResolverErr, SubstParser,
+        wrapped_ext_method, wrapped_sys_method, CtxResolver, Env, ResolverErr, SubstParser,
     };
     use crate::util::{HttpMethodPattern, StringMatcher, ToResolved, ValueMatcher, ValuePattern};
     use crate::wave::{DirectedCore, DirectedWave, Method, MethodKind, Ping, SingularDirectedWave};
@@ -3558,7 +3558,7 @@ pub mod model {
     }
 
     impl<I: ToString, V: ToString> RootScopeSelector<I, V> {
-        pub fn to_concrete(self) -> Result<RootScopeSelector<String, Version>, MsgErr> {
+        pub fn to_concrete(self) -> Result<RootScopeSelector<String, Version>, UniErr> {
             Ok(RootScopeSelector {
                 name: self.name.to_string(),
                 version: Version::from_str(self.version.to_string().as_str())?,
@@ -3584,7 +3584,7 @@ pub mod model {
     }
 
     impl RouteScopeSelector {
-        pub fn new<I: ToString>(path: Option<I>) -> Result<Self, MsgErr> {
+        pub fn new<I: ToString>(path: Option<I>) -> Result<Self, UniErr> {
             let path = match path {
                 None => Regex::new(".*")?,
                 Some(path) => Regex::new(path.to_string().as_str())?,
@@ -3597,9 +3597,9 @@ pub mod model {
             })
         }
 
-        pub fn from<I: ToString>(selector: LexScopeSelector<I>) -> Result<Self, MsgErr> {
+        pub fn from<I: ToString>(selector: LexScopeSelector<I>) -> Result<Self, UniErr> {
             if selector.name.to_string().as_str() != "Route" {
-                return Err(MsgErr::from_500("expected Route"));
+                return Err(UniErr::from_500("expected Route"));
             }
             let path = match selector.path {
                 None => None,
@@ -3668,14 +3668,14 @@ pub mod model {
         }
     }
 
-    fn default_path<I: ToString>(path: Option<I>) -> Result<Regex, MsgErr> {
+    fn default_path<I: ToString>(path: Option<I>) -> Result<Regex, UniErr> {
         match path {
             None => Ok(Regex::new(".*")?),
             Some(path) => Ok(Regex::new(path.to_string().as_str())?),
         }
     }
     impl WaveScope {
-        pub fn from_scope<I: Span>(scope: LexParentScope<I>) -> Result<Self, MsgErr> {
+        pub fn from_scope<I: Span>(scope: LexParentScope<I>) -> Result<Self, UniErr> {
             let selector = MessageScopeSelectorAndFilters::from_selector(scope.selector)?;
             let mut block = vec![];
 
@@ -3699,7 +3699,7 @@ pub mod model {
     }
 
     impl MessageScopeSelectorAndFilters {
-        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, MsgErr> {
+        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, UniErr> {
             let filters = selector.filters.clone().to_scope_filters();
             let selector = MessageScopeSelector::from_selector(selector)?;
             Ok(Self { selector, filters })
@@ -3707,7 +3707,7 @@ pub mod model {
     }
 
     impl RouteScopeSelectorAndFilters {
-        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, MsgErr> {
+        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, UniErr> {
             let filters = selector.filters.clone().to_scope_filters();
             let selector = RouteScopeSelector::new(selector.path.clone())?;
             Ok(Self { selector, filters })
@@ -3760,7 +3760,7 @@ pub mod model {
         pub fn from_scope<I: Span>(
             parent: &ValuePattern<MethodKind>,
             scope: LexScope<I>,
-        ) -> Result<Self, MsgErr> {
+        ) -> Result<Self, UniErr> {
             let selector = MethodScopeSelectorAndFilters::from_selector(parent, scope.selector)?;
             let block = result(pipeline(scope.block.content))?;
             Ok(Self { selector, block })
@@ -3768,13 +3768,13 @@ pub mod model {
     }
 
     impl MessageScopeSelector {
-        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, MsgErr> {
+        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, UniErr> {
             let kind = match result(value_pattern(method_kind)(selector.name.clone())) {
                 Ok(kind) => kind,
                 Err(_) => {
                     return Err(ParseErrs::from_loc_span(
                         format!(
-                            "unknown MessageKind: {} valid message kinds: Msg, Http, Cmd or *",
+                            "unknown MessageKind: {} valid message kinds: Ext, Http, Cmd or *",
                             selector.name.to_string()
                         )
                         .as_str(),
@@ -3814,7 +3814,7 @@ pub mod model {
         pub fn from_selector<I: Span>(
             parent: &ValuePattern<MethodKind>,
             selector: LexScopeSelector<I>,
-        ) -> Result<Self, MsgErr> {
+        ) -> Result<Self, UniErr> {
             let filters = selector.filters.clone().to_scope_filters();
             let selector = MethodScopeSelector::from_selector(parent, selector)?;
             Ok(Self { selector, filters })
@@ -3825,7 +3825,7 @@ pub mod model {
         pub fn from_selector<I: Span>(
             parent: &ValuePattern<MethodKind>,
             selector: LexScopeSelector<I>,
-        ) -> Result<Self, MsgErr> {
+        ) -> Result<Self, UniErr> {
             let name = match parent {
                 ValuePattern::Any => ValuePattern::Any,
                 ValuePattern::None => ValuePattern::None,
@@ -3862,17 +3862,17 @@ pub mod model {
                             }
                         }
                     }
-                    MethodKind::Msg => {
-                        match result(value_pattern(wrapped_msg_method)(selector.name.clone())) {
+                    MethodKind::Ext => {
+                        match result(value_pattern(wrapped_ext_method)(selector.name.clone())) {
                             Ok(r) => r,
                             Err(_) => {
                                 return Err(ParseErrs::from_loc_span(
                                     format!(
-                                        "invalid Msg method '{}'.  Msg should be CamelCase",
+                                        "invalid Ext method '{}'.  Ext should be CamelCase",
                                         selector.name.to_string()
                                     )
                                     .as_str(),
-                                    "invalid Msg",
+                                    "invalid Ext",
                                     selector.name,
                                 ))
                             }
@@ -4014,14 +4014,14 @@ pub mod model {
     }
 
     impl ToResolved<PipelineSegment> for PipelineSegmentVar {
-        fn to_resolved(self, env: &Env) -> Result<PipelineSegment, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<PipelineSegment, UniErr> {
             let rtn: PipelineSegmentCtx = self.to_resolved(env)?;
             rtn.to_resolved(env)
         }
     }
 
     impl ToResolved<PipelineSegment> for PipelineSegmentCtx {
-        fn to_resolved(self, env: &Env) -> Result<PipelineSegment, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<PipelineSegment, UniErr> {
             Ok(PipelineSegment {
                 step: self.step.to_resolved(env)?,
                 stop: self.stop.to_resolved(env)?,
@@ -4030,7 +4030,7 @@ pub mod model {
     }
 
     impl ToResolved<PipelineSegmentCtx> for PipelineSegmentVar {
-        fn to_resolved(self, env: &Env) -> Result<PipelineSegmentCtx, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<PipelineSegmentCtx, UniErr> {
             Ok(PipelineSegmentCtx {
                 step: self.step.to_resolved(env)?,
                 stop: self.stop.to_resolved(env)?,
@@ -4040,7 +4040,7 @@ pub mod model {
 
     /*
     impl CtxSubst<PipelineSegment> for PipelineSegmentCtx{
-        fn resolve_ctx(self, resolver: &dyn CtxResolver) -> Result<PipelineSegment, MsgErr> {
+        fn resolve_ctx(self, resolver: &dyn CtxResolver) -> Result<PipelineSegment, ExtErr> {
             let mut errs = vec![];
             let step = match self.step.resolve_ctx(resolver) {
                 Ok(step) => Some(step),
@@ -4090,7 +4090,7 @@ pub mod model {
     //    pub type Pipeline = Vec<PipelineSegment>;
 
     impl<I: Span> TryFrom<LexParentScope<I>> for RouteScope {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_from(scope: LexParentScope<I>) -> Result<Self, Self::Error> {
             let mut errs = vec![];
@@ -4122,7 +4122,7 @@ pub mod model {
     impl<I: Span> LexScopeSelectorAndFilters<I> {
         pub fn to_value_pattern_scope_selector(
             self,
-        ) -> Result<ValuePatternScopeSelectorAndFilters, MsgErr> {
+        ) -> Result<ValuePatternScopeSelectorAndFilters, ExtErr> {
             Ok(ValuePatternScopeSelectorAndFilters {
                 selector: self.selector.to_value_pattern_scope_selector()?,
                 filters: self.filters.to_scope_filters(),
@@ -4152,7 +4152,7 @@ pub mod model {
     pub type PipelineVar = PipelineDef<PipelineSegmentVar>;
 
     impl ToResolved<Pipeline> for PipelineCtx {
-        fn to_resolved(self, env: &Env) -> Result<Pipeline, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<Pipeline, UniErr> {
             let mut segments = vec![];
             for segment in self.segments.into_iter() {
                 segments.push(segment.to_resolved(env)?);
@@ -4163,7 +4163,7 @@ pub mod model {
     }
 
     impl ToResolved<PipelineCtx> for PipelineVar {
-        fn to_resolved(self, env: &Env) -> Result<PipelineCtx, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<PipelineCtx, UniErr> {
             let mut segments = vec![];
             for segment in self.segments.into_iter() {
                 segments.push(segment.to_resolved(env)?);
@@ -4175,7 +4175,7 @@ pub mod model {
 
     /*
     impl CtxSubst<Pipeline> for PipelineCtx {
-        fn resolve_ctx(self, resolver: &dyn CtxResolver) -> Result<Pipeline, MsgErr> {
+        fn resolve_ctx(self, resolver: &dyn CtxResolver) -> Result<Pipeline, ExtErr> {
             let mut errs = vec![];
             let mut segments = vec![];
             for segment in self.segments {
@@ -4231,7 +4231,7 @@ pub mod model {
 
     /*
     impl <I:Span> VarSubst<PipelineCtx> for VarPipeline<I> {
-        fn resolve_vars(self, resolver: &dyn VarResolver) -> Result<PipelineCtx, MsgErr> {
+        fn resolve_vars(self, resolver: &dyn VarResolver) -> Result<PipelineCtx, ExtErr> {
             let mut pipeline = PipelineCtx::new();
             let mut errs = vec![];
             for segment in self.segments {
@@ -4257,7 +4257,7 @@ pub mod model {
 
     /*
     impl <I:Span> VarSubst<PipelineSegmentCtx> for VarPipelineSegment<I> {
-        fn resolve_vars(self, resolver: &dyn VarResolver) -> Result<PipelineSegmentCtx, MsgErr> {
+        fn resolve_vars(self, resolver: &dyn VarResolver) -> Result<PipelineSegmentCtx, ExtErr> {
             unimplemented!()
             /*
             let mut errs = vec![];
@@ -4637,7 +4637,7 @@ pub mod model {
     }
 
     pub trait VarParser<O> {
-        fn parse<I: Span>(input: I) -> Result<O, MsgErr>;
+        fn parse<I: Span>(input: I) -> Result<O, UniErr>;
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -4647,7 +4647,7 @@ pub mod model {
     }
 
     impl Subst<Tw<String>> {
-        pub fn new(path: &str) -> Result<Self, MsgErr> {
+        pub fn new(path: &str) -> Result<Self, UniErr> {
             let path = result(crate::parse::subst_path(new_span(path)))?;
             Ok(path.stringify())
         }
@@ -4688,7 +4688,7 @@ pub mod model {
     }
 
     impl ToResolved<String> for Subst<Tw<String>> {
-        fn to_resolved(self, env: &Env) -> Result<String, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<String, UniErr> {
             let mut rtn = String::new();
             let mut errs = vec![];
             for chunk in self.chunks {
@@ -4724,7 +4724,7 @@ pub mod model {
 }
 
 pub mod error {
-    use crate::error::{MsgErr, ParseErrs};
+    use crate::error::{UniErr, ParseErrs};
     use crate::parse::model::NestedBlockKind;
     use crate::parse::{nospace1, skewer};
     use ariadne::Report;
@@ -4740,7 +4740,7 @@ pub mod error {
     use nom_supreme::error::{BaseErrorKind, ErrorTree, StackContext};
     use regex::{Error, Regex};
 
-    pub fn result<I: Span, R>(result: Result<(I, R), Err<ErrorTree<I>>>) -> Result<R, MsgErr> {
+    pub fn result<I: Span, R>(result: Result<(I, R), Err<ErrorTree<I>>>) -> Result<R, UniErr> {
         match result {
             Ok((_, e)) => Ok(e),
             Err(err) => Err(find_parse_err(&err)),
@@ -4762,7 +4762,7 @@ pub mod error {
 
      */
 
-    fn create_err_report<I: Span>(context: &str, loc: I) -> MsgErr {
+    fn create_err_report<I: Span>(context: &str, loc: I) -> UniErr {
         let mut builder = Report::build(ReportKind::Error, (), 23);
 
         match NestedBlockKind::error_message(&loc, context) {
@@ -4910,7 +4910,7 @@ pub mod error {
         ParseErrs::from_report(builder.finish(), loc.extra()).into()
     }
 
-    pub fn find_parse_err<I: Span>(err: &Err<ErrorTree<I>>) -> MsgErr {
+    pub fn find_parse_err<I: Span>(err: &Err<ErrorTree<I>>) -> UniErr {
         match err {
             Err::Incomplete(_) => "internal parser error: Incomplete".into(),
             Err::Error(err) => find_tree(err),
@@ -4923,7 +4923,7 @@ pub mod error {
         Message(String),
     }
 
-    pub fn find_tree<I: Span>(err: &ErrorTree<I>) -> MsgErr {
+    pub fn find_tree<I: Span>(err: &ErrorTree<I>) -> UniErr {
         match err {
             ErrorTree::Stack { base, contexts } => {
                 let (span, context) = contexts.first().unwrap();
@@ -4996,7 +4996,7 @@ use crate::config::config::Document;
 use crate::http::HttpMethod;
 use crate::id::id::{BaseKind, KindParts, PointKind, PointSeg, Specific};
 use crate::id::{ArtifactSubKind, DatabaseSubKind, FileSubKind, StarKey, StarSub, UserBaseSubKind};
-use crate::msg::MsgMethod;
+use crate::ext::ExtMethod;
 use crate::parse::error::{find_parse_err, result};
 use crate::parse::model::{
     BindScope, BindScopeKind, Block, BlockKind, Chunk, DelimitedBlockKind, LexBlock,
@@ -5018,7 +5018,7 @@ use crate::selector::{
 };
 use crate::substance::substance::{
     Call, CallCtx, CallKind, CallVar, CallWithConfig, CallWithConfigCtx, CallWithConfigVar,
-    HttpCall, ListPattern, MapPattern, MapPatternCtx, MapPatternVar, MsgCall, NumRange, Substance,
+    HttpCall, ListPattern, MapPattern, MapPatternCtx, MapPatternVar, ExtCall, NumRange, Substance,
     SubstanceFormat, SubstanceKind, SubstancePattern, SubstancePatternCtx, SubstancePatternVar,
     SubstanceTypePatternCtx, SubstanceTypePatternDef, SubstanceTypePatternVar,
 };
@@ -5456,7 +5456,7 @@ pub fn delim_kind_parts<I: Span>(input: I) -> Res<I, KindParts> {
     delimited(tag("<"), kind_parts, tag(">"))(input)
 }
 
-pub fn consume_kind<I: Span>(input: I) -> Result<KindParts, MsgErr> {
+pub fn consume_kind<I: Span>(input: I) -> Result<KindParts, UniErr> {
     let (_, kind_parts) = all_consuming(kind_parts)(input)?;
 
     Ok(kind_parts.try_into()?)
@@ -5969,9 +5969,9 @@ pub fn rc_command<I: Span>(input: I) -> Res<I, RcCommandType> {
     parse_alpha1_str(input)
 }
 
-pub fn msg_call<I: Span>(input: I) -> Res<I, CallKind> {
+pub fn ext_call<I: Span>(input: I) -> Res<I, CallKind> {
     tuple((
-        delimited(tag("Msg<"), msg_method, tag(">")),
+        delimited(tag("Ext<"), ext_method, tag(">")),
         opt(subst_path),
     ))(input)
     .map(|(next, (method, path))| {
@@ -5979,7 +5979,7 @@ pub fn msg_call<I: Span>(input: I) -> Res<I, CallKind> {
             None => subst(filepath_chars)(new_span("/")).unwrap().1.stringify(),
             Some(path) => path.stringify(),
         };
-        (next, CallKind::Msg(MsgCall::new(method, path)))
+        (next, CallKind::Ext(ExtCall::new(method, path)))
     })
 }
 
@@ -5998,7 +5998,7 @@ pub fn http_call<I: Span>(input: I) -> Res<I, CallKind> {
 }
 
 pub fn call_kind<I: Span>(input: I) -> Res<I, CallKind> {
-    alt((msg_call, http_call))(input)
+    alt((ext_call, http_call))(input)
 }
 
 pub fn call<I: Span>(input: I) -> Res<I, CallVar> {
@@ -6191,7 +6191,7 @@ pub fn value_constrained_map_pattern<I: Span>(input: I) -> Res<I, ValuePattern<M
     value_pattern(map_pattern)(input)
 }
 
-pub fn msg_action<I: Span>(input: I) -> Res<I, ValuePattern<StringMatcher>> {
+pub fn ext_action<I: Span>(input: I) -> Res<I, ValuePattern<StringMatcher>> {
     value_pattern(camel_case_to_string_matcher)(input)
 }
 
@@ -6230,10 +6230,10 @@ where
     }
 }
 
-pub fn msg_method<I: Span>(input: I) -> Res<I, MsgMethod> {
-    let (next, msg_method) = camel_case_chars(input.clone())?;
+pub fn ext_method<I: Span>(input: I) -> Res<I, ExtMethod> {
+    let (next, ext_method) = camel_case_chars(input.clone())?;
 
-    match MsgMethod::new(msg_method.to_string()) {
+    match ExtMethod::new(ext_method.to_string()) {
         Ok(method) => Ok((next, method)),
         Err(err) => Err(nom::Err::Error(ErrorTree::from_error_kind(
             input,
@@ -6266,11 +6266,11 @@ pub fn cmd_method<I: Span>(input: I) -> Res<I, CmdMethod> {
     }
 }
 
-pub fn wrapped_msg_method<I: Span>(input: I) -> Res<I, Method> {
-    let (next, msg_method) = msg_method(input.clone())?;
+pub fn wrapped_ext_method<I: Span>(input: I) -> Res<I, Method> {
+    let (next, ext_method) = ext_method(input.clone())?;
 
-    match MsgMethod::new(msg_method.to_string()) {
-        Ok(method) => Ok((next, Method::Msg(method))),
+    match ExtMethod::new(ext_method.to_string()) {
+        Ok(method) => Ok((next, Method::Ext(method))),
         Err(err) => Err(nom::Err::Error(ErrorTree::from_error_kind(
             input,
             ErrorKind::Fail,
@@ -6492,7 +6492,7 @@ where
 }
 
 /*
-pub fn strip<I:Span>(input: Span) -> Result<Span, MsgErr>
+pub fn strip<I:Span>(input: Span) -> Result<Span, ExtErr>
 {
     let (_, stripped) = strip_comments(input.clone())?;
     let span = LocatedSpan::new_extra(stripped.as_str().clone(), Arc::new(input.to_string()));
@@ -6531,14 +6531,14 @@ where
     .map(|(next, comment)| (next, TextType::Comment(comment)))
 }
 
-pub fn bind_config(src: &str) -> Result<BindConfig, MsgErr> {
+pub fn bind_config(src: &str) -> Result<BindConfig, UniErr> {
     let document = doc(src)?;
     match document {
         Document::BindConfig(bind_config) => Ok(bind_config),
     }
 }
 
-pub fn doc(src: &str) -> Result<Document, MsgErr> {
+pub fn doc(src: &str) -> Result<Document, UniErr> {
     let src = src.to_string();
     let (next, stripped) = strip_comments(new_span(src.as_str()))?;
     let span = span_with_extra(stripped.as_str(), Arc::new(src.to_string()));
@@ -6589,7 +6589,7 @@ pub fn doc(src: &str) -> Result<Document, MsgErr> {
     }
 }
 
-fn parse_bind_config<I: Span>(input: I) -> Result<BindConfig, MsgErr> {
+fn parse_bind_config<I: Span>(input: I) -> Result<BindConfig, UniErr> {
     let lex_scopes = lex_scopes(input)?;
     let mut scopes = vec![];
     let mut errors = vec![];
@@ -6612,7 +6612,7 @@ fn parse_bind_config<I: Span>(input: I) -> Result<BindConfig, MsgErr> {
     Ok(config)
 }
 
-fn semantic_bind_scope<I: Span>(scope: LexScope<I>) -> Result<BindScope, MsgErr> {
+fn semantic_bind_scope<I: Span>(scope: LexScope<I>) -> Result<BindScope, UniErr> {
     let selector_name = scope.selector.name.to_string();
     match selector_name.as_str() {
         "Route" => {
@@ -6647,7 +6647,7 @@ fn parse_bind_pipelines_scope<I: Span>(input: I) -> Result<Spanned<I, BindScopeK
     let mut errs = vec![];
     for lex_scope in lex_scopes {
         match lex_scope.selector.name.to_string().as_str() {
-            "Msg" => {}
+            "Ext" => {}
             "Http" => {}
             "Rc" => {}
             what => {
@@ -6819,7 +6819,7 @@ pub fn entity_selector<I:Span>(input: Span) -> Res<Span, Selector<PipelineSelect
         .map(|(next, (pattern, _, pipeline, _))| (next, Selector::new(pattern, pipeline)))
 }
 
-pub fn msg_selector<I:Span>(input: Span) -> Res<Span, Selector<MsgPipelineSelector>> {
+pub fn msg_selector<I:Span>(input: Span) -> Res<Span, Selector<ExtPipelineSelector>> {
     tuple((msg_pattern_scoped, multispace0, pipeline, tag(";")))(input)
         .map(|(next, (pattern, _, pipeline, _))| (next, Selector::new(pattern, pipeline)))
 }
@@ -6886,13 +6886,13 @@ pub fn var_chunk<I: Span>(input: I) -> Res<I, Chunk<I>> {
     .map(|(next, variable_name)| (next, Chunk::Var(variable_name)))
 }
 /*
-pub fn unwrap_route_selector(input: &str ) -> Result<RouteSelector,MsgErr> {
+pub fn unwrap_route_selector(input: &str ) -> Result<RouteSelector,ExtErr> {
     let input = new_span(input);
     let input = result(unwrap_block( BlockKind::Nested(NestedBlockKind::Parens),input))?;
 }
 
  */
-pub fn route_attribute(input: &str) -> Result<RouteSelector, MsgErr> {
+pub fn route_attribute(input: &str) -> Result<RouteSelector, UniErr> {
     let input = new_span(input);
     let (_, (_, lex_route)) = result(pair(
         tag("#"),
@@ -6914,7 +6914,7 @@ pub fn route_attribute(input: &str) -> Result<RouteSelector, MsgErr> {
     route_selector(lex_route)
 }
 
-pub fn route_attribute_value(input: &str) -> Result<RouteSelector, MsgErr> {
+pub fn route_attribute_value(input: &str) -> Result<RouteSelector, UniErr> {
     let input = new_span(input);
     let lex_route = result(unwrap_block(
         BlockKind::Delimited(DelimitedBlockKind::DoubleQuotes),
@@ -6942,7 +6942,7 @@ pub fn topic<I: Span>(input: I) -> Res<I, ValuePattern<Topic>> {
 
  */
 
-pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, MsgErr> {
+pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, UniErr> {
     let (next, (topic, lex_route)) = match pair(
         opt(terminated(
             unwrap_block(
@@ -6974,7 +6974,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, MsgErr> {
     let method_kind_span = names
         .pop()
         .ok_or(ParseErrs::from_loc_span(
-            "expecting MethodKind [ Http, Msg ]",
+            "expecting MethodKind [ Http, Ext ]",
             "expecting MethodKind",
             input,
         ))?
@@ -6986,7 +6986,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, MsgErr> {
         ValuePattern::Pattern(method_kind) => match method_kind {
             MethodKind::Sys => {
                 let method = names.pop().ok_or(ParseErrs::from_loc_span(
-                    "Sys method requires a sub kind i.e. Sys<Assign> or Msg<*>",
+                    "Sys method requires a sub kind i.e. Sys<Assign> or Ext<*>",
                     "sub kind required",
                     method_kind_span,
                 ))?;
@@ -7002,14 +7002,14 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, MsgErr> {
                 let method = result(value_pattern(cmd_method)(method))?;
                 ValuePattern::Pattern(MethodPattern::Cmd(method))
             }
-            MethodKind::Msg => {
+            MethodKind::Ext => {
                 let method = names.pop().ok_or(ParseErrs::from_loc_span(
-                    "Msg method requires a sub kind i.e. Msg<Get> or Msg<*>",
+                    "Ext method requires a sub kind i.e. Ext<SomeExt> or Ext<*>",
                     "sub kind required",
                     method_kind_span,
                 ))?;
-                let method = result(value_pattern(msg_method)(method))?;
-                ValuePattern::Pattern(MethodPattern::Msg(method))
+                let method = result(value_pattern(ext_method)(method))?;
+                ValuePattern::Pattern(MethodPattern::Ext(method))
             }
             MethodKind::Http => {
                 let method = names.pop().ok_or(ParseErrs::from_loc_span(
@@ -7025,7 +7025,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, MsgErr> {
 
     if !names.is_empty() {
         let name = names.pop().unwrap();
-        return Err(ParseErrs::from_loc_span("Too many SubKinds: only Http/Msg supported with one subkind i.e. Http<Get>, Msg<MyMethod>", "too many subkinds", name).into());
+        return Err(ParseErrs::from_loc_span("Too many SubKinds: only Http/Ext supported with one subkind i.e. Http<Get>, Ext<MyMethod>", "too many subkinds", name).into());
     }
 
     let path = match lex_route.path.as_ref() {
@@ -7057,7 +7057,7 @@ pub mod test {
     };
     use crate::command::Command;
     use crate::config::config::Document;
-    use crate::error::{MsgErr, ParseErrs};
+    use crate::error::{UniErr, ParseErrs};
     use crate::id::id::{Point, PointCtx, PointSegVar, RouteSegVar};
     use crate::parse::error::result;
     use crate::parse::model::{
@@ -7086,7 +7086,7 @@ pub mod test {
     #[test]
     pub fn test_message_selector() {
         let route =
-            util::log(route_attribute("#[route(\"[Topic<*>]::Msg<NewSession>\")]")).unwrap();
+            util::log(route_attribute("#[route(\"[Topic<*>]::Ext<NewSession>\")]")).unwrap();
         let route = util::log(route_attribute("#[route(\"Sys<Assign>\")]")).unwrap();
 
         println!("path: {}", route.path.to_string());
@@ -7094,7 +7094,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_create_command() -> Result<(), MsgErr> {
+    pub fn test_create_command() -> Result<(), UniErr> {
         let command = util::log(result(create_command(new_span("create localhost<Space>"))))?;
         let env = Env::new(Point::root());
         let command: Command = util::log(command.to_resolved(&env))?;
@@ -7102,7 +7102,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_template() -> Result<(), MsgErr> {
+    pub fn test_template() -> Result<(), UniErr> {
         /*        let t= util::log(result(all_consuming(template)(new_span("localhost<Space>"))))?;
                let env = Env::new(Point::root());
                let t: Template = util::log(t.to_resolved(&env))?;
@@ -7131,7 +7131,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_point_template() -> Result<(), MsgErr> {
+    pub fn test_point_template() -> Result<(), UniErr> {
         assert!(mesh_eos(new_span(":")).is_ok());
         assert!(mesh_eos(new_span("%")).is_ok());
         assert!(mesh_eos(new_span("x")).is_err());
@@ -7151,7 +7151,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_point_var() -> Result<(), MsgErr> {
+    pub fn test_point_var() -> Result<(), UniErr> {
         util::log(result(all_consuming(point_var)(new_span(
             "[hub]::my-domain.com:${name}:base",
         ))))?;
@@ -7252,7 +7252,7 @@ pub mod test {
                 let point = log(consume_point_var("../../hello") )?;
         //        let point: Point = log(point.to_resolved(&resolver))?;
           //      println!("point.to_string(): {}", point.to_string());
-                let _: Result<Point, MsgErr> = log(log(result(all_consuming(point_var)(new_span(
+                let _: Result<Point, ExtErr> = log(log(result(all_consuming(point_var)(new_span(
                     "${not-supported}::my-domain.com:1.0.0:/${dorko}/x/",
                 )))?
                     .to_resolved(&env)));
@@ -7262,7 +7262,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_point() -> Result<(), MsgErr> {
+    pub fn test_point() -> Result<(), UniErr> {
         util::log(
             result(all_consuming(point_var)(new_span(
                 "[hub]::my-domain.com:name:base",
@@ -7286,7 +7286,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_simple_point_var() -> Result<(), MsgErr> {
+    pub fn test_simple_point_var() -> Result<(), UniErr> {
         /*
         let point = util::log(result(point_var(new_span("localhost:base"))))?;
         println!("point '{}'", point.to_string());
@@ -7320,7 +7320,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_lex_block() -> Result<(), MsgErr> {
+    pub fn test_lex_block() -> Result<(), UniErr> {
         let esc = result(escaped(anychar, '\\', anychar)(new_span("\\}")))?;
         //println!("esc: {}", esc);
         util::log(result(all_consuming(lex_block(BlockKind::Nested(
@@ -7343,12 +7343,12 @@ pub mod test {
         Ok(())
     }
     #[test]
-    pub fn test_path_regex2() -> Result<(), MsgErr> {
+    pub fn test_path_regex2() -> Result<(), UniErr> {
         util::log(result(path_regex(new_span("/xyz"))))?;
         Ok(())
     }
     #[test]
-    pub fn test_bind_config() -> Result<(), MsgErr> {
+    pub fn test_bind_config() -> Result<(), UniErr> {
         let bind_config_str = r#"Bind(version=1.0.0)  { Route<Http> -> { <Get> -> ((*)) => &; } }
         "#;
 
@@ -7373,7 +7373,7 @@ pub mod test {
         }
 
         let bind_config_str = r#"Bind(version=1.0.0)  {
-              Route<Msg<Create>> -> localhost:app => &;
+              Route<Ext<Create>> -> localhost:app => &;
            }"#;
 
         if let Document::BindConfig(bind) = util::log(doc(bind_config_str))? {
@@ -7384,12 +7384,12 @@ pub mod test {
             let message_scope = pipeline_scope.block.first().unwrap();
             assert_eq!(
                 message_scope.selector.selector.name.to_string().as_str(),
-                "Msg"
+                "Ext"
             );
             let action_scope = message_scope.block.first().unwrap();
             assert_eq!(
                 action_scope.selector.selector.name.to_string().as_str(),
-                "Msg<Create>"
+                "Ext<Create>"
             );
         } else {
             assert!(false);
@@ -7439,7 +7439,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_pipeline_segment() -> Result<(), MsgErr> {
+    pub fn test_pipeline_segment() -> Result<(), UniErr> {
         util::log(result(pipeline_segment(new_span("-> localhost"))))?;
         assert!(util::log(result(pipeline_segment(new_span("->")))).is_err());
         assert!(util::log(result(pipeline_segment(new_span("localhost")))).is_err());
@@ -7447,7 +7447,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_pipeline_stop() -> Result<(), MsgErr> {
+    pub fn test_pipeline_stop() -> Result<(), UniErr> {
         util::log(result(space_chars(new_span("localhost"))))?;
         util::log(result(space_no_dupe_dots(new_span("localhost"))))?;
 
@@ -7467,13 +7467,13 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_pipeline() -> Result<(), MsgErr> {
+    pub fn test_pipeline() -> Result<(), UniErr> {
         util::log(result(pipeline(new_span("-> localhost => &"))))?;
         Ok(())
     }
 
     #[test]
-    pub fn test_pipeline_step() -> Result<(), MsgErr> {
+    pub fn test_pipeline_step() -> Result<(), UniErr> {
         util::log(result(pipeline_step_var(new_span("->"))))?;
         util::log(result(pipeline_step_var(new_span("-[ Text ]->"))))?;
         util::log(result(pipeline_step_var(new_span("-[ Text ]=>"))))?;
@@ -7486,7 +7486,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_rough_bind_config() -> Result<(), MsgErr> {
+    pub fn test_rough_bind_config() -> Result<(), UniErr> {
         let unknown_config_kind = r#"
 Unknown(version=1.0.0) # test unknown config kind
 {
@@ -7520,7 +7520,7 @@ Bind(version=1.0.0)
     }
 
     Route -> {
-       Msg<FullStop> -> localhost:apps:
+       Ext<FullStop> -> localhost:apps:
        * -> localhost:app:bad-page => &;
     }
 
@@ -7535,7 +7535,7 @@ Bind(version=1.0.0)
     }
 
     #[test]
-    pub fn test_remove_comments() -> Result<(), MsgErr> {
+    pub fn test_remove_comments() -> Result<(), UniErr> {
         let bind_str = r#"
 # this is a test of comments
 Bind(version=1.0.0)->
@@ -7564,7 +7564,7 @@ Bind(version=1.0.0)->
     }
 
     #[test]
-    pub fn test_version() -> Result<(), MsgErr> {
+    pub fn test_version() -> Result<(), UniErr> {
         rec_version(new_span("1.0.0"))?;
         rec_version(new_span("1.0.0-alpha"))?;
         version(new_span("1.0.0-alpha"))?;
@@ -7572,7 +7572,7 @@ Bind(version=1.0.0)->
         Ok(())
     }
     #[test]
-    pub fn test_rough_block() -> Result<(), MsgErr> {
+    pub fn test_rough_block() -> Result<(), UniErr> {
         result(all_consuming(lex_nested_block(NestedBlockKind::Curly))(
             new_span("{  }"),
         ))?;
@@ -7618,7 +7618,7 @@ Hello my friend
     }
 
     #[test]
-    pub fn test_block() -> Result<(), MsgErr> {
+    pub fn test_block() -> Result<(), UniErr> {
         util::log(result(lex_nested_block(NestedBlockKind::Curly)(new_span(
             "{ <Get> -> localhost; }    ",
         ))))?;
@@ -7660,7 +7660,7 @@ Hello my friend
     }
 
     #[test]
-    pub fn test_root_scope_selector() -> Result<(), MsgErr> {
+    pub fn test_root_scope_selector() -> Result<(), UniErr> {
         assert!(
             (result(root_scope_selector(new_span(
                 r#"
@@ -7710,7 +7710,7 @@ Hello my friend
     }
 
     #[test]
-    pub fn test_scope_filter() -> Result<(), MsgErr> {
+    pub fn test_scope_filter() -> Result<(), UniErr> {
         result(scope_filter(new_span("(auth)")))?;
         result(scope_filter(new_span("(auth )")))?;
         result(scope_filter(new_span("(auth hello)")))?;
@@ -7756,7 +7756,7 @@ Hello my friend
         );
         assert_eq!(
             "Http",
-            next_stacked_name(new_span("Http<Msg>"))
+            next_stacked_name(new_span("Http<Ext>"))
                 .unwrap()
                 .1
                  .0
@@ -7765,7 +7765,7 @@ Hello my friend
         );
         assert_eq!(
             "Http",
-            next_stacked_name(new_span("<Http<Msg>>"))
+            next_stacked_name(new_span("<Http<Ext>>"))
                 .unwrap()
                 .1
                  .0
@@ -7775,7 +7775,7 @@ Hello my friend
 
         assert_eq!(
             "*",
-            next_stacked_name(new_span("<*<Msg>>"))
+            next_stacked_name(new_span("<*<Ext>>"))
                 .unwrap()
                 .1
                  .0
@@ -7793,10 +7793,10 @@ Hello my friend
                 .as_str()
         );
 
-        assert!(next_stacked_name(new_span("<*x<Msg>>")).is_err());
+        assert!(next_stacked_name(new_span("<*x<Ext>>")).is_err());
     }
     #[test]
-    pub fn test_lex_scope2() -> Result<(), MsgErr> {
+    pub fn test_lex_scope2() -> Result<(), UniErr> {
         /*        let scope = log(result(lex_scopes(create_span(
                    "  Get -> {}\n\nPut -> {}   ",
                ))))?;
@@ -7814,7 +7814,7 @@ Hello my friend
     }
 
     #[test]
-    pub fn test_lex_scope() -> Result<(), MsgErr> {
+    pub fn test_lex_scope() -> Result<(), UniErr> {
         let pipes = util::log(result(lex_scope(new_span("Pipes -> {}")))).unwrap();
 
         //        let pipes = log(result(lex_scope(create_span("Pipes {}"))));
@@ -7857,7 +7857,7 @@ Hello my friend
         assert_eq!(pipes.selector.filters.len(), 1);
         assert!(pipes.pipeline_step.is_some());
 
-        let pipes = util::log(result(lex_scope(new_span("Route<Msg> -> {}"))))?;
+        let pipes = util::log(result(lex_scope(new_span("Route<Ext> -> {}"))))?;
 
         assert_eq!(pipes.selector.name.to_string().as_str(), "Route");
         assert_eq!(
@@ -7870,7 +7870,7 @@ Hello my friend
                     .to_string()
                     .as_str()
             ),
-            Some("<Msg>")
+            Some("<Ext>")
         );
 
         assert_eq!(pipes.block.content.to_string().as_str(), "");
@@ -8003,7 +8003,7 @@ Hello my friend
 
             Get -> {}
             <Put>(superuser) -> localhost:app => &;
-            Post/users/scott -> localhost:app^Msg<SuperScott> => &;
+            Post/users/scott -> localhost:app^Ext<SuperScott> => &;
 
         }"#,
         ))?;
@@ -8035,7 +8035,7 @@ Hello my friend
     }
 
     #[test]
-    pub fn test_root_and_subscope_phases() -> Result<(), MsgErr> {
+    pub fn test_root_and_subscope_phases() -> Result<(), UniErr> {
         let config = r#"
 Bind(version=1.2.3)-> {
    Route -> {
@@ -8057,7 +8057,7 @@ Bind(version=1.2.3)-> {
         Ok(())
     }
     #[test]
-    pub fn test_variable_name() -> Result<(), MsgErr> {
+    pub fn test_variable_name() -> Result<(), UniErr> {
         assert_eq!(
             "v".to_string(),
             util::log(result(lowercase1(new_span("v"))))?.to_string()
@@ -8072,7 +8072,7 @@ Bind(version=1.2.3)-> {
     }
 
     #[test]
-    pub fn test_subst() -> Result<(), MsgErr> {
+    pub fn test_subst() -> Result<(), UniErr> {
         /*
         #[derive(Clone)]
         pub struct SomeParser();
@@ -8188,7 +8188,7 @@ pub fn rec_script_line<I: Span>(input: I) -> Res<I, I> {
 #[cfg(test)]
 pub mod cmd_test {
     use crate::command::{Command, CommandVar};
-    use crate::error::MsgErr;
+    use crate::error::UniErr;
     use crate::parse::{command, script, CamelCase};
     use core::str::FromStr;
     use cosmic_nom::{new_span, Res};
@@ -8214,7 +8214,7 @@ pub mod cmd_test {
      */
 
     #[test]
-    pub fn test() -> Result<(), MsgErr> {
+    pub fn test() -> Result<(), UniErr> {
         let input = "xreate? localhost<Space>";
         match command(new_span(input)) {
             Ok(_) => {}
@@ -8230,7 +8230,7 @@ pub mod cmd_test {
     }
 
     #[test]
-    pub fn test_kind() -> Result<(), MsgErr> {
+    pub fn test_kind() -> Result<(), UniErr> {
         let input = "create localhost:users<UserBase<Keycloak>>";
         let (_, command) = command(new_span(input))?;
         match command {
@@ -8248,7 +8248,7 @@ pub mod cmd_test {
     }
 
     #[test]
-    pub fn test_script() -> Result<(), MsgErr> {
+    pub fn test_script() -> Result<(), UniErr> {
         let input = r#" create? localhost<Space>;
  Xcrete localhost:repo<Base<Repo>>;
  create? localhost:repo:tutorial<ArtifactBundleSeries>;

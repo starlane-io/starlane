@@ -268,7 +268,7 @@ pub struct HostAndPort {
 
 pub mod parse {
     use crate::star::variant::web::HostAndPort;
-    use cosmic_universe::error::MsgErr;
+    use cosmic_universe::error::UniErr;
     use cosmic_universe::parse::domain;
     use cosmic_universe::parse::error::result;
     use cosmic_nom::Span;
@@ -280,7 +280,7 @@ pub mod parse {
     use std::num::ParseIntError;
     use std::str::FromStr;
 
-    pub fn host_and_port<I: Span>(input: I) -> Result<HostAndPort, MsgErr> {
+    pub fn host_and_port<I: Span>(input: I) -> Result<HostAndPort, UniErr> {
         let input = input;
         let (host, _, port) = result(tuple((domain, tag(":"), is_a("0123456789")))(input.clone()))?;
 
@@ -289,7 +289,7 @@ pub mod parse {
         let port = match u32::from_str(port.as_str()) {
             Ok(port) => port,
             Err(err) => {
-                return Err(MsgErr::from_500(format!("bad port {}", port).as_str()));
+                return Err(UniErr::from_500(format!("bad port {}", port).as_str()));
             }
         };
         let host_and_port = HostAndPort { host, port };

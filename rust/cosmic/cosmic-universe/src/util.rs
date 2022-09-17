@@ -6,7 +6,7 @@ use core::option::Option::{None, Some};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
 
-use crate::error::MsgErr;
+use crate::error::UniErr;
 use crate::http::HttpMethod;
 use crate::id::id::Uuid;
 use crate::parse::Env;
@@ -85,9 +85,9 @@ where
 }
 
 impl<T> ValuePattern<T> {
-    pub fn modify<X, F>(self, mut f: F) -> Result<ValuePattern<X>, MsgErr>
+    pub fn modify<X, F>(self, mut f: F) -> Result<ValuePattern<X>, UniErr>
     where
-        F: FnMut(T) -> Result<X, MsgErr>,
+        F: FnMut(T) -> Result<X, UniErr>,
     {
         Ok(match self {
             ValuePattern::Any => ValuePattern::Any,
@@ -189,14 +189,14 @@ impl ValueMatcher<String> for StringMatcher {
 }
 
 pub trait Convert<A> {
-    fn convert(self) -> Result<A, MsgErr>;
+    fn convert(self) -> Result<A, UniErr>;
 }
 
 pub trait ConvertFrom<A>
 where
     Self: Sized,
 {
-    fn convert_from(a: A) -> Result<Self, MsgErr>;
+    fn convert_from(a: A) -> Result<Self, UniErr>;
 }
 
 pub fn uuid() -> Uuid {
@@ -211,14 +211,14 @@ pub trait ToResolved<R>
 where
     Self: Sized,
 {
-    fn collapse(self) -> Result<R, MsgErr> {
+    fn collapse(self) -> Result<R, UniErr> {
         self.to_resolved(&Env::no_point())
     }
 
-    fn to_resolved(self, env: &Env) -> Result<R, MsgErr>;
+    fn to_resolved(self, env: &Env) -> Result<R, UniErr>;
 }
 
-pub fn log<R>(result: Result<R, MsgErr>) -> Result<R, MsgErr> {
+pub fn log<R>(result: Result<R, UniErr>) -> Result<R, UniErr> {
     match result {
         Ok(r) => Ok(r),
         Err(err) => {

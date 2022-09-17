@@ -1,4 +1,4 @@
-use crate::error::MsgErr;
+use crate::error::UniErr;
 use crate::id::id::{Point, PointCtx, PointVar};
 use crate::parse::{CtxResolver, Env};
 use crate::substance::substance::{
@@ -19,7 +19,7 @@ pub mod selector {
     use serde::de::Visitor;
     use serde::{de, Deserializer, Serializer};
 
-    use crate::error::MsgErr;
+    use crate::error::UniErr;
 
     use crate::command::request::{Rc, RcCommandType};
     use crate::id::id::{
@@ -35,7 +35,7 @@ pub mod selector {
     };
     use crate::substance::substance::{
         Call, CallKind, CallWithConfig, CallWithConfigDef, HttpCall, ListPattern, MapPattern,
-        MsgCall, NumRange, Substance, SubstanceFormat, SubstanceKind, SubstancePattern,
+        ExtCall, NumRange, Substance, SubstanceFormat, SubstanceKind, SubstancePattern,
         SubstancePatternDef, SubstanceTypePatternDef,
     };
     use crate::util::{HttpMethodPattern, StringMatcher, ToResolved, ValueMatcher, ValuePattern};
@@ -132,13 +132,13 @@ pub mod selector {
     pub type SelectorVar = SelectorDef<Hop>;
 
     impl ToResolved<Selector> for Selector {
-        fn to_resolved(self, env: &Env) -> Result<Selector, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<Selector, UniErr> {
             Ok(self)
         }
     }
 
     impl FromStr for Selector {
-        type Err = MsgErr;
+        type Err = UniErr;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             let (_, rtn) = all_consuming(point_selector)(new_span(s))?;
@@ -371,7 +371,7 @@ pub mod selector {
     }
 
     impl TryInto<semver::VersionReq> for VersionReq {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<semver::VersionReq, Self::Error> {
             Ok(self.version)
@@ -379,7 +379,7 @@ pub mod selector {
     }
 
     impl FromStr for VersionReq {
-        type Err = MsgErr;
+        type Err = UniErr;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             let version = semver::VersionReq::from_str(s)?;
@@ -423,7 +423,7 @@ pub mod selector {
     }
 
     impl FromStr for PointSegSelector {
-        type Err = MsgErr;
+        type Err = UniErr;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             result(all_consuming(point_segment_selector)(new_span(s)))
@@ -529,7 +529,7 @@ pub mod selector {
     >;
 
     impl FromStr for SpecificSelector {
-        type Err = MsgErr;
+        type Err = UniErr;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             result(all_consuming(specific_selector)(new_span(s)))
@@ -578,7 +578,7 @@ pub mod selector {
         }
     }
     pub mod specific {
-        use crate::error::MsgErr;
+        use crate::error::UniErr;
         use crate::parse::{Domain, SkewerCase};
         use crate::selector::selector::Pattern;
         use alloc::string::String;
@@ -598,7 +598,7 @@ pub mod selector {
         }
 
         impl FromStr for VersionReq {
-            type Err = MsgErr;
+            type Err = UniErr;
 
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 Ok(VersionReq {
@@ -644,7 +644,7 @@ pub mod selector {
     #[derive(Debug, Clone, strum_macros::Display, strum_macros::EnumString, Eq, PartialEq)]
     pub enum PipelineKind {
         Rc,
-        Msg,
+        Ext,
         Http,
     }
 
@@ -920,9 +920,9 @@ pub mod selector {
             }
         }
 
-        pub fn convert<To>(self) -> Result<Pattern<To>, MsgErr>
+        pub fn convert<To>(self) -> Result<Pattern<To>, UniErr>
         where
-            P: TryInto<To, Error = MsgErr> + Eq + PartialEq,
+            P: TryInto<To, Error =UniErr> + Eq + PartialEq,
         {
             Ok(match self {
                 Pattern::Any => Pattern::Any,
@@ -987,9 +987,9 @@ pub mod selector {
             }
         }
 
-        pub fn convert<To>(self) -> Result<EmptyPattern<To>, MsgErr>
+        pub fn convert<To>(self) -> Result<EmptyPattern<To>, UniErr>
         where
-            P: TryInto<To, Error = MsgErr> + Eq + PartialEq,
+            P: TryInto<To, Error =UniErr> + Eq + PartialEq,
         {
             Ok(match self {
                 EmptyPattern::Any => EmptyPattern::Any,
@@ -1127,7 +1127,7 @@ pub mod selector {
     }
 
     impl FromStr for PointHierarchy {
-        type Err = MsgErr;
+        type Err = UniErr;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             Ok(consume_hierarchy(new_span(s))?)
@@ -1146,7 +1146,7 @@ pub enum PayloadBlockDef<Pnt> {
 }
 
 impl ToResolved<PayloadBlock> for PayloadBlockCtx {
-    fn to_resolved(self, env: &Env) -> Result<PayloadBlock, MsgErr> {
+    fn to_resolved(self, env: &Env) -> Result<PayloadBlock, UniErr> {
         match self {
             PayloadBlockCtx::DirectPattern(block) => Ok(PayloadBlock::DirectPattern(
                 block.modify(move |block| {
@@ -1162,7 +1162,7 @@ impl ToResolved<PayloadBlock> for PayloadBlockCtx {
 }
 
 impl ToResolved<PayloadBlockCtx> for PayloadBlockVar {
-    fn to_resolved(self, env: &Env) -> Result<PayloadBlockCtx, MsgErr> {
+    fn to_resolved(self, env: &Env) -> Result<PayloadBlockCtx, UniErr> {
         match self {
             PayloadBlockVar::DirectPattern(block) => Ok(PayloadBlockCtx::DirectPattern(
                 block.modify(move |block| {
@@ -1178,7 +1178,7 @@ impl ToResolved<PayloadBlockCtx> for PayloadBlockVar {
 }
 
 impl ToResolved<PayloadBlock> for PayloadBlockVar {
-    fn to_resolved(self, env: &Env) -> Result<PayloadBlock, MsgErr> {
+    fn to_resolved(self, env: &Env) -> Result<PayloadBlock, UniErr> {
         let block: PayloadBlockCtx = self.to_resolved(env)?;
         block.to_resolved(env)
     }
@@ -1186,7 +1186,7 @@ impl ToResolved<PayloadBlock> for PayloadBlockVar {
 
 /*
 impl CtxSubst<PayloadBlock> for PayloadBlockCtx{
-    fn resolve_ctx(self, resolver: &dyn CtxResolver) -> Result<PayloadBlock, MsgErr> {
+    fn resolve_ctx(self, resolver: &dyn CtxResolver) -> Result<PayloadBlock, ExtErr> {
         match self {
             PayloadBlockCtx::RequestPattern(pattern) => {
                 Ok(PayloadBlock::RequestPattern(pattern.resolve_ctx(resolver)?))
@@ -1215,7 +1215,7 @@ pub type PatternBlockVar = PatternBlockDef<PointVar>;
 pub type PatternBlockDef<Pnt> = ValuePattern<SubstancePatternDef<Pnt>>;
 
 impl ToResolved<PatternBlock> for PatternBlockCtx {
-    fn to_resolved(self, env: &Env) -> Result<PatternBlock, MsgErr> {
+    fn to_resolved(self, env: &Env) -> Result<PatternBlock, UniErr> {
         match self {
             PatternBlockCtx::Any => Ok(PatternBlock::Any),
             PatternBlockCtx::None => Ok(PatternBlock::None),
@@ -1227,7 +1227,7 @@ impl ToResolved<PatternBlock> for PatternBlockCtx {
 }
 
 impl ToResolved<PatternBlockCtx> for PatternBlockVar {
-    fn to_resolved(self, env: &Env) -> Result<PatternBlockCtx, MsgErr> {
+    fn to_resolved(self, env: &Env) -> Result<PatternBlockCtx, UniErr> {
         match self {
             PatternBlockVar::Any => Ok(PatternBlockCtx::Any),
             PatternBlockVar::None => Ok(PatternBlockCtx::None),

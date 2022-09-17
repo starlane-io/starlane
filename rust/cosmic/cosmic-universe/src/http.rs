@@ -1,4 +1,4 @@
-use crate::error::MsgErr;
+use crate::error::UniErr;
 use crate::id::id::Meta;
 use crate::substance::substance::{Errors, Substance};
 use crate::util::ValueMatcher;
@@ -46,7 +46,7 @@ impl Into<http::Method> for HttpMethod {
 }
 
 impl TryFrom<http::Method> for HttpMethod {
-    type Error = MsgErr;
+    type Error = UniErr;
 
     fn try_from(method: http::Method) -> Result<Self, Self::Error> {
         match method.as_str() {
@@ -97,7 +97,7 @@ impl HttpRequest {
 }
 
 impl TryFrom<DirectedCore> for HttpRequest {
-    type Error = MsgErr;
+    type Error = UniErr;
 
     fn try_from(core: DirectedCore) -> Result<Self, Self::Error> {
         if let Method::Http(method) = core.method {

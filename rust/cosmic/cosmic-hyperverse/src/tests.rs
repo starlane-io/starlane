@@ -8,7 +8,7 @@ use cosmic_universe::command::command::common::StateSrc;
 use cosmic_universe::id::id::{Layer, ToPoint, ToPort, Uuid};
 use cosmic_universe::id::{StarHandle, TraversalDirection};
 use cosmic_universe::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
-use cosmic_universe::msg::MsgMethod;
+use cosmic_universe::ext::ExtMethod;
 use cosmic_universe::sys::{Assign, AssignmentKind, InterchangeKind, Knock, Sys};
 use cosmic_universe::wave::{
     Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Method, Pong,
@@ -308,9 +308,9 @@ impl ToString for TestErr {
     }
 }
 
-impl Into<MsgErr> for TestErr {
-    fn into(self) -> MsgErr {
-        MsgErr::from_500(self.to_string())
+impl Into<UniErr> for TestErr {
+    fn into(self) -> UniErr {
+        UniErr::from_500(self.to_string())
     }
 }
 
@@ -344,8 +344,8 @@ impl From<&'static str> for TestErr {
         }
     }
 }
-impl From<MsgErr> for TestErr {
-    fn from(err: MsgErr) -> Self {
+impl From<UniErr> for TestErr {
+    fn from(err: UniErr) -> Self {
         Self {
             message: err.to_string(),
         }
@@ -361,8 +361,8 @@ impl From<io::Error> for TestErr {
 }
 
 impl PlatErr for TestErr {
-    fn to_cosmic_err(&self) -> MsgErr {
-        MsgErr::from_500(self.to_string())
+    fn to_cosmic_err(&self) -> UniErr {
+        UniErr::from_500(self.to_string())
     }
 
     fn new<S>(message: S) -> Self
@@ -478,7 +478,7 @@ fn test_gravity_routing() -> Result<(), TestErr> {
         let mut wave = DirectedProto::ping();
         wave.from(FAE.clone().to_port());
         wave.to(LESS.clone().to_port());
-        wave.method(MsgMethod::new("DieTacEng").unwrap());
+        wave.method(ExtMethod::new("DieTacEng").unwrap());
         let wave = wave.build().unwrap();
         let wave = wave.to_ultra();
 
@@ -833,7 +833,7 @@ impl<P> HyperwayEndpointFactory for MachineApiExtFactory<P>
     where
         P: Platform,
 {
-    async fn create(&self, status_tx:mpsc::Sender<HyperConnectionDetails>) -> Result<HyperwayEndpoint, MsgErr> {
+    async fn create(&self, status_tx:mpsc::Sender<HyperConnectionDetails>) -> Result<HyperwayEndpoint, UniErr> {
         let knock = Knock {
             kind: InterchangeKind::DefaultControl,
             auth: Box::new(Substance::Empty),

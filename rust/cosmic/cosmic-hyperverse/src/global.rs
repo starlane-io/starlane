@@ -5,7 +5,7 @@ use cosmic_universe::cli::RawCommand;
 use cosmic_universe::command::command::common::StateSrc;
 use cosmic_universe::command::request::create::{Create, PointSegTemplate, Strategy};
 use cosmic_universe::command::Command;
-use cosmic_universe::error::MsgErr;
+use cosmic_universe::error::UniErr;
 use cosmic_universe::id::id::{Kind, Layer, Point, Port, ToPort, GLOBAL_EXEC, ToPoint};
 use cosmic_universe::log::{PointLogger, RootLogger};
 use cosmic_universe::parse::{bind_config, command_line};

@@ -17,7 +17,7 @@ use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf, ReadHalf, WriteHalf};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time::error::Elapsed;
 use tokio_openssl::SslStream;
-use cosmic_universe::error::MsgErr;
+use cosmic_universe::error::UniErr;
 use cosmic_universe::log::PointLogger;
 use cosmic_universe::substance::substance::Substance;
 use cosmic_universe::sys::Knock;
@@ -55,27 +55,27 @@ impl HyperlaneTcpClient {
 
 #[async_trait]
 impl HyperwayEndpointFactory for HyperlaneTcpClient {
-    async fn create(&self, status_tx: mpsc::Sender<HyperConnectionDetails>) -> Result<HyperwayEndpoint, MsgErr> {
+    async fn create(&self, status_tx: mpsc::Sender<HyperConnectionDetails>) -> Result<HyperwayEndpoint, UniErr> {
         status_tx.send(HyperConnectionDetails::new(HyperConnectionStatus::Connecting,"init")).await.unwrap_or_default();
         let (kill_tx,kill_rx) = broadcast::channel(1);
-        let mut connector :SslConnectorBuilder= SslConnector::builder(SslMethod::tls()).map_err(MsgErr::map)?;
+        let mut connector :SslConnectorBuilder= SslConnector::builder(SslMethod::tls()).map_err(UniErr::map)?;
 
 
         status_tx.send(HyperConnectionDetails::new(HyperConnectionStatus::Connecting,"loading cert")).await.unwrap_or_default();
 
-        connector.set_ca_file(format!("{}/cert.pem", self.cert_dir)).map_err(MsgErr::map)?;
+        connector.set_ca_file(format!("{}/cert.pem", self.cert_dir)).map_err(UniErr::map)?;
 
         let ssl =
          connector
             .build()
-            .configure().map_err(MsgErr::map)?.verify_hostname(self.verify)
-            .into_ssl(self.host.as_str()).map_err(MsgErr::map)?;
+            .configure().map_err(UniErr::map)?.verify_hostname(self.verify)
+            .into_ssl(self.host.as_str()).map_err(UniErr::map)?;
 
         status_tx.send(HyperConnectionDetails::new(HyperConnectionStatus::Connecting,"connecting tcp stream")).await.unwrap_or_default();
         let stream = TcpStream::connect(&self.host).await?;
         status_tx.send(HyperConnectionDetails::new(HyperConnectionStatus::Connecting,"creating ssl layer")).await.unwrap_or_default();
-        let mut stream = SslStream::new(ssl, stream).map_err(MsgErr::map)?;
-        Pin::new(&mut stream).connect().await.map_err(MsgErr::map)?;
+        let mut stream = SslStream::new(ssl, stream).map_err(UniErr::map)?;
+        Pin::new(&mut stream).connect().await.map_err(UniErr::map)?;
         let mut stream = FrameStream::new( stream );
         status_tx.send(HyperConnectionDetails::new(HyperConnectionStatus::Connecting,"starting handshake")).await.unwrap_or_default();
         let endpoint = FrameMuxer::handshake(stream, kill_rx, status_tx.clone(), self.logger.clone()).await?;
@@ -145,7 +145,7 @@ impl Frame {
         Frame{ data: string.as_bytes().to_vec() }
     }
 
-    pub fn to_string(self) -> Result<String,MsgErr> {
+    pub fn to_string(self) -> Result<String, UniErr> {
         Ok(String::from_utf8(self.data)?)
     }
 
@@ -154,13 +154,13 @@ impl Frame {
       Frame{ data: version.to_string().as_bytes().to_vec() }
   }
 
-  pub fn to_version( self ) -> Result<semver::Version, MsgErr> {
+  pub fn to_version( self ) -> Result<semver::Version, UniErr> {
       Ok(semver::Version::from_str(String::from_utf8(self.data )?.as_str())?)
   }
 
 
 
-  pub async fn from_stream<'a>(read: &'a mut SslStream<TcpStream>) -> Result<Frame,MsgErr> {
+  pub async fn from_stream<'a>(read: &'a mut SslStream<TcpStream>) -> Result<Frame, UniErr> {
       let size = read.read_u32().await?;
       let mut data = Vec::with_capacity(size as usize);
       read.read_buf(&mut data).await?;
@@ -169,17 +169,17 @@ impl Frame {
       })
   }
 
-  pub async fn to_stream<'a>(&self, write: &'a mut SslStream<TcpStream>) -> Result<(),MsgErr> {
+  pub async fn to_stream<'a>(&self, write: &'a mut SslStream<TcpStream>) -> Result<(), UniErr> {
       write.write_u32(self.data.len() as u32).await?;
       write.write_all(self.data.as_slice()).await?;
       Ok(())
   }
 
-  pub fn to_wave(self) -> Result<UltraWave,MsgErr> {
+  pub fn to_wave(self) -> Result<UltraWave, UniErr> {
       Ok(bincode::deserialize(self.data.as_slice())?)
   }
 
-  pub fn from_wave(wave: UltraWave) -> Result<Self,MsgErr> {
+  pub fn from_wave(wave: UltraWave) -> Result<Self, UniErr> {
       Ok(Self{data:bincode::serialize(&wave)?})
   }
 }
@@ -197,7 +197,7 @@ pub struct FrameMuxer {
 
 impl FrameMuxer {
 
-    pub async fn handshake(mut stream : FrameStream, kill_rx: broadcast::Receiver<()>, status_tx: mpsc::Sender<HyperConnectionDetails>, logger: PointLogger ) -> Result<HyperwayEndpoint,MsgErr> {
+    pub async fn handshake(mut stream : FrameStream, kill_rx: broadcast::Receiver<()>, status_tx: mpsc::Sender<HyperConnectionDetails>, logger: PointLogger ) -> Result<HyperwayEndpoint, UniErr> {
         status_tx.send(HyperConnectionDetails::new(HyperConnectionStatus::Handshake, "exchanging versions")).await.unwrap_or_default();
         stream.write_version(&VERSION.clone()).await?;
         let in_version = tokio::time::timeout(Duration::from_secs(30), stream.read_version()).await??;
@@ -238,7 +238,7 @@ impl FrameMuxer {
         HyperwayEndpoint::new_with_drop(out_tx,in_rx,terminate_tx)
     }
 
-    pub async fn mux(mut self) -> Result<(),MsgErr> {
+    pub async fn mux(mut self) -> Result<(), UniErr> {
         loop {
             tokio::select! {
                 Some(wave) = self.rx.recv() => {
@@ -269,34 +269,34 @@ impl  FrameStream {
         }
     }
 
-    pub async fn frame(&mut self) -> Result<Frame,MsgErr> {
+    pub async fn frame(&mut self) -> Result<Frame, UniErr> {
         Frame::from_stream(& mut self.stream).await
     }
-    pub async fn read_version(&mut self) -> Result<semver::Version,MsgErr>{
+    pub async fn read_version(&mut self) -> Result<semver::Version, UniErr>{
         self.frame().await?.to_version()
     }
 
-    pub async fn read_string(&mut self) -> Result<String,MsgErr>{
+    pub async fn read_string(&mut self) -> Result<String, UniErr>{
         self.frame().await?.to_string()
     }
 
-    pub async fn read_wave(&mut self) -> Result<UltraWave,MsgErr>{
+    pub async fn read_wave(&mut self) -> Result<UltraWave, UniErr>{
         self.frame().await?.to_wave()
     }
 
-    pub async fn write_frame(&mut self, frame: Frame ) -> Result<(),MsgErr>{
+    pub async fn write_frame(&mut self, frame: Frame ) -> Result<(), UniErr>{
         frame.to_stream(& mut self.stream).await
     }
 
-    pub async fn write_string(&mut self, string: String ) -> Result<(),MsgErr> {
+    pub async fn write_string(&mut self, string: String ) -> Result<(), UniErr> {
         self.write_frame(Frame::from_string(string)).await
     }
 
-    pub async fn write_version(&mut self, version: &semver::Version) -> Result<(),MsgErr> {
+    pub async fn write_version(&mut self, version: &semver::Version) -> Result<(), UniErr> {
         self.write_frame(Frame::from_version(version)).await
     }
 
-    pub async fn write_wave(&mut self, wave: UltraWave) -> Result<(),MsgErr> {
+    pub async fn write_wave(&mut self, wave: UltraWave) -> Result<(), UniErr> {
         self.write_frame(Frame::from_wave(wave)?).await
     }
 
@@ -374,7 +374,7 @@ impl HyperlaneTcpServer {
                         mux.connect(endpoint);
                      } else {
                         let msg = format!("expected client Substance::Knock(Knock) encountered '{}'",knock.body().kind().to_string());
-                        return logger.result(Err(MsgErr::str(msg).into()));
+                        return logger.result(Err(UniErr::str(msg).into()));
                     }
 
                     Ok(())
@@ -431,8 +431,8 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<MsgErr> for Error {
-    fn from(e: MsgErr) -> Self {
+impl From<UniErr> for Error {
+    fn from(e: UniErr) -> Self {
         Error::new(e)
     }
 }

@@ -46,7 +46,7 @@ impl GlobalApi {
     async fn handle_command_service_request(&self, request: ReqShell) -> RespShell {
         async fn handle(global: &GlobalApi, request: ReqShell) -> Result<RespShell, Error> {
             match &request.core.method {
-                Method::Msg(method) if method.as_str() == "Command" && request.core.body.kind() == PayloadType::Command => {
+                Method::Ext(method) if method.as_str() == "Command" && request.core.body.kind() == PayloadType::Command => {
                     if let Substance::Command(command) = &request.core.body {
                         match &**command {
                             Command::Create(create) => {

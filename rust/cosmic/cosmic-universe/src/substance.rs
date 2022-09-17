@@ -7,11 +7,11 @@ pub mod substance {
     use crate::cli::RawCommand;
     use crate::command::request::{Rc, RcCommandType};
     use crate::command::Command;
-    use crate::error::{MsgErr, ParseErrs};
+    use crate::error::{UniErr, ParseErrs};
     use crate::http::HttpMethod;
     use crate::id::id::{BaseKind, KindParts, Meta, Point, PointCtx, PointVar, Port};
     use crate::log::Log;
-    use crate::msg::MsgMethod;
+    use crate::ext::ExtMethod;
     use crate::parse::model::Subst;
     use crate::parse::{CtxResolver, Env};
     use crate::particle::particle::{Particle, Status, Stub};
@@ -112,8 +112,8 @@ pub mod substance {
     }
 
     pub trait ToSubstance<S> {
-        fn to_substance(self) -> Result<S, MsgErr>;
-        fn to_substance_ref(&self) -> Result<&S, MsgErr>;
+        fn to_substance(self) -> Result<S, UniErr>;
+        fn to_substance_ref(&self) -> Result<&S, UniErr>;
     }
 
     pub trait ChildSubstance {}
@@ -150,7 +150,7 @@ pub mod substance {
     }
 
     impl FromStr for Token {
-        type Err = MsgErr;
+        type Err = UniErr;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             Ok(Token::new(s))
@@ -158,7 +158,7 @@ pub mod substance {
     }
 
     impl TryFrom<Pong> for Token {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_from(response: Pong) -> Result<Self, Self::Error> {
             response.core.body.try_into()
@@ -177,7 +177,7 @@ pub mod substance {
     }
 
     impl Substance {
-        pub fn to_text(self) -> Result<String, MsgErr> {
+        pub fn to_text(self) -> Result<String, UniErr> {
             if let Substance::Text(text) = self {
                 Ok(text)
             } else {
@@ -229,7 +229,7 @@ pub mod substance {
             }
         }
 
-        pub fn to_bin(self) -> Result<Bin, MsgErr> {
+        pub fn to_bin(self) -> Result<Bin, UniErr> {
             match self {
                 Substance::Empty => Ok(Arc::new(vec![])),
                 Substance::List(list) => list.to_bin(),
@@ -241,7 +241,7 @@ pub mod substance {
     }
 
     impl TryInto<HashMap<String, Substance>> for Substance {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<HashMap<String, Substance>, Self::Error> {
             match self {
@@ -302,7 +302,7 @@ pub mod substance {
         }
 
          */
-        pub fn to_bin(self) -> Result<Bin, MsgErr> {
+        pub fn to_bin(self) -> Result<Bin, UniErr> {
             Ok(Arc::new(bincode::serialize(&self)?))
         }
 
@@ -321,8 +321,8 @@ pub mod substance {
 
 
     impl Errors {
-        pub fn to_cosmic_err(&self) -> MsgErr {
-            MsgErr::new(500, self.to_string().as_str() )
+        pub fn to_cosmic_err(&self) -> UniErr {
+            UniErr::new(500, self.to_string().as_str() )
         }
 
         pub fn empty() -> Self {
@@ -338,13 +338,13 @@ pub mod substance {
         }
     }
 
-    impl From<MsgErr> for Errors {
-        fn from(err: MsgErr) -> Self {
+    impl From<UniErr> for Errors {
+        fn from(err: UniErr) -> Self {
             match err {
-                MsgErr::Status { status, message } => {
+                UniErr::Status { status, message } => {
                     Self::default(format!("{} {}", status, message).as_str())
                 }
-                MsgErr::ParseErrs(_) => {
+                UniErr::ParseErrs(_) => {
                     Self::default("500: parse error")
                 }
             }
@@ -387,7 +387,7 @@ pub mod substance {
         pub fn new() -> Self {
             Self { list: vec![] }
         }
-        pub fn to_bin(self) -> Result<Bin, MsgErr> {
+        pub fn to_bin(self) -> Result<Bin, UniErr> {
             Ok(Arc::new(bincode::serialize(&self)?))
         }
     }
@@ -413,7 +413,7 @@ pub mod substance {
     }
 
     impl ListPattern {
-        pub fn is_match(&self, list: &SubstanceList) -> Result<(), MsgErr> {
+        pub fn is_match(&self, list: &SubstanceList) -> Result<(), UniErr> {
             /*
             for i in &list.list {
                 if self.primitive != i.primitive_type() {
@@ -451,7 +451,7 @@ pub mod substance {
     }
 
     impl ToResolved<SubstanceTypePatternDef<Point>> for SubstanceTypePatternDef<PointCtx> {
-        fn to_resolved(self, env: &Env) -> Result<SubstanceTypePatternDef<Point>, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<SubstanceTypePatternDef<Point>, UniErr> {
             match self {
                 SubstanceTypePatternDef::Empty => Ok(SubstanceTypePatternDef::Empty),
                 SubstanceTypePatternDef::Primitive(payload_type) => {
@@ -466,7 +466,7 @@ pub mod substance {
     }
 
     impl ToResolved<SubstanceTypePatternCtx> for SubstanceTypePatternVar {
-        fn to_resolved(self, env: &Env) -> Result<SubstanceTypePatternCtx, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<SubstanceTypePatternCtx, UniErr> {
             match self {
                 SubstanceTypePatternVar::Empty => Ok(SubstanceTypePatternCtx::Empty),
                 SubstanceTypePatternVar::Primitive(payload_type) => {
@@ -557,7 +557,7 @@ pub mod substance {
         pub validator: Option<CallWithConfigDef<Pnt>>,
     }
     impl ToResolved<SubstancePatternCtx> for SubstancePatternVar {
-        fn to_resolved(self, env: &Env) -> Result<SubstancePatternCtx, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<SubstancePatternCtx, UniErr> {
             let mut errs = vec![];
             let structure = match self.structure.to_resolved(env) {
                 Ok(structure) => Some(structure),
@@ -590,7 +590,7 @@ pub mod substance {
     }
 
     impl ToResolved<SubstancePattern> for SubstancePatternCtx {
-        fn to_resolved(self, resolver: &Env) -> Result<SubstancePattern, MsgErr> {
+        fn to_resolved(self, resolver: &Env) -> Result<SubstancePattern, UniErr> {
             let mut errs = vec![];
             let structure = match self.structure.to_resolved(resolver) {
                 Ok(structure) => Some(structure),
@@ -642,7 +642,7 @@ pub mod substance {
     pub type CallWithConfigVar = CallWithConfigDef<PointVar>;
 
     impl ToResolved<CallWithConfigCtx> for CallWithConfigVar {
-        fn to_resolved(self, resolver: &Env) -> Result<CallWithConfigCtx, MsgErr> {
+        fn to_resolved(self, resolver: &Env) -> Result<CallWithConfigCtx, UniErr> {
             let mut errs = vec![];
             let call = match self.call.to_resolved(resolver) {
                 Ok(call) => Some(call),
@@ -673,7 +673,7 @@ pub mod substance {
         }
     }
     impl ToResolved<CallWithConfig> for CallWithConfigCtx {
-        fn to_resolved(self, resolver: &Env) -> Result<CallWithConfig, MsgErr> {
+        fn to_resolved(self, resolver: &Env) -> Result<CallWithConfig, UniErr> {
             let mut errs = vec![];
             let call = match self.call.to_resolved(resolver) {
                 Ok(call) => Some(call),
@@ -709,7 +709,7 @@ pub mod substance {
     pub type CallVar = CallDef<PointVar>;
 
     impl ToResolved<Call> for CallCtx {
-        fn to_resolved(self, env: &Env) -> Result<Call, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<Call, UniErr> {
             Ok(Call {
                 point: self.point.to_resolved(env)?,
                 kind: self.kind,
@@ -718,7 +718,7 @@ pub mod substance {
     }
 
     impl ToResolved<CallCtx> for CallVar {
-        fn to_resolved(self, env: &Env) -> Result<CallCtx, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<CallCtx, UniErr> {
             Ok(CallCtx {
                 point: self.point.to_resolved(env)?,
                 kind: self.kind,
@@ -727,7 +727,7 @@ pub mod substance {
     }
 
     impl ToResolved<Call> for CallVar {
-        fn to_resolved(self, env: &Env) -> Result<Call, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<Call, UniErr> {
             let call: CallCtx = self.to_resolved(env)?;
             call.to_resolved(env)
         }
@@ -743,17 +743,17 @@ pub mod substance {
     pub enum CallKind {
         Cmd(CmdCall),
         Sys(SysCall),
-        Msg(MsgCall),
+        Ext(ExtCall),
         Http(HttpCall),
     }
 
     impl CallKind {
         /*
-        pub fn core_with_body(self, body: Substance) -> Result<RequestCore, MsgErr> {
+        pub fn core_with_body(self, body: Substance) -> Result<RequestCore, ExtErr> {
             Ok(match self {
-                CallKind::Msg(msg) => RequestCore {
+                CallKind::Ext(msg) => RequestCore {
                     headers: Default::default(),
-                    method: Method::Msg(MsgMethod::new(msg.method)?),
+                    method: Method::Ext(ExtMethod::new(msg.method)?),
                     uri: Uri::from_str(msg.path.as_str())?,
                     body,
                 },
@@ -775,20 +775,20 @@ pub mod substance {
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-    pub struct MsgCall {
+    pub struct ExtCall {
         pub path: Subst<Tw<String>>,
-        pub method: MsgMethod,
+        pub method: ExtMethod,
     }
 
-    impl MsgCall {
-        pub fn new(method: MsgMethod, path: Subst<Tw<String>>) -> Self {
+    impl ExtCall {
+        pub fn new(method: ExtMethod, path: Subst<Tw<String>>) -> Self {
             Self { method, path }
         }
     }
 
-    impl ToString for MsgCall {
+    impl ToString for ExtCall {
         fn to_string(&self) -> String {
-            format!("Msg<{}>{}", self.method.to_string(), self.path.to_string())
+            format!("Ext<{}>{}", self.method.to_string(), self.path.to_string())
         }
     }
 
@@ -883,7 +883,7 @@ pub mod substance {
     impl ToString for CallKind {
         fn to_string(&self) -> String {
             match self {
-                CallKind::Msg(msg) => msg.to_string(),
+                CallKind::Ext(msg) => msg.to_string(),
                 CallKind::Http(http) => http.to_string(),
                 CallKind::Cmd(cmd) => cmd.to_string(),
                 CallKind::Sys(sys) => sys.to_string(),
@@ -1109,7 +1109,7 @@ pub mod substance {
     }
 
     impl TryInto<HashMap<String, String>> for MultipartForm {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<HashMap<String, String>, Self::Error> {
             let map: HashMap<String, String> = serde_urlencoded::from_str(&self.data)?;
@@ -1192,7 +1192,7 @@ pub mod substance {
     }
 
     impl MultipartFormBuilder {
-        pub fn build(self) -> Result<MultipartForm, MsgErr> {
+        pub fn build(self) -> Result<MultipartForm, UniErr> {
             let data = serde_urlencoded::to_string(&self.map)?;
             Ok(MultipartForm { data })
         }

@@ -22,7 +22,7 @@ pub mod frame;
 pub mod http;
 pub mod id;
 pub mod log;
-pub mod msg;
+pub mod ext;
 pub mod parse;
 pub mod particle;
 pub mod portal;
@@ -44,7 +44,7 @@ use crate::command::request::query::{Query, QueryResult};
 use crate::command::request::select::{Select, SubSelect};
 use crate::config::config::bind::BindConfig;
 use crate::config::config::Document;
-use crate::error::MsgErr;
+use crate::error::UniErr;
 use crate::id::id::{BaseKind, Kind, Point, Port, Specific, Uuid};
 use crate::id::{ArtifactSubKind, FileSubKind, StarSub, UserBaseSubKind};
 use crate::particle::particle::{Details, Properties, Status, Stub};
@@ -90,7 +90,7 @@ impl ArtifactApi {
         }
     }
 
-    pub async fn bind(&self, point: &Point) -> Result<ArtRef<BindConfig>, MsgErr> {
+    pub async fn bind(&self, point: &Point) -> Result<ArtRef<BindConfig>, UniErr> {
         {
             let read = self.binds.read().await;
             if read.contains(point) {
@@ -108,9 +108,9 @@ impl ArtifactApi {
         return Ok(ArtRef::new(bind, point.clone()));
     }
 
-    async fn get<A>(&self, point: &Point) -> Result<A, MsgErr>
+    async fn get<A>(&self, point: &Point) -> Result<A, UniErr>
     where
-        A: TryFrom<Vec<u8>, Error = MsgErr>,
+        A: TryFrom<Vec<u8>, Error =UniErr>,
     {
         if !point.has_bundle() {
             return Err("point is not from a bundle".into());
@@ -130,12 +130,12 @@ impl NoDiceArtifactFetcher {
 
 #[async_trait]
 impl ArtifactFetcher for NoDiceArtifactFetcher {
-    async fn stub(&self, point: &Point) -> Result<Stub, MsgErr> {
-        Err(MsgErr::from_status(404u16))
+    async fn stub(&self, point: &Point) -> Result<Stub, UniErr> {
+        Err(UniErr::from_status(404u16))
     }
 
-    async fn fetch(&self, point: &Point) -> Result<Vec<u8>, MsgErr> {
-        Err(MsgErr::from_status(404u16))
+    async fn fetch(&self, point: &Point) -> Result<Vec<u8>, UniErr> {
+        Err(UniErr::from_status(404u16))
     }
 }
 
@@ -176,8 +176,8 @@ impl<A> Drop for ArtRef<A> {
 
 #[async_trait]
 pub trait ArtifactFetcher: Send + Sync {
-    async fn stub(&self, point: &Point) -> Result<Stub, MsgErr>;
-    async fn fetch(&self, point: &Point) -> Result<Vec<u8>, MsgErr>;
+    async fn stub(&self, point: &Point) -> Result<Stub, UniErr>;
+    async fn fetch(&self, point: &Point) -> Result<Vec<u8>, UniErr>;
 }
 
 pub struct FetchErr {}
@@ -202,7 +202,7 @@ pub trait StateFactory: Send + Sync {
 }
 
 pub trait State: Send + Sync {
-    fn deserialize<DS>(from: Vec<u8>) -> Result<DS, MsgErr>
+    fn deserialize<DS>(from: Vec<u8>) -> Result<DS, UniErr>
     where
         DS: State,
         Self: Sized;
@@ -233,7 +233,7 @@ pub mod artifact {
 }
 
 pub mod path {
-    use crate::error::MsgErr;
+    use crate::error::UniErr;
     use crate::parse::consume_path;
     use alloc::format;
     use alloc::string::{String, ToString};
@@ -254,7 +254,7 @@ pub mod path {
             }
         }
 
-        pub fn make_absolute(string: &str) -> Result<Self, MsgErr> {
+        pub fn make_absolute(string: &str) -> Result<Self, UniErr> {
             if string.starts_with("/") {
                 Path::from_str(string)
             } else {
@@ -262,7 +262,7 @@ pub mod path {
             }
         }
 
-        pub fn bin(&self) -> Result<Vec<u8>, MsgErr> {
+        pub fn bin(&self) -> Result<Vec<u8>, UniErr> {
             let bin = bincode::serialize(self)?;
             Ok(bin)
         }
@@ -271,7 +271,7 @@ pub mod path {
             self.string.starts_with("/")
         }
 
-        pub fn cat(&self, path: &Path) -> Result<Self, MsgErr> {
+        pub fn cat(&self, path: &Path) -> Result<Self, UniErr> {
             if self.string.ends_with("/") {
                 Path::from_str(format!("{}{}", self.string.as_str(), path.string.as_str()).as_str())
             } else {
@@ -315,7 +315,7 @@ pub mod path {
     }
 
     impl FromStr for Path {
-        type Err = MsgErr;
+        type Err = UniErr;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             let (_, path) = consume_path(new_span(s))?;
@@ -345,7 +345,7 @@ pub mod fail {
     use alloc::string::String;
     use serde::{Deserialize, Serialize};
 
-    use crate::error::MsgErr;
+    use crate::error::UniErr;
     use crate::id::id::Specific;
 
     pub mod mesh {
@@ -362,13 +362,13 @@ pub mod fail {
         use alloc::string::String;
         use serde::{Deserialize, Serialize};
 
-        use crate::fail::{http, msg, resource};
+        use crate::fail::{http, ext, resource};
 
         #[derive(Debug, Clone, Serialize, Deserialize)]
         pub enum Fail {
             Error(String),
             Resource(resource::Fail),
-            Msg(msg::Fail),
+            Ext(ext::Fail),
             Http(http::Error),
         }
     }
@@ -421,7 +421,7 @@ pub mod fail {
         }
     }
 
-    pub mod msg {
+    pub mod ext {
         use alloc::string::String;
         use serde::{Deserialize, Serialize};
 
@@ -519,9 +519,9 @@ pub mod fail {
         }
     }
 
-    /*    impl Into<MsgErr> for Fail {
-           fn into(self) -> MsgErr {
-               MsgErr {
+    /*    impl Into<ExtErr> for Fail {
+           fn into(self) -> ExtErr {
+               ExtErr {
                    status: 500,
                    message: "Fail".to_string(),
                }

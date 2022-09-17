@@ -1,6 +1,6 @@
 use crate::star::{HyperStar, HyperStarApi, StarCon, HyperStarSkel, StarTemplate, HyperStarTx};
 use crate::{DriversBuilder, PlatErr, Platform, Registry, RegistryApi};
-use cosmic_universe::error::MsgErr;
+use cosmic_universe::error::UniErr;
 use cosmic_universe::id::id::{Layer, Point, Port, ToPoint, ToPort};
 use cosmic_universe::id::{ConstellationName, MachineName, StarHandle, StarKey, StarSub};
 use cosmic_universe::log::{PointLogger, RootLogger};
@@ -54,13 +54,13 @@ where
         &self,
         kind: InterchangeKind,
         gate: Arc<dyn HyperGate>,
-    ) -> Result<(), MsgErr> {
+    ) -> Result<(), UniErr> {
         let (rtn, rtn_rx) = oneshot::channel();
         self.tx.send(MachineCall::AddGate { kind, gate, rtn }).await?;
         rtn_rx.await?
     }
 
-    pub async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint,MsgErr> {
+    pub async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, UniErr> {
         let (rtn,rtn_rx) = oneshot::channel();
         self.tx.send(MachineCall::Knock {knock, rtn}).await;
         rtn_rx.await?
@@ -95,14 +95,14 @@ where
 
 
     #[cfg(test)]
-    pub async fn get_machine_star(&self) -> Result<HyperStarApi<P>, MsgErr> {
+    pub async fn get_machine_star(&self) -> Result<HyperStarApi<P>, UniErr> {
         let (tx, mut rx) = oneshot::channel();
         self.tx.send(MachineCall::GetMachineStar(tx)).await;
         Ok(rx.await?)
     }
 
     #[cfg(test)]
-    pub async fn get_star(&self, key: StarKey) -> Result<HyperStarApi<P>, MsgErr> {
+    pub async fn get_star(&self, key: StarKey) -> Result<HyperStarApi<P>, UniErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.tx.send(MachineCall::GetStar{key, rtn}).await;
         rtn_rx.await?
@@ -444,17 +444,17 @@ where
     AddGate {
         kind: InterchangeKind,
         gate: Arc<dyn HyperGate>,
-        rtn: oneshot::Sender<Result<(), MsgErr>>,
+        rtn: oneshot::Sender<Result<(), UniErr>>,
     },
     Knock {
         knock: Knock,
-        rtn: oneshot::Sender<Result<HyperwayEndpoint, MsgErr>>,
+        rtn: oneshot::Sender<Result<HyperwayEndpoint, UniErr>>,
     },
     EndpointFactory { from: StarKey, to: StarKey, rtn: oneshot::Sender<Box<dyn HyperwayEndpointFactory>> } ,
     #[cfg(test)]
     GetMachineStar(oneshot::Sender<HyperStarApi<P>>),
     #[cfg(test)]
-    GetStar{key: StarKey, rtn:oneshot::Sender<Result<HyperStarApi<P>,MsgErr>>},
+    GetStar{key: StarKey, rtn:oneshot::Sender<Result<HyperStarApi<P>, UniErr>>},
     #[cfg(test)]
     GetRegistry(oneshot::Sender<Registry<P>>),
 }
@@ -572,7 +572,7 @@ impl <P> MachineHyperwayEndpointFactory<P> where P: Platform {
 
 #[async_trait]
 impl <P> HyperwayEndpointFactory for MachineHyperwayEndpointFactory<P> where P: Platform{
-    async fn create(&self, status_tx:mpsc::Sender<HyperConnectionDetails>) -> Result<HyperwayEndpoint, MsgErr> {
+    async fn create(&self, status_tx:mpsc::Sender<HyperConnectionDetails>) -> Result<HyperwayEndpoint, UniErr> {
         let knock = Knock::new( InterchangeKind::Star(self.to.clone()), self.from.clone().to_point().to_port().with_layer(Layer::Gravity), Substance::Empty );
         let (rtn,mut rtn_rx) = oneshot::channel();
         self.call_tx.send(MachineCall::Knock { knock, rtn }).await;

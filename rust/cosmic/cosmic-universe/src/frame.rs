@@ -6,7 +6,7 @@ pub mod frame {
 
     use serde::{Deserialize, Serialize};
 
-    use crate::error::MsgErr;
+    use crate::error::UniErr;
     use crate::sys::Knock;
     use crate::wave::{Ping, Pong, UltraWave, Wave};
 
@@ -36,7 +36,7 @@ pub mod frame {
     }
 
     impl TryInto<String> for PrimitiveFrame {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<String, Self::Error> {
             Ok(String::from_utf8(self.data)?)
@@ -44,7 +44,7 @@ pub mod frame {
     }
 
     impl TryInto<semver::Version> for PrimitiveFrame {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<semver::Version, Self::Error> {
             let data = String::from_utf8(self.data)?;
@@ -66,7 +66,7 @@ pub mod frame {
     }
 
     impl TryInto<PrimitiveFrame> for Ping {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<PrimitiveFrame, Self::Error> {
             let data = bincode::serialize(&self)?;
@@ -75,7 +75,7 @@ pub mod frame {
     }
 
     impl TryInto<Ping> for PrimitiveFrame {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<Ping, Self::Error> {
             Ok(bincode::deserialize(self.data.as_bytes())?)
@@ -83,7 +83,7 @@ pub mod frame {
     }
 
     impl TryInto<PrimitiveFrame> for Pong {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<PrimitiveFrame, Self::Error> {
             let data = bincode::serialize(&self)?;
@@ -92,7 +92,7 @@ pub mod frame {
     }
 
     impl TryInto<Pong> for PrimitiveFrame {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<Pong, Self::Error> {
             Ok(bincode::deserialize(self.data.as_bytes())?)
@@ -100,7 +100,7 @@ pub mod frame {
     }
 
     impl TryInto<PrimitiveFrame> for UltraWave {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<PrimitiveFrame, Self::Error> {
             let data = bincode::serialize(&self)?;
@@ -109,7 +109,7 @@ pub mod frame {
     }
 
     impl TryInto<UltraWave> for PrimitiveFrame {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<UltraWave, Self::Error> {
             Ok(bincode::deserialize(self.data.as_bytes())?)
@@ -117,7 +117,7 @@ pub mod frame {
     }
 
     impl TryInto<PrimitiveFrame> for Knock {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<PrimitiveFrame, Self::Error> {
             let data = bincode::serialize(&self)?;
@@ -126,7 +126,7 @@ pub mod frame {
     }
 
     impl TryInto<Knock> for PrimitiveFrame {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<Knock, Self::Error> {
             Ok(bincode::deserialize(self.data.as_bytes())?)

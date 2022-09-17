@@ -1,4 +1,4 @@
-use crate::error::MsgErr;
+use crate::error::UniErr;
 use crate::id::id::{
     BaseKind, Kind, KindParts, Layer, Point, Port, RouteSeg, Specific, Sub, ToPoint, ToPort,
 };
@@ -43,7 +43,7 @@ pub mod id {
     use tokio::sync::{mpsc, oneshot};
 
     use crate::config::config::bind::RouteSelector;
-    use crate::error::{MsgErr, ParseErrs};
+    use crate::error::{UniErr, ParseErrs};
     use crate::id::id::PointSegCtx::Working;
     use crate::id::{
         ArtifactSubKind,  DatabaseSubKind, FileSubKind, StarSub, Traversal,
@@ -223,7 +223,7 @@ pub mod id {
     }
 
     impl TryFrom<CamelCase> for BaseKind {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_from(base: CamelCase) -> Result<Self, Self::Error> {
             Ok(BaseKind::from_str(base.as_str())?)
@@ -359,7 +359,7 @@ pub mod id {
     }
 
     impl TryFrom<KindParts> for Kind {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_from(value: KindParts) -> Result<Self, Self::Error> {
             Ok(match value.base {
@@ -371,7 +371,7 @@ pub mod id {
                                 .ok_or("Database<Relational<?>> requires a Specific")?,
                         )),
                         what => {
-                            return Err(MsgErr::from(format!(
+                            return Err(UniErr::from(format!(
                                 "unexpected Database SubKind '{}'",
                                 what
                             )));
@@ -386,7 +386,7 @@ pub mod id {
                                 .ok_or("UserBase<OAuth<?>> requires a Specific")?,
                         )),
                         what => {
-                            return Err(MsgErr::from(format!(
+                            return Err(UniErr::from(format!(
                                 "unexpected Database SubKind '{}'",
                                 what
                             )));
@@ -434,7 +434,7 @@ pub mod id {
     }
 
     impl ToResolved<PointKindCtx> for PointKindVar {
-        fn to_resolved(self, env: &Env) -> Result<PointKindCtx, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<PointKindCtx, UniErr> {
             Ok(PointKindCtx {
                 point: self.point.to_resolved(env)?,
                 kind: self.kind,
@@ -443,7 +443,7 @@ pub mod id {
     }
 
     impl ToResolved<PointKind> for PointKindVar {
-        fn to_resolved(self, env: &Env) -> Result<PointKind, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<PointKind, UniErr> {
             Ok(PointKind {
                 point: self.point.to_resolved(env)?,
                 kind: self.kind,
@@ -452,7 +452,7 @@ pub mod id {
     }
 
     impl ToResolved<PointKind> for PointKindCtx {
-        fn to_resolved(self, env: &Env) -> Result<PointKind, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<PointKind, UniErr> {
             Ok(PointKind {
                 point: self.point.to_resolved(env)?,
                 kind: self.kind,
@@ -472,7 +472,7 @@ pub mod id {
     }
 
     impl FromStr for PointKind {
-        type Err = MsgErr;
+        type Err = UniErr;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             let point_and_kind: PointKindVar = result(all_consuming(point_and_kind)(new_span(s)))?;
@@ -551,7 +551,7 @@ pub mod id {
     }
 
     impl TryInto<semver::Version> for Version {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<semver::Version, Self::Error> {
             Ok(self.version)
@@ -559,7 +559,7 @@ pub mod id {
     }
 
     impl FromStr for Version {
-        type Err = MsgErr;
+        type Err = UniErr;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             let version = semver::Version::from_str(s)?;
@@ -612,7 +612,7 @@ pub mod id {
     }
 
     impl TryInto<SpecificSelector> for Specific {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<SpecificSelector, Self::Error> {
             Ok(SpecificSelector {
@@ -681,7 +681,7 @@ pub mod id {
     }
 
     impl TryInto<RouteSeg> for RouteSegVar {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<RouteSeg, Self::Error> {
             match self {
@@ -738,7 +738,7 @@ pub mod id {
     }
 
     impl FromStr for RouteSeg {
-        type Err = MsgErr;
+        type Err = UniErr;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             let s = new_span(s);
@@ -883,9 +883,9 @@ pub mod id {
 
     impl<V> ToResolved<V> for VarVal<V>
     where
-        V: FromStr<Err = MsgErr>,
+        V: FromStr<Err =UniErr>,
     {
-        fn to_resolved(self, env: &Env) -> Result<V, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<V, UniErr> {
             match self {
                 VarVal::Var(var) => match env.val(var.as_str()) {
                     Ok(val) => {
@@ -1064,7 +1064,7 @@ pub mod id {
     }
 
     impl TryInto<PointSegCtx> for PointSegVar {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<PointSegCtx, Self::Error> {
             match self {
@@ -1098,7 +1098,7 @@ pub mod id {
     }
 
     impl TryInto<PointSeg> for PointSegCtx {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<PointSeg, Self::Error> {
             match self {
@@ -1231,7 +1231,7 @@ pub mod id {
 
     /*
     impl PointSeg {
-        pub fn apply_captures(self, captures: &Captures) -> Result<Self, MsgErr> {
+        pub fn apply_captures(self, captures: &Captures) -> Result<Self, ExtErr> {
             match self {
                 PointSeg::Root => Ok(PointSeg::Root),
                 PointSeg::Space(replacement) => {
@@ -1434,7 +1434,7 @@ pub mod id {
 
     impl TraversalStack {
 
-        async fn start_traversal(&self, wave: Wave, injector: &Port ) -> Result<(),MsgErr>{
+        async fn start_traversal(&self, wave: Wave, injector: &Port ) -> Result<(),ExtErr>{
             let record = match self
                 .registry
                 .locate(&wave.to().point)
@@ -1442,7 +1442,7 @@ pub mod id {
                 Ok(record) => record,
                 Err(err) => {
                     self.skel.logger.error( err.to_string() );
-                    return Err(MsgErr::not_found());
+                    return Err(ExtErr::not_found());
                 }
             };
 
@@ -1463,7 +1463,7 @@ pub mod id {
                     let plan = record.details.stub.kind.wave_traversal_plan();
                     if !plan.has_layer(&wave.to().layer) {
                         self.skel.logger.warn("attempt to send wave to layer that the recipient Kind does not have in its traversal plan");
-                        return Err(MsgErr::bad_request());
+                        return Err(ExtErr::bad_request());
                     }
 
                     // dir is from inject_layer to dest
@@ -1644,15 +1644,15 @@ pub mod id {
 
         fn exchanger(&self) -> &Exchanger;
 
-        async fn deliver_directed(&self, direct: Traversal<DirectedWave>) -> Result<(),MsgErr>{
-            Err(MsgErr::from_500("this layer does not handle directed messages"))
+        async fn deliver_directed(&self, direct: Traversal<DirectedWave>) -> Result<(), UniErr>{
+            Err(UniErr::from_500("this layer does not handle directed messages"))
         }
 
-        async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) -> Result<(),MsgErr> {
+        async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) -> Result<(), UniErr> {
             self.exchanger().reflected(reflect.payload).await
         }
 
-        async fn visit(&self, traversal: Traversal<UltraWave>) -> Result<(),MsgErr>{
+        async fn visit(&self, traversal: Traversal<UltraWave>) -> Result<(), UniErr>{
 
             if let Some(dest) = &traversal.dest {
                 if self.port().layer == *dest {
@@ -1686,7 +1686,7 @@ pub mod id {
         async fn directed_fabric_bound(
             &self,
             mut traversal: Traversal<DirectedWave>,
-        ) -> Result<(), MsgErr> {
+        ) -> Result<(), UniErr> {
             self.traverse_next(traversal.wrap()).await;
             Ok(())
         }
@@ -1694,7 +1694,7 @@ pub mod id {
         async fn directed_core_bound(
             &self,
             mut traversal: Traversal<DirectedWave>,
-        ) -> Result<(), MsgErr> {
+        ) -> Result<(), UniErr> {
             self.traverse_next(traversal.wrap()).await;
             Ok(())
         }
@@ -1703,7 +1703,7 @@ pub mod id {
         async fn reflected_core_bound(
             &self,
             traversal: Traversal<ReflectedWave>,
-        ) -> Result<(), MsgErr> {
+        ) -> Result<(), UniErr> {
             self.traverse_next(traversal.to_ultra()).await;
             Ok(())
         }
@@ -1711,7 +1711,7 @@ pub mod id {
         async fn reflected_fabric_bound(
             &self,
             traversal: Traversal<ReflectedWave>,
-        ) -> Result<(), MsgErr> {
+        ) -> Result<(), UniErr> {
             self.traverse_next(traversal.to_ultra()).await;
             Ok(())
         }
@@ -1936,11 +1936,11 @@ pub mod id {
     pub type PointVar = PointDef<RouteSegVar, PointSegVar>;
 
     impl PointVar {
-        pub fn to_point(self) -> Result<Point, MsgErr> {
+        pub fn to_point(self) -> Result<Point, UniErr> {
             self.collapse()
         }
 
-        pub fn to_point_ctx(self) -> Result<PointCtx, MsgErr> {
+        pub fn to_point_ctx(self) -> Result<PointCtx, UniErr> {
             self.collapse()
         }
     }
@@ -1958,7 +1958,7 @@ pub mod id {
     }
 
     impl ToResolved<Point> for PointVar {
-        fn to_resolved(self, env: &Env) -> Result<Point, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<Point, UniErr> {
             let point_ctx: PointCtx = self.to_resolved(env)?;
             point_ctx.to_resolved(env)
         }
@@ -1974,13 +1974,13 @@ pub mod id {
     }
 
     impl PointCtx {
-        pub fn to_point(self) -> Result<Point, MsgErr> {
+        pub fn to_point(self) -> Result<Point, UniErr> {
             self.collapse()
         }
     }
 
     impl ToResolved<PointCtx> for PointVar {
-        fn collapse(self) -> Result<PointCtx, MsgErr> {
+        fn collapse(self) -> Result<PointCtx, UniErr> {
             let route = self.route.try_into()?;
             let mut segments = vec![];
             for segment in self.segments {
@@ -1989,7 +1989,7 @@ pub mod id {
             Ok(PointCtx { route, segments })
         }
 
-        fn to_resolved(self, env: &Env) -> Result<PointCtx, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<PointCtx, UniErr> {
             let mut rtn = String::new();
             let mut after_fs = false;
             let mut errs = vec![];
@@ -2118,7 +2118,7 @@ pub mod id {
     }
 
     impl ToResolved<Point> for PointCtx {
-        fn collapse(self) -> Result<Point, MsgErr> {
+        fn collapse(self) -> Result<Point, UniErr> {
             let mut segments = vec![];
             for segment in self.segments {
                 segments.push(segment.try_into()?);
@@ -2129,7 +2129,7 @@ pub mod id {
             })
         }
 
-        fn to_resolved(self, env: &Env) -> Result<Point, MsgErr> {
+        fn to_resolved(self, env: &Env) -> Result<Point, UniErr> {
             if self.segments.is_empty() {
                 return Ok(Point {
                     route: self.route,
@@ -2209,7 +2209,7 @@ pub mod id {
     }
 
     impl TryInto<Point> for PointCtx {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<Point, Self::Error> {
             let mut rtn = vec![];
@@ -2224,7 +2224,7 @@ pub mod id {
     }
 
     impl TryFrom<String> for Point {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_from(value: String) -> Result<Self, Self::Error> {
             consume_point(value.as_str())
@@ -2232,7 +2232,7 @@ pub mod id {
     }
 
     impl TryFrom<&str> for Point {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_from(value: &str) -> Result<Self, Self::Error> {
             consume_point(value)
@@ -2330,7 +2330,7 @@ pub mod id {
             REMOTE_ENDPOINT.clone()
         }
 
-        pub fn normalize(self) -> Result<Point, MsgErr> {
+        pub fn normalize(self) -> Result<Point, UniErr> {
             if self.is_normalized() {
                 return Ok(self);
             }
@@ -2392,7 +2392,7 @@ pub mod id {
             true
         }
 
-        pub fn to_bundle(self) -> Result<Point, MsgErr> {
+        pub fn to_bundle(self) -> Result<Point, UniErr> {
             if self.segments.is_empty() {
                 return Err("Point does not contain a bundle".into());
             }
@@ -2469,7 +2469,7 @@ pub mod id {
                 segments
             }
         }
-        pub fn push<S: ToString>(&self, segment: S) -> Result<Self, MsgErr> {
+        pub fn push<S: ToString>(&self, segment: S) -> Result<Self, UniErr> {
             let segment = segment.to_string();
             if self.segments.is_empty() {
                 Self::from_str(segment.as_str())
@@ -2503,11 +2503,11 @@ pub mod id {
             }
         }
 
-        pub fn push_file(&self, segment: String) -> Result<Self, MsgErr> {
+        pub fn push_file(&self, segment: String) -> Result<Self, UniErr> {
             Self::from_str(format!("{}{}", self.to_string(), segment).as_str())
         }
 
-        pub fn push_segment(&self, segment: PointSeg) -> Result<Self, MsgErr> {
+        pub fn push_segment(&self, segment: PointSeg) -> Result<Self, UniErr> {
             if (self.has_filesystem() && segment.is_filesystem_seg())
                 || segment.kind().is_mesh_seg()
             {
@@ -2554,7 +2554,7 @@ pub mod id {
             }
         }
 
-        pub fn truncate(self, kind: PointSegKind) -> Result<Point, MsgErr> {
+        pub fn truncate(self, kind: PointSegKind) -> Result<Point, UniErr> {
             let mut segments = vec![];
             for segment in &self.segments {
                 segments.push(segment.clone());
@@ -2566,7 +2566,7 @@ pub mod id {
                 }
             }
 
-            Err(MsgErr::Status {
+            Err(UniErr::Status {
                 status: 404,
                 message: format!(
                     "Point segment kind: {} not found in point: {}",
@@ -2578,7 +2578,7 @@ pub mod id {
     }
 
     impl FromStr for Point {
-        type Err = MsgErr;
+        type Err = UniErr;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             consume_point(s)
@@ -2681,7 +2681,7 @@ pub mod id {
     }
 
     impl CaptureAddress {
-        pub fn to_point(self, captures: Captures) -> Result<Point, MsgErr> {
+        pub fn to_point(self, captures: Captures) -> Result<Point, ExtErr> {
             let mut segments = vec![];
             for segment in self.segments {
                 segments.push(segment.apply_captures(&captures)?)
@@ -2739,7 +2739,7 @@ pub mod id {
     }
 
     impl TryInto<KindParts> for KindLex {
-        type Error = MsgErr;
+        type Error = UniErr;
 
         fn try_into(self) -> Result<KindParts, Self::Error> {
             Ok(KindParts {
@@ -2795,7 +2795,7 @@ pub mod id {
     }
 
     impl FromStr for KindParts {
-        type Err = MsgErr;
+        type Err = UniErr;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             let (_, kind) = all_consuming(kind_parts)(new_span(s))?;
@@ -3085,7 +3085,7 @@ impl Into<Port> for StarKey {
 }
 
 impl TryFrom<Point> for StarKey {
-    type Error = MsgErr;
+    type Error = UniErr;
 
     fn try_from(point: Point) -> Result<Self, Self::Error> {
         match point.route {
@@ -3166,7 +3166,7 @@ impl StarKey {
 }
 
 impl FromStr for StarKey {
-    type Err = MsgErr;
+    type Err = UniErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(result(all_consuming(parse_star_key)(new_span(s)))?)
@@ -3232,7 +3232,7 @@ pub enum TraversalDirection {
 }
 
 impl TraversalDirection {
-    pub fn new(from: &Layer, to: &Layer) -> Result<Self, MsgErr> {
+    pub fn new(from: &Layer, to: &Layer) -> Result<Self, UniErr> {
         if from == to {
             return Err(
                 "cannot determine traversal direction if from and to are the same layer".into(),

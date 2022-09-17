@@ -7,7 +7,7 @@ use cosmic_universe::command::request::get::{Get, GetOp};
 use cosmic_universe::command::request::query::{Query, QueryResult};
 use cosmic_universe::command::request::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
 use cosmic_universe::command::request::set::Set;
-use cosmic_universe::error::MsgErr;
+use cosmic_universe::error::UniErr;
 use cosmic_universe::id::id::{
     BaseKind, Kind, KindParts, Point, PointSeg, Specific, ToBaseKind, Version,
 };
@@ -1480,21 +1480,21 @@ impl From<strum::ParseError> for PostErr {
     }
 }
 
-impl Into<MsgErr> for PostErr {
-    fn into(self) -> MsgErr {
-        MsgErr::new(500u16, "Post Err")
+impl Into<UniErr> for PostErr {
+    fn into(self) -> UniErr {
+        UniErr::new(500u16, "Post Err")
     }
 }
 
-impl From<MsgErr> for PostErr {
-    fn from(e: MsgErr) -> Self {
+impl From<UniErr> for PostErr {
+    fn from(e: UniErr) -> Self {
         PostErr::Error(e.to_string())
     }
 }
 
 impl PlatErr for PostErr {
-    fn to_cosmic_err(&self) -> MsgErr {
-        MsgErr::new(500u16, "Post Err")
+    fn to_cosmic_err(&self) -> UniErr {
+        UniErr::new(500u16, "Post Err")
     }
 
     fn new<S>(message: S) -> Self

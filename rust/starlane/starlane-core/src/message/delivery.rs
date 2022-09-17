@@ -174,7 +174,7 @@ impl Delivery<ReqShell> {
                 method.clone(),
                 Subst::new(self.item.core.uri.path())?,
             )),
-            Method::Msg(method) => CallKind::Msg(MsgCall::new(
+            Method::Ext(method) => CallKind::Msg(MsgCall::new(
                 method.clone(),
                 Subst::new(self.item.core.uri.path())?,
             )),

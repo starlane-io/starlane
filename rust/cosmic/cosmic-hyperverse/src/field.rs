@@ -1,7 +1,7 @@
 use crate::star::{LayerInjectionRouter, HyperStarSkel};
 use crate::{PlatErr, Platform};
 use cosmic_universe::config::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar, WaveDirection};
-use cosmic_universe::error::{MsgErr, StatusErr};
+use cosmic_universe::error::{UniErr, StatusErr};
 use cosmic_universe::id::id::{Layer, Point, Port, ToPoint, ToPort, TraversalLayer};
 use cosmic_universe::id::Traversal;
 use cosmic_universe::wave::{BounceBacks, CmdMethod, DirectedKind, DirectedProto, DirectedWave, Echo, Exchanger, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedAggregate, ReflectedCore, Reflection, UltraWave, Wave, WaveKind};
@@ -45,7 +45,7 @@ where
         }
     }
 
-    async fn bind(&self, directed: &Traversal<DirectedWave>) -> Result<ArtRef<BindConfig>, MsgErr> {
+    async fn bind(&self, directed: &Traversal<DirectedWave>) -> Result<ArtRef<BindConfig>, UniErr> {
         let record = self.skel.registry.record(&self.port.point).await.map_err(|e|e.to_cosmic_err())?;
         let properties = self
             .skel
@@ -98,7 +98,7 @@ where
         &self.skel.exchanger
     }
 
-    async fn directed_core_bound(&self, directed: Traversal<DirectedWave>) -> Result<(), MsgErr> {
+    async fn directed_core_bound(&self, directed: Traversal<DirectedWave>) -> Result<(), UniErr> {
         let bind = self.bind(&directed).await?;
         match bind.select(&directed.payload) {
             Ok(route) => {
@@ -141,7 +141,7 @@ pub struct PipeEx {
   pub port: Port,
   pub logger: PointLogger,
   pub env: Env,
-  pub reflection: Result<Reflection,MsgErr>,
+  pub reflection: Result<Reflection, UniErr>,
   pub pipeline: PipelineVar,
   pub shell_transmitter: ProtoTransmitter,
   pub gravity_transmitter: ProtoTransmitter,
@@ -212,7 +212,7 @@ impl PipeEx {
         proto
     }
 
-    pub async fn execute( &mut self ) -> Result<(),MsgErr> {
+    pub async fn execute( &mut self ) -> Result<(), UniErr> {
         while let Some( segment ) = self.pipeline.consume() {
             self.execute_step(&segment.step)?;
             self.execute_stop(&segment.stop).await?;
@@ -221,7 +221,7 @@ impl PipeEx {
     }
 
 
-    fn execute_step(&mut self, step: &PipelineStepVar) -> Result<(), MsgErr> {
+    fn execute_step(&mut self, step: &PipelineStepVar) -> Result<(), UniErr> {
          for block in &step.blocks {
              match block.clone().to_resolved(&self.env)? {
                  PayloadBlock::DirectPattern(pattern) => {
@@ -235,7 +235,7 @@ impl PipeEx {
         Ok(())
     }
 
-    async fn execute_stop( &mut self, stop: &PipelineStopVar) -> Result<(),MsgErr> {
+    async fn execute_stop( &mut self, stop: &PipelineStopVar) -> Result<(), UniErr> {
         match stop {
             PipelineStopVar::Core => {
                 let mut proto = self.proto();
@@ -266,7 +266,7 @@ impl PipeEx {
         }
     }
 
-    async fn direct(&mut self, mut proto: DirectedProto, transmitter: ProtoTransmitter ) -> Result<(),MsgErr> {
+    async fn direct(&mut self, mut proto: DirectedProto, transmitter: ProtoTransmitter ) -> Result<(), UniErr> {
 
         match proto.kind.as_ref().unwrap() {
             DirectedKind::Ping => {

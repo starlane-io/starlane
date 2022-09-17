@@ -1,4 +1,4 @@
-use crate::error::MsgErr;
+use crate::error::UniErr;
 use crate::id::id::{Kind, KindParts, Point, ToPoint, ToPort};
 use crate::particle::particle::{Details, Status, Stub};
 use crate::substance::substance::Substance;
@@ -47,7 +47,7 @@ impl Location {
         Location::Somewhere(point)
     }
 
-    pub fn ok_or(&self) -> Result<Point, MsgErr> {
+    pub fn ok_or(&self) -> Result<Point, UniErr> {
         match self {
             Location::Nowhere => Err("Particle is presently nowhere".into()),
             Location::Somewhere(point) => Ok(point.clone()),
@@ -115,13 +115,13 @@ impl Provision {
 
 
 impl TryFrom<Ping> for Provision{
-    type Error = MsgErr;
+    type Error = UniErr;
 
     fn try_from(request: Ping) -> Result<Self, Self::Error> {
         if let Substance::Sys(Sys::Provision(provision)) = request.core.body {
             Ok(provision)
         } else {
-            Err(MsgErr::bad_request())
+            Err(UniErr::bad_request())
         }
     }
 }
@@ -211,13 +211,13 @@ impl DerefMut for Discoveries {
 }
 
 impl TryFrom<Ping> for Assign {
-    type Error = MsgErr;
+    type Error = UniErr;
 
     fn try_from(request: Ping) -> Result<Self, Self::Error> {
         if let Substance::Sys(Sys::Assign(assign)) = request.core.body {
             Ok(assign)
         } else {
-            Err(MsgErr::bad_request())
+            Err(UniErr::bad_request())
         }
     }
 }

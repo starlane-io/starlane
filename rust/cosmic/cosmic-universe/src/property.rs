@@ -1,6 +1,6 @@
 use crate::command::command::common::PropertyMod;
 use crate::parse::SkewerCase;
-use crate::{MsgErr, Point, SetProperties};
+use crate::{UniErr, Point, SetProperties};
 use core::str::FromStr;
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -25,7 +25,7 @@ impl PropertyDef {
         default: Option<String>,
         constant: bool,
         permits: Vec<PropertyPermit>,
-    ) -> Result<Self, MsgErr> {
+    ) -> Result<Self, UniErr> {
         if constant {
             default
                 .as_ref()
@@ -58,14 +58,14 @@ impl PropertyDef {
 }
 
 pub trait PropertyPattern: Send + Sync + 'static {
-    fn is_match(&self, value: &String) -> Result<(), MsgErr>;
+    fn is_match(&self, value: &String) -> Result<(), UniErr>;
 }
 
 #[derive(Clone)]
 pub struct AnythingPattern {}
 
 impl PropertyPattern for AnythingPattern {
-    fn is_match(&self, value: &String) -> Result<(), MsgErr> {
+    fn is_match(&self, value: &String) -> Result<(), UniErr> {
         Ok(())
     }
 }
@@ -74,7 +74,7 @@ impl PropertyPattern for AnythingPattern {
 pub struct PointPattern {}
 
 impl PropertyPattern for PointPattern {
-    fn is_match(&self, value: &String) -> Result<(), MsgErr> {
+    fn is_match(&self, value: &String) -> Result<(), UniErr> {
         use std::str::FromStr;
         Point::from_str(value.as_str())?;
         Ok(())
@@ -85,7 +85,7 @@ impl PropertyPattern for PointPattern {
 pub struct U64Pattern {}
 
 impl PropertyPattern for U64Pattern {
-    fn is_match(&self, value: &String) -> Result<(), MsgErr> {
+    fn is_match(&self, value: &String) -> Result<(), UniErr> {
         use std::str::FromStr;
         match u64::from_str(value.as_str()) {
             Ok(_) => Ok(()),
@@ -98,7 +98,7 @@ impl PropertyPattern for U64Pattern {
 pub struct BoolPattern {}
 
 impl PropertyPattern for BoolPattern {
-    fn is_match(&self, value: &String) -> Result<(), MsgErr> {
+    fn is_match(&self, value: &String) -> Result<(), UniErr> {
         use std::str::FromStr;
         match bool::from_str(value.as_str()) {
             Ok(_) => Ok(()),
@@ -111,7 +111,7 @@ impl PropertyPattern for BoolPattern {
 pub struct UsernamePattern {}
 
 impl PropertyPattern for UsernamePattern {
-    fn is_match(&self, value: &String) -> Result<(), MsgErr> {
+    fn is_match(&self, value: &String) -> Result<(), UniErr> {
         SkewerCase::from_str(value.as_str())?;
         Ok(())
     }
@@ -121,7 +121,7 @@ impl PropertyPattern for UsernamePattern {
 pub struct EmailPattern {}
 
 impl PropertyPattern for EmailPattern {
-    fn is_match(&self, value: &String) -> Result<(), MsgErr> {
+    fn is_match(&self, value: &String) -> Result<(), UniErr> {
         if !validate_email(value) {
             Err(format!("not a valid email: '{}'", value).into())
         } else {
@@ -183,7 +183,7 @@ impl PropertiesConfig {
         rtn
     }
 
-    pub fn check_create(&self, set: &SetProperties) -> Result<(), MsgErr> {
+    pub fn check_create(&self, set: &SetProperties) -> Result<(), UniErr> {
         for req in self.required() {
             if !set.contains_key(&req) {
                 return Err(format!("missing required property: '{}'", req).into());
@@ -217,7 +217,7 @@ impl PropertiesConfig {
         Ok(())
     }
 
-    pub fn check_update(&self, set: &SetProperties) -> Result<(), MsgErr> {
+    pub fn check_update(&self, set: &SetProperties) -> Result<(), UniErr> {
         for (key, propmod) in &set.map {
             let def = self
                 .get(key)
@@ -252,7 +252,7 @@ impl PropertiesConfig {
         Ok(())
     }
 
-    pub fn check_read(&self, keys: &Vec<String>) -> Result<(), MsgErr> {
+    pub fn check_read(&self, keys: &Vec<String>) -> Result<(), UniErr> {
         for key in keys {
             let def = self
                 .get(key)
@@ -271,7 +271,7 @@ impl PropertiesConfig {
         Ok(())
     }
 
-    pub fn fill_create_defaults(&self, set: &SetProperties) -> Result<SetProperties, MsgErr> {
+    pub fn fill_create_defaults(&self, set: &SetProperties) -> Result<SetProperties, UniErr> {
         let mut rtn = set.clone();
         let defaults = self.defaults();
         for d in defaults {
@@ -319,7 +319,7 @@ impl PropertiesConfigBuilder {
         default: Option<String>,
         constant: bool,
         permits: Vec<PropertyPermit>,
-    ) -> Result<(), MsgErr> {
+    ) -> Result<(), UniErr> {
         let def = PropertyDef::new(
             pattern, required, mutable, source, default, constant, permits,
         )?;
@@ -327,7 +327,7 @@ impl PropertiesConfigBuilder {
         Ok(())
     }
 
-    pub fn add_string(&mut self, name: &str) -> Result<(), MsgErr> {
+    pub fn add_string(&mut self, name: &str) -> Result<(), UniErr> {
         let def = PropertyDef::new(
             Box::new(AnythingPattern {}),
             false,
@@ -341,7 +341,7 @@ impl PropertiesConfigBuilder {
         Ok(())
     }
 
-    pub fn add_address(&mut self, name: &str, required: bool, mutable: bool) -> Result<(), MsgErr> {
+    pub fn add_address(&mut self, name: &str, required: bool, mutable: bool) -> Result<(), UniErr> {
         let def = PropertyDef::new(
             Box::new(PointPattern {}),
             required,

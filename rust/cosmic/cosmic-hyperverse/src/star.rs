@@ -16,7 +16,7 @@ use cosmic_universe::command::command::common::StateSrc;
 use cosmic_universe::command::request::create::{Create, Strategy};
 use cosmic_universe::command::request::set::Set;
 use cosmic_universe::config::config::bind::{BindConfig, RouteSelector};
-use cosmic_universe::error::MsgErr;
+use cosmic_universe::error::UniErr;
 use cosmic_universe::id::id::{BaseKind, Kind, Layer, Point, Port, PortSelector, RouteSeg, Sub, ToBaseKind, ToPoint, ToPort, Topic, TraversalLayer, Uuid, GLOBAL_EXEC, LOCAL_STAR};
 use cosmic_universe::id::{StarKey, StarStub, StarSub, TraversalInjection};
 use cosmic_universe::id::{Traversal, TraversalDirection};
@@ -105,7 +105,7 @@ where
                         },
                         StateCall::Put { port, state, tx } => {
                             if states.contains_key(&port) {
-                                tx.send(Err(MsgErr::bad_request()));
+                                tx.send(Err(UniErr::bad_request()));
                             } else {
                                 states.insert(port, state);
                                 tx.send(Ok(()));
@@ -137,7 +137,7 @@ where
         self.topic.insert(port, handler);
     }
 
-    pub async fn find_state<S>(&self, port: &Port) -> Result<Arc<RwLock<dyn State>>, MsgErr> {
+    pub async fn find_state<S>(&self, port: &Port) -> Result<Arc<RwLock<dyn State>>, UniErr> {
         Ok(self
             .states
             .get(port)
@@ -150,7 +150,7 @@ where
         &self,
         port: &Port,
         source: &Port,
-    ) -> Option<Result<Arc<dyn TopicHandler>, MsgErr>> {
+    ) -> Option<Result<Arc<dyn TopicHandler>, UniErr>> {
         match self.topic.get(port) {
             None => None,
             Some(topic) => {
@@ -158,13 +158,13 @@ where
                 if topic.source_selector().is_match(source).is_ok() {
                     Some(Ok(topic))
                 } else {
-                    Some(Err(MsgErr::forbidden()))
+                    Some(Err(UniErr::forbidden()))
                 }
             }
         }
     }
 
-    pub fn find_shell(&self, point: &Point) -> Result<ShellState, MsgErr> {
+    pub fn find_shell(&self, point: &Point) -> Result<ShellState, UniErr> {
         Ok(self
             .shell
             .get(point)
@@ -391,7 +391,7 @@ where
     Stub(oneshot::Sender<StarStub>),
     FromHyperway {
         wave: UltraWave,
-        rtn: Option<oneshot::Sender<Result<(), MsgErr>>>,
+        rtn: Option<oneshot::Sender<Result<(), UniErr>>>,
     },
     TraverseToNextLayer(Traversal<UltraWave>),
     LayerTraversalInjection(TraversalInjection),
@@ -400,10 +400,10 @@ where
     ToGravity(UltraWave),
     ToHyperway(Wave<Signal>),
     Shard(UltraWave),
-    Wrangle(oneshot::Sender<Result<StarWrangles, MsgErr>>),
+    Wrangle(oneshot::Sender<Result<StarWrangles, UniErr>>),
     Bounce {
         key: StarKey,
-        rtn: oneshot::Sender<Result<(), MsgErr>>,
+        rtn: oneshot::Sender<Result<(), UniErr>>,
     },
     #[cfg(test)]
     GetSkel(oneshot::Sender<HyperStarSkel<P>>),
@@ -571,19 +571,19 @@ where
         self.tx.send(HyperStarCall::Init).await;
     }
 
-    pub async fn wrangle(&self) -> Result<StarWrangles, MsgErr> {
+    pub async fn wrangle(&self) -> Result<StarWrangles, UniErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.tx.send(HyperStarCall::Wrangle(rtn)).await?;
         tokio::time::timeout(Duration::from_secs(5), rtn_rx).await??
     }
 
-    pub async fn bounce(&self, key: StarKey) -> Result<(), MsgErr> {
+    pub async fn bounce(&self, key: StarKey) -> Result<(), UniErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.tx.send(HyperStarCall::Bounce { key, rtn }).await?;
         tokio::time::timeout(Duration::from_secs(5), rtn_rx).await??
     }
 
-    pub async fn from_hyperway(&self, wave: UltraWave, results: bool) -> Result<(), MsgErr> {
+    pub async fn from_hyperway(&self, wave: UltraWave, results: bool) -> Result<(), UniErr> {
         match results {
             true => {
                 let (tx, mut rx) = oneshot::channel();
@@ -616,13 +616,13 @@ where
             .await;
     }
 
-    pub async fn stub(&self) -> Result<StarStub, MsgErr> {
+    pub async fn stub(&self) -> Result<StarStub, UniErr> {
         let (tx, rx) = oneshot::channel();
         self.tx.send(HyperStarCall::Stub(tx)).await;
         Ok(rx.await?)
     }
 
-    pub async fn create_states(&self, point: Point) -> Result<(), MsgErr> {
+    pub async fn create_states(&self, point: Point) -> Result<(), UniErr> {
         let (rtn, rtn_rx) = oneshot::channel();
         self.tx
             .send(HyperStarCall::CreateStates { point, rtn })
@@ -632,7 +632,7 @@ where
     }
 
     #[cfg(test)]
-    pub async fn get_skel(&self) -> Result<HyperStarSkel<P>, MsgErr> {
+    pub async fn get_skel(&self) -> Result<HyperStarSkel<P>, UniErr> {
         let (tx, rx) = oneshot::channel();
         self.tx.send(HyperStarCall::GetSkel(tx)).await;
         Ok(rx.await?)
@@ -1200,7 +1200,7 @@ where
     }
 
 
-    async fn wrangle(&self, rtn: oneshot::Sender<Result<StarWrangles, MsgErr>>) {
+    async fn wrangle(&self, rtn: oneshot::Sender<Result<StarWrangles, UniErr>>) {
         let skel = self.skel.clone();
         tokio::spawn(async move {
             let mut wrangler = Wrangler::new(skel.clone(), Search::Kinds);
@@ -1232,7 +1232,7 @@ where
         });
     }
 
-    async fn bounce(&self, key: StarKey, rtn: oneshot::Sender<Result<(), MsgErr>>) {
+    async fn bounce(&self, key: StarKey, rtn: oneshot::Sender<Result<(), UniErr>>) {
         let transmitter = self.skel.star_transmitter.clone();
         let logger = self.skel.logger.clone();
         tokio::spawn(async move {
@@ -1470,7 +1470,7 @@ where
         *layer == Layer::Shell || *layer == Layer::Field
     }
 
-    async fn exit(&self, traversal: Traversal<UltraWave>) -> Result<(), MsgErr> {
+    async fn exit(&self, traversal: Traversal<UltraWave>) -> Result<(), UniErr> {
         match traversal.dir {
             TraversalDirection::Fabric => {
                 self.exit_up.send(traversal).await;
@@ -1483,7 +1483,7 @@ where
         }
     }
 
-    async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(), MsgErr> {
+    async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(), UniErr> {
 
         let logger = self.skel.logger.push_mark("stack-traversal:visit")?;
         logger.track(&traversal, || {
@@ -1647,10 +1647,10 @@ pub struct StateApi {
 }
 
 impl StateApi {
-    pub async fn get_state(&self, port: Port) -> Result<Option<Arc<RwLock<dyn State>>>, MsgErr> {
+    pub async fn get_state(&self, port: Port) -> Result<Option<Arc<RwLock<dyn State>>>, UniErr> {
         if let Some(layer) = &self.layer_filter {
             if port.layer != *layer {
-                return Err(MsgErr::forbidden_msg(format!(
+                return Err(UniErr::forbidden_msg(format!(
                     "not allowed to get state from Port Layer {} try layer {}",
                     port.layer.to_string(),
                     layer.to_string()
@@ -1662,10 +1662,10 @@ impl StateApi {
         rx.await?
     }
 
-    pub async fn put_state(&self, port: Port, state: Arc<RwLock<dyn State>>) -> Result<(), MsgErr> {
+    pub async fn put_state(&self, port: Port, state: Arc<RwLock<dyn State>>) -> Result<(), UniErr> {
         if let Some(layer) = &self.layer_filter {
             if port.layer != *layer {
-                return Err(MsgErr::forbidden_msg(format!(
+                return Err(UniErr::forbidden_msg(format!(
                     "not allowed to put state on Port Layer {} try layer {}",
                     port.layer.to_string(),
                     layer.to_string()
@@ -1681,12 +1681,12 @@ impl StateApi {
 pub enum StateCall {
     Get {
         port: Port,
-        tx: oneshot::Sender<Result<Option<Arc<RwLock<dyn State>>>, MsgErr>>,
+        tx: oneshot::Sender<Result<Option<Arc<RwLock<dyn State>>>, UniErr>>,
     },
     Put {
         port: Port,
         state: Arc<RwLock<dyn State>>,
-        tx: oneshot::Sender<Result<(), MsgErr>>,
+        tx: oneshot::Sender<Result<(), UniErr>>,
     },
 }
 
@@ -2000,7 +2000,7 @@ where
         <Star<P> as Item<P>>::bind(self).await
     }
 
-    async fn init(&self) -> Result<Status, MsgErr> {
+    async fn init(&self) -> Result<Status, UniErr> {
         match self.skel.kind {
             StarSub::Central => {
                 let registration = Registration {
@@ -2195,7 +2195,7 @@ where
             ctx: &'a InCtx<'a, Sys>,
             mut history: HashSet<Point>,
             search: Search,
-        ) -> Result<ReflectedCore, MsgErr>
+        ) -> Result<ReflectedCore, UniErr>
         where
             E: Platform,
         {
@@ -2317,7 +2317,7 @@ impl StarWrangles {
         }
     }
 
-    pub fn verify(&self, kinds: &[&Kind]) -> Result<(), MsgErr> {
+    pub fn verify(&self, kinds: &[&Kind]) -> Result<(), UniErr> {
         for kind in kinds {
             if !self.wrangles.contains_key(*kind) {
                 return Err(format!(
@@ -2330,7 +2330,7 @@ impl StarWrangles {
         Ok(())
     }
 
-    pub async fn wrangle(&self, kind: &Kind) -> Result<StarKey, MsgErr> {
+    pub async fn wrangle(&self, kind: &Kind) -> Result<StarKey, UniErr> {
         self.wrangles
             .get(kind)
             .ok_or(format!(
@@ -2374,7 +2374,7 @@ impl RoundRobinWrangleSelector {
         }
     }
 
-    pub async fn wrangle(&self) -> Result<StarKey, MsgErr> {
+    pub async fn wrangle(&self) -> Result<StarKey, UniErr> {
         if self.stars.is_empty() {
             return Err(format!("cannot find wrangle for kind: {}", self.kind.to_string()).into());
         }
@@ -2660,7 +2660,7 @@ where
         }
     }
 
-    pub async fn wrangle(&self) -> Result<Discoveries, MsgErr> {
+    pub async fn wrangle(&self) -> Result<Discoveries, UniErr> {
         let mut ripple = DirectedProto::ripple();
         ripple.method(SysMethod::Search);
         ripple.body(Substance::Sys(Sys::Search(self.search.clone())));

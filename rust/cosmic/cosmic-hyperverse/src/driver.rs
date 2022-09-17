@@ -7,7 +7,7 @@ use crate::{PlatErr, Platform, Registry, RegistryApi};
 use cosmic_universe::command::command::common::{SetProperties, StateSrc};
 use cosmic_universe::command::request::create::{Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template};
 use cosmic_universe::config::config::bind::{BindConfig, RouteSelector};
-use cosmic_universe::error::MsgErr;
+use cosmic_universe::error::UniErr;
 use cosmic_universe::id::id::{
     BaseKind, Kind, Layer, Point, Port, ToBaseKind, ToPoint, ToPort, TraversalLayer, Uuid,
 };
@@ -144,11 +144,11 @@ where
     Drivers(oneshot::Sender<HashMap<Kind, DriverApi<P>>>),
     Get {
         kind: Kind,
-        rtn: oneshot::Sender<Result<DriverApi<P>, MsgErr>>,
+        rtn: oneshot::Sender<Result<DriverApi<P>, UniErr>>,
     },
     Status {
         kind: Kind,
-        rtn: oneshot::Sender<Result<DriverStatus, MsgErr>>,
+        rtn: oneshot::Sender<Result<DriverStatus, UniErr>>,
     },
     StatusRx(oneshot::Sender<watch::Receiver<DriverStatus>>),
 }
@@ -177,7 +177,7 @@ where
         self.status_rx.borrow().clone()
     }
 
-    pub async fn status_changed(&mut self) -> Result<DriverStatus, MsgErr> {
+    pub async fn status_changed(&mut self) -> Result<DriverStatus, UniErr> {
         self.status_rx.changed().await?;
         Ok(self.status())
     }
@@ -186,25 +186,25 @@ where
         self.call_tx.send(DriversCall::Visit(traversal)).await;
     }
 
-    pub async fn internal_kinds(&self) -> Result<Vec<Kind>, MsgErr> {
+    pub async fn internal_kinds(&self) -> Result<Vec<Kind>, UniErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx.send(DriversCall::InternalKinds(rtn)).await?;
         Ok(rtn_rx.await?)
     }
 
-    pub async fn external_kinds(&self) -> Result<Vec<Kind>, MsgErr> {
+    pub async fn external_kinds(&self) -> Result<Vec<Kind>, UniErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx.send(DriversCall::ExternalKinds(rtn)).await?;
         Ok(rtn_rx.await?)
     }
 
-    pub async fn drivers(&self) -> Result<HashMap<Kind, DriverApi<P>>, MsgErr> {
+    pub async fn drivers(&self) -> Result<HashMap<Kind, DriverApi<P>>, UniErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx.send(DriversCall::Drivers(rtn)).await;
         Ok(rtn_rx.await?)
     }
 
-    pub async fn get(&self, kind: &Kind) -> Result<DriverApi<P>, MsgErr> {
+    pub async fn get(&self, kind: &Kind) -> Result<DriverApi<P>, UniErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
             .send(DriversCall::Get {
@@ -325,7 +325,7 @@ where
                     }
                     DriversCall::Status { kind, rtn } => match self.statuses_rx.get(&kind) {
                         None => {
-                            rtn.send(Err(MsgErr::not_found()));
+                            rtn.send(Err(UniErr::not_found()));
                         }
                         Some(status_rx) => {
                             rtn.send(Ok(status_rx.borrow().clone()));
@@ -673,7 +673,7 @@ where
         let driver = self
             .drivers
             .get(&assign.details.stub.kind)
-            .ok_or::<MsgErr>(
+            .ok_or::<UniErr>(
                 format!(
                     "Kind {} not supported by Drivers for Star: {}",
                     assign.details.stub.kind.to_string(),
@@ -684,7 +684,7 @@ where
         driver.assign(assign).await
     }
 
-    pub async fn handle(&self, wave: DirectedWave) -> Result<ReflectedCore, MsgErr> {
+    pub async fn handle(&self, wave: DirectedWave) -> Result<ReflectedCore, UniErr> {
         let record = self
             .skel
             .registry
@@ -694,7 +694,7 @@ where
         let driver = self
             .drivers
             .get(&record.details.stub.kind)
-            .ok_or::<MsgErr>("do not handle this kind of driver".into())?;
+            .ok_or::<UniErr>("do not handle this kind of driver".into())?;
         driver.handle(wave).await
     }
 
@@ -772,7 +772,7 @@ where
         Self { call_tx: tx, kind }
     }
 
-    pub async fn init_item(&self, point: Point ) -> Result<Status,MsgErr> {
+    pub async fn init_item(&self, point: Point ) -> Result<Status, UniErr> {
         let (rtn,mut rtn_rx) = oneshot::channel();
         self.call_tx.try_send(DriverRunnerCall::InitItem{ point, rtn });
         rtn_rx.await?
@@ -807,7 +807,7 @@ where
             .await;
     }
 
-    pub async fn handle(&self, wave: DirectedWave) -> Result<ReflectedCore, MsgErr> {
+    pub async fn handle(&self, wave: DirectedWave) -> Result<ReflectedCore, UniErr> {
         let (tx, mut rx) = oneshot::channel();
         self.call_tx
             .send(DriverRunnerCall::Handle { wave, tx })
@@ -867,7 +867,7 @@ where
     Traversal(Traversal<UltraWave>),
     Handle {
         wave: DirectedWave,
-        tx: oneshot::Sender<Result<ReflectedCore, MsgErr>>,
+        tx: oneshot::Sender<Result<ReflectedCore, UniErr>>,
     },
     Item {
         point: Point,
@@ -878,7 +878,7 @@ where
         rtn: oneshot::Sender<Result<(), P::Err>>,
     },
     OnAdded,
-    InitItem{ point: Point, rtn: oneshot::Sender<Result<Status,MsgErr>> },
+    InitItem{ point: Point, rtn: oneshot::Sender<Result<Status, UniErr>> },
     DriverRunnerRequest(DriverRunnerRequest<P>),
     Bind {
         point: Point,
@@ -926,7 +926,7 @@ where
     }
 
 
-    async fn deliver_directed(&self, direct: Traversal<DirectedWave>) -> Result<(), MsgErr> {
+    async fn deliver_directed(&self, direct: Traversal<DirectedWave>) -> Result<(), UniErr> {
         self.skel
             .logger
             .track(&direct, || Tracker::new("core:outer", "DeliverDirected"));
@@ -988,7 +988,7 @@ println!("RECEIVED INIT COMMAND!");
         Ok(())
     }
 
-    async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) -> Result<(),MsgErr> {
+    async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) -> Result<(), UniErr> {
         if reflect.to().layer == self.port.layer {
             self.exchanger().reflected(reflect.payload).await
         } else {
@@ -1112,7 +1112,7 @@ where
                         let ctx = RootInCtx::new(wave, port.clone(), logger, transmitter);
                         match self.handle(ctx).await {
                             CoreBounce::Absorbed => {
-                                tx.send(Err(MsgErr::server_error()));
+                                tx.send(Err(UniErr::server_error()));
                             }
                             CoreBounce::Reflected(reflect) => {
                                 tx.send(Ok(reflect));
@@ -1190,7 +1190,7 @@ where
 
                 Ok(ReflectedCore::ok_body(Substance::Empty))
             }
-            _ => Err(MsgErr::bad_request().into()),
+            _ => Err(UniErr::bad_request().into()),
         }
     }
 }
@@ -1459,7 +1459,7 @@ impl<P> ItemSphere<P>
 where
     P: Platform,
 {
-    pub async fn init(&self) -> Result<Status, MsgErr> {
+    pub async fn init(&self) -> Result<Status, UniErr> {
         match self {
             ItemSphere::Handler(handler) => handler.init().await,
             ItemSphere::Router(router) =>  {
@@ -1502,7 +1502,7 @@ where
     P: Platform,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err>;
-    async fn init(&self) -> Result<Status, MsgErr> {
+    async fn init(&self) -> Result<Status, UniErr> {
         Ok(Status::Ready)
     }
 }

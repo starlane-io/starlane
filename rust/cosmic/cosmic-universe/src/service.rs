@@ -1,4 +1,4 @@
-use crate::error::MsgErr;
+use crate::error::UniErr;
 use crate::id::id::{Point, Topic};
 use crate::wave::{Agent, DirectedCore, Method, Ping, Pong, ReflectedCore};
 
@@ -13,13 +13,13 @@ use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, RwLock};
 
 pub trait AccessProvider: Send + Sync {
-    fn access(&self, to: &Agent, on: &Point) -> Result<Access, MsgErr>;
+    fn access(&self, to: &Agent, on: &Point) -> Result<Access, UniErr>;
 }
 
 pub struct AllAccessProvider();
 
 impl AccessProvider for AllAccessProvider {
-    fn access(&self, _: &Agent, _: &Point) -> Result<Access, MsgErr> {
+    fn access(&self, _: &Agent, _: &Point) -> Result<Access, UniErr> {
         Ok(Access::SuperOwner)
     }
 }

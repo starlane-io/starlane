@@ -2,7 +2,7 @@
 
 use chrono::{DateTime, Utc};
 use cosmic_universe::command::request::create::KindTemplate;
-use cosmic_universe::error::MsgErr;
+use cosmic_universe::error::UniErr;
 use cosmic_universe::id::id::{BaseKind, Kind, Specific, ToBaseKind};
 use cosmic_universe::id::{
     ArtifactSubKind, BaseSubKind, FileSubKind, MachineName, StarKey, StarSub, UserBaseSubKind,
@@ -181,7 +181,7 @@ impl Platform for Starlane {
 
     fn start_services(&self, entry_router: &mut HyperGateSelector) {}
 
-    fn select_kind(&self, template: &KindTemplate) -> Result<Kind, MsgErr> {
+    fn select_kind(&self, template: &KindTemplate) -> Result<Kind, UniErr> {
         let base: BaseKind = BaseKind::from_str(template.base.to_string().as_str())?;
         match base {
             BaseKind::UserBase => match &template.sub {

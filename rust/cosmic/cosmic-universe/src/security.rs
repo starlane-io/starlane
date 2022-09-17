@@ -1,4 +1,4 @@
-use crate::error::MsgErr;
+use crate::error::UniErr;
 use crate::id::id::Point;
 use crate::parse::error::result;
 use crate::parse::{particle_perms, permissions, permissions_mask, privilege, MapResolver};
@@ -62,7 +62,7 @@ impl Access {
         }
     }
 
-    pub fn check_privilege(&self, privilege: &str) -> Result<(), MsgErr> {
+    pub fn check_privilege(&self, privilege: &str) -> Result<(), UniErr> {
         match self {
             Access::Super => Ok(()),
             Access::Owner => Ok(()),
@@ -214,7 +214,7 @@ impl ToString for Privilege {
 }
 
 impl FromStr for Privilege {
-    type Err = MsgErr;
+    type Err = UniErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let span = new_span(s);
@@ -277,7 +277,7 @@ pub struct PermissionsMask {
 }
 
 impl FromStr for PermissionsMask {
-    type Err = MsgErr;
+    type Err = UniErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = new_span(s);
@@ -301,7 +301,7 @@ pub struct Permissions {
 }
 
 impl FromStr for Permissions {
-    type Err = MsgErr;
+    type Err = UniErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(permissions(new_span(s)))
@@ -441,7 +441,7 @@ impl ParticlePerms {
 }
 
 impl FromStr for ParticlePerms {
-    type Err = MsgErr;
+    type Err = UniErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = new_span(s);

@@ -3,7 +3,7 @@ use crate::star::{LayerInjectionRouter, HyperStarSkel};
 use crate::{PlatErr, Platform, Registry};
 use cosmic_universe::command::command::common::StateSrc;
 use cosmic_universe::command::request::create::{Create, KindTemplate, PointFactory, PointFactoryU64, PointSegTemplate, PointTemplate, Strategy, Template, TemplateDef};
-use cosmic_universe::error::MsgErr;
+use cosmic_universe::error::UniErr;
 use cosmic_universe::id::id::{BaseKind, Kind, Layer, Point, Port, ToPoint, ToPort};
 use cosmic_universe::id::{StarSub, TraversalInjection};
 use cosmic_universe::substance::substance::Substance;
@@ -69,7 +69,7 @@ where
 
 use cosmic_universe::config::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::log::{RootLogger, Track, Tracker};
-use cosmic_universe::msg::MsgMethod;
+use cosmic_universe::ext::ExtMethod;
 use cosmic_universe::parse::{CamelCase, route_attribute};
 use cosmic_universe::particle::particle::{Details, Status, Stub};
 use cosmic_universe::quota::Timeouts;
@@ -262,7 +262,7 @@ impl <P> ControlCreator<P> where P: Platform {
 
 #[async_trait]
 impl <P> PointFactory for ControlCreator<P> where P: Platform {
-    async fn create(&self) -> Result<Point, MsgErr> {
+    async fn create(&self) -> Result<Point, UniErr> {
 
         let create = Create {
             template: Template::new( PointTemplate { parent:self.controls.clone(), child_segment_template: PointSegTemplate::Pattern("control-%".to_string())}, KindTemplate{ base: BaseKind::Control, sub: None, specific: None }),
@@ -303,7 +303,7 @@ impl <P> ControlGreeter<P> where P: Platform {
 
 #[async_trait]
 impl <P> HyperGreeter for ControlGreeter<P> where P: Platform{
-    async fn greet(&self, stub: HyperwayStub) -> Result<Greet,MsgErr> {
+    async fn greet(&self, stub: HyperwayStub) -> Result<Greet, UniErr> {
         Ok(Greet {
             port: stub.remote.clone().with_layer(Layer::Core),
             agent: stub.agent.clone(),
@@ -373,7 +373,7 @@ pub struct ControlClient {
 }
 
 impl  ControlClient  {
-    pub fn new(factory: Box<dyn HyperwayEndpointFactory>) -> Result<Self,MsgErr>{
+    pub fn new(factory: Box<dyn HyperwayEndpointFactory>) -> Result<Self, UniErr>{
         let exchanger = Exchanger::new( Point::from_str("control-client")?.to_port(), Timeouts::default());
         let logger = RootLogger::default();
         let logger = logger.point(Point::from_str("control-client")?);
@@ -383,24 +383,24 @@ impl  ControlClient  {
         })
     }
 
-    pub fn port(&self) -> Result<Port,MsgErr> {
+    pub fn port(&self) -> Result<Port, UniErr> {
         let greet = self.client.get_greeting().ok_or("cannot access port until greeting has been received")?;
         Ok(greet.port)
     }
 
-    pub async fn wait_for_ready(&self, duration: Duration ) -> Result<(),MsgErr>{
+    pub async fn wait_for_ready(&self, duration: Duration ) -> Result<(), UniErr>{
         self.client.wait_for_ready(duration).await
     }
 
-    pub async fn transmitter_builder(&self) -> Result<ProtoTransmitterBuilder,MsgErr> {
+    pub async fn transmitter_builder(&self) -> Result<ProtoTransmitterBuilder, UniErr> {
         self.client.transmitter_builder().await
     }
 
-    pub async fn new_cli_session(&self) -> Result<ControlCliSession,MsgErr> {
+    pub async fn new_cli_session(&self) -> Result<ControlCliSession, UniErr> {
         let transmitter = self.transmitter_builder().await?.build();
         let mut proto = DirectedProto::ping();
         proto.to( self.port()?.with_layer(Layer::Shell));
-        proto.method(MsgMethod::new("NewCliSession".to_string())?);
+        proto.method(ExtMethod::new("NewCliSession".to_string())?);
         let pong: Wave<Pong> = transmitter.direct(proto).await?;
         pong.ok_or()?;
         if let Substance::Port(port) = pong.variant.core.body {
@@ -424,14 +424,14 @@ impl ControlCliSession {
             transmitter
         }
     }
-    pub async fn exec<C>( &self, command: C) -> Result<ReflectedCore,MsgErr> where C: ToString{
+    pub async fn exec<C>( &self, command: C) -> Result<ReflectedCore, UniErr> where C: ToString{
         let command = RawCommand::new(command.to_string());
         self.raw(command).await
     }
 
-    pub async fn raw( &self, command: RawCommand ) -> Result<ReflectedCore,MsgErr> {
+    pub async fn raw( &self, command: RawCommand ) -> Result<ReflectedCore, UniErr> {
         let mut proto = DirectedProto::ping();
-        proto.method(MsgMethod::new("Exec".to_string())?);
+        proto.method(ExtMethod::new("Exec".to_string())?);
         proto.body(Substance::RawCommand(command));
         let pong: Wave<Pong> = self.transmitter.direct(proto).await?;
         Ok(pong.variant.core)

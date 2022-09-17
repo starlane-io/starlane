@@ -1,11 +1,11 @@
 #![allow(warnings)]
 
 use cosmic_universe::command::request::create::{PointFactory, PointFactoryU64, PointSegTemplate};
-use cosmic_universe::error::MsgErr;
+use cosmic_universe::error::UniErr;
 use cosmic_universe::frame::frame::PrimitiveFrame;
 use cosmic_universe::id::id::{Layer, Point, Port, ToPoint, ToPort, Version};
 use cosmic_universe::log::{PointLogger, RootLogger};
-use cosmic_universe::msg::MsgMethod;
+use cosmic_universe::ext::ExtMethod;
 use cosmic_universe::particle::particle::Status;
 use cosmic_universe::quota::Timeouts;
 use cosmic_universe::substance::substance::{Errors, Substance, SubstanceKind, Token};
@@ -147,7 +147,7 @@ impl Hyperway {
 
 #[cfg(test)]
 pub struct HyperwayDiagnostic {
-    pub replaced_ext: broadcast::Sender<Result<(), MsgErr>>,
+    pub replaced_ext: broadcast::Sender<Result<(), UniErr>>,
 }
 
 #[cfg(test)]
@@ -254,7 +254,7 @@ pub enum HyperwayInterchangeCall {
     Mount {
         stub: HyperwayStub,
         init_wave: Option<UltraWave>,
-        rtn: oneshot::Sender<Result<HyperwayEndpoint, MsgErr>>,
+        rtn: oneshot::Sender<Result<HyperwayEndpoint, UniErr>>,
     },
 }
 
@@ -479,7 +479,7 @@ impl Hyperlane {
         self.eavesdrop_tx.subscribe()
     }
 
-    pub async fn send(&self, wave: UltraWave) -> Result<(), MsgErr> {
+    pub async fn send(&self, wave: UltraWave) -> Result<(), UniErr> {
         Ok(self
             .tx
             .send_timeout(HyperlaneCall::Wave(wave), Duration::from_secs(5))
@@ -613,7 +613,7 @@ impl HyperwayInterchange {
         &self,
         stub: HyperwayStub,
         init_wave: Option<UltraWave>,
-    ) -> Result<HyperwayEndpoint, MsgErr> {
+    ) -> Result<HyperwayEndpoint, UniErr> {
         let call_tx = self.call_tx.clone();
         let (tx, rx) = oneshot::channel();
         call_tx
@@ -682,7 +682,7 @@ impl Router for OutboundRouter {
 
 #[async_trait]
 pub trait HyperGreeter: Send + Sync + Clone + Sized {
-    async fn greet(&self, stub: HyperwayStub) -> Result<Greet, MsgErr>;
+    async fn greet(&self, stub: HyperwayStub) -> Result<Greet, UniErr>;
 }
 
 #[derive(Clone)]
@@ -699,7 +699,7 @@ impl SimpleGreeter {
 
 #[async_trait]
 impl HyperGreeter for SimpleGreeter {
-    async fn greet(&self, stub: HyperwayStub) -> Result<Greet, MsgErr> {
+    async fn greet(&self, stub: HyperwayStub) -> Result<Greet, UniErr> {
         Ok(Greet {
             port: stub.remote,
             agent: stub.agent,
@@ -711,7 +711,7 @@ impl HyperGreeter for SimpleGreeter {
 
 #[async_trait]
 pub trait HyperAuthenticator: Send + Sync + Clone + Sized {
-    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, MsgErr>;
+    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, UniErr>;
 }
 
 #[derive(Clone)]
@@ -728,21 +728,21 @@ impl TokenAuthenticator {
 
 #[async_trait]
 impl HyperAuthenticator for TokenAuthenticator {
-    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, MsgErr> {
+    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, UniErr> {
         if let Substance::Token(token) = &*knock.auth {
             if *token == self.token {
                 Ok(HyperwayStub {
                     agent: self.agent.clone(),
                     remote: knock
                         .remote
-                        .ok_or::<MsgErr>("expected a remote entry selection".into())?,
+                        .ok_or::<UniErr>("expected a remote entry selection".into())?,
                 })
             } else {
-                Err(MsgErr::new(500,"invalid token"))
+                Err(UniErr::new(500, "invalid token"))
             }
         } else {
-            Err(MsgErr::new( 500,
-                "expected Subtance: Token",
+            Err(UniErr::new(500,
+                            "expected Subtance: Token",
             ))
         }
     }
@@ -776,11 +776,11 @@ impl TokenAuthenticatorWithRemoteWhitelist {
 
 #[async_trait]
 impl HyperAuthenticator for TokenAuthenticatorWithRemoteWhitelist {
-    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, MsgErr> {
+    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, UniErr> {
         if let Substance::Token(token) = &*knock.auth {
             if *token == self.token {
-                let remote = knock.remote.ok_or(MsgErr::new( 500,
-                    "expected a remote entry selection",
+                let remote = knock.remote.ok_or(UniErr::new(500,
+                                                            "expected a remote entry selection",
                 ))?;
                 if self.whitelist.contains(&remote) {
                     Ok(HyperwayStub {
@@ -788,16 +788,16 @@ impl HyperAuthenticator for TokenAuthenticatorWithRemoteWhitelist {
                         remote,
                     })
                 } else {
-                    Err(MsgErr::new( 500,
-                        "remote is not part of the whitelist",
+                    Err(UniErr::new(500,
+                                    "remote is not part of the whitelist",
                     ))
                 }
             } else {
-                Err(MsgErr::new(500,"invalid token"))
+                Err(UniErr::new(500, "invalid token"))
             }
         } else {
-            Err(MsgErr::new(500,
-                "expecting Substance: Token",
+            Err(UniErr::new(500,
+                            "expecting Substance: Token",
             ))
         }
     }
@@ -805,9 +805,9 @@ impl HyperAuthenticator for TokenAuthenticatorWithRemoteWhitelist {
 
 #[async_trait]
 impl HyperAuthenticator for AnonHyperAuthenticator {
-    async fn auth(&self, req: Knock) -> Result<HyperwayStub, MsgErr> {
-        let remote = req.remote.ok_or(MsgErr::new( 500,
-            "required remote point request",
+    async fn auth(&self, req: Knock) -> Result<HyperwayStub, UniErr> {
+        let remote = req.remote.ok_or(UniErr::new(500,
+                                                  "required remote point request",
         ))?;
 
         Ok(HyperwayStub {
@@ -834,7 +834,7 @@ impl AnonHyperAuthenticatorAssignEndPoint {
 
 #[async_trait]
 impl HyperAuthenticator for AnonHyperAuthenticatorAssignEndPoint {
-    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, MsgErr> {
+    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, UniErr> {
         let remote = self
             .logger
             .result(self.remote_point_factory.create().await)?
@@ -860,18 +860,18 @@ impl TokensFromHeavenHyperAuthenticatorAssignEndPoint {
 
 #[async_trait]
 impl HyperAuthenticator for TokensFromHeavenHyperAuthenticatorAssignEndPoint {
-    async fn auth(&self, auth_req: Knock) -> Result<HyperwayStub, MsgErr> {
+    async fn auth(&self, auth_req: Knock) -> Result<HyperwayStub, UniErr> {
         match &*auth_req.auth {
             Substance::Token(token) => {
                 if let Some((_, stub)) = self.tokens.remove(token) {
                     return Ok(stub);
                 } else {
-                    return Err(MsgErr::new(500,"invalid token"));
+                    return Err(UniErr::new(500, "invalid token"));
                 }
             }
             _ => {
-                return Err(MsgErr::new(500,
-                    "expected Substance: Token",
+                return Err(UniErr::new(500,
+                                       "expected Substance: Token",
                 ));
             }
         }
@@ -911,7 +911,7 @@ impl TokenDispensingHyperwayInterchange {
         }
     }
 
-    pub async fn dispense(&self) -> Result<(Token, HyperwayStub), MsgErr> {
+    pub async fn dispense(&self) -> Result<(Token, HyperwayStub), UniErr> {
         let token = Token::new_uuid();
         let remote_point = self.remote_point_factory.create().await?.to_port();
         let lane_point = self.lane_point_factory.create().await?;
@@ -960,13 +960,13 @@ impl VersionGate {
 
 #[async_trait]
 pub trait HyperGate: Send + Sync {
-    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, MsgErr>;
+    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, UniErr>;
 
     async fn jump(
         &self,
         kind: InterchangeKind,
         stub: HyperwayStub,
-    ) -> Result<HyperwayEndpoint, MsgErr>;
+    ) -> Result<HyperwayEndpoint, UniErr>;
 }
 
 pub struct HopRouter {
@@ -975,7 +975,7 @@ pub struct HopRouter {
 }
 
 impl HopRouter {
-    fn to_hop(&self, mut wave: UltraWave) -> Result<UltraWave, MsgErr> {
+    fn to_hop(&self, mut wave: UltraWave) -> Result<UltraWave, UniErr> {
         wave.set_agent(self.greet.agent.clone());
         let mut transport = wave
             .wrap_in_transport(self.greet.port.clone(), self.greet.transport.clone())
@@ -1061,7 +1061,7 @@ impl HyperGateSelector {
         Self { map }
     }
 
-    pub fn add(&self, kind: InterchangeKind, gate: Arc<dyn HyperGate>) -> Result<(), MsgErr> {
+    pub fn add(&self, kind: InterchangeKind, gate: Arc<dyn HyperGate>) -> Result<(), UniErr> {
         if self.map.contains_key(&kind) {
             Err(format!("already have an interchange of kind: {}", kind.to_string()).into())
         } else {
@@ -1073,11 +1073,11 @@ impl HyperGateSelector {
 
 #[async_trait]
 impl HyperGate for HyperGateSelector {
-    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, MsgErr> {
+    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, UniErr> {
         if let Some(gate) = self.map.get(&knock.kind) {
             gate.value().knock(knock).await
         } else {
-            Err(MsgErr::new(500,format!(
+            Err(UniErr::new(500, format!(
                 "interchange not available: {}",
                 knock.kind.to_string()
             ).as_str()))
@@ -1088,10 +1088,10 @@ impl HyperGate for HyperGateSelector {
         &self,
         kind: InterchangeKind,
         stub: HyperwayStub,
-    ) -> Result<HyperwayEndpoint, MsgErr> {
+    ) -> Result<HyperwayEndpoint, UniErr> {
         self.map
             .get(&kind)
-            .ok_or(MsgErr::new(500,format!(
+            .ok_or(UniErr::new(500, format!(
                 "interchange kind not available: {}",
                 kind.to_string()
             ).as_str()))?
@@ -1153,7 +1153,7 @@ where
     G: HyperGreeter,
     C: HyperwayConfigurator,
 {
-    async fn enter(&self, greet: Greet) -> Result<HyperwayEndpoint, MsgErr> {
+    async fn enter(&self, greet: Greet) -> Result<HyperwayEndpoint, UniErr> {
         let mut hyperway = Hyperway::new(greet.port.clone(), greet.agent.clone());
         self.configurator.config(&greet, &mut hyperway);
 
@@ -1190,7 +1190,7 @@ where
     G: HyperGreeter,
     C: HyperwayConfigurator,
 {
-    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, MsgErr> {
+    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, UniErr> {
         let stub = self.auth.auth(knock).await?;
         let greet = self.greeter.greet(stub).await?;
         self.enter(greet).await
@@ -1200,7 +1200,7 @@ where
         &self,
         _kind: InterchangeKind,
         stub: HyperwayStub,
-    ) -> Result<HyperwayEndpoint, MsgErr> {
+    ) -> Result<HyperwayEndpoint, UniErr> {
         let greet = self.greeter.greet(stub).await?;
         self.enter(greet).await
     }
@@ -1237,7 +1237,7 @@ where
         }
     }
 
-    async fn enter(&self, greet: Greet) -> Result<HyperwayEndpoint, MsgErr> {
+    async fn enter(&self, greet: Greet) -> Result<HyperwayEndpoint, UniErr> {
         let stub = HyperwayStub::new(greet.port.clone(), greet.agent.clone());
         let ext = self.interchange.mount(stub.clone(), Some(greet.into())).await?;
         Ok(ext)
@@ -1250,7 +1250,7 @@ where
     A: HyperAuthenticator,
     G: HyperGreeter,
 {
-    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, MsgErr> {
+    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, UniErr> {
         let stub = self.auth.auth(knock).await?;
         let greet = self.greeter.greet(stub).await?;
         let ext = self.enter(greet).await?;
@@ -1261,7 +1261,7 @@ where
         &self,
         _kind: InterchangeKind,
         stub: HyperwayStub,
-    ) -> Result<HyperwayEndpoint, MsgErr> {
+    ) -> Result<HyperwayEndpoint, UniErr> {
         let greet = self.greeter.greet(stub).await?;
         let ext = self.enter(greet).await?;
         Ok(ext)
@@ -1281,7 +1281,7 @@ impl HyperClient where{
     pub fn new(
         factory:  Box<dyn HyperwayEndpointFactory>,
         logger: PointLogger,
-    ) -> Result<HyperClient, MsgErr> {
+    ) -> Result<HyperClient, UniErr> {
         Self::new_with_exchanger(factory,None,logger)
     }
 
@@ -1289,7 +1289,7 @@ impl HyperClient where{
         factory: Box<dyn HyperwayEndpointFactory>,
         exchanger: Option<Exchanger>,
         logger: PointLogger,
-    ) -> Result<HyperClient, MsgErr> {
+    ) -> Result<HyperClient, UniErr> {
         let (to_client_listener_tx, _) = broadcast::channel(1024);
         let (to_hyperway_tx, from_client_rx) = mpsc::channel(1024);
         let (status_watch_tx, mut status_rx) = watch::channel(HyperConnectionStatus::Pending);
@@ -1353,7 +1353,7 @@ impl HyperClient where{
                     greet_tx: watch::Sender<Option<Greet>>,
                     exchanger: Option<Exchanger>,
                     logger: PointLogger,
-                ) -> Result<(), MsgErr> {
+                ) -> Result<(), UniErr> {
                     if let Some(wave) = from_runner_rx.recv().await {
                         match wave.to_reflected() {
                             Ok(reflected) => {
@@ -1480,13 +1480,13 @@ logger.info("Received GREETING");
         self.exchanger.clone()
     }
 
-    pub async fn transmitter_builder(&self) -> Result<ProtoTransmitterBuilder, MsgErr> {
+    pub async fn transmitter_builder(&self) -> Result<ProtoTransmitterBuilder, UniErr> {
         self.wait_for_ready(Duration::from_secs(30)).await?;
         let mut builder =
-            ProtoTransmitterBuilder::new(Arc::new(self.router()), self.exchanger.as_ref().ok_or(MsgErr::from_500("cannot create a transmitter on a client that does not have an exchanger"))?.clone());
+            ProtoTransmitterBuilder::new(Arc::new(self.router()), self.exchanger.as_ref().ok_or(UniErr::from_500("cannot create a transmitter on a client that does not have an exchanger"))?.clone());
         let greet = self
             .get_greeting()
-            .ok_or::<MsgErr>("expected greeting to already be set in HyperClient".into())?;
+            .ok_or::<UniErr>("expected greeting to already be set in HyperClient".into())?;
         builder.agent = SetStrategy::Fill(greet.agent.clone());
         builder.from = SetStrategy::Fill(greet.port.clone());
         Ok(builder)
@@ -1495,7 +1495,7 @@ logger.info("Received GREETING");
     pub fn reset(&self) {
         let mut wave = DirectedProto::signal();
         wave.to(LOCAL_CLIENT_RUNNER.clone().to_port());
-        wave.method(MsgMethod::new("Reset").unwrap());
+        wave.method(ExtMethod::new("Reset").unwrap());
         let wave = wave.build().unwrap();
         let wave = wave.to_ultra();
         let tx = self.tx.clone();
@@ -1508,7 +1508,7 @@ logger.info("Received GREETING");
         let mut wave = DirectedProto::signal();
         wave.from(LOCAL_CLIENT.clone().to_port());
         wave.to(LOCAL_CLIENT_RUNNER.clone().to_port());
-        wave.method(MsgMethod::new("Close").unwrap());
+        wave.method(ExtMethod::new("Close").unwrap());
         let wave = wave.build().unwrap();
         let wave = wave.to_ultra();
         let tx = self.tx.clone();
@@ -1529,7 +1529,7 @@ logger.info("Received GREETING");
         self.greet_rx.borrow().clone()
     }
 
-    pub async fn wait_for_greet(&self) -> Result<Greet, MsgErr> {
+    pub async fn wait_for_greet(&self) -> Result<Greet, UniErr> {
         let mut greet_rx = self.greet_rx.clone();
         loop {
             let greet = greet_rx.borrow().clone();
@@ -1541,7 +1541,7 @@ logger.info("Received GREETING");
         }
     }
 
-    pub async fn wait_for_ready(&self, duration: Duration) -> Result<(), MsgErr> {
+    pub async fn wait_for_ready(&self, duration: Duration) -> Result<(), UniErr> {
         let mut status_rx = self.status_rx.clone();
         let (rtn, mut rtn_rx) = oneshot::channel();
 
@@ -1554,7 +1554,7 @@ logger.info("Received GREETING");
                         break;
                     }
                     HyperConnectionStatus::Fatal => {
-                        rtn.send(Err(MsgErr::from_500(
+                        rtn.send(Err(UniErr::from_500(
                             "Fatal status from HyperClient while waiting for Ready",
                         )));
                         break;
@@ -1614,8 +1614,8 @@ impl ToString for HyperConnectionErr {
     }
 }
 
-impl From<MsgErr> for HyperConnectionErr {
-    fn from(err: MsgErr) -> Self {
+impl From<UniErr> for HyperConnectionErr {
+    fn from(err: UniErr) -> Self {
         HyperConnectionErr::Retry(err.to_string())
     }
 }
@@ -1702,11 +1702,11 @@ runner.logger.info("Hyperway Replaced");
                 }
             }
 
-            async fn relay(runner: &mut HyperClientRunner) -> Result<(), MsgErr> {
+            async fn relay(runner: &mut HyperClientRunner) -> Result<(), UniErr> {
                 let ext = runner
                     .ext
                     .as_mut()
-                    .ok_or::<MsgErr>("must reconnect".into())?;
+                    .ok_or::<UniErr>("must reconnect".into())?;
 
                 loop {
                     tokio::select!(
@@ -1716,9 +1716,9 @@ runner.logger.info("Hyperway Replaced");
                                   Some(wave) => {
                                     if wave.is_directed() && wave.to().is_single() && wave.to().unwrap_single().point == *LOCAL_CLIENT_RUNNER
                                     {
-                                        let method: MsgMethod = wave.to_directed().unwrap().core().method.clone().try_into().unwrap();
+                                        let method: ExtMethod = wave.to_directed().unwrap().core().method.clone().try_into().unwrap();
                                         if method.to_string() == "Reset".to_string() {
-                                           return Err(MsgErr::from_500("reset"));
+                                           return Err(UniErr::from_500("reset"));
                                         } else if method.to_string() == "Close".to_string(){
                                             runner.status_tx.send(HyperConnectionStatus::Closed).await;
                                             return Ok(());
@@ -1729,7 +1729,7 @@ runner.logger.info("Hyperway Replaced");
                                             Err(err) => {
                                                 // wave gets lost... need to requeue it somehow...
                                                 //                                    runner.to_client_tx.try_send(err.0);
-                                                return Err(MsgErr::from_500("ext failure"));
+                                                return Err(UniErr::from_500("ext failure"));
                                             }
                                         }
                                     }
@@ -1793,7 +1793,7 @@ runner.logger.info("Hyperway Replaced");
 
 #[async_trait]
 pub trait HyperwayEndpointFactory: Send + Sync {
-    async fn create(&self, status_tx:mpsc::Sender<HyperConnectionDetails>) -> Result<HyperwayEndpoint, MsgErr>;
+    async fn create(&self, status_tx:mpsc::Sender<HyperConnectionDetails>) -> Result<HyperwayEndpoint, UniErr>;
 }
 
 pub struct LocalHyperwayGateUnlocker {
@@ -1810,7 +1810,7 @@ impl LocalHyperwayGateUnlocker {
 
 #[async_trait]
 impl HyperwayEndpointFactory for LocalHyperwayGateUnlocker {
-    async fn create(&self, status_tx:mpsc::Sender<HyperConnectionDetails>) -> Result<HyperwayEndpoint, MsgErr> {
+    async fn create(&self, status_tx:mpsc::Sender<HyperConnectionDetails>) -> Result<HyperwayEndpoint, UniErr> {
         self.gate.knock(self.knock.clone()).await
     }
 }
@@ -1829,7 +1829,7 @@ impl LocalHyperwayGateJumper {
 
 #[async_trait]
 impl HyperwayEndpointFactory for LocalHyperwayGateJumper {
-    async fn create(&self, status_tx: mpsc::Sender<HyperConnectionDetails>) -> Result<HyperwayEndpoint, MsgErr> {
+    async fn create(&self, status_tx: mpsc::Sender<HyperConnectionDetails>) -> Result<HyperwayEndpoint, UniErr> {
         self.gate.jump(self.kind.clone(), self.stub.clone()).await
     }
 }
@@ -1881,7 +1881,7 @@ impl Bridge {
         mut local_hyperway_endpoint: HyperwayEndpoint,
         remote_factory: Box<dyn HyperwayEndpointFactory>,
         logger: PointLogger,
-    ) -> Result<Self,MsgErr> {
+    ) -> Result<Self, UniErr> {
 
         let client = HyperClient::new( remote_factory, logger )?;
         let client_router = client.router();
@@ -1998,10 +1998,10 @@ pub mod test_util {
 
     use crate::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, HyperClient, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter, HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist, Bridge, HyperConnectionDetails};
     use cosmic_universe::command::request::create::PointFactoryU64;
-    use cosmic_universe::error::MsgErr;
+    use cosmic_universe::error::UniErr;
     use cosmic_universe::id::id::{Layer, Point, Port, ToPoint, ToPort};
     use cosmic_universe::log::RootLogger;
-    use cosmic_universe::msg::MsgMethod;
+    use cosmic_universe::ext::ExtMethod;
     use cosmic_universe::substance::substance::{Substance, Token};
     use cosmic_universe::sys::{Greet, InterchangeKind, Knock};
     use cosmic_universe::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedCore, ReflectedKind, ReflectedProto, ReflectedWave, Router, SetStrategy, TxRouter, UltraWave, Wave};
@@ -2072,7 +2072,7 @@ pub mod test_util {
             }
         }
 
-        pub async fn go(self) -> Result<(),MsgErr> {
+        pub async fn go(self) -> Result<(), UniErr> {
             let less_exchanger = Exchanger::new( LESS.push("exchanger").unwrap().to_port(), Timeouts::default() );
             let fae_exchanger = Exchanger::new( FAE.push("exchanger").unwrap().to_port(), Timeouts::default() );
 
@@ -2114,7 +2114,7 @@ pub mod test_util {
                 let mut hello = DirectedProto::ping();
                 hello.to(FAE.clone().to_port());
                 hello.from(LESS.clone().to_port());
-                hello.method(MsgMethod::new("Hello").unwrap());
+                hello.method(ExtMethod::new("Hello").unwrap());
                 hello.body(Substance::Empty);
                 let pong: Wave<Pong> = less_transmitter.direct(hello).await.unwrap();
                 rtn.send(pong.core.status.as_u16() == 200u16);
@@ -2140,7 +2140,7 @@ pub mod test_util {
 
     #[async_trait]
     impl HyperGreeter for TestGreeter {
-        async fn greet(&self, stub: HyperwayStub) -> Result<Greet, MsgErr> {
+        async fn greet(&self, stub: HyperwayStub) -> Result<Greet, UniErr> {
 println!("Sending GREETING to {}",stub.remote.to_string());
             Ok(Greet {
                 port: stub.remote.clone(),
@@ -2156,10 +2156,10 @@ println!("Sending GREETING to {}",stub.remote.to_string());
 pub mod test {
     use crate::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, HyperClient, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter, HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist, Bridge, HyperConnectionDetails};
     use cosmic_universe::command::request::create::PointFactoryU64;
-    use cosmic_universe::error::MsgErr;
+    use cosmic_universe::error::UniErr;
     use cosmic_universe::id::id::{Layer, Point, Port, ToPoint, ToPort};
     use cosmic_universe::log::RootLogger;
-    use cosmic_universe::msg::MsgMethod;
+    use cosmic_universe::ext::ExtMethod;
     use cosmic_universe::substance::substance::{Substance, Token};
     use cosmic_universe::sys::{Greet, InterchangeKind, Knock};
     use cosmic_universe::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedCore, ReflectedKind, ReflectedProto, ReflectedWave, Router, SetStrategy, TxRouter, UltraWave, Wave};
@@ -2190,7 +2190,7 @@ pub mod test {
         let mut hello = DirectedProto::ping();
         hello.to(FAE.clone().to_port());
         hello.from(LESS.clone().to_port());
-        hello.method(MsgMethod::new("Hello").unwrap());
+        hello.method(ExtMethod::new("Hello").unwrap());
         hello.body(Substance::Empty);
         let directed = hello.build().unwrap();
         let wave = directed.to_ultra();
@@ -2299,7 +2299,7 @@ pub mod test {
 
         #[async_trait]
         impl HyperwayEndpointFactory for TestFactory {
-            async fn create(&self, status_tx: mpsc::Sender<HyperConnectionDetails>) -> Result<HyperwayEndpoint, MsgErr> {
+            async fn create(&self, status_tx: mpsc::Sender<HyperConnectionDetails>) -> Result<HyperwayEndpoint, UniErr> {
                 Ok(self.hyperway.hyperway_endpoint_far(None).await)
             }
         }
@@ -2437,7 +2437,7 @@ pub mod test {
             let mut hello = DirectedProto::ping();
             hello.to(FAE.clone().to_port());
             hello.from(LESS.clone().to_port());
-            hello.method(MsgMethod::new("Hello").unwrap());
+            hello.method(ExtMethod::new("Hello").unwrap());
             hello.body(Substance::Empty);
             let pong: Wave<Pong> = less_transmitter.direct(hello).await.unwrap();
             rtn.send(pong.core.status.as_u16() == 200u16);

@@ -78,7 +78,7 @@ pub mod config {
 
     pub mod bind {
         use crate::command::request::Rc;
-        use crate::error::{MsgErr, ParseErrs};
+        use crate::error::{UniErr, ParseErrs};
         use crate::id::id::{Point, PointCtx, PointVar, Topic};
         use crate::substance::substance::{Call, CallDef};
         use crate::substance::substance::{Substance, SubstancePattern};
@@ -106,7 +106,7 @@ pub mod config {
 
         #[derive(Clone)]
         pub struct BindConfig {
-            scopes: Vec<BindScope>, /*pub msg: ConfigScope<EntityKind, Selector<MsgPipelineSelector>>,
+            scopes: Vec<BindScope>, /*pub msg: ConfigScope<EntityKind, Selector<ExtPipelineSelector>>,
                                     pub http: ConfigScope<EntityKind, Selector<HttpPipelineSelector>>,
                                     pub rc: ConfigScope<EntityKind, Selector<RcPipelineSelector>>,
 
@@ -128,7 +128,7 @@ pub mod config {
                 scopes
             }
 
-            pub fn select(&self, directed: &DirectedWave) -> Result<&MethodScope, MsgErr> {
+            pub fn select(&self, directed: &DirectedWave) -> Result<&MethodScope, UniErr> {
                 for route_scope in self.route_scopes() {
                     if route_scope.selector.is_match(directed).is_ok() {
                         for message_scope in &route_scope.block {
@@ -142,7 +142,7 @@ pub mod config {
                         }
                     }
                 }
-                Err(MsgErr::Status{
+                Err(UniErr::Status{
                     status: 404,
                     message: format!("no route matches {}<{}>{}", directed.kind().to_string(), directed.core().method.to_string(), directed.core().uri.path().to_string())
                 })
@@ -150,7 +150,7 @@ pub mod config {
         }
 
         impl TryFrom<Vec<u8>> for BindConfig {
-            type Error = MsgErr;
+            type Error = UniErr;
 
             fn try_from(doc: Vec<u8>) -> Result<Self, Self::Error> {
                 let doc = String::from_utf8(doc)?;
@@ -227,7 +227,7 @@ pub mod config {
         }
 
         impl ToResolved<PipelineStep> for PipelineStepCtx {
-            fn to_resolved(self, env: &Env) -> Result<PipelineStep, MsgErr> {
+            fn to_resolved(self, env: &Env) -> Result<PipelineStep, UniErr> {
                 let mut blocks = vec![];
                 for block in self.blocks {
                     blocks.push(block.to_resolved(env)?);
@@ -242,7 +242,7 @@ pub mod config {
         }
 
         impl ToResolved<PipelineStepCtx> for PipelineStepVar {
-            fn to_resolved(self, env: &Env) -> Result<PipelineStepCtx, MsgErr> {
+            fn to_resolved(self, env: &Env) -> Result<PipelineStepCtx, UniErr> {
                 let mut blocks = vec![];
                 for block in self.blocks {
                     blocks.push(block.to_resolved(env)?);
@@ -258,7 +258,7 @@ pub mod config {
 
         /*
         impl CtxSubst<PipelineStep> for PipelineStepCtx{
-            fn resolve_ctx(self, resolver: &dyn CtxResolver) -> Result<PipelineStep, MsgErr> {
+            fn resolve_ctx(self, resolver: &dyn CtxResolver) -> Result<PipelineStep, ExtErr> {
                 let mut errs = vec![];
                 let mut blocks = vec![];
                 for block in self.blocks {
@@ -315,14 +315,14 @@ pub mod config {
         }
 
         impl ToResolved<PipelineStop> for PipelineStopVar {
-            fn to_resolved(self, env: &Env) -> Result<PipelineStop, MsgErr> {
+            fn to_resolved(self, env: &Env) -> Result<PipelineStop, UniErr> {
                 let stop: PipelineStopCtx = self.to_resolved(env)?;
                 stop.to_resolved(env)
             }
         }
 
         impl ToResolved<PipelineStop> for PipelineStopCtx {
-            fn to_resolved(self, env: &Env) -> Result<PipelineStop, MsgErr> {
+            fn to_resolved(self, env: &Env) -> Result<PipelineStop, UniErr> {
                 Ok(match self {
                     PipelineStopCtx::Core => PipelineStop::Core,
                     PipelineStopCtx::Call(call) => PipelineStop::Call(call.to_resolved(env)?),
@@ -334,7 +334,7 @@ pub mod config {
         }
 
         impl ToResolved<PipelineStopCtx> for PipelineStopVar {
-            fn to_resolved(self, env: &Env) -> Result<PipelineStopCtx, MsgErr> {
+            fn to_resolved(self, env: &Env) -> Result<PipelineStopCtx, UniErr> {
                 Ok(match self {
                     PipelineStopVar::Core => PipelineStopCtx::Core,
                     PipelineStopVar::Call(call) => PipelineStopCtx::Call(call.to_resolved(env)?),
@@ -349,7 +349,7 @@ pub mod config {
 
         /*
         impl CtxSubst<PipelineStop> for PipelineStopCtx {
-            fn resolve_ctx(self, resolver: &dyn CtxResolver) -> Result<PipelineStop, MsgErr> {
+            fn resolve_ctx(self, resolver: &dyn CtxResolver) -> Result<PipelineStop, ExtErr> {
                 match self {
                     PipelineStopCtx::Internal => Ok(PipelineStop::Internal),
                     PipelineStopCtx::Call(call) => Ok(PipelineStop::Call(call.resolve_ctx(resolver)?)),

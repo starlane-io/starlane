@@ -23,7 +23,7 @@ use cosmic_universe::command::request::create::KindTemplate;
 use cosmic_universe::command::request::delete::Delete;
 use cosmic_universe::command::request::query::{Query, QueryResult};
 use cosmic_universe::command::request::select::{Select, SubSelect};
-use cosmic_universe::error::MsgErr;
+use cosmic_universe::error::UniErr;
 use cosmic_universe::fail::Timeout;
 use cosmic_universe::id::id::{BaseKind, GLOBAL_EXEC, Kind, Layer, LOCAL_STAR, Point, Port, RouteSeg, Specific, ToBaseKind, ToPort};
 use cosmic_universe::id::{
@@ -274,8 +274,8 @@ where P: Platform, P::Err: PlatErr
 
  */
 
-pub trait PlatErr: Sized + Send + Sync + ToString + Clone + Into<MsgErr> + From<MsgErr> +From<String> +From<&'static str>+From<tokio::sync::oneshot::error::RecvError>+Into<MsgErr> {
-    fn to_cosmic_err(&self) -> MsgErr;
+pub trait PlatErr: Sized + Send + Sync + ToString + Clone + Into<UniErr> + From<UniErr> +From<String> +From<&'static str>+From<tokio::sync::oneshot::error::RecvError>+Into<UniErr> {
+    fn to_cosmic_err(&self) -> UniErr;
 
     fn new<S>(message: S) -> Self
     where
@@ -344,7 +344,7 @@ where
         Default::default()
     }
 
-    fn select_kind(&self, template: &KindTemplate) -> Result<Kind, MsgErr> {
+    fn select_kind(&self, template: &KindTemplate) -> Result<Kind, UniErr> {
         let base: BaseKind = BaseKind::from_str(template.base.to_string().as_str())?;
         Ok(match base {
             BaseKind::Root => Kind::Root,

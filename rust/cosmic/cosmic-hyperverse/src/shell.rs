@@ -4,7 +4,7 @@ use crate::{PlatErr, Platform};
 use cosmic_universe::cli::RawCommand;
 use cosmic_universe::command::Command;
 use cosmic_universe::config::config::bind::RouteSelector;
-use cosmic_universe::error::MsgErr;
+use cosmic_universe::error::UniErr;
 use cosmic_universe::id::id::{
     Layer, Point, Port, PortSelector, ToPoint, ToPort, Topic, TraversalLayer, Uuid,
 };
@@ -67,7 +67,7 @@ where
         &self.skel.exchanger
     }
 
-    async fn deliver_directed(&self, directed: Traversal<DirectedWave>) -> Result<(), MsgErr> {
+    async fn deliver_directed(&self, directed: Traversal<DirectedWave>) -> Result<(), UniErr> {
         if directed.from().point == self.port().point
             && directed.from().layer.ordinal() >= self.port().layer.ordinal()
         {
@@ -124,7 +124,7 @@ println!("Handling Topic");
     async fn directed_fabric_bound(
         &self,
         mut traversal: Traversal<DirectedWave>,
-    ) -> Result<(), MsgErr> {
+    ) -> Result<(), UniErr> {
 
         match traversal.directed_kind() {
             DirectedKind::Ping => {
@@ -155,7 +155,7 @@ println!("Handling Topic");
     async fn reflected_core_bound(
         &self,
         traversal: Traversal<ReflectedWave>,
-    ) -> Result<(), MsgErr> {
+    ) -> Result<(), UniErr> {
         // println!("Shell reflected_core_bound: {}", traversal.kind().to_string() );
 
         if let Some(count) = self
@@ -200,10 +200,10 @@ where
     P: Platform + 'static,
 {
     #[route("Msg<NewCliSession>")]
-    pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Port, MsgErr> {
+    pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Port, UniErr> {
         // only allow a cli session to be created by any layer of THIS particle
         if ctx.from().clone().to_point() != ctx.to().clone().to_point() {
-            return Err(MsgErr::forbidden());
+            return Err(UniErr::forbidden());
         }
 
         let mut session_port = ctx
@@ -231,7 +231,7 @@ where
 #[routes]
 impl CliSession {
     #[route("Msg<Exec>")]
-    pub async fn exec(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, MsgErr> {
+    pub async fn exec(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, UniErr> {
 println!("---> Reached Msg<Exec> !!!!");
         let exec_topic = Topic::uuid();
         let exec_port = self.port.clone().with_topic(exec_topic.clone());
@@ -267,7 +267,7 @@ impl CommandExecutor {
         Self { port, source, env }
     }
 
-    pub async fn execute(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, MsgErr> {
+    pub async fn execute(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, UniErr> {
 println!("CommadnExecutor...");
         // make sure everything is coming from this command executor topic
         let ctx = ctx.push_from(self.port.clone());

@@ -1,4 +1,4 @@
-use crate::error::MsgErr;
+use crate::error::UniErr;
 use crate::id::id::Meta;
 use crate::parse::camel_case_chars;
 use crate::parse::error::result;
@@ -14,12 +14,12 @@ use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub struct MsgMethod {
+pub struct ExtMethod {
     string: String,
 }
 
-impl MsgMethod {
-    pub fn new<S: ToString>(string: S) -> Result<Self, MsgErr> {
+impl ExtMethod {
+    pub fn new<S: ToString>(string: S) -> Result<Self, UniErr> {
         let tmp = string.to_string();
         let string = result(all_consuming(camel_case_chars)(new_span(tmp.as_str())))?.to_string();
         Ok(Self { string })
@@ -28,14 +28,14 @@ impl MsgMethod {
 
 
 
-impl ToString for MsgMethod {
+impl ToString for ExtMethod {
     fn to_string(&self) -> String {
         self.string.clone()
     }
 }
 
-impl ValueMatcher<MsgMethod> for MsgMethod {
-    fn is_match(&self, x: &MsgMethod) -> Result<(), ()> {
+impl ValueMatcher<ExtMethod> for ExtMethod {
+    fn is_match(&self, x: &ExtMethod) -> Result<(), ()> {
         if *self == *x {
             Ok(())
         } else {
@@ -44,32 +44,32 @@ impl ValueMatcher<MsgMethod> for MsgMethod {
     }
 }
 
-impl Into<MethodScopeSelector> for MsgMethod {
+impl Into<MethodScopeSelector> for ExtMethod {
     fn into(self) -> MethodScopeSelector {
         MethodScopeSelector::new(
-            ValuePattern::Pattern(Method::Msg(self)),
+            ValuePattern::Pattern(Method::Ext(self)),
             Regex::new(".*").unwrap(),
         )
     }
 }
 
-impl TryFrom<String> for MsgMethod {
-    type Error = MsgErr;
+impl TryFrom<String> for ExtMethod {
+    type Error = UniErr;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::new(value)
     }
 }
 
-impl TryFrom<&str> for MsgMethod {
-    type Error = MsgErr;
+impl TryFrom<&str> for ExtMethod {
+    type Error = UniErr;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Self::new(value)
     }
 }
 
-impl Deref for MsgMethod {
+impl Deref for ExtMethod {
     type Target = String;
 
     fn deref(&self) -> &Self::Target {
@@ -77,7 +77,7 @@ impl Deref for MsgMethod {
     }
 }
 
-impl Default for MsgMethod {
+impl Default for ExtMethod {
     fn default() -> Self {
         Self {
             string: "Def".to_string(),
@@ -86,8 +86,8 @@ impl Default for MsgMethod {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MsgRequest {
-    pub method: MsgMethod,
+pub struct ExtDirected {
+    pub method: ExtMethod,
 
     #[serde(with = "http_serde::header_map")]
     pub headers: HeaderMap,
@@ -97,7 +97,7 @@ pub struct MsgRequest {
     pub body: Substance,
 }
 
-impl Default for MsgRequest {
+impl Default for ExtDirected {
     fn default() -> Self {
         Self {
             method: Default::default(),
@@ -108,12 +108,12 @@ impl Default for MsgRequest {
     }
 }
 
-impl MsgRequest {
-    pub fn new<M>(method: M) -> Result<Self, MsgErr>
+impl ExtDirected {
+    pub fn new<M>(method: M) -> Result<Self, UniErr>
     where
-        M: TryInto<MsgMethod, Error = MsgErr>,
+        M: TryInto<ExtMethod, Error =UniErr>,
     {
-        Ok(MsgRequest {
+        Ok(ExtDirected {
             method: method.try_into()?,
             ..Default::default()
         })
@@ -142,11 +142,11 @@ impl MsgRequest {
     }
 }
 
-impl TryFrom<DirectedCore> for MsgRequest {
-    type Error = MsgErr;
+impl TryFrom<DirectedCore> for ExtDirected {
+    type Error = UniErr;
 
     fn try_from(core: DirectedCore) -> Result<Self, Self::Error> {
-        if let Method::Msg(action) = core.method {
+        if let Method::Ext(action) = core.method {
             Ok(Self {
                 method: action,
                 headers: core.headers,
@@ -154,7 +154,7 @@ impl TryFrom<DirectedCore> for MsgRequest {
                 body: core.body,
             })
         } else {
-            Err("expected Msg".into())
+            Err("expected Ext".into())
         }
     }
 }
