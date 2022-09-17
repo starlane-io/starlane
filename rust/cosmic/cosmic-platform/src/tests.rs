@@ -15,10 +15,7 @@ use cosmic_api::wave::{
     ProtoTransmitterBuilder, SysMethod, Wave,
 };
 use cosmic_api::{MountKind, NoDiceArtifactFetcher, HYPERUSER};
-use cosmic_hyperlane::{
-    AnonHyperAuthenticator, HyperClient, HyperConnectionErr, HyperGate, HyperwayEndpoint, HyperwayStub,
-    LocalHyperwayGateJumper,
-};
+use cosmic_hyperlane::{AnonHyperAuthenticator, HyperClient, HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperwayEndpoint, HyperwayStub, LocalHyperwayGateJumper};
 use dashmap::DashMap;
 use std::io::Error;
 use std::sync::atomic;
@@ -836,7 +833,7 @@ impl<P> HyperwayEndpointFactory for MachineApiExtFactory<P>
     where
         P: Platform,
 {
-    async fn create(&self) -> Result<HyperwayEndpoint, HyperConnectionErr> {
+    async fn create(&self, status_tx:mpsc::Sender<HyperConnectionDetails>) -> Result<HyperwayEndpoint, MsgErr> {
         let knock = Knock {
             kind: InterchangeKind::DefaultControl,
             auth: Box::new(Substance::Empty),

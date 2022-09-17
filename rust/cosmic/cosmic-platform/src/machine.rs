@@ -10,7 +10,7 @@ use cosmic_api::substance::substance::Substance;
 use cosmic_api::sys::{InterchangeKind, Knock};
 use cosmic_api::wave::{Agent, HyperWave, UltraWave};
 use cosmic_api::ArtifactApi;
-use cosmic_hyperlane::{HyperClient, HyperConnectionErr, HyperGate, HyperGateSelector, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, InterchangeGate, LayerTransform, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, SimpleGreeter, TokenAuthenticatorWithRemoteWhitelist};
+use cosmic_hyperlane::{HyperClient, HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, InterchangeGate, LayerTransform, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, SimpleGreeter, TokenAuthenticatorWithRemoteWhitelist};
 use dashmap::DashMap;
 use futures::future::{join_all, select_all, BoxFuture};
 use futures::FutureExt;
@@ -60,10 +60,10 @@ where
         rtn_rx.await?
     }
 
-    pub async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint,HyperConnectionErr> {
+    pub async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint,MsgErr> {
         let (rtn,rtn_rx) = oneshot::channel();
         self.tx.send(MachineCall::Knock {knock, rtn}).await;
-        rtn_rx.await.map_err(|e|HyperConnectionErr::Retry(e.to_string().into()))?
+        rtn_rx.await?
     }
 
     pub fn terminate(&self) {
@@ -448,7 +448,7 @@ where
     },
     Knock {
         knock: Knock,
-        rtn: oneshot::Sender<Result<HyperwayEndpoint, HyperConnectionErr>>,
+        rtn: oneshot::Sender<Result<HyperwayEndpoint, MsgErr>>,
     },
     EndpointFactory { from: StarKey, to: StarKey, rtn: oneshot::Sender<Box<dyn HyperwayEndpointFactory>> } ,
     #[cfg(test)]
@@ -572,10 +572,10 @@ impl <P> MachineHyperwayEndpointFactory<P> where P: Platform {
 
 #[async_trait]
 impl <P> HyperwayEndpointFactory for MachineHyperwayEndpointFactory<P> where P: Platform{
-    async fn create(&self) -> Result<HyperwayEndpoint, HyperConnectionErr> {
+    async fn create(&self, status_tx:mpsc::Sender<HyperConnectionDetails>) -> Result<HyperwayEndpoint, MsgErr> {
         let knock = Knock::new( InterchangeKind::Star(self.to.clone()), self.from.clone().to_point().to_port().with_layer(Layer::Gravity), Substance::Empty );
         let (rtn,mut rtn_rx) = oneshot::channel();
         self.call_tx.send(MachineCall::Knock { knock, rtn }).await;
-        tokio::time::timeout(Duration::from_secs(60),rtn_rx).await.unwrap().unwrap()
+        tokio::time::timeout(Duration::from_secs(60),rtn_rx).await??
     }
 }
