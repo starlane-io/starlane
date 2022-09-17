@@ -1,17 +1,13 @@
-use crate::star::{LayerInjectionRouter, HyperStarSkel, TopicHandler};
+use crate::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
 use crate::state::ShellState;
 use crate::{PlatErr, Platform};
 use cosmic_universe::cli::RawCommand;
 use cosmic_universe::command::Command;
 use cosmic_universe::config::bind::RouteSelector;
 use cosmic_universe::error::UniErr;
-use cosmic_universe::id2::id::{
-    Layer, Point, Port, PortSelector, ToPoint, ToPort, Topic, TraversalLayer, Uuid,
-};
-use cosmic_universe::id2::{Traversal, TraversalDirection, TraversalInjection};
 use cosmic_universe::log::{PointLogger, RootLogger, Trackable};
 use cosmic_universe::parse::error::result;
-use cosmic_universe::parse::{command_line, route_attribute, Env};
+use cosmic_universe::parse::{command_line, Env, route_attribute};
 use cosmic_universe::quota::Timeouts;
 use cosmic_universe::util::{log, ToResolved};
 use cosmic_universe::wave::{Agent, Bounce, BounceBacks, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, Reflectable, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, UltraWave, Wave, WaveKind};
@@ -24,6 +20,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
+use cosmic_universe::id::{Layer, Point, Port, PortSelector, Topic, ToPoint, ToPort, Traversal, TraversalDirection, TraversalInjection, TraversalLayer, Uuid};
 
 #[derive(DirectedHandler)]
 pub struct Shell<P>

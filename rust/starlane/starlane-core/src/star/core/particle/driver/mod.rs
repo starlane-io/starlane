@@ -16,7 +16,7 @@ use crate::star::core::particle::driver::artifact::ArtifactManager;
 use crate::star::core::particle::driver::file::{FileCoreManager, FileSystemManager};
 use crate::star::core::particle::driver::user::UserBaseKeycloakCoreDriver;
 use cosmic_universe::command::Command;
-use cosmic_universe::id2::id::BaseKind;
+use cosmic_universe::id::BaseKind;
 use mesh_portal::version::latest::entity::request::set::Set;
 use mesh_portal::version::latest::entity::request::Rc;
 use mesh_portal::version::latest::fail;

@@ -1,6 +1,5 @@
 use crate::command::common::StateSrc::Substance;
 use crate::error::UniErr;
-use crate::id2::id::{Point, ToPoint, Uuid};
 use crate::parse::{CamelCase, to_string};
 use crate::util::{timestamp, uuid};
 use crate::{cosmic_timestamp, Selector};
@@ -15,6 +14,7 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::process::Output;
 use std::sync::Arc;
+use crate::id::{Point, ToPoint, Uuid};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum Level {

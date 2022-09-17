@@ -1,5 +1,5 @@
 use crate::error::UniErr;
-use crate::id2::id::Point;
+use crate::id::Point;
 use crate::parse::error::result;
 use crate::parse::{MapResolver, particle_perms, permissions, permissions_mask, privilege};
 use crate::selector2::selector::{PointHierarchy, Selector};

@@ -1,8 +1,8 @@
 use crate::error::Error;
 use crate::registry::RegistryApi;
 use cosmic_universe::command::Command;
-use cosmic_universe::id2::id::Port;
-use cosmic_universe::id2::id::ToPort;
+use cosmic_universe::id::Port;
+use cosmic_universe::id::ToPort;
 use cosmic_universe::service::Global;
 use cosmic_universe::wave::{AsyncTransmitterWithAgent, Method, Transmitter};
 use mesh_portal::version::latest::id::Point;

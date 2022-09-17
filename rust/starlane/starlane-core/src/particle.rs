@@ -12,9 +12,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use cosmic_universe::id2::id::{BaseKind, ToBaseKind, ToPoint};
-use cosmic_universe::id2::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, UserBaseSubKind};
-use cosmic_universe::parse::{consume_kind, CamelCase};
+use cosmic_universe::id::{ArtifactSubKind, FileSubKind, StarKey, ToPoint, UserBaseSubKind};
+use cosmic_universe::id2::{BaseSubKind};
+use cosmic_universe::parse::{CamelCase, consume_kind};
 use cosmic_universe::particle2::particle::{Details, Property};
 use cosmic_universe::hyper::{AssignmentKind, ChildRegistry, Location};
 use cosmic_nom::new_span;
@@ -28,6 +28,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::{mpsc, oneshot};
 use tracing_futures::WithSubscriber;
+use cosmic_universe::id::{BaseKind, ToBaseKind};
 
 use crate::config::config::ParticleConfig;
 use crate::error::Error;

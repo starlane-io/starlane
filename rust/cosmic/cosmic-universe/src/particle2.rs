@@ -1,4 +1,4 @@
-use crate::id2::id::Point;
+use crate::id::Point;
 use crate::particle2::particle::Stub;
 use crate::substance2::substance::Substance;
 
@@ -19,11 +19,11 @@ pub mod particle {
     use serde::{Deserialize, Serialize};
 
     use crate::error::UniErr;
-    use crate::id2::id::{BaseKind, Kind, KindParts, Point, PointKind};
     use crate::parse::parse_alpha1_str;
     use crate::security::Permissions;
     use crate::substance2::substance::{Substance, SubstanceMap};
     use cosmic_nom::{Res, Span};
+    use crate::id::{BaseKind, Kind, KindParts, Point, PointKind};
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct StatusUpdate {

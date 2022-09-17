@@ -1,4 +1,4 @@
-use crate::Kind;
+use crate::id::Kind;
 
 #[derive(Clone)]
 pub enum MountKind {

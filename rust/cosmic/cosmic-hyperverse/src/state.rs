@@ -1,5 +1,4 @@
-use cosmic_universe::id2::id;
-use cosmic_universe::id2::id::{Point, Uuid};
+use cosmic_universe::id::Point;
 use cosmic_universe::particle2::particle::Details;
 use cosmic_universe::wave::WaveId;
 use cosmic_universe::state::State;
@@ -7,6 +6,7 @@ use dashmap::{DashMap, DashSet};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::atomic::AtomicU16;
+use cosmic_universe::id::Uuid;
 
 #[derive(Clone)]
 pub struct ShellState {

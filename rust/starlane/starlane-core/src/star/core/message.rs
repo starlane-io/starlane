@@ -22,8 +22,8 @@ use crate::star::shell::db::{StarFieldSelection, StarSelector};
 use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use cosmic_universe::command::Command;
-use cosmic_universe::id2::id::{BaseKind, Kind, Tks, ToPoint};
-use cosmic_universe::id2::{ArtifactSubKind, FileSubKind, StarKey, UserBaseSubKind};
+use cosmic_universe::id::{ArtifactSubKind, FileSubKind, StarKey, ToPoint, UserBaseSubKind};
+use cosmic_universe::id2::{};
 use cosmic_universe::particle2::particle::Details;
 use cosmic_universe::hyper::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
 use cosmic_locality::field::FieldEx;
@@ -51,6 +51,7 @@ use mesh_portal::version::latest::security::Access;
 use regex::Regex;
 use std::future::Future;
 use std::sync::Arc;
+use cosmic_universe::id::{BaseKind, Kind, Tks};
 
 /*
 lazy_static!{

@@ -1,5 +1,4 @@
 use crate::error::UniErr;
-use crate::id2::id::{Point, PointCtx, PointVar};
 use crate::parse::{CtxResolver, Env};
 use crate::substance2::substance::{
     Substance, SubstancePattern, SubstancePatternCtx, SubstancePatternDef,
@@ -7,6 +6,7 @@ use crate::substance2::substance::{
 use crate::util::{ToResolved, ValuePattern};
 use alloc::string::String;
 use serde::{Deserialize, Serialize};
+use crate::id::{Point, PointCtx, PointVar};
 
 pub mod selector {
     use alloc::format;
@@ -22,20 +22,16 @@ pub mod selector {
     use crate::error::UniErr;
 
     use crate::command::request::{Rc, RcCommandType};
-    use crate::id2::id::{
-        BaseKind, Kind, KindParts, Layer, Point, PointCtx, PointSeg, PointSegKind, PointVar, Port,
-        RouteSeg, Specific, Sub, Tks, ToBaseKind, Topic, VarVal, Variable, Version,
-    };
     use crate::parse;
     use crate::parse::error::result;
     use crate::parse::model::Var;
-    use crate::parse::{camel_case_chars, camel_case_to_string_matcher, consume_hierarchy, file_chars, path, path_regex, point_segment_selector, point_selector, CamelCase, Env, specific_selector};
+    use crate::parse::{camel_case_chars, camel_case_to_string_matcher, CamelCase, consume_hierarchy, Env, file_chars, path, path_regex, point_segment_selector, point_selector, specific_selector};
     use crate::selector2::selector::specific::{
         ProductSelector, ProviderSelector, VariantSelector, VendorSelector,
     };
     use crate::substance2::substance::{
-        Call, CallKind, CallWithConfig, CallWithConfigDef, HttpCall, ListPattern, MapPattern,
-        ExtCall, NumRange, Substance, SubstanceFormat, SubstanceKind, SubstancePattern,
+        Call, CallKind, CallWithConfig, CallWithConfigDef, ExtCall, HttpCall, ListPattern,
+        MapPattern, NumRange, Substance, SubstanceFormat, SubstanceKind, SubstancePattern,
         SubstancePatternDef, SubstanceTypePatternDef,
     };
     use crate::util::{HttpMethodPattern, StringMatcher, ToResolved, ValueMatcher, ValuePattern};
@@ -49,13 +45,14 @@ pub mod selector {
     use nom::error::{context, ErrorKind, FromExternalError, ParseError, VerboseError};
     use nom::multi::separated_list0;
     use nom::sequence::{delimited, preceded, terminated, tuple};
-    use nom::{AsChar, Compare, IResult, InputLength, InputTake, InputTakeAtPosition, Parser};
+    use nom::{AsChar, Compare, InputLength, InputTake, InputTakeAtPosition, IResult, Parser};
     use nom_locate::LocatedSpan;
     use nom_supreme::error::ErrorTree;
     use nom_supreme::parser_ext::FromStrParser;
     use nom_supreme::{parse_from_str, ParserExt};
     use regex::Regex;
     use std::collections::HashMap;
+    use crate::id::{BaseKind, Kind, KindParts, Layer, Point, PointCtx, PointSeg, PointSegKind, PointVar, Port, RouteSeg, Specific, Sub, Tks, ToBaseKind, Topic, Variable, VarVal, Version};
 
     pub type KindSelector = KindSelectorDef<KindBaseSelector, SubKindSelector, SpecificSelector>;
     pub type KindSelectorVar = KindSelectorDef<

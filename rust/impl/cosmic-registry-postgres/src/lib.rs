@@ -8,10 +8,8 @@ use cosmic_universe::command::request::query::{Query, QueryResult};
 use cosmic_universe::command::request::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
 use cosmic_universe::command::request::set::Set;
 use cosmic_universe::error::UniErr;
-use cosmic_universe::id2::id::{
-    BaseKind, Kind, KindParts, Point, PointSeg, Specific, ToBaseKind, Version,
-};
-use cosmic_universe::id2::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, UserBaseSubKind};
+use cosmic_universe::id2::id::{};
+use cosmic_universe::id2::{BaseSubKind};
 use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
 use cosmic_universe::particle2::particle::{Details, Properties, Property, Status, Stub};
 use cosmic_universe::security::{Access, AccessGrant, AccessGrantKind, EnumeratedAccess, IndexedAccessGrant, Permissions, PermissionsMask, PermissionsMaskKind, Privilege, Privileges};
@@ -41,6 +39,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use strum::ParseError;
 use tokio::sync::mpsc;
+use cosmic_universe::id::{ArtifactSubKind, BaseKind, FileSubKind, Kind, KindParts, Point, PointSeg, Specific, StarKey, ToBaseKind, UserBaseSubKind, Version};
 use cosmic_universe::reg::Registration;
 
 #[macro_use]
@@ -1140,8 +1139,8 @@ pub mod test {
     use cosmic_universe::command::request::query::Query;
     use cosmic_universe::command::request::select::{Select, SelectIntoSubstance, SelectKind};
     use cosmic_universe::entity::request::select::SelectKind;
-    use cosmic_universe::id2::id::{Kind, Point, ToPoint};
-    use cosmic_universe::id2::{StarKey, UserBaseSubKind};
+    use cosmic_universe::id2::id::{};
+    use cosmic_universe::id2::{};
     use cosmic_universe::particle2::particle::Status;
     use cosmic_universe::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
@@ -1158,6 +1157,7 @@ pub mod test {
     use mesh_portal::version::latest::selector::{PointHierarchy, Selector};
     use std::convert::TryInto;
     use std::str::FromStr;
+    use cosmic_universe::id::{Kind, Point, StarKey, ToPoint, UserBaseSubKind};
 
     #[tokio::test]
     pub async fn test_nuke() -> Result<(), PostErr> {

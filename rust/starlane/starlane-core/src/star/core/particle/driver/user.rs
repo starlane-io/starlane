@@ -6,9 +6,8 @@ use crate::particle::property::{
 use crate::registry::match_kind;
 use crate::star::core::particle::driver::ParticleCoreDriver;
 use crate::star::StarSkel;
-use alcoholic_jwt::{token_kid, JWKS};
+use alcoholic_jwt::{JWKS, token_kid};
 use cosmic_universe::command::Command;
-use cosmic_universe::id2::id::{BaseKind, Kind};
 use cosmic_universe::parse::skewer_or_snake;
 use cosmic_universe::hyper::Assign;
 use http::StatusCode;
@@ -39,6 +38,7 @@ use std::future::Future;
 use std::str::FromStr;
 use std::sync::Arc;
 use validator::validate_email;
+use cosmic_universe::id::{BaseKind, Kind};
 
 #[derive(Clone)]
 pub struct UsernamePattern {}

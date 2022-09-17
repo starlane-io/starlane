@@ -5,7 +5,7 @@ use crate::message::delivery::Delivery;
 use crate::registry::match_kind;
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use cosmic_universe::id2::id::ToPoint;
+use cosmic_universe::id::ToPoint;
 use cosmic_universe::particle2::particle::Details;
 use cosmic_universe::hyper::{Location, ParticleRecord};
 use mesh_portal::version::latest::entity::request::create::{PointSegFactory, Template};

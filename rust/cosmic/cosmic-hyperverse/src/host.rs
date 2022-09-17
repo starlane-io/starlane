@@ -1,4 +1,4 @@
-use cosmic_universe::id2::Traversal;
+use cosmic_universe::id::Traversal;
 use cosmic_universe::log::PointLogger;
 use cosmic_universe::wave::{UltraWave, Wave};
 use cosmic_hyperlane::HyperwayInterchange;

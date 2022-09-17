@@ -465,9 +465,10 @@ impl From<&str> for Error {
 mod tests {
     use super::*;
     use std::time::Duration;
-    use cosmic_universe::id2::id::{Point, ToPort};
+    use cosmic_universe::id2::id::{};
     use cosmic_universe::log::RootLogger;
     use cosmic_hyperlane::test_util::{FAE, LESS, SingleInterchangePlatform, WaveTest};
+    use cosmic_universe::id::{Point, ToPort};
 
     #[tokio::test]
     async fn test() -> Result<(), Error> {

@@ -2,7 +2,7 @@ use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::path::Path;
 use std::str::{FromStr, Split};
 
-use cosmic_universe::id2::ArtifactSubKind;
+use cosmic_universe::id::ArtifactSubKind;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;

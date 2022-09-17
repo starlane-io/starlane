@@ -14,7 +14,7 @@ use tokio::time::Duration;
 use walkdir::WalkDir;
 
 use crate::error::Error;
-use cosmic_universe::id2::FileSubKind;
+use cosmic_universe::id::FileSubKind;
 
 use crate::util;
 use mesh_portal::version::latest::path::Path;

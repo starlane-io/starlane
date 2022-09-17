@@ -1,5 +1,5 @@
 use crate::error::UniErr;
-use crate::id2::id::Meta;
+use crate::id::Meta;
 use crate::substance2::substance::{Errors, Substance};
 use crate::util::ValueMatcher;
 use crate::wave::{DirectedCore, Method, ReflectedCore};

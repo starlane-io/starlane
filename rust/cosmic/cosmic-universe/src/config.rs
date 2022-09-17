@@ -1,6 +1,7 @@
 use std::ops::Deref;
-use crate::{BindConfig, Details, Point, Stub};
+use crate::{BindConfig, Details, Stub};
 use serde::{Serialize,Deserialize};
+use crate::id::Point;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PortalKind {
@@ -69,7 +70,6 @@ pub struct ParticleConfigBody {
 pub mod bind {
     use crate::command::request::Rc;
     use crate::error::{ParseErrs, UniErr};
-    use crate::id2::id::{Point, PointCtx, PointVar, Topic};
     use crate::substance2::substance::{Call, CallDef};
     use crate::substance2::substance::{Substance, SubstancePattern};
     use crate::wave::{
@@ -87,6 +87,7 @@ pub mod bind {
     use regex::Regex;
     use serde::{Deserialize, Serialize};
     use std::convert::TryInto;
+    use crate::id::{Point, PointCtx, PointVar, Topic};
 
     #[derive(Debug,Clone,Serialize,Deserialize)]
     pub enum WaveDirection {

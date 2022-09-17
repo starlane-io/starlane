@@ -1,4 +1,4 @@
-use cosmic_universe::id2::StarKey;
+use cosmic_universe::id::StarKey;
 lazy_static! {
     pub static ref REGISTRY_URL: String =
         std::env::var("REGISTRY_URL").unwrap_or("localhost".to_string());

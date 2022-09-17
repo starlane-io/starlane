@@ -23,10 +23,6 @@ use crate::command::request::get::{Get, GetOp, GetVar};
 use crate::command::request::select::{Select, SelectIntoSubstance, SelectKind, SelectVar};
 use crate::command::request::set::{Set, SetVar};
 use crate::error::{ParseErrs, UniErr};
-use crate::id2::id::{
-    Kind, KindLex, Layer, Point, PointCtx, PointKindVar, PointSegCtx, PointSegDelim, PointSegment,
-    PointSegVar, PointVar, Port, RouteSeg, RouteSegVar, Topic, Uuid, Variable, VarVal, Version,
-};
 use crate::security::{
     AccessGrantKind, AccessGrantKindDef, ChildPerms, ParticlePerms, Permissions, PermissionsMask,
     PermissionsMaskKind, Privilege,
@@ -3433,7 +3429,6 @@ pub mod model {
     };
     use crate::error::{ParseErrs, UniErr};
     use crate::http::HttpMethod;
-    use crate::id2::id::{Point, PointCtx, PointVar, Version};
     use crate::parse::error::result;
     use crate::parse::{
         camel_case_chars, CtxResolver, Env, filepath_chars, http_method, lex_child_scopes,
@@ -3457,6 +3452,7 @@ pub mod model {
     use std::ops::{Deref, DerefMut};
     use std::rc::Rc;
     use std::str::FromStr;
+    use crate::id::{Point, PointCtx, PointVar, Version};
 
     #[derive(Clone)]
     pub struct ScopeSelectorAndFiltersDef<S, I> {
@@ -4994,8 +4990,7 @@ use crate::config::bind::{
 };
 use crate::config::Document;
 use crate::http::HttpMethod;
-use crate::id2::id::{BaseKind, KindParts, PointKind, PointSeg, Specific};
-use crate::id2::{ArtifactSubKind, DatabaseSubKind, FileSubKind, StarKey, StarSub, UserBaseSubKind};
+use crate::id::{ArtifactSubKind, DatabaseSubKind, FileSubKind, KindParts, StarKey, StarSub, UserBaseSubKind};
 use crate::ext::ExtMethod;
 use crate::parse::error::{find_parse_err, result};
 use crate::parse::model::{
@@ -5028,6 +5023,7 @@ use cosmic_nom::{Res, Span, trim, tw, Wrap};
 use nom_supreme::error::ErrorTree;
 use nom_supreme::parser_ext::MapRes;
 use nom_supreme::{parse_from_str, ParserExt};
+use crate::id::{BaseKind, Kind, KindLex, Layer, Point, PointCtx, PointKind, PointKindVar, PointSeg, PointSegCtx, PointSegDelim, PointSegment, PointSegVar, PointVar, Port, RouteSeg, RouteSegVar, Specific, Topic, Uuid, Variable, VarVal, Version};
 
 fn inclusive_any_segment<I: Span>(input: I) -> Res<I, PointSegSelector> {
     alt((tag("+*"), tag("ROOT+*")))(input).map(|(next, _)| (next, PointSegSelector::InclusiveAny))
@@ -7058,7 +7054,7 @@ pub mod test {
     use crate::command::Command;
     use crate::config::Document;
     use crate::error::{ParseErrs, UniErr};
-    use crate::id2::id::{Point, PointCtx, PointSegVar, RouteSegVar};
+    use crate::id2::id::{};
     use crate::parse::error::result;
     use crate::parse::model::{
         BlockKind, DelimitedBlockKind, LexScope, NestedBlockKind, TerminatedBlockKind,
@@ -7082,6 +7078,7 @@ pub mod test {
     use std::rc::Rc;
     use std::str::FromStr;
     use std::sync::Arc;
+    use crate::id::{Point, PointCtx, PointSegVar, RouteSegVar};
 
     #[test]
     pub fn test_message_selector() {

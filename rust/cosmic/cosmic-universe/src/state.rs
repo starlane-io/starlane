@@ -1,7 +1,8 @@
 use std::sync::Arc;
 use dashmap::DashMap;
 use tokio::sync::RwLock;
-use crate::{Point, UniErr};
+use crate::{UniErr};
+use crate::id::Point;
 
 pub struct StateCache<C>
 where

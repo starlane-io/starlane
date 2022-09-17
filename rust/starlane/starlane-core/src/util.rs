@@ -27,7 +27,7 @@ use zip::write::FileOptions;
 
 use crate::error::Error;
 use crate::starlane::api::StarlaneApi;
-use cosmic_universe::id2::id::ToPort;
+use cosmic_universe::id::ToPort;
 use serde::Deserialize;
 
 lazy_static! {

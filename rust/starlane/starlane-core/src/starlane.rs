@@ -19,8 +19,8 @@ use mesh_portal::version::latest::path;
 use mesh_portal_api_server::Portal;
 
 use crate::artifact::ArtifactRef;
-use cosmic_universe::id2::id::ToPort;
-use cosmic_universe::id2::{MachineName, StarKey};
+use cosmic_universe::id::{MachineName, StarKey, ToPort};
+use cosmic_universe::id2::{};
 use cosmic_universe::wave::AsyncTransmitterWithAgent;
 use mesh_portal::version::latest::messaging::{Agent, RespShell};
 use serde::{Deserialize, Serialize};

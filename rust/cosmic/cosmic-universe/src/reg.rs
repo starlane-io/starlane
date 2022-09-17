@@ -1,4 +1,5 @@
-use crate::{Kind, Point, SetProperties, SetRegistry, Status, Strategy};
+use crate::{SetProperties, SetRegistry, Status, Strategy};
+use crate::id::{Kind, Point};
 
 #[derive(Clone)]
 pub struct Registration {

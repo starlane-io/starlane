@@ -30,7 +30,7 @@ use crate::lane::{
     UltimaLaneKey,
 };
 
-use crate::logger::{Flags, LogInfo, Logger};
+use crate::logger::{Flags, Logger, LogInfo};
 use crate::message::{
     MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage,
     ProtoStarMessageTo, TrackerJob,
@@ -51,8 +51,8 @@ use crate::star::variant::{FrameVerdict, VariantApi};
 use crate::starlane::StarlaneMachine;
 use crate::template::StarHandle;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
-use cosmic_universe::id2::id::{BaseKind, RouteSeg, ToPoint, ToPort};
-use cosmic_universe::id2::{ConstellationName, StarKey};
+use cosmic_universe::id2::id::{};
+use cosmic_universe::id2::{};
 use cosmic_universe::parse::error::result;
 use cosmic_universe::parse::lowercase_alphanumeric;
 use cosmic_universe::hyper::ParticleRecord;
@@ -77,6 +77,7 @@ use std::fmt;
 use std::future::Future;
 use std::num::ParseIntError;
 use std::str::FromStr;
+use cosmic_universe::id::{BaseKind, ConstellationName, RouteSeg, StarKey, ToPoint, ToPort};
 
 pub mod core;
 pub mod shell;

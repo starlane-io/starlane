@@ -4,8 +4,6 @@ use crate::{PlatErr, Platform, Registry};
 use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::request::create::{Create, KindTemplate, PointFactory, PointFactoryU64, PointSegTemplate, PointTemplate, Strategy, Template, TemplateDef};
 use cosmic_universe::error::UniErr;
-use cosmic_universe::id2::id::{BaseKind, Kind, Layer, Point, Port, ToPoint, ToPort};
-use cosmic_universe::id2::{StarSub, TraversalInjection};
 use cosmic_universe::substance2::substance::Substance;
 use cosmic_universe::hyper::{Assign, AssignmentKind, ControlPattern, Greet, InterchangeKind, Knock};
 use cosmic_universe::wave::Agent::Anonymous;
@@ -71,6 +69,7 @@ where
 use cosmic_universe::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::log::{RootLogger, Track, Tracker};
 use cosmic_universe::ext::ExtMethod;
+use cosmic_universe::id::{BaseKind, Kind, Layer, Point, Port, StarSub, ToPoint, ToPort, TraversalInjection};
 use cosmic_universe::parse::{CamelCase, route_attribute};
 use cosmic_universe::particle2::particle::{Details, Status, Stub};
 use cosmic_universe::quota::Timeouts;

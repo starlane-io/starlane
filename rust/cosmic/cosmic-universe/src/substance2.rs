@@ -11,7 +11,6 @@ pub mod substance {
     use crate::command::Command;
     use crate::error::{ParseErrs, UniErr};
     use crate::http::HttpMethod;
-    use crate::id2::id::{BaseKind, KindParts, Meta, Point, PointCtx, PointVar, Port};
     use crate::log::Log;
     use crate::ext::ExtMethod;
     use crate::parse::model::Subst;
@@ -31,6 +30,7 @@ pub mod substance {
     use std::str::FromStr;
     use std::sync::Arc;
     use crate::Details;
+    use crate::id::{BaseKind, KindParts, Meta, Point, PointCtx, PointVar, Port};
 
     #[derive(
         Debug,

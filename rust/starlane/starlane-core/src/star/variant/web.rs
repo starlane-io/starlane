@@ -16,7 +16,7 @@ use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner};
 use ascii::IntoAsciiString;
 use bytes::BytesMut;
-use cosmic_universe::id2::ArtifactSubKind;
+use cosmic_universe::id::ArtifactSubKind;
 use cosmic_universe::wave::AsyncTransmitterWithAgent;
 use handlebars::Handlebars;
 use http::header::{HeaderName, HOST};

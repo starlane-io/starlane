@@ -8,10 +8,6 @@ use cosmic_universe::command::common::{SetProperties, StateSrc};
 use cosmic_universe::command::request::create::{Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template};
 use cosmic_universe::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::error::UniErr;
-use cosmic_universe::id2::id::{
-    BaseKind, Kind, Layer, Point, Port, ToBaseKind, ToPoint, ToPort, TraversalLayer, Uuid,
-};
-use cosmic_universe::id2::{StarKey, StarSub, Traversal, TraversalInjection};
 use cosmic_universe::log::{PointLogger, Tracker};
 use cosmic_universe::parse::model::Subst;
 use cosmic_universe::parse::{bind_config, route_attribute};
@@ -36,6 +32,7 @@ use tokio::sync::oneshot::Receiver;
 use tokio::sync::watch::Ref;
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock, watch};
 use cosmic_universe::artifact::ArtRef;
+use cosmic_universe::id::{BaseKind, Kind, Layer, Point, Port, StarKey, StarSub, ToBaseKind, ToPoint, ToPort, Traversal, TraversalInjection, TraversalLayer, Uuid};
 use cosmic_universe::reg::Registration;
 use cosmic_universe::state::State;
 
@@ -924,7 +921,7 @@ impl<P> TraversalLayer for ItemOuter<P>
 where
     P: Platform,
 {
-    fn port(&self) -> cosmic_universe::id2::id::Port {
+    fn port(&self) -> cosmic_universe::id::Port {
         self.port.clone()
     }
 

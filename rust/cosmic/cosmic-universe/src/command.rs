@@ -16,7 +16,7 @@ use crate::substance2::substance::ChildSubstance;
 use crate::{Delete, Select, UniErr};
 use crate::util::ToResolved;
 use crate::wave::CmdMethod;
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
 
 pub mod common {
     use std::collections::HashMap;
@@ -26,7 +26,7 @@ pub mod common {
     use serde::{Deserialize, Serialize};
 
     use crate::error::UniErr;
-    use crate::id2::id::Variable;
+    use crate::id::Variable;
     use crate::parse::model::Var;
     use crate::substance2::substance::{Substance, SubstanceMap};
 
@@ -162,7 +162,6 @@ pub mod request {
     use crate::fail;
     use crate::fail::{BadRequest, Fail, NotFound};
     use crate::http::HttpMethod;
-    use crate::id2::id::{BaseKind, KindParts, Meta, Point};
     use crate::ext::ExtMethod;
     use crate::selector2::selector::KindSelector;
     use crate::substance2::substance::{Errors, Substance};
@@ -172,6 +171,7 @@ pub mod request {
     use http::status::InvalidStatusCode;
     use http::{HeaderMap, Request, StatusCode, Uri};
     use serde::{Deserialize, Serialize};
+    use crate::id::{BaseKind, KindParts, Meta, Point};
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub enum Rc {
@@ -256,10 +256,10 @@ pub mod request {
     pub mod set {
         use crate::command::common::SetProperties;
         use crate::error::UniErr;
-        use crate::id2::id::{Point, PointCtx, PointVar};
         use crate::parse::Env;
         use crate::util::ToResolved;
         use serde::{Deserialize, Serialize};
+        use crate::id::{Point, PointCtx, PointVar};
 
         pub type Set = SetDef<Point>;
         pub type SetCtx = SetDef<PointCtx>;
@@ -300,10 +300,10 @@ pub mod request {
     pub mod get {
         use crate::command::common::SetProperties;
         use crate::error::UniErr;
-        use crate::id2::id::{Point, PointCtx, PointVar};
         use crate::parse::Env;
         use crate::util::ToResolved;
         use serde::{Deserialize, Serialize};
+        use crate::id::{Point, PointCtx, PointVar};
 
         pub type Get = GetDef<Point>;
         pub type GetCtx = GetDef<PointCtx>;
@@ -359,10 +359,8 @@ pub mod request {
         use crate::command::common::{SetProperties, SetRegistry, StateSrc, StateSrcVar};
         use crate::command::Command;
         use crate::error::{ParseErrs, UniErr};
-        use crate::id2::id::{
-            BaseKind, HostKey, KindParts, Point, PointCtx, PointSeg, PointVar, ToPort,
-        };
         use crate::ext::ExtMethod;
+        use crate::id::{BaseKind, HostKey, KindParts, Point, PointCtx, PointSeg, PointVar, ToPort};
         use crate::parse::{CamelCase, Env, ResolverErr};
         use crate::parse::model::Subst;
         use crate::selector2::selector::SpecificSelector;
@@ -692,7 +690,7 @@ pub mod request {
 
         use crate::error::UniErr;
         use crate::fail::{BadCoercion, Fail};
-        use crate::id2::id::Point;
+        use crate::id::Point;
         use crate::parse::Env;
         use crate::particle2::particle::Stub;
         use crate::selector2::selector::{
@@ -896,7 +894,7 @@ pub mod request {
 
         use crate::command::common::SetProperties;
         use crate::error::UniErr;
-        use crate::id2::id::{Point, PointCtx, PointVar};
+        use crate::id::{Point, PointCtx, PointVar};
         use crate::parse::Env;
         use crate::substance2::substance::Substance;
         use crate::util::ToResolved;
@@ -932,11 +930,11 @@ pub mod request {
 
     pub mod read {
         use crate::error::UniErr;
-        use crate::id2::id::{Point, PointCtx, PointVar};
         use crate::parse::Env;
         use crate::substance2::substance::Substance;
         use crate::util::ToResolved;
         use serde::{Deserialize, Serialize};
+        use crate::id::{Point, PointCtx, PointVar};
 
         pub type Read = ReadDef<Point>;
         pub type ReadCtx = ReadDef<PointCtx>;

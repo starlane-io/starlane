@@ -1,5 +1,5 @@
 use crate::error::UniErr;
-use crate::id2::id::Meta;
+use crate::id::Meta;
 use crate::parse::camel_case_chars;
 use crate::parse::error::result;
 use crate::parse::model::MethodScopeSelector;

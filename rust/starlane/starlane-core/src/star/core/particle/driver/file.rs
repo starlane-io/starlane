@@ -13,8 +13,7 @@ use crate::star::core::particle::state::StateStore;
 use crate::star::StarSkel;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 
-use cosmic_universe::id2::id::{BaseKind, Kind};
-use cosmic_universe::id2::{ArtifactSubKind, FileSubKind};
+use cosmic_universe::id2::{};
 use cosmic_universe::wave::DirectedProto;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
 use mesh_portal::version::latest::entity::request::create::{
@@ -25,6 +24,7 @@ use mesh_portal::version::latest::id::{AddressAndKind, KindParts, Point};
 use mesh_portal::version::latest::messaging::ReqShell;
 use mesh_portal::version::latest::sys::Assign;
 use std::str::FromStr;
+use cosmic_universe::id::{ArtifactSubKind, BaseKind, FileSubKind, Kind};
 
 #[derive(Debug)]
 pub struct FileCoreManager {

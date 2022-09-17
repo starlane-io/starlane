@@ -2,7 +2,7 @@ use alloc::string::String;
 use serde::{Deserialize, Serialize};
 
 use crate::error::UniErr;
-use crate::id2::id::Specific;
+use crate::id::Specific;
 
 pub mod mesh {
     use alloc::string::String;
@@ -44,7 +44,7 @@ pub mod resource {
     use serde::{Deserialize, Serialize};
 
     use crate::fail::{Bad, BadCoercion, BadRequest, Conditional, Messaging, NotFound};
-    use crate::id2::id::Point;
+    use crate::id::Point;
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub enum Fail {

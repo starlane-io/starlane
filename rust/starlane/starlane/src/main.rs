@@ -3,9 +3,9 @@
 use chrono::{DateTime, Utc};
 use cosmic_universe::command::request::create::KindTemplate;
 use cosmic_universe::error::UniErr;
-use cosmic_universe::id2::id::{BaseKind, Kind, Specific, ToBaseKind};
+use cosmic_universe::id::{ArtifactSubKind, FileSubKind, MachineName, Specific, StarKey, StarSub, UserBaseSubKind};
 use cosmic_universe::id2::{
-    ArtifactSubKind, BaseSubKind, FileSubKind, MachineName, StarKey, StarSub, UserBaseSubKind,
+    BaseSubKind,
 };
 use cosmic_universe::property::{
     AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit,
@@ -30,6 +30,7 @@ use tokio::io;
 use tokio::runtime::Runtime;
 use uuid::Uuid;
 use cosmic_universe::artifact::ArtifactApi;
+use cosmic_universe::id::{BaseKind, Kind, ToBaseKind};
 
 #[macro_use]
 extern crate lazy_static;

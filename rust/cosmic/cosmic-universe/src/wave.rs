@@ -2,12 +2,9 @@ use crate::substance2::Bin;
 use crate::cli::RawCommand;
 use crate::command::Command;
 use crate::config::bind::RouteSelector;
-use crate::error::{UniErr, StatusErr};
+use crate::error::{StatusErr, UniErr};
 use crate::http::HttpMethod;
-use crate::id2::id::{
-    Layer, Point, PointSeg, Port, PortSelector, RouteSeg, Sub, ToPoint, ToPort, Topic, Uuid,
-};
-use crate::id2::StarKey;
+use crate::id::StarKey;
 use crate::log::{
     LogSpan, LogSpanEvent, PointLogger, RootLogger, SpanLogger, Spannable, Trackable, TrailSpanId,
 };
@@ -20,8 +17,8 @@ use crate::quota::Timeouts;
 use crate::security::{Permissions, Privilege, Privileges};
 use crate::selector2::selector::Selector;
 use crate::substance2::substance::{
-    Call, CallKind, CmdCall, Errors, HttpCall, ExtCall, MultipartFormBuilder, SubstanceKind,
-    HypCall, ToRequestCore, Token,
+    Call, CallKind, CmdCall, Errors, ExtCall, HttpCall, HypCall, MultipartFormBuilder,
+    SubstanceKind, Token, ToRequestCore,
 };
 use crate::substance2::substance::{Substance, ToSubstance};
 use crate::hyper::AssignmentKind;
@@ -45,6 +42,7 @@ use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use tokio::time::Instant;
 use crate::hyper::InterchangeKind::DefaultControl;
+use crate::id::{Layer, Point, PointSeg, Port, PortSelector, RouteSeg, Sub, Topic, ToPoint, ToPort, Uuid};
 
 #[derive(
     Debug,
