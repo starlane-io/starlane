@@ -77,7 +77,7 @@ base64 = "0.13.0"
 cosmic-nom={ path="../../cosmic/cosmic-nom"}
 cosmic-portal-cli={ path="../../cosmic/cosmic-portal-cli"}
 cosmic-macros={ path="../../cosmic/cosmic-macros"}
-cosmic-platform={ path= "../../cosmic/cosmic-platform" }
+cosmic-hyperverse={ path= "../../cosmic/cosmic-hyperverse" }
 cosmic-universe = { path= "../../cosmic/cosmic-universe" }
 cosmic-store ={ path= "../../cosmic/cosmic-store", default-features=true }
 

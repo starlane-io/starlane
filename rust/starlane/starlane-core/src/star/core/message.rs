@@ -27,7 +27,7 @@ use cosmic_universe::id::{ArtifactSubKind, FileSubKind, StarKey, UserBaseSubKind
 use cosmic_universe::particle::particle::Details;
 use cosmic_universe::sys::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
 use cosmic_locality::field::FieldEx;
-use cosmic_platform::RegistryApi;
+use cosmic_hyperverse::RegistryApi;
 use futures::StreamExt;
 use http::{HeaderMap, StatusCode, Uri};
 use mesh_portal::error::MsgErr;

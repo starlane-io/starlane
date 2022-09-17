@@ -29,9 +29,9 @@ use cosmic_universe::substance::substance::{Substance, SubstanceList, SubstanceM
 use cosmic_universe::sys::{Location, ParticleRecord};
 use cosmic_universe::util::ValuePattern;
 use cosmic_universe::{IndexedAccessGrant, Registration, HYPERUSER};
-use cosmic_platform::machine::MachineTemplate;
-use cosmic_platform::Platform;
-use cosmic_platform::{PlatErr, RegistryApi};
+use cosmic_hyperverse::machine::MachineTemplate;
+use cosmic_hyperverse::Platform;
+use cosmic_hyperverse::{PlatErr, RegistryApi};
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
@@ -1151,7 +1151,7 @@ pub mod test {
     };
     use cosmic_universe::selector::selector::{PointHierarchy, Selector};
     use cosmic_universe::Registration;
-    use cosmic_platform::RegistryApi;
+    use cosmic_hyperverse::RegistryApi;
     use mesh_portal::version::latest::entity::request::query::Query;
     use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoSubstance};
     use mesh_portal::version::latest::id::Point;

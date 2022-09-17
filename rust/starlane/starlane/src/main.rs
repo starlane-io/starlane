@@ -15,10 +15,10 @@ use cosmic_universe::substance::substance::Token;
 use cosmic_universe::{ArtifactApi, NoDiceArtifactFetcher};
 use cosmic_artifact::Artifacts;
 use cosmic_hyperlane::HyperGateSelector;
-use cosmic_platform::driver::DriversBuilder;
-use cosmic_platform::machine::{Machine, MachineTemplate};
-use cosmic_platform::Platform;
-use cosmic_platform::{Registry, RegistryApi};
+use cosmic_hyperverse::driver::DriversBuilder;
+use cosmic_hyperverse::machine::{Machine, MachineTemplate};
+use cosmic_hyperverse::Platform;
+use cosmic_hyperverse::{Registry, RegistryApi};
 use cosmic_registry_postgres::{
     PostErr, PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,

@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 cosmic-universe={ path= "../../cosmic/cosmic-universe" }
-cosmic-platform={ path="../../cosmic/cosmic-platform"}
+cosmic-hyperverse={ path= "../../cosmic/cosmic-hyperverse" }
 sqlx = { version = "0.5.11", features = [ "runtime-tokio-rustls", "postgres", "macros", "any" ] }
 tokio = { version = "1.15.0", features = ["full"] }
 serde = { version="1.0.69", features=['derive','rc'] }
