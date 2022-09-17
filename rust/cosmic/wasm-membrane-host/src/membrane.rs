@@ -1,11 +1,12 @@
+use std::ops::Deref;
 use std::sync::{Arc, RwLock, Weak};
 
-use crate::error::Error;
-use std::ops::Deref;
 use wasmer::{
-    imports, Array, ChainableNamedResolver, Function, ImportObject, Instance, Module,
-    NamedResolver, RuntimeError, WasmPtr, WasmerEnv,
+    Array, ChainableNamedResolver, Function, ImportObject, imports, Instance, Module,
+    NamedResolver, RuntimeError, WasmerEnv, WasmPtr,
 };
+
+use crate::error::Error;
 
 pub static VERSION: i32 = 1;
 

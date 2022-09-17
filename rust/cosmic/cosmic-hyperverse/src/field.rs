@@ -1,13 +1,16 @@
-use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::{HyperErr, Hyperverse};
+use std::str::FromStr;
+use std::sync::Arc;
+
+use http::Uri;
+
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar, WaveDirection};
 use cosmic_universe::err::{StatusErr, UniErr};
-use cosmic_universe::particle::traversal::{Traversal, TraversalLayer};
 use cosmic_universe::loc::{Layer, Point, Surface, ToPoint, ToSurface};
 use cosmic_universe::log::{PointLogger, Trackable};
-use cosmic_universe::parse::model::{MethodScope, PipelineSegmentVar, PipelineVar};
 use cosmic_universe::parse::{Env, RegexCapturesResolver};
+use cosmic_universe::parse::model::{MethodScope, PipelineSegmentVar, PipelineVar};
+use cosmic_universe::particle::traversal::{Traversal, TraversalLayer};
 use cosmic_universe::selector::{PayloadBlock, PayloadBlockVar};
 use cosmic_universe::substance::Substance;
 use cosmic_universe::util::ToResolved;
@@ -16,12 +19,12 @@ use cosmic_universe::wave::{
     Pong, ReflectedAggregate, Reflection,
     UltraWave, Wave, WaveKind,
 };
-use http::Uri;
-use std::str::FromStr;
-use std::sync::Arc;
 use cosmic_universe::wave::core::{Method, ReflectedCore};
 use cosmic_universe::wave::core::cmd::CmdMethod;
 use cosmic_universe::wave::exchange::{Exchanger, ProtoTransmitter, ProtoTransmitterBuilder};
+
+use crate::{HyperErr, Hyperverse};
+use crate::star::{HyperStarSkel, LayerInjectionRouter};
 
 pub struct Field<P>
 where

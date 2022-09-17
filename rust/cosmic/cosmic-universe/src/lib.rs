@@ -1,18 +1,51 @@
 #![allow(warnings)]
-//# ! [feature(unboxed_closures)]
-#[macro_use]
-extern crate lazy_static;
-
-#[macro_use]
-extern crate strum_macros;
 extern crate alloc;
+#[macro_use]
+extern crate async_trait;
 extern crate core;
 #[macro_use]
 extern crate enum_ordinalize;
+//# ! [feature(unboxed_closures)]
 #[macro_use]
-extern crate async_trait;
+extern crate lazy_static;
+#[macro_use]
+extern crate strum_macros;
 
+use core::str::FromStr;
+use std::cmp::Ordering;
+use std::ops::Deref;
+use std::sync::Arc;
+
+use ::http::StatusCode;
+use chrono::{DateTime, Utc};
+use dashmap::{DashMap, DashSet};
+use lru::LruCache;
 use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
+
+use artifact::ArtifactFetcher;
+use command::common::{SetProperties, SetRegistry};
+use command::direct::create::{KindTemplate, Strategy};
+use command::direct::delete::Delete;
+use command::direct::query::{Query, QueryResult};
+use command::direct::select::{Select, SubSelect};
+use config::bind::BindConfig;
+use config::Document;
+use kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind};
+use loc::{
+    Point, Surface,
+    Uuid,
+};
+use particle::{Details, Properties, Status, Stub};
+use selector::Selector;
+use substance::{Substance, SubstanceList, Token, ToSubstance};
+use substance::Bin;
+use wave::core::ReflectedCore;
+
+use crate::err::UniErr;
+use crate::hyper::ParticleRecord;
+use crate::security::{Access, AccessGrant};
+use crate::wave::Agent;
 
 pub mod artifact;
 pub mod command;
@@ -33,38 +66,6 @@ pub mod selector;
 pub mod substance;
 pub mod util;
 pub mod wave;
-
-use crate::err::UniErr;
-use crate::hyper::ParticleRecord;
-use crate::security::{Access, AccessGrant};
-use crate::wave::Agent;
-use ::http::StatusCode;
-use artifact::ArtifactFetcher;
-use chrono::{DateTime, Utc};
-use command::common::{SetProperties, SetRegistry};
-use command::direct::create::{KindTemplate, Strategy};
-use command::direct::delete::Delete;
-use command::direct::query::{Query, QueryResult};
-use command::direct::select::{Select, SubSelect};
-use config::bind::BindConfig;
-use config::Document;
-use core::str::FromStr;
-use dashmap::{DashMap, DashSet};
-use loc::{
-    Point, Specific, Surface,
-    Uuid,
-};
-use lru::LruCache;
-use particle::{Details, Properties, Status, Stub};
-use selector::Selector;
-use std::cmp::Ordering;
-use std::ops::Deref;
-use std::sync::Arc;
-use substance::Bin;
-use substance::{Substance, SubstanceList, Token, ToSubstance};
-use tokio::sync::RwLock;
-use kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, StarSub, UserBaseSubKind};
-use wave::core::ReflectedCore;
 
 lazy_static! {
     pub static ref VERSION: semver::Version = semver::Version::from_str("0.3.0").unwrap();

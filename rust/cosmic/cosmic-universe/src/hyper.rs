@@ -1,20 +1,22 @@
-use crate::err::UniErr;
-use crate::substance::Substance;
-use cosmic_macros_primitive::Autobox;
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 
+use serde::{Deserialize, Serialize};
+
+use cosmic_macros_primitive::Autobox;
+
+use crate::Agent;
 use crate::command::common::StateSrc;
+use crate::err::UniErr;
+use crate::kind::{Kind, KindParts, StarSub};
 use crate::loc::{Point, StarKey, Surface, ToPoint, ToSurface};
 use crate::log::Log;
 use crate::particle::{Details, Status, Stub};
+use crate::substance::Substance;
 use crate::wave::{
     Ping, Pong, ReflectedKind, ReflectedProto, ToRecipients,
     UltraWave, Wave, WaveId, WaveKind,
 };
-use crate::Agent;
-use serde::{Deserialize, Serialize};
-use crate::kind::{Kind, KindParts, StarSub};
 use crate::wave::core::{DirectedCore, ReflectedCore};
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::hyp::HypMethod;

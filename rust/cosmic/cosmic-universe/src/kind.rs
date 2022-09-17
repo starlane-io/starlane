@@ -1,14 +1,17 @@
 use core::str::FromStr;
-use nom::combinator::all_consuming;
+
 use convert_case::{Case, Casing};
-use cosmic_nom::new_span;
-use crate::{KindTemplate, Specific, UniErr};
-use crate::hyper::ChildRegistry;
-use crate::loc::{CONTROL_WAVE_TRAVERSAL_PLAN, MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, ProvisionAffinity, STAR_WAVE_TRAVERSAL_PLAN, StarKey, STD_WAVE_TRAVERSAL_PLAN, ToBaseKind};
-use crate::parse::{CamelCase, kind_parts, SkewerCase};
-use crate::selector::SpecificSelector;
+use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
+
+use cosmic_nom::new_span;
+
+use crate::{KindTemplate, UniErr};
+use crate::hyper::ChildRegistry;
+use crate::loc::{CONTROL_WAVE_TRAVERSAL_PLAN, MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, ProvisionAffinity, STAR_WAVE_TRAVERSAL_PLAN, StarKey, STD_WAVE_TRAVERSAL_PLAN, ToBaseKind, Version};
+use crate::parse::{CamelCase, Domain, kind_parts, SkewerCase};
 use crate::particle::traversal::TraversalPlan;
+use crate::selector::{Pattern, SpecificSelector, VersionReq};
 
 impl ToBaseKind for KindParts {
     fn to_base(&self) -> BaseKind {
@@ -613,5 +616,55 @@ pub struct StarStub {
 impl StarStub {
     pub fn new(key: StarKey, kind: StarSub) -> Self {
         Self { key, kind }
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
+pub struct Specific {
+    pub provider: Domain,
+    pub vendor: Domain,
+    pub product: SkewerCase,
+    pub variant: SkewerCase,
+    pub version: Version,
+}
+
+impl Specific {
+    pub fn to_selector(&self) -> SpecificSelector {
+        SpecificSelector::from_str(self.to_string().as_str()).unwrap()
+    }
+}
+
+impl ToString for Specific {
+    fn to_string(&self) -> String {
+        format!(
+            "{}:{}:{}:{}:{}",
+            self.provider,
+            self.vendor,
+            self.product,
+            self.variant,
+            self.version.to_string()
+        )
+    }
+}
+
+impl FromStr for Specific {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        todo!()
+    }
+}
+
+impl TryInto<SpecificSelector> for Specific {
+    type Error = UniErr;
+
+    fn try_into(self) -> Result<SpecificSelector, Self::Error> {
+        Ok(SpecificSelector {
+            provider: Pattern::Exact(self.provider),
+            vendor: Pattern::Exact(self.vendor),
+            product: Pattern::Exact(self.product),
+            variant: Pattern::Exact(self.variant),
+            version: VersionReq::from_str(self.version.to_string().as_str())?,
+        })
     }
 }

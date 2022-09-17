@@ -1,5 +1,18 @@
 #![allow(warnings)]
 
+use std::io;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::task::Poll;
+use std::time::Duration;
+
+use quinn::{
+    ClientConfig, Connecting, Connection, Endpoint, NewConnection, RecvStream, ServerConfig, VarInt,
+};
+use rustls::Error;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::{Receiver, Sender};
+
 use cosmic_hyperlane::{HyperGate, HyperGateSelector, VersionGate};
 use cosmic_universe::err::{StatusErr, UniErr};
 use cosmic_universe::frame::PrimitiveFrame;
@@ -7,19 +20,8 @@ use cosmic_universe::hyper::{HyperSubstance, Knock};
 use cosmic_universe::loc::{Point, ToSurface};
 use cosmic_universe::log::PointLogger;
 use cosmic_universe::substance::Substance;
-use cosmic_universe::wave::{DirectedProto, Pong, UltraWave, Wave};
 use cosmic_universe::VERSION;
-use quinn::{
-    ClientConfig, Connecting, Connection, Endpoint, NewConnection, RecvStream, ServerConfig, VarInt,
-};
-use rustls::Error;
-use std::io;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::task::Poll;
-use std::time::Duration;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::{Receiver, Sender};
+use cosmic_universe::wave::{DirectedProto, Pong, UltraWave, Wave};
 use cosmic_universe::wave::core::DirectedCore;
 use cosmic_universe::wave::core::hyp::HypMethod;
 
@@ -313,12 +315,15 @@ impl ConErr {
 
 #[cfg(test)]
 mod tests {
-    use crate::HyperServerQuic;
-    use cosmic_hyperlane::{HyperGateSelector, VersionGate};
-    use cosmic_universe::err::UniErr;
-    use dashmap::DashMap;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use std::sync::Arc;
+
+    use dashmap::DashMap;
+
+    use cosmic_hyperlane::{HyperGateSelector, VersionGate};
+    use cosmic_universe::err::UniErr;
+
+    use crate::HyperServerQuic;
 
     #[tokio::test]
     pub async fn test() -> Result<(), UniErr> {

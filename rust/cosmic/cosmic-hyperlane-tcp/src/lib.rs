@@ -1,3 +1,26 @@
+#[macro_use]
+extern crate async_trait;
+
+use std::io::{Empty, Read};
+use std::net::{SocketAddr, ToSocketAddrs};
+use std::pin::Pin;
+use std::str::FromStr;
+use std::string::FromUtf8Error;
+use std::sync::Arc;
+use std::time::Duration;
+
+use openssl::error::ErrorStack;
+use openssl::ssl::{Ssl, SslAcceptor, SslConnector, SslConnectorBuilder, SslFiletype, SslMethod};
+use rcgen::{Certificate, generate_simple_self_signed, RcgenError};
+use tokio::fs::File;
+use tokio::io;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream};
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf, ReadHalf, WriteHalf};
+use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::time::error::Elapsed;
+use tokio_openssl::SslStream;
+
 use cosmic_hyperlane::{
     HyperConnectionDetails, HyperConnectionStatus, HyperGate, HyperGateSelector, HyperwayEndpoint,
     HyperwayEndpointFactory, VersionGate,
@@ -6,29 +29,9 @@ use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::Knock;
 use cosmic_universe::log::PointLogger;
 use cosmic_universe::substance::Substance;
-use cosmic_universe::wave::{Ping, UltraWave, Wave};
 use cosmic_universe::VERSION;
-use openssl::error::ErrorStack;
-use openssl::ssl::{Ssl, SslAcceptor, SslConnector, SslConnectorBuilder, SslFiletype, SslMethod};
-use rcgen::{generate_simple_self_signed, Certificate, RcgenError};
-use std::io::{Empty, Read};
-use std::net::{SocketAddr, ToSocketAddrs};
-use std::pin::Pin;
-use std::str::FromStr;
-use std::string::FromUtf8Error;
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::fs::File;
-use tokio::io;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf, ReadHalf, WriteHalf};
-use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{broadcast, mpsc, oneshot};
-use tokio::time::error::Elapsed;
-use tokio_openssl::SslStream;
+use cosmic_universe::wave::{Ping, UltraWave, Wave};
 
-#[macro_use]
-extern crate async_trait;
 
 pub struct HyperlaneTcpClient {
     host: String,
@@ -591,11 +594,13 @@ impl From<&str> for Error {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use cosmic_hyperlane::test_util::{SingleInterchangePlatform, WaveTest, FAE, LESS};
+    use std::time::Duration;
+
+    use cosmic_hyperlane::test_util::{FAE, LESS, SingleInterchangePlatform, WaveTest};
     use cosmic_universe::loc::{Point, ToSurface};
     use cosmic_universe::log::RootLogger;
-    use std::time::Duration;
+
+    use super::*;
 
     #[tokio::test]
     async fn test() -> Result<(), Error> {

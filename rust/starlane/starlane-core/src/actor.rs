@@ -1,11 +1,9 @@
 use std::fmt;
-
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
-
 use crate::names::Name;
 
 pub type ActorSpecific = Name;

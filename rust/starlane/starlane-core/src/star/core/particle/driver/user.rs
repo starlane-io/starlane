@@ -1,3 +1,39 @@
+use std::collections::HashMap;
+use std::convert::TryInto;
+use std::env;
+use std::future::Future;
+use std::str::FromStr;
+use std::sync::Arc;
+
+use alcoholic_jwt::{JWKS, token_kid};
+use http::StatusCode;
+use keycloak::{KeycloakAdmin, KeycloakAdminToken, KeycloakError};
+use keycloak::types::{
+    CredentialRepresentation, ProtocolMapperRepresentation, RealmRepresentation, UserRepresentation,
+};
+use nom::AsBytes;
+use nom::combinator::all_consuming;
+use nom_supreme::final_parser::final_parser;
+use serde_json::{json, Value};
+use validator::validate_email;
+
+use cosmic_universe::command::Command;
+use cosmic_universe::hyper::Assign;
+use cosmic_universe::kind::{BaseKind, Kind};
+use cosmic_universe::parse::skewer_or_snake;
+use mesh_portal::version::latest::command::common::StateSrc;
+use mesh_portal::version::latest::entity::request::{Method, Rc};
+use mesh_portal::version::latest::entity::request::create::{Create, PointSegFactory};
+use mesh_portal::version::latest::entity::request::get::{Get, GetOp};
+use mesh_portal::version::latest::entity::request::select::Select;
+use mesh_portal::version::latest::entity::request::set::Set;
+use mesh_portal::version::latest::entity::response::RespCore;
+use mesh_portal::version::latest::http::HttpMethod;
+use mesh_portal::version::latest::id::Point;
+use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
+use mesh_portal::version::latest::particle::Stub;
+use mesh_portal::version::latest::payload::Substance;
+
 use crate::error::Error;
 use crate::particle::property::{
     AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPattern,
@@ -6,40 +42,6 @@ use crate::particle::property::{
 use crate::registry::match_kind;
 use crate::star::core::particle::driver::ParticleCoreDriver;
 use crate::star::StarSkel;
-use alcoholic_jwt::{token_kid, JWKS};
-use cosmic_universe::command::Command;
-use cosmic_universe::hyper::Assign;
-use cosmic_universe::loc::{};
-use cosmic_universe::parse::skewer_or_snake;
-use http::StatusCode;
-use keycloak::types::{
-    CredentialRepresentation, ProtocolMapperRepresentation, RealmRepresentation, UserRepresentation,
-};
-use keycloak::{KeycloakAdmin, KeycloakAdminToken, KeycloakError};
-use mesh_portal::version::latest::command::common::StateSrc;
-use mesh_portal::version::latest::entity::request::create::{Create, PointSegFactory};
-use mesh_portal::version::latest::entity::request::get::{Get, GetOp};
-use mesh_portal::version::latest::entity::request::select::Select;
-use mesh_portal::version::latest::entity::request::set::Set;
-use mesh_portal::version::latest::entity::request::{Method, Rc};
-use mesh_portal::version::latest::entity::response::RespCore;
-use mesh_portal::version::latest::http::HttpMethod;
-use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
-use mesh_portal::version::latest::particle::Stub;
-use mesh_portal::version::latest::payload::Substance;
-use nom::combinator::all_consuming;
-use nom::AsBytes;
-use nom_supreme::final_parser::final_parser;
-use serde_json::{json, Value};
-use std::collections::HashMap;
-use std::convert::TryInto;
-use std::env;
-use std::future::Future;
-use std::str::FromStr;
-use std::sync::Arc;
-use validator::validate_email;
-use cosmic_universe::kind::{BaseKind, Kind};
 
 #[derive(Clone)]
 pub struct UsernamePattern {}

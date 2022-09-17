@@ -1,18 +1,21 @@
-use http::{HeaderMap, StatusCode, Uri};
-use cosmic_macros_primitive::Autobox;
 use std::sync::Arc;
+
+use http::{HeaderMap, StatusCode, Uri};
+use serde::{Deserialize, Serialize};
+
+use cmd::CmdMethod;
+use cosmic_macros_primitive::Autobox;
+
 use crate::{Bin, Substance, Surface, ToSubstance, UniErr};
 use crate::command::Command;
 use crate::err::StatusErr;
 use crate::loc::ToSurface;
 use crate::substance::Errors;
 use crate::util::{ValueMatcher, ValuePattern};
+use crate::wave::{Bounce, Ping, Pong, ToRecipients, WaveId};
 use crate::wave::core::ext::ExtMethod;
 use crate::wave::core::http2::HttpMethod;
 use crate::wave::core::hyp::HypMethod;
-use crate::wave::{Bounce, Ping, Pong, ToRecipients, WaveId};
-use serde::{Deserialize, Serialize};
-use cmd::CmdMethod;
 
 pub mod ext;
 pub mod http2;

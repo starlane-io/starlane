@@ -1,11 +1,13 @@
 use alloc::string::String;
+
 use serde::{Deserialize, Serialize};
 
 use crate::err::UniErr;
-use crate::loc::Specific;
+use crate::kind::Specific;
 
 pub mod mesh {
     use alloc::string::String;
+
     use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -16,6 +18,7 @@ pub mod mesh {
 
 pub mod portal {
     use alloc::string::String;
+
     use serde::{Deserialize, Serialize};
 
     use crate::fail::{ext, http, resource};
@@ -31,6 +34,7 @@ pub mod portal {
 
 pub mod http {
     use alloc::string::String;
+
     use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,6 +45,7 @@ pub mod http {
 
 pub mod resource {
     use alloc::string::String;
+
     use serde::{Deserialize, Serialize};
 
     use crate::fail::{Bad, BadCoercion, BadRequest, Conditional, Messaging, NotFound};
@@ -79,6 +84,7 @@ pub mod resource {
 
 pub mod ext {
     use alloc::string::String;
+
     use serde::{Deserialize, Serialize};
 
     use crate::fail::{BadRequest, Conditional};

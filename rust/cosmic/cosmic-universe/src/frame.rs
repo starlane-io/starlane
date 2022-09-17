@@ -1,11 +1,12 @@
-use crate::hyper::Knock;
-use crate::wave::{Ping, Pong, UltraWave};
-use crate::UniErr;
 use core::str::FromStr;
+
 use nom::AsBytes;
 use semver::Version;
-
 use serde::{Deserialize, Serialize};
+
+use crate::hyper::Knock;
+use crate::UniErr;
+use crate::wave::{Ping, Pong, UltraWave};
 
 pub struct PrimitiveFrame {
     pub data: Vec<u8>,

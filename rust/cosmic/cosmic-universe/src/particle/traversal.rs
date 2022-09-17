@@ -1,7 +1,8 @@
 use std::ops::{Deref, DerefMut};
+
+use crate::{ParticleRecord, Point, Surface, UniErr};
 use crate::loc::Layer;
 use crate::log::{SpanLogger, Trackable};
-use crate::{ParticleRecord, Point, Surface, UniErr};
 use crate::wave::{DirectedWave, Ping, Pong, ReflectedWave, SingularDirectedWave, UltraWave, Wave};
 use crate::wave::exchange::Exchanger;
 

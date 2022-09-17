@@ -1,47 +1,47 @@
 use std::collections::HashMap;
+use std::convert::{TryFrom, TryInto};
+use std::future::Future;
 use std::str::FromStr;
-
+use std::sync::Arc;
 use std::thread;
 
-use url::Url;
-
-use crate::artifact::ArtifactRef;
-use crate::cache::ArtifactItem;
-use crate::error::Error;
-use crate::html::HTML;
-use crate::message::StarlaneMessenger;
-use crate::star::variant::web::parse::host_and_port;
-use crate::star::variant::{FrameVerdict, VariantCall};
-use crate::star::StarSkel;
-use crate::util::{AsyncProcessor, AsyncRunner};
 use ascii::IntoAsciiString;
 use bytes::BytesMut;
-use cosmic_universe::kind::ArtifactSubKind;
-use cosmic_universe::wave::AsyncTransmitterWithAgent;
 use handlebars::Handlebars;
-use http::header::{HeaderName, HOST};
 use http::{HeaderMap, HeaderValue, Response, Uri, Version};
+use http::header::{HeaderName, HOST};
 use httparse::{Header, Request};
-use mesh_portal::version::latest::bin::Bin;
-use mesh_portal::version::latest::entity::request::{Method, ReqCore};
-use mesh_portal::version::latest::http::HttpMethod;
-use mesh_portal::version::latest::id::{Meta, Point};
-use mesh_portal::version::latest::messaging;
-use mesh_portal::version::latest::payload::Substance;
 use nom::AsBytes;
 use nom_supreme::error::ErrorTree;
 use nom_supreme::final_parser::final_parser;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::convert::{TryFrom, TryInto};
-use std::future::Future;
-use std::sync::Arc;
 use tiny_http::{HeaderField, Server, StatusCode};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Runtime;
 use tokio::sync::{mpsc, oneshot};
+use url::Url;
+
+use cosmic_universe::kind::ArtifactSubKind;
+use cosmic_universe::wave::AsyncTransmitterWithAgent;
+use mesh_portal::version::latest::bin::Bin;
+use mesh_portal::version::latest::entity::request::{Method, ReqCore};
+use mesh_portal::version::latest::http::HttpMethod;
+use mesh_portal::version::latest::id::{Meta, Point};
+use mesh_portal::version::latest::messaging;
+use mesh_portal::version::latest::payload::Substance;
+
+use crate::artifact::ArtifactRef;
+use crate::cache::ArtifactItem;
+use crate::error::Error;
+use crate::html::HTML;
+use crate::message::StarlaneMessenger;
+use crate::star::StarSkel;
+use crate::star::variant::{FrameVerdict, VariantCall};
+use crate::star::variant::web::parse::host_and_port;
+use crate::util::{AsyncProcessor, AsyncRunner};
 
 lazy_static! {
 //    pub static ref DATA_DIR: Mutex<String> = Mutex::new("data".to_string());
@@ -222,11 +222,13 @@ async fn process_request(
 mod tests {}
 #[cfg(test)]
 mod test {
-    use crate::error::Error;
-    use crate::star::variant::web::parse::host_and_port;
-    use crate::star::variant::web::HostAndPort;
-    use cosmic_universe::span::new_span;
     use regex::Regex;
+
+    use cosmic_universe::span::new_span;
+
+    use crate::error::Error;
+    use crate::star::variant::web::HostAndPort;
+    use crate::star::variant::web::parse::host_and_port;
 
     #[test]
     pub async fn path_regex() -> Result<(), Error> {
@@ -267,18 +269,21 @@ pub struct HostAndPort {
 }
 
 pub mod parse {
-    use crate::star::variant::web::HostAndPort;
-    use cosmic_nom::Span;
-    use cosmic_universe::err::UniErr;
-    use cosmic_universe::parse::domain;
-    use cosmic_universe::parse::error::result;
+    use std::num::ParseIntError;
+    use std::str::FromStr;
+
     use nom::bytes::complete::{is_a, tag, take_while};
     use nom::character::is_digit;
     use nom::error::{ErrorKind, ParseError, VerboseError};
     use nom::sequence::tuple;
     use nom_supreme::error::ErrorTree;
-    use std::num::ParseIntError;
-    use std::str::FromStr;
+
+    use cosmic_nom::Span;
+    use cosmic_universe::err::UniErr;
+    use cosmic_universe::parse::domain;
+    use cosmic_universe::parse::error::result;
+
+    use crate::star::variant::web::HostAndPort;
 
     pub fn host_and_port<I: Span>(input: I) -> Result<HostAndPort, UniErr> {
         let input = input;

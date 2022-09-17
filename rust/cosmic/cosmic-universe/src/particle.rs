@@ -1,12 +1,19 @@
-use crate::loc::PointKind;
-use crate::parse::parse_alpha1_str;
-use crate::substance::Substance;
-use crate::Point;
-use cosmic_nom::{Res, Span};
-use nom::bytes::complete::tag;
-use serde::{Deserialize, Serialize};
+use core::str::FromStr;
 use std::collections::HashMap;
+
+use nom::bytes::complete::tag;
+use nom::combinator::all_consuming;
+use serde::{Deserialize, Serialize};
+
+use cosmic_nom::{new_span, Res, Span};
+
+use crate::{BaseKind, Point, UniErr};
 use crate::kind::{Kind, KindParts};
+use crate::loc::{PointCtx, PointVar};
+use crate::parse::{Env, parse_alpha1_str, point_and_kind};
+use crate::parse::error::result;
+use crate::substance::Substance;
+use crate::util::ToResolved;
 
 pub mod property;
 pub mod traversal;
@@ -153,37 +160,39 @@ pub mod particle {
     use nom::bytes::complete::{is_a, tag};
     use nom::character::complete::{alpha1, digit1};
     use nom::combinator::{not, recognize};
-    use nom::error::{ErrorKind, ParseError, VerboseError};
-    use nom::sequence::{delimited, tuple};
     use nom::CompareResult::Incomplete;
+    use nom::error::{ErrorKind, ParseError, VerboseError};
     use nom::Parser;
-    use nom_supreme::error::ErrorTree;
+    use nom::sequence::{delimited, tuple};
     use nom_supreme::{parse_from_str, ParserExt};
+    use nom_supreme::error::ErrorTree;
     use serde::{Deserialize, Serialize};
 
+    use cosmic_nom::{Res, Span};
+
     use crate::err::UniErr;
-    use crate::loc::{Point, PointKind};
+    use crate::kind::{BaseKind, Kind, KindParts};
+    use crate::loc::Point;
     use crate::parse::parse_alpha1_str;
+    use crate::particle::PointKind;
     use crate::security::Permissions;
     use crate::substance::{Substance, SubstanceMap};
-    use cosmic_nom::{Res, Span};
-    use crate::kind::{BaseKind, Kind, KindParts};
 
     /*
-    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-    pub struct StatusDetails<C>
-    where
-        C: Condition,
-    {
-        pub status: Status,
-        pub conditions: HashSet<C>,
-    }
+            #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+            pub struct StatusDetails<C>
+            where
+                C: Condition,
+            {
+                pub status: Status,
+                pub conditions: HashSet<C>,
+            }
 
-    pub trait Condition: ToString {
-        fn status(&self) -> Status;
-        fn desc(&self) -> String;
-    }
-     */
+            pub trait Condition: ToString {
+                fn status(&self) -> Status;
+                fn desc(&self) -> String;
+            }
+             */
 
     /*
     pub fn error_code<I:Span>(input: I) -> Res<I, Code> {
@@ -221,4 +230,69 @@ pub enum Aspect {
     State,
     Property,
     Child,
+}
+
+pub type PointKind = PointKindDef<Point>;
+pub type PointKindCtx = PointKindDef<PointCtx>;
+pub type PointKindVar = PointKindDef<PointVar>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub struct PointKindDef<Pnt> {
+    pub point: Pnt,
+    pub kind: Kind,
+}
+
+impl ToResolved<PointKindCtx> for PointKindVar {
+    fn to_resolved(self, env: &Env) -> Result<PointKindCtx, UniErr> {
+        Ok(PointKindCtx {
+            point: self.point.to_resolved(env)?,
+            kind: self.kind,
+        })
+    }
+}
+
+impl ToResolved<PointKind> for PointKindVar {
+    fn to_resolved(self, env: &Env) -> Result<PointKind, UniErr> {
+        Ok(PointKind {
+            point: self.point.to_resolved(env)?,
+            kind: self.kind,
+        })
+    }
+}
+
+impl ToResolved<PointKind> for PointKindCtx {
+    fn to_resolved(self, env: &Env) -> Result<PointKind, UniErr> {
+        Ok(PointKind {
+            point: self.point.to_resolved(env)?,
+            kind: self.kind,
+        })
+    }
+}
+
+impl PointKind {
+    pub fn new(point: Point, kind: Kind) -> Self {
+        Self { point, kind }
+    }
+}
+
+impl ToString for PointKind {
+    fn to_string(&self) -> String {
+        format!("{}<{}>", self.point.to_string(), self.kind.to_string())
+    }
+}
+
+impl FromStr for PointKind {
+    type Err = UniErr;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let point_and_kind: PointKindVar = result(all_consuming(point_and_kind)(new_span(s)))?;
+        let point_and_kind = point_and_kind.collapse()?;
+        Ok(point_and_kind)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub struct AddressAndType {
+    pub point: Point,
+    pub resource_type: BaseKind,
 }

@@ -1,8 +1,20 @@
 use std::convert::{TryFrom, TryInto};
+use std::str::FromStr;
 use std::sync::Arc;
 
 use clap::{App, AppSettings};
 use yaml_rust::Yaml;
+
+use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind};
+use cosmic_universe::wave::DirectedProto;
+use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
+use mesh_portal::version::latest::entity::request::{Method, Rc, ReqCore};
+use mesh_portal::version::latest::entity::request::create::{
+    Create, KindTemplate, PointSegFactory, PointTemplate, Strategy, Template,
+};
+use mesh_portal::version::latest::id::{AddressAndKind, KindParts, Point};
+use mesh_portal::version::latest::messaging::ReqShell;
+use mesh_portal::version::latest::sys::Assign;
 
 use crate::artifact::ArtifactRef;
 use crate::error::Error;
@@ -12,19 +24,6 @@ use crate::star::core::particle::driver::ParticleCoreDriver;
 use crate::star::core::particle::state::StateStore;
 use crate::star::StarSkel;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
-
-use cosmic_universe::loc::{};
-use cosmic_universe::wave::DirectedProto;
-use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
-use mesh_portal::version::latest::entity::request::create::{
-    Create, KindTemplate, PointSegFactory, PointTemplate, Strategy, Template,
-};
-use mesh_portal::version::latest::entity::request::{Method, Rc, ReqCore};
-use mesh_portal::version::latest::id::{AddressAndKind, KindParts, Point};
-use mesh_portal::version::latest::messaging::ReqShell;
-use mesh_portal::version::latest::sys::Assign;
-use std::str::FromStr;
-use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind};
 
 #[derive(Debug)]
 pub struct FileCoreManager {

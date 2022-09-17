@@ -1,7 +1,5 @@
-use mesh_portal::version::latest::command::common::StateSrc;
-use mesh_portal::version::latest::entity::request::create::KindTemplate;
-use std::collections::hash_map::RandomState;
 use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::RandomState;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::fmt::{Debug, Formatter};
@@ -12,41 +10,43 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
+use serde::{Deserialize, Serialize};
+use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot::Receiver;
+use tracing_futures::WithSubscriber;
+
 use cosmic_nom::new_span;
 use cosmic_universe::hyper::{AssignmentKind, ChildRegistry, Location};
-use cosmic_universe::loc::{StarKey, ToPoint};
-use cosmic_universe::loc::{ToBaseKind};
 use cosmic_universe::id2::BaseSubKind;
-use cosmic_universe::parse::{consume_kind, CamelCase};
+use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, UserBaseSubKind};
+use cosmic_universe::loc::{StarKey, ToPoint};
+use cosmic_universe::loc::ToBaseKind;
+use cosmic_universe::parse::{CamelCase, consume_kind};
 use cosmic_universe::particle::{Details, Property};
 use mesh_portal::error::MsgErr;
+use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::config::{ParticleConfigBody, PointConfig};
+use mesh_portal::version::latest::entity::request::create::KindTemplate;
 use mesh_portal::version::latest::id::{KindParts, Point, ResourceKind, Specific};
 use mesh_portal::version::latest::particle::{Status, Stub};
 use mesh_portal::version::latest::payload::Substance;
 use mesh_portal::version::latest::security::Permissions;
-use serde::{Deserialize, Serialize};
-use tokio::sync::oneshot::Receiver;
-use tokio::sync::{mpsc, oneshot};
-use tracing_futures::WithSubscriber;
-use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, UserBaseSubKind};
 
+use crate::{error, logger, util};
 use crate::config::config::ParticleConfig;
 use crate::error::Error;
 use crate::fail::Fail;
 use crate::file_access::FileAccess;
 use crate::frame::{ResourceHostAction, StarMessagePayload};
 use crate::logger::{elog, LogInfo, StaticLogInfo};
-use crate::{error, logger, util};
-
 use crate::message::{MessageExpect, ProtoStarMessage, ReplyKind};
 use crate::names::Name;
 use crate::particle::property::{
     AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit,
     PropertySource, U64Pattern,
 };
-use crate::star::core::particle::driver::user::UsernamePattern;
 use crate::star::{StarInfo, StarSkel};
+use crate::star::core::particle::driver::user::UsernamePattern;
 use crate::util::AsyncHashMap;
 
 pub mod artifact;

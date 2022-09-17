@@ -1,23 +1,29 @@
 #![allow(warnings)]
 
 #[macro_use]
-extern crate cosmic_macros;
-
-#[macro_use]
-extern crate lazy_static;
-
+extern crate async_recursion;
 #[macro_use]
 extern crate async_trait;
-
+#[macro_use]
+extern crate cosmic_macros;
+#[macro_use]
+extern crate lazy_static;
 #[macro_use]
 extern crate strum_macros;
 
-#[macro_use]
-extern crate async_recursion;
+use std::cmp::Ordering;
+use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
+use std::sync::Arc;
 
-use crate::driver::{DriverFactory, DriversBuilder};
-use crate::machine::{Machine, MachineApi, MachineTemplate};
 use chrono::{DateTime, Utc};
+use http::StatusCode;
+use tokio::io;
+use tokio::runtime::{Handle, Runtime};
+use tokio::sync::{mpsc, oneshot};
+use tracing::error;
+use uuid::Uuid;
+
 use cosmic_hyperlane::{HyperAuthenticator, HyperGate, HyperGateSelector, HyperwayEndpointFactory};
 use cosmic_universe::artifact::ArtifactApi;
 use cosmic_universe::command::common::{SetProperties, SetRegistry};
@@ -28,31 +34,24 @@ use cosmic_universe::command::direct::select::{Select, SubSelect};
 use cosmic_universe::err::UniErr;
 use cosmic_universe::fail::Timeout;
 use cosmic_universe::hyper::ParticleRecord;
+use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind};
 use cosmic_universe::loc::{
-    Layer, MachineName, Point, RouteSeg, Specific,
+    Layer, MachineName, Point, RouteSeg,
     StarKey, Surface, ToBaseKind, ToSurface,
 };
 use cosmic_universe::log::RootLogger;
 use cosmic_universe::particle::{Details, Properties, Status, Stub};
 use cosmic_universe::particle::property::PropertiesConfig;
-use cosmic_universe::settings::Timeouts;
-use cosmic_universe::security::IndexedAccessGrant;
 use cosmic_universe::security::{Access, AccessGrant};
+use cosmic_universe::security::IndexedAccessGrant;
 use cosmic_universe::selector::Selector;
+use cosmic_universe::settings::Timeouts;
 use cosmic_universe::substance::{Substance, SubstanceList, Token};
-use cosmic_universe::wave::UltraWave;
-use http::StatusCode;
-use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
-use std::str::FromStr;
-use std::sync::Arc;
-use tokio::io;
-use tokio::runtime::{Handle, Runtime};
-use tokio::sync::{mpsc, oneshot};
-use tracing::error;
-use uuid::Uuid;
-use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, StarSub, UserBaseSubKind};
 use cosmic_universe::wave::core::ReflectedCore;
+use cosmic_universe::wave::UltraWave;
+
+use crate::driver::{DriverFactory, DriversBuilder};
+use crate::machine::{Machine, MachineApi, MachineTemplate};
 
 pub mod control;
 pub mod driver;

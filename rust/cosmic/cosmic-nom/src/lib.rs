@@ -1,17 +1,19 @@
 #![allow(warnings)]
+
+use std::ops::{Deref, Range, RangeFrom, RangeTo};
+use std::sync::Arc;
+
+use nom::{
+    AsBytes, AsChar, Compare, CompareResult, FindSubstring, InputIter, InputLength, InputTake,
+    InputTakeAtPosition, IResult, Needed, Offset, Slice,
+};
 use nom::character::complete::multispace0;
 use nom::combinator::recognize;
 use nom::error::{ErrorKind, ParseError};
 use nom::sequence::delimited;
-use nom::{
-    AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength,
-    InputTake, InputTakeAtPosition, Needed, Offset, Slice,
-};
 use nom_locate::LocatedSpan;
 use nom_supreme::error::ErrorTree;
 use serde::{Deserialize, Serialize};
-use std::ops::{Deref, Range, RangeFrom, RangeTo};
-use std::sync::Arc;
 
 #[cfg(test)]
 mod tests {
@@ -468,9 +470,11 @@ impl FindSubstring<&str> for SliceStr {
 
 #[cfg(test)]
 pub mod test {
-    use crate::SliceStr;
-    use cosmic_nom::SliceStr;
     use nom::Slice;
+
+    use cosmic_nom::SliceStr;
+
+    use crate::SliceStr;
 
     #[test]
     pub fn test() {

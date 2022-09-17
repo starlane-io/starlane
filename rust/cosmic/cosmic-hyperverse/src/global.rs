@@ -1,23 +1,45 @@
-use crate::{DriverFactory, HyperErr, Hyperverse, Registry};
+use std::marker::PhantomData;
+use std::str::FromStr;
+use std::sync::Arc;
+
 use cosmic_nom::new_span;
 use cosmic_universe::artifact::ArtRef;
+use cosmic_universe::command::Command;
 use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::direct::create::{Create, PointSegTemplate, Strategy};
-use cosmic_universe::command::Command;
 use cosmic_universe::command::RawCommand;
+use cosmic_universe::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::err::UniErr;
+use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance};
+use cosmic_universe::HYPERUSER;
+use cosmic_universe::kind::Kind;
+use cosmic_universe::loc::{Layer, Point, Surface, ToPoint, ToSurface};
 use cosmic_universe::log::{PointLogger, RootLogger};
-use cosmic_universe::parse::error::result;
 use cosmic_universe::parse::{bind_config, command_line};
+use cosmic_universe::parse::error::result;
+use cosmic_universe::parse::route_attribute;
+use cosmic_universe::particle::{Details, Status};
+use cosmic_universe::substance::Substance;
 use cosmic_universe::util::{log, ToResolved};
 use cosmic_universe::wave::{
     Agent, DirectedProto, Handling, Pong,
     Scope, Wave,
 };
-use cosmic_universe::HYPERUSER;
-use std::marker::PhantomData;
-use std::str::FromStr;
-use std::sync::Arc;
+use cosmic_universe::wave::core::CoreBounce;
+use cosmic_universe::wave::core::hyp::HypMethod;
+use cosmic_universe::wave::core::ReflectedCore;
+use cosmic_universe::wave::exchange::{DirectedHandlerSelector, ProtoTransmitter, ProtoTransmitterBuilder, Router, SetStrategy};
+use cosmic_universe::wave::exchange::{DirectedHandler, Exchanger, InCtx};
+use cosmic_universe::wave::exchange::DirectedHandlerShell;
+use cosmic_universe::wave::exchange::RootInCtx;
+use cosmic_universe::wave::RecipientSelector;
+
+use crate::{DriverFactory, HyperErr, Hyperverse, Registry};
+use crate::driver::{
+    Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere,
+};
+use crate::Registration;
+use crate::star::HyperStarSkel;
 
 /*
 #[derive(DirectedHandler,Clone)]
@@ -28,26 +50,6 @@ pub struct Global<P> where P: Platform {
 
  */
 
-use crate::driver::{
-    Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere,
-};
-use crate::star::HyperStarSkel;
-use cosmic_universe::config::bind::{BindConfig, RouteSelector};
-use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance};
-use cosmic_universe::kind::Kind;
-use cosmic_universe::loc::{Layer, Point, Surface, ToPoint, ToSurface};
-use cosmic_universe::parse::route_attribute;
-use cosmic_universe::particle::{Details, Status};
-use crate::Registration;
-use cosmic_universe::substance::Substance;
-use cosmic_universe::wave::core::CoreBounce;
-use cosmic_universe::wave::exchange::{DirectedHandlerSelector, ProtoTransmitter, ProtoTransmitterBuilder, Router, SetStrategy};
-use cosmic_universe::wave::core::hyp::HypMethod;
-use cosmic_universe::wave::core::ReflectedCore;
-use cosmic_universe::wave::exchange::{DirectedHandler, Exchanger, InCtx};
-use cosmic_universe::wave::exchange::DirectedHandlerShell;
-use cosmic_universe::wave::RecipientSelector;
-use cosmic_universe::wave::exchange::RootInCtx;
 lazy_static! {
     static ref GLOBAL_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
         Arc::new(global_bind()),

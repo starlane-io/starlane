@@ -1,8 +1,10 @@
-use crate::error::Error;
-use crate::starlane::STARLANE_MECHTRON_PORT;
-use mesh_portal::version::latest::id::Point;
 use std::env;
 use std::process::{Child, Command};
+
+use mesh_portal::version::latest::id::Point;
+
+use crate::error::Error;
+use crate::starlane::STARLANE_MECHTRON_PORT;
 
 pub fn launch_mechtron_process(wasm_src: Point) -> Result<Child, Error> {
     let host = format!("localhost:{}", STARLANE_MECHTRON_PORT.to_string());

@@ -1,15 +1,16 @@
-use std::collections::hash_map::RandomState;
 use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::RandomState;
 use std::convert::TryInto;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 
-use cosmic_universe::loc::StarKey;
 use futures::future::select_all;
 use futures::FutureExt;
 use lru::LruCache;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
+
+use cosmic_universe::loc::StarKey;
 
 use crate::error::Error;
 use crate::frame::{Frame, ProtoFrame, StarMessage, StarPattern};
@@ -18,9 +19,9 @@ use crate::lane::{
     LaneWrapper, OnCloseAction, ProtoLaneEnd, UltimaLaneKey,
 };
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
+use crate::star::{ForwardFrame, StarCommand, StarSkel};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::shell::router::RouterCall;
-use crate::star::{ForwardFrame, StarCommand, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
 #[derive(Clone)]

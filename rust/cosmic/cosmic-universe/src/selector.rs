@@ -1,26 +1,29 @@
+use core::fmt::Formatter;
+use core::str::FromStr;
+use std::ops::Deref;
+
+use nom::combinator::all_consuming;
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::de::{Error, Visitor};
+
+use cosmic_nom::{new_span, Trace};
+use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
+
+use crate::{Point, UniErr};
+use crate::kind::{BaseKind, Kind, KindParts, Specific};
 use crate::loc::{
     Layer, PointCtx, PointSeg, PointVar, RouteSeg, ToBaseKind, Topic, Variable, VarVal,
     Version,
 };
-use crate::parse::error::result;
 use crate::parse::{
     CamelCase, consume_hierarchy, Env, point_segment_selector, point_selector, specific_selector,
 };
+use crate::parse::error::result;
 use crate::substance::{
     CallWithConfigDef, Substance, SubstanceFormat, SubstanceKind, SubstancePattern,
     SubstancePatternCtx, SubstancePatternDef,
 };
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
-use crate::{Point, Specific, UniErr};
-use core::fmt::Formatter;
-use core::str::FromStr;
-use cosmic_nom::{new_span, Trace};
-use nom::combinator::all_consuming;
-use serde::de::{Error, Visitor};
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
-use std::ops::Deref;
-use crate::kind::{BaseKind, Kind, KindParts};
 
 pub type KindSelector = KindSelectorDef<KindBaseSelector, SubKindSelector, SpecificSelector>;
 pub type KindSelectorVar =
@@ -542,12 +545,13 @@ impl ToString for SpecificSelector {
 }
 
 pub mod specific {
-    use crate::err::UniErr;
-    use crate::parse::{Domain, SkewerCase};
-    use crate::selector::Pattern;
     use alloc::string::String;
     use core::ops::Deref;
     use core::str::FromStr;
+
+    use crate::err::UniErr;
+    use crate::parse::{Domain, SkewerCase};
+    use crate::selector::Pattern;
 
     pub struct VersionReq {
         pub req: semver::VersionReq,

@@ -6,10 +6,11 @@
 extern crate quote;
 
 use proc_macro::TokenStream;
+
 use quote::quote;
 use quote::ToTokens;
+use syn::{Data, DeriveInput, parse_macro_input, PathArguments, Type};
 use syn::__private::TokenStream2;
-use syn::{parse_macro_input, Data, DeriveInput, PathArguments, Type};
 
 #[proc_macro_derive(Autobox)]
 pub fn autobox(item: TokenStream) -> TokenStream {

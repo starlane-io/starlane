@@ -1,12 +1,15 @@
-use crate::message::delivery::Delivery;
+use std::str::FromStr;
+
+use tokio::sync::mpsc;
+
 use cosmic_universe::loc::StarKey;
 use mesh_portal::version::latest::entity::request::create::{
     KindTemplate, PointSegFactory, PointTemplate, Template,
 };
 use mesh_portal::version::latest::id::{Point, RouteSegment};
 use mesh_portal::version::latest::messaging::{Message, ReqShell};
-use std::str::FromStr;
-use tokio::sync::mpsc;
+
+use crate::message::delivery::Delivery;
 
 lazy_static! {
     pub static ref HYPERUSER: &'static Point =

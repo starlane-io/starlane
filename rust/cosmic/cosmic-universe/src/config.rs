@@ -1,10 +1,12 @@
-pub mod bind;
+use std::ops::Deref;
 
+use serde::{Deserialize, Serialize};
+
+use crate::BindConfig;
 use crate::loc::Point;
 use crate::particle::{Details, Stub};
-use crate::BindConfig;
-use serde::{Deserialize, Serialize};
-use std::ops::Deref;
+
+pub mod bind;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PortalKind {

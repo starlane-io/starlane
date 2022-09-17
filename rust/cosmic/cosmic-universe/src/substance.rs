@@ -1,27 +1,30 @@
-use crate::command::{Command, RawCommand};
-use crate::err::ParseErrs;
-use crate::wave::core::ext::ExtMethod;
-use crate::wave::core::http2::HttpMethod;
-use crate::hyper::{Greet, HyperSubstance, Knock};
-use crate::loc::{Meta, PointCtx, PointVar};
-use crate::parse::model::Subst;
-use crate::parse::Env;
-use crate::particle::Particle;
-use crate::util::{ToResolved, ValueMatcher, ValuePattern};
-use crate::wave::{Pong, UltraWave};
-use crate::{Details, Point, Status, Stub, Surface, UniErr, util};
 use core::str::FromStr;
-use cosmic_macros_primitive::Autobox;
-use cosmic_nom::Tw;
-use http::header::CONTENT_TYPE;
-use http::{HeaderMap, HeaderValue};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+
+use http::{HeaderMap, HeaderValue};
+use http::header::CONTENT_TYPE;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+use cosmic_macros_primitive::Autobox;
+use cosmic_nom::Tw;
+
+use crate::{Details, Point, Status, Stub, Surface, UniErr, util};
+use crate::command::{Command, RawCommand};
+use crate::err::ParseErrs;
+use crate::hyper::{Greet, HyperSubstance, Knock};
+use crate::loc::{Meta, PointCtx, PointVar};
+use crate::parse::Env;
+use crate::parse::model::Subst;
+use crate::particle::Particle;
+use crate::util::{ToResolved, ValueMatcher, ValuePattern};
+use crate::wave::{Pong, UltraWave};
 use crate::wave::core::{DirectedCore, ReflectedCore};
 use crate::wave::core::cmd::CmdMethod;
+use crate::wave::core::ext::ExtMethod;
+use crate::wave::core::http2::HttpMethod;
 use crate::wave::core::hyp::HypMethod;
 
 #[derive(

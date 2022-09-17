@@ -3,6 +3,7 @@ use std::fmt::{Debug, Formatter};
 use std::io;
 use std::string::FromUtf8Error;
 use std::sync::PoisonError;
+
 use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
 
 #[derive(Debug, Clone)]

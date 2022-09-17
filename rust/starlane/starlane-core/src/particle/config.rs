@@ -1,5 +1,6 @@
-use mesh_portal::version::latest::bin::Bin;
 use std::sync::Arc;
+
+use mesh_portal::version::latest::bin::Bin;
 
 use crate::artifact::ArtifactRef;
 use crate::cache::Cacheable;

@@ -1,7 +1,9 @@
-use crate::{MechtronFactory, MechtronWrapper};
-use bincode::ErrorKind;
 use std::collections::HashMap;
 use std::sync::{Arc, PoisonError, RwLockReadGuard, RwLockWriteGuard};
+
+use bincode::ErrorKind;
+
+use crate::{MechtronFactory, MechtronWrapper};
 
 pub struct Error {
     pub message: String,
