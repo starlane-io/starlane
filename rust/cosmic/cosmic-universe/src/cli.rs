@@ -13,39 +13,3 @@ use crate::substance2::substance::Substance;
 use crate::util::ToResolved;
 use cosmic_nom::{new_span, Trace};
 use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CommandTemplate {
-    pub line: String,
-    pub transfers: Vec<Trace>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct RawCommand {
-    pub line: String,
-    pub transfers: Vec<Transfer>,
-}
-
-impl RawCommand {
-    pub fn new(line: String) -> Self {
-        Self {
-            line,
-            transfers: vec![],
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct Transfer {
-    pub id: String,
-    pub content: Bin,
-}
-
-impl Transfer {
-    pub fn new<N: ToString>(id: N, content: Bin) -> Self {
-        Self {
-            id: id.to_string(),
-            content,
-        }
-    }
-}

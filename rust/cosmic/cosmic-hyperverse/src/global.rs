@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::str::FromStr;
 use crate::{DriverFactory, PlatErr, Platform, Registry};
-use cosmic_universe::cli::RawCommand;
+use cosmic_universe::command::RawCommand;
 use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::request::create::{Create, PointSegTemplate, Strategy};
 use cosmic_universe::command::Command;

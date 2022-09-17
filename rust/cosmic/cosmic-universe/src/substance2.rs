@@ -6,7 +6,7 @@ pub mod substance {
     use std::ops::{Deref, DerefMut};
 
     use crate::substance2::Bin;
-    use crate::cli::RawCommand;
+    use crate::command::RawCommand;
     use crate::command::request::{Rc, RcCommandType};
     use crate::command::Command;
     use crate::error::{ParseErrs, UniErr};

@@ -10,7 +10,7 @@ use crate::shell::Shell;
 use crate::state::ShellState;
 use crate::{DriversBuilder, PlatErr, Platform, Registry, RegistryApi};
 use cosmic_universe::substance2::Bin;
-use cosmic_universe::cli::RawCommand;
+use cosmic_universe::command::RawCommand;
 use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::request::create::{Create, Strategy};
 use cosmic_universe::command::request::set::Set;

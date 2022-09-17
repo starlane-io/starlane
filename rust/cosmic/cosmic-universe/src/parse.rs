@@ -4981,7 +4981,7 @@ use nom_locate::LocatedSpan;
 
 use crate::substance2::Bin;
 use crate::cli;
-use crate::cli::RawCommand;
+use crate::command::RawCommand;
 use crate::command::request::RcCommandType;
 use crate::command::CommandVar;
 use crate::config::bind::{

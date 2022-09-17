@@ -1,7 +1,7 @@
 use core::str::FromStr;
 
 use cosmic_macros_primitive::Autobox;
-use cosmic_nom::new_span;
+use cosmic_nom::{new_span, Trace};
 use nom::combinator::all_consuming;
 use request::create::{Create, CreateCtx, CreateVar};
 use request::delete::{DeleteCtx, DeleteVar};
@@ -13,7 +13,7 @@ use request::update::{Update, UpdateCtx, UpdateVar};
 use crate::parse::{command_line, Env};
 use crate::parse::error::result;
 use crate::substance2::substance::ChildSubstance;
-use crate::{Delete, Select, UniErr};
+use crate::{Bin, Delete, Select, UniErr};
 use crate::util::ToResolved;
 use crate::wave::CmdMethod;
 use serde::{Deserialize, Serialize};
@@ -1092,5 +1092,41 @@ impl ToResolved<Command> for CommandCtx {
             CommandCtx::Update(update) => Command::Update(update.to_resolved(env)?),
             CommandCtx::Read(read) => Command::Read(read.to_resolved(env)?),
         })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommandTemplate {
+    pub line: String,
+    pub transfers: Vec<Trace>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct RawCommand {
+    pub line: String,
+    pub transfers: Vec<Transfer>,
+}
+
+impl RawCommand {
+    pub fn new(line: String) -> Self {
+        Self {
+            line,
+            transfers: vec![],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Transfer {
+    pub id: String,
+    pub content: Bin,
+}
+
+impl Transfer {
+    pub fn new<N: ToString>(id: N, content: Bin) -> Self {
+        Self {
+            id: id.to_string(),
+            content,
+        }
     }
 }

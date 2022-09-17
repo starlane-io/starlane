@@ -20,7 +20,7 @@ use std::time::Duration;
 use dashmap::mapref::one::Ref;
 use tokio::sync::{mpsc, Mutex, oneshot, RwLock};
 use cosmic_universe::artifact::ArtRef;
-use cosmic_universe::cli::RawCommand;
+use cosmic_universe::command::RawCommand;
 
 pub struct ControlDriverFactory<P>
 where

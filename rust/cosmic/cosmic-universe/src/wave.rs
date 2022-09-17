@@ -1,5 +1,5 @@
 use crate::substance2::Bin;
-use crate::cli::RawCommand;
+use crate::command::RawCommand;
 use crate::command::Command;
 use crate::config::bind::RouteSelector;
 use crate::error::{StatusErr, UniErr};

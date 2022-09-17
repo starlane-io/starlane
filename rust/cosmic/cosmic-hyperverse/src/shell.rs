@@ -1,7 +1,7 @@
 use crate::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
 use crate::state::ShellState;
 use crate::{PlatErr, Platform};
-use cosmic_universe::cli::RawCommand;
+use cosmic_universe::command::RawCommand;
 use cosmic_universe::command::Command;
 use cosmic_universe::config::bind::RouteSelector;
 use cosmic_universe::error::UniErr;
