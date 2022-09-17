@@ -1,6 +1,6 @@
 use crate::star::{LayerInjectionRouter, HyperStarSkel};
 use crate::{PlatErr, Platform};
-use cosmic_universe::config2::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar, WaveDirection};
+use cosmic_universe::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar, WaveDirection};
 use cosmic_universe::error::{UniErr, StatusErr};
 use cosmic_universe::id2::id::{Layer, Point, Port, ToPoint, ToPort, TraversalLayer};
 use cosmic_universe::id2::Traversal;

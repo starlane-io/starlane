@@ -15,7 +15,6 @@ extern crate async_trait;
 use serde::{Deserialize, Serialize};
 
 pub mod cli;
-pub mod config2;
 pub mod error;
 pub mod frame2;
 pub mod http;
@@ -40,6 +39,7 @@ pub mod fail;
 pub mod reg;
 pub mod mount;
 pub mod command;
+pub mod config;
 
 
 use substance2::Bin;
@@ -48,8 +48,8 @@ use command::request::create::{KindTemplate, Strategy};
 use command::request::delete::Delete;
 use command::request::query::{Query, QueryResult};
 use command::request::select::{Select, SubSelect};
-use crate::config2::config::bind::BindConfig;
-use crate::config2::config::Document;
+use config::bind::BindConfig;
+use config::Document;
 use crate::error::UniErr;
 use crate::id2::id::{BaseKind, Kind, Point, Port, Specific, Uuid};
 use crate::id2::{ArtifactSubKind, FileSubKind, StarSub, UserBaseSubKind};

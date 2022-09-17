@@ -32,7 +32,7 @@ pub struct Global<P> where P: Platform {
 
 use crate::driver::{Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere};
 use crate::star::HyperStarSkel;
-use cosmic_universe::config2::config::bind::{BindConfig, RouteSelector};
+use cosmic_universe::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::parse::route_attribute;
 use cosmic_universe::substance2::substance::Substance;
 use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance};

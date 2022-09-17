@@ -3,7 +3,7 @@ use crate::state::ShellState;
 use crate::{PlatErr, Platform};
 use cosmic_universe::cli::RawCommand;
 use cosmic_universe::command::Command;
-use cosmic_universe::config2::config::bind::RouteSelector;
+use cosmic_universe::config::bind::RouteSelector;
 use cosmic_universe::error::UniErr;
 use cosmic_universe::id2::id::{
     Layer, Point, Port, PortSelector, ToPoint, ToPort, Topic, TraversalLayer, Uuid,

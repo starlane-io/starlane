@@ -42,7 +42,7 @@ pub mod id {
     use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
     use tokio::sync::{mpsc, oneshot};
 
-    use crate::config2::config::bind::RouteSelector;
+    use crate::config::bind::RouteSelector;
     use crate::error::{ParseErrs, UniErr};
     use crate::id2::id::PointSegCtx::Working;
     use crate::id2::{

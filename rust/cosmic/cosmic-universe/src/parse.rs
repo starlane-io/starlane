@@ -3427,7 +3427,7 @@ pub fn method_kind<I: Span>(input: I) -> Res<I, MethodKind> {
 
 pub mod model {
     use crate::command::request::RcCommandType;
-    use crate::config2::config::bind::{
+    use crate::config::bind::{
         BindConfig, PipelineStepCtx, PipelineStepDef, PipelineStepVar, PipelineStopCtx,
         PipelineStopDef, PipelineStopVar, WaveDirection,
     };
@@ -4988,11 +4988,11 @@ use crate::cli;
 use crate::cli::RawCommand;
 use crate::command::request::RcCommandType;
 use crate::command::CommandVar;
-use crate::config2::config::bind::{
+use crate::config::bind::{
     BindConfig, Pipeline, PipelineStep, PipelineStepCtx, PipelineStepVar, PipelineStop,
     PipelineStopCtx, PipelineStopVar, RouteSelector, WaveDirection,
 };
-use crate::config2::config::Document;
+use crate::config::Document;
 use crate::http::HttpMethod;
 use crate::id2::id::{BaseKind, KindParts, PointKind, PointSeg, Specific};
 use crate::id2::{ArtifactSubKind, DatabaseSubKind, FileSubKind, StarKey, StarSub, UserBaseSubKind};
@@ -7056,7 +7056,7 @@ pub mod test {
         PointSegTemplate, PointTemplate, PointTemplateCtx, Template,
     };
     use crate::command::Command;
-    use crate::config2::config::Document;
+    use crate::config::Document;
     use crate::error::{ParseErrs, UniErr};
     use crate::id2::id::{Point, PointCtx, PointSegVar, RouteSegVar};
     use crate::parse::error::result;

@@ -15,7 +15,7 @@ use cosmic_universe::cli::RawCommand;
 use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::request::create::{Create, Strategy};
 use cosmic_universe::command::request::set::Set;
-use cosmic_universe::config2::config::bind::{BindConfig, RouteSelector};
+use cosmic_universe::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::error::UniErr;
 use cosmic_universe::id2::id::{BaseKind, GLOBAL_EXEC, Kind, Layer, LOCAL_STAR, Point, Port, PortSelector, RouteSeg, Sub, ToBaseKind, Topic, ToPoint, ToPort, TraversalLayer, Uuid};
 use cosmic_universe::id2::{StarKey, StarStub, StarSub, TraversalInjection};

@@ -1,7 +1,7 @@
 use crate::substance2::Bin;
 use crate::cli::RawCommand;
 use crate::command::Command;
-use crate::config2::config::bind::RouteSelector;
+use crate::config::bind::RouteSelector;
 use crate::error::{UniErr, StatusErr};
 use crate::http::HttpMethod;
 use crate::id2::id::{

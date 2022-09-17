@@ -68,7 +68,7 @@ where
 }
 
 
-use cosmic_universe::config2::config::bind::{BindConfig, RouteSelector};
+use cosmic_universe::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::log::{RootLogger, Track, Tracker};
 use cosmic_universe::ext::ExtMethod;
 use cosmic_universe::parse::{CamelCase, route_attribute};
