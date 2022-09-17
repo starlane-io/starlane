@@ -12,7 +12,7 @@ use cosmic_universe::property::{
     PropertySource, U64Pattern, UsernamePattern,
 };
 use cosmic_universe::substance::substance::Token;
-use cosmic_universe::{ArtifactApi, NoDiceArtifactFetcher};
+use cosmic_universe::artifact::NoDiceArtifactFetcher;
 use cosmic_artifact::Artifacts;
 use cosmic_hyperlane::HyperGateSelector;
 use cosmic_hyperverse::driver::DriversBuilder;
@@ -29,6 +29,7 @@ use std::sync::Arc;
 use tokio::io;
 use tokio::runtime::Runtime;
 use uuid::Uuid;
+use cosmic_universe::artifact::ArtifactApi;
 
 #[macro_use]
 extern crate lazy_static;

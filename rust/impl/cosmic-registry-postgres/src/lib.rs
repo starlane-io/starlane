@@ -14,10 +14,7 @@ use cosmic_universe::id::id::{
 use cosmic_universe::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, UserBaseSubKind};
 use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
 use cosmic_universe::particle::particle::{Details, Properties, Property, Status, Stub};
-use cosmic_universe::security::{
-    Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask,
-    PermissionsMaskKind, Privilege, Privileges,
-};
+use cosmic_universe::security::{Access, AccessGrant, AccessGrantKind, EnumeratedAccess, IndexedAccessGrant, Permissions, PermissionsMask, PermissionsMaskKind, Privilege, Privileges};
 use cosmic_universe::selector::selector::specific::{
     ProductSelector, ProviderSelector, VariantSelector, VendorSelector,
 };
@@ -28,7 +25,7 @@ use cosmic_universe::selector::selector::{
 use cosmic_universe::substance::substance::{Substance, SubstanceList, SubstanceMap};
 use cosmic_universe::hyper::{Location, ParticleRecord};
 use cosmic_universe::util::ValuePattern;
-use cosmic_universe::{IndexedAccessGrant, Registration, HYPERUSER};
+use cosmic_universe::HYPERUSER;
 use cosmic_hyperverse::machine::MachineTemplate;
 use cosmic_hyperverse::Platform;
 use cosmic_hyperverse::{PlatErr, RegistryApi};
@@ -44,6 +41,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use strum::ParseError;
 use tokio::sync::mpsc;
+use cosmic_universe::reg::Registration;
 
 #[macro_use]
 extern crate lazy_static;
@@ -1150,7 +1148,7 @@ pub mod test {
         Privilege,
     };
     use cosmic_universe::selector::selector::{PointHierarchy, Selector};
-    use cosmic_universe::Registration;
+    use cosmic_universe::reg::Registration;
     use cosmic_hyperverse::RegistryApi;
     use mesh_portal::version::latest::entity::request::query::Query;
     use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoSubstance};

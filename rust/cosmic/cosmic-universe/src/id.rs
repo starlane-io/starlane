@@ -4,7 +4,7 @@ use crate::id::id::{
 };
 use crate::log::{SpanLogger, Trackable};
 use crate::parse::error::result;
-use crate::parse::{parse_star_key, CamelCase};
+use crate::parse::{CamelCase, parse_star_key};
 use crate::particle::particle::Stub;
 use crate::substance::substance::Substance;
 use crate::hyper::{ChildRegistry, ParticleRecord};
@@ -37,32 +37,33 @@ pub mod id {
     use std::str::FromStr;
     use std::sync::Arc;
 
-    use cosmic_nom::{new_span, tw, Res, Span, SpanExtra, Trace, Tw};
+    use cosmic_nom::{new_span, Res, Span, SpanExtra, Trace, tw, Tw};
     use serde::de::Visitor;
     use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
     use tokio::sync::{mpsc, oneshot};
 
     use crate::config::config::bind::RouteSelector;
-    use crate::error::{UniErr, ParseErrs};
+    use crate::error::{ParseErrs, UniErr};
     use crate::id::id::PointSegCtx::Working;
     use crate::id::{
-        ArtifactSubKind,  DatabaseSubKind, FileSubKind, StarSub, Traversal,
+        ArtifactSubKind, DatabaseSubKind, FileSubKind, StarSub, Traversal,
         TraversalDirection, TraversalInjection, UserBaseSubKind,
     };
     use crate::log::{PointLogger, Trackable};
     use crate::parse::{
-        camel_case, camel_case_chars, consume_point, consume_point_ctx, kind_lex, kind_parts,
-        parse_uuid, point_and_kind, point_route_segment, point_selector, point_var, uuid_chars,
-        CamelCase, Ctx, CtxResolver, Domain, Env, ResolverErr, SkewerCase, VarResolver,
+        camel_case, camel_case_chars, CamelCase, consume_point, consume_point_ctx, Ctx,
+        CtxResolver, Domain, Env, kind_lex, kind_parts, parse_uuid,
+        point_and_kind, point_route_segment, point_selector, point_var, ResolverErr, SkewerCase, uuid_chars, VarResolver,
     };
     use crate::{cosmic_uuid, KindTemplate, parse};
-    use crate::{Agent, State, ANONYMOUS, HYPERUSER};
+    use crate::{Agent, ANONYMOUS, HYPERUSER};
 
     use crate::parse::error::result;
     use crate::selector::selector::{
         Pattern, PointHierarchy, Selector, SpecificSelector, VersionReq,
     };
     use crate::hyper::Location::Central;
+    use crate::state::State;
     use crate::util::{ToResolved, ValueMatcher, ValuePattern};
     use crate::wave::{DirectedWave, Exchanger, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave, ToRecipients, UltraWave, Wave, WaveKind};
 

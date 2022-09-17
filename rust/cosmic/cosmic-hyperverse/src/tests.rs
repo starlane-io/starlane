@@ -9,12 +9,12 @@ use cosmic_universe::id::id::{Layer, ToPoint, ToPort, Uuid};
 use cosmic_universe::id::{StarHandle, TraversalDirection};
 use cosmic_universe::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
 use cosmic_universe::ext::ExtMethod;
-use cosmic_universe::hyper::{Assign, AssignmentKind, InterchangeKind, Knock, HyperSubstance};
+use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance, InterchangeKind, Knock};
 use cosmic_universe::wave::{
-    Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Method, Pong,
-    ProtoTransmitterBuilder, HypMethod, Wave,
+    Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, HypMethod, Method,
+    Pong, ProtoTransmitterBuilder, Wave,
 };
-use cosmic_universe::{MountKind, NoDiceArtifactFetcher, HYPERUSER};
+use cosmic_universe::HYPERUSER;
 use cosmic_hyperlane::{AnonHyperAuthenticator, HyperClient, HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperwayEndpoint, HyperwayStub, LocalHyperwayGateJumper};
 use dashmap::DashMap;
 use std::io::Error;
@@ -24,9 +24,11 @@ use std::time::Duration;
 use tokio::join;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{Mutex, oneshot};
 use tokio::time::error::Elapsed;
+use cosmic_universe::artifact::NoDiceArtifactFetcher;
 use cosmic_universe::command::request::create::{Create, PointSegTemplate, PointTemplate, Strategy, Template};
+use cosmic_universe::mount::MountKind;
 //use crate::control::ControlDriverFactory;
 use crate::driver::{DriverAvail, DriverFactory};
 use crate::root::RootDriverFactory;

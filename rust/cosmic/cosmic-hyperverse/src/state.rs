@@ -2,7 +2,7 @@ use cosmic_universe::id::id;
 use cosmic_universe::id::id::{Point, Uuid};
 use cosmic_universe::particle::particle::Details;
 use cosmic_universe::wave::WaveId;
-use cosmic_universe::State;
+use cosmic_universe::state::State;
 use dashmap::{DashMap, DashSet};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

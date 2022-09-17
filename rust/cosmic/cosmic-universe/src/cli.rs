@@ -1,7 +1,7 @@
 use core::str::FromStr;
 use nom::combinator::all_consuming;
 
-use crate::bin::Bin;
+use crate::substance::Bin;
 use crate::command::request::create::{Create, CreateCtx, CreateVar, Strategy};
 use crate::command::request::get::{Get, GetCtx, GetVar};
 use crate::command::request::select::{Select, SelectCtx, SelectVar};

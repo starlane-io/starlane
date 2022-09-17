@@ -4983,7 +4983,7 @@ use nom::{
 use nom::{Err, IResult};
 use nom_locate::LocatedSpan;
 
-use crate::bin::Bin;
+use crate::substance::Bin;
 use crate::cli;
 use crate::cli::RawCommand;
 use crate::command::request::RcCommandType;

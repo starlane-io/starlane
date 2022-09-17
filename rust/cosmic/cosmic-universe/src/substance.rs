@@ -1,13 +1,15 @@
+use std::sync::Arc;
+
 pub mod substance {
     use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
     use std::ops::{Deref, DerefMut};
 
-    use crate::bin::Bin;
+    use crate::substance::Bin;
     use crate::cli::RawCommand;
     use crate::command::request::{Rc, RcCommandType};
     use crate::command::Command;
-    use crate::error::{UniErr, ParseErrs};
+    use crate::error::{ParseErrs, UniErr};
     use crate::http::HttpMethod;
     use crate::id::id::{BaseKind, KindParts, Meta, Point, PointCtx, PointVar, Port};
     use crate::log::Log;
@@ -16,10 +18,10 @@ pub mod substance {
     use crate::parse::{CtxResolver, Env};
     use crate::particle::particle::{Particle, Status, Stub};
     use crate::selector::selector::{KindSelector, Selector};
-    use crate::hyper::{Greet, Knock, HyperSubstance};
-    use crate::util::{uuid, ToResolved, ValueMatcher, ValuePattern};
+    use crate::hyper::{Greet, HyperSubstance, Knock};
+    use crate::util::{ToResolved, uuid, ValueMatcher, ValuePattern};
     use crate::wave::{
-        CmdMethod, DirectedCore, HyperWave, Method, Pong, ReflectedCore, HypMethod, UltraWave, Wave,
+        CmdMethod, DirectedCore, HyperWave, HypMethod, Method, Pong, ReflectedCore, UltraWave, Wave,
     };
     use cosmic_macros_primitive::Autobox;
     use cosmic_nom::Tw;
@@ -1198,3 +1200,5 @@ pub mod substance {
         }
     }
 }
+
+pub type Bin = Arc<Vec<u8>>;

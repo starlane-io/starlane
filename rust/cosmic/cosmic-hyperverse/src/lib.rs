@@ -37,7 +37,7 @@ use cosmic_universe::selector::selector::Selector;
 use cosmic_universe::substance::substance::{Substance, SubstanceList, Token};
 use cosmic_universe::hyper::ParticleRecord;
 use cosmic_universe::wave::{ReflectedCore, UltraWave};
-use cosmic_universe::{ArtifactApi, IndexedAccessGrant, Registration};
+use cosmic_universe::security::IndexedAccessGrant;
 use cosmic_hyperlane::{HyperAuthenticator, HyperGate, HyperGateSelector, HyperwayEndpointFactory};
 use http::StatusCode;
 use std::cmp::Ordering;
@@ -49,7 +49,9 @@ use tokio::runtime::{Handle, Runtime};
 use tokio::sync::{mpsc, oneshot};
 use tracing::error;
 use uuid::Uuid;
+use cosmic_universe::artifact::ArtifactApi;
 use cosmic_universe::log::RootLogger;
+use cosmic_universe::reg::Registration;
 
 pub mod control;
 pub mod driver;

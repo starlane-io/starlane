@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
-use cosmic_universe::ArtRef;
+use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::config::config::bind::BindConfig;
 use cosmic_universe::id::id::{Kind, Point};
 use cosmic_universe::parse::bind_config;

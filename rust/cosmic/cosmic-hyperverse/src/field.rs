@@ -5,7 +5,7 @@ use cosmic_universe::error::{UniErr, StatusErr};
 use cosmic_universe::id::id::{Layer, Point, Port, ToPoint, ToPort, TraversalLayer};
 use cosmic_universe::id::Traversal;
 use cosmic_universe::wave::{BounceBacks, CmdMethod, DirectedKind, DirectedProto, DirectedWave, Echo, Exchanger, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedAggregate, ReflectedCore, Reflection, UltraWave, Wave, WaveKind};
-use cosmic_universe::ArtRef;
+use cosmic_universe::artifact::ArtRef;
 use std::str::FromStr;
 use std::sync::Arc;
 use http::Uri;

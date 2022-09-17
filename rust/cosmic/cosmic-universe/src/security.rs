@@ -1,7 +1,7 @@
 use crate::error::UniErr;
 use crate::id::id::Point;
 use crate::parse::error::result;
-use crate::parse::{particle_perms, permissions, permissions_mask, privilege, MapResolver};
+use crate::parse::{MapResolver, particle_perms, permissions, permissions_mask, privilege};
 use crate::selector::selector::{PointHierarchy, Selector};
 use crate::wave::ScopeGrant;
 use cosmic_nom::new_span;
@@ -12,6 +12,7 @@ use std::collections::{HashMap, HashSet};
 use std::ops;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
+use std::cmp::Ordering;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Access {
@@ -524,5 +525,57 @@ impl<Priv, PermMask> ToString for AccessGrantKindDef<Priv, PermMask> {
             AccessGrantKindDef::Privilege(_) => "priv".to_string(),
             AccessGrantKindDef::PermissionsMask(_) => "perm".to_string(),
         }
+    }
+}
+
+impl Ord for IndexedAccessGrant {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.id < other.id {
+            Ordering::Greater
+        } else if self.id < other.id {
+            Ordering::Less
+        } else {
+            Ordering::Equal
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct IndexedAccessGrant {
+    pub id: i32,
+    pub access_grant: AccessGrant,
+}
+
+impl Eq for IndexedAccessGrant {}
+
+impl PartialEq<Self> for IndexedAccessGrant {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl PartialOrd<Self> for IndexedAccessGrant {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.id < other.id {
+            Some(Ordering::Greater)
+        } else if self.id < other.id {
+            Some(Ordering::Less)
+        } else {
+            Some(Ordering::Equal)
+        }
+    }
+}
+
+impl Deref for IndexedAccessGrant {
+    type Target = AccessGrant;
+
+    fn deref(&self) -> &Self::Target {
+        &self.access_grant
+    }
+}
+
+impl Into<AccessGrant> for IndexedAccessGrant {
+    fn into(self) -> AccessGrant {
+        self.access_grant
     }
 }

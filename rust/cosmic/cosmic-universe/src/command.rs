@@ -154,7 +154,7 @@ pub mod command {
 }
 
 pub mod request {
-    use crate::bin::Bin;
+    use crate::substance::Bin;
     use crate::command::request::create::Create;
     use crate::command::request::get::Get;
     use crate::command::request::select::Select;
@@ -357,7 +357,7 @@ pub mod request {
         use serde::{Deserialize, Serialize};
         use tokio::sync::Mutex;
 
-        use crate::bin::Bin;
+        use crate::substance::Bin;
         use crate::command::command::common::{SetProperties, SetRegistry, StateSrc, StateSrcVar};
         use crate::command::Command;
         use crate::error::{UniErr, ParseErrs};

@@ -1,4 +1,4 @@
-use crate::bin::Bin;
+use crate::substance::Bin;
 use crate::cli::RawCommand;
 use crate::command::Command;
 use crate::config::config::bind::RouteSelector;
