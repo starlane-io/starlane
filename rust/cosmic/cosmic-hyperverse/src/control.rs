@@ -98,7 +98,7 @@ use cosmic_universe::log::{RootLogger, Track, Tracker};
 use cosmic_universe::parse::{CamelCase, route_attribute};
 use cosmic_universe::particle::{Details, Status, Stub};
 use cosmic_universe::particle::traversal::TraversalInjection;
-use cosmic_universe::quota::Timeouts;
+use cosmic_universe::settings::Timeouts;
 use cosmic_universe::util::log;
 use cosmic_universe::wave::core::{CoreBounce, Method};
 use cosmic_universe::wave::core::cmd::CmdMethod;

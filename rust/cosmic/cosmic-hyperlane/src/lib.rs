@@ -8,7 +8,7 @@ use cosmic_universe::hyper::{Greet, HyperSubstance, InterchangeKind, Knock};
 use cosmic_universe::loc::{Layer, Point, PointFactory, Surface, ToPoint, ToSurface, Version};
 use cosmic_universe::log::{PointLogger, RootLogger};
 use cosmic_universe::particle::Status;
-use cosmic_universe::quota::Timeouts;
+use cosmic_universe::settings::Timeouts;
 use cosmic_universe::substance::{Errors, Substance, SubstanceKind, Token};
 use cosmic_universe::util::uuid;
 use cosmic_universe::wave::{
@@ -2022,7 +2022,7 @@ pub mod test_util {
     use cosmic_universe::hyper::{Greet, InterchangeKind, Knock};
     use cosmic_universe::loc::{Layer, Point, Surface, ToPoint, ToSurface};
     use cosmic_universe::log::RootLogger;
-    use cosmic_universe::quota::Timeouts;
+    use cosmic_universe::settings::Timeouts;
     use cosmic_universe::substance::{Substance, Token};
     use cosmic_universe::wave::{
         Agent, DirectedKind, DirectedProto, HyperWave, Pong,
@@ -2215,7 +2215,7 @@ pub mod test {
     use cosmic_universe::hyper::{Greet, InterchangeKind, Knock};
     use cosmic_universe::loc::{Layer, Point, Surface, ToPoint, ToSurface};
     use cosmic_universe::log::RootLogger;
-    use cosmic_universe::quota::Timeouts;
+    use cosmic_universe::settings::Timeouts;
     use cosmic_universe::substance::{Substance, Token};
     use cosmic_universe::wave::{
         Agent, DirectedKind, DirectedProto, HyperWave, Pong,

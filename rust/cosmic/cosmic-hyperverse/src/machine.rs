@@ -17,7 +17,7 @@ use cosmic_universe::loc::{
 };
 use cosmic_universe::log::{PointLogger, RootLogger};
 use cosmic_universe::particle::Status;
-use cosmic_universe::quota::Timeouts;
+use cosmic_universe::settings::Timeouts;
 use cosmic_universe::substance::Substance;
 use cosmic_universe::wave::{Agent, HyperWave, UltraWave};
 use dashmap::DashMap;

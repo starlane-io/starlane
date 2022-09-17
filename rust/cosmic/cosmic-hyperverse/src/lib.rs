@@ -35,7 +35,7 @@ use cosmic_universe::loc::{
 use cosmic_universe::log::RootLogger;
 use cosmic_universe::particle::{Details, Properties, Status, Stub};
 use cosmic_universe::particle::property::PropertiesConfig;
-use cosmic_universe::quota::Timeouts;
+use cosmic_universe::settings::Timeouts;
 use cosmic_universe::reg::Registration;
 use cosmic_universe::security::IndexedAccessGrant;
 use cosmic_universe::security::{Access, AccessGrant};

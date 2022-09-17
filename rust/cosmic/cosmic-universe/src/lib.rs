@@ -27,7 +27,7 @@ pub mod log;
 pub mod parse;
 pub mod particle;
 pub mod path;
-pub mod quota;
+pub mod settings;
 pub mod reg;
 pub mod security;
 pub mod selector;

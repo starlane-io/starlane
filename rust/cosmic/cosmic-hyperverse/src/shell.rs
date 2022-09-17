@@ -13,7 +13,7 @@ use cosmic_universe::loc::{
 use cosmic_universe::log::{PointLogger, RootLogger, Trackable};
 use cosmic_universe::parse::error::result;
 use cosmic_universe::parse::{command_line, Env, route_attribute};
-use cosmic_universe::quota::Timeouts;
+use cosmic_universe::settings::Timeouts;
 use cosmic_universe::util::{log, ToResolved};
 use cosmic_universe::wave::{
     Agent, Bounce, BounceBacks,

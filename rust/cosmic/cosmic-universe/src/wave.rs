@@ -17,7 +17,7 @@ use crate::parse::model::Subst;
 use crate::parse::sub;
 use crate::particle::Watch;
 use crate::particle::{Details, Status};
-use crate::quota::Timeouts;
+use crate::settings::Timeouts;
 use crate::security::{Permissions, Privilege, Privileges};
 use crate::selector::Selector;
 use crate::substance::Bin;

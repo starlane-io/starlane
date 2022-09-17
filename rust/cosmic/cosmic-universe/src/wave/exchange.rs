@@ -5,7 +5,7 @@ use std::time::Duration;
 use http::StatusCode;
 use std::ops::Deref;
 use alloc::borrow::Cow;
-use crate::quota::Timeouts;
+use crate::settings::Timeouts;
 use crate::{Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, UniErr};
 use crate::config::bind::RouteSelector;
 use crate::loc::{Topic, ToPoint, ToSurface};

@@ -33,7 +33,7 @@ use cosmic_universe::log::{PointLogger, RootLogger, Trackable, Tracker};
 use cosmic_universe::hyper::MountKind;
 use cosmic_universe::parse::{bind_config, Env, route_attribute};
 use cosmic_universe::particle::{Details, Status, Stub};
-use cosmic_universe::quota::Timeouts;
+use cosmic_universe::settings::Timeouts;
 use cosmic_universe::reg::Registration;
 use cosmic_universe::substance::Bin;
 use cosmic_universe::substance::{Substance, ToSubstance};
