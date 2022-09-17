@@ -12,6 +12,7 @@ use nom_supreme::error::ErrorTree;
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, Range, RangeFrom, RangeTo};
 use std::sync::Arc;
+use nom::bytes::complete::tag;
 
 #[cfg(test)]
 mod tests {
@@ -875,3 +876,19 @@ where
 {
     move |input: I| delimited(multispace0, f, multispace0)(input)
 }
+
+
+/*
+pub fn fn_cp<I,Fn,Rtn>( mut f: Fn ) -> impl FnMut(I) -> Res<I,Rtn> where I:Span, Fn: FnMut(I) -> Res<I,Rtn> {
+    move | input: I | {
+        f(input)
+    }
+}
+
+pub fn fn_tag<I>( t: &'static str ) -> impl FnMut(I) -> Res<I,I> where I:Span {
+    move | input: I | {
+        tag(t)(input)
+    }
+}
+
+ */
