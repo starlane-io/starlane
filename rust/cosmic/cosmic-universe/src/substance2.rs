@@ -15,7 +15,6 @@ pub mod substance {
     use crate::ext::ExtMethod;
     use crate::parse::model::Subst;
     use crate::parse::{CtxResolver, Env};
-    use crate::selector2::selector::{KindSelector, Selector};
     use crate::hyper::{Greet, HyperSubstance, Knock};
     use crate::util::{ToResolved, uuid, ValueMatcher, ValuePattern};
     use crate::wave::{
@@ -31,6 +30,7 @@ pub mod substance {
     use crate::particle::Details;
     use crate::id::{BaseKind, KindParts, Meta, Point, PointCtx, PointVar, Port};
     use crate::particle::{Particle, Status, Stub};
+    use crate::selector::{KindSelector, Selector};
 
     #[derive(
         Debug,

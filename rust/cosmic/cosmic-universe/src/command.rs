@@ -163,7 +163,7 @@ pub mod request {
     use crate::fail::{BadRequest, Fail, NotFound};
     use crate::http::HttpMethod;
     use crate::ext::ExtMethod;
-    use crate::selector2::selector::KindSelector;
+    use crate::selector::KindSelector;
     use crate::substance2::substance::{Errors, Substance};
     use crate::util::{ValueMatcher, ValuePattern};
     use crate::wave::MethodKind;
@@ -363,7 +363,7 @@ pub mod request {
         use crate::id::{BaseKind, HostKey, KindParts, Point, PointCtx, PointSeg, PointVar, ToPort};
         use crate::parse::{CamelCase, Env, ResolverErr};
         use crate::parse::model::Subst;
-        use crate::selector2::selector::SpecificSelector;
+        use crate::selector::SpecificSelector;
         use crate::substance2::substance::Substance;
         use crate::util::{ConvertFrom, ToResolved};
         use crate::wave::{CmdMethod, DirectedCore, DirectedProto, HypMethod, Ping, Wave};
@@ -693,9 +693,7 @@ pub mod request {
         use crate::id::Point;
         use crate::parse::Env;
         use crate::particle::Stub;
-        use crate::selector2::selector::{
-            Hop, HopCtx, HopVar, PointHierarchy, Selector, SelectorDef,
-        };
+        use crate::selector::{Hop, HopCtx, HopVar, PointHierarchy, Selector, SelectorDef};
         use crate::substance2::substance::{MapPattern, Substance, SubstanceList};
         use crate::util::{ConvertFrom, ToResolved};
 
@@ -859,9 +857,9 @@ pub mod request {
         use crate::command::request::select::{PropertiesPattern, Select, SelectIntoSubstance};
         use crate::error::UniErr;
         use crate::parse::Env;
-        use crate::selector2::selector::{Hop, SelectorDef};
         use crate::util::ToResolved;
         use serde::{Deserialize, Serialize};
+        use crate::selector::{Hop, SelectorDef};
 
         pub type Delete = DeleteDef<Hop>;
         pub type DeleteCtx = DeleteDef<Hop>;
@@ -972,7 +970,7 @@ pub mod request {
 
         use crate::command::request::Rc;
         use crate::error::UniErr;
-        use crate::selector2::selector::PointHierarchy;
+        use crate::selector::PointHierarchy;
 
         #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub enum Query {

@@ -14,7 +14,7 @@ use crate::parse::sub;
 use crate::particle::Watch;
 use crate::quota::Timeouts;
 use crate::security::{Permissions, Privilege, Privileges};
-use crate::selector2::selector::Selector;
+use crate::selector::Selector;
 use crate::substance2::substance::{
     Call, CallKind, CmdCall, Errors, ExtCall, HttpCall, HypCall, MultipartFormBuilder,
     SubstanceKind, Token, ToRequestCore,

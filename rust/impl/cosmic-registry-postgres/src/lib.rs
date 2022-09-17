@@ -11,12 +11,8 @@ use cosmic_universe::error::UniErr;
 use cosmic_universe::id2::BaseSubKind;
 use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
 use cosmic_universe::security::{Access, AccessGrant, AccessGrantKind, EnumeratedAccess, IndexedAccessGrant, Permissions, PermissionsMask, PermissionsMaskKind, Privilege, Privileges};
-use cosmic_universe::selector2::selector::specific::{
+use cosmic_universe::selector::specific::{
     ProductSelector, ProviderSelector, VariantSelector, VendorSelector,
-};
-use cosmic_universe::selector2::selector::{
-    ExactPointSeg, KindBaseSelector, PointHierarchy, PointKindSeg, PointSegSelector, Selector,
-    SubKindSelector,
 };
 use cosmic_universe::substance2::substance::{Substance, SubstanceList, SubstanceMap};
 use cosmic_universe::hyper::{Location, ParticleRecord};
@@ -40,6 +36,7 @@ use tokio::sync::mpsc;
 use cosmic_universe::id::{ArtifactSubKind, BaseKind, FileSubKind, Kind, KindParts, Point, PointSeg, Specific, StarKey, ToBaseKind, UserBaseSubKind, Version};
 use cosmic_universe::particle::{Details, Properties, Property, Status, Stub};
 use cosmic_universe::reg::Registration;
+use cosmic_universe::selector::{ExactPointSeg, KindBaseSelector, PointHierarchy, PointKindSeg, PointSegSelector, Selector, SubKindSelector};
 
 #[macro_use]
 extern crate lazy_static;
@@ -1143,7 +1140,6 @@ pub mod test {
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
         Privilege,
     };
-    use cosmic_universe::selector2::selector::{PointHierarchy, Selector};
     use cosmic_universe::reg::Registration;
     use cosmic_hyperverse::RegistryApi;
     use mesh_portal::version::latest::entity::request::query::Query;
@@ -1155,6 +1151,7 @@ pub mod test {
     use std::convert::TryInto;
     use std::str::FromStr;
     use cosmic_universe::id::{Kind, Point, StarKey, ToPoint, UserBaseSubKind};
+    use cosmic_universe::selector::{PointHierarchy, Selector};
 
     #[tokio::test]
     pub async fn test_nuke() -> Result<(), PostErr> {

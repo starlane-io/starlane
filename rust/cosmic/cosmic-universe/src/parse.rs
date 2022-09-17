@@ -27,9 +27,6 @@ use crate::security::{
     AccessGrantKind, AccessGrantKindDef, ChildPerms, ParticlePerms, Permissions, PermissionsMask,
     PermissionsMaskKind, Privilege,
 };
-use crate::selector2::selector::{
-    MapEntryPatternCtx, MapEntryPatternVar, PointHierarchy, PointKindSeg, SelectorDef,
-};
 use crate::util::{HttpMethodPattern, StringMatcher, ToResolved, ValuePattern};
 use nom::bytes::complete::take;
 use nom::character::is_space;
@@ -5001,16 +4998,7 @@ use crate::parse::model::{
     ScopeFilterDef, ScopeFilters, ScopeFiltersDef, ScopeSelectorAndFiltersDef, Spanned, Subst,
     TerminatedBlockKind, TextType, Var, VarParser,
 };
-use crate::selector2::selector::specific::{ProductSelector, VariantSelector, VendorSelector};
-use crate::selector2::selector::{
-    ExactPointSeg, Hop, KindBaseSelector, KindSelector, LabeledPrimitiveTypeDef, MapEntryPattern,
-    Pattern, PayloadType2Def, PointSegSelector, Selector, SpecificSelector, SubKindSelector,
-    VersionReq,
-};
-use crate::selector2::{
-    PatternBlock, PatternBlockCtx, PatternBlockVar, PayloadBlock, PayloadBlockCtx, PayloadBlockVar,
-    UploadBlock,
-};
+use crate::selector::specific::{ProductSelector, VariantSelector, VendorSelector};
 use crate::substance2::substance::{
     Call, CallCtx, CallKind, CallVar, CallWithConfig, CallWithConfigCtx, CallWithConfigVar,
     ExtCall, HttpCall, ListPattern, MapPattern, MapPatternCtx, MapPatternVar, NumRange, Substance,
@@ -5024,6 +5012,7 @@ use nom_supreme::error::ErrorTree;
 use nom_supreme::parser_ext::MapRes;
 use nom_supreme::{parse_from_str, ParserExt};
 use crate::id::{BaseKind, Kind, KindLex, Layer, Point, PointCtx, PointKind, PointKindVar, PointSeg, PointSegCtx, PointSegDelim, PointSegment, PointSegVar, PointVar, Port, RouteSeg, RouteSegVar, Specific, Topic, Uuid, Variable, VarVal, Version};
+use crate::selector::{ExactPointSeg, Hop, KindBaseSelector, KindSelector, LabeledPrimitiveTypeDef, MapEntryPattern, MapEntryPatternCtx, MapEntryPatternVar, Pattern, PatternBlock, PatternBlockCtx, PatternBlockVar, PayloadBlock, PayloadBlockCtx, PayloadBlockVar, PayloadType2Def, PointHierarchy, PointKindSeg, PointSegSelector, Selector, SelectorDef, SpecificSelector, SubKindSelector, UploadBlock, VersionReq};
 
 fn inclusive_any_segment<I: Span>(input: I) -> Res<I, PointSegSelector> {
     alt((tag("+*"), tag("ROOT+*")))(input).map(|(next, _)| (next, PointSegSelector::InclusiveAny))
@@ -7054,7 +7043,6 @@ pub mod test {
     use crate::command::Command;
     use crate::config::Document;
     use crate::error::{ParseErrs, UniErr};
-    use crate::id2::id::{};
     use crate::parse::error::result;
     use crate::parse::model::{
         BlockKind, DelimitedBlockKind, LexScope, NestedBlockKind, TerminatedBlockKind,

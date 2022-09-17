@@ -1,7 +1,7 @@
-use crate::star::{LayerInjectionRouter, HyperStarSkel};
+use crate::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::{PlatErr, Platform};
 use cosmic_universe::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar, WaveDirection};
-use cosmic_universe::error::{UniErr, StatusErr};
+use cosmic_universe::error::{StatusErr, UniErr};
 use cosmic_universe::id::Traversal;
 use cosmic_universe::wave::{BounceBacks, CmdMethod, DirectedKind, DirectedProto, DirectedWave, Echo, Exchanger, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedAggregate, ReflectedCore, Reflection, UltraWave, Wave, WaveKind};
 use cosmic_universe::artifact::ArtRef;
@@ -12,7 +12,7 @@ use cosmic_universe::id::{Layer, Point, Port, ToPoint, ToPort, TraversalLayer};
 use cosmic_universe::log::{PointLogger, Trackable};
 use cosmic_universe::parse::model::{MethodScope, PipelineSegmentVar, PipelineVar};
 use cosmic_universe::parse::{Env, RegexCapturesResolver};
-use cosmic_universe::selector2::{PayloadBlock, PayloadBlockVar};
+use cosmic_universe::selector::{PayloadBlock, PayloadBlockVar};
 use cosmic_universe::substance2::substance::Substance;
 use cosmic_universe::util::ToResolved;
 

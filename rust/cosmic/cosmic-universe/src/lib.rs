@@ -23,7 +23,6 @@ pub mod parse;
 pub mod property;
 pub mod quota;
 pub mod security;
-pub mod selector2;
 pub mod service;
 pub mod substance2;
 pub mod hyper;
@@ -40,6 +39,7 @@ pub mod config;
 pub mod id;
 pub mod particle;
 pub mod frame;
+pub mod selector;
 
 
 use substance2::Bin;
@@ -52,7 +52,7 @@ use config::bind::BindConfig;
 use config::Document;
 use crate::error::UniErr;
 use crate::security::{Access, AccessGrant};
-use crate::selector2::selector::Selector;
+use selector::Selector;
 use crate::substance2::substance::{Substance, SubstanceList, Token, ToSubstance};
 use crate::hyper::ParticleRecord;
 use crate::wave::{Agent, ReflectedCore};

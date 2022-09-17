@@ -83,12 +83,13 @@ pub mod bind {
         ScopeFilters, WaveScope,
     };
     use crate::parse::{bind_config, Env};
-    use crate::selector2::{PayloadBlock, PayloadBlockDef};
+    use crate::selector::PayloadBlockDef;
     use crate::util::{ToResolved, ValueMatcher, ValuePattern};
     use regex::Regex;
     use serde::{Deserialize, Serialize};
     use std::convert::TryInto;
     use crate::id::{Point, PointCtx, PointVar, Topic};
+    use crate::selector::PayloadBlock;
 
     #[derive(Debug,Clone,Serialize,Deserialize)]
     pub enum WaveDirection {

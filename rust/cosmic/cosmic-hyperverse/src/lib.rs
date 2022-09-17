@@ -28,7 +28,7 @@ use cosmic_universe::fail::Timeout;
 use cosmic_universe::property::PropertiesConfig;
 use cosmic_universe::quota::Timeouts;
 use cosmic_universe::security::{Access, AccessGrant};
-use cosmic_universe::selector2::selector::Selector;
+use cosmic_universe::selector::Selector;
 use cosmic_universe::substance2::substance::{Substance, SubstanceList, Token};
 use cosmic_universe::hyper::ParticleRecord;
 use cosmic_universe::wave::{ReflectedCore, UltraWave};

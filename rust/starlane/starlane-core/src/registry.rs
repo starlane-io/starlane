@@ -14,7 +14,7 @@ use cosmic_universe::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask,
     PermissionsMaskKind, Privilege, Privileges,
 };
-use cosmic_universe::selector2::selector::SubKindSelector;
+use cosmic_universe::selector::SubKindSelector;
 use cosmic_universe::hyper::{Location, ParticleRecord};
 use futures::{FutureExt, StreamExt};
 use mesh_portal::error::MsgErr;

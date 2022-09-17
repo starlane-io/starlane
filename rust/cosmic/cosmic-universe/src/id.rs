@@ -8,12 +8,12 @@ use cosmic_nom::{new_span, Trace, Tw};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use crate::parse::{CamelCase, consume_point, consume_point_ctx, Domain, Env, kind_parts, parse_star_key, point_and_kind, point_route_segment, point_selector, ResolverErr, SkewerCase};
-use crate::{Agent, ANONYMOUS,  cosmic_uuid,  HYPERUSER, KindTemplate, ParticleRecord,  Selector,  UniErr,};
+use crate::{Agent, ANONYMOUS, cosmic_uuid, HYPERUSER, KindTemplate, ParticleRecord, UniErr,};
 use crate::error::ParseErrs;
 use crate::hyper::ChildRegistry;
 use crate::log::{SpanLogger, Trackable};
 use crate::parse::error::result;
-use crate::selector2::selector::{Pattern, SpecificSelector, VersionReq};
+use crate::selector::{Pattern, Selector, SpecificSelector, VersionReq};
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
 use crate::wave::{DirectedWave, Exchanger, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave, ToRecipients, UltraWave, Wave};
 lazy_static! {

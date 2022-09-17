@@ -2,7 +2,7 @@ use crate::command::common::StateSrc::Substance;
 use crate::error::UniErr;
 use crate::parse::{CamelCase, to_string};
 use crate::util::{timestamp, uuid};
-use crate::{cosmic_timestamp, Selector};
+use crate::cosmic_timestamp;
 use chrono::serde::ts_milliseconds;
 use chrono::{DateTime, Utc};
 use core::str::FromStr;
@@ -15,6 +15,7 @@ use std::ops::Deref;
 use std::process::Output;
 use std::sync::Arc;
 use crate::id::{Point, ToPoint, Uuid};
+use crate::selector::Selector;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum Level {

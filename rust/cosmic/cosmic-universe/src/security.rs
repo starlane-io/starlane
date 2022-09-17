@@ -2,7 +2,6 @@ use crate::error::UniErr;
 use crate::id::Point;
 use crate::parse::error::result;
 use crate::parse::{MapResolver, particle_perms, permissions, permissions_mask, privilege};
-use crate::selector2::selector::{PointHierarchy, Selector};
 use crate::wave::ScopeGrant;
 use cosmic_nom::new_span;
 use nom::combinator::all_consuming;
@@ -13,6 +12,7 @@ use std::ops;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::cmp::Ordering;
+use crate::selector::{PointHierarchy, Selector};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Access {
