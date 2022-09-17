@@ -14,7 +14,7 @@ use cosmic_registry_postgres::{
 use cosmic_universe::artifact::ArtifactApi;
 use cosmic_universe::artifact::NoDiceArtifactFetcher;
 use cosmic_universe::command::direct::create::KindTemplate;
-use cosmic_universe::error::UniErr;
+use cosmic_universe::err::UniErr;
 use cosmic_universe::loc::{
     MachineName, Specific, StarKey,
 };

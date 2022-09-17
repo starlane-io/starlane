@@ -26,6 +26,9 @@ use syn::{
     ItemStruct, PathArguments, PathSegment, ReturnType, Signature, Type, Visibility,
 };
 
+#[macro_use]
+extern crate lazy_static;
+
 // this is just to make the user realize he needs to import DirectedHandler
 #[proc_macro_derive(DirectedHandler)]
 pub fn directed_handler(item: TokenStream) -> TokenStream {
@@ -97,8 +100,8 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
     let rtn = quote! {
         impl #generics DirectedHandlerSelector for #self_ty #where_clause{
               fn select<'a>( &self, select: &'a RecipientSelector<'a>, ) -> Result<&dyn DirectedHandler, ()> {
-                use cosmic_universe::wave::Method;
-                use cosmic_universe::wave::CmdMethod;
+                use cosmic_universe::wave::core::Method;
+                use cosmic_universe::wave::core::cmd::CmdMethod;
                 if select.wave.core().method == Method::Cmd(CmdMethod::Bounce) {
                     return Ok(self);
                 }
@@ -114,8 +117,8 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
         #[async_trait]
         impl #generics DirectedHandler for #self_ty #where_clause{
             async fn handle( &self, ctx: RootInCtx) -> CoreBounce {
-                use cosmic_universe::wave::Method;
-                use cosmic_universe::wave::CmdMethod;
+                use cosmic_universe::wave::core::Method;
+                use cosmic_universe::wave::core::cmd::CmdMethod;
                 #(
                     if #static_selector_keys.is_match(&ctx.wave).is_ok() {
                        return self.#idents( ctx ).await;

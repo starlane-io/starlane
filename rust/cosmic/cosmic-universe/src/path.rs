@@ -1,4 +1,4 @@
-use crate::error::UniErr;
+use crate::err::UniErr;
 use crate::parse::consume_path;
 use alloc::format;
 use alloc::string::{String, ToString};

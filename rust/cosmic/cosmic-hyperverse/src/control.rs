@@ -17,7 +17,7 @@ use cosmic_universe::command::direct::create::{
     TemplateDef,
 };
 use cosmic_universe::command::RawCommand;
-use cosmic_universe::error::UniErr;
+use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::{
     Assign, AssignmentKind, ControlPattern, Greet, InterchangeKind, Knock,
 };
@@ -25,11 +25,11 @@ use cosmic_universe::reg::Registration;
 use cosmic_universe::substance::Substance;
 use cosmic_universe::wave::Agent::Anonymous;
 use cosmic_universe::wave::{
-    Agent, CmdMethod, CoreBounce, DirectedHandler, Exchanger, InCtx, Method, Pong,
-    ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, Signal, ToRecipients, UltraWave,
+    Agent, Pong,
+    Signal, ToRecipients, UltraWave,
     Wave,
 };
-use cosmic_universe::wave::{DirectedHandlerSelector, SetStrategy, TxRouter};
+use cosmic_universe::wave::exchange::{ProtoTransmitter, ProtoTransmitterBuilder, Router, SetStrategy, TxRouter};
 use cosmic_universe::wave::{DirectedProto, RecipientSelector};
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
@@ -90,7 +90,7 @@ where
 use crate::star::HyperStarCall::LayerTraversalInjection;
 use cosmic_universe::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::kind::{BaseKind, Kind, StarSub};
-use cosmic_universe::wave::ext::ExtMethod;
+use cosmic_universe::wave::core::ext::ExtMethod;
 use cosmic_universe::loc::{
     Layer, Point, PointFactory, Surface, ToPoint, ToSurface,
 };
@@ -100,7 +100,10 @@ use cosmic_universe::particle::{Details, Status, Stub};
 use cosmic_universe::particle::traversal::TraversalInjection;
 use cosmic_universe::quota::Timeouts;
 use cosmic_universe::util::log;
-use cosmic_universe::wave::ReflectedCore;
+use cosmic_universe::wave::core::{CoreBounce, Method};
+use cosmic_universe::wave::core::cmd::CmdMethod;
+use cosmic_universe::wave::core::ReflectedCore;
+use cosmic_universe::wave::exchange::{DirectedHandler, DirectedHandlerSelector, Exchanger, InCtx, RootInCtx};
 
 pub struct ControlFactory<P>
 where
@@ -203,10 +206,10 @@ where
             self.skel.driver.logger.clone(),
         );
         let mut interchange = HyperwayInterchange::new(self.skel.driver.logger.clone());
-        let hyperway = Hyperway::new(Point::remote_endpoint().to_port(), Agent::HyperUser);
+        let hyperway = Hyperway::new(Point::remote_endpoint().to_surface(), Agent::HyperUser);
         let mut hyperway_endpoint = hyperway.hyperway_endpoint_far(None).await;
         interchange.add(hyperway).await;
-        interchange.singular_to(Point::remote_endpoint().to_port());
+        interchange.singular_to(Point::remote_endpoint().to_surface());
         let interchange = Arc::new(interchange);
         let greeter = ControlGreeter::new(
             self.skel.clone(),
@@ -218,7 +221,7 @@ where
 
         impl HyperwayConfigurator for ControlHyperwayConfigurator {
             fn config(&self, greet: &Greet, hyperway: &mut Hyperway) {
-                hyperway.transform_inbound(Box::new(FromTransform::new(greet.port.clone())));
+                hyperway.transform_inbound(Box::new(FromTransform::new(greet.surface.clone())));
                 hyperway
                     .transform_inbound(Box::new(TransportTransform::new(greet.transport.clone())));
                 hyperway.transform_inbound(Box::new(HopTransform::new(greet.hop.clone())));
@@ -377,7 +380,7 @@ where
                 let point = details.stub.point;
                 let fabric_router = LayerInjectionRouter::new(
                     self.skel.star.clone(),
-                    point.clone().to_port().with_layer(Layer::Shell),
+                    point.clone().to_surface().with_layer(Layer::Shell),
                 );
                 self.fabric_routers.insert(point.clone(), fabric_router);
                 Ok(point)
@@ -412,9 +415,9 @@ where
 {
     async fn greet(&self, stub: HyperwayStub) -> Result<Greet, UniErr> {
         Ok(Greet {
-            port: stub.remote.clone().with_layer(Layer::Core),
+            surface: stub.remote.clone().with_layer(Layer::Core),
             agent: stub.agent.clone(),
-            hop: self.skel.driver.point.clone().to_port(),
+            hop: self.skel.driver.point.clone().to_surface(),
             transport: stub.remote.clone().with_layer(Layer::Portal),
         })
     }
@@ -493,7 +496,7 @@ pub struct ControlClient {
 impl ControlClient {
     pub fn new(factory: Box<dyn HyperwayEndpointFactory>) -> Result<Self, UniErr> {
         let exchanger = Exchanger::new(
-            Point::from_str("control-client")?.to_port(),
+            Point::from_str("control-client")?.to_surface(),
             Timeouts::default(),
         );
         let logger = RootLogger::default();
@@ -507,7 +510,7 @@ impl ControlClient {
             .client
             .get_greeting()
             .ok_or("cannot access port until greeting has been received")?;
-        Ok(greet.port)
+        Ok(greet.surface)
     }
 
     pub async fn wait_for_ready(&self, duration: Duration) -> Result<(), UniErr> {

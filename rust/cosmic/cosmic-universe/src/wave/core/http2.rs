@@ -1,10 +1,10 @@
-use crate::error::UniErr;
+use crate::err::UniErr;
 use crate::loc::Meta;
 use crate::substance::{Errors, Substance};
 use crate::util::ValueMatcher;
-use crate::wave::{DirectedCore, Method, ReflectedCore};
 use http::{HeaderMap, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
+use crate::wave::core::{DirectedCore, Method, ReflectedCore};
 
 #[derive(
     Debug,

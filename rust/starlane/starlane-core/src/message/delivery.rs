@@ -20,7 +20,7 @@ use cosmic_universe::hyper::ParticleRecord;
 use cosmic_universe::loc::ToPoint;
 use cosmic_universe::parse::model::Subst;
 use cosmic_universe::substance::HttpCall;
-use cosmic_universe::wave::Method;
+use cosmic_universe::wave::core::Method;
 use http::StatusCode;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::entity::response::RespCore;

@@ -6,8 +6,8 @@ use core::option::Option::{None, Some};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
 
-use crate::error::UniErr;
-use crate::wave::http2::HttpMethod;
+use crate::err::UniErr;
+use crate::wave::core::http2::HttpMethod;
 use crate::loc::Uuid;
 use crate::parse::Env;
 use crate::{cosmic_timestamp, cosmic_uuid};

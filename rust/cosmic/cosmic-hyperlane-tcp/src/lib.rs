@@ -2,7 +2,7 @@ use cosmic_hyperlane::{
     HyperConnectionDetails, HyperConnectionStatus, HyperGate, HyperGateSelector, HyperwayEndpoint,
     HyperwayEndpointFactory, VersionGate,
 };
-use cosmic_universe::error::UniErr;
+use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::Knock;
 use cosmic_universe::log::PointLogger;
 use cosmic_universe::substance::Substance;
@@ -616,7 +616,7 @@ mod tests {
         let less_client = Box::new(HyperlaneTcpClient::new(
             format!("localhost:{}", port),
             ".",
-            platform.knock(LESS.to_port()),
+            platform.knock(LESS.to_surface()),
             false,
             less_logger,
         ));
@@ -624,7 +624,7 @@ mod tests {
         let fae_client = Box::new(HyperlaneTcpClient::new(
             format!("localhost:{}", port),
             ".",
-            platform.knock(FAE.to_port()),
+            platform.knock(FAE.to_surface()),
             false,
             fae_logger,
         ));

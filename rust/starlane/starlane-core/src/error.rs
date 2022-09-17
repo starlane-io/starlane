@@ -21,7 +21,7 @@ use actix_web::ResponseError;
 use alcoholic_jwt::ValidationError;
 use ascii::FromAsciiError;
 use cosmic_nom::Span;
-use cosmic_universe::error::StatusErr;
+use cosmic_universe::err::StatusErr;
 use handlebars::RenderError;
 use http::header::{InvalidHeaderName, InvalidHeaderValue, ToStrError};
 use http::method::InvalidMethod;

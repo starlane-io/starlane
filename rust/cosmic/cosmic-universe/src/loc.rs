@@ -1,4 +1,4 @@
-use crate::error::ParseErrs;
+use crate::err::ParseErrs;
 use crate::hyper::ChildRegistry;
 use crate::log::{SpanLogger, Trackable};
 use crate::parse::error::result;
@@ -9,7 +9,7 @@ use crate::parse::{
 use crate::selector::{Pattern, Selector, SpecificSelector, VersionReq};
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
 use crate::wave::{
-    DirectedWave, Exchanger, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave,
+    DirectedWave, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave,
     ToRecipients, UltraWave, Wave,
 };
 use crate::{Agent, ANONYMOUS, BaseKind, cosmic_uuid, HYPERUSER, Kind, KindTemplate, ParticleRecord, UniErr};
@@ -24,6 +24,7 @@ use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use crate::kind::KindParts;
 use crate::particle::traversal::TraversalPlan;
+use crate::wave::exchange::Exchanger;
 lazy_static! {
     pub static ref GLOBAL_CENTRAL: Point = Point::from_str("GLOBAL::central").unwrap();
     pub static ref GLOBAL_EXEC: Point = Point::from_str("GLOBAL::executor").unwrap();
@@ -1061,25 +1062,25 @@ impl Into<SurfaceSelector> for Surface {
 }
 
 impl ValueMatcher<Surface> for SurfaceSelector {
-    fn is_match(&self, port: &Surface) -> Result<(), ()> {
+    fn is_match(&self, surface: &Surface) -> Result<(), ()> {
         match &self.point {
             ValuePattern::Any => {}
             ValuePattern::None => return Err(()),
-            ValuePattern::Pattern(point) if *point != port.point => return Err(()),
+            ValuePattern::Pattern(point) if *point != surface.point => return Err(()),
             _ => {}
         }
 
         match &self.layer {
             ValuePattern::Any => {}
             ValuePattern::None => return Err(()),
-            ValuePattern::Pattern(layer) if *layer != port.layer => return Err(()),
+            ValuePattern::Pattern(layer) if *layer != surface.layer => return Err(()),
             _ => {}
         }
 
         match &self.topic {
             ValuePattern::Any => {}
             ValuePattern::None => return Err(()),
-            ValuePattern::Pattern(topic) if *topic != port.topic => return Err(()),
+            ValuePattern::Pattern(topic) if *topic != surface.topic => return Err(()),
             _ => {}
         }
 
@@ -1120,7 +1121,7 @@ impl ToPoint for Surface {
 }
 
 impl ToSurface for Surface {
-    fn to_port(&self) -> Surface {
+    fn to_surface(&self) -> Surface {
         self.clone()
     }
 }
@@ -1130,7 +1131,7 @@ pub trait ToPoint {
 }
 
 pub trait ToSurface {
-    fn to_port(&self) -> Surface;
+    fn to_surface(&self) -> Surface;
 }
 
 impl Into<Surface> for Point {
@@ -1145,7 +1146,7 @@ impl Into<Surface> for Point {
 
 impl ToRecipients for Point {
     fn to_recipients(self) -> Recipients {
-        self.to_port().to_recipients()
+        self.to_surface().to_recipients()
     }
 }
 
@@ -1170,7 +1171,7 @@ impl ToPoint for Point {
 }
 
 impl ToSurface for Point {
-    fn to_port(&self) -> Surface {
+    fn to_surface(&self) -> Surface {
         self.clone().into()
     }
 }
@@ -1917,7 +1918,7 @@ impl Into<Point> for StarKey {
 
 impl Into<Surface> for StarKey {
     fn into(self) -> Surface {
-        self.to_port()
+        self.to_surface()
     }
 }
 
@@ -1939,8 +1940,8 @@ impl ToPoint for StarKey {
 }
 
 impl ToSurface for StarKey {
-    fn to_port(&self) -> Surface {
-        self.clone().to_point().to_port()
+    fn to_surface(&self) -> Surface {
+        self.clone().to_point().to_surface()
     }
 }
 

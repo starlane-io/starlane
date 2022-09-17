@@ -22,7 +22,7 @@ use crate::command::direct::create::{
 use crate::command::direct::get::{Get, GetOp, GetVar};
 use crate::command::direct::select::{Select, SelectIntoSubstance, SelectKind, SelectVar};
 use crate::command::direct::set::{Set, SetVar};
-use crate::error::{ParseErrs, UniErr};
+use crate::err::{ParseErrs, UniErr};
 use crate::security::{
     AccessGrantKind, AccessGrantKindDef, ChildPerms, ParticlePerms, Permissions, PermissionsMask,
     PermissionsMaskKind, Privilege,
@@ -3429,8 +3429,8 @@ pub mod model {
         BindConfig, PipelineStepCtx, PipelineStepDef, PipelineStepVar, PipelineStopCtx,
         PipelineStopDef, PipelineStopVar, WaveDirection,
     };
-    use crate::error::{ParseErrs, UniErr};
-    use crate::wave::http2::HttpMethod;
+    use crate::err::{ParseErrs, UniErr};
+    use crate::wave::core::http2::HttpMethod;
     use crate::loc::{Point, PointCtx, PointVar, Version};
     use crate::parse::error::result;
     use crate::parse::{
@@ -3439,7 +3439,7 @@ pub mod model {
         SubstParser, value_pattern, wrapped_cmd_method, wrapped_ext_method, wrapped_http_method, wrapped_sys_method,
     };
     use crate::util::{HttpMethodPattern, StringMatcher, ToResolved, ValueMatcher, ValuePattern};
-    use crate::wave::{DirectedCore, DirectedWave, Method, MethodKind, Ping, SingularDirectedWave};
+    use crate::wave::{DirectedWave, Ping, SingularDirectedWave};
     use bincode::Options;
     use cosmic_nom::{new_span, Res, Span, Trace, Tw};
     use nom::bytes::complete::tag;
@@ -3455,6 +3455,7 @@ pub mod model {
     use std::ops::{Deref, DerefMut};
     use std::rc::Rc;
     use std::str::FromStr;
+    use crate::wave::core::{DirectedCore, Method, MethodKind};
 
     #[derive(Clone)]
     pub struct ScopeSelectorAndFiltersDef<S, I> {
@@ -4722,7 +4723,7 @@ pub mod model {
 }
 
 pub mod error {
-    use crate::error::{ParseErrs, UniErr};
+    use crate::err::{ParseErrs, UniErr};
     use crate::parse::model::NestedBlockKind;
     use crate::parse::{nospace1, skewer};
     use ariadne::Report;
@@ -4989,11 +4990,9 @@ use crate::config::bind::{
     PipelineStopCtx, PipelineStopVar, RouteSelector, WaveDirection,
 };
 use crate::config::Document;
-use crate::wave::ext::ExtMethod;
-use crate::wave::http2::HttpMethod;
-use crate::loc::{
-    StarKey,
-};
+use crate::wave::core::ext::ExtMethod;
+use crate::wave::core::http2::HttpMethod;
+use crate::loc::StarKey;
 use crate::loc::{
     Layer, Point, PointCtx, PointKind, PointKindVar, PointSeg,
     PointSegCtx, PointSegDelim, PointSegment, PointSegVar, PointVar, RouteSeg, RouteSegVar, Specific,
@@ -5023,13 +5022,16 @@ use crate::substance::{
     SubstanceFormat, SubstanceKind, SubstancePattern, SubstancePatternCtx, SubstancePatternVar,
     SubstanceTypePatternCtx, SubstanceTypePatternDef, SubstanceTypePatternVar,
 };
-use crate::wave::{CmdMethod, HypMethod, Method, MethodKind, MethodPattern};
+use crate::wave::core::MethodKind;
 use cosmic_nom::{new_span, span_with_extra, Trace};
 use cosmic_nom::{Res, Span, trim, tw, Wrap};
 use nom_supreme::error::ErrorTree;
 use nom_supreme::parser_ext::MapRes;
 use nom_supreme::{parse_from_str, ParserExt};
 use crate::kind::{ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, StarSub, UserBaseSubKind};
+use crate::wave::core::{Method, MethodPattern};
+use crate::wave::core::cmd::CmdMethod;
+use crate::wave::core::hyp::HypMethod;
 
 fn inclusive_any_segment<I: Span>(input: I) -> Res<I, PointSegSelector> {
     alt((tag("+*"), tag("ROOT+*")))(input).map(|(next, _)| (next, PointSegSelector::InclusiveAny))
@@ -7059,7 +7061,7 @@ pub mod test {
     };
     use crate::command::Command;
     use crate::config::Document;
-    use crate::error::{ParseErrs, UniErr};
+    use crate::err::{ParseErrs, UniErr};
     use crate::loc::{Point, PointCtx, PointSegVar, RouteSegVar};
     use crate::parse::error::result;
     use crate::parse::model::{
@@ -8203,7 +8205,7 @@ pub fn rec_script_line<I: Span>(input: I) -> Res<I, I> {
 #[cfg(test)]
 pub mod cmd_test {
     use crate::command::{Command, CommandVar};
-    use crate::error::UniErr;
+    use crate::err::UniErr;
     use crate::parse::{CamelCase, command, script};
     use core::str::FromStr;
     use cosmic_nom::{new_span, Res};

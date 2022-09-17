@@ -5,7 +5,7 @@ use cosmic_nom::new_span;
 use cosmic_universe::command::Command;
 use cosmic_universe::command::RawCommand;
 use cosmic_universe::config::bind::RouteSelector;
-use cosmic_universe::error::UniErr;
+use cosmic_universe::err::UniErr;
 use cosmic_universe::loc::{
     Layer, Point, Surface, SurfaceSelector, Topic, ToPoint, ToSurface,
     Uuid,
@@ -16,10 +16,10 @@ use cosmic_universe::parse::{command_line, Env, route_attribute};
 use cosmic_universe::quota::Timeouts;
 use cosmic_universe::util::{log, ToResolved};
 use cosmic_universe::wave::{
-    Agent, Bounce, BounceBacks, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector,
-    DirectedKind, DirectedProto, DirectedWave, Exchanger, InCtx, Ping, Pong, ProtoTransmitter,
-    ProtoTransmitterBuilder, RecipientSelector, Reflectable, ReflectedCore, ReflectedWave,
-    RootInCtx, Router, SetStrategy, UltraWave, Wave, WaveKind,
+    Agent, Bounce, BounceBacks,
+    DirectedKind, DirectedProto, DirectedWave, Ping, Pong,
+    RecipientSelector, Reflectable, ReflectedWave,
+    UltraWave, Wave, WaveKind,
 };
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
@@ -30,6 +30,8 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use cosmic_universe::particle::traversal::{Traversal, TraversalDirection, TraversalInjection, TraversalLayer};
+use cosmic_universe::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
+use cosmic_universe::wave::exchange::{DirectedHandler, DirectedHandlerSelector, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, SetStrategy};
 
 #[derive(DirectedHandler)]
 pub struct Shell<P>
@@ -60,8 +62,8 @@ impl<P> TraversalLayer for Shell<P>
 where
     P: Platform + 'static,
 {
-    fn port(&self) -> Surface {
-        self.state.point.clone().to_port().with_layer(Layer::Shell)
+    fn surface(&self) -> Surface {
+        self.state.point.clone().to_surface().with_layer(Layer::Shell)
     }
 
     async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
@@ -69,7 +71,7 @@ where
     }
 
     async fn inject(&self, wave: UltraWave) {
-        let inject = TraversalInjection::new(self.port().clone(), wave);
+        let inject = TraversalInjection::new(self.surface().clone(), wave);
         self.skel.inject_tx.send(inject).await;
     }
 
@@ -78,8 +80,8 @@ where
     }
 
     async fn deliver_directed(&self, directed: Traversal<DirectedWave>) -> Result<(), UniErr> {
-        if directed.from().point == self.port().point
-            && directed.from().layer.ordinal() >= self.port().layer.ordinal()
+        if directed.from().point == self.surface().point
+            && directed.from().layer.ordinal() >= self.surface().layer.ordinal()
         {
             self.state
                 .fabric_requests
@@ -91,7 +93,7 @@ where
             .from()
             .clone()
             .with_topic(directed.to.topic.clone())
-            .with_layer(self.port().layer.clone());
+            .with_layer(self.surface().layer.clone());
         let router = Arc::new(LayerInjectionRouter::new(
             self.skel.clone(),
             injector.clone(),
@@ -102,14 +104,14 @@ where
         transmitter.from = SetStrategy::Fill(
             directed
                 .from()
-                .with_layer(self.port().layer.clone())
+                .with_layer(self.surface().layer.clone())
                 .with_topic(directed.to.topic.clone()),
         );
         let transmitter = transmitter.build();
         let reflection = directed.reflection();
         let ctx = RootInCtx::new(
             directed.payload.clone(),
-            self.port().clone(),
+            self.surface().clone(),
             logger,
             transmitter.clone(),
         );
@@ -129,7 +131,7 @@ where
         match bounce {
             CoreBounce::Absorbed => {}
             CoreBounce::Reflected(core) => {
-                let reflected = reflection.unwrap().make(core, self.port().clone());
+                let reflected = reflection.unwrap().make(core, self.surface().clone());
                 self.inject(reflected.to_ultra()).await;
             }
         }
@@ -185,7 +187,7 @@ where
             } else {
                 self.logger.warn(format!(
                     "{} blocked a reflected from {} to a directed id {} of which the Shell has already received a reflected wave",
-                    self.port().to_string(),
+                    self.surface().to_string(),
                     traversal.from().to_string(),
                     traversal.reflection_of().to_short_string()
                 ));
@@ -201,7 +203,7 @@ where
         } else {
             self.logger.warn(format!(
                 "{} blocked a reflected from {} to a directed id {} of which the Shell has no record",
-                self.port().to_string(),
+                self.surface().to_string(),
                 traversal.from().to_string(),
                 traversal.reflection_of().to_short_string()
             ));

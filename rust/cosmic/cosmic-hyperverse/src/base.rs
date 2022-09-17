@@ -9,12 +9,11 @@ use cosmic_universe::kind::Kind;
 use cosmic_universe::loc::Point;
 use cosmic_universe::parse::bind_config;
 use cosmic_universe::util::log;
-use cosmic_universe::wave::{
-    CoreBounce, DirectedHandler, DirectedHandlerSelector, RecipientSelector, ReflectedCore,
-    RootInCtx,
-};
+use cosmic_universe::wave::RecipientSelector;
 use std::str::FromStr;
 use std::sync::Arc;
+use cosmic_universe::wave::core::{CoreBounce, ReflectedCore};
+use cosmic_universe::wave::exchange::{DirectedHandler, DirectedHandlerSelector, RootInCtx};
 lazy_static! {
     static ref BASE_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
         Arc::new(base_bind()),

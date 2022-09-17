@@ -9,10 +9,11 @@ use cosmic_universe::kind::Kind;
 use cosmic_universe::loc::Point;
 use cosmic_universe::parse::bind_config;
 use cosmic_universe::util::log;
-use cosmic_universe::wave::{CoreBounce, DirectedHandler, ReflectedCore, RootInCtx};
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
+use cosmic_universe::wave::core::{CoreBounce, ReflectedCore};
+use cosmic_universe::wave::exchange::{DirectedHandlerSelector, RootInCtx};
 
 lazy_static! {
     static ref ROOT_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -111,7 +112,7 @@ where
     }
 }
 
-use cosmic_universe::wave::DirectedHandlerSelector;
+use cosmic_universe::wave::exchange::DirectedHandler;
 use cosmic_universe::wave::RecipientSelector;
 #[routes]
 impl<P> Root<P> where P: Platform {}

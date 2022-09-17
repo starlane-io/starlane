@@ -269,7 +269,7 @@ pub struct HostAndPort {
 pub mod parse {
     use crate::star::variant::web::HostAndPort;
     use cosmic_nom::Span;
-    use cosmic_universe::error::UniErr;
+    use cosmic_universe::err::UniErr;
     use cosmic_universe::parse::domain;
     use cosmic_universe::parse::error::result;
     use nom::bytes::complete::{is_a, tag, take_while};

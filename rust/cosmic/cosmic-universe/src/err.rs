@@ -5,7 +5,7 @@ use std::string::FromUtf8Error;
 
 use crate::parse::error::find_parse_err;
 use crate::substance::{Errors, Substance};
-use crate::wave::ReflectedCore;
+use crate::wave::core::ReflectedCore;
 use ariadne::{Label, Report, ReportBuilder, ReportKind, Source};
 use cosmic_nom::Span;
 use cosmic_nom::SpanExtra;

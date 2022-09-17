@@ -9,7 +9,7 @@ use cosmic_hyperlane::{
     TokenAuthenticatorWithRemoteWhitelist,
 };
 use cosmic_universe::artifact::ArtifactApi;
-use cosmic_universe::error::UniErr;
+use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::{InterchangeKind, Knock};
 use cosmic_universe::loc::{
     ConstellationName, Layer, MachineName, Point, Surface, StarHandle, StarKey, ToPoint,
@@ -187,14 +187,14 @@ where
 
         let machine_star = StarKey::machine(machine_name.clone())
             .to_point()
-            .to_port()
+            .to_surface()
             .with_layer(Layer::Gravity);
         let logger = platform.logger().point(machine_star.point.clone());
         let global = machine_star
             .point
             .push("global")
             .unwrap()
-            .to_port()
+            .to_surface()
             .with_layer(Layer::Core);
         let skel = MachineSkel {
             name: machine_name.clone(),
@@ -216,7 +216,7 @@ where
 
         for star_template in star_templates {
             let star_point = star_template.key.clone().to_point();
-            let star_port = star_point.clone().to_port().with_layer(Layer::Core);
+            let star_port = star_point.clone().to_surface().with_layer(Layer::Core);
 
             let drivers_point = star_point.push("drivers".to_string()).unwrap();
             let logger = skel.logger.point(drivers_point.clone());
@@ -230,7 +230,7 @@ where
             let mut interchange =
                 HyperwayInterchange::new(logger.push_point("interchange").unwrap());
 
-            let star_hop = star_point.clone().to_port().with_layer(Layer::Gravity);
+            let star_hop = star_point.clone().to_surface().with_layer(Layer::Gravity);
 
             let mut hyperway = Hyperway::new(star_hop.clone(), Agent::HyperUser);
             hyperway.transform_inbound(Box::new(LayerTransform::new(Layer::Gravity)));
@@ -256,7 +256,7 @@ where
                             .key
                             .clone()
                             .to_point()
-                            .to_port()
+                            .to_surface()
                             .with_layer(Layer::Gravity);
                         let hyperway = Hyperway::new(star, Agent::HyperUser);
                         interchange.add(hyperway).await;
@@ -266,7 +266,7 @@ where
                             .key
                             .clone()
                             .to_point()
-                            .to_port()
+                            .to_surface()
                             .with_layer(Layer::Gravity);
                         let hyperway = Hyperway::new(star, Agent::HyperUser);
                         interchange.add(hyperway).await;
@@ -629,7 +629,7 @@ where
             self.from
                 .clone()
                 .to_point()
-                .to_port()
+                .to_surface()
                 .with_layer(Layer::Gravity),
             Substance::Empty,
         );

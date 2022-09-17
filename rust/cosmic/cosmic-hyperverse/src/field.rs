@@ -2,7 +2,7 @@ use crate::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::{PlatErr, Platform};
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar, WaveDirection};
-use cosmic_universe::error::{StatusErr, UniErr};
+use cosmic_universe::err::{StatusErr, UniErr};
 use cosmic_universe::particle::traversal::{Traversal, TraversalLayer};
 use cosmic_universe::loc::{Layer, Point, Surface, ToPoint, ToSurface};
 use cosmic_universe::log::{PointLogger, Trackable};
@@ -12,13 +12,16 @@ use cosmic_universe::selector::{PayloadBlock, PayloadBlockVar};
 use cosmic_universe::substance::Substance;
 use cosmic_universe::util::ToResolved;
 use cosmic_universe::wave::{
-    BounceBacks, CmdMethod, DirectedKind, DirectedProto, DirectedWave, Echo, Exchanger, Method,
-    Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedAggregate, ReflectedCore, Reflection,
+    BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo,
+    Pong, ReflectedAggregate, Reflection,
     UltraWave, Wave, WaveKind,
 };
 use http::Uri;
 use std::str::FromStr;
 use std::sync::Arc;
+use cosmic_universe::wave::core::{Method, ReflectedCore};
+use cosmic_universe::wave::core::cmd::CmdMethod;
+use cosmic_universe::wave::exchange::{Exchanger, ProtoTransmitter, ProtoTransmitterBuilder};
 
 pub struct Field<P>
 where
@@ -35,7 +38,7 @@ where
     P: Platform,
 {
     pub fn new(point: Point, skel: HyperStarSkel<P>) -> Self {
-        let port = point.to_port().with_layer(Layer::Field);
+        let port = point.to_surface().with_layer(Layer::Field);
         let logger = skel.logger.point(port.point.clone());
         let shell_router = Arc::new(LayerInjectionRouter::new(
             skel.clone(),
@@ -101,7 +104,7 @@ impl<P> TraversalLayer for Field<P>
 where
     P: Platform,
 {
-    fn port(&self) -> Surface {
+    fn surface(&self) -> Surface {
         self.port.clone()
     }
 
@@ -289,7 +292,7 @@ impl PipeEx {
             PipelineStopVar::Point(point) => {
                 let point: Point = point.clone().to_resolved(&self.env)?;
                 let mut proto = self.proto();
-                proto.to(point.to_port().with_layer(Layer::Core));
+                proto.to(point.to_surface().with_layer(Layer::Core));
                 self.direct(proto, self.gravity_transmitter.clone()).await
             }
             PipelineStopVar::Err { .. } => {

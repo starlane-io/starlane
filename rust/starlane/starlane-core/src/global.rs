@@ -4,13 +4,14 @@ use cosmic_universe::command::Command;
 use cosmic_universe::loc::Surface;
 use cosmic_universe::loc::ToSurface;
 use cosmic_universe::service::Global;
-use cosmic_universe::wave::{AsyncTransmitterWithAgent, Method, Transmitter};
+use cosmic_universe::wave::{AsyncTransmitterWithAgent, Transmitter};
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Agent, ReqProto, ReqShell, RespShell};
 use mesh_portal::version::latest::msg::MsgMethod;
 use mesh_portal::version::latest::payload::{PayloadType, Substance};
 use std::str::FromStr;
 use std::sync::Arc;
+use cosmic_universe::wave::core::Method;
 
 lazy_static! {
     static ref COMMAND_SERVICE_PORT: Surface = Point::from_str("GLOBAL::command-service")
@@ -52,7 +53,7 @@ impl GlobalApi {
                             Command::Create(create) => {
                                 let mut response = {
                                     let mut request = request.clone();
-                                    request.to = create.template.point.parent.clone().to_port();
+                                    request.to = create.template.point.parent.clone().to_surface();
                                     global.transmitter.direct(request).await
                                 };
                                 response.from = Point::global_executor().to_port();

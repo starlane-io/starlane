@@ -1,4 +1,4 @@
-use crate::error::UniErr;
+use crate::err::UniErr;
 use crate::loc::Point;
 use crate::parse::error::result;
 use crate::parse::{MapResolver, particle_perms, permissions, permissions_mask, privilege};

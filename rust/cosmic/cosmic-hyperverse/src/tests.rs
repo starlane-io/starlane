@@ -13,14 +13,14 @@ use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::direct::create::{
     Create, PointSegTemplate, PointTemplate, Strategy, Template,
 };
-use cosmic_universe::wave::ext::ExtMethod;
+use cosmic_universe::wave::core::ext::ExtMethod;
 use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance, InterchangeKind, Knock};
 use cosmic_universe::loc::{Layer, StarHandle, ToPoint, ToSurface, Uuid};
 use cosmic_universe::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
 use cosmic_universe::hyper::MountKind;
 use cosmic_universe::wave::{
-    Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, HypMethod, Method, Pong,
-    ProtoTransmitterBuilder, Wave,
+    Agent, DirectedKind, DirectedProto, HyperWave, Pong,
+    Wave,
 };
 use cosmic_universe::HYPERUSER;
 use dashmap::DashMap;
@@ -34,6 +34,11 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{Mutex, oneshot};
 use tokio::time::error::Elapsed;
 use cosmic_universe::particle::traversal::TraversalDirection;
+use cosmic_universe::wave::core::Method;
+use cosmic_universe::wave::core::cmd::CmdMethod;
+use cosmic_universe::wave::core::hyp::HypMethod;
+use cosmic_universe::wave::exchange::Exchanger;
+use cosmic_universe::wave::exchange::ProtoTransmitterBuilder;
 //use crate::control::ControlDriverFactory;
 use crate::driver::{DriverAvail, DriverFactory};
 use crate::root::RootDriverFactory;
@@ -415,7 +420,7 @@ async fn create(
     );
 
     let mut wave = DirectedProto::ping();
-    wave.to(star_api.get_skel().await?.point.clone().to_port());
+    wave.to(star_api.get_skel().await?.point.clone().to_surface());
     wave.from(HYPERUSER.clone());
     wave.agent(Agent::HyperUser);
     wave.method(HypMethod::Assign);
@@ -481,8 +486,8 @@ fn test_gravity_routing() -> Result<(), TestErr> {
 
         // send a 'nice' wave from Fae to Less
         let mut wave = DirectedProto::ping();
-        wave.from(FAE.clone().to_port());
-        wave.to(LESS.clone().to_port());
+        wave.from(FAE.clone().to_surface());
+        wave.to(LESS.clone().to_surface());
         wave.method(ExtMethod::new("DieTacEng").unwrap());
         let wave = wave.build().unwrap();
         let wave = wave.to_ultra();
@@ -659,8 +664,8 @@ fn test_layer_traversal() -> Result<(), TestErr> {
 
         // send a 'nice' wave from Fae to Less
         let mut wave = DirectedProto::ping();
-        wave.from(FAE.clone().to_port());
-        wave.to(LESS.clone().to_port());
+        wave.from(FAE.clone().to_surface());
+        wave.to(LESS.clone().to_surface());
         wave.method(CmdMethod::Bounce);
         let wave = wave.build().unwrap();
         let wave = wave.to_ultra();
@@ -875,7 +880,7 @@ fn test_control() -> Result<(), TestErr> {
         };
 
         let exchanger = Exchanger::new(
-            Point::from_str("client").unwrap().to_port(),
+            Point::from_str("client").unwrap().to_surface(),
             Timeouts::default(),
         );
         let client =
@@ -893,7 +898,7 @@ fn test_control() -> Result<(), TestErr> {
                         let directed = wave.to_directed().unwrap();
                         if directed.core().method == Method::Cmd(CmdMethod::Bounce) {
                             let reflection = directed.reflection().unwrap();
-                            let reflect = reflection.make(ReflectedCore::ok(), greet.port.clone());
+                            let reflect = reflection.make(ReflectedCore::ok(), greet.surface.clone());
                             let wave = reflect.to_ultra();
                             transmitter.route(wave).await;
                         }
@@ -1002,7 +1007,7 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
         };
 
         let exchanger = Exchanger::new(
-            Point::from_str("client").unwrap().to_port(),
+            Point::from_str("client").unwrap().to_surface(),
             Timeouts::default(),
         );
         let client =
@@ -1012,7 +1017,7 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
 
         let mut proto = DirectedProto::ping();
         proto.method(CmdMethod::Bounce);
-        proto.to(Point::root().to_port());
+        proto.to(Point::root().to_surface());
         let reflect: Wave<Pong> = transmitter.direct(proto).await?;
         println!("{}", reflect.core.status.to_string());
         assert!(reflect.core.is_ok());
@@ -1039,7 +1044,7 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
         let point = Point::from_str("my-domain.com")?;
         let mut proto = DirectedProto::ping();
         proto.method(CmdMethod::Bounce);
-        proto.to(point.to_port());
+        proto.to(point.to_surface());
         let reflect: Wave<Pong> = transmitter.direct(proto).await?;
         println!("{}", reflect.core.status.to_string());
         assert!(reflect.core.is_ok());

@@ -161,7 +161,7 @@ pub mod particle {
     use nom_supreme::{parse_from_str, ParserExt};
     use serde::{Deserialize, Serialize};
 
-    use crate::error::UniErr;
+    use crate::err::UniErr;
     use crate::loc::{Point, PointKind};
     use crate::parse::parse_alpha1_str;
     use crate::security::Permissions;

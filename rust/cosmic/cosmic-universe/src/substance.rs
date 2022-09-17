@@ -1,15 +1,15 @@
 use crate::command::{Command, RawCommand};
-use crate::error::ParseErrs;
-use crate::wave::ext::ExtMethod;
-use crate::wave::http2::HttpMethod;
+use crate::err::ParseErrs;
+use crate::wave::core::ext::ExtMethod;
+use crate::wave::core::http2::HttpMethod;
 use crate::hyper::{Greet, HyperSubstance, Knock};
 use crate::loc::{Meta, PointCtx, PointVar};
 use crate::parse::model::Subst;
 use crate::parse::Env;
 use crate::particle::Particle;
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
-use crate::wave::{CmdMethod, DirectedCore, HypMethod, HyperWave, Pong, UltraWave};
-use crate::{util, Details, Point, Surface, ReflectedCore, Status, Stub, UniErr};
+use crate::wave::{Pong, UltraWave};
+use crate::{Details, Point, Status, Stub, Surface, UniErr, util};
 use core::str::FromStr;
 use cosmic_macros_primitive::Autobox;
 use cosmic_nom::Tw;
@@ -20,6 +20,9 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use crate::wave::core::{DirectedCore, ReflectedCore};
+use crate::wave::core::cmd::CmdMethod;
+use crate::wave::core::hyp::HypMethod;
 
 #[derive(
     Debug,

@@ -1,13 +1,13 @@
 #![allow(warnings)]
 
 use cosmic_hyperlane::{HyperGate, HyperGateSelector, VersionGate};
-use cosmic_universe::error::{StatusErr, UniErr};
+use cosmic_universe::err::{StatusErr, UniErr};
 use cosmic_universe::frame::PrimitiveFrame;
 use cosmic_universe::hyper::{HyperSubstance, Knock};
 use cosmic_universe::loc::{Point, ToSurface};
 use cosmic_universe::log::PointLogger;
 use cosmic_universe::substance::Substance;
-use cosmic_universe::wave::{DirectedCore, DirectedProto, HypMethod, Pong, UltraWave, Wave};
+use cosmic_universe::wave::{DirectedProto, Pong, UltraWave, Wave};
 use cosmic_universe::VERSION;
 use quinn::{
     ClientConfig, Connecting, Connection, Endpoint, NewConnection, RecvStream, ServerConfig, VarInt,
@@ -20,6 +20,8 @@ use std::task::Poll;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
+use cosmic_universe::wave::core::DirectedCore;
+use cosmic_universe::wave::core::hyp::HypMethod;
 
 fn generate_self_signed_cert() -> Result<(rustls::Certificate, rustls::PrivateKey), UniErr> {
     let cert = rcgen::generate_simple_self_signed(vec!["cosmic-hyperlane".to_string()])?;
@@ -313,7 +315,7 @@ impl ConErr {
 mod tests {
     use crate::HyperServerQuic;
     use cosmic_hyperlane::{HyperGateSelector, VersionGate};
-    use cosmic_universe::error::UniErr;
+    use cosmic_universe::err::UniErr;
     use dashmap::DashMap;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use std::sync::Arc;

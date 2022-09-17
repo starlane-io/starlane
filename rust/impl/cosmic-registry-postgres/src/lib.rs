@@ -12,7 +12,7 @@ use cosmic_universe::command::direct::select::{
     Select, SelectIntoSubstance, SelectKind, SubSelect,
 };
 use cosmic_universe::command::direct::set::Set;
-use cosmic_universe::error::UniErr;
+use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::{Location, ParticleRecord};
 use cosmic_universe::loc::{
     Point, PointSeg, Specific, StarKey,

@@ -8,7 +8,7 @@ use cosmic_universe::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
 use cosmic_universe::config::bind::{BindConfig, RouteSelector};
-use cosmic_universe::error::UniErr;
+use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance};
 use cosmic_universe::loc::{
     Layer, Point, StarKey, Surface, ToBaseKind, ToPoint, ToSurface,
@@ -22,10 +22,10 @@ use cosmic_universe::reg::Registration;
 use cosmic_universe::substance::Substance;
 use cosmic_universe::util::{log, ValuePattern};
 use cosmic_universe::wave::{
-    Agent, Bounce, CmdMethod, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector,
-    DirectedKind, DirectedProto, DirectedWave, Exchanger, HypMethod, InCtx, Method, Ping, Pong,
-    ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, ReflectedCore, ReflectedWave,
-    RootInCtx, Router, SetStrategy, UltraWave, Wave, WaveKind,
+    Agent, Bounce,
+    DirectedKind, DirectedProto, DirectedWave, Ping, Pong,
+    RecipientSelector, ReflectedWave,
+    UltraWave, Wave, WaveKind,
 };
 use cosmic_universe::HYPERUSER;
 use dashmap::DashMap;
@@ -44,7 +44,10 @@ use tokio::sync::watch::Ref;
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock, watch};
 use cosmic_universe::kind::{BaseKind, Kind, StarSub};
 use cosmic_universe::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
-
+use cosmic_universe::wave::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
+use cosmic_universe::wave::core::cmd::CmdMethod;
+use cosmic_universe::wave::core::hyp::HypMethod;
+use cosmic_universe::wave::exchange::{DirectedHandler, DirectedHandlerSelector, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, SetStrategy};
 lazy_static! {
     static ref DEFAULT_BIND: ArtRef<BindConfig> = ArtRef::new(
         Arc::new(default_bind()),
@@ -123,7 +126,7 @@ where
         status_tx: watch::Sender<DriverStatus>,
         status_rx: watch::Receiver<DriverStatus>,
     ) -> DriversApi<P> {
-        let port = skel.point.push("drivers").unwrap().to_port();
+        let port = skel.point.push("drivers").unwrap().to_surface();
         Drivers::new(
             port,
             skel.clone(),
@@ -591,11 +594,11 @@ where
 
             let router = Arc::new(LayerInjectionRouter::new(
                 skel.clone(),
-                point.clone().to_port().with_layer(Layer::Guest),
+                point.clone().to_surface().with_layer(Layer::Guest),
             ));
             let mut transmitter = ProtoTransmitterBuilder::new(router, skel.exchanger.clone());
             transmitter.from =
-                SetStrategy::Override(point.clone().to_port().with_layer(Layer::Core));
+                SetStrategy::Override(point.clone().to_surface().with_layer(Layer::Core));
             let transmitter = transmitter.build();
 
             let (runner_tx, runner_rx) = mpsc::channel(1024);
@@ -634,7 +637,7 @@ where
                 let mut transmitter =
                     ProtoTransmitterBuilder::new(router, self.skel.exchanger.clone());
                 transmitter.from = SetStrategy::Override(
-                    self.skel.point.clone().to_port().with_layer(Layer::Gravity),
+                    self.skel.point.clone().to_surface().with_layer(Layer::Gravity),
                 );
                 transmitter.agent = SetStrategy::Override(Agent::HyperUser);
                 let ctx = DriverCtx::new(transmitter.build());
@@ -939,7 +942,7 @@ impl<P> TraversalLayer for ItemOuter<P>
 where
     P: Platform,
 {
-    fn port(&self) -> cosmic_universe::loc::Surface {
+    fn surface(&self) -> cosmic_universe::loc::Surface {
         self.port.clone()
     }
 
@@ -950,7 +953,7 @@ where
         let logger = self
             .skel
             .logger
-            .point(self.port().clone().to_point())
+            .point(self.surface().clone().to_point())
             .span();
 
         match &self.item {
@@ -962,17 +965,17 @@ where
                         Ok(status) => {
                             self.skel
                                 .registry
-                                .set_status(&self.port().point.clone(), &status)
+                                .set_status(&self.surface().point.clone(), &status)
                                 .await;
-                            let reflect = reflection.make(ReflectedCore::ok(), self.port());
+                            let reflect = reflection.make(ReflectedCore::ok(), self.surface());
                             self.router.route(reflect.to_ultra()).await;
                         }
                         Err(err) => {
                             self.skel
                                 .registry
-                                .set_status(&self.port().point.clone(), &Status::Panic)
+                                .set_status(&self.surface().point.clone(), &Status::Panic)
                                 .await;
-                            let reflect = reflection.make(ReflectedCore::err(err), self.port());
+                            let reflect = reflection.make(ReflectedCore::err(err), self.surface());
                             self.router.route(reflect.to_ultra()).await;
                         }
                     }
@@ -1034,7 +1037,7 @@ where
     }
 
     async fn inject(&self, wave: UltraWave) {
-        let inject = TraversalInjection::new(self.port().clone().with_layer(Layer::Guest), wave);
+        let inject = TraversalInjection::new(self.surface().clone().with_layer(Layer::Guest), wave);
         self.skel.inject_tx.send(inject).await;
     }
 
@@ -1076,7 +1079,7 @@ where
         let logger = star_skel.logger.point(skel.point.clone());
         let router = LayerInjectionRouter::new(
             star_skel.clone(),
-            skel.point.clone().to_port().with_layer(Layer::Guest),
+            skel.point.clone().to_surface().with_layer(Layer::Guest),
         );
 
         let driver = Self {
@@ -1103,7 +1106,7 @@ where
                     DriverRunnerCall::OnAdded => {
                         let router = Arc::new(LayerInjectionRouter::new(
                             self.star_skel.clone(),
-                            self.skel.point.clone().to_port().with_layer(Layer::Core),
+                            self.skel.point.clone().to_surface().with_layer(Layer::Core),
                         ));
                         let transmitter =
                             ProtoTransmitter::new(router, self.star_skel.exchanger.clone());
@@ -1199,7 +1202,7 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemOuter<P>, P::Err> {
-        let port = point.clone().to_port().with_layer(self.layer.clone());
+        let port = point.clone().to_surface().with_layer(self.layer.clone());
 
         Ok(ItemOuter {
             port: port.clone(),

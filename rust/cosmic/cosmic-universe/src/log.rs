@@ -1,6 +1,6 @@
 use crate::command::common::StateSrc::Substance;
 use crate::cosmic_timestamp;
-use crate::error::UniErr;
+use crate::err::UniErr;
 use crate::loc::{Point, ToPoint, Uuid};
 use crate::parse::{to_string, CamelCase};
 use crate::selector::Selector;

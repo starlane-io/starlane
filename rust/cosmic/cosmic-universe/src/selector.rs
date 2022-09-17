@@ -542,7 +542,7 @@ impl ToString for SpecificSelector {
 }
 
 pub mod specific {
-    use crate::error::UniErr;
+    use crate::err::UniErr;
     use crate::parse::{Domain, SkewerCase};
     use crate::selector::Pattern;
     use alloc::string::String;

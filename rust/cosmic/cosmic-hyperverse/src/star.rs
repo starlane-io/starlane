@@ -19,7 +19,7 @@ use cosmic_universe::command::direct::create::{Create, Strategy};
 use cosmic_universe::command::direct::set::Set;
 use cosmic_universe::command::RawCommand;
 use cosmic_universe::config::bind::{BindConfig, RouteSelector};
-use cosmic_universe::error::UniErr;
+use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::{
     Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, Location, ParticleRecord,
     Provision, Search,
@@ -39,14 +39,14 @@ use cosmic_universe::substance::Bin;
 use cosmic_universe::substance::{Substance, ToSubstance};
 use cosmic_universe::util::{log, ValueMatcher, ValuePattern};
 use cosmic_universe::wave::{
-    Agent, Bounce, BounceBacks, CmdMethod, CoreBounce, DirectedHandler, DirectedHandlerSelector,
-    DirectedHandlerShell, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
-    HandlingKind, InCtx, Method, Ping, Pong, Priority, ProtoTransmitter, ProtoTransmitterBuilder,
-    Recipients, RecipientSelector, Reflectable, ReflectedCore, ReflectedWave, Retries, Ripple,
-    RootInCtx, Router, Scope, SetStrategy, Signal, SingularRipple, ToRecipients, TxRouter,
+    Agent, Bounce, BounceBacks,
+    DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
+    HandlingKind, Ping, Pong, Priority,
+    Recipients, RecipientSelector, Reflectable, ReflectedWave, Retries, Ripple,
+    Scope, Signal, SingularRipple, ToRecipients,
     WaitTime, Wave, WaveKind,
 };
-use cosmic_universe::wave::{DirectedCore, Exchanger, HyperWave, HypMethod, UltraWave};
+use cosmic_universe::wave::{HyperWave, UltraWave};
 use cosmic_universe::HYPERUSER;
 use dashmap::mapref::one::{Ref, RefMut};
 use dashmap::DashMap;
@@ -69,6 +69,10 @@ use tokio::time::error::Elapsed;
 use tracing::{error, info};
 use cosmic_universe::kind::{BaseKind, Kind, StarStub, StarSub, Sub};
 use cosmic_universe::particle::traversal::{Traversal, TraversalDirection, TraversalInjection, TraversalLayer};
+use cosmic_universe::wave::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
+use cosmic_universe::wave::core::cmd::CmdMethod;
+use cosmic_universe::wave::core::hyp::HypMethod;
+use cosmic_universe::wave::exchange::{DirectedHandler, DirectedHandlerSelector, DirectedHandlerShell, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, SetStrategy, TxRouter};
 
 #[derive(Clone)]
 pub struct StarState<P>
@@ -175,7 +179,7 @@ where
     ) -> Self {
         let point = template.key.clone().to_point();
         let logger = machine.logger.point(point.clone());
-        let exchanger = Exchanger::new(point.clone().to_port(), machine.timeouts.clone());
+        let exchanger = Exchanger::new(point.clone().to_surface(), machine.timeouts.clone());
         let state = StarState::new();
         let api = HyperStarApi::new(
             template.kind.clone(),
@@ -194,7 +198,7 @@ where
         let gravity_router = TxRouter::new(star_tx.gravity_tx.clone());
         let mut gravity_transmitter =
             ProtoTransmitterBuilder::new(Arc::new(gravity_router.clone()), exchanger.clone());
-        gravity_transmitter.from = SetStrategy::Override(point.clone().to_port());
+        gravity_transmitter.from = SetStrategy::Override(point.clone().to_surface());
         gravity_transmitter.handling = SetStrategy::Fill(Handling {
             kind: HandlingKind::Immediate,
             priority: Priority::High,
@@ -213,11 +217,11 @@ where
 
         let star_router = LayerInjectionRouter::injector(
             star_tx.inject_tx.clone(),
-            point.to_port().with_layer(Layer::Core),
+            point.to_surface().with_layer(Layer::Core),
         );
         let mut star_transmitter =
             ProtoTransmitterBuilder::new(Arc::new(star_router), exchanger.clone());
-        star_transmitter.from = SetStrategy::Override(point.to_port().with_layer(Layer::Core));
+        star_transmitter.from = SetStrategy::Override(point.to_surface().with_layer(Layer::Core));
         star_transmitter.agent = SetStrategy::Override(Agent::HyperUser);
         let star_transmitter = star_transmitter.build();
 
@@ -295,17 +299,17 @@ where
         )?;
         let assign_body = Assign::new(AssignmentKind::Create, details.clone(), StateSrc::None);
         let mut assign = DirectedProto::sys(
-            self.point.clone().to_port().with_layer(Layer::Core),
+            self.point.clone().to_surface().with_layer(Layer::Core),
             HypMethod::Assign,
         );
 
         assign.body(assign_body.into());
         let router = Arc::new(LayerInjectionRouter::new(
             self.clone(),
-            self.point.clone().to_port().with_layer(Layer::Shell),
+            self.point.clone().to_surface().with_layer(Layer::Shell),
         ));
         let mut transmitter = ProtoTransmitterBuilder::new(router, self.exchanger.clone());
-        transmitter.from = SetStrategy::Override(self.point.to_port().with_layer(Layer::Core));
+        transmitter.from = SetStrategy::Override(self.point.to_surface().with_layer(Layer::Core));
         transmitter.agent = SetStrategy::Override(Agent::HyperUser);
         let transmitter = transmitter.build();
 
@@ -643,7 +647,7 @@ where
         let star_rx = star_tx.call_rx.take().unwrap();
         let star_tx = star_tx.call_tx;
 
-        let global_port = Point::global_executor().to_port().with_layer(Layer::Core);
+        let global_port = Point::global_executor().to_surface().with_layer(Layer::Core);
         let mut transmitter = ProtoTransmitterBuilder::new(
             Arc::new(skel.gravity_router.clone()),
             skel.exchanger.clone(),
@@ -677,7 +681,7 @@ where
             .clone()
             .push("injector")
             .unwrap()
-            .to_port()
+            .to_surface()
             .with_layer(Layer::Gravity);
 
         let (to_gravity_traversal_tx, mut to_gravity_traversal_rx): (
@@ -700,7 +704,7 @@ where
             to_gravity_traversal_tx,
         );
 
-        let gravity = skel.point.clone().to_port().with_layer(Layer::Gravity);
+        let gravity = skel.point.clone().to_surface().with_layer(Layer::Gravity);
 
         // relay from hyper_rx
         {
@@ -770,7 +774,7 @@ where
                         match interchange
                             .mount(
                                 HyperwayStub::new(
-                                    stub.key.to_point().to_port().with_layer(Layer::Gravity),
+                                    stub.key.to_point().to_surface().with_layer(Layer::Gravity),
                                     Agent::HyperUser,
                                 ),
                                 None,
@@ -1082,9 +1086,9 @@ where
                             wave.history.insert(skel.point.clone());
                             let mut transport = wave.to_ultra().wrap_in_transport(
                                 gravity.clone(),
-                                star.to_port().with_layer(Layer::Core),
+                                star.to_surface().with_layer(Layer::Core),
                             );
-                            transport.from(skel.point.clone().to_port());
+                            transport.from(skel.point.clone().to_surface());
                             let transport = transport.build()?;
                             let transport = transport.to_signal()?;
                             skel.api.to_hyperway(transport).await;
@@ -1094,8 +1098,8 @@ where
                         let to = wave.to().unwrap_single();
                         let location = locator.locate(&to.point).await?;
                         let mut transport = wave
-                            .wrap_in_transport(gravity, location.to_port().with_layer(Layer::Core));
-                        transport.from(skel.point.clone().to_port());
+                            .wrap_in_transport(gravity, location.to_surface().with_layer(Layer::Core));
+                        transport.from(skel.point.clone().to_surface());
                         let transport = transport.build()?;
                         let transport = transport.to_signal()?;
                         skel.api.to_hyperway(transport).await;
@@ -1126,7 +1130,7 @@ where
                 self.hyperway_transmitter
                     .direct(
                         transport
-                            .wrap_in_hop(self.gravity.clone(), self.skel.point.clone().to_port()),
+                            .wrap_in_hop(self.gravity.clone(), self.skel.point.clone().to_surface()),
                     )
                     .await,
             )?;
@@ -1140,7 +1144,7 @@ where
             )?;
             Ok(())
         } else if self.forwarders.len() == 1 {
-            let to = self.forwarders.first().unwrap().clone().to_port();
+            let to = self.forwarders.first().unwrap().clone().to_surface();
             logger.result(
                 self.hyperway_transmitter
                     .direct(transport.wrap_in_hop(self.gravity.clone(), to))
@@ -1192,7 +1196,7 @@ where
         tokio::spawn(async move {
             let mut proto = DirectedProto::ping();
             proto.method(CmdMethod::Bounce);
-            proto.to(key.to_point().to_port().with_layer(Layer::Core));
+            proto.to(key.to_point().to_surface().with_layer(Layer::Core));
             let pong: Wave<Pong> = match transmitter.direct(proto).await {
                 Ok(pong) => pong,
                 Err(err) => {
@@ -1308,9 +1312,9 @@ where
                     Recipients::Watchers(_) => {}
                     Recipients::Stars => {
                         if self.skel.point == wave.from().point {
-                            tos.push(self.skel.point.to_port().with_layer(Layer::Gravity));
+                            tos.push(self.skel.point.to_surface().with_layer(Layer::Gravity));
                         } else {
-                            tos.push(self.skel.point.to_port().with_layer(Layer::Core));
+                            tos.push(self.skel.point.to_surface().with_layer(Layer::Core));
                         }
                     }
                 }
@@ -1461,7 +1465,7 @@ where
                     self.skel.clone(),
                     self.skel
                         .state
-                        .find_shell(&traversal.point.to_port().with_layer(Layer::Shell))?,
+                        .find_shell(&traversal.point.to_surface().with_layer(Layer::Shell))?,
                 );
 
                 let logger = logger.clone();
@@ -2024,7 +2028,7 @@ where
                     let assign: DirectedCore = assign.into();
                     let mut proto = DirectedProto::ping();
                     proto.core(assign);
-                    proto.to(key.to_port());
+                    proto.to(key.to_surface());
                     let pong: Wave<Pong> = ctx.transmitter.direct(proto).await?;
                     pong.ok_or()?;
                     Ok(ReflectedCore::ok_body(key.to_point().into()))
@@ -2085,7 +2089,7 @@ where
         let wave = ctx.input.clone();
 
         let injection = TraversalInjection::new(
-            self.skel.point.clone().to_port().with_layer(Layer::Gravity),
+            self.skel.point.clone().to_surface().with_layer(Layer::Gravity),
             wave,
         );
 
@@ -2407,7 +2411,7 @@ where
             unimplemented!();
         }
         Recipients::Stars => {
-            let stars: Vec<Surface> = adjacent.clone().into_iter().map(|p| p.to_port()).collect();
+            let stars: Vec<Surface> = adjacent.clone().into_iter().map(|p| p.to_surface()).collect();
             Ok(stars)
         }
     }
@@ -2500,8 +2504,8 @@ where
         let mut wave = DirectedProto::ping();
         wave.method(HypMethod::Provision);
         wave.body(HyperSubstance::Provision(provision).into());
-        wave.from(self.skel.point.clone().to_port().with_layer(Layer::Core));
-        wave.to(parent_star.to_port().with_layer(Layer::Core));
+        wave.from(self.skel.point.clone().to_surface().with_layer(Layer::Core));
+        wave.to(parent_star.to_surface().with_layer(Layer::Core));
         let pong: Wave<Pong> = self.skel.star_transmitter.direct(wave).await?;
         if pong.core.status.as_u16() == 200 {
             if let Substance::Point(location) = &pong.core.body {
@@ -2539,10 +2543,10 @@ where
 {
     pub fn new(skel: HyperStarSkel<P>, search: Search) -> Self {
         let router =
-            LayerInjectionRouter::new(skel.clone(), skel.point.to_port().with_layer(Layer::Shell));
+            LayerInjectionRouter::new(skel.clone(), skel.point.to_surface().with_layer(Layer::Shell));
         let mut transmitter =
             ProtoTransmitterBuilder::new(Arc::new(router), skel.exchanger.clone());
-        transmitter.from = SetStrategy::Override(skel.point.to_port().with_layer(Layer::Core));
+        transmitter.from = SetStrategy::Override(skel.point.to_surface().with_layer(Layer::Core));
         transmitter.agent = SetStrategy::Override(Agent::HyperUser);
         transmitter.handling = SetStrategy::Override(Handling {
             kind: HandlingKind::Immediate,

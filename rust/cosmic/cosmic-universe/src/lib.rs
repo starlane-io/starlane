@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 pub mod artifact;
 pub mod command;
 pub mod config;
-pub mod error;
+pub mod err;
 pub mod fail;
 pub mod frame;
 pub mod hyper;
@@ -36,10 +36,10 @@ pub mod substance;
 pub mod util;
 pub mod wave;
 
-use crate::error::UniErr;
+use crate::err::UniErr;
 use crate::hyper::ParticleRecord;
 use crate::security::{Access, AccessGrant};
-use crate::wave::{Agent, ReflectedCore};
+use crate::wave::Agent;
 use ::http::StatusCode;
 use artifact::ArtifactFetcher;
 use chrono::{DateTime, Utc};
@@ -66,6 +66,7 @@ use substance::Bin;
 use substance::{Substance, SubstanceList, Token, ToSubstance};
 use tokio::sync::RwLock;
 use kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, StarSub, UserBaseSubKind};
+use wave::core::ReflectedCore;
 
 lazy_static! {
     pub static ref VERSION: semver::Version = semver::Version::from_str("0.3.0").unwrap();

@@ -2,11 +2,12 @@ use std::ops::{Deref, DerefMut};
 use crate::loc::Layer;
 use crate::log::{SpanLogger, Trackable};
 use crate::{ParticleRecord, Point, Surface, UniErr};
-use crate::wave::{DirectedWave, Exchanger, Ping, Pong, ReflectedWave, SingularDirectedWave, UltraWave, Wave};
+use crate::wave::{DirectedWave, Ping, Pong, ReflectedWave, SingularDirectedWave, UltraWave, Wave};
+use crate::wave::exchange::Exchanger;
 
 #[async_trait]
 pub trait TraversalLayer {
-    fn port(&self) -> Surface;
+    fn surface(&self) -> Surface;
 
     async fn traverse_next(&self, traversal: Traversal<UltraWave>);
     async fn inject(&self, wave: UltraWave);
@@ -25,7 +26,7 @@ pub trait TraversalLayer {
 
     async fn visit(&self, traversal: Traversal<UltraWave>) -> Result<(), UniErr> {
         if let Some(dest) = &traversal.dest {
-            if self.port().layer == *dest {
+            if self.surface().layer == *dest {
                 if traversal.is_directed() {
                     self.deliver_directed(traversal.unwrap_directed()).await?;
                 } else {

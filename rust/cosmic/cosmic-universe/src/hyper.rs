@@ -1,4 +1,4 @@
-use crate::error::UniErr;
+use crate::err::UniErr;
 use crate::substance::Substance;
 use cosmic_macros_primitive::Autobox;
 use std::collections::HashSet;
@@ -9,12 +9,15 @@ use crate::loc::{Point, StarKey, Surface, ToPoint, ToSurface};
 use crate::log::Log;
 use crate::particle::{Details, Status, Stub};
 use crate::wave::{
-    CmdMethod, DirectedCore, HypMethod, Ping, Pong, ReflectedKind, ReflectedProto, ToRecipients,
+    Ping, Pong, ReflectedKind, ReflectedProto, ToRecipients,
     UltraWave, Wave, WaveId, WaveKind,
 };
-use crate::{Agent, ReflectedCore};
+use crate::Agent;
 use serde::{Deserialize, Serialize};
 use crate::kind::{Kind, KindParts, StarSub};
+use crate::wave::core::{DirectedCore, ReflectedCore};
+use crate::wave::core::cmd::CmdMethod;
+use crate::wave::core::hyp::HypMethod;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {
@@ -292,8 +295,8 @@ impl Into<Wave<Ping>> for Knock {
         let mut core = DirectedCore::new(HypMethod::Knock.into());
         core.body = Substance::Knock(self);
         let wave = Wave::new(
-            Ping::new(core, Point::local_endpoint().to_port()),
-            Point::remote_endpoint().to_port(),
+            Ping::new(core, Point::local_endpoint().to_surface()),
+            Point::remote_endpoint().to_surface(),
         );
         wave
     }
@@ -301,17 +304,17 @@ impl Into<Wave<Ping>> for Knock {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Greet {
-    pub port: Surface,
+    pub surface: Surface,
     pub agent: Agent,
     pub hop: Surface,
     pub transport: Surface,
 }
 
 impl Greet {
-    pub fn new(agent: Agent, port: Surface, hop: Surface, transport: Surface) -> Self {
+    pub fn new(agent: Agent, surface: Surface, hop: Surface, transport: Surface) -> Self {
         Self {
             agent,
-            port,
+            surface,
             hop,
             transport,
         }
@@ -324,7 +327,7 @@ impl Into<UltraWave> for Greet {
         proto.kind(ReflectedKind::Pong);
         proto.agent(Agent::HyperUser);
         proto.from(self.transport.clone());
-        proto.to(self.port.clone());
+        proto.to(self.surface.clone());
         proto.intended(self.hop.clone());
         proto.reflection_of(WaveId::new(WaveKind::Ping)); // this is just randomly created since this pong reflection will not be traditionally handled on the receiving end
         proto.status(200u16);

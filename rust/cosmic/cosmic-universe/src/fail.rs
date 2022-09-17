@@ -1,7 +1,7 @@
 use alloc::string::String;
 use serde::{Deserialize, Serialize};
 
-use crate::error::UniErr;
+use crate::err::UniErr;
 use crate::loc::Specific;
 
 pub mod mesh {

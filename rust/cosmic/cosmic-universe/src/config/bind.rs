@@ -1,7 +1,7 @@
 use crate::command::direct::Cmd;
-use crate::error::{ParseErrs, UniErr};
+use crate::err::{ParseErrs, UniErr};
 use crate::wave::{
-    DirectedCore, DirectedWave, MethodKind, MethodPattern, Ping, RecipientSelector,
+    DirectedWave, Ping, RecipientSelector,
     SingularDirectedWave, Wave,
 };
 
@@ -18,6 +18,7 @@ use crate::util::{ToResolved, ValueMatcher, ValuePattern};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
+use crate::wave::core::{DirectedCore, MethodKind, MethodPattern};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WaveDirection {
