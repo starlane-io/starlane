@@ -75,11 +75,9 @@ alcoholic_jwt = "1.0.1"
 base64 = "0.13.0"
 
 cosmic-nom={ path="../../cosmic/cosmic-nom"}
-cosmic-portal-cli={ path="../../cosmic/cosmic-portal-cli"}
 cosmic-macros={ path="../../cosmic/cosmic-macros"}
-cosmic-platform={ path= "../../cosmic/cosmic-platform" }
-cosmic-api = { path= "../../cosmic/cosmic-api" }
-cosmic-store ={ path= "../../cosmic/cosmic-store", default-features=true }
+cosmic-hyperverse={ path= "../../cosmic/cosmic-hyperverse" }
+cosmic-universe = { path= "../../cosmic/cosmic-universe" }
 
 async-recursion = "1.0.0"
 

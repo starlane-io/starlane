@@ -12,12 +12,13 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use cosmic_api::id::id::{BaseKind, ToBaseKind, ToPoint};
-use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, UserBaseSubKind};
-use cosmic_api::parse::{consume_kind, CamelCase};
-use cosmic_api::particle::particle::{Details, Property};
-use cosmic_api::sys::{AssignmentKind, ChildRegistry, Location};
 use cosmic_nom::new_span;
+use cosmic_universe::hyper::{AssignmentKind, ChildRegistry, Location};
+use cosmic_universe::loc::{StarKey, ToPoint};
+use cosmic_universe::loc::{ToBaseKind};
+use cosmic_universe::id2::BaseSubKind;
+use cosmic_universe::parse::{consume_kind, CamelCase};
+use cosmic_universe::particle::{Details, Property};
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::config::{ParticleConfigBody, PointConfig};
 use mesh_portal::version::latest::id::{KindParts, Point, ResourceKind, Specific};
@@ -28,6 +29,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot::Receiver;
 use tokio::sync::{mpsc, oneshot};
 use tracing_futures::WithSubscriber;
+use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, UserBaseSubKind};
 
 use crate::config::config::ParticleConfig;
 use crate::error::Error;

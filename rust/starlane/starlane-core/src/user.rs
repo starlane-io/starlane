@@ -1,5 +1,5 @@
 use crate::message::delivery::Delivery;
-use cosmic_api::id::StarKey;
+use cosmic_universe::loc::StarKey;
 use mesh_portal::version::latest::entity::request::create::{
     KindTemplate, PointSegFactory, PointTemplate, Template,
 };

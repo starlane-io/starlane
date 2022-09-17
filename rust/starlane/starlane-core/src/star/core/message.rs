@@ -21,13 +21,13 @@ use crate::star::core::particle::driver::{ResourceCoreDriverApi, ResourceCoreDri
 use crate::star::shell::db::{StarFieldSelection, StarSelector};
 use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use cosmic_api::command::Command;
-use cosmic_api::id::id::{BaseKind, Kind, Tks, ToPoint};
-use cosmic_api::id::{ArtifactSubKind, FileSubKind, StarKey, UserBaseSubKind};
-use cosmic_api::particle::particle::Details;
-use cosmic_api::sys::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
+use cosmic_hyperverse::RegistryApi;
 use cosmic_locality::field::FieldEx;
-use cosmic_platform::RegistryApi;
+use cosmic_universe::command::Command;
+use cosmic_universe::hyper::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
+use cosmic_universe::loc::{StarKey, ToPoint};
+use cosmic_universe::loc::{};
+use cosmic_universe::particle::Details;
 use futures::StreamExt;
 use http::{HeaderMap, StatusCode, Uri};
 use mesh_portal::error::MsgErr;
@@ -51,6 +51,7 @@ use mesh_portal::version::latest::security::Access;
 use regex::Regex;
 use std::future::Future;
 use std::sync::Arc;
+use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Tks, UserBaseSubKind};
 
 /*
 lazy_static!{
@@ -298,7 +299,7 @@ impl MessagingEndpointComponentInner {
                                 }
                             }
                         }
-                        Command::Update(update) => {
+                        Command::Write(update) => {
                             unimplemented!()
                         }
                         Command::Read(point) => {

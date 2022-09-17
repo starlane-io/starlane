@@ -1,5 +1,5 @@
-use cosmic_api::id::StarKey;
-use cosmic_api::sys::ParticleRecord;
+use cosmic_universe::hyper::ParticleRecord;
+use cosmic_universe::loc::StarKey;
 use futures::channel::oneshot;
 use lru::LruCache;
 use tokio::sync::mpsc;

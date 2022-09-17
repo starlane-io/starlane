@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1.48"
 cosmic-hyperlane= { path= "../cosmic-hyperlane" }
-cosmic-api = { path= "../cosmic-api" }
+cosmic-universe = { path= "../cosmic-universe" }
 tokio-openssl = "0.6.3"
 tokio = { version = "1.20.1", features = ["full"] }
 rcgen = "0.9.3"

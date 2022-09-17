@@ -8,9 +8,10 @@ use std::collections::HashSet;
 use std::convert::{Infallible, TryFrom, TryInto};
 use std::string::FromUtf8Error;
 
-use cosmic_api::id::id::{BaseKind, ToPoint};
-use cosmic_api::id::StarKey;
-use cosmic_api::sys::ParticleRecord;
+use cosmic_universe::hyper::ParticleRecord;
+use cosmic_universe::kind::BaseKind;
+use cosmic_universe::loc::StarKey;
+use cosmic_universe::loc::ToPoint;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use uuid::Uuid;
@@ -370,7 +371,7 @@ impl StarlaneMessenger {
 
 #[async_trait]
 impl Transmitter for StarlaneMessenger {
-    async fn direct(&self, request: cosmic_api::wave::Ping) -> cosmic_api::wave::Pong {
+    async fn direct(&self, request: cosmic_universe::wave::Ping) -> cosmic_universe::wave::Pong {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(StarlaneCommand::Request {
@@ -387,7 +388,7 @@ impl Transmitter for StarlaneMessenger {
         }
     }
 
-    fn send_sync(&self, request: cosmic_api::wave::Ping) -> cosmic_api::wave::Pong {
+    fn send_sync(&self, request: cosmic_universe::wave::Ping) -> cosmic_universe::wave::Pong {
         let starlane_tx = self.tx.clone();
         tokio::runtime::Handle::current().block_on(async move {
             let (tx, rx) = oneshot::channel();

@@ -1,34 +1,37 @@
 #![allow(warnings)]
 
 use chrono::{DateTime, Utc};
-use cosmic_api::command::request::create::KindTemplate;
-use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{BaseKind, Kind, Specific, ToBaseKind};
-use cosmic_api::id::{
-    ArtifactSubKind, BaseSubKind, FileSubKind, MachineName, StarKey, StarSub, UserBaseSubKind,
-};
-use cosmic_api::property::{
-    AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit,
-    PropertySource, U64Pattern, UsernamePattern,
-};
-use cosmic_api::substance::substance::Token;
-use cosmic_api::{ArtifactApi, NoDiceArtifactFetcher};
 use cosmic_artifact::Artifacts;
 use cosmic_hyperlane::HyperGateSelector;
-use cosmic_platform::driver::DriversBuilder;
-use cosmic_platform::machine::{Machine, MachineTemplate};
-use cosmic_platform::Platform;
-use cosmic_platform::{Registry, RegistryApi};
+use cosmic_hyperverse::driver::DriversBuilder;
+use cosmic_hyperverse::machine::{Machine, MachineTemplate};
+use cosmic_hyperverse::Platform;
+use cosmic_hyperverse::{Registry, RegistryApi};
 use cosmic_registry_postgres::{
     PostErr, PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
 };
+use cosmic_universe::artifact::ArtifactApi;
+use cosmic_universe::artifact::NoDiceArtifactFetcher;
+use cosmic_universe::command::direct::create::KindTemplate;
+use cosmic_universe::err::UniErr;
+use cosmic_universe::loc::{
+    MachineName, Specific, StarKey,
+};
+use cosmic_universe::loc::{ToBaseKind};
+use cosmic_universe::id2::BaseSubKind;
+use cosmic_universe::particle::property::{
+    AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit,
+    PropertySource, U64Pattern, UsernamePattern,
+};
+use cosmic_universe::substance::Token;
 use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::io;
 use tokio::runtime::Runtime;
 use uuid::Uuid;
+use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, StarSub, UserBaseSubKind};
 
 #[macro_use]
 extern crate lazy_static;
@@ -181,7 +184,7 @@ impl Platform for Starlane {
 
     fn start_services(&self, entry_router: &mut HyperGateSelector) {}
 
-    fn select_kind(&self, template: &KindTemplate) -> Result<Kind, MsgErr> {
+    fn select_kind(&self, template: &KindTemplate) -> Result<Kind, UniErr> {
         let base: BaseKind = BaseKind::from_str(template.base.to_string().as_str())?;
         match base {
             BaseKind::UserBase => match &template.sub {

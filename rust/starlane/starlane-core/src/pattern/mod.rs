@@ -42,7 +42,7 @@
 
 // Http<Post>:/some/path/(.*) +( set req.path="/new/path/$1" )-[ Map{ body<Bin~json> } ]+( session )-[ Map{ headers<Meta>, body<Bin~json>, session<Text> } ]-> {*} => &;
 
-// Msg<Action>:/work/it -> { +( sa .:users:*||.:old-users:*; )+( grant .:my-files:** +CRWX; )-> $app:**<Mechtron>^Msg/admin/**; } =[ Text ]=> &;
+// Ext<Action>:/work/it -> { +( sa .:users:*||.:old-users:*; )+( grant .:my-files:** +CRWX; )-> $app:**<Mechtron>^Msg/admin/**; } =[ Text ]=> &;
 
 // <App> 'taint'
 // block -| $app:..:** +crwx |-| !$app:..:** +---- |

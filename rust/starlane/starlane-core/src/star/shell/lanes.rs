@@ -4,7 +4,7 @@ use std::convert::TryInto;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 
-use cosmic_api::id::StarKey;
+use cosmic_universe::loc::StarKey;
 use futures::future::select_all;
 use futures::FutureExt;
 use lru::LruCache;

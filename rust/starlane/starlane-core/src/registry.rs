@@ -4,18 +4,19 @@ use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
 
 use crate::databases::lookup_registry_db;
 use crate::particle::properties_config;
-use cosmic_api::command::request::delete::Delete;
-use cosmic_api::command::request::select::{SelectKind, SubSelect};
-use cosmic_api::id::id::{BaseKind, Kind, Tks};
-use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, UserBaseSubKind};
-use cosmic_api::parse::{CamelCase, Domain, SkewerCase};
-use cosmic_api::particle::particle::Details;
-use cosmic_api::security::{
+use cosmic_universe::command::direct::delete::Delete;
+use cosmic_universe::command::direct::select::{SelectKind, SubSelect};
+use cosmic_universe::hyper::{Location, ParticleRecord};
+use cosmic_universe::loc::{};
+use cosmic_universe::loc::{};
+use cosmic_universe::id2::BaseSubKind;
+use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
+use cosmic_universe::particle::Details;
+use cosmic_universe::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask,
     PermissionsMaskKind, Privilege, Privileges,
 };
-use cosmic_api::selector::selector::SubKindSelector;
-use cosmic_api::sys::{Location, ParticleRecord};
+use cosmic_universe::selector::SubKindSelector;
 use futures::{FutureExt, StreamExt};
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties, SetRegistry};
@@ -50,6 +51,7 @@ use std::ops::{Deref, Index};
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::mpsc;
+use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Tks, UserBaseSubKind};
 
 lazy_static! {
     pub static ref HYPERUSER: Point = Point::from_str("hyperspace:users:hyperuser").expect("point");
@@ -1181,11 +1183,12 @@ pub mod test {
     use crate::error::Error;
     use crate::particle::Kind;
     use crate::registry::{Registration, Registry};
-    use cosmic_api::command::request::select::SelectKind;
-    use cosmic_api::entity::request::select::SelectKind;
-    use cosmic_api::id::id::{Kind, ToPoint};
-    use cosmic_api::id::UserBaseSubKind;
-    use cosmic_api::security::{
+    use cosmic_universe::command::direct::select::SelectKind;
+    use cosmic_universe::entity::request::select::SelectKind;
+    use cosmic_universe::kind::Kind;
+    use cosmic_universe::loc::ToPoint;
+    use cosmic_universe::kind::UserBaseSubKind;
+    use cosmic_universe::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
         Privilege,
     };

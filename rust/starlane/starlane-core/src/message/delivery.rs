@@ -16,11 +16,11 @@ use crate::message::ProtoStarMessage;
 use crate::message::Reply;
 use crate::star::{StarCommand, StarSkel};
 use crate::util;
-use cosmic_api::id::id::ToPoint;
-use cosmic_api::parse::model::Subst;
-use cosmic_api::substance::substance::HttpCall;
-use cosmic_api::sys::ParticleRecord;
-use cosmic_api::wave::Method;
+use cosmic_universe::hyper::ParticleRecord;
+use cosmic_universe::loc::ToPoint;
+use cosmic_universe::parse::model::Subst;
+use cosmic_universe::substance::HttpCall;
+use cosmic_universe::wave::core::Method;
 use http::StatusCode;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::entity::response::RespCore;
@@ -174,7 +174,7 @@ impl Delivery<ReqShell> {
                 method.clone(),
                 Subst::new(self.item.core.uri.path())?,
             )),
-            Method::Msg(method) => CallKind::Msg(MsgCall::new(
+            Method::Ext(method) => CallKind::Msg(MsgCall::new(
                 method.clone(),
                 Subst::new(self.item.core.uri.path())?,
             )),

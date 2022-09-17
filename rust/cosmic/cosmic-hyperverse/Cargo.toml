@@ -1,0 +1,29 @@
+[package]
+name = "cosmic-hyperverse"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-recursion = "1.0.0"
+cosmic-macros = { path="../cosmic-macros"}
+cosmic-universe = { path= "../cosmic-universe" }
+cosmic-nom = { path="../cosmic-nom"}
+cosmic-hyperlane = { path= "../cosmic-hyperlane" }
+anyhow = "1.0.44"
+dashmap = "5.3.4"
+tokio = { version = "1.15.0", features = ["full"] }
+serde = { version="1.0.69", features=['derive','rc'] }
+lazy_static = "1.4.0"
+async-trait = "0.1.48"
+regex = "1.5.4"
+http = "0.2.6"
+futures = "0.3.21"
+ctrlc = "3.2.2"
+tracing = "0.1.35"
+strum = "0.24.1"
+strum_macros = "0.24.1"
+
+chrono = { version="0.4.19", features=["serde"] }
+uuid = { version="1.1.2", features=["v4"] }

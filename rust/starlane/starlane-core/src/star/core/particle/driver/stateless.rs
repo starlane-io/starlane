@@ -1,5 +1,5 @@
-use cosmic_api::id::id::BaseKind;
-use cosmic_api::sys::Assign;
+use cosmic_universe::hyper::Assign;
+use cosmic_universe::kind::BaseKind;
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::id::Point;
 

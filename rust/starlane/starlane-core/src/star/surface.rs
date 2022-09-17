@@ -7,7 +7,7 @@ use std::sync::mpsc::SendError;
 use std::sync::Arc;
 use std::{sync, thread};
 
-use cosmic_api::sys::ParticleRecord;
+use cosmic_universe::hyper::ParticleRecord;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::time::Duration;

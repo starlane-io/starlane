@@ -18,9 +18,9 @@ use crate::util;
 
 use crate::file_access::FileAccess;
 use crate::message::delivery::Delivery;
-use cosmic_api::id::id::{BaseKind, Kind};
-use cosmic_api::id::ArtifactSubKind;
-use cosmic_api::sys::Assign;
+use cosmic_universe::hyper::Assign;
+use cosmic_universe::kind::{ArtifactSubKind, BaseKind, Kind};
+use cosmic_universe::loc::{};
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
 use mesh_portal::version::latest::entity::request::create::{
     Create, KindTemplate, PointSegFactory, PointTemplate, Strategy, Template,

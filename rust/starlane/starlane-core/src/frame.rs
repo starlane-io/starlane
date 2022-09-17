@@ -3,8 +3,8 @@ use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 
-use cosmic_api::id::StarKey;
-use cosmic_api::sys::{Assign, ParticleRecord};
+use cosmic_universe::hyper::{Assign, ParticleRecord};
+use cosmic_universe::loc::StarKey;
 use semver::SemVerError;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
