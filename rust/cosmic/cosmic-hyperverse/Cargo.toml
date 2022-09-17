@@ -11,7 +11,6 @@ cosmic-macros = { path="../cosmic-macros"}
 cosmic-universe = { path= "../cosmic-universe" }
 cosmic-nom = { path="../cosmic-nom"}
 cosmic-hyperlane = { path= "../cosmic-hyperlane" }
-cosmic-driver = { path= "../cosmic-driver" }
 anyhow = "1.0.44"
 dashmap = "5.3.4"
 tokio = { version = "1.15.0", features = ["full"] }
