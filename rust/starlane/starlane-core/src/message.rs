@@ -10,7 +10,7 @@ use std::string::FromUtf8Error;
 
 use cosmic_universe::id::id::{BaseKind, ToPoint};
 use cosmic_universe::id::StarKey;
-use cosmic_universe::sys::ParticleRecord;
+use cosmic_universe::hyper::ParticleRecord;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use uuid::Uuid;

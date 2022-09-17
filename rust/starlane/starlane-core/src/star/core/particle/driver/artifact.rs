@@ -20,7 +20,7 @@ use crate::file_access::FileAccess;
 use crate::message::delivery::Delivery;
 use cosmic_universe::id::id::{BaseKind, Kind};
 use cosmic_universe::id::ArtifactSubKind;
-use cosmic_universe::sys::Assign;
+use cosmic_universe::hyper::Assign;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
 use mesh_portal::version::latest::entity::request::create::{
     Create, KindTemplate, PointSegFactory, PointTemplate, Strategy, Template,

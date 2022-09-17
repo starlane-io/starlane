@@ -7,7 +7,7 @@ use cosmic_universe::error::UniErr;
 use cosmic_universe::id::id::{BaseKind, Kind, Layer, Point, Port, ToPoint, ToPort};
 use cosmic_universe::id::{StarSub, TraversalInjection};
 use cosmic_universe::substance::substance::Substance;
-use cosmic_universe::sys::{Assign, AssignmentKind, ControlPattern, Greet, InterchangeKind, Knock};
+use cosmic_universe::hyper::{Assign, AssignmentKind, ControlPattern, Greet, InterchangeKind, Knock};
 use cosmic_universe::wave::Agent::Anonymous;
 use cosmic_universe::wave::{Agent, Method, CmdMethod, CoreBounce, DirectedHandler, InCtx, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, Signal, UltraWave, Wave, Exchanger, ToRecipients};
 use cosmic_universe::wave::{DirectedHandlerSelector, SetStrategy, TxRouter};

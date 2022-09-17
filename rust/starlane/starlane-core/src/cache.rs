@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::thread;
 
 use cosmic_universe::id::id::PointSegKind;
-use cosmic_universe::sys::ParticleRecord;
+use cosmic_universe::hyper::ParticleRecord;
 use futures::FutureExt;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::bin::Bin;

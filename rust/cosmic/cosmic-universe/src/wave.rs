@@ -21,10 +21,10 @@ use crate::security::{Permissions, Privilege, Privileges};
 use crate::selector::selector::Selector;
 use crate::substance::substance::{
     Call, CallKind, CmdCall, Errors, HttpCall, ExtCall, MultipartFormBuilder, SubstanceKind,
-    SysCall, ToRequestCore, Token,
+    HypCall, ToRequestCore, Token,
 };
 use crate::substance::substance::{Substance, ToSubstance};
-use crate::sys::AssignmentKind;
+use crate::hyper::AssignmentKind;
 use crate::util::{uuid, ValueMatcher, ValuePattern};
 use crate::{ANONYMOUS, HYPERUSER};
 use alloc::borrow::Cow;
@@ -44,7 +44,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use tokio::time::Instant;
-use crate::sys::InterchangeKind::DefaultControl;
+use crate::hyper::InterchangeKind::DefaultControl;
 
 #[derive(
     Debug,
@@ -286,7 +286,7 @@ impl UltraWave {
         signal.from(from);
         signal.agent(self.agent().clone());
         signal.handling(self.handling().clone());
-        signal.method(SysMethod::Transport);
+        signal.method(HypMethod::Transport);
         signal.track = self.track();
         signal.body(Substance::UltraWave(Box::new(self)));
         signal.to(to);
@@ -1660,8 +1660,8 @@ impl DirectedProto {
         }
     }
 
-    pub fn sys<M: Into<SysMethod>, P: ToRecipients + Clone>(to: P, method: M) -> Self {
-        let method: SysMethod = method.into();
+    pub fn sys<M: Into<HypMethod>, P: ToRecipients + Clone>(to: P, method: M) -> Self {
+        let method: HypMethod = method.into();
         let method: Method = method.into();
         Self::to_with_method(to, method)
     }
@@ -2066,7 +2066,7 @@ impl DirectedWave {
                 method.clone(),
                 Subst::new(self.core().uri.path())?,
             )),
-            Method::Sys(method) => CallKind::Sys(SysCall::new(
+            Method::Hyp(method) => CallKind::Hyp(HypCall::new(
                 method.clone(),
                 Subst::new(self.core().uri.path())?,
             )),
@@ -2146,7 +2146,7 @@ impl SingularDirectedWave {
                 method.clone(),
                 Subst::new(self.core().uri.path())?,
             )),
-            Method::Sys(method) => CallKind::Sys(SysCall::new(
+            Method::Hyp(method) => CallKind::Hyp(HypCall::new(
                 method.clone(),
                 Subst::new(self.core().uri.path())?,
             )),
@@ -2819,7 +2819,7 @@ impl Wave<Signal> {
         signal.from(from);
         signal.agent(self.agent.clone());
         signal.handling(self.handling.clone());
-        signal.method(SysMethod::Hop);
+        signal.method(HypMethod::Hop);
         signal.track = self.track;
         signal.body(Substance::UltraWave(Box::new(self.to_ultra())));
         signal.to(to);
@@ -2827,7 +2827,7 @@ impl Wave<Signal> {
     }
 
     pub fn unwrap_from_hop(self) -> Result<Wave<Signal>, UniErr> {
-        if self.method != Method::Sys(SysMethod::Hop) {
+        if self.method != Method::Hyp(HypMethod::Hop) {
             return Err(UniErr::from_500("expected signal wave to have method Hop"));
         }
         if let Substance::UltraWave(wave) = &self.body {
@@ -2840,7 +2840,7 @@ impl Wave<Signal> {
     }
 
     pub fn unwrap_from_transport(self) -> Result<UltraWave, UniErr> {
-        if self.method != Method::Sys(SysMethod::Transport) {
+        if self.method != Method::Hyp(HypMethod::Transport) {
             return Err(UniErr::from_500(
                 "expected signal wave to have method Transport",
             ));
@@ -3608,7 +3608,7 @@ impl DirectedHandlerSelector for PointRequestHandler<AsyncRequestHandlerRelay> {
     PartialEq,
 )]
 pub enum MethodKind {
-    Sys,
+    Hyp,
     Cmd,
     Ext,
     Http,
@@ -3856,7 +3856,7 @@ impl TryInto<http::Response<Bin>> for ReflectedCore {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Autobox)]
 pub enum Method {
-    Sys(SysMethod),
+    Hyp(HypMethod),
     Cmd(CmdMethod),
     Http(HttpMethod),
     Ext(ExtMethod),
@@ -3865,7 +3865,7 @@ pub enum Method {
 impl Method {
     pub fn to_deep_string(&self) -> String {
         match self {
-            Method::Sys(x) => format!("Sys<{}>",x.to_string()),
+            Method::Hyp(x) => format!("Hyp<{}>", x.to_string()),
             Method::Cmd(x) => format!("Cmd<{}>",x.to_string()),
             Method::Http(x) => format!("Http<{}>",x.to_string()),
             Method::Ext(x) => format!("Ext<{}>", x.to_string()),
@@ -3875,7 +3875,7 @@ impl Method {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum MethodPattern {
-    Sys(ValuePattern<SysMethod>),
+    Hyp(ValuePattern<HypMethod>),
     Cmd(ValuePattern<CmdMethod>),
     Http(ValuePattern<HttpMethod>),
     Ext(ValuePattern<ExtMethod>),
@@ -3893,8 +3893,8 @@ impl ToString for MethodPattern {
             MethodPattern::Ext(c) => {
                 format!("Ext<{}>", c.to_string())
             }
-            MethodPattern::Sys(c) => {
-                format!("Sys<{}>", c.to_string())
+            MethodPattern::Hyp(c) => {
+                format!("Hyp<{}>", c.to_string())
             }
         }
     }
@@ -3903,8 +3903,8 @@ impl ToString for MethodPattern {
 impl ValueMatcher<Method> for MethodPattern {
     fn is_match(&self, x: &Method) -> Result<(), ()> {
         match self {
-            MethodPattern::Sys(pattern) => {
-                if let Method::Sys(v) = x {
+            MethodPattern::Hyp(pattern) => {
+                if let Method::Hyp(v) = x {
                     pattern.is_match(v)
                 } else {
                     Err(())
@@ -3951,7 +3951,7 @@ impl Method {
             Method::Cmd(_) => MethodKind::Cmd,
             Method::Http(_) => MethodKind::Http,
             Method::Ext(_) => MethodKind::Ext,
-            Method::Sys(_) => MethodKind::Sys,
+            Method::Hyp(_) => MethodKind::Hyp,
         }
     }
 }
@@ -3962,7 +3962,7 @@ impl ToString for Method {
             Method::Cmd(cmd) => format!("Cmd<{}>", cmd.to_string()),
             Method::Http(method) => format!("Http<{}>", method.to_string()),
             Method::Ext(msg) => format!("Ext<{}>", msg.to_string()),
-            Method::Sys(sys) => format!("Sys<{}>", sys.to_string()),
+            Method::Hyp(sys) => format!("Hyp<{}>", sys.to_string()),
         }
     }
 }
@@ -4267,7 +4267,7 @@ impl ValueMatcher<CmdMethod> for CmdMethod {
     strum_macros::Display,
     strum_macros::EnumString,
 )]
-pub enum SysMethod {
+pub enum HypMethod {
     Command,
     Assign,
     Provision,
@@ -4278,8 +4278,8 @@ pub enum SysMethod {
     Search,
 }
 
-impl ValueMatcher<SysMethod> for SysMethod {
-    fn is_match(&self, x: &SysMethod) -> Result<(), ()> {
+impl ValueMatcher<HypMethod> for HypMethod {
+    fn is_match(&self, x: &HypMethod) -> Result<(), ()> {
         if *x == *self {
             Ok(())
         } else {

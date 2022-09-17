@@ -32,7 +32,7 @@ pub mod security;
 pub mod selector;
 pub mod service;
 pub mod substance;
-pub mod sys;
+pub mod hyper;
 pub mod util;
 pub mod wave;
 
@@ -51,7 +51,7 @@ use crate::particle::particle::{Details, Properties, Status, Stub};
 use crate::security::{Access, AccessGrant};
 use crate::selector::selector::Selector;
 use crate::substance::substance::{Substance, SubstanceList, ToSubstance, Token};
-use crate::sys::ParticleRecord;
+use crate::hyper::ParticleRecord;
 use crate::wave::{Agent, ReflectedCore};
 use ::http::StatusCode;
 use chrono::{DateTime, Utc};

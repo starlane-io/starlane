@@ -370,7 +370,7 @@ pub mod request {
         use crate::selector::selector::SpecificSelector;
         use crate::substance::substance::Substance;
         use crate::util::{ConvertFrom, ToResolved};
-        use crate::wave::{CmdMethod, DirectedCore, DirectedProto, Ping, SysMethod, Wave};
+        use crate::wave::{CmdMethod, DirectedCore, DirectedProto, Ping, HypMethod, Wave};
 
         pub enum PointTemplateSeg {
             ExactSeg(PointSeg),
@@ -599,7 +599,7 @@ pub mod request {
         impl Into<DirectedProto> for Create {
             fn into(self) -> DirectedProto {
                 let mut request =
-                    DirectedProto::sys(Point::global_executor().to_port(), SysMethod::Command);
+                    DirectedProto::sys(Point::global_executor().to_port(), HypMethod::Command);
                 request.body(Substance::Command(Box::new(Command::Create(self))));
                 request
             }

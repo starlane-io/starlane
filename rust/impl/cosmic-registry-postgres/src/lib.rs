@@ -26,7 +26,7 @@ use cosmic_universe::selector::selector::{
     SubKindSelector,
 };
 use cosmic_universe::substance::substance::{Substance, SubstanceList, SubstanceMap};
-use cosmic_universe::sys::{Location, ParticleRecord};
+use cosmic_universe::hyper::{Location, ParticleRecord};
 use cosmic_universe::util::ValuePattern;
 use cosmic_universe::{IndexedAccessGrant, Registration, HYPERUSER};
 use cosmic_hyperverse::machine::MachineTemplate;

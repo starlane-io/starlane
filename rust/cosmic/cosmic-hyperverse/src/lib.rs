@@ -35,7 +35,7 @@ use cosmic_universe::quota::Timeouts;
 use cosmic_universe::security::{Access, AccessGrant};
 use cosmic_universe::selector::selector::Selector;
 use cosmic_universe::substance::substance::{Substance, SubstanceList, Token};
-use cosmic_universe::sys::ParticleRecord;
+use cosmic_universe::hyper::ParticleRecord;
 use cosmic_universe::wave::{ReflectedCore, UltraWave};
 use cosmic_universe::{ArtifactApi, IndexedAccessGrant, Registration};
 use cosmic_hyperlane::{HyperAuthenticator, HyperGate, HyperGateSelector, HyperwayEndpointFactory};

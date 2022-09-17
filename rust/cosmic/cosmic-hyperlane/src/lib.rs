@@ -9,12 +9,12 @@ use cosmic_universe::ext::ExtMethod;
 use cosmic_universe::particle::particle::Status;
 use cosmic_universe::quota::Timeouts;
 use cosmic_universe::substance::substance::{Errors, Substance, SubstanceKind, Token};
-use cosmic_universe::sys::{Greet, InterchangeKind, Knock, Sys};
+use cosmic_universe::hyper::{Greet, InterchangeKind, Knock, HyperSubstance};
 use cosmic_universe::util::uuid;
 use cosmic_universe::wave::{
     Agent, DirectedKind, DirectedProto, Exchanger, Handling, HyperWave, Method, Ping, Pong,
     ProtoTransmitter, ProtoTransmitterBuilder, Reflectable, ReflectedKind, ReflectedProto,
-    ReflectedWave, Router, SetStrategy, SysMethod, TxRouter, UltraWave, Wave, WaveId, WaveKind,
+    ReflectedWave, Router, SetStrategy, HypMethod, TxRouter, UltraWave, Wave, WaveId, WaveKind,
 };
 use cosmic_universe::VERSION;
 use dashmap::DashMap;
@@ -1928,7 +1928,7 @@ mod tests {
     use cosmic_universe::id::id::{Point, Uuid};
     use cosmic_universe::log::RootLogger;
     use cosmic_universe::substance::substance::Substance;
-    use cosmic_universe::sys::{InterchangeKind, Knock};
+    use cosmic_universe::hyper::{InterchangeKind, Knock};
     use cosmic_universe::wave::HyperWave;
     use dashmap::DashMap;
     use std::collections::HashMap;
@@ -2003,7 +2003,7 @@ pub mod test_util {
     use cosmic_universe::log::RootLogger;
     use cosmic_universe::ext::ExtMethod;
     use cosmic_universe::substance::substance::{Substance, Token};
-    use cosmic_universe::sys::{Greet, InterchangeKind, Knock};
+    use cosmic_universe::hyper::{Greet, InterchangeKind, Knock};
     use cosmic_universe::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedCore, ReflectedKind, ReflectedProto, ReflectedWave, Router, SetStrategy, TxRouter, UltraWave, Wave};
     use dashmap::DashMap;
     use lazy_static::lazy_static;
@@ -2161,7 +2161,7 @@ pub mod test {
     use cosmic_universe::log::RootLogger;
     use cosmic_universe::ext::ExtMethod;
     use cosmic_universe::substance::substance::{Substance, Token};
-    use cosmic_universe::sys::{Greet, InterchangeKind, Knock};
+    use cosmic_universe::hyper::{Greet, InterchangeKind, Knock};
     use cosmic_universe::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedCore, ReflectedKind, ReflectedProto, ReflectedWave, Router, SetStrategy, TxRouter, UltraWave, Wave};
     use dashmap::DashMap;
     use lazy_static::lazy_static;

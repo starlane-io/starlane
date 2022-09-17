@@ -19,7 +19,7 @@ use crate::util;
 use cosmic_universe::id::id::ToPoint;
 use cosmic_universe::parse::model::Subst;
 use cosmic_universe::substance::substance::HttpCall;
-use cosmic_universe::sys::ParticleRecord;
+use cosmic_universe::hyper::ParticleRecord;
 use cosmic_universe::wave::Method;
 use http::StatusCode;
 use mesh_portal::error::MsgErr;

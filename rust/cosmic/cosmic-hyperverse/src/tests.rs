@@ -9,10 +9,10 @@ use cosmic_universe::id::id::{Layer, ToPoint, ToPort, Uuid};
 use cosmic_universe::id::{StarHandle, TraversalDirection};
 use cosmic_universe::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
 use cosmic_universe::ext::ExtMethod;
-use cosmic_universe::sys::{Assign, AssignmentKind, InterchangeKind, Knock, Sys};
+use cosmic_universe::hyper::{Assign, AssignmentKind, InterchangeKind, Knock, HyperSubstance};
 use cosmic_universe::wave::{
     Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Method, Pong,
-    ProtoTransmitterBuilder, SysMethod, Wave,
+    ProtoTransmitterBuilder, HypMethod, Wave,
 };
 use cosmic_universe::{MountKind, NoDiceArtifactFetcher, HYPERUSER};
 use cosmic_hyperlane::{AnonHyperAuthenticator, HyperClient, HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperwayEndpoint, HyperwayStub, LocalHyperwayGateJumper};
@@ -412,8 +412,8 @@ async fn create(
     wave.to(star_api.get_skel().await?.point.clone().to_port());
     wave.from(HYPERUSER.clone());
     wave.agent(Agent::HyperUser);
-    wave.method(SysMethod::Assign);
-    wave.body(Substance::Sys(Sys::Assign(Assign::new(
+    wave.method(HypMethod::Assign);
+    wave.body(Substance::Hyper(HyperSubstance::Assign(Assign::new(
         AssignmentKind::Create,
         details,
         StateSrc::None,

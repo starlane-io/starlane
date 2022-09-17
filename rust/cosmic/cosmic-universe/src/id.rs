@@ -7,7 +7,7 @@ use crate::parse::error::result;
 use crate::parse::{parse_star_key, CamelCase};
 use crate::particle::particle::Stub;
 use crate::substance::substance::Substance;
-use crate::sys::{ChildRegistry, ParticleRecord};
+use crate::hyper::{ChildRegistry, ParticleRecord};
 use crate::wave::{DirectedWave, Ping, Pong, ReflectedWave, SingularDirectedWave, UltraWave, Wave};
 use alloc::fmt::format;
 use core::str::FromStr;
@@ -62,7 +62,7 @@ pub mod id {
     use crate::selector::selector::{
         Pattern, PointHierarchy, Selector, SpecificSelector, VersionReq,
     };
-    use crate::sys::Location::Central;
+    use crate::hyper::Location::Central;
     use crate::util::{ToResolved, ValueMatcher, ValuePattern};
     use crate::wave::{DirectedWave, Exchanger, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave, ToRecipients, UltraWave, Wave, WaveKind};
 

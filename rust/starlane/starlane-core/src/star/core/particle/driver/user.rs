@@ -10,7 +10,7 @@ use alcoholic_jwt::{token_kid, JWKS};
 use cosmic_universe::command::Command;
 use cosmic_universe::id::id::{BaseKind, Kind};
 use cosmic_universe::parse::skewer_or_snake;
-use cosmic_universe::sys::Assign;
+use cosmic_universe::hyper::Assign;
 use http::StatusCode;
 use keycloak::types::{
     CredentialRepresentation, ProtocolMapperRepresentation, RealmRepresentation, UserRepresentation,

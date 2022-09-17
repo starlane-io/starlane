@@ -9,7 +9,7 @@ use std::ops::{Deref, DerefMut};
 use crate::command::command::common::StateSrc;
 use crate::id::{StarKey, StarSub};
 use crate::log::Log;
-use crate::wave::{CmdMethod, DirectedCore, Ping, Pong, ReflectedKind, ReflectedProto, SysMethod, ToRecipients, UltraWave, Wave, WaveId, WaveKind};
+use crate::wave::{CmdMethod, DirectedCore, Ping, Pong, ReflectedKind, ReflectedProto, HypMethod, ToRecipients, UltraWave, Wave, WaveId, WaveKind};
 use crate::{Agent, Port, ReflectedCore};
 use serde::{Deserialize, Serialize};
 
@@ -118,7 +118,7 @@ impl TryFrom<Ping> for Provision{
     type Error = UniErr;
 
     fn try_from(request: Ping) -> Result<Self, Self::Error> {
-        if let Substance::Sys(Sys::Provision(provision)) = request.core.body {
+        if let Substance::Hyper(HyperSubstance::Provision(provision)) = request.core.body {
             Ok(provision)
         } else {
             Err(UniErr::bad_request())
@@ -128,13 +128,13 @@ impl TryFrom<Ping> for Provision{
 
 impl Into<Substance> for Provision{
     fn into(self) -> Substance {
-        Substance::Sys(Sys::Provision(self))
+        Substance::Hyper(HyperSubstance::Provision(self))
     }
 }
 
 impl Into<DirectedCore> for Provision{
     fn into(self) -> DirectedCore {
-        DirectedCore::new(SysMethod::Assign.into()).with_body(Substance::Sys(Sys::Provision(self)))
+        DirectedCore::new(HypMethod::Assign.into()).with_body(Substance::Hyper(HyperSubstance::Provision(self)))
     }
 }
 
@@ -161,10 +161,10 @@ impl Assign {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Autobox)]
-pub enum Sys {
+pub enum HyperSubstance {
     Provision(Provision),
     Assign(Assign),
-    Event(SysEvent),
+    Event(HyperEvent),
     Log(Log),
     Search(Search),
     Discoveries(Discoveries),
@@ -214,7 +214,7 @@ impl TryFrom<Ping> for Assign {
     type Error = UniErr;
 
     fn try_from(request: Ping) -> Result<Self, Self::Error> {
-        if let Substance::Sys(Sys::Assign(assign)) = request.core.body {
+        if let Substance::Hyper(HyperSubstance::Assign(assign)) = request.core.body {
             Ok(assign)
         } else {
             Err(UniErr::bad_request())
@@ -224,18 +224,18 @@ impl TryFrom<Ping> for Assign {
 
 impl Into<Substance> for Assign {
     fn into(self) -> Substance {
-        Substance::Sys(Sys::Assign(self))
+        Substance::Hyper(HyperSubstance::Assign(self))
     }
 }
 
 impl Into<DirectedCore> for Assign {
     fn into(self) -> DirectedCore {
-        DirectedCore::new(SysMethod::Assign.into()).with_body(Substance::Sys(Sys::Assign(self)))
+        DirectedCore::new(HypMethod::Assign.into()).with_body(Substance::Hyper(HyperSubstance::Assign(self)))
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Autobox)]
-pub enum SysEvent {
+pub enum HyperEvent {
     Created(Created),
 }
 
@@ -289,7 +289,7 @@ impl Default for Knock {
 
 impl Into<Wave<Ping>> for Knock {
     fn into(self) -> Wave<Ping> {
-        let mut core = DirectedCore::new(SysMethod::Knock.into());
+        let mut core = DirectedCore::new(HypMethod::Knock.into());
         core.body = Substance::Knock(self);
         let wave = Wave::new(
             Ping::new(core, Point::local_endpoint().to_port()),

@@ -3421,7 +3421,7 @@ pub fn lex_root_scope<I: Span>(span: I) -> Result<LexRootScope<I>, UniErr> {
 }
 
 pub fn method_kind<I: Span>(input: I) -> Res<I, MethodKind> {
-    let (next, v) = recognize(alt((tag("Cmd"), tag("Ext"), tag("Http"), tag("Sys"))))(input)?;
+    let (next, v) = recognize(alt((tag("Cmd"), tag("Ext"), tag("Http"), tag("Hyp"))))(input)?;
     Ok((next, MethodKind::from_str(v.to_string().as_str()).unwrap()))
 }
 
@@ -3830,17 +3830,17 @@ pub mod model {
                 ValuePattern::Any => ValuePattern::Any,
                 ValuePattern::None => ValuePattern::None,
                 ValuePattern::Pattern(message_kind) => match message_kind {
-                    MethodKind::Sys => {
+                    MethodKind::Hyp => {
                         match result(value_pattern(wrapped_sys_method)(selector.name.clone())) {
                             Ok(r) => r,
                             Err(_) => {
                                 return Err(ParseErrs::from_loc_span(
                                     format!(
-                                        "invalid Sys method '{}'.  Sys should be CamelCase",
+                                        "invalid Hyp method '{}'.  Hyp should be CamelCase",
                                         selector.name.to_string()
                                     )
                                     .as_str(),
-                                    "invalid Sys",
+                                    "invalid Hyp",
                                     selector.name,
                                 ))
                             }
@@ -5022,7 +5022,7 @@ use crate::substance::substance::{
     SubstanceFormat, SubstanceKind, SubstancePattern, SubstancePatternCtx, SubstancePatternVar,
     SubstanceTypePatternCtx, SubstanceTypePatternDef, SubstanceTypePatternVar,
 };
-use crate::wave::{CmdMethod, Method, MethodKind, MethodPattern, SysMethod};
+use crate::wave::{CmdMethod, Method, MethodKind, MethodPattern, HypMethod};
 use cosmic_nom::{new_span, span_with_extra, Trace};
 use cosmic_nom::{trim, tw, Res, Span, Wrap};
 use nom_supreme::error::ErrorTree;
@@ -6242,10 +6242,10 @@ pub fn ext_method<I: Span>(input: I) -> Res<I, ExtMethod> {
     }
 }
 
-pub fn sys_method<I: Span>(input: I) -> Res<I, SysMethod> {
+pub fn sys_method<I: Span>(input: I) -> Res<I, HypMethod> {
     let (next, sys_method) = camel_case_chars(input.clone())?;
 
-    match SysMethod::from_str(sys_method.to_string().as_str()) {
+    match HypMethod::from_str(sys_method.to_string().as_str()) {
         Ok(method) => Ok((next, method)),
         Err(err) => Err(nom::Err::Error(ErrorTree::from_error_kind(
             input,
@@ -6283,7 +6283,7 @@ pub fn wrapped_http_method<I: Span>(input: I) -> Res<I, Method> {
 }
 
 pub fn wrapped_sys_method<I: Span>(input: I) -> Res<I, Method> {
-    sys_method(input).map(|(next, method)| (next, Method::Sys(method)))
+    sys_method(input).map(|(next, method)| (next, Method::Hyp(method)))
 }
 
 pub fn wrapped_cmd_method<I: Span>(input: I) -> Res<I, Method> {
@@ -6984,14 +6984,14 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, UniErr> {
         ValuePattern::Any => ValuePattern::Any,
         ValuePattern::None => ValuePattern::None,
         ValuePattern::Pattern(method_kind) => match method_kind {
-            MethodKind::Sys => {
+            MethodKind::Hyp => {
                 let method = names.pop().ok_or(ParseErrs::from_loc_span(
-                    "Sys method requires a sub kind i.e. Sys<Assign> or Ext<*>",
+                    "Hyp method requires a sub kind i.e. Hyp<Assign> or Ext<*>",
                     "sub kind required",
                     method_kind_span,
                 ))?;
                 let method = result(value_pattern(sys_method)(method))?;
-                ValuePattern::Pattern(MethodPattern::Sys(method))
+                ValuePattern::Pattern(MethodPattern::Hyp(method))
             }
             MethodKind::Cmd => {
                 let method = names.pop().ok_or(ParseErrs::from_loc_span(
@@ -7087,7 +7087,7 @@ pub mod test {
     pub fn test_message_selector() {
         let route =
             util::log(route_attribute("#[route(\"[Topic<*>]::Ext<NewSession>\")]")).unwrap();
-        let route = util::log(route_attribute("#[route(\"Sys<Assign>\")]")).unwrap();
+        let route = util::log(route_attribute("#[route(\"Hyp<Assign>\")]")).unwrap();
 
         println!("path: {}", route.path.to_string());
         //println!("filters: {}", route.filters.first().unwrap().name)

@@ -19,7 +19,7 @@ use crate::star::variant::FrameVerdict;
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::watch::{Notification, Topic, Watch, WatchKey, WatchSelector, WatchStub, Watcher};
-use cosmic_universe::sys::{Location, ParticleRecord};
+use cosmic_universe::hyper::{Location, ParticleRecord};
 
 #[derive(Clone)]
 pub struct WatchApi {

@@ -55,7 +55,7 @@ use cosmic_universe::id::id::{BaseKind, RouteSeg, ToPoint, ToPort};
 use cosmic_universe::id::{ConstellationName, StarKey};
 use cosmic_universe::parse::error::result;
 use cosmic_universe::parse::lowercase_alphanumeric;
-use cosmic_universe::sys::ParticleRecord;
+use cosmic_universe::hyper::ParticleRecord;
 use cosmic_nom::{new_span, Res, Span};
 use mesh_portal::version::latest::id::{Point, Port};
 use mesh_portal::version::latest::log::{PointLogger, RootLogger};

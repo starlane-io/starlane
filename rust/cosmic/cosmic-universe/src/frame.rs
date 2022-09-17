@@ -7,7 +7,7 @@ pub mod frame {
     use serde::{Deserialize, Serialize};
 
     use crate::error::UniErr;
-    use crate::sys::Knock;
+    use crate::hyper::Knock;
     use crate::wave::{Ping, Pong, UltraWave, Wave};
 
     pub struct PrimitiveFrame {

@@ -17,9 +17,9 @@ use cosmic_universe::parse::model::Subst;
 use cosmic_universe::parse::{bind_config, route_attribute};
 use cosmic_universe::particle::particle::{Details, Status, Stub};
 use cosmic_universe::substance::substance::Substance;
-use cosmic_universe::sys::{Assign, AssignmentKind, Sys};
+use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance};
 use cosmic_universe::util::{log, ValuePattern};
-use cosmic_universe::wave::{Agent, Bounce, CmdMethod, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, DirectedWave, Exchanger, InCtx, Method, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, SysMethod, UltraWave, Wave, WaveKind};
+use cosmic_universe::wave::{Agent, Bounce, CmdMethod, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, DirectedWave, Exchanger, InCtx, Method, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, HypMethod, UltraWave, Wave, WaveKind};
 use cosmic_universe::{ArtRef, Registration, State, HYPERUSER};
 use dashmap::DashMap;
 use futures::future::select_all;
@@ -1182,10 +1182,10 @@ where
     }
 
 
-    #[route("Sys<Assign>")]
-    async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, P::Err> {
+    #[route("Hyp<Assign>")]
+    async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, P::Err> {
         match ctx.input {
-            Sys::Assign(assign) => {
+            HyperSubstance::Assign(assign) => {
                 self.driver.assign(assign.clone()).await?;
 
                 Ok(ReflectedCore::ok_body(Substance::Empty))

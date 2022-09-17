@@ -16,10 +16,10 @@ pub mod substance {
     use crate::parse::{CtxResolver, Env};
     use crate::particle::particle::{Particle, Status, Stub};
     use crate::selector::selector::{KindSelector, Selector};
-    use crate::sys::{Greet, Knock, Sys};
+    use crate::hyper::{Greet, Knock, HyperSubstance};
     use crate::util::{uuid, ToResolved, ValueMatcher, ValuePattern};
     use crate::wave::{
-        CmdMethod, DirectedCore, HyperWave, Method, Pong, ReflectedCore, SysMethod, UltraWave, Wave,
+        CmdMethod, DirectedCore, HyperWave, Method, Pong, ReflectedCore, HypMethod, UltraWave, Wave,
     };
     use cosmic_macros_primitive::Autobox;
     use cosmic_nom::Tw;
@@ -62,7 +62,7 @@ pub mod substance {
         Command,
         ReqCore,
         RespCore,
-        Sys,
+        Hyp,
         Token,
         UltraWave,
         HyperWave,
@@ -103,7 +103,7 @@ pub mod substance {
         MultipartForm(MultipartForm),
         ReqCore(Box<DirectedCore>),
         RespCore(Box<ReflectedCore>),
-        Sys(Sys),
+        Hyper(HyperSubstance),
         Token(Token),
         UltraWave(Box<UltraWave>),
         HyperWave(Box<HyperWave>),
@@ -218,7 +218,7 @@ pub mod substance {
                 Substance::Command(_) => SubstanceKind::Command,
                 Substance::ReqCore(_) => SubstanceKind::ReqCore,
                 Substance::RespCore(_) => SubstanceKind::RespCore,
-                Substance::Sys(_) => SubstanceKind::Sys,
+                Substance::Hyper(_) => SubstanceKind::Hyp,
                 Substance::MultipartForm(_) => SubstanceKind::MultipartForm,
                 Substance::Token(_) => SubstanceKind::Token,
                 Substance::UltraWave(_) => SubstanceKind::UltraWave,
@@ -742,7 +742,7 @@ pub mod substance {
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
     pub enum CallKind {
         Cmd(CmdCall),
-        Sys(SysCall),
+        Hyp(HypCall),
         Ext(ExtCall),
         Http(HttpCall),
     }
@@ -811,20 +811,20 @@ pub mod substance {
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-    pub struct SysCall {
+    pub struct HypCall {
         pub path: Subst<Tw<String>>,
-        pub method: SysMethod,
+        pub method: HypMethod,
     }
 
-    impl SysCall {
-        pub fn new(method: SysMethod, path: Subst<Tw<String>>) -> Self {
+    impl HypCall {
+        pub fn new(method: HypMethod, path: Subst<Tw<String>>) -> Self {
             Self { method, path }
         }
     }
 
-    impl ToString for SysCall {
+    impl ToString for HypCall {
         fn to_string(&self) -> String {
-            format!("Sys<{}>{}", self.method.to_string(), self.path.to_string())
+            format!("Hyp<{}>{}", self.method.to_string(), self.path.to_string())
         }
     }
 
@@ -886,7 +886,7 @@ pub mod substance {
                 CallKind::Ext(msg) => msg.to_string(),
                 CallKind::Http(http) => http.to_string(),
                 CallKind::Cmd(cmd) => cmd.to_string(),
-                CallKind::Sys(sys) => sys.to_string(),
+                CallKind::Hyp(sys) => sys.to_string(),
             }
         }
     }

@@ -25,7 +25,7 @@ use cosmic_universe::command::Command;
 use cosmic_universe::id::id::{BaseKind, Kind, Tks, ToPoint};
 use cosmic_universe::id::{ArtifactSubKind, FileSubKind, StarKey, UserBaseSubKind};
 use cosmic_universe::particle::particle::Details;
-use cosmic_universe::sys::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
+use cosmic_universe::hyper::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
 use cosmic_locality::field::FieldEx;
 use cosmic_hyperverse::RegistryApi;
 use futures::StreamExt;

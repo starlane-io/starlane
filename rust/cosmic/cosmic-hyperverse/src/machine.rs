@@ -7,7 +7,7 @@ use cosmic_universe::log::{PointLogger, RootLogger};
 use cosmic_universe::particle::particle::Status;
 use cosmic_universe::quota::Timeouts;
 use cosmic_universe::substance::substance::Substance;
-use cosmic_universe::sys::{InterchangeKind, Knock};
+use cosmic_universe::hyper::{InterchangeKind, Knock};
 use cosmic_universe::wave::{Agent, HyperWave, UltraWave};
 use cosmic_universe::ArtifactApi;
 use cosmic_hyperlane::{HyperClient, HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, InterchangeGate, LayerTransform, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, SimpleGreeter, TokenAuthenticatorWithRemoteWhitelist};

@@ -15,7 +15,7 @@ use crate::star::core::message::CoreMessageCall;
 use crate::star::variant::FrameVerdict;
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use cosmic_universe::sys::ParticleRecord;
+use cosmic_universe::hyper::ParticleRecord;
 
 #[derive(Clone)]
 pub struct RouterApi {

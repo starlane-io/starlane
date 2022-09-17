@@ -25,9 +25,9 @@ use cosmic_universe::parse::{bind_config, route_attribute, Env};
 use cosmic_universe::particle::particle::{Details, Status, Stub};
 use cosmic_universe::quota::Timeouts;
 use cosmic_universe::substance::substance::{Substance, ToSubstance};
-use cosmic_universe::sys::{
+use cosmic_universe::hyper::{
     Assign, AssignmentKind, Discoveries, Discovery, Location, ParticleRecord, Provision, Search,
-    Sys,
+    HyperSubstance,
 };
 use cosmic_universe::util::{log, ValueMatcher, ValuePattern};
 use cosmic_universe::wave::{
@@ -38,7 +38,7 @@ use cosmic_universe::wave::{
     RootInCtx, Router, Scope, SetStrategy, Signal, SingularRipple, ToRecipients, TxRouter,
     WaitTime, Wave, WaveKind,
 };
-use cosmic_universe::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
+use cosmic_universe::wave::{DirectedCore, Exchanger, HyperWave, HypMethod, UltraWave};
 use cosmic_universe::ArtRef;
 use cosmic_universe::{MountKind, Registration, State, StateFactory, HYPERUSER};
 use cosmic_hyperlane::{
@@ -342,7 +342,7 @@ where
         let assign_body = Assign::new(AssignmentKind::Create, details.clone(), StateSrc::None);
         let mut assign = DirectedProto::sys(
             self.point.clone().to_port().with_layer(Layer::Core),
-            SysMethod::Assign,
+            HypMethod::Assign,
         );
 
         assign.body(assign_body.into());
@@ -1838,10 +1838,10 @@ fn star_bind() -> BindConfig {
         r#"
     Bind(version=1.0.0)
     {
-       Route<Sys<Transport>> -> (());
-       Route<Sys<Assign>> -> (()) => &;
-       Route<Sys<Search>> -> (()) => &;
-       Route<Sys<Provision>> -> (()) => &;
+       Route<Hyp<Transport>> -> (());
+       Route<Hyp<Assign>> -> (()) => &;
+       Route<Hyp<Search>> -> (()) => &;
+       Route<Hyp<Provision>> -> (()) => &;
     }
     "#,
     ))
@@ -2074,9 +2074,9 @@ impl<P> Star<P>
 where
     P: Platform,
 {
-    #[route("Sys<Provision>")]
-    pub async fn provision(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, P::Err> {
-        if let Sys::Provision(provision) = ctx.input {
+    #[route("Hyp<Provision>")]
+    pub async fn provision(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, P::Err> {
+        if let HyperSubstance::Provision(provision) = ctx.input {
             let record = self.skel.registry.record(&provision.point).await?;
             match self.skel.wrangles.wrangles.get(&record.details.stub.kind) {
                 None => {
@@ -2089,13 +2089,13 @@ where
                         .await?
                         .contains(&record.details.stub.kind)
                     {
-                        let assign = Sys::Assign(Assign::new(
+                        let assign = HyperSubstance::Assign(Assign::new(
                             AssignmentKind::Create,
                             record.details,
                             StateSrc::None,
                         ));
 
-                        let ctx: InCtx<'_, Sys> = ctx.push_input_ref(&assign);
+                        let ctx: InCtx<'_, HyperSubstance> = ctx.push_input_ref(&assign);
                         if self.assign(ctx).await?.is_ok() {
                             Ok(ReflectedCore::ok_body(self.skel.point.clone().into()))
                         } else {
@@ -2126,14 +2126,14 @@ where
                 }
             }
         } else {
-            Err("expected Sys<Provision>".into())
+            Err("expected Hyp<Provision>".into())
         }
     }
 
-    #[route("Sys<Assign>")]
-    pub async fn assign(&self, ctx: InCtx<'_, Sys>) -> Result<ReflectedCore, P::Err> {
+    #[route("Hyp<Assign>")]
+    pub async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, P::Err> {
 
-        if let Sys::Assign(assign) = ctx.input {
+        if let HyperSubstance::Assign(assign) = ctx.input {
             #[cfg(test)]
             self.skel
                 .diagnostic_interceptors
@@ -2161,11 +2161,11 @@ where
 
             Ok(ReflectedCore::ok())
         } else {
-            Err("expected Sys<Assign>".into())
+            Err("expected Hyp<Assign>".into())
         }
     }
 
-    #[route("Sys<Transport>")]
+    #[route("Hyp<Transport>")]
     pub async fn transport(&self, ctx: InCtx<'_, UltraWave>) {
         #[cfg(test)]
         self.skel
@@ -2188,11 +2188,11 @@ where
         self.skel.inject_tx.send(injection).await;
     }
 
-    #[route("Sys<Search>")]
-    pub async fn handle_search_request(&self, ctx: InCtx<'_, Sys>) -> CoreBounce {
+    #[route("Hyp<Search>")]
+    pub async fn handle_search_request(&self, ctx: InCtx<'_, HyperSubstance>) -> CoreBounce {
         async fn sub_search_and_reflect<'a, E>(
             star: &Star<E>,
-            ctx: &'a InCtx<'a, Sys>,
+            ctx: &'a InCtx<'a, HyperSubstance>,
             mut history: HashSet<Point>,
             search: Search,
         ) -> Result<ReflectedCore, UniErr>
@@ -2226,12 +2226,12 @@ where
             }
 
             let mut core = ReflectedCore::new();
-            core.body = Substance::Sys(Sys::Discoveries(discoveries));
+            core.body = Substance::Hyper(HyperSubstance::Discoveries(discoveries));
             core.status = StatusCode::from_u16(200).unwrap();
             Ok(core)
         }
 
-        if let Sys::Search(search) = ctx.input {
+        if let HyperSubstance::Search(search) = ctx.input {
             match search {
                 Search::Star(star) => {
                     if self.skel.key == *star {
@@ -2247,7 +2247,7 @@ where
                                 discoveries.push(discovery);
 
                                 let mut core = ReflectedCore::new();
-                                core.body = Substance::Sys(Sys::Discoveries(discoveries));
+                                core.body = Substance::Hyper(HyperSubstance::Discoveries(discoveries));
                                 core.status = StatusCode::from_u16(200).unwrap();
                                 return CoreBounce::Reflected(core);
                             }
@@ -2593,8 +2593,8 @@ where
         let parent_star = parent_record.location.unwrap();
         let provision = Provision::new(point.clone(), StateSrc::None);
         let mut wave = DirectedProto::ping();
-        wave.method(SysMethod::Provision);
-        wave.body(Sys::Provision(provision).into());
+        wave.method(HypMethod::Provision);
+        wave.body(HyperSubstance::Provision(provision).into());
         wave.from(self.skel.point.clone().to_port().with_layer(Layer::Core));
         wave.to(parent_star.to_port().with_layer(Layer::Core));
         let pong: Wave<Pong> = self.skel.star_transmitter.direct(wave).await?;
@@ -2662,8 +2662,8 @@ where
 
     pub async fn wrangle(&self) -> Result<Discoveries, UniErr> {
         let mut ripple = DirectedProto::ripple();
-        ripple.method(SysMethod::Search);
-        ripple.body(Substance::Sys(Sys::Search(self.search.clone())));
+        ripple.method(HypMethod::Search);
+        ripple.body(Substance::Hyper(HyperSubstance::Search(self.search.clone())));
         ripple.history(self.history.clone());
         let mut adjacents = self.skel.adjacents.clone();
         adjacents.retain(|point, _| !self.history.contains(point));
@@ -2676,7 +2676,7 @@ where
         let mut discoveries = Discoveries::new();
         for echo in echoes {
             if echo.core.status.is_success() {
-                if let Substance::Sys(Sys::Discoveries(new)) = echo.variant.core.body {
+                if let Substance::Hyper(HyperSubstance::Discoveries(new)) = echo.variant.core.body {
                     for discovery in new.vec.into_iter() {
                         discoveries.push(discovery);
                     }

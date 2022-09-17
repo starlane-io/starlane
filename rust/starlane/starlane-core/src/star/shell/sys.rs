@@ -7,7 +7,7 @@ use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use cosmic_universe::id::id::ToPoint;
 use cosmic_universe::particle::particle::Details;
-use cosmic_universe::sys::{Location, ParticleRecord};
+use cosmic_universe::hyper::{Location, ParticleRecord};
 use mesh_portal::version::latest::entity::request::create::{PointSegFactory, Template};
 use mesh_portal::version::latest::fail;
 use mesh_portal::version::latest::id::{Point, RouteSegment};

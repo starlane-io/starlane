@@ -14,7 +14,7 @@ use cosmic_universe::particle::particle::{Details, Status};
 use cosmic_universe::util::{log, ToResolved};
 use cosmic_universe::wave::{
     Agent, DirectedHandlerShell, DirectedProto, Exchanger, Handling, InCtx, Pong, ProtoTransmitter,
-    ProtoTransmitterBuilder, ReflectedCore, Router, Scope, SetStrategy, SysMethod, Wave,
+    ProtoTransmitterBuilder, ReflectedCore, Router, Scope, SetStrategy, HypMethod, Wave,
 };
 use cosmic_universe::{Registration, HYPERUSER, ArtRef};
 use cosmic_nom::new_span;
@@ -34,7 +34,7 @@ use crate::star::HyperStarSkel;
 use cosmic_universe::config::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::parse::route_attribute;
 use cosmic_universe::substance::substance::Substance;
-use cosmic_universe::sys::{Assign, AssignmentKind, Sys};
+use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance};
 use cosmic_universe::wave::CoreBounce;
 use cosmic_universe::wave::DirectedHandler;
 use cosmic_universe::wave::DirectedHandlerSelector;
@@ -94,7 +94,7 @@ where
         self.command(ctx).await
     }
 
-    #[route("Sys<Command>")]
+    #[route("Hyp<Command>")]
     pub async fn command(&self, ctx: InCtx<'_, Command>) -> Result<ReflectedCore, P::Err> {
         let global = GlobalExecutionChamber::new(self.skel.clone() );
         let agent = ctx.wave().agent().clone();

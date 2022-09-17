@@ -199,7 +199,7 @@ impl<P> Shell<P>
 where
     P: Platform + 'static,
 {
-    #[route("Msg<NewCliSession>")]
+    #[route("Ext<NewCliSession>")]
     pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Port, UniErr> {
         // only allow a cli session to be created by any layer of THIS particle
         if ctx.from().clone().to_point() != ctx.to().clone().to_point() {
@@ -230,9 +230,9 @@ where
 
 #[routes]
 impl CliSession {
-    #[route("Msg<Exec>")]
+    #[route("Ext<Exec>")]
     pub async fn exec(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, UniErr> {
-println!("---> Reached Msg<Exec> !!!!");
+println!("---> Reached Ext<Exec> !!!!");
         let exec_topic = Topic::uuid();
         let exec_port = self.port.clone().with_topic(exec_topic.clone());
         let mut exec = CommandExecutor::new(exec_port, ctx.from().clone(), self.env.clone());
