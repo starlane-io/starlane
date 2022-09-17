@@ -25,7 +25,6 @@ use cosmic_universe::command::request::query::{Query, QueryResult};
 use cosmic_universe::command::request::select::{Select, SubSelect};
 use cosmic_universe::error::UniErr;
 use cosmic_universe::fail::Timeout;
-use cosmic_universe::particle2::particle::{Details, Properties, Status, Stub};
 use cosmic_universe::property::PropertiesConfig;
 use cosmic_universe::quota::Timeouts;
 use cosmic_universe::security::{Access, AccessGrant};
@@ -48,6 +47,7 @@ use uuid::Uuid;
 use cosmic_universe::artifact::ArtifactApi;
 use cosmic_universe::id::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Layer, MachineName, Point, Port, RouteSeg, Specific, StarKey, StarSub, ToBaseKind, ToPort, UserBaseSubKind};
 use cosmic_universe::log::RootLogger;
+use cosmic_universe::particle::{Details, Properties, Status, Stub};
 use cosmic_universe::reg::Registration;
 
 pub mod control;

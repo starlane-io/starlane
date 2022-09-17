@@ -11,8 +11,7 @@ use crate::log::{
 use crate::ext::ExtMethod;
 use crate::parse::model::Subst;
 use crate::parse::sub;
-use crate::particle2::particle::{Details, Status};
-use crate::particle2::Watch;
+use crate::particle::Watch;
 use crate::quota::Timeouts;
 use crate::security::{Permissions, Privilege, Privileges};
 use crate::selector2::selector::Selector;
@@ -43,6 +42,7 @@ use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use tokio::time::Instant;
 use crate::hyper::InterchangeKind::DefaultControl;
 use crate::id::{Layer, Point, PointSeg, Port, PortSelector, RouteSeg, Sub, Topic, ToPoint, ToPort, Uuid};
+use crate::particle::{Details, Status};
 
 #[derive(
     Debug,

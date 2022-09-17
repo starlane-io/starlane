@@ -1,7 +1,8 @@
 use std::ops::Deref;
-use crate::{BindConfig, Details, Stub};
-use serde::{Serialize,Deserialize};
+use crate::BindConfig;
+use serde::{Deserialize, Serialize};
 use crate::id::Point;
+use crate::particle::{Details, Stub};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PortalKind {

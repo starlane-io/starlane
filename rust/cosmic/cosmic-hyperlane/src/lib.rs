@@ -5,7 +5,7 @@ use cosmic_universe::error::UniErr;
 use cosmic_universe::frame2::frame::PrimitiveFrame;
 use cosmic_universe::log::{PointLogger, RootLogger};
 use cosmic_universe::ext::ExtMethod;
-use cosmic_universe::particle2::particle::Status;
+use cosmic_universe::particle::Status;
 use cosmic_universe::quota::Timeouts;
 use cosmic_universe::substance2::substance::{Errors, Substance, SubstanceKind, Token};
 use cosmic_universe::hyper::{Greet, HyperSubstance, InterchangeKind, Knock};

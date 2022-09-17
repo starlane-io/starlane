@@ -1,5 +1,4 @@
 use crate::error::UniErr;
-use crate::particle2::particle::{Details, Status, Stub};
 use crate::substance2::substance::Substance;
 use cosmic_macros_primitive::Autobox;
 use std::collections::HashSet;
@@ -11,6 +10,7 @@ use crate::wave::{CmdMethod, DirectedCore, HypMethod, Ping, Pong, ReflectedKind,
 use crate::{Agent, ReflectedCore};
 use serde::{Deserialize, Serialize};
 use crate::id::{Kind, KindParts, Point, Port, StarKey, StarSub, ToPoint, ToPort};
+use crate::particle::{Details, Status, Stub};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {

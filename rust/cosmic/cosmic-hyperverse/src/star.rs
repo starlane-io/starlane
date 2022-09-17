@@ -18,7 +18,6 @@ use cosmic_universe::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::error::UniErr;
 use cosmic_universe::log::{PointLogger, RootLogger, Trackable, Tracker};
 use cosmic_universe::parse::{bind_config, Env, route_attribute};
-use cosmic_universe::particle2::particle::{Details, Status, Stub};
 use cosmic_universe::quota::Timeouts;
 use cosmic_universe::substance2::substance::{Substance, ToSubstance};
 use cosmic_universe::hyper::{
@@ -62,6 +61,7 @@ use tokio::time::error::Elapsed;
 use tracing::{error, info};
 use cosmic_universe::id::{BaseKind, GLOBAL_EXEC, Kind, Layer, LOCAL_STAR, Point, Port, PortSelector, RouteSeg, StarKey, StarStub, StarSub, Sub, ToBaseKind, Topic, ToPoint, ToPort, Traversal, TraversalDirection, TraversalInjection, TraversalLayer, Uuid};
 use cosmic_universe::mount::MountKind;
+use cosmic_universe::particle::{Details, Status, Stub};
 use cosmic_universe::reg::Registration;
 use cosmic_universe::state::{State, StateFactory};
 

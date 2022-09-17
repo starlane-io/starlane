@@ -2,10 +2,11 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use lru::LruCache;
 use std::ops::Deref;
-use crate::{BindConfig, Stub, UniErr};
+use crate::{BindConfig, UniErr};
 use crate::substance2::Bin;
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
 use crate::id::Point;
+use crate::particle::Stub;
 
 #[derive(Clone)]
 pub struct ArtifactApi {

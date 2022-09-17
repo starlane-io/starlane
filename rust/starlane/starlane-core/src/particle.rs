@@ -13,9 +13,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use cosmic_universe::id::{ArtifactSubKind, FileSubKind, StarKey, ToPoint, UserBaseSubKind};
-use cosmic_universe::id2::{BaseSubKind};
+use cosmic_universe::id2::BaseSubKind;
 use cosmic_universe::parse::{CamelCase, consume_kind};
-use cosmic_universe::particle2::particle::{Details, Property};
 use cosmic_universe::hyper::{AssignmentKind, ChildRegistry, Location};
 use cosmic_nom::new_span;
 use mesh_portal::error::MsgErr;
@@ -29,6 +28,7 @@ use tokio::sync::oneshot::Receiver;
 use tokio::sync::{mpsc, oneshot};
 use tracing_futures::WithSubscriber;
 use cosmic_universe::id::{BaseKind, ToBaseKind};
+use cosmic_universe::particle::{Details, Property};
 
 use crate::config::config::ParticleConfig;
 use crate::error::Error;

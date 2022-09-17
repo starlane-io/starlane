@@ -11,7 +11,6 @@ use cosmic_universe::error::UniErr;
 use cosmic_universe::log::{PointLogger, Tracker};
 use cosmic_universe::parse::model::Subst;
 use cosmic_universe::parse::{bind_config, route_attribute};
-use cosmic_universe::particle2::particle::{Details, Status, Stub};
 use cosmic_universe::substance2::substance::Substance;
 use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance};
 use cosmic_universe::util::{log, ValuePattern};
@@ -33,6 +32,7 @@ use tokio::sync::watch::Ref;
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock, watch};
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::id::{BaseKind, Kind, Layer, Point, Port, StarKey, StarSub, ToBaseKind, ToPoint, ToPort, Traversal, TraversalInjection, TraversalLayer, Uuid};
+use cosmic_universe::particle::{Details, Status, Stub};
 use cosmic_universe::reg::Registration;
 use cosmic_universe::state::State;
 

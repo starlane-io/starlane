@@ -9,7 +9,7 @@ use cosmic_universe::command::request::select::{SelectKind, SubSelect};
 use cosmic_universe::id::{ArtifactSubKind, FileSubKind, Tks, UserBaseSubKind};
 use cosmic_universe::id2::{BaseSubKind};
 use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
-use cosmic_universe::particle2::particle::Details;
+use cosmic_universe::particle::Details;
 use cosmic_universe::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask,
     PermissionsMaskKind, Privilege, Privileges,

@@ -71,7 +71,7 @@ use cosmic_universe::log::{RootLogger, Track, Tracker};
 use cosmic_universe::ext::ExtMethod;
 use cosmic_universe::id::{BaseKind, Kind, Layer, Point, Port, StarSub, ToPoint, ToPort, TraversalInjection};
 use cosmic_universe::parse::{CamelCase, route_attribute};
-use cosmic_universe::particle2::particle::{Details, Status, Stub};
+use cosmic_universe::particle::{Details, Status, Stub};
 use cosmic_universe::quota::Timeouts;
 use cosmic_universe::state::State;
 use cosmic_universe::util::log;

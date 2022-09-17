@@ -2,7 +2,7 @@ use crate::star::{HyperStar, HyperStarApi, StarCon, HyperStarSkel, StarTemplate,
 use crate::{DriversBuilder, PlatErr, Platform, Registry, RegistryApi};
 use cosmic_universe::error::UniErr;
 use cosmic_universe::log::{PointLogger, RootLogger};
-use cosmic_universe::particle2::particle::Status;
+use cosmic_universe::particle::Status;
 use cosmic_universe::quota::Timeouts;
 use cosmic_universe::substance2::substance::Substance;
 use cosmic_universe::hyper::{InterchangeKind, Knock};

@@ -1,5 +1,6 @@
-use crate::{SetProperties, SetRegistry, Status, Strategy};
+use crate::{SetProperties, SetRegistry, Strategy};
 use crate::id::{Kind, Point};
+use crate::particle::Status;
 
 #[derive(Clone)]
 pub struct Registration {

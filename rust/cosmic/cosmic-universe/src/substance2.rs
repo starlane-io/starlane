@@ -15,7 +15,6 @@ pub mod substance {
     use crate::ext::ExtMethod;
     use crate::parse::model::Subst;
     use crate::parse::{CtxResolver, Env};
-    use crate::particle2::particle::{Particle, Status, Stub};
     use crate::selector2::selector::{KindSelector, Selector};
     use crate::hyper::{Greet, HyperSubstance, Knock};
     use crate::util::{ToResolved, uuid, ValueMatcher, ValuePattern};
@@ -29,8 +28,9 @@ pub mod substance {
     use serde_json::Value;
     use std::str::FromStr;
     use std::sync::Arc;
-    use crate::Details;
+    use crate::particle::Details;
     use crate::id::{BaseKind, KindParts, Meta, Point, PointCtx, PointVar, Port};
+    use crate::particle::{Particle, Status, Stub};
 
     #[derive(
         Debug,

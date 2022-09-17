@@ -8,10 +8,8 @@ use cosmic_universe::command::request::query::{Query, QueryResult};
 use cosmic_universe::command::request::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
 use cosmic_universe::command::request::set::Set;
 use cosmic_universe::error::UniErr;
-use cosmic_universe::id2::id::{};
-use cosmic_universe::id2::{BaseSubKind};
+use cosmic_universe::id2::BaseSubKind;
 use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
-use cosmic_universe::particle2::particle::{Details, Properties, Property, Status, Stub};
 use cosmic_universe::security::{Access, AccessGrant, AccessGrantKind, EnumeratedAccess, IndexedAccessGrant, Permissions, PermissionsMask, PermissionsMaskKind, Privilege, Privileges};
 use cosmic_universe::selector2::selector::specific::{
     ProductSelector, ProviderSelector, VariantSelector, VendorSelector,
@@ -40,6 +38,7 @@ use std::sync::Arc;
 use strum::ParseError;
 use tokio::sync::mpsc;
 use cosmic_universe::id::{ArtifactSubKind, BaseKind, FileSubKind, Kind, KindParts, Point, PointSeg, Specific, StarKey, ToBaseKind, UserBaseSubKind, Version};
+use cosmic_universe::particle::{Details, Properties, Property, Status, Stub};
 use cosmic_universe::reg::Registration;
 
 #[macro_use]
@@ -1139,9 +1138,7 @@ pub mod test {
     use cosmic_universe::command::request::query::Query;
     use cosmic_universe::command::request::select::{Select, SelectIntoSubstance, SelectKind};
     use cosmic_universe::entity::request::select::SelectKind;
-    use cosmic_universe::id2::id::{};
-    use cosmic_universe::id2::{};
-    use cosmic_universe::particle2::particle::Status;
+    use cosmic_universe::particle::Status;
     use cosmic_universe::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
         Privilege,

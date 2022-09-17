@@ -24,7 +24,7 @@ use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use cosmic_universe::command::Command;
 use cosmic_universe::id::{ArtifactSubKind, FileSubKind, StarKey, ToPoint, UserBaseSubKind};
 use cosmic_universe::id2::{};
-use cosmic_universe::particle2::particle::Details;
+use cosmic_universe::particle::Details;
 use cosmic_universe::hyper::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
 use cosmic_locality::field::FieldEx;
 use cosmic_hyperverse::RegistryApi;

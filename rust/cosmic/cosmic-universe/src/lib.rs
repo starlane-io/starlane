@@ -21,7 +21,6 @@ pub mod http;
 pub mod log;
 pub mod ext;
 pub mod parse;
-pub mod particle2;
 pub mod property;
 pub mod quota;
 pub mod security;
@@ -40,6 +39,7 @@ pub mod mount;
 pub mod command;
 pub mod config;
 pub mod id;
+pub mod particle;
 
 
 use substance2::Bin;
@@ -51,7 +51,6 @@ use command::request::select::{Select, SubSelect};
 use config::bind::BindConfig;
 use config::Document;
 use crate::error::UniErr;
-use crate::particle2::particle::{Details, Properties, Status, Stub};
 use crate::security::{Access, AccessGrant};
 use crate::selector2::selector::Selector;
 use crate::substance2::substance::{Substance, SubstanceList, Token, ToSubstance};
@@ -68,6 +67,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use artifact::ArtifactFetcher;
 use id::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Point, Port, Specific, StarSub, UserBaseSubKind, Uuid};
+use particle::{Details, Properties, Status, Stub};
 
 lazy_static! {
     pub static ref VERSION: semver::Version = semver::Version::from_str("0.3.0").unwrap();

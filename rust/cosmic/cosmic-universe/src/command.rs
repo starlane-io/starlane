@@ -692,7 +692,7 @@ pub mod request {
         use crate::fail::{BadCoercion, Fail};
         use crate::id::Point;
         use crate::parse::Env;
-        use crate::particle2::particle::Stub;
+        use crate::particle::Stub;
         use crate::selector2::selector::{
             Hop, HopCtx, HopVar, PointHierarchy, Selector, SelectorDef,
         };
