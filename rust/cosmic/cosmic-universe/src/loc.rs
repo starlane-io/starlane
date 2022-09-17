@@ -1,30 +1,34 @@
+use core::fmt::Formatter;
+use core::str::FromStr;
+use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
+
+use convert_case::{Case, Casing};
+use nom::combinator::all_consuming;
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::de::{Error, Visitor};
+
+use cosmic_nom::{new_span, Trace, Tw};
+
+use crate::{Agent, ANONYMOUS, BaseKind, cosmic_uuid, HYPERUSER, Kind, KindTemplate, ParticleRecord, UniErr};
 use crate::err::ParseErrs;
 use crate::hyper::ChildRegistry;
+use crate::kind::KindParts;
 use crate::log::{SpanLogger, Trackable};
-use crate::parse::error::result;
 use crate::parse::{
     CamelCase, consume_point, consume_point_ctx, Domain, Env,
     kind_parts, parse_star_key, point_and_kind, point_route_segment, point_selector, ResolverErr, SkewerCase,
 };
+use crate::parse::error::result;
+use crate::particle::traversal::TraversalPlan;
 use crate::selector::{Pattern, Selector, SpecificSelector, VersionReq};
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
 use crate::wave::{
     DirectedWave, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave,
     ToRecipients, UltraWave, Wave,
 };
-use crate::{Agent, ANONYMOUS, BaseKind, cosmic_uuid, HYPERUSER, Kind, KindTemplate, ParticleRecord, UniErr};
-use convert_case::{Case, Casing};
-use core::fmt::Formatter;
-use core::str::FromStr;
-use cosmic_nom::{new_span, Trace, Tw};
-use nom::combinator::all_consuming;
-use serde::de::{Error, Visitor};
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use std::collections::HashMap;
-use std::ops::{Deref, DerefMut};
-use crate::kind::KindParts;
-use crate::particle::traversal::TraversalPlan;
 use crate::wave::exchange::Exchanger;
+
 lazy_static! {
     pub static ref GLOBAL_CENTRAL: Point = Point::from_str("GLOBAL::central").unwrap();
     pub static ref GLOBAL_EXEC: Point = Point::from_str("GLOBAL::executor").unwrap();
@@ -74,71 +78,6 @@ pub trait ToBaseKind {
 pub enum ProvisionAffinity {
     Local,
     Wrangle,
-}
-
-pub type PointKind = PointKindDef<Point>;
-pub type PointKindCtx = PointKindDef<PointCtx>;
-pub type PointKindVar = PointKindDef<PointVar>;
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub struct PointKindDef<Pnt> {
-    pub point: Pnt,
-    pub kind: Kind,
-}
-
-impl ToResolved<PointKindCtx> for PointKindVar {
-    fn to_resolved(self, env: &Env) -> Result<PointKindCtx, UniErr> {
-        Ok(PointKindCtx {
-            point: self.point.to_resolved(env)?,
-            kind: self.kind,
-        })
-    }
-}
-
-impl ToResolved<PointKind> for PointKindVar {
-    fn to_resolved(self, env: &Env) -> Result<PointKind, UniErr> {
-        Ok(PointKind {
-            point: self.point.to_resolved(env)?,
-            kind: self.kind,
-        })
-    }
-}
-
-impl ToResolved<PointKind> for PointKindCtx {
-    fn to_resolved(self, env: &Env) -> Result<PointKind, UniErr> {
-        Ok(PointKind {
-            point: self.point.to_resolved(env)?,
-            kind: self.kind,
-        })
-    }
-}
-
-impl PointKind {
-    pub fn new(point: Point, kind: Kind) -> Self {
-        Self { point, kind }
-    }
-}
-
-impl ToString for PointKind {
-    fn to_string(&self) -> String {
-        format!("{}<{}>", self.point.to_string(), self.kind.to_string())
-    }
-}
-
-impl FromStr for PointKind {
-    type Err = UniErr;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let point_and_kind: PointKindVar = result(all_consuming(point_and_kind)(new_span(s)))?;
-        let point_and_kind = point_and_kind.collapse()?;
-        Ok(point_and_kind)
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub struct AddressAndType {
-    pub point: Point,
-    pub resource_type: BaseKind,
 }
 
 pub type Meta = HashMap<String, String>;
@@ -218,56 +157,6 @@ impl FromStr for Version {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let version = semver::Version::from_str(s)?;
         Ok(Self { version })
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
-pub struct Specific {
-    pub provider: Domain,
-    pub vendor: Domain,
-    pub product: SkewerCase,
-    pub variant: SkewerCase,
-    pub version: Version,
-}
-
-impl Specific {
-    pub fn to_selector(&self) -> SpecificSelector {
-        SpecificSelector::from_str(self.to_string().as_str()).unwrap()
-    }
-}
-
-impl ToString for Specific {
-    fn to_string(&self) -> String {
-        format!(
-            "{}:{}:{}:{}:{}",
-            self.provider,
-            self.vendor,
-            self.product,
-            self.variant,
-            self.version.to_string()
-        )
-    }
-}
-
-impl FromStr for Specific {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
-    }
-}
-
-impl TryInto<SpecificSelector> for Specific {
-    type Error = UniErr;
-
-    fn try_into(self) -> Result<SpecificSelector, Self::Error> {
-        Ok(SpecificSelector {
-            provider: Pattern::Exact(self.provider),
-            vendor: Pattern::Exact(self.vendor),
-            product: Pattern::Exact(self.product),
-            variant: Pattern::Exact(self.variant),
-            version: VersionReq::from_str(self.version.to_string().as_str())?,
-        })
     }
 }
 

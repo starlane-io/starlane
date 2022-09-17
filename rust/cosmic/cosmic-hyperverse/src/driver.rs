@@ -1,7 +1,19 @@
-use crate::machine::MachineSkel;
-use crate::star::HyperStarCall::LayerTraversalInjection;
-use crate::star::{HyperStarSkel, LayerInjectionRouter, StarDriver, StarDriverFactory, StarState};
-use crate::{HyperErr, Hyperverse, Registry, RegistryApi};
+use std::cell::Cell;
+use std::collections::{HashMap, HashSet};
+use std::marker::PhantomData;
+use std::str::FromStr;
+use std::sync::Arc;
+use std::time::Duration;
+
+use dashmap::DashMap;
+use futures::future::select_all;
+use futures::FutureExt;
+use tokio::sync::{broadcast, mpsc, oneshot, RwLock, watch};
+use tokio::sync::mpsc::Sender;
+use tokio::sync::oneshot::error::RecvError;
+use tokio::sync::oneshot::Receiver;
+use tokio::sync::watch::Ref;
+
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::command::common::{SetProperties, StateSrc};
 use cosmic_universe::command::direct::create::{
@@ -10,15 +22,17 @@ use cosmic_universe::command::direct::create::{
 use cosmic_universe::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance};
+use cosmic_universe::HYPERUSER;
+use cosmic_universe::kind::{BaseKind, Kind, StarSub};
 use cosmic_universe::loc::{
     Layer, Point, StarKey, Surface, ToBaseKind, ToPoint, ToSurface,
     Uuid,
 };
 use cosmic_universe::log::{PointLogger, Tracker};
-use cosmic_universe::parse::model::Subst;
 use cosmic_universe::parse::{bind_config, route_attribute};
+use cosmic_universe::parse::model::Subst;
 use cosmic_universe::particle::{Details, Status, Stub};
-use crate::Registration;
+use cosmic_universe::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
 use cosmic_universe::substance::Substance;
 use cosmic_universe::util::{log, ValuePattern};
 use cosmic_universe::wave::{
@@ -27,27 +41,17 @@ use cosmic_universe::wave::{
     RecipientSelector, ReflectedWave,
     UltraWave, Wave, WaveKind,
 };
-use cosmic_universe::HYPERUSER;
-use dashmap::DashMap;
-use futures::future::select_all;
-use futures::FutureExt;
-use std::cell::Cell;
-use std::collections::{HashMap, HashSet};
-use std::marker::PhantomData;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::mpsc::Sender;
-use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::oneshot::Receiver;
-use tokio::sync::watch::Ref;
-use tokio::sync::{broadcast, mpsc, oneshot, RwLock, watch};
-use cosmic_universe::kind::{BaseKind, Kind, StarSub};
-use cosmic_universe::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
 use cosmic_universe::wave::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
 use cosmic_universe::wave::core::cmd::CmdMethod;
 use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::exchange::{DirectedHandler, DirectedHandlerSelector, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, SetStrategy};
+
+use crate::{HyperErr, Hyperverse, Registry, RegistryApi};
+use crate::machine::MachineSkel;
+use crate::Registration;
+use crate::star::{HyperStarSkel, LayerInjectionRouter, StarDriver, StarDriverFactory, StarState};
+use crate::star::HyperStarCall::LayerTraversalInjection;
+
 lazy_static! {
     static ref DEFAULT_BIND: ArtRef<BindConfig> = ArtRef::new(
         Arc::new(default_bind()),

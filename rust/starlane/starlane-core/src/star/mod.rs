@@ -1,23 +1,49 @@
 use std::cmp::{min, Ordering};
+use std::cmp;
 use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Debug, Formatter};
+use std::fmt;
+use std::future::Future;
 use std::iter::FromIterator;
-use std::sync::atomic::AtomicU64;
+use std::num::ParseIntError;
+use std::str::FromStr;
 use std::sync::Arc;
+use std::sync::atomic::AtomicU64;
 use std::time::{Duration, Instant};
 
 use futures::future::select_all;
 use futures::FutureExt;
 use lru::LruCache;
+use mysql::{FromRowError, Row};
+use mysql::prelude::FromRow;
+use nom::branch::alt;
+use nom::bytes::complete::tag;
+use nom::character::complete::digit1;
+use nom::combinator::all_consuming;
+use nom::error::{ErrorKind, ParseError, VerboseError};
+use nom::multi::many0;
+use nom::Parser;
+use nom::sequence::{delimited, preceded, terminated, tuple};
+use nom_supreme::error::ErrorTree;
 use serde::{Deserialize, Serialize};
+use shell::search::{
+    SearchCommit, SearchHits, SearchInit, StarSearchTransaction, TransactionResult,
+};
+use sqlx::postgres::PgTypeInfo;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
-use shell::search::{
-    SearchCommit, SearchHits, SearchInit, StarSearchTransaction, TransactionResult,
-};
+use cosmic_nom::{new_span, Res, Span};
+use cosmic_universe::hyper::ParticleRecord;
+use cosmic_universe::kind::BaseKind;
+use cosmic_universe::loc::{ConstellationName, RouteSeg, StarKey, ToPoint, ToSurface};
+use cosmic_universe::parse::error::result;
+use cosmic_universe::parse::lowercase_alphanumeric;
+use mesh_portal::version::latest::id::{Point, Port};
+use mesh_portal::version::latest::log::{PointLogger, RootLogger};
+use mesh_portal::version::latest::particle::Status;
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::constellation::ConstellationStatus;
@@ -29,8 +55,7 @@ use crate::lane::{
     ConnectorController, LaneCommand, LaneEnd, LaneIndex, LaneMeta, LaneWrapper, ProtoLaneEnd,
     UltimaLaneKey,
 };
-
-use crate::logger::{Flags, LogInfo, Logger};
+use crate::logger::{Flags, Logger, LogInfo};
 use crate::message::{
     MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage,
     ProtoStarMessageTo, TrackerJob,
@@ -51,32 +76,6 @@ use crate::star::variant::{FrameVerdict, VariantApi};
 use crate::starlane::StarlaneMachine;
 use crate::template::StarHandle;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
-use cosmic_nom::{new_span, Res, Span};
-use cosmic_universe::hyper::ParticleRecord;
-use cosmic_universe::loc::{ConstellationName, RouteSeg, StarKey, ToPoint, ToSurface};
-use cosmic_universe::parse::error::result;
-use cosmic_universe::parse::lowercase_alphanumeric;
-use mesh_portal::version::latest::id::{Point, Port};
-use mesh_portal::version::latest::log::{PointLogger, RootLogger};
-use mesh_portal::version::latest::particle::Status;
-use mysql::prelude::FromRow;
-use mysql::{FromRowError, Row};
-use nom::branch::alt;
-use nom::bytes::complete::tag;
-use nom::character::complete::digit1;
-use nom::combinator::all_consuming;
-use nom::error::{ErrorKind, ParseError, VerboseError};
-use nom::multi::many0;
-use nom::sequence::{delimited, preceded, terminated, tuple};
-use nom::Parser;
-use nom_supreme::error::ErrorTree;
-use sqlx::postgres::PgTypeInfo;
-use std::cmp;
-use std::fmt;
-use std::future::Future;
-use std::num::ParseIntError;
-use std::str::FromStr;
-use cosmic_universe::kind::BaseKind;
 
 pub mod core;
 pub mod shell;

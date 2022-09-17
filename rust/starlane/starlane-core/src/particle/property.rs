@@ -1,11 +1,14 @@
-use crate::error::Error;
+use std::collections::HashMap;
+use std::ops::Deref;
+
+use validator::validate_email;
+
 use cosmic_universe::util::ValueMatcher;
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::payload::{PayloadPattern, Substance};
-use std::collections::HashMap;
-use std::ops::Deref;
-use validator::validate_email;
+
+use crate::error::Error;
 
 pub struct PropertyDef {
     pub pattern: Box<dyn PropertyPattern>,

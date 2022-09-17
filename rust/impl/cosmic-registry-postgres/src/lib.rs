@@ -1,8 +1,32 @@
 #![allow(warnings)]
 
-use cosmic_hyperverse::machine::MachineTemplate;
-use cosmic_hyperverse::Hyperverse;
+#[macro_use]
+extern crate async_recursion;
+#[macro_use]
+extern crate async_trait;
+#[macro_use]
+extern crate lazy_static;
+#[macro_use]
+extern crate tracing;
+
+use std::cmp::Ordering;
+use std::collections::{HashMap, HashSet};
+use std::io::Error;
+use std::marker::PhantomData;
+use std::ops::Deref;
+use std::str::FromStr;
+use std::sync::Arc;
+
+use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
+use sqlx::pool::PoolConnection;
+use sqlx::postgres::{PgPoolOptions, PgRow};
+use strum::ParseError;
+use tokio::sync::mpsc;
+
 use cosmic_hyperverse::{HyperErr, RegistryApi};
+use cosmic_hyperverse::Hyperverse;
+use cosmic_hyperverse::machine::MachineTemplate;
+use cosmic_hyperverse::Registration;
 use cosmic_universe::command::common::{PropertyMod, SetProperties, SetRegistry};
 use cosmic_universe::command::direct::create::{Create, KindTemplate, PointSegTemplate, Strategy};
 use cosmic_universe::command::direct::delete::Delete;
@@ -14,50 +38,29 @@ use cosmic_universe::command::direct::select::{
 use cosmic_universe::command::direct::set::Set;
 use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::{Location, ParticleRecord};
+use cosmic_universe::HYPERUSER;
+use cosmic_universe::id2::BaseSubKind;
+use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, KindParts, Specific, UserBaseSubKind};
 use cosmic_universe::loc::{
-    Point, PointSeg, Specific, StarKey,
+    Point, PointSeg, StarKey,
     ToBaseKind, Version,
 };
-use cosmic_universe::id2::BaseSubKind;
 use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
 use cosmic_universe::particle::{Details, Properties, Property, Status, Stub};
-use cosmic_hyperverse::Registration;
 use cosmic_universe::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, IndexedAccessGrant, Permissions,
     PermissionsMask, PermissionsMaskKind, Privilege, Privileges,
-};
-use cosmic_universe::selector::specific::{
-    ProductSelector, ProviderSelector, VariantSelector, VendorSelector,
 };
 use cosmic_universe::selector::{
     ExactPointSeg, KindBaseSelector, PointHierarchy, PointKindSeg, PointSegSelector, Selector,
     SubKindSelector,
 };
+use cosmic_universe::selector::specific::{
+    ProductSelector, ProviderSelector, VariantSelector, VendorSelector,
+};
 use cosmic_universe::substance::{Substance, SubstanceList, SubstanceMap};
 use cosmic_universe::util::ValuePattern;
-use cosmic_universe::HYPERUSER;
-use sqlx::pool::PoolConnection;
-use sqlx::postgres::{PgPoolOptions, PgRow};
-use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
-use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
-use std::io::Error;
-use std::marker::PhantomData;
-use std::ops::Deref;
-use std::str::FromStr;
-use std::sync::Arc;
-use strum::ParseError;
-use tokio::sync::mpsc;
-use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, KindParts, UserBaseSubKind};
 
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate async_trait;
-#[macro_use]
-extern crate async_recursion;
-#[macro_use]
-extern crate tracing;
 
 pub struct PostgresRegistry<P>
 where
@@ -1140,17 +1143,17 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
 
 #[cfg(test)]
 pub mod test {
-    use crate::error::Error;
-    use crate::particle::Kind;
-    use crate::registry::{Registration, Registry};
-    use crate::{PostErr, PostgresRegistry};
+    use std::convert::TryInto;
+    use std::str::FromStr;
+
+    use cosmic_hyperverse::Registration;
     use cosmic_hyperverse::RegistryApi;
     use cosmic_universe::command::direct::query::Query;
     use cosmic_universe::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
     use cosmic_universe::entity::request::select::SelectKind;
+    use cosmic_universe::kind::{Kind, UserBaseSubKind};
     use cosmic_universe::loc::{Point, StarKey, ToPoint};
     use cosmic_universe::particle::Status;
-    use cosmic_hyperverse::Registration;
     use cosmic_universe::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
         Privilege,
@@ -1162,9 +1165,11 @@ pub mod test {
     use mesh_portal::version::latest::particle::Status;
     use mesh_portal::version::latest::payload::Primitive;
     use mesh_portal::version::latest::selector::{PointHierarchy, Selector};
-    use std::convert::TryInto;
-    use std::str::FromStr;
-    use cosmic_universe::kind::{Kind, UserBaseSubKind};
+
+    use crate::{PostErr, PostgresRegistry};
+    use crate::error::Error;
+    use crate::particle::Kind;
+    use crate::registry::{Registration, Registry};
 
     #[tokio::test]
     pub async fn test_nuke() -> Result<(), PostErr> {

@@ -8,13 +8,12 @@ use std::convert::TryInto;
 use std::str::FromStr;
 
 use nom::error::{context, ErrorKind, ParseError, VerboseError};
-use serde::de::Error as OtherError;
 use serde::{Deserialize, Serialize};
-
+use serde::de::Error as OtherError;
 use starlane_core::error::Error;
-
 use starlane_core::particle::ResourceAddressPart;
 use starlane_core::star::StarKind;
+
 use starlane_macros::resources;
 
 pub fn parse_address_part(string: &str) -> Result<(&str, Vec<ResourceAddressPart>), Error> {

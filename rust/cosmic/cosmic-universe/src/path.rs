@@ -1,11 +1,14 @@
-use crate::err::UniErr;
-use crate::parse::consume_path;
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use cosmic_nom::new_span;
-use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+
+use serde::{Deserialize, Serialize};
+
+use cosmic_nom::new_span;
+
+use crate::err::UniErr;
+use crate::parse::consume_path;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct Path {

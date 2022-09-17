@@ -1,17 +1,19 @@
-use crate::error::Error;
-use crate::registry::RegistryApi;
+use std::str::FromStr;
+use std::sync::Arc;
+
 use cosmic_universe::command::Command;
 use cosmic_universe::loc::Surface;
 use cosmic_universe::loc::ToSurface;
 use cosmic_universe::service::Global;
 use cosmic_universe::wave::{AsyncTransmitterWithAgent, Transmitter};
+use cosmic_universe::wave::core::Method;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Agent, ReqProto, ReqShell, RespShell};
 use mesh_portal::version::latest::msg::MsgMethod;
 use mesh_portal::version::latest::payload::{PayloadType, Substance};
-use std::str::FromStr;
-use std::sync::Arc;
-use cosmic_universe::wave::core::Method;
+
+use crate::error::Error;
+use crate::registry::RegistryApi;
 
 lazy_static! {
     static ref COMMAND_SERVICE_PORT: Surface = Point::from_str("GLOBAL::command-service")

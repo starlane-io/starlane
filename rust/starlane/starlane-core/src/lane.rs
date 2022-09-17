@@ -1,31 +1,27 @@
 use std::cell::Cell;
-
 use std::convert::TryInto;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 
 use futures::FutureExt;
-
 use lru::LruCache;
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
-use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{broadcast, mpsc};
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::time::Duration;
 
 use cosmic_universe::loc::StarKey;
-use tokio::time::Duration;
 
 use crate::error::Error;
 use crate::frame::{Frame, StarPattern};
-
 use crate::proto::{local_tunnels, ProtoTunnel};
-use crate::star::StarCommand;
-
 use crate::star::shell::lanes::LaneMuxerCall;
+use crate::star::StarCommand;
 use crate::template::StarInConstellationTemplateSelector;
 
 pub static STARLANE_PROTOCOL_VERSION: i32 = 1;

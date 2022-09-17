@@ -1,7 +1,9 @@
-use cosmic_universe::service::Global;
-use mesh_portal::version::latest::id::RouteSegment;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
+
+use cosmic_universe::hyper::ParticleRecord;
+use cosmic_universe::service::Global;
+use mesh_portal::version::latest::id::RouteSegment;
 
 use crate::error::Error;
 use crate::fail::{Fail, StarlaneFailure};
@@ -12,10 +14,9 @@ use crate::frame::{
 use crate::lane::{LaneKey, LaneSession, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply};
 use crate::star::core::message::CoreMessageCall;
-use crate::star::variant::FrameVerdict;
 use crate::star::StarSkel;
+use crate::star::variant::FrameVerdict;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use cosmic_universe::hyper::ParticleRecord;
 
 #[derive(Clone)]
 pub struct RouterApi {

@@ -1,3 +1,12 @@
+use std::ops::Deref;
+
+use http::{HeaderMap, StatusCode, Uri};
+use nom::combinator::all_consuming;
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+
+use cosmic_nom::new_span;
+
 use crate::err::UniErr;
 use crate::loc::Meta;
 use crate::parse::camel_case_chars;
@@ -5,12 +14,6 @@ use crate::parse::error::result;
 use crate::parse::model::MethodScopeSelector;
 use crate::substance::{Errors, Substance};
 use crate::util::{ValueMatcher, ValuePattern};
-use cosmic_nom::new_span;
-use http::{HeaderMap, StatusCode, Uri};
-use nom::combinator::all_consuming;
-use regex::Regex;
-use serde::{Deserialize, Serialize};
-use std::ops::Deref;
 use crate::wave::core::{DirectedCore, Method, ReflectedCore};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]

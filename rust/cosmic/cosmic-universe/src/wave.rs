@@ -1,39 +1,5 @@
-use crate::command::Command;
-use crate::command::RawCommand;
-use crate::config::bind::RouteSelector;
-use crate::err::{StatusErr, UniErr};
-use self::core::ext::ExtMethod;
-use self::core::http2::HttpMethod;
-use crate::hyper::AssignmentKind;
-use crate::hyper::InterchangeKind::DefaultControl;
-use crate::loc::StarKey;
-use crate::loc::{
-    Layer, Point, PointSeg, RouteSeg, Surface, SurfaceSelector, Topic, ToPoint, ToSurface, Uuid,
-};
-use crate::log::{
-    LogSpan, LogSpanEvent, PointLogger, RootLogger, SpanLogger, Spannable, Trackable, TrailSpanId,
-};
-use crate::parse::model::Subst;
-use crate::parse::sub;
-use crate::particle::Watch;
-use crate::particle::{Details, Status};
-use crate::settings::Timeouts;
-use crate::security::{Permissions, Privilege, Privileges};
-use crate::selector::Selector;
-use crate::substance::Bin;
-use crate::substance::{
-    Call, CallKind, CmdCall, Errors, ExtCall, HttpCall, HypCall, MultipartFormBuilder, Substance,
-    SubstanceKind, Token, ToRequestCore, ToSubstance,
-};
-use crate::util::{uuid, ValueMatcher, ValuePattern};
-use crate::{ANONYMOUS, HYPERUSER};
-use alloc::borrow::Cow;
 use ::core::borrow::Borrow;
-use cosmic_macros_primitive::Autobox;
-use cosmic_nom::{Res, SpanExtra};
-use dashmap::DashMap;
-use http::{HeaderMap, StatusCode, Uri};
-use serde::{Deserialize, Serialize};
+use alloc::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::env::var;
@@ -42,13 +8,51 @@ use std::ops;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::time::Duration;
+
+use dashmap::DashMap;
+use http::{HeaderMap, StatusCode, Uri};
+use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use tokio::time::Instant;
-use self::core::hyp::HypMethod;
-use self::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
+
+use cosmic_macros_primitive::Autobox;
+use cosmic_nom::{Res, SpanExtra};
 use exchange::ProtoTransmitter;
+
+use crate::{ANONYMOUS, HYPERUSER};
+use crate::command::Command;
+use crate::command::RawCommand;
+use crate::config::bind::RouteSelector;
+use crate::err::{StatusErr, UniErr};
+use crate::hyper::AssignmentKind;
+use crate::hyper::InterchangeKind::DefaultControl;
 use crate::kind::Sub;
+use crate::loc::{
+    Layer, Point, PointSeg, RouteSeg, Surface, SurfaceSelector, Topic, ToPoint, ToSurface, Uuid,
+};
+use crate::loc::StarKey;
+use crate::log::{
+    LogSpan, LogSpanEvent, PointLogger, RootLogger, SpanLogger, Spannable, Trackable, TrailSpanId,
+};
+use crate::parse::model::Subst;
+use crate::parse::sub;
+use crate::particle::{Details, Status};
+use crate::particle::Watch;
+use crate::security::{Permissions, Privilege, Privileges};
+use crate::selector::Selector;
+use crate::settings::Timeouts;
+use crate::substance::{
+    Call, CallKind, CmdCall, Errors, ExtCall, HttpCall, HypCall, MultipartFormBuilder, Substance,
+    SubstanceKind, Token, ToRequestCore, ToSubstance,
+};
+use crate::substance::Bin;
+use crate::util::{uuid, ValueMatcher, ValuePattern};
+
+use self::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
 use self::core::cmd::CmdMethod;
+use self::core::ext::ExtMethod;
+use self::core::http2::HttpMethod;
+use self::core::hyp::HypMethod;
 
 pub mod core;
 pub mod exchange;

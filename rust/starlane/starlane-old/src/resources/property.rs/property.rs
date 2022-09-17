@@ -1,13 +1,13 @@
-use crate::{SkewerCase, Resource, ResourceIdentifier, ResourceSelector, ResourceStub, FieldSelection, ResourcePath, ConfigSrc};
-use std::str::FromStr;
-use crate::error::Error;
-use crate::data::{DataSet, BinSrc, Meta};
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::parse::{parse_resource_property_value_selector, parse_resource_value_selector, parse_resource_property_assignment};
-use crate::status::Status;
 use std::convert::TryInto;
+use std::str::FromStr;
 
+use crate::{ConfigSrc, FieldSelection, Resource, ResourceIdentifier, ResourcePath, ResourceSelector, ResourceStub, SkewerCase};
+use crate::data::{BinSrc, DataSet, Meta};
+use crate::error::Error;
+use crate::parse::{parse_resource_property_assignment, parse_resource_property_value_selector, parse_resource_value_selector};
+use crate::status::Status;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceValueSelector {

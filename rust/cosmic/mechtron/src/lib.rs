@@ -6,9 +6,11 @@
 #[macro_use]
 extern crate lazy_static;
 
-pub mod error;
-
-use crate::error::Error;
+use std::collections::HashMap;
+use std::convert::TryFrom;
+use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::RwLock;
 
 use mesh_portal::version::latest::config::ResourceConfigBody;
 use mesh_portal::version::latest::entity::request::Action;
@@ -22,15 +24,14 @@ use mesh_portal::version::latest::particle::Stub;
 use mesh_portal::version::latest::portal::outlet;
 use mesh_portal::version::latest::portal::outlet::Frame;
 use mesh_portal::version::latest::util::unique_id;
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::sync::atomic::AtomicUsize;
-use std::sync::Arc;
-use std::sync::RwLock;
 //use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_membrane_guest::membrane::{
     log, membrane_consume_buffer, membrane_read_buffer, membrane_read_string, membrane_write_buffer,
 };
+
+use crate::error::Error;
+
+pub mod error;
 
 lazy_static! {
     pub static ref FACTORIES: RwLock<HashMap<String, Box<dyn MechtronFactory>>> =

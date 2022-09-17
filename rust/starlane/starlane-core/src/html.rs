@@ -1,7 +1,9 @@
-use crate::error::Error;
+use std::sync::Arc;
+
 use handlebars::Handlebars;
 use serde_json::json;
-use std::sync::Arc;
+
+use crate::error::Error;
 
 lazy_static! {
     pub static ref HTML: Handlebars<'static> = {

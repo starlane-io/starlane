@@ -1,48 +1,3 @@
-use crate::error::Error;
-use crate::frame::{ResourceHostAction, StarMessagePayload};
-use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
-
-use crate::databases::lookup_registry_db;
-use crate::particle::properties_config;
-use cosmic_universe::command::direct::delete::Delete;
-use cosmic_universe::command::direct::select::{SelectKind, SubSelect};
-use cosmic_universe::hyper::{Location, ParticleRecord};
-use cosmic_universe::loc::{};
-use cosmic_universe::loc::{};
-use cosmic_universe::id2::BaseSubKind;
-use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
-use cosmic_universe::particle::Details;
-use cosmic_universe::security::{
-    Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask,
-    PermissionsMaskKind, Privilege, Privileges,
-};
-use cosmic_universe::selector::SubKindSelector;
-use futures::{FutureExt, StreamExt};
-use mesh_portal::error::MsgErr;
-use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties, SetRegistry};
-use mesh_portal::version::latest::entity::request::create::{
-    Create, KindTemplate, PointSegFactory, Strategy,
-};
-use mesh_portal::version::latest::entity::request::get::{Get, GetOp};
-use mesh_portal::version::latest::entity::request::query::{Query, QueryResult};
-use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoPayload};
-use mesh_portal::version::latest::entity::request::set::Set;
-use mesh_portal::version::latest::entity::request::{Method, Rc};
-use mesh_portal::version::latest::id::{KindParts, Point, Specific, Version};
-use mesh_portal::version::latest::messaging::ReqShell;
-use mesh_portal::version::latest::particle::{Properties, Property, Status, Stub};
-use mesh_portal::version::latest::payload::{PayloadMap, PrimitiveList, Substance};
-use mesh_portal::version::latest::selector::specific::{
-    ProductSelector, VariantSelector, VendorSelector,
-};
-use mesh_portal::version::latest::selector::{
-    ExactSegment, GenericKindSelector, KindSelector, PointKindHierarchy, PointKindSeg,
-    PointSegSelector, PointSelector,
-};
-use mesh_portal::version::latest::util::ValuePattern;
-use mysql::prelude::TextQuery;
-use sqlx::postgres::{PgArguments, PgPoolOptions, PgRow};
-use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
@@ -50,8 +5,53 @@ use std::num::ParseIntError;
 use std::ops::{Deref, Index};
 use std::str::FromStr;
 use std::sync::Arc;
+
+use futures::{FutureExt, StreamExt};
+use mysql::prelude::TextQuery;
+use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
+use sqlx::postgres::{PgArguments, PgPoolOptions, PgRow};
 use tokio::sync::mpsc;
+
+use cosmic_universe::command::direct::delete::Delete;
+use cosmic_universe::command::direct::select::{SelectKind, SubSelect};
+use cosmic_universe::hyper::{Location, ParticleRecord};
+use cosmic_universe::id2::BaseSubKind;
 use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Tks, UserBaseSubKind};
+use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
+use cosmic_universe::particle::Details;
+use cosmic_universe::security::{
+    Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask,
+    PermissionsMaskKind, Privilege, Privileges,
+};
+use cosmic_universe::selector::SubKindSelector;
+use mesh_portal::error::MsgErr;
+use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties, SetRegistry};
+use mesh_portal::version::latest::entity::request::{Method, Rc};
+use mesh_portal::version::latest::entity::request::create::{
+    Create, KindTemplate, PointSegFactory, Strategy,
+};
+use mesh_portal::version::latest::entity::request::get::{Get, GetOp};
+use mesh_portal::version::latest::entity::request::query::{Query, QueryResult};
+use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoPayload};
+use mesh_portal::version::latest::entity::request::set::Set;
+use mesh_portal::version::latest::id::{KindParts, Point, Specific, Version};
+use mesh_portal::version::latest::messaging::ReqShell;
+use mesh_portal::version::latest::particle::{Properties, Property, Status, Stub};
+use mesh_portal::version::latest::payload::{PayloadMap, PrimitiveList, Substance};
+use mesh_portal::version::latest::selector::{
+    ExactSegment, GenericKindSelector, KindSelector, PointKindHierarchy, PointKindSeg,
+    PointSegSelector, PointSelector,
+};
+use mesh_portal::version::latest::selector::specific::{
+    ProductSelector, VariantSelector, VendorSelector,
+};
+use mesh_portal::version::latest::util::ValuePattern;
+
+use crate::databases::lookup_registry_db;
+use crate::error::Error;
+use crate::frame::{ResourceHostAction, StarMessagePayload};
+use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
+use crate::particle::properties_config;
 
 lazy_static! {
     pub static ref HYPERUSER: Point = Point::from_str("hyperspace:users:hyperuser").expect("point");
@@ -1180,14 +1180,14 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
 
 #[cfg(test)]
 pub mod test {
-    use crate::error::Error;
-    use crate::particle::Kind;
-    use crate::registry::{Registration, Registry};
+    use std::convert::TryInto;
+    use std::str::FromStr;
+
     use cosmic_universe::command::direct::select::SelectKind;
     use cosmic_universe::entity::request::select::SelectKind;
     use cosmic_universe::kind::Kind;
-    use cosmic_universe::loc::ToPoint;
     use cosmic_universe::kind::UserBaseSubKind;
+    use cosmic_universe::loc::ToPoint;
     use cosmic_universe::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
         Privilege,
@@ -1198,8 +1198,10 @@ pub mod test {
     use mesh_portal::version::latest::particle::Status;
     use mesh_portal::version::latest::payload::Primitive;
     use mesh_portal::version::latest::selector::{PointKindHierarchy, PointSelector};
-    use std::convert::TryInto;
-    use std::str::FromStr;
+
+    use crate::error::Error;
+    use crate::particle::Kind;
+    use crate::registry::{Registration, Registry};
 
     #[tokio::test]
     pub async fn test_nuke() -> Result<(), Error> {

@@ -3,7 +3,12 @@
 #[macro_use]
 extern crate actix_web;
 #[macro_use]
+extern crate async_recursion;
+#[macro_use]
 extern crate async_trait;
+extern crate core;
+#[macro_use]
+extern crate cosmic_macros;
 #[macro_use]
 extern crate error_chain;
 #[macro_use]
@@ -30,16 +35,11 @@ extern crate tracing;
 extern crate validate;
 #[macro_use]
 extern crate wasmer;
-#[macro_use]
-extern crate cosmic_macros;
-#[macro_use]
-extern crate async_recursion;
-extern crate core;
 
-use chrono::{DateTime, Utc};
 use std::str::FromStr;
 use std::time::SystemTime;
 
+use chrono::{DateTime, Utc};
 use semver;
 use uuid::Uuid;
 

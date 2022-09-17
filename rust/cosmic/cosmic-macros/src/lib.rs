@@ -2,32 +2,34 @@
 #![allow(warnings)]
 
 #[macro_use]
+extern crate lazy_static;
+#[macro_use]
 extern crate strum_macros;
 
+use proc_macro::TokenStream;
+use std::str::FromStr;
+
 use chrono::{DateTime, Utc};
-use cosmic_universe::parse::route_attribute_value;
-use cosmic_universe::util::log;
 use nom::combinator::into;
 use nom_locate::LocatedSpan;
-use proc_macro::TokenStream;
 use proc_macro2::Ident;
+use quote::{format_ident, quote, TokenStreamExt, ToTokens};
 use quote::__private::ext::RepToTokensExt;
-use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 use regex::Regex;
-use std::str::FromStr;
+use syn::{
+    AngleBracketedGenericArguments, Attribute, Data, DataEnum, DataUnion, DeriveInput,
+    FieldsNamed, FieldsUnnamed, FnArg, GenericArgument, ImplItem, ItemImpl, ItemStruct,
+    parse_macro_input, PathArguments, PathSegment, ReturnType, Signature, Type, Visibility,
+};
 use syn::__private::TokenStream2;
 use syn::parse::{Parse, ParseBuffer, ParseStream};
 use syn::parse_quote::ParseQuote;
 use syn::spanned::Spanned;
 use syn::token::Async;
-use syn::{
-    parse_macro_input, AngleBracketedGenericArguments, Attribute, Data, DataEnum, DataUnion,
-    DeriveInput, FieldsNamed, FieldsUnnamed, FnArg, GenericArgument, ImplItem, ItemImpl,
-    ItemStruct, PathArguments, PathSegment, ReturnType, Signature, Type, Visibility,
-};
 
-#[macro_use]
-extern crate lazy_static;
+use cosmic_universe::parse::route_attribute_value;
+use cosmic_universe::util::log;
+
 
 // this is just to make the user realize he needs to import DirectedHandler
 #[proc_macro_derive(DirectedHandler)]

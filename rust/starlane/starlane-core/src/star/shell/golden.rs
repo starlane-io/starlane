@@ -1,17 +1,18 @@
-use std::collections::hash_map::RandomState;
 use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::RandomState;
 
-use cosmic_universe::loc::StarKey;
 use lru::LruCache;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
+
+use cosmic_universe::loc::StarKey;
 
 use crate::error::Error;
 use crate::frame::{Frame, StarMessage, StarPattern};
 use crate::lane::{LaneWrapper, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
-use crate::star::core::message::CoreMessageCall;
 use crate::star::{ForwardFrame, StarCommand, StarSkel};
+use crate::star::core::message::CoreMessageCall;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
 #[derive(Clone)]

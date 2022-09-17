@@ -1,6 +1,20 @@
-use crate::control::ControlDriverFactory;
-use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
-use crate::{DriversBuilder, HyperErr, Hyperverse, Registry, RegistryApi};
+use std::collections::{HashMap, HashSet};
+use std::future::Future;
+use std::marker::PhantomData;
+use std::process::Output;
+use std::str::FromStr;
+use std::sync::Arc;
+use std::time::Duration;
+
+use dashmap::DashMap;
+use futures::future::{BoxFuture, join_all, select_all};
+use futures::FutureExt;
+use tokio::sync::{broadcast, mpsc, oneshot, watch};
+use tokio::sync::broadcast::Receiver;
+use tokio::sync::oneshot::error::RecvError;
+use tokio::sync::watch::Ref;
+use tracing::info;
+
 use cosmic_hyperlane::{
     HyperClient, HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector,
     HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange,
@@ -11,8 +25,9 @@ use cosmic_hyperlane::{
 use cosmic_universe::artifact::ArtifactApi;
 use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::{InterchangeKind, Knock};
+use cosmic_universe::kind::StarSub;
 use cosmic_universe::loc::{
-    ConstellationName, Layer, MachineName, Point, Surface, StarHandle, StarKey, ToPoint,
+    ConstellationName, Layer, MachineName, Point, StarHandle, StarKey, Surface, ToPoint,
     ToSurface,
 };
 use cosmic_universe::log::{PointLogger, RootLogger};
@@ -20,22 +35,10 @@ use cosmic_universe::particle::Status;
 use cosmic_universe::settings::Timeouts;
 use cosmic_universe::substance::Substance;
 use cosmic_universe::wave::{Agent, HyperWave, UltraWave};
-use dashmap::DashMap;
-use futures::future::{join_all, select_all, BoxFuture};
-use futures::FutureExt;
-use std::collections::{HashMap, HashSet};
-use std::future::Future;
-use std::marker::PhantomData;
-use std::process::Output;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::broadcast::Receiver;
-use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::watch::Ref;
-use tokio::sync::{broadcast, mpsc, oneshot, watch};
-use tracing::info;
-use cosmic_universe::kind::StarSub;
+
+use crate::{DriversBuilder, HyperErr, Hyperverse, Registry, RegistryApi};
+use crate::control::ControlDriverFactory;
+use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
 
 #[derive(Clone)]
 pub struct MachineApi<P>

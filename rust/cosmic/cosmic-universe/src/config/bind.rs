@@ -1,23 +1,24 @@
+use std::convert::TryInto;
+
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+
 use crate::command::direct::Cmd;
 use crate::err::{ParseErrs, UniErr};
-use crate::wave::{
-    DirectedWave, Ping, RecipientSelector,
-    SingularDirectedWave, Wave,
-};
-
 use crate::loc::{Point, PointCtx, PointVar, Topic};
+use crate::parse::{bind_config, Env};
 use crate::parse::model::{
     BindScope, MethodScope, PipelineSegment, PipelineSegmentDef, PipelineVar, RouteScope,
     ScopeFilters, WaveScope,
 };
-use crate::parse::{bind_config, Env};
 use crate::selector::PayloadBlock;
 use crate::selector::PayloadBlockDef;
 use crate::substance::{Call, CallDef, Substance, SubstancePattern};
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
-use regex::Regex;
-use serde::{Deserialize, Serialize};
-use std::convert::TryInto;
+use crate::wave::{
+    DirectedWave, Ping, RecipientSelector,
+    SingularDirectedWave, Wave,
+};
 use crate::wave::core::{DirectedCore, MethodKind, MethodPattern};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

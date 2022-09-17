@@ -1,9 +1,10 @@
-use mesh_portal::version::latest::command::common::StateSrc;
-use mesh_portal::version::latest::id::Point;
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+
+use mesh_portal::version::latest::command::common::StateSrc;
+use mesh_portal::version::latest::id::Point;
 
 use crate::error::Error;
 

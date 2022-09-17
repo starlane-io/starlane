@@ -1,10 +1,9 @@
 #![allow(warnings)]
 #![no_std]
 
+extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
-
-extern crate alloc;
 
 use serde::{Deserialize, Serialize};
 

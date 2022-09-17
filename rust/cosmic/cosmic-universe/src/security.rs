@@ -1,19 +1,22 @@
-use crate::err::UniErr;
-use crate::loc::Point;
-use crate::parse::error::result;
-use crate::parse::{MapResolver, particle_perms, permissions, permissions_mask, privilege};
-use crate::selector::{PointHierarchy, Selector};
-use crate::wave::ScopeGrant;
-use cosmic_nom::new_span;
-use nom::combinator::all_consuming;
-use nom_supreme::parser_ext::MapRes;
-use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::ops;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
+
+use nom::combinator::all_consuming;
+use nom_supreme::parser_ext::MapRes;
+use serde::{Deserialize, Serialize};
+
+use cosmic_nom::new_span;
+
 use crate::Agent;
+use crate::err::UniErr;
+use crate::loc::Point;
+use crate::parse::{MapResolver, particle_perms, permissions, permissions_mask, privilege};
+use crate::parse::error::result;
+use crate::selector::{PointHierarchy, Selector};
+use crate::wave::ScopeGrant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Access {

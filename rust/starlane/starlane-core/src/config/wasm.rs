@@ -1,14 +1,17 @@
+use std::convert::TryInto;
+use std::str::FromStr;
+use std::sync::Arc;
+
+use wasmer::{Cranelift, Module, Store, Universal};
+
+use cosmic_universe::kind::ArtifactSubKind;
+use mesh_portal::version::latest::bin::Bin;
+use mesh_portal::version::latest::id::Point;
+
 use crate::artifact::ArtifactRef;
 use crate::cache::Cacheable;
 use crate::error::Error;
 use crate::particle::config::Parser;
-use cosmic_universe::kind::ArtifactSubKind;
-use mesh_portal::version::latest::bin::Bin;
-use mesh_portal::version::latest::id::Point;
-use std::convert::TryInto;
-use std::str::FromStr;
-use std::sync::Arc;
-use wasmer::{Cranelift, Module, Store, Universal};
 
 pub struct Wasm {
     pub artifact: Point,

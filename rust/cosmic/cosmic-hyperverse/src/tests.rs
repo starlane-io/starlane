@@ -1,9 +1,18 @@
 #![cfg(test)]
 
-use super::*;
-use crate::base::BaseDriverFactory;
-use crate::control::{ControlClient, ControlCliSession, ControlDriverFactory};
+use std::io::Error;
+use std::sync::atomic;
+use std::sync::atomic::AtomicU64;
+use std::time::Duration;
+
 use chrono::{DateTime, Utc};
+use dashmap::DashMap;
+use tokio::join;
+use tokio::sync::{Mutex, oneshot};
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::oneshot::error::RecvError;
+use tokio::time::error::Elapsed;
+
 use cosmic_hyperlane::{
     AnonHyperAuthenticator, HyperClient, HyperConnectionDetails, HyperConnectionErr, HyperGate,
     HyperwayEndpoint, HyperwayStub, LocalHyperwayGateJumper,
@@ -13,37 +22,32 @@ use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::direct::create::{
     Create, PointSegTemplate, PointTemplate, Strategy, Template,
 };
-use cosmic_universe::wave::core::ext::ExtMethod;
 use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance, InterchangeKind, Knock};
+use cosmic_universe::hyper::MountKind;
+use cosmic_universe::HYPERUSER;
 use cosmic_universe::loc::{Layer, StarHandle, ToPoint, ToSurface, Uuid};
 use cosmic_universe::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
-use cosmic_universe::hyper::MountKind;
+use cosmic_universe::particle::traversal::TraversalDirection;
 use cosmic_universe::wave::{
     Agent, DirectedKind, DirectedProto, HyperWave, Pong,
     Wave,
 };
-use cosmic_universe::HYPERUSER;
-use dashmap::DashMap;
-use std::io::Error;
-use std::sync::atomic;
-use std::sync::atomic::AtomicU64;
-use std::time::Duration;
-use tokio::join;
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{Mutex, oneshot};
-use tokio::time::error::Elapsed;
-use cosmic_universe::particle::traversal::TraversalDirection;
-use cosmic_universe::wave::core::Method;
 use cosmic_universe::wave::core::cmd::CmdMethod;
+use cosmic_universe::wave::core::ext::ExtMethod;
 use cosmic_universe::wave::core::hyp::HypMethod;
+use cosmic_universe::wave::core::Method;
 use cosmic_universe::wave::exchange::Exchanger;
 use cosmic_universe::wave::exchange::ProtoTransmitterBuilder;
+
+use crate::base::BaseDriverFactory;
+use crate::control::{ControlClient, ControlCliSession, ControlDriverFactory};
 //use crate::control::ControlDriverFactory;
 use crate::driver::{DriverAvail, DriverFactory};
 use crate::root::RootDriverFactory;
 use crate::space::SpaceDriverFactory;
 use crate::star::HyperStarApi;
+
+use super::*;
 
 lazy_static! {
     pub static ref LESS: Point = Point::from_str("space:users:less").expect("point");

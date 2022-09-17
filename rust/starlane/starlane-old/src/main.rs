@@ -2,47 +2,43 @@
 
 #[macro_use]
 extern crate lazy_static;
-
 #[macro_use]
 extern crate tablestream;
-
 #[macro_use]
 extern crate tracing;
 
+use clap::{App, Arg, ArgMatches, SubCommand};
+use cosmic_universe::cli::CommandOp;
+use cosmic_universe::cli::outlet;
+use cosmic_universe::cli::outlet::Frame;
+use cosmic_universe::parse::{command_line, rec_script_line};
+use cosmic_universe::span::new_span;
+use mesh_portal::version::latest::entity::request::create::Require;
+use mesh_portal::version::latest::id::Point;
+use reqwest::StatusCode;
+use serde::{Deserialize, Serialize};
+use starlane_core::command::cli::TcpCliClient;
+use starlane_core::error::Error;
+use starlane_core::mechtron::portal_client::launch_mechtron_client;
+use starlane_core::mechtron::process::launch_mechtron_process;
+use starlane_core::star::shell::sys::SysCall::Create;
+use starlane_core::starlane::api::StarlaneApi;
+use starlane_core::starlane::StarlaneMachine;
+use starlane_core::template::ConstellationLayout;
+use starlane_core::util;
+use starlane_core::util::shutdown;
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::io;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
-
-use clap::{App, Arg, ArgMatches, SubCommand};
-use starlane_core::error::Error;
-use tracing_subscriber::FmtSubscriber;
-use tokio::runtime::Runtime;
-use starlane_core::starlane::StarlaneMachine;
-use starlane_core::template::ConstellationLayout;
-use starlane_core::util::shutdown;
-use starlane_core::util;
-use starlane_core::starlane::api::StarlaneApi;
-use std::convert::TryInto;
-use mesh_portal::version::latest::entity::request::create::Require;
-use mesh_portal::version::latest::id::Point;
-use cosmic_universe::span::new_span;
-use reqwest::StatusCode;
 use tokio::io::AsyncReadExt;
+use tokio::runtime::Runtime;
 use tracing::error;
-use starlane_core::command::cli::TcpCliClient;
-use cosmic_universe::cli::outlet::Frame;
-use cosmic_universe::cli::CommandOp;
-use starlane_core::mechtron::portal_client::launch_mechtron_client;
-use starlane_core::mechtron::process::launch_mechtron_process;
-use starlane_core::star::shell::sys::SysCall::Create;
-use serde::{Deserialize, Serialize};
-use cosmic_universe::cli::outlet;
-use cosmic_universe::parse::{command_line, rec_script_line};
-
+use tracing_subscriber::FmtSubscriber;
 
 pub mod cli;
 pub mod resource;

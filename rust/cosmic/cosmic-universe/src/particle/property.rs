@@ -1,11 +1,13 @@
-use crate::command::common::PropertyMod;
-use crate::loc::Point;
-use crate::parse::SkewerCase;
-use crate::{SetProperties, UniErr};
 use core::str::FromStr;
 use std::collections::HashMap;
 use std::ops::Deref;
+
 use validator::validate_email;
+
+use crate::{SetProperties, UniErr};
+use crate::command::common::PropertyMod;
+use crate::loc::Point;
+use crate::parse::SkewerCase;
 
 pub struct PropertyDef {
     pub pattern: Box<dyn PropertyPattern>,

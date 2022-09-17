@@ -1,9 +1,10 @@
-use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::path::Path;
 use std::str::{FromStr, Split};
 
-use cosmic_universe::kind::ArtifactSubKind;
 use serde::{Deserialize, Serialize};
+
+use cosmic_universe::kind::ArtifactSubKind;
+use mesh_portal::version::latest::id::Point;
+use mesh_portal::version::latest::path::Path;
 
 use crate::error::Error;
 

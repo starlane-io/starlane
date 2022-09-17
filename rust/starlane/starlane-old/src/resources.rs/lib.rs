@@ -1,11 +1,6 @@
 #[macro_use]
 extern crate strum_macros;
 
-use std::collections::{HashMap, HashSet};
-use std::convert::{TryFrom, TryInto};
-use std::str::FromStr;
-use std::sync::Arc;
-
 use mesh_portal::version::latest::fail::Fail;
 use mesh_portal::version::latest::payload::Payload;
 use nom::{AsChar, InputTakeAtPosition, IResult};
@@ -19,8 +14,11 @@ use nom::sequence::{delimited, preceded, terminated, tuple};
 use semver::SemVerError;
 use serde::Deserialize;
 use serde::Serialize;
-
 use starlane_macros::resources;
+use std::collections::{HashMap, HashSet};
+use std::convert::{TryFrom, TryInto};
+use std::str::FromStr;
+use std::sync::Arc;
 
 use crate::data::{BinSrc, DataSet};
 use crate::error::Error;

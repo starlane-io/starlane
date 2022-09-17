@@ -2,9 +2,10 @@ use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 
-use cosmic_universe::loc::StarKey;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
+
+use cosmic_universe::loc::StarKey;
 
 use crate::error::Error;
 use crate::frame::{
@@ -13,9 +14,9 @@ use crate::frame::{
 };
 use crate::lane::{LaneCommand, LaneKey, LaneWrapper, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
+use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::shell::lanes::LanePattern;
-use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
 pub static MAX_HOPS: usize = 32;

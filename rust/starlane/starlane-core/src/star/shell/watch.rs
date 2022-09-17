@@ -1,25 +1,26 @@
-use std::collections::hash_map::RandomState;
 use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::RandomState;
 use std::convert::TryFrom;
 use std::future::Future;
 
+use mysql::uuid::Uuid;
+use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc::Sender;
+use tokio::time::Duration;
+
+use cosmic_universe::hyper::{Location, ParticleRecord};
 use cosmic_universe::loc::StarKey;
 use cosmic_universe::loc::ToPoint;
-use mysql::uuid::Uuid;
-use tokio::sync::mpsc::Sender;
-use tokio::sync::{mpsc, oneshot};
-use tokio::time::Duration;
 
 use crate::error::Error;
 use crate::frame::{Frame, ProtoFrame, StarMessage, WatchFrame};
 use crate::lane::{LaneKey, LaneSession, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
 use crate::star::core::message::CoreMessageCall;
-use crate::star::variant::FrameVerdict;
 use crate::star::StarSkel;
+use crate::star::variant::FrameVerdict;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use crate::watch::{Notification, Topic, Watch, WatchKey, WatchSelector, WatchStub, Watcher};
-use cosmic_universe::hyper::{Location, ParticleRecord};
+use crate::watch::{Notification, Topic, Watch, Watcher, WatchKey, WatchSelector, WatchStub};
 
 #[derive(Clone)]
 pub struct WatchApi {
