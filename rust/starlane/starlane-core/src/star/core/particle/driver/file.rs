@@ -13,9 +13,9 @@ use crate::star::core::particle::state::StateStore;
 use crate::star::StarSkel;
 use crate::watch::{Change, Notification, Property, Topic, WatchSelector};
 
-use cosmic_api::id::id::{BaseKind, Kind};
-use cosmic_api::id::{ArtifactSubKind, FileSubKind};
-use cosmic_api::wave::DirectedProto;
+use cosmic_universe::id::id::{BaseKind, Kind};
+use cosmic_universe::id::{ArtifactSubKind, FileSubKind};
+use cosmic_universe::wave::DirectedProto;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
 use mesh_portal::version::latest::entity::request::create::{
     Create, KindTemplate, PointSegFactory, PointTemplate, Strategy, Template,

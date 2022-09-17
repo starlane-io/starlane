@@ -2,7 +2,7 @@ use crate::artifact::ArtifactRef;
 use crate::cache::Cacheable;
 use crate::error::Error;
 use crate::particle::config::Parser;
-use cosmic_api::id::ArtifactSubKind;
+use cosmic_universe::id::ArtifactSubKind;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::id::Point;
 use std::convert::TryInto;

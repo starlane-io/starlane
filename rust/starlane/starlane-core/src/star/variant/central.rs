@@ -4,9 +4,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use cosmic_api::id::id::ToPort;
-use cosmic_api::id::StarKey;
-use cosmic_api::sys::{Location, ParticleRecord};
+use cosmic_universe::id::id::ToPort;
+use cosmic_universe::id::StarKey;
+use cosmic_universe::sys::{Location, ParticleRecord};
 use mesh_portal::version::latest::cli::Transfer;
 use tokio::sync::{mpsc, oneshot};
 

@@ -12,11 +12,11 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use cosmic_api::id::id::{BaseKind, ToBaseKind, ToPoint};
-use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, UserBaseSubKind};
-use cosmic_api::parse::{consume_kind, CamelCase};
-use cosmic_api::particle::particle::{Details, Property};
-use cosmic_api::sys::{AssignmentKind, ChildRegistry, Location};
+use cosmic_universe::id::id::{BaseKind, ToBaseKind, ToPoint};
+use cosmic_universe::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, UserBaseSubKind};
+use cosmic_universe::parse::{consume_kind, CamelCase};
+use cosmic_universe::particle::particle::{Details, Property};
+use cosmic_universe::sys::{AssignmentKind, ChildRegistry, Location};
 use cosmic_nom::new_span;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::config::{ParticleConfigBody, PointConfig};

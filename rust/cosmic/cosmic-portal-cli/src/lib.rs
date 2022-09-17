@@ -6,11 +6,11 @@ extern crate cosmic_macros;
 #[macro_use]
 extern crate async_trait;
 
-use cosmic_api::cli::{CommandTemplate, RawCommand, Transfer};
-use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{Port, Topic};
-use cosmic_api::msg::MsgMethod;
-use cosmic_api::wave::{
+use cosmic_universe::cli::{CommandTemplate, RawCommand, Transfer};
+use cosmic_universe::error::MsgErr;
+use cosmic_universe::id::id::{Port, Topic};
+use cosmic_universe::msg::MsgMethod;
+use cosmic_universe::wave::{
     Agent, DirectedProto, Exchanger, Handling, Pong, ProtoTransmitter, Router, Scope, SetStrategy,
     ToRecipients, Wave,
 };
@@ -129,7 +129,7 @@ impl<'a> Drop for CliSession<'a> {
 
 #[cfg(test)]
 pub mod test {
-    use cosmic_api::wave::{DirectedHandler, DirectedHandler, InCtx, RequestHandlerRelay};
+    use cosmic_universe::wave::{DirectedHandler, DirectedHandler, InCtx, RequestHandlerRelay};
     use mesh_portal::error::MsgErr;
     use mesh_portal::version::latest::entity::request::ReqCore;
     use mesh_portal::version::latest::entity::response::RespCore;

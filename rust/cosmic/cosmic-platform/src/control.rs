@@ -1,18 +1,18 @@
 use crate::driver::{Driver, DriverFactory, DriverCtx, DriverSkel, DriverStatus, ItemHandler, ItemSphere, ItemSkel, HyperDriverFactory, HyperSkel, DriverRunnerRequest, Item, ItemRouter, DriverAvail};
 use crate::star::{LayerInjectionRouter, HyperStarSkel};
 use crate::{PlatErr, Platform, Registry};
-use cosmic_api::command::command::common::StateSrc;
-use cosmic_api::command::request::create::{Create, KindTemplate, PointFactory, PointFactoryU64, PointSegTemplate, PointTemplate, Strategy, Template, TemplateDef};
-use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{BaseKind, Kind, Layer, Point, Port, ToPoint, ToPort};
-use cosmic_api::id::{StarSub, TraversalInjection};
-use cosmic_api::substance::substance::Substance;
-use cosmic_api::sys::{Assign, AssignmentKind, ControlPattern, Greet, InterchangeKind, Knock};
-use cosmic_api::wave::Agent::Anonymous;
-use cosmic_api::wave::{Agent, Method, CmdMethod, CoreBounce, DirectedHandler, InCtx, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, Signal, UltraWave, Wave, Exchanger, ToRecipients};
-use cosmic_api::wave::{DirectedHandlerSelector, SetStrategy, TxRouter};
-use cosmic_api::wave::{DirectedProto, RecipientSelector};
-use cosmic_api::{ArtRef, Registration, State};
+use cosmic_universe::command::command::common::StateSrc;
+use cosmic_universe::command::request::create::{Create, KindTemplate, PointFactory, PointFactoryU64, PointSegTemplate, PointTemplate, Strategy, Template, TemplateDef};
+use cosmic_universe::error::MsgErr;
+use cosmic_universe::id::id::{BaseKind, Kind, Layer, Point, Port, ToPoint, ToPort};
+use cosmic_universe::id::{StarSub, TraversalInjection};
+use cosmic_universe::substance::substance::Substance;
+use cosmic_universe::sys::{Assign, AssignmentKind, ControlPattern, Greet, InterchangeKind, Knock};
+use cosmic_universe::wave::Agent::Anonymous;
+use cosmic_universe::wave::{Agent, Method, CmdMethod, CoreBounce, DirectedHandler, InCtx, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, Signal, UltraWave, Wave, Exchanger, ToRecipients};
+use cosmic_universe::wave::{DirectedHandlerSelector, SetStrategy, TxRouter};
+use cosmic_universe::wave::{DirectedProto, RecipientSelector};
+use cosmic_universe::{ArtRef, Registration, State};
 use cosmic_hyperlane::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, FromTransform, HopTransform, HyperAuthenticator, HyperClient, HyperConnectionErr, HyperGate, HyperGreeter, Hyperway, HyperwayConfigurator, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, InterchangeGate, TransportTransform};
 use dashmap::DashMap;
 use std::marker::PhantomData;
@@ -21,7 +21,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use dashmap::mapref::one::Ref;
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
-use cosmic_api::cli::RawCommand;
+use cosmic_universe::cli::RawCommand;
 
 pub struct ControlDriverFactory<P>
 where
@@ -67,14 +67,14 @@ where
 }
 
 
-use cosmic_api::config::config::bind::{BindConfig, RouteSelector};
-use cosmic_api::log::{RootLogger, Track, Tracker};
-use cosmic_api::msg::MsgMethod;
-use cosmic_api::parse::{CamelCase, route_attribute};
-use cosmic_api::particle::particle::{Details, Status, Stub};
-use cosmic_api::quota::Timeouts;
-use cosmic_api::util::log;
-use cosmic_api::wave::ReflectedCore;
+use cosmic_universe::config::config::bind::{BindConfig, RouteSelector};
+use cosmic_universe::log::{RootLogger, Track, Tracker};
+use cosmic_universe::msg::MsgMethod;
+use cosmic_universe::parse::{CamelCase, route_attribute};
+use cosmic_universe::particle::particle::{Details, Status, Stub};
+use cosmic_universe::quota::Timeouts;
+use cosmic_universe::util::log;
+use cosmic_universe::wave::ReflectedCore;
 use crate::star::HyperStarCall::LayerTraversalInjection;
 
 pub struct ControlFactory<P> where P: Platform {

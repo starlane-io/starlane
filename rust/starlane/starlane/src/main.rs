@@ -1,18 +1,18 @@
 #![allow(warnings)]
 
 use chrono::{DateTime, Utc};
-use cosmic_api::command::request::create::KindTemplate;
-use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{BaseKind, Kind, Specific, ToBaseKind};
-use cosmic_api::id::{
+use cosmic_universe::command::request::create::KindTemplate;
+use cosmic_universe::error::MsgErr;
+use cosmic_universe::id::id::{BaseKind, Kind, Specific, ToBaseKind};
+use cosmic_universe::id::{
     ArtifactSubKind, BaseSubKind, FileSubKind, MachineName, StarKey, StarSub, UserBaseSubKind,
 };
-use cosmic_api::property::{
+use cosmic_universe::property::{
     AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit,
     PropertySource, U64Pattern, UsernamePattern,
 };
-use cosmic_api::substance::substance::Token;
-use cosmic_api::{ArtifactApi, NoDiceArtifactFetcher};
+use cosmic_universe::substance::substance::Token;
+use cosmic_universe::{ArtifactApi, NoDiceArtifactFetcher};
 use cosmic_artifact::Artifacts;
 use cosmic_hyperlane::HyperGateSelector;
 use cosmic_platform::driver::DriversBuilder;

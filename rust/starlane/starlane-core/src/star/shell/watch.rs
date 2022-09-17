@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::future::Future;
 
-use cosmic_api::id::id::ToPoint;
-use cosmic_api::id::StarKey;
+use cosmic_universe::id::id::ToPoint;
+use cosmic_universe::id::StarKey;
 use mysql::uuid::Uuid;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, oneshot};
@@ -19,7 +19,7 @@ use crate::star::variant::FrameVerdict;
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 use crate::watch::{Notification, Topic, Watch, WatchKey, WatchSelector, WatchStub, Watcher};
-use cosmic_api::sys::{Location, ParticleRecord};
+use cosmic_universe::sys::{Location, ParticleRecord};
 
 #[derive(Clone)]
 pub struct WatchApi {

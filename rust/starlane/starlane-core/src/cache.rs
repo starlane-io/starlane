@@ -7,8 +7,8 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
 
-use cosmic_api::id::id::PointSegKind;
-use cosmic_api::sys::ParticleRecord;
+use cosmic_universe::id::id::PointSegKind;
+use cosmic_universe::sys::ParticleRecord;
 use futures::FutureExt;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::bin::Bin;
@@ -33,7 +33,7 @@ use crate::particle::config::Parser;
 use crate::starlane::api::StarlaneApi;
 use crate::starlane::StarlaneMachine;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
-use cosmic_api::id::{ArtifactSubKind, BaseSubKind};
+use cosmic_universe::id::{ArtifactSubKind, BaseSubKind};
 
 pub type ZipFile = Point;
 

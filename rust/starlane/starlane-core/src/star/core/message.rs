@@ -21,11 +21,11 @@ use crate::star::core::particle::driver::{ResourceCoreDriverApi, ResourceCoreDri
 use crate::star::shell::db::{StarFieldSelection, StarSelector};
 use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use cosmic_api::command::Command;
-use cosmic_api::id::id::{BaseKind, Kind, Tks, ToPoint};
-use cosmic_api::id::{ArtifactSubKind, FileSubKind, StarKey, UserBaseSubKind};
-use cosmic_api::particle::particle::Details;
-use cosmic_api::sys::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
+use cosmic_universe::command::Command;
+use cosmic_universe::id::id::{BaseKind, Kind, Tks, ToPoint};
+use cosmic_universe::id::{ArtifactSubKind, FileSubKind, StarKey, UserBaseSubKind};
+use cosmic_universe::particle::particle::Details;
+use cosmic_universe::sys::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
 use cosmic_locality::field::FieldEx;
 use cosmic_platform::RegistryApi;
 use futures::StreamExt;

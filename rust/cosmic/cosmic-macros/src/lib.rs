@@ -6,8 +6,8 @@
 extern crate strum_macros;
 
 use chrono::{DateTime, Utc};
-use cosmic_api::parse::route_attribute_value;
-use cosmic_api::util::log;
+use cosmic_universe::parse::route_attribute_value;
+use cosmic_universe::util::log;
 use nom::combinator::into;
 use nom_locate::LocatedSpan;
 use proc_macro::TokenStream;
@@ -99,8 +99,8 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
     let rtn = quote! {
         impl #generics DirectedHandlerSelector for #self_ty #where_clause{
               fn select<'a>( &self, select: &'a RecipientSelector<'a>, ) -> Result<&dyn DirectedHandler, ()> {
-                use cosmic_api::wave::Method;
-                use cosmic_api::wave::CmdMethod;
+                use cosmic_universe::wave::Method;
+                use cosmic_universe::wave::CmdMethod;
                 if select.wave.core().method == Method::Cmd(CmdMethod::Bounce) {
                     return Ok(self);
                 }
@@ -116,8 +116,8 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
         #[async_trait]
         impl #generics DirectedHandler for #self_ty #where_clause{
             async fn handle( &self, ctx: RootInCtx) -> CoreBounce {
-                use cosmic_api::wave::Method;
-                use cosmic_api::wave::CmdMethod;
+                use cosmic_universe::wave::Method;
+                use cosmic_universe::wave::CmdMethod;
                 #(
                     if #static_selector_keys.is_match(&ctx.wave).is_ok() {
                        return self.#idents( ctx ).await;

@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 cosmic-macros = { path="../cosmic-macros"}
-cosmic-api = { path= "../cosmic-api" }
+cosmic-universe = { path= "../cosmic-universe" }
 
 serde = { version="1.0.69", features=['derive','rc'] }
 async-trait = "0.1.48"

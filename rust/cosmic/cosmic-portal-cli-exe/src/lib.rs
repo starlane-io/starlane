@@ -5,14 +5,14 @@ mod scratch;
 use core::option::Option;
 use core::option::Option::None;
 use core::result::Result::{Err, Ok};
-use cosmic_api::command::Command;
-use cosmic_api::id::id::{ToPoint, ToPort};
-use cosmic_api::msg::MsgMethod;
-use cosmic_api::parse::error::result;
-use cosmic_api::parse::model::MethodScopeSelector;
-use cosmic_api::parse::{command, command_line, Env};
-use cosmic_api::util::{ToResolved, ValuePattern};
-use cosmic_api::wave::{
+use cosmic_universe::command::Command;
+use cosmic_universe::id::id::{ToPoint, ToPort};
+use cosmic_universe::msg::MsgMethod;
+use cosmic_universe::parse::error::result;
+use cosmic_universe::parse::model::MethodScopeSelector;
+use cosmic_universe::parse::{command, command_line, Env};
+use cosmic_universe::util::{ToResolved, ValuePattern};
+use cosmic_universe::wave::{
     AsyncRequestHandlerRelay, AsyncRouter, DirectedHandler, DirectedHandler, InternalPipeline,
     PointRequestHandler, RequestHandlerRelay, SyncTransmitRelay, SyncTransmitter, Transmitter,
 };

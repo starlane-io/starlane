@@ -20,7 +20,7 @@ use crate::fail::Fail;
 use actix_web::ResponseError;
 use alcoholic_jwt::ValidationError;
 use ascii::FromAsciiError;
-use cosmic_api::error::StatusErr;
+use cosmic_universe::error::StatusErr;
 use cosmic_nom::Span;
 use handlebars::RenderError;
 use http::header::{InvalidHeaderName, InvalidHeaderValue, ToStrError};

@@ -1,5 +1,5 @@
-use cosmic_api::sys::ParticleRecord;
-use cosmic_api::wave::{AsyncTransmitterWithAgent, Transmitter};
+use cosmic_universe::sys::ParticleRecord;
+use cosmic_universe::wave::{AsyncTransmitterWithAgent, Transmitter};
 use cosmic_portal_cli::Cli;
 use cosmic_portal_cli::CliSession;
 use mesh_portal::error::MsgErr;

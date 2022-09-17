@@ -4,23 +4,23 @@ use crate::star::{
     LayerInjectionRouter, StarDriver, StarDriverFactory, HyperStarSkel, StarState, StateApi, StateCall,
 };
 use crate::{PlatErr, Platform, Registry, RegistryApi};
-use cosmic_api::command::command::common::{SetProperties, StateSrc};
-use cosmic_api::command::request::create::{Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template};
-use cosmic_api::config::config::bind::{BindConfig, RouteSelector};
-use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{
+use cosmic_universe::command::command::common::{SetProperties, StateSrc};
+use cosmic_universe::command::request::create::{Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template};
+use cosmic_universe::config::config::bind::{BindConfig, RouteSelector};
+use cosmic_universe::error::MsgErr;
+use cosmic_universe::id::id::{
     BaseKind, Kind, Layer, Point, Port, ToBaseKind, ToPoint, ToPort, TraversalLayer, Uuid,
 };
-use cosmic_api::id::{StarKey, StarSub, Traversal, TraversalInjection};
-use cosmic_api::log::{PointLogger, Tracker};
-use cosmic_api::parse::model::Subst;
-use cosmic_api::parse::{bind_config, route_attribute};
-use cosmic_api::particle::particle::{Details, Status, Stub};
-use cosmic_api::substance::substance::Substance;
-use cosmic_api::sys::{Assign, AssignmentKind, Sys};
-use cosmic_api::util::{log, ValuePattern};
-use cosmic_api::wave::{Agent, Bounce, CmdMethod, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, DirectedWave, Exchanger, InCtx, Method, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, SysMethod, UltraWave, Wave, WaveKind};
-use cosmic_api::{ArtRef, Registration, State, HYPERUSER};
+use cosmic_universe::id::{StarKey, StarSub, Traversal, TraversalInjection};
+use cosmic_universe::log::{PointLogger, Tracker};
+use cosmic_universe::parse::model::Subst;
+use cosmic_universe::parse::{bind_config, route_attribute};
+use cosmic_universe::particle::particle::{Details, Status, Stub};
+use cosmic_universe::substance::substance::Substance;
+use cosmic_universe::sys::{Assign, AssignmentKind, Sys};
+use cosmic_universe::util::{log, ValuePattern};
+use cosmic_universe::wave::{Agent, Bounce, CmdMethod, CoreBounce, DirectedCore, DirectedHandler, DirectedHandlerSelector, DirectedKind, DirectedProto, DirectedWave, Exchanger, InCtx, Method, Ping, Pong, ProtoTransmitter, ProtoTransmitterBuilder, RecipientSelector, ReflectedCore, ReflectedWave, RootInCtx, Router, SetStrategy, SysMethod, UltraWave, Wave, WaveKind};
+use cosmic_universe::{ArtRef, Registration, State, HYPERUSER};
 use dashmap::DashMap;
 use futures::future::select_all;
 use futures::FutureExt;
@@ -921,7 +921,7 @@ impl<P> TraversalLayer for ItemOuter<P>
 where
     P: Platform,
 {
-    fn port(&self) -> cosmic_api::id::id::Port {
+    fn port(&self) -> cosmic_universe::id::id::Port {
         self.port.clone()
     }
 

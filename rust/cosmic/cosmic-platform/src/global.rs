@@ -1,22 +1,22 @@
 use std::marker::PhantomData;
 use std::str::FromStr;
 use crate::{DriverFactory, PlatErr, Platform, Registry};
-use cosmic_api::cli::RawCommand;
-use cosmic_api::command::command::common::StateSrc;
-use cosmic_api::command::request::create::{Create, PointSegTemplate, Strategy};
-use cosmic_api::command::Command;
-use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{Kind, Layer, Point, Port, ToPort, GLOBAL_EXEC, ToPoint};
-use cosmic_api::log::{PointLogger, RootLogger};
-use cosmic_api::parse::{bind_config, command_line};
-use cosmic_api::parse::error::result;
-use cosmic_api::particle::particle::{Details, Status};
-use cosmic_api::util::{log, ToResolved};
-use cosmic_api::wave::{
+use cosmic_universe::cli::RawCommand;
+use cosmic_universe::command::command::common::StateSrc;
+use cosmic_universe::command::request::create::{Create, PointSegTemplate, Strategy};
+use cosmic_universe::command::Command;
+use cosmic_universe::error::MsgErr;
+use cosmic_universe::id::id::{Kind, Layer, Point, Port, ToPort, GLOBAL_EXEC, ToPoint};
+use cosmic_universe::log::{PointLogger, RootLogger};
+use cosmic_universe::parse::{bind_config, command_line};
+use cosmic_universe::parse::error::result;
+use cosmic_universe::particle::particle::{Details, Status};
+use cosmic_universe::util::{log, ToResolved};
+use cosmic_universe::wave::{
     Agent, DirectedHandlerShell, DirectedProto, Exchanger, Handling, InCtx, Pong, ProtoTransmitter,
     ProtoTransmitterBuilder, ReflectedCore, Router, Scope, SetStrategy, SysMethod, Wave,
 };
-use cosmic_api::{Registration, HYPERUSER, ArtRef};
+use cosmic_universe::{Registration, HYPERUSER, ArtRef};
 use cosmic_nom::new_span;
 use std::sync::Arc;
 
@@ -31,15 +31,15 @@ pub struct Global<P> where P: Platform {
 
 use crate::driver::{Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere};
 use crate::star::HyperStarSkel;
-use cosmic_api::config::config::bind::{BindConfig, RouteSelector};
-use cosmic_api::parse::route_attribute;
-use cosmic_api::substance::substance::Substance;
-use cosmic_api::sys::{Assign, AssignmentKind, Sys};
-use cosmic_api::wave::CoreBounce;
-use cosmic_api::wave::DirectedHandler;
-use cosmic_api::wave::DirectedHandlerSelector;
-use cosmic_api::wave::RecipientSelector;
-use cosmic_api::wave::RootInCtx;
+use cosmic_universe::config::config::bind::{BindConfig, RouteSelector};
+use cosmic_universe::parse::route_attribute;
+use cosmic_universe::substance::substance::Substance;
+use cosmic_universe::sys::{Assign, AssignmentKind, Sys};
+use cosmic_universe::wave::CoreBounce;
+use cosmic_universe::wave::DirectedHandler;
+use cosmic_universe::wave::DirectedHandlerSelector;
+use cosmic_universe::wave::RecipientSelector;
+use cosmic_universe::wave::RootInCtx;
 
 lazy_static! {
     static ref GLOBAL_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(

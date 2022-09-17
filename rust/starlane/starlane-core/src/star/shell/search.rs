@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 
-use cosmic_api::id::StarKey;
+use cosmic_universe::id::StarKey;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
 

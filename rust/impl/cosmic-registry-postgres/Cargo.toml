@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cosmic-api={ path="../../cosmic/cosmic-api"}
+cosmic-universe={ path= "../../cosmic/cosmic-universe" }
 cosmic-platform={ path="../../cosmic/cosmic-platform"}
 sqlx = { version = "0.5.11", features = [ "runtime-tokio-rustls", "postgres", "macros", "any" ] }
 tokio = { version = "1.15.0", features = ["full"] }

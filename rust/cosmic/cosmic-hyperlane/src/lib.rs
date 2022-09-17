@@ -1,22 +1,22 @@
 #![allow(warnings)]
 
-use cosmic_api::command::request::create::{PointFactory, PointFactoryU64, PointSegTemplate};
-use cosmic_api::error::MsgErr;
-use cosmic_api::frame::frame::PrimitiveFrame;
-use cosmic_api::id::id::{Layer, Point, Port, ToPoint, ToPort, Version};
-use cosmic_api::log::{PointLogger, RootLogger};
-use cosmic_api::msg::MsgMethod;
-use cosmic_api::particle::particle::Status;
-use cosmic_api::quota::Timeouts;
-use cosmic_api::substance::substance::{Errors, Substance, SubstanceKind, Token};
-use cosmic_api::sys::{Greet, InterchangeKind, Knock, Sys};
-use cosmic_api::util::uuid;
-use cosmic_api::wave::{
+use cosmic_universe::command::request::create::{PointFactory, PointFactoryU64, PointSegTemplate};
+use cosmic_universe::error::MsgErr;
+use cosmic_universe::frame::frame::PrimitiveFrame;
+use cosmic_universe::id::id::{Layer, Point, Port, ToPoint, ToPort, Version};
+use cosmic_universe::log::{PointLogger, RootLogger};
+use cosmic_universe::msg::MsgMethod;
+use cosmic_universe::particle::particle::Status;
+use cosmic_universe::quota::Timeouts;
+use cosmic_universe::substance::substance::{Errors, Substance, SubstanceKind, Token};
+use cosmic_universe::sys::{Greet, InterchangeKind, Knock, Sys};
+use cosmic_universe::util::uuid;
+use cosmic_universe::wave::{
     Agent, DirectedKind, DirectedProto, Exchanger, Handling, HyperWave, Method, Ping, Pong,
     ProtoTransmitter, ProtoTransmitterBuilder, Reflectable, ReflectedKind, ReflectedProto,
     ReflectedWave, Router, SetStrategy, SysMethod, TxRouter, UltraWave, Wave, WaveId, WaveKind,
 };
-use cosmic_api::VERSION;
+use cosmic_universe::VERSION;
 use dashmap::DashMap;
 use futures::future::select_all;
 use futures::FutureExt;
@@ -1924,12 +1924,12 @@ mod tests {
         InterchangeGate,
     };
     use chrono::{DateTime, Utc};
-    use cosmic_api::command::request::create::PointFactoryU64;
-    use cosmic_api::id::id::{Point, Uuid};
-    use cosmic_api::log::RootLogger;
-    use cosmic_api::substance::substance::Substance;
-    use cosmic_api::sys::{InterchangeKind, Knock};
-    use cosmic_api::wave::HyperWave;
+    use cosmic_universe::command::request::create::PointFactoryU64;
+    use cosmic_universe::id::id::{Point, Uuid};
+    use cosmic_universe::log::RootLogger;
+    use cosmic_universe::substance::substance::Substance;
+    use cosmic_universe::sys::{InterchangeKind, Knock};
+    use cosmic_universe::wave::HyperWave;
     use dashmap::DashMap;
     use std::collections::HashMap;
     use std::str::FromStr;
@@ -1997,14 +1997,14 @@ pub mod test_util {
     }
 
     use crate::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, HyperClient, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter, HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist, Bridge, HyperConnectionDetails};
-    use cosmic_api::command::request::create::PointFactoryU64;
-    use cosmic_api::error::MsgErr;
-    use cosmic_api::id::id::{Layer, Point, Port, ToPoint, ToPort};
-    use cosmic_api::log::RootLogger;
-    use cosmic_api::msg::MsgMethod;
-    use cosmic_api::substance::substance::{Substance, Token};
-    use cosmic_api::sys::{Greet, InterchangeKind, Knock};
-    use cosmic_api::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedCore, ReflectedKind, ReflectedProto, ReflectedWave, Router, SetStrategy, TxRouter, UltraWave, Wave};
+    use cosmic_universe::command::request::create::PointFactoryU64;
+    use cosmic_universe::error::MsgErr;
+    use cosmic_universe::id::id::{Layer, Point, Port, ToPoint, ToPort};
+    use cosmic_universe::log::RootLogger;
+    use cosmic_universe::msg::MsgMethod;
+    use cosmic_universe::substance::substance::{Substance, Token};
+    use cosmic_universe::sys::{Greet, InterchangeKind, Knock};
+    use cosmic_universe::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedCore, ReflectedKind, ReflectedProto, ReflectedWave, Router, SetStrategy, TxRouter, UltraWave, Wave};
     use dashmap::DashMap;
     use lazy_static::lazy_static;
     use std::collections::{HashMap, HashSet};
@@ -2012,7 +2012,7 @@ pub mod test_util {
     use std::sync::Arc;
     use std::time::Duration;
     use tokio::sync::{broadcast, mpsc, oneshot};
-    use cosmic_api::quota::Timeouts;
+    use cosmic_universe::quota::Timeouts;
 
     pub struct SingleInterchangePlatform {
         pub interchange: Arc<HyperwayInterchange>,
@@ -2155,14 +2155,14 @@ println!("Sending GREETING to {}",stub.remote.to_string());
 #[cfg(test)]
 pub mod test {
     use crate::{AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, HyperClient, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter, HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper, LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist, Bridge, HyperConnectionDetails};
-    use cosmic_api::command::request::create::PointFactoryU64;
-    use cosmic_api::error::MsgErr;
-    use cosmic_api::id::id::{Layer, Point, Port, ToPoint, ToPort};
-    use cosmic_api::log::RootLogger;
-    use cosmic_api::msg::MsgMethod;
-    use cosmic_api::substance::substance::{Substance, Token};
-    use cosmic_api::sys::{Greet, InterchangeKind, Knock};
-    use cosmic_api::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedCore, ReflectedKind, ReflectedProto, ReflectedWave, Router, SetStrategy, TxRouter, UltraWave, Wave};
+    use cosmic_universe::command::request::create::PointFactoryU64;
+    use cosmic_universe::error::MsgErr;
+    use cosmic_universe::id::id::{Layer, Point, Port, ToPoint, ToPort};
+    use cosmic_universe::log::RootLogger;
+    use cosmic_universe::msg::MsgMethod;
+    use cosmic_universe::substance::substance::{Substance, Token};
+    use cosmic_universe::sys::{Greet, InterchangeKind, Knock};
+    use cosmic_universe::wave::{Agent, CmdMethod, DirectedKind, DirectedProto, Exchanger, HyperWave, Method, Pong, ProtoTransmitter, ProtoTransmitterBuilder, ReflectedCore, ReflectedKind, ReflectedProto, ReflectedWave, Router, SetStrategy, TxRouter, UltraWave, Wave};
     use dashmap::DashMap;
     use lazy_static::lazy_static;
     use std::collections::{HashMap, HashSet};
@@ -2170,7 +2170,7 @@ pub mod test {
     use std::sync::Arc;
     use std::time::Duration;
     use tokio::sync::{broadcast, mpsc, oneshot};
-    use cosmic_api::quota::Timeouts;
+    use cosmic_universe::quota::Timeouts;
     use crate::test_util::{FAE, LESS, SingleInterchangePlatform, TestGreeter, WaveTest};
 
 

@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use anyhow::anyhow;
-use cosmic_api::error::MsgErr;
+use cosmic_universe::error::MsgErr;
 use std::io;
 use std::io::Error;
 use std::prelude::rust_2021::String;
@@ -24,7 +24,7 @@ pub mod local {
     use crate::file::{FileAccess, Res};
     use alloc::vec::Vec;
     use core::fmt::Error;
-    use cosmic_api::error::MsgErr;
+    use cosmic_universe::error::MsgErr;
     use std::path::Path;
     use std::path::PathBuf;
     use std::prelude::rust_2021::{String, ToString};

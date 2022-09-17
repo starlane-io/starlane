@@ -1,8 +1,8 @@
-use cosmic_api::id::id;
-use cosmic_api::id::id::{Point, Uuid};
-use cosmic_api::particle::particle::Details;
-use cosmic_api::wave::WaveId;
-use cosmic_api::State;
+use cosmic_universe::id::id;
+use cosmic_universe::id::id::{Point, Uuid};
+use cosmic_universe::particle::particle::Details;
+use cosmic_universe::wave::WaveId;
+use cosmic_universe::State;
 use dashmap::{DashMap, DashSet};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

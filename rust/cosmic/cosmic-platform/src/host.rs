@@ -1,6 +1,6 @@
-use cosmic_api::id::Traversal;
-use cosmic_api::log::PointLogger;
-use cosmic_api::wave::{UltraWave, Wave};
+use cosmic_universe::id::Traversal;
+use cosmic_universe::log::PointLogger;
+use cosmic_universe::wave::{UltraWave, Wave};
 use cosmic_hyperlane::HyperwayInterchange;
 use std::sync::Arc;
 use tokio::sync::mpsc;

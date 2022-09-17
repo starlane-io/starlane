@@ -1,34 +1,34 @@
 #![allow(warnings)]
 
-use cosmic_api::command::command::common::{PropertyMod, SetProperties, SetRegistry};
-use cosmic_api::command::request::create::{Create, KindTemplate, PointSegTemplate, Strategy};
-use cosmic_api::command::request::delete::Delete;
-use cosmic_api::command::request::get::{Get, GetOp};
-use cosmic_api::command::request::query::{Query, QueryResult};
-use cosmic_api::command::request::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
-use cosmic_api::command::request::set::Set;
-use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{
+use cosmic_universe::command::command::common::{PropertyMod, SetProperties, SetRegistry};
+use cosmic_universe::command::request::create::{Create, KindTemplate, PointSegTemplate, Strategy};
+use cosmic_universe::command::request::delete::Delete;
+use cosmic_universe::command::request::get::{Get, GetOp};
+use cosmic_universe::command::request::query::{Query, QueryResult};
+use cosmic_universe::command::request::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
+use cosmic_universe::command::request::set::Set;
+use cosmic_universe::error::MsgErr;
+use cosmic_universe::id::id::{
     BaseKind, Kind, KindParts, Point, PointSeg, Specific, ToBaseKind, Version,
 };
-use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, UserBaseSubKind};
-use cosmic_api::parse::{CamelCase, Domain, SkewerCase};
-use cosmic_api::particle::particle::{Details, Properties, Property, Status, Stub};
-use cosmic_api::security::{
+use cosmic_universe::id::{ArtifactSubKind, BaseSubKind, FileSubKind, StarKey, UserBaseSubKind};
+use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
+use cosmic_universe::particle::particle::{Details, Properties, Property, Status, Stub};
+use cosmic_universe::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask,
     PermissionsMaskKind, Privilege, Privileges,
 };
-use cosmic_api::selector::selector::specific::{
+use cosmic_universe::selector::selector::specific::{
     ProductSelector, ProviderSelector, VariantSelector, VendorSelector,
 };
-use cosmic_api::selector::selector::{
+use cosmic_universe::selector::selector::{
     ExactPointSeg, KindBaseSelector, PointHierarchy, PointKindSeg, PointSegSelector, Selector,
     SubKindSelector,
 };
-use cosmic_api::substance::substance::{Substance, SubstanceList, SubstanceMap};
-use cosmic_api::sys::{Location, ParticleRecord};
-use cosmic_api::util::ValuePattern;
-use cosmic_api::{IndexedAccessGrant, Registration, HYPERUSER};
+use cosmic_universe::substance::substance::{Substance, SubstanceList, SubstanceMap};
+use cosmic_universe::sys::{Location, ParticleRecord};
+use cosmic_universe::util::ValuePattern;
+use cosmic_universe::{IndexedAccessGrant, Registration, HYPERUSER};
 use cosmic_platform::machine::MachineTemplate;
 use cosmic_platform::Platform;
 use cosmic_platform::{PlatErr, RegistryApi};
@@ -1139,18 +1139,18 @@ pub mod test {
     use crate::particle::Kind;
     use crate::registry::{Registration, Registry};
     use crate::{PostErr, PostgresRegistry};
-    use cosmic_api::command::request::query::Query;
-    use cosmic_api::command::request::select::{Select, SelectIntoSubstance, SelectKind};
-    use cosmic_api::entity::request::select::SelectKind;
-    use cosmic_api::id::id::{Kind, Point, ToPoint};
-    use cosmic_api::id::{StarKey, UserBaseSubKind};
-    use cosmic_api::particle::particle::Status;
-    use cosmic_api::security::{
+    use cosmic_universe::command::request::query::Query;
+    use cosmic_universe::command::request::select::{Select, SelectIntoSubstance, SelectKind};
+    use cosmic_universe::entity::request::select::SelectKind;
+    use cosmic_universe::id::id::{Kind, Point, ToPoint};
+    use cosmic_universe::id::{StarKey, UserBaseSubKind};
+    use cosmic_universe::particle::particle::Status;
+    use cosmic_universe::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
         Privilege,
     };
-    use cosmic_api::selector::selector::{PointHierarchy, Selector};
-    use cosmic_api::Registration;
+    use cosmic_universe::selector::selector::{PointHierarchy, Selector};
+    use cosmic_universe::Registration;
     use cosmic_platform::RegistryApi;
     use mesh_portal::version::latest::entity::request::query::Query;
     use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoSubstance};

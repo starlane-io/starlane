@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 async-recursion = "1.0.0"
 cosmic-macros = { path="../cosmic-macros"}
-cosmic-api = { path= "../cosmic-api" }
+cosmic-universe = { path= "../cosmic-universe" }
 cosmic-nom = { path="../cosmic-nom"}
 cosmic-hyperlane = { path= "../cosmic-hyperlane" }
 cosmic-driver = { path= "../cosmic-driver" }

@@ -1,5 +1,5 @@
 [package]
-name = "cosmic-api"
+name = "cosmic-universe"
 version = "0.2.0-rc1"
 edition = "2021"
 license = "MIT"

@@ -1,8 +1,8 @@
 use crate::artifact::ArtifactRef;
 use crate::cache::{ArtifactItem, Cacheable};
 use crate::error::Error;
-use cosmic_api::id::id::Kind;
-use cosmic_api::id::ArtifactSubKind;
+use cosmic_universe::id::id::Kind;
+use cosmic_universe::id::ArtifactSubKind;
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::particle::Property;

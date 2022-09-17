@@ -1,14 +1,14 @@
 #![allow(warnings)]
 
 use std::io;
-use cosmic_api::error::{MsgErr, StatusErr};
-use cosmic_api::frame::frame::PrimitiveFrame;
-use cosmic_api::id::id::{Point, ToPort};
-use cosmic_api::log::PointLogger;
-use cosmic_api::substance::substance::Substance;
-use cosmic_api::sys::{Knock, Sys};
-use cosmic_api::wave::{DirectedCore, DirectedProto, Pong, SysMethod, UltraWave, Wave};
-use cosmic_api::VERSION;
+use cosmic_universe::error::{MsgErr, StatusErr};
+use cosmic_universe::frame::frame::PrimitiveFrame;
+use cosmic_universe::id::id::{Point, ToPort};
+use cosmic_universe::log::PointLogger;
+use cosmic_universe::substance::substance::Substance;
+use cosmic_universe::sys::{Knock, Sys};
+use cosmic_universe::wave::{DirectedCore, DirectedProto, Pong, SysMethod, UltraWave, Wave};
+use cosmic_universe::VERSION;
 use cosmic_hyperlane::{HyperGate, HyperGateSelector, VersionGate};
 use quinn::{
     ClientConfig, Connecting, Connection, Endpoint, NewConnection, RecvStream, ServerConfig, VarInt,
@@ -315,7 +315,7 @@ mod tests {
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use std::sync::Arc;
     use dashmap::DashMap;
-    use cosmic_api::error::MsgErr;
+    use cosmic_universe::error::MsgErr;
     use cosmic_hyperlane::{HyperGateSelector, VersionGate};
     use crate::HyperServerQuic;
 

@@ -17,12 +17,12 @@ use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf, ReadHalf, WriteHalf};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time::error::Elapsed;
 use tokio_openssl::SslStream;
-use cosmic_api::error::MsgErr;
-use cosmic_api::log::PointLogger;
-use cosmic_api::substance::substance::Substance;
-use cosmic_api::sys::Knock;
-use cosmic_api::VERSION;
-use cosmic_api::wave::{Ping, UltraWave, Wave};
+use cosmic_universe::error::MsgErr;
+use cosmic_universe::log::PointLogger;
+use cosmic_universe::substance::substance::Substance;
+use cosmic_universe::sys::Knock;
+use cosmic_universe::VERSION;
+use cosmic_universe::wave::{Ping, UltraWave, Wave};
 
 
 #[macro_use]
@@ -465,8 +465,8 @@ impl From<&str> for Error {
 mod tests {
     use super::*;
     use std::time::Duration;
-    use cosmic_api::id::id::{Point, ToPort};
-    use cosmic_api::log::RootLogger;
+    use cosmic_universe::id::id::{Point, ToPort};
+    use cosmic_universe::log::RootLogger;
     use cosmic_hyperlane::test_util::{FAE, LESS, SingleInterchangePlatform, WaveTest};
 
     #[tokio::test]

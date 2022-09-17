@@ -16,8 +16,8 @@ use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner};
 use ascii::IntoAsciiString;
 use bytes::BytesMut;
-use cosmic_api::id::ArtifactSubKind;
-use cosmic_api::wave::AsyncTransmitterWithAgent;
+use cosmic_universe::id::ArtifactSubKind;
+use cosmic_universe::wave::AsyncTransmitterWithAgent;
 use handlebars::Handlebars;
 use http::header::{HeaderName, HOST};
 use http::{HeaderMap, HeaderValue, Response, Uri, Version};
@@ -225,7 +225,7 @@ mod test {
     use crate::error::Error;
     use crate::star::variant::web::parse::host_and_port;
     use crate::star::variant::web::HostAndPort;
-    use cosmic_api::span::new_span;
+    use cosmic_universe::span::new_span;
     use regex::Regex;
 
     #[test]
@@ -268,9 +268,9 @@ pub struct HostAndPort {
 
 pub mod parse {
     use crate::star::variant::web::HostAndPort;
-    use cosmic_api::error::MsgErr;
-    use cosmic_api::parse::domain;
-    use cosmic_api::parse::error::result;
+    use cosmic_universe::error::MsgErr;
+    use cosmic_universe::parse::domain;
+    use cosmic_universe::parse::error::result;
     use cosmic_nom::Span;
     use nom::bytes::complete::{is_a, tag, take_while};
     use nom::character::is_digit;

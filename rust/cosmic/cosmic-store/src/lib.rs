@@ -10,8 +10,8 @@ use alloc::sync::Arc;
 use std::ops::Deref;
 use std::prelude::rust_2021::Vec;
 
-use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{Point, PointSegKind};
+use cosmic_universe::error::MsgErr;
+use cosmic_universe::id::id::{Point, PointSegKind};
 
 pub mod file;
 

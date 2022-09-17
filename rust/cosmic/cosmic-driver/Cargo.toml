@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cosmic-api = { path= "../cosmic-api" }
+cosmic-universe = { path= "../cosmic-universe" }
 tokio = { version = "1.15.0", features = ["full"] }
 serde = { version="1.0.69", features=['derive','rc'] }
 lazy_static = "1.4.0"

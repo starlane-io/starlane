@@ -1,12 +1,12 @@
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
-use cosmic_api::ArtRef;
-use cosmic_api::config::config::bind::BindConfig;
-use cosmic_api::id::id::{Kind, Point};
-use cosmic_api::parse::bind_config;
-use cosmic_api::util::log;
-use cosmic_api::wave::{CoreBounce, DirectedHandler, ReflectedCore, RootInCtx};
+use cosmic_universe::ArtRef;
+use cosmic_universe::config::config::bind::BindConfig;
+use cosmic_universe::id::id::{Kind, Point};
+use cosmic_universe::parse::bind_config;
+use cosmic_universe::util::log;
+use cosmic_universe::wave::{CoreBounce, DirectedHandler, ReflectedCore, RootInCtx};
 use crate::driver::{Driver, DriverCtx, DriverSkel, HyperDriverFactory, Item, ItemHandler, ItemSphere};
 use crate::Platform;
 use crate::star::HyperStarSkel;
@@ -89,8 +89,8 @@ impl <P> Item<P> for Root<P> where P: Platform {
     }
 }
 
-use cosmic_api::wave::RecipientSelector;
-use cosmic_api::wave::DirectedHandlerSelector;
+use cosmic_universe::wave::RecipientSelector;
+use cosmic_universe::wave::DirectedHandlerSelector;
 #[routes]
 impl <P> Root<P> where P: Platform {
 

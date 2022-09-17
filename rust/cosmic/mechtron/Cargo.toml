@@ -18,7 +18,7 @@ mechtron-common = { path="../mechtron-common"}
 lazy_static = "1.4.0"
 wasm_membrane_guest = { path="../wasm-membrane-guest"}
 bincode = "1.3.3"
-cosmic-api= { path="../cosmic-api"}
+cosmic-universe= { path= "../cosmic-universe" }
 
 serde_json = "1.0.61"
 serde = { version="1.0.69", features=['derive','rc'] }

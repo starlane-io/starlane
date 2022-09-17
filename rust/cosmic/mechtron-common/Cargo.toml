@@ -13,5 +13,5 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 serde = { version="1.0.69", features=['derive','rc'] }
-cosmic-api= { path="../cosmic-api"}
+cosmic-universe= { path= "../cosmic-universe" }
 bincode = "1.3.3"

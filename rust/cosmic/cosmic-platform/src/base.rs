@@ -1,11 +1,11 @@
 use std::str::FromStr;
 use std::sync::Arc;
-use cosmic_api::ArtRef;
-use cosmic_api::config::config::bind::BindConfig;
-use cosmic_api::id::id::{Kind, Point};
-use cosmic_api::parse::bind_config;
-use cosmic_api::util::log;
-use cosmic_api::wave::{CoreBounce, DirectedHandler, DirectedHandlerSelector, RecipientSelector, ReflectedCore, RootInCtx};
+use cosmic_universe::ArtRef;
+use cosmic_universe::config::config::bind::BindConfig;
+use cosmic_universe::id::id::{Kind, Point};
+use cosmic_universe::parse::bind_config;
+use cosmic_universe::util::log;
+use cosmic_universe::wave::{CoreBounce, DirectedHandler, DirectedHandlerSelector, RecipientSelector, ReflectedCore, RootInCtx};
 use crate::{DriverFactory, Platform};
 use crate::driver::{Driver, DriverAvail, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere};
 use crate::star::HyperStarSkel;

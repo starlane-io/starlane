@@ -10,27 +10,27 @@ use crate::machine::MachineSkel;
 use crate::shell::Shell;
 use crate::state::ShellState;
 use crate::{DriversBuilder, PlatErr, Platform, Registry, RegistryApi};
-use cosmic_api::bin::Bin;
-use cosmic_api::cli::RawCommand;
-use cosmic_api::command::command::common::StateSrc;
-use cosmic_api::command::request::create::{Create, Strategy};
-use cosmic_api::command::request::set::Set;
-use cosmic_api::config::config::bind::{BindConfig, RouteSelector};
-use cosmic_api::error::MsgErr;
-use cosmic_api::id::id::{BaseKind, Kind, Layer, Point, Port, PortSelector, RouteSeg, Sub, ToBaseKind, ToPoint, ToPort, Topic, TraversalLayer, Uuid, GLOBAL_EXEC, LOCAL_STAR};
-use cosmic_api::id::{StarKey, StarStub, StarSub, TraversalInjection};
-use cosmic_api::id::{Traversal, TraversalDirection};
-use cosmic_api::log::{PointLogger, RootLogger, Trackable, Tracker};
-use cosmic_api::parse::{bind_config, route_attribute, Env};
-use cosmic_api::particle::particle::{Details, Status, Stub};
-use cosmic_api::quota::Timeouts;
-use cosmic_api::substance::substance::{Substance, ToSubstance};
-use cosmic_api::sys::{
+use cosmic_universe::bin::Bin;
+use cosmic_universe::cli::RawCommand;
+use cosmic_universe::command::command::common::StateSrc;
+use cosmic_universe::command::request::create::{Create, Strategy};
+use cosmic_universe::command::request::set::Set;
+use cosmic_universe::config::config::bind::{BindConfig, RouteSelector};
+use cosmic_universe::error::MsgErr;
+use cosmic_universe::id::id::{BaseKind, Kind, Layer, Point, Port, PortSelector, RouteSeg, Sub, ToBaseKind, ToPoint, ToPort, Topic, TraversalLayer, Uuid, GLOBAL_EXEC, LOCAL_STAR};
+use cosmic_universe::id::{StarKey, StarStub, StarSub, TraversalInjection};
+use cosmic_universe::id::{Traversal, TraversalDirection};
+use cosmic_universe::log::{PointLogger, RootLogger, Trackable, Tracker};
+use cosmic_universe::parse::{bind_config, route_attribute, Env};
+use cosmic_universe::particle::particle::{Details, Status, Stub};
+use cosmic_universe::quota::Timeouts;
+use cosmic_universe::substance::substance::{Substance, ToSubstance};
+use cosmic_universe::sys::{
     Assign, AssignmentKind, Discoveries, Discovery, Location, ParticleRecord, Provision, Search,
     Sys,
 };
-use cosmic_api::util::{log, ValueMatcher, ValuePattern};
-use cosmic_api::wave::{
+use cosmic_universe::util::{log, ValueMatcher, ValuePattern};
+use cosmic_universe::wave::{
     Agent, Bounce, BounceBacks, CmdMethod, CoreBounce, DirectedHandler, DirectedHandlerSelector,
     DirectedHandlerShell, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
     HandlingKind, InCtx, Method, Ping, Pong, Priority, ProtoTransmitter, ProtoTransmitterBuilder,
@@ -38,9 +38,9 @@ use cosmic_api::wave::{
     RootInCtx, Router, Scope, SetStrategy, Signal, SingularRipple, ToRecipients, TxRouter,
     WaitTime, Wave, WaveKind,
 };
-use cosmic_api::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
-use cosmic_api::ArtRef;
-use cosmic_api::{MountKind, Registration, State, StateFactory, HYPERUSER};
+use cosmic_universe::wave::{DirectedCore, Exchanger, HyperWave, SysMethod, UltraWave};
+use cosmic_universe::ArtRef;
+use cosmic_universe::{MountKind, Registration, State, StateFactory, HYPERUSER};
 use cosmic_hyperlane::{
     Bridge, HyperClient, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
     HyperwayInterchange, HyperwayStub,

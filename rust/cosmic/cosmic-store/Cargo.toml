@@ -11,6 +11,6 @@ std=[]
 local-filesystem=["std"]
 
 [dependencies]
-cosmic-api  = { path= "../cosmic-api", default-features=false}
+cosmic-universe  = { path= "../cosmic-universe", default-features=false}
 anyhow = {version="1.0.56", default-features=false}
 zip = { version="0.6.2", default-features=false }
