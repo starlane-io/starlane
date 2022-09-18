@@ -12,6 +12,40 @@ use quote::ToTokens;
 use syn::{Data, DeriveInput, parse_macro_input, PathArguments, Type};
 use syn::__private::TokenStream2;
 
+/// Takes a given enum (which in turn accepts child enums) and auto generates a `Parent::From` so the child
+/// can turn into the parent and a `TryInto<Child> for Parent` so the Parent can attempt to turn into the child.
+/// ```
+/// #[derive(Autobox)]
+/// pub enum Parent {
+///   Child(Child)
+/// }
+///
+/// pub enum Child {
+///   Variant1,
+///   Variant2
+/// }
+/// ```
+/// Will generate something like:
+/// ```
+///
+/// impl From<Child> for Parent {
+///   fn from( child: Child ) -> Self {
+///      Self::Child(child)
+///   }
+/// }
+///
+/// impl TryInto<Child> for Parent {
+///   type Err=UniErr;
+///
+///   fn try_into(self) -> Result<Child,Self::Err> {
+///     if let Self::Child(child) = self {
+///        Ok(self)
+///     } else {
+///        Err("err")
+///     }
+///   }
+/// }
+/// ```
 #[proc_macro_derive(Autobox)]
 pub fn autobox(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);

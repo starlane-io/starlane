@@ -31,12 +31,49 @@ use cosmic_universe::parse::route_attribute_value;
 use cosmic_universe::util::log;
 
 
-// this is just to make the user realize he needs to import DirectedHandler
+/// This macro will auto implement the `cosmic_universe::wave::exchange::DirectedHandler` trait.
+/// In order to finalize the implementation a `#[routes]` attribute must also be specified
+/// above one of the impls.
 #[proc_macro_derive(DirectedHandler)]
 pub fn directed_handler(item: TokenStream) -> TokenStream {
     TokenStream::from(quote! {})
 }
 
+/// This impl attribute creates a `fn handler` which receives directed waves and routes them to the first local method
+/// which the route selector matches.
+/// To implement:
+/// ```
+///
+/// use cosmic_universe::err::UniErr;
+/// use cosmic_universe::hyper::HyperSubstance;
+/// use cosmic_universe::log::PointLogger;
+/// use cosmic_universe::substance::Substance;
+/// use cosmic_universe::substance::Substance::Text;
+/// use cosmic_universe::wave::core::ReflectedCore;
+/// use cosmic_universe::wave::exchange::InCtx;
+///
+/// #[derive(DirectedHandler)]
+/// pub struct MyHandler {
+///   logger: PointLogger
+/// }
+///
+/// #[routes]
+/// impl MyHandler {
+///     /// the route attribute captures an ExtMethod implementing a custom `MyNameIs`
+///     /// notice that the InCtx will accept any valid cosmic_universe::substance::Substance
+///     #[route("Ext<MyNameIs>")]
+///     pub async fn hello(&self, ctx: InCtx<'_, Text>) -> Result<String, UniErr> {
+///         /// also we can return any Substance in our Reflected wave
+///         Ok(format!("Hello, {}", ctx.input.to_string()))
+///     }
+///
+///     /// if the function returns nothing then an Empty Ok Reflected will be returned unless
+///     /// the wave type is `Wave<Signal>`
+///     #[route("Ext<Bye>")]
+///     pub async fn bye(&self, ctx: InCtx<'_,()>) {
+///        self.logger.info("funny that! He left without saying a word!");
+///     }
+/// }
 #[proc_macro_attribute]
 pub fn routes(attr: TokenStream, item: TokenStream) -> TokenStream {
     _routes(attr, item, true)
