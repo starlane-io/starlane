@@ -1,6 +1,6 @@
 [package]
 name = "cosmic-universe"
-version = "0.3.0-alpha"
+version = "0.3.0-alpha2"
 edition = "2021"
 license = "MIT"
 homepage ="http://starlane.io/"
@@ -11,8 +11,8 @@ description = "The raw data types for mesh-portal-api serde."
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cosmic-nom = { path="../cosmic-nom" }
-cosmic-macros-primitive = { path="../cosmic-macros-primitive" }
+cosmic-nom = { path="../cosmic-nom" ,version = "0.3.0-alpha2"}
+cosmic-macros-primitive = { path="../cosmic-macros-primitive" ,version = "0.3.0-alpha2"}
 async-trait = "0.1.48"
 lazy_static = "1.4.0"
 serde = { version="1.0.69", features=['derive','rc'] }
