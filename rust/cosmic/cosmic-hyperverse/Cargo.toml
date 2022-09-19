@@ -3,6 +3,12 @@ name = "cosmic-hyperverse"
 version = "0.1.0"
 edition = "2021"
 
+authors = ["Scott Williams <scott@mightydevco.com>"]
+description = "The Cosmic Hyperverse is the infrastructure component of The Cosmic Initiative framework that orchestrates and enforces security.  It is responsible for making the universe painless to extend by supplying goodies such as provisioning, sharding, load balancing, routing, discovery & of course security."
+homepage = "http://thecosmicinitiative.io"
+repository = "https://github.com/cosmic-initiative/cosmic-initiative"
+license = "MIT"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

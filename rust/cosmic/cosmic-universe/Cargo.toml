@@ -2,11 +2,13 @@
 name = "cosmic-universe"
 version = "0.3.0-alpha2"
 edition = "2021"
+
+authors = ["Scott Williams <scott@mightydevco.com>"]
+description = "Some primitive macros needed to jump start cosmic-universe"
+homepage = "http://thecosmicinitiative.io"
+repository = "https://github.com/cosmic-initiative/cosmic-initiative"
 license = "MIT"
-homepage ="http://starlane.io/"
-readme="README.md"
-repository = "https://github.com/mechtronium/mesh-portal"
-description = "The raw data types for mesh-portal-api serde."
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

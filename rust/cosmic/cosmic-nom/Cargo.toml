@@ -4,10 +4,10 @@ version = "0.3.0-alpha2"
 edition = "2021"
 
 authors = ["Scott Williams <scott@mightydevco.com>"]
-description = "Cosmic Nom"
+description = "Is a collection of utilities for making using the great [nom](https://crates.io/crates/nom) parser combinator easier to use."
 homepage = "http://thecosmicinitiative.io"
 repository = "https://github.com/cosmic-initiative/cosmic-initiative"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 
 [dependencies]
 nom = "7"
