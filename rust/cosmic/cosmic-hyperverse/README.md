@@ -5,7 +5,7 @@ The Cosmic Hyperverse is the infrastructure component of The Cosmic Initiative f
 security.  It is responsible for making the universe painless to extend by supplying goodies such as provisioning, 
 sharding, load balancing, routing, discovery & of course security.
 
-### WORK IN PROGRESS
+## WORK IN PROGRESS
 *this framework is a work in progress and not ready for production. And it is not yet fully documented for feedback and discussion .*
 *right now there is little in the way of Drivers other than creating a few generic Particles and passing Waves between them* 
 
