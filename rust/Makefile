@@ -5,7 +5,8 @@ clean :
 	find . -type f -name "Makefile" -exec touch {} +
 
 
-version: 
+version:
+	cp VERSION cosmic/cosmic-universe/src
 	$(MAKE) -C cosmic
 
 publish-dry-run-impl: 
