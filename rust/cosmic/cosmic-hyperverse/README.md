@@ -10,7 +10,7 @@ sharding, load balancing, routing, discovery & of course security.
 *right now there is little in the way of Drivers other than creating a few generic Particles and passing Waves between them* 
 
 ## BUILDS ON THE COSMIC UNIVERSE
-The concepts in the `cosmic-hyperverse` package build upon the concepts in the [cosmic-universe](../cosmic-universe/README.md) 
+The concepts in the `cosmic-hyperverse` package build upon the concepts in the [cosmic-universe](../cosmic-universe) 
 package so familiarity with The Cosmic Universe is recommended before grappling with Hyperversal concepts.
 
 ## TERMS

@@ -42,7 +42,7 @@ there is less complexity (and variation) with the various Particles.  Particles 
 complexity means that they are easier to implement and there are fewer things that can
 go wrong as there is less duplication of logic in each Particle.
 
-Conversely [`cosmic-hyperverse`](https://crates.io/crates/cosmic-hyperverse) Is the package for
+Conversely [`cosmic-hyperverse`](../cosmic-hyperverse) Is the package for
 managing security and orchestration.
 
 ### SECURITY EXAMPLE
