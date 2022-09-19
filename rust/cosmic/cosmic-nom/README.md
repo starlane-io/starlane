@@ -3,7 +3,7 @@ Is a collection of utilities for making using the great [nom](https://crates.io/
 parser combinator easier to use.
 
 ## THE COSMIC INITIATIVE
-`cosmic-nom` is part of a group of packages that compose [`The Cosmic Initiative`](http://thecosmicinitiative.io) although you can use it for any project you want.
+`cosmic-nom` is part of [`The Cosmic Initiative`](http://thecosmicinitiative.io) a WebAssembly orchestration framework--although you can use it for any project you want.
 
 ## A DERIVATIVE OF DERIVATIVE WORKS
 `cosmic-nom` synthesizes the utilities of two other derivatives of nom: 

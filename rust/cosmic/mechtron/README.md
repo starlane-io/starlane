@@ -1,3 +1,3 @@
-A Mechtron is a WebAssembly binary that implements the Mechtron framework so that it can communicate with a Mesh Portal like Starlane.
+Part of [THE COSMIC INITIATIVE](http://thecosmicinitiative.io) a WebAssembly orchestration framework.
 
-Read more about it on the Starlane website: http://starlane.io
+**this code is out of date for the current version is scheduled to be revised**
