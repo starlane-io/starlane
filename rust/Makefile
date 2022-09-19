@@ -1,4 +1,10 @@
 
+.PHONY : clean version
+clean :
+	find . -type f -name "*.toml" -exec touch {} +
+	find . -type f -name "Makefile" -exec touch {} +
+
+
 version: 
 	$(MAKE) -C cosmic
 
