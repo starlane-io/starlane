@@ -1,6 +1,6 @@
 [package]
 name = "cosmic-universe"
-version = "0.3.0-alpha5"
+version = "0.3.0-alpha6"
 edition = "2021"
 
 authors = ["Scott Williams <scott@mightydevco.com>"]
@@ -13,8 +13,8 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cosmic-nom = { path="../cosmic-nom" ,version = "0.3.0-alpha5"}
-cosmic-macros-primitive = { path="../cosmic-macros-primitive" ,version = "0.3.0-alpha5"}
+cosmic-nom = { path="../cosmic-nom" ,version = "0.3.0-alpha6"}
+cosmic-macros-primitive = { path="../cosmic-macros-primitive" ,version = "0.3.0-alpha6"}
 async-trait = "0.1.48"
 lazy_static = "1.4.0"
 serde = { version="1.0.69", features=['derive','rc'] }
