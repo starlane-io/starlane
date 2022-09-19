@@ -3,6 +3,9 @@
 
 Concepts within The Cosmic Initiative framework exist in one of two dimensions: Universal or Hyperversal.
 
+## WORK IN PROGRESS
+*this framework is a work in progress and not ready for production. It is ready for community feedback and discussion.*
+
 ## TERMS
 To avoid name collision with other domain many concepts in The Cosmic Initiative are 
 given names from Astro Physics concepts:
