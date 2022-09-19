@@ -6,7 +6,7 @@ clean :
 
 
 version:
-	cp VERSION cosmic/cosmic-universe/src
+	cp ../VERSION cosmic/cosmic-universe/src
 	$(MAKE) -C cosmic
 
 publish-dry-run-impl: 

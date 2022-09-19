@@ -16,6 +16,7 @@ publish-dry-run:
 publish:
 	$(MAKE) -C cosmic-nom publish
 	$(MAKE) -C cosmic-macros-primitive publish
+	sleep 60
 	$(MAKE) -C cosmic-universe publish
 	sleep 60
 	$(MAKE) -C cosmic-hyperlane publish
