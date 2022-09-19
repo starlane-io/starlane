@@ -3,7 +3,11 @@ name = "cosmic-nom"
 version = "0.3.0-alpha2"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Scott Williams <scott@mightydevco.com>"]
+description = "Cosmic Nom"
+homepage = "http://thecosmicinitiative.io"
+repository = "https://github.com/cosmic-initiative/cosmic-initiative"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 nom = "7"
