@@ -1,0 +1,13 @@
+[package]
+name = "wasm_membrane_guest"
+version = "0.2.0"
+authors = ["Scott Williams <scott@mightydevco.com>"]
+edition = "2018"
+license = "MIT"
+homepage ="http://starlane.io/"
+repository = "https://github.com/mechtronium/starlane"
+description = "Host environment to facilitate communication with Wasm"
+
+
+[dependencies]
+lazy_static = "1.4.0"

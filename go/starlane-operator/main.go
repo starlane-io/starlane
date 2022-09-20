@@ -41,6 +41,8 @@ var (
 	setupLog = ctrl.Log.WithName("setup")
 )
 
+var DefaultImage = "none"
+
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
@@ -49,6 +51,7 @@ func init() {
 }
 
 func main() {
+	controllers.DefaultImage = DefaultImage
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -99,6 +102,13 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "StarlaneProvisioner")
+		os.Exit(1)
+	}
+	if err = (&controllers.PostgresReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Postgres")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

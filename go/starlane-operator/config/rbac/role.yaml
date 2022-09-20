@@ -45,10 +45,34 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - persistentvolumeclaims
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - pods
   verbs:
   - get
   - list
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - ""
   resources:
@@ -61,6 +85,32 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - postgres
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - postgres/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - starlane.starlane.io
+  resources:
+  - postgres/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - starlane.starlane.io
   resources:

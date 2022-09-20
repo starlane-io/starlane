@@ -1,0 +1,20 @@
+[package]
+name = "cosmic-macros-primitive"
+version = "0.3.0"
+edition = "2021"
+
+authors = ["Scott Williams <scott@mightydevco.com>"]
+description = "Some primitive macros needed to jump start cosmic-universe"
+homepage = "http://thecosmicinitiative.io"
+repository = "https://github.com/cosmic-initiative/cosmic-initiative"
+license = "MIT"
+
+
+[lib]
+proc-macro = true
+
+[dependencies]
+
+syn = { version = "1.0", features = ["full"] }
+quote = "1.0"
+proc-macro2 = "1.0"

@@ -10,6 +10,17 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - description: StarlaneProvisioner is the Schema for the starlaneprovisioners
+        API
+      displayName: Starlane Provisioner
+      kind: StarlaneProvisioner
+      name: starlaneprovisioners.starlane.starlane.io
+      version: v1alpha1
+    - description: StarlaneResource is the Schema for the starlaneresources API
+      displayName: Starlane Resource
+      kind: StarlaneResource
+      name: starlaneresources.starlane.starlane.io
+      version: v1alpha1
     - description: Starlane is the Schema for the starlanes API
       displayName: Starlane
       kind: Starlane

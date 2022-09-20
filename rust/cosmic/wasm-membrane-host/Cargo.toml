@@ -1,0 +1,15 @@
+[package]
+name = "wasm_membrane_host"
+version = "0.2.0"
+authors = ["Scott Williams <scott@mightydevco.com>"]
+edition = "2018"
+license = "MIT"
+homepage ="http://starlane.io/"
+repository = "https://github.com/mechtronium/starlane"
+description = "Host environment to facilitate communication with Wasm"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+wasmer = "2.1.1"
+log = "0.4.14"

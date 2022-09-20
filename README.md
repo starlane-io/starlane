@@ -1,39 +1,26 @@
-# STARLANE
-Starlane makes it easy to deploy and interoperate with secure WebAssembly code in the cloud, the edge, desktop, mobile and IoT environments.
+# THE COSMIC INITIATIVE
 
-To learn more checkout the [about page](http://starlane.io/about/).
+*A WEBASSEMBLY ORCHESTRATION FRAMWORK*
 
-## A WORK IN PROGRESS 
-Starlane is a work in progress and not ready for production yet, however it is ready for community feedback.
+The Cosmic Initiative is a framework for orchestrating WebAssembly components locally
+and/or accross every tier of the enterprise (Browser,Mobile,Desktop,Server,Edge,IoT.)
 
-## GETTING STARTED
+For a quick overview visit [The Cosmic Initiative](http://thecosmicinitiative.io) website.
 
-### INSTALL RUST
-To build starlane you will need to have **rust** and **make** installed.  Follow the official Rust instructions to [install Rust](https://www.rust-lang.org/tools/install).
 
-### NIGHTLY TOOLCHAIN
-Starlane requires the `nightly` toolchain for compilation.  To switch to the `nightly` toolchain:
+## WORK IN PROGRESS
+*this framework is a work in progress and not ready for production. It is ready for feedback and discussion.*
 
-```bash
-rustup toolchain install nightly
-rustup default nightly
-```
+## WHAT TO SEE
+To get started take a look at the [cosmic-universe](rust/cosmic/cosmic-universe) package.
 
-## INSTALLING STARLANE
+After that you might find the [cosmic-hyperverse](rust/cosmic/cosmic-hyperverse) interesting.
 
-```bash
-cargo install starlane
-```
 
-## BUILDING FROM SOURCE
+## STARLANE - A REFERENCE IMPLEMENTATION
+The Cosmic Initiative has one reference implementation at this time called [Starlane](http://starlane.io)  
 
-### MAKE
-You will need **Make** installed to build from source.  Sorry, you will have to figure that out yourself!
-
-```bash
-make install
-```
-
-## TUTORIAL
-For more hands on fun check out the Starlane [Tutorial](http://starlane.io/docs/tutorial/). 
+There is a working previous version 0.2.0 which can be downloaded and experimented with, however,
+the archetecture for the upcoming 0.3.0 is already quite different and 0.3.0 is not in a ready
+state to download and toy with. 
 

@@ -36,12 +36,26 @@ spec:
           spec:
             description: StarlaneSpec defines the desired state of Starlane
             properties:
+              disable-starlane-deployment:
+                type: boolean
               gateway-service-type:
                 description: Service Type string describes ingress methods for a service
+                type: string
+              image:
+                type: string
+              keycloak-service-type:
+                description: Service Type string describes ingress methods for a service
+                type: string
+              postgres-service-type:
+                description: Service Type string describes ingress methods for a service
+                type: string
+              storage-class:
                 type: string
               web-service-type:
                 description: Service Type string describes ingress methods for a service
                 type: string
+            required:
+            - storage-class
             type: object
           status:
             description: StarlaneStatus defines the observed state of Starlane

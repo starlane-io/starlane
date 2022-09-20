@@ -1,0 +1,24 @@
+[package]
+name = "cosmic-hyperlane"
+version = "0.3.0"
+edition = "2021"
+
+authors = ["Scott Williams <scott@mightydevco.com>"]
+description = "The Cosmic Hyperlane provides \"Lanes\" to queue Waves(messages) and Hyperways for back and forth Wave communication. It provides services such as routing and authentication as well."
+homepage = "http://thecosmicinitiative.io"
+repository = "https://github.com/cosmic-initiative/cosmic-initiative"
+license = "MIT"
+
+[dependencies]
+cosmic-universe = { path= "../cosmic-universe" ,version = "0.3.0"}
+async-trait = "0.1.48"
+futures = {version = "0.3.21", default-features = true }
+tokio = { version = "1.15.0", features = ["full"] }
+dashmap = "5.3.4"
+semver = { version="1.0.10", features=['serde'] }
+lazy_static = "1.4.0"
+strum_macros = "0.24.1"
+uuid = { version="1.1.2", features=["v4"] }
+
+[dev-dependencies]
+chrono = { version="0.4.19", features=["serde"] }

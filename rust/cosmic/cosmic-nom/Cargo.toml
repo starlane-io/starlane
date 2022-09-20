@@ -1,0 +1,16 @@
+[package]
+name = "cosmic-nom"
+version = "0.3.0"
+edition = "2021"
+
+authors = ["Scott Williams <scott@mightydevco.com>"]
+description = "Is a collection of utilities for making using the great [nom](https://crates.io/crates/nom) parser combinator easier to use."
+homepage = "http://thecosmicinitiative.io"
+repository = "https://github.com/cosmic-initiative/cosmic-initiative"
+license = "MIT"
+
+[dependencies]
+nom = "7"
+nom-supreme = "0.6.0"
+nom_locate = "4.0.0"
+serde = { version="1.0.69", features=['derive','rc'] }
