@@ -19,17 +19,17 @@ publish-dry-run:
 	$(MAKE) -C cosmic-cli publish-dry-run
 
 publish:
-	#$(MAKE) -C cosmic-nom publish
-	#$(MAKE) -C cosmic-macros-primitive publish
-	#sleep 60
-	#$(MAKE) -C cosmic-universe publish
-	#sleep 60
-	#$(MAKE) -C cosmic-macros publish
-	#sleep 60
-	#$(MAKE) -C cosmic-hyperlane publish
-	#sleep 60
-	#$(MAKE) -C cosmic-hyperlane-tcp publish
-	#sleep 60
+	$(MAKE) -C cosmic-nom publish
+	$(MAKE) -C cosmic-macros-primitive publish
+	sleep 60
+	$(MAKE) -C cosmic-universe publish
+	sleep 60
+	$(MAKE) -C cosmic-macros publish
+	sleep 60
+	$(MAKE) -C cosmic-hyperlane publish
+	sleep 60
+	$(MAKE) -C cosmic-hyperlane-tcp publish
+	sleep 60
 	$(MAKE) -C cosmic-hyperverse publish
 	$(MAKE) -C cosmic-cli publish
 
