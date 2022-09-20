@@ -87,7 +87,7 @@ where
     }
 }
 
-#[routes]
+#[handler]
 impl<P> GlobalCommandExecutionHandler<P>
 where
     P: Hyperverse,

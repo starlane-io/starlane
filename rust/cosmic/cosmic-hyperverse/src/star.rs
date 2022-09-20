@@ -1860,7 +1860,7 @@ where
     }
 }
 
-#[routes]
+#[handler]
 impl<P> StarDriver<P> where P: Hyperverse {}
 
 #[derive(DirectedHandler)]
@@ -1981,7 +1981,7 @@ where
     }
 }
 
-#[routes]
+#[handler]
 impl<P> Star<P>
 where
     P: Hyperverse,

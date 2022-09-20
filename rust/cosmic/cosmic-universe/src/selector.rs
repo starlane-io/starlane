@@ -486,6 +486,12 @@ impl ToString for ExactPointSeg {
     }
 }
 
+/// Provides ability to Select on a Specific.  This means wildcards can be applied when any match will do:
+/// `mechtronhub.io:postgres.org:postgres:*:(9.0.0)` will select ANY variant of postgres version 9.0.0.
+/// (notice the version MUST be delimited by Parenthesis.
+/// A more useful example is when performing some type of version selection it follows SemVer Req rules:
+/// `mechtronhub.io:postgres.org:postgres:gis:(>=10.2.3 <12.3.0)`
+/// which would match on any version of postgres:gis with a version in that range
 pub type SpecificSelector = SpecificSelectorDef<
     ProviderSelector,
     VendorSelector,

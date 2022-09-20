@@ -68,7 +68,7 @@ pub struct BaseDriver {
     pub avail: DriverAvail,
 }
 
-#[routes]
+#[handler]
 impl BaseDriver {
     pub fn new(avail: DriverAvail) -> Self {
         Self { avail }
@@ -91,7 +91,7 @@ where
 
 pub struct Base;
 
-#[routes]
+#[handler]
 impl Base {}
 
 #[async_trait]

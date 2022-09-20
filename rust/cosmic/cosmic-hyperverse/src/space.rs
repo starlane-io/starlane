@@ -62,7 +62,7 @@ where
 
 pub struct SpaceDriver;
 
-#[routes]
+#[handler]
 impl SpaceDriver {}
 
 #[async_trait]
@@ -81,7 +81,7 @@ where
 
 pub struct Space;
 
-#[routes]
+#[handler]
 impl Space {}
 
 #[async_trait]

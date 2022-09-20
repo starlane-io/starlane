@@ -17,6 +17,7 @@ cosmic-macros = { path="../cosmic-macros",version = "0.3.0"}
 cosmic-universe = { path= "../cosmic-universe" ,version = "0.3.0"}
 cosmic-nom = { path="../cosmic-nom",version = "0.3.0"}
 cosmic-hyperlane = { path= "../cosmic-hyperlane" ,version = "0.3.0"}
+acid-store = "0.11.3"
 anyhow = "1.0.44"
 dashmap = "5.3.4"
 tokio = { version = "1.15.0", features = ["full"] }
