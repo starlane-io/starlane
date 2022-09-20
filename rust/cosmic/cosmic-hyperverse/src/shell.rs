@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::time::Duration;
 
-use dashmap::DashMap;
+use dashmap::{DashMap, DashSet};
 use dashmap::mapref::one::Ref;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
@@ -23,18 +23,12 @@ use cosmic_universe::parse::error::result;
 use cosmic_universe::particle::traversal::{Traversal, TraversalDirection, TraversalInjection, TraversalLayer};
 use cosmic_universe::settings::Timeouts;
 use cosmic_universe::util::{log, ToResolved};
-use cosmic_universe::wave::{
-    Agent, Bounce, BounceBacks,
-    DirectedKind, DirectedProto, DirectedWave, Ping, Pong,
-    RecipientSelector, Reflectable, ReflectedWave,
-    UltraWave, Wave, WaveKind,
-};
+use cosmic_universe::wave::{Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Ping, Pong, RecipientSelector, Reflectable, ReflectedWave, UltraWave, Wave, WaveId, WaveKind};
 use cosmic_universe::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
 use cosmic_universe::wave::exchange::{DirectedHandler, DirectedHandlerSelector, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, SetStrategy};
 
 use crate::{HyperErr, Hyperverse};
 use crate::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
-use crate::state::ShellState;
 
 #[derive(DirectedHandler)]
 pub struct Shell<P>
@@ -310,5 +304,22 @@ impl CommandExecutor {
         println!("GOT HERE");
         let pong: Wave<Pong> = ctx.transmitter.direct(directed).await?;
         Ok(pong.variant.core)
+    }
+}
+
+#[derive(Clone)]
+pub struct ShellState {
+    pub point: Point,
+    pub core_requests: Arc<DashSet<WaveId>>,
+    pub fabric_requests: Arc<DashMap<WaveId, AtomicU16>>,
+}
+
+impl ShellState {
+    pub fn new(point: Point) -> Self {
+        Self {
+            point,
+            core_requests: Arc::new(DashSet::new()),
+            fabric_requests: Arc::new(DashMap::new()),
+        }
     }
 }

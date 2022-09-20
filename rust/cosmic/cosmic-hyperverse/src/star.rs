@@ -76,7 +76,7 @@ use crate::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
 use crate::machine::MachineSkel;
 use crate::Registration;
 use crate::shell::Shell;
-use crate::state::ShellState;
+use crate::shell::ShellState;
 
 #[derive(Clone)]
 pub struct StarState<P>

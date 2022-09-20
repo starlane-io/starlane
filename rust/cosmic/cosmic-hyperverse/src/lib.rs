@@ -60,7 +60,6 @@ pub mod host;
 pub mod machine;
 pub mod shell;
 pub mod star;
-pub mod state;
 pub mod tests;
 
 #[cfg(test)]
