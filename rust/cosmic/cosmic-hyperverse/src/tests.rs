@@ -51,6 +51,8 @@ use crate::test::registry::TestRegistryContext;
 
 use super::*;
 
+use super::*;
+
 lazy_static! {
     pub static ref LESS: Point = Point::from_str("space:users:less").expect("point");
     pub static ref FAE: Point = Point::from_str("space:users:fae").expect("point");
