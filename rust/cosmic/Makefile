@@ -24,10 +24,10 @@ publish:
 	#sleep 60
 	#$(MAKE) -C cosmic-universe publish
 	#sleep 60
-	$(MAKE) -C cosmic-macros publish
-	sleep 60
-	$(MAKE) -C cosmic-hyperlane publish
-	sleep 60
+	#$(MAKE) -C cosmic-macros publish
+	#sleep 60
+	#$(MAKE) -C cosmic-hyperlane publish
+	#sleep 60
 	$(MAKE) -C cosmic-hyperlane-tcp publish
 	sleep 60
 	$(MAKE) -C cosmic-hyperverse publish
