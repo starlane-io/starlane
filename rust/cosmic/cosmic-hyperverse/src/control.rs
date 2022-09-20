@@ -173,7 +173,7 @@ where
     pub driver: DriverSkel<P>,
 }
 
-#[routes]
+#[handler]
 impl<P> ControlDriver<P> where P: Hyperverse {}
 
 #[async_trait]

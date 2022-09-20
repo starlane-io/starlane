@@ -75,11 +75,11 @@ pub fn directed_handler(item: TokenStream) -> TokenStream {
 ///     }
 /// }
 #[proc_macro_attribute]
-pub fn routes(attr: TokenStream, item: TokenStream) -> TokenStream {
-    _routes(attr, item, true)
+pub fn handler(attr: TokenStream, item: TokenStream) -> TokenStream {
+    _handler(attr, item, true)
 }
 
-fn _routes(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
+fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
     let item_cp = item.clone();
     let mut impl_item = parse_macro_input!(item_cp as syn::ItemImpl);
     //    let mut selectors = vec![];

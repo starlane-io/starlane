@@ -70,6 +70,7 @@ pub mod tests;
 
 #[cfg(test)]
 pub mod test;
+mod artifact;
 
 #[no_mangle]
 pub extern "C" fn cosmic_uuid() -> String {

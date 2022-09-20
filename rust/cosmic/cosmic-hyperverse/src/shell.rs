@@ -215,7 +215,7 @@ where
     }
 }
 
-#[routes]
+#[handler]
 impl<P> Shell<P>
 where
     P: Hyperverse + 'static,
@@ -249,7 +249,7 @@ where
     }
 }
 
-#[routes]
+#[handler]
 impl CliSession {
     #[route("Ext<Exec>")]
     pub async fn exec(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, UniErr> {
@@ -282,7 +282,7 @@ pub struct CommandExecutor {
     env: Env,
 }
 
-#[routes]
+#[handler]
 impl CommandExecutor {
     pub fn new(port: Surface, source: Surface, env: Env) -> Self {
         Self { port, source, env }

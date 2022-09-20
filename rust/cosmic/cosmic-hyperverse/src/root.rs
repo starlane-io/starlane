@@ -116,7 +116,7 @@ where
     }
 }
 
-#[routes]
+#[handler]
 impl<P> Root<P> where P: Hyperverse {}
 
 #[async_trait]

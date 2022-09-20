@@ -1066,7 +1066,7 @@ where
     layer: Layer,
 }
 
-#[routes]
+#[handler]
 impl<P> DriverRunner<P>
 where
     P: Hyperverse + 'static,
@@ -1623,7 +1623,7 @@ where
     skel: DriverSkel<P>,
 }
 
-#[routes]
+#[handler]
 impl<P> DriverDriver<P>
 where
     P: Hyperverse,
@@ -1655,7 +1655,7 @@ where
     skel: ItemSkel<P>,
 }
 
-#[routes]
+#[handler]
 impl<P> DriverCore<P>
 where
     P: Hyperverse,
