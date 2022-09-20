@@ -137,8 +137,8 @@ fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
     };
 
     let rtn = quote! {
-        impl #generics DirectedHandlerSelector for #self_ty #where_clause{
-              fn select<'a>( &self, select: &'a RecipientSelector<'a>, ) -> Result<&dyn DirectedHandler, ()> {
+        impl #generics cosmic_universe::wave::exchange::DirectedHandlerSelector for #self_ty #where_clause{
+              fn select<'a>( &self, select: &'a cosmic_universe::wave::RecipientSelector<'a>, ) -> Result<&dyn cosmic_universe::wave::exchange::DirectedHandler, ()> {
                 use cosmic_universe::wave::core::Method;
                 use cosmic_universe::wave::core::cmd::CmdMethod;
                 if select.wave.core().method == Method::Cmd(CmdMethod::Bounce) {
@@ -154,8 +154,8 @@ fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
         }
 
         #[async_trait]
-        impl #generics DirectedHandler for #self_ty #where_clause{
-            async fn handle( &self, ctx: RootInCtx) -> CoreBounce {
+        impl #generics cosmic_universe::wave::exchange::DirectedHandler for #self_ty #where_clause{
+            async fn handle( &self, ctx: cosmic_universe::wave::exchange::RootInCtx) -> cosmic_universe::wave::core::CoreBounce {
                 use cosmic_universe::wave::core::Method;
                 use cosmic_universe::wave::core::cmd::CmdMethod;
                 #(
@@ -248,7 +248,7 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
     let item = ctx.item;
 
     let expanded = quote! {
-      #__async fn #ident( &self, mut ctx: RootInCtx ) -> CoreBounce {
+      #__async fn #ident( &self, mut ctx: RootInCtx ) -> cosmic_universe::wave::core::CoreBounce {
           let ctx: InCtx<'_,#item> = match ctx.push::<#item>() {
               Ok(ctx) => ctx,
               Err(err) => {
