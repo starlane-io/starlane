@@ -28,8 +28,8 @@ publish:
 	#sleep 60
 	#$(MAKE) -C cosmic-hyperlane publish
 	#sleep 60
-	$(MAKE) -C cosmic-hyperlane-tcp publish
-	sleep 60
+	#$(MAKE) -C cosmic-hyperlane-tcp publish
+	#sleep 60
 	$(MAKE) -C cosmic-hyperverse publish
 	$(MAKE) -C cosmic-cli publish
 
