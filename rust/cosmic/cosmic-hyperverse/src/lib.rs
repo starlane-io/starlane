@@ -53,24 +53,19 @@ use cosmic_universe::wave::UltraWave;
 use crate::driver::{DriverFactory, DriversBuilder};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
 
-pub mod control;
 pub mod driver;
 //pub mod field2;
-pub mod base;
 pub mod field;
 pub mod global;
 pub mod host;
 pub mod machine;
-pub mod root;
 pub mod shell;
-pub mod space;
 pub mod star;
 pub mod state;
 pub mod tests;
 
 #[cfg(test)]
 pub mod test;
-mod artifact;
 
 #[no_mangle]
 pub extern "C" fn cosmic_uuid() -> String {

@@ -1,18 +1,13 @@
 use std::str::FromStr;
 use std::sync::Arc;
-
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::config::bind::BindConfig;
 use cosmic_universe::kind::Kind;
 use cosmic_universe::loc::Point;
 use cosmic_universe::parse::bind_config;
 use cosmic_universe::util::log;
-use cosmic_universe::wave::core::{CoreBounce, ReflectedCore};
-use cosmic_universe::wave::exchange::{DirectedHandler, DirectedHandlerSelector, RootInCtx};
-use cosmic_universe::wave::RecipientSelector;
-
-use crate::{DriverFactory, Hyperverse};
 use crate::driver::{Driver, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere};
+use crate::Hyperverse;
 use crate::star::HyperStarSkel;
 
 lazy_static! {
@@ -21,6 +16,7 @@ lazy_static! {
         Point::from_str("GLOBAL::repo:1.0.0:/bind/space.bind").unwrap()
     );
 }
+
 
 fn space_bind() -> BindConfig {
     log(bind_config(

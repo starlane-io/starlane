@@ -39,12 +39,12 @@ use cosmic_universe::wave::core::Method;
 use cosmic_universe::wave::exchange::Exchanger;
 use cosmic_universe::wave::exchange::ProtoTransmitterBuilder;
 
-use crate::base::BaseDriverFactory;
-use crate::control::{ControlClient, ControlCliSession, ControlDriverFactory};
+use crate::driver::base::BaseDriverFactory;
 //use crate::control::ControlDriverFactory;
 use crate::driver::{DriverAvail, DriverFactory};
-use crate::root::RootDriverFactory;
-use crate::space::SpaceDriverFactory;
+use crate::driver::control::{ControlClient, ControlCliSession, ControlDriverFactory};
+use crate::driver::root::RootDriverFactory;
+use crate::driver::space::SpaceDriverFactory;
 use crate::star::HyperStarApi;
 use crate::test::hyperverse::{TestErr, TestHyperverse};
 use crate::test::registry::TestRegistryContext;

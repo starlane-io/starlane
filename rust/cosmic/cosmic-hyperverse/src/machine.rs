@@ -37,7 +37,7 @@ use cosmic_universe::substance::Substance;
 use cosmic_universe::wave::{Agent, HyperWave, UltraWave};
 
 use crate::{DriversBuilder, HyperErr, Hyperverse, Registry, RegistryApi};
-use crate::control::ControlDriverFactory;
+use crate::driver::control::ControlDriverFactory;
 use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
 
 #[derive(Clone)]

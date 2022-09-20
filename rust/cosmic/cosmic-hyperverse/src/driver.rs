@@ -45,12 +45,20 @@ use cosmic_universe::wave::core::{CoreBounce, DirectedCore, Method, ReflectedCor
 use cosmic_universe::wave::core::cmd::CmdMethod;
 use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::exchange::{DirectedHandler, DirectedHandlerSelector, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, SetStrategy};
+use star::{StarDriver, StarDriverFactory};
 
 use crate::{HyperErr, Hyperverse, Registry, RegistryApi};
 use crate::machine::MachineSkel;
 use crate::Registration;
-use crate::star::{HyperStarSkel, LayerInjectionRouter, StarDriver, StarDriverFactory, StarState};
+use crate::star::{HyperStarSkel, LayerInjectionRouter, StarState};
 use crate::star::HyperStarCall::LayerTraversalInjection;
+
+pub mod artifact;
+pub mod base;
+pub mod control;
+pub mod root;
+pub mod space;
+pub mod star;
 
 lazy_static! {
     static ref DEFAULT_BIND: ArtRef<BindConfig> = ArtRef::new(
