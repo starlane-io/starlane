@@ -179,6 +179,21 @@ impl From<io::Error> for TestErr {
         }
     }
 }
+impl From<acid_store::Error> for TestErr {
+    fn from(e: acid_store::Error) -> Self {
+        Self {
+            message: e.to_string()
+        }
+    }
+}
+
+impl From<zip::result::ZipError> for TestErr {
+    fn from(a: zip::result::ZipError) -> Self {
+        Self {
+            message: a.to_string()
+        }
+    }
+}
 
 impl HyperErr for TestErr {
     fn to_cosmic_err(&self) -> UniErr {

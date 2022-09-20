@@ -290,6 +290,8 @@ pub trait HyperErr:
     + From<String>
     + From<&'static str>
     + From<tokio::sync::oneshot::error::RecvError>
+    + From<std::io::Error>
+    + From<zip::result::ZipError>
     + Into<UniErr>
 {
     fn to_cosmic_err(&self) -> UniErr;
