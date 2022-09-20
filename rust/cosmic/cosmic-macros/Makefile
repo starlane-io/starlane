@@ -9,7 +9,3 @@ publish-dry-run:
 
 publish:
 	cargo publish
- 
-  
- 
-

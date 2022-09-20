@@ -1,20 +1,12 @@
 [package]
-name = "cosmic-macros-primitive"
+name = "cosmic-cli"
 version = "0.3.0-alpha8"
 edition = "2021"
 
 authors = ["Scott Williams <scott@mightydevco.com>"]
-description = "Some primitive macros needed to jump start cosmic-universe"
+description = "The Cosmic Cli provides command line inerface access to running cosmos like http://starlane.io"
 homepage = "http://thecosmicinitiative.io"
 repository = "https://github.com/cosmic-initiative/cosmic-initiative"
 license = "MIT"
 
-
-[lib]
-proc-macro = true
-
 [dependencies]
-
-syn = { version = "1.0", features = ["full"] }
-quote = "1.0"
-proc-macro2 = "1.0"
