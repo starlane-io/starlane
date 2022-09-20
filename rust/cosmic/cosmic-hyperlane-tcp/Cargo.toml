@@ -1,6 +1,6 @@
 [package]
 name = "cosmic-hyperlane-tcp"
-version = "0.3.0-alpha8"
+version = "0.3.0-alpha9"
 edition = "2021"
 
 authors = ["Scott Williams <scott@mightydevco.com>"]
@@ -11,8 +11,8 @@ license = "MIT"
 
 [dependencies]
 async-trait = "0.1.48"
-cosmic-hyperlane= { path= "../cosmic-hyperlane" ,version = "0.3.0-alpha8"}
-cosmic-universe = { path= "../cosmic-universe" ,version = "0.3.0-alpha8"}
+cosmic-hyperlane= { path= "../cosmic-hyperlane" ,version = "0.3.0-alpha9"}
+cosmic-universe = { path= "../cosmic-universe" ,version = "0.3.0-alpha9"}
 tokio-openssl = "0.6.3"
 tokio = { version = "1.20.1", features = ["full"] }
 rcgen = "0.9.3"
