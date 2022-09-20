@@ -1,64 +1,42 @@
-use std::cell::Cell;
-use std::collections::{HashMap, HashSet};
-use std::marker::PhantomData;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::time::Duration;
-
-use dashmap::DashMap;
-use futures::future::select_all;
-use futures::FutureExt;
-use tokio::sync::{broadcast, mpsc, oneshot, RwLock, watch};
-use tokio::sync::mpsc::Sender;
-use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::oneshot::Receiver;
-use tokio::sync::watch::Ref;
-
-use cosmic_universe::artifact::ArtRef;
-use cosmic_universe::command::common::{SetProperties, StateSrc};
-use cosmic_universe::command::direct::create::{
-    Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
-};
-use cosmic_universe::config::bind::{BindConfig, RouteSelector};
-use cosmic_universe::err::UniErr;
-use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance};
-use cosmic_universe::HYPERUSER;
-use cosmic_universe::kind::{BaseKind, Kind, StarSub};
-use cosmic_universe::loc::{
-    Layer, Point, StarKey, Surface, ToBaseKind, ToPoint, ToSurface,
-    Uuid,
-};
-use cosmic_universe::log::{PointLogger, Tracker};
-use cosmic_universe::parse::{bind_config, route_attribute};
-use cosmic_universe::parse::model::Subst;
-use cosmic_universe::particle::{Details, Status, Stub};
-use cosmic_universe::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
-use cosmic_universe::substance::Substance;
-use cosmic_universe::util::{log, ValuePattern};
-use cosmic_universe::wave::{
-    Agent, Bounce,
-    DirectedKind, DirectedProto, DirectedWave, Ping, Pong,
-    RecipientSelector, ReflectedWave,
-    UltraWave, Wave, WaveKind,
-};
-use cosmic_universe::wave::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
-use cosmic_universe::wave::core::cmd::CmdMethod;
-use cosmic_universe::wave::core::hyp::HypMethod;
-use cosmic_universe::wave::exchange::{DirectedHandler, DirectedHandlerSelector, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, SetStrategy};
-use star::{StarDriver, StarDriverFactory};
-
-use crate::{HyperErr, Hyperverse, Registry, RegistryApi};
-use crate::machine::MachineSkel;
-use crate::Registration;
-use crate::star::{HyperStarSkel, LayerInjectionRouter, StarState};
-use crate::star::HyperStarCall::LayerTraversalInjection;
-
 pub mod artifact;
 pub mod base;
 pub mod control;
 pub mod root;
 pub mod space;
 pub mod star;
+
+use std::collections::HashMap;
+use std::marker::PhantomData;
+use std::str::FromStr;
+use std::sync::Arc;
+use std::time::Duration;
+use dashmap::DashMap;
+use futures::future::select_all;
+use futures::FutureExt;
+use futures::task::Spawn;
+use tokio::sync::{mpsc, oneshot, RwLock, watch};
+use cosmic_universe::artifact::ArtRef;
+use cosmic_universe::command::common::{SetProperties, StateSrc};
+use cosmic_universe::command::direct::create::{Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template};
+use cosmic_universe::config::bind::BindConfig;
+use cosmic_universe::err::UniErr;
+use cosmic_universe::hyper::{Assign, HyperSubstance};
+use cosmic_universe::HYPERUSER;
+use cosmic_universe::kind::{Kind, StarSub};
+use cosmic_universe::loc::{Layer, Point, Surface, ToPoint, ToSurface};
+use cosmic_universe::log::{PointLogger, Tracker};
+use cosmic_universe::parse::bind_config;
+use cosmic_universe::particle::{Details, Status, Stub};
+use cosmic_universe::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
+use cosmic_universe::substance::Substance;
+use cosmic_universe::util::log;
+use cosmic_universe::wave::{Agent, DirectedWave, ReflectedWave, UltraWave};
+use cosmic_universe::wave::core::{CoreBounce, Method, ReflectedCore};
+use cosmic_universe::wave::core::cmd::CmdMethod;
+use cosmic_universe::wave::exchange::{DirectedHandler, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, SetStrategy};
+use crate::{HyperErr, Hyperverse, Registration};
+use crate::driver::star::StarDriverFactory;
+use crate::star::{HyperStarSkel, LayerInjectionRouter};
 
 lazy_static! {
     static ref DEFAULT_BIND: ArtRef<BindConfig> = ArtRef::new(
@@ -845,50 +823,6 @@ where
         tokio::time::timeout(Duration::from_secs(30), rx).await??
     }
 }
-/*
-fn create_driver<P>(
-    factory: Box<dyn DriverFactory<P>>,
-    drivers_port: Port,
-    skel: StarSkel<P>,
-) -> Result<DriverApi, MsgErr>
-where
-    P: Platform + 'static,
-{
-    let point = drivers_port
-        .point
-        .push(factory.kind().as_point_segments())?;
-    let (shell_tx, shell_rx) = mpsc::channel(1024);
-    let (tx, mut rx) = mpsc::channel(1024);
-    {
-        let shell_tx = shell_tx.clone();
-        tokio::spawn(async move {
-            while let Some(call) = rx.recv().await {
-                match call {
-                    DriverShellRequest::Ex { point, tx } => {
-                        let call = DriverShellCall::Item { point, tx };
-                        shell_tx.send(call).await;
-                    }
-                    DriverShellRequest::Assign { assign, rtn } => {
-                        let call = DriverShellCall::Assign { assign, rtn };
-                        shell_tx.send(call).await;
-                    }
-                }
-            }
-        });
-    }
-    let router = Arc::new(LayerInjectionRouter::new(
-        skel.clone(),
-        point.clone().to_port().with_layer(Layer::Guest),
-    ));
-    let (driver_skel,status_tx,status_ctx_tx) = DriverSkel::new(point.clone(), router, tx, skel.clone());
-    let driver = factory.create(driver_skel, status_tx);
-    let state = skel.state.api().with_layer(Layer::Core);
-    let shell = DriverShell::new(point, skel.clone(), driver, state, shell_tx, shell_rx);
-    let api = DriverApi::new(shell, factory.kind());
-    Ok(api)
-}
-
- */
 
 pub enum DriverRunnerCall<P>
 where

@@ -54,7 +54,6 @@ use crate::driver::{DriverFactory, DriversBuilder};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
 
 pub mod driver;
-//pub mod field2;
 pub mod field;
 pub mod global;
 pub mod host;
