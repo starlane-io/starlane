@@ -1,6 +1,6 @@
 [package]
 name = "cosmic-hyperlane"
-version = "0.3.0-alpha9"
+version = "0.3.0"
 edition = "2021"
 
 authors = ["Scott Williams <scott@mightydevco.com>"]
@@ -10,7 +10,7 @@ repository = "https://github.com/cosmic-initiative/cosmic-initiative"
 license = "MIT"
 
 [dependencies]
-cosmic-universe = { path= "../cosmic-universe" ,version = "0.3.0-alpha9"}
+cosmic-universe = { path= "../cosmic-universe" ,version = "0.3.0"}
 async-trait = "0.1.48"
 futures = {version = "0.3.21", default-features = true }
 tokio = { version = "1.15.0", features = ["full"] }
