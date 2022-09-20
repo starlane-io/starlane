@@ -4,7 +4,8 @@ version = "0.3.0-alpha9"
 edition = "2021"
 
 authors = ["Scott Williams <scott@mightydevco.com>"]
-description = "Some primitive macros needed to jump start cosmic-universe"
+description = "Part of http://thecosmicinitiative.io This package--the Cosmic Universe--provides an API and utilities for interacting with the Cosmic Fabric and other Particles within the Universal Dimension."
+
 homepage = "http://thecosmicinitiative.io"
 repository = "https://github.com/cosmic-initiative/cosmic-initiative"
 license = "MIT"
