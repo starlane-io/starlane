@@ -46,6 +46,10 @@ use crate::driver::{DriverAvail, DriverFactory};
 use crate::root::RootDriverFactory;
 use crate::space::SpaceDriverFactory;
 use crate::star::HyperStarApi;
+use crate::test::hyperverse::{TestErr, TestHyperverse};
+use crate::test::registry::TestRegistryContext;
+
+use super::*;
 
 use super::*;
 
@@ -58,356 +62,11 @@ lazy_static! {
     pub static ref PROPERTIES_CONFIG: PropertiesConfig = PropertiesConfig::new();
 }
 
-#[derive(Clone)]
-pub struct TestPlatform {
-    pub ctx: TestRegistryContext,
-}
-
-impl TestPlatform {
-    pub fn new() -> Self {
-        Self {
-            ctx: TestRegistryContext::new(),
-        }
-    }
-}
-
-#[async_trait]
-impl Hyperverse for TestPlatform {
-    type Err = TestErr;
-    type RegistryContext = TestRegistryContext;
-    type StarAuth = AnonHyperAuthenticator;
-    type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
-
-    fn star_auth(&self, star: &StarKey) -> Result<Self::StarAuth, Self::Err> {
-        Ok(AnonHyperAuthenticator::new())
-    }
-
-    fn remote_connection_factory_for_star(
-        &self,
-        star: &StarKey,
-    ) -> Result<Self::RemoteStarConnectionFactory, Self::Err> {
-        todo!()
-    }
-
-    fn machine_template(&self) -> MachineTemplate {
-        MachineTemplate::default()
-    }
-
-    fn machine_name(&self) -> MachineName {
-        "test".to_string()
-    }
-
-    fn properties_config<K: ToBaseKind>(&self, base: &K) -> &'static PropertiesConfig {
-        &PROPERTIES_CONFIG
-    }
-
-    fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
-        let mut builder = DriversBuilder::new(kind.clone());
-
-        // only allow external Base wrangling external to Super
-        if *kind == StarSub::Super {
-            builder.add_post(Arc::new(BaseDriverFactory::new(DriverAvail::External)));
-        } else {
-            builder.add_post(Arc::new(BaseDriverFactory::new(DriverAvail::Internal)));
-        }
-
-        match kind {
-            StarSub::Central => {
-                builder.add_post(Arc::new(RootDriverFactory::new()));
-            }
-            StarSub::Super => {
-                builder.add_post(Arc::new(SpaceDriverFactory::new()));
-            }
-            StarSub::Nexus => {}
-            StarSub::Maelstrom => {}
-            StarSub::Scribe => {}
-            StarSub::Jump => {
-                builder.add_post(Arc::new(ControlDriverFactory::new()));
-            }
-            StarSub::Fold => {}
-            StarSub::Machine => {
-                builder.add_post(Arc::new(ControlDriverFactory::new()));
-            }
-        }
-
-        builder
-    }
-
-    async fn global_registry(&self) -> Result<Registry<Self>, Self::Err> {
-        Ok(Arc::new(TestRegistryApi::new(self.ctx.clone())))
-    }
-
-    async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>, Self::Err> {
-        todo!()
-    }
-
-    fn artifact_hub(&self) -> ArtifactApi {
-        ArtifactApi::new(Arc::new(NoDiceArtifactFetcher::new()))
-    }
-
-    fn start_services(&self, gate: &Arc<dyn HyperGate>) {}
-}
-
-#[derive(Clone)]
-pub struct TestRegistryContext {
-    pub sequence: Arc<AtomicU64>,
-    pub particles: Arc<DashMap<Point, ParticleRecord>>,
-}
-
-impl TestRegistryContext {
-    pub fn new() -> Self {
-        Self {
-            sequence: Arc::new(AtomicU64::new(0u64)),
-            particles: Arc::new(DashMap::new()),
-        }
-    }
-}
-
-pub struct TestRegistryApi {
-    ctx: TestRegistryContext,
-}
-
-impl TestRegistryApi {
-    fn new(ctx: TestRegistryContext) -> Self {
-        Self { ctx }
-    }
-
-    fn ctx(&self) -> &TestRegistryContext {
-        &self.ctx
-    }
-}
-
-#[async_trait]
-impl RegistryApi<TestPlatform> for TestRegistryApi {
-    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, TestErr> {
-        let details = Details {
-            stub: Stub {
-                point: registration.point.clone(),
-                kind: registration.kind.clone(),
-                status: Status::Pending,
-            },
-            properties: Default::default(),
-        };
-        let record = ParticleRecord {
-            details: details.clone(),
-            location: None,
-        };
-        self.ctx
-            .particles
-            .insert(registration.point.clone(), record);
-        Ok(details)
-    }
-
-    fn assign<'a>(&'a self, point: &'a Point) -> oneshot::Sender<Point> {
-        let (rtn, mut rtn_rx) = oneshot::channel();
-        let ctx = self.ctx.clone();
-        let point = point.clone();
-        tokio::spawn(async move {
-            match rtn_rx.await {
-                Ok(location) => {
-                    let mut record = ctx.particles.get_mut(&point).unwrap();
-
-                    let location: Point = location;
-                    record.value_mut().location = Some(location);
-                }
-                Err(_) => {
-                    // hopefully logged elsewhere
-                }
-            }
-        });
-
-        rtn
-    }
-
-    async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), TestErr> {
-        let mut record = self
-            .ctx
-            .particles
-            .get_mut(point)
-            .ok_or(TestErr::new(format!("not found: {}", point.to_string())))?;
-        record.value_mut().details.stub.status = status.clone();
-        Ok(())
-    }
-
-    async fn set_properties<'a>(
-        &'a self,
-        point: &'a Point,
-        properties: &'a SetProperties,
-    ) -> Result<(), TestErr> {
-        Ok(())
-    }
-
-    async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, TestErr> {
-        Ok(self.ctx.sequence.fetch_add(1, atomic::Ordering::Relaxed))
-    }
-
-    async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, TestErr> {
-        Ok(Default::default())
-    }
-
-    async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, TestErr> {
-        Ok(self
-            .ctx
-            .particles
-            .get(&point)
-            .ok_or(TestErr::new("not found"))?
-            .value()
-            .clone())
-    }
-
-    async fn query<'a>(
-        &'a self,
-        point: &'a Point,
-        query: &'a Query,
-    ) -> Result<QueryResult, TestErr> {
-        todo!()
-    }
-
-    async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, TestErr> {
-        todo!()
-    }
-
-    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, TestErr> {
-        todo!()
-    }
-
-    async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, TestErr> {
-        todo!()
-    }
-
-    async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), TestErr> {
-        todo!()
-    }
-
-    async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, TestErr> {
-        Ok(Access::Super)
-    }
-
-    async fn chown<'a>(
-        &'a self,
-        on: &'a Selector,
-        owner: &'a Point,
-        by: &'a Point,
-    ) -> Result<(), TestErr> {
-        todo!()
-    }
-
-    async fn list_access<'a>(
-        &'a self,
-        to: &'a Option<&'a Point>,
-        on: &'a Selector,
-    ) -> Result<Vec<IndexedAccessGrant>, TestErr> {
-        todo!()
-    }
-
-    async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), TestErr> {
-        todo!()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct TestErr {
-    pub message: String,
-}
-
-impl TestErr {
-    pub fn new<S: ToString>(message: S) -> Self {
-        Self {
-            message: message.to_string(),
-        }
-    }
-}
-
-impl ToString for TestErr {
-    fn to_string(&self) -> String {
-        self.message.clone()
-    }
-}
-
-impl Into<UniErr> for TestErr {
-    fn into(self) -> UniErr {
-        UniErr::from_500(self.to_string())
-    }
-}
-
-impl From<oneshot::error::RecvError> for TestErr {
-    fn from(err: RecvError) -> Self {
-        TestErr {
-            message: err.to_string(),
-        }
-    }
-}
-
-impl From<Elapsed> for TestErr {
-    fn from(err: Elapsed) -> Self {
-        TestErr {
-            message: err.to_string(),
-        }
-    }
-}
-
-impl From<String> for TestErr {
-    fn from(err: String) -> Self {
-        TestErr { message: err }
-    }
-}
-
-impl From<&'static str> for TestErr {
-    fn from(err: &'static str) -> Self {
-        TestErr {
-            message: err.to_string(),
-        }
-    }
-}
-impl From<UniErr> for TestErr {
-    fn from(err: UniErr) -> Self {
-        Self {
-            message: err.to_string(),
-        }
-    }
-}
-
-impl From<io::Error> for TestErr {
-    fn from(err: Error) -> Self {
-        Self {
-            message: err.to_string(),
-        }
-    }
-}
-
-impl HyperErr for TestErr {
-    fn to_cosmic_err(&self) -> UniErr {
-        UniErr::from_500(self.to_string())
-    }
-
-    fn new<S>(message: S) -> Self
-    where
-        S: ToString,
-    {
-        Self {
-            message: message.to_string(),
-        }
-    }
-
-    fn status_msg<S>(status: u16, message: S) -> Self
-    where
-        S: ToString,
-    {
-        Self {
-            message: message.to_string(),
-        }
-    }
-
-    fn status(&self) -> u16 {
-        500u16
-    }
-}
-
 async fn create(
     ctx: &TestRegistryContext,
     particle: Point,
     location: Point,
-    star_api: HyperStarApi<TestPlatform>,
+    star_api: HyperStarApi<TestHyperverse>,
 ) -> Result<(), TestErr> {
     println!("ADDING PARTICLE: {}", particle.to_string());
     let details = Details::new(
@@ -445,7 +104,7 @@ fn test_gravity_routing() -> Result<(), TestErr> {
         .enable_all()
         .build()?;
     runtime.block_on(async move {
-        let platform = TestPlatform::new();
+        let platform = TestHyperverse::new();
         let machine_api = platform.machine();
         machine_api.wait_ready().await;
 
@@ -613,7 +272,7 @@ fn test_layer_traversal() -> Result<(), TestErr> {
             direct_tx.send(());
         });
 
-        let platform = TestPlatform::new();
+        let platform = TestHyperverse::new();
         let machine_api = platform.machine();
         machine_api.wait_ready().await;
 
@@ -869,7 +528,7 @@ fn test_control() -> Result<(), TestErr> {
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestPlatform::new();
+        let platform = TestHyperverse::new();
         let machine_api = platform.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
         let logger = logger.point(Point::from_str("test-client").unwrap());
@@ -933,7 +592,7 @@ fn test_star_wrangle() -> Result<(), TestErr> {
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestPlatform::new();
+        let platform = TestHyperverse::new();
         let machine_api = platform.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
         let logger = logger.point(Point::from_str("test-client").unwrap());
@@ -964,7 +623,7 @@ fn test_golden_path() -> Result<(), TestErr> {
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestPlatform::new();
+        let platform = TestHyperverse::new();
         let machine_api = platform.machine();
 
         tokio::time::timeout(Duration::from_secs(1), machine_api.wait_ready())
@@ -996,7 +655,7 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestPlatform::new();
+        let platform = TestHyperverse::new();
         let machine_api = platform.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
         let logger = logger.point(Point::from_str("test-client").unwrap());
@@ -1065,7 +724,7 @@ fn test_control_cli() -> Result<(), TestErr> {
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestPlatform::new();
+        let platform = TestHyperverse::new();
         let machine_api = platform.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
         let logger = logger.point(Point::from_str("test-client").unwrap());

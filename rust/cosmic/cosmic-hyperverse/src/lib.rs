@@ -68,6 +68,9 @@ pub mod star;
 pub mod state;
 pub mod tests;
 
+#[cfg(test)]
+pub mod test;
+
 #[no_mangle]
 pub extern "C" fn cosmic_uuid() -> String {
     Uuid::new_v4().to_string()

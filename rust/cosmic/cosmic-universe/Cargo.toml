@@ -1,18 +1,21 @@
 [package]
 name = "cosmic-universe"
-version = "0.2.0-rc1"
+version = "0.3.0"
 edition = "2021"
+
+authors = ["Scott Williams <scott@mightydevco.com>"]
+description = "Part of http://thecosmicinitiative.io This package--the Cosmic Universe--provides an API and utilities for interacting with the Cosmic Fabric and other Particles within the Universal Dimension."
+
+homepage = "http://thecosmicinitiative.io"
+repository = "https://github.com/cosmic-initiative/cosmic-initiative"
 license = "MIT"
-homepage ="http://starlane.io/"
-readme="README.md"
-repository = "https://github.com/mechtronium/mesh-portal"
-description = "The raw data types for mesh-portal-api serde."
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cosmic-nom = { path="../cosmic-nom" }
-cosmic-macros-primitive = { path="../cosmic-macros-primitive" }
+cosmic-nom = { path="../cosmic-nom" ,version = "0.3.0"}
+cosmic-macros-primitive = { path="../cosmic-macros-primitive" ,version = "0.3.0"}
 async-trait = "0.1.48"
 lazy_static = "1.4.0"
 serde = { version="1.0.69", features=['derive','rc'] }

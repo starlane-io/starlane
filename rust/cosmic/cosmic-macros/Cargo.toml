@@ -1,7 +1,13 @@
 [package]
 name = "cosmic-macros"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
+
+authors = ["Scott Williams <scott@mightydevco.com>"]
+description = "macros for thecosmicinitiative.io"
+homepage = "http://thecosmicinitiative.io"
+repository = "https://github.com/cosmic-initiative/cosmic-initiative"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -10,7 +16,7 @@ proc-macro = true
 
 [dependencies]
 
-cosmic-universe = { path= "../cosmic-universe", default-features=false}
+cosmic-universe = { path= "../cosmic-universe", default-features=false,version = "0.3.0"}
 lazy_static = "1.4.0"
 syn = { version = "1.0", features = ["full"] }
 quote = "1.0"

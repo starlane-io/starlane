@@ -68,7 +68,7 @@ pub mod util;
 pub mod wave;
 
 lazy_static! {
-    pub static ref VERSION: semver::Version = semver::Version::from_str("0.3.0").unwrap();
+    pub static ref VERSION: semver::Version = semver::Version::from_str(include_str!("VERSION").trim()).unwrap();
     pub static ref HYPERUSER: Point = Point::from_str("hyperspace:users:hyperuser").expect("point");
     pub static ref ANONYMOUS: Point = Point::from_str("hyperspace:users:anonymous").expect("point");
 }
@@ -82,6 +82,10 @@ pub fn cosmic_timestamp() -> DateTime<Utc> {
 
 #[cfg(test)]
 pub mod tests {
+    use crate::VERSION;
+
     #[test]
-    fn it_works() {}
+    fn version() {
+        println!("VERSION: {}", VERSION.to_string());
+    }
 }
