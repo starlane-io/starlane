@@ -1,4 +1,4 @@
-# COSMIC HYPERLANE
+# COSMIC CLI
 `cosmic-cli` is part of [THE COSMIC INITIATIVE](http://thecosmicinitiative.io) a WebAssembly orchestration framework.
 
 The Cosmic Cli provides command line inerface access to running cosmos like [Starlane](http://starlane.io)
