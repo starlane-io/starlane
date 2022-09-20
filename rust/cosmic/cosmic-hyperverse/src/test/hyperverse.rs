@@ -195,6 +195,14 @@ impl From<zip::result::ZipError> for TestErr {
     }
 }
 
+impl From<Box<bincode::ErrorKind>> for TestErr {
+    fn from(e: Box<bincode::ErrorKind>) -> Self {
+         Self {
+            message: e.to_string()
+        }
+    }
+}
+
 impl HyperErr for TestErr {
     fn to_cosmic_err(&self) -> UniErr {
         UniErr::from_500(self.to_string())

@@ -292,6 +292,8 @@ pub trait HyperErr:
     + From<tokio::sync::oneshot::error::RecvError>
     + From<std::io::Error>
     + From<zip::result::ZipError>
+    + From<Box<bincode::ErrorKind>>
+    + From<acid_store::Error>
     + Into<UniErr>
 {
     fn to_cosmic_err(&self) -> UniErr;

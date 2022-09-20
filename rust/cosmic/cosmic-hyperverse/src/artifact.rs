@@ -273,7 +273,9 @@ where
             return Err("ArtifactBundle Manager expected Bin payload".into());
         }
 
-        unimplemented!();
+        let mut object = file_repo()?.insert(assign.details.stub.point.to_string());
+        object.write_all( bincode::serialize(&state)?.as_slice() )?;
+        object.commit()?;
 //        self.store.put(assign.details.stub.point, *state).await?;
 
         // need to unzip and create Artifacts for each...
@@ -284,7 +286,7 @@ where
 }
 
 
-fn file_repo() -> Result<KeyRepo<Bin>,UniErr> {
+fn file_repo() -> Result<KeyRepo<String>,UniErr> {
     let config = acid_store::store::DirectoryConfig {
         path: PathBuf::from("./data/artifacts")
     };
