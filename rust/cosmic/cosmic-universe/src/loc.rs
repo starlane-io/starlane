@@ -15,10 +15,7 @@ use crate::err::ParseErrs;
 use crate::hyper::ChildRegistry;
 use crate::kind::KindParts;
 use crate::log::{SpanLogger, Trackable};
-use crate::parse::{
-    CamelCase, consume_point, consume_point_ctx, Domain, Env,
-    kind_parts, parse_star_key, point_and_kind, point_route_segment, point_selector, ResolverErr, SkewerCase,
-};
+use crate::parse::{CamelCase, consume_point, consume_point_ctx, Domain, Env, kind_parts, parse_star_key, point_and_kind, point_route_segment, point_selector, point_var, ResolverErr, SkewerCase};
 use crate::parse::error::result;
 use crate::particle::traversal::TraversalPlan;
 use crate::selector::{Pattern, Selector, SpecificSelector, VersionReq};
@@ -1039,8 +1036,44 @@ impl ToRecipients for Point {
     }
 }
 
+/// A Point is an address usually referencing a Particle.
+/// Points can be created from a String composed of ':' delimited segments: `space.com:base:etc`
+/// To create a Point:
+/// ```
+/// use std::str::FromStr;
+/// use cosmic_universe::loc::Point;
+/// let Point = Point::from_str("my-domain.com:apps:my-app")?;
+/// ```
+/// Besides PointSegs points also have a RouteSeg which can change the meaning of a Point drastically
+/// including referencing a completely different Cosmos, etc.  Routes are prepended and delimited by
+/// a `::` i.e. `GLOBAL::executor:service`
+///
 pub type Point = PointDef<RouteSeg, PointSeg>;
+
+/// A Point with potential contextual information for example one with a working dir:
+/// `.:mechtrons:mechtron`  the single `.` works the same as in unix shell and refers to the `working`
+/// location.  You can also reference parent hierarchies just as you would expect: `..:another-app:something`
+///
+/// In order to create an absolute Point from a PointCtx one must call the PointCtx::to_resolved(&env) method
+/// with a proper Env (environment) reference which should have a contextual point set:
+/// ```
+/// use std::str::FromStr;
+/// use cosmic_universe::loc::Point;
+/// use cosmic_universe::loc::PointCtx;
+/// let point_var = PointCtx::from_str("..:another-app:something")?;
+/// let point: Point = point_ctx.to_resolve(&env)?;
+/// ```
 pub type PointCtx = PointDef<RouteSeg, PointSegCtx>;
+
+/// A Point with potential Variables and Context (see PointCtx)
+/// this point may look like `my-domain:users:${user}` in which case before it can be made into a
+/// usable point it must be resolved like so:
+/// ```
+/// use std::str::FromStr;
+/// use cosmic_universe::loc::{Point, PointVar};
+/// let point_var = PointVar::from_str("my-domain:users:${user}")?;
+/// let point: Point = point_var.to_resolve(&env)?;
+/// ```
 pub type PointVar = PointDef<RouteSegVar, PointSegVar>;
 
 impl PointVar {
@@ -1687,6 +1720,22 @@ impl FromStr for Point {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         consume_point(s)
+    }
+}
+
+impl FromStr for PointVar {
+    type Err = UniErr;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        result(point_var(new_span(s)))
+    }
+}
+
+impl FromStr for PointCtx {
+    type Err = UniErr;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(result(point_var(new_span(s)))?.collapse()?)
     }
 }
 

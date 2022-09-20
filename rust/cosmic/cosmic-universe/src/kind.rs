@@ -211,6 +211,9 @@ impl TryFrom<CamelCase> for BaseKind {
     }
 }
 
+/// Kind defines the behavior and properties of a Particle.  Each particle has a Kind.
+/// At minimum a Kind must have a BaseKind, it can also have a SubKind and a Specific.
+/// A Particle's complete Kind definition is used to match it with a Driver in the Hyperverse
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum Kind {
     Root,
@@ -619,6 +622,22 @@ impl StarStub {
     }
 }
 
+/// A Specific is used to extend the Kind system in The Cosmic Initiative to a very exact level.
+/// when a Kind has a specific it is not only referencing something general like a Database,
+/// but the vendor, product and version of that database among other things.
+/// The Specific def looks like this `provider.url:vendor.url:product:variant:version`
+/// * **provider** - this is the domain name of the person or entity that provided the driver
+///                  that this specific defines
+/// * **vendor** - the vendor that provides the product which may have had nothing to do with
+///                creating the driver
+/// * **product** - the product
+/// * **variant** - many products have variation and here it is where it is specificied
+/// * **version** - this is a SemVer describing the exact version of the Specific
+///
+/// ## Example:
+/// `mechtronhub.com:postgres.org:postgres:gis:8.0.0`
+/// And the above would be embedde into the appropriate Base Kind and Sub Kind:
+/// `<Database<Rel<mechtronhub.com:postgres.org:postgres:gis:8.0.0>>>`
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct Specific {
     pub provider: Domain,
