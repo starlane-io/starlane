@@ -11,7 +11,7 @@ use tokio::sync::oneshot::error::RecvError;
 use std::io;
 use std::io::Error;
 use crate::{DriversBuilder, HyperErr, Hyperverse, MachineTemplate, Registry};
-use crate::driver::artifact::{BundleDriverFactory, BundleSeriesDriverFactory, RepoDriverFactory};
+use crate::driver::artifact::{ArtifactDriverFactory, BundleDriverFactory, BundleSeriesDriverFactory, RepoDriverFactory};
 use crate::driver::base::BaseDriverFactory;
 use crate::driver::control::ControlDriverFactory;
 use crate::driver::DriverAvail;
@@ -86,6 +86,7 @@ impl Hyperverse for TestHyperverse {
                 builder.add_post(Arc::new(RepoDriverFactory::new()));
                 builder.add_post(Arc::new(BundleSeriesDriverFactory::new()));
                 builder.add_post(Arc::new(BundleDriverFactory::new()));
+                builder.add_post(Arc::new(ArtifactDriverFactory::new()));
             }
             StarSub::Jump => {
                 builder.add_post(Arc::new(ControlDriverFactory::new()));

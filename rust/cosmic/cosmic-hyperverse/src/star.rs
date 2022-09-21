@@ -1196,7 +1196,7 @@ where
                 ));
             }
             coalated.sort();
-            skel.wrangles.add(coalated);
+            skel.wrangles.add(coalated).await;
             rtn.send(Ok(skel.wrangles.clone())).unwrap_or_default();
         });
     }

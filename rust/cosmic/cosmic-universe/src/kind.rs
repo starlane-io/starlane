@@ -442,7 +442,7 @@ impl StarSub {
         KindSelector {
             base: Pattern::Exact(BaseKind::Star),
             sub: SubKindSelector::Exact(Some(self.to_camel_case())),
-            specific: ValuePattern::None
+            specific: ValuePattern::Any
         }
     }
 
@@ -707,5 +707,21 @@ impl TryInto<SpecificSelector> for Specific {
             variant: Pattern::Exact(self.variant),
             version: VersionReq::from_str(self.version.to_string().as_str())?,
         })
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use core::str::FromStr;
+    use crate::{Kind, StarSub, UniErr};
+    use crate::parse::kind_selector;
+    use crate::selector::KindSelector;
+
+    #[test]
+    pub fn selector( ) -> Result<(),UniErr> {
+        let kind = Kind::Star(StarSub::Fold);
+        let selector = KindSelector::from_str( "<Star<Fold>>")?;
+        assert!(selector.matches(&kind));
+        Ok(())
     }
 }

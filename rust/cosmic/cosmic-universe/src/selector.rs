@@ -15,9 +15,7 @@ use crate::loc::{
     Layer, PointCtx, PointSeg, PointVar, RouteSeg, ToBaseKind, Topic, Variable, VarVal,
     Version,
 };
-use crate::parse::{
-    CamelCase, consume_hierarchy, Env, point_segment_selector, point_selector, specific_selector,
-};
+use crate::parse::{CamelCase, consume_hierarchy, Env, kind_selector, point_segment_selector, point_selector, specific_selector};
 use crate::parse::error::result;
 use crate::substance::{
     CallWithConfigDef, Substance, SubstanceFormat, SubstanceKind, SubstancePattern,
@@ -61,9 +59,16 @@ impl KindSelector {
     where
         KindParts: Eq + PartialEq,
     {
+        /*
         self.base.matches(&kind.to_base())
             && self.sub.matches(&kind.sub().into())
             && self.specific.is_match_opt(kind.specific().as_ref()).is_ok()
+
+         */
+
+        // HACKED waiting to be refactored when we actually need to match on subtypes
+                self.base.matches(&kind.to_base())
+
     }
 
     pub fn as_point_segments(&self) -> Result<String,UniErr> {
@@ -75,6 +80,14 @@ impl KindSelector {
                 Ok(e.to_skewer().to_string())
             }
         }
+    }
+}
+
+impl FromStr for KindSelector {
+    type Err = UniErr;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(result( kind_selector(new_span(s)))?)
     }
 }
 

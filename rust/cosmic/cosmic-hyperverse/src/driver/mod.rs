@@ -22,7 +22,7 @@ use cosmic_universe::config::bind::BindConfig;
 use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::{Assign, HyperSubstance};
 use cosmic_universe::HYPERUSER;
-use cosmic_universe::kind::{BaseKind, Kind, StarSub};
+use cosmic_universe::kind::{BaseKind, Kind, KindParts, StarSub};
 use cosmic_universe::loc::{Layer, Point, Surface, ToPoint, ToSurface};
 use cosmic_universe::log::{PointLogger, Tracker};
 use cosmic_universe::parse::bind_config;
@@ -358,7 +358,6 @@ where
                     DriversCall::StatusRx(rtn) => {
                         rtn.send(self.status_rx.clone());
                     }
-
                     DriversCall::Get { kind, rtn } => {
                         rtn.send(
                             self.find(&kind).cloned().ok_or(
@@ -793,7 +792,7 @@ where
                 None => {
                     traversal.logger.warn(format!(
                         "star does not have a driver for Kind <{}>",
-                        traversal.record.details.stub.kind.to_string()
+                        traversal.record.details.stub.kind.to_template().to_string()
                     ));
                 }
                 Some(driver) => {
