@@ -11,7 +11,7 @@ use dashmap::DashMap;
 use tokio::join;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{Mutex, oneshot};
 use tokio::time::error::Elapsed;
 
 use cosmic_hyperlane::{
@@ -40,10 +40,11 @@ use cosmic_universe::HYPERUSER;
 
 use crate::driver::base::BaseDriverFactory;
 //use crate::control::ControlDriverFactory;
-use crate::driver::control::{ControlCliSession, ControlClient, ControlDriverFactory};
+use crate::driver::control::{ControlClient, ControlCliSession, ControlDriverFactory};
 use crate::driver::root::RootDriverFactory;
 use crate::driver::space::SpaceDriverFactory;
 use crate::driver::{DriverAvail, DriverFactory};
+use crate::machine::MachineApiExtFactory;
 use crate::star::HyperStarApi;
 use crate::test::hyperverse::{TestErr, TestHyperverse};
 use crate::test::registry::TestRegistryContext;
@@ -490,33 +491,6 @@ fn test_layer_traversal() -> Result<(), TestErr> {
 
         Ok(())
     })
-}
-
-pub struct MachineApiExtFactory<P>
-where
-    P: Hyperverse,
-{
-    machine_api: MachineApi<P>,
-    logger: PointLogger,
-}
-
-#[async_trait]
-impl<P> HyperwayEndpointFactory for MachineApiExtFactory<P>
-where
-    P: Hyperverse,
-{
-    async fn create(
-        &self,
-        status_tx: mpsc::Sender<HyperConnectionDetails>,
-    ) -> Result<HyperwayEndpoint, UniErr> {
-        let knock = Knock {
-            kind: InterchangeKind::DefaultControl,
-            auth: Box::new(Substance::Empty),
-            remote: None,
-        };
-        self.logger
-            .result_ctx("machine_api.knock()", self.machine_api.knock(knock).await)
-    }
 }
 
 #[test]

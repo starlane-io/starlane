@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
-use futures::future::{join_all, select_all, BoxFuture};
+use futures::future::{BoxFuture, join_all, select_all};
 use futures::FutureExt;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::error::RecvError;
@@ -22,7 +22,7 @@ use cosmic_hyperlane::{
     LocalHyperwayGateUnlocker, MountInterchangeGate, SimpleGreeter,
     TokenAuthenticatorWithRemoteWhitelist,
 };
-use cosmic_universe::artifact::ArtifactApi;
+use cosmic_universe::artifact::{ArtifactApi, ArtifactFetcher, ReadArtifactFetcher};
 use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::{InterchangeKind, Knock};
 use cosmic_universe::kind::StarSub;
@@ -30,10 +30,11 @@ use cosmic_universe::loc::{
     ConstellationName, Layer, MachineName, Point, StarHandle, StarKey, Surface, ToPoint, ToSurface,
 };
 use cosmic_universe::log::{PointLogger, RootLogger};
-use cosmic_universe::particle::Status;
+use cosmic_universe::particle::{Status, Stub};
 use cosmic_universe::settings::Timeouts;
-use cosmic_universe::substance::Substance;
-use cosmic_universe::wave::{Agent, HyperWave, UltraWave};
+use cosmic_universe::substance::{Bin, Substance};
+use cosmic_universe::wave::{Agent, DirectedProto, HyperWave, Pong, UltraWave, Wave};
+use cosmic_universe::wave::exchange::{Exchanger, SetStrategy};
 
 use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
 use crate::{DriversBuilder, HyperErr, Hyperverse, Registry, RegistryApi};
@@ -362,8 +363,8 @@ where
         }
 
         let mut machine = Self {
-            skel,
-            logger,
+            skel: skel.clone(),
+            logger: logger.clone(),
             machine_star,
             stars,
             gate_selector,
@@ -371,6 +372,22 @@ where
             call_rx,
             termination_broadcast_tx: term_tx,
         };
+
+
+        /// SETUP ARTIFAC
+        let factory = MachineApiExtFactory {
+            machine_api: machine_api.clone(),
+            logger: logger.clone(),
+        };
+        let exchanger = Exchanger::new(
+            Point::from_str("artifact").unwrap().to_surface(),
+            Timeouts::default(),
+        );
+        let client =
+            HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger.clone()).unwrap();
+
+        let fetcher = Box::new(ClientArtifactFetcher::new(client,skel.registry.clone() ));
+        skel.artifacts.set_fetcher(fetcher).await;
 
         machine.start().await;
         Ok(machine_api)
@@ -639,3 +656,67 @@ where
         tokio::time::timeout(Duration::from_secs(60), rtn_rx).await??
     }
 }
+
+pub struct MachineApiExtFactory<P>
+where
+    P: Hyperverse,
+{
+    pub machine_api: MachineApi<P>,
+    pub logger: PointLogger,
+}
+
+#[async_trait]
+impl<P> HyperwayEndpointFactory for MachineApiExtFactory<P>
+where
+    P: Hyperverse,
+{
+    async fn create(
+        &self,
+        status_tx: mpsc::Sender<HyperConnectionDetails>,
+    ) -> Result<HyperwayEndpoint, UniErr> {
+        let knock = Knock {
+            kind: InterchangeKind::DefaultControl,
+            auth: Box::new(Substance::Empty),
+            remote: None,
+        };
+        self.logger
+            .result_ctx("machine_api.knock()", self.machine_api.knock(knock).await)
+    }
+}
+
+
+pub struct ClientArtifactFetcher<P> where P: Hyperverse {
+    pub registry: Registry<P>,
+    pub client: HyperClient
+}
+
+impl <P> ClientArtifactFetcher<P> where P:  Hyperverse {
+    pub fn new( client: HyperClient, registry: Registry<P> ) -> Self {
+        Self {
+            client,
+            registry
+        }
+    }
+}
+
+#[async_trait]
+impl <P> ArtifactFetcher for ClientArtifactFetcher<P> where P: Hyperverse {
+    async fn stub(&self, point: &Point) -> Result<Stub, UniErr> {
+        let record = self.registry.record(point).await.map_err(|e|e.to_cosmic_err())?;
+        Ok(record.details.stub)
+    }
+
+    async fn fetch(&self, point: &Point) -> Result<Bin, UniErr> {
+        let transmitter = self.client.transmitter_builder().await?.build();
+        let mut wave = DirectedProto::ping();
+        wave.to(point.clone().to_surface().with_layer(Layer::Core));
+        let pong: Wave<Pong> = transmitter.direct(wave).await?;
+        if let Substance::Bin(bin) = pong.variant.core.body {
+            Ok(bin)
+        } else {
+            Err("expecting Bin encountered some other substance when fetching artifact".into())
+        }
+    }
+}
+
+
