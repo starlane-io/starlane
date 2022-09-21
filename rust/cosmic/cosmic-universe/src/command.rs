@@ -1107,9 +1107,9 @@ pub struct RawCommand {
 }
 
 impl RawCommand {
-    pub fn new(line: String) -> Self {
+    pub fn new<S>(line: S) -> Self where S:ToString{
         Self {
-            line,
+            line: line.to_string(),
             transfers: vec![],
         }
     }

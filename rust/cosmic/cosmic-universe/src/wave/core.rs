@@ -209,6 +209,14 @@ impl ReflectedCore {
             Err(E::from("error"))
         }
     }
+
+    pub fn ok_or(self) -> Result<Self,UniErr> {
+        if self.is_ok() {
+            Ok(self)
+        } else {
+            Err(UniErr::new(self.status.as_u16(), "error"))
+        }
+    }
 }
 
 impl TryInto<http::response::Builder> for ReflectedCore {

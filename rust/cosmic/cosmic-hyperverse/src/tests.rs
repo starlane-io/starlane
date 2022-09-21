@@ -1,5 +1,6 @@
 #![cfg(test)]
 
+use std::fs;
 use std::io::Error;
 use std::sync::atomic;
 use std::sync::atomic::AtomicU64;
@@ -22,6 +23,7 @@ use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::direct::create::{
     Create, PointSegTemplate, PointTemplate, Strategy, Template,
 };
+use cosmic_universe::command::{CmdTransfer, RawCommand};
 use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance, InterchangeKind, Knock};
 use cosmic_universe::hyper::MountKind;
 use cosmic_universe::HYPERUSER;
@@ -748,6 +750,60 @@ fn test_control_cli() -> Result<(), TestErr> {
         let core = cli.exec("create localhost<Space>").await?;
 
         println!("{}", core.to_err().to_string());
+        assert!(core.is_ok());
+
+        Ok(())
+    })
+}
+
+#[test]
+fn test_publish() -> Result<(), TestErr> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async move {
+        // let (final_tx, final_rx) = oneshot::channel();
+
+        let platform = TestHyperverse::new();
+        let machine_api = platform.machine();
+        let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
+        let logger = logger.point(Point::from_str("test-client").unwrap());
+
+        tokio::time::timeout(Duration::from_secs(1), machine_api.wait_ready())
+            .await
+            .unwrap();
+
+        tokio::time::sleep(Duration::from_secs(5)).await;
+
+        let factory = MachineApiExtFactory {
+            machine_api,
+            logger: logger.clone(),
+        };
+
+        let client = ControlClient::new(Box::new(factory))?;
+        client.wait_for_ready(Duration::from_secs(5)).await?;
+
+        let cli = client.new_cli_session().await?;
+
+        cli.exec("create localhost<Space>").await.unwrap().ok_or().unwrap();
+        cli.exec("create localhost:repo<Repo>").await.unwrap().ok_or().unwrap();
+        cli.exec("create localhost:repo:my<BundleSeries>").await.unwrap().ok_or().unwrap();
+
+        let mut command = RawCommand::new("publish ^[ bundle.zip ]-> localhost:repo:my:1.0.0");
+
+
+        let file_path = "test/bundle.zip";
+        let bin = Arc::new(fs::read(file_path)?);
+        command.transfers.push(CmdTransfer::new("bundle.zip", bin ));
+
+        let core = cli.raw(command).await?;
+
+        if !core.is_ok() {
+            if let Substance::Errors(ref e) = core.body {
+               println!("{}",e.to_string());
+            }
+        }
+
         assert!(core.is_ok());
 
         Ok(())

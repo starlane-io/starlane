@@ -6414,7 +6414,7 @@ pub fn upload_payload_block<I: Span>(input: I) -> Res<I, UploadBlock> {
 }
 
 pub fn upload_step<I: Span>(input: I) -> Res<I, UploadBlock> {
-    delimited(tag("^["), upload_payload_block, tag("->"))(input)
+    delimited(tag("^["), upload_payload_block, tag("]->"))(input)
 }
 
 pub fn request_payload_filter_block<I: Span>(input: I) -> Res<I, PayloadBlockVar> {
@@ -8220,7 +8220,7 @@ pub mod cmd_test {
 
     use crate::command::{Command, CommandVar};
     use crate::err::UniErr;
-    use crate::parse::{CamelCase, command, script};
+    use crate::parse::{CamelCase, command, publish_command, script};
 
     /*
             #[test]
@@ -8284,6 +8284,14 @@ pub mod cmd_test {
         "#;
 
         crate::parse::script(new_span(input))?;
+        Ok(())
+    }
+
+
+        #[test]
+    pub fn test_publish() -> Result<(), UniErr> {
+        let input = r#"publish ^[ bundle.zip ]-> localhost:repo:tutorial:1.0.0"#;
+        publish_command(new_span(input))?;
         Ok(())
     }
 }
