@@ -52,6 +52,13 @@ pub mod common {
                 StateSrc::Substance(_) => true,
             }
         }
+
+        pub fn get_substance(&self) -> Result<Substance,UniErr> {
+            match self {
+                StateSrc::None => Err(UniErr::from_500("state has no substance")),
+                StateSrc::Substance(substance) => Ok(*substance.clone())
+            }
+        }
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]

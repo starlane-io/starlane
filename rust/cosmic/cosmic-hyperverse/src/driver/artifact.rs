@@ -154,7 +154,7 @@ where
     }
 }
 
-fn file_repo() -> Result<KeyRepo<String>, UniErr> {
+fn store() -> Result<KeyRepo<String>, UniErr> {
     let config = acid_store::store::DirectoryConfig {
         path: PathBuf::from("./data/artifacts"),
     };
@@ -443,7 +443,7 @@ where
             return Err("ArtifactBundle Manager expected Bin payload".into());
         }
 
-        let mut repo = file_repo()?;
+        let mut repo = store()?;
         let mut object = repo.insert(assign.details.stub.point.to_string());
         object.write_all(bincode::serialize(&state)?.as_slice())?;
         object.commit()?;
@@ -530,7 +530,20 @@ where
     }
 
     async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
-        println!("ASSIGNED ARTIFACT!");
+        if let Kind::Artifact(sub) = assign.details.stub.kind {
+            match sub {
+                ArtifactSubKind::Dir => {}
+                _ => {
+                    let substance = assign.state.get_substance()?;
+                     let mut repo = store()?;
+                    let mut object = repo.insert(assign.details.stub.point.to_string());
+                    object.write_all(bincode::serialize(&substance)?.as_slice())?;
+                    object.commit()?;
+                }
+            }
+        }
+
+
         Ok(())
     }
 }
