@@ -210,9 +210,9 @@ impl ReflectedCore {
         }
     }
 
-    pub fn ok_or(self) -> Result<Self, UniErr> {
+    pub fn ok_or(&self) -> Result<(), UniErr> {
         if self.is_ok() {
-            Ok(self)
+            Ok(())
         } else {
             Err(UniErr::new(self.status.as_u16(), "error"))
         }

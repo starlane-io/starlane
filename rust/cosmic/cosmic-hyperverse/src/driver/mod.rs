@@ -16,7 +16,7 @@ use cosmic_universe::command::direct::create::{
 };
 use cosmic_universe::config::bind::BindConfig;
 use cosmic_universe::err::UniErr;
-use cosmic_universe::hyper::{Assign, HyperSubstance};
+use cosmic_universe::hyper::{Assign, HyperSubstance, ParticleRecord};
 use cosmic_universe::kind::{BaseKind, Kind, KindParts, StarSub};
 use cosmic_universe::loc::{Layer, Point, Surface, ToPoint, ToSurface};
 use cosmic_universe::log::{PointLogger, Tracker};
@@ -1320,6 +1320,10 @@ where
         };
         self.skel.create_in_star(create).await
     }
+
+    pub async fn locate(&self,point: &Point) -> Result<ParticleRecord,P::Err> {
+        self.skel.registry.record(point).await
+    }
 }
 
 pub struct DriverFactoryWrapper<P>
@@ -1570,7 +1574,7 @@ where
     P: Hyperverse,
 {
     pub point: Point,
-    pub transmitter: ProtoTransmitter,
+    pub kind: Kind,
     phantom: PhantomData<P>,
 }
 
@@ -1578,10 +1582,10 @@ impl<P> ItemSkel<P>
 where
     P: Hyperverse,
 {
-    pub fn new(point: Point, transmitter: ProtoTransmitter) -> Self {
+    pub fn new(point: Point, kind: Kind) -> Self {
         Self {
             point,
-            transmitter,
+            kind,
             phantom: Default::default(),
         }
     }

@@ -1,3 +1,5 @@
+use core::borrow::Borrow;
+use std::cell::Cell;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -5,23 +7,32 @@ use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
-use crate::loc::Point;
+use crate::loc::{Point, ToSurface};
 use crate::particle::Stub;
 use crate::substance::Bin;
-use crate::{BindConfig, UniErr};
+use crate::{BindConfig, Substance, UniErr};
+use crate::wave::{DirectedProto, Pong, Wave};
+use crate::wave::exchange::{ProtoTransmitter, ProtoTransmitterBuilder};
 
 #[derive(Clone)]
 pub struct ArtifactApi {
     binds: Arc<RwLock<LruCache<Point, Arc<BindConfig>>>>,
-    fetcher: Arc<dyn ArtifactFetcher>,
+    fetcher: Arc<RwLock<FetchChamber>>,
 }
 
 impl ArtifactApi {
-    pub fn new(fetcher: Arc<dyn ArtifactFetcher>) -> Self {
+    pub fn new() -> Self {
+        let fetcher = Box::new( NoDiceArtifactFetcher );
         Self {
             binds: Arc::new(RwLock::new(LruCache::new(1024))),
-            fetcher,
+            fetcher: Arc::new(RwLock::new(FetchChamber {
+                fetcher
+            })),
         }
+    }
+
+    pub async fn set_fetcher(&self, fetcher:Box<dyn ArtifactFetcher>) {
+        self.fetcher.write().await.set(fetcher);
     }
 
     pub async fn bind(&self, point: &Point) -> Result<ArtRef<BindConfig>, UniErr> {
@@ -44,13 +55,23 @@ impl ArtifactApi {
 
     async fn get<A>(&self, point: &Point) -> Result<A, UniErr>
     where
-        A: TryFrom<Vec<u8>, Error = UniErr>,
+        A: TryFrom<Bin, Error = UniErr>,
     {
         if !point.has_bundle() {
             return Err("point is not from a bundle".into());
         }
-        let bin = self.fetcher.fetch(point).await?;
+        let bin = self.fetcher.read().await.fetcher.fetch(point).await?;
         Ok(A::try_from(bin)?)
+    }
+}
+
+pub struct FetchChamber{
+    pub fetcher: Box<dyn ArtifactFetcher>
+}
+
+impl FetchChamber {
+    pub fn set(&mut self, fetcher: Box<dyn ArtifactFetcher>) {
+        self.fetcher = fetcher;
     }
 }
 
@@ -89,30 +110,63 @@ impl<A> Drop for ArtRef<A> {
     }
 }
 
-impl NoDiceArtifactFetcher {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
+
+
+
 
 #[async_trait]
 pub trait ArtifactFetcher: Send + Sync {
     async fn stub(&self, point: &Point) -> Result<Stub, UniErr>;
-    async fn fetch(&self, point: &Point) -> Result<Vec<u8>, UniErr>;
+    async fn fetch(&self, point: &Point) -> Result<Bin, UniErr>;
 }
 
 pub struct FetchErr {}
 
-pub struct NoDiceArtifactFetcher {}
+pub struct NoDiceArtifactFetcher;
 
 #[async_trait]
 impl ArtifactFetcher for NoDiceArtifactFetcher {
     async fn stub(&self, point: &Point) -> Result<Stub, UniErr> {
+        Err("cannot pull artifacts right now".into())
+    }
+
+    async fn fetch(&self, point: &Point) -> Result<Bin, UniErr> {
+        Err("cannot pull artifacts right now".into())
+    }
+}
+
+pub struct ReadArtifactFetcher {
+    transmitter: ProtoTransmitter
+}
+
+impl ReadArtifactFetcher {
+    pub fn new(transmitter: ProtoTransmitter) -> Self {
+        Self {
+            transmitter
+        }
+    }
+}
+
+
+#[async_trait]
+impl ArtifactFetcher for ReadArtifactFetcher {
+    async fn stub(&self, point: &Point) -> Result<Stub, UniErr> {
         Err(UniErr::from_status(404u16))
     }
 
-    async fn fetch(&self, point: &Point) -> Result<Vec<u8>, UniErr> {
-        Err(UniErr::from_status(404u16))
+    async fn fetch(&self, point: &Point) -> Result<Bin, UniErr> {
+        let mut directed = DirectedProto::ping();
+        directed.to(point.clone().to_surface());
+        let pong: Wave<Pong> = self.transmitter.direct(directed).await?;
+        pong.core.ok_or()?;
+        match pong.variant.core.body {
+            Substance::Bin(bin) => {
+                Ok(bin)
+            }
+            _ => {
+                Err(UniErr::from_500("encountered unexpected substance (expected Bin) when fetching Artifact"))
+            }
+        }
     }
 }
 

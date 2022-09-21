@@ -1,6 +1,4 @@
-use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere,
-};
+use crate::driver::{Driver, DriverAvail, DriverCtx, DriverSkel, HyperDriverFactory, Item, ItemHandler, ItemSkel, ItemSphere};
 use crate::star::HyperStarSkel;
 use crate::{HyperErr, Hyperverse};
 use acid_store::repo::key::KeyRepo;
@@ -495,7 +493,7 @@ where
         driver_skel: DriverSkel<P>,
         ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
-        Ok(Box::new(ArtifactDriver::new(skel, ctx)))
+        Ok(Box::new(ArtifactDriver::new(driver_skel, ctx)))
     }
 }
 
@@ -503,7 +501,7 @@ pub struct ArtifactDriver<P>
 where
     P: Hyperverse,
 {
-    skel: HyperStarSkel<P>,
+    skel: DriverSkel<P>,
     ctx: DriverCtx,
 }
 
@@ -512,23 +510,11 @@ impl<P> ArtifactDriver<P>
 where
     P: Hyperverse,
 {
-    pub fn new(skel: HyperStarSkel<P>, ctx: DriverCtx) -> Self {
+    pub fn new(skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
         Self { skel, ctx }
     }
 
-    #[route("Cmd<Read>")]
-    pub async fn read( &self, _: InCtx<'_,()>) -> Result<Substance,P::Err> {
-        if let Kind::Artifact(ArtifactSubKind::Dir) = self.skel.kind {
-            return Ok(Substance::Empty);
-        }
-        let store = store()?;
-        let mut rtn = vec![];
-        let mut object = store.object(self.skel.point.to_string().as_str()).ok_or("could not find Artifact substance from store")?;
-        object.read_to_end(& mut rtn )?;
-        drop(object);
-        let substance = bincode::deserialize(rtn.as_slice())?;
-        Ok(substance)
-    }
+
 }
 
 #[async_trait]
@@ -541,7 +527,10 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
-        Ok(ItemSphere::Handler(Box::new(Artifact)))
+        let record = self.skel.locate(point).await?;
+
+        let skel = ItemSkel::new(point.clone(), record.details.stub.kind );
+        Ok(ItemSphere::Handler(Box::new(Artifact::restore(skel,(),()))))
     }
 
     async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
@@ -563,13 +552,42 @@ where
     }
 }
 
-pub struct Artifact;
+pub struct Artifact<P> where P: Hyperverse {
+    skel: ItemSkel<P>
+}
 
 #[handler]
-impl Artifact {}
+impl <P> Artifact<P> where P:Hyperverse{
+
+    #[route("Cmd<Read>")]
+    pub async fn read( &self, _: InCtx<'_,()>) -> Result<Substance,P::Err> {
+        if let Kind::Artifact(ArtifactSubKind::Dir) = self.skel.kind{
+            return Ok(Substance::Empty);
+        }
+        let store = store()?;
+        let mut rtn = vec![];
+        let mut object = store.object(self.skel.point.to_string().as_str()).ok_or("could not find Artifact substance from store")?;
+        object.read_to_end(& mut rtn )?;
+        drop(object);
+        let substance = bincode::deserialize(rtn.as_slice())?;
+        Ok(substance)
+    }
+}
+
+impl <P> Item<P> for Artifact<P> where P: Hyperverse{
+    type Skel = ItemSkel<P>;
+    type Ctx = ();
+    type State = ();
+
+    fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self {
+        Self {
+            skel
+        }
+    }
+}
 
 #[async_trait]
-impl<P> ItemHandler<P> for Artifact
+impl<P> ItemHandler<P> for Artifact<P>
 where
     P: Hyperverse,
 {

@@ -10,7 +10,7 @@ use crate::test::registry::{TestRegistryApi, TestRegistryContext};
 use crate::tests::PROPERTIES_CONFIG;
 use crate::{DriversBuilder, HyperErr, Hyperverse, MachineTemplate, Registry};
 use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, LocalHyperwayGateJumper};
-use cosmic_universe::artifact::{ArtifactApi, NoDiceArtifactFetcher};
+use cosmic_universe::artifact::{ArtifactApi, ReadArtifactFetcher};
 use cosmic_universe::err::UniErr;
 use cosmic_universe::kind::StarSub;
 use cosmic_universe::loc::{MachineName, StarKey, ToBaseKind};
@@ -111,8 +111,15 @@ impl Hyperverse for TestHyperverse {
     }
 
     fn artifact_hub(&self) -> ArtifactApi {
-        ArtifactApi::new(Arc::new(NoDiceArtifactFetcher::new()))
+        ArtifactApi::new()
     }
+
+    /*
+    fn artifact_hub(&self) -> ArtifactApi {
+        ArtifactApi::new(Arc::new(ReadArtifactFetcher::new()))
+    }
+
+     */
 
     fn start_services(&self, gate: &Arc<dyn HyperGate>) {}
 }

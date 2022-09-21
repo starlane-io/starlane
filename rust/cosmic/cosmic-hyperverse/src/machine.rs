@@ -35,7 +35,6 @@ use cosmic_universe::settings::Timeouts;
 use cosmic_universe::substance::Substance;
 use cosmic_universe::wave::{Agent, HyperWave, UltraWave};
 
-use crate::driver::control::ControlDriverFactory;
 use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
 use crate::{DriversBuilder, HyperErr, Hyperverse, Registry, RegistryApi};
 
@@ -133,7 +132,7 @@ where
     P: Hyperverse,
 {
     pub name: MachineName,
-    pub platform: P,
+    pub hyperverse: P,
     pub registry: Registry<P>,
     pub artifacts: ArtifactApi,
     pub logger: RootLogger,
@@ -205,7 +204,7 @@ where
             artifacts: platform.artifact_hub(),
             logger: platform.logger(),
             timeouts: Timeouts::default(),
-            platform: platform.clone(),
+            hyperverse: platform.clone(),
             api: machine_api.clone(),
             status_tx: mpsc_status_tx,
             status_rx: watch_status_rx,
@@ -242,7 +241,7 @@ where
             interchange.singular_to(star_hop.clone());
 
             let interchange = Arc::new(interchange);
-            let auth = skel.platform.star_auth(&star_template.key)?;
+            let auth = skel.hyperverse.star_auth(&star_template.key)?;
             let greeter = SimpleGreeter::new(star_hop.clone(), star_port.clone());
             let gate: Arc<dyn HyperGate> = Arc::new(MountInterchangeGate::new(
                 auth,
@@ -290,7 +289,7 @@ where
 
         let mut gate_selector = Arc::new(HyperGateSelector::new(gates));
         let gate: Arc<dyn HyperGate> = gate_selector.clone();
-        skel.platform.start_services(&gate);
+        skel.hyperverse.start_services(&gate);
 
         let (machine_point, machine_star) = stars
             .iter()

@@ -2,6 +2,7 @@ use std::convert::TryInto;
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use crate::Bin;
 
 use crate::command::direct::Cmd;
 use crate::err::{ParseErrs, UniErr};
@@ -78,6 +79,16 @@ impl TryFrom<Vec<u8>> for BindConfig {
         bind_config(doc.as_str())
     }
 }
+
+impl TryFrom<Bin> for BindConfig {
+    type Error = UniErr;
+
+    fn try_from(doc: Bin) -> Result<Self, Self::Error> {
+        let doc = String::from_utf8((*doc).clone() )?;
+        bind_config(doc.as_str())
+    }
+}
+
 
 pub struct Cursor {}
 

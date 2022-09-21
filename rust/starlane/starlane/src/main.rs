@@ -25,7 +25,7 @@ use cosmic_registry_postgres::{
     PostgresRegistryContextHandle,
 };
 use cosmic_universe::artifact::ArtifactApi;
-use cosmic_universe::artifact::NoDiceArtifactFetcher;
+use cosmic_universe::artifact::ReadArtifactFetcher;
 use cosmic_universe::command::direct::create::KindTemplate;
 use cosmic_universe::err::UniErr;
 use cosmic_universe::id2::BaseSubKind;
@@ -179,7 +179,7 @@ impl Hyperverse for Starlane {
     }
 
     fn artifact_hub(&self) -> ArtifactApi {
-        let fetcher = Arc::new(NoDiceArtifactFetcher {});
+        let fetcher = Arc::new(ReadArtifactFetcher {});
         ArtifactApi::new(fetcher)
     }
 
