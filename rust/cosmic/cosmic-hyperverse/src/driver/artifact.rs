@@ -31,6 +31,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
+use cosmic_universe::wave::exchange::InCtx;
 use tempdir::TempDir;
 
 lazy_static! {
@@ -513,6 +514,20 @@ where
 {
     pub fn new(skel: HyperStarSkel<P>, ctx: DriverCtx) -> Self {
         Self { skel, ctx }
+    }
+
+    #[route("Cmd<Read>")]
+    pub async fn read( &self, _: InCtx<'_,()>) -> Result<Substance,P::Err> {
+        if let Kind::Artifact(ArtifactSubKind::Dir) = self.skel.kind {
+            return Ok(Substance::Empty);
+        }
+        let store = store()?;
+        let mut rtn = vec![];
+        let mut object = store.object(self.skel.point.to_string().as_str()).ok_or("could not find Artifact substance from store")?;
+        object.read_to_end(& mut rtn )?;
+        drop(object);
+        let substance = bincode::deserialize(rtn.as_slice())?;
+        Ok(substance)
     }
 }
 

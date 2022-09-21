@@ -247,7 +247,7 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
           let ctx: InCtx<'_,#item> = match ctx.push::<#item>() {
               Ok(ctx) => ctx,
               Err(err) => {
-                  return cosmic_universe::wave::core::CoreBounce::Reflected(ReflectedCore::server_error());
+                  return cosmic_universe::wave::core::CoreBounce::Reflected(cosmic_universe::wave::core::ReflectedCore::server_error());
               }
           };
 
@@ -321,11 +321,26 @@ fn rtn_type(output: &ReturnType) -> TokenStream2 {
                 let PathSegment { ident, arguments } = path.path.segments.last().unwrap();
                 match ident.to_string().as_str() {
                     "Result" => {
-                        quote! {
-                            match result {
-                                Ok(rtn) => cosmic_universe::wave::core::CoreBounce::Reflected(rtn.into()),
-                                Err(err) => cosmic_universe::wave::core::CoreBounce::Reflected(err.as_reflected_core())
+                        if let PathArguments::AngleBracketed(brackets) = arguments {
+                            let arg = brackets.args.first().unwrap();
+                            if "Substance" == arg.to_token_stream().to_string().as_str() {
+                              quote! {
+                                match result {
+                                    Ok(rtn) => cosmic_universe::wave::core::CoreBounce::Reflected(cosmic_universe::wave::core::ReflectedCore::ok_body(rtn)),
+                                    Err(err) => cosmic_universe::wave::core::CoreBounce::Reflected(err.as_reflected_core())
+                                }
+                               }
+                            } else {
+                                quote! {
+                                match result {
+                                    Ok(rtn) => cosmic_universe::wave::core::CoreBounce::Reflected(rtn.into()),
+                                    Err(err) => cosmic_universe::wave::core::CoreBounce::Reflected(err.as_reflected_core())
+                                }
+                               }
                             }
+                        }
+                        else {
+                            panic!("Result without angle brackets")
                         }
                     }
                     "Bounce" => {

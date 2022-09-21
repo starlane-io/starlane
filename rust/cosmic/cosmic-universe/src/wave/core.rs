@@ -605,6 +605,14 @@ impl DirectedCore {
     }
 }
 
+
+impl From<()> for ReflectedCore {
+    fn from(_: ()) -> Self {
+        ReflectedCore::ok()
+    }
+}
+
+
 impl Into<ReflectedCore> for Surface {
     fn into(self) -> ReflectedCore {
         ReflectedCore::ok_body(Substance::Surface(self))
