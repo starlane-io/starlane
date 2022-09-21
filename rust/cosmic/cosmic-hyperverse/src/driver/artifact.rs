@@ -287,7 +287,8 @@ println!();
         let state = match &assign.state {
             StateSrc::Substance(data) => data.clone(),
             StateSrc::None => {
-println!("ArtifactBundle cannot be stateless");
+println!("!!ArtifactBundle cannot be stateless!!");
+println!();
                 return Err("ArtifactBundle cannot be stateless".into())
             },
         };

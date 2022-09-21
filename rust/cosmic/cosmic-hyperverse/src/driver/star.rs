@@ -380,7 +380,7 @@ where
                         let assign = HyperSubstance::Assign(Assign::new(
                             AssignmentKind::Create,
                             record.details,
-                            StateSrc::None,
+                            provision.state.clone(),
                         ));
 
                         let ctx: InCtx<'_, HyperSubstance> = ctx.push_input_ref(&assign);
