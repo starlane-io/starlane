@@ -172,7 +172,7 @@ fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
 
     };
 
-    println!("{}", rtn.to_string());
+    //println!("{}", rtn.to_string());
 
     TokenStream2::from_iter(vec![rtn, TokenStream2::from(item)]).into()
 }
@@ -260,7 +260,7 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
 
     };
 
-    println!("{}", expanded.to_string());
+    //println!("{}", expanded.to_string());
     TokenStream::from(expanded)
 }
 

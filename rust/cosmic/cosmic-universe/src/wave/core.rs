@@ -444,7 +444,7 @@ impl Into<DirectedCore> for Command {
     fn into(self) -> DirectedCore {
         DirectedCore {
             body: Substance::Command(Box::new(self)),
-            method: Method::Ext(ExtMethod::new("Command").unwrap()),
+            method: Method::Cmd(CmdMethod::Command),
             ..Default::default()
         }
     }

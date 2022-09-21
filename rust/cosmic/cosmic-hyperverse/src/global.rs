@@ -102,8 +102,9 @@ where
         self.command(ctx).await
     }
 
-    #[route("Hyp<Command>")]
+    #[route("Cmd<Command>")]
     pub async fn command(&self, ctx: InCtx<'_, Command>) -> Result<ReflectedCore, P::Err> {
+println!("REceived Command!");
         let global = GlobalExecutionChamber::new(self.skel.clone());
         let agent = ctx.wave().agent().clone();
         match ctx.input {

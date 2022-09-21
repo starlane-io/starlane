@@ -599,7 +599,7 @@ pub mod direct {
         impl Into<DirectedProto> for Create {
             fn into(self) -> DirectedProto {
                 let mut request =
-                    DirectedProto::sys(Point::global_executor().to_surface(), HypMethod::Command);
+                    DirectedProto::cmd(Point::global_executor().to_surface(), CmdMethod::Command);
                 request.body(Substance::Command(Box::new(Command::Create(self))));
                 request
             }

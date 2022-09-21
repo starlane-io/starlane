@@ -79,7 +79,7 @@ use crate::shell::Shell;
 use crate::shell::ShellState;
 
 #[derive(Clone)]
-pub struct StarState<P>
+pub struct ParticleStates<P>
 where
     P: Hyperverse + 'static,
 {
@@ -88,7 +88,7 @@ where
     shell: Arc<DashMap<Point, ShellState>>,
 }
 
-impl<P> StarState<P>
+impl<P> ParticleStates<P>
 where
     P: Hyperverse + 'static,
 {
@@ -155,7 +155,7 @@ where
     pub inject_tx: mpsc::Sender<TraversalInjection>,
     pub machine: MachineSkel<P>,
     pub exchanger: Exchanger,
-    pub state: StarState<P>,
+    pub state: ParticleStates<P>,
     pub adjacents: HashMap<Point, StarStub>,
     pub wrangles: StarWrangles,
     pub gravity_tx: mpsc::Sender<UltraWave>,
@@ -184,7 +184,7 @@ where
         let point = template.key.clone().to_point();
         let logger = machine.logger.point(point.clone());
         let exchanger = Exchanger::new(point.clone().to_surface(), machine.timeouts.clone());
-        let state = StarState::new();
+        let state = ParticleStates::new();
         let api = HyperStarApi::new(
             template.kind.clone(),
             star_tx.call_tx.clone(),
