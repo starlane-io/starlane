@@ -29,6 +29,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
+use cosmic_universe::wave::{DirectedProto, Pong, Wave};
 use tempdir::TempDir;
 
 lazy_static! {
@@ -41,9 +42,25 @@ lazy_static! {
         Point::from_str("GLOBAL::repo:1.0.0:/bind/bundle_series.bind").unwrap()
     );
     static ref BUNDLE_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
-        Arc::new(series_bind()),
+        Arc::new(bundle_bind()),
         Point::from_str("GLOBAL::repo:1.0.0:/bind/bundle.bind").unwrap()
     );
+
+     static ref ARTIFACT_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
+        Arc::new(artifact_bind()),
+        Point::from_str("GLOBAL::repo:1.0.0:/bind/artifact.bind").unwrap()
+    );
+}
+
+fn artifact_bind() -> BindConfig {
+    log(bind_config(
+        r#"
+    Bind(version=1.0.0)
+    {
+    }
+    "#,
+    ))
+    .unwrap()
 }
 
 fn repo_bind() -> BindConfig {
@@ -254,21 +271,27 @@ where
         driver_skel: DriverSkel<P>,
         ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
-        Ok(Box::new(BundleDriver::new()))
+        Ok(Box::new(BundleDriver::new(driver_skel,ctx)))
     }
 }
 
-pub struct BundleDriver {}
+pub struct BundleDriver<P> where P: Hyperverse {
+    skel: DriverSkel<P>,
+    ctx: DriverCtx
+}
 
 #[handler]
-impl BundleDriver {
-    pub fn new() -> Self {
-        Self {}
+impl <P> BundleDriver<P> where P: Hyperverse{
+    pub fn new(skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
+        Self {
+            skel,
+            ctx
+        }
     }
 }
 
 #[async_trait]
-impl<P> Driver<P> for BundleDriver
+impl<P> Driver<P> for BundleDriver<P>
 where
     P: Hyperverse,
 {
@@ -281,18 +304,21 @@ where
     }
 
     async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
-println!();
-println!("!!!!! BundleDriver Received ASSIGN! {} ----------", assign.details.stub.kind.to_string());
-println!();
+        println!();
+        println!(
+            "!!!!! BundleDriver Received ASSIGN! {} ----------",
+            assign.details.stub.kind.to_string()
+        );
+        println!();
         let state = match &assign.state {
             StateSrc::Substance(data) => data.clone(),
             StateSrc::None => {
-println!("!!ArtifactBundle cannot be stateless!!");
-println!();
-                return Err("ArtifactBundle cannot be stateless".into())
-            },
+                println!("!!ArtifactBundle cannot be stateless!!");
+                println!();
+                return Err("ArtifactBundle cannot be stateless".into());
+            }
         };
-println!("...");
+        println!("...");
         if let Substance::Bin(zip) = (*state).clone() {
             let temp_dir = TempDir::new("zipcheck")?;
             let temp_path = temp_dir.path().clone();
@@ -300,7 +326,7 @@ println!("...");
             let mut file = File::create(file_path.as_path())?;
             file.write_all(zip.as_slice())?;
 
-println!("wrote to tmpfile");
+            println!("wrote to tmpfile");
             let file = File::open(file_path.as_path())?;
             let mut archive = zip::ZipArchive::new(file)?;
             let mut artifacts = vec![];
@@ -311,7 +337,7 @@ println!("wrote to tmpfile");
                 }
             }
 
-println!("whatup artifact?");
+            println!("whatup artifact?");
             let mut point_and_kind_set = HashSet::new();
             for artifact in artifacts {
                 let mut path = String::new();
@@ -363,6 +389,7 @@ println!("whatup artifact?");
             });
 
             {
+                let ctx = self.ctx.clone();
                 tokio::spawn(async move {
                     for point_and_kind in point_and_kind_set {
                         let parent = point_and_kind.point.parent().expect("expected parent");
@@ -395,37 +422,32 @@ println!("whatup artifact?");
                             }
                         };
 
-                        /*
-                                               let create = Create {
-                                                   template: Template {
-                                                       point: PointTemplate {
-                                                           parent: parent.clone(),
-                                                           child_segment_template: PointSegTemplate::Exact(
-                                                               point_and_kind
-                                                                   .point
-                                                                   .last_segment()
-                                                                   .expect("expected final segment")
-                                                                   .to_string(),
-                                                           ),
-                                                       },
-                                                       kind: KindTemplate {
-                                                           base: point_and_kind.kind.to_base(),
-                                                           sub: point_and_kind.kind.sub().into(),
-                                                           specific: None,
-                                                       },
-                                                   },
-                                                   state,
-                                                   properties: SetProperties::new(),
-                                                   strategy: Strategy::Commit,
-                                               };
+                        let create = Create {
+                            template: Template {
+                                point: PointTemplate {
+                                    parent: parent.clone(),
+                                    child_segment_template: PointSegTemplate::Exact(
+                                        point_and_kind
+                                            .point
+                                            .last_segment()
+                                            .expect("expected final segment")
+                                            .to_string(),
+                                    ),
+                                },
+                                kind: KindTemplate {
+                                    base: point_and_kind.kind.to_base(),
+                                    sub: point_and_kind.kind.sub().into(),
+                                    specific: None,
+                                },
+                            },
+                            state,
+                            properties: SetProperties::new(),
+                            strategy: Strategy::Commit,
+                        };
 
-                                               // this is where things get SENT to other parts... do we need it?
-                                               let core : DirectedCore = create.into();
-                                               let request =
-                                                   ReqShell::new(core, assign.details.stub.point.clone(), parent);
-                                               let response = skel.messaging_api.request(request).await;
+                        let wave :DirectedProto = create.into();
+                        let pong: Wave<Pong> = ctx.transmitter.direct(wave).await.unwrap();
 
-                        */
                     }
                 });
             }
@@ -433,9 +455,14 @@ println!("whatup artifact?");
             return Err("ArtifactBundle Manager expected Bin payload".into());
         }
 
-        let mut object = file_repo()?.insert(assign.details.stub.point.to_string());
+        println!("writing zip file..");
+        let mut repo = file_repo()?;
+        let mut object = repo.insert(assign.details.stub.point.to_string());
         object.write_all(bincode::serialize(&state)?.as_slice())?;
         object.commit()?;
+        println!("zip file commited..");
+
+
         //        self.store.put(assign.details.stub.point, *state).await?;
 
         // need to unzip and create Artifacts for each...
@@ -458,3 +485,93 @@ where
         Ok(BUNDLE_BIND_CONFIG.clone())
     }
 }
+
+
+
+
+
+
+
+pub struct ArtifactDriverFactory;
+
+impl ArtifactDriverFactory {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait]
+impl<P> HyperDriverFactory<P> for ArtifactDriverFactory
+where
+    P: Hyperverse,
+{
+    fn kind(&self) -> Kind {
+        Kind::Artifact(ArtifactSubKind::Raw)
+    }
+
+    async fn create(
+        &self,
+        skel: HyperStarSkel<P>,
+        driver_skel: DriverSkel<P>,
+        ctx: DriverCtx,
+    ) -> Result<Box<dyn Driver<P>>, P::Err> {
+        Ok(Box::new(ArtifactDriver::new(skel, ctx)))
+    }
+}
+
+pub struct ArtifactDriver<P>
+where
+    P: Hyperverse,
+{
+    skel: HyperStarSkel<P>,
+    ctx: DriverCtx
+}
+
+#[handler]
+impl<P> ArtifactDriver<P>
+where
+    P: Hyperverse,
+{
+    pub fn new(skel: HyperStarSkel<P>, ctx: DriverCtx) -> Self {
+        Self { skel, ctx }
+    }
+}
+
+#[async_trait]
+impl<P> Driver<P> for ArtifactDriver<P>
+where
+    P: Hyperverse,
+{
+    fn kind(&self) -> Kind {
+        Kind::Artifact(ArtifactSubKind::Raw)
+    }
+
+    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+        Ok(ItemSphere::Handler(Box::new(Artifact)))
+    }
+
+    async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
+println!("ASSIGNED ARTIFACT!");
+        Ok(())
+    }
+}
+
+
+
+pub struct Artifact;
+
+#[handler]
+impl Artifact {}
+
+#[async_trait]
+impl<P> ItemHandler<P> for Artifact
+where
+    P: Hyperverse,
+{
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+        Ok(ARTIFACT_BIND_CONFIG.clone())
+    }
+
+
+}
+

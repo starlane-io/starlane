@@ -1628,9 +1628,9 @@ impl Point {
                     format!("{}{}", self.to_string(), segment)
                 }
                 PointSeg::Version(_) => {
-                    if segment != ":/" {
+                    if segment != "/" {
                         return Err(format!(
-                            "expected Root filesystem artifact ':/' encountered: {}",
+                            "expected Root filesystem artifact '/' encountered: {}",
                             segment
                         )
                         .into());

@@ -37,6 +37,7 @@ use cosmic_universe::wave::exchange::{DirectedHandler, Exchanger, InCtx, ProtoTr
 use crate::{HyperErr, Hyperverse, Registration};
 use crate::driver::star::StarDriverFactory;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
+use crate::star::HyperStarCall::LayerTraversalInjection;
 
 lazy_static! {
     static ref DEFAULT_BIND: ArtRef<BindConfig> = ArtRef::new(
@@ -597,7 +598,7 @@ where
                 skel,
                 kind.clone(),
                 point.clone(),
-                transmitter,
+                transmitter.clone(),
                 logger.clone(),
                 status_tx,
                 request_tx,
@@ -623,14 +624,7 @@ where
                 let skel = self.skel.clone();
                 let call_tx = call_tx.clone();
                 let logger = logger.clone();
-                let router = Arc::new(self.skel.gravity_router.clone());
-                let mut transmitter =
-                    ProtoTransmitterBuilder::new(router, self.skel.exchanger.clone());
-                transmitter.from = SetStrategy::Override(
-                    self.skel.point.clone().to_surface().with_layer(Layer::Gravity),
-                );
-                transmitter.agent = SetStrategy::Override(Agent::HyperUser);
-                let ctx = DriverCtx::new(transmitter.build());
+                let ctx = DriverCtx::new(transmitter.clone());
 
                 tokio::spawn(async move {
                     let driver =
@@ -1171,6 +1165,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct DriverCtx {
     pub transmitter: ProtoTransmitter,
 }
@@ -1585,7 +1580,7 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
-        todo!()
+        Ok(ItemSphere::Handler(Box::new(DriverCore::restore((), (), ()))))
     }
 }
 
@@ -1594,7 +1589,7 @@ pub struct DriverCore<P>
 where
     P: Hyperverse,
 {
-    skel: ItemSkel<P>,
+    phantom: PhantomData<P>
 }
 
 #[handler]
@@ -1602,8 +1597,10 @@ impl<P> DriverCore<P>
 where
     P: Hyperverse,
 {
-    pub fn new(skel: ItemSkel<P>) -> Self {
-        Self { skel }
+    pub fn new() -> Self {
+        Self {
+            phantom: Default::default()
+        }
     }
 }
 
@@ -1611,11 +1608,21 @@ impl<P> Item<P> for DriverCore<P>
 where
     P: Hyperverse,
 {
-    type Skel = ItemSkel<P>;
+    type Skel = ();
     type Ctx = ();
     type State = ();
 
     fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self {
-        Self { skel }
+        Self { phantom: Default::default() }
+    }
+}
+
+#[async_trait]
+impl<P> ItemHandler<P> for DriverCore<P>
+    where
+        P: Hyperverse,
+{
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+        Ok(DEFAULT_BIND.clone())
     }
 }
