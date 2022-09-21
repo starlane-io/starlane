@@ -5,10 +5,10 @@ use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
-use crate::{BindConfig, UniErr};
 use crate::loc::Point;
 use crate::particle::Stub;
 use crate::substance::Bin;
+use crate::{BindConfig, UniErr};
 
 #[derive(Clone)]
 pub struct ArtifactApi {

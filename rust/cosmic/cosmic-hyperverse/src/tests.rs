@@ -9,9 +9,9 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use tokio::join;
-use tokio::sync::{Mutex, oneshot};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot::error::RecvError;
+use tokio::sync::{oneshot, Mutex};
 use tokio::time::error::Elapsed;
 
 use cosmic_hyperlane::{
@@ -24,29 +24,26 @@ use cosmic_universe::command::direct::create::{
     Create, PointSegTemplate, PointTemplate, Strategy, Template,
 };
 use cosmic_universe::command::{CmdTransfer, RawCommand};
-use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance, InterchangeKind, Knock};
 use cosmic_universe::hyper::MountKind;
-use cosmic_universe::HYPERUSER;
+use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance, InterchangeKind, Knock};
 use cosmic_universe::loc::{Layer, StarHandle, ToPoint, ToSurface, Uuid};
 use cosmic_universe::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
 use cosmic_universe::particle::traversal::TraversalDirection;
-use cosmic_universe::wave::{
-    Agent, DirectedKind, DirectedProto, HyperWave, Pong,
-    Wave,
-};
 use cosmic_universe::wave::core::cmd::CmdMethod;
 use cosmic_universe::wave::core::ext::ExtMethod;
 use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::Method;
 use cosmic_universe::wave::exchange::Exchanger;
 use cosmic_universe::wave::exchange::ProtoTransmitterBuilder;
+use cosmic_universe::wave::{Agent, DirectedKind, DirectedProto, HyperWave, Pong, Wave};
+use cosmic_universe::HYPERUSER;
 
 use crate::driver::base::BaseDriverFactory;
 //use crate::control::ControlDriverFactory;
-use crate::driver::{DriverAvail, DriverFactory};
-use crate::driver::control::{ControlClient, ControlCliSession, ControlDriverFactory};
+use crate::driver::control::{ControlCliSession, ControlClient, ControlDriverFactory};
 use crate::driver::root::RootDriverFactory;
 use crate::driver::space::SpaceDriverFactory;
+use crate::driver::{DriverAvail, DriverFactory};
 use crate::star::HyperStarApi;
 use crate::test::hyperverse::{TestErr, TestHyperverse};
 use crate::test::registry::TestRegistryContext;
@@ -563,7 +560,8 @@ fn test_control() -> Result<(), TestErr> {
                         let directed = wave.to_directed().unwrap();
                         if directed.core().method == Method::Cmd(CmdMethod::Bounce) {
                             let reflection = directed.reflection().unwrap();
-                            let reflect = reflection.make(ReflectedCore::ok(), greet.surface.clone());
+                            let reflect =
+                                reflection.make(ReflectedCore::ok(), greet.surface.clone());
                             let wave = reflect.to_ultra();
                             transmitter.route(wave).await;
                         }
@@ -785,28 +783,39 @@ fn test_publish() -> Result<(), TestErr> {
 
         let cli = client.new_cli_session().await?;
 
-        cli.exec("create localhost<Space>").await.unwrap().ok_or().unwrap();
-        cli.exec("create localhost:repo<Repo>").await.unwrap().ok_or().unwrap();
-        cli.exec("create localhost:repo:my<BundleSeries>").await.unwrap().ok_or().unwrap();
+        cli.exec("create localhost<Space>")
+            .await
+            .unwrap()
+            .ok_or()
+            .unwrap();
+        cli.exec("create localhost:repo<Repo>")
+            .await
+            .unwrap()
+            .ok_or()
+            .unwrap();
+        cli.exec("create localhost:repo:my<BundleSeries>")
+            .await
+            .unwrap()
+            .ok_or()
+            .unwrap();
 
         let mut command = RawCommand::new("publish ^[ bundle.zip ]-> localhost:repo:my:1.0.0");
 
-
         let file_path = "test/bundle.zip";
         let bin = Arc::new(fs::read(file_path)?);
-        command.transfers.push(CmdTransfer::new("bundle.zip", bin ));
+        command.transfers.push(CmdTransfer::new("bundle.zip", bin));
 
         let core = cli.raw(command).await?;
 
         if !core.is_ok() {
             if let Substance::Errors(ref e) = core.body {
-               println!("{}",e.to_string());
+                println!("{}", e.to_string());
             }
         }
 
         assert!(core.is_ok());
 
-        tokio::time::sleep( Duration::from_secs(5)).await;
+        tokio::time::sleep(Duration::from_secs(5)).await;
 
         Ok(())
     })

@@ -1,8 +1,10 @@
+use crate::driver::{
+    Driver, DriverCtx, DriverSkel, HyperDriverFactory, Item, ItemHandler, ItemSphere,
+};
+use crate::star::HyperStarSkel;
+use crate::Hyperverse;
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::config::bind::BindConfig;
-use std::marker::PhantomData;
-use std::str::FromStr;
-use std::sync::Arc;
 use cosmic_universe::kind::{BaseKind, Kind};
 use cosmic_universe::loc::Point;
 use cosmic_universe::parse::bind_config;
@@ -10,9 +12,9 @@ use cosmic_universe::selector::KindSelector;
 use cosmic_universe::util::log;
 use cosmic_universe::wave::core::{CoreBounce, ReflectedCore};
 use cosmic_universe::wave::exchange::{DirectedHandler, RootInCtx};
-use crate::driver::{Driver, DriverCtx, DriverSkel, HyperDriverFactory, Item, ItemHandler, ItemSphere};
-use crate::Hyperverse;
-use crate::star::HyperStarSkel;
+use std::marker::PhantomData;
+use std::str::FromStr;
+use std::sync::Arc;
 
 lazy_static! {
     static ref ROOT_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -22,7 +24,6 @@ lazy_static! {
 }
 
 fn root_bind() -> BindConfig {
-
     log(bind_config(
         r#"
     Bind(version=1.0.0)

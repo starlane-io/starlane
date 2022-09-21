@@ -1,20 +1,20 @@
-use std::sync::{Arc, atomic};
-use std::sync::atomic::AtomicU64;
-use dashmap::DashMap;
-use cosmic_universe::hyper::ParticleRecord;
-use cosmic_universe::loc::Point;
-use cosmic_universe::particle::{Details, Properties, Status, Stub};
-use tokio::sync::oneshot;
+use crate::test::hyperverse::TestErr;
+use crate::test::hyperverse::TestHyperverse;
+use crate::{Registration, RegistryApi};
 use cosmic_universe::command::common::SetProperties;
 use cosmic_universe::command::direct::delete::Delete;
 use cosmic_universe::command::direct::query::{Query, QueryResult};
 use cosmic_universe::command::direct::select::{Select, SubSelect};
+use cosmic_universe::hyper::ParticleRecord;
+use cosmic_universe::loc::Point;
+use cosmic_universe::particle::{Details, Properties, Status, Stub};
 use cosmic_universe::security::{Access, AccessGrant, IndexedAccessGrant};
 use cosmic_universe::selector::Selector;
 use cosmic_universe::substance::SubstanceList;
-use crate::{Registration, RegistryApi};
-use crate::test::hyperverse::TestHyperverse;
-use crate::test::hyperverse::TestErr;
+use dashmap::DashMap;
+use std::sync::atomic::AtomicU64;
+use std::sync::{atomic, Arc};
+use tokio::sync::oneshot;
 
 impl TestRegistryContext {
     pub fn new() -> Self {

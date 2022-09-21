@@ -35,16 +35,17 @@ use cosmic_universe::command::direct::select::{Select, SubSelect};
 use cosmic_universe::err::UniErr;
 use cosmic_universe::fail::Timeout;
 use cosmic_universe::hyper::ParticleRecord;
-use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind};
+use cosmic_universe::kind::{
+    ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind,
+};
 use cosmic_universe::loc::{
-    Layer, MachineName, Point, RouteSeg,
-    StarKey, Surface, ToBaseKind, ToSurface,
+    Layer, MachineName, Point, RouteSeg, StarKey, Surface, ToBaseKind, ToSurface,
 };
 use cosmic_universe::log::RootLogger;
-use cosmic_universe::particle::{Details, Properties, Status, Stub};
 use cosmic_universe::particle::property::PropertiesConfig;
-use cosmic_universe::security::{Access, AccessGrant};
+use cosmic_universe::particle::{Details, Properties, Status, Stub};
 use cosmic_universe::security::IndexedAccessGrant;
+use cosmic_universe::security::{Access, AccessGrant};
 use cosmic_universe::selector::Selector;
 use cosmic_universe::settings::Timeouts;
 use cosmic_universe::substance::{Substance, SubstanceList, Token};
@@ -56,9 +57,9 @@ use crate::machine::{Machine, MachineApi, MachineTemplate};
 
 pub mod driver;
 pub mod global;
+pub mod layer;
 pub mod machine;
 pub mod star;
-pub mod layer;
 
 #[cfg(test)]
 pub mod tests;

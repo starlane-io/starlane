@@ -20,8 +20,8 @@ use mesh_portal::version::latest::selector::PointKindHierarchy;
 use crate::error::Error;
 use crate::frame::{MessageAck, SimpleReply, StarMessage, StarMessagePayload};
 use crate::star::shell::search::{StarSearchTransaction, TransactionResult};
-use crate::star::StarCommand;
 use crate::star::surface::SurfaceApi;
+use crate::star::StarCommand;
 use crate::starlane::StarlaneCommand;
 
 pub mod delivery;

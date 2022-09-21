@@ -8,12 +8,12 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
 
-use alcoholic_jwt::{JWK, JWKS, token_kid, validate, ValidJWT};
+use alcoholic_jwt::{token_kid, validate, ValidJWT, JWK, JWKS};
 use lru::LruCache;
 use serde::Deserialize;
+use tokio::sync::mpsc::Receiver;
 use tokio::sync::{broadcast, RwLock};
 use tokio::sync::{mpsc, oneshot};
-use tokio::sync::mpsc::Receiver;
 use tokio::time::Duration;
 use walkdir::{DirEntry, WalkDir};
 use zip::result::ZipError;

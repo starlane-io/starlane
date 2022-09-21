@@ -8,8 +8,8 @@ extern crate lazy_static;
 
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
 use std::sync::RwLock;
 
 use mesh_portal::version::latest::config::ResourceConfigBody;

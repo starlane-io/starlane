@@ -7,13 +7,13 @@ use serde::{Deserialize, Serialize};
 
 use cosmic_nom::{new_span, Res, Span};
 
-use crate::{BaseKind, Point, UniErr};
 use crate::kind::{Kind, KindParts};
 use crate::loc::{PointCtx, PointVar};
-use crate::parse::{Env, parse_alpha1_str, point_and_kind};
 use crate::parse::error::result;
+use crate::parse::{parse_alpha1_str, point_and_kind, Env};
 use crate::substance::Substance;
 use crate::util::ToResolved;
+use crate::{BaseKind, Point, UniErr};
 
 pub mod property;
 pub mod traversal;
@@ -160,12 +160,12 @@ pub mod particle {
     use nom::bytes::complete::{is_a, tag};
     use nom::character::complete::{alpha1, digit1};
     use nom::combinator::{not, recognize};
-    use nom::CompareResult::Incomplete;
     use nom::error::{ErrorKind, ParseError, VerboseError};
-    use nom::Parser;
     use nom::sequence::{delimited, tuple};
-    use nom_supreme::{parse_from_str, ParserExt};
+    use nom::CompareResult::Incomplete;
+    use nom::Parser;
     use nom_supreme::error::ErrorTree;
+    use nom_supreme::{parse_from_str, ParserExt};
     use serde::{Deserialize, Serialize};
 
     use cosmic_nom::{Res, Span};
@@ -179,20 +179,20 @@ pub mod particle {
     use crate::substance::{Substance, SubstanceMap};
 
     /*
-            #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-            pub struct StatusDetails<C>
-            where
-                C: Condition,
-            {
-                pub status: Status,
-                pub conditions: HashSet<C>,
-            }
+    #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+    pub struct StatusDetails<C>
+    where
+        C: Condition,
+    {
+        pub status: Status,
+        pub conditions: HashSet<C>,
+    }
 
-            pub trait Condition: ToString {
-                fn status(&self) -> Status;
-                fn desc(&self) -> String;
-            }
-             */
+    pub trait Condition: ToString {
+        fn status(&self) -> Status;
+        fn desc(&self) -> String;
+    }
+     */
 
     /*
     pub fn error_code<I:Span>(input: I) -> Res<I, Code> {

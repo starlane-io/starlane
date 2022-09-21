@@ -13,12 +13,12 @@ use direct::select::{SelectCtx, SelectVar};
 use direct::set::{Set, SetCtx, SetVar};
 use direct::write::{Write, WriteCtx, WriteVar};
 
-use crate::{Delete, Select, UniErr};
-use crate::parse::{command_line, Env};
 use crate::parse::error::result;
+use crate::parse::{command_line, Env};
 use crate::substance::{Bin, ChildSubstance};
 use crate::util::ToResolved;
 use crate::wave::core::cmd::CmdMethod;
+use crate::{Delete, Select, UniErr};
 
 pub mod common {
     use std::collections::HashMap;
@@ -49,7 +49,7 @@ pub mod common {
         pub fn has_substance(&self) -> bool {
             match self {
                 StateSrc::None => false,
-                StateSrc::Substance(_) => true
+                StateSrc::Substance(_) => true,
             }
         }
     }
@@ -162,8 +162,8 @@ pub mod common {
 }
 
 pub mod direct {
-    use http::{HeaderMap, Request, StatusCode, Uri};
     use http::status::InvalidStatusCode;
+    use http::{HeaderMap, Request, StatusCode, Uri};
     use serde::{Deserialize, Serialize};
 
     use crate::command::direct::create::Create;
@@ -177,8 +177,8 @@ pub mod direct {
     use crate::kind::{BaseKind, KindParts};
     use crate::loc::{Meta, Point};
     use crate::selector::KindSelector;
-    use crate::substance::{Errors, Substance};
     use crate::substance::Bin;
+    use crate::substance::{Errors, Substance};
     use crate::util::{ValueMatcher, ValuePattern};
     use crate::wave::core::ext::ExtMethod;
     use crate::wave::core::http2::HttpMethod;
@@ -347,30 +347,28 @@ pub mod direct {
 
     pub mod create {
         use std::convert::TryInto;
-        use std::sync::Arc;
         use std::sync::atomic::{AtomicU64, Ordering};
+        use std::sync::Arc;
 
         use serde::{Deserialize, Serialize};
         use tokio::sync::Mutex;
 
-        use crate::command::Command;
         use crate::command::common::{SetProperties, SetRegistry, StateSrc, StateSrcVar};
+        use crate::command::Command;
         use crate::err::{ParseErrs, UniErr};
         use crate::kind::{BaseKind, KindParts};
-        use crate::loc::{
-            HostKey, Point, PointCtx, PointFactory, PointSeg, PointVar, ToSurface,
-        };
-        use crate::parse::{CamelCase, Env, ResolverErr};
+        use crate::loc::{HostKey, Point, PointCtx, PointFactory, PointSeg, PointVar, ToSurface};
         use crate::parse::model::Subst;
+        use crate::parse::{CamelCase, Env, ResolverErr};
         use crate::selector::SpecificSelector;
         use crate::substance::Bin;
         use crate::substance::Substance;
         use crate::util::{ConvertFrom, ToResolved};
-        use crate::wave::{DirectedProto, Ping, Wave};
         use crate::wave::core::cmd::CmdMethod;
-        use crate::wave::core::DirectedCore;
         use crate::wave::core::ext::ExtMethod;
         use crate::wave::core::hyp::HypMethod;
+        use crate::wave::core::DirectedCore;
+        use crate::wave::{DirectedProto, Ping, Wave};
 
         pub enum PointTemplateSeg {
             ExactSeg(PointSeg),
@@ -420,7 +418,7 @@ pub mod direct {
 
                 let template = Template {
                     point,
-                    kind: self.kind
+                    kind: self.kind,
                 };
                 Ok(template)
             }
@@ -1108,7 +1106,10 @@ pub struct RawCommand {
 }
 
 impl RawCommand {
-    pub fn new<S>(line: S) -> Self where S:ToString{
+    pub fn new<S>(line: S) -> Self
+    where
+        S: ToString,
+    {
         Self {
             line: line.to_string(),
             transfers: vec![],

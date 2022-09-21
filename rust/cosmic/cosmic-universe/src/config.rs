@@ -2,9 +2,9 @@ use std::ops::Deref;
 
 use serde::{Deserialize, Serialize};
 
-use crate::BindConfig;
 use crate::loc::Point;
 use crate::particle::{Details, Stub};
+use crate::BindConfig;
 
 pub mod bind;
 
@@ -71,5 +71,3 @@ pub enum Document {
 pub struct ParticleConfigBody {
     pub details: Details,
 }
-
-

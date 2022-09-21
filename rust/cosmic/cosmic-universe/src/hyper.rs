@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 
 use cosmic_macros_primitive::Autobox;
 
-use crate::Agent;
 use crate::command::common::StateSrc;
 use crate::err::UniErr;
 use crate::kind::{Kind, KindParts, StarSub};
@@ -14,13 +13,13 @@ use crate::log::Log;
 use crate::particle::{Details, Status, Stub};
 use crate::selector::KindSelector;
 use crate::substance::Substance;
-use crate::wave::{
-    Ping, Pong, ReflectedKind, ReflectedProto, ToRecipients,
-    UltraWave, Wave, WaveId, WaveKind,
-};
-use crate::wave::core::{DirectedCore, ReflectedCore};
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::hyp::HypMethod;
+use crate::wave::core::{DirectedCore, ReflectedCore};
+use crate::wave::{
+    Ping, Pong, ReflectedKind, ReflectedProto, ToRecipients, UltraWave, Wave, WaveId, WaveKind,
+};
+use crate::Agent;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {

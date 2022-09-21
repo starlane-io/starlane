@@ -6,13 +6,13 @@ use std::ops::{Deref, DerefMut};
 
 use futures::FutureExt;
 use lru::LruCache;
-use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
-use tokio::sync::{broadcast, mpsc};
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::{broadcast, mpsc};
 use tokio::time::Duration;
 
 use cosmic_universe::loc::StarKey;

@@ -3,25 +3,27 @@ use core::str::FromStr;
 use std::ops::Deref;
 
 use nom::combinator::all_consuming;
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::{Error, Visitor};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use cosmic_nom::{new_span, Trace};
 use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
 
-use crate::{Point, UniErr};
 use crate::kind::{BaseKind, Kind, KindParts, Specific};
 use crate::loc::{
-    Layer, PointCtx, PointSeg, PointVar, RouteSeg, ToBaseKind, Topic, Variable, VarVal,
-    Version,
+    Layer, PointCtx, PointSeg, PointVar, RouteSeg, ToBaseKind, Topic, VarVal, Variable, Version,
 };
-use crate::parse::{CamelCase, consume_hierarchy, Env, kind_selector, point_segment_selector, point_selector, specific_selector};
 use crate::parse::error::result;
+use crate::parse::{
+    consume_hierarchy, kind_selector, point_segment_selector, point_selector, specific_selector,
+    CamelCase, Env,
+};
 use crate::substance::{
     CallWithConfigDef, Substance, SubstanceFormat, SubstanceKind, SubstancePattern,
     SubstancePatternCtx, SubstancePatternDef,
 };
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
+use crate::{Point, UniErr};
 
 pub type KindSelector = KindSelectorDef<KindBaseSelector, SubKindSelector, SpecificSelector>;
 pub type KindSelectorVar =
@@ -47,11 +49,11 @@ impl KindSelector {
         }
     }
 
-    pub fn from_base( base: BaseKind ) -> Self {
+    pub fn from_base(base: BaseKind) -> Self {
         Self {
             base: Pattern::Exact(base),
             sub: SubKindSelector::Any,
-            specific: ValuePattern::Any
+            specific: ValuePattern::Any,
         }
     }
 
@@ -67,18 +69,15 @@ impl KindSelector {
          */
 
         // HACKED waiting to be refactored when we actually need to match on subtypes
-                self.base.matches(&kind.to_base())
-
+        self.base.matches(&kind.to_base())
     }
 
-    pub fn as_point_segments(&self) -> Result<String,UniErr> {
+    pub fn as_point_segments(&self) -> Result<String, UniErr> {
         match &self.base {
-            KindBaseSelector::Any => {
-                Err(UniErr::from_500("cannot turn a base wildcard kind into point segments"))
-            }
-            KindBaseSelector::Exact(e) => {
-                Ok(e.to_skewer().to_string())
-            }
+            KindBaseSelector::Any => Err(UniErr::from_500(
+                "cannot turn a base wildcard kind into point segments",
+            )),
+            KindBaseSelector::Exact(e) => Ok(e.to_skewer().to_string()),
         }
     }
 }
@@ -87,7 +86,7 @@ impl FromStr for KindSelector {
     type Err = UniErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(result( kind_selector(new_span(s)))?)
+        Ok(result(kind_selector(new_span(s)))?)
     }
 }
 

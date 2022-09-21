@@ -15,8 +15,8 @@ use crate::error::Error;
 use crate::fail::{Fail, StarlaneFailure};
 use crate::id::Id;
 use crate::logger::Flags;
-use crate::message::{MessageExpect, MessageId, MessageUpdate, ProtoStarMessage, Reply};
 use crate::message::delivery::ActorMessage;
+use crate::message::{MessageExpect, MessageId, MessageUpdate, ProtoStarMessage, Reply};
 use crate::star::{Star, StarCommand, StarInfo, StarKind, StarNotify};
 use crate::watch::{Notification, Watch, WatchKey};
 

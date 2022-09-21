@@ -18,9 +18,11 @@ use cosmic_universe::kind::{ArtifactSubKind, BaseKind, Kind};
 use cosmic_universe::loc::{Point, ToBaseKind};
 use cosmic_universe::parse::bind_config;
 use cosmic_universe::particle::PointKind;
+use cosmic_universe::selector::KindSelector;
 use cosmic_universe::substance::{Bin, Substance};
 use cosmic_universe::util::log;
 use cosmic_universe::wave::core::DirectedCore;
+use cosmic_universe::wave::{DirectedProto, Pong, Wave};
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fs::File;
@@ -29,8 +31,6 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use cosmic_universe::selector::KindSelector;
-use cosmic_universe::wave::{DirectedProto, Pong, Wave};
 use tempdir::TempDir;
 
 lazy_static! {
@@ -46,8 +46,7 @@ lazy_static! {
         Arc::new(bundle_bind()),
         Point::from_str("GLOBAL::repo:1.0.0:/bind/bundle.bind").unwrap()
     );
-
-     static ref ARTIFACT_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
+    static ref ARTIFACT_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
         Arc::new(artifact_bind()),
         Point::from_str("GLOBAL::repo:1.0.0:/bind/artifact.bind").unwrap()
     );
@@ -272,22 +271,25 @@ where
         driver_skel: DriverSkel<P>,
         ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
-        Ok(Box::new(BundleDriver::new(driver_skel,ctx)))
+        Ok(Box::new(BundleDriver::new(driver_skel, ctx)))
     }
 }
 
-pub struct BundleDriver<P> where P: Hyperverse {
+pub struct BundleDriver<P>
+where
+    P: Hyperverse,
+{
     skel: DriverSkel<P>,
-    ctx: DriverCtx
+    ctx: DriverCtx,
 }
 
 #[handler]
-impl <P> BundleDriver<P> where P: Hyperverse{
+impl<P> BundleDriver<P>
+where
+    P: Hyperverse,
+{
     pub fn new(skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
-        Self {
-            skel,
-            ctx
-        }
+        Self { skel, ctx }
     }
 }
 
@@ -305,21 +307,12 @@ where
     }
 
     async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
-        println!();
-        println!(
-            "!!!!! BundleDriver Received ASSIGN! {} ----------",
-            assign.details.stub.kind.to_string()
-        );
-        println!();
         let state = match &assign.state {
             StateSrc::Substance(data) => data.clone(),
             StateSrc::None => {
-                println!("!!ArtifactBundle cannot be stateless!!");
-                println!();
                 return Err("ArtifactBundle cannot be stateless".into());
             }
         };
-        println!("...");
         if let Substance::Bin(zip) = (*state).clone() {
             let temp_dir = TempDir::new("zipcheck")?;
             let temp_path = temp_dir.path().clone();
@@ -327,7 +320,6 @@ where
             let mut file = File::create(file_path.as_path())?;
             file.write_all(zip.as_slice())?;
 
-            println!("wrote to tmpfile");
             let file = File::open(file_path.as_path())?;
             let mut archive = zip::ZipArchive::new(file)?;
             let mut artifacts = vec![];
@@ -338,7 +330,6 @@ where
                 }
             }
 
-            println!("whatup artifact?");
             let mut point_and_kind_set = HashSet::new();
             for artifact in artifacts {
                 let mut path = String::new();
@@ -412,10 +403,7 @@ where
                                         let payload = Substance::Bin(bin);
                                         StateSrc::Substance(Box::new(payload))
                                     }
-                                    Err(err) => {
-                                        eprintln!("Artifact archive error: {}", err.to_string());
-                                        StateSrc::None
-                                    }
+                                    Err(err) => StateSrc::None,
                                 }
                             }
                             _ => {
@@ -446,9 +434,8 @@ where
                             strategy: Strategy::Commit,
                         };
 
-                        let wave :DirectedProto = create.into();
+                        let wave: DirectedProto = create.into();
                         let pong: Wave<Pong> = ctx.transmitter.direct(wave).await.unwrap();
-
                     }
                 });
             }
@@ -456,13 +443,10 @@ where
             return Err("ArtifactBundle Manager expected Bin payload".into());
         }
 
-        println!("writing zip file..");
         let mut repo = file_repo()?;
         let mut object = repo.insert(assign.details.stub.point.to_string());
         object.write_all(bincode::serialize(&state)?.as_slice())?;
         object.commit()?;
-        println!("zip file commited..");
-
 
         //        self.store.put(assign.details.stub.point, *state).await?;
 
@@ -486,12 +470,6 @@ where
         Ok(BUNDLE_BIND_CONFIG.clone())
     }
 }
-
-
-
-
-
-
 
 pub struct ArtifactDriverFactory;
 
@@ -525,7 +503,7 @@ where
     P: Hyperverse,
 {
     skel: HyperStarSkel<P>,
-    ctx: DriverCtx
+    ctx: DriverCtx,
 }
 
 #[handler]
@@ -552,12 +530,10 @@ where
     }
 
     async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
-println!("ASSIGNED ARTIFACT!");
+        println!("ASSIGNED ARTIFACT!");
         Ok(())
     }
 }
-
-
 
 pub struct Artifact;
 
@@ -572,7 +548,4 @@ where
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(ARTIFACT_BIND_CONFIG.clone())
     }
-
-
 }
-

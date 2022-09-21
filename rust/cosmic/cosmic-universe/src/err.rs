@@ -10,10 +10,10 @@ use std::sync::{Arc, PoisonError};
 use ariadne::{Label, Report, ReportBuilder, ReportKind, Source};
 use http::header::ToStrError;
 use http::status::InvalidStatusCode;
-use http::StatusCode;
 use http::uri::InvalidUri;
-use nom::Err;
+use http::StatusCode;
 use nom::error::VerboseError;
+use nom::Err;
 use nom_locate::LocatedSpan;
 use nom_supreme::error::{ErrorTree, StackContext};
 use serde::de::Error;
@@ -49,7 +49,6 @@ impl Into<ReflectedCore> for UniErr {
         }
     }
 }
-
 
 impl Clone for UniErr {
     fn clone(&self) -> Self {

@@ -1,22 +1,30 @@
-use cosmic_universe::err::UniErr;
-use cosmic_universe::loc::{Layer, Point, Surface, SurfaceSelector, Topic, ToPoint, ToSurface};
-use cosmic_universe::log::PointLogger;
-use cosmic_universe::parse::{command_line, Env};
-use cosmic_universe::wave::exchange::{DirectedHandler, Exchanger, InCtx, ProtoTransmitterBuilder, RootInCtx, SetStrategy};
-use std::sync::Arc;
-use cosmic_nom::new_span;
-use cosmic_universe::command::{Command, RawCommand};
-use cosmic_universe::parse::error::result;
-use cosmic_universe::util::{log, ToResolved};
-use cosmic_universe::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
-use cosmic_universe::wave::{BounceBacks, DirectedKind, DirectedProto, DirectedWave, Pong, ReflectedWave, UltraWave, Wave, WaveId};
-use dashmap::{DashMap, DashSet};
 use std::sync::atomic::{AtomicU16, Ordering};
+use std::sync::Arc;
+
+use dashmap::{DashMap, DashSet};
+
+use cosmic_nom::new_span;
 use cosmic_universe::command::common::StateSrc;
+use cosmic_universe::command::{Command, RawCommand};
+use cosmic_universe::err::UniErr;
+use cosmic_universe::loc::{Layer, Point, Surface, SurfaceSelector, ToPoint, ToSurface, Topic};
+use cosmic_universe::log::PointLogger;
+use cosmic_universe::parse::error::result;
+use cosmic_universe::parse::{command_line, Env};
 use cosmic_universe::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
 use cosmic_universe::substance::Substance;
-use crate::Hyperverse;
+use cosmic_universe::util::{log, ToResolved};
+use cosmic_universe::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
+use cosmic_universe::wave::exchange::{
+    DirectedHandler, Exchanger, InCtx, ProtoTransmitterBuilder, RootInCtx, SetStrategy,
+};
+use cosmic_universe::wave::{
+    BounceBacks, DirectedKind, DirectedProto, DirectedWave, Pong, ReflectedWave, UltraWave, Wave,
+    WaveId,
+};
+
 use crate::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
+use crate::Hyperverse;
 
 #[derive(DirectedHandler)]
 pub struct Shell<P>
@@ -48,7 +56,11 @@ where
     P: Hyperverse + 'static,
 {
     fn surface(&self) -> Surface {
-        self.state.point.clone().to_surface().with_layer(Layer::Shell)
+        self.state
+            .point
+            .clone()
+            .to_surface()
+            .with_layer(Layer::Shell)
     }
 
     async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
@@ -287,8 +299,11 @@ impl CommandExecutor {
         let mut command: Command = command.to_resolved(&self.env)?;
         println!("resolved?...");
 
-        if let Command::Create(create) = & mut command {
-println!("...CHedcking For Transfers... for {} ", create.template.kind.to_string() );
+        if let Command::Create(create) = &mut command {
+            println!(
+                "...CHedcking For Transfers... for {} ",
+                create.template.kind.to_string()
+            );
             if ctx.transfers.len() == 1 {
                 let transfer = ctx.transfers.get(0).unwrap().clone();
                 println!();

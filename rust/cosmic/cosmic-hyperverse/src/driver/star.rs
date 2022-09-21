@@ -1,37 +1,46 @@
-use std::cmp::Ordering;
-use std::sync::Arc;
-use dashmap::DashMap;
-use cosmic_universe::err::UniErr;
-use cosmic_universe::hyper::{Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, Search};
-use cosmic_universe::kind::{BaseKind, Kind, StarSub};
-use cosmic_universe::loc::{Layer, LOCAL_STAR, Point, StarKey, ToPoint, ToSurface};
-use tokio::sync::{Mutex, RwLock};
+use crate::driver::{
+    Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item,
+    ItemHandler, ItemSphere,
+};
+use crate::star::{HyperStarSkel, LayerInjectionRouter};
+use crate::{HyperErr, Hyperverse, Registration, RegistryApi};
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::direct::create::Strategy;
 use cosmic_universe::config::bind::BindConfig;
-use cosmic_universe::HYPERUSER;
+use cosmic_universe::err::UniErr;
+use cosmic_universe::hyper::{
+    Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, Search,
+};
+use cosmic_universe::kind::{BaseKind, Kind, StarSub};
+use cosmic_universe::loc::{Layer, Point, StarKey, ToPoint, ToSurface, LOCAL_STAR};
+use cosmic_universe::log::Tracker;
+use cosmic_universe::parse::bind_config;
+use cosmic_universe::particle::traversal::TraversalInjection;
 use cosmic_universe::particle::Status;
-use cosmic_universe::wave::exchange::{InCtx, ProtoTransmitter, ProtoTransmitterBuilder, SetStrategy};
+use cosmic_universe::selector::{KindSelector, Pattern, SubKindSelector};
+use cosmic_universe::substance::Substance;
+use cosmic_universe::util::{log, ValuePattern};
+use cosmic_universe::wave::core::hyp::HypMethod;
+use cosmic_universe::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
+use cosmic_universe::wave::exchange::{
+    InCtx, ProtoTransmitter, ProtoTransmitterBuilder, SetStrategy,
+};
+use cosmic_universe::wave::{
+    Agent, BounceBacks, DirectedProto, Echoes, Handling, HandlingKind, Pong, Priority, Recipients,
+    Retries, UltraWave, WaitTime, Wave,
+};
+use cosmic_universe::HYPERUSER;
+use dashmap::DashMap;
+use http::StatusCode;
+use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::marker::PhantomData;
-use cosmic_universe::substance::Substance;
-use cosmic_universe::wave::{Agent, BounceBacks, DirectedProto, Echoes, Handling, HandlingKind, Pong, Priority, Recipients, Retries, UltraWave, WaitTime, Wave};
-use cosmic_universe::wave::core::hyp::HypMethod;
 use std::ops::{Add, Deref};
 use std::str::FromStr;
-use cosmic_universe::log::Tracker;
-use cosmic_universe::particle::traversal::TraversalInjection;
-use cosmic_universe::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
-use http::StatusCode;
+use std::sync::Arc;
+use tokio::sync::{Mutex, RwLock};
 use tracing::error;
-use cosmic_universe::parse::bind_config;
-use cosmic_universe::selector::{KindSelector, Pattern, SubKindSelector};
-use cosmic_universe::util::{log, ValuePattern};
-use crate::driver::{Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere};
-use crate::{HyperErr, Hyperverse, Registration, RegistryApi};
-use crate::star::{HyperStarSkel, LayerInjectionRouter};
-
 
 lazy_static! {
     static ref STAR_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -52,7 +61,7 @@ fn star_bind() -> BindConfig {
     }
     "#,
     ))
-        .unwrap()
+    .unwrap()
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -136,7 +145,7 @@ where
         let kind = KindSelector {
             base: Pattern::Exact(BaseKind::Star),
             sub: SubKindSelector::Exact(Some(sub.to_camel_case())),
-            specific: ValuePattern::Any
+            specific: ValuePattern::Any,
         };
         Self {
             kind,
@@ -370,10 +379,7 @@ where
 {
     #[route("Hyp<Provision>")]
     pub async fn provision(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, P::Err> {
-
-
         if let HyperSubstance::Provision(provision) = ctx.input {
-
             let record = self.skel.registry.record(&provision.point).await?;
             match self.skel.wrangles.find(&record.details.stub.kind) {
                 None => {
@@ -383,7 +389,8 @@ where
                         .skel
                         .drivers
                         .find_external(record.details.stub.kind.clone())
-                        .await?.is_some()
+                        .await?
+                        .is_some()
                     {
                         let assign = HyperSubstance::Assign(Assign::new(
                             AssignmentKind::Create,
@@ -478,7 +485,11 @@ where
         let wave = ctx.input.clone();
 
         let injection = TraversalInjection::new(
-            self.skel.point.clone().to_surface().with_layer(Layer::Gravity),
+            self.skel
+                .point
+                .clone()
+                .to_surface()
+                .with_layer(Layer::Gravity),
             wave,
         );
 
@@ -595,14 +606,14 @@ impl StarWrangles {
         }
     }
 
-    pub fn find(&self, kind: &Kind ) -> Option<Arc<RwLock<RoundRobinWrangleSelector>>> {
+    pub fn find(&self, kind: &Kind) -> Option<Arc<RwLock<RoundRobinWrangleSelector>>> {
         let mut iter = self.wrangles.iter();
         while let Some(multi) = iter.next() {
-             if multi.key().matches( &kind ) {
-                return Some(multi.value().clone())
+            if multi.key().matches(&kind) {
+                return Some(multi.value().clone());
             }
         }
-        return None
+        return None;
     }
 
     pub async fn add(&self, discoveries: Vec<StarDiscovery>) {
@@ -641,12 +652,13 @@ impl StarWrangles {
     }
 
     pub async fn wrangle(&self, kind: &Kind) -> Result<StarKey, UniErr> {
-        self
-            .find(kind)
+        self.find(kind)
             .ok_or(format!(
                 "could not find wrangles for kind {}",
                 kind.to_string()
-            ))?.write().await
+            ))?
+            .write()
+            .await
             .wrangle()
             .await
     }
@@ -715,8 +727,10 @@ where
     P: Hyperverse,
 {
     pub fn new(skel: HyperStarSkel<P>, search: Search) -> Self {
-        let router =
-            LayerInjectionRouter::new(skel.clone(), skel.point.to_surface().with_layer(Layer::Shell));
+        let router = LayerInjectionRouter::new(
+            skel.clone(),
+            skel.point.to_surface().with_layer(Layer::Shell),
+        );
         let mut transmitter =
             ProtoTransmitterBuilder::new(Arc::new(router), skel.exchanger.clone());
         transmitter.from = SetStrategy::Override(skel.point.to_surface().with_layer(Layer::Core));

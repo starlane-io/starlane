@@ -1,24 +1,26 @@
+use crate::driver::artifact::{
+    ArtifactDriverFactory, BundleDriverFactory, BundleSeriesDriverFactory, RepoDriverFactory,
+};
+use crate::driver::base::BaseDriverFactory;
+use crate::driver::control::ControlDriverFactory;
+use crate::driver::root::RootDriverFactory;
+use crate::driver::space::SpaceDriverFactory;
+use crate::driver::DriverAvail;
+use crate::test::registry::{TestRegistryApi, TestRegistryContext};
+use crate::tests::PROPERTIES_CONFIG;
+use crate::{DriversBuilder, HyperErr, Hyperverse, MachineTemplate, Registry};
 use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, LocalHyperwayGateJumper};
+use cosmic_universe::artifact::{ArtifactApi, NoDiceArtifactFetcher};
+use cosmic_universe::err::UniErr;
 use cosmic_universe::kind::StarSub;
 use cosmic_universe::loc::{MachineName, StarKey, ToBaseKind};
 use cosmic_universe::particle::property::PropertiesConfig;
-use std::sync::Arc;
-use cosmic_universe::artifact::{ArtifactApi, NoDiceArtifactFetcher};
-use cosmic_universe::err::UniErr;
-use tokio::time::error::Elapsed;
-use tokio::sync::oneshot;
-use tokio::sync::oneshot::error::RecvError;
 use std::io;
 use std::io::Error;
-use crate::{DriversBuilder, HyperErr, Hyperverse, MachineTemplate, Registry};
-use crate::driver::artifact::{ArtifactDriverFactory, BundleDriverFactory, BundleSeriesDriverFactory, RepoDriverFactory};
-use crate::driver::base::BaseDriverFactory;
-use crate::driver::control::ControlDriverFactory;
-use crate::driver::DriverAvail;
-use crate::driver::root::RootDriverFactory;
-use crate::driver::space::SpaceDriverFactory;
-use crate::test::registry::{TestRegistryApi, TestRegistryContext};
-use crate::tests::{PROPERTIES_CONFIG};
+use std::sync::Arc;
+use tokio::sync::oneshot;
+use tokio::sync::oneshot::error::RecvError;
+use tokio::time::error::Elapsed;
 
 impl TestHyperverse {
     pub fn new() -> Self {
@@ -188,7 +190,7 @@ impl From<io::Error> for TestErr {
 impl From<acid_store::Error> for TestErr {
     fn from(e: acid_store::Error) -> Self {
         Self {
-            message: e.to_string()
+            message: e.to_string(),
         }
     }
 }
@@ -196,15 +198,15 @@ impl From<acid_store::Error> for TestErr {
 impl From<zip::result::ZipError> for TestErr {
     fn from(a: zip::result::ZipError) -> Self {
         Self {
-            message: a.to_string()
+            message: a.to_string(),
         }
     }
 }
 
 impl From<Box<bincode::ErrorKind>> for TestErr {
     fn from(e: Box<bincode::ErrorKind>) -> Self {
-         Self {
-            message: e.to_string()
+        Self {
+            message: e.to_string(),
         }
     }
 }

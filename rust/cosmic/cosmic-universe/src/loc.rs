@@ -5,26 +5,32 @@ use std::ops::{Deref, DerefMut};
 
 use convert_case::{Case, Casing};
 use nom::combinator::all_consuming;
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::{Error, Visitor};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use cosmic_nom::{new_span, Trace, Tw};
 
-use crate::{Agent, ANONYMOUS, BaseKind, cosmic_uuid, HYPERUSER, Kind, KindTemplate, ParticleRecord, UniErr};
 use crate::err::ParseErrs;
 use crate::hyper::ChildRegistry;
 use crate::kind::KindParts;
 use crate::log::{SpanLogger, Trackable};
-use crate::parse::{CamelCase, consume_point, consume_point_ctx, Domain, Env, kind_parts, parse_star_key, point_and_kind, point_route_segment, point_selector, point_var, ResolverErr, SkewerCase};
 use crate::parse::error::result;
+use crate::parse::{
+    consume_point, consume_point_ctx, kind_parts, parse_star_key, point_and_kind,
+    point_route_segment, point_selector, point_var, CamelCase, Domain, Env, ResolverErr,
+    SkewerCase,
+};
 use crate::particle::traversal::TraversalPlan;
 use crate::selector::{Pattern, Selector, SpecificSelector, VersionReq};
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
-use crate::wave::{
-    DirectedWave, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave,
-    ToRecipients, UltraWave, Wave,
-};
 use crate::wave::exchange::Exchanger;
+use crate::wave::{
+    DirectedWave, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave, ToRecipients,
+    UltraWave, Wave,
+};
+use crate::{
+    cosmic_uuid, Agent, BaseKind, Kind, KindTemplate, ParticleRecord, UniErr, ANONYMOUS, HYPERUSER,
+};
 
 lazy_static! {
     pub static ref GLOBAL_CENTRAL: Point = Point::from_str("GLOBAL::central").unwrap();
@@ -65,7 +71,6 @@ lazy_static! {
 }
 
 pub type Uuid = String;
-
 
 pub trait ToBaseKind {
     fn to_base(&self) -> BaseKind;

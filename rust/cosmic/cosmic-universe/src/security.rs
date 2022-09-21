@@ -10,13 +10,13 @@ use serde::{Deserialize, Serialize};
 
 use cosmic_nom::new_span;
 
-use crate::Agent;
 use crate::err::UniErr;
 use crate::loc::Point;
-use crate::parse::{MapResolver, particle_perms, permissions, permissions_mask, privilege};
 use crate::parse::error::result;
+use crate::parse::{particle_perms, permissions, permissions_mask, privilege, MapResolver};
 use crate::selector::{PointHierarchy, Selector};
 use crate::wave::ScopeGrant;
+use crate::Agent;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Access {

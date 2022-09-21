@@ -1,5 +1,6 @@
-use std::str::FromStr;
-use std::sync::Arc;
+use crate::driver::{Driver, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere};
+use crate::star::HyperStarSkel;
+use crate::Hyperverse;
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::config::bind::BindConfig;
 use cosmic_universe::kind::{BaseKind, Kind};
@@ -7,9 +8,8 @@ use cosmic_universe::loc::Point;
 use cosmic_universe::parse::bind_config;
 use cosmic_universe::selector::KindSelector;
 use cosmic_universe::util::log;
-use crate::driver::{Driver, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere};
-use crate::Hyperverse;
-use crate::star::HyperStarSkel;
+use std::str::FromStr;
+use std::sync::Arc;
 
 lazy_static! {
     static ref SPACE_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -17,7 +17,6 @@ lazy_static! {
         Point::from_str("GLOBAL::repo:1.0.0:/bind/space.bind").unwrap()
     );
 }
-
 
 fn space_bind() -> BindConfig {
     log(bind_config(

@@ -6,13 +6,19 @@ use serde::{Deserialize, Serialize};
 
 use cosmic_nom::new_span;
 
-use crate::{KindTemplate, UniErr};
 use crate::hyper::ChildRegistry;
-use crate::loc::{CONTROL_WAVE_TRAVERSAL_PLAN, MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, ProvisionAffinity, STAR_WAVE_TRAVERSAL_PLAN, StarKey, STD_WAVE_TRAVERSAL_PLAN, ToBaseKind, Version};
-use crate::parse::{CamelCase, Domain, kind_parts, SkewerCase};
+use crate::loc::{
+    ProvisionAffinity, StarKey, ToBaseKind, Version, CONTROL_WAVE_TRAVERSAL_PLAN,
+    MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, STAR_WAVE_TRAVERSAL_PLAN,
+    STD_WAVE_TRAVERSAL_PLAN,
+};
+use crate::parse::{kind_parts, CamelCase, Domain, SkewerCase};
 use crate::particle::traversal::TraversalPlan;
-use crate::selector::{KindSelector, KindSelectorDef, Pattern, SpecificSelector, SubKindSelector, VersionReq};
+use crate::selector::{
+    KindSelector, KindSelectorDef, Pattern, SpecificSelector, SubKindSelector, VersionReq,
+};
 use crate::util::ValuePattern;
+use crate::{KindTemplate, UniErr};
 
 impl ToBaseKind for KindParts {
     fn to_base(&self) -> BaseKind {
@@ -284,7 +290,7 @@ impl Kind {
         match self {
             Kind::Bundle => true,
             Kind::Artifact(_) => true,
-            _ => false
+            _ => false,
         }
     }
 
@@ -437,12 +443,11 @@ pub enum StarSub {
 }
 
 impl StarSub {
-
     pub fn to_selector(&self) -> KindSelector {
         KindSelector {
             base: Pattern::Exact(BaseKind::Star),
             sub: SubKindSelector::Exact(Some(self.to_camel_case())),
-            specific: ValuePattern::Any
+            specific: ValuePattern::Any,
         }
     }
 
@@ -712,15 +717,15 @@ impl TryInto<SpecificSelector> for Specific {
 
 #[cfg(test)]
 pub mod test {
-    use core::str::FromStr;
-    use crate::{Kind, StarSub, UniErr};
     use crate::parse::kind_selector;
     use crate::selector::KindSelector;
+    use crate::{Kind, StarSub, UniErr};
+    use core::str::FromStr;
 
     #[test]
-    pub fn selector( ) -> Result<(),UniErr> {
+    pub fn selector() -> Result<(), UniErr> {
         let kind = Kind::Star(StarSub::Fold);
-        let selector = KindSelector::from_str( "<Star<Fold>>")?;
+        let selector = KindSelector::from_str("<Star<Fold>>")?;
         assert!(selector.matches(&kind));
         Ok(())
     }

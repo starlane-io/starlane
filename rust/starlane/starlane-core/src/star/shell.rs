@@ -8,8 +8,8 @@ use cosmic_universe::loc::StarKey;
 
 use crate::frame::{ResourceRegistryRequest, SimpleReply, StarMessagePayload};
 use crate::message::ProtoStarMessage;
-use crate::star::{LogId, Set, Star, StarCommand, StarKind, StarSkel};
 use crate::star::Request;
+use crate::star::{LogId, Set, Star, StarCommand, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
 pub mod db;

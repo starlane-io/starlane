@@ -14,8 +14,8 @@ use crate::frame::{
 use crate::lane::{LaneKey, LaneSession, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply};
 use crate::star::core::message::CoreMessageCall;
-use crate::star::StarSkel;
 use crate::star::variant::FrameVerdict;
+use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
 #[derive(Clone)]

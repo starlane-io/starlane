@@ -14,9 +14,9 @@ use crate::frame::{
 };
 use crate::lane::{LaneCommand, LaneKey, LaneWrapper, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
-use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::shell::lanes::LanePattern;
+use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
 pub static MAX_HOPS: usize = 32;

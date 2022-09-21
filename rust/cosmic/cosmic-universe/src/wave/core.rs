@@ -5,22 +5,22 @@ use serde::{Deserialize, Serialize};
 
 use cosmic_macros_primitive::Autobox;
 
-use crate::{Bin, Substance, Surface, ToSubstance, UniErr};
 use crate::command::Command;
 use crate::err::StatusErr;
 use crate::loc::ToSurface;
 use crate::substance::Errors;
 use crate::util::{ValueMatcher, ValuePattern};
-use crate::wave::{Bounce, Ping, Pong, ToRecipients, WaveId};
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::ext::ExtMethod;
 use crate::wave::core::http2::HttpMethod;
 use crate::wave::core::hyp::HypMethod;
+use crate::wave::{Bounce, Ping, Pong, ToRecipients, WaveId};
+use crate::{Bin, Substance, Surface, ToSubstance, UniErr};
 
+pub mod cmd;
 pub mod ext;
 pub mod http2;
 pub mod hyp;
-pub mod cmd;
 
 impl From<Result<ReflectedCore, UniErr>> for ReflectedCore {
     fn from(result: Result<ReflectedCore, UniErr>) -> Self {
@@ -210,7 +210,7 @@ impl ReflectedCore {
         }
     }
 
-    pub fn ok_or(self) -> Result<Self,UniErr> {
+    pub fn ok_or(self) -> Result<Self, UniErr> {
         if self.is_ok() {
             Ok(self)
         } else {
@@ -620,9 +620,11 @@ impl TryFrom<ReflectedCore> for Surface {
         } else {
             match core.body {
                 Substance::Surface(surface) => Ok(surface),
-                substance => {
-                    Err(format!("expecting Surface received {}", substance.kind().to_string()).into())
-                }
+                substance => Err(format!(
+                    "expecting Surface received {}",
+                    substance.kind().to_string()
+                )
+                .into()),
             }
         }
     }

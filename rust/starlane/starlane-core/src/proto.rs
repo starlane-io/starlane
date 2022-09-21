@@ -1,15 +1,15 @@
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, AtomicI64, AtomicU64, Ordering};
+use std::sync::Arc;
 
 use futures::future::select_all;
-use futures::FutureExt;
 use futures::prelude::*;
+use futures::FutureExt;
 use log::Level;
-use tokio::sync::{broadcast, mpsc};
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::{broadcast, mpsc};
 use tokio::time::{Duration, Instant};
 
 use cosmic_universe::loc::StarKey;
@@ -26,13 +26,9 @@ use crate::frame::{
 };
 use crate::lane::{
     ConnectorController, LaneCommand, LaneEnd, LaneIndex, LaneMeta, LaneWrapper, ProtoLaneEnd,
-    STARLANE_PROTOCOL_VERSION, TunnelConnector, TunnelIn, TunnelOut, TunnelOutState,
+    TunnelConnector, TunnelIn, TunnelOut, TunnelOutState, STARLANE_PROTOCOL_VERSION,
 };
 use crate::logger::{Flag, Flags, Log, Logger, ProtoStarLog, ProtoStarLogPayload, StarFlag};
-use crate::star::{
-    ConstellationBroadcast, FrameHold, FrameTimeoutInner, Persistence, Star, StarCommand,
-    StarController, StarInfo, StarKernel, StarKind, StarSkel,
-};
 use crate::star::core::message::MessagingEndpointComponent;
 use crate::star::core::particle::driver::ResourceCoreDriverApi;
 use crate::star::shell::db::StarDB;
@@ -47,6 +43,10 @@ use crate::star::shell::sys::{SysApi, SysComponent};
 use crate::star::shell::watch::{WatchApi, WatchComponent};
 use crate::star::surface::{SurfaceApi, SurfaceCall, SurfaceComponent};
 use crate::star::variant::{start_variant, VariantApi};
+use crate::star::{
+    ConstellationBroadcast, FrameHold, FrameTimeoutInner, Persistence, Star, StarCommand,
+    StarController, StarInfo, StarKernel, StarKind, StarSkel,
+};
 use crate::starlane::StarlaneMachine;
 use crate::template::StarKeyConstellationIndex;
 

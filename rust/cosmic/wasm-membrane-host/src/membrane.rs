@@ -2,8 +2,8 @@ use std::ops::Deref;
 use std::sync::{Arc, RwLock, Weak};
 
 use wasmer::{
-    Array, ChainableNamedResolver, Function, ImportObject, imports, Instance, Module,
-    NamedResolver, RuntimeError, WasmerEnv, WasmPtr,
+    imports, Array, ChainableNamedResolver, Function, ImportObject, Instance, Module,
+    NamedResolver, RuntimeError, WasmPtr, WasmerEnv,
 };
 
 use crate::error::Error;

@@ -19,7 +19,6 @@ use cosmic_macros_primitive::Autobox;
 use cosmic_nom::{Res, SpanExtra};
 use exchange::ProtoTransmitter;
 
-use crate::{ANONYMOUS, HYPERUSER};
 use crate::command::Command;
 use crate::command::RawCommand;
 use crate::config::bind::RouteSelector;
@@ -27,32 +26,33 @@ use crate::err::{StatusErr, UniErr};
 use crate::hyper::AssignmentKind;
 use crate::hyper::InterchangeKind::DefaultControl;
 use crate::kind::Sub;
-use crate::loc::{
-    Layer, Point, PointSeg, RouteSeg, Surface, SurfaceSelector, Topic, ToPoint, ToSurface, Uuid,
-};
 use crate::loc::StarKey;
+use crate::loc::{
+    Layer, Point, PointSeg, RouteSeg, Surface, SurfaceSelector, ToPoint, ToSurface, Topic, Uuid,
+};
 use crate::log::{
     LogSpan, LogSpanEvent, PointLogger, RootLogger, SpanLogger, Spannable, Trackable, TrailSpanId,
 };
 use crate::parse::model::Subst;
 use crate::parse::sub;
-use crate::particle::{Details, Status};
 use crate::particle::Watch;
+use crate::particle::{Details, Status};
 use crate::security::{Permissions, Privilege, Privileges};
 use crate::selector::Selector;
 use crate::settings::Timeouts;
+use crate::substance::Bin;
 use crate::substance::{
     Call, CallKind, CmdCall, Errors, ExtCall, HttpCall, HypCall, MultipartFormBuilder, Substance,
-    SubstanceKind, Token, ToRequestCore, ToSubstance,
+    SubstanceKind, ToRequestCore, ToSubstance, Token,
 };
-use crate::substance::Bin;
 use crate::util::{uuid, ValueMatcher, ValuePattern};
+use crate::{ANONYMOUS, HYPERUSER};
 
-use self::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
 use self::core::cmd::CmdMethod;
 use self::core::ext::ExtMethod;
 use self::core::http2::HttpMethod;
 use self::core::hyp::HypMethod;
+use self::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
 
 pub mod core;
 pub mod exchange;
@@ -1555,7 +1555,12 @@ impl Echo {
 }
 
 impl Echo {
-    pub fn new(core: ReflectedCore, to: Surface, intended: Recipients, reflection_of: WaveId) -> Self {
+    pub fn new(
+        core: ReflectedCore,
+        to: Surface,
+        intended: Recipients,
+        reflection_of: WaveId,
+    ) -> Self {
         Self {
             to,
             intended,
@@ -1645,7 +1650,12 @@ impl Pong {
 }
 
 impl Pong {
-    pub fn new(core: ReflectedCore, to: Surface, intended: Recipients, reflection_of: WaveId) -> Self {
+    pub fn new(
+        core: ReflectedCore,
+        to: Surface,
+        intended: Recipients,
+        reflection_of: WaveId,
+    ) -> Self {
         Self {
             to,
             intended,
@@ -3216,8 +3226,6 @@ impl TryInto<Vec<Wave<Echo>>> for ReflectedAggregate {
     }
 }
 
-
-
 #[derive(Clone)]
 pub struct Delivery {
     pub to: Surface,
@@ -3241,5 +3249,5 @@ impl Deref for Delivery {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct HyperWave {
     point: Point,
-    wave: UltraWave
+    wave: UltraWave,
 }

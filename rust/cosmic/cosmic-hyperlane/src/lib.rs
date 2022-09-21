@@ -11,8 +11,8 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU16, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
@@ -20,10 +20,10 @@ use futures::future::select_all;
 use futures::FutureExt;
 use tokio::io::AsyncWriteExt;
 use tokio::select;
-use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock, watch};
 use tokio::sync::mpsc::error::{SendError, SendTimeoutError, TrySendError};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot::Sender;
+use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 
 use cosmic_universe::command::direct::create::{PointFactoryU64, PointSegTemplate};
 use cosmic_universe::err::UniErr;
@@ -35,17 +35,17 @@ use cosmic_universe::particle::Status;
 use cosmic_universe::settings::Timeouts;
 use cosmic_universe::substance::{Errors, Substance, SubstanceKind, Token};
 use cosmic_universe::util::uuid;
-use cosmic_universe::VERSION;
-use cosmic_universe::wave::{
-    Agent, DirectedKind, DirectedProto, Handling, HyperWave, Ping,
-    Pong, Reflectable, ReflectedKind, ReflectedProto,
-    ReflectedWave, UltraWave, Wave, WaveId, WaveKind,
-};
 use cosmic_universe::wave::core::ext::ExtMethod;
 use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::Method;
-use cosmic_universe::wave::exchange::{Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, SetStrategy, TxRouter};
-
+use cosmic_universe::wave::exchange::{
+    Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, SetStrategy, TxRouter,
+};
+use cosmic_universe::wave::{
+    Agent, DirectedKind, DirectedProto, Handling, HyperWave, Ping, Pong, Reflectable,
+    ReflectedKind, ReflectedProto, ReflectedWave, UltraWave, Wave, WaveId, WaveKind,
+};
+use cosmic_universe::VERSION;
 
 lazy_static! {
     pub static ref LOCAL_CLIENT: Point = Point::from_str("LOCAL::client").expect("point");
@@ -1951,7 +1951,7 @@ mod tests {
     use crate::{
         AnonHyperAuthenticator, HyperGate, HyperGateSelector, HyperRouter, HyperwayInterchange,
         InterchangeGate,
-        };
+    };
 
     #[no_mangle]
     pub(crate) extern "C" fn cosmic_uuid() -> String {
@@ -2024,20 +2024,21 @@ pub mod test_util {
     use cosmic_universe::log::RootLogger;
     use cosmic_universe::settings::Timeouts;
     use cosmic_universe::substance::{Substance, Token};
-    use cosmic_universe::wave::{
-        Agent, DirectedKind, DirectedProto, HyperWave, Pong,
-        ReflectedKind, ReflectedProto,
-        ReflectedWave, UltraWave, Wave,
-    };
-    use cosmic_universe::wave::core::{Method, ReflectedCore};
     use cosmic_universe::wave::core::cmd::CmdMethod;
     use cosmic_universe::wave::core::ext::ExtMethod;
-    use cosmic_universe::wave::exchange::{Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, SetStrategy, TxRouter};
+    use cosmic_universe::wave::core::{Method, ReflectedCore};
+    use cosmic_universe::wave::exchange::{
+        Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, SetStrategy, TxRouter,
+    };
+    use cosmic_universe::wave::{
+        Agent, DirectedKind, DirectedProto, HyperWave, Pong, ReflectedKind, ReflectedProto,
+        ReflectedWave, UltraWave, Wave,
+    };
 
     use crate::{
         AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, Bridge, HyperClient,
         HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter,
-        Hyperlane, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
+        HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
         HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper,
         LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist,
     };
@@ -2199,7 +2200,9 @@ pub mod test_util {
             Ok(Greet {
                 surface: stub.remote.clone(),
                 agent: stub.agent.clone(),
-                hop: Point::remote_endpoint().to_surface().with_layer(Layer::Core),
+                hop: Point::remote_endpoint()
+                    .to_surface()
+                    .with_layer(Layer::Core),
                 transport: stub.remote.clone(),
             })
         }
@@ -2224,24 +2227,25 @@ pub mod test {
     use cosmic_universe::log::RootLogger;
     use cosmic_universe::settings::Timeouts;
     use cosmic_universe::substance::{Substance, Token};
-    use cosmic_universe::wave::{
-        Agent, DirectedKind, DirectedProto, HyperWave, Pong,
-        ReflectedKind, ReflectedProto,
-        ReflectedWave, UltraWave, Wave,
-    };
-    use cosmic_universe::wave::core::{Method, ReflectedCore};
     use cosmic_universe::wave::core::cmd::CmdMethod;
     use cosmic_universe::wave::core::ext::ExtMethod;
-    use cosmic_universe::wave::exchange::{Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, SetStrategy, TxRouter};
+    use cosmic_universe::wave::core::{Method, ReflectedCore};
+    use cosmic_universe::wave::exchange::{
+        Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, SetStrategy, TxRouter,
+    };
+    use cosmic_universe::wave::{
+        Agent, DirectedKind, DirectedProto, HyperWave, Pong, ReflectedKind, ReflectedProto,
+        ReflectedWave, UltraWave, Wave,
+    };
 
+    use crate::test_util::{SingleInterchangePlatform, TestGreeter, WaveTest, FAE, LESS};
     use crate::{
         AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, Bridge, HyperClient,
         HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter,
-        Hyperlane, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
+        HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
         HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper,
         LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist,
     };
-    use crate::test_util::{FAE, LESS, SingleInterchangePlatform, TestGreeter, WaveTest};
 
     pub struct TestRouter {}
 
@@ -2550,13 +2554,15 @@ pub mod test {
         let (fae_interchange, fae_gate) = create("fae");
 
         {
-            let hyperway = Hyperway::new(FAE.to_surface().with_layer(Layer::Core), Agent::HyperUser);
+            let hyperway =
+                Hyperway::new(FAE.to_surface().with_layer(Layer::Core), Agent::HyperUser);
             less_interchange.add(hyperway).await;
             let access = Hyperway::new(LESS.to_surface().with_layer(Layer::Core), Agent::HyperUser);
             less_interchange.add(access).await;
         }
         {
-            let hyperway = Hyperway::new(LESS.to_surface().with_layer(Layer::Core), Agent::HyperUser);
+            let hyperway =
+                Hyperway::new(LESS.to_surface().with_layer(Layer::Core), Agent::HyperUser);
             fae_interchange.add(hyperway).await;
             let access = Hyperway::new(FAE.to_surface().with_layer(Layer::Core), Agent::HyperUser);
             fae_interchange.add(access).await;
@@ -2605,8 +2611,10 @@ pub mod test {
                 if wave.is_directed() {
                     let directed = wave.to_directed().unwrap();
                     let reflection = directed.reflection().unwrap();
-                    let reflection =
-                        reflection.make(ReflectedCore::ok(), FAE.to_surface().with_layer(Layer::Core));
+                    let reflection = reflection.make(
+                        ReflectedCore::ok(),
+                        FAE.to_surface().with_layer(Layer::Core),
+                    );
                     fae_access.tx.send(reflection.to_ultra()).await.unwrap();
                 }
             }

@@ -11,12 +11,12 @@ use std::time::Duration;
 
 use openssl::error::ErrorStack;
 use openssl::ssl::{Ssl, SslAcceptor, SslConnector, SslConnectorBuilder, SslFiletype, SslMethod};
-use rcgen::{Certificate, generate_simple_self_signed, RcgenError};
+use rcgen::{generate_simple_self_signed, Certificate, RcgenError};
 use tokio::fs::File;
 use tokio::io;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf, ReadHalf, WriteHalf};
+use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time::error::Elapsed;
 use tokio_openssl::SslStream;
@@ -29,9 +29,8 @@ use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::Knock;
 use cosmic_universe::log::PointLogger;
 use cosmic_universe::substance::Substance;
-use cosmic_universe::VERSION;
 use cosmic_universe::wave::{Ping, UltraWave, Wave};
-
+use cosmic_universe::VERSION;
 
 pub struct HyperlaneTcpClient {
     host: String,
@@ -596,7 +595,7 @@ impl From<&str> for Error {
 mod tests {
     use std::time::Duration;
 
-    use cosmic_hyperlane::test_util::{FAE, LESS, SingleInterchangePlatform, WaveTest};
+    use cosmic_hyperlane::test_util::{SingleInterchangePlatform, WaveTest, FAE, LESS};
     use cosmic_universe::loc::{Point, ToSurface};
     use cosmic_universe::log::RootLogger;
 

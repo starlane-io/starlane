@@ -4,48 +4,46 @@ use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::Formatter;
 use std::marker::PhantomData;
-use std::ops::{Deref, Range, RangeFrom, RangeTo};
 use std::ops;
+use std::ops::{Deref, Range, RangeFrom, RangeTo};
 use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::Arc;
 
 use ariadne::{Label, Report, ReportKind};
-use nom::{
-    AsChar, Compare, FindToken, InputIter, InputLength, InputTake, InputTakeAtPosition, Offset,
-    Parser, Slice,
-};
-use nom::{Err, IResult};
 use nom::branch::alt;
+use nom::bytes::complete::take;
 use nom::bytes::complete::{escaped, is_a, is_not};
 use nom::bytes::complete::{tag, take_till, take_until, take_until1, take_while};
-use nom::bytes::complete::take;
 use nom::character::complete::{
     alpha0, alphanumeric0, alphanumeric1, anychar, char, digit0, line_ending, multispace0,
     multispace1, newline, one_of, satisfy, space0, space1,
 };
 use nom::character::complete::{alpha1, digit1};
 use nom::character::is_space;
-use nom::combinator::{cut, eof, fail, not, peek, recognize, success, value, verify};
 use nom::combinator::{all_consuming, opt};
+use nom::combinator::{cut, eof, fail, not, peek, recognize, success, value, verify};
 use nom::error::{context, ContextError, ErrorKind, ParseError, VerboseError};
 use nom::multi::{many0, many1, separated_list0};
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
+use nom::{
+    AsChar, Compare, FindToken, InputIter, InputLength, InputTake, InputTakeAtPosition, Offset,
+    Parser, Slice,
+};
+use nom::{Err, IResult};
 use nom_locate::LocatedSpan;
-use nom_supreme::{parse_from_str, ParserExt};
 use nom_supreme::error::ErrorTree;
 use nom_supreme::final_parser::ExtractContext;
 use nom_supreme::parser_ext::MapRes;
-use regex::{Captures, Error, Match, Regex};
+use nom_supreme::{parse_from_str, ParserExt};
 use regex::internal::Input;
+use regex::{Captures, Error, Match, Regex};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use cosmic_nom::{new_span, span_with_extra, Trace};
-use cosmic_nom::{Res, Span, trim, tw, Wrap};
+use cosmic_nom::{trim, tw, Res, Span, Wrap};
 
-use crate::command::CommandVar;
 use crate::command::common::{PropertyMod, SetProperties, StateSrc, StateSrcVar};
-use crate::command::direct::CmdKind;
 use crate::command::direct::create::{
     Create, CreateVar, KindTemplate, PointSegTemplate, PointTemplate, PointTemplateSeg,
     PointTemplateVar, Require, Strategy, Template, TemplateVar,
@@ -53,6 +51,8 @@ use crate::command::direct::create::{
 use crate::command::direct::get::{Get, GetOp, GetVar};
 use crate::command::direct::select::{Select, SelectIntoSubstance, SelectKind, SelectVar};
 use crate::command::direct::set::{Set, SetVar};
+use crate::command::direct::CmdKind;
+use crate::command::CommandVar;
 use crate::command::RawCommand;
 use crate::config::bind::{
     BindConfig, Pipeline, PipelineStep, PipelineStepCtx, PipelineStepVar, PipelineStop,
@@ -60,13 +60,15 @@ use crate::config::bind::{
 };
 use crate::config::Document;
 use crate::err::{ParseErrs, UniErr};
-use crate::kind::{ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, Specific, StarSub, UserBaseSubKind};
-use crate::loc::{
-    Layer, Point, PointCtx, PointSeg,
-    PointSegCtx, PointSegDelim, PointSegment, PointSegVar, PointVar, RouteSeg, RouteSegVar,
-    Surface, Topic, Uuid, Variable, VarVal, Version,
+use crate::kind::{
+    ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, Specific, StarSub,
+    UserBaseSubKind,
 };
 use crate::loc::StarKey;
+use crate::loc::{
+    Layer, Point, PointCtx, PointSeg, PointSegCtx, PointSegDelim, PointSegVar, PointSegment,
+    PointVar, RouteSeg, RouteSegVar, Surface, Topic, Uuid, VarVal, Variable, Version,
+};
 use crate::parse::error::{find_parse_err, result};
 use crate::parse::model::{
     BindScope, BindScopeKind, Block, BlockKind, Chunk, DelimitedBlockKind, LexBlock,
@@ -81,6 +83,7 @@ use crate::security::{
     AccessGrantKind, AccessGrantKindDef, ChildPerms, ParticlePerms, Permissions, PermissionsMask,
     PermissionsMaskKind, Privilege,
 };
+use crate::selector::specific::{ProductSelector, VariantSelector, VendorSelector};
 use crate::selector::{
     ExactPointSeg, Hop, KindBaseSelector, KindSelector, LabeledPrimitiveTypeDef, MapEntryPattern,
     MapEntryPatternCtx, MapEntryPatternVar, Pattern, PatternBlock, PatternBlockCtx,
@@ -88,21 +91,20 @@ use crate::selector::{
     PointHierarchy, PointKindSeg, PointSegSelector, Selector, SelectorDef, SpecificSelector,
     SubKindSelector, UploadBlock, VersionReq,
 };
-use crate::selector::specific::{ProductSelector, VariantSelector, VendorSelector};
+use crate::substance::Bin;
 use crate::substance::{
     Call, CallCtx, CallKind, CallVar, CallWithConfig, CallWithConfigCtx, CallWithConfigVar,
     ExtCall, HttpCall, ListPattern, MapPattern, MapPatternCtx, MapPatternVar, NumRange, Substance,
     SubstanceFormat, SubstanceKind, SubstancePattern, SubstancePatternCtx, SubstancePatternVar,
     SubstanceTypePatternCtx, SubstanceTypePatternDef, SubstanceTypePatternVar,
 };
-use crate::substance::Bin;
 use crate::util::{HttpMethodPattern, StringMatcher, ToResolved, ValuePattern};
-use crate::wave::core::{Method, MethodPattern};
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::ext::ExtMethod;
 use crate::wave::core::http2::HttpMethod;
 use crate::wave::core::hyp::HypMethod;
 use crate::wave::core::MethodKind;
+use crate::wave::core::{Method, MethodPattern};
 
 /*
 pub struct Parser {}
@@ -3505,8 +3507,8 @@ pub mod model {
     use nom::combinator::{cut, fail, not, peek, recognize, value};
     use nom::sequence::delimited;
     use regex::Regex;
-    use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
     use serde::de::Visitor;
+    use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
     use cosmic_nom::{new_span, Res, Span, Trace, Tw};
 
@@ -3517,16 +3519,16 @@ pub mod model {
     };
     use crate::err::{ParseErrs, UniErr};
     use crate::loc::{Point, PointCtx, PointVar, Version};
-    use crate::parse::{
-        camel_case_chars, CtxResolver, Env, filepath_chars, http_method, lex_child_scopes,
-        method_kind, pipeline, rc_command_type, ResolverErr,
-        SubstParser, value_pattern, wrapped_cmd_method, wrapped_ext_method, wrapped_http_method, wrapped_sys_method,
-    };
     use crate::parse::error::result;
+    use crate::parse::{
+        camel_case_chars, filepath_chars, http_method, lex_child_scopes, method_kind, pipeline,
+        rc_command_type, value_pattern, wrapped_cmd_method, wrapped_ext_method,
+        wrapped_http_method, wrapped_sys_method, CtxResolver, Env, ResolverErr, SubstParser,
+    };
     use crate::util::{HttpMethodPattern, StringMatcher, ToResolved, ValueMatcher, ValuePattern};
-    use crate::wave::{DirectedWave, Ping, SingularDirectedWave};
-    use crate::wave::core::{DirectedCore, Method, MethodKind};
     use crate::wave::core::http2::HttpMethod;
+    use crate::wave::core::{DirectedCore, Method, MethodKind};
+    use crate::wave::{DirectedWave, Ping, SingularDirectedWave};
 
     #[derive(Clone)]
     pub struct ScopeSelectorAndFiltersDef<S, I> {
@@ -4794,23 +4796,23 @@ pub mod model {
 }
 
 pub mod error {
-    use ariadne::{Label, ReportKind, Source};
     use ariadne::Report;
-    use nom::{Err, Slice};
+    use ariadne::{Label, ReportKind, Source};
     use nom::branch::alt;
     use nom::bytes::complete::tag;
     use nom::character::complete::{alphanumeric0, alphanumeric1, multispace1};
     use nom::combinator::not;
     use nom::multi::many0;
     use nom::sequence::{preceded, tuple};
+    use nom::{Err, Slice};
     use nom_supreme::error::{BaseErrorKind, ErrorTree, StackContext};
     use regex::{Error, Regex};
 
     use cosmic_nom::{len, Span};
 
     use crate::err::{ParseErrs, UniErr};
-    use crate::parse::{nospace1, skewer};
     use crate::parse::model::NestedBlockKind;
+    use crate::parse::{nospace1, skewer};
 
     pub fn result<I: Span, R>(result: Result<(I, R), Err<ErrorTree<I>>>) -> Result<R, UniErr> {
         match result {
@@ -7070,37 +7072,37 @@ pub mod test {
     use nom::character::is_alphanumeric;
     use nom::combinator::{all_consuming, eof, not, opt, peek, recognize};
     use nom::error::context;
-    use nom::IResult;
     use nom::multi::{many0, many1};
     use nom::sequence::{delimited, pair, terminated, tuple};
+    use nom::IResult;
     use nom_locate::LocatedSpan;
     use nom_supreme::error::ErrorTree;
 
-    use cosmic_nom::{new_span, Res, span_with_extra};
+    use cosmic_nom::{new_span, span_with_extra, Res};
 
-    use crate::command::Command;
     use crate::command::direct::create::{
         PointSegTemplate, PointTemplate, PointTemplateCtx, Template,
-        };
+    };
+    use crate::command::Command;
     use crate::config::Document;
     use crate::err::{ParseErrs, UniErr};
     use crate::loc::{Point, PointCtx, PointSegVar, RouteSegVar};
-    use crate::parse::{
-        args, base_point_segment, base_seg, comment, consume_point_var, create, create_command,
-        doc, Env, expected_block_terminator_or_non_terminator, lex_block,
-        lex_child_scopes, lex_nested_block, lex_scope, lex_scope_pipeline_step_and_block,
-        lex_scope_selector, lex_scopes, lowercase1, MapResolver, mesh_eos, mesh_seg,
-        nested_block, nested_block_content, next_stacked_name, no_comment, parse_bind_config,
-        parse_include_blocks, parse_inner_block, path_regex, pipeline, pipeline_segment,
-        pipeline_step_var, pipeline_stop_var, point_non_root_var, point_template, point_var, pop, rec_version,
-        root_ctx_seg, root_scope, root_scope_selector, route_attribute, route_selector,
-        scope_filter, scope_filters, skewer_case_chars, skewer_dot, space_chars,
-        space_no_dupe_dots, space_point_segment, strip_comments, subst, SubstParser, template, var_seg,
-        variable_name, VarResolver, version, version_point_segment, wrapper,
-    };
     use crate::parse::error::result;
     use crate::parse::model::{
         BlockKind, DelimitedBlockKind, LexScope, NestedBlockKind, TerminatedBlockKind,
+    };
+    use crate::parse::{
+        args, base_point_segment, base_seg, comment, consume_point_var, create, create_command,
+        doc, expected_block_terminator_or_non_terminator, lex_block, lex_child_scopes,
+        lex_nested_block, lex_scope, lex_scope_pipeline_step_and_block, lex_scope_selector,
+        lex_scopes, lowercase1, mesh_eos, mesh_seg, nested_block, nested_block_content,
+        next_stacked_name, no_comment, parse_bind_config, parse_include_blocks, parse_inner_block,
+        path_regex, pipeline, pipeline_segment, pipeline_step_var, pipeline_stop_var,
+        point_non_root_var, point_template, point_var, pop, rec_version, root_ctx_seg, root_scope,
+        root_scope_selector, route_attribute, route_selector, scope_filter, scope_filters,
+        skewer_case_chars, skewer_dot, space_chars, space_no_dupe_dots, space_point_segment,
+        strip_comments, subst, template, var_seg, variable_name, version, version_point_segment,
+        wrapper, Env, MapResolver, SubstParser, VarResolver,
     };
     use crate::substance::Substance;
     use crate::util;
@@ -8213,34 +8215,34 @@ pub mod cmd_test {
     use core::str::FromStr;
 
     use nom::error::{VerboseError, VerboseErrorKind};
-    use nom_supreme::final_parser::{ExtractContext, final_parser};
+    use nom_supreme::final_parser::{final_parser, ExtractContext};
 
     use cosmic_nom::{new_span, Res};
 
     use crate::command::{Command, CommandVar};
     use crate::err::UniErr;
-    use crate::{BaseKind, KindTemplate};
-    use crate::parse::{CamelCase, command, create_command, publish_command, script};
     use crate::parse::error::result;
+    use crate::parse::{command, create_command, publish_command, script, CamelCase};
     use crate::util::ToResolved;
+    use crate::{BaseKind, KindTemplate};
 
     /*
-            #[test]
-            pub async fn test2() -> Result<(),Error>{
-                let input = "? xreate localhost<Space>";
-                let x: Result<CommandOp,VerboseError<&str>> = final_parser(command)(input);
-                match x {
-                    Ok(_) => {}
-                    Err(err) => {
-                        println!("err: {}", err.to_string())
-                    }
-                }
-
-
-                Ok(())
+    #[test]
+    pub async fn test2() -> Result<(),Error>{
+        let input = "? xreate localhost<Space>";
+        let x: Result<CommandOp,VerboseError<&str>> = final_parser(command)(input);
+        match x {
+            Ok(_) => {}
+            Err(err) => {
+                println!("err: {}", err.to_string())
             }
+        }
 
-             */
+
+        Ok(())
+    }
+
+     */
 
     #[test]
     pub fn test() -> Result<(), UniErr> {
@@ -8289,8 +8291,7 @@ pub mod cmd_test {
         Ok(())
     }
 
-
-        #[test]
+    #[test]
     pub fn test_publish() -> Result<(), UniErr> {
         let input = r#"publish ^[ bundle.zip ]-> localhost:repo:tutorial:1.0.0"#;
         publish_command(new_span(input))?;
@@ -8298,7 +8299,7 @@ pub mod cmd_test {
     }
 
     #[test]
-    pub fn test_create_kind()-> Result<(), UniErr> {
+    pub fn test_create_kind() -> Result<(), UniErr> {
         let input = r#"create localhost:repo:tutorial:1.0.0<Repo>"#;
         let mut command = result(create_command(new_span(input)))?;
         let command = command.collapse()?;
@@ -8306,9 +8307,9 @@ pub mod cmd_test {
             let kind = KindTemplate {
                 base: BaseKind::Repo,
                 sub: None,
-                specific: None
+                specific: None,
             };
-            assert_eq!(create.template.kind,kind);
+            assert_eq!(create.template.kind, kind);
         } else {
             assert!(false);
         }

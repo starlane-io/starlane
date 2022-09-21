@@ -20,10 +20,10 @@ use cosmic_universe::hyper::{HyperSubstance, Knock};
 use cosmic_universe::loc::{Point, ToSurface};
 use cosmic_universe::log::PointLogger;
 use cosmic_universe::substance::Substance;
-use cosmic_universe::VERSION;
-use cosmic_universe::wave::{DirectedProto, Pong, UltraWave, Wave};
-use cosmic_universe::wave::core::DirectedCore;
 use cosmic_universe::wave::core::hyp::HypMethod;
+use cosmic_universe::wave::core::DirectedCore;
+use cosmic_universe::wave::{DirectedProto, Pong, UltraWave, Wave};
+use cosmic_universe::VERSION;
 
 fn generate_self_signed_cert() -> Result<(rustls::Certificate, rustls::PrivateKey), UniErr> {
     let cert = rcgen::generate_simple_self_signed(vec!["cosmic-hyperlane".to_string()])?;

@@ -4,8 +4,8 @@ use std::ops::Deref;
 use std::process::Output;
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use chrono::serde::ts_milliseconds;
+use chrono::{DateTime, Utc};
 use regex::Regex;
 use serde;
 use serde::{Deserialize, Serialize};
@@ -15,7 +15,7 @@ use crate::command::common::StateSrc::Substance;
 use crate::cosmic_timestamp;
 use crate::err::UniErr;
 use crate::loc::{Point, ToPoint, Uuid};
-use crate::parse::{CamelCase, to_string};
+use crate::parse::{to_string, CamelCase};
 use crate::selector::Selector;
 use crate::util::{timestamp, uuid};
 
