@@ -1,29 +1,21 @@
-use std::str::FromStr;
-use std::sync::Arc;
-
-use http::Uri;
-
-use cosmic_universe::artifact::ArtRef;
-use cosmic_universe::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar, WaveDirection};
-use cosmic_universe::err::{StatusErr, UniErr};
-use cosmic_universe::loc::{Layer, Point, Surface, ToPoint, ToSurface};
+use cosmic_universe::err::UniErr;
+use cosmic_universe::loc::{Layer, Point, Surface, ToSurface};
 use cosmic_universe::log::{PointLogger, Trackable};
 use cosmic_universe::parse::{Env, RegexCapturesResolver};
-use cosmic_universe::parse::model::{MethodScope, PipelineSegmentVar, PipelineVar};
+use cosmic_universe::parse::model::{PipelineSegmentVar, PipelineVar};
 use cosmic_universe::particle::traversal::{Traversal, TraversalLayer};
-use cosmic_universe::selector::{PayloadBlock, PayloadBlockVar};
-use cosmic_universe::substance::Substance;
-use cosmic_universe::util::ToResolved;
-use cosmic_universe::wave::{
-    BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo,
-    Pong, ReflectedAggregate, Reflection,
-    UltraWave, Wave, WaveKind,
-};
-use cosmic_universe::wave::core::{Method, ReflectedCore};
-use cosmic_universe::wave::core::cmd::CmdMethod;
 use cosmic_universe::wave::exchange::{Exchanger, ProtoTransmitter, ProtoTransmitterBuilder};
-
-use crate::{HyperErr, Hyperverse};
+use cosmic_universe::wave::{BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Pong, Reflection, UltraWave, Wave};
+use cosmic_universe::wave::core::{Method, ReflectedCore};
+use http::Uri;
+use cosmic_universe::substance::Substance;
+use std::sync::Arc;
+use cosmic_universe::artifact::ArtRef;
+use cosmic_universe::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
+use cosmic_universe::selector::PayloadBlock;
+use std::str::FromStr;
+use cosmic_universe::util::ToResolved;
+use crate::{HyperErr, Hyperverse, RegistryApi};
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
 
 pub struct Field<P>

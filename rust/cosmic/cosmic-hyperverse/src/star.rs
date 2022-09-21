@@ -71,12 +71,12 @@ use crate::driver::{
     ItemSkel, ItemSphere,
 };
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
-use crate::field::Field;
+use crate::layer::field::Field;
 use crate::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
 use crate::machine::MachineSkel;
 use crate::Registration;
-use crate::shell::Shell;
-use crate::shell::ShellState;
+use crate::layer::shell::Shell;
+use crate::layer::shell::ShellState;
 
 #[derive(Clone)]
 pub struct ParticleStates<P>

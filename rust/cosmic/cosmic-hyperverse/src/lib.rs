@@ -54,13 +54,12 @@ use crate::driver::{DriverFactory, DriversBuilder};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
 
 pub mod driver;
-pub mod field;
 pub mod global;
 pub mod host;
 pub mod machine;
-pub mod shell;
 pub mod star;
 pub mod tests;
+pub mod layer;
 
 #[cfg(test)]
 pub mod test;
