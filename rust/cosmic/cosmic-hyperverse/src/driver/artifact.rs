@@ -281,11 +281,17 @@ where
     }
 
     async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
+println!();
+println!("!!!!! BundleDriver Received ASSIGN! {} ----------", assign.details.stub.kind.to_string());
+println!();
         let state = match &assign.state {
             StateSrc::Substance(data) => data.clone(),
-            StateSrc::None => return Err("ArtifactBundle cannot be stateless".into()),
+            StateSrc::None => {
+println!("ArtifactBundle cannot be stateless");
+                return Err("ArtifactBundle cannot be stateless".into())
+            },
         };
-
+println!("...");
         if let Substance::Bin(zip) = (*state).clone() {
             let temp_dir = TempDir::new("zipcheck")?;
             let temp_path = temp_dir.path().clone();
@@ -293,6 +299,7 @@ where
             let mut file = File::create(file_path.as_path())?;
             file.write_all(zip.as_slice())?;
 
+println!("wrote to tmpfile");
             let file = File::open(file_path.as_path())?;
             let mut archive = zip::ZipArchive::new(file)?;
             let mut artifacts = vec![];
@@ -303,6 +310,7 @@ where
                 }
             }
 
+println!("whatup artifact?");
             let mut point_and_kind_set = HashSet::new();
             for artifact in artifacts {
                 let mut path = String::new();

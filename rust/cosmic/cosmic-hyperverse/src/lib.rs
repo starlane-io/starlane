@@ -13,6 +13,7 @@ extern crate strum_macros;
 
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -55,11 +56,12 @@ use crate::machine::{Machine, MachineApi, MachineTemplate};
 
 pub mod driver;
 pub mod global;
-pub mod host;
 pub mod machine;
 pub mod star;
-pub mod tests;
 pub mod layer;
+
+#[cfg(test)]
+pub mod tests;
 
 #[cfg(test)]
 pub mod test;
@@ -128,151 +130,9 @@ where
     async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), P::Err>;
 }
 
-/*
-#[derive(Clone)]
-pub struct Registry<P>
-where P: Platform, P::Err: PlatErr
-{
-    registry: Arc<dyn RegistryApi<P>>,
-}
-
-impl<P> Registry<P>
-    where P: Platform, P::Err: PlatErr
-{
-    pub fn new(registry: Arc<dyn RegistryApi<P>>) -> Self {
-        Self { registry }
-    }
-}
-
-#[async_trait]
-impl<P> RegistryApi<P> for Registry<P>
-where P: Platform, P::Err: PlatErr
-{
-    async fn register(&self, registration: &Registration) -> Result<Details, MsgErr> {
-        self.registry
-            .register(registration)
-            .await
-            .map_err(|e| e.to_cosmic_err())
-    }
-
-    async fn assign(&self, point: &Point, location: &Point) -> Result<(), MsgErr> {
-        self.registry
-            .assign(point, location)
-            .await
-            .map_err(|e| e.to_cosmic_err())
-    }
-
-    async fn set_status(&self, point: &Point, status: &Status) -> Result<(), MsgErr> {
-        self.registry
-            .set_status(point, status)
-            .await
-            .map_err(|e| e.to_cosmic_err())
-    }
-
-    async fn set_properties(
-        &self,
-        point: &Point,
-        properties: &SetProperties,
-    ) -> Result<(), MsgErr> {
-        self.registry
-            .set_properties(point, properties)
-            .await
-            .map_err(|e| e.to_cosmic_err())
-    }
-
-    async fn sequence(&self, point: &Point) -> Result<u64, MsgErr> {
-        self.registry
-            .sequence(point)
-            .await
-            .map_err(|e| e.to_cosmic_err())
-    }
-
-    async fn get_properties(&self, point: &Point) -> Result<Properties, MsgErr> {
-        self.registry
-            .get_properties(point)
-            .await
-            .map_err(|e| e.to_cosmic_err())
-    }
-
-    async fn locate(&self, point: &Point) -> Result<ParticleRecord, MsgErr> {
-        self.registry
-            .locate(point)
-            .await
-            .map_err(|e| e.to_cosmic_err())
-    }
-
-    async fn query(&self, point: &Point, query: &Query) -> Result<QueryResult, MsgErr> {
-        self.registry
-            .query(point, query)
-            .await
-            .map_err(|e| e.to_cosmic_err())
-    }
-
-    async fn delete(&self, delete: &Delete) -> Result<SubstanceList, MsgErr> {
-        self.registry
-            .delete(delete)
-            .await
-            .map_err(|e| e.to_cosmic_err())
-    }
-
-    async fn select(&self, select: &mut Select) -> Result<SubstanceList, MsgErr> {
-        self.registry
-            .select(select)
-            .await
-            .map_err(|e| e.to_cosmic_err())
-    }
-
-    async fn sub_select(&self, sub_select: &SubSelect) -> Result<Vec<Stub>, MsgErr> {
-        self.registry
-            .sub_select(sub_select)
-            .await
-            .map_err(|e| e.to_cosmic_err())
-    }
-
-    async fn grant(&self, access_grant: &AccessGrant) -> Result<(), MsgErr> {
-        self.registry
-            .grant(access_grant)
-            .await
-            .map_err(|e| e.to_cosmic_err())
-    }
-
-    async fn access(&self, to: &Point, on: &Point) -> Result<Access, MsgErr> {
-        self.registry
-            .access(to, on)
-            .await
-            .map_err(|e| e.to_cosmic_err())
-    }
-
-    async fn chown(&self, on: &Selector, owner: &Point, by: &Point) -> Result<(), MsgErr> {
-        self.registry
-            .chown(on, owner, by)
-            .await
-            .map_err(|e| e.to_cosmic_err())
-    }
-
-    async fn list_access(
-        &self,
-        to: &Option<&Point>,
-        on: &Selector,
-    ) -> Result<Vec<IndexedAccessGrant>, MsgErr> {
-        self.registry
-            .list_access(to, on)
-            .await
-            .map_err(|e| e.to_cosmic_err())
-    }
-
-    async fn remove_access(&self, id: i32, to: &Point) -> Result<(), MsgErr> {
-        self.registry
-            .remove_access(id, to)
-            .await
-            .map_err(|e| e.to_cosmic_err())
-    }
-}
-
- */
-
 pub trait HyperErr:
     Sized
+    + Debug
     + Send
     + Sync
     + ToString

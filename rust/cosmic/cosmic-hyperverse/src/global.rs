@@ -39,7 +39,7 @@ use crate::driver::{
     Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere,
 };
 use crate::Registration;
-use crate::star::HyperStarSkel;
+use crate::star::{HyperStarSkel, SmartLocator};
 
 /*
 #[derive(DirectedHandler,Clone)]
@@ -138,6 +138,7 @@ where
 
     #[track_caller]
     pub async fn create(&self, create: &Create, agent: &Agent) -> Result<Details, P::Err> {
+println!("CREATING....{}", create.template.kind.to_string() );
         let child_kind = self
             .skel
             .machine
@@ -149,6 +150,7 @@ where
                     create.template.kind.to_string()
                 ))
             })?;
+println!("Child Kind: {}", child_kind.to_string());
         let details = match &create.template.point.child_segment_template {
             PointSegTemplate::Exact(child_segment) => {
                 let point = create.template.point.parent.push(child_segment.clone());
@@ -208,6 +210,22 @@ where
                 self.skel.registry.register(&registration).await?
             }
         };
+
+
+        if create.state.has_substance() {
+            // spawning a task is a hack, but without it this process will freeze
+            // need to come up with a better solution so that
+            {
+                let details = details.clone();
+                let provisioner = SmartLocator::new(self.skel.clone());
+                let state = create.state.clone();
+                println!("provisioning: {}<{}>", details.stub.point.to_string(), details.stub.kind.to_string());
+                tokio::spawn(async move {
+                    provisioner.provision(&details.stub.point, state).await.unwrap();
+                });
+            }
+        }
+
 
         Ok(details)
     }

@@ -1800,7 +1800,6 @@ pub fn publish<I: Span>(input: I) -> Res<I, CreateVar> {
         }
         Some(last) => last,
     };
-
      */
 
     let template = TemplateVar {
@@ -8220,7 +8219,10 @@ pub mod cmd_test {
 
     use crate::command::{Command, CommandVar};
     use crate::err::UniErr;
-    use crate::parse::{CamelCase, command, publish_command, script};
+    use crate::{BaseKind, KindTemplate};
+    use crate::parse::{CamelCase, command, create_command, publish_command, script};
+    use crate::parse::error::result;
+    use crate::util::ToResolved;
 
     /*
             #[test]
@@ -8292,6 +8294,25 @@ pub mod cmd_test {
     pub fn test_publish() -> Result<(), UniErr> {
         let input = r#"publish ^[ bundle.zip ]-> localhost:repo:tutorial:1.0.0"#;
         publish_command(new_span(input))?;
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_create_kind()-> Result<(), UniErr> {
+        let input = r#"create localhost:repo:tutorial:1.0.0<Repo>"#;
+        let mut command = result(create_command(new_span(input)))?;
+        let command = command.collapse()?;
+        if let Command::Create(create) = command {
+            let kind = KindTemplate {
+                base: BaseKind::Repo,
+                sub: None,
+                specific: None
+            };
+            assert_eq!(create.template.kind,kind);
+        } else {
+            assert!(false);
+        }
+
         Ok(())
     }
 }

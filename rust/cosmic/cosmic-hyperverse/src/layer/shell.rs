@@ -12,7 +12,9 @@ use cosmic_universe::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
 use cosmic_universe::wave::{BounceBacks, DirectedKind, DirectedProto, DirectedWave, Pong, ReflectedWave, UltraWave, Wave, WaveId};
 use dashmap::{DashMap, DashSet};
 use std::sync::atomic::{AtomicU16, Ordering};
+use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
+use cosmic_universe::substance::Substance;
 use crate::Hyperverse;
 use crate::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
 
@@ -275,19 +277,34 @@ impl CommandExecutor {
 
         println!("Pre parse line... '{}'", ctx.line);
         let command = log(result(command_line(new_span(ctx.line.as_str()))))?;
+
         println!("post parse line...");
         let mut env = self.env.clone();
         for transfer in &ctx.transfers {
             env.set_file(transfer.id.clone(), transfer.content.clone())
         }
         println!("Staring to work...");
-        let command: Command = command.to_resolved(&self.env)?;
+        let mut command: Command = command.to_resolved(&self.env)?;
         println!("resolved?...");
+
+        if let Command::Create(create) = & mut command {
+println!("...CHedcking For Transfers... for {} ", create.template.kind.to_string() );
+            if ctx.transfers.len() == 1 {
+                let transfer = ctx.transfers.get(0).unwrap().clone();
+                println!();
+                println!(" === > ADDING TRANSFER < ===");
+                create.state = StateSrc::Substance(Box::new(Substance::Bin(transfer.content)));
+                println!("NOW STATEFUL");
+                println!();
+            } else if ctx.transfers.len() > 1 {
+                return Err("create cannot handle more than one state transfer".into());
+            }
+        }
 
         let request: DirectedCore = command.into();
         let mut directed = DirectedProto::from_core(request);
         directed.to(Point::global_executor());
-        println!("GOT HERE");
+        println!("GOT HERE ready ");
         let pong: Wave<Pong> = ctx.transmitter.direct(directed).await?;
         Ok(pong.variant.core)
     }

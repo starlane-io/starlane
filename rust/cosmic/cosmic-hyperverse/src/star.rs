@@ -1217,32 +1217,7 @@ where
         });
     }
 
-    /*
-    async fn search_for_stars(&self, search: Search) -> Result<Vec<Discovery>, MsgErr> {
-        let mut ripple = DirectedProto::ping();
-        ripple.kind(DirectedKind::Ripple);
-        ripple.method(SysMethod::Search);
-        ripple.bounce_backs = Some(BounceBacks::Count(self.skel.adjacents.len()));
-        ripple.body(Substance::Sys(Sys::Search(search)));
-        ripple.to(Recipients::Stars);
-        let echoes: Echoes = self.skel.gravity_transmitter.direct(ripple).await?;
 
-        let mut rtn = vec![];
-        for echo in echoes {
-            if let Substance::Sys(Sys::Discoveries(discoveries)) = echo.variant.core.body {
-                for discovery in discoveries.vec.into_iter() {
-                    rtn.push(discovery);
-                }
-            } else {
-                self.star_skel
-                    .logger
-                    .warn("unexpected reflected core substance from search echo");
-            }
-        }
-
-        Ok(rtn)
-    }
-     */
 }
 
 #[derive(Clone)]
@@ -1837,24 +1812,25 @@ where
             Some(location) => Ok(location),
             None => {
                 // now we must provision
-                self.provision(point).await
+                self.provision(point, StateSrc::None).await
             }
         }
     }
 
     #[async_recursion]
-    async fn provision(&self, point: &Point) -> Result<Point, P::Err> {
+    pub async fn provision(&self, point: &Point, state: StateSrc) -> Result<Point, P::Err> {
         // check if parent is provisioned
         let parent = point
             .parent()
             .ok_or(P::Err::new("expected Root to be provisioned"))?;
-        let parent_record = self.skel.registry.record(&parent).await?;
+        let mut parent_record = self.skel.registry.record(&parent).await?;
         if parent_record.location.is_none() {
-            self.provision(&parent).await?;
+            self.provision(&parent, StateSrc::None).await?;
+            parent_record = self.skel.registry.record(&parent).await?;
         }
 
         let parent_star = parent_record.location.unwrap();
-        let provision = Provision::new(point.clone(), StateSrc::None);
+        let provision = Provision::new(point.clone(), state);
         let mut wave = DirectedProto::ping();
         wave.method(HypMethod::Provision);
         wave.body(HyperSubstance::Provision(provision).into());

@@ -45,6 +45,15 @@ pub mod common {
         Substance(Box<Substance>),
     }
 
+    impl StateSrc {
+        pub fn has_substance(&self) -> bool {
+            match self {
+                StateSrc::None => false,
+                StateSrc::Substance(_) => true
+            }
+        }
+    }
+
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
     pub enum PropertyMod {
         Set {
@@ -400,11 +409,7 @@ pub mod direct {
 
                 let template = TemplateCtx {
                     point,
-                    kind: KindTemplate {
-                        base: BaseKind::Bundle,
-                        sub: None,
-                        specific: None,
-                    },
+                    kind: self.kind,
                 };
                 Ok(template)
             }
@@ -415,11 +420,7 @@ pub mod direct {
 
                 let template = Template {
                     point,
-                    kind: KindTemplate {
-                        base: BaseKind::Bundle,
-                        sub: None,
-                        specific: None,
-                    },
+                    kind: self.kind
                 };
                 Ok(template)
             }
