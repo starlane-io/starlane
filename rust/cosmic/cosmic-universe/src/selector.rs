@@ -31,7 +31,7 @@ pub type KindSelectorVar =
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct KindSelectorDef<GenericKindSelector, GenericSubKindSelector, SpecificSelector> {
-    pub kind: GenericKindSelector,
+    pub base: GenericKindSelector,
     pub sub: GenericSubKindSelector,
     pub specific: ValuePattern<SpecificSelector>,
 }
@@ -43,9 +43,17 @@ impl KindSelector {
         specific: ValuePattern<SpecificSelector>,
     ) -> Self {
         Self {
-            kind,
+            base: kind,
             sub: sub_kind,
             specific,
+        }
+    }
+
+    pub fn from_base( base: BaseKind ) -> Self {
+        Self {
+            base: Pattern::Exact(base),
+            sub: SubKindSelector::Any,
+            specific: ValuePattern::Any
         }
     }
 
@@ -53,9 +61,20 @@ impl KindSelector {
     where
         KindParts: Eq + PartialEq,
     {
-        self.kind.matches(&kind.to_base())
+        self.base.matches(&kind.to_base())
             && self.sub.matches(&kind.sub().into())
             && self.specific.is_match_opt(kind.specific().as_ref()).is_ok()
+    }
+
+    pub fn as_point_segments(&self) -> Result<String,UniErr> {
+        match &self.base {
+            KindBaseSelector::Any => {
+                Err(UniErr::from_500("cannot turn a base wildcard kind into point segments"))
+            }
+            KindBaseSelector::Exact(e) => {
+                Ok(e.to_skewer().to_string())
+            }
+        }
     }
 }
 
@@ -63,7 +82,7 @@ impl ToString for KindSelector {
     fn to_string(&self) -> String {
         format!(
             "{}<{}<{}>>",
-            self.kind.to_string(),
+            self.base.to_string(),
             match &self.sub {
                 SubKindSelector::Any => "*".to_string(),
                 SubKindSelector::Exact(sub) => {
@@ -78,7 +97,7 @@ impl ToString for KindSelector {
 impl KindSelector {
     pub fn any() -> Self {
         Self {
-            kind: KindBaseSelector::Any,
+            base: KindBaseSelector::Any,
             sub: SubKindSelector::Any,
             specific: ValuePattern::Any,
         }
@@ -657,7 +676,7 @@ impl ToString for Hop {
         let mut rtn = String::new();
         rtn.push_str(self.segment_selector.to_string().as_str());
 
-        if let Pattern::Exact(base) = &self.kind_selector.kind {
+        if let Pattern::Exact(base) = &self.kind_selector.base {
             rtn.push_str(format!("<{}", base.to_string()).as_str());
             if let Pattern::Exact(sub) = &self.kind_selector.sub {
                 rtn.push_str(format!("<{}", sub.as_ref().unwrap().to_string()).as_str());

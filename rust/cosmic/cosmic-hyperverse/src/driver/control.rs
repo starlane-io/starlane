@@ -20,6 +20,7 @@ use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::RawCommand;
 use cosmic_universe::wave::core::ReflectedCore;
 use std::str::FromStr;
+use cosmic_universe::selector::KindSelector;
 use crate::driver::{ Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Item, ItemRouter, ItemSphere};
 use crate::{HyperErr, Hyperverse};
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
@@ -36,8 +37,8 @@ impl<P> HyperDriverFactory<P> for ControlDriverFactory<P>
 where
     P: Hyperverse,
 {
-    fn kind(&self) -> Kind {
-        Kind::Control
+    fn kind(&self) -> KindSelector {
+        KindSelector::from_base(BaseKind::Control)
     }
 
     fn avail(&self) -> DriverAvail {
@@ -95,8 +96,8 @@ impl<P> HyperDriverFactory<P> for ControlFactory<P>
 where
     P: Hyperverse,
 {
-    fn kind(&self) -> Kind {
-        Kind::Control
+    fn kind(&self) -> KindSelector {
+        KindSelector::from_base(BaseKind::Control)
     }
 
     async fn create(

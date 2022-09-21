@@ -11,7 +11,8 @@ use crate::hyper::ChildRegistry;
 use crate::loc::{CONTROL_WAVE_TRAVERSAL_PLAN, MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, ProvisionAffinity, STAR_WAVE_TRAVERSAL_PLAN, StarKey, STD_WAVE_TRAVERSAL_PLAN, ToBaseKind, Version};
 use crate::parse::{CamelCase, Domain, kind_parts, SkewerCase};
 use crate::particle::traversal::TraversalPlan;
-use crate::selector::{Pattern, SpecificSelector, VersionReq};
+use crate::selector::{KindSelector, KindSelectorDef, Pattern, SpecificSelector, SubKindSelector, VersionReq};
+use crate::util::ValuePattern;
 
 impl ToBaseKind for KindParts {
     fn to_base(&self) -> BaseKind {
@@ -279,6 +280,14 @@ impl Kind {
         }
     }
 
+    pub fn is_auto_provision(&self) -> bool {
+        match self {
+            Kind::Bundle => true,
+            Kind::Artifact(_) => true,
+            _ => false
+        }
+    }
+
     pub fn as_point_segments(&self) -> String {
         if Sub::None != self.sub() {
             if let Some(specific) = self.specific() {
@@ -428,6 +437,19 @@ pub enum StarSub {
 }
 
 impl StarSub {
+
+    pub fn to_selector(&self) -> KindSelector {
+        KindSelector {
+            base: Pattern::Exact(BaseKind::Star),
+            sub: SubKindSelector::Exact(Some(self.to_camel_case())),
+            specific: ValuePattern::None
+        }
+    }
+
+    pub fn to_camel_case(&self) -> CamelCase {
+        CamelCase::from_str(self.to_string().as_str()).unwrap()
+    }
+
     pub fn is_forwarder(&self) -> bool {
         match self {
             StarSub::Nexus => true,

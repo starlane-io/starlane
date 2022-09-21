@@ -212,7 +212,7 @@ println!("Child Kind: {}", child_kind.to_string());
         };
 
 
-        if create.state.has_substance() {
+        if create.state.has_substance() || details.stub.kind.is_auto_provision() {
             // spawning a task is a hack, but without it this process will freeze
             // need to come up with a better solution so that
             {

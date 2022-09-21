@@ -543,7 +543,7 @@ where
                 _ => {}
             }
 
-            match &hop.kind_selector.kind {
+            match &hop.kind_selector.base {
                 KindBaseSelector::Any => {}
                 KindBaseSelector::Exact(kind) => {
                     index = index + 1;
@@ -552,7 +552,7 @@ where
                 }
             }
 
-            match &hop.kind_selector.kind {
+            match &hop.kind_selector.base {
                 KindBaseSelector::Any => {}
                 KindBaseSelector::Exact(kind) => match &hop.kind_selector.sub {
                     SubKindSelector::Any => {}

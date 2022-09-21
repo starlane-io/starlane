@@ -2,9 +2,10 @@ use std::str::FromStr;
 use std::sync::Arc;
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::config::bind::BindConfig;
-use cosmic_universe::kind::Kind;
+use cosmic_universe::kind::{BaseKind, Kind};
 use cosmic_universe::loc::Point;
 use cosmic_universe::parse::bind_config;
+use cosmic_universe::selector::KindSelector;
 use cosmic_universe::util::log;
 use crate::driver::{Driver, DriverAvail, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere};
 use crate::Hyperverse;
@@ -43,8 +44,8 @@ impl<P> HyperDriverFactory<P> for BaseDriverFactory
 where
     P: Hyperverse,
 {
-    fn kind(&self) -> Kind {
-        Kind::Base
+    fn kind(&self) -> KindSelector {
+        KindSelector::from_base(BaseKind::Base)
     }
 
     async fn create(

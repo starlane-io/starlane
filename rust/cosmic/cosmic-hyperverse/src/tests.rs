@@ -610,7 +610,7 @@ fn test_star_wrangle() -> Result<(), TestErr> {
         println!("wrangles: {}", wrangles.wrangles.len());
 
         for kind in wrangles.wrangles.iter() {
-            println!("\tkind: {}", kind.kind.to_string());
+            println!("\tkind: {}", kind.key().to_string());
         }
 
         Ok(())

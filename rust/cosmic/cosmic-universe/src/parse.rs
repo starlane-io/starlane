@@ -5624,7 +5624,7 @@ pub fn kind_selector<I: Span>(input: I) -> Res<I, KindSelector> {
         };
 
         let tks = KindSelector {
-            kind,
+            base: kind,
             sub: sub_kind,
             specific,
         };
@@ -5676,7 +5676,7 @@ fn base_hop<I: Span>(input: I) -> Res<I, Hop> {
 fn file_hop<I: Span>(input: I) -> Res<I, Hop> {
     tuple((file_segment, opt(tag("+"))))(input).map(|(next, (segment, inclusive))| {
         let tks = KindSelector {
-            kind: Pattern::Exact(BaseKind::File),
+            base: Pattern::Exact(BaseKind::File),
             sub: Pattern::Any,
             specific: ValuePattern::Any,
         };
@@ -5755,7 +5755,7 @@ pub fn point_selector<I: Span>(input: I) -> Res<I, Selector> {
                         PointSeg::FilesystemRootDir,
                     )),
                     kind_selector: KindSelector {
-                        kind: Pattern::Exact(BaseKind::File),
+                        base: Pattern::Exact(BaseKind::File),
                         sub: Pattern::Any,
                         specific: ValuePattern::Any,
                     },

@@ -22,12 +22,13 @@ use cosmic_universe::config::bind::BindConfig;
 use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::{Assign, HyperSubstance};
 use cosmic_universe::HYPERUSER;
-use cosmic_universe::kind::{Kind, StarSub};
+use cosmic_universe::kind::{BaseKind, Kind, StarSub};
 use cosmic_universe::loc::{Layer, Point, Surface, ToPoint, ToSurface};
 use cosmic_universe::log::{PointLogger, Tracker};
 use cosmic_universe::parse::bind_config;
 use cosmic_universe::particle::{Details, Status, Stub};
 use cosmic_universe::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
+use cosmic_universe::selector::KindSelector;
 use cosmic_universe::substance::Substance;
 use cosmic_universe::util::log;
 use cosmic_universe::wave::{Agent, DirectedWave, ReflectedWave, UltraWave};
@@ -55,8 +56,8 @@ where
     P: Hyperverse,
 {
     factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
-    kinds: Vec<Kind>,
-    external_kinds: Vec<Kind>,
+    kinds: Vec<KindSelector>,
+    external_kinds: Vec<KindSelector>,
 }
 
 impl<P> DriversBuilder<P>
@@ -80,7 +81,7 @@ where
             ));
         }
         pre.push(drivers_factory);
-        kinds.push(Kind::Star(kind));
+        kinds.push(kind.to_selector());
         pre.push(star_factory);
         Self {
             factories: pre,
@@ -89,7 +90,7 @@ where
         }
     }
 
-    pub fn kinds(&self) -> Vec<Kind> {
+    pub fn kinds(&self) -> Vec<KindSelector> {
         self.kinds.clone()
     }
 
@@ -143,19 +144,21 @@ where
         rtn: oneshot::Sender<()>,
     },
     Visit(Traversal<UltraWave>),
-    InternalKinds(oneshot::Sender<Vec<Kind>>),
-    ExternalKinds(oneshot::Sender<Vec<Kind>>),
+    InternalKinds(oneshot::Sender<Vec<KindSelector>>),
+    ExternalKinds(oneshot::Sender<Vec<KindSelector>>),
+    FindExternalKind{kind: Kind, rtn:oneshot::Sender<Option<DriverApi<P>>>},
+    FindInternalKind{kind: Kind, rtn:oneshot::Sender<Option<DriverApi<P>>>},
     Assign {
         assign: Assign,
         rtn: oneshot::Sender<Result<(), P::Err>>,
     },
-    Drivers(oneshot::Sender<HashMap<Kind, DriverApi<P>>>),
+    Drivers(oneshot::Sender<HashMap<KindSelector, DriverApi<P>>>),
     Get {
         kind: Kind,
         rtn: oneshot::Sender<Result<DriverApi<P>, UniErr>>,
     },
     Status {
-        kind: Kind,
+        kind: KindSelector,
         rtn: oneshot::Sender<Result<DriverStatus, UniErr>>,
     },
     StatusRx(oneshot::Sender<watch::Receiver<DriverStatus>>),
@@ -194,19 +197,32 @@ where
         self.call_tx.send(DriversCall::Visit(traversal)).await;
     }
 
-    pub async fn internal_kinds(&self) -> Result<Vec<Kind>, UniErr> {
+    pub async fn internal_kinds(&self) -> Result<Vec<KindSelector>, UniErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx.send(DriversCall::InternalKinds(rtn)).await?;
         Ok(rtn_rx.await?)
     }
 
-    pub async fn external_kinds(&self) -> Result<Vec<Kind>, UniErr> {
+    pub async fn external_kinds(&self) -> Result<Vec<KindSelector>, UniErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx.send(DriversCall::ExternalKinds(rtn)).await?;
         Ok(rtn_rx.await?)
     }
 
-    pub async fn drivers(&self) -> Result<HashMap<Kind, DriverApi<P>>, UniErr> {
+pub async fn find_external(&self, kind : Kind) -> Result<Option<DriverApi<P>>, UniErr> {
+        let (rtn, mut rtn_rx) = oneshot::channel();
+        self.call_tx.send(DriversCall::FindExternalKind{kind, rtn}).await?;
+        Ok(rtn_rx.await?)
+    }
+
+pub async fn find_internal(&self, kind : Kind) -> Result<Option<DriverApi<P>>, UniErr> {
+        let (rtn, mut rtn_rx) = oneshot::channel();
+        self.call_tx.send(DriversCall::FindInternalKind{kind, rtn}).await?;
+        Ok(rtn_rx.await?)
+    }
+
+
+    pub async fn drivers(&self) -> Result<HashMap<KindSelector, DriverApi<P>>, UniErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx.send(DriversCall::Drivers(rtn)).await;
         Ok(rtn_rx.await?)
@@ -243,14 +259,14 @@ where
     port: Surface,
     skel: HyperStarSkel<P>,
     factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
-    drivers: HashMap<Kind, DriverApi<P>>,
+    drivers: HashMap<KindSelector, DriverApi<P>>,
     call_rx: mpsc::Receiver<DriversCall<P>>,
     call_tx: mpsc::Sender<DriversCall<P>>,
-    statuses_rx: Arc<DashMap<Kind, watch::Receiver<DriverStatus>>>,
+    statuses_rx: Arc<DashMap<KindSelector, watch::Receiver<DriverStatus>>>,
     status_tx: mpsc::Sender<DriverStatus>,
     status_rx: watch::Receiver<DriverStatus>,
-    kinds: Vec<Kind>,
-    external_kinds: Vec<Kind>,
+    kinds: Vec<KindSelector>,
+    external_kinds: Vec<KindSelector>,
     init: bool,
 }
 
@@ -262,8 +278,8 @@ where
         port: Surface,
         skel: HyperStarSkel<P>,
         factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
-        kinds: Vec<Kind>,
-        external_kinds: Vec<Kind>,
+        kinds: Vec<KindSelector>,
+        external_kinds: Vec<KindSelector>,
         call_tx: mpsc::Sender<DriversCall<P>>,
         call_rx: mpsc::Receiver<DriversCall<P>>,
         watch_status_tx: watch::Sender<DriverStatus>,
@@ -345,7 +361,7 @@ where
 
                     DriversCall::Get { kind, rtn } => {
                         rtn.send(
-                            self.drivers.get(&kind).cloned().ok_or(
+                            self.find(&kind).cloned().ok_or(
                                 format!("star does not have driver for kind: {}", kind.to_string())
                                     .into(),
                             ),
@@ -354,16 +370,22 @@ where
                     DriversCall::ExternalKinds(rtn) => {
                         rtn.send(self.external_kinds.clone());
                     }
+                    DriversCall::FindExternalKind { kind, rtn } => {
+                        rtn.send(self.find_external(&kind).cloned() );
+                    }
+                    DriversCall::FindInternalKind { kind, rtn } => {
+                        rtn.send(self.find_internal(&kind).cloned() );
+                    }
                 }
             }
         });
     }
 
-    pub fn internal_kinds(&self) -> Vec<Kind> {
+    pub fn internal_kinds(&self) -> Vec<KindSelector> {
         self.kinds.clone()
     }
 
-    pub fn external_kinds(&self) -> Vec<Kind> {
+    pub fn external_kinds(&self) -> Vec<KindSelector> {
         self.external_kinds.clone()
     }
     pub async fn init0(&mut self) {
@@ -372,7 +394,7 @@ where
         } else {
             let factory = self.factories.remove(0);
             let (status_tx, mut status_rx) = watch::channel(DriverStatus::Pending);
-            self.statuses_rx.insert(Kind::Driver, status_rx.clone());
+            self.statuses_rx.insert(KindSelector::from_base(BaseKind::Driver), status_rx.clone());
 
             self.create(factory.kind(), factory.clone(), status_tx)
                 .await;
@@ -490,7 +512,7 @@ where
 
     async fn create(
         &self,
-        kind: Kind,
+        kind: KindSelector,
         factory: Arc<dyn HyperDriverFactory<P>>,
         status_tx: watch::Sender<DriverStatus>,
     ) {
@@ -522,7 +544,7 @@ where
                 skel.registry.assign(&point).send(skel.point.clone());
                 Ok(())
             }
-            let point = drivers_point.push(kind.as_point_segments()).unwrap();
+            let point = drivers_point.push(kind.as_point_segments().unwrap()).unwrap();
             let logger = self.skel.logger.point(point.clone());
             let status_rx = status_tx.subscribe();
 
@@ -664,6 +686,39 @@ where
             }
         }
     }
+
+    pub fn find( &self, kind: &Kind ) -> Option<& DriverApi<P>> {
+        for selector  in &self.kinds {
+            if selector.matches(kind) {
+                return self.drivers.get(&selector);
+            }
+        }
+
+        for selector  in &self.external_kinds {
+            if selector.matches(kind) {
+                return self.drivers.get(selector);
+            }
+        }
+        None
+    }
+
+    pub fn find_external( &self, kind: &Kind ) -> Option<& DriverApi<P>> {
+        for selector  in &self.external_kinds {
+            if selector.matches(kind) {
+                return self.drivers.get(selector);
+            }
+        }
+        None
+    }
+
+    pub fn find_internal( &self, kind: &Kind ) -> Option<& DriverApi<P>> {
+        for selector  in &self.kinds {
+            if selector.matches(kind) {
+                return self.drivers.get(selector);
+            }
+        }
+        None
+    }
 }
 
 impl<P> Drivers<P>
@@ -671,9 +726,8 @@ where
     P: Hyperverse,
 {
     pub async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
-        let driver = self
-            .drivers
-            .get(&assign.details.stub.kind)
+        let driver = self.
+             find(&assign.details.stub.kind)
             .ok_or::<UniErr>(
                 format!(
                     "Kind {} not supported by Drivers for Star: {}",
@@ -693,8 +747,7 @@ where
             .await
             .map_err(|e| e.to_cosmic_err())?;
         let driver = self
-            .drivers
-            .get(&record.details.stub.kind)
+            .find(&record.details.stub.kind)
             .ok_or::<UniErr>("do not handle this kind of driver".into())?;
         driver.handle(wave).await
     }
@@ -736,7 +789,7 @@ where
 
     pub async fn visit(&self, traversal: Traversal<UltraWave>) {
         if traversal.dir.is_core() {
-            match self.drivers.get(&traversal.record.details.stub.kind) {
+            match self.find(&traversal.record.details.stub.kind) {
                 None => {
                     traversal.logger.warn(format!(
                         "star does not have a driver for Kind <{}>",
@@ -762,14 +815,14 @@ where
     P: Hyperverse,
 {
     pub call_tx: mpsc::Sender<DriverRunnerCall<P>>,
-    pub kind: Kind,
+    pub kind: KindSelector,
 }
 
 impl<P> DriverApi<P>
 where
     P: Hyperverse,
 {
-    pub fn new(tx: mpsc::Sender<DriverRunnerCall<P>>, kind: Kind) -> Self {
+    pub fn new(tx: mpsc::Sender<DriverRunnerCall<P>>, kind: KindSelector) -> Self {
         Self { call_tx: tx, kind }
     }
 
@@ -1182,7 +1235,7 @@ where
     P: Hyperverse,
 {
     skel: HyperStarSkel<P>,
-    pub kind: Kind,
+    pub kind: KindSelector,
     pub point: Point,
     pub logger: PointLogger,
     pub status_rx: watch::Receiver<DriverStatus>,
@@ -1201,7 +1254,7 @@ where
 
     pub fn new(
         skel: HyperStarSkel<P>,
-        kind: Kind,
+        kind: KindSelector,
         point: Point,
         transmitter: ProtoTransmitter,
         logger: PointLogger,
@@ -1277,7 +1330,7 @@ impl<P> HyperDriverFactory<P> for DriverFactoryWrapper<P>
 where
     P: Hyperverse,
 {
-    fn kind(&self) -> Kind {
+    fn kind(&self) -> KindSelector {
         self.factory.kind()
     }
 
@@ -1296,7 +1349,7 @@ pub trait DriverFactory<P>: Send + Sync
 where
     P: Hyperverse,
 {
-    fn kind(&self) -> Kind;
+    fn kind(&self) -> KindSelector;
 
     fn avail(&self) -> DriverAvail {
         DriverAvail::External
@@ -1318,7 +1371,7 @@ pub trait HyperDriverFactory<P>: Send + Sync
 where
     P: Hyperverse,
 {
-    fn kind(&self) -> Kind;
+    fn kind(&self) -> KindSelector;
 
     fn avail(&self) -> DriverAvail {
         DriverAvail::External
@@ -1534,8 +1587,8 @@ impl<P> HyperDriverFactory<P> for DriverDriverFactory
 where
     P: Hyperverse,
 {
-    fn kind(&self) -> Kind {
-        Kind::Driver
+    fn kind(&self) -> KindSelector {
+        KindSelector::from_base(BaseKind::Driver)
     }
 
     fn avail(&self) -> DriverAvail {

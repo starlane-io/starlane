@@ -3,9 +3,9 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::{Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, Search};
-use cosmic_universe::kind::{Kind, StarSub};
+use cosmic_universe::kind::{BaseKind, Kind, StarSub};
 use cosmic_universe::loc::{Layer, LOCAL_STAR, Point, StarKey, ToPoint, ToSurface};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::direct::create::Strategy;
@@ -26,7 +26,8 @@ use cosmic_universe::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
 use http::StatusCode;
 use tracing::error;
 use cosmic_universe::parse::bind_config;
-use cosmic_universe::util::log;
+use cosmic_universe::selector::{KindSelector, Pattern, SubKindSelector};
+use cosmic_universe::util::{log, ValuePattern};
 use crate::driver::{Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere};
 use crate::{HyperErr, Hyperverse, Registration, RegistryApi};
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
@@ -123,7 +124,7 @@ pub struct StarDriverFactory<P>
 where
     P: Hyperverse + 'static,
 {
-    pub kind: Kind,
+    pub kind: KindSelector,
     pub phantom: PhantomData<P>,
 }
 
@@ -131,9 +132,14 @@ impl<P> StarDriverFactory<P>
 where
     P: Hyperverse + 'static,
 {
-    pub fn new(kind: StarSub) -> Self {
+    pub fn new(sub: StarSub) -> Self {
+        let kind = KindSelector {
+            base: Pattern::Exact(BaseKind::Star),
+            sub: SubKindSelector::Exact(Some(sub.to_camel_case())),
+            specific: ValuePattern::Any
+        };
         Self {
-            kind: Kind::Star(kind),
+            kind,
             phantom: Default::default(),
         }
     }
@@ -144,7 +150,7 @@ impl<P> HyperDriverFactory<P> for StarDriverFactory<P>
 where
     P: Hyperverse + 'static,
 {
-    fn kind(&self) -> Kind {
+    fn kind(&self) -> KindSelector {
         self.kind.clone()
     }
 
@@ -366,16 +372,15 @@ where
     pub async fn provision(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, P::Err> {
         if let HyperSubstance::Provision(provision) = ctx.input {
             let record = self.skel.registry.record(&provision.point).await?;
-            match self.skel.wrangles.wrangles.get(&record.details.stub.kind) {
+            match self.skel.wrangles.find(&record.details.stub.kind) {
                 None => {
                     let kind = record.details.stub.kind.clone();
                     let point = record.details.stub.point.clone();
                     if self
                         .skel
                         .drivers
-                        .external_kinds()
-                        .await?
-                        .contains(&record.details.stub.kind)
+                        .find_external(record.details.stub.kind.clone())
+                        .await?.is_some()
                     {
                         let assign = HyperSubstance::Assign(Assign::new(
                             AssignmentKind::Create,
@@ -401,6 +406,8 @@ where
                     }
                 }
                 Some(selector) => {
+                    // hate using a write lock for this...
+                    let mut selector = selector.write().await;
                     let key = selector.wrangle().await?;
                     let assign =
                         Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
@@ -432,9 +439,9 @@ where
             if self
                 .skel
                 .drivers
-                .internal_kinds()
+                .find_internal(assign.details.stub.kind.clone())
                 .await?
-                .contains(&assign.details.stub.kind)
+                .is_some()
             {
                 self.create(assign).await;
             } else {
@@ -575,7 +582,7 @@ where
 
 #[derive(Clone)]
 pub struct StarWrangles {
-    pub wrangles: Arc<DashMap<Kind, RoundRobinWrangleSelector>>,
+    pub wrangles: Arc<DashMap<KindSelector, Arc<RwLock<RoundRobinWrangleSelector>>>>,
 }
 
 impl StarWrangles {
@@ -585,7 +592,17 @@ impl StarWrangles {
         }
     }
 
-    pub fn add(&self, discoveries: Vec<StarDiscovery>) {
+    pub fn find(&self, kind: &Kind ) -> Option<Arc<RwLock<RoundRobinWrangleSelector>>> {
+        let mut iter = self.wrangles.iter();
+        while let Some(multi) = iter.next() {
+             if multi.key().matches( &kind ) {
+                return Some(multi.value().clone())
+            }
+        }
+        return None
+    }
+
+    pub async fn add(&self, discoveries: Vec<StarDiscovery>) {
         for discovery in discoveries {
             for kind in discovery.kinds.clone() {
                 match self.wrangles.get_mut(&kind) {
@@ -593,10 +610,12 @@ impl StarWrangles {
                         let mut wrangler = RoundRobinWrangleSelector::new(kind.clone());
                         wrangler.stars.push(discovery.clone());
                         wrangler.sort();
+                        let mut wrangler = Arc::new(RwLock::new(wrangler));
                         self.wrangles.insert(kind, wrangler);
                     }
                     Some(mut wrangler) => {
                         let mut wrangler = wrangler.value_mut();
+                        let mut wrangler = wrangler.write().await;
                         wrangler.stars.push(discovery.clone());
                         wrangler.sort();
                     }
@@ -607,7 +626,7 @@ impl StarWrangles {
 
     pub fn verify(&self, kinds: &[&Kind]) -> Result<(), UniErr> {
         for kind in kinds {
-            if !self.wrangles.contains_key(*kind) {
+            if self.find(*kind).is_none() {
                 return Err(format!(
                     "star must be able to wrangle at least one {}",
                     kind.to_string()
@@ -619,31 +638,30 @@ impl StarWrangles {
     }
 
     pub async fn wrangle(&self, kind: &Kind) -> Result<StarKey, UniErr> {
-        self.wrangles
-            .get(kind)
+        self
+            .find(kind)
             .ok_or(format!(
                 "could not find wrangles for kind {}",
                 kind.to_string()
-            ))?
-            .value()
+            ))?.write().await
             .wrangle()
             .await
     }
 }
 
 pub struct RoundRobinWrangleSelector {
-    pub kind: Kind,
+    pub kind: KindSelector,
     pub stars: Vec<StarDiscovery>,
-    pub index: Mutex<usize>,
+    pub index: usize,
     pub step_index: usize,
 }
 
 impl RoundRobinWrangleSelector {
-    pub fn new(kind: Kind) -> Self {
+    pub fn new(kind: KindSelector) -> Self {
         Self {
             kind,
             stars: vec![],
-            index: Mutex::new(0),
+            index: 0,
             step_index: 0,
         }
     }
@@ -662,19 +680,14 @@ impl RoundRobinWrangleSelector {
         }
     }
 
-    pub async fn wrangle(&self) -> Result<StarKey, UniErr> {
+    pub async fn wrangle(&mut self) -> Result<StarKey, UniErr> {
         if self.stars.is_empty() {
             return Err(format!("cannot find wrangle for kind: {}", self.kind.to_string()).into());
         }
 
-        let index = {
-            let mut lock = self.index.lock().await;
-            let index = *lock;
-            lock.add(1);
-            index
-        };
+        self.index = self.index + 1;
 
-        let index = index % self.step_index;
+        let index = self.index % self.step_index;
 
         if let Some(discovery) = self.stars.get(index) {
             Ok(discovery.discovery.star_key.clone())

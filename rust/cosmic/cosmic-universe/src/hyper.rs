@@ -12,6 +12,7 @@ use crate::kind::{Kind, KindParts, StarSub};
 use crate::loc::{Point, StarKey, Surface, ToPoint, ToSurface};
 use crate::log::Log;
 use crate::particle::{Details, Status, Stub};
+use crate::selector::KindSelector;
 use crate::substance::Substance;
 use crate::wave::{
     Ping, Pong, ReflectedKind, ReflectedProto, ToRecipients,
@@ -186,7 +187,7 @@ pub struct Discovery {
     pub star_kind: StarSub,
     pub hops: u16,
     pub star_key: StarKey,
-    pub kinds: HashSet<Kind>,
+    pub kinds: HashSet<KindSelector>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]

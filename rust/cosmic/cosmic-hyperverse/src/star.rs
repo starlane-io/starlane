@@ -7,15 +7,15 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use dashmap::DashMap;
 use dashmap::mapref::one::{Ref, RefMut};
-use futures::future::{BoxFuture, join_all};
+use dashmap::DashMap;
+use futures::future::{join_all, BoxFuture};
 use futures::FutureExt;
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock, watch};
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
+use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 use tokio::time::error::Elapsed;
 use tracing::{error, info};
 
@@ -30,53 +30,54 @@ use cosmic_universe::command::direct::set::Set;
 use cosmic_universe::command::RawCommand;
 use cosmic_universe::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::err::UniErr;
+use cosmic_universe::hyper::MountKind;
 use cosmic_universe::hyper::{
     Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, Location, ParticleRecord,
     Provision, Search,
 };
-use cosmic_universe::hyper::MountKind;
-use cosmic_universe::HYPERUSER;
 use cosmic_universe::kind::{BaseKind, Kind, StarStub, StarSub, Sub};
 use cosmic_universe::loc::{
-    GLOBAL_EXEC, Layer, LOCAL_STAR, Point, RouteSeg, StarKey,
-    Surface, SurfaceSelector, ToBaseKind, Topic,
-    ToPoint, ToSurface, Uuid,
+    Layer, Point, RouteSeg, StarKey, Surface, SurfaceSelector, ToBaseKind, ToPoint, ToSurface,
+    Topic, Uuid, GLOBAL_EXEC, LOCAL_STAR,
 };
 use cosmic_universe::log::{PointLogger, RootLogger, Trackable, Tracker};
-use cosmic_universe::parse::{bind_config, Env, route_attribute};
-use cosmic_universe::particle::{Details, Status, Stub};
-use cosmic_universe::particle::traversal::{Traversal, TraversalDirection, TraversalInjection, TraversalLayer};
-use cosmic_universe::settings::Timeouts;
-use cosmic_universe::substance::{Substance, ToSubstance};
-use cosmic_universe::substance::Bin;
-use cosmic_universe::util::{log, ValueMatcher, ValuePattern};
-use cosmic_universe::wave::{
-    Agent, Bounce, BounceBacks,
-    DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
-    HandlingKind, Ping, Pong, Priority,
-    Recipients, RecipientSelector, Reflectable, ReflectedWave, Retries, Ripple,
-    Scope, Signal, SingularRipple, ToRecipients,
-    WaitTime, Wave, WaveKind,
+use cosmic_universe::parse::{bind_config, route_attribute, Env};
+use cosmic_universe::particle::traversal::{
+    Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
-use cosmic_universe::wave::{HyperWave, UltraWave};
-use cosmic_universe::wave::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
+use cosmic_universe::particle::{Details, Status, Stub};
+use cosmic_universe::settings::Timeouts;
+use cosmic_universe::substance::Bin;
+use cosmic_universe::substance::{Substance, ToSubstance};
+use cosmic_universe::util::{log, ValueMatcher, ValuePattern};
 use cosmic_universe::wave::core::cmd::CmdMethod;
 use cosmic_universe::wave::core::hyp::HypMethod;
-use cosmic_universe::wave::exchange::{DirectedHandler, DirectedHandlerSelector, DirectedHandlerShell, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, SetStrategy, TxRouter};
+use cosmic_universe::wave::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
+use cosmic_universe::wave::exchange::{
+    DirectedHandler, DirectedHandlerSelector, DirectedHandlerShell, Exchanger, InCtx,
+    ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, SetStrategy, TxRouter,
+};
+use cosmic_universe::wave::{
+    Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
+    HandlingKind, Ping, Pong, Priority, RecipientSelector, Recipients, Reflectable, ReflectedWave,
+    Retries, Ripple, Scope, Signal, SingularRipple, ToRecipients, WaitTime, Wave, WaveKind,
+};
+use cosmic_universe::wave::{HyperWave, UltraWave};
+use cosmic_universe::HYPERUSER;
 
-use crate::{DriversBuilder, HyperErr, Hyperverse, Registry, RegistryApi};
+use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, Drivers,
-    DriversApi, DriversCall, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler,
+    Driver, DriverAvail, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, DriverSkel,
+    DriverStatus, Drivers, DriversApi, DriversCall, HyperDriverFactory, Item, ItemHandler,
     ItemSkel, ItemSphere,
 };
-use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
-use crate::layer::field::Field;
 use crate::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
-use crate::machine::MachineSkel;
-use crate::Registration;
+use crate::layer::field::Field;
 use crate::layer::shell::Shell;
 use crate::layer::shell::ShellState;
+use crate::machine::MachineSkel;
+use crate::Registration;
+use crate::{DriversBuilder, HyperErr, Hyperverse, Registry, RegistryApi};
 
 #[derive(Clone)]
 pub struct ParticleStates<P>
@@ -651,7 +652,9 @@ where
         let star_rx = star_tx.call_rx.take().unwrap();
         let star_tx = star_tx.call_tx;
 
-        let global_port = Point::global_executor().to_surface().with_layer(Layer::Core);
+        let global_port = Point::global_executor()
+            .to_surface()
+            .with_layer(Layer::Core);
         let mut transmitter = ProtoTransmitterBuilder::new(
             Arc::new(skel.gravity_router.clone()),
             skel.exchanger.clone(),
@@ -1101,8 +1104,10 @@ where
                     _ => {
                         let to = wave.to().unwrap_single();
                         let location = locator.locate(&to.point).await?;
-                        let mut transport = wave
-                            .wrap_in_transport(gravity, location.to_surface().with_layer(Layer::Core));
+                        let mut transport = wave.wrap_in_transport(
+                            gravity,
+                            location.to_surface().with_layer(Layer::Core),
+                        );
                         transport.from(skel.point.clone().to_surface());
                         let transport = transport.build()?;
                         let transport = transport.to_signal()?;
@@ -1133,8 +1138,10 @@ where
             logger.result(
                 self.hyperway_transmitter
                     .direct(
-                        transport
-                            .wrap_in_hop(self.gravity.clone(), self.skel.point.clone().to_surface()),
+                        transport.wrap_in_hop(
+                            self.gravity.clone(),
+                            self.skel.point.clone().to_surface(),
+                        ),
                     )
                     .await,
             )?;
@@ -1216,8 +1223,6 @@ where
             }
         });
     }
-
-
 }
 
 #[derive(Clone)]
@@ -1632,8 +1637,6 @@ impl StarCon {
     }
 }
 
-
-
 async fn shard_ripple_by_location<E>(
     ripple: &Wave<Ripple>,
     adjacent: &HashMap<Point, StarStub>,
@@ -1740,7 +1743,11 @@ where
             unimplemented!();
         }
         Recipients::Stars => {
-            let stars: Vec<Surface> = adjacent.clone().into_iter().map(|p| p.to_surface()).collect();
+            let stars: Vec<Surface> = adjacent
+                .clone()
+                .into_iter()
+                .map(|p| p.to_surface())
+                .collect();
             Ok(stars)
         }
     }
@@ -1849,10 +1856,17 @@ where
                 .set_status(&point, &Status::Panic)
                 .await?;
 
-            Err(P::Err::new(format!(
-                "failed to provision{}",
-                point.to_string()
-            )))
+            match self.skel.registry.record(&point).await {
+                Ok(record) => Err(P::Err::new(format!(
+                    "failed to provision {}<{}>",
+                    point.to_string(),
+                    record.details.stub.kind.to_template().to_string()
+                ))),
+                Err(_) => Err(P::Err::new(format!(
+                    "failed to provision {}",
+                    point.to_string()
+                ))),
+            }
         }
     }
 }

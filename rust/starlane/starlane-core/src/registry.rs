@@ -520,7 +520,7 @@ impl Registry {
                 _ => {}
             }
 
-            match &hop.kind_selector.kind {
+            match &hop.kind_selector.base {
                 GenericKindSelector::Any => {}
                 GenericKindSelector::Exact(kind) => {
                     index = index + 1;
@@ -529,7 +529,7 @@ impl Registry {
                 }
             }
 
-            match &hop.kind_selector.kind {
+            match &hop.kind_selector.base {
                 GenericKindSelector::Any => {}
                 GenericKindSelector::Exact(kind) => match &hop.kind_selector.sub {
                     SubKindSelector::Any => {}

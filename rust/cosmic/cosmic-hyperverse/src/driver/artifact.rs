@@ -14,7 +14,7 @@ use cosmic_universe::command::direct::create::{
 use cosmic_universe::config::bind::BindConfig;
 use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::Assign;
-use cosmic_universe::kind::{ArtifactSubKind, Kind};
+use cosmic_universe::kind::{ArtifactSubKind, BaseKind, Kind};
 use cosmic_universe::loc::{Point, ToBaseKind};
 use cosmic_universe::parse::bind_config;
 use cosmic_universe::particle::PointKind;
@@ -29,6 +29,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
+use cosmic_universe::selector::KindSelector;
 use cosmic_universe::wave::{DirectedProto, Pong, Wave};
 use tempdir::TempDir;
 
@@ -109,8 +110,8 @@ impl<P> HyperDriverFactory<P> for RepoDriverFactory
 where
     P: Hyperverse,
 {
-    fn kind(&self) -> Kind {
-        Kind::Repo
+    fn kind(&self) -> KindSelector {
+        KindSelector::from_base(BaseKind::Repo)
     }
 
     async fn create(
@@ -196,8 +197,8 @@ impl<P> HyperDriverFactory<P> for BundleSeriesDriverFactory
 where
     P: Hyperverse,
 {
-    fn kind(&self) -> Kind {
-        Kind::BundleSeries
+    fn kind(&self) -> KindSelector {
+        KindSelector::from_base(BaseKind::BundleSeries)
     }
 
     async fn create(
@@ -261,8 +262,8 @@ impl<P> HyperDriverFactory<P> for BundleDriverFactory
 where
     P: Hyperverse,
 {
-    fn kind(&self) -> Kind {
-        Kind::Bundle
+    fn kind(&self) -> KindSelector {
+        KindSelector::from_base(BaseKind::Bundle)
     }
 
     async fn create(
@@ -505,8 +506,8 @@ impl<P> HyperDriverFactory<P> for ArtifactDriverFactory
 where
     P: Hyperverse,
 {
-    fn kind(&self) -> Kind {
-        Kind::Artifact(ArtifactSubKind::Raw)
+    fn kind(&self) -> KindSelector {
+        KindSelector::from_base(BaseKind::Artifact)
     }
 
     async fn create(

@@ -3,9 +3,10 @@ use cosmic_universe::config::bind::BindConfig;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
-use cosmic_universe::kind::Kind;
+use cosmic_universe::kind::{BaseKind, Kind};
 use cosmic_universe::loc::Point;
 use cosmic_universe::parse::bind_config;
+use cosmic_universe::selector::KindSelector;
 use cosmic_universe::util::log;
 use cosmic_universe::wave::core::{CoreBounce, ReflectedCore};
 use cosmic_universe::wave::exchange::{DirectedHandler, RootInCtx};
@@ -44,8 +45,8 @@ impl<P> HyperDriverFactory<P> for RootDriverFactory
 where
     P: Hyperverse,
 {
-    fn kind(&self) -> Kind {
-        Kind::Root
+    fn kind(&self) -> KindSelector {
+        KindSelector::from_base(BaseKind::Root)
     }
 
     async fn create(
