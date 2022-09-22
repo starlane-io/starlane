@@ -2,8 +2,8 @@ use core::borrow::Borrow;
 use std::cell::Cell;
 use std::ops::Deref;
 use std::sync::Arc;
+use dashmap::DashMap;
 
-use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
@@ -17,7 +17,7 @@ use crate::wave::exchange::{ProtoTransmitter, ProtoTransmitterBuilder};
 
 #[derive(Clone)]
 pub struct ArtifactApi {
-    binds: Arc<RwLock<LruCache<Point, Arc<BindConfig>>>>,
+    binds: Arc<DashMap<Point, Arc<BindConfig>>>,
     fetcher: Arc<RwLock<FetchChamber>>,
 }
 
@@ -29,7 +29,7 @@ impl ArtifactApi {
 
     pub fn new( fetcher: Box<dyn ArtifactFetcher>) -> Self {
         Self {
-            binds: Arc::new(RwLock::new(LruCache::new(1024))),
+            binds: Arc::new(DashMap::new() ),
             fetcher: Arc::new(RwLock::new(FetchChamber {
                 fetcher
             })),
@@ -43,18 +43,15 @@ impl ArtifactApi {
 
     pub async fn bind(&self, point: &Point) -> Result<ArtRef<BindConfig>, UniErr> {
         {
-            let read = self.binds.read().await;
-            if read.contains(point) {
-                let mut write = self.binds.write().await;
-                let bind = write.get(point).unwrap().clone();
+            if self.binds.contains_key(point) {
+                let bind = self.binds.get(point).unwrap().clone();
                 return Ok(ArtRef::new(bind, point.clone()));
             }
         }
 
         let bind: Arc<BindConfig> = Arc::new(self.get(point).await?);
         {
-            let mut write = self.binds.write().await;
-            write.put(point.clone(), bind.clone());
+            self.binds.insert(point.clone(), bind.clone());
         }
         return Ok(ArtRef::new(bind, point.clone()));
     }

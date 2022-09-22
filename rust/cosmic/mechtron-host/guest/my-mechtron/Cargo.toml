@@ -12,6 +12,8 @@ crate-type = ["cdylib"]
 #mechtron= { path="../../../mechtron" }
 wasm_membrane_guest = { path= "../../../wasm-membrane-guest"}
 cosmic-universe= { path= "../../../cosmic-universe"}
+#cosmic-macros= { path= "../../../cosmic-macros"}
+#tokio = { version = "1.15.0", features = ["rt"] }
 
 # `wee_alloc` is a tiny allocator for wasm that is only ~1K in code size
 # compared to the default allocator's ~10K. It is slower than the default
