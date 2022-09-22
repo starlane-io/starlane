@@ -20,6 +20,7 @@ use crate::wave::exchange::{ProtoTransmitter, ProtoTransmitterBuilder};
 pub struct ArtifactApi {
     binds: Arc<DashMap<Point, Arc<BindConfig>>>,
     mechtrons : Arc<DashMap<Point, Arc<MechtronConfig>>>,
+    wasm: Arc<DashMap<Point, Bin>>,
     fetcher: Arc<RwLock<FetchChamber>>,
 }
 
@@ -33,6 +34,7 @@ impl ArtifactApi {
         Self {
             binds: Arc::new(DashMap::new() ),
             mechtrons: Arc::new(DashMap::new() ),
+            wasm: Arc::new(DashMap::new() ),
             fetcher: Arc::new(RwLock::new(FetchChamber {
                 fetcher
             })),
@@ -73,6 +75,23 @@ impl ArtifactApi {
         }
         return Ok(ArtRef::new(bind, point.clone()));
     }
+
+        pub async fn wasm(&self, point: &Point) -> Result<ArtRef<Bin>, UniErr> {
+        {
+            if self.wasm.contains_key(point) {
+                let wasm = self.wasm.get(point).unwrap().clone();
+                return Ok(ArtRef::new(Arc::new(wasm), point.clone()));
+            }
+        }
+
+
+        let wasm = self.fetcher.read().await.fetcher.fetch(point).await?;
+        {
+            self.wasm.insert(point.clone(), wasm.clone());
+        }
+        return Ok(ArtRef::new(Arc::new(wasm), point.clone()));
+    }
+
 
     async fn get<A>(&self, point: &Point) -> Result<A, UniErr>
     where

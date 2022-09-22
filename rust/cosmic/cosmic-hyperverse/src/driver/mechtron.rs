@@ -62,21 +62,21 @@ where
     }
 }
 
-pub struct MechtronHostDriver {
-    pub avail: DriverAvail,
+pub struct MechtronHostDriver<P> where P: Hyperverse {
+    pub skel: DriverSkel<P>,
     pub hosts: DashMap<Point,MechtronHostHost>
 }
 
 #[handler]
-impl MechtronHostDriver {
-    pub fn new(avail: DriverAvail) -> Self {
+impl <P>MechtronHostDriver<P> where P: Hyperverse {
+    pub fn new(skel: DriverSkel<P>) -> Self {
         let hosts = DashMap::new();
-        Self { avail, hosts }
+        Self {  skel, hosts }
     }
 }
 
 #[async_trait]
-impl<P> Driver<P> for MechtronHostDriver
+impl<P> Driver<P> for MechtronHostDriver<P>
 where
     P: Hyperverse,
 {
@@ -89,7 +89,13 @@ where
     }
 
     async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
-        assign.details.properties.get("config")
+        let config = assign.details.properties.get("config").ok_or("expected config property")?;
+        let config = Point::from_str(config.value.as_str())?;
+        let config = self.skel.skel.machine.artifacts.mechtron(&config).await?;
+
+        let config = self.skel.skel.machine.artifacts.wasm(&config).await?;
+
+        Ok(())
     }
 }
 
