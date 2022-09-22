@@ -111,7 +111,7 @@ impl Hyperverse for TestHyperverse {
     }
 
     fn artifact_hub(&self) -> ArtifactApi {
-        ArtifactApi::new()
+        ArtifactApi::no_fetcher()
     }
 
     /*

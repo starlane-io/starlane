@@ -12,6 +12,7 @@ use crate::particle::Stub;
 use crate::substance::Bin;
 use crate::{BindConfig, Substance, UniErr};
 use crate::wave::{DirectedProto, Pong, Wave};
+use crate::wave::core::cmd::CmdMethod;
 use crate::wave::exchange::{ProtoTransmitter, ProtoTransmitterBuilder};
 
 #[derive(Clone)]
@@ -21,8 +22,12 @@ pub struct ArtifactApi {
 }
 
 impl ArtifactApi {
-    pub fn new() -> Self {
+    pub fn no_fetcher() -> Self {
         let fetcher = Box::new( NoDiceArtifactFetcher );
+        Self::new(fetcher)
+    }
+
+    pub fn new( fetcher: Box<dyn ArtifactFetcher>) -> Self {
         Self {
             binds: Arc::new(RwLock::new(LruCache::new(1024))),
             fetcher: Arc::new(RwLock::new(FetchChamber {
@@ -30,6 +35,7 @@ impl ArtifactApi {
             })),
         }
     }
+
 
     pub async fn set_fetcher(&self, fetcher:Box<dyn ArtifactFetcher>) {
         self.fetcher.write().await.set(fetcher);
@@ -157,6 +163,7 @@ impl ArtifactFetcher for ReadArtifactFetcher {
     async fn fetch(&self, point: &Point) -> Result<Bin, UniErr> {
         let mut directed = DirectedProto::ping();
         directed.to(point.clone().to_surface());
+        directed.method(CmdMethod::Read);
         let pong: Wave<Pong> = self.transmitter.direct(directed).await?;
         pong.core.ok_or()?;
         match pong.variant.core.body {

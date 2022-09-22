@@ -180,7 +180,7 @@ impl Hyperverse for Starlane {
 
     fn artifact_hub(&self) -> ArtifactApi {
         let fetcher = Arc::new(ReadArtifactFetcher {});
-        ArtifactApi::new(fetcher)
+        ArtifactApi::no_fetcher(fetcher)
     }
 
     fn start_services(&self, entry_router: &mut HyperGateSelector) {}

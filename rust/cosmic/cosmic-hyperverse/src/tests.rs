@@ -789,7 +789,13 @@ fn test_publish() -> Result<(), TestErr> {
 
         assert!(core.is_ok());
 
-        tokio::time::sleep(Duration::from_secs(5)).await;
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let fetcher = Box::new(ReadArtifactFetcher::new(client.transmitter_builder().await.unwrap().build()));
+        let artifacts = ArtifactApi::new(fetcher);
+
+        let point = Point::from_str("localhost:repo:my:1.0.0:/bind/app.bind").unwrap();
+        let bind = artifacts.bind( &point).await.unwrap();
 
         Ok(())
     })

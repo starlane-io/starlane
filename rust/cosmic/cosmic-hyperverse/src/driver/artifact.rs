@@ -1,8 +1,10 @@
 use crate::driver::{Driver, DriverAvail, DriverCtx, DriverSkel, HyperDriverFactory, Item, ItemHandler, ItemSkel, ItemSphere};
 use crate::star::HyperStarSkel;
 use crate::{HyperErr, Hyperverse};
+use acid_store::repo::Commit;
 use acid_store::repo::key::KeyRepo;
-use acid_store::repo::OpenOptions;
+use acid_store::repo::value::ValueRepo;
+use acid_store::repo::{OpenMode, OpenOptions};
 use acid_store::store::MemoryConfig;
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::command::common::{SetProperties, StateSrc};
@@ -153,13 +155,13 @@ where
     }
 }
 
-fn store() -> Result<KeyRepo<String>, UniErr> {
+fn store() -> Result<ValueRepo<String>, UniErr> {
     let config = acid_store::store::DirectoryConfig {
         path: PathBuf::from("./data/artifacts"),
     };
 
     match OpenOptions::new()
-        .mode(acid_store::repo::OpenMode::Create)
+        .mode(acid_store::repo::OpenMode::Open)
         .open(&config)
     {
         Ok(repo) => Ok(repo),
@@ -209,12 +211,17 @@ where
     }
 }
 
-pub struct BundleSeriesDriver {}
+pub struct BundleSeriesDriver {
+    pub store: KeyRepo<String>
+}
 
 #[handler]
 impl BundleSeriesDriver {
     pub fn new() -> Self {
-        Self {}
+        let store = OpenOptions::new().mode(OpenMode::CreateNew).open(&MemoryConfig::new()).unwrap();
+        Self {
+            store
+        }
     }
 }
 
@@ -280,6 +287,7 @@ where
 {
     skel: DriverSkel<P>,
     ctx: DriverCtx,
+    store: KeyRepo<String>
 }
 
 #[handler]
@@ -288,7 +296,8 @@ where
     P: Hyperverse,
 {
     pub fn new(skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
-        Self { skel, ctx }
+        let store: KeyRepo<String> = OpenOptions::new().mode(OpenMode::CreateNew).open(&MemoryConfig::new()).unwrap();
+        Self { store, skel, ctx }
     }
 }
 
@@ -442,15 +451,10 @@ where
             return Err("ArtifactBundle Manager expected Bin payload".into());
         }
 
-        let mut repo = store()?;
-        let mut object = repo.insert(assign.details.stub.point.to_string());
-        object.write_all(bincode::serialize(&state)?.as_slice())?;
-        object.commit()?;
-
-        //        self.store.put(assign.details.stub.point, *state).await?;
-
-        // need to unzip and create Artifacts for each...
-
+        let mut store = store()?;
+        let state = *state;
+        store.insert(assign.details.stub.point.to_string(),&state)?;
+        store.commit()?;
         Ok(())
     }
 }
@@ -539,10 +543,10 @@ where
                 ArtifactSubKind::Dir => {}
                 _ => {
                     let substance = assign.state.get_substance()?;
-                     let mut repo = store()?;
-                    let mut object = repo.insert(assign.details.stub.point.to_string());
-                    object.write_all(bincode::serialize(&substance)?.as_slice())?;
-                    object.commit()?;
+                     let mut store = store()?;
+println!("storing: {}", assign.details.stub.point.to_string() );
+                    store.insert(assign.details.stub.point.to_string(),&substance)?;
+                    store.commit()?;
                 }
             }
         }
@@ -561,15 +565,27 @@ impl <P> Artifact<P> where P:Hyperverse{
 
     #[route("Cmd<Read>")]
     pub async fn read( &self, _: InCtx<'_,()>) -> Result<Substance,P::Err> {
+println!();
+println!("Reading  {}",self.skel.point.to_string());
+println!();
         if let Kind::Artifact(ArtifactSubKind::Dir) = self.skel.kind{
             return Ok(Substance::Empty);
         }
         let store = store()?;
-        let mut rtn = vec![];
-        let mut object = store.object(self.skel.point.to_string().as_str()).ok_or("could not find Artifact substance from store")?;
-        object.read_to_end(& mut rtn )?;
-        drop(object);
-        let substance = bincode::deserialize(rtn.as_slice())?;
+
+
+        println!("keys: {}", store.keys().len() );
+        for key in store.keys() {
+            println!("key: {}",key.to_string() );
+        }
+
+
+println!("about to get object...");
+        let substance: Substance = store.get(&self.skel.point.to_string()).unwrap();
+println!("read to end");
+println!();
+println!("Substance deserialized...");
+println!();
         Ok(substance)
     }
 }
