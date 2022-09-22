@@ -30,7 +30,7 @@ use cosmic_universe::command::direct::set::Set;
 use cosmic_universe::command::RawCommand;
 use cosmic_universe::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::err::UniErr;
-use cosmic_universe::hyper::MountKind;
+use cosmic_universe::hyper::{MountKind, ParticleLocation};
 use cosmic_universe::hyper::{
     Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, Location, ParticleRecord,
     Provision, Search,
@@ -322,9 +322,9 @@ where
             "StarSkel::create(assign_result)",
             transmitter.direct(assign).await,
         )?;
+        let location = ParticleLocation::new( self.point.clone(), None);
         self.registry
-            .assign(&details.stub.point)
-            .send(self.point.clone());
+            .assign(&details.stub.point, location).await?;
         let logger = logger.push_mark("result").unwrap();
         logger.result(assign_result.ok_or())?;
         Ok(details)
@@ -861,7 +861,6 @@ where
                     }
                     retries = retries + 1;
                 }
-                skel.logger.info("Wrangle Success!");
             });
         }
 
@@ -1106,7 +1105,7 @@ where
                         let location = locator.locate(&to.point).await?;
                         let mut transport = wave.wrap_in_transport(
                             gravity,
-                            location.to_surface().with_layer(Layer::Core),
+                            location.star.to_surface().with_layer(Layer::Core),
                         );
                         transport.from(skel.point.clone().to_surface());
                         let transport = transport.build()?;
@@ -1288,7 +1287,7 @@ where
                         for port in &ports {
                             let record = self.skel.registry.record(&port.point).await?;
                             let loc = logger.result(record.location.ok_or(P::Err::new("multi port ripple has recipient that is not located, this should have been provisioned when the ripple was sent")))?;
-                            if loc == self.skel.point {
+                            if loc.star == self.skel.point {
                                 tos.push(port.clone());
                             }
                         }
@@ -1813,7 +1812,7 @@ where
         Self { skel }
     }
 
-    pub async fn locate(&self, point: &Point) -> Result<Point, P::Err> {
+    pub async fn locate(&self, point: &Point) -> Result<ParticleLocation, P::Err> {
         let record = self.skel.registry.record(&point).await?;
         match record.location {
             Some(location) => Ok(location),
@@ -1825,7 +1824,7 @@ where
     }
 
     #[async_recursion]
-    pub async fn provision(&self, point: &Point, state: StateSrc) -> Result<Point, P::Err> {
+    pub async fn provision(&self, point: &Point, state: StateSrc) -> Result<ParticleLocation, P::Err> {
         // check if parent is provisioned
         let parent = point
             .parent()
@@ -1842,10 +1841,10 @@ where
         wave.method(HypMethod::Provision);
         wave.body(HyperSubstance::Provision(provision).into());
         wave.from(self.skel.point.clone().to_surface().with_layer(Layer::Core));
-        wave.to(parent_star.to_surface().with_layer(Layer::Core));
+        wave.to(parent_star.star.to_surface().with_layer(Layer::Core));
         let pong: Wave<Pong> = self.skel.star_transmitter.direct(wave).await?;
         if pong.core.status.as_u16() == 200 {
-            if let Substance::Point(location) = &pong.core.body {
+            if let Substance::Location(location) = &pong.core.body {
                 Ok(location.clone())
             } else {
                 Err(P::Err::new("Provision result expected Substance Point"))

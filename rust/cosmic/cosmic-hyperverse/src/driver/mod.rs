@@ -4,6 +4,8 @@ pub mod control;
 pub mod root;
 pub mod space;
 pub mod star;
+pub mod mechtron;
+pub mod host;
 
 use crate::driver::star::StarDriverFactory;
 use crate::star::HyperStarCall::LayerTraversalInjection;
@@ -16,7 +18,7 @@ use cosmic_universe::command::direct::create::{
 };
 use cosmic_universe::config::bind::BindConfig;
 use cosmic_universe::err::UniErr;
-use cosmic_universe::hyper::{Assign, HyperSubstance, ParticleRecord};
+use cosmic_universe::hyper::{Assign, HyperSubstance, ParticleLocation, ParticleRecord};
 use cosmic_universe::kind::{BaseKind, Kind, KindParts, StarSub};
 use cosmic_universe::loc::{Layer, Point, Surface, ToPoint, ToSurface};
 use cosmic_universe::log::{PointLogger, Tracker};
@@ -555,7 +557,8 @@ where
 
                 skel.registry.register(&registration).await?;
                 skel.api.create_states(point.clone()).await?;
-                skel.registry.assign(&point).send(skel.point.clone());
+                let location = ParticleLocation::new( skel.point.clone(), None );
+                skel.registry.assign(&point, location ).await?;
                 Ok(())
             }
             let point = drivers_point

@@ -9,9 +9,7 @@ use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::direct::create::Strategy;
 use cosmic_universe::config::bind::BindConfig;
 use cosmic_universe::err::UniErr;
-use cosmic_universe::hyper::{
-    Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, Search,
-};
+use cosmic_universe::hyper::{Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, ParticleLocation, Search};
 use cosmic_universe::kind::{BaseKind, Kind, StarSub};
 use cosmic_universe::loc::{Layer, Point, StarKey, ToPoint, ToSurface, LOCAL_STAR};
 use cosmic_universe::log::Tracker;
@@ -226,10 +224,10 @@ where
 
         self.star_skel.api.create_states(point.clone()).await?;
         self.star_skel.registry.register(&registration).await?;
+        let location = ParticleLocation::new( self.star_skel.point.clone(), None);
         self.star_skel
             .registry
-            .assign(&point)
-            .send(self.star_skel.point.clone());
+            .assign(&point,location).await?;
 
         logger
             .result(skel.status_tx.send(DriverStatus::Ready).await)
@@ -314,10 +312,10 @@ where
                     .map_err(|e| e.to_cosmic_err())?;
                 let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
                 self.create(&assign).await.map_err(|e| e.to_cosmic_err())?;
+                let location = ParticleLocation::new(self.skel.point.clone(),None );
                 self.skel
                     .registry
-                    .assign(&Point::root())
-                    .send(self.skel.point.clone());
+                    .assign(&Point::root(), location ).await.map_err(|e|e.to_cosmic_err())?;
 
                 let registration = Registration {
                     point: Point::global_executor(),
@@ -342,10 +340,10 @@ where
                     .map_err(|e| e.to_cosmic_err())?;
                 let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
                 self.create(&assign).await.map_err(|e| e.to_cosmic_err())?;
+                let location = ParticleLocation::new( LOCAL_STAR.clone(), None );
                 self.skel
                     .registry
-                    .assign(&Point::global_executor())
-                    .send(LOCAL_STAR.clone());
+                    .assign(&Point::global_executor(), location ).await.map_err(|e|e.to_cosmic_err())?;
 
                 Ok(Status::Ready)
             }
@@ -378,7 +376,7 @@ where
     P: Hyperverse,
 {
     #[route("Hyp<Provision>")]
-    pub async fn provision(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, P::Err> {
+    pub async fn provision(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ParticleLocation, P::Err> {
         if let HyperSubstance::Provision(provision) = ctx.input {
             let record = self.skel.registry.record(&provision.point).await?;
             match self.skel.wrangles.find(&record.details.stub.kind) {
@@ -400,7 +398,7 @@ where
 
                         let ctx: InCtx<'_, HyperSubstance> = ctx.push_input_ref(&assign);
                         if self.assign(ctx).await?.is_ok() {
-                            Ok(ReflectedCore::ok_body(self.skel.point.clone().into()))
+                            Ok(ParticleLocation::new(self.skel.point.clone(),None))
                         } else {
                             Err(
                                 format!("could not find assign kind {} to self", kind.to_string())
@@ -427,7 +425,7 @@ where
                     proto.to(key.to_surface());
                     let pong: Wave<Pong> = ctx.transmitter.direct(proto).await?;
                     pong.ok_or()?;
-                    Ok(ReflectedCore::ok_body(key.to_point().into()))
+                    Ok(ParticleLocation::new(key.to_point().into(), None))
                 }
             }
         } else {
@@ -445,7 +443,6 @@ where
                 .send(assign.clone())
                 .unwrap_or_default();
 
-            let complete_tx = self.skel.registry.assign(&assign.details.stub.point);
             if self
                 .skel
                 .drivers
@@ -461,7 +458,8 @@ where
                 );
             }
 
-            complete_tx.send(self.skel.point.clone());
+            let location = ParticleLocation::new( self.skel.point.clone(), None );
+            self.skel.registry.assign(&assign.details.stub.point, location).await?;
 
             Ok(ReflectedCore::ok())
         } else {

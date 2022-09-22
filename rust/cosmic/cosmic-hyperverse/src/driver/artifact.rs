@@ -544,7 +544,6 @@ where
                 _ => {
                     let substance = assign.state.get_substance()?;
                      let mut store = store()?;
-println!("storing: {}", assign.details.stub.point.to_string() );
                     store.insert(assign.details.stub.point.to_string(),&substance)?;
                     store.commit()?;
                 }
@@ -565,27 +564,12 @@ impl <P> Artifact<P> where P:Hyperverse{
 
     #[route("Cmd<Read>")]
     pub async fn read( &self, _: InCtx<'_,()>) -> Result<Substance,P::Err> {
-println!();
-println!("Reading  {}",self.skel.point.to_string());
-println!();
         if let Kind::Artifact(ArtifactSubKind::Dir) = self.skel.kind{
             return Ok(Substance::Empty);
         }
         let store = store()?;
 
-
-        println!("keys: {}", store.keys().len() );
-        for key in store.keys() {
-            println!("key: {}",key.to_string() );
-        }
-
-
-println!("about to get object...");
         let substance: Substance = store.get(&self.skel.point.to_string()).unwrap();
-println!("read to end");
-println!();
-println!("Substance deserialized...");
-println!();
         Ok(substance)
     }
 }

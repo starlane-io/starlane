@@ -13,7 +13,7 @@ use cosmic_nom::Tw;
 
 use crate::command::{Command, RawCommand};
 use crate::err::ParseErrs;
-use crate::hyper::{Greet, HyperSubstance, Knock};
+use crate::hyper::{Greet, HyperSubstance, Knock, ParticleLocation};
 use crate::loc::{Meta, PointCtx, PointVar};
 use crate::parse::model::Subst;
 use crate::parse::Env;
@@ -52,6 +52,7 @@ pub enum SubstanceKind {
     Details,
     Status,
     Particle,
+    Location,
     Errors,
     Json,
     MultipartForm,
@@ -92,6 +93,7 @@ pub enum Substance {
     Int(i64),
     Status(Status),
     Particle(Particle),
+    Location(ParticleLocation),
     RawCommand(RawCommand),
     Command(Box<Command>),
     Errors(Errors),
@@ -195,8 +197,8 @@ impl Substance {
     pub fn kind(&self) -> SubstanceKind {
         match self {
             Substance::Empty => SubstanceKind::Empty,
-            Substance::List(list) => SubstanceKind::List,
-            Substance::Map(map) => SubstanceKind::Map,
+            Substance::List(_) => SubstanceKind::List,
+            Substance::Map(_) => SubstanceKind::Map,
             Substance::Point(_) => SubstanceKind::Point,
             Substance::Text(_) => SubstanceKind::Text,
             Substance::Stub(_) => SubstanceKind::Stub,
@@ -220,6 +222,7 @@ impl Substance {
             Substance::Knock(_) => SubstanceKind::Knock,
             Substance::Greet(_) => SubstanceKind::Greet,
             Substance::Details(_) => SubstanceKind::Details,
+            Substance::Location(_) => SubstanceKind::Location
         }
     }
 

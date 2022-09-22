@@ -65,7 +65,7 @@ lazy_static! {
 async fn create(
     ctx: &TestRegistryContext,
     particle: Point,
-    location: Point,
+    location: ParticleLocation,
     star_api: HyperStarApi<TestHyperverse>,
 ) -> Result<(), TestErr> {
     println!("ADDING PARTICLE: {}", particle.to_string());
@@ -79,7 +79,7 @@ async fn create(
     );
     ctx.particles.insert(
         particle.clone(),
-        ParticleRecord::new(details.clone(), location),
+        ParticleRecord::new(details.clone(), Some(location)),
     );
 
     let mut wave = DirectedProto::ping();
@@ -110,7 +110,7 @@ fn test_gravity_routing() -> Result<(), TestErr> {
 
         let star_api = machine_api.get_machine_star().await.unwrap();
         let stub = star_api.stub().await.unwrap();
-        let location = stub.key.clone().to_point();
+        let location = ParticleLocation::new(stub.key.clone().to_point(),None);
 
         //        let record = platform.global_registry().await.unwrap().locate(&LESS).await.expect("IS LESS THERE?");
 
@@ -278,7 +278,7 @@ fn test_layer_traversal() -> Result<(), TestErr> {
 
         let star_api = machine_api.get_machine_star().await.unwrap();
         let stub = star_api.stub().await.unwrap();
-        let location = stub.key.clone().to_point();
+        let location = ParticleLocation::new(stub.key.clone().to_point(),None);
 
         //        let record = platform.global_registry().await.unwrap().locate(&LESS).await.expect("IS LESS THERE?");
 

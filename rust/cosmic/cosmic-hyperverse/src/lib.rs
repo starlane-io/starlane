@@ -34,7 +34,7 @@ use cosmic_universe::command::direct::query::{Query, QueryResult};
 use cosmic_universe::command::direct::select::{Select, SubSelect};
 use cosmic_universe::err::UniErr;
 use cosmic_universe::fail::Timeout;
-use cosmic_universe::hyper::ParticleRecord;
+use cosmic_universe::hyper::{ParticleLocation, ParticleRecord};
 use cosmic_universe::kind::{
     ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind,
 };
@@ -86,7 +86,7 @@ where
 {
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, P::Err>;
 
-    fn assign<'a>(&'a self, point: &'a Point) -> oneshot::Sender<Point>;
+    async fn assign<'a>(&'a self, point: &'a Point, location: ParticleLocation) -> Result<(),P::Err>;
 
     async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), P::Err>;
 
@@ -268,6 +268,7 @@ where
             }
             BaseKind::Driver => Kind::Driver,
             BaseKind::Global => Kind::Global,
+            BaseKind::Host => Kind::Host
         })
     }
 
