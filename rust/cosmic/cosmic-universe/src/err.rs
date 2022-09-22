@@ -7,7 +7,7 @@ use std::rc::Rc;
 use std::string::FromUtf8Error;
 use std::sync::{Arc, PoisonError};
 
-use ariadne::{Label, Report, ReportBuilder, ReportKind, Source};
+//use ariadne::{Label, Report, ReportBuilder, ReportKind, Source};
 use http::header::ToStrError;
 use http::status::InvalidStatusCode;
 use http::uri::InvalidUri;
@@ -23,6 +23,7 @@ use tokio::time::error::Elapsed;
 
 use cosmic_nom::Span;
 use cosmic_nom::SpanExtra;
+use crate::err::report::{Label, Report, ReportKind};
 
 use crate::parse::error::find_parse_err;
 use crate::substance::{Errors, Substance};
@@ -46,6 +47,7 @@ impl Into<ReflectedCore> for UniErr {
                 status: StatusCode::from_u16(500u16).unwrap_or(StatusCode::from_u16(500).unwrap()),
                 body: Substance::Errors(Errors::default("parsing error...")),
             },
+
         }
     }
 }
@@ -91,6 +93,7 @@ impl UniErr {
     }
 }
 
+/*
 impl Into<ParseErrs> for UniErr {
     fn into(self) -> ParseErrs {
         match self {
@@ -107,6 +110,8 @@ impl Into<ParseErrs> for UniErr {
         }
     }
 }
+
+ */
 
 impl UniErr {
     pub fn timeout() -> Self {
@@ -523,13 +528,6 @@ impl<I: Span> From<nom::Err<ErrorTree<I>>> for ParseErrs {
     }
 }
 
-pub struct SubstErr {}
-
-impl SubstErr {
-    pub fn report(&self) -> Result<Report, UniErr> {
-        unimplemented!()
-    }
-}
 
 pub struct ParseErrs {
     pub report: Vec<Report>,
@@ -578,13 +576,7 @@ impl ParseErrs {
     }
 
     pub fn print(&self) {
-        if let Some(source) = self.source.as_ref() {
-            for report in &self.report {
-                report
-                    .print(Source::from(source.as_str()))
-                    .unwrap_or_default()
-            }
-        }
+
     }
 
     pub fn fold<E: Into<ParseErrs>>(errs: Vec<E>) -> ParseErrs {
@@ -613,6 +605,16 @@ impl ParseErrs {
         rtn
     }
 }
+
+impl From<UniErr> for ParseErrs {
+    fn from(u: UniErr) -> Self {
+        ParseErrs {
+            report: vec![],
+            source: None
+        }
+    }
+}
+
 impl From<serde_urlencoded::de::Error> for UniErr {
     fn from(err: serde_urlencoded::de::Error) -> Self {
         UniErr::Status {
@@ -645,6 +647,58 @@ pub mod report {
         labels: Vec<Label>,
     }
 
+    impl Default for Report {
+        fn default() -> Self {
+            Self {
+                kind: ReportKind::Error,
+                code: None,
+                msg: None,
+                note: None,
+                help: None,
+                location: Range {
+                    start: 0,
+                    end: 0
+                },
+                labels: vec![]
+            }
+        }
+    }
+
+    pub struct ReportBuilder {
+
+    }
+
+    impl ReportBuilder {
+            pub fn with_message<S:ToString>(&self,message: S) -> MessageBuilder {
+                MessageBuilder{}
+            }
+    }
+
+    pub struct MessageBuilder {
+    }
+
+    impl MessageBuilder {
+            pub fn with_label(&self, label: Label) -> LabelBuilder {
+                LabelBuilder{}
+            }
+    }
+
+    pub struct LabelBuilder;
+
+    impl LabelBuilder {
+        pub fn finish(&self) -> Report{
+            Default::default()
+        }
+    }
+
+
+
+    impl Report {
+        pub(crate) fn build(p0: ReportKind, p1: (), p2: i32) -> ReportBuilder {
+            ReportBuilder{}
+        }
+    }
+
     #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq)]
     pub enum ReportKind {
         Error,
@@ -658,6 +712,7 @@ pub mod report {
         pub end: u32,
     }
 
+
     #[derive(Clone, Serialize, Deserialize)]
     pub struct Label {
         span: Range,
@@ -665,6 +720,25 @@ pub mod report {
         color: Option<Color>,
         order: i32,
         priority: i32,
+    }
+
+    impl Label {
+        pub fn new(range: std::ops::Range<usize> ) -> Self {
+            Self {
+                span: Range {
+                    start: range.start as u32,
+                    end: range.end as u32,
+                },
+                msg: None,
+                color: None,
+                order: 0,
+                priority: 0
+            }
+        }
+
+        pub fn with_message( self, msg: &str ) -> Label {
+            self
+        }
     }
 
     #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Copy, Clone)]

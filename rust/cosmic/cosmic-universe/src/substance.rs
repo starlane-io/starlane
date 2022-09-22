@@ -12,7 +12,6 @@ use cosmic_macros_primitive::Autobox;
 use cosmic_nom::Tw;
 
 use crate::command::{Command, RawCommand};
-use crate::err::ParseErrs;
 use crate::hyper::{Greet, HyperSubstance, Knock, ParticleLocation};
 use crate::loc::{Meta, PointCtx, PointVar};
 use crate::parse::model::Subst;
@@ -26,6 +25,7 @@ use crate::wave::core::hyp::HypMethod;
 use crate::wave::core::{DirectedCore, ReflectedCore};
 use crate::wave::{Pong, UltraWave};
 use crate::{util, Details, Point, Status, Stub, Surface, UniErr};
+use crate::err::ParseErrs;
 
 #[derive(
     Debug,

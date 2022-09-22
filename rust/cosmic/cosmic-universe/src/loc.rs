@@ -10,7 +10,6 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use cosmic_nom::{new_span, Trace, Tw};
 
-use crate::err::ParseErrs;
 use crate::hyper::ChildRegistry;
 use crate::kind::KindParts;
 use crate::log::{SpanLogger, Trackable};
@@ -31,6 +30,7 @@ use crate::wave::{
 use crate::{
     cosmic_uuid, Agent, BaseKind, Kind, KindTemplate, ParticleRecord, UniErr, ANONYMOUS, HYPERUSER,
 };
+use crate::err::ParseErrs;
 
 lazy_static! {
     pub static ref GLOBAL_CENTRAL: Point = Point::from_str("GLOBAL::central").unwrap();

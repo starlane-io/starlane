@@ -30,7 +30,6 @@ regex = "1.5.4"
 http = "0.2.6"
 http-serde = "1.1.0"
 serde_json = "1.0.79"
-ariadne = "0.1.5"
 chrono = { version="0.4.19", features=["serde"] }
 tokio = { version = "1.15.0", features = ["full"] }
 dashmap = "5.3.4"

@@ -362,7 +362,7 @@ pub mod direct {
 
         use crate::command::common::{SetProperties, SetRegistry, StateSrc, StateSrcVar};
         use crate::command::Command;
-        use crate::err::{ParseErrs, UniErr};
+        use crate::err::{UniErr};
         use crate::kind::{BaseKind, KindParts};
         use crate::loc::{HostKey, Point, PointCtx, PointFactory, PointSeg, PointVar, ToSurface};
         use crate::parse::model::Subst;
