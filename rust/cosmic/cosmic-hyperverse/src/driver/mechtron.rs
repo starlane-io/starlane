@@ -12,6 +12,8 @@ use cosmic_universe::selector::KindSelector;
 use cosmic_universe::util::log;
 use std::str::FromStr;
 use std::sync::Arc;
+use dashmap::DashMap;
+use cosmic_universe::hyper::Assign;
 
 lazy_static! {
     static ref MECHTRON_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -31,6 +33,85 @@ fn mechtron_bind() -> BindConfig {
     .unwrap()
 }
 
+pub struct MechtronHostDriverFactory {
+    pub avail: DriverAvail,
+}
+
+impl MechtronHostDriverFactory {
+    pub fn new(avail: DriverAvail) -> Self {
+        Self { avail }
+    }
+}
+
+#[async_trait]
+impl<P> HyperDriverFactory<P> for MechtronHostDriverFactory
+where
+    P: Hyperverse,
+{
+    fn kind(&self) -> KindSelector {
+        KindSelector::from_base(BaseKind::MechtronHost)
+    }
+
+    async fn create(
+        &self,
+        skel: HyperStarSkel<P>,
+        driver_skel: DriverSkel<P>,
+        ctx: DriverCtx,
+    ) -> Result<Box<dyn Driver<P>>, P::Err> {
+        Ok(Box::new(MechtronHostDriver::new(self.avail.clone())))
+    }
+}
+
+pub struct MechtronHostDriver {
+    pub avail: DriverAvail,
+    pub hosts: DashMap<Point,MechtronHostHost>
+}
+
+#[handler]
+impl MechtronHostDriver {
+    pub fn new(avail: DriverAvail) -> Self {
+        let hosts = DashMap::new();
+        Self { avail, hosts }
+    }
+}
+
+#[async_trait]
+impl<P> Driver<P> for MechtronHostDriver
+where
+    P: Hyperverse,
+{
+    fn kind(&self) -> Kind {
+        Kind::MechtronHost
+    }
+
+    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+        Ok(ItemSphere::Handler(Box::new(MechtronHost)))
+    }
+
+    async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
+        assign.details.properties.get("config")
+    }
+}
+
+pub struct MechtronHost;
+
+#[handler]
+impl MechtronHost {}
+
+#[async_trait]
+impl<P> ItemHandler<P> for MechtronHost
+where
+    P: Hyperverse,
+{
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+        Ok(MECHTRON_BIND_CONFIG.clone())
+    }
+}
+
+
+
+
+
 pub struct MechtronDriverFactory {
     pub avail: DriverAvail,
 }
@@ -43,8 +124,8 @@ impl MechtronDriverFactory {
 
 #[async_trait]
 impl<P> HyperDriverFactory<P> for MechtronDriverFactory
-where
-    P: Hyperverse,
+    where
+        P: Hyperverse,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Mechtron)
@@ -62,19 +143,21 @@ where
 
 pub struct MechtronDriver {
     pub avail: DriverAvail,
+    pub hosts: DashMap<Point,MechtronHost>
 }
 
 #[handler]
 impl MechtronDriver {
     pub fn new(avail: DriverAvail) -> Self {
-        Self { avail }
+        let hosts = DashMap::new();
+        Self { avail, hosts }
     }
 }
 
 #[async_trait]
 impl<P> Driver<P> for MechtronDriver
-where
-    P: Hyperverse,
+    where
+        P: Hyperverse,
 {
     fn kind(&self) -> Kind {
         Kind::Mechtron
@@ -82,6 +165,11 @@ where
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
         Ok(ItemSphere::Handler(Box::new(Mechtron)))
+    }
+
+    async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
+        // when a mechtron is assigned first we  have to find it's host
+
     }
 }
 
@@ -92,8 +180,8 @@ impl Mechtron {}
 
 #[async_trait]
 impl<P> ItemHandler<P> for Mechtron
-where
-    P: Hyperverse,
+    where
+        P: Hyperverse,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(MECHTRON_BIND_CONFIG.clone())

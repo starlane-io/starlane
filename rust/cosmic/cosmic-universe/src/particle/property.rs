@@ -344,7 +344,7 @@ impl PropertiesConfigBuilder {
         Ok(())
     }
 
-    pub fn add_address(&mut self, name: &str, required: bool, mutable: bool) -> Result<(), UniErr> {
+    pub fn add_point(&mut self, name: &str, required: bool, mutable: bool) -> Result<(), UniErr> {
         let def = PropertyDef::new(
             Box::new(PointPattern {}),
             required,

@@ -6,3 +6,4 @@ pkg/
 wasm-pack.log
 appy.zip
 bundle
+*.wasm

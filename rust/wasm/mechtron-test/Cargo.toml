@@ -4,8 +4,8 @@ version = "0.1.0"
 authors = ["Scott Williams <scott@mightydevco.com>"]
 edition = "2018"
 
-#[lib]
-#crate-type = ["cdylib"]
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 mechtron= { path="../../cosmic/mechtron" }
@@ -22,7 +22,7 @@ tokio = { version = "1.15.0", features = ["rt","sync"] }
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.
-#opt-level = "s"
-#lto = true
-#codegen-units = 1
-#panic = "abort"
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
