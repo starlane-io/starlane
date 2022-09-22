@@ -3,8 +3,6 @@ use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
-use http::header::CONTENT_TYPE;
-use http::{HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -22,7 +20,7 @@ use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::ext::ExtMethod;
 use crate::wave::core::http2::HttpMethod;
 use crate::wave::core::hyp::HypMethod;
-use crate::wave::core::{DirectedCore, ReflectedCore};
+use crate::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use crate::wave::{Pong, UltraWave};
 use crate::{util, Details, Point, Status, Stub, Surface, UniErr};
 use crate::err::ParseErrs;
@@ -972,8 +970,8 @@ impl ToRequestCore for MultipartForm {
         let mut headers = HeaderMap::new();
 
         headers.insert(
-            CONTENT_TYPE,
-            HeaderValue::from_static("application/x-www-form-urlencoded"),
+            "Content-Type".to_string(),
+            "application/x-www-form-urlencoded".to_string(),
         );
 
         DirectedCore {

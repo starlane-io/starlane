@@ -10,7 +10,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
-use http::{HeaderMap, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use tokio::time::Instant;
@@ -47,6 +46,8 @@ use crate::substance::{
 };
 use crate::util::{uuid, ValueMatcher, ValuePattern};
 use crate::{ANONYMOUS, HYPERUSER};
+use crate::wave::core::http2::StatusCode;
+use crate::wave::core::Uri;
 
 use self::core::cmd::CmdMethod;
 use self::core::ext::ExtMethod;
@@ -1576,7 +1577,7 @@ impl Echo {
             if let Substance::Text(error) = self.core.body {
                 Err(error.into())
             } else {
-                Err(format!("error code: {}", self.core.status).into())
+                Err(format!("error code: {}", self.core.status.to_string()).into())
             }
         }
     }

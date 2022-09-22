@@ -1,6 +1,5 @@
 use std::ops::Deref;
 
-use http::{HeaderMap, StatusCode, Uri};
 use nom::combinator::all_consuming;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -14,7 +13,8 @@ use crate::parse::error::result;
 use crate::parse::model::MethodScopeSelector;
 use crate::substance::{Errors, Substance};
 use crate::util::{ValueMatcher, ValuePattern};
-use crate::wave::core::{DirectedCore, Method, ReflectedCore};
+use crate::wave::core::{DirectedCore, HeaderMap, Method, ReflectedCore, Uri};
+use crate::wave::core::http2::StatusCode;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct ExtMethod {
@@ -90,10 +90,8 @@ impl Default for ExtMethod {
 pub struct ExtDirected {
     pub method: ExtMethod,
 
-    #[serde(with = "http_serde::header_map")]
     pub headers: HeaderMap,
 
-    #[serde(with = "http_serde::uri")]
     pub uri: Uri,
     pub body: Substance,
 }

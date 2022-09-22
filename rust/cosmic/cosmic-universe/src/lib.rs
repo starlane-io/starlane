@@ -16,7 +16,6 @@ use std::cmp::Ordering;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use ::http::StatusCode;
 use chrono::{DateTime, Utc};
 use dashmap::{DashMap, DashSet};
 use lru::LruCache;

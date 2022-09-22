@@ -8,10 +8,6 @@ use std::string::FromUtf8Error;
 use std::sync::{Arc, PoisonError};
 
 //use ariadne::{Label, Report, ReportBuilder, ReportKind, Source};
-use http::header::ToStrError;
-use http::status::InvalidStatusCode;
-use http::uri::InvalidUri;
-use http::StatusCode;
 use nom::error::VerboseError;
 use nom::Err;
 use nom_locate::LocatedSpan;
@@ -27,6 +23,7 @@ use crate::err::report::{Label, Report, ReportKind};
 
 use crate::parse::error::find_parse_err;
 use crate::substance::{Errors, Substance};
+use crate::wave::core::http2::StatusCode;
 use crate::wave::core::ReflectedCore;
 
 pub enum UniErr {
@@ -308,14 +305,7 @@ impl<T> From<PoisonError<T>> for UniErr {
     }
 }
 
-impl From<InvalidStatusCode> for UniErr {
-    fn from(error: InvalidStatusCode) -> Self {
-        Self::Status {
-            status: 500,
-            message: error.to_string(),
-        }
-    }
-}
+
 
 impl From<FromUtf8Error> for UniErr {
     fn from(message: FromUtf8Error) -> Self {
@@ -425,24 +415,9 @@ impl From<regex::Error> for UniErr {
     }
 }
 
-impl From<InvalidUri> for UniErr {
-    fn from(x: InvalidUri) -> Self {
-        Self::Status {
-            status: 500,
-            message: x.to_string(),
-        }
-    }
-}
 
-impl From<http::Error> for UniErr {
-    fn from(x: http::Error) -> Self {
-        Self::Status {
-            status: 500,
-            message: x.to_string(),
-        }
-    }
-}
 
+/*
 impl From<ToStrError> for UniErr {
     fn from(x: ToStrError) -> Self {
         Self::Status {
@@ -451,6 +426,8 @@ impl From<ToStrError> for UniErr {
         }
     }
 }
+
+ */
 
 impl<I: Span> From<nom::Err<ErrorTree<I>>> for UniErr {
     fn from(err: Err<ErrorTree<I>>) -> Self {

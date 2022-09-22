@@ -4,7 +4,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
-use http::StatusCode;
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 use crate::config::bind::RouteSelector;
@@ -18,6 +17,7 @@ use crate::wave::{
     ReflectedWave, Scope, Session, ToRecipients, UltraWave, Wave, WaveId,
 };
 use crate::{Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, UniErr};
+use crate::wave::core::http2::StatusCode;
 
 #[derive(Clone)]
 pub struct Exchanger {
