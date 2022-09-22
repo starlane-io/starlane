@@ -2,7 +2,8 @@ use core::str::FromStr;
 use serde::de::Unexpected::Option;
 use crate::parse::model::MechtronScope;
 use crate::loc::Point;
-use crate::UniErr;
+use crate::{Bin, UniErr};
+use crate::parse::mechtron_config;
 
 #[derive(Clone)]
 pub struct MechtronConfig {
@@ -36,5 +37,23 @@ impl MechtronConfig {
         } else {
             Err("required `bin` and `name` in Wasm scope".into())
         }
+    }
+}
+
+impl TryFrom<Vec<u8>> for MechtronConfig {
+    type Error = UniErr;
+
+    fn try_from(doc: Vec<u8>) -> Result<Self, Self::Error> {
+        let doc = String::from_utf8(doc)?;
+        mechtron_config(doc.as_str())
+    }
+}
+
+impl TryFrom<Bin> for MechtronConfig {
+    type Error = UniErr;
+
+    fn try_from(doc: Bin) -> Result<Self, Self::Error> {
+        let doc = String::from_utf8((*doc).clone() )?;
+        mechtron_config(doc.as_str())
     }
 }

@@ -6572,6 +6572,14 @@ pub fn bind_config(src: &str) -> Result<BindConfig, UniErr> {
     }
 }
 
+pub fn mechtron_config(src: &str) -> Result<MechtronConfig, UniErr> {
+    let document = doc(src)?;
+    match document {
+        Document::MechtronConfig(mechtron_config) => Ok(mechtron_config),
+        _ => Err("not a Mechtron config".into())
+    }
+}
+
 pub fn doc(src: &str) -> Result<Document, UniErr> {
     let src = src.to_string();
     let (next, stripped) = strip_comments(new_span(src.as_str()))?;

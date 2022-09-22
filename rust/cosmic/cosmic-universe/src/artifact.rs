@@ -11,6 +11,7 @@ use crate::loc::{Point, ToSurface};
 use crate::particle::Stub;
 use crate::substance::Bin;
 use crate::{BindConfig, Substance, UniErr};
+use crate::config::mechtron::MechtronConfig;
 use crate::wave::{DirectedProto, Pong, Wave};
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::exchange::{ProtoTransmitter, ProtoTransmitterBuilder};
@@ -18,6 +19,7 @@ use crate::wave::exchange::{ProtoTransmitter, ProtoTransmitterBuilder};
 #[derive(Clone)]
 pub struct ArtifactApi {
     binds: Arc<DashMap<Point, Arc<BindConfig>>>,
+    mechtrons : Arc<DashMap<Point, Arc<MechtronConfig>>>,
     fetcher: Arc<RwLock<FetchChamber>>,
 }
 
@@ -30,6 +32,7 @@ impl ArtifactApi {
     pub fn new( fetcher: Box<dyn ArtifactFetcher>) -> Self {
         Self {
             binds: Arc::new(DashMap::new() ),
+            mechtrons: Arc::new(DashMap::new() ),
             fetcher: Arc::new(RwLock::new(FetchChamber {
                 fetcher
             })),
@@ -39,6 +42,21 @@ impl ArtifactApi {
 
     pub async fn set_fetcher(&self, fetcher:Box<dyn ArtifactFetcher>) {
         self.fetcher.write().await.set(fetcher);
+    }
+
+    pub async fn mechtron(&self, point: &Point) -> Result<ArtRef<MechtronConfig>, UniErr> {
+        {
+            if self.mechtrons.contains_key(point) {
+                let mechtron = self.mechtrons.get(point).unwrap().clone();
+                return Ok(ArtRef::new(mechtron, point.clone()));
+            }
+        }
+
+        let mechtron: Arc<MechtronConfig> = Arc::new(self.get(point).await?);
+        {
+            self.mechtrons.insert(point.clone(), mechtron.clone());
+        }
+        return Ok(ArtRef::new(mechtron, point.clone()));
     }
 
     pub async fn bind(&self, point: &Point) -> Result<ArtRef<BindConfig>, UniErr> {
