@@ -15,6 +15,7 @@ use crate::util::ValueMatcher;
 )]
 pub enum HypMethod {
     Assign,
+    Host,
     Provision,
     Knock,
     Hop,

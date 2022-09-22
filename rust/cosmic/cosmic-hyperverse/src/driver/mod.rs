@@ -170,8 +170,9 @@ where
         kind: Kind,
         rtn: oneshot::Sender<Result<DriverApi<P>, UniErr>>,
     },
+    LocalDriverLookup{ kind: Kind, rtn: oneshot::Sender<Option<Point>> },
     Status {
-        kind: KindSelector,
+        kind: Kind,
         rtn: oneshot::Sender<Result<DriverStatus, UniErr>>,
     },
     StatusRx(oneshot::Sender<watch::Receiver<DriverStatus>>),
@@ -237,6 +238,15 @@ where
             .await?;
         Ok(rtn_rx.await?)
     }
+
+     pub async fn local_driver_lookup(&self, kind: Kind) -> Result<Option<Point>, UniErr> {
+        let (rtn, mut rtn_rx) = oneshot::channel();
+        self.call_tx
+            .send(DriversCall::LocalDriverLookup{ kind, rtn })
+            .await?;
+        Ok(rtn_rx.await?)
+    }
+
 
     pub async fn drivers(&self) -> Result<HashMap<KindSelector, DriverApi<P>>, UniErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
@@ -390,6 +400,16 @@ where
                     }
                     DriversCall::FindInternalKind { kind, rtn } => {
                         rtn.send(self.find_internal(&kind).cloned());
+                    }
+                    DriversCall::LocalDriverLookup { kind, rtn } => {
+                        match self.find(&kind) {
+                            None => {
+                                rtn.send(None);
+                            }
+                            Some(driver_api) => {
+                                driver_api.
+                            }
+                        }
                     }
                 }
             }
@@ -843,6 +863,12 @@ where
         Self { call_tx: tx, kind }
     }
 
+    pub async fn get_point(&self) -> Result<Point,UniErr> {
+        let (rtn,mut rtn_rx) = oneshot::channel();
+        self.call_tx.send(DriverRunnerCall::GetPoint(rtn)).await.unwrap_or_default();
+        Ok(rtn_rx.await?)
+    }
+
     pub async fn init_item(&self, point: Point) -> Result<Status, UniErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
@@ -892,6 +918,7 @@ pub enum DriverRunnerCall<P>
 where
     P: Hyperverse,
 {
+    GetPoint(oneshot::Sender<Point>),
     Traversal(Traversal<UltraWave>),
     Handle {
         wave: DirectedWave,
@@ -1188,6 +1215,9 @@ where
                             }
                         }
                     }
+                    DriverRunnerCall::GetPoint(rtn) => {
+                        rtn.send(self.skel.point.clone());
+                    }
                 }
             }
         });
@@ -1327,6 +1357,10 @@ where
     pub async fn locate(&self,point: &Point) -> Result<ParticleRecord,P::Err> {
         self.skel.registry.record(point).await
     }
+
+    pub async fn local_driver_lookup( &self, kind: Kind) -> Result<Option<Point>,UniErr> {
+        self.skel.drivers.local_driver_lookup(kind)?
+    }
 }
 
 pub struct DriverFactoryWrapper<P>
@@ -1434,7 +1468,7 @@ where
 {
     fn kind(&self) -> Kind;
 
-    fn layer(&self) -> Layer {
+    fn layer(&sef) -> Layer {
         Layer::Core
     }
 

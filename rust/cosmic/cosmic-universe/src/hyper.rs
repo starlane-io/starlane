@@ -178,6 +178,15 @@ pub struct Assign {
     pub state: StateSrc,
 }
 
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Host{
+    pub kind: AssignmentKind,
+    pub details: Details,
+    pub state: StateSrc,
+}
+
+
 impl Assign {
     pub fn kind(&self) -> &Kind {
         &self.details.stub.kind
@@ -190,12 +199,21 @@ impl Assign {
             state,
         }
     }
+
+    pub fn to_host(self) -> Host {
+        Host {
+            kind: self.kind,
+            details: self.details,
+            state: self.state
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Autobox)]
 pub enum HyperSubstance {
     Provision(Provision),
     Assign(Assign),
+    Host(Host),
     Event(HyperEvent),
     Log(Log),
     Search(Search),
