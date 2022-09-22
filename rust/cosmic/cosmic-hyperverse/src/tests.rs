@@ -46,7 +46,7 @@ use crate::driver::space::SpaceDriverFactory;
 use crate::driver::{DriverAvail, DriverFactory};
 use crate::machine::MachineApiExtFactory;
 use crate::star::HyperStarApi;
-use crate::test::hyperverse::{TestErr, TestCosmos};
+use crate::test::cosmos::{TestErr, TestCosmos};
 use crate::test::registry::TestRegistryContext;
 
 use super::*;

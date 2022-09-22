@@ -1,5 +1,5 @@
-use crate::test::hyperverse::TestErr;
-use crate::test::hyperverse::TestCosmos;
+use crate::test::cosmos::TestErr;
+use crate::test::cosmos::TestCosmos;
 use crate::{Registration, RegistryApi};
 use cosmic_universe::command::common::SetProperties;
 use cosmic_universe::command::direct::delete::Delete;
