@@ -1,5 +1,5 @@
-use std::string::FromUtf8Error;
-use std::sync::PoisonError;
+use alloc::format;
+use alloc::string::{FromUtf8Error, String, ToString};
 
 #[derive(Debug, Clone)]
 pub struct Error {
@@ -22,6 +22,7 @@ impl From<String> for Error {
     }
 }
 
+/*
 impl<T> From<PoisonError<T>> for Error {
     fn from(e: PoisonError<T>) -> Self {
         Error {
@@ -29,6 +30,8 @@ impl<T> From<PoisonError<T>> for Error {
         }
     }
 }
+
+ */
 
 impl From<FromUtf8Error> for Error {
     fn from(e: FromUtf8Error) -> Self {

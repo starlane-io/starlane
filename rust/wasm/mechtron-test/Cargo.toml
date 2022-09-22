@@ -1,19 +1,17 @@
-[workspace]
 [package]
-name = "my-mechtron"
+name = "mechtron-test"
 version = "0.1.0"
 authors = ["Scott Williams <scott@mightydevco.com>"]
-edition = "2021"
+edition = "2018"
 
-[lib]
-crate-type = ["cdylib"]
+#[lib]
+#crate-type = ["cdylib"]
 
 [dependencies]
-mechtron= { path="../../../mechtron" }
-wasm_membrane_guest = { path= "../../../wasm-membrane-guest"}
-cosmic-universe= { path= "../../../cosmic-universe"}
-#cosmic-macros= { path= "../../../cosmic-macros"}
-#tokio = { version = "1.15.0", features = ["rt"] }
+mechtron= { path="../../cosmic/mechtron" }
+wasm_membrane_guest = { path= "../../cosmic/wasm-membrane-guest"}
+cosmic-universe= { path= "../../cosmic/cosmic-universe"}
+tokio = { version = "1.15.0", features = ["rt","sync"] }
 
 # `wee_alloc` is a tiny allocator for wasm that is only ~1K in code size
 # compared to the default allocator's ~10K. It is slower than the default
@@ -24,7 +22,7 @@ cosmic-universe= { path= "../../../cosmic-universe"}
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.
-opt-level = "s"
-lto = true
-codegen-units = 1
-panic = "abort"
+#opt-level = "s"
+#lto = true
+#codegen-units = 1
+#panic = "abort"

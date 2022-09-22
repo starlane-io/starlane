@@ -3,6 +3,7 @@ members = [
   "starlane/*",
   "cosmic/*",
   "impl/*",
+  "wasm/*",
   ]
 
 exclude = [

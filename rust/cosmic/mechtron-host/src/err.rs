@@ -1,6 +1,7 @@
 use wasmer::CompileError;
 use wasm_membrane_host::error::Error;
 
+#[derive(Debug)]
 pub struct HostErr{
   pub message: String
 }

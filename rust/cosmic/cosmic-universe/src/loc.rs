@@ -28,7 +28,7 @@ use crate::wave::{
     UltraWave, Wave,
 };
 use crate::{
-    cosmic_uuid, Agent, BaseKind, Kind, KindTemplate, ParticleRecord, UniErr, ANONYMOUS, HYPERUSER,
+     Agent, BaseKind, Kind, KindTemplate, ParticleRecord, UniErr, ANONYMOUS, HYPERUSER,
 };
 use crate::err::ParseErrs;
 
@@ -814,7 +814,7 @@ impl ToString for Topic {
 
 impl Topic {
     pub fn uuid() -> Self {
-        Self::Uuid(unsafe { cosmic_uuid() })
+        Self::Uuid(Uuid::new())
     }
 }
 

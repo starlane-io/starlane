@@ -12,7 +12,6 @@ use crate::err::UniErr;
 use crate::loc::Uuid;
 use crate::parse::Env;
 use crate::wave::core::http2::HttpMethod;
-use crate::{cosmic_timestamp, cosmic_uuid};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum HttpMethodPattern {
@@ -201,11 +200,12 @@ where
 }
 
 pub fn uuid() -> Uuid {
-    unsafe { cosmic_uuid() }
+//    unsafe { cosmic_uuid() }
+    Uuid::new()
 }
 
 pub fn timestamp() -> DateTime<Utc> {
-    unsafe { cosmic_timestamp() }
+    Utc::now()
 }
 
 pub trait ToResolved<R>

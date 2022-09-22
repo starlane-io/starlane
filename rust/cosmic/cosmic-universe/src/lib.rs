@@ -69,12 +69,15 @@ lazy_static! {
     pub static ref ANONYMOUS: Point = Point::from_str("hyperspace:users:anonymous").expect("point");
 }
 
+/*
 pub fn cosmic_uuid() -> Uuid {
     uuid::Uuid::new_v4().to_string()
 }
 pub fn cosmic_timestamp() -> DateTime<Utc> {
     Utc::now()
 }
+
+ */
 
 #[cfg(test)]
 pub mod tests {

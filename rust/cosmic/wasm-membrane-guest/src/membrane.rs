@@ -1,13 +1,21 @@
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicI32, Ordering};
-use std::sync::RwLock;
-
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use core::sync::atomic::Ordering;
 use crate::error::Error;
+use alloc::collections::BTreeMap;
+use dashmap::DashMap;
+use core::sync::atomic::AtomicI32;
+use alloc::sync::Arc;
+use core::panic::PanicInfo;
+
+
 
 lazy_static! {
-    pub static ref BUFFERS: RwLock<HashMap<i32, Vec<u8>>> = RwLock::new(HashMap::new());
-    pub static ref BUFFER_INDEX: AtomicI32 = AtomicI32::new(0);
+    static ref BUFFERS: Arc<DashMap<i32, Vec<u8>>> = Arc::new(DashMap::new());
+    static ref BUFFER_INDEX: AtomicI32 = AtomicI32::new(0);
 }
+
+
 
 pub static VERSION: i32 = 1;
 
@@ -25,18 +33,16 @@ pub extern "C" fn membrane_guest_version() -> i32 {
 pub extern "C" fn membrane_guest_alloc_buffer(len: i32) -> i32 {
     let buffer_id = BUFFER_INDEX.fetch_add(1, Ordering::Relaxed);
     {
-        let mut buffers = BUFFERS.write().unwrap();
         let mut bytes: Vec<u8> = Vec::with_capacity(len as _);
         unsafe { bytes.set_len(len as _) }
-        buffers.insert(buffer_id, bytes);
+        BUFFERS.insert(buffer_id, bytes);
     }
     buffer_id
 }
 
 #[no_mangle]
 pub extern "C" fn membrane_guest_dealloc_buffer(id: i32) {
-    let mut buffers = BUFFERS.write().unwrap();
-    buffers.remove(&id);
+    BUFFERS.remove(&id);
 }
 
 #[no_mangle]
@@ -48,17 +54,13 @@ pub extern "C" fn membrane_guest_test(test_buffer_message: i32) {
 
 #[no_mangle]
 pub extern "C" fn membrane_guest_get_buffer_ptr(id: i32) -> *const u8 {
-    let buffer_info = BUFFERS.read();
-    let buffer_info = buffer_info.unwrap();
-    let buffer = buffer_info.get(&id).unwrap();
+    let buffer = BUFFERS.get(&id).unwrap();
     return buffer.as_ptr();
 }
 
 #[no_mangle]
 pub extern "C" fn membrane_guest_get_buffer_len(id: i32) -> i32 {
-    let buffer_info = BUFFERS.read();
-    let buffer_info = buffer_info.unwrap();
-    let buffer = buffer_info.get(&id).unwrap();
+    let buffer = BUFFERS.get(&id).unwrap();
     buffer.len() as _
 }
 
@@ -79,32 +81,23 @@ pub fn log(message: &str) {
     }
 }
 
-pub fn panic(message: &str) {
-    let buffer_id = membrane_write_str(message);
-    unsafe {
-        membrane_host_panic(buffer_id);
-    }
-}
 
 pub fn membrane_write_buffer(bytes: Vec<u8>) -> i32 {
-    let mut buffers = BUFFERS.write().unwrap();
     let buffer_id = BUFFER_INDEX.fetch_add(1, Ordering::Relaxed);
-    buffers.insert(buffer_id, bytes);
+    BUFFERS.insert(buffer_id, bytes);
     buffer_id
 }
 
 pub fn membrane_read_buffer(buffer: i32) -> Result<Vec<u8>, Error> {
     let bytes = {
-        let buffers = BUFFERS.read()?;
-        buffers.get(&buffer).unwrap().clone()
+        BUFFERS.get(&buffer).unwrap().clone()
     };
     Ok(bytes)
 }
 
 pub fn membrane_consume_buffer(buffer: i32) -> Result<Vec<u8>, Error> {
-    let bytes = {
-        let mut buffers = BUFFERS.write()?;
-        buffers.remove(&buffer).unwrap()
+    let (_,bytes) = {
+        BUFFERS.remove(&buffer).unwrap()
     };
     Ok(bytes)
 }
@@ -126,10 +119,9 @@ pub fn membrane_write_str(string: &str) -> i32 {
 }
 
 pub fn membrane_write_string(mut string: String) -> i32 {
-    let mut buffers = BUFFERS.write().unwrap();
     let buffer_id = BUFFER_INDEX.fetch_add(1, Ordering::Relaxed);
     unsafe {
-        buffers.insert(buffer_id, string.as_mut_vec().to_vec());
+        BUFFERS.insert(buffer_id, string.as_mut_vec().to_vec());
     }
     buffer_id
 }

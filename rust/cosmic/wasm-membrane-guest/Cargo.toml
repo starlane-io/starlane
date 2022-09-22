@@ -10,4 +10,7 @@ description = "Host environment to facilitate communication with Wasm"
 
 
 [dependencies]
-lazy_static = "1.4.0"
+lazy_static = {version="1.4.0", features=["spin_no_std"] }
+tokio = { version="1.21.1", features=["rt","sync"] }
+dashmap = "5.3.4"
+

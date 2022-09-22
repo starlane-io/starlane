@@ -54,6 +54,12 @@ impl MechtronHost {
             membrane
         })
     }
+
+    pub fn init(&self) -> Result<(),HostErr> {
+        self.membrane.init()?;
+        Ok(())
+    }
+
 }
 
 
@@ -61,9 +67,16 @@ impl MechtronHost {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+    use std::str::FromStr;
     use super::*;
 
     #[test]
-    fn it_works() {
+    fn wasm() {
+        let factory = MechtronHostFactory::new();
+        let point = Point::from_str("guest").unwrap();
+        let data = Arc::new(fs::read("../../wasm/my-app/my_app.wasm").unwrap());
+        let host = factory.create(point, data).unwrap();
+        host.init().unwrap();
     }
 }

@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::command::common::StateSrc::Substance;
-use crate::cosmic_timestamp;
 use crate::err::UniErr;
 use crate::loc::{Point, ToPoint, Uuid};
 use crate::parse::{to_string, CamelCase};
@@ -390,6 +389,28 @@ impl RootLogger {
         }
     }
 }
+pub struct NoAppender{}
+
+impl NoAppender {
+    pub fn new() -> Self {
+        NoAppender{}
+    }
+}
+
+impl LogAppender for NoAppender {
+    fn log(&self, log: Log) {
+    }
+
+    fn audit(&self, log: AuditLog) {
+    }
+
+    fn span_event(&self, log: LogSpanEvent) {
+    }
+
+    fn pointless(&self, log: PointlessLog) {
+    }
+}
+
 
 pub struct StdOutAppender();
 

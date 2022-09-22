@@ -5611,7 +5611,8 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
             BaseKind::Repo => Ok((next, Kind::Repo)),
             BaseKind::Driver => Ok((next, Kind::Driver)),
             BaseKind::Global => Ok((next, Kind::Global)),
-            BaseKind::Host => Ok((next,Kind::Host))
+            BaseKind::Host => Ok((next,Kind::Host)),
+            BaseKind::Guest => Ok((next,Kind::Guest))
         }
     }
 }
