@@ -18,7 +18,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use http::StatusCode;
 use tokio::io;
 use tokio::runtime::{Handle, Runtime};
 use tokio::sync::{mpsc, oneshot};
@@ -49,8 +48,10 @@ use cosmic_universe::security::{Access, AccessGrant};
 use cosmic_universe::selector::Selector;
 use cosmic_universe::settings::Timeouts;
 use cosmic_universe::substance::{Substance, SubstanceList, Token};
+use cosmic_universe::wave::core::http2::StatusCode;
 use cosmic_universe::wave::core::ReflectedCore;
 use cosmic_universe::wave::UltraWave;
+use mechtron_host::err::HostErr;
 
 use crate::driver::{DriverFactory, DriversBuilder};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
@@ -82,7 +83,7 @@ pub type Registry<P> = Arc<dyn RegistryApi<P>>;
 #[async_trait]
 pub trait RegistryApi<P>: Send + Sync
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, P::Err>;
 
@@ -147,6 +148,7 @@ pub trait HyperErr:
     + From<zip::result::ZipError>
     + From<Box<bincode::ErrorKind>>
     + From<acid_store::Error>
+    + From<HostErr>
     + Into<UniErr>
 {
     fn to_cosmic_err(&self) -> UniErr;
@@ -182,7 +184,7 @@ pub trait HyperErr:
 }
 
 #[async_trait]
-pub trait Hyperverse: Send + Sync + Sized + Clone
+pub trait Cosmos: Send + Sync + Sized + Clone
 where
     Self::Err: HyperErr,
     Self: 'static,
@@ -268,7 +270,8 @@ where
             }
             BaseKind::Driver => Kind::Driver,
             BaseKind::Global => Kind::Global,
-            BaseKind::Host => Kind::Host
+            BaseKind::Host => Kind::Host,
+            BaseKind::Guest => Kind::Guest,
         })
     }
 

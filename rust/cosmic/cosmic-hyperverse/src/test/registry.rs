@@ -1,5 +1,5 @@
 use crate::test::hyperverse::TestErr;
-use crate::test::hyperverse::TestHyperverse;
+use crate::test::hyperverse::TestCosmos;
 use crate::{Registration, RegistryApi};
 use cosmic_universe::command::common::SetProperties;
 use cosmic_universe::command::direct::delete::Delete;
@@ -40,7 +40,7 @@ impl TestRegistryApi {
 }
 
 #[async_trait]
-impl RegistryApi<TestHyperverse> for TestRegistryApi {
+impl RegistryApi<TestCosmos> for TestRegistryApi {
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, TestErr> {
         let details = Details {
             stub: Stub {

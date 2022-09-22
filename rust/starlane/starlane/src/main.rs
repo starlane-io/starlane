@@ -18,7 +18,7 @@ use cosmic_artifact::Artifacts;
 use cosmic_hyperlane::HyperGateSelector;
 use cosmic_hyperverse::driver::DriversBuilder;
 use cosmic_hyperverse::machine::{Machine, MachineTemplate};
-use cosmic_hyperverse::Hyperverse;
+use cosmic_hyperverse::Cosmos;
 use cosmic_hyperverse::{Registry, RegistryApi};
 use cosmic_registry_postgres::{
     PostErr, PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
@@ -120,7 +120,7 @@ impl PostgresPlatform for Starlane {
 }
 
 #[async_trait]
-impl Hyperverse for Starlane {
+impl Cosmos for Starlane {
     type Err = PostErr;
     type RegistryContext = PostgresRegistryContext;
 
@@ -202,7 +202,7 @@ impl Hyperverse for Starlane {
                     what => return Err(format!("unrecognized UserBase sub: '{}'", what).into()),
                 },
             },
-            _ => Hyperverse::select_kind(self, template),
+            _ => Cosmos::select_kind(self, template),
         }
     }
 }

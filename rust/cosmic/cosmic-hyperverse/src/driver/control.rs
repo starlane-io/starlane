@@ -3,7 +3,7 @@ use crate::driver::{
     ItemRouter, ItemSphere,
 };
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::{HyperErr, Hyperverse};
+use crate::{HyperErr, Cosmos};
 use cosmic_hyperlane::{
     AnonHyperAuthenticatorAssignEndPoint, FromTransform, HopTransform, HyperClient, HyperGreeter,
     Hyperway, HyperwayConfigurator, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub,
@@ -38,7 +38,7 @@ use std::time::Duration;
 
 pub struct ControlDriverFactory<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     phantom: PhantomData<P>,
 }
@@ -46,7 +46,7 @@ where
 #[async_trait]
 impl<P> HyperDriverFactory<P> for ControlDriverFactory<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Control)
@@ -75,7 +75,7 @@ where
 
 impl<P> ControlDriverFactory<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new() -> Self {
         Self {
@@ -86,14 +86,14 @@ where
 
 pub struct ControlFactory<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     phantom: PhantomData<P>,
 }
 
 impl<P> ControlFactory<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new() -> Self {
         Self {
@@ -105,7 +105,7 @@ where
 #[async_trait]
 impl<P> HyperDriverFactory<P> for ControlFactory<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Control)
@@ -132,7 +132,7 @@ where
 #[derive(DirectedHandler)]
 pub struct ControlDriver<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub ctx: DriverCtx,
     pub skel: HyperSkel<P>,
@@ -144,19 +144,19 @@ where
 #[derive(Clone)]
 pub struct ControlSkel<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub star: HyperStarSkel<P>,
     pub driver: DriverSkel<P>,
 }
 
 #[handler]
-impl<P> ControlDriver<P> where P: Hyperverse {}
+impl<P> ControlDriver<P> where P: Cosmos {}
 
 #[async_trait]
 impl<P> Driver<P> for ControlDriver<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     fn kind(&self) -> Kind {
         Kind::Control
@@ -301,7 +301,7 @@ where
 
 pub struct ControlCreator<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub skel: HyperSkel<P>,
     pub fabric_routers: Arc<DashMap<Point, LayerInjectionRouter>>,
@@ -311,7 +311,7 @@ where
 
 impl<P> ControlCreator<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(
         skel: HyperSkel<P>,
@@ -331,7 +331,7 @@ where
 #[async_trait]
 impl<P> PointFactory for ControlCreator<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     async fn create(&self) -> Result<Point, UniErr> {
         let create = Create {
@@ -372,7 +372,7 @@ where
 #[derive(Clone)]
 pub struct ControlGreeter<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub skel: HyperSkel<P>,
     pub controls: Point,
@@ -380,7 +380,7 @@ where
 
 impl<P> ControlGreeter<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(skel: HyperSkel<P>, controls: Point) -> Self {
         Self { skel, controls }
@@ -390,7 +390,7 @@ where
 #[async_trait]
 impl<P> HyperGreeter for ControlGreeter<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     async fn greet(&self, stub: HyperwayStub) -> Result<Greet, UniErr> {
         Ok(Greet {
@@ -404,7 +404,7 @@ where
 
 pub struct Control<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub skel: HyperSkel<P>,
     pub ctx: ControlCtx<P>,
@@ -412,7 +412,7 @@ where
 
 impl<P> Item<P> for Control<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     type Skel = HyperSkel<P>;
     type Ctx = ControlCtx<P>;
@@ -426,7 +426,7 @@ where
 #[async_trait]
 impl<P> Router for Control<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     async fn route(&self, wave: UltraWave) {
         self.ctx.router.route(wave).await;
@@ -440,7 +440,7 @@ where
 #[async_trait]
 impl<P> ItemRouter<P> for Control<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         <Control<P> as Item<P>>::bind(self).await
@@ -450,7 +450,7 @@ where
 #[derive(Clone)]
 pub struct ControlCtx<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub phantom: PhantomData<P>,
     pub router: Arc<dyn Router>,
@@ -458,7 +458,7 @@ where
 
 impl<P> ControlCtx<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(router: Arc<dyn Router>) -> Self {
         Self {

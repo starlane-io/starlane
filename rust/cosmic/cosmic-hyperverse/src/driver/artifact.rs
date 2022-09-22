@@ -1,6 +1,6 @@
 use crate::driver::{Driver, DriverAvail, DriverCtx, DriverSkel, HyperDriverFactory, Item, ItemHandler, ItemSkel, ItemSphere};
 use crate::star::HyperStarSkel;
-use crate::{HyperErr, Hyperverse};
+use crate::{HyperErr, Cosmos};
 use acid_store::repo::Commit;
 use acid_store::repo::key::KeyRepo;
 use acid_store::repo::value::ValueRepo;
@@ -108,7 +108,7 @@ impl RepoDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for RepoDriverFactory
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Repo)
@@ -126,7 +126,7 @@ where
 
 pub struct RepoDriver<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     skel: HyperStarSkel<P>,
 }
@@ -134,7 +134,7 @@ where
 #[handler]
 impl<P> RepoDriver<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(skel: HyperStarSkel<P>) -> Self {
         Self { skel }
@@ -144,7 +144,7 @@ where
 #[async_trait]
 impl<P> Driver<P> for RepoDriver<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     fn kind(&self) -> Kind {
         Kind::Repo
@@ -177,7 +177,7 @@ impl Repo {}
 #[async_trait]
 impl<P> ItemHandler<P> for Repo
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(REPO_BIND_CONFIG.clone())
@@ -195,7 +195,7 @@ impl BundleSeriesDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for BundleSeriesDriverFactory
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::BundleSeries)
@@ -228,7 +228,7 @@ impl BundleSeriesDriver {
 #[async_trait]
 impl<P> Driver<P> for BundleSeriesDriver
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     fn kind(&self) -> Kind {
         Kind::BundleSeries
@@ -247,7 +247,7 @@ impl BundleSeries {}
 #[async_trait]
 impl<P> ItemHandler<P> for BundleSeries
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(SERIES_BIND_CONFIG.clone())
@@ -265,7 +265,7 @@ impl BundleDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for BundleDriverFactory
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Bundle)
@@ -283,7 +283,7 @@ where
 
 pub struct BundleDriver<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     skel: DriverSkel<P>,
     ctx: DriverCtx,
@@ -293,7 +293,7 @@ where
 #[handler]
 impl<P> BundleDriver<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
         let store: KeyRepo<String> = OpenOptions::new().mode(OpenMode::CreateNew).open(&MemoryConfig::new()).unwrap();
@@ -304,7 +304,7 @@ where
 #[async_trait]
 impl<P> Driver<P> for BundleDriver<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     fn kind(&self) -> Kind {
         Kind::Bundle
@@ -467,7 +467,7 @@ impl Bundle {}
 #[async_trait]
 impl<P> ItemHandler<P> for Bundle
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(BUNDLE_BIND_CONFIG.clone())
@@ -485,7 +485,7 @@ impl ArtifactDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for ArtifactDriverFactory
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Artifact)
@@ -503,7 +503,7 @@ where
 
 pub struct ArtifactDriver<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     skel: DriverSkel<P>,
     ctx: DriverCtx,
@@ -512,7 +512,7 @@ where
 #[handler]
 impl<P> ArtifactDriver<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
         Self { skel, ctx }
@@ -524,7 +524,7 @@ where
 #[async_trait]
 impl<P> Driver<P> for ArtifactDriver<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     fn kind(&self) -> Kind {
         Kind::Artifact(ArtifactSubKind::Raw)
@@ -555,12 +555,12 @@ where
     }
 }
 
-pub struct Artifact<P> where P: Hyperverse {
+pub struct Artifact<P> where P: Cosmos {
     skel: ItemSkel<P>
 }
 
 #[handler]
-impl <P> Artifact<P> where P:Hyperverse{
+impl <P> Artifact<P> where P: Cosmos {
 
     #[route("Cmd<Read>")]
     pub async fn read( &self, _: InCtx<'_,()>) -> Result<Substance,P::Err> {
@@ -574,7 +574,7 @@ impl <P> Artifact<P> where P:Hyperverse{
     }
 }
 
-impl <P> Item<P> for Artifact<P> where P: Hyperverse{
+impl <P> Item<P> for Artifact<P> where P: Cosmos {
     type Skel = ItemSkel<P>;
     type Ctx = ();
     type State = ();
@@ -589,7 +589,7 @@ impl <P> Item<P> for Artifact<P> where P: Hyperverse{
 #[async_trait]
 impl<P> ItemHandler<P> for Artifact<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(ARTIFACT_BIND_CONFIG.clone())

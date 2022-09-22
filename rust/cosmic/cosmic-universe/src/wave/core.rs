@@ -33,12 +33,8 @@ impl From<Result<ReflectedCore, UniErr>> for ReflectedCore {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ReflectedCore {
-    //#[serde(with = "http_serde::header_map")]
     pub headers: HeaderMap,
-
-    //#[serde(with = "http_serde::status_code")]
     pub status: StatusCode,
-
     pub body: Substance,
 }
 

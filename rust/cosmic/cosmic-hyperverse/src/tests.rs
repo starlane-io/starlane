@@ -46,7 +46,7 @@ use crate::driver::space::SpaceDriverFactory;
 use crate::driver::{DriverAvail, DriverFactory};
 use crate::machine::MachineApiExtFactory;
 use crate::star::HyperStarApi;
-use crate::test::hyperverse::{TestErr, TestHyperverse};
+use crate::test::hyperverse::{TestErr, TestCosmos};
 use crate::test::registry::TestRegistryContext;
 
 use super::*;
@@ -66,7 +66,7 @@ async fn create(
     ctx: &TestRegistryContext,
     particle: Point,
     location: ParticleLocation,
-    star_api: HyperStarApi<TestHyperverse>,
+    star_api: HyperStarApi<TestCosmos>,
 ) -> Result<(), TestErr> {
     println!("ADDING PARTICLE: {}", particle.to_string());
     let details = Details::new(
@@ -104,7 +104,7 @@ fn test_gravity_routing() -> Result<(), TestErr> {
         .enable_all()
         .build()?;
     runtime.block_on(async move {
-        let platform = TestHyperverse::new();
+        let platform = TestCosmos::new();
         let machine_api = platform.machine();
         machine_api.wait_ready().await;
 
@@ -272,7 +272,7 @@ fn test_layer_traversal() -> Result<(), TestErr> {
             direct_tx.send(());
         });
 
-        let platform = TestHyperverse::new();
+        let platform = TestCosmos::new();
         let machine_api = platform.machine();
         machine_api.wait_ready().await;
 
@@ -501,7 +501,7 @@ fn test_control() -> Result<(), TestErr> {
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestHyperverse::new();
+        let platform = TestCosmos::new();
         let machine_api = platform.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
         let logger = logger.point(Point::from_str("test-client").unwrap());
@@ -566,7 +566,7 @@ fn test_star_wrangle() -> Result<(), TestErr> {
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestHyperverse::new();
+        let platform = TestCosmos::new();
         let machine_api = platform.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
         let logger = logger.point(Point::from_str("test-client").unwrap());
@@ -597,7 +597,7 @@ fn test_golden_path() -> Result<(), TestErr> {
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestHyperverse::new();
+        let platform = TestCosmos::new();
         let machine_api = platform.machine();
 
         tokio::time::timeout(Duration::from_secs(1), machine_api.wait_ready())
@@ -629,7 +629,7 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestHyperverse::new();
+        let platform = TestCosmos::new();
         let machine_api = platform.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
         let logger = logger.point(Point::from_str("test-client").unwrap());
@@ -698,7 +698,7 @@ fn test_control_cli() -> Result<(), TestErr> {
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestHyperverse::new();
+        let platform = TestCosmos::new();
         let machine_api = platform.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
         let logger = logger.point(Point::from_str("test-client").unwrap());
@@ -736,12 +736,12 @@ fn test_publish() -> Result<(), TestErr> {
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestHyperverse::new();
-        let machine_api = platform.machine();
+        let cosmos = TestCosmos::new();
+        let machine_api = cosmos.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
         let logger = logger.point(Point::from_str("test-client").unwrap());
 
-        tokio::time::timeout(Duration::from_secs(1), machine_api.wait_ready())
+        tokio::time::timeout(Duration::from_secs(2), machine_api.wait_ready())
             .await
             .unwrap();
 
@@ -796,6 +796,14 @@ fn test_publish() -> Result<(), TestErr> {
 
         let point = Point::from_str("localhost:repo:my:1.0.0:/bind/app.bind").unwrap();
         let bind = artifacts.bind( &point).await.unwrap();
+
+
+        cli.exec("create localhost:my-app<Mechtron>{ +config=localhost:repo:my:1.0.0:/config/my-app.app }")
+            .await
+            .unwrap()
+            .ok_or()
+            .unwrap();
+
 
         Ok(())
     })

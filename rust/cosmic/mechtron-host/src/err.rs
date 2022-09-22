@@ -6,6 +6,13 @@ pub struct HostErr{
   pub message: String
 }
 
+impl ToString for HostErr {
+    fn to_string(&self) -> String {
+        self.message.clone()
+    }
+}
+
+
 
 impl From<CompileError> for HostErr {
     fn from(e: CompileError) -> Self {

@@ -8,7 +8,7 @@ use crate::driver::space::SpaceDriverFactory;
 use crate::driver::DriverAvail;
 use crate::test::registry::{TestRegistryApi, TestRegistryContext};
 use crate::tests::PROPERTIES_CONFIG;
-use crate::{DriversBuilder, HyperErr, Hyperverse, MachineTemplate, Registry};
+use crate::{DriversBuilder, HyperErr, Cosmos, MachineTemplate, Registry};
 use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, LocalHyperwayGateJumper};
 use cosmic_universe::artifact::{ArtifactApi, ReadArtifactFetcher};
 use cosmic_universe::err::UniErr;
@@ -21,8 +21,10 @@ use std::sync::Arc;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
+use mechtron_host::err::HostErr;
+use crate::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
 
-impl TestHyperverse {
+impl TestCosmos {
     pub fn new() -> Self {
         Self {
             ctx: TestRegistryContext::new(),
@@ -31,12 +33,12 @@ impl TestHyperverse {
 }
 
 #[derive(Clone)]
-pub struct TestHyperverse {
+pub struct TestCosmos {
     pub ctx: TestRegistryContext,
 }
 
 #[async_trait]
-impl Hyperverse for TestHyperverse {
+impl Cosmos for TestCosmos {
     type Err = TestErr;
     type RegistryContext = TestRegistryContext;
     type StarAuth = AnonHyperAuthenticator;
@@ -83,7 +85,10 @@ impl Hyperverse for TestHyperverse {
                 builder.add_post(Arc::new(SpaceDriverFactory::new()));
             }
             StarSub::Nexus => {}
-            StarSub::Maelstrom => {}
+            StarSub::Maelstrom => {
+                builder.add_post(Arc::new(HostDriverFactory::new()));
+                builder.add_post(Arc::new(MechtronDriverFactory::new()));
+            }
             StarSub::Scribe => {
                 builder.add_post(Arc::new(RepoDriverFactory::new()));
                 builder.add_post(Arc::new(BundleSeriesDriverFactory::new()));
@@ -189,6 +194,14 @@ impl From<UniErr> for TestErr {
 
 impl From<io::Error> for TestErr {
     fn from(err: Error) -> Self {
+        Self {
+            message: err.to_string(),
+        }
+    }
+}
+
+impl From<HostErr> for TestErr {
+    fn from(err: HostErr) -> Self {
         Self {
             message: err.to_string(),
         }

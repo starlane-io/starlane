@@ -38,7 +38,7 @@ use crate::driver::{
 };
 use crate::star::{HyperStarSkel, SmartLocator};
 use crate::Registration;
-use crate::{DriverFactory, HyperErr, Hyperverse, Registry};
+use crate::{DriverFactory, HyperErr, Cosmos, Registry};
 
 /*
 #[derive(DirectedHandler,Clone)]
@@ -72,14 +72,14 @@ fn global_bind() -> BindConfig {
 #[derive(Clone, DirectedHandler)]
 pub struct GlobalCommandExecutionHandler<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     skel: HyperStarSkel<P>,
 }
 
 impl<P> GlobalCommandExecutionHandler<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(skel: HyperStarSkel<P>) -> Self {
         Self { skel }
@@ -89,7 +89,7 @@ where
 #[handler]
 impl<P> GlobalCommandExecutionHandler<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     #[route("Cmd<RawCommand>")]
     pub async fn raw(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, P::Err> {
@@ -119,7 +119,7 @@ where
 
 pub struct GlobalExecutionChamber<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub skel: HyperStarSkel<P>,
     pub logger: PointLogger,
@@ -127,7 +127,7 @@ where
 
 impl<P> GlobalExecutionChamber<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(skel: HyperStarSkel<P>) -> Self {
         let logger = skel.logger.push_point("global").unwrap();

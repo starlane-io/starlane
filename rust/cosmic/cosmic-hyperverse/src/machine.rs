@@ -37,19 +37,19 @@ use cosmic_universe::wave::{Agent, DirectedProto, HyperWave, Pong, UltraWave, Wa
 use cosmic_universe::wave::exchange::{Exchanger, SetStrategy};
 
 use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
-use crate::{DriversBuilder, HyperErr, Hyperverse, Registry, RegistryApi};
+use crate::{DriversBuilder, HyperErr, Cosmos, Registry, RegistryApi};
 
 #[derive(Clone)]
 pub struct MachineApi<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     tx: mpsc::Sender<MachineCall<P>>,
 }
 
 impl<P> MachineApi<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(tx: mpsc::Sender<MachineCall<P>>) -> Self {
         Self { tx }
@@ -130,7 +130,7 @@ where
 #[derive(Clone)]
 pub struct MachineSkel<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub name: MachineName,
     pub hyperverse: P,
@@ -147,7 +147,7 @@ where
 
 pub struct Machine<P>
 where
-    P: Hyperverse + 'static,
+    P: Cosmos + 'static,
 {
     pub skel: MachineSkel<P>,
     pub stars: Arc<HashMap<Point, HyperStarApi<P>>>,
@@ -161,7 +161,7 @@ where
 
 impl<P> Machine<P>
 where
-    P: Hyperverse + 'static,
+    P: Cosmos + 'static,
 {
     pub fn new(platform: P) -> MachineApi<P> {
         let (call_tx, call_rx) = mpsc::channel(1024);
@@ -491,7 +491,7 @@ where
 
 pub enum MachineCall<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     Init,
     Terminate,
@@ -617,7 +617,7 @@ impl Default for MachineTemplate {
 
 pub struct MachineHyperwayEndpointFactory<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     from: StarKey,
     to: StarKey,
@@ -626,7 +626,7 @@ where
 
 impl<P> MachineHyperwayEndpointFactory<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(from: StarKey, to: StarKey, call_tx: mpsc::Sender<MachineCall<P>>) -> Self {
         Self { from, to, call_tx }
@@ -636,7 +636,7 @@ where
 #[async_trait]
 impl<P> HyperwayEndpointFactory for MachineHyperwayEndpointFactory<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     async fn create(
         &self,
@@ -659,7 +659,7 @@ where
 
 pub struct MachineApiExtFactory<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub machine_api: MachineApi<P>,
     pub logger: PointLogger,
@@ -668,7 +668,7 @@ where
 #[async_trait]
 impl<P> HyperwayEndpointFactory for MachineApiExtFactory<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     async fn create(
         &self,
@@ -685,12 +685,12 @@ where
 }
 
 
-pub struct ClientArtifactFetcher<P> where P: Hyperverse {
+pub struct ClientArtifactFetcher<P> where P: Cosmos {
     pub registry: Registry<P>,
     pub client: HyperClient
 }
 
-impl <P> ClientArtifactFetcher<P> where P:  Hyperverse {
+impl <P> ClientArtifactFetcher<P> where P: Cosmos {
     pub fn new( client: HyperClient, registry: Registry<P> ) -> Self {
         Self {
             client,
@@ -700,7 +700,7 @@ impl <P> ClientArtifactFetcher<P> where P:  Hyperverse {
 }
 
 #[async_trait]
-impl <P> ArtifactFetcher for ClientArtifactFetcher<P> where P: Hyperverse {
+impl <P> ArtifactFetcher for ClientArtifactFetcher<P> where P: Cosmos {
     async fn stub(&self, point: &Point) -> Result<Stub, UniErr> {
         let record = self.registry.record(point).await.map_err(|e|e.to_cosmic_err())?;
         Ok(record.details.stub)

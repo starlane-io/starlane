@@ -1,8 +1,6 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use http::Uri;
-
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
 use cosmic_universe::err::UniErr;
@@ -14,18 +12,18 @@ use cosmic_universe::particle::traversal::{Traversal, TraversalLayer};
 use cosmic_universe::selector::PayloadBlock;
 use cosmic_universe::substance::Substance;
 use cosmic_universe::util::ToResolved;
-use cosmic_universe::wave::core::{Method, ReflectedCore};
+use cosmic_universe::wave::core::{Method, ReflectedCore, Uri};
 use cosmic_universe::wave::exchange::{Exchanger, ProtoTransmitter, ProtoTransmitterBuilder};
 use cosmic_universe::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Pong, Reflection, UltraWave, Wave,
 };
 
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::{HyperErr, Hyperverse, RegistryApi};
+use crate::{HyperErr, Cosmos, RegistryApi};
 
 pub struct Field<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub port: Surface,
     pub skel: HyperStarSkel<P>,
@@ -35,7 +33,7 @@ where
 
 impl<P> Field<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(point: Point, skel: HyperStarSkel<P>) -> Self {
         let port = point.to_surface().with_layer(Layer::Field);
@@ -102,7 +100,7 @@ where
 #[async_trait]
 impl<P> TraversalLayer for Field<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     fn surface(&self) -> Surface {
         self.port.clone()

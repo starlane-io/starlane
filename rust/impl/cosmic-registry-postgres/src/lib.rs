@@ -24,7 +24,7 @@ use strum::ParseError;
 use tokio::sync::mpsc;
 
 use cosmic_hyperverse::machine::MachineTemplate;
-use cosmic_hyperverse::Hyperverse;
+use cosmic_hyperverse::Cosmos;
 use cosmic_hyperverse::Registration;
 use cosmic_hyperverse::{HyperErr, RegistryApi};
 use cosmic_universe::command::common::{PropertyMod, SetProperties, SetRegistry};
@@ -62,7 +62,7 @@ use cosmic_universe::HYPERUSER;
 
 pub struct PostgresRegistry<P>
 where
-    P: PostgresPlatform + Hyperverse<Err = PostErr> + 'static,
+    P: PostgresPlatform + Cosmos<Err = PostErr> + 'static,
 {
     ctx: PostgresRegistryContextHandle,
     platform: P,
@@ -70,7 +70,7 @@ where
 
 impl<P> PostgresRegistry<P>
 where
-    P: PostgresPlatform + Hyperverse<Err = PostErr> + 'static,
+    P: PostgresPlatform + Cosmos<Err = PostErr> + 'static,
 {
     pub async fn new(ctx: PostgresRegistryContextHandle, platform: P) -> Result<Self, PostErr> {
         /*
@@ -202,7 +202,7 @@ where
 #[async_trait]
 impl<P> RegistryApi<P> for PostgresRegistry<P>
 where
-    P: PostgresPlatform + Hyperverse<Err = PostErr> + 'static,
+    P: PostgresPlatform + Cosmos<Err = PostErr> + 'static,
 {
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, PostErr> {
         /*
@@ -1653,7 +1653,7 @@ impl RegistryParams {
 
 impl<P> PostgresRegistry<P>
 where
-    P: PostgresPlatform + Hyperverse<Err = PostErr> + 'static,
+    P: PostgresPlatform + Cosmos<Err = PostErr> + 'static,
 {
     pub async fn set(&self, set: &Set) -> Result<(), PostErr> {
         self.set_properties(&set.point, &set.properties).await
@@ -1901,7 +1901,7 @@ impl PostgresDbInfo {
     }
 }
 
-pub trait PostgresPlatform: Hyperverse<Err = PostErr> {
+pub trait PostgresPlatform: Cosmos<Err = PostErr> {
     fn lookup_registry_db() -> Result<PostgresDbInfo, Self::Err>;
     fn lookup_star_db(star: &StarKey) -> Result<PostgresDbInfo, Self::Err>;
 }

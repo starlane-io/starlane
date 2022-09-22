@@ -28,7 +28,6 @@ serde = { version="1.0.69", features=['derive','rc'] }
 lazy_static = "1.4.0"
 async-trait = "0.1.48"
 regex = "1.5.4"
-http = "0.2.6"
 futures = "0.3.21"
 ctrlc = "3.2.2"
 tracing = "0.1.35"
