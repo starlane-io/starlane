@@ -355,6 +355,16 @@ impl UltraWave {
         }
     }
 
+    pub fn max_hops(&self) -> u16 {
+        if let Some(wave) = self.transported() {
+            let child = wave.max_hops();
+            if child > self.hops() {
+                return child;
+            }
+        }
+        self.hops()
+    }
+
     pub fn inc_hops(&mut self) {
         match self {
             UltraWave::Ping(w) => w.hops += 1,
@@ -363,7 +373,14 @@ impl UltraWave {
             UltraWave::Echo(w) => w.hops += 1,
             UltraWave::Signal(w) => w.hops += 1,
         };
+
+        if let Some(wave) = self.transported_mut() {
+            wave.inc_hops();
+        }
+
     }
+
+
 
     pub fn add_to_history(&mut self, star: Point) {
         match self {
@@ -516,6 +533,26 @@ impl UltraWave {
         match self {
             UltraWave::Ripple(ripple) => Ok(ripple),
             _ => Err("not a ripple".into()),
+        }
+    }
+
+    pub fn transported(&self) -> Option<&UltraWave> {
+        match self {
+            UltraWave::Ping(w) => w.core.body.ultrawave(),
+            UltraWave::Pong(w) => w.core.body.ultrawave(),
+            UltraWave::Ripple(w) => w.core.body.ultrawave(),
+            UltraWave::Echo(w) => w.core.body.ultrawave(),
+            UltraWave::Signal(w) => w.core.body.ultrawave(),
+        }
+    }
+
+    pub fn transported_mut(&mut self) -> Option<&mut UltraWave> {
+        match self {
+            UltraWave::Ping(w) => w.core.body.ultrawave_mut(),
+            UltraWave::Pong(w) => w.core.body.ultrawave_mut(),
+            UltraWave::Ripple(w) => w.core.body.ultrawave_mut(),
+            UltraWave::Echo(w) => w.core.body.ultrawave_mut(),
+            UltraWave::Signal(w) => w.core.body.ultrawave_mut(),
         }
     }
 }

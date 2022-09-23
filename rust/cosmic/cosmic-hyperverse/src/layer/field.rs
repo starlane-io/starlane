@@ -122,6 +122,7 @@ where
     }
 
     async fn directed_core_bound(&self, directed: Traversal<DirectedWave>) -> Result<(), UniErr> {
+
         let bind = self.bind(&directed).await?;
         match bind.select(&directed.payload) {
             Ok(route) => {
@@ -131,8 +132,8 @@ where
                         RegexCapturesResolver::new(regex, directed.core().uri.path().to_string())?;
                     let mut env = Env::new(self.port.point.clone());
                     env.add_var_resolver(Arc::new(path_regex_capture_resolver));
-                    env.set_var("self.bundle", bind.bundle().clone().into());
-                    env.set_var("self.bind", bind.point().clone().into());
+                    env.set_var("doc.bundle", bind.bundle().clone().into());
+                    env.set_var("doc", bind.point().clone().into());
                     env
                 };
                 self.pipex(directed, route.block.clone(), env);
@@ -151,8 +152,8 @@ where
                     });
                     let env = {
                         let mut env = Env::new(self.port.point.clone());
-                        env.set_var("self.bundle", bind.bundle().clone().into());
-                        env.set_var("self.bind", bind.point().clone().into());
+                        env.set_var("doc.bundle", bind.bundle().clone().into());
+                        env.set_var("doc", bind.point().clone().into());
                         env
                     };
                     self.pipex(directed, pipeline, env);

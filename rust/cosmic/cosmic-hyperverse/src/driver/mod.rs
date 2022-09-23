@@ -389,8 +389,7 @@ where
                         rtn.send(self.find_internal(&kind).cloned());
                     }
                     DriversCall::LocalDriverLookup { kind, rtn } => {
-println!("Local Driver Lookup find...");
-/*                        match self.find(&kind) {
+                        match self.find(&kind) {
                             None => {
                                 rtn.send(None);
                             }
@@ -402,9 +401,6 @@ println!("getting the PPoint...");
                                 };
                             }
                         };
-
- */
-                        rtn.send(None);
                     }
                 }
             }
@@ -1670,7 +1666,6 @@ where
     }
 }
 
-#[derive(DirectedHandler)]
 pub struct DriverDriver<P>
 where
     P: Cosmos,
@@ -1678,7 +1673,6 @@ where
     skel: DriverSkel<P>,
 }
 
-#[handler]
 impl<P> DriverDriver<P>
 where
     P: Cosmos,
@@ -1698,6 +1692,7 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+        println!("Returning DRIVER DRIVER!");
         Ok(ItemSphere::Handler(Box::new(DriverCore::restore(
             (),
             (),

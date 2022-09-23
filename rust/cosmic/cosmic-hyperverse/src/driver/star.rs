@@ -451,6 +451,7 @@ where
             {
                 self.create(assign).await;
 
+println!("ASSIGNING !");
                 let driver = self.skel.drivers.local_driver_lookup(assign.details.stub.kind.clone()).await?.ok_or(P::Err::new(format!("Star does not have  driver for {}",assign.details.stub.kind.to_string())))?;
                 let mut directed = DirectedProto::ping();
                 directed.method(HypMethod::Assign);
@@ -458,7 +459,9 @@ where
                 directed.to(driver.to_surface());
                 directed.body(HyperSubstance::Assign(assign.clone()).into());
                 let pong: Wave<Pong> = ctx.transmitter.direct(directed).await?;
+println!("ASSIGN SUCCESS? {}", pong.is_ok());
                 pong.ok_or()?;
+println!("ASSIGNED by star to driver!");
             } else {
                 error!(
                     "do not have a driver for kind: {}",
@@ -490,12 +493,13 @@ where
 
         let wave = ctx.input.clone();
 
+
         let injection = TraversalInjection::new(
             self.skel
                 .point
                 .clone()
                 .to_surface()
-                .with_layer(Layer::Gravity),
+                .with_layer(Layer::Field),
             wave,
         );
 

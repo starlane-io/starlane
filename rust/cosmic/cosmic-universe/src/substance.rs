@@ -107,6 +107,24 @@ pub enum Substance {
     Greet(Greet),
 }
 
+impl Substance {
+    pub fn ultrawave(&self) -> Option<&UltraWave> {
+        if let Substance::UltraWave(wave) = self {
+            Some(wave.as_ref())
+        } else {
+            None
+        }
+    }
+
+    pub fn ultrawave_mut(&mut self) -> Option<&mut UltraWave> {
+        if let Substance::UltraWave(wave) = self {
+            Some(wave.as_mut())
+        } else {
+            None
+        }
+    }
+}
+
 pub trait ToSubstance<S> {
     fn to_substance(self) -> Result<S, UniErr>;
     fn to_substance_ref(&self) -> Result<&S, UniErr>;

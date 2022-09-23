@@ -105,7 +105,7 @@ impl Cosmos for TestCosmos {
                 builder.add_post(Arc::new(ArtifactDriverFactory::new()));
             }
             StarSub::Jump => {
-                builder.add_post(Arc::new(ControlDriverFactory::new()));
+//                builder.add_post(Arc::new(ControlDriverFactory::new()));
             }
             StarSub::Fold => {}
             StarSub::Machine => {
