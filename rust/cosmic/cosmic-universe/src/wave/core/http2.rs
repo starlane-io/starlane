@@ -4,7 +4,8 @@ use crate::err::UniErr;
 use crate::loc::Meta;
 use crate::substance::{Errors, Substance};
 use crate::util::ValueMatcher;
-use crate::wave::core::{DirectedCore, HeaderMap, Method, ReflectedCore, Uri};
+use crate::wave::core::{DirectedCore, HeaderMap, Method, ReflectedCore };
+use url::Url;
 
 #[derive(
     Debug,
@@ -34,7 +35,7 @@ pub enum HttpMethod {
 pub struct HttpRequest {
     pub method: HttpMethod,
     pub headers: HeaderMap,
-    pub uri: Uri,
+    pub uri: Url,
     pub body: Substance,
 }
 

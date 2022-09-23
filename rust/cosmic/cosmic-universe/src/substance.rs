@@ -9,6 +9,7 @@ use serde_json::Value;
 use cosmic_macros_primitive::Autobox;
 use cosmic_nom::Tw;
 
+use url::Url;
 use crate::command::{Command, RawCommand};
 use crate::hyper::{Greet, HyperSubstance, Knock, ParticleLocation};
 use crate::loc::{Meta, PointCtx, PointVar};
@@ -977,7 +978,7 @@ impl ToRequestCore for MultipartForm {
         DirectedCore {
             headers,
             method: HttpMethod::Post.into(),
-            uri: Default::default(),
+            uri: Url::parse("/").unwrap(),
             body: Substance::MultipartForm(self),
         }
     }

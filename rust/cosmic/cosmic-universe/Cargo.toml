@@ -40,3 +40,4 @@ validator = "0.15.0"
 uuid = { version="1.1.2", features=["v4", "js"] }
 #tailcall = "0.1.6"
 getrandom = { version = "0.2", features = ["js"] }
+url = { version="2.3.1", features=["serde"] }

@@ -18,6 +18,8 @@ use cosmic_macros_primitive::Autobox;
 use cosmic_nom::{Res, SpanExtra};
 use exchange::ProtoTransmitter;
 
+use url::Url;
+
 use crate::command::Command;
 use crate::command::RawCommand;
 use crate::config::bind::RouteSelector;
@@ -47,7 +49,6 @@ use crate::substance::{
 use crate::util::{uuid, ValueMatcher, ValuePattern};
 use crate::{ANONYMOUS, HYPERUSER};
 use crate::wave::core::http2::StatusCode;
-use crate::wave::core::Uri;
 
 use self::core::cmd::CmdMethod;
 use self::core::ext::ExtMethod;
@@ -1366,7 +1367,7 @@ impl DirectedProto {
         self.history = history;
     }
 
-    pub fn uri(&mut self, uri: Uri) {
+    pub fn uri(&mut self, uri: Url) {
         self.core.uri = uri;
     }
 

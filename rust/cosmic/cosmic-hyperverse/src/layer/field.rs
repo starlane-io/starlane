@@ -1,6 +1,8 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
+use url::Url;
+
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
 use cosmic_universe::err::UniErr;
@@ -12,7 +14,7 @@ use cosmic_universe::particle::traversal::{Traversal, TraversalLayer};
 use cosmic_universe::selector::PayloadBlock;
 use cosmic_universe::substance::Substance;
 use cosmic_universe::util::ToResolved;
-use cosmic_universe::wave::core::{Method, ReflectedCore, Uri};
+use cosmic_universe::wave::core::{Method, ReflectedCore };
 use cosmic_universe::wave::exchange::{Exchanger, ProtoTransmitter, ProtoTransmitterBuilder};
 use cosmic_universe::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Pong, Reflection, UltraWave, Wave,
@@ -175,7 +177,7 @@ pub struct PipeEx {
 
     pub kind: DirectedKind,
     pub method: Method,
-    pub uri: Uri,
+    pub uri: Url,
     pub body: Substance,
     pub status: u16,
 }

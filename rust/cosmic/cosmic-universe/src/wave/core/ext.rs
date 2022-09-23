@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use cosmic_nom::new_span;
 
+use url::Url;
 use crate::err::UniErr;
 use crate::loc::Meta;
 use crate::parse::camel_case_chars;
@@ -13,7 +14,7 @@ use crate::parse::error::result;
 use crate::parse::model::MethodScopeSelector;
 use crate::substance::{Errors, Substance};
 use crate::util::{ValueMatcher, ValuePattern};
-use crate::wave::core::{DirectedCore, HeaderMap, Method, ReflectedCore, Uri};
+use crate::wave::core::{DirectedCore, HeaderMap, Method, ReflectedCore };
 use crate::wave::core::http2::StatusCode;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
@@ -92,7 +93,7 @@ pub struct ExtDirected {
 
     pub headers: HeaderMap,
 
-    pub uri: Uri,
+    pub uri: Url,
     pub body: Substance,
 }
 
@@ -101,7 +102,7 @@ impl Default for ExtDirected {
         Self {
             method: Default::default(),
             headers: Default::default(),
-            uri: Default::default(),
+            uri: Url::parse("http:://localhost/").unwrap(),
             body: Default::default(),
         }
     }

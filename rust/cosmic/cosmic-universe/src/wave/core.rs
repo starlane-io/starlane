@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use cosmic_macros_primitive::Autobox;
 
+use url::Url;
 use crate::command::Command;
 use crate::err::StatusErr;
 use crate::loc::ToSurface;
@@ -375,7 +376,7 @@ impl Into<DirectedCore> for Method {
         DirectedCore {
             headers: Default::default(),
             method: self,
-            uri: Uri::from_static("/"),
+            uri: Url::parse("http://localhost/").unwrap(),
             body: Substance::Empty,
         }
     }
@@ -385,7 +386,7 @@ impl Into<DirectedCore> for Method {
 pub struct DirectedCore {
     pub headers: HeaderMap,
     pub method: Method,
-    pub uri: Uri,
+    pub uri: Url,
     pub body: Substance,
 }
 
@@ -407,7 +408,7 @@ impl DirectedCore {
         Self {
             method,
             headers: HeaderMap::new(),
-            uri: Default::default(),
+            uri: Url::parse("http://localhost/").unwrap(),
             body: Default::default(),
         }
     }
@@ -499,7 +500,7 @@ impl Default for DirectedCore {
         Self {
             headers: Default::default(),
             method: Method::Http(HttpMethod::Get),
-            uri: Uri::from_static("/"),
+            uri: Url::parse("http://localhost/").unwrap(),
             body: Substance::Empty,
         }
     }
@@ -669,35 +670,3 @@ impl ValueMatcher<MethodKind> for MethodKind {
 
 
 pub type HeaderMap = HashMap<String,String>;
-
-#[derive(
-    Debug,
-    Clone,
-    Serialize,
-    Deserialize,
-    Eq,
-    PartialEq,
-)]
-pub struct Uri {
-    pub uri: String
-}
-
-impl Uri {
-    pub fn from_static(s: &str) -> Self {
-        Self {
-            uri: s.to_string()
-        }
-    }
-    pub fn path(&self) -> &str{
-        // hacked for now
-        self.uri.as_str()
-    }
-}
-
-impl Default for Uri {
-    fn default() -> Self {
-        Uri {
-            uri: "".to_string()
-        }
-    }
-}
