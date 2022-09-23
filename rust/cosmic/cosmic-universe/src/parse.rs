@@ -932,7 +932,11 @@ where
 }
 
 pub fn parse_uuid<I: Span>(i: I) -> Res<I, Uuid> {
-    uuid_chars(i).map(|(next, uuid)| (next, uuid.to_string()))
+    let (next,uuid) = uuid_chars(i.clone())?;
+    Ok((next,Uuid::from(uuid).map_err(|e|nom::Err::Error(ErrorTree::from_error_kind(
+                i,
+                ErrorKind::Tag,
+            )))?))
 }
 
 pub fn uuid_chars<T: Span>(i: T) -> Res<T, T>

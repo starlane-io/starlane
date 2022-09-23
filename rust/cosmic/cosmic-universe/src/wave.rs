@@ -19,7 +19,6 @@ use cosmic_nom::{Res, SpanExtra};
 use exchange::ProtoTransmitter;
 
 use url::Url;
-
 use crate::command::Command;
 use crate::command::RawCommand;
 use crate::config::bind::RouteSelector;
@@ -563,11 +562,11 @@ impl WaveId {
     }
 
     pub fn to_short_string(&self) -> String {
-        if self.uuid.len() > 8 {
+        if self.uuid.to_string().len() > 8 {
             format!(
                 "<Wave<{}>>::{}",
                 self.kind.to_string(),
-                self.uuid[..8].to_string()
+                self.uuid.to_string().as_str()[..8].to_string()
             )
         }
         else {
@@ -578,7 +577,7 @@ impl WaveId {
 
 impl ToString for WaveId {
     fn to_string(&self) -> String {
-        format!("<Wave<{}>>::{}", self.kind.to_string(), self.uuid)
+        format!("<Wave<{}>>::{}", self.kind.to_string(), self.uuid.to_string())
     }
 }
 
@@ -2926,7 +2925,7 @@ impl Default for Agent {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
-    pub id: String,
+    pub id: Uuid,
     pub attributes: HashMap<String, String>,
 }
 

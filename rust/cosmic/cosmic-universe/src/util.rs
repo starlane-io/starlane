@@ -9,6 +9,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::err::UniErr;
+use crate::loc;
 use crate::loc::Uuid;
 use crate::parse::Env;
 use crate::wave::core::http2::HttpMethod;
@@ -200,8 +201,7 @@ where
 }
 
 pub fn uuid() -> Uuid {
-//    unsafe { cosmic_uuid() }
-    Uuid::new()
+    loc::Uuid::rnd()
 }
 
 pub fn timestamp() -> DateTime<Utc> {

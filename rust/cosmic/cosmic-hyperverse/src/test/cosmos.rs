@@ -7,14 +7,13 @@ use crate::driver::root::RootDriverFactory;
 use crate::driver::space::SpaceDriverFactory;
 use crate::driver::DriverAvail;
 use crate::test::registry::{TestRegistryApi, TestRegistryContext};
-use crate::tests::PROPERTIES_CONFIG;
 use crate::{DriversBuilder, HyperErr, Cosmos, MachineTemplate, Registry};
 use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, LocalHyperwayGateJumper};
 use cosmic_universe::artifact::{ArtifactApi, ReadArtifactFetcher};
 use cosmic_universe::err::UniErr;
-use cosmic_universe::kind::StarSub;
+use cosmic_universe::kind::{BaseKind, Kind, StarSub};
 use cosmic_universe::loc::{MachineName, StarKey, ToBaseKind};
-use cosmic_universe::particle::property::PropertiesConfig;
+use cosmic_universe::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
 use std::io;
 use std::io::Error;
 use std::sync::Arc;
@@ -63,8 +62,18 @@ impl Cosmos for TestCosmos {
         "test".to_string()
     }
 
-    fn properties_config<K: ToBaseKind>(&self, base: &K) -> &'static PropertiesConfig {
-        &PROPERTIES_CONFIG
+    fn properties_config(&self, kind: &Kind) -> PropertiesConfig {
+        let mut builder = PropertiesConfigBuilder::new();
+        builder.kind(kind.clone());
+        match kind.to_base() {
+            BaseKind::Mechtron => {
+                builder.add_point( "config", true, true ).unwrap();
+                builder.build().unwrap()
+            }
+            _ => {
+                builder.build().unwrap()
+            }
+        }
     }
 
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {

@@ -58,10 +58,6 @@ lazy_static! {
     pub static ref FAE: Point = Point::from_str("space:users:fae").expect("point");
 }
 
-lazy_static! {
-    pub static ref PROPERTIES_CONFIG: PropertiesConfig = PropertiesConfig::new();
-}
-
 async fn create(
     ctx: &TestRegistryContext,
     particle: Point,
@@ -803,7 +799,6 @@ fn test_publish() -> Result<(), TestErr> {
             .unwrap()
             .ok_or()
             .unwrap();
-
 
         Ok(())
     })

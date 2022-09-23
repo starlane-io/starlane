@@ -70,11 +70,36 @@ lazy_static! {
         TraversalPlan::new(vec![Layer::Field, Layer::Shell, Layer::Core]);
 }
 
-pub type Uuid = String;
-
 pub trait ToBaseKind {
     fn to_base(&self) -> BaseKind;
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub struct Uuid {
+    uuid: String
+}
+
+impl Uuid {
+    pub fn rnd() -> Self {
+        Self::new( uuid::Uuid::new_v4() )
+    }
+    pub fn new(uuid: uuid::Uuid) -> Self {
+        Self {
+            uuid: uuid.to_string()
+        }
+    }
+
+    pub fn from<S: ToString>(uuid: S) -> Result<Self, UniErr> {
+        Ok(Self::new(uuid::Uuid::from_str(uuid.to_string().as_str()).map_err(|e| UniErr::from_500(format!("'{}' is not a valid uuid",uuid.to_string())))?))
+    }
+}
+
+impl ToString for Uuid {
+    fn to_string(&self) -> String {
+        self.uuid.clone()
+    }
+}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum ProvisionAffinity {
@@ -795,7 +820,7 @@ impl ToString for Topic {
             Topic::None => "".to_string(),
             Topic::Not => "Topic<!>".to_string(),
             Topic::Any => "Topic<*>".to_string(),
-            Topic::Uuid(uuid) => format!("Topic<Uuid>({})", uuid),
+            Topic::Uuid(uuid) => format!("Topic<Uuid>({})", uuid.to_string()),
             Topic::Path(segs) => {
                 let segments: Vec<String> = segs.into_iter().map(|s| s.to_string()).collect();
                 let mut rtn = String::new();
@@ -814,7 +839,7 @@ impl ToString for Topic {
 
 impl Topic {
     pub fn uuid() -> Self {
-        Self::Uuid(Uuid::new())
+        Topic::Uuid(Uuid::rnd())
     }
 }
 

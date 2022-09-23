@@ -100,7 +100,7 @@ pub struct LogSpan {
     pub point: Point,
     pub mark: Point,
     pub action: Option<CamelCase>,
-    pub parent: Option<String>,
+    pub parent: Option<Uuid>,
     pub attributes: HashMap<String, String>,
     #[serde(with = "ts_milliseconds")]
     pub entry_timestamp: DateTime<Utc>,
@@ -175,7 +175,7 @@ impl ToString for LogPayload {
 
 pub struct RootLogBuilder {
     pub point: Option<Point>,
-    pub span: Option<String>,
+    pub span: Option<Uuid>,
     pub logger: RootLogger,
     pub level: Level,
     pub message: Option<String>,
@@ -184,7 +184,7 @@ pub struct RootLogBuilder {
 }
 
 impl RootLogBuilder {
-    pub fn new(logger: RootLogger, span: Option<String>) -> Self {
+    pub fn new(logger: RootLogger, span: Option<Uuid>) -> Self {
         RootLogBuilder {
             logger,
             span,
@@ -728,7 +728,7 @@ pub struct SpanLogger {
 }
 
 impl SpanLogger {
-    pub fn span_uuid(&self) -> String {
+    pub fn span_uuid(&self) -> Uuid{
         self.span.id.clone()
     }
 
@@ -968,12 +968,12 @@ impl LogBuilder {
 pub struct AuditLogBuilder {
     logger: RootLogger,
     point: Point,
-    span: String,
+    span: Uuid,
     attributes: HashMap<String, String>,
 }
 
 impl AuditLogBuilder {
-    pub fn new(logger: RootLogger, point: Point, span: String) -> Self {
+    pub fn new(logger: RootLogger, point: Point, span: Uuid) -> Self {
         AuditLogBuilder {
             logger,
             point,

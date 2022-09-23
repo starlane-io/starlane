@@ -210,7 +210,7 @@ where
 
     fn machine_template(&self) -> MachineTemplate;
     fn machine_name(&self) -> MachineName;
-    fn properties_config<K: ToBaseKind>(&self, base: &K) -> &'static PropertiesConfig;
+    fn properties_config(&self, kind: &Kind) -> PropertiesConfig;
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self>;
     async fn global_registry(&self) -> Result<Registry<Self>, Self::Err>;
     async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>, Self::Err>;
