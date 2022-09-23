@@ -200,11 +200,11 @@ impl Assign {
         }
     }
 
-    pub fn to_host(self) -> Host {
+    pub fn to_host(&self) -> Host {
         Host {
-            kind: self.kind,
-            details: self.details,
-            state: self.state
+            kind: self.kind.clone(),
+            details: self.details.clone(),
+            state: self.state.clone()
         }
     }
 }

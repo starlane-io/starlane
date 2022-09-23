@@ -160,10 +160,6 @@ where
         kind: Kind,
         rtn: oneshot::Sender<Option<DriverApi<P>>>,
     },
-    Assign {
-        assign: Assign,
-        rtn: oneshot::Sender<Result<(), P::Err>>,
-    },
     Drivers(oneshot::Sender<HashMap<KindSelector, DriverApi<P>>>),
     Get {
         kind: Kind,
@@ -239,6 +235,7 @@ where
     }
 
      pub async fn local_driver_lookup(&self, kind: Kind) -> Result<Option<Point>, UniErr> {
+println!("2nd doing local driver lookup {}", self.call_tx.is_closed());
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
             .send(DriversCall::LocalDriverLookup{ kind, rtn })
@@ -268,12 +265,6 @@ where
         self.call_tx.send(DriversCall::Init0).await;
     }
 
-    pub async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
-        let (rtn, rtn_rx) = oneshot::channel();
-        self.call_tx.send(DriversCall::Assign { assign, rtn }).await;
-        let rtn = Ok(rtn_rx.await??);
-        rtn
-    }
 }
 
 #[derive(DirectedHandler)]
@@ -366,9 +357,6 @@ where
                     DriversCall::InternalKinds(rtn) => {
                         rtn.send(self.internal_kinds());
                     }
-                    DriversCall::Assign { assign, rtn } => {
-                        rtn.send(self.assign(assign).await).unwrap_or_default();
-                    }
                     DriversCall::Drivers(rtn) => {
                         rtn.send(self.drivers.clone()).unwrap_or_default();
                     }
@@ -401,20 +389,26 @@ where
                         rtn.send(self.find_internal(&kind).cloned());
                     }
                     DriversCall::LocalDriverLookup { kind, rtn } => {
-                        match self.find(&kind) {
+println!("Local Driver Lookup find...");
+/*                        match self.find(&kind) {
                             None => {
                                 rtn.send(None);
                             }
                             Some(driver_api) => {
+println!("getting the PPoint...");
                                 match driver_api.get_point().await {
                                     Ok(point) => rtn.send(Some(point)),
                                     Err(_) => rtn.send(None)
                                 };
                             }
                         };
+
+ */
+                        rtn.send(None);
                     }
                 }
             }
+println!("Drivers TERMINATED...");
         });
     }
 
@@ -766,6 +760,7 @@ impl<P> Drivers<P>
 where
     P: Cosmos,
 {
+    /*
     pub async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
         let driver = self.find(&assign.details.stub.kind).ok_or::<UniErr>(
             format!(
@@ -778,7 +773,9 @@ where
         driver.assign(assign).await
     }
 
-    pub async fn handle(&self, wave: DirectedWave) -> Result<ReflectedCore, UniErr> {
+     */
+
+    pub async fn handle(&self, wave: DirectedWave) -> Result<(),P::Err>{
         let record = self
             .skel
             .registry
@@ -788,7 +785,8 @@ where
         let driver = self
             .find(&record.details.stub.kind)
             .ok_or::<UniErr>("do not handle this kind of driver".into())?;
-        driver.handle(wave).await
+        driver.handle(wave).await;
+        Ok(())
     }
 
     /*
@@ -848,6 +846,9 @@ where
     }
 }
 
+
+
+
 #[derive(Clone)]
 pub struct DriverApi<P>
 where
@@ -893,26 +894,16 @@ where
         rtn_rx.await?
     }
 
-    pub async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
-        let (rtn, rtn_rx) = oneshot::channel();
-        self.call_tx
-            .send(DriverRunnerCall::Assign { assign, rtn })
-            .await;
-        Ok(rtn_rx.await??)
-    }
-
     pub async fn traversal(&self, traversal: Traversal<UltraWave>) {
         self.call_tx
             .send(DriverRunnerCall::Traversal(traversal))
             .await;
     }
 
-    pub async fn handle(&self, wave: DirectedWave) -> Result<ReflectedCore, UniErr> {
-        let (tx, mut rx) = oneshot::channel();
+    pub async fn handle(&self, wave: DirectedWave)  {
         self.call_tx
-            .send(DriverRunnerCall::Handle { wave, tx })
+            .send(DriverRunnerCall::Handle(wave) )
             .await;
-        tokio::time::timeout(Duration::from_secs(30), rx).await??
     }
 }
 
@@ -922,18 +913,12 @@ where
 {
     GetPoint(oneshot::Sender<Point>),
     Traversal(Traversal<UltraWave>),
-    Handle {
-        wave: DirectedWave,
-        tx: oneshot::Sender<Result<ReflectedCore, UniErr>>,
-    },
+    Handle(DirectedWave),
     Item {
         point: Point,
         tx: oneshot::Sender<Result<ItemSphere<P>, P::Err>>,
     },
-    Assign {
-        assign: Assign,
-        rtn: oneshot::Sender<Result<(), P::Err>>,
-    },
+
     OnAdded,
     InitItem {
         point: Point,
@@ -1166,29 +1151,33 @@ where
                     DriverRunnerCall::Traversal(traversal) => {
                         self.traverse(traversal).await;
                     }
-                    DriverRunnerCall::Handle { wave, tx } => {
+                    DriverRunnerCall::Handle(wave) => {
                         self.logger
                             .track(&wave, || Tracker::new("driver:shell", "Handle"));
+                        let reflection = wave.reflection();
                         let port = wave.to().clone().unwrap_single();
                         let logger = self.star_skel.logger.point(port.clone().to_point()).span();
                         let router = Arc::new(self.router.clone());
                         let transmitter =
                             ProtoTransmitter::new(router, self.star_skel.exchanger.clone());
-                        let ctx = RootInCtx::new(wave, port.clone(), logger, transmitter);
-                        match self.handle(ctx).await {
-                            CoreBounce::Absorbed => {
-                                tx.send(Err(UniErr::server_error()));
+                        let ctx = RootInCtx::new(wave, port.clone(), logger, transmitter.clone());
+                        let handler = self.handler().await;
+                        let skel = self.skel.clone();
+                        tokio::spawn(async move {
+                            match handler.handle(ctx).await {
+                                CoreBounce::Absorbed => {
+                                    // do nothign
+                                }
+                                CoreBounce::Reflected(core) => {
+                                    let reflection = reflection.unwrap();
+                                    let reflect = reflection.make( core, skel.point.to_surface().with_layer(Layer::Core) );
+                                    transmitter.route(reflect.to_ultra()).await;
+                                }
                             }
-                            CoreBounce::Reflected(reflect) => {
-                                tx.send(Ok(reflect));
-                            }
-                        }
+                        });
                     }
                     DriverRunnerCall::Item { point, tx } => {
                         tx.send(self.driver.item(&point).await);
-                    }
-                    DriverRunnerCall::Assign { assign, rtn } => {
-                        rtn.send(self.driver.assign(assign).await);
                     }
                     DriverRunnerCall::DriverRunnerRequest(request) => match request {
                         DriverRunnerRequest::Create { .. } => {}
@@ -1218,6 +1207,7 @@ where
                         }
                     }
                     DriverRunnerCall::GetPoint(rtn) => {
+ println!("returning POINT");
                         rtn.send(self.skel.point.clone());
                     }
                 }
@@ -1253,16 +1243,8 @@ where
         })
     }
 
-    #[route("Hyp<Assign>")]
-    async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, P::Err> {
-        match ctx.input {
-            HyperSubstance::Assign(assign) => {
-                self.driver.assign(assign.clone()).await?;
-
-                Ok(ReflectedCore::ok_body(Substance::Empty))
-            }
-            _ => Err(UniErr::bad_request().into()),
-        }
+    async fn handler(&self) -> Box<dyn DriverHandler<P>> {
+        self.driver.handler().await
     }
 }
 
@@ -1361,7 +1343,11 @@ where
     }
 
     pub async fn local_driver_lookup( &self, kind: Kind) -> Result<Option<Point>,UniErr> {
-        self.skel.drivers.local_driver_lookup(kind).await
+println!("Doing LOCAL DRIVER LOOKUP...");
+        let rtn = self.skel.drivers.local_driver_lookup(kind).await;
+
+        println!("RETURNED FROM LOOKUP...");
+        rtn
     }
 }
 
@@ -1464,7 +1450,7 @@ where
 }
 
 #[async_trait]
-pub trait Driver<P>: DirectedHandler + Send + Sync
+pub trait Driver<P>: Send + Sync
 where
     P: Cosmos,
 {
@@ -1486,13 +1472,36 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err>;
-    async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
-        Ok(())
+
+    async fn handler(&self) -> Box<dyn DriverHandler<P>> {
+        Box::new( DefaultDriverHandler::restore() )
     }
+
     fn default_bind(&self) -> ArtRef<BindConfig> {
         DEFAULT_BIND.clone()
     }
 }
+
+#[async_trait]
+pub trait DriverHandler<P>: DirectedHandler where P: Cosmos{
+}
+
+pub struct DefaultDriverHandler {
+
+}
+
+impl DefaultDriverHandler {
+
+    fn restore() -> Self {
+        DefaultDriverHandler{}
+    }
+}
+
+impl <P> DriverHandler<P> for DefaultDriverHandler where P: Cosmos {
+
+}
+#[handler]
+impl DefaultDriverHandler{}
 
 pub trait States: Sync + Sync
 where

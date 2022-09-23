@@ -171,27 +171,28 @@ where
         skel: DriverSkel<P>,
         ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
-        Ok(Box::new(StarDriver::new(star, skel)))
+        Ok(Box::new(StarDriver::new(star, skel, ctx )))
     }
 }
 
-#[derive(DirectedHandler)]
 pub struct StarDriver<P>
 where
     P: Cosmos + 'static,
 {
     pub star_skel: HyperStarSkel<P>,
     pub driver_skel: DriverSkel<P>,
+    pub ctx: DriverCtx
 }
 
 impl<P> StarDriver<P>
 where
     P: Cosmos,
 {
-    pub fn new(star_skel: HyperStarSkel<P>, driver_skel: DriverSkel<P>) -> Self {
+    pub fn new(star_skel: HyperStarSkel<P>, driver_skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
         Self {
             star_skel,
             driver_skel,
+            ctx,
         }
     }
 }
@@ -239,18 +240,12 @@ where
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
         Ok(ItemSphere::Handler(Box::new(Star::restore(
             self.star_skel.clone(),
-            (),
+            self.ctx.clone(),
             (),
         ))))
     }
-
-    async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
-        Err("only allowed one Star per StarDriver".into())
-    }
 }
 
-#[handler]
-impl<P> StarDriver<P> where P: Cosmos {}
 
 #[derive(DirectedHandler)]
 pub struct Star<P>
@@ -258,6 +253,7 @@ where
     P: Cosmos + 'static,
 {
     pub skel: HyperStarSkel<P>,
+    pub ctx: DriverCtx,
 }
 
 impl<P> Star<P>
@@ -269,9 +265,12 @@ where
             .state
             .create_shell(assign.details.stub.point.clone());
 
+        /*
         self.skel
             .logger
             .result(self.skel.drivers.assign(assign.clone()).await)?;
+
+         */
 
         Ok(())
     }
@@ -358,11 +357,11 @@ where
     P: Cosmos + 'static,
 {
     type Skel = HyperStarSkel<P>;
-    type Ctx = ();
+    type Ctx = DriverCtx;
     type State = ();
 
-    fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self {
-        Star { skel }
+    fn restore(skel: Self::Skel, ctx: Self::Ctx, _: Self::State) -> Self {
+        Star { skel, ctx }
     }
 
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
@@ -451,6 +450,15 @@ where
                 .is_some()
             {
                 self.create(assign).await;
+
+                let driver = self.skel.drivers.local_driver_lookup(assign.details.stub.kind.clone()).await?.ok_or(P::Err::new(format!("Star does not have  driver for {}",assign.details.stub.kind.to_string())))?;
+                let mut directed = DirectedProto::ping();
+                directed.method(HypMethod::Assign);
+                directed.from(self.skel.point.to_surface());
+                directed.to(driver.to_surface());
+                directed.body(HyperSubstance::Assign(assign.clone()).into());
+                let pong: Wave<Pong> = ctx.transmitter.direct(directed).await?;
+                pong.ok_or()?;
             } else {
                 error!(
                     "do not have a driver for kind: {}",

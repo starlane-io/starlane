@@ -1,8 +1,9 @@
 use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere,
+    Driver, DriverAvail, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, ItemHandler,
+    ItemSphere,
 };
 use crate::star::HyperStarSkel;
-use crate::Cosmos;
+use crate::{Cosmos, HyperErr};
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::config::bind::BindConfig;
 use cosmic_universe::err::UniErr;
@@ -80,7 +81,7 @@ where
         driver_skel: DriverSkel<P>,
         ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
-        Ok(Box::new(HostDriver::new(driver_skel)))
+        Ok(Box::new(HostDriver::new(driver_skel, ctx)))
     }
 }
 
@@ -88,58 +89,17 @@ pub struct HostDriver<P>
 where
     P: Cosmos,
 {
-    pub skel: DriverSkel<P>,
-    pub hosts: DashMap<Point, Arc<MechtronHost>>,
-    pub wasm_to_host_lookup: DashMap<Point, Point>,
-    pub factory: MechtronHostFactory,
+    pub skel: HostDriverSkel<P>,
+    pub ctx: DriverCtx,
 }
 
-#[handler]
 impl<P> HostDriver<P>
 where
     P: Cosmos,
 {
-    pub fn new(skel: DriverSkel<P>) -> Self {
-        let hosts = DashMap::new();
-        let factory = MechtronHostFactory::new();
-        let wasm_to_host_lookup = DashMap::new();
-        Self {
-            skel,
-            hosts,
-            factory,
-            wasm_to_host_lookup,
-        }
-    }
-
-    #[route("Hyp<Host>")]
-    pub async fn host(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), UniErr> {
-println!("HOST DRIVER RECEIVED REQUEST!");
-        if let HyperSubstance::Host(host) = ctx.input {
-            let config = host
-                .details
-                .properties
-                .get("config")
-                .ok_or("expected config property").map_err(|e|UniErr::from_500(e))?;
-            let config = Point::from_str(config.value.as_str())?;
-            let config = self.skel.skel.machine.artifacts.mechtron(&config).await?;
-
-            if !self.wasm_to_host_lookup.contains_key(&config.bin) {
-                let wasm = self.skel.skel.machine.artifacts.wasm(&config.bin).await?;
-                let bin = wasm.deref().deref().clone();
-                let mechtron_host = Arc::new(
-                    self.factory
-                        .create(host.details.stub.point.clone(), bin)
-                        .map_err(|e| UniErr::from_500("host err"))?
-                );
-                self.hosts
-                    .insert(host.details.stub.point.clone(), mechtron_host);
-                self.wasm_to_host_lookup
-                    .insert(config.bin.clone(), host.details.stub.point.clone());
-            }
-            Ok(())
-        } else {
-            Err("expecting Host".into())
-        }
+    pub fn new(skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
+        let skel = HostDriverSkel::new(skel);
+        Self { skel, ctx }
     }
 }
 
@@ -154,6 +114,95 @@ where
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
         Ok(ItemSphere::Handler(Box::new(HostItem)))
+    }
+
+    async fn handler(&self) -> Box<dyn DriverHandler<P>> {
+        Box::new(HostDriverHandler::restore(
+            self.skel.clone(),
+            self.ctx.clone(),
+        ))
+    }
+}
+
+#[derive(Clone)]
+pub struct HostDriverSkel<P>
+where
+    P: Cosmos,
+{
+    pub skel: DriverSkel<P>,
+    pub hosts: Arc<DashMap<Point, Arc<MechtronHost>>>,
+    pub wasm_to_host_lookup: Arc<DashMap<Point, Point>>,
+    pub factory: Arc<MechtronHostFactory>,
+}
+
+impl<P> HostDriverSkel<P>
+where
+    P: Cosmos,
+{
+    pub fn new(skel: DriverSkel<P>) -> Self {
+        Self {
+            skel,
+            hosts: Arc::new(DashMap::new()),
+            wasm_to_host_lookup: Arc::new(DashMap::new()),
+            factory: Arc::new(MechtronHostFactory::new()),
+        }
+    }
+}
+
+pub struct HostDriverHandler<P> where P:Cosmos {
+    pub skel: HostDriverSkel<P>,
+    pub ctx: DriverCtx
+}
+
+impl <P> HostDriverHandler<P>
+where
+    P: Cosmos,
+{
+    fn restore(skel: HostDriverSkel<P>, ctx: DriverCtx) -> Self {
+        HostDriverHandler { skel, ctx }
+    }
+}
+
+impl <P> DriverHandler<P> for HostDriverHandler<P> where P: Cosmos {
+
+}
+
+#[handler]
+impl<P> HostDriverHandler<P>
+where
+    P: Cosmos,
+{
+    #[route("Hyp<Host>")]
+    pub async fn host(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), UniErr> {
+        println!("HOST DRIVER RECEIVED REQUEST!");
+        if let HyperSubstance::Host(host) = ctx.input {
+            let config = host
+                .details
+                .properties
+                .get("config")
+                .ok_or("expected config property")
+                .map_err(|e| UniErr::from_500(e))?;
+            let config = Point::from_str(config.value.as_str())?;
+            let config = self.skel.skel.skel.machine.artifacts.mechtron(&config).await?;
+
+            if !self.skel.wasm_to_host_lookup.contains_key(&config.bin) {
+                let wasm = self.skel.skel.skel.machine.artifacts.wasm(&config.bin).await?;
+                let bin = wasm.deref().deref().clone();
+                let mechtron_host = Arc::new(
+                    self.skel.factory
+                        .create(host.details.stub.point.clone(), bin)
+                        .map_err(|e| UniErr::from_500("host err"))?,
+                );
+                self.skel.hosts
+                    .insert(host.details.stub.point.clone(), mechtron_host);
+                self.skel
+                    .wasm_to_host_lookup
+                    .insert(config.bin.clone(), host.details.stub.point.clone());
+            }
+            Ok(())
+        } else {
+            Err("expecting Host".into())
+        }
     }
 }
 
@@ -207,16 +256,6 @@ where
     pub skel: DriverSkel<P>,
 }
 
-#[handler]
-impl<P> MechtronDriver<P>
-where
-    P: Cosmos,
-{
-    pub fn new(skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
-        Self { skel, ctx }
-    }
-}
-
 #[async_trait]
 impl<P> Driver<P> for MechtronDriver<P>
 where
@@ -229,21 +268,59 @@ where
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
         Ok(ItemSphere::Handler(Box::new(Mechtron)))
     }
+    async fn handler(&self) -> Box<dyn DriverHandler<P>> {
+        Box::new(MechtronDriverHandler::restore(self.skel.clone(), self.ctx.clone()))
+    }
+}
 
-    async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
-println!("\tASSIGNING MECHTRON!");
-        let host = self
-            .skel
-            .local_driver_lookup(Kind::Host)
-            .await?
-            .ok_or::<P::Err>("cannot find local Host Driver".into())?;
-        let mut wave = DirectedProto::ping();
-        wave.method(HypMethod::Host);
-        wave.to(host.to_surface().with_layer(Layer::Core));
-        wave.body(HyperSubstance::Host(assign.to_host()).into());
-        let pong: Wave<Pong> = self.ctx.transmitter.direct(wave).await?;
-        pong.ok_or()?;
-        Ok(())
+pub struct MechtronDriverHandler<P> where P: Cosmos {
+    skel: DriverSkel<P>,
+    ctx: DriverCtx
+}
+
+impl <P> MechtronDriver<P> where P: Cosmos {
+    pub fn new( skel: DriverSkel<P>, ctx: DriverCtx ) -> Self {
+        Self {
+            skel,
+            ctx
+        }
+    }
+}
+
+impl <P> MechtronDriverHandler<P> where P: Cosmos
+{
+    fn restore( skel: DriverSkel<P>, ctx: DriverCtx ) -> Self {
+        MechtronDriverHandler { skel, ctx }
+    }
+}
+
+impl <P> DriverHandler<P> for MechtronDriverHandler<P> where P: Cosmos {
+
+}
+
+#[handler]
+impl <P>MechtronDriverHandler<P> where P: Cosmos
+{
+    #[route("Hyp<Assign>")]
+    async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), UniErr> {
+        if let HyperSubstance::Assign(assign) = ctx.input {
+            println!("\tASSIGNING MECHTRON!");
+            let logger = self.skel.logger.push_mark("assign")?;
+            // THIS is a HACK to get the host... a better way would be to do a lookup
+            // but that will jam this DriverRunner thread... so Driver Runner must
+            // be rearchitechted so that multiple requests can be processed simultaneously
+            let host = self.skel.point.parent().unwrap().push("host")?;
+            let mut wave = DirectedProto::ping();
+            wave.method(HypMethod::Host);
+            println!("\tSending HOST command to {}", host.to_string());
+            wave.to(host.to_surface().with_layer(Layer::Core));
+            wave.body(HyperSubstance::Host(assign.to_host()).into());
+            let pong: Wave<Pong> = self.ctx.transmitter.direct(wave).await?;
+            pong.ok_or()?;
+            Ok(())
+        } else {
+            Err(UniErr::bad_request_msg("MechtronDriverHandler expecting Assign"))
+        }
     }
 }
 

@@ -150,9 +150,6 @@ where
     pub driver: DriverSkel<P>,
 }
 
-#[handler]
-impl<P> ControlDriver<P> where P: Cosmos {}
-
 #[async_trait]
 impl<P> Driver<P> for ControlDriver<P>
 where

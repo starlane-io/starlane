@@ -63,13 +63,6 @@ where
 pub struct RootDriver;
 
 #[async_trait]
-impl DirectedHandler for RootDriver {
-    async fn handle(&self, ctx: RootInCtx) -> CoreBounce {
-        CoreBounce::Reflected(ReflectedCore::status(404))
-    }
-}
-
-#[async_trait]
 impl<P> Driver<P> for RootDriver
 where
     P: Cosmos,

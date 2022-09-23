@@ -58,8 +58,6 @@ where
 
 pub struct SpaceDriver;
 
-#[handler]
-impl SpaceDriver {}
 
 #[async_trait]
 impl<P> Driver<P> for SpaceDriver
