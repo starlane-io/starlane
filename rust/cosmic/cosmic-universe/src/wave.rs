@@ -562,11 +562,16 @@ impl WaveId {
     }
 
     pub fn to_short_string(&self) -> String {
-        format!(
-            "<Wave<{}>>::{}",
-            self.kind.to_string(),
-            self.uuid[..8].to_string()
-        )
+        if self.uuid.len() > 8 {
+            format!(
+                "<Wave<{}>>::{}",
+                self.kind.to_string(),
+                self.uuid[..8].to_string()
+            )
+        }
+        else {
+            self.to_string()
+        }
     }
 }
 
