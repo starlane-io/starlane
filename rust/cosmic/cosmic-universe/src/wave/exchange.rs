@@ -16,7 +16,8 @@ use crate::wave::{
     Handling, Pong, RecipientSelector, Recipients, ReflectedAggregate, ReflectedProto,
     ReflectedWave, Scope, Session, ToRecipients, UltraWave, Wave, WaveId,
 };
-use crate::{Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, UniErr};
+use crate::{Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, UniErr, wave};
+use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::http2::StatusCode;
 
 #[derive(Clone)]
@@ -670,6 +671,34 @@ impl ProtoTransmitter {
                 let reflected_agg = reflected_rx.await?;
                 FromReflectedAggregate::from_reflected_aggregate(reflected_agg)
             }
+        }
+    }
+
+    pub async fn bounce_from(&self, to: &Surface, from: &Surface ) -> bool {
+        let mut directed = DirectedProto::ping();
+        directed.from(from.clone());
+        directed.to(to.clone());
+        directed.method(CmdMethod::Bounce);
+        match self.direct(directed).await {
+            Ok(pong) => {
+                let pong : Wave<Pong> = pong;
+                pong.is_ok()
+            },
+            Err(_) => false
+        }
+    }
+
+
+    pub async fn bounce(&self, to: &Surface ) -> bool {
+        let mut directed = DirectedProto::ping();
+        directed.to(to.clone());
+        directed.method(CmdMethod::Bounce);
+        match self.direct(directed).await {
+            Ok(pong) => {
+                let pong : Wave<Pong> = pong;
+                pong.is_ok()
+            },
+            Err(_) => false
         }
     }
 

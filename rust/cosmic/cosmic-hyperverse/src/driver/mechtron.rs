@@ -113,6 +113,7 @@ where
 
     #[route("Hyp<Host>")]
     pub async fn host(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), UniErr> {
+println!("HOST DRIVER RECEIVED REQUEST!");
         if let HyperSubstance::Host(host) = ctx.input {
             let config = host
                 .details
@@ -230,6 +231,7 @@ where
     }
 
     async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
+println!("\tASSIGNING MECHTRON!");
         let host = self
             .skel
             .local_driver_lookup(Kind::Host)

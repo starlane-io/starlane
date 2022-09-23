@@ -296,6 +296,7 @@ impl Kind {
         match self {
             Kind::Bundle => true,
             Kind::Artifact(_) => true,
+            Kind::Mechtron => true,
             _ => false,
         }
     }

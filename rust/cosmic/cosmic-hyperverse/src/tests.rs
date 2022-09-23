@@ -794,11 +794,17 @@ fn test_publish() -> Result<(), TestErr> {
         let bind = artifacts.bind( &point).await.unwrap();
 
 
-        cli.exec("create localhost:my-app<Mechtron>{ +config=localhost:repo:my:1.0.0:/config/my-app.app }")
+        let reflect = cli.exec("create localhost:my-app<Mechtron>{ +config=localhost:repo:my:1.0.0:/config/my-app.app }")
             .await
-            .unwrap()
-            .ok_or()
             .unwrap();
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        reflect.ok_or().unwrap();
+        assert!(reflect.is_ok());
+
+        let tx = client.transmitter_builder().await?.build();
+        assert!(tx.bounce(&Point::from_str("localhost:my-app").unwrap().to_surface()).await);
+
 
         Ok(())
     })
