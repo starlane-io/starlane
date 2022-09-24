@@ -104,6 +104,16 @@ pub struct Details {
     pub properties: Properties,
 }
 
+
+impl Default for Details {
+    fn default() -> Self {
+        Self {
+            stub: Default::default(),
+            properties: Default::default()
+        }
+    }
+}
+
 impl Details {
     pub fn new(stub: Stub, properties: Properties) -> Self {
         Self { stub, properties }
@@ -115,6 +125,16 @@ pub struct Stub {
     pub point: Point,
     pub kind: Kind,
     pub status: Status,
+}
+
+impl Default for Stub {
+    fn default() -> Self {
+        Self {
+            point: Point::root(),
+            kind: Kind::Root,
+            status: Status::Unknown
+        }
+    }
 }
 
 impl Stub {

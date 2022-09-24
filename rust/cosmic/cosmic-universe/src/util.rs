@@ -11,7 +11,7 @@ use crate::err::UniErr;
 use crate::loc;
 use crate::loc::Uuid;
 use crate::parse::Env;
-use crate::wasm::{cosmic_timestamp, Timestamp};
+use crate::wasm::{cosmic_timestamp, cosmic_uuid, Timestamp};
 use crate::wave::core::http2::HttpMethod;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
@@ -201,7 +201,7 @@ where
 }
 
 pub fn uuid() -> Uuid {
-    loc::Uuid::rnd()
+    unsafe{cosmic_uuid()}
 }
 
 pub fn timestamp() ->
