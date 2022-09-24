@@ -34,7 +34,6 @@ use wasm_membrane_guest::membrane::{log, membrane_guest_version, membrane_consum
 
 lazy_static! {
     static ref TX: GuestTx = GuestTx::new();
-    static ref FACTORIES:  Arc<DashMap<String,Box<dyn MechtronFactory>>> = Arc::new(DashMap::new());
 }
 
 #[no_mangle]
@@ -65,18 +64,9 @@ pub fn mechtron_guest_init(version: i32, frame: i32) -> i32{
 pub fn mechtron_frame_to_guest(frame: i32) {
       let frame = membrane_consume_buffer(frame).unwrap();
       let frame: UltraWave = bincode::deserialize(frame.as_slice()).unwrap();
-      mechtron_guest_receive(frame);
+      TX.tx.send(wave).unwrap();
 }
 
-
-
-pub fn mechtron_guest_receive( wave: UltraWave ) {
-    TX.tx.send(wave).unwrap();
-}
-
-pub fn mechtron_register_factory( factory: Box<dyn MechtronFactory>) {
-    FACTORIES.insert( factory.name(), factory );
-}
 
 pub struct MechtronFactories {
     factories: HashMap<String,Box<dyn MechtronFactory>>
