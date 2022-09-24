@@ -1,13 +1,15 @@
 pub mod err;
 
 use std::sync::{Arc, Mutex};
-use wasmer::{Module,Cranelift,Store,Universal};
+use wasmer::{Module, Cranelift, Store, Universal, imports};
 use threadpool::ThreadPool;
 use wasmer_compiler_singlepass::Singlepass;
 use cosmic_universe::err::UniErr;
 use cosmic_universe::loc::Point;
 use cosmic_universe::substance::Bin;
 use wasm_membrane_host::membrane::WasmMembrane;
+use wasmer::Function;
+
 use crate::err::HostErr;
 
 pub struct MechtronHostFactory {
@@ -30,7 +32,8 @@ impl MechtronHostFactory {
 
     pub fn create(&self, point: Point, data: Bin) -> Result<MechtronHost, HostErr> {
         let module = Arc::new(Module::new(&self.store, data.as_ref())?);
-        let membrane = WasmMembrane::new(module, point.to_string() )?;
+        let membrane = WasmMembrane::new(module, point.to_string())?;
+
         MechtronHost::new( point, membrane, self.ctx.clone() )
     }
 }

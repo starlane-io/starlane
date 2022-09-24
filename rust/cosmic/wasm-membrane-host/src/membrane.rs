@@ -398,9 +398,23 @@ impl WasmMembrane {
 
         let imports = imports! {
 
-
-
             "env"=>{
+             "mechtron_timestamp"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env| {
+                    chrono::Utc::now().timestamp_millis()
+            }),
+
+        "mechtron_uuid"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env| -> i32 {
+                match env.unwrap()
+                {
+                   Ok(membrane)=>{
+                        let uuid = uuid::Uuid::new_v4().to_string();
+                        membrane.write_string(uuid.as_str()).unwrap()
+                   },
+                   Err(_)=>{
+                    -1
+                }
+                }
+            }),
 
 
         "membrane_host_log"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env,buffer:i32| {

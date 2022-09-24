@@ -1,5 +1,6 @@
 use alloc::format;
 use alloc::string::{FromUtf8Error, String, ToString};
+use core::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone)]
 pub struct Error {
@@ -41,8 +42,9 @@ impl From<FromUtf8Error> for Error {
     }
 }
 
-impl ToString for Error {
-    fn to_string(&self) -> String {
-        self.error.clone()
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.write_fmt(format_args!("{}",self.error))
     }
 }

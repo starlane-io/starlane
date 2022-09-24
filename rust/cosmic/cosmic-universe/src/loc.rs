@@ -96,7 +96,12 @@ impl Uuid {
         //Ok(Self::new(uuid::Uuid::from_str(uuid.to_string().as_str()).map_err(|e| UniErr::from_500(format!("'{}' is not a valid uuid",uuid.to_string())))?))
         Ok(Self { uuid: uuid.to_string() })
     }
+
+pub fn from_unwrap<S: ToString>(uuid: S) -> Self {
+        Self { uuid: uuid.to_string() }
+    }
 }
+
 
 impl ToString for Uuid {
     fn to_string(&self) -> String {

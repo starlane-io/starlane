@@ -27,7 +27,8 @@ use cosmic_macros::route;
 use cosmic_universe::hyper::HyperSubstance;
 use cosmic_universe::log::{LogSource, NoAppender, PointLogger, RootLogger};
 use cosmic_universe::parse::SkewerCase;
-use cosmic_universe::VERSION;
+use cosmic_universe::{loc, VERSION};
+use cosmic_universe::wasm::Timestamp;
 use cosmic_universe::wave::exchange::{DirectedHandler, DirectedHandlerShell, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, SetStrategy, TxRouter};
 
 use wasm_membrane_guest::membrane::{log, membrane_guest_version, membrane_consume_buffer, membrane_read_buffer, membrane_read_string, membrane_write_buffer, membrane_guest_alloc_buffer, membrane_consume_string};
@@ -39,8 +40,22 @@ lazy_static! {
 #[no_mangle]
 extern "C" {
     pub fn mechtron_frame_to_host(frame: i32);
+    pub fn mechtron_uuid() -> i32;
+    pub fn mechtron_timestamp() -> i64;
     pub fn mechtron_register(factories: & mut MechtronFactories ) -> Result<(),UniErr>;
 }
+
+#[no_mangle]
+extern "C" fn cosmic_uuid() -> loc::Uuid{
+    loc::Uuid::from_unwrap(membrane_consume_string(unsafe{mechtron_uuid()} ).unwrap())
+}
+
+#[no_mangle]
+extern "C" fn cosmic_timestamp() -> Timestamp {
+    Timestamp::new(unsafe{mechtron_timestamp()})
+}
+
+
 
 #[no_mangle]
 pub fn mechtron_guest_init(version: i32, frame: i32) -> i32{
