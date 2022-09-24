@@ -14,7 +14,6 @@ description = "The Wasm Package to help easily create a Mechtron"
 
 
 [dependencies]
-mechtron-common = { path="../mechtron-common"}
 lazy_static = {version="1.4.0", features=["spin_no_std"] }
 wasm_membrane_guest = { path="../wasm-membrane-guest"}
 bincode = "1.3.3"

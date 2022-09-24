@@ -5,8 +5,9 @@
 extern crate lazy_static;
 //mod html;
 
+use cosmic_universe::err::UniErr;
 use wasm_membrane_guest::membrane::log;
-use mechtron::{Mechtron, MechtronFactory};
+use mechtron::{Mechtron, MechtronFactories, MechtronFactory};
 //use mechtron::error::Error;
 /*use mesh_portal::version::latest::entity::request::Action;
 use mesh_portal::version::latest::entity::response::ResponseCore;
@@ -20,10 +21,11 @@ use crate::html::greeting;
 
 
 #[no_mangle]
-pub extern "C" fn mechtron_init()
-{
-//    mechtron_register(Box::new(MyAppFactory::new()));
+pub extern "C" fn mechtron_register(factories: & mut MechtronFactories ) -> Result<(),UniErr> {
+  Ok(())
 }
+
+
 
 /*
 pub struct MyAppFactory { }

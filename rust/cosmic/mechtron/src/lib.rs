@@ -8,11 +8,14 @@ extern crate lazy_static;
 #[macro_use]
 extern crate async_trait;
 extern crate alloc;
+extern crate core;
 
 
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::sync::Arc;
+use core::str::FromStr;
+use std::collections::HashMap;
 use cosmic_universe::err::UniErr;
 use cosmic_universe::loc::{Layer, Point, ToSurface, Uuid};
 use cosmic_universe::particle::{Details, Stub};
@@ -23,30 +26,39 @@ use cosmic_macros::handler;
 use cosmic_macros::route;
 use cosmic_universe::hyper::HyperSubstance;
 use cosmic_universe::log::{LogSource, NoAppender, PointLogger, RootLogger};
-use cosmic_universe::wave::exchange::{DirectedHandlerShell, Exchanger, InCtx, ProtoTransmitterBuilder, SetStrategy, TxRouter};
+use cosmic_universe::parse::SkewerCase;
+use cosmic_universe::VERSION;
+use cosmic_universe::wave::exchange::{DirectedHandler, DirectedHandlerShell, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, SetStrategy, TxRouter};
 
-use wasm_membrane_guest::membrane::{
-    log, membrane_guest_version, membrane_consume_buffer, membrane_read_buffer, membrane_read_string, membrane_write_buffer, membrane_guest_alloc_buffer
-};
+use wasm_membrane_guest::membrane::{log, membrane_guest_version, membrane_consume_buffer, membrane_read_buffer, membrane_read_string, membrane_write_buffer, membrane_guest_alloc_buffer, membrane_consume_string};
 
 lazy_static! {
-    static ref TX: MechtronGuestTx = MechtronGuestTx::new();
+    static ref TX: GuestTx = GuestTx::new();
     static ref FACTORIES:  Arc<DashMap<String,Box<dyn MechtronFactory>>> = Arc::new(DashMap::new());
 }
 
 #[no_mangle]
 extern "C" {
-    pub fn mechtron_registration();
     pub fn mechtron_frame_to_host(frame: i32);
+    pub fn mechtron_register(factories: & mut MechtronFactories ) -> Result<(),UniErr>;
 }
 
-
-
 #[no_mangle]
-pub fn mechtron_guest_init(frame: i32) {
+pub fn mechtron_guest_init(version: i32, frame: i32) -> i32{
+      let mut factories = MechtronFactories::new();
+      unsafe {
+         if let Err(_) = mechtron_register(&mut factories) {
+             return -1;
+         }
+      }
+      let version = membrane_consume_string(version).unwrap();
+      if version != VERSION.to_string() {
+          return -2;
+      }
       let frame = membrane_consume_buffer(frame).unwrap();
       let details: Details = bincode::deserialize(frame.as_slice()).unwrap();
-      MechtronGuest::new(details);
+      Guest::new(details, factories);
+      0
 }
 
 #[no_mangle]
@@ -56,14 +68,7 @@ pub fn mechtron_frame_to_guest(frame: i32) {
       mechtron_guest_receive(frame);
 }
 
-pub fn mechtron_guest_send(wave: UltraWave) -> Result<(),UniErr> {
-    let data = bincode::serialize(&wave)?;
-    let buffer_id = membrane_write_buffer(data);
-    unsafe {
-        mechtron_frame_to_host(buffer_id);
-    }
-    Ok(())
-}
+
 
 pub fn mechtron_guest_receive( wave: UltraWave ) {
     TX.tx.send(wave).unwrap();
@@ -73,12 +78,28 @@ pub fn mechtron_register_factory( factory: Box<dyn MechtronFactory>) {
     FACTORIES.insert( factory.name(), factory );
 }
 
-pub struct MechtronGuestTx {
+pub struct MechtronFactories {
+    factories: HashMap<String,Box<dyn MechtronFactory>>
+}
+
+impl MechtronFactories {
+    pub fn new() -> Self {
+        Self {
+            factories: HashMap::new()
+        }
+    }
+    pub fn add<F>( &mut self, factory: F ) where F: MechtronFactory {
+        SkewerCase::from_str(factory.name().as_str() ).expect("Mechtron Name must be valid kebab (skewer) case (all lower case alphanumeric and dashes with leading letter)");
+        self.factories.insert( factory.name(), Box::new(factory));
+    }
+}
+
+pub struct GuestTx {
     pub tx: tokio::sync::broadcast::Sender<UltraWave>,
     pub rx: tokio::sync::broadcast::Receiver<UltraWave>,
 }
 
-impl MechtronGuestTx {
+impl GuestTx {
     pub fn new() -> Self {
         let (tx,rx):(tokio::sync::broadcast::Sender<UltraWave>, tokio::sync::broadcast::Receiver<UltraWave>) = tokio::sync::broadcast::channel(1024);
         Self {
@@ -88,22 +109,22 @@ impl MechtronGuestTx {
     }
 }
 
-pub struct MechtronGuest {
+pub struct Guest {
    details: Details,
    mechtrons: DashMap<Point,Details>,
+   factories: MechtronFactories,
    tx: tokio::sync::broadcast::Sender<UltraWave>,
    rx: tokio::sync::broadcast::Receiver<UltraWave>,
    logger: PointLogger,
-   handler: DirectedHandlerShell<MechtronGuestHandler>,
+   handler: DirectedHandlerShell<GuestHandler>,
    exchanger: Exchanger
 }
 
-impl MechtronGuest {
-    pub fn new(details: Details) {
-
+impl Guest {
+    pub fn new(details: Details, factories: MechtronFactories) {
         let root_logger = RootLogger::new( LogSource::Core, Arc::new(NoAppender::new()) );
         let logger = root_logger.point(details.stub.point.clone());
-        let handler = MechtronGuestHandler { };
+        let handler = GuestHandler { };
 
         let surface = details.stub.point.to_surface().with_layer(Layer::Core);
         let (out_tx, out_rx) = tokio::sync::mpsc::channel(1024);
@@ -118,6 +139,7 @@ impl MechtronGuest {
         let mut guest = Self {
             details,
             mechtrons: DashMap::new(),
+            factories,
             tx: TX.tx.clone(),
             rx: TX.tx.subscribe(),
             handler,
@@ -150,15 +172,30 @@ impl MechtronGuest {
         self.mechtrons.insert( details.stub.point.clone(), details );
     }
 
+    pub fn route_to_host(wave: UltraWave) {
+        tokio::spawn( async move {
+            match bincode::serialize(&wave) {
+                Ok(data) => {
+                    let buffer_id = membrane_write_buffer(data);
+                    unsafe {
+                        mechtron_frame_to_host(buffer_id);
+                    }
+                }
+                Err(err) => {
+
+                }
+            }
+        });
+    }
 }
 
 #[derive(DirectedHandler)]
-pub struct MechtronGuestHandler {
+pub struct GuestHandler {
 
 }
 
 #[handler]
-impl MechtronGuestHandler {
+impl GuestHandler {
 
     #[route("Hyp<Assign>")]
     pub async fn assign( &self, ctx: InCtx<'_,HyperSubstance>) -> Result<(),UniErr> {
@@ -175,18 +212,64 @@ impl MechtronGuestHandler {
 
 pub trait MechtronFactory: Sync + Send + 'static {
     fn name(&self) -> String;
-    fn create(&self, details: Details) -> Result<Box<dyn Mechtron>, UniErr>;
+    fn create(&self, details: Details) -> Result<Box<dyn MechtronLifecycle>, UniErr>;
 }
 
-
+/// The MechtronSkel holds the common static elements of the Mechtron together
+/// Since a Mechtron is always an instance created to handle a single
+/// Directed Wave or Init, the Skel is cloned and passed to each
+/// Mechtron instance.
+///
+#[derive(Clone)]
 pub struct MechtronSkel {
+   pub details: Details
+}
 
+/// The Mechtron Context, it holds a transmitter for sending Waves
+/// which can be used outside of a Directed/Reflected Wave Handler interaction
+#[derive(Clone)]
+pub struct MechtronCtx {
+    pub transmitter: ProtoTransmitter
+}
+
+/// MechtronSphere is the interface used by Guest
+/// to make important calls to the Mechtron
+pub trait MechtronLifecycle: DirectedHandler+Sync+Send {
+   fn create(&self);
+}
+
+/// Create a Mechtron by implementing this trait.
+/// Mechtrons are created per request and disposed of afterwards...
+/// Implementers of this trait should only hold references to
+/// Mechtron::Skel, Mechtron::Ctx & Mechtron::State at most.
+pub trait Mechtron: MechtronLifecycle + Sync + Send + 'static {
+
+   /// it is recommended to implement MechtronSkel or some derivative
+   /// of MechtronSkel. Skel holds info about the Mechtron (like it's Point,
+   /// exact Kind & Properties)  The Skel may also provide access to other
+   /// services within the Guest. If your Mechtron doesn't use the Skel
+   /// then implement ```type Skel=()```
+   type Skel;
+
+   /// it is recommended to implement MechtronCtx or some derivative of MechtronCtx.
+   /// Ctx provides the ProtoTransmitter which can be used outside of a
+   /// Directed/Reflected Wave interaction.  If you don't need Ctx then
+   /// implement ```type Ctx=()```
+   type Ctx;
+
+   /// State is the aspect of the Mechtron that is changeable.  It is recommended
+   /// to wrap State in a tokio Mutex or RwLock if used.  If you are implementing
+   /// a statelens mechtron then implement ```type State=();```
+   type State;
+
+   /// This method is called by a companion MechtronFactory implementation
+   /// to bring this Mechtron back to life to handle an Init or a Directed Wave
+   fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State ) -> Self;
 }
 
 
-pub trait Mechtron: Sync + Send + 'static {
 
-}
+
 
 #[cfg(test)]
 pub mod test {
