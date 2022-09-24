@@ -124,6 +124,9 @@ where
     async fn directed_core_bound(&self, directed: Traversal<DirectedWave>) -> Result<(), UniErr> {
 
         let bind = self.bind(&directed).await?;
+println!();
+println!("GOt BIND CONFIG: {}", bind.point.to_string() );
+println!();
         match bind.select(&directed.payload) {
             Ok(route) => {
                 let regex = route.selector.path.clone();

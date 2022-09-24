@@ -2,6 +2,8 @@ use std::sync::Arc;
 use serde_json::json;
 use handlebars::Handlebars;
 use handlebars::RenderError;
+use mesh_portal::version::latest::entity::response::ResponseCore;
+use mesh_portal::version::latest::payload::{Payload, Primitive};
 
 lazy_static! {
   pub static ref HTML: Handlebars<'static> = {
@@ -404,7 +406,6 @@ footer {
     }
 
 
-/*
 pub fn greeting( name: &str ) -> Result<ResponseCore,Error> {
     let json = json!({"title": "Greetings!", "message": format!("Hello {}",name).as_str() });
     let response = ResponseCore::ok(Payload::Primitive(Primitive::Bin((Arc::new(HTML.render("mechtron-page", &json)?.as_bytes().to_vec())))));
@@ -418,8 +419,6 @@ pub fn html_error_code( code: usize, title: String, message: String ) -> Result<
     response.body = Payload::Primitive(Primitive::Bin(Arc::new(HTML.render("error-code-page", &json)?.as_bytes().to_vec())));
     Ok(response)
 }
-
- */
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Error {

@@ -54,7 +54,7 @@ lazy_static! {
     );
 
     static ref DRIVER_DRIVER_BIND: ArtRef<BindConfig> = ArtRef::new(
-        Arc::new(default_bind()),
+        Arc::new(driver_bind()),
         Point::from_str("GLOBAL::repo:1.0.0:/bind/driver.bind").unwrap()
     );
 }
@@ -425,6 +425,7 @@ where
                         };
                     }
                     DriversCall::Route(wave) => {
+println!("DriversApi::Route!");
                         match wave.to().to_single() {
                             Ok(to) => {
                                match self.point_to_driver.get(&to.point ) {
@@ -872,7 +873,7 @@ where
                 Some(driver) => {
                     let driver = driver.clone();
                     tokio::spawn(async move {
-                        driver.traversal(traversal).await;
+                        driver.route(traversal.payload).await;
                     });
                 }
             }
@@ -1203,6 +1204,7 @@ where
                         self.traverse(traversal).await;
                     }
                     DriverRunnerCall::Route(wave) => {
+println!("DriverRunnerCall::Route: {}",wave.to().to_string());
                         if wave.is_directed() {
                             let wave = wave.to_directed().unwrap();
                             self.logger
@@ -1276,6 +1278,7 @@ where
     }
 
     async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), P::Err> {
+println!("Driver Traversal: {}", self.skel.kind.to_string() );
         let item = self.item(&traversal.to.point).await?;
         let logger = item.skel.logger.clone();
         tokio::spawn(async move {
@@ -1541,9 +1544,6 @@ where
         Box::new( DefaultDriverHandler::restore() )
     }
 
-    fn default_bind(&self) -> ArtRef<BindConfig> {
-        DEFAULT_BIND.clone()
-    }
 }
 
 #[async_trait]
@@ -1789,7 +1789,7 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
-println!("Returning DRIVER DRIVER!");
+println!("Returning DRIVER DRIVER: {}",point.to_string());
         let kind = self.map.get(point).ok_or("expected Driver Kind")?.value().clone();
         let skel = DriverDriverItemSkel::new( self.skel.clone(), kind );
         Ok(ItemSphere::Router(Box::new(DriverItem::restore(
@@ -1846,8 +1846,10 @@ where
     P: Cosmos,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
-        let api = self.skel.drivers().get(&self.skel.driver_kind).await?;
-        api.driver_bind().await
+println!("GEtting DRiver DRIVER BIND!");
+        //let api = self.skel.drivers().get(&self.skel.driver_kind).await?;
+        //api.driver_bind().await
+        Ok(DRIVER_DRIVER_BIND.clone())
     }
 }
 

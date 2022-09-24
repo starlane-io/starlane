@@ -238,6 +238,7 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+println!("\tRETURNING STAR ITEM HANDLER");
         Ok(ItemSphere::Handler(Box::new(Star::restore(
             self.star_skel.clone(),
             self.ctx.clone(),
@@ -482,12 +483,7 @@ println!("ASSIGNED by star to driver!");
 
     #[route("Hyp<Transport>")]
     pub async fn transport(&self, ctx: InCtx<'_, UltraWave>) {
-        #[cfg(test)]
-        self.skel
-            .diagnostic_interceptors
-            .transport_endpoint
-            .send(ctx.wave().clone().to_ultra())
-            .unwrap_or_default();
+println!("\tReceived TRANSPORT");
 
         self.skel.logger.track(ctx.wave(), || {
             Tracker::new("star:core:transport", "Receive")

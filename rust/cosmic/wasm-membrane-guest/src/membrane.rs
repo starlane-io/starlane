@@ -19,7 +19,7 @@ lazy_static! {
 
 pub static VERSION: i32 = 1;
 
-#[link(wasm_import_module = "the-wasm-import-module")]
+#[no_mangle]
 extern "C" {
     pub fn membrane_host_log(buffer: i32);
     pub fn membrane_host_panic(buffer: i32);

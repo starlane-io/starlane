@@ -316,7 +316,7 @@ where
         transmitter.from = SetStrategy::Override(self.point.to_surface().with_layer(Layer::Core));
         transmitter.agent = SetStrategy::Override(Agent::HyperUser);
         let transmitter = transmitter.build();
-
+assign.track = true;
         let assign_result: Wave<Pong> = logger.result_ctx(
             "StarSkel::create(assign_result)",
             transmitter.direct(assign).await,

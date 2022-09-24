@@ -118,7 +118,7 @@ impl FetchChamber {
 #[derive(Clone)]
 pub struct ArtRef<A> {
     artifact: Arc<A>,
-    point: Point,
+    pub point: Point,
 }
 
 impl<A> ArtRef<A> {

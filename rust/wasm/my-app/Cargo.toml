@@ -11,10 +11,14 @@ crate-type = ["cdylib"]
 
 [dependencies]
 
+#mechtron= "0.2.0-rc1"
+#mechtron-common= "0.2.0-rc1"
+#wasm_membrane_guest = "0.2.0"
+#mesh-portal= "0.2.0-rc1"
+
 mechtron= { path="../../cosmic/mechtron" }
-wasm_membrane_guest = { path= "../../cosmic/wasm-membrane-guest"}
-cosmic-universe= { path= "../../cosmic/cosmic-universe"}
-tokio = { version = "1.15.0", features = ["rt","sync"] }
+wasm_membrane_guest = { path="../../cosmic/wasm-membrane-guest" }
+
 
 
 handlebars = "4.2.1"
