@@ -189,7 +189,8 @@ impl WasmMembrane {
         println!("{}({}) : {}", self.name, log_type, message);
     }
 
-    pub fn write_string(&self, string: &str) -> Result<i32, Error> {
+    pub fn write_string<S:ToString>(&self, string: S) -> Result<i32, Error> {
+        let string = string.to_string();
         let string = string.as_bytes();
         let memory = self.instance.exports.get_memory("memory")?;
         let buffer_id = self.alloc_buffer(string.len() as _)?;
@@ -380,6 +381,7 @@ impl WasmMembrane {
     pub fn new(module: Arc<Module>, name: String) -> Result<Arc<Self>, Error> {
         Self::new_with_init(module, name, "membrane_guest_init".to_string())
     }
+
     pub fn new_with_init(
         module: Arc<Module>,
         init: String,

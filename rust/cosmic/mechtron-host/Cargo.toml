@@ -12,6 +12,7 @@ threadpool = "1.8.1"
 wasmer = "2.3.0"
 wasmer-compiler-singlepass = "2.3.0"
 
+bincode = "1.3.3"
 chrono = { version="0.4.19", features=["serde"] }
 uuid = { version="1.1.2", features=["v4"] }
 

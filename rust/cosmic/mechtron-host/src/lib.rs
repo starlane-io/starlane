@@ -9,6 +9,8 @@ use cosmic_universe::loc::Point;
 use cosmic_universe::substance::Bin;
 use wasm_membrane_host::membrane::WasmMembrane;
 use wasmer::Function;
+use cosmic_universe::particle::Details;
+use cosmic_universe::VERSION;
 
 use crate::err::HostErr;
 
@@ -58,9 +60,22 @@ impl MechtronHost {
         })
     }
 
-    pub fn init(&self) -> Result<(),HostErr> {
+    pub fn init(&self, details: Details) -> Result<(),HostErr> {
         self.membrane.init()?;
-        Ok(())
+        let version = self.membrane.write_string( VERSION.to_string() )?;
+        let details: Vec<u8> = bincode::serialize(&details)?;
+        let details = self.membrane.write_buffer(&details )?;
+        let ok = self
+            .membrane.instance
+            .exports
+            .get_native_function::<(i32,i32), i32>("mechtron_guest_init")
+            .unwrap()
+            .call(version,details)?;
+        if ok == 0 {
+            Ok(())
+        } else {
+            Err("Mehctron init error".into())
+        }
     }
 
 }
@@ -80,6 +95,7 @@ mod tests {
         let point = Point::from_str("guest").unwrap();
         let data = Arc::new(fs::read("../../wasm/my-app/my_app.wasm").unwrap());
         let host = factory.create(point, data).unwrap();
-        host.init().unwrap();
+        let details = Details::default();
+        host.init(details).unwrap();
     }
 }
