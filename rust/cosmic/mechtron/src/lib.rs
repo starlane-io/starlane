@@ -63,7 +63,7 @@ pub fn mechtron_guest_init(version: i32, frame: i32) -> i32{
 #[no_mangle]
 pub fn mechtron_frame_to_guest(frame: i32) {
       let frame = membrane_consume_buffer(frame).unwrap();
-      let frame: UltraWave = bincode::deserialize(frame.as_slice()).unwrap();
+      let wave: UltraWave = bincode::deserialize(frame.as_slice()).unwrap();
       TX.tx.send(wave).unwrap();
 }
 

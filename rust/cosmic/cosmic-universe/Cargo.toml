@@ -30,14 +30,15 @@ regex = "1.5.4"
 #http = "0.2.6"
 #http-serde = "1.1.0"
 serde_json = "1.0.79"
-chrono = { version="0.4.19", features=["serde", "js-sys"] }
 tokio = { version = "1.15.0", features = ["rt","sync","time"] }
 dashmap = "5.3.4"
 serde_urlencoded = "0.7.1"
 enum-ordinalize = "3.1.11"
 convert_case = "0.5.0"
 validator = "0.15.0"
-uuid = { version="1.1.2", features=["v4", "js"] }
-#tailcall = "0.1.6"
-getrandom = { version = "0.2", features = ["js"] }
 url = { version="2.3.1", features=["serde"] }
+
+
+#uuid = { version="1.1.2", features=["v4", "js"] }
+#getrandom = { version = "0.2", features = ["js"] }
+#chrono = { version="0.4.19", features=["serde", "js-sys"] }

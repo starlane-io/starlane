@@ -16,7 +16,6 @@ use std::cmp::Ordering;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use dashmap::{DashMap, DashSet};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
@@ -61,6 +60,7 @@ pub mod settings;
 pub mod substance;
 pub mod util;
 pub mod wave;
+pub mod wasm;
 
 lazy_static! {
     pub static ref VERSION: semver::Version =

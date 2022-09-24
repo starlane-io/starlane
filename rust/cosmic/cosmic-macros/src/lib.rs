@@ -26,9 +26,25 @@ use syn::{
     DeriveInput, FieldsNamed, FieldsUnnamed, FnArg, GenericArgument, ImplItem, ItemImpl,
     ItemStruct, PathArguments, PathSegment, ReturnType, Signature, Type, Visibility,
 };
+use cosmic_universe::loc;
 
 use cosmic_universe::parse::route_attribute_value;
 use cosmic_universe::util::log;
+use cosmic_universe::wasm::Timestamp;
+
+
+#[no_mangle]
+extern "C" fn cosmic_uuid() -> loc::Uuid{
+    loc::Uuid::from(uuid::Uuid::new_v4().to_string()).unwrap()
+}
+
+#[no_mangle]
+extern "C" fn cosmic_timestamp() -> Timestamp {
+    Timestamp::new(Utc::now().timestamp_millis())
+}
+
+
+
 
 /// This macro will auto implement the `cosmic_universe::wave::exchange::DirectedHandler` trait.
 /// In order to finalize the implementation a `#[routes]` attribute must also be specified

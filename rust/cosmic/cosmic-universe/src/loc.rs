@@ -21,7 +21,7 @@ use crate::parse::{
 };
 use crate::particle::traversal::TraversalPlan;
 use crate::selector::{Pattern, Selector, SpecificSelector, VersionReq};
-use crate::util::{ToResolved, ValueMatcher, ValuePattern};
+use crate::util::{ToResolved, uuid, ValueMatcher, ValuePattern};
 use crate::wave::exchange::Exchanger;
 use crate::wave::{
     DirectedWave, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave, ToRecipients,
@@ -81,16 +81,20 @@ pub struct Uuid {
 
 impl Uuid {
     pub fn rnd() -> Self {
-        Self::new( uuid::Uuid::new_v4() )
+        //Self::new( uuid::Uuid::new_v4() )
+         uuid()
     }
+    /*
     pub fn new(uuid: uuid::Uuid) -> Self {
         Self {
             uuid: uuid.to_string()
         }
     }
+     */
 
     pub fn from<S: ToString>(uuid: S) -> Result<Self, UniErr> {
-        Ok(Self::new(uuid::Uuid::from_str(uuid.to_string().as_str()).map_err(|e| UniErr::from_500(format!("'{}' is not a valid uuid",uuid.to_string())))?))
+        //Ok(Self::new(uuid::Uuid::from_str(uuid.to_string().as_str()).map_err(|e| UniErr::from_500(format!("'{}' is not a valid uuid",uuid.to_string())))?))
+        Ok(Self { uuid: uuid.to_string() })
     }
 }
 

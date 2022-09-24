@@ -4,8 +4,6 @@ use std::ops::Deref;
 use std::process::Output;
 use std::sync::Arc;
 
-use chrono::serde::ts_milliseconds;
-use chrono::{DateTime, Utc};
 use regex::Regex;
 use serde;
 use serde::{Deserialize, Serialize};
@@ -17,6 +15,7 @@ use crate::loc::{Point, ToPoint, Uuid};
 use crate::parse::{to_string, CamelCase};
 use crate::selector::Selector;
 use crate::util::{timestamp, uuid};
+use crate::wasm::Timestamp;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum Level {
@@ -72,9 +71,7 @@ pub struct LogSpanEvent {
     pub span: Uuid,
     pub kind: LogSpanEventKind,
     pub attributes: HashMap<String, String>,
-
-    #[serde(with = "ts_milliseconds")]
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp
 }
 
 impl LogSpanEvent {
@@ -87,7 +84,7 @@ impl LogSpanEvent {
             span: span.id.clone(),
             kind,
             attributes,
-            timestamp: Utc::now(),
+            timestamp: timestamp()
         }
     }
 }
@@ -102,8 +99,7 @@ pub struct LogSpan {
     pub action: Option<CamelCase>,
     pub parent: Option<Uuid>,
     pub attributes: HashMap<String, String>,
-    #[serde(with = "ts_milliseconds")]
-    pub entry_timestamp: DateTime<Utc>,
+    pub entry_timestamp: Timestamp
 }
 
 impl LogSpan {
@@ -115,7 +111,7 @@ impl LogSpan {
             action: None,
             parent: None,
             attributes: Default::default(),
-            entry_timestamp: Utc::now(),
+            entry_timestamp: timestamp()
         }
     }
 
@@ -127,7 +123,7 @@ impl LogSpan {
             action: None,
             parent: Some(parent),
             attributes: Default::default(),
-            entry_timestamp: Utc::now(),
+            entry_timestamp: timestamp()
         }
     }
 
@@ -139,7 +135,7 @@ impl LogSpan {
             action: None,
             parent: None,
             attributes: Default::default(),
-            entry_timestamp: Utc::now(),
+            entry_timestamp: timestamp()
         });
         span.point = point;
         span
@@ -148,8 +144,7 @@ impl LogSpan {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PointlessLog {
-    #[serde(with = "ts_milliseconds")]
-    timestamp: DateTime<Utc>,
+    timestamp: Timestamp,
     message: String,
     level: Level,
 }
@@ -707,7 +702,7 @@ impl PointLogger {
 }
 
 pub struct SpanLogBuilder {
-    pub entry_timestamp: DateTime<Utc>,
+    pub entry_timestamp: Timestamp,
     pub attributes: HashMap<String, String>,
 }
 
@@ -777,7 +772,7 @@ impl SpanLogger {
         &self.span
     }
 
-    pub fn entry_timestamp(&self) -> DateTime<Utc> {
+    pub fn entry_timestamp(&self) -> Timestamp {
         self.span.entry_timestamp.clone()
     }
 
@@ -1014,8 +1009,7 @@ impl AuditLogBuilder {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditLog {
     pub point: Point,
-    #[serde(with = "ts_milliseconds")]
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
     pub metrics: HashMap<String, String>,
 }
 

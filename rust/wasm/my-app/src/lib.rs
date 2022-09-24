@@ -1,6 +1,3 @@
-//#[macro_use]
-//extern crate wasm_bindgen;
-
 #[macro_use]
 extern crate lazy_static;
 //mod html;
@@ -8,6 +5,7 @@ extern crate lazy_static;
 use cosmic_universe::err::UniErr;
 use wasm_membrane_guest::membrane::log;
 use mechtron::{Mechtron, MechtronFactories, MechtronFactory};
+
 //use mechtron::error::Error;
 /*use mesh_portal::version::latest::entity::request::Action;
 use mesh_portal::version::latest::entity::response::ResponseCore;
@@ -24,6 +22,7 @@ use crate::html::greeting;
 pub extern "C" fn mechtron_register(factories: & mut MechtronFactories ) -> Result<(),UniErr> {
   Ok(())
 }
+
 
 
 

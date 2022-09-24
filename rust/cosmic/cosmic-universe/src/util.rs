@@ -5,13 +5,13 @@ use core::option::Option::{None, Some};
 use core::result::Result;
 use core::result::Result::{Err, Ok};
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::err::UniErr;
 use crate::loc;
 use crate::loc::Uuid;
 use crate::parse::Env;
+use crate::wasm::{cosmic_timestamp, Timestamp};
 use crate::wave::core::http2::HttpMethod;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
@@ -204,8 +204,9 @@ pub fn uuid() -> Uuid {
     loc::Uuid::rnd()
 }
 
-pub fn timestamp() -> DateTime<Utc> {
-    Utc::now()
+pub fn timestamp() ->
+                   Timestamp {
+    unsafe{ cosmic_timestamp() }
 }
 
 pub trait ToResolved<R>

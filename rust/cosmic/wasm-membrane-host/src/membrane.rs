@@ -403,7 +403,6 @@ impl WasmMembrane {
             "env"=>{
 
 
-
         "membrane_host_log"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env,buffer:i32| {
                 match env.unwrap()
                 {
