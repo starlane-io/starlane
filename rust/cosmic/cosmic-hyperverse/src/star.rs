@@ -1345,11 +1345,7 @@ where
                     }
                 }
             } else {
-                // if this wave was injected by the from Particle, then we need to first
-                // traverse towards the fabric
-                if injector.point == wave.from().point {
-                    dir = TraversalDirection::Fabric;
-                } else {
+
                     // if this was injected by something else (like the Star)
                     // then it needs to traverse towards the Core
                     dir = TraversalDirection::Core;
@@ -1357,8 +1353,10 @@ where
                     if !from_hyperway {
                         dest.replace(to.layer.clone());
                     }
-                }
             }
+if wave.track() && wave.transported().is_none() {
+    println!("\n\rDIR : {} ",dir.to_string());
+}
 
             let traversal_logger = self.skel.logger.point(to.to_point());
             let traversal_logger = traversal_logger.span();
@@ -1413,6 +1411,7 @@ where
     async fn exit(&self, traversal: Traversal<UltraWave>) -> Result<(), UniErr> {
         match traversal.dir {
             TraversalDirection::Fabric => {
+println!("Sending EXIT UP {}",traversal.method().as_ref().unwrap().to_string());
                 self.exit_up.send(traversal).await;
                 return Ok(());
             }

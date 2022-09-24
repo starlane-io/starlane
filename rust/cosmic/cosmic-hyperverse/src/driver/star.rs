@@ -451,13 +451,15 @@ where
             {
                 self.create(assign).await;
 
-println!("ASSIGNING !");
                 let driver = self.skel.drivers.local_driver_lookup(assign.details.stub.kind.clone()).await?.ok_or(P::Err::new(format!("Star does not have  driver for {}",assign.details.stub.kind.to_string())))?;
+
+println!("ASSIGNING : {}", driver.to_string());
                 let mut directed = DirectedProto::ping();
                 directed.method(HypMethod::Assign);
                 directed.from(self.skel.point.to_surface());
                 directed.to(driver.to_surface());
                 directed.body(HyperSubstance::Assign(assign.clone()).into());
+                directed.track = true;
                 let pong: Wave<Pong> = ctx.transmitter.direct(directed).await?;
 println!("ASSIGN SUCCESS? {}", pong.is_ok());
                 pong.ok_or()?;
