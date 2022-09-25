@@ -448,6 +448,13 @@ impl <P> WasmMembrane <P> where P: HostPlatform+'static{
                 }
             }),
 
+
+        "mechtron_frame_to_host"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env<P>,buffer_id:i32| -> i32 {
+println!("MECHTRON FAME TO HOST!");
+                    env.unwrap().unwrap().consume_buffer(buffer_id);
+                    0
+            }),
+
         } };
 
         let instance = match ext_imports {

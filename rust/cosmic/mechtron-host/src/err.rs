@@ -2,14 +2,12 @@ use cosmic_universe::err::UniErr;
 use std::fmt::Debug;
 use std::str::Utf8Error;
 use std::string::FromUtf8Error;
-use wasm_membrane_host::error::Error;
 use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
 
 pub trait HostErr:
     Debug
     + ToString
     + From<CompileError>
-    + From<wasm_membrane_host::error::Error>
     + From<RuntimeError>
     + From<&'static str>
     + From<Box<bincode::ErrorKind>>
@@ -70,13 +68,7 @@ impl From<CompileError> for DefaultHostErr {
     }
 }
 
-impl From<wasm_membrane_host::error::Error> for DefaultHostErr {
-    fn from(e: Error) -> Self {
-        DefaultHostErr {
-            message: e.to_string(),
-        }
-    }
-}
+
 impl From<Box<bincode::ErrorKind>> for DefaultHostErr {
     fn from(e: Box<bincode::ErrorKind>) -> Self {
         DefaultHostErr {

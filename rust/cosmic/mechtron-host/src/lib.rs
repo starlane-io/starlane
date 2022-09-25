@@ -12,10 +12,10 @@ use cosmic_universe::{loc, VERSION};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 use threadpool::ThreadPool;
-use wasm_membrane_host::membrane::WasmMembrane;
 use wasmer::Function;
 use wasmer::{imports, Cranelift, Module, Store, Universal};
 use wasmer_compiler_singlepass::Singlepass;
+use crate::membrane::WasmMembrane;
 
 pub trait HostPlatform: Clone+Send+Sync
 where
@@ -35,7 +35,7 @@ where
 
 impl<P> MechtronHostFactory<P>
 where
-    P: HostPlatform,
+    P: HostPlatform+'static,
 {
     pub fn new(platform: P ) -> Self {
         let compiler = Singlepass::new();
@@ -52,7 +52,7 @@ where
 
     pub fn create(&self, point: Point, data: Bin) -> Result<MechtronHost<P>, P::Err> {
         let module = Arc::new(Module::new(&self.store, data.as_ref())?);
-        let membrane = WasmMembrane::new(module, point.to_string())?;
+        let membrane = WasmMembrane::new(module, point.to_string(),self.platform.clone())?;
 
         MechtronHost::new(point, membrane, self.ctx.clone(),self.platform.clone())
     }
@@ -69,7 +69,7 @@ where
 {
     pub ctx: MechtronHostCtx,
     pub point: Point,
-    pub membrane: Arc<WasmMembrane>,
+    pub membrane: Arc<WasmMembrane<P>>,
     pub platform: P
 }
 
@@ -79,7 +79,7 @@ where
 {
     pub fn new(
         point: Point,
-        membrane: Arc<WasmMembrane>,
+        membrane: Arc<WasmMembrane<P>>,
         ctx: MechtronHostCtx,
         platform: P
     ) -> Result<Self, P::Err> {
