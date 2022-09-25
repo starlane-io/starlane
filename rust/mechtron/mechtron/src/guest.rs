@@ -13,6 +13,7 @@ use cosmic_universe::wave::exchange::SetStrategy;
 use crate::{MechtronFactories, Platform};
 use crate::err::GuestErr;
 use crate::err::MechErr;
+use cosmic_macros::handler_sync;
 
 pub struct Guest<P> where P:Platform + 'static {
     details: Details,
@@ -24,7 +25,7 @@ pub struct Guest<P> where P:Platform + 'static {
 
 impl <P> Guest<P> where P: Platform + 'static {
     pub fn new(details: Details, platform : P) -> Result<Self,GuestErr> where P: Sized, GuestErr: From<<P as Platform>::Err>{
-        let router:MechtronRouter<P> = MechtronRouter::new();
+        let router: GuestRouter<P> = GuestRouter::new();
         let router = Arc::new(router);
         let mut transmitter = ProtoTransmitterBuilder::new(router);
         transmitter.agent = SetStrategy::Override(Agent::Point(details.stub.point.clone()));
@@ -51,7 +52,7 @@ impl <P> Guest<P> where P: Platform + 'static {
 impl <G> crate::Guest for Guest<G> where G: Platform {
      fn handler(&self) -> DirectedHandlerShell<DirectedHandlerProxy> {
         let surface = self.details.stub.point.to_surface().with_layer(Layer::Core);
-        let router: MechtronRouter<G> = MechtronRouter::new();
+        let router: GuestRouter<G> = GuestRouter::new();
         let router = Arc::new(router);
         let mut transmitter = ProtoTransmitterBuilder::new(router);
         transmitter.from = SetStrategy::Override(surface.clone());
@@ -61,24 +62,24 @@ impl <G> crate::Guest for Guest<G> where G: Platform {
 }
 
 
-pub struct MechtronRouter<G> where G: crate::Platform {
-    phantom: PhantomData<G>
+pub struct GuestRouter<P> where P: crate::Platform {
+    phantom: PhantomData<P>
 }
 
-impl <G> MechtronRouter<G> where G: crate::Platform {
+impl <P> GuestRouter<P> where P: crate::Platform {
     pub fn new() -> Self { Self {
         phantom: PhantomData::default()
     } }
 }
 
 
-impl <G> ExchangeRouter for MechtronRouter<G> where G: crate::Platform {
+impl <P> ExchangeRouter for GuestRouter<P> where P: crate::Platform {
     fn route(&self, wave: UltraWave) {
-        crate::membrane::mechtron_exchange_wave_host::<G>(wave);
+        crate::membrane::mechtron_exchange_wave_host::<P>(wave);
     }
 
     fn exchange(&self, direct: DirectedWave) -> Result<ReflectedAggregate, UniErr> {
-        crate::membrane::mechtron_exchange_wave_host::<G>(direct.to_ultra()).map_err(|e|e.to_uni_err())
+        crate::membrane::mechtron_exchange_wave_host::<P>(direct.to_ultra()).map_err(|e|e.to_uni_err())
     }
 }
 
@@ -92,11 +93,12 @@ impl GuestHandler {
     }
 }
 
-impl DirectedHandler for GuestHandler {
-    fn handle(&self, ctx: RootInCtx) -> CoreBounce {
-        CoreBounce::Absorbed
-    }
+#[handler_sync]
+impl GuestHandler {
+
 }
+
+
 
 /*
 #[handler]

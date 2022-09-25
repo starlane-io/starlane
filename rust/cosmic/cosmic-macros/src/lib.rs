@@ -94,6 +94,13 @@ pub fn handler(attr: TokenStream, item: TokenStream) -> TokenStream {
     _handler(attr, item, true)
 }
 
+
+#[proc_macro_attribute]
+pub fn handler_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
+    _handler(attr, item, false)
+}
+
+
 fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
     let item_cp = item.clone();
     let mut impl_item = parse_macro_input!(item_cp as syn::ItemImpl);
@@ -151,9 +158,43 @@ fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
         rtn
     };
 
+    let selector = match _async {
+        true => quote!{cosmic_universe::wave::exchange::asynch::DirectedHandlerSelector},
+        false => quote!{cosmic_universe::wave::exchange::synch::DirectedHandlerSelector},
+    };
+
+    let handler = match _async {
+        true => quote!{cosmic_universe::wave::exchange::asynch::DirectedHandler},
+        false => quote!{cosmic_universe::wave::exchange::synch::DirectedHandler},
+    };
+
+    let root_ctx = match _async {
+        true => quote!{cosmic_universe::wave::exchange::asynch::RootInCtx},
+        false => quote!{cosmic_universe::wave::exchange::synch::RootInCtx},
+    };
+
+
+    let _await = match _async {
+        true => quote!{.await},
+        false => quote!{}
+    };
+
+    let _async_trait= match _async {
+        true => quote!{#[async_trait]},
+        false => quote!{}
+    };
+
+
+    let _async = match _async {
+        true => quote!{async},
+        false => quote!{}
+    };
+
+
+
     let rtn = quote! {
-        impl #generics cosmic_universe::wave::exchange::asynch::DirectedHandlerSelector for #self_ty #where_clause{
-              fn select<'a>( &self, select: &'a cosmic_universe::wave::RecipientSelector<'a>, ) -> Result<&dyn cosmic_universe::wave::exchange::asynch::DirectedHandler, ()> {
+        impl #generics #selector for #self_ty #where_clause{
+              fn select<'a>( &self, select: &'a cosmic_universe::wave::RecipientSelector<'a>, ) -> Result<&dyn #handler, ()> {
                 if select.wave.core().method == cosmic_universe::wave::core::Method::Cmd(cosmic_universe::wave::core::cmd::CmdMethod::Bounce) {
                     return Ok(self);
                 }
@@ -166,16 +207,16 @@ fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
               }
         }
 
-        #[async_trait]
-        impl #generics cosmic_universe::wave::exchange::asynch::DirectedHandler for #self_ty #where_clause{
-            async fn handle( &self, ctx: cosmic_universe::wave::exchange::asynch::RootInCtx) -> cosmic_universe::wave::core::CoreBounce {
+        #_async_trait
+        impl #generics #handler for #self_ty #where_clause{
+            #_async fn handle( &self, ctx: #root_ctx) -> cosmic_universe::wave::core::CoreBounce {
                 #(
                     if #static_selector_keys.is_match(&ctx.wave).is_ok() {
-                       return self.#idents( ctx ).await;
+                       return self.#idents( ctx )#_await;
                     }
                 )*
                 if ctx.wave.core().method == cosmic_universe::wave::core::Method::Cmd(cosmic_universe::wave::core::cmd::CmdMethod::Bounce) {
-                    return self.bounce(ctx).await;
+                    return self.bounce(ctx)#_await;
                 }
                 ctx.not_found().into()
              }
@@ -187,10 +228,12 @@ fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
 
     };
 
-    //println!("{}", rtn.to_string());
+    println!("{}", rtn.to_string());
 
     TokenStream2::from_iter(vec![rtn, TokenStream2::from(item)]).into()
 }
+
+
 
 fn find_impl_type(item_impl: &ItemImpl) -> Ident {
     if let Type::Path(path) = &*item_impl.self_ty {

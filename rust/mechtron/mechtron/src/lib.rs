@@ -1,12 +1,16 @@
 #![allow(warnings)]
 
 pub mod err;
-pub mod synch;
+pub mod guest;
 mod membrane;
 mod uni;
 
 #[macro_use]
 extern crate lazy_static;
+
+#[macro_use]
+extern crate cosmic_macros;
+
 
 extern crate alloc;
 extern crate core;
