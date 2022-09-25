@@ -25,7 +25,7 @@ use crate::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use crate::wave::{Pong, UltraWave};
 use crate::{util, Details, Point, Status, Stub, Surface, UniErr};
 use crate::err::ParseErrs;
-use crate::log::{AuditLog, Log, LogSpan, LogSpanEvent};
+use crate::log::{AuditLog, Log, LogSpan, LogSpanEvent, PointlessLog};
 
 #[derive(
     Debug,
@@ -273,7 +273,8 @@ pub enum LogSubstance {
     Log(Log),
     Span(LogSpan),
     Event(LogSpanEvent),
-    Audit(AuditLog)
+    Audit(AuditLog),
+    Pointless(PointlessLog)
 }
 
 

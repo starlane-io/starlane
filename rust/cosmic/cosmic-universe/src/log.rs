@@ -8,7 +8,7 @@ use regex::Regex;
 use serde;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::{Agent, ToSubstance};
+use crate::{Agent, ANONYMOUS, ToSubstance};
 
 use crate::command::common::StateSrc::Substance;
 use crate::err::UniErr;
@@ -171,7 +171,14 @@ impl LogSpan {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+)]
 pub struct PointlessLog {
     timestamp: Timestamp,
     message: String,
@@ -471,11 +478,11 @@ impl LogAppender for StdOutAppender {
     }
 }
 
-pub struct SyncLogAppender {
+pub struct SynchTransmittingLogAppender {
     transmitter: ProtoTransmitter
 }
 
-impl SyncLogAppender {
+impl SynchTransmittingLogAppender {
     pub fn new( mut transmitter: ProtoTransmitterBuilder) -> Self {
         transmitter.to = SetStrategy::Override(Point::global_logger().to_surface().with_layer(Layer::Core).to_recipients());
         transmitter.handling = SetStrategy::Fill(Handling {
@@ -491,7 +498,7 @@ impl SyncLogAppender {
     }
 }
 
-impl LogAppender for SyncLogAppender {
+impl LogAppender for SynchTransmittingLogAppender {
     fn log(&self, log: Log) {
         let mut directed = DirectedProto::signal();
         directed.from( log.point.to_surface() );
@@ -517,7 +524,11 @@ impl LogAppender for SyncLogAppender {
     }
 
     fn pointless(&self, log: PointlessLog) {
-        todo!()
+        let mut directed = DirectedProto::signal();
+        directed.from( Point::anonymous() );
+        directed.agent(Agent::Anonymous);
+        directed.body( LogSubstance::Pointless(log).into() );
+        self.transmitter.signal(directed);
     }
 }
 

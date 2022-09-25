@@ -30,6 +30,7 @@ use crate::wave::{
 use crate::{
      Agent, BaseKind, Kind, KindTemplate, ParticleRecord, UniErr, ANONYMOUS, HYPERUSER,
 };
+use crate::Agent::Anonymous;
 use crate::err::ParseErrs;
 
 lazy_static! {
@@ -1510,6 +1511,14 @@ impl Point {
 
     pub fn remote_endpoint() -> Self {
         REMOTE_ENDPOINT.clone()
+    }
+
+    pub fn hyperuser() -> Self {
+        HYPERUSER.clone()
+    }
+
+    pub fn anonymous() -> Self {
+        ANONYMOUS.clone()
     }
 
     pub fn normalize(self) -> Result<Point, UniErr> {
