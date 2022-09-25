@@ -16,6 +16,8 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use core::str::FromStr;
 use std::collections::HashMap;
+use std::sync::{mpsc, MutexGuard};
+use std::sync::mpsc::Sender;
 use cosmic_universe::err::UniErr;
 use cosmic_universe::loc::{Layer, Point, ToSurface, Uuid};
 use cosmic_universe::particle::{Details, Stub};
@@ -32,13 +34,12 @@ use cosmic_universe::{loc, VERSION};
 use cosmic_universe::wasm::Timestamp;
 use cosmic_universe::wave::exchange::{DirectedHandler, DirectedHandlerShell, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, SetStrategy, TxRouter};
 
-use tokio::sync::RwLock;
+use std::sync::Mutex;
 
 use wasm_membrane_guest::membrane::{log, membrane_guest_version, membrane_consume_buffer, membrane_read_buffer, membrane_read_string, membrane_write_buffer, membrane_guest_alloc_buffer, membrane_consume_string};
 
 lazy_static! {
-    static ref TX: GuestTx = GuestTx::new();
-    static ref GUEST: Arc<RwLock<Option<Guest>>> = Arc::new(RwLock::new(None));
+    static ref TX: Mutex<Option<mpsc::Sender<UltraWave>>>= Mutex::new(None);
     static ref RUNTIME: Runtime =  tokio::runtime::Builder::new_current_thread().build().unwrap();
 }
 
@@ -76,8 +77,10 @@ pub fn mechtron_guest_init(version: i32, frame: i32) -> i32{
       }
       let frame = membrane_consume_buffer(frame).unwrap();
       let details: Details = bincode::deserialize(frame.as_slice()).unwrap();
-    RUNTIME.block_on( async move {
-        Guest::new(details,factories).await
+    let (tx,rx) = mpsc::channel();
+    TX.lock().unwrap().replace(tx);
+    RUNTIME.block_on( async move  {
+           // Guest::new(rx, details, factories).await
     });
       0
 }
@@ -86,12 +89,16 @@ pub fn mechtron_guest_init(version: i32, frame: i32) -> i32{
 pub fn mechtron_frame_to_guest(frame: i32) {
       let frame = membrane_consume_buffer(frame).unwrap();
       let wave: UltraWave = bincode::deserialize(frame.as_slice()).unwrap();
-      TX.tx.send(wave).unwrap();
+      match TX.lock().unwrap().as_ref() {
+          None => {}
+          Some(tx) => {
+//              tx.send(wave);
+          }
+      }
     /*
     RUNTIME.block_on( async move {
       GUEST.read().await.unwrap();
       });
-
      */
 
 }
@@ -132,8 +139,7 @@ pub struct Guest {
    details: Details,
    mechtrons: DashMap<Point,Details>,
    factories: MechtronFactories,
-   tx: tokio::sync::broadcast::Sender<UltraWave>,
-   rx: tokio::sync::broadcast::Receiver<UltraWave>,
+   rx: mpsc::Receiver<UltraWave>,
    logger: PointLogger,
    handler: DirectedHandlerShell<GuestHandler>,
    exchanger: Exchanger,
@@ -141,7 +147,7 @@ pub struct Guest {
 }
 
 impl Guest {
-    pub async fn new(details: Details, factories: MechtronFactories) {
+    pub async fn new(rx: mpsc::Receiver<UltraWave>, details: Details, factories: MechtronFactories) {
         let root_logger = RootLogger::new( LogSource::Core, Arc::new(NoAppender::new()) );
         let logger = root_logger.point(details.stub.point.clone());
         let handler = GuestHandler { };
@@ -163,8 +169,7 @@ impl Guest {
             details,
             mechtrons: DashMap::new(),
             factories,
-            tx: TX.tx.clone(),
-            rx: TX.tx.subscribe(),
+            rx,
             handler,
             exchanger,
             logger,
@@ -185,7 +190,9 @@ impl Guest {
     }
 
     pub async fn start(mut self) {
-        loop {}
+        loop {
+           // self.rx.recv();
+        }
 //            self.rx.recv().await;
 /*        while let Ok(wave) = self.rx.recv().await {
             if wave.is_directed() {
