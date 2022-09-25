@@ -29,6 +29,7 @@ use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::{Agent, DirectedWave, ReflectedAggregate, ReflectedWave, UltraWave};
 use cosmic_universe::{loc, VERSION};
 use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::sync::mpsc::Sender;
 use std::sync::{mpsc, MutexGuard};
 
@@ -36,41 +37,60 @@ use cosmic_universe::wave::Bounce;
 
 use cosmic_universe::wave::exchange::synch::{DirectedHandler, DirectedHandlerProxy, DirectedHandlerShell, ExchangeRouter, InCtx, ProtoTransmitter, ProtoTransmitterBuilder};
 use std::sync::RwLock;
+use cosmic_universe::artifact::ArtifactApi;
 
+use crate::err::{GuestErr, MechErr};
+use crate::membrane::{mechtron_frame_to_host,  mechtron_timestamp, mechtron_uuid};
 
-use crate::err::MechErr;
-use crate::membrane::{mechtron_frame_to_host, mechtron_register, mechtron_timestamp, mechtron_uuid};
-
-lazy_static! {
-    static ref GUEST: RwLock<Option<synch::Guest>> = RwLock::new(None);
+#[no_mangle]
+extern "C" {
+    pub fn mechtron_guest(details: Details) -> Result<Arc<dyn Guest>,GuestErr>;
 }
 
-pub struct MechtronFactories {
-    factories: HashMap<String, Box<dyn MechtronFactory>>,
+pub trait Guest: Send+Sync {
+     fn handler(&self) -> DirectedHandlerShell<DirectedHandlerProxy>;
 }
 
-impl MechtronFactories {
+pub trait Platform: Send+Sync where Self::Err : MechErr {
+    type Err;
+    fn factories(&self) -> Result<MechtronFactories<Self>, Self::Err> where Self:Sized{
+        Ok(MechtronFactories::new())
+    }
+}
+
+
+pub struct MechtronFactories<P> where P: Platform {
+    factories: HashMap<String, Box<dyn MechtronFactory<P>>>,
+    phantom: PhantomData<P>
+}
+
+impl <P> MechtronFactories<P> where P: Platform {
     pub fn new() -> Self {
         Self {
             factories: HashMap::new(),
+            phantom: Default::default()
         }
     }
     pub fn add<F>(&mut self, factory: F)
     where
-        F: MechtronFactory,
+        F: MechtronFactory<P>,
     {
         SkewerCase::from_str(factory.name().as_str() ).expect("Mechtron Name must be valid kebab (skewer) case (all lower case alphanumeric and dashes with leading letter)");
         self.factories.insert(factory.name(), Box::new(factory));
     }
 }
 
-pub trait Guest: Send+Sync where Self::Err : MechErr {
-    type Err;
+
+
+pub struct DefaultPlatform;
+
+impl Platform for DefaultPlatform {
+    type Err = GuestErr;
 }
 
-pub trait MechtronFactory: Sync + Send + 'static {
+pub trait MechtronFactory<P>: Sync + Send + 'static where P: Platform {
     fn name(&self) -> String;
-    fn create(&self, details: Details) -> Result<Box<dyn MechtronLifecycle>, UniErr>;
+    fn create(&self, details: Details) -> Result<Box<dyn MechtronLifecycle<P>>, UniErr>;
 }
 
 #[cfg(test)]
@@ -93,20 +113,25 @@ pub struct MechtronSkel {
 /// which can be used outside of a Directed/Reflected Wave Handler interaction
 #[derive(Clone)]
 pub struct MechtronCtx {
+    pub artifacts: ArtifactApi,
     pub transmitter: ProtoTransmitter,
 }
 
 /// MechtronSphere is the interface used by Guest
 /// to make important calls to the Mechtron
-pub trait MechtronLifecycle: DirectedHandler + Sync + Send {
-    fn create(&self);
+pub trait MechtronLifecycle<G>: DirectedHandler + Sync + Send where G: Platform {
+
+    fn create(&self, _ctx: MechtronCtx ) -> Result<(),G::Err> {
+        Ok(())
+    }
+
 }
 
 /// Create a Mechtron by implementing this trait.
 /// Mechtrons are created per request and disposed of afterwards...
 /// Implementers of this trait should only hold references to
 /// Mechtron::Skel, Mechtron::Ctx & Mechtron::State at most.
-pub trait Mechtron: MechtronLifecycle + Sync + Send + 'static {
+pub trait Mechtron<G>: MechtronLifecycle<G> + Sync + Send + 'static where G: Platform {
     /// it is recommended to implement MechtronSkel or some derivative
     /// of MechtronSkel. Skel holds info about the Mechtron (like it's Point,
     /// exact Kind & Properties)  The Skel may also provide access to other
@@ -120,6 +145,10 @@ pub trait Mechtron: MechtronLifecycle + Sync + Send + 'static {
     /// implement ```type Ctx=()```
     type Ctx;
 
+    /// Is any static data (templates, config files) that does not change
+    /// and may need to be reused
+    type Cache;
+
     /// State is the aspect of the Mechtron that is changeable.  It is recommended
     /// to wrap State in a tokio Mutex or RwLock if used.  If you are implementing
     /// a statelens mechtron then implement ```type State=();```
@@ -127,5 +156,11 @@ pub trait Mechtron: MechtronLifecycle + Sync + Send + 'static {
 
     /// This method is called by a companion MechtronFactory implementation
     /// to bring this Mechtron back to life to handle an Init or a Directed Wave
-    fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self;
+    fn restore(skel: Self::Skel, ctx: Self::Ctx, cache: Self::Cache, state: Self::State) -> Self;
+
+    /// create the Cache for this Mechtron (templates, configs & static content)
+    /// the cache should hold any static content that is expected to be unchanging
+    fn cache(ctx: Self::Ctx) -> Self::Cache;
 }
+
+

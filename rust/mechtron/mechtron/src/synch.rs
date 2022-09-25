@@ -10,45 +10,21 @@ use std::sync::Arc;
 use cosmic_universe::wave::{Agent, DirectedWave, ReflectedAggregate, ToRecipients, UltraWave};
 use cosmic_universe::wave::core::CoreBounce;
 use cosmic_universe::wave::exchange::SetStrategy;
-use crate::MechtronFactories;
+use crate::{MechtronFactories, Platform};
 use crate::err::GuestErr;
 use crate::err::MechErr;
 
-pub struct MechtronRouter<G> where G: crate::Guest {
-    phantom: PhantomData<G>
-}
-
-impl <G> MechtronRouter<G> where G: crate::Guest {
-    pub fn new() -> Self { Self {
-        phantom: PhantomData::default()
-    } }
-}
-
-
-impl <G> ExchangeRouter for MechtronRouter<G> where G: crate::Guest {
-    fn route(&self, wave: UltraWave) {
-        crate::membrane::mechtron_exchange_wave_host::<G>(wave);
-    }
-
-    fn exchange(&self, direct: DirectedWave) -> Result<ReflectedAggregate, UniErr> {
-        crate::membrane::mechtron_exchange_wave_host::<G>(direct.to_ultra()).map_err(|e|e.to_uni_err())
-    }
-}
-
-pub struct Guest {
+pub struct Guest<P> where P:Platform + 'static {
     details: Details,
     mechtrons: HashMap<Point, Details>,
-    factories: MechtronFactories,
+    factories: MechtronFactories<P>,
     logger: PointLogger,
+    platform: P
 }
 
-impl crate::Guest for Guest {
-    type Err = GuestErr;
-}
-
-impl Guest {
-    pub fn new(details: Details, factories: MechtronFactories) -> Self {
-        let router:MechtronRouter<Guest> = MechtronRouter::new();
+impl <P> Guest<P> where P: Platform + 'static {
+    pub fn new(details: Details, platform : P) -> Result<Self,GuestErr> where P: Sized, GuestErr: From<<P as Platform>::Err>{
+        let router:MechtronRouter<P> = MechtronRouter::new();
         let router = Arc::new(router);
         let mut transmitter = ProtoTransmitterBuilder::new(router);
         transmitter.agent = SetStrategy::Override(Agent::Point(details.stub.point.clone()));
@@ -59,17 +35,23 @@ impl Guest {
         let logger = root_logger.point(details.stub.point.clone());
         logger.info("Guest created");
 
-        Self {
+        let factories = platform.factories()?;
+
+        Ok(Self {
             details,
             mechtrons: HashMap::new(),
             factories,
             logger,
-        }
+            platform
+        })
     }
 
-    pub fn handler(&self) -> DirectedHandlerShell<DirectedHandlerProxy> {
+}
+
+impl <G> crate::Guest for Guest<G> where G: Platform {
+     fn handler(&self) -> DirectedHandlerShell<DirectedHandlerProxy> {
         let surface = self.details.stub.point.to_surface().with_layer(Layer::Core);
-        let router: MechtronRouter<Self> = MechtronRouter::new();
+        let router: MechtronRouter<G> = MechtronRouter::new();
         let router = Arc::new(router);
         let mut transmitter = ProtoTransmitterBuilder::new(router);
         transmitter.from = SetStrategy::Override(surface.clone());
@@ -77,6 +59,30 @@ impl Guest {
         DirectedHandlerShell::new( DirectedHandlerProxy::new( GuestHandler::new() ), transmitter, self.details.stub.point.to_surface(), self.logger.logger.clone() )
     }
 }
+
+
+pub struct MechtronRouter<G> where G: crate::Platform {
+    phantom: PhantomData<G>
+}
+
+impl <G> MechtronRouter<G> where G: crate::Platform {
+    pub fn new() -> Self { Self {
+        phantom: PhantomData::default()
+    } }
+}
+
+
+impl <G> ExchangeRouter for MechtronRouter<G> where G: crate::Platform {
+    fn route(&self, wave: UltraWave) {
+        crate::membrane::mechtron_exchange_wave_host::<G>(wave);
+    }
+
+    fn exchange(&self, direct: DirectedWave) -> Result<ReflectedAggregate, UniErr> {
+        crate::membrane::mechtron_exchange_wave_host::<G>(direct.to_ultra()).map_err(|e|e.to_uni_err())
+    }
+}
+
+
 
 pub struct GuestHandler;
 

@@ -6,38 +6,49 @@ use cosmic_universe::particle::Details;
 use cosmic_universe::VERSION;
 use cosmic_universe::wave::{Bounce, ReflectedAggregate, UltraWave};
 use cosmic_universe::wave::exchange::synch::{DirectedHandlerProxy, DirectedHandlerShell};
-use crate::{Guest, GUEST, MechtronFactories, synch};
+use crate::{Platform, MechtronFactories, synch, DefaultPlatform, mechtron_guest, GuestErr};
 use crate::err::MembraneErr;
+use crate::Guest;
+use std::sync::RwLock;
+
+lazy_static! {
+    static ref GUEST : RwLock<Option<Arc<dyn Guest>>> = RwLock::new(None);
+}
 
 #[no_mangle]
 extern "C" {
     pub fn mechtron_frame_to_host(frame: i32) -> i32;
     pub fn mechtron_uuid() -> i32;
     pub fn mechtron_timestamp() -> i64;
-    pub fn mechtron_register(factories: &mut MechtronFactories) -> Result<(), UniErr>;
 }
 
 
 #[no_mangle]
 pub fn mechtron_guest_init(version: i32, frame: i32) -> i32 {
-    let mut factories = MechtronFactories::new();
-    unsafe {
-        if let Err(_) = mechtron_register(&mut factories) {
-            return -1;
-        }
-    }
+
     let version = mechtron_consume_string(version).unwrap();
     if version != VERSION.to_string() {
-        return -2;
+        return -1;
     }
     let frame = mechtron_consume_buffer(frame).unwrap();
     let details: Details = bincode::deserialize(frame.as_slice()).unwrap();
 
     {
-        let mut write = GUEST.write().unwrap();
-        let guest = synch::Guest::new(details, factories);
-        write.replace(guest);
+        let read = GUEST.read().unwrap();
+        if read.is_some() {
+            return -3;
+        }
     }
+
+    match unsafe {mechtron_guest(details)} {
+        Ok(guest) => {
+            let mut write = GUEST.write().unwrap();
+            write.replace(guest);
+        }
+        Err(_) => {
+            return -2;
+        }
+    };
 
     0
 }
@@ -51,7 +62,7 @@ pub fn mechtron_frame_to_guest(frame: i32) -> i32 {
         let wave = wave.to_directed().unwrap();
         let handler: DirectedHandlerShell<DirectedHandlerProxy> = {
             let read = GUEST.read().unwrap();
-            let guest : &synch::Guest = read.as_ref().unwrap();
+            let guest = read.as_ref().unwrap();
             guest.handler()
         };
 
@@ -74,7 +85,7 @@ pub fn mechtron_write_wave_to_host(wave: UltraWave) -> Result<i32, UniErr> {
     Ok(mechtron_write_buffer(data))
 }
 
-pub fn mechtron_exchange_wave_host<G>(wave: UltraWave) -> Result<ReflectedAggregate, G::Err> where G:Guest {
+pub fn mechtron_exchange_wave_host<G>(wave: UltraWave) -> Result<ReflectedAggregate, G::Err> where G: Platform {
     let data = bincode::serialize(&wave)?;
     let buffer_id = mechtron_write_buffer(data);
     let reflect_id = unsafe { mechtron_frame_to_host(buffer_id) };

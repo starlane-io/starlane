@@ -4,8 +4,11 @@
 extern crate lazy_static;
 //mod html;
 
+use std::sync::Arc;
 use cosmic_universe::err::UniErr;
-use mechtron::{MechtronFactories, MechtronFactory};
+use cosmic_universe::particle::Details;
+use mechtron::{DefaultPlatform, Guest, MechtronFactories, MechtronFactory, Platform, synch};
+use mechtron::err::{GuestErr, MechErr};
 use mechtron::Mechtron;
 
 //use mechtron::error::Error;
@@ -21,8 +24,20 @@ use crate::html::greeting;
 
 
 #[no_mangle]
-pub extern "C" fn mechtron_register(factories: & mut MechtronFactories ) -> Result<(),UniErr> {
-  Ok(())
+pub extern "C" fn mechtron_guest( details: Details ) -> Result<Arc<dyn mechtron::Guest>,GuestErr> {
+   Ok(Arc::new(mechtron::synch::Guest::new(details,MyAppPlatform::new() )?))
+}
+
+pub struct MyAppPlatform;
+
+impl Platform for MyAppPlatform {
+  type Err = GuestErr;
+}
+
+impl MyAppPlatform {
+  pub fn new() -> Self {
+    Self {}
+  }
 }
 
 
