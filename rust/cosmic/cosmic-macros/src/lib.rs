@@ -292,18 +292,31 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
         Some(_) => quote! {.await},
     };
 
+    let root_ctx = match input.sig.asyncness{
+        None=> quote!{cosmic_universe::wave::exchange::synch::RootInCtx},
+        Some(_)=> quote!{cosmic_universe::wave::exchange::asynch::RootInCtx},
+    };
+
+    let in_ctx = match input.sig.asyncness{
+        None=> quote!{cosmic_universe::wave::exchange::synch::InCtx},
+        Some(_)=> quote!{cosmic_universe::wave::exchange::asynch::InCtx},
+    };
+
+
+
     let __async = match input.sig.asyncness {
         None => quote! {},
         Some(_) => quote! {async},
     };
+
     let orig = input.sig.ident.clone();
     let ident = format_ident!("__{}__route", input.sig.ident);
     let rtn_type = rtn_type(&input.sig.output);
     let item = ctx.item;
 
     let expanded = quote! {
-      #__async fn #ident( &self, mut ctx: cosmic_universe::wave::exchange::asynch::RootInCtx ) -> cosmic_universe::wave::core::CoreBounce {
-          let ctx: InCtx<'_,#item> = match ctx.push::<#item>() {
+      #__async fn #ident( &self, mut ctx: #root_ctx ) -> cosmic_universe::wave::core::CoreBounce {
+          let ctx: #in_ctx<'_,#item> = match ctx.push::<#item>() {
               Ok(ctx) => ctx,
               Err(err) => {
                   return cosmic_universe::wave::core::CoreBounce::Reflected(cosmic_universe::wave::core::ReflectedCore::server_error());

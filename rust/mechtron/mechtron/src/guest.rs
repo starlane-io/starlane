@@ -95,14 +95,6 @@ impl GuestHandler {
 
 #[handler_sync]
 impl GuestHandler {
-
-}
-
-
-
-/*
-#[handler]
-impl GuestHandler {
     #[route("Hyp<Assign>")]
     pub fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), UniErr> {
         if let HyperSubstance::Assign(assign) = ctx.input {
@@ -113,4 +105,5 @@ impl GuestHandler {
     }
 }
 
- */
+
+
