@@ -192,7 +192,8 @@ mod tests {
         let point = Point::from_str("guest").unwrap();
         let data = Arc::new(fs::read("../../wasm/my-app/my_app.wasm").unwrap());
         let host = factory.create(details, data).unwrap();
-        let details = Details::default();
+        let mut details = Details::default();
+        details.stub.point = Point::from_str("host:guest").unwrap();
         host.init(details).unwrap();
 
         let mut wave = DirectedProto::ping();

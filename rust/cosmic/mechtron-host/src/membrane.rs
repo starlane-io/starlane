@@ -7,6 +7,7 @@ use wasmer::{
     NamedResolver, RuntimeError, WasmPtr, WasmerEnv,
 };
 use cosmic_universe::err::UniErr;
+use cosmic_universe::loc::Point;
 use cosmic_universe::log::PointLogger;
 use cosmic_universe::substance::Substance;
 use cosmic_universe::wave::UltraWave;
@@ -469,7 +470,12 @@ impl <P> WasmMembrane <P> where P: HostPlatform+'static{
                         let wave = wave.to_directed().unwrap();
                         if let Method::Cmd(CmdMethod::Log) = wave.core().method {
                             if let Substance::Log(log) = wave.core().body.clone() {
-                                membrane.logger.handle(log)
+                                if wave.to().is_single() {
+                                    let to = wave.to().to_single().unwrap();
+                                    if to.point == Point::global_logger() {
+                                     membrane.logger.handle(log)
+                                    }
+                                }
                             }
                         }
                     }
