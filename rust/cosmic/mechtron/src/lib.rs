@@ -37,10 +37,7 @@ use cosmic_universe::wave::Bounce;
 use cosmic_universe::wave::exchange::synch::{DirectedHandler, DirectedHandlerProxy, DirectedHandlerShell, ExchangeRouter, InCtx, ProtoTransmitter, ProtoTransmitterBuilder};
 use std::sync::RwLock;
 
-use wasm_membrane_guest::membrane::{
-    log, membrane_consume_buffer, membrane_consume_string, membrane_guest_alloc_buffer,
-    membrane_guest_version, membrane_read_buffer, membrane_read_string, membrane_write_buffer,
-};
+
 use crate::err::MechErr;
 use crate::membrane::{mechtron_frame_to_host, mechtron_register, mechtron_timestamp, mechtron_uuid};
 

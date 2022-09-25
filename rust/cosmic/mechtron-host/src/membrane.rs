@@ -142,26 +142,28 @@ impl <P> WasmMembrane<P> where P: HostPlatform {
         match self
             .instance
             .exports
-            .get_native_function::<(), ()>(self.init.as_str())
+            .get_native_function::<(i32,i32), i32>("mechtron_guest_init")
         {
             Ok(func) => {
-                self.log_wasm("host", "verified: membrane_guest_init()");
+                self.log_wasm("host", "verified: mechtron_guest_init()");
 
-                match func.call() {
+/*                match func.call() {
                     Ok(_) => {
-                        self.log_wasm("host", "passed: membrane_guest_init()");
+                        self.log_wasm("host", "passed: mechtron_guest_init()");
                     }
                     Err(error) => {
                         self.log_wasm(
                             "host",
-                            format!("failed: membrane_guest_init() ERROR: {:?}", error).as_str(),
+                            format!("failed: mechtron_guest_init() ERROR: {:?}", error).as_str(),
                         );
                         pass = false;
                     }
                 }
+
+ */
             }
             Err(_) => {
-                self.log_wasm("host", "failed: membrane_guest_init() [NOT REQUIRED]");
+                self.log_wasm("host", "failed: mechtron_guest_init() [NOT REQUIRED]");
             }
         }
 
@@ -382,7 +384,7 @@ impl <P> Env<P> where P: HostPlatform{
 
 impl <P> WasmMembrane <P> where P: HostPlatform+'static{
     pub fn new(module: Arc<Module>, name: String, platform:P ) -> Result<Arc<Self>, P::Err> {
-        Self::new_with_init(module, name, "membrane_guest_init".to_string(),platform)
+        Self::new_with_init(module, name, "mechtron_guest_init".to_string(),platform)
     }
 
     pub fn new_with_init(

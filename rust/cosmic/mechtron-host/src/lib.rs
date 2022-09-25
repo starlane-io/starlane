@@ -106,7 +106,7 @@ where
         if ok == 0 {
             Ok(())
         } else {
-            Err("Mehctron init error".into())
+            Err(format!("Mehctron init error {} ",ok).into())
         }
     }
 

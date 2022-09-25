@@ -1,5 +1,5 @@
 use cosmic_universe::err::UniErr;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Formatter, Write};
 use std::str::Utf8Error;
 use std::string::FromUtf8Error;
 use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
@@ -9,6 +9,7 @@ pub trait HostErr:
     + ToString
     + From<CompileError>
     + From<RuntimeError>
+    + From<String>
     + From<&'static str>
     + From<Box<bincode::ErrorKind>>
     + From<ExportError>
@@ -93,6 +94,14 @@ impl From<&str> for DefaultHostErr {
     }
 }
 
+impl From<String> for DefaultHostErr {
+    fn from(e: String) -> Self {
+        DefaultHostErr {
+            message: e
+        }
+    }
+}
+
 impl From<ExportError> for DefaultHostErr {
     fn from(e: ExportError) -> Self {
         DefaultHostErr {
@@ -100,3 +109,6 @@ impl From<ExportError> for DefaultHostErr {
         }
     }
 }
+
+
+
