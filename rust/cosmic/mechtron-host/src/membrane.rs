@@ -465,11 +465,9 @@ impl <P> WasmMembrane <P> where P: HostPlatform+'static{
                     let membrane = env.unwrap().unwrap();
                     let wave = membrane.consume_buffer(buffer_id).unwrap();
                     let wave :UltraWave = bincode::deserialize(wave.as_slice()).unwrap();
-println!("MECHTRON FRAME TO HOST: {}", wave.method().unwrap().to_string() );
                     if wave.is_directed() {
                         let wave = wave.to_directed().unwrap();
                         if let Method::Cmd(CmdMethod::Log) = wave.core().method {
-                            println!("logging!");
                             if let Substance::Log(log) = wave.core().body.clone() {
                                 membrane.logger.handle(log)
                             }

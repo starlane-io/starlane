@@ -185,7 +185,8 @@ mod tests {
     #[test]
     fn wasm() {
 
-        let details = Default::default();
+        let mut details:Details = Default::default();
+        details.stub.point = Point::from_str("host").unwrap();
 
         let factory = MechtronHostFactory::new(TestPlatform::new());
         let point = Point::from_str("guest").unwrap();

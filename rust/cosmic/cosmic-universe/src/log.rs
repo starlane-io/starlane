@@ -472,7 +472,15 @@ impl LogAppender for StdOutAppender {
         println!("audit log...")
     }
 
-    fn span_event(&self, log: LogSpanEvent) {}
+    fn span_event(&self, log: LogSpanEvent) {
+/*         println!(
+            "{} | Span({})",
+            log.point.to_string(),
+            log.span.to_string(),
+        )
+
+ */
+    }
 
     fn pointless(&self, log: PointlessLog) {
         println!("{}", log.message);
@@ -686,6 +694,7 @@ impl PointLogger {
                self.logger.log(log);
            }
            LogSubstance::Span(span) => {
+               println!("start log span...");
                // not sure how to handle this
            }
            LogSubstance::Event(event) => {
