@@ -3224,6 +3224,7 @@ pub enum BounceProto {
     Reflected(ReflectedProto),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ReflectedAggregate {
     None,
     Single(ReflectedWave),

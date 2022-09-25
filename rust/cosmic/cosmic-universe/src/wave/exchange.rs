@@ -1,4 +1,5 @@
 pub mod asynch;
+pub mod synch;
 
 use alloc::borrow::Cow;
 use std::marker::PhantomData;
@@ -6,12 +7,14 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
-use asynch::{DirectedHandler, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router};
+use asynch::{
+    DirectedHandler, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router,
+};
 use dashmap::DashMap;
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 use crate::config::bind::RouteSelector;
-use crate::loc::{Topic, ToPoint, ToSurface};
+use crate::loc::{ToPoint, ToSurface, Topic};
 use crate::log::{PointLogger, RootLogger, SpanLogger};
 use crate::settings::Timeouts;
 use crate::wave::core::cmd::CmdMethod;
@@ -20,15 +23,13 @@ use crate::wave::core::CoreBounce;
 use crate::wave::exchange::asynch::AsyncRouter;
 use crate::wave::{
     Bounce, BounceBacks, BounceProto, DirectedProto, DirectedWave, Echo, FromReflectedAggregate,
-    Handling, Pong, Recipients, RecipientSelector, ReflectedAggregate, ReflectedProto,
+    Handling, Pong, RecipientSelector, Recipients, ReflectedAggregate, ReflectedProto,
     ReflectedWave, Scope, Session, ToRecipients, UltraWave, Wave, WaveId,
 };
-use crate::{Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, UniErr, wave};
+use crate::{wave, Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, UniErr};
 
 #[derive(Clone)]
-pub struct DirectedHandlerShellDef<D,T>
-where
-    D: DirectedHandler,
+pub struct DirectedHandlerShellDef<D, T>
 {
     logger: PointLogger,
     handler: D,
@@ -36,16 +37,9 @@ where
     builder: T,
 }
 
-impl<D,T> DirectedHandlerShellDef<D,T>
-where
-    D: DirectedHandler,
+impl<D, T> DirectedHandlerShellDef<D, T>
 {
-    pub fn new(
-        handler: D,
-        builder: T,
-        surface: Surface,
-        logger: RootLogger,
-    ) -> Self {
+    pub fn new(handler: D, builder: T, surface: Surface, logger: RootLogger) -> Self {
         let logger = logger.point(surface.point.clone());
         Self {
             handler,
@@ -54,8 +48,6 @@ where
             logger,
         }
     }
-
-
 }
 
 pub struct InternalPipeline<H> {
@@ -74,22 +66,17 @@ pub struct RootInCtxDef<T> {
     pub wave: DirectedWave,
     pub session: Option<Session>,
     pub logger: SpanLogger,
-    pub transmitter: T
+    pub transmitter: T,
 }
 
-impl <T> RootInCtxDef<T> {
-    pub fn new(
-        wave: DirectedWave,
-        to: Surface,
-        logger: SpanLogger,
-        transmitter: T,
-    ) -> Self {
+impl<T> RootInCtxDef<T> {
+    pub fn new(wave: DirectedWave, to: Surface, logger: SpanLogger, transmitter: T) -> Self {
         Self {
             wave,
             to,
             logger,
             session: None,
-            transmitter
+            transmitter,
         }
     }
 
@@ -194,14 +181,20 @@ impl <T> RootInCtxDef<T> {
     }
 }
 
-pub struct InCtxDef<'a, I, T> where T: Clone {
-    root: &'a RootInCtx,
+pub struct InCtxDef<'a, I, T>
+where
+    T: Clone,
+{
+    root: &'a RootInCtxDef<T>,
     pub transmitter: Cow<'a, T>,
     pub input: &'a I,
     pub logger: SpanLogger,
 }
 
-impl<'a, I,T> Deref for InCtxDef<'a, I, T> where T: Clone{
+impl<'a, I, T> Deref for InCtxDef<'a, I, T>
+where
+    T: Clone,
+{
     type Target = I;
 
     fn deref(&self) -> &Self::Target {
@@ -209,13 +202,11 @@ impl<'a, I,T> Deref for InCtxDef<'a, I, T> where T: Clone{
     }
 }
 
-impl<'a, I, T> InCtxDef<'a, I, T> where T:Clone{
-    pub fn new(
-        root: &'a RootInCtx,
-        input: &'a I,
-        tx: Cow<'a, T>,
-        logger: SpanLogger,
-    ) -> Self {
+impl<'a, I, T> InCtxDef<'a, I, T>
+where
+    T: Clone,
+{
+    pub fn new(root: &'a RootInCtxDef<T>, input: &'a I, tx: Cow<'a, T>, logger: SpanLogger) -> Self {
         Self {
             root,
             input,
@@ -240,7 +231,6 @@ impl<'a, I, T> InCtxDef<'a, I, T> where T:Clone{
             transmitter: self.transmitter.clone(),
         }
     }
-
 
     pub fn push_input_ref<I2>(self, input: &'a I2) -> InCtxDef<'a, I2, T> {
         InCtxDef {
@@ -295,7 +285,7 @@ impl BroadTxRouter {
 }
 
 #[derive(Clone)]
-pub struct ProtoTransmitterBuilderDef<R,E> {
+pub struct ProtoTransmitterBuilderDef<R, E> {
     pub agent: SetStrategy<Agent>,
     pub scope: SetStrategy<Scope>,
     pub handling: SetStrategy<Handling>,
@@ -305,8 +295,8 @@ pub struct ProtoTransmitterBuilderDef<R,E> {
     pub exchanger: E,
 }
 
-impl <R,E> ProtoTransmitterBuilderDef<R,E> {
-    pub fn build(self) -> ProtoTransmitterDef<R,E> {
+impl<R, E> ProtoTransmitterBuilderDef<R, E> {
+    pub fn build(self) -> ProtoTransmitterDef<R, E> {
         ProtoTransmitterDef {
             agent: self.agent,
             scope: self.scope,
@@ -320,7 +310,7 @@ impl <R,E> ProtoTransmitterBuilderDef<R,E> {
 }
 
 #[derive(Clone)]
-pub struct ProtoTransmitterDef<R,E> {
+pub struct ProtoTransmitterDef<R, E> {
     agent: SetStrategy<Agent>,
     scope: SetStrategy<Scope>,
     handling: SetStrategy<Handling>,
@@ -330,7 +320,7 @@ pub struct ProtoTransmitterDef<R,E> {
     exchanger: E,
 }
 
-impl<R,E> ProtoTransmitterDef<R,E> {
+impl<R, E> ProtoTransmitterDef<R, E> {
     pub fn from_topic(&mut self, topic: Topic) -> Result<(), UniErr> {
         self.from = match self.from.clone() {
             SetStrategy::None => {
