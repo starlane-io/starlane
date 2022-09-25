@@ -194,24 +194,6 @@ impl <T> RootInCtxDef<T> {
     }
 }
 
-impl RootInCtx {
-    pub fn push<'a, I>(&self) -> Result<InCtx<I>, UniErr>
-    where
-        Substance: ToSubstance<I>,
-    {
-        let input = match self.wave.to_substance_ref() {
-            Ok(input) => input,
-            Err(err) => return Err(err.into()),
-        };
-        Ok(InCtx {
-            root: self,
-            input,
-            logger: self.logger.clone(),
-            transmitter: Cow::Borrowed(&self.transmitter),
-        })
-    }
-}
-
 pub struct InCtxDef<'a, I, T> where T: Clone {
     root: &'a RootInCtx,
     pub transmitter: Cow<'a, T>,

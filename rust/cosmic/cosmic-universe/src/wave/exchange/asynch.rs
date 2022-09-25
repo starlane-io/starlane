@@ -2,7 +2,8 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use dashmap::DashMap;
 use std::time::Duration;
-use crate::{Agent, Point, ReflectedCore, Substance, Surface, UniErr};
+use alloc::borrow::Cow;
+use crate::{Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, UniErr};
 use crate::loc::{ToPoint, ToSurface};
 use crate::settings::Timeouts;
 use crate::wave::exchange::{BroadTxRouter, DirectedHandlerShellDef, InCtxDef, ProtoTransmitterBuilderDef, ProtoTransmitterDef, RootInCtxDef, SetStrategy};
@@ -387,5 +388,23 @@ impl <D> DirectedHandlerShell<D> where D: DirectedHandler{
                 transmitter.route(wave).await;
             }
         }
+    }
+}
+
+impl RootInCtx {
+    pub fn push<'a, I>(&self) -> Result<InCtx<I>, UniErr>
+    where
+        Substance: ToSubstance<I>,
+    {
+        let input = match self.wave.to_substance_ref() {
+            Ok(input) => input,
+            Err(err) => return Err(err.into()),
+        };
+        Ok(InCtx {
+            root: self,
+            input,
+            logger: self.logger.clone(),
+            transmitter: Cow::Borrowed(&self.transmitter),
+        })
     }
 }
