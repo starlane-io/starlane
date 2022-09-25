@@ -1,6 +1,7 @@
 pub mod asynch;
 
 use alloc::borrow::Cow;
+use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
@@ -22,6 +23,7 @@ use crate::wave::{
 use crate::{Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, UniErr, wave};
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::http2::StatusCode;
+use crate::wave::exchange::asynch::AsyncRouter;
 
 
 #[derive(Clone)]
@@ -536,12 +538,13 @@ pub struct ProtoTransmitterBuilder {
     pub handling: SetStrategy<Handling>,
     pub from: SetStrategy<Surface>,
     pub to: SetStrategy<Recipients>,
-    pub router: Arc<dyn Router>,
+    pub router: AsyncRouter,
     pub exchanger: Exchanger,
 }
 
 impl ProtoTransmitterBuilder {
     pub fn new(router: Arc<dyn Router>, exchanger: Exchanger) -> ProtoTransmitterBuilder {
+        let router = AsyncRouter::new(router);
         Self {
             from: SetStrategy::None,
             to: SetStrategy::None,
@@ -566,19 +569,11 @@ impl ProtoTransmitterBuilder {
     }
 }
 
-#[derive(Clone)]
-pub struct ProtoTransmitter {
-    agent: SetStrategy<Agent>,
-    scope: SetStrategy<Scope>,
-    handling: SetStrategy<Handling>,
-    from: SetStrategy<Surface>,
-    to: SetStrategy<Recipients>,
-    router: Arc<dyn Router>,
-    exchanger: Exchanger,
-}
+pub type ProtoTransmitter = ProtoTransmitterDef<AsyncRouter>;
 
 impl ProtoTransmitter {
     pub fn new(router: Arc<dyn Router>, exchanger: Exchanger) -> ProtoTransmitter {
+        let router = AsyncRouter::new(router);
         Self {
             from: SetStrategy::None,
             to: SetStrategy::None,
@@ -590,20 +585,7 @@ impl ProtoTransmitter {
         }
     }
 
-    pub fn from_topic(&mut self, topic: Topic) -> Result<(), UniErr> {
-        self.from = match self.from.clone() {
-            SetStrategy::None => {
-                return Err(UniErr::from_500(
-                    "cannot set Topic without first setting Surface",
-                ));
-            }
-            SetStrategy::Fill(from) => SetStrategy::Fill(from.with_topic(topic)),
-            SetStrategy::Override(from) => SetStrategy::Override(from.with_topic(topic)),
-        };
-        Ok(())
-    }
-
-    pub async fn direct<D, W>(&self, wave: D) -> Result<W, UniErr>
+        pub async fn direct<D, W>(&self, wave: D) -> Result<W, UniErr>
     where
         W: FromReflectedAggregate,
         D: Into<DirectedProto>,
@@ -724,6 +706,49 @@ impl ProtoTransmitter {
 
         Ok(())
     }
+}
+
+#[derive(Clone)]
+pub struct ProtoTransmitterDef<R> {
+    agent: SetStrategy<Agent>,
+    scope: SetStrategy<Scope>,
+    handling: SetStrategy<Handling>,
+    from: SetStrategy<Surface>,
+    to: SetStrategy<Recipients>,
+    router: R,
+    exchanger: Exchanger,
+}
+
+impl <R> ProtoTransmitterDef<R> {
+    /*
+    pub fn new(router: R, exchanger: Exchanger) -> ProtoTransmitter {
+        let router = AsyncRouter::new(Arc::new(router));
+        Self {
+            from: SetStrategy::None,
+            to: SetStrategy::None,
+            agent: SetStrategy::Fill(Agent::Anonymous),
+            scope: SetStrategy::Fill(Scope::None),
+            handling: SetStrategy::Fill(Handling::default()),
+            router,
+            exchanger,
+        }
+    }
+     */
+
+    pub fn from_topic(&mut self, topic: Topic) -> Result<(), UniErr> {
+        self.from = match self.from.clone() {
+            SetStrategy::None => {
+                return Err(UniErr::from_500(
+                    "cannot set Topic without first setting Surface",
+                ));
+            }
+            SetStrategy::Fill(from) => SetStrategy::Fill(from.with_topic(topic)),
+            SetStrategy::Override(from) => SetStrategy::Override(from.with_topic(topic)),
+        };
+        Ok(())
+    }
+
+
 }
 
 #[derive(Clone)]

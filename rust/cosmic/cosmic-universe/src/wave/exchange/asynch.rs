@@ -21,6 +21,7 @@ pub trait Router: Send + Sync {
     async fn route(&self, wave: UltraWave);
 }
 
+#[derive(Clone)]
 pub struct AsyncRouter {
     pub router: Arc<dyn Router>
 }
