@@ -301,20 +301,20 @@ where
                     .registry
                     .register(&registration)
                     .await
-                    .map_err(|e| e.to_cosmic_err())?;
+                    .map_err(|e| e.to_uni_err())?;
 
                 let record = self
                     .skel
                     .registry
                     .record(&Point::root())
                     .await
-                    .map_err(|e| e.to_cosmic_err())?;
+                    .map_err(|e| e.to_uni_err())?;
                 let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
-                self.create(&assign).await.map_err(|e| e.to_cosmic_err())?;
+                self.create(&assign).await.map_err(|e| e.to_uni_err())?;
                 let location = ParticleLocation::new(self.skel.point.clone(),None );
                 self.skel
                     .registry
-                    .assign(&Point::root(), location ).await.map_err(|e|e.to_cosmic_err())?;
+                    .assign(&Point::root(), location ).await.map_err(|e|e.to_uni_err())?;
 
                 let registration = Registration {
                     point: Point::global_executor(),
@@ -329,20 +329,20 @@ where
                     .registry
                     .register(&registration)
                     .await
-                    .map_err(|e| e.to_cosmic_err())?;
+                    .map_err(|e| e.to_uni_err())?;
 
                 let record = self
                     .skel
                     .registry
                     .record(&Point::global_executor())
                     .await
-                    .map_err(|e| e.to_cosmic_err())?;
+                    .map_err(|e| e.to_uni_err())?;
                 let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
-                self.create(&assign).await.map_err(|e| e.to_cosmic_err())?;
+                self.create(&assign).await.map_err(|e| e.to_uni_err())?;
                 let location = ParticleLocation::new( LOCAL_STAR.clone(), None );
                 self.skel
                     .registry
-                    .assign(&Point::global_executor(), location ).await.map_err(|e|e.to_cosmic_err())?;
+                    .assign(&Point::global_executor(), location ).await.map_err(|e|e.to_uni_err())?;
 
                 Ok(Status::Ready)
             }

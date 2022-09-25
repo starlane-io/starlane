@@ -37,7 +37,7 @@ pub struct DirectedHandlerShellDef<D, T>
     builder: T,
 }
 
-impl<D, T> DirectedHandlerShellDef<D, T>
+impl<D, T> DirectedHandlerShellDef<D, T> where D: Sized
 {
     pub fn new(handler: D, builder: T, surface: Surface, logger: RootLogger) -> Self {
         let logger = logger.point(surface.point.clone());

@@ -893,7 +893,7 @@ where
                         let result = self
                             .from_hyperway(wave)
                             .await
-                            .map_err(|e| e.to_cosmic_err());
+                            .map_err(|e| e.to_uni_err());
                         if let Some(tx) = rtn {
                             tx.send(result);
                         } else {

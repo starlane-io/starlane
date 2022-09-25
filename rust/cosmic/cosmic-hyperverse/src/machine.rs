@@ -703,7 +703,7 @@ impl <P> ClientArtifactFetcher<P> where P: Cosmos {
 #[async_trait]
 impl <P> ArtifactFetcher for ClientArtifactFetcher<P> where P: Cosmos {
     async fn stub(&self, point: &Point) -> Result<Stub, UniErr> {
-        let record = self.registry.record(point).await.map_err(|e|e.to_cosmic_err())?;
+        let record = self.registry.record(point).await.map_err(|e|e.to_uni_err())?;
         Ok(record.details.stub)
     }
 

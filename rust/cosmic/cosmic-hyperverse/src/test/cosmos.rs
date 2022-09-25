@@ -241,7 +241,7 @@ impl From<Box<bincode::ErrorKind>> for TestErr {
 }
 
 impl HyperErr for TestErr {
-    fn to_cosmic_err(&self) -> UniErr {
+    fn to_uni_err(&self) -> UniErr {
         UniErr::from_500(self.to_string())
     }
 

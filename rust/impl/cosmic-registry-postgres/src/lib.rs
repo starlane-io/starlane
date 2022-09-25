@@ -1501,7 +1501,7 @@ impl From<UniErr> for PostErr {
 }
 
 impl HyperErr for PostErr {
-    fn to_cosmic_err(&self) -> UniErr {
+    fn to_uni_err(&self) -> UniErr {
         UniErr::new(500u16, "Post Err")
     }
 

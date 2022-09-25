@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{Agent, ReflectedCore, Substance, Surface, ToSubstance, UniErr};
 use crate::loc::ToPoint;
 use crate::wave::exchange::{DirectedHandlerShellDef, InCtxDef, ProtoTransmitterBuilderDef, ProtoTransmitterDef, RootInCtxDef, SetStrategy};
-use crate::wave::{BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, FromReflectedAggregate, Handling, Ping, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto, ReflectedWave, Scope, UltraWave, Wave, WaveKind};
+use crate::wave::{Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, FromReflectedAggregate, Handling, Ping, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto, ReflectedWave, Scope, UltraWave, Wave, WaveKind};
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::CoreBounce;
 
@@ -25,7 +25,6 @@ impl SyncRouter {
     }
 }
 
-#[async_trait]
 impl ExchangeRouter for SyncRouter {
     fn route(&self, wave: UltraWave ) {
         self.router.route(wave)
@@ -186,12 +185,10 @@ impl <'a,I> InCtx<'a,I> {
 
 }
 
-#[async_trait]
 pub trait DirectedHandlerSelector {
     fn select<'a>(&self, select: &'a RecipientSelector<'a>) -> Result<&dyn DirectedHandler, ()>;
 }
 
-#[async_trait]
 pub trait DirectedHandler: Send + Sync {
     fn handle(&self, ctx: RootInCtx) -> CoreBounce;
 
@@ -200,10 +197,28 @@ pub trait DirectedHandler: Send + Sync {
     }
 }
 
+pub struct DirectedHandlerProxy {
+    proxy: Box<dyn DirectedHandler>
+}
+
+impl DirectedHandlerProxy {
+    pub fn new<D>( handler: D ) ->  Self where D: DirectedHandler+'static+Sized {
+        Self {
+            proxy: Box::new(handler)
+        }
+    }
+}
+
+impl DirectedHandler for DirectedHandlerProxy {
+    fn handle(&self, ctx: RootInCtx) -> CoreBounce {
+        self.proxy.handle(ctx)
+    }
+}
+
 pub type DirectedHandlerShell<D> = DirectedHandlerShellDef<D,ProtoTransmitterBuilder>;
 
-impl <D> DirectedHandlerShell<D> where D: DirectedHandler{
-    pub fn handle(&self, wave: DirectedWave) {
+impl <D> DirectedHandlerShell<D> where D: DirectedHandler+Sized {
+    pub fn handle(&self, wave: DirectedWave) -> Bounce<ReflectedWave>{
         let logger = self
             .logger
             .point(self.surface.clone().to_point())
@@ -212,12 +227,10 @@ impl <D> DirectedHandlerShell<D> where D: DirectedHandler{
         let reflection = wave.reflection();
         let ctx = RootInCtx::new(wave, self.surface.clone(), logger, transmitter.clone());
         match self.handler.handle(ctx) {
-            CoreBounce::Absorbed => {}
+            CoreBounce::Absorbed => Bounce::Absorbed,
             CoreBounce::Reflected(reflected) => {
                 let wave = reflection.unwrap().make(reflected, self.surface.clone());
-                let wave = wave.to_ultra();
-                let transmitter = self.builder.clone().build();
-                transmitter.route(wave);
+                Bounce::Reflected(wave)
             }
         }
     }

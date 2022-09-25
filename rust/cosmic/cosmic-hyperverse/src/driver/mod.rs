@@ -816,7 +816,7 @@ where
             .registry
             .record(&wave.to().single_or()?.point)
             .await
-            .map_err(|e| e.to_cosmic_err())?;
+            .map_err(|e| e.to_uni_err())?;
         let driver = self
             .find(&record.details.stub.kind)
             .ok_or::<UniErr>("do not handle this kind of driver".into())?;
@@ -1259,7 +1259,7 @@ println!("DriverRunnerCall::Route: {}",wave.to().to_string());
                                 rtn.send(item.init().await);
                             }
                             Err(err) => {
-                                rtn.send(Err(err.to_cosmic_err()));
+                                rtn.send(Err(err.to_uni_err()));
                             }
                         }
                     }

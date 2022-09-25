@@ -4,7 +4,8 @@ extern crate lazy_static;
 
 use cosmic_universe::err::UniErr;
 use wasm_membrane_guest::membrane::log;
-use mechtron::{Mechtron, MechtronFactories, MechtronFactory};
+use mechtron::{MechtronFactories, MechtronFactory};
+use mechtron::Mechtron;
 
 //use mechtron::error::Error;
 /*use mesh_portal::version::latest::entity::request::Action;

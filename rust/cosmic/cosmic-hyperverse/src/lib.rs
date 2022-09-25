@@ -151,7 +151,7 @@ pub trait HyperErr:
     + From<HostErr>
     + Into<UniErr>
 {
-    fn to_cosmic_err(&self) -> UniErr;
+    fn to_uni_err(&self) -> UniErr;
 
     fn new<S>(message: S) -> Self
     where

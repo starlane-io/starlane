@@ -62,13 +62,13 @@ where
             .registry
             .record(&self.port.point)
             .await
-            .map_err(|e| e.to_cosmic_err())?;
+            .map_err(|e| e.to_uni_err())?;
         let properties = self
             .skel
             .registry
             .get_properties(&directed.to.point)
             .await
-            .map_err(|e| e.to_cosmic_err())?;
+            .map_err(|e| e.to_uni_err())?;
 
         let bind_property = properties.get("bind");
         let bind = match bind_property {
@@ -77,7 +77,7 @@ where
                 driver
                     .bind(&directed.to.point)
                     .await
-                    .map_err(|e| e.to_cosmic_err())?
+                    .map_err(|e| e.to_uni_err())?
             }
             Some(bind) => {
                 let bind = Point::from_str(bind.value.as_str())?;
