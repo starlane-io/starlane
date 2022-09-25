@@ -27,11 +27,11 @@ impl <G> MechtronRouter<G> where G: crate::Guest {
 
 impl <G> ExchangeRouter for MechtronRouter<G> where G: crate::Guest {
     fn route(&self, wave: UltraWave) {
-        crate::mechtron_exchange_wave_host::<G>(wave);
+        crate::membrane::mechtron_exchange_wave_host::<G>(wave);
     }
 
     fn exchange(&self, direct: DirectedWave) -> Result<ReflectedAggregate, UniErr> {
-        crate::mechtron_exchange_wave_host::<G>(direct.to_ultra()).map_err(|e|e.to_uni_err())
+        crate::membrane::mechtron_exchange_wave_host::<G>(direct.to_ultra()).map_err(|e|e.to_uni_err())
     }
 }
 
