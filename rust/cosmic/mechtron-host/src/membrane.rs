@@ -8,6 +8,7 @@ use wasmer::{
 };
 use cosmic_universe::err::UniErr;
 use cosmic_universe::log::PointLogger;
+use cosmic_universe::substance::Substance;
 use cosmic_universe::wave::UltraWave;
 use cosmic_universe::wave::core::Method;
 use cosmic_universe::wave::core::cmd::CmdMethod;
@@ -464,9 +465,15 @@ impl <P> WasmMembrane <P> where P: HostPlatform+'static{
                     let membrane = env.unwrap().unwrap();
                     let wave = membrane.consume_buffer(buffer_id).unwrap();
                     let wave :UltraWave = bincode::deserialize(wave.as_slice()).unwrap();
-println!("MECHTRON FAME TO HOST: {}", wave.method().unwrap().to_string() );
-                    if let Some(&Method::Cmd(CmdMethod::Log)) = wave.method() {
-                        println!("logging!");
+println!("MECHTRON FRAME TO HOST: {}", wave.method().unwrap().to_string() );
+                    if wave.is_directed() {
+                        let wave = wave.to_directed().unwrap();
+                        if let Method::Cmd(CmdMethod::Log) = wave.core().method {
+                            println!("logging!");
+                            if let Substance::Log(log) = wave.core().body.clone() {
+                                membrane.logger.handle(log)
+                            }
+                        }
                     }
 
                     0

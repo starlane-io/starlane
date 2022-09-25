@@ -680,6 +680,26 @@ impl PointLogger {
         })
     }
 
+    pub fn handle(&self, log: LogSubstance) {
+       match log {
+           LogSubstance::Log(log) => {
+               self.logger.log(log);
+           }
+           LogSubstance::Span(span) => {
+               // not sure how to handle this
+           }
+           LogSubstance::Event(event) => {
+               self.logger.span_event(event);
+           }
+           LogSubstance::Audit(audit) => {
+               self.logger.audit(audit);
+           }
+           LogSubstance::Pointless(pointless) => {
+               self.logger.pointless(pointless);
+           }
+       }
+    }
+
     pub fn trace<M>(&self, message: M)
     where
         M: ToString,
