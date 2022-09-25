@@ -30,7 +30,7 @@ use cosmic_universe::util::log;
 use cosmic_universe::wave::core::cmd::CmdMethod;
 use cosmic_universe::wave::core::{CoreBounce, Method, ReflectedCore};
 use cosmic_universe::wave::exchange::{
-    DirectedHandler, Exchanger, InCtx,
+    Exchanger,
     SetStrategy,
 };
 use cosmic_universe::wave::{Agent, DirectedWave, ReflectedWave, UltraWave};
@@ -46,7 +46,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot, RwLock, watch};
-use cosmic_universe::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router};
+use cosmic_universe::wave::exchange::asynch::{DirectedHandler, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router};
 
 lazy_static! {
     static ref DEFAULT_BIND: ArtRef<BindConfig> = ArtRef::new(

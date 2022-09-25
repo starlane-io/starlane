@@ -1,8 +1,10 @@
 use std::sync::Arc;
-use crate::{Agent, Surface, UniErr};
-use crate::wave::exchange::{BroadTxRouter, Exchanger, ProtoTransmitterBuilderDef, ProtoTransmitterDef, RootInCtxDef, SetStrategy, TxRouter};
-use crate::wave::{BounceBacks, DirectedProto, FromReflectedAggregate, Handling, Pong, ReflectedAggregate, ReflectedProto, Scope, UltraWave, Wave};
+use tokio::sync::mpsc;
+use crate::{Agent, ReflectedCore, Surface, UniErr};
+use crate::wave::exchange::{BroadTxRouter, Exchanger, InCtxDef, ProtoTransmitterBuilderDef, ProtoTransmitterDef, RootInCtxDef, SetStrategy};
+use crate::wave::{BounceBacks, DirectedProto, FromReflectedAggregate, Handling, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto, Scope, UltraWave, Wave};
 use crate::wave::core::cmd::CmdMethod;
+use crate::wave::core::CoreBounce;
 
 #[async_trait]
 impl Router for TxRouter {
@@ -149,3 +151,45 @@ impl ProtoTransmitterBuilder {
 }
 
 pub type RootInCtx=RootInCtxDef<ProtoTransmitter>;
+
+pub type InCtx<'a,I> = InCtxDef<'a,I,ProtoTransmitter>;
+
+impl <'a,I> InCtx<'a,I> {
+
+        pub fn push_from(self, from: Surface) -> InCtx<'a, I> {
+        let mut transmitter = self.transmitter.clone();
+        transmitter.to_mut().from = SetStrategy::Override(from);
+        InCtx{
+            root: self.root,
+            input: self.input,
+            logger: self.logger.clone(),
+            transmitter,
+        }
+    }
+
+}
+
+#[async_trait]
+pub trait DirectedHandlerSelector {
+    fn select<'a>(&self, select: &'a RecipientSelector<'a>) -> Result<&dyn DirectedHandler, ()>;
+}
+
+#[async_trait]
+pub trait DirectedHandler: Send + Sync {
+    async fn handle(&self, ctx: RootInCtx) -> CoreBounce;
+
+    async fn bounce(&self, ctx: RootInCtx) -> CoreBounce {
+        CoreBounce::Reflected(ReflectedCore::ok())
+    }
+}
+
+#[derive(Clone)]
+pub struct TxRouter {
+    pub tx: mpsc::Sender<UltraWave>,
+}
+
+impl TxRouter {
+    pub fn new(tx: mpsc::Sender<UltraWave>) -> Self {
+        Self { tx }
+    }
+}

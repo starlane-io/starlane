@@ -46,7 +46,7 @@ extern "C" fn cosmic_timestamp() -> Timestamp {
 
 
 
-/// This macro will auto implement the `cosmic_universe::wave::exchange::DirectedHandler` trait.
+/// This macro will auto implement the `cosmic_universe::wave::exchange::asynch::DirectedHandler` trait.
 /// In order to finalize the implementation a `#[routes]` attribute must also be specified
 /// above one of the impls.
 #[proc_macro_derive(DirectedHandler)]
@@ -65,7 +65,7 @@ pub fn directed_handler(item: TokenStream) -> TokenStream {
 /// use cosmic_universe::substance::Substance;
 /// use cosmic_universe::substance::Substance::Text;
 /// use cosmic_universe::wave::core::ReflectedCore;
-/// use cosmic_universe::wave::exchange::InCtx;
+/// use cosmic_universe::wave::exchange::asynch::InCtx;
 ///
 /// #[derive(DirectedHandler)]
 /// pub struct MyHandler {
@@ -152,8 +152,8 @@ fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
     };
 
     let rtn = quote! {
-        impl #generics cosmic_universe::wave::exchange::DirectedHandlerSelector for #self_ty #where_clause{
-              fn select<'a>( &self, select: &'a cosmic_universe::wave::RecipientSelector<'a>, ) -> Result<&dyn cosmic_universe::wave::exchange::DirectedHandler, ()> {
+        impl #generics cosmic_universe::wave::exchange::asynch::DirectedHandlerSelector for #self_ty #where_clause{
+              fn select<'a>( &self, select: &'a cosmic_universe::wave::RecipientSelector<'a>, ) -> Result<&dyn cosmic_universe::wave::exchange::asynch::DirectedHandler, ()> {
                 if select.wave.core().method == cosmic_universe::wave::core::Method::Cmd(cosmic_universe::wave::core::cmd::CmdMethod::Bounce) {
                     return Ok(self);
                 }
@@ -167,7 +167,7 @@ fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
         }
 
         #[async_trait]
-        impl #generics cosmic_universe::wave::exchange::DirectedHandler for #self_ty #where_clause{
+        impl #generics cosmic_universe::wave::exchange::asynch::DirectedHandler for #self_ty #where_clause{
             async fn handle( &self, ctx: cosmic_universe::wave::exchange::asynch::RootInCtx) -> cosmic_universe::wave::core::CoreBounce {
                 #(
                     if #static_selector_keys.is_match(&ctx.wave).is_ok() {

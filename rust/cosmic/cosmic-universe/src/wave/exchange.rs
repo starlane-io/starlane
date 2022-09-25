@@ -6,7 +6,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
-use asynch::{ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router};
+use asynch::{DirectedHandler, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router};
 use dashmap::DashMap;
 use tokio::sync::{broadcast, mpsc, oneshot};
 
@@ -253,20 +253,6 @@ impl<H> InternalPipeline<H> {
     }
 }
 
-#[async_trait]
-pub trait DirectedHandlerSelector {
-    fn select<'a>(&self, select: &'a RecipientSelector<'a>) -> Result<&dyn DirectedHandler, ()>;
-}
-
-#[async_trait]
-pub trait DirectedHandler: Send + Sync {
-    async fn handle(&self, ctx: RootInCtx) -> CoreBounce;
-
-    async fn bounce(&self, ctx: RootInCtx) -> CoreBounce {
-        CoreBounce::Reflected(ReflectedCore::ok())
-    }
-}
-
 pub struct RootInCtxDef<T> {
     pub to: Surface,
     pub wave: DirectedWave,
@@ -410,23 +396,6 @@ impl RootInCtx {
     }
 }
 
-pub type InCtx<'a,I> = InCtxDef<'a,I,ProtoTransmitter>;
-
-impl <'a,I> InCtx<'a,I> {
-
-        pub fn push_from(self, from: Surface) -> InCtx<'a, I> {
-        let mut transmitter = self.transmitter.clone();
-        transmitter.to_mut().from = SetStrategy::Override(from);
-        InCtx{
-            root: self.root,
-            input: self.input,
-            logger: self.logger.clone(),
-            transmitter,
-        }
-    }
-
-}
-
 pub struct InCtxDef<'a, I, T> where T: Clone {
     root: &'a RootInCtx,
     pub transmitter: Cow<'a, T>,
@@ -513,17 +482,6 @@ impl<'a, I, T> InCtxDef<'a, I, T> where T:Clone{
 
     pub fn err(self, err: UniErr) -> ReflectedCore {
         self.root.wave.core().err(err)
-    }
-}
-
-#[derive(Clone)]
-pub struct TxRouter {
-    pub tx: mpsc::Sender<UltraWave>,
-}
-
-impl TxRouter {
-    pub fn new(tx: mpsc::Sender<UltraWave>) -> Self {
-        Self { tx }
     }
 }
 

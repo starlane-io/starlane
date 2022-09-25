@@ -32,10 +32,10 @@ use cosmic_universe::log::{LogSource, NoAppender, PointLogger, RootLogger};
 use cosmic_universe::parse::SkewerCase;
 use cosmic_universe::{loc, VERSION};
 use cosmic_universe::wasm::Timestamp;
-use cosmic_universe::wave::exchange::{DirectedHandler, DirectedHandlerShell, Exchanger, InCtx, SetStrategy, TxRouter};
+use cosmic_universe::wave::exchange::{DirectedHandlerShell, Exchanger, SetStrategy};
 
 use std::sync::Mutex;
-use cosmic_universe::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder};
+use cosmic_universe::wave::exchange::asynch::{DirectedHandler, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, TxRouter};
 
 use wasm_membrane_guest::membrane::{log, membrane_consume_buffer, membrane_consume_string, membrane_guest_alloc_buffer, membrane_guest_version, membrane_read_buffer, membrane_read_string, membrane_write_buffer};
 

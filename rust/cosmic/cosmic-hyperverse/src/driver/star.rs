@@ -21,9 +21,7 @@ use cosmic_universe::substance::Substance;
 use cosmic_universe::util::{log, ValuePattern};
 use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
-use cosmic_universe::wave::exchange::{
-    InCtx, SetStrategy,
-};
+use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::{
     Agent, BounceBacks, DirectedProto, Echoes, Handling, HandlingKind, Pong, Priority, Recipients,
     Retries, UltraWave, WaitTime, Wave,
@@ -39,7 +37,7 @@ use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tracing::error;
 use cosmic_universe::wave::core::http2::StatusCode;
-use cosmic_universe::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder};
+use cosmic_universe::wave::exchange::asynch::{InCtx, ProtoTransmitter, ProtoTransmitterBuilder};
 
 lazy_static! {
     static ref STAR_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(

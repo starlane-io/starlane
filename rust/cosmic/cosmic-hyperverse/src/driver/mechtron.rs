@@ -14,7 +14,7 @@ use cosmic_universe::parse::bind_config;
 use cosmic_universe::selector::KindSelector;
 use cosmic_universe::util::log;
 use cosmic_universe::wave::core::hyp::HypMethod;
-use cosmic_universe::wave::exchange::InCtx;
+use cosmic_universe::wave::exchange::asynch::InCtx;
 use cosmic_universe::wave::{DirectedProto, DirectedWave, Pong, Wave};
 use dashmap::DashMap;
 use mechtron_host::{MechtronHost, MechtronHostFactory};

@@ -11,7 +11,7 @@ use cosmic_universe::parse::bind_config;
 use cosmic_universe::selector::KindSelector;
 use cosmic_universe::util::log;
 use cosmic_universe::wave::core::{CoreBounce, ReflectedCore};
-use cosmic_universe::wave::exchange::DirectedHandler;
+use cosmic_universe::wave::exchange::asynch::DirectedHandler;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;

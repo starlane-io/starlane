@@ -31,7 +31,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use cosmic_universe::wave::exchange::InCtx;
+use cosmic_universe::wave::exchange::asynch::InCtx;
 use tempdir::TempDir;
 
 lazy_static! {
