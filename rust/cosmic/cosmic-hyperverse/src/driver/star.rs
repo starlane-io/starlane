@@ -3,7 +3,7 @@ use crate::driver::{
     ItemHandler, ItemSphere,
 };
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::{HyperErr, Cosmos, Registration, RegistryApi};
+use crate::{Cosmos, HyperErr, Registration, RegistryApi};
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::direct::create::Strategy;
@@ -11,7 +11,7 @@ use cosmic_universe::config::bind::BindConfig;
 use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::{Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, ParticleLocation, Search};
 use cosmic_universe::kind::{BaseKind, Kind, StarSub};
-use cosmic_universe::loc::{Layer, Point, StarKey, ToPoint, ToSurface, LOCAL_STAR};
+use cosmic_universe::loc::{Layer, LOCAL_STAR, Point, StarKey, ToPoint, ToSurface};
 use cosmic_universe::log::Tracker;
 use cosmic_universe::parse::bind_config;
 use cosmic_universe::particle::traversal::TraversalInjection;
@@ -22,7 +22,7 @@ use cosmic_universe::util::{log, ValuePattern};
 use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
 use cosmic_universe::wave::exchange::{
-    InCtx, ProtoTransmitter, ProtoTransmitterBuilder, SetStrategy,
+    InCtx, SetStrategy,
 };
 use cosmic_universe::wave::{
     Agent, BounceBacks, DirectedProto, Echoes, Handling, HandlingKind, Pong, Priority, Recipients,
@@ -39,6 +39,7 @@ use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tracing::error;
 use cosmic_universe::wave::core::http2::StatusCode;
+use cosmic_universe::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder};
 
 lazy_static! {
     static ref STAR_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(

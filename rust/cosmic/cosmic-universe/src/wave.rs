@@ -16,7 +16,7 @@ use tokio::time::Instant;
 
 use cosmic_macros_primitive::Autobox;
 use cosmic_nom::{Res, SpanExtra};
-use exchange::ProtoTransmitter;
+use exchange::asynch::ProtoTransmitter;
 
 use url::Url;
 use crate::command::Command;

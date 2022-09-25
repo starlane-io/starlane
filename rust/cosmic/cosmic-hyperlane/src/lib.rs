@@ -39,14 +39,14 @@ use cosmic_universe::wave::core::ext::ExtMethod;
 use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::Method;
 use cosmic_universe::wave::exchange::{
-    Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, SetStrategy, TxRouter,
+    Exchanger, SetStrategy, TxRouter,
 };
 use cosmic_universe::wave::{
     Agent, DirectedKind, DirectedProto, Handling, HyperWave, Ping, Pong, Reflectable,
     ReflectedKind, ReflectedProto, ReflectedWave, UltraWave, Wave, WaveId, WaveKind,
 };
 use cosmic_universe::VERSION;
-use cosmic_universe::wave::exchange::asynch::Router;
+use cosmic_universe::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder, Router};
 
 lazy_static! {
     pub static ref LOCAL_CLIENT: Point = Point::from_str("LOCAL::client").expect("point");
@@ -2014,13 +2014,13 @@ pub mod test_util {
     use cosmic_universe::wave::core::ext::ExtMethod;
     use cosmic_universe::wave::core::{Method, ReflectedCore};
     use cosmic_universe::wave::exchange::{
-        Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, SetStrategy, TxRouter,
+        Exchanger, SetStrategy, TxRouter,
     };
     use cosmic_universe::wave::{
         Agent, DirectedKind, DirectedProto, HyperWave, Pong, ReflectedKind, ReflectedProto,
         ReflectedWave, UltraWave, Wave,
     };
-    use cosmic_universe::wave::exchange::asynch::Router;
+    use cosmic_universe::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder, Router};
 
     use crate::{
         AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, Bridge, HyperClient,
@@ -2218,13 +2218,13 @@ pub mod test {
     use cosmic_universe::wave::core::ext::ExtMethod;
     use cosmic_universe::wave::core::{Method, ReflectedCore};
     use cosmic_universe::wave::exchange::{
-        Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, SetStrategy, TxRouter,
+        Exchanger, SetStrategy, TxRouter,
     };
     use cosmic_universe::wave::{
         Agent, DirectedKind, DirectedProto, HyperWave, Pong, ReflectedKind, ReflectedProto,
         ReflectedWave, UltraWave, Wave,
     };
-    use cosmic_universe::wave::exchange::asynch::Router;
+    use cosmic_universe::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder, Router};
 
     use crate::test_util::{FAE, LESS, SingleInterchangePlatform, TestGreeter, WaveTest};
     use crate::{

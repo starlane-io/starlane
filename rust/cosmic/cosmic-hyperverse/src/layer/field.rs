@@ -14,14 +14,15 @@ use cosmic_universe::particle::traversal::{Traversal, TraversalLayer};
 use cosmic_universe::selector::PayloadBlock;
 use cosmic_universe::substance::Substance;
 use cosmic_universe::util::ToResolved;
-use cosmic_universe::wave::core::{Method, ReflectedCore };
-use cosmic_universe::wave::exchange::{Exchanger, ProtoTransmitter, ProtoTransmitterBuilder};
+use cosmic_universe::wave::core::{Method, ReflectedCore};
+use cosmic_universe::wave::exchange::Exchanger;
 use cosmic_universe::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Pong, Reflection, UltraWave, Wave,
 };
+use cosmic_universe::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder};
 
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::{HyperErr, Cosmos, RegistryApi};
+use crate::{Cosmos, HyperErr, RegistryApi};
 
 pub struct Field<P>
 where

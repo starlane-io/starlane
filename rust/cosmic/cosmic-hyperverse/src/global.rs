@@ -27,12 +27,12 @@ use cosmic_universe::wave::exchange::DirectedHandlerShell;
 use cosmic_universe::wave::exchange::RootInCtx;
 use cosmic_universe::wave::exchange::{DirectedHandler, Exchanger, InCtx};
 use cosmic_universe::wave::exchange::{
-    DirectedHandlerSelector, ProtoTransmitter, ProtoTransmitterBuilder, SetStrategy,
+    DirectedHandlerSelector, SetStrategy,
 };
 use cosmic_universe::wave::RecipientSelector;
 use cosmic_universe::wave::{Agent, DirectedProto, Handling, Pong, Scope, Wave};
 use cosmic_universe::HYPERUSER;
-use cosmic_universe::wave::exchange::asynch::Router;
+use cosmic_universe::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder, Router};
 
 use crate::driver::{
     Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere,

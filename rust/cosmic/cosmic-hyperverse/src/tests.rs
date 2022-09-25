@@ -34,7 +34,7 @@ use cosmic_universe::wave::core::ext::ExtMethod;
 use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::Method;
 use cosmic_universe::wave::exchange::Exchanger;
-use cosmic_universe::wave::exchange::ProtoTransmitterBuilder;
+use cosmic_universe::wave::exchange::asynch::ProtoTransmitterBuilder;
 use cosmic_universe::wave::{Agent, DirectedKind, DirectedProto, HyperWave, Pong, Wave};
 use cosmic_universe::HYPERUSER;
 

@@ -14,7 +14,8 @@ use crate::{BindConfig, Substance, UniErr};
 use crate::config::mechtron::MechtronConfig;
 use crate::wave::{DirectedProto, Pong, Wave};
 use crate::wave::core::cmd::CmdMethod;
-use crate::wave::exchange::{ProtoTransmitter, ProtoTransmitterBuilder};
+use crate::wave::exchange::asynch::ProtoTransmitterBuilder;
+use crate::wave::exchange::asynch::ProtoTransmitter;
 
 #[derive(Clone)]
 pub struct ArtifactApi {

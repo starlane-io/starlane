@@ -27,7 +27,7 @@ use cosmic_universe::substance::Substance;
 use cosmic_universe::wave::core::ext::ExtMethod;
 use cosmic_universe::wave::core::ReflectedCore;
 use cosmic_universe::wave::exchange::{
-    Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, SetStrategy,
+    Exchanger, SetStrategy,
 };
 use cosmic_universe::wave::{Agent, DirectedProto, Pong, ToRecipients, UltraWave, Wave};
 use dashmap::DashMap;
@@ -35,7 +35,7 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use cosmic_universe::wave::exchange::asynch::Router;
+use cosmic_universe::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder, Router};
 
 pub struct ControlDriverFactory<P>
 where
