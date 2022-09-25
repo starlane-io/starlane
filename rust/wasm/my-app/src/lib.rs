@@ -5,7 +5,6 @@ extern crate lazy_static;
 //mod html;
 
 use cosmic_universe::err::UniErr;
-use wasm_membrane_guest::membrane::log;
 use mechtron::{MechtronFactories, MechtronFactory};
 use mechtron::Mechtron;
 

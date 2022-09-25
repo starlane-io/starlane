@@ -35,36 +35,36 @@ impl <P> WasmMembrane<P> where P: HostPlatform {
         match self
             .instance
             .exports
-            .get_native_function::<(), i32>("membrane_guest_version")
+            .get_native_function::<(), i32>("mechtron_guest_version")
         {
             Ok(func) => {
-                self.log_wasm("host", "verified: membrane_guest_version( ) -> i32");
+                self.log_wasm("host", "verified: mechtron_guest_version( ) -> i32");
                 match func.call() {
                     Ok(version) => {
                         if version == VERSION {
                             self.log_wasm(
                                 "host",
                                 format!(
-                                    "passed: membrane_guest_version( ) -> i32 [USING VERSION {}]",
+                                    "passed: mechtron_guest_version( ) -> i32 [USING VERSION {}]",
                                     version
                                 )
                                 .as_str(),
                             );
                         } else {
-                            self.log_wasm("host", format!("fail : membrane_guest_version( ) -> i32 [THIS HOST CANNOT WORK WITH VERSION {}]", version).as_str());
+                            self.log_wasm("host", format!("fail : mechtron_guest_version( ) -> i32 [THIS HOST CANNOT WORK WITH VERSION {}]", version).as_str());
                             pass = false;
                         }
                     }
                     Err(error) => {
                         self.log_wasm(
                             "host",
-                            "fail : membrane_guest_version( ) -> i32 [CALL FAILED]",
+                            "fail : mechtron_guest_version( ) -> i32 [CALL FAILED]",
                         );
                     }
                 }
             }
             Err(_) => {
-                self.log_wasm("host", "failed: membrane_guest_version( ) -> i32");
+                self.log_wasm("host", "failed: mechtron_guest_version( ) -> i32");
                 pass = false
             }
         }
@@ -72,16 +72,16 @@ impl <P> WasmMembrane<P> where P: HostPlatform {
         match self
             .instance
             .exports
-            .get_native_function::<i32, i32>("membrane_guest_alloc_buffer")
+            .get_native_function::<i32, i32>("mechtron_guest_alloc_buffer")
         {
             Ok(_) => {
                 self.log_wasm(
                     "host",
-                    "verified: membrane_guest_alloc_buffer( i32 ) -> i32",
+                    "verified: mechtron_guest_alloc_buffer( i32 ) -> i32",
                 );
             }
             Err(_) => {
-                self.log_wasm("host", "failed: membrane_guest_alloc_buffer( i32 ) -> i32");
+                self.log_wasm("host", "failed: mechtron_guest_alloc_buffer( i32 ) -> i32");
                 pass = false
             }
         }
@@ -89,18 +89,18 @@ impl <P> WasmMembrane<P> where P: HostPlatform {
         match self
             .instance
             .exports
-            .get_native_function::<i32, WasmPtr<u8, Array>>("membrane_guest_get_buffer_ptr")
+            .get_native_function::<i32, WasmPtr<u8, Array>>("mechtron_guest_get_buffer_ptr")
         {
             Ok(_) => {
                 self.log_wasm(
                     "host",
-                    "verified: membrane_guest_get_buffer_ptr( i32 ) -> *const u8",
+                    "verified: mechtron_guest_get_buffer_ptr( i32 ) -> *const u8",
                 );
             }
             Err(_) => {
                 self.log_wasm(
                     "host",
-                    "failed: membrane_guest_get_buffer_ptr( i32 ) -> *const u8",
+                    "failed: mechtron_guest_get_buffer_ptr( i32 ) -> *const u8",
                 );
                 pass = false
             }
@@ -109,18 +109,18 @@ impl <P> WasmMembrane<P> where P: HostPlatform {
         match self
             .instance
             .exports
-            .get_native_function::<i32, i32>("membrane_guest_get_buffer_len")
+            .get_native_function::<i32, i32>("mechtron_guest_get_buffer_len")
         {
             Ok(_) => {
                 self.log_wasm(
                     "host",
-                    "verified: membrane_guest_get_buffer_len( i32 ) -> i32",
+                    "verified: mechtron_guest_get_buffer_len( i32 ) -> i32",
                 );
             }
             Err(_) => {
                 self.log_wasm(
                     "host",
-                    "failed: membrane_guest_get_buffer_len( i32 ) -> i32",
+                    "failed: mechtron_guest_get_buffer_len( i32 ) -> i32",
                 );
                 pass = false
             }
@@ -128,13 +128,13 @@ impl <P> WasmMembrane<P> where P: HostPlatform {
         match self
             .instance
             .exports
-            .get_native_function::<i32, ()>("membrane_guest_dealloc_buffer")
+            .get_native_function::<i32, ()>("mechtron_guest_dealloc_buffer")
         {
             Ok(_) => {
-                self.log_wasm("host", "verified: membrane_guest_dealloc_buffer( i32 )");
+                self.log_wasm("host", "verified: mechtron_guest_dealloc_buffer( i32 )");
             }
             Err(_) => {
-                self.log_wasm("host", "failed: membrane_guest_dealloc_buffer( i32 )");
+                self.log_wasm("host", "failed: mechtron_guest_dealloc_buffer( i32 )");
                 pass = false
             }
         }
@@ -223,7 +223,7 @@ impl <P> WasmMembrane<P> where P: HostPlatform {
         let buffer_id = self
             .instance
             .exports
-            .get_native_function::<i32, i32>("membrane_guest_alloc_buffer")
+            .get_native_function::<i32, i32>("mechtron_guest_alloc_buffer")
             .unwrap()
             .call(len.clone())?;
         Ok(buffer_id)
@@ -233,7 +233,7 @@ impl <P> WasmMembrane<P> where P: HostPlatform {
         Ok(self
             .instance
             .exports
-            .get_native_function::<i32, WasmPtr<u8, Array>>("membrane_guest_get_buffer_ptr")
+            .get_native_function::<i32, WasmPtr<u8, Array>>("mechtron_guest_get_buffer_ptr")
             .unwrap()
             .call(buffer_id)?)
     }
@@ -242,13 +242,13 @@ impl <P> WasmMembrane<P> where P: HostPlatform {
         let ptr = self
             .instance
             .exports
-            .get_native_function::<i32, WasmPtr<u8, Array>>("membrane_guest_get_buffer_ptr")
+            .get_native_function::<i32, WasmPtr<u8, Array>>("mechtron_guest_get_buffer_ptr")
             .unwrap()
             .call(buffer_id)?;
         let len = self
             .instance
             .exports
-            .get_native_function::<i32, i32>("membrane_guest_get_buffer_len")
+            .get_native_function::<i32, i32>("mechtron_guest_get_buffer_len")
             .unwrap()
             .call(buffer_id)?;
         let memory = self.instance.exports.get_memory("memory")?;
@@ -271,20 +271,20 @@ impl <P> WasmMembrane<P> where P: HostPlatform {
     pub fn consume_string(&self, buffer_id: i32) -> Result<String, P::Err> {
         let raw = self.read_buffer(buffer_id)?;
         let rtn = String::from_utf8(raw)?;
-        self.membrane_guest_dealloc_buffer(buffer_id)?;
+        self.mechtron_guest_dealloc_buffer(buffer_id)?;
         Ok(rtn)
     }
 
     pub fn consume_buffer(&self, buffer_id: i32) -> Result<Vec<u8>, P::Err> {
         let raw = self.read_buffer(buffer_id)?;
-        self.membrane_guest_dealloc_buffer(buffer_id)?;
+        self.mechtron_guest_dealloc_buffer(buffer_id)?;
         Ok(raw)
     }
 
-    fn membrane_guest_dealloc_buffer(&self, buffer_id: i32) -> Result<(), P::Err> {
+    fn mechtron_guest_dealloc_buffer(&self, buffer_id: i32) -> Result<(), P::Err> {
         self.instance
             .exports
-            .get_native_function::<i32, ()>("membrane_guest_dealloc_buffer")?
+            .get_native_function::<i32, ()>("mechtron_guest_dealloc_buffer")?
             .call(buffer_id.clone())?;
         Ok(())
     }
@@ -303,7 +303,7 @@ impl <P> WasmMembrane<P> where P: HostPlatform {
         let log_message_buffer = self.write_string(log_message_string)?;
         self.instance
             .exports
-            .get_native_function::<i32, ()>("membrane_guest_test_log")
+            .get_native_function::<i32, ()>("mechtron_guest_test_log")
             .unwrap()
             .call(log_message_buffer)?;
         Ok(())
@@ -313,7 +313,7 @@ impl <P> WasmMembrane<P> where P: HostPlatform {
         println!("test endless loop");
         self.instance
             .exports
-            .get_native_function::<(), ()>("membrane_guest_example_test_endless_loop")
+            .get_native_function::<(), ()>("mechtron_guest_example_test_endless_loop")
             .unwrap()
             .call()?;
         println!("test endless loop... done");
@@ -426,7 +426,7 @@ impl <P> WasmMembrane <P> where P: HostPlatform+'static{
             }),
 
 
-        "membrane_host_log"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env<P>,buffer:i32| {
+        "mechtron_host_log"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env<P>,buffer:i32| {
                 match env.unwrap()
                 {
                    Ok(membrane)=>{
@@ -437,7 +437,7 @@ impl <P> WasmMembrane <P> where P: HostPlatform+'static{
                 }
             }),
 
-        "membrane_host_panic"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env<P>,buffer_id:i32| {
+        "mechtron_host_panic"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env<P>,buffer_id:i32| {
                 match env.unwrap()
                 {
                    Ok(membrane)=>{
@@ -500,7 +500,7 @@ impl <P> BufferLock<P>  where P: HostPlatform{
     }
 
     pub fn release(&self) -> Result<(), P::Err> {
-        self.membrane.membrane_guest_dealloc_buffer(self.id)?;
+        self.membrane.mechtron_guest_dealloc_buffer(self.id)?;
         Ok(())
     }
 }

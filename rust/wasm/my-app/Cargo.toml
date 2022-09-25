@@ -17,7 +17,6 @@ crate-type = ["cdylib"]
 #mesh-portal= "0.2.0-rc1"
 
 mechtron= { path="../../cosmic/mechtron" }
-wasm_membrane_guest = { path="../../cosmic/wasm-membrane-guest" }
 cosmic-universe = { path="../../cosmic/cosmic-universe" }
 
 
