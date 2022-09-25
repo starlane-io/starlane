@@ -46,6 +46,7 @@ impl ProtoTransmitter {
             agent: SetStrategy::Fill(Agent::Anonymous),
             scope: SetStrategy::Fill(Scope::None),
             handling: SetStrategy::Fill(Handling::default()),
+            method: SetStrategy::None,
             router,
             exchanger: (),
         }
@@ -160,6 +161,7 @@ impl ProtoTransmitterBuilder {
             agent: SetStrategy::Fill(Agent::Anonymous),
             scope: SetStrategy::Fill(Scope::None),
             handling: SetStrategy::Fill(Handling::default()),
+            method: SetStrategy::None,
             router,
             exchanger: (),
         }

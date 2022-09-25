@@ -19,6 +19,7 @@ use crate::substance::LogSubstance;
 use crate::util::{timestamp, uuid};
 use crate::wasm::Timestamp;
 use crate::wave::{DirectedProto, Handling, HandlingKind, Priority, Retries, ToRecipients, WaitTime};
+use crate::wave::core::cmd::CmdMethod;
 use crate::wave::exchange::SetStrategy;
 use crate::wave::exchange::synch::{ProtoTransmitter, ProtoTransmitterBuilder};
 
@@ -484,6 +485,7 @@ pub struct SynchTransmittingLogAppender {
 
 impl SynchTransmittingLogAppender {
     pub fn new( mut transmitter: ProtoTransmitterBuilder) -> Self {
+        transmitter.method = SetStrategy::Override(CmdMethod::Log.into());
         transmitter.to = SetStrategy::Override(Point::global_logger().to_surface().with_layer(Layer::Core).to_recipients());
         transmitter.handling = SetStrategy::Fill(Handling {
             kind: HandlingKind::Durable,

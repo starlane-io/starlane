@@ -4,10 +4,10 @@ use std::marker::PhantomData;
 use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::HyperSubstance;
 use cosmic_universe::loc::{Layer, Point, ToSurface};
-use cosmic_universe::log::{LogSource, NoAppender, PointLogger, RootLogger};
+use cosmic_universe::log::{LogSource, NoAppender, PointLogger, RootLogger, SynchTransmittingLogAppender};
 use cosmic_universe::wave::exchange::synch::{DirectedHandler, DirectedHandlerProxy, DirectedHandlerShell, ExchangeRouter, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx};
 use std::sync::Arc;
-use cosmic_universe::wave::{Agent, DirectedWave, ReflectedAggregate, UltraWave};
+use cosmic_universe::wave::{Agent, DirectedWave, ReflectedAggregate, ToRecipients, UltraWave};
 use cosmic_universe::wave::core::CoreBounce;
 use cosmic_universe::wave::exchange::SetStrategy;
 use crate::MechtronFactories;
@@ -48,8 +48,16 @@ impl crate::Guest for Guest {
 
 impl Guest {
     pub fn new(details: Details, factories: MechtronFactories) -> Self {
-        let root_logger = RootLogger::new(LogSource::Core, Arc::new(NoAppender::new()));
+        let router:MechtronRouter<Guest> = MechtronRouter::new();
+        let router = Arc::new(router);
+        let mut transmitter = ProtoTransmitterBuilder::new(router);
+        transmitter.agent = SetStrategy::Override(Agent::Point(details.stub.point.clone()));
+        transmitter.from = SetStrategy::Override(details.stub.point.clone().to_surface());
+        transmitter.to = SetStrategy::Override(Point::global_logger().to_surface().to_recipients());
+        let appender = SynchTransmittingLogAppender::new(transmitter);
+        let root_logger = RootLogger::new(LogSource::Core, Arc::new(appender ));
         let logger = root_logger.point(details.stub.point.clone());
+        logger.info("Guest created");
 
         Self {
             details,

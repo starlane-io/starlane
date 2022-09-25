@@ -64,7 +64,7 @@ impl MechtronFactories {
     }
 }
 
-pub trait Guest where Self::Err : MechErr {
+pub trait Guest: Send+Sync where Self::Err : MechErr {
     type Err;
 }
 

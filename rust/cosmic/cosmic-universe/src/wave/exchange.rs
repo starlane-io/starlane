@@ -19,7 +19,7 @@ use crate::log::{PointLogger, RootLogger, SpanLogger};
 use crate::settings::Timeouts;
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::http2::StatusCode;
-use crate::wave::core::CoreBounce;
+use crate::wave::core::{CoreBounce, Method};
 use crate::wave::exchange::asynch::AsyncRouter;
 use crate::wave::{
     Bounce, BounceBacks, BounceProto, DirectedProto, DirectedWave, Echo, FromReflectedAggregate,
@@ -289,6 +289,7 @@ pub struct ProtoTransmitterBuilderDef<R, E> {
     pub agent: SetStrategy<Agent>,
     pub scope: SetStrategy<Scope>,
     pub handling: SetStrategy<Handling>,
+    pub method: SetStrategy<Method>,
     pub from: SetStrategy<Surface>,
     pub to: SetStrategy<Recipients>,
     pub router: R,
@@ -301,6 +302,7 @@ impl<R, E> ProtoTransmitterBuilderDef<R, E> {
             agent: self.agent,
             scope: self.scope,
             handling: self.handling,
+            method: self.method,
             from: self.from,
             to: self.to,
             router: self.router,
@@ -314,6 +316,7 @@ pub struct ProtoTransmitterDef<R, E> {
     agent: SetStrategy<Agent>,
     scope: SetStrategy<Scope>,
     handling: SetStrategy<Handling>,
+    method: SetStrategy<Method>,
     from: SetStrategy<Surface>,
     to: SetStrategy<Recipients>,
     router: R,
@@ -364,6 +367,12 @@ impl<R, E> ProtoTransmitterDef<R, E> {
             SetStrategy::Fill(handling) => wave.fill_handling(handling),
             SetStrategy::Override(handling) => wave.handling(handling.clone()),
         }
+
+        match &self.method {
+            SetStrategy::None => {}
+            SetStrategy::Fill(method) => wave.fill_method(method),
+            SetStrategy::Override(handling) => wave.method(handling.clone()),
+        }
     }
 
     fn prep_reflect(&self, wave: &mut ReflectedProto) {
@@ -395,8 +404,13 @@ impl<R, E> ProtoTransmitterDef<R, E> {
 
 #[derive(Clone)]
 pub enum SetStrategy<T> {
+    /// The ProtoTransmitter will NOT set a value
     None,
+    /// The ProtoTransmitter will set the DirectedProto value unless
+    /// the value was already explicitly set
     Fill(T),
+    /// The ProtoTransmitter will over write the DirectedProto value
+    /// even if it has already been explicitly set
     Override(T),
 }
 

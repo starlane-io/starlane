@@ -7,6 +7,7 @@ use wasmer::{
     NamedResolver, RuntimeError, WasmPtr, WasmerEnv,
 };
 use cosmic_universe::err::UniErr;
+use cosmic_universe::wave::UltraWave;
 use crate::HostPlatform;
 
 pub static VERSION: i32 = 1;
@@ -452,8 +453,9 @@ impl <P> WasmMembrane <P> where P: HostPlatform+'static{
 
 
         "mechtron_frame_to_host"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env<P>,buffer_id:i32| -> i32 {
-println!("MECHTRON FAME TO HOST!");
-                    env.unwrap().unwrap().consume_buffer(buffer_id);
+                    let wave = env.unwrap().unwrap().consume_buffer(buffer_id).unwrap();
+                    let wave :UltraWave = bincode::deserialize(wave.as_slice()).unwrap();
+println!("MECHTRON FAME TO HOST: {}", wave.method().unwrap().to_string() );
                     0
             }),
 

@@ -933,9 +933,11 @@ impl DerefMut for Ping {
 
 impl Into<DirectedProto> for Wave<Ping> {
     fn into(self) -> DirectedProto {
+        let mut core = self.core.clone();
         DirectedProto {
             to: Some(self.to.clone().to_recipients()),
-            core: DirectedCore::default(),
+            method: None,
+            core,
             id: self.id,
             from: Some(self.from),
             handling: Some(self.handling),
@@ -1223,6 +1225,7 @@ pub struct DirectedProto {
     pub from: Option<Surface>,
     pub to: Option<Recipients>,
     pub core: DirectedCore,
+    pub method: Option<Method>,
     pub handling: Option<Handling>,
     pub scope: Option<Scope>,
     pub agent: Option<Agent>,
@@ -1270,6 +1273,11 @@ impl DirectedProto {
             "kind must be set for DirectedProto to create the proper DirectedWave".into(),
         )?;
 
+        let mut core  = self.core.clone();
+        if let Some(method) = self.method {
+            core.method = method;
+        }
+
         let mut wave = match kind {
             DirectedKind::Ping => {
                 let mut wave = Wave::new(
@@ -1278,7 +1286,7 @@ impl DirectedProto {
                             .to
                             .ok_or(UniErr::new(500u16, "must set 'to'"))?
                             .single_or()?,
-                        core: self.core,
+                        core
                     },
                     self.from.ok_or(UniErr::new(500u16, "must set 'from'"))?,
                 );
@@ -1293,7 +1301,7 @@ impl DirectedProto {
                 let mut wave = Wave::new(
                     Ripple {
                         to: self.to.ok_or(UniErr::new(500u16, "must set 'to'"))?,
-                        core: self.core,
+                        core,
                         bounce_backs: self.bounce_backs.ok_or("BounceBacks must be set")?,
                         history: self.history,
                     },
@@ -1313,7 +1321,7 @@ impl DirectedProto {
                             .to
                             .ok_or(UniErr::new(500u16, "must set 'to'"))?
                             .single_or()?,
-                        core: self.core,
+                        core,
                     },
                     self.from.ok_or(UniErr::new(500u16, "must set 'from'"))?,
                 );
@@ -1370,6 +1378,13 @@ impl DirectedProto {
             self.handling.replace(handling.clone());
         }
     }
+
+    pub fn fill_method(&mut self, method: &Method) {
+        if self.method.is_none() {
+            self.method.replace(method.clone());
+        }
+    }
+
 
     pub fn agent(&mut self, agent: Agent) {
         self.agent.replace(agent);
@@ -1509,6 +1524,7 @@ impl Default for DirectedProto {
     fn default() -> Self {
         Self {
             id: WaveId::new(WaveKind::Ping),
+            method: None,
             core: DirectedCore::default(),
             from: None,
             to: None,
