@@ -18,7 +18,6 @@ cosmic-universe = { path= "../cosmic-universe" ,version = "0.3.0"}
 cosmic-nom = { path="../cosmic-nom",version = "0.3.0"}
 cosmic-hyperlane = { path= "../cosmic-hyperlane" ,version = "0.3.0"}
 mechtron-host = { path="../mechtron-host"}
-wasm_membrane_host = { path= "../wasm-membrane-host" ,version = "0.3.0"}
 threadpool = "1.8.1"
 acid-store = { version = "0.12.0", features=['store-directory','repo-value'] }
 anyhow = "1.0.44"
