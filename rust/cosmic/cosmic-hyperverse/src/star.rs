@@ -52,10 +52,7 @@ use cosmic_universe::util::{log, ValueMatcher, ValuePattern};
 use cosmic_universe::wave::core::cmd::CmdMethod;
 use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
-use cosmic_universe::wave::exchange::{
-    DirectedHandlerShell, Exchanger,
-    SetStrategy,
-};
+use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::{
     Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
     HandlingKind, Ping, Pong, Priority, Recipients, RecipientSelector, Reflectable, ReflectedWave,
@@ -63,7 +60,7 @@ use cosmic_universe::wave::{
 };
 use cosmic_universe::wave::{HyperWave, UltraWave};
 use cosmic_universe::HYPERUSER;
-use cosmic_universe::wave::exchange::asynch::{DirectedHandler, DirectedHandlerSelector, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, TxRouter};
+use cosmic_universe::wave::exchange::asynch::{DirectedHandler, DirectedHandlerSelector, DirectedHandlerShell, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, TxRouter};
 
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::driver::{

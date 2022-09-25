@@ -1,10 +1,15 @@
 use std::sync::Arc;
-use tokio::sync::mpsc;
-use crate::{Agent, ReflectedCore, Surface, UniErr};
-use crate::wave::exchange::{BroadTxRouter, Exchanger, InCtxDef, ProtoTransmitterBuilderDef, ProtoTransmitterDef, RootInCtxDef, SetStrategy};
-use crate::wave::{BounceBacks, DirectedProto, FromReflectedAggregate, Handling, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto, Scope, UltraWave, Wave};
+use tokio::sync::{mpsc, oneshot};
+use dashmap::DashMap;
+use std::time::Duration;
+use crate::{Agent, Point, ReflectedCore, Substance, Surface, UniErr};
+use crate::loc::{ToPoint, ToSurface};
+use crate::settings::Timeouts;
+use crate::wave::exchange::{BroadTxRouter, DirectedHandlerShellDef, InCtxDef, ProtoTransmitterBuilderDef, ProtoTransmitterDef, RootInCtxDef, SetStrategy};
+use crate::wave::{BounceBacks, BounceProto, DirectedProto, DirectedWave, FromReflectedAggregate, Handling, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto, ReflectedWave, Scope, UltraWave, Wave, WaveId};
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::CoreBounce;
+use crate::wave::core::http2::StatusCode;
 
 #[async_trait]
 impl Router for TxRouter {
@@ -45,7 +50,7 @@ impl Router for AsyncRouter {
     }
 }
 
-pub type ProtoTransmitter = ProtoTransmitterDef<AsyncRouter>;
+pub type ProtoTransmitter = ProtoTransmitterDef<AsyncRouter,Exchanger>;
 
 impl ProtoTransmitter {
     pub fn new(router: Arc<dyn Router>, exchanger: Exchanger) -> ProtoTransmitter {
@@ -133,7 +138,7 @@ impl ProtoTransmitter {
     }
 }
 
-pub type ProtoTransmitterBuilder = ProtoTransmitterBuilderDef<AsyncRouter>;
+pub type ProtoTransmitterBuilder = ProtoTransmitterBuilderDef<AsyncRouter,Exchanger>;
 
 impl ProtoTransmitterBuilder {
     pub fn new(router: Arc<dyn Router>, exchanger: Exchanger) -> ProtoTransmitterBuilder {
@@ -191,5 +196,196 @@ pub struct TxRouter {
 impl TxRouter {
     pub fn new(tx: mpsc::Sender<UltraWave>) -> Self {
         Self { tx }
+    }
+}
+
+
+#[derive(Clone)]
+pub struct Exchanger {
+    pub surface: Surface,
+    pub multis: Arc<DashMap<WaveId, mpsc::Sender<ReflectedWave>>>,
+    pub singles: Arc<DashMap<WaveId, oneshot::Sender<ReflectedAggregate>>>,
+    pub timeouts: Timeouts,
+}
+
+impl Exchanger {
+    pub fn new(surface: Surface, timeouts: Timeouts) -> Self {
+        Self {
+            surface,
+            singles: Arc::new(DashMap::new()),
+            multis: Arc::new(DashMap::new()),
+            timeouts,
+        }
+    }
+
+    pub fn with_surface(&self, surface: Surface) -> Self {
+        Self {
+            surface,
+            singles: self.singles.clone(),
+            multis: self.multis.clone(),
+            timeouts: self.timeouts.clone(),
+        }
+    }
+
+    pub async fn reflected(&self, reflect: ReflectedWave) -> Result<(), UniErr> {
+        if let Some(multi) = self.multis.get(reflect.reflection_of()) {
+            multi.value().send(reflect).await;
+        } else if let Some((_, tx)) = self.singles.remove(reflect.reflection_of()) {
+            tx.send(ReflectedAggregate::Single(reflect));
+        } else {
+            let reflect = reflect.to_ultra();
+            let kind = match &reflect {
+                UltraWave::Ping(_) => "Ping",
+                UltraWave::Pong(_) => "Pong",
+                UltraWave::Ripple(_) => "Ripple",
+                UltraWave::Echo(_) => "Echo",
+                UltraWave::Signal(_) => "Signal",
+            };
+            let reflect = reflect.to_reflected()?;
+
+            return Err(UniErr::from_500(format!(
+                "Not expecting reflected message from: {} to: {} KIND: {} STATUS: {}",
+                reflect.from().to_string(),
+                reflect.to().to_string(),
+                kind,
+                reflect.core().status.to_string()
+            )));
+        }
+        Ok(())
+    }
+
+    pub async fn exchange(&self, directed: &DirectedWave) -> oneshot::Receiver<ReflectedAggregate> {
+        let (tx, rx) = oneshot::channel();
+
+        let mut reflected = match directed.reflected_proto() {
+            BounceProto::Absorbed => {
+                return rx;
+            }
+            BounceProto::Reflected(reflected) => reflected,
+        };
+
+        reflected.from(self.surface.clone());
+
+        let reflection = directed.reflection().unwrap();
+
+        let timeout = self.timeouts.from(directed.handling().wait.clone());
+        self.singles.insert(directed.id().clone(), tx);
+        match directed.bounce_backs() {
+            BounceBacks::None => {
+                panic!("we already dealt with this")
+            }
+            BounceBacks::Single => {
+                let singles = self.singles.clone();
+                tokio::spawn(async move {
+                    tokio::time::sleep(Duration::from_secs(timeout)).await;
+                    let id = reflected.reflection_of.as_ref().unwrap();
+                    if let Some((_, tx)) = singles.remove(id) {
+                        reflected.status = Some(StatusCode::from_u16(408).unwrap());
+                        reflected.body = Some(Substance::Empty);
+                        reflected.intended = Some(reflection.intended);
+                        let reflected = reflected.build().unwrap();
+                        tx.send(ReflectedAggregate::Single(reflected));
+                    }
+                });
+            }
+            BounceBacks::Count(count) => {
+                let (tx, mut rx) = mpsc::channel(count);
+                self.multis.insert(directed.id().clone(), tx);
+                let singles = self.singles.clone();
+                let id = directed.id().clone();
+                tokio::spawn(async move {
+                    let mut agg = vec![];
+                    loop {
+                        if let Some(reflected) = rx.recv().await {
+                            agg.push(reflected);
+                            if count == agg.len() {
+                                if let Some((_, tx)) = singles.remove(&id) {
+                                    tx.send(ReflectedAggregate::Multi(agg));
+                                    break;
+                                }
+                            }
+                        } else {
+                            // this would occur in a timeout scenario
+                            if let Some((_, tx)) = singles.remove(&id) {
+                                reflected.status = Some(StatusCode::from_u16(408).unwrap());
+                                reflected.body = Some(Substance::Empty);
+                                reflected.intended = Some(reflection.intended);
+                                let reflected = reflected.build().unwrap();
+                                tx.send(ReflectedAggregate::Multi(vec![reflected]));
+                                break;
+                            }
+                        }
+                    }
+                });
+
+                let id = directed.id().clone();
+                let multis = self.multis.clone();
+                tokio::spawn(async move {
+                    tokio::time::sleep(Duration::from_secs(timeout)).await;
+                    // all we have to do is remove it, the multi loop will take care of the rest
+                    multis.remove(&id);
+                });
+            }
+            BounceBacks::Timer(wait) => {
+                let (tx, mut rx) = mpsc::channel(32);
+                self.multis.insert(directed.id().clone(), tx);
+                let singles = self.singles.clone();
+                let id = directed.id().clone();
+                tokio::spawn(async move {
+                    let mut agg = vec![];
+                    loop {
+                        if let Some(reflected) = rx.recv().await {
+                            agg.push(reflected);
+                        } else {
+                            // this would occur in a timeout scenario
+                            if let Some((_, tx)) = singles.remove(&id) {
+                                tx.send(ReflectedAggregate::Multi(agg));
+                                break;
+                            }
+                        }
+                    }
+                });
+
+                let id = directed.id().clone();
+                let multis = self.multis.clone();
+                let timeout = self.timeouts.from(wait);
+                tokio::spawn(async move {
+                    tokio::time::sleep(Duration::from_secs(timeout)).await;
+                    // all we have to do is remove it, the multi loop will take care of the rest
+                    multis.remove(&id);
+                });
+            }
+        }
+
+        rx
+    }
+}
+
+impl Default for Exchanger {
+    fn default() -> Self {
+        Self::new(Point::root().to_surface(), Default::default())
+    }
+}
+
+pub type DirectedHandlerShell<D> = DirectedHandlerShellDef<D,ProtoTransmitterBuilder>;
+
+impl <D> DirectedHandlerShell<D> where D: DirectedHandler{
+    pub async fn handle(&self, wave: DirectedWave) {
+        let logger = self
+            .logger
+            .point(self.surface.clone().to_point())
+            .spanner(&wave);
+        let mut transmitter = self.builder.clone().build();
+        let reflection = wave.reflection();
+        let ctx = RootInCtx::new(wave, self.surface.clone(), logger, transmitter);
+        match self.handler.handle(ctx).await {
+            CoreBounce::Absorbed => {}
+            CoreBounce::Reflected(reflected) => {
+                let wave = reflection.unwrap().make(reflected, self.surface.clone());
+                let wave = wave.to_ultra();
+                let transmitter = self.builder.clone().build();
+                transmitter.route(wave).await;
+            }
+        }
     }
 }

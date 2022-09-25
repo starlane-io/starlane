@@ -22,7 +22,7 @@ use crate::parse::{
 use crate::particle::traversal::TraversalPlan;
 use crate::selector::{Pattern, Selector, SpecificSelector, VersionReq};
 use crate::util::{ToResolved, uuid, ValueMatcher, ValuePattern};
-use crate::wave::exchange::Exchanger;
+use crate::wave::exchange::asynch::Exchanger;
 use crate::wave::{
     DirectedWave, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave, ToRecipients,
     UltraWave, Wave,

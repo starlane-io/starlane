@@ -15,14 +15,12 @@ use cosmic_universe::particle::traversal::{Traversal, TraversalInjection, Traver
 use cosmic_universe::substance::Substance;
 use cosmic_universe::util::{log, ToResolved};
 use cosmic_universe::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
-use cosmic_universe::wave::exchange::{
-    Exchanger, SetStrategy,
-};
+use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, Pong, ReflectedWave, UltraWave, Wave,
     WaveId,
 };
-use cosmic_universe::wave::exchange::asynch::{DirectedHandler, InCtx, ProtoTransmitterBuilder, RootInCtx};
+use cosmic_universe::wave::exchange::asynch::{DirectedHandler, Exchanger, InCtx, ProtoTransmitterBuilder, RootInCtx};
 
 use crate::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
 use crate::Cosmos;

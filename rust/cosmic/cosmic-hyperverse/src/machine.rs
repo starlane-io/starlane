@@ -34,10 +34,11 @@ use cosmic_universe::particle::{Status, Stub};
 use cosmic_universe::settings::Timeouts;
 use cosmic_universe::substance::{Bin, Substance};
 use cosmic_universe::wave::{Agent, DirectedProto, HyperWave, Pong, UltraWave, Wave};
-use cosmic_universe::wave::exchange::{Exchanger, SetStrategy};
+use cosmic_universe::wave::exchange::SetStrategy;
+use cosmic_universe::wave::exchange::asynch::Exchanger;
 
 use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
-use crate::{DriversBuilder, HyperErr, Cosmos, Registry, RegistryApi};
+use crate::{Cosmos, DriversBuilder, HyperErr, Registry, RegistryApi};
 
 #[derive(Clone)]
 pub struct MachineApi<P>
