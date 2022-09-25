@@ -7,7 +7,10 @@ use wasmer::{
     NamedResolver, RuntimeError, WasmPtr, WasmerEnv,
 };
 use cosmic_universe::err::UniErr;
+use cosmic_universe::log::PointLogger;
 use cosmic_universe::wave::UltraWave;
+use cosmic_universe::wave::core::Method;
+use cosmic_universe::wave::core::cmd::CmdMethod;
 use crate::HostPlatform;
 
 pub static VERSION: i32 = 1;
@@ -16,7 +19,8 @@ pub struct WasmMembrane<P> where P: HostPlatform {
     pub instance: Instance,
     init: String,
     name: String,
-    platform: P
+    platform: P,
+    logger: PointLogger
 }
 
 impl <P> WasmMembrane<P> where P: HostPlatform {
@@ -337,12 +341,14 @@ impl <P> WasmBuffer<P> where P: HostPlatform{
 
 pub struct WasmHost<P>  where P: HostPlatform{
     membrane: Option<Weak<WasmMembrane<P>>>,
+    logger: PointLogger
 }
 
 impl <P> WasmHost<P>  where P: HostPlatform{
-    fn new() -> Self {
+    fn new(logger: PointLogger) -> Self {
         WasmHost {
             membrane: Option::None,
+            logger
         }
     }
 }
@@ -384,8 +390,8 @@ impl <P> Env<P> where P: HostPlatform{
 }
 
 impl <P> WasmMembrane <P> where P: HostPlatform+'static{
-    pub fn new(module: Arc<Module>, name: String, platform:P ) -> Result<Arc<Self>, P::Err> {
-        Self::new_with_init(module, name, "mechtron_guest_init".to_string(),platform)
+    pub fn new(module: Arc<Module>, name: String, platform:P, logger: PointLogger ) -> Result<Arc<Self>, P::Err> {
+        Self::new_with_init(module, name, "mechtron_guest_init".to_string(),platform, logger )
     }
 
     pub fn new_with_init(
@@ -393,8 +399,9 @@ impl <P> WasmMembrane <P> where P: HostPlatform+'static{
         init: String,
         name: String,
         platform: P,
+        logger: PointLogger
     ) -> Result<Arc<Self>, P::Err> {
-        Self::new_with_init_and_imports(module, init, name, Option::None, platform )
+        Self::new_with_init_and_imports(module, init, name, Option::None, platform, logger )
     }
 
     pub fn new_with_init_and_imports(
@@ -402,9 +409,10 @@ impl <P> WasmMembrane <P> where P: HostPlatform+'static{
         init: String,
         name: String,
         ext_imports: Option<ImportObject>,
-        platform: P
+        platform: P,
+        logger: PointLogger
     ) -> Result<Arc<Self>, P::Err> {
-        let host = Arc::new(RwLock::new(WasmHost::new()));
+        let host = Arc::new(RwLock::new(WasmHost::new(logger.clone())));
 
         let imports = imports! {
 
@@ -453,9 +461,14 @@ impl <P> WasmMembrane <P> where P: HostPlatform+'static{
 
 
         "mechtron_frame_to_host"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env<P>,buffer_id:i32| -> i32 {
-                    let wave = env.unwrap().unwrap().consume_buffer(buffer_id).unwrap();
+                    let membrane = env.unwrap().unwrap();
+                    let wave = membrane.consume_buffer(buffer_id).unwrap();
                     let wave :UltraWave = bincode::deserialize(wave.as_slice()).unwrap();
 println!("MECHTRON FAME TO HOST: {}", wave.method().unwrap().to_string() );
+                    if let Some(&Method::Cmd(CmdMethod::Log)) = wave.method() {
+                        println!("logging!");
+                    }
+
                     0
             }),
 
@@ -473,7 +486,8 @@ println!("MECHTRON FAME TO HOST: {}", wave.method().unwrap().to_string() );
             instance: instance,
             init,
             name,
-            platform
+            platform,
+            logger
         });
 
         {

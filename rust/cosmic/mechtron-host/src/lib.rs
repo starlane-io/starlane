@@ -15,6 +15,7 @@ use threadpool::ThreadPool;
 use wasmer::Function;
 use wasmer::{imports, Cranelift, Module, Store, Universal};
 use wasmer_compiler_singlepass::Singlepass;
+use cosmic_universe::log::{PointLogger, RootLogger};
 use crate::membrane::WasmMembrane;
 
 pub trait HostPlatform: Clone+Send+Sync
@@ -22,6 +23,8 @@ where
     Self::Err: HostErr,
 {
     type Err;
+
+    fn root_logger(&self) -> RootLogger;
 }
 
 pub struct MechtronHostFactory<P>
@@ -50,11 +53,14 @@ where
         }
     }
 
-    pub fn create(&self, point: Point, data: Bin) -> Result<MechtronHost<P>, P::Err> {
-        let module = Arc::new(Module::new(&self.store, data.as_ref())?);
-        let membrane = WasmMembrane::new(module, point.to_string(),self.platform.clone())?;
+    pub fn create(&self, details: Details, data: Bin) -> Result<MechtronHost<P>, P::Err> {
+        let logger = self.platform.root_logger();
+        let logger = logger.point(details.stub.point.clone());
 
-        MechtronHost::new(point, membrane, self.ctx.clone(),self.platform.clone())
+        let module = Arc::new(Module::new(&self.store, data.as_ref())?);
+        let membrane = WasmMembrane::new(module, details.stub.point.to_string(),self.platform.clone(),logger.clone())?;
+
+        MechtronHost::new(details, membrane, self.ctx.clone(),self.platform.clone(), logger)
     }
 }
 
@@ -67,8 +73,9 @@ pub struct MechtronHost<P>
 where
     P: HostPlatform,
 {
+    pub details: Details,
+    pub logger: PointLogger,
     pub ctx: MechtronHostCtx,
-    pub point: Point,
     pub membrane: Arc<WasmMembrane<P>>,
     pub platform: P
 }
@@ -78,15 +85,19 @@ where
     P: HostPlatform,
 {
     pub fn new(
-        point: Point,
+        details: Details,
         membrane: Arc<WasmMembrane<P>>,
         ctx: MechtronHostCtx,
-        platform: P
+        platform: P,
+        logger: PointLogger
     ) -> Result<Self, P::Err> {
+
+
         Ok(Self {
             ctx,
-            point,
+            details,
             membrane,
+            logger,
             platform
         })
     }
@@ -141,6 +152,7 @@ mod tests {
     use cosmic_universe::wave::{DirectedProto, WaveId, WaveKind};
     use std::str::FromStr;
     use std::{fs, thread};
+    use cosmic_universe::log::{LogSource, StdOutAppender};
     use crate::err::DefaultHostErr;
 
     #[no_mangle]
@@ -164,14 +176,21 @@ mod tests {
 
     impl HostPlatform for TestPlatform {
         type Err = DefaultHostErr;
+
+        fn root_logger(&self) -> RootLogger {
+            RootLogger::new( LogSource::Core, Arc::new(StdOutAppender::new()))
+        }
     }
 
     #[test]
     fn wasm() {
+
+        let details = Default::default();
+
         let factory = MechtronHostFactory::new(TestPlatform::new());
         let point = Point::from_str("guest").unwrap();
         let data = Arc::new(fs::read("../../wasm/my-app/my_app.wasm").unwrap());
-        let host = factory.create(point, data).unwrap();
+        let host = factory.create(details, data).unwrap();
         let details = Details::default();
         host.init(details).unwrap();
 
