@@ -55,7 +55,7 @@ pub trait Guest: Send+Sync {
      fn handler(&self) -> DirectedHandlerShell<DirectedHandlerProxy>;
 }
 
-pub trait Platform: Send+Sync where Self::Err : MechErr {
+pub trait Platform: Clone+Send+Sync where Self::Err : MechErr {
     type Err;
     fn factories(&self) -> Result<MechtronFactories<Self>, Self::Err> where Self:Sized{
         Ok(MechtronFactories::new())
@@ -82,14 +82,6 @@ impl <P> MechtronFactories<P> where P: Platform {
         SkewerCase::from_str(factory.name().as_str() ).expect("Mechtron Name must be valid kebab (skewer) case (all lower case alphanumeric and dashes with leading letter)");
         self.factories.insert(factory.name(), Box::new(factory));
     }
-}
-
-
-
-pub struct DefaultPlatform;
-
-impl Platform for DefaultPlatform {
-    type Err = GuestErr;
 }
 
 pub trait MechtronFactory<P>: Sync + Send + 'static where P: Platform {

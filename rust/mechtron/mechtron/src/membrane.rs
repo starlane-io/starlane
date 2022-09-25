@@ -6,7 +6,7 @@ use cosmic_universe::particle::Details;
 use cosmic_universe::VERSION;
 use cosmic_universe::wave::{Bounce, ReflectedAggregate, UltraWave};
 use cosmic_universe::wave::exchange::synch::{DirectedHandlerProxy, DirectedHandlerShell};
-use crate::{Platform, MechtronFactories, guest, DefaultPlatform, mechtron_guest, GuestErr};
+use crate::{Platform, MechtronFactories, guest, mechtron_guest, GuestErr};
 use crate::err::MembraneErr;
 use crate::Guest;
 use std::sync::RwLock;
