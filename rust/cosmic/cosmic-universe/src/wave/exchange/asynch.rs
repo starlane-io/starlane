@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use crate::{Agent, Surface, UniErr};
-use crate::wave::exchange::{BroadTxRouter, Exchanger, ProtoTransmitterBuilderDef, ProtoTransmitterDef, SetStrategy, TxRouter};
+use crate::wave::exchange::{BroadTxRouter, Exchanger, ProtoTransmitterBuilderDef, ProtoTransmitterDef, RootInCtxDef, SetStrategy, TxRouter};
 use crate::wave::{BounceBacks, DirectedProto, FromReflectedAggregate, Handling, Pong, ReflectedAggregate, ReflectedProto, Scope, UltraWave, Wave};
 use crate::wave::core::cmd::CmdMethod;
 
@@ -147,3 +147,5 @@ impl ProtoTransmitterBuilder {
         }
     }
 }
+
+pub type RootInCtx=RootInCtxDef<ProtoTransmitter>;

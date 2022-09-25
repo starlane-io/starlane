@@ -6,7 +6,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
-use asynch::{ProtoTransmitter, ProtoTransmitterBuilder, Router};
+use asynch::{ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router};
 use dashmap::DashMap;
 use tokio::sync::{broadcast, mpsc, oneshot};
 
@@ -267,27 +267,27 @@ pub trait DirectedHandler: Send + Sync {
     }
 }
 
-pub struct RootInCtx {
+pub struct RootInCtxDef<T> {
     pub to: Surface,
     pub wave: DirectedWave,
     pub session: Option<Session>,
     pub logger: SpanLogger,
-    pub transmitter: ProtoTransmitter,
+    pub transmitter: T
 }
 
-impl RootInCtx {
+impl <T> RootInCtxDef<T> {
     pub fn new(
         wave: DirectedWave,
         to: Surface,
         logger: SpanLogger,
-        transmitter: ProtoTransmitter,
+        transmitter: T,
     ) -> Self {
         Self {
             wave,
             to,
             logger,
             session: None,
-            transmitter: transmitter,
+            transmitter
         }
     }
 
@@ -410,14 +410,31 @@ impl RootInCtx {
     }
 }
 
-pub struct InCtx<'a, I> {
+pub type InCtx<'a,I> = InCtxDef<'a,I,ProtoTransmitter>;
+
+impl <'a,I> InCtx<'a,I> {
+
+        pub fn push_from(self, from: Surface) -> InCtx<'a, I> {
+        let mut transmitter = self.transmitter.clone();
+        transmitter.to_mut().from = SetStrategy::Override(from);
+        InCtx{
+            root: self.root,
+            input: self.input,
+            logger: self.logger.clone(),
+            transmitter,
+        }
+    }
+
+}
+
+pub struct InCtxDef<'a, I, T> where T: Clone {
     root: &'a RootInCtx,
-    pub transmitter: Cow<'a, ProtoTransmitter>,
+    pub transmitter: Cow<'a, T>,
     pub input: &'a I,
     pub logger: SpanLogger,
 }
 
-impl<'a, I> Deref for InCtx<'a, I> {
+impl<'a, I,T> Deref for InCtxDef<'a, I, T> where T: Clone{
     type Target = I;
 
     fn deref(&self) -> &Self::Target {
@@ -425,11 +442,11 @@ impl<'a, I> Deref for InCtx<'a, I> {
     }
 }
 
-impl<'a, I> InCtx<'a, I> {
+impl<'a, I, T> InCtxDef<'a, I, T> where T:Clone{
     pub fn new(
         root: &'a RootInCtx,
         input: &'a I,
-        tx: Cow<'a, ProtoTransmitter>,
+        tx: Cow<'a, T>,
         logger: SpanLogger,
     ) -> Self {
         Self {
@@ -448,8 +465,8 @@ impl<'a, I> InCtx<'a, I> {
         &self.root.to
     }
 
-    pub fn push(self) -> InCtx<'a, I> {
-        InCtx {
+    pub fn push(self) -> InCtxDef<'a, I, T> {
+        InCtxDef {
             root: self.root,
             input: self.input,
             logger: self.logger.span(),
@@ -457,19 +474,9 @@ impl<'a, I> InCtx<'a, I> {
         }
     }
 
-    pub fn push_from(self, from: Surface) -> InCtx<'a, I> {
-        let mut transmitter = self.transmitter.clone();
-        transmitter.to_mut().from = SetStrategy::Override(from);
-        InCtx {
-            root: self.root,
-            input: self.input,
-            logger: self.logger.clone(),
-            transmitter,
-        }
-    }
 
-    pub fn push_input_ref<I2>(self, input: &'a I2) -> InCtx<'a, I2> {
-        InCtx {
+    pub fn push_input_ref<I2>(self, input: &'a I2) -> InCtxDef<'a, I2, T> {
+        InCtxDef {
             root: self.root,
             input,
             logger: self.logger.clone(),
@@ -481,12 +488,13 @@ impl<'a, I> InCtx<'a, I> {
         &self.root.wave
     }
 
+    /*
     pub async fn ping(&self, req: DirectedProto) -> Result<Wave<Pong>, UniErr> {
         self.transmitter.direct(req).await
     }
-}
 
-impl<'a, I> InCtx<'a, I> {
+     */
+
     pub fn ok_body(self, substance: Substance) -> ReflectedCore {
         self.root.wave.core().ok_body(substance)
     }

@@ -24,7 +24,7 @@ use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::CoreBounce;
 use cosmic_universe::wave::core::ReflectedCore;
 use cosmic_universe::wave::exchange::DirectedHandlerShell;
-use cosmic_universe::wave::exchange::RootInCtx;
+use cosmic_universe::wave::exchange::asynch::RootInCtx;
 use cosmic_universe::wave::exchange::{DirectedHandler, Exchanger, InCtx};
 use cosmic_universe::wave::exchange::{
     DirectedHandlerSelector, SetStrategy,

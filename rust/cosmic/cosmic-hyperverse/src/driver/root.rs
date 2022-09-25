@@ -11,10 +11,11 @@ use cosmic_universe::parse::bind_config;
 use cosmic_universe::selector::KindSelector;
 use cosmic_universe::util::log;
 use cosmic_universe::wave::core::{CoreBounce, ReflectedCore};
-use cosmic_universe::wave::exchange::{DirectedHandler, RootInCtx};
+use cosmic_universe::wave::exchange::DirectedHandler;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
+use cosmic_universe::wave::exchange::asynch::RootInCtx;
 
 lazy_static! {
     static ref ROOT_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
