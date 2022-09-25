@@ -25,6 +25,7 @@ use crate::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use crate::wave::{Pong, UltraWave};
 use crate::{util, Details, Point, Status, Stub, Surface, UniErr};
 use crate::err::ParseErrs;
+use crate::log::{AuditLog, Log, LogSpan, LogSpanEvent};
 
 #[derive(
     Debug,
@@ -64,6 +65,7 @@ pub enum SubstanceKind {
     UltraWave,
     Knock,
     Greet,
+    Log
 }
 
 #[derive(
@@ -105,6 +107,7 @@ pub enum Substance {
     UltraWave(Box<UltraWave>),
     Knock(Knock),
     Greet(Greet),
+    Log(LogSubstance)
 }
 
 impl Substance {
@@ -239,9 +242,11 @@ impl Substance {
             Substance::Knock(_) => SubstanceKind::Knock,
             Substance::Greet(_) => SubstanceKind::Greet,
             Substance::Details(_) => SubstanceKind::Details,
-            Substance::Location(_) => SubstanceKind::Location
+            Substance::Location(_) => SubstanceKind::Location,
+            Substance::Log(_) => SubstanceKind::Log
         }
     }
+
 
     pub fn to_bin(self) -> Result<Bin, UniErr> {
         match self {
@@ -253,6 +258,24 @@ impl Substance {
         }
     }
 }
+
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    Autobox,
+    cosmic_macros_primitive::ToSubstance,
+)]
+pub enum LogSubstance {
+    Log(Log),
+    Span(LogSpan),
+    Event(LogSpanEvent),
+    Audit(AuditLog)
+}
+
 
 impl TryInto<HashMap<String, Substance>> for Substance {
     type Error = UniErr;

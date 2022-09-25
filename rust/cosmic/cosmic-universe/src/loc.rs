@@ -34,6 +34,7 @@ use crate::err::ParseErrs;
 
 lazy_static! {
     pub static ref GLOBAL_CENTRAL: Point = Point::from_str("GLOBAL::central").unwrap();
+    pub static ref GLOBAL_LOGGER: Point = Point::from_str("GLOBAL::logger").unwrap();
     pub static ref GLOBAL_EXEC: Point = Point::from_str("GLOBAL::executor").unwrap();
     pub static ref LOCAL_STAR: Point = Point::from_str("LOCAL::star").unwrap();
     pub static ref LOCAL_PORTAL: Point = Point::from_str("LOCAL::portal").unwrap();
@@ -1489,6 +1490,10 @@ impl Point {
 
     pub fn global_executor() -> Self {
         GLOBAL_EXEC.clone()
+    }
+
+    pub fn global_logger() -> Self {
+        GLOBAL_LOGGER.clone()
     }
 
     pub fn local_portal() -> Self {

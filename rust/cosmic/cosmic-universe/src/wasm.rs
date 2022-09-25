@@ -1,7 +1,14 @@
 use serde::{Serialize,Deserialize};
 use crate::loc;
 
-#[derive(Debug,Clone,Serialize,Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+)]
 pub struct Timestamp {
   millis: i64
 }

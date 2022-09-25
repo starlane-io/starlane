@@ -7,7 +7,7 @@ use crate::wave::{Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::CoreBounce;
 
-pub trait ExchangeRouter {
+pub trait ExchangeRouter: Send+Sync {
     fn route(&self, wave: UltraWave );
     fn exchange( &self, direct: DirectedWave ) -> Result<ReflectedAggregate,UniErr>;
 }
