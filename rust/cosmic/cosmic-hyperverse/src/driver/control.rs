@@ -3,7 +3,7 @@ use crate::driver::{
     ItemRouter, ItemSphere,
 };
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::{HyperErr, Cosmos};
+use crate::{Cosmos, HyperErr};
 use cosmic_hyperlane::{
     AnonHyperAuthenticatorAssignEndPoint, FromTransform, HopTransform, HyperClient, HyperGreeter,
     Hyperway, HyperwayConfigurator, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub,
@@ -27,7 +27,7 @@ use cosmic_universe::substance::Substance;
 use cosmic_universe::wave::core::ext::ExtMethod;
 use cosmic_universe::wave::core::ReflectedCore;
 use cosmic_universe::wave::exchange::{
-    Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, SetStrategy,
+    Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, SetStrategy,
 };
 use cosmic_universe::wave::{Agent, DirectedProto, Pong, ToRecipients, UltraWave, Wave};
 use dashmap::DashMap;
@@ -35,6 +35,7 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use cosmic_universe::wave::exchange::asynch::Router;
 
 pub struct ControlDriverFactory<P>
 where
@@ -427,10 +428,6 @@ where
 {
     async fn route(&self, wave: UltraWave) {
         self.ctx.router.route(wave).await;
-    }
-
-    fn route_sync(&self, wave: UltraWave) {
-        self.ctx.router.route_sync(wave);
     }
 }
 

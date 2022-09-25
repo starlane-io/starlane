@@ -9,7 +9,7 @@ pub mod mechtron;
 use crate::driver::star::StarDriverFactory;
 use crate::star::HyperStarCall::LayerTraversalInjection;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::{HyperErr, Cosmos, Registration};
+use crate::{Cosmos, HyperErr, Registration};
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::command::common::{SetProperties, StateSrc};
 use cosmic_universe::command::direct::create::{
@@ -31,7 +31,7 @@ use cosmic_universe::wave::core::cmd::CmdMethod;
 use cosmic_universe::wave::core::{CoreBounce, Method, ReflectedCore};
 use cosmic_universe::wave::exchange::{
     DirectedHandler, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx,
-    Router, SetStrategy,
+    SetStrategy,
 };
 use cosmic_universe::wave::{Agent, DirectedWave, ReflectedWave, UltraWave};
 use cosmic_universe::HYPERUSER;
@@ -45,7 +45,8 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, oneshot, watch, RwLock};
+use tokio::sync::{mpsc, oneshot, RwLock, watch};
+use cosmic_universe::wave::exchange::asynch::Router;
 
 lazy_static! {
     static ref DEFAULT_BIND: ArtRef<BindConfig> = ArtRef::new(
@@ -1831,13 +1832,6 @@ println!("DRIVER DRIVER ROUTING!");
         api.route(wave).await;
     }
 
-    fn route_sync(&self, wave: UltraWave) {
-        let skel = self.skel.clone();
-        tokio::spawn( async move {
-           let api = skel.drivers().get(&skel.driver_kind ).await.unwrap();
-           api.route(wave).await;
-        });
-    }
 }
 
 #[async_trait]

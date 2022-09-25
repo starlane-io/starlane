@@ -9,12 +9,12 @@ use std::time::Duration;
 
 use dashmap::mapref::one::{Ref, RefMut};
 use dashmap::DashMap;
-use futures::future::{join_all, BoxFuture};
+use futures::future::{BoxFuture, join_all};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
+use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock, watch};
 use tokio::time::error::Elapsed;
 use tracing::{error, info};
 
@@ -36,11 +36,11 @@ use cosmic_universe::hyper::{
 };
 use cosmic_universe::kind::{BaseKind, Kind, StarStub, StarSub, Sub};
 use cosmic_universe::loc::{
-    Layer, Point, RouteSeg, StarKey, Surface, SurfaceSelector, ToBaseKind, ToPoint, ToSurface,
-    Topic, Uuid, GLOBAL_EXEC, LOCAL_STAR,
+    GLOBAL_EXEC, Layer, LOCAL_STAR, Point, RouteSeg, StarKey, Surface, SurfaceSelector, ToBaseKind,
+    Topic, ToPoint, ToSurface, Uuid,
 };
 use cosmic_universe::log::{PointLogger, RootLogger, Trackable, Tracker};
-use cosmic_universe::parse::{bind_config, route_attribute, Env};
+use cosmic_universe::parse::{bind_config, Env, route_attribute};
 use cosmic_universe::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
@@ -54,20 +54,21 @@ use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
 use cosmic_universe::wave::exchange::{
     DirectedHandler, DirectedHandlerSelector, DirectedHandlerShell, Exchanger, InCtx,
-    ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, SetStrategy, TxRouter,
+    ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, SetStrategy, TxRouter,
 };
 use cosmic_universe::wave::{
     Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
-    HandlingKind, Ping, Pong, Priority, RecipientSelector, Recipients, Reflectable, ReflectedWave,
+    HandlingKind, Ping, Pong, Priority, Recipients, RecipientSelector, Reflectable, ReflectedWave,
     Retries, Ripple, Scope, Signal, SingularRipple, ToRecipients, WaitTime, Wave, WaveKind,
 };
 use cosmic_universe::wave::{HyperWave, UltraWave};
 use cosmic_universe::HYPERUSER;
+use cosmic_universe::wave::exchange::asynch::Router;
 
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, DriverSkel,
-    DriverStatus, Drivers, DriversApi, DriversCall, HyperDriverFactory, Item, ItemHandler,
+    Driver, DriverAvail, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, Drivers,
+    DriversApi, DriversCall, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler,
     ItemSkel, ItemSphere,
 };
 use crate::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
@@ -76,7 +77,7 @@ use crate::layer::shell::Shell;
 use crate::layer::shell::ShellState;
 use crate::machine::MachineSkel;
 use crate::Registration;
-use crate::{DriversBuilder, HyperErr, Cosmos, Registry, RegistryApi};
+use crate::{Cosmos, DriversBuilder, HyperErr, Registry, RegistryApi};
 
 #[derive(Clone)]
 pub struct ParticleStates<P>
@@ -1547,10 +1548,6 @@ impl Router for LayerInjectionRouter {
         self.inject_tx.send(inject).await;
     }
 
-    fn route_sync(&self, wave: UltraWave) {
-        let inject = TraversalInjection::new(self.injector.clone(), wave);
-        self.inject_tx.try_send(inject);
-    }
 }
 
 pub trait TopicHandler: Send + Sync + DirectedHandler {
