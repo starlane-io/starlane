@@ -7,7 +7,7 @@ extern crate lazy_static;
 use std::sync::Arc;
 use cosmic_universe::err::UniErr;
 use cosmic_universe::particle::Details;
-use mechtron::{DefaultPlatform, Guest, MechtronFactories, MechtronFactory, Platform, guest};
+use mechtron::{Guest, MechtronFactories, MechtronFactory, Platform, guest};
 use mechtron::err::{GuestErr, MechErr};
 use mechtron::Mechtron;
 
@@ -28,6 +28,7 @@ pub extern "C" fn mechtron_guest( details: Details ) -> Result<Arc<dyn mechtron:
    Ok(Arc::new(mechtron::guest::Guest::new(details, MyAppPlatform::new() )?))
 }
 
+#[derive(Clone)]
 pub struct MyAppPlatform;
 
 impl Platform for MyAppPlatform {

@@ -179,13 +179,13 @@ impl<P> GuestHandler<P>
 where
     P: Platform,
 {
-    #[route("Hyp<Assign>")]
+    #[route("Hyp<Host>")]
     pub fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), UniErr> {
-        if let HyperSubstance::Assign(assign) = ctx.input {
-            self.skel.logger.info("Received Assign command!");
+        if let HyperSubstance::Host(host) = ctx.input {
+            self.skel.logger.info("Received Host command!");
             Ok(())
         } else {
-            Err("expecting Assign".into())
+            Err("expecting Host ".into())
         }
     }
 }

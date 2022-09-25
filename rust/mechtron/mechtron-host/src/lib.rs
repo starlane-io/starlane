@@ -102,6 +102,10 @@ where
         })
     }
 
+    pub fn point(&self) -> &Point {
+        &self.details.stub.point
+    }
+
     pub fn init(&self, details: Details) -> Result<(), P::Err> {
         self.membrane.init()?;
         let version = self.membrane.write_string(VERSION.to_string())?;
@@ -147,12 +151,19 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmic_universe::kind::Sub;
+    use cosmic_universe::kind::{Kind, Sub};
     use cosmic_universe::loc::ToSurface;
     use cosmic_universe::wave::{DirectedProto, WaveId, WaveKind};
     use std::str::FromStr;
     use std::{fs, thread};
+    use cosmic_universe::command::common::StateSrc;
+    use cosmic_universe::hyper;
+    use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance};
     use cosmic_universe::log::{LogSource, StdOutAppender};
+    use cosmic_universe::particle::{Status, Stub};
+    use cosmic_universe::substance::Substance;
+    use cosmic_universe::wave::core::hyp::HypMethod;
+    use cosmic_universe::wave::core::Method;
     use crate::err::DefaultHostErr;
 
     #[no_mangle]
@@ -194,14 +205,30 @@ mod tests {
         let host = factory.create(details, data).unwrap();
         let mut details = Details::default();
         details.stub.point = Point::from_str("host:guest").unwrap();
+        let guest = details.stub.point.to_surface();
         host.init(details).unwrap();
 
-        let mut wave = DirectedProto::ping();
-        wave.to(Point::local_endpoint().to_surface());
-        wave.from(Point::local_endpoint().to_surface());
 
+        let mechtron = Details {
+            stub: Stub {
+                point: guest.point.push("mechtron").unwrap(),
+                kind: Kind::Mechtron,
+                status: Status::Ready
+            },
+            properties: Default::default()
+        };
+        let host_cmd = Assign::new( AssignmentKind::Create, mechtron.clone(), StateSrc::None ).to_host();
+        let mut wave = DirectedProto::ping();
+        wave.to(guest);
+        wave.from(host.point().to_surface());
+        wave.method(Method::Hyp(HypMethod::Host));
+        wave.body(Substance::Hyper(HyperSubstance::Host(host_cmd)));
         let wave = wave.build().unwrap();
         let wave = wave.to_ultra();
-        host.route(wave).unwrap();
+        let reflect = host.route(wave).unwrap();
+        let reflect = reflect.unwrap();
+        let reflect = reflect.to_reflected().unwrap();
+
+        reflect.success_or().unwrap();
     }
 }
