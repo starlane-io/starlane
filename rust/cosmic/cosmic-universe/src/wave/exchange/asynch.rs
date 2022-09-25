@@ -7,7 +7,7 @@ use crate::{Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, UniErr
 use crate::loc::{ToPoint, ToSurface};
 use crate::settings::Timeouts;
 use crate::wave::exchange::{BroadTxRouter, DirectedHandlerShellDef, InCtxDef, ProtoTransmitterBuilderDef, ProtoTransmitterDef, RootInCtxDef, SetStrategy};
-use crate::wave::{BounceBacks, BounceProto, DirectedProto, DirectedWave, FromReflectedAggregate, Handling, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto, ReflectedWave, Scope, UltraWave, Wave, WaveId};
+use crate::wave::{BounceBacks, BounceProto, DirectedKind, DirectedProto, DirectedWave, Echo, FromReflectedAggregate, Handling, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto, ReflectedWave, Scope, UltraWave, Wave, WaveId};
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::CoreBounce;
 use crate::wave::core::http2::StatusCode;
@@ -89,6 +89,36 @@ impl ProtoTransmitter {
                 let reflected_agg = reflected_rx.await?;
                 FromReflectedAggregate::from_reflected_aggregate(reflected_agg)
             }
+        }
+    }
+
+    pub async fn ping<D>(&self, ping: D ) -> Result<Wave<Pong>,UniErr> where D: Into<DirectedProto>,
+    {
+        let mut ping: DirectedProto = ping.into();
+        if let Some(DirectedKind::Ping) = ping.kind {
+            self.direct(ping).await
+        } else {
+            Err(UniErr::from_500("expected DirectedKind::Ping"))
+        }
+    }
+
+    pub async fn ripple<D>(&self, ripple: D ) -> Result<Vec<Wave<Echo>>,UniErr> where D: Into<DirectedProto>,
+    {
+        let mut ripple: DirectedProto = ripple.into();
+        if let Some(DirectedKind::Ripple) = ripple.kind {
+            self.direct(ripple).await
+        } else {
+            Err(UniErr::from_500("expected DirectedKind::Ping"))
+        }
+    }
+
+    pub async fn signal<D>(&self, signal: D ) -> Result<(),UniErr> where D: Into<DirectedProto>,
+    {
+        let mut signal: DirectedProto = signal.into();
+        if let Some(DirectedKind::Signal) = signal.kind {
+            self.direct(signal).await
+        } else {
+            Err(UniErr::from_500("expected DirectedKind::Ping"))
         }
     }
 
