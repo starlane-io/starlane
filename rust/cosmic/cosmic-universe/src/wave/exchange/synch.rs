@@ -1,41 +1,46 @@
-use alloc::borrow::Cow;
-use std::sync::Arc;
-use crate::{Agent, ReflectedCore, Substance, Surface, ToSubstance, UniErr};
 use crate::loc::ToPoint;
-use crate::wave::exchange::{DirectedHandlerShellDef, InCtxDef, ProtoTransmitterBuilderDef, ProtoTransmitterDef, RootInCtxDef, SetStrategy};
-use crate::wave::{Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, FromReflectedAggregate, Handling, Ping, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto, ReflectedWave, Scope, UltraWave, Wave, WaveKind};
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::CoreBounce;
+use crate::wave::exchange::{
+    DirectedHandlerShellDef, InCtxDef, ProtoTransmitterBuilderDef, ProtoTransmitterDef,
+    RootInCtxDef, SetStrategy,
+};
+use crate::wave::{
+    Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, FromReflectedAggregate,
+    Handling, Ping, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto, ReflectedWave,
+    Scope, UltraWave, Wave, WaveKind,
+};
+use crate::{Agent, ReflectedCore, Substance, Surface, ToSubstance, UniErr};
+use alloc::borrow::Cow;
+use std::sync::Arc;
 
-pub trait ExchangeRouter: Send+Sync {
-    fn route(&self, wave: UltraWave );
-    fn exchange( &self, direct: DirectedWave ) -> Result<ReflectedAggregate,UniErr>;
+pub trait ExchangeRouter: Send + Sync {
+    fn route(&self, wave: UltraWave);
+    fn exchange(&self, direct: DirectedWave) -> Result<ReflectedAggregate, UniErr>;
 }
 
 #[derive(Clone)]
 pub struct SyncRouter {
-    pub router: Arc<dyn ExchangeRouter>
+    pub router: Arc<dyn ExchangeRouter>,
 }
 
 impl SyncRouter {
     pub fn new(router: Arc<dyn ExchangeRouter>) -> Self {
-        Self {
-            router
-        }
+        Self { router }
     }
 }
 
 impl ExchangeRouter for SyncRouter {
-    fn route(&self, wave: UltraWave ) {
+    fn route(&self, wave: UltraWave) {
         self.router.route(wave)
     }
 
-    fn exchange(&self, direct: DirectedWave) -> Result<ReflectedAggregate,UniErr> {
+    fn exchange(&self, direct: DirectedWave) -> Result<ReflectedAggregate, UniErr> {
         self.router.exchange(direct)
     }
 }
 
-pub type ProtoTransmitter = ProtoTransmitterDef<SyncRouter,()>;
+pub type ProtoTransmitter = ProtoTransmitterDef<SyncRouter, ()>;
 
 impl ProtoTransmitter {
     pub fn new(router: Arc<dyn ExchangeRouter>) -> ProtoTransmitter {
@@ -53,9 +58,9 @@ impl ProtoTransmitter {
     }
 
     pub fn direct<D, W>(&self, wave: D) -> Result<W, UniErr>
-        where
-            W: FromReflectedAggregate,
-            D: Into<DirectedProto>,
+    where
+        W: FromReflectedAggregate,
+        D: Into<DirectedProto>,
     {
         let mut wave: DirectedProto = wave.into();
 
@@ -68,13 +73,13 @@ impl ProtoTransmitter {
                 self.router.route(directed.to_ultra());
                 FromReflectedAggregate::from_reflected_aggregate(ReflectedAggregate::None)
             }
-            _ => {
-                FromReflectedAggregate::from_reflected_aggregate(self.router.exchange(directed)?)
-            }
+            _ => FromReflectedAggregate::from_reflected_aggregate(self.router.exchange(directed)?),
         }
     }
 
-    pub fn ping<D>(&self, ping: D ) -> Result<Wave<Pong>,UniErr> where D: Into<DirectedProto>,
+    pub fn ping<D>(&self, ping: D) -> Result<Wave<Pong>, UniErr>
+    where
+        D: Into<DirectedProto>,
     {
         let mut ping: DirectedProto = ping.into();
         if let Some(DirectedKind::Ping) = ping.kind {
@@ -84,7 +89,9 @@ impl ProtoTransmitter {
         }
     }
 
-    pub fn ripple<D>(&self, ripple: D ) -> Result<Vec<Wave<Echo>>,UniErr> where D: Into<DirectedProto>,
+    pub fn ripple<D>(&self, ripple: D) -> Result<Vec<Wave<Echo>>, UniErr>
+    where
+        D: Into<DirectedProto>,
     {
         let mut ripple: DirectedProto = ripple.into();
         if let Some(DirectedKind::Ripple) = ripple.kind {
@@ -94,7 +101,9 @@ impl ProtoTransmitter {
         }
     }
 
-    pub fn signal<D>(&self, signal: D ) -> Result<(),UniErr> where D: Into<DirectedProto>,
+    pub fn signal<D>(&self, signal: D) -> Result<(), UniErr>
+    where
+        D: Into<DirectedProto>,
     {
         let mut signal: DirectedProto = signal.into();
         if let Some(DirectedKind::Signal) = signal.kind {
@@ -104,16 +113,13 @@ impl ProtoTransmitter {
         }
     }
 
-
     pub fn bounce_from(&self, to: &Surface, from: &Surface) -> bool {
         let mut directed = DirectedProto::ping();
         directed.from(from.clone());
         directed.to(to.clone());
         directed.method(CmdMethod::Bounce);
-        match self.ping(directed){
-            Ok(pong) => {
-                pong.is_ok()
-            }
+        match self.ping(directed) {
+            Ok(pong) => pong.is_ok(),
             Err(_) => false,
         }
     }
@@ -123,9 +129,7 @@ impl ProtoTransmitter {
         directed.to(to.clone());
         directed.method(CmdMethod::Bounce);
         match self.ping(directed) {
-            Ok(pong) => {
-                pong.is_ok()
-            }
+            Ok(pong) => pong.is_ok(),
             Err(_) => false,
         }
     }
@@ -135,8 +139,8 @@ impl ProtoTransmitter {
     }
 
     pub fn reflect<W>(&self, wave: W) -> Result<(), UniErr>
-        where
-            W: Into<ReflectedProto>,
+    where
+        W: Into<ReflectedProto>,
     {
         let mut wave: ReflectedProto = wave.into();
 
@@ -150,7 +154,7 @@ impl ProtoTransmitter {
     }
 }
 
-pub type ProtoTransmitterBuilder = ProtoTransmitterBuilderDef<SyncRouter,()>;
+pub type ProtoTransmitterBuilder = ProtoTransmitterBuilderDef<SyncRouter, ()>;
 
 impl ProtoTransmitterBuilder {
     pub fn new(router: Arc<dyn ExchangeRouter>) -> ProtoTransmitterBuilder {
@@ -168,23 +172,21 @@ impl ProtoTransmitterBuilder {
     }
 }
 
-pub type RootInCtx=RootInCtxDef<ProtoTransmitter>;
+pub type RootInCtx = RootInCtxDef<ProtoTransmitter>;
 
-pub type InCtx<'a,I> = InCtxDef<'a,I,ProtoTransmitter>;
+pub type InCtx<'a, I> = InCtxDef<'a, I, ProtoTransmitter>;
 
-impl <'a,I> InCtx<'a,I> {
-
+impl<'a, I> InCtx<'a, I> {
     pub fn push_from(self, from: Surface) -> InCtx<'a, I> {
         let mut transmitter = self.transmitter.clone();
         transmitter.to_mut().from = SetStrategy::Override(from);
-        InCtx{
+        InCtx {
             root: self.root,
             input: self.input,
             logger: self.logger.clone(),
             transmitter,
         }
     }
-
 }
 
 pub trait DirectedHandlerSelector {
@@ -200,14 +202,24 @@ pub trait DirectedHandler: Send + Sync {
 }
 
 pub struct DirectedHandlerProxy {
-    proxy: Box<dyn DirectedHandler>
+    proxy: Box<dyn DirectedHandler>,
 }
 
 impl DirectedHandlerProxy {
-    pub fn new<D>( handler: D ) ->  Self where D: DirectedHandler+'static+Sized {
+    pub fn new<D>(handler: D) -> Self
+    where
+        D: DirectedHandler + 'static + Sized,
+    {
         Self {
-            proxy: Box::new(handler)
+            proxy: Box::new(handler),
         }
+    }
+
+    pub fn boxed<D>(handler: Box<D>) -> Self
+    where
+        D: DirectedHandler + 'static + Sized,
+    {
+        Self { proxy: handler }
     }
 }
 
@@ -217,10 +229,11 @@ impl DirectedHandler for DirectedHandlerProxy {
     }
 }
 
-pub type DirectedHandlerShell<D> = DirectedHandlerShellDef<D,ProtoTransmitterBuilder>;
+pub type DirectedHandlerShell = DirectedHandlerShellDef<Box<dyn DirectedHandler>, ProtoTransmitterBuilder>;
 
-impl <D> DirectedHandlerShell<D> where D: DirectedHandler+Sized {
-    pub fn handle(&self, wave: DirectedWave) -> Bounce<ReflectedWave>{
+impl DirectedHandlerShell
+{
+    pub fn handle(&self, wave: DirectedWave) -> Bounce<ReflectedWave> {
         let logger = self
             .logger
             .point(self.surface.clone().to_point())
@@ -240,8 +253,8 @@ impl <D> DirectedHandlerShell<D> where D: DirectedHandler+Sized {
 
 impl RootInCtx {
     pub fn push<'a, I>(&self) -> Result<InCtx<I>, UniErr>
-        where
-            Substance: ToSubstance<I>,
+    where
+        Substance: ToSubstance<I>,
     {
         let input = match self.wave.to_substance_ref() {
             Ok(input) => input,

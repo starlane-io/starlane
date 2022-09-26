@@ -11,11 +11,11 @@ use std::marker::PhantomData;
 use cosmic_universe::err::UniErr;
 use cosmic_universe::particle::Details;
 use mechtron::err::{GuestErr, MechErr};
-use mechtron::{Mechtron, MechtronLifecycle};
+use mechtron::{Mechtron, MechtronLifecycle, MechtronSkel};
 use mechtron::{guest, Guest, MechtronFactories, MechtronFactory, Platform};
 use std::sync::Arc;
 use cosmic_universe::wave::core::CoreBounce;
-use cosmic_universe::wave::exchange::synch::{DirectedHandler, RootInCtx};
+use cosmic_universe::wave::exchange::synch::{DirectedHandler, ProtoTransmitterBuilder, RootInCtx};
 use cosmic_macros::handler_sync;
 
 #[no_mangle]
@@ -61,35 +61,38 @@ impl <P> MechtronFactory<P> for MyAppFactory where P: Platform+'static{
         "my-app".to_string()
     }
 
-    fn create(&self, details: Details ) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err> {
-        Ok(Box::new(MyApp::new()))
+    fn lifecycle(&self, details: &Details) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err> {
+        let phantom:PhantomData<P> = PhantomData::default();
+        let skel = MechtronSkel::new(details.clone(), phantom );
+        Ok(Box::new(MyApp::restore(skel,(),(),())))
+    }
+
+    fn handler(&self, details: &Details, transmitter: ProtoTransmitterBuilder) -> Result<Box<dyn DirectedHandler>, P::Err> {
+                let phantom:PhantomData<P> = PhantomData::default();
+        let skel = MechtronSkel::new(details.clone(), phantom );
+
+        Ok(Box::new(MyApp::restore(skel,(),(),())))
     }
 }
 
 
 
 
-pub struct MyApp<P> where P: Platform {
-    phantom: PhantomData<P>
+pub struct MyApp<P> where P: Platform + 'static{
+    skel: MechtronSkel<P>
 }
 
-impl <P> MyApp<P> where P: Platform {
-    pub fn new()->Self{
-        Self{
-            phantom: Default::default()
-        }
-
-    }
-}
 
 impl <P> Mechtron<P> for MyApp<P> where P: Platform+'static {
-    type Skel = ();
+    type Skel = MechtronSkel<P>;
     type Ctx = ();
     type Cache = ();
     type State = ();
 
-    fn restore(_skel: Self::Skel, _ctx: Self::Ctx, _cache: Self::Cache, _state: Self::State) -> Self {
-        MyApp::new()
+    fn restore(skel: Self::Skel, _ctx: Self::Ctx, _cache: Self::Cache, _state: Self::State) -> Self {
+        MyApp {
+            skel
+        }
     }
 
     fn cache(ctx: Self::Ctx) -> Self::Cache {
@@ -97,12 +100,13 @@ impl <P> Mechtron<P> for MyApp<P> where P: Platform+'static {
     }
 }
 
+
 impl <P> MechtronLifecycle<P> for MyApp<P> where P: Platform+'static {
 
 }
 
 #[handler_sync]
-impl <P> MyApp<P> where P:Platform {
+impl <P> MyApp<P> where P: Platform+'static {
 
 }
 

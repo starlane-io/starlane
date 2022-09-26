@@ -52,7 +52,8 @@ extern "C" {
 }
 
 pub trait Guest: Send+Sync {
-     fn handler(&self) -> DirectedHandlerShell<DirectedHandlerProxy>;
+     fn handler(&self, point: &Point) -> Result<DirectedHandlerShell, GuestErr>;
+     fn logger(&self) -> &PointLogger;
 }
 
 pub trait Platform: Clone+Send+Sync where Self::Err : MechErr {
@@ -90,7 +91,8 @@ impl <P> MechtronFactories<P> where P: Platform {
 
 pub trait MechtronFactory<P>: Sync + Send + 'static where P: Platform {
     fn name(&self) -> String;
-    fn create(&self, details: Details) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err>;
+    fn lifecycle(&self, details: &Details) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err>;
+    fn handler(&self, details: &Details, transmitter: ProtoTransmitterBuilder) -> Result<Box<dyn DirectedHandler>, P::Err>;
 }
 
 #[cfg(test)]
@@ -105,8 +107,18 @@ pub mod test {
 /// Mechtron instance.
 ///
 #[derive(Clone)]
-pub struct MechtronSkel {
+pub struct MechtronSkel<P> where P: Platform {
     pub details: Details,
+    phantom: PhantomData<P>
+}
+
+impl <P> MechtronSkel<P> where P: Platform{
+    pub fn new( details: Details, phantom: PhantomData<P> ) -> Self {
+        Self {
+            details,
+            phantom
+        }
+    }
 }
 
 /// The Mechtron Context, it holds a transmitter for sending Waves
@@ -126,9 +138,9 @@ impl MechtronCtx {
 
 /// MechtronSphere is the interface used by Guest
 /// to make important calls to the Mechtron
-pub trait MechtronLifecycle<G>: DirectedHandler + Sync + Send where G: Platform {
+pub trait MechtronLifecycle<P>: DirectedHandler + Sync + Send where P: Platform {
 
-    fn create(&self, _ctx: MechtronCtx ) -> Result<(),G::Err> {
+    fn create(&self, _ctx: MechtronCtx ) -> Result<(), P::Err> {
         Ok(())
     }
 

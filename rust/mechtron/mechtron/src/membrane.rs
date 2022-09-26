@@ -59,11 +59,12 @@ pub fn mechtron_frame_to_guest(frame: i32) -> i32 {
     let wave: UltraWave = bincode::deserialize(frame.as_slice()).unwrap();
 
     if wave.is_directed() {
+
         let wave = wave.to_directed().unwrap();
-        let handler: DirectedHandlerShell<DirectedHandlerProxy> = {
+        let handler: DirectedHandlerShell = {
             let read = GUEST.read().unwrap();
             let guest = read.as_ref().unwrap();
-            guest.handler()
+            guest.logger().result(guest.handler(&wave.to().to_single().unwrap().point )).unwrap()
         };
 
         match handler.handle(wave) {
