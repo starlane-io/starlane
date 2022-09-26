@@ -283,7 +283,6 @@ where
 
     #[track_caller]
     pub async fn create_in_star(&self, create: Create) -> Result<Details, P::Err> {
-println!("CREATE IN STAR : {}", create.template.kind.to_string() );
         if self.point != create.template.point.parent
             && !self.point.is_parent_of(&create.template.point.parent)
         {
@@ -315,7 +314,6 @@ println!("CREATE IN STAR : {}", create.template.kind.to_string() );
         transmitter.from = SetStrategy::Override(self.point.to_surface().with_layer(Layer::Core));
         transmitter.agent = SetStrategy::Override(Agent::HyperUser);
         let transmitter = transmitter.build();
-assign.track = true;
         let assign_result: Wave<Pong> = logger.result_ctx(
             "StarSkel::create(assign_result)",
             transmitter.direct(assign).await,
@@ -459,7 +457,6 @@ where
             let call_tx = call_tx.clone();
             tokio::spawn(async move {
                 while let Some(inject) = drivers_rx.recv().await {
-println!(" TO DRIVERS -> {}", inject.to.to_string());
                     match call_tx.send(HyperStarCall::ToDriver(inject)).await {
                         Ok(_) => {}
                         Err(_) => {
@@ -1408,7 +1405,6 @@ where
     async fn exit(&self, traversal: Traversal<UltraWave>) -> Result<(), UniErr> {
         match traversal.dir {
             TraversalDirection::Fabric => {
-println!("Sending EXIT UP {}",traversal.method().as_ref().unwrap().to_string());
                 self.exit_up.send(traversal).await;
                 return Ok(());
             }

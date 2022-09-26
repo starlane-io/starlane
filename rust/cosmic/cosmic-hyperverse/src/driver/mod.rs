@@ -870,11 +870,7 @@ where
     async fn start_inner_traversal(&self, traversal: Traversal<UltraWave>) {}
 
     pub async fn visit(&self, traversal: Traversal<UltraWave>) {
-        println!(
-            "  Visit: {} core? {}",
-            traversal.to.to_string(),
-            traversal.dir.is_core()
-        );
+
         if traversal.dir.is_core() {
             match self.find(&traversal.record.details.stub.kind) {
                 None => {
@@ -886,7 +882,6 @@ where
                 Some(driver) => {
                     let driver = driver.clone();
                     tokio::spawn(async move {
-                        println!("\tSPawning Traversal.... for {}<{}>",traversal.to.point.to_string(), traversal.record.details.stub.kind.to_string()  );
                         driver.traverse(traversal).await;
                     });
                 }
@@ -1047,7 +1042,6 @@ where
     }
 
     async fn deliver_directed(&self, direct: Traversal<DirectedWave>) -> Result<(), UniErr> {
-        println!("\nItemOUter deliver_directed...");
         self.skel
             .logger
             .track(&direct, || Tracker::new("core:outer", "DeliverDirected"));
@@ -1059,7 +1053,6 @@ where
 
         match &self.item {
             ItemSphere::Handler(item) => {
-                println!("\tItemSphere {} is a HANDLER", self.surface.to_string());
                 if direct.core().method == Method::Cmd(CmdMethod::Init) {
                     let reflection = direct.reflection()?;
                     match item.init().await {
@@ -1109,7 +1102,6 @@ where
                 }
             }
             ItemSphere::Router(router) => {
-                println!("\tItemSphere {} is a ROUTER", self.surface.to_string());
                 router.traverse(direct.wrap() ).await;
             }
         }
@@ -1230,7 +1222,6 @@ where
                         self.traverse(traversal).await;
                     }
                     DriverRunnerCall::Handle(traversal) => {
-                    println!("DriverRunnerCall::Handle: {}",traversal.to.to_string());
                                             if traversal.is_directed() {
                                                 let wave = traversal.payload.to_directed().unwrap();
                                                 self.logger
@@ -1245,7 +1236,6 @@ where
                                                 let handler = self.handler().await;
                                                 let skel = self.skel.clone();
                                                 tokio::spawn(async move {
-                    println!(" Grabbing Handler...");
                                                     match handler.handle(ctx).await {
                                                         CoreBounce::Absorbed => {
                                                             // do nothign
@@ -1311,12 +1301,10 @@ where
     }
 
     async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), P::Err> {
-        println!("\t...Driver Traversal: {}", self.skel.kind.to_string());
         let item = self
             .skel
             .logger
             .result(self.item(&traversal.to.point).await)?;
-        println!("\tGOT ITEM");
         let logger = item.skel.logger.clone();
         tokio::spawn(async move {
             if traversal.is_directed() {
@@ -1455,11 +1443,7 @@ where
     }
 
     pub async fn local_driver_lookup(&self, kind: Kind) -> Result<Option<Point>, UniErr> {
-        println!("Doing LOCAL DRIVER LOOKUP...");
-        let rtn = self.skel.drivers.local_driver_lookup(kind).await;
-
-        println!("RETURNED FROM LOOKUP...");
-        rtn
+        self.skel.drivers.local_driver_lookup(kind).await
     }
 }
 
@@ -1616,7 +1600,6 @@ impl DefaultDriverHandler {
 
     #[route("Hyp<Assign>")]
     pub async fn assign( &self, _ctx: InCtx<'_,HyperSubstance> ) -> Result<(),UniErr> {
-println!("ASSIGNED! {}", _ctx.to().to_string() );
         Ok(())
     }
 
@@ -1878,7 +1861,6 @@ where
             (),
         ))));
 
-        println!("\tReturning DRIVER DRIVER FOR REALZ: {}", point.to_string());
         rtn
     }
 }
@@ -1910,7 +1892,6 @@ where
     P: Cosmos,
 {
     async fn traverse(&self, traversal: Traversal<UltraWave>) {
-         println!("DRIVER DRIVER ROUTING!");
          self.skel.api.handle(traversal).await;
     }
 }
@@ -1921,7 +1902,6 @@ where
     P: Cosmos,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
-        println!("GEtting DRiver DRIVER BIND!");
         //let api = self.skel.drivers().get(&self.skel.driver_kind).await?;
         //api.driver_bind().await
         Ok(DRIVER_DRIVER_BIND.clone())
