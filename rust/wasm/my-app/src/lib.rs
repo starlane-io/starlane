@@ -36,6 +36,7 @@ impl Platform for MyAppPlatform {
         Self: Sized,
     {
         let mut factories = MechtronFactories::new();
+        factories.add( MyAppFactory::new() );
         Ok(factories)
     }
 }
@@ -57,13 +58,15 @@ impl MyAppFactory {
 
 impl <P> MechtronFactory<P> for MyAppFactory where P: Platform+'static{
     fn name(&self) -> String {
-        "my-mechtron".to_string()
+        "my-app".to_string()
     }
 
     fn create(&self, details: Details ) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err> {
         Ok(Box::new(MyApp::new()))
     }
 }
+
+
 
 
 pub struct MyApp<P> where P: Platform {

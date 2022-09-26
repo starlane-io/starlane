@@ -183,15 +183,17 @@ where
 {
     #[route("Hyp<Host>")]
     pub fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
+        self.skel.logger.info("Received Host command!");
         if let HyperSubstance::Host(host) = ctx.input {
-            let factory = self.skel.factories.get(&host.name).ok_or(format!("Guest does not have a mechtron with name: {}", host.name))?;
+            let factory = self.skel.logger.result(self.skel.factories.get(&host.name).ok_or(format!("Guest does not have a mechtron with name: {}", host.name)))?;
+            self.skel.logger.info("Creating...");
             let mechtron = factory.create(host.details.clone())?;
+            self.skel.logger.info("Got MechtronLifecycle...");
             let mut transmitter = self.ctx.builder();
             transmitter.from = SetStrategy::Override(host.details.stub.point.to_surface());
             transmitter.agent = SetStrategy::Fill(Agent::Point(host.details.stub.point.clone()));
             let ctx = MechtronCtx::new(transmitter.build() );
             mechtron.create(ctx)?;
-            self.skel.logger.info("Received Host command!");
             Ok(())
         } else {
             Err("expecting Host ".into())

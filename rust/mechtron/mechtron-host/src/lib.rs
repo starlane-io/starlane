@@ -217,7 +217,7 @@ mod tests {
             },
             properties: Default::default()
         };
-        let host_cmd = Host::new( AssignmentKind::Create, mechtron.clone(), StateSrc::None, "my-mechtron");
+        let host_cmd = Host::new( AssignmentKind::Create, mechtron.clone(), StateSrc::None, "my-app");
         let mut wave = DirectedProto::ping();
         wave.to(guest);
         wave.from(host.point().to_surface());
