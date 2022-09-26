@@ -257,6 +257,10 @@ impl<W> Traversal<W> {
         }
     }
 
+    pub fn extract(self) -> W {
+        self.payload
+    }
+
     pub fn with<N>(self, payload: N) -> Traversal<N> {
         Traversal {
             payload,

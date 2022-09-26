@@ -958,6 +958,13 @@ where
             .await;
     }
 
+     pub async fn handle(&self, traversal: Traversal<UltraWave>) {
+        self.call_tx
+            .send(DriverRunnerCall::Handle(traversal))
+            .await;
+    }
+
+
     /*
     pub async fn route(&self, wave: UltraWave)  {
         self.call_tx
@@ -981,6 +988,7 @@ where
     AddDriver(DriverApi<P>),
     GetPoint(oneshot::Sender<Point>),
     Traverse(Traversal<UltraWave>),
+    Handle(Traversal<UltraWave>),
     Item {
         point: Point,
         tx: oneshot::Sender<Result<ItemSphere<P>, P::Err>>,
@@ -1219,13 +1227,12 @@ where
                         }
                     }
                     DriverRunnerCall::Traverse(traversal) => {
-
                         self.traverse(traversal).await;
                     }
-                    /*DriverRunnerCall::Route(wave) => {
-                    println!("DriverRunnerCall::Route: {}",wave.to().to_string());
-                                            if wave.is_directed() {
-                                                let wave = wave.to_directed().unwrap();
+                    DriverRunnerCall::Handle(traversal) => {
+                    println!("DriverRunnerCall::Handle: {}",traversal.to.to_string());
+                                            if traversal.is_directed() {
+                                                let wave = traversal.payload.to_directed().unwrap();
                                                 self.logger
                                                     .track(&wave, || Tracker::new("driver:shell", "Route"));
                                                 let reflection = wave.reflection();
@@ -1251,10 +1258,10 @@ where
                                                     }
                                                 });
                                             } else {
-                                                let wave = wave.to_reflected().unwrap();
+                                                let wave = traversal.payload.to_reflected().unwrap();
                                                 self.star_skel.exchanger.reflected(wave).await;
                                             }
-                                        }*/
+                                        }
                     DriverRunnerCall::Item { point, tx } => {
                         tx.send(self.driver.item(&point).await);
                     }
@@ -1605,7 +1612,15 @@ impl DefaultDriverHandler {
 
 impl<P> DriverHandler<P> for DefaultDriverHandler where P: Cosmos {}
 #[handler]
-impl DefaultDriverHandler {}
+impl DefaultDriverHandler {
+
+    #[route("Hyp<Assign>")]
+    pub async fn assign( &self, _ctx: InCtx<'_,HyperSubstance> ) -> Result<(),UniErr> {
+println!("ASSIGNED! {}", _ctx.to().to_string() );
+        Ok(())
+    }
+
+}
 
 pub trait States: Sync + Sync
 where
@@ -1896,7 +1911,7 @@ where
 {
     async fn traverse(&self, traversal: Traversal<UltraWave>) {
          println!("DRIVER DRIVER ROUTING!");
-         self.skel.api.traverse(traversal).await;
+         self.skel.api.handle(traversal).await;
     }
 }
 
