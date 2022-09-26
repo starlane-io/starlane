@@ -91,15 +91,12 @@ impl <P> MechtronFactories<P> where P: Platform {
 
 pub trait MechtronFactory<P>: Sync + Send + 'static where P: Platform {
     fn name(&self) -> String;
-    fn lifecycle(&self, details: &Details, logger: PointLogger) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err>;
-    fn handler(&self, details: &Details, transmitter: ProtoTransmitter, logger: PointLogger ) -> Result<Box<dyn DirectedHandler>, P::Err>;
+
+    fn lifecycle(&self, skel: MechtronSkel<P>) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err>;
+    fn handler(&self, ske: MechtronSkel<P> ) -> Result<Box<dyn DirectedHandler>, P::Err>;
 }
 
-#[cfg(test)]
-pub mod test {
-    #[test]
-    pub fn test() {}
-}
+
 
 /// The MechtronSkel holds the common static elements of the Mechtron together
 /// Since a Mechtron is always an instance created to handle a single
@@ -110,40 +107,28 @@ pub mod test {
 pub struct MechtronSkel<P> where P: Platform {
     pub details: Details,
     pub logger: PointLogger,
+    pub transmitter: ProtoTransmitter,
     phantom: PhantomData<P>
 }
 
 impl <P> MechtronSkel<P> where P: Platform{
-    pub fn new( details: Details, logger: PointLogger, phantom: PhantomData<P> ) -> Self {
+    pub fn new( details: Details, logger: PointLogger, transmitter: ProtoTransmitter, phantom: PhantomData<P> ) -> Self {
         let logger = logger.point(details.stub.point.clone());
         Self {
             details,
             logger,
-            phantom
-        }
-    }
-}
-
-/// The Mechtron Context, it holds a transmitter for sending Waves
-/// which can be used outside of a Directed/Reflected Wave Handler interaction
-#[derive(Clone)]
-pub struct MechtronCtx {
-    pub transmitter: ProtoTransmitter,
-}
-
-impl MechtronCtx {
-    pub fn new( transmitter: ProtoTransmitter ) -> Self {
-        Self {
+            phantom,
             transmitter
         }
     }
 }
 
+
 /// MechtronSphere is the interface used by Guest
 /// to make important calls to the Mechtron
 pub trait MechtronLifecycle<P>: DirectedHandler + Sync + Send where P: Platform {
 
-    fn create(&self, _ctx: MechtronCtx ) -> Result<(), P::Err> {
+    fn create(&self, _skel: MechtronSkel<P> ) -> Result<(), P::Err> {
         Ok(())
     }
 
@@ -161,28 +146,30 @@ pub trait Mechtron<P>: MechtronLifecycle<P> + Sync + Send + 'static where P: Pla
     /// then implement ```type Skel=()```
     type Skel;
 
-    /// it is recommended to implement MechtronCtx or some derivative of MechtronCtx.
-    /// Ctx provides the ProtoTransmitter which can be used outside of a
-    /// Directed/Reflected Wave interaction.  If you don't need Ctx then
-    /// implement ```type Ctx=()```
-    type Ctx;
-
     /// Is any static data (templates, config files) that does not change
-    /// and may need to be reused
+    /// and may need to be reused. If your Mechtron doesn't need a Cache
+    /// then implement ```type Cache=()``
     type Cache;
 
     /// State is the aspect of the Mechtron that is changeable.  It is recommended
     /// to wrap State in a tokio Mutex or RwLock if used.  If you are implementing
-    /// a statelens mechtron then implement ```type State=();```
+    /// a stateless mechtron then implement ```type State=();```
     type State;
 
     /// This method is called by a companion MechtronFactory implementation
     /// to bring this Mechtron back to life to handle an Init or a Directed Wave
-    fn restore(skel: Self::Skel, ctx: Self::Ctx, cache: Self::Cache, state: Self::State) -> Self;
+    fn restore(skel: Self::Skel, cache: Self::Cache, state: Self::State) -> Self;
 
     /// create the Cache for this Mechtron (templates, configs & static content)
     /// the cache should hold any static content that is expected to be unchanging
-    fn cache(ctx: Self::Ctx) -> Self::Cache;
+    fn cache(_skel: Self::Skel) -> Result<Option<Self::Cache>,P::Err> {
+        Ok(None)
+    }
 }
 
 
+#[cfg(test)]
+pub mod test {
+    #[test]
+    pub fn test() {}
+}

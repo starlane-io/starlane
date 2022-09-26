@@ -63,16 +63,12 @@ impl <P> MechtronFactory<P> for MyAppFactory where P: Platform+'static{
         "my-app".to_string()
     }
 
-    fn lifecycle(&self, details: &Details, logger: PointLogger ) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err> {
-        let phantom:PhantomData<P> = PhantomData::default();
-        let skel = MechtronSkel::new(details.clone(), logger, phantom );
-        Ok(Box::new(MyApp::restore(skel,(),(),())))
+    fn lifecycle(&self, skel: MechtronSkel<P> ) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err> {
+        Ok(Box::new(MyApp::restore(skel,(),())))
     }
 
-    fn handler(&self, details: &Details, transmitter: ProtoTransmitter, logger: PointLogger) -> Result<Box<dyn DirectedHandler>, P::Err> {
-         let phantom:PhantomData<P> = PhantomData::default();
-        let skel = MechtronSkel::new(details.clone(), logger, phantom );
-        Ok(Box::new(MyApp::restore(skel,(),(),())))
+    fn handler(&self, skel: MechtronSkel<P>) -> Result<Box<dyn DirectedHandler>, P::Err> {
+        Ok(Box::new(MyApp::restore(skel,(),())))
     }
 
     /*
@@ -96,18 +92,13 @@ pub struct MyApp<P> where P: Platform + 'static{
 
 impl <P> Mechtron<P> for MyApp<P> where P: Platform+'static {
     type Skel = MechtronSkel<P>;
-    type Ctx = ();
     type Cache = ();
     type State = ();
 
-    fn restore(skel: Self::Skel, _ctx: Self::Ctx, _cache: Self::Cache, _state: Self::State) -> Self {
+    fn restore(skel: Self::Skel, _cache: Self::Cache, _state: Self::State) -> Self {
         MyApp {
             skel
         }
-    }
-
-    fn cache(ctx: Self::Ctx) -> Self::Cache {
-        ()
     }
 }
 

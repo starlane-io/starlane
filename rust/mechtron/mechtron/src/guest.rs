@@ -1,6 +1,6 @@
 use crate::err::GuestErr;
 use crate::err::MechErr;
-use crate::{MechtronCtx, MechtronFactories, Platform};
+use crate::{MechtronFactories, MechtronSkel, Platform};
 use cosmic_macros::handler_sync;
 use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::HyperSubstance;
@@ -25,25 +25,35 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct GuestSkel<P>
 where
-    P: Platform,
+    P: Platform +'static,
 {
     details: Details,
     mechtrons: Arc<DashMap<Point, HostedMechtron>>,
     factories: Arc<MechtronFactories<P>>,
     logger: PointLogger,
+    transmitter: ProtoTransmitterBuilder,
     platform: P,
 }
 
 impl<P> GuestSkel<P>
 where
-    P: Platform,
+    P: Platform + 'static,
 {
     pub fn new(
         details: Details,
         factories: Arc<MechtronFactories<P>>,
-        logger: PointLogger,
         platform: P,
     ) -> Self {
+        let router: GuestRouter<P> = GuestRouter::new();
+        let router = Arc::new(router);
+        let mut transmitter = ProtoTransmitterBuilder::new(router);
+        transmitter.agent = SetStrategy::Override(Agent::Point(details.stub.point.clone()));
+        transmitter.from = SetStrategy::Override(details.stub.point.clone().to_surface());
+        transmitter.to = SetStrategy::Override(Point::global_logger().to_surface().to_recipients());
+        let appender = SynchTransmittingLogAppender::new(transmitter.clone());
+        let root_logger = RootLogger::new(LogSource::Core, Arc::new(appender));
+        let logger = root_logger.point(details.stub.point.clone());
+
         let mechtrons = Arc::new(DashMap::new());
         Self {
             details,
@@ -51,18 +61,43 @@ where
             factories,
             logger,
             platform,
+            transmitter,
         }
     }
-}
 
-#[derive(Clone)]
-pub struct GuestCtx {
-    pub transmitter: ProtoTransmitterBuilder,
-}
+    fn hosted( &self, point: &Point) -> Result<HostedMechtron,GuestErr> {
+         Ok(self
+            .mechtrons
+            .get(point)
+            .ok_or::<GuestErr>(
+                format!(
+                    "mechtron associated with point: {} is not hosted by guest {}",
+                    point.to_string(),
+                    self.details.stub.point.to_string()
+                )
+                .into(),
+            )?
+            .value()
+            .clone())
 
-impl GuestCtx {
-    pub fn new(transmitter: ProtoTransmitterBuilder) -> Self {
-        Self { transmitter }
+    }
+
+    fn mechtron_skel(&self, point: &Point) -> Result<MechtronSkel<P>, GuestErr> {
+
+        let hosted = self.hosted(point)?;
+        let mut transmitter = self.builder();
+        transmitter.from = SetStrategy::Override(hosted.details.stub.point.to_surface());
+        transmitter.agent = SetStrategy::Fill(Agent::Point(hosted.details.stub.point.clone()));
+        let logger = self.logger.point(hosted.details.stub.point.clone());
+        let phantom: PhantomData<P> = PhantomData::default();
+        let skel = MechtronSkel::new(
+            hosted.details.clone(),
+            logger,
+            transmitter.clone().build(),
+            phantom,
+        );
+
+        Ok(skel)
     }
 
     pub fn builder(&self) -> ProtoTransmitterBuilder {
@@ -79,7 +114,6 @@ where
     P: Platform + 'static,
 {
     skel: GuestSkel<P>,
-    ctx: GuestCtx,
 }
 
 impl<P> Guest<P>
@@ -91,24 +125,12 @@ where
         P: Sized,
         GuestErr: From<<P as Platform>::Err>,
     {
-        let router: GuestRouter<P> = GuestRouter::new();
-        let router = Arc::new(router);
-        let mut transmitter = ProtoTransmitterBuilder::new(router);
-        transmitter.agent = SetStrategy::Override(Agent::Point(details.stub.point.clone()));
-        transmitter.from = SetStrategy::Override(details.stub.point.clone().to_surface());
-        transmitter.to = SetStrategy::Override(Point::global_logger().to_surface().to_recipients());
-        let appender = SynchTransmittingLogAppender::new(transmitter.clone());
-        let root_logger = RootLogger::new(LogSource::Core, Arc::new(appender));
-        let logger = root_logger.point(details.stub.point.clone());
-        logger.info("Guest created");
-
-        let ctx = GuestCtx::new(transmitter.clone());
 
         let factories = Arc::new(platform.factories()?);
+        let skel = GuestSkel::new(details, factories,  platform);
+        skel.logger.info("Guest created");
 
-        let skel = GuestSkel::new(details, factories, logger, platform);
-
-        Ok(Self { skel, ctx })
+        Ok(Self { skel })
     }
 }
 
@@ -119,49 +141,31 @@ where
     fn handler(&self, point: &Point) -> Result<DirectedHandlerShell, GuestErr> {
         if *point == self.skel.details.stub.point {
             Ok(DirectedHandlerShell::new(
-                Box::new(GuestHandler::new(self.skel.clone(), self.ctx.clone())),
-                self.ctx.builder(),
+                Box::new(GuestHandler::new(self.skel.clone())),
+                self.skel.builder(),
                 self.skel.details.stub.point.to_surface(),
                 self.skel.logger.logger.clone(),
             ))
         } else {
-            let hosted = self
-                .skel
-                .mechtrons
-                .get(point)
-                .ok_or::<GuestErr>(
-                    format!(
-                        "mechtron associated with point: {} is not hosted by guest {}",
-                        point.to_string(),
-                        self.skel.details.stub.point.to_string()
-                    )
-                    .into(),
-                )?
-                .value().clone();
-
-
-            let mut transmitter = self.ctx.builder();
-            transmitter.from = SetStrategy::Override(hosted.details.stub.point.to_surface());
-            transmitter.agent = SetStrategy::Fill(Agent::Point(hosted.details.stub.point.clone()));
-
+            let hosted = self.skel.hosted(point)?;
             let factory = self.skel.factories.get(&hosted.name).ok_or(format!(
                 "cannot find factory assicated with name: {}",
                 hosted.name
             ))?;
-            let logger = self.skel.logger.point(hosted.details.stub.point.clone());
+
+            let skel = self.skel.mechtron_skel(point)?;
             let mechtron = factory
-                .handler(&hosted.details, transmitter.clone().build(), logger )
+                .handler(skel)
                 .map_err(|e| GuestErr::from(e.to_string()))?;
 
             Ok(DirectedHandlerShell::new(
                 mechtron,
-                transmitter,
+                 self.skel.builder(),
                 hosted.details.stub.point.to_surface(),
                 self.skel.logger.logger.clone(),
             ))
         }
     }
-
 
     fn logger(&self) -> &PointLogger {
         &self.skel.logger
@@ -202,18 +206,17 @@ where
 
 pub struct GuestHandler<P>
 where
-    P: Platform,
+    P: Platform + 'static,
 {
     skel: GuestSkel<P>,
-    ctx: GuestCtx,
 }
 
 impl<P> GuestHandler<P>
 where
     P: Platform + 'static,
 {
-    pub fn new(skel: GuestSkel<P>, ctx: GuestCtx) -> Self {
-        Self { skel, ctx }
+    pub fn new(skel: GuestSkel<P> ) -> Self {
+        Self { skel }
     }
 }
 
@@ -234,18 +237,17 @@ where
                     host.name
                 )))?;
             self.skel.logger.info("Creating...");
-            let logger = self.skel.logger.point( host.details.stub.point.clone());
-            let mechtron = factory.lifecycle(&host.details, logger)?;
-            self.skel.logger.info("Got MechtronLifecycle...");
-            let mut transmitter = self.ctx.builder();
-            transmitter.from = SetStrategy::Override(host.details.stub.point.to_surface());
-            transmitter.agent = SetStrategy::Fill(Agent::Point(host.details.stub.point.clone()));
-            let ctx = MechtronCtx::new(transmitter.build());
-            mechtron.create(ctx)?;
-            self.skel.mechtrons.insert(
+             self.skel.mechtrons.insert(
                 host.details.stub.point.clone(),
                 HostedMechtron::new(host.details.clone(), host.name.clone()),
             );
+
+            let skel = self.skel.mechtron_skel(&host.details.stub.point)?;
+            let mechtron = factory.lifecycle(skel)?;
+            self.skel.logger.info("Got MechtronLifecycle...");
+            let skel = self.skel.mechtron_skel(&host.details.stub.point)?;
+            mechtron.create(skel )?;
+
             Ok(())
         } else {
             Err("expecting Host ".into())

@@ -7,7 +7,7 @@ use cosmic_universe::wave::core::http2::StatusCode;
 use cosmic_universe::wave::core::ReflectedCore;
 
 pub trait MechErr:
-    CoreReflector+ToString + From<Box<bincode::ErrorKind>> + From<MembraneErr>+From<UniErr>+From<String>+From<&'static str>+Into<GuestErr>
+    CoreReflector+ToString + From<Box<bincode::ErrorKind>> + From<MembraneErr>+From<UniErr>+From<String>+From<&'static str>+From<GuestErr>
 {
     fn to_uni_err(self) -> UniErr;
 }
