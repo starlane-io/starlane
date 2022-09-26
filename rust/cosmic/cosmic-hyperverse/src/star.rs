@@ -308,6 +308,8 @@ where
             HypMethod::Assign,
         );
 
+assign.track = true;
+
         assign.body(assign_body.into());
         let router = Arc::new(LayerInjectionRouter::new(
             self.clone(),
@@ -918,7 +920,7 @@ where
                         let layer_traversal_engine = self.layer_traversal_engine.clone();
                         tokio::spawn(async move {
                             layer_traversal_engine
-                                .start_layer_traversal(inject.wave, &inject.injector, false)
+                                .start_layer_traversal(inject.wave, &inject.injector, inject.from_gravity)
                                 .await;
                         });
                     }
@@ -1101,14 +1103,20 @@ where
                     _ => {
                         let to = wave.to().unwrap_single();
                         let location = locator.locate(&to.point).await?;
-                        let mut transport = wave.wrap_in_transport(
-                            gravity,
-                            location.star.to_surface().with_layer(Layer::Core),
-                        );
-                        transport.from(skel.point.clone().to_surface());
-                        let transport = transport.build()?;
-                        let transport = transport.to_signal()?;
-                        skel.api.to_hyperway(transport).await;
+                        if location.star == skel.point {
+                            let mut inject = TraversalInjection::new( skel.point.to_surface().with_layer(Layer::Gravity), wave ) ;
+                            inject.from_gravity = true;
+                            skel.inject_tx.send(inject).await;
+                        } else {
+                            let mut transport = wave.wrap_in_transport(
+                                gravity,
+                                location.star.to_surface().with_layer(Layer::Core),
+                            );
+                            transport.from(skel.point.clone().to_surface());
+                            let transport = transport.build()?;
+                            let transport = transport.to_signal()?;
+                            skel.api.to_hyperway(transport).await;
+                        }
                     }
                 }
                 Ok(())
@@ -1260,7 +1268,7 @@ where
         &self,
         mut wave: UltraWave,
         injector: &Surface,
-        from_hyperway: bool,
+        from_gravity: bool,
     ) -> Result<(), P::Err> {
         #[cfg(test)]
         self.skel
@@ -1325,9 +1333,13 @@ where
             // now we check if we are doing an inter point delivery (from one layer to another in the same Particle)
             // if this delivery was from_hyperway, then it was certainly a message being routed back to the star
             // and is not considered an inter point delivery
-            if to.point.is_global() {
+            if from_gravity {
+                dir = TraversalDirection::Core;
+                dest.replace(to.layer.clone());
+            }
+            else if to.point.is_global() {
                 dir = TraversalDirection::Fabric;
-            } else if !from_hyperway && to.point == wave.from().point {
+            } else if to.point == wave.from().point {
                 // it's the SAME point, so the to layer becomes our dest
                 dest.replace(to.layer.clone());
 
@@ -1346,14 +1358,16 @@ where
                     }
                 }
             } else {
-                // if this was injected by something else (like the Star)
-                // then it needs to traverse towards the Core
-                dir = TraversalDirection::Core;
-                // and dest will be the to layer
-                if !from_hyperway {
-                    dest.replace(to.layer.clone());
-                }
+                dir = TraversalDirection::Fabric;
             }
+if wave.track() {
+    if dest.is_some() {
+
+        println!(" {} -> {} DIR: {} dest: {}",  wave.from().to_string(), to.to_string(), dir.to_string(), dest.as_ref().unwrap().to_string() );
+    } else {
+        println!(" {} -> {} DIR: {}", wave.from().to_string(), to.to_string(), dir.to_string());
+    }
+}
 
             let traversal_logger = self.skel.logger.point(to.to_point());
             let traversal_logger = traversal_logger.span();

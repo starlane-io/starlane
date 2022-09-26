@@ -168,6 +168,7 @@ where
     }
 
     async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
+println!("\n\n\nINIT CONTROL\n\n\n");
         self.skel.driver.status_tx.send(DriverStatus::Init).await;
 
         skel.create_driver_particle(
@@ -176,6 +177,7 @@ where
         )
         .await?;
 
+println!("CoNTROL GOT HERE");
         let remote_point_factory = Arc::new(ControlCreator::new(
             self.skel.clone(),
             self.fabric_routers.clone(),
@@ -197,6 +199,7 @@ where
         );
         self.external_router = Some(interchange.router().into());
 
+println!("AND HERE");
         pub struct ControlHyperwayConfigurator;
 
         impl HyperwayConfigurator for ControlHyperwayConfigurator {
@@ -216,6 +219,7 @@ where
             self.skel.driver.logger.clone(),
         ));
         {
+            println!("CONTROL SPAWNING");
             let logger = self.skel.driver.logger.clone();
             let fabric_routers = self.fabric_routers.clone();
             let skel = self.skel.clone();
@@ -271,6 +275,7 @@ where
             )
             .await?;
 
+        println!("ABOUT TO ADD INTERCHANGE");
         if self.skel.star.kind == StarSub::Machine {
             self.skel
                 .star
@@ -278,6 +283,8 @@ where
                 .api
                 .add_interchange(InterchangeKind::DefaultControl, gate)
                 .await?;
+
+            println!("\n\n\nDefaultControl ADDED\n\n\n");
         }
 
         self.skel.driver.status_tx.send(DriverStatus::Ready).await;

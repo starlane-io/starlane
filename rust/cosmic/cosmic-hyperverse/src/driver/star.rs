@@ -14,7 +14,7 @@ use cosmic_universe::hyper::{
 };
 use cosmic_universe::kind::{BaseKind, Kind, StarSub};
 use cosmic_universe::loc::{Layer, Point, StarKey, ToPoint, ToSurface, LOCAL_STAR};
-use cosmic_universe::log::Tracker;
+use cosmic_universe::log::{Trackable, Tracker};
 use cosmic_universe::parse::bind_config;
 use cosmic_universe::particle::traversal::TraversalInjection;
 use cosmic_universe::particle::Status;
@@ -386,6 +386,7 @@ where
             let record = self.skel.registry.record(&provision.point).await?;
             match self.skel.wrangles.find(&record.details.stub.kind) {
                 None => {
+println!("\n{} found no provisioning wrangles for {}", self.skel.kind.to_string(), record.details.stub.kind.to_string() );
                     let kind = record.details.stub.kind.clone();
                     if self
                         .skel
@@ -425,11 +426,12 @@ where
                     let key = selector.wrangle().await?;
                     let assign =
                         Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
-println!("\tsending assign request to {}", key.to_string());
                     let assign: DirectedCore = assign.into();
                     let mut proto = DirectedProto::ping();
                     proto.core(assign);
                     proto.to(key.to_surface());
+println!("\tsending assign request to {}", key.to_surface().to_string() );
+                    proto.track = true;
                     let pong: Wave<Pong> = ctx.transmitter.direct(proto).await?;
                     pong.ok_or()?;
 println!("\tassignment success!");
@@ -480,6 +482,7 @@ println!("\tassignment success!");
                 directed.to(driver.to_surface());
 println!("\tassign to driver: {}", driver.to_surface().to_string());
                 directed.body(HyperSubstance::Assign(assign.clone()).into());
+                directed.track = ctx.wave().track();
                 let pong: Wave<Pong> = ctx.transmitter.direct(directed).await?;
                 pong.ok_or()?;
             } else {
@@ -515,7 +518,7 @@ println!("\tassign to driver: {}", driver.to_surface().to_string());
                 .point
                 .clone()
                 .to_surface()
-                .with_layer(Layer::Field),
+                .with_layer(Layer::Gravity),
             wave,
         );
 

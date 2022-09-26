@@ -63,9 +63,9 @@ lazy_static! {
 fn driver_bind() -> BindConfig {
     log(bind_config(
         r#" Bind(version=1.0.0) {
-       Route {
-         Hyp<Assign> -> (()) => &;
-       }
+
+       Route<Hyp<Assign>> -> (()) => &;
+
     } "#,
     ))
     .unwrap()
@@ -1466,7 +1466,7 @@ where
             strategy: Strategy::Override,
             state: StateSrc::None,
         };
-        self.skel.create_in_star(create).await
+        self.skel.logger.result(self.skel.create_in_star(create).await)
     }
 
     pub async fn locate(&self, point: &Point) -> Result<ParticleRecord, P::Err> {
