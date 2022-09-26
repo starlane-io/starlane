@@ -171,5 +171,5 @@ pub trait Mechtron<P>: MechtronLifecycle<P> + Sync + Send + 'static where P: Pla
 #[cfg(test)]
 pub mod test {
     #[test]
-    pub fn test() {}
+    pub fn mechtron() {}
 }

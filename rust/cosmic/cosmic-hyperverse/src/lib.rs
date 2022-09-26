@@ -52,6 +52,7 @@ use cosmic_universe::wave::core::http2::StatusCode;
 use cosmic_universe::wave::core::ReflectedCore;
 use cosmic_universe::wave::UltraWave;
 use mechtron_host::err::HostErr;
+use mechtron_host::HostPlatform;
 
 use crate::driver::{DriverFactory, DriversBuilder};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
@@ -139,6 +140,7 @@ pub trait HyperErr:
     + Sync
     + ToString
     + Clone
+    + HostErr
     + Into<UniErr>
     + From<UniErr>
     + From<String>
@@ -148,7 +150,6 @@ pub trait HyperErr:
     + From<zip::result::ZipError>
     + From<Box<bincode::ErrorKind>>
     + From<acid_store::Error>
-    + From<HostErr>
     + Into<UniErr>
 {
     fn to_uni_err(&self) -> UniErr;

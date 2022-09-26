@@ -6,10 +6,12 @@ use serde::{Deserialize, Serialize};
 use cosmic_macros_primitive::Autobox;
 
 use crate::command::common::StateSrc;
+use crate::config::mechtron::MechtronConfig;
 use crate::err::UniErr;
 use crate::kind::{Kind, KindParts, StarSub};
 use crate::loc::{Point, StarKey, Surface, ToPoint, ToSurface};
 use crate::log::Log;
+use crate::parse::SkewerCase;
 use crate::particle::{Details, Status, Stub};
 use crate::selector::KindSelector;
 use crate::substance::Substance;
@@ -19,8 +21,7 @@ use crate::wave::core::{DirectedCore, ReflectedCore};
 use crate::wave::{
     Ping, Pong, ReflectedKind, ReflectedProto, ToRecipients, UltraWave, Wave, WaveId, WaveKind,
 };
-use crate::Agent;
-use crate::parse::SkewerCase;
+use crate::{Agent, Document};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {
@@ -75,15 +76,12 @@ pub struct ParticleRecord {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ParticleLocation {
     pub star: Point,
-    pub host: Option<Point>
+    pub host: Option<Point>,
 }
 
 impl ParticleLocation {
-    pub fn new( star: Point, host: Option<Point> ) -> Self {
-        Self {
-            star,
-            host
-        }
+    pub fn new(star: Point, host: Option<Point>) -> Self {
+        Self { star, host }
     }
 }
 
@@ -96,7 +94,7 @@ impl From<ParticleLocation> for ReflectedCore {
 
 impl Default for ParticleLocation {
     fn default() -> Self {
-        ParticleLocation::new( Point::central(), None )
+        ParticleLocation::new(Point::central(), None)
     }
 }
 
@@ -108,10 +106,7 @@ impl Default for ParticleRecord {
 
 impl ParticleRecord {
     pub fn new(details: Details, location: Option<ParticleLocation>) -> Self {
-        ParticleRecord {
-            details,
-            location
-        }
+        ParticleRecord { details, location }
     }
 
     pub fn root() -> Self {
@@ -179,31 +174,33 @@ pub struct Assign {
     pub state: StateSrc,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct Host{
+pub struct HostCmd {
     pub kind: AssignmentKind,
     pub details: Details,
     pub state: StateSrc,
-    pub name: String
+    pub config: MechtronConfig,
 }
 
-impl Host{
+impl HostCmd {
     pub fn kind(&self) -> &Kind {
         &self.details.stub.kind
     }
 
-    pub fn new<S>(kind: AssignmentKind, details: Details, state: StateSrc, name: S) -> Self where S: ToString{
+    pub fn new(
+        kind: AssignmentKind,
+        details: Details,
+        state: StateSrc,
+        config: MechtronConfig,
+    ) -> Self {
         Self {
             kind,
             details,
             state,
-            name: name.to_string()
+            config,
         }
     }
-
 }
-
 
 impl Assign {
     pub fn kind(&self) -> &Kind {
@@ -218,13 +215,21 @@ impl Assign {
         }
     }
 
+    pub fn to_host_cmd(self, config: MechtronConfig) -> HostCmd {
+        HostCmd {
+            kind: self.kind,
+            details: self.details,
+            state: self.state,
+            config,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Autobox)]
 pub enum HyperSubstance {
     Provision(Provision),
     Assign(Assign),
-    Host(Host),
+    Host(HostCmd),
     Event(HyperEvent),
     Log(Log),
     Search(Search),

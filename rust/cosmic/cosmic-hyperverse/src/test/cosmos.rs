@@ -16,11 +16,14 @@ use cosmic_universe::loc::{MachineName, StarKey, ToBaseKind};
 use cosmic_universe::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
 use std::io;
 use std::io::Error;
+use std::str::Utf8Error;
+use std::string::FromUtf8Error;
 use std::sync::Arc;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 use mechtron_host::err::HostErr;
+use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
 use crate::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
 
 impl TestCosmos {
@@ -209,13 +212,7 @@ impl From<io::Error> for TestErr {
     }
 }
 
-impl From<HostErr> for TestErr {
-    fn from(err: HostErr) -> Self {
-        Self {
-            message: err.to_string(),
-        }
-    }
-}
+
 impl From<acid_store::Error> for TestErr {
     fn from(e: acid_store::Error) -> Self {
         Self {
@@ -236,6 +233,60 @@ impl From<Box<bincode::ErrorKind>> for TestErr {
     fn from(e: Box<bincode::ErrorKind>) -> Self {
         Self {
             message: e.to_string(),
+        }
+    }
+}
+
+impl HostErr for TestErr {
+    fn to_uni_err(self) -> UniErr {
+        UniErr::from_500(self.to_string() )
+    }
+}
+
+impl From<CompileError> for TestErr {
+    fn from(e: CompileError) -> Self {
+                Self  {
+            message: e.to_string()
+        }
+    }
+}
+
+impl From<RuntimeError> for TestErr {
+    fn from(e: RuntimeError) -> Self {
+                Self  {
+            message: e.to_string()
+        }
+    }
+}
+
+impl From<ExportError> for TestErr {
+    fn from(e: ExportError) -> Self {
+                Self  {
+            message: e.to_string()
+        }
+    }
+}
+
+impl From<Utf8Error> for TestErr {
+    fn from(e: Utf8Error) -> Self {
+                Self  {
+            message: e.to_string()
+        }
+    }
+}
+
+impl From<FromUtf8Error> for TestErr {
+    fn from(e: FromUtf8Error) -> Self {
+                Self  {
+            message: e.to_string()
+        }
+    }
+}
+
+impl From<InstantiationError> for TestErr {
+    fn from(e: InstantiationError) -> Self {
+        Self  {
+            message: e.to_string()
         }
     }
 }

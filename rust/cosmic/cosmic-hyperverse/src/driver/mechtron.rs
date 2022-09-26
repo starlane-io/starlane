@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use crate::driver::{
     Driver, DriverAvail, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, ItemHandler,
     ItemSphere,
@@ -17,10 +18,11 @@ use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::exchange::asynch::InCtx;
 use cosmic_universe::wave::{DirectedProto, DirectedWave, Pong, Wave};
 use dashmap::DashMap;
-use mechtron_host::{MechtronHost, MechtronHostFactory};
+use mechtron_host::{HostPlatform, MechtronHost, MechtronHostFactory};
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
+use cosmic_universe::log::RootLogger;
 
 lazy_static! {
     static ref HOIST_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -125,14 +127,38 @@ where
 }
 
 #[derive(Clone)]
+pub struct HostDriverPlatform<P> where P: Cosmos {
+    logger: RootLogger,
+    phantom: PhantomData<P>
+}
+
+impl <P> HostDriverPlatform<P> where P: Cosmos {
+    pub fn new(logger: RootLogger) -> Self {
+        let phantom : PhantomData<P> = PhantomData::default();
+        Self {
+            logger,
+            phantom
+        }
+    }
+}
+
+impl <P> HostPlatform for HostDriverPlatform<P> where P: Cosmos{
+    type Err = P::Err;
+
+    fn root_logger(&self) -> RootLogger {
+        self.logger.clone()
+    }
+}
+
+#[derive(Clone)]
 pub struct HostDriverSkel<P>
 where
     P: Cosmos,
 {
     pub skel: DriverSkel<P>,
-    pub hosts: Arc<DashMap<Point, Arc<MechtronHost>>>,
+    pub hosts: Arc<DashMap<Point, Arc<MechtronHost<HostDriverPlatform<P>>>>>,
     pub wasm_to_host_lookup: Arc<DashMap<Point, Point>>,
-    pub factory: Arc<MechtronHostFactory>,
+    pub factory: Arc<MechtronHostFactory<HostDriverPlatform<P>>>,
 }
 
 impl<P> HostDriverSkel<P>
@@ -140,11 +166,13 @@ where
     P: Cosmos,
 {
     pub fn new(skel: DriverSkel<P>) -> Self {
+        let platform = HostDriverPlatform::new(skel.logger.logger.clone() );
+        let factory = Arc::new(MechtronHostFactory::new(platform));
         Self {
             skel,
             hosts: Arc::new(DashMap::new()),
             wasm_to_host_lookup: Arc::new(DashMap::new()),
-            factory: Arc::new(MechtronHostFactory::new()),
+            factory
         }
     }
 }
@@ -190,7 +218,7 @@ where
                 let bin = wasm.deref().deref().clone();
                 let mechtron_host = Arc::new(
                     self.skel.factory
-                        .create(host.details.stub.point.clone(), bin)
+                        .create(host.details.clone(), bin)
                         .map_err(|e| UniErr::from_500("host err"))?,
                 );
                 self.skel.hosts
@@ -306,15 +334,24 @@ impl <P>MechtronDriverHandler<P> where P: Cosmos
         if let HyperSubstance::Assign(assign) = ctx.input {
             println!("\tASSIGNING MECHTRON!");
             let logger = self.skel.logger.push_mark("assign")?;
+
+
+            let config = assign.details.properties.get("config").ok_or("config property must be set for a Mechtron")?;
+            let config = Point::from_str(config.value.as_str() )?;
+            let config = self.skel.artifacts().mechtron( &config ).await?;
+            let config = config.contents();
+
+
             // THIS is a HACK to get the host... a better way would be to do a lookup
             // but that will jam this DriverRunner thread... so Driver Runner must
             // be rearchitechted so that multiple requests can be processed simultaneously
             let host = self.skel.point.parent().unwrap().push("host")?;
+
             let mut wave = DirectedProto::ping();
             wave.method(HypMethod::Host);
             println!("\tSending HOST command to {}", host.to_string());
             wave.to(host.to_surface().with_layer(Layer::Core));
-            wave.body(HyperSubstance::Host(assign.to_host()).into());
+            wave.body(HyperSubstance::Host(assign.clone().to_host_cmd(config)).into());
             let pong: Wave<Pong> = self.ctx.transmitter.direct(wave).await?;
             pong.ok_or()?;
             Ok(())

@@ -36,7 +36,7 @@ lazy_static = "1.4.0"
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.
-#opt-level = "s"
-#lto = true
-#codegen-units = 1
-#panic = "abort"
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"

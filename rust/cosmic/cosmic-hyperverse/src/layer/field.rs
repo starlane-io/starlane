@@ -5,7 +5,7 @@ use url::Url;
 
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
-use cosmic_universe::err::UniErr;
+use cosmic_universe::err::{CoreReflector, UniErr};
 use cosmic_universe::loc::{Layer, Point, Surface, ToSurface};
 use cosmic_universe::log::{PointLogger, Trackable};
 use cosmic_universe::parse::model::{PipelineSegmentVar, PipelineVar};

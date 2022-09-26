@@ -8,7 +8,7 @@ use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::direct::create::Strategy;
 use cosmic_universe::config::bind::BindConfig;
-use cosmic_universe::err::UniErr;
+use cosmic_universe::err::{CoreReflector, UniErr};
 use cosmic_universe::hyper::{Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, ParticleLocation, Search};
 use cosmic_universe::kind::{BaseKind, Kind, StarSub};
 use cosmic_universe::loc::{Layer, LOCAL_STAR, Point, StarKey, ToPoint, ToSurface};

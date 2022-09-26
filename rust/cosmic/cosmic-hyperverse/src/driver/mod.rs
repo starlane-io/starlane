@@ -9,8 +9,8 @@ pub mod mechtron;
 use crate::driver::star::StarDriverFactory;
 use crate::star::HyperStarCall::LayerTraversalInjection;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::{Cosmos, HyperErr, Registration};
-use cosmic_universe::artifact::ArtRef;
+use crate::{Cosmos, HyperErr, Registration, Registry};
+use cosmic_universe::artifact::{ArtifactApi, ArtRef};
 use cosmic_universe::command::common::{SetProperties, StateSrc};
 use cosmic_universe::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
@@ -1346,6 +1346,15 @@ where
     pub fn drivers(&self)-> & DriversApi<P> {
         &self.skel.drivers
     }
+
+    pub fn artifacts(&self) -> &ArtifactApi {
+        &self.skel.machine.artifacts
+    }
+
+    pub fn registry(&self) -> &Registry<P>{
+        &self.skel.machine.registry
+    }
+
 
     pub fn new(
         skel: HyperStarSkel<P>,

@@ -128,6 +128,12 @@ impl<A> ArtRef<A> {
     }
 }
 
+impl <A> ArtRef<A> where A:Clone {
+   pub fn contents(&self) -> A {
+       (*self.artifact).clone()
+   }
+}
+
 impl<A> ArtRef<A> {
     pub fn bundle(&self) -> Point {
         self.point.clone().to_bundle().unwrap()

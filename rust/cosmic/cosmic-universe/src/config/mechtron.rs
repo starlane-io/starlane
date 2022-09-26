@@ -4,8 +4,9 @@ use crate::parse::model::MechtronScope;
 use crate::loc::Point;
 use crate::{Bin, UniErr};
 use crate::parse::mechtron_config;
+use serde::{Serialize,Deserialize};
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct MechtronConfig {
     pub bin: Point,
     pub name: String

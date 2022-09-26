@@ -16,7 +16,7 @@ use threadpool::ThreadPool;
 use wasmer::Function;
 use wasmer::{imports, Cranelift, Module, Store, Universal};
 use wasmer_compiler_singlepass::Singlepass;
-use cosmic_universe::log::{PointLogger, RootLogger};
+use cosmic_universe::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
 use crate::membrane::WasmMembrane;
 
 pub trait HostPlatform: Clone+Send+Sync
@@ -25,7 +25,9 @@ where
 {
     type Err;
 
-    fn root_logger(&self) -> RootLogger;
+    fn root_logger(&self) -> RootLogger {
+        RootLogger::new( LogSource::Core, Arc::new(StdOutAppender::new()) )
+    }
 }
 
 pub struct MechtronHostFactory<P>
@@ -158,8 +160,9 @@ mod tests {
     use std::str::FromStr;
     use std::{fs, thread};
     use cosmic_universe::command::common::StateSrc;
+    use cosmic_universe::config::mechtron::MechtronConfig;
     use cosmic_universe::hyper;
-    use cosmic_universe::hyper::{Assign, AssignmentKind, Host, HyperSubstance};
+    use cosmic_universe::hyper::{Assign, AssignmentKind, HostCmd, HyperSubstance};
     use cosmic_universe::log::{LogSource, StdOutAppender};
     use cosmic_universe::particle::{Status, Stub};
     use cosmic_universe::substance::Substance;
@@ -220,7 +223,11 @@ mod tests {
             },
             properties: Default::default()
         };
-        let host_cmd = Host::new( AssignmentKind::Create, mechtron.clone(), StateSrc::None, "my-app");
+        let config = MechtronConfig {
+            bin: Point::root(),
+            name: "my-app".to_string()
+        };
+        let host_cmd = HostCmd::new(AssignmentKind::Create, mechtron.clone(), StateSrc::None, config);
         let mut wave = DirectedProto::ping();
         wave.to(guest);
         wave.from(host.point().to_surface());

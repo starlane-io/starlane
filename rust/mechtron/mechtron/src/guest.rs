@@ -232,14 +232,14 @@ where
             let factory = self
                 .skel
                 .logger
-                .result(self.skel.factories.get(&host.name).ok_or(format!(
+                .result(self.skel.factories.get(&host.config.name).ok_or(format!(
                     "Guest does not have a mechtron with name: {}",
-                    host.name
+                    host.config.name
                 )))?;
             self.skel.logger.info("Creating...");
              self.skel.mechtrons.insert(
                 host.details.stub.point.clone(),
-                HostedMechtron::new(host.details.clone(), host.name.clone()),
+                HostedMechtron::new(host.details.clone(), host.config.name.clone()),
             );
 
             let skel = self.skel.mechtron_skel(&host.details.stub.point)?;
