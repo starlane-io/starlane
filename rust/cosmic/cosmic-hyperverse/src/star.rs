@@ -283,6 +283,7 @@ where
 
     #[track_caller]
     pub async fn create_in_star(&self, create: Create) -> Result<Details, P::Err> {
+println!("CREATE IN STAR : {}", create.template.kind.to_string() );
         if self.point != create.template.point.parent
             && !self.point.is_parent_of(&create.template.point.parent)
         {
@@ -403,7 +404,7 @@ where
             mpsc::Sender<Traversal<UltraWave>>,
             mpsc::Receiver<Traversal<UltraWave>>,
         ) = mpsc::channel(1024);
-        let (drivers_traversal_tx, mut drivers_rx) = mpsc::channel(1024);
+        let (drivers_traversal_tx, mut drivers_rx) :(mpsc::Sender<Traversal<UltraWave>>, mpsc::Receiver<Traversal<UltraWave>>) = mpsc::channel(1024);
         let (drivers_call_tx, mut drivers_call_rx) = mpsc::channel(1024);
         let (drivers_status_tx, drivers_status_rx) = watch::channel(DriverStatus::Pending);
         let (mpsc_status_tx, mut mpsc_status_rx) = mpsc::channel(128);
@@ -458,6 +459,7 @@ where
             let call_tx = call_tx.clone();
             tokio::spawn(async move {
                 while let Some(inject) = drivers_rx.recv().await {
+println!(" TO DRIVERS -> {}", inject.to.to_string());
                     match call_tx.send(HyperStarCall::ToDriver(inject)).await {
                         Ok(_) => {}
                         Err(_) => {
@@ -1352,9 +1354,6 @@ where
                         dest.replace(to.layer.clone());
                     }
             }
-if wave.track() && wave.transported().is_none() {
-    println!("\n\rDIR : {} ",dir.to_string());
-}
 
             let traversal_logger = self.skel.logger.point(to.to_point());
             let traversal_logger = traversal_logger.span();
