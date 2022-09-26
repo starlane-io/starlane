@@ -38,7 +38,7 @@ use cosmic_universe::HYPERUSER;
 use dashmap::DashMap;
 use futures::future::select_all;
 use futures::task::Spawn;
-use futures::FutureExt;
+use futures::{FutureExt, TryFutureExt};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -377,7 +377,11 @@ where
                     DriversCall::AddDriver { driver, rtn } => {
                         self.point_to_driver
                             .insert(driver.get_point().await.unwrap(), driver.clone());
-                        self.kind_to_driver.insert(driver.kind.clone(), driver);
+                        self.kind_to_driver.insert(driver.kind.clone(), driver.clone());
+                        if !driver.kind.matches(&Kind::Driver) {
+                            let driver_driver = self.find(&Kind::Driver).unwrap();
+                            driver_driver.add_driver(driver.clone()).await;
+                        }
                         rtn.send(());
                     }
                     DriversCall::Visit(traversal) => {
@@ -452,7 +456,6 @@ where
                                            */
                 }
             }
-            println!("Drivers TERMINATED...");
         });
     }
 
@@ -888,6 +891,7 @@ where
                 Some(driver) => {
                     let driver = driver.clone();
                     tokio::spawn(async move {
+                        println!("\tSPawning Traversall...." );
                         driver.traversal(traversal).await;
                     });
                 }
@@ -922,6 +926,11 @@ where
             .await
             .unwrap_or_default();
         Ok(rtn_rx.await?)
+    }
+
+    /// This method call will only work for DriverDriver
+    pub async fn add_driver(&self, api: DriverApi<P> )  {
+        self.call_tx.send(DriverRunnerCall::AddDriver(api)).await;
     }
 
     pub async fn init_item(&self, point: Point) -> Result<Status, UniErr> {
@@ -973,10 +982,12 @@ where
      */
 }
 
+#[derive(strum_macros::Display)]
 pub enum DriverRunnerCall<P>
 where
     P: Cosmos,
 {
+    AddDriver(DriverApi<P>),
     GetPoint(oneshot::Sender<Point>),
     Traversal(Traversal<UltraWave>),
     Item {
@@ -1218,6 +1229,7 @@ where
                         }
                     }
                     DriverRunnerCall::Traversal(traversal) => {
+println!("\texecuting Traversal: {}", self.skel.kind.to_string() );
                         self.traverse(traversal).await;
                     }
                     /*DriverRunnerCall::Route(wave) => {
@@ -1290,8 +1302,16 @@ where
                         let item = self.item(&self.skel.point).await.unwrap();
                         rtn.send(item.bind().await);
                     }
+                    DriverRunnerCall::AddDriver(api) => {
+println!();
+println!("\tDriverApi -> ADD DRIVER: {}", api.get_point().await.unwrap().to_string() );
+println!();
+                        self.driver.add_driver(api).await;
+println!("ADD DRIVER return to looping...");
+                    }
                 }
             }
+
         });
     }
 
@@ -1573,6 +1593,11 @@ where
     async fn handler(&self) -> Box<dyn DriverHandler<P>> {
         Box::new(DefaultDriverHandler::restore())
     }
+
+    /// This is sorta a hack, it only works for DriverDriver
+    async fn add_driver(&self, _driver: DriverApi<P>) {
+
+    }
 }
 
 #[async_trait]
@@ -1815,9 +1840,6 @@ impl<P> DriverDriver<P>
 where
     P: Cosmos,
 {
-    pub fn add_driver(&self, point: Point, api: DriverApi<P>) {
-        self.map.insert(point, api);
-    }
 
     pub fn get_driver( &self, point: &Point ) -> Option<DriverApi<P>> {
         let rtn = self.map.get(point);
@@ -1835,6 +1857,11 @@ where
 {
     fn kind(&self) -> Kind {
         Kind::Driver
+    }
+
+    async fn add_driver(&self, api: DriverApi<P>) {
+        let point = api.get_point().await.unwrap();
+        self.map.insert(point, api);
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
