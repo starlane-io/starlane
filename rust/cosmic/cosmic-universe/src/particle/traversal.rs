@@ -411,6 +411,13 @@ impl Traversal<DirectedWave> {
     }
 }
 
+impl Traversal<ReflectedWave> {
+    pub fn wrap(self) -> Traversal<UltraWave> {
+        let ping = self.payload.clone();
+        self.with(ping.to_ultra())
+    }
+}
+
 impl Traversal<SingularDirectedWave> {
     pub fn wrap(self) -> Traversal<UltraWave> {
         let ping = self.payload.clone();

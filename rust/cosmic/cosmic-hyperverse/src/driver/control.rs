@@ -27,13 +27,14 @@ use cosmic_universe::substance::Substance;
 use cosmic_universe::wave::core::ext::ExtMethod;
 use cosmic_universe::wave::core::ReflectedCore;
 use cosmic_universe::wave::exchange::SetStrategy;
-use cosmic_universe::wave::{Agent, DirectedProto, Pong, ToRecipients, UltraWave, Wave};
+use cosmic_universe::wave::{Agent, DirectedProto, DirectedWave, Pong, ToRecipients, UltraWave, Wave};
 use dashmap::DashMap;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use cosmic_universe::wave::exchange::asynch::{Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router};
+use cosmic_universe::particle::traversal::Traversal;
+use cosmic_universe::wave::exchange::asynch::{Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TraversalRouter};
 
 pub struct ControlDriverFactory<P>
 where
@@ -420,12 +421,9 @@ where
 }
 
 #[async_trait]
-impl<P> Router for Control<P>
-where
-    P: Cosmos,
-{
-    async fn route(&self, wave: UltraWave) {
-        self.ctx.router.route(wave).await;
+impl<P> TraversalRouter for Control<P> where P: Cosmos {
+    async fn traverse(&self, traversal: Traversal<UltraWave>) {
+        self.ctx.router.route(traversal.payload).await;
     }
 }
 

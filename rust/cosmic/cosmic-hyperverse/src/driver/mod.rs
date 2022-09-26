@@ -29,9 +29,7 @@ use cosmic_universe::substance::Substance;
 use cosmic_universe::util::log;
 use cosmic_universe::wave::core::cmd::CmdMethod;
 use cosmic_universe::wave::core::{CoreBounce, Method, ReflectedCore};
-use cosmic_universe::wave::exchange::asynch::{
-    DirectedHandler, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router,
-};
+use cosmic_universe::wave::exchange::asynch::{DirectedHandler, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, TraversalRouter};
 use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::{Agent, DirectedWave, ReflectedWave, UltraWave};
 use cosmic_universe::HYPERUSER;
@@ -376,7 +374,7 @@ where
                     }
                     DriversCall::AddDriver { driver, rtn } => {
                         self.point_to_driver
-                            .insert(driver.get_point().await.unwrap(), driver.clone());
+                            .insert(driver.get_point(), driver.clone());
                         self.kind_to_driver.insert(driver.kind.clone(), driver.clone());
                         if !driver.kind.matches(&Kind::Driver) {
                             let driver_driver = self.find(&Kind::Driver).unwrap();
@@ -427,10 +425,7 @@ where
                                 rtn.send(None);
                             }
                             Some(driver_api) => {
-                                match driver_api.get_point().await {
-                                    Ok(point) => rtn.send(Some(point)),
-                                    Err(_) => rtn.send(None),
-                                };
+                                rtn.send(Some(driver_api.get_point()));
                             }
                         };
                     } /*DriversCall::Route(wave) => {
@@ -745,7 +740,7 @@ where
                                 status_rx.clone(),
                                 layer,
                             );
-                            let driver = DriverApi::new(runner.clone(), factory.kind());
+                            let driver = DriverApi::new(runner.clone(), driver_skel.point.clone(), factory.kind());
                             let (rtn, rtn_rx) = oneshot::channel();
                             call_tx
                                 .send(DriversCall::AddDriver { driver, rtn })
@@ -891,8 +886,8 @@ where
                 Some(driver) => {
                     let driver = driver.clone();
                     tokio::spawn(async move {
-                        println!("\tSPawning Traversall...." );
-                        driver.traversal(traversal).await;
+                        println!("\tSPawning Traversal.... for {}<{}>",traversal.to.point.to_string(), traversal.record.details.stub.kind.to_string()  );
+                        driver.traverse(traversal).await;
                     });
                 }
             }
@@ -909,23 +904,19 @@ where
 {
     pub call_tx: mpsc::Sender<DriverRunnerCall<P>>,
     pub kind: KindSelector,
+    pub point: Point
 }
 
 impl<P> DriverApi<P>
 where
     P: Cosmos,
 {
-    pub fn new(tx: mpsc::Sender<DriverRunnerCall<P>>, kind: KindSelector) -> Self {
-        Self { call_tx: tx, kind }
+    pub fn new(tx: mpsc::Sender<DriverRunnerCall<P>>, point: Point, kind: KindSelector) -> Self {
+        Self { call_tx: tx, point, kind }
     }
 
-    pub async fn get_point(&self) -> Result<Point, UniErr> {
-        let (rtn, mut rtn_rx) = oneshot::channel();
-        self.call_tx
-            .send(DriverRunnerCall::GetPoint(rtn))
-            .await
-            .unwrap_or_default();
-        Ok(rtn_rx.await?)
+    pub fn get_point(&self) -> Point {
+        self.point.clone()
     }
 
     /// This method call will only work for DriverDriver
@@ -961,9 +952,9 @@ where
         rtn_rx.await?
     }
 
-    pub async fn traversal(&self, traversal: Traversal<UltraWave>) {
+    pub async fn traverse(&self, traversal: Traversal<UltraWave>) {
         self.call_tx
-            .send(DriverRunnerCall::Traversal(traversal))
+            .send(DriverRunnerCall::Traverse(traversal))
             .await;
     }
 
@@ -989,7 +980,7 @@ where
 {
     AddDriver(DriverApi<P>),
     GetPoint(oneshot::Sender<Point>),
-    Traversal(Traversal<UltraWave>),
+    Traverse(Traversal<UltraWave>),
     Item {
         point: Point,
         tx: oneshot::Sender<Result<ItemSphere<P>, P::Err>>,
@@ -1111,8 +1102,7 @@ where
             }
             ItemSphere::Router(router) => {
                 println!("\tItemSphere {} is a ROUTER", self.surface.to_string());
-                let wave = direct.payload.to_ultra();
-                router.route(wave).await;
+                router.traverse(direct.wrap() ).await;
             }
         }
 
@@ -1125,7 +1115,7 @@ where
         } else {
             match &self.item {
                 ItemSphere::Router(router) => {
-                    router.route(reflect.payload.to_ultra()).await;
+                    router.traverse(reflect.wrap() ).await;
                     Ok(())
                 }
                 ItemSphere::Handler(_) => {
@@ -1228,8 +1218,8 @@ where
                             }
                         }
                     }
-                    DriverRunnerCall::Traversal(traversal) => {
-println!("\texecuting Traversal: {}", self.skel.kind.to_string() );
+                    DriverRunnerCall::Traverse(traversal) => {
+
                         self.traverse(traversal).await;
                     }
                     /*DriverRunnerCall::Route(wave) => {
@@ -1303,13 +1293,11 @@ println!("\texecuting Traversal: {}", self.skel.kind.to_string() );
                         rtn.send(item.bind().await);
                     }
                     DriverRunnerCall::AddDriver(api) => {
-println!();
-println!("\tDriverApi -> ADD DRIVER: {}", api.get_point().await.unwrap().to_string() );
-println!();
                         self.driver.add_driver(api).await;
-println!("ADD DRIVER return to looping...");
                     }
                 }
+
+
             }
 
         });
@@ -1725,7 +1713,7 @@ where
 }
 
 #[async_trait]
-pub trait ItemRouter<P>: Router + Send + Sync
+pub trait ItemRouter<P>: TraversalRouter + Send + Sync
 where
     P: Cosmos,
 {
@@ -1860,7 +1848,7 @@ where
     }
 
     async fn add_driver(&self, api: DriverApi<P>) {
-        let point = api.get_point().await.unwrap();
+        let point = api.get_point();
         self.map.insert(point, api);
     }
 
@@ -1902,14 +1890,13 @@ where
 }
 
 #[async_trait]
-impl<P> Router for DriverItem<P>
+impl<P> TraversalRouter for DriverItem<P>
 where
     P: Cosmos,
 {
-    async fn route(&self, wave: UltraWave) {
-        println!("DRIVER DRIVER ROUTING!");
-        let api = self.skel.drivers();
-        //api.route(wave).await;
+    async fn traverse(&self, traversal: Traversal<UltraWave>) {
+         println!("DRIVER DRIVER ROUTING!");
+         self.skel.api.traverse(traversal).await;
     }
 }
 

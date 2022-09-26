@@ -5,6 +5,7 @@ use std::time::Duration;
 use alloc::borrow::Cow;
 use crate::{Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, UniErr};
 use crate::loc::{ToPoint, ToSurface};
+use crate::particle::traversal::Traversal;
 use crate::settings::Timeouts;
 use crate::wave::exchange::{BroadTxRouter, DirectedHandlerShellDef, InCtxDef, ProtoTransmitterBuilderDef, ProtoTransmitterDef, RootInCtxDef, SetStrategy};
 use crate::wave::{BounceBacks, BounceProto, DirectedKind, DirectedProto, DirectedWave, Echo, FromReflectedAggregate, Handling, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto, ReflectedWave, Scope, UltraWave, Wave, WaveId};
@@ -30,6 +31,12 @@ impl Router for BroadTxRouter {
 pub trait Router: Send + Sync {
     async fn route(&self, wave: UltraWave);
 }
+
+#[async_trait]
+pub trait TraversalRouter: Send + Sync {
+    async fn traverse(&self, traversal: Traversal<UltraWave>);
+}
+
 
 #[derive(Clone)]
 pub struct AsyncRouter {
