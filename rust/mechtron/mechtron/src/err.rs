@@ -7,12 +7,19 @@ use cosmic_universe::wave::core::http2::StatusCode;
 use cosmic_universe::wave::core::ReflectedCore;
 
 pub trait MechErr:
-    CoreReflector+ToString + From<Box<bincode::ErrorKind>> + From<MembraneErr>+From<UniErr>+From<String>+From<&'static str>+From<GuestErr>
+    CoreReflector
+    + ToString
+    + From<Box<bincode::ErrorKind>>
+    + From<MembraneErr>
+    + From<UniErr>
+    + From<String>
+    + From<&'static str>
+    + From<GuestErr>
 {
     fn to_uni_err(self) -> UniErr;
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct GuestErr {
     pub message: String,
 }
@@ -26,7 +33,7 @@ impl ToString for GuestErr {
 impl From<MembraneErr> for GuestErr {
     fn from(e: MembraneErr) -> Self {
         Self {
-            message: e.to_string()
+            message: e.to_string(),
         }
     }
 }
@@ -34,7 +41,7 @@ impl From<MembraneErr> for GuestErr {
 impl From<UniErr> for GuestErr {
     fn from(err: UniErr) -> Self {
         Self {
-            message: err.to_string()
+            message: err.to_string(),
         }
     }
 }
@@ -51,16 +58,14 @@ impl CoreReflector for GuestErr {
 
 impl From<String> for GuestErr {
     fn from(s: String) -> Self {
-        Self {
-            message:s
-        }
+        Self { message: s }
     }
 }
 
 impl From<&str> for GuestErr {
     fn from(s: &str) -> Self {
         Self {
-            message: s.to_string()
+            message: s.to_string(),
         }
     }
 }
@@ -78,8 +83,6 @@ impl From<Box<bincode::ErrorKind>> for GuestErr {
         }
     }
 }
-
-
 
 #[derive(Debug, Clone)]
 pub struct MembraneErr {
