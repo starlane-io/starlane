@@ -91,8 +91,8 @@ impl <P> MechtronFactories<P> where P: Platform {
 
 pub trait MechtronFactory<P>: Sync + Send + 'static where P: Platform {
     fn name(&self) -> String;
-    fn lifecycle(&self, details: &Details) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err>;
-    fn handler(&self, details: &Details, transmitter: ProtoTransmitterBuilder) -> Result<Box<dyn DirectedHandler>, P::Err>;
+    fn lifecycle(&self, details: &Details, logger: PointLogger) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err>;
+    fn handler(&self, details: &Details, transmitter: ProtoTransmitter, logger: PointLogger ) -> Result<Box<dyn DirectedHandler>, P::Err>;
 }
 
 #[cfg(test)]
@@ -109,13 +109,16 @@ pub mod test {
 #[derive(Clone)]
 pub struct MechtronSkel<P> where P: Platform {
     pub details: Details,
+    pub logger: PointLogger,
     phantom: PhantomData<P>
 }
 
 impl <P> MechtronSkel<P> where P: Platform{
-    pub fn new( details: Details, phantom: PhantomData<P> ) -> Self {
+    pub fn new( details: Details, logger: PointLogger, phantom: PhantomData<P> ) -> Self {
+        let logger = logger.point(details.stub.point.clone());
         Self {
             details,
+            logger,
             phantom
         }
     }

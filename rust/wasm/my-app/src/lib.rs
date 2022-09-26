@@ -15,8 +15,10 @@ use mechtron::{Mechtron, MechtronLifecycle, MechtronSkel};
 use mechtron::{guest, Guest, MechtronFactories, MechtronFactory, Platform};
 use std::sync::Arc;
 use cosmic_universe::wave::core::CoreBounce;
-use cosmic_universe::wave::exchange::synch::{DirectedHandler, ProtoTransmitterBuilder, RootInCtx};
+use cosmic_universe::wave::exchange::synch::{DirectedHandler, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx};
 use cosmic_macros::handler_sync;
+use cosmic_universe::log::{PointLogger, RootLogger};
+use mechtron::guest::GuestSkel;
 
 #[no_mangle]
 pub extern "C" fn mechtron_guest(details: Details) -> Result<Arc<dyn mechtron::Guest>, GuestErr> {
@@ -61,18 +63,27 @@ impl <P> MechtronFactory<P> for MyAppFactory where P: Platform+'static{
         "my-app".to_string()
     }
 
-    fn lifecycle(&self, details: &Details) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err> {
+    fn lifecycle(&self, details: &Details, logger: PointLogger ) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err> {
         let phantom:PhantomData<P> = PhantomData::default();
-        let skel = MechtronSkel::new(details.clone(), phantom );
+        let skel = MechtronSkel::new(details.clone(), logger, phantom );
         Ok(Box::new(MyApp::restore(skel,(),(),())))
     }
 
+    fn handler(&self, details: &Details, transmitter: ProtoTransmitter, logger: PointLogger) -> Result<Box<dyn DirectedHandler>, P::Err> {
+         let phantom:PhantomData<P> = PhantomData::default();
+        let skel = MechtronSkel::new(details.clone(), logger, phantom );
+        Ok(Box::new(MyApp::restore(skel,(),(),())))
+    }
+
+    /*
     fn handler(&self, details: &Details, transmitter: ProtoTransmitterBuilder) -> Result<Box<dyn DirectedHandler>, P::Err> {
                 let phantom:PhantomData<P> = PhantomData::default();
         let skel = MechtronSkel::new(details.clone(), phantom );
 
         Ok(Box::new(MyApp::restore(skel,(),(),())))
     }
+
+     */
 }
 
 
@@ -107,7 +118,11 @@ impl <P> MechtronLifecycle<P> for MyApp<P> where P: Platform+'static {
 
 #[handler_sync]
 impl <P> MyApp<P> where P: Platform+'static {
-
+    #[route("Ext<Check>")]
+    pub fn check(&self, _: InCtx<'_,()> ) -> Result<(),P::Err> {
+        self.skel.logger.info("CHECK MECHTRON REACHED!");
+        Ok(())
+    }
 }
 
 

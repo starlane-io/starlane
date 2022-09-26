@@ -148,8 +148,9 @@ where
                 "cannot find factory assicated with name: {}",
                 hosted.name
             ))?;
+            let logger = self.skel.logger.point(hosted.details.stub.point.clone());
             let mechtron = factory
-                .handler(&hosted.details, transmitter.clone())
+                .handler(&hosted.details, transmitter.clone().build(), logger )
                 .map_err(|e| GuestErr::from(e.to_string()))?;
 
             Ok(DirectedHandlerShell::new(
@@ -160,6 +161,7 @@ where
             ))
         }
     }
+
 
     fn logger(&self) -> &PointLogger {
         &self.skel.logger
@@ -232,7 +234,8 @@ where
                     host.name
                 )))?;
             self.skel.logger.info("Creating...");
-            let mechtron = factory.lifecycle(&host.details)?;
+            let logger = self.skel.logger.point( host.details.stub.point.clone());
+            let mechtron = factory.lifecycle(&host.details, logger)?;
             self.skel.logger.info("Got MechtronLifecycle...");
             let mut transmitter = self.ctx.builder();
             transmitter.from = SetStrategy::Override(host.details.stub.point.to_surface());

@@ -162,6 +162,8 @@ mod tests {
     use cosmic_universe::log::{LogSource, StdOutAppender};
     use cosmic_universe::particle::{Status, Stub};
     use cosmic_universe::substance::Substance;
+    use cosmic_universe::wave::core::cmd::CmdMethod;
+    use cosmic_universe::wave::core::ext::ExtMethod;
     use cosmic_universe::wave::core::hyp::HypMethod;
     use cosmic_universe::wave::core::Method;
     use crate::err::DefaultHostErr;
@@ -228,7 +230,18 @@ mod tests {
         let reflect = host.route(wave).unwrap();
         let reflect = reflect.unwrap();
         let reflect = reflect.to_reflected().unwrap();
-
         reflect.success_or().unwrap();
+
+        let mut wave = DirectedProto::ping();
+        wave.method(ExtMethod::new("Check").unwrap());
+        wave.to(mechtron.stub.point.to_surface());
+        wave.from(host.point().to_surface());
+        let wave = wave.build().unwrap();
+        let wave = wave.to_ultra();
+        let reflect = host.route(wave).unwrap();
+        let reflect = reflect.unwrap();
+        let reflect = reflect.to_reflected().unwrap();
+        reflect.success_or().unwrap();
+
     }
 }
