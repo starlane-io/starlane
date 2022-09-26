@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::Bin;
 
 use crate::command::direct::Cmd;
-use crate::err::{ParseErrs, UniErr};
+use crate::err::{ UniErr};
 use crate::loc::{Point, PointCtx, PointVar, Topic};
 use crate::parse::model::{
     BindScope, MethodScope, PipelineSegment, PipelineSegmentDef, PipelineVar, RouteScope,
@@ -263,6 +263,12 @@ pub struct RouteSelector {
     pub filters: ScopeFilters,
 }
 
+impl ToString for RouteSelector{
+    fn to_string(&self) -> String {
+        format!("{}",self.method.to_string())
+    }
+}
+
 impl RouteSelector {
     pub fn new(
         topic: Option<ValuePattern<Topic>>,
@@ -307,9 +313,12 @@ impl RouteSelector {
 
     pub fn is_match<'a>(&self, wave: &'a DirectedWave) -> Result<(), ()> {
         self.method.is_match(&wave.core().method)?;
-        match self.path.is_match(&wave.core().uri.path()) {
+        Ok(())
+/*        match self.path.is_match(&wave.core().uri.path()) {
             true => Ok(()),
             false => Err(()),
         }
+
+ */
     }
 }

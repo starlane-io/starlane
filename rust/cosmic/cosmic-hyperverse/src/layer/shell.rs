@@ -7,7 +7,7 @@ use cosmic_nom::new_span;
 use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::{Command, RawCommand};
 use cosmic_universe::err::UniErr;
-use cosmic_universe::loc::{Layer, Point, Surface, SurfaceSelector, ToPoint, ToSurface, Topic};
+use cosmic_universe::loc::{Layer, Point, Surface, SurfaceSelector, Topic, ToPoint, ToSurface};
 use cosmic_universe::log::PointLogger;
 use cosmic_universe::parse::error::result;
 use cosmic_universe::parse::{command_line, Env};
@@ -15,21 +15,20 @@ use cosmic_universe::particle::traversal::{Traversal, TraversalInjection, Traver
 use cosmic_universe::substance::Substance;
 use cosmic_universe::util::{log, ToResolved};
 use cosmic_universe::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
-use cosmic_universe::wave::exchange::{
-    DirectedHandler, Exchanger, InCtx, ProtoTransmitterBuilder, RootInCtx, SetStrategy,
-};
+use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, Pong, ReflectedWave, UltraWave, Wave,
     WaveId,
 };
+use cosmic_universe::wave::exchange::asynch::{DirectedHandler, Exchanger, InCtx, ProtoTransmitterBuilder, RootInCtx};
 
 use crate::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
-use crate::Hyperverse;
+use crate::Cosmos;
 
 #[derive(DirectedHandler)]
 pub struct Shell<P>
 where
-    P: Hyperverse + 'static,
+    P: Cosmos + 'static,
 {
     skel: HyperStarSkel<P>,
     state: ShellState,
@@ -38,7 +37,7 @@ where
 
 impl<P> Shell<P>
 where
-    P: Hyperverse + 'static,
+    P: Cosmos + 'static,
 {
     pub fn new(skel: HyperStarSkel<P>, state: ShellState) -> Self {
         let logger = skel.logger.point(state.point.clone());
@@ -53,7 +52,7 @@ where
 #[async_trait]
 impl<P> TraversalLayer for Shell<P>
 where
-    P: Hyperverse + 'static,
+    P: Cosmos + 'static,
 {
     fn surface(&self) -> Surface {
         self.state
@@ -116,7 +115,6 @@ where
         let bounce: CoreBounce = if directed.to.topic == Topic::None {
             self.handle(ctx).await
         } else {
-            println!("Handling Topic");
             let handler = self
                 .skel
                 .state
@@ -175,8 +173,6 @@ where
         &self,
         traversal: Traversal<ReflectedWave>,
     ) -> Result<(), UniErr> {
-        // println!("Shell reflected_core_bound: {}", traversal.kind().to_string() );
-
         if let Some(count) = self.state.fabric_requests.get(traversal.reflection_of()) {
             let value = count.value().fetch_sub(1, Ordering::Relaxed);
             if value >= 0 {
@@ -212,7 +208,7 @@ where
 #[handler]
 impl<P> Shell<P>
 where
-    P: Hyperverse + 'static,
+    P: Cosmos + 'static,
 {
     #[route("Ext<NewCliSession>")]
     pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Surface, UniErr> {
@@ -247,7 +243,6 @@ where
 impl CliSession {
     #[route("Ext<Exec>")]
     pub async fn exec(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, UniErr> {
-        println!("---> Reached Ext<Exec> !!!!");
         let exec_topic = Topic::uuid();
         let exec_port = self.port.clone().with_topic(exec_topic.clone());
         let mut exec = CommandExecutor::new(exec_port, ctx.from().clone(), self.env.clone());
@@ -283,34 +278,22 @@ impl CommandExecutor {
     }
 
     pub async fn execute(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, UniErr> {
-        println!("CommadnExecutor...");
         // make sure everything is coming from this command executor topic
         let ctx = ctx.push_from(self.port.clone());
 
-        println!("Pre parse line... '{}'", ctx.line);
         let command = log(result(command_line(new_span(ctx.line.as_str()))))?;
 
-        println!("post parse line...");
         let mut env = self.env.clone();
         for transfer in &ctx.transfers {
             env.set_file(transfer.id.clone(), transfer.content.clone())
         }
-        println!("Staring to work...");
         let mut command: Command = command.to_resolved(&self.env)?;
-        println!("resolved?...");
 
         if let Command::Create(create) = &mut command {
-            println!(
-                "...CHedcking For Transfers... for {} ",
-                create.template.kind.to_string()
-            );
+
             if ctx.transfers.len() == 1 {
                 let transfer = ctx.transfers.get(0).unwrap().clone();
-                println!();
-                println!(" === > ADDING TRANSFER < ===");
                 create.state = StateSrc::Substance(Box::new(Substance::Bin(transfer.content)));
-                println!("NOW STATEFUL");
-                println!();
             } else if ctx.transfers.len() > 1 {
                 return Err("create cannot handle more than one state transfer".into());
             }
@@ -319,7 +302,6 @@ impl CommandExecutor {
         let request: DirectedCore = command.into();
         let mut directed = DirectedProto::from_core(request);
         directed.to(Point::global_executor());
-        println!("GOT HERE ready ");
         let pong: Wave<Pong> = ctx.transmitter.direct(directed).await?;
         Ok(pong.variant.core)
     }

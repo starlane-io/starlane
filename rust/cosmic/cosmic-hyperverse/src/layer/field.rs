@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use http::Uri;
+use url::Url;
 
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
@@ -15,17 +15,18 @@ use cosmic_universe::selector::PayloadBlock;
 use cosmic_universe::substance::Substance;
 use cosmic_universe::util::ToResolved;
 use cosmic_universe::wave::core::{Method, ReflectedCore};
-use cosmic_universe::wave::exchange::{Exchanger, ProtoTransmitter, ProtoTransmitterBuilder};
+use cosmic_universe::wave::exchange::asynch::Exchanger;
 use cosmic_universe::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Pong, Reflection, UltraWave, Wave,
 };
+use cosmic_universe::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder};
 
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::{HyperErr, Hyperverse, RegistryApi};
+use crate::{Cosmos, HyperErr, RegistryApi};
 
 pub struct Field<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub port: Surface,
     pub skel: HyperStarSkel<P>,
@@ -35,7 +36,7 @@ where
 
 impl<P> Field<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(point: Point, skel: HyperStarSkel<P>) -> Self {
         let port = point.to_surface().with_layer(Layer::Field);
@@ -61,13 +62,13 @@ where
             .registry
             .record(&self.port.point)
             .await
-            .map_err(|e| e.to_cosmic_err())?;
+            .map_err(|e| e.to_uni_err())?;
         let properties = self
             .skel
             .registry
             .get_properties(&directed.to.point)
             .await
-            .map_err(|e| e.to_cosmic_err())?;
+            .map_err(|e| e.to_uni_err())?;
 
         let bind_property = properties.get("bind");
         let bind = match bind_property {
@@ -76,7 +77,7 @@ where
                 driver
                     .bind(&directed.to.point)
                     .await
-                    .map_err(|e| e.to_cosmic_err())?
+                    .map_err(|e| e.to_uni_err())?
             }
             Some(bind) => {
                 let bind = Point::from_str(bind.value.as_str())?;
@@ -102,7 +103,7 @@ where
 #[async_trait]
 impl<P> TraversalLayer for Field<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     fn surface(&self) -> Surface {
         self.port.clone()
@@ -122,7 +123,11 @@ where
     }
 
     async fn directed_core_bound(&self, directed: Traversal<DirectedWave>) -> Result<(), UniErr> {
+
         let bind = self.bind(&directed).await?;
+println!();
+println!("GOt BIND CONFIG: {}", bind.point.to_string() );
+println!();
         match bind.select(&directed.payload) {
             Ok(route) => {
                 let regex = route.selector.path.clone();
@@ -131,8 +136,8 @@ where
                         RegexCapturesResolver::new(regex, directed.core().uri.path().to_string())?;
                     let mut env = Env::new(self.port.point.clone());
                     env.add_var_resolver(Arc::new(path_regex_capture_resolver));
-                    env.set_var("self.bundle", bind.bundle().clone().into());
-                    env.set_var("self.bind", bind.point().clone().into());
+                    env.set_var("doc.bundle", bind.bundle().clone().into());
+                    env.set_var("doc", bind.point().clone().into());
                     env
                 };
                 self.pipex(directed, route.block.clone(), env);
@@ -151,8 +156,8 @@ where
                     });
                     let env = {
                         let mut env = Env::new(self.port.point.clone());
-                        env.set_var("self.bundle", bind.bundle().clone().into());
-                        env.set_var("self.bind", bind.point().clone().into());
+                        env.set_var("doc.bundle", bind.bundle().clone().into());
+                        env.set_var("doc", bind.point().clone().into());
                         env
                     };
                     self.pipex(directed, pipeline, env);
@@ -177,7 +182,7 @@ pub struct PipeEx {
 
     pub kind: DirectedKind,
     pub method: Method,
-    pub uri: Uri,
+    pub uri: Url,
     pub body: Substance,
     pub status: u16,
 }

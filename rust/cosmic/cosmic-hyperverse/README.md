@@ -36,7 +36,7 @@ given names from Astro Physics concepts:
 
 ## HYPERVERSE COMPOSITION
 To create a new Hyperverse composition (which means you are creating a new Platform) you need to implement the 
-Hyperverse trait.  An incomplete example can be found in the [test package](src/test/hyperverse.rs). It's incomplete
+Hyperverse trait.  An incomplete example can be found in the [test package](src/test/cosmos). It's incomplete
 because not every feature is needed for testing at this moment, however, it does show how the DriverFactories are
 created and a basic in memory registry.   
 

@@ -23,22 +23,21 @@ use cosmic_universe::util::{log, ToResolved};
 use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::CoreBounce;
 use cosmic_universe::wave::core::ReflectedCore;
-use cosmic_universe::wave::exchange::DirectedHandlerShell;
-use cosmic_universe::wave::exchange::RootInCtx;
-use cosmic_universe::wave::exchange::{DirectedHandler, Exchanger, InCtx};
-use cosmic_universe::wave::exchange::{
-    DirectedHandlerSelector, ProtoTransmitter, ProtoTransmitterBuilder, Router, SetStrategy,
-};
+use cosmic_universe::wave::exchange::asynch::DirectedHandlerShell;
+use cosmic_universe::wave::exchange::asynch::{DirectedHandler, DirectedHandlerSelector, InCtx, RootInCtx};
+use cosmic_universe::wave::exchange::asynch::Exchanger;
+use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::RecipientSelector;
 use cosmic_universe::wave::{Agent, DirectedProto, Handling, Pong, Scope, Wave};
 use cosmic_universe::HYPERUSER;
+use cosmic_universe::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder, Router};
 
 use crate::driver::{
     Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere,
 };
 use crate::star::{HyperStarSkel, SmartLocator};
 use crate::Registration;
-use crate::{DriverFactory, HyperErr, Hyperverse, Registry};
+use crate::{Cosmos, DriverFactory, HyperErr, Registry};
 
 /*
 #[derive(DirectedHandler,Clone)]
@@ -72,14 +71,14 @@ fn global_bind() -> BindConfig {
 #[derive(Clone, DirectedHandler)]
 pub struct GlobalCommandExecutionHandler<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     skel: HyperStarSkel<P>,
 }
 
 impl<P> GlobalCommandExecutionHandler<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(skel: HyperStarSkel<P>) -> Self {
         Self { skel }
@@ -89,7 +88,7 @@ where
 #[handler]
 impl<P> GlobalCommandExecutionHandler<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     #[route("Cmd<RawCommand>")]
     pub async fn raw(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, P::Err> {
@@ -119,7 +118,7 @@ where
 
 pub struct GlobalExecutionChamber<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub skel: HyperStarSkel<P>,
     pub logger: PointLogger,
@@ -127,7 +126,7 @@ where
 
 impl<P> GlobalExecutionChamber<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(skel: HyperStarSkel<P>) -> Self {
         let logger = skel.logger.push_point("global").unwrap();

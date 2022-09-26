@@ -133,6 +133,8 @@ pub enum BaseKind {
     Star,
     Driver,
     Global,
+    Host,
+    Guest
 }
 
 impl BaseKind {
@@ -242,6 +244,8 @@ pub enum Kind {
     UserBase(UserBaseSubKind),
     Star(StarSub),
     Global,
+    Host,
+    Guest
 }
 
 impl ToBaseKind for Kind {
@@ -266,6 +270,8 @@ impl ToBaseKind for Kind {
             Kind::Star(_) => BaseKind::Star,
             Kind::Driver => BaseKind::Driver,
             Kind::Global => BaseKind::Global,
+            Kind::Host => BaseKind::Host,
+            Kind::Guest => BaseKind::Guest
         }
     }
 }
@@ -290,6 +296,7 @@ impl Kind {
         match self {
             Kind::Bundle => true,
             Kind::Artifact(_) => true,
+            Kind::Mechtron => true,
             _ => false,
         }
     }
@@ -408,6 +415,8 @@ impl TryFrom<KindParts> for Kind {
             BaseKind::Repo => Kind::Repo,
             BaseKind::Driver => Kind::Driver,
             BaseKind::Global => Kind::Global,
+            BaseKind::Host => Kind::Host,
+            BaseKind::Guest => Kind::Guest
         })
     }
 }
@@ -730,3 +739,6 @@ pub mod test {
         Ok(())
     }
 }
+
+
+

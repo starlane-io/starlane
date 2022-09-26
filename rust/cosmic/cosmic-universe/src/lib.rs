@@ -16,10 +16,7 @@ use std::cmp::Ordering;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use ::http::StatusCode;
-use chrono::{DateTime, Utc};
 use dashmap::{DashMap, DashSet};
-use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
@@ -63,6 +60,7 @@ pub mod settings;
 pub mod substance;
 pub mod util;
 pub mod wave;
+pub mod wasm;
 
 lazy_static! {
     pub static ref VERSION: semver::Version =
@@ -71,12 +69,15 @@ lazy_static! {
     pub static ref ANONYMOUS: Point = Point::from_str("hyperspace:users:anonymous").expect("point");
 }
 
+/*
 pub fn cosmic_uuid() -> Uuid {
     uuid::Uuid::new_v4().to_string()
 }
 pub fn cosmic_timestamp() -> DateTime<Utc> {
     Utc::now()
 }
+
+ */
 
 #[cfg(test)]
 pub mod tests {

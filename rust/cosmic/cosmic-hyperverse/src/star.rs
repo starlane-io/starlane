@@ -9,13 +9,12 @@ use std::time::Duration;
 
 use dashmap::mapref::one::{Ref, RefMut};
 use dashmap::DashMap;
-use futures::future::{join_all, BoxFuture};
+use futures::future::{BoxFuture, join_all};
 use futures::FutureExt;
-use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
+use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock, watch};
 use tokio::time::error::Elapsed;
 use tracing::{error, info};
 
@@ -30,18 +29,18 @@ use cosmic_universe::command::direct::set::Set;
 use cosmic_universe::command::RawCommand;
 use cosmic_universe::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::err::UniErr;
-use cosmic_universe::hyper::MountKind;
+use cosmic_universe::hyper::{MountKind, ParticleLocation};
 use cosmic_universe::hyper::{
     Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, Location, ParticleRecord,
     Provision, Search,
 };
 use cosmic_universe::kind::{BaseKind, Kind, StarStub, StarSub, Sub};
 use cosmic_universe::loc::{
-    Layer, Point, RouteSeg, StarKey, Surface, SurfaceSelector, ToBaseKind, ToPoint, ToSurface,
-    Topic, Uuid, GLOBAL_EXEC, LOCAL_STAR,
+    GLOBAL_EXEC, Layer, LOCAL_STAR, Point, RouteSeg, StarKey, Surface, SurfaceSelector, ToBaseKind,
+    Topic, ToPoint, ToSurface, Uuid,
 };
 use cosmic_universe::log::{PointLogger, RootLogger, Trackable, Tracker};
-use cosmic_universe::parse::{bind_config, route_attribute, Env};
+use cosmic_universe::parse::{bind_config, Env, route_attribute};
 use cosmic_universe::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
@@ -53,22 +52,20 @@ use cosmic_universe::util::{log, ValueMatcher, ValuePattern};
 use cosmic_universe::wave::core::cmd::CmdMethod;
 use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
-use cosmic_universe::wave::exchange::{
-    DirectedHandler, DirectedHandlerSelector, DirectedHandlerShell, Exchanger, InCtx,
-    ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, SetStrategy, TxRouter,
-};
+use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::{
     Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
-    HandlingKind, Ping, Pong, Priority, RecipientSelector, Recipients, Reflectable, ReflectedWave,
+    HandlingKind, Ping, Pong, Priority, Recipients, RecipientSelector, Reflectable, ReflectedWave,
     Retries, Ripple, Scope, Signal, SingularRipple, ToRecipients, WaitTime, Wave, WaveKind,
 };
 use cosmic_universe::wave::{HyperWave, UltraWave};
 use cosmic_universe::HYPERUSER;
+use cosmic_universe::wave::exchange::asynch::{DirectedHandler, DirectedHandlerSelector, DirectedHandlerShell, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, TxRouter};
 
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, DriverSkel,
-    DriverStatus, Drivers, DriversApi, DriversCall, HyperDriverFactory, Item, ItemHandler,
+    Driver, DriverAvail, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, Drivers,
+    DriversApi, DriversCall, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler,
     ItemSkel, ItemSphere,
 };
 use crate::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
@@ -77,12 +74,12 @@ use crate::layer::shell::Shell;
 use crate::layer::shell::ShellState;
 use crate::machine::MachineSkel;
 use crate::Registration;
-use crate::{DriversBuilder, HyperErr, Hyperverse, Registry, RegistryApi};
+use crate::{Cosmos, DriversBuilder, HyperErr, Registry, RegistryApi};
 
 #[derive(Clone)]
 pub struct ParticleStates<P>
 where
-    P: Hyperverse + 'static,
+    P: Cosmos + 'static,
 {
     phantom: PhantomData<P>,
     topic: Arc<DashMap<Surface, Arc<dyn TopicHandler>>>,
@@ -91,7 +88,7 @@ where
 
 impl<P> ParticleStates<P>
 where
-    P: Hyperverse + 'static,
+    P: Cosmos + 'static,
 {
     pub fn create_shell(&self, point: Point) {
         self.shell.insert(point.clone(), ShellState::new(point));
@@ -143,7 +140,7 @@ where
 #[derive(Clone)]
 pub struct HyperStarSkel<P>
 where
-    P: Hyperverse + 'static,
+    P: Cosmos + 'static,
 {
     pub api: HyperStarApi<P>,
     pub key: StarKey,
@@ -175,7 +172,7 @@ where
 
 impl<P> HyperStarSkel<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub async fn new(
         template: StarTemplate,
@@ -317,14 +314,14 @@ where
         transmitter.from = SetStrategy::Override(self.point.to_surface().with_layer(Layer::Core));
         transmitter.agent = SetStrategy::Override(Agent::HyperUser);
         let transmitter = transmitter.build();
-
+assign.track = true;
         let assign_result: Wave<Pong> = logger.result_ctx(
             "StarSkel::create(assign_result)",
             transmitter.direct(assign).await,
         )?;
+        let location = ParticleLocation::new( self.point.clone(), None);
         self.registry
-            .assign(&details.stub.point)
-            .send(self.point.clone());
+            .assign(&details.stub.point, location).await?;
         let logger = logger.push_mark("result").unwrap();
         logger.result(assign_result.ok_or())?;
         Ok(details)
@@ -346,7 +343,7 @@ where
 
 pub enum HyperStarCall<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     Init,
     CreateStates {
@@ -376,7 +373,7 @@ where
 
 pub struct HyperStarTx<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub gravity_tx: mpsc::Sender<UltraWave>,
     pub traverse_to_next_tx: mpsc::Sender<Traversal<UltraWave>>,
@@ -394,7 +391,7 @@ where
 
 impl<P> HyperStarTx<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(point: Point) -> Self {
         let (gravity_tx, mut gravity_rx) = mpsc::channel(1024);
@@ -496,7 +493,7 @@ where
 #[derive(Clone)]
 pub struct HyperStarApi<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub kind: StarSub,
     tx: mpsc::Sender<HyperStarCall<P>>,
@@ -505,7 +502,7 @@ where
 
 impl<P> HyperStarApi<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(
         kind: StarSub,
@@ -615,7 +612,7 @@ where
 
 pub struct HyperStar<P>
 where
-    P: Hyperverse + 'static,
+    P: Cosmos + 'static,
 {
     skel: HyperStarSkel<P>,
     star_tx: mpsc::Sender<HyperStarCall<P>>,
@@ -632,7 +629,7 @@ where
 
 impl<P> HyperStar<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub async fn new(
         skel: HyperStarSkel<P>,
@@ -861,7 +858,6 @@ where
                     }
                     retries = retries + 1;
                 }
-                skel.logger.info("Wrangle Success!");
             });
         }
 
@@ -897,7 +893,7 @@ where
                         let result = self
                             .from_hyperway(wave)
                             .await
-                            .map_err(|e| e.to_cosmic_err());
+                            .map_err(|e| e.to_uni_err());
                         if let Some(tx) = rtn {
                             tx.send(result);
                         } else {
@@ -1080,7 +1076,7 @@ where
                 gravity: Surface,
             ) -> Result<(), P::Err>
             where
-                P: Hyperverse,
+                P: Cosmos,
             {
                 match &mut wave {
                     UltraWave::Ripple(ripple) => {
@@ -1106,7 +1102,7 @@ where
                         let location = locator.locate(&to.point).await?;
                         let mut transport = wave.wrap_in_transport(
                             gravity,
-                            location.to_surface().with_layer(Layer::Core),
+                            location.star.to_surface().with_layer(Layer::Core),
                         );
                         transport.from(skel.point.clone().to_surface());
                         let transport = transport.build()?;
@@ -1228,7 +1224,7 @@ where
 #[derive(Clone)]
 pub struct LayerTraversalEngine<P>
 where
-    P: Hyperverse + 'static,
+    P: Cosmos + 'static,
 {
     pub skel: HyperStarSkel<P>,
     pub injector: Surface,
@@ -1239,7 +1235,7 @@ where
 
 impl<P> LayerTraversalEngine<P>
 where
-    P: Hyperverse + 'static,
+    P: Cosmos + 'static,
 {
     pub fn new(
         skel: HyperStarSkel<P>,
@@ -1288,7 +1284,7 @@ where
                         for port in &ports {
                             let record = self.skel.registry.record(&port.point).await?;
                             let loc = logger.result(record.location.ok_or(P::Err::new("multi port ripple has recipient that is not located, this should have been provisioned when the ripple was sent")))?;
-                            if loc == self.skel.point {
+                            if loc.star == self.skel.point {
                                 tos.push(port.clone());
                             }
                         }
@@ -1347,11 +1343,7 @@ where
                     }
                 }
             } else {
-                // if this wave was injected by the from Particle, then we need to first
-                // traverse towards the fabric
-                if injector.point == wave.from().point {
-                    dir = TraversalDirection::Fabric;
-                } else {
+
                     // if this was injected by something else (like the Star)
                     // then it needs to traverse towards the Core
                     dir = TraversalDirection::Core;
@@ -1359,8 +1351,10 @@ where
                     if !from_hyperway {
                         dest.replace(to.layer.clone());
                     }
-                }
             }
+if wave.track() && wave.transported().is_none() {
+    println!("\n\rDIR : {} ",dir.to_string());
+}
 
             let traversal_logger = self.skel.logger.point(to.to_point());
             let traversal_logger = traversal_logger.span();
@@ -1415,6 +1409,7 @@ where
     async fn exit(&self, traversal: Traversal<UltraWave>) -> Result<(), UniErr> {
         match traversal.dir {
             TraversalDirection::Fabric => {
+println!("Sending EXIT UP {}",traversal.method().as_ref().unwrap().to_string());
                 self.exit_up.send(traversal).await;
                 return Ok(());
             }
@@ -1520,7 +1515,7 @@ pub struct LayerInjectionRouter {
 impl LayerInjectionRouter {
     pub fn new<P>(skel: HyperStarSkel<P>, injector: Surface) -> Self
     where
-        P: Hyperverse,
+        P: Cosmos,
     {
         Self {
             inject_tx: skel.inject_tx.clone(),
@@ -1550,10 +1545,6 @@ impl Router for LayerInjectionRouter {
         self.inject_tx.send(inject).await;
     }
 
-    fn route_sync(&self, wave: UltraWave) {
-        let inject = TraversalInjection::new(self.injector.clone(), wave);
-        self.inject_tx.try_send(inject);
-    }
 }
 
 pub trait TopicHandler: Send + Sync + DirectedHandler {
@@ -1643,7 +1634,7 @@ async fn shard_ripple_by_location<E>(
     registry: &Registry<E>,
 ) -> Result<HashMap<Point, Wave<Ripple>>, E::Err>
 where
-    E: Hyperverse,
+    E: Cosmos,
 {
     let mut map = HashMap::new();
     for (star, recipients) in shard_by_location(ripple.to.clone(), adjacent, registry).await? {
@@ -1663,7 +1654,7 @@ pub async fn ripple_to_singulars<E>(
     registry: &Registry<E>,
 ) -> Result<Vec<Wave<SingularRipple>>, E::Err>
 where
-    E: Hyperverse,
+    E: Cosmos,
 {
     let mut rtn = vec![];
     for port in to_ports(ripple.to.clone(), adjacent, registry).await? {
@@ -1679,7 +1670,7 @@ pub async fn shard_by_location<E>(
     registry: &Registry<E>,
 ) -> Result<HashMap<Point, Recipients>, E::Err>
 where
-    E: Hyperverse,
+    E: Cosmos,
 {
     match recipients {
         Recipients::Single(single) => {
@@ -1734,7 +1725,7 @@ pub async fn to_ports<E>(
     registry: &Registry<E>,
 ) -> Result<Vec<Surface>, E::Err>
 where
-    E: Hyperverse,
+    E: Cosmos,
 {
     match recipients {
         Recipients::Single(single) => Ok(vec![single]),
@@ -1756,7 +1747,7 @@ where
 #[derive(Clone)]
 pub struct DiagnosticInterceptors<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub from_hyperway: broadcast::Sender<UltraWave>,
     pub to_gravity: broadcast::Sender<UltraWave>,
@@ -1771,7 +1762,7 @@ where
 
 impl<P> DiagnosticInterceptors<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new() -> Self {
         let (from_hyperway, _) = broadcast::channel(1024);
@@ -1800,20 +1791,20 @@ where
 #[derive(Clone)]
 pub struct SmartLocator<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub skel: HyperStarSkel<P>,
 }
 
 impl<P> SmartLocator<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(skel: HyperStarSkel<P>) -> Self {
         Self { skel }
     }
 
-    pub async fn locate(&self, point: &Point) -> Result<Point, P::Err> {
+    pub async fn locate(&self, point: &Point) -> Result<ParticleLocation, P::Err> {
         let record = self.skel.registry.record(&point).await?;
         match record.location {
             Some(location) => Ok(location),
@@ -1825,7 +1816,7 @@ where
     }
 
     #[async_recursion]
-    pub async fn provision(&self, point: &Point, state: StateSrc) -> Result<Point, P::Err> {
+    pub async fn provision(&self, point: &Point, state: StateSrc) -> Result<ParticleLocation, P::Err> {
         // check if parent is provisioned
         let parent = point
             .parent()
@@ -1842,10 +1833,10 @@ where
         wave.method(HypMethod::Provision);
         wave.body(HyperSubstance::Provision(provision).into());
         wave.from(self.skel.point.clone().to_surface().with_layer(Layer::Core));
-        wave.to(parent_star.to_surface().with_layer(Layer::Core));
+        wave.to(parent_star.star.to_surface().with_layer(Layer::Core));
         let pong: Wave<Pong> = self.skel.star_transmitter.direct(wave).await?;
         if pong.core.status.as_u16() == 200 {
-            if let Substance::Point(location) = &pong.core.body {
+            if let Substance::Location(location) = &pong.core.body {
                 Ok(location.clone())
             } else {
                 Err(P::Err::new("Provision result expected Substance Point"))

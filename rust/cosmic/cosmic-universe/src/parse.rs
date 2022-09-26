@@ -10,7 +10,7 @@ use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use ariadne::{Label, Report, ReportKind};
+//use ariadne::{Label, Report, ReportKind};
 use nom::branch::alt;
 use nom::bytes::complete::take;
 use nom::bytes::complete::{escaped, is_a, is_not};
@@ -59,7 +59,9 @@ use crate::config::bind::{
     PipelineStopCtx, PipelineStopVar, RouteSelector, WaveDirection,
 };
 use crate::config::Document;
+use crate::config::mechtron::MechtronConfig;
 use crate::err::{ParseErrs, UniErr};
+use crate::err::report::{Label, Report, ReportKind};
 use crate::kind::{
     ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, Specific, StarSub,
     UserBaseSubKind,
@@ -70,14 +72,7 @@ use crate::loc::{
     PointVar, RouteSeg, RouteSegVar, Surface, Topic, Uuid, VarVal, Variable, Version,
 };
 use crate::parse::error::{find_parse_err, result};
-use crate::parse::model::{
-    BindScope, BindScopeKind, Block, BlockKind, Chunk, DelimitedBlockKind, LexBlock,
-    LexParentScope, LexRootScope, LexScope, LexScopeSelector, LexScopeSelectorAndFilters,
-    MessageScopeSelectorAndFilters, NestedBlockKind, PipelineCtx, PipelineSegment,
-    PipelineSegmentCtx, PipelineSegmentVar, PipelineVar, RootScopeSelector, RouteScope,
-    ScopeFilterDef, ScopeFilters, ScopeFiltersDef, ScopeSelectorAndFiltersDef, Spanned, Subst,
-    TerminatedBlockKind, TextType, Var, VarParser,
-};
+use crate::parse::model::{BindScope, BindScopeKind, Block, BlockKind, Chunk, DelimitedBlockKind, LexBlock, LexParentScope, LexRootScope, LexScope, LexScopeSelector, LexScopeSelectorAndFilters, MechtronScope, MessageScopeSelectorAndFilters, NestedBlockKind, PipelineCtx, PipelineSegment, PipelineSegmentCtx, PipelineSegmentVar, PipelineVar, RootScopeSelector, RouteScope, ScopeFilterDef, ScopeFilters, ScopeFiltersDef, ScopeSelectorAndFiltersDef, Spanned, Subst, TerminatedBlockKind, TextType, Var, VarParser};
 use crate::particle::{PointKind, PointKindVar};
 use crate::security::{
     AccessGrantKind, AccessGrantKindDef, ChildPerms, ParticlePerms, Permissions, PermissionsMask,
@@ -937,7 +932,11 @@ where
 }
 
 pub fn parse_uuid<I: Span>(i: I) -> Res<I, Uuid> {
-    uuid_chars(i).map(|(next, uuid)| (next, uuid.to_string()))
+    let (next,uuid) = uuid_chars(i.clone())?;
+    Ok((next,Uuid::from(uuid).map_err(|e|nom::Err::Error(ErrorTree::from_error_kind(
+                i,
+                ErrorKind::Tag,
+            )))?))
 }
 
 pub fn uuid_chars<T: Span>(i: T) -> Res<T, T>
@@ -3519,12 +3518,8 @@ pub mod model {
     };
     use crate::err::{ParseErrs, UniErr};
     use crate::loc::{Point, PointCtx, PointVar, Version};
+    use crate::parse::{camel_case_chars, filepath_chars, http_method, lex_child_scopes, method_kind, pipeline, rc_command_type, value_pattern, wrapped_cmd_method, wrapped_ext_method, wrapped_http_method, wrapped_sys_method, CtxResolver, Env, ResolverErr, SubstParser, Assignment};
     use crate::parse::error::result;
-    use crate::parse::{
-        camel_case_chars, filepath_chars, http_method, lex_child_scopes, method_kind, pipeline,
-        rc_command_type, value_pattern, wrapped_cmd_method, wrapped_ext_method,
-        wrapped_http_method, wrapped_sys_method, CtxResolver, Env, ResolverErr, SubstParser,
-    };
     use crate::util::{HttpMethodPattern, StringMatcher, ToResolved, ValueMatcher, ValuePattern};
     use crate::wave::core::http2::HttpMethod;
     use crate::wave::core::{DirectedCore, Method, MethodKind};
@@ -4376,6 +4371,12 @@ pub mod model {
      */
 
     #[derive(Clone)]
+    pub enum MechtronScope {
+        WasmScope(Vec<Assignment>),
+    }
+
+
+    #[derive(Clone)]
     pub enum BindScope {
         RequestScope(RouteScope),
     }
@@ -4796,23 +4797,44 @@ pub mod model {
 }
 
 pub mod error {
-    use ariadne::Report;
-    use ariadne::{Label, ReportKind, Source};
+    use core::str::FromStr;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+    //    use ariadne::Report;
+//    use ariadne::{Label, ReportKind, Source};
     use nom::branch::alt;
     use nom::bytes::complete::tag;
-    use nom::character::complete::{alphanumeric0, alphanumeric1, multispace1};
-    use nom::combinator::not;
-    use nom::multi::many0;
-    use nom::sequence::{preceded, tuple};
-    use nom::{Err, Slice};
+    use nom::character::complete::{alpha1, alphanumeric0, alphanumeric1, digit1, multispace0, multispace1, satisfy, space1};
+    use nom::combinator::{all_consuming, cut, fail, not, opt, peek, recognize, value};
+    use nom::multi::{many0, many1, separated_list0};
+    use nom::sequence::{delimited, pair, preceded, terminated, tuple};
+    use nom::{AsChar, Compare, Err, InputLength, InputTake, InputTakeAtPosition, IResult, Parser, Slice};
+    use nom::error::{context, ContextError, ErrorKind, ParseError};
     use nom_supreme::error::{BaseErrorKind, ErrorTree, StackContext};
     use regex::{Error, Regex};
+    use regex::internal::Input;
 
-    use cosmic_nom::{len, Span};
+    use cosmic_nom::{len, new_span, Res, Span, span_with_extra, trim, tw};
 
-    use crate::err::{ParseErrs, UniErr};
-    use crate::parse::model::NestedBlockKind;
-    use crate::parse::{nospace1, skewer};
+    use crate::err::{UniErr};
+    use crate::loc::{Layer, PointSeg, PointVar, StarKey, Topic, VarVal, Version};
+    use crate::parse::model::{BindScope, BindScopeKind, BlockKind, Chunk, DelimitedBlockKind, LexScope, NestedBlockKind, PipelineSegmentVar, PipelineVar, RouteScope, Spanned, Subst, TextType};
+    use crate::parse::{any_block, any_soround_lex_block, camel_case, camel_case_chars, camel_case_to_string_matcher, CamelCase, domain, file_chars, filepath_chars, get, lex_child_scopes, lex_root_scope, lex_route_selector, lex_scopes, lowercase_alphanumeric, method_kind, nospace1, parse_uuid, point_segment_chars, point_var, rec_version, select, set, skewer, skewer_case, skewer_chars, subst_path, SubstParser, unwrap_block, variable_name, version_chars, version_req_chars};
+    use crate::{ArtifactSubKind, BaseKind, BindConfig, Document, FileSubKind, Kind, Selector, Specific, StarSub, Strategy, Surface};
+    use crate::command::CommandVar;
+    use crate::command::direct::CmdKind;
+    use crate::config::bind::{PipelineStepVar, PipelineStopVar, RouteSelector, WaveDirection};
+    use crate::err::report::{Label, Report, ReportKind};
+    use crate::kind::KindParts;
+    use crate::particle::PointKindVar;
+    use crate::selector::{ExactPointSeg, Hop, KindBaseSelector, KindSelector, LabeledPrimitiveTypeDef, MapEntryPattern, MapEntryPatternVar, Pattern, PatternBlockVar, PayloadBlockVar, PayloadType2Def, PointSegSelector, SelectorDef, SpecificSelector, SubKindSelector, UploadBlock, VersionReq};
+    use crate::substance::{CallKind, CallVar, CallWithConfigVar, ExtCall, HttpCall, ListPattern, MapPatternVar, NumRange, SubstanceFormat, SubstanceKind, SubstancePattern, SubstancePatternVar, SubstanceTypePatternDef, SubstanceTypePatternVar};
+    use crate::util::{HttpMethodPattern, StringMatcher, ToResolved, ValuePattern};
+    use crate::wave::core::cmd::CmdMethod;
+    use crate::wave::core::ext::ExtMethod;
+    use crate::wave::core::http2::HttpMethod;
+    use crate::wave::core::hyp::HypMethod;
+    use crate::wave::core::{Method, MethodKind, MethodPattern};
 
     pub fn result<I: Span, R>(result: Result<(I, R), Err<ErrorTree<I>>>) -> Result<R, UniErr> {
         match result {
@@ -4837,6 +4859,9 @@ pub mod error {
      */
 
     fn create_err_report<I: Span>(context: &str, loc: I) -> UniErr {
+      UniErr::from_500(context)
+    }
+/*    fn create_err_report<I: Span>(context: &str, loc: I) -> UniErr {
         let mut builder = Report::build(ReportKind::Error, (), 23);
 
         match NestedBlockKind::error_message(&loc, context) {
@@ -4983,7 +5008,7 @@ pub mod error {
         //            let source = String::from_utf8(loc.get_line_beginning().to_vec() ).unwrap_or("could not parse utf8 of original source".to_string() );
         ParseErrs::from_report(builder.finish(), loc.extra()).into()
     }
-
+*/
     pub fn find_parse_err<I: Span>(err: &Err<ErrorTree<I>>) -> UniErr {
         match err {
             Err::Incomplete(_) => "internal parser error: Incomplete".into(),
@@ -5037,6 +5062,7 @@ pub mod error {
         }
     }
 }
+
 
 fn inclusive_any_segment<I: Span>(input: I) -> Res<I, PointSegSelector> {
     alt((tag("+*"), tag("ROOT+*")))(input).map(|(next, _)| (next, PointSegSelector::InclusiveAny))
@@ -5585,6 +5611,8 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
             BaseKind::Repo => Ok((next, Kind::Repo)),
             BaseKind::Driver => Ok((next, Kind::Driver)),
             BaseKind::Global => Ok((next, Kind::Global)),
+            BaseKind::Host => Ok((next,Kind::Host)),
+            BaseKind::Guest => Ok((next,Kind::Guest))
         }
     }
 }
@@ -6544,6 +6572,15 @@ pub fn bind_config(src: &str) -> Result<BindConfig, UniErr> {
     let document = doc(src)?;
     match document {
         Document::BindConfig(bind_config) => Ok(bind_config),
+        _ => Err("not a bind config".into())
+    }
+}
+
+pub fn mechtron_config(src: &str) -> Result<MechtronConfig, UniErr> {
+    let document = doc(src)?;
+    match document {
+        Document::MechtronConfig(mechtron_config) => Ok(mechtron_config),
+        _ => Err("not a Mechtron config".into())
     }
 }
 
@@ -6553,7 +6590,32 @@ pub fn doc(src: &str) -> Result<Document, UniErr> {
     let span = span_with_extra(stripped.as_str(), Arc::new(src.to_string()));
     let lex_root_scope = lex_root_scope(span.clone())?;
     let root_scope_selector = lex_root_scope.selector.clone().to_concrete()?;
-    if root_scope_selector.name.as_str() == "Bind" {
+        if root_scope_selector.name.as_str() == "Mechtron" {
+        if root_scope_selector.version == Version::from_str("1.0.0")? {
+            let mechtron = parse_mechtron_config(lex_root_scope.block.content.clone())?;
+
+            return Ok(Document::MechtronConfig(mechtron));
+        } else {
+            let message = format!(
+                "ConfigParser does not know how to process a Bind at version '{}'",
+                root_scope_selector.version.to_string()
+            );
+            let mut builder = Report::build(ReportKind::Error, (), 0);
+            let report = builder
+                .with_message(message)
+                .with_label(
+                    Label::new(
+                        lex_root_scope.selector.version.span.location_offset()
+                            ..lex_root_scope.selector.version.span.location_offset()
+                                + lex_root_scope.selector.version.span.len(),
+                    )
+                    .with_message("Unsupported Bind Config Version"),
+                )
+                .finish();
+            Err(ParseErrs::from_report(report, lex_root_scope.block.content.extra.clone()).into())
+        }
+    }
+    else if root_scope_selector.name.as_str() == "Bind" {
         if root_scope_selector.version == Version::from_str("1.0.0")? {
             let bind = parse_bind_config(lex_root_scope.block.content.clone())?;
 
@@ -6595,6 +6657,53 @@ pub fn doc(src: &str) -> Result<Document, UniErr> {
             )
             .finish();
         Err(ParseErrs::from_report(report, lex_root_scope.block.content.extra.clone()).into())
+    }
+}
+
+fn parse_mechtron_config<I: Span>(input: I) -> Result<MechtronConfig, UniErr> {
+    let (next,(_,_,_,_,assignments,_)) = tuple(( multispace0,tag("Wasm"),multispace0,tag("{"),many0(assignment),tag("}")))(input)?;
+    let config = MechtronConfig::new(vec![MechtronScope::WasmScope(assignments)])?;
+    Ok(config)
+}
+
+fn assignment<I>( input: I ) -> Res<I,Assignment> where I:Span{
+    tuple( (multispace0,skewer,multispace0,tag("="),multispace0,nospace1,multispace0,opt(tag(";"))) )(input).map(|(next, (_,k,_,_,_,v,_,_))|(next,Assignment {
+        key: k.to_string(),
+        value: v.to_string()
+    }))
+}
+
+#[derive(Clone)]
+pub struct Assignment{
+   pub key: String,
+   pub value: String
+}
+
+
+fn semantic_mechtron_scope<I: Span>(scope: LexScope<I>) -> Result<MechtronScope, UniErr> {
+    let selector_name = scope.selector.name.to_string();
+    match selector_name.as_str() {
+        "Wasm" => {
+            let assignments= result(many0(assignment)(scope.block.content))?;
+            Ok(MechtronScope::WasmScope(assignments))
+        }
+        what => {
+            let mut builder = Report::build(ReportKind::Error, (), 0);
+            let report = builder
+                .with_message(format!(
+                    "Unrecognized MechtronConfig selector: '{}'",
+                    scope.selector.name.to_string()
+                ))
+                .with_label(
+                    Label::new(
+                        scope.selector.name.location_offset()
+                            ..scope.selector.name.location_offset() + scope.selector.name.len(),
+                    )
+                    .with_message("Unrecognized Selector"),
+                )
+                .finish();
+            Err(ParseErrs::from_report(report, scope.block.content.extra().clone()).into())
+        }
     }
 }
 
@@ -7087,26 +7196,36 @@ pub mod test {
     use crate::config::Document;
     use crate::err::{ParseErrs, UniErr};
     use crate::loc::{Point, PointCtx, PointSegVar, RouteSegVar};
-    use crate::parse::error::result;
     use crate::parse::model::{
         BlockKind, DelimitedBlockKind, LexScope, NestedBlockKind, TerminatedBlockKind,
     };
-    use crate::parse::{
-        args, base_point_segment, base_seg, comment, consume_point_var, create, create_command,
-        doc, expected_block_terminator_or_non_terminator, lex_block, lex_child_scopes,
-        lex_nested_block, lex_scope, lex_scope_pipeline_step_and_block, lex_scope_selector,
-        lex_scopes, lowercase1, mesh_eos, mesh_seg, nested_block, nested_block_content,
-        next_stacked_name, no_comment, parse_bind_config, parse_include_blocks, parse_inner_block,
-        path_regex, pipeline, pipeline_segment, pipeline_step_var, pipeline_stop_var,
-        point_non_root_var, point_template, point_var, pop, rec_version, root_ctx_seg, root_scope,
-        root_scope_selector, route_attribute, route_selector, scope_filter, scope_filters,
-        skewer_case_chars, skewer_dot, space_chars, space_no_dupe_dots, space_point_segment,
-        strip_comments, subst, template, var_seg, variable_name, version, version_point_segment,
-        wrapper, Env, MapResolver, SubstParser, VarResolver,
-    };
+    use crate::parse::{args, base_point_segment, base_seg, comment, consume_point_var, create, create_command, doc, expected_block_terminator_or_non_terminator, lex_block, lex_child_scopes, lex_nested_block, lex_scope, lex_scope_pipeline_step_and_block, lex_scope_selector, lex_scopes, lowercase1, mesh_eos, mesh_seg, nested_block, nested_block_content, next_stacked_name, no_comment, parse_bind_config, parse_include_blocks, parse_inner_block, path_regex, pipeline, pipeline_segment, pipeline_step_var, pipeline_stop_var, point_non_root_var, point_template, point_var, pop, rec_version, root_ctx_seg, root_scope, root_scope_selector, route_attribute, route_selector, scope_filter, scope_filters, skewer_case_chars, skewer_dot, space_chars, space_no_dupe_dots, space_point_segment, strip_comments, subst, template, var_seg, variable_name, version, version_point_segment, wrapper, Env, MapResolver, SubstParser, VarResolver, parse_mechtron_config};
+    use crate::parse::error::result;
     use crate::substance::Substance;
     use crate::util;
     use crate::util::{log, ToResolved};
+
+
+     #[test]
+    pub fn test_mechtron_config() {
+         let config = r#"Mechtron(version=1.0.0) {
+                              Wasm {
+                                bin=some:bin:somewhere
+                                name=freddy
+                              }
+                             }
+
+         "#;
+
+         let doc = log(doc(config)).unwrap();
+
+         if let Document::MechtronConfig(_) =  doc {
+
+         } else {
+             assert!(false)
+         }
+
+    }
 
     #[test]
     pub fn test_message_selector() {
@@ -8221,7 +8340,7 @@ pub mod cmd_test {
 
     use crate::command::{Command, CommandVar};
     use crate::err::UniErr;
-    use crate::parse::error::result;
+    use crate::parse::error::{result};
     use crate::parse::{command, create_command, publish_command, script, CamelCase};
     use crate::util::ToResolved;
     use crate::{BaseKind, KindTemplate};
@@ -8424,3 +8543,5 @@ impl TryInto<KindParts> for KindLex {
         })
     }
 }
+
+

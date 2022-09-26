@@ -20,6 +20,7 @@ use crate::wave::{
     Ping, Pong, ReflectedKind, ReflectedProto, ToRecipients, UltraWave, Wave, WaveId, WaveKind,
 };
 use crate::Agent;
+use crate::parse::SkewerCase;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {
@@ -68,7 +69,35 @@ impl Location {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParticleRecord {
     pub details: Details,
-    pub location: Option<Point>,
+    pub location: Option<ParticleLocation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct ParticleLocation {
+    pub star: Point,
+    pub host: Option<Point>
+}
+
+impl ParticleLocation {
+    pub fn new( star: Point, host: Option<Point> ) -> Self {
+        Self {
+            star,
+            host
+        }
+    }
+}
+
+impl From<ParticleLocation> for ReflectedCore {
+    fn from(location: ParticleLocation) -> Self {
+        let location = Substance::Location(location);
+        ReflectedCore::ok_body(location)
+    }
+}
+
+impl Default for ParticleLocation {
+    fn default() -> Self {
+        ParticleLocation::new( Point::central(), None )
+    }
 }
 
 impl Default for ParticleRecord {
@@ -78,10 +107,10 @@ impl Default for ParticleRecord {
 }
 
 impl ParticleRecord {
-    pub fn new(details: Details, point: Point) -> Self {
+    pub fn new(details: Details, location: Option<ParticleLocation>) -> Self {
         ParticleRecord {
             details,
-            location: Some(point),
+            location
         }
     }
 
@@ -95,7 +124,7 @@ impl ParticleRecord {
                 },
                 properties: Default::default(),
             },
-            location: Some(Point::central()),
+            location: Some(Default::default()),
         }
     }
 }
@@ -150,6 +179,32 @@ pub struct Assign {
     pub state: StateSrc,
 }
 
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct Host{
+    pub kind: AssignmentKind,
+    pub details: Details,
+    pub state: StateSrc,
+    pub name: String
+}
+
+impl Host{
+    pub fn kind(&self) -> &Kind {
+        &self.details.stub.kind
+    }
+
+    pub fn new<S>(kind: AssignmentKind, details: Details, state: StateSrc, name: S) -> Self where S: ToString{
+        Self {
+            kind,
+            details,
+            state,
+            name: name.to_string()
+        }
+    }
+
+}
+
+
 impl Assign {
     pub fn kind(&self) -> &Kind {
         &self.details.stub.kind
@@ -162,12 +217,14 @@ impl Assign {
             state,
         }
     }
+
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Autobox)]
 pub enum HyperSubstance {
     Provision(Provision),
     Assign(Assign),
+    Host(Host),
     Event(HyperEvent),
     Log(Log),
     Search(Search),

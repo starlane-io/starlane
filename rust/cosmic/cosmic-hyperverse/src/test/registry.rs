@@ -1,11 +1,11 @@
-use crate::test::hyperverse::TestErr;
-use crate::test::hyperverse::TestHyperverse;
+use crate::test::cosmos::TestErr;
+use crate::test::cosmos::TestCosmos;
 use crate::{Registration, RegistryApi};
 use cosmic_universe::command::common::SetProperties;
 use cosmic_universe::command::direct::delete::Delete;
 use cosmic_universe::command::direct::query::{Query, QueryResult};
 use cosmic_universe::command::direct::select::{Select, SubSelect};
-use cosmic_universe::hyper::ParticleRecord;
+use cosmic_universe::hyper::{ParticleLocation, ParticleRecord};
 use cosmic_universe::loc::Point;
 use cosmic_universe::particle::{Details, Properties, Status, Stub};
 use cosmic_universe::security::{Access, AccessGrant, IndexedAccessGrant};
@@ -40,7 +40,7 @@ impl TestRegistryApi {
 }
 
 #[async_trait]
-impl RegistryApi<TestHyperverse> for TestRegistryApi {
+impl RegistryApi<TestCosmos> for TestRegistryApi {
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, TestErr> {
         let details = Details {
             stub: Stub {
@@ -60,25 +60,10 @@ impl RegistryApi<TestHyperverse> for TestRegistryApi {
         Ok(details)
     }
 
-    fn assign<'a>(&'a self, point: &'a Point) -> oneshot::Sender<Point> {
-        let (rtn, mut rtn_rx) = oneshot::channel();
-        let ctx = self.ctx.clone();
-        let point = point.clone();
-        tokio::spawn(async move {
-            match rtn_rx.await {
-                Ok(location) => {
-                    let mut record = ctx.particles.get_mut(&point).unwrap();
-
-                    let location: Point = location;
-                    record.value_mut().location = Some(location);
-                }
-                Err(_) => {
-                    // hopefully logged elsewhere
-                }
-            }
-        });
-
-        rtn
+    async fn assign<'a>(&'a self, point: &'a Point, location: ParticleLocation) -> Result<(),TestErr> {
+        let mut record = self.ctx.particles.get_mut(&point).unwrap();
+        record.value_mut().location = Some(location);
+        Ok(())
     }
 
     async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), TestErr> {

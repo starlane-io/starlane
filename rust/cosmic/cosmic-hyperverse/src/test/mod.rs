@@ -1,2 +1,2 @@
-pub mod hyperverse;
+pub mod cosmos;
 pub mod registry;

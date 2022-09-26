@@ -3,17 +3,15 @@ use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
-use http::header::CONTENT_TYPE;
-use http::{HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use cosmic_macros_primitive::Autobox;
 use cosmic_nom::Tw;
 
+use url::Url;
 use crate::command::{Command, RawCommand};
-use crate::err::ParseErrs;
-use crate::hyper::{Greet, HyperSubstance, Knock};
+use crate::hyper::{Greet, HyperSubstance, Knock, ParticleLocation};
 use crate::loc::{Meta, PointCtx, PointVar};
 use crate::parse::model::Subst;
 use crate::parse::Env;
@@ -23,9 +21,11 @@ use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::ext::ExtMethod;
 use crate::wave::core::http2::HttpMethod;
 use crate::wave::core::hyp::HypMethod;
-use crate::wave::core::{DirectedCore, ReflectedCore};
+use crate::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use crate::wave::{Pong, UltraWave};
 use crate::{util, Details, Point, Status, Stub, Surface, UniErr};
+use crate::err::ParseErrs;
+use crate::log::{AuditLog, Log, LogSpan, LogSpanEvent, PointlessLog};
 
 #[derive(
     Debug,
@@ -52,6 +52,7 @@ pub enum SubstanceKind {
     Details,
     Status,
     Particle,
+    Location,
     Errors,
     Json,
     MultipartForm,
@@ -64,6 +65,7 @@ pub enum SubstanceKind {
     UltraWave,
     Knock,
     Greet,
+    Log
 }
 
 #[derive(
@@ -92,6 +94,7 @@ pub enum Substance {
     Int(i64),
     Status(Status),
     Particle(Particle),
+    Location(ParticleLocation),
     RawCommand(RawCommand),
     Command(Box<Command>),
     Errors(Errors),
@@ -104,6 +107,25 @@ pub enum Substance {
     UltraWave(Box<UltraWave>),
     Knock(Knock),
     Greet(Greet),
+    Log(LogSubstance)
+}
+
+impl Substance {
+    pub fn ultrawave(&self) -> Option<&UltraWave> {
+        if let Substance::UltraWave(wave) = self {
+            Some(wave.as_ref())
+        } else {
+            None
+        }
+    }
+
+    pub fn ultrawave_mut(&mut self) -> Option<&mut UltraWave> {
+        if let Substance::UltraWave(wave) = self {
+            Some(wave.as_mut())
+        } else {
+            None
+        }
+    }
 }
 
 pub trait ToSubstance<S> {
@@ -195,8 +217,8 @@ impl Substance {
     pub fn kind(&self) -> SubstanceKind {
         match self {
             Substance::Empty => SubstanceKind::Empty,
-            Substance::List(list) => SubstanceKind::List,
-            Substance::Map(map) => SubstanceKind::Map,
+            Substance::List(_) => SubstanceKind::List,
+            Substance::Map(_) => SubstanceKind::Map,
             Substance::Point(_) => SubstanceKind::Point,
             Substance::Text(_) => SubstanceKind::Text,
             Substance::Stub(_) => SubstanceKind::Stub,
@@ -220,8 +242,11 @@ impl Substance {
             Substance::Knock(_) => SubstanceKind::Knock,
             Substance::Greet(_) => SubstanceKind::Greet,
             Substance::Details(_) => SubstanceKind::Details,
+            Substance::Location(_) => SubstanceKind::Location,
+            Substance::Log(_) => SubstanceKind::Log
         }
     }
+
 
     pub fn to_bin(self) -> Result<Bin, UniErr> {
         match self {
@@ -233,6 +258,25 @@ impl Substance {
         }
     }
 }
+
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    Autobox,
+    cosmic_macros_primitive::ToSubstance,
+)]
+pub enum LogSubstance {
+    Log(Log),
+    Span(LogSpan),
+    Event(LogSpanEvent),
+    Audit(AuditLog),
+    Pointless(PointlessLog)
+}
+
 
 impl TryInto<HashMap<String, Substance>> for Substance {
     type Error = UniErr;
@@ -969,14 +1013,14 @@ impl ToRequestCore for MultipartForm {
         let mut headers = HeaderMap::new();
 
         headers.insert(
-            CONTENT_TYPE,
-            HeaderValue::from_static("application/x-www-form-urlencoded"),
+            "Content-Type".to_string(),
+            "application/x-www-form-urlencoded".to_string(),
         );
 
         DirectedCore {
             headers,
             method: HttpMethod::Post.into(),
-            uri: Default::default(),
+            uri: Url::parse("/").unwrap(),
             body: Substance::MultipartForm(self),
         }
     }

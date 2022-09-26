@@ -169,8 +169,8 @@ pub mod common {
 }
 
 pub mod direct {
-    use http::status::InvalidStatusCode;
-    use http::{HeaderMap, Request, StatusCode, Uri};
+//    use http::status::InvalidStatusCode;
+//    use http::{HeaderMap, Request, StatusCode, Uri};
     use serde::{Deserialize, Serialize};
 
     use crate::command::direct::create::Create;
@@ -362,7 +362,7 @@ pub mod direct {
 
         use crate::command::common::{SetProperties, SetRegistry, StateSrc, StateSrcVar};
         use crate::command::Command;
-        use crate::err::{ParseErrs, UniErr};
+        use crate::err::{UniErr};
         use crate::kind::{BaseKind, KindParts};
         use crate::loc::{HostKey, Point, PointCtx, PointFactory, PointSeg, PointVar, ToSurface};
         use crate::parse::model::Subst;

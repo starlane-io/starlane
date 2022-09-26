@@ -2,8 +2,8 @@ use core::borrow::Borrow;
 use std::cell::Cell;
 use std::ops::Deref;
 use std::sync::Arc;
+use dashmap::DashMap;
 
-use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
@@ -11,13 +11,17 @@ use crate::loc::{Point, ToSurface};
 use crate::particle::Stub;
 use crate::substance::Bin;
 use crate::{BindConfig, Substance, UniErr};
+use crate::config::mechtron::MechtronConfig;
 use crate::wave::{DirectedProto, Pong, Wave};
 use crate::wave::core::cmd::CmdMethod;
-use crate::wave::exchange::{ProtoTransmitter, ProtoTransmitterBuilder};
+use crate::wave::exchange::asynch::ProtoTransmitterBuilder;
+use crate::wave::exchange::asynch::ProtoTransmitter;
 
 #[derive(Clone)]
 pub struct ArtifactApi {
-    binds: Arc<RwLock<LruCache<Point, Arc<BindConfig>>>>,
+    binds: Arc<DashMap<Point, Arc<BindConfig>>>,
+    mechtrons : Arc<DashMap<Point, Arc<MechtronConfig>>>,
+    wasm: Arc<DashMap<Point, Bin>>,
     fetcher: Arc<RwLock<FetchChamber>>,
 }
 
@@ -29,7 +33,9 @@ impl ArtifactApi {
 
     pub fn new( fetcher: Box<dyn ArtifactFetcher>) -> Self {
         Self {
-            binds: Arc::new(RwLock::new(LruCache::new(1024))),
+            binds: Arc::new(DashMap::new() ),
+            mechtrons: Arc::new(DashMap::new() ),
+            wasm: Arc::new(DashMap::new() ),
             fetcher: Arc::new(RwLock::new(FetchChamber {
                 fetcher
             })),
@@ -41,23 +47,52 @@ impl ArtifactApi {
         self.fetcher.write().await.set(fetcher);
     }
 
+    pub async fn mechtron(&self, point: &Point) -> Result<ArtRef<MechtronConfig>, UniErr> {
+        {
+            if self.mechtrons.contains_key(point) {
+                let mechtron = self.mechtrons.get(point).unwrap().clone();
+                return Ok(ArtRef::new(mechtron, point.clone()));
+            }
+        }
+
+        let mechtron: Arc<MechtronConfig> = Arc::new(self.get(point).await?);
+        {
+            self.mechtrons.insert(point.clone(), mechtron.clone());
+        }
+        return Ok(ArtRef::new(mechtron, point.clone()));
+    }
+
     pub async fn bind(&self, point: &Point) -> Result<ArtRef<BindConfig>, UniErr> {
         {
-            let read = self.binds.read().await;
-            if read.contains(point) {
-                let mut write = self.binds.write().await;
-                let bind = write.get(point).unwrap().clone();
+            if self.binds.contains_key(point) {
+                let bind = self.binds.get(point).unwrap().clone();
                 return Ok(ArtRef::new(bind, point.clone()));
             }
         }
 
         let bind: Arc<BindConfig> = Arc::new(self.get(point).await?);
         {
-            let mut write = self.binds.write().await;
-            write.put(point.clone(), bind.clone());
+            self.binds.insert(point.clone(), bind.clone());
         }
         return Ok(ArtRef::new(bind, point.clone()));
     }
+
+        pub async fn wasm(&self, point: &Point) -> Result<ArtRef<Bin>, UniErr> {
+        {
+            if self.wasm.contains_key(point) {
+                let wasm = self.wasm.get(point).unwrap().clone();
+                return Ok(ArtRef::new(Arc::new(wasm), point.clone()));
+            }
+        }
+
+
+        let wasm = self.fetcher.read().await.fetcher.fetch(point).await?;
+        {
+            self.wasm.insert(point.clone(), wasm.clone());
+        }
+        return Ok(ArtRef::new(Arc::new(wasm), point.clone()));
+    }
+
 
     async fn get<A>(&self, point: &Point) -> Result<A, UniErr>
     where
@@ -84,7 +119,7 @@ impl FetchChamber {
 #[derive(Clone)]
 pub struct ArtRef<A> {
     artifact: Arc<A>,
-    point: Point,
+    pub point: Point,
 }
 
 impl<A> ArtRef<A> {
@@ -140,6 +175,7 @@ impl ArtifactFetcher for NoDiceArtifactFetcher {
         Err("cannot pull artifacts right now".into())
     }
 }
+
 
 pub struct ReadArtifactFetcher {
     transmitter: ProtoTransmitter

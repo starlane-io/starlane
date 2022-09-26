@@ -7,22 +7,23 @@ use crate::driver::root::RootDriverFactory;
 use crate::driver::space::SpaceDriverFactory;
 use crate::driver::DriverAvail;
 use crate::test::registry::{TestRegistryApi, TestRegistryContext};
-use crate::tests::PROPERTIES_CONFIG;
-use crate::{DriversBuilder, HyperErr, Hyperverse, MachineTemplate, Registry};
+use crate::{DriversBuilder, HyperErr, Cosmos, MachineTemplate, Registry};
 use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, LocalHyperwayGateJumper};
 use cosmic_universe::artifact::{ArtifactApi, ReadArtifactFetcher};
 use cosmic_universe::err::UniErr;
-use cosmic_universe::kind::StarSub;
+use cosmic_universe::kind::{BaseKind, Kind, StarSub};
 use cosmic_universe::loc::{MachineName, StarKey, ToBaseKind};
-use cosmic_universe::particle::property::PropertiesConfig;
+use cosmic_universe::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
 use std::io;
 use std::io::Error;
 use std::sync::Arc;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
+use mechtron_host::err::HostErr;
+use crate::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
 
-impl TestHyperverse {
+impl TestCosmos {
     pub fn new() -> Self {
         Self {
             ctx: TestRegistryContext::new(),
@@ -31,12 +32,12 @@ impl TestHyperverse {
 }
 
 #[derive(Clone)]
-pub struct TestHyperverse {
+pub struct TestCosmos {
     pub ctx: TestRegistryContext,
 }
 
 #[async_trait]
-impl Hyperverse for TestHyperverse {
+impl Cosmos for TestCosmos {
     type Err = TestErr;
     type RegistryContext = TestRegistryContext;
     type StarAuth = AnonHyperAuthenticator;
@@ -61,8 +62,18 @@ impl Hyperverse for TestHyperverse {
         "test".to_string()
     }
 
-    fn properties_config<K: ToBaseKind>(&self, base: &K) -> &'static PropertiesConfig {
-        &PROPERTIES_CONFIG
+    fn properties_config(&self, kind: &Kind) -> PropertiesConfig {
+        let mut builder = PropertiesConfigBuilder::new();
+        builder.kind(kind.clone());
+        match kind.to_base() {
+            BaseKind::Mechtron => {
+                builder.add_point( "config", true, true ).unwrap();
+                builder.build().unwrap()
+            }
+            _ => {
+                builder.build().unwrap()
+            }
+        }
     }
 
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
@@ -83,7 +94,10 @@ impl Hyperverse for TestHyperverse {
                 builder.add_post(Arc::new(SpaceDriverFactory::new()));
             }
             StarSub::Nexus => {}
-            StarSub::Maelstrom => {}
+            StarSub::Maelstrom => {
+                builder.add_post(Arc::new(HostDriverFactory::new()));
+                builder.add_post(Arc::new(MechtronDriverFactory::new()));
+            }
             StarSub::Scribe => {
                 builder.add_post(Arc::new(RepoDriverFactory::new()));
                 builder.add_post(Arc::new(BundleSeriesDriverFactory::new()));
@@ -91,7 +105,7 @@ impl Hyperverse for TestHyperverse {
                 builder.add_post(Arc::new(ArtifactDriverFactory::new()));
             }
             StarSub::Jump => {
-                builder.add_post(Arc::new(ControlDriverFactory::new()));
+//                builder.add_post(Arc::new(ControlDriverFactory::new()));
             }
             StarSub::Fold => {}
             StarSub::Machine => {
@@ -194,6 +208,14 @@ impl From<io::Error> for TestErr {
         }
     }
 }
+
+impl From<HostErr> for TestErr {
+    fn from(err: HostErr) -> Self {
+        Self {
+            message: err.to_string(),
+        }
+    }
+}
 impl From<acid_store::Error> for TestErr {
     fn from(e: acid_store::Error) -> Self {
         Self {
@@ -219,7 +241,7 @@ impl From<Box<bincode::ErrorKind>> for TestErr {
 }
 
 impl HyperErr for TestErr {
-    fn to_cosmic_err(&self) -> UniErr {
+    fn to_uni_err(&self) -> UniErr {
         UniErr::from_500(self.to_string())
     }
 

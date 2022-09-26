@@ -10,19 +10,19 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
-use http::{HeaderMap, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use tokio::time::Instant;
 
 use cosmic_macros_primitive::Autobox;
 use cosmic_nom::{Res, SpanExtra};
-use exchange::ProtoTransmitter;
+use exchange::asynch::ProtoTransmitter;
 
+use url::Url;
 use crate::command::Command;
 use crate::command::RawCommand;
 use crate::config::bind::RouteSelector;
-use crate::err::{StatusErr, UniErr};
+use crate::err::{CoreReflector, StatusErr, UniErr};
 use crate::hyper::AssignmentKind;
 use crate::hyper::InterchangeKind::DefaultControl;
 use crate::kind::Sub;
@@ -47,6 +47,7 @@ use crate::substance::{
 };
 use crate::util::{uuid, ValueMatcher, ValuePattern};
 use crate::{ANONYMOUS, HYPERUSER};
+use crate::wave::core::http2::StatusCode;
 
 use self::core::cmd::CmdMethod;
 use self::core::ext::ExtMethod;
@@ -354,6 +355,16 @@ impl UltraWave {
         }
     }
 
+    pub fn max_hops(&self) -> u16 {
+        if let Some(wave) = self.transported() {
+            let child = wave.max_hops();
+            if child > self.hops() {
+                return child;
+            }
+        }
+        self.hops()
+    }
+
     pub fn inc_hops(&mut self) {
         match self {
             UltraWave::Ping(w) => w.hops += 1,
@@ -362,7 +373,14 @@ impl UltraWave {
             UltraWave::Echo(w) => w.hops += 1,
             UltraWave::Signal(w) => w.hops += 1,
         };
+
+        if let Some(wave) = self.transported_mut() {
+            wave.inc_hops();
+        }
+
     }
+
+
 
     pub fn add_to_history(&mut self, star: Point) {
         match self {
@@ -517,6 +535,26 @@ impl UltraWave {
             _ => Err("not a ripple".into()),
         }
     }
+
+    pub fn transported(&self) -> Option<&UltraWave> {
+        match self {
+            UltraWave::Ping(w) => w.core.body.ultrawave(),
+            UltraWave::Pong(w) => w.core.body.ultrawave(),
+            UltraWave::Ripple(w) => w.core.body.ultrawave(),
+            UltraWave::Echo(w) => w.core.body.ultrawave(),
+            UltraWave::Signal(w) => w.core.body.ultrawave(),
+        }
+    }
+
+    pub fn transported_mut(&mut self) -> Option<&mut UltraWave> {
+        match self {
+            UltraWave::Ping(w) => w.core.body.ultrawave_mut(),
+            UltraWave::Pong(w) => w.core.body.ultrawave_mut(),
+            UltraWave::Ripple(w) => w.core.body.ultrawave_mut(),
+            UltraWave::Echo(w) => w.core.body.ultrawave_mut(),
+            UltraWave::Signal(w) => w.core.body.ultrawave_mut(),
+        }
+    }
 }
 
 impl<S> ToSubstance<S> for UltraWave
@@ -561,17 +599,22 @@ impl WaveId {
     }
 
     pub fn to_short_string(&self) -> String {
-        format!(
-            "<Wave<{}>>::{}",
-            self.kind.to_string(),
-            self.uuid[..8].to_string()
-        )
+        if self.uuid.to_string().len() > 8 {
+            format!(
+                "<Wave<{}>>::{}",
+                self.kind.to_string(),
+                self.uuid.to_string().as_str()[..8].to_string()
+            )
+        }
+        else {
+            self.to_string()
+        }
     }
 }
 
 impl ToString for WaveId {
     fn to_string(&self) -> String {
-        format!("<Wave<{}>>::{}", self.kind.to_string(), self.uuid)
+        format!("<Wave<{}>>::{}", self.kind.to_string(), self.uuid.to_string())
     }
 }
 
@@ -890,9 +933,11 @@ impl DerefMut for Ping {
 
 impl Into<DirectedProto> for Wave<Ping> {
     fn into(self) -> DirectedProto {
+        let mut core = self.core.clone();
         DirectedProto {
             to: Some(self.to.clone().to_recipients()),
-            core: DirectedCore::default(),
+            method: None,
+            core,
             id: self.id,
             from: Some(self.from),
             handling: Some(self.handling),
@@ -1180,6 +1225,7 @@ pub struct DirectedProto {
     pub from: Option<Surface>,
     pub to: Option<Recipients>,
     pub core: DirectedCore,
+    pub method: Option<Method>,
     pub handling: Option<Handling>,
     pub scope: Option<Scope>,
     pub agent: Option<Agent>,
@@ -1227,6 +1273,11 @@ impl DirectedProto {
             "kind must be set for DirectedProto to create the proper DirectedWave".into(),
         )?;
 
+        let mut core  = self.core.clone();
+        if let Some(method) = self.method {
+            core.method = method;
+        }
+
         let mut wave = match kind {
             DirectedKind::Ping => {
                 let mut wave = Wave::new(
@@ -1235,7 +1286,7 @@ impl DirectedProto {
                             .to
                             .ok_or(UniErr::new(500u16, "must set 'to'"))?
                             .single_or()?,
-                        core: self.core,
+                        core
                     },
                     self.from.ok_or(UniErr::new(500u16, "must set 'from'"))?,
                 );
@@ -1250,7 +1301,7 @@ impl DirectedProto {
                 let mut wave = Wave::new(
                     Ripple {
                         to: self.to.ok_or(UniErr::new(500u16, "must set 'to'"))?,
-                        core: self.core,
+                        core,
                         bounce_backs: self.bounce_backs.ok_or("BounceBacks must be set")?,
                         history: self.history,
                     },
@@ -1270,7 +1321,7 @@ impl DirectedProto {
                             .to
                             .ok_or(UniErr::new(500u16, "must set 'to'"))?
                             .single_or()?,
-                        core: self.core,
+                        core,
                     },
                     self.from.ok_or(UniErr::new(500u16, "must set 'from'"))?,
                 );
@@ -1328,6 +1379,13 @@ impl DirectedProto {
         }
     }
 
+    pub fn fill_method(&mut self, method: &Method) {
+        if self.method.is_none() {
+            self.method.replace(method.clone());
+        }
+    }
+
+
     pub fn agent(&mut self, agent: Agent) {
         self.agent.replace(agent);
     }
@@ -1360,7 +1418,7 @@ impl DirectedProto {
         self.history = history;
     }
 
-    pub fn uri(&mut self, uri: Uri) {
+    pub fn uri(&mut self, uri: Url) {
         self.core.uri = uri;
     }
 
@@ -1466,6 +1524,7 @@ impl Default for DirectedProto {
     fn default() -> Self {
         Self {
             id: WaveId::new(WaveKind::Ping),
+            method: None,
             core: DirectedCore::default(),
             from: None,
             to: None,
@@ -1576,7 +1635,7 @@ impl Echo {
             if let Substance::Text(error) = self.core.body {
                 Err(error.into())
             } else {
-                Err(format!("error code: {}", self.core.status).into())
+                Err(format!("error code: {}", self.core.status.to_string()).into())
             }
         }
     }
@@ -2919,7 +2978,7 @@ impl Default for Agent {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
-    pub id: String,
+    pub id: Uuid,
     pub attributes: HashMap<String, String>,
 }
 
@@ -3181,6 +3240,7 @@ pub enum BounceProto {
     Reflected(ReflectedProto),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ReflectedAggregate {
     None,
     Single(ReflectedWave),

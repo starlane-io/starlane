@@ -5,8 +5,10 @@ use serde::{Deserialize, Serialize};
 use crate::loc::Point;
 use crate::particle::{Details, Stub};
 use crate::BindConfig;
+use crate::config::mechtron::MechtronConfig;
 
 pub mod bind;
+pub mod mechtron;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PortalKind {
@@ -65,6 +67,7 @@ impl<Body> Deref for PointConfig<Body> {
 #[derive(Clone)]
 pub enum Document {
     BindConfig(BindConfig),
+    MechtronConfig(MechtronConfig)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]

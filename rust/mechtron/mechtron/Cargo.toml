@@ -9,20 +9,18 @@ license = "MIT"
 description = "The Wasm Package to help easily create a Mechtron"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[lib]
-crate-type = ["cdylib", "rlib"]
+#[lib]
+#crate-type = ["cdylib", "rlib"]
 
 
 [dependencies]
-mechtron-common = { path="../mechtron-common"}
-lazy_static = "1.4.0"
-wasm_membrane_guest = { path="../wasm-membrane-guest"}
+lazy_static = {version="1.4.0", features=["spin_no_std"] }
+#wasm_membrane_guest = { path="../wasm-membrane-guest"}
 bincode = "1.3.3"
-cosmic-universe= { path= "../cosmic-universe" }
-
-serde_json = "1.0.61"
+cosmic-universe= { path= "../../cosmic/cosmic-universe" }
+cosmic-macros= { path= "../../cosmic/cosmic-macros" }
 serde = { version="1.0.69", features=['derive','rc'] }
-
+dashmap = "5.3.4"
 # `wee_alloc` is a tiny allocator for wasm that is only ~1K in code size
 # compared to the default allocator's ~10K. It is slower than the default
 # allocator, however.

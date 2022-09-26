@@ -2,7 +2,7 @@ use crate::driver::{
     Driver, DriverCtx, DriverSkel, HyperDriverFactory, Item, ItemHandler, ItemSphere,
 };
 use crate::star::HyperStarSkel;
-use crate::Hyperverse;
+use crate::Cosmos;
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::config::bind::BindConfig;
 use cosmic_universe::kind::{BaseKind, Kind};
@@ -11,10 +11,11 @@ use cosmic_universe::parse::bind_config;
 use cosmic_universe::selector::KindSelector;
 use cosmic_universe::util::log;
 use cosmic_universe::wave::core::{CoreBounce, ReflectedCore};
-use cosmic_universe::wave::exchange::{DirectedHandler, RootInCtx};
+use cosmic_universe::wave::exchange::asynch::DirectedHandler;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
+use cosmic_universe::wave::exchange::asynch::RootInCtx;
 
 lazy_static! {
     static ref ROOT_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -44,7 +45,7 @@ impl RootDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for RootDriverFactory
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Root)
@@ -63,16 +64,9 @@ where
 pub struct RootDriver;
 
 #[async_trait]
-impl DirectedHandler for RootDriver {
-    async fn handle(&self, ctx: RootInCtx) -> CoreBounce {
-        CoreBounce::Reflected(ReflectedCore::status(404))
-    }
-}
-
-#[async_trait]
 impl<P> Driver<P> for RootDriver
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     fn kind(&self) -> Kind {
         Kind::Root
@@ -85,14 +79,14 @@ where
 
 pub struct Root<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     phantom: PhantomData<P>,
 }
 
 impl<P> Root<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new() -> Self {
         Self {
@@ -103,7 +97,7 @@ where
 
 impl<P> Item<P> for Root<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     type Skel = ();
     type Ctx = ();
@@ -115,12 +109,12 @@ where
 }
 
 #[handler]
-impl<P> Root<P> where P: Hyperverse {}
+impl<P> Root<P> where P: Cosmos {}
 
 #[async_trait]
 impl<P> ItemHandler<P> for Root<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(ROOT_BIND_CONFIG.clone())

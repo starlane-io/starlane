@@ -7,7 +7,7 @@ use validator::validate_email;
 use crate::command::common::PropertyMod;
 use crate::loc::Point;
 use crate::parse::SkewerCase;
-use crate::{SetProperties, UniErr};
+use crate::{Kind, SetProperties, UniErr};
 
 pub struct PropertyDef {
     pub pattern: Box<dyn PropertyPattern>,
@@ -143,6 +143,7 @@ pub enum PropertySource {
 
 pub struct PropertiesConfig {
     pub properties: HashMap<String, PropertyDef>,
+    pub kind: Kind,
 }
 
 impl Deref for PropertiesConfig {
@@ -154,15 +155,17 @@ impl Deref for PropertiesConfig {
 }
 
 impl PropertiesConfig {
-    pub fn new() -> PropertiesConfig {
+    pub fn new(kind: Kind) -> PropertiesConfig {
         Self {
             properties: HashMap::new(),
+            kind
         }
     }
 
     pub fn builder() -> PropertiesConfigBuilder {
         PropertiesConfigBuilder {
-            config: Self::new(),
+            kind: None,
+            properties: HashMap::new()
         }
     }
 
@@ -189,25 +192,25 @@ impl PropertiesConfig {
     pub fn check_create(&self, set: &SetProperties) -> Result<(), UniErr> {
         for req in self.required() {
             if !set.contains_key(&req) {
-                return Err(format!("missing required property: '{}'", req).into());
+                return Err(format!("{} missing required property: '{}'", self.kind.to_string(), req).into());
             }
         }
 
         for (key, propmod) in &set.map {
             let def = self
                 .get(key)
-                .ok_or(format!("illegal property: '{}'", key))?;
+                .ok_or(format!("{} illegal property: '{}'", self.kind.to_string(), key))?;
             match propmod {
                 PropertyMod::Set { key, value, lock } => {
                     if def.constant && def.default.as_ref().unwrap().clone() != value.clone() {
                         return Err(
-                            format!("property: '{}' is constant and cannot be set", key).into()
+                            format!("{} property: '{}' is constant and cannot be set", self.kind.to_string(), key).into()
                         );
                     }
                     def.pattern.is_match(value)?;
                     match def.source {
                         PropertySource::CoreReadOnly => {
-                            return Err(format!("property '{}' is flagged CoreReadOnly and cannot be set within the Mesh",key).into());
+                            return Err(format!("{} property '{}' is flagged CoreReadOnly and cannot be set within the Mesh",self.kind.to_string(), key).into());
                         }
                         _ => {}
                     }
@@ -304,12 +307,31 @@ pub enum PropertyPermit {
 }
 
 pub struct PropertiesConfigBuilder {
-    config: PropertiesConfig,
+    kind: Option<Kind>,
+    properties: HashMap<String,PropertyDef>,
 }
 
 impl PropertiesConfigBuilder {
-    pub fn build(self) -> PropertiesConfig {
-        self.config
+
+    pub fn new() -> Self {
+        let mut rtn = Self {
+            kind: None,
+            properties: HashMap::new()
+        };
+        rtn.add_point("bind",false,true).unwrap();
+        rtn
+    }
+
+    pub fn build(self) -> Result<PropertiesConfig,UniErr> {
+
+        Ok(PropertiesConfig {
+            kind: self.kind.ok_or(UniErr::from_500("kind must be set before PropertiesConfig can be built"))?,
+            properties: self.properties
+        })
+    }
+
+    pub fn kind( &mut self, kind: Kind ) {
+        self.kind.replace(kind);
     }
 
     pub fn add(
@@ -326,7 +348,7 @@ impl PropertiesConfigBuilder {
         let def = PropertyDef::new(
             pattern, required, mutable, source, default, constant, permits,
         )?;
-        self.config.properties.insert(name.to_string(), def);
+        self.properties.insert(name.to_string(), def);
         Ok(())
     }
 
@@ -340,11 +362,11 @@ impl PropertiesConfigBuilder {
             false,
             vec![],
         )?;
-        self.config.properties.insert(name.to_string(), def);
+        self.properties.insert(name.to_string(), def);
         Ok(())
     }
 
-    pub fn add_address(&mut self, name: &str, required: bool, mutable: bool) -> Result<(), UniErr> {
+    pub fn add_point(&mut self, name: &str, required: bool, mutable: bool) -> Result<(), UniErr> {
         let def = PropertyDef::new(
             Box::new(PointPattern {}),
             required,
@@ -354,7 +376,7 @@ impl PropertiesConfigBuilder {
             false,
             vec![],
         )?;
-        self.config.properties.insert(name.to_string(), def);
+        self.properties.insert(name.to_string(), def);
         Ok(())
     }
 }

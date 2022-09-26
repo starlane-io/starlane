@@ -1,10 +1,11 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
-use http::{HeaderMap, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 
 use cosmic_macros_primitive::Autobox;
 
+use url::Url;
 use crate::command::Command;
 use crate::err::StatusErr;
 use crate::loc::ToSurface;
@@ -12,7 +13,7 @@ use crate::substance::Errors;
 use crate::util::{ValueMatcher, ValuePattern};
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::ext::ExtMethod;
-use crate::wave::core::http2::HttpMethod;
+use crate::wave::core::http2::{HttpMethod, StatusCode};
 use crate::wave::core::hyp::HypMethod;
 use crate::wave::{Bounce, Ping, Pong, ToRecipients, WaveId};
 use crate::{Bin, Substance, Surface, ToSubstance, UniErr};
@@ -33,12 +34,8 @@ impl From<Result<ReflectedCore, UniErr>> for ReflectedCore {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ReflectedCore {
-    #[serde(with = "http_serde::header_map")]
     pub headers: HeaderMap,
-
-    #[serde(with = "http_serde::status_code")]
     pub status: StatusCode,
-
     pub body: Substance,
 }
 
@@ -219,6 +216,7 @@ impl ReflectedCore {
     }
 }
 
+/*
 impl TryInto<http::response::Builder> for ReflectedCore {
     type Error = UniErr;
 
@@ -257,6 +255,8 @@ impl TryInto<http::Response<Bin>> for ReflectedCore {
         Ok(response)
     }
 }
+
+ */
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Autobox)]
 pub enum Method {
@@ -376,7 +376,7 @@ impl Into<DirectedCore> for Method {
         DirectedCore {
             headers: Default::default(),
             method: self,
-            uri: Uri::from_static("/"),
+            uri: Url::parse("http://localhost/").unwrap(),
             body: Substance::Empty,
         }
     }
@@ -384,11 +384,9 @@ impl Into<DirectedCore> for Method {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct DirectedCore {
-    #[serde(with = "http_serde::header_map")]
     pub headers: HeaderMap,
     pub method: Method,
-    #[serde(with = "http_serde::uri")]
-    pub uri: Uri,
+    pub uri: Url,
     pub body: Substance,
 }
 
@@ -410,7 +408,7 @@ impl DirectedCore {
         Self {
             method,
             headers: HeaderMap::new(),
-            uri: Default::default(),
+            uri: Url::parse("http://localhost/").unwrap(),
             body: Default::default(),
         }
     }
@@ -458,6 +456,7 @@ impl Into<DirectedCore> for Command {
     }
 }
 
+/*
 impl TryFrom<http::Request<Bin>> for DirectedCore {
     type Error = UniErr;
 
@@ -494,12 +493,14 @@ impl TryInto<http::Request<Bin>> for DirectedCore {
     }
 }
 
+ */
+
 impl Default for DirectedCore {
     fn default() -> Self {
         Self {
             headers: Default::default(),
             method: Method::Http(HttpMethod::Get),
-            uri: Uri::from_static("/"),
+            uri: Url::parse("http://localhost/").unwrap(),
             body: Substance::Empty,
         }
     }
@@ -596,7 +597,7 @@ impl DirectedCore {
             Ok(status) => status,
             Err(_) => StatusCode::from_u16(500u16).unwrap(),
         };
-        println!("----->   returning STATUS of {}", status.as_str());
+        println!("----->   returning STATUS of {}", status.to_string());
         ReflectedCore {
             headers: Default::default(),
             status,
@@ -666,3 +667,6 @@ impl ValueMatcher<MethodKind> for MethodKind {
         }
     }
 }
+
+
+pub type HeaderMap = HashMap<String,String>;
