@@ -228,7 +228,7 @@ fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
 
     };
 
-    println!("{}", rtn.to_string());
+//    println!("{}", rtn.to_string());
 
     TokenStream2::from_iter(vec![rtn, TokenStream2::from(item)]).into()
 }
@@ -397,6 +397,7 @@ fn rtn_type(output: &ReturnType) -> TokenStream2 {
                             let arg = brackets.args.first().unwrap();
                             if "Substance" == arg.to_token_stream().to_string().as_str() {
                               quote! {
+                                use cosmic_universe::err::CoreReflector;
                                 match result {
                                     Ok(rtn) => cosmic_universe::wave::core::CoreBounce::Reflected(cosmic_universe::wave::core::ReflectedCore::ok_body(rtn)),
                                     Err(err) => cosmic_universe::wave::core::CoreBounce::Reflected(err.as_reflected_core())
@@ -404,6 +405,7 @@ fn rtn_type(output: &ReturnType) -> TokenStream2 {
                                }
                             } else {
                                 quote! {
+                                use cosmic_universe::err::CoreReflector;
                                 match result {
                                     Ok(rtn) => cosmic_universe::wave::core::CoreBounce::Reflected(rtn.into()),
                                     Err(err) => cosmic_universe::wave::core::CoreBounce::Reflected(err.as_reflected_core())

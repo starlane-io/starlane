@@ -158,7 +158,7 @@ mod tests {
     use std::{fs, thread};
     use cosmic_universe::command::common::StateSrc;
     use cosmic_universe::hyper;
-    use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance};
+    use cosmic_universe::hyper::{Assign, AssignmentKind, Host, HyperSubstance};
     use cosmic_universe::log::{LogSource, StdOutAppender};
     use cosmic_universe::particle::{Status, Stub};
     use cosmic_universe::substance::Substance;
@@ -217,7 +217,7 @@ mod tests {
             },
             properties: Default::default()
         };
-        let host_cmd = Assign::new( AssignmentKind::Create, mechtron.clone(), StateSrc::None ).to_host();
+        let host_cmd = Host::new( AssignmentKind::Create, mechtron.clone(), StateSrc::None, "my-mechtron");
         let mut wave = DirectedProto::ping();
         wave.to(guest);
         wave.from(host.point().to_surface());

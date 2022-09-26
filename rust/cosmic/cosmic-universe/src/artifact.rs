@@ -176,6 +176,7 @@ impl ArtifactFetcher for NoDiceArtifactFetcher {
     }
 }
 
+
 pub struct ReadArtifactFetcher {
     transmitter: ProtoTransmitter
 }

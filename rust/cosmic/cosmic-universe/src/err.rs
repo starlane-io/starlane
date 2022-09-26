@@ -17,9 +17,9 @@ use tokio::sync::mpsc::error::{SendError, SendTimeoutError};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 
+use crate::err::report::{Label, Report, ReportKind};
 use cosmic_nom::Span;
 use cosmic_nom::SpanExtra;
-use crate::err::report::{Label, Report, ReportKind};
 
 use crate::parse::error::find_parse_err;
 use crate::substance::{Errors, Substance};
@@ -44,7 +44,6 @@ impl Into<ReflectedCore> for UniErr {
                 status: StatusCode::from_u16(500u16).unwrap_or(StatusCode::from_u16(500).unwrap()),
                 body: Substance::Errors(Errors::default("parsing error...")),
             },
-
         }
     }
 }
@@ -54,6 +53,20 @@ impl Clone for UniErr {
         UniErr::Status {
             status: 500,
             message: self.message(),
+        }
+    }
+}
+
+pub trait CoreReflector {
+    fn as_reflected_core(self) -> ReflectedCore;
+}
+
+impl CoreReflector for UniErr {
+    fn as_reflected_core(self) -> ReflectedCore {
+        ReflectedCore {
+            headers: Default::default(),
+            status: StatusCode::from_u16(500u16).unwrap(),
+            body: Substance::Text(self.message().to_string()),
         }
     }
 }
@@ -70,13 +83,6 @@ impl UniErr {
         UniErr::new(500, s)
     }
 
-    pub fn as_reflected_core(self) -> ReflectedCore {
-        ReflectedCore {
-            headers: Default::default(),
-            status: StatusCode::from_u16(500u16).unwrap(),
-            body: Substance::Text(self.message().to_string()),
-        }
-    }
     pub fn from_status(status: u16) -> UniErr {
         let message = match status {
             400 => "Bad Request".to_string(),
@@ -305,8 +311,6 @@ impl<T> From<PoisonError<T>> for UniErr {
     }
 }
 
-
-
 impl From<FromUtf8Error> for UniErr {
     fn from(message: FromUtf8Error) -> Self {
         Self::Status {
@@ -415,8 +419,6 @@ impl From<regex::Error> for UniErr {
     }
 }
 
-
-
 /*
 impl From<ToStrError> for UniErr {
     fn from(x: ToStrError) -> Self {
@@ -505,7 +507,6 @@ impl<I: Span> From<nom::Err<ErrorTree<I>>> for ParseErrs {
     }
 }
 
-
 pub struct ParseErrs {
     pub report: Vec<Report>,
     pub source: Option<Arc<String>>,
@@ -552,9 +553,7 @@ impl ParseErrs {
         return ParseErrs::from_report(report, span.extra()).into();
     }
 
-    pub fn print(&self) {
-
-    }
+    pub fn print(&self) {}
 
     pub fn fold<E: Into<ParseErrs>>(errs: Vec<E>) -> ParseErrs {
         let errs: Vec<ParseErrs> = errs.into_iter().map(|e| e.into()).collect();
@@ -587,7 +586,7 @@ impl From<UniErr> for ParseErrs {
     fn from(u: UniErr) -> Self {
         ParseErrs {
             report: vec![],
-            source: None
+            source: None,
         }
     }
 }
@@ -632,47 +631,39 @@ pub mod report {
                 msg: None,
                 note: None,
                 help: None,
-                location: Range {
-                    start: 0,
-                    end: 0
-                },
-                labels: vec![]
+                location: Range { start: 0, end: 0 },
+                labels: vec![],
             }
         }
     }
 
-    pub struct ReportBuilder {
-
-    }
+    pub struct ReportBuilder {}
 
     impl ReportBuilder {
-            pub fn with_message<S:ToString>(&self,message: S) -> MessageBuilder {
-                MessageBuilder{}
-            }
+        pub fn with_message<S: ToString>(&self, message: S) -> MessageBuilder {
+            MessageBuilder {}
+        }
     }
 
-    pub struct MessageBuilder {
-    }
+    pub struct MessageBuilder {}
 
     impl MessageBuilder {
-            pub fn with_label(&self, label: Label) -> LabelBuilder {
-                LabelBuilder{}
-            }
+        pub fn with_label(&self, label: Label) -> LabelBuilder {
+            LabelBuilder {}
+        }
     }
 
     pub struct LabelBuilder;
 
     impl LabelBuilder {
-        pub fn finish(&self) -> Report{
+        pub fn finish(&self) -> Report {
             Default::default()
         }
     }
 
-
-
     impl Report {
         pub(crate) fn build(p0: ReportKind, p1: (), p2: i32) -> ReportBuilder {
-            ReportBuilder{}
+            ReportBuilder {}
         }
     }
 
@@ -689,7 +680,6 @@ pub mod report {
         pub end: u32,
     }
 
-
     #[derive(Clone, Serialize, Deserialize)]
     pub struct Label {
         span: Range,
@@ -700,7 +690,7 @@ pub mod report {
     }
 
     impl Label {
-        pub fn new(range: std::ops::Range<usize> ) -> Self {
+        pub fn new(range: std::ops::Range<usize>) -> Self {
             Self {
                 span: Range {
                     start: range.start as u32,
@@ -709,11 +699,11 @@ pub mod report {
                 msg: None,
                 color: None,
                 order: 0,
-                priority: 0
+                priority: 0,
             }
         }
 
-        pub fn with_message( self, msg: &str ) -> Label {
+        pub fn with_message(self, msg: &str) -> Label {
             self
         }
     }

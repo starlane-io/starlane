@@ -20,6 +20,7 @@ use crate::wave::{
     Ping, Pong, ReflectedKind, ReflectedProto, ToRecipients, UltraWave, Wave, WaveId, WaveKind,
 };
 use crate::Agent;
+use crate::parse::SkewerCase;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {
@@ -184,6 +185,23 @@ pub struct Host{
     pub kind: AssignmentKind,
     pub details: Details,
     pub state: StateSrc,
+    pub name: String
+}
+
+impl Host{
+    pub fn kind(&self) -> &Kind {
+        &self.details.stub.kind
+    }
+
+    pub fn new<S>(kind: AssignmentKind, details: Details, state: StateSrc, name: S) -> Self where S: ToString{
+        Self {
+            kind,
+            details,
+            state,
+            name: name.to_string()
+        }
+    }
+
 }
 
 
@@ -200,13 +218,6 @@ impl Assign {
         }
     }
 
-    pub fn to_host(&self) -> Host {
-        Host {
-            kind: self.kind.clone(),
-            details: self.details.clone(),
-            state: self.state.clone()
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Autobox)]

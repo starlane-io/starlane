@@ -1,6 +1,6 @@
 use crate::err::GuestErr;
 use crate::err::MechErr;
-use crate::{MechtronFactories, Platform};
+use crate::{MechtronCtx, MechtronFactories, Platform};
 use cosmic_macros::handler_sync;
 use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::HyperSubstance;
@@ -20,6 +20,7 @@ use dashmap::DashMap;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
+use cosmic_universe::kind::Kind::Mechtron;
 
 #[derive(Clone)]
 pub struct GuestSkel<P>
@@ -101,11 +102,12 @@ where
         let logger = root_logger.point(details.stub.point.clone());
         logger.info("Guest created");
 
-        let ctx = GuestCtx::new(transmitter);
+
+        let ctx = GuestCtx::new(transmitter.clone());
 
         let factories = Arc::new(platform.factories()?);
 
-        let skel = GuestSkel::new(details, factories, logger, platform);
+        let skel = GuestSkel::new(details, factories, logger,  platform);
 
         Ok(Self { skel, ctx })
     }
@@ -167,7 +169,7 @@ where
 
 impl<P> GuestHandler<P>
 where
-    P: Platform,
+    P: Platform + 'static,
 {
     pub fn new(skel: GuestSkel<P>, ctx: GuestCtx) -> Self {
         Self { skel, ctx }
@@ -177,11 +179,18 @@ where
 #[handler_sync]
 impl<P> GuestHandler<P>
 where
-    P: Platform,
+    P: Platform + 'static,
 {
     #[route("Hyp<Host>")]
-    pub fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), UniErr> {
+    pub fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         if let HyperSubstance::Host(host) = ctx.input {
+            let factory = self.skel.factories.get(&host.name).ok_or(format!("Guest does not have a mechtron with name: {}", host.name))?;
+            let mechtron = factory.create(host.details.clone())?;
+            let mut transmitter = self.ctx.builder();
+            transmitter.from = SetStrategy::Override(host.details.stub.point.to_surface());
+            transmitter.agent = SetStrategy::Fill(Agent::Point(host.details.stub.point.clone()));
+            let ctx = MechtronCtx::new(transmitter.build() );
+            mechtron.create(ctx)?;
             self.skel.logger.info("Received Host command!");
             Ok(())
         } else {

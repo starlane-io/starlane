@@ -82,11 +82,15 @@ impl <P> MechtronFactories<P> where P: Platform {
         SkewerCase::from_str(factory.name().as_str() ).expect("Mechtron Name must be valid kebab (skewer) case (all lower case alphanumeric and dashes with leading letter)");
         self.factories.insert(factory.name(), Box::new(factory));
     }
+
+    pub fn get<S>(&self, name: S) -> Option<&Box<dyn MechtronFactory<P>>> where S: ToString {
+        self.factories.get(&name.to_string() )
+    }
 }
 
 pub trait MechtronFactory<P>: Sync + Send + 'static where P: Platform {
     fn name(&self) -> String;
-    fn create(&self, details: Details) -> Result<Box<dyn MechtronLifecycle<P>>, UniErr>;
+    fn create(&self, details: Details) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err>;
 }
 
 #[cfg(test)]
@@ -109,8 +113,15 @@ pub struct MechtronSkel {
 /// which can be used outside of a Directed/Reflected Wave Handler interaction
 #[derive(Clone)]
 pub struct MechtronCtx {
-    pub artifacts: ArtifactApi,
     pub transmitter: ProtoTransmitter,
+}
+
+impl MechtronCtx {
+    pub fn new( transmitter: ProtoTransmitter ) -> Self {
+        Self {
+            transmitter
+        }
+    }
 }
 
 /// MechtronSphere is the interface used by Guest
@@ -127,7 +138,7 @@ pub trait MechtronLifecycle<G>: DirectedHandler + Sync + Send where G: Platform 
 /// Mechtrons are created per request and disposed of afterwards...
 /// Implementers of this trait should only hold references to
 /// Mechtron::Skel, Mechtron::Ctx & Mechtron::State at most.
-pub trait Mechtron<G>: MechtronLifecycle<G> + Sync + Send + 'static where G: Platform {
+pub trait Mechtron<P>: MechtronLifecycle<P> + Sync + Send + 'static where P: Platform {
     /// it is recommended to implement MechtronSkel or some derivative
     /// of MechtronSkel. Skel holds info about the Mechtron (like it's Point,
     /// exact Kind & Properties)  The Skel may also provide access to other
