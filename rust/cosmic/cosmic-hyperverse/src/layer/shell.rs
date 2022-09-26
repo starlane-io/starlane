@@ -7,7 +7,7 @@ use cosmic_nom::new_span;
 use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::{Command, RawCommand};
 use cosmic_universe::err::UniErr;
-use cosmic_universe::loc::{Layer, Point, Surface, SurfaceSelector, Topic, ToPoint, ToSurface};
+use cosmic_universe::loc::{Layer, Point, Surface, SurfaceSelector, ToPoint, ToSurface, Topic};
 use cosmic_universe::log::PointLogger;
 use cosmic_universe::parse::error::result;
 use cosmic_universe::parse::{command_line, Env};
@@ -15,12 +15,14 @@ use cosmic_universe::particle::traversal::{Traversal, TraversalInjection, Traver
 use cosmic_universe::substance::Substance;
 use cosmic_universe::util::{log, ToResolved};
 use cosmic_universe::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
+use cosmic_universe::wave::exchange::asynch::{
+    DirectedHandler, Exchanger, InCtx, ProtoTransmitterBuilder, RootInCtx,
+};
 use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, Pong, ReflectedWave, UltraWave, Wave,
     WaveId,
 };
-use cosmic_universe::wave::exchange::asynch::{DirectedHandler, Exchanger, InCtx, ProtoTransmitterBuilder, RootInCtx};
 
 use crate::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
 use crate::Cosmos;
@@ -278,6 +280,7 @@ impl CommandExecutor {
     }
 
     pub async fn execute(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, UniErr> {
+println!("Executing command: {}", ctx.input.to_string( ));
         // make sure everything is coming from this command executor topic
         let ctx = ctx.push_from(self.port.clone());
 
@@ -290,7 +293,6 @@ impl CommandExecutor {
         let mut command: Command = command.to_resolved(&self.env)?;
 
         if let Command::Create(create) = &mut command {
-
             if ctx.transfers.len() == 1 {
                 let transfer = ctx.transfers.get(0).unwrap().clone();
                 create.state = StateSrc::Substance(Box::new(Substance::Bin(transfer.content)));
@@ -303,6 +305,8 @@ impl CommandExecutor {
         let mut directed = DirectedProto::from_core(request);
         directed.to(Point::global_executor());
         let pong: Wave<Pong> = ctx.transmitter.direct(directed).await?;
+
+println!("command execution complete: {}", ctx.input.to_string( ));
         Ok(pong.variant.core)
     }
 }

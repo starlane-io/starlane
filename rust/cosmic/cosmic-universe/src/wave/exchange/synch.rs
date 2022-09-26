@@ -229,10 +229,10 @@ impl DirectedHandler for DirectedHandlerProxy {
     }
 }
 
-pub type DirectedHandlerShell = DirectedHandlerShellDef<Box<dyn DirectedHandler>, ProtoTransmitterBuilder>;
+pub type DirectedHandlerShell =
+    DirectedHandlerShellDef<Box<dyn DirectedHandler>, ProtoTransmitterBuilder>;
 
-impl DirectedHandlerShell
-{
+impl DirectedHandlerShell {
     pub fn handle(&self, wave: DirectedWave) -> Bounce<ReflectedWave> {
         let logger = self
             .logger

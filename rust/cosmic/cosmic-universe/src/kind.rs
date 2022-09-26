@@ -134,7 +134,7 @@ pub enum BaseKind {
     Driver,
     Global,
     Host,
-    Guest
+    Guest,
 }
 
 impl BaseKind {
@@ -245,7 +245,7 @@ pub enum Kind {
     Star(StarSub),
     Global,
     Host,
-    Guest
+    Guest,
 }
 
 impl ToBaseKind for Kind {
@@ -271,7 +271,7 @@ impl ToBaseKind for Kind {
             Kind::Driver => BaseKind::Driver,
             Kind::Global => BaseKind::Global,
             Kind::Host => BaseKind::Host,
-            Kind::Guest => BaseKind::Guest
+            Kind::Guest => BaseKind::Guest,
         }
     }
 }
@@ -416,7 +416,7 @@ impl TryFrom<KindParts> for Kind {
             BaseKind::Driver => Kind::Driver,
             BaseKind::Global => Kind::Global,
             BaseKind::Host => Kind::Host,
-            BaseKind::Guest => Kind::Guest
+            BaseKind::Guest => Kind::Guest,
         })
     }
 }
@@ -739,6 +739,3 @@ pub mod test {
         Ok(())
     }
 }
-
-
-

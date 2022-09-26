@@ -158,14 +158,14 @@ impl PropertiesConfig {
     pub fn new(kind: Kind) -> PropertiesConfig {
         Self {
             properties: HashMap::new(),
-            kind
+            kind,
         }
     }
 
     pub fn builder() -> PropertiesConfigBuilder {
         PropertiesConfigBuilder {
             kind: None,
-            properties: HashMap::new()
+            properties: HashMap::new(),
         }
     }
 
@@ -192,20 +192,30 @@ impl PropertiesConfig {
     pub fn check_create(&self, set: &SetProperties) -> Result<(), UniErr> {
         for req in self.required() {
             if !set.contains_key(&req) {
-                return Err(format!("{} missing required property: '{}'", self.kind.to_string(), req).into());
+                return Err(format!(
+                    "{} missing required property: '{}'",
+                    self.kind.to_string(),
+                    req
+                )
+                .into());
             }
         }
 
         for (key, propmod) in &set.map {
-            let def = self
-                .get(key)
-                .ok_or(format!("{} illegal property: '{}'", self.kind.to_string(), key))?;
+            let def = self.get(key).ok_or(format!(
+                "{} illegal property: '{}'",
+                self.kind.to_string(),
+                key
+            ))?;
             match propmod {
                 PropertyMod::Set { key, value, lock } => {
                     if def.constant && def.default.as_ref().unwrap().clone() != value.clone() {
-                        return Err(
-                            format!("{} property: '{}' is constant and cannot be set", self.kind.to_string(), key).into()
-                        );
+                        return Err(format!(
+                            "{} property: '{}' is constant and cannot be set",
+                            self.kind.to_string(),
+                            key
+                        )
+                        .into());
                     }
                     def.pattern.is_match(value)?;
                     match def.source {
@@ -308,29 +318,29 @@ pub enum PropertyPermit {
 
 pub struct PropertiesConfigBuilder {
     kind: Option<Kind>,
-    properties: HashMap<String,PropertyDef>,
+    properties: HashMap<String, PropertyDef>,
 }
 
 impl PropertiesConfigBuilder {
-
     pub fn new() -> Self {
         let mut rtn = Self {
             kind: None,
-            properties: HashMap::new()
+            properties: HashMap::new(),
         };
-        rtn.add_point("bind",false,true).unwrap();
+        rtn.add_point("bind", false, true).unwrap();
         rtn
     }
 
-    pub fn build(self) -> Result<PropertiesConfig,UniErr> {
-
+    pub fn build(self) -> Result<PropertiesConfig, UniErr> {
         Ok(PropertiesConfig {
-            kind: self.kind.ok_or(UniErr::from_500("kind must be set before PropertiesConfig can be built"))?,
-            properties: self.properties
+            kind: self.kind.ok_or(UniErr::from_500(
+                "kind must be set before PropertiesConfig can be built",
+            ))?,
+            properties: self.properties,
         })
     }
 
-    pub fn kind( &mut self, kind: Kind ) {
+    pub fn kind(&mut self, kind: Kind) {
         self.kind.replace(kind);
     }
 

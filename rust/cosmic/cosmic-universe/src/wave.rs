@@ -18,7 +18,6 @@ use cosmic_macros_primitive::Autobox;
 use cosmic_nom::{Res, SpanExtra};
 use exchange::asynch::ProtoTransmitter;
 
-use url::Url;
 use crate::command::Command;
 use crate::command::RawCommand;
 use crate::config::bind::RouteSelector;
@@ -46,8 +45,9 @@ use crate::substance::{
     SubstanceKind, ToRequestCore, ToSubstance, Token,
 };
 use crate::util::{uuid, ValueMatcher, ValuePattern};
-use crate::{ANONYMOUS, HYPERUSER};
 use crate::wave::core::http2::StatusCode;
+use crate::{ANONYMOUS, HYPERUSER};
+use url::Url;
 
 use self::core::cmd::CmdMethod;
 use self::core::ext::ExtMethod;
@@ -377,10 +377,7 @@ impl UltraWave {
         if let Some(wave) = self.transported_mut() {
             wave.inc_hops();
         }
-
     }
-
-
 
     pub fn add_to_history(&mut self, star: Point) {
         match self {
@@ -605,8 +602,7 @@ impl WaveId {
                 self.kind.to_string(),
                 self.uuid.to_string().as_str()[..8].to_string()
             )
-        }
-        else {
+        } else {
             self.to_string()
         }
     }
@@ -614,7 +610,11 @@ impl WaveId {
 
 impl ToString for WaveId {
     fn to_string(&self) -> String {
-        format!("<Wave<{}>>::{}", self.kind.to_string(), self.uuid.to_string())
+        format!(
+            "<Wave<{}>>::{}",
+            self.kind.to_string(),
+            self.uuid.to_string()
+        )
     }
 }
 
@@ -1273,7 +1273,7 @@ impl DirectedProto {
             "kind must be set for DirectedProto to create the proper DirectedWave".into(),
         )?;
 
-        let mut core  = self.core.clone();
+        let mut core = self.core.clone();
         if let Some(method) = self.method {
             core.method = method;
         }
@@ -1286,7 +1286,7 @@ impl DirectedProto {
                             .to
                             .ok_or(UniErr::new(500u16, "must set 'to'"))?
                             .single_or()?,
-                        core
+                        core,
                     },
                     self.from.ok_or(UniErr::new(500u16, "must set 'from'"))?,
                 );
@@ -1384,7 +1384,6 @@ impl DirectedProto {
             self.method.replace(method.clone());
         }
     }
-
 
     pub fn agent(&mut self, agent: Agent) {
         self.agent.replace(agent);

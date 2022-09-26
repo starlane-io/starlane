@@ -9,10 +9,11 @@ use serde_json::Value;
 use cosmic_macros_primitive::Autobox;
 use cosmic_nom::Tw;
 
-use url::Url;
 use crate::command::{Command, RawCommand};
+use crate::err::ParseErrs;
 use crate::hyper::{Greet, HyperSubstance, Knock, ParticleLocation};
 use crate::loc::{Meta, PointCtx, PointVar};
+use crate::log::{AuditLog, Log, LogSpan, LogSpanEvent, PointlessLog};
 use crate::parse::model::Subst;
 use crate::parse::Env;
 use crate::particle::Particle;
@@ -24,8 +25,7 @@ use crate::wave::core::hyp::HypMethod;
 use crate::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use crate::wave::{Pong, UltraWave};
 use crate::{util, Details, Point, Status, Stub, Surface, UniErr};
-use crate::err::ParseErrs;
-use crate::log::{AuditLog, Log, LogSpan, LogSpanEvent, PointlessLog};
+use url::Url;
 
 #[derive(
     Debug,
@@ -65,7 +65,7 @@ pub enum SubstanceKind {
     UltraWave,
     Knock,
     Greet,
-    Log
+    Log,
 }
 
 #[derive(
@@ -107,7 +107,7 @@ pub enum Substance {
     UltraWave(Box<UltraWave>),
     Knock(Knock),
     Greet(Greet),
-    Log(LogSubstance)
+    Log(LogSubstance),
 }
 
 impl Substance {
@@ -243,10 +243,9 @@ impl Substance {
             Substance::Greet(_) => SubstanceKind::Greet,
             Substance::Details(_) => SubstanceKind::Details,
             Substance::Location(_) => SubstanceKind::Location,
-            Substance::Log(_) => SubstanceKind::Log
+            Substance::Log(_) => SubstanceKind::Log,
         }
     }
-
 
     pub fn to_bin(self) -> Result<Bin, UniErr> {
         match self {
@@ -274,9 +273,8 @@ pub enum LogSubstance {
     Span(LogSpan),
     Event(LogSpanEvent),
     Audit(AuditLog),
-    Pointless(PointlessLog)
+    Pointless(PointlessLog),
 }
-
 
 impl TryInto<HashMap<String, Substance>> for Substance {
     type Error = UniErr;

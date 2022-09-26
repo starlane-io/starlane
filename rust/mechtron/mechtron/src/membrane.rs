@@ -1,18 +1,18 @@
-use std::sync::Arc;
-use std::sync::atomic::{AtomicI32, Ordering};
-use dashmap::DashMap;
-use cosmic_universe::err::UniErr;
-use cosmic_universe::particle::Details;
-use cosmic_universe::VERSION;
-use cosmic_universe::wave::{Bounce, ReflectedAggregate, UltraWave};
-use cosmic_universe::wave::exchange::synch::{DirectedHandlerProxy, DirectedHandlerShell};
-use crate::{Platform, MechtronFactories, guest, mechtron_guest, GuestErr};
 use crate::err::MembraneErr;
 use crate::Guest;
+use crate::{guest, mechtron_guest, GuestErr, MechtronFactories, Platform};
+use cosmic_universe::err::UniErr;
+use cosmic_universe::particle::Details;
+use cosmic_universe::wave::exchange::synch::{DirectedHandlerProxy, DirectedHandlerShell};
+use cosmic_universe::wave::{Bounce, ReflectedAggregate, UltraWave};
+use cosmic_universe::VERSION;
+use dashmap::DashMap;
+use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::Arc;
 use std::sync::RwLock;
 
 lazy_static! {
-    static ref GUEST : RwLock<Option<Arc<dyn Guest>>> = RwLock::new(None);
+    static ref GUEST: RwLock<Option<Arc<dyn Guest>>> = RwLock::new(None);
 }
 
 #[no_mangle]
@@ -22,10 +22,8 @@ extern "C" {
     pub fn mechtron_timestamp() -> i64;
 }
 
-
 #[no_mangle]
 pub fn mechtron_guest_init(version: i32, frame: i32) -> i32 {
-
     let version = mechtron_consume_string(version).unwrap();
     if version != VERSION.to_string() {
         return -1;
@@ -40,7 +38,7 @@ pub fn mechtron_guest_init(version: i32, frame: i32) -> i32 {
         }
     }
 
-    match unsafe {mechtron_guest(details)} {
+    match unsafe { mechtron_guest(details) } {
         Ok(guest) => {
             let mut write = GUEST.write().unwrap();
             write.replace(guest);
@@ -59,18 +57,20 @@ pub fn mechtron_frame_to_guest(frame: i32) -> i32 {
     let wave: UltraWave = bincode::deserialize(frame.as_slice()).unwrap();
 
     if wave.is_directed() {
-
         let wave = wave.to_directed().unwrap();
         let handler: DirectedHandlerShell = {
             let read = GUEST.read().unwrap();
             let guest = read.as_ref().unwrap();
-            guest.logger().result(guest.handler(&wave.to().to_single().unwrap().point )).unwrap()
+            guest
+                .logger()
+                .result(guest.handler(&wave.to().to_single().unwrap().point))
+                .unwrap()
         };
 
         match handler.handle(wave) {
             Bounce::Absorbed => 0,
             Bounce::Reflected(wave) => {
-                let wave = mechtron_write_wave_to_host(wave.to_ultra() ).unwrap();
+                let wave = mechtron_write_wave_to_host(wave.to_ultra()).unwrap();
                 wave
             }
         }
@@ -86,7 +86,10 @@ pub fn mechtron_write_wave_to_host(wave: UltraWave) -> Result<i32, UniErr> {
     Ok(mechtron_write_buffer(data))
 }
 
-pub fn mechtron_exchange_wave_host<G>(wave: UltraWave) -> Result<ReflectedAggregate, G::Err> where G: Platform {
+pub fn mechtron_exchange_wave_host<G>(wave: UltraWave) -> Result<ReflectedAggregate, G::Err>
+where
+    G: Platform,
+{
     let data = bincode::serialize(&wave)?;
     let buffer_id = mechtron_write_buffer(data);
     let reflect_id = unsafe { mechtron_frame_to_host(buffer_id) };
@@ -100,13 +103,10 @@ pub fn mechtron_exchange_wave_host<G>(wave: UltraWave) -> Result<ReflectedAggreg
     }
 }
 
-
-
 lazy_static! {
     static ref BUFFERS: Arc<DashMap<i32, Vec<u8>>> = Arc::new(DashMap::new());
     static ref BUFFER_INDEX: AtomicI32 = AtomicI32::new(0);
 }
-
 
 /*
 #[no_mangle]
@@ -174,7 +174,6 @@ pub fn log(message: &str) {
     }
 }
 
-
 pub fn mechtron_write_buffer(bytes: Vec<u8>) -> i32 {
     let buffer_id = BUFFER_INDEX.fetch_add(1, Ordering::Relaxed);
     BUFFERS.insert(buffer_id, bytes);
@@ -182,16 +181,12 @@ pub fn mechtron_write_buffer(bytes: Vec<u8>) -> i32 {
 }
 
 pub fn mechtron_read_buffer(buffer: i32) -> Result<Vec<u8>, MembraneErr> {
-    let bytes = {
-        BUFFERS.get(&buffer).unwrap().clone()
-    };
+    let bytes = { BUFFERS.get(&buffer).unwrap().clone() };
     Ok(bytes)
 }
 
 pub fn mechtron_consume_buffer(buffer: i32) -> Result<Vec<u8>, MembraneErr> {
-    let (_,bytes) = {
-        BUFFERS.remove(&buffer).unwrap()
-    };
+    let (_, bytes) = { BUFFERS.remove(&buffer).unwrap() };
     Ok(bytes)
 }
 

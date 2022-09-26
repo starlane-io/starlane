@@ -104,12 +104,11 @@ pub struct Details {
     pub properties: Properties,
 }
 
-
 impl Default for Details {
     fn default() -> Self {
         Self {
             stub: Default::default(),
-            properties: Default::default()
+            properties: Default::default(),
         }
     }
 }
@@ -132,7 +131,7 @@ impl Default for Stub {
         Self {
             point: Point::root(),
             kind: Kind::Root,
-            status: Status::Unknown
+            status: Status::Unknown,
         }
     }
 }

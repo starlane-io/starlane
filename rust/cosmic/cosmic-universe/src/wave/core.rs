@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 
 use cosmic_macros_primitive::Autobox;
 
-use url::Url;
 use crate::command::Command;
 use crate::err::StatusErr;
 use crate::loc::ToSurface;
@@ -17,6 +16,7 @@ use crate::wave::core::http2::{HttpMethod, StatusCode};
 use crate::wave::core::hyp::HypMethod;
 use crate::wave::{Bounce, Ping, Pong, ToRecipients, WaveId};
 use crate::{Bin, Substance, Surface, ToSubstance, UniErr};
+use url::Url;
 
 pub mod cmd;
 pub mod ext;
@@ -606,13 +606,11 @@ impl DirectedCore {
     }
 }
 
-
 impl From<()> for ReflectedCore {
     fn from(_: ()) -> Self {
         ReflectedCore::ok()
     }
 }
-
 
 impl Into<ReflectedCore> for Surface {
     fn into(self) -> ReflectedCore {
@@ -668,5 +666,4 @@ impl ValueMatcher<MethodKind> for MethodKind {
     }
 }
 
-
-pub type HeaderMap = HashMap<String,String>;
+pub type HeaderMap = HashMap<String, String>;

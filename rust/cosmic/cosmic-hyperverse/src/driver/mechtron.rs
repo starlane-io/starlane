@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use crate::driver::{
     Driver, DriverAvail, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, ItemHandler,
     ItemSphere,
@@ -11,6 +10,7 @@ use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::{Assign, HyperSubstance};
 use cosmic_universe::kind::{BaseKind, Kind};
 use cosmic_universe::loc::{Layer, Point, ToSurface};
+use cosmic_universe::log::RootLogger;
 use cosmic_universe::parse::bind_config;
 use cosmic_universe::selector::KindSelector;
 use cosmic_universe::util::log;
@@ -19,10 +19,10 @@ use cosmic_universe::wave::exchange::asynch::InCtx;
 use cosmic_universe::wave::{DirectedProto, DirectedWave, Pong, Wave};
 use dashmap::DashMap;
 use mechtron_host::{HostPlatform, MechtronHost, MechtronHostFactory};
+use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
-use cosmic_universe::log::RootLogger;
 
 lazy_static! {
     static ref HOIST_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -127,22 +127,28 @@ where
 }
 
 #[derive(Clone)]
-pub struct HostDriverPlatform<P> where P: Cosmos {
+pub struct HostDriverPlatform<P>
+where
+    P: Cosmos,
+{
     logger: RootLogger,
-    phantom: PhantomData<P>
+    phantom: PhantomData<P>,
 }
 
-impl <P> HostDriverPlatform<P> where P: Cosmos {
+impl<P> HostDriverPlatform<P>
+where
+    P: Cosmos,
+{
     pub fn new(logger: RootLogger) -> Self {
-        let phantom : PhantomData<P> = PhantomData::default();
-        Self {
-            logger,
-            phantom
-        }
+        let phantom: PhantomData<P> = PhantomData::default();
+        Self { logger, phantom }
     }
 }
 
-impl <P> HostPlatform for HostDriverPlatform<P> where P: Cosmos{
+impl<P> HostPlatform for HostDriverPlatform<P>
+where
+    P: Cosmos,
+{
     type Err = P::Err;
 
     fn root_logger(&self) -> RootLogger {
@@ -166,23 +172,26 @@ where
     P: Cosmos,
 {
     pub fn new(skel: DriverSkel<P>) -> Self {
-        let platform = HostDriverPlatform::new(skel.logger.logger.clone() );
+        let platform = HostDriverPlatform::new(skel.logger.logger.clone());
         let factory = Arc::new(MechtronHostFactory::new(platform));
         Self {
             skel,
             hosts: Arc::new(DashMap::new()),
             wasm_to_host_lookup: Arc::new(DashMap::new()),
-            factory
+            factory,
         }
     }
 }
 
-pub struct HostDriverHandler<P> where P:Cosmos {
+pub struct HostDriverHandler<P>
+where
+    P: Cosmos,
+{
     pub skel: HostDriverSkel<P>,
-    pub ctx: DriverCtx
+    pub ctx: DriverCtx,
 }
 
-impl <P> HostDriverHandler<P>
+impl<P> HostDriverHandler<P>
 where
     P: Cosmos,
 {
@@ -191,9 +200,7 @@ where
     }
 }
 
-impl <P> DriverHandler<P> for HostDriverHandler<P> where P: Cosmos {
-
-}
+impl<P> DriverHandler<P> for HostDriverHandler<P> where P: Cosmos {}
 
 #[handler]
 impl<P> HostDriverHandler<P>
@@ -211,17 +218,33 @@ where
                 .ok_or("expected config property")
                 .map_err(|e| UniErr::from_500(e))?;
             let config = Point::from_str(config.value.as_str())?;
-            let config = self.skel.skel.skel.machine.artifacts.mechtron(&config).await?;
+            let config = self
+                .skel
+                .skel
+                .skel
+                .machine
+                .artifacts
+                .mechtron(&config)
+                .await?;
 
             if !self.skel.wasm_to_host_lookup.contains_key(&config.bin) {
-                let wasm = self.skel.skel.skel.machine.artifacts.wasm(&config.bin).await?;
+                let wasm = self
+                    .skel
+                    .skel
+                    .skel
+                    .machine
+                    .artifacts
+                    .wasm(&config.bin)
+                    .await?;
                 let bin = wasm.deref().deref().clone();
                 let mechtron_host = Arc::new(
-                    self.skel.factory
+                    self.skel
+                        .factory
                         .create(host.details.clone(), bin)
                         .map_err(|e| UniErr::from_500("host err"))?,
                 );
-                self.skel.hosts
+                self.skel
+                    .hosts
                     .insert(host.details.stub.point.clone(), mechtron_host);
                 self.skel
                     .wasm_to_host_lookup
@@ -297,37 +320,45 @@ where
         Ok(ItemSphere::Handler(Box::new(Mechtron)))
     }
     async fn handler(&self) -> Box<dyn DriverHandler<P>> {
-        Box::new(MechtronDriverHandler::restore(self.skel.clone(), self.ctx.clone()))
+        Box::new(MechtronDriverHandler::restore(
+            self.skel.clone(),
+            self.ctx.clone(),
+        ))
     }
 }
 
-pub struct MechtronDriverHandler<P> where P: Cosmos {
-    skel: DriverSkel<P>,
-    ctx: DriverCtx
-}
-
-impl <P> MechtronDriver<P> where P: Cosmos {
-    pub fn new( skel: DriverSkel<P>, ctx: DriverCtx ) -> Self {
-        Self {
-            skel,
-            ctx
-        }
-    }
-}
-
-impl <P> MechtronDriverHandler<P> where P: Cosmos
+pub struct MechtronDriverHandler<P>
+where
+    P: Cosmos,
 {
-    fn restore( skel: DriverSkel<P>, ctx: DriverCtx ) -> Self {
+    skel: DriverSkel<P>,
+    ctx: DriverCtx,
+}
+
+impl<P> MechtronDriver<P>
+where
+    P: Cosmos,
+{
+    pub fn new(skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
+        Self { skel, ctx }
+    }
+}
+
+impl<P> MechtronDriverHandler<P>
+where
+    P: Cosmos,
+{
+    fn restore(skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
         MechtronDriverHandler { skel, ctx }
     }
 }
 
-impl <P> DriverHandler<P> for MechtronDriverHandler<P> where P: Cosmos {
-
-}
+impl<P> DriverHandler<P> for MechtronDriverHandler<P> where P: Cosmos {}
 
 #[handler]
-impl <P>MechtronDriverHandler<P> where P: Cosmos
+impl<P> MechtronDriverHandler<P>
+where
+    P: Cosmos,
 {
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), UniErr> {
@@ -335,12 +366,14 @@ impl <P>MechtronDriverHandler<P> where P: Cosmos
             println!("\tASSIGNING MECHTRON!");
             let logger = self.skel.logger.push_mark("assign")?;
 
-
-            let config = assign.details.properties.get("config").ok_or("config property must be set for a Mechtron")?;
-            let config = Point::from_str(config.value.as_str() )?;
-            let config = self.skel.artifacts().mechtron( &config ).await?;
+            let config = assign
+                .details
+                .properties
+                .get("config")
+                .ok_or("config property must be set for a Mechtron")?;
+            let config = Point::from_str(config.value.as_str())?;
+            let config = self.skel.artifacts().mechtron(&config).await?;
             let config = config.contents();
-
 
             // THIS is a HACK to get the host... a better way would be to do a lookup
             // but that will jam this DriverRunner thread... so Driver Runner must
@@ -356,7 +389,9 @@ impl <P>MechtronDriverHandler<P> where P: Cosmos
             pong.ok_or()?;
             Ok(())
         } else {
-            Err(UniErr::bad_request_msg("MechtronDriverHandler expecting Assign"))
+            Err(UniErr::bad_request_msg(
+                "MechtronDriverHandler expecting Assign",
+            ))
         }
     }
 }

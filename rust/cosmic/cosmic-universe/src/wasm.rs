@@ -1,31 +1,20 @@
-use serde::{Serialize,Deserialize};
 use crate::loc;
+use serde::{Deserialize, Serialize};
 
-#[derive(
-    Debug,
-    Clone,
-    Serialize,
-    Deserialize,
-    Eq,
-    PartialEq,
-)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Timestamp {
-  millis: i64
+    millis: i64,
 }
 
 impl Timestamp {
-    pub fn timestamp_millis(&self)-> i64 {
+    pub fn timestamp_millis(&self) -> i64 {
         self.millis
     }
 
     pub fn new(millis: i64) -> Self {
-        Self {
-            millis
-        }
+        Self { millis }
     }
 }
-
-
 
 #[no_mangle]
 extern "C" {

@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
-use futures::future::{BoxFuture, join_all, select_all};
+use futures::future::{join_all, select_all, BoxFuture};
 use futures::FutureExt;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::error::RecvError;
@@ -33,9 +33,9 @@ use cosmic_universe::log::{PointLogger, RootLogger};
 use cosmic_universe::particle::{Status, Stub};
 use cosmic_universe::settings::Timeouts;
 use cosmic_universe::substance::{Bin, Substance};
-use cosmic_universe::wave::{Agent, DirectedProto, HyperWave, Pong, UltraWave, Wave};
-use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::exchange::asynch::Exchanger;
+use cosmic_universe::wave::exchange::SetStrategy;
+use cosmic_universe::wave::{Agent, DirectedProto, HyperWave, Pong, UltraWave, Wave};
 
 use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
 use crate::{Cosmos, DriversBuilder, HyperErr, Registry, RegistryApi};
@@ -374,7 +374,6 @@ where
             termination_broadcast_tx: term_tx,
         };
 
-
         /// SETUP ARTIFAC
         let factory = MachineApiExtFactory {
             machine_api: machine_api.clone(),
@@ -385,9 +384,10 @@ where
             Timeouts::default(),
         );
         let client =
-            HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger.clone()).unwrap();
+            HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger.clone())
+                .unwrap();
 
-        let fetcher = Box::new(ClientArtifactFetcher::new(client,skel.registry.clone() ));
+        let fetcher = Box::new(ClientArtifactFetcher::new(client, skel.registry.clone()));
         skel.artifacts.set_fetcher(fetcher).await;
 
         machine.start().await;
@@ -685,25 +685,34 @@ where
     }
 }
 
-
-pub struct ClientArtifactFetcher<P> where P: Cosmos {
+pub struct ClientArtifactFetcher<P>
+where
+    P: Cosmos,
+{
     pub registry: Registry<P>,
-    pub client: HyperClient
+    pub client: HyperClient,
 }
 
-impl <P> ClientArtifactFetcher<P> where P: Cosmos {
-    pub fn new( client: HyperClient, registry: Registry<P> ) -> Self {
-        Self {
-            client,
-            registry
-        }
+impl<P> ClientArtifactFetcher<P>
+where
+    P: Cosmos,
+{
+    pub fn new(client: HyperClient, registry: Registry<P>) -> Self {
+        Self { client, registry }
     }
 }
 
 #[async_trait]
-impl <P> ArtifactFetcher for ClientArtifactFetcher<P> where P: Cosmos {
+impl<P> ArtifactFetcher for ClientArtifactFetcher<P>
+where
+    P: Cosmos,
+{
     async fn stub(&self, point: &Point) -> Result<Stub, UniErr> {
-        let record = self.registry.record(point).await.map_err(|e|e.to_uni_err())?;
+        let record = self
+            .registry
+            .record(point)
+            .await
+            .map_err(|e| e.to_uni_err())?;
         Ok(record.details.stub)
     }
 
@@ -719,5 +728,3 @@ impl <P> ArtifactFetcher for ClientArtifactFetcher<P> where P: Cosmos {
         }
     }
 }
-
-

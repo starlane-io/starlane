@@ -24,13 +24,15 @@ use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::CoreBounce;
 use cosmic_universe::wave::core::ReflectedCore;
 use cosmic_universe::wave::exchange::asynch::DirectedHandlerShell;
-use cosmic_universe::wave::exchange::asynch::{DirectedHandler, DirectedHandlerSelector, InCtx, RootInCtx};
 use cosmic_universe::wave::exchange::asynch::Exchanger;
+use cosmic_universe::wave::exchange::asynch::{
+    DirectedHandler, DirectedHandlerSelector, InCtx, RootInCtx,
+};
+use cosmic_universe::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder, Router};
 use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::RecipientSelector;
 use cosmic_universe::wave::{Agent, DirectedProto, Handling, Pong, Scope, Wave};
 use cosmic_universe::HYPERUSER;
-use cosmic_universe::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder, Router};
 
 use crate::driver::{
     Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere,
@@ -207,18 +209,14 @@ where
         };
 
         if create.state.has_substance() || details.stub.kind.is_auto_provision() {
-            // spawning a task is a hack, but without it this process will freeze
-            // need to come up with a better solution so that
             {
-                let details = details.clone();
                 let provisioner = SmartLocator::new(self.skel.clone());
-                let state = create.state.clone();
-                tokio::spawn(async move {
-                    provisioner
-                        .provision(&details.stub.point, state)
-                        .await
-                        .unwrap();
-                });
+                //tokio::spawn(async move {
+                provisioner
+                    .provision(&details.stub.point, create.state.clone())
+                    .await
+                    .unwrap();
+                //});
             }
         }
 

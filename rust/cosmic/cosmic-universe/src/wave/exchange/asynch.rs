@@ -1,17 +1,24 @@
-use std::sync::Arc;
-use tokio::sync::{mpsc, oneshot};
-use dashmap::DashMap;
-use std::time::Duration;
-use alloc::borrow::Cow;
-use crate::{Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, UniErr};
 use crate::loc::{ToPoint, ToSurface};
 use crate::particle::traversal::Traversal;
 use crate::settings::Timeouts;
-use crate::wave::exchange::{BroadTxRouter, DirectedHandlerShellDef, InCtxDef, ProtoTransmitterBuilderDef, ProtoTransmitterDef, RootInCtxDef, SetStrategy};
-use crate::wave::{BounceBacks, BounceProto, DirectedKind, DirectedProto, DirectedWave, Echo, FromReflectedAggregate, Handling, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto, ReflectedWave, Scope, UltraWave, Wave, WaveId};
 use crate::wave::core::cmd::CmdMethod;
-use crate::wave::core::CoreBounce;
 use crate::wave::core::http2::StatusCode;
+use crate::wave::core::CoreBounce;
+use crate::wave::exchange::{
+    BroadTxRouter, DirectedHandlerShellDef, InCtxDef, ProtoTransmitterBuilderDef,
+    ProtoTransmitterDef, RootInCtxDef, SetStrategy,
+};
+use crate::wave::{
+    BounceBacks, BounceProto, DirectedKind, DirectedProto, DirectedWave, Echo,
+    FromReflectedAggregate, Handling, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto,
+    ReflectedWave, Scope, UltraWave, Wave, WaveId,
+};
+use crate::{Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, UniErr};
+use alloc::borrow::Cow;
+use dashmap::DashMap;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::{mpsc, oneshot};
 
 #[async_trait]
 impl Router for TxRouter {
@@ -37,17 +44,14 @@ pub trait TraversalRouter: Send + Sync {
     async fn traverse(&self, traversal: Traversal<UltraWave>);
 }
 
-
 #[derive(Clone)]
 pub struct AsyncRouter {
-    pub router: Arc<dyn Router>
+    pub router: Arc<dyn Router>,
 }
 
 impl AsyncRouter {
-    pub fn new( router: Arc<dyn Router>) -> Self {
-        Self {
-            router
-        }
+    pub fn new(router: Arc<dyn Router>) -> Self {
+        Self { router }
     }
 }
 
@@ -58,7 +62,7 @@ impl Router for AsyncRouter {
     }
 }
 
-pub type ProtoTransmitter = ProtoTransmitterDef<AsyncRouter,Exchanger>;
+pub type ProtoTransmitter = ProtoTransmitterDef<AsyncRouter, Exchanger>;
 
 impl ProtoTransmitter {
     pub fn new(router: Arc<dyn Router>, exchanger: Exchanger) -> ProtoTransmitter {
@@ -100,7 +104,9 @@ impl ProtoTransmitter {
         }
     }
 
-    pub async fn ping<D>(&self, ping: D ) -> Result<Wave<Pong>,UniErr> where D: Into<DirectedProto>,
+    pub async fn ping<D>(&self, ping: D) -> Result<Wave<Pong>, UniErr>
+    where
+        D: Into<DirectedProto>,
     {
         let mut ping: DirectedProto = ping.into();
         if let Some(DirectedKind::Ping) = ping.kind {
@@ -110,7 +116,9 @@ impl ProtoTransmitter {
         }
     }
 
-    pub async fn ripple<D>(&self, ripple: D ) -> Result<Vec<Wave<Echo>>,UniErr> where D: Into<DirectedProto>,
+    pub async fn ripple<D>(&self, ripple: D) -> Result<Vec<Wave<Echo>>, UniErr>
+    where
+        D: Into<DirectedProto>,
     {
         let mut ripple: DirectedProto = ripple.into();
         if let Some(DirectedKind::Ripple) = ripple.kind {
@@ -120,7 +128,9 @@ impl ProtoTransmitter {
         }
     }
 
-    pub async fn signal<D>(&self, signal: D ) -> Result<(),UniErr> where D: Into<DirectedProto>,
+    pub async fn signal<D>(&self, signal: D) -> Result<(), UniErr>
+    where
+        D: Into<DirectedProto>,
     {
         let mut signal: DirectedProto = signal.into();
         if let Some(DirectedKind::Signal) = signal.kind {
@@ -177,7 +187,7 @@ impl ProtoTransmitter {
     }
 }
 
-pub type ProtoTransmitterBuilder = ProtoTransmitterBuilderDef<AsyncRouter,Exchanger>;
+pub type ProtoTransmitterBuilder = ProtoTransmitterBuilderDef<AsyncRouter, Exchanger>;
 
 impl ProtoTransmitterBuilder {
     pub fn new(router: Arc<dyn Router>, exchanger: Exchanger) -> ProtoTransmitterBuilder {
@@ -195,23 +205,21 @@ impl ProtoTransmitterBuilder {
     }
 }
 
-pub type RootInCtx=RootInCtxDef<ProtoTransmitter>;
+pub type RootInCtx = RootInCtxDef<ProtoTransmitter>;
 
-pub type InCtx<'a,I> = InCtxDef<'a,I,ProtoTransmitter>;
+pub type InCtx<'a, I> = InCtxDef<'a, I, ProtoTransmitter>;
 
-impl <'a,I> InCtx<'a,I> {
-
-        pub fn push_from(self, from: Surface) -> InCtx<'a, I> {
+impl<'a, I> InCtx<'a, I> {
+    pub fn push_from(self, from: Surface) -> InCtx<'a, I> {
         let mut transmitter = self.transmitter.clone();
         transmitter.to_mut().from = SetStrategy::Override(from);
-        InCtx{
+        InCtx {
             root: self.root,
             input: self.input,
             logger: self.logger.clone(),
             transmitter,
         }
     }
-
 }
 
 #[async_trait]
@@ -238,7 +246,6 @@ impl TxRouter {
         Self { tx }
     }
 }
-
 
 #[derive(Clone)]
 pub struct Exchanger {
@@ -407,9 +414,12 @@ impl Default for Exchanger {
     }
 }
 
-pub type DirectedHandlerShell<D> = DirectedHandlerShellDef<D,ProtoTransmitterBuilder>;
+pub type DirectedHandlerShell<D> = DirectedHandlerShellDef<D, ProtoTransmitterBuilder>;
 
-impl <D> DirectedHandlerShell<D> where D: DirectedHandler{
+impl<D> DirectedHandlerShell<D>
+where
+    D: DirectedHandler,
+{
     pub async fn handle(&self, wave: DirectedWave) {
         let logger = self
             .logger

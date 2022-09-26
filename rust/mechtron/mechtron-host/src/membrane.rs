@@ -2,30 +2,36 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::{Arc, RwLock, Weak};
 
-use wasmer::{
-    imports, Array, ChainableNamedResolver, Function, ImportObject, Instance, Module,
-    NamedResolver, RuntimeError, WasmPtr, WasmerEnv,
-};
+use crate::HostPlatform;
 use cosmic_universe::err::UniErr;
 use cosmic_universe::loc::Point;
 use cosmic_universe::log::PointLogger;
 use cosmic_universe::substance::Substance;
-use cosmic_universe::wave::UltraWave;
-use cosmic_universe::wave::core::Method;
 use cosmic_universe::wave::core::cmd::CmdMethod;
-use crate::HostPlatform;
+use cosmic_universe::wave::core::Method;
+use cosmic_universe::wave::UltraWave;
+use wasmer::{
+    imports, Array, ChainableNamedResolver, Function, ImportObject, Instance, Module,
+    NamedResolver, RuntimeError, WasmPtr, WasmerEnv,
+};
 
 pub static VERSION: i32 = 1;
 
-pub struct WasmMembrane<P> where P: HostPlatform {
+pub struct WasmMembrane<P>
+where
+    P: HostPlatform,
+{
     pub instance: Instance,
     init: String,
     name: String,
     platform: P,
-    logger: PointLogger
+    logger: PointLogger,
 }
 
-impl <P> WasmMembrane<P> where P: HostPlatform {
+impl<P> WasmMembrane<P>
+where
+    P: HostPlatform,
+{
     pub fn init(&self) -> Result<(), P::Err> {
         println!("WASM MEMBRANE INIT CALLED");
         let mut pass = true;
@@ -149,25 +155,25 @@ impl <P> WasmMembrane<P> where P: HostPlatform {
         match self
             .instance
             .exports
-            .get_native_function::<(i32,i32), i32>("mechtron_guest_init")
+            .get_native_function::<(i32, i32), i32>("mechtron_guest_init")
         {
             Ok(func) => {
                 self.log_wasm("host", "verified: mechtron_guest_init()");
 
-/*                match func.call() {
-                    Ok(_) => {
-                        self.log_wasm("host", "passed: mechtron_guest_init()");
-                    }
-                    Err(error) => {
-                        self.log_wasm(
-                            "host",
-                            format!("failed: mechtron_guest_init() ERROR: {:?}", error).as_str(),
-                        );
-                        pass = false;
-                    }
-                }
+                /*                match func.call() {
+                                   Ok(_) => {
+                                       self.log_wasm("host", "passed: mechtron_guest_init()");
+                                   }
+                                   Err(error) => {
+                                       self.log_wasm(
+                                           "host",
+                                           format!("failed: mechtron_guest_init() ERROR: {:?}", error).as_str(),
+                                       );
+                                       pass = false;
+                                   }
+                               }
 
- */
+                */
             }
             Err(_) => {
                 self.log_wasm("host", "failed: mechtron_guest_init() [NOT REQUIRED]");
@@ -200,7 +206,7 @@ impl <P> WasmMembrane<P> where P: HostPlatform {
         println!("{}({}) : {}", self.name, log_type, message);
     }
 
-    pub fn write_string<S:ToString>(&self, string: S) -> Result<i32, P::Err> {
+    pub fn write_string<S: ToString>(&self, string: S) -> Result<i32, P::Err> {
         let string = string.to_string();
         let string = string.as_bytes();
         let memory = self.instance.exports.get_memory("memory")?;
@@ -329,38 +335,60 @@ impl <P> WasmMembrane<P> where P: HostPlatform {
 }
 
 #[derive(Clone)]
-pub struct WasmBuffer<P>  where P: HostPlatform {
+pub struct WasmBuffer<P>
+where
+    P: HostPlatform,
+{
     ptr: WasmPtr<u8, Array>,
     len: u32,
-    phantom: PhantomData<P>
+    phantom: PhantomData<P>,
 }
 
-impl <P> WasmBuffer<P> where P: HostPlatform{
+impl<P> WasmBuffer<P>
+where
+    P: HostPlatform,
+{
     pub fn new(ptr: WasmPtr<u8, Array>, len: u32) -> Self {
-        WasmBuffer { ptr: ptr, len: len, phantom: Default::default() }
+        WasmBuffer {
+            ptr: ptr,
+            len: len,
+            phantom: Default::default(),
+        }
     }
 }
 
-pub struct WasmHost<P>  where P: HostPlatform{
+pub struct WasmHost<P>
+where
+    P: HostPlatform,
+{
     membrane: Option<Weak<WasmMembrane<P>>>,
-    logger: PointLogger
+    logger: PointLogger,
 }
 
-impl <P> WasmHost<P>  where P: HostPlatform{
+impl<P> WasmHost<P>
+where
+    P: HostPlatform,
+{
     fn new(logger: PointLogger) -> Self {
         WasmHost {
             membrane: Option::None,
-            logger
+            logger,
         }
     }
 }
 
 #[derive(WasmerEnv, Clone)]
-struct Env<P> where P: HostPlatform {
+struct Env<P>
+where
+    P: HostPlatform,
+{
     host: Arc<RwLock<WasmHost<P>>>,
 }
 
-impl <P> Env<P> where P: HostPlatform{
+impl<P> Env<P>
+where
+    P: HostPlatform,
+{
     pub fn unwrap(&self) -> Result<Arc<WasmMembrane<P>>, P::Err> {
         let host = self.host.read();
         if host.is_err() {
@@ -391,9 +419,23 @@ impl <P> Env<P> where P: HostPlatform{
     }
 }
 
-impl <P> WasmMembrane <P> where P: HostPlatform+'static{
-    pub fn new(module: Arc<Module>, name: String, platform:P, logger: PointLogger ) -> Result<Arc<Self>, P::Err> {
-        Self::new_with_init(module, name, "mechtron_guest_init".to_string(),platform, logger )
+impl<P> WasmMembrane<P>
+where
+    P: HostPlatform + 'static,
+{
+    pub fn new(
+        module: Arc<Module>,
+        name: String,
+        platform: P,
+        logger: PointLogger,
+    ) -> Result<Arc<Self>, P::Err> {
+        Self::new_with_init(
+            module,
+            name,
+            "mechtron_guest_init".to_string(),
+            platform,
+            logger,
+        )
     }
 
     pub fn new_with_init(
@@ -401,9 +443,9 @@ impl <P> WasmMembrane <P> where P: HostPlatform+'static{
         init: String,
         name: String,
         platform: P,
-        logger: PointLogger
+        logger: PointLogger,
     ) -> Result<Arc<Self>, P::Err> {
-        Self::new_with_init_and_imports(module, init, name, Option::None, platform, logger )
+        Self::new_with_init_and_imports(module, init, name, Option::None, platform, logger)
     }
 
     pub fn new_with_init_and_imports(
@@ -412,7 +454,7 @@ impl <P> WasmMembrane <P> where P: HostPlatform+'static{
         name: String,
         ext_imports: Option<ImportObject>,
         platform: P,
-        logger: PointLogger
+        logger: PointLogger,
     ) -> Result<Arc<Self>, P::Err> {
         let host = Arc::new(RwLock::new(WasmHost::new(logger.clone())));
 
@@ -498,7 +540,7 @@ impl <P> WasmMembrane <P> where P: HostPlatform+'static{
             init,
             name,
             platform,
-            logger
+            logger,
         });
 
         {
@@ -509,12 +551,18 @@ impl <P> WasmMembrane <P> where P: HostPlatform+'static{
     }
 }
 
-pub struct BufferLock<P> where P: HostPlatform{
+pub struct BufferLock<P>
+where
+    P: HostPlatform,
+{
     id: i32,
     membrane: Arc<WasmMembrane<P>>,
 }
 
-impl <P> BufferLock<P>  where P: HostPlatform{
+impl<P> BufferLock<P>
+where
+    P: HostPlatform,
+{
     pub fn new(id: i32, membrane: Arc<WasmMembrane<P>>) -> Self {
         BufferLock {
             id: id,
@@ -532,7 +580,10 @@ impl <P> BufferLock<P>  where P: HostPlatform{
     }
 }
 
-impl <P> Drop for BufferLock<P>  where P: HostPlatform{
+impl<P> Drop for BufferLock<P>
+where
+    P: HostPlatform,
+{
     fn drop(&mut self) {
         self.release().unwrap_or(());
     }

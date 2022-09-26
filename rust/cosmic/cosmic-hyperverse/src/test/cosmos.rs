@@ -3,17 +3,19 @@ use crate::driver::artifact::{
 };
 use crate::driver::base::BaseDriverFactory;
 use crate::driver::control::ControlDriverFactory;
+use crate::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
 use crate::driver::root::RootDriverFactory;
 use crate::driver::space::SpaceDriverFactory;
 use crate::driver::DriverAvail;
 use crate::test::registry::{TestRegistryApi, TestRegistryContext};
-use crate::{DriversBuilder, HyperErr, Cosmos, MachineTemplate, Registry};
+use crate::{Cosmos, DriversBuilder, HyperErr, MachineTemplate, Registry};
 use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, LocalHyperwayGateJumper};
 use cosmic_universe::artifact::{ArtifactApi, ReadArtifactFetcher};
 use cosmic_universe::err::UniErr;
 use cosmic_universe::kind::{BaseKind, Kind, StarSub};
 use cosmic_universe::loc::{MachineName, StarKey, ToBaseKind};
 use cosmic_universe::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
+use mechtron_host::err::HostErr;
 use std::io;
 use std::io::Error;
 use std::str::Utf8Error;
@@ -22,9 +24,7 @@ use std::sync::Arc;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
-use mechtron_host::err::HostErr;
 use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
-use crate::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
 
 impl TestCosmos {
     pub fn new() -> Self {
@@ -70,12 +70,10 @@ impl Cosmos for TestCosmos {
         builder.kind(kind.clone());
         match kind.to_base() {
             BaseKind::Mechtron => {
-                builder.add_point( "config", true, true ).unwrap();
+                builder.add_point("config", true, true).unwrap();
                 builder.build().unwrap()
             }
-            _ => {
-                builder.build().unwrap()
-            }
+            _ => builder.build().unwrap(),
         }
     }
 
@@ -108,7 +106,7 @@ impl Cosmos for TestCosmos {
                 builder.add_post(Arc::new(ArtifactDriverFactory::new()));
             }
             StarSub::Jump => {
-//                builder.add_post(Arc::new(ControlDriverFactory::new()));
+                //                builder.add_post(Arc::new(ControlDriverFactory::new()));
             }
             StarSub::Fold => {}
             StarSub::Machine => {
@@ -212,7 +210,6 @@ impl From<io::Error> for TestErr {
     }
 }
 
-
 impl From<acid_store::Error> for TestErr {
     fn from(e: acid_store::Error) -> Self {
         Self {
@@ -239,54 +236,54 @@ impl From<Box<bincode::ErrorKind>> for TestErr {
 
 impl HostErr for TestErr {
     fn to_uni_err(self) -> UniErr {
-        UniErr::from_500(self.to_string() )
+        UniErr::from_500(self.to_string())
     }
 }
 
 impl From<CompileError> for TestErr {
     fn from(e: CompileError) -> Self {
-                Self  {
-            message: e.to_string()
+        Self {
+            message: e.to_string(),
         }
     }
 }
 
 impl From<RuntimeError> for TestErr {
     fn from(e: RuntimeError) -> Self {
-                Self  {
-            message: e.to_string()
+        Self {
+            message: e.to_string(),
         }
     }
 }
 
 impl From<ExportError> for TestErr {
     fn from(e: ExportError) -> Self {
-                Self  {
-            message: e.to_string()
+        Self {
+            message: e.to_string(),
         }
     }
 }
 
 impl From<Utf8Error> for TestErr {
     fn from(e: Utf8Error) -> Self {
-                Self  {
-            message: e.to_string()
+        Self {
+            message: e.to_string(),
         }
     }
 }
 
 impl From<FromUtf8Error> for TestErr {
     fn from(e: FromUtf8Error) -> Self {
-                Self  {
-            message: e.to_string()
+        Self {
+            message: e.to_string(),
         }
     }
 }
 
 impl From<InstantiationError> for TestErr {
     fn from(e: InstantiationError) -> Self {
-        Self  {
-            message: e.to_string()
+        Self {
+            message: e.to_string(),
         }
     }
 }

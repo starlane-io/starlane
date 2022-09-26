@@ -4,7 +4,7 @@ use crate::err::UniErr;
 use crate::loc::Meta;
 use crate::substance::{Errors, Substance};
 use crate::util::ValueMatcher;
-use crate::wave::core::{DirectedCore, HeaderMap, Method, ReflectedCore };
+use crate::wave::core::{DirectedCore, HeaderMap, Method, ReflectedCore};
 use url::Url;
 
 #[derive(
@@ -29,7 +29,6 @@ pub enum HttpMethod {
     Connect,
     Patch,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HttpRequest {
@@ -74,24 +73,14 @@ impl TryFrom<DirectedCore> for HttpRequest {
         }
     }
 }
-#[derive(
-    Debug,
-    Clone,
-    Serialize,
-    Deserialize,
-    Eq,
-    PartialEq,
-    Hash,
-)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct StatusCode {
-    pub code: u16
+    pub code: u16,
 }
 
 impl StatusCode {
-    pub fn from_u16( code: u16 ) -> Result<Self,UniErr> {
-        Ok(Self {
-            code
-        })
+    pub fn from_u16(code: u16) -> Result<Self, UniErr> {
+        Ok(Self { code })
     }
 
     pub fn as_u16(&self) -> u16 {
@@ -101,8 +90,6 @@ impl StatusCode {
     pub fn is_success(&self) -> bool {
         self.code >= 200 && self.code <= 299
     }
-
-
 }
 
 impl ToString for StatusCode {
@@ -116,4 +103,3 @@ impl Default for StatusCode {
         StatusCode::from_u16(200).unwrap()
     }
 }
-

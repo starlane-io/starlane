@@ -10,6 +10,7 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use cosmic_nom::{new_span, Trace, Tw};
 
+use crate::err::ParseErrs;
 use crate::hyper::ChildRegistry;
 use crate::kind::KindParts;
 use crate::log::{SpanLogger, Trackable};
@@ -21,17 +22,14 @@ use crate::parse::{
 };
 use crate::particle::traversal::TraversalPlan;
 use crate::selector::{Pattern, Selector, SpecificSelector, VersionReq};
-use crate::util::{ToResolved, uuid, ValueMatcher, ValuePattern};
+use crate::util::{uuid, ToResolved, ValueMatcher, ValuePattern};
 use crate::wave::exchange::asynch::Exchanger;
 use crate::wave::{
     DirectedWave, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave, ToRecipients,
     UltraWave, Wave,
 };
-use crate::{
-     Agent, BaseKind, Kind, KindTemplate, ParticleRecord, UniErr, ANONYMOUS, HYPERUSER,
-};
 use crate::Agent::Anonymous;
-use crate::err::ParseErrs;
+use crate::{Agent, BaseKind, Kind, KindTemplate, ParticleRecord, UniErr, ANONYMOUS, HYPERUSER};
 
 lazy_static! {
     pub static ref GLOBAL_CENTRAL: Point = Point::from_str("GLOBAL::central").unwrap();
@@ -78,13 +76,13 @@ pub trait ToBaseKind {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct Uuid {
-    uuid: String
+    uuid: String,
 }
 
 impl Uuid {
     pub fn rnd() -> Self {
         //Self::new( uuid::Uuid::new_v4() )
-         uuid()
+        uuid()
     }
     /*
     pub fn new(uuid: uuid::Uuid) -> Self {
@@ -96,21 +94,23 @@ impl Uuid {
 
     pub fn from<S: ToString>(uuid: S) -> Result<Self, UniErr> {
         //Ok(Self::new(uuid::Uuid::from_str(uuid.to_string().as_str()).map_err(|e| UniErr::from_500(format!("'{}' is not a valid uuid",uuid.to_string())))?))
-        Ok(Self { uuid: uuid.to_string() })
+        Ok(Self {
+            uuid: uuid.to_string(),
+        })
     }
 
-pub fn from_unwrap<S: ToString>(uuid: S) -> Self {
-        Self { uuid: uuid.to_string() }
+    pub fn from_unwrap<S: ToString>(uuid: S) -> Self {
+        Self {
+            uuid: uuid.to_string(),
+        }
     }
 }
-
 
 impl ToString for Uuid {
     fn to_string(&self) -> String {
         self.uuid.clone()
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum ProvisionAffinity {

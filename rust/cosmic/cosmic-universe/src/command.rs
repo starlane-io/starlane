@@ -53,10 +53,10 @@ pub mod common {
             }
         }
 
-        pub fn get_substance(&self) -> Result<Substance,UniErr> {
+        pub fn get_substance(&self) -> Result<Substance, UniErr> {
             match self {
                 StateSrc::None => Err(UniErr::from_500("state has no substance")),
-                StateSrc::Substance(substance) => Ok(*substance.clone())
+                StateSrc::Substance(substance) => Ok(*substance.clone()),
             }
         }
     }
@@ -169,8 +169,8 @@ pub mod common {
 }
 
 pub mod direct {
-//    use http::status::InvalidStatusCode;
-//    use http::{HeaderMap, Request, StatusCode, Uri};
+    //    use http::status::InvalidStatusCode;
+    //    use http::{HeaderMap, Request, StatusCode, Uri};
     use serde::{Deserialize, Serialize};
 
     use crate::command::direct::create::Create;
@@ -362,7 +362,7 @@ pub mod direct {
 
         use crate::command::common::{SetProperties, SetRegistry, StateSrc, StateSrcVar};
         use crate::command::Command;
-        use crate::err::{UniErr};
+        use crate::err::UniErr;
         use crate::kind::{BaseKind, KindParts};
         use crate::loc::{HostKey, Point, PointCtx, PointFactory, PointSeg, PointVar, ToSurface};
         use crate::parse::model::Subst;
@@ -1121,6 +1121,12 @@ impl RawCommand {
             line: line.to_string(),
             transfers: vec![],
         }
+    }
+}
+
+impl ToString for RawCommand {
+    fn to_string(&self) -> String {
+        self.line.clone()
     }
 }
 

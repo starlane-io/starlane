@@ -11,7 +11,6 @@ extern crate lazy_static;
 #[macro_use]
 extern crate cosmic_macros;
 
-
 extern crate alloc;
 extern crate core;
 
@@ -39,41 +38,55 @@ use std::sync::{mpsc, MutexGuard};
 
 use cosmic_universe::wave::Bounce;
 
-use cosmic_universe::wave::exchange::synch::{DirectedHandler, DirectedHandlerProxy, DirectedHandlerShell, ExchangeRouter, InCtx, ProtoTransmitter, ProtoTransmitterBuilder};
-use std::sync::RwLock;
 use cosmic_universe::artifact::ArtifactApi;
+use cosmic_universe::wave::exchange::synch::{
+    DirectedHandler, DirectedHandlerProxy, DirectedHandlerShell, ExchangeRouter, InCtx,
+    ProtoTransmitter, ProtoTransmitterBuilder,
+};
+use std::sync::RwLock;
 
 use crate::err::{GuestErr, MechErr};
-use crate::membrane::{mechtron_frame_to_host,  mechtron_timestamp, mechtron_uuid};
+use crate::membrane::{mechtron_frame_to_host, mechtron_timestamp, mechtron_uuid};
 
 #[no_mangle]
 extern "C" {
-    pub fn mechtron_guest(details: Details) -> Result<Arc<dyn Guest>,GuestErr>;
+    pub fn mechtron_guest(details: Details) -> Result<Arc<dyn Guest>, GuestErr>;
 }
 
-pub trait Guest: Send+Sync {
-     fn handler(&self, point: &Point) -> Result<DirectedHandlerShell, GuestErr>;
-     fn logger(&self) -> &PointLogger;
+pub trait Guest: Send + Sync {
+    fn handler(&self, point: &Point) -> Result<DirectedHandlerShell, GuestErr>;
+    fn logger(&self) -> &PointLogger;
 }
 
-pub trait Platform: Clone+Send+Sync where Self::Err : MechErr {
+pub trait Platform: Clone + Send + Sync
+where
+    Self::Err: MechErr,
+{
     type Err;
-    fn factories(&self) -> Result<MechtronFactories<Self>, Self::Err> where Self:Sized{
+    fn factories(&self) -> Result<MechtronFactories<Self>, Self::Err>
+    where
+        Self: Sized,
+    {
         Ok(MechtronFactories::new())
     }
 }
 
-
-pub struct MechtronFactories<P> where P: Platform {
+pub struct MechtronFactories<P>
+where
+    P: Platform,
+{
     factories: HashMap<String, Box<dyn MechtronFactory<P>>>,
-    phantom: PhantomData<P>
+    phantom: PhantomData<P>,
 }
 
-impl <P> MechtronFactories<P> where P: Platform {
+impl<P> MechtronFactories<P>
+where
+    P: Platform,
+{
     pub fn new() -> Self {
         Self {
             factories: HashMap::new(),
-            phantom: Default::default()
+            phantom: Default::default(),
         }
     }
     pub fn add<F>(&mut self, factory: F)
@@ -84,19 +97,23 @@ impl <P> MechtronFactories<P> where P: Platform {
         self.factories.insert(factory.name(), Box::new(factory));
     }
 
-    pub fn get<S>(&self, name: S) -> Option<&Box<dyn MechtronFactory<P>>> where S: ToString {
-        self.factories.get(&name.to_string() )
+    pub fn get<S>(&self, name: S) -> Option<&Box<dyn MechtronFactory<P>>>
+    where
+        S: ToString,
+    {
+        self.factories.get(&name.to_string())
     }
 }
 
-pub trait MechtronFactory<P>: Sync + Send + 'static where P: Platform {
+pub trait MechtronFactory<P>: Sync + Send + 'static
+where
+    P: Platform,
+{
     fn name(&self) -> String;
 
     fn lifecycle(&self, skel: MechtronSkel<P>) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err>;
-    fn handler(&self, ske: MechtronSkel<P> ) -> Result<Box<dyn DirectedHandler>, P::Err>;
+    fn handler(&self, ske: MechtronSkel<P>) -> Result<Box<dyn DirectedHandler>, P::Err>;
 }
-
-
 
 /// The MechtronSkel holds the common static elements of the Mechtron together
 /// Since a Mechtron is always an instance created to handle a single
@@ -104,41 +121,55 @@ pub trait MechtronFactory<P>: Sync + Send + 'static where P: Platform {
 /// Mechtron instance.
 ///
 #[derive(Clone)]
-pub struct MechtronSkel<P> where P: Platform {
+pub struct MechtronSkel<P>
+where
+    P: Platform,
+{
     pub details: Details,
     pub logger: PointLogger,
     pub transmitter: ProtoTransmitter,
-    phantom: PhantomData<P>
+    phantom: PhantomData<P>,
 }
 
-impl <P> MechtronSkel<P> where P: Platform{
-    pub fn new( details: Details, logger: PointLogger, transmitter: ProtoTransmitter, phantom: PhantomData<P> ) -> Self {
+impl<P> MechtronSkel<P>
+where
+    P: Platform,
+{
+    pub fn new(
+        details: Details,
+        logger: PointLogger,
+        transmitter: ProtoTransmitter,
+        phantom: PhantomData<P>,
+    ) -> Self {
         let logger = logger.point(details.stub.point.clone());
         Self {
             details,
             logger,
             phantom,
-            transmitter
+            transmitter,
         }
     }
 }
 
-
 /// MechtronSphere is the interface used by Guest
 /// to make important calls to the Mechtron
-pub trait MechtronLifecycle<P>: DirectedHandler + Sync + Send where P: Platform {
-
-    fn create(&self, _skel: MechtronSkel<P> ) -> Result<(), P::Err> {
+pub trait MechtronLifecycle<P>: DirectedHandler + Sync + Send
+where
+    P: Platform,
+{
+    fn create(&self, _skel: MechtronSkel<P>) -> Result<(), P::Err> {
         Ok(())
     }
-
 }
 
 /// Create a Mechtron by implementing this trait.
 /// Mechtrons are created per request and disposed of afterwards...
 /// Implementers of this trait should only hold references to
 /// Mechtron::Skel, Mechtron::Ctx & Mechtron::State at most.
-pub trait Mechtron<P>: MechtronLifecycle<P> + Sync + Send + 'static where P: Platform {
+pub trait Mechtron<P>: MechtronLifecycle<P> + Sync + Send + 'static
+where
+    P: Platform,
+{
     /// it is recommended to implement MechtronSkel or some derivative
     /// of MechtronSkel. Skel holds info about the Mechtron (like it's Point,
     /// exact Kind & Properties)  The Skel may also provide access to other
@@ -162,11 +193,10 @@ pub trait Mechtron<P>: MechtronLifecycle<P> + Sync + Send + 'static where P: Pla
 
     /// create the Cache for this Mechtron (templates, configs & static content)
     /// the cache should hold any static content that is expected to be unchanging
-    fn cache(_skel: Self::Skel) -> Result<Option<Self::Cache>,P::Err> {
+    fn cache(_skel: Self::Skel) -> Result<Option<Self::Cache>, P::Err> {
         Ok(None)
     }
 }
-
 
 #[cfg(test)]
 pub mod test {

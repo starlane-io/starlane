@@ -16,10 +16,10 @@ use cosmic_universe::substance::Substance;
 use cosmic_universe::util::ToResolved;
 use cosmic_universe::wave::core::{Method, ReflectedCore};
 use cosmic_universe::wave::exchange::asynch::Exchanger;
+use cosmic_universe::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder};
 use cosmic_universe::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Pong, Reflection, UltraWave, Wave,
 };
-use cosmic_universe::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder};
 
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::{Cosmos, HyperErr, RegistryApi};
@@ -123,7 +123,6 @@ where
     }
 
     async fn directed_core_bound(&self, directed: Traversal<DirectedWave>) -> Result<(), UniErr> {
-
         let bind = self.bind(&directed).await?;
 
         match bind.select(&directed.payload) {

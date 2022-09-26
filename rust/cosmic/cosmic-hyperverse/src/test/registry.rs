@@ -1,5 +1,5 @@
-use crate::test::cosmos::TestErr;
 use crate::test::cosmos::TestCosmos;
+use crate::test::cosmos::TestErr;
 use crate::{Registration, RegistryApi};
 use cosmic_universe::command::common::SetProperties;
 use cosmic_universe::command::direct::delete::Delete;
@@ -60,7 +60,11 @@ impl RegistryApi<TestCosmos> for TestRegistryApi {
         Ok(details)
     }
 
-    async fn assign<'a>(&'a self, point: &'a Point, location: ParticleLocation) -> Result<(),TestErr> {
+    async fn assign<'a>(
+        &'a self,
+        point: &'a Point,
+        location: ParticleLocation,
+    ) -> Result<(), TestErr> {
         let mut record = self.ctx.particles.get_mut(&point).unwrap();
         record.value_mut().location = Some(location);
         Ok(())

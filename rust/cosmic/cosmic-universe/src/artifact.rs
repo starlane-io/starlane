@@ -1,49 +1,46 @@
 use core::borrow::Borrow;
+use dashmap::DashMap;
 use std::cell::Cell;
 use std::ops::Deref;
 use std::sync::Arc;
-use dashmap::DashMap;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
+use crate::config::mechtron::MechtronConfig;
 use crate::loc::{Point, ToSurface};
 use crate::particle::Stub;
 use crate::substance::Bin;
-use crate::{BindConfig, Substance, UniErr};
-use crate::config::mechtron::MechtronConfig;
-use crate::wave::{DirectedProto, Pong, Wave};
 use crate::wave::core::cmd::CmdMethod;
-use crate::wave::exchange::asynch::ProtoTransmitterBuilder;
 use crate::wave::exchange::asynch::ProtoTransmitter;
+use crate::wave::exchange::asynch::ProtoTransmitterBuilder;
+use crate::wave::{DirectedProto, Pong, Wave};
+use crate::{BindConfig, Substance, UniErr};
 
 #[derive(Clone)]
 pub struct ArtifactApi {
     binds: Arc<DashMap<Point, Arc<BindConfig>>>,
-    mechtrons : Arc<DashMap<Point, Arc<MechtronConfig>>>,
+    mechtrons: Arc<DashMap<Point, Arc<MechtronConfig>>>,
     wasm: Arc<DashMap<Point, Bin>>,
     fetcher: Arc<RwLock<FetchChamber>>,
 }
 
 impl ArtifactApi {
     pub fn no_fetcher() -> Self {
-        let fetcher = Box::new( NoDiceArtifactFetcher );
+        let fetcher = Box::new(NoDiceArtifactFetcher);
         Self::new(fetcher)
     }
 
-    pub fn new( fetcher: Box<dyn ArtifactFetcher>) -> Self {
+    pub fn new(fetcher: Box<dyn ArtifactFetcher>) -> Self {
         Self {
-            binds: Arc::new(DashMap::new() ),
-            mechtrons: Arc::new(DashMap::new() ),
-            wasm: Arc::new(DashMap::new() ),
-            fetcher: Arc::new(RwLock::new(FetchChamber {
-                fetcher
-            })),
+            binds: Arc::new(DashMap::new()),
+            mechtrons: Arc::new(DashMap::new()),
+            wasm: Arc::new(DashMap::new()),
+            fetcher: Arc::new(RwLock::new(FetchChamber { fetcher })),
         }
     }
 
-
-    pub async fn set_fetcher(&self, fetcher:Box<dyn ArtifactFetcher>) {
+    pub async fn set_fetcher(&self, fetcher: Box<dyn ArtifactFetcher>) {
         self.fetcher.write().await.set(fetcher);
     }
 
@@ -77,7 +74,7 @@ impl ArtifactApi {
         return Ok(ArtRef::new(bind, point.clone()));
     }
 
-        pub async fn wasm(&self, point: &Point) -> Result<ArtRef<Bin>, UniErr> {
+    pub async fn wasm(&self, point: &Point) -> Result<ArtRef<Bin>, UniErr> {
         {
             if self.wasm.contains_key(point) {
                 let wasm = self.wasm.get(point).unwrap().clone();
@@ -85,14 +82,12 @@ impl ArtifactApi {
             }
         }
 
-
         let wasm = self.fetcher.read().await.fetcher.fetch(point).await?;
         {
             self.wasm.insert(point.clone(), wasm.clone());
         }
         return Ok(ArtRef::new(Arc::new(wasm), point.clone()));
     }
-
 
     async fn get<A>(&self, point: &Point) -> Result<A, UniErr>
     where
@@ -106,8 +101,8 @@ impl ArtifactApi {
     }
 }
 
-pub struct FetchChamber{
-    pub fetcher: Box<dyn ArtifactFetcher>
+pub struct FetchChamber {
+    pub fetcher: Box<dyn ArtifactFetcher>,
 }
 
 impl FetchChamber {
@@ -128,10 +123,13 @@ impl<A> ArtRef<A> {
     }
 }
 
-impl <A> ArtRef<A> where A:Clone {
-   pub fn contents(&self) -> A {
-       (*self.artifact).clone()
-   }
+impl<A> ArtRef<A>
+where
+    A: Clone,
+{
+    pub fn contents(&self) -> A {
+        (*self.artifact).clone()
+    }
 }
 
 impl<A> ArtRef<A> {
@@ -157,10 +155,6 @@ impl<A> Drop for ArtRef<A> {
     }
 }
 
-
-
-
-
 #[async_trait]
 pub trait ArtifactFetcher: Send + Sync {
     async fn stub(&self, point: &Point) -> Result<Stub, UniErr>;
@@ -182,19 +176,15 @@ impl ArtifactFetcher for NoDiceArtifactFetcher {
     }
 }
 
-
 pub struct ReadArtifactFetcher {
-    transmitter: ProtoTransmitter
+    transmitter: ProtoTransmitter,
 }
 
 impl ReadArtifactFetcher {
     pub fn new(transmitter: ProtoTransmitter) -> Self {
-        Self {
-            transmitter
-        }
+        Self { transmitter }
     }
 }
-
 
 #[async_trait]
 impl ArtifactFetcher for ReadArtifactFetcher {
@@ -209,12 +199,10 @@ impl ArtifactFetcher for ReadArtifactFetcher {
         let pong: Wave<Pong> = self.transmitter.direct(directed).await?;
         pong.core.ok_or()?;
         match pong.variant.core.body {
-            Substance::Bin(bin) => {
-                Ok(bin)
-            }
-            _ => {
-                Err(UniErr::from_500("encountered unexpected substance (expected Bin) when fetching Artifact"))
-            }
+            Substance::Bin(bin) => Ok(bin),
+            _ => Err(UniErr::from_500(
+                "encountered unexpected substance (expected Bin) when fetching Artifact",
+            )),
         }
     }
 }

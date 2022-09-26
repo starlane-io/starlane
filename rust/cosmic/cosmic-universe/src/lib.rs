@@ -59,8 +59,8 @@ pub mod selector;
 pub mod settings;
 pub mod substance;
 pub mod util;
-pub mod wave;
 pub mod wasm;
+pub mod wave;
 
 lazy_static! {
     pub static ref VERSION: semver::Version =

@@ -44,7 +44,7 @@ impl From<FromUtf8Error> for DefaultHostErr {
 impl From<InstantiationError> for DefaultHostErr {
     fn from(e: InstantiationError) -> Self {
         DefaultHostErr {
-            message: e.to_string()
+            message: e.to_string(),
         }
     }
 }
@@ -68,7 +68,6 @@ impl From<CompileError> for DefaultHostErr {
         }
     }
 }
-
 
 impl From<Box<bincode::ErrorKind>> for DefaultHostErr {
     fn from(e: Box<bincode::ErrorKind>) -> Self {
@@ -96,9 +95,7 @@ impl From<&str> for DefaultHostErr {
 
 impl From<String> for DefaultHostErr {
     fn from(e: String) -> Self {
-        DefaultHostErr {
-            message: e
-        }
+        DefaultHostErr { message: e }
     }
 }
 
@@ -109,6 +106,3 @@ impl From<ExportError> for DefaultHostErr {
         }
     }
 }
-
-
-

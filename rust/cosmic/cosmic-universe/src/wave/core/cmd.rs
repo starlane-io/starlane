@@ -22,7 +22,7 @@ pub enum CmdMethod {
     Greet,
     Command,
     RawCommand,
-    Log
+    Log,
 }
 
 impl ValueMatcher<CmdMethod> for CmdMethod {

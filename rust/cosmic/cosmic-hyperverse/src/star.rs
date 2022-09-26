@@ -9,12 +9,12 @@ use std::time::Duration;
 
 use dashmap::mapref::one::{Ref, RefMut};
 use dashmap::DashMap;
-use futures::future::{BoxFuture, join_all};
+use futures::future::{join_all, BoxFuture};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock, watch};
+use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 use tokio::time::error::Elapsed;
 use tracing::{error, info};
 
@@ -29,18 +29,18 @@ use cosmic_universe::command::direct::set::Set;
 use cosmic_universe::command::RawCommand;
 use cosmic_universe::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::err::UniErr;
-use cosmic_universe::hyper::{MountKind, ParticleLocation};
 use cosmic_universe::hyper::{
     Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, Location, ParticleRecord,
     Provision, Search,
 };
+use cosmic_universe::hyper::{MountKind, ParticleLocation};
 use cosmic_universe::kind::{BaseKind, Kind, StarStub, StarSub, Sub};
 use cosmic_universe::loc::{
-    GLOBAL_EXEC, Layer, LOCAL_STAR, Point, RouteSeg, StarKey, Surface, SurfaceSelector, ToBaseKind,
-    Topic, ToPoint, ToSurface, Uuid,
+    Layer, Point, RouteSeg, StarKey, Surface, SurfaceSelector, ToBaseKind, ToPoint, ToSurface,
+    Topic, Uuid, GLOBAL_EXEC, LOCAL_STAR,
 };
 use cosmic_universe::log::{PointLogger, RootLogger, Trackable, Tracker};
-use cosmic_universe::parse::{bind_config, Env, route_attribute};
+use cosmic_universe::parse::{bind_config, route_attribute, Env};
 use cosmic_universe::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
@@ -52,20 +52,23 @@ use cosmic_universe::util::{log, ValueMatcher, ValuePattern};
 use cosmic_universe::wave::core::cmd::CmdMethod;
 use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
+use cosmic_universe::wave::exchange::asynch::{
+    DirectedHandler, DirectedHandlerSelector, DirectedHandlerShell, Exchanger, InCtx,
+    ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, TxRouter,
+};
 use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::{
     Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
-    HandlingKind, Ping, Pong, Priority, Recipients, RecipientSelector, Reflectable, ReflectedWave,
+    HandlingKind, Ping, Pong, Priority, RecipientSelector, Recipients, Reflectable, ReflectedWave,
     Retries, Ripple, Scope, Signal, SingularRipple, ToRecipients, WaitTime, Wave, WaveKind,
 };
 use cosmic_universe::wave::{HyperWave, UltraWave};
 use cosmic_universe::HYPERUSER;
-use cosmic_universe::wave::exchange::asynch::{DirectedHandler, DirectedHandlerSelector, DirectedHandlerShell, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, TxRouter};
 
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, Drivers,
-    DriversApi, DriversCall, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler,
+    Driver, DriverAvail, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, DriverSkel,
+    DriverStatus, Drivers, DriversApi, DriversCall, HyperDriverFactory, Item, ItemHandler,
     ItemSkel, ItemSphere,
 };
 use crate::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
@@ -318,9 +321,8 @@ where
             "StarSkel::create(assign_result)",
             transmitter.direct(assign).await,
         )?;
-        let location = ParticleLocation::new( self.point.clone(), None);
-        self.registry
-            .assign(&details.stub.point, location).await?;
+        let location = ParticleLocation::new(self.point.clone(), None);
+        self.registry.assign(&details.stub.point, location).await?;
         let logger = logger.push_mark("result").unwrap();
         logger.result(assign_result.ok_or())?;
         Ok(details)
@@ -402,7 +404,10 @@ where
             mpsc::Sender<Traversal<UltraWave>>,
             mpsc::Receiver<Traversal<UltraWave>>,
         ) = mpsc::channel(1024);
-        let (drivers_traversal_tx, mut drivers_rx) :(mpsc::Sender<Traversal<UltraWave>>, mpsc::Receiver<Traversal<UltraWave>>) = mpsc::channel(1024);
+        let (drivers_traversal_tx, mut drivers_rx): (
+            mpsc::Sender<Traversal<UltraWave>>,
+            mpsc::Receiver<Traversal<UltraWave>>,
+        ) = mpsc::channel(1024);
         let (drivers_call_tx, mut drivers_call_rx) = mpsc::channel(1024);
         let (drivers_status_tx, drivers_status_rx) = watch::channel(DriverStatus::Pending);
         let (mpsc_status_tx, mut mpsc_status_rx) = mpsc::channel(128);
@@ -889,10 +894,7 @@ where
                         self.drivers.init().await;
                     }
                     HyperStarCall::FromHyperway { wave, rtn } => {
-                        let result = self
-                            .from_hyperway(wave)
-                            .await
-                            .map_err(|e| e.to_uni_err());
+                        let result = self.from_hyperway(wave).await.map_err(|e| e.to_uni_err());
                         if let Some(tx) = rtn {
                             tx.send(result);
                         } else {
@@ -1323,7 +1325,9 @@ where
             // now we check if we are doing an inter point delivery (from one layer to another in the same Particle)
             // if this delivery was from_hyperway, then it was certainly a message being routed back to the star
             // and is not considered an inter point delivery
-            if !from_hyperway && to.point == wave.from().point {
+            if to.point.is_global() {
+                dir = TraversalDirection::Fabric;
+            } else if !from_hyperway && to.point == wave.from().point {
                 // it's the SAME point, so the to layer becomes our dest
                 dest.replace(to.layer.clone());
 
@@ -1342,14 +1346,13 @@ where
                     }
                 }
             } else {
-
-                    // if this was injected by something else (like the Star)
-                    // then it needs to traverse towards the Core
-                    dir = TraversalDirection::Core;
-                    // and dest will be the to layer
-                    if !from_hyperway {
-                        dest.replace(to.layer.clone());
-                    }
+                // if this was injected by something else (like the Star)
+                // then it needs to traverse towards the Core
+                dir = TraversalDirection::Core;
+                // and dest will be the to layer
+                if !from_hyperway {
+                    dest.replace(to.layer.clone());
+                }
             }
 
             let traversal_logger = self.skel.logger.point(to.to_point());
@@ -1539,7 +1542,6 @@ impl Router for LayerInjectionRouter {
         let inject = TraversalInjection::new(self.injector.clone(), wave);
         self.inject_tx.send(inject).await;
     }
-
 }
 
 pub trait TopicHandler: Send + Sync + DirectedHandler {
@@ -1810,15 +1812,30 @@ where
         }
     }
 
+    pub async fn provision(
+        &self,
+        point: &Point,
+        state: StateSrc,
+    ) -> Result<ParticleLocation, P::Err> {
+println!("\tprovision request: {}", point.to_string());
+        self.skel
+            .logger
+            .result(self.provision_inner(point, state).await)
+    }
+
     #[async_recursion]
-    pub async fn provision(&self, point: &Point, state: StateSrc) -> Result<ParticleLocation, P::Err> {
+    async fn provision_inner(
+        &self,
+        point: &Point,
+        state: StateSrc,
+    ) -> Result<ParticleLocation, P::Err> {
         // check if parent is provisioned
         let parent = point
             .parent()
             .ok_or(P::Err::new("expected Root to be provisioned"))?;
         let mut parent_record = self.skel.registry.record(&parent).await?;
         if parent_record.location.is_none() {
-            self.provision(&parent, StateSrc::None).await?;
+            self.provision_inner(&parent, StateSrc::None).await?;
             parent_record = self.skel.registry.record(&parent).await?;
         }
 
@@ -1832,6 +1849,9 @@ where
         let pong: Wave<Pong> = self.skel.star_transmitter.direct(wave).await?;
         if pong.core.status.as_u16() == 200 {
             if let Substance::Location(location) = &pong.core.body {
+                self.skel
+                    .logger
+                    .info(format!("successfully provisioned: {}", point.to_string()));
                 Ok(location.clone())
             } else {
                 Err(P::Err::new("Provision result expected Substance Point"))
@@ -1844,9 +1864,10 @@ where
 
             match self.skel.registry.record(&point).await {
                 Ok(record) => Err(P::Err::new(format!(
-                    "failed to provision {}<{}>",
+                    "failed to provision {}<{}> status code {}",
                     point.to_string(),
-                    record.details.stub.kind.to_template().to_string()
+                    record.details.stub.kind.to_template().to_string(),
+                    pong.core.status.as_u16()
                 ))),
                 Err(_) => Err(P::Err::new(format!(
                     "failed to provision {}",

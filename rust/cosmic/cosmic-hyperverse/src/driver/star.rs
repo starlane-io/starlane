@@ -9,9 +9,11 @@ use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::direct::create::Strategy;
 use cosmic_universe::config::bind::BindConfig;
 use cosmic_universe::err::{CoreReflector, UniErr};
-use cosmic_universe::hyper::{Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, ParticleLocation, Search};
+use cosmic_universe::hyper::{
+    Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, ParticleLocation, Search,
+};
 use cosmic_universe::kind::{BaseKind, Kind, StarSub};
-use cosmic_universe::loc::{Layer, LOCAL_STAR, Point, StarKey, ToPoint, ToSurface};
+use cosmic_universe::loc::{Layer, Point, StarKey, ToPoint, ToSurface, LOCAL_STAR};
 use cosmic_universe::log::Tracker;
 use cosmic_universe::parse::bind_config;
 use cosmic_universe::particle::traversal::TraversalInjection;
@@ -19,8 +21,10 @@ use cosmic_universe::particle::Status;
 use cosmic_universe::selector::{KindSelector, Pattern, SubKindSelector};
 use cosmic_universe::substance::Substance;
 use cosmic_universe::util::{log, ValuePattern};
+use cosmic_universe::wave::core::http2::StatusCode;
 use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
+use cosmic_universe::wave::exchange::asynch::{InCtx, ProtoTransmitter, ProtoTransmitterBuilder};
 use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::{
     Agent, BounceBacks, DirectedProto, Echoes, Handling, HandlingKind, Pong, Priority, Recipients,
@@ -36,8 +40,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tracing::error;
-use cosmic_universe::wave::core::http2::StatusCode;
-use cosmic_universe::wave::exchange::asynch::{InCtx, ProtoTransmitter, ProtoTransmitterBuilder};
 
 lazy_static! {
     static ref STAR_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -170,7 +172,7 @@ where
         skel: DriverSkel<P>,
         ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
-        Ok(Box::new(StarDriver::new(star, skel, ctx )))
+        Ok(Box::new(StarDriver::new(star, skel, ctx)))
     }
 }
 
@@ -180,7 +182,7 @@ where
 {
     pub star_skel: HyperStarSkel<P>,
     pub driver_skel: DriverSkel<P>,
-    pub ctx: DriverCtx
+    pub ctx: DriverCtx,
 }
 
 impl<P> StarDriver<P>
@@ -224,10 +226,8 @@ where
 
         self.star_skel.api.create_states(point.clone()).await?;
         self.star_skel.registry.register(&registration).await?;
-        let location = ParticleLocation::new( self.star_skel.point.clone(), None);
-        self.star_skel
-            .registry
-            .assign(&point,location).await?;
+        let location = ParticleLocation::new(self.star_skel.point.clone(), None);
+        self.star_skel.registry.assign(&point, location).await?;
 
         logger
             .result(skel.status_tx.send(DriverStatus::Ready).await)
@@ -244,7 +244,6 @@ where
         ))))
     }
 }
-
 
 #[derive(DirectedHandler)]
 pub struct Star<P>
@@ -310,10 +309,12 @@ where
                     .map_err(|e| e.to_uni_err())?;
                 let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
                 self.create(&assign).await.map_err(|e| e.to_uni_err())?;
-                let location = ParticleLocation::new(self.skel.point.clone(),None );
+                let location = ParticleLocation::new(self.skel.point.clone(), None);
                 self.skel
                     .registry
-                    .assign(&Point::root(), location ).await.map_err(|e|e.to_uni_err())?;
+                    .assign(&Point::root(), location)
+                    .await
+                    .map_err(|e| e.to_uni_err())?;
 
                 let registration = Registration {
                     point: Point::global_executor(),
@@ -338,10 +339,12 @@ where
                     .map_err(|e| e.to_uni_err())?;
                 let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
                 self.create(&assign).await.map_err(|e| e.to_uni_err())?;
-                let location = ParticleLocation::new( LOCAL_STAR.clone(), None );
+                let location = ParticleLocation::new(LOCAL_STAR.clone(), None);
                 self.skel
                     .registry
-                    .assign(&Point::global_executor(), location ).await.map_err(|e|e.to_uni_err())?;
+                    .assign(&Point::global_executor(), location)
+                    .await
+                    .map_err(|e| e.to_uni_err())?;
 
                 Ok(Status::Ready)
             }
@@ -374,13 +377,16 @@ where
     P: Cosmos,
 {
     #[route("Hyp<Provision>")]
-    pub async fn provision(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ParticleLocation, P::Err> {
+    pub async fn provision(
+        &self,
+        ctx: InCtx<'_, HyperSubstance>,
+    ) -> Result<ParticleLocation, P::Err> {
         if let HyperSubstance::Provision(provision) = ctx.input {
+            println!("\tprovisioning : {}", provision.point.to_string());
             let record = self.skel.registry.record(&provision.point).await?;
             match self.skel.wrangles.find(&record.details.stub.kind) {
                 None => {
                     let kind = record.details.stub.kind.clone();
-                    let point = record.details.stub.point.clone();
                     if self
                         .skel
                         .drivers
@@ -388,6 +394,7 @@ where
                         .await?
                         .is_some()
                     {
+                        println!("\trequesting assignment...");
                         let assign = HyperSubstance::Assign(Assign::new(
                             AssignmentKind::Create,
                             record.details,
@@ -396,7 +403,7 @@ where
 
                         let ctx: InCtx<'_, HyperSubstance> = ctx.push_input_ref(&assign);
                         if self.assign(ctx).await?.is_ok() {
-                            Ok(ParticleLocation::new(self.skel.point.clone(),None))
+                            Ok(ParticleLocation::new(self.skel.point.clone(), None))
                         } else {
                             Err(
                                 format!("could not find assign kind {} to self", kind.to_string())
@@ -404,6 +411,7 @@ where
                             )
                         }
                     } else {
+                        println!("could not find a place to provision!!!");
                         Err(format!(
                             "could not find a place to provision kind {}",
                             kind.to_string()
@@ -417,12 +425,14 @@ where
                     let key = selector.wrangle().await?;
                     let assign =
                         Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
+println!("\tsending assign request to {}", key.to_string());
                     let assign: DirectedCore = assign.into();
                     let mut proto = DirectedProto::ping();
                     proto.core(assign);
                     proto.to(key.to_surface());
                     let pong: Wave<Pong> = ctx.transmitter.direct(proto).await?;
                     pong.ok_or()?;
+println!("\tassignment success!");
                     Ok(ParticleLocation::new(key.to_point().into(), None))
                 }
             }
@@ -434,6 +444,10 @@ where
     #[route("Hyp<Assign>")]
     pub async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, P::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
+            println!(
+                "\tassigning to star: {}",
+                assign.details.stub.point.to_string()
+            );
             #[cfg(test)]
             self.skel
                 .diagnostic_interceptors
@@ -444,30 +458,43 @@ where
             if self
                 .skel
                 .drivers
-                .find_internal(assign.details.stub.kind.clone())
+                .find(assign.details.stub.kind.clone())
                 .await?
                 .is_some()
             {
                 self.create(assign).await;
 
-                let driver = self.skel.drivers.local_driver_lookup(assign.details.stub.kind.clone()).await?.ok_or(P::Err::new(format!("Star does not have  driver for {}",assign.details.stub.kind.to_string())))?;
+                let driver = self
+                    .skel
+                    .drivers
+                    .local_driver_lookup(assign.details.stub.kind.clone())
+                    .await?
+                    .ok_or(P::Err::new(format!(
+                        "Star does not have  driver for {}",
+                        assign.details.stub.kind.to_string()
+                    )))?;
 
                 let mut directed = DirectedProto::ping();
                 directed.method(HypMethod::Assign);
                 directed.from(self.skel.point.to_surface());
                 directed.to(driver.to_surface());
+println!("\tassign to driver: {}", driver.to_surface().to_string());
                 directed.body(HyperSubstance::Assign(assign.clone()).into());
                 let pong: Wave<Pong> = ctx.transmitter.direct(directed).await?;
                 pong.ok_or()?;
             } else {
-                error!(
-                    "do not have a driver for kind: {}",
-                    assign.details.stub.kind.to_string()
-                );
+                self.skel.logger.result::<(),UniErr>(
+                    Err(UniErr::from_500(format!("Star {} does not have a driver for kind: {}",
+                        self.skel.kind.to_string(),
+                    assign.details.stub.kind.to_string())).into())
+                )?;
             }
 
-            let location = ParticleLocation::new( self.skel.point.clone(), None );
-            self.skel.registry.assign(&assign.details.stub.point, location).await?;
+            let location = ParticleLocation::new(self.skel.point.clone(), None);
+            self.skel
+                .registry
+                .assign(&assign.details.stub.point, location)
+                .await?;
 
             Ok(ReflectedCore::ok())
         } else {
@@ -477,13 +504,11 @@ where
 
     #[route("Hyp<Transport>")]
     pub async fn transport(&self, ctx: InCtx<'_, UltraWave>) {
-
         self.skel.logger.track(ctx.wave(), || {
             Tracker::new("star:core:transport", "Receive")
         });
 
         let wave = ctx.input.clone();
-
 
         let injection = TraversalInjection::new(
             self.skel

@@ -201,12 +201,11 @@ where
 }
 
 pub fn uuid() -> Uuid {
-    unsafe{cosmic_uuid()}
+    unsafe { cosmic_uuid() }
 }
 
-pub fn timestamp() ->
-                   Timestamp {
-    unsafe{ cosmic_timestamp() }
+pub fn timestamp() -> Timestamp {
+    unsafe { cosmic_timestamp() }
 }
 
 pub trait ToResolved<R>

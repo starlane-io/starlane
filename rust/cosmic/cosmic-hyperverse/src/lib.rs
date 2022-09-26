@@ -88,7 +88,11 @@ where
 {
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, P::Err>;
 
-    async fn assign<'a>(&'a self, point: &'a Point, location: ParticleLocation) -> Result<(),P::Err>;
+    async fn assign<'a>(
+        &'a self,
+        point: &'a Point,
+        location: ParticleLocation,
+    ) -> Result<(), P::Err>;
 
     async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), P::Err>;
 

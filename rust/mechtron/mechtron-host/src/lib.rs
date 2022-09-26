@@ -3,8 +3,10 @@ pub mod err;
 mod membrane;
 
 use crate::err::HostErr;
+use crate::membrane::WasmMembrane;
 use cosmic_universe::err::UniErr;
 use cosmic_universe::loc::Point;
+use cosmic_universe::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
 use cosmic_universe::particle::Details;
 use cosmic_universe::substance::Bin;
 use cosmic_universe::wasm::Timestamp;
@@ -16,17 +18,15 @@ use threadpool::ThreadPool;
 use wasmer::Function;
 use wasmer::{imports, Cranelift, Module, Store, Universal};
 use wasmer_compiler_singlepass::Singlepass;
-use cosmic_universe::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
-use crate::membrane::WasmMembrane;
 
-pub trait HostPlatform: Clone+Send+Sync
+pub trait HostPlatform: Clone + Send + Sync
 where
     Self::Err: HostErr,
 {
     type Err;
 
     fn root_logger(&self) -> RootLogger {
-        RootLogger::new( LogSource::Core, Arc::new(StdOutAppender::new()) )
+        RootLogger::new(LogSource::Core, Arc::new(StdOutAppender::new()))
     }
 }
 
@@ -41,9 +41,9 @@ where
 
 impl<P> MechtronHostFactory<P>
 where
-    P: HostPlatform+'static,
+    P: HostPlatform + 'static,
 {
-    pub fn new(platform: P ) -> Self {
+    pub fn new(platform: P) -> Self {
         let compiler = Singlepass::new();
         let store = Store::new(&Universal::new(compiler).engine());
         let ctx = MechtronHostCtx {
@@ -52,7 +52,7 @@ where
         Self {
             ctx,
             store,
-            platform
+            platform,
         }
     }
 
@@ -61,9 +61,20 @@ where
         let logger = logger.point(details.stub.point.clone());
 
         let module = Arc::new(Module::new(&self.store, data.as_ref())?);
-        let membrane = WasmMembrane::new(module, details.stub.point.to_string(),self.platform.clone(),logger.clone())?;
+        let membrane = WasmMembrane::new(
+            module,
+            details.stub.point.to_string(),
+            self.platform.clone(),
+            logger.clone(),
+        )?;
 
-        MechtronHost::new(details, membrane, self.ctx.clone(),self.platform.clone(), logger)
+        MechtronHost::new(
+            details,
+            membrane,
+            self.ctx.clone(),
+            self.platform.clone(),
+            logger,
+        )
     }
 }
 
@@ -80,7 +91,7 @@ where
     pub logger: PointLogger,
     pub ctx: MechtronHostCtx,
     pub membrane: Arc<WasmMembrane<P>>,
-    pub platform: P
+    pub platform: P,
 }
 
 impl<P> MechtronHost<P>
@@ -92,16 +103,14 @@ where
         membrane: Arc<WasmMembrane<P>>,
         ctx: MechtronHostCtx,
         platform: P,
-        logger: PointLogger
+        logger: PointLogger,
     ) -> Result<Self, P::Err> {
-
-
         Ok(Self {
             ctx,
             details,
             membrane,
             logger,
-            platform
+            platform,
         })
     }
 
@@ -124,7 +133,7 @@ where
         if ok == 0 {
             Ok(())
         } else {
-            Err(format!("Mehctron init error {} ",ok).into())
+            Err(format!("Mehctron init error {} ", ok).into())
         }
     }
 
@@ -154,15 +163,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmic_universe::kind::{Kind, Sub};
-    use cosmic_universe::loc::ToSurface;
-    use cosmic_universe::wave::{DirectedProto, WaveId, WaveKind};
-    use std::str::FromStr;
-    use std::{fs, thread};
+    use crate::err::DefaultHostErr;
     use cosmic_universe::command::common::StateSrc;
     use cosmic_universe::config::mechtron::MechtronConfig;
     use cosmic_universe::hyper;
     use cosmic_universe::hyper::{Assign, AssignmentKind, HostCmd, HyperSubstance};
+    use cosmic_universe::kind::{Kind, Sub};
+    use cosmic_universe::loc::ToSurface;
     use cosmic_universe::log::{LogSource, StdOutAppender};
     use cosmic_universe::particle::{Status, Stub};
     use cosmic_universe::substance::Substance;
@@ -170,7 +177,9 @@ mod tests {
     use cosmic_universe::wave::core::ext::ExtMethod;
     use cosmic_universe::wave::core::hyp::HypMethod;
     use cosmic_universe::wave::core::Method;
-    use crate::err::DefaultHostErr;
+    use cosmic_universe::wave::{DirectedProto, WaveId, WaveKind};
+    use std::str::FromStr;
+    use std::{fs, thread};
 
     #[no_mangle]
     extern "C" fn cosmic_uuid() -> loc::Uuid {
@@ -183,26 +192,25 @@ mod tests {
     }
 
     #[derive(Clone)]
-    pub struct TestPlatform {
-
-    }
+    pub struct TestPlatform {}
 
     impl TestPlatform {
-        pub fn new() -> Self { Self {} }
+        pub fn new() -> Self {
+            Self {}
+        }
     }
 
     impl HostPlatform for TestPlatform {
         type Err = DefaultHostErr;
 
         fn root_logger(&self) -> RootLogger {
-            RootLogger::new( LogSource::Core, Arc::new(StdOutAppender::new()))
+            RootLogger::new(LogSource::Core, Arc::new(StdOutAppender::new()))
         }
     }
 
     #[test]
     fn wasm() {
-
-        let mut details:Details = Default::default();
+        let mut details: Details = Default::default();
         details.stub.point = Point::from_str("host").unwrap();
 
         let factory = MechtronHostFactory::new(TestPlatform::new());
@@ -214,20 +222,24 @@ mod tests {
         let guest = details.stub.point.to_surface();
         host.init(details).unwrap();
 
-
         let mechtron = Details {
             stub: Stub {
                 point: guest.point.push("mechtron").unwrap(),
                 kind: Kind::Mechtron,
-                status: Status::Ready
+                status: Status::Ready,
             },
-            properties: Default::default()
+            properties: Default::default(),
         };
         let config = MechtronConfig {
             bin: Point::root(),
-            name: "my-app".to_string()
+            name: "my-app".to_string(),
         };
-        let host_cmd = HostCmd::new(AssignmentKind::Create, mechtron.clone(), StateSrc::None, config);
+        let host_cmd = HostCmd::new(
+            AssignmentKind::Create,
+            mechtron.clone(),
+            StateSrc::None,
+            config,
+        );
         let mut wave = DirectedProto::ping();
         wave.to(guest);
         wave.from(host.point().to_surface());
@@ -250,6 +262,5 @@ mod tests {
         let reflect = reflect.unwrap();
         let reflect = reflect.to_reflected().unwrap();
         reflect.success_or().unwrap();
-
     }
 }

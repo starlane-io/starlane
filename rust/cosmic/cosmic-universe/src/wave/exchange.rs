@@ -29,15 +29,16 @@ use crate::wave::{
 use crate::{wave, Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, UniErr};
 
 #[derive(Clone)]
-pub struct DirectedHandlerShellDef<D, T>
-{
+pub struct DirectedHandlerShellDef<D, T> {
     logger: PointLogger,
     handler: D,
     surface: Surface,
     builder: T,
 }
 
-impl<D, T> DirectedHandlerShellDef<D, T> where D: Sized
+impl<D, T> DirectedHandlerShellDef<D, T>
+where
+    D: Sized,
 {
     pub fn new(handler: D, builder: T, surface: Surface, logger: RootLogger) -> Self {
         let logger = logger.point(surface.point.clone());
@@ -206,7 +207,12 @@ impl<'a, I, T> InCtxDef<'a, I, T>
 where
     T: Clone,
 {
-    pub fn new(root: &'a RootInCtxDef<T>, input: &'a I, tx: Cow<'a, T>, logger: SpanLogger) -> Self {
+    pub fn new(
+        root: &'a RootInCtxDef<T>,
+        input: &'a I,
+        tx: Cow<'a, T>,
+        logger: SpanLogger,
+    ) -> Self {
         Self {
             root,
             input,

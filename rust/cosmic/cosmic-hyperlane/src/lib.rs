@@ -23,7 +23,7 @@ use tokio::select;
 use tokio::sync::mpsc::error::{SendError, SendTimeoutError, TrySendError};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot::Sender;
-use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock, watch};
+use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 
 use cosmic_universe::command::direct::create::{PointFactoryU64, PointSegTemplate};
 use cosmic_universe::err::UniErr;
@@ -38,13 +38,15 @@ use cosmic_universe::util::uuid;
 use cosmic_universe::wave::core::ext::ExtMethod;
 use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::Method;
+use cosmic_universe::wave::exchange::asynch::{
+    Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
+};
 use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::{
     Agent, DirectedKind, DirectedProto, Handling, HyperWave, Ping, Pong, Reflectable,
     ReflectedKind, ReflectedProto, ReflectedWave, UltraWave, Wave, WaveId, WaveKind,
 };
 use cosmic_universe::VERSION;
-use cosmic_universe::wave::exchange::asynch::{Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter};
 
 lazy_static! {
     pub static ref LOCAL_CLIENT: Point = Point::from_str("LOCAL::client").expect("point");
@@ -2011,17 +2013,19 @@ pub mod test_util {
     use cosmic_universe::wave::core::cmd::CmdMethod;
     use cosmic_universe::wave::core::ext::ExtMethod;
     use cosmic_universe::wave::core::{Method, ReflectedCore};
+    use cosmic_universe::wave::exchange::asynch::{
+        Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
+    };
     use cosmic_universe::wave::exchange::SetStrategy;
     use cosmic_universe::wave::{
         Agent, DirectedKind, DirectedProto, HyperWave, Pong, ReflectedKind, ReflectedProto,
         ReflectedWave, UltraWave, Wave,
     };
-    use cosmic_universe::wave::exchange::asynch::{Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter};
 
     use crate::{
         AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, Bridge, HyperClient,
         HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter,
-        Hyperlane, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
+        HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
         HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper,
         LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist,
     };
@@ -2213,18 +2217,20 @@ pub mod test {
     use cosmic_universe::wave::core::cmd::CmdMethod;
     use cosmic_universe::wave::core::ext::ExtMethod;
     use cosmic_universe::wave::core::{Method, ReflectedCore};
+    use cosmic_universe::wave::exchange::asynch::{
+        Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
+    };
     use cosmic_universe::wave::exchange::SetStrategy;
     use cosmic_universe::wave::{
         Agent, DirectedKind, DirectedProto, HyperWave, Pong, ReflectedKind, ReflectedProto,
         ReflectedWave, UltraWave, Wave,
     };
-    use cosmic_universe::wave::exchange::asynch::{Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter};
 
-    use crate::test_util::{FAE, LESS, SingleInterchangePlatform, TestGreeter, WaveTest};
+    use crate::test_util::{SingleInterchangePlatform, TestGreeter, WaveTest, FAE, LESS};
     use crate::{
         AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, Bridge, HyperClient,
         HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter,
-        Hyperlane, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
+        HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
         HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper,
         LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist,
     };

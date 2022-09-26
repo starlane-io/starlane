@@ -2,10 +2,10 @@ use std::ops::Deref;
 
 use serde::{Deserialize, Serialize};
 
+use crate::config::mechtron::MechtronConfig;
 use crate::loc::Point;
 use crate::particle::{Details, Stub};
 use crate::BindConfig;
-use crate::config::mechtron::MechtronConfig;
 
 pub mod bind;
 pub mod mechtron;
@@ -67,7 +67,7 @@ impl<Body> Deref for PointConfig<Body> {
 #[derive(Clone)]
 pub enum Document {
     BindConfig(BindConfig),
-    MechtronConfig(MechtronConfig)
+    MechtronConfig(MechtronConfig),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]

@@ -11,7 +11,7 @@ use dashmap::DashMap;
 use tokio::join;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{Mutex, oneshot};
+use tokio::sync::{oneshot, Mutex};
 use tokio::time::error::Elapsed;
 
 use cosmic_hyperlane::{
@@ -40,13 +40,13 @@ use cosmic_universe::HYPERUSER;
 
 use crate::driver::base::BaseDriverFactory;
 //use crate::control::ControlDriverFactory;
-use crate::driver::control::{ControlClient, ControlCliSession, ControlDriverFactory};
+use crate::driver::control::{ControlCliSession, ControlClient, ControlDriverFactory};
 use crate::driver::root::RootDriverFactory;
 use crate::driver::space::SpaceDriverFactory;
 use crate::driver::{DriverAvail, DriverFactory};
 use crate::machine::MachineApiExtFactory;
 use crate::star::HyperStarApi;
-use crate::test::cosmos::{TestErr, TestCosmos};
+use crate::test::cosmos::{TestCosmos, TestErr};
 use crate::test::registry::TestRegistryContext;
 
 use super::*;
@@ -106,7 +106,7 @@ fn test_gravity_routing() -> Result<(), TestErr> {
 
         let star_api = machine_api.get_machine_star().await.unwrap();
         let stub = star_api.stub().await.unwrap();
-        let location = ParticleLocation::new(stub.key.clone().to_point(),None);
+        let location = ParticleLocation::new(stub.key.clone().to_point(), None);
 
         //        let record = platform.global_registry().await.unwrap().locate(&LESS).await.expect("IS LESS THERE?");
 
@@ -274,7 +274,7 @@ fn test_layer_traversal() -> Result<(), TestErr> {
 
         let star_api = machine_api.get_machine_star().await.unwrap();
         let stub = star_api.stub().await.unwrap();
-        let location = ParticleLocation::new(stub.key.clone().to_point(),None);
+        let location = ParticleLocation::new(stub.key.clone().to_point(), None);
 
         //        let record = platform.global_registry().await.unwrap().locate(&LESS).await.expect("IS LESS THERE?");
 
@@ -751,12 +751,15 @@ fn test_publish() -> Result<(), TestErr> {
         let client = ControlClient::new(Box::new(factory))?;
         client.wait_for_ready(Duration::from_secs(5)).await?;
 
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+
         let cli = client.new_cli_session().await?;
 
-        cli.exec("create localhost<Space>")
+        logger.result(cli.exec("create localhost<Space>")
             .await
             .unwrap()
-            .ok_or()
+            .ok_or())
             .unwrap();
         cli.exec("create localhost:repo<Repo>")
             .await

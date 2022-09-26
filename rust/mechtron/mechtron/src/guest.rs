@@ -25,7 +25,7 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct GuestSkel<P>
 where
-    P: Platform +'static,
+    P: Platform + 'static,
 {
     details: Details,
     mechtrons: Arc<DashMap<Point, HostedMechtron>>,
@@ -39,11 +39,7 @@ impl<P> GuestSkel<P>
 where
     P: Platform + 'static,
 {
-    pub fn new(
-        details: Details,
-        factories: Arc<MechtronFactories<P>>,
-        platform: P,
-    ) -> Self {
+    pub fn new(details: Details, factories: Arc<MechtronFactories<P>>, platform: P) -> Self {
         let router: GuestRouter<P> = GuestRouter::new();
         let router = Arc::new(router);
         let mut transmitter = ProtoTransmitterBuilder::new(router);
@@ -65,8 +61,8 @@ where
         }
     }
 
-    fn hosted( &self, point: &Point) -> Result<HostedMechtron,GuestErr> {
-         Ok(self
+    fn hosted(&self, point: &Point) -> Result<HostedMechtron, GuestErr> {
+        Ok(self
             .mechtrons
             .get(point)
             .ok_or::<GuestErr>(
@@ -79,11 +75,9 @@ where
             )?
             .value()
             .clone())
-
     }
 
     fn mechtron_skel(&self, point: &Point) -> Result<MechtronSkel<P>, GuestErr> {
-
         let hosted = self.hosted(point)?;
         let mut transmitter = self.builder();
         transmitter.from = SetStrategy::Override(hosted.details.stub.point.to_surface());
@@ -125,9 +119,8 @@ where
         P: Sized,
         GuestErr: From<<P as Platform>::Err>,
     {
-
         let factories = Arc::new(platform.factories()?);
-        let skel = GuestSkel::new(details, factories,  platform);
+        let skel = GuestSkel::new(details, factories, platform);
         skel.logger.info("Guest created");
 
         Ok(Self { skel })
@@ -160,7 +153,7 @@ where
 
             Ok(DirectedHandlerShell::new(
                 mechtron,
-                 self.skel.builder(),
+                self.skel.builder(),
                 hosted.details.stub.point.to_surface(),
                 self.skel.logger.logger.clone(),
             ))
@@ -215,7 +208,7 @@ impl<P> GuestHandler<P>
 where
     P: Platform + 'static,
 {
-    pub fn new(skel: GuestSkel<P> ) -> Self {
+    pub fn new(skel: GuestSkel<P>) -> Self {
         Self { skel }
     }
 }
@@ -229,15 +222,15 @@ where
     pub fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         self.skel.logger.info("Received Host command!");
         if let HyperSubstance::Host(host) = ctx.input {
-            let factory = self
-                .skel
-                .logger
-                .result(self.skel.factories.get(&host.config.name).ok_or(format!(
-                    "Guest does not have a mechtron with name: {}",
-                    host.config.name
-                )))?;
+            let factory =
+                self.skel
+                    .logger
+                    .result(self.skel.factories.get(&host.config.name).ok_or(format!(
+                        "Guest does not have a mechtron with name: {}",
+                        host.config.name
+                    )))?;
             self.skel.logger.info("Creating...");
-             self.skel.mechtrons.insert(
+            self.skel.mechtrons.insert(
                 host.details.stub.point.clone(),
                 HostedMechtron::new(host.details.clone(), host.config.name.clone()),
             );
@@ -246,7 +239,7 @@ where
             let mechtron = factory.lifecycle(skel)?;
             self.skel.logger.info("Got MechtronLifecycle...");
             let skel = self.skel.mechtron_skel(&host.details.stub.point)?;
-            mechtron.create(skel )?;
+            mechtron.create(skel)?;
 
             Ok(())
         } else {
