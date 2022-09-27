@@ -928,6 +928,24 @@ impl Surface {
             topic,
         }
     }
+
+
+    fn postfix(&self) -> String {
+        let point = self.clone().to_point();
+        match &self.topic {
+            Topic::None => {
+                format!("{}@{}", self.point.postfix(), self.layer.to_string())
+            }
+            topic => {
+                format!(
+                    "{}@{}+{}",
+                    self.point.postfix(),
+                    self.layer.to_string(),
+                    topic.to_string()
+                )
+            }
+        }
+    }
 }
 
 impl Into<Recipients> for Surface {
@@ -1828,6 +1846,11 @@ where
             rtn.to_string()
         }
     }
+
+    pub fn postfix(&self) -> String {
+        self.to_string_impl(false)
+    }
+
 }
 
 impl<Route, Seg> ToString for PointDef<Route, Seg>

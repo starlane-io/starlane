@@ -1363,9 +1363,9 @@ where
 if wave.track() {
     if dest.is_some() {
 
-        println!(" {} -> {} DIR: {} dest: {}",  wave.from().to_string(), to.to_string(), dir.to_string(), dest.as_ref().unwrap().to_string() );
+        println!("\t{} -> {} DIR: {} dest: {}",  wave.from().postfix(), to.postfix(), dir.to_string(), dest.as_ref().unwrap().to_string() );
     } else {
-        println!(" {} -> {} DIR: {}", wave.from().to_string(), to.to_string(), dir.to_string());
+        println!("\t{} -> {} DIR: {}", wave.from().postfix(), to.postfix(), dir.to_string());
     }
 }
 
@@ -1422,10 +1422,16 @@ if wave.track() {
     async fn exit(&self, traversal: Traversal<UltraWave>) -> Result<(), UniErr> {
         match traversal.dir {
             TraversalDirection::Fabric => {
+if traversal.track() {
+   println!("\tEXIT UP")
+}
                 self.exit_up.send(traversal).await;
                 return Ok(());
             }
             TraversalDirection::Core => {
+if traversal.track() {
+   println!("\tEXIT DOWN")
+}
                 self.exit_down.send(traversal).await;
                 return Ok(());
             }

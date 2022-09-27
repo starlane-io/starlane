@@ -1628,6 +1628,8 @@ impl<P> DriverHandler<P> for DefaultDriverHandler where P: Cosmos {}
 impl DefaultDriverHandler {
     #[route("Hyp<Assign>")]
     pub async fn assign(&self, _ctx: InCtx<'_, HyperSubstance>) -> Result<(), UniErr> {
+println!("\tDefaultDriverHandler<> Assign");
+
         Ok(())
     }
 }

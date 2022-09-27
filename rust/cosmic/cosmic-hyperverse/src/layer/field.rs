@@ -89,6 +89,7 @@ where
 
     pub fn pipex(&self, traversal: Traversal<DirectedWave>, pipeline: PipelineVar, env: Env) {
         PipeEx::new(
+              self.skel.clone(),
             self.port.clone(),
             traversal,
             pipeline,
@@ -167,7 +168,8 @@ where
     }
 }
 
-pub struct PipeEx {
+pub struct PipeEx<P> where P: Cosmos {
+    pub skel: HyperStarSkel<P>,
     pub port: Surface,
     pub logger: PointLogger,
     pub env: Env,
@@ -184,8 +186,10 @@ pub struct PipeEx {
     pub status: u16,
 }
 
-impl PipeEx {
+impl <P> PipeEx <P> where P: Cosmos{
+
     pub fn new(
+        skel: HyperStarSkel<P>,
         port: Surface,
         traversal: Traversal<DirectedWave>,
         pipeline: PipelineVar,
@@ -196,6 +200,7 @@ impl PipeEx {
     ) {
         tokio::spawn(async move {
             let pipex = Self {
+                skel,
                 kind: traversal.directed_kind(),
                 method: traversal.core().method.clone(),
                 uri: traversal.core().uri.clone(),
@@ -225,6 +230,7 @@ impl PipeEx {
                             .clone()
                             .make(err.as_reflected_core(), self.port.clone());
                         let wave = wave.to_ultra();
+println!("-[ Field ]-> TO GRAVITY");
                         self.gravity_transmitter.route(wave).await;
                     }
                     Err(_) => {}
@@ -246,7 +252,7 @@ impl PipeEx {
         proto.scope(self.traversal.scope().clone());
         proto.from(self.traversal.from().clone());
         proto.history(self.traversal.history());
-        proto.track = self.traversal.track();
+//        proto.track = self.traversal.track();
         proto
     }
 
@@ -275,9 +281,14 @@ impl PipeEx {
     async fn execute_stop(&mut self, stop: &PipelineStopVar) -> Result<(), UniErr> {
         match stop {
             PipelineStopVar::Core => {
-                let mut proto = self.proto();
+                let traversal = self.traversal.clone().wrap();
+                self.skel.traverse_to_next_tx.send(traversal ).await;
+                Ok(())
+/*                let mut proto = self.proto();
                 proto.to(self.port.with_layer(Layer::Core));
                 self.direct(proto, self.shell_transmitter.clone()).await
+
+ */
             }
             PipelineStopVar::Reflect => {
                 let reflection = self.reflection.clone()?;
@@ -285,6 +296,8 @@ impl PipeEx {
                 core.body = self.body.clone();
 
                 let reflected = reflection.make(core, self.traversal.to.clone());
+
+println!("-[ Field ]-> TO GRAVITY");
                 self.gravity_transmitter.route(reflected.to_ultra()).await;
                 Ok(())
             }
@@ -295,6 +308,8 @@ impl PipeEx {
                 let point: Point = point.clone().to_resolved(&self.env)?;
                 let mut proto = self.proto();
                 proto.to(point.to_surface().with_layer(Layer::Core));
+
+println!("-[ Field ]-> TO GRAVITY");
                 self.direct(proto, self.gravity_transmitter.clone()).await
             }
             PipelineStopVar::Err { .. } => {
