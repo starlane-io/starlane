@@ -1,5 +1,7 @@
 #![allow(warnings)]
 
+pub mod err;
+
 #[macro_use]
 extern crate async_recursion;
 #[macro_use]
@@ -11,12 +13,12 @@ extern crate tracing;
 
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 use std::marker::PhantomData;
 use std::ops::Deref;
-use std::str::FromStr;
+use std::str::{FromStr, Utf8Error};
+use std::string::FromUtf8Error;
 use std::sync::Arc;
-
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
@@ -37,8 +39,7 @@ use cosmic_universe::command::direct::select::{
 };
 use cosmic_universe::command::direct::set::Set;
 use cosmic_universe::err::UniErr;
-use cosmic_universe::hyper::{Location, ParticleRecord};
-use cosmic_universe::id2::BaseSubKind;
+use cosmic_universe::hyper::{Location, ParticleLocation, ParticleRecord};
 use cosmic_universe::kind::{
     ArtifactSubKind, BaseKind, FileSubKind, Kind, KindParts, Specific, UserBaseSubKind,
 };
@@ -59,6 +60,7 @@ use cosmic_universe::selector::{
 use cosmic_universe::substance::{Substance, SubstanceList, SubstanceMap};
 use cosmic_universe::util::ValuePattern;
 use cosmic_universe::HYPERUSER;
+use err::PostErr;
 
 pub struct PostgresRegistry<P>
 where
@@ -1026,7 +1028,7 @@ impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
 
 struct StarlaneParticleRecord {
     pub details: Details,
-    pub location: Point,
+    pub location: Option<ParticleLocation>,
 }
 
 impl Into<ParticleRecord> for StarlaneParticleRecord {
@@ -1146,6 +1148,7 @@ pub mod test {
 
     use cosmic_hyperverse::Registration;
     use cosmic_hyperverse::RegistryApi;
+    use cosmic_universe::command::direct::create::Strategy;
     use cosmic_universe::command::direct::query::Query;
     use cosmic_universe::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
     use cosmic_universe::entity::request::select::SelectKind;
@@ -1167,7 +1170,8 @@ pub mod test {
     use crate::error::Error;
     use crate::particle::Kind;
     use crate::registry::{Registration, Registry};
-    use crate::{PostErr, PostgresRegistry};
+    use crate::PostgresRegistry;
+    use crate::err::PostErr;
 
     #[tokio::test]
     pub async fn test_nuke() -> Result<(), PostErr> {
@@ -1189,6 +1193,8 @@ pub mod test {
             registry: Default::default(),
             properties: Default::default(),
             owner: hyperuser.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown
         };
         registry.register(&registration).await?;
 
@@ -1199,6 +1205,8 @@ pub mod test {
             registry: Default::default(),
             properties: Default::default(),
             owner: hyperuser,
+            strategy: Strategy::Commit,
+            status: Status::Unknown
         };
         registry.register(&registration).await?;
 
@@ -1244,6 +1252,8 @@ pub mod test {
             registry: Default::default(),
             properties: Default::default(),
             owner: hyperuser.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown
         };
         registry.register(&registration).await?;
 
@@ -1253,6 +1263,8 @@ pub mod test {
             registry: Default::default(),
             properties: Default::default(),
             owner: hyperuser.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown
         };
         registry.register(&registration).await?;
 
@@ -1262,6 +1274,8 @@ pub mod test {
             registry: Default::default(),
             properties: Default::default(),
             owner: hyperuser.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown
         };
         registry.register(&registration).await?;
 
@@ -1271,6 +1285,8 @@ pub mod test {
             registry: Default::default(),
             properties: Default::default(),
             owner: hyperuser.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown
         };
         registry.register(&registration).await?;
 
@@ -1280,6 +1296,8 @@ pub mod test {
             registry: Default::default(),
             properties: Default::default(),
             owner: hyperuser.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown
         };
         registry.register(&registration).await?;
 
@@ -1299,6 +1317,8 @@ pub mod test {
             registry: Default::default(),
             properties: Default::default(),
             owner: hyperuser.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown
         };
         registry.register(&registration).await?;
 
@@ -1318,6 +1338,8 @@ pub mod test {
             registry: Default::default(),
             properties: Default::default(),
             owner: app.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown
         };
         registry.register(&registration).await?;
 
@@ -1327,6 +1349,8 @@ pub mod test {
             registry: Default::default(),
             properties: Default::default(),
             owner: app.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown
         };
         registry.register(&registration).await?;
 
@@ -1467,98 +1491,6 @@ pub mod test {
         }
 
         Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum PostErr {
-    Dupe,
-    Error(String),
-}
-
-impl From<std::io::Error> for PostErr {
-    fn from(e: Error) -> Self {
-        PostErr::Error(e.to_string())
-    }
-}
-
-impl From<strum::ParseError> for PostErr {
-    fn from(x: ParseError) -> Self {
-        PostErr::Error("strum parse error".to_string())
-    }
-}
-
-impl Into<UniErr> for PostErr {
-    fn into(self) -> UniErr {
-        UniErr::new(500u16, "Post Err")
-    }
-}
-
-impl From<UniErr> for PostErr {
-    fn from(e: UniErr) -> Self {
-        PostErr::Error(e.to_string())
-    }
-}
-
-impl HyperErr for PostErr {
-    fn to_uni_err(&self) -> UniErr {
-        UniErr::new(500u16, "Post Err")
-    }
-
-    fn new<S>(message: S) -> Self
-    where
-        S: ToString,
-    {
-        PostErr::Error(message.to_string())
-    }
-
-    fn status_msg<S>(status: u16, message: S) -> Self
-    where
-        S: ToString,
-    {
-        PostErr::Error(message.to_string())
-    }
-
-    fn status(&self) -> u16 {
-        500u16
-    }
-}
-
-impl ToString for PostErr {
-    fn to_string(&self) -> String {
-        match self {
-            PostErr::Dupe => "Dupe".to_string(),
-            PostErr::Error(error) => error.to_string(),
-        }
-    }
-}
-impl From<sqlx::Error> for PostErr {
-    fn from(e: sqlx::Error) -> Self {
-        PostErr::Error(e.to_string())
-    }
-}
-
-impl From<tokio::sync::oneshot::error::RecvError> for PostErr {
-    fn from(e: tokio::sync::oneshot::error::RecvError) -> Self {
-        PostErr::Error(format!("{}", e.to_string()))
-    }
-}
-
-impl<T> From<mpsc::error::SendError<T>> for PostErr {
-    fn from(e: mpsc::error::SendError<T>) -> Self {
-        PostErr::Error(e.to_string())
-    }
-}
-
-impl From<&str> for PostErr {
-    fn from(e: &str) -> Self {
-        PostErr::Error(e.into())
-    }
-}
-
-impl From<String> for PostErr {
-    fn from(e: String) -> Self {
-        PostErr::Error(e)
     }
 }
 
@@ -1777,6 +1709,19 @@ where
     ) -> Result<Substance, PostErr> {
         let result = Substance::Text(self.query(to, query).await?.to_string());
         Ok(result)
+    }
+}
+pub struct PostRegApi {
+    ctx: PostgresRegistryContext,
+}
+
+impl PostRegApi {
+    pub fn new(ctx: PostgresRegistryContext) -> Self {
+        Self { ctx }
+    }
+
+    fn ctx(&self) -> &PostgresRegistryContext{
+        &self.ctx
     }
 }
 

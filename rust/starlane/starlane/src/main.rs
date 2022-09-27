@@ -1,5 +1,7 @@
 #![allow(warnings)]
 
+pub mod properties;
+
 #[macro_use]
 extern crate async_trait;
 #[macro_use]
@@ -8,6 +10,7 @@ extern crate lazy_static;
 use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use tokio::io;
@@ -15,15 +18,23 @@ use tokio::runtime::Runtime;
 use uuid::Uuid;
 
 use cosmic_artifact::Artifacts;
-use cosmic_hyperlane::HyperGateSelector;
-use cosmic_hyperverse::driver::DriversBuilder;
+use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, HyperGateSelector, LocalHyperwayGateJumper};
+use cosmic_hyperverse::driver::{DriverAvail, DriversBuilder};
 use cosmic_hyperverse::machine::{Machine, MachineTemplate};
 use cosmic_hyperverse::Cosmos;
 use cosmic_hyperverse::{Registry, RegistryApi};
+use cosmic_hyperverse::driver::artifact::{ArtifactDriverFactory, BundleDriverFactory, BundleSeriesDriverFactory, RepoDriverFactory};
+use cosmic_hyperverse::driver::base::BaseDriverFactory;
+use cosmic_hyperverse::driver::control::ControlDriverFactory;
+use cosmic_hyperverse::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
+use cosmic_hyperverse::driver::root::RootDriverFactory;
+use cosmic_hyperverse::driver::space::SpaceDriverFactory;
+use cosmic_hyperverse::err::CosmicErr;
 use cosmic_registry_postgres::{
-    PostErr, PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
+    PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
 };
+use cosmic_registry_postgres::err::PostErr;
 use cosmic_universe::artifact::ArtifactApi;
 use cosmic_universe::artifact::ReadArtifactFetcher;
 use cosmic_universe::command::direct::create::KindTemplate;
@@ -34,11 +45,22 @@ use cosmic_universe::kind::{
 };
 use cosmic_universe::loc::ToBaseKind;
 use cosmic_universe::loc::{MachineName, StarKey};
-use cosmic_universe::particle::property::{
-    AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit,
-    PropertySource, U64Pattern, UsernamePattern,
-};
+use cosmic_universe::particle::property::{AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertiesConfigBuilder, PropertyPermit, PropertySource, U64Pattern, UsernamePattern};
 use cosmic_universe::substance::Token;
+
+fn main() -> Result<(), PostErr> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async move {
+        let starlane = Starlane::new().await.unwrap();
+        let machine_api = starlane.machine();
+        tokio::time::timeout(Duration::from_secs(30), machine_api.wait_ready())
+            .await
+            .unwrap();
+        machine_api.wait().await.unwrap_or_default();
+    })
+}
 
 lazy_static! {
     pub static ref STARLANE_PORT: usize = std::env::var("STARLANE_PORT")
@@ -70,19 +92,10 @@ pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
     Utc::now()
 }
 
-fn main() -> Result<(), PostErr> {
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()?;
-    runtime.block_on(async move {
-        let machine = Starlane::new().await.unwrap().machine();
-        machine.wait().await
-    })
-}
 
 #[derive(Clone)]
 pub struct Starlane {
-    ctx: PostgresRegistryContext,
+    pub ctx: PostgresRegistryContext
 }
 
 impl Starlane {
@@ -97,6 +110,108 @@ impl Starlane {
         Ok(Self { ctx })
     }
 }
+
+#[async_trait]
+impl Cosmos for Starlane {
+    type Err = CosmicErr;
+    type RegistryContext = PostgresRegistryContext;
+    type StarAuth = AnonHyperAuthenticator;
+    type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
+
+    fn star_auth(&self, star: &StarKey) -> Result<Self::StarAuth, Self::Err> {
+        Ok(AnonHyperAuthenticator::new())
+    }
+
+    fn remote_connection_factory_for_star(
+        &self,
+        star: &StarKey,
+    ) -> Result<Self::RemoteStarConnectionFactory, Self::Err> {
+        todo!()
+    }
+
+    fn machine_template(&self) -> MachineTemplate {
+        MachineTemplate::default()
+    }
+
+    fn machine_name(&self) -> MachineName {
+        "starlane".to_string()
+    }
+
+    fn properties_config(&self, kind: &Kind) -> PropertiesConfig {
+        let mut builder = PropertiesConfigBuilder::new();
+        builder.kind(kind.clone());
+        match kind.to_base() {
+            BaseKind::Mechtron => {
+                builder.add_point("config", true, true).unwrap();
+                builder.build().unwrap()
+            }
+            _ => builder.build().unwrap(),
+        }
+    }
+
+    fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
+        let mut builder = DriversBuilder::new(kind.clone());
+
+        // only allow external Base wrangling external to Super
+        if *kind == StarSub::Super {
+            builder.add_post(Arc::new(BaseDriverFactory::new(DriverAvail::External)));
+        } else {
+            builder.add_post(Arc::new(BaseDriverFactory::new(DriverAvail::Internal)));
+        }
+
+        match kind {
+            StarSub::Central => {
+                builder.add_post(Arc::new(RootDriverFactory::new()));
+            }
+            StarSub::Super => {
+                builder.add_post(Arc::new(SpaceDriverFactory::new()));
+            }
+            StarSub::Nexus => {}
+            StarSub::Maelstrom => {
+                builder.add_post(Arc::new(HostDriverFactory::new()));
+                builder.add_post(Arc::new(MechtronDriverFactory::new()));
+            }
+            StarSub::Scribe => {
+                builder.add_post(Arc::new(RepoDriverFactory::new()));
+                builder.add_post(Arc::new(BundleSeriesDriverFactory::new()));
+                builder.add_post(Arc::new(BundleDriverFactory::new()));
+                builder.add_post(Arc::new(ArtifactDriverFactory::new()));
+            }
+            StarSub::Jump => {
+                //                builder.add_post(Arc::new(ControlDriverFactory::new()));
+            }
+            StarSub::Fold => {}
+            StarSub::Machine => {
+                builder.add_post(Arc::new(ControlDriverFactory::new()));
+            }
+        }
+
+        builder
+    }
+
+    async fn global_registry(&self) -> Result<Registry<Self>, Self::Err> {
+        Ok(Arc::new(PostgresRegistryApi::new(self.ctx.clone())))
+    }
+
+    async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>, Self::Err> {
+        todo!()
+    }
+
+    fn artifact_hub(&self) -> ArtifactApi {
+        ArtifactApi::no_fetcher()
+    }
+
+    fn start_services(&self, gate: &Arc<dyn HyperGate>) {}
+}
+
+
+
+
+
+
+
+
+
 
 impl PostgresPlatform for Starlane {
     fn lookup_registry_db() -> Result<PostgresDbInfo, Self::Err> {
@@ -119,179 +234,3 @@ impl PostgresPlatform for Starlane {
     }
 }
 
-
-
-lazy_static! {
-    pub static ref DEFAULT_PROPERTIES_CONFIG: PropertiesConfig = default_properties_config();
-    pub static ref USER_PROPERTIES_CONFIG: PropertiesConfig = user_properties_config();
-    pub static ref USER_BASE_PROPERTIES_CONFIG: PropertiesConfig = userbase_properties_config();
-    pub static ref MECHTRON_PROERTIES_CONFIG: PropertiesConfig = mechtron_properties_config();
-    pub static ref UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG: PropertiesConfig =
-        unrequired_bind_and_config_properties_config();
-}
-
-fn default_properties_config() -> PropertiesConfig {
-    let mut builder = PropertiesConfig::builder();
-    builder.build()
-}
-
-fn mechtron_properties_config() -> PropertiesConfig {
-    let mut builder = PropertiesConfig::builder();
-    builder.add(
-        "bind",
-        Box::new(PointPattern {}),
-        true,
-        false,
-        PropertySource::Shell,
-        None,
-        false,
-        vec![],
-    );
-    builder.add(
-        "config",
-        Box::new(PointPattern {}),
-        true,
-        false,
-        PropertySource::Shell,
-        None,
-        false,
-        vec![],
-    );
-    builder.build()
-}
-
-fn unrequired_bind_and_config_properties_config() -> PropertiesConfig {
-    let mut builder = PropertiesConfig::builder();
-    builder.add(
-        "bind",
-        Box::new(PointPattern {}),
-        false,
-        false,
-        PropertySource::Shell,
-        None,
-        false,
-        vec![],
-    );
-    builder.add(
-        "config",
-        Box::new(PointPattern {}),
-        false,
-        false,
-        PropertySource::Shell,
-        None,
-        false,
-        vec![],
-    );
-    builder.build()
-}
-
-fn user_properties_config() -> PropertiesConfig {
-    let mut builder = PropertiesConfig::builder();
-    builder.add(
-        "bind",
-        Box::new(PointPattern {}),
-        true,
-        false,
-        PropertySource::Shell,
-        Some("hyperspace:repo:boot:1.0.0:/bind/user.bind".to_string()),
-        true,
-        vec![],
-    );
-    builder.add(
-        "username",
-        Box::new(UsernamePattern {}),
-        false,
-        false,
-        PropertySource::Core,
-        None,
-        false,
-        vec![],
-    );
-    builder.add(
-        "email",
-        Box::new(EmailPattern {}),
-        false,
-        true,
-        PropertySource::Core,
-        None,
-        false,
-        vec![PropertyPermit::Read],
-    );
-    builder.add(
-        "password",
-        Box::new(AnythingPattern {}),
-        false,
-        true,
-        PropertySource::CoreSecret,
-        None,
-        false,
-        vec![],
-    );
-    builder.build()
-}
-
-fn userbase_properties_config() -> PropertiesConfig {
-    let mut builder = PropertiesConfig::builder();
-    builder.add(
-        "bind",
-        Box::new(PointPattern {}),
-        true,
-        false,
-        PropertySource::Shell,
-        Some("hyperspace:repo:boot:1.0.0:/bind/userbase.bind".to_string()),
-        true,
-        vec![],
-    );
-    builder.add(
-        "config",
-        Box::new(PointPattern {}),
-        false,
-        true,
-        PropertySource::Shell,
-        None,
-        false,
-        vec![],
-    );
-    builder.add(
-        "registration-email-as-username",
-        Box::new(BoolPattern {}),
-        false,
-        false,
-        PropertySource::Shell,
-        Some("true".to_string()),
-        false,
-        vec![],
-    );
-    builder.add(
-        "verify-email",
-        Box::new(BoolPattern {}),
-        false,
-        false,
-        PropertySource::Shell,
-        Some("false".to_string()),
-        false,
-        vec![],
-    );
-    builder.add(
-        "sso-session-max-lifespan",
-        Box::new(U64Pattern {}),
-        false,
-        true,
-        PropertySource::Core,
-        Some("315360000".to_string()),
-        false,
-        vec![],
-    );
-    builder.build()
-}
-
-pub fn properties_config<K: ToBaseKind>(base: &K) -> &'static PropertiesConfig {
-    match base.to_base() {
-        BaseKind::Space => &UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG,
-        BaseKind::UserBase => &USER_BASE_PROPERTIES_CONFIG,
-        BaseKind::User => &USER_PROPERTIES_CONFIG,
-        BaseKind::App => &MECHTRON_PROERTIES_CONFIG,
-        BaseKind::Mechtron => &MECHTRON_PROERTIES_CONFIG,
-        _ => &DEFAULT_PROPERTIES_CONFIG,
-    }
-}

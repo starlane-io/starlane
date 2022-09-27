@@ -3,7 +3,6 @@ members = [
   "starlane/*",
   "cosmic/*",
   "mechtron/*",
-  "impl/*",
   "wasm/*",
   ]
 
