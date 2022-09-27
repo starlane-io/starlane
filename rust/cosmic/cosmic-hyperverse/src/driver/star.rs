@@ -395,7 +395,6 @@ where
                         .await?
                         .is_some()
                     {
-                        println!("\trequesting assignment...");
                         let assign = HyperSubstance::Assign(Assign::new(
                             AssignmentKind::Create,
                             record.details,
@@ -430,11 +429,8 @@ where
                     let mut proto = DirectedProto::ping();
                     proto.core(assign);
                     proto.to(key.to_surface());
-println!("\tsending assign request to {}", key.to_surface().to_string() );
-                    proto.track = true;
                     let pong: Wave<Pong> = ctx.transmitter.direct(proto).await?;
                     pong.ok_or()?;
-println!("\tassignment success!");
                     Ok(ParticleLocation::new(key.to_point().into(), None))
                 }
             }
@@ -446,10 +442,7 @@ println!("\tassignment success!");
     #[route("Hyp<Assign>")]
     pub async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, P::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
-            println!(
-                "\tassigning to star: {}",
-                assign.details.stub.point.to_string()
-            );
+
             #[cfg(test)]
             self.skel
                 .diagnostic_interceptors
@@ -480,7 +473,6 @@ println!("\tassignment success!");
                 directed.method(HypMethod::Assign);
                 directed.from(self.skel.point.to_surface());
                 directed.to(driver.to_surface());
-println!("\tassign to driver: {}", driver.to_surface().to_string());
                 directed.body(HyperSubstance::Assign(assign.clone()).into());
                 directed.track = ctx.wave().track();
                 let pong: Wave<Pong> = ctx.transmitter.direct(directed).await?;

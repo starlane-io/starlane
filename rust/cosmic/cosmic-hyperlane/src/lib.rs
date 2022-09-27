@@ -1328,7 +1328,7 @@ impl HyperClient {
             tokio::spawn(async move {
                 while let Ok(_) = status_rx.changed().await {
                     let status = status_rx.borrow().clone();
-                    logger.info(format!("HyperClient status: {}", status.to_string()))
+//                    logger.info(format!("HyperClient status: {}", status.to_string()))
                 }
             });
         }
@@ -1416,7 +1416,6 @@ impl HyperClient {
                                     }
                                 }
                                 if let Substance::Greet(greet) = &reflected.core().body {
-                                    logger.info("Received GREETING");
 
                                     greet_tx.send(Some(greet.clone()));
                                 } else {
@@ -1695,10 +1694,7 @@ impl HyperClientRunner {
                         .await,
                     ) {
                         Ok(Ok(ext)) => {
-                            runner.logger.info("");
-                            runner.logger.info("Replacing Hyperway...");
                             runner.ext.replace(ext);
-                            runner.logger.info("Hyperway Replaced");
                             if let Err(_) =
                                 runner.status_tx.send(HyperConnectionStatus::Ready).await
                             {

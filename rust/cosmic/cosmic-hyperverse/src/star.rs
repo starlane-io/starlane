@@ -52,7 +52,10 @@ use cosmic_universe::util::{log, ValueMatcher, ValuePattern};
 use cosmic_universe::wave::core::cmd::CmdMethod;
 use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
-use cosmic_universe::wave::exchange::asynch::{DirectedHandler, DirectedHandlerSelector, DirectedHandlerShell, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, TraversalRouter, TxRouter};
+use cosmic_universe::wave::exchange::asynch::{
+    DirectedHandler, DirectedHandlerSelector, DirectedHandlerShell, Exchanger, InCtx,
+    ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, TraversalRouter, TxRouter,
+};
 use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::{
     Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
@@ -1209,11 +1212,7 @@ where
             history.insert(skel.point.clone());
             wrangler.history(history);
 
-            let discoveries = match skel.logger.result(
-                tokio::time::timeout(Duration::from_secs(2), wrangler.wrangle(false))
-                    .await
-                    .unwrap(),
-            ) {
+            let discoveries = match skel.logger.result(wrangler.wrangle(false).await) {
                 Ok(discoveries) => discoveries,
                 Err(err) => {
                     println!("\tWrangle ERROR");
@@ -1617,18 +1616,14 @@ impl LayerInjectionRouter {
     }
 }
 
-
 #[derive(Clone)]
 pub struct TraverseToNextRouter {
-    pub tx: mpsc::Sender<Traversal<UltraWave>>
+    pub tx: mpsc::Sender<Traversal<UltraWave>>,
 }
 
-impl  TraverseToNextRouter {
-    pub fn new(tx: mpsc::Sender<Traversal<UltraWave>>) -> Self
-    {
-        Self {
-            tx
-        }
+impl TraverseToNextRouter {
+    pub fn new(tx: mpsc::Sender<Traversal<UltraWave>>) -> Self {
+        Self { tx }
     }
 }
 
@@ -1638,7 +1633,6 @@ impl TraversalRouter for TraverseToNextRouter {
         self.tx.send(traversal).await;
     }
 }
-
 
 #[async_trait]
 impl Router for LayerInjectionRouter {
@@ -1953,9 +1947,7 @@ where
         let pong: Wave<Pong> = self.skel.star_transmitter.direct(wave).await?;
         if pong.core.status.as_u16() == 200 {
             if let Substance::Location(location) = &pong.core.body {
-                self.skel
-                    .logger
-                    .info(format!("successfully provisioned: {}", point.to_string()));
+
                 Ok(location.clone())
             } else {
                 Err(P::Err::new("Provision result expected Substance Point"))

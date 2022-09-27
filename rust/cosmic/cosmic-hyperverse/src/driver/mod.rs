@@ -654,16 +654,16 @@ where
                         let status = status_rx.borrow().clone();
                         match status {
                             DriverStatus::Unknown => {
-                                logger.info(format!("{} {}", kind.to_string(), status.to_string()));
+//                                logger.info(format!("{} {}", kind.to_string(), status.to_string()));
                             }
                             DriverStatus::Pending => {
-                                logger.info(format!("{} {}", kind.to_string(), status.to_string()));
+//                               logger.info(format!("{} {}", kind.to_string(), status.to_string()));
                             }
                             DriverStatus::Init => {
-                                logger.info(format!("{} {}", kind.to_string(), status.to_string()));
+//                                logger.info(format!("{} {}", kind.to_string(), status.to_string()));
                             }
                             DriverStatus::Ready => {
-                                logger.info(format!("{} {}", kind.to_string(), status.to_string()));
+//                                logger.info(format!("{} {}", kind.to_string(), status.to_string()));
                             }
                             DriverStatus::Retrying(ref reason) => {
                                 logger.warn(format!(
@@ -1249,7 +1249,6 @@ where
                     }
                     DriverRunnerCall::Handle(traversal) => {
 
-println!("\ttraversing to handler for {}", self.skel.kind.to_string() );
                         if traversal.is_directed() {
                             let wave = traversal.payload.to_directed().unwrap();
                             self.logger
@@ -1636,7 +1635,6 @@ impl<P> DriverHandler<P> for DefaultDriverHandler where P: Cosmos {}
 impl DefaultDriverHandler {
     #[route("Hyp<Assign>")]
     pub async fn assign(&self, _ctx: InCtx<'_, HyperSubstance>) -> Result<(), UniErr> {
-println!("\tDefaultDriverHandler ASSIGN");
         Ok(())
     }
 }
