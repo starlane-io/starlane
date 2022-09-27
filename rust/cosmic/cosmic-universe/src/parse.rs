@@ -8413,7 +8413,7 @@ pub mod cmd_test {
     use crate::parse::error::result;
     use crate::parse::{command, create_command, publish_command, script, CamelCase};
     use crate::util::ToResolved;
-    use crate::{BaseKind, KindTemplate};
+    use crate::{BaseKind, KindTemplate, SetProperties};
 
     /*
     #[test]
@@ -8499,6 +8499,21 @@ pub mod cmd_test {
                 specific: None,
             };
             assert_eq!(create.template.kind, kind);
+        } else {
+            assert!(false);
+        }
+
+        Ok(())
+    }
+
+
+    #[test]
+    pub fn test_create_properties() -> Result<(), UniErr> {
+        let input = r#"create localhost:repo:tutorial:1.0.0<Repo>{ +config=the:cool:property }"#;
+        let mut command = result(create_command(new_span(input)))?;
+        let command = command.collapse()?;
+        if let Command::Create(create) = command {
+            assert!( create.properties.get("config").is_some());
         } else {
             assert!(false);
         }

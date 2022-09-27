@@ -365,20 +365,27 @@ where
         if let HyperSubstance::Assign(assign) = ctx.input {
             println!("\tASSIGNING MECHTRON!");
             let logger = self.skel.logger.push_mark("assign")?;
+            println!("config?");
 
             let config = assign
                 .details
                 .properties
-                .get("config")
+                .get(&"config".to_string() )
                 .ok_or("config property must be set for a Mechtron")?;
+            println!("got config...");
+            println!("config point: {}",config.value.as_str());
+
             let config = Point::from_str(config.value.as_str())?;
+            println!("Grabbing Config...");
             let config = self.skel.artifacts().mechtron(&config).await?;
             let config = config.contents();
+            println!("got contents...");
 
             // THIS is a HACK to get the host... a better way would be to do a lookup
             // but that will jam this DriverRunner thread... so Driver Runner must
             // be rearchitechted so that multiple requests can be processed simultaneously
             let host = self.skel.point.parent().unwrap().push("host")?;
+            println!("ref to host...");
 
             let mut wave = DirectedProto::ping();
             wave.method(HypMethod::Host);

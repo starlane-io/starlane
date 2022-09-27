@@ -1,26 +1,29 @@
 use crate::test::cosmos::TestCosmos;
 use crate::test::cosmos::TestErr;
 use crate::{Registration, RegistryApi};
-use cosmic_universe::command::common::SetProperties;
+use cosmic_universe::command::common::{PropertyMod, SetProperties};
 use cosmic_universe::command::direct::delete::Delete;
 use cosmic_universe::command::direct::query::{Query, QueryResult};
 use cosmic_universe::command::direct::select::{Select, SubSelect};
 use cosmic_universe::hyper::{ParticleLocation, ParticleRecord};
 use cosmic_universe::loc::Point;
-use cosmic_universe::particle::{Details, Properties, Status, Stub};
+use cosmic_universe::particle::{Details, Properties, Property, Status, Stub};
 use cosmic_universe::security::{Access, AccessGrant, IndexedAccessGrant};
 use cosmic_universe::selector::Selector;
 use cosmic_universe::substance::SubstanceList;
 use dashmap::DashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::{atomic, Arc};
+use dashmap::mapref::one::Ref;
 use tokio::sync::oneshot;
+use cosmic_universe::parse::get_properties;
 
 impl TestRegistryContext {
     pub fn new() -> Self {
         Self {
             sequence: Arc::new(AtomicU64::new(0u64)),
             particles: Arc::new(DashMap::new()),
+            properties: Arc::new( DashMap::new() )
         }
     }
 }
@@ -42,13 +45,15 @@ impl TestRegistryApi {
 #[async_trait]
 impl RegistryApi<TestCosmos> for TestRegistryApi {
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, TestErr> {
+        self.set_properties(&registration.point, &registration.properties).await?;
+
         let details = Details {
             stub: Stub {
                 point: registration.point.clone(),
                 kind: registration.kind.clone(),
                 status: Status::Pending,
             },
-            properties: Default::default(),
+            properties: self.get_properties(&registration.point).await?
         };
         let record = ParticleRecord {
             details: details.clone(),
@@ -85,6 +90,21 @@ impl RegistryApi<TestCosmos> for TestRegistryApi {
         point: &'a Point,
         properties: &'a SetProperties,
     ) -> Result<(), TestErr> {
+        let mut rtn= Properties::new();
+        for (id,property) in properties.iter() {
+            match property {
+                PropertyMod::Set { key, value, lock } => {
+                    let property = Property{
+                        key: key.clone(),
+                        value: value.clone(),
+                        locked: lock.clone()
+                    };
+                    rtn.insert(id.clone(), property );
+                }
+                PropertyMod::UnSet(_) => {}
+            }
+        }
+        self.ctx.properties.insert( point.clone(), rtn );
         Ok(())
     }
 
@@ -93,17 +113,23 @@ impl RegistryApi<TestCosmos> for TestRegistryApi {
     }
 
     async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, TestErr> {
-        Ok(Default::default())
+        match self.ctx.properties.get( point) {
+            None => Ok(Default::default()),
+            Some(mul) =>  Ok(mul.value().clone())
+        }
     }
 
     async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, TestErr> {
-        Ok(self
+        let properties = self.get_properties(point).await?;
+        let mut record = self
             .ctx
             .particles
             .get(&point)
             .ok_or(TestErr::new("not found"))?
             .value()
-            .clone())
+            .clone();
+        record.details.properties = properties;
+        Ok(record)
     }
 
     async fn query<'a>(
@@ -160,4 +186,5 @@ impl RegistryApi<TestCosmos> for TestRegistryApi {
 pub struct TestRegistryContext {
     pub sequence: Arc<AtomicU64>,
     pub particles: Arc<DashMap<Point, ParticleRecord>>,
+    pub properties: Arc<DashMap<Point, Properties>>,
 }

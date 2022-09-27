@@ -21,6 +21,7 @@ use crate::wave::core::cmd::CmdMethod;
 use crate::{Delete, Select, UniErr};
 
 pub mod common {
+    use std::collections::hash_map::Iter;
     use std::collections::HashMap;
     use std::convert::{TryFrom, TryInto};
     use std::ops::{Deref, DerefMut};
@@ -122,6 +123,10 @@ pub mod common {
                     self.map.insert(key.clone(), property);
                 }
             }
+        }
+
+        pub fn iter(&self) -> Iter<'_, String, PropertyMod>{
+            self.map.iter()
         }
     }
 
