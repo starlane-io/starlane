@@ -1,7 +1,4 @@
-use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, Item,
-    ItemHandler, ItemSkel, ItemSphere,
-};
+use crate::driver::{Driver, DriverAvail, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, HyperSkel, Item, ItemHandler, ItemSkel, ItemSphere};
 use crate::star::HyperStarSkel;
 use crate::{Cosmos, HyperErr};
 use acid_store::repo::key::KeyRepo;
@@ -16,7 +13,7 @@ use cosmic_universe::command::direct::create::{
 };
 use cosmic_universe::config::bind::BindConfig;
 use cosmic_universe::err::UniErr;
-use cosmic_universe::hyper::{Assign, HyperSubstance};
+use cosmic_universe::hyper::{Assign, HyperSubstance, ParticleLocation};
 use cosmic_universe::kind::{ArtifactSubKind, BaseKind, Kind};
 use cosmic_universe::loc::{Point, ToBaseKind};
 use cosmic_universe::parse::bind_config;
@@ -281,7 +278,8 @@ where
         driver_skel: DriverSkel<P>,
         ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
-        Ok(Box::new(BundleDriver::new(driver_skel, ctx)))
+        let skel = HyperSkel::new( skel, driver_skel );
+        Ok(Box::new(BundleDriver::new(skel, ctx)))
     }
 }
 
@@ -289,7 +287,7 @@ pub struct BundleDriver<P>
 where
     P: Cosmos,
 {
-    skel: DriverSkel<P>,
+    skel: HyperSkel<P>,
     ctx: DriverCtx,
     store: KeyRepo<String>,
 }
@@ -299,7 +297,7 @@ impl<P> BundleDriver<P>
 where
     P: Cosmos,
 {
-    pub fn new(skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
+    pub fn new(skel: HyperSkel<P>, ctx: DriverCtx) -> Self {
         let store: KeyRepo<String> = OpenOptions::new()
             .mode(OpenMode::CreateNew)
             .open(&MemoryConfig::new())
@@ -333,7 +331,7 @@ pub struct BundleDriverHandler<P>
 where
     P: Cosmos,
 {
-    skel: DriverSkel<P>,
+    skel: HyperSkel<P>,
     ctx: DriverCtx,
 }
 
@@ -341,7 +339,7 @@ impl<P> BundleDriverHandler<P>
 where
     P: Cosmos,
 {
-    fn restore(skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
+    fn restore(skel: HyperSkel<P>, ctx: DriverCtx) -> Self {
         Self { skel, ctx }
     }
 }
@@ -355,12 +353,15 @@ where
 {
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
-        println!("\nAssign Bundle!");
         if let HyperSubstance::Assign(assign) = ctx.input {
+            println!("\nAssign Bundle: {}", assign.details.stub.point.to_string());
             let state = match &assign.state {
                 StateSrc::Substance(data) => data.clone(),
                 StateSrc::None => {
-                    return Err("ArtifactBundle cannot be stateless".into());
+                    return self
+                        .skel.driver
+                        .logger
+                        .result(Err("ArtifactBundle cannot be stateless".into()));
                 }
             };
             if let Substance::Bin(zip) = (*state).clone() {
@@ -379,6 +380,15 @@ where
                         artifacts.push(file.name().to_string())
                     }
                 }
+
+                println!("Assign Bundle about to commit!");
+                let mut store = store()?;
+                let state = *state;
+                store.insert(assign.details.stub.point.to_string(), &state)?;
+                store.commit()?;
+                println!("Assign Bundle all done!");
+
+                self.skel.star.registry.assign( &assign.details.stub.point, ParticleLocation::new(self.skel.star.point.clone(),None) ).await?;
 
                 let mut point_and_kind_set = HashSet::new();
                 for artifact in artifacts {
@@ -494,10 +504,6 @@ where
                 return Err("ArtifactBundle Manager expected Bin payload".into());
             }
 
-            let mut store = store()?;
-            let state = *state;
-            store.insert(assign.details.stub.point.to_string(), &state)?;
-            store.commit()?;
             Ok(())
         } else {
             Err(P::Err::new("Bad Reqeust: expected Assign"))

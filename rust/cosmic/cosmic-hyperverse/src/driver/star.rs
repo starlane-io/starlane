@@ -476,7 +476,8 @@ where
                 directed.body(HyperSubstance::Assign(assign.clone()).into());
                 directed.track = ctx.wave().track();
                 let pong: Wave<Pong> = ctx.transmitter.direct(directed).await?;
-                pong.ok_or()?;
+println!("ok? {} {}", assign.details.stub.kind.to_string(), pong.is_ok());
+                self.skel.logger.result(pong.ok_or())?;
             } else {
                 self.skel.logger.result::<(),UniErr>(
                     Err(UniErr::from_500(format!("Star {} does not have a driver for kind: {}",
@@ -485,6 +486,7 @@ where
                 )?;
             }
 
+println!("ASsigned....{}", assign.details.stub.kind.to_string());
             let location = ParticleLocation::new(self.skel.point.clone(), None);
             self.skel
                 .registry
