@@ -367,6 +367,7 @@ where
     ToGravity(UltraWave),
     ToHyperway(Wave<Signal>),
     Shard(UltraWave),
+    StartWrangling,
     Wrangle(oneshot::Sender<Result<StarWrangles, UniErr>>),
     Bounce {
         key: StarKey,
@@ -546,6 +547,11 @@ where
         self.tx.send(HyperStarCall::Wrangle(rtn)).await?;
         tokio::time::timeout(Duration::from_secs(5), rtn_rx).await??
     }
+
+   pub async fn start_wrangling(&self) {
+        self.tx.send(HyperStarCall::StartWrangling).await;
+    }
+
 
     pub async fn bounce(&self, key: StarKey) -> Result<(), UniErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
@@ -759,7 +765,7 @@ where
                                     .await
                                     .unwrap();
                                 star_driver.init_item(skel.point.to_point()).await;
-                                api.wrangle().await;
+                                api.start_wrangling().await;
                             }
                             DriverStatus::Retrying(_) => {
                                 status_tx.send(Status::Panic).await;
@@ -837,41 +843,7 @@ where
             });
         }
 
-        {
-            let skel = skel.clone();
-            tokio::spawn(async move {
-                let mut retries = 0;
-                tokio::time::sleep(Duration::from_secs(1)).await;
-                loop {
-                    match tokio::time::timeout(Duration::from_secs(60), skel.api.wrangle()).await {
-                        Ok(Ok(_)) => {
-                            break;
-                        }
-                        Ok(Err(err)) => {
-                            skel.logger.error(format!(
-                                "HyperStar Auto Wrangle failed: {}",
-                                err.to_string()
-                            ));
-                        }
-                        Err(err) => {
-                            skel.logger.error(format!(
-                                "HyperStar Auto Wrangle failed: {}",
-                                err.to_string()
-                            ));
-                        }
-                    }
-                    skel.logger.info("trying wrangle again in 5 seconds...");
-                    if retries > 10 {
-                        tokio::time::sleep(Duration::from_secs(15)).await;
-                    } else if retries > 2 {
-                        tokio::time::sleep(Duration::from_secs(5)).await;
-                    } else {
-                        tokio::time::sleep(Duration::from_secs(1)).await;
-                    }
-                    retries = retries + 1;
-                }
-            });
-        }
+
 
         let kind = skel.kind.clone();
         {
@@ -971,6 +943,9 @@ where
                     }
                     HyperStarCall::Bounce { key, rtn } => {
                         self.bounce(key, rtn).await;
+                    }
+                    HyperStarCall::StartWrangling => {
+                        self.start_wrangling().await;
                     }
                 }
             }
@@ -1202,6 +1177,41 @@ where
         } else {
             unimplemented!("need to now send out a ripple search for the star being transported to")
         }
+    }
+
+    async fn start_wrangling(&self)  {
+            let skel = self.skel.clone();
+            tokio::spawn(async move {
+                let mut retries = 0;
+                loop {
+                    match tokio::time::timeout(Duration::from_secs(60), skel.api.wrangle()).await {
+                        Ok(Ok(_)) => {
+                            break;
+                        }
+                        Ok(Err(err)) => {
+                            skel.logger.error(format!(
+                                "HyperStar Auto Wrangle failed: {}",
+                                err.to_string()
+                            ));
+                        }
+                        Err(err) => {
+                            skel.logger.error(format!(
+                                "HyperStar Auto Wrangle failed: {}",
+                                err.to_string()
+                            ));
+                        }
+                    }
+                    skel.logger.info("trying wrangle again in 5 seconds...");
+                    if retries > 10 {
+                        tokio::time::sleep(Duration::from_secs(15)).await;
+                    } else if retries > 2 {
+                        tokio::time::sleep(Duration::from_secs(5)).await;
+                    } else {
+                        tokio::time::sleep(Duration::from_secs(1)).await;
+                    }
+                    retries = retries + 1;
+                }
+            });
     }
 
     async fn wrangle(&self, rtn: oneshot::Sender<Result<StarWrangles, UniErr>>) {
