@@ -40,9 +40,7 @@ fn host_bind() -> BindConfig {
         r#"
     Bind(version=1.0.0)
     {
-       Route {
-         Hyp<Host> -> (()) => &;
-       }
+       Route<Hyp<Host>> -> (()) => &;
     }
     "#,
     ))
