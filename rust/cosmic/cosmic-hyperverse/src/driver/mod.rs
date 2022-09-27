@@ -54,7 +54,7 @@ lazy_static! {
         Arc::new(default_bind()),
         Point::from_str("GLOBAL::repo:1.0.0:/bind/default.bind").unwrap()
     );
-    static ref DRIVER_DRIVER_BIND: ArtRef<BindConfig> = ArtRef::new(
+    static ref DRIVER_BIND: ArtRef<BindConfig> = ArtRef::new(
         Arc::new(driver_bind()),
         Point::from_str("GLOBAL::repo:1.0.0:/bind/driver.bind").unwrap()
     );
@@ -196,6 +196,10 @@ where
         rtn: oneshot::Sender<Result<DriverStatus, UniErr>>,
     },
     StatusRx(oneshot::Sender<watch::Receiver<DriverStatus>>),
+    ByPoint {
+        point: Point,
+        rtn: oneshot::Sender<Option<DriverApi<P>>>,
+    },
 }
 
 #[derive(Clone)]
@@ -288,6 +292,17 @@ where
             })
             .await;
         rtn_rx.await?
+    }
+
+    pub async fn find_by_point(&self, point: &Point) -> Result<Option<DriverApi<P>>, UniErr> {
+        let (rtn, mut rtn_rx) = oneshot::channel();
+        self.call_tx
+            .send(DriversCall::ByPoint {
+                point: point.clone(),
+                rtn,
+            })
+            .await;
+        Ok(rtn_rx.await?)
     }
 
     pub async fn init(&self) {
@@ -446,26 +461,30 @@ where
                             }
                         };
                     } /*DriversCall::Route(wave) => {
-                      println!("DriversApi::Route!");
-                                              match wave.to().to_single() {
-                                                  Ok(to) => {
-                                                     match self.point_to_driver.get(&to.point ) {
-                                                         Some(api) => {
-                                                             api.route(wave).await;
-                                                         }
-                                                         None => {
-                                                             self.skel.logger.error(format!("Drivers does not have a Driver at surface: {}",to.to_string()));
-                                                         }
-                                                     }
-                                                  }
-                                                  Err(err) => {
-                                                      self.skel.logger.error(format!("expecting single recipient: {}",err.to_string()));
-                                                  }
-                                              }
+                    println!("DriversApi::Route!");
+                    match wave.to().to_single() {
+                    Ok(to) => {
+                    match self.point_to_driver.get(&to.point ) {
+                    Some(api) => {
+                    api.route(wave).await;
+                    }
+                    None => {
+                    self.skel.logger.error(format!("Drivers does not have a Driver at surface: {}",to.to_string()));
+                    }
+                    }
+                    }
+                    Err(err) => {
+                    self.skel.logger.error(format!("expecting single recipient: {}",err.to_string()));
+                    }
+                    }
 
-                                          }
+                    }
 
-                                           */
+                    */
+                    DriversCall::ByPoint { point, rtn } => {
+                        let driver = self.point_to_driver.get(&point).cloned();
+                        rtn.send(driver);
+                    }
                 }
             }
         });
@@ -973,7 +992,7 @@ where
     pub async fn driver_bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         let (rtn, rtn_rx) = oneshot::channel();
         self.call_tx.send(DriverRunnerCall::DriverBind(rtn)).await;
-        rtn_rx.await?
+        Ok(rtn_rx.await?)
     }
 
     pub async fn traverse(&self, traversal: Traversal<UltraWave>) {
@@ -1021,7 +1040,7 @@ where
         rtn: oneshot::Sender<Result<Status, UniErr>>,
     },
     DriverRunnerRequest(DriverRunnerRequest<P>),
-    DriverBind(oneshot::Sender<Result<ArtRef<BindConfig>, P::Err>>),
+    DriverBind(oneshot::Sender<ArtRef<BindConfig>>),
     Bind {
         point: Point,
         rtn: oneshot::Sender<Result<ArtRef<BindConfig>, P::Err>>,
@@ -1317,8 +1336,8 @@ where
                         rtn.send(self.skel.point.clone());
                     }
                     DriverRunnerCall::DriverBind(rtn) => {
-                        let item = self.item(&self.skel.point).await.unwrap();
-                        rtn.send(item.bind().await);
+                        ;
+                        rtn.send(self.driver.bind());
                     }
                     DriverRunnerCall::AddDriver(api) => {
                         self.driver.add_driver(api.clone()).await;
@@ -1596,6 +1615,10 @@ where
 
     fn avail(&self) -> DriverAvail {
         DriverAvail::External
+    }
+
+    fn bind(&self) -> ArtRef<BindConfig> {
+        DRIVER_BIND.clone()
     }
 
     async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
@@ -1933,8 +1956,6 @@ where
     P: Cosmos,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
-        //let api = self.skel.drivers().get(&self.skel.driver_kind).await?;
-        //api.driver_bind().await
-        Ok(DRIVER_DRIVER_BIND.clone())
+        self.skel.api.driver_bind().await
     }
 }

@@ -1,6 +1,4 @@
-use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere,
-};
+use crate::driver::{Driver, DRIVER_BIND, DriverAvail, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere};
 use crate::star::HyperStarSkel;
 use crate::Cosmos;
 use cosmic_universe::artifact::ArtRef;
@@ -64,7 +62,6 @@ pub struct BaseDriver {
     pub avail: DriverAvail,
 }
 
-#[handler]
 impl BaseDriver {
     pub fn new(avail: DriverAvail) -> Self {
         Self { avail }
@@ -97,6 +94,6 @@ where
     P: Cosmos,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
-        Ok(BASE_BIND_CONFIG.clone())
+        Ok(DRIVER_BIND.clone())
     }
 }

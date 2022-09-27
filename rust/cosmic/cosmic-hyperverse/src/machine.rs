@@ -36,6 +36,7 @@ use cosmic_universe::substance::{Bin, Substance};
 use cosmic_universe::wave::exchange::asynch::Exchanger;
 use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::{Agent, DirectedProto, HyperWave, Pong, UltraWave, Wave};
+use cosmic_universe::wave::core::cmd::CmdMethod;
 
 use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
 use crate::{Cosmos, DriversBuilder, HyperErr, Registry, RegistryApi};
@@ -719,7 +720,9 @@ where
 
     async fn fetch(&self, point: &Point) -> Result<Bin, UniErr> {
         let transmitter = self.client.transmitter_builder().await?.build();
+
         let mut wave = DirectedProto::ping();
+        wave.method(CmdMethod::Read);
         wave.to(point.clone().to_surface().with_layer(Layer::Core));
         let pong: Wave<Pong> = transmitter.direct(wave).await?;
         if let Substance::Bin(bin) = pong.variant.core.body {

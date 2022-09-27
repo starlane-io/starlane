@@ -60,12 +60,8 @@ impl ArtifactApi {
             }
         }
 
-println!("fetching mechtron...");
-        let mechtron: Arc<MechtronConfig> = Arc::new(self.get(point).await?);
-        {
-            self.mechtrons.insert(point.clone(), mechtron.clone());
-        }
-println!("got mechtron...");
+        let mechtron: Arc<MechtronConfig> = Arc::new(self.fetch(point).await.unwrap());
+        self.mechtrons.insert(point.clone(), mechtron.clone());
         return Ok(ArtRef::new(mechtron, point.clone()));
     }
 
@@ -77,7 +73,7 @@ println!("got mechtron...");
             }
         }
 
-        let bind: Arc<BindConfig> = Arc::new(self.get(point).await?);
+        let bind: Arc<BindConfig> = Arc::new(self.fetch(point).await?);
         {
             self.binds.insert(point.clone(), bind.clone());
         }
@@ -99,7 +95,7 @@ println!("got mechtron...");
         return Ok(ArtRef::new(Arc::new(wasm), point.clone()));
     }
 
-    async fn get<A>(&self, point: &Point) -> Result<A, UniErr>
+    async fn fetch<A>(&self, point: &Point) -> Result<A, UniErr>
     where
         A: TryFrom<Bin, Error = UniErr>,
     {
@@ -206,14 +202,14 @@ impl ArtifactFetcher for ReadArtifactFetcher {
         let mut directed = DirectedProto::ping();
         directed.to(point.clone().to_surface());
         directed.method(CmdMethod::Read);
-println!("getting : {} ", point.to_surface().to_string());
         let pong = self.transmitter.ping(directed).await?;
-println!("got: {} ", point.to_surface().to_string());
         pong.core.ok_or()?;
         match pong.variant.core.body {
-            Substance::Bin(bin) => Ok(bin),
-            _ => Err(UniErr::from_500(
-                "encountered unexpected substance (expected Bin) when fetching Artifact",
+            Substance::Bin(bin) => {
+                Ok(bin)
+            },
+            other => Err(UniErr::from_500(
+                format!("expected Bin, encountered unexpected substance {} when fetching Artifact",other.kind().to_string()),
             )),
         }
     }

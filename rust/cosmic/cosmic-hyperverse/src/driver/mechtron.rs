@@ -25,7 +25,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 lazy_static! {
-    static ref HOIST_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
+    static ref HOST_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
         Arc::new(host_bind()),
         Point::from_str("GLOBAL::repo:1.0.0:/bind/host.bind").unwrap()
     );
@@ -117,6 +117,11 @@ where
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
         Ok(ItemSphere::Handler(Box::new(HostItem)))
     }
+
+    fn bind(&self) -> ArtRef<BindConfig> {
+        HOST_BIND_CONFIG.clone()
+    }
+
 
     async fn handler(&self) -> Box<dyn DriverHandler<P>> {
         Box::new(HostDriverHandler::restore(
@@ -361,43 +366,32 @@ where
     P: Cosmos,
 {
     #[route("Hyp<Assign>")]
-    async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), UniErr> {
+    async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
             println!("\tASSIGNING MECHTRON!");
             let logger = self.skel.logger.push_mark("assign")?;
-            println!("config?");
 
             let config = assign
                 .details
                 .properties
                 .get(&"config".to_string() )
                 .ok_or("config property must be set for a Mechtron")?;
-            println!("got config...");
-            println!("config point: {}",config.value.as_str());
 
             let config = Point::from_str(config.value.as_str())?;
-            println!("Grabbing Config...");
             let config = self.skel.logger.result(self.skel.artifacts().mechtron(&config).await)?;
-            println!("Got Config.... 2 ");
             let config = config.contents();
-            println!("got contents...");
 
-            // THIS is a HACK to get the host... a better way would be to do a lookup
-            // but that will jam this DriverRunner thread... so Driver Runner must
-            // be rearchitechted so that multiple requests can be processed simultaneously
-            let host = self.skel.point.parent().unwrap().push("host")?;
-            println!("ref to host...");
-
+            let host = self.skel.drivers().local_driver_lookup(Kind::Host).await?.ok_or(P::Err::new("missing Host Driver which must be on the same Star as the Mechtron Driver in order for it to work"))?;
             let mut wave = DirectedProto::ping();
             wave.method(HypMethod::Host);
             println!("\tSending HOST command to {}", host.to_string());
             wave.to(host.to_surface().with_layer(Layer::Core));
             wave.body(HyperSubstance::Host(assign.clone().to_host_cmd(config)).into());
-            let pong: Wave<Pong> = self.ctx.transmitter.direct(wave).await?;
+            let pong = self.ctx.transmitter.ping(wave).await?;
             pong.ok_or()?;
             Ok(())
         } else {
-            Err(UniErr::bad_request_msg(
+            Err(P::Err::new(
                 "MechtronDriverHandler expecting Assign",
             ))
         }
