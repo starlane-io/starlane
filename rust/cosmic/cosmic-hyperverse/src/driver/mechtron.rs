@@ -211,7 +211,7 @@ where
     P: Cosmos,
 {
     #[route("Hyp<Host>")]
-    pub async fn host(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), UniErr> {
+    pub async fn host(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         println!("HOST DRIVER RECEIVED REQUEST!");
         if let HyperSubstance::Host(host) = ctx.input {
             let config = host
@@ -246,6 +246,9 @@ where
                         .create(host.details.clone(), bin)
                         .map_err(|e| UniErr::from_500("host err"))?,
                 );
+
+                mechtron_host.init( host.details.clone() )?;
+
                 self.skel
                     .hosts
                     .insert(host.details.stub.point.clone(), mechtron_host);

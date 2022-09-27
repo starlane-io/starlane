@@ -1,6 +1,6 @@
 [package]
 name = "mechtron"
-version = "0.2.0-rc1"
+version = "0.3.0"
 authors = ["Scott Williams <scott@mightydevco.com>"]
 edition = "2021"
 homepage = "http://starlane.io"
