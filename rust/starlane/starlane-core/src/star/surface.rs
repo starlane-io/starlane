@@ -1,6 +1,6 @@
-use std::{sync, thread};
-use std::sync::Arc;
 use std::sync::mpsc::SendError;
+use std::sync::Arc;
+use std::{sync, thread};
 
 use futures::TryFutureExt;
 use tokio::sync::mpsc;
@@ -17,11 +17,11 @@ use crate::cache::ProtoArtifactCachesFactory;
 use crate::error::Error;
 use crate::frame::{StarMessagePayload, StarPattern};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
-use crate::star::{StarCommand, StarInfo, StarSkel};
 use crate::star::shell::message::MessagingCall;
 use crate::star::shell::search::SearchHits;
+use crate::star::{StarCommand, StarInfo, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use crate::watch::{Notification, Topic, Watch, Watcher, WatchResourceSelector, WatchSelector};
+use crate::watch::{Notification, Topic, Watch, WatchResourceSelector, WatchSelector, Watcher};
 
 #[derive(Clone)]
 pub struct SurfaceApi {

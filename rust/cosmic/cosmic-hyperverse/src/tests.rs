@@ -1,5 +1,6 @@
 #![cfg(test)]
 
+use std::fs;
 use std::io::Error;
 use std::sync::atomic;
 use std::sync::atomic::AtomicU64;
@@ -8,46 +9,46 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use tokio::join;
-use tokio::sync::{Mutex, oneshot};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot::error::RecvError;
+use tokio::sync::{Mutex, oneshot};
 use tokio::time::error::Elapsed;
 
 use cosmic_hyperlane::{
     AnonHyperAuthenticator, HyperClient, HyperConnectionDetails, HyperConnectionErr, HyperGate,
     HyperwayEndpoint, HyperwayStub, LocalHyperwayGateJumper,
 };
-use cosmic_universe::artifact::NoDiceArtifactFetcher;
+use cosmic_universe::artifact::ReadArtifactFetcher;
 use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::direct::create::{
     Create, PointSegTemplate, PointTemplate, Strategy, Template,
 };
-use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance, InterchangeKind, Knock};
+use cosmic_universe::command::{CmdTransfer, RawCommand};
 use cosmic_universe::hyper::MountKind;
-use cosmic_universe::HYPERUSER;
+use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance, InterchangeKind, Knock};
 use cosmic_universe::loc::{Layer, StarHandle, ToPoint, ToSurface, Uuid};
 use cosmic_universe::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
 use cosmic_universe::particle::traversal::TraversalDirection;
-use cosmic_universe::wave::{
-    Agent, DirectedKind, DirectedProto, HyperWave, Pong,
-    Wave,
-};
 use cosmic_universe::wave::core::cmd::CmdMethod;
 use cosmic_universe::wave::core::ext::ExtMethod;
 use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::Method;
-use cosmic_universe::wave::exchange::Exchanger;
-use cosmic_universe::wave::exchange::ProtoTransmitterBuilder;
+use cosmic_universe::wave::exchange::asynch::Exchanger;
+use cosmic_universe::wave::exchange::asynch::ProtoTransmitterBuilder;
+use cosmic_universe::wave::{Agent, DirectedKind, DirectedProto, HyperWave, Pong, Wave};
+use cosmic_universe::HYPERUSER;
 
-use crate::base::BaseDriverFactory;
-use crate::control::{ControlClient, ControlCliSession, ControlDriverFactory};
+use crate::driver::base::BaseDriverFactory;
 //use crate::control::ControlDriverFactory;
+use crate::driver::control::{ControlClient, ControlCliSession, ControlDriverFactory};
+use crate::driver::root::RootDriverFactory;
+use crate::driver::space::SpaceDriverFactory;
 use crate::driver::{DriverAvail, DriverFactory};
-use crate::root::RootDriverFactory;
-use crate::space::SpaceDriverFactory;
+use crate::err::CosmicErr;
+use crate::machine::MachineApiExtFactory;
 use crate::star::HyperStarApi;
-use crate::test::hyperverse::{TestErr, TestHyperverse};
-use crate::test::registry::TestRegistryContext;
+use crate::mem::cosmos::MemCosmos;
+use crate::mem::registry::MemRegCtx;
 
 use super::*;
 
@@ -58,16 +59,12 @@ lazy_static! {
     pub static ref FAE: Point = Point::from_str("space:users:fae").expect("point");
 }
 
-lazy_static! {
-    pub static ref PROPERTIES_CONFIG: PropertiesConfig = PropertiesConfig::new();
-}
-
 async fn create(
-    ctx: &TestRegistryContext,
+    ctx: &MemRegCtx,
     particle: Point,
-    location: Point,
-    star_api: HyperStarApi<TestHyperverse>,
-) -> Result<(), TestErr> {
+    location: ParticleLocation,
+    star_api: HyperStarApi<MemCosmos>,
+) -> Result<(), CosmicErr> {
     println!("ADDING PARTICLE: {}", particle.to_string());
     let details = Details::new(
         Stub {
@@ -79,7 +76,7 @@ async fn create(
     );
     ctx.particles.insert(
         particle.clone(),
-        ParticleRecord::new(details.clone(), location),
+        ParticleRecord::new(details.clone(), Some(location)),
     );
 
     let mut wave = DirectedProto::ping();
@@ -99,18 +96,18 @@ async fn create(
 }
 
 #[test]
-fn test_gravity_routing() -> Result<(), TestErr> {
+fn test_gravity_routing() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     runtime.block_on(async move {
-        let platform = TestHyperverse::new();
+        let platform = MemCosmos::new();
         let machine_api = platform.machine();
         machine_api.wait_ready().await;
 
         let star_api = machine_api.get_machine_star().await.unwrap();
         let stub = star_api.stub().await.unwrap();
-        let location = stub.key.clone().to_point();
+        let location = ParticleLocation::new(stub.key.clone().to_point(), None);
 
         //        let record = platform.global_registry().await.unwrap().locate(&LESS).await.expect("IS LESS THERE?");
 
@@ -214,7 +211,7 @@ fn test_gravity_routing() -> Result<(), TestErr> {
     })
 }
 #[test]
-fn test_layer_traversal() -> Result<(), TestErr> {
+fn test_layer_traversal() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -272,13 +269,13 @@ fn test_layer_traversal() -> Result<(), TestErr> {
             direct_tx.send(());
         });
 
-        let platform = TestHyperverse::new();
+        let platform = MemCosmos::new();
         let machine_api = platform.machine();
         machine_api.wait_ready().await;
 
         let star_api = machine_api.get_machine_star().await.unwrap();
         let stub = star_api.stub().await.unwrap();
-        let location = stub.key.clone().to_point();
+        let location = ParticleLocation::new(stub.key.clone().to_point(), None);
 
         //        let record = platform.global_registry().await.unwrap().locate(&LESS).await.expect("IS LESS THERE?");
 
@@ -493,45 +490,18 @@ fn test_layer_traversal() -> Result<(), TestErr> {
     })
 }
 
-pub struct MachineApiExtFactory<P>
-where
-    P: Hyperverse,
-{
-    machine_api: MachineApi<P>,
-    logger: PointLogger,
-}
-
-#[async_trait]
-impl<P> HyperwayEndpointFactory for MachineApiExtFactory<P>
-where
-    P: Hyperverse,
-{
-    async fn create(
-        &self,
-        status_tx: mpsc::Sender<HyperConnectionDetails>,
-    ) -> Result<HyperwayEndpoint, UniErr> {
-        let knock = Knock {
-            kind: InterchangeKind::DefaultControl,
-            auth: Box::new(Substance::Empty),
-            remote: None,
-        };
-        self.logger
-            .result_ctx("machine_api.knock()", self.machine_api.knock(knock).await)
-    }
-}
-
 #[test]
-fn test_control() -> Result<(), TestErr> {
+fn test_control() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestHyperverse::new();
+        let platform = MemCosmos::new();
         let machine_api = platform.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
-        let logger = logger.point(Point::from_str("test-client").unwrap());
+        let logger = logger.point(Point::from_str("mem-client").unwrap());
 
         tokio::time::timeout(Duration::from_secs(10), machine_api.wait_ready())
             .await
@@ -545,6 +515,7 @@ fn test_control() -> Result<(), TestErr> {
         let exchanger = Exchanger::new(
             Point::from_str("client").unwrap().to_surface(),
             Timeouts::default(),
+            Default::default(),
         );
         let client =
             HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger).unwrap();
@@ -561,7 +532,8 @@ fn test_control() -> Result<(), TestErr> {
                         let directed = wave.to_directed().unwrap();
                         if directed.core().method == Method::Cmd(CmdMethod::Bounce) {
                             let reflection = directed.reflection().unwrap();
-                            let reflect = reflection.make(ReflectedCore::ok(), greet.surface.clone());
+                            let reflect =
+                                reflection.make(ReflectedCore::ok(), greet.surface.clone());
                             let wave = reflect.to_ultra();
                             transmitter.route(wave).await;
                         }
@@ -585,17 +557,16 @@ fn test_control() -> Result<(), TestErr> {
 }
 
 #[test]
-fn test_star_wrangle() -> Result<(), TestErr> {
+fn test_star_wrangle() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestHyperverse::new();
+        let platform = MemCosmos::new();
         let machine_api = platform.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
-        let logger = logger.point(Point::from_str("test-client").unwrap());
 
         tokio::time::timeout(Duration::from_secs(1), machine_api.wait_ready())
             .await
@@ -603,12 +574,15 @@ fn test_star_wrangle() -> Result<(), TestErr> {
 
         let star_api = machine_api.get_machine_star().await?;
 
-        let wrangles = tokio::time::timeout(Duration::from_secs(55), star_api.wrangle()).await??;
+        let wrangles = tokio::time::timeout(Duration::from_secs(55), star_api.wrangle())
+            .await
+            .unwrap()
+            .unwrap();
 
         println!("wrangles: {}", wrangles.wrangles.len());
 
         for kind in wrangles.wrangles.iter() {
-            println!("\tkind: {}", kind.kind.to_string());
+            println!("\tkind: {}", kind.key().to_string());
         }
 
         Ok(())
@@ -616,14 +590,14 @@ fn test_star_wrangle() -> Result<(), TestErr> {
 }
 
 #[test]
-fn test_golden_path() -> Result<(), TestErr> {
+fn test_golden_path() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestHyperverse::new();
+        let platform = MemCosmos::new();
         let machine_api = platform.machine();
 
         tokio::time::timeout(Duration::from_secs(1), machine_api.wait_ready())
@@ -633,7 +607,7 @@ fn test_golden_path() -> Result<(), TestErr> {
         let fold = StarKey::new(&"central".to_string(), &StarHandle::new("fold", 0));
         let star_api = machine_api.get_star(fold).await?;
 
-        // first test if we can bounce nexus which fold should be directly connected too
+        // first mem if we can bounce nexus which fold should be directly connected too
         let nexus = StarKey::new(&"central".to_string(), &StarHandle::new("nexus", 0));
         tokio::time::timeout(Duration::from_secs(5), star_api.bounce(nexus)).await??;
         println!("Ok");
@@ -648,19 +622,19 @@ fn test_golden_path() -> Result<(), TestErr> {
 }
 
 #[test]
-fn test_provision_and_assign() -> Result<(), TestErr> {
+fn test_provision_and_assign() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestHyperverse::new();
+        let platform = MemCosmos::new();
         let machine_api = platform.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
-        let logger = logger.point(Point::from_str("test-client").unwrap());
+        let logger = logger.point(Point::from_str("mem-client").unwrap());
 
-        tokio::time::timeout(Duration::from_secs(1), machine_api.wait_ready())
+        tokio::time::timeout(Duration::from_secs(5), machine_api.wait_ready())
             .await
             .unwrap();
 
@@ -669,21 +643,44 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
             logger: logger.clone(),
         };
 
-        let exchanger = Exchanger::new(
-            Point::from_str("client").unwrap().to_surface(),
-            Timeouts::default(),
-        );
-        let client =
-            HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger).unwrap();
+        let client = ControlClient::new(Box::new(factory))?;
+        client.wait_for_ready(Duration::from_secs(5)).await?;
+
         let transmitter = client.transmitter_builder().await?;
         let transmitter = transmitter.build();
 
+        tokio::time::sleep(Duration::from_secs(5)).await;
+
+        /*
+                let mut proto = DirectedProto::ping();
+                proto.method(CmdMethod::Bounce);
+                proto.to(Point::root().to_surface());
+        proto.track = true;
+                let reflect: Wave<Pong> = transmitter.direct(proto).await?;
+                println!("\tBOUNCE ROOT: {}", reflect.core.status.to_string());
+                assert!(reflect.core.is_ok());
+
+                let mut proto = DirectedProto::ping();
+                proto.method(CmdMethod::Bounce);
+                proto.to(Point::root().to_surface());
+        proto.track = true;
+                let reflect: Wave<Pong> = transmitter.direct(proto).await?;
+                println!("\tBOUNCE ROOT2: {}", reflect.core.status.to_string());
+                assert!(reflect.core.is_ok());
+
+                 */
+
+        /*
         let mut proto = DirectedProto::ping();
         proto.method(CmdMethod::Bounce);
-        proto.to(Point::root().to_surface());
+        proto.to(Point::global_executor().to_surface());
         let reflect: Wave<Pong> = transmitter.direct(proto).await?;
-        println!("{}", reflect.core.status.to_string());
+        println!("\tBOUNCE EXECUTOR: {}", reflect.core.status.to_string());
         assert!(reflect.core.is_ok());
+
+         */
+
+        //        assert!(transmitter.bounce(&Point::global_executor().to_surface()).await);
 
         let create = Create {
             template: Template::new(
@@ -697,9 +694,10 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
             strategy: Strategy::Override,
             state: StateSrc::None,
         };
-        let proto: DirectedProto = create.into();
+        let mut proto: DirectedProto = create.into();
+        //proto.track = true;
+
         let reflect: Wave<Pong> = transmitter.direct(proto).await?;
-        println!("{}", reflect.core.status.to_string());
         assert!(reflect.core.is_ok());
 
         tokio::time::sleep(Duration::from_secs(5)).await;
@@ -717,17 +715,17 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
 }
 
 #[test]
-fn test_control_cli() -> Result<(), TestErr> {
+fn test_control_cli() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestHyperverse::new();
+        let platform = MemCosmos::new();
         let machine_api = platform.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
-        let logger = logger.point(Point::from_str("test-client").unwrap());
+        let logger = logger.point(Point::from_str("mem-client").unwrap());
 
         tokio::time::timeout(Duration::from_secs(1), machine_api.wait_ready())
             .await
@@ -749,6 +747,95 @@ fn test_control_cli() -> Result<(), TestErr> {
 
         println!("{}", core.to_err().to_string());
         assert!(core.is_ok());
+        let core = cli.exec("create localhost:base<Base>").await?;
+        assert!(core.is_ok());
+
+        Ok(())
+    })
+}
+
+#[test]
+fn test_publish() -> Result<(), CosmicErr> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async move {
+        // let (final_tx, final_rx) = oneshot::channel();
+
+        let cosmos = MemCosmos::new();
+        let machine_api = cosmos.machine();
+        let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
+        let logger = logger.point(Point::from_str("mem-client").unwrap());
+
+        tokio::time::timeout(Duration::from_secs(10), machine_api.wait_ready())
+            .await
+            .unwrap();
+
+        let factory = MachineApiExtFactory {
+            machine_api,
+            logger: logger.clone(),
+        };
+
+        let client = ControlClient::new(Box::new(factory))?;
+        client.wait_for_ready(Duration::from_secs(5)).await?;
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+
+        let cli = client.new_cli_session().await?;
+
+        logger.result(cli.exec("create localhost<Space>")
+            .await
+            .unwrap()
+            .ok_or())
+            .unwrap();
+        cli.exec("create localhost:repo<Repo>")
+            .await
+            .unwrap()
+            .ok_or()
+            .unwrap();
+        cli.exec("create localhost:repo:my<BundleSeries>")
+            .await
+            .unwrap()
+            .ok_or()
+            .unwrap();
+
+        let mut command = RawCommand::new("publish ^[ bundle.zip ]-> localhost:repo:my:1.0.0");
+
+        let file_path = "mem/bundle.zip";
+        let bin = Arc::new(fs::read(file_path)?);
+        command.transfers.push(CmdTransfer::new("bundle.zip", bin));
+
+        let core = cli.raw(command).await?;
+
+        if !core.is_ok() {
+            if let Substance::Errors(ref e) = core.body {
+                println!("{}", e.to_string());
+            }
+        }
+
+        assert!(core.is_ok());
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let fetcher = Arc::new(ReadArtifactFetcher::new(client.transmitter_builder().await.unwrap().build()));
+        let artifacts = ArtifactApi::new(fetcher);
+
+        let point = Point::from_str("localhost:repo:my:1.0.0:/bind/app.bind").unwrap();
+        let bind = artifacts.bind( &point).await.unwrap();
+
+
+        let reflect = cli.exec("create localhost:my-app<Mechtron>{ +config=localhost:repo:my:1.0.0:/config/my-app.app }")
+            .await
+            .unwrap();
+
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        reflect.ok_or().unwrap();
+        assert!(reflect.is_ok());
+
+        let tx = client.transmitter_builder().await?.build();
+//        assert!(tx.bounce(&Point::from_str("localhost:my-app").unwrap().to_surface()).await);
+
 
         Ok(())
     })

@@ -1061,8 +1061,8 @@ impl AuditLogCollectorProc {
 }
 
 /*
-#[cfg(test)]
-mod test {
+#[cfg(mem)]
+mod mem {
     use std::fs;
     use std::str::FromStr;
 
@@ -1090,7 +1090,7 @@ mod test {
         std::env::set_var("STARLANE_CACHE", cache_dir);
     }
 
-    #[test]
+    #[mem]
     pub fn some_test() -> Result<(), Error> {
         let mut builder = tokio::runtime::Builder::new_multi_thread();
         let rt = builder.enable_time().enable_io().enable_all().build()?;

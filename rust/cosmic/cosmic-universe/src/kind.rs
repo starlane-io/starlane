@@ -6,12 +6,19 @@ use serde::{Deserialize, Serialize};
 
 use cosmic_nom::new_span;
 
-use crate::{KindTemplate, UniErr};
 use crate::hyper::ChildRegistry;
-use crate::loc::{CONTROL_WAVE_TRAVERSAL_PLAN, MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, ProvisionAffinity, STAR_WAVE_TRAVERSAL_PLAN, StarKey, STD_WAVE_TRAVERSAL_PLAN, ToBaseKind, Version};
-use crate::parse::{CamelCase, Domain, kind_parts, SkewerCase};
+use crate::loc::{
+    ProvisionAffinity, StarKey, ToBaseKind, Version, CONTROL_WAVE_TRAVERSAL_PLAN,
+    MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, STAR_WAVE_TRAVERSAL_PLAN,
+    STD_WAVE_TRAVERSAL_PLAN,
+};
+use crate::parse::{kind_parts, CamelCase, Domain, SkewerCase};
 use crate::particle::traversal::TraversalPlan;
-use crate::selector::{Pattern, SpecificSelector, VersionReq};
+use crate::selector::{
+    KindSelector, KindSelectorDef, Pattern, SpecificSelector, SubKindSelector, VersionReq,
+};
+use crate::util::ValuePattern;
+use crate::{KindTemplate, UniErr};
 
 impl ToBaseKind for KindParts {
     fn to_base(&self) -> BaseKind {
@@ -126,6 +133,8 @@ pub enum BaseKind {
     Star,
     Driver,
     Global,
+    Host,
+    Guest,
 }
 
 impl BaseKind {
@@ -235,6 +244,8 @@ pub enum Kind {
     UserBase(UserBaseSubKind),
     Star(StarSub),
     Global,
+    Host,
+    Guest,
 }
 
 impl ToBaseKind for Kind {
@@ -259,6 +270,8 @@ impl ToBaseKind for Kind {
             Kind::Star(_) => BaseKind::Star,
             Kind::Driver => BaseKind::Driver,
             Kind::Global => BaseKind::Global,
+            Kind::Host => BaseKind::Host,
+            Kind::Guest => BaseKind::Guest,
         }
     }
 }
@@ -276,6 +289,15 @@ impl Kind {
         match self.to_base() {
             BaseKind::Base => ProvisionAffinity::Local,
             _ => ProvisionAffinity::Wrangle,
+        }
+    }
+
+    pub fn is_auto_provision(&self) -> bool {
+        match self {
+            Kind::Bundle => true,
+            Kind::Artifact(_) => true,
+            Kind::Mechtron => true,
+            _ => false,
         }
     }
 
@@ -393,6 +415,8 @@ impl TryFrom<KindParts> for Kind {
             BaseKind::Repo => Kind::Repo,
             BaseKind::Driver => Kind::Driver,
             BaseKind::Global => Kind::Global,
+            BaseKind::Host => Kind::Host,
+            BaseKind::Guest => Kind::Guest,
         })
     }
 }
@@ -428,6 +452,18 @@ pub enum StarSub {
 }
 
 impl StarSub {
+    pub fn to_selector(&self) -> KindSelector {
+        KindSelector {
+            base: Pattern::Exact(BaseKind::Star),
+            sub: SubKindSelector::Exact(Some(self.to_camel_case())),
+            specific: ValuePattern::Any,
+        }
+    }
+
+    pub fn to_camel_case(&self) -> CamelCase {
+        CamelCase::from_str(self.to_string().as_str()).unwrap()
+    }
+
     pub fn is_forwarder(&self) -> bool {
         match self {
             StarSub::Nexus => true,
@@ -685,5 +721,21 @@ impl TryInto<SpecificSelector> for Specific {
             variant: Pattern::Exact(self.variant),
             version: VersionReq::from_str(self.version.to_string().as_str())?,
         })
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use crate::parse::kind_selector;
+    use crate::selector::KindSelector;
+    use crate::{Kind, StarSub, UniErr};
+    use core::str::FromStr;
+
+    #[test]
+    pub fn selector() -> Result<(), UniErr> {
+        let kind = Kind::Star(StarSub::Fold);
+        let selector = KindSelector::from_str("<Star<Fold>>")?;
+        assert!(selector.matches(&kind));
+        Ok(())
     }
 }

@@ -4,20 +4,26 @@ use std::ops::Deref;
 use std::process::Output;
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
-use chrono::serde::ts_milliseconds;
+use crate::{Agent, ToSubstance, ANONYMOUS};
 use regex::Regex;
 use serde;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::command::common::StateSrc::Substance;
-use crate::cosmic_timestamp;
 use crate::err::UniErr;
-use crate::loc::{Point, ToPoint, Uuid};
-use crate::parse::{CamelCase, to_string};
+use crate::loc::{Layer, Point, ToPoint, ToSurface, Uuid};
+use crate::parse::{to_string, CamelCase};
 use crate::selector::Selector;
+use crate::substance::LogSubstance;
 use crate::util::{timestamp, uuid};
+use crate::wasm::Timestamp;
+use crate::wave::core::cmd::CmdMethod;
+use crate::wave::exchange::synch::{ProtoTransmitter, ProtoTransmitterBuilder};
+use crate::wave::exchange::SetStrategy;
+use crate::wave::{
+    DirectedProto, Handling, HandlingKind, Priority, Retries, ToRecipients, WaitTime,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum Level {
@@ -68,43 +74,43 @@ pub enum LogSpanEventKind {
     Exit,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct LogSpanEvent {
+    pub point: Point,
     pub span: Uuid,
     pub kind: LogSpanEventKind,
     pub attributes: HashMap<String, String>,
-
-    #[serde(with = "ts_milliseconds")]
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
 }
 
 impl LogSpanEvent {
     pub fn new(
         span: &LogSpan,
+        point: &Point,
         kind: LogSpanEventKind,
         attributes: HashMap<String, String>,
     ) -> LogSpanEvent {
         LogSpanEvent {
             span: span.id.clone(),
+            point: point.clone(),
             kind,
             attributes,
-            timestamp: Utc::now(),
+            timestamp: timestamp(),
         }
     }
 }
 
 pub type TrailSpanId = Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct LogSpan {
     pub id: TrailSpanId,
     pub point: Point,
     pub mark: Point,
     pub action: Option<CamelCase>,
-    pub parent: Option<String>,
+    pub parent: Option<Uuid>,
     pub attributes: HashMap<String, String>,
-    #[serde(with = "ts_milliseconds")]
-    pub entry_timestamp: DateTime<Utc>,
+    pub entry_timestamp: Timestamp,
 }
 
 impl LogSpan {
@@ -116,7 +122,7 @@ impl LogSpan {
             action: None,
             parent: None,
             attributes: Default::default(),
-            entry_timestamp: Utc::now(),
+            entry_timestamp: timestamp(),
         }
     }
 
@@ -128,7 +134,7 @@ impl LogSpan {
             action: None,
             parent: Some(parent),
             attributes: Default::default(),
-            entry_timestamp: Utc::now(),
+            entry_timestamp: timestamp(),
         }
     }
 
@@ -140,17 +146,16 @@ impl LogSpan {
             action: None,
             parent: None,
             attributes: Default::default(),
-            entry_timestamp: Utc::now(),
+            entry_timestamp: timestamp(),
         });
         span.point = point;
         span
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PointlessLog {
-    #[serde(with = "ts_milliseconds")]
-    timestamp: DateTime<Utc>,
+    timestamp: Timestamp,
     message: String,
     level: Level,
 }
@@ -176,7 +181,7 @@ impl ToString for LogPayload {
 
 pub struct RootLogBuilder {
     pub point: Option<Point>,
-    pub span: Option<String>,
+    pub span: Option<Uuid>,
     pub logger: RootLogger,
     pub level: Level,
     pub message: Option<String>,
@@ -185,7 +190,7 @@ pub struct RootLogBuilder {
 }
 
 impl RootLogBuilder {
-    pub fn new(logger: RootLogger, span: Option<String>) -> Self {
+    pub fn new(logger: RootLogger, span: Option<Uuid>) -> Self {
         RootLogBuilder {
             logger,
             span,
@@ -390,6 +395,23 @@ impl RootLogger {
         }
     }
 }
+pub struct NoAppender {}
+
+impl NoAppender {
+    pub fn new() -> Self {
+        NoAppender {}
+    }
+}
+
+impl LogAppender for NoAppender {
+    fn log(&self, log: Log) {}
+
+    fn audit(&self, log: AuditLog) {}
+
+    fn span_event(&self, log: LogSpanEvent) {}
+
+    fn pointless(&self, log: PointlessLog) {}
+}
 
 pub struct StdOutAppender();
 
@@ -419,10 +441,76 @@ impl LogAppender for StdOutAppender {
         println!("audit log...")
     }
 
-    fn span_event(&self, log: LogSpanEvent) {}
+    fn span_event(&self, log: LogSpanEvent) {
+        /*         println!(
+                   "{} | Span({})",
+                   log.point.to_string(),
+                   log.span.to_string(),
+               )
+
+        */
+    }
 
     fn pointless(&self, log: PointlessLog) {
         println!("{}", log.message);
+    }
+}
+
+pub struct SynchTransmittingLogAppender {
+    transmitter: ProtoTransmitter,
+}
+
+impl SynchTransmittingLogAppender {
+    pub fn new(mut transmitter: ProtoTransmitterBuilder) -> Self {
+        transmitter.method = SetStrategy::Override(CmdMethod::Log.into());
+        transmitter.to = SetStrategy::Override(
+            Point::global_logger()
+                .to_surface()
+                .with_layer(Layer::Core)
+                .to_recipients(),
+        );
+        transmitter.handling = SetStrategy::Fill(Handling {
+            kind: HandlingKind::Durable,
+            priority: Priority::Low,
+            retries: Retries::Medium,
+            wait: WaitTime::High,
+        });
+        let transmitter = transmitter.build();
+        Self { transmitter }
+    }
+}
+
+impl LogAppender for SynchTransmittingLogAppender {
+    fn log(&self, log: Log) {
+        let mut directed = DirectedProto::signal();
+        directed.from(log.point.to_surface());
+        directed.agent(Agent::Point(log.point.clone()));
+        directed.body(LogSubstance::Log(log).into());
+        self.transmitter.signal(directed);
+    }
+
+    fn audit(&self, log: AuditLog) {
+        let mut directed = DirectedProto::signal();
+        directed.from(log.point.to_surface());
+        directed.agent(Agent::Point(log.point.clone()));
+        directed.body(LogSubstance::Audit(log).into());
+        self.transmitter.signal(directed);
+    }
+
+    fn span_event(&self, log: LogSpanEvent) {
+        let mut directed = DirectedProto::signal();
+        directed.from(log.point.to_surface());
+        directed.agent(Agent::Point(log.point.clone()));
+        directed.body(LogSubstance::Event(log).into());
+        self.transmitter.signal(directed);
+    }
+
+    fn pointless(&self, log: PointlessLog) {
+        let mut directed = DirectedProto::signal();
+        directed.from(Point::anonymous());
+        directed.agent(Agent::Anonymous);
+        directed.body(LogSubstance::Pointless(log).into());
+        self.transmitter.signal(directed);
     }
 }
 
@@ -432,6 +520,17 @@ pub struct PointLogger {
     pub point: Point,
     pub mark: Point,
     pub action: Option<CamelCase>,
+}
+
+impl Default for PointLogger {
+    fn default() -> Self {
+        Self {
+            logger: Default::default(),
+            point: Point::root(),
+            mark: Point::root(),
+            action: None,
+        }
+    }
 }
 
 impl PointLogger {
@@ -451,6 +550,7 @@ impl PointLogger {
         if new {
             self.logger.span_event(LogSpanEvent::new(
                 &span,
+                &self.point,
                 LogSpanEventKind::Entry,
                 Default::default(),
             ));
@@ -484,6 +584,7 @@ impl PointLogger {
 
         self.logger.span_event(LogSpanEvent::new(
             &span,
+            &self.point,
             LogSpanEventKind::Entry,
             Default::default(),
         ));
@@ -568,6 +669,27 @@ impl PointLogger {
             span: None,
             source: self.logger.source(),
         })
+    }
+
+    pub fn handle(&self, log: LogSubstance) {
+        match log {
+            LogSubstance::Log(log) => {
+                self.logger.log(log);
+            }
+            LogSubstance::Span(span) => {
+                println!("start log span...");
+                // not sure how to handle this
+            }
+            LogSubstance::Event(event) => {
+                self.logger.span_event(event);
+            }
+            LogSubstance::Audit(audit) => {
+                self.logger.audit(audit);
+            }
+            LogSubstance::Pointless(pointless) => {
+                self.logger.pointless(pointless);
+            }
+        }
     }
 
     pub fn trace<M>(&self, message: M)
@@ -686,7 +808,7 @@ impl PointLogger {
 }
 
 pub struct SpanLogBuilder {
-    pub entry_timestamp: DateTime<Utc>,
+    pub entry_timestamp: Timestamp,
     pub attributes: HashMap<String, String>,
 }
 
@@ -707,7 +829,7 @@ pub struct SpanLogger {
 }
 
 impl SpanLogger {
-    pub fn span_uuid(&self) -> String {
+    pub fn span_uuid(&self) -> Uuid {
         self.span.id.clone()
     }
 
@@ -756,7 +878,7 @@ impl SpanLogger {
         &self.span
     }
 
-    pub fn entry_timestamp(&self) -> DateTime<Utc> {
+    pub fn entry_timestamp(&self) -> Timestamp {
         self.span.entry_timestamp.clone()
     }
 
@@ -879,6 +1001,7 @@ impl Drop for SpanLogger {
         if self.commit_on_drop {
             let log = LogSpanEvent::new(
                 &self.span,
+                self.point(),
                 LogSpanEventKind::Exit,
                 self.span.attributes.clone(),
             );
@@ -947,12 +1070,12 @@ impl LogBuilder {
 pub struct AuditLogBuilder {
     logger: RootLogger,
     point: Point,
-    span: String,
+    span: Uuid,
     attributes: HashMap<String, String>,
 }
 
 impl AuditLogBuilder {
-    pub fn new(logger: RootLogger, point: Point, span: String) -> Self {
+    pub fn new(logger: RootLogger, point: Point, span: Uuid) -> Self {
         AuditLogBuilder {
             logger,
             point,
@@ -990,11 +1113,10 @@ impl AuditLogBuilder {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct AuditLog {
     pub point: Point,
-    #[serde(with = "ts_milliseconds")]
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
     pub metrics: HashMap<String, String>,
 }
 

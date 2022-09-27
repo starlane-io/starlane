@@ -1,5 +1,5 @@
-use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::RandomState;
+use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
@@ -19,9 +19,9 @@ use crate::lane::{
     LaneWrapper, OnCloseAction, ProtoLaneEnd, UltimaLaneKey,
 };
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
-use crate::star::{ForwardFrame, StarCommand, StarSkel};
 use crate::star::core::message::CoreMessageCall;
 use crate::star::shell::router::RouterCall;
+use crate::star::{ForwardFrame, StarCommand, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
 #[derive(Clone)]

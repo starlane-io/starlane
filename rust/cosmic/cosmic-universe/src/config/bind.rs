@@ -1,25 +1,23 @@
 use std::convert::TryInto;
 
+use crate::Bin;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::command::direct::Cmd;
-use crate::err::{ParseErrs, UniErr};
+use crate::err::UniErr;
 use crate::loc::{Point, PointCtx, PointVar, Topic};
-use crate::parse::{bind_config, Env};
 use crate::parse::model::{
     BindScope, MethodScope, PipelineSegment, PipelineSegmentDef, PipelineVar, RouteScope,
     ScopeFilters, WaveScope,
 };
+use crate::parse::{bind_config, Env};
 use crate::selector::PayloadBlock;
 use crate::selector::PayloadBlockDef;
 use crate::substance::{Call, CallDef, Substance, SubstancePattern};
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
-use crate::wave::{
-    DirectedWave, Ping, RecipientSelector,
-    SingularDirectedWave, Wave,
-};
 use crate::wave::core::{DirectedCore, MethodKind, MethodPattern};
+use crate::wave::{DirectedWave, Ping, RecipientSelector, SingularDirectedWave, Wave};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WaveDirection {
@@ -78,6 +76,15 @@ impl TryFrom<Vec<u8>> for BindConfig {
 
     fn try_from(doc: Vec<u8>) -> Result<Self, Self::Error> {
         let doc = String::from_utf8(doc)?;
+        bind_config(doc.as_str())
+    }
+}
+
+impl TryFrom<Bin> for BindConfig {
+    type Error = UniErr;
+
+    fn try_from(doc: Bin) -> Result<Self, Self::Error> {
+        let doc = String::from_utf8((*doc).clone())?;
         bind_config(doc.as_str())
     }
 }
@@ -255,6 +262,12 @@ pub struct RouteSelector {
     pub filters: ScopeFilters,
 }
 
+impl ToString for RouteSelector {
+    fn to_string(&self) -> String {
+        format!("{}", self.method.to_string())
+    }
+}
+
 impl RouteSelector {
     pub fn new(
         topic: Option<ValuePattern<Topic>>,
@@ -299,9 +312,12 @@ impl RouteSelector {
 
     pub fn is_match<'a>(&self, wave: &'a DirectedWave) -> Result<(), ()> {
         self.method.is_match(&wave.core().method)?;
-        match self.path.is_match(&wave.core().uri.path()) {
-            true => Ok(()),
-            false => Err(()),
-        }
+        Ok(())
+        /*        match self.path.is_match(&wave.core().uri.path()) {
+                   true => Ok(()),
+                   false => Err(()),
+               }
+
+        */
     }
 }

@@ -1244,7 +1244,7 @@ mod tests {
     }
 
     /*
-    #[test]
+    #[mem]
     fn test_key() -> Result<(), Error> {
         let space_key = SpaceKey::new(RootKey::new(), 0);
         let space_key: ResourceKey = space_key.into();

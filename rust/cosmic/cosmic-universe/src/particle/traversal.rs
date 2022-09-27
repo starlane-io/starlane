@@ -1,10 +1,10 @@
 use std::ops::{Deref, DerefMut};
 
-use crate::{ParticleRecord, Point, Surface, UniErr};
 use crate::loc::Layer;
 use crate::log::{SpanLogger, Trackable};
+use crate::wave::exchange::asynch::Exchanger;
 use crate::wave::{DirectedWave, Ping, Pong, ReflectedWave, SingularDirectedWave, UltraWave, Wave};
-use crate::wave::exchange::Exchanger;
+use crate::{ParticleRecord, Point, Surface, UniErr};
 
 #[async_trait]
 pub trait TraversalLayer {
@@ -143,11 +143,16 @@ impl TraversalPlan {
 pub struct TraversalInjection {
     pub injector: Surface,
     pub wave: UltraWave,
+    pub from_gravity: bool,
 }
 
 impl TraversalInjection {
     pub fn new(injector: Surface, wave: UltraWave) -> Self {
-        Self { injector, wave }
+        Self {
+            injector,
+            wave,
+            from_gravity: false,
+        }
     }
 }
 
@@ -255,6 +260,10 @@ impl<W> Traversal<W> {
             to,
             point,
         }
+    }
+
+    pub fn extract(self) -> W {
+        self.payload
     }
 
     pub fn with<N>(self, payload: N) -> Traversal<N> {
@@ -405,6 +414,13 @@ impl Traversal<UltraWave> {
 }
 
 impl Traversal<DirectedWave> {
+    pub fn wrap(self) -> Traversal<UltraWave> {
+        let ping = self.payload.clone();
+        self.with(ping.to_ultra())
+    }
+}
+
+impl Traversal<ReflectedWave> {
     pub fn wrap(self) -> Traversal<UltraWave> {
         let ping = self.payload.clone();
         self.with(ping.to_ultra())

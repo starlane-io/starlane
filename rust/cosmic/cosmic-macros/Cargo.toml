@@ -29,3 +29,4 @@ nom-supreme = "0.6.0"
 nom_locate = "4.0.0"
 serde = "1.0.79"
 chrono = { version="0.4.19", features=["serde"] }
+uuid = { version="1.1.2", features=["v4"] }

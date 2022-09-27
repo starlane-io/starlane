@@ -2,11 +2,13 @@ use std::ops::Deref;
 
 use serde::{Deserialize, Serialize};
 
-use crate::BindConfig;
+use crate::config::mechtron::MechtronConfig;
 use crate::loc::Point;
 use crate::particle::{Details, Stub};
+use crate::BindConfig;
 
 pub mod bind;
+pub mod mechtron;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PortalKind {
@@ -65,11 +67,10 @@ impl<Body> Deref for PointConfig<Body> {
 #[derive(Clone)]
 pub enum Document {
     BindConfig(BindConfig),
+    MechtronConfig(MechtronConfig),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ParticleConfigBody {
     pub details: Details,
 }
-
-

@@ -9,8 +9,8 @@ use proc_macro::TokenStream;
 
 use quote::quote;
 use quote::ToTokens;
-use syn::{Data, DeriveInput, parse_macro_input, PathArguments, Type};
 use syn::__private::TokenStream2;
+use syn::{parse_macro_input, Data, DeriveInput, PathArguments, Type};
 
 /// Takes a given enum (which in turn accepts child enums) and auto generates a `Parent::From` so the child
 /// can turn into the parent and a `TryInto<Child> for Parent` so the Parent can attempt to turn into the child.

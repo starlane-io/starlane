@@ -13,14 +13,15 @@ use direct::select::{SelectCtx, SelectVar};
 use direct::set::{Set, SetCtx, SetVar};
 use direct::write::{Write, WriteCtx, WriteVar};
 
-use crate::{Delete, Select, UniErr};
-use crate::parse::{command_line, Env};
 use crate::parse::error::result;
+use crate::parse::{command_line, Env};
 use crate::substance::{Bin, ChildSubstance};
 use crate::util::ToResolved;
 use crate::wave::core::cmd::CmdMethod;
+use crate::{Delete, Select, UniErr};
 
 pub mod common {
+    use std::collections::hash_map::Iter;
     use std::collections::HashMap;
     use std::convert::{TryFrom, TryInto};
     use std::ops::{Deref, DerefMut};
@@ -43,6 +44,22 @@ pub mod common {
     pub enum StateSrc {
         None,
         Substance(Box<Substance>),
+    }
+
+    impl StateSrc {
+        pub fn has_substance(&self) -> bool {
+            match self {
+                StateSrc::None => false,
+                StateSrc::Substance(_) => true,
+            }
+        }
+
+        pub fn get_substance(&self) -> Result<Substance, UniErr> {
+            match self {
+                StateSrc::None => Err(UniErr::from_500("state has no substance")),
+                StateSrc::Substance(substance) => Ok(*substance.clone()),
+            }
+        }
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -107,6 +124,10 @@ pub mod common {
                 }
             }
         }
+
+        pub fn iter(&self) -> Iter<'_, String, PropertyMod>{
+            self.map.iter()
+        }
     }
 
     impl Deref for SetProperties {
@@ -153,8 +174,8 @@ pub mod common {
 }
 
 pub mod direct {
-    use http::{HeaderMap, Request, StatusCode, Uri};
-    use http::status::InvalidStatusCode;
+    //    use http::status::InvalidStatusCode;
+    //    use http::{HeaderMap, Request, StatusCode, Uri};
     use serde::{Deserialize, Serialize};
 
     use crate::command::direct::create::Create;
@@ -168,8 +189,8 @@ pub mod direct {
     use crate::kind::{BaseKind, KindParts};
     use crate::loc::{Meta, Point};
     use crate::selector::KindSelector;
-    use crate::substance::{Errors, Substance};
     use crate::substance::Bin;
+    use crate::substance::{Errors, Substance};
     use crate::util::{ValueMatcher, ValuePattern};
     use crate::wave::core::ext::ExtMethod;
     use crate::wave::core::http2::HttpMethod;
@@ -338,30 +359,28 @@ pub mod direct {
 
     pub mod create {
         use std::convert::TryInto;
-        use std::sync::Arc;
         use std::sync::atomic::{AtomicU64, Ordering};
+        use std::sync::Arc;
 
         use serde::{Deserialize, Serialize};
         use tokio::sync::Mutex;
 
-        use crate::command::Command;
         use crate::command::common::{SetProperties, SetRegistry, StateSrc, StateSrcVar};
-        use crate::err::{ParseErrs, UniErr};
+        use crate::command::Command;
+        use crate::err::UniErr;
         use crate::kind::{BaseKind, KindParts};
-        use crate::loc::{
-            HostKey, Point, PointCtx, PointFactory, PointSeg, PointVar, ToSurface,
-        };
-        use crate::parse::{CamelCase, Env, ResolverErr};
+        use crate::loc::{HostKey, Point, PointCtx, PointFactory, PointSeg, PointVar, ToSurface};
         use crate::parse::model::Subst;
+        use crate::parse::{CamelCase, Env, ResolverErr};
         use crate::selector::SpecificSelector;
         use crate::substance::Bin;
         use crate::substance::Substance;
         use crate::util::{ConvertFrom, ToResolved};
-        use crate::wave::{DirectedProto, Ping, Wave};
         use crate::wave::core::cmd::CmdMethod;
-        use crate::wave::core::DirectedCore;
         use crate::wave::core::ext::ExtMethod;
         use crate::wave::core::hyp::HypMethod;
+        use crate::wave::core::DirectedCore;
+        use crate::wave::{DirectedProto, Ping, Wave};
 
         pub enum PointTemplateSeg {
             ExactSeg(PointSeg),
@@ -400,11 +419,7 @@ pub mod direct {
 
                 let template = TemplateCtx {
                     point,
-                    kind: KindTemplate {
-                        base: BaseKind::Bundle,
-                        sub: None,
-                        specific: None,
-                    },
+                    kind: self.kind,
                 };
                 Ok(template)
             }
@@ -415,11 +430,7 @@ pub mod direct {
 
                 let template = Template {
                     point,
-                    kind: KindTemplate {
-                        base: BaseKind::Bundle,
-                        sub: None,
-                        specific: None,
-                    },
+                    kind: self.kind,
                 };
                 Ok(template)
             }
@@ -590,7 +601,7 @@ pub mod direct {
 
         impl Into<DirectedCore> for Create {
             fn into(self) -> DirectedCore {
-                let mut request = DirectedCore::msg(ExtMethod::new("Command").unwrap());
+                let mut request = DirectedCore::ext(ExtMethod::new("Command").unwrap());
                 request.body = Substance::Command(Box::new(Command::Create(self)));
                 request
             }
@@ -599,7 +610,7 @@ pub mod direct {
         impl Into<DirectedProto> for Create {
             fn into(self) -> DirectedProto {
                 let mut request =
-                    DirectedProto::sys(Point::global_executor().to_surface(), HypMethod::Command);
+                    DirectedProto::cmd(Point::global_executor().to_surface(), CmdMethod::Command);
                 request.body(Substance::Command(Box::new(Command::Create(self))));
                 request
             }
@@ -1107,11 +1118,20 @@ pub struct RawCommand {
 }
 
 impl RawCommand {
-    pub fn new(line: String) -> Self {
+    pub fn new<S>(line: S) -> Self
+    where
+        S: ToString,
+    {
         Self {
-            line,
+            line: line.to_string(),
             transfers: vec![],
         }
+    }
+}
+
+impl ToString for RawCommand {
+    fn to_string(&self) -> String {
+        self.line.clone()
     }
 }
 

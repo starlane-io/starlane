@@ -7,12 +7,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
-use futures::future::{BoxFuture, join_all, select_all};
+use futures::future::{join_all, select_all, BoxFuture};
 use futures::FutureExt;
-use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::watch::Ref;
+use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use tracing::info;
 
 use cosmic_hyperlane::{
@@ -22,35 +22,36 @@ use cosmic_hyperlane::{
     LocalHyperwayGateUnlocker, MountInterchangeGate, SimpleGreeter,
     TokenAuthenticatorWithRemoteWhitelist,
 };
-use cosmic_universe::artifact::ArtifactApi;
+use cosmic_universe::artifact::{ArtifactApi, ArtifactFetcher, ReadArtifactFetcher};
 use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::{InterchangeKind, Knock};
 use cosmic_universe::kind::StarSub;
 use cosmic_universe::loc::{
-    ConstellationName, Layer, MachineName, Point, StarHandle, StarKey, Surface, ToPoint,
-    ToSurface,
+    ConstellationName, Layer, MachineName, Point, StarHandle, StarKey, Surface, ToPoint, ToSurface,
 };
 use cosmic_universe::log::{PointLogger, RootLogger};
-use cosmic_universe::particle::Status;
+use cosmic_universe::particle::{Status, Stub};
 use cosmic_universe::settings::Timeouts;
-use cosmic_universe::substance::Substance;
-use cosmic_universe::wave::{Agent, HyperWave, UltraWave};
+use cosmic_universe::substance::{Bin, Substance};
+use cosmic_universe::wave::exchange::asynch::Exchanger;
+use cosmic_universe::wave::exchange::SetStrategy;
+use cosmic_universe::wave::{Agent, DirectedProto, HyperWave, Pong, UltraWave, Wave};
+use cosmic_universe::wave::core::cmd::CmdMethod;
 
-use crate::{DriversBuilder, HyperErr, Hyperverse, Registry, RegistryApi};
-use crate::control::ControlDriverFactory;
 use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
+use crate::{Cosmos, DriversBuilder, HyperErr, Registry, RegistryApi};
 
 #[derive(Clone)]
 pub struct MachineApi<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     tx: mpsc::Sender<MachineCall<P>>,
 }
 
 impl<P> MachineApi<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(tx: mpsc::Sender<MachineCall<P>>) -> Self {
         Self { tx }
@@ -131,10 +132,10 @@ where
 #[derive(Clone)]
 pub struct MachineSkel<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub name: MachineName,
-    pub platform: P,
+    pub hyperverse: P,
     pub registry: Registry<P>,
     pub artifacts: ArtifactApi,
     pub logger: RootLogger,
@@ -148,7 +149,7 @@ where
 
 pub struct Machine<P>
 where
-    P: Hyperverse + 'static,
+    P: Cosmos + 'static,
 {
     pub skel: MachineSkel<P>,
     pub stars: Arc<HashMap<Point, HyperStarApi<P>>>,
@@ -162,7 +163,7 @@ where
 
 impl<P> Machine<P>
 where
-    P: Hyperverse + 'static,
+    P: Cosmos + 'static,
 {
     pub fn new(platform: P) -> MachineApi<P> {
         let (call_tx, call_rx) = mpsc::channel(1024);
@@ -206,7 +207,7 @@ where
             artifacts: platform.artifact_hub(),
             logger: platform.logger(),
             timeouts: Timeouts::default(),
-            platform: platform.clone(),
+            hyperverse: platform.clone(),
             api: machine_api.clone(),
             status_tx: mpsc_status_tx,
             status_rx: watch_status_rx,
@@ -235,7 +236,7 @@ where
 
             let star_hop = star_point.clone().to_surface().with_layer(Layer::Gravity);
 
-            let mut hyperway = Hyperway::new(star_hop.clone(), Agent::HyperUser);
+            let mut hyperway = Hyperway::new(star_hop.clone(), Agent::HyperUser, logger.clone());
             hyperway.transform_inbound(Box::new(LayerTransform::new(Layer::Gravity)));
 
             let hyperway_endpoint = hyperway.hyperway_endpoint_far(None).await;
@@ -243,7 +244,7 @@ where
             interchange.singular_to(star_hop.clone());
 
             let interchange = Arc::new(interchange);
-            let auth = skel.platform.star_auth(&star_template.key)?;
+            let auth = skel.hyperverse.star_auth(&star_template.key)?;
             let greeter = SimpleGreeter::new(star_hop.clone(), star_port.clone());
             let gate: Arc<dyn HyperGate> = Arc::new(MountInterchangeGate::new(
                 auth,
@@ -261,7 +262,7 @@ where
                             .to_point()
                             .to_surface()
                             .with_layer(Layer::Gravity);
-                        let hyperway = Hyperway::new(star, Agent::HyperUser);
+                        let hyperway = Hyperway::new(star, Agent::HyperUser, logger.clone());
                         interchange.add(hyperway).await;
                     }
                     StarCon::Connector(remote) => {
@@ -271,7 +272,7 @@ where
                             .to_point()
                             .to_surface()
                             .with_layer(Layer::Gravity);
-                        let hyperway = Hyperway::new(star, Agent::HyperUser);
+                        let hyperway = Hyperway::new(star, Agent::HyperUser, logger.clone());
                         interchange.add(hyperway).await;
                     }
                 }
@@ -291,7 +292,7 @@ where
 
         let mut gate_selector = Arc::new(HyperGateSelector::new(gates));
         let gate: Arc<dyn HyperGate> = gate_selector.clone();
-        skel.platform.start_services(&gate);
+        skel.hyperverse.start_services(&gate);
 
         let (machine_point, machine_star) = stars
             .iter()
@@ -364,8 +365,8 @@ where
         }
 
         let mut machine = Self {
-            skel,
-            logger,
+            skel: skel.clone(),
+            logger: logger.clone(),
             machine_star,
             stars,
             gate_selector,
@@ -373,6 +374,23 @@ where
             call_rx,
             termination_broadcast_tx: term_tx,
         };
+
+        /// SETUP ARTIFAC
+        let factory = MachineApiExtFactory {
+            machine_api: machine_api.clone(),
+            logger: logger.clone(),
+        };
+        let exchanger = Exchanger::new(
+            Point::from_str("artifact").unwrap().to_surface(),
+            Timeouts::default(),
+            logger.clone(),
+        );
+        let client =
+            HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger.clone())
+                .unwrap();
+
+        let fetcher = Arc::new(ClientArtifactFetcher::new(client, skel.registry.clone()));
+        skel.artifacts.set_fetcher(fetcher).await;
 
         machine.start().await;
         Ok(machine_api)
@@ -476,7 +494,7 @@ where
 
 pub enum MachineCall<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     Init,
     Terminate,
@@ -602,7 +620,7 @@ impl Default for MachineTemplate {
 
 pub struct MachineHyperwayEndpointFactory<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     from: StarKey,
     to: StarKey,
@@ -611,7 +629,7 @@ where
 
 impl<P> MachineHyperwayEndpointFactory<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(from: StarKey, to: StarKey, call_tx: mpsc::Sender<MachineCall<P>>) -> Self {
         Self { from, to, call_tx }
@@ -621,7 +639,7 @@ where
 #[async_trait]
 impl<P> HyperwayEndpointFactory for MachineHyperwayEndpointFactory<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     async fn create(
         &self,
@@ -639,5 +657,78 @@ where
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx.send(MachineCall::Knock { knock, rtn }).await;
         tokio::time::timeout(Duration::from_secs(60), rtn_rx).await??
+    }
+}
+
+pub struct MachineApiExtFactory<P>
+where
+    P: Cosmos,
+{
+    pub machine_api: MachineApi<P>,
+    pub logger: PointLogger,
+}
+
+#[async_trait]
+impl<P> HyperwayEndpointFactory for MachineApiExtFactory<P>
+where
+    P: Cosmos,
+{
+    async fn create(
+        &self,
+        status_tx: mpsc::Sender<HyperConnectionDetails>,
+    ) -> Result<HyperwayEndpoint, UniErr> {
+        let knock = Knock {
+            kind: InterchangeKind::DefaultControl,
+            auth: Box::new(Substance::Empty),
+            remote: None,
+        };
+        self.logger
+            .result_ctx("machine_api.knock()", self.machine_api.knock(knock).await)
+    }
+}
+
+pub struct ClientArtifactFetcher<P>
+where
+    P: Cosmos,
+{
+    pub registry: Registry<P>,
+    pub client: HyperClient,
+}
+
+impl<P> ClientArtifactFetcher<P>
+where
+    P: Cosmos,
+{
+    pub fn new(client: HyperClient, registry: Registry<P>) -> Self {
+        Self { client, registry }
+    }
+}
+
+#[async_trait]
+impl<P> ArtifactFetcher for ClientArtifactFetcher<P>
+where
+    P: Cosmos,
+{
+    async fn stub(&self, point: &Point) -> Result<Stub, UniErr> {
+        let record = self
+            .registry
+            .record(point)
+            .await
+            .map_err(|e| e.to_uni_err())?;
+        Ok(record.details.stub)
+    }
+
+    async fn fetch(&self, point: &Point) -> Result<Bin, UniErr> {
+        let transmitter = self.client.transmitter_builder().await?.build();
+
+        let mut wave = DirectedProto::ping();
+        wave.method(CmdMethod::Read);
+        wave.to(point.clone().to_surface().with_layer(Layer::Core));
+        let pong: Wave<Pong> = transmitter.direct(wave).await?;
+        if let Substance::Bin(bin) = pong.variant.core.body {
+            Ok(bin)
+        } else {
+            Err("expecting Bin encountered some other substance when fetching artifact".into())
+        }
     }
 }

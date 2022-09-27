@@ -8,8 +8,8 @@ use std::thread;
 use ascii::IntoAsciiString;
 use bytes::BytesMut;
 use handlebars::Handlebars;
-use http::{HeaderMap, HeaderValue, Response, Uri, Version};
 use http::header::{HeaderName, HOST};
+use http::{HeaderMap, HeaderValue, Response, Uri, Version};
 use httparse::{Header, Request};
 use nom::AsBytes;
 use nom_supreme::error::ErrorTree;
@@ -38,9 +38,9 @@ use crate::cache::ArtifactItem;
 use crate::error::Error;
 use crate::html::HTML;
 use crate::message::StarlaneMessenger;
-use crate::star::StarSkel;
-use crate::star::variant::{FrameVerdict, VariantCall};
 use crate::star::variant::web::parse::host_and_port;
+use crate::star::variant::{FrameVerdict, VariantCall};
+use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner};
 
 lazy_static! {
@@ -227,8 +227,8 @@ mod test {
     use cosmic_universe::span::new_span;
 
     use crate::error::Error;
-    use crate::star::variant::web::HostAndPort;
     use crate::star::variant::web::parse::host_and_port;
+    use crate::star::variant::web::HostAndPort;
 
     #[test]
     pub async fn path_regex() -> Result<(), Error> {

@@ -16,10 +16,7 @@ use std::cmp::Ordering;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use ::http::StatusCode;
-use chrono::{DateTime, Utc};
 use dashmap::{DashMap, DashSet};
-use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
@@ -32,14 +29,11 @@ use command::direct::select::{Select, SubSelect};
 use config::bind::BindConfig;
 use config::Document;
 use kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind};
-use loc::{
-    Point, Surface,
-    Uuid,
-};
+use loc::{Point, Surface, Uuid};
 use particle::{Details, Properties, Status, Stub};
 use selector::Selector;
-use substance::{Substance, SubstanceList, Token, ToSubstance};
 use substance::Bin;
+use substance::{Substance, SubstanceList, ToSubstance, Token};
 use wave::core::ReflectedCore;
 
 use crate::err::UniErr;
@@ -54,31 +48,36 @@ pub mod err;
 pub mod fail;
 pub mod frame;
 pub mod hyper;
-pub mod loc;
 pub mod kind;
+pub mod loc;
 pub mod log;
 pub mod parse;
 pub mod particle;
 pub mod path;
-pub mod settings;
 pub mod security;
 pub mod selector;
+pub mod settings;
 pub mod substance;
 pub mod util;
+pub mod wasm;
 pub mod wave;
 
 lazy_static! {
-    pub static ref VERSION: semver::Version = semver::Version::from_str(include_str!("VERSION").trim()).unwrap();
+    pub static ref VERSION: semver::Version =
+        semver::Version::from_str(include_str!("VERSION").trim()).unwrap();
     pub static ref HYPERUSER: Point = Point::from_str("hyperspace:users:hyperuser").expect("point");
     pub static ref ANONYMOUS: Point = Point::from_str("hyperspace:users:anonymous").expect("point");
 }
 
+/*
 pub fn cosmic_uuid() -> Uuid {
     uuid::Uuid::new_v4().to_string()
 }
 pub fn cosmic_timestamp() -> DateTime<Utc> {
     Utc::now()
 }
+
+ */
 
 #[cfg(test)]
 pub mod tests {

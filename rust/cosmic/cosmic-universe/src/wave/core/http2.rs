@@ -1,11 +1,11 @@
-use http::{HeaderMap, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 
 use crate::err::UniErr;
 use crate::loc::Meta;
 use crate::substance::{Errors, Substance};
 use crate::util::ValueMatcher;
-use crate::wave::core::{DirectedCore, Method, ReflectedCore};
+use crate::wave::core::{DirectedCore, HeaderMap, Method, ReflectedCore};
+use url::Url;
 
 #[derive(
     Debug,
@@ -30,51 +30,11 @@ pub enum HttpMethod {
     Patch,
 }
 
-impl Into<http::Method> for HttpMethod {
-    fn into(self) -> http::Method {
-        match self {
-            HttpMethod::Options => http::Method::OPTIONS,
-            HttpMethod::Get => http::Method::GET,
-            HttpMethod::Post => http::Method::POST,
-            HttpMethod::Put => http::Method::PUT,
-            HttpMethod::Delete => http::Method::DELETE,
-            HttpMethod::Head => http::Method::HEAD,
-            HttpMethod::Trace => http::Method::TRACE,
-            HttpMethod::Connect => http::Method::CONNECT,
-            HttpMethod::Patch => http::Method::PATCH,
-        }
-    }
-}
-
-impl TryFrom<http::Method> for HttpMethod {
-    type Error = UniErr;
-
-    fn try_from(method: http::Method) -> Result<Self, Self::Error> {
-        match method.as_str() {
-            "OPTIONS" => Ok(HttpMethod::Options),
-            "GET" => Ok(HttpMethod::Get),
-            "POST" => Ok(HttpMethod::Post),
-            "PUT" => Ok(HttpMethod::Put),
-            "DELETE" => Ok(HttpMethod::Delete),
-            "HEAD" => Ok(HttpMethod::Head),
-            "TRACE" => Ok(HttpMethod::Trace),
-            "CONNECT" => Ok(HttpMethod::Connect),
-            "PATCH" => Ok(HttpMethod::Patch),
-            _ => Err("http method extensions not supported".into()),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HttpRequest {
-    #[serde(with = "http_serde::method")]
-    pub method: http::Method,
-
-    #[serde(with = "http_serde::header_map")]
+    pub method: HttpMethod,
     pub headers: HeaderMap,
-
-    #[serde(with = "http_serde::uri")]
-    pub uri: Uri,
+    pub uri: Url,
     pub body: Substance,
 }
 
@@ -111,5 +71,35 @@ impl TryFrom<DirectedCore> for HttpRequest {
         } else {
             Err("expected Http".into())
         }
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub struct StatusCode {
+    pub code: u16,
+}
+
+impl StatusCode {
+    pub fn from_u16(code: u16) -> Result<Self, UniErr> {
+        Ok(Self { code })
+    }
+
+    pub fn as_u16(&self) -> u16 {
+        self.code
+    }
+
+    pub fn is_success(&self) -> bool {
+        self.code >= 200 && self.code <= 299
+    }
+}
+
+impl ToString for StatusCode {
+    fn to_string(&self) -> String {
+        self.code.to_string()
+    }
+}
+
+impl Default for StatusCode {
+    fn default() -> Self {
+        StatusCode::from_u16(200).unwrap()
     }
 }

@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 use futures::{FutureExt, StreamExt};
 use mysql::prelude::TextQuery;
-use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
 use sqlx::postgres::{PgArguments, PgPoolOptions, PgRow};
+use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
 use tokio::sync::mpsc;
 
 use cosmic_universe::command::direct::delete::Delete;
@@ -26,7 +26,6 @@ use cosmic_universe::security::{
 use cosmic_universe::selector::SubKindSelector;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties, SetRegistry};
-use mesh_portal::version::latest::entity::request::{Method, Rc};
 use mesh_portal::version::latest::entity::request::create::{
     Create, KindTemplate, PointSegFactory, Strategy,
 };
@@ -34,16 +33,17 @@ use mesh_portal::version::latest::entity::request::get::{Get, GetOp};
 use mesh_portal::version::latest::entity::request::query::{Query, QueryResult};
 use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoPayload};
 use mesh_portal::version::latest::entity::request::set::Set;
+use mesh_portal::version::latest::entity::request::{Method, Rc};
 use mesh_portal::version::latest::id::{KindParts, Point, Specific, Version};
 use mesh_portal::version::latest::messaging::ReqShell;
 use mesh_portal::version::latest::particle::{Properties, Property, Status, Stub};
 use mesh_portal::version::latest::payload::{PayloadMap, PrimitiveList, Substance};
+use mesh_portal::version::latest::selector::specific::{
+    ProductSelector, VariantSelector, VendorSelector,
+};
 use mesh_portal::version::latest::selector::{
     ExactSegment, GenericKindSelector, KindSelector, PointKindHierarchy, PointKindSeg,
     PointSegSelector, PointSelector,
-};
-use mesh_portal::version::latest::selector::specific::{
-    ProductSelector, VariantSelector, VendorSelector,
 };
 use mesh_portal::version::latest::util::ValuePattern;
 
@@ -520,7 +520,7 @@ impl Registry {
                 _ => {}
             }
 
-            match &hop.kind_selector.kind {
+            match &hop.kind_selector.base {
                 GenericKindSelector::Any => {}
                 GenericKindSelector::Exact(kind) => {
                     index = index + 1;
@@ -529,7 +529,7 @@ impl Registry {
                 }
             }
 
-            match &hop.kind_selector.kind {
+            match &hop.kind_selector.base {
                 GenericKindSelector::Any => {}
                 GenericKindSelector::Exact(kind) => match &hop.kind_selector.sub {
                     SubKindSelector::Any => {}
@@ -1452,12 +1452,12 @@ pub mod test {
         assert_eq!(access.has_super(), false);
         assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
 
-        // test masked OR permissions
+        // mem masked OR permissions
         let access = registry.access(&scott, &mechtron).await?;
         assert_eq!(access.has_super(), false);
         assert_eq!(access.permissions().to_string(), "csd-RwX".to_string());
 
-        // now test AND permissions (masking Read)
+        // now mem AND permissions (masking Read)
         let grant = AccessGrant {
             kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("&csd-rwX")?),
             on_point: PointSelector::from_str("localhost:app:**<Mechtron>")?,

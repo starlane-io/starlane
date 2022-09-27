@@ -4,42 +4,42 @@ use std::sync::Arc;
 
 use cosmic_nom::new_span;
 use cosmic_universe::artifact::ArtRef;
-use cosmic_universe::command::Command;
 use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::direct::create::{Create, PointSegTemplate, Strategy};
+use cosmic_universe::command::Command;
 use cosmic_universe::command::RawCommand;
 use cosmic_universe::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::{Assign, AssignmentKind, HyperSubstance};
-use cosmic_universe::HYPERUSER;
 use cosmic_universe::kind::Kind;
 use cosmic_universe::loc::{Layer, Point, Surface, ToPoint, ToSurface};
 use cosmic_universe::log::{PointLogger, RootLogger};
-use cosmic_universe::parse::{bind_config, command_line};
 use cosmic_universe::parse::error::result;
 use cosmic_universe::parse::route_attribute;
+use cosmic_universe::parse::{bind_config, command_line};
 use cosmic_universe::particle::{Details, Status};
 use cosmic_universe::substance::Substance;
 use cosmic_universe::util::{log, ToResolved};
-use cosmic_universe::wave::{
-    Agent, DirectedProto, Handling, Pong,
-    Scope, Wave,
-};
-use cosmic_universe::wave::core::CoreBounce;
 use cosmic_universe::wave::core::hyp::HypMethod;
+use cosmic_universe::wave::core::CoreBounce;
 use cosmic_universe::wave::core::ReflectedCore;
-use cosmic_universe::wave::exchange::{DirectedHandlerSelector, ProtoTransmitter, ProtoTransmitterBuilder, Router, SetStrategy};
-use cosmic_universe::wave::exchange::{DirectedHandler, Exchanger, InCtx};
-use cosmic_universe::wave::exchange::DirectedHandlerShell;
-use cosmic_universe::wave::exchange::RootInCtx;
+use cosmic_universe::wave::exchange::asynch::DirectedHandlerShell;
+use cosmic_universe::wave::exchange::asynch::Exchanger;
+use cosmic_universe::wave::exchange::asynch::{
+    DirectedHandler, DirectedHandlerSelector, InCtx, RootInCtx,
+};
+use cosmic_universe::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder, Router};
+use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::RecipientSelector;
+use cosmic_universe::wave::{Agent, DirectedProto, Handling, Pong, Scope, Wave};
+use cosmic_universe::HYPERUSER;
 
-use crate::{DriverFactory, HyperErr, Hyperverse, Registry};
 use crate::driver::{
     Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere,
 };
+use crate::star::{HyperStarSkel, SmartLocator};
 use crate::Registration;
-use crate::star::HyperStarSkel;
+use crate::{Cosmos, DriverFactory, HyperErr, Registry};
 
 /*
 #[derive(DirectedHandler,Clone)]
@@ -73,14 +73,14 @@ fn global_bind() -> BindConfig {
 #[derive(Clone, DirectedHandler)]
 pub struct GlobalCommandExecutionHandler<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     skel: HyperStarSkel<P>,
 }
 
 impl<P> GlobalCommandExecutionHandler<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(skel: HyperStarSkel<P>) -> Self {
         Self { skel }
@@ -90,7 +90,7 @@ where
 #[handler]
 impl<P> GlobalCommandExecutionHandler<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     #[route("Cmd<RawCommand>")]
     pub async fn raw(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, P::Err> {
@@ -102,7 +102,7 @@ where
         self.command(ctx).await
     }
 
-    #[route("Hyp<Command>")]
+    #[route("Cmd<Command>")]
     pub async fn command(&self, ctx: InCtx<'_, Command>) -> Result<ReflectedCore, P::Err> {
         let global = GlobalExecutionChamber::new(self.skel.clone());
         let agent = ctx.wave().agent().clone();
@@ -120,7 +120,7 @@ where
 
 pub struct GlobalExecutionChamber<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub skel: HyperStarSkel<P>,
     pub logger: PointLogger,
@@ -128,7 +128,7 @@ where
 
 impl<P> GlobalExecutionChamber<P>
 where
-    P: Hyperverse,
+    P: Cosmos,
 {
     pub fn new(skel: HyperStarSkel<P>) -> Self {
         let logger = skel.logger.push_point("global").unwrap();
@@ -140,7 +140,7 @@ where
         let child_kind = self
             .skel
             .machine
-            .platform
+            .hyperverse
             .select_kind(&create.template.kind)
             .map_err(|err| {
                 P::Err::new(format!(
@@ -162,12 +162,12 @@ where
                 let properties = self
                     .skel
                     .machine
-                    .platform
+                    .hyperverse
                     .properties_config(&child_kind)
                     .fill_create_defaults(&create.properties)?;
                 self.skel
                     .machine
-                    .platform
+                    .hyperverse
                     .properties_config(&child_kind)
                     .check_create(&properties)?;
 
@@ -207,6 +207,15 @@ where
                 self.skel.registry.register(&registration).await?
             }
         };
+
+        if create.state.has_substance() || details.stub.kind.is_auto_provision() {
+            let provisioner = SmartLocator::new(self.skel.clone());
+            //tokio::spawn(async move {
+            provisioner
+                .provision(&details.stub.point, create.state.clone())
+                .await?;
+            //});
+        }
 
         Ok(details)
     }

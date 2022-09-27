@@ -3,16 +3,16 @@ use std::collections::{HashMap, HashSet};
 use nom::bytes::complete::take_till1;
 use nom::character::complete::anychar;
 use nom::error::{context, VerboseError};
-use nom::IResult;
 use nom::multi::many1;
 use nom::sequence::tuple;
+use nom::IResult;
 use quote::__private::TokenStream;
 use quote::quote;
+use syn::parse::{Parse, ParseStream};
 use syn::{
-    Expr, Ident, Item, ItemEnum, Lit, Meta, MetaList, MetaNameValue, NestedMeta, parse_macro_input,
+    parse_macro_input, Expr, Ident, Item, ItemEnum, Lit, Meta, MetaList, MetaNameValue, NestedMeta,
     Path, PathArguments, Token, Type, Visibility,
 };
-use syn::parse::{Parse, ParseStream};
 
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
 

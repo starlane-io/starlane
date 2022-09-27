@@ -9,8 +9,8 @@ use tokio::sync::{mpsc, oneshot};
 
 use cosmic_universe::command::Command;
 use cosmic_universe::kind::BaseKind;
-use mesh_portal::version::latest::entity::request::Rc;
 use mesh_portal::version::latest::entity::request::set::Set;
+use mesh_portal::version::latest::entity::request::Rc;
 use mesh_portal::version::latest::fail;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{ReqShell, RespShell};

@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 use std::str::FromStr;
-use std::sync::Arc;
 use std::sync::atomic::AtomicU32;
+use std::sync::Arc;
 
 use clap::{App, AppSettings};
 use yaml_rust::Yaml;

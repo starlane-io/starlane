@@ -1,11 +1,11 @@
-use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::RandomState;
+use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::future::Future;
 
 use mysql::uuid::Uuid;
-use tokio::sync::{mpsc, oneshot};
 use tokio::sync::mpsc::Sender;
+use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
 
 use cosmic_universe::hyper::{Location, ParticleRecord};
@@ -17,10 +17,10 @@ use crate::frame::{Frame, ProtoFrame, StarMessage, WatchFrame};
 use crate::lane::{LaneKey, LaneSession, UltimaLaneKey};
 use crate::message::{ProtoStarMessage, ProtoStarMessageTo};
 use crate::star::core::message::CoreMessageCall;
-use crate::star::StarSkel;
 use crate::star::variant::FrameVerdict;
+use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use crate::watch::{Notification, Topic, Watch, Watcher, WatchKey, WatchSelector, WatchStub};
+use crate::watch::{Notification, Topic, Watch, WatchKey, WatchSelector, WatchStub, Watcher};
 
 #[derive(Clone)]
 pub struct WatchApi {

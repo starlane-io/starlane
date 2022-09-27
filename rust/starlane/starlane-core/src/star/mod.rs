@@ -1,30 +1,30 @@
-use std::cmp::{min, Ordering};
 use std::cmp;
+use std::cmp::{min, Ordering};
 use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
-use std::fmt::{Debug, Formatter};
 use std::fmt;
+use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::iter::FromIterator;
 use std::num::ParseIntError;
 use std::str::FromStr;
-use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use futures::future::select_all;
 use futures::FutureExt;
 use lru::LruCache;
-use mysql::{FromRowError, Row};
 use mysql::prelude::FromRow;
+use mysql::{FromRowError, Row};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::digit1;
 use nom::combinator::all_consuming;
 use nom::error::{ErrorKind, ParseError, VerboseError};
 use nom::multi::many0;
-use nom::Parser;
 use nom::sequence::{delimited, preceded, terminated, tuple};
+use nom::Parser;
 use nom_supreme::error::ErrorTree;
 use serde::{Deserialize, Serialize};
 use shell::search::{
@@ -55,7 +55,7 @@ use crate::lane::{
     ConnectorController, LaneCommand, LaneEnd, LaneIndex, LaneMeta, LaneWrapper, ProtoLaneEnd,
     UltimaLaneKey,
 };
-use crate::logger::{Flags, Logger, LogInfo};
+use crate::logger::{Flags, LogInfo, Logger};
 use crate::message::{
     MessageId, MessageReplyTracker, MessageResult, MessageUpdate, ProtoStarMessage,
     ProtoStarMessageTo, TrackerJob,
@@ -503,7 +503,7 @@ impl Star {
                         //                        self.logger.tx.push(tx);
                     }
                     StarCommand::Test(_test) => {
-                        /*                        match test
+                        /*                        match mem
                                                {
                                                    StarTest::StarSearchForStarKey(star) => {
                                                        let search = Search{

@@ -1,4 +1,3 @@
-use std::{fs, thread};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::convert::TryInto;
@@ -6,9 +5,10 @@ use std::fs::{DirBuilder, File};
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::{Arc, mpsc};
+use std::sync::{mpsc, Arc};
+use std::{fs, thread};
 
-use notify::{Op, raw_watcher, RawEvent, RecursiveMode, Watcher};
+use notify::{raw_watcher, Op, RawEvent, RecursiveMode, Watcher};
 use tokio::fs::ReadDir;
 use tokio::io::AsyncReadExt;
 use tokio::sync::mpsc::Sender;

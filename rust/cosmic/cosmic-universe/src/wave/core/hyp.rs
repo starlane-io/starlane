@@ -14,8 +14,8 @@ use crate::util::ValueMatcher;
     strum_macros::EnumString,
 )]
 pub enum HypMethod {
-    Command,
     Assign,
+    Host,
     Provision,
     Knock,
     Hop,

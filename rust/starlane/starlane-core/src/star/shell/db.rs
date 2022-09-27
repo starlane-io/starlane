@@ -3,9 +3,9 @@ use std::iter::FromIterator;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
 use sqlx::error::DatabaseError;
 use sqlx::postgres::{PgArguments, PgColumn, PgPoolOptions, PgRow};
+use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
 
 use cosmic_universe::loc::StarKey;
 

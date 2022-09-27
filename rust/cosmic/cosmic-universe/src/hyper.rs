@@ -5,21 +5,23 @@ use serde::{Deserialize, Serialize};
 
 use cosmic_macros_primitive::Autobox;
 
-use crate::Agent;
 use crate::command::common::StateSrc;
+use crate::config::mechtron::MechtronConfig;
 use crate::err::UniErr;
 use crate::kind::{Kind, KindParts, StarSub};
 use crate::loc::{Point, StarKey, Surface, ToPoint, ToSurface};
 use crate::log::Log;
+use crate::parse::SkewerCase;
 use crate::particle::{Details, Status, Stub};
+use crate::selector::KindSelector;
 use crate::substance::Substance;
-use crate::wave::{
-    Ping, Pong, ReflectedKind, ReflectedProto, ToRecipients,
-    UltraWave, Wave, WaveId, WaveKind,
-};
-use crate::wave::core::{DirectedCore, ReflectedCore};
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::hyp::HypMethod;
+use crate::wave::core::{DirectedCore, ReflectedCore};
+use crate::wave::{
+    Ping, Pong, ReflectedKind, ReflectedProto, ToRecipients, UltraWave, Wave, WaveId, WaveKind,
+};
+use crate::{Agent, Document};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {
@@ -68,7 +70,32 @@ impl Location {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParticleRecord {
     pub details: Details,
-    pub location: Option<Point>,
+    pub location: Option<ParticleLocation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct ParticleLocation {
+    pub star: Point,
+    pub host: Option<Point>,
+}
+
+impl ParticleLocation {
+    pub fn new(star: Point, host: Option<Point>) -> Self {
+        Self { star, host }
+    }
+}
+
+impl From<ParticleLocation> for ReflectedCore {
+    fn from(location: ParticleLocation) -> Self {
+        let location = Substance::Location(location);
+        ReflectedCore::ok_body(location)
+    }
+}
+
+impl Default for ParticleLocation {
+    fn default() -> Self {
+        ParticleLocation::new(Point::central(), None)
+    }
 }
 
 impl Default for ParticleRecord {
@@ -78,11 +105,8 @@ impl Default for ParticleRecord {
 }
 
 impl ParticleRecord {
-    pub fn new(details: Details, point: Point) -> Self {
-        ParticleRecord {
-            details,
-            location: Some(point),
-        }
+    pub fn new(details: Details, location: Option<ParticleLocation>) -> Self {
+        ParticleRecord { details, location }
     }
 
     pub fn root() -> Self {
@@ -95,7 +119,7 @@ impl ParticleRecord {
                 },
                 properties: Default::default(),
             },
-            location: Some(Point::central()),
+            location: Some(Default::default()),
         }
     }
 }
@@ -150,6 +174,34 @@ pub struct Assign {
     pub state: StateSrc,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct HostCmd {
+    pub kind: AssignmentKind,
+    pub details: Details,
+    pub state: StateSrc,
+    pub config: MechtronConfig,
+}
+
+impl HostCmd {
+    pub fn kind(&self) -> &Kind {
+        &self.details.stub.kind
+    }
+
+    pub fn new(
+        kind: AssignmentKind,
+        details: Details,
+        state: StateSrc,
+        config: MechtronConfig,
+    ) -> Self {
+        Self {
+            kind,
+            details,
+            state,
+            config,
+        }
+    }
+}
+
 impl Assign {
     pub fn kind(&self) -> &Kind {
         &self.details.stub.kind
@@ -162,12 +214,22 @@ impl Assign {
             state,
         }
     }
+
+    pub fn to_host_cmd(self, config: MechtronConfig) -> HostCmd {
+        HostCmd {
+            kind: self.kind,
+            details: self.details,
+            state: self.state,
+            config,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Autobox)]
 pub enum HyperSubstance {
     Provision(Provision),
     Assign(Assign),
+    Host(HostCmd),
     Event(HyperEvent),
     Log(Log),
     Search(Search),
@@ -186,7 +248,7 @@ pub struct Discovery {
     pub star_kind: StarSub,
     pub hops: u16,
     pub star_key: StarKey,
-    pub kinds: HashSet<Kind>,
+    pub kinds: HashSet<KindSelector>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]

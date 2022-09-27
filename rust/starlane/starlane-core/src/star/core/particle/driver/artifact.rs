@@ -14,10 +14,10 @@ use zip::result::ZipResult;
 use cosmic_universe::hyper::Assign;
 use cosmic_universe::kind::{ArtifactSubKind, BaseKind, Kind};
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
-use mesh_portal::version::latest::entity::request::{Method, Rc};
 use mesh_portal::version::latest::entity::request::create::{
     Create, KindTemplate, PointSegFactory, PointTemplate, Strategy, Template,
 };
+use mesh_portal::version::latest::entity::request::{Method, Rc};
 use mesh_portal::version::latest::id::{AddressAndKind, KindParts, Point, RouteSegment};
 use mesh_portal::version::latest::messaging::ReqShell;
 use mesh_portal::version::latest::payload::Substance;
