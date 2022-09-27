@@ -1994,9 +1994,9 @@ mod tests {
     }
 
     /*
-    #[tokio::test]
+    #[tokio::mem]
     async fn hyper_test() {
-        let point = Point::from_str("test").unwrap();
+        let point = Point::from_str("mem").unwrap();
         let logger = RootLogger::default().point(point.clone());
         let interchange = Arc::new(HyperwayInterchange::new(
             logger.push("interchange").unwrap(),
@@ -2303,7 +2303,7 @@ pub mod test {
 
     #[tokio::test]
     pub async fn test_hyperlane() {
-        let hyperlane = Hyperlane::new("test");
+        let hyperlane = Hyperlane::new("mem");
         let mut rx = hyperlane.rx(None).await;
         let wave = hello_wave();
         let wave_id = wave.id().clone();
@@ -2347,7 +2347,7 @@ pub mod test {
     }
 
     /*
-    #[tokio::test]
+    #[tokio::mem]
     pub async fn test_hyperway_ext() {
         let hyperway = Hyperway::new(LESS.clone().to_port(), LESS.to_agent());
 

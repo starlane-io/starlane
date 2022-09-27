@@ -266,7 +266,7 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
     log(route_attribute_value(attr.to_string().as_str())).expect("valid route selector");
 
     //    attr.to_tokens().next();
-    // we do this just to test for a valid selector...
+    // we do this just to mem for a valid selector...
     //log(wrapped_route_selector(attr.tokens.to_string().as_str())).expect("properly formatted route selector");
 
     let params: Vec<FnArg> = input.sig.inputs.clone().into_iter().collect();

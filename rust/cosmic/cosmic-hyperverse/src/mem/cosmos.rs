@@ -7,7 +7,7 @@ use crate::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
 use crate::driver::root::RootDriverFactory;
 use crate::driver::space::SpaceDriverFactory;
 use crate::driver::DriverAvail;
-use crate::test::registry::{TestRegistryApi, TestRegistryContext};
+use crate::mem::registry::{MemRegCtx, MemRegApi};
 use crate::{Cosmos, DriversBuilder, HyperErr, MachineTemplate, Registry};
 use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, LocalHyperwayGateJumper};
 use cosmic_universe::artifact::{ArtifactApi, ReadArtifactFetcher};
@@ -25,24 +25,25 @@ use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
+use crate::err::CosmicErr;
 
-impl TestCosmos {
+impl MemCosmos {
     pub fn new() -> Self {
         Self {
-            ctx: TestRegistryContext::new(),
+            ctx: MemRegCtx::new(),
         }
     }
 }
 
 #[derive(Clone)]
-pub struct TestCosmos {
-    pub ctx: TestRegistryContext,
+pub struct MemCosmos {
+    pub ctx: MemRegCtx,
 }
 
 #[async_trait]
-impl Cosmos for TestCosmos {
-    type Err = TestErr;
-    type RegistryContext = TestRegistryContext;
+impl Cosmos for MemCosmos {
+    type Err = CosmicErr;
+    type RegistryContext = MemRegCtx;
     type StarAuth = AnonHyperAuthenticator;
     type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
 
@@ -62,7 +63,7 @@ impl Cosmos for TestCosmos {
     }
 
     fn machine_name(&self) -> MachineName {
-        "test".to_string()
+        "mem".to_string()
     }
 
     fn properties_config(&self, kind: &Kind) -> PropertiesConfig {
@@ -118,7 +119,7 @@ impl Cosmos for TestCosmos {
     }
 
     async fn global_registry(&self) -> Result<Registry<Self>, Self::Err> {
-        Ok(Arc::new(TestRegistryApi::new(self.ctx.clone())))
+        Ok(Arc::new(MemRegApi::new(self.ctx.clone())))
     }
 
     async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>, Self::Err> {
@@ -137,181 +138,4 @@ impl Cosmos for TestCosmos {
      */
 
     fn start_services(&self, gate: &Arc<dyn HyperGate>) {}
-}
-
-#[derive(Debug, Clone)]
-pub struct TestErr {
-    pub message: String,
-}
-
-impl TestErr {
-    pub fn new<S: ToString>(message: S) -> Self {
-        Self {
-            message: message.to_string(),
-        }
-    }
-}
-
-impl ToString for TestErr {
-    fn to_string(&self) -> String {
-        self.message.clone()
-    }
-}
-
-impl Into<UniErr> for TestErr {
-    fn into(self) -> UniErr {
-        UniErr::from_500(self.to_string())
-    }
-}
-
-impl From<oneshot::error::RecvError> for TestErr {
-    fn from(err: RecvError) -> Self {
-        TestErr {
-            message: err.to_string(),
-        }
-    }
-}
-
-impl From<Elapsed> for TestErr {
-    fn from(err: Elapsed) -> Self {
-        TestErr {
-            message: err.to_string(),
-        }
-    }
-}
-
-impl From<String> for TestErr {
-    fn from(err: String) -> Self {
-        TestErr { message: err }
-    }
-}
-
-impl From<&'static str> for TestErr {
-    fn from(err: &'static str) -> Self {
-        TestErr {
-            message: err.to_string(),
-        }
-    }
-}
-
-impl From<UniErr> for TestErr {
-    fn from(err: UniErr) -> Self {
-        Self {
-            message: err.to_string(),
-        }
-    }
-}
-
-impl From<io::Error> for TestErr {
-    fn from(err: Error) -> Self {
-        Self {
-            message: err.to_string(),
-        }
-    }
-}
-
-impl From<acid_store::Error> for TestErr {
-    fn from(e: acid_store::Error) -> Self {
-        Self {
-            message: e.to_string(),
-        }
-    }
-}
-
-impl From<zip::result::ZipError> for TestErr {
-    fn from(a: zip::result::ZipError) -> Self {
-        Self {
-            message: a.to_string(),
-        }
-    }
-}
-
-impl From<Box<bincode::ErrorKind>> for TestErr {
-    fn from(e: Box<bincode::ErrorKind>) -> Self {
-        Self {
-            message: e.to_string(),
-        }
-    }
-}
-
-impl HostErr for TestErr {
-    fn to_uni_err(self) -> UniErr {
-        UniErr::from_500(self.to_string())
-    }
-}
-
-impl From<CompileError> for TestErr {
-    fn from(e: CompileError) -> Self {
-        Self {
-            message: e.to_string(),
-        }
-    }
-}
-
-impl From<RuntimeError> for TestErr {
-    fn from(e: RuntimeError) -> Self {
-        Self {
-            message: e.to_string(),
-        }
-    }
-}
-
-impl From<ExportError> for TestErr {
-    fn from(e: ExportError) -> Self {
-        Self {
-            message: e.to_string(),
-        }
-    }
-}
-
-impl From<Utf8Error> for TestErr {
-    fn from(e: Utf8Error) -> Self {
-        Self {
-            message: e.to_string(),
-        }
-    }
-}
-
-impl From<FromUtf8Error> for TestErr {
-    fn from(e: FromUtf8Error) -> Self {
-        Self {
-            message: e.to_string(),
-        }
-    }
-}
-
-impl From<InstantiationError> for TestErr {
-    fn from(e: InstantiationError) -> Self {
-        Self {
-            message: e.to_string(),
-        }
-    }
-}
-
-impl HyperErr for TestErr {
-    fn to_uni_err(&self) -> UniErr {
-        UniErr::from_500(self.to_string())
-    }
-
-    fn new<S>(message: S) -> Self
-    where
-        S: ToString,
-    {
-        Self {
-            message: message.to_string(),
-        }
-    }
-
-    fn status_msg<S>(status: u16, message: S) -> Self
-    where
-        S: ToString,
-    {
-        Self {
-            message: message.to_string(),
-        }
-    }
-
-    fn status(&self) -> u16 {
-        500u16
-    }
 }

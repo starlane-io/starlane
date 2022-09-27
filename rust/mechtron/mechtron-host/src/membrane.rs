@@ -189,7 +189,7 @@ where
                 Err(e) => {
                     self.log_wasm(
                         "host",
-                        format!("failed: write_string() test {:?}", e).as_str(),
+                        format!("failed: write_string() mem {:?}", e).as_str(),
                     );
                     pass = false;
                 }
@@ -323,13 +323,13 @@ where
     }
 
     pub async fn test_endless_loop(&self) -> Result<(), P::Err> {
-        println!("test endless loop");
+        println!("mem endless loop");
         self.instance
             .exports
             .get_native_function::<(), ()>("mechtron_guest_example_test_endless_loop")
             .unwrap()
             .call()?;
-        println!("test endless loop... done");
+        println!("mem endless loop... done");
         Ok(())
     }
 }

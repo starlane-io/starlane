@@ -505,7 +505,7 @@ mod tests {
     }
 
     /*
-    #[test]
+    #[mem]
     fn test_parse_resource_value_selector() -> Result<(), Error> {
         let (leftover, result)= parse_resource_value_selector("hello:my::state")?;
         let selector = result?;
@@ -547,7 +547,7 @@ mod tests {
     }
 
 
-    #[test]
+    #[mem]
     fn test_parse_resource_property_assignment() -> Result<(), Error> {
         let (leftover, result)= parse_resource_property_assignment("hello:my::config=future:friend")?;
         let assignment = result?;

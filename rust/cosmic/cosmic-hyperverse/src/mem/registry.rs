@@ -1,5 +1,5 @@
-use crate::test::cosmos::TestCosmos;
-use crate::test::cosmos::TestErr;
+use crate::mem::cosmos::MemCosmos;
+use crate::err::CosmicErr;
 use crate::{Registration, RegistryApi};
 use cosmic_universe::command::common::{PropertyMod, SetProperties};
 use cosmic_universe::command::direct::delete::Delete;
@@ -18,7 +18,7 @@ use dashmap::mapref::one::Ref;
 use tokio::sync::oneshot;
 use cosmic_universe::parse::get_properties;
 
-impl TestRegistryContext {
+impl MemRegCtx {
     pub fn new() -> Self {
         Self {
             sequence: Arc::new(AtomicU64::new(0u64)),
@@ -28,23 +28,30 @@ impl TestRegistryContext {
     }
 }
 
-pub struct TestRegistryApi {
-    ctx: TestRegistryContext,
+#[derive(Clone)]
+pub struct MemRegCtx {
+    pub sequence: Arc<AtomicU64>,
+    pub particles: Arc<DashMap<Point, ParticleRecord>>,
+    pub properties: Arc<DashMap<Point, Properties>>,
 }
 
-impl TestRegistryApi {
-    pub fn new(ctx: TestRegistryContext) -> Self {
+pub struct MemRegApi {
+    ctx: MemRegCtx,
+}
+
+impl MemRegApi {
+    pub fn new(ctx: MemRegCtx) -> Self {
         Self { ctx }
     }
 
-    fn ctx(&self) -> &TestRegistryContext {
+    fn ctx(&self) -> &MemRegCtx {
         &self.ctx
     }
 }
 
 #[async_trait]
-impl RegistryApi<TestCosmos> for TestRegistryApi {
-    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, TestErr> {
+impl RegistryApi<MemCosmos> for MemRegApi {
+    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, CosmicErr> {
         self.set_properties(&registration.point, &registration.properties).await?;
 
         let details = Details {
@@ -69,18 +76,18 @@ impl RegistryApi<TestCosmos> for TestRegistryApi {
         &'a self,
         point: &'a Point,
         location: ParticleLocation,
-    ) -> Result<(), TestErr> {
+    ) -> Result<(), CosmicErr> {
         let mut record = self.ctx.particles.get_mut(&point).unwrap();
         record.value_mut().location = Some(location);
         Ok(())
     }
 
-    async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), TestErr> {
+    async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), CosmicErr> {
         let mut record = self
             .ctx
             .particles
             .get_mut(point)
-            .ok_or(TestErr::new(format!("not found: {}", point.to_string())))?;
+            .ok_or(CosmicErr::new(format!("not found: {}", point.to_string())))?;
         record.value_mut().details.stub.status = status.clone();
         Ok(())
     }
@@ -89,7 +96,7 @@ impl RegistryApi<TestCosmos> for TestRegistryApi {
         &'a self,
         point: &'a Point,
         properties: &'a SetProperties,
-    ) -> Result<(), TestErr> {
+    ) -> Result<(), CosmicErr> {
         let mut rtn= Properties::new();
         for (id,property) in properties.iter() {
             match property {
@@ -108,24 +115,24 @@ impl RegistryApi<TestCosmos> for TestRegistryApi {
         Ok(())
     }
 
-    async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, TestErr> {
+    async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, CosmicErr> {
         Ok(self.ctx.sequence.fetch_add(1, atomic::Ordering::Relaxed))
     }
 
-    async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, TestErr> {
+    async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, CosmicErr> {
         match self.ctx.properties.get( point) {
             None => Ok(Default::default()),
             Some(mul) =>  Ok(mul.value().clone())
         }
     }
 
-    async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, TestErr> {
+    async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, CosmicErr> {
         let properties = self.get_properties(point).await?;
         let mut record = self
             .ctx
             .particles
             .get(&point)
-            .ok_or(TestErr::new("not found"))?
+            .ok_or(CosmicErr::new("not found"))?
             .value()
             .clone();
         record.details.properties = properties;
@@ -136,27 +143,27 @@ impl RegistryApi<TestCosmos> for TestRegistryApi {
         &'a self,
         point: &'a Point,
         query: &'a Query,
-    ) -> Result<QueryResult, TestErr> {
+    ) -> Result<QueryResult, CosmicErr> {
         todo!()
     }
 
-    async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, TestErr> {
+    async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, CosmicErr> {
         todo!()
     }
 
-    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, TestErr> {
+    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, CosmicErr> {
         todo!()
     }
 
-    async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, TestErr> {
+    async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, CosmicErr> {
         todo!()
     }
 
-    async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), TestErr> {
+    async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), CosmicErr> {
         todo!()
     }
 
-    async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, TestErr> {
+    async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, CosmicErr> {
         Ok(Access::Super)
     }
 
@@ -165,7 +172,7 @@ impl RegistryApi<TestCosmos> for TestRegistryApi {
         on: &'a Selector,
         owner: &'a Point,
         by: &'a Point,
-    ) -> Result<(), TestErr> {
+    ) -> Result<(), CosmicErr> {
         todo!()
     }
 
@@ -173,18 +180,12 @@ impl RegistryApi<TestCosmos> for TestRegistryApi {
         &'a self,
         to: &'a Option<&'a Point>,
         on: &'a Selector,
-    ) -> Result<Vec<IndexedAccessGrant>, TestErr> {
+    ) -> Result<Vec<IndexedAccessGrant>, CosmicErr> {
         todo!()
     }
 
-    async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), TestErr> {
+    async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), CosmicErr> {
         todo!()
     }
 }
 
-#[derive(Clone)]
-pub struct TestRegistryContext {
-    pub sequence: Arc<AtomicU64>,
-    pub particles: Arc<DashMap<Point, ParticleRecord>>,
-    pub properties: Arc<DashMap<Point, Properties>>,
-}

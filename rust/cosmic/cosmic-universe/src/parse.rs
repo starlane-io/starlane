@@ -7702,13 +7702,13 @@ pub mod test {
     #[test]
     pub fn test_rough_bind_config() -> Result<(), UniErr> {
         let unknown_config_kind = r#"
-Unknown(version=1.0.0) # test unknown config kind
+Unknown(version=1.0.0) # mem unknown config kind
 {
     Route{
     }
 }"#;
         let unsupported_bind_version = r#"
-Bind(version=100.0.0) # test unsupported version
+Bind(version=100.0.0) # mem unsupported version
 {
     Route{
     }
@@ -7751,7 +7751,7 @@ Bind(version=1.0.0)
     #[test]
     pub fn test_remove_comments() -> Result<(), UniErr> {
         let bind_str = r#"
-# this is a test of comments
+# this is a mem of comments
 Bind(version=1.0.0)->
 {
   # let's see if it works a couple of spaces in.
@@ -8416,7 +8416,7 @@ pub mod cmd_test {
     use crate::{BaseKind, KindTemplate, SetProperties};
 
     /*
-    #[test]
+    #[mem]
     pub async fn test2() -> Result<(),Error>{
         let input = "? xreate localhost<Space>";
         let x: Result<CommandOp,VerboseError<&str>> = final_parser(command)(input);

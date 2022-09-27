@@ -11,7 +11,7 @@ use dashmap::DashMap;
 use tokio::join;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{Mutex, oneshot};
 use tokio::time::error::Elapsed;
 
 use cosmic_hyperlane::{
@@ -40,14 +40,15 @@ use cosmic_universe::HYPERUSER;
 
 use crate::driver::base::BaseDriverFactory;
 //use crate::control::ControlDriverFactory;
-use crate::driver::control::{ControlCliSession, ControlClient, ControlDriverFactory};
+use crate::driver::control::{ControlClient, ControlCliSession, ControlDriverFactory};
 use crate::driver::root::RootDriverFactory;
 use crate::driver::space::SpaceDriverFactory;
 use crate::driver::{DriverAvail, DriverFactory};
+use crate::err::CosmicErr;
 use crate::machine::MachineApiExtFactory;
 use crate::star::HyperStarApi;
-use crate::test::cosmos::{TestCosmos, TestErr};
-use crate::test::registry::TestRegistryContext;
+use crate::mem::cosmos::MemCosmos;
+use crate::mem::registry::MemRegCtx;
 
 use super::*;
 
@@ -59,11 +60,11 @@ lazy_static! {
 }
 
 async fn create(
-    ctx: &TestRegistryContext,
+    ctx: &MemRegCtx,
     particle: Point,
     location: ParticleLocation,
-    star_api: HyperStarApi<TestCosmos>,
-) -> Result<(), TestErr> {
+    star_api: HyperStarApi<MemCosmos>,
+) -> Result<(), CosmicErr> {
     println!("ADDING PARTICLE: {}", particle.to_string());
     let details = Details::new(
         Stub {
@@ -95,12 +96,12 @@ async fn create(
 }
 
 #[test]
-fn test_gravity_routing() -> Result<(), TestErr> {
+fn test_gravity_routing() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     runtime.block_on(async move {
-        let platform = TestCosmos::new();
+        let platform = MemCosmos::new();
         let machine_api = platform.machine();
         machine_api.wait_ready().await;
 
@@ -210,7 +211,7 @@ fn test_gravity_routing() -> Result<(), TestErr> {
     })
 }
 #[test]
-fn test_layer_traversal() -> Result<(), TestErr> {
+fn test_layer_traversal() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -268,7 +269,7 @@ fn test_layer_traversal() -> Result<(), TestErr> {
             direct_tx.send(());
         });
 
-        let platform = TestCosmos::new();
+        let platform = MemCosmos::new();
         let machine_api = platform.machine();
         machine_api.wait_ready().await;
 
@@ -490,17 +491,17 @@ fn test_layer_traversal() -> Result<(), TestErr> {
 }
 
 #[test]
-fn test_control() -> Result<(), TestErr> {
+fn test_control() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestCosmos::new();
+        let platform = MemCosmos::new();
         let machine_api = platform.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
-        let logger = logger.point(Point::from_str("test-client").unwrap());
+        let logger = logger.point(Point::from_str("mem-client").unwrap());
 
         tokio::time::timeout(Duration::from_secs(10), machine_api.wait_ready())
             .await
@@ -556,14 +557,14 @@ fn test_control() -> Result<(), TestErr> {
 }
 
 #[test]
-fn test_star_wrangle() -> Result<(), TestErr> {
+fn test_star_wrangle() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestCosmos::new();
+        let platform = MemCosmos::new();
         let machine_api = platform.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
 
@@ -589,14 +590,14 @@ fn test_star_wrangle() -> Result<(), TestErr> {
 }
 
 #[test]
-fn test_golden_path() -> Result<(), TestErr> {
+fn test_golden_path() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestCosmos::new();
+        let platform = MemCosmos::new();
         let machine_api = platform.machine();
 
         tokio::time::timeout(Duration::from_secs(1), machine_api.wait_ready())
@@ -606,7 +607,7 @@ fn test_golden_path() -> Result<(), TestErr> {
         let fold = StarKey::new(&"central".to_string(), &StarHandle::new("fold", 0));
         let star_api = machine_api.get_star(fold).await?;
 
-        // first test if we can bounce nexus which fold should be directly connected too
+        // first mem if we can bounce nexus which fold should be directly connected too
         let nexus = StarKey::new(&"central".to_string(), &StarHandle::new("nexus", 0));
         tokio::time::timeout(Duration::from_secs(5), star_api.bounce(nexus)).await??;
         println!("Ok");
@@ -621,17 +622,17 @@ fn test_golden_path() -> Result<(), TestErr> {
 }
 
 #[test]
-fn test_provision_and_assign() -> Result<(), TestErr> {
+fn test_provision_and_assign() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestCosmos::new();
+        let platform = MemCosmos::new();
         let machine_api = platform.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
-        let logger = logger.point(Point::from_str("test-client").unwrap());
+        let logger = logger.point(Point::from_str("mem-client").unwrap());
 
         tokio::time::timeout(Duration::from_secs(5), machine_api.wait_ready())
             .await
@@ -714,17 +715,17 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
 }
 
 #[test]
-fn test_control_cli() -> Result<(), TestErr> {
+fn test_control_cli() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let platform = TestCosmos::new();
+        let platform = MemCosmos::new();
         let machine_api = platform.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
-        let logger = logger.point(Point::from_str("test-client").unwrap());
+        let logger = logger.point(Point::from_str("mem-client").unwrap());
 
         tokio::time::timeout(Duration::from_secs(1), machine_api.wait_ready())
             .await
@@ -754,17 +755,17 @@ fn test_control_cli() -> Result<(), TestErr> {
 }
 
 #[test]
-fn test_publish() -> Result<(), TestErr> {
+fn test_publish() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     runtime.block_on(async move {
         // let (final_tx, final_rx) = oneshot::channel();
 
-        let cosmos = TestCosmos::new();
+        let cosmos = MemCosmos::new();
         let machine_api = cosmos.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
-        let logger = logger.point(Point::from_str("test-client").unwrap());
+        let logger = logger.point(Point::from_str("mem-client").unwrap());
 
         tokio::time::timeout(Duration::from_secs(10), machine_api.wait_ready())
             .await
@@ -801,7 +802,7 @@ fn test_publish() -> Result<(), TestErr> {
 
         let mut command = RawCommand::new("publish ^[ bundle.zip ]-> localhost:repo:my:1.0.0");
 
-        let file_path = "test/bundle.zip";
+        let file_path = "mem/bundle.zip";
         let bin = Arc::new(fs::read(file_path)?);
         command.transfers.push(CmdTransfer::new("bundle.zip", bin));
 

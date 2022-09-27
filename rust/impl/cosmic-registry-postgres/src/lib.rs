@@ -1418,12 +1418,12 @@ pub mod test {
         assert_eq!(access.has_super(), false);
         assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
 
-        // test masked OR permissions
+        // mem masked OR permissions
         let access = registry.access(&scott, &mechtron).await?;
         assert_eq!(access.has_super(), false);
         assert_eq!(access.permissions().to_string(), "csd-RwX".to_string());
 
-        // now test AND permissions (masking Read)
+        // now mem AND permissions (masking Read)
         let grant = AccessGrant {
             kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("&csd-rwX")?),
             on_point: Selector::from_str("localhost:app:**<Mechtron>")?,

@@ -503,7 +503,7 @@ impl Star {
                         //                        self.logger.tx.push(tx);
                     }
                     StarCommand::Test(_test) => {
-                        /*                        match test
+                        /*                        match mem
                                                {
                                                    StarTest::StarSearchForStarKey(star) => {
                                                        let search = Search{

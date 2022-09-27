@@ -907,7 +907,7 @@ where
                         rtn.send(self.skel.stub());
                     }
                     HyperStarCall::Phantom(_) => {
-                        // phantom literally does nothing but hold the P in not test mode
+                        // phantom literally does nothing but hold the P in not mem mode
                     }
                     HyperStarCall::ToDriver(traversal) => {
                         self.drivers.visit(traversal).await;
