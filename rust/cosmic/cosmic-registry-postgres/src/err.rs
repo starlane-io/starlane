@@ -37,8 +37,8 @@ impl From<UniErr> for PostErr {
     }
 }
 
-impl From<Box<bincode::error::ErrorKind>> for PostErr {
-    fn from(_: Box<bincode::error::ErrorKind>) -> Self {
+impl From<Box<bincode::ErrorKind>> for PostErr {
+    fn from(_: Box<bincode::ErrorKind>) -> Self {
         todo!()
     }
 }
