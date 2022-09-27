@@ -1826,6 +1826,8 @@ where
         }
     }
 
+
+
     pub fn has_visited(&self, star: &Point) -> bool {
         match self {
             Self::Ripple(ripple) => ripple.history.contains(star),
@@ -2089,6 +2091,19 @@ where
             DirectedWaveDef::Signal(signal) => signal.bounce_backs(),
         }
     }
+
+     pub fn set_bounce_backs(&mut self, bounce_backs: BounceBacks) -> Result<(),UniErr> {
+        match self {
+            DirectedWaveDef::Ripple(ripple) => {
+                ripple.bounce_backs = bounce_backs;
+                Ok(())
+            },
+            _  => {
+                Err(UniErr::from_500("can only set bouncebacks for Ripple"))
+            }
+        }
+    }
+
 
     pub fn from(&self) -> &Surface {
         match self {

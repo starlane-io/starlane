@@ -631,7 +631,7 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
         let logger = logger.point(Point::from_str("test-client").unwrap());
 
-        tokio::time::timeout(Duration::from_secs(1), machine_api.wait_ready())
+        tokio::time::timeout(Duration::from_secs(5), machine_api.wait_ready())
             .await
             .unwrap();
 

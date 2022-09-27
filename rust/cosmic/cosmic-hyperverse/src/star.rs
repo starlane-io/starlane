@@ -52,10 +52,7 @@ use cosmic_universe::util::{log, ValueMatcher, ValuePattern};
 use cosmic_universe::wave::core::cmd::CmdMethod;
 use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
-use cosmic_universe::wave::exchange::asynch::{
-    DirectedHandler, DirectedHandlerSelector, DirectedHandlerShell, Exchanger, InCtx,
-    ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, TxRouter,
-};
+use cosmic_universe::wave::exchange::asynch::{DirectedHandler, DirectedHandlerSelector, DirectedHandlerShell, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, TraversalRouter, TxRouter};
 use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::{
     Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
@@ -184,7 +181,11 @@ where
     ) -> Self {
         let point = template.key.clone().to_point();
         let logger = machine.logger.point(point.clone());
-        let exchanger = Exchanger::new(point.clone().to_surface(), machine.timeouts.clone(), logger.clone() );
+        let exchanger = Exchanger::new(
+            point.clone().to_surface(),
+            machine.timeouts.clone(),
+            logger.clone(),
+        );
         let state = ParticleStates::new();
         let api = HyperStarApi::new(
             template.kind.clone(),
@@ -732,6 +733,7 @@ where
             let skel = skel.clone();
             let mut drivers = drivers.clone();
             let status_tx = skel.status_tx.clone();
+            let api = skel.api.clone();
             tokio::spawn(async move {
                 let mut previous = DriverStatus::Unknown;
                 loop {
@@ -748,10 +750,13 @@ where
                                 status_tx.send(Status::Init).await;
                             }
                             DriverStatus::Ready => {
-                                let star_driver =
-                                    drivers.get(&Kind::Star(skel.kind.clone())).await.unwrap();
+                                let star_driver = skel
+                                    .drivers
+                                    .get(&Kind::Star(skel.kind.clone()))
+                                    .await
+                                    .unwrap();
                                 star_driver.init_item(skel.point.to_point()).await;
-                                status_tx.send(Status::Ready).await;
+                                api.wrangle().await;
                             }
                             DriverStatus::Retrying(_) => {
                                 status_tx.send(Status::Panic).await;
@@ -1070,8 +1075,6 @@ where
 
     #[track_caller]
     async fn shard(&self, mut wave: UltraWave) {
-
-
         let skel = self.skel.clone();
         let locator = SmartLocator::new(self.skel.clone());
         let gravity = self.gravity.clone();
@@ -1085,17 +1088,17 @@ where
             where
                 P: Cosmos,
             {
-if wave.track() {
-   println!("\tsharding wave...{}", wave.kind().to_string() );
-}
+                if wave.track() {
+                    println!("\tsharding wave...{}", wave.kind().to_string());
+                }
                 match &mut wave {
                     UltraWave::Ripple(ripple) => {
                         let mut map =
                             shard_ripple_by_location(ripple, &skel.adjacents, &skel.registry)
                                 .await?;
-if ripple.track {
-   println!("\tRipple sharded into: {}", map.len() );
-}
+                        if ripple.track {
+                            println!("\tRipple sharded into: {}", map.len());
+                        }
                         for (star, mut wave) in map {
                             // add this star to history
                             wave.history.insert(skel.point.clone());
@@ -1105,9 +1108,9 @@ if ripple.track {
                                     wave.to_ultra(),
                                 );
                                 inject.from_gravity = true;
-if ripple.track {
-    println!("\tripple injecting from_gravity");
-}
+                                if ripple.track {
+                                    println!("\tripple injecting from_gravity");
+                                }
                                 skel.inject_tx.send(inject).await;
                             } else {
                                 let mut transport = wave.to_ultra().wrap_in_transport(
@@ -1207,13 +1210,11 @@ if ripple.track {
             wrangler.history(history);
 
             let discoveries = match skel.logger.result(
-                tokio::time::timeout(Duration::from_secs(2), wrangler.wrangle(false ))
+                tokio::time::timeout(Duration::from_secs(2), wrangler.wrangle(false))
                     .await
                     .unwrap(),
             ) {
-                Ok(discoveries) => {
-                    discoveries
-                }
+                Ok(discoveries) => discoveries,
                 Err(err) => {
                     println!("\tWrangle ERROR");
                     rtn.send(Err(err)).unwrap_or_default();
@@ -1234,6 +1235,8 @@ if ripple.track {
             coalated.sort();
             skel.wrangles.add(coalated).await;
             rtn.send(Ok(skel.wrangles.clone())).unwrap_or_default();
+
+            skel.status_tx.send(Status::Ready).await;
         });
     }
 
@@ -1367,18 +1370,18 @@ where
             if from_gravity {
                 dir = TraversalDirection::Core;
                 dest.replace(to.layer.clone());
-if wave.track() {
-    println!("\twave is from_gravity so it gets a Core direction")
-}
+                if wave.track() {
+                    println!("\twave is from_gravity so it gets a Core direction")
+                }
             } else if to.point.is_global() {
                 dir = TraversalDirection::Fabric;
-if wave.track() {
-    println!("\twave is a GLOBAL point so it gets a Fabric Direction")
-}
+                if wave.track() {
+                    println!("\twave is a GLOBAL point so it gets a Fabric Direction")
+                }
             } else if to.point == wave.from().point {
- if wave.track() {
-    println!("\twave is to and from the same point...")
-}
+                if wave.track() {
+                    println!("\twave is to and from the same point...")
+                }
                 // it's the SAME point, so the to layer becomes our dest
                 dest.replace(to.layer.clone());
 
@@ -1396,13 +1399,16 @@ if wave.track() {
                         TraversalDirection::Fabric
                     }
                 };
-if wave.track() {
-    println!("\t...decided wave is in the {} Direction", dir.to_string())
-}
+                if wave.track() {
+                    println!("\t...decided wave is in the {} Direction", dir.to_string())
+                }
             } else {
-if wave.track() {
-    println!("\tno matches so choosing Fabric Direction ({})", self.skel.point.to_string());
-}
+                if wave.track() {
+                    println!(
+                        "\tno matches so choosing Fabric Direction ({})",
+                        self.skel.point.to_string()
+                    );
+                }
                 dir = TraversalDirection::Fabric;
             }
             if wave.track() {
@@ -1610,6 +1616,29 @@ impl LayerInjectionRouter {
         }
     }
 }
+
+
+#[derive(Clone)]
+pub struct TraverseToNextRouter {
+    pub tx: mpsc::Sender<Traversal<UltraWave>>
+}
+
+impl  TraverseToNextRouter {
+    pub fn new(tx: mpsc::Sender<Traversal<UltraWave>>) -> Self
+    {
+        Self {
+            tx
+        }
+    }
+}
+
+#[async_trait]
+impl TraversalRouter for TraverseToNextRouter {
+    async fn traverse(&self, traversal: Traversal<UltraWave>) {
+        self.tx.send(traversal).await;
+    }
+}
+
 
 #[async_trait]
 impl Router for LayerInjectionRouter {

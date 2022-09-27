@@ -15,13 +15,13 @@ use cosmic_universe::selector::PayloadBlock;
 use cosmic_universe::substance::Substance;
 use cosmic_universe::util::ToResolved;
 use cosmic_universe::wave::core::{Method, ReflectedCore};
-use cosmic_universe::wave::exchange::asynch::Exchanger;
+use cosmic_universe::wave::exchange::asynch::{Exchanger, TraversalTransmitter};
 use cosmic_universe::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder};
 use cosmic_universe::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Pong, Reflection, UltraWave, Wave,
 };
 
-use crate::star::{HyperStarSkel, LayerInjectionRouter};
+use crate::star::{HyperStarSkel, LayerInjectionRouter, TraverseToNextRouter};
 use crate::{Cosmos, HyperErr, RegistryApi};
 
 pub struct Field<P>
@@ -31,7 +31,7 @@ where
     pub port: Surface,
     pub skel: HyperStarSkel<P>,
     pub logger: PointLogger,
-    pub shell_transmitter: ProtoTransmitter,
+    pub shell_transmitter: TraversalTransmitter,
 }
 
 impl<P> Field<P>
@@ -41,12 +41,8 @@ where
     pub fn new(point: Point, skel: HyperStarSkel<P>) -> Self {
         let port = point.to_surface().with_layer(Layer::Field);
         let logger = skel.logger.point(port.point.clone());
-        let shell_router = Arc::new(LayerInjectionRouter::new(
-            skel.clone(),
-            port.clone().with_layer(Layer::Shell),
-        ));
-        let shell_transmitter = ProtoTransmitterBuilder::new(shell_router, skel.exchanger.clone());
-        let shell_transmitter = shell_transmitter.build();
+        let shell_router = Arc::new(TraverseToNextRouter::new( skel.traverse_to_next_tx.clone() ));
+        let shell_transmitter = TraversalTransmitter::new(shell_router, skel.exchanger.clone());
 
         Self {
             port,
@@ -116,7 +112,8 @@ where
     }
 
     async fn inject(&self, wave: UltraWave) {
-        self.shell_transmitter.route(wave).await;
+        panic!("cannot inject here!");
+//        self.shell_transmitter.route(wave).await;
     }
 
     fn exchanger(&self) -> &Exchanger {
@@ -170,12 +167,12 @@ where
 
 pub struct PipeEx<P> where P: Cosmos {
     pub skel: HyperStarSkel<P>,
-    pub port: Surface,
+    pub surface: Surface,
     pub logger: PointLogger,
     pub env: Env,
     pub reflection: Result<Reflection, UniErr>,
     pub pipeline: PipelineVar,
-    pub shell_transmitter: ProtoTransmitter,
+    pub shell_transmitter: TraversalTransmitter,
     pub gravity_transmitter: ProtoTransmitter,
     pub traversal: Traversal<DirectedWave>,
 
@@ -194,7 +191,7 @@ impl <P> PipeEx <P> where P: Cosmos{
         traversal: Traversal<DirectedWave>,
         pipeline: PipelineVar,
         env: Env,
-        shell_transmitter: ProtoTransmitter,
+        shell_transmitter: TraversalTransmitter,
         gravity_transmitter: ProtoTransmitter,
         logger: PointLogger,
     ) {
@@ -206,7 +203,7 @@ impl <P> PipeEx <P> where P: Cosmos{
                 uri: traversal.core().uri.clone(),
                 body: traversal.core().body.clone(),
                 reflection: traversal.reflection(),
-                port,
+                surface: port,
                 traversal,
                 env,
                 pipeline,
@@ -228,7 +225,7 @@ impl <P> PipeEx <P> where P: Cosmos{
                     Ok(reflection) => {
                         let wave = reflection
                             .clone()
-                            .make(err.as_reflected_core(), self.port.clone());
+                            .make(err.as_reflected_core(), self.surface.clone());
                         let wave = wave.to_ultra();
                         self.gravity_transmitter.route(wave).await;
                     }
@@ -241,7 +238,7 @@ impl <P> PipeEx <P> where P: Cosmos{
     fn proto(&self) -> DirectedProto {
         let mut proto = DirectedProto::kind(&self.kind);
         proto.id = self.traversal.id().clone();
-        proto.via(Some(self.port.clone()));
+        proto.via(Some(self.surface.clone()));
         proto.method(self.method.clone());
         proto.body(self.body.clone());
         proto.uri(self.uri.clone());
@@ -280,14 +277,11 @@ impl <P> PipeEx <P> where P: Cosmos{
     async fn execute_stop(&mut self, stop: &PipelineStopVar) -> Result<(), UniErr> {
         match stop {
             PipelineStopVar::Core => {
-                let traversal = self.traversal.clone().wrap();
-                self.skel.traverse_to_next_tx.send(traversal ).await;
-                Ok(())
-/*                let mut proto = self.proto();
-                proto.to(self.port.with_layer(Layer::Core));
-                self.direct(proto, self.shell_transmitter.clone()).await
-
- */
+                let mut proto = self.proto();
+                proto.to(self.surface.with_layer(Layer::Core));
+                let directed = proto.build()?;
+                let traversal = self.traversal.clone().with(directed);
+                self.traverse_to_next(traversal, self.shell_transmitter.clone()).await
             }
             PipelineStopVar::Reflect => {
                 let reflection = self.reflection.clone()?;
@@ -315,10 +309,11 @@ impl <P> PipeEx <P> where P: Cosmos{
         }
     }
 
+
     async fn direct(
         &mut self,
         mut proto: DirectedProto,
-        transmitter: ProtoTransmitter,
+        transmitter: ProtoTransmitter
     ) -> Result<(), UniErr> {
         match proto.kind.as_ref().unwrap() {
             DirectedKind::Ping => {
@@ -336,6 +331,46 @@ impl <P> PipeEx <P> where P: Cosmos{
                 if proto.bounce_backs.is_some() {
                     proto.bounce_backs(BounceBacks::Count(1));
                 }
+                let mut echoes: Vec<Wave<Echo>> = transmitter.direct(proto).await?;
+                if !echoes.is_empty() {
+                    let echo = echoes.remove(0);
+                    self.status = echo.core.status.as_u16();
+                    if echo.core.status.is_success() {
+                        self.body = echo.core.body.clone();
+                        Ok(())
+                    } else {
+                        Err(echo.core.to_err())
+                    }
+                } else {
+                    Ok(())
+                }
+            }
+            DirectedKind::Signal => {
+                transmitter.direct(proto).await?;
+                Ok(())
+            }
+        }
+    }
+
+    async fn traverse_to_next(
+        &mut self,
+        mut proto: Traversal<DirectedWave>,
+        transmitter: TraversalTransmitter,
+    ) -> Result<(), UniErr> {
+        match proto.directed_kind() {
+            DirectedKind::Ping => {
+                let pong: Wave<Pong> = transmitter.direct(proto).await?;
+                self.status = pong.core.status.as_u16();
+                if pong.core.status.is_success() {
+                    self.body = pong.core.body.clone();
+                    Ok(())
+                } else {
+                    Err(pong.core.to_err())
+                }
+            }
+            DirectedKind::Ripple => {
+                // this should be a single echo since in traversal it is only going to a single target
+                proto.set_bounce_backs(BounceBacks::Count(1));
                 let mut echoes: Vec<Wave<Echo>> = transmitter.direct(proto).await?;
                 if !echoes.is_empty() {
                     let echo = echoes.remove(0);

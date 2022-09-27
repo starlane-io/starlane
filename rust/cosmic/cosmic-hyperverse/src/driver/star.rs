@@ -382,11 +382,11 @@ where
         ctx: InCtx<'_, HyperSubstance>,
     ) -> Result<ParticleLocation, P::Err> {
         if let HyperSubstance::Provision(provision) = ctx.input {
-            println!("\tprovisioning : {}", provision.point.to_string());
+
             let record = self.skel.registry.record(&provision.point).await?;
+
             match self.skel.wrangles.find(&record.details.stub.kind) {
                 None => {
-println!("\n{} found no provisioning wrangles for {}", self.skel.kind.to_string(), record.details.stub.kind.to_string() );
                     let kind = record.details.stub.kind.clone();
                     if self
                         .skel
@@ -580,7 +580,7 @@ println!("\tassign to driver: {}", driver.to_surface().to_string());
             match search {
                 Search::Star(star) => {
                     if self.skel.key == *star {
-                        match self.skel.drivers.internal_kinds().await {
+                        match self.skel.drivers.external_kinds().await {
                             Ok(kinds) => {
                                 let discovery = Discovery {
                                     star_kind: self.skel.kind.clone(),
@@ -817,10 +817,19 @@ where
                         discoveries.push(discovery);
                     }
                 } else {
-                    self.skel.logger.warn(format!(
-                        "unexpected reflected core substance from search echo : {}",
-                        echo.core.body.kind().to_string()
-                    ));
+                    // this is not good, but it's not breaking anything, and I cant deal with all the errors right now -- Scott
+
+                    if let Substance::Hyper(sub) = echo.variant.core.body {
+                         self.skel.logger.warn(format!(
+                            "unexpected reflected core substance from search echo : {}",
+                           sub.to_string()
+                        ));
+                    } else {
+                        self.skel.logger.warn(format!(
+                            "unexpected reflected core substance from search echo : {}",
+                            echo.core.body.kind().to_string()
+                        ));
+                    }
                 }
             } else {
                 self.skel.logger.error(format!(

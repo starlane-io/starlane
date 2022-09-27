@@ -207,6 +207,42 @@ impl ProtoTransmitterBuilder {
     }
 }
 
+pub type TraversalTransmitter = ProtoTransmitterDef<Arc<dyn TraversalRouter>,Exchanger>;
+
+impl TraversalTransmitter {
+    pub fn new(router: Arc<dyn TraversalRouter>, exchanger: Exchanger ) -> Self {
+        Self {
+            agent: SetStrategy::None,
+            scope: SetStrategy::None,
+            handling: SetStrategy::None,
+            method: SetStrategy::None,
+            from: SetStrategy::None,
+            to: SetStrategy::None,
+            router,
+            exchanger
+        }
+    }
+
+    pub async fn direct<W>(&self, traversal: Traversal<DirectedWave>) -> Result<W, UniErr>
+    where
+        W: FromReflectedAggregate,
+    {
+        match traversal.bounce_backs() {
+            BounceBacks::None => {
+                self.router.traverse(traversal.wrap() ).await;
+                FromReflectedAggregate::from_reflected_aggregate(ReflectedAggregate::None)
+            }
+            _ => {
+                let reflected_rx = self.exchanger.exchange(&traversal.payload).await;
+                self.router.traverse(traversal.wrap() ).await;
+                let reflected_agg = reflected_rx.await?;
+                FromReflectedAggregate::from_reflected_aggregate(reflected_agg)
+            }
+        }
+    }
+
+}
+
 pub type RootInCtx = RootInCtxDef<ProtoTransmitter>;
 
 pub type InCtx<'a, I> = InCtxDef<'a, I, ProtoTransmitter>;
