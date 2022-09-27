@@ -41,7 +41,7 @@ where
     pub fn new(point: Point, skel: HyperStarSkel<P>) -> Self {
         let port = point.to_surface().with_layer(Layer::Field);
         let logger = skel.logger.point(port.point.clone());
-        let shell_router = Arc::new(TraverseToNextRouter::new( skel.traverse_to_next_tx.clone() ));
+        let shell_router = Arc::new(TraverseToNextRouter::new(skel.traverse_to_next_tx.clone()));
         let shell_transmitter = TraversalTransmitter::new(shell_router, skel.exchanger.clone());
 
         Self {
@@ -85,7 +85,7 @@ where
 
     pub fn pipex(&self, traversal: Traversal<DirectedWave>, pipeline: PipelineVar, env: Env) {
         PipeEx::new(
-              self.skel.clone(),
+            self.skel.clone(),
             self.port.clone(),
             traversal,
             pipeline,
@@ -113,7 +113,7 @@ where
 
     async fn inject(&self, wave: UltraWave) {
         panic!("cannot inject here!");
-//        self.shell_transmitter.route(wave).await;
+        //        self.shell_transmitter.route(wave).await;
     }
 
     fn exchanger(&self) -> &Exchanger {
@@ -165,7 +165,10 @@ where
     }
 }
 
-pub struct PipeEx<P> where P: Cosmos {
+pub struct PipeEx<P>
+where
+    P: Cosmos,
+{
     pub skel: HyperStarSkel<P>,
     pub surface: Surface,
     pub logger: PointLogger,
@@ -183,8 +186,10 @@ pub struct PipeEx<P> where P: Cosmos {
     pub status: u16,
 }
 
-impl <P> PipeEx <P> where P: Cosmos{
-
+impl<P> PipeEx<P>
+where
+    P: Cosmos,
+{
     pub fn new(
         skel: HyperStarSkel<P>,
         port: Surface,
@@ -281,7 +286,8 @@ impl <P> PipeEx <P> where P: Cosmos{
                 proto.to(self.surface.with_layer(Layer::Core));
                 let directed = proto.build()?;
                 let traversal = self.traversal.clone().with(directed);
-                self.traverse_to_next(traversal, self.shell_transmitter.clone()).await
+                self.traverse_to_next(traversal, self.shell_transmitter.clone())
+                    .await
             }
             PipelineStopVar::Reflect => {
                 let reflection = self.reflection.clone()?;
@@ -309,11 +315,10 @@ impl <P> PipeEx <P> where P: Cosmos{
         }
     }
 
-
     async fn direct(
         &mut self,
         mut proto: DirectedProto,
-        transmitter: ProtoTransmitter
+        transmitter: ProtoTransmitter,
     ) -> Result<(), UniErr> {
         match proto.kind.as_ref().unwrap() {
             DirectedKind::Ping => {

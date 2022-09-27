@@ -186,7 +186,11 @@ where
             self.skel.driver.logger.clone(),
         );
         let mut interchange = HyperwayInterchange::new(self.skel.driver.logger.clone());
-        let hyperway = Hyperway::new(Point::remote_endpoint().to_surface(), Agent::HyperUser, self.skel.driver.logger.clone());
+        let hyperway = Hyperway::new(
+            Point::remote_endpoint().to_surface(),
+            Agent::HyperUser,
+            self.skel.driver.logger.clone(),
+        );
         let mut hyperway_endpoint = hyperway.hyperway_endpoint_far(None).await;
         interchange.add(hyperway).await;
         interchange.singular_to(Point::remote_endpoint().to_surface());
@@ -278,7 +282,6 @@ where
                 .api
                 .add_interchange(InterchangeKind::DefaultControl, gate)
                 .await?;
-
         }
 
         self.skel.driver.status_tx.send(DriverStatus::Ready).await;
@@ -433,7 +436,7 @@ where
     async fn traverse(&self, traversal: Traversal<UltraWave>) {
         self.skel.driver.logger.track(&traversal, || {
             Tracker::new(
-                format!("control -> {}",traversal.dir.to_string()),
+                format!("control -> {}", traversal.dir.to_string()),
                 "Traverse",
             )
         });
@@ -482,7 +485,7 @@ impl ControlClient {
         let exchanger = Exchanger::new(
             Point::from_str("control-client")?.to_surface(),
             Timeouts::default(),
-            Default::default()
+            Default::default(),
         );
         let logger = RootLogger::default();
         let logger = logger.point(Point::from_str("control-client")?);

@@ -209,15 +209,12 @@ where
         };
 
         if create.state.has_substance() || details.stub.kind.is_auto_provision() {
-            {
-                let provisioner = SmartLocator::new(self.skel.clone());
-                //tokio::spawn(async move {
-                provisioner
-                    .provision(&details.stub.point, create.state.clone())
-                    .await
-                    .unwrap();
-                //});
-            }
+            let provisioner = SmartLocator::new(self.skel.clone());
+            //tokio::spawn(async move {
+            provisioner
+                .provision(&details.stub.point, create.state.clone())
+                .await?;
+            //});
         }
 
         Ok(details)

@@ -24,7 +24,9 @@ use cosmic_universe::util::{log, ValuePattern};
 use cosmic_universe::wave::core::http2::StatusCode;
 use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
-use cosmic_universe::wave::exchange::asynch::{InCtx, ProtoTransmitter, ProtoTransmitterBuilder, Router};
+use cosmic_universe::wave::exchange::asynch::{
+    InCtx, ProtoTransmitter, ProtoTransmitterBuilder, Router,
+};
 use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::{
     Agent, BounceBacks, DirectedProto, Echoes, Handling, HandlingKind, Pong, Priority, Recipients,
@@ -382,7 +384,6 @@ where
         ctx: InCtx<'_, HyperSubstance>,
     ) -> Result<ParticleLocation, P::Err> {
         if let HyperSubstance::Provision(provision) = ctx.input {
-
             let record = self.skel.registry.record(&provision.point).await?;
 
             match self.skel.wrangles.find(&record.details.stub.kind) {
@@ -442,7 +443,6 @@ where
     #[route("Hyp<Assign>")]
     pub async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, P::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
-
             #[cfg(test)]
             self.skel
                 .diagnostic_interceptors
@@ -476,17 +476,19 @@ where
                 directed.body(HyperSubstance::Assign(assign.clone()).into());
                 directed.track = ctx.wave().track();
                 let pong: Wave<Pong> = ctx.transmitter.direct(directed).await?;
-println!("ok? {} {}", assign.details.stub.kind.to_string(), pong.is_ok());
+
                 self.skel.logger.result(pong.ok_or())?;
             } else {
-                self.skel.logger.result::<(),UniErr>(
-                    Err(UniErr::from_500(format!("Star {} does not have a driver for kind: {}",
+                self.skel
+                    .logger
+                    .result::<(), UniErr>(Err(UniErr::from_500(format!(
+                        "Star {} does not have a driver for kind: {}",
                         self.skel.kind.to_string(),
-                    assign.details.stub.kind.to_string())).into())
-                )?;
+                        assign.details.stub.kind.to_string()
+                    ))
+                    .into()))?;
             }
 
-println!("ASsigned....{}", assign.details.stub.kind.to_string());
             let location = ParticleLocation::new(self.skel.point.clone(), None);
             self.skel
                 .registry
@@ -507,11 +509,11 @@ println!("ASsigned....{}", assign.details.stub.kind.to_string());
 
         let wave = ctx.input.clone();
 
-        self.skel.logger.track(&wave, || {
-            Tracker::new("star:core:transport", "Unwrapped")
-        });
+        self.skel
+            .logger
+            .track(&wave, || Tracker::new("star:core:transport", "Unwrapped"));
 
-//        self.skel.gravity_router.route(wave).await;
+        //        self.skel.gravity_router.route(wave).await;
 
         let mut injection = TraversalInjection::new(
             self.skel
@@ -524,7 +526,6 @@ println!("ASsigned....{}", assign.details.stub.kind.to_string());
         injection.from_gravity = true;
 
         self.skel.inject_tx.send(injection).await;
-
     }
 
     #[route("Hyp<Search>")]
@@ -814,9 +815,9 @@ where
                     // this is not good, but it's not breaking anything, and I cant deal with all the errors right now -- Scott
 
                     if let Substance::Hyper(sub) = echo.variant.core.body {
-                         self.skel.logger.warn(format!(
+                        self.skel.logger.warn(format!(
                             "unexpected reflected core substance from search echo : {}",
-                           sub.to_string()
+                            sub.to_string()
                         ));
                     } else {
                         self.skel.logger.warn(format!(

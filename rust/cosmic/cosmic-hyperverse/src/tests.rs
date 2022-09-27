@@ -514,7 +514,7 @@ fn test_control() -> Result<(), TestErr> {
         let exchanger = Exchanger::new(
             Point::from_str("client").unwrap().to_surface(),
             Timeouts::default(),
-            Default::default()
+            Default::default(),
         );
         let client =
             HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger).unwrap();
@@ -573,14 +573,16 @@ fn test_star_wrangle() -> Result<(), TestErr> {
 
         let star_api = machine_api.get_machine_star().await?;
 
-        let wrangles = tokio::time::timeout(Duration::from_secs(55), star_api.wrangle()).await.unwrap().unwrap();
+        let wrangles = tokio::time::timeout(Duration::from_secs(55), star_api.wrangle())
+            .await
+            .unwrap()
+            .unwrap();
 
         println!("wrangles: {}", wrangles.wrangles.len());
 
         for kind in wrangles.wrangles.iter() {
             println!("\tkind: {}", kind.key().to_string());
         }
-
 
         Ok(())
     })
@@ -649,23 +651,23 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
         tokio::time::sleep(Duration::from_secs(5)).await;
 
         /*
-        let mut proto = DirectedProto::ping();
-        proto.method(CmdMethod::Bounce);
-        proto.to(Point::root().to_surface());
-proto.track = true;
-        let reflect: Wave<Pong> = transmitter.direct(proto).await?;
-        println!("\tBOUNCE ROOT: {}", reflect.core.status.to_string());
-        assert!(reflect.core.is_ok());
+                let mut proto = DirectedProto::ping();
+                proto.method(CmdMethod::Bounce);
+                proto.to(Point::root().to_surface());
+        proto.track = true;
+                let reflect: Wave<Pong> = transmitter.direct(proto).await?;
+                println!("\tBOUNCE ROOT: {}", reflect.core.status.to_string());
+                assert!(reflect.core.is_ok());
 
-        let mut proto = DirectedProto::ping();
-        proto.method(CmdMethod::Bounce);
-        proto.to(Point::root().to_surface());
-proto.track = true;
-        let reflect: Wave<Pong> = transmitter.direct(proto).await?;
-        println!("\tBOUNCE ROOT2: {}", reflect.core.status.to_string());
-        assert!(reflect.core.is_ok());
+                let mut proto = DirectedProto::ping();
+                proto.method(CmdMethod::Bounce);
+                proto.to(Point::root().to_surface());
+        proto.track = true;
+                let reflect: Wave<Pong> = transmitter.direct(proto).await?;
+                println!("\tBOUNCE ROOT2: {}", reflect.core.status.to_string());
+                assert!(reflect.core.is_ok());
 
-         */
+                 */
 
         /*
         let mut proto = DirectedProto::ping();
@@ -677,7 +679,7 @@ proto.track = true;
 
          */
 
-//        assert!(transmitter.bounce(&Point::global_executor().to_surface()).await);
+        //        assert!(transmitter.bounce(&Point::global_executor().to_surface()).await);
 
         let create = Create {
             template: Template::new(
@@ -692,7 +694,7 @@ proto.track = true;
             state: StateSrc::None,
         };
         let mut proto: DirectedProto = create.into();
-//proto.track = true;
+        //proto.track = true;
 
         let reflect: Wave<Pong> = transmitter.direct(proto).await?;
         assert!(reflect.core.is_ok());
@@ -764,11 +766,9 @@ fn test_publish() -> Result<(), TestErr> {
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
         let logger = logger.point(Point::from_str("test-client").unwrap());
 
-        tokio::time::timeout(Duration::from_secs(2), machine_api.wait_ready())
+        tokio::time::timeout(Duration::from_secs(10), machine_api.wait_ready())
             .await
             .unwrap();
-
-        tokio::time::sleep(Duration::from_secs(5)).await;
 
         let factory = MachineApiExtFactory {
             machine_api,

@@ -170,7 +170,7 @@ where
     Visit(Traversal<UltraWave>),
     InternalKinds(oneshot::Sender<Vec<KindSelector>>),
     ExternalKinds(oneshot::Sender<Vec<KindSelector>>),
-     Find{
+    Find {
         kind: Kind,
         rtn: oneshot::Sender<Option<DriverApi<P>>>,
     },
@@ -245,12 +245,9 @@ where
 
     pub async fn find(&self, kind: Kind) -> Result<Option<DriverApi<P>>, UniErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
-        self.call_tx
-            .send(DriversCall::Find{ kind, rtn })
-            .await?;
+        self.call_tx.send(DriversCall::Find { kind, rtn }).await?;
         Ok(rtn_rx.await?)
     }
-
 
     pub async fn find_external(&self, kind: Kind) -> Result<Option<DriverApi<P>>, UniErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
@@ -436,7 +433,7 @@ where
                     DriversCall::FindInternalKind { kind, rtn } => {
                         rtn.send(self.find_internal(&kind).cloned());
                     }
-                    DriversCall::Find{ kind, rtn } => {
+                    DriversCall::Find { kind, rtn } => {
                         rtn.send(self.find(&kind).cloned());
                     }
                     DriversCall::LocalDriverLookup { kind, rtn } => {
@@ -654,16 +651,16 @@ where
                         let status = status_rx.borrow().clone();
                         match status {
                             DriverStatus::Unknown => {
-//                                logger.info(format!("{} {}", kind.to_string(), status.to_string()));
+                                //                                logger.info(format!("{} {}", kind.to_string(), status.to_string()));
                             }
                             DriverStatus::Pending => {
-//                               logger.info(format!("{} {}", kind.to_string(), status.to_string()));
+                                //                               logger.info(format!("{} {}", kind.to_string(), status.to_string()));
                             }
                             DriverStatus::Init => {
-//                                logger.info(format!("{} {}", kind.to_string(), status.to_string()));
+                                //                                logger.info(format!("{} {}", kind.to_string(), status.to_string()));
                             }
                             DriverStatus::Ready => {
-//                                logger.info(format!("{} {}", kind.to_string(), status.to_string()));
+                                //                                logger.info(format!("{} {}", kind.to_string(), status.to_string()));
                             }
                             DriverStatus::Retrying(ref reason) => {
                                 logger.warn(format!(
@@ -767,7 +764,10 @@ where
                             );
                             let (rtn, rtn_rx) = oneshot::channel();
                             call_tx
-                                .send(DriversCall::AddDriver { driver: driver.clone(), rtn })
+                                .send(DriversCall::AddDriver {
+                                    driver: driver.clone(),
+                                    rtn,
+                                })
                                 .await
                                 .unwrap_or_default();
                             if driver.kind.matches(&Kind::Driver) {
@@ -1248,7 +1248,6 @@ where
                         self.traverse(traversal).await;
                     }
                     DriverRunnerCall::Handle(traversal) => {
-
                         if traversal.is_directed() {
                             let wave = traversal.payload.to_directed().unwrap();
                             self.logger
@@ -1331,10 +1330,9 @@ where
     }
 
     async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), P::Err> {
-
         self.skel.logger.track(&traversal, || {
             Tracker::new(
-                format!("drivers -> {}",traversal.dir.to_string()),
+                format!("drivers -> {}", traversal.dir.to_string()),
                 "Traverse",
             )
         });
@@ -1473,7 +1471,9 @@ where
             strategy: Strategy::Override,
             state: StateSrc::None,
         };
-        self.skel.logger.result(self.skel.create_in_star(create).await)
+        self.skel
+            .logger
+            .result(self.skel.create_in_star(create).await)
     }
 
     pub async fn locate(&self, point: &Point) -> Result<ParticleRecord, P::Err> {

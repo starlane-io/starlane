@@ -274,7 +274,7 @@ impl UltraWave {
         signal.agent(self.agent().clone());
         signal.handling(self.handling().clone());
         signal.method(HypMethod::Transport);
-//        signal.track = self.track();
+        //        signal.track = self.track();
         signal.body(Substance::UltraWave(Box::new(self)));
         signal.to(to);
         signal
@@ -1826,8 +1826,6 @@ where
         }
     }
 
-
-
     pub fn has_visited(&self, star: &Point) -> bool {
         match self {
             Self::Ripple(ripple) => ripple.history.contains(star),
@@ -2092,18 +2090,15 @@ where
         }
     }
 
-     pub fn set_bounce_backs(&mut self, bounce_backs: BounceBacks) -> Result<(),UniErr> {
+    pub fn set_bounce_backs(&mut self, bounce_backs: BounceBacks) -> Result<(), UniErr> {
         match self {
             DirectedWaveDef::Ripple(ripple) => {
                 ripple.bounce_backs = bounce_backs;
                 Ok(())
-            },
-            _  => {
-                Err(UniErr::from_500("can only set bouncebacks for Ripple"))
             }
+            _ => Err(UniErr::from_500("can only set bouncebacks for Ripple")),
         }
     }
-
 
     pub fn from(&self) -> &Surface {
         match self {

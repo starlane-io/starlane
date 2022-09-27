@@ -929,7 +929,6 @@ impl Surface {
         }
     }
 
-
     fn postfix(&self) -> String {
         let point = self.clone().to_point();
         match &self.topic {
@@ -1850,7 +1849,6 @@ where
     pub fn postfix(&self) -> String {
         self.to_string_impl(false)
     }
-
 }
 
 impl<Route, Seg> ToString for PointDef<Route, Seg>

@@ -548,10 +548,9 @@ where
         tokio::time::timeout(Duration::from_secs(5), rtn_rx).await??
     }
 
-   pub async fn start_wrangling(&self) {
+    pub async fn start_wrangling(&self) {
         self.tx.send(HyperStarCall::StartWrangling).await;
     }
-
 
     pub async fn bounce(&self, key: StarKey) -> Result<(), UniErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
@@ -842,8 +841,6 @@ where
                 }
             });
         }
-
-
 
         let kind = skel.kind.clone();
         {
@@ -1179,39 +1176,39 @@ where
         }
     }
 
-    async fn start_wrangling(&self)  {
-            let skel = self.skel.clone();
-            tokio::spawn(async move {
-                let mut retries = 0;
-                loop {
-                    match tokio::time::timeout(Duration::from_secs(60), skel.api.wrangle()).await {
-                        Ok(Ok(_)) => {
-                            break;
-                        }
-                        Ok(Err(err)) => {
-                            skel.logger.error(format!(
-                                "HyperStar Auto Wrangle failed: {}",
-                                err.to_string()
-                            ));
-                        }
-                        Err(err) => {
-                            skel.logger.error(format!(
-                                "HyperStar Auto Wrangle failed: {}",
-                                err.to_string()
-                            ));
-                        }
+    async fn start_wrangling(&self) {
+        let skel = self.skel.clone();
+        tokio::spawn(async move {
+            let mut retries = 0;
+            loop {
+                match tokio::time::timeout(Duration::from_secs(60), skel.api.wrangle()).await {
+                    Ok(Ok(_)) => {
+                        break;
                     }
-                    skel.logger.info("trying wrangle again in 5 seconds...");
-                    if retries > 10 {
-                        tokio::time::sleep(Duration::from_secs(15)).await;
-                    } else if retries > 2 {
-                        tokio::time::sleep(Duration::from_secs(5)).await;
-                    } else {
-                        tokio::time::sleep(Duration::from_secs(1)).await;
+                    Ok(Err(err)) => {
+                        skel.logger.error(format!(
+                            "HyperStar Auto Wrangle failed: {}",
+                            err.to_string()
+                        ));
                     }
-                    retries = retries + 1;
+                    Err(err) => {
+                        skel.logger.error(format!(
+                            "HyperStar Auto Wrangle failed: {}",
+                            err.to_string()
+                        ));
+                    }
                 }
-            });
+                skel.logger.info("trying wrangle again in 5 seconds...");
+                if retries > 10 {
+                    tokio::time::sleep(Duration::from_secs(15)).await;
+                } else if retries > 2 {
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                } else {
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                }
+                retries = retries + 1;
+            }
+        });
     }
 
     async fn wrangle(&self, rtn: oneshot::Sender<Result<StarWrangles, UniErr>>) {
@@ -1925,7 +1922,6 @@ where
         point: &Point,
         state: StateSrc,
     ) -> Result<ParticleLocation, P::Err> {
-        println!("\tprovision request: {}", point.to_string());
         self.skel
             .logger
             .result(self.provision_inner(point, state).await)
@@ -1957,7 +1953,6 @@ where
         let pong: Wave<Pong> = self.skel.star_transmitter.direct(wave).await?;
         if pong.core.status.as_u16() == 200 {
             if let Substance::Location(location) = &pong.core.body {
-
                 Ok(location.clone())
             } else {
                 Err(P::Err::new("Provision result expected Substance Point"))

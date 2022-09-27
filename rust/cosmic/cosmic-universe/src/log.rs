@@ -528,7 +528,7 @@ impl Default for PointLogger {
             logger: Default::default(),
             point: Point::root(),
             mark: Point::root(),
-            action: None
+            action: None,
         }
     }
 }

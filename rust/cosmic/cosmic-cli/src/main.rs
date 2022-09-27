@@ -28,7 +28,7 @@ async fn main() -> Result<(), UniErr> {
                 .required(false)
                 .default_value("localhost"),
         )
-                .arg(
+        .arg(
             Arg::new("certs")
                 .short('c')
                 .long("certs")
@@ -37,7 +37,6 @@ async fn main() -> Result<(), UniErr> {
                 .required(false)
                 .default_value("."),
         )
-
         .allow_external_subcommands(true)
         .get_matches();
 

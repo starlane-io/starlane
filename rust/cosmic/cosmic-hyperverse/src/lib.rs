@@ -154,6 +154,7 @@ pub trait HyperErr:
     + From<zip::result::ZipError>
     + From<Box<bincode::ErrorKind>>
     + From<acid_store::Error>
+    + From<UniErr>
     + Into<UniErr>
 {
     fn to_uni_err(&self) -> UniErr;

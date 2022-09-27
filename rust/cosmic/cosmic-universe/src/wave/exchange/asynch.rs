@@ -1,4 +1,5 @@
 use crate::loc::{ToPoint, ToSurface};
+use crate::log::{PointLogger, RootLogger, Trackable, Tracker};
 use crate::particle::traversal::Traversal;
 use crate::settings::Timeouts;
 use crate::wave::core::cmd::CmdMethod;
@@ -15,12 +16,11 @@ use crate::wave::{
 };
 use crate::{Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, UniErr};
 use alloc::borrow::Cow;
-use std::collections::HashSet;
 use dashmap::{DashMap, DashSet};
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
-use crate::log::{PointLogger, RootLogger, Trackable, Tracker};
 
 #[async_trait]
 impl Router for TxRouter {
@@ -207,10 +207,10 @@ impl ProtoTransmitterBuilder {
     }
 }
 
-pub type TraversalTransmitter = ProtoTransmitterDef<Arc<dyn TraversalRouter>,Exchanger>;
+pub type TraversalTransmitter = ProtoTransmitterDef<Arc<dyn TraversalRouter>, Exchanger>;
 
 impl TraversalTransmitter {
-    pub fn new(router: Arc<dyn TraversalRouter>, exchanger: Exchanger ) -> Self {
+    pub fn new(router: Arc<dyn TraversalRouter>, exchanger: Exchanger) -> Self {
         Self {
             agent: SetStrategy::None,
             scope: SetStrategy::None,
@@ -219,7 +219,7 @@ impl TraversalTransmitter {
             from: SetStrategy::None,
             to: SetStrategy::None,
             router,
-            exchanger
+            exchanger,
         }
     }
 
@@ -229,18 +229,17 @@ impl TraversalTransmitter {
     {
         match traversal.bounce_backs() {
             BounceBacks::None => {
-                self.router.traverse(traversal.wrap() ).await;
+                self.router.traverse(traversal.wrap()).await;
                 FromReflectedAggregate::from_reflected_aggregate(ReflectedAggregate::None)
             }
             _ => {
                 let reflected_rx = self.exchanger.exchange(&traversal.payload).await;
-                self.router.traverse(traversal.wrap() ).await;
+                self.router.traverse(traversal.wrap()).await;
                 let reflected_agg = reflected_rx.await?;
                 FromReflectedAggregate::from_reflected_aggregate(reflected_agg)
             }
         }
     }
-
 }
 
 pub type RootInCtx = RootInCtxDef<ProtoTransmitter>;
@@ -293,7 +292,7 @@ pub struct Exchanger {
     pub timeouts: Timeouts,
     pub logger: PointLogger,
     #[cfg(test)]
-    pub claimed: Arc<DashSet<String>>
+    pub claimed: Arc<DashSet<String>>,
 }
 
 impl Exchanger {
@@ -306,7 +305,7 @@ impl Exchanger {
             timeouts,
             logger,
             #[cfg(test)]
-            claimed: Arc::new(DashSet::new())
+            claimed: Arc::new(DashSet::new()),
         }
     }
 
@@ -319,20 +318,19 @@ impl Exchanger {
             timeouts: self.timeouts.clone(),
             logger,
             #[cfg(test)]
-            claimed: self.claimed.clone()
+            claimed: self.claimed.clone(),
         }
     }
 
     pub async fn reflected(&self, reflect: ReflectedWave) -> Result<(), UniErr> {
-        self.logger.track(&reflect, || {
-            Tracker::new("exchange", "Reflected")
-        });
+        self.logger
+            .track(&reflect, || Tracker::new("exchange", "Reflected"));
 
         if let Some(multi) = self.multis.get(reflect.reflection_of()) {
             multi.value().send(reflect).await;
         } else if let Some((_, tx)) = self.singles.remove(reflect.reflection_of()) {
             #[cfg(test)]
-            self.claimed.insert(reflect.reflection_of().to_string() );
+            self.claimed.insert(reflect.reflection_of().to_string());
             tx.send(ReflectedAggregate::Single(reflect));
         } else {
             let reflect = reflect.to_ultra();
@@ -346,8 +344,11 @@ impl Exchanger {
             let reflect = reflect.to_reflected()?;
 
             #[cfg(test)]
-            if self.claimed.contains(reflect.reflection_of().to_string().as_str() ) {
-              return Err(UniErr::from_500(format!(
+            if self
+                .claimed
+                .contains(reflect.reflection_of().to_string().as_str())
+            {
+                return Err(UniErr::from_500(format!(
                     "Reflection already claimed for {} from: {} to: {} KIND: {} STATUS: {}",
                     reflect.reflection_of().to_short_string(),
                     reflect.from().to_string(),
@@ -364,7 +365,6 @@ impl Exchanger {
                 kind,
                 reflect.core().status.to_string()
             )));
-
         }
         Ok(())
     }
@@ -478,7 +478,11 @@ impl Exchanger {
 
 impl Default for Exchanger {
     fn default() -> Self {
-        Self::new(Point::root().to_surface(), Default::default(), RootLogger::default().point(Point::root()))
+        Self::new(
+            Point::root().to_surface(),
+            Default::default(),
+            RootLogger::default().point(Point::root()),
+        )
     }
 }
 

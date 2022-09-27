@@ -1,4 +1,7 @@
-use crate::driver::{Driver, DriverAvail, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, HyperSkel, Item, ItemHandler, ItemSkel, ItemSphere};
+use crate::driver::{
+    Driver, DriverAvail, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, HyperSkel, Item,
+    ItemHandler, ItemSkel, ItemSphere,
+};
 use crate::star::HyperStarSkel;
 use crate::{Cosmos, HyperErr};
 use acid_store::repo::key::KeyRepo;
@@ -278,7 +281,7 @@ where
         driver_skel: DriverSkel<P>,
         ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
-        let skel = HyperSkel::new( skel, driver_skel );
+        let skel = HyperSkel::new(skel, driver_skel);
         Ok(Box::new(BundleDriver::new(skel, ctx)))
     }
 }
@@ -354,12 +357,12 @@ where
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
-            println!("\nAssign Bundle: {}", assign.details.stub.point.to_string());
             let state = match &assign.state {
                 StateSrc::Substance(data) => data.clone(),
                 StateSrc::None => {
                     return self
-                        .skel.driver
+                        .skel
+                        .driver
                         .logger
                         .result(Err("ArtifactBundle cannot be stateless".into()));
                 }
@@ -381,14 +384,21 @@ where
                     }
                 }
 
-                println!("Assign Bundle about to commit!");
-                let mut store = store()?;
-                let state = *state;
-                store.insert(assign.details.stub.point.to_string(), &state)?;
-                store.commit()?;
-                println!("Assign Bundle all done!");
+                {
+                    let mut store = store()?;
+                    let state = *state;
+                    store.insert(assign.details.stub.point.to_string(), &state)?;
+                    store.commit()?;
+                }
 
-                self.skel.star.registry.assign( &assign.details.stub.point, ParticleLocation::new(self.skel.star.point.clone(),None) ).await?;
+                self.skel
+                    .star
+                    .registry
+                    .assign(
+                        &assign.details.stub.point,
+                        ParticleLocation::new(self.skel.star.point.clone(), None),
+                    )
+                    .await?;
 
                 let mut point_and_kind_set = HashSet::new();
                 for artifact in artifacts {
@@ -443,62 +453,62 @@ where
 
                 {
                     let ctx = self.ctx.clone();
-                    tokio::spawn(async move {
-                        for point_and_kind in point_and_kind_set {
-                            let parent = point_and_kind.point.parent().expect("expected parent");
+                    //                    tokio::spawn(async move {
+                    for point_and_kind in point_and_kind_set {
+                        let parent = point_and_kind.point.parent().expect("expected parent");
 
-                            let state = match point_and_kind.kind {
-                                Kind::Artifact(ArtifactSubKind::Dir) => StateSrc::None,
-                                Kind::Artifact(_) => {
-                                    let mut path = point_and_kind
-                                        .point
-                                        .filepath()
-                                        .expect("expecting non Dir artifact to have a filepath");
-                                    // convert to relative path
-                                    path.remove(0);
-                                    match archive.by_name(path.as_str()) {
-                                        Ok(mut file) => {
-                                            let mut buf = vec![];
-                                            file.read_to_end(&mut buf);
-                                            let bin = Arc::new(buf);
-                                            let payload = Substance::Bin(bin);
-                                            StateSrc::Substance(Box::new(payload))
-                                        }
-                                        Err(err) => StateSrc::None,
+                        let state = match point_and_kind.kind {
+                            Kind::Artifact(ArtifactSubKind::Dir) => StateSrc::None,
+                            Kind::Artifact(_) => {
+                                let mut path = point_and_kind
+                                    .point
+                                    .filepath()
+                                    .expect("expecting non Dir artifact to have a filepath");
+                                // convert to relative path
+                                path.remove(0);
+                                match archive.by_name(path.as_str()) {
+                                    Ok(mut file) => {
+                                        let mut buf = vec![];
+                                        file.read_to_end(&mut buf);
+                                        let bin = Arc::new(buf);
+                                        let payload = Substance::Bin(bin);
+                                        StateSrc::Substance(Box::new(payload))
                                     }
+                                    Err(err) => StateSrc::None,
                                 }
-                                _ => {
-                                    panic!("unexpected knd");
-                                }
-                            };
+                            }
+                            _ => {
+                                panic!("unexpected knd");
+                            }
+                        };
 
-                            let create = Create {
-                                template: Template {
-                                    point: PointTemplate {
-                                        parent: parent.clone(),
-                                        child_segment_template: PointSegTemplate::Exact(
-                                            point_and_kind
-                                                .point
-                                                .last_segment()
-                                                .expect("expected final segment")
-                                                .to_string(),
-                                        ),
-                                    },
-                                    kind: KindTemplate {
-                                        base: point_and_kind.kind.to_base(),
-                                        sub: point_and_kind.kind.sub().into(),
-                                        specific: None,
-                                    },
+                        let create = Create {
+                            template: Template {
+                                point: PointTemplate {
+                                    parent: parent.clone(),
+                                    child_segment_template: PointSegTemplate::Exact(
+                                        point_and_kind
+                                            .point
+                                            .last_segment()
+                                            .expect("expected final segment")
+                                            .to_string(),
+                                    ),
                                 },
-                                state,
-                                properties: SetProperties::new(),
-                                strategy: Strategy::Commit,
-                            };
+                                kind: KindTemplate {
+                                    base: point_and_kind.kind.to_base(),
+                                    sub: point_and_kind.kind.sub().into(),
+                                    specific: None,
+                                },
+                            },
+                            state,
+                            properties: SetProperties::new(),
+                            strategy: Strategy::Commit,
+                        };
 
-                            let wave: DirectedProto = create.into();
-                            let pong: Wave<Pong> = ctx.transmitter.direct(wave).await.unwrap();
-                        }
-                    });
+                        let wave: DirectedProto = create.into();
+                        let pong: Wave<Pong> = ctx.transmitter.direct(wave).await.unwrap();
+                    }
+                    //   });
                 }
             } else {
                 return Err("ArtifactBundle Manager expected Bin payload".into());
@@ -592,42 +602,56 @@ where
     }
 
     async fn handler(&self) -> Box<dyn DriverHandler<P>> {
-        Box::new(ArtifactDriverHandler::restore())
+        let skel = HyperSkel::new( self.skel.skel.clone(), self.skel.clone() );
+        Box::new(ArtifactDriverHandler::restore(skel))
     }
 }
 
-pub struct ArtifactDriverHandler {}
+pub struct ArtifactDriverHandler<P> where P: Cosmos {
+    skel: HyperSkel<P>
+}
 
-impl ArtifactDriverHandler {
-    fn restore() -> Self {
-        ArtifactDriverHandler {}
+impl <P> ArtifactDriverHandler<P> where P: Cosmos{
+    fn restore(skel: HyperSkel<P>) -> Self {
+        Self{
+            skel
+        }
     }
 }
 
-impl<P> DriverHandler<P> for ArtifactDriverHandler where P: Cosmos {}
+impl<P> DriverHandler<P> for ArtifactDriverHandler<P> where P: Cosmos {}
 
 #[handler]
-impl ArtifactDriverHandler {
+impl <P> ArtifactDriverHandler<P> where P: Cosmos {
     #[route("Hyp<Assign>")]
-    async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), UniErr> {
-        println!("\nAssign Artifact!");
+    async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
             if let Kind::Artifact(sub) = &assign.details.stub.kind {
                 match sub {
-                    ArtifactSubKind::Dir => {}
+                    ArtifactSubKind::Dir => {
+                    }
                     _ => {
                         let substance = assign.state.get_substance()?;
-                        let mut store = store()?;
+                        let mut store = self.skel.driver.logger.result(store())?;
                         store
                             .insert(assign.details.stub.point.to_string(), &substance)
                             .map_err(|e| UniErr::from_500(e.to_string()))?;
-                        store.commit().map_err(|e| UniErr::from_500(e.to_string()));
+                        self.skel.driver.logger.result(store.commit().map_err(|e| UniErr::from_500(e.to_string())))?;
                     }
                 }
+                 self.skel
+                    .star
+                    .registry
+                    .assign(
+                        &assign.details.stub.point,
+                        ParticleLocation::new(self.skel.star.point.clone(), None),
+                    )
+                    .await?;
+
             }
             Ok(())
         } else {
-            Err(UniErr::bad_request_msg("ArtifactDriver expected Assign"))
+            Err(P::Err::new("ArtifactDriver expected Assign"))
         }
     }
 }

@@ -186,7 +186,6 @@ where
                     traversal.from().to_string(),
                     traversal.reflection_of().to_short_string()
                 ));
-
             }
 
             if value <= 0 {
