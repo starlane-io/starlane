@@ -671,7 +671,7 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
             state: StateSrc::None,
         };
         let mut proto: DirectedProto = create.into();
-proto.track = true;
+//proto.track = true;
 
         let reflect: Wave<Pong> = transmitter.direct(proto).await?;
 println!("\tCORE STATUS {}", reflect.core.status.to_string());

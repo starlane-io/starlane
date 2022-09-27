@@ -535,7 +535,6 @@ println!("\tassign to driver: {}", driver.to_surface().to_string());
 
     #[route("Hyp<Search>")]
     pub async fn handle_search_request(&self, ctx: InCtx<'_, HyperSubstance>) -> CoreBounce {
-println!("\tHandle search request...");
         async fn sub_search_and_reflect<'a, E>(
             star: &Star<E>,
             ctx: &'a InCtx<'a, HyperSubstance>,
@@ -796,7 +795,7 @@ where
 
     pub async fn wrangle(&self, track: bool) -> Result<Discoveries, UniErr> {
         let mut ripple = DirectedProto::ripple();
-ripple.track = track;
+        ripple.track = track;
         ripple.method(HypMethod::Search);
         ripple.body(Substance::Hyper(HyperSubstance::Search(
             self.search.clone(),

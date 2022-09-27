@@ -833,7 +833,7 @@ where
             let skel = skel.clone();
             tokio::spawn(async move {
                 let mut retries = 0;
-                tokio::time::sleep(Duration::from_secs(5)).await;
+                tokio::time::sleep(Duration::from_secs(1)).await;
                 loop {
                     match tokio::time::timeout(Duration::from_secs(60), skel.api.wrangle()).await {
                         Ok(Ok(_)) => {
@@ -1199,7 +1199,6 @@ if ripple.track {
     }
 
     async fn wrangle(&self, rtn: oneshot::Sender<Result<StarWrangles, UniErr>>) {
-        println!("\tWRANGLING!");
         let skel = self.skel.clone();
         tokio::spawn(async move {
             let mut wrangler = Wrangler::new(skel.clone(), Search::Kinds);
@@ -1208,12 +1207,11 @@ if ripple.track {
             wrangler.history(history);
 
             let discoveries = match skel.logger.result(
-                tokio::time::timeout(Duration::from_secs(2), wrangler.wrangle(skel.kind == StarSub::Machine ))
+                tokio::time::timeout(Duration::from_secs(2), wrangler.wrangle(false ))
                     .await
                     .unwrap(),
             ) {
                 Ok(discoveries) => {
-                    println!("\tWrangle discoveries: {}", discoveries.len());
                     discoveries
                 }
                 Err(err) => {
