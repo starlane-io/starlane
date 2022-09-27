@@ -274,7 +274,7 @@ impl UltraWave {
         signal.agent(self.agent().clone());
         signal.handling(self.handling().clone());
         signal.method(HypMethod::Transport);
-        signal.track = self.track();
+//        signal.track = self.track();
         signal.body(Substance::UltraWave(Box::new(self)));
         signal.to(to);
         signal

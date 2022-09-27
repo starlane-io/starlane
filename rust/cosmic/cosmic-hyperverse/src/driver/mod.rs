@@ -1249,7 +1249,7 @@ where
                     }
                     DriverRunnerCall::Handle(traversal) => {
 
-println!("\ttravering to handler for {}", self.skel.kind.to_string() );
+println!("\ttraversing to handler for {}", self.skel.kind.to_string() );
                         if traversal.is_directed() {
                             let wave = traversal.payload.to_directed().unwrap();
                             self.logger
@@ -1332,6 +1332,14 @@ println!("\ttravering to handler for {}", self.skel.kind.to_string() );
     }
 
     async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), P::Err> {
+
+        self.skel.logger.track(&traversal, || {
+            Tracker::new(
+                format!("drivers -> {}",traversal.dir.to_string()),
+                "Traverse",
+            )
+        });
+
         let item = self
             .skel
             .logger
@@ -1628,8 +1636,7 @@ impl<P> DriverHandler<P> for DefaultDriverHandler where P: Cosmos {}
 impl DefaultDriverHandler {
     #[route("Hyp<Assign>")]
     pub async fn assign(&self, _ctx: InCtx<'_, HyperSubstance>) -> Result<(), UniErr> {
-println!("\tDefaultDriverHandler<> Assign");
-
+println!("\tDefaultDriverHandler ASSIGN");
         Ok(())
     }
 }

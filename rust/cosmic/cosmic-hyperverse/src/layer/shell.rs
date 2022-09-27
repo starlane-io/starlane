@@ -280,7 +280,6 @@ impl CommandExecutor {
     }
 
     pub async fn execute(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, UniErr> {
-println!("Executing command: {}", ctx.input.to_string( ));
         // make sure everything is coming from this command executor topic
         let ctx = ctx.push_from(self.port.clone());
 
@@ -306,7 +305,6 @@ println!("Executing command: {}", ctx.input.to_string( ));
         directed.to(Point::global_executor());
         let pong: Wave<Pong> = ctx.transmitter.direct(directed).await?;
 
-println!("command execution complete: {}", ctx.input.to_string( ));
         Ok(pong.variant.core)
     }
 }

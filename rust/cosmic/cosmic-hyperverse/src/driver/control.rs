@@ -20,7 +20,7 @@ use cosmic_universe::err::UniErr;
 use cosmic_universe::hyper::{ControlPattern, Greet, InterchangeKind};
 use cosmic_universe::kind::{BaseKind, Kind, StarSub};
 use cosmic_universe::loc::{Layer, Point, PointFactory, Surface, ToSurface};
-use cosmic_universe::log::RootLogger;
+use cosmic_universe::log::{RootLogger, Tracker};
 use cosmic_universe::particle::traversal::Traversal;
 use cosmic_universe::selector::KindSelector;
 use cosmic_universe::settings::Timeouts;
@@ -168,7 +168,6 @@ where
     }
 
     async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
-println!("\n\n\nINIT CONTROL\n\n\n");
         self.skel.driver.status_tx.send(DriverStatus::Init).await;
 
         skel.create_driver_particle(
@@ -177,7 +176,6 @@ println!("\n\n\nINIT CONTROL\n\n\n");
         )
         .await?;
 
-println!("CoNTROL GOT HERE");
         let remote_point_factory = Arc::new(ControlCreator::new(
             self.skel.clone(),
             self.fabric_routers.clone(),
@@ -199,7 +197,6 @@ println!("CoNTROL GOT HERE");
         );
         self.external_router = Some(interchange.router().into());
 
-println!("AND HERE");
         pub struct ControlHyperwayConfigurator;
 
         impl HyperwayConfigurator for ControlHyperwayConfigurator {
@@ -219,7 +216,6 @@ println!("AND HERE");
             self.skel.driver.logger.clone(),
         ));
         {
-            println!("CONTROL SPAWNING");
             let logger = self.skel.driver.logger.clone();
             let fabric_routers = self.fabric_routers.clone();
             let skel = self.skel.clone();
@@ -275,7 +271,6 @@ println!("AND HERE");
             )
             .await?;
 
-        println!("ABOUT TO ADD INTERCHANGE");
         if self.skel.star.kind == StarSub::Machine {
             self.skel
                 .star
@@ -284,7 +279,6 @@ println!("AND HERE");
                 .add_interchange(InterchangeKind::DefaultControl, gate)
                 .await?;
 
-            println!("\n\n\nDefaultControl ADDED\n\n\n");
         }
 
         self.skel.driver.status_tx.send(DriverStatus::Ready).await;
@@ -437,6 +431,13 @@ where
     P: Cosmos,
 {
     async fn traverse(&self, traversal: Traversal<UltraWave>) {
+        self.skel.driver.logger.track(&traversal, || {
+            Tracker::new(
+                format!("control -> {}",traversal.dir.to_string()),
+                "Traverse",
+            )
+        });
+
         self.ctx.router.route(traversal.payload).await;
     }
 }

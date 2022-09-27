@@ -137,6 +137,7 @@ where
 
     #[track_caller]
     pub async fn create(&self, create: &Create, agent: &Agent) -> Result<Details, P::Err> {
+println!("GLOBAL CREATE {}",create.template.kind.to_string() );
         let child_kind = self
             .skel
             .machine
@@ -220,6 +221,7 @@ where
             }
         }
 
+        println!("GLOBAL created: {}<{}>",details.stub.point.to_string(),details.stub.kind.to_string() );
         Ok(details)
     }
 }

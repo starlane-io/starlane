@@ -230,7 +230,6 @@ impl <P> PipeEx <P> where P: Cosmos{
                             .clone()
                             .make(err.as_reflected_core(), self.port.clone());
                         let wave = wave.to_ultra();
-println!("-[ Field ]-> TO GRAVITY");
                         self.gravity_transmitter.route(wave).await;
                     }
                     Err(_) => {}
@@ -252,7 +251,7 @@ println!("-[ Field ]-> TO GRAVITY");
         proto.scope(self.traversal.scope().clone());
         proto.from(self.traversal.from().clone());
         proto.history(self.traversal.history());
-//        proto.track = self.traversal.track();
+        proto.track = self.traversal.track();
         proto
     }
 
@@ -297,7 +296,6 @@ println!("-[ Field ]-> TO GRAVITY");
 
                 let reflected = reflection.make(core, self.traversal.to.clone());
 
-println!("-[ Field ]-> TO GRAVITY");
                 self.gravity_transmitter.route(reflected.to_ultra()).await;
                 Ok(())
             }
@@ -309,7 +307,6 @@ println!("-[ Field ]-> TO GRAVITY");
                 let mut proto = self.proto();
                 proto.to(point.to_surface().with_layer(Layer::Core));
 
-println!("-[ Field ]-> TO GRAVITY");
                 self.direct(proto, self.gravity_transmitter.clone()).await
             }
             PipelineStopVar::Err { .. } => {

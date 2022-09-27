@@ -15,7 +15,8 @@ use crate::wave::{
 };
 use crate::{Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, UniErr};
 use alloc::borrow::Cow;
-use dashmap::DashMap;
+use std::collections::HashSet;
+use dashmap::{DashMap, DashSet};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
@@ -253,6 +254,8 @@ pub struct Exchanger {
     pub multis: Arc<DashMap<WaveId, mpsc::Sender<ReflectedWave>>>,
     pub singles: Arc<DashMap<WaveId, oneshot::Sender<ReflectedAggregate>>>,
     pub timeouts: Timeouts,
+    #[cfg(test)]
+    pub claimed: Arc<DashSet<String>>
 }
 
 impl Exchanger {
@@ -262,6 +265,8 @@ impl Exchanger {
             singles: Arc::new(DashMap::new()),
             multis: Arc::new(DashMap::new()),
             timeouts,
+            #[cfg(test)]
+            claimed: Arc::new(DashSet::new())
         }
     }
 
@@ -271,6 +276,8 @@ impl Exchanger {
             singles: self.singles.clone(),
             multis: self.multis.clone(),
             timeouts: self.timeouts.clone(),
+            #[cfg(test)]
+            claimed: self.claimed.clone()
         }
     }
 
@@ -278,6 +285,8 @@ impl Exchanger {
         if let Some(multi) = self.multis.get(reflect.reflection_of()) {
             multi.value().send(reflect).await;
         } else if let Some((_, tx)) = self.singles.remove(reflect.reflection_of()) {
+            #[cfg(test)]
+            self.claimed.insert(reflect.reflection_of().to_string() );
             tx.send(ReflectedAggregate::Single(reflect));
         } else {
             let reflect = reflect.to_ultra();
@@ -290,13 +299,26 @@ impl Exchanger {
             };
             let reflect = reflect.to_reflected()?;
 
+            #[cfg(test)]
+            if self.claimed.contains(reflect.reflection_of().to_string().as_str() ) {
+              return Err(UniErr::from_500(format!(
+                    "Reflection already claimed for {} from: {} to: {} KIND: {} STATUS: {}",
+                    reflect.reflection_of().to_short_string(),
+                    reflect.from().to_string(),
+                    reflect.to().to_string(),
+                    kind,
+                    reflect.core().status.to_string()
+                )));
+            }
             return Err(UniErr::from_500(format!(
-                "Not expecting reflected message from: {} to: {} KIND: {} STATUS: {}",
+                "Not expecting reflected message for {} from: {} to: {} KIND: {} STATUS: {}",
+                reflect.reflection_of().to_short_string(),
                 reflect.from().to_string(),
                 reflect.to().to_string(),
                 kind,
                 reflect.core().status.to_string()
             )));
+
         }
         Ok(())
     }

@@ -565,7 +565,6 @@ fn test_star_wrangle() -> Result<(), TestErr> {
         let platform = TestCosmos::new();
         let machine_api = platform.machine();
         let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
-        let logger = logger.point(Point::from_str("test-client").unwrap());
 
         tokio::time::timeout(Duration::from_secs(1), machine_api.wait_ready())
             .await
@@ -573,13 +572,14 @@ fn test_star_wrangle() -> Result<(), TestErr> {
 
         let star_api = machine_api.get_machine_star().await?;
 
-        let wrangles = tokio::time::timeout(Duration::from_secs(55), star_api.wrangle()).await??;
+        let wrangles = tokio::time::timeout(Duration::from_secs(55), star_api.wrangle()).await.unwrap().unwrap();
 
         println!("wrangles: {}", wrangles.wrangles.len());
 
         for kind in wrangles.wrangles.iter() {
             println!("\tkind: {}", kind.key().to_string());
         }
+
 
         Ok(())
     })
@@ -647,12 +647,15 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
             HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger).unwrap();
         let transmitter = client.transmitter_builder().await?;
         let transmitter = transmitter.build();
+        client.wait_for_ready(Duration::from_secs(2)).await?;
+
+        tokio::time::sleep(Duration::from_secs(2)).await;
 
         let mut proto = DirectedProto::ping();
         proto.method(CmdMethod::Bounce);
         proto.to(Point::root().to_surface());
         let reflect: Wave<Pong> = transmitter.direct(proto).await?;
-        println!("{}", reflect.core.status.to_string());
+        println!("\tBOUNCE ROOT: {}", reflect.core.status.to_string());
         assert!(reflect.core.is_ok());
 
         let create = Create {
@@ -667,9 +670,11 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
             strategy: Strategy::Override,
             state: StateSrc::None,
         };
-        let proto: DirectedProto = create.into();
+        let mut proto: DirectedProto = create.into();
+proto.track = true;
+
         let reflect: Wave<Pong> = transmitter.direct(proto).await?;
-        println!("{}", reflect.core.status.to_string());
+println!("\tCORE STATUS {}", reflect.core.status.to_string());
         assert!(reflect.core.is_ok());
 
         tokio::time::sleep(Duration::from_secs(5)).await;

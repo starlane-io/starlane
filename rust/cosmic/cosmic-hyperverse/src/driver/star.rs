@@ -24,7 +24,7 @@ use cosmic_universe::util::{log, ValuePattern};
 use cosmic_universe::wave::core::http2::StatusCode;
 use cosmic_universe::wave::core::hyp::HypMethod;
 use cosmic_universe::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
-use cosmic_universe::wave::exchange::asynch::{InCtx, ProtoTransmitter, ProtoTransmitterBuilder};
+use cosmic_universe::wave::exchange::asynch::{InCtx, ProtoTransmitter, ProtoTransmitterBuilder, Router};
 use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::{
     Agent, BounceBacks, DirectedProto, Echoes, Handling, HandlingKind, Pong, Priority, Recipients,
@@ -513,7 +513,13 @@ println!("\tassign to driver: {}", driver.to_surface().to_string());
 
         let wave = ctx.input.clone();
 
-        let injection = TraversalInjection::new(
+        self.skel.logger.track(&wave, || {
+            Tracker::new("star:core:transport", "Unwrapped")
+        });
+
+//        self.skel.gravity_router.route(wave).await;
+
+        let mut injection = TraversalInjection::new(
             self.skel
                 .point
                 .clone()
@@ -521,12 +527,15 @@ println!("\tassign to driver: {}", driver.to_surface().to_string());
                 .with_layer(Layer::Gravity),
             wave,
         );
+        injection.from_gravity = true;
 
         self.skel.inject_tx.send(injection).await;
+
     }
 
     #[route("Hyp<Search>")]
     pub async fn handle_search_request(&self, ctx: InCtx<'_, HyperSubstance>) -> CoreBounce {
+println!("\tHandle search request...");
         async fn sub_search_and_reflect<'a, E>(
             star: &Star<E>,
             ctx: &'a InCtx<'a, HyperSubstance>,
@@ -540,7 +549,7 @@ println!("\tassign to driver: {}", driver.to_surface().to_string());
                 let mut wrangler = Wrangler::new(star.skel.clone(), search);
                 history.insert(star.skel.point.clone());
                 wrangler.history(history);
-                wrangler.wrangle().await?
+                wrangler.wrangle(false).await?
             } else {
                 // if not a forwarder, then we don't seek sub wrangles
                 Discoveries::new()
@@ -785,8 +794,9 @@ where
         }
     }
 
-    pub async fn wrangle(&self) -> Result<Discoveries, UniErr> {
+    pub async fn wrangle(&self, track: bool) -> Result<Discoveries, UniErr> {
         let mut ripple = DirectedProto::ripple();
+ripple.track = track;
         ripple.method(HypMethod::Search);
         ripple.body(Substance::Hyper(HyperSubstance::Search(
             self.search.clone(),

@@ -308,8 +308,6 @@ where
             HypMethod::Assign,
         );
 
-assign.track = true;
-
         assign.body(assign_body.into());
         let router = Arc::new(LayerInjectionRouter::new(
             self.clone(),
@@ -920,7 +918,11 @@ where
                         let layer_traversal_engine = self.layer_traversal_engine.clone();
                         tokio::spawn(async move {
                             layer_traversal_engine
-                                .start_layer_traversal(inject.wave, &inject.injector, inject.from_gravity)
+                                .start_layer_traversal(
+                                    inject.wave,
+                                    &inject.injector,
+                                    inject.from_gravity,
+                                )
                                 .await;
                         });
                     }
@@ -975,8 +977,10 @@ where
         self.drivers.init().await;
     }
 
-    // receive a wave from the hyperlane... this wave should always be
-    // a Wave<Signal> of the SysMethod<Hop> which should in turn contain a SysMethod<Transport> Signal
+    /// receive a wave from the hyperlane... this wave should always be
+    /// a Wave<Signal> of the SysMethod<Hop> which should in turn contain a SysMethod<Transport> Signal
+    /// all messages are then traversed to the Star Core where they are unwrapped and then sent to
+    /// gravity to start a new traversal
     #[track_caller]
     async fn from_hyperway(&self, wave: UltraWave) -> Result<(), P::Err> {
         self.skel
@@ -1066,7 +1070,7 @@ where
 
     #[track_caller]
     async fn shard(&self, mut wave: UltraWave) {
-        wave.add_to_history(self.skel.point.clone());
+
 
         let skel = self.skel.clone();
         let locator = SmartLocator::new(self.skel.clone());
@@ -1081,30 +1085,50 @@ where
             where
                 P: Cosmos,
             {
+if wave.track() {
+   println!("\tsharding wave...{}", wave.kind().to_string() );
+}
                 match &mut wave {
                     UltraWave::Ripple(ripple) => {
                         let mut map =
                             shard_ripple_by_location(ripple, &skel.adjacents, &skel.registry)
                                 .await?;
-
+if ripple.track {
+   println!("\tRipple sharded into: {}", map.len() );
+}
                         for (star, mut wave) in map {
                             // add this star to history
                             wave.history.insert(skel.point.clone());
-                            let mut transport = wave.to_ultra().wrap_in_transport(
-                                gravity.clone(),
-                                star.to_surface().with_layer(Layer::Core),
-                            );
-                            transport.from(skel.point.clone().to_surface());
-                            let transport = transport.build()?;
-                            let transport = transport.to_signal()?;
-                            skel.api.to_hyperway(transport).await;
+                            if star == skel.point {
+                                let mut inject = TraversalInjection::new(
+                                    skel.point.to_surface().with_layer(Layer::Gravity),
+                                    wave.to_ultra(),
+                                );
+                                inject.from_gravity = true;
+if ripple.track {
+    println!("\tripple injecting from_gravity");
+}
+                                skel.inject_tx.send(inject).await;
+                            } else {
+                                let mut transport = wave.to_ultra().wrap_in_transport(
+                                    gravity.clone(),
+                                    star.to_surface().with_layer(Layer::Core),
+                                );
+                                transport.from(skel.point.clone().to_surface());
+                                let transport = transport.build()?;
+                                let transport = transport.to_signal()?;
+                                skel.api.to_hyperway(transport).await;
+                            }
                         }
                     }
                     _ => {
                         let to = wave.to().unwrap_single();
                         let location = locator.locate(&to.point).await?;
                         if location.star == skel.point {
-                            let mut inject = TraversalInjection::new( skel.point.to_surface().with_layer(Layer::Gravity), wave ) ;
+                            let mut inject = TraversalInjection::new(
+                                skel.point.to_surface().with_layer(Layer::Gravity),
+                                wave,
+                            );
                             inject.from_gravity = true;
                             skel.inject_tx.send(inject).await;
                         } else {
@@ -1175,6 +1199,7 @@ where
     }
 
     async fn wrangle(&self, rtn: oneshot::Sender<Result<StarWrangles, UniErr>>) {
+        println!("\tWRANGLING!");
         let skel = self.skel.clone();
         tokio::spawn(async move {
             let mut wrangler = Wrangler::new(skel.clone(), Search::Kinds);
@@ -1182,9 +1207,17 @@ where
             history.insert(skel.point.clone());
             wrangler.history(history);
 
-            let discoveries = match wrangler.wrangle().await {
-                Ok(discoveries) => discoveries,
+            let discoveries = match skel.logger.result(
+                tokio::time::timeout(Duration::from_secs(2), wrangler.wrangle(skel.kind == StarSub::Machine ))
+                    .await
+                    .unwrap(),
+            ) {
+                Ok(discoveries) => {
+                    println!("\tWrangle discoveries: {}", discoveries.len());
+                    discoveries
+                }
                 Err(err) => {
+                    println!("\tWrangle ERROR");
                     rtn.send(Err(err)).unwrap_or_default();
                     return;
                 }
@@ -1336,10 +1369,18 @@ where
             if from_gravity {
                 dir = TraversalDirection::Core;
                 dest.replace(to.layer.clone());
-            }
-            else if to.point.is_global() {
+if wave.track() {
+    println!("\twave is from_gravity so it gets a Core direction")
+}
+            } else if to.point.is_global() {
                 dir = TraversalDirection::Fabric;
+if wave.track() {
+    println!("\twave is a GLOBAL point so it gets a Fabric Direction")
+}
             } else if to.point == wave.from().point {
+ if wave.track() {
+    println!("\twave is to and from the same point...")
+}
                 // it's the SAME point, so the to layer becomes our dest
                 dest.replace(to.layer.clone());
 
@@ -1356,18 +1397,34 @@ where
                         // that means it doesn't matter what the TraversalDirection is
                         TraversalDirection::Fabric
                     }
-                }
+                };
+if wave.track() {
+    println!("\t...decided wave is in the {} Direction", dir.to_string())
+}
             } else {
+if wave.track() {
+    println!("\tno matches so choosing Fabric Direction ({})", self.skel.point.to_string());
+}
                 dir = TraversalDirection::Fabric;
             }
-if wave.track() {
-    if dest.is_some() {
-
-        println!("\t{} -> {} DIR: {} dest: {}",  wave.from().postfix(), to.postfix(), dir.to_string(), dest.as_ref().unwrap().to_string() );
-    } else {
-        println!("\t{} -> {} DIR: {}", wave.from().postfix(), to.postfix(), dir.to_string());
-    }
-}
+            if wave.track() {
+                if dest.is_some() {
+                    println!(
+                        "\t{} -> {} DIR: {} dest: {}",
+                        wave.from().to_string(),
+                        to.to_string(),
+                        dir.to_string(),
+                        dest.as_ref().unwrap().to_string()
+                    );
+                } else {
+                    println!(
+                        "\t{} -> {} DIR: {}",
+                        wave.from().to_string(),
+                        to.to_string(),
+                        dir.to_string()
+                    );
+                }
+            }
 
             let traversal_logger = self.skel.logger.point(to.to_point());
             let traversal_logger = traversal_logger.span();
@@ -1422,16 +1479,16 @@ if wave.track() {
     async fn exit(&self, traversal: Traversal<UltraWave>) -> Result<(), UniErr> {
         match traversal.dir {
             TraversalDirection::Fabric => {
-if traversal.track() {
-   println!("\tEXIT UP")
-}
+                if traversal.track() {
+                    println!("\tEXIT UP")
+                }
                 self.exit_up.send(traversal).await;
                 return Ok(());
             }
             TraversalDirection::Core => {
-if traversal.track() {
-   println!("\tEXIT DOWN")
-}
+                if traversal.track() {
+                    println!("\tEXIT DOWN")
+                }
                 self.exit_down.send(traversal).await;
                 return Ok(());
             }
@@ -1837,7 +1894,7 @@ where
         point: &Point,
         state: StateSrc,
     ) -> Result<ParticleLocation, P::Err> {
-println!("\tprovision request: {}", point.to_string());
+        println!("\tprovision request: {}", point.to_string());
         self.skel
             .logger
             .result(self.provision_inner(point, state).await)

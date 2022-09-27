@@ -30,7 +30,7 @@ use cosmic_universe::err::UniErr;
 use cosmic_universe::frame::PrimitiveFrame;
 use cosmic_universe::hyper::{Greet, HyperSubstance, InterchangeKind, Knock};
 use cosmic_universe::loc::{Layer, Point, PointFactory, Surface, ToPoint, ToSurface, Version};
-use cosmic_universe::log::{PointLogger, RootLogger};
+use cosmic_universe::log::{PointLogger, RootLogger, Tracker};
 use cosmic_universe::particle::Status;
 use cosmic_universe::settings::Timeouts;
 use cosmic_universe::substance::{Errors, Substance, SubstanceKind, Token};
@@ -1326,6 +1326,8 @@ impl HyperClient {
                     logger: PointLogger,
                 ) -> Result<(), UniErr> {
                     if let Some(wave) = from_runner_rx.recv().await {
+                        logger.track(&wave, || Tracker::new("client", "ReceiveReflected"));
+
                         match wave.to_reflected() {
                             Ok(reflected) => {
                                 if !reflected.core().status.is_success() {
