@@ -377,7 +377,8 @@ where
 
             let config = Point::from_str(config.value.as_str())?;
             println!("Grabbing Config...");
-            let config = self.skel.artifacts().mechtron(&config).await?;
+            let config = self.skel.logger.result(self.skel.artifacts().mechtron(&config).await)?;
+            println!("Got Config.... 2 ");
             let config = config.contents();
             println!("got contents...");
 

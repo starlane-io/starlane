@@ -5,7 +5,7 @@ use url::Url;
 
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
-use cosmic_universe::err::{CoreReflector, UniErr};
+use cosmic_universe::err::{CoreReflector, StatusErr, UniErr};
 use cosmic_universe::loc::{Layer, Point, Surface, ToSurface};
 use cosmic_universe::log::{PointLogger, Trackable};
 use cosmic_universe::parse::model::{PipelineSegmentVar, PipelineVar};
@@ -158,7 +158,20 @@ where
                     self.pipex(directed, pipeline, env);
                     Ok(())
                 } else {
-                    Err(err)
+                    if err.status() == 404u16 {
+                        Err(UniErr::new(
+                            404,
+                            format!(
+                                "no route matches: {} on surface {} and bind {} from {}",
+                                directed.core().to_selection_str(),
+                                directed.to.to_string(),
+                                bind.point.to_string(),
+                                directed.from().to_string()
+                            ),
+                        ))
+                    } else {
+                        Err(err)
+                    }
                 }
             }
         }

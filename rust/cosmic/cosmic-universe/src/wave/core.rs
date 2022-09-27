@@ -413,7 +413,11 @@ impl DirectedCore {
         }
     }
 
-    pub fn msg<M: Into<ExtMethod>>(method: M) -> Self {
+    pub fn to_selection_str(&self) -> String {
+        format!("{}{} -[{}]->", self.method.to_deep_string(), self.uri.path(), self.body.kind().to_string())
+    }
+
+    pub fn ext<M: Into<ExtMethod>>(method: M) -> Self {
         let method: ExtMethod = method.into();
         let method: Method = method.into();
         Self::new(method)

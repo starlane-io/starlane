@@ -388,7 +388,7 @@ where
             HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger.clone())
                 .unwrap();
 
-        let fetcher = Box::new(ClientArtifactFetcher::new(client, skel.registry.clone()));
+        let fetcher = Arc::new(ClientArtifactFetcher::new(client, skel.registry.clone()));
         skel.artifacts.set_fetcher(fetcher).await;
 
         machine.start().await;

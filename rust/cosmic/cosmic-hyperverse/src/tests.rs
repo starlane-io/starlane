@@ -817,7 +817,7 @@ fn test_publish() -> Result<(), TestErr> {
 
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-        let fetcher = Box::new(ReadArtifactFetcher::new(client.transmitter_builder().await.unwrap().build()));
+        let fetcher = Arc::new(ReadArtifactFetcher::new(client.transmitter_builder().await.unwrap().build()));
         let artifacts = ArtifactApi::new(fetcher);
 
         let point = Point::from_str("localhost:repo:my:1.0.0:/bind/app.bind").unwrap();

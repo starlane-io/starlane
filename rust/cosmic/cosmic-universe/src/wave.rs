@@ -1426,7 +1426,8 @@ impl DirectedProto {
         Ok(())
     }
 
-    pub fn method<M: Into<Method>>(&mut self, method: M) {
+    pub fn method<M: Into<Method>+Clone>(&mut self, method: M) {
+        self.method.replace(method.clone().into());
         self.core.method = method.into();
     }
 

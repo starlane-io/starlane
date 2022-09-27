@@ -408,7 +408,7 @@ impl<R, E> ProtoTransmitterDef<R, E> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, strum_macros::Display)]
 pub enum SetStrategy<T> {
     /// The ProtoTransmitter will NOT set a value
     None,
