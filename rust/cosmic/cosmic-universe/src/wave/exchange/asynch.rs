@@ -20,6 +20,7 @@ use dashmap::{DashMap, DashSet};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
+use crate::log::{PointLogger, RootLogger, Trackable, Tracker};
 
 #[async_trait]
 impl Router for TxRouter {
@@ -254,34 +255,43 @@ pub struct Exchanger {
     pub multis: Arc<DashMap<WaveId, mpsc::Sender<ReflectedWave>>>,
     pub singles: Arc<DashMap<WaveId, oneshot::Sender<ReflectedAggregate>>>,
     pub timeouts: Timeouts,
+    pub logger: PointLogger,
     #[cfg(test)]
     pub claimed: Arc<DashSet<String>>
 }
 
 impl Exchanger {
-    pub fn new(surface: Surface, timeouts: Timeouts) -> Self {
+    pub fn new(surface: Surface, timeouts: Timeouts, logger: PointLogger) -> Self {
+        let logger = logger.point(surface.point.clone());
         Self {
             surface,
             singles: Arc::new(DashMap::new()),
             multis: Arc::new(DashMap::new()),
             timeouts,
+            logger,
             #[cfg(test)]
             claimed: Arc::new(DashSet::new())
         }
     }
 
     pub fn with_surface(&self, surface: Surface) -> Self {
+        let logger = self.logger.point(surface.point.clone());
         Self {
             surface,
             singles: self.singles.clone(),
             multis: self.multis.clone(),
             timeouts: self.timeouts.clone(),
+            logger,
             #[cfg(test)]
             claimed: self.claimed.clone()
         }
     }
 
     pub async fn reflected(&self, reflect: ReflectedWave) -> Result<(), UniErr> {
+        self.logger.track(&reflect, || {
+            Tracker::new("exchange", "Reflected")
+        });
+
         if let Some(multi) = self.multis.get(reflect.reflection_of()) {
             multi.value().send(reflect).await;
         } else if let Some((_, tx)) = self.singles.remove(reflect.reflection_of()) {
@@ -432,7 +442,7 @@ impl Exchanger {
 
 impl Default for Exchanger {
     fn default() -> Self {
-        Self::new(Point::root().to_surface(), Default::default())
+        Self::new(Point::root().to_surface(), Default::default(), RootLogger::default().point(Point::root()))
     }
 }
 

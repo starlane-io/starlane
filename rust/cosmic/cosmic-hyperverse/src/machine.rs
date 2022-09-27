@@ -235,7 +235,7 @@ where
 
             let star_hop = star_point.clone().to_surface().with_layer(Layer::Gravity);
 
-            let mut hyperway = Hyperway::new(star_hop.clone(), Agent::HyperUser);
+            let mut hyperway = Hyperway::new(star_hop.clone(), Agent::HyperUser, logger.clone() );
             hyperway.transform_inbound(Box::new(LayerTransform::new(Layer::Gravity)));
 
             let hyperway_endpoint = hyperway.hyperway_endpoint_far(None).await;
@@ -261,7 +261,7 @@ where
                             .to_point()
                             .to_surface()
                             .with_layer(Layer::Gravity);
-                        let hyperway = Hyperway::new(star, Agent::HyperUser);
+                        let hyperway = Hyperway::new(star, Agent::HyperUser, logger.clone());
                         interchange.add(hyperway).await;
                     }
                     StarCon::Connector(remote) => {
@@ -271,7 +271,7 @@ where
                             .to_point()
                             .to_surface()
                             .with_layer(Layer::Gravity);
-                        let hyperway = Hyperway::new(star, Agent::HyperUser);
+                        let hyperway = Hyperway::new(star, Agent::HyperUser, logger.clone());
                         interchange.add(hyperway).await;
                     }
                 }
@@ -382,6 +382,7 @@ where
         let exchanger = Exchanger::new(
             Point::from_str("artifact").unwrap().to_surface(),
             Timeouts::default(),
+            logger.clone()
         );
         let client =
             HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger.clone())

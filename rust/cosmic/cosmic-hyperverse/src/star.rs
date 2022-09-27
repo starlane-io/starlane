@@ -184,7 +184,7 @@ where
     ) -> Self {
         let point = template.key.clone().to_point();
         let logger = machine.logger.point(point.clone());
-        let exchanger = Exchanger::new(point.clone().to_surface(), machine.timeouts.clone());
+        let exchanger = Exchanger::new(point.clone().to_surface(), machine.timeouts.clone(), logger.clone() );
         let state = ParticleStates::new();
         let api = HyperStarApi::new(
             template.kind.clone(),

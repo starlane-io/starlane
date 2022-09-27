@@ -522,6 +522,17 @@ pub struct PointLogger {
     pub action: Option<CamelCase>,
 }
 
+impl Default for PointLogger {
+    fn default() -> Self {
+        Self {
+            logger: Default::default(),
+            point: Point::root(),
+            mark: Point::root(),
+            action: None
+        }
+    }
+}
+
 impl PointLogger {
     pub fn source(&self) -> LogSource {
         self.logger.source()

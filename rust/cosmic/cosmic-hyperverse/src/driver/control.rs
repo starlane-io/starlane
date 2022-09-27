@@ -186,7 +186,7 @@ where
             self.skel.driver.logger.clone(),
         );
         let mut interchange = HyperwayInterchange::new(self.skel.driver.logger.clone());
-        let hyperway = Hyperway::new(Point::remote_endpoint().to_surface(), Agent::HyperUser);
+        let hyperway = Hyperway::new(Point::remote_endpoint().to_surface(), Agent::HyperUser, self.skel.driver.logger.clone());
         let mut hyperway_endpoint = hyperway.hyperway_endpoint_far(None).await;
         interchange.add(hyperway).await;
         interchange.singular_to(Point::remote_endpoint().to_surface());
@@ -482,6 +482,7 @@ impl ControlClient {
         let exchanger = Exchanger::new(
             Point::from_str("control-client")?.to_surface(),
             Timeouts::default(),
+            Default::default()
         );
         let logger = RootLogger::default();
         let logger = logger.point(Point::from_str("control-client")?);

@@ -514,6 +514,7 @@ fn test_control() -> Result<(), TestErr> {
         let exchanger = Exchanger::new(
             Point::from_str("client").unwrap().to_surface(),
             Timeouts::default(),
+            Default::default()
         );
         let client =
             HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger).unwrap();
@@ -639,21 +640,19 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
             logger: logger.clone(),
         };
 
-        let exchanger = Exchanger::new(
-            Point::from_str("client").unwrap().to_surface(),
-            Timeouts::default(),
-        );
-        let client =
-            HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger).unwrap();
+        let client = ControlClient::new(Box::new(factory))?;
+        client.wait_for_ready(Duration::from_secs(5)).await?;
+
         let transmitter = client.transmitter_builder().await?;
         let transmitter = transmitter.build();
-        client.wait_for_ready(Duration::from_secs(2)).await?;
 
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        tokio::time::sleep(Duration::from_secs(5)).await;
 
+        /*
         let mut proto = DirectedProto::ping();
         proto.method(CmdMethod::Bounce);
         proto.to(Point::root().to_surface());
+proto.track = true;
         let reflect: Wave<Pong> = transmitter.direct(proto).await?;
         println!("\tBOUNCE ROOT: {}", reflect.core.status.to_string());
         assert!(reflect.core.is_ok());
@@ -661,9 +660,12 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
         let mut proto = DirectedProto::ping();
         proto.method(CmdMethod::Bounce);
         proto.to(Point::root().to_surface());
+proto.track = true;
         let reflect: Wave<Pong> = transmitter.direct(proto).await?;
         println!("\tBOUNCE ROOT2: {}", reflect.core.status.to_string());
         assert!(reflect.core.is_ok());
+
+         */
 
         /*
         let mut proto = DirectedProto::ping();
@@ -741,6 +743,8 @@ fn test_control_cli() -> Result<(), TestErr> {
         let core = cli.exec("create localhost<Space>").await?;
 
         println!("{}", core.to_err().to_string());
+        assert!(core.is_ok());
+        let core = cli.exec("create localhost:base<Base>").await?;
         assert!(core.is_ok());
 
         Ok(())
