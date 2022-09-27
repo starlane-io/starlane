@@ -658,6 +658,25 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
         println!("\tBOUNCE ROOT: {}", reflect.core.status.to_string());
         assert!(reflect.core.is_ok());
 
+        let mut proto = DirectedProto::ping();
+        proto.method(CmdMethod::Bounce);
+        proto.to(Point::root().to_surface());
+        let reflect: Wave<Pong> = transmitter.direct(proto).await?;
+        println!("\tBOUNCE ROOT2: {}", reflect.core.status.to_string());
+        assert!(reflect.core.is_ok());
+
+        /*
+        let mut proto = DirectedProto::ping();
+        proto.method(CmdMethod::Bounce);
+        proto.to(Point::global_executor().to_surface());
+        let reflect: Wave<Pong> = transmitter.direct(proto).await?;
+        println!("\tBOUNCE EXECUTOR: {}", reflect.core.status.to_string());
+        assert!(reflect.core.is_ok());
+
+         */
+
+//        assert!(transmitter.bounce(&Point::global_executor().to_surface()).await);
+
         let create = Create {
             template: Template::new(
                 PointTemplate {
@@ -674,7 +693,6 @@ fn test_provision_and_assign() -> Result<(), TestErr> {
 //proto.track = true;
 
         let reflect: Wave<Pong> = transmitter.direct(proto).await?;
-println!("\tCORE STATUS {}", reflect.core.status.to_string());
         assert!(reflect.core.is_ok());
 
         tokio::time::sleep(Duration::from_secs(5)).await;

@@ -156,10 +156,10 @@ impl ProtoTransmitter {
     }
 
     pub async fn bounce(&self, to: &Surface) -> bool {
-        let mut directed = DirectedProto::ping();
-        directed.to(to.clone());
-        directed.method(CmdMethod::Bounce);
-        match self.direct(directed).await {
+        let mut direct = DirectedProto::ping();
+        direct.to(to.clone());
+        direct.method(CmdMethod::Bounce);
+        match self.direct(direct).await {
             Ok(pong) => {
                 let pong: Wave<Pong> = pong;
                 pong.is_ok()
