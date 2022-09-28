@@ -130,7 +130,8 @@ println!("database setup!") ;
          variant TEXT,
          version TEXT,
          version_variant TEXT,
-         location TEXT,
+         star TEXT,
+         host TEXT,
          status TEXT NOT NULL,
          sequence INTEGER DEFAULT 0,
          owner TEXT,
@@ -204,16 +205,7 @@ println!("database setup!") ;
         Ok(())
     }
 
-    async fn nuke(&self) -> Result<(), P::Err> {
-        let mut conn = self.ctx.acquire().await?;
-        let mut trans = conn.begin().await?;
-        trans.execute("DROP TABLE particles CASCADE").await;
-        trans.execute("DROP TABLE access_grants CASCADE").await;
-        trans.execute("DROP TABLE properties CASCADE").await;
-        trans.commit().await?;
-        self.setup().await?;
-        Ok(())
-    }
+
 }
 
 #[async_trait]
@@ -222,7 +214,16 @@ where
     P: PostgresPlatform + 'static,
     <P as Cosmos>::Err: PostErr,
 {
-    async fn nuke<'a>(&'a self) -> Result<(), P::Err> {
+
+     async fn nuke<'a>(&'a self) -> Result<(), P::Err> {
+        self.logger.info("nuking database!");
+        let mut conn = self.ctx.acquire().await?;
+        let mut trans = conn.begin().await?;
+        trans.execute("DROP TABLE particles CASCADE").await;
+        trans.execute("DROP TABLE access_grants CASCADE").await;
+        trans.execute("DROP TABLE properties CASCADE").await;
+        trans.commit().await?;
+        self.setup().await?;
         Ok(())
     }
 
@@ -263,7 +264,7 @@ where
             return Err(P::Err::dupe());
         }
 
-        let statement = format!("INSERT INTO particles (point,point_segment,base,kind,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.base, opt(&params.sub), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
+        let statement = format!("INSERT INTO particles (point,point_segment,base,sub,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.base, opt(&params.sub), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
         trans.execute(statement.as_str()).await?;
 
         for (_, property_mod) in registration.properties.iter() {
@@ -1796,7 +1797,9 @@ pub mod test {
             strategy: Strategy::Commit,
             status: Status::Unknown,
         };
+println!("pre register...");
         registry.register(&registration).await?;
+println!("post registration!");
 
         let point = Point::from_str("localhost:mechtron")?;
         let registration = Registration {
