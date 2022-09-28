@@ -51,8 +51,10 @@ use cosmic_universe::substance::{Substance, SubstanceList, Token};
 use cosmic_universe::wave::core::http2::StatusCode;
 use cosmic_universe::wave::core::ReflectedCore;
 use cosmic_universe::wave::UltraWave;
+use err::HyperErr;
 use mechtron_host::err::HostErr;
 use mechtron_host::HostPlatform;
+use reg::Registry;
 
 use crate::driver::{DriverFactory, DriversBuilder};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
@@ -63,6 +65,7 @@ pub mod layer;
 pub mod machine;
 pub mod star;
 pub mod err;
+pub mod reg;
 
 #[cfg(test)]
 pub mod tests;
@@ -78,116 +81,6 @@ pub extern "C" fn cosmic_uuid() -> String {
 #[no_mangle]
 pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
     Utc::now()
-}
-
-pub type Registry<P> = Arc<dyn RegistryApi<P>>;
-
-#[async_trait]
-pub trait RegistryApi<P>: Send + Sync
-where
-    P: Cosmos,
-{
-    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, P::Err>;
-
-    async fn assign<'a>(
-        &'a self,
-        point: &'a Point,
-        location: ParticleLocation,
-    ) -> Result<(), P::Err>;
-
-    async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), P::Err>;
-
-    async fn set_properties<'a>(
-        &'a self,
-        point: &'a Point,
-        properties: &'a SetProperties,
-    ) -> Result<(), P::Err>;
-
-    async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, P::Err>;
-
-    async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, P::Err>;
-
-    async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, P::Err>;
-
-    async fn query<'a>(&'a self, point: &'a Point, query: &'a Query)
-        -> Result<QueryResult, P::Err>;
-
-    async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, P::Err>;
-
-    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, P::Err>;
-
-    async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, P::Err>;
-
-    async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), P::Err>;
-
-    async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, P::Err>;
-
-    async fn chown<'a>(
-        &'a self,
-        on: &'a Selector,
-        owner: &'a Point,
-        by: &'a Point,
-    ) -> Result<(), P::Err>;
-
-    async fn list_access<'a>(
-        &'a self,
-        to: &'a Option<&'a Point>,
-        on: &'a Selector,
-    ) -> Result<Vec<IndexedAccessGrant>, P::Err>;
-
-    async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), P::Err>;
-}
-
-pub trait HyperErr:
-    Sized
-    + Debug
-    + Send
-    + Sync
-    + ToString
-    + Clone
-    + HostErr
-    + Into<UniErr>
-    + From<UniErr>
-    + From<String>
-    + From<&'static str>
-    + From<tokio::sync::oneshot::error::RecvError>
-    + From<std::io::Error>
-    + From<zip::result::ZipError>
-    + From<Box<bincode::ErrorKind>>
-    + From<acid_store::Error>
-    + From<UniErr>
-    + Into<UniErr>
-{
-    fn to_uni_err(&self) -> UniErr;
-
-    fn new<S>(message: S) -> Self
-    where
-        S: ToString;
-
-    fn status_msg<S>(status: u16, message: S) -> Self
-    where
-        S: ToString;
-
-    fn not_found() -> Self {
-        Self::not_found_msg("Not Found")
-    }
-
-    fn not_found_msg<S>(message: S) -> Self
-    where
-        S: ToString,
-    {
-        Self::status_msg(404, message)
-    }
-
-    fn status(&self) -> u16;
-
-    fn as_reflected_core(&self) -> ReflectedCore {
-        let mut core = ReflectedCore::new();
-        core.status =
-            StatusCode::from_u16(self.status()).unwrap_or(StatusCode::from_u16(500u16).unwrap());
-        core.body = Substance::Empty;
-        core
-    }
 }
 
 #[async_trait]
@@ -329,19 +222,11 @@ impl Default for Settings {
     }
 }
 
+/*
 #[derive(strum_macros::Display)]
 pub enum Anatomy {
     FromHyperlane,
     ToGravity,
 }
 
-#[derive(Clone)]
-pub struct Registration {
-    pub point: Point,
-    pub kind: Kind,
-    pub registry: SetRegistry,
-    pub properties: SetProperties,
-    pub owner: Point,
-    pub strategy: Strategy,
-    pub status: Status,
-}
+ */

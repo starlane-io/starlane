@@ -1,6 +1,5 @@
 use crate::mem::cosmos::MemCosmos;
 use crate::err::CosmicErr;
-use crate::{Registration, RegistryApi};
 use cosmic_universe::command::common::{PropertyMod, SetProperties};
 use cosmic_universe::command::direct::delete::Delete;
 use cosmic_universe::command::direct::query::{Query, QueryResult};
@@ -13,10 +12,11 @@ use cosmic_universe::selector::Selector;
 use cosmic_universe::substance::SubstanceList;
 use dashmap::DashMap;
 use std::sync::atomic::AtomicU64;
-use std::sync::{atomic, Arc};
+use std::sync::{Arc, atomic};
 use dashmap::mapref::one::Ref;
 use tokio::sync::oneshot;
 use cosmic_universe::parse::get_properties;
+use crate::reg::{Registration, RegistryApi};
 
 impl MemRegCtx {
     pub fn new() -> Self {

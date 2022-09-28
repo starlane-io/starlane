@@ -22,7 +22,6 @@ use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, HyperGateSelector, Loc
 use cosmic_hyperverse::driver::{DriverAvail, DriversBuilder};
 use cosmic_hyperverse::machine::{Machine, MachineTemplate};
 use cosmic_hyperverse::Cosmos;
-use cosmic_hyperverse::{Registry, RegistryApi};
 use cosmic_hyperverse::driver::artifact::{ArtifactDriverFactory, BundleDriverFactory, BundleSeriesDriverFactory, RepoDriverFactory};
 use cosmic_hyperverse::driver::base::BaseDriverFactory;
 use cosmic_hyperverse::driver::control::ControlDriverFactory;
@@ -30,6 +29,7 @@ use cosmic_hyperverse::driver::mechtron::{HostDriverFactory, MechtronDriverFacto
 use cosmic_hyperverse::driver::root::RootDriverFactory;
 use cosmic_hyperverse::driver::space::SpaceDriverFactory;
 use cosmic_hyperverse::err::CosmicErr;
+use cosmic_hyperverse::reg::{Registry, RegistryApi};
 use cosmic_registry_postgres::{
     PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,

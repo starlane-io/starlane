@@ -11,6 +11,9 @@ extern crate lazy_static;
 #[macro_use]
 extern crate tracing;
 
+use sqlx::pool::PoolConnection;
+use sqlx::postgres::{PgPoolOptions, PgRow};
+use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::io::{Error, ErrorKind};
@@ -19,16 +22,14 @@ use std::ops::Deref;
 use std::str::{FromStr, Utf8Error};
 use std::string::FromUtf8Error;
 use std::sync::Arc;
-use sqlx::pool::PoolConnection;
-use sqlx::postgres::{PgPoolOptions, PgRow};
-use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
 use strum::ParseError;
 use tokio::sync::mpsc;
 
+use crate::err::PostErr;
+use cosmic_hyperverse::err::HyperErr;
 use cosmic_hyperverse::machine::MachineTemplate;
+use cosmic_hyperverse::reg::{Registration, RegistryApi};
 use cosmic_hyperverse::Cosmos;
-use cosmic_hyperverse::Registration;
-use cosmic_hyperverse::{HyperErr, RegistryApi};
 use cosmic_universe::command::common::{PropertyMod, SetProperties, SetRegistry};
 use cosmic_universe::command::direct::create::{Create, KindTemplate, PointSegTemplate, Strategy};
 use cosmic_universe::command::direct::delete::Delete;
@@ -60,21 +61,30 @@ use cosmic_universe::selector::{
 use cosmic_universe::substance::{Substance, SubstanceList, SubstanceMap};
 use cosmic_universe::util::ValuePattern;
 use cosmic_universe::HYPERUSER;
-use err::PostErr;
+
+pub trait PostgresPlatform: Cosmos
+where
+    <Self as Cosmos>::Err: PostErr,
+{
+    fn lookup_registry_db() -> Result<PostgresDbInfo, <Self as Cosmos>::Err>;
+    fn lookup_star_db(star: &StarKey) -> Result<PostgresDbInfo, <Self as Cosmos>::Err>;
+}
 
 pub struct PostgresRegistry<P>
 where
-    P: PostgresPlatform + Cosmos<Err = PostErr> + 'static,
+    P: PostgresPlatform + 'static,
+    <P as Cosmos>::Err: PostErr,
 {
-    ctx: PostgresRegistryContextHandle,
+    ctx: PostgresRegistryContextHandle<P>,
     platform: P,
 }
 
 impl<P> PostgresRegistry<P>
 where
-    P: PostgresPlatform + Cosmos<Err = PostErr> + 'static,
+    P: PostgresPlatform + 'static,
+    <P as Cosmos>::Err: PostErr,
 {
-    pub async fn new(ctx: PostgresRegistryContextHandle, platform: P) -> Result<Self, PostErr> {
+    pub async fn new(ctx: PostgresRegistryContextHandle<P>, platform: P) -> Result<Self, P::Err> {
         /*
         let pool = PgPoolOptions::new()
             .max_connections(5)
@@ -189,7 +199,7 @@ where
         Ok(())
     }
 
-    async fn nuke(&self) -> Result<(), PostErr> {
+    async fn nuke(&self) -> Result<(), P::Err> {
         let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
         trans.execute("DROP TABLE particles CASCADE").await;
@@ -204,9 +214,10 @@ where
 #[async_trait]
 impl<P> RegistryApi<P> for PostgresRegistry<P>
 where
-    P: PostgresPlatform + Cosmos<Err = PostErr> + 'static,
+    P: PostgresPlatform + 'static,
+    <P as Cosmos>::Err: PostErr,
 {
-    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, PostErr> {
+    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, P::Err> {
         /*
         async fn check<'a>( registration: &Registration,  trans:&mut Transaction<Postgres>, ) -> Result<(),Erroror> {
             let params = RegistryParams::from_registration(registration)?;
@@ -240,7 +251,7 @@ where
         .await?;
 
         if count.0 > 0 {
-            return Err(PostErr::Dupe);
+            return Err(P::Err::Dupe);
         }
 
         let statement = format!("INSERT INTO particles (point,point_segment,base,kind,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.base, opt(&params.sub), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
@@ -273,27 +284,27 @@ where
         })
     }
 
-    async fn assign<'a>(&'a self, point: &'a Point, location: &'a Point) -> Result<(), PostErr> {
+    async fn assign<'a>(&'a self, point: &'a Point, location: ParticleLocation ) -> Result<(), P::Err> {
         let parent = point
             .parent()
             .ok_or("expecting parent since we have already established the segments are >= 2")?;
         let point_segment = point
             .last_segment()
             .ok_or("expecting a last_segment since we know segments are >= 2")?;
-        let statement = format!(
-            "UPDATE particles SET location='{}' WHERE parent='{}' AND point_segment='{}'",
-            location.to_string(),
-            parent.to_string(),
-            point_segment.to_string()
-        );
+
+
+        let statement = "UPDATE particles SET star=$1, host=$2 WHERE parent=$3 AND point_segment=$4";
+
         let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
-        trans.execute(statement.as_str()).await?;
+
+        trans.execute(sqlx::query( statement ).bind( location.star).bind( location.host).bind(parent.to_string().bind(point_segment.to_string()))).await?;
+
         trans.commit().await?;
         Ok(())
     }
 
-    async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), PostErr> {
+    async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), P::Err> {
         let parent = point
             .parent()
             .ok_or("particle must have a parent")?
@@ -320,7 +331,7 @@ where
         &'a self,
         point: &'a Point,
         properties: &'a SetProperties,
-    ) -> Result<(), PostErr> {
+    ) -> Result<(), P::Err> {
         let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
         let parent = point
@@ -353,7 +364,7 @@ where
         Ok(())
     }
 
-    async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, PostErr> {
+    async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, P::Err> {
         struct Sequence(u64);
 
         impl sqlx::FromRow<'_, PgRow> for Sequence {
@@ -390,7 +401,7 @@ where
         Ok(sequence.0)
     }
 
-    async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, PostErr> {
+    async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, P::Err> {
         let parent = point.parent().ok_or("expected a parent")?;
         let point_segment = point
             .last_segment()
@@ -406,7 +417,7 @@ where
         Ok(map)
     }
 
-    async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, PostErr> {
+    async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, P::Err> {
         if point.is_local_root() {
             return Ok(ParticleRecord::root());
         }
@@ -418,7 +429,7 @@ where
             .ok_or("expected last point_segment")?
             .to_string();
 
-        let mut record = sqlx::query_as::<Postgres, StarlaneParticleRecord>(
+        let mut record = sqlx::query_as::<Postgres, PostgresParticleRecord>(
             "SELECT DISTINCT * FROM particles as r WHERE parent=$1 AND point_segment=$2",
         )
         .bind(parent.to_string())
@@ -440,7 +451,7 @@ where
         &'a self,
         point: &'a Point,
         query: &'a Query,
-    ) -> Result<QueryResult, PostErr> {
+    ) -> Result<QueryResult, P::Err> {
         let mut kind_path = PointHierarchy::new(point.route.clone(), vec![]);
         let route = point.route.clone();
 
@@ -466,7 +477,7 @@ where
         return Ok(QueryResult::PointHierarchy(kind_path));
     }
 
-    async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, PostErr> {
+    async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, P::Err> {
         let mut select = delete.clone().into();
         let list = self.select(&mut select).await?;
         if !list.is_empty() {
@@ -489,7 +500,7 @@ where
     }
 
     //    #[async_recursion]
-    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, PostErr> {
+    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, P::Err> {
         let point = select.pattern.query_root();
 
         let hierarchy = self
@@ -516,7 +527,7 @@ where
     }
 
     //    #[async_recursion]
-    async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, PostErr> {
+    async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, P::Err> {
         // build a 'matching so far' query.  Here we will find every child that matches the subselect
         // these matches are used to then query children for additional matches if there are more hops.
         // all of these matches will be filtered to see if they match the ENTIRE select before returning results.
@@ -613,7 +624,7 @@ where
         );
 
         let mut query =
-            sqlx::query_as::<Postgres, StarlaneParticleRecord>(matching_so_far_statement.as_str());
+            sqlx::query_as::<Postgres, PostgresParticleRecord>(matching_so_far_statement.as_str());
         for param in params {
             query = query.bind(param);
         }
@@ -681,7 +692,7 @@ where
         Ok(stubs)
     }
 
-    async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), PostErr> {
+    async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), P::Err> {
         let mut conn = self.ctx.acquire().await?;
         match &access_grant.kind {
             AccessGrantKind::Super => {
@@ -713,7 +724,7 @@ where
     }
 
     //    #[async_recursion]
-    async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, PostErr> {
+    async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, P::Err> {
         let mut conn = self.ctx.acquire().await?;
 
         struct Owner(bool);
@@ -847,7 +858,7 @@ where
         on: &'a Selector,
         owner: &'a Point,
         by: &'a Point,
-    ) -> Result<(), PostErr> {
+    ) -> Result<(), P::Err> {
         let mut select = Select {
             pattern: on.clone(),
             properties: Default::default(),
@@ -880,7 +891,7 @@ where
         &'a self,
         to: &'a Option<&'a Point>,
         on: &'a Selector,
-    ) -> Result<Vec<IndexedAccessGrant>, PostErr> {
+    ) -> Result<Vec<IndexedAccessGrant>, P::Err> {
         let mut select = Select {
             pattern: on.clone(),
             properties: Default::default(),
@@ -898,7 +909,7 @@ where
         let mut conn = self.ctx.acquire().await?;
         for on in selection.list {
             let on: Point = (*on).try_into()?;
-            let access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(on.to_string() ).fetch_all(& mut conn).await?;
+            let access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant<P>>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(on.to_string() ).fetch_all(& mut conn).await?;
             let mut access_grants: Vec<IndexedAccessGrant> =
                 access_grants.into_iter().map(|a| a.into()).collect();
 
@@ -922,9 +933,9 @@ where
         Ok(all_access_grants)
     }
 
-    async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), PostErr> {
+    async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), P::Err> {
         let mut conn = self.ctx.acquire().await?;
-        let access_grant: IndexedAccessGrant = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.id=$1 AND particles.id=access_grants.by_particle").bind(id ).fetch_one(& mut conn).await?.into();
+        let access_grant: IndexedAccessGrant = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant<P>>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.id=$1 AND particles.id=access_grants.by_particle").bind(id ).fetch_one(& mut conn).await?.into();
         let access = self.access(to, &access_grant.by_particle).await?;
         if access.has_full() {
             let mut trans = conn.begin().await?;
@@ -974,17 +985,35 @@ impl sqlx::FromRow<'_, PgRow> for LocalProperty {
     }
 }
 
-pub struct WrappedIndexedAccessGrant(IndexedAccessGrant);
+pub struct WrappedIndexedAccessGrant<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr {
+    grant: IndexedAccessGrant,
+    phantom: PhantomData<P>
+}
 
-impl Into<IndexedAccessGrant> for WrappedIndexedAccessGrant {
+impl<P> Into<IndexedAccessGrant> for WrappedIndexedAccessGrant<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
     fn into(self) -> IndexedAccessGrant {
-        self.0
+        self.grant
     }
 }
 
-impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
+impl<P> sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
-        fn wrap(row: &PgRow) -> Result<IndexedAccessGrant, PostErr> {
+        fn wrap<C>(row: &PgRow) -> Result<IndexedAccessGrant, C::Err>
+        where
+            C: PostgresPlatform,
+            <C as Cosmos>::Err: PostErr,
+        {
             let id: i32 = row.get("id");
             let kind: &str = row.get("kind");
             let kind = match kind {
@@ -1017,7 +1046,10 @@ impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
         }
 
         match wrap(row) {
-            Ok(record) => Ok(WrappedIndexedAccessGrant(record)),
+            Ok(record) => {
+                let phantom = Default::default();
+                Ok(WrappedIndexedAccessGrant{grant: record, phantom })
+            },
             Err(err) => {
                 error!("{}", err.to_string());
                 Err(sqlx::error::Error::PoolClosed)
@@ -1026,12 +1058,12 @@ impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
     }
 }
 
-struct StarlaneParticleRecord {
+struct PostgresParticleRecord {
     pub details: Details,
     pub location: Option<ParticleLocation>,
 }
 
-impl Into<ParticleRecord> for StarlaneParticleRecord {
+impl Into<ParticleRecord> for PostgresParticleRecord {
     fn into(self) -> ParticleRecord {
         ParticleRecord {
             details: self.details,
@@ -1040,9 +1072,12 @@ impl Into<ParticleRecord> for StarlaneParticleRecord {
     }
 }
 
-impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
+impl sqlx::FromRow<'_, PgRow> for PostgresParticleRecord {
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
-        fn wrap(row: &PgRow) -> Result<StarlaneParticleRecord, PostErr> {
+        fn wrap<C>(row: &PgRow) -> Result<PostgresParticleRecord, C::Err>
+        where
+            C: PostgresPlatform, <C as Cosmos>::Err: PostErr,
+        {
             let parent: String = row.get("parent");
             let point_segment: String = row.get("point_segment");
             let base: String = row.get("base");
@@ -1060,7 +1095,8 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
             let variant: Option<String> = row.get("variant");
             let version: Option<String> = row.get("version");
             let version_variant: Option<String> = row.get("version_variant");
-            let location: String = row.get("location");
+            let star: Option<String> = row.get("star");
+            let host: Option<String> = row.get("host");
             let status: String = row.get("status");
 
             let point = Point::from_str(parent.as_str())?;
@@ -1111,7 +1147,12 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
             let kind = KindParts::new(base, sub, specific);
             let kind: Kind = kind.try_into()?;
 
-            let location = Point::from_str(location.as_str())?;
+            let location = star.map(|star| {
+                ParticleLocation::new(
+                    Point::from_str(star.as_str())?,
+                    host.map(|host| Point::from_str(host.as_str())?),
+                )
+            });
 
             let status = Status::from_str(status.as_str())?;
 
@@ -1126,7 +1167,7 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
                 properties: Default::default(), // not implemented yet...
             };
 
-            let record = StarlaneParticleRecord { details, location };
+            let record = PostgresParticleRecord { details, location };
 
             Ok(record)
         }
@@ -1141,48 +1182,542 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
     }
 }
 
+pub struct RegistryParams<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
+    pub point: String,
+    pub point_segment: String,
+    pub base: String,
+    pub sub: Option<String>,
+    pub provider: Option<Domain>,
+    pub vendor: Option<Domain>,
+    pub product: Option<SkewerCase>,
+    pub variant: Option<SkewerCase>,
+    pub version: Option<String>,
+    pub version_variant: Option<String>,
+    pub parent: String,
+    pub owner: Point,
+    pub phantom: PhantomData<P>,
+}
+
+impl<P> RegistryParams<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
+    pub fn from_registration(registration: &Registration) -> Result<Self, P::Err> {
+        let point_segment = match registration.point.segments.last() {
+            None => "".to_string(),
+            Some(segment) => segment.to_string(),
+        };
+        let parent = match registration.point.parent() {
+            None => "".to_string(),
+            Some(parent) => parent.to_string(),
+        };
+
+        let base = registration.kind.to_base().to_string();
+        let sub = registration.kind.sub();
+
+        let provider = match &registration.kind.specific() {
+            None => Option::None,
+            Some(specific) => Option::Some(specific.provider.clone()),
+        };
+
+        let vendor = match &registration.kind.specific() {
+            None => Option::None,
+            Some(specific) => Option::Some(specific.vendor.clone()),
+        };
+
+        let product = match &registration.kind.specific() {
+            None => Option::None,
+            Some(specific) => Option::Some(specific.product.clone()),
+        };
+
+        let variant = match &registration.kind.specific() {
+            None => Option::None,
+            Some(specific) => Option::Some(specific.variant.clone()),
+        };
+
+        let version = match &registration.kind.specific() {
+            None => Option::None,
+            Some(specific) => {
+                let version = &specific.version;
+                Option::Some(format!(
+                    "{}.{}.{}",
+                    version.major, version.minor, version.patch
+                ))
+            }
+        };
+
+        let version_variant = match &registration.kind.specific() {
+            None => Option::None,
+            Some(specific) => {
+                let version = &specific.version;
+                if !version.pre.is_empty() {
+                    Option::Some(version.pre.to_string())
+                } else {
+                    Option::None
+                }
+            }
+        };
+
+        Ok(RegistryParams {
+            point: registration.point.to_string(),
+            point_segment: point_segment,
+            parent,
+            base,
+            sub: sub.into(),
+            provider,
+            vendor,
+            product,
+            variant,
+            version,
+            version_variant,
+            owner: registration.owner.clone(),
+            phantom: PhantomData::default(),
+        })
+    }
+}
+
+impl<P> PostgresRegistry<P>
+where
+    P: PostgresPlatform + 'static,
+    <P as Cosmos>::Err: PostErr
+{
+    pub async fn set(&self, set: &Set) -> Result<(), P::Err> {
+        self.set_properties(&set.point, &set.properties).await
+    }
+
+    pub async fn get(&self, get: &Get) -> Result<Substance, P::Err> {
+        match &get.op {
+            GetOp::State => {
+                return Err("Registry does not handle GetOp::State operations".into());
+                /*
+                let mut proto = ProtoStarMessage::new();
+                proto.to(ProtoStarMessageTo::Resource(get.point.clone()));
+                proto.payload = StarMessageSubstance::ResourceHost(ResourceHostAction::GetState(get.point.clone()));
+                if let Ok(Reply::Substance(payload)) = self.skel.messaging_api
+                    .star_exchange(proto, ReplyKind::Substance, "get state from driver")
+                    .await {
+                    Ok(payload)
+                } else {
+                    Err("could not get state".into())
+                }
+                 */
+            }
+            GetOp::Properties(keys) => {
+                println!("GET PROPERTIES for {}", get.point.to_string());
+                let properties = self.get_properties(&get.point).await?;
+                let mut map = SubstanceMap::new();
+                for (index, property) in properties.iter().enumerate() {
+                    println!("\tprop{}", property.0.clone());
+                    map.insert(
+                        property.0.clone(),
+                        Substance::Text(property.1.value.clone()),
+                    );
+                }
+
+                Ok(Substance::Map(map))
+            }
+        }
+    }
+
+    pub async fn create(&self, create: &Create) -> Result<Details, P::Err> {
+        let child_kind = self.platform.select_kind(&create.template.kind)?;
+        let stub = match &create.template.point.child_segment_template {
+            PointSegTemplate::Exact(child_segment) => {
+                let point = create.template.point.parent.push(child_segment.clone());
+                match &point {
+                    Ok(_) => {}
+                    Err(err) => {
+                        eprintln!("RC CREATE error: {}", err.to_string());
+                    }
+                }
+                let point = point?;
+
+                let properties = self
+                    .platform
+                    .properties_config(&child_kind)
+                    .fill_create_defaults(&create.properties)?;
+                self.platform
+                    .properties_config(&child_kind)
+                    .check_create(&properties)?;
+
+                let registration = Registration {
+                    point: point.clone(),
+                    kind: child_kind.clone(),
+                    registry: Default::default(),
+                    properties,
+                    owner: Point::root(),
+                    strategy: Strategy::Commit,
+                    status: Status::Unknown,
+                };
+                println!("creating {}", point.to_string());
+                let mut result = self.register(&registration).await;
+
+                // if strategy is ensure then a dupe is GOOD!
+                if create.strategy == Strategy::Ensure {
+                    if let Err(P::Err::dupe()) = result {
+                        result = Ok(self.record(&point).await?.details);
+                    }
+                }
+
+                println!("result {}? {}", point.to_string(), result.is_ok());
+                result?
+            }
+            PointSegTemplate::Pattern(pattern) => {
+                if !pattern.contains("%") {
+                    return Err("AddressSegmentTemplate::Pattern must have at least one '%' char for substitution".into());
+                }
+                loop {
+                    let index = self.sequence(&create.template.point.parent).await?;
+                    let child_segment = pattern.replace("%", index.to_string().as_str());
+                    let point = create.template.point.parent.push(child_segment.clone())?;
+                    let registration = Registration {
+                        point: point.clone(),
+                        kind: child_kind.clone(),
+                        registry: Default::default(),
+                        properties: create.properties.clone(),
+                        owner: Point::root(),
+                        strategy: Strategy::Commit,
+                        status: Status::Unknown,
+                    };
+
+                    match self.register(&registration).await {
+                        Ok(stub) => return Ok(stub),
+                        Err(P::Err::dupe()) => {
+                            // continue loop
+                        }
+                        Err(err) => {
+                            return Err(err);
+                        }
+                    }
+                }
+            }
+        };
+        Ok(stub)
+    }
+
+    pub async fn cmd_select<'a>(&'a self, select: &'a mut Select) -> Result<Substance, P::Err> {
+        let list = Substance::List(self.select(select).await?);
+        Ok(list)
+    }
+
+    pub async fn cmd_query<'a>(
+        &'a self,
+        to: &'a Point,
+        query: &'a Query,
+    ) -> Result<Substance, P::Err> {
+        let result = Substance::Text(self.query(to, query).await?.to_string());
+        Ok(result)
+    }
+}
+pub struct PostRegApi<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
+    ctx: PostgresRegistryContext<P>,
+}
+
+impl<P> PostRegApi<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
+    pub fn new(ctx: PostgresRegistryContext<P>) -> Self {
+        Self { ctx }
+    }
+
+    fn ctx(&self) -> &PostgresRegistryContext<P> {
+        &self.ctx
+    }
+}
+
+#[derive(Clone)]
+pub struct PostgresRegistryContextHandle<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
+    key: PostgresDbKey,
+    pool: Arc<PostgresRegistryContext<P>>,
+    pub schema: String,
+}
+
+impl<P> PostgresRegistryContextHandle<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
+    pub fn new(db: &PostgresDbInfo, pool: Arc<PostgresRegistryContext<P>>) -> Self {
+        Self {
+            key: db.to_key(),
+            schema: db.schema.clone(),
+            pool,
+        }
+    }
+
+    pub async fn acquire(&self) -> Result<PoolConnection<Postgres>, P::Err> {
+        self.pool.acquire(&self.key).await
+    }
+
+    pub async fn begin(&self) -> Result<Transaction<Postgres>, P::Err> {
+        self.pool.begin(&self.key).await
+    }
+}
+
+pub struct PostgresRegistryContext<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
+    pools: HashMap<PostgresDbKey, Pool<Postgres>>,
+    phantom: PhantomData<P>,
+}
+
+impl<P> PostgresRegistryContext<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
+    pub async fn new(dbs: HashSet<PostgresDbInfo>) -> Result<Self, P::Err> {
+        let mut pools = HashMap::new();
+        for db in dbs {
+            let pool = PgPoolOptions::new()
+                .max_connections(5)
+                .connect(db.to_uri().as_str())
+                .await?;
+            pools.insert(db.to_key(), pool);
+        }
+        let phantom = PhantomData::default();
+        Ok(Self { pools, phantom })
+    }
+
+    pub async fn acquire<'a>(
+        &'a self,
+        key: &'a PostgresDbKey,
+    ) -> Result<PoolConnection<Postgres>, P::Err> {
+        Ok(self
+            .pools
+            .get(key)
+            .ok_or(P::Err::new("could not acquire db connection".to_string()))?
+            .acquire()
+            .await?)
+    }
+
+    pub async fn begin<'a>(
+        &'a self,
+        key: &'a PostgresDbKey,
+    ) -> Result<Transaction<Postgres>, P::Err> {
+        Ok(self
+            .pools
+            .get(key)
+            .ok_or(P::Err::new("could not begin db transaction".to_string()))?
+            .begin()
+            .await?)
+    }
+}
+
+#[derive(Eq, PartialEq, Hash)]
+pub struct PostgresDbKey {
+    pub url: String,
+    pub user: String,
+    pub database: String,
+}
+
+#[derive(Clone,Eq, PartialEq, Hash)]
+pub struct PostgresDbInfo {
+    pub url: String,
+    pub user: String,
+    pub password: String,
+    pub database: String,
+    pub schema: String,
+}
+
+impl PostgresDbInfo {
+    pub fn new<Url, User, Pass, Db>(url: Url, user: User, password: Pass, database: Db) -> Self
+    where
+        Url: ToString,
+        User: ToString,
+        Pass: ToString,
+        Db: ToString,
+    {
+        Self::new_with_schema(
+            url.to_string(),
+            user.to_string(),
+            password.to_string(),
+            database.to_string(),
+            "PUBLIC".to_string(),
+        )
+    }
+
+    pub fn new_with_schema(
+        url: String,
+        user: String,
+        password: String,
+        database: String,
+        schema: String,
+    ) -> Self {
+        Self {
+            url,
+            user,
+            password,
+            database,
+            schema,
+        }
+    }
+
+    pub fn to_key(&self) -> PostgresDbKey {
+        PostgresDbKey {
+            url: self.url.clone(),
+            user: self.user.clone(),
+            database: self.database.clone(),
+        }
+    }
+
+    pub fn to_uri(&self) -> String {
+        format!(
+            "postgres://{}:{}@{}/{}",
+            self.user, self.password, self.url, self.database
+        )
+    }
+}
+
 #[cfg(test)]
 pub mod test {
+    use cosmic_hyperverse::driver::DriversBuilder;
+    use cosmic_hyperverse::machine::MachineTemplate;
+    use cosmic_hyperverse::Cosmos;
+    use std::collections::HashSet;
     use std::convert::TryInto;
     use std::str::FromStr;
+    use std::sync::Arc;
 
-    use cosmic_hyperverse::Registration;
-    use cosmic_hyperverse::RegistryApi;
+    use crate::err::TestErr;
+    use crate::{
+        PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
+        PostgresRegistryContextHandle,
+    };
+    use cosmic_hyperverse::reg::RegistryApi;
+    use cosmic_hyperverse::reg::{Registration, Registry};
+    use cosmic_universe::artifact::ArtifactApi;
     use cosmic_universe::command::direct::create::Strategy;
     use cosmic_universe::command::direct::query::Query;
     use cosmic_universe::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
-    use cosmic_universe::entity::request::select::SelectKind;
-    use cosmic_universe::kind::{Kind, UserBaseSubKind};
-    use cosmic_universe::loc::{Point, StarKey, ToPoint};
+    use cosmic_universe::hyper::ParticleLocation;
+    use cosmic_universe::kind::{Kind, StarSub, UserBaseSubKind};
+    use cosmic_universe::loc::{MachineName, Point, StarKey, ToPoint};
+    use cosmic_universe::particle::property::PropertiesConfig;
     use cosmic_universe::particle::Status;
     use cosmic_universe::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
         Privilege,
     };
     use cosmic_universe::selector::{PointHierarchy, Selector};
-    use mesh_portal::version::latest::entity::request::query::Query;
-    use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoSubstance};
-    use mesh_portal::version::latest::id::Point;
-    use mesh_portal::version::latest::particle::Status;
-    use mesh_portal::version::latest::payload::Primitive;
-    use mesh_portal::version::latest::selector::{PointHierarchy, Selector};
+    use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, LocalHyperwayGateJumper};
 
-    use crate::error::Error;
-    use crate::particle::Kind;
-    use crate::registry::{Registration, Registry};
-    use crate::PostgresRegistry;
-    use crate::err::PostErr;
+    #[derive(Clone)]
+    pub struct TestPlatform {
+        pub handle: PostgresRegistryContextHandle<Self>,
+    }
+
+    impl TestPlatform {
+        pub async fn new() -> Result<Self, TestErr> {
+            let db = <Self as PostgresPlatform>::lookup_registry_db()?;
+            let mut set = HashSet::new();
+            set.insert(db.clone());
+            let ctx = Arc::new(PostgresRegistryContext::new(set).await?);
+            let handle = PostgresRegistryContextHandle::new(&db, ctx);
+            Ok(Self { handle })
+        }
+    }
+
+    impl PostgresPlatform for TestPlatform {
+        fn lookup_registry_db() -> Result<PostgresDbInfo, <Self as Cosmos>::Err> {
+            Ok(PostgresDbInfo::new(
+                "localhost",
+                "postgres",
+                "password",
+                "postgres",
+            ))
+        }
+
+        fn lookup_star_db(star: &StarKey) -> Result<PostgresDbInfo, <Self as Cosmos>::Err> {
+            todo!()
+        }
+    }
+
+    #[async_trait]
+    impl Cosmos for TestPlatform {
+        type Err = TestErr;
+        type RegistryContext = PostgresRegistryContextHandle<Self>;
+        type StarAuth = AnonHyperAuthenticator;
+        type RemoteStarConnectionFactory = ();
+
+        async fn global_registry(&self) -> Result<Registry<Self>, Self::Err> {
+            Ok(PostgresRegistry::new(self.handle.clone(), self.clone())?)
+        }
+
+        fn star_auth(&self, star: &StarKey) -> Result<Self::StarAuth, Self::Err> {
+            todo!()
+        }
+
+        fn remote_connection_factory_for_star(
+            &self,
+            star: &StarKey,
+        ) -> Result<Self::RemoteStarConnectionFactory, Self::Err> {
+            todo!()
+        }
+
+        fn machine_template(&self) -> MachineTemplate {
+            todo!()
+        }
+
+        fn machine_name(&self) -> MachineName {
+            todo!()
+        }
+
+        fn properties_config(&self, kind: &Kind) -> PropertiesConfig {
+            todo!()
+        }
+
+        fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
+            todo!()
+        }
+
+        async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>, Self::Err> {
+            todo!()
+        }
+
+        fn artifact_hub(&self) -> ArtifactApi {
+            todo!()
+        }
+
+        fn start_services(&self, gate: &Arc<dyn cosmic_hyperlane::HyperGate>) {
+            todo!()
+        }
+    }
+
+    pub async fn registry() -> Result<Registry<TestPlatform>, TestErr> {
+        TestPlatform::new().await?.global_registry().await
+    }
+
+    #[test]
+    pub fn test_compile_postgres() {}
 
     #[tokio::test]
-    pub async fn test_nuke() -> Result<(), PostErr> {
-        let registry = PostgresRegistry::new().await?;
+    pub async fn test_nuke() -> Result<(), TestErr> {
+        let registry = registry().await?;
         registry.nuke().await?;
         Ok(())
     }
 
     #[tokio::test]
-    pub async fn test_create() -> Result<(), PostErr> {
-        let registry = PostgresRegistry::new().await?;
+    pub async fn test_create() -> Result<(), TestErr> {
+        let registry = registry().await?;
         registry.nuke().await?;
 
         let point = Point::from_str("localhost")?;
@@ -1194,7 +1729,7 @@ pub mod test {
             properties: Default::default(),
             owner: hyperuser.clone(),
             strategy: Strategy::Commit,
-            status: Status::Unknown
+            status: Status::Unknown,
         };
         registry.register(&registration).await?;
 
@@ -1206,12 +1741,12 @@ pub mod test {
             properties: Default::default(),
             owner: hyperuser,
             strategy: Strategy::Commit,
-            status: Status::Unknown
+            status: Status::Unknown,
         };
         registry.register(&registration).await?;
 
-        let location = StarKey::central().to_point();
-        registry.assign(&point, &location).await?;
+        let location = ParticleLocation::new(StarKey::central().to_point(), None);
+        registry.assign(&point, location).await?;
         registry.set_status(&point, &Status::Ready).await?;
         registry.sequence(&point).await?;
         let record = registry.record(&point).await?;
@@ -1235,8 +1770,8 @@ pub mod test {
     }
 
     #[tokio::test]
-    pub async fn test_access() -> Result<(), PostErr> {
-        let registry = PostgresRegistry::new().await?;
+    pub async fn test_access() -> Result<(), TestErr> {
+        let registry = registry().await?;
         registry.nuke().await?;
 
         let hyperuser = Point::from_str("hyperspace:users:hyperuser")?;
@@ -1253,7 +1788,7 @@ pub mod test {
             properties: Default::default(),
             owner: hyperuser.clone(),
             strategy: Strategy::Commit,
-            status: Status::Unknown
+            status: Status::Unknown,
         };
         registry.register(&registration).await?;
 
@@ -1264,7 +1799,7 @@ pub mod test {
             properties: Default::default(),
             owner: hyperuser.clone(),
             strategy: Strategy::Commit,
-            status: Status::Unknown
+            status: Status::Unknown,
         };
         registry.register(&registration).await?;
 
@@ -1275,7 +1810,7 @@ pub mod test {
             properties: Default::default(),
             owner: hyperuser.clone(),
             strategy: Strategy::Commit,
-            status: Status::Unknown
+            status: Status::Unknown,
         };
         registry.register(&registration).await?;
 
@@ -1286,7 +1821,7 @@ pub mod test {
             properties: Default::default(),
             owner: hyperuser.clone(),
             strategy: Strategy::Commit,
-            status: Status::Unknown
+            status: Status::Unknown,
         };
         registry.register(&registration).await?;
 
@@ -1297,7 +1832,7 @@ pub mod test {
             properties: Default::default(),
             owner: hyperuser.clone(),
             strategy: Strategy::Commit,
-            status: Status::Unknown
+            status: Status::Unknown,
         };
         registry.register(&registration).await?;
 
@@ -1308,6 +1843,8 @@ pub mod test {
             registry: Default::default(),
             properties: Default::default(),
             owner: hyperuser.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown,
         };
         registry.register(&registration).await?;
 
@@ -1318,7 +1855,7 @@ pub mod test {
             properties: Default::default(),
             owner: hyperuser.clone(),
             strategy: Strategy::Commit,
-            status: Status::Unknown
+            status: Status::Unknown,
         };
         registry.register(&registration).await?;
 
@@ -1328,6 +1865,8 @@ pub mod test {
             registry: Default::default(),
             properties: Default::default(),
             owner: superuser.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown,
         };
         registry.register(&registration).await?;
 
@@ -1339,7 +1878,7 @@ pub mod test {
             properties: Default::default(),
             owner: app.clone(),
             strategy: Strategy::Commit,
-            status: Status::Unknown
+            status: Status::Unknown,
         };
         registry.register(&registration).await?;
 
@@ -1350,7 +1889,7 @@ pub mod test {
             properties: Default::default(),
             owner: app.clone(),
             strategy: Strategy::Commit,
-            status: Status::Unknown
+            status: Status::Unknown,
         };
         registry.register(&registration).await?;
 
@@ -1360,6 +1899,8 @@ pub mod test {
             registry: Default::default(),
             properties: Default::default(),
             owner: app.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown,
         };
         registry.register(&registration).await?;
 
@@ -1492,361 +2033,4 @@ pub mod test {
 
         Ok(())
     }
-}
-
-pub struct RegistryParams {
-    pub point: String,
-    pub point_segment: String,
-    pub base: String,
-    pub sub: Option<String>,
-    pub provider: Option<Domain>,
-    pub vendor: Option<Domain>,
-    pub product: Option<SkewerCase>,
-    pub variant: Option<SkewerCase>,
-    pub version: Option<String>,
-    pub version_variant: Option<String>,
-    pub parent: String,
-    pub owner: Point,
-}
-
-impl RegistryParams {
-    pub fn from_registration(registration: &Registration) -> Result<Self, PostErr> {
-        let point_segment = match registration.point.segments.last() {
-            None => "".to_string(),
-            Some(segment) => segment.to_string(),
-        };
-        let parent = match registration.point.parent() {
-            None => "".to_string(),
-            Some(parent) => parent.to_string(),
-        };
-
-        let base = registration.kind.to_base().to_string();
-        let sub = registration.kind.sub();
-
-        let provider = match &registration.kind.specific() {
-            None => Option::None,
-            Some(specific) => Option::Some(specific.provider.clone()),
-        };
-
-        let vendor = match &registration.kind.specific() {
-            None => Option::None,
-            Some(specific) => Option::Some(specific.vendor.clone()),
-        };
-
-        let product = match &registration.kind.specific() {
-            None => Option::None,
-            Some(specific) => Option::Some(specific.product.clone()),
-        };
-
-        let variant = match &registration.kind.specific() {
-            None => Option::None,
-            Some(specific) => Option::Some(specific.variant.clone()),
-        };
-
-        let version = match &registration.kind.specific() {
-            None => Option::None,
-            Some(specific) => {
-                let version = &specific.version;
-                Option::Some(format!(
-                    "{}.{}.{}",
-                    version.major, version.minor, version.patch
-                ))
-            }
-        };
-
-        let version_variant = match &registration.kind.specific() {
-            None => Option::None,
-            Some(specific) => {
-                let version = &specific.version;
-                if !version.pre.is_empty() {
-                    Option::Some(version.pre.to_string())
-                } else {
-                    Option::None
-                }
-            }
-        };
-
-        Ok(RegistryParams {
-            point: registration.point.to_string(),
-            point_segment: point_segment,
-            parent,
-            base,
-            sub: sub.into(),
-            provider,
-            vendor,
-            product,
-            variant,
-            version,
-            version_variant,
-            owner: registration.owner.clone(),
-        })
-    }
-}
-
-impl<P> PostgresRegistry<P>
-where
-    P: PostgresPlatform + Cosmos<Err = PostErr> + 'static,
-{
-    pub async fn set(&self, set: &Set) -> Result<(), PostErr> {
-        self.set_properties(&set.point, &set.properties).await
-    }
-
-    pub async fn get(&self, get: &Get) -> Result<Substance, PostErr> {
-        match &get.op {
-            GetOp::State => {
-                return Err("Registry does not handle GetOp::State operations".into());
-                /*
-                let mut proto = ProtoStarMessage::new();
-                proto.to(ProtoStarMessageTo::Resource(get.point.clone()));
-                proto.payload = StarMessageSubstance::ResourceHost(ResourceHostAction::GetState(get.point.clone()));
-                if let Ok(Reply::Substance(payload)) = self.skel.messaging_api
-                    .star_exchange(proto, ReplyKind::Substance, "get state from driver")
-                    .await {
-                    Ok(payload)
-                } else {
-                    Err("could not get state".into())
-                }
-                 */
-            }
-            GetOp::Properties(keys) => {
-                println!("GET PROPERTIES for {}", get.point.to_string());
-                let properties = self.get_properties(&get.point).await?;
-                let mut map = SubstanceMap::new();
-                for (index, property) in properties.iter().enumerate() {
-                    println!("\tprop{}", property.0.clone());
-                    map.insert(
-                        property.0.clone(),
-                        Substance::Text(property.1.value.clone()),
-                    );
-                }
-
-                Ok(Substance::Map(map))
-            }
-        }
-    }
-
-    pub async fn create(&self, create: &Create) -> Result<Details, PostErr> {
-        let child_kind = self.platform.select_kind(&create.template.kind)?;
-        let stub = match &create.template.point.child_segment_template {
-            PointSegTemplate::Exact(child_segment) => {
-                let point = create.template.point.parent.push(child_segment.clone());
-                match &point {
-                    Ok(_) => {}
-                    Err(err) => {
-                        eprintln!("RC CREATE error: {}", err.to_string());
-                    }
-                }
-                let point = point?;
-
-                let properties = self
-                    .platform
-                    .properties_config(&child_kind)
-                    .fill_create_defaults(&create.properties)?;
-                self.platform
-                    .properties_config(&child_kind)
-                    .check_create(&properties)?;
-
-                let registration = Registration {
-                    point: point.clone(),
-                    kind: child_kind.clone(),
-                    registry: create.registry.clone(),
-                    properties,
-                    owner: Point::root(),
-                };
-                println!("creating {}", point.to_string());
-                let mut result = self.register(&registration).await;
-
-                // if strategy is ensure then a dupe is GOOD!
-                if create.strategy == Strategy::Ensure {
-                    if let Err(PostErr::Dupe) = result {
-                        result = Ok(self.record(&point).await?.details);
-                    }
-                }
-
-                println!("result {}? {}", point.to_string(), result.is_ok());
-                result?
-            }
-            PointSegTemplate::Pattern(pattern) => {
-                if !pattern.contains("%") {
-                    return Err("AddressSegmentTemplate::Pattern must have at least one '%' char for substitution".into());
-                }
-                loop {
-                    let index = self.sequence(&create.template.point.parent).await?;
-                    let child_segment = pattern.replace("%", index.to_string().as_str());
-                    let point = create.template.point.parent.push(child_segment.clone())?;
-                    let registration = Registration {
-                        point: point.clone(),
-                        kind: child_kind.clone(),
-                        registry: create.registry.clone(),
-                        properties: create.properties.clone(),
-                        owner: Point::root(),
-                    };
-
-                    match self.register(&registration).await {
-                        Ok(stub) => return Ok(stub),
-                        Err(PostErr::Dupe) => {
-                            // continue loop
-                        }
-                        Err(err) => {
-                            return Err(err);
-                        }
-                    }
-                }
-            }
-        };
-        Ok(stub)
-    }
-
-    pub async fn cmd_select<'a>(&'a self, select: &'a mut Select) -> Result<Substance, PostErr> {
-        let list = Substance::List(self.select(select).await?);
-        Ok(list)
-    }
-
-    pub async fn cmd_query<'a>(
-        &'a self,
-        to: &'a Point,
-        query: &'a Query,
-    ) -> Result<Substance, PostErr> {
-        let result = Substance::Text(self.query(to, query).await?.to_string());
-        Ok(result)
-    }
-}
-pub struct PostRegApi {
-    ctx: PostgresRegistryContext,
-}
-
-impl PostRegApi {
-    pub fn new(ctx: PostgresRegistryContext) -> Self {
-        Self { ctx }
-    }
-
-    fn ctx(&self) -> &PostgresRegistryContext{
-        &self.ctx
-    }
-}
-
-pub struct PostgresRegistryContextHandle {
-    key: PostgresDbKey,
-    pool: Arc<PostgresRegistryContext>,
-    pub schema: String,
-}
-
-impl PostgresRegistryContextHandle {
-    pub fn new(db: &PostgresDbInfo, pool: Arc<PostgresRegistryContext>) -> Self {
-        Self {
-            key: db.to_key(),
-            schema: db.schema.clone(),
-            pool,
-        }
-    }
-
-    pub async fn acquire(&self) -> Result<PoolConnection<Postgres>, PostErr> {
-        self.pool.acquire(&self.key).await
-    }
-
-    pub async fn begin(&self) -> Result<Transaction<Postgres>, PostErr> {
-        self.pool.begin(&self.key).await
-    }
-}
-
-pub struct PostgresRegistryContext {
-    pools: HashMap<PostgresDbKey, Pool<Postgres>>,
-}
-
-impl PostgresRegistryContext {
-    pub async fn new(dbs: HashSet<PostgresDbInfo>) -> Result<Self, PostErr> {
-        let mut pools = HashMap::new();
-        for db in dbs {
-            let pool = PgPoolOptions::new()
-                .max_connections(5)
-                .connect(db.to_uri().as_str())
-                .await?;
-            pools.insert(db.to_key(), pool);
-        }
-        Ok(Self { pools })
-    }
-
-    pub async fn acquire<'a>(
-        &'a self,
-        key: &'a PostgresDbKey,
-    ) -> Result<PoolConnection<Postgres>, PostErr> {
-        Ok(self
-            .pools
-            .get(key)
-            .ok_or(PostErr::Error(
-                "could not acquire db connection".to_string(),
-            ))?
-            .acquire()
-            .await?)
-    }
-
-    pub async fn begin<'a>(
-        &'a self,
-        key: &'a PostgresDbKey,
-    ) -> Result<Transaction<Postgres>, PostErr> {
-        Ok(self
-            .pools
-            .get(key)
-            .ok_or(PostErr::Error("could not begin db transaction".to_string()))?
-            .begin()
-            .await?)
-    }
-}
-
-#[derive(Eq, PartialEq, Hash)]
-pub struct PostgresDbKey {
-    pub url: String,
-    pub user: String,
-    pub database: String,
-}
-
-#[derive(Eq, PartialEq, Hash)]
-pub struct PostgresDbInfo {
-    pub url: String,
-    pub user: String,
-    pub password: String,
-    pub database: String,
-    pub schema: String,
-}
-
-impl PostgresDbInfo {
-    pub fn new(url: String, user: String, password: String, database: String) -> Self {
-        Self::new_with_schema(url, user, password, database, "PUBLIC".to_string())
-    }
-
-    pub fn new_with_schema(
-        url: String,
-        user: String,
-        password: String,
-        database: String,
-        schema: String,
-    ) -> Self {
-        Self {
-            url,
-            user,
-            password,
-            database,
-            schema,
-        }
-    }
-
-    pub fn to_key(&self) -> PostgresDbKey {
-        PostgresDbKey {
-            url: self.url.clone(),
-            user: self.user.clone(),
-            database: self.database.clone(),
-        }
-    }
-
-    pub fn to_uri(&self) -> String {
-        format!(
-            "postgres://{}:{}@{}/{}",
-            self.user, self.password, self.url, self.database
-        )
-    }
-}
-
-pub trait PostgresPlatform: Cosmos<Err = PostErr> {
-    fn lookup_registry_db() -> Result<PostgresDbInfo, Self::Err>;
-    fn lookup_star_db(star: &StarKey) -> Result<PostgresDbInfo, Self::Err>;
 }

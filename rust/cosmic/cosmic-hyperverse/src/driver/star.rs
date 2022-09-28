@@ -3,7 +3,7 @@ use crate::driver::{
     ItemHandler, ItemSphere,
 };
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::{Cosmos, HyperErr, Registration, RegistryApi};
+use crate::Cosmos;
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::direct::create::Strategy;
@@ -13,7 +13,7 @@ use cosmic_universe::hyper::{
     Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, ParticleLocation, Search,
 };
 use cosmic_universe::kind::{BaseKind, Kind, StarSub};
-use cosmic_universe::loc::{Layer, Point, StarKey, ToPoint, ToSurface, LOCAL_STAR};
+use cosmic_universe::loc::{Layer, LOCAL_STAR, Point, StarKey, ToPoint, ToSurface};
 use cosmic_universe::log::{Trackable, Tracker};
 use cosmic_universe::parse::bind_config;
 use cosmic_universe::particle::traversal::TraversalInjection;
@@ -42,6 +42,8 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tracing::error;
+use crate::err::HyperErr;
+use crate::reg::{Registration, RegistryApi};
 
 lazy_static! {
     static ref STAR_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(

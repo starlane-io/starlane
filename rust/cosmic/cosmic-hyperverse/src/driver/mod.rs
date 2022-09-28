@@ -9,8 +9,8 @@ pub mod star;
 use crate::driver::star::StarDriverFactory;
 use crate::star::HyperStarCall::LayerTraversalInjection;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::{Cosmos, HyperErr, Registration, Registry};
-use cosmic_universe::artifact::{ArtRef, ArtifactApi};
+use crate::Cosmos;
+use cosmic_universe::artifact::{ArtifactApi, ArtRef};
 use cosmic_universe::command::common::{SetProperties, StateSrc};
 use cosmic_universe::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
@@ -47,7 +47,9 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, oneshot, watch, RwLock};
+use tokio::sync::{mpsc, oneshot, RwLock, watch};
+use crate::err::HyperErr;
+use crate::reg::{Registration, Registry};
 
 lazy_static! {
     static ref DEFAULT_BIND: ArtRef<BindConfig> = ArtRef::new(

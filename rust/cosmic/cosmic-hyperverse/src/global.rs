@@ -38,8 +38,9 @@ use crate::driver::{
     Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere,
 };
 use crate::star::{HyperStarSkel, SmartLocator};
-use crate::Registration;
-use crate::{Cosmos, DriverFactory, HyperErr, Registry};
+use crate::reg::{Registration, Registry};
+use crate::{Cosmos, DriverFactory};
+use crate::err::HyperErr;
 
 /*
 #[derive(DirectedHandler,Clone)]

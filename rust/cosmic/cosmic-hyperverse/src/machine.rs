@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
-use futures::future::{join_all, select_all, BoxFuture};
+use futures::future::{BoxFuture, join_all, select_all};
 use futures::FutureExt;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::error::RecvError;
@@ -39,7 +39,9 @@ use cosmic_universe::wave::{Agent, DirectedProto, HyperWave, Pong, UltraWave, Wa
 use cosmic_universe::wave::core::cmd::CmdMethod;
 
 use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
-use crate::{Cosmos, DriversBuilder, HyperErr, Registry, RegistryApi};
+use crate::{Cosmos, DriversBuilder};
+use crate::err::HyperErr;
+use crate::reg::{Registry, RegistryApi};
 
 #[derive(Clone)]
 pub struct MachineApi<P>
