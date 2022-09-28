@@ -264,7 +264,7 @@ where
             return Err(P::Err::dupe());
         }
 
-        let statement = format!("INSERT INTO particles (point,point_segment,base,sub,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.base, opt(&params.sub), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
+        let statement = format!("INSERT INTO particles (point,point_segment,base,sub,provider,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.base, opt(&params.sub), opt(&params.provider),opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
         trans.execute(statement.as_str()).await?;
 
         for (_, property_mod) in registration.properties.iter() {
@@ -1237,7 +1237,7 @@ where
         match wrap::<P>(row) {
             Ok(record) => Ok(record),
             Err(err) => {
-                Err(sqlx::error::Error::Decode("particle record".into()))
+                Err(sqlx::error::Error::Decode(format!("particle record: {}",err.to_string()).into()))
             }
         }
     }
@@ -1277,6 +1277,7 @@ where
             None => "".to_string(),
             Some(parent) => parent.to_string(),
         };
+        let specific_str = match registration.kind.sub().specific() { None=>"None".to_string(),Some(specific)=>specific.to_string()};
 
         let base = registration.kind.to_base().to_string();
         let sub = registration.kind.sub();
@@ -1980,7 +1981,9 @@ println!("post registration!");
             to_point: superuser.clone().try_into().map_err(|e|TestErr::new(e))?,
             by_particle: hyperuser.clone(),
         };
+println!("granting...");
         registry.grant(&grant).await?;
+println!("granted...");
 
         let grant = AccessGrant {
             kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("+csd-Rwx")?),
@@ -2014,18 +2017,29 @@ println!("post registration!");
         };
         registry.grant(&grant).await?;
 
+println!("access?");
         let access = registry.access(&hyperuser, &superuser).await?;
+println!("access...");
+println!("super?");
         assert_eq!(access.has_super(), true);
+println!("super!");
+
+        println!("get superuser record...");
+let record = registry.record(&superuser).await?;
+        println!("got superuser record...");
 
         let access = registry.access(&superuser, &localhost).await?;
         assert_eq!(access.has_super(), true);
-
+println!("one");
         let access = registry.access(&superuser, &app).await?;
         assert_eq!(access.has_super(), true);
 
+println!("two");
         let access = registry.access(&app, &scott).await?;
         assert_eq!(access.has_super(), false);
+println!("owner?");
         assert_eq!(access.has_owner(), true);
+println!("owner.");
         assert_eq!(access.has_full(), true);
 
         let access = registry.access(&scott, &superuser).await?;
@@ -2037,12 +2051,13 @@ println!("post registration!");
         let access = registry.access(&scott, &app).await?;
         assert_eq!(access.has_super(), false);
         assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
-
+println!("chown?");
         // must have super to chagne ownership
         let app_pattern = Selector::from_str("localhost:app+:**")?;
         assert!(registry.chown(&app_pattern, &app, &scott).await.is_err());
         // this should work:
         assert!(registry.chown(&app_pattern, &app, &superuser).await.is_ok());
+println!("chown...");
 
         // now the previous rule should work since app now owns itself.
         let access = registry.access(&scott, &app).await?;
@@ -2057,7 +2072,7 @@ println!("post registration!");
         let access = registry.access(&scott, &mechtron).await?;
         assert_eq!(access.has_super(), false);
         assert_eq!(access.permissions().to_string(), "csd-RwX".to_string());
-
+println!("got here...");
         // now mem AND permissions (masking Read)
         let grant = AccessGrant {
             kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("&csd-rwX")?),
@@ -2075,11 +2090,11 @@ println!("post registration!");
         assert_eq!(access.has_super(), false);
         assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
         assert!(access.check_privilege("property:email:read").is_ok());
-
+println!("and here...");
         let access_grants = registry
             .list_access(&None, &Selector::from_str("+:**")?)
             .await?;
-
+println!("lising access grants...");
         println!(
             "{: <4}{:<6}{:<20}{:<40}{:<40}{:<40}",
             "id", "grant", "data", "on", "to", "by"

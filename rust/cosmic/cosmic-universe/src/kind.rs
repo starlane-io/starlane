@@ -12,13 +12,14 @@ use crate::loc::{
     MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, STAR_WAVE_TRAVERSAL_PLAN,
     STD_WAVE_TRAVERSAL_PLAN,
 };
-use crate::parse::{kind_parts, CamelCase, Domain, SkewerCase};
+use crate::parse::{kind_parts, CamelCase, Domain, SkewerCase, specific};
 use crate::particle::traversal::TraversalPlan;
 use crate::selector::{
     KindSelector, KindSelectorDef, Pattern, SpecificSelector, SubKindSelector, VersionReq,
 };
 use crate::util::ValuePattern;
 use crate::{KindTemplate, UniErr};
+use crate::parse::error::result;
 
 impl ToBaseKind for KindParts {
     fn to_base(&self) -> BaseKind {
@@ -327,6 +328,8 @@ impl Kind {
             Kind::File(s) => s.clone().into(),
             Kind::Artifact(s) => s.clone().into(),
             Kind::Database(s) => s.clone().into(),
+            Kind::UserBase(s) => s.clone().into(),
+            Kind::Star(s) => s.clone().into(),
             _ => Sub::None,
         }
     }
@@ -703,10 +706,10 @@ impl ToString for Specific {
 }
 
 impl FromStr for Specific {
-    type Err = ();
+    type Err = UniErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
+        result(specific(new_span(s)))
     }
 }
 
