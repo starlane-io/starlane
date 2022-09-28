@@ -61,6 +61,7 @@ use cosmic_universe::selector::{
 use cosmic_universe::substance::{Substance, SubstanceList, SubstanceMap};
 use cosmic_universe::util::ValuePattern;
 use cosmic_universe::HYPERUSER;
+use cosmic_universe::log::PointLogger;
 
 pub trait PostgresPlatform: Cosmos
 where
@@ -75,6 +76,7 @@ where
     P: PostgresPlatform + 'static,
     <P as Cosmos>::Err: PostErr,
 {
+    logger: PointLogger,
     ctx: PostgresRegistryContextHandle<P>,
     platform: P,
 }
@@ -84,7 +86,8 @@ where
     P: PostgresPlatform + 'static,
     <P as Cosmos>::Err: PostErr,
 {
-    pub async fn new(ctx: PostgresRegistryContextHandle<P>, platform: P) -> Result<Self, P::Err> {
+    pub async fn new(ctx: PostgresRegistryContextHandle<P>, platform: P, logger: PointLogger) -> Result<Self, P::Err> {
+        let logger = logger.point( Point::global_registry() );
         /*
         let pool = PgPoolOptions::new()
             .max_connections(5)
@@ -93,15 +96,16 @@ where
             )
             .await?;
          */
-        let registry = Self { ctx, platform };
+        let registry = Self { ctx, platform, logger: logger.clone() };
 
+        logger.info("staring...");
         match registry.setup().await {
             Ok(_) => {
-                info!("registry setup complete.");
+                logger.info("registry setup complete.");
             }
             Err(err) => {
                 let message = err.to_string();
-                error!("database setup failed {} ", message);
+                logger.error(format!("database setup failed {} ", message));
                 return Err(message.into());
             }
         }
@@ -110,6 +114,7 @@ where
     }
 
     async fn setup(&self) -> Result<(), P::Err> {
+println!("database setup!") ;
         //        let database= format!("CREATE DATABASE IF NOT EXISTS {}", REGISTRY_DATABASE );
 
         let particles = r#"CREATE TABLE IF NOT EXISTS particles (
@@ -1076,7 +1081,6 @@ where
                 })
             }
             Err(err) => {
-                error!("{}", err.to_string());
                 Err(sqlx::error::Error::PoolClosed)
             }
         }
@@ -1232,7 +1236,6 @@ where
         match wrap::<P>(row) {
             Ok(record) => Ok(record),
             Err(err) => {
-                error!("{}", err.to_string());
                 Err(sqlx::error::Error::Decode("particle record".into()))
             }
         }
@@ -1670,6 +1673,7 @@ pub mod test {
     use cosmic_universe::hyper::ParticleLocation;
     use cosmic_universe::kind::{Kind, Specific, StarSub, UserBaseSubKind};
     use cosmic_universe::loc::{MachineName, Point, StarKey, ToPoint};
+    use cosmic_universe::log::RootLogger;
     use cosmic_universe::particle::property::PropertiesConfig;
     use cosmic_universe::particle::Status;
     use cosmic_universe::security::{
@@ -1717,7 +1721,9 @@ pub mod test {
         type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
 
         async fn global_registry(&self) -> Result<Registry<Self>, Self::Err> {
-            Ok(Arc::new(PostgresRegistry::new(self.handle.clone(), self.clone()).await?))
+            let logger = RootLogger::default();
+            let logger = logger.point(Point::global_registry());
+            Ok(Arc::new(PostgresRegistry::new(self.handle.clone(), self.clone(),logger ).await?))
         }
 
         fn star_auth(&self, star: &StarKey) -> Result<Self::StarAuth, Self::Err> {
