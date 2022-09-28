@@ -26,7 +26,7 @@ use strum::ParseError;
 use tokio::sync::mpsc;
 
 use crate::err::PostErr;
-use cosmic_hyperverse::err::HyperErr;
+use cosmic_hyperverse::err::{ErrKind, HyperErr};
 use cosmic_hyperverse::machine::MachineTemplate;
 use cosmic_hyperverse::reg::{Registration, RegistryApi};
 use cosmic_hyperverse::Cosmos;
@@ -217,6 +217,10 @@ where
     P: PostgresPlatform + 'static,
     <P as Cosmos>::Err: PostErr,
 {
+    async fn nuke<'a>(&'a self) -> Result<(), P::Err> {
+        Ok(())
+    }
+
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, P::Err> {
         /*
         async fn check<'a>( registration: &Registration,  trans:&mut Transaction<Postgres>, ) -> Result<(),Erroror> {
@@ -240,7 +244,7 @@ where
 
         let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
-        let params = RegistryParams::from_registration(registration)?;
+        let params:RegistryParams<P> = RegistryParams::from_registration(registration)?;
 
         let count = sqlx::query_as::<Postgres, Count>(
             "SELECT count(*) as count from particles WHERE parent=$1 AND point_segment=$2",
@@ -251,7 +255,7 @@ where
         .await?;
 
         if count.0 > 0 {
-            return Err(P::Err::Dupe);
+            return Err(P::Err::dupe());
         }
 
         let statement = format!("INSERT INTO particles (point,point_segment,base,kind,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.base, opt(&params.sub), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
@@ -284,7 +288,11 @@ where
         })
     }
 
-    async fn assign<'a>(&'a self, point: &'a Point, location: ParticleLocation ) -> Result<(), P::Err> {
+    async fn assign<'a>(
+        &'a self,
+        point: &'a Point,
+        location: ParticleLocation,
+    ) -> Result<(), P::Err> {
         let parent = point
             .parent()
             .ok_or("expecting parent since we have already established the segments are >= 2")?;
@@ -292,13 +300,20 @@ where
             .last_segment()
             .ok_or("expecting a last_segment since we know segments are >= 2")?;
 
-
-        let statement = "UPDATE particles SET star=$1, host=$2 WHERE parent=$3 AND point_segment=$4";
+        let statement =
+            "UPDATE particles SET star=$1, host=$2 WHERE parent=$3 AND point_segment=$4";
 
         let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
 
-        trans.execute(sqlx::query( statement ).bind( location.star).bind( location.host).bind(parent.to_string().bind(point_segment.to_string()))).await?;
+        trans
+            .execute(
+                sqlx::query(statement)
+                    .bind(location.star.to_string())
+                    .bind(location.host.map(|p|p.to_string()))
+                    .bind(parent.to_string()).bind(point_segment.to_string())
+            )
+            .await?;
 
         trans.commit().await?;
         Ok(())
@@ -429,7 +444,7 @@ where
             .ok_or("expected last point_segment")?
             .to_string();
 
-        let mut record = sqlx::query_as::<Postgres, PostgresParticleRecord>(
+        let mut record = sqlx::query_as::<Postgres, PostgresParticleRecord<P>>(
             "SELECT DISTINCT * FROM particles as r WHERE parent=$1 AND point_segment=$2",
         )
         .bind(parent.to_string())
@@ -623,8 +638,9 @@ where
             where_clause
         );
 
-        let mut query =
-            sqlx::query_as::<Postgres, PostgresParticleRecord>(matching_so_far_statement.as_str());
+        let mut query = sqlx::query_as::<Postgres, PostgresParticleRecord<P>>(
+            matching_so_far_statement.as_str(),
+        );
         for param in params {
             query = query.bind(param);
         }
@@ -767,7 +783,7 @@ where
         let mut permissions = Permissions::none();
         let mut level_ands: Vec<Vec<PermissionsMask>> = vec![];
         loop {
-            let mut access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(traversal.to_string() ).fetch_all(& mut conn).await?;
+            let mut access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant<P>>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(traversal.to_string() ).fetch_all(& mut conn).await?;
             let mut access_grants: Vec<AccessGrant> = access_grants
                 .into_iter()
                 .map(|a| a.into())
@@ -988,9 +1004,15 @@ impl sqlx::FromRow<'_, PgRow> for LocalProperty {
 pub struct WrappedIndexedAccessGrant<P>
 where
     P: PostgresPlatform,
-    <P as Cosmos>::Err: PostErr {
+    <P as Cosmos>::Err: PostErr,
+{
     grant: IndexedAccessGrant,
-    phantom: PhantomData<P>
+    phantom: PhantomData<P>,
+}
+impl <P> Unpin for WrappedIndexedAccessGrant<P>where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr {
+
 }
 
 impl<P> Into<IndexedAccessGrant> for WrappedIndexedAccessGrant<P>
@@ -1045,11 +1067,14 @@ where
             Ok(IndexedAccessGrant { id, access_grant })
         }
 
-        match wrap(row) {
+        match wrap::<P>(row) {
             Ok(record) => {
                 let phantom = Default::default();
-                Ok(WrappedIndexedAccessGrant{grant: record, phantom })
-            },
+                Ok(WrappedIndexedAccessGrant {
+                    grant: record,
+                    phantom,
+                })
+            }
             Err(err) => {
                 error!("{}", err.to_string());
                 Err(sqlx::error::Error::PoolClosed)
@@ -1058,12 +1083,28 @@ where
     }
 }
 
-struct PostgresParticleRecord {
+
+struct PostgresParticleRecord<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
     pub details: Details,
     pub location: Option<ParticleLocation>,
+    pub phantom: PhantomData<P>,
 }
 
-impl Into<ParticleRecord> for PostgresParticleRecord {
+impl <P> Unpin for PostgresParticleRecord<P>where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr {
+
+}
+
+impl<P> Into<ParticleRecord> for PostgresParticleRecord<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
     fn into(self) -> ParticleRecord {
         ParticleRecord {
             details: self.details,
@@ -1072,11 +1113,16 @@ impl Into<ParticleRecord> for PostgresParticleRecord {
     }
 }
 
-impl sqlx::FromRow<'_, PgRow> for PostgresParticleRecord {
+impl<P> sqlx::FromRow<'_, PgRow> for PostgresParticleRecord<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
-        fn wrap<C>(row: &PgRow) -> Result<PostgresParticleRecord, C::Err>
+        fn wrap<C>(row: &PgRow) -> Result<PostgresParticleRecord<C>, C::Err>
         where
-            C: PostgresPlatform, <C as Cosmos>::Err: PostErr,
+            C: PostgresPlatform,
+            <C as Cosmos>::Err: PostErr,
         {
             let parent: String = row.get("parent");
             let point_segment: String = row.get("point_segment");
@@ -1147,12 +1193,18 @@ impl sqlx::FromRow<'_, PgRow> for PostgresParticleRecord {
             let kind = KindParts::new(base, sub, specific);
             let kind: Kind = kind.try_into()?;
 
-            let location = star.map(|star| {
-                ParticleLocation::new(
-                    Point::from_str(star.as_str())?,
-                    host.map(|host| Point::from_str(host.as_str())?),
-                )
-            });
+            let location = match star {
+                None => None,
+                Some(star) => {
+                    let star = Point::from_str(star.as_str())?;
+                    let host = match host {
+                        None => None,
+                        Some(host) => Some(Point::from_str(host.as_str())?),
+                    };
+
+                    Some(ParticleLocation::new(star, host))
+                }
+            };
 
             let status = Status::from_str(status.as_str())?;
 
@@ -1167,12 +1219,17 @@ impl sqlx::FromRow<'_, PgRow> for PostgresParticleRecord {
                 properties: Default::default(), // not implemented yet...
             };
 
-            let record = PostgresParticleRecord { details, location };
+            let phantom = Default::default();
+            let record = PostgresParticleRecord {
+                details,
+                location,
+                phantom,
+            };
 
             Ok(record)
         }
 
-        match wrap(row) {
+        match wrap::<P>(row) {
             Ok(record) => Ok(record),
             Err(err) => {
                 error!("{}", err.to_string());
@@ -1284,7 +1341,7 @@ where
 impl<P> PostgresRegistry<P>
 where
     P: PostgresPlatform + 'static,
-    <P as Cosmos>::Err: PostErr
+    <P as Cosmos>::Err: PostErr,
 {
     pub async fn set(&self, set: &Set) -> Result<(), P::Err> {
         self.set_properties(&set.point, &set.properties).await
@@ -1359,12 +1416,13 @@ where
 
                 // if strategy is ensure then a dupe is GOOD!
                 if create.strategy == Strategy::Ensure {
-                    if let Err(P::Err::dupe()) = result {
-                        result = Ok(self.record(&point).await?.details);
+                    if let Err(err) = &result {
+                        if err.kind() == ErrKind::Dupe {
+                            result = Ok(self.record(&point).await?.details);
+                        }
                     }
                 }
 
-                println!("result {}? {}", point.to_string(), result.is_ok());
                 result?
             }
             PointSegTemplate::Pattern(pattern) => {
@@ -1387,11 +1445,12 @@ where
 
                     match self.register(&registration).await {
                         Ok(stub) => return Ok(stub),
-                        Err(P::Err::dupe()) => {
-                            // continue loop
-                        }
                         Err(err) => {
-                            return Err(err);
+                            if err.kind() == ErrKind::Dupe {
+                                // continue loop
+                            } else {
+                                return Err(err);
+                            }
                         }
                     }
                 }
@@ -1521,14 +1580,14 @@ where
     }
 }
 
-#[derive(Eq, PartialEq, Hash)]
+#[derive(Clone,Eq, PartialEq, Hash)]
 pub struct PostgresDbKey {
     pub url: String,
     pub user: String,
     pub database: String,
 }
 
-#[derive(Clone,Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub struct PostgresDbInfo {
     pub url: String,
     pub user: String,
@@ -1601,6 +1660,7 @@ pub mod test {
         PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
         PostgresRegistryContextHandle,
     };
+    use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, LocalHyperwayGateJumper};
     use cosmic_hyperverse::reg::RegistryApi;
     use cosmic_hyperverse::reg::{Registration, Registry};
     use cosmic_universe::artifact::ArtifactApi;
@@ -1608,7 +1668,7 @@ pub mod test {
     use cosmic_universe::command::direct::query::Query;
     use cosmic_universe::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
     use cosmic_universe::hyper::ParticleLocation;
-    use cosmic_universe::kind::{Kind, StarSub, UserBaseSubKind};
+    use cosmic_universe::kind::{Kind, Specific, StarSub, UserBaseSubKind};
     use cosmic_universe::loc::{MachineName, Point, StarKey, ToPoint};
     use cosmic_universe::particle::property::PropertiesConfig;
     use cosmic_universe::particle::Status;
@@ -1617,7 +1677,6 @@ pub mod test {
         Privilege,
     };
     use cosmic_universe::selector::{PointHierarchy, Selector};
-    use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, LocalHyperwayGateJumper};
 
     #[derive(Clone)]
     pub struct TestPlatform {
@@ -1655,10 +1714,10 @@ pub mod test {
         type Err = TestErr;
         type RegistryContext = PostgresRegistryContextHandle<Self>;
         type StarAuth = AnonHyperAuthenticator;
-        type RemoteStarConnectionFactory = ();
+        type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
 
         async fn global_registry(&self) -> Result<Registry<Self>, Self::Err> {
-            Ok(PostgresRegistry::new(self.handle.clone(), self.clone())?)
+            Ok(Arc::new(PostgresRegistry::new(self.handle.clone(), self.clone()).await?))
         }
 
         fn star_auth(&self, star: &StarKey) -> Result<Self::StarAuth, Self::Err> {
@@ -1803,9 +1862,11 @@ pub mod test {
         };
         registry.register(&registration).await?;
 
+        let userbase = Kind::UserBase(UserBaseSubKind::OAuth(Specific::from_str("mechtronhost.io:keycloak.com:keycloak:community:11.0.0")?));
+
         let registration = Registration {
             point: Point::from_str("hyperspace:users")?,
-            kind: Kind::UserBase(UserBaseSubKind::Keycloak),
+            kind: userbase.clone(),
             registry: Default::default(),
             properties: Default::default(),
             owner: hyperuser.clone(),
@@ -1839,7 +1900,7 @@ pub mod test {
         let point = Point::from_str("localhost:users")?;
         let registration = Registration {
             point: point.clone(),
-            kind: Kind::UserBase(UserBaseSubKind::Keycloak),
+            kind: userbase.clone(),
             registry: Default::default(),
             properties: Default::default(),
             owner: hyperuser.clone(),
@@ -1850,7 +1911,7 @@ pub mod test {
 
         let registration = Registration {
             point: superuser.clone(),
-            kind: Kind::UserBase(UserBaseSubKind::Keycloak),
+            kind: userbase.clone(),
             registry: Default::default(),
             properties: Default::default(),
             owner: hyperuser.clone(),
@@ -1873,7 +1934,7 @@ pub mod test {
         let app_userbase = Point::from_str("localhost:app:users")?;
         let registration = Registration {
             point: app_userbase.clone(),
-            kind: Kind::UserBase(UserBaseSubKind::Keycloak),
+            kind: userbase.clone(),
             registry: Default::default(),
             properties: Default::default(),
             owner: app.clone(),
@@ -1907,7 +1968,7 @@ pub mod test {
         let grant = AccessGrant {
             kind: AccessGrantKind::Super,
             on_point: Selector::from_str("localhost+:**")?,
-            to_point: superuser.clone().try_into()?,
+            to_point: superuser.clone().try_into().map_err(|e|TestErr::new(e))?,
             by_particle: hyperuser.clone(),
         };
         registry.grant(&grant).await?;
@@ -1931,7 +1992,7 @@ pub mod test {
         let grant = AccessGrant {
             kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("+CSD-RWX")?),
             on_point: Selector::from_str("localhost:users:superuser")?,
-            to_point: scott.clone().try_into()?,
+            to_point: scott.clone().try_into().map_err(|e|TestErr::new(e))?,
             by_particle: app.clone(),
         };
         registry.grant(&grant).await?;

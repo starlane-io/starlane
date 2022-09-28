@@ -20,6 +20,9 @@ pub trait RegistryApi<P>: Send + Sync
 where
     P: Cosmos,
 {
+
+    async fn nuke<'a>(&'a self) -> Result<(),P::Err>;
+
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, P::Err>;
 
     async fn assign<'a>(

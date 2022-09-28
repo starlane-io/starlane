@@ -13,7 +13,7 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone,Eq, PartialEq)]
 pub enum ErrKind {
     Default,
     Dupe,
@@ -45,6 +45,7 @@ pub trait HyperErr:
     + From<acid_store::Error>
     + From<UniErr>
     + Into<UniErr>
+    + From<()>
 {
     fn to_uni_err(&self) -> UniErr;
 
@@ -109,6 +110,12 @@ pub mod convert {
     impl ToString for Err {
         fn to_string(&self) -> String {
             self.message.clone()
+        }
+    }
+
+    impl From<()> for Err {
+        fn from(_: ()) -> Self {
+            Err::new("Empty")
         }
     }
 

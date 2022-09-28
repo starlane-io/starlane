@@ -51,6 +51,10 @@ impl MemRegApi {
 
 #[async_trait]
 impl RegistryApi<MemCosmos> for MemRegApi {
+    async fn nuke<'a>(&'a self) -> Result<(), crate::Err> {
+        todo!()
+    }
+
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, CosmicErr> {
         self.set_properties(&registration.point, &registration.properties).await?;
 

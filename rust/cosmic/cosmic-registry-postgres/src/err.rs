@@ -4,7 +4,7 @@ use std::io::{Error, ErrorKind};
 use std::string::FromUtf8Error;
 use strum::ParseError;
 
-pub trait PostErr: HyperErr + From<sqlx::Error>{
+pub trait PostErr: HyperErr + From<sqlx::Error>+From<ParseError>{
     fn dupe() -> Self;
 }
 
@@ -16,6 +16,7 @@ pub struct TestErr {
     pub message: String,
     pub kind: ErrKind
 }
+
 
 #[cfg(test)]
 impl PostErr for TestErr {
@@ -39,6 +40,7 @@ pub mod convert {
     use std::str::Utf8Error;
     use std::string::FromUtf8Error;
     use sqlx::Error;
+    use strum::ParseError;
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
@@ -98,6 +100,19 @@ pub mod convert {
                 kind,
                 message: msg.to_string(),
             }
+        }
+    }
+
+     impl From<()> for Err {
+        fn from(_: ()) -> Self {
+            Err::new("empty")
+        }
+    }
+
+
+    impl From<ParseError> for Err {
+        fn from(e: ParseError) -> Self {
+            Err::new(e)
         }
     }
 
