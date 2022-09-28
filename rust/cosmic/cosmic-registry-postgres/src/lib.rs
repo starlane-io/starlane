@@ -259,8 +259,15 @@ where
         .fetch_one(&mut trans)
         .await?;
 
-        if count.0 > 0 {
-            return Err(P::Err::dupe());
+        if count.0 > 0  {
+            // returning ok on Override for now which is the expected behavior but not the desired
+            // result.... will revisit this and properly do an update when the time comes -- Scott
+            if registration.strategy == Strategy::Ensure || registration.strategy == Strategy::Override
+            {
+                return Ok(self.record( &registration.point).await?.details );
+            } else {
+                return Err(P::Err::dupe());
+            }
         }
 
         let statement = format!("INSERT INTO particles (point,point_segment,base,sub,provider,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.base, opt(&params.sub), opt(&params.provider),opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());

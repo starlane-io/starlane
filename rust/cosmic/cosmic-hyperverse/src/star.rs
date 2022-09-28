@@ -277,7 +277,7 @@ where
             registry: Default::default(),
             properties: Default::default(),
             owner: self.point.clone(),
-            strategy: Strategy::Override,
+            strategy: Strategy::Ensure,
             status: Status::Ready
         };
 

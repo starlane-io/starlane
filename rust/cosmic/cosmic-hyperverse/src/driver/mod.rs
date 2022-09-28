@@ -647,7 +647,7 @@ where
                     registry: Default::default(),
                     properties: Default::default(),
                     owner: HYPERUSER.clone(),
-                    strategy: Strategy::Override,
+                    strategy: Strategy::Ensure,
                     status: Status::Init,
                 };
 
@@ -1489,7 +1489,7 @@ where
                 kind,
             ),
             properties: Default::default(),
-            strategy: Strategy::Override,
+            strategy: Strategy::Ensure,
             state: StateSrc::None,
         };
         self.skel

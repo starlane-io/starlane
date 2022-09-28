@@ -51,7 +51,7 @@ impl MemRegApi {
 
 #[async_trait]
 impl RegistryApi<MemCosmos> for MemRegApi {
-    async fn nuke<'a>(&'a self) -> Result<(), crate::Err> {
+    async fn nuke<'a>(&'a self) -> Result<(), CosmicErr> {
         todo!()
     }
 
