@@ -1,6 +1,6 @@
-use crate::error::Error;
-use crate::frame::StarPattern;
-use crate::star::StarKind;
+use std::collections::HashMap;
+use std::str::FromStr;
+
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
 use nom::character::complete::{alpha1, anychar, multispace0, multispace1};
@@ -11,8 +11,11 @@ use nom::sequence::{delimited, preceded, terminated, tuple};
 use nom::{AsChar, InputTakeAtPosition};
 use nom_supreme::parse_from_str;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::str::FromStr;
+
+use crate::error::Error;
+use crate::frame::StarPattern;
+use crate::star::StarKind;
+
 /*
 
 pub fn parse_star_kind(input: &str) -> Res<&str, Result<StarKind, Error>> {

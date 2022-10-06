@@ -1,21 +1,26 @@
-use crate::error::Error;
-use crate::particle::property::{
-    AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPattern,
-    PropertyPermit, PropertySource,
-};
-use crate::registry::match_kind;
-use crate::star::core::particle::driver::ParticleCoreDriver;
-use crate::star::StarSkel;
+use std::collections::HashMap;
+use std::convert::TryInto;
+use std::env;
+use std::future::Future;
+use std::str::FromStr;
+use std::sync::Arc;
+
 use alcoholic_jwt::{token_kid, JWKS};
-use cosmic_api::command::Command;
-use cosmic_api::id::id::{BaseKind, Kind};
-use cosmic_api::parse::skewer_or_snake;
-use cosmic_api::sys::Assign;
 use http::StatusCode;
 use keycloak::types::{
     CredentialRepresentation, ProtocolMapperRepresentation, RealmRepresentation, UserRepresentation,
 };
 use keycloak::{KeycloakAdmin, KeycloakAdminToken, KeycloakError};
+use nom::combinator::all_consuming;
+use nom::AsBytes;
+use nom_supreme::final_parser::final_parser;
+use serde_json::{json, Value};
+use validator::validate_email;
+
+use cosmic_universe::command::Command;
+use cosmic_universe::hyper::Assign;
+use cosmic_universe::kind::{BaseKind, Kind};
+use cosmic_universe::parse::skewer_or_snake;
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::entity::request::create::{Create, PointSegFactory};
 use mesh_portal::version::latest::entity::request::get::{Get, GetOp};
@@ -28,17 +33,15 @@ use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 use mesh_portal::version::latest::particle::Stub;
 use mesh_portal::version::latest::payload::Substance;
-use nom::combinator::all_consuming;
-use nom::AsBytes;
-use nom_supreme::final_parser::final_parser;
-use serde_json::{json, Value};
-use std::collections::HashMap;
-use std::convert::TryInto;
-use std::env;
-use std::future::Future;
-use std::str::FromStr;
-use std::sync::Arc;
-use validator::validate_email;
+
+use crate::error::Error;
+use crate::particle::property::{
+    AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPattern,
+    PropertyPermit, PropertySource,
+};
+use crate::registry::match_kind;
+use crate::star::core::particle::driver::ParticleCoreDriver;
+use crate::star::StarSkel;
 
 #[derive(Clone)]
 pub struct UsernamePattern {}

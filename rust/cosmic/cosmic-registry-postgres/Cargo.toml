@@ -1,0 +1,28 @@
+[package]
+name = "cosmic-registry-postgres"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cosmic-universe={ path= "../cosmic-universe" }
+cosmic-hyperverse={ path= "../cosmic-hyperverse" }
+mechtron-host={ path= "../../mechtron/mechtron-host"}
+sqlx = { version = "0.5.11", features = [ "runtime-tokio-rustls", "postgres", "macros", "any" ] }
+serde = { version="1.0.69", features=['derive','rc'] }
+async-trait = "0.1.48"
+tracing = "0.1.26"
+async-recursion = "1.0.0"
+lazy_static = "1.4.0"
+strum = "0.24.1"
+
+
+[dev-dependencies]
+zip = "0.6.2"
+wasmer = "2.3.0"
+wasmer-compiler-singlepass = "2.3.0"
+acid-store = { version = "0.12.0", features=['store-directory','repo-value'] }
+bincode = "1.3.3"
+tokio = { version = "1.15.0", features = ["full"] }
+cosmic-hyperlane= { path="../cosmic-hyperlane" }

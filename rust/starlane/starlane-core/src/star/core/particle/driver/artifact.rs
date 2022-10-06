@@ -9,18 +9,10 @@ use std::sync::Arc;
 
 use tempdir::TempDir;
 use tokio::sync::Mutex;
+use zip::result::ZipResult;
 
-use crate::error::Error;
-use crate::star::core::particle::driver::ParticleCoreDriver;
-use crate::star::core::particle::state::StateStore;
-use crate::star::StarSkel;
-use crate::util;
-
-use crate::file_access::FileAccess;
-use crate::message::delivery::Delivery;
-use cosmic_api::id::id::{BaseKind, Kind};
-use cosmic_api::id::ArtifactSubKind;
-use cosmic_api::sys::Assign;
+use cosmic_universe::hyper::Assign;
+use cosmic_universe::kind::{ArtifactSubKind, BaseKind, Kind};
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
 use mesh_portal::version::latest::entity::request::create::{
     Create, KindTemplate, PointSegFactory, PointTemplate, Strategy, Template,
@@ -29,7 +21,14 @@ use mesh_portal::version::latest::entity::request::{Method, Rc};
 use mesh_portal::version::latest::id::{AddressAndKind, KindParts, Point, RouteSegment};
 use mesh_portal::version::latest::messaging::ReqShell;
 use mesh_portal::version::latest::payload::Substance;
-use zip::result::ZipResult;
+
+use crate::error::Error;
+use crate::file_access::FileAccess;
+use crate::message::delivery::Delivery;
+use crate::star::core::particle::driver::ParticleCoreDriver;
+use crate::star::core::particle::state::StateStore;
+use crate::star::StarSkel;
+use crate::util;
 
 fn get_artifacts(data: Arc<Vec<u8>>) -> Result<Vec<String>, Error> {
     let temp_dir = TempDir::new("zipcheck")?;

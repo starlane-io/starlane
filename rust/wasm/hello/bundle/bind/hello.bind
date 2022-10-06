@@ -1,0 +1,5 @@
+Bind(version=1.0.0) {
+
+   Route<Ext<Hello>> -> (()) => &;
+
+}

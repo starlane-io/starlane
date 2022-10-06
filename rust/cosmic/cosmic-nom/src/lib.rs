@@ -1,4 +1,8 @@
 #![allow(warnings)]
+
+use std::ops::{Deref, Range, RangeFrom, RangeTo};
+use std::sync::Arc;
+
 use nom::character::complete::multispace0;
 use nom::combinator::recognize;
 use nom::error::{ErrorKind, ParseError};
@@ -10,9 +14,6 @@ use nom::{
 use nom_locate::LocatedSpan;
 use nom_supreme::error::ErrorTree;
 use serde::{Deserialize, Serialize};
-use std::ops::{Deref, Range, RangeFrom, RangeTo};
-use std::sync::Arc;
-use nom::bytes::complete::tag;
 
 #[cfg(test)]
 mod tests {
@@ -469,9 +470,11 @@ impl FindSubstring<&str> for SliceStr {
 
 #[cfg(test)]
 pub mod test {
-    use crate::SliceStr;
-    use cosmic_nom::SliceStr;
     use nom::Slice;
+
+    use cosmic_nom::SliceStr;
+
+    use crate::SliceStr;
 
     #[test]
     pub fn test() {
@@ -876,19 +879,3 @@ where
 {
     move |input: I| delimited(multispace0, f, multispace0)(input)
 }
-
-
-/*
-pub fn fn_cp<I,Fn,Rtn>( mut f: Fn ) -> impl FnMut(I) -> Res<I,Rtn> where I:Span, Fn: FnMut(I) -> Res<I,Rtn> {
-    move | input: I | {
-        f(input)
-    }
-}
-
-pub fn fn_tag<I>( t: &'static str ) -> impl FnMut(I) -> Res<I,I> where I:Span {
-    move | input: I | {
-        tag(t)(input)
-    }
-}
-
- */

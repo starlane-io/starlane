@@ -1,0 +1,20 @@
+[package]
+name = "cosmic-cli"
+version = "0.3.0"
+edition = "2021"
+
+authors = ["Scott Williams <scott@mightydevco.com>"]
+description = "The Cosmic Cli provides command line inerface to access a running server enabled with The Cosmic Initiative framework http://thecosmicinitiative.io"
+homepage = "http://thecosmicinitiative.io"
+repository = "https://github.com/cosmic-initiative/cosmic-initiative"
+license = "MIT"
+
+[dependencies]
+
+cosmic-hyperlane={ path="../cosmic-hyperlane"}
+cosmic-hyperlane-tcp={ path="../cosmic-hyperlane-tcp"}
+cosmic-universe= { path="../cosmic-universe"}
+cosmic-hyperverse= { path="../cosmic-hyperverse"}
+
+clap = { version="3.2.22", features=["cargo"] }
+tokio = { version = "1.15.0", features = ["rt"] }

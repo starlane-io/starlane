@@ -1,6 +1,6 @@
-use mesh_portal::version::latest::fail;
-
 use serde::{Deserialize, Serialize};
+
+use mesh_portal::version::latest::fail;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Fail {

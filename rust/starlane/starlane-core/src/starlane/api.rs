@@ -1,12 +1,13 @@
-use cosmic_api::sys::ParticleRecord;
-use cosmic_api::wave::{AsyncTransmitterWithAgent, Transmitter};
+use std::sync::Arc;
+
 use cosmic_portal_cli::Cli;
 use cosmic_portal_cli::CliSession;
+use cosmic_universe::hyper::ParticleRecord;
+use cosmic_universe::wave::{AsyncTransmitterWithAgent, Transmitter};
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::id::{Point, Port, TargetLayer};
 use mesh_portal::version::latest::messaging::{Agent, RespShell};
-use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct StarlaneApi {

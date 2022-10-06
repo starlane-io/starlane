@@ -4,12 +4,13 @@ use std::convert::TryInto;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 
-use cosmic_api::id::StarKey;
 use futures::future::select_all;
 use futures::FutureExt;
 use lru::LruCache;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
+
+use cosmic_universe::loc::StarKey;
 
 use crate::error::Error;
 use crate::frame::{Frame, ProtoFrame, StarMessage, StarPattern};

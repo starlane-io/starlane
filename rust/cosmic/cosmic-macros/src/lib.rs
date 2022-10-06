@@ -1,21 +1,22 @@
 #![crate_type = "lib"]
 #![allow(warnings)]
 
-
+#[macro_use]
+extern crate lazy_static;
 #[macro_use]
 extern crate strum_macros;
 
+use proc_macro::TokenStream;
+use std::str::FromStr;
+
 use chrono::{DateTime, Utc};
-use cosmic_api::parse::route_attribute_value;
-use cosmic_api::util::log;
+use cosmic_universe::loc;
 use nom::combinator::into;
 use nom_locate::LocatedSpan;
-use proc_macro::TokenStream;
 use proc_macro2::Ident;
 use quote::__private::ext::RepToTokensExt;
 use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 use regex::Regex;
-use std::str::FromStr;
 use syn::__private::TokenStream2;
 use syn::parse::{Parse, ParseBuffer, ParseStream};
 use syn::parse_quote::ParseQuote;
@@ -27,19 +28,74 @@ use syn::{
     ItemStruct, PathArguments, PathSegment, ReturnType, Signature, Type, Visibility,
 };
 
+use cosmic_universe::parse::route_attribute_value;
+use cosmic_universe::util::log;
+use cosmic_universe::wasm::Timestamp;
 
-// this is just to make the user realize he needs to import DirectedHandler
+#[no_mangle]
+extern "C" fn cosmic_uuid() -> loc::Uuid {
+    loc::Uuid::from(uuid::Uuid::new_v4().to_string()).unwrap()
+}
+
+#[no_mangle]
+extern "C" fn cosmic_timestamp() -> Timestamp {
+    Timestamp::new(Utc::now().timestamp_millis())
+}
+
+/// This macro will auto implement the `cosmic_universe::wave::exchange::asynch::DirectedHandler` trait.
+/// In order to finalize the implementation a `#[routes]` attribute must also be specified
+/// above one of the impls.
 #[proc_macro_derive(DirectedHandler)]
 pub fn directed_handler(item: TokenStream) -> TokenStream {
     TokenStream::from(quote! {})
 }
 
+/// This impl attribute creates a `fn handler` which receives directed waves and routes them to the first local method
+/// which the route selector matches.
+/// To implement:
+/// ```
+///
+/// use cosmic_universe::err::UniErr;
+/// use cosmic_universe::hyper::HyperSubstance;
+/// use cosmic_universe::log::PointLogger;
+/// use cosmic_universe::substance::Substance;
+/// use cosmic_universe::substance::Substance::Text;
+/// use cosmic_universe::wave::core::ReflectedCore;
+/// use cosmic_universe::wave::exchange::asynch::InCtx;
+///
+/// #[derive(DirectedHandler)]
+/// pub struct MyHandler {
+///   logger: PointLogger
+/// }
+///
+/// #[routes]
+/// impl MyHandler {
+///     /// the route attribute captures an ExtMethod implementing a custom `MyNameIs`
+///     /// notice that the InCtx will accept any valid cosmic_universe::substance::Substance
+///     #[route("Ext<MyNameIs>")]
+///     pub async fn hello(&self, ctx: InCtx<'_, Text>) -> Result<String, UniErr> {
+///         /// also we can return any Substance in our Reflected wave
+///         Ok(format!("Hello, {}", ctx.input.to_string()))
+///     }
+///
+///     /// if the function returns nothing then an Empty Ok Reflected will be returned unless
+///     /// the wave type is `Wave<Signal>`
+///     #[route("Ext<Bye>")]
+///     pub async fn bye(&self, ctx: InCtx<'_,()>) {
+///        self.logger.info("funny that! He left without saying a word!");
+///     }
+/// }
 #[proc_macro_attribute]
-pub fn routes(attr: TokenStream, item: TokenStream) -> TokenStream {
-    _routes(attr, item, true)
+pub fn handler(attr: TokenStream, item: TokenStream) -> TokenStream {
+    _handler(attr, item, true)
 }
 
-fn _routes(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
+#[proc_macro_attribute]
+pub fn handler_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
+    _handler(attr, item, false)
+}
+
+fn _handler(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
     let item_cp = item.clone();
     let mut impl_item = parse_macro_input!(item_cp as syn::ItemImpl);
     //    let mut selectors = vec![];
@@ -59,7 +115,7 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
                 let route_selector = attr.to_token_stream().to_string();
                 static_selector_keys.push(selector_ident.clone());
                 let static_selector = quote! {
-                    static ref #selector_ident : RouteSelector = route_attribute(#route_selector).unwrap();
+                    static ref #selector_ident : cosmic_universe::config::bind::RouteSelector = cosmic_universe::parse::route_attribute(#route_selector).unwrap();
                 };
                 static_selectors.push(static_selector);
             //println!(" ~~ ROUTE {}", attr.tokens.to_string() );
@@ -96,12 +152,40 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
         rtn
     };
 
+    let selector = match _async {
+        true => quote! {cosmic_universe::wave::exchange::asynch::DirectedHandlerSelector},
+        false => quote! {cosmic_universe::wave::exchange::synch::DirectedHandlerSelector},
+    };
+
+    let handler = match _async {
+        true => quote! {cosmic_universe::wave::exchange::asynch::DirectedHandler},
+        false => quote! {cosmic_universe::wave::exchange::synch::DirectedHandler},
+    };
+
+    let root_ctx = match _async {
+        true => quote! {cosmic_universe::wave::exchange::asynch::RootInCtx},
+        false => quote! {cosmic_universe::wave::exchange::synch::RootInCtx},
+    };
+
+    let _await = match _async {
+        true => quote! {.await},
+        false => quote! {},
+    };
+
+    let _async_trait = match _async {
+        true => quote! {#[async_trait]},
+        false => quote! {},
+    };
+
+    let _async = match _async {
+        true => quote! {async},
+        false => quote! {},
+    };
+
     let rtn = quote! {
-        impl #generics DirectedHandlerSelector for #self_ty #where_clause{
-              fn select<'a>( &self, select: &'a RecipientSelector<'a>, ) -> Result<&dyn DirectedHandler, ()> {
-                use cosmic_api::wave::Method;
-                use cosmic_api::wave::CmdMethod;
-                if select.wave.core().method == Method::Cmd(CmdMethod::Bounce) {
+        impl #generics #selector for #self_ty #where_clause{
+              fn select<'a>( &self, select: &'a cosmic_universe::wave::RecipientSelector<'a>, ) -> Result<&dyn #handler, ()> {
+                if select.wave.core().method == cosmic_universe::wave::core::Method::Cmd(cosmic_universe::wave::core::cmd::CmdMethod::Bounce) {
                     return Ok(self);
                 }
                 #(
@@ -113,18 +197,16 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
               }
         }
 
-        #[async_trait]
-        impl #generics DirectedHandler for #self_ty #where_clause{
-            async fn handle( &self, ctx: RootInCtx) -> CoreBounce {
-                use cosmic_api::wave::Method;
-                use cosmic_api::wave::CmdMethod;
+        #_async_trait
+        impl #generics #handler for #self_ty #where_clause{
+            #_async fn handle( &self, ctx: #root_ctx) -> cosmic_universe::wave::core::CoreBounce {
                 #(
                     if #static_selector_keys.is_match(&ctx.wave).is_ok() {
-                       return self.#idents( ctx ).await;
+                       return self.#idents( ctx )#_await;
                     }
                 )*
-                if ctx.wave.core().method == Method::Cmd(CmdMethod::Bounce) {
-                    return self.bounce(ctx).await;
+                if ctx.wave.core().method == cosmic_universe::wave::core::Method::Cmd(cosmic_universe::wave::core::cmd::CmdMethod::Bounce) {
+                    return self.bounce(ctx)#_await;
                 }
                 ctx.not_found().into()
              }
@@ -136,7 +218,7 @@ fn _routes(attr: TokenStream, item: TokenStream, _async: bool) -> TokenStream {
 
     };
 
-    println!("{}", rtn.to_string());
+    //    println!("{}", rtn.to_string());
 
     TokenStream2::from_iter(vec![rtn, TokenStream2::from(item)]).into()
 }
@@ -184,7 +266,7 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
     log(route_attribute_value(attr.to_string().as_str())).expect("valid route selector");
 
     //    attr.to_tokens().next();
-    // we do this just to test for a valid selector...
+    // we do this just to mem for a valid selector...
     //log(wrapped_route_selector(attr.tokens.to_string().as_str())).expect("properly formatted route selector");
 
     let params: Vec<FnArg> = input.sig.inputs.clone().into_iter().collect();
@@ -198,21 +280,32 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
         Some(_) => quote! {.await},
     };
 
+    let root_ctx = match input.sig.asyncness {
+        None => quote! {cosmic_universe::wave::exchange::synch::RootInCtx},
+        Some(_) => quote! {cosmic_universe::wave::exchange::asynch::RootInCtx},
+    };
+
+    let in_ctx = match input.sig.asyncness {
+        None => quote! {cosmic_universe::wave::exchange::synch::InCtx},
+        Some(_) => quote! {cosmic_universe::wave::exchange::asynch::InCtx},
+    };
+
     let __async = match input.sig.asyncness {
         None => quote! {},
         Some(_) => quote! {async},
     };
+
     let orig = input.sig.ident.clone();
     let ident = format_ident!("__{}__route", input.sig.ident);
     let rtn_type = rtn_type(&input.sig.output);
     let item = ctx.item;
 
     let expanded = quote! {
-      #__async fn #ident( &self, mut ctx: RootInCtx ) -> CoreBounce {
-          let ctx: InCtx<'_,#item> = match ctx.push::<#item>() {
+      #__async fn #ident( &self, mut ctx: #root_ctx ) -> cosmic_universe::wave::core::CoreBounce {
+          let ctx: #in_ctx<'_,#item> = match ctx.push::<#item>() {
               Ok(ctx) => ctx,
               Err(err) => {
-                  return CoreBounce::Reflected(ReflectedCore::server_error());
+                  return cosmic_universe::wave::core::CoreBounce::Reflected(cosmic_universe::wave::core::ReflectedCore::server_error());
               }
           };
 
@@ -224,7 +317,7 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
 
     };
 
-    println!("{}", expanded.to_string());
+    //println!("{}", expanded.to_string());
     TokenStream::from(expanded)
 }
 
@@ -279,23 +372,39 @@ fn messsage_ctx(input: &FnArg) -> Result<RequestCtx, String> {
 fn rtn_type(output: &ReturnType) -> TokenStream2 {
     match output {
         ReturnType::Default => {
-            quote! {Bounce::Absorbed}
+            quote! {cosmic_universe::wave::Bounce::Absorbed}
         }
         ReturnType::Type(_, path) => {
             if let Type::Path(path) = &**path {
                 let PathSegment { ident, arguments } = path.path.segments.last().unwrap();
                 match ident.to_string().as_str() {
                     "Result" => {
-                        quote! {
-                            match result {
-                                Ok(rtn) => CoreBounce::Reflected(rtn.into()),
-                                Err(err) => CoreBounce::Reflected(err.as_reflected_core())
+                        if let PathArguments::AngleBracketed(brackets) = arguments {
+                            let arg = brackets.args.first().unwrap();
+                            if "Substance" == arg.to_token_stream().to_string().as_str() {
+                                quote! {
+                                 use cosmic_universe::err::CoreReflector;
+                                 match result {
+                                     Ok(rtn) => cosmic_universe::wave::core::CoreBounce::Reflected(cosmic_universe::wave::core::ReflectedCore::ok_body(rtn)),
+                                     Err(err) => cosmic_universe::wave::core::CoreBounce::Reflected(err.as_reflected_core())
+                                 }
+                                }
+                            } else {
+                                quote! {
+                                 use cosmic_universe::err::CoreReflector;
+                                 match result {
+                                     Ok(rtn) => cosmic_universe::wave::core::CoreBounce::Reflected(rtn.into()),
+                                     Err(err) => cosmic_universe::wave::core::CoreBounce::Reflected(err.as_reflected_core())
+                                 }
+                                }
                             }
+                        } else {
+                            panic!("Result without angle brackets")
                         }
                     }
                     "Bounce" => {
                         quote! {
-                            let rtn : CoreBounce = result.to_core_bounce();
+                            let rtn : cosmic_universe::wave::core::CoreBounce = result.to_core_bounce();
                             rtn
                         }
                     }
@@ -306,7 +415,7 @@ fn rtn_type(output: &ReturnType) -> TokenStream2 {
                     }
                     "ReflectedCore" => {
                         quote! {
-                           CoreBounce::Reflected(result)
+                           cosmic_universe::wave::core::CoreBounce::Reflected(result)
                         }
                     }
                     what => {

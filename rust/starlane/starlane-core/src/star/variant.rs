@@ -1,6 +1,9 @@
 use std::fmt;
+use std::sync::Arc;
 
+use tokio::sync::mpsc;
 use tokio::sync::oneshot;
+use tokio::time::Duration;
 
 use crate::error::Error;
 use crate::frame::{Frame, StarMessage};
@@ -9,9 +12,6 @@ use crate::star::variant::central::CentralVariant;
 use crate::star::variant::web::WebVariant;
 use crate::star::{StarCommand, StarKind, StarSkel};
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use std::sync::Arc;
-use tokio::sync::mpsc;
-use tokio::time::Duration;
 
 pub mod central;
 pub mod web;

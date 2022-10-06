@@ -2,9 +2,10 @@ use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 
-use cosmic_api::id::StarKey;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
+
+use cosmic_universe::loc::StarKey;
 
 use crate::error::Error;
 use crate::frame::{

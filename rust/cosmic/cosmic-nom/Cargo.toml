@@ -1,9 +1,13 @@
 [package]
 name = "cosmic-nom"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Scott Williams <scott@mightydevco.com>"]
+description = "Is a collection of utilities for making using the great [nom](https://crates.io/crates/nom) parser combinator easier to use."
+homepage = "http://thecosmicinitiative.io"
+repository = "https://github.com/cosmic-initiative/cosmic-initiative"
+license = "MIT"
 
 [dependencies]
 nom = "7"

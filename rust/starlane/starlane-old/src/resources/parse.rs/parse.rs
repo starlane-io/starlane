@@ -1,19 +1,18 @@
-use std::convert::TryInto;
-use std::str::FromStr;
-
 use nom::{AsChar, InputTakeAtPosition};
+use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
-use nom::character::complete::{alpha0, alpha1, anychar, digit0, digit1, one_of, alphanumeric1, multispace0};
-use nom::combinator::{not, opt, all_consuming};
+use nom::character::complete::{alpha0, alpha1, alphanumeric1, anychar, digit0, digit1, multispace0, one_of};
+use nom::combinator::{all_consuming, not, opt};
 use nom::error::{context, ErrorKind, VerboseError};
 use nom::multi::{many1, many_m_n, separated_list0, separated_list1};
 use nom::sequence::{delimited, preceded, terminated, tuple};
 use serde::{Deserialize, Serialize};
+use std::convert::TryInto;
+use std::str::FromStr;
 
-use crate::{DomainCase, Res, ResourceKind, ResourceKindParts, ResourcePath, ResourcePathAndKind, ResourcePathAndType, ResourcePathSegmentKind, ResourceType, SkewerCase, Specific, Version, ResourceSelector, FieldSelection, parse_resource_property, ConfigSrc, ResourcePropertiesKind};
+use crate::{ConfigSrc, DomainCase, FieldSelection, parse_resource_property, Res, ResourceKind, ResourceKindParts, ResourcePath, ResourcePathAndKind, ResourcePathAndType, ResourcePathSegmentKind, ResourcePropertiesKind, ResourceSelector, ResourceType, SkewerCase, Specific, Version};
 use crate::error::Error;
-use crate::property::{ResourcePropertyValueSelector, DataSetAspectSelector, ResourceValueSelector, ResourceProperty, ResourcePropertyAssignment, ResourceRegistryPropertyValueSelector, ResourceHostPropertyValueSelector, ResourceRegistryProperty};
-use nom::branch::alt;
+use crate::property::{DataSetAspectSelector, ResourceHostPropertyValueSelector, ResourceProperty, ResourcePropertyAssignment, ResourcePropertyValueSelector, ResourceRegistryProperty, ResourceRegistryPropertyValueSelector, ResourceValueSelector};
 
 pub fn any_resource_path_segment<T>(i: T) -> Res<T, T>
     where
@@ -443,10 +442,10 @@ mod tests {
     use std::convert::TryInto;
     use std::str::FromStr;
 
-    use crate::{ResourcePath, ResourcePathAndKind, ConfigSrc};
+    use crate::{ConfigSrc, ResourcePath, ResourcePathAndKind};
     use crate::error::Error;
-    use crate::parse::{parse_resource_path, parse_resource_path_and_kind, parse_resource_value_selector, parse_resource_property_assignment};
-    use crate::property::{ResourcePropertyValueSelector, DataSetAspectSelector, FieldValueSelector, MetaFieldValueSelector, ResourceProperty};
+    use crate::parse::{parse_resource_path, parse_resource_path_and_kind, parse_resource_property_assignment, parse_resource_value_selector};
+    use crate::property::{DataSetAspectSelector, FieldValueSelector, MetaFieldValueSelector, ResourceProperty, ResourcePropertyValueSelector};
 
     #[test]
     fn test_parse_resource_path() -> Result<(), Error> {
@@ -506,7 +505,7 @@ mod tests {
     }
 
     /*
-    #[test]
+    #[mem]
     fn test_parse_resource_value_selector() -> Result<(), Error> {
         let (leftover, result)= parse_resource_value_selector("hello:my::state")?;
         let selector = result?;
@@ -548,7 +547,7 @@ mod tests {
     }
 
 
-    #[test]
+    #[mem]
     fn test_parse_resource_property_assignment() -> Result<(), Error> {
         let (leftover, result)= parse_resource_property_assignment("hello:my::config=future:friend")?;
         let assignment = result?;

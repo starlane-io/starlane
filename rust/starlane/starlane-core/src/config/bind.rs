@@ -1,12 +1,14 @@
+use std::convert::TryInto;
+use std::sync::Arc;
+
+use cosmic_universe::parse::{bind_config, doc};
+use mesh_portal::version::latest::bin::Bin;
+use mesh_portal::version::latest::config::bind::BindConfig;
+
 use crate::artifact::ArtifactRef;
 use crate::cache::CachedConfig;
 use crate::error::Error;
 use crate::particle::config::Parser;
-use cosmic_api::parse::{bind_config, doc};
-use mesh_portal::version::latest::bin::Bin;
-use mesh_portal::version::latest::config::bind::BindConfig;
-use std::convert::TryInto;
-use std::sync::Arc;
 
 pub struct BindConfigParser;
 

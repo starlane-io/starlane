@@ -1,35 +1,23 @@
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
-
-use crate::error::Error;
-use crate::fail::{Fail, StarlaneFailure};
-use crate::frame::{
-    ResourceHostAction, ResourceRegistryRequest, SimpleReply, StarMessage, StarMessagePayload,
-};
+use std::future::Future;
 use std::str::FromStr;
+use std::sync::Arc;
+
+use futures::StreamExt;
+use http::{HeaderMap, StatusCode, Uri};
+use regex::Regex;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::artifact::ArtifactRef;
-use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
-use crate::config::config::{ContextualConfig, ParticleConfig};
-use crate::message::delivery::Delivery;
-use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
-use crate::registry::{RegError, Registration};
-use crate::star::core::particle::driver::{ResourceCoreDriverApi, ResourceCoreDriverComponent};
-use crate::star::shell::db::{StarFieldSelection, StarSelector};
-use crate::star::{StarCommand, StarKind, StarSkel};
-use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use cosmic_api::command::Command;
-use cosmic_api::id::id::{BaseKind, Kind, Tks, ToPoint};
-use cosmic_api::id::{ArtifactSubKind, FileSubKind, StarKey, UserBaseSubKind};
-use cosmic_api::particle::particle::Details;
-use cosmic_api::sys::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
+use cosmic_hyperverse::RegistryApi;
 use cosmic_locality::field::FieldEx;
-use cosmic_platform::RegistryApi;
-use futures::StreamExt;
-use http::{HeaderMap, StatusCode, Uri};
+use cosmic_universe::command::Command;
+use cosmic_universe::hyper::{Assign, AssignmentKind, ChildRegistry, Location, ParticleRecord};
+use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Tks, UserBaseSubKind};
+use cosmic_universe::loc::{StarKey, ToPoint};
+use cosmic_universe::particle::Details;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
 use mesh_portal::version::latest::config::bind::BindConfig;
@@ -48,9 +36,22 @@ use mesh_portal::version::latest::particle::{Status, Stub};
 use mesh_portal::version::latest::payload::CallKind;
 use mesh_portal::version::latest::payload::{PayloadMap, Substance};
 use mesh_portal::version::latest::security::Access;
-use regex::Regex;
-use std::future::Future;
-use std::sync::Arc;
+
+use crate::artifact::ArtifactRef;
+use crate::cache::{ArtifactCaches, ArtifactItem, CachedConfig};
+use crate::config::config::{ContextualConfig, ParticleConfig};
+use crate::error::Error;
+use crate::fail::{Fail, StarlaneFailure};
+use crate::frame::{
+    ResourceHostAction, ResourceRegistryRequest, SimpleReply, StarMessage, StarMessagePayload,
+};
+use crate::message::delivery::Delivery;
+use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
+use crate::registry::{RegError, Registration};
+use crate::star::core::particle::driver::{ResourceCoreDriverApi, ResourceCoreDriverComponent};
+use crate::star::shell::db::{StarFieldSelection, StarSelector};
+use crate::star::{StarCommand, StarKind, StarSkel};
+use crate::util::{AsyncProcessor, AsyncRunner, Call};
 
 /*
 lazy_static!{
@@ -298,7 +299,7 @@ impl MessagingEndpointComponentInner {
                                 }
                             }
                         }
-                        Command::Update(update) => {
+                        Command::Write(update) => {
                             unimplemented!()
                         }
                         Command::Read(point) => {

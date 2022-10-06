@@ -1,12 +1,16 @@
 [package]
 name = "cosmic-hyperlane"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Scott Williams <scott@mightydevco.com>"]
+description = "The Cosmic Hyperlane provides \"Lanes\" to queue Waves(messages) and Hyperways for back and forth Wave communication. It provides services such as routing and authentication as well."
+homepage = "http://thecosmicinitiative.io"
+repository = "https://github.com/cosmic-initiative/cosmic-initiative"
+license = "MIT"
 
 [dependencies]
-cosmic-api = { path= "../cosmic-api" }
+cosmic-universe = { path= "../cosmic-universe" ,version = "0.3.0"}
 async-trait = "0.1.48"
 futures = {version = "0.3.21", default-features = true }
 tokio = { version = "1.15.0", features = ["full"] }

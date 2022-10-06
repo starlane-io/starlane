@@ -1,7 +1,9 @@
-use cosmic_api::service::Global;
-use mesh_portal::version::latest::id::RouteSegment;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
+
+use cosmic_universe::hyper::ParticleRecord;
+use cosmic_universe::service::Global;
+use mesh_portal::version::latest::id::RouteSegment;
 
 use crate::error::Error;
 use crate::fail::{Fail, StarlaneFailure};
@@ -15,7 +17,6 @@ use crate::star::core::message::CoreMessageCall;
 use crate::star::variant::FrameVerdict;
 use crate::star::StarSkel;
 use crate::util::{AsyncProcessor, AsyncRunner, Call};
-use cosmic_api::sys::ParticleRecord;
 
 #[derive(Clone)]
 pub struct RouterApi {

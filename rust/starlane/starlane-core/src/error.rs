@@ -6,33 +6,34 @@ use std::num::ParseIntError;
 use std::string::FromUtf8Error;
 use std::sync::PoisonError;
 
-use base64::DecodeError;
-use futures::channel::oneshot::Canceled;
-use nom::error::VerboseError;
-use semver::SemVerError;
-use tokio::sync::broadcast;
-use tokio::sync::broadcast::error::RecvError;
-use tokio::sync::mpsc::error::{SendError, TrySendError};
-use tokio::time::error::Elapsed;
-use zip::result::ZipError;
-
-use crate::fail::Fail;
 use actix_web::ResponseError;
 use alcoholic_jwt::ValidationError;
 use ascii::FromAsciiError;
-use cosmic_api::error::StatusErr;
-use cosmic_nom::Span;
+use base64::DecodeError;
+use futures::channel::oneshot::Canceled;
 use handlebars::RenderError;
 use http::header::{InvalidHeaderName, InvalidHeaderValue, ToStrError};
 use http::method::InvalidMethod;
 use http::status::InvalidStatusCode;
 use http::uri::InvalidUri;
 use keycloak::KeycloakError;
-use mesh_portal::error::MsgErr;
+use nom::error::VerboseError;
 use nom_supreme::error::ErrorTree;
+use semver::SemVerError;
 use sqlx::error::DatabaseError;
+use tokio::sync::broadcast;
+use tokio::sync::broadcast::error::RecvError;
+use tokio::sync::mpsc::error::{SendError, TrySendError};
 use tokio::task::JoinError;
+use tokio::time::error::Elapsed;
 use wasmer::{CompileError, ExportError, RuntimeError};
+use zip::result::ZipError;
+
+use cosmic_nom::Span;
+use cosmic_universe::err::StatusErr;
+use mesh_portal::error::MsgErr;
+
+use crate::fail::Fail;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Error {

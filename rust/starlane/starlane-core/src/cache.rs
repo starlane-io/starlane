@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::hash::Hasher;
@@ -7,19 +6,23 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
 
-use cosmic_api::id::id::PointSegKind;
-use cosmic_api::sys::ParticleRecord;
+use anyhow::anyhow;
 use futures::FutureExt;
+use tokio::io::AsyncReadExt;
+use tokio::runtime::Handle;
+use tokio::sync::{broadcast, mpsc, oneshot};
+use wasmer::{Cranelift, Store, Universal};
+
+use cosmic_universe::hyper::ParticleRecord;
+use cosmic_universe::id2::BaseSubKind;
+use cosmic_universe::kind::ArtifactSubKind;
+use cosmic_universe::loc::PointSegKind;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::config::bind::BindConfig;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::path::Path;
 use mesh_portal::version::latest::payload::Substance;
-use tokio::io::AsyncReadExt;
-use tokio::runtime::Handle;
-use tokio::sync::{broadcast, mpsc, oneshot};
-use wasmer::{Cranelift, Store, Universal};
 
 use crate::artifact::ArtifactRef;
 use crate::config::bind::BindConfigParser;
@@ -33,7 +36,6 @@ use crate::particle::config::Parser;
 use crate::starlane::api::StarlaneApi;
 use crate::starlane::StarlaneMachine;
 use crate::util::{AsyncHashMap, AsyncProcessor, AsyncRunner, Call};
-use cosmic_api::id::{ArtifactSubKind, BaseSubKind};
 
 pub type ZipFile = Point;
 
@@ -1059,8 +1061,8 @@ impl AuditLogCollectorProc {
 }
 
 /*
-#[cfg(test)]
-mod test {
+#[cfg(mem)]
+mod mem {
     use std::fs;
     use std::str::FromStr;
 
@@ -1088,7 +1090,7 @@ mod test {
         std::env::set_var("STARLANE_CACHE", cache_dir);
     }
 
-    #[test]
+    #[mem]
     pub fn some_test() -> Result<(), Error> {
         let mut builder = tokio::runtime::Builder::new_multi_thread();
         let rt = builder.enable_time().enable_io().enable_all().build()?;

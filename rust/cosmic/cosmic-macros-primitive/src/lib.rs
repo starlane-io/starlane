@@ -6,11 +6,46 @@
 extern crate quote;
 
 use proc_macro::TokenStream;
+
 use quote::quote;
 use quote::ToTokens;
 use syn::__private::TokenStream2;
 use syn::{parse_macro_input, Data, DeriveInput, PathArguments, Type};
 
+/// Takes a given enum (which in turn accepts child enums) and auto generates a `Parent::From` so the child
+/// can turn into the parent and a `TryInto<Child> for Parent` so the Parent can attempt to turn into the child.
+/// ```
+/// #[derive(Autobox)]
+/// pub enum Parent {
+///   Child(Child)
+/// }
+///
+/// pub enum Child {
+///   Variant1,
+///   Variant2
+/// }
+/// ```
+/// Will generate something like:
+/// ```
+///
+/// impl From<Child> for Parent {
+///   fn from( child: Child ) -> Self {
+///      Self::Child(child)
+///   }
+/// }
+///
+/// impl TryInto<Child> for Parent {
+///   type Err=UniErr;
+///
+///   fn try_into(self) -> Result<Child,Self::Err> {
+///     if let Self::Child(child) = self {
+///        Ok(self)
+///     } else {
+///        Err("err")
+///     }
+///   }
+/// }
+/// ```
 #[proc_macro_derive(Autobox)]
 pub fn autobox(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
@@ -44,7 +79,7 @@ pub fn autobox(item: TokenStream) -> TokenStream {
 
                             xforms.push(quote! {
                                 impl TryInto<#ty> for #ident {
-                                    type Error=MsgErr;
+                                    type Error=UniErr;
 
                                     fn try_into(self) -> Result<#ty,Self::Error> {
                                         match self {
@@ -66,7 +101,7 @@ pub fn autobox(item: TokenStream) -> TokenStream {
                             let ty_str = ty.to_token_stream().to_string();
                             xforms.push(quote! {
                                 impl TryInto<#ty> for #ident {
-                                    type Error=MsgErr;
+                                    type Error=UniErr;
 
                                     fn try_into(self) -> Result<#ty,Self::Error> {
                                         match self {
@@ -133,14 +168,14 @@ pub fn to_substance(item: TokenStream) -> TokenStream {
 
                             xforms.push(quote! {
                             impl ToSubstance<#ty> for #ident {
-                                fn to_substance(self) -> Result<#ty,MsgErr> {
+                                fn to_substance(self) -> Result<#ty,UniErr> {
                                     match self {
                                     Self::#variant_ident(val) => Ok(*val),
                                     _ => Err(format!("expected {}",#ty_str).into())
                                     }
                                 }
 
-                                fn to_substance_ref(&self) -> Result<&#ty,MsgErr> {
+                                fn to_substance_ref(&self) -> Result<&#ty,UniErr> {
                                     match self {
                                     Self::#variant_ident(val) => Ok(val.as_ref()),
                                     _ => Err(format!("expected {}",#ty_str).into())
@@ -154,13 +189,13 @@ pub fn to_substance(item: TokenStream) -> TokenStream {
                             let ty_str = ty.to_token_stream().to_string();
                             xforms.push(quote! {
                             impl ToSubstance<#ty> for #ident {
-                                fn to_substance(self) -> Result<#ty,MsgErr> {
+                                fn to_substance(self) -> Result<#ty,UniErr> {
                                     match self {
                                     Self::#variant_ident(val) => Ok(val),
                                     _ => Err(format!("expected {}",#ty_str).into())
                                     }
                                 }
-                                 fn to_substance_ref(&self) -> Result<&#ty,MsgErr> {
+                                 fn to_substance_ref(&self) -> Result<&#ty,UniErr> {
                                     match self {
                                     Self::#variant_ident(val) => Ok(val),
                                     _ => Err(format!("expected {}",#ty_str).into())
@@ -178,13 +213,13 @@ pub fn to_substance(item: TokenStream) -> TokenStream {
             } else {
                 xforms.push(quote! {
                 impl ToSubstance<()> for #ident {
-                    fn to_substance(self) -> Result<(),MsgErr> {
+                    fn to_substance(self) -> Result<(),UniErr> {
                         match self {
                         Self::#variant_ident => Ok(()),
                         _ => Err(format!("expected Empty").into())
                         }
                     }
-                     fn to_substance_ref(&self) -> Result<&(),MsgErr> {
+                     fn to_substance_ref(&self) -> Result<&(),UniErr> {
                         match self {
                         Self::#variant_ident => Ok(&()),
                         _ => Err(format!("expected Empty").into())

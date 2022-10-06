@@ -1,8 +1,11 @@
+use std::collections::HashSet;
+
+use tokio::sync::RwLock;
+
+use cosmic_universe::loc::StarKey;
+
 use crate::error::Error;
 use crate::file_access::FileAccess;
-use cosmic_api::id::StarKey;
-use std::collections::HashSet;
-use tokio::sync::RwLock;
 
 pub struct MachineFileSystem {
     local_stars: RwLock<HashSet<StarKey>>,

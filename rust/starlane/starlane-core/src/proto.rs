@@ -4,16 +4,17 @@ use std::convert::TryInto;
 use std::sync::atomic::{AtomicI32, AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
 
-use cosmic_api::id::StarKey;
-use cosmic_api::log::LogSource;
 use futures::future::select_all;
 use futures::prelude::*;
 use futures::FutureExt;
 use log::Level;
-use mesh_portal::version::latest::log::RootLogger;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{broadcast, mpsc};
 use tokio::time::{Duration, Instant};
+
+use cosmic_universe::loc::StarKey;
+use cosmic_universe::log::LogSource;
+use mesh_portal::version::latest::log::RootLogger;
 
 use crate::cache::ProtoArtifactCachesFactory;
 use crate::constellation::ConstellationStatus;

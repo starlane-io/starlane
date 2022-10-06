@@ -1,11 +1,12 @@
-use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::path::Path;
-use mesh_portal::version::latest::payload::Substance;
 use std::convert::TryInto;
 use std::str::FromStr;
 use std::sync::Arc;
 
 use tokio::sync::{mpsc, oneshot};
+
+use mesh_portal::version::latest::id::Point;
+use mesh_portal::version::latest::path::Path;
+use mesh_portal::version::latest::payload::Substance;
 
 use crate::error::Error;
 use crate::fail::Fail;

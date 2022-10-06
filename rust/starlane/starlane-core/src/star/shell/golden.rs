@@ -1,10 +1,11 @@
 use std::collections::hash_map::RandomState;
 use std::collections::{HashMap, HashSet};
 
-use cosmic_api::id::StarKey;
 use lru::LruCache;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
+
+use cosmic_universe::loc::StarKey;
 
 use crate::error::Error;
 use crate::frame::{Frame, StarMessage, StarPattern};

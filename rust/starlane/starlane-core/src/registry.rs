@@ -1,22 +1,29 @@
-use crate::error::Error;
-use crate::frame::{ResourceHostAction, StarMessagePayload};
-use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
+use std::cmp::Ordering;
+use std::collections::{HashMap, HashSet};
+use std::convert::TryInto;
+use std::num::ParseIntError;
+use std::ops::{Deref, Index};
+use std::str::FromStr;
+use std::sync::Arc;
 
-use crate::databases::lookup_registry_db;
-use crate::particle::properties_config;
-use cosmic_api::command::request::delete::Delete;
-use cosmic_api::command::request::select::{SelectKind, SubSelect};
-use cosmic_api::id::id::{BaseKind, Kind, Tks};
-use cosmic_api::id::{ArtifactSubKind, BaseSubKind, FileSubKind, UserBaseSubKind};
-use cosmic_api::parse::{CamelCase, Domain, SkewerCase};
-use cosmic_api::particle::particle::Details;
-use cosmic_api::security::{
+use futures::{FutureExt, StreamExt};
+use mysql::prelude::TextQuery;
+use sqlx::postgres::{PgArguments, PgPoolOptions, PgRow};
+use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
+use tokio::sync::mpsc;
+
+use cosmic_universe::command::direct::delete::Delete;
+use cosmic_universe::command::direct::select::{SelectKind, SubSelect};
+use cosmic_universe::hyper::{Location, ParticleRecord};
+use cosmic_universe::id2::BaseSubKind;
+use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Tks, UserBaseSubKind};
+use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
+use cosmic_universe::particle::Details;
+use cosmic_universe::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask,
     PermissionsMaskKind, Privilege, Privileges,
 };
-use cosmic_api::selector::selector::SubKindSelector;
-use cosmic_api::sys::{Location, ParticleRecord};
-use futures::{FutureExt, StreamExt};
+use cosmic_universe::selector::SubKindSelector;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties, SetRegistry};
 use mesh_portal::version::latest::entity::request::create::{
@@ -39,17 +46,12 @@ use mesh_portal::version::latest::selector::{
     PointSegSelector, PointSelector,
 };
 use mesh_portal::version::latest::util::ValuePattern;
-use mysql::prelude::TextQuery;
-use sqlx::postgres::{PgArguments, PgPoolOptions, PgRow};
-use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
-use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
-use std::convert::TryInto;
-use std::num::ParseIntError;
-use std::ops::{Deref, Index};
-use std::str::FromStr;
-use std::sync::Arc;
-use tokio::sync::mpsc;
+
+use crate::databases::lookup_registry_db;
+use crate::error::Error;
+use crate::frame::{ResourceHostAction, StarMessagePayload};
+use crate::message::{ProtoStarMessage, ProtoStarMessageTo, Reply, ReplyKind};
+use crate::particle::properties_config;
 
 lazy_static! {
     pub static ref HYPERUSER: Point = Point::from_str("hyperspace:users:hyperuser").expect("point");
@@ -518,7 +520,7 @@ impl Registry {
                 _ => {}
             }
 
-            match &hop.kind_selector.kind {
+            match &hop.kind_selector.base {
                 GenericKindSelector::Any => {}
                 GenericKindSelector::Exact(kind) => {
                     index = index + 1;
@@ -527,7 +529,7 @@ impl Registry {
                 }
             }
 
-            match &hop.kind_selector.kind {
+            match &hop.kind_selector.base {
                 GenericKindSelector::Any => {}
                 GenericKindSelector::Exact(kind) => match &hop.kind_selector.sub {
                     SubKindSelector::Any => {}
@@ -1178,14 +1180,15 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
 
 #[cfg(test)]
 pub mod test {
-    use crate::error::Error;
-    use crate::particle::Kind;
-    use crate::registry::{Registration, Registry};
-    use cosmic_api::command::request::select::SelectKind;
-    use cosmic_api::entity::request::select::SelectKind;
-    use cosmic_api::id::id::{Kind, ToPoint};
-    use cosmic_api::id::UserBaseSubKind;
-    use cosmic_api::security::{
+    use std::convert::TryInto;
+    use std::str::FromStr;
+
+    use cosmic_universe::command::direct::select::SelectKind;
+    use cosmic_universe::entity::request::select::SelectKind;
+    use cosmic_universe::kind::Kind;
+    use cosmic_universe::kind::UserBaseSubKind;
+    use cosmic_universe::loc::ToPoint;
+    use cosmic_universe::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
         Privilege,
     };
@@ -1195,8 +1198,10 @@ pub mod test {
     use mesh_portal::version::latest::particle::Status;
     use mesh_portal::version::latest::payload::Primitive;
     use mesh_portal::version::latest::selector::{PointKindHierarchy, PointSelector};
-    use std::convert::TryInto;
-    use std::str::FromStr;
+
+    use crate::error::Error;
+    use crate::particle::Kind;
+    use crate::registry::{Registration, Registry};
 
     #[tokio::test]
     pub async fn test_nuke() -> Result<(), Error> {
@@ -1447,12 +1452,12 @@ pub mod test {
         assert_eq!(access.has_super(), false);
         assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
 
-        // test masked OR permissions
+        // mem masked OR permissions
         let access = registry.access(&scott, &mechtron).await?;
         assert_eq!(access.has_super(), false);
         assert_eq!(access.permissions().to_string(), "csd-RwX".to_string());
 
-        // now test AND permissions (masking Read)
+        // now mem AND permissions (masking Read)
         let grant = AccessGrant {
             kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("&csd-rwX")?),
             on_point: PointSelector::from_str("localhost:app:**<Mechtron>")?,

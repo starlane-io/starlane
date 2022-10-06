@@ -1,15 +1,18 @@
-use crate::artifact::ArtifactRef;
-use crate::cache::{ArtifactItem, Cacheable};
-use crate::error::Error;
-use cosmic_api::id::id::Kind;
-use cosmic_api::id::ArtifactSubKind;
-use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
-use mesh_portal::version::latest::id::Point;
-use mesh_portal::version::latest::particle::Property;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::str::FromStr;
+
+use serde::{Deserialize, Serialize};
+
+use cosmic_universe::kind::ArtifactSubKind;
+use cosmic_universe::kind::Kind;
+use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
+use mesh_portal::version::latest::id::Point;
+use mesh_portal::version::latest::particle::Property;
+
+use crate::artifact::ArtifactRef;
+use crate::cache::{ArtifactItem, Cacheable};
+use crate::error::Error;
 
 #[derive(Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ParticleConfig {

@@ -1,9 +1,10 @@
-use cosmic_api::id::StarKey;
-use cosmic_api::sys::ParticleRecord;
 use futures::channel::oneshot;
 use lru::LruCache;
 use tokio::sync::mpsc;
 use tokio::time::Duration;
+
+use cosmic_universe::hyper::ParticleRecord;
+use cosmic_universe::loc::StarKey;
 
 use crate::frame::{ResourceRegistryRequest, SimpleReply, StarMessagePayload};
 use crate::message::ProtoStarMessage;

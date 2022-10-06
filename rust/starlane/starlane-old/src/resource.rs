@@ -1,5 +1,5 @@
-use cosmic_api::id::StarKey;
-use serde::{Serialize,Deserialize};
+use cosmic_universe::id::StarKey;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceLocation {
