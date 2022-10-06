@@ -23,7 +23,7 @@ where
 
     async fn nuke<'a>(&'a self) -> Result<(),P::Err>;
 
-    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, P::Err>;
+    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), P::Err>;
 
     async fn assign<'a>(
         &'a self,

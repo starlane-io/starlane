@@ -45,7 +45,7 @@ use cosmic_universe::kind::{
 };
 use cosmic_universe::loc::{Point, PointSeg, StarKey, ToBaseKind, Version};
 use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
-use cosmic_universe::particle::{Details, Properties, Property, Status, Stub};
+use cosmic_universe::particle::{Details, PointKind, Properties, Property, Status, Stub};
 use cosmic_universe::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, IndexedAccessGrant, Permissions,
     PermissionsMask, PermissionsMaskKind, Privilege, Privileges,
@@ -226,7 +226,7 @@ where
         Ok(())
     }
 
-    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, P::Err> {
+    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), P::Err> {
         /*
         async fn check<'a>( registration: &Registration,  trans:&mut Transaction<Postgres>, ) -> Result<(),Erroror> {
             let params = RegistryParams::from_registration(registration)?;
@@ -238,7 +238,9 @@ where
             }
         }
          */
+println!("REGISTER : {}",registration.point.to_string());
         struct Count(u64);
+
 
         impl sqlx::FromRow<'_, PgRow> for Count {
             fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
@@ -264,7 +266,8 @@ where
             // result.... will revisit this and properly do an update when the time comes -- Scott
             if registration.strategy == Strategy::Ensure || registration.strategy == Strategy::Override
             {
-                return Ok(self.record( &registration.point).await?.details );
+println!("\tENSURED: {}",registration.point.to_string());
+                return Ok(());
             } else {
                 return Err(P::Err::dupe());
             }
@@ -290,14 +293,8 @@ where
             }
         }
         trans.commit().await?;
-        Ok(Details {
-            stub: Stub {
-                point: registration.point.clone(),
-                kind: registration.kind.clone(),
-                status: Status::Pending,
-            },
-            properties: Default::default(),
-        })
+        println!("\tRETUrNING: {}",registration.point.to_string());
+        Ok(())
     }
 
     async fn assign<'a>(
@@ -1392,83 +1389,6 @@ where
         }
     }
 
-    pub async fn create(&self, create: &Create) -> Result<Details, P::Err> {
-        let child_kind = self.platform.select_kind(&create.template.kind)?;
-        let stub = match &create.template.point.child_segment_template {
-            PointSegTemplate::Exact(child_segment) => {
-                let point = create.template.point.parent.push(child_segment.clone());
-                match &point {
-                    Ok(_) => {}
-                    Err(err) => {
-                        eprintln!("RC CREATE error: {}", err.to_string());
-                    }
-                }
-                let point = point?;
-
-                let properties = self
-                    .platform
-                    .properties_config(&child_kind)
-                    .fill_create_defaults(&create.properties)?;
-                self.platform
-                    .properties_config(&child_kind)
-                    .check_create(&properties)?;
-
-                let registration = Registration {
-                    point: point.clone(),
-                    kind: child_kind.clone(),
-                    registry: Default::default(),
-                    properties,
-                    owner: Point::root(),
-                    strategy: Strategy::Commit,
-                    status: Status::Unknown,
-                };
-                println!("creating {}", point.to_string());
-                let mut result = self.register(&registration).await;
-
-                // if strategy is ensure then a dupe is GOOD!
-                if create.strategy == Strategy::Ensure {
-                    if let Err(err) = &result {
-                        if err.kind() == ErrKind::Dupe {
-                            result = Ok(self.record(&point).await?.details);
-                        }
-                    }
-                }
-
-                result?
-            }
-            PointSegTemplate::Pattern(pattern) => {
-                if !pattern.contains("%") {
-                    return Err("AddressSegmentTemplate::Pattern must have at least one '%' char for substitution".into());
-                }
-                loop {
-                    let index = self.sequence(&create.template.point.parent).await?;
-                    let child_segment = pattern.replace("%", index.to_string().as_str());
-                    let point = create.template.point.parent.push(child_segment.clone())?;
-                    let registration = Registration {
-                        point: point.clone(),
-                        kind: child_kind.clone(),
-                        registry: Default::default(),
-                        properties: create.properties.clone(),
-                        owner: Point::root(),
-                        strategy: Strategy::Commit,
-                        status: Status::Unknown,
-                    };
-
-                    match self.register(&registration).await {
-                        Ok(stub) => return Ok(stub),
-                        Err(err) => {
-                            if err.kind() == ErrKind::Dupe {
-                                // continue loop
-                            } else {
-                                return Err(err);
-                            }
-                        }
-                    }
-                }
-            }
-        };
-        Ok(stub)
-    }
 
     pub async fn cmd_select<'a>(&'a self, select: &'a mut Select) -> Result<Substance, P::Err> {
         let list = Substance::List(self.select(select).await?);

@@ -169,6 +169,7 @@ where
     }
 
     async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
+println!("\tINIT ControlDriver....");
         self.skel.driver.status_tx.send(DriverStatus::Init).await;
 
         skel.create_driver_particle(

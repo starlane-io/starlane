@@ -55,7 +55,8 @@ impl RegistryApi<MemCosmos> for MemRegApi {
         todo!()
     }
 
-    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, CosmicErr> {
+    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), CosmicErr> {
+println!("REG: {}",registration.point.to_string());
         self.set_properties(&registration.point, &registration.properties).await?;
 
         let details = Details {
@@ -73,7 +74,7 @@ impl RegistryApi<MemCosmos> for MemRegApi {
         self.ctx
             .particles
             .insert(registration.point.clone(), record);
-        Ok(details)
+        Ok(())
     }
 
     async fn assign<'a>(

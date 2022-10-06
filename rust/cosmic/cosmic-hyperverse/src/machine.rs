@@ -387,12 +387,15 @@ where
             Timeouts::default(),
             logger.clone(),
         );
+        /*
         let client =
             HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger.clone())
                 .unwrap();
 
-        let fetcher = Arc::new(ClientArtifactFetcher::new(client, skel.registry.clone()));
-        skel.artifacts.set_fetcher(fetcher).await;
+         */
+
+//        let fetcher = Arc::new(ClientArtifactFetcher::new(client, skel.registry.clone()));
+//        skel.artifacts.set_fetcher(fetcher).await;
 
         machine.start().await;
         Ok(machine_api)

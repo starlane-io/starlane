@@ -191,6 +191,22 @@ where
             logger.clone(),
         );
         let state = ParticleStates::new();
+        state.create_shell(point.clone());
+
+        let registration = Registration {
+            point: point.clone(),
+            kind: Kind::Star(template.kind.clone()),
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: point.clone(),
+            strategy: Strategy::Ensure,
+            status: Status::Unknown
+        };
+
+        machine.registry.register(&registration).await.unwrap();
+        machine.registry.assign(&point, ParticleLocation::new(point.clone(),None)).await.unwrap();
+
+
         let api = HyperStarApi::new(
             template.kind.clone(),
             star_tx.call_tx.clone(),
@@ -299,7 +315,7 @@ where
 
         let logger = self.logger.push_mark("create").unwrap();
         let global = GlobalExecutionChamber::new(self.clone());
-        let details = self.logger.result_ctx(
+        let point_kind = self.logger.result_ctx(
             format!(
                 "StarSkel::create_in_star(register({}))",
                 create.template.kind.to_string()
@@ -307,6 +323,16 @@ where
             .as_str(),
             global.create(&create, &Agent::HyperUser).await,
         )?;
+
+        let details = Details {
+            stub: Stub{
+                point: point_kind.point,
+                kind: point_kind.kind,
+                status: Status::Unknown
+            },
+            properties: Default::default(),
+        };
+
         let assign_body = Assign::new(AssignmentKind::Create, details.clone(), StateSrc::None);
         let mut assign = DirectedProto::sys(
             self.point.clone().to_surface().with_layer(Layer::Core),
@@ -660,6 +686,7 @@ where
             star_tx.drivers_status_rx.clone(),
         );
 
+
         let star_rx = star_tx.call_rx.take().unwrap();
         let star_tx = star_tx.call_tx;
 
@@ -842,6 +869,7 @@ where
                 }
             });
         }
+
 
         let kind = skel.kind.clone();
         {
