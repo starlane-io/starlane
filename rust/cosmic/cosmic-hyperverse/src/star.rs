@@ -313,7 +313,7 @@ where
             return Err(P::Err::new(format!("cannot create_in_star in star {} for parent point {} since it is not a point within this star", self.point.to_string(), create.template.point.parent.to_string())));
         }
 
-        let logger = self.logger.push_mark("create").unwrap();
+        let logger = self.logger.push_mark("create-in-star").unwrap();
         let global = GlobalExecutionChamber::new(self.clone());
         let point_kind = self.logger.result_ctx(
             format!(
@@ -339,7 +339,7 @@ where
             HypMethod::Assign,
         );
 
-        assign.body(assign_body.into());
+        assign.body(assign_body.clone().into());
         let router = Arc::new(LayerInjectionRouter::new(
             self.clone(),
             self.point.clone().to_surface().with_layer(Layer::Shell),
@@ -355,7 +355,14 @@ where
         let location = ParticleLocation::new(self.point.clone(), None);
         self.registry.assign(&details.stub.point, location).await?;
         let logger = logger.push_mark("result").unwrap();
-        logger.result(assign_result.ok_or())?;
+        match logger.result(assign_result.ok_or()) {
+            Ok(_) => {
+            }
+            Err(err) => {
+                logger.error(format!("could not assign {}: {}", assign_body.clone().details.stub.point.to_string(), err.to_string() ) );
+                Err(err)?;
+            }
+        };
         Ok(details)
     }
 
@@ -1206,6 +1213,12 @@ where
     }
 
     async fn start_wrangling(&self) {
+if true {
+println!("---> Wrangling supressed!");
+    return;
+
+}
+
         let skel = self.skel.clone();
         tokio::spawn(async move {
             let mut retries = 0;
@@ -1962,6 +1975,7 @@ where
         point: &Point,
         state: StateSrc,
     ) -> Result<ParticleLocation, P::Err> {
+println!("\tPROVISIONING: {}",point.to_string());
         // check if parent is provisioned
         let parent = point
             .parent()

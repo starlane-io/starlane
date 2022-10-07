@@ -297,35 +297,55 @@ println!("\tENSURED: {}",registration.point.to_string());
         Ok(())
     }
 
+
+
     async fn assign<'a>(
         &'a self,
         point: &'a Point,
         location: ParticleLocation,
     ) -> Result<(), P::Err> {
-        let parent = point
-            .parent()
-            .ok_or("expecting parent since we have already established the segments are >= 2")?;
-        let point_segment = point
-            .last_segment()
-            .ok_or("expecting a last_segment since we know segments are >= 2")?;
 
-        let statement =
-            "UPDATE particles SET star=$1, host=$2 WHERE parent=$3 AND point_segment=$4";
+        async fn invoke_assign<'a,C>(
+        reg: &'a PostgresRegistry<C>,
+        point: &'a Point,
+        location: ParticleLocation,
+        ) -> Result<(), C::Err> where C: PostgresPlatform + 'static, <C as Cosmos>::Err: PostErr {
+            let parent = point
+                .parent()
+                .ok_or(format!("expecting parent ({})", point.to_string()))?;
+            let point_segment = point
+                .last_segment()
+                .ok_or("expecting a last_segment")?;
 
-        let mut conn = self.ctx.acquire().await?;
-        let mut trans = conn.begin().await?;
+            let statement =
+                "UPDATE particles SET star=$1, host=$2 WHERE parent=$3 AND point_segment=$4";
 
-        trans
-            .execute(
-                sqlx::query(statement)
-                    .bind(location.star.to_string())
-                    .bind(location.host.map(|p|p.to_string()))
-                    .bind(parent.to_string()).bind(point_segment.to_string())
-            )
-            .await?;
+            let mut conn = reg.ctx.acquire().await?;
+            let mut trans = conn.begin().await?;
 
-        trans.commit().await?;
-        Ok(())
+            trans
+                .execute(
+                    sqlx::query(statement)
+                        .bind(location.star.to_string())
+                        .bind(location.host.map(|p|p.to_string()))
+                        .bind(parent.to_string()).bind(point_segment.to_string())
+                )
+                .await?;
+
+            trans.commit().await?;
+            Ok(())
+        }
+
+        match invoke_assign(self, point, location ).await {
+            Ok(ok) => {
+                Ok(())
+            }
+            Err(err) => {
+println!("ASSIGN Err: {}", err.to_string());
+                Err(err)
+            }
+        }
+
     }
 
     async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), P::Err> {
