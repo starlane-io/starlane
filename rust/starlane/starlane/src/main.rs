@@ -67,7 +67,13 @@ fn main() -> Result<(), StarErr> {
             .await
             .unwrap();
 println!("> MACHINE READY!");
-        let mut term_rx = machine_api.wait().await.unwrap();
+        // this is a dirty hack which is good enough for a 0.3.0 release...
+        loop {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+        }
+        let cl = machine_api.clone();
+        machine_api.await_termination().await.unwrap();
+        cl.terminate();
     });
     Ok(())
 }

@@ -212,7 +212,6 @@ where
         };
 
         if create.state.has_substance() || child_kind.is_auto_provision() {
-println!("\t~GLOBAL PROVISION: {}", point.to_string() );
             let provisioner = SmartLocator::new(self.skel.clone());
             //tokio::spawn(async move {
             provisioner

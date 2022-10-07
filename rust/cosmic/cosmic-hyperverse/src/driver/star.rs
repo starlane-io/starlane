@@ -314,7 +314,6 @@ where
                 let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
                 self.create(&assign).await.map_err(|e| e.to_uni_err())?;
                 let location = ParticleLocation::new(self.skel.point.clone(), None);
-println!("CENTRAL ASSIGNING ROOT!!!");
 /*                self.skel
                     .registry
                     .assign(&Point::root(), location)
@@ -353,7 +352,6 @@ println!("CENTRAL ASSIGNING ROOT!!!");
                     .await
                     .map_err(|e| e.to_uni_err())?;
 
-println!("--->   DONE INIT CENTRAL!!!");
                 Ok(Status::Ready)
             }
             _ => Ok(Status::Ready),

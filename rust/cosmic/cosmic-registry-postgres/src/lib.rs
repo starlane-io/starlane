@@ -97,10 +97,8 @@ where
          */
         let registry = Self { ctx, platform, logger: logger.clone() };
 
-        logger.info("staring...");
         match registry.setup().await {
             Ok(_) => {
-                logger.info("registry setup complete.");
             }
             Err(err) => {
                 let message = err.to_string();
@@ -113,7 +111,6 @@ where
     }
 
     async fn setup(&self) -> Result<(), P::Err> {
-println!("database setup!") ;
         //        let database= format!("CREATE DATABASE IF NOT EXISTS {}", REGISTRY_DATABASE );
 
         let particles = r#"CREATE TABLE IF NOT EXISTS particles (
@@ -238,7 +235,6 @@ where
             }
         }
          */
-println!("REGISTER : {}",registration.point.to_string());
         struct Count(u64);
 
 
@@ -266,7 +262,6 @@ println!("REGISTER : {}",registration.point.to_string());
             trans.rollback().await?;
             if registration.strategy == Strategy::Ensure || registration.strategy == Strategy::Override
             {
-println!("\tENSURED: {}",registration.point.to_string());
                 return Ok(());
             } else {
                 return Err(P::Err::dupe());
@@ -305,11 +300,6 @@ println!("\tENSURED: {}",registration.point.to_string());
         location: ParticleLocation,
     ) -> Result<(), P::Err> {
 
-        async fn invoke_assign<'a,C>(
-        reg: &'a PostgresRegistry<C>,
-        point: &'a Point,
-        location: ParticleLocation,
-        ) -> Result<(), C::Err> where C: PostgresPlatform + 'static, <C as Cosmos>::Err: PostErr {
             let parent = point
                 .parent()
                 .ok_or(format!("expecting parent ({})", point.to_string()))?;
@@ -320,7 +310,7 @@ println!("\tENSURED: {}",registration.point.to_string());
             let statement =
                 "UPDATE particles SET star=$1, host=$2 WHERE parent=$3 AND point_segment=$4";
 
-            let mut conn = reg.ctx.acquire().await?;
+            let mut conn = self.ctx.acquire().await?;
             let mut trans = conn.begin().await?;
 
             trans
@@ -334,18 +324,6 @@ println!("\tENSURED: {}",registration.point.to_string());
 
             trans.commit().await?;
             Ok(())
-        }
-
-        match invoke_assign(self, point, location ).await {
-            Ok(ok) => {
-                Ok(())
-            }
-            Err(err) => {
-println!("ASSIGN Err: {}", err.to_string());
-                Err(err)
-            }
-        }
-
     }
 
     async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), P::Err> {

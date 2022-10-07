@@ -205,7 +205,6 @@ where
 
         machine.registry.register(&registration).await.unwrap();
         machine.registry.assign(&point, ParticleLocation::new(point.clone(),None)).await.unwrap();
-println!("^^^ ASSIGNED {} to {} ^^^",  point.to_string(), point.to_string());
 
 
         let api = HyperStarApi::new(
@@ -362,15 +361,7 @@ println!("^^^ ASSIGNED {} to {} ^^^",  point.to_string(), point.to_string());
         let location = ParticleLocation::new(self.point.clone(), None);
         self.registry.assign(&details.stub.point, location).await?;
         let logger = logger.push_mark("result").unwrap();
-        match logger.result(assign_result.ok_or()) {
-            Ok(_) => {
-                logger.info(format!("... SUCCESS {}", assign_body.clone().details.stub.point.to_string()) );
-            }
-            Err(err) => {
-                logger.error(format!("could not assign {}: {}", assign_body.clone().details.stub.point.to_string(), err.to_string() ) );
-                Err(err)?;
-            }
-        };
+        logger.result(assign_result.ok_or())?;
         Ok(details)
     }
 
@@ -1233,14 +1224,8 @@ if wave.track() {
     }
 
     async fn start_wrangling(&self) {
-/*if true {
-println!("---> Wrangling supressed!");
-    return;
-}*/
 
-        println!("---> Wrangling waiting...");
         self.skel.machine.api.wait_ready().await;
-        println!("---> Wrangling started: {}", self.skel.kind.to_string() );
 
 
 

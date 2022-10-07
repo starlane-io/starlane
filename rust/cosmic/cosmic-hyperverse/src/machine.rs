@@ -99,9 +99,9 @@ where
         rx.await;
     }
 
-    pub async fn wait(&self) -> Result<(), P::Err> {
+    pub async fn await_termination(&self) -> Result<(), P::Err> {
         let (tx, mut rx) = oneshot::channel();
-        self.tx.send(MachineCall::Wait(tx)).await;
+        self.tx.send(MachineCall::AwaitTermination(tx)).await;
         let mut rx = match rx.await {
             Ok(rx) => rx,
             Err(err) => {
@@ -403,7 +403,6 @@ where
 
     async fn init0(&self) {
         let logger = self.logger.span();
-        logger.info("Machine::init_drivers()");
         let mut inits = vec![];
         for star in self.stars.values() {
             inits.push(star.init().boxed());
@@ -427,7 +426,7 @@ where
                     self.termination_broadcast_tx.send(Ok(()));
                     return Ok(());
                 }
-                MachineCall::Wait(tx) => {
+                MachineCall::AwaitTermination(tx) => {
                     tx.send(self.termination_broadcast_tx.subscribe());
                 }
                 MachineCall::WaitForReady(rtn) => {
@@ -503,7 +502,7 @@ where
 {
     Init,
     Terminate,
-    Wait(oneshot::Sender<broadcast::Receiver<Result<(), P::Err>>>),
+    AwaitTermination(oneshot::Sender<broadcast::Receiver<Result<(), P::Err>>>),
     WaitForReady(oneshot::Sender<()>),
     AddGate {
         kind: InterchangeKind,
@@ -530,7 +529,7 @@ where
     GetRegistry(oneshot::Sender<Registry<P>>),
 }
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq, strum_macros::Display)]
 pub enum MachineStatus {
     Pending,
     Init,
