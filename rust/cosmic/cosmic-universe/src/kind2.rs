@@ -6,6 +6,8 @@ use http::uri::Parts;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use strum::ParseError::VariantNotFound;
+use crate::loc::Version;
+use crate::selector::specific::VersionReq;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct SubTypeDef<Part, SubType> {
@@ -372,6 +374,7 @@ pub mod parse {
     use nom::combinator::{fail, opt, success, value};
     use nom::sequence::{delimited, pair, preceded, tuple};
     use std::str::FromStr;
+    use crate::kind2::{CamelCaseSubTypes, CamelCaseSubTypesSelector, OptPattern, ParentChildDef, ProtoVariant, SpecificDef, SpecificFullSelector, SpecificSubTypes, SpecificSubTypesSelector, SubTypeDef, VariantDef};
 
     pub fn pattern<I, FnX, X>(mut f: FnX) -> impl FnMut(I) -> Res<I, Pattern<X>> + Copy
     where
@@ -595,6 +598,8 @@ pub mod parse {
         use nom::bytes::complete::tag;
         use nom::combinator::{all_consuming, opt};
         use nom::sequence::{pair, preceded};
+        use crate::kind2::OptPattern;
+        use crate::kind2::parse::{camel_case_sub_types, camel_case_sub_types_selector, opt_pattern, preceded_opt_pattern, proto_variant, specific, specific_full_selector, specific_selector, specific_sub_types};
 
         #[test]
         pub fn test_camel_case_subtypes() {
@@ -713,6 +718,10 @@ pub mod test {
     use crate::parse::{CamelCase, Domain, SkewerCase};
     use crate::selector::selector::VersionReq;
     use core::str::FromStr;
+    use crate::kind2::{DomainSelector, OptPattern, SkewerSelector, SpecificSubTypes, SubTypeDef, Variant, VariantFull, VariantFullSelector, VersionSelector};
+    use crate::loc::Version;
+    use crate::selector::specific::VersionReq;
+    use crate::util::ValueMatcher;
 
     fn create_specific() -> Specific {
         Specific::new(
