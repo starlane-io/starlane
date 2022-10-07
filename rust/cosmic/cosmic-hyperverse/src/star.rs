@@ -205,6 +205,7 @@ where
 
         machine.registry.register(&registration).await.unwrap();
         machine.registry.assign(&point, ParticleLocation::new(point.clone(),None)).await.unwrap();
+println!("^^^ ASSIGNED {} to {} ^^^",  point.to_string(), point.to_string());
 
 
         let api = HyperStarApi::new(
@@ -347,6 +348,12 @@ where
         let mut transmitter = ProtoTransmitterBuilder::new(router, self.exchanger.clone());
         transmitter.from = SetStrategy::Override(self.point.to_surface().with_layer(Layer::Core));
         transmitter.agent = SetStrategy::Override(Agent::HyperUser);
+        transmitter.handling = SetStrategy::Override(Handling {
+            kind: HandlingKind::Durable,
+            priority: Default::default(),
+            retries: Default::default(),
+            wait: WaitTime::High
+        } );
         let transmitter = transmitter.build();
         let assign_result: Wave<Pong> = logger.result_ctx(
             "StarSkel::create(assign_result)",
@@ -357,6 +364,7 @@ where
         let logger = logger.push_mark("result").unwrap();
         match logger.result(assign_result.ok_or()) {
             Ok(_) => {
+                logger.info(format!("... SUCCESS {}", assign_body.clone().details.stub.point.to_string()) );
             }
             Err(err) => {
                 logger.error(format!("could not assign {}: {}", assign_body.clone().details.stub.point.to_string(), err.to_string() ) );
@@ -800,6 +808,8 @@ where
                                     .unwrap();
                                 star_driver.init_item(skel.point.to_point()).await;
                                 api.start_wrangling().await;
+// seeing if wrangling can wait on MachineApi...
+status_tx.send(Status::Ready).await;
                             }
                             DriverStatus::Retrying(_) => {
                                 status_tx.send(Status::Panic).await;
@@ -1136,9 +1146,19 @@ where
                         }
                     }
                     _ => {
+if wave.track() {
+    println!("sharding {} to {}", wave.kind().to_string(), wave.to().to_string());
+}
                         let to = wave.to().unwrap_single();
                         let location = locator.locate(&to.point).await?;
+if wave.track() {
+    println!("\twith LOCATION {} in {}", location.star.to_string(), skel.point.to_string() );
+}
+
                         if location.star == skel.point {
+if wave.track() {
+    println!("\tSAME POINT -> {} to {}", wave.kind().to_string(), wave.to().to_string());
+}
                             let mut inject = TraversalInjection::new(
                                 skel.point.to_surface().with_layer(Layer::Gravity),
                                 wave,
@@ -1213,11 +1233,16 @@ where
     }
 
     async fn start_wrangling(&self) {
-if true {
+/*if true {
 println!("---> Wrangling supressed!");
     return;
+}*/
 
-}
+        println!("---> Wrangling waiting...");
+        self.skel.machine.api.wait_ready().await;
+        println!("---> Wrangling started: {}", self.skel.kind.to_string() );
+
+
 
         let skel = self.skel.clone();
         tokio::spawn(async move {
@@ -1428,7 +1453,7 @@ where
                 }
             } else if to.point == wave.from().point {
                 if wave.track() {
-                    println!("\twave is to and from the same point...")
+                    println!("\twave is to and from the same point... {} <{}>", wave.from().to_string(), wave.kind().to_string() )
                 }
                 // it's the SAME point, so the to layer becomes our dest
                 dest.replace(to.layer.clone());

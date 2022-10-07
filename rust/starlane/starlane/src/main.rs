@@ -66,7 +66,8 @@ fn main() -> Result<(), StarErr> {
         tokio::time::timeout(Duration::from_secs(30), machine_api.wait_ready())
             .await
             .unwrap();
-        machine_api.wait().await.unwrap_or_default();
+println!("> MACHINE READY!");
+        let mut term_rx = machine_api.wait().await.unwrap();
     });
     Ok(())
 }

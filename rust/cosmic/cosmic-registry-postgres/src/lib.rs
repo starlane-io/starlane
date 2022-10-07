@@ -254,16 +254,16 @@ println!("REGISTER : {}",registration.point.to_string());
         let params:RegistryParams<P> = RegistryParams::from_registration(registration)?;
 
         let count = sqlx::query_as::<Postgres, Count>(
-            "SELECT count(*) as count from particles WHERE parent=$1 AND point_segment=$2",
+            "SELECT count(*) as count from particles WHERE point=$1",
         )
-        .bind(params.parent.to_string())
-        .bind(params.point_segment.to_string())
+        .bind(params.point.clone() )
         .fetch_one(&mut trans)
         .await?;
 
         if count.0 > 0  {
             // returning ok on Override for now which is the expected behavior but not the desired
             // result.... will revisit this and properly do an update when the time comes -- Scott
+            trans.rollback().await?;
             if registration.strategy == Strategy::Ensure || registration.strategy == Strategy::Override
             {
 println!("\tENSURED: {}",registration.point.to_string());

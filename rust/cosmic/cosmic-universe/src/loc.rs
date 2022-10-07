@@ -1834,7 +1834,8 @@ where
         let mut post_fileroot = false;
 
         if self.segments.is_empty() {
-            "ROOT".to_string()
+            rtn.push_str( "ROOT");
+            rtn.to_string()
         } else {
             for (i, segment) in self.segments.iter().enumerate() {
                 if segment.is_filesystem_root() {
@@ -1883,6 +1884,8 @@ impl Point {
         self.segments.is_empty() && self.route.is_local()
     }
 }
+
+
 
 impl PointVar {
     pub fn is_dir(&self) -> bool {
@@ -2029,4 +2032,18 @@ impl FromStr for StarKey {
 #[async_trait]
 pub trait PointFactory: Send + Sync {
     async fn create(&self) -> Result<Point, UniErr>;
+}
+
+#[cfg(test)]
+pub mod test {
+    use core::str::FromStr;
+    use crate::Point;
+
+    #[test]
+    pub fn test_root_routes() {
+        let point = Point::from_str("GLOBAL::star").unwrap();
+        let parent = point.parent().unwrap();
+        assert!(!parent.is_local_root());
+        assert_eq!( parent.to_string(), "GLOBAL::ROOT".to_string() )
+    }
 }
