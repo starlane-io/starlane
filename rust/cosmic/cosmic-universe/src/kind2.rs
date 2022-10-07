@@ -5,7 +5,6 @@ use crate::MsgErr;
 use http::uri::Parts;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use strum::ParseError::VariantNotFound;
 use crate::loc::Version;
 use crate::selector::specific::VersionReq;
 
@@ -707,20 +706,22 @@ pub mod parse {
     }
 }
 
+
+
 #[cfg(test)]
 pub mod test {
     use crate::id::id::Version;
     use crate::kind::{
         DomainSelector, IsMatch, Kind, OptPattern, ParentChildDef, Pattern, SkewerSelector,
-        Specific, SpecificSelector, SpecificSubTypes, SubTypeDef, Variant, VariantFull,
+        Specific, SpecificSubTypes, SubTypeDef, Variant, VariantFull,
         VariantFullSelector, VersionSelector,
     };
     use crate::parse::{CamelCase, Domain, SkewerCase};
     use crate::selector::selector::VersionReq;
     use core::str::FromStr;
-    use crate::kind2::{DomainSelector, OptPattern, SkewerSelector, SpecificSubTypes, SubTypeDef, Variant, VariantFull, VariantFullSelector, VersionSelector};
+    use crate::kind2::{SpecificSelector, DomainSelector, OptPattern, SkewerSelector, SpecificSubTypes, SubTypeDef, Variant, VariantFull, VariantFullSelector, VersionSelector};
     use crate::loc::Version;
-    use crate::selector::specific::VersionReq;
+    use crate::selector::specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector, VersionReq};
     use crate::util::ValueMatcher;
 
     fn create_specific() -> Specific {
@@ -790,7 +791,7 @@ pub mod test {
         assert!(selector.is_match(&specific));
 
         let selector = SpecificSelector {
-            provider: DomainSelector::None,
+            provider: DomainSelector::Any,
             vendor: DomainSelector::Matches(Domain::from_str("my-domain.com").unwrap()),
             product: SkewerSelector::Any,
             variant: SkewerSelector::Matches(SkewerCase::from_str("variant").unwrap()),
