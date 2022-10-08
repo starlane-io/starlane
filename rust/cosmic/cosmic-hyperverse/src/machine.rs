@@ -294,7 +294,7 @@ where
 
         let mut gate_selector = Arc::new(HyperGateSelector::new(gates));
         let gate: Arc<dyn HyperGate> = gate_selector.clone();
-        skel.hyperverse.start_services(&gate);
+        skel.hyperverse.start_services(&gate).await;
 
         let (machine_point, machine_star) = stars
             .iter()

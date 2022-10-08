@@ -10,6 +10,7 @@ cosmic-universe={ path= "../../cosmic/cosmic-universe" }
 cosmic-hyperverse={ path= "../../cosmic/cosmic-hyperverse" }
 cosmic-registry-postgres={ path= "../../cosmic/cosmic-registry-postgres" }
 cosmic-hyperlane={ path="../../cosmic/cosmic-hyperlane"}
+cosmic-hyperlane-tcp={ path="../../cosmic/cosmic-hyperlane-tcp"}
 mechtron-host={ path="../../mechtron/mechtron-host"}
 lazy_static = "1.4.0"
 uuid = { version="1.1.2", features=["v4"] }

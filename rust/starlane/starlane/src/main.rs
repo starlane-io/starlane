@@ -1,5 +1,6 @@
 #![allow(warnings)]
-
+use std::fs;
+use cosmic_hyperlane_tcp::CertGenerator;
 pub mod err;
 pub mod properties;
 
@@ -9,6 +10,8 @@ extern crate async_trait;
 extern crate lazy_static;
 
 use std::collections::HashSet;
+
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -97,6 +100,8 @@ lazy_static! {
         std::env::var("STARLANE_REGISTRY_PASSWORD").unwrap_or("password".to_string());
     pub static ref STARLANE_REGISTRY_DATABASE: String =
         std::env::var("STARLANE_REGISTRY_DATABASE").unwrap_or("postgres".to_string());
+    pub static ref STARLANE_CERTS_DIR: String =
+        std::env::var("STARLANE_CERTS_DIR").unwrap_or("./certs".to_string());
 }
 #[no_mangle]
 pub extern "C" fn cosmic_uuid() -> String {
@@ -218,7 +223,19 @@ impl Cosmos for Starlane {
         ArtifactApi::no_fetcher()
     }
 
-    fn start_services(&self, gate: &Arc<dyn HyperGate>) {}
+    async fn start_services(&self, gate: &Arc<dyn HyperGate>) {
+        fs::create_dir_all(STARLANE_CERTS_DIR.as_str() );
+        let cert = format!("{}/cert.pem", STARLANE_CERTS_DIR.as_str());
+        let key = format!("{}/key.pem", STARLANE_CERTS_DIR.as_str());
+        let cert_path =  Path::new(&cert );
+        let key_path=  Path::new(&key);
+
+        if !cert_path.exists() || !key_path.exists() {
+            CertGenerator::gen(vec!["localhost".to_string()]).unwrap()
+            .write_to_dir(STARLANE_CERTS_DIR.clone())
+            .await.unwrap();
+        };
+    }
 }
 
 impl PostgresPlatform for Starlane {
