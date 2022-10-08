@@ -53,7 +53,6 @@ use crate::command::direct::select::{Select, SelectIntoSubstance, SelectKind, Se
 use crate::command::direct::set::{Set, SetVar};
 use crate::command::direct::CmdKind;
 use crate::command::CommandVar;
-use crate::command::RawCommand;
 use crate::config::bind::{
     BindConfig, Pipeline, PipelineStep, PipelineStepCtx, PipelineStepVar, PipelineStop,
     PipelineStopCtx, PipelineStopVar, RouteSelector, WaveDirection,
@@ -1787,7 +1786,7 @@ pub fn select<I: Span>(input: I) -> Res<I, SelectVar> {
 }
 
 pub fn publish<I: Span>(input: I) -> Res<I, CreateVar> {
-    let (next, (upload, _, point)) = tuple((upload_step, space1, point_template))(input.clone())?;
+    let (next, (upload, _, point)) = tuple((upload_block, space1, point_template))(input.clone())?;
 
     /*
     let parent = match point.parent() {
@@ -6479,9 +6478,20 @@ pub fn upload_payload_block<I: Span>(input: I) -> Res<I, UploadBlock> {
     })
 }
 
-pub fn upload_step<I: Span>(input: I) -> Res<I, UploadBlock> {
+pub fn upload_block<I: Span>(input: I) -> Res<I, UploadBlock> {
     delimited(tag("^["), upload_payload_block, tag("]->"))(input)
 }
+
+pub fn upload_blocks<I: Span>(input: I) -> Res<I, Vec<UploadBlock>> {
+    many0(pair(take_until("^[" ), upload_block))(input).map(|(next,blocks)| {
+        let mut rtn = vec![];
+        for (_,block) in blocks {
+                rtn.push(block);
+        }
+        (next,rtn)
+    })
+}
+
 
 pub fn request_payload_filter_block<I: Span>(input: I) -> Res<I, PayloadBlockVar> {
     tuple((
@@ -8332,7 +8342,7 @@ fn create_command<I: Span>(input: I) -> Res<I, CommandVar> {
         .map(|(next, (_, create))| (next, CommandVar::Create(create)))
 }
 
-fn publish_command<I: Span>(input: I) -> Res<I, CommandVar> {
+pub fn publish_command<I: Span>(input: I) -> Res<I, CommandVar> {
     tuple((tag("publish"), space1, publish))(input)
         .map(|(next, (_, _, create))| (next, CommandVar::Create(create)))
 }
@@ -8411,7 +8421,7 @@ pub mod cmd_test {
     use crate::command::{Command, CommandVar};
     use crate::err::UniErr;
     use crate::parse::error::result;
-    use crate::parse::{command, create_command, publish_command, script, CamelCase};
+    use crate::parse::{command, create_command, publish_command, script, CamelCase, upload_blocks};
     use crate::util::ToResolved;
     use crate::{BaseKind, KindTemplate, SetProperties};
 
@@ -8484,6 +8494,30 @@ pub mod cmd_test {
     pub fn test_publish() -> Result<(), UniErr> {
         let input = r#"publish ^[ bundle.zip ]-> localhost:repo:tutorial:1.0.0"#;
         publish_command(new_span(input))?;
+        Ok(())
+    }
+
+
+    #[test]
+    pub fn test_upload_blocks() -> Result<(), UniErr> {
+        let input = r#"publish ^[ bundle.zip ]-> localhost:repo:tutorial:1.0.0"#;
+        let blocks = result(upload_blocks(new_span(input)))?;
+        assert_eq!(1,blocks.len());
+        let block = blocks.get(0).unwrap();
+        assert_eq!("bundle.zip", block.name.as_str() );
+
+
+        // this should fail bcause it has multiple ^[
+        let input = r#"publish ^[ ^[ bundle.zip ]-> localhost:repo:tutorial:1.0.0"#;
+        let blocks = result(upload_blocks(new_span(input)))?;
+        assert_eq!(0,blocks.len());
+
+
+                // this should fail bcause it has no ^[
+        let input = r#"publish localhost:repo:tutorial:1.0.0"#;
+        let blocks = result(upload_blocks(new_span(input)))?;
+        assert_eq!(0,blocks.len());
+
         Ok(())
     }
 

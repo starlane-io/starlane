@@ -5,7 +5,7 @@ extern crate clap;
 
 use clap::arg;
 use clap::command;
-use clap::{App, Arg, Args, Command, Parser, Subcommand};
+use clap::{App, Arg, Args, Command as ClapCommand, Parser, Subcommand};
 use cosmic_hyperlane::test_util::SingleInterchangePlatform;
 use cosmic_hyperlane::HyperwayEndpointFactory;
 use cosmic_hyperlane_tcp::HyperlaneTcpClient;
@@ -16,12 +16,19 @@ use cosmic_universe::log::RootLogger;
 use cosmic_universe::substance::Substance;
 use cosmic_universe::wave::core::ReflectedCore;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::fs;
+use cosmic_universe::command::{CmdTransfer, Command, RawCommand};
 use cosmic_universe::hyper::{InterchangeKind, Knock};
+use cosmic_universe::parse::{command_line, upload_blocks};
+use cosmic_universe::parse::error::result;
+use cosmic_universe::util::{log, ToResolved};
+use cosmic_nom::new_span;
 
 #[tokio::main]
 async fn main() -> Result<(), UniErr> {
-    let matches = Command::new("comsic-cli")
+    let matches = ClapCommand::new("comsic-cli")
         .arg(
             Arg::new("host")
                 .short('h')
@@ -69,7 +76,15 @@ async fn command(host: String, certs: String, command: &str) -> Result<(), UniEr
     tokio::time::sleep(Duration::from_secs(1)).await;
     let cli = client.new_cli_session().await?;
 
-    let result = cli.exec(command).await?;
+
+    let blocks = result(upload_blocks(new_span(command)))?;
+    let mut command = RawCommand::new(command.to_string());
+    for block in blocks {
+        let content = Arc::new(fs::read(block.name.as_str()).await?);
+        command.transfers.push( CmdTransfer::new(block.name, content ));
+    }
+
+    let result = cli.raw(command).await?;
     core_out(result);
 
     Ok(())
