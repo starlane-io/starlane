@@ -63,21 +63,10 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
         &self,
         status_tx: mpsc::Sender<HyperConnectionDetails>,
     ) -> Result<HyperwayEndpoint, UniErr> {
-        status_tx
-            .send(HyperConnectionDetails::new(
-                HyperConnectionStatus::Connecting,
-                "init",
-            ))
-            .await?;
+
         let mut connector: SslConnectorBuilder =
             SslConnector::builder(SslMethod::tls()).map_err(UniErr::map)?;
 
-        status_tx
-            .send(HyperConnectionDetails::new(
-                HyperConnectionStatus::Connecting,
-                "loading cert",
-            ))
-            .await?;
 
         connector
             .set_ca_file(format!("{}/cert.pem", self.cert_dir))
@@ -91,36 +80,15 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
             .into_ssl(self.host.as_str())
             .map_err(UniErr::map)?;
 
-        status_tx
-            .send(HyperConnectionDetails::new(
-                HyperConnectionStatus::Connecting,
-                "connecting tcp stream",
-            ))
-            .await?;
         let stream = TcpStream::connect(&self.host).await?;
-        status_tx
-            .send(HyperConnectionDetails::new(
-                HyperConnectionStatus::Connecting,
-                "creating ssl layer",
-            ))
-            .await?;
+
         let mut stream = SslStream::new(ssl, stream).map_err(UniErr::map)?;
         Pin::new(&mut stream).connect().await.map_err(UniErr::map)?;
         let mut stream = FrameStream::new(stream);
-        status_tx
-            .send(HyperConnectionDetails::new(
-                HyperConnectionStatus::Connecting,
-                "starting handshake",
-            ))
-            .await?;
+
         let endpoint =
             FrameMuxer::handshake(stream, status_tx.clone(), self.logger.clone()).await?;
-        status_tx
-            .send(HyperConnectionDetails::new(
-                HyperConnectionStatus::Auth,
-                "sending knock",
-            ))
-            .await?;
+
         let wave: Wave<Ping> = self.knock.clone().into();
         let wave = wave.to_ultra();
         endpoint.tx.send(wave).await?;
@@ -238,24 +206,14 @@ impl FrameMuxer {
         status_tx: mpsc::Sender<HyperConnectionDetails>,
         logger: PointLogger,
     ) -> Result<HyperwayEndpoint, UniErr> {
-        status_tx
-            .send(HyperConnectionDetails::new(
-                HyperConnectionStatus::Handshake,
-                "exchanging versions",
-            ))
-            .await?;
+
         stream.write_version(&VERSION.clone()).await?;
         let in_version =
             tokio::time::timeout(Duration::from_secs(30), stream.read_version()).await??;
 
         if in_version == *VERSION {
-            logger.info("version match");
-            status_tx
-                .send(HyperConnectionDetails::new(
-                    HyperConnectionStatus::Handshake,
-                    "version match",
-                ))
-                .await?;
+//            logger.info("version match");
+
             stream.write_string("Ok".to_string()).await?;
         } else {
             logger.warn("version mismatch");
@@ -273,12 +231,7 @@ impl FrameMuxer {
             stream.write_string(msg.clone()).await?;
             return Err(msg.into());
         }
-        status_tx
-            .send(HyperConnectionDetails::new(
-                HyperConnectionStatus::Handshake,
-                "waiting for Ok",
-            ))
-            .await?;
+
         let result = tokio::time::timeout(Duration::from_secs(30), stream.read_string()).await??;
         if "Ok".to_string() != result {
             return logger.result(Err(format!(
@@ -287,13 +240,6 @@ impl FrameMuxer {
             )
             .into()));
         }
-
-        status_tx
-            .send(HyperConnectionDetails::new(
-                HyperConnectionStatus::Handshake,
-                "handshake complete",
-            ))
-            .await?;
 
         Ok(Self::new(stream, logger))
     }
@@ -344,7 +290,7 @@ impl FrameMuxer {
                     self.tx.send(wave).await?;
                        },
                        Err(err) => {
-                          self.logger.error(format!("read stream err: {}",err.to_string()));
+                          //self.logger.error(format!("read stream err: {}",err.to_string()));
                           break
                        }
                     }
@@ -482,11 +428,11 @@ impl HyperlaneTcpServer {
                         let logger = logger.clone();
                         tokio::spawn(async move {
                             while let Some(details) = status_rx.recv().await {
-                                logger.info(format!(
+/*                                logger.info(format!(
                                     "{} | {}",
                                     details.status.to_string(),
                                     details.info
-                                ))
+                                ))*/
                             }
                         });
                     }

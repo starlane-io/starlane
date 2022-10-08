@@ -494,11 +494,11 @@ impl ControlClient {
         Ok(Self { client })
     }
 
-    pub fn port(&self) -> Result<Surface, UniErr> {
+    pub fn surface(&self) -> Result<Surface, UniErr> {
         let greet = self
             .client
             .get_greeting()
-            .ok_or("cannot access port until greeting has been received")?;
+            .ok_or("cannot access surface until greeting has been received")?;
         Ok(greet.surface)
     }
 
@@ -513,7 +513,7 @@ impl ControlClient {
     pub async fn new_cli_session(&self) -> Result<ControlCliSession, UniErr> {
         let transmitter = self.transmitter_builder().await?.build();
         let mut proto = DirectedProto::ping();
-        proto.to(self.port()?.with_layer(Layer::Shell));
+        proto.to(self.surface()?.with_layer(Layer::Shell));
         proto.method(ExtMethod::new("NewCliSession".to_string())?);
         let pong: Wave<Pong> = transmitter.direct(proto).await?;
         pong.ok_or()?;
@@ -523,7 +523,7 @@ impl ControlClient {
             let transmitter = transmitter.build();
             Ok(ControlCliSession::new(transmitter))
         } else {
-            Err("NewCliSession expected: Port".into())
+            Err("NewCliSession expected: Surface".into())
         }
     }
 }

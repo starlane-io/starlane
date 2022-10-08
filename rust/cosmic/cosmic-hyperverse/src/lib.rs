@@ -115,7 +115,7 @@ where
     async fn global_registry(&self) -> Result<Registry<Self>, Self::Err>;
     async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>, Self::Err>;
     fn artifact_hub(&self) -> ArtifactApi;
-    async fn start_services(&self, gate: &Arc<HyperGateSelector>);
+    async fn start_services(&self, gate: &Arc<HyperGateSelector>) {}
     fn logger(&self) -> RootLogger {
         Default::default()
     }

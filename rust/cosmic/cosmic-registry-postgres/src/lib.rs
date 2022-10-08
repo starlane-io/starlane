@@ -288,7 +288,6 @@ where
             }
         }
         trans.commit().await?;
-        println!("\tRETUrNING: {}",registration.point.to_string());
         Ok(())
     }
 
@@ -1589,7 +1588,7 @@ pub mod test {
         PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
         PostgresRegistryContextHandle,
     };
-    use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, LocalHyperwayGateJumper};
+    use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, HyperGateSelector, LocalHyperwayGateJumper};
     use cosmic_hyperverse::reg::RegistryApi;
     use cosmic_hyperverse::reg::{Registration, Registry};
     use cosmic_universe::artifact::ArtifactApi;
@@ -1687,9 +1686,6 @@ pub mod test {
             todo!()
         }
 
-        fn start_services(&self, gate: &Arc<dyn cosmic_hyperlane::HyperGate>) {
-            todo!()
-        }
     }
 
     pub async fn registry() -> Result<Registry<TestPlatform>, TestErr> {

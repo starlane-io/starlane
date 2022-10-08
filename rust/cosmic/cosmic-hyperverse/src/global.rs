@@ -7,6 +7,7 @@ use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::command::common::StateSrc;
 use cosmic_universe::command::direct::create::{Create, PointSegTemplate, Strategy};
 use cosmic_universe::command::Command;
+use cosmic_universe::command::direct::select::Select;
 use cosmic_universe::command::RawCommand;
 use cosmic_universe::config::bind::{BindConfig, RouteSelector};
 use cosmic_universe::err::UniErr;
@@ -109,8 +110,13 @@ where
         let agent = ctx.wave().agent().clone();
         match ctx.input {
             Command::Create(create) => {
-                    self.skel.logger.result(global.create(create, &agent).await)?;
+                self.skel.logger.result(global.create(create, &agent).await)?;
                 Ok(ReflectedCore::ok())
+            }
+            Command::Select(select) => {
+                let mut select = select.clone();
+                let substance :Substance = self.skel.registry.select(&mut select).await?.into();
+                Ok(ReflectedCore::ok_body(substance))
             }
 
 
@@ -224,4 +230,5 @@ where
 
         Ok(point_kind)
     }
+
 }

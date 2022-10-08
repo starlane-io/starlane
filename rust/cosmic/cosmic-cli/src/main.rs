@@ -1,3 +1,5 @@
+#![allow(warnings)]
+
 #[macro_use]
 extern crate clap;
 
@@ -51,7 +53,6 @@ async fn main() -> Result<(), UniErr> {
 }
 
 async fn command(host: String, certs: String, command: &str) -> Result<(), UniErr> {
-println!("COMMAND");
     let logger = RootLogger::default();
     let logger = logger.point(Point::from_str("cosmic-cli")?);
     let tcp_client: Box<dyn HyperwayEndpointFactory> = Box::new(HyperlaneTcpClient::new(
@@ -63,30 +64,52 @@ println!("COMMAND");
     ));
 
     let client = ControlClient::new(tcp_client)?;
-println!("launching!");
     client.wait_for_ready(Duration::from_secs(5)).await?;
-println!("READY!");
 
     tokio::time::sleep(Duration::from_secs(1)).await;
     let cli = client.new_cli_session().await?;
-println!("Got CLI session!");
 
-    match cli.exec(command).await {
-        Ok(ok) => match ok.body {
-            Substance::Text(text) => println!("{}", text),
-            Substance::Errors(errors) => {
-                for (_, error) in errors.iter() {
-                    println!("{}", error)
-                }
-            }
-            s => {
-                println!("ResponseKind: {}", s.kind().to_string());
-            }
-        },
-        Err(err) => {
-            println!("{}", err.to_string())
-        }
-    }
+    let result = cli.exec(command).await?;
+    core_out(result);
 
     Ok(())
+}
+
+pub fn core_out( core: ReflectedCore ) {
+    match core.is_ok() {
+        true => out(core.body),
+        false => {out_err(core.ok_or().unwrap_err() )}
+    }
+}
+
+pub fn out(  substance: Substance ) {
+    match substance {
+        Substance::Empty => {
+            println!("Ok");
+        }
+        Substance::List(list) => {
+            for i in list.list {
+                out(*i);
+            }
+        }
+        Substance::Point(point) => {
+            println!("{}",point.to_string());
+        }
+        Substance::Surface(surface) => {
+            println!("{}",surface.to_string());
+        }
+        Substance::Text(text) => {
+            println!("{}",text);
+        }
+        Substance::Stub(stub) => {
+            println!("{}<{}>", stub.point.to_string(), stub.kind.to_string())
+        }
+        what => {
+            eprintln!("cosmic-cli not sure how to output {}",what.kind().to_string())
+        }
+    }
+}
+
+pub fn out_err( err: UniErr ) {
+    eprintln!("{}",err.to_string())
 }

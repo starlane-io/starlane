@@ -1730,7 +1730,7 @@ impl HyperClientRunner {
                             return Ok(());
                         }
                         Ok(Err(err)) => {
-                            runner.logger.error(format!("{}", err.to_string()));
+                            //runner.logger.error(format!("{}", err.to_string()));
                         }
                         Err(err) => {
                             runner.logger.error(format!("{}", err.to_string()));
@@ -1775,7 +1775,7 @@ impl HyperClientRunner {
                                     }
                                       }
                                       None => {
-                                        runner.logger.warn("from_client_rx.recv() returned None");
+                                        //runner.logger.warn("from_client_rx.recv() returned None");
                                         break;
                                       }
                                     }
@@ -1795,7 +1795,7 @@ impl HyperClientRunner {
                     );
                 }
 
-                runner.logger.warn("client relay interrupted");
+//                runner.logger.warn("client relay interrupted");
 
                 Ok(())
             }
@@ -1825,7 +1825,7 @@ impl HyperClientRunner {
                         break;
                     }
                     Err(err) => {
-                        self.logger.error(format!("{}", err.to_string()));
+                        //self.logger.error(format!("{}", err.to_string()));
                         // some error occurred when relaying therefore we need to reconnect
                         self.ext = None;
                     }
