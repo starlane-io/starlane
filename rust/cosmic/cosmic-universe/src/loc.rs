@@ -32,7 +32,7 @@ use crate::Agent::Anonymous;
 use crate::{Agent, BaseKind, Kind, KindTemplate, ParticleRecord, UniErr, ANONYMOUS, HYPERUSER};
 
 lazy_static! {
-    pub static ref GLOBAL_CENTRAL: Point = Point::from_str("GLOBAL::central").unwrap();
+    pub static ref CENTRAL: Point = StarKey::central().to_point();
     pub static ref GLOBAL_LOGGER: Point = Point::from_str("GLOBAL::logger").unwrap();
     pub static ref GLOBAL_REGISTRY: Point = Point::from_str("GLOBAL::registry").unwrap();
     pub static ref GLOBAL_EXEC: Point = Point::from_str("GLOBAL::executor").unwrap();
@@ -1504,7 +1504,7 @@ impl Point {
     }
 
     pub fn central() -> Self {
-        GLOBAL_CENTRAL.clone()
+        CENTRAL.clone()
     }
 
     pub fn global_executor() -> Self {

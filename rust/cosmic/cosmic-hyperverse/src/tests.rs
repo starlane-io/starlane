@@ -802,7 +802,7 @@ fn test_publish() -> Result<(), CosmicErr> {
 
         let mut command = RawCommand::new("publish ^[ bundle.zip ]-> localhost:repo:my:1.0.0");
 
-        let file_path = "mem/bundle.zip";
+        let file_path = "test/bundle.zip";
         let bin = Arc::new(fs::read(file_path)?);
         command.transfers.push(CmdTransfer::new("bundle.zip", bin));
 

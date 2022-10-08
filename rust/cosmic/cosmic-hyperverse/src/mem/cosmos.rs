@@ -138,5 +138,4 @@ impl Cosmos for MemCosmos {
 
      */
 
-    fn start_services(&self, gate: &Arc<dyn HyperGate>) {}
 }
