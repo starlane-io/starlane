@@ -7,8 +7,8 @@ use crate::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
 use crate::driver::root::RootDriverFactory;
 use crate::driver::space::SpaceDriverFactory;
 use crate::driver::DriverAvail;
-use crate::mem::registry::{MemRegCtx, MemRegApi};
-use crate::{Cosmos, DriversBuilder, HyperErr, MachineTemplate, Registry};
+use crate::mem::registry::{MemRegApi, MemRegCtx};
+use crate::{Cosmos, DriversBuilder, MachineTemplate};
 use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, LocalHyperwayGateJumper};
 use cosmic_universe::artifact::{ArtifactApi, ReadArtifactFetcher};
 use cosmic_universe::err::UniErr;
@@ -25,7 +25,8 @@ use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
-use crate::err::CosmicErr;
+use crate::err::{CosmicErr, HyperErr};
+use crate::reg::Registry;
 
 impl MemCosmos {
     pub fn new() -> Self {

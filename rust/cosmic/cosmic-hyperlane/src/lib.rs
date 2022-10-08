@@ -207,22 +207,30 @@ impl HyperwayEndpoint {
 
     pub fn connect(mut self, mut endpoint: HyperwayEndpoint) {
         tokio::spawn(async move {
+            let logger = endpoint.logger.clone();
             let end_tx = endpoint.tx.clone();
             {
                 let my_tx = self.tx.clone();
-                let logger = self.logger.clone();
                 tokio::spawn(async move {
+                    let logger = endpoint.logger.push_mark("mux:tx").unwrap();
                     while let Some(wave) = endpoint.rx.recv().await {
                         logger.track(&wave, || Tracker::new("hyperway-endpoint", "Rx"));
-                        my_tx.send(wave).await.unwrap_or_default();
+                        match logger.result(my_tx.send(wave).await) {
+                            Ok(_) => {},
+                            Err(_) => break
+                        }
                     }
                 });
             }
 
+            let logger = logger.push_mark("mux:rx").unwrap();
             while let Some(wave) = self.rx.recv().await {
-                self.logger
+                logger
                     .track(&wave, || Tracker::new("hyperway-endpoint", "Tx"));
-                end_tx.send(wave).await.unwrap_or_default();
+                match logger.result(end_tx.send(wave).await) {
+                    Ok(_) => {}
+                    Err(_) => break
+                }
             }
         });
     }
@@ -1718,12 +1726,15 @@ impl HyperClientRunner {
                                 runner.ext.take();
                                 return Err(HyperConnectionErr::Fatal("can no longer update HyperClient status (probably due to previous Fatal status)".to_string()));
                             }
+
                             return Ok(());
                         }
                         Ok(Err(err)) => {
                             runner.logger.error(format!("{}", err.to_string()));
                         }
-                        _ => {}
+                        Err(err) => {
+                            runner.logger.error(format!("{}", err.to_string()));
+                        }
                     }
                     // wait a little while before attempting to reconnect
                     // maybe add exponential backoff later
@@ -1764,23 +1775,27 @@ impl HyperClientRunner {
                                     }
                                       }
                                       None => {
+                                        runner.logger.warn("from_client_rx.recv() returned None");
                                         break;
                                       }
                                     }
                         }
+
                         wave = ext.rx.recv() => {
                             match wave {
                                 Some( wave ) => {
                                    runner.to_client_tx.send(wave).await;
                                 }
                                 None => {
-                                    runner.logger.warn("client does not have a hyperway_endpoint");
+                                   runner.logger.warn("client hyperway_endpoint has been closed.  This can happen if the client sender (tx) has been dropped.");
                                     break;
                                 }
                             }
                         }
                     );
                 }
+
+                runner.logger.warn("client relay interrupted");
 
                 Ok(())
             }
@@ -2182,6 +2197,7 @@ pub mod test_util {
             {
                 let fae = FAE.clone();
                 tokio::spawn(async move {
+                    fae_client.wait_for_greet().await.unwrap();
                     let wave = fae_rx.recv().await.unwrap();
                     let mut reflected = ReflectedProto::new();
                     reflected.kind(ReflectedKind::Pong);
@@ -2198,6 +2214,7 @@ pub mod test_util {
 
             let (rtn, mut rtn_rx) = oneshot::channel();
             tokio::spawn(async move {
+                less_client.wait_for_greet().await.unwrap();
                 let mut hello = DirectedProto::ping();
                 hello.to(FAE.clone().to_surface());
                 hello.from(LESS.clone().to_surface());
@@ -2228,7 +2245,6 @@ pub mod test_util {
     #[async_trait]
     impl HyperGreeter for TestGreeter {
         async fn greet(&self, stub: HyperwayStub) -> Result<Greet, UniErr> {
-            println!("Sending GREETING to {}", stub.remote.to_string());
             Ok(Greet {
                 surface: stub.remote.clone(),
                 agent: stub.agent.clone(),

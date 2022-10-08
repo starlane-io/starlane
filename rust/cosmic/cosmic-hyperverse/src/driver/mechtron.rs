@@ -3,7 +3,7 @@ use crate::driver::{
     ItemSphere,
 };
 use crate::star::HyperStarSkel;
-use crate::{Cosmos, HyperErr};
+use crate::Cosmos;
 use cosmic_universe::artifact::ArtRef;
 use cosmic_universe::config::bind::BindConfig;
 use cosmic_universe::err::UniErr;
@@ -23,6 +23,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
+use crate::err::HyperErr;
 
 lazy_static! {
     static ref HOST_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(

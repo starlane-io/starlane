@@ -11,6 +11,9 @@ extern crate lazy_static;
 #[macro_use]
 extern crate tracing;
 
+use sqlx::pool::PoolConnection;
+use sqlx::postgres::{PgPoolOptions, PgRow};
+use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::io::{Error, ErrorKind};
@@ -19,16 +22,13 @@ use std::ops::Deref;
 use std::str::{FromStr, Utf8Error};
 use std::string::FromUtf8Error;
 use std::sync::Arc;
-use sqlx::pool::PoolConnection;
-use sqlx::postgres::{PgPoolOptions, PgRow};
-use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
 use strum::ParseError;
-use tokio::sync::mpsc;
 
+use crate::err::PostErr;
+use cosmic_hyperverse::err::{ErrKind, HyperErr};
 use cosmic_hyperverse::machine::MachineTemplate;
+use cosmic_hyperverse::reg::{Registration, RegistryApi};
 use cosmic_hyperverse::Cosmos;
-use cosmic_hyperverse::Registration;
-use cosmic_hyperverse::{HyperErr, RegistryApi};
 use cosmic_universe::command::common::{PropertyMod, SetProperties, SetRegistry};
 use cosmic_universe::command::direct::create::{Create, KindTemplate, PointSegTemplate, Strategy};
 use cosmic_universe::command::direct::delete::Delete;
@@ -45,7 +45,7 @@ use cosmic_universe::kind::{
 };
 use cosmic_universe::loc::{Point, PointSeg, StarKey, ToBaseKind, Version};
 use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
-use cosmic_universe::particle::{Details, Properties, Property, Status, Stub};
+use cosmic_universe::particle::{Details, PointKind, Properties, Property, Status, Stub};
 use cosmic_universe::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, IndexedAccessGrant, Permissions,
     PermissionsMask, PermissionsMaskKind, Privilege, Privileges,
@@ -60,21 +60,33 @@ use cosmic_universe::selector::{
 use cosmic_universe::substance::{Substance, SubstanceList, SubstanceMap};
 use cosmic_universe::util::ValuePattern;
 use cosmic_universe::HYPERUSER;
-use err::PostErr;
+use cosmic_universe::log::PointLogger;
+
+pub trait PostgresPlatform: Cosmos
+where
+    <Self as Cosmos>::Err: PostErr,
+{
+    fn lookup_registry_db() -> Result<PostgresDbInfo, <Self as Cosmos>::Err>;
+    fn lookup_star_db(star: &StarKey) -> Result<PostgresDbInfo, <Self as Cosmos>::Err>;
+}
 
 pub struct PostgresRegistry<P>
 where
-    P: PostgresPlatform + Cosmos<Err = PostErr> + 'static,
+    P: PostgresPlatform + 'static,
+    <P as Cosmos>::Err: PostErr,
 {
-    ctx: PostgresRegistryContextHandle,
+    logger: PointLogger,
+    ctx: PostgresRegistryContextHandle<P>,
     platform: P,
 }
 
 impl<P> PostgresRegistry<P>
 where
-    P: PostgresPlatform + Cosmos<Err = PostErr> + 'static,
+    P: PostgresPlatform + 'static,
+    <P as Cosmos>::Err: PostErr,
 {
-    pub async fn new(ctx: PostgresRegistryContextHandle, platform: P) -> Result<Self, PostErr> {
+    pub async fn new(ctx: PostgresRegistryContextHandle<P>, platform: P, logger: PointLogger) -> Result<Self, P::Err> {
+        let logger = logger.point( Point::global_registry() );
         /*
         let pool = PgPoolOptions::new()
             .max_connections(5)
@@ -83,15 +95,14 @@ where
             )
             .await?;
          */
-        let registry = Self { ctx, platform };
+        let registry = Self { ctx, platform, logger: logger.clone() };
 
         match registry.setup().await {
             Ok(_) => {
-                info!("registry setup complete.");
             }
             Err(err) => {
                 let message = err.to_string();
-                error!("database setup failed {} ", message);
+                logger.error(format!("database setup failed {} ", message));
                 return Err(message.into());
             }
         }
@@ -115,7 +126,8 @@ where
          variant TEXT,
          version TEXT,
          version_variant TEXT,
-         location TEXT,
+         star TEXT,
+         host TEXT,
          status TEXT NOT NULL,
          sequence INTEGER DEFAULT 0,
          owner TEXT,
@@ -189,7 +201,18 @@ where
         Ok(())
     }
 
-    async fn nuke(&self) -> Result<(), PostErr> {
+
+}
+
+#[async_trait]
+impl<P> RegistryApi<P> for PostgresRegistry<P>
+where
+    P: PostgresPlatform + 'static,
+    <P as Cosmos>::Err: PostErr,
+{
+
+     async fn nuke<'a>(&'a self) -> Result<(), P::Err> {
+        self.logger.info("nuking database!");
         let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
         trans.execute("DROP TABLE particles CASCADE").await;
@@ -199,14 +222,8 @@ where
         self.setup().await?;
         Ok(())
     }
-}
 
-#[async_trait]
-impl<P> RegistryApi<P> for PostgresRegistry<P>
-where
-    P: PostgresPlatform + Cosmos<Err = PostErr> + 'static,
-{
-    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, PostErr> {
+    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), P::Err> {
         /*
         async fn check<'a>( registration: &Registration,  trans:&mut Transaction<Postgres>, ) -> Result<(),Erroror> {
             let params = RegistryParams::from_registration(registration)?;
@@ -220,6 +237,7 @@ where
          */
         struct Count(u64);
 
+
         impl sqlx::FromRow<'_, PgRow> for Count {
             fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
                 let v: i64 = row.get(0);
@@ -229,21 +247,28 @@ where
 
         let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
-        let params = RegistryParams::from_registration(registration)?;
+        let params:RegistryParams<P> = RegistryParams::from_registration(registration)?;
 
         let count = sqlx::query_as::<Postgres, Count>(
-            "SELECT count(*) as count from particles WHERE parent=$1 AND point_segment=$2",
+            "SELECT count(*) as count from particles WHERE point=$1",
         )
-        .bind(params.parent.to_string())
-        .bind(params.point_segment.to_string())
+        .bind(params.point.clone() )
         .fetch_one(&mut trans)
         .await?;
 
-        if count.0 > 0 {
-            return Err(PostErr::Dupe);
+        if count.0 > 0  {
+            // returning ok on Override for now which is the expected behavior but not the desired
+            // result.... will revisit this and properly do an update when the time comes -- Scott
+            trans.rollback().await?;
+            if registration.strategy == Strategy::Ensure || registration.strategy == Strategy::Override
+            {
+                return Ok(());
+            } else {
+                return Err(P::Err::dupe());
+            }
         }
 
-        let statement = format!("INSERT INTO particles (point,point_segment,base,kind,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.base, opt(&params.sub), opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
+        let statement = format!("INSERT INTO particles (point,point_segment,base,sub,provider,vendor,product,variant,version,version_variant,parent,owner,status) VALUES ('{}','{}','{}',{},{},{},{},{},{},{},'{}','{}','Pending')", params.point, params.point_segment, params.base, opt(&params.sub), opt(&params.provider),opt(&params.vendor), opt(&params.product), opt(&params.variant), opt(&params.version), opt(&params.version_variant), params.parent, params.owner.to_string());
         trans.execute(statement.as_str()).await?;
 
         for (_, property_mod) in registration.properties.iter() {
@@ -263,37 +288,45 @@ where
             }
         }
         trans.commit().await?;
-        Ok(Details {
-            stub: Stub {
-                point: registration.point.clone(),
-                kind: registration.kind.clone(),
-                status: Status::Pending,
-            },
-            properties: Default::default(),
-        })
-    }
-
-    async fn assign<'a>(&'a self, point: &'a Point, location: &'a Point) -> Result<(), PostErr> {
-        let parent = point
-            .parent()
-            .ok_or("expecting parent since we have already established the segments are >= 2")?;
-        let point_segment = point
-            .last_segment()
-            .ok_or("expecting a last_segment since we know segments are >= 2")?;
-        let statement = format!(
-            "UPDATE particles SET location='{}' WHERE parent='{}' AND point_segment='{}'",
-            location.to_string(),
-            parent.to_string(),
-            point_segment.to_string()
-        );
-        let mut conn = self.ctx.acquire().await?;
-        let mut trans = conn.begin().await?;
-        trans.execute(statement.as_str()).await?;
-        trans.commit().await?;
+        println!("\tRETUrNING: {}",registration.point.to_string());
         Ok(())
     }
 
-    async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), PostErr> {
+
+
+    async fn assign<'a>(
+        &'a self,
+        point: &'a Point,
+        location: ParticleLocation,
+    ) -> Result<(), P::Err> {
+
+            let parent = point
+                .parent()
+                .ok_or(format!("expecting parent ({})", point.to_string()))?;
+            let point_segment = point
+                .last_segment()
+                .ok_or("expecting a last_segment")?;
+
+            let statement =
+                "UPDATE particles SET star=$1, host=$2 WHERE parent=$3 AND point_segment=$4";
+
+            let mut conn = self.ctx.acquire().await?;
+            let mut trans = conn.begin().await?;
+
+            trans
+                .execute(
+                    sqlx::query(statement)
+                        .bind(location.star.to_string())
+                        .bind(location.host.map(|p|p.to_string()))
+                        .bind(parent.to_string()).bind(point_segment.to_string())
+                )
+                .await?;
+
+            trans.commit().await?;
+            Ok(())
+    }
+
+    async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), P::Err> {
         let parent = point
             .parent()
             .ok_or("particle must have a parent")?
@@ -320,7 +353,7 @@ where
         &'a self,
         point: &'a Point,
         properties: &'a SetProperties,
-    ) -> Result<(), PostErr> {
+    ) -> Result<(), P::Err> {
         let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
         let parent = point
@@ -353,7 +386,7 @@ where
         Ok(())
     }
 
-    async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, PostErr> {
+    async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, P::Err> {
         struct Sequence(u64);
 
         impl sqlx::FromRow<'_, PgRow> for Sequence {
@@ -390,7 +423,7 @@ where
         Ok(sequence.0)
     }
 
-    async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, PostErr> {
+    async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, P::Err> {
         let parent = point.parent().ok_or("expected a parent")?;
         let point_segment = point
             .last_segment()
@@ -406,7 +439,7 @@ where
         Ok(map)
     }
 
-    async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, PostErr> {
+    async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, P::Err> {
         if point.is_local_root() {
             return Ok(ParticleRecord::root());
         }
@@ -418,7 +451,7 @@ where
             .ok_or("expected last point_segment")?
             .to_string();
 
-        let mut record = sqlx::query_as::<Postgres, StarlaneParticleRecord>(
+        let mut record = sqlx::query_as::<Postgres, PostgresParticleRecord<P>>(
             "SELECT DISTINCT * FROM particles as r WHERE parent=$1 AND point_segment=$2",
         )
         .bind(parent.to_string())
@@ -440,7 +473,7 @@ where
         &'a self,
         point: &'a Point,
         query: &'a Query,
-    ) -> Result<QueryResult, PostErr> {
+    ) -> Result<QueryResult, P::Err> {
         let mut kind_path = PointHierarchy::new(point.route.clone(), vec![]);
         let route = point.route.clone();
 
@@ -466,7 +499,7 @@ where
         return Ok(QueryResult::PointHierarchy(kind_path));
     }
 
-    async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, PostErr> {
+    async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, P::Err> {
         let mut select = delete.clone().into();
         let list = self.select(&mut select).await?;
         if !list.is_empty() {
@@ -489,7 +522,7 @@ where
     }
 
     //    #[async_recursion]
-    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, PostErr> {
+    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, P::Err> {
         let point = select.pattern.query_root();
 
         let hierarchy = self
@@ -516,7 +549,7 @@ where
     }
 
     //    #[async_recursion]
-    async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, PostErr> {
+    async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, P::Err> {
         // build a 'matching so far' query.  Here we will find every child that matches the subselect
         // these matches are used to then query children for additional matches if there are more hops.
         // all of these matches will be filtered to see if they match the ENTIRE select before returning results.
@@ -612,8 +645,9 @@ where
             where_clause
         );
 
-        let mut query =
-            sqlx::query_as::<Postgres, StarlaneParticleRecord>(matching_so_far_statement.as_str());
+        let mut query = sqlx::query_as::<Postgres, PostgresParticleRecord<P>>(
+            matching_so_far_statement.as_str(),
+        );
         for param in params {
             query = query.bind(param);
         }
@@ -681,7 +715,7 @@ where
         Ok(stubs)
     }
 
-    async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), PostErr> {
+    async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), P::Err> {
         let mut conn = self.ctx.acquire().await?;
         match &access_grant.kind {
             AccessGrantKind::Super => {
@@ -713,7 +747,7 @@ where
     }
 
     //    #[async_recursion]
-    async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, PostErr> {
+    async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, P::Err> {
         let mut conn = self.ctx.acquire().await?;
 
         struct Owner(bool);
@@ -756,7 +790,7 @@ where
         let mut permissions = Permissions::none();
         let mut level_ands: Vec<Vec<PermissionsMask>> = vec![];
         loop {
-            let mut access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(traversal.to_string() ).fetch_all(& mut conn).await?;
+            let mut access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant<P>>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(traversal.to_string() ).fetch_all(& mut conn).await?;
             let mut access_grants: Vec<AccessGrant> = access_grants
                 .into_iter()
                 .map(|a| a.into())
@@ -847,7 +881,7 @@ where
         on: &'a Selector,
         owner: &'a Point,
         by: &'a Point,
-    ) -> Result<(), PostErr> {
+    ) -> Result<(), P::Err> {
         let mut select = Select {
             pattern: on.clone(),
             properties: Default::default(),
@@ -880,7 +914,7 @@ where
         &'a self,
         to: &'a Option<&'a Point>,
         on: &'a Selector,
-    ) -> Result<Vec<IndexedAccessGrant>, PostErr> {
+    ) -> Result<Vec<IndexedAccessGrant>, P::Err> {
         let mut select = Select {
             pattern: on.clone(),
             properties: Default::default(),
@@ -898,7 +932,7 @@ where
         let mut conn = self.ctx.acquire().await?;
         for on in selection.list {
             let on: Point = (*on).try_into()?;
-            let access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(on.to_string() ).fetch_all(& mut conn).await?;
+            let access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant<P>>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(on.to_string() ).fetch_all(& mut conn).await?;
             let mut access_grants: Vec<IndexedAccessGrant> =
                 access_grants.into_iter().map(|a| a.into()).collect();
 
@@ -922,9 +956,9 @@ where
         Ok(all_access_grants)
     }
 
-    async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), PostErr> {
+    async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), P::Err> {
         let mut conn = self.ctx.acquire().await?;
-        let access_grant: IndexedAccessGrant = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.id=$1 AND particles.id=access_grants.by_particle").bind(id ).fetch_one(& mut conn).await?.into();
+        let access_grant: IndexedAccessGrant = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant<P>>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.id=$1 AND particles.id=access_grants.by_particle").bind(id ).fetch_one(& mut conn).await?.into();
         let access = self.access(to, &access_grant.by_particle).await?;
         if access.has_full() {
             let mut trans = conn.begin().await?;
@@ -974,17 +1008,41 @@ impl sqlx::FromRow<'_, PgRow> for LocalProperty {
     }
 }
 
-pub struct WrappedIndexedAccessGrant(IndexedAccessGrant);
+pub struct WrappedIndexedAccessGrant<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
+    grant: IndexedAccessGrant,
+    phantom: PhantomData<P>,
+}
+impl <P> Unpin for WrappedIndexedAccessGrant<P>where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr {
 
-impl Into<IndexedAccessGrant> for WrappedIndexedAccessGrant {
+}
+
+impl<P> Into<IndexedAccessGrant> for WrappedIndexedAccessGrant<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
     fn into(self) -> IndexedAccessGrant {
-        self.0
+        self.grant
     }
 }
 
-impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
+impl<P> sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
-        fn wrap(row: &PgRow) -> Result<IndexedAccessGrant, PostErr> {
+        fn wrap<C>(row: &PgRow) -> Result<IndexedAccessGrant, C::Err>
+        where
+            C: PostgresPlatform,
+            <C as Cosmos>::Err: PostErr,
+        {
             let id: i32 = row.get("id");
             let kind: &str = row.get("kind");
             let kind = match kind {
@@ -1016,22 +1074,43 @@ impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
             Ok(IndexedAccessGrant { id, access_grant })
         }
 
-        match wrap(row) {
-            Ok(record) => Ok(WrappedIndexedAccessGrant(record)),
+        match wrap::<P>(row) {
+            Ok(record) => {
+                let phantom = Default::default();
+                Ok(WrappedIndexedAccessGrant {
+                    grant: record,
+                    phantom,
+                })
+            }
             Err(err) => {
-                error!("{}", err.to_string());
                 Err(sqlx::error::Error::PoolClosed)
             }
         }
     }
 }
 
-struct StarlaneParticleRecord {
+
+struct PostgresParticleRecord<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
     pub details: Details,
     pub location: Option<ParticleLocation>,
+    pub phantom: PhantomData<P>,
 }
 
-impl Into<ParticleRecord> for StarlaneParticleRecord {
+impl <P> Unpin for PostgresParticleRecord<P>where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr {
+
+}
+
+impl<P> Into<ParticleRecord> for PostgresParticleRecord<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
     fn into(self) -> ParticleRecord {
         ParticleRecord {
             details: self.details,
@@ -1040,9 +1119,17 @@ impl Into<ParticleRecord> for StarlaneParticleRecord {
     }
 }
 
-impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
+impl<P> sqlx::FromRow<'_, PgRow> for PostgresParticleRecord<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
-        fn wrap(row: &PgRow) -> Result<StarlaneParticleRecord, PostErr> {
+        fn wrap<C>(row: &PgRow) -> Result<PostgresParticleRecord<C>, C::Err>
+        where
+            C: PostgresPlatform,
+            <C as Cosmos>::Err: PostErr,
+        {
             let parent: String = row.get("parent");
             let point_segment: String = row.get("point_segment");
             let base: String = row.get("base");
@@ -1060,7 +1147,8 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
             let variant: Option<String> = row.get("variant");
             let version: Option<String> = row.get("version");
             let version_variant: Option<String> = row.get("version_variant");
-            let location: String = row.get("location");
+            let star: Option<String> = row.get("star");
+            let host: Option<String> = row.get("host");
             let status: String = row.get("status");
 
             let point = Point::from_str(parent.as_str())?;
@@ -1111,7 +1199,18 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
             let kind = KindParts::new(base, sub, specific);
             let kind: Kind = kind.try_into()?;
 
-            let location = Point::from_str(location.as_str())?;
+            let location = match star {
+                None => None,
+                Some(star) => {
+                    let star = Point::from_str(star.as_str())?;
+                    let host = match host {
+                        None => None,
+                        Some(host) => Some(Point::from_str(host.as_str())?),
+                    };
+
+                    Some(ParticleLocation::new(star, host))
+                }
+            };
 
             let status = Status::from_str(status.as_str())?;
 
@@ -1126,375 +1225,30 @@ impl sqlx::FromRow<'_, PgRow> for StarlaneParticleRecord {
                 properties: Default::default(), // not implemented yet...
             };
 
-            let record = StarlaneParticleRecord { details, location };
+            let phantom = Default::default();
+            let record = PostgresParticleRecord {
+                details,
+                location,
+                phantom,
+            };
 
             Ok(record)
         }
 
-        match wrap(row) {
+        match wrap::<P>(row) {
             Ok(record) => Ok(record),
             Err(err) => {
-                error!("{}", err.to_string());
-                Err(sqlx::error::Error::Decode("particle record".into()))
+                Err(sqlx::error::Error::Decode(format!("particle record: {}",err.to_string()).into()))
             }
         }
     }
 }
 
-#[cfg(test)]
-pub mod test {
-    use std::convert::TryInto;
-    use std::str::FromStr;
-
-    use cosmic_hyperverse::Registration;
-    use cosmic_hyperverse::RegistryApi;
-    use cosmic_universe::command::direct::create::Strategy;
-    use cosmic_universe::command::direct::query::Query;
-    use cosmic_universe::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
-    use cosmic_universe::entity::request::select::SelectKind;
-    use cosmic_universe::kind::{Kind, UserBaseSubKind};
-    use cosmic_universe::loc::{Point, StarKey, ToPoint};
-    use cosmic_universe::particle::Status;
-    use cosmic_universe::security::{
-        Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
-        Privilege,
-    };
-    use cosmic_universe::selector::{PointHierarchy, Selector};
-    use mesh_portal::version::latest::entity::request::query::Query;
-    use mesh_portal::version::latest::entity::request::select::{Select, SelectIntoSubstance};
-    use mesh_portal::version::latest::id::Point;
-    use mesh_portal::version::latest::particle::Status;
-    use mesh_portal::version::latest::payload::Primitive;
-    use mesh_portal::version::latest::selector::{PointHierarchy, Selector};
-
-    use crate::error::Error;
-    use crate::particle::Kind;
-    use crate::registry::{Registration, Registry};
-    use crate::PostgresRegistry;
-    use crate::err::PostErr;
-
-    #[tokio::test]
-    pub async fn test_nuke() -> Result<(), PostErr> {
-        let registry = PostgresRegistry::new().await?;
-        registry.nuke().await?;
-        Ok(())
-    }
-
-    #[tokio::test]
-    pub async fn test_create() -> Result<(), PostErr> {
-        let registry = PostgresRegistry::new().await?;
-        registry.nuke().await?;
-
-        let point = Point::from_str("localhost")?;
-        let hyperuser = Point::from_str("hyperspace:users:hyperuser")?;
-        let registration = Registration {
-            point: point.clone(),
-            kind: Kind::Space,
-            registry: Default::default(),
-            properties: Default::default(),
-            owner: hyperuser.clone(),
-            strategy: Strategy::Commit,
-            status: Status::Unknown
-        };
-        registry.register(&registration).await?;
-
-        let point = Point::from_str("localhost:mechtron")?;
-        let registration = Registration {
-            point: point.clone(),
-            kind: Kind::Mechtron,
-            registry: Default::default(),
-            properties: Default::default(),
-            owner: hyperuser,
-            strategy: Strategy::Commit,
-            status: Status::Unknown
-        };
-        registry.register(&registration).await?;
-
-        let location = StarKey::central().to_point();
-        registry.assign(&point, &location).await?;
-        registry.set_status(&point, &Status::Ready).await?;
-        registry.sequence(&point).await?;
-        let record = registry.record(&point).await?;
-
-        let result = registry.query(&point, &Query::PointHierarchy).await?;
-        let kind_path: PointHierarchy = result.try_into()?;
-
-        let pattern = Selector::from_str("**")?;
-        let mut select = Select {
-            pattern,
-            properties: Default::default(),
-            into_substance: SelectIntoSubstance::Points,
-            kind: SelectKind::Initial,
-        };
-
-        let points = registry.select(&mut select).await?;
-
-        assert_eq!(points.len(), 2);
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    pub async fn test_access() -> Result<(), PostErr> {
-        let registry = PostgresRegistry::new().await?;
-        registry.nuke().await?;
-
-        let hyperuser = Point::from_str("hyperspace:users:hyperuser")?;
-        let superuser = Point::from_str("localhost:users:superuser")?;
-        let scott = Point::from_str("localhost:app:users:scott")?;
-        let app = Point::from_str("localhost:app")?;
-        let mechtron = Point::from_str("localhost:app:mechtron")?;
-        let localhost = Point::from_str("localhost")?;
-
-        let registration = Registration {
-            point: Point::root(),
-            kind: Kind::Root,
-            registry: Default::default(),
-            properties: Default::default(),
-            owner: hyperuser.clone(),
-            strategy: Strategy::Commit,
-            status: Status::Unknown
-        };
-        registry.register(&registration).await?;
-
-        let registration = Registration {
-            point: Point::from_str("hyperspace")?,
-            kind: Kind::Space,
-            registry: Default::default(),
-            properties: Default::default(),
-            owner: hyperuser.clone(),
-            strategy: Strategy::Commit,
-            status: Status::Unknown
-        };
-        registry.register(&registration).await?;
-
-        let registration = Registration {
-            point: Point::from_str("hyperspace:users")?,
-            kind: Kind::UserBase(UserBaseSubKind::Keycloak),
-            registry: Default::default(),
-            properties: Default::default(),
-            owner: hyperuser.clone(),
-            strategy: Strategy::Commit,
-            status: Status::Unknown
-        };
-        registry.register(&registration).await?;
-
-        let registration = Registration {
-            point: hyperuser.clone(),
-            kind: Kind::Space,
-            registry: Default::default(),
-            properties: Default::default(),
-            owner: hyperuser.clone(),
-            strategy: Strategy::Commit,
-            status: Status::Unknown
-        };
-        registry.register(&registration).await?;
-
-        let registration = Registration {
-            point: localhost.clone(),
-            kind: Kind::Space,
-            registry: Default::default(),
-            properties: Default::default(),
-            owner: hyperuser.clone(),
-            strategy: Strategy::Commit,
-            status: Status::Unknown
-        };
-        registry.register(&registration).await?;
-
-        let point = Point::from_str("localhost:users")?;
-        let registration = Registration {
-            point: point.clone(),
-            kind: Kind::UserBase(UserBaseSubKind::Keycloak),
-            registry: Default::default(),
-            properties: Default::default(),
-            owner: hyperuser.clone(),
-        };
-        registry.register(&registration).await?;
-
-        let registration = Registration {
-            point: superuser.clone(),
-            kind: Kind::UserBase(UserBaseSubKind::Keycloak),
-            registry: Default::default(),
-            properties: Default::default(),
-            owner: hyperuser.clone(),
-            strategy: Strategy::Commit,
-            status: Status::Unknown
-        };
-        registry.register(&registration).await?;
-
-        let registration = Registration {
-            point: app.clone(),
-            kind: Kind::App,
-            registry: Default::default(),
-            properties: Default::default(),
-            owner: superuser.clone(),
-        };
-        registry.register(&registration).await?;
-
-        let app_userbase = Point::from_str("localhost:app:users")?;
-        let registration = Registration {
-            point: app_userbase.clone(),
-            kind: Kind::UserBase(UserBaseSubKind::Keycloak),
-            registry: Default::default(),
-            properties: Default::default(),
-            owner: app.clone(),
-            strategy: Strategy::Commit,
-            status: Status::Unknown
-        };
-        registry.register(&registration).await?;
-
-        let registration = Registration {
-            point: scott.clone(),
-            kind: Kind::User,
-            registry: Default::default(),
-            properties: Default::default(),
-            owner: app.clone(),
-            strategy: Strategy::Commit,
-            status: Status::Unknown
-        };
-        registry.register(&registration).await?;
-
-        let registration = Registration {
-            point: mechtron.clone(),
-            kind: Kind::Mechtron,
-            registry: Default::default(),
-            properties: Default::default(),
-            owner: app.clone(),
-        };
-        registry.register(&registration).await?;
-
-        let grant = AccessGrant {
-            kind: AccessGrantKind::Super,
-            on_point: Selector::from_str("localhost+:**")?,
-            to_point: superuser.clone().try_into()?,
-            by_particle: hyperuser.clone(),
-        };
-        registry.grant(&grant).await?;
-
-        let grant = AccessGrant {
-            kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("+csd-Rwx")?),
-            on_point: Selector::from_str("localhost:app+:**")?,
-            to_point: Selector::from_str("localhost:app:users:**<User>")?,
-            by_particle: app.clone(),
-        };
-        registry.grant(&grant).await?;
-
-        let grant = AccessGrant {
-            kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("+csd-rwX")?),
-            on_point: Selector::from_str("localhost:app:**<Mechtron>")?,
-            to_point: Selector::from_str("localhost:app:users:**<User>")?,
-            by_particle: app.clone(),
-        };
-        registry.grant(&grant).await?;
-
-        let grant = AccessGrant {
-            kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("+CSD-RWX")?),
-            on_point: Selector::from_str("localhost:users:superuser")?,
-            to_point: scott.clone().try_into()?,
-            by_particle: app.clone(),
-        };
-        registry.grant(&grant).await?;
-
-        let grant = AccessGrant {
-            kind: AccessGrantKind::Privilege(Privilege::Single("property:email:read".to_string())),
-            on_point: Selector::from_str("localhost:app:users:**<User>")?,
-            to_point: Selector::from_str("localhost:app:**<Mechtron>")?,
-            by_particle: app.clone(),
-        };
-        registry.grant(&grant).await?;
-
-        let access = registry.access(&hyperuser, &superuser).await?;
-        assert_eq!(access.has_super(), true);
-
-        let access = registry.access(&superuser, &localhost).await?;
-        assert_eq!(access.has_super(), true);
-
-        let access = registry.access(&superuser, &app).await?;
-        assert_eq!(access.has_super(), true);
-
-        let access = registry.access(&app, &scott).await?;
-        assert_eq!(access.has_super(), false);
-        assert_eq!(access.has_owner(), true);
-        assert_eq!(access.has_full(), true);
-
-        let access = registry.access(&scott, &superuser).await?;
-        assert_eq!(access.has_super(), false);
-        assert_eq!(access.has_full(), false);
-        assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
-
-        // should fail because app is not the owner of localhost:app yet...
-        let access = registry.access(&scott, &app).await?;
-        assert_eq!(access.has_super(), false);
-        assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
-
-        // must have super to chagne ownership
-        let app_pattern = Selector::from_str("localhost:app+:**")?;
-        assert!(registry.chown(&app_pattern, &app, &scott).await.is_err());
-        // this should work:
-        assert!(registry.chown(&app_pattern, &app, &superuser).await.is_ok());
-
-        // now the previous rule should work since app now owns itself.
-        let access = registry.access(&scott, &app).await?;
-        assert_eq!(access.has_super(), false);
-        assert_eq!(access.permissions().to_string(), "csd-Rwx".to_string());
-
-        let access = registry.access(&scott, &superuser).await?;
-        assert_eq!(access.has_super(), false);
-        assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
-
-        // mem masked OR permissions
-        let access = registry.access(&scott, &mechtron).await?;
-        assert_eq!(access.has_super(), false);
-        assert_eq!(access.permissions().to_string(), "csd-RwX".to_string());
-
-        // now mem AND permissions (masking Read)
-        let grant = AccessGrant {
-            kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("&csd-rwX")?),
-            on_point: Selector::from_str("localhost:app:**<Mechtron>")?,
-            to_point: Selector::from_str("localhost:app:users:**<User>")?,
-            by_particle: app.clone(),
-        };
-        registry.grant(&grant).await?;
-
-        let access = registry.access(&scott, &mechtron).await?;
-        assert_eq!(access.has_super(), false);
-        assert_eq!(access.permissions().to_string(), "csd-rwX".to_string());
-
-        let access = registry.access(&mechtron, &scott).await?;
-        assert_eq!(access.has_super(), false);
-        assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
-        assert!(access.check_privilege("property:email:read").is_ok());
-
-        let access_grants = registry
-            .list_access(&None, &Selector::from_str("+:**")?)
-            .await?;
-
-        println!(
-            "{: <4}{:<6}{:<20}{:<40}{:<40}{:<40}",
-            "id", "grant", "data", "on", "to", "by"
-        );
-        for access_grant in &access_grants {
-            println!(
-                "{: <4}{:<6}{:<20}{:<40}{:<40}{:<40}",
-                access_grant.id,
-                access_grant.access_grant.kind.to_string(),
-                match &access_grant.kind {
-                    AccessGrantKind::Super => "".to_string(),
-                    AccessGrantKind::Privilege(prv) => prv.to_string(),
-                    AccessGrantKind::PermissionsMask(perm) => perm.to_string(),
-                },
-                access_grant.access_grant.on_point.to_string(),
-                access_grant.to_point.to_string(),
-                access_grant.by_particle.to_string()
-            );
-            //            registry.remove_access(access_grant.id, &app ).await?;
-        }
-
-        Ok(())
-    }
-}
-
-pub struct RegistryParams {
+pub struct RegistryParams<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
     pub point: String,
     pub point_segment: String,
     pub base: String,
@@ -1507,10 +1261,15 @@ pub struct RegistryParams {
     pub version_variant: Option<String>,
     pub parent: String,
     pub owner: Point,
+    pub phantom: PhantomData<P>,
 }
 
-impl RegistryParams {
-    pub fn from_registration(registration: &Registration) -> Result<Self, PostErr> {
+impl<P> RegistryParams<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
+    pub fn from_registration(registration: &Registration) -> Result<Self, P::Err> {
         let point_segment = match registration.point.segments.last() {
             None => "".to_string(),
             Some(segment) => segment.to_string(),
@@ -1519,6 +1278,7 @@ impl RegistryParams {
             None => "".to_string(),
             Some(parent) => parent.to_string(),
         };
+        let specific_str = match registration.kind.sub().specific() { None=>"None".to_string(),Some(specific)=>specific.to_string()};
 
         let base = registration.kind.to_base().to_string();
         let sub = registration.kind.sub();
@@ -1579,19 +1339,21 @@ impl RegistryParams {
             version,
             version_variant,
             owner: registration.owner.clone(),
+            phantom: PhantomData::default(),
         })
     }
 }
 
 impl<P> PostgresRegistry<P>
 where
-    P: PostgresPlatform + Cosmos<Err = PostErr> + 'static,
+    P: PostgresPlatform + 'static,
+    <P as Cosmos>::Err: PostErr,
 {
-    pub async fn set(&self, set: &Set) -> Result<(), PostErr> {
+    pub async fn set(&self, set: &Set) -> Result<(), P::Err> {
         self.set_properties(&set.point, &set.properties).await
     }
 
-    pub async fn get(&self, get: &Get) -> Result<Substance, PostErr> {
+    pub async fn get(&self, get: &Get) -> Result<Substance, P::Err> {
         match &get.op {
             GetOp::State => {
                 return Err("Registry does not handle GetOp::State operations".into());
@@ -1625,79 +1387,8 @@ where
         }
     }
 
-    pub async fn create(&self, create: &Create) -> Result<Details, PostErr> {
-        let child_kind = self.platform.select_kind(&create.template.kind)?;
-        let stub = match &create.template.point.child_segment_template {
-            PointSegTemplate::Exact(child_segment) => {
-                let point = create.template.point.parent.push(child_segment.clone());
-                match &point {
-                    Ok(_) => {}
-                    Err(err) => {
-                        eprintln!("RC CREATE error: {}", err.to_string());
-                    }
-                }
-                let point = point?;
 
-                let properties = self
-                    .platform
-                    .properties_config(&child_kind)
-                    .fill_create_defaults(&create.properties)?;
-                self.platform
-                    .properties_config(&child_kind)
-                    .check_create(&properties)?;
-
-                let registration = Registration {
-                    point: point.clone(),
-                    kind: child_kind.clone(),
-                    registry: create.registry.clone(),
-                    properties,
-                    owner: Point::root(),
-                };
-                println!("creating {}", point.to_string());
-                let mut result = self.register(&registration).await;
-
-                // if strategy is ensure then a dupe is GOOD!
-                if create.strategy == Strategy::Ensure {
-                    if let Err(PostErr::Dupe) = result {
-                        result = Ok(self.record(&point).await?.details);
-                    }
-                }
-
-                println!("result {}? {}", point.to_string(), result.is_ok());
-                result?
-            }
-            PointSegTemplate::Pattern(pattern) => {
-                if !pattern.contains("%") {
-                    return Err("AddressSegmentTemplate::Pattern must have at least one '%' char for substitution".into());
-                }
-                loop {
-                    let index = self.sequence(&create.template.point.parent).await?;
-                    let child_segment = pattern.replace("%", index.to_string().as_str());
-                    let point = create.template.point.parent.push(child_segment.clone())?;
-                    let registration = Registration {
-                        point: point.clone(),
-                        kind: child_kind.clone(),
-                        registry: create.registry.clone(),
-                        properties: create.properties.clone(),
-                        owner: Point::root(),
-                    };
-
-                    match self.register(&registration).await {
-                        Ok(stub) => return Ok(stub),
-                        Err(PostErr::Dupe) => {
-                            // continue loop
-                        }
-                        Err(err) => {
-                            return Err(err);
-                        }
-                    }
-                }
-            }
-        };
-        Ok(stub)
-    }
-
-    pub async fn cmd_select<'a>(&'a self, select: &'a mut Select) -> Result<Substance, PostErr> {
+    pub async fn cmd_select<'a>(&'a self, select: &'a mut Select) -> Result<Substance, P::Err> {
         let list = Substance::List(self.select(select).await?);
         Ok(list)
     }
@@ -1706,33 +1397,50 @@ where
         &'a self,
         to: &'a Point,
         query: &'a Query,
-    ) -> Result<Substance, PostErr> {
+    ) -> Result<Substance, P::Err> {
         let result = Substance::Text(self.query(to, query).await?.to_string());
         Ok(result)
     }
 }
-pub struct PostRegApi {
-    ctx: PostgresRegistryContext,
+pub struct PostRegApi<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
+    ctx: PostgresRegistryContext<P>,
 }
 
-impl PostRegApi {
-    pub fn new(ctx: PostgresRegistryContext) -> Self {
+impl<P> PostRegApi<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
+    pub fn new(ctx: PostgresRegistryContext<P>) -> Self {
         Self { ctx }
     }
 
-    fn ctx(&self) -> &PostgresRegistryContext{
+    fn ctx(&self) -> &PostgresRegistryContext<P> {
         &self.ctx
     }
 }
 
-pub struct PostgresRegistryContextHandle {
+#[derive(Clone)]
+pub struct PostgresRegistryContextHandle<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
     key: PostgresDbKey,
-    pool: Arc<PostgresRegistryContext>,
+    pool: Arc<PostgresRegistryContext<P>>,
     pub schema: String,
 }
 
-impl PostgresRegistryContextHandle {
-    pub fn new(db: &PostgresDbInfo, pool: Arc<PostgresRegistryContext>) -> Self {
+impl<P> PostgresRegistryContextHandle<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
+    pub fn new(db: &PostgresDbInfo, pool: Arc<PostgresRegistryContext<P>>) -> Self {
         Self {
             key: db.to_key(),
             schema: db.schema.clone(),
@@ -1740,21 +1448,30 @@ impl PostgresRegistryContextHandle {
         }
     }
 
-    pub async fn acquire(&self) -> Result<PoolConnection<Postgres>, PostErr> {
+    pub async fn acquire(&self) -> Result<PoolConnection<Postgres>, P::Err> {
         self.pool.acquire(&self.key).await
     }
 
-    pub async fn begin(&self) -> Result<Transaction<Postgres>, PostErr> {
+    pub async fn begin(&self) -> Result<Transaction<Postgres>, P::Err> {
         self.pool.begin(&self.key).await
     }
 }
 
-pub struct PostgresRegistryContext {
+pub struct PostgresRegistryContext<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
     pools: HashMap<PostgresDbKey, Pool<Postgres>>,
+    phantom: PhantomData<P>,
 }
 
-impl PostgresRegistryContext {
-    pub async fn new(dbs: HashSet<PostgresDbInfo>) -> Result<Self, PostErr> {
+impl<P> PostgresRegistryContext<P>
+where
+    P: PostgresPlatform,
+    <P as Cosmos>::Err: PostErr,
+{
+    pub async fn new(dbs: HashSet<PostgresDbInfo>) -> Result<Self, P::Err> {
         let mut pools = HashMap::new();
         for db in dbs {
             let pool = PgPoolOptions::new()
@@ -1763,19 +1480,18 @@ impl PostgresRegistryContext {
                 .await?;
             pools.insert(db.to_key(), pool);
         }
-        Ok(Self { pools })
+        let phantom = PhantomData::default();
+        Ok(Self { pools, phantom })
     }
 
     pub async fn acquire<'a>(
         &'a self,
         key: &'a PostgresDbKey,
-    ) -> Result<PoolConnection<Postgres>, PostErr> {
+    ) -> Result<PoolConnection<Postgres>, P::Err> {
         Ok(self
             .pools
             .get(key)
-            .ok_or(PostErr::Error(
-                "could not acquire db connection".to_string(),
-            ))?
+            .ok_or(P::Err::new("could not acquire db connection".to_string()))?
             .acquire()
             .await?)
     }
@@ -1783,24 +1499,24 @@ impl PostgresRegistryContext {
     pub async fn begin<'a>(
         &'a self,
         key: &'a PostgresDbKey,
-    ) -> Result<Transaction<Postgres>, PostErr> {
+    ) -> Result<Transaction<Postgres>, P::Err> {
         Ok(self
             .pools
             .get(key)
-            .ok_or(PostErr::Error("could not begin db transaction".to_string()))?
+            .ok_or(P::Err::new("could not begin db transaction".to_string()))?
             .begin()
             .await?)
     }
 }
 
-#[derive(Eq, PartialEq, Hash)]
+#[derive(Clone,Eq, PartialEq, Hash)]
 pub struct PostgresDbKey {
     pub url: String,
     pub user: String,
     pub database: String,
 }
 
-#[derive(Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub struct PostgresDbInfo {
     pub url: String,
     pub user: String,
@@ -1810,8 +1526,20 @@ pub struct PostgresDbInfo {
 }
 
 impl PostgresDbInfo {
-    pub fn new(url: String, user: String, password: String, database: String) -> Self {
-        Self::new_with_schema(url, user, password, database, "PUBLIC".to_string())
+    pub fn new<Url, User, Pass, Db>(url: Url, user: User, password: Pass, database: Db) -> Self
+    where
+        Url: ToString,
+        User: ToString,
+        Pass: ToString,
+        Db: ToString,
+    {
+        Self::new_with_schema(
+            url.to_string(),
+            user.to_string(),
+            password.to_string(),
+            database.to_string(),
+            "PUBLIC".to_string(),
+        )
     }
 
     pub fn new_with_schema(
@@ -1846,7 +1574,472 @@ impl PostgresDbInfo {
     }
 }
 
-pub trait PostgresPlatform: Cosmos<Err = PostErr> {
-    fn lookup_registry_db() -> Result<PostgresDbInfo, Self::Err>;
-    fn lookup_star_db(star: &StarKey) -> Result<PostgresDbInfo, Self::Err>;
+#[cfg(test)]
+pub mod test {
+    use cosmic_hyperverse::driver::DriversBuilder;
+    use cosmic_hyperverse::machine::MachineTemplate;
+    use cosmic_hyperverse::Cosmos;
+    use std::collections::HashSet;
+    use std::convert::TryInto;
+    use std::str::FromStr;
+    use std::sync::Arc;
+
+    use crate::err::TestErr;
+    use crate::{
+        PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
+        PostgresRegistryContextHandle,
+    };
+    use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, LocalHyperwayGateJumper};
+    use cosmic_hyperverse::reg::RegistryApi;
+    use cosmic_hyperverse::reg::{Registration, Registry};
+    use cosmic_universe::artifact::ArtifactApi;
+    use cosmic_universe::command::direct::create::Strategy;
+    use cosmic_universe::command::direct::query::Query;
+    use cosmic_universe::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
+    use cosmic_universe::hyper::ParticleLocation;
+    use cosmic_universe::kind::{Kind, Specific, StarSub, UserBaseSubKind};
+    use cosmic_universe::loc::{MachineName, Point, StarKey, ToPoint};
+    use cosmic_universe::log::RootLogger;
+    use cosmic_universe::particle::property::PropertiesConfig;
+    use cosmic_universe::particle::Status;
+    use cosmic_universe::security::{
+        Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
+        Privilege,
+    };
+    use cosmic_universe::selector::{PointHierarchy, Selector};
+
+    #[derive(Clone)]
+    pub struct TestPlatform {
+        pub handle: PostgresRegistryContextHandle<Self>,
+    }
+
+    impl TestPlatform {
+        pub async fn new() -> Result<Self, TestErr> {
+            let db = <Self as PostgresPlatform>::lookup_registry_db()?;
+            let mut set = HashSet::new();
+            set.insert(db.clone());
+            let ctx = Arc::new(PostgresRegistryContext::new(set).await?);
+            let handle = PostgresRegistryContextHandle::new(&db, ctx);
+            Ok(Self { handle })
+        }
+    }
+
+    impl PostgresPlatform for TestPlatform {
+        fn lookup_registry_db() -> Result<PostgresDbInfo, <Self as Cosmos>::Err> {
+            Ok(PostgresDbInfo::new(
+                "localhost",
+                "postgres",
+                "password",
+                "postgres",
+            ))
+        }
+
+        fn lookup_star_db(star: &StarKey) -> Result<PostgresDbInfo, <Self as Cosmos>::Err> {
+            todo!()
+        }
+    }
+
+    #[async_trait]
+    impl Cosmos for TestPlatform {
+        type Err = TestErr;
+        type RegistryContext = PostgresRegistryContextHandle<Self>;
+        type StarAuth = AnonHyperAuthenticator;
+        type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
+
+        async fn global_registry(&self) -> Result<Registry<Self>, Self::Err> {
+            let logger = RootLogger::default();
+            let logger = logger.point(Point::global_registry());
+            Ok(Arc::new(PostgresRegistry::new(self.handle.clone(), self.clone(),logger ).await?))
+        }
+
+        fn star_auth(&self, star: &StarKey) -> Result<Self::StarAuth, Self::Err> {
+            todo!()
+        }
+
+        fn remote_connection_factory_for_star(
+            &self,
+            star: &StarKey,
+        ) -> Result<Self::RemoteStarConnectionFactory, Self::Err> {
+            todo!()
+        }
+
+        fn machine_template(&self) -> MachineTemplate {
+            todo!()
+        }
+
+        fn machine_name(&self) -> MachineName {
+            todo!()
+        }
+
+        fn properties_config(&self, kind: &Kind) -> PropertiesConfig {
+            todo!()
+        }
+
+        fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
+            todo!()
+        }
+
+        async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>, Self::Err> {
+            todo!()
+        }
+
+        fn artifact_hub(&self) -> ArtifactApi {
+            todo!()
+        }
+
+        fn start_services(&self, gate: &Arc<dyn cosmic_hyperlane::HyperGate>) {
+            todo!()
+        }
+    }
+
+    pub async fn registry() -> Result<Registry<TestPlatform>, TestErr> {
+        TestPlatform::new().await?.global_registry().await
+    }
+
+    #[test]
+    pub fn test_compile_postgres() {}
+
+    #[tokio::test]
+    pub async fn test_nuke() -> Result<(), TestErr> {
+        let registry = registry().await?;
+        registry.nuke().await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    pub async fn test_create() -> Result<(), TestErr> {
+        let registry = registry().await?;
+        registry.nuke().await?;
+
+        let point = Point::from_str("localhost")?;
+        let hyperuser = Point::from_str("hyperspace:users:hyperuser")?;
+        let registration = Registration {
+            point: point.clone(),
+            kind: Kind::Space,
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: hyperuser.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown,
+        };
+println!("pre register...");
+        registry.register(&registration).await?;
+println!("post registration!");
+
+        let point = Point::from_str("localhost:mechtron")?;
+        let registration = Registration {
+            point: point.clone(),
+            kind: Kind::Mechtron,
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: hyperuser,
+            strategy: Strategy::Commit,
+            status: Status::Unknown,
+        };
+        registry.register(&registration).await?;
+
+        let location = ParticleLocation::new(StarKey::central().to_point(), None);
+        registry.assign(&point, location).await?;
+        registry.set_status(&point, &Status::Ready).await?;
+        registry.sequence(&point).await?;
+        let record = registry.record(&point).await?;
+
+        let result = registry.query(&point, &Query::PointHierarchy).await?;
+        let kind_path: PointHierarchy = result.try_into()?;
+
+        let pattern = Selector::from_str("**")?;
+        let mut select = Select {
+            pattern,
+            properties: Default::default(),
+            into_substance: SelectIntoSubstance::Points,
+            kind: SelectKind::Initial,
+        };
+
+        let points = registry.select(&mut select).await?;
+
+        assert_eq!(points.len(), 2);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    pub async fn test_access() -> Result<(), TestErr> {
+        let registry = registry().await?;
+        registry.nuke().await?;
+
+        let hyperuser = Point::from_str("hyperspace:users:hyperuser")?;
+        let superuser = Point::from_str("localhost:users:superuser")?;
+        let scott = Point::from_str("localhost:app:users:scott")?;
+        let app = Point::from_str("localhost:app")?;
+        let mechtron = Point::from_str("localhost:app:mechtron")?;
+        let localhost = Point::from_str("localhost")?;
+
+        let registration = Registration {
+            point: Point::root(),
+            kind: Kind::Root,
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: hyperuser.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown,
+        };
+        registry.register(&registration).await?;
+
+        let registration = Registration {
+            point: Point::from_str("hyperspace")?,
+            kind: Kind::Space,
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: hyperuser.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown,
+        };
+        registry.register(&registration).await?;
+
+        let userbase = Kind::UserBase(UserBaseSubKind::OAuth(Specific::from_str("mechtronhost.io:keycloak.com:keycloak:community:11.0.0")?));
+
+        let registration = Registration {
+            point: Point::from_str("hyperspace:users")?,
+            kind: userbase.clone(),
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: hyperuser.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown,
+        };
+        registry.register(&registration).await?;
+
+        let registration = Registration {
+            point: hyperuser.clone(),
+            kind: Kind::Space,
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: hyperuser.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown,
+        };
+        registry.register(&registration).await?;
+
+        let registration = Registration {
+            point: localhost.clone(),
+            kind: Kind::Space,
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: hyperuser.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown,
+        };
+        registry.register(&registration).await?;
+
+        let point = Point::from_str("localhost:users")?;
+        let registration = Registration {
+            point: point.clone(),
+            kind: userbase.clone(),
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: hyperuser.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown,
+        };
+        registry.register(&registration).await?;
+
+        let registration = Registration {
+            point: superuser.clone(),
+            kind: userbase.clone(),
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: hyperuser.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown,
+        };
+        registry.register(&registration).await?;
+
+        let registration = Registration {
+            point: app.clone(),
+            kind: Kind::App,
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: superuser.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown,
+        };
+        registry.register(&registration).await?;
+
+        let app_userbase = Point::from_str("localhost:app:users")?;
+        let registration = Registration {
+            point: app_userbase.clone(),
+            kind: userbase.clone(),
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: app.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown,
+        };
+        registry.register(&registration).await?;
+
+        let registration = Registration {
+            point: scott.clone(),
+            kind: Kind::User,
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: app.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown,
+        };
+        registry.register(&registration).await?;
+
+        let registration = Registration {
+            point: mechtron.clone(),
+            kind: Kind::Mechtron,
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: app.clone(),
+            strategy: Strategy::Commit,
+            status: Status::Unknown,
+        };
+        registry.register(&registration).await?;
+
+        let grant = AccessGrant {
+            kind: AccessGrantKind::Super,
+            on_point: Selector::from_str("localhost+:**")?,
+            to_point: superuser.clone().try_into().map_err(|e|TestErr::new(e))?,
+            by_particle: hyperuser.clone(),
+        };
+println!("granting...");
+        registry.grant(&grant).await?;
+println!("granted...");
+
+        let grant = AccessGrant {
+            kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("+csd-Rwx")?),
+            on_point: Selector::from_str("localhost:app+:**")?,
+            to_point: Selector::from_str("localhost:app:users:**<User>")?,
+            by_particle: app.clone(),
+        };
+        registry.grant(&grant).await?;
+
+        let grant = AccessGrant {
+            kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("+csd-rwX")?),
+            on_point: Selector::from_str("localhost:app:**<Mechtron>")?,
+            to_point: Selector::from_str("localhost:app:users:**<User>")?,
+            by_particle: app.clone(),
+        };
+        registry.grant(&grant).await?;
+
+        let grant = AccessGrant {
+            kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("+CSD-RWX")?),
+            on_point: Selector::from_str("localhost:users:superuser")?,
+            to_point: scott.clone().try_into().map_err(|e|TestErr::new(e))?,
+            by_particle: app.clone(),
+        };
+        registry.grant(&grant).await?;
+
+        let grant = AccessGrant {
+            kind: AccessGrantKind::Privilege(Privilege::Single("property:email:read".to_string())),
+            on_point: Selector::from_str("localhost:app:users:**<User>")?,
+            to_point: Selector::from_str("localhost:app:**<Mechtron>")?,
+            by_particle: app.clone(),
+        };
+        registry.grant(&grant).await?;
+
+println!("access?");
+        let access = registry.access(&hyperuser, &superuser).await?;
+println!("access...");
+println!("super?");
+        assert_eq!(access.has_super(), true);
+println!("super!");
+
+        println!("get superuser record...");
+let record = registry.record(&superuser).await?;
+        println!("got superuser record...");
+
+        let access = registry.access(&superuser, &localhost).await?;
+        assert_eq!(access.has_super(), true);
+println!("one");
+        let access = registry.access(&superuser, &app).await?;
+        assert_eq!(access.has_super(), true);
+
+println!("two");
+        let access = registry.access(&app, &scott).await?;
+        assert_eq!(access.has_super(), false);
+println!("owner?");
+        assert_eq!(access.has_owner(), true);
+println!("owner.");
+        assert_eq!(access.has_full(), true);
+
+        let access = registry.access(&scott, &superuser).await?;
+        assert_eq!(access.has_super(), false);
+        assert_eq!(access.has_full(), false);
+        assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
+
+        // should fail because app is not the owner of localhost:app yet...
+        let access = registry.access(&scott, &app).await?;
+        assert_eq!(access.has_super(), false);
+        assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
+println!("chown?");
+        // must have super to chagne ownership
+        let app_pattern = Selector::from_str("localhost:app+:**")?;
+        assert!(registry.chown(&app_pattern, &app, &scott).await.is_err());
+        // this should work:
+        assert!(registry.chown(&app_pattern, &app, &superuser).await.is_ok());
+println!("chown...");
+
+        // now the previous rule should work since app now owns itself.
+        let access = registry.access(&scott, &app).await?;
+        assert_eq!(access.has_super(), false);
+        assert_eq!(access.permissions().to_string(), "csd-Rwx".to_string());
+
+        let access = registry.access(&scott, &superuser).await?;
+        assert_eq!(access.has_super(), false);
+        assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
+
+        // mem masked OR permissions
+        let access = registry.access(&scott, &mechtron).await?;
+        assert_eq!(access.has_super(), false);
+        assert_eq!(access.permissions().to_string(), "csd-RwX".to_string());
+println!("got here...");
+        // now mem AND permissions (masking Read)
+        let grant = AccessGrant {
+            kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("&csd-rwX")?),
+            on_point: Selector::from_str("localhost:app:**<Mechtron>")?,
+            to_point: Selector::from_str("localhost:app:users:**<User>")?,
+            by_particle: app.clone(),
+        };
+        registry.grant(&grant).await?;
+
+        let access = registry.access(&scott, &mechtron).await?;
+        assert_eq!(access.has_super(), false);
+        assert_eq!(access.permissions().to_string(), "csd-rwX".to_string());
+
+        let access = registry.access(&mechtron, &scott).await?;
+        assert_eq!(access.has_super(), false);
+        assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
+        assert!(access.check_privilege("property:email:read").is_ok());
+println!("and here...");
+        let access_grants = registry
+            .list_access(&None, &Selector::from_str("+:**")?)
+            .await?;
+println!("lising access grants...");
+        println!(
+            "{: <4}{:<6}{:<20}{:<40}{:<40}{:<40}",
+            "id", "grant", "data", "on", "to", "by"
+        );
+        for access_grant in &access_grants {
+            println!(
+                "{: <4}{:<6}{:<20}{:<40}{:<40}{:<40}",
+                access_grant.id,
+                access_grant.access_grant.kind.to_string(),
+                match &access_grant.kind {
+                    AccessGrantKind::Super => "".to_string(),
+                    AccessGrantKind::Privilege(prv) => prv.to_string(),
+                    AccessGrantKind::PermissionsMask(perm) => perm.to_string(),
+                },
+                access_grant.access_grant.on_point.to_string(),
+                access_grant.to_point.to_string(),
+                access_grant.by_particle.to_string()
+            );
+            //            registry.remove_access(access_grant.id, &app ).await?;
+        }
+
+        Ok(())
+    }
 }

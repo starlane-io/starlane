@@ -1,6 +1,5 @@
 use crate::mem::cosmos::MemCosmos;
 use crate::err::CosmicErr;
-use crate::{Registration, RegistryApi};
 use cosmic_universe::command::common::{PropertyMod, SetProperties};
 use cosmic_universe::command::direct::delete::Delete;
 use cosmic_universe::command::direct::query::{Query, QueryResult};
@@ -13,10 +12,11 @@ use cosmic_universe::selector::Selector;
 use cosmic_universe::substance::SubstanceList;
 use dashmap::DashMap;
 use std::sync::atomic::AtomicU64;
-use std::sync::{atomic, Arc};
+use std::sync::{Arc, atomic};
 use dashmap::mapref::one::Ref;
 use tokio::sync::oneshot;
 use cosmic_universe::parse::get_properties;
+use crate::reg::{Registration, RegistryApi};
 
 impl MemRegCtx {
     pub fn new() -> Self {
@@ -51,7 +51,12 @@ impl MemRegApi {
 
 #[async_trait]
 impl RegistryApi<MemCosmos> for MemRegApi {
-    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<Details, CosmicErr> {
+    async fn nuke<'a>(&'a self) -> Result<(), CosmicErr> {
+        todo!()
+    }
+
+    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), CosmicErr> {
+println!("REG: {}",registration.point.to_string());
         self.set_properties(&registration.point, &registration.properties).await?;
 
         let details = Details {
@@ -69,7 +74,7 @@ impl RegistryApi<MemCosmos> for MemRegApi {
         self.ctx
             .particles
             .insert(registration.point.clone(), record);
-        Ok(details)
+        Ok(())
     }
 
     async fn assign<'a>(

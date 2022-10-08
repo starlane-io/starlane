@@ -9,12 +9,12 @@ use std::time::Duration;
 
 use dashmap::mapref::one::{Ref, RefMut};
 use dashmap::DashMap;
-use futures::future::{join_all, BoxFuture};
+use futures::future::{BoxFuture, join_all};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
+use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock, watch};
 use tokio::time::error::Elapsed;
 use tracing::{error, info};
 
@@ -36,11 +36,11 @@ use cosmic_universe::hyper::{
 use cosmic_universe::hyper::{MountKind, ParticleLocation};
 use cosmic_universe::kind::{BaseKind, Kind, StarStub, StarSub, Sub};
 use cosmic_universe::loc::{
-    Layer, Point, RouteSeg, StarKey, Surface, SurfaceSelector, ToBaseKind, ToPoint, ToSurface,
-    Topic, Uuid, GLOBAL_EXEC, LOCAL_STAR,
+    GLOBAL_EXEC, Layer, LOCAL_STAR, Point, RouteSeg, StarKey, Surface, SurfaceSelector, ToBaseKind,
+    Topic, ToPoint, ToSurface, Uuid,
 };
 use cosmic_universe::log::{PointLogger, RootLogger, Trackable, Tracker};
-use cosmic_universe::parse::{bind_config, route_attribute, Env};
+use cosmic_universe::parse::{bind_config, Env, route_attribute};
 use cosmic_universe::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
@@ -59,7 +59,7 @@ use cosmic_universe::wave::exchange::asynch::{
 use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::{
     Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
-    HandlingKind, Ping, Pong, Priority, RecipientSelector, Recipients, Reflectable, ReflectedWave,
+    HandlingKind, Ping, Pong, Priority, Recipients, RecipientSelector, Reflectable, ReflectedWave,
     Retries, Ripple, Scope, Signal, SingularRipple, ToRecipients, WaitTime, Wave, WaveKind,
 };
 use cosmic_universe::wave::{HyperWave, UltraWave};
@@ -67,8 +67,8 @@ use cosmic_universe::HYPERUSER;
 
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, DriverSkel,
-    DriverStatus, Drivers, DriversApi, DriversCall, HyperDriverFactory, Item, ItemHandler,
+    Driver, DriverAvail, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, Drivers,
+    DriversApi, DriversCall, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler,
     ItemSkel, ItemSphere,
 };
 use crate::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
@@ -76,8 +76,9 @@ use crate::layer::field::Field;
 use crate::layer::shell::Shell;
 use crate::layer::shell::ShellState;
 use crate::machine::MachineSkel;
-use crate::Registration;
-use crate::{Cosmos, DriversBuilder, HyperErr, Registry, RegistryApi};
+use crate::reg::{Registration, Registry, RegistryApi};
+use crate::{Cosmos, DriversBuilder};
+use crate::err::HyperErr;
 
 #[derive(Clone)]
 pub struct ParticleStates<P>
@@ -190,6 +191,22 @@ where
             logger.clone(),
         );
         let state = ParticleStates::new();
+        state.create_shell(point.clone());
+
+        let registration = Registration {
+            point: point.clone(),
+            kind: Kind::Star(template.kind.clone()),
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: point.clone(),
+            strategy: Strategy::Ensure,
+            status: Status::Unknown
+        };
+
+        machine.registry.register(&registration).await.unwrap();
+        machine.registry.assign(&point, ParticleLocation::new(point.clone(),None)).await.unwrap();
+
+
         let api = HyperStarApi::new(
             template.kind.clone(),
             star_tx.call_tx.clone(),
@@ -276,7 +293,7 @@ where
             registry: Default::default(),
             properties: Default::default(),
             owner: self.point.clone(),
-            strategy: Strategy::Override,
+            strategy: Strategy::Ensure,
             status: Status::Ready
         };
 
@@ -296,9 +313,9 @@ where
             return Err(P::Err::new(format!("cannot create_in_star in star {} for parent point {} since it is not a point within this star", self.point.to_string(), create.template.point.parent.to_string())));
         }
 
-        let logger = self.logger.push_mark("create").unwrap();
+        let logger = self.logger.push_mark("create-in-star").unwrap();
         let global = GlobalExecutionChamber::new(self.clone());
-        let details = self.logger.result_ctx(
+        let point_kind = self.logger.result_ctx(
             format!(
                 "StarSkel::create_in_star(register({}))",
                 create.template.kind.to_string()
@@ -306,13 +323,23 @@ where
             .as_str(),
             global.create(&create, &Agent::HyperUser).await,
         )?;
+
+        let details = Details {
+            stub: Stub{
+                point: point_kind.point,
+                kind: point_kind.kind,
+                status: Status::Unknown
+            },
+            properties: Default::default(),
+        };
+
         let assign_body = Assign::new(AssignmentKind::Create, details.clone(), StateSrc::None);
         let mut assign = DirectedProto::sys(
             self.point.clone().to_surface().with_layer(Layer::Core),
             HypMethod::Assign,
         );
 
-        assign.body(assign_body.into());
+        assign.body(assign_body.clone().into());
         let router = Arc::new(LayerInjectionRouter::new(
             self.clone(),
             self.point.clone().to_surface().with_layer(Layer::Shell),
@@ -320,6 +347,12 @@ where
         let mut transmitter = ProtoTransmitterBuilder::new(router, self.exchanger.clone());
         transmitter.from = SetStrategy::Override(self.point.to_surface().with_layer(Layer::Core));
         transmitter.agent = SetStrategy::Override(Agent::HyperUser);
+        transmitter.handling = SetStrategy::Override(Handling {
+            kind: HandlingKind::Durable,
+            priority: Default::default(),
+            retries: Default::default(),
+            wait: WaitTime::High
+        } );
         let transmitter = transmitter.build();
         let assign_result: Wave<Pong> = logger.result_ctx(
             "StarSkel::create(assign_result)",
@@ -659,6 +692,7 @@ where
             star_tx.drivers_status_rx.clone(),
         );
 
+
         let star_rx = star_tx.call_rx.take().unwrap();
         let star_tx = star_tx.call_tx;
 
@@ -765,6 +799,8 @@ where
                                     .unwrap();
                                 star_driver.init_item(skel.point.to_point()).await;
                                 api.start_wrangling().await;
+// seeing if wrangling can wait on MachineApi...
+status_tx.send(Status::Ready).await;
                             }
                             DriverStatus::Retrying(_) => {
                                 status_tx.send(Status::Panic).await;
@@ -841,6 +877,7 @@ where
                 }
             });
         }
+
 
         let kind = skel.kind.clone();
         {
@@ -1100,9 +1137,19 @@ where
                         }
                     }
                     _ => {
+if wave.track() {
+    println!("sharding {} to {}", wave.kind().to_string(), wave.to().to_string());
+}
                         let to = wave.to().unwrap_single();
                         let location = locator.locate(&to.point).await?;
+if wave.track() {
+    println!("\twith LOCATION {} in {}", location.star.to_string(), skel.point.to_string() );
+}
+
                         if location.star == skel.point {
+if wave.track() {
+    println!("\tSAME POINT -> {} to {}", wave.kind().to_string(), wave.to().to_string());
+}
                             let mut inject = TraversalInjection::new(
                                 skel.point.to_surface().with_layer(Layer::Gravity),
                                 wave,
@@ -1177,6 +1224,11 @@ where
     }
 
     async fn start_wrangling(&self) {
+
+        self.skel.machine.api.wait_ready().await;
+
+
+
         let skel = self.skel.clone();
         tokio::spawn(async move {
             let mut retries = 0;
@@ -1386,7 +1438,7 @@ where
                 }
             } else if to.point == wave.from().point {
                 if wave.track() {
-                    println!("\twave is to and from the same point...")
+                    println!("\twave is to and from the same point... {} <{}>", wave.from().to_string(), wave.kind().to_string() )
                 }
                 // it's the SAME point, so the to layer becomes our dest
                 dest.replace(to.layer.clone());
@@ -1933,6 +1985,7 @@ where
         point: &Point,
         state: StateSrc,
     ) -> Result<ParticleLocation, P::Err> {
+println!("\tPROVISIONING: {}",point.to_string());
         // check if parent is provisioned
         let parent = point
             .parent()

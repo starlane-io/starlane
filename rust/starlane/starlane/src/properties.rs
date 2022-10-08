@@ -2,16 +2,15 @@ use cosmic_universe::err::UniErr;
 use cosmic_universe::kind::BaseKind;
 use cosmic_universe::loc::ToBaseKind;
 use cosmic_universe::particle::property::{AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit, PropertySource, U64Pattern, UsernamePattern};
-use crate::{DEFAULT_PROPERTIES_CONFIG, MECHTRON_PROERTIES_CONFIG, UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG, USER_BASE_PROPERTIES_CONFIG, USER_PROPERTIES_CONFIG};
 
 
 lazy_static! {
-    pub static ref DEFAULT_PROPERTIES_CONFIG: PropertiesConfig = default_properties_config();
-    pub static ref USER_PROPERTIES_CONFIG: PropertiesConfig = user_properties_config();
-    pub static ref USER_BASE_PROPERTIES_CONFIG: PropertiesConfig = userbase_properties_config();
-    pub static ref MECHTRON_PROERTIES_CONFIG: PropertiesConfig = mechtron_properties_config();
+    pub static ref DEFAULT_PROPERTIES_CONFIG: PropertiesConfig = default_properties_config().unwrap();
+    pub static ref USER_PROPERTIES_CONFIG: PropertiesConfig = user_properties_config().unwrap();
+    pub static ref USER_BASE_PROPERTIES_CONFIG: PropertiesConfig = userbase_properties_config().unwrap();
+    pub static ref MECHTRON_PROERTIES_CONFIG: PropertiesConfig = mechtron_properties_config().unwrap();
     pub static ref UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG: PropertiesConfig =
-        unrequired_bind_and_config_properties_config();
+        unrequired_bind_and_config_properties_config().unwrap();
 }
 
 fn default_properties_config() -> Result<PropertiesConfig,UniErr> {

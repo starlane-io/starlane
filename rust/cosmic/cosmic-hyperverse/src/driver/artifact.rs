@@ -3,7 +3,7 @@ use crate::driver::{
     ItemHandler, ItemSkel, ItemSphere,
 };
 use crate::star::HyperStarSkel;
-use crate::{Cosmos, HyperErr};
+use crate::Cosmos;
 use acid_store::repo::key::KeyRepo;
 use acid_store::repo::value::ValueRepo;
 use acid_store::repo::Commit;
@@ -36,6 +36,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use tempdir::TempDir;
+use crate::err::HyperErr;
 
 lazy_static! {
     static ref REPO_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(

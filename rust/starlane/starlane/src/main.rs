@@ -1,5 +1,6 @@
 #![allow(warnings)]
 
+pub mod err;
 pub mod properties;
 
 #[macro_use]
@@ -17,38 +18,45 @@ use tokio::io;
 use tokio::runtime::Runtime;
 use uuid::Uuid;
 
-use cosmic_artifact::Artifacts;
-use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, HyperGateSelector, LocalHyperwayGateJumper};
-use cosmic_hyperverse::driver::{DriverAvail, DriversBuilder};
-use cosmic_hyperverse::machine::{Machine, MachineTemplate};
-use cosmic_hyperverse::Cosmos;
-use cosmic_hyperverse::{Registry, RegistryApi};
-use cosmic_hyperverse::driver::artifact::{ArtifactDriverFactory, BundleDriverFactory, BundleSeriesDriverFactory, RepoDriverFactory};
+use crate::err::StarErr;
+use cosmic_hyperlane::{
+    AnonHyperAuthenticator, HyperGate, HyperGateSelector, LocalHyperwayGateJumper,
+};
+use cosmic_hyperverse::driver::artifact::{
+    ArtifactDriverFactory, BundleDriverFactory, BundleSeriesDriverFactory, RepoDriverFactory,
+};
 use cosmic_hyperverse::driver::base::BaseDriverFactory;
 use cosmic_hyperverse::driver::control::ControlDriverFactory;
 use cosmic_hyperverse::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
 use cosmic_hyperverse::driver::root::RootDriverFactory;
 use cosmic_hyperverse::driver::space::SpaceDriverFactory;
+use cosmic_hyperverse::driver::{DriverAvail, DriversBuilder};
 use cosmic_hyperverse::err::CosmicErr;
+use cosmic_hyperverse::machine::{Machine, MachineTemplate};
+use cosmic_hyperverse::reg::{Registry, RegistryApi};
+use cosmic_hyperverse::Cosmos;
+use cosmic_registry_postgres::err::PostErr;
 use cosmic_registry_postgres::{
     PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
 };
-use cosmic_registry_postgres::err::PostErr;
 use cosmic_universe::artifact::ArtifactApi;
 use cosmic_universe::artifact::ReadArtifactFetcher;
 use cosmic_universe::command::direct::create::KindTemplate;
 use cosmic_universe::err::UniErr;
-use cosmic_universe::id2::BaseSubKind;
 use cosmic_universe::kind::{
     ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind,
 };
-use cosmic_universe::loc::ToBaseKind;
 use cosmic_universe::loc::{MachineName, StarKey};
-use cosmic_universe::particle::property::{AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertiesConfigBuilder, PropertyPermit, PropertySource, U64Pattern, UsernamePattern};
+use cosmic_universe::loc::{Point, ToBaseKind};
+use cosmic_universe::log::RootLogger;
+use cosmic_universe::particle::property::{
+    AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig,
+    PropertiesConfigBuilder, PropertyPermit, PropertySource, U64Pattern, UsernamePattern,
+};
 use cosmic_universe::substance::Token;
 
-fn main() -> Result<(), PostErr> {
+fn main() -> Result<(), StarErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -58,8 +66,16 @@ fn main() -> Result<(), PostErr> {
         tokio::time::timeout(Duration::from_secs(30), machine_api.wait_ready())
             .await
             .unwrap();
-        machine_api.wait().await.unwrap_or_default();
-    })
+println!("> MACHINE READY!");
+        // this is a dirty hack which is good enough for a 0.3.0 release...
+        loop {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+        }
+        let cl = machine_api.clone();
+        machine_api.await_termination().await.unwrap();
+        cl.terminate();
+    });
+    Ok(())
 }
 
 lazy_static! {
@@ -92,29 +108,26 @@ pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
     Utc::now()
 }
 
-
 #[derive(Clone)]
 pub struct Starlane {
-    pub ctx: PostgresRegistryContext
+    pub handle: PostgresRegistryContextHandle<Self>,
 }
 
 impl Starlane {
-    pub async fn new() -> Result<Self, Self::Err> {
-        let mut dbs = HashSet::new();
-        dbs.insert(Self::lookup_registry_db()?);
-        for star in stars {
-            dbs.insert(Self::lookup_star_db(&star)?);
-        }
-        let ctx = PostgresRegistryContext::new(dbs).await?;
-
-        Ok(Self { ctx })
+    pub async fn new() -> Result<Self, StarErr> {
+        let db = <Self as PostgresPlatform>::lookup_registry_db()?;
+        let mut set = HashSet::new();
+        set.insert(db.clone());
+        let ctx = Arc::new(PostgresRegistryContext::new(set).await?);
+        let handle = PostgresRegistryContextHandle::new(&db, ctx);
+        Ok(Self { handle })
     }
 }
 
 #[async_trait]
 impl Cosmos for Starlane {
-    type Err = CosmicErr;
-    type RegistryContext = PostgresRegistryContext;
+    type Err = StarErr;
+    type RegistryContext = PostgresRegistryContextHandle<Self>;
     type StarAuth = AnonHyperAuthenticator;
     type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
 
@@ -190,7 +203,11 @@ impl Cosmos for Starlane {
     }
 
     async fn global_registry(&self) -> Result<Registry<Self>, Self::Err> {
-        Ok(Arc::new(PostgresRegistryApi::new(self.ctx.clone())))
+        let logger = RootLogger::default();
+        let logger = logger.point(Point::global_registry());
+        Ok(Arc::new(
+            PostgresRegistry::new(self.handle.clone(), self.clone(), logger).await?,
+        ))
     }
 
     async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>, Self::Err> {
@@ -203,15 +220,6 @@ impl Cosmos for Starlane {
 
     fn start_services(&self, gate: &Arc<dyn HyperGate>) {}
 }
-
-
-
-
-
-
-
-
-
 
 impl PostgresPlatform for Starlane {
     fn lookup_registry_db() -> Result<PostgresDbInfo, Self::Err> {
@@ -233,4 +241,3 @@ impl PostgresPlatform for Starlane {
         ))
     }
 }
-

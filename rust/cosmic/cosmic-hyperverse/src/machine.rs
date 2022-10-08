@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
-use futures::future::{join_all, select_all, BoxFuture};
+use futures::future::{BoxFuture, join_all, select_all};
 use futures::FutureExt;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::error::RecvError;
@@ -39,7 +39,9 @@ use cosmic_universe::wave::{Agent, DirectedProto, HyperWave, Pong, UltraWave, Wa
 use cosmic_universe::wave::core::cmd::CmdMethod;
 
 use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
-use crate::{Cosmos, DriversBuilder, HyperErr, Registry, RegistryApi};
+use crate::{Cosmos, DriversBuilder};
+use crate::err::HyperErr;
+use crate::reg::{Registry, RegistryApi};
 
 #[derive(Clone)]
 pub struct MachineApi<P>
@@ -97,9 +99,9 @@ where
         rx.await;
     }
 
-    pub async fn wait(&self) -> Result<(), P::Err> {
+    pub async fn await_termination(&self) -> Result<(), P::Err> {
         let (tx, mut rx) = oneshot::channel();
-        self.tx.send(MachineCall::Wait(tx)).await;
+        self.tx.send(MachineCall::AwaitTermination(tx)).await;
         let mut rx = match rx.await {
             Ok(rx) => rx,
             Err(err) => {
@@ -385,12 +387,15 @@ where
             Timeouts::default(),
             logger.clone(),
         );
+        /*
         let client =
             HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger.clone())
                 .unwrap();
 
-        let fetcher = Arc::new(ClientArtifactFetcher::new(client, skel.registry.clone()));
-        skel.artifacts.set_fetcher(fetcher).await;
+         */
+
+//        let fetcher = Arc::new(ClientArtifactFetcher::new(client, skel.registry.clone()));
+//        skel.artifacts.set_fetcher(fetcher).await;
 
         machine.start().await;
         Ok(machine_api)
@@ -398,7 +403,6 @@ where
 
     async fn init0(&self) {
         let logger = self.logger.span();
-        logger.info("Machine::init_drivers()");
         let mut inits = vec![];
         for star in self.stars.values() {
             inits.push(star.init().boxed());
@@ -422,7 +426,7 @@ where
                     self.termination_broadcast_tx.send(Ok(()));
                     return Ok(());
                 }
-                MachineCall::Wait(tx) => {
+                MachineCall::AwaitTermination(tx) => {
                     tx.send(self.termination_broadcast_tx.subscribe());
                 }
                 MachineCall::WaitForReady(rtn) => {
@@ -498,7 +502,7 @@ where
 {
     Init,
     Terminate,
-    Wait(oneshot::Sender<broadcast::Receiver<Result<(), P::Err>>>),
+    AwaitTermination(oneshot::Sender<broadcast::Receiver<Result<(), P::Err>>>),
     WaitForReady(oneshot::Sender<()>),
     AddGate {
         kind: InterchangeKind,
@@ -525,7 +529,7 @@ where
     GetRegistry(oneshot::Sender<Registry<P>>),
 }
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq, strum_macros::Display)]
 pub enum MachineStatus {
     Pending,
     Init,

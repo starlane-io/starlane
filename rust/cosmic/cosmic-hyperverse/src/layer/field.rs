@@ -22,7 +22,9 @@ use cosmic_universe::wave::{
 };
 
 use crate::star::{HyperStarSkel, LayerInjectionRouter, TraverseToNextRouter};
-use crate::{Cosmos, HyperErr, RegistryApi};
+use crate::Cosmos;
+use crate::err::HyperErr;
+use crate::reg::RegistryApi;
 
 pub struct Field<P>
 where

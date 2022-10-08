@@ -1,3 +1,5 @@
+#![allow(warnings)]
+
 #[macro_use]
 extern crate async_trait;
 
@@ -31,7 +33,6 @@ use cosmic_universe::log::PointLogger;
 use cosmic_universe::substance::Substance;
 use cosmic_universe::wave::{Ping, UltraWave, Wave};
 use cosmic_universe::VERSION;
-
 pub struct HyperlaneTcpClient {
     host: String,
     cert_dir: String,
@@ -67,9 +68,7 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
                 HyperConnectionStatus::Connecting,
                 "init",
             ))
-            .await
-            .unwrap_or_default();
-        let (kill_tx, kill_rx) = broadcast::channel(1);
+            .await?;
         let mut connector: SslConnectorBuilder =
             SslConnector::builder(SslMethod::tls()).map_err(UniErr::map)?;
 
@@ -78,8 +77,7 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
                 HyperConnectionStatus::Connecting,
                 "loading cert",
             ))
-            .await
-            .unwrap_or_default();
+            .await?;
 
         connector
             .set_ca_file(format!("{}/cert.pem", self.cert_dir))
@@ -98,16 +96,14 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
                 HyperConnectionStatus::Connecting,
                 "connecting tcp stream",
             ))
-            .await
-            .unwrap_or_default();
+            .await?;
         let stream = TcpStream::connect(&self.host).await?;
         status_tx
             .send(HyperConnectionDetails::new(
                 HyperConnectionStatus::Connecting,
                 "creating ssl layer",
             ))
-            .await
-            .unwrap_or_default();
+            .await?;
         let mut stream = SslStream::new(ssl, stream).map_err(UniErr::map)?;
         Pin::new(&mut stream).connect().await.map_err(UniErr::map)?;
         let mut stream = FrameStream::new(stream);
@@ -116,22 +112,19 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
                 HyperConnectionStatus::Connecting,
                 "starting handshake",
             ))
-            .await
-            .unwrap_or_default();
+            .await?;
         let endpoint =
-            FrameMuxer::handshake(stream, kill_rx, status_tx.clone(), self.logger.clone()).await?;
+            FrameMuxer::handshake(stream, status_tx.clone(), self.logger.clone()).await?;
         status_tx
             .send(HyperConnectionDetails::new(
                 HyperConnectionStatus::Auth,
                 "sending knock",
             ))
-            .await
-            .unwrap_or_default();
+            .await?;
         let wave: Wave<Ping> = self.knock.clone().into();
         let wave = wave.to_ultra();
-        endpoint.tx.send(wave).await.unwrap_or_default();
+        endpoint.tx.send(wave).await?;
 
-        println!("Returning HyperwayEndpoint");
         Ok(endpoint)
     }
 }
@@ -236,15 +229,12 @@ pub struct FrameMuxer {
     stream: FrameStream,
     tx: mpsc::Sender<UltraWave>,
     rx: mpsc::Receiver<UltraWave>,
-    terminate_rx: oneshot::Receiver<()>,
-    kill_rx: broadcast::Receiver<()>,
+    terminate_rx: mpsc::Receiver<()>,
     logger: PointLogger,
 }
-
 impl FrameMuxer {
     pub async fn handshake(
         mut stream: FrameStream,
-        kill_rx: broadcast::Receiver<()>,
         status_tx: mpsc::Sender<HyperConnectionDetails>,
         logger: PointLogger,
     ) -> Result<HyperwayEndpoint, UniErr> {
@@ -253,12 +243,10 @@ impl FrameMuxer {
                 HyperConnectionStatus::Handshake,
                 "exchanging versions",
             ))
-            .await
-            .unwrap_or_default();
+            .await?;
         stream.write_version(&VERSION.clone()).await?;
         let in_version =
             tokio::time::timeout(Duration::from_secs(30), stream.read_version()).await??;
-        logger.info(format!("remote version: {}", in_version.to_string()));
 
         if in_version == *VERSION {
             logger.info("version match");
@@ -267,8 +255,7 @@ impl FrameMuxer {
                     HyperConnectionStatus::Handshake,
                     "version match",
                 ))
-                .await
-                .unwrap_or_default();
+                .await?;
             stream.write_string("Ok".to_string()).await?;
         } else {
             logger.warn("version mismatch");
@@ -277,8 +264,7 @@ impl FrameMuxer {
                     HyperConnectionStatus::Handshake,
                     "version mismatch",
                 ))
-                .await
-                .unwrap_or_default();
+                .await?;
             let msg = format!(
                 "Err(\"expected version {}. encountered version {}\")",
                 VERSION.to_string(),
@@ -292,8 +278,7 @@ impl FrameMuxer {
                 HyperConnectionStatus::Handshake,
                 "waiting for Ok",
             ))
-            .await
-            .unwrap_or_default();
+            .await?;
         let result = tokio::time::timeout(Duration::from_secs(30), stream.read_string()).await??;
         if "Ok".to_string() != result {
             return logger.result(Err(format!(
@@ -308,49 +293,70 @@ impl FrameMuxer {
                 HyperConnectionStatus::Handshake,
                 "handshake complete",
             ))
-            .await
-            .unwrap_or_default();
-        logger.info("remote signaled Ok");
+            .await?;
 
-        Ok(Self::new(stream, kill_rx, logger))
+        Ok(Self::new(stream, logger))
     }
 
     pub fn new(
         stream: FrameStream,
-        kill_rx: broadcast::Receiver<()>,
         logger: PointLogger,
     ) -> HyperwayEndpoint {
         let (in_tx, in_rx) = mpsc::channel(1024);
         let (out_tx, out_rx) = mpsc::channel(1024);
-        let (terminate_tx, terminate_rx) = oneshot::channel();
+        let (terminate_tx, mut terminate_rx) = mpsc::channel(1);
         let mut muxer = Self {
             stream,
             tx: in_tx,
             rx: out_rx,
             terminate_rx,
-            kill_rx,
-            logger,
+            logger: logger.clone(),
         };
-        tokio::spawn(async move {
-            muxer.mux().await.unwrap_or_default();
+        {
+            let logger = logger.clone();
+            tokio::spawn(async move {
+                logger.result(muxer.mux().await).unwrap();
+            });
+        }
+
+        let (oneshot_terminate_tx,mut oneshot_terminate_rx) = oneshot::channel();
+        tokio::spawn( async move {
+            oneshot_terminate_rx.await.unwrap_or_default();
+            terminate_tx.send(()).await.unwrap_or_default();
         });
-        HyperwayEndpoint::new_with_drop(out_tx, in_rx, terminate_tx)
+        HyperwayEndpoint::new_with_drop(out_tx, in_rx, oneshot_terminate_tx, logger)
+
     }
 
     pub async fn mux(mut self) -> Result<(), UniErr> {
         loop {
             tokio::select! {
-                            Some(wave) = self.rx.recv() => {
-            self.logger.info(format!("Writing wave: {}", wave.desc()));
-                                self.stream.write_wave(wave).await?;
+                            wave = self.rx.recv() => {
+                                match wave {
+                                    None => {
+                                        self.logger.warn("rx discon");
+                                        break
+                                    },
+                                    Some(wave) => {
+                                       self.stream.write_wave(wave.clone()).await?;
+                                    }
+                                }
                             }
-                            Ok(wave) = self.stream.read_wave() => {
-            self.logger.info(format!("Reading wave: {}", wave.desc()));
+                            wave = self.stream.read_wave() => {
+                                match wave {
+                                   Ok(wave) => {
                                 self.tx.send(wave).await?;
+                                   },
+                                   Err(err) => {
+                                      self.logger.error(format!("ERR_NO {}",err.to_string()));
+                                      break
+                                   }
+                                }
                             }
-                            _ = self.kill_rx.recv() => {
-                                return Ok(());
-                            }
+                            _ = self.terminate_rx.recv() => {
+                                 self.logger.warn(format!("terminated"));
+                                 return Ok(())
+                                }
                         }
         }
         Ok(())
@@ -369,6 +375,7 @@ impl FrameStream {
     pub async fn frame(&mut self) -> Result<Frame, UniErr> {
         Frame::from_stream(&mut self.stream).await
     }
+
     pub async fn read_version(&mut self) -> Result<semver::Version, UniErr> {
         self.frame().await?.to_version()
     }
@@ -466,7 +473,6 @@ impl HyperlaneTcpServer {
                     server_kill_rx: broadcast::Receiver<()>,
                     logger: PointLogger,
                 ) -> Result<(), Error> {
-                    logger.info("accepted new client");
                     let mut stream = SslStream::new(ssl, stream)?;
 
                     Pin::new(&mut stream).accept().await?;
@@ -489,7 +495,7 @@ impl HyperlaneTcpServer {
                         });
                     }
                     let mut mux =
-                        FrameMuxer::handshake(stream, server_kill_rx, status_tx, logger.clone())
+                        FrameMuxer::handshake(stream, status_tx, logger.clone())
                             .await?;
 
                     let knock = tokio::time::timeout(Duration::from_secs(30), mux.rx.recv())
@@ -599,10 +605,24 @@ mod tests {
     use cosmic_universe::loc::{Point, ToSurface};
     use cosmic_universe::log::RootLogger;
 
+    use chrono::DateTime;
+    use chrono::Utc;
+
     use super::*;
 
+    #[no_mangle]
+    pub extern "C" fn cosmic_uuid() -> String {
+        uuid::Uuid::new_v4().to_string()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
+        Utc::now()
+    }
+
+
     #[tokio::test]
-    async fn test() -> Result<(), Error> {
+    async fn test_tcp() -> Result<(), Error> {
         let platform = SingleInterchangePlatform::new().await;
 
         CertGenerator::gen(vec!["localhost".to_string()])?
@@ -624,6 +644,7 @@ mod tests {
             false,
             less_logger,
         ));
+
         let fae_logger = logger.point(FAE.clone());
         let fae_client = Box::new(HyperlaneTcpClient::new(
             format!("localhost:{}", port),
@@ -633,7 +654,7 @@ mod tests {
             fae_logger,
         ));
 
-        let test = WaveTest::new(less_client, fae_client);
+        let test = WaveTest::new(fae_client, less_client );
 
         test.go().await.unwrap();
 

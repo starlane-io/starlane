@@ -3,7 +3,7 @@ use crate::driver::{
     ItemRouter, ItemSphere,
 };
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::{Cosmos, HyperErr};
+use crate::Cosmos;
 use cosmic_hyperlane::{
     AnonHyperAuthenticatorAssignEndPoint, FromTransform, HopTransform, HyperClient, HyperGreeter,
     Hyperway, HyperwayConfigurator, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub,
@@ -39,6 +39,7 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use crate::err::HyperErr;
 
 pub struct ControlDriverFactory<P>
 where

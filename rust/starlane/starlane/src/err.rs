@@ -1,99 +1,29 @@
-use cosmic_universe::err::UniErr;
-use cosmic_universe::substance::Substance;
-use cosmic_universe::wave::core::http2::StatusCode;
-use cosmic_universe::wave::core::ReflectedCore;
-use mechtron_host::err::HostErr;
-use std::fmt::Debug;
-use std::io;
-use std::io::Error;
-use std::str::Utf8Error;
-use std::string::FromUtf8Error;
-use tokio::sync::oneshot;
-use tokio::sync::oneshot::error::RecvError;
-use tokio::time::error::Elapsed;
-use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
+use cosmic_hyperverse::err::ErrKind;
+use cosmic_registry_postgres::err::PostErr;
 
-#[derive(Debug, Clone,Eq, PartialEq)]
-pub enum ErrKind {
-    Default,
-    Dupe,
-    Status(u16),
-}
+pub trait StarlaneErr: PostErr {}
 
-#[derive(Debug, Clone)]
-pub struct CosmicErr {
+#[derive(Debug,Clone)]
+pub struct StarErr {
     pub kind: ErrKind,
     pub message: String,
 }
 
-pub trait HyperErr:
-    Sized
-    + Debug
-    + Send
-    + Sync
-    + ToString
-    + Clone
-    + HostErr
-    + Into<UniErr>
-    + From<UniErr>
-    + From<String>
-    + From<&'static str>
-    + From<tokio::sync::oneshot::error::RecvError>
-    + From<std::io::Error>
-    + From<zip::result::ZipError>
-    + From<Box<bincode::ErrorKind>>
-    + From<acid_store::Error>
-    + From<UniErr>
-    + Into<UniErr>
-    + From<()>
-{
-    fn to_uni_err(&self) -> UniErr;
+impl StarlaneErr for StarErr {}
 
-    fn new<S>(message: S) -> Self
-    where
-        S: ToString;
-
-    fn status_msg<S>(status: u16, message: S) -> Self
-    where
-        S: ToString;
-
-    fn not_found() -> Self {
-        Self::not_found_msg("Not Found")
-    }
-
-    fn not_found_msg<S>(message: S) -> Self
-    where
-        S: ToString,
-    {
-        Self::status_msg(404, message)
-    }
-
-    fn status(&self) -> u16;
-
-    fn as_reflected_core(&self) -> ReflectedCore {
-        let mut core = ReflectedCore::new();
-        core.status =
-            StatusCode::from_u16(self.status()).unwrap_or(StatusCode::from_u16(500u16).unwrap());
-        core.body = Substance::Empty;
-        core
-    }
-
-    fn kind(&self) -> ErrKind;
-
-    fn with_kind<S>(kind: ErrKind, msg: S) -> Self
-    where
-        S: ToString;
-}
 
 pub mod convert {
-    use crate::err::{CosmicErr as Err, ErrKind};
-    use crate::HyperErr;
+    use crate::err::StarErr as Err;
     use bincode::ErrorKind;
+    use cosmic_hyperverse::err::{ErrKind, HyperErr};
+    use cosmic_registry_postgres::err::PostErr;
     use cosmic_universe::err::UniErr;
     use mechtron_host::err::HostErr;
+    use sqlx::Error;
     use std::io;
     use std::str::Utf8Error;
-    use std::string::FromUtf8Error;
+    use std::string::{FromUtf8Error};
+    use strum::ParseError;
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
@@ -112,13 +42,14 @@ pub mod convert {
             self.message.clone()
         }
     }
-
-    impl From<()> for Err {
-        fn from(_: ()) -> Self {
-            Err::new("Empty")
+    impl PostErr for Err {
+        fn dupe() -> Self {
+            Self {
+                kind: ErrKind::Dupe,
+                message: "Dupe".to_string(),
+            }
         }
     }
-
     impl HyperErr for Err {
         fn to_uni_err(&self) -> UniErr {
             UniErr::from_500(self.to_string())
@@ -160,6 +91,25 @@ pub mod convert {
             }
         }
     }
+
+    impl From<()> for Err {
+        fn from(_: ()) -> Self {
+            Err::new("empty")
+        }
+    }
+
+    impl From<ParseError> for Err {
+        fn from(e: ParseError) -> Self {
+            Err::new(e)
+        }
+    }
+
+    impl From<sqlx::Error> for Err {
+        fn from(e: sqlx::Error) -> Self {
+            Err::new(e)
+        }
+    }
+
     impl Into<UniErr> for Err {
         fn into(self) -> UniErr {
             UniErr::from_500(self.to_string())
@@ -220,7 +170,6 @@ pub mod convert {
         }
     }
 
-
     impl From<ExportError> for Err {
         fn from(e: ExportError) -> Self {
             Err::new(e)
@@ -262,6 +211,4 @@ pub mod convert {
             Err::new(e)
         }
     }
-
-
 }

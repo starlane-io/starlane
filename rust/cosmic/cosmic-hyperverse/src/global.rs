@@ -17,7 +17,7 @@ use cosmic_universe::log::{PointLogger, RootLogger};
 use cosmic_universe::parse::error::result;
 use cosmic_universe::parse::route_attribute;
 use cosmic_universe::parse::{bind_config, command_line};
-use cosmic_universe::particle::{Details, Status};
+use cosmic_universe::particle::{Details, PointKind, Status};
 use cosmic_universe::substance::Substance;
 use cosmic_universe::util::{log, ToResolved};
 use cosmic_universe::wave::core::hyp::HypMethod;
@@ -38,8 +38,9 @@ use crate::driver::{
     Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere,
 };
 use crate::star::{HyperStarSkel, SmartLocator};
-use crate::Registration;
-use crate::{Cosmos, DriverFactory, HyperErr, Registry};
+use crate::reg::{Registration, Registry};
+use crate::{Cosmos, DriverFactory};
+use crate::err::HyperErr;
 
 /*
 #[derive(DirectedHandler,Clone)]
@@ -107,12 +108,12 @@ where
         let global = GlobalExecutionChamber::new(self.skel.clone());
         let agent = ctx.wave().agent().clone();
         match ctx.input {
-            Command::Create(create) => Ok(ctx.ok_body(
-                self.skel
-                    .logger
-                    .result(global.create(create, &agent).await)?
-                    .into(),
-            )),
+            Command::Create(create) => {
+                    self.skel.logger.result(global.create(create, &agent).await)?;
+                Ok(ReflectedCore::ok())
+            }
+
+
             _ => Err(P::Err::new("not implemented")),
         }
     }
@@ -136,7 +137,7 @@ where
     }
 
     #[track_caller]
-    pub async fn create(&self, create: &Create, agent: &Agent) -> Result<Details, P::Err> {
+    pub async fn create(&self, create: &Create, agent: &Agent) -> Result<PointKind, P::Err> {
         let child_kind = self
             .skel
             .machine
@@ -148,7 +149,7 @@ where
                     create.template.kind.to_string()
                 ))
             })?;
-        let details = match &create.template.point.child_segment_template {
+        let point= match &create.template.point.child_segment_template {
             PointSegTemplate::Exact(child_segment) => {
                 let point = create.template.point.parent.push(child_segment.clone());
                 match &point {
@@ -181,7 +182,8 @@ where
                     status: Status::Ready,
                 };
                 let mut result = self.skel.registry.register(&registration).await;
-                result?
+                result?;
+                point
             }
             PointSegTemplate::Pattern(pattern) => {
                 if !pattern.contains("%") {
@@ -204,19 +206,22 @@ where
                     status: Status::Ready,
                 };
 
-                self.skel.registry.register(&registration).await?
+                self.skel.registry.register(&registration).await?;
+                point
             }
         };
 
-        if create.state.has_substance() || details.stub.kind.is_auto_provision() {
+        if create.state.has_substance() || child_kind.is_auto_provision() {
             let provisioner = SmartLocator::new(self.skel.clone());
             //tokio::spawn(async move {
             provisioner
-                .provision(&details.stub.point, create.state.clone())
+                .provision(&point, create.state.clone())
                 .await?;
             //});
         }
 
-        Ok(details)
+        let point_kind = PointKind::new( point,child_kind );
+
+        Ok(point_kind)
     }
 }
