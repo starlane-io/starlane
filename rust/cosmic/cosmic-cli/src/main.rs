@@ -15,6 +15,7 @@ use cosmic_universe::substance::Substance;
 use cosmic_universe::wave::core::ReflectedCore;
 use std::str::FromStr;
 use std::time::Duration;
+use cosmic_universe::hyper::{InterchangeKind, Knock};
 
 #[tokio::main]
 async fn main() -> Result<(), UniErr> {
@@ -35,7 +36,7 @@ async fn main() -> Result<(), UniErr> {
                 .takes_value(true)
                 .value_name("certs")
                 .required(false)
-                .default_value("."),
+                .default_value("./certs"),
         )
         .allow_external_subcommands(true)
         .get_matches();
@@ -50,22 +51,25 @@ async fn main() -> Result<(), UniErr> {
 }
 
 async fn command(host: String, certs: String, command: &str) -> Result<(), UniErr> {
-    let platform = SingleInterchangePlatform::new().await;
+println!("COMMAND");
     let logger = RootLogger::default();
-    let logger = logger.point(Point::from_str("client")?);
+    let logger = logger.point(Point::from_str("cosmic-cli")?);
     let tcp_client: Box<dyn HyperwayEndpointFactory> = Box::new(HyperlaneTcpClient::new(
         format!("{}:{}", host, 4343),
         certs,
-        platform.knock(Point::from_str("client")?.to_surface()),
+        Knock::default(),
         false,
         logger,
     ));
 
     let client = ControlClient::new(tcp_client)?;
+println!("launching!");
     client.wait_for_ready(Duration::from_secs(5)).await?;
+println!("READY!");
 
     tokio::time::sleep(Duration::from_secs(1)).await;
     let cli = client.new_cli_session().await?;
+println!("Got CLI session!");
 
     match cli.exec(command).await {
         Ok(ok) => match ok.body {

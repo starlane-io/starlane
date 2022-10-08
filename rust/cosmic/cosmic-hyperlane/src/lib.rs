@@ -2127,8 +2127,8 @@ pub mod test_util {
             Self { interchange, gate }
         }
 
-        pub fn knock(&self, port: Surface) -> Knock {
-            Knock::new(InterchangeKind::Singleton, port, Substance::Empty)
+        pub fn knock(&self, surface: Surface) -> Knock {
+            Knock::new(InterchangeKind::Singleton, surface, Substance::Empty)
         }
 
         pub fn local_hyperway_endpoint_factory(

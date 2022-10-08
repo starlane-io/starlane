@@ -298,10 +298,7 @@ impl FrameMuxer {
         Ok(Self::new(stream, logger))
     }
 
-    pub fn new(
-        stream: FrameStream,
-        logger: PointLogger,
-    ) -> HyperwayEndpoint {
+    pub fn new(stream: FrameStream, logger: PointLogger) -> HyperwayEndpoint {
         let (in_tx, in_rx) = mpsc::channel(1024);
         let (out_tx, out_rx) = mpsc::channel(1024);
         let (terminate_tx, mut terminate_rx) = mpsc::channel(1);
@@ -319,45 +316,44 @@ impl FrameMuxer {
             });
         }
 
-        let (oneshot_terminate_tx,mut oneshot_terminate_rx) = oneshot::channel();
-        tokio::spawn( async move {
+        let (oneshot_terminate_tx, mut oneshot_terminate_rx) = oneshot::channel();
+        tokio::spawn(async move {
             oneshot_terminate_rx.await.unwrap_or_default();
             terminate_tx.send(()).await.unwrap_or_default();
         });
         HyperwayEndpoint::new_with_drop(out_tx, in_rx, oneshot_terminate_tx, logger)
-
     }
 
     pub async fn mux(mut self) -> Result<(), UniErr> {
         loop {
             tokio::select! {
-                            wave = self.rx.recv() => {
-                                match wave {
-                                    None => {
-                                        self.logger.warn("rx discon");
-                                        break
-                                    },
-                                    Some(wave) => {
-                                       self.stream.write_wave(wave.clone()).await?;
-                                    }
-                                }
-                            }
-                            wave = self.stream.read_wave() => {
-                                match wave {
-                                   Ok(wave) => {
-                                self.tx.send(wave).await?;
-                                   },
-                                   Err(err) => {
-                                      self.logger.error(format!("ERR_NO {}",err.to_string()));
-                                      break
-                                   }
-                                }
-                            }
-                            _ = self.terminate_rx.recv() => {
-                                 self.logger.warn(format!("terminated"));
-                                 return Ok(())
-                                }
+                wave = self.rx.recv() => {
+                    match wave {
+                        None => {
+                            self.logger.warn("rx discon");
+                            break
+                        },
+                        Some(wave) => {
+                           self.stream.write_wave(wave.clone()).await?;
                         }
+                    }
+                }
+                wave = self.stream.read_wave() => {
+                    match wave {
+                       Ok(wave) => {
+                    self.tx.send(wave).await?;
+                       },
+                       Err(err) => {
+                          self.logger.error(format!("read stream err: {}",err.to_string()));
+                          break
+                       }
+                    }
+                }
+                _ = self.terminate_rx.recv() => {
+                     self.logger.warn(format!("terminated"));
+                     return Ok(())
+                    }
+            }
         }
         Ok(())
     }
@@ -494,9 +490,7 @@ impl HyperlaneTcpServer {
                             }
                         });
                     }
-                    let mut mux =
-                        FrameMuxer::handshake(stream, status_tx, logger.clone())
-                            .await?;
+                    let mut mux = FrameMuxer::handshake(stream, status_tx, logger.clone()).await?;
 
                     let knock = tokio::time::timeout(Duration::from_secs(30), mux.rx.recv())
                         .await?
@@ -620,7 +614,6 @@ mod tests {
         Utc::now()
     }
 
-
     #[tokio::test]
     async fn test_tcp() -> Result<(), Error> {
         let platform = SingleInterchangePlatform::new().await;
@@ -654,7 +647,7 @@ mod tests {
             fae_logger,
         ));
 
-        let test = WaveTest::new(fae_client, less_client );
+        let test = WaveTest::new(fae_client, less_client);
 
         test.go().await.unwrap();
 

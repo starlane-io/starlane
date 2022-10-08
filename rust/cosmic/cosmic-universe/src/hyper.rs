@@ -347,7 +347,7 @@ impl Knock {
 impl Default for Knock {
     fn default() -> Self {
         Self {
-            kind: InterchangeKind::Control(ControlPattern::Any),
+            kind: InterchangeKind::DefaultControl,
             auth: Box::new(Substance::Empty),
             remote: None,
         }
