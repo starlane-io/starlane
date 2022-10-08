@@ -213,16 +213,13 @@ impl HyperwayEndpoint {
                 let my_tx = self.tx.clone();
                 tokio::spawn(async move {
                     let logger = endpoint.logger.push_mark("mux:tx").unwrap();
-                    logger.info("listening...");
                     while let Some(wave) = endpoint.rx.recv().await {
                         logger.track(&wave, || Tracker::new("hyperway-endpoint", "Rx"));
-                        logger.info(format!("\tforwarding outgoing wave: {}", wave.desc()));
                         match logger.result(my_tx.send(wave).await) {
                             Ok(_) => {},
                             Err(_) => break
                         }
                     }
-                    logger.warn("server outgoing stream closed");
                 });
             }
 
@@ -230,14 +227,11 @@ impl HyperwayEndpoint {
             while let Some(wave) = self.rx.recv().await {
                 logger
                     .track(&wave, || Tracker::new("hyperway-endpoint", "Tx"));
-                logger
-                    .info(format!("\tforwarding incoming wave: {}", wave.desc()));
                 match logger.result(end_tx.send(wave).await) {
                     Ok(_) => {}
                     Err(_) => break
                 }
             }
-            self.logger.warn("server incoming stream closed");
         });
     }
 
@@ -837,12 +831,10 @@ impl HyperAuthenticator for TokenAuthenticatorWithRemoteWhitelist {
 #[async_trait]
 impl HyperAuthenticator for AnonHyperAuthenticator {
     async fn auth(&self, req: Knock) -> Result<HyperwayStub, UniErr> {
-println!("received Knock!");
         let remote = req
             .remote
             .ok_or(UniErr::new(500, "required remote point request"))?;
 
-println!("returning AUth!");
         Ok(HyperwayStub {
             agent: Agent::Anonymous,
             remote,
@@ -1450,7 +1442,6 @@ impl HyperClient {
                                     }
                                 }
                                 if let Substance::Greet(greet) = &reflected.core().body {
-logger.info(format!("GREET RECEIVED: {}", greet.surface.to_string()));
                                     greet_tx.send(Some(greet.clone()));
                                 } else {
                                     status_tx
@@ -1728,7 +1719,6 @@ impl HyperClientRunner {
                         .await,
                     ) {
                         Ok(Ok(ext)) => {
-                            runner.logger.info("replaced HyperwayEndpoint");
                             runner.ext.replace(ext);
                             if let Err(_) =
                                 runner.status_tx.send(HyperConnectionStatus::Ready).await
@@ -2207,6 +2197,7 @@ pub mod test_util {
             {
                 let fae = FAE.clone();
                 tokio::spawn(async move {
+                    fae_client.wait_for_greet().await.unwrap();
                     let wave = fae_rx.recv().await.unwrap();
                     let mut reflected = ReflectedProto::new();
                     reflected.kind(ReflectedKind::Pong);
@@ -2223,13 +2214,13 @@ pub mod test_util {
 
             let (rtn, mut rtn_rx) = oneshot::channel();
             tokio::spawn(async move {
+                less_client.wait_for_greet().await.unwrap();
                 let mut hello = DirectedProto::ping();
                 hello.to(FAE.clone().to_surface());
                 hello.from(LESS.clone().to_surface());
                 hello.method(ExtMethod::new("Hello").unwrap());
                 hello.body(Substance::Empty);
                 let pong: Wave<Pong> = less_transmitter.direct(hello).await.unwrap();
-println!("STATUS == {}",pong.core.status.as_u16());
                 rtn.send(pong.core.status.as_u16() == 200u16);
             });
 
@@ -2254,7 +2245,6 @@ println!("STATUS == {}",pong.core.status.as_u16());
     #[async_trait]
     impl HyperGreeter for TestGreeter {
         async fn greet(&self, stub: HyperwayStub) -> Result<Greet, UniErr> {
-            println!("Sending GREETING to {}", stub.remote.to_string());
             Ok(Greet {
                 surface: stub.remote.clone(),
                 agent: stub.agent.clone(),

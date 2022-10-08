@@ -125,7 +125,6 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
         let wave = wave.to_ultra();
         endpoint.tx.send(wave).await?;
 
-        println!("Returning HyperwayEndpoint");
         Ok(endpoint)
     }
 }
@@ -248,7 +247,6 @@ impl FrameMuxer {
         stream.write_version(&VERSION.clone()).await?;
         let in_version =
             tokio::time::timeout(Duration::from_secs(30), stream.read_version()).await??;
-        logger.info(format!("remote version: {}", in_version.to_string()));
 
         if in_version == *VERSION {
             logger.info("version match");
@@ -296,7 +294,6 @@ impl FrameMuxer {
                 "handshake complete",
             ))
             .await?;
-        logger.info("remote signaled Ok");
 
         Ok(Self::new(stream, logger))
     }
@@ -341,18 +338,14 @@ impl FrameMuxer {
                                         break
                                     },
                                     Some(wave) => {
-                                       self.logger.info(format!("Writing wave: {}", wave.desc()));
                                        self.stream.write_wave(wave.clone()).await?;
-                                       self.logger.info(format!("\tWave was written: {}", wave.desc()));
                                     }
                                 }
                             }
                             wave = self.stream.read_wave() => {
                                 match wave {
                                    Ok(wave) => {
-             self.logger.info(format!("Reading wave: {}", wave.desc()));
                                 self.tx.send(wave).await?;
-             self.logger.info(format!("\tpushed wave"));
                                    },
                                    Err(err) => {
                                       self.logger.error(format!("ERR_NO {}",err.to_string()));
@@ -480,7 +473,6 @@ impl HyperlaneTcpServer {
                     server_kill_rx: broadcast::Receiver<()>,
                     logger: PointLogger,
                 ) -> Result<(), Error> {
-                    logger.info("accepted new client");
                     let mut stream = SslStream::new(ssl, stream)?;
 
                     Pin::new(&mut stream).accept().await?;
@@ -628,10 +620,6 @@ mod tests {
         Utc::now()
     }
 
-    #[tokio::test]
-    async fn test_frames() {
-
-    }
 
     #[tokio::test]
     async fn test_tcp() -> Result<(), Error> {
@@ -666,7 +654,7 @@ mod tests {
             fae_logger,
         ));
 
-        let test = WaveTest::new(less_client, fae_client);
+        let test = WaveTest::new(fae_client, less_client );
 
         test.go().await.unwrap();
 
