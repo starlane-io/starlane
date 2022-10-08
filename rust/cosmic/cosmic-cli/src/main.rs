@@ -81,10 +81,8 @@ async fn command(host: String, certs: String, command: &str) -> Result<(), UniEr
     let mut command = RawCommand::new(command.to_string());
     for block in blocks {
         let content = Arc::new(fs::read(block.name.as_str()).await?);
-println!("bytes: {}",content.len());
         command.transfers.push( CmdTransfer::new(block.name, content ));
     }
-println!("Transfers: {}",command.transfers.len());
 
     let core = cli.raw(command).await?;
     core_out(core);

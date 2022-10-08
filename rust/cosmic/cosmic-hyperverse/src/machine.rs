@@ -137,7 +137,7 @@ where
     P: Cosmos,
 {
     pub name: MachineName,
-    pub hyperverse: P,
+    pub cosmos: P,
     pub registry: Registry<P>,
     pub artifacts: ArtifactApi,
     pub logger: RootLogger,
@@ -209,7 +209,7 @@ where
             artifacts: platform.artifact_hub(),
             logger: platform.logger(),
             timeouts: Timeouts::default(),
-            hyperverse: platform.clone(),
+            cosmos: platform.clone(),
             api: machine_api.clone(),
             status_tx: mpsc_status_tx,
             status_rx: watch_status_rx,
@@ -246,7 +246,7 @@ where
             interchange.singular_to(star_hop.clone());
 
             let interchange = Arc::new(interchange);
-            let auth = skel.hyperverse.star_auth(&star_template.key)?;
+            let auth = skel.cosmos.star_auth(&star_template.key)?;
             let greeter = SimpleGreeter::new(star_hop.clone(), star_port.clone());
             let gate: Arc<dyn HyperGate> = Arc::new(MountInterchangeGate::new(
                 auth,
@@ -293,7 +293,7 @@ where
         }
 
         let mut gate_selector = Arc::new(HyperGateSelector::new(gates));
-        skel.hyperverse.start_services(&gate_selector).await;
+        skel.cosmos.start_services(&gate_selector).await;
         let gate: Arc<dyn HyperGate> = gate_selector.clone();
 
         let (machine_point, machine_star) = stars

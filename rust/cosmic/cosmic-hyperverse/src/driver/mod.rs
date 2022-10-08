@@ -1423,6 +1423,11 @@ impl<P> DriverSkel<P>
 where
     P: Cosmos,
 {
+
+    pub fn data_dir(&self) -> String {
+        self.skel.data_dir()
+    }
+
     pub fn status(&self) -> DriverStatus {
         self.status_rx.borrow().clone()
     }
@@ -1782,21 +1787,25 @@ pub struct ItemSkel<P>
 where
     P: Cosmos,
 {
+    skel: DriverSkel<P>,
     pub point: Point,
     pub kind: Kind,
-    phantom: PhantomData<P>,
 }
 
 impl<P> ItemSkel<P>
 where
     P: Cosmos,
 {
-    pub fn new(point: Point, kind: Kind) -> Self {
+    pub fn new(point: Point, kind: Kind, skel: DriverSkel<P>) -> Self {
         Self {
             point,
             kind,
-            phantom: Default::default(),
+            skel,
         }
+    }
+
+    pub fn data_dir(&self) -> String {
+        self.skel.data_dir()
     }
 }
 

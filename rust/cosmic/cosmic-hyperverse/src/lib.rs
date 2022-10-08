@@ -120,6 +120,10 @@ where
         Default::default()
     }
 
+    fn data_dir(&self) -> String {
+        "./data/".to_string()
+    }
+
     fn select_kind(&self, template: &KindTemplate) -> Result<Kind, UniErr> {
         let base: BaseKind = BaseKind::from_str(template.base.to_string().as_str())?;
         Ok(match base {

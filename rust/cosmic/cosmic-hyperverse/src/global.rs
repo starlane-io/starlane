@@ -163,7 +163,7 @@ where
         let child_kind = self
             .skel
             .machine
-            .hyperverse
+            .cosmos
             .select_kind(&create.template.kind)
             .map_err(|err| {
                 P::Err::new(format!(
@@ -185,12 +185,12 @@ where
                 let properties = self
                     .skel
                     .machine
-                    .hyperverse
+                    .cosmos
                     .properties_config(&child_kind)
                     .fill_create_defaults(&create.properties)?;
                 self.skel
                     .machine
-                    .hyperverse
+                    .cosmos
                     .properties_config(&child_kind)
                     .check_create(&properties)?;
 

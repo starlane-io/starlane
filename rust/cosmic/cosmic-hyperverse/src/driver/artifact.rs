@@ -2,6 +2,7 @@ use crate::driver::{
     Driver, DriverAvail, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, HyperSkel, Item,
     ItemHandler, ItemSkel, ItemSphere,
 };
+use crate::err::HyperErr;
 use crate::star::HyperStarSkel;
 use crate::Cosmos;
 use acid_store::repo::key::KeyRepo;
@@ -36,7 +37,6 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use tempdir::TempDir;
-use crate::err::HyperErr;
 
 lazy_static! {
     static ref REPO_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -159,19 +159,21 @@ where
     }
 }
 
+/*
 fn store() -> Result<ValueRepo<String>, UniErr> {
     let config = acid_store::store::DirectoryConfig {
         path: PathBuf::from("./data/artifacts"),
     };
 
     match OpenOptions::new()
-        .mode(acid_store::repo::OpenMode::Open)
+        .mode(acid_store::repo::OpenMode::Create)
         .open(&config)
     {
         Ok(repo) => Ok(repo),
         Err(err) => return Err(UniErr::new(500u16, err.to_string())),
     }
 }
+ */
 
 pub struct Repo;
 
@@ -216,17 +218,12 @@ where
 }
 
 pub struct BundleSeriesDriver {
-    pub store: KeyRepo<String>,
 }
 
 #[handler]
 impl BundleSeriesDriver {
     pub fn new() -> Self {
-        let store = OpenOptions::new()
-            .mode(OpenMode::CreateNew)
-            .open(&MemoryConfig::new())
-            .unwrap();
-        Self { store }
+        Self {}
     }
 }
 
@@ -293,7 +290,6 @@ where
 {
     skel: HyperSkel<P>,
     ctx: DriverCtx,
-    store: KeyRepo<String>,
 }
 
 #[handler]
@@ -302,11 +298,7 @@ where
     P: Cosmos,
 {
     pub fn new(skel: HyperSkel<P>, ctx: DriverCtx) -> Self {
-        let store: KeyRepo<String> = OpenOptions::new()
-            .mode(OpenMode::CreateNew)
-            .open(&MemoryConfig::new())
-            .unwrap();
-        Self { store, skel, ctx }
+        Self { skel, ctx }
     }
 }
 
@@ -355,6 +347,19 @@ impl<P> BundleDriverHandler<P>
 where
     P: Cosmos,
 {
+    fn store(&self) -> Result<ValueRepo<String>, UniErr> {
+        let config = acid_store::store::DirectoryConfig {
+            path: PathBuf::from(format!("{}artifacts", self.skel.star.data_dir())),
+        };
+
+        match OpenOptions::new()
+            .mode(acid_store::repo::OpenMode::Create)
+            .open(&config)
+        {
+            Ok(repo) => Ok(repo),
+            Err(err) => return Err(UniErr::new(500u16, err.to_string())),
+        }
+    }
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
@@ -386,7 +391,7 @@ where
                 }
 
                 {
-                    let mut store = store()?;
+                    let mut store = self.store()?;
                     let state = *state;
                     store.insert(assign.details.stub.point.to_string(), &state)?;
                     store.commit()?;
@@ -594,7 +599,7 @@ where
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
         let record = self.skel.locate(point).await?;
 
-        let skel = ItemSkel::new(point.clone(), record.details.stub.kind);
+        let skel = ItemSkel::new(point.clone(), record.details.stub.kind,self.skel.clone());
         Ok(ItemSphere::Handler(Box::new(Artifact::restore(
             skel,
             (),
@@ -603,44 +608,67 @@ where
     }
 
     async fn handler(&self) -> Box<dyn DriverHandler<P>> {
-        let skel = HyperSkel::new( self.skel.skel.clone(), self.skel.clone() );
+        let skel = HyperSkel::new(self.skel.skel.clone(), self.skel.clone());
         Box::new(ArtifactDriverHandler::restore(skel))
     }
 }
 
-pub struct ArtifactDriverHandler<P> where P: Cosmos {
-    skel: HyperSkel<P>
+pub struct ArtifactDriverHandler<P>
+where
+    P: Cosmos,
+{
+    skel: HyperSkel<P>,
 }
 
-impl <P> ArtifactDriverHandler<P> where P: Cosmos{
+impl<P> ArtifactDriverHandler<P>
+where
+    P: Cosmos,
+{
     fn restore(skel: HyperSkel<P>) -> Self {
-        Self{
-            skel
-        }
+        Self { skel }
     }
 }
 
 impl<P> DriverHandler<P> for ArtifactDriverHandler<P> where P: Cosmos {}
 
 #[handler]
-impl <P> ArtifactDriverHandler<P> where P: Cosmos {
+impl<P> ArtifactDriverHandler<P>
+where
+    P: Cosmos,
+{
+    fn store(&self) -> Result<ValueRepo<String>, UniErr> {
+        let config = acid_store::store::DirectoryConfig {
+            path: PathBuf::from(format!("{}artifacts", self.skel.star.data_dir())),
+        };
+
+        match OpenOptions::new()
+            .mode(acid_store::repo::OpenMode::Create)
+            .open(&config)
+        {
+            Ok(repo) => Ok(repo),
+            Err(err) => return Err(UniErr::new(500u16, err.to_string())),
+        }
+    }
+
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
             if let Kind::Artifact(sub) = &assign.details.stub.kind {
                 match sub {
-                    ArtifactSubKind::Dir => {
-                    }
+                    ArtifactSubKind::Dir => {}
                     _ => {
                         let substance = assign.state.get_substance()?;
-                        let mut store = self.skel.driver.logger.result(store())?;
+                        let mut store = self.skel.driver.logger.result(self.store())?;
                         store
                             .insert(assign.details.stub.point.to_string(), &substance)
                             .map_err(|e| UniErr::from_500(e.to_string()))?;
-                        self.skel.driver.logger.result(store.commit().map_err(|e| UniErr::from_500(e.to_string())))?;
+                        self.skel
+                            .driver
+                            .logger
+                            .result(store.commit().map_err(|e| UniErr::from_500(e.to_string())))?;
                     }
                 }
-                 self.skel
+                self.skel
                     .star
                     .registry
                     .assign(
@@ -648,7 +676,6 @@ impl <P> ArtifactDriverHandler<P> where P: Cosmos {
                         ParticleLocation::new(self.skel.star.point.clone(), None),
                     )
                     .await?;
-
             }
             Ok(())
         } else {
@@ -669,12 +696,26 @@ impl<P> Artifact<P>
 where
     P: Cosmos,
 {
+
+    fn store(&self) -> Result<ValueRepo<String>, UniErr> {
+        let config = acid_store::store::DirectoryConfig {
+            path: PathBuf::from(format!("{}artifacts", self.skel.data_dir())),
+        };
+
+        match OpenOptions::new()
+            .mode(acid_store::repo::OpenMode::Create)
+            .open(&config)
+        {
+            Ok(repo) => Ok(repo),
+            Err(err) => return Err(UniErr::new(500u16, err.to_string())),
+        }
+    }
     #[route("Cmd<Read>")]
     pub async fn read(&self, _: InCtx<'_, ()>) -> Result<Substance, P::Err> {
         if let Kind::Artifact(ArtifactSubKind::Dir) = self.skel.kind {
             return Ok(Substance::Empty);
         }
-        let store = store()?;
+        let store = self.store()?;
 
         let substance: Substance = store.get(&self.skel.point.to_string()).unwrap();
         Ok(substance)

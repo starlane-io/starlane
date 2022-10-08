@@ -89,7 +89,7 @@ lazy_static! {
         .parse::<u16>()
         .unwrap_or(4343);
     pub static ref STARLANE_DATA_DIR: String =
-        std::env::var("STARLANE_DATA_DIR").unwrap_or("data".to_string());
+        std::env::var("STARLANE_DATA_DIR").unwrap_or("./data/".to_string());
     pub static ref STARLANE_CACHE_DIR: String =
         std::env::var("STARLANE_CACHE_DIR").unwrap_or("cache".to_string());
     pub static ref STARLANE_TOKEN: String =
@@ -137,6 +137,10 @@ impl Cosmos for Starlane {
     type RegistryContext = PostgresRegistryContextHandle<Self>;
     type StarAuth = AnonHyperAuthenticator;
     type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
+
+    fn data_dir(&self) -> String {
+        STARLANE_DATA_DIR.clone()
+    }
 
     fn star_auth(&self, star: &StarKey) -> Result<Self::StarAuth, Self::Err> {
         Ok(AnonHyperAuthenticator::new())

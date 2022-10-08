@@ -280,6 +280,10 @@ where
         }
     }
 
+    pub fn data_dir(&self) -> String {
+        format!("{}/{}/", self.machine.cosmos.data_dir(), self.point.to_string() )
+    }
+
     /*
     pub async fn create_star_particle(&self, point: Point, kind: Kind ) -> Result<(),P::Err> {
 
@@ -1985,7 +1989,6 @@ where
         point: &Point,
         state: StateSrc,
     ) -> Result<ParticleLocation, P::Err> {
-println!("\tPROVISIONING: {}",point.to_string());
         // check if parent is provisioned
         let parent = point
             .parent()
