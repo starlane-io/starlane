@@ -34,6 +34,7 @@ use cosmic_universe::wave::exchange::SetStrategy;
 use cosmic_universe::wave::RecipientSelector;
 use cosmic_universe::wave::{Agent, DirectedProto, Handling, Pong, Scope, Wave};
 use cosmic_universe::HYPERUSER;
+use cosmic_universe::wave::core::cmd::CmdMethod;
 
 use crate::driver::{
     Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere,
@@ -118,8 +119,23 @@ where
                 let substance :Substance = self.skel.registry.select(&mut select).await?.into();
                 Ok(ReflectedCore::ok_body(substance))
             }
-
-
+            Command::Delete(delete) => {
+                let substance :Substance = self.skel.registry.delete(delete).await?.into();
+                Ok(ReflectedCore::ok_body(substance))
+            }
+            Command::Set(set) => {
+                self.skel.registry.set_properties(&set.point, &set.properties).await?;
+                Ok(ReflectedCore::ok())
+            }
+            Command::Read(read) => {
+                // proxy the read command
+                let mut proto = DirectedProto::ping();
+                proto.method(CmdMethod::Read);
+                proto.agent(ctx.wave().agent().clone());
+                proto.to(read.point.to_surface());
+                let pong = ctx.transmitter.ping(proto).await?;
+                Ok(pong.variant.core)
+            }
             _ => Err(P::Err::new("not implemented")),
         }
     }

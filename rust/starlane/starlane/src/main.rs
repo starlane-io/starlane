@@ -71,7 +71,7 @@ fn main() -> Result<(), StarErr> {
         tokio::time::timeout(Duration::from_secs(30), machine_api.wait_ready())
             .await
             .unwrap();
-println!("> MACHINE READY!");
+println!("> STARLANE Ready!");
         // this is a dirty hack which is good enough for a 0.3.0 release...
         loop {
             tokio::time::sleep(Duration::from_secs(60)).await;
