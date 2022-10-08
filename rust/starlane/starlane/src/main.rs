@@ -59,6 +59,8 @@ use cosmic_universe::particle::property::{
 };
 use cosmic_universe::substance::Token;
 
+use cosmic_hyperlane_tcp::HyperlaneTcpServer;
+
 fn main() -> Result<(), StarErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -82,9 +84,9 @@ println!("> MACHINE READY!");
 }
 
 lazy_static! {
-    pub static ref STARLANE_PORT: usize = std::env::var("STARLANE_PORT")
+    pub static ref STARLANE_CONTROL_PORT: u16 = std::env::var("STARLANE_PORT")
         .unwrap_or("4343".to_string())
-        .parse::<usize>()
+        .parse::<u16>()
         .unwrap_or(4343);
     pub static ref STARLANE_DATA_DIR: String =
         std::env::var("STARLANE_DATA_DIR").unwrap_or("data".to_string());
@@ -223,7 +225,7 @@ impl Cosmos for Starlane {
         ArtifactApi::no_fetcher()
     }
 
-    async fn start_services(&self, gate: &Arc<dyn HyperGate>) {
+    async fn start_services(&self, gate: &Arc<HyperGateSelector>) {
         fs::create_dir_all(STARLANE_CERTS_DIR.as_str() );
         let cert = format!("{}/cert.pem", STARLANE_CERTS_DIR.as_str());
         let key = format!("{}/key.pem", STARLANE_CERTS_DIR.as_str());
@@ -235,6 +237,12 @@ impl Cosmos for Starlane {
             .write_to_dir(STARLANE_CERTS_DIR.clone())
             .await.unwrap();
         };
+
+        let logger = self.logger().point(Point::from_str("control-server").unwrap());
+        let server =
+            HyperlaneTcpServer::new(STARLANE_CONTROL_PORT.clone(), STARLANE_CERTS_DIR.clone(), gate.clone(), logger)
+                .await.unwrap();
+        server.start().unwrap();
     }
 }
 
