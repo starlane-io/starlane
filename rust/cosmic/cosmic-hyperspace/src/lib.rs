@@ -175,6 +175,9 @@ where
             BaseKind::Global => Kind::Global,
             BaseKind::Host => Kind::Host,
             BaseKind::Guest => Kind::Guest,
+            BaseKind::Service => {
+                unimplemented!()
+            }
         })
     }
 

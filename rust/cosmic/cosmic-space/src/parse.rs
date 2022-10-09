@@ -61,10 +61,7 @@ use crate::config::mechtron::MechtronConfig;
 use crate::config::Document;
 use crate::err::report::{Label, Report, ReportKind};
 use crate::err::{ParseErrs, UniErr};
-use crate::kind::{
-    ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, Specific, StarSub,
-    UserBaseSubKind,
-};
+use crate::kind::{ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, ServiceSub, Specific, StarSub, UserBaseSubKind};
 use crate::loc::StarKey;
 use crate::loc::{
     Layer, Point, PointCtx, PointSeg, PointSegCtx, PointSegDelim, PointSegVar, PointSegment,
@@ -5569,6 +5566,7 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
     move |input: I| {
         let (next, sub) = context("kind-sub", camel_case)(input.clone())?;
         match base {
+
             BaseKind::Database => match sub.as_str() {
                 "Relational" => {
                     let (next, specific) =
@@ -5599,7 +5597,17 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
                     )))
                 }
             },
-
+            BaseKind::Service => match ServiceSub::from_str(sub.as_str()) {
+                Ok(sub) => Ok((next, Kind::Service(sub))),
+                Err(err) => {
+                    let err = ErrorTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(ErrorTree::add_context(
+                        input,
+                        "kind-sub:not-accepted",
+                        err,
+                    )))
+                }
+            },
             BaseKind::Artifact => match ArtifactSubKind::from_str(sub.as_str()) {
                 Ok(sub) => Ok((next, Kind::Artifact(sub))),
                 Err(err) => {
