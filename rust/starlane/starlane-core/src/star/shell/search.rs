@@ -5,7 +5,7 @@ use std::iter::FromIterator;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
 
-use cosmic_universe::loc::StarKey;
+use cosmic_space::loc::StarKey;
 
 use crate::error::Error;
 use crate::frame::{

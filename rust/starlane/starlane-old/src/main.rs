@@ -8,11 +8,11 @@ extern crate tablestream;
 extern crate tracing;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
-use cosmic_universe::cli::CommandOp;
-use cosmic_universe::cli::outlet;
-use cosmic_universe::cli::outlet::Frame;
-use cosmic_universe::parse::{command_line, rec_script_line};
-use cosmic_universe::span::new_span;
+use cosmic_space::cli::CommandOp;
+use cosmic_space::cli::outlet;
+use cosmic_space::cli::outlet::Frame;
+use cosmic_space::parse::{command_line, rec_script_line};
+use cosmic_space::span::new_span;
 use mesh_portal::version::latest::entity::request::create::Require;
 use mesh_portal::version::latest::id::Point;
 use reqwest::StatusCode;

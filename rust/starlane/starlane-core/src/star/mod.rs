@@ -36,11 +36,11 @@ use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
 use cosmic_nom::{new_span, Res, Span};
-use cosmic_universe::hyper::ParticleRecord;
-use cosmic_universe::kind::BaseKind;
-use cosmic_universe::loc::{ConstellationName, RouteSeg, StarKey, ToPoint, ToSurface};
-use cosmic_universe::parse::error::result;
-use cosmic_universe::parse::lowercase_alphanumeric;
+use cosmic_space::hyper::ParticleRecord;
+use cosmic_space::kind::BaseKind;
+use cosmic_space::loc::{ConstellationName, RouteSeg, StarKey, ToPoint, ToSurface};
+use cosmic_space::parse::error::result;
+use cosmic_space::parse::lowercase_alphanumeric;
 use mesh_portal::version::latest::id::{Point, Port};
 use mesh_portal::version::latest::log::{PointLogger, RootLogger};
 use mesh_portal::version::latest::particle::Status;

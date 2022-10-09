@@ -1,4 +1,4 @@
-use cosmic_universe::err::UniErr;
+use cosmic_space::err::UniErr;
 use std::fmt::{Debug, Display, Formatter, Write};
 use std::str::Utf8Error;
 use std::string::FromUtf8Error;

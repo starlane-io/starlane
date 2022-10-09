@@ -24,8 +24,8 @@ use tokio::runtime::Runtime;
 use tokio::sync::{mpsc, oneshot};
 use url::Url;
 
-use cosmic_universe::kind::ArtifactSubKind;
-use cosmic_universe::wave::AsyncTransmitterWithAgent;
+use cosmic_space::kind::ArtifactSubKind;
+use cosmic_space::wave::AsyncTransmitterWithAgent;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::entity::request::{Method, ReqCore};
 use mesh_portal::version::latest::http::HttpMethod;
@@ -224,7 +224,7 @@ mod tests {}
 mod test {
     use regex::Regex;
 
-    use cosmic_universe::span::new_span;
+    use cosmic_space::span::new_span;
 
     use crate::error::Error;
     use crate::star::variant::web::parse::host_and_port;
@@ -279,9 +279,9 @@ pub mod parse {
     use nom_supreme::error::ErrorTree;
 
     use cosmic_nom::Span;
-    use cosmic_universe::err::UniErr;
-    use cosmic_universe::parse::domain;
-    use cosmic_universe::parse::error::result;
+    use cosmic_space::err::UniErr;
+    use cosmic_space::parse::domain;
+    use cosmic_space::parse::error::result;
 
     use crate::star::variant::web::HostAndPort;
 

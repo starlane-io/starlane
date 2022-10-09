@@ -17,7 +17,7 @@ crate-type = ["cdylib"]
 #mesh-portal= "0.2.0-rc1"
 
 mechtron= { path="../../mechtron/mechtron" }
-cosmic-universe = { path="../../cosmic/cosmic-universe" }
+cosmic-space = { path= "../../cosmic/cosmic-space" }
 cosmic-macros = { path="../../cosmic/cosmic-macros" }
 
 

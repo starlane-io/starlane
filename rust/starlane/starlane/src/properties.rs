@@ -1,7 +1,7 @@
-use cosmic_universe::err::UniErr;
-use cosmic_universe::kind::BaseKind;
-use cosmic_universe::loc::ToBaseKind;
-use cosmic_universe::particle::property::{AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit, PropertySource, U64Pattern, UsernamePattern};
+use cosmic_space::err::UniErr;
+use cosmic_space::kind::BaseKind;
+use cosmic_space::loc::ToBaseKind;
+use cosmic_space::particle::property::{AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit, PropertySource, U64Pattern, UsernamePattern};
 
 
 lazy_static! {

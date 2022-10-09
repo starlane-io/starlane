@@ -1,10 +1,10 @@
 use alloc::string::FromUtf8Error;
 use bincode::ErrorKind;
 use core::fmt::{Display, Formatter};
-use cosmic_universe::err::{CoreReflector, UniErr};
-use cosmic_universe::substance::Substance;
-use cosmic_universe::wave::core::http2::StatusCode;
-use cosmic_universe::wave::core::ReflectedCore;
+use cosmic_space::err::{CoreReflector, UniErr};
+use cosmic_space::substance::Substance;
+use cosmic_space::wave::core::http2::StatusCode;
+use cosmic_space::wave::core::ReflectedCore;
 
 pub trait MechErr:
     CoreReflector

@@ -6,10 +6,10 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use uuid::Uuid;
 
-use cosmic_universe::hyper::ParticleRecord;
-use cosmic_universe::kind::BaseKind;
-use cosmic_universe::loc::StarKey;
-use cosmic_universe::loc::ToPoint;
+use cosmic_space::hyper::ParticleRecord;
+use cosmic_space::kind::BaseKind;
+use cosmic_space::loc::StarKey;
+use cosmic_space::loc::ToPoint;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
@@ -372,7 +372,7 @@ impl StarlaneMessenger {
 
 #[async_trait]
 impl Transmitter for StarlaneMessenger {
-    async fn direct(&self, request: cosmic_universe::wave::Ping) -> cosmic_universe::wave::Pong {
+    async fn direct(&self, request: cosmic_space::wave::Ping) -> cosmic_space::wave::Pong {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(StarlaneCommand::Request {
@@ -389,7 +389,7 @@ impl Transmitter for StarlaneMessenger {
         }
     }
 
-    fn send_sync(&self, request: cosmic_universe::wave::Ping) -> cosmic_universe::wave::Pong {
+    fn send_sync(&self, request: cosmic_space::wave::Ping) -> cosmic_space::wave::Pong {
         let starlane_tx = self.tx.clone();
         tokio::runtime::Handle::current().block_on(async move {
             let (tx, rx) = oneshot::channel();

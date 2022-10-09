@@ -25,28 +25,28 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 
-use cosmic_universe::command::direct::create::{PointFactoryU64, PointSegTemplate};
-use cosmic_universe::err::UniErr;
-use cosmic_universe::frame::PrimitiveFrame;
-use cosmic_universe::hyper::{Greet, HyperSubstance, InterchangeKind, Knock};
-use cosmic_universe::loc::{Layer, Point, PointFactory, Surface, ToPoint, ToSurface, Version};
-use cosmic_universe::log::{PointLogger, RootLogger, Tracker};
-use cosmic_universe::particle::Status;
-use cosmic_universe::settings::Timeouts;
-use cosmic_universe::substance::{Errors, Substance, SubstanceKind, Token};
-use cosmic_universe::util::uuid;
-use cosmic_universe::wave::core::ext::ExtMethod;
-use cosmic_universe::wave::core::hyp::HypMethod;
-use cosmic_universe::wave::core::Method;
-use cosmic_universe::wave::exchange::asynch::{
+use cosmic_space::command::direct::create::{PointFactoryU64, PointSegTemplate};
+use cosmic_space::err::UniErr;
+use cosmic_space::frame::PrimitiveFrame;
+use cosmic_space::hyper::{Greet, HyperSubstance, InterchangeKind, Knock};
+use cosmic_space::loc::{Layer, Point, PointFactory, Surface, ToPoint, ToSurface, Version};
+use cosmic_space::log::{PointLogger, RootLogger, Tracker};
+use cosmic_space::particle::Status;
+use cosmic_space::settings::Timeouts;
+use cosmic_space::substance::{Errors, Substance, SubstanceKind, Token};
+use cosmic_space::util::uuid;
+use cosmic_space::wave::core::ext::ExtMethod;
+use cosmic_space::wave::core::hyp::HypMethod;
+use cosmic_space::wave::core::Method;
+use cosmic_space::wave::exchange::asynch::{
     Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
 };
-use cosmic_universe::wave::exchange::SetStrategy;
-use cosmic_universe::wave::{
+use cosmic_space::wave::exchange::SetStrategy;
+use cosmic_space::wave::{
     Agent, DirectedKind, DirectedProto, Handling, HyperWave, Ping, Pong, Reflectable,
     ReflectedKind, ReflectedProto, ReflectedWave, UltraWave, Wave, WaveId, WaveKind,
 };
-use cosmic_universe::VERSION;
+use cosmic_space::VERSION;
 
 lazy_static! {
     pub static ref LOCAL_CLIENT: Point = Point::from_str("LOCAL::client").expect("point");
@@ -207,22 +207,30 @@ impl HyperwayEndpoint {
 
     pub fn connect(mut self, mut endpoint: HyperwayEndpoint) {
         tokio::spawn(async move {
+            let logger = endpoint.logger.clone();
             let end_tx = endpoint.tx.clone();
             {
                 let my_tx = self.tx.clone();
-                let logger = self.logger.clone();
                 tokio::spawn(async move {
+                    let logger = endpoint.logger.push_mark("mux:tx").unwrap();
                     while let Some(wave) = endpoint.rx.recv().await {
                         logger.track(&wave, || Tracker::new("hyperway-endpoint", "Rx"));
-                        my_tx.send(wave).await.unwrap_or_default();
+                        match logger.result(my_tx.send(wave).await) {
+                            Ok(_) => {},
+                            Err(_) => break
+                        }
                     }
                 });
             }
 
+            let logger = logger.push_mark("mux:rx").unwrap();
             while let Some(wave) = self.rx.recv().await {
-                self.logger
+                logger
                     .track(&wave, || Tracker::new("hyperway-endpoint", "Tx"));
-                end_tx.send(wave).await.unwrap_or_default();
+                match logger.result(end_tx.send(wave).await) {
+                    Ok(_) => {}
+                    Err(_) => break
+                }
             }
         });
     }
@@ -1718,12 +1726,15 @@ impl HyperClientRunner {
                                 runner.ext.take();
                                 return Err(HyperConnectionErr::Fatal("can no longer update HyperClient status (probably due to previous Fatal status)".to_string()));
                             }
+
                             return Ok(());
                         }
                         Ok(Err(err)) => {
+                            //runner.logger.error(format!("{}", err.to_string()));
+                        }
+                        Err(err) => {
                             runner.logger.error(format!("{}", err.to_string()));
                         }
-                        _ => {}
                     }
                     // wait a little while before attempting to reconnect
                     // maybe add exponential backoff later
@@ -1764,23 +1775,27 @@ impl HyperClientRunner {
                                     }
                                       }
                                       None => {
+                                        //runner.logger.warn("from_client_rx.recv() returned None");
                                         break;
                                       }
                                     }
                         }
+
                         wave = ext.rx.recv() => {
                             match wave {
                                 Some( wave ) => {
                                    runner.to_client_tx.send(wave).await;
                                 }
                                 None => {
-                                    runner.logger.warn("client does not have a hyperway_endpoint");
+                                   runner.logger.warn("client hyperway_endpoint has been closed.  This can happen if the client sender (tx) has been dropped.");
                                     break;
                                 }
                             }
                         }
                     );
                 }
+
+//                runner.logger.warn("client relay interrupted");
 
                 Ok(())
             }
@@ -1810,7 +1825,7 @@ impl HyperClientRunner {
                         break;
                     }
                     Err(err) => {
-                        self.logger.error(format!("{}", err.to_string()));
+                        //self.logger.error(format!("{}", err.to_string()));
                         // some error occurred when relaying therefore we need to reconnect
                         self.ext = None;
                     }
@@ -1961,13 +1976,13 @@ mod tests {
     use chrono::{DateTime, Utc};
     use dashmap::DashMap;
 
-    use cosmic_universe::command::direct::create::PointFactoryU64;
-    use cosmic_universe::hyper::{InterchangeKind, Knock};
-    use cosmic_universe::loc::Point;
-    use cosmic_universe::loc::Uuid;
-    use cosmic_universe::log::RootLogger;
-    use cosmic_universe::substance::Substance;
-    use cosmic_universe::wave::HyperWave;
+    use cosmic_space::command::direct::create::PointFactoryU64;
+    use cosmic_space::hyper::{InterchangeKind, Knock};
+    use cosmic_space::loc::Point;
+    use cosmic_space::loc::Uuid;
+    use cosmic_space::log::RootLogger;
+    use cosmic_space::substance::Substance;
+    use cosmic_space::wave::HyperWave;
 
     use crate::{
         AnonHyperAuthenticator, HyperGate, HyperGateSelector, HyperRouter, HyperwayInterchange,
@@ -2038,21 +2053,21 @@ pub mod test_util {
     use lazy_static::lazy_static;
     use tokio::sync::{broadcast, mpsc, oneshot};
 
-    use cosmic_universe::command::direct::create::PointFactoryU64;
-    use cosmic_universe::err::UniErr;
-    use cosmic_universe::hyper::{Greet, InterchangeKind, Knock};
-    use cosmic_universe::loc::{Layer, Point, Surface, ToPoint, ToSurface};
-    use cosmic_universe::log::{PointLogger, RootLogger};
-    use cosmic_universe::settings::Timeouts;
-    use cosmic_universe::substance::{Substance, Token};
-    use cosmic_universe::wave::core::cmd::CmdMethod;
-    use cosmic_universe::wave::core::ext::ExtMethod;
-    use cosmic_universe::wave::core::{Method, ReflectedCore};
-    use cosmic_universe::wave::exchange::asynch::{
+    use cosmic_space::command::direct::create::PointFactoryU64;
+    use cosmic_space::err::UniErr;
+    use cosmic_space::hyper::{Greet, InterchangeKind, Knock};
+    use cosmic_space::loc::{Layer, Point, Surface, ToPoint, ToSurface};
+    use cosmic_space::log::{PointLogger, RootLogger};
+    use cosmic_space::settings::Timeouts;
+    use cosmic_space::substance::{Substance, Token};
+    use cosmic_space::wave::core::cmd::CmdMethod;
+    use cosmic_space::wave::core::ext::ExtMethod;
+    use cosmic_space::wave::core::{Method, ReflectedCore};
+    use cosmic_space::wave::exchange::asynch::{
         Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
     };
-    use cosmic_universe::wave::exchange::SetStrategy;
-    use cosmic_universe::wave::{
+    use cosmic_space::wave::exchange::SetStrategy;
+    use cosmic_space::wave::{
         Agent, DirectedKind, DirectedProto, HyperWave, Pong, ReflectedKind, ReflectedProto,
         ReflectedWave, UltraWave, Wave,
     };
@@ -2112,8 +2127,8 @@ pub mod test_util {
             Self { interchange, gate }
         }
 
-        pub fn knock(&self, port: Surface) -> Knock {
-            Knock::new(InterchangeKind::Singleton, port, Substance::Empty)
+        pub fn knock(&self, surface: Surface) -> Knock {
+            Knock::new(InterchangeKind::Singleton, surface, Substance::Empty)
         }
 
         pub fn local_hyperway_endpoint_factory(
@@ -2182,6 +2197,7 @@ pub mod test_util {
             {
                 let fae = FAE.clone();
                 tokio::spawn(async move {
+                    fae_client.wait_for_greet().await.unwrap();
                     let wave = fae_rx.recv().await.unwrap();
                     let mut reflected = ReflectedProto::new();
                     reflected.kind(ReflectedKind::Pong);
@@ -2198,6 +2214,7 @@ pub mod test_util {
 
             let (rtn, mut rtn_rx) = oneshot::channel();
             tokio::spawn(async move {
+                less_client.wait_for_greet().await.unwrap();
                 let mut hello = DirectedProto::ping();
                 hello.to(FAE.clone().to_surface());
                 hello.from(LESS.clone().to_surface());
@@ -2228,7 +2245,6 @@ pub mod test_util {
     #[async_trait]
     impl HyperGreeter for TestGreeter {
         async fn greet(&self, stub: HyperwayStub) -> Result<Greet, UniErr> {
-            println!("Sending GREETING to {}", stub.remote.to_string());
             Ok(Greet {
                 surface: stub.remote.clone(),
                 agent: stub.agent.clone(),
@@ -2252,21 +2268,21 @@ pub mod test {
     use lazy_static::lazy_static;
     use tokio::sync::{broadcast, mpsc, oneshot};
 
-    use cosmic_universe::command::direct::create::PointFactoryU64;
-    use cosmic_universe::err::UniErr;
-    use cosmic_universe::hyper::{Greet, InterchangeKind, Knock};
-    use cosmic_universe::loc::{Layer, Point, Surface, ToPoint, ToSurface};
-    use cosmic_universe::log::RootLogger;
-    use cosmic_universe::settings::Timeouts;
-    use cosmic_universe::substance::{Substance, Token};
-    use cosmic_universe::wave::core::cmd::CmdMethod;
-    use cosmic_universe::wave::core::ext::ExtMethod;
-    use cosmic_universe::wave::core::{Method, ReflectedCore};
-    use cosmic_universe::wave::exchange::asynch::{
+    use cosmic_space::command::direct::create::PointFactoryU64;
+    use cosmic_space::err::UniErr;
+    use cosmic_space::hyper::{Greet, InterchangeKind, Knock};
+    use cosmic_space::loc::{Layer, Point, Surface, ToPoint, ToSurface};
+    use cosmic_space::log::RootLogger;
+    use cosmic_space::settings::Timeouts;
+    use cosmic_space::substance::{Substance, Token};
+    use cosmic_space::wave::core::cmd::CmdMethod;
+    use cosmic_space::wave::core::ext::ExtMethod;
+    use cosmic_space::wave::core::{Method, ReflectedCore};
+    use cosmic_space::wave::exchange::asynch::{
         Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
     };
-    use cosmic_universe::wave::exchange::SetStrategy;
-    use cosmic_universe::wave::{
+    use cosmic_space::wave::exchange::SetStrategy;
+    use cosmic_space::wave::{
         Agent, DirectedKind, DirectedProto, HyperWave, Pong, ReflectedKind, ReflectedProto,
         ReflectedWave, UltraWave, Wave,
     };

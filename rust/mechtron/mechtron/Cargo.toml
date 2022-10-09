@@ -17,7 +17,7 @@ description = "The Wasm Package to help easily create a Mechtron"
 lazy_static = {version="1.4.0", features=["spin_no_std"] }
 #wasm_membrane_guest = { path="../wasm-membrane-guest"}
 bincode = "1.3.3"
-cosmic-universe= { path= "../../cosmic/cosmic-universe" }
+cosmic-space= { path= "../../cosmic/cosmic-space" }
 cosmic-macros= { path= "../../cosmic/cosmic-macros" }
 serde = { version="1.0.69", features=['derive','rc'] }
 dashmap = "5.3.4"

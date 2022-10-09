@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 #wasm_membrane_host = { path= "../wasm-membrane-host" ,version = "0.3.0"}
-cosmic-universe = { path="../../cosmic/cosmic-universe"}
+cosmic-space = { path= "../../cosmic/cosmic-space" }
 threadpool = "1.8.1"
 wasmer = "2.3.0"
 wasmer-compiler-singlepass = "2.3.0"

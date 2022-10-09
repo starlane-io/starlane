@@ -1,7 +1,7 @@
 use crate::membrane::mechtron_consume_string;
 use crate::{mechtron_timestamp, mechtron_uuid};
-use cosmic_universe::loc;
-use cosmic_universe::wasm::Timestamp;
+use cosmic_space::loc;
+use cosmic_space::wasm::Timestamp;
 
 #[no_mangle]
 extern "C" fn cosmic_uuid() -> loc::Uuid {

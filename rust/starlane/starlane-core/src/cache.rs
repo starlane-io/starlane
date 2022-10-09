@@ -13,10 +13,10 @@ use tokio::runtime::Handle;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use wasmer::{Cranelift, Store, Universal};
 
-use cosmic_universe::hyper::ParticleRecord;
-use cosmic_universe::id2::BaseSubKind;
-use cosmic_universe::kind::ArtifactSubKind;
-use cosmic_universe::loc::PointSegKind;
+use cosmic_space::hyper::ParticleRecord;
+use cosmic_space::id2::BaseSubKind;
+use cosmic_space::kind::ArtifactSubKind;
+use cosmic_space::loc::PointSegKind;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::config::bind::BindConfig;

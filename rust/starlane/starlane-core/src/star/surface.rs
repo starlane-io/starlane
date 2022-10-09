@@ -7,7 +7,7 @@ use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::time::Duration;
 
-use cosmic_universe::hyper::ParticleRecord;
+use cosmic_space::hyper::ParticleRecord;
 use mesh_portal::version::latest::entity::request::create::{PointTemplate, Template};
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Message, ReqShell, RespShell};

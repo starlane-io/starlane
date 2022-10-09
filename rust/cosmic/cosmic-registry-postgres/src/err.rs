@@ -1,5 +1,5 @@
-use cosmic_hyperverse::err::{ErrKind, HyperErr};
-use cosmic_universe::err::UniErr;
+use cosmic_hyperspace::err::{ErrKind, HyperErr};
+use cosmic_space::err::UniErr;
 use std::io::{Error, ErrorKind};
 use std::string::FromUtf8Error;
 use strum::ParseError;
@@ -34,7 +34,7 @@ pub mod convert {
     use crate::err::TestErr as Err;
     use crate::HyperErr;
     use bincode::ErrorKind;
-    use cosmic_universe::err::UniErr;
+    use cosmic_space::err::UniErr;
     use mechtron_host::err::HostErr;
     use std::io;
     use std::str::Utf8Error;
@@ -44,7 +44,7 @@ pub mod convert {
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
-    use cosmic_hyperverse::err::ErrKind;
+    use cosmic_hyperspace::err::ErrKind;
 
     impl Err {
         pub fn new<S: ToString>(message: S) -> Self {

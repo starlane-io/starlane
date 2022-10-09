@@ -14,16 +14,16 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use cosmic_hyperlane::{HyperGate, HyperGateSelector, VersionGate};
-use cosmic_universe::err::{StatusErr, UniErr};
-use cosmic_universe::frame::PrimitiveFrame;
-use cosmic_universe::hyper::{HyperSubstance, Knock};
-use cosmic_universe::loc::{Point, ToSurface};
-use cosmic_universe::log::PointLogger;
-use cosmic_universe::substance::Substance;
-use cosmic_universe::wave::core::hyp::HypMethod;
-use cosmic_universe::wave::core::DirectedCore;
-use cosmic_universe::wave::{DirectedProto, Pong, UltraWave, Wave};
-use cosmic_universe::VERSION;
+use cosmic_space::err::{StatusErr, UniErr};
+use cosmic_space::frame::PrimitiveFrame;
+use cosmic_space::hyper::{HyperSubstance, Knock};
+use cosmic_space::loc::{Point, ToSurface};
+use cosmic_space::log::PointLogger;
+use cosmic_space::substance::Substance;
+use cosmic_space::wave::core::hyp::HypMethod;
+use cosmic_space::wave::core::DirectedCore;
+use cosmic_space::wave::{DirectedProto, Pong, UltraWave, Wave};
+use cosmic_space::VERSION;
 
 fn generate_self_signed_cert() -> Result<(rustls::Certificate, rustls::PrivateKey), UniErr> {
     let cert = rcgen::generate_simple_self_signed(vec!["cosmic-hyperlane".to_string()])?;
@@ -321,7 +321,7 @@ mod tests {
     use dashmap::DashMap;
 
     use cosmic_hyperlane::{HyperGateSelector, VersionGate};
-    use cosmic_universe::err::UniErr;
+    use cosmic_space::err::UniErr;
 
     use crate::HyperServerQuic;
 

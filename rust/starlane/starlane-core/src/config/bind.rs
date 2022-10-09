@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 use std::sync::Arc;
 
-use cosmic_universe::parse::{bind_config, doc};
+use cosmic_space::parse::{bind_config, doc};
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::config::bind::BindConfig;
 

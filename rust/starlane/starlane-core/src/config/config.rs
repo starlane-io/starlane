@@ -4,8 +4,8 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-use cosmic_universe::kind::ArtifactSubKind;
-use cosmic_universe::kind::Kind;
+use cosmic_space::kind::ArtifactSubKind;
+use cosmic_space::kind::Kind;
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties};
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::particle::Property;

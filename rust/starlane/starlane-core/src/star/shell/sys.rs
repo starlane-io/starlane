@@ -4,9 +4,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use tokio::sync::{mpsc, oneshot};
 
-use cosmic_universe::hyper::{Location, ParticleRecord};
-use cosmic_universe::loc::ToPoint;
-use cosmic_universe::particle::Details;
+use cosmic_space::hyper::{Location, ParticleRecord};
+use cosmic_space::loc::ToPoint;
+use cosmic_space::particle::Details;
 use mesh_portal::version::latest::entity::request::create::{PointSegFactory, Template};
 use mesh_portal::version::latest::fail;
 use mesh_portal::version::latest::id::{Point, RouteSegment};

@@ -3,3 +3,5 @@ Cargo.lock
 data
 cache
 .idea
+certs
+bundle.zip

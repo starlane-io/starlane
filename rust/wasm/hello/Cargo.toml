@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 [dependencies]
 
 mechtron= { path="../../mechtron/mechtron" }
-cosmic-universe = { path="../../cosmic/cosmic-universe" }
+cosmic-space = { path= "../../cosmic/cosmic-space" }
 cosmic-macros = { path="../../cosmic/cosmic-macros" }
 lazy_static = "1.4.0"
 

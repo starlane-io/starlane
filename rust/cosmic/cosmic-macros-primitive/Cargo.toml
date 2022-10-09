@@ -4,7 +4,7 @@ version = "0.3.0"
 edition = "2021"
 
 authors = ["Scott Williams <scott@mightydevco.com>"]
-description = "Some primitive macros needed to jump start cosmic-universe"
+description = "Some primitive macros needed to jump start cosmic-space"
 homepage = "http://thecosmicinitiative.io"
 repository = "https://github.com/cosmic-initiative/cosmic-initiative"
 license = "MIT"

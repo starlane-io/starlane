@@ -11,11 +11,11 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 use tokio::time::Duration;
 
-use cosmic_universe::hyper::ParticleRecord;
-use cosmic_universe::loc::ToPoint;
-use cosmic_universe::parse::model::Subst;
-use cosmic_universe::substance::HttpCall;
-use cosmic_universe::wave::core::Method;
+use cosmic_space::hyper::ParticleRecord;
+use cosmic_space::loc::ToPoint;
+use cosmic_space::parse::model::Subst;
+use cosmic_space::substance::HttpCall;
+use cosmic_space::wave::core::Method;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::entity::response::RespCore;
 use mesh_portal::version::latest::id::Point;
