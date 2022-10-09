@@ -840,3 +840,45 @@ fn test_publish() -> Result<(), CosmicErr> {
         Ok(())
     })
 }
+
+#[test]
+fn test_web() -> Result<(), CosmicErr> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async move {
+        // let (final_tx, final_rx) = oneshot::channel();
+
+        let cosmos = MemCosmos::new();
+        let machine_api = cosmos.machine();
+        let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
+        let logger = logger.point(Point::from_str("mem-client").unwrap());
+
+        tokio::time::timeout(Duration::from_secs(5), machine_api.wait_ready())
+            .await
+            .unwrap();
+
+        let factory = MachineApiExtFactory {
+            machine_api,
+            logger: logger.clone(),
+        };
+
+        let client = ControlClient::new(Box::new(factory))?;
+        client.wait_for_ready(Duration::from_secs(5)).await?;
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let cli = client.new_cli_session().await?;
+
+        logger.result(cli.exec("create web<Native<Web>>")
+            .await
+            .unwrap()
+            .ok_or())
+            .unwrap();
+
+
+        Ok(())
+    })
+}
+
+

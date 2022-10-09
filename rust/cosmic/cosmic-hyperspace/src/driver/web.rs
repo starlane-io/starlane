@@ -12,10 +12,10 @@ use cosmic_space::fail::http;
 use cosmic_space::hyper::HyperSubstance;
 use cosmic_space::kind::{BaseKind, Kind, NativeSub};
 use cosmic_space::loc::{Layer, Point, ToSurface};
-use cosmic_space::parse::bind_config;
-use cosmic_space::selector::KindSelector;
+use cosmic_space::parse::{bind_config, CamelCase};
+use cosmic_space::selector::{KindSelector, Pattern, SubKindSelector};
 use cosmic_space::substance::{Bin, Substance};
-use cosmic_space::util::log;
+use cosmic_space::util::{log, ValuePattern};
 use cosmic_space::wave::core::http2::{HttpMethod, HttpRequest};
 use cosmic_space::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use cosmic_space::wave::exchange::asynch::{InCtx, ProtoTransmitter, ProtoTransmitterBuilder};
@@ -63,7 +63,11 @@ where
     P: Cosmos,
 {
     fn kind(&self) -> KindSelector {
-        KindSelector::from_str("Native<Web>").unwrap()
+        KindSelector {
+            base: Pattern::Exact(BaseKind::Native),
+            sub: SubKindSelector::Exact(Some(CamelCase::from_str("Web").unwrap())),
+            specific: ValuePattern::Any,
+        }
     }
 
     async fn create(
@@ -115,6 +119,7 @@ where
             self.skel.clone(),
         ))
     }
+
 }
 
 pub struct WebDriverHandler<P>

@@ -25,6 +25,7 @@ use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
+use crate::driver::web::WebDriverFactory;
 use crate::err::{CosmicErr, HyperErr};
 use crate::reg::Registry;
 
@@ -108,7 +109,7 @@ impl Cosmos for MemCosmos {
                 builder.add_post(Arc::new(ArtifactDriverFactory::new()));
             }
             StarSub::Jump => {
-                //                builder.add_post(Arc::new(ControlDriverFactory::new()));
+                builder.add_post(Arc::new(WebDriverFactory::new()));
             }
             StarSub::Fold => {}
             StarSub::Machine => {
