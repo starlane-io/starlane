@@ -6,9 +6,9 @@ use std::sync::Arc;
 use clap::{App, AppSettings};
 use yaml_rust::Yaml;
 
-use cosmic_universe::hyper::Assign;
-use cosmic_universe::kind::ArtifactSubKind;
-use cosmic_universe::kind::BaseKind;
+use cosmic_space::hyper::Assign;
+use cosmic_space::kind::ArtifactSubKind;
+use cosmic_space::kind::BaseKind;
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{ReqShell, RespShell};

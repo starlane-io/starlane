@@ -1,4 +1,4 @@
-use cosmic_universe::loc::StarKey;
+use cosmic_space::loc::StarKey;
 
 lazy_static! {
     pub static ref REGISTRY_URL: String =

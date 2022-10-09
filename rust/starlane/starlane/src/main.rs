@@ -25,39 +25,39 @@ use crate::err::StarErr;
 use cosmic_hyperlane::{
     AnonHyperAuthenticator, HyperGate, HyperGateSelector, LocalHyperwayGateJumper,
 };
-use cosmic_hyperverse::driver::artifact::{
+use cosmic_hyperspace::driver::artifact::{
     ArtifactDriverFactory, BundleDriverFactory, BundleSeriesDriverFactory, RepoDriverFactory,
 };
-use cosmic_hyperverse::driver::base::BaseDriverFactory;
-use cosmic_hyperverse::driver::control::ControlDriverFactory;
-use cosmic_hyperverse::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
-use cosmic_hyperverse::driver::root::RootDriverFactory;
-use cosmic_hyperverse::driver::space::SpaceDriverFactory;
-use cosmic_hyperverse::driver::{DriverAvail, DriversBuilder};
-use cosmic_hyperverse::err::CosmicErr;
-use cosmic_hyperverse::machine::{Machine, MachineTemplate};
-use cosmic_hyperverse::reg::{Registry, RegistryApi};
-use cosmic_hyperverse::Cosmos;
+use cosmic_hyperspace::driver::base::BaseDriverFactory;
+use cosmic_hyperspace::driver::control::ControlDriverFactory;
+use cosmic_hyperspace::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
+use cosmic_hyperspace::driver::root::RootDriverFactory;
+use cosmic_hyperspace::driver::space::SpaceDriverFactory;
+use cosmic_hyperspace::driver::{DriverAvail, DriversBuilder};
+use cosmic_hyperspace::err::CosmicErr;
+use cosmic_hyperspace::machine::{Machine, MachineTemplate};
+use cosmic_hyperspace::reg::{Registry, RegistryApi};
+use cosmic_hyperspace::Cosmos;
 use cosmic_registry_postgres::err::PostErr;
 use cosmic_registry_postgres::{
     PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
 };
-use cosmic_universe::artifact::ArtifactApi;
-use cosmic_universe::artifact::ReadArtifactFetcher;
-use cosmic_universe::command::direct::create::KindTemplate;
-use cosmic_universe::err::UniErr;
-use cosmic_universe::kind::{
+use cosmic_space::artifact::ArtifactApi;
+use cosmic_space::artifact::ReadArtifactFetcher;
+use cosmic_space::command::direct::create::KindTemplate;
+use cosmic_space::err::UniErr;
+use cosmic_space::kind::{
     ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind,
 };
-use cosmic_universe::loc::{MachineName, StarKey};
-use cosmic_universe::loc::{Point, ToBaseKind};
-use cosmic_universe::log::RootLogger;
-use cosmic_universe::particle::property::{
+use cosmic_space::loc::{MachineName, StarKey};
+use cosmic_space::loc::{Point, ToBaseKind};
+use cosmic_space::log::RootLogger;
+use cosmic_space::particle::property::{
     AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig,
     PropertiesConfigBuilder, PropertyPermit, PropertySource, U64Pattern, UsernamePattern,
 };
-use cosmic_universe::substance::Token;
+use cosmic_space::substance::Token;
 
 use cosmic_hyperlane_tcp::HyperlaneTcpServer;
 

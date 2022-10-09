@@ -11,7 +11,7 @@ It provides services such as routing and authentication as well.
 *this framework is a work in progress and not ready for production. And it is not yet fully documented for feedback and discussion .*
 
 ## BUILDS ON THE COSMIC UNIVERSE
-The concepts in the `cosmic-hyperlane` package build upon the concepts in the [cosmic-universe](../cosmic-universe) 
+The concepts in the `cosmic-hyperlane` package build upon the concepts in the [cosmic-space](../cosmic-space) 
 package so familiarity with The Cosmic Universe is recommended before grappling with Hyperlane.
 
 ## WORK IN PROGRESS

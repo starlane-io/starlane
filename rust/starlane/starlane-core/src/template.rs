@@ -3,7 +3,7 @@ use std::convert::{TryFrom, TryInto};
 
 use serde::{Deserialize, Serialize};
 
-use cosmic_universe::loc::{ConstellationName, MachineName, StarKey};
+use cosmic_space::loc::{ConstellationName, MachineName, StarKey};
 
 use crate::error::Error;
 use crate::proto::ProtoStarKey;

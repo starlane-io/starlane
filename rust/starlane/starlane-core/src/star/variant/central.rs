@@ -5,9 +5,9 @@ use std::time::Duration;
 
 use tokio::sync::{mpsc, oneshot};
 
-use cosmic_universe::hyper::{Location, ParticleRecord};
-use cosmic_universe::loc::StarKey;
-use cosmic_universe::loc::ToSurface;
+use cosmic_space::hyper::{Location, ParticleRecord};
+use cosmic_space::loc::StarKey;
+use cosmic_space::loc::ToSurface;
 use mesh_portal::version::latest::cli::Transfer;
 use mesh_portal::version::latest::entity::request::create::Strategy;
 

@@ -8,11 +8,11 @@ extern crate cosmic_macros;
 //mod html;
 
 use cosmic_macros::handler_sync;
-use cosmic_universe::err::UniErr;
-use cosmic_universe::log::{PointLogger, RootLogger};
-use cosmic_universe::particle::Details;
-use cosmic_universe::wave::core::CoreBounce;
-use cosmic_universe::wave::exchange::synch::{
+use cosmic_space::err::UniErr;
+use cosmic_space::log::{PointLogger, RootLogger};
+use cosmic_space::particle::Details;
+use cosmic_space::wave::core::CoreBounce;
+use cosmic_space::wave::exchange::synch::{
     DirectedHandler, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx,
 };
 use mechtron::err::{GuestErr, MechErr};

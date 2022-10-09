@@ -5,8 +5,8 @@ use std::sync::Arc;
 use clap::{App, AppSettings};
 use yaml_rust::Yaml;
 
-use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind};
-use cosmic_universe::wave::DirectedProto;
+use cosmic_space::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind};
+use cosmic_space::wave::DirectedProto;
 use mesh_portal::version::latest::command::common::{SetProperties, StateSrc};
 use mesh_portal::version::latest::entity::request::create::{
     Create, KindTemplate, PointSegFactory, PointTemplate, Strategy, Template,

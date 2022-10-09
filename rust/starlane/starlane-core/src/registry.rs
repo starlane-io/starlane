@@ -12,18 +12,18 @@ use sqlx::postgres::{PgArguments, PgPoolOptions, PgRow};
 use sqlx::{Connection, Executor, Pool, Postgres, Row, Transaction};
 use tokio::sync::mpsc;
 
-use cosmic_universe::command::direct::delete::Delete;
-use cosmic_universe::command::direct::select::{SelectKind, SubSelect};
-use cosmic_universe::hyper::{Location, ParticleRecord};
-use cosmic_universe::id2::BaseSubKind;
-use cosmic_universe::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Tks, UserBaseSubKind};
-use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
-use cosmic_universe::particle::Details;
-use cosmic_universe::security::{
+use cosmic_space::command::direct::delete::Delete;
+use cosmic_space::command::direct::select::{SelectKind, SubSelect};
+use cosmic_space::hyper::{Location, ParticleRecord};
+use cosmic_space::id2::BaseSubKind;
+use cosmic_space::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Tks, UserBaseSubKind};
+use cosmic_space::parse::{CamelCase, Domain, SkewerCase};
+use cosmic_space::particle::Details;
+use cosmic_space::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, Permissions, PermissionsMask,
     PermissionsMaskKind, Privilege, Privileges,
 };
-use cosmic_universe::selector::SubKindSelector;
+use cosmic_space::selector::SubKindSelector;
 use mesh_portal::error::MsgErr;
 use mesh_portal::version::latest::command::common::{PropertyMod, SetProperties, SetRegistry};
 use mesh_portal::version::latest::entity::request::create::{
@@ -1183,12 +1183,12 @@ pub mod test {
     use std::convert::TryInto;
     use std::str::FromStr;
 
-    use cosmic_universe::command::direct::select::SelectKind;
-    use cosmic_universe::entity::request::select::SelectKind;
-    use cosmic_universe::kind::Kind;
-    use cosmic_universe::kind::UserBaseSubKind;
-    use cosmic_universe::loc::ToPoint;
-    use cosmic_universe::security::{
+    use cosmic_space::command::direct::select::SelectKind;
+    use cosmic_space::entity::request::select::SelectKind;
+    use cosmic_space::kind::Kind;
+    use cosmic_space::kind::UserBaseSubKind;
+    use cosmic_space::loc::ToPoint;
+    use cosmic_space::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
         Privilege,
     };

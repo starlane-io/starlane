@@ -25,28 +25,28 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 
-use cosmic_universe::command::direct::create::{PointFactoryU64, PointSegTemplate};
-use cosmic_universe::err::UniErr;
-use cosmic_universe::frame::PrimitiveFrame;
-use cosmic_universe::hyper::{Greet, HyperSubstance, InterchangeKind, Knock};
-use cosmic_universe::loc::{Layer, Point, PointFactory, Surface, ToPoint, ToSurface, Version};
-use cosmic_universe::log::{PointLogger, RootLogger, Tracker};
-use cosmic_universe::particle::Status;
-use cosmic_universe::settings::Timeouts;
-use cosmic_universe::substance::{Errors, Substance, SubstanceKind, Token};
-use cosmic_universe::util::uuid;
-use cosmic_universe::wave::core::ext::ExtMethod;
-use cosmic_universe::wave::core::hyp::HypMethod;
-use cosmic_universe::wave::core::Method;
-use cosmic_universe::wave::exchange::asynch::{
+use cosmic_space::command::direct::create::{PointFactoryU64, PointSegTemplate};
+use cosmic_space::err::UniErr;
+use cosmic_space::frame::PrimitiveFrame;
+use cosmic_space::hyper::{Greet, HyperSubstance, InterchangeKind, Knock};
+use cosmic_space::loc::{Layer, Point, PointFactory, Surface, ToPoint, ToSurface, Version};
+use cosmic_space::log::{PointLogger, RootLogger, Tracker};
+use cosmic_space::particle::Status;
+use cosmic_space::settings::Timeouts;
+use cosmic_space::substance::{Errors, Substance, SubstanceKind, Token};
+use cosmic_space::util::uuid;
+use cosmic_space::wave::core::ext::ExtMethod;
+use cosmic_space::wave::core::hyp::HypMethod;
+use cosmic_space::wave::core::Method;
+use cosmic_space::wave::exchange::asynch::{
     Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
 };
-use cosmic_universe::wave::exchange::SetStrategy;
-use cosmic_universe::wave::{
+use cosmic_space::wave::exchange::SetStrategy;
+use cosmic_space::wave::{
     Agent, DirectedKind, DirectedProto, Handling, HyperWave, Ping, Pong, Reflectable,
     ReflectedKind, ReflectedProto, ReflectedWave, UltraWave, Wave, WaveId, WaveKind,
 };
-use cosmic_universe::VERSION;
+use cosmic_space::VERSION;
 
 lazy_static! {
     pub static ref LOCAL_CLIENT: Point = Point::from_str("LOCAL::client").expect("point");
@@ -1976,13 +1976,13 @@ mod tests {
     use chrono::{DateTime, Utc};
     use dashmap::DashMap;
 
-    use cosmic_universe::command::direct::create::PointFactoryU64;
-    use cosmic_universe::hyper::{InterchangeKind, Knock};
-    use cosmic_universe::loc::Point;
-    use cosmic_universe::loc::Uuid;
-    use cosmic_universe::log::RootLogger;
-    use cosmic_universe::substance::Substance;
-    use cosmic_universe::wave::HyperWave;
+    use cosmic_space::command::direct::create::PointFactoryU64;
+    use cosmic_space::hyper::{InterchangeKind, Knock};
+    use cosmic_space::loc::Point;
+    use cosmic_space::loc::Uuid;
+    use cosmic_space::log::RootLogger;
+    use cosmic_space::substance::Substance;
+    use cosmic_space::wave::HyperWave;
 
     use crate::{
         AnonHyperAuthenticator, HyperGate, HyperGateSelector, HyperRouter, HyperwayInterchange,
@@ -2053,21 +2053,21 @@ pub mod test_util {
     use lazy_static::lazy_static;
     use tokio::sync::{broadcast, mpsc, oneshot};
 
-    use cosmic_universe::command::direct::create::PointFactoryU64;
-    use cosmic_universe::err::UniErr;
-    use cosmic_universe::hyper::{Greet, InterchangeKind, Knock};
-    use cosmic_universe::loc::{Layer, Point, Surface, ToPoint, ToSurface};
-    use cosmic_universe::log::{PointLogger, RootLogger};
-    use cosmic_universe::settings::Timeouts;
-    use cosmic_universe::substance::{Substance, Token};
-    use cosmic_universe::wave::core::cmd::CmdMethod;
-    use cosmic_universe::wave::core::ext::ExtMethod;
-    use cosmic_universe::wave::core::{Method, ReflectedCore};
-    use cosmic_universe::wave::exchange::asynch::{
+    use cosmic_space::command::direct::create::PointFactoryU64;
+    use cosmic_space::err::UniErr;
+    use cosmic_space::hyper::{Greet, InterchangeKind, Knock};
+    use cosmic_space::loc::{Layer, Point, Surface, ToPoint, ToSurface};
+    use cosmic_space::log::{PointLogger, RootLogger};
+    use cosmic_space::settings::Timeouts;
+    use cosmic_space::substance::{Substance, Token};
+    use cosmic_space::wave::core::cmd::CmdMethod;
+    use cosmic_space::wave::core::ext::ExtMethod;
+    use cosmic_space::wave::core::{Method, ReflectedCore};
+    use cosmic_space::wave::exchange::asynch::{
         Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
     };
-    use cosmic_universe::wave::exchange::SetStrategy;
-    use cosmic_universe::wave::{
+    use cosmic_space::wave::exchange::SetStrategy;
+    use cosmic_space::wave::{
         Agent, DirectedKind, DirectedProto, HyperWave, Pong, ReflectedKind, ReflectedProto,
         ReflectedWave, UltraWave, Wave,
     };
@@ -2268,21 +2268,21 @@ pub mod test {
     use lazy_static::lazy_static;
     use tokio::sync::{broadcast, mpsc, oneshot};
 
-    use cosmic_universe::command::direct::create::PointFactoryU64;
-    use cosmic_universe::err::UniErr;
-    use cosmic_universe::hyper::{Greet, InterchangeKind, Knock};
-    use cosmic_universe::loc::{Layer, Point, Surface, ToPoint, ToSurface};
-    use cosmic_universe::log::RootLogger;
-    use cosmic_universe::settings::Timeouts;
-    use cosmic_universe::substance::{Substance, Token};
-    use cosmic_universe::wave::core::cmd::CmdMethod;
-    use cosmic_universe::wave::core::ext::ExtMethod;
-    use cosmic_universe::wave::core::{Method, ReflectedCore};
-    use cosmic_universe::wave::exchange::asynch::{
+    use cosmic_space::command::direct::create::PointFactoryU64;
+    use cosmic_space::err::UniErr;
+    use cosmic_space::hyper::{Greet, InterchangeKind, Knock};
+    use cosmic_space::loc::{Layer, Point, Surface, ToPoint, ToSurface};
+    use cosmic_space::log::RootLogger;
+    use cosmic_space::settings::Timeouts;
+    use cosmic_space::substance::{Substance, Token};
+    use cosmic_space::wave::core::cmd::CmdMethod;
+    use cosmic_space::wave::core::ext::ExtMethod;
+    use cosmic_space::wave::core::{Method, ReflectedCore};
+    use cosmic_space::wave::exchange::asynch::{
         Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
     };
-    use cosmic_universe::wave::exchange::SetStrategy;
-    use cosmic_universe::wave::{
+    use cosmic_space::wave::exchange::SetStrategy;
+    use cosmic_space::wave::{
         Agent, DirectedKind, DirectedProto, HyperWave, Pong, ReflectedKind, ReflectedProto,
         ReflectedWave, UltraWave, Wave,
     };

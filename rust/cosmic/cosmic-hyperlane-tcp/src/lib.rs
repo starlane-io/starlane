@@ -27,12 +27,12 @@ use cosmic_hyperlane::{
     HyperConnectionDetails, HyperConnectionStatus, HyperGate, HyperGateSelector, HyperwayEndpoint,
     HyperwayEndpointFactory, VersionGate,
 };
-use cosmic_universe::err::UniErr;
-use cosmic_universe::hyper::Knock;
-use cosmic_universe::log::PointLogger;
-use cosmic_universe::substance::Substance;
-use cosmic_universe::wave::{Ping, UltraWave, Wave};
-use cosmic_universe::VERSION;
+use cosmic_space::err::UniErr;
+use cosmic_space::hyper::Knock;
+use cosmic_space::log::PointLogger;
+use cosmic_space::substance::Substance;
+use cosmic_space::wave::{Ping, UltraWave, Wave};
+use cosmic_space::VERSION;
 pub struct HyperlaneTcpClient {
     host: String,
     cert_dir: String,
@@ -542,8 +542,8 @@ mod tests {
     use std::time::Duration;
 
     use cosmic_hyperlane::test_util::{SingleInterchangePlatform, WaveTest, FAE, LESS};
-    use cosmic_universe::loc::{Point, ToSurface};
-    use cosmic_universe::log::RootLogger;
+    use cosmic_space::loc::{Point, ToSurface};
+    use cosmic_space::log::RootLogger;
 
     use chrono::DateTime;
     use chrono::Utc;

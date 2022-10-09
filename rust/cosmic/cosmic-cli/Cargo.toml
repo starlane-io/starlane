@@ -13,8 +13,8 @@ license = "MIT"
 
 cosmic-hyperlane={ path="../cosmic-hyperlane"}
 cosmic-hyperlane-tcp={ path="../cosmic-hyperlane-tcp"}
-cosmic-universe= { path="../cosmic-universe"}
-cosmic-hyperverse= { path="../cosmic-hyperverse"}
+cosmic-space= { path= "../cosmic-space" }
+cosmic-hyperspace= { path= "../cosmic-hyperspace" }
 cosmic-nom= { path="../cosmic-nom"}
 
 clap = { version="3.2.22", features=["cargo"] }

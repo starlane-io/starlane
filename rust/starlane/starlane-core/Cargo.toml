@@ -76,8 +76,8 @@ base64 = "0.13.0"
 
 cosmic-nom={ path="../../cosmic/cosmic-nom"}
 cosmic-macros={ path="../../cosmic/cosmic-macros"}
-cosmic-hyperverse={ path= "../../cosmic/cosmic-hyperverse" }
-cosmic-universe = { path= "../../cosmic/cosmic-universe" }
+cosmic-hyperspace={ path= "../../cosmic/cosmic-hyperspace" }
+cosmic-space = { path= "../../cosmic/cosmic-space" }
 
 async-recursion = "1.0.0"
 

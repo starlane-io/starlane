@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cosmic-universe={ path= "../cosmic-universe" }
-cosmic-hyperverse={ path= "../cosmic-hyperverse" }
+cosmic-space={ path= "../cosmic-space" }
+cosmic-hyperspace={ path= "../cosmic-hyperspace" }
 mechtron-host={ path= "../../mechtron/mechtron-host"}
 sqlx = { version = "0.5.11", features = [ "runtime-tokio-rustls", "postgres", "macros", "any" ] }
 serde = { version="1.0.69", features=['derive','rc'] }

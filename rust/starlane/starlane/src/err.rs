@@ -1,4 +1,4 @@
-use cosmic_hyperverse::err::ErrKind;
+use cosmic_hyperspace::err::ErrKind;
 use cosmic_registry_postgres::err::PostErr;
 
 pub trait StarlaneErr: PostErr {}
@@ -15,9 +15,9 @@ impl StarlaneErr for StarErr {}
 pub mod convert {
     use crate::err::StarErr as Err;
     use bincode::ErrorKind;
-    use cosmic_hyperverse::err::{ErrKind, HyperErr};
+    use cosmic_hyperspace::err::{ErrKind, HyperErr};
     use cosmic_registry_postgres::err::PostErr;
-    use cosmic_universe::err::UniErr;
+    use cosmic_space::err::UniErr;
     use mechtron_host::err::HostErr;
     use sqlx::Error;
     use std::io;

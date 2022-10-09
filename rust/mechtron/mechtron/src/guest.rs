@@ -2,21 +2,21 @@ use crate::err::GuestErr;
 use crate::err::MechErr;
 use crate::{MechtronFactories, MechtronSkel, Platform};
 use cosmic_macros::handler_sync;
-use cosmic_universe::err::UniErr;
-use cosmic_universe::hyper::HyperSubstance;
-use cosmic_universe::kind::Kind::Mechtron;
-use cosmic_universe::loc::{Layer, Point, ToSurface};
-use cosmic_universe::log::{
+use cosmic_space::err::UniErr;
+use cosmic_space::hyper::HyperSubstance;
+use cosmic_space::kind::Kind::Mechtron;
+use cosmic_space::loc::{Layer, Point, ToSurface};
+use cosmic_space::log::{
     LogSource, NoAppender, PointLogger, RootLogger, SynchTransmittingLogAppender,
 };
-use cosmic_universe::particle::Details;
-use cosmic_universe::wave::core::CoreBounce;
-use cosmic_universe::wave::exchange::synch::{
+use cosmic_space::particle::Details;
+use cosmic_space::wave::core::CoreBounce;
+use cosmic_space::wave::exchange::synch::{
     DirectedHandler, DirectedHandlerProxy, DirectedHandlerShell, ExchangeRouter, InCtx,
     ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx,
 };
-use cosmic_universe::wave::exchange::SetStrategy;
-use cosmic_universe::wave::{Agent, DirectedWave, ReflectedAggregate, ToRecipients, UltraWave};
+use cosmic_space::wave::exchange::SetStrategy;
+use cosmic_space::wave::{Agent, DirectedWave, ReflectedAggregate, ToRecipients, UltraWave};
 use dashmap::DashMap;
 use std::collections::HashMap;
 use std::marker::PhantomData;

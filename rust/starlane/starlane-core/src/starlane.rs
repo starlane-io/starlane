@@ -17,8 +17,8 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
 use tokio::sync::{broadcast, mpsc};
 
-use cosmic_universe::loc::{MachineName, StarKey, ToSurface};
-use cosmic_universe::wave::AsyncTransmitterWithAgent;
+use cosmic_space::loc::{MachineName, StarKey, ToSurface};
+use cosmic_space::wave::AsyncTransmitterWithAgent;
 use mesh_portal::version::latest::frame::PrimitiveFrame;
 use mesh_portal::version::latest::id::{Point, Port};
 use mesh_portal::version::latest::messaging::{Agent, RespShell};

@@ -32,8 +32,8 @@ use tokio::sync::broadcast::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot::error::RecvError;
 use mesh_portal::version::latest::config::{ParticleConfigBody, PointConfig};
-use cosmic_universe::wave::AsyncTransmitter;
-use cosmic_universe::particle::particle::Details;
+use cosmic_space::wave::AsyncTransmitter;
+use cosmic_space::particle::particle::Details;
 
 use crate::config::config::{MechtronConfig, ParticleConfig};
 

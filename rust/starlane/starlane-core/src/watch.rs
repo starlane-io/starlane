@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
-use cosmic_universe::loc::StarKey;
+use cosmic_space::loc::StarKey;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::particle::Status;
 use mesh_portal::version::latest::payload::Substance;

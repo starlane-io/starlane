@@ -25,42 +25,42 @@ use std::sync::Arc;
 use strum::ParseError;
 
 use crate::err::PostErr;
-use cosmic_hyperverse::err::{ErrKind, HyperErr};
-use cosmic_hyperverse::machine::MachineTemplate;
-use cosmic_hyperverse::reg::{Registration, RegistryApi};
-use cosmic_hyperverse::Cosmos;
-use cosmic_universe::command::common::{PropertyMod, SetProperties, SetRegistry};
-use cosmic_universe::command::direct::create::{Create, KindTemplate, PointSegTemplate, Strategy};
-use cosmic_universe::command::direct::delete::Delete;
-use cosmic_universe::command::direct::get::{Get, GetOp};
-use cosmic_universe::command::direct::query::{Query, QueryResult};
-use cosmic_universe::command::direct::select::{
+use cosmic_hyperspace::err::{ErrKind, HyperErr};
+use cosmic_hyperspace::machine::MachineTemplate;
+use cosmic_hyperspace::reg::{Registration, RegistryApi};
+use cosmic_hyperspace::Cosmos;
+use cosmic_space::command::common::{PropertyMod, SetProperties, SetRegistry};
+use cosmic_space::command::direct::create::{Create, KindTemplate, PointSegTemplate, Strategy};
+use cosmic_space::command::direct::delete::Delete;
+use cosmic_space::command::direct::get::{Get, GetOp};
+use cosmic_space::command::direct::query::{Query, QueryResult};
+use cosmic_space::command::direct::select::{
     Select, SelectIntoSubstance, SelectKind, SubSelect,
 };
-use cosmic_universe::command::direct::set::Set;
-use cosmic_universe::err::UniErr;
-use cosmic_universe::hyper::{Location, ParticleLocation, ParticleRecord};
-use cosmic_universe::kind::{
+use cosmic_space::command::direct::set::Set;
+use cosmic_space::err::UniErr;
+use cosmic_space::hyper::{Location, ParticleLocation, ParticleRecord};
+use cosmic_space::kind::{
     ArtifactSubKind, BaseKind, FileSubKind, Kind, KindParts, Specific, UserBaseSubKind,
 };
-use cosmic_universe::loc::{Point, PointSeg, StarKey, ToBaseKind, Version};
-use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
-use cosmic_universe::particle::{Details, PointKind, Properties, Property, Status, Stub};
-use cosmic_universe::security::{
+use cosmic_space::loc::{Point, PointSeg, StarKey, ToBaseKind, Version};
+use cosmic_space::parse::{CamelCase, Domain, SkewerCase};
+use cosmic_space::particle::{Details, PointKind, Properties, Property, Status, Stub};
+use cosmic_space::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, IndexedAccessGrant, Permissions,
     PermissionsMask, PermissionsMaskKind, Privilege, Privileges,
 };
-use cosmic_universe::selector::specific::{
+use cosmic_space::selector::specific::{
     ProductSelector, ProviderSelector, VariantSelector, VendorSelector,
 };
-use cosmic_universe::selector::{
+use cosmic_space::selector::{
     ExactPointSeg, KindBaseSelector, PointHierarchy, PointKindSeg, PointSegSelector, Selector,
     SubKindSelector,
 };
-use cosmic_universe::substance::{Substance, SubstanceList, SubstanceMap};
-use cosmic_universe::util::ValuePattern;
-use cosmic_universe::HYPERUSER;
-use cosmic_universe::log::PointLogger;
+use cosmic_space::substance::{Substance, SubstanceList, SubstanceMap};
+use cosmic_space::util::ValuePattern;
+use cosmic_space::HYPERUSER;
+use cosmic_space::log::PointLogger;
 
 pub trait PostgresPlatform: Cosmos
 where
@@ -1575,9 +1575,9 @@ impl PostgresDbInfo {
 
 #[cfg(test)]
 pub mod test {
-    use cosmic_hyperverse::driver::DriversBuilder;
-    use cosmic_hyperverse::machine::MachineTemplate;
-    use cosmic_hyperverse::Cosmos;
+    use cosmic_hyperspace::driver::DriversBuilder;
+    use cosmic_hyperspace::machine::MachineTemplate;
+    use cosmic_hyperspace::Cosmos;
     use std::collections::HashSet;
     use std::convert::TryInto;
     use std::str::FromStr;
@@ -1589,23 +1589,23 @@ pub mod test {
         PostgresRegistryContextHandle,
     };
     use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, HyperGateSelector, LocalHyperwayGateJumper};
-    use cosmic_hyperverse::reg::RegistryApi;
-    use cosmic_hyperverse::reg::{Registration, Registry};
-    use cosmic_universe::artifact::ArtifactApi;
-    use cosmic_universe::command::direct::create::Strategy;
-    use cosmic_universe::command::direct::query::Query;
-    use cosmic_universe::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
-    use cosmic_universe::hyper::ParticleLocation;
-    use cosmic_universe::kind::{Kind, Specific, StarSub, UserBaseSubKind};
-    use cosmic_universe::loc::{MachineName, Point, StarKey, ToPoint};
-    use cosmic_universe::log::RootLogger;
-    use cosmic_universe::particle::property::PropertiesConfig;
-    use cosmic_universe::particle::Status;
-    use cosmic_universe::security::{
+    use cosmic_hyperspace::reg::RegistryApi;
+    use cosmic_hyperspace::reg::{Registration, Registry};
+    use cosmic_space::artifact::ArtifactApi;
+    use cosmic_space::command::direct::create::Strategy;
+    use cosmic_space::command::direct::query::Query;
+    use cosmic_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
+    use cosmic_space::hyper::ParticleLocation;
+    use cosmic_space::kind::{Kind, Specific, StarSub, UserBaseSubKind};
+    use cosmic_space::loc::{MachineName, Point, StarKey, ToPoint};
+    use cosmic_space::log::RootLogger;
+    use cosmic_space::particle::property::PropertiesConfig;
+    use cosmic_space::particle::Status;
+    use cosmic_space::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
         Privilege,
     };
-    use cosmic_universe::selector::{PointHierarchy, Selector};
+    use cosmic_space::selector::{PointHierarchy, Selector};
 
     #[derive(Clone)]
     pub struct TestPlatform {

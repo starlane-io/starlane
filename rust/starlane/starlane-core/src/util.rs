@@ -19,7 +19,7 @@ use walkdir::{DirEntry, WalkDir};
 use zip::result::ZipError;
 use zip::write::FileOptions;
 
-use cosmic_universe::loc::ToSurface;
+use cosmic_space::loc::ToSurface;
 use mesh_portal::version::latest::entity::request::Method;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{ReqProto, ReqShell};

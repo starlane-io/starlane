@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cosmic-universe={ path= "../../cosmic/cosmic-universe" }
-cosmic-hyperverse={ path= "../../cosmic/cosmic-hyperverse" }
+cosmic-space={ path= "../../cosmic/cosmic-space" }
+cosmic-hyperspace={ path= "../../cosmic/cosmic-hyperspace" }
 cosmic-registry-postgres={ path= "../../cosmic/cosmic-registry-postgres" }
 cosmic-hyperlane={ path="../../cosmic/cosmic-hyperlane"}
 cosmic-hyperlane-tcp={ path="../../cosmic/cosmic-hyperlane-tcp"}

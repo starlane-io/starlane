@@ -15,7 +15,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{broadcast, mpsc};
 use tokio::time::Duration;
 
-use cosmic_universe::loc::StarKey;
+use cosmic_space::loc::StarKey;
 
 use crate::error::Error;
 use crate::frame::{Frame, StarPattern};

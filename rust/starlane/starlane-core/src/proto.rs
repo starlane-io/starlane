@@ -12,8 +12,8 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{broadcast, mpsc};
 use tokio::time::{Duration, Instant};
 
-use cosmic_universe::loc::StarKey;
-use cosmic_universe::log::LogSource;
+use cosmic_space::loc::StarKey;
+use cosmic_space::log::LogSource;
 use mesh_portal::version::latest::log::RootLogger;
 
 use crate::cache::ProtoArtifactCachesFactory;
