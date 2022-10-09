@@ -136,7 +136,7 @@ pub enum BaseKind {
     Global,
     Host,
     Guest,
-    Service
+    Native
 }
 
 impl BaseKind {
@@ -153,7 +153,7 @@ pub enum Sub {
     Artifact(ArtifactSubKind),
     UserBase(UserBaseSubKind),
     Star(StarSub),
-    Service(ServiceSub)
+    Native(NativeSub)
 }
 
 impl Sub {
@@ -165,7 +165,7 @@ impl Sub {
             Sub::Artifact(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
             Sub::UserBase(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
             Sub::Star(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
-            Sub::Service(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap())
+            Sub::Native(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap())
         }
     }
 
@@ -193,7 +193,7 @@ impl Into<Option<CamelCase>> for Sub {
             Sub::Artifact(a) => a.into(),
             Sub::UserBase(u) => u.into(),
             Sub::Star(s) => s.into(),
-            Sub::Service(s) => s.into()
+            Sub::Native(s) => s.into()
         }
     }
 }
@@ -207,7 +207,7 @@ impl Into<Option<String>> for Sub {
             Sub::Artifact(a) => a.into(),
             Sub::UserBase(u) => u.into(),
             Sub::Star(s) => s.into(),
-            Sub::Service(s) => s.into()
+            Sub::Native(s) => s.into()
         }
     }
 }
@@ -252,7 +252,7 @@ pub enum Kind {
     Global,
     Host,
     Guest,
-    Service(ServiceSub)
+    Native(NativeSub)
 }
 
 impl ToBaseKind for Kind {
@@ -272,7 +272,7 @@ impl ToBaseKind for Kind {
             Kind::File(_) => BaseKind::File,
             Kind::Artifact(_) => BaseKind::Artifact,
             Kind::Database(_) => BaseKind::Database,
-            Kind::Service(_) => BaseKind::Service,
+            Kind::Native(_) => BaseKind::Native,
             Kind::Base => BaseKind::Base,
             Kind::Repo => BaseKind::Repo,
             Kind::Star(_) => BaseKind::Star,
@@ -410,8 +410,8 @@ impl TryFrom<KindParts> for Kind {
             BaseKind::Star => Kind::Star(StarSub::from_str(
                 value.sub.ok_or("Star<?> requires a sub kind")?.as_str(),
             )?),
-            BaseKind::Service => Kind::Service(ServiceSub::from_str(
-                value.sub.ok_or("Service<?> requires a sub kind")?.as_str(),
+            BaseKind::Native => Kind::Native(NativeSub::from_str(
+                value.sub.ok_or("Native<?> requires a sub kind")?.as_str(),
             )?),
 
             BaseKind::Root => Kind::Root,
@@ -453,7 +453,7 @@ pub trait Tks {
     strum_macros::Display,
     strum_macros::EnumString,
 )]
-pub enum ServiceSub {
+pub enum NativeSub {
     Web,
 }
 
@@ -515,19 +515,19 @@ impl StarSub {
 }
 
 
-impl Into<Sub> for ServiceSub {
+impl Into<Sub> for NativeSub {
     fn into(self) -> Sub {
-        Sub::Service(self)
+        Sub::Native(self)
     }
 }
 
-impl Into<Option<CamelCase>> for ServiceSub{
+impl Into<Option<CamelCase>> for NativeSub {
     fn into(self) -> Option<CamelCase> {
         Some(CamelCase::from_str(self.to_string().as_str()).unwrap())
     }
 }
 
-impl Into<Option<String>> for ServiceSub {
+impl Into<Option<String>> for NativeSub {
     fn into(self) -> Option<String> {
         Some(self.to_string())
     }

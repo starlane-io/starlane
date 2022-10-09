@@ -57,6 +57,17 @@ impl HttpRequest {
     }
 }
 
+impl Into<DirectedCore> for HttpRequest {
+    fn into(self) -> DirectedCore {
+        DirectedCore {
+            headers: self.headers,
+            method: self.method.into(),
+            uri: self.uri,
+            body: self.body
+        }
+    }
+}
+
 impl TryFrom<DirectedCore> for HttpRequest {
     type Error = UniErr;
 

@@ -5,6 +5,7 @@ pub mod mechtron;
 pub mod root;
 pub mod space;
 pub mod star;
+pub mod web;
 
 use crate::driver::star::StarDriverFactory;
 use crate::star::HyperStarCall::LayerTraversalInjection;
@@ -1781,6 +1782,17 @@ where
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err>;
 }
+
+#[derive(Clone)]
+pub struct HyperItemSkel<P>
+where
+    P: Cosmos,
+{
+    pub skel: DriverSkel<P>,
+    pub point: Point,
+    pub kind: Kind,
+}
+
 
 #[derive(Clone)]
 pub struct ItemSkel<P>

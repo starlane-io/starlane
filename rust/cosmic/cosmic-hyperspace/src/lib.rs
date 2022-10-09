@@ -119,6 +119,10 @@ where
         Default::default()
     }
 
+    fn web_port(&self) -> Result<u16,Self::Err> {
+        Ok(8080u16)
+    }
+
     fn data_dir(&self) -> String {
         "./data/".to_string()
     }
@@ -175,7 +179,7 @@ where
             BaseKind::Global => Kind::Global,
             BaseKind::Host => Kind::Host,
             BaseKind::Guest => Kind::Guest,
-            BaseKind::Service => {
+            BaseKind::Native => {
                 unimplemented!()
             }
         })

@@ -12,8 +12,9 @@ use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
+use ascii::FromAsciiError;
 
-#[derive(Debug, Clone,Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ErrKind {
     Default,
     Dupe,
@@ -43,6 +44,9 @@ pub trait HyperErr:
     + From<zip::result::ZipError>
     + From<Box<bincode::ErrorKind>>
     + From<acid_store::Error>
+    + From<strum::ParseError>
+    + From<url::ParseError>
+ +From<FromAsciiError<std::string::String>>
     + From<UniErr>
     + Into<UniErr>
     + From<()>
@@ -97,6 +101,7 @@ pub mod convert {
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
+    use ascii::FromAsciiError;
 
     impl Err {
         pub fn new<S: ToString>(message: S) -> Self {
@@ -119,6 +124,31 @@ pub mod convert {
         }
     }
 
+     impl From<strum::ParseError> for Err {
+        fn from(e: strum::ParseError) -> Self {
+            Self {
+                kind: ErrKind::Default,
+                message: e.to_string()
+            }
+        }
+    }
+
+     impl From<url::ParseError> for Err {
+        fn from(e: url::ParseError) -> Self {
+            Self {
+                kind: ErrKind::Default,
+                message: e.to_string()
+            }
+        }
+    }
+    impl From<FromAsciiError<std::string::String>> for Err {
+        fn from(e: FromAsciiError<String>) -> Self {
+            Self {
+                kind: ErrKind::Default,
+                message: e.to_string()
+            }
+        }
+    }
     impl HyperErr for Err {
         fn to_uni_err(&self) -> UniErr {
             UniErr::from_500(self.to_string())
@@ -220,7 +250,6 @@ pub mod convert {
         }
     }
 
-
     impl From<ExportError> for Err {
         fn from(e: ExportError) -> Self {
             Err::new(e)
@@ -262,6 +291,4 @@ pub mod convert {
             Err::new(e)
         }
     }
-
-
 }
