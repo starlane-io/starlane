@@ -334,13 +334,7 @@ where
     }
 }
 
-pub struct MechtronDriverHandler<P>
-where
-    P: Cosmos,
-{
-    skel: DriverSkel<P>,
-    ctx: DriverCtx,
-}
+
 
 impl<P> MechtronDriver<P>
 where
@@ -349,6 +343,14 @@ where
     pub fn new(skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
         Self { skel, ctx }
     }
+}
+
+pub struct MechtronDriverHandler<P>
+where
+    P: Cosmos,
+{
+    skel: DriverSkel<P>,
+    ctx: DriverCtx,
 }
 
 impl<P> MechtronDriverHandler<P>
