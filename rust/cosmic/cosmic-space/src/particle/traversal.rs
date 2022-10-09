@@ -140,18 +140,21 @@ impl TraversalPlan {
     }
 }
 
+#[derive(Clone)]
 pub struct TraversalInjection {
-    pub injector: Surface,
+    pub surface: Surface,
     pub wave: UltraWave,
     pub from_gravity: bool,
+    pub dir: Option<TraversalDirection>
 }
 
 impl TraversalInjection {
     pub fn new(injector: Surface, wave: UltraWave) -> Self {
         Self {
-            injector,
+            surface: injector,
             wave,
             from_gravity: false,
+            dir: None
         }
     }
 }

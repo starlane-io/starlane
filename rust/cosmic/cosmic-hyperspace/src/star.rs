@@ -937,9 +937,7 @@ status_tx.send(Status::Ready).await;
                         tokio::spawn(async move {
                             layer_traversal_engine
                                 .start_layer_traversal(
-                                    inject.wave,
-                                    &inject.injector,
-                                    inject.from_gravity,
+                                    inject
                                 )
                                 .await;
                         });
@@ -1035,8 +1033,14 @@ status_tx.send(Status::Ready).await;
             });
 
             tokio::spawn(async move {
+                let injection = TraversalInjection {
+                    surface: injector.clone(),
+                    wave: transport.to_ultra(),
+                    from_gravity: true,
+                    dir: None
+                };
                 layer_engine
-                    .start_layer_traversal(transport.to_ultra(), &injector, true)
+                    .start_layer_traversal(injection )
                     .await;
             });
             Ok(())
@@ -1362,10 +1366,14 @@ where
 
     async fn start_layer_traversal(
         &self,
-        mut wave: UltraWave,
-        injector: &Surface,
-        from_gravity: bool,
+        injection: TraversalInjection,
     ) -> Result<(), P::Err> {
+
+        let wave = injection.wave;
+        let from_gravity = injection.from_gravity;
+        let inject_dir = injection.dir;
+        let injection= injection.surface;
+
         #[cfg(test)]
         self.skel
             .diagnostic_interceptors
@@ -1426,10 +1434,16 @@ where
 
             let mut dest = None;
             let mut dir = TraversalDirection::Core;
+
+            // injection direction can be forced when we are sending a message from core
+            // to the same core
+            if let Some(inject_dir) = &inject_dir {
+                dir = inject_dir.clone();
+            }
             // now we check if we are doing an inter point delivery (from one layer to another in the same Particle)
             // if this delivery was from_hyperway, then it was certainly a message being routed back to the star
             // and is not considered an inter point delivery
-            if from_gravity {
+            else if from_gravity {
                 dir = TraversalDirection::Core;
                 dest.replace(to.layer.clone());
                 if wave.track() {
@@ -1453,7 +1467,7 @@ where
                 }
 
                 // dir is from inject_layer to dest
-                dir = match TraversalDirection::new(&injector.layer, &to.layer) {
+                dir = match TraversalDirection::new(&injection.layer, &to.layer) {
                     Ok(dir) => dir,
                     Err(_) => {
                         // looks like we are already on the dest layer...
@@ -1505,7 +1519,7 @@ where
             let mut traversal = Traversal::new(
                 wave.clone(),
                 record,
-                injector.layer.clone(),
+                injection.layer.clone(),
                 traversal_logger,
                 dir,
                 dest,
@@ -1651,6 +1665,7 @@ pub struct StarMount {
 pub struct LayerInjectionRouter {
     pub inject_tx: mpsc::Sender<TraversalInjection>,
     pub injector: Surface,
+    pub direction: Option<TraversalDirection>
 }
 
 impl LayerInjectionRouter {
@@ -1661,6 +1676,7 @@ impl LayerInjectionRouter {
         Self {
             inject_tx: skel.inject_tx.clone(),
             injector,
+            direction: None
         }
     }
 
@@ -1668,6 +1684,7 @@ impl LayerInjectionRouter {
         Self {
             inject_tx: self.inject_tx.clone(),
             injector,
+            direction: None
         }
     }
 
@@ -1675,6 +1692,7 @@ impl LayerInjectionRouter {
         Self {
             inject_tx,
             injector,
+            direction: None
         }
     }
 }
@@ -1700,7 +1718,8 @@ impl TraversalRouter for TraverseToNextRouter {
 #[async_trait]
 impl Router for LayerInjectionRouter {
     async fn route(&self, wave: UltraWave) {
-        let inject = TraversalInjection::new(self.injector.clone(), wave);
+        let mut inject = TraversalInjection::new(self.injector.clone(), wave);
+        inject.dir = self.direction.clone();
         self.inject_tx.send(inject).await;
     }
 }

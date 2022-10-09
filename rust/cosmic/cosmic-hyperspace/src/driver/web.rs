@@ -1,7 +1,4 @@
-use crate::driver::{
-    Driver, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, HyperItemSkel, HyperSkel,
-    ItemHandler, ItemSkel, ItemSphere,
-};
+use crate::driver::{Driver, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, HyperItemSkel, HyperSkel, ItemHandler, ItemRouter, ItemSkel, ItemSphere};
 use crate::err::HyperErr;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::Cosmos;
@@ -18,17 +15,16 @@ use cosmic_space::substance::{Bin, Substance};
 use cosmic_space::util::{log, ValuePattern};
 use cosmic_space::wave::core::http2::{HttpMethod, HttpRequest};
 use cosmic_space::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
-use cosmic_space::wave::exchange::asynch::{InCtx, ProtoTransmitter, ProtoTransmitterBuilder};
+use cosmic_space::wave::exchange::asynch::{InCtx, ProtoTransmitter, ProtoTransmitterBuilder, TraversalRouter};
 use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{
-    Agent, DirectedProto, Handling, HandlingKind, Ping, ToRecipients, WaitTime, Wave,
-};
+use cosmic_space::wave::{Agent, DirectedProto, Handling, HandlingKind, Ping, ToRecipients, UltraWave, WaitTime, Wave};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
 use tiny_http::Server;
 use tokio::runtime::Runtime;
 use url::Url;
+use cosmic_space::particle::traversal::{Traversal, TraversalDirection};
 use inflector::Inflector;
 
 lazy_static! {
@@ -43,7 +39,6 @@ fn web_bind() -> BindConfig {
         r#"
     Bind(version=1.0.0)
     {
-       Route<Http<*>> -> (()) => &;
     }
     "#,
     ))
@@ -112,7 +107,7 @@ where
             Kind::Native(NativeSub::Web),
             self.skel.clone(),
         );
-        Ok(ItemSphere::Handler(Box::new(Web::new(skel))))
+        Ok(ItemSphere::Router(Box::new(Web::new(skel))))
     }
 
     async fn handler(&self) -> Box<dyn DriverHandler<P>> {
@@ -182,7 +177,21 @@ where
 }
 
 #[async_trait]
-impl<P> ItemHandler<P> for Web<P>
+impl<P> TraversalRouter for Web<P> where P: Cosmos {
+    async fn traverse(&self, traversal: Traversal<UltraWave>) {
+        if traversal.is_directed() {
+
+        } else {
+            let wave = traversal.payload;
+            let reflected = wave.to_reflected().unwrap();
+println!("Exchanging reflected@!");
+            self.skel.skel.skel.exchanger.reflected(reflected).await.unwrap_or_default();
+        }
+    }
+}
+
+#[async_trait]
+impl<P> ItemRouter<P> for Web<P>
 where
     P: Cosmos,
 {
@@ -204,10 +213,13 @@ where
     P: Cosmos,
 {
     pub fn new(skel: ItemSkel<P>) -> Self {
-        let router = Arc::new(LayerInjectionRouter::new(
+        let mut router = LayerInjectionRouter::new(
             skel.skel.skel.clone(),
-            skel.point.clone().to_surface().with_layer(Layer::Field),
-        ));
+            skel.point.clone().to_surface().with_layer(Layer::Core),
+        );
+
+        router.direction = Some(TraversalDirection::Fabric);
+        let router = Arc::new(router);
 
         let mut transmitter =
             ProtoTransmitterBuilder::new(router, skel.skel.skel.exchanger.clone());
@@ -224,7 +236,7 @@ where
             kind: HandlingKind::Immediate,
             priority: Default::default(),
             retries: Default::default(),
-            wait: WaitTime::High,
+            wait: WaitTime::Low,
         });
         transmitter.agent = SetStrategy::Fill(Agent::Anonymous);
 
@@ -243,7 +255,9 @@ where
                 let transmitter = self.transmitter.clone();
                 runtime.spawn(async move {
                     match Self::handle::<P>(transmitter, req).await {
-                        Ok(_) => {}
+                        Ok(_) => {
+
+                        }
                         Err(err) => {
                             println!("http handle ERR: {}", err.to_string());
                         }
@@ -292,6 +306,7 @@ where
 
         let mut wave = DirectedProto::ping();
         wave.core(core);
+        wave.track = true;
         let pong = transmitter.ping(wave).await?;
 
         let body = pong.core.body.clone().to_bin()?;
@@ -314,6 +329,7 @@ where
                 None,
             );
 
+println!("RESPONDING...");
             req.respond(response);
         });
 
