@@ -261,7 +261,7 @@ where
     where
         C: Cosmos,
     {
-println!("Handling Request!");
+        println!("Handling Request!");
         let method = HttpMethod::from_str(req.method().to_string().as_str())?;
         let mut headers = HeaderMap::new();
         for header in req.headers() {
@@ -303,14 +303,14 @@ println!("Handling Request!");
         }
         let data_length = Some(body.len());
 
-        rayon::spawn( move || {
-        let response = tiny_http::Response::new(
-            tiny_http::StatusCode(pong.core.status.as_u16()),
-            headers,
-            body.as_slice(),
-            data_length,
-            None,
-        );
+        rayon::spawn(move || {
+            let response = tiny_http::Response::new(
+                tiny_http::StatusCode(pong.core.status.as_u16()),
+                headers,
+                body.as_slice(),
+                data_length,
+                None,
+            );
 
             req.respond(response);
         });
