@@ -34,7 +34,6 @@ use cosmic_hyperspace::driver::mechtron::{HostDriverFactory, MechtronDriverFacto
 use cosmic_hyperspace::driver::root::RootDriverFactory;
 use cosmic_hyperspace::driver::space::SpaceDriverFactory;
 use cosmic_hyperspace::driver::{DriverAvail, DriversBuilder};
-use cosmic_hyperspace::err::CosmicErr;
 use cosmic_hyperspace::machine::{Machine, MachineTemplate};
 use cosmic_hyperspace::reg::{Registry, RegistryApi};
 use cosmic_hyperspace::Cosmos;
@@ -60,6 +59,7 @@ use cosmic_space::particle::property::{
 use cosmic_space::substance::Token;
 
 use cosmic_hyperlane_tcp::HyperlaneTcpServer;
+use cosmic_hyperspace::mem::registry::{MemRegApi, MemRegCtx};
 
 fn main() -> Result<(), StarErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -117,24 +117,31 @@ pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
 
 #[derive(Clone)]
 pub struct Starlane {
-    pub handle: PostgresRegistryContextHandle<Self>,
+    //pub handle: PostgresRegistryContextHandle<Self>,
+    pub ctx: MemRegCtx,
 }
 
 impl Starlane {
     pub async fn new() -> Result<Self, StarErr> {
+        /*
         let db = <Self as PostgresPlatform>::lookup_registry_db()?;
         let mut set = HashSet::new();
         set.insert(db.clone());
         let ctx = Arc::new(PostgresRegistryContext::new(set).await?);
         let handle = PostgresRegistryContextHandle::new(&db, ctx);
-        Ok(Self { handle })
+
+         */
+        let ctx = MemRegCtx::new();
+        Ok(Self { ctx })
+
     }
 }
 
 #[async_trait]
 impl Cosmos for Starlane {
     type Err = StarErr;
-    type RegistryContext = PostgresRegistryContextHandle<Self>;
+    //type RegistryContext = PostgresRegistryContextHandle<Self>;
+    type RegistryContext = MemRegCtx;
     type StarAuth = AnonHyperAuthenticator;
     type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
 
@@ -216,9 +223,13 @@ impl Cosmos for Starlane {
     async fn global_registry(&self) -> Result<Registry<Self>, Self::Err> {
         let logger = RootLogger::default();
         let logger = logger.point(Point::global_registry());
+        /*
         Ok(Arc::new(
             PostgresRegistry::new(self.handle.clone(), self.clone(), logger).await?,
         ))
+         */
+
+        Ok(Arc::new(MemRegApi::new(self.ctx.clone())))
     }
 
     async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>, Self::Err> {

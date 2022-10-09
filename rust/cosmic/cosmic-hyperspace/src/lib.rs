@@ -66,12 +66,11 @@ pub mod machine;
 pub mod star;
 pub mod err;
 pub mod reg;
+pub mod mem;
 
 #[cfg(test)]
 pub mod tests;
 
-#[cfg(test)]
-pub mod mem;
 
 #[no_mangle]
 pub extern "C" fn cosmic_uuid() -> String {
