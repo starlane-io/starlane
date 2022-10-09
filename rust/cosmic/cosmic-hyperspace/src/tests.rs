@@ -877,7 +877,6 @@ fn test_web() -> Result<(), CosmicErr> {
             .unwrap();
 
 
-
         Ok(())
     })
 }

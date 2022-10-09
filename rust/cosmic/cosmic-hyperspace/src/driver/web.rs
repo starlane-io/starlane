@@ -29,6 +29,7 @@ use std::thread;
 use tiny_http::Server;
 use tokio::runtime::Runtime;
 use url::Url;
+use inflector::Inflector;
 
 lazy_static! {
     static ref WEB_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -42,9 +43,7 @@ fn web_bind() -> BindConfig {
         r#"
     Bind(version=1.0.0)
     {
-       Route {
-         Http<*> -> (()) => &;
-       }
+       Route<Http<*>> -> (()) => &;
     }
     "#,
     ))
@@ -261,13 +260,16 @@ where
     where
         C: Cosmos,
     {
-        println!("Handling Request!");
-        let method = HttpMethod::from_str(req.method().to_string().as_str())?;
+        let method = req.method().to_string().to_lowercase().as_str().to_title_case();
+        println!("Handling Request! {}, {}",method, req.url() );
+
+        let method = HttpMethod::from_str(method.as_str())?;
         let mut headers = HeaderMap::new();
         for header in req.headers() {
             headers.insert(header.field.to_string(), header.value.to_string());
         }
-        let uri: Url = Url::from_str(req.url())?;
+        let url = format!("http://localhost{}",req.url());
+        let uri: Url = Url::from_str(url.as_str())?;
         let body = Substance::Bin(match req.body_length().as_ref() {
             None => Arc::new(vec![]),
             Some(len) => {

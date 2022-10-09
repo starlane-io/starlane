@@ -27,12 +27,38 @@ pub mod convert {
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
-
+    use ascii::FromAsciiError;
     impl Err {
         pub fn new<S: ToString>(message: S) -> Self {
             Self {
                 message: message.to_string(),
                 kind: ErrKind::Default,
+            }
+        }
+    }
+
+         impl From<strum::ParseError> for Err {
+        fn from(e: strum::ParseError) -> Self {
+            Self {
+                kind: ErrKind::Default,
+                message: e.to_string()
+            }
+        }
+    }
+
+     impl From<url::ParseError> for Err {
+        fn from(e: url::ParseError) -> Self {
+            Self {
+                kind: ErrKind::Default,
+                message: e.to_string()
+            }
+        }
+    }
+    impl From<FromAsciiError<std::string::String>> for Err {
+        fn from(e: FromAsciiError<String>) -> Self {
+            Self {
+                kind: ErrKind::Default,
+                message: e.to_string()
             }
         }
     }
@@ -95,12 +121,6 @@ pub mod convert {
     impl From<()> for Err {
         fn from(_: ()) -> Self {
             Err::new("empty")
-        }
-    }
-
-    impl From<ParseError> for Err {
-        fn from(e: ParseError) -> Self {
-            Err::new(e)
         }
     }
 

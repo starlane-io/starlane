@@ -59,6 +59,7 @@ use cosmic_space::particle::property::{
 use cosmic_space::substance::Token;
 
 use cosmic_hyperlane_tcp::HyperlaneTcpServer;
+use cosmic_hyperspace::driver::web::WebDriverFactory;
 use cosmic_hyperspace::mem::registry::{MemRegApi, MemRegCtx};
 
 fn main() -> Result<(), StarErr> {
@@ -209,7 +210,8 @@ impl Cosmos for Starlane {
                 builder.add_post(Arc::new(ArtifactDriverFactory::new()));
             }
             StarSub::Jump => {
-                //                builder.add_post(Arc::new(ControlDriverFactory::new()));
+                builder.add_post(Arc::new(WebDriverFactory::new()));
+                // builder.add_post(Arc::new(ControlDriverFactory::new()));
             }
             StarSub::Fold => {}
             StarSub::Machine => {

@@ -11,6 +11,9 @@ extern crate lazy_static;
 #[macro_use]
 extern crate strum_macros;
 
+extern crate inflector;
+use inflector::Inflector;
+
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
