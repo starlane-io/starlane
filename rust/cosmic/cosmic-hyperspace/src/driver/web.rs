@@ -141,7 +141,6 @@ where
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
-            println!("\tASSIGNING WEB!");
             let skel = ItemSkel::new(
                 assign.details.stub.point.clone(),
                 Kind::Native(NativeSub::Web),
@@ -306,7 +305,6 @@ where
 
         let mut wave = DirectedProto::ping();
         wave.core(core);
-        wave.track = true;
         let pong = transmitter.ping(wave).await?;
 
         let body = pong.core.body.clone().to_bin()?;
@@ -329,7 +327,6 @@ where
                 None,
             );
 
-println!("RESPONDING...");
             req.respond(response);
         });
 
