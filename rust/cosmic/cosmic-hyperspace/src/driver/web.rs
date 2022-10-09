@@ -13,17 +13,19 @@ use cosmic_space::parse::bind_config;
 use cosmic_space::selector::KindSelector;
 use cosmic_space::util::log;
 use cosmic_space::wave::core::http2::{HttpMethod, HttpRequest};
-use cosmic_space::wave::core::{DirectedCore, HeaderMap};
+use cosmic_space::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
 use tiny_http::Server;
 use tokio::runtime::Runtime;
 use url::Url;
-use cosmic_space::substance::Substance;
+use cosmic_space::substance::{Bin, Substance};
 use cosmic_space::wave::{DirectedProto, Ping, Wave};
-use cosmic_space::wave::exchange::asynch::ProtoTransmitter;
+use cosmic_space::wave::exchange::asynch::{InCtx, ProtoTransmitter};
 use ascii::IntoAsciiString;
+use crate::err::HyperErr;
+
 lazy_static! {
     static ref WEB_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
         Arc::new(web_bind()),
@@ -36,6 +38,9 @@ fn web_bind() -> BindConfig {
         r#"
     Bind(version=1.0.0)
     {
+       Route {
+         Http<*> -> (()) => &;
+       }
     }
     "#,
     ))
@@ -61,18 +66,30 @@ where
 
     async fn create(
         &self,
-        skel: HyperStarSkel<P>,
+        _: HyperStarSkel<P>,
         driver_skel: DriverSkel<P>,
-        ctx: DriverCtx,
+        _: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
-        Ok(Box::new(WebDriver))
+
+        Ok(Box::new(WebDriver::new(driver_skel)))
     }
 }
 
-pub struct WebDriver;
+pub struct WebDriver<P> where P: Cosmos
+{
+    skel: DriverSkel<P>
+}
+
+impl <P> WebDriver<P> where P: Cosmos {
+    pub fn new(skel: DriverSkel<P>) -> Self {
+        Self {
+            skel
+        }
+    }
+}
 
 #[async_trait]
-impl<P> Driver<P> for WebDriver
+impl<P> Driver<P> for WebDriver<P>
 where
     P: Cosmos,
 {
@@ -81,17 +98,30 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
-        Ok(ItemSphere::Handler(Box::new(Web)))
+        let skel = ItemSkel::new( point.clone(), Kind::Native(NativeSub::Web), self.skel.clone());
+        Ok(ItemSphere::Handler(Box::new(Web::new(skel) )))
     }
 }
 
-pub struct Web;
+pub struct Web<P> where P: Cosmos{
+    skel: ItemSkel<P>
+}
+
 
 #[handler]
-impl Web {}
+impl <P> Web<P> where P: Cosmos {
+    pub fn new(skel: ItemSkel<P>) -> Self {
+       Self { skel }
+    }
+
+    #[route("Http<*>")]
+    pub async fn handle( &self, _: InCtx<'_,Bin>) -> Result<ReflectedCore,P::Err> {
+        Ok(ReflectedCore::ok())
+    }
+}
 
 #[async_trait]
-impl<P> ItemHandler<P> for Web
+impl<P> ItemHandler<P> for Web<P>
 where
     P: Cosmos,
 {
@@ -175,26 +205,6 @@ where
                None,
            );
            req.respond(response);
-        /*
-           let response = rocess_request(request, api.clone(), skel.clone()).await?;
-           let mut headers = vec![];
-           for (name, value) in response.headers() {
-               let header = tiny_http::Header {
-                   field: HeaderField::from_str(name.as_str())?,
-                   value: value.to_str()?.into_ascii_string()?,
-               };
-               headers.push(header);
-           }
-           let data_length = Some(response.body().len());
-           let response = tiny_http::Response::new(
-               tiny_http::StatusCode(response.status().as_u16()),
-               headers,
-               response.body().as_slice(),
-               data_length,
-               None,
-           );
-           req.respond(response);
-        */
         Ok(())
     }
 }
