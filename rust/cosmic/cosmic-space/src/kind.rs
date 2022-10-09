@@ -305,6 +305,7 @@ impl Kind {
             Kind::Bundle => true,
             Kind::Artifact(_) => true,
             Kind::Mechtron => true,
+            Kind::Native(NativeSub::Web) => true,
             _ => false,
         }
     }

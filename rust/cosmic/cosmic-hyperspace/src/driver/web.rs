@@ -19,14 +19,16 @@ use cosmic_space::util::{log, ValuePattern};
 use cosmic_space::wave::core::http2::{HttpMethod, HttpRequest};
 use cosmic_space::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use cosmic_space::wave::exchange::asynch::{InCtx, ProtoTransmitter, ProtoTransmitterBuilder};
-use cosmic_space::wave::{Agent, DirectedProto, Handling, HandlingKind, Ping, ToRecipients, WaitTime, Wave};
+use cosmic_space::wave::exchange::SetStrategy;
+use cosmic_space::wave::{
+    Agent, DirectedProto, Handling, HandlingKind, Ping, ToRecipients, WaitTime, Wave,
+};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
 use tiny_http::Server;
 use tokio::runtime::Runtime;
 use url::Url;
-use cosmic_space::wave::exchange::SetStrategy;
 
 lazy_static! {
     static ref WEB_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -115,11 +117,8 @@ where
     }
 
     async fn handler(&self) -> Box<dyn DriverHandler<P>> {
-        Box::new(WebDriverHandler::restore(
-            self.skel.clone(),
-        ))
+        Box::new(WebDriverHandler::restore(self.skel.clone()))
     }
-
 }
 
 pub struct WebDriverHandler<P>
@@ -133,7 +132,7 @@ impl<P> WebDriverHandler<P>
 where
     P: Cosmos,
 {
-    fn restore(skel: DriverSkel<P> ) -> Self {
+    fn restore(skel: DriverSkel<P>) -> Self {
         WebDriverHandler { skel }
     }
 }
@@ -149,7 +148,11 @@ where
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
             println!("\tASSIGNING WEB!");
-            let skel = ItemSkel::new( assign.details.stub.point.clone(), Kind::Native(NativeSub::Web), self.skel.clone());
+            let skel = ItemSkel::new(
+                assign.details.stub.point.clone(),
+                Kind::Native(NativeSub::Web),
+                self.skel.clone(),
+            );
             let mut runner = WebRunner::new(skel);
             runner.start();
         }
@@ -202,48 +205,63 @@ where
     P: Cosmos,
 {
     pub fn new(skel: ItemSkel<P>) -> Self {
-            let router = Arc::new(LayerInjectionRouter::new(
-                skel.skel.skel.clone(),
-                skel.point.clone().to_surface().with_layer(Layer::Field),
-            ));
+        let router = Arc::new(LayerInjectionRouter::new(
+            skel.skel.skel.clone(),
+            skel.point.clone().to_surface().with_layer(Layer::Field),
+        ));
 
-            let mut transmitter = ProtoTransmitterBuilder::new(router, skel.skel.skel.exchanger.clone());
-            transmitter.from =
-                SetStrategy::Override(skel.point.clone().to_surface().with_layer(Layer::Gravity ));
-            transmitter.to =
-                SetStrategy::Override(skel.point.clone().to_surface().with_layer(Layer::Core).to_recipients());
-            transmitter.handling = SetStrategy::Fill(Handling{
-                kind: HandlingKind::Immediate,
-                priority: Default::default(),
-                retries: Default::default(),
-                wait: WaitTime::High
-            });
-            transmitter.agent = SetStrategy::Fill(Agent::Anonymous);
+        let mut transmitter =
+            ProtoTransmitterBuilder::new(router, skel.skel.skel.exchanger.clone());
+        transmitter.from =
+            SetStrategy::Override(skel.point.clone().to_surface().with_layer(Layer::Gravity));
+        transmitter.to = SetStrategy::Override(
+            skel.point
+                .clone()
+                .to_surface()
+                .with_layer(Layer::Core)
+                .to_recipients(),
+        );
+        transmitter.handling = SetStrategy::Fill(Handling {
+            kind: HandlingKind::Immediate,
+            priority: Default::default(),
+            retries: Default::default(),
+            wait: WaitTime::High,
+        });
+        transmitter.agent = SetStrategy::Fill(Agent::Anonymous);
 
-            let transmitter = transmitter.build();
+        let transmitter = transmitter.build();
 
-        Self {
-            skel,
-            transmitter
-        }
+        Self { skel, transmitter }
     }
 
     pub fn start(mut self) {
-        tokio::spawn(async move {
+        let runtime = tokio::runtime::Handle::current();
+        thread::spawn(move || {
             let port = self.skel.skel.skel.machine.cosmos.web_port().unwrap();
             let server = Server::http(format!("0.0.0.0:{}", port)).unwrap();
             for req in server.incoming_requests() {
-                match self.handle(req).await {
-                    Ok(_) => {}
-                    Err(err) => {
-                        println!("http handle ERR: {}", err.to_string());
+                let runtime = runtime.clone();
+                let transmitter = self.transmitter.clone();
+                runtime.spawn(async move {
+                    match Self::handle::<P>(transmitter, req).await {
+                        Ok(_) => {}
+                        Err(err) => {
+                            println!("http handle ERR: {}", err.to_string());
+                        }
                     }
-                }
+                });
             }
         });
     }
 
-    async fn handle(&self, mut req: tiny_http::Request) -> Result<(), P::Err> {
+    async fn handle<C>(
+        transmitter: ProtoTransmitter,
+        mut req: tiny_http::Request,
+    ) -> Result<(), C::Err>
+    where
+        C: Cosmos,
+    {
+println!("Handling Request!");
         let method = HttpMethod::from_str(req.method().to_string().as_str())?;
         let mut headers = HeaderMap::new();
         for header in req.headers() {
@@ -272,7 +290,7 @@ where
 
         let mut wave = DirectedProto::ping();
         wave.core(core);
-        let pong = self.transmitter.ping(wave).await?;
+        let pong = transmitter.ping(wave).await?;
 
         let body = pong.core.body.clone().to_bin()?;
         let mut headers = vec![];
@@ -284,6 +302,8 @@ where
             headers.push(header);
         }
         let data_length = Some(body.len());
+
+        rayon::spawn( move || {
         let response = tiny_http::Response::new(
             tiny_http::StatusCode(pong.core.status.as_u16()),
             headers,
@@ -291,7 +311,10 @@ where
             data_length,
             None,
         );
-        req.respond(response);
+
+            req.respond(response);
+        });
+
         Ok(())
     }
 }
