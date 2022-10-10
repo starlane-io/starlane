@@ -16,6 +16,6 @@ cosmic-hyperlane-tcp={ path="../cosmic-hyperlane-tcp"}
 cosmic-space= { path= "../cosmic-space" }
 cosmic-hyperspace= { path= "../cosmic-hyperspace" }
 cosmic-nom= { path="../cosmic-nom"}
-
+text_io = "0.1.12"
 clap = { version="3.2.22", features=["cargo"] }
 tokio = { version = "1.15.0", features = ["rt"] }
