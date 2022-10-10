@@ -320,8 +320,6 @@ where
                     .await
                     .map_err(|e| e.to_uni_err())?;
 
-
-
                 let registration = Registration {
                     point: Point::global_executor(),
                     kind: Kind::Global,

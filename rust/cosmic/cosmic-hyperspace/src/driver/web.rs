@@ -1,31 +1,45 @@
-use crate::driver::{Driver, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, HyperItemSkel, HyperSkel, ItemHandler, ItemRouter, ItemSkel, ItemSphere};
+use crate::driver::{
+    Driver, DriverCtx, DriverHandler, DriverSkel, DriverStatus, HyperDriverFactory, HyperItemSkel,
+    HyperSkel, ItemHandler, ItemRouter, ItemSkel, ItemSphere,
+};
 use crate::err::HyperErr;
+use crate::reg::Registration;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::Cosmos;
 use ascii::IntoAsciiString;
 use cosmic_space::artifact::ArtRef;
+use cosmic_space::command::common::StateSrc;
+use cosmic_space::command::direct::create::{
+    Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
+};
 use cosmic_space::config::bind::BindConfig;
 use cosmic_space::fail::http;
-use cosmic_space::hyper::HyperSubstance;
+use cosmic_space::hyper::{HyperSubstance, ParticleLocation};
 use cosmic_space::kind::{BaseKind, Kind, NativeSub};
 use cosmic_space::loc::{Layer, Point, ToSurface};
 use cosmic_space::parse::{bind_config, CamelCase};
+use cosmic_space::particle::traversal::{Traversal, TraversalDirection};
+use cosmic_space::particle::Status;
 use cosmic_space::selector::{KindSelector, Pattern, SubKindSelector};
 use cosmic_space::substance::{Bin, Substance};
 use cosmic_space::util::{log, ValuePattern};
 use cosmic_space::wave::core::http2::{HttpMethod, HttpRequest};
 use cosmic_space::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
-use cosmic_space::wave::exchange::asynch::{InCtx, ProtoTransmitter, ProtoTransmitterBuilder, TraversalRouter};
+use cosmic_space::wave::exchange::asynch::{
+    InCtx, ProtoTransmitter, ProtoTransmitterBuilder, TraversalRouter,
+};
 use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{Agent, DirectedProto, Handling, HandlingKind, Ping, ToRecipients, UltraWave, WaitTime, Wave};
+use cosmic_space::wave::{
+    Agent, DirectedProto, Handling, HandlingKind, Ping, ToRecipients, UltraWave, WaitTime, Wave,
+};
+use cosmic_space::HYPERUSER;
+use inflector::Inflector;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
 use tiny_http::Server;
 use tokio::runtime::Runtime;
 use url::Url;
-use cosmic_space::particle::traversal::{Traversal, TraversalDirection};
-use inflector::Inflector;
 
 lazy_static! {
     static ref WEB_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -39,6 +53,7 @@ fn web_bind() -> BindConfig {
         r#"
     Bind(version=1.0.0)
     {
+        Route<Http<*>> -> localhost => &;
     }
     "#,
     ))
@@ -101,6 +116,33 @@ where
         Kind::Native(NativeSub::Web)
     }
 
+    async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
+        let point = self.skel.point.push("http-server")?;
+        let registration = Registration {
+            point: point.clone(),
+            kind: Kind::Native(NativeSub::Web),
+            registry: Default::default(),
+            properties: Default::default(),
+            owner: HYPERUSER.clone(),
+            strategy: Strategy::Ensure,
+            status: Status::Ready,
+        };
+
+        self.skel.skel.api.create_states(point.clone()).await?;
+        self.skel.skel.registry.register(&registration).await?;
+        let location = ParticleLocation::new(self.skel.skel.point.clone(), None);
+        self.skel.skel.registry.assign(&point, location).await?;
+
+        let item_skel = ItemSkel::new(point, Kind::Native(NativeSub::Web), self.skel.clone());
+        let mut runner = WebRunner::new(item_skel);
+        runner.start();
+
+        skel.status_tx
+            .send(DriverStatus::Ready)
+            .await
+            .unwrap_or_default();
+        Ok(())
+    }
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
         let skel = ItemSkel::new(
             point.clone(),
@@ -138,6 +180,7 @@ impl<P> WebDriverHandler<P>
 where
     P: Cosmos,
 {
+    /*
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
@@ -151,6 +194,8 @@ where
         }
         Ok(())
     }
+
+     */
 }
 
 pub struct Web<P>
@@ -176,15 +221,23 @@ where
 }
 
 #[async_trait]
-impl<P> TraversalRouter for Web<P> where P: Cosmos {
+impl<P> TraversalRouter for Web<P>
+where
+    P: Cosmos,
+{
     async fn traverse(&self, traversal: Traversal<UltraWave>) {
         if traversal.is_directed() {
-
         } else {
             let wave = traversal.payload;
             let reflected = wave.to_reflected().unwrap();
-println!("Exchanging reflected@!");
-            self.skel.skel.skel.exchanger.reflected(reflected).await.unwrap_or_default();
+            println!("Exchanging reflected@!");
+            self.skel
+                .skel
+                .skel
+                .exchanger
+                .reflected(reflected)
+                .await
+                .unwrap_or_default();
         }
     }
 }
@@ -254,9 +307,7 @@ where
                 let transmitter = self.transmitter.clone();
                 runtime.spawn(async move {
                     match Self::handle::<P>(transmitter, req).await {
-                        Ok(_) => {
-
-                        }
+                        Ok(_) => {}
                         Err(err) => {
                             println!("http handle ERR: {}", err.to_string());
                         }
@@ -273,15 +324,20 @@ where
     where
         C: Cosmos,
     {
-        let method = req.method().to_string().to_lowercase().as_str().to_title_case();
-        println!("Handling Request! {}, {}",method, req.url() );
+        let method = req
+            .method()
+            .to_string()
+            .to_lowercase()
+            .as_str()
+            .to_title_case();
+        println!("Handling Request! {}, {}", method, req.url());
 
         let method = HttpMethod::from_str(method.as_str())?;
         let mut headers = HeaderMap::new();
         for header in req.headers() {
             headers.insert(header.field.to_string(), header.value.to_string());
         }
-        let url = format!("http://localhost{}",req.url());
+        let url = format!("http://localhost{}", req.url());
         let uri: Url = Url::from_str(url.as_str())?;
         let body = Substance::Bin(match req.body_length().as_ref() {
             None => Arc::new(vec![]),
