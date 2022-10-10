@@ -25,8 +25,8 @@ use cosmic_space::particle::PointKind;
 use cosmic_space::selector::KindSelector;
 use cosmic_space::substance::{Bin, Substance};
 use cosmic_space::util::log;
-use cosmic_space::wave::core::DirectedCore;
-use cosmic_space::wave::exchange::asynch::InCtx;
+use cosmic_space::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
+use cosmic_space::wave::exchange::asynch::{DirectedHandler, InCtx, RootInCtx};
 use cosmic_space::wave::{DirectedProto, Pong, Wave};
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -62,6 +62,9 @@ fn artifact_bind() -> BindConfig {
         r#"
     Bind(version=1.0.0)
     {
+        Route -> {
+           Http<Get> -> (()) => &;
+        }
     }
     "#,
     ))
@@ -597,6 +600,7 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+
         let record = self.skel.locate(point).await?;
 
         let skel = ItemSkel::new(point.clone(), record.details.stub.kind,self.skel.clone());
@@ -710,8 +714,9 @@ where
             Err(err) => return Err(SpaceErr::new(500u16, err.to_string())),
         }
     }
+
     #[route("Cmd<Read>")]
-    pub async fn read(&self, _: InCtx<'_, ()>) -> Result<Substance, P::Err> {
+    pub async fn read(&self, ctx: InCtx<'_, ()>) -> Result<Substance, P::Err> {
         if let Kind::Artifact(ArtifactSubKind::Dir) = self.skel.kind {
             return Ok(Substance::Empty);
         }
@@ -720,6 +725,18 @@ where
         let substance: Substance = store.get(&self.skel.point.to_string()).unwrap();
         Ok(substance)
     }
+
+    #[route("Http<Get>")]
+    pub async fn get(&self, _: InCtx<'_, ()>) -> Result<Substance, P::Err> {
+        if let Kind::Artifact(ArtifactSubKind::Dir) = self.skel.kind {
+            return Ok(Substance::Empty);
+        }
+        let store = self.store()?;
+
+        let substance: Substance = store.get(&self.skel.point.to_string()).unwrap();
+        Ok(substance)
+    }
+
 }
 
 impl<P> Item<P> for Artifact<P>
@@ -735,6 +752,23 @@ where
     }
 }
 
+/*
+#[async_trait]
+impl<P> DirectedHandler for Artifact<P> where P: Cosmos {
+    async fn handle(&self, ctx: RootInCtx) -> CoreBounce {
+        println!("ARTIFACT HANDLE REQUEST : {}",ctx.wave.clone().to_ultra().desc());
+
+        let core = ReflectedCore {
+            headers: Default::default(),
+            status: Default::default(),
+            body: Default::default()
+        };
+        CoreBounce::Reflected(core)
+    }
+}
+
+ */
+
 #[async_trait]
 impl<P> ItemHandler<P> for Artifact<P>
 where
@@ -743,4 +777,7 @@ where
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(ARTIFACT_BIND_CONFIG.clone())
     }
+
 }
+
+

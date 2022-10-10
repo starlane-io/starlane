@@ -2,6 +2,7 @@ use core::str::FromStr;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use nom::ExtendInto;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -253,7 +254,11 @@ impl Substance {
             Substance::List(list) => list.to_bin(),
             Substance::Map(map) => map.to_bin(),
             Substance::Bin(bin) => Ok(bin),
-            _ => Err("not supported".into()),
+            Substance::Text(text) => {
+println!("to_bin() -> {}", text );
+                Ok(Arc::new( text.as_bytes().new_builder()))
+            },
+            what => Err(format!("{}.to_bin() not supported", what.kind().to_string()).into()),
         }
     }
 }

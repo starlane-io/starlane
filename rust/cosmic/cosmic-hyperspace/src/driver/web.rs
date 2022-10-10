@@ -205,7 +205,6 @@ where
     skel: ItemSkel<P>,
 }
 
-#[handler]
 impl<P> Web<P>
 where
     P: Cosmos,
@@ -214,10 +213,6 @@ where
         Self { skel }
     }
 
-    #[route("Http<*>")]
-    pub async fn handle(&self, _: InCtx<'_, Bin>) -> Result<ReflectedCore, P::Err> {
-        Ok(ReflectedCore::not_found())
-    }
 }
 
 #[async_trait]
@@ -230,7 +225,7 @@ where
         } else {
             let wave = traversal.payload;
             let reflected = wave.to_reflected().unwrap();
-            println!("Exchanging reflected@!");
+            println!("Exchanging reflected@! {}", reflected.core().status.to_string() );
             self.skel
                 .skel
                 .skel
@@ -339,16 +334,16 @@ where
         }
         let url = format!("http://localhost{}", req.url());
         let uri: Url = Url::from_str(url.as_str())?;
-        let body = Substance::Bin(match req.body_length().as_ref() {
-            None => Arc::new(vec![]),
+        let body = match req.body_length().as_ref() {
+            None => Substance::Empty,
             Some(len) => {
                 let mut buf: Vec<u8> = Vec::with_capacity(*len);
                 let reader = req.as_reader();
                 reader.read_to_end(&mut buf);
                 let buf = Arc::new(buf);
-                buf
+                Substance::Bin(buf)
             }
-        });
+        };
 
         let request = HttpRequest {
             method,
@@ -361,6 +356,7 @@ where
 
         let mut wave = DirectedProto::ping();
         wave.core(core);
+//        wave.track = true;
         let pong = transmitter.ping(wave).await?;
 
         let body = pong.core.body.clone().to_bin()?;

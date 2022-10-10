@@ -43,7 +43,7 @@ extern "C" fn cosmic_timestamp() -> Timestamp {
 }
 
 /// This macro will auto implement the `cosmic_space::wave::exchange::asynch::DirectedHandler` trait.
-/// In order to finalize the implementation a `#[routes]` attribute must also be specified
+/// In order to finalize the implementation a `#[handler]` attribute must also be specified
 /// above one of the impls.
 #[proc_macro_derive(DirectedHandler)]
 pub fn directed_handler(item: TokenStream) -> TokenStream {
@@ -68,7 +68,7 @@ pub fn directed_handler(item: TokenStream) -> TokenStream {
 ///   logger: PointLogger
 /// }
 ///
-/// #[routes]
+/// #[handler]
 /// impl MyHandler {
 ///     /// the route attribute captures an ExtMethod implementing a custom `MyNameIs`
 ///     /// notice that the InCtx will accept any valid cosmic_space::substance::Substance

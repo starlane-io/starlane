@@ -1,4 +1,4 @@
 Bind(version=1.0.0)
 {
-   Route<Http<Get>> -> repo:tutorial:1.0.0:/html/index.html => &;
+   Route<Http<Get>>/index.html -> repo:tutorial:1.0.0:/html/index.html => &;
 }

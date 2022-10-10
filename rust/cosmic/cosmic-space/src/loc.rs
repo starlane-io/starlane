@@ -1388,7 +1388,7 @@ impl ToResolved<Point> for PointCtx {
                     }
                 }
                 PointSegCtx::FilesystemRootDir => {
-                    point = point.push(":/".to_string())?;
+                    point = point.push("/".to_string())?;
                 }
                 PointSegCtx::Root => {
                     //segments.push(PointSeg::Root)
