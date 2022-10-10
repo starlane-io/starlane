@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use cosmic_nom::new_span;
 
-use crate::err::UniErr;
+use crate::err::SpaceErr;
 use crate::loc::Meta;
 use crate::parse::camel_case_chars;
 use crate::parse::error::result;
@@ -23,7 +23,7 @@ pub struct ExtMethod {
 }
 
 impl ExtMethod {
-    pub fn new<S: ToString>(string: S) -> Result<Self, UniErr> {
+    pub fn new<S: ToString>(string: S) -> Result<Self, SpaceErr> {
         let tmp = string.to_string();
         let string = result(all_consuming(camel_case_chars)(new_span(tmp.as_str())))?.to_string();
         Ok(Self { string })
@@ -56,7 +56,7 @@ impl Into<MethodScopeSelector> for ExtMethod {
 }
 
 impl TryFrom<String> for ExtMethod {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::new(value)
@@ -64,7 +64,7 @@ impl TryFrom<String> for ExtMethod {
 }
 
 impl TryFrom<&str> for ExtMethod {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Self::new(value)
@@ -109,9 +109,9 @@ impl Default for ExtDirected {
 }
 
 impl ExtDirected {
-    pub fn new<M>(method: M) -> Result<Self, UniErr>
+    pub fn new<M>(method: M) -> Result<Self, SpaceErr>
     where
-        M: TryInto<ExtMethod, Error = UniErr>,
+        M: TryInto<ExtMethod, Error =SpaceErr>,
     {
         Ok(ExtDirected {
             method: method.try_into()?,
@@ -143,7 +143,7 @@ impl ExtDirected {
 }
 
 impl TryFrom<DirectedCore> for ExtDirected {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(core: DirectedCore) -> Result<Self, Self::Error> {
         if let Method::Ext(action) = core.method {

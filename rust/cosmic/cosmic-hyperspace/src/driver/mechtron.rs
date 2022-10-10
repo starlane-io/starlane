@@ -6,7 +6,7 @@ use crate::star::HyperStarSkel;
 use crate::Cosmos;
 use cosmic_space::artifact::ArtRef;
 use cosmic_space::config::bind::BindConfig;
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{Assign, HyperSubstance};
 use cosmic_space::kind::{BaseKind, Kind};
 use cosmic_space::loc::{Layer, Point, ToSurface};
@@ -220,7 +220,7 @@ where
                 .properties
                 .get("config")
                 .ok_or("expected config property")
-                .map_err(|e| UniErr::from_500(e))?;
+                .map_err(|e| SpaceErr::from_500(e))?;
             let config = Point::from_str(config.value.as_str())?;
             let config = self
                 .skel
@@ -245,7 +245,7 @@ where
                     self.skel
                         .factory
                         .create(host.details.clone(), bin)
-                        .map_err(|e| UniErr::from_500("host err"))?,
+                        .map_err(|e| SpaceErr::from_500("host err"))?,
                 );
 
                 mechtron_host.init( host.details.clone() )?;

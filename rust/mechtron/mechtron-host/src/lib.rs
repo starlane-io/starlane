@@ -4,7 +4,7 @@ mod membrane;
 
 use crate::err::HostErr;
 use crate::membrane::WasmMembrane;
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::loc::Point;
 use cosmic_space::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
 use cosmic_space::particle::Details;

@@ -7,7 +7,7 @@ use core::result::Result::{Err, Ok};
 
 use serde::{Deserialize, Serialize};
 
-use crate::err::UniErr;
+use crate::err::SpaceErr;
 use crate::loc;
 use crate::loc::Uuid;
 use crate::parse::Env;
@@ -86,9 +86,9 @@ where
 }
 
 impl<T> ValuePattern<T> {
-    pub fn modify<X, F>(self, mut f: F) -> Result<ValuePattern<X>, UniErr>
+    pub fn modify<X, F>(self, mut f: F) -> Result<ValuePattern<X>, SpaceErr>
     where
-        F: FnMut(T) -> Result<X, UniErr>,
+        F: FnMut(T) -> Result<X, SpaceErr>,
     {
         Ok(match self {
             ValuePattern::Any => ValuePattern::Any,
@@ -190,14 +190,14 @@ impl ValueMatcher<String> for StringMatcher {
 }
 
 pub trait Convert<A> {
-    fn convert(self) -> Result<A, UniErr>;
+    fn convert(self) -> Result<A, SpaceErr>;
 }
 
 pub trait ConvertFrom<A>
 where
     Self: Sized,
 {
-    fn convert_from(a: A) -> Result<Self, UniErr>;
+    fn convert_from(a: A) -> Result<Self, SpaceErr>;
 }
 
 pub fn uuid() -> Uuid {
@@ -212,14 +212,14 @@ pub trait ToResolved<R>
 where
     Self: Sized,
 {
-    fn collapse(self) -> Result<R, UniErr> {
+    fn collapse(self) -> Result<R, SpaceErr> {
         self.to_resolved(&Env::no_point())
     }
 
-    fn to_resolved(self, env: &Env) -> Result<R, UniErr>;
+    fn to_resolved(self, env: &Env) -> Result<R, SpaceErr>;
 }
 
-pub fn log<R>(result: Result<R, UniErr>) -> Result<R, UniErr> {
+pub fn log<R>(result: Result<R, SpaceErr>) -> Result<R, SpaceErr> {
     match result {
         Ok(r) => Ok(r),
         Err(err) => {

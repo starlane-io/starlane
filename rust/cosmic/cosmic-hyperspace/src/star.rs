@@ -28,7 +28,7 @@ use cosmic_space::command::direct::create::{Create, Strategy};
 use cosmic_space::command::direct::set::Set;
 use cosmic_space::command::RawCommand;
 use cosmic_space::config::bind::{BindConfig, RouteSelector};
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{
     Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, Location, ParticleRecord,
     Provision, Search,
@@ -114,7 +114,7 @@ where
         &self,
         port: &Surface,
         source: &Surface,
-    ) -> Option<Result<Arc<dyn TopicHandler>, UniErr>> {
+    ) -> Option<Result<Arc<dyn TopicHandler>, SpaceErr>> {
         match self.topic.get(port) {
             None => None,
             Some(topic) => {
@@ -122,13 +122,13 @@ where
                 if topic.source_selector().is_match(source).is_ok() {
                     Some(Ok(topic))
                 } else {
-                    Some(Err(UniErr::forbidden()))
+                    Some(Err(SpaceErr::forbidden()))
                 }
             }
         }
     }
 
-    pub fn find_shell(&self, point: &Point) -> Result<ShellState, UniErr> {
+    pub fn find_shell(&self, point: &Point) -> Result<ShellState, SpaceErr> {
         Ok(self
             .shell
             .get(point)
@@ -395,7 +395,7 @@ where
     Stub(oneshot::Sender<StarStub>),
     FromHyperway {
         wave: UltraWave,
-        rtn: Option<oneshot::Sender<Result<(), UniErr>>>,
+        rtn: Option<oneshot::Sender<Result<(), SpaceErr>>>,
     },
     TraverseToNextLayer(Traversal<UltraWave>),
     LayerTraversalInjection(TraversalInjection),
@@ -405,10 +405,10 @@ where
     ToHyperway(Wave<Signal>),
     Shard(UltraWave),
     StartWrangling,
-    Wrangle(oneshot::Sender<Result<StarWrangles, UniErr>>),
+    Wrangle(oneshot::Sender<Result<StarWrangles, SpaceErr>>),
     Bounce {
         key: StarKey,
-        rtn: oneshot::Sender<Result<(), UniErr>>,
+        rtn: oneshot::Sender<Result<(), SpaceErr>>,
     },
     #[cfg(test)]
     GetSkel(oneshot::Sender<HyperStarSkel<P>>),
@@ -579,7 +579,7 @@ where
         self.tx.send(HyperStarCall::Init).await;
     }
 
-    pub async fn wrangle(&self) -> Result<StarWrangles, UniErr> {
+    pub async fn wrangle(&self) -> Result<StarWrangles, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.tx.send(HyperStarCall::Wrangle(rtn)).await?;
         tokio::time::timeout(Duration::from_secs(5), rtn_rx).await??
@@ -589,13 +589,13 @@ where
         self.tx.send(HyperStarCall::StartWrangling).await;
     }
 
-    pub async fn bounce(&self, key: StarKey) -> Result<(), UniErr> {
+    pub async fn bounce(&self, key: StarKey) -> Result<(), SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.tx.send(HyperStarCall::Bounce { key, rtn }).await?;
         tokio::time::timeout(Duration::from_secs(5), rtn_rx).await??
     }
 
-    pub async fn from_hyperway(&self, wave: UltraWave, results: bool) -> Result<(), UniErr> {
+    pub async fn from_hyperway(&self, wave: UltraWave, results: bool) -> Result<(), SpaceErr> {
         match results {
             true => {
                 let (tx, mut rx) = oneshot::channel();
@@ -628,13 +628,13 @@ where
             .await;
     }
 
-    pub async fn stub(&self) -> Result<StarStub, UniErr> {
+    pub async fn stub(&self) -> Result<StarStub, SpaceErr> {
         let (tx, rx) = oneshot::channel();
         self.tx.send(HyperStarCall::Stub(tx)).await;
         Ok(rx.await?)
     }
 
-    pub async fn create_states(&self, point: Point) -> Result<(), UniErr> {
+    pub async fn create_states(&self, point: Point) -> Result<(), SpaceErr> {
         let (rtn, rtn_rx) = oneshot::channel();
         self.tx
             .send(HyperStarCall::CreateStates { point, rtn })
@@ -644,7 +644,7 @@ where
     }
 
     #[cfg(test)]
-    pub async fn get_skel(&self) -> Result<HyperStarSkel<P>, UniErr> {
+    pub async fn get_skel(&self) -> Result<HyperStarSkel<P>, SpaceErr> {
         let (tx, rx) = oneshot::channel();
         self.tx.send(HyperStarCall::GetSkel(tx)).await;
         Ok(rx.await?)
@@ -1271,7 +1271,7 @@ if wave.track() {
         });
     }
 
-    async fn wrangle(&self, rtn: oneshot::Sender<Result<StarWrangles, UniErr>>) {
+    async fn wrangle(&self, rtn: oneshot::Sender<Result<StarWrangles, SpaceErr>>) {
         let skel = self.skel.clone();
         tokio::spawn(async move {
             let mut wrangler = Wrangler::new(skel.clone(), Search::Kinds);
@@ -1306,7 +1306,7 @@ if wave.track() {
         });
     }
 
-    async fn bounce(&self, key: StarKey, rtn: oneshot::Sender<Result<(), UniErr>>) {
+    async fn bounce(&self, key: StarKey, rtn: oneshot::Sender<Result<(), SpaceErr>>) {
         let transmitter = self.skel.star_transmitter.clone();
         let logger = self.skel.logger.clone();
         tokio::spawn(async move {
@@ -1556,7 +1556,7 @@ where
         *layer == Layer::Shell || *layer == Layer::Field
     }
 
-    async fn exit(&self, traversal: Traversal<UltraWave>) -> Result<(), UniErr> {
+    async fn exit(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
         match traversal.dir {
             TraversalDirection::Fabric => {
                 if traversal.track() {
@@ -1575,7 +1575,7 @@ where
         }
     }
 
-    async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(), UniErr> {
+    async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
         let logger = self.skel.logger.push_mark("stack-traversal:visit")?;
         logger.track(&traversal, || {
             Tracker::new(

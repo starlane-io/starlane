@@ -36,7 +36,7 @@ use substance::Bin;
 use substance::{Substance, SubstanceList, ToSubstance, Token};
 use wave::core::ReflectedCore;
 
-use crate::err::UniErr;
+use crate::err::SpaceErr;
 use crate::hyper::ParticleRecord;
 use crate::security::{Access, AccessGrant};
 use crate::wave::Agent;

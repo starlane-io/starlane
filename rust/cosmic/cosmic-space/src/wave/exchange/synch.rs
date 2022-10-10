@@ -10,13 +10,13 @@ use crate::wave::{
     Handling, Ping, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto, ReflectedWave,
     Scope, UltraWave, Wave, WaveKind,
 };
-use crate::{Agent, ReflectedCore, Substance, Surface, ToSubstance, UniErr};
+use crate::{Agent, ReflectedCore, Substance, Surface, ToSubstance, SpaceErr};
 use alloc::borrow::Cow;
 use std::sync::Arc;
 
 pub trait ExchangeRouter: Send + Sync {
     fn route(&self, wave: UltraWave);
-    fn exchange(&self, direct: DirectedWave) -> Result<ReflectedAggregate, UniErr>;
+    fn exchange(&self, direct: DirectedWave) -> Result<ReflectedAggregate, SpaceErr>;
 }
 
 #[derive(Clone)]
@@ -35,7 +35,7 @@ impl ExchangeRouter for SyncRouter {
         self.router.route(wave)
     }
 
-    fn exchange(&self, direct: DirectedWave) -> Result<ReflectedAggregate, UniErr> {
+    fn exchange(&self, direct: DirectedWave) -> Result<ReflectedAggregate, SpaceErr> {
         self.router.exchange(direct)
     }
 }
@@ -57,7 +57,7 @@ impl ProtoTransmitter {
         }
     }
 
-    pub fn direct<D, W>(&self, wave: D) -> Result<W, UniErr>
+    pub fn direct<D, W>(&self, wave: D) -> Result<W, SpaceErr>
     where
         W: FromReflectedAggregate,
         D: Into<DirectedProto>,
@@ -77,7 +77,7 @@ impl ProtoTransmitter {
         }
     }
 
-    pub fn ping<D>(&self, ping: D) -> Result<Wave<Pong>, UniErr>
+    pub fn ping<D>(&self, ping: D) -> Result<Wave<Pong>, SpaceErr>
     where
         D: Into<DirectedProto>,
     {
@@ -85,11 +85,11 @@ impl ProtoTransmitter {
         if let Some(DirectedKind::Ping) = ping.kind {
             self.direct(ping)
         } else {
-            Err(UniErr::from_500("expected DirectedKind::Ping"))
+            Err(SpaceErr::from_500("expected DirectedKind::Ping"))
         }
     }
 
-    pub fn ripple<D>(&self, ripple: D) -> Result<Vec<Wave<Echo>>, UniErr>
+    pub fn ripple<D>(&self, ripple: D) -> Result<Vec<Wave<Echo>>, SpaceErr>
     where
         D: Into<DirectedProto>,
     {
@@ -97,11 +97,11 @@ impl ProtoTransmitter {
         if let Some(DirectedKind::Ripple) = ripple.kind {
             self.direct(ripple)
         } else {
-            Err(UniErr::from_500("expected DirectedKind::Ping"))
+            Err(SpaceErr::from_500("expected DirectedKind::Ping"))
         }
     }
 
-    pub fn signal<D>(&self, signal: D) -> Result<(), UniErr>
+    pub fn signal<D>(&self, signal: D) -> Result<(), SpaceErr>
     where
         D: Into<DirectedProto>,
     {
@@ -109,7 +109,7 @@ impl ProtoTransmitter {
         if let Some(DirectedKind::Signal) = signal.kind {
             self.direct(signal)
         } else {
-            Err(UniErr::from_500("expected DirectedKind::Ping"))
+            Err(SpaceErr::from_500("expected DirectedKind::Ping"))
         }
     }
 
@@ -138,7 +138,7 @@ impl ProtoTransmitter {
         self.router.route(wave)
     }
 
-    pub fn reflect<W>(&self, wave: W) -> Result<(), UniErr>
+    pub fn reflect<W>(&self, wave: W) -> Result<(), SpaceErr>
     where
         W: Into<ReflectedProto>,
     {
@@ -252,7 +252,7 @@ impl DirectedHandlerShell {
 }
 
 impl RootInCtx {
-    pub fn push<'a, I>(&self) -> Result<InCtx<I>, UniErr>
+    pub fn push<'a, I>(&self) -> Result<InCtx<I>, SpaceErr>
     where
         Substance: ToSubstance<I>,
     {

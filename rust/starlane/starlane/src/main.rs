@@ -45,7 +45,7 @@ use cosmic_registry_postgres::{
 use cosmic_space::artifact::ArtifactApi;
 use cosmic_space::artifact::ReadArtifactFetcher;
 use cosmic_space::command::direct::create::KindTemplate;
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::kind::{
     ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind,
 };

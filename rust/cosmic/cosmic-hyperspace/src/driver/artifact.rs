@@ -16,7 +16,7 @@ use cosmic_space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
 use cosmic_space::config::bind::BindConfig;
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{Assign, HyperSubstance, ParticleLocation};
 use cosmic_space::kind::{ArtifactSubKind, BaseKind, Kind};
 use cosmic_space::loc::{Point, ToBaseKind};
@@ -347,7 +347,7 @@ impl<P> BundleDriverHandler<P>
 where
     P: Cosmos,
 {
-    fn store(&self) -> Result<ValueRepo<String>, UniErr> {
+    fn store(&self) -> Result<ValueRepo<String>, SpaceErr> {
         let config = acid_store::store::DirectoryConfig {
             path: PathBuf::from(format!("{}artifacts", self.skel.star.data_dir())),
         };
@@ -357,7 +357,7 @@ where
             .open(&config)
         {
             Ok(repo) => Ok(repo),
-            Err(err) => return Err(UniErr::new(500u16, err.to_string())),
+            Err(err) => return Err(SpaceErr::new(500u16, err.to_string())),
         }
     }
     #[route("Hyp<Assign>")]
@@ -636,7 +636,7 @@ impl<P> ArtifactDriverHandler<P>
 where
     P: Cosmos,
 {
-    fn store(&self) -> Result<ValueRepo<String>, UniErr> {
+    fn store(&self) -> Result<ValueRepo<String>, SpaceErr> {
         let config = acid_store::store::DirectoryConfig {
             path: PathBuf::from(format!("{}artifacts", self.skel.star.data_dir())),
         };
@@ -646,7 +646,7 @@ where
             .open(&config)
         {
             Ok(repo) => Ok(repo),
-            Err(err) => return Err(UniErr::new(500u16, err.to_string())),
+            Err(err) => return Err(SpaceErr::new(500u16, err.to_string())),
         }
     }
 
@@ -661,11 +661,11 @@ where
                         let mut store = self.skel.driver.logger.result(self.store())?;
                         store
                             .insert(assign.details.stub.point.to_string(), &substance)
-                            .map_err(|e| UniErr::from_500(e.to_string()))?;
+                            .map_err(|e| SpaceErr::from_500(e.to_string()))?;
                         self.skel
                             .driver
                             .logger
-                            .result(store.commit().map_err(|e| UniErr::from_500(e.to_string())))?;
+                            .result(store.commit().map_err(|e| SpaceErr::from_500(e.to_string())))?;
                     }
                 }
                 self.skel
@@ -697,7 +697,7 @@ where
     P: Cosmos,
 {
 
-    fn store(&self) -> Result<ValueRepo<String>, UniErr> {
+    fn store(&self) -> Result<ValueRepo<String>, SpaceErr> {
         let config = acid_store::store::DirectoryConfig {
             path: PathBuf::from(format!("{}artifacts", self.skel.data_dir())),
         };
@@ -707,7 +707,7 @@ where
             .open(&config)
         {
             Ok(repo) => Ok(repo),
-            Err(err) => return Err(UniErr::new(500u16, err.to_string())),
+            Err(err) => return Err(SpaceErr::new(500u16, err.to_string())),
         }
     }
     #[route("Cmd<Read>")]

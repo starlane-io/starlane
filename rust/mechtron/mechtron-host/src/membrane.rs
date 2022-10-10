@@ -3,7 +3,7 @@ use std::ops::Deref;
 use std::sync::{Arc, RwLock, Weak};
 
 use crate::HostPlatform;
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::loc::Point;
 use cosmic_space::log::PointLogger;
 use cosmic_space::substance::Substance;

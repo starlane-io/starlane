@@ -17,7 +17,7 @@ pub mod convert {
     use bincode::ErrorKind;
     use cosmic_hyperspace::err::{ErrKind, HyperErr};
     use cosmic_registry_postgres::err::PostErr;
-    use cosmic_space::err::UniErr;
+    use cosmic_space::err::SpaceErr;
     use mechtron_host::err::HostErr;
     use sqlx::Error;
     use std::io;
@@ -77,8 +77,8 @@ pub mod convert {
         }
     }
     impl HyperErr for Err {
-        fn to_uni_err(&self) -> UniErr {
-            UniErr::from_500(self.to_string())
+        fn to_uni_err(&self) -> SpaceErr {
+            SpaceErr::from_500(self.to_string())
         }
 
         fn new<S>(message: S) -> Self
@@ -130,9 +130,9 @@ pub mod convert {
         }
     }
 
-    impl Into<UniErr> for Err {
-        fn into(self) -> UniErr {
-            UniErr::from_500(self.to_string())
+    impl Into<SpaceErr> for Err {
+        fn into(self) -> SpaceErr {
+            SpaceErr::from_500(self.to_string())
         }
     }
 
@@ -160,8 +160,8 @@ pub mod convert {
         }
     }
 
-    impl From<UniErr> for Err {
-        fn from(err: UniErr) -> Self {
+    impl From<SpaceErr> for Err {
+        fn from(err: SpaceErr) -> Self {
             Err::new(err)
         }
     }
@@ -215,8 +215,8 @@ pub mod convert {
     }
 
     impl HostErr for Err {
-        fn to_uni_err(self) -> UniErr {
-            UniErr::from_500(self.to_string())
+        fn to_uni_err(self) -> SpaceErr {
+            SpaceErr::from_500(self.to_string())
         }
     }
 

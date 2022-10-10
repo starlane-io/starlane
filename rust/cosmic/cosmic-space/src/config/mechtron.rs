@@ -1,7 +1,7 @@
 use crate::loc::Point;
 use crate::parse::mechtron_config;
 use crate::parse::model::MechtronScope;
-use crate::{Bin, UniErr};
+use crate::{Bin, SpaceErr};
 use core::str::FromStr;
 use serde::de::Unexpected::Option;
 use serde::{Deserialize, Serialize};
@@ -13,7 +13,7 @@ pub struct MechtronConfig {
 }
 
 impl MechtronConfig {
-    pub fn new(scopes: Vec<MechtronScope>) -> Result<Self, UniErr> {
+    pub fn new(scopes: Vec<MechtronScope>) -> Result<Self, SpaceErr> {
         let mut bin = None;
         let mut name = None;
         for scope in scopes {
@@ -41,7 +41,7 @@ impl MechtronConfig {
 }
 
 impl TryFrom<Vec<u8>> for MechtronConfig {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(doc: Vec<u8>) -> Result<Self, Self::Error> {
         let doc = String::from_utf8(doc)?;
@@ -50,7 +50,7 @@ impl TryFrom<Vec<u8>> for MechtronConfig {
 }
 
 impl TryFrom<Bin> for MechtronConfig {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(doc: Bin) -> Result<Self, Self::Error> {
         let doc = String::from_utf8((*doc).clone())?;

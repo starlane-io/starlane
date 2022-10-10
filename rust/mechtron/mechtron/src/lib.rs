@@ -21,7 +21,7 @@ use core::str::FromStr;
 use cosmic_macros::handler;
 use cosmic_macros::route;
 use cosmic_macros::DirectedHandler;
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::HyperSubstance;
 use cosmic_space::loc::{Layer, Point, ToSurface, Uuid};
 use cosmic_space::log::{LogSource, NoAppender, PointLogger, RootLogger};

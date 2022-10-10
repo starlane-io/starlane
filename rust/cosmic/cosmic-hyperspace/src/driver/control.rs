@@ -16,7 +16,7 @@ use cosmic_space::command::direct::create::{
 };
 use cosmic_space::command::RawCommand;
 use cosmic_space::config::bind::BindConfig;
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{ControlPattern, Greet, InterchangeKind};
 use cosmic_space::kind::{BaseKind, Kind, StarSub};
 use cosmic_space::loc::{Layer, Point, PointFactory, Surface, ToSurface};
@@ -339,7 +339,7 @@ impl<P> PointFactory for ControlCreator<P>
 where
     P: Cosmos,
 {
-    async fn create(&self) -> Result<Point, UniErr> {
+    async fn create(&self) -> Result<Point, SpaceErr> {
         let create = Create {
             template: Template::new(
                 PointTemplate {
@@ -398,7 +398,7 @@ impl<P> HyperGreeter for ControlGreeter<P>
 where
     P: Cosmos,
 {
-    async fn greet(&self, stub: HyperwayStub) -> Result<Greet, UniErr> {
+    async fn greet(&self, stub: HyperwayStub) -> Result<Greet, SpaceErr> {
         Ok(Greet {
             surface: stub.remote.clone().with_layer(Layer::Core),
             agent: stub.agent.clone(),
@@ -482,7 +482,7 @@ pub struct ControlClient {
 }
 
 impl ControlClient {
-    pub fn new(factory: Box<dyn HyperwayEndpointFactory>) -> Result<Self, UniErr> {
+    pub fn new(factory: Box<dyn HyperwayEndpointFactory>) -> Result<Self, SpaceErr> {
         let exchanger = Exchanger::new(
             Point::from_str("control-client")?.to_surface(),
             Timeouts::default(),
@@ -494,7 +494,7 @@ impl ControlClient {
         Ok(Self { client })
     }
 
-    pub fn surface(&self) -> Result<Surface, UniErr> {
+    pub fn surface(&self) -> Result<Surface, SpaceErr> {
         let greet = self
             .client
             .get_greeting()
@@ -502,20 +502,20 @@ impl ControlClient {
         Ok(greet.surface)
     }
 
-    pub async fn wait_for_ready(&self, duration: Duration) -> Result<(), UniErr> {
+    pub async fn wait_for_ready(&self, duration: Duration) -> Result<(), SpaceErr> {
         self.client.wait_for_ready(duration).await
     }
 
 
-    pub async fn wait_for_greet(&self) -> Result<Greet, UniErr> {
+    pub async fn wait_for_greet(&self) -> Result<Greet, SpaceErr> {
         self.client.wait_for_greet().await
     }
 
-    pub async fn transmitter_builder(&self) -> Result<ProtoTransmitterBuilder, UniErr> {
+    pub async fn transmitter_builder(&self) -> Result<ProtoTransmitterBuilder, SpaceErr> {
         self.client.transmitter_builder().await
     }
 
-    pub async fn new_cli_session(&self) -> Result<ControlCliSession, UniErr> {
+    pub async fn new_cli_session(&self) -> Result<ControlCliSession, SpaceErr> {
         let transmitter = self.transmitter_builder().await?.build();
         let mut proto = DirectedProto::ping();
         proto.to(self.surface()?.with_layer(Layer::Shell));
@@ -541,7 +541,7 @@ impl ControlCliSession {
     pub fn new(transmitter: ProtoTransmitter) -> Self {
         Self { transmitter }
     }
-    pub async fn exec<C>(&self, command: C) -> Result<ReflectedCore, UniErr>
+    pub async fn exec<C>(&self, command: C) -> Result<ReflectedCore, SpaceErr>
     where
         C: ToString,
     {
@@ -549,7 +549,7 @@ impl ControlCliSession {
         self.raw(command).await
     }
 
-    pub async fn raw(&self, command: RawCommand) -> Result<ReflectedCore, UniErr> {
+    pub async fn raw(&self, command: RawCommand) -> Result<ReflectedCore, SpaceErr> {
         let mut proto = DirectedProto::ping();
         proto.method(ExtMethod::new("Exec".to_string())?);
         proto.body(Substance::RawCommand(command));

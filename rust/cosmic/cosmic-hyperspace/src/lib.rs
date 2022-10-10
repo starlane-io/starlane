@@ -34,7 +34,7 @@ use cosmic_space::command::direct::create::{KindTemplate, Strategy};
 use cosmic_space::command::direct::delete::Delete;
 use cosmic_space::command::direct::query::{Query, QueryResult};
 use cosmic_space::command::direct::select::{Select, SubSelect};
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::fail::Timeout;
 use cosmic_space::hyper::{ParticleLocation, ParticleRecord};
 use cosmic_space::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind};
@@ -128,7 +128,7 @@ where
         "./data/".to_string()
     }
 
-    fn select_kind(&self, template: &KindTemplate) -> Result<Kind, UniErr> {
+    fn select_kind(&self, template: &KindTemplate) -> Result<Kind, SpaceErr> {
         let base: BaseKind = BaseKind::from_str(template.base.to_string().as_str())?;
         Ok(match base {
             BaseKind::Root => Kind::Root,

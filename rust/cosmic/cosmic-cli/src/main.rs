@@ -13,7 +13,7 @@ use cosmic_hyperlane::test_util::SingleInterchangePlatform;
 use cosmic_hyperlane::HyperwayEndpointFactory;
 use cosmic_hyperlane_tcp::HyperlaneTcpClient;
 use cosmic_hyperspace::driver::control::{ControlClient, ControlCliSession};
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::loc::{Point, ToSurface};
 use cosmic_space::log::RootLogger;
 use cosmic_space::substance::Substance;
@@ -30,7 +30,7 @@ use cosmic_space::util::{log, ToResolved};
 use cosmic_nom::new_span;
 
 #[tokio::main]
-async fn main() -> Result<(), UniErr> {
+async fn main() -> Result<(), SpaceErr> {
     let home_dir : String = match dirs::home_dir() {
       None => ".".to_string(),
       Some(dir) => dir.display().to_string()
@@ -65,7 +65,7 @@ async fn main() -> Result<(), UniErr> {
         session.command(matches.subcommand_name().unwrap()).await
     } else {
         loop {
-            let line: String = text_io::try_read!("{};").map_err(|e|UniErr::new(500,"err"))?;
+            let line: String = text_io::try_read!("{};").map_err(|e| SpaceErr::new(500, "err"))?;
 
             let line_str= line.trim();
 
@@ -85,7 +85,7 @@ pub struct Session{
 }
 
 impl Session {
-    pub async fn new(host: String, certs: String) -> Result<Self,UniErr> {
+    pub async fn new(host: String, certs: String) -> Result<Self, SpaceErr> {
         let logger = RootLogger::default();
         let logger = logger.point(Point::from_str("cosmic-cli")?);
         let tcp_client: Box<dyn HyperwayEndpointFactory> = Box::new(HyperlaneTcpClient::new(
@@ -108,7 +108,7 @@ impl Session {
         })
     }
 
-    async fn command(&self, command: &str) -> Result<(), UniErr> {
+    async fn command(&self, command: &str) -> Result<(), SpaceErr> {
 
         let blocks = result(upload_blocks(new_span(command)))?;
         let mut command = RawCommand::new(command.to_string());
@@ -158,7 +158,7 @@ impl Session {
         }
     }
 
-    pub fn out_err(&self, err: UniErr) {
+    pub fn out_err(&self, err: SpaceErr) {
         eprintln!("{}", err.to_string())
     }
 }

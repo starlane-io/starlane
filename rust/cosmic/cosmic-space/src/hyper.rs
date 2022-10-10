@@ -7,7 +7,7 @@ use cosmic_macros_primitive::Autobox;
 
 use crate::command::common::StateSrc;
 use crate::config::mechtron::MechtronConfig;
-use crate::err::UniErr;
+use crate::err::SpaceErr;
 use crate::kind::{Kind, KindParts, StarSub};
 use crate::loc::{Point, StarKey, Surface, ToPoint, ToSurface};
 use crate::log::Log;
@@ -57,7 +57,7 @@ impl Location {
         Location::Somewhere(point)
     }
 
-    pub fn ok_or(&self) -> Result<Point, UniErr> {
+    pub fn ok_or(&self) -> Result<Point, SpaceErr> {
         match self {
             Location::Nowhere => Err("Particle is presently nowhere".into()),
             Location::Somewhere(point) => Ok(point.clone()),
@@ -143,13 +143,13 @@ impl Provision {
 }
 
 impl TryFrom<Ping> for Provision {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(request: Ping) -> Result<Self, Self::Error> {
         if let Substance::Hyper(HyperSubstance::Provision(provision)) = request.core.body {
             Ok(provision)
         } else {
-            Err(UniErr::bad_request())
+            Err(SpaceErr::bad_request())
         }
     }
 }
@@ -277,13 +277,13 @@ impl DerefMut for Discoveries {
 }
 
 impl TryFrom<Ping> for Assign {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(request: Ping) -> Result<Self, Self::Error> {
         if let Substance::Hyper(HyperSubstance::Assign(assign)) = request.core.body {
             Ok(assign)
         } else {
-            Err(UniErr::bad_request())
+            Err(SpaceErr::bad_request())
         }
     }
 }

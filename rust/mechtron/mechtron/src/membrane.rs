@@ -1,7 +1,7 @@
 use crate::err::MembraneErr;
 use crate::Guest;
 use crate::{guest, mechtron_guest, GuestErr, MechtronFactories, Platform};
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::particle::Details;
 use cosmic_space::wave::exchange::synch::{DirectedHandlerProxy, DirectedHandlerShell};
 use cosmic_space::wave::{Bounce, ReflectedAggregate, UltraWave};
@@ -81,7 +81,7 @@ pub fn mechtron_frame_to_guest(frame: i32) -> i32 {
     }
 }
 
-pub fn mechtron_write_wave_to_host(wave: UltraWave) -> Result<i32, UniErr> {
+pub fn mechtron_write_wave_to_host(wave: UltraWave) -> Result<i32, SpaceErr> {
     let data = bincode::serialize(&wave)?;
     Ok(mechtron_write_buffer(data))
 }

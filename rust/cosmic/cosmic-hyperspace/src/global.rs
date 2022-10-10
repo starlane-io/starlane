@@ -10,7 +10,7 @@ use cosmic_space::command::Command;
 use cosmic_space::command::direct::select::Select;
 use cosmic_space::command::RawCommand;
 use cosmic_space::config::bind::{BindConfig, RouteSelector};
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{Assign, AssignmentKind, HyperSubstance};
 use cosmic_space::kind::Kind;
 use cosmic_space::loc::{Layer, Point, Surface, ToPoint, ToSurface};

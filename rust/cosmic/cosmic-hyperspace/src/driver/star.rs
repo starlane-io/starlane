@@ -8,7 +8,7 @@ use cosmic_space::artifact::ArtRef;
 use cosmic_space::command::common::StateSrc;
 use cosmic_space::command::direct::create::Strategy;
 use cosmic_space::config::bind::BindConfig;
-use cosmic_space::err::{CoreReflector, UniErr};
+use cosmic_space::err::{CoreReflector, SpaceErr};
 use cosmic_space::hyper::{
     Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, ParticleLocation, Search,
 };
@@ -287,7 +287,7 @@ where
         <Star<P> as Item<P>>::bind(self).await
     }
 
-    async fn init(&self) -> Result<Status, UniErr> {
+    async fn init(&self) -> Result<Status, SpaceErr> {
         match self.skel.kind {
             StarSub::Central => {
                 let registration = Registration {
@@ -483,7 +483,7 @@ where
             } else {
                 self.skel
                     .logger
-                    .result::<(), UniErr>(Err(UniErr::from_500(format!(
+                    .result::<(), SpaceErr>(Err(SpaceErr::from_500(format!(
                         "Star {} does not have a driver for kind: {}",
                         self.skel.kind.to_string(),
                         assign.details.stub.kind.to_string()
@@ -537,7 +537,7 @@ where
             ctx: &'a InCtx<'a, HyperSubstance>,
             mut history: HashSet<Point>,
             search: Search,
-        ) -> Result<ReflectedCore, UniErr>
+        ) -> Result<ReflectedCore, SpaceErr>
         where
             E: Cosmos,
         {
@@ -672,7 +672,7 @@ impl StarWrangles {
         }
     }
 
-    pub fn verify(&self, kinds: &[&Kind]) -> Result<(), UniErr> {
+    pub fn verify(&self, kinds: &[&Kind]) -> Result<(), SpaceErr> {
         for kind in kinds {
             if self.find(*kind).is_none() {
                 return Err(format!(
@@ -685,7 +685,7 @@ impl StarWrangles {
         Ok(())
     }
 
-    pub async fn wrangle(&self, kind: &Kind) -> Result<StarKey, UniErr> {
+    pub async fn wrangle(&self, kind: &Kind) -> Result<StarKey, SpaceErr> {
         self.find(kind)
             .ok_or(format!(
                 "could not find wrangles for kind {}",
@@ -729,7 +729,7 @@ impl RoundRobinWrangleSelector {
         }
     }
 
-    pub async fn wrangle(&mut self) -> Result<StarKey, UniErr> {
+    pub async fn wrangle(&mut self) -> Result<StarKey, SpaceErr> {
         if self.stars.is_empty() {
             return Err(format!("cannot find wrangle for kind: {}", self.kind.to_string()).into());
         }
@@ -790,7 +790,7 @@ where
         }
     }
 
-    pub async fn wrangle(&self, track: bool) -> Result<Discoveries, UniErr> {
+    pub async fn wrangle(&self, track: bool) -> Result<Discoveries, SpaceErr> {
         let mut ripple = DirectedProto::ripple();
         ripple.track = track;
         ripple.method(HypMethod::Search);

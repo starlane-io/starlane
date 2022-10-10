@@ -18,7 +18,7 @@ use crate::selector::{
     KindSelector, KindSelectorDef, Pattern, SpecificSelector, SubKindSelector, VersionReq,
 };
 use crate::util::ValuePattern;
-use crate::{KindTemplate, UniErr};
+use crate::{KindTemplate, SpaceErr};
 use crate::parse::error::result;
 
 impl ToBaseKind for KindParts {
@@ -84,7 +84,7 @@ impl ToString for KindParts {
 }
 
 impl FromStr for KindParts {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (_, kind) = all_consuming(kind_parts)(new_span(s))?;
@@ -219,7 +219,7 @@ impl ToBaseKind for BaseKind {
 }
 
 impl TryFrom<CamelCase> for BaseKind {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(base: CamelCase) -> Result<Self, Self::Error> {
         Ok(BaseKind::from_str(base.as_str())?)
@@ -366,7 +366,7 @@ impl Kind {
 }
 
 impl TryFrom<KindParts> for Kind {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(value: KindParts) -> Result<Self, Self::Error> {
         Ok(match value.base {
@@ -378,7 +378,7 @@ impl TryFrom<KindParts> for Kind {
                             .ok_or("Database<Relational<?>> requires a Specific")?,
                     )),
                     what => {
-                        return Err(UniErr::from(format!(
+                        return Err(SpaceErr::from(format!(
                             "unexpected Database SubKind '{}'",
                             what
                         )));
@@ -393,7 +393,7 @@ impl TryFrom<KindParts> for Kind {
                             .ok_or("UserBase<OAuth<?>> requires a Specific")?,
                     )),
                     what => {
-                        return Err(UniErr::from(format!(
+                        return Err(SpaceErr::from(format!(
                             "unexpected Database SubKind '{}'",
                             what
                         )));
@@ -752,7 +752,7 @@ impl ToString for Specific {
 }
 
 impl FromStr for Specific {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(specific(new_span(s)))
@@ -760,7 +760,7 @@ impl FromStr for Specific {
 }
 
 impl TryInto<SpecificSelector> for Specific {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_into(self) -> Result<SpecificSelector, Self::Error> {
         Ok(SpecificSelector {
@@ -777,11 +777,11 @@ impl TryInto<SpecificSelector> for Specific {
 pub mod test {
     use crate::parse::kind_selector;
     use crate::selector::KindSelector;
-    use crate::{Kind, StarSub, UniErr};
+    use crate::{Kind, StarSub, SpaceErr};
     use core::str::FromStr;
 
     #[test]
-    pub fn selector() -> Result<(), UniErr> {
+    pub fn selector() -> Result<(), SpaceErr> {
         let kind = Kind::Star(StarSub::Fold);
         let selector = KindSelector::from_str("<Star<Fold>>")?;
         assert!(selector.matches(&kind));

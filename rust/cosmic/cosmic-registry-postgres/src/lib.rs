@@ -38,7 +38,7 @@ use cosmic_space::command::direct::select::{
     Select, SelectIntoSubstance, SelectKind, SubSelect,
 };
 use cosmic_space::command::direct::set::Set;
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{Location, ParticleLocation, ParticleRecord};
 use cosmic_space::kind::{
     ArtifactSubKind, BaseKind, FileSubKind, Kind, KindParts, Specific, UserBaseSubKind,

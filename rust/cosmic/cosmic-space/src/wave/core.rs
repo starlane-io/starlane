@@ -15,7 +15,7 @@ use crate::wave::core::ext::ExtMethod;
 use crate::wave::core::http2::{HttpMethod, StatusCode};
 use crate::wave::core::hyp::HypMethod;
 use crate::wave::{Bounce, Ping, Pong, ToRecipients, WaveId};
-use crate::{Bin, Substance, Surface, ToSubstance, UniErr};
+use crate::{Bin, Substance, Surface, ToSubstance, SpaceErr};
 use url::Url;
 
 pub mod cmd;
@@ -23,8 +23,8 @@ pub mod ext;
 pub mod http2;
 pub mod hyp;
 
-impl From<Result<ReflectedCore, UniErr>> for ReflectedCore {
-    fn from(result: Result<ReflectedCore, UniErr>) -> Self {
+impl From<Result<ReflectedCore, SpaceErr>> for ReflectedCore {
+    fn from(result: Result<ReflectedCore, SpaceErr>) -> Self {
         match result {
             Ok(response) => response,
             Err(err) => err.into(),
@@ -43,17 +43,17 @@ impl<S> ToSubstance<S> for ReflectedCore
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, UniErr> {
+    fn to_substance(self) -> Result<S, SpaceErr> {
         self.body.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, UniErr> {
+    fn to_substance_ref(&self) -> Result<&S, SpaceErr> {
         self.body.to_substance_ref()
     }
 }
 
 impl ReflectedCore {
-    pub fn to_err(&self) -> UniErr {
+    pub fn to_err(&self) -> SpaceErr {
         if self.status.is_success() {
             "cannot convert a success into an error".into()
         } else {
@@ -78,7 +78,7 @@ impl ReflectedCore {
         }
     }
 
-    pub fn result(result: Result<ReflectedCore, UniErr>) -> ReflectedCore {
+    pub fn result(result: Result<ReflectedCore, SpaceErr>) -> ReflectedCore {
         match result {
             Ok(core) => core,
             Err(err) => {
@@ -160,7 +160,7 @@ impl ReflectedCore {
         }
     }
 
-    pub fn err(err: UniErr) -> Self {
+    pub fn err(err: SpaceErr) -> Self {
         let errors = Errors::default(err.to_string().as_str());
         Self {
             headers: HeaderMap::new(),
@@ -207,11 +207,11 @@ impl ReflectedCore {
         }
     }
 
-    pub fn ok_or(&self) -> Result<(), UniErr> {
+    pub fn ok_or(&self) -> Result<(), SpaceErr> {
         if self.is_ok() {
             Ok(())
         } else {
-            Err(UniErr::new(self.status.as_u16(), "error"))
+            Err(SpaceErr::new(self.status.as_u16(), "error"))
         }
     }
 }
@@ -394,11 +394,11 @@ impl<S> ToSubstance<S> for DirectedCore
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, UniErr> {
+    fn to_substance(self) -> Result<S, SpaceErr> {
         self.body.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, UniErr> {
+    fn to_substance_ref(&self) -> Result<&S, SpaceErr> {
         self.body.to_substance_ref()
     }
 }
@@ -437,7 +437,7 @@ impl DirectedCore {
 }
 
 impl TryFrom<Ping> for DirectedCore {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(request: Ping) -> Result<Self, Self::Error> {
         Ok(request.core)
@@ -623,11 +623,11 @@ impl Into<ReflectedCore> for Surface {
 }
 
 impl TryFrom<ReflectedCore> for Surface {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(core: ReflectedCore) -> Result<Self, Self::Error> {
         if !core.status.is_success() {
-            Err(UniErr::new(core.status.as_u16(), "error"))
+            Err(SpaceErr::new(core.status.as_u16(), "error"))
         } else {
             match core.body {
                 Substance::Surface(surface) => Ok(surface),

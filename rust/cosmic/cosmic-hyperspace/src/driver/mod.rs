@@ -17,7 +17,7 @@ use cosmic_space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
 use cosmic_space::config::bind::BindConfig;
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{Assign, HyperSubstance, ParticleLocation, ParticleRecord};
 use cosmic_space::kind::{BaseKind, Kind, KindParts, StarSub};
 use cosmic_space::loc::{Layer, Point, Surface, ToPoint, ToSurface};
@@ -188,7 +188,7 @@ where
     Drivers(oneshot::Sender<HashMap<KindSelector, DriverApi<P>>>),
     Get {
         kind: Kind,
-        rtn: oneshot::Sender<Result<DriverApi<P>, UniErr>>,
+        rtn: oneshot::Sender<Result<DriverApi<P>, SpaceErr>>,
     },
     LocalDriverLookup {
         kind: Kind,
@@ -196,7 +196,7 @@ where
     },
     Status {
         kind: KindSelector,
-        rtn: oneshot::Sender<Result<DriverStatus, UniErr>>,
+        rtn: oneshot::Sender<Result<DriverStatus, SpaceErr>>,
     },
     StatusRx(oneshot::Sender<watch::Receiver<DriverStatus>>),
     ByPoint {
@@ -229,7 +229,7 @@ where
         self.status_rx.borrow().clone()
     }
 
-    pub async fn status_changed(&mut self) -> Result<DriverStatus, UniErr> {
+    pub async fn status_changed(&mut self) -> Result<DriverStatus, SpaceErr> {
         self.status_rx.changed().await?;
         Ok(self.status())
     }
@@ -238,25 +238,25 @@ where
         self.call_tx.send(DriversCall::Visit(traversal)).await;
     }
 
-    pub async fn internal_kinds(&self) -> Result<Vec<KindSelector>, UniErr> {
+    pub async fn internal_kinds(&self) -> Result<Vec<KindSelector>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx.send(DriversCall::InternalKinds(rtn)).await?;
         Ok(rtn_rx.await?)
     }
 
-    pub async fn external_kinds(&self) -> Result<Vec<KindSelector>, UniErr> {
+    pub async fn external_kinds(&self) -> Result<Vec<KindSelector>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx.send(DriversCall::ExternalKinds(rtn)).await?;
         Ok(rtn_rx.await?)
     }
 
-    pub async fn find(&self, kind: Kind) -> Result<Option<DriverApi<P>>, UniErr> {
+    pub async fn find(&self, kind: Kind) -> Result<Option<DriverApi<P>>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx.send(DriversCall::Find { kind, rtn }).await?;
         Ok(rtn_rx.await?)
     }
 
-    pub async fn find_external(&self, kind: Kind) -> Result<Option<DriverApi<P>>, UniErr> {
+    pub async fn find_external(&self, kind: Kind) -> Result<Option<DriverApi<P>>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
             .send(DriversCall::FindExternalKind { kind, rtn })
@@ -264,7 +264,7 @@ where
         Ok(rtn_rx.await?)
     }
 
-    pub async fn find_internal(&self, kind: Kind) -> Result<Option<DriverApi<P>>, UniErr> {
+    pub async fn find_internal(&self, kind: Kind) -> Result<Option<DriverApi<P>>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
             .send(DriversCall::FindInternalKind { kind, rtn })
@@ -272,7 +272,7 @@ where
         Ok(rtn_rx.await?)
     }
 
-    pub async fn local_driver_lookup(&self, kind: Kind) -> Result<Option<Point>, UniErr> {
+    pub async fn local_driver_lookup(&self, kind: Kind) -> Result<Option<Point>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
             .send(DriversCall::LocalDriverLookup { kind, rtn })
@@ -280,13 +280,13 @@ where
         Ok(rtn_rx.await?)
     }
 
-    pub async fn drivers(&self) -> Result<HashMap<KindSelector, DriverApi<P>>, UniErr> {
+    pub async fn drivers(&self) -> Result<HashMap<KindSelector, DriverApi<P>>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx.send(DriversCall::Drivers(rtn)).await;
         Ok(rtn_rx.await?)
     }
 
-    pub async fn get(&self, kind: &Kind) -> Result<DriverApi<P>, UniErr> {
+    pub async fn get(&self, kind: &Kind) -> Result<DriverApi<P>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
             .send(DriversCall::Get {
@@ -297,7 +297,7 @@ where
         rtn_rx.await?
     }
 
-    pub async fn find_by_point(&self, point: &Point) -> Result<Option<DriverApi<P>>, UniErr> {
+    pub async fn find_by_point(&self, point: &Point) -> Result<Option<DriverApi<P>>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
             .send(DriversCall::ByPoint {
@@ -425,7 +425,7 @@ where
                     }
                     DriversCall::Status { kind, rtn } => match self.statuses_rx.get(&kind) {
                         None => {
-                            rtn.send(Err(UniErr::not_found()));
+                            rtn.send(Err(SpaceErr::not_found()));
                         }
                         Some(status_rx) => {
                             rtn.send(Ok(status_rx.borrow().clone()));
@@ -970,7 +970,7 @@ where
         self.call_tx.send(DriverRunnerCall::AddDriver(api)).await;
     }
 
-    pub async fn init_item(&self, point: Point) -> Result<Status, UniErr> {
+    pub async fn init_item(&self, point: Point) -> Result<Status, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
             .try_send(DriverRunnerCall::InitItem { point, rtn });
@@ -1040,7 +1040,7 @@ where
     OnAdded,
     InitItem {
         point: Point,
-        rtn: oneshot::Sender<Result<Status, UniErr>>,
+        rtn: oneshot::Sender<Result<Status, SpaceErr>>,
     },
     DriverRunnerRequest(DriverRunnerRequest<P>),
     DriverBind(oneshot::Sender<ArtRef<BindConfig>>),
@@ -1089,7 +1089,7 @@ where
         self.surface.clone()
     }
 
-    async fn deliver_directed(&self, direct: Traversal<DirectedWave>) -> Result<(), UniErr> {
+    async fn deliver_directed(&self, direct: Traversal<DirectedWave>) -> Result<(), SpaceErr> {
         self.skel
             .logger
             .track(&direct, || Tracker::new("core:outer", "DeliverDirected"));
@@ -1157,7 +1157,7 @@ where
         Ok(())
     }
 
-    async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) -> Result<(), UniErr> {
+    async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) -> Result<(), SpaceErr> {
         if reflect.to().layer == self.surface.layer {
             self.exchanger().reflected(reflect.payload).await
         } else {
@@ -1507,7 +1507,7 @@ where
         self.skel.registry.record(point).await
     }
 
-    pub async fn local_driver_lookup(&self, kind: Kind) -> Result<Option<Point>, UniErr> {
+    pub async fn local_driver_lookup(&self, kind: Kind) -> Result<Option<Point>, SpaceErr> {
         self.skel.drivers.local_driver_lookup(kind).await
     }
 }
@@ -1665,7 +1665,7 @@ impl<P> DriverHandler<P> for DefaultDriverHandler where P: Cosmos {}
 #[handler]
 impl DefaultDriverHandler {
     #[route("Hyp<Assign>")]
-    pub async fn assign(&self, _ctx: InCtx<'_, HyperSubstance>) -> Result<(), UniErr> {
+    pub async fn assign(&self, _ctx: InCtx<'_, HyperSubstance>) -> Result<(), SpaceErr> {
         Ok(())
     }
 }
@@ -1724,7 +1724,7 @@ impl<P> ItemSphere<P>
 where
     P: Cosmos,
 {
-    pub async fn init(&self) -> Result<Status, UniErr> {
+    pub async fn init(&self) -> Result<Status, SpaceErr> {
         match self {
             ItemSphere::Handler(handler) => handler.init().await,
             ItemSphere::Router(router) => {
@@ -1770,7 +1770,7 @@ where
     P: Cosmos,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err>;
-    async fn init(&self) -> Result<Status, UniErr> {
+    async fn init(&self) -> Result<Status, SpaceErr> {
         Ok(Status::Ready)
     }
 }

@@ -2,7 +2,7 @@ use crate::err::GuestErr;
 use crate::err::MechErr;
 use crate::{MechtronFactories, MechtronSkel, Platform};
 use cosmic_macros::handler_sync;
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::HyperSubstance;
 use cosmic_space::kind::Kind::Mechtron;
 use cosmic_space::loc::{Layer, Point, ToSurface};
@@ -191,7 +191,7 @@ where
         crate::membrane::mechtron_exchange_wave_host::<P>(wave);
     }
 
-    fn exchange(&self, direct: DirectedWave) -> Result<ReflectedAggregate, UniErr> {
+    fn exchange(&self, direct: DirectedWave) -> Result<ReflectedAggregate, SpaceErr> {
         crate::membrane::mechtron_exchange_wave_host::<P>(direct.to_ultra())
             .map_err(|e| e.to_uni_err())
     }

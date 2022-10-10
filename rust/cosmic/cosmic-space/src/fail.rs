@@ -2,7 +2,7 @@ use alloc::string::String;
 
 use serde::{Deserialize, Serialize};
 
-use crate::err::UniErr;
+use crate::err::SpaceErr;
 use crate::kind::Specific;
 
 pub mod mesh {

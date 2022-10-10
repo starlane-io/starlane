@@ -1,4 +1,4 @@
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::substance::Substance;
 use cosmic_space::wave::core::http2::StatusCode;
 use cosmic_space::wave::core::ReflectedCore;
@@ -35,8 +35,8 @@ pub trait HyperErr:
     + ToString
     + Clone
     + HostErr
-    + Into<UniErr>
-    + From<UniErr>
+    + Into<SpaceErr>
+    + From<SpaceErr>
     + From<String>
     + From<&'static str>
     + From<tokio::sync::oneshot::error::RecvError>
@@ -47,11 +47,11 @@ pub trait HyperErr:
     + From<strum::ParseError>
     + From<url::ParseError>
  +From<FromAsciiError<std::string::String>>
-    + From<UniErr>
-    + Into<UniErr>
+    + From<SpaceErr>
+    + Into<SpaceErr>
     + From<()>
 {
-    fn to_uni_err(&self) -> UniErr;
+    fn to_uni_err(&self) -> SpaceErr;
 
     fn new<S>(message: S) -> Self
     where
@@ -93,7 +93,7 @@ pub mod convert {
     use crate::err::{CosmicErr as Err, ErrKind};
     use crate::HyperErr;
     use bincode::ErrorKind;
-    use cosmic_space::err::UniErr;
+    use cosmic_space::err::SpaceErr;
     use mechtron_host::err::HostErr;
     use std::io;
     use std::str::Utf8Error;
@@ -150,8 +150,8 @@ pub mod convert {
         }
     }
     impl HyperErr for Err {
-        fn to_uni_err(&self) -> UniErr {
-            UniErr::from_500(self.to_string())
+        fn to_uni_err(&self) -> SpaceErr {
+            SpaceErr::from_500(self.to_string())
         }
 
         fn new<S>(message: S) -> Self
@@ -190,9 +190,9 @@ pub mod convert {
             }
         }
     }
-    impl Into<UniErr> for Err {
-        fn into(self) -> UniErr {
-            UniErr::from_500(self.to_string())
+    impl Into<SpaceErr> for Err {
+        fn into(self) -> SpaceErr {
+            SpaceErr::from_500(self.to_string())
         }
     }
 
@@ -220,8 +220,8 @@ pub mod convert {
         }
     }
 
-    impl From<UniErr> for Err {
-        fn from(err: UniErr) -> Self {
+    impl From<SpaceErr> for Err {
+        fn from(err: SpaceErr) -> Self {
             Err::new(err)
         }
     }
@@ -275,8 +275,8 @@ pub mod convert {
     }
 
     impl HostErr for Err {
-        fn to_uni_err(self) -> UniErr {
-            UniErr::from_500(self.to_string())
+        fn to_uni_err(self) -> SpaceErr {
+            SpaceErr::from_500(self.to_string())
         }
     }
 

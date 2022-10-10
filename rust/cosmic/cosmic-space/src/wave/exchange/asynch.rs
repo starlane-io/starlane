@@ -14,7 +14,7 @@ use crate::wave::{
     FromReflectedAggregate, Handling, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto,
     ReflectedWave, Scope, UltraWave, Wave, WaveId,
 };
-use crate::{Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, UniErr};
+use crate::{Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, SpaceErr};
 use alloc::borrow::Cow;
 use dashmap::{DashMap, DashSet};
 use std::collections::HashSet;
@@ -81,7 +81,7 @@ impl ProtoTransmitter {
         }
     }
 
-    pub async fn direct<D, W>(&self, wave: D) -> Result<W, UniErr>
+    pub async fn direct<D, W>(&self, wave: D) -> Result<W, SpaceErr>
     where
         W: FromReflectedAggregate,
         D: Into<DirectedProto>,
@@ -106,7 +106,7 @@ impl ProtoTransmitter {
         }
     }
 
-    pub async fn ping<D>(&self, ping: D) -> Result<Wave<Pong>, UniErr>
+    pub async fn ping<D>(&self, ping: D) -> Result<Wave<Pong>, SpaceErr>
     where
         D: Into<DirectedProto>,
     {
@@ -114,11 +114,11 @@ impl ProtoTransmitter {
         if let Some(DirectedKind::Ping) = ping.kind {
             self.direct(ping).await
         } else {
-            Err(UniErr::from_500("expected DirectedKind::Ping"))
+            Err(SpaceErr::from_500("expected DirectedKind::Ping"))
         }
     }
 
-    pub async fn ripple<D>(&self, ripple: D) -> Result<Vec<Wave<Echo>>, UniErr>
+    pub async fn ripple<D>(&self, ripple: D) -> Result<Vec<Wave<Echo>>, SpaceErr>
     where
         D: Into<DirectedProto>,
     {
@@ -126,11 +126,11 @@ impl ProtoTransmitter {
         if let Some(DirectedKind::Ripple) = ripple.kind {
             self.direct(ripple).await
         } else {
-            Err(UniErr::from_500("expected DirectedKind::Ping"))
+            Err(SpaceErr::from_500("expected DirectedKind::Ping"))
         }
     }
 
-    pub async fn signal<D>(&self, signal: D) -> Result<(), UniErr>
+    pub async fn signal<D>(&self, signal: D) -> Result<(), SpaceErr>
     where
         D: Into<DirectedProto>,
     {
@@ -138,7 +138,7 @@ impl ProtoTransmitter {
         if let Some(DirectedKind::Signal) = signal.kind {
             self.direct(signal).await
         } else {
-            Err(UniErr::from_500("expected DirectedKind::Ping"))
+            Err(SpaceErr::from_500("expected DirectedKind::Ping"))
         }
     }
 
@@ -173,7 +173,7 @@ impl ProtoTransmitter {
         self.router.route(wave).await
     }
 
-    pub async fn reflect<W>(&self, wave: W) -> Result<(), UniErr>
+    pub async fn reflect<W>(&self, wave: W) -> Result<(), SpaceErr>
     where
         W: Into<ReflectedProto>,
     {
@@ -223,7 +223,7 @@ impl TraversalTransmitter {
         }
     }
 
-    pub async fn direct<W>(&self, traversal: Traversal<DirectedWave>) -> Result<W, UniErr>
+    pub async fn direct<W>(&self, traversal: Traversal<DirectedWave>) -> Result<W, SpaceErr>
     where
         W: FromReflectedAggregate,
     {
@@ -322,7 +322,7 @@ impl Exchanger {
         }
     }
 
-    pub async fn reflected(&self, reflect: ReflectedWave) -> Result<(), UniErr> {
+    pub async fn reflected(&self, reflect: ReflectedWave) -> Result<(), SpaceErr> {
         self.logger
             .track(&reflect, || Tracker::new("exchange", "Reflected"));
 
@@ -348,7 +348,7 @@ impl Exchanger {
                 .claimed
                 .contains(reflect.reflection_of().to_string().as_str())
             {
-                return Err(UniErr::from_500(format!(
+                return Err(SpaceErr::from_500(format!(
                     "Reflection already claimed for {} from: {} to: {} KIND: {} STATUS: {}",
                     reflect.reflection_of().to_short_string(),
                     reflect.from().to_string(),
@@ -357,7 +357,7 @@ impl Exchanger {
                     reflect.core().status.to_string()
                 )));
             }
-            return Err(UniErr::from_500(format!(
+            return Err(SpaceErr::from_500(format!(
                 "Not expecting reflected message for {} from: {} to: {} KIND: {} STATUS: {}",
                 reflect.reflection_of().to_short_string(),
                 reflect.from().to_string(),
@@ -513,7 +513,7 @@ where
 }
 
 impl RootInCtx {
-    pub fn push<'a, I>(&self) -> Result<InCtx<I>, UniErr>
+    pub fn push<'a, I>(&self) -> Result<InCtx<I>, SpaceErr>
     where
         Substance: ToSubstance<I>,
     {

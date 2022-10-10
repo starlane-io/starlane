@@ -26,7 +26,7 @@ use crate::wave::{
     Handling, Pong, RecipientSelector, Recipients, ReflectedAggregate, ReflectedProto,
     ReflectedWave, Scope, Session, ToRecipients, UltraWave, Wave, WaveId,
 };
-use crate::{wave, Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, UniErr};
+use crate::{wave, Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, SpaceErr};
 
 #[derive(Clone)]
 pub struct DirectedHandlerShellDef<D, T> {
@@ -274,7 +274,7 @@ where
         self.root.wave.core().bad_request()
     }
 
-    pub fn err(self, err: UniErr) -> ReflectedCore {
+    pub fn err(self, err: SpaceErr) -> ReflectedCore {
         self.root.wave.core().err(err)
     }
 }
@@ -330,10 +330,10 @@ pub struct ProtoTransmitterDef<R, E> {
 }
 
 impl<R, E> ProtoTransmitterDef<R, E> {
-    pub fn from_topic(&mut self, topic: Topic) -> Result<(), UniErr> {
+    pub fn from_topic(&mut self, topic: Topic) -> Result<(), SpaceErr> {
         self.from = match self.from.clone() {
             SetStrategy::None => {
-                return Err(UniErr::from_500(
+                return Err(SpaceErr::from_500(
                     "cannot set Topic without first setting Surface",
                 ));
             }
@@ -421,7 +421,7 @@ pub enum SetStrategy<T> {
 }
 
 impl<T> SetStrategy<T> {
-    pub fn unwrap(self) -> Result<T, UniErr> {
+    pub fn unwrap(self) -> Result<T, SpaceErr> {
         match self {
             SetStrategy::None => Err("cannot unwrap a SetStrategy::None".into()),
             SetStrategy::Fill(t) => Ok(t),
@@ -431,7 +431,7 @@ impl<T> SetStrategy<T> {
 }
 
 impl SetStrategy<Surface> {
-    pub fn with_topic(self, topic: Topic) -> Result<Self, UniErr> {
+    pub fn with_topic(self, topic: Topic) -> Result<Self, SpaceErr> {
         match self {
             SetStrategy::None => Err("cannot set topic if Strategy is None".into()),
             SetStrategy::Fill(surface) => Ok(SetStrategy::Fill(surface.with_topic(topic))),

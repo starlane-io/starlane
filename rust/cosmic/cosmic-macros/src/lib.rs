@@ -55,7 +55,7 @@ pub fn directed_handler(item: TokenStream) -> TokenStream {
 /// To implement:
 /// ```
 ///
-/// use cosmic_space::err::UniErr;
+/// use cosmic_space::err::SpaceErr;
 /// use cosmic_space::hyper::HyperSubstance;
 /// use cosmic_space::log::PointLogger;
 /// use cosmic_space::substance::Substance;
@@ -73,7 +73,7 @@ pub fn directed_handler(item: TokenStream) -> TokenStream {
 ///     /// the route attribute captures an ExtMethod implementing a custom `MyNameIs`
 ///     /// notice that the InCtx will accept any valid cosmic_space::substance::Substance
 ///     #[route("Ext<MyNameIs>")]
-///     pub async fn hello(&self, ctx: InCtx<'_, Text>) -> Result<String, UniErr> {
+///     pub async fn hello(&self, ctx: InCtx<'_, Text>) -> Result<String, SpaceErr> {
 ///         /// also we can return any Substance in our Reflected wave
 ///         Ok(format!("Hello, {}", ctx.input.to_string()))
 ///     }

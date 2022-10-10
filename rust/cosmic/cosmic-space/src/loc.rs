@@ -29,7 +29,7 @@ use crate::wave::{
     UltraWave, Wave,
 };
 use crate::Agent::Anonymous;
-use crate::{Agent, BaseKind, Kind, KindTemplate, ParticleRecord, UniErr, ANONYMOUS, HYPERUSER};
+use crate::{Agent, BaseKind, Kind, KindTemplate, ParticleRecord, SpaceErr, ANONYMOUS, HYPERUSER};
 
 lazy_static! {
     pub static ref CENTRAL: Point = StarKey::central().to_point();
@@ -93,7 +93,7 @@ impl Uuid {
     }
      */
 
-    pub fn from<S: ToString>(uuid: S) -> Result<Self, UniErr> {
+    pub fn from<S: ToString>(uuid: S) -> Result<Self, SpaceErr> {
         //Ok(Self::new(uuid::Uuid::from_str(uuid.to_string().as_str()).map_err(|e| UniErr::from_500(format!("'{}' is not a valid uuid",uuid.to_string())))?))
         Ok(Self {
             uuid: uuid.to_string(),
@@ -183,7 +183,7 @@ impl ToString for Version {
 }
 
 impl TryInto<semver::Version> for Version {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_into(self) -> Result<semver::Version, Self::Error> {
         Ok(self.version)
@@ -191,7 +191,7 @@ impl TryInto<semver::Version> for Version {
 }
 
 impl FromStr for Version {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let version = semver::Version::from_str(s)?;
@@ -255,7 +255,7 @@ impl RouteSegQuery for RouteSegVar {
 }
 
 impl TryInto<RouteSeg> for RouteSegVar {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_into(self) -> Result<RouteSeg, Self::Error> {
         match self {
@@ -312,7 +312,7 @@ impl ToString for RouteSegVar {
 }
 
 impl FromStr for RouteSeg {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = new_span(s);
@@ -457,9 +457,9 @@ pub enum VarVal<V> {
 
 impl<V> ToResolved<V> for VarVal<V>
 where
-    V: FromStr<Err = UniErr>,
+    V: FromStr<Err =SpaceErr>,
 {
-    fn to_resolved(self, env: &Env) -> Result<V, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<V, SpaceErr> {
         match self {
             VarVal::Var(var) => match env.val(var.as_str()) {
                 Ok(val) => {
@@ -637,7 +637,7 @@ impl Into<PointSegVar> for PointSegCtx {
 }
 
 impl TryInto<PointSegCtx> for PointSegVar {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_into(self) -> Result<PointSegCtx, Self::Error> {
         match self {
@@ -671,7 +671,7 @@ impl TryInto<PointSegCtx> for PointSegVar {
 }
 
 impl TryInto<PointSeg> for PointSegCtx {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_into(self) -> Result<PointSeg, Self::Error> {
         match self {
@@ -1136,11 +1136,11 @@ pub type PointCtx = PointDef<RouteSeg, PointSegCtx>;
 pub type PointVar = PointDef<RouteSegVar, PointSegVar>;
 
 impl PointVar {
-    pub fn to_point(self) -> Result<Point, UniErr> {
+    pub fn to_point(self) -> Result<Point, SpaceErr> {
         self.collapse()
     }
 
-    pub fn to_point_ctx(self) -> Result<PointCtx, UniErr> {
+    pub fn to_point_ctx(self) -> Result<PointCtx, SpaceErr> {
         self.collapse()
     }
 }
@@ -1158,7 +1158,7 @@ impl ToSurface for Point {
 }
 
 impl ToResolved<Point> for PointVar {
-    fn to_resolved(self, env: &Env) -> Result<Point, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<Point, SpaceErr> {
         let point_ctx: PointCtx = self.to_resolved(env)?;
         point_ctx.to_resolved(env)
     }
@@ -1174,13 +1174,13 @@ impl Into<Selector> for Point {
 }
 
 impl PointCtx {
-    pub fn to_point(self) -> Result<Point, UniErr> {
+    pub fn to_point(self) -> Result<Point, SpaceErr> {
         self.collapse()
     }
 }
 
 impl ToResolved<PointCtx> for PointVar {
-    fn collapse(self) -> Result<PointCtx, UniErr> {
+    fn collapse(self) -> Result<PointCtx, SpaceErr> {
         let route = self.route.try_into()?;
         let mut segments = vec![];
         for segment in self.segments {
@@ -1189,7 +1189,7 @@ impl ToResolved<PointCtx> for PointVar {
         Ok(PointCtx { route, segments })
     }
 
-    fn to_resolved(self, env: &Env) -> Result<PointCtx, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<PointCtx, SpaceErr> {
         let mut rtn = String::new();
         let mut after_fs = false;
         let mut errs = vec![];
@@ -1315,7 +1315,7 @@ impl ToResolved<PointCtx> for PointVar {
 }
 
 impl ToResolved<Point> for PointCtx {
-    fn collapse(self) -> Result<Point, UniErr> {
+    fn collapse(self) -> Result<Point, SpaceErr> {
         let mut segments = vec![];
         for segment in self.segments {
             segments.push(segment.try_into()?);
@@ -1326,7 +1326,7 @@ impl ToResolved<Point> for PointCtx {
         })
     }
 
-    fn to_resolved(self, env: &Env) -> Result<Point, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<Point, SpaceErr> {
         if self.segments.is_empty() {
             return Ok(Point {
                 route: self.route,
@@ -1406,7 +1406,7 @@ impl ToResolved<Point> for PointCtx {
 }
 
 impl TryInto<Point> for PointCtx {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_into(self) -> Result<Point, Self::Error> {
         let mut rtn = vec![];
@@ -1421,7 +1421,7 @@ impl TryInto<Point> for PointCtx {
 }
 
 impl TryFrom<String> for Point {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         consume_point(value.as_str())
@@ -1429,7 +1429,7 @@ impl TryFrom<String> for Point {
 }
 
 impl TryFrom<&str> for Point {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         consume_point(value)
@@ -1541,7 +1541,7 @@ impl Point {
         ANONYMOUS.clone()
     }
 
-    pub fn normalize(self) -> Result<Point, UniErr> {
+    pub fn normalize(self) -> Result<Point, SpaceErr> {
         if self.is_normalized() {
             return Ok(self);
         }
@@ -1603,7 +1603,7 @@ impl Point {
         true
     }
 
-    pub fn to_bundle(self) -> Result<Point, UniErr> {
+    pub fn to_bundle(self) -> Result<Point, SpaceErr> {
         if self.segments.is_empty() {
             return Err("Point does not contain a bundle".into());
         }
@@ -1680,7 +1680,7 @@ impl Point {
             segments,
         }
     }
-    pub fn push<S: ToString>(&self, segment: S) -> Result<Self, UniErr> {
+    pub fn push<S: ToString>(&self, segment: S) -> Result<Self, SpaceErr> {
         let segment = segment.to_string();
         if self.segments.is_empty() {
             Self::from_str(segment.as_str())
@@ -1716,11 +1716,11 @@ impl Point {
         }
     }
 
-    pub fn push_file(&self, segment: String) -> Result<Self, UniErr> {
+    pub fn push_file(&self, segment: String) -> Result<Self, SpaceErr> {
         Self::from_str(format!("{}{}", self.to_string(), segment).as_str())
     }
 
-    pub fn push_segment(&self, segment: PointSeg) -> Result<Self, UniErr> {
+    pub fn push_segment(&self, segment: PointSeg) -> Result<Self, SpaceErr> {
         if (self.has_filesystem() && segment.is_filesystem_seg()) || segment.kind().is_mesh_seg() {
             let mut point = self.clone();
             point.segments.push(segment);
@@ -1765,7 +1765,7 @@ impl Point {
         }
     }
 
-    pub fn truncate(self, kind: PointSegKind) -> Result<Point, UniErr> {
+    pub fn truncate(self, kind: PointSegKind) -> Result<Point, SpaceErr> {
         let mut segments = vec![];
         for segment in &self.segments {
             segments.push(segment.clone());
@@ -1777,7 +1777,7 @@ impl Point {
             }
         }
 
-        Err(UniErr::Status {
+        Err(SpaceErr::Status {
             status: 404,
             message: format!(
                 "Point segment kind: {} not found in point: {}",
@@ -1789,7 +1789,7 @@ impl Point {
 }
 
 impl FromStr for Point {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         consume_point(s)
@@ -1797,7 +1797,7 @@ impl FromStr for Point {
 }
 
 impl FromStr for PointVar {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(point_var(new_span(s)))
@@ -1805,7 +1805,7 @@ impl FromStr for PointVar {
 }
 
 impl FromStr for PointCtx {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(result(point_var(new_span(s)))?.collapse()?)
@@ -1941,7 +1941,7 @@ impl Into<Surface> for StarKey {
 }
 
 impl TryFrom<Point> for StarKey {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(point: Point) -> Result<Self, Self::Error> {
         match point.route {
@@ -2022,7 +2022,7 @@ impl StarKey {
 }
 
 impl FromStr for StarKey {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(result(all_consuming(parse_star_key)(new_span(s)))?)
@@ -2031,7 +2031,7 @@ impl FromStr for StarKey {
 
 #[async_trait]
 pub trait PointFactory: Send + Sync {
-    async fn create(&self) -> Result<Point, UniErr>;
+    async fn create(&self) -> Result<Point, SpaceErr>;
 }
 
 #[cfg(test)]

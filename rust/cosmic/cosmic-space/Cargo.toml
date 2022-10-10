@@ -16,6 +16,7 @@ license = "MIT"
 [dependencies]
 cosmic-nom = { path="../cosmic-nom" ,version = "0.3.0"}
 cosmic-macros-primitive = { path="../cosmic-macros-primitive" ,version = "0.3.0"}
+ariadne = "0.1.5"
 async-trait = "0.1.48"
 lazy_static = "1.4.0"
 serde = { version="1.0.69", features=['derive','rc'] }

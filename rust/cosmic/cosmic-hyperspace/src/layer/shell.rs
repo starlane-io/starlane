@@ -6,7 +6,7 @@ use dashmap::{DashMap, DashSet};
 use cosmic_nom::new_span;
 use cosmic_space::command::common::StateSrc;
 use cosmic_space::command::{Command, RawCommand};
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::loc::{Layer, Point, Surface, SurfaceSelector, ToPoint, ToSurface, Topic};
 use cosmic_space::log::PointLogger;
 use cosmic_space::parse::error::result;
@@ -77,7 +77,7 @@ where
         &self.skel.exchanger
     }
 
-    async fn deliver_directed(&self, directed: Traversal<DirectedWave>) -> Result<(), UniErr> {
+    async fn deliver_directed(&self, directed: Traversal<DirectedWave>) -> Result<(), SpaceErr> {
         if directed.from().point == self.surface().point
             && directed.from().layer.ordinal() >= self.surface().layer.ordinal()
         {
@@ -138,7 +138,7 @@ where
     async fn directed_fabric_bound(
         &self,
         mut traversal: Traversal<DirectedWave>,
-    ) -> Result<(), UniErr> {
+    ) -> Result<(), SpaceErr> {
         match traversal.directed_kind() {
             DirectedKind::Ping => {
                 //self.logger.info(format!("Shell tracking id: {} to: {}",traversal.id().to_short_string(), traversal.to.to_string()) );
@@ -174,7 +174,7 @@ where
     async fn reflected_core_bound(
         &self,
         traversal: Traversal<ReflectedWave>,
-    ) -> Result<(), UniErr> {
+    ) -> Result<(), SpaceErr> {
         if let Some(count) = self.state.fabric_requests.get(traversal.reflection_of()) {
             let value = count.value().fetch_sub(1, Ordering::Relaxed);
             if value >= 0 {
@@ -213,10 +213,10 @@ where
     P: Cosmos + 'static,
 {
     #[route("Ext<NewCliSession>")]
-    pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Surface, UniErr> {
+    pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Surface, SpaceErr> {
         // only allow a cli session to be created by any layer of THIS particle
         if ctx.from().clone().to_point() != ctx.to().clone().to_point() {
-            return Err(UniErr::forbidden());
+            return Err(SpaceErr::forbidden());
         }
 
         let mut session_port = ctx
@@ -244,7 +244,7 @@ where
 #[handler]
 impl CliSession {
     #[route("Ext<Exec>")]
-    pub async fn exec(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, UniErr> {
+    pub async fn exec(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, SpaceErr> {
         let exec_topic = Topic::uuid();
         let exec_port = self.port.clone().with_topic(exec_topic.clone());
         let mut exec = CommandExecutor::new(exec_port, ctx.from().clone(), self.env.clone());
@@ -279,7 +279,7 @@ impl CommandExecutor {
         Self { port, source, env }
     }
 
-    pub async fn execute(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, UniErr> {
+    pub async fn execute(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, SpaceErr> {
         // make sure everything is coming from this command executor topic
         let ctx = ctx.push_from(self.port.clone());
 

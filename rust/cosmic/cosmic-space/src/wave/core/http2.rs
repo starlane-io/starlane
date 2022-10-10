@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::err::UniErr;
+use crate::err::SpaceErr;
 use crate::loc::Meta;
 use crate::substance::{Errors, Substance};
 use crate::util::ValueMatcher;
@@ -69,7 +69,7 @@ impl Into<DirectedCore> for HttpRequest {
 }
 
 impl TryFrom<DirectedCore> for HttpRequest {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(core: DirectedCore) -> Result<Self, Self::Error> {
         if let Method::Http(method) = core.method {
@@ -90,7 +90,7 @@ pub struct StatusCode {
 }
 
 impl StatusCode {
-    pub fn from_u16(code: u16) -> Result<Self, UniErr> {
+    pub fn from_u16(code: u16) -> Result<Self, SpaceErr> {
         Ok(Self { code })
     }
 

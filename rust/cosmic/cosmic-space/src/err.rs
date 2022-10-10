@@ -7,7 +7,6 @@ use std::rc::Rc;
 use std::string::FromUtf8Error;
 use std::sync::{Arc, PoisonError};
 
-//use ariadne::{Label, Report, ReportBuilder, ReportKind, Source};
 use nom::error::VerboseError;
 use nom::Err;
 use nom_locate::LocatedSpan;
@@ -26,20 +25,42 @@ use crate::substance::{Errors, Substance};
 use crate::wave::core::http2::StatusCode;
 use crate::wave::core::ReflectedCore;
 
-pub enum UniErr {
+pub enum SpaceErr {
     Status { status: u16, message: String },
     ParseErrs(ParseErrs),
 }
 
-impl Into<ReflectedCore> for UniErr {
+impl SpaceErr {
+    pub fn print(&self) {
+        match self {
+            SpaceErr::Status { status, message } => {
+                println!("{}: {}", status, message);
+            }
+            SpaceErr::ParseErrs(errs) => {
+println!("REport len: {}", errs.report.len() );
+                for report in &errs.report {
+                   let report : ariadne::Report = report.clone().into();
+                    if let Some(source) = &errs.source {
+                        let source = source.to_string();
+                        report.print(ariadne::Source::from(source));
+                    } else {
+                        println!("No source..");
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl Into<ReflectedCore> for SpaceErr {
     fn into(self) -> ReflectedCore {
         match self {
-            UniErr::Status { status, message } => ReflectedCore {
+            SpaceErr::Status { status, message } => ReflectedCore {
                 headers: Default::default(),
                 status: StatusCode::from_u16(status).unwrap_or(StatusCode::from_u16(500).unwrap()),
                 body: Substance::Errors(Errors::default(message.as_str())),
             },
-            UniErr::ParseErrs(_) => ReflectedCore {
+            SpaceErr::ParseErrs(_) => ReflectedCore {
                 headers: Default::default(),
                 status: StatusCode::from_u16(500u16).unwrap_or(StatusCode::from_u16(500).unwrap()),
                 body: Substance::Errors(Errors::default("parsing error...")),
@@ -48,9 +69,9 @@ impl Into<ReflectedCore> for UniErr {
     }
 }
 
-impl Clone for UniErr {
+impl Clone for SpaceErr {
     fn clone(&self) -> Self {
-        UniErr::Status {
+        SpaceErr::Status {
             status: 500,
             message: self.message(),
         }
@@ -61,7 +82,7 @@ pub trait CoreReflector {
     fn as_reflected_core(self) -> ReflectedCore;
 }
 
-impl CoreReflector for UniErr {
+impl CoreReflector for SpaceErr {
     fn as_reflected_core(self) -> ReflectedCore {
         ReflectedCore {
             headers: Default::default(),
@@ -71,19 +92,19 @@ impl CoreReflector for UniErr {
     }
 }
 
-impl UniErr {
-    pub fn str<S: ToString>(s: S) -> UniErr {
-        UniErr::new(500, s)
+impl SpaceErr {
+    pub fn str<S: ToString>(s: S) -> SpaceErr {
+        SpaceErr::new(500, s)
     }
 
     pub fn map<S>(s: S) -> Self
     where
         S: ToString,
     {
-        UniErr::new(500, s)
+        SpaceErr::new(500, s)
     }
 
-    pub fn from_status(status: u16) -> UniErr {
+    pub fn from_status(status: u16) -> SpaceErr {
         let message = match status {
             400 => "Bad Request".to_string(),
             404 => "Not Found".to_string(),
@@ -92,7 +113,7 @@ impl UniErr {
             500 => "Internal Server Error".to_string(),
             status => format!("{} Error", status),
         };
-        UniErr::Status { status, message }
+        SpaceErr::Status { status, message }
     }
 }
 
@@ -116,67 +137,58 @@ impl Into<ParseErrs> for UniErr {
 
  */
 
-impl UniErr {
+impl SpaceErr {
     pub fn timeout() -> Self {
-        UniErr::from_status(408)
+        SpaceErr::from_status(408)
     }
 
     pub fn server_error() -> Self {
-        UniErr::from_status(500)
+        SpaceErr::from_status(500)
     }
     pub fn forbidden() -> Self {
-        UniErr::err403()
+        SpaceErr::err403()
     }
 
     pub fn forbidden_msg<S: ToString>(msg: S) -> Self {
-        UniErr::Status {
+        SpaceErr::Status {
             status: 403,
             message: msg.to_string(),
         }
     }
 
     pub fn not_found() -> Self {
-        UniErr::err404()
+        SpaceErr::err404()
     }
 
     pub fn bad_request() -> Self {
-        UniErr::from_status(400)
+        SpaceErr::from_status(400)
     }
 
     pub fn bad_request_msg<M: ToString>(m: M) -> Self {
-        UniErr::Status {
+        SpaceErr::Status {
             status: 400,
             message: m.to_string(),
         }
     }
 }
 
-impl Debug for UniErr {
+impl Debug for SpaceErr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            UniErr::Status { status, message } => {
+            SpaceErr::Status { status, message } => {
                 f.write_str(format!("{}: {}", status, message).as_str())
             }
-            UniErr::ParseErrs(errs) => {
-                errs.print();
+            SpaceErr::ParseErrs(errs) => {
+                self.print();
                 f.write_str("Parse Errors... [Report redacted]")
             }
         }
     }
 }
 
-impl UniErr {
-    pub fn print(&self) {
-        match self {
-            UniErr::Status { .. } => {
-                println!("{}", self.to_string());
-            }
-            UniErr::ParseErrs(err) => err.print(),
-        }
-    }
-}
 
-impl UniErr {
+
+impl SpaceErr {
     pub fn new<S: ToString>(status: u16, message: S) -> Self {
         Self::Status {
             status,
@@ -220,18 +232,18 @@ impl UniErr {
     }
 }
 
-impl StatusErr for UniErr {
+impl StatusErr for SpaceErr {
     fn status(&self) -> u16 {
         match self {
-            UniErr::Status { status, .. } => status.clone(),
-            UniErr::ParseErrs(_) => 500u16,
+            SpaceErr::Status { status, .. } => status.clone(),
+            SpaceErr::ParseErrs(_) => 500u16,
         }
     }
 
     fn message(&self) -> String {
         match self {
-            UniErr::Status { status, message } => message.clone(),
-            UniErr::ParseErrs(_) => "Error report".to_string(),
+            SpaceErr::Status { status, message } => message.clone(),
+            SpaceErr::ParseErrs(_) => "Error report".to_string(),
         }
     }
 }
@@ -241,50 +253,51 @@ pub trait StatusErr {
     fn message(&self) -> String;
 }
 
-impl Display for UniErr {
+impl Display for SpaceErr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            UniErr::Status { status, message } => {
+            SpaceErr::Status { status, message } => {
                 f.write_str(format!("{}: {}", status, message).as_str())
             }
-            UniErr::ParseErrs(errs) => {
-                errs.print();
+            SpaceErr::ParseErrs(errs) => {
+println!("PRINING!");
+                self.print();
                 f.write_str("Error Report...")
             }
         }
     }
 }
 
-impl std::error::Error for UniErr {}
+impl std::error::Error for SpaceErr {}
 
-impl<C> From<SendTimeoutError<C>> for UniErr {
+impl<C> From<SendTimeoutError<C>> for SpaceErr {
     fn from(e: SendTimeoutError<C>) -> Self {
-        UniErr::Status {
+        SpaceErr::Status {
             status: 500,
             message: e.to_string(),
         }
     }
 }
 
-impl<C> From<tokio::sync::mpsc::error::SendError<C>> for UniErr {
+impl<C> From<tokio::sync::mpsc::error::SendError<C>> for SpaceErr {
     fn from(e: SendError<C>) -> Self {
-        UniErr::from_500(e.to_string())
+        SpaceErr::from_500(e.to_string())
     }
 }
 
-impl<C> From<tokio::sync::broadcast::error::SendError<C>> for UniErr {
+impl<C> From<tokio::sync::broadcast::error::SendError<C>> for SpaceErr {
     fn from(e: tokio::sync::broadcast::error::SendError<C>) -> Self {
-        UniErr::from_500(e.to_string())
+        SpaceErr::from_500(e.to_string())
     }
 }
 
-impl From<tokio::sync::watch::error::RecvError> for UniErr {
+impl From<tokio::sync::watch::error::RecvError> for SpaceErr {
     fn from(e: tokio::sync::watch::error::RecvError) -> Self {
-        UniErr::from_500(e.to_string())
+        SpaceErr::from_500(e.to_string())
     }
 }
 
-impl From<String> for UniErr {
+impl From<String> for SpaceErr {
     fn from(message: String) -> Self {
         Self::Status {
             status: 500,
@@ -293,7 +306,7 @@ impl From<String> for UniErr {
     }
 }
 
-impl From<Elapsed> for UniErr {
+impl From<Elapsed> for SpaceErr {
     fn from(e: Elapsed) -> Self {
         Self::Status {
             status: 408,
@@ -302,16 +315,16 @@ impl From<Elapsed> for UniErr {
     }
 }
 
-impl<T> From<PoisonError<T>> for UniErr {
+impl<T> From<PoisonError<T>> for SpaceErr {
     fn from(e: PoisonError<T>) -> Self {
-        UniErr::Status {
+        SpaceErr::Status {
             status: 500,
             message: e.to_string(),
         }
     }
 }
 
-impl From<FromUtf8Error> for UniErr {
+impl From<FromUtf8Error> for SpaceErr {
     fn from(message: FromUtf8Error) -> Self {
         Self::Status {
             status: 500,
@@ -320,7 +333,7 @@ impl From<FromUtf8Error> for UniErr {
     }
 }
 
-impl From<&str> for UniErr {
+impl From<&str> for SpaceErr {
     fn from(message: &str) -> Self {
         Self::Status {
             status: 500,
@@ -329,7 +342,7 @@ impl From<&str> for UniErr {
     }
 }
 
-impl From<Box<bincode::ErrorKind>> for UniErr {
+impl From<Box<bincode::ErrorKind>> for SpaceErr {
     fn from(message: Box<bincode::ErrorKind>) -> Self {
         Self::Status {
             status: 500,
@@ -338,7 +351,7 @@ impl From<Box<bincode::ErrorKind>> for UniErr {
     }
 }
 
-impl From<Infallible> for UniErr {
+impl From<Infallible> for SpaceErr {
     fn from(i: Infallible) -> Self {
         Self::Status {
             status: 500,
@@ -347,7 +360,7 @@ impl From<Infallible> for UniErr {
     }
 }
 
-impl From<nom::Err<VerboseError<&str>>> for UniErr {
+impl From<nom::Err<VerboseError<&str>>> for SpaceErr {
     fn from(error: nom::Err<VerboseError<&str>>) -> Self {
         Self::Status {
             status: 500,
@@ -356,7 +369,7 @@ impl From<nom::Err<VerboseError<&str>>> for UniErr {
     }
 }
 
-impl From<semver::Error> for UniErr {
+impl From<semver::Error> for SpaceErr {
     fn from(error: semver::Error) -> Self {
         Self::Status {
             status: 500,
@@ -365,7 +378,7 @@ impl From<semver::Error> for UniErr {
     }
 }
 
-impl From<ErrorTree<&str>> for UniErr {
+impl From<ErrorTree<&str>> for SpaceErr {
     fn from(error: ErrorTree<&str>) -> Self {
         Self::Status {
             status: 500,
@@ -374,7 +387,7 @@ impl From<ErrorTree<&str>> for UniErr {
     }
 }
 
-impl From<strum::ParseError> for UniErr {
+impl From<strum::ParseError> for SpaceErr {
     fn from(error: strum::ParseError) -> Self {
         Self::Status {
             status: 500,
@@ -383,7 +396,7 @@ impl From<strum::ParseError> for UniErr {
     }
 }
 
-impl From<()> for UniErr {
+impl From<()> for SpaceErr {
     fn from(err: ()) -> Self {
         Self::Status {
             status: 500,
@@ -392,7 +405,7 @@ impl From<()> for UniErr {
     }
 }
 
-impl From<tokio::sync::oneshot::error::RecvError> for UniErr {
+impl From<tokio::sync::oneshot::error::RecvError> for SpaceErr {
     fn from(err: RecvError) -> Self {
         Self::Status {
             status: 500,
@@ -401,7 +414,7 @@ impl From<tokio::sync::oneshot::error::RecvError> for UniErr {
     }
 }
 
-impl From<ParseIntError> for UniErr {
+impl From<ParseIntError> for SpaceErr {
     fn from(x: ParseIntError) -> Self {
         Self::Status {
             status: 500,
@@ -410,7 +423,7 @@ impl From<ParseIntError> for UniErr {
     }
 }
 
-impl From<regex::Error> for UniErr {
+impl From<regex::Error> for SpaceErr {
     fn from(x: regex::Error) -> Self {
         Self::Status {
             status: 500,
@@ -431,14 +444,14 @@ impl From<ToStrError> for UniErr {
 
  */
 
-impl<I: Span> From<nom::Err<ErrorTree<I>>> for UniErr {
+impl<I: Span> From<nom::Err<ErrorTree<I>>> for SpaceErr {
     fn from(err: Err<ErrorTree<I>>) -> Self {
-        fn handle<I: Span>(err: ErrorTree<I>) -> UniErr {
+        fn handle<I: Span>(err: ErrorTree<I>) -> SpaceErr {
             match err {
                 ErrorTree::Base {
                     location,
                     kind: _kind,
-                } => UniErr::Status {
+                } => SpaceErr::Status {
                     status: 500,
                     message: format!(
                         "parse error line: {} column: {}",
@@ -447,11 +460,11 @@ impl<I: Span> From<nom::Err<ErrorTree<I>>> for UniErr {
                     ),
                 },
                 ErrorTree::Stack { base, contexts } => match contexts.first() {
-                    None => UniErr::Status {
+                    None => SpaceErr::Status {
                         status: 500,
                         message: "error, cannot find location".to_string(),
                     },
-                    Some((location, _)) => UniErr::Status {
+                    Some((location, _)) => SpaceErr::Status {
                         status: 500,
                         message: format!(
                             "Stack parse error line: {} column: {}",
@@ -460,14 +473,14 @@ impl<I: Span> From<nom::Err<ErrorTree<I>>> for UniErr {
                         ),
                     },
                 },
-                ErrorTree::Alt(what) => UniErr::Status {
+                ErrorTree::Alt(what) => SpaceErr::Status {
                     status: 500,
                     message: "alt error".to_string(),
                 },
             }
         }
         match err {
-            Err::Incomplete(_) => UniErr::Status {
+            Err::Incomplete(_) => SpaceErr::Status {
                 status: 500,
                 message: "unexpected incomplete parsing error".to_string(),
             },
@@ -478,31 +491,31 @@ impl<I: Span> From<nom::Err<ErrorTree<I>>> for UniErr {
     }
 }
 
-impl Into<String> for UniErr {
+impl Into<String> for SpaceErr {
     fn into(self) -> String {
         self.to_string()
     }
 }
 
-impl From<io::Error> for UniErr {
+impl From<io::Error> for SpaceErr {
     fn from(e: io::Error) -> Self {
-        UniErr::new(500, e.to_string().as_str())
+        SpaceErr::new(500, e.to_string().as_str())
     }
 }
 
-impl From<ParseErrs> for UniErr {
+impl From<ParseErrs> for SpaceErr {
     fn from(errs: ParseErrs) -> Self {
-        UniErr::ParseErrs(errs)
+        SpaceErr::ParseErrs(errs)
     }
 }
 impl<I: Span> From<nom::Err<ErrorTree<I>>> for ParseErrs {
     fn from(err: Err<ErrorTree<I>>) -> Self {
         match find_parse_err(&err) {
-            UniErr::Status { .. } => ParseErrs {
+            SpaceErr::Status { .. } => ParseErrs {
                 report: vec![],
                 source: None,
             },
-            UniErr::ParseErrs(parse_errs) => parse_errs,
+            SpaceErr::ParseErrs(parse_errs) => parse_errs,
         }
     }
 }
@@ -520,7 +533,7 @@ impl ParseErrs {
         }
     }
 
-    pub fn from_loc_span<I: Span>(message: &str, label: &str, span: I) -> UniErr {
+    pub fn from_loc_span<I: Span>(message: &str, label: &str, span: I) -> SpaceErr {
         let mut builder = Report::build(ReportKind::Error, (), 23);
         let report = builder
             .with_message(message)
@@ -532,7 +545,7 @@ impl ParseErrs {
         return ParseErrs::from_report(report, span.extra()).into();
     }
 
-    pub fn from_range(message: &str, label: &str, range: Range<usize>, extra: SpanExtra) -> UniErr {
+    pub fn from_range(message: &str, label: &str, range: Range<usize>, extra: SpanExtra) -> SpaceErr {
         let mut builder = Report::build(ReportKind::Error, (), 23);
         let report = builder
             .with_message(message)
@@ -541,7 +554,7 @@ impl ParseErrs {
         return ParseErrs::from_report(report, extra).into();
     }
 
-    pub fn from_owned_span<I: Span>(message: &str, label: &str, span: I) -> UniErr {
+    pub fn from_owned_span<I: Span>(message: &str, label: &str, span: I) -> SpaceErr {
         let mut builder = Report::build(ReportKind::Error, (), 23);
         let report = builder
             .with_message(message)
@@ -553,7 +566,6 @@ impl ParseErrs {
         return ParseErrs::from_report(report, span.extra()).into();
     }
 
-    pub fn print(&self) {}
 
     pub fn fold<E: Into<ParseErrs>>(errs: Vec<E>) -> ParseErrs {
         let errs: Vec<ParseErrs> = errs.into_iter().map(|e| e.into()).collect();
@@ -582,8 +594,8 @@ impl ParseErrs {
     }
 }
 
-impl From<UniErr> for ParseErrs {
-    fn from(u: UniErr) -> Self {
+impl From<SpaceErr> for ParseErrs {
+    fn from(u: SpaceErr) -> Self {
         ParseErrs {
             report: vec![],
             source: None,
@@ -591,18 +603,18 @@ impl From<UniErr> for ParseErrs {
     }
 }
 
-impl From<serde_urlencoded::de::Error> for UniErr {
+impl From<serde_urlencoded::de::Error> for SpaceErr {
     fn from(err: serde_urlencoded::de::Error) -> Self {
-        UniErr::Status {
+        SpaceErr::Status {
             status: 500u16,
             message: err.to_string(),
         }
     }
 }
 
-impl From<serde_urlencoded::ser::Error> for UniErr {
+impl From<serde_urlencoded::ser::Error> for SpaceErr {
     fn from(err: serde_urlencoded::ser::Error) -> Self {
-        UniErr::Status {
+        SpaceErr::Status {
             status: 500u16,
             message: err.to_string(),
         }
@@ -623,6 +635,19 @@ pub mod report {
         labels: Vec<Label>,
     }
 
+    impl Into<ariadne::Report> for Report {
+        fn into(self) -> ariadne::Report {
+            let mut builder = ariadne::Report::build(self.kind.into(), (), 0);
+            if let Some(msg) = self.msg {
+                builder.set_message(msg);
+            }
+            for label in self.labels {
+                builder.add_label(label.into());
+            }
+            builder.finish()
+        }
+    }
+
     impl Default for Report {
         fn default() -> Self {
             Self {
@@ -637,33 +662,51 @@ pub mod report {
         }
     }
 
-    pub struct ReportBuilder {}
+    pub struct ReportBuilder {
+        kind: ReportKind,
+        code: Option<String>,
+        msg: Option<String>,
+        note: Option<String>,
+        help: Option<String>,
+        location: Range,
+        labels: Vec<Label>,
+    }
 
     impl ReportBuilder {
-        pub fn with_message<S: ToString>(&self, message: S) -> MessageBuilder {
-            MessageBuilder {}
+        pub fn with_message<S: ToString>(mut self, message: S) -> Self {
+            self.msg.replace(message.to_string());
+            self
         }
-    }
 
-    pub struct MessageBuilder {}
-
-    impl MessageBuilder {
-        pub fn with_label(&self, label: Label) -> LabelBuilder {
-            LabelBuilder {}
+        pub fn with_label(mut self, label: Label) -> Self {
+            self.labels.push(label);
+            self
         }
-    }
 
-    pub struct LabelBuilder;
-
-    impl LabelBuilder {
-        pub fn finish(&self) -> Report {
-            Default::default()
+        pub fn finish(self) -> Report {
+            Report {
+                kind: self.kind,
+                code: None,
+                msg: self.msg,
+                note: None,
+                help: None,
+                location: self.location,
+                labels: self.labels,
+            }
         }
     }
 
     impl Report {
-        pub(crate) fn build(p0: ReportKind, p1: (), p2: i32) -> ReportBuilder {
-            ReportBuilder {}
+        pub(crate) fn build(kind: ReportKind, p1: (), p2: i32) -> ReportBuilder {
+            ReportBuilder {
+                kind,
+                code: None,
+                msg: None,
+                note: None,
+                help: None,
+                location: Default::default(),
+                labels: vec![],
+            }
         }
     }
 
@@ -674,10 +717,35 @@ pub mod report {
         Advice,
     }
 
+    impl Into<ariadne::ReportKind> for ReportKind {
+        fn into(self) -> ariadne::ReportKind {
+            match self {
+                ReportKind::Error => ariadne::ReportKind::Error,
+                ReportKind::Warning => ariadne::ReportKind::Warning,
+                ReportKind::Advice => ariadne::ReportKind::Advice,
+            }
+        }
+    }
+
     #[derive(Clone, Serialize, Deserialize)]
     pub struct Range {
         pub start: u32,
         pub end: u32,
+    }
+
+    impl Into<std::ops::Range<usize>> for Range {
+        fn into(self) -> std::ops::Range<usize> {
+            std::ops::Range {
+                start: self.start as usize,
+                end: self.end as usize
+            }
+        }
+    }
+
+    impl Default for Range {
+        fn default() -> Self {
+            Self { start: 0, end: 0 }
+        }
     }
 
     #[derive(Clone, Serialize, Deserialize)]
@@ -687,6 +755,16 @@ pub mod report {
         color: Option<Color>,
         order: i32,
         priority: i32,
+    }
+
+    impl Into<ariadne::Label> for Label {
+        fn into(self) -> ariadne::Label {
+            let mut rtn = ariadne::Label::new(self.span.into());
+            if let Some(msg) = self.msg {
+                rtn = rtn.with_message(msg);
+            }
+            rtn
+        }
     }
 
     impl Label {
@@ -703,7 +781,8 @@ pub mod report {
             }
         }
 
-        pub fn with_message(self, msg: &str) -> Label {
+        pub fn with_message(mut self, msg: &str) -> Label {
+            self.msg.replace(msg.to_string());
             self
         }
     }

@@ -5,7 +5,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::command::direct::Cmd;
-use crate::err::UniErr;
+use crate::err::SpaceErr;
 use crate::loc::{Point, PointCtx, PointVar, Topic};
 use crate::parse::model::{
     BindScope, MethodScope, PipelineSegment, PipelineSegmentDef, PipelineVar, RouteScope,
@@ -45,7 +45,7 @@ impl BindConfig {
         scopes
     }
 
-    pub fn select(&self, directed: &DirectedWave) -> Result<&MethodScope, UniErr> {
+    pub fn select(&self, directed: &DirectedWave) -> Result<&MethodScope, SpaceErr> {
         for route_scope in self.route_scopes() {
             if route_scope.selector.is_match(directed).is_ok() {
                 for message_scope in &route_scope.block {
@@ -59,7 +59,7 @@ impl BindConfig {
                 }
             }
         }
-        Err(UniErr::Status {
+        Err(SpaceErr::Status {
             status: 404,
             message: format!(
                 "no route matches {}<{}>{}",
@@ -72,7 +72,7 @@ impl BindConfig {
 }
 
 impl TryFrom<Vec<u8>> for BindConfig {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(doc: Vec<u8>) -> Result<Self, Self::Error> {
         let doc = String::from_utf8(doc)?;
@@ -81,7 +81,7 @@ impl TryFrom<Vec<u8>> for BindConfig {
 }
 
 impl TryFrom<Bin> for BindConfig {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(doc: Bin) -> Result<Self, Self::Error> {
         let doc = String::from_utf8((*doc).clone())?;
@@ -158,7 +158,7 @@ impl<Pnt> PipelineStepDef<Pnt> {
 }
 
 impl ToResolved<PipelineStep> for PipelineStepCtx {
-    fn to_resolved(self, env: &Env) -> Result<PipelineStep, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<PipelineStep, SpaceErr> {
         let mut blocks = vec![];
         for block in self.blocks {
             blocks.push(block.to_resolved(env)?);
@@ -173,7 +173,7 @@ impl ToResolved<PipelineStep> for PipelineStepCtx {
 }
 
 impl ToResolved<PipelineStepCtx> for PipelineStepVar {
-    fn to_resolved(self, env: &Env) -> Result<PipelineStepCtx, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<PipelineStepCtx, SpaceErr> {
         let mut blocks = vec![];
         for block in self.blocks {
             blocks.push(block.to_resolved(env)?);
@@ -213,14 +213,14 @@ pub enum PipelineStopDef<Pnt> {
 }
 
 impl ToResolved<PipelineStop> for PipelineStopVar {
-    fn to_resolved(self, env: &Env) -> Result<PipelineStop, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<PipelineStop, SpaceErr> {
         let stop: PipelineStopCtx = self.to_resolved(env)?;
         stop.to_resolved(env)
     }
 }
 
 impl ToResolved<PipelineStop> for PipelineStopCtx {
-    fn to_resolved(self, env: &Env) -> Result<PipelineStop, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<PipelineStop, SpaceErr> {
         Ok(match self {
             PipelineStopCtx::Core => PipelineStop::Core,
             PipelineStopCtx::Call(call) => PipelineStop::Call(call.to_resolved(env)?),
@@ -232,7 +232,7 @@ impl ToResolved<PipelineStop> for PipelineStopCtx {
 }
 
 impl ToResolved<PipelineStopCtx> for PipelineStopVar {
-    fn to_resolved(self, env: &Env) -> Result<PipelineStopCtx, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<PipelineStopCtx, SpaceErr> {
         Ok(match self {
             PipelineStopVar::Core => PipelineStopCtx::Core,
             PipelineStopVar::Call(call) => PipelineStopCtx::Call(call.to_resolved(env)?),

@@ -1,4 +1,4 @@
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use std::fmt::{Debug, Display, Formatter, Write};
 use std::str::Utf8Error;
 use std::string::FromUtf8Error;
@@ -17,7 +17,7 @@ pub trait HostErr:
     + From<FromUtf8Error>
     + From<InstantiationError>
 {
-    fn to_uni_err(self) -> UniErr;
+    fn to_uni_err(self) -> SpaceErr;
 }
 
 #[derive(Debug)]
@@ -50,8 +50,8 @@ impl From<InstantiationError> for DefaultHostErr {
 }
 
 impl HostErr for DefaultHostErr {
-    fn to_uni_err(self) -> UniErr {
-        UniErr::from_500(self.to_string())
+    fn to_uni_err(self) -> SpaceErr {
+        SpaceErr::from_500(self.to_string())
     }
 }
 

@@ -60,7 +60,7 @@ use crate::config::bind::{
 use crate::config::mechtron::MechtronConfig;
 use crate::config::Document;
 use crate::err::report::{Label, Report, ReportKind};
-use crate::err::{ParseErrs, UniErr};
+use crate::err::{ParseErrs, SpaceErr};
 use crate::kind::{ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, NativeSub, Specific, StarSub, UserBaseSubKind};
 use crate::loc::StarKey;
 use crate::loc::{
@@ -543,15 +543,15 @@ pub fn point_non_root_var<I: Span>(input: I) -> Res<I, PointVar> {
     )
 }
 
-pub fn consume_point(input: &str) -> Result<Point, UniErr> {
+pub fn consume_point(input: &str) -> Result<Point, SpaceErr> {
     consume_point_ctx(input)?.collapse()
 }
 
-pub fn consume_point_ctx(input: &str) -> Result<PointCtx, UniErr> {
+pub fn consume_point_ctx(input: &str) -> Result<PointCtx, SpaceErr> {
     consume_point_var(input)?.collapse()
 }
 
-pub fn consume_point_var(input: &str) -> Result<PointVar, UniErr> {
+pub fn consume_point_var(input: &str) -> Result<PointVar, SpaceErr> {
     let span = new_span(input);
     let point = result(context("consume", all_consuming(point_var))(span))?;
     Ok(point)
@@ -708,7 +708,7 @@ pub fn version_point_kind_segment<I: Span>(input: I) -> Res<I, PointKindSeg> {
     })
 }
 
-pub fn consume_hierarchy<I: Span>(input: I) -> Result<PointHierarchy, UniErr> {
+pub fn consume_hierarchy<I: Span>(input: I) -> Result<PointHierarchy, SpaceErr> {
     let (_, rtn) = all_consuming(point_kind_hierarchy)(input)?;
     Ok(rtn)
 }
@@ -1170,7 +1170,7 @@ impl CamelCase {
 }
 
 impl FromStr for CamelCase {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(camel_case)(new_span(s)))
@@ -1245,7 +1245,7 @@ impl<'de> Deserialize<'de> for Domain {
 }
 
 impl FromStr for Domain {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(domain)(new_span(s)))
@@ -1296,7 +1296,7 @@ impl<'de> Deserialize<'de> for SkewerCase {
 }
 
 impl FromStr for SkewerCase {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(skewer_case)(new_span(s)))
@@ -1929,7 +1929,7 @@ impl Env {
         }
     }
 
-    pub fn push_working<S: ToString>(self, segs: S) -> Result<Self, UniErr> {
+    pub fn push_working<S: ToString>(self, segs: S) -> Result<Self, SpaceErr> {
         Ok(Self {
             point: self.point.push(segs.to_string())?,
             parent: Some(Box::new(self)),
@@ -1939,14 +1939,14 @@ impl Env {
         })
     }
 
-    pub fn point_or(&self) -> Result<Point, UniErr> {
+    pub fn point_or(&self) -> Result<Point, SpaceErr> {
         Ok(self.point.clone())
     }
 
-    pub fn pop(self) -> Result<Env, UniErr> {
+    pub fn pop(self) -> Result<Env, SpaceErr> {
         Ok(*self
             .parent
-            .ok_or::<UniErr>("expected parent scopedVars".into())?)
+            .ok_or::<SpaceErr>("expected parent scopedVars".into())?)
     }
 
     pub fn add_var_resolver(&mut self, var_resolver: Arc<dyn VarResolver>) {
@@ -2155,13 +2155,13 @@ impl VarResolver for CompositeResolver {
 }
 
 pub trait CtxResolver {
-    fn working_point(&self) -> Result<&Point, UniErr>;
+    fn working_point(&self) -> Result<&Point, SpaceErr>;
 }
 
 pub struct PointCtxResolver(Point);
 
 impl CtxResolver for PointCtxResolver {
-    fn working_point(&self) -> Result<&Point, UniErr> {
+    fn working_point(&self) -> Result<&Point, SpaceErr> {
         Ok(&self.0)
     }
 }
@@ -2221,7 +2221,7 @@ pub struct RegexCapturesResolver {
 }
 
 impl RegexCapturesResolver {
-    pub fn new(regex: Regex, text: String) -> Result<Self, UniErr> {
+    pub fn new(regex: Regex, text: String) -> Result<Self, SpaceErr> {
         regex.captures(text.as_str()).ok_or("no regex captures")?;
         Ok(Self { regex, text })
     }
@@ -2309,7 +2309,7 @@ where
 }
 
 pub trait SubstParser<T: Sized> {
-    fn parse_string(&self, string: String) -> Result<T, UniErr> {
+    fn parse_string(&self, string: String) -> Result<T, SpaceErr> {
         let span = new_span(string.as_str());
         let output = result(self.parse_span(span))?;
         Ok(output)
@@ -2529,7 +2529,7 @@ where
     <I as InputTakeAtPosition>::Item: AsChar,
     F: nom::Parser<I, O, E>,
     E: nom::error::ContextError<I>,
-    O: Clone + FromStr<Err = UniErr>,
+    O: Clone + FromStr<Err =SpaceErr>,
 {
     move |input: I| {
         let (next, element) = f.parse(input.clone())?;
@@ -3022,7 +3022,7 @@ where
     }
 }
 
-pub fn lex_child_scopes<I: Span>(parent: LexScope<I>) -> Result<LexParentScope<I>, UniErr> {
+pub fn lex_child_scopes<I: Span>(parent: LexScope<I>) -> Result<LexParentScope<I>, SpaceErr> {
     if parent.selector.children.is_some() {
         let (_, child_selector) = all_consuming(lex_scope_selector)(
             parent
@@ -3154,7 +3154,7 @@ pub fn root_scope<I: Span>(input: I) -> Res<I, LexRootScope<I>> {
     })
 }
 
-pub fn lex_scopes<I: Span>(input: I) -> Result<Vec<LexScope<I>>, UniErr> {
+pub fn lex_scopes<I: Span>(input: I) -> Result<Vec<LexScope<I>>, SpaceErr> {
     if input.len() == 0 {
         return Ok(vec![]);
     }
@@ -3486,7 +3486,7 @@ pub fn root_scope_selector_name<I: Span>(input: I) -> Res<I, I> {
     .map(|(next, (_, name))| (next, name))
 }
 
-pub fn lex_root_scope<I: Span>(span: I) -> Result<LexRootScope<I>, UniErr> {
+pub fn lex_root_scope<I: Span>(span: I) -> Result<LexRootScope<I>, SpaceErr> {
     let root_scope = result(delimited(multispace0, root_scope, multispace0)(span))?;
     Ok(root_scope)
 }
@@ -3520,7 +3520,7 @@ pub mod model {
         BindConfig, PipelineStepCtx, PipelineStepDef, PipelineStepVar, PipelineStopCtx,
         PipelineStopDef, PipelineStopVar, WaveDirection,
     };
-    use crate::err::{ParseErrs, UniErr};
+    use crate::err::{ParseErrs, SpaceErr};
     use crate::loc::{Point, PointCtx, PointVar, Version};
     use crate::parse::error::result;
     use crate::parse::{
@@ -3634,7 +3634,7 @@ pub mod model {
     }
 
     impl<I: ToString, V: ToString> RootScopeSelector<I, V> {
-        pub fn to_concrete(self) -> Result<RootScopeSelector<String, Version>, UniErr> {
+        pub fn to_concrete(self) -> Result<RootScopeSelector<String, Version>, SpaceErr> {
             Ok(RootScopeSelector {
                 name: self.name.to_string(),
                 version: Version::from_str(self.version.to_string().as_str())?,
@@ -3660,7 +3660,7 @@ pub mod model {
     }
 
     impl RouteScopeSelector {
-        pub fn new<I: ToString>(path: Option<I>) -> Result<Self, UniErr> {
+        pub fn new<I: ToString>(path: Option<I>) -> Result<Self, SpaceErr> {
             let path = match path {
                 None => Regex::new(".*")?,
                 Some(path) => Regex::new(path.to_string().as_str())?,
@@ -3673,9 +3673,9 @@ pub mod model {
             })
         }
 
-        pub fn from<I: ToString>(selector: LexScopeSelector<I>) -> Result<Self, UniErr> {
+        pub fn from<I: ToString>(selector: LexScopeSelector<I>) -> Result<Self, SpaceErr> {
             if selector.name.to_string().as_str() != "Route" {
-                return Err(UniErr::from_500("expected Route"));
+                return Err(SpaceErr::from_500("expected Route"));
             }
             let path = match selector.path {
                 None => None,
@@ -3744,14 +3744,14 @@ pub mod model {
         }
     }
 
-    fn default_path<I: ToString>(path: Option<I>) -> Result<Regex, UniErr> {
+    fn default_path<I: ToString>(path: Option<I>) -> Result<Regex, SpaceErr> {
         match path {
             None => Ok(Regex::new(".*")?),
             Some(path) => Ok(Regex::new(path.to_string().as_str())?),
         }
     }
     impl WaveScope {
-        pub fn from_scope<I: Span>(scope: LexParentScope<I>) -> Result<Self, UniErr> {
+        pub fn from_scope<I: Span>(scope: LexParentScope<I>) -> Result<Self, SpaceErr> {
             let selector = MessageScopeSelectorAndFilters::from_selector(scope.selector)?;
             let mut block = vec![];
 
@@ -3775,7 +3775,7 @@ pub mod model {
     }
 
     impl MessageScopeSelectorAndFilters {
-        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, UniErr> {
+        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, SpaceErr> {
             let filters = selector.filters.clone().to_scope_filters();
             let selector = MessageScopeSelector::from_selector(selector)?;
             Ok(Self { selector, filters })
@@ -3783,7 +3783,7 @@ pub mod model {
     }
 
     impl RouteScopeSelectorAndFilters {
-        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, UniErr> {
+        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, SpaceErr> {
             let filters = selector.filters.clone().to_scope_filters();
             let selector = RouteScopeSelector::new(selector.path.clone())?;
             Ok(Self { selector, filters })
@@ -3836,7 +3836,7 @@ pub mod model {
         pub fn from_scope<I: Span>(
             parent: &ValuePattern<MethodKind>,
             scope: LexScope<I>,
-        ) -> Result<Self, UniErr> {
+        ) -> Result<Self, SpaceErr> {
             let selector = MethodScopeSelectorAndFilters::from_selector(parent, scope.selector)?;
             let block = result(pipeline(scope.block.content))?;
             Ok(Self { selector, block })
@@ -3844,7 +3844,7 @@ pub mod model {
     }
 
     impl MessageScopeSelector {
-        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, UniErr> {
+        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, SpaceErr> {
             let kind = match result(value_pattern(method_kind)(selector.name.clone())) {
                 Ok(kind) => kind,
                 Err(_) => {
@@ -3890,7 +3890,7 @@ pub mod model {
         pub fn from_selector<I: Span>(
             parent: &ValuePattern<MethodKind>,
             selector: LexScopeSelector<I>,
-        ) -> Result<Self, UniErr> {
+        ) -> Result<Self, SpaceErr> {
             let filters = selector.filters.clone().to_scope_filters();
             let selector = MethodScopeSelector::from_selector(parent, selector)?;
             Ok(Self { selector, filters })
@@ -3901,7 +3901,7 @@ pub mod model {
         pub fn from_selector<I: Span>(
             parent: &ValuePattern<MethodKind>,
             selector: LexScopeSelector<I>,
-        ) -> Result<Self, UniErr> {
+        ) -> Result<Self, SpaceErr> {
             let name = match parent {
                 ValuePattern::Any => ValuePattern::Any,
                 ValuePattern::None => ValuePattern::None,
@@ -4090,14 +4090,14 @@ pub mod model {
     }
 
     impl ToResolved<PipelineSegment> for PipelineSegmentVar {
-        fn to_resolved(self, env: &Env) -> Result<PipelineSegment, UniErr> {
+        fn to_resolved(self, env: &Env) -> Result<PipelineSegment, SpaceErr> {
             let rtn: PipelineSegmentCtx = self.to_resolved(env)?;
             rtn.to_resolved(env)
         }
     }
 
     impl ToResolved<PipelineSegment> for PipelineSegmentCtx {
-        fn to_resolved(self, env: &Env) -> Result<PipelineSegment, UniErr> {
+        fn to_resolved(self, env: &Env) -> Result<PipelineSegment, SpaceErr> {
             Ok(PipelineSegment {
                 step: self.step.to_resolved(env)?,
                 stop: self.stop.to_resolved(env)?,
@@ -4106,7 +4106,7 @@ pub mod model {
     }
 
     impl ToResolved<PipelineSegmentCtx> for PipelineSegmentVar {
-        fn to_resolved(self, env: &Env) -> Result<PipelineSegmentCtx, UniErr> {
+        fn to_resolved(self, env: &Env) -> Result<PipelineSegmentCtx, SpaceErr> {
             Ok(PipelineSegmentCtx {
                 step: self.step.to_resolved(env)?,
                 stop: self.stop.to_resolved(env)?,
@@ -4166,7 +4166,7 @@ pub mod model {
     //    pub type Pipeline = Vec<PipelineSegment>;
 
     impl<I: Span> TryFrom<LexParentScope<I>> for RouteScope {
-        type Error = UniErr;
+        type Error = SpaceErr;
 
         fn try_from(scope: LexParentScope<I>) -> Result<Self, Self::Error> {
             let mut errs = vec![];
@@ -4228,7 +4228,7 @@ pub mod model {
     pub type PipelineVar = PipelineDef<PipelineSegmentVar>;
 
     impl ToResolved<Pipeline> for PipelineCtx {
-        fn to_resolved(self, env: &Env) -> Result<Pipeline, UniErr> {
+        fn to_resolved(self, env: &Env) -> Result<Pipeline, SpaceErr> {
             let mut segments = vec![];
             for segment in self.segments.into_iter() {
                 segments.push(segment.to_resolved(env)?);
@@ -4239,7 +4239,7 @@ pub mod model {
     }
 
     impl ToResolved<PipelineCtx> for PipelineVar {
-        fn to_resolved(self, env: &Env) -> Result<PipelineCtx, UniErr> {
+        fn to_resolved(self, env: &Env) -> Result<PipelineCtx, SpaceErr> {
             let mut segments = vec![];
             for segment in self.segments.into_iter() {
                 segments.push(segment.to_resolved(env)?);
@@ -4718,7 +4718,7 @@ pub mod model {
     }
 
     pub trait VarParser<O> {
-        fn parse<I: Span>(input: I) -> Result<O, UniErr>;
+        fn parse<I: Span>(input: I) -> Result<O, SpaceErr>;
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -4728,7 +4728,7 @@ pub mod model {
     }
 
     impl Subst<Tw<String>> {
-        pub fn new(path: &str) -> Result<Self, UniErr> {
+        pub fn new(path: &str) -> Result<Self, SpaceErr> {
             let path = result(crate::parse::subst_path(new_span(path)))?;
             Ok(path.stringify())
         }
@@ -4769,7 +4769,7 @@ pub mod model {
     }
 
     impl ToResolved<String> for Subst<Tw<String>> {
-        fn to_resolved(self, env: &Env) -> Result<String, UniErr> {
+        fn to_resolved(self, env: &Env) -> Result<String, SpaceErr> {
             let mut rtn = String::new();
             let mut errs = vec![];
             for chunk in self.chunks {
@@ -4832,7 +4832,7 @@ pub mod error {
     use crate::command::CommandVar;
     use crate::config::bind::{PipelineStepVar, PipelineStopVar, RouteSelector, WaveDirection};
     use crate::err::report::{Label, Report, ReportKind};
-    use crate::err::UniErr;
+    use crate::err::SpaceErr;
     use crate::kind::KindParts;
     use crate::loc::{Layer, PointSeg, PointVar, StarKey, Topic, VarVal, Version};
     use crate::parse::model::{
@@ -4870,7 +4870,7 @@ pub mod error {
         StarSub, Strategy, Surface,
     };
 
-    pub fn result<I: Span, R>(result: Result<(I, R), Err<ErrorTree<I>>>) -> Result<R, UniErr> {
+    pub fn result<I: Span, R>(result: Result<(I, R), Err<ErrorTree<I>>>) -> Result<R, SpaceErr> {
         match result {
             Ok((_, e)) => Ok(e),
             Err(err) => Err(find_parse_err(&err)),
@@ -4892,8 +4892,8 @@ pub mod error {
 
      */
 
-    fn create_err_report<I: Span>(context: &str, loc: I) -> UniErr {
-        UniErr::from_500(context)
+    fn create_err_report<I: Span>(context: &str, loc: I) -> SpaceErr {
+        SpaceErr::from_500(context)
     }
     /*    fn create_err_report<I: Span>(context: &str, loc: I) -> UniErr {
             let mut builder = Report::build(ReportKind::Error, (), 23);
@@ -5043,7 +5043,7 @@ pub mod error {
             ParseErrs::from_report(builder.finish(), loc.extra()).into()
         }
     */
-    pub fn find_parse_err<I: Span>(err: &Err<ErrorTree<I>>) -> UniErr {
+    pub fn find_parse_err<I: Span>(err: &Err<ErrorTree<I>>) -> SpaceErr {
         match err {
             Err::Incomplete(_) => "internal parser error: Incomplete".into(),
             Err::Error(err) => find_tree(err),
@@ -5056,7 +5056,7 @@ pub mod error {
         Message(String),
     }
 
-    pub fn find_tree<I: Span>(err: &ErrorTree<I>) -> UniErr {
+    pub fn find_tree<I: Span>(err: &ErrorTree<I>) -> SpaceErr {
         match err {
             ErrorTree::Stack { base, contexts } => {
                 let (span, context) = contexts.first().unwrap();
@@ -5524,7 +5524,7 @@ pub fn delim_kind_parts<I: Span>(input: I) -> Res<I, KindParts> {
     delimited(tag("<"), kind_parts, tag(">"))(input)
 }
 
-pub fn consume_kind<I: Span>(input: I) -> Result<KindParts, UniErr> {
+pub fn consume_kind<I: Span>(input: I) -> Result<KindParts, SpaceErr> {
     let (_, kind_parts) = all_consuming(kind_parts)(input)?;
 
     Ok(kind_parts.try_into()?)
@@ -6623,7 +6623,7 @@ where
     .map(|(next, comment)| (next, TextType::Comment(comment)))
 }
 
-pub fn bind_config(src: &str) -> Result<BindConfig, UniErr> {
+pub fn bind_config(src: &str) -> Result<BindConfig, SpaceErr> {
     let document = doc(src)?;
     match document {
         Document::BindConfig(bind_config) => Ok(bind_config),
@@ -6631,7 +6631,7 @@ pub fn bind_config(src: &str) -> Result<BindConfig, UniErr> {
     }
 }
 
-pub fn mechtron_config(src: &str) -> Result<MechtronConfig, UniErr> {
+pub fn mechtron_config(src: &str) -> Result<MechtronConfig, SpaceErr> {
     let document = doc(src)?;
     match document {
         Document::MechtronConfig(mechtron_config) => Ok(mechtron_config),
@@ -6639,7 +6639,7 @@ pub fn mechtron_config(src: &str) -> Result<MechtronConfig, UniErr> {
     }
 }
 
-pub fn doc(src: &str) -> Result<Document, UniErr> {
+pub fn doc(src: &str) -> Result<Document, SpaceErr> {
     let src = src.to_string();
     let (next, stripped) = strip_comments(new_span(src.as_str()))?;
     let span = span_with_extra(stripped.as_str(), Arc::new(src.to_string()));
@@ -6714,7 +6714,7 @@ pub fn doc(src: &str) -> Result<Document, UniErr> {
     }
 }
 
-fn parse_mechtron_config<I: Span>(input: I) -> Result<MechtronConfig, UniErr> {
+fn parse_mechtron_config<I: Span>(input: I) -> Result<MechtronConfig, SpaceErr> {
     let (next, (_, _, _, _, assignments, _)) = tuple((
         multispace0,
         tag("Wasm"),
@@ -6758,7 +6758,7 @@ pub struct Assignment {
     pub value: String,
 }
 
-fn semantic_mechtron_scope<I: Span>(scope: LexScope<I>) -> Result<MechtronScope, UniErr> {
+fn semantic_mechtron_scope<I: Span>(scope: LexScope<I>) -> Result<MechtronScope, SpaceErr> {
     let selector_name = scope.selector.name.to_string();
     match selector_name.as_str() {
         "Wasm" => {
@@ -6785,7 +6785,7 @@ fn semantic_mechtron_scope<I: Span>(scope: LexScope<I>) -> Result<MechtronScope,
     }
 }
 
-fn parse_bind_config<I: Span>(input: I) -> Result<BindConfig, UniErr> {
+fn parse_bind_config<I: Span>(input: I) -> Result<BindConfig, SpaceErr> {
     let lex_scopes = lex_scopes(input)?;
     let mut scopes = vec![];
     let mut errors = vec![];
@@ -6808,7 +6808,7 @@ fn parse_bind_config<I: Span>(input: I) -> Result<BindConfig, UniErr> {
     Ok(config)
 }
 
-fn semantic_bind_scope<I: Span>(scope: LexScope<I>) -> Result<BindScope, UniErr> {
+fn semantic_bind_scope<I: Span>(scope: LexScope<I>) -> Result<BindScope, SpaceErr> {
     let selector_name = scope.selector.name.to_string();
     match selector_name.as_str() {
         "Route" => {
@@ -7088,7 +7088,7 @@ pub fn unwrap_route_selector(input: &str ) -> Result<RouteSelector,ExtErr> {
 }
 
  */
-pub fn route_attribute(input: &str) -> Result<RouteSelector, UniErr> {
+pub fn route_attribute(input: &str) -> Result<RouteSelector, SpaceErr> {
     let input = new_span(input);
     let (_, (_, lex_route)) = result(pair(
         tag("#"),
@@ -7110,7 +7110,7 @@ pub fn route_attribute(input: &str) -> Result<RouteSelector, UniErr> {
     route_selector(lex_route)
 }
 
-pub fn route_attribute_value(input: &str) -> Result<RouteSelector, UniErr> {
+pub fn route_attribute_value(input: &str) -> Result<RouteSelector, SpaceErr> {
     let input = new_span(input);
     let lex_route = result(unwrap_block(
         BlockKind::Delimited(DelimitedBlockKind::DoubleQuotes),
@@ -7138,7 +7138,7 @@ pub fn topic<I: Span>(input: I) -> Res<I, ValuePattern<Topic>> {
 
  */
 
-pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, UniErr> {
+pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, SpaceErr> {
     let (next, (topic, lex_route)) = match pair(
         opt(terminated(
             unwrap_block(
@@ -7272,7 +7272,7 @@ pub mod test {
     };
     use crate::command::Command;
     use crate::config::Document;
-    use crate::err::{ParseErrs, UniErr};
+    use crate::err::{ParseErrs, SpaceErr};
     use crate::loc::{Point, PointCtx, PointSegVar, RouteSegVar};
     use crate::parse::error::result;
     use crate::parse::model::{
@@ -7326,7 +7326,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_create_command() -> Result<(), UniErr> {
+    pub fn test_create_command() -> Result<(), SpaceErr> {
         let command = util::log(result(create_command(new_span("create localhost<Space>"))))?;
         let env = Env::new(Point::root());
         let command: Command = util::log(command.to_resolved(&env))?;
@@ -7334,7 +7334,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_template() -> Result<(), UniErr> {
+    pub fn test_template() -> Result<(), SpaceErr> {
         /*        let t= util::log(result(all_consuming(template)(new_span("localhost<Space>"))))?;
                let env = Env::new(Point::root());
                let t: Template = util::log(t.to_resolved(&env))?;
@@ -7362,7 +7362,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_point_template() -> Result<(), UniErr> {
+    pub fn test_point_template() -> Result<(), SpaceErr> {
         assert!(mesh_eos(new_span(":")).is_ok());
         assert!(mesh_eos(new_span("%")).is_ok());
         assert!(mesh_eos(new_span("x")).is_err());
@@ -7382,7 +7382,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_point_var() -> Result<(), UniErr> {
+    pub fn test_point_var() -> Result<(), SpaceErr> {
         util::log(result(all_consuming(point_var)(new_span(
             "[hub]::my-domain.com:${name}:base",
         ))))?;
@@ -7493,7 +7493,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_point() -> Result<(), UniErr> {
+    pub fn test_point() -> Result<(), SpaceErr> {
         util::log(
             result(all_consuming(point_var)(new_span(
                 "[hub]::my-domain.com:name:base",
@@ -7517,7 +7517,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_simple_point_var() -> Result<(), UniErr> {
+    pub fn test_simple_point_var() -> Result<(), SpaceErr> {
         /*
         let point = util::log(result(point_var(new_span("localhost:base"))))?;
         println!("point '{}'", point.to_string());
@@ -7552,7 +7552,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_lex_block() -> Result<(), UniErr> {
+    pub fn test_lex_block() -> Result<(), SpaceErr> {
         let esc = result(escaped(anychar, '\\', anychar)(new_span("\\}")))?;
         //println!("esc: {}", esc);
         util::log(result(all_consuming(lex_block(BlockKind::Nested(
@@ -7575,12 +7575,12 @@ pub mod test {
         Ok(())
     }
     #[test]
-    pub fn test_path_regex2() -> Result<(), UniErr> {
+    pub fn test_path_regex2() -> Result<(), SpaceErr> {
         util::log(result(path_regex(new_span("/xyz"))))?;
         Ok(())
     }
     #[test]
-    pub fn test_bind_config() -> Result<(), UniErr> {
+    pub fn test_bind_config() -> Result<(), SpaceErr> {
         let bind_config_str = r#"Bind(version=1.0.0)  { Route<Http> -> { <Get> -> ((*)) => &; } }
         "#;
 
@@ -7671,7 +7671,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_pipeline_segment() -> Result<(), UniErr> {
+    pub fn test_pipeline_segment() -> Result<(), SpaceErr> {
         util::log(result(pipeline_segment(new_span("-> localhost"))))?;
         assert!(util::log(result(pipeline_segment(new_span("->")))).is_err());
         assert!(util::log(result(pipeline_segment(new_span("localhost")))).is_err());
@@ -7679,7 +7679,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_pipeline_stop() -> Result<(), UniErr> {
+    pub fn test_pipeline_stop() -> Result<(), SpaceErr> {
         util::log(result(space_chars(new_span("localhost"))))?;
         util::log(result(space_no_dupe_dots(new_span("localhost"))))?;
 
@@ -7699,13 +7699,13 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_pipeline() -> Result<(), UniErr> {
+    pub fn test_pipeline() -> Result<(), SpaceErr> {
         util::log(result(pipeline(new_span("-> localhost => &"))))?;
         Ok(())
     }
 
     #[test]
-    pub fn test_pipeline_step() -> Result<(), UniErr> {
+    pub fn test_pipeline_step() -> Result<(), SpaceErr> {
         util::log(result(pipeline_step_var(new_span("->"))))?;
         util::log(result(pipeline_step_var(new_span("-[ Text ]->"))))?;
         util::log(result(pipeline_step_var(new_span("-[ Text ]=>"))))?;
@@ -7718,7 +7718,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_rough_bind_config() -> Result<(), UniErr> {
+    pub fn test_rough_bind_config() -> Result<(), SpaceErr> {
         let unknown_config_kind = r#"
 Unknown(version=1.0.0) # mem unknown config kind
 {
@@ -7767,7 +7767,7 @@ Bind(version=1.0.0)
     }
 
     #[test]
-    pub fn test_remove_comments() -> Result<(), UniErr> {
+    pub fn test_remove_comments() -> Result<(), SpaceErr> {
         let bind_str = r#"
 # this is a mem of comments
 Bind(version=1.0.0)->
@@ -7796,7 +7796,7 @@ Bind(version=1.0.0)->
     }
 
     #[test]
-    pub fn test_version() -> Result<(), UniErr> {
+    pub fn test_version() -> Result<(), SpaceErr> {
         rec_version(new_span("1.0.0"))?;
         rec_version(new_span("1.0.0-alpha"))?;
         version(new_span("1.0.0-alpha"))?;
@@ -7804,7 +7804,7 @@ Bind(version=1.0.0)->
         Ok(())
     }
     #[test]
-    pub fn test_rough_block() -> Result<(), UniErr> {
+    pub fn test_rough_block() -> Result<(), SpaceErr> {
         result(all_consuming(lex_nested_block(NestedBlockKind::Curly))(
             new_span("{  }"),
         ))?;
@@ -7850,7 +7850,7 @@ Hello my friend
     }
 
     #[test]
-    pub fn test_block() -> Result<(), UniErr> {
+    pub fn test_block() -> Result<(), SpaceErr> {
         util::log(result(lex_nested_block(NestedBlockKind::Curly)(new_span(
             "{ <Get> -> localhost; }    ",
         ))))?;
@@ -7892,7 +7892,7 @@ Hello my friend
     }
 
     #[test]
-    pub fn test_root_scope_selector() -> Result<(), UniErr> {
+    pub fn test_root_scope_selector() -> Result<(), SpaceErr> {
         assert!(
             (result(root_scope_selector(new_span(
                 r#"
@@ -7942,7 +7942,7 @@ Hello my friend
     }
 
     #[test]
-    pub fn test_scope_filter() -> Result<(), UniErr> {
+    pub fn test_scope_filter() -> Result<(), SpaceErr> {
         result(scope_filter(new_span("(auth)")))?;
         result(scope_filter(new_span("(auth )")))?;
         result(scope_filter(new_span("(auth hello)")))?;
@@ -8028,7 +8028,7 @@ Hello my friend
         assert!(next_stacked_name(new_span("<*x<Ext>>")).is_err());
     }
     #[test]
-    pub fn test_lex_scope2() -> Result<(), UniErr> {
+    pub fn test_lex_scope2() -> Result<(), SpaceErr> {
         /*        let scope = log(result(lex_scopes(create_span(
                    "  Get -> {}\n\nPut -> {}   ",
                ))))?;
@@ -8046,7 +8046,7 @@ Hello my friend
     }
 
     #[test]
-    pub fn test_lex_scope() -> Result<(), UniErr> {
+    pub fn test_lex_scope() -> Result<(), SpaceErr> {
         let pipes = util::log(result(lex_scope(new_span("Pipes -> {}")))).unwrap();
 
         //        let pipes = log(result(lex_scope(create_span("Pipes {}"))));
@@ -8267,7 +8267,7 @@ Hello my friend
     }
 
     #[test]
-    pub fn test_root_and_subscope_phases() -> Result<(), UniErr> {
+    pub fn test_root_and_subscope_phases() -> Result<(), SpaceErr> {
         let config = r#"
 Bind(version=1.2.3)-> {
    Route -> {
@@ -8289,7 +8289,7 @@ Bind(version=1.2.3)-> {
         Ok(())
     }
     #[test]
-    pub fn test_variable_name() -> Result<(), UniErr> {
+    pub fn test_variable_name() -> Result<(), SpaceErr> {
         assert_eq!(
             "v".to_string(),
             util::log(result(lowercase1(new_span("v"))))?.to_string()
@@ -8304,7 +8304,7 @@ Bind(version=1.2.3)-> {
     }
 
     #[test]
-    pub fn test_subst() -> Result<(), UniErr> {
+    pub fn test_subst() -> Result<(), SpaceErr> {
         /*
         #[derive(Clone)]
         pub struct SomeParser();
@@ -8427,7 +8427,7 @@ pub mod cmd_test {
     use cosmic_nom::{new_span, Res};
 
     use crate::command::{Command, CommandVar};
-    use crate::err::UniErr;
+    use crate::err::SpaceErr;
     use crate::parse::error::result;
     use crate::parse::{command, create_command, publish_command, script, CamelCase, upload_blocks};
     use crate::util::ToResolved;
@@ -8452,7 +8452,7 @@ pub mod cmd_test {
      */
 
     #[test]
-    pub fn test() -> Result<(), UniErr> {
+    pub fn test() -> Result<(), SpaceErr> {
         let input = "xreate? localhost<Space>";
         match command(new_span(input)) {
             Ok(_) => {}
@@ -8468,7 +8468,7 @@ pub mod cmd_test {
     }
 
     #[test]
-    pub fn test_kind() -> Result<(), UniErr> {
+    pub fn test_kind() -> Result<(), SpaceErr> {
         let input = "create localhost:users<UserBase<Keycloak>>";
         let (_, command) = command(new_span(input))?;
         match command {
@@ -8486,7 +8486,7 @@ pub mod cmd_test {
     }
 
     #[test]
-    pub fn test_script() -> Result<(), UniErr> {
+    pub fn test_script() -> Result<(), SpaceErr> {
         let input = r#" create? localhost<Space>;
  Xcrete localhost:repo<Base<Repo>>;
  create? localhost:repo:tutorial<ArtifactBundleSeries>;
@@ -8499,7 +8499,7 @@ pub mod cmd_test {
     }
 
     #[test]
-    pub fn test_publish() -> Result<(), UniErr> {
+    pub fn test_publish() -> Result<(), SpaceErr> {
         let input = r#"publish ^[ bundle.zip ]-> localhost:repo:tutorial:1.0.0"#;
         publish_command(new_span(input))?;
         Ok(())
@@ -8507,7 +8507,7 @@ pub mod cmd_test {
 
 
     #[test]
-    pub fn test_upload_blocks() -> Result<(), UniErr> {
+    pub fn test_upload_blocks() -> Result<(), SpaceErr> {
         let input = r#"publish ^[ bundle.zip ]-> localhost:repo:tutorial:1.0.0"#;
         let blocks = result(upload_blocks(new_span(input)))?;
         assert_eq!(1,blocks.len());
@@ -8530,7 +8530,7 @@ pub mod cmd_test {
     }
 
     #[test]
-    pub fn test_create_kind() -> Result<(), UniErr> {
+    pub fn test_create_kind() -> Result<(), SpaceErr> {
         let input = r#"create localhost:repo:tutorial:1.0.0<Repo>"#;
         let mut command = result(create_command(new_span(input)))?;
         let command = command.collapse()?;
@@ -8550,7 +8550,7 @@ pub mod cmd_test {
 
 
     #[test]
-    pub fn test_create_properties() -> Result<(), UniErr> {
+    pub fn test_create_properties() -> Result<(), SpaceErr> {
         let input = r#"create localhost:repo:tutorial:1.0.0<Repo>{ +config=the:cool:property }"#;
         let mut command = result(create_command(new_span(input)))?;
         let command = command.collapse()?;
@@ -8660,7 +8660,7 @@ pub struct KindLex {
 }
 
 impl TryInto<KindParts> for KindLex {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_into(self) -> Result<KindParts, Self::Error> {
         Ok(KindParts {
