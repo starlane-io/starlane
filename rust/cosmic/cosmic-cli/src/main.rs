@@ -102,7 +102,6 @@ impl Session {
 
         let cli = client.new_cli_session().await?;
 
-
         Ok(Self {
             client,
             cli

@@ -159,7 +159,7 @@ impl Debug for UniErr {
             }
             UniErr::ParseErrs(errs) => {
                 errs.print();
-                f.write_str("Error Report...")
+                f.write_str("Parse Errors... [Report redacted]")
             }
         }
     }

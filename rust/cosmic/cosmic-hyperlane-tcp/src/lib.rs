@@ -67,7 +67,6 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
         let mut connector: SslConnectorBuilder =
             SslConnector::builder(SslMethod::tls()).map_err(UniErr::map)?;
 
-
         connector
             .set_ca_file(format!("{}/cert.pem", self.cert_dir))
             .map_err(UniErr::map)?;

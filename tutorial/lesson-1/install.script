@@ -1,5 +1,6 @@
 create? localhost<Space>;
 create? repo<Repo>;
 create? repo:tutorial<BundleSeries>;
-publish? ^[ bundle.zip ]-> repo:tutorial:1.0.0;
+publish ^[ bundle.zip ]-> repo:tutorial:1.0.0;
 set localhost{ +bind=repo:tutorial:1.0.0:/bind/localhost.bind };
+exit;
