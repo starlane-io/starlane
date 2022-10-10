@@ -103,8 +103,6 @@ lazy_static! {
         std::env::var("STARLANE_REGISTRY_PASSWORD").unwrap_or("password".to_string());
     pub static ref STARLANE_REGISTRY_DATABASE: String =
         std::env::var("STARLANE_REGISTRY_DATABASE").unwrap_or("postgres".to_string());
-    pub static ref STARLANE_CERTS_DIR: String =
-        std::env::var("STARLANE_CERTS_DIR").unwrap_or("./certs".to_string());
 }
 #[no_mangle]
 pub extern "C" fn cosmic_uuid() -> String {
@@ -243,21 +241,26 @@ impl Cosmos for Starlane {
     }
 
     async fn start_services(&self, gate: &Arc<HyperGateSelector>) {
-        fs::create_dir_all(STARLANE_CERTS_DIR.as_str() );
-        let cert = format!("{}/cert.pem", STARLANE_CERTS_DIR.as_str());
-        let key = format!("{}/key.pem", STARLANE_CERTS_DIR.as_str());
+        let dir = match dirs::home_dir() {
+            None => ".starlane/localhost/certs".to_string(),
+            Some(path) => format!("{}/.starlane/localhost/certs", path.display() )
+        };
+        fs::create_dir_all(dir.as_str() );
+
+        let cert = format!("{}/cert.pem", dir.as_str());
+        let key = format!("{}/key.pem", dir.as_str());
         let cert_path =  Path::new(&cert );
         let key_path=  Path::new(&key);
 
         if !cert_path.exists() || !key_path.exists() {
             CertGenerator::gen(vec!["localhost".to_string()]).unwrap()
-            .write_to_dir(STARLANE_CERTS_DIR.clone())
+            .write_to_dir(dir.clone())
             .await.unwrap();
         };
 
         let logger = self.logger().point(Point::from_str("control-server").unwrap());
         let server =
-            HyperlaneTcpServer::new(STARLANE_CONTROL_PORT.clone(), STARLANE_CERTS_DIR.clone(), gate.clone(), logger)
+            HyperlaneTcpServer::new(STARLANE_CONTROL_PORT.clone(), dir, gate.clone(), logger)
                 .await.unwrap();
         server.start().unwrap();
     }

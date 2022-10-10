@@ -506,6 +506,11 @@ impl ControlClient {
         self.client.wait_for_ready(duration).await
     }
 
+
+    pub async fn wait_for_greet(&self) -> Result<Greet, UniErr> {
+        self.client.wait_for_greet().await
+    }
+
     pub async fn transmitter_builder(&self) -> Result<ProtoTransmitterBuilder, UniErr> {
         self.client.transmitter_builder().await
     }

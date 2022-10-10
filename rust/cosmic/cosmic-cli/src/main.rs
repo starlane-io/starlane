@@ -31,6 +31,10 @@ use cosmic_nom::new_span;
 
 #[tokio::main]
 async fn main() -> Result<(), UniErr> {
+    let home_dir : String = match dirs::home_dir() {
+      None => ".".to_string(),
+      Some(dir) => dir.display().to_string()
+    };
     let matches = ClapCommand::new("cosmic-cli")
         .arg(
             Arg::new("host")
@@ -48,7 +52,7 @@ async fn main() -> Result<(), UniErr> {
                 .takes_value(true)
                 .value_name("certs")
                 .required(false)
-                .default_value("./certs"),
+                .default_value(format!("{}/.starlane/localhost/certs", home_dir).as_str()),
         ).subcommand(ClapCommand::new("script"))
         .allow_external_subcommands(true)
         .get_matches();
@@ -93,10 +97,11 @@ impl Session {
         ));
 
         let client = ControlClient::new(tcp_client)?;
-        client.wait_for_ready(Duration::from_secs(5)).await?;
+        client.wait_for_ready(Duration::from_secs(10)).await?;
+        client.wait_for_greet().await?;
 
-        tokio::time::sleep(Duration::from_secs(1)).await;
         let cli = client.new_cli_session().await?;
+
 
         Ok(Self {
             client,

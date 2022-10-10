@@ -26,6 +26,6 @@ wasmer = "2.3.0"
 wasmer-compiler-singlepass = "2.3.0"
 acid-store = { version = "0.12.0", features=['store-directory','repo-value'] }
 zip = "0.6.2"
-
+dirs = "4.0.0"
 ascii = "1.1.0"
 url = "2.3.1"
