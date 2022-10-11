@@ -716,7 +716,7 @@ where
             .registry
             .record(point)
             .await
-            .map_err(|e| e.to_uni_err())?;
+            .map_err(|e| e.to_space_err())?;
         Ok(record.details.stub)
     }
 

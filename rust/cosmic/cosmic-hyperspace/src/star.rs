@@ -912,7 +912,7 @@ status_tx.send(Status::Ready).await;
                         self.drivers.init().await;
                     }
                     HyperStarCall::FromHyperway { wave, rtn } => {
-                        let result = self.from_hyperway(wave).await.map_err(|e| e.to_uni_err());
+                        let result = self.from_hyperway(wave).await.map_err(|e| e.to_space_err());
                         if let Some(tx) = rtn {
                             tx.send(result);
                         } else {
@@ -1710,8 +1710,9 @@ impl TraverseToNextRouter {
 
 #[async_trait]
 impl TraversalRouter for TraverseToNextRouter {
-    async fn traverse(&self, traversal: Traversal<UltraWave>) {
-        self.tx.send(traversal).await;
+    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(),SpaceErr> {
+        self.tx.send(traversal).await?;
+        Ok(())
     }
 }
 

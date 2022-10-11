@@ -40,6 +40,7 @@ use std::thread;
 use tiny_http::Server;
 use tokio::runtime::Runtime;
 use url::Url;
+use cosmic_space::err::SpaceErr;
 
 lazy_static! {
     static ref WEB_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -220,7 +221,7 @@ impl<P> TraversalRouter for Web<P>
 where
     P: Cosmos,
 {
-    async fn traverse(&self, traversal: Traversal<UltraWave>) {
+    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(),SpaceErr> {
         if traversal.is_directed() {
         } else {
             let wave = traversal.payload;
@@ -234,6 +235,7 @@ where
                 .await
                 .unwrap_or_default();
         }
+        Ok(())
     }
 }
 

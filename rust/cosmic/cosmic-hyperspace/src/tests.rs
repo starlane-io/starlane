@@ -841,6 +841,82 @@ fn test_publish() -> Result<(), CosmicErr> {
     })
 }
 
+#[test]
+fn test_mechtron() -> Result<(), CosmicErr> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async move {
+        // let (final_tx, final_rx) = oneshot::channel();
 
+        let cosmos = MemCosmos::new();
+        let machine_api = cosmos.machine();
+        let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
+        let logger = logger.point(Point::from_str("mem-client").unwrap());
+
+        tokio::time::timeout(Duration::from_secs(10), machine_api.wait_ready())
+            .await
+            .unwrap();
+
+        let factory = MachineApiExtFactory {
+            machine_api,
+            logger: logger.clone(),
+        };
+
+        let client = ControlClient::new(Box::new(factory))?;
+        client.wait_for_ready(Duration::from_secs(5)).await?;
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+
+        let cli = client.new_cli_session().await?;
+
+        cli.exec("create repo<Repo>")
+            .await
+            .unwrap()
+            .ok_or()
+            .unwrap();
+        cli.exec("create repo:hello-goodbye<BundleSeries>")
+            .await
+            .unwrap()
+            .ok_or()
+            .unwrap();
+
+        let mut command = RawCommand::new("publish ^[ bundle.zip ]-> repo:hello-goodbye:1.0.0");
+
+        let file_path = "../../mechtron/mocks/hello-goodbye/bundle.zip";
+        let bin = Arc::new(fs::read(file_path)?);
+        command.transfers.push(CmdTransfer::new("bundle.zip", bin));
+
+        let core = cli.raw(command).await?;
+
+        if !core.is_ok() {
+            if let Substance::Errors(ref e) = core.body {
+                println!("{}", e.to_string());
+            }
+        }
+
+        assert!(core.is_ok());
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+       let reflect = cli.exec("create hello-goodbye<Mechtron>{ +config=repo:hello-goodbye:1.0.0:/config/hello-goodbye.mechtron }")
+            .await
+            .unwrap();
+
+        assert!(reflect.is_ok());
+
+        let mut proto = DirectedProto::ping();
+        proto.to(Point::from_str("hello-goodbye")?.to_surface());
+        proto.method(ExtMethod::new("Hello").unwrap());
+
+        let transmitter = client.transmitter_builder().await.unwrap().build();
+        let result = transmitter.ping(proto).await.unwrap();
+
+        assert!(result.is_ok());
+
+        Ok(())
+    })
+}
 
 

@@ -23,7 +23,7 @@ use cosmic_space::kind::{BaseKind, Kind, KindParts, StarSub};
 use cosmic_space::loc::{Layer, Point, Surface, ToPoint, ToSurface};
 use cosmic_space::log::{PointLogger, Tracker};
 use cosmic_space::parse::bind_config;
-use cosmic_space::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
+use cosmic_space::particle::traversal::{Traversal, TraversalDirection, TraversalInjection, TraversalLayer};
 use cosmic_space::particle::{Details, Status, Stub};
 use cosmic_space::selector::KindSelector;
 use cosmic_space::substance::Substance;
@@ -1331,7 +1331,7 @@ where
                                 rtn.send(item.init().await);
                             }
                             Err(err) => {
-                                rtn.send(Err(err.to_uni_err()));
+                                rtn.send(Err(err.to_space_err()));
                             }
                         }
                     }
@@ -1509,6 +1509,19 @@ where
 
     pub async fn local_driver_lookup(&self, kind: Kind) -> Result<Option<Point>, SpaceErr> {
         self.skel.drivers.local_driver_lookup(kind).await
+    }
+
+    pub fn item_ctx(&self, point: &Point, layer: Layer ) -> Result<ItemCtx,P::Err>{
+        let mut router = LayerInjectionRouter::new( self.skel.clone(), point.to_surface().with_layer(Layer::Core));
+        router.direction = Some(TraversalDirection::Fabric);
+        let mut transmitter = ProtoTransmitterBuilder::new(Arc::new(router), self.skel.exchanger.clone() );
+        transmitter.from = SetStrategy::Fill(point.to_surface().with_layer(layer));
+        transmitter.agent = SetStrategy::Fill(Agent::Point(point.clone()));
+        let transmitter = transmitter.build();
+        let ctx = ItemCtx {
+            transmitter
+        };
+        Ok(ctx)
     }
 }
 
@@ -1794,6 +1807,8 @@ where
 }
 
 
+
+
 #[derive(Clone)]
 pub struct ItemSkel<P>
 where
@@ -1819,6 +1834,10 @@ where
     pub fn data_dir(&self) -> String {
         self.skel.data_dir()
     }
+}
+
+pub struct ItemCtx {
+    pub transmitter: ProtoTransmitter
 }
 
 pub struct DriverDriverFactory {}
@@ -1968,9 +1987,11 @@ impl<P> TraversalRouter for DriverItem<P>
 where
     P: Cosmos,
 {
-    async fn traverse(&self, traversal: Traversal<UltraWave>) {
+    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(),SpaceErr>{
         self.skel.api.handle(traversal).await;
+        Ok(())
     }
+
 }
 
 #[async_trait]

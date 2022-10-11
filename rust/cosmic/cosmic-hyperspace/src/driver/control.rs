@@ -434,7 +434,7 @@ impl<P> TraversalRouter for Control<P>
 where
     P: Cosmos,
 {
-    async fn traverse(&self, traversal: Traversal<UltraWave>) {
+    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(),SpaceErr>{
         self.skel.driver.logger.track(&traversal, || {
             Tracker::new(
                 format!("control -> {}", traversal.dir.to_string()),
@@ -443,6 +443,7 @@ where
         });
 
         self.ctx.router.route(traversal.payload).await;
+        Ok(())
     }
 }
 

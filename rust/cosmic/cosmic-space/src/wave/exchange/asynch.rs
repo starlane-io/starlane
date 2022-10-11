@@ -43,7 +43,7 @@ pub trait Router: Send + Sync {
 
 #[async_trait]
 pub trait TraversalRouter: Send + Sync {
-    async fn traverse(&self, traversal: Traversal<UltraWave>);
+    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(),SpaceErr>;
 }
 
 #[derive(Clone)]

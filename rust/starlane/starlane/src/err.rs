@@ -77,7 +77,7 @@ pub mod convert {
         }
     }
     impl HyperErr for Err {
-        fn to_uni_err(&self) -> SpaceErr {
+        fn to_space_err(&self) -> SpaceErr {
             SpaceErr::from_500(self.to_string())
         }
 

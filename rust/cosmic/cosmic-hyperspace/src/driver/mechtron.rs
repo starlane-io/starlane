@@ -1,8 +1,5 @@
-use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, ItemHandler,
-    ItemSphere,
-};
-use crate::star::HyperStarSkel;
+use crate::driver::{Driver, DriverAvail, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, Item, ItemCtx, ItemHandler, ItemRouter, ItemSkel, ItemSphere};
+use crate::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::Cosmos;
 use cosmic_space::artifact::ArtRef;
 use cosmic_space::config::bind::BindConfig;
@@ -15,14 +12,15 @@ use cosmic_space::parse::bind_config;
 use cosmic_space::selector::KindSelector;
 use cosmic_space::util::log;
 use cosmic_space::wave::core::hyp::HypMethod;
-use cosmic_space::wave::exchange::asynch::InCtx;
-use cosmic_space::wave::{DirectedProto, DirectedWave, Pong, Wave};
+use cosmic_space::wave::exchange::asynch::{InCtx, TraversalRouter};
+use cosmic_space::wave::{DirectedProto, DirectedWave, Pong, UltraWave, Wave};
 use dashmap::DashMap;
 use mechtron_host::{HostPlatform, MechtronHost, MechtronHostFactory};
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
+use cosmic_space::particle::traversal::{Traversal, TraversalDirection};
 use crate::err::HyperErr;
 
 lazy_static! {
@@ -53,6 +51,10 @@ fn mechtron_bind() -> BindConfig {
         r#"
     Bind(version=1.0.0)
     {
+       Route -> {
+          Ext<*> -> (()) => &;
+          Http<*> -> (()) => &;
+       }
     }
     "#,
     ))
@@ -324,7 +326,10 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
-        Ok(ItemSphere::Handler(Box::new(Mechtron)))
+        let ctx = self.skel.item_ctx(point,Layer::Core)?;
+        let skel = ItemSkel::new( point.clone(), Kind::Mechtron, self.skel.clone() );
+        let mechtron = Mechtron::restore(skel,ctx,());
+        Ok(ItemSphere::Router(Box::new( mechtron )))
     }
     async fn handler(&self) -> Box<dyn DriverHandler<P>> {
         Box::new(MechtronDriverHandler::restore(
@@ -402,17 +407,43 @@ where
     }
 }
 
-pub struct Mechtron;
+pub struct Mechtron<P> where P: Cosmos {
+    skel: ItemSkel<P>,
+    ctx: ItemCtx
+}
 
-#[handler]
-impl Mechtron {}
+impl <P> Item<P> for Mechtron<P> where P: Cosmos {
+    type Skel = ItemSkel<P>;
+    type Ctx = ItemCtx;
+    type State = ();
+
+    fn restore(skel: Self::Skel, ctx: Self::Ctx, _state: Self::State) -> Self {
+        Self {
+            skel,
+            ctx
+        }
+    }
+}
+
 
 #[async_trait]
-impl<P> ItemHandler<P> for Mechtron
-where
-    P: Cosmos,
-{
+impl<P> TraversalRouter for Mechtron<P> where P: Cosmos {
+    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
+        let wave = traversal.payload;
+        let record = self.skel.skel.registry().record( &self.skel.point ).await.map_err(|e|e.to_space_err())?;
+        let location = record.location.ok_or::<SpaceErr>("expected Mechtron to have an assigned Host".into() )?;
+        let host = location.host.ok_or::<SpaceErr>("expected Mechtron to have an assigned Host".into() )?.to_surface().with_layer(Layer::Core );
+
+        let transport = wave.wrap_in_transport(self.skel.point.to_surface().with_layer(Layer::Core),host );
+        self.ctx.transmitter.signal(transport).await?;
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl <P> ItemRouter<P> for Mechtron<P> where P:Cosmos {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(MECHTRON_BIND_CONFIG.clone())
     }
 }
+

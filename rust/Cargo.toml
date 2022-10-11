@@ -7,6 +7,6 @@ members = [
   ]
 
 exclude = [
-  "cosmic/src", "cosmic/target", "starlane/starlane-old", "starlane/starlane-core"
+  "cosmic/src", "cosmic/target", "starlane/starlane-old", "starlane/starlane-core", "mechtron/mocks"
 ]
 
