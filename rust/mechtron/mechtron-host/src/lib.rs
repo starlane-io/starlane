@@ -231,7 +231,7 @@ mod tests {
             properties: Default::default(),
         };
         let config = MechtronConfig {
-            bin: Point::root(),
+            wasm: Point::root(),
             name: "my-app".to_string(),
         };
         let host_cmd = HostCmd::new(

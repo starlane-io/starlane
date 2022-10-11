@@ -68,18 +68,6 @@ impl Cosmos for MemCosmos {
         "mem".to_string()
     }
 
-    fn properties_config(&self, kind: &Kind) -> PropertiesConfig {
-        let mut builder = PropertiesConfigBuilder::new();
-        builder.kind(kind.clone());
-        match kind.to_base() {
-            BaseKind::Mechtron => {
-                builder.add_point("config", true, true).unwrap();
-                builder.build().unwrap()
-            }
-            _ => builder.build().unwrap(),
-        }
-    }
-
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
         let mut builder = DriversBuilder::new(kind.clone());
 

@@ -1481,7 +1481,7 @@ where
         }
     }
 
-    pub async fn create_driver_particle(
+    pub async fn create_in_driver(
         &self,
         child_segment_template: PointSegTemplate,
         kind: KindTemplate,

@@ -171,7 +171,7 @@ where
     async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
         self.skel.driver.status_tx.send(DriverStatus::Init).await;
 
-        skel.create_driver_particle(
+        skel.create_in_driver(
             PointSegTemplate::Exact("controls".to_string()),
             Kind::Base.to_template(),
         )

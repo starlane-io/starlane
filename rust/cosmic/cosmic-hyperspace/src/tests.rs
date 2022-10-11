@@ -65,7 +65,6 @@ async fn create(
     location: ParticleLocation,
     star_api: HyperStarApi<MemCosmos>,
 ) -> Result<(), CosmicErr> {
-    println!("ADDING PARTICLE: {}", particle.to_string());
     let details = Details::new(
         Stub {
             point: particle.clone(),

@@ -42,7 +42,7 @@ use cosmic_space::loc::{
     Layer, MachineName, Point, RouteSeg, StarKey, Surface, ToBaseKind, ToSurface,
 };
 use cosmic_space::log::RootLogger;
-use cosmic_space::particle::property::PropertiesConfig;
+use cosmic_space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
 use cosmic_space::particle::{Details, Properties, Status, Stub};
 use cosmic_space::security::IndexedAccessGrant;
 use cosmic_space::security::{Access, AccessGrant};
@@ -110,7 +110,23 @@ where
 
     fn machine_template(&self) -> MachineTemplate;
     fn machine_name(&self) -> MachineName;
-    fn properties_config(&self, kind: &Kind) -> PropertiesConfig;
+
+    fn properties_config(&self, kind: &Kind) -> PropertiesConfig {
+        let mut builder = PropertiesConfigBuilder::new();
+        builder.kind(kind.clone());
+        match kind.to_base() {
+            BaseKind::Mechtron => {
+                builder.add_point("config", true, true).unwrap();
+                builder.build().unwrap()
+            }
+            BaseKind::Host=> {
+                builder.add_point("bin", true, true).unwrap();
+                builder.build().unwrap()
+            }
+            _ => builder.build().unwrap(),
+        }
+    }
+
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self>;
     async fn global_registry(&self) -> Result<Registry<Self>, Self::Err>;
     async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>, Self::Err>;
