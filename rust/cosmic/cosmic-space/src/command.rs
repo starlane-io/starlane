@@ -601,9 +601,9 @@ pub mod direct {
 
         impl Into<DirectedCore> for Create {
             fn into(self) -> DirectedCore {
-                let mut request = DirectedCore::ext(ExtMethod::new("Command").unwrap());
-                request.body = Substance::Command(Box::new(Command::Create(self)));
-                request
+                let mut directed = DirectedCore::ext(ExtMethod::new("Command").unwrap());
+                directed.body = Substance::Command(Box::new(Command::Create(self)));
+                directed
             }
         }
 

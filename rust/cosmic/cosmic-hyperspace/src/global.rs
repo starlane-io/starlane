@@ -165,6 +165,8 @@ where
 
     #[track_caller]
     pub async fn create(&self, create: &Create, agent: &Agent) -> Result<PointKind, P::Err> {
+println!("CREATE...");
+
         let child_kind = self
             .skel
             .machine
@@ -176,6 +178,7 @@ where
                     create.template.kind.to_string()
                 ))
             })?;
+println!("Global Creating: {}", child_kind.to_string());
         let point = match &create.template.point.child_segment_template {
             PointSegTemplate::Exact(child_segment) => {
                 let point = create.template.point.parent.push(child_segment.clone());

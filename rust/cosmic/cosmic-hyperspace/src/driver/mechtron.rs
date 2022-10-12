@@ -296,18 +296,15 @@ where
                     state: StateSrc::None,
                 };
 
-                let core: DirectedCore = create.into();
-                let mut create = DirectedProto::from_core(core);
-                create.to(Point::global_executor());
-                let pong = self.ctx.transmitter.ping(create).await?;
                 println!("GOT HERE!");
+                //self.skel.skel.logger.result(self.skel.skel.create_in_driver(PointSegTemplate::Pattern("host-%".to_string()),Kind::Host.to_template()).await)?;
+
+                let mut create: DirectedProto = create.into();
+                let pong = self.ctx.transmitter.ping(create).await?;
+                println!("and... GOT HERE!");
                 pong.ok_or()?;
 
                 println!("AND HERE!");
-                if let Substance::Details(details) = &pong.core.body {
-                } else {
-                    return Err("expected body to be Details".into());
-                }
             }
 
             let host = self
@@ -354,15 +351,16 @@ where
         if let HyperSubstance::Assign(assign) = ctx.input {
             println!("\tASSIGNING MECHTRON HOST!");
 
-            let wasm = assign
+            let wasm = self.skel.skel.logger.result(assign
                 .details
                 .properties
                 .get(&"wasm".to_string())
-                .ok_or("wasm property must be set for a Mechtron Host")?;
-
+                .ok_or("wasm property must be set for a Mechtron Host"))?;
+println!("\there...");
             let wasm_point = Point::from_str(wasm.value.as_str())?;
             let wasm = self.skel.skel.artifacts().wasm(&wasm_point).await?;
 
+println!("\tand...");
             let bin = wasm.deref().deref().clone();
             let mechtron_host = Arc::new(
                 self.skel
@@ -370,6 +368,7 @@ where
                     .create(assign.details.clone(), bin)
                     .map_err(|e| SpaceErr::from_500("host err"))?,
             );
+println!("\tmechtron_host...");
 
             self.skel
                 .hosts
