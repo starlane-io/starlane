@@ -24,11 +24,18 @@ where
 
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), P::Err>;
 
-    async fn assign<'a>(
+    async fn assign_star<'a>(
         &'a self,
         point: &'a Point,
-        location: ParticleLocation,
+        star: &'a Point
     ) -> Result<(), P::Err>;
+
+    async fn assign_host<'a>(
+        &'a self,
+        point: &'a Point,
+        host: &'a Point
+    ) -> Result<(), P::Err>;
+
 
     async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), P::Err>;
 

@@ -206,7 +206,7 @@ where
         machine.registry.register(&registration).await.unwrap();
         machine
             .registry
-            .assign(&point, ParticleLocation::new(point.clone(), None))
+            .assign_star(&point, &point)
             .await
             .unwrap();
 
@@ -369,8 +369,7 @@ where
             "StarSkel::create(assign_result)",
             transmitter.direct(assign).await,
         )?;
-        let location = ParticleLocation::new(self.point.clone(), None);
-        self.registry.assign(&details.stub.point, location).await?;
+        self.registry.assign_star(&details.stub.point, &self.point ).await?;
         let logger = logger.push_mark("result").unwrap();
         logger.result(assign_result.ok_or())?;
         Ok(details)
@@ -1153,15 +1152,8 @@ where
                         }
                         let to = wave.to().unwrap_single();
                         let location = locator.locate(&to.point).await?;
-                        if wave.track() {
-                            println!(
-                                "\twith LOCATION {} in {}",
-                                location.star.to_string(),
-                                skel.point.to_string()
-                            );
-                        }
 
-                        if location.star == skel.point {
+                        if location.star.is_some() && *location.star.as_ref().unwrap() == skel.point {
                             if wave.track() {
                                 println!(
                                     "\tSAME POINT -> {} to {}",
@@ -1178,7 +1170,7 @@ where
                         } else {
                             let mut transport = wave.wrap_in_transport(
                                 gravity,
-                                location.star.to_surface().with_layer(Layer::Core),
+                                location.star.as_ref().unwrap().to_surface().with_layer(Layer::Core),
                             );
                             transport.from(skel.point.clone().to_surface());
                             let transport = transport.build()?;
@@ -1400,8 +1392,8 @@ where
                     Recipients::Multi(ports) => {
                         for port in &ports {
                             let record = self.skel.registry.record(&port.point).await?;
-                            let loc = logger.result(record.location.ok_or(P::Err::new("multi port ripple has recipient that is not located, this should have been provisioned when the ripple was sent")))?;
-                            if loc.star == self.skel.point {
+                            let loc = logger.result(record.location.star.ok_or(P::Err::new("multi port ripple has recipient that is not located, this should have been provisioned when the ripple was sent")))?;
+                            if loc == self.skel.point {
                                 tos.push(port.clone());
                             }
                         }
@@ -1992,8 +1984,8 @@ where
 
     pub async fn locate(&self, point: &Point) -> Result<ParticleLocation, P::Err> {
         let record = self.skel.registry.record(&point).await?;
-        match record.location {
-            Some(location) => Ok(location),
+        match &record.location.star {
+            Some(_) => Ok(record.location),
             None => {
                 // now we must provision
                 self.provision(point, StateSrc::None).await
@@ -2022,18 +2014,18 @@ where
             .parent()
             .ok_or(P::Err::new("expected Root to be provisioned"))?;
         let mut parent_record = self.skel.registry.record(&parent).await?;
-        if parent_record.location.is_none() {
+        if parent_record.location.star.is_none() {
             self.provision_inner(&parent, StateSrc::None).await?;
             parent_record = self.skel.registry.record(&parent).await?;
         }
 
-        let parent_star = parent_record.location.unwrap();
+        let parent_star = parent_record.location.star.unwrap();
         let provision = Provision::new(point.clone(), state);
         let mut wave = DirectedProto::ping();
         wave.method(HypMethod::Provision);
         wave.body(HyperSubstance::Provision(provision).into());
         wave.from(self.skel.point.clone().to_surface().with_layer(Layer::Core));
-        wave.to(parent_star.star.to_surface().with_layer(Layer::Core));
+        wave.to(parent_star.to_surface().with_layer(Layer::Core));
         let pong: Wave<Pong> = self.skel.star_transmitter.direct(wave).await?;
         if pong.core.status.as_u16() == 200 {
             if let Substance::Location(location) = &pong.core.body {

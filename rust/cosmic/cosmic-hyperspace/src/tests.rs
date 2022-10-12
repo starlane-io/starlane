@@ -75,7 +75,7 @@ async fn create(
     );
     ctx.particles.insert(
         particle.clone(),
-        ParticleRecord::new(details.clone(), Some(location)),
+        ParticleRecord::new(details.clone(),location),
     );
 
     let mut wave = DirectedProto::ping();
@@ -106,7 +106,7 @@ fn test_gravity_routing() -> Result<(), CosmicErr> {
 
         let star_api = machine_api.get_machine_star().await.unwrap();
         let stub = star_api.stub().await.unwrap();
-        let location = ParticleLocation::new(stub.key.clone().to_point(), None);
+        let location = ParticleLocation::new(Some(stub.key.clone().to_point()), None);
 
         //        let record = platform.global_registry().await.unwrap().locate(&LESS).await.expect("IS LESS THERE?");
 
@@ -274,7 +274,7 @@ fn test_layer_traversal() -> Result<(), CosmicErr> {
 
         let star_api = machine_api.get_machine_star().await.unwrap();
         let stub = star_api.stub().await.unwrap();
-        let location = ParticleLocation::new(stub.key.clone().to_point(), None);
+        let location = ParticleLocation::new(Some(stub.key.clone().to_point()), None);
 
         //        let record = platform.global_registry().await.unwrap().locate(&LESS).await.expect("IS LESS THERE?");
 

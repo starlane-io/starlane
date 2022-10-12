@@ -656,8 +656,7 @@ where
 
                 skel.registry.register(&registration).await?;
                 skel.api.create_states(point.clone()).await?;
-                let location = ParticleLocation::new(skel.point.clone(), None);
-                skel.registry.assign(&point, location).await?;
+                skel.registry.assign_star(&point, &skel.point).await?;
                 Ok(())
             }
             let point = drivers_point
@@ -1155,7 +1154,7 @@ where
                 }
             }
             ItemSphere::Router(router) => {
-                router.traverse(direct.wrap()).await;
+                self.skel.logger.result(router.traverse(direct.wrap()).await)?;
             }
         }
 

@@ -131,8 +131,7 @@ where
 
         self.skel.skel.api.create_states(point.clone()).await?;
         self.skel.skel.registry.register(&registration).await?;
-        let location = ParticleLocation::new(self.skel.skel.point.clone(), None);
-        self.skel.skel.registry.assign(&point, location).await?;
+        self.skel.skel.registry.assign_star(&point,&self.skel.skel.point).await?;
 
         let item_skel = ItemSkel::new(point, Kind::Native(NativeSub::Web), self.skel.clone());
         let mut runner = WebRunner::new(item_skel);

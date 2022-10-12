@@ -70,17 +70,17 @@ impl Location {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParticleRecord {
     pub details: Details,
-    pub location: Option<ParticleLocation>,
+    pub location: ParticleLocation,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ParticleLocation {
-    pub star: Point,
+    pub star: Option<Point>,
     pub host: Option<Point>,
 }
 
 impl ParticleLocation {
-    pub fn new(star: Point, host: Option<Point>) -> Self {
+    pub fn new(star: Option<Point>, host: Option<Point>) -> Self {
         Self { star, host }
     }
 }
@@ -94,7 +94,7 @@ impl From<ParticleLocation> for ReflectedCore {
 
 impl Default for ParticleLocation {
     fn default() -> Self {
-        ParticleLocation::new(Point::central(), None)
+        ParticleLocation::new(None, None)
     }
 }
 
@@ -105,7 +105,7 @@ impl Default for ParticleRecord {
 }
 
 impl ParticleRecord {
-    pub fn new(details: Details, location: Option<ParticleLocation>) -> Self {
+    pub fn new(details: Details, location: ParticleLocation) -> Self {
         ParticleRecord { details, location }
     }
 
@@ -119,7 +119,7 @@ impl ParticleRecord {
                 },
                 properties: Default::default(),
             },
-            location: Some(Default::default()),
+            location: Default::default(),
         }
     }
 }

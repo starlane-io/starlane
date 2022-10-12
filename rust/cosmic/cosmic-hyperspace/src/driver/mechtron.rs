@@ -31,6 +31,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 
 lazy_static! {
     static ref HOST_DRIVER_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -327,17 +328,31 @@ where
 
             host.create_mechtron(host_cmd.details.clone())?;
 
+
+            println!("Assigning mechtron Host {} -> {}", host_cmd.details.stub.point.to_string(), host.details.stub.point.to_string());
             self.skel
                 .skel
                 .registry()
-                .assign(
-                    &host.details.stub.point,
-                    ParticleLocation::new(
-                        self.skel.skel.skel.point.clone(),
-                        Some(host.details.stub.point.clone()),
-                    ),
+                .assign_star(
+                    &host_cmd.details.stub.point,
+                        &self.skel.skel.skel.point,
                 )
                 .await?;
+
+            self.skel
+                .skel
+                .registry()
+                .assign_host(
+                        &host_cmd.details.stub.point,
+                    &host.details.stub.point
+                )
+                .await?;
+
+
+let location = self.skel.skel.registry().record(&host_cmd.details.stub.point).await?.location;
+assert!(location.host.is_some());
+println!("HOST LOCATION IS: {}", location.host.unwrap().to_string() );
+
 
             println!("HOST COMMAND COMPLETED!");
             Ok(())
@@ -555,7 +570,7 @@ where
     P: Cosmos,
 {
     async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
-        println!("MECHTRON TRANSPORT TRAVERSAL!");
+        println!("MECHTRON TRANSPORT TRAVERSAL! {} self {}", traversal.to.to_string(), self.skel.point.to_string());
         let wave = traversal.payload;
         let record = self
             .skel
@@ -565,8 +580,8 @@ where
             .await
             .map_err(|e| e.to_space_err())?;
         let location = record
-            .location
-            .ok_or::<SpaceErr>("expected Mechtron to have an assigned Host".into())?;
+            .location;
+
         let host = location
             .host
             .ok_or::<SpaceErr>("expected Mechtron to have an assigned Host".into())?

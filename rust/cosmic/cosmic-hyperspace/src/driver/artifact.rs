@@ -402,9 +402,9 @@ where
                 self.skel
                     .star
                     .registry
-                    .assign(
+                    .assign_star(
                         &assign.details.stub.point,
-                        ParticleLocation::new(self.skel.star.point.clone(), None),
+                        &self.skel.star.point,
                     )
                     .await?;
 
@@ -674,9 +674,9 @@ where
                 self.skel
                     .star
                     .registry
-                    .assign(
+                    .assign_star(
                         &assign.details.stub.point,
-                        ParticleLocation::new(self.skel.star.point.clone(), None),
+                        &self.skel.star.point,
                     )
                     .await?;
             }

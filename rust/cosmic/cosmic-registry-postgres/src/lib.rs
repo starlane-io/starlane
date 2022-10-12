@@ -293,7 +293,7 @@ where
         Ok(())
     }
 
-    async fn assign<'a>(
+    async fn assign_star<'a>(
         &'a self,
         point: &'a Point,
         location: ParticleLocation,
@@ -1737,7 +1737,7 @@ pub mod test {
         registry.register(&registration).await?;
 
         let location = ParticleLocation::new(StarKey::central().to_point(), None);
-        registry.assign(&point, location).await?;
+        registry.assign_star(&point, location).await?;
         registry.set_status(&point, &Status::Ready).await?;
         registry.sequence(&point).await?;
         let record = registry.record(&point).await?;

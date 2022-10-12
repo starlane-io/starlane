@@ -230,8 +230,7 @@ where
 
         self.star_skel.api.create_states(point.clone()).await?;
         self.star_skel.registry.register(&registration).await?;
-        let location = ParticleLocation::new(self.star_skel.point.clone(), None);
-        self.star_skel.registry.assign(&point, location).await?;
+        self.star_skel.registry.assign_star(&point,&self.star_skel.point).await?;
 
         logger
             .result(skel.status_tx.send(DriverStatus::Ready).await)
@@ -313,10 +312,9 @@ where
                     .map_err(|e| e.to_space_err())?;
                 let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
                 self.create(&assign).await.map_err(|e| e.to_space_err())?;
-                let location = ParticleLocation::new(self.skel.point.clone(), None);
                 self.skel
                     .registry
-                    .assign(&Point::root(), location)
+                    .assign_star(&Point::root(), &self.skel.point)
                     .await
                     .map_err(|e| e.to_space_err())?;
 
@@ -343,10 +341,9 @@ where
                     .map_err(|e| e.to_space_err())?;
                 let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
                 self.create(&assign).await.map_err(|e| e.to_space_err())?;
-                let location = ParticleLocation::new(LOCAL_STAR.clone(), None);
                 self.skel
                     .registry
-                    .assign(&Point::global_executor(), location)
+                    .assign_star(&Point::global_executor(), &LOCAL_STAR)
                     .await
                     .map_err(|e| e.to_space_err())?;
 
@@ -406,7 +403,7 @@ where
 
                         let ctx: InCtx<'_, HyperSubstance> = ctx.push_input_ref(&assign);
                         if self.assign(ctx).await?.is_ok() {
-                            Ok(ParticleLocation::new(self.skel.point.clone(), None))
+                            Ok(ParticleLocation::new(Some(self.skel.point.clone()), None))
                         } else {
                             Err(
                                 format!("could not find assign kind {} to self", kind.to_string())
@@ -491,10 +488,9 @@ where
                     .into()))?;
             }
 
-            let location = ParticleLocation::new(self.skel.point.clone(), None);
             self.skel
                 .registry
-                .assign(&assign.details.stub.point, location)
+                .assign_star(&assign.details.stub.point,&self.skel.point )
                 .await?;
 
             Ok(ReflectedCore::ok())
