@@ -2,6 +2,12 @@
 name = "mechtron-host"
 version = "0.3.1-alpha"
 edition = "2021"
+authors = ["Scott Williams <scott@starlane.io>"]
+description = "Part of http://thecosmicinitiative.io This package--MECHTRON HOST--uses Wasmer to host a Wasm guest with Mechtrons"
+
+homepage = "http://thecosmicinitiative.io"
+repository = "https://github.com/cosmic-initiative/cosmic-initiative"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
