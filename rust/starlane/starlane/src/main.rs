@@ -37,11 +37,13 @@ use cosmic_hyperspace::driver::{DriverAvail, DriversBuilder};
 use cosmic_hyperspace::machine::{Machine, MachineTemplate};
 use cosmic_hyperspace::reg::{Registry, RegistryApi};
 use cosmic_hyperspace::Cosmos;
-use cosmic_registry_postgres::err::PostErr;
-use cosmic_registry_postgres::{
+//use cosmic_registry_postgres::err::PostErr;
+/*use cosmic_registry_postgres::{
     PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
 };
+
+ */
 use cosmic_space::artifact::ArtifactApi;
 use cosmic_space::artifact::ReadArtifactFetcher;
 use cosmic_space::command::direct::create::KindTemplate;
@@ -258,6 +260,7 @@ impl Cosmos for Starlane {
     }
 }
 
+/*
 impl PostgresPlatform for Starlane {
     fn lookup_registry_db() -> Result<PostgresDbInfo, Self::Err> {
         Ok(PostgresDbInfo::new(
@@ -278,3 +281,5 @@ impl PostgresPlatform for Starlane {
         ))
     }
 }
+
+ */

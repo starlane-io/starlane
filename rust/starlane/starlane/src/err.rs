@@ -1,7 +1,7 @@
 use cosmic_hyperspace::err::ErrKind;
-use cosmic_registry_postgres::err::PostErr;
+//use cosmic_registry_postgres::err::PostErr;
 
-pub trait StarlaneErr: PostErr {}
+pub trait StarlaneErr {}   //: PostErr {}
 
 #[derive(Debug, Clone)]
 pub struct StarErr {
@@ -16,7 +16,7 @@ pub mod convert {
     use ascii::FromAsciiError;
     use bincode::ErrorKind;
     use cosmic_hyperspace::err::{ErrKind, HyperErr};
-    use cosmic_registry_postgres::err::PostErr;
+//    use cosmic_registry_postgres::err::PostErr;
     use cosmic_space::err::SpaceErr;
     use mechtron_host::err::HostErr;
     use sqlx::Error;
@@ -67,7 +67,7 @@ pub mod convert {
             self.message.clone()
         }
     }
-    impl PostErr for Err {
+/*    impl PostErr for Err {
         fn dupe() -> Self {
             Self {
                 kind: ErrKind::Dupe,
@@ -75,6 +75,8 @@ pub mod convert {
             }
         }
     }
+
+ */
     impl HyperErr for Err {
         fn to_space_err(&self) -> SpaceErr {
             SpaceErr::from_500(self.to_string())
