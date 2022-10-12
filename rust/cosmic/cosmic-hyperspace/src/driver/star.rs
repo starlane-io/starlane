@@ -57,10 +57,12 @@ fn star_bind() -> BindConfig {
         r#"
     Bind(version=1.0.0)
     {
-       Route<Hyp<Transport>> -> (());
-       Route<Hyp<Assign>> -> (()) => &;
-       Route<Hyp<Search>> -> (()) => &;
-       Route<Hyp<Provision>> -> (()) => &;
+       Route -> {
+           Hyp<Transport> -> (());
+           Hyp<Assign> -> (()) => &;
+           Hyp<Search> -> (()) => &;
+           Hyp<Provision> -> (()) => &;
+       }
     }
     "#,
     ))

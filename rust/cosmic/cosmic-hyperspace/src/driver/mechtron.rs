@@ -69,7 +69,7 @@ fn host_bind() -> BindConfig {
     Bind(version=1.0.0)
     {
        Route -> {
-          Hyp<Transport> -> (()) => &;
+          Hyp<Transport> -> (());
        }
     }
     "#,
@@ -158,7 +158,25 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
-        Ok(ItemSphere::Handler(Box::new(HostItem)))
+        let host = self
+            .skel
+            .hosts
+            .get(point)
+            .ok_or(P::Err::not_found_msg(format!(
+                "could not find host for :{}",
+                point.to_string()
+            )))?
+            .value()
+            .clone();
+        let skel = HostItemSkel {
+            skel: ItemSkel::new(point.clone(), Kind::Host, self.skel.skel.clone()),
+            host,
+        };
+        Ok(ItemSphere::Handler(Box::new(HostItem::restore(
+            skel,
+            (),
+            (),
+        ))))
     }
 
     fn bind(&self) -> ArtRef<BindConfig> {
@@ -328,31 +346,11 @@ where
 
             host.create_mechtron(host_cmd.details.clone())?;
 
-
-            println!("Assigning mechtron Host {} -> {}", host_cmd.details.stub.point.to_string(), host.details.stub.point.to_string());
             self.skel
                 .skel
                 .registry()
-                .assign_star(
-                    &host_cmd.details.stub.point,
-                        &self.skel.skel.skel.point,
-                )
+                .assign_host(&host_cmd.details.stub.point, &host.details.stub.point)
                 .await?;
-
-            self.skel
-                .skel
-                .registry()
-                .assign_host(
-                        &host_cmd.details.stub.point,
-                    &host.details.stub.point
-                )
-                .await?;
-
-
-let location = self.skel.skel.registry().record(&host_cmd.details.stub.point).await?.location;
-assert!(location.host.is_some());
-println!("HOST LOCATION IS: {}", location.host.unwrap().to_string() );
-
 
             println!("HOST COMMAND COMPLETED!");
             Ok(())
@@ -366,16 +364,18 @@ println!("HOST LOCATION IS: {}", location.host.unwrap().to_string() );
         if let HyperSubstance::Assign(assign) = ctx.input {
             println!("\tASSIGNING MECHTRON HOST!");
 
-            let wasm = self.skel.skel.logger.result(assign
-                .details
-                .properties
-                .get(&"wasm".to_string())
-                .ok_or("wasm property must be set for a Mechtron Host"))?;
-println!("\there...");
+            let wasm = self.skel.skel.logger.result(
+                assign
+                    .details
+                    .properties
+                    .get(&"wasm".to_string())
+                    .ok_or("wasm property must be set for a Mechtron Host"),
+            )?;
+            println!("\there...");
             let wasm_point = Point::from_str(wasm.value.as_str())?;
             let wasm = self.skel.skel.artifacts().wasm(&wasm_point).await?;
 
-println!("\tand...");
+            println!("\tand...");
             let bin = wasm.deref().deref().clone();
             let mechtron_host = Arc::new(
                 self.skel
@@ -383,7 +383,7 @@ println!("\tand...");
                     .create(assign.details.clone(), bin)
                     .map_err(|e| SpaceErr::from_500("host err"))?,
             );
-println!("\tmechtron_host...");
+            println!("\tmechtron_host...");
 
             self.skel
                 .hosts
@@ -398,20 +398,59 @@ println!("\tmechtron_host...");
     }
 }
 
-pub struct HostItem;
+#[derive(Clone)]
+pub struct HostItemSkel<P, H>
+where
+    P: Cosmos,
+    H: HostPlatform<Err = P::Err>,
+{
+    pub skel: ItemSkel<P>,
+    pub host: Arc<MechtronHost<H>>,
+}
+
+pub struct HostItem<P, H>
+where
+    P: Cosmos,
+    H: HostPlatform<Err = P::Err>,
+{
+    pub skel: HostItemSkel<P, H>,
+}
+
+impl<P, H> Item<P> for HostItem<P, H>
+where
+    P: Cosmos,
+    H: HostPlatform<Err = P::Err>,
+{
+    type Skel = HostItemSkel<P, H>;
+    type Ctx = ();
+    type State = ();
+
+    fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self {
+        Self { skel }
+    }
+}
 
 #[handler]
-impl HostItem {
+impl<P, H> HostItem<P, H>
+where
+    P: Cosmos,
+    H: HostPlatform<Err = P::Err>,
+{
     #[route("Hyp<Transport>")]
-    async fn transport(&self, _ctx: InCtx<'_, UltraWave>) {
-        println!("HOST Received TRANSPORT");
+    async fn transport(&self, ctx: InCtx<'_, UltraWave>) {
+        if let Ok(Some(wave)) = self.skel.host.route(ctx.input.clone()) {
+            let re = wave.clone().to_reflected().unwrap();
+println!("GOT RESPONSE FROM MECHTRON! {} -> {}", re.core().status.to_string(), re.to().to_string());
+            ctx.transmitter.route(wave).await;
+        }
     }
 }
 
 #[async_trait]
-impl<P> ItemHandler<P> for HostItem
+impl<P, H> ItemHandler<P> for HostItem<P, H>
 where
     P: Cosmos,
+    H: HostPlatform<Err = P::Err>,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(HOST_BIND_CONFIG.clone())
@@ -570,7 +609,11 @@ where
     P: Cosmos,
 {
     async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
-        println!("MECHTRON TRANSPORT TRAVERSAL! {} self {}", traversal.to.to_string(), self.skel.point.to_string());
+        println!(
+            "MECHTRON TRANSPORT TRAVERSAL! {} self {}",
+            traversal.to.to_string(),
+            self.skel.point.to_string()
+        );
         let wave = traversal.payload;
         let record = self
             .skel
@@ -579,8 +622,7 @@ where
             .record(&self.skel.point)
             .await
             .map_err(|e| e.to_space_err())?;
-        let location = record
-            .location;
+        let location = record.location;
 
         let host = location
             .host
