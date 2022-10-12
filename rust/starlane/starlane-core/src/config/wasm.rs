@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use wasmer::{Cranelift, Module, Store, Universal};
 
-use cosmic_universe::kind::ArtifactSubKind;
+use cosmic_space::kind::ArtifactSubKind;
 use mesh_portal::version::latest::bin::Bin;
 use mesh_portal::version::latest::id::Point;
 

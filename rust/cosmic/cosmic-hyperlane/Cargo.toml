@@ -1,16 +1,16 @@
 [package]
 name = "cosmic-hyperlane"
-version = "0.3.0"
+version = "0.3.1-alpha"
 edition = "2021"
 
-authors = ["Scott Williams <scott@mightydevco.com>"]
+authors = ["Scott Williams <scott@starlane.io>"]
 description = "The Cosmic Hyperlane provides \"Lanes\" to queue Waves(messages) and Hyperways for back and forth Wave communication. It provides services such as routing and authentication as well."
 homepage = "http://thecosmicinitiative.io"
 repository = "https://github.com/cosmic-initiative/cosmic-initiative"
 license = "MIT"
 
 [dependencies]
-cosmic-universe = { path= "../cosmic-universe" ,version = "0.3.0"}
+cosmic-space = { path= "../cosmic-space",version = "0.3.1-alpha"}
 async-trait = "0.1.48"
 futures = {version = "0.3.21", default-features = true }
 tokio = { version = "1.15.0", features = ["full"] }

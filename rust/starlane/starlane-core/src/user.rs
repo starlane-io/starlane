@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use tokio::sync::mpsc;
 
-use cosmic_universe::loc::StarKey;
+use cosmic_space::loc::StarKey;
 use mesh_portal::version::latest::entity::request::create::{
     KindTemplate, PointSegFactory, PointTemplate, Template,
 };

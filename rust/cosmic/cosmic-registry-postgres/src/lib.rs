@@ -25,42 +25,40 @@ use std::sync::Arc;
 use strum::ParseError;
 
 use crate::err::PostErr;
-use cosmic_hyperverse::err::{ErrKind, HyperErr};
-use cosmic_hyperverse::machine::MachineTemplate;
-use cosmic_hyperverse::reg::{Registration, RegistryApi};
-use cosmic_hyperverse::Cosmos;
-use cosmic_universe::command::common::{PropertyMod, SetProperties, SetRegistry};
-use cosmic_universe::command::direct::create::{Create, KindTemplate, PointSegTemplate, Strategy};
-use cosmic_universe::command::direct::delete::Delete;
-use cosmic_universe::command::direct::get::{Get, GetOp};
-use cosmic_universe::command::direct::query::{Query, QueryResult};
-use cosmic_universe::command::direct::select::{
-    Select, SelectIntoSubstance, SelectKind, SubSelect,
-};
-use cosmic_universe::command::direct::set::Set;
-use cosmic_universe::err::UniErr;
-use cosmic_universe::hyper::{Location, ParticleLocation, ParticleRecord};
-use cosmic_universe::kind::{
+use cosmic_hyperspace::err::{ErrKind, HyperErr};
+use cosmic_hyperspace::machine::MachineTemplate;
+use cosmic_hyperspace::reg::{Registration, RegistryApi};
+use cosmic_hyperspace::Cosmos;
+use cosmic_space::command::common::{PropertyMod, SetProperties, SetRegistry};
+use cosmic_space::command::direct::create::{Create, KindTemplate, PointSegTemplate, Strategy};
+use cosmic_space::command::direct::delete::Delete;
+use cosmic_space::command::direct::get::{Get, GetOp};
+use cosmic_space::command::direct::query::{Query, QueryResult};
+use cosmic_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
+use cosmic_space::command::direct::set::Set;
+use cosmic_space::err::SpaceErr;
+use cosmic_space::hyper::{Location, ParticleLocation, ParticleRecord};
+use cosmic_space::kind::{
     ArtifactSubKind, BaseKind, FileSubKind, Kind, KindParts, Specific, UserBaseSubKind,
 };
-use cosmic_universe::loc::{Point, PointSeg, StarKey, ToBaseKind, Version};
-use cosmic_universe::parse::{CamelCase, Domain, SkewerCase};
-use cosmic_universe::particle::{Details, PointKind, Properties, Property, Status, Stub};
-use cosmic_universe::security::{
+use cosmic_space::loc::{Point, PointSeg, StarKey, ToBaseKind, Version};
+use cosmic_space::log::PointLogger;
+use cosmic_space::parse::{CamelCase, Domain, SkewerCase};
+use cosmic_space::particle::{Details, PointKind, Properties, Property, Status, Stub};
+use cosmic_space::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, IndexedAccessGrant, Permissions,
     PermissionsMask, PermissionsMaskKind, Privilege, Privileges,
 };
-use cosmic_universe::selector::specific::{
+use cosmic_space::selector::specific::{
     ProductSelector, ProviderSelector, VariantSelector, VendorSelector,
 };
-use cosmic_universe::selector::{
+use cosmic_space::selector::{
     ExactPointSeg, KindBaseSelector, PointHierarchy, PointKindSeg, PointSegSelector, Selector,
     SubKindSelector,
 };
-use cosmic_universe::substance::{Substance, SubstanceList, SubstanceMap};
-use cosmic_universe::util::ValuePattern;
-use cosmic_universe::HYPERUSER;
-use cosmic_universe::log::PointLogger;
+use cosmic_space::substance::{Substance, SubstanceList, SubstanceMap};
+use cosmic_space::util::ValuePattern;
+use cosmic_space::HYPERUSER;
 
 pub trait PostgresPlatform: Cosmos
 where
@@ -85,8 +83,12 @@ where
     P: PostgresPlatform + 'static,
     <P as Cosmos>::Err: PostErr,
 {
-    pub async fn new(ctx: PostgresRegistryContextHandle<P>, platform: P, logger: PointLogger) -> Result<Self, P::Err> {
-        let logger = logger.point( Point::global_registry() );
+    pub async fn new(
+        ctx: PostgresRegistryContextHandle<P>,
+        platform: P,
+        logger: PointLogger,
+    ) -> Result<Self, P::Err> {
+        let logger = logger.point(Point::global_registry());
         /*
         let pool = PgPoolOptions::new()
             .max_connections(5)
@@ -95,11 +97,14 @@ where
             )
             .await?;
          */
-        let registry = Self { ctx, platform, logger: logger.clone() };
+        let registry = Self {
+            ctx,
+            platform,
+            logger: logger.clone(),
+        };
 
         match registry.setup().await {
-            Ok(_) => {
-            }
+            Ok(_) => {}
             Err(err) => {
                 let message = err.to_string();
                 logger.error(format!("database setup failed {} ", message));
@@ -200,8 +205,6 @@ where
 
         Ok(())
     }
-
-
 }
 
 #[async_trait]
@@ -210,8 +213,7 @@ where
     P: PostgresPlatform + 'static,
     <P as Cosmos>::Err: PostErr,
 {
-
-     async fn nuke<'a>(&'a self) -> Result<(), P::Err> {
+    async fn nuke<'a>(&'a self) -> Result<(), P::Err> {
         self.logger.info("nuking database!");
         let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
@@ -237,7 +239,6 @@ where
          */
         struct Count(u64);
 
-
         impl sqlx::FromRow<'_, PgRow> for Count {
             fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
                 let v: i64 = row.get(0);
@@ -247,20 +248,21 @@ where
 
         let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
-        let params:RegistryParams<P> = RegistryParams::from_registration(registration)?;
+        let params: RegistryParams<P> = RegistryParams::from_registration(registration)?;
 
         let count = sqlx::query_as::<Postgres, Count>(
             "SELECT count(*) as count from particles WHERE point=$1",
         )
-        .bind(params.point.clone() )
+        .bind(params.point.clone())
         .fetch_one(&mut trans)
         .await?;
 
-        if count.0 > 0  {
+        if count.0 > 0 {
             // returning ok on Override for now which is the expected behavior but not the desired
             // result.... will revisit this and properly do an update when the time comes -- Scott
             trans.rollback().await?;
-            if registration.strategy == Strategy::Ensure || registration.strategy == Strategy::Override
+            if registration.strategy == Strategy::Ensure
+                || registration.strategy == Strategy::Override
             {
                 return Ok(());
             } else {
@@ -288,42 +290,37 @@ where
             }
         }
         trans.commit().await?;
-        println!("\tRETUrNING: {}",registration.point.to_string());
         Ok(())
     }
 
-
-
-    async fn assign<'a>(
+    async fn assign_star<'a>(
         &'a self,
         point: &'a Point,
         location: ParticleLocation,
     ) -> Result<(), P::Err> {
+        let parent = point
+            .parent()
+            .ok_or(format!("expecting parent ({})", point.to_string()))?;
+        let point_segment = point.last_segment().ok_or("expecting a last_segment")?;
 
-            let parent = point
-                .parent()
-                .ok_or(format!("expecting parent ({})", point.to_string()))?;
-            let point_segment = point
-                .last_segment()
-                .ok_or("expecting a last_segment")?;
+        let statement =
+            "UPDATE particles SET star=$1, host=$2 WHERE parent=$3 AND point_segment=$4";
 
-            let statement =
-                "UPDATE particles SET star=$1, host=$2 WHERE parent=$3 AND point_segment=$4";
+        let mut conn = self.ctx.acquire().await?;
+        let mut trans = conn.begin().await?;
 
-            let mut conn = self.ctx.acquire().await?;
-            let mut trans = conn.begin().await?;
+        trans
+            .execute(
+                sqlx::query(statement)
+                    .bind(location.star.to_string())
+                    .bind(location.host.map(|p| p.to_string()))
+                    .bind(parent.to_string())
+                    .bind(point_segment.to_string()),
+            )
+            .await?;
 
-            trans
-                .execute(
-                    sqlx::query(statement)
-                        .bind(location.star.to_string())
-                        .bind(location.host.map(|p|p.to_string()))
-                        .bind(parent.to_string()).bind(point_segment.to_string())
-                )
-                .await?;
-
-            trans.commit().await?;
-            Ok(())
+        trans.commit().await?;
+        Ok(())
     }
 
     async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), P::Err> {
@@ -1016,10 +1013,11 @@ where
     grant: IndexedAccessGrant,
     phantom: PhantomData<P>,
 }
-impl <P> Unpin for WrappedIndexedAccessGrant<P>where
+impl<P> Unpin for WrappedIndexedAccessGrant<P>
+where
     P: PostgresPlatform,
-    <P as Cosmos>::Err: PostErr {
-
+    <P as Cosmos>::Err: PostErr,
+{
 }
 
 impl<P> Into<IndexedAccessGrant> for WrappedIndexedAccessGrant<P>
@@ -1082,13 +1080,10 @@ where
                     phantom,
                 })
             }
-            Err(err) => {
-                Err(sqlx::error::Error::PoolClosed)
-            }
+            Err(err) => Err(sqlx::error::Error::PoolClosed),
         }
     }
 }
-
 
 struct PostgresParticleRecord<P>
 where
@@ -1100,10 +1095,11 @@ where
     pub phantom: PhantomData<P>,
 }
 
-impl <P> Unpin for PostgresParticleRecord<P>where
+impl<P> Unpin for PostgresParticleRecord<P>
+where
     P: PostgresPlatform,
-    <P as Cosmos>::Err: PostErr {
-
+    <P as Cosmos>::Err: PostErr,
+{
 }
 
 impl<P> Into<ParticleRecord> for PostgresParticleRecord<P>
@@ -1237,9 +1233,9 @@ where
 
         match wrap::<P>(row) {
             Ok(record) => Ok(record),
-            Err(err) => {
-                Err(sqlx::error::Error::Decode(format!("particle record: {}",err.to_string()).into()))
-            }
+            Err(err) => Err(sqlx::error::Error::Decode(
+                format!("particle record: {}", err.to_string()).into(),
+            )),
         }
     }
 }
@@ -1278,7 +1274,10 @@ where
             None => "".to_string(),
             Some(parent) => parent.to_string(),
         };
-        let specific_str = match registration.kind.sub().specific() { None=>"None".to_string(),Some(specific)=>specific.to_string()};
+        let specific_str = match registration.kind.sub().specific() {
+            None => "None".to_string(),
+            Some(specific) => specific.to_string(),
+        };
 
         let base = registration.kind.to_base().to_string();
         let sub = registration.kind.sub();
@@ -1386,7 +1385,6 @@ where
             }
         }
     }
-
 
     pub async fn cmd_select<'a>(&'a self, select: &'a mut Select) -> Result<Substance, P::Err> {
         let list = Substance::List(self.select(select).await?);
@@ -1509,7 +1507,7 @@ where
     }
 }
 
-#[derive(Clone,Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub struct PostgresDbKey {
     pub url: String,
     pub user: String,
@@ -1576,9 +1574,9 @@ impl PostgresDbInfo {
 
 #[cfg(test)]
 pub mod test {
-    use cosmic_hyperverse::driver::DriversBuilder;
-    use cosmic_hyperverse::machine::MachineTemplate;
-    use cosmic_hyperverse::Cosmos;
+    use cosmic_hyperspace::driver::DriversBuilder;
+    use cosmic_hyperspace::machine::MachineTemplate;
+    use cosmic_hyperspace::Cosmos;
     use std::collections::HashSet;
     use std::convert::TryInto;
     use std::str::FromStr;
@@ -1589,24 +1587,26 @@ pub mod test {
         PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
         PostgresRegistryContextHandle,
     };
-    use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, LocalHyperwayGateJumper};
-    use cosmic_hyperverse::reg::RegistryApi;
-    use cosmic_hyperverse::reg::{Registration, Registry};
-    use cosmic_universe::artifact::ArtifactApi;
-    use cosmic_universe::command::direct::create::Strategy;
-    use cosmic_universe::command::direct::query::Query;
-    use cosmic_universe::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
-    use cosmic_universe::hyper::ParticleLocation;
-    use cosmic_universe::kind::{Kind, Specific, StarSub, UserBaseSubKind};
-    use cosmic_universe::loc::{MachineName, Point, StarKey, ToPoint};
-    use cosmic_universe::log::RootLogger;
-    use cosmic_universe::particle::property::PropertiesConfig;
-    use cosmic_universe::particle::Status;
-    use cosmic_universe::security::{
+    use cosmic_hyperlane::{
+        AnonHyperAuthenticator, HyperGate, HyperGateSelector, LocalHyperwayGateJumper,
+    };
+    use cosmic_hyperspace::reg::RegistryApi;
+    use cosmic_hyperspace::reg::{Registration, Registry};
+    use cosmic_space::artifact::ArtifactApi;
+    use cosmic_space::command::direct::create::Strategy;
+    use cosmic_space::command::direct::query::Query;
+    use cosmic_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
+    use cosmic_space::hyper::ParticleLocation;
+    use cosmic_space::kind::{Kind, Specific, StarSub, UserBaseSubKind};
+    use cosmic_space::loc::{MachineName, Point, StarKey, ToPoint};
+    use cosmic_space::log::RootLogger;
+    use cosmic_space::particle::property::PropertiesConfig;
+    use cosmic_space::particle::Status;
+    use cosmic_space::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
         Privilege,
     };
-    use cosmic_universe::selector::{PointHierarchy, Selector};
+    use cosmic_space::selector::{PointHierarchy, Selector};
 
     #[derive(Clone)]
     pub struct TestPlatform {
@@ -1649,7 +1649,9 @@ pub mod test {
         async fn global_registry(&self) -> Result<Registry<Self>, Self::Err> {
             let logger = RootLogger::default();
             let logger = logger.point(Point::global_registry());
-            Ok(Arc::new(PostgresRegistry::new(self.handle.clone(), self.clone(),logger ).await?))
+            Ok(Arc::new(
+                PostgresRegistry::new(self.handle.clone(), self.clone(), logger).await?,
+            ))
         }
 
         fn star_auth(&self, star: &StarKey) -> Result<Self::StarAuth, Self::Err> {
@@ -1686,10 +1688,6 @@ pub mod test {
         fn artifact_hub(&self) -> ArtifactApi {
             todo!()
         }
-
-        fn start_services(&self, gate: &Arc<dyn cosmic_hyperlane::HyperGate>) {
-            todo!()
-        }
     }
 
     pub async fn registry() -> Result<Registry<TestPlatform>, TestErr> {
@@ -1722,9 +1720,9 @@ pub mod test {
             strategy: Strategy::Commit,
             status: Status::Unknown,
         };
-println!("pre register...");
+        println!("pre register...");
         registry.register(&registration).await?;
-println!("post registration!");
+        println!("post registration!");
 
         let point = Point::from_str("localhost:mechtron")?;
         let registration = Registration {
@@ -1739,7 +1737,7 @@ println!("post registration!");
         registry.register(&registration).await?;
 
         let location = ParticleLocation::new(StarKey::central().to_point(), None);
-        registry.assign(&point, location).await?;
+        registry.assign_star(&point, location).await?;
         registry.set_status(&point, &Status::Ready).await?;
         registry.sequence(&point).await?;
         let record = registry.record(&point).await?;
@@ -1796,7 +1794,9 @@ println!("post registration!");
         };
         registry.register(&registration).await?;
 
-        let userbase = Kind::UserBase(UserBaseSubKind::OAuth(Specific::from_str("mechtronhost.io:keycloak.com:keycloak:community:11.0.0")?));
+        let userbase = Kind::UserBase(UserBaseSubKind::OAuth(Specific::from_str(
+            "mechtronhost.io:keycloak.com:keycloak:community:11.0.0",
+        )?));
 
         let registration = Registration {
             point: Point::from_str("hyperspace:users")?,
@@ -1902,12 +1902,12 @@ println!("post registration!");
         let grant = AccessGrant {
             kind: AccessGrantKind::Super,
             on_point: Selector::from_str("localhost+:**")?,
-            to_point: superuser.clone().try_into().map_err(|e|TestErr::new(e))?,
+            to_point: superuser.clone().try_into().map_err(|e| TestErr::new(e))?,
             by_particle: hyperuser.clone(),
         };
-println!("granting...");
+        println!("granting...");
         registry.grant(&grant).await?;
-println!("granted...");
+        println!("granted...");
 
         let grant = AccessGrant {
             kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("+csd-Rwx")?),
@@ -1928,7 +1928,7 @@ println!("granted...");
         let grant = AccessGrant {
             kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("+CSD-RWX")?),
             on_point: Selector::from_str("localhost:users:superuser")?,
-            to_point: scott.clone().try_into().map_err(|e|TestErr::new(e))?,
+            to_point: scott.clone().try_into().map_err(|e| TestErr::new(e))?,
             by_particle: app.clone(),
         };
         registry.grant(&grant).await?;
@@ -1941,29 +1941,29 @@ println!("granted...");
         };
         registry.grant(&grant).await?;
 
-println!("access?");
+        println!("access?");
         let access = registry.access(&hyperuser, &superuser).await?;
-println!("access...");
-println!("super?");
+        println!("access...");
+        println!("super?");
         assert_eq!(access.has_super(), true);
-println!("super!");
+        println!("super!");
 
         println!("get superuser record...");
-let record = registry.record(&superuser).await?;
+        let record = registry.record(&superuser).await?;
         println!("got superuser record...");
 
         let access = registry.access(&superuser, &localhost).await?;
         assert_eq!(access.has_super(), true);
-println!("one");
+        println!("one");
         let access = registry.access(&superuser, &app).await?;
         assert_eq!(access.has_super(), true);
 
-println!("two");
+        println!("two");
         let access = registry.access(&app, &scott).await?;
         assert_eq!(access.has_super(), false);
-println!("owner?");
+        println!("owner?");
         assert_eq!(access.has_owner(), true);
-println!("owner.");
+        println!("owner.");
         assert_eq!(access.has_full(), true);
 
         let access = registry.access(&scott, &superuser).await?;
@@ -1975,13 +1975,13 @@ println!("owner.");
         let access = registry.access(&scott, &app).await?;
         assert_eq!(access.has_super(), false);
         assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
-println!("chown?");
+        println!("chown?");
         // must have super to chagne ownership
         let app_pattern = Selector::from_str("localhost:app+:**")?;
         assert!(registry.chown(&app_pattern, &app, &scott).await.is_err());
         // this should work:
         assert!(registry.chown(&app_pattern, &app, &superuser).await.is_ok());
-println!("chown...");
+        println!("chown...");
 
         // now the previous rule should work since app now owns itself.
         let access = registry.access(&scott, &app).await?;
@@ -1996,7 +1996,7 @@ println!("chown...");
         let access = registry.access(&scott, &mechtron).await?;
         assert_eq!(access.has_super(), false);
         assert_eq!(access.permissions().to_string(), "csd-RwX".to_string());
-println!("got here...");
+        println!("got here...");
         // now mem AND permissions (masking Read)
         let grant = AccessGrant {
             kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("&csd-rwX")?),
@@ -2014,11 +2014,11 @@ println!("got here...");
         assert_eq!(access.has_super(), false);
         assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
         assert!(access.check_privilege("property:email:read").is_ok());
-println!("and here...");
+        println!("and here...");
         let access_grants = registry
             .list_access(&None, &Selector::from_str("+:**")?)
             .await?;
-println!("lising access grants...");
+        println!("lising access grants...");
         println!(
             "{: <4}{:<6}{:<20}{:<40}{:<40}{:<40}",
             "id", "grant", "data", "on", "to", "by"

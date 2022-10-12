@@ -1,8 +1,8 @@
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
 
-use cosmic_universe::hyper::ParticleRecord;
-use cosmic_universe::service::Global;
+use cosmic_space::hyper::ParticleRecord;
+use cosmic_space::service::Global;
 use mesh_portal::version::latest::id::RouteSegment;
 
 use crate::error::Error;

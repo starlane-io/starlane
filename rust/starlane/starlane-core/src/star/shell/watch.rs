@@ -8,9 +8,9 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Duration;
 
-use cosmic_universe::hyper::{Location, ParticleRecord};
-use cosmic_universe::loc::StarKey;
-use cosmic_universe::loc::ToPoint;
+use cosmic_space::hyper::{Location, ParticleRecord};
+use cosmic_space::loc::StarKey;
+use cosmic_space::loc::ToPoint;
 
 use crate::error::Error;
 use crate::frame::{Frame, ProtoFrame, StarMessage, WatchFrame};

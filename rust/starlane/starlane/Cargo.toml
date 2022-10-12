@@ -1,16 +1,27 @@
 [package]
 name = "starlane"
-version = "0.1.0"
+version = "0.3.1-alpha"
+
+
+
+authors = ["Scott Williams <scott@starlane.io>"]
 edition = "2021"
+description = "Starlane -- A Mesh for extending any enterprise resource with WebAssembly!  Starlane is the Reference implementation of the Cosmic Initiative: http://thecosmicinitiative.io (A WebAssembly Orchestration Framework)"
+
+homepage = "http://starlane.io"
+repository = "https://github.com/cosmic-initiative/cosmic-initiative"
+license = "MIT"
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cosmic-universe={ path= "../../cosmic/cosmic-universe" }
-cosmic-hyperverse={ path= "../../cosmic/cosmic-hyperverse" }
-cosmic-registry-postgres={ path= "../../cosmic/cosmic-registry-postgres" }
-cosmic-hyperlane={ path="../../cosmic/cosmic-hyperlane"}
-mechtron-host={ path="../../mechtron/mechtron-host"}
+cosmic-space={ path= "../../cosmic/cosmic-space" ,version = "0.3.1-alpha"}
+cosmic-hyperspace={ path= "../../cosmic/cosmic-hyperspace" ,version = "0.3.1-alpha"}
+#cosmic-registry-postgres={ path= "../../cosmic/cosmic-registry-postgres" ,version = "0.3.1-alpha"}
+cosmic-hyperlane={ path="../../cosmic/cosmic-hyperlane",version = "0.3.1-alpha"}
+cosmic-hyperlane-tcp={ path="../../cosmic/cosmic-hyperlane-tcp",version = "0.3.1-alpha"}
+mechtron-host={ path="../../mechtron/mechtron-host",version = "0.3.1-alpha"}
 lazy_static = "1.4.0"
 uuid = { version="1.1.2", features=["v4"] }
 chrono = { version="0.4.19", features=["serde"] }
@@ -25,4 +36,6 @@ wasmer = "2.3.0"
 wasmer-compiler-singlepass = "2.3.0"
 acid-store = { version = "0.12.0", features=['store-directory','repo-value'] }
 zip = "0.6.2"
-
+dirs = "4.0.0"
+ascii = "1.1.0"
+url = "2.3.1"

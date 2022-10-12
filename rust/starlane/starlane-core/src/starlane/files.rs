@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use tokio::sync::RwLock;
 
-use cosmic_universe::loc::StarKey;
+use cosmic_space::loc::StarKey;
 
 use crate::error::Error;
 use crate::file_access::FileAccess;

@@ -1,4 +1,4 @@
-use cosmic_universe::id::StarKey;
+use cosmic_space::id::StarKey;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

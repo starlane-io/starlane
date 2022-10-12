@@ -35,7 +35,7 @@ use syn::{parse_macro_input, Data, DeriveInput, PathArguments, Type};
 /// }
 ///
 /// impl TryInto<Child> for Parent {
-///   type Err=UniErr;
+///   type Err=SpaceErr;
 ///
 ///   fn try_into(self) -> Result<Child,Self::Err> {
 ///     if let Self::Child(child) = self {
@@ -79,7 +79,7 @@ pub fn autobox(item: TokenStream) -> TokenStream {
 
                             xforms.push(quote! {
                                 impl TryInto<#ty> for #ident {
-                                    type Error=UniErr;
+                                    type Error=SpaceErr;
 
                                     fn try_into(self) -> Result<#ty,Self::Error> {
                                         match self {
@@ -101,7 +101,7 @@ pub fn autobox(item: TokenStream) -> TokenStream {
                             let ty_str = ty.to_token_stream().to_string();
                             xforms.push(quote! {
                                 impl TryInto<#ty> for #ident {
-                                    type Error=UniErr;
+                                    type Error=SpaceErr;
 
                                     fn try_into(self) -> Result<#ty,Self::Error> {
                                         match self {
@@ -168,14 +168,14 @@ pub fn to_substance(item: TokenStream) -> TokenStream {
 
                             xforms.push(quote! {
                             impl ToSubstance<#ty> for #ident {
-                                fn to_substance(self) -> Result<#ty,UniErr> {
+                                fn to_substance(self) -> Result<#ty,SpaceErr> {
                                     match self {
                                     Self::#variant_ident(val) => Ok(*val),
                                     _ => Err(format!("expected {}",#ty_str).into())
                                     }
                                 }
 
-                                fn to_substance_ref(&self) -> Result<&#ty,UniErr> {
+                                fn to_substance_ref(&self) -> Result<&#ty,SpaceErr> {
                                     match self {
                                     Self::#variant_ident(val) => Ok(val.as_ref()),
                                     _ => Err(format!("expected {}",#ty_str).into())
@@ -189,13 +189,13 @@ pub fn to_substance(item: TokenStream) -> TokenStream {
                             let ty_str = ty.to_token_stream().to_string();
                             xforms.push(quote! {
                             impl ToSubstance<#ty> for #ident {
-                                fn to_substance(self) -> Result<#ty,UniErr> {
+                                fn to_substance(self) -> Result<#ty,SpaceErr> {
                                     match self {
                                     Self::#variant_ident(val) => Ok(val),
                                     _ => Err(format!("expected {}",#ty_str).into())
                                     }
                                 }
-                                 fn to_substance_ref(&self) -> Result<&#ty,UniErr> {
+                                 fn to_substance_ref(&self) -> Result<&#ty,SpaceErr> {
                                     match self {
                                     Self::#variant_ident(val) => Ok(val),
                                     _ => Err(format!("expected {}",#ty_str).into())
@@ -213,13 +213,13 @@ pub fn to_substance(item: TokenStream) -> TokenStream {
             } else {
                 xforms.push(quote! {
                 impl ToSubstance<()> for #ident {
-                    fn to_substance(self) -> Result<(),UniErr> {
+                    fn to_substance(self) -> Result<(),SpaceErr> {
                         match self {
                         Self::#variant_ident => Ok(()),
                         _ => Err(format!("expected Empty").into())
                         }
                     }
-                     fn to_substance_ref(&self) -> Result<&(),UniErr> {
+                     fn to_substance_ref(&self) -> Result<&(),SpaceErr> {
                         match self {
                         Self::#variant_ident => Ok(&()),
                         _ => Err(format!("expected Empty").into())

@@ -27,12 +27,12 @@ use cosmic_hyperlane::{
     HyperConnectionDetails, HyperConnectionStatus, HyperGate, HyperGateSelector, HyperwayEndpoint,
     HyperwayEndpointFactory, VersionGate,
 };
-use cosmic_universe::err::UniErr;
-use cosmic_universe::hyper::Knock;
-use cosmic_universe::log::PointLogger;
-use cosmic_universe::substance::Substance;
-use cosmic_universe::wave::{Ping, UltraWave, Wave};
-use cosmic_universe::VERSION;
+use cosmic_space::err::SpaceErr;
+use cosmic_space::hyper::Knock;
+use cosmic_space::log::PointLogger;
+use cosmic_space::substance::Substance;
+use cosmic_space::wave::{Ping, UltraWave, Wave};
+use cosmic_space::VERSION;
 pub struct HyperlaneTcpClient {
     host: String,
     cert_dir: String,
@@ -62,65 +62,34 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
     async fn create(
         &self,
         status_tx: mpsc::Sender<HyperConnectionDetails>,
-    ) -> Result<HyperwayEndpoint, UniErr> {
-        status_tx
-            .send(HyperConnectionDetails::new(
-                HyperConnectionStatus::Connecting,
-                "init",
-            ))
-            .await?;
+    ) -> Result<HyperwayEndpoint, SpaceErr> {
         let mut connector: SslConnectorBuilder =
-            SslConnector::builder(SslMethod::tls()).map_err(UniErr::map)?;
-
-        status_tx
-            .send(HyperConnectionDetails::new(
-                HyperConnectionStatus::Connecting,
-                "loading cert",
-            ))
-            .await?;
+            SslConnector::builder(SslMethod::tls()).map_err(SpaceErr::map)?;
 
         connector
             .set_ca_file(format!("{}/cert.pem", self.cert_dir))
-            .map_err(UniErr::map)?;
+            .map_err(SpaceErr::map)?;
 
         let ssl = connector
             .build()
             .configure()
-            .map_err(UniErr::map)?
+            .map_err(SpaceErr::map)?
             .verify_hostname(self.verify)
             .into_ssl(self.host.as_str())
-            .map_err(UniErr::map)?;
+            .map_err(SpaceErr::map)?;
 
-        status_tx
-            .send(HyperConnectionDetails::new(
-                HyperConnectionStatus::Connecting,
-                "connecting tcp stream",
-            ))
-            .await?;
         let stream = TcpStream::connect(&self.host).await?;
-        status_tx
-            .send(HyperConnectionDetails::new(
-                HyperConnectionStatus::Connecting,
-                "creating ssl layer",
-            ))
-            .await?;
-        let mut stream = SslStream::new(ssl, stream).map_err(UniErr::map)?;
-        Pin::new(&mut stream).connect().await.map_err(UniErr::map)?;
+
+        let mut stream = SslStream::new(ssl, stream).map_err(SpaceErr::map)?;
+        Pin::new(&mut stream)
+            .connect()
+            .await
+            .map_err(SpaceErr::map)?;
         let mut stream = FrameStream::new(stream);
-        status_tx
-            .send(HyperConnectionDetails::new(
-                HyperConnectionStatus::Connecting,
-                "starting handshake",
-            ))
-            .await?;
+
         let endpoint =
             FrameMuxer::handshake(stream, status_tx.clone(), self.logger.clone()).await?;
-        status_tx
-            .send(HyperConnectionDetails::new(
-                HyperConnectionStatus::Auth,
-                "sending knock",
-            ))
-            .await?;
+
         let wave: Wave<Ping> = self.knock.clone().into();
         let wave = wave.to_ultra();
         endpoint.tx.send(wave).await?;
@@ -185,7 +154,7 @@ impl Frame {
         }
     }
 
-    pub fn to_string(self) -> Result<String, UniErr> {
+    pub fn to_string(self) -> Result<String, SpaceErr> {
         Ok(String::from_utf8(self.data)?)
     }
 
@@ -195,30 +164,30 @@ impl Frame {
         }
     }
 
-    pub fn to_version(self) -> Result<semver::Version, UniErr> {
+    pub fn to_version(self) -> Result<semver::Version, SpaceErr> {
         Ok(semver::Version::from_str(
             String::from_utf8(self.data)?.as_str(),
         )?)
     }
 
-    pub async fn from_stream<'a>(read: &'a mut SslStream<TcpStream>) -> Result<Frame, UniErr> {
+    pub async fn from_stream<'a>(read: &'a mut SslStream<TcpStream>) -> Result<Frame, SpaceErr> {
         let size = read.read_u32().await?;
         let mut data = Vec::with_capacity(size as usize);
         read.read_buf(&mut data).await?;
         Ok(Self { data })
     }
 
-    pub async fn to_stream<'a>(&self, write: &'a mut SslStream<TcpStream>) -> Result<(), UniErr> {
+    pub async fn to_stream<'a>(&self, write: &'a mut SslStream<TcpStream>) -> Result<(), SpaceErr> {
         write.write_u32(self.data.len() as u32).await?;
         write.write_all(self.data.as_slice()).await?;
         Ok(())
     }
 
-    pub fn to_wave(self) -> Result<UltraWave, UniErr> {
+    pub fn to_wave(self) -> Result<UltraWave, SpaceErr> {
         Ok(bincode::deserialize(self.data.as_slice())?)
     }
 
-    pub fn from_wave(wave: UltraWave) -> Result<Self, UniErr> {
+    pub fn from_wave(wave: UltraWave) -> Result<Self, SpaceErr> {
         Ok(Self {
             data: bincode::serialize(&wave)?,
         })
@@ -237,25 +206,14 @@ impl FrameMuxer {
         mut stream: FrameStream,
         status_tx: mpsc::Sender<HyperConnectionDetails>,
         logger: PointLogger,
-    ) -> Result<HyperwayEndpoint, UniErr> {
-        status_tx
-            .send(HyperConnectionDetails::new(
-                HyperConnectionStatus::Handshake,
-                "exchanging versions",
-            ))
-            .await?;
+    ) -> Result<HyperwayEndpoint, SpaceErr> {
         stream.write_version(&VERSION.clone()).await?;
         let in_version =
             tokio::time::timeout(Duration::from_secs(30), stream.read_version()).await??;
 
         if in_version == *VERSION {
-            logger.info("version match");
-            status_tx
-                .send(HyperConnectionDetails::new(
-                    HyperConnectionStatus::Handshake,
-                    "version match",
-                ))
-                .await?;
+            //            logger.info("version match");
+
             stream.write_string("Ok".to_string()).await?;
         } else {
             logger.warn("version mismatch");
@@ -273,12 +231,7 @@ impl FrameMuxer {
             stream.write_string(msg.clone()).await?;
             return Err(msg.into());
         }
-        status_tx
-            .send(HyperConnectionDetails::new(
-                HyperConnectionStatus::Handshake,
-                "waiting for Ok",
-            ))
-            .await?;
+
         let result = tokio::time::timeout(Duration::from_secs(30), stream.read_string()).await??;
         if "Ok".to_string() != result {
             return logger.result(Err(format!(
@@ -288,20 +241,10 @@ impl FrameMuxer {
             .into()));
         }
 
-        status_tx
-            .send(HyperConnectionDetails::new(
-                HyperConnectionStatus::Handshake,
-                "handshake complete",
-            ))
-            .await?;
-
         Ok(Self::new(stream, logger))
     }
 
-    pub fn new(
-        stream: FrameStream,
-        logger: PointLogger,
-    ) -> HyperwayEndpoint {
+    pub fn new(stream: FrameStream, logger: PointLogger) -> HyperwayEndpoint {
         let (in_tx, in_rx) = mpsc::channel(1024);
         let (out_tx, out_rx) = mpsc::channel(1024);
         let (terminate_tx, mut terminate_rx) = mpsc::channel(1);
@@ -319,45 +262,44 @@ impl FrameMuxer {
             });
         }
 
-        let (oneshot_terminate_tx,mut oneshot_terminate_rx) = oneshot::channel();
-        tokio::spawn( async move {
+        let (oneshot_terminate_tx, mut oneshot_terminate_rx) = oneshot::channel();
+        tokio::spawn(async move {
             oneshot_terminate_rx.await.unwrap_or_default();
             terminate_tx.send(()).await.unwrap_or_default();
         });
         HyperwayEndpoint::new_with_drop(out_tx, in_rx, oneshot_terminate_tx, logger)
-
     }
 
-    pub async fn mux(mut self) -> Result<(), UniErr> {
+    pub async fn mux(mut self) -> Result<(), SpaceErr> {
         loop {
             tokio::select! {
-                            wave = self.rx.recv() => {
-                                match wave {
-                                    None => {
-                                        self.logger.warn("rx discon");
-                                        break
-                                    },
-                                    Some(wave) => {
-                                       self.stream.write_wave(wave.clone()).await?;
-                                    }
-                                }
-                            }
-                            wave = self.stream.read_wave() => {
-                                match wave {
-                                   Ok(wave) => {
-                                self.tx.send(wave).await?;
-                                   },
-                                   Err(err) => {
-                                      self.logger.error(format!("ERR_NO {}",err.to_string()));
-                                      break
-                                   }
-                                }
-                            }
-                            _ = self.terminate_rx.recv() => {
-                                 self.logger.warn(format!("terminated"));
-                                 return Ok(())
-                                }
+                wave = self.rx.recv() => {
+                    match wave {
+                        None => {
+                            self.logger.warn("rx discon");
+                            break
+                        },
+                        Some(wave) => {
+                           self.stream.write_wave(wave.clone()).await?;
                         }
+                    }
+                }
+                wave = self.stream.read_wave() => {
+                    match wave {
+                       Ok(wave) => {
+                    self.tx.send(wave).await?;
+                       },
+                       Err(err) => {
+                          //self.logger.error(format!("read stream err: {}",err.to_string()));
+                          break
+                       }
+                    }
+                }
+                _ = self.terminate_rx.recv() => {
+                     self.logger.warn(format!("terminated"));
+                     return Ok(())
+                    }
+            }
         }
         Ok(())
     }
@@ -372,35 +314,35 @@ impl FrameStream {
         Self { stream }
     }
 
-    pub async fn frame(&mut self) -> Result<Frame, UniErr> {
+    pub async fn frame(&mut self) -> Result<Frame, SpaceErr> {
         Frame::from_stream(&mut self.stream).await
     }
 
-    pub async fn read_version(&mut self) -> Result<semver::Version, UniErr> {
+    pub async fn read_version(&mut self) -> Result<semver::Version, SpaceErr> {
         self.frame().await?.to_version()
     }
 
-    pub async fn read_string(&mut self) -> Result<String, UniErr> {
+    pub async fn read_string(&mut self) -> Result<String, SpaceErr> {
         self.frame().await?.to_string()
     }
 
-    pub async fn read_wave(&mut self) -> Result<UltraWave, UniErr> {
+    pub async fn read_wave(&mut self) -> Result<UltraWave, SpaceErr> {
         self.frame().await?.to_wave()
     }
 
-    pub async fn write_frame(&mut self, frame: Frame) -> Result<(), UniErr> {
+    pub async fn write_frame(&mut self, frame: Frame) -> Result<(), SpaceErr> {
         frame.to_stream(&mut self.stream).await
     }
 
-    pub async fn write_string(&mut self, string: String) -> Result<(), UniErr> {
+    pub async fn write_string(&mut self, string: String) -> Result<(), SpaceErr> {
         self.write_frame(Frame::from_string(string)).await
     }
 
-    pub async fn write_version(&mut self, version: &semver::Version) -> Result<(), UniErr> {
+    pub async fn write_version(&mut self, version: &semver::Version) -> Result<(), SpaceErr> {
         self.write_frame(Frame::from_version(version)).await
     }
 
-    pub async fn write_wave(&mut self, wave: UltraWave) -> Result<(), UniErr> {
+    pub async fn write_wave(&mut self, wave: UltraWave) -> Result<(), SpaceErr> {
         self.write_frame(Frame::from_wave(wave)?).await
     }
 }
@@ -486,17 +428,15 @@ impl HyperlaneTcpServer {
                         let logger = logger.clone();
                         tokio::spawn(async move {
                             while let Some(details) = status_rx.recv().await {
-                                logger.info(format!(
+                                /*                                logger.info(format!(
                                     "{} | {}",
                                     details.status.to_string(),
                                     details.info
-                                ))
+                                ))*/
                             }
                         });
                     }
-                    let mut mux =
-                        FrameMuxer::handshake(stream, status_tx, logger.clone())
-                            .await?;
+                    let mut mux = FrameMuxer::handshake(stream, status_tx, logger.clone()).await?;
 
                     let knock = tokio::time::timeout(Duration::from_secs(30), mux.rx.recv())
                         .await?
@@ -510,7 +450,7 @@ impl HyperlaneTcpServer {
                             "expected client Substance::Knock(Knock) encountered '{}'",
                             knock.body().kind().to_string()
                         );
-                        return logger.result(Err(UniErr::str(msg).into()));
+                        return logger.result(Err(SpaceErr::str(msg).into()));
                     }
 
                     Ok(())
@@ -567,8 +507,8 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<UniErr> for Error {
-    fn from(e: UniErr) -> Self {
+impl From<SpaceErr> for Error {
+    fn from(e: SpaceErr) -> Self {
         Error::new(e)
     }
 }
@@ -602,8 +542,8 @@ mod tests {
     use std::time::Duration;
 
     use cosmic_hyperlane::test_util::{SingleInterchangePlatform, WaveTest, FAE, LESS};
-    use cosmic_universe::loc::{Point, ToSurface};
-    use cosmic_universe::log::RootLogger;
+    use cosmic_space::loc::{Point, ToSurface};
+    use cosmic_space::log::RootLogger;
 
     use chrono::DateTime;
     use chrono::Utc;
@@ -619,7 +559,6 @@ mod tests {
     pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
         Utc::now()
     }
-
 
     #[tokio::test]
     async fn test_tcp() -> Result<(), Error> {
@@ -654,7 +593,7 @@ mod tests {
             fae_logger,
         ));
 
-        let test = WaveTest::new(fae_client, less_client );
+        let test = WaveTest::new(fae_client, less_client);
 
         test.go().await.unwrap();
 

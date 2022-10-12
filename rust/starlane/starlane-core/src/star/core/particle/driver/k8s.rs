@@ -6,8 +6,8 @@ use kube::api::{ListParams, PostParams};
 use kube::Api;
 use serde::{Deserialize, Serialize};
 
-use cosmic_universe::hyper::Assign;
-use cosmic_universe::kind::BaseKind;
+use cosmic_space::hyper::Assign;
+use cosmic_space::kind::BaseKind;
 use mesh_portal::version::latest::id::Point;
 
 use crate::error::Error;

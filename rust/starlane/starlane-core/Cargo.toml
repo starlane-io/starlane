@@ -1,7 +1,7 @@
 [package]
 name = "starlane-core"
 version = "0.2.0-rc1"
-authors = ["Scott Williams <scott@mightydevco.com>"]
+authors = ["Scott Williams <scott@starlane.io>"]
 edition = "2018"
 description = "Resource Mesh"
 homepage = "http://starlane.io"
@@ -76,8 +76,8 @@ base64 = "0.13.0"
 
 cosmic-nom={ path="../../cosmic/cosmic-nom"}
 cosmic-macros={ path="../../cosmic/cosmic-macros"}
-cosmic-hyperverse={ path= "../../cosmic/cosmic-hyperverse" }
-cosmic-universe = { path= "../../cosmic/cosmic-universe" }
+cosmic-hyperspace={ path= "../../cosmic/cosmic-hyperspace" }
+cosmic-space = { path= "../../cosmic/cosmic-space" }
 
 async-recursion = "1.0.0"
 

@@ -26,13 +26,13 @@ impl MyHandler {
 ### FULL EXAMPLE
 
 ```rust
-use cosmic_universe::err::UniErr;
-use cosmic_universe::hyper::HyperSubstance;
-use cosmic_universe::log::PointLogger;
-use cosmic_universe::substance::Substance;
-use cosmic_universe::substance::Substance::Text;
-use cosmic_universe::wave::core::ReflectedCore;
-use cosmic_universe::wave::exchange::InCtx;
+use cosmic_space::err::UniErr;
+use cosmic_space::hyper::HyperSubstance;
+use cosmic_space::log::PointLogger;
+use cosmic_space::substance::Substance;
+use cosmic_space::substance::Substance::Text;
+use cosmic_space::wave::core::ReflectedCore;
+use cosmic_space::wave::exchange::InCtx;
 
 #[derive(DirectedHandler)]
 pub struct MyHandler {
@@ -42,7 +42,7 @@ pub struct MyHandler {
 #[routes]
 impl MyHandler {
    /// the route attribute captures an ExtMethod implementing a custom `MyNameIs`
-   /// notice that the InCtx will accept any valid cosmic_universe::substance::Substance
+   /// notice that the InCtx will accept any valid cosmic_space::substance::Substance
    #[route("Ext<MyNameIs>")]
    pub async fn hello(&self, ctx: InCtx<'_, Text>) -> Result<String, UniErr> {
      /// also we can return any Substance in our Reflected wave

@@ -15,7 +15,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::time::Duration;
 use walkdir::WalkDir;
 
-use cosmic_universe::kind::FileSubKind;
+use cosmic_space::kind::FileSubKind;
 use mesh_portal::version::latest::path::Path;
 
 use crate::error::Error;

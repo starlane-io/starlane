@@ -4,20 +4,22 @@ mod membrane;
 
 use crate::err::HostErr;
 use crate::membrane::WasmMembrane;
-use cosmic_universe::err::UniErr;
-use cosmic_universe::loc::Point;
-use cosmic_universe::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
-use cosmic_universe::particle::Details;
-use cosmic_universe::substance::Bin;
-use cosmic_universe::wasm::Timestamp;
-use cosmic_universe::wave::UltraWave;
-use cosmic_universe::{loc, VERSION};
+use cosmic_space::err::SpaceErr;
+use cosmic_space::loc::{Layer, Point, ToSurface};
+use cosmic_space::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
+use cosmic_space::particle::Details;
+use cosmic_space::substance::{Bin, Substance};
+use cosmic_space::wasm::Timestamp;
+use cosmic_space::wave::{Agent, DirectedProto, UltraWave};
+use cosmic_space::{loc, VERSION};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 use threadpool::ThreadPool;
 use wasmer::Function;
 use wasmer::{imports, Cranelift, Module, Store, Universal};
 use wasmer_compiler_singlepass::Singlepass;
+use cosmic_space::hyper::{HostCmd, HyperSubstance};
+use cosmic_space::wave::core::hyp::HypMethod;
 
 pub trait HostPlatform: Clone + Send + Sync
 where
@@ -118,10 +120,10 @@ where
         &self.details.stub.point
     }
 
-    pub fn init(&self, details: Details) -> Result<(), P::Err> {
+    pub fn create_guest(&self) -> Result<(), P::Err> {
         self.membrane.init()?;
         let version = self.membrane.write_string(VERSION.to_string())?;
-        let details: Vec<u8> = bincode::serialize(&details)?;
+        let details: Vec<u8> = bincode::serialize(&self.details)?;
         let details = self.membrane.write_buffer(&details)?;
         let ok = self
             .membrane
@@ -133,8 +135,23 @@ where
         if ok == 0 {
             Ok(())
         } else {
-            Err(format!("Mehctron init error {} ", ok).into())
+            Err(format!("Mechtron init error {} ", ok).into())
         }
+    }
+
+    pub fn create_mechtron(&self, host_cmd: HostCmd) -> Result<(), P::Err> {
+        let mut wave = DirectedProto::ping();
+        wave.to(self.details.stub.point.to_surface().with_layer(Layer::Core));
+        wave.from(self.details.stub.point.to_surface().with_layer(Layer::Host));
+        wave.method(HypMethod::Host);
+        wave.body(Substance::Hyper(HyperSubstance::Host(host_cmd)));
+        let wave = wave.build()?;
+        let wave = wave.to_ultra();
+        let pong = self.route(wave)?.ok_or("create_mechtron guest error")?;
+        let pong = pong.to_reflected()?.to_pong()?;
+        self.logger.result(pong.ok_or())?;
+
+        Ok(())
     }
 
     pub fn route(&self, wave: UltraWave) -> Result<Option<UltraWave>, P::Err> {
@@ -164,20 +181,20 @@ where
 mod tests {
     use super::*;
     use crate::err::DefaultHostErr;
-    use cosmic_universe::command::common::StateSrc;
-    use cosmic_universe::config::mechtron::MechtronConfig;
-    use cosmic_universe::hyper;
-    use cosmic_universe::hyper::{Assign, AssignmentKind, HostCmd, HyperSubstance};
-    use cosmic_universe::kind::{Kind, Sub};
-    use cosmic_universe::loc::ToSurface;
-    use cosmic_universe::log::{LogSource, StdOutAppender};
-    use cosmic_universe::particle::{Status, Stub};
-    use cosmic_universe::substance::Substance;
-    use cosmic_universe::wave::core::cmd::CmdMethod;
-    use cosmic_universe::wave::core::ext::ExtMethod;
-    use cosmic_universe::wave::core::hyp::HypMethod;
-    use cosmic_universe::wave::core::Method;
-    use cosmic_universe::wave::{DirectedProto, WaveId, WaveKind};
+    use cosmic_space::command::common::StateSrc;
+    use cosmic_space::config::mechtron::MechtronConfig;
+    use cosmic_space::hyper;
+    use cosmic_space::hyper::{Assign, AssignmentKind, HostCmd, HyperSubstance};
+    use cosmic_space::kind::{Kind, Sub};
+    use cosmic_space::loc::ToSurface;
+    use cosmic_space::log::{LogSource, StdOutAppender};
+    use cosmic_space::particle::{Status, Stub};
+    use cosmic_space::substance::Substance;
+    use cosmic_space::wave::core::cmd::CmdMethod;
+    use cosmic_space::wave::core::ext::ExtMethod;
+    use cosmic_space::wave::core::hyp::HypMethod;
+    use cosmic_space::wave::core::Method;
+    use cosmic_space::wave::{DirectedProto, WaveId, WaveKind};
     use std::str::FromStr;
     use std::{fs, thread};
 
@@ -220,7 +237,7 @@ mod tests {
         let mut details = Details::default();
         details.stub.point = Point::from_str("host:guest").unwrap();
         let guest = details.stub.point.to_surface();
-        host.init(details).unwrap();
+        host.create_mechtron(details).unwrap();
 
         let mechtron = Details {
             stub: Stub {
@@ -231,7 +248,7 @@ mod tests {
             properties: Default::default(),
         };
         let config = MechtronConfig {
-            bin: Point::root(),
+            wasm: Point::root(),
             name: "my-app".to_string(),
         };
         let host_cmd = HostCmd::new(

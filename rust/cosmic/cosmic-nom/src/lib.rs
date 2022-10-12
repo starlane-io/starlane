@@ -472,8 +472,6 @@ impl FindSubstring<&str> for SliceStr {
 pub mod test {
     use nom::Slice;
 
-    use cosmic_nom::SliceStr;
-
     use crate::SliceStr;
 
     #[test]

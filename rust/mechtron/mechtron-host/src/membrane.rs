@@ -3,13 +3,13 @@ use std::ops::Deref;
 use std::sync::{Arc, RwLock, Weak};
 
 use crate::HostPlatform;
-use cosmic_universe::err::UniErr;
-use cosmic_universe::loc::Point;
-use cosmic_universe::log::PointLogger;
-use cosmic_universe::substance::Substance;
-use cosmic_universe::wave::core::cmd::CmdMethod;
-use cosmic_universe::wave::core::Method;
-use cosmic_universe::wave::UltraWave;
+use cosmic_space::err::SpaceErr;
+use cosmic_space::loc::Point;
+use cosmic_space::log::PointLogger;
+use cosmic_space::substance::Substance;
+use cosmic_space::wave::core::cmd::CmdMethod;
+use cosmic_space::wave::core::Method;
+use cosmic_space::wave::UltraWave;
 use wasmer::{
     imports, Array, ChainableNamedResolver, Function, ImportObject, Instance, Module,
     NamedResolver, RuntimeError, WasmPtr, WasmerEnv,
@@ -33,7 +33,6 @@ where
     P: HostPlatform,
 {
     pub fn init(&self) -> Result<(), P::Err> {
-        println!("WASM MEMBRANE INIT CALLED");
         let mut pass = true;
         match self.instance.exports.get_memory("memory") {
             Ok(_) => {

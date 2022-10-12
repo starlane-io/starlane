@@ -1,12 +1,12 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use cosmic_universe::command::Command;
-use cosmic_universe::loc::Surface;
-use cosmic_universe::loc::ToSurface;
-use cosmic_universe::service::Global;
-use cosmic_universe::wave::core::Method;
-use cosmic_universe::wave::{AsyncTransmitterWithAgent, Transmitter};
+use cosmic_space::command::Command;
+use cosmic_space::loc::Surface;
+use cosmic_space::loc::ToSurface;
+use cosmic_space::service::Global;
+use cosmic_space::wave::core::Method;
+use cosmic_space::wave::{AsyncTransmitterWithAgent, Transmitter};
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Agent, ReqProto, ReqShell, RespShell};
 use mesh_portal::version::latest::msg::MsgMethod;

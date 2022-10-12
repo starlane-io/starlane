@@ -4,7 +4,7 @@ use std::sync::{Arc, RwLock};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
-use cosmic_universe::loc::StarKey;
+use cosmic_space::loc::StarKey;
 
 use crate::star::{StarInfo, StarKind};
 

@@ -12,9 +12,9 @@ use tokio::time::error::Elapsed;
 use tokio::time::Duration;
 use tokio::time::Instant;
 
-use cosmic_universe::hyper::ParticleRecord;
-use cosmic_universe::loc::StarKey;
-use cosmic_universe::loc::{ToPoint, ToSurface};
+use cosmic_space::hyper::ParticleRecord;
+use cosmic_space::loc::StarKey;
+use cosmic_space::loc::{ToPoint, ToSurface};
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{Message, ReqShell, RespShell};
 use mesh_portal::version::latest::parse::Res;

@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time::error::Elapsed;
 
-use cosmic_universe::hyper::{Assign, ParticleRecord};
-use cosmic_universe::loc::StarKey;
+use cosmic_space::hyper::{Assign, ParticleRecord};
+use cosmic_space::loc::StarKey;
 use mesh_portal::version::latest::id::Point;
 use mesh_portal::version::latest::messaging::{ReqShell, RespShell};
 

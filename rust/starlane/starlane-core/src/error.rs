@@ -30,7 +30,7 @@ use wasmer::{CompileError, ExportError, RuntimeError};
 use zip::result::ZipError;
 
 use cosmic_nom::Span;
-use cosmic_universe::err::StatusErr;
+use cosmic_space::err::StatusErr;
 use mesh_portal::error::MsgErr;
 
 use crate::fail::Fail;

@@ -3,7 +3,7 @@
 pub mod err;
 pub mod guest;
 mod membrane;
-mod uni;
+mod space;
 
 #[macro_use]
 extern crate lazy_static;
@@ -21,25 +21,25 @@ use core::str::FromStr;
 use cosmic_macros::handler;
 use cosmic_macros::route;
 use cosmic_macros::DirectedHandler;
-use cosmic_universe::err::UniErr;
-use cosmic_universe::hyper::HyperSubstance;
-use cosmic_universe::loc::{Layer, Point, ToSurface, Uuid};
-use cosmic_universe::log::{LogSource, NoAppender, PointLogger, RootLogger};
-use cosmic_universe::parse::SkewerCase;
-use cosmic_universe::particle::{Details, Stub};
-use cosmic_universe::wasm::Timestamp;
-use cosmic_universe::wave::exchange::SetStrategy;
-use cosmic_universe::wave::{Agent, DirectedWave, ReflectedAggregate, ReflectedWave, UltraWave};
-use cosmic_universe::{loc, VERSION};
+use cosmic_space::err::SpaceErr;
+use cosmic_space::hyper::HyperSubstance;
+use cosmic_space::loc::{Layer, Point, ToSurface, Uuid};
+use cosmic_space::log::{LogSource, NoAppender, PointLogger, RootLogger};
+use cosmic_space::parse::SkewerCase;
+use cosmic_space::particle::{Details, Stub};
+use cosmic_space::wasm::Timestamp;
+use cosmic_space::wave::exchange::SetStrategy;
+use cosmic_space::wave::{Agent, DirectedWave, ReflectedAggregate, ReflectedWave, UltraWave};
+use cosmic_space::{loc, VERSION};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::mpsc::Sender;
 use std::sync::{mpsc, MutexGuard};
 
-use cosmic_universe::wave::Bounce;
+use cosmic_space::wave::Bounce;
 
-use cosmic_universe::artifact::ArtifactApi;
-use cosmic_universe::wave::exchange::synch::{
+use cosmic_space::artifact::ArtifactApi;
+use cosmic_space::wave::exchange::synch::{
     DirectedHandler, DirectedHandlerProxy, DirectedHandlerShell, ExchangeRouter, InCtx,
     ProtoTransmitter, ProtoTransmitterBuilder,
 };
@@ -151,7 +151,7 @@ where
     }
 }
 
-/// MechtronSphere is the interface used by Guest
+/// MechtronLifecycle is the interface used by Guest
 /// to make important calls to the Mechtron
 pub trait MechtronLifecycle<P>: DirectedHandler + Sync + Send
 where
@@ -165,7 +165,7 @@ where
 /// Create a Mechtron by implementing this trait.
 /// Mechtrons are created per request and disposed of afterwards...
 /// Implementers of this trait should only hold references to
-/// Mechtron::Skel, Mechtron::Ctx & Mechtron::State at most.
+/// Mechtron::Skel, Mechtron::Ctx, Mechtron::Cache & Mechtron::State at most.
 pub trait Mechtron<P>: MechtronLifecycle<P> + Sync + Send + 'static
 where
     P: Platform,
@@ -183,7 +183,7 @@ where
     type Cache;
 
     /// State is the aspect of the Mechtron that is changeable.  It is recommended
-    /// to wrap State in a tokio Mutex or RwLock if used.  If you are implementing
+    /// to wrap State in a Mutex or RwLock if used.  If you are implementing
     /// a stateless mechtron then implement ```type State=();```
     type State;
 

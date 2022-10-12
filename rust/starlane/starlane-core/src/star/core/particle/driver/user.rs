@@ -17,10 +17,10 @@ use nom_supreme::final_parser::final_parser;
 use serde_json::{json, Value};
 use validator::validate_email;
 
-use cosmic_universe::command::Command;
-use cosmic_universe::hyper::Assign;
-use cosmic_universe::kind::{BaseKind, Kind};
-use cosmic_universe::parse::skewer_or_snake;
+use cosmic_space::command::Command;
+use cosmic_space::hyper::Assign;
+use cosmic_space::kind::{BaseKind, Kind};
+use cosmic_space::parse::skewer_or_snake;
 use mesh_portal::version::latest::command::common::StateSrc;
 use mesh_portal::version::latest::entity::request::create::{Create, PointSegFactory};
 use mesh_portal::version::latest::entity::request::get::{Get, GetOp};
