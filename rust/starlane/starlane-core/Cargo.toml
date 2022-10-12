@@ -1,7 +1,7 @@
 [package]
 name = "starlane-core"
 version = "0.2.0-rc1"
-authors = ["Scott Williams <scott@mightydevco.com>"]
+authors = ["Scott Williams <scott@starlane.io>"]
 edition = "2018"
 description = "Resource Mesh"
 homepage = "http://starlane.io"

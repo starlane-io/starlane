@@ -1,13 +1,12 @@
 [package]
 name = "mechtron-host"
-version = "0.1.0"
+version = "0.3.1-alpha"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-#wasm_membrane_host = { path= "../wasm-membrane-host" ,version = "0.3.0"}
-cosmic-space = { path= "../../cosmic/cosmic-space" }
+cosmic-space = { path= "../../cosmic/cosmic-space" ,version = "0.3.1-alpha"}
 threadpool = "1.8.1"
 wasmer = "2.3.0"
 wasmer-compiler-singlepass = "2.3.0"

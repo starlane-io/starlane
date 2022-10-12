@@ -1,9 +1,9 @@
 [package]
 name = "cosmic-cli"
-version = "0.3.0"
+version = "0.3.1-alpha"
 edition = "2021"
 
-authors = ["Scott Williams <scott@mightydevco.com>"]
+authors = ["Scott Williams <scott@starlane.io>"]
 description = "The Cosmic Cli provides command line inerface to access a running server enabled with The Cosmic Initiative framework http://thecosmicinitiative.io"
 homepage = "http://thecosmicinitiative.io"
 repository = "https://github.com/cosmic-initiative/cosmic-initiative"

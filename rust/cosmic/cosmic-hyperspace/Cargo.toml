@@ -1,10 +1,10 @@
 [package]
 name = "cosmic-hyperspace"
-version = "0.3.0"
+version = "0.3.1-alpha"
 edition = "2021"
 
-authors = ["Scott Williams <scott@mightydevco.com>"]
-description = "The Cosmic Hyperverse is the infrastructure component of The Cosmic Initiative framework that orchestrates and enforces security.  It is responsible for making the universe painless to extend by supplying goodies such as provisioning, sharding, load balancing, routing, discovery & of course security."
+authors = ["Scott Williams <scott@starlane.io>"]
+description = "The Cosmic Hyperspace is the infrastructure component of The Cosmic Initiative framework that orchestrates and enforces security.  It is responsible for making Space painless to extend by supplying goodies such as provisioning, sharding, load balancing, routing, discovery & of course security."
 homepage = "http://thecosmicinitiative.io"
 repository = "https://github.com/cosmic-initiative/cosmic-initiative"
 license = "MIT"
@@ -13,10 +13,10 @@ license = "MIT"
 
 [dependencies]
 async-recursion = "1.0.0"
-cosmic-macros = { path="../cosmic-macros",version = "0.3.0"}
-cosmic-space = { path= "../cosmic-space",version = "0.3.0"}
-cosmic-nom = { path="../cosmic-nom",version = "0.3.0"}
-cosmic-hyperlane = { path= "../cosmic-hyperlane" ,version = "0.3.0"}
+cosmic-macros = { path="../cosmic-macros",version = "0.3.1-alpha"}
+cosmic-space = { path= "../cosmic-space",version = "0.3.1-alpha"}
+cosmic-nom = { path="../cosmic-nom",version = "0.3.1-alpha"}
+cosmic-hyperlane = { path= "../cosmic-hyperlane" ,version = "0.3.1-alpha"}
 mechtron-host = { path="../../mechtron/mechtron-host" }
 threadpool = "1.8.1"
 acid-store = { version = "0.12.0", features=['store-directory','repo-value'] }

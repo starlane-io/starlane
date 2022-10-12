@@ -1,13 +1,15 @@
 [package]
 name = "mechtron"
-version = "0.3.0"
-authors = ["Scott Williams <scott@mightydevco.com>"]
+version = "0.3.1-alpha"
+authors = ["Scott Williams <scott@starlane.io>"]
 edition = "2021"
-homepage = "http://starlane.io"
-repository = "https://github.com/mechtronium/starlane"
+description = "Part of http://thecosmicinitiative.io This package--MECHTRON--provides an API and framework that allows a Wasm component to send and receive messages from other Wasm components."
+
+homepage = "http://thecosmicinitiative.io"
+repository = "https://github.com/cosmic-initiative/cosmic-initiative"
 license = "MIT"
-description = "The Wasm Package to help easily create a Mechtron"
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
 
 #[lib]
 #crate-type = ["cdylib", "rlib"]
@@ -15,10 +17,9 @@ description = "The Wasm Package to help easily create a Mechtron"
 
 [dependencies]
 lazy_static = {version="1.4.0", features=["spin_no_std"] }
-#wasm_membrane_guest = { path="../wasm-membrane-guest"}
 bincode = "1.3.3"
-cosmic-space= { path= "../../cosmic/cosmic-space" }
-cosmic-macros= { path= "../../cosmic/cosmic-macros" }
+cosmic-space= { path= "../../cosmic/cosmic-space" ,version = "0.3.1-alpha"}
+cosmic-macros= { path= "../../cosmic/cosmic-macros" ,version = "0.3.1-alpha"}
 serde = { version="1.0.69", features=['derive','rc'] }
 dashmap = "5.3.4"
 # `wee_alloc` is a tiny allocator for wasm that is only ~1K in code size
