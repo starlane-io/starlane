@@ -1,6 +1,6 @@
 #![allow(warnings)]
-use std::fs;
 use cosmic_hyperlane_tcp::CertGenerator;
+use std::fs;
 pub mod err;
 pub mod properties;
 
@@ -72,7 +72,7 @@ fn main() -> Result<(), StarErr> {
         tokio::time::timeout(Duration::from_secs(30), machine_api.wait_ready())
             .await
             .unwrap();
-println!("> STARLANE Ready!");
+        println!("> STARLANE Ready!");
         // this is a dirty hack which is good enough for a 0.3.0 release...
         loop {
             tokio::time::sleep(Duration::from_secs(60)).await;
@@ -132,7 +132,6 @@ impl Starlane {
          */
         let ctx = MemRegCtx::new();
         Ok(Self { ctx })
-
     }
 }
 
@@ -231,25 +230,30 @@ impl Cosmos for Starlane {
     async fn start_services(&self, gate: &Arc<HyperGateSelector>) {
         let dir = match dirs::home_dir() {
             None => ".starlane/localhost/certs".to_string(),
-            Some(path) => format!("{}/.starlane/localhost/certs", path.display() )
+            Some(path) => format!("{}/.starlane/localhost/certs", path.display()),
         };
-        fs::create_dir_all(dir.as_str() );
+        fs::create_dir_all(dir.as_str());
 
         let cert = format!("{}/cert.pem", dir.as_str());
         let key = format!("{}/key.pem", dir.as_str());
-        let cert_path =  Path::new(&cert );
-        let key_path=  Path::new(&key);
+        let cert_path = Path::new(&cert);
+        let key_path = Path::new(&key);
 
         if !cert_path.exists() || !key_path.exists() {
-            CertGenerator::gen(vec!["localhost".to_string()]).unwrap()
-            .write_to_dir(dir.clone())
-            .await.unwrap();
+            CertGenerator::gen(vec!["localhost".to_string()])
+                .unwrap()
+                .write_to_dir(dir.clone())
+                .await
+                .unwrap();
         };
 
-        let logger = self.logger().point(Point::from_str("control-server").unwrap());
+        let logger = self
+            .logger()
+            .point(Point::from_str("control-server").unwrap());
         let server =
             HyperlaneTcpServer::new(STARLANE_CONTROL_PORT.clone(), dir, gate.clone(), logger)
-                .await.unwrap();
+                .await
+                .unwrap();
         server.start().unwrap();
     }
 }

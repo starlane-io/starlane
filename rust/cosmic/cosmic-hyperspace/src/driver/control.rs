@@ -2,6 +2,7 @@ use crate::driver::{
     Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Item,
     ItemRouter, ItemSphere,
 };
+use crate::err::HyperErr;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::Cosmos;
 use cosmic_hyperlane::{
@@ -31,15 +32,12 @@ use cosmic_space::wave::exchange::asynch::{
     Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TraversalRouter,
 };
 use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{
-    Agent, DirectedProto, DirectedWave, Pong, ToRecipients, UltraWave, Wave,
-};
+use cosmic_space::wave::{Agent, DirectedProto, DirectedWave, Pong, ToRecipients, UltraWave, Wave};
 use dashmap::DashMap;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use crate::err::HyperErr;
 
 pub struct ControlDriverFactory<P>
 where
@@ -434,7 +432,7 @@ impl<P> TraversalRouter for Control<P>
 where
     P: Cosmos,
 {
-    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(),SpaceErr>{
+    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
         self.skel.driver.logger.track(&traversal, || {
             Tracker::new(
                 format!("control -> {}", traversal.dir.to_string()),
@@ -506,7 +504,6 @@ impl ControlClient {
     pub async fn wait_for_ready(&self, duration: Duration) -> Result<(), SpaceErr> {
         self.client.wait_for_ready(duration).await
     }
-
 
     pub async fn wait_for_greet(&self) -> Result<Greet, SpaceErr> {
         self.client.wait_for_greet().await

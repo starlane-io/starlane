@@ -10,7 +10,7 @@ use crate::wave::{
     Handling, Ping, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto, ReflectedWave,
     Scope, UltraWave, Wave, WaveKind,
 };
-use crate::{Agent, ReflectedCore, Substance, Surface, ToSubstance, SpaceErr};
+use crate::{Agent, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
 use alloc::borrow::Cow;
 use std::sync::Arc;
 

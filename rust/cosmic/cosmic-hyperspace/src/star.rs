@@ -9,12 +9,12 @@ use std::time::Duration;
 
 use dashmap::mapref::one::{Ref, RefMut};
 use dashmap::DashMap;
-use futures::future::{BoxFuture, join_all};
+use futures::future::{join_all, BoxFuture};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock, watch};
+use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 use tokio::time::error::Elapsed;
 use tracing::{error, info};
 
@@ -36,11 +36,11 @@ use cosmic_space::hyper::{
 use cosmic_space::hyper::{MountKind, ParticleLocation};
 use cosmic_space::kind::{BaseKind, Kind, StarStub, StarSub, Sub};
 use cosmic_space::loc::{
-    GLOBAL_EXEC, Layer, LOCAL_STAR, Point, RouteSeg, StarKey, Surface, SurfaceSelector, ToBaseKind,
-    Topic, ToPoint, ToSurface, Uuid,
+    Layer, Point, RouteSeg, StarKey, Surface, SurfaceSelector, ToBaseKind, ToPoint, ToSurface,
+    Topic, Uuid, GLOBAL_EXEC, LOCAL_STAR,
 };
 use cosmic_space::log::{PointLogger, RootLogger, Trackable, Tracker};
-use cosmic_space::parse::{bind_config, Env, route_attribute};
+use cosmic_space::parse::{bind_config, route_attribute, Env};
 use cosmic_space::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
@@ -59,7 +59,7 @@ use cosmic_space::wave::exchange::asynch::{
 use cosmic_space::wave::exchange::SetStrategy;
 use cosmic_space::wave::{
     Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
-    HandlingKind, Ping, Pong, Priority, Recipients, RecipientSelector, Reflectable, ReflectedWave,
+    HandlingKind, Ping, Pong, Priority, RecipientSelector, Recipients, Reflectable, ReflectedWave,
     Retries, Ripple, Scope, Signal, SingularRipple, ToRecipients, WaitTime, Wave, WaveKind,
 };
 use cosmic_space::wave::{HyperWave, UltraWave};
@@ -67,10 +67,11 @@ use cosmic_space::HYPERUSER;
 
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, Drivers,
-    DriversApi, DriversCall, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler,
+    Driver, DriverAvail, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, DriverSkel,
+    DriverStatus, Drivers, DriversApi, DriversCall, HyperDriverFactory, Item, ItemHandler,
     ItemSkel, ItemSphere,
 };
+use crate::err::HyperErr;
 use crate::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
 use crate::layer::field::Field;
 use crate::layer::shell::Shell;
@@ -78,7 +79,6 @@ use crate::layer::shell::ShellState;
 use crate::machine::MachineSkel;
 use crate::reg::{Registration, Registry, RegistryApi};
 use crate::{Cosmos, DriversBuilder};
-use crate::err::HyperErr;
 
 #[derive(Clone)]
 pub struct ParticleStates<P>
@@ -200,12 +200,15 @@ where
             properties: Default::default(),
             owner: point.clone(),
             strategy: Strategy::Ensure,
-            status: Status::Unknown
+            status: Status::Unknown,
         };
 
         machine.registry.register(&registration).await.unwrap();
-        machine.registry.assign(&point, ParticleLocation::new(point.clone(),None)).await.unwrap();
-
+        machine
+            .registry
+            .assign(&point, ParticleLocation::new(point.clone(), None))
+            .await
+            .unwrap();
 
         let api = HyperStarApi::new(
             template.kind.clone(),
@@ -281,7 +284,11 @@ where
     }
 
     pub fn data_dir(&self) -> String {
-        format!("{}/{}/", self.machine.cosmos.data_dir(), self.point.to_string() )
+        format!(
+            "{}/{}/",
+            self.machine.cosmos.data_dir(),
+            self.point.to_string()
+        )
     }
 
     /*
@@ -329,10 +336,10 @@ where
         )?;
 
         let details = Details {
-            stub: Stub{
+            stub: Stub {
                 point: point_kind.point,
                 kind: point_kind.kind,
-                status: Status::Unknown
+                status: Status::Unknown,
             },
             properties: Default::default(),
         };
@@ -355,8 +362,8 @@ where
             kind: HandlingKind::Durable,
             priority: Default::default(),
             retries: Default::default(),
-            wait: WaitTime::High
-        } );
+            wait: WaitTime::High,
+        });
         let transmitter = transmitter.build();
         let assign_result: Wave<Pong> = logger.result_ctx(
             "StarSkel::create(assign_result)",
@@ -696,7 +703,6 @@ where
             star_tx.drivers_status_rx.clone(),
         );
 
-
         let star_rx = star_tx.call_rx.take().unwrap();
         let star_tx = star_tx.call_tx;
 
@@ -803,8 +809,8 @@ where
                                     .unwrap();
                                 star_driver.init_item(skel.point.to_point()).await;
                                 api.start_wrangling().await;
-// seeing if wrangling can wait on MachineApi...
-status_tx.send(Status::Ready).await;
+                                // seeing if wrangling can wait on MachineApi...
+                                status_tx.send(Status::Ready).await;
                             }
                             DriverStatus::Retrying(_) => {
                                 status_tx.send(Status::Panic).await;
@@ -882,7 +888,6 @@ status_tx.send(Status::Ready).await;
             });
         }
 
-
         let kind = skel.kind.clone();
         {
             let star = Self {
@@ -935,11 +940,7 @@ status_tx.send(Status::Ready).await;
                     HyperStarCall::LayerTraversalInjection(inject) => {
                         let layer_traversal_engine = self.layer_traversal_engine.clone();
                         tokio::spawn(async move {
-                            layer_traversal_engine
-                                .start_layer_traversal(
-                                    inject
-                                )
-                                .await;
+                            layer_traversal_engine.start_layer_traversal(inject).await;
                         });
                     }
                     HyperStarCall::Stub(rtn) => {
@@ -1037,11 +1038,9 @@ status_tx.send(Status::Ready).await;
                     surface: injector.clone(),
                     wave: transport.to_ultra(),
                     from_gravity: true,
-                    dir: None
+                    dir: None,
                 };
-                layer_engine
-                    .start_layer_traversal(injection )
-                    .await;
+                layer_engine.start_layer_traversal(injection).await;
             });
             Ok(())
         } else {
@@ -1145,19 +1144,31 @@ status_tx.send(Status::Ready).await;
                         }
                     }
                     _ => {
-if wave.track() {
-    println!("sharding {} to {}", wave.kind().to_string(), wave.to().to_string());
-}
+                        if wave.track() {
+                            println!(
+                                "sharding {} to {}",
+                                wave.kind().to_string(),
+                                wave.to().to_string()
+                            );
+                        }
                         let to = wave.to().unwrap_single();
                         let location = locator.locate(&to.point).await?;
-if wave.track() {
-    println!("\twith LOCATION {} in {}", location.star.to_string(), skel.point.to_string() );
-}
+                        if wave.track() {
+                            println!(
+                                "\twith LOCATION {} in {}",
+                                location.star.to_string(),
+                                skel.point.to_string()
+                            );
+                        }
 
                         if location.star == skel.point {
-if wave.track() {
-    println!("\tSAME POINT -> {} to {}", wave.kind().to_string(), wave.to().to_string());
-}
+                            if wave.track() {
+                                println!(
+                                    "\tSAME POINT -> {} to {}",
+                                    wave.kind().to_string(),
+                                    wave.to().to_string()
+                                );
+                            }
                             let mut inject = TraversalInjection::new(
                                 skel.point.to_surface().with_layer(Layer::Gravity),
                                 wave,
@@ -1232,10 +1243,7 @@ if wave.track() {
     }
 
     async fn start_wrangling(&self) {
-
         self.skel.machine.api.wait_ready().await;
-
-
 
         let skel = self.skel.clone();
         tokio::spawn(async move {
@@ -1364,15 +1372,11 @@ where
         }
     }
 
-    async fn start_layer_traversal(
-        &self,
-        injection: TraversalInjection,
-    ) -> Result<(), P::Err> {
-
+    async fn start_layer_traversal(&self, injection: TraversalInjection) -> Result<(), P::Err> {
         let wave = injection.wave;
         let from_gravity = injection.from_gravity;
         let inject_dir = injection.dir;
-        let injection= injection.surface;
+        let injection = injection.surface;
 
         #[cfg(test)]
         self.skel
@@ -1456,7 +1460,11 @@ where
                 }
             } else if to.point == wave.from().point {
                 if wave.track() {
-                    println!("\twave is to and from the same point... {} <{}>", wave.from().to_string(), wave.kind().to_string() )
+                    println!(
+                        "\twave is to and from the same point... {} <{}>",
+                        wave.from().to_string(),
+                        wave.kind().to_string()
+                    )
                 }
                 // it's the SAME point, so the to layer becomes our dest
                 dest.replace(to.layer.clone());
@@ -1665,7 +1673,7 @@ pub struct StarMount {
 pub struct LayerInjectionRouter {
     pub inject_tx: mpsc::Sender<TraversalInjection>,
     pub injector: Surface,
-    pub direction: Option<TraversalDirection>
+    pub direction: Option<TraversalDirection>,
 }
 
 impl LayerInjectionRouter {
@@ -1676,7 +1684,7 @@ impl LayerInjectionRouter {
         Self {
             inject_tx: skel.inject_tx.clone(),
             injector,
-            direction: None
+            direction: None,
         }
     }
 
@@ -1684,7 +1692,7 @@ impl LayerInjectionRouter {
         Self {
             inject_tx: self.inject_tx.clone(),
             injector,
-            direction: None
+            direction: None,
         }
     }
 
@@ -1692,7 +1700,7 @@ impl LayerInjectionRouter {
         Self {
             inject_tx,
             injector,
-            direction: None
+            direction: None,
         }
     }
 }
@@ -1710,7 +1718,7 @@ impl TraverseToNextRouter {
 
 #[async_trait]
 impl TraversalRouter for TraverseToNextRouter {
-    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(),SpaceErr> {
+    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
         self.tx.send(traversal).await?;
         Ok(())
     }

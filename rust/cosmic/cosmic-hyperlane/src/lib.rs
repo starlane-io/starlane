@@ -216,8 +216,8 @@ impl HyperwayEndpoint {
                     while let Some(wave) = endpoint.rx.recv().await {
                         logger.track(&wave, || Tracker::new("hyperway-endpoint", "Rx"));
                         match logger.result(my_tx.send(wave).await) {
-                            Ok(_) => {},
-                            Err(_) => break
+                            Ok(_) => {}
+                            Err(_) => break,
                         }
                     }
                 });
@@ -225,11 +225,10 @@ impl HyperwayEndpoint {
 
             let logger = logger.push_mark("mux:rx").unwrap();
             while let Some(wave) = self.rx.recv().await {
-                logger
-                    .track(&wave, || Tracker::new("hyperway-endpoint", "Tx"));
+                logger.track(&wave, || Tracker::new("hyperway-endpoint", "Tx"));
                 match logger.result(end_tx.send(wave).await) {
                     Ok(_) => {}
-                    Err(_) => break
+                    Err(_) => break,
                 }
             }
         });
@@ -1795,7 +1794,7 @@ impl HyperClientRunner {
                     );
                 }
 
-//                runner.logger.warn("client relay interrupted");
+                //                runner.logger.warn("client relay interrupted");
 
                 Ok(())
             }

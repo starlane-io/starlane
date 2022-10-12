@@ -63,7 +63,6 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
         &self,
         status_tx: mpsc::Sender<HyperConnectionDetails>,
     ) -> Result<HyperwayEndpoint, SpaceErr> {
-
         let mut connector: SslConnectorBuilder =
             SslConnector::builder(SslMethod::tls()).map_err(SpaceErr::map)?;
 
@@ -82,7 +81,10 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
         let stream = TcpStream::connect(&self.host).await?;
 
         let mut stream = SslStream::new(ssl, stream).map_err(SpaceErr::map)?;
-        Pin::new(&mut stream).connect().await.map_err(SpaceErr::map)?;
+        Pin::new(&mut stream)
+            .connect()
+            .await
+            .map_err(SpaceErr::map)?;
         let mut stream = FrameStream::new(stream);
 
         let endpoint =
@@ -205,13 +207,12 @@ impl FrameMuxer {
         status_tx: mpsc::Sender<HyperConnectionDetails>,
         logger: PointLogger,
     ) -> Result<HyperwayEndpoint, SpaceErr> {
-
         stream.write_version(&VERSION.clone()).await?;
         let in_version =
             tokio::time::timeout(Duration::from_secs(30), stream.read_version()).await??;
 
         if in_version == *VERSION {
-//            logger.info("version match");
+            //            logger.info("version match");
 
             stream.write_string("Ok".to_string()).await?;
         } else {
@@ -427,7 +428,7 @@ impl HyperlaneTcpServer {
                         let logger = logger.clone();
                         tokio::spawn(async move {
                             while let Some(details) = status_rx.recv().await {
-/*                                logger.info(format!(
+                                /*                                logger.info(format!(
                                     "{} | {}",
                                     details.status.to_string(),
                                     details.info

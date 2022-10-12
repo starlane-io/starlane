@@ -21,7 +21,7 @@ use exchange::asynch::ProtoTransmitter;
 use crate::command::Command;
 use crate::command::RawCommand;
 use crate::config::bind::RouteSelector;
-use crate::err::{CoreReflector, StatusErr, SpaceErr};
+use crate::err::{CoreReflector, SpaceErr, StatusErr};
 use crate::hyper::AssignmentKind;
 use crate::hyper::InterchangeKind::DefaultControl;
 use crate::kind::Sub;
@@ -822,7 +822,7 @@ where
 
     pub fn require_body<B>(self) -> Result<B, SpaceErr>
     where
-        B: TryFrom<Substance, Error =SpaceErr>,
+        B: TryFrom<Substance, Error = SpaceErr>,
     {
         match B::try_from(self.body.clone()) {
             Ok(body) => Ok(body),
@@ -969,7 +969,7 @@ impl Ping {
 
     pub fn require_body<B>(self) -> Result<B, SpaceErr>
     where
-        B: TryFrom<Substance, Error =SpaceErr>,
+        B: TryFrom<Substance, Error = SpaceErr>,
     {
         match B::try_from(self.clone().core.body) {
             Ok(body) => Ok(body),
@@ -1426,7 +1426,7 @@ impl DirectedProto {
         Ok(())
     }
 
-    pub fn method<M: Into<Method>+Clone>(&mut self, method: M) {
+    pub fn method<M: Into<Method> + Clone>(&mut self, method: M) {
         self.method.replace(method.clone().into());
         self.core.method = method.into();
     }
@@ -2677,7 +2677,9 @@ impl Wave<Signal> {
 
     pub fn unwrap_from_hop(self) -> Result<Wave<Signal>, SpaceErr> {
         if self.method != Method::Hyp(HypMethod::Hop) {
-            return Err(SpaceErr::from_500("expected signal wave to have method Hop"));
+            return Err(SpaceErr::from_500(
+                "expected signal wave to have method Hop",
+            ));
         }
         if let Substance::UltraWave(wave) = &self.body {
             Ok((*wave.clone()).to_signal()?)
@@ -3224,7 +3226,7 @@ pub enum Bounce<W> {
 impl<W> Bounce<W> {
     pub fn to_core_bounce(self) -> CoreBounce
     where
-        W: TryInto<ReflectedCore, Error =SpaceErr>,
+        W: TryInto<ReflectedCore, Error = SpaceErr>,
     {
         match self {
             Bounce::Absorbed => Bounce::Absorbed,

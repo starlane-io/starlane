@@ -5,7 +5,7 @@ use url::Url;
 
 use cosmic_space::artifact::ArtRef;
 use cosmic_space::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
-use cosmic_space::err::{CoreReflector, StatusErr, SpaceErr};
+use cosmic_space::err::{CoreReflector, SpaceErr, StatusErr};
 use cosmic_space::loc::{Layer, Point, Surface, ToSurface};
 use cosmic_space::log::{PointLogger, Trackable};
 use cosmic_space::parse::model::{PipelineSegmentVar, PipelineVar};
@@ -21,10 +21,10 @@ use cosmic_space::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Pong, Reflection, UltraWave, Wave,
 };
 
-use crate::star::{HyperStarSkel, LayerInjectionRouter, TraverseToNextRouter};
-use crate::Cosmos;
 use crate::err::HyperErr;
 use crate::reg::RegistryApi;
+use crate::star::{HyperStarSkel, LayerInjectionRouter, TraverseToNextRouter};
+use crate::Cosmos;
 
 pub struct Field<P>
 where
@@ -54,7 +54,10 @@ where
         }
     }
 
-    async fn bind(&self, directed: &Traversal<DirectedWave>) -> Result<ArtRef<BindConfig>, SpaceErr> {
+    async fn bind(
+        &self,
+        directed: &Traversal<DirectedWave>,
+    ) -> Result<ArtRef<BindConfig>, SpaceErr> {
         let record = self
             .skel
             .registry

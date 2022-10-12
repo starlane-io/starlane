@@ -11,7 +11,7 @@ use dashmap::DashMap;
 use tokio::join;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{Mutex, oneshot};
+use tokio::sync::{oneshot, Mutex};
 use tokio::time::error::Elapsed;
 
 use cosmic_hyperlane::{
@@ -40,15 +40,15 @@ use cosmic_space::HYPERUSER;
 
 use crate::driver::base::BaseDriverFactory;
 //use crate::control::ControlDriverFactory;
-use crate::driver::control::{ControlClient, ControlCliSession, ControlDriverFactory};
+use crate::driver::control::{ControlCliSession, ControlClient, ControlDriverFactory};
 use crate::driver::root::RootDriverFactory;
 use crate::driver::space::SpaceDriverFactory;
 use crate::driver::{DriverAvail, DriverFactory};
 use crate::err::CosmicErr;
 use crate::machine::MachineApiExtFactory;
-use crate::star::HyperStarApi;
 use crate::mem::cosmos::MemCosmos;
 use crate::mem::registry::MemRegCtx;
+use crate::star::HyperStarApi;
 
 use super::*;
 
@@ -817,6 +817,7 @@ fn test_publish() -> Result<(), CosmicErr> {
 
         tokio::time::sleep(Duration::from_secs(1)).await;
 
+        /*
         let fetcher = Arc::new(ReadArtifactFetcher::new(client.transmitter_builder().await.unwrap().build()));
         let artifacts = ArtifactApi::new(fetcher);
 
@@ -832,7 +833,9 @@ fn test_publish() -> Result<(), CosmicErr> {
         reflect.ok_or().unwrap();
         assert!(reflect.is_ok());
 
+
         let tx = client.transmitter_builder().await?.build();
+         */
 //        assert!(tx.bounce(&Point::from_str("localhost:my-app").unwrap().to_surface()).await);
 
 
@@ -917,5 +920,3 @@ fn test_mechtron() -> Result<(), CosmicErr> {
         Ok(())
     })
 }
-
-

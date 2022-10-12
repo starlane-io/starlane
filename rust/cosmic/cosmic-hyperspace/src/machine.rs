@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
-use futures::future::{BoxFuture, join_all, select_all};
+use futures::future::{join_all, select_all, BoxFuture};
 use futures::FutureExt;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::error::RecvError;
@@ -33,15 +33,15 @@ use cosmic_space::log::{PointLogger, RootLogger};
 use cosmic_space::particle::{Status, Stub};
 use cosmic_space::settings::Timeouts;
 use cosmic_space::substance::{Bin, Substance};
+use cosmic_space::wave::core::cmd::CmdMethod;
 use cosmic_space::wave::exchange::asynch::Exchanger;
 use cosmic_space::wave::exchange::SetStrategy;
 use cosmic_space::wave::{Agent, DirectedProto, HyperWave, Pong, UltraWave, Wave};
-use cosmic_space::wave::core::cmd::CmdMethod;
 
-use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
-use crate::{Cosmos, DriversBuilder};
 use crate::err::HyperErr;
 use crate::reg::{Registry, RegistryApi};
+use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
+use crate::{Cosmos, DriversBuilder};
 
 #[derive(Clone)]
 pub struct MachineApi<P>
@@ -390,7 +390,6 @@ where
         let client =
             HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger.clone())
                 .unwrap();
-
 
         let fetcher = Arc::new(ClientArtifactFetcher::new(client, skel.registry.clone()));
         skel.artifacts.set_fetcher(fetcher).await;

@@ -12,14 +12,14 @@ use crate::loc::{
     MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, STAR_WAVE_TRAVERSAL_PLAN,
     STD_WAVE_TRAVERSAL_PLAN,
 };
-use crate::parse::{kind_parts, CamelCase, Domain, SkewerCase, specific};
+use crate::parse::error::result;
+use crate::parse::{kind_parts, specific, CamelCase, Domain, SkewerCase};
 use crate::particle::traversal::TraversalPlan;
 use crate::selector::{
     KindSelector, KindSelectorDef, Pattern, SpecificSelector, SubKindSelector, VersionReq,
 };
 use crate::util::ValuePattern;
 use crate::{KindTemplate, SpaceErr};
-use crate::parse::error::result;
 
 impl ToBaseKind for KindParts {
     fn to_base(&self) -> BaseKind {
@@ -136,7 +136,7 @@ pub enum BaseKind {
     Global,
     Host,
     Guest,
-    Native
+    Native,
 }
 
 impl BaseKind {
@@ -153,7 +153,7 @@ pub enum Sub {
     Artifact(ArtifactSubKind),
     UserBase(UserBaseSubKind),
     Star(StarSub),
-    Native(NativeSub)
+    Native(NativeSub),
 }
 
 impl Sub {
@@ -165,7 +165,7 @@ impl Sub {
             Sub::Artifact(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
             Sub::UserBase(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
             Sub::Star(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
-            Sub::Native(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap())
+            Sub::Native(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
         }
     }
 
@@ -193,7 +193,7 @@ impl Into<Option<CamelCase>> for Sub {
             Sub::Artifact(a) => a.into(),
             Sub::UserBase(u) => u.into(),
             Sub::Star(s) => s.into(),
-            Sub::Native(s) => s.into()
+            Sub::Native(s) => s.into(),
         }
     }
 }
@@ -207,7 +207,7 @@ impl Into<Option<String>> for Sub {
             Sub::Artifact(a) => a.into(),
             Sub::UserBase(u) => u.into(),
             Sub::Star(s) => s.into(),
-            Sub::Native(s) => s.into()
+            Sub::Native(s) => s.into(),
         }
     }
 }
@@ -252,7 +252,7 @@ pub enum Kind {
     Global,
     Host,
     Guest,
-    Native(NativeSub)
+    Native(NativeSub),
 }
 
 impl ToBaseKind for Kind {
@@ -305,6 +305,7 @@ impl Kind {
             Kind::Bundle => true,
             Kind::Artifact(_) => true,
             Kind::Mechtron => true,
+            Kind::Host => true,
             Kind::Native(NativeSub::Web) => true,
             _ => false,
         }
@@ -515,7 +516,6 @@ impl StarSub {
     }
 }
 
-
 impl Into<Sub> for NativeSub {
     fn into(self) -> Sub {
         Sub::Native(self)
@@ -533,7 +533,6 @@ impl Into<Option<String>> for NativeSub {
         Some(self.to_string())
     }
 }
-
 
 impl Into<Sub> for StarSub {
     fn into(self) -> Sub {
@@ -777,7 +776,7 @@ impl TryInto<SpecificSelector> for Specific {
 pub mod test {
     use crate::parse::kind_selector;
     use crate::selector::KindSelector;
-    use crate::{Kind, StarSub, SpaceErr};
+    use crate::{Kind, SpaceErr, StarSub};
     use core::str::FromStr;
 
     #[test]

@@ -14,7 +14,7 @@ use crate::wave::{
     FromReflectedAggregate, Handling, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto,
     ReflectedWave, Scope, UltraWave, Wave, WaveId,
 };
-use crate::{Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, SpaceErr};
+use crate::{Agent, Point, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
 use alloc::borrow::Cow;
 use dashmap::{DashMap, DashSet};
 use std::collections::HashSet;
@@ -43,7 +43,7 @@ pub trait Router: Send + Sync {
 
 #[async_trait]
 pub trait TraversalRouter: Send + Sync {
-    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(),SpaceErr>;
+    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr>;
 }
 
 #[derive(Clone)]

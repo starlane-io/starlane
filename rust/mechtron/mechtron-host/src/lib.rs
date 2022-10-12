@@ -118,7 +118,7 @@ where
         &self.details.stub.point
     }
 
-    pub fn init(&self, details: Details) -> Result<(), P::Err> {
+    pub fn create_mechtron(&self, details: Details) -> Result<(), P::Err> {
         self.membrane.init()?;
         let version = self.membrane.write_string(VERSION.to_string())?;
         let details: Vec<u8> = bincode::serialize(&details)?;
@@ -220,7 +220,7 @@ mod tests {
         let mut details = Details::default();
         details.stub.point = Point::from_str("host:guest").unwrap();
         let guest = details.stub.point.to_surface();
-        host.init(details).unwrap();
+        host.create_mechtron(details).unwrap();
 
         let mechtron = Details {
             stub: Stub {

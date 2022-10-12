@@ -457,7 +457,7 @@ pub enum VarVal<V> {
 
 impl<V> ToResolved<V> for VarVal<V>
 where
-    V: FromStr<Err =SpaceErr>,
+    V: FromStr<Err = SpaceErr>,
 {
     fn to_resolved(self, env: &Env) -> Result<V, SpaceErr> {
         match self {
@@ -1515,7 +1515,9 @@ impl Point {
         GLOBAL_LOGGER.clone()
     }
 
-    pub fn global_registry() -> Self { GLOBAL_REGISTRY.clone() }
+    pub fn global_registry() -> Self {
+        GLOBAL_REGISTRY.clone()
+    }
 
     pub fn local_portal() -> Self {
         LOCAL_PORTAL.clone()
@@ -1834,7 +1836,7 @@ where
         let mut post_fileroot = false;
 
         if self.segments.is_empty() {
-            rtn.push_str( "ROOT");
+            rtn.push_str("ROOT");
             rtn.to_string()
         } else {
             for (i, segment) in self.segments.iter().enumerate() {
@@ -1884,8 +1886,6 @@ impl Point {
         self.segments.is_empty() && self.route.is_local()
     }
 }
-
-
 
 impl PointVar {
     pub fn is_dir(&self) -> bool {
@@ -2036,14 +2036,14 @@ pub trait PointFactory: Send + Sync {
 
 #[cfg(test)]
 pub mod test {
-    use core::str::FromStr;
     use crate::Point;
+    use core::str::FromStr;
 
     #[test]
     pub fn test_root_routes() {
         let point = Point::from_str("GLOBAL::star").unwrap();
         let parent = point.parent().unwrap();
         assert!(!parent.is_local_root());
-        assert_eq!( parent.to_string(), "GLOBAL::ROOT".to_string() )
+        assert_eq!(parent.to_string(), "GLOBAL::ROOT".to_string())
     }
 }

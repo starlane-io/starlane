@@ -37,9 +37,9 @@ impl SpaceErr {
                 println!("{}: {}", status, message);
             }
             SpaceErr::ParseErrs(errs) => {
-println!("REport len: {}", errs.report.len() );
+                println!("REport len: {}", errs.report.len());
                 for report in &errs.report {
-                   let report : ariadne::Report = report.clone().into();
+                    let report: ariadne::Report = report.clone().into();
                     if let Some(source) = &errs.source {
                         let source = source.to_string();
                         report.print(ariadne::Source::from(source));
@@ -186,8 +186,6 @@ impl Debug for SpaceErr {
     }
 }
 
-
-
 impl SpaceErr {
     pub fn new<S: ToString>(status: u16, message: S) -> Self {
         Self::Status {
@@ -260,7 +258,7 @@ impl Display for SpaceErr {
                 f.write_str(format!("{}: {}", status, message).as_str())
             }
             SpaceErr::ParseErrs(errs) => {
-println!("PRINING!");
+                println!("PRINING!");
                 self.print();
                 f.write_str("Error Report...")
             }
@@ -545,7 +543,12 @@ impl ParseErrs {
         return ParseErrs::from_report(report, span.extra()).into();
     }
 
-    pub fn from_range(message: &str, label: &str, range: Range<usize>, extra: SpanExtra) -> SpaceErr {
+    pub fn from_range(
+        message: &str,
+        label: &str,
+        range: Range<usize>,
+        extra: SpanExtra,
+    ) -> SpaceErr {
         let mut builder = Report::build(ReportKind::Error, (), 23);
         let report = builder
             .with_message(message)
@@ -565,7 +568,6 @@ impl ParseErrs {
             .finish();
         return ParseErrs::from_report(report, span.extra()).into();
     }
-
 
     pub fn fold<E: Into<ParseErrs>>(errs: Vec<E>) -> ParseErrs {
         let errs: Vec<ParseErrs> = errs.into_iter().map(|e| e.into()).collect();
@@ -737,7 +739,7 @@ pub mod report {
         fn into(self) -> std::ops::Range<usize> {
             std::ops::Range {
                 start: self.start as usize,
-                end: self.end as usize
+                end: self.end as usize,
             }
         }
     }

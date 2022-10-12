@@ -220,8 +220,7 @@ where
     }
 }
 
-pub struct BundleSeriesDriver {
-}
+pub struct BundleSeriesDriver {}
 
 #[handler]
 impl BundleSeriesDriver {
@@ -600,10 +599,9 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
-
         let record = self.skel.locate(point).await?;
 
-        let skel = ItemSkel::new(point.clone(), record.details.stub.kind,self.skel.clone());
+        let skel = ItemSkel::new(point.clone(), record.details.stub.kind, self.skel.clone());
         Ok(ItemSphere::Handler(Box::new(Artifact::restore(
             skel,
             (),
@@ -666,10 +664,11 @@ where
                         store
                             .insert(assign.details.stub.point.to_string(), &substance)
                             .map_err(|e| SpaceErr::from_500(e.to_string()))?;
-                        self.skel
-                            .driver
-                            .logger
-                            .result(store.commit().map_err(|e| SpaceErr::from_500(e.to_string())))?;
+                        self.skel.driver.logger.result(
+                            store
+                                .commit()
+                                .map_err(|e| SpaceErr::from_500(e.to_string())),
+                        )?;
                     }
                 }
                 self.skel
@@ -700,7 +699,6 @@ impl<P> Artifact<P>
 where
     P: Cosmos,
 {
-
     fn store(&self) -> Result<ValueRepo<String>, SpaceErr> {
         let config = acid_store::store::DirectoryConfig {
             path: PathBuf::from(format!("{}artifacts", self.skel.data_dir())),
@@ -736,7 +734,6 @@ where
         let substance: Substance = store.get(&self.skel.point.to_string()).unwrap();
         Ok(substance)
     }
-
 }
 
 impl<P> Item<P> for Artifact<P>
@@ -777,7 +774,4 @@ where
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(ARTIFACT_BIND_CONFIG.clone())
     }
-
 }
-
-

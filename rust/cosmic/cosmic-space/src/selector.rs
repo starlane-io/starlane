@@ -756,7 +756,7 @@ where
 
     pub fn convert<To>(self) -> Result<Pattern<To>, SpaceErr>
     where
-        P: TryInto<To, Error =SpaceErr> + Eq + PartialEq,
+        P: TryInto<To, Error = SpaceErr> + Eq + PartialEq,
     {
         Ok(match self {
             Pattern::Any => Pattern::Any,
@@ -808,7 +808,7 @@ where
 
     pub fn convert<To>(self) -> Result<EmptyPattern<To>, SpaceErr>
     where
-        P: TryInto<To, Error =SpaceErr> + Eq + PartialEq,
+        P: TryInto<To, Error = SpaceErr> + Eq + PartialEq,
     {
         Ok(match self {
             EmptyPattern::Any => EmptyPattern::Any,

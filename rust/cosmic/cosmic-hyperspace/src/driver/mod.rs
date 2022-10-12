@@ -8,10 +8,12 @@ pub mod star;
 pub mod web;
 
 use crate::driver::star::StarDriverFactory;
+use crate::err::HyperErr;
+use crate::reg::{Registration, Registry};
 use crate::star::HyperStarCall::LayerTraversalInjection;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::Cosmos;
-use cosmic_space::artifact::{ArtifactApi, ArtRef};
+use cosmic_space::artifact::{ArtRef, ArtifactApi};
 use cosmic_space::command::common::{SetProperties, StateSrc};
 use cosmic_space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
@@ -23,7 +25,9 @@ use cosmic_space::kind::{BaseKind, Kind, KindParts, StarSub};
 use cosmic_space::loc::{Layer, Point, Surface, ToPoint, ToSurface};
 use cosmic_space::log::{PointLogger, Tracker};
 use cosmic_space::parse::bind_config;
-use cosmic_space::particle::traversal::{Traversal, TraversalDirection, TraversalInjection, TraversalLayer};
+use cosmic_space::particle::traversal::{
+    Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
+};
 use cosmic_space::particle::{Details, Status, Stub};
 use cosmic_space::selector::KindSelector;
 use cosmic_space::substance::Substance;
@@ -48,9 +52,7 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, oneshot, RwLock, watch};
-use crate::err::HyperErr;
-use crate::reg::{Registration, Registry};
+use tokio::sync::{mpsc, oneshot, watch, RwLock};
 
 lazy_static! {
     static ref DEFAULT_BIND: ArtRef<BindConfig> = ArtRef::new(
@@ -721,11 +723,14 @@ where
                 }
             }
 
-            let router = Arc::new(LayerInjectionRouter::new(
+            let mut router = LayerInjectionRouter::new(
                 skel.clone(),
-                point.clone().to_surface().with_layer(Layer::Guest),
-            ));
-            let mut transmitter = ProtoTransmitterBuilder::new(router, skel.exchanger.clone());
+                point.clone().to_surface().with_layer(Layer::Core),
+            );
+
+            router.direction = Some(TraversalDirection::Fabric);
+
+            let mut transmitter = ProtoTransmitterBuilder::new(Arc::new(router), skel.exchanger.clone());
             transmitter.from =
                 SetStrategy::Override(point.clone().to_surface().with_layer(Layer::Core));
             let transmitter = transmitter.build();
@@ -1245,12 +1250,14 @@ where
             while let Some(call) = self.call_rx.recv().await {
                 match call {
                     DriverRunnerCall::OnAdded => {
-                        let router = Arc::new(LayerInjectionRouter::new(
+                        let mut router = LayerInjectionRouter::new(
                             self.star_skel.clone(),
                             self.skel.point.clone().to_surface().with_layer(Layer::Core),
-                        ));
-                        let transmitter =
-                            ProtoTransmitter::new(router, self.star_skel.exchanger.clone());
+                        );
+                        router.direction = Some(TraversalDirection::Fabric);
+
+                        let mut transmitter =
+                            ProtoTransmitter::new(Arc::new(router), self.star_skel.exchanger.clone());
                         let ctx = DriverCtx::new(transmitter);
                         match self
                             .skel
@@ -1339,7 +1346,6 @@ where
                         rtn.send(self.skel.point.clone());
                     }
                     DriverRunnerCall::DriverBind(rtn) => {
-                        ;
                         rtn.send(self.driver.bind());
                     }
                     DriverRunnerCall::AddDriver(api) => {
@@ -1424,7 +1430,6 @@ impl<P> DriverSkel<P>
 where
     P: Cosmos,
 {
-
     pub fn data_dir(&self) -> String {
         self.skel.data_dir()
     }
@@ -1511,16 +1516,18 @@ where
         self.skel.drivers.local_driver_lookup(kind).await
     }
 
-    pub fn item_ctx(&self, point: &Point, layer: Layer ) -> Result<ItemCtx,P::Err>{
-        let mut router = LayerInjectionRouter::new( self.skel.clone(), point.to_surface().with_layer(Layer::Core));
+    pub fn item_ctx(&self, point: &Point, layer: Layer) -> Result<ItemCtx, P::Err> {
+        let mut router = LayerInjectionRouter::new(
+            self.skel.clone(),
+            point.to_surface().with_layer(Layer::Core),
+        );
         router.direction = Some(TraversalDirection::Fabric);
-        let mut transmitter = ProtoTransmitterBuilder::new(Arc::new(router), self.skel.exchanger.clone() );
+        let mut transmitter =
+            ProtoTransmitterBuilder::new(Arc::new(router), self.skel.exchanger.clone());
         transmitter.from = SetStrategy::Fill(point.to_surface().with_layer(layer));
         transmitter.agent = SetStrategy::Fill(Agent::Point(point.clone()));
         let transmitter = transmitter.build();
-        let ctx = ItemCtx {
-            transmitter
-        };
+        let ctx = ItemCtx { transmitter };
         Ok(ctx)
     }
 }
@@ -1806,9 +1813,6 @@ where
     pub kind: Kind,
 }
 
-
-
-
 #[derive(Clone)]
 pub struct ItemSkel<P>
 where
@@ -1824,11 +1828,7 @@ where
     P: Cosmos,
 {
     pub fn new(point: Point, kind: Kind, skel: DriverSkel<P>) -> Self {
-        Self {
-            point,
-            kind,
-            skel,
-        }
+        Self { point, kind, skel }
     }
 
     pub fn data_dir(&self) -> String {
@@ -1837,7 +1837,7 @@ where
 }
 
 pub struct ItemCtx {
-    pub transmitter: ProtoTransmitter
+    pub transmitter: ProtoTransmitter,
 }
 
 pub struct DriverDriverFactory {}
@@ -1987,11 +1987,10 @@ impl<P> TraversalRouter for DriverItem<P>
 where
     P: Cosmos,
 {
-    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(),SpaceErr>{
+    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
         self.skel.api.handle(traversal).await;
         Ok(())
     }
-
 }
 
 #[async_trait]

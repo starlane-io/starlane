@@ -13,6 +13,7 @@ use cosmic_space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
 use cosmic_space::config::bind::BindConfig;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::fail::http;
 use cosmic_space::hyper::{HyperSubstance, ParticleLocation};
 use cosmic_space::kind::{BaseKind, Kind, NativeSub};
@@ -40,7 +41,6 @@ use std::thread;
 use tiny_http::Server;
 use tokio::runtime::Runtime;
 use url::Url;
-use cosmic_space::err::SpaceErr;
 
 lazy_static! {
     static ref WEB_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -213,7 +213,6 @@ where
     pub fn new(skel: ItemSkel<P>) -> Self {
         Self { skel }
     }
-
 }
 
 #[async_trait]
@@ -221,12 +220,15 @@ impl<P> TraversalRouter for Web<P>
 where
     P: Cosmos,
 {
-    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(),SpaceErr> {
+    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
         if traversal.is_directed() {
         } else {
             let wave = traversal.payload;
             let reflected = wave.to_reflected().unwrap();
-            println!("Exchanging reflected@! {}", reflected.core().status.to_string() );
+            println!(
+                "Exchanging reflected@! {}",
+                reflected.core().status.to_string()
+            );
             self.skel
                 .skel
                 .skel
@@ -358,7 +360,7 @@ where
 
         let mut wave = DirectedProto::ping();
         wave.core(core);
-//        wave.track = true;
+        //        wave.track = true;
         let pong = transmitter.ping(wave).await?;
 
         let body = pong.core.body.clone().to_bin()?;

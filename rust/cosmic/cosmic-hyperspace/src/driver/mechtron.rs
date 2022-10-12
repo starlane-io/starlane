@@ -52,7 +52,10 @@ fn host_driver_bind() -> BindConfig {
         r#"
     Bind(version=1.0.0)
     {
-       Route<Hyp<Host>> -> (()) => &;
+       Route -> {
+           Hyp<Host> -> (()) => &;
+           Hyp<Assign> -> (()) => &;
+       }
     }
     "#,
     ))
@@ -256,8 +259,8 @@ where
     #[route("Hyp<Host>")]
     pub async fn host(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         println!("HOST DRIVER RECEIVED REQUEST!");
-        if let HyperSubstance::Host(host) = ctx.input {
-            let config = host
+        if let HyperSubstance::Host(host_cmd) = ctx.input {
+            let config = host_cmd
                 .details
                 .properties
                 .get("config")
@@ -274,31 +277,12 @@ where
                 .await?;
 
             if !self.skel.wasm_to_host_lookup.contains_key(&config.wasm) {
-                let wasm = self
-                    .skel
-                    .skel
-                    .skel
-                    .machine
-                    .artifacts
-                    .wasm(&config.wasm)
-                    .await?;
-                let bin = wasm.deref().deref().clone();
-                let mechtron_host = Arc::new(
-                    self.skel
-                        .factory
-                        .create(host.details.clone(), bin)
-                        .map_err(|e| SpaceErr::from_500("host err"))?,
-                );
-
-                mechtron_host.init(host.details.clone())?;
-
                 let mut properties = SetProperties::new();
                 properties.push(PropertyMod::Set {
                     key: "wasm".to_string(),
                     value: config.wasm.clone().to_string(),
                     lock: false,
                 });
-
                 let create = Create {
                     template: Template {
                         point: PointTemplate {
@@ -316,24 +300,86 @@ where
                 let mut create = DirectedProto::from_core(core);
                 create.to(Point::global_executor());
                 let pong = self.ctx.transmitter.ping(create).await?;
-
+                println!("GOT HERE!");
                 pong.ok_or()?;
 
+                println!("AND HERE!");
                 if let Substance::Details(details) = &pong.core.body {
-                    self.skel
-                        .hosts
-                        .insert(details.stub.point.clone(), mechtron_host);
-                    self.skel
-                        .wasm_to_host_lookup
-                        .insert(config.wasm.clone(), host.details.stub.point.clone());
                 } else {
-                    return Err("expected body to be Details".into())
+                    return Err("expected body to be Details".into());
                 }
             }
 
+            let host = self
+                .skel
+                .wasm_to_host_lookup
+                .get(&config.wasm)
+                .ok_or("expected Host to be in wasm_to_host_lookup")?
+                .value()
+                .clone();
+            let host = self
+                .skel
+                .hosts
+                .get(&host)
+                .ok_or(P::Err::new(format!(
+                    "expected host for point : {}",
+                    host.to_string()
+                )))?
+                .value()
+                .clone();
+
+            host.create_mechtron(host_cmd.details.clone())?;
+
+            self.skel
+                .skel
+                .registry()
+                .assign(
+                    &host.details.stub.point,
+                    ParticleLocation::new(
+                        self.skel.skel.skel.point.clone(),
+                        Some(host.details.stub.point.clone()),
+                    ),
+                )
+                .await?;
+
+            println!("HOST COMMAND COMPLETED!");
             Ok(())
         } else {
             Err("expecting Host".into())
+        }
+    }
+
+    #[route("Hyp<Assign>")]
+    pub async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
+        if let HyperSubstance::Assign(assign) = ctx.input {
+            println!("\tASSIGNING MECHTRON HOST!");
+
+            let wasm = assign
+                .details
+                .properties
+                .get(&"wasm".to_string())
+                .ok_or("wasm property must be set for a Mechtron Host")?;
+
+            let wasm_point = Point::from_str(wasm.value.as_str())?;
+            let wasm = self.skel.skel.artifacts().wasm(&wasm_point).await?;
+
+            let bin = wasm.deref().deref().clone();
+            let mechtron_host = Arc::new(
+                self.skel
+                    .factory
+                    .create(assign.details.clone(), bin)
+                    .map_err(|e| SpaceErr::from_500("host err"))?,
+            );
+
+            self.skel
+                .hosts
+                .insert(assign.details.stub.point.clone(), mechtron_host);
+            self.skel
+                .wasm_to_host_lookup
+                .insert(wasm_point, assign.details.stub.point.clone());
+            Ok(())
+        } else {
+            Err(P::Err::new("expected HyperSubstance<Assign>"))
         }
     }
 }

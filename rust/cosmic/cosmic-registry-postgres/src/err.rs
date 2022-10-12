@@ -4,47 +4,43 @@ use std::io::{Error, ErrorKind};
 use std::string::FromUtf8Error;
 use strum::ParseError;
 
-pub trait PostErr: HyperErr + From<sqlx::Error>+From<ParseError>{
+pub trait PostErr: HyperErr + From<sqlx::Error> + From<ParseError> {
     fn dupe() -> Self;
 }
 
-
-
 #[cfg(test)]
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct TestErr {
     pub message: String,
-    pub kind: ErrKind
+    pub kind: ErrKind,
 }
-
 
 #[cfg(test)]
 impl PostErr for TestErr {
     fn dupe() -> Self {
         Self {
             kind: ErrKind::Dupe,
-            message: "Dupe".to_string()
+            message: "Dupe".to_string(),
         }
     }
 }
-
 
 #[cfg(test)]
 pub mod convert {
     use crate::err::TestErr as Err;
     use crate::HyperErr;
     use bincode::ErrorKind;
+    use cosmic_hyperspace::err::ErrKind;
     use cosmic_space::err::SpaceErr;
     use mechtron_host::err::HostErr;
+    use sqlx::Error;
     use std::io;
     use std::str::Utf8Error;
     use std::string::FromUtf8Error;
-    use sqlx::Error;
     use strum::ParseError;
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
-    use cosmic_hyperspace::err::ErrKind;
 
     impl Err {
         pub fn new<S: ToString>(message: S) -> Self {
@@ -103,12 +99,11 @@ pub mod convert {
         }
     }
 
-     impl From<()> for Err {
+    impl From<()> for Err {
         fn from(_: ()) -> Self {
             Err::new("empty")
         }
     }
-
 
     impl From<ParseError> for Err {
         fn from(e: ParseError) -> Self {
@@ -121,7 +116,6 @@ pub mod convert {
             Err::new(e)
         }
     }
-
 
     impl Into<SpaceErr> for Err {
         fn into(self) -> SpaceErr {
@@ -183,7 +177,6 @@ pub mod convert {
         }
     }
 
-
     impl From<ExportError> for Err {
         fn from(e: ExportError) -> Self {
             Err::new(e)
@@ -225,7 +218,4 @@ pub mod convert {
             Err::new(e)
         }
     }
-
-
 }
-

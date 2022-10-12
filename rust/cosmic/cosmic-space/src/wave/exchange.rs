@@ -26,7 +26,7 @@ use crate::wave::{
     Handling, Pong, RecipientSelector, Recipients, ReflectedAggregate, ReflectedProto,
     ReflectedWave, Scope, Session, ToRecipients, UltraWave, Wave, WaveId,
 };
-use crate::{wave, Agent, Point, ReflectedCore, Substance, Surface, ToSubstance, SpaceErr};
+use crate::{wave, Agent, Point, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
 
 #[derive(Clone)]
 pub struct DirectedHandlerShellDef<D, T> {

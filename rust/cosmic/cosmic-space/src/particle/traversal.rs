@@ -4,7 +4,7 @@ use crate::loc::Layer;
 use crate::log::{SpanLogger, Trackable};
 use crate::wave::exchange::asynch::Exchanger;
 use crate::wave::{DirectedWave, Ping, Pong, ReflectedWave, SingularDirectedWave, UltraWave, Wave};
-use crate::{ParticleRecord, Point, Surface, SpaceErr};
+use crate::{ParticleRecord, Point, SpaceErr, Surface};
 
 #[async_trait]
 pub trait TraversalLayer {
@@ -145,7 +145,7 @@ pub struct TraversalInjection {
     pub surface: Surface,
     pub wave: UltraWave,
     pub from_gravity: bool,
-    pub dir: Option<TraversalDirection>
+    pub dir: Option<TraversalDirection>,
 }
 
 impl TraversalInjection {
@@ -154,7 +154,7 @@ impl TraversalInjection {
             surface: injector,
             wave,
             from_gravity: false,
-            dir: None
+            dir: None,
         }
     }
 }

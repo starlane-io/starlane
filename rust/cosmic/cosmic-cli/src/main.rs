@@ -12,28 +12,28 @@ use clap::{App, Arg, Args, Command as ClapCommand, Parser, Subcommand};
 use cosmic_hyperlane::test_util::SingleInterchangePlatform;
 use cosmic_hyperlane::HyperwayEndpointFactory;
 use cosmic_hyperlane_tcp::HyperlaneTcpClient;
-use cosmic_hyperspace::driver::control::{ControlClient, ControlCliSession};
+use cosmic_hyperspace::driver::control::{ControlCliSession, ControlClient};
+use cosmic_nom::new_span;
+use cosmic_space::command::{CmdTransfer, Command, RawCommand};
 use cosmic_space::err::SpaceErr;
+use cosmic_space::hyper::{InterchangeKind, Knock};
 use cosmic_space::loc::{Point, ToSurface};
 use cosmic_space::log::RootLogger;
+use cosmic_space::parse::error::result;
+use cosmic_space::parse::{command_line, upload_blocks};
 use cosmic_space::substance::Substance;
+use cosmic_space::util::{log, ToResolved};
 use cosmic_space::wave::core::ReflectedCore;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs;
-use cosmic_space::command::{CmdTransfer, Command, RawCommand};
-use cosmic_space::hyper::{InterchangeKind, Knock};
-use cosmic_space::parse::{command_line, upload_blocks};
-use cosmic_space::parse::error::result;
-use cosmic_space::util::{log, ToResolved};
-use cosmic_nom::new_span;
 
 #[tokio::main]
 async fn main() -> Result<(), SpaceErr> {
-    let home_dir : String = match dirs::home_dir() {
-      None => ".".to_string(),
-      Some(dir) => dir.display().to_string()
+    let home_dir: String = match dirs::home_dir() {
+        None => ".".to_string(),
+        Some(dir) => dir.display().to_string(),
     };
     let matches = ClapCommand::new("cosmic-cli")
         .arg(
@@ -53,13 +53,14 @@ async fn main() -> Result<(), SpaceErr> {
                 .value_name("certs")
                 .required(false)
                 .default_value(format!("{}/.starlane/localhost/certs", home_dir).as_str()),
-        ).subcommand(ClapCommand::new("script"))
+        )
+        .subcommand(ClapCommand::new("script"))
         .allow_external_subcommands(true)
         .get_matches();
 
     let host = matches.get_one::<String>("host").unwrap().clone();
     let certs = matches.get_one::<String>("certs").unwrap().clone();
-    let session = Session::new(host,certs).await?;
+    let session = Session::new(host, certs).await?;
 
     if matches.subcommand_name().is_some() {
         session.command(matches.subcommand_name().unwrap()).await
@@ -67,21 +68,21 @@ async fn main() -> Result<(), SpaceErr> {
         loop {
             let line: String = text_io::try_read!("{};").map_err(|e| SpaceErr::new(500, "err"))?;
 
-            let line_str= line.trim();
+            let line_str = line.trim();
 
             if "exit" == line_str {
                 return Ok(());
             }
-            println!("> {}",line_str);
+            println!("> {}", line_str);
             session.command(line.as_str()).await?;
         }
         Ok(())
     }
 }
 
-pub struct Session{
+pub struct Session {
     pub client: ControlClient,
-    pub cli: ControlCliSession
+    pub cli: ControlCliSession,
 }
 
 impl Session {
@@ -102,19 +103,17 @@ impl Session {
 
         let cli = client.new_cli_session().await?;
 
-        Ok(Self {
-            client,
-            cli
-        })
+        Ok(Self { client, cli })
     }
 
     async fn command(&self, command: &str) -> Result<(), SpaceErr> {
-
         let blocks = result(upload_blocks(new_span(command)))?;
         let mut command = RawCommand::new(command.to_string());
         for block in blocks {
             let content = Arc::new(fs::read(block.name.as_str()).await?);
-            command.transfers.push(CmdTransfer::new(block.name, content));
+            command
+                .transfers
+                .push(CmdTransfer::new(block.name, content));
         }
 
         let core = self.cli.raw(command).await?;
@@ -126,7 +125,7 @@ impl Session {
     pub fn core_out(&self, core: ReflectedCore) {
         match core.is_ok() {
             true => self.out(core.body),
-            false => { self.out_err(core.ok_or().unwrap_err()) }
+            false => self.out_err(core.ok_or().unwrap_err()),
         }
     }
 
@@ -153,7 +152,10 @@ impl Session {
                 println!("{}<{}>", stub.point.to_string(), stub.kind.to_string())
             }
             what => {
-                eprintln!("cosmic-cli not sure how to output {}", what.kind().to_string())
+                eprintln!(
+                    "cosmic-cli not sure how to output {}",
+                    what.kind().to_string()
+                )
             }
         }
     }

@@ -3,7 +3,7 @@ use cosmic_registry_postgres::err::PostErr;
 
 pub trait StarlaneErr: PostErr {}
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct StarErr {
     pub kind: ErrKind,
     pub message: String,
@@ -11,9 +11,9 @@ pub struct StarErr {
 
 impl StarlaneErr for StarErr {}
 
-
 pub mod convert {
     use crate::err::StarErr as Err;
+    use ascii::FromAsciiError;
     use bincode::ErrorKind;
     use cosmic_hyperspace::err::{ErrKind, HyperErr};
     use cosmic_registry_postgres::err::PostErr;
@@ -22,12 +22,11 @@ pub mod convert {
     use sqlx::Error;
     use std::io;
     use std::str::Utf8Error;
-    use std::string::{FromUtf8Error};
+    use std::string::FromUtf8Error;
     use strum::ParseError;
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
-    use ascii::FromAsciiError;
     impl Err {
         pub fn new<S: ToString>(message: S) -> Self {
             Self {
@@ -37,20 +36,20 @@ pub mod convert {
         }
     }
 
-         impl From<strum::ParseError> for Err {
+    impl From<strum::ParseError> for Err {
         fn from(e: strum::ParseError) -> Self {
             Self {
                 kind: ErrKind::Default,
-                message: e.to_string()
+                message: e.to_string(),
             }
         }
     }
 
-     impl From<url::ParseError> for Err {
+    impl From<url::ParseError> for Err {
         fn from(e: url::ParseError) -> Self {
             Self {
                 kind: ErrKind::Default,
-                message: e.to_string()
+                message: e.to_string(),
             }
         }
     }
@@ -58,7 +57,7 @@ pub mod convert {
         fn from(e: FromAsciiError<String>) -> Self {
             Self {
                 kind: ErrKind::Default,
-                message: e.to_string()
+                message: e.to_string(),
             }
         }
     }

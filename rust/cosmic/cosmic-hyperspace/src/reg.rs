@@ -1,17 +1,17 @@
+use crate::Cosmos;
 use cosmic_space::command::common::{SetProperties, SetRegistry};
 use cosmic_space::command::direct::create::Strategy;
-use cosmic_space::kind::Kind;
-use cosmic_space::loc::Point;
-use cosmic_space::particle::{Details, Properties, Status, Stub};
-use std::sync::Arc;
 use cosmic_space::command::direct::delete::Delete;
 use cosmic_space::command::direct::query::{Query, QueryResult};
 use cosmic_space::command::direct::select::{Select, SubSelect};
 use cosmic_space::hyper::{ParticleLocation, ParticleRecord};
+use cosmic_space::kind::Kind;
+use cosmic_space::loc::Point;
+use cosmic_space::particle::{Details, Properties, Status, Stub};
 use cosmic_space::security::{Access, AccessGrant, IndexedAccessGrant};
 use cosmic_space::selector::Selector;
 use cosmic_space::substance::SubstanceList;
-use crate::Cosmos;
+use std::sync::Arc;
 
 pub type Registry<P> = Arc<dyn RegistryApi<P>>;
 
@@ -20,8 +20,7 @@ pub trait RegistryApi<P>: Send + Sync
 where
     P: Cosmos,
 {
-
-    async fn nuke<'a>(&'a self) -> Result<(),P::Err>;
+    async fn nuke<'a>(&'a self) -> Result<(), P::Err>;
 
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), P::Err>;
 

@@ -5,7 +5,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::{RwLock, watch};
+use tokio::sync::{watch, RwLock};
 
 use crate::config::mechtron::MechtronConfig;
 use crate::loc::{Point, ToSurface};
@@ -15,7 +15,7 @@ use crate::wave::core::cmd::CmdMethod;
 use crate::wave::exchange::asynch::ProtoTransmitter;
 use crate::wave::exchange::asynch::ProtoTransmitterBuilder;
 use crate::wave::{DirectedProto, Pong, Wave};
-use crate::{BindConfig, Substance, SpaceErr};
+use crate::{BindConfig, SpaceErr, Substance};
 
 #[derive(Clone)]
 pub struct ArtifactApi {
@@ -23,7 +23,7 @@ pub struct ArtifactApi {
     mechtrons: Arc<DashMap<Point, Arc<MechtronConfig>>>,
     wasm: Arc<DashMap<Point, Bin>>,
     fetcher_tx: Arc<watch::Sender<Arc<dyn ArtifactFetcher>>>,
-    fetcher_rx: watch::Receiver<Arc<dyn ArtifactFetcher>>
+    fetcher_rx: watch::Receiver<Arc<dyn ArtifactFetcher>>,
 }
 
 impl ArtifactApi {
@@ -33,14 +33,14 @@ impl ArtifactApi {
     }
 
     pub fn new(fetcher: Arc<dyn ArtifactFetcher>) -> Self {
-        let (fetcher_tx,fetcher_rx) = watch::channel(fetcher);
+        let (fetcher_tx, fetcher_rx) = watch::channel(fetcher);
         let fetcher_tx = Arc::new(fetcher_tx);
         Self {
             binds: Arc::new(DashMap::new()),
             mechtrons: Arc::new(DashMap::new()),
             wasm: Arc::new(DashMap::new()),
             fetcher_tx,
-            fetcher_rx
+            fetcher_rx,
         }
     }
 
@@ -97,7 +97,7 @@ impl ArtifactApi {
 
     async fn fetch<A>(&self, point: &Point) -> Result<A, SpaceErr>
     where
-        A: TryFrom<Bin, Error =SpaceErr>,
+        A: TryFrom<Bin, Error = SpaceErr>,
     {
         if !point.has_bundle() {
             return Err("point is not from a bundle".into());
@@ -205,12 +205,11 @@ impl ArtifactFetcher for ReadArtifactFetcher {
         let pong = self.transmitter.ping(directed).await?;
         pong.core.ok_or()?;
         match pong.variant.core.body {
-            Substance::Bin(bin) => {
-                Ok(bin)
-            },
-            other => Err(SpaceErr::from_500(
-                format!("expected Bin, encountered unexpected substance {} when fetching Artifact",other.kind().to_string()),
-            )),
+            Substance::Bin(bin) => Ok(bin),
+            other => Err(SpaceErr::from_500(format!(
+                "expected Bin, encountered unexpected substance {} when fetching Artifact",
+                other.kind().to_string()
+            ))),
         }
     }
 }

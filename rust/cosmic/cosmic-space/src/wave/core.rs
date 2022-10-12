@@ -15,7 +15,7 @@ use crate::wave::core::ext::ExtMethod;
 use crate::wave::core::http2::{HttpMethod, StatusCode};
 use crate::wave::core::hyp::HypMethod;
 use crate::wave::{Bounce, Ping, Pong, ToRecipients, WaveId};
-use crate::{Bin, Substance, Surface, ToSubstance, SpaceErr};
+use crate::{Bin, SpaceErr, Substance, Surface, ToSubstance};
 use url::Url;
 
 pub mod cmd;
@@ -414,7 +414,12 @@ impl DirectedCore {
     }
 
     pub fn to_selection_str(&self) -> String {
-        format!("{}{} -[{}]->", self.method.to_deep_string(), self.uri.path(), self.body.kind().to_string())
+        format!(
+            "{}{} -[{}]->",
+            self.method.to_deep_string(),
+            self.uri.path(),
+            self.body.kind().to_string()
+        )
     }
 
     pub fn ext<M: Into<ExtMethod>>(method: M) -> Self {

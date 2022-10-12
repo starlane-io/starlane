@@ -1,8 +1,8 @@
 use core::str::FromStr;
+use nom::ExtendInto;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use nom::ExtendInto;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -25,7 +25,7 @@ use crate::wave::core::http2::HttpMethod;
 use crate::wave::core::hyp::HypMethod;
 use crate::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use crate::wave::{Pong, UltraWave};
-use crate::{util, Details, Point, Status, Stub, Surface, SpaceErr};
+use crate::{util, Details, Point, SpaceErr, Status, Stub, Surface};
 use url::Url;
 
 #[derive(
@@ -255,9 +255,9 @@ impl Substance {
             Substance::Map(map) => map.to_bin(),
             Substance::Bin(bin) => Ok(bin),
             Substance::Text(text) => {
-println!("to_bin() -> {}", text );
-                Ok(Arc::new( text.as_bytes().new_builder()))
-            },
+                println!("to_bin() -> {}", text);
+                Ok(Arc::new(text.as_bytes().new_builder()))
+            }
             what => Err(format!("{}.to_bin() not supported", what.kind().to_string()).into()),
         }
     }

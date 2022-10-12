@@ -63,7 +63,7 @@ impl Into<DirectedCore> for HttpRequest {
             headers: self.headers,
             method: self.method.into(),
             uri: self.uri,
-            body: self.body
+            body: self.body,
         }
     }
 }

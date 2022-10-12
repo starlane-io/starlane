@@ -37,7 +37,9 @@ use cosmic_space::command::direct::select::{Select, SubSelect};
 use cosmic_space::err::SpaceErr;
 use cosmic_space::fail::Timeout;
 use cosmic_space::hyper::{ParticleLocation, ParticleRecord};
-use cosmic_space::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind};
+use cosmic_space::kind::{
+    ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind,
+};
 use cosmic_space::loc::{
     Layer, MachineName, Point, RouteSeg, StarKey, Surface, ToBaseKind, ToSurface,
 };
@@ -61,17 +63,16 @@ use crate::driver::{DriverFactory, DriversBuilder};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
 
 pub mod driver;
+pub mod err;
 pub mod global;
 pub mod layer;
 pub mod machine;
-pub mod star;
-pub mod err;
-pub mod reg;
 pub mod mem;
+pub mod reg;
+pub mod star;
 
 #[cfg(test)]
 pub mod tests;
-
 
 #[no_mangle]
 pub extern "C" fn cosmic_uuid() -> String {
@@ -119,7 +120,7 @@ where
                 builder.add_point("config", true, true).unwrap();
                 builder.build().unwrap()
             }
-            BaseKind::Host=> {
+            BaseKind::Host => {
                 builder.add_point("bin", true, true).unwrap();
                 builder.build().unwrap()
             }
@@ -136,7 +137,7 @@ where
         Default::default()
     }
 
-    fn web_port(&self) -> Result<u16,Self::Err> {
+    fn web_port(&self) -> Result<u16, Self::Err> {
         Ok(8080u16)
     }
 
@@ -196,9 +197,7 @@ where
             BaseKind::Global => Kind::Global,
             BaseKind::Host => Kind::Host,
             BaseKind::Guest => Kind::Guest,
-            BaseKind::Native => {
-                Kind::Native(NativeSub::Web)
-            }
+            BaseKind::Native => Kind::Native(NativeSub::Web),
         })
     }
 

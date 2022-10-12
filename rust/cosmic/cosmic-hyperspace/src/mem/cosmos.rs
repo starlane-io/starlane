@@ -6,8 +6,11 @@ use crate::driver::control::ControlDriverFactory;
 use crate::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
 use crate::driver::root::RootDriverFactory;
 use crate::driver::space::SpaceDriverFactory;
+use crate::driver::web::WebDriverFactory;
 use crate::driver::DriverAvail;
+use crate::err::{CosmicErr, HyperErr};
 use crate::mem::registry::{MemRegApi, MemRegCtx};
+use crate::reg::Registry;
 use crate::{Cosmos, DriversBuilder, MachineTemplate};
 use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, LocalHyperwayGateJumper};
 use cosmic_space::artifact::{ArtifactApi, ReadArtifactFetcher};
@@ -25,9 +28,6 @@ use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
-use crate::driver::web::WebDriverFactory;
-use crate::err::{CosmicErr, HyperErr};
-use crate::reg::Registry;
 
 impl MemCosmos {
     pub fn new() -> Self {
@@ -126,5 +126,4 @@ impl Cosmos for MemCosmos {
     }
 
      */
-
 }

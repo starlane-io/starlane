@@ -125,7 +125,7 @@ pub mod common {
             }
         }
 
-        pub fn iter(&self) -> Iter<'_, String, PropertyMod>{
+        pub fn iter(&self) -> Iter<'_, String, PropertyMod> {
             self.map.iter()
         }
     }
@@ -539,9 +539,9 @@ pub mod direct {
                         StateSrc::Substance(Box::new(Substance::Bin(
                             env.file(val.clone())
                                 .map_err(|e| match e {
-                                    ResolverErr::NotAvailable => {
-                                        SpaceErr::from_500("files are not available in this context")
-                                    }
+                                    ResolverErr::NotAvailable => SpaceErr::from_500(
+                                        "files are not available in this context",
+                                    ),
                                     ResolverErr::NotFound => SpaceErr::from_500(format!(
                                         "cannot find file '{}'",
                                         val.to_text().unwrap_or("err".to_string())

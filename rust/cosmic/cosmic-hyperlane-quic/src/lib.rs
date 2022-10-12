@@ -14,7 +14,7 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use cosmic_hyperlane::{HyperGate, HyperGateSelector, VersionGate};
-use cosmic_space::err::{StatusErr, SpaceErr};
+use cosmic_space::err::{SpaceErr, StatusErr};
 use cosmic_space::frame::PrimitiveFrame;
 use cosmic_space::hyper::{HyperSubstance, Knock};
 use cosmic_space::loc::{Point, ToSurface};

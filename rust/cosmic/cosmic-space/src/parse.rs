@@ -61,7 +61,10 @@ use crate::config::mechtron::MechtronConfig;
 use crate::config::Document;
 use crate::err::report::{Label, Report, ReportKind};
 use crate::err::{ParseErrs, SpaceErr};
-use crate::kind::{ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, NativeSub, Specific, StarSub, UserBaseSubKind};
+use crate::kind::{
+    ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, NativeSub, Specific,
+    StarSub, UserBaseSubKind,
+};
 use crate::loc::StarKey;
 use crate::loc::{
     Layer, Point, PointCtx, PointSeg, PointSegCtx, PointSegDelim, PointSegVar, PointSegment,
@@ -2529,7 +2532,7 @@ where
     <I as InputTakeAtPosition>::Item: AsChar,
     F: nom::Parser<I, O, E>,
     E: nom::error::ContextError<I>,
-    O: Clone + FromStr<Err =SpaceErr>,
+    O: Clone + FromStr<Err = SpaceErr>,
 {
     move |input: I| {
         let (next, element) = f.parse(input.clone())?;
@@ -5566,7 +5569,6 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
     move |input: I| {
         let (next, sub) = context("kind-sub", camel_case)(input.clone())?;
         match base {
-
             BaseKind::Database => match sub.as_str() {
                 "Relational" => {
                     let (next, specific) =
@@ -6491,15 +6493,14 @@ pub fn upload_block<I: Span>(input: I) -> Res<I, UploadBlock> {
 }
 
 pub fn upload_blocks<I: Span>(input: I) -> Res<I, Vec<UploadBlock>> {
-    many0(pair(take_until("^[" ), upload_block))(input).map(|(next,blocks)| {
+    many0(pair(take_until("^["), upload_block))(input).map(|(next, blocks)| {
         let mut rtn = vec![];
-        for (_,block) in blocks {
-                rtn.push(block);
+        for (_, block) in blocks {
+            rtn.push(block);
         }
-        (next,rtn)
+        (next, rtn)
     })
 }
-
 
 pub fn request_payload_filter_block<I: Span>(input: I) -> Res<I, PayloadBlockVar> {
     tuple((
@@ -8429,7 +8430,9 @@ pub mod cmd_test {
     use crate::command::{Command, CommandVar};
     use crate::err::SpaceErr;
     use crate::parse::error::result;
-    use crate::parse::{command, create_command, publish_command, script, CamelCase, upload_blocks};
+    use crate::parse::{
+        command, create_command, publish_command, script, upload_blocks, CamelCase,
+    };
     use crate::util::ToResolved;
     use crate::{BaseKind, KindTemplate, SetProperties};
 
@@ -8505,26 +8508,23 @@ pub mod cmd_test {
         Ok(())
     }
 
-
     #[test]
     pub fn test_upload_blocks() -> Result<(), SpaceErr> {
         let input = r#"publish ^[ bundle.zip ]-> localhost:repo:tutorial:1.0.0"#;
         let blocks = result(upload_blocks(new_span(input)))?;
-        assert_eq!(1,blocks.len());
+        assert_eq!(1, blocks.len());
         let block = blocks.get(0).unwrap();
-        assert_eq!("bundle.zip", block.name.as_str() );
-
+        assert_eq!("bundle.zip", block.name.as_str());
 
         // this should fail bcause it has multiple ^[
         let input = r#"publish ^[ ^[ bundle.zip ]-> localhost:repo:tutorial:1.0.0"#;
         let blocks = result(upload_blocks(new_span(input)))?;
-        assert_eq!(0,blocks.len());
+        assert_eq!(0, blocks.len());
 
-
-                // this should fail bcause it has no ^[
+        // this should fail bcause it has no ^[
         let input = r#"publish localhost:repo:tutorial:1.0.0"#;
         let blocks = result(upload_blocks(new_span(input)))?;
-        assert_eq!(0,blocks.len());
+        assert_eq!(0, blocks.len());
 
         Ok(())
     }
@@ -8548,14 +8548,13 @@ pub mod cmd_test {
         Ok(())
     }
 
-
     #[test]
     pub fn test_create_properties() -> Result<(), SpaceErr> {
         let input = r#"create localhost:repo:tutorial:1.0.0<Repo>{ +config=the:cool:property }"#;
         let mut command = result(create_command(new_span(input)))?;
         let command = command.collapse()?;
         if let Command::Create(create) = command {
-            assert!( create.properties.get("config").is_some());
+            assert!(create.properties.get("config").is_some());
         } else {
             assert!(false);
         }

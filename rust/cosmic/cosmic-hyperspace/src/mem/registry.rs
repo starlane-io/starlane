@@ -1,31 +1,31 @@
-use std::marker::PhantomData;
-use crate::mem::cosmos::MemCosmos;
 use crate::err::CosmicErr;
+use crate::mem::cosmos::MemCosmos;
+use crate::reg::{Registration, RegistryApi};
+use crate::Cosmos;
 use cosmic_space::command::common::{PropertyMod, SetProperties};
 use cosmic_space::command::direct::delete::Delete;
 use cosmic_space::command::direct::query::{Query, QueryResult};
 use cosmic_space::command::direct::select::{Select, SubSelect};
 use cosmic_space::hyper::{ParticleLocation, ParticleRecord};
 use cosmic_space::loc::Point;
+use cosmic_space::parse::get_properties;
 use cosmic_space::particle::{Details, Properties, Property, Status, Stub};
 use cosmic_space::security::{Access, AccessGrant, IndexedAccessGrant};
 use cosmic_space::selector::Selector;
 use cosmic_space::substance::SubstanceList;
-use dashmap::DashMap;
-use std::sync::atomic::AtomicU64;
-use std::sync::{Arc, atomic};
 use dashmap::mapref::one::Ref;
+use dashmap::DashMap;
+use std::marker::PhantomData;
+use std::sync::atomic::AtomicU64;
+use std::sync::{atomic, Arc};
 use tokio::sync::oneshot;
-use cosmic_space::parse::get_properties;
-use crate::Cosmos;
-use crate::reg::{Registration, RegistryApi};
 
 impl MemRegCtx {
     pub fn new() -> Self {
         Self {
             sequence: Arc::new(AtomicU64::new(0u64)),
             particles: Arc::new(DashMap::new()),
-            properties: Arc::new( DashMap::new() )
+            properties: Arc::new(DashMap::new()),
         }
     }
 }
@@ -37,17 +37,21 @@ pub struct MemRegCtx {
     pub properties: Arc<DashMap<Point, Properties>>,
 }
 
-pub struct MemRegApi<C> where C: Cosmos{
+pub struct MemRegApi<C>
+where
+    C: Cosmos,
+{
     ctx: MemRegCtx,
-    phantom: PhantomData<C>
+    phantom: PhantomData<C>,
 }
 
-impl <C> MemRegApi<C> where C: Cosmos {
+impl<C> MemRegApi<C>
+where
+    C: Cosmos,
+{
     pub fn new(ctx: MemRegCtx) -> Self {
         let phantom = Default::default();
-        Self {
-            phantom,
-            ctx }
+        Self { phantom, ctx }
     }
 
     fn ctx(&self) -> &MemRegCtx {
@@ -56,14 +60,17 @@ impl <C> MemRegApi<C> where C: Cosmos {
 }
 
 #[async_trait]
-impl <C> RegistryApi<C> for MemRegApi<C> where C: Cosmos {
-
+impl<C> RegistryApi<C> for MemRegApi<C>
+where
+    C: Cosmos,
+{
     async fn nuke<'a>(&'a self) -> Result<(), C::Err> {
         todo!()
     }
 
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), C::Err> {
-        self.set_properties(&registration.point, &registration.properties).await?;
+        self.set_properties(&registration.point, &registration.properties)
+            .await?;
 
         let details = Details {
             stub: Stub {
@@ -71,7 +78,7 @@ impl <C> RegistryApi<C> for MemRegApi<C> where C: Cosmos {
                 kind: registration.kind.clone(),
                 status: Status::Pending,
             },
-            properties: self.get_properties(&registration.point).await?
+            properties: self.get_properties(&registration.point).await?,
         };
         let record = ParticleRecord {
             details: details.clone(),
@@ -108,21 +115,21 @@ impl <C> RegistryApi<C> for MemRegApi<C> where C: Cosmos {
         point: &'a Point,
         properties: &'a SetProperties,
     ) -> Result<(), C::Err> {
-        let mut rtn= Properties::new();
-        for (id,property) in properties.iter() {
+        let mut rtn = Properties::new();
+        for (id, property) in properties.iter() {
             match property {
                 PropertyMod::Set { key, value, lock } => {
-                    let property = Property{
+                    let property = Property {
                         key: key.clone(),
                         value: value.clone(),
-                        locked: lock.clone()
+                        locked: lock.clone(),
                     };
-                    rtn.insert(id.clone(), property );
+                    rtn.insert(id.clone(), property);
                 }
                 PropertyMod::UnSet(_) => {}
             }
         }
-        self.ctx.properties.insert( point.clone(), rtn );
+        self.ctx.properties.insert(point.clone(), rtn);
         Ok(())
     }
 
@@ -131,9 +138,9 @@ impl <C> RegistryApi<C> for MemRegApi<C> where C: Cosmos {
     }
 
     async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, C::Err> {
-        match self.ctx.properties.get( point) {
+        match self.ctx.properties.get(point) {
             None => Ok(Default::default()),
-            Some(mul) =>  Ok(mul.value().clone())
+            Some(mul) => Ok(mul.value().clone()),
         }
     }
 
@@ -199,4 +206,3 @@ impl <C> RegistryApi<C> for MemRegApi<C> where C: Cosmos {
         todo!()
     }
 }
-

@@ -1,3 +1,4 @@
+use ascii::FromAsciiError;
 use cosmic_space::err::SpaceErr;
 use cosmic_space::substance::Substance;
 use cosmic_space::wave::core::http2::StatusCode;
@@ -12,7 +13,6 @@ use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
-use ascii::FromAsciiError;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ErrKind {
@@ -46,7 +46,7 @@ pub trait HyperErr:
     + From<acid_store::Error>
     + From<strum::ParseError>
     + From<url::ParseError>
- +From<FromAsciiError<std::string::String>>
+    + From<FromAsciiError<std::string::String>>
     + From<SpaceErr>
     + Into<SpaceErr>
     + From<()>
@@ -92,6 +92,7 @@ pub trait HyperErr:
 pub mod convert {
     use crate::err::{CosmicErr as Err, ErrKind};
     use crate::HyperErr;
+    use ascii::FromAsciiError;
     use bincode::ErrorKind;
     use cosmic_space::err::SpaceErr;
     use mechtron_host::err::HostErr;
@@ -101,7 +102,6 @@ pub mod convert {
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
-    use ascii::FromAsciiError;
 
     impl Err {
         pub fn new<S: ToString>(message: S) -> Self {
@@ -124,20 +124,20 @@ pub mod convert {
         }
     }
 
-     impl From<strum::ParseError> for Err {
+    impl From<strum::ParseError> for Err {
         fn from(e: strum::ParseError) -> Self {
             Self {
                 kind: ErrKind::Default,
-                message: e.to_string()
+                message: e.to_string(),
             }
         }
     }
 
-     impl From<url::ParseError> for Err {
+    impl From<url::ParseError> for Err {
         fn from(e: url::ParseError) -> Self {
             Self {
                 kind: ErrKind::Default,
-                message: e.to_string()
+                message: e.to_string(),
             }
         }
     }
@@ -145,7 +145,7 @@ pub mod convert {
         fn from(e: FromAsciiError<String>) -> Self {
             Self {
                 kind: ErrKind::Default,
-                message: e.to_string()
+                message: e.to_string(),
             }
         }
     }
