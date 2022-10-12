@@ -277,7 +277,6 @@ where
 {
     #[route("Hyp<Host>")]
     pub async fn host(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
-        println!("HOST DRIVER RECEIVED REQUEST!");
         if let HyperSubstance::Host(host_cmd) = ctx.input {
             let config = host_cmd
                 .details
@@ -315,15 +314,10 @@ where
                     state: StateSrc::None,
                 };
 
-                println!("GOT HERE!");
-                //self.skel.skel.logger.result(self.skel.skel.create_in_driver(PointSegTemplate::Pattern("host-%".to_string()),Kind::Host.to_template()).await)?;
-
                 let mut create: DirectedProto = create.into();
                 let pong = self.ctx.transmitter.ping(create).await?;
-                println!("and... GOT HERE!");
                 pong.ok_or()?;
 
-                println!("AND HERE!");
             }
 
             let host = self
@@ -344,7 +338,7 @@ where
                 .value()
                 .clone();
 
-            host.create_mechtron(host_cmd.details.clone())?;
+            host.create_mechtron(host_cmd.clone())?;
 
             self.skel
                 .skel
@@ -352,7 +346,6 @@ where
                 .assign_host(&host_cmd.details.stub.point, &host.details.stub.point)
                 .await?;
 
-            println!("HOST COMMAND COMPLETED!");
             Ok(())
         } else {
             Err("expecting Host".into())
@@ -362,7 +355,6 @@ where
     #[route("Hyp<Assign>")]
     pub async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
-            println!("\tASSIGNING MECHTRON HOST!");
 
             let wasm = self.skel.skel.logger.result(
                 assign
@@ -371,11 +363,9 @@ where
                     .get(&"wasm".to_string())
                     .ok_or("wasm property must be set for a Mechtron Host"),
             )?;
-            println!("\there...");
             let wasm_point = Point::from_str(wasm.value.as_str())?;
             let wasm = self.skel.skel.artifacts().wasm(&wasm_point).await?;
 
-            println!("\tand...");
             let bin = wasm.deref().deref().clone();
             let mechtron_host = Arc::new(
                 self.skel
@@ -383,8 +373,8 @@ where
                     .create(assign.details.clone(), bin)
                     .map_err(|e| SpaceErr::from_500("host err"))?,
             );
-            println!("\tmechtron_host...");
 
+            mechtron_host.create_guest()?;
             self.skel
                 .hosts
                 .insert(assign.details.stub.point.clone(), mechtron_host);
@@ -440,7 +430,6 @@ where
     async fn transport(&self, ctx: InCtx<'_, UltraWave>) {
         if let Ok(Some(wave)) = self.skel.host.route(ctx.input.clone()) {
             let re = wave.clone().to_reflected().unwrap();
-println!("GOT RESPONSE FROM MECHTRON! {} -> {}", re.core().status.to_string(), re.to().to_string());
             ctx.transmitter.route(wave).await;
         }
     }
@@ -551,7 +540,6 @@ where
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
-            println!("\tASSIGNING MECHTRON!");
             let logger = self.skel.logger.push_mark("assign")?;
 
             let config = assign
@@ -570,7 +558,6 @@ where
             let host = self.skel.drivers().local_driver_lookup(Kind::Host).await?.ok_or(P::Err::new("missing Host Driver which must be on the same Star as the Mechtron Driver in order for it to work"))?;
             let mut wave = DirectedProto::ping();
             wave.method(HypMethod::Host);
-            println!("\tSending HOST command to {}", host.to_string());
             wave.to(host.to_surface().with_layer(Layer::Core));
             wave.body(HyperSubstance::Host(assign.clone().to_host_cmd(config)).into());
             let pong = self.ctx.transmitter.ping(wave).await?;
@@ -609,11 +596,6 @@ where
     P: Cosmos,
 {
     async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
-        println!(
-            "MECHTRON TRANSPORT TRAVERSAL! {} self {}",
-            traversal.to.to_string(),
-            self.skel.point.to_string()
-        );
         let wave = traversal.payload;
         let record = self
             .skel
@@ -632,9 +614,7 @@ where
 
         let transport =
             wave.wrap_in_transport(self.skel.point.to_surface().with_layer(Layer::Core), host);
-        println!("MECHTRON TRANSPORT INITIAATED!");
         self.ctx.transmitter.signal(transport).await?;
-        println!("MECHTRON signal sent!");
         Ok(())
     }
 }

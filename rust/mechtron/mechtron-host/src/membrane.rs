@@ -33,7 +33,6 @@ where
     P: HostPlatform,
 {
     pub fn init(&self) -> Result<(), P::Err> {
-        println!("WASM MEMBRANE INIT CALLED");
         let mut pass = true;
         match self.instance.exports.get_memory("memory") {
             Ok(_) => {

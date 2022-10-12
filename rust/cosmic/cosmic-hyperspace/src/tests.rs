@@ -902,7 +902,7 @@ fn test_mechtron() -> Result<(), CosmicErr> {
 
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-       let reflect = cli.exec("create hello-goodbye<Mechtron>{ +config=repo:hello-goodbye:1.0.0:/config/hello-goodbye.mechtron }")
+       let reflect = cli.exec("create hello-goodbye<Mechtron>{ +config=repo:hello-goodbye:1.0.0:/config/hello-goodbye.mechtron, +bind=repo:hello-goodbye:1.0.0:/bind/hello-goodbye.bind }")
             .await
             .unwrap();
 
@@ -916,6 +916,12 @@ fn test_mechtron() -> Result<(), CosmicErr> {
         let result = transmitter.ping(proto).await.unwrap();
 
         assert!(result.is_ok());
+
+        if let Substance::Text(text) = &result.core.body {
+            assert_eq!(text.as_str(), "Goodbye")
+        } else {
+            assert!(false);
+        }
 
         Ok(())
     })

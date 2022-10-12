@@ -120,8 +120,8 @@ where
         GuestErr: From<<P as Platform>::Err>,
     {
         let factories = Arc::new(platform.factories()?);
-        let skel = GuestSkel::new(details, factories, platform);
-        skel.logger.info("Guest created");
+        let skel = GuestSkel::new(details.clone(), factories, platform);
+        skel.logger.info(format!("Guest created '{}'", details.stub.point.to_string() ));
 
         Ok(Self { skel })
     }

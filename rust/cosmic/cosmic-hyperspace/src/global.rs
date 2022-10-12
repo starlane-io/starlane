@@ -165,7 +165,6 @@ where
 
     #[track_caller]
     pub async fn create(&self, create: &Create, agent: &Agent) -> Result<PointKind, P::Err> {
-println!("CREATE...");
 
         let child_kind = self
             .skel
@@ -178,7 +177,6 @@ println!("CREATE...");
                     create.template.kind.to_string()
                 ))
             })?;
-println!("Global Creating: {}", child_kind.to_string());
         let point = match &create.template.point.child_segment_template {
             PointSegTemplate::Exact(child_segment) => {
                 let point = create.template.point.parent.push(child_segment.clone());
@@ -244,7 +242,6 @@ println!("Global Creating: {}", child_kind.to_string());
         if create.state.has_substance() || child_kind.is_auto_provision() {
             let provisioner = SmartLocator::new(self.skel.clone());
             //tokio::spawn(async move {
-            println!("PROVISIONING: {}<{}> ", point.to_string(), child_kind.to_string() );
             provisioner.provision(&point, create.state.clone()).await?;
             //});
         }

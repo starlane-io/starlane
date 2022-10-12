@@ -5,12 +5,12 @@ mod membrane;
 use crate::err::HostErr;
 use crate::membrane::WasmMembrane;
 use cosmic_space::err::SpaceErr;
-use cosmic_space::loc::Point;
+use cosmic_space::loc::{Layer, Point, ToSurface};
 use cosmic_space::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
 use cosmic_space::particle::Details;
-use cosmic_space::substance::Bin;
+use cosmic_space::substance::{Bin, Substance};
 use cosmic_space::wasm::Timestamp;
-use cosmic_space::wave::UltraWave;
+use cosmic_space::wave::{Agent, DirectedProto, UltraWave};
 use cosmic_space::{loc, VERSION};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
@@ -18,6 +18,8 @@ use threadpool::ThreadPool;
 use wasmer::Function;
 use wasmer::{imports, Cranelift, Module, Store, Universal};
 use wasmer_compiler_singlepass::Singlepass;
+use cosmic_space::hyper::{HostCmd, HyperSubstance};
+use cosmic_space::wave::core::hyp::HypMethod;
 
 pub trait HostPlatform: Clone + Send + Sync
 where
@@ -118,10 +120,10 @@ where
         &self.details.stub.point
     }
 
-    pub fn create_mechtron(&self, details: Details) -> Result<(), P::Err> {
+    pub fn create_guest(&self) -> Result<(), P::Err> {
         self.membrane.init()?;
         let version = self.membrane.write_string(VERSION.to_string())?;
-        let details: Vec<u8> = bincode::serialize(&details)?;
+        let details: Vec<u8> = bincode::serialize(&self.details)?;
         let details = self.membrane.write_buffer(&details)?;
         let ok = self
             .membrane
@@ -133,8 +135,23 @@ where
         if ok == 0 {
             Ok(())
         } else {
-            Err(format!("Mehctron init error {} ", ok).into())
+            Err(format!("Mechtron init error {} ", ok).into())
         }
+    }
+
+    pub fn create_mechtron(&self, host_cmd: HostCmd) -> Result<(), P::Err> {
+        let mut wave = DirectedProto::ping();
+        wave.to(self.details.stub.point.to_surface().with_layer(Layer::Core));
+        wave.from(self.details.stub.point.to_surface().with_layer(Layer::Host));
+        wave.method(HypMethod::Host);
+        wave.body(Substance::Hyper(HyperSubstance::Host(host_cmd)));
+        let wave = wave.build()?;
+        let wave = wave.to_ultra();
+        let pong = self.route(wave)?.ok_or("create_mechtron guest error")?;
+        let pong = pong.to_reflected()?.to_pong()?;
+        self.logger.result(pong.ok_or())?;
+
+        Ok(())
     }
 
     pub fn route(&self, wave: UltraWave) -> Result<Option<UltraWave>, P::Err> {
