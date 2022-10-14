@@ -1724,7 +1724,7 @@ pub fn get_properties<I: Span>(input: I) -> Res<I, Vec<String>> {
 
 pub fn create<I: Span>(input: I) -> Res<I, CreateVar> {
     tuple((
-        opt(value(Strategy::Ensure, tag("?"))),
+        opt(alt((value(Strategy::Override, tag("!")),value(Strategy::Ensure, tag("?"))))),
         space1,
         template,
         opt(delimited(tag("{"), set_properties, tag("}"))),

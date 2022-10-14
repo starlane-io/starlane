@@ -65,7 +65,9 @@ where
     C: Cosmos,
 {
     async fn nuke<'a>(&'a self) -> Result<(), C::Err> {
-        todo!()
+        self.ctx.properties.clear();
+        self.ctx.particles.clear();
+        Ok(())
     }
 
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), C::Err> {
