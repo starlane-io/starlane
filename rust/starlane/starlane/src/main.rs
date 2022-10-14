@@ -108,6 +108,8 @@ lazy_static! {
     pub static ref STARLANE_REGISTRY_DATABASE: String =
         std::env::var("STARLANE_REGISTRY_DATABASE").unwrap_or("postgres".to_string());
 }
+
+/*
 #[no_mangle]
 pub extern "C" fn cosmic_uuid() -> loc::Uuid {
     loc::Uuid::from(uuid::Uuid::new_v4()).unwrap()
@@ -117,6 +119,8 @@ pub extern "C" fn cosmic_uuid() -> loc::Uuid {
 pub extern "C" fn cosmic_timestamp() -> Timestamp {
     Timestamp { millis: Utc::now().timestamp_millis() }
 }
+
+ */
 
 
 #[derive(Clone)]
