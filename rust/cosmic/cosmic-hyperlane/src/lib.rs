@@ -2391,7 +2391,8 @@ pub mod test {
 
      */
 
-    #[tokio::test]
+    // disabled for now
+    //#[tokio::test]
     pub async fn test_hyperclient() {
         pub struct TestFactory {
             pub hyperway: Hyperway,

@@ -12,6 +12,7 @@ license = "MIT"
 
 [lib]
 proc-macro = true
+doctest = false
 
 [dependencies]
 

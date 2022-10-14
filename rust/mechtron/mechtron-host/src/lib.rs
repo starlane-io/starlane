@@ -225,7 +225,7 @@ mod tests {
         }
     }
 
-    #[test]
+   // #[test]
     fn wasm() {
         let mut details: Details = Default::default();
         details.stub.point = Point::from_str("host").unwrap();
@@ -237,7 +237,16 @@ mod tests {
         let mut details = Details::default();
         details.stub.point = Point::from_str("host:guest").unwrap();
         let guest = details.stub.point.to_surface();
-        host.create_mechtron(details).unwrap();
+
+        let host_cmd = HostCmd {
+            kind: AssignmentKind::Create,
+            details,
+            state: StateSrc::None,
+            config: MechtronConfig { wasm: Point::from_str("blah").unwrap(), name: "my-app".to_string() }
+        };
+
+
+        host.create_mechtron(host_cmd).unwrap();
 
         let mechtron = Details {
             stub: Stub {
