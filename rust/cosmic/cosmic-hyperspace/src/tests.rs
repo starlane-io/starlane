@@ -94,7 +94,7 @@ async fn create(
     Ok(())
 }
 
-#[test]
+//#[test]
 fn test_gravity_routing() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -209,7 +209,7 @@ fn test_gravity_routing() -> Result<(), CosmicErr> {
         Ok(())
     })
 }
-#[test]
+//#[test]
 fn test_layer_traversal() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -843,7 +843,7 @@ fn test_publish() -> Result<(), CosmicErr> {
     })
 }
 
-#[test]
+//#[test]
 fn test_mechtron() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()

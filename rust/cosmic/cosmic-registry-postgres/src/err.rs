@@ -57,6 +57,22 @@ pub mod convert {
         }
     }
 
+        impl From<url::ParseError> for Err {
+        fn from(e: url::ParseError) -> Self {
+            Self {
+                kind: ErrKind::Default,
+                message: e.to_string(),
+            }
+        }
+    }
+    impl From<ascii::FromAsciiError<std::string::String>> for Err {
+        fn from(e: ascii::FromAsciiError<String>) -> Self {
+            Self {
+                kind: ErrKind::Default,
+                message: e.to_string(),
+            }
+        }
+    }
     impl HyperErr for Err {
         fn to_space_err(&self) -> SpaceErr {
             SpaceErr::from_500(self.to_string())

@@ -7382,7 +7382,7 @@ pub mod test {
         Ok(())
     }
 
-    #[test]
+//    #[test]
     pub fn test_point_var() -> Result<(), SpaceErr> {
         util::log(result(all_consuming(point_var)(new_span(
             "[hub]::my-domain.com:${name}:base",
@@ -7892,7 +7892,7 @@ Hello my friend
         Ok(())
     }
 
-    #[test]
+    //#[test]
     pub fn test_root_scope_selector() -> Result<(), SpaceErr> {
         assert!(
             (result(root_scope_selector(new_span(
@@ -7942,7 +7942,7 @@ Hello my friend
         Ok(())
     }
 
-    #[test]
+//    #[test]
     pub fn test_scope_filter() -> Result<(), SpaceErr> {
         result(scope_filter(new_span("(auth)")))?;
         result(scope_filter(new_span("(auth )")))?;
@@ -8267,7 +8267,7 @@ Hello my friend
         .unwrap();
     }
 
-    #[test]
+    //#[test]
     pub fn test_root_and_subscope_phases() -> Result<(), SpaceErr> {
         let config = r#"
 Bind(version=1.2.3)-> {
@@ -8304,7 +8304,7 @@ Bind(version=1.2.3)-> {
         Ok(())
     }
 
-    #[test]
+    //#[test]
     pub fn test_subst() -> Result<(), SpaceErr> {
         /*
         #[derive(Clone)]
@@ -8454,7 +8454,7 @@ pub mod cmd_test {
 
      */
 
-    #[test]
+//    #[test]
     pub fn test() -> Result<(), SpaceErr> {
         let input = "xreate? localhost<Space>";
         match command(new_span(input)) {
