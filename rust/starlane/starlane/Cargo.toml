@@ -40,5 +40,3 @@ dirs = "4.0.0"
 ascii = "1.1.0"
 url = "2.3.1"
 
-[dependencies.cosmic-registry-postgres]
-version = "0.3.1"
