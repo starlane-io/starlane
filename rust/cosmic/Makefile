@@ -32,6 +32,7 @@ publish:
 	sleep 60
 	$(MAKE) -C cosmic-hyperlane-tcp publish
 	sleep 60
+	$(MAKE) -C ../mechtron/mechtron-host publish
 	$(MAKE) -C cosmic-hyperspace publish
 	$(MAKE) -C cosmic-cli publish
 	$(MAKE) -C cosmic-registry-postgres publish
