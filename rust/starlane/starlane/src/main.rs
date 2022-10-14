@@ -63,6 +63,8 @@ use cosmic_space::substance::Token;
 use cosmic_hyperlane_tcp::HyperlaneTcpServer;
 use cosmic_hyperspace::driver::web::WebDriverFactory;
 use cosmic_hyperspace::mem::registry::{MemRegApi, MemRegCtx};
+use cosmic_space::loc;
+use cosmic_space::wasm::Timestamp;
 
 fn main() -> Result<(), StarErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -107,14 +109,15 @@ lazy_static! {
         std::env::var("STARLANE_REGISTRY_DATABASE").unwrap_or("postgres".to_string());
 }
 #[no_mangle]
-pub extern "C" fn cosmic_uuid() -> String {
-    Uuid::new_v4().to_string()
+pub extern "C" fn cosmic_uuid() -> loc::Uuid {
+    loc::Uuid::from(uuid::Uuid::new_v4()).unwrap()
 }
 
 #[no_mangle]
-pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
-    Utc::now()
+pub extern "C" fn cosmic_timestamp() -> Timestamp {
+    Timestamp { millis: Utc::now().timestamp_millis() }
 }
+
 
 #[derive(Clone)]
 pub struct Starlane {

@@ -3,8 +3,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Timestamp {
-    millis: i64,
+    pub millis: i64,
 }
+
 
 impl Timestamp {
     pub fn timestamp_millis(&self) -> i64 {
