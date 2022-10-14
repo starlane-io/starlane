@@ -54,7 +54,7 @@ fn web_bind() -> BindConfig {
         r#"
     Bind(version=1.0.0)
     {
-        Route<Http<*>> -> localhost => &;
+        Route<Http<*>> -> ROOT => &;
     }
     "#,
     ))

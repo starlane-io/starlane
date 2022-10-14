@@ -67,6 +67,11 @@ use cosmic_space::loc;
 use cosmic_space::wasm::Timestamp;
 
 fn main() -> Result<(), StarErr> {
+
+    ctrlc::set_handler(move || {
+        std::process::exit(1);
+    });
+
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
