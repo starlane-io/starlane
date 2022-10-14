@@ -753,7 +753,7 @@ fn test_control_cli() -> Result<(), CosmicErr> {
     })
 }
 
-#[test]
+//#[test]
 fn test_publish() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
