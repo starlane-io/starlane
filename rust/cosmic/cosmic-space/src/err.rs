@@ -24,7 +24,12 @@ use crate::parse::error::find_parse_err;
 use crate::substance::{Errors, Substance};
 use crate::wave::core::http2::StatusCode;
 use crate::wave::core::ReflectedCore;
+use serde::{Deserialize,Serialize};
 
+
+
+
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub enum SpaceErr {
     Status { status: u16, message: String },
     ParseErrs(ParseErrs),
@@ -69,14 +74,6 @@ impl Into<ReflectedCore> for SpaceErr {
     }
 }
 
-impl Clone for SpaceErr {
-    fn clone(&self) -> Self {
-        SpaceErr::Status {
-            status: 500,
-            message: self.message(),
-        }
-    }
-}
 
 pub trait CoreReflector {
     fn as_reflected_core(self) -> ReflectedCore;
@@ -172,19 +169,6 @@ impl SpaceErr {
     }
 }
 
-impl Debug for SpaceErr {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SpaceErr::Status { status, message } => {
-                f.write_str(format!("{}: {}", status, message).as_str())
-            }
-            SpaceErr::ParseErrs(errs) => {
-                self.print();
-                f.write_str("Parse Errors... [Report redacted]")
-            }
-        }
-    }
-}
 
 impl SpaceErr {
     pub fn new<S: ToString>(status: u16, message: S) -> Self {
@@ -518,6 +502,7 @@ impl<I: Span> From<nom::Err<ErrorTree<I>>> for ParseErrs {
     }
 }
 
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub struct ParseErrs {
     pub report: Vec<Report>,
     pub source: Option<Arc<String>>,
@@ -626,7 +611,7 @@ impl From<serde_urlencoded::ser::Error> for SpaceErr {
 pub mod report {
     use serde::{Deserialize, Serialize};
 
-    #[derive(Clone, Serialize, Deserialize)]
+    #[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq)]
     pub struct Report {
         kind: ReportKind,
         code: Option<String>,
@@ -729,7 +714,7 @@ pub mod report {
         }
     }
 
-    #[derive(Clone, Serialize, Deserialize)]
+    #[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq)]
     pub struct Range {
         pub start: u32,
         pub end: u32,
@@ -750,7 +735,7 @@ pub mod report {
         }
     }
 
-    #[derive(Clone, Serialize, Deserialize)]
+    #[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq)]
     pub struct Label {
         span: Range,
         msg: Option<String>,
@@ -827,4 +812,15 @@ pub mod report {
         /// A 24-bit RGB color, as specified by ISO-8613-3.
         RGB(u8, u8, u8),
     }
+}
+
+
+#[cfg(test)]
+pub mod test {
+
+    #[test]
+    pub fn compile() {
+
+    }
+
 }
