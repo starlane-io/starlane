@@ -122,7 +122,7 @@ where
                 if topic.source_selector().is_match(source).is_ok() {
                     Some(Ok(topic))
                 } else {
-                    Some(Err(SpaceErr::forbidden()))
+                    Some(Err(SpaceErr::not_found("topic")))
                 }
             }
         }

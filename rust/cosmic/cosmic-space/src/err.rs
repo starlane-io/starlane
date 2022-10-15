@@ -135,36 +135,34 @@ impl Into<ParseErrs> for UniErr {
  */
 
 impl SpaceErr {
-    pub fn timeout() -> Self {
-        SpaceErr::from_status(408)
+    pub fn timeout<S:ToString>(s:S) -> Self {
+        SpaceErr::new(408,format!("Timeout: {}",s.to_string()))
     }
 
-    pub fn server_error() -> Self {
-        SpaceErr::from_status(500)
+    pub fn server_error<S:ToString>(s:S) -> Self {
+        SpaceErr::new(500,format!("Server Side Error: {}",s.to_string()))
     }
-    pub fn forbidden() -> Self {
-        SpaceErr::err403()
-    }
-
-    pub fn forbidden_msg<S: ToString>(msg: S) -> Self {
-        SpaceErr::Status {
-            status: 403,
-            message: msg.to_string(),
-        }
+    pub fn forbidden<S:ToString>(s:S) -> Self {
+        SpaceErr::new(403,format!("Forbidden: {}",s.to_string()))
     }
 
-    pub fn not_found() -> Self {
-        SpaceErr::err404()
+    pub fn not_found<S:ToString>(s:S) -> Self {
+        SpaceErr::new(404,format!("Not Found: {}",s.to_string()))
     }
 
-    pub fn bad_request() -> Self {
-        SpaceErr::from_status(400)
+    pub fn bad_request<S:ToString>(s:S) -> Self {
+        SpaceErr::new(400,format!("Bad Request: {}",s.to_string()))
     }
 
-    pub fn bad_request_msg<M: ToString>(m: M) -> Self {
-        SpaceErr::Status {
-            status: 400,
-            message: m.to_string(),
+    pub fn ctx<S: ToString>(mut self, ctx: S) -> Self {
+        match self {
+            Self::Status { status, message } => {
+                Self::Status {status, message: format!("{} | {}", message, ctx.to_string())}
+            }
+            Self::ParseErrs(mut errs) => {
+                Self::ParseErrs(errs.ctx(ctx))
+            }
+
         }
     }
 }
@@ -496,6 +494,7 @@ impl<I: Span> From<nom::Err<ErrorTree<I>>> for ParseErrs {
             SpaceErr::Status { .. } => ParseErrs {
                 report: vec![],
                 source: None,
+                ctx: "".to_string()
             },
             SpaceErr::ParseErrs(parse_errs) => parse_errs,
         }
@@ -506,13 +505,24 @@ impl<I: Span> From<nom::Err<ErrorTree<I>>> for ParseErrs {
 pub struct ParseErrs {
     pub report: Vec<Report>,
     pub source: Option<Arc<String>>,
+    pub ctx: String
 }
 
 impl ParseErrs {
+
+    pub fn ctx<S:ToString>( mut self, ctx: S) -> Self{
+        Self {
+            report: self.report,
+            source: self.source,
+            ctx: ctx.to_string()
+        }
+    }
+
     pub fn from_report(report: Report, source: Arc<String>) -> Self {
         Self {
             report: vec![report],
             source: Some(source),
+            ctx: "".to_string()
         }
     }
 
@@ -570,6 +580,7 @@ impl ParseErrs {
         let mut rtn = ParseErrs {
             report: vec![],
             source,
+            ctx: "".to_string()
         };
 
         for err in errs {
@@ -586,6 +597,7 @@ impl From<SpaceErr> for ParseErrs {
         ParseErrs {
             report: vec![],
             source: None,
+            ctx: "".to_string()
         }
     }
 }

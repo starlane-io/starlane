@@ -86,7 +86,7 @@ impl WaveKind {
         match self {
             WaveKind::Pong => Ok(ReflectedKind::Pong),
             WaveKind::Echo => Ok(ReflectedKind::Echo),
-            _ => Err(SpaceErr::not_found()),
+            _ => Err(SpaceErr::bad_request("expected a reflected WaveKind")),
         }
     }
 }
@@ -299,7 +299,7 @@ impl UltraWave {
             UltraWave::Ping(ping) => Ok(ping.to_directed()),
             UltraWave::Ripple(ripple) => Ok(ripple.to_directed()),
             UltraWave::Signal(signal) => Ok(signal.to_directed()),
-            _ => Err(SpaceErr::bad_request()),
+            _ => Err(SpaceErr::bad_request("expected a DirectedWave")),
         }
     }
 
@@ -307,7 +307,7 @@ impl UltraWave {
         match self {
             UltraWave::Pong(pong) => Ok(pong.to_reflected()),
             UltraWave::Echo(echo) => Ok(echo.to_reflected()),
-            _ => Err(SpaceErr::bad_request_msg(format!(
+            _ => Err(SpaceErr::bad_request(format!(
                 "expected: ReflectedWave; encountered: {}",
                 self.desc()
             ))),
@@ -391,7 +391,7 @@ impl UltraWave {
     pub fn to_signal(self) -> Result<Wave<Signal>, SpaceErr> {
         match self {
             UltraWave::Signal(signal) => Ok(signal),
-            _ => Err(SpaceErr::bad_request_msg(format!(
+            _ => Err(SpaceErr::bad_request(format!(
                 "expecting: Wave<Signal> encountered: Wave<{}>",
                 self.kind().to_string()
             ))),
@@ -826,7 +826,7 @@ where
     {
         match B::try_from(self.body.clone()) {
             Ok(body) => Ok(body),
-            Err(err) => Err(SpaceErr::bad_request()),
+            Err(err) => Err(SpaceErr::bad_request("expected a body")),
         }
     }
 }
@@ -973,7 +973,7 @@ impl Ping {
     {
         match B::try_from(self.clone().core.body) {
             Ok(body) => Ok(body),
-            Err(err) => Err(SpaceErr::bad_request()),
+            Err(err) => Err(SpaceErr::bad_request("body is required")),
         }
     }
 }
@@ -1549,7 +1549,7 @@ impl FromReflectedAggregate for () {
     {
         match agg {
             ReflectedAggregate::None => Ok(()),
-            _ => Err(SpaceErr::bad_request()),
+            _ => Err(SpaceErr::bad_request("expected a ReflectedAggregate of None")),
         }
     }
 }
@@ -1568,7 +1568,7 @@ impl FromReflectedAggregate for Echoes {
                 }
                 Ok(echoes)
             }
-            _ => Err(SpaceErr::bad_request()),
+            _ => Err(SpaceErr::bad_request("expecting a ReflectedAggregate of Multi")),
         }
     }
 }
@@ -1659,9 +1659,9 @@ impl FromReflectedAggregate for Wave<Pong> {
         match agg {
             ReflectedAggregate::Single(reflected) => match reflected {
                 ReflectedWave::Pong(pong) => Ok(pong),
-                _ => Err(SpaceErr::bad_request()),
+                _ => Err(SpaceErr::bad_request("expected a Pong Reflected")),
             },
-            _ => Err(SpaceErr::bad_request()),
+            _ => Err(SpaceErr::bad_request("expected a Single Reflected")),
         }
     }
 }
@@ -2340,14 +2340,14 @@ impl ReflectedWave {
     pub fn to_echo(self) -> Result<Wave<Echo>, SpaceErr> {
         match self {
             ReflectedWave::Echo(echo) => Ok(echo),
-            _ => Err(SpaceErr::bad_request()),
+            _ => Err(SpaceErr::bad_request("expected Wave to be an Echo")),
         }
     }
 
     pub fn to_pong(self) -> Result<Wave<Pong>, SpaceErr> {
         match self {
             ReflectedWave::Pong(pong) => Ok(pong),
-            _ => Err(SpaceErr::bad_request()),
+            _ => Err(SpaceErr::bad_request("expecrted wave to be a Pong")),
         }
     }
 }
@@ -2802,7 +2802,7 @@ impl ToReflected for Wave<Pong> {
     fn from_reflected(reflected: ReflectedWave) -> Result<Self, SpaceErr> {
         match reflected {
             ReflectedWave::Pong(pong) => Ok(pong),
-            _ => Err(SpaceErr::bad_request()),
+            _ => Err(SpaceErr::bad_request("expected wave to be a Pong")),
         }
     }
 }
@@ -2815,7 +2815,7 @@ impl ToReflected for Wave<Echo> {
     fn from_reflected(reflected: ReflectedWave) -> Result<Self, SpaceErr> {
         match reflected {
             ReflectedWave::Echo(echo) => Ok(echo),
-            _ => Err(SpaceErr::bad_request()),
+            _ => Err(SpaceErr::bad_request("expected Wave to be an Echo")),
         }
     }
 }
@@ -2836,7 +2836,7 @@ impl TryFrom<ReflectedWave> for Wave<Pong> {
     fn try_from(wave: ReflectedWave) -> Result<Self, Self::Error> {
         match wave {
             ReflectedWave::Pong(pong) => Ok(pong),
-            _ => Err(SpaceErr::bad_request()),
+            _ => Err(SpaceErr::bad_request("Expected Wave to be a Pong")),
         }
     }
 }
@@ -3271,9 +3271,9 @@ impl TryInto<Wave<Pong>> for ReflectedAggregate {
         match self {
             Self::Single(reflected) => match reflected {
                 ReflectedWave::Pong(pong) => Ok(pong),
-                _ => Err(SpaceErr::bad_request()),
+                _ => Err(SpaceErr::bad_request("Expected ReflectedAggregate to be for a Pong")),
             },
-            _ => Err(SpaceErr::bad_request()),
+            _ => Err(SpaceErr::bad_request("Expected ReflectedAggregate to be a Single")),
         }
     }
 }
@@ -3284,7 +3284,7 @@ impl TryInto<Vec<Wave<Echo>>> for ReflectedAggregate {
         match self {
             Self::Single(reflected) => match reflected {
                 ReflectedWave::Echo(echo) => Ok(vec![echo]),
-                _ => Err(SpaceErr::bad_request()),
+                _ => Err(SpaceErr::bad_request("Expected Reflected to be a Single Echo")),
             },
             ReflectedAggregate::None => Ok(vec![]),
             ReflectedAggregate::Multi(waves) => {
