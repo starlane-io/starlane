@@ -111,12 +111,15 @@ impl Session {
         let mut command = RawCommand::new(command.to_string());
         for block in blocks {
             let content = Arc::new(fs::read(block.name.as_str()).await?);
+println!("UPLOAD BLOCK: {} size {}",block.name, content.len());
             command
                 .transfers
                 .push(CmdTransfer::new(block.name, content));
         }
 
+println!("sending raw command");
         let core = self.cli.raw(command).await?;
+println!("raw command sent");
         self.core_out(core);
 
         Ok(())
