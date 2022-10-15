@@ -54,7 +54,7 @@ pub enum SubstanceKind {
     Status,
     Particle,
     Location,
-    Errors,
+    FormErrs,
     Json,
     MultipartForm,
     RawCommand,
@@ -67,6 +67,7 @@ pub enum SubstanceKind {
     Knock,
     Greet,
     Log,
+    Err
 }
 
 #[derive(
@@ -98,7 +99,7 @@ pub enum Substance {
     Location(ParticleLocation),
     RawCommand(RawCommand),
     Command(Box<Command>),
-    Errors(Errors),
+    FormErrs(FormErrs),
     Json(Value),
     MultipartForm(MultipartForm),
     DirectedCore(Box<DirectedCore>),
@@ -109,6 +110,7 @@ pub enum Substance {
     Knock(Knock),
     Greet(Greet),
     Log(LogSubstance),
+    Err(SpaceErr)
 }
 
 impl Substance {
@@ -229,7 +231,7 @@ impl Substance {
             Substance::Int(_) => SubstanceKind::Int,
             Substance::Status(_) => SubstanceKind::Status,
             Substance::Particle(_) => SubstanceKind::Particle,
-            Substance::Errors(_) => SubstanceKind::Errors,
+            Substance::FormErrs(_) => SubstanceKind::FormErrs,
             Substance::Json(_) => SubstanceKind::Json,
             Substance::RawCommand(_) => SubstanceKind::RawCommand,
             Substance::Surface(_) => SubstanceKind::Surface,
@@ -245,6 +247,7 @@ impl Substance {
             Substance::Details(_) => SubstanceKind::Details,
             Substance::Location(_) => SubstanceKind::Location,
             Substance::Log(_) => SubstanceKind::Log,
+            Substance::Err(_) => SubstanceKind::Err,
         }
     }
 
@@ -341,11 +344,11 @@ impl SubstanceMap {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct Errors {
+pub struct FormErrs {
     map: HashMap<String, String>,
 }
 
-impl Errors {
+impl FormErrs {
     pub fn to_cosmic_err(&self) -> SpaceErr {
         SpaceErr::new(500, self.to_string().as_str())
     }
@@ -363,7 +366,7 @@ impl Errors {
     }
 }
 
-impl From<SpaceErr> for Errors {
+impl From<SpaceErr> for FormErrs {
     fn from(err: SpaceErr) -> Self {
         match err {
             SpaceErr::Status { status, message } => {
@@ -374,7 +377,7 @@ impl From<SpaceErr> for Errors {
     }
 }
 
-impl ToString for Errors {
+impl ToString for FormErrs {
     fn to_string(&self) -> String {
         let mut rtn = String::new();
         for (index, (_, value)) in self.iter().enumerate() {
@@ -387,7 +390,7 @@ impl ToString for Errors {
     }
 }
 
-impl Deref for Errors {
+impl Deref for FormErrs {
     type Target = HashMap<String, String>;
 
     fn deref(&self) -> &Self::Target {

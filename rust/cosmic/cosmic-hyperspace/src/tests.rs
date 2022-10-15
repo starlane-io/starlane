@@ -808,7 +808,7 @@ fn test_publish() -> Result<(), CosmicErr> {
         let core = cli.raw(command).await?;
 
         if !core.is_ok() {
-            if let Substance::Errors(ref e) = core.body {
+            if let Substance::FormErrs(ref e) = core.body {
                 println!("{}", e.to_string());
             }
         }
@@ -893,7 +893,7 @@ fn test_mechtron() -> Result<(), CosmicErr> {
         let core = cli.raw(command).await?;
 
         if !core.is_ok() {
-            if let Substance::Errors(ref e) = core.body {
+            if let Substance::FormErrs(ref e) = core.body {
                 println!("{}", e.to_string());
             }
         }

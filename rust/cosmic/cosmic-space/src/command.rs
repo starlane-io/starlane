@@ -190,7 +190,7 @@ pub mod direct {
     use crate::loc::{Meta, Point};
     use crate::selector::KindSelector;
     use crate::substance::Bin;
-    use crate::substance::{Errors, Substance};
+    use crate::substance::{FormErrs, Substance};
     use crate::util::{ValueMatcher, ValuePattern};
     use crate::wave::core::ext::ExtMethod;
     use crate::wave::core::http2::HttpMethod;

@@ -41,7 +41,7 @@ use crate::selector::Selector;
 use crate::settings::Timeouts;
 use crate::substance::Bin;
 use crate::substance::{
-    Call, CallKind, CmdCall, Errors, ExtCall, HttpCall, HypCall, MultipartFormBuilder, Substance,
+    Call, CallKind, CmdCall, FormErrs, ExtCall, HttpCall, HypCall, MultipartFormBuilder, Substance,
     SubstanceKind, ToRequestCore, ToSubstance, Token,
 };
 use crate::util::{uuid, ValueMatcher, ValuePattern};
@@ -1699,7 +1699,7 @@ impl Pong {
         if self.is_ok() {
             Ok(())
         } else {
-            if let Substance::Errors(errs) = &self.core.body {
+            if let Substance::FormErrs(errs) = &self.core.body {
                 Err(format!("{} : {}", self.core.status.to_string(), errs.to_string()).into())
             } else {
                 Err(self.core.status.to_string().into())

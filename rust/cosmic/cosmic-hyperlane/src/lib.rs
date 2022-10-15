@@ -33,7 +33,7 @@ use cosmic_space::loc::{Layer, Point, PointFactory, Surface, ToPoint, ToSurface,
 use cosmic_space::log::{PointLogger, RootLogger, Tracker};
 use cosmic_space::particle::Status;
 use cosmic_space::settings::Timeouts;
-use cosmic_space::substance::{Errors, Substance, SubstanceKind, Token};
+use cosmic_space::substance::{FormErrs, Substance, SubstanceKind, Token};
 use cosmic_space::util::uuid;
 use cosmic_space::wave::core::ext::ExtMethod;
 use cosmic_space::wave::core::hyp::HypMethod;

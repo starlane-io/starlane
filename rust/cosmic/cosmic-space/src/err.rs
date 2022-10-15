@@ -21,7 +21,7 @@ use cosmic_nom::Span;
 use cosmic_nom::SpanExtra;
 
 use crate::parse::error::find_parse_err;
-use crate::substance::{Errors, Substance};
+use crate::substance::{FormErrs, Substance};
 use crate::wave::core::http2::StatusCode;
 use crate::wave::core::ReflectedCore;
 use serde::{Deserialize,Serialize};
@@ -63,12 +63,12 @@ impl Into<ReflectedCore> for SpaceErr {
             SpaceErr::Status { status, message } => ReflectedCore {
                 headers: Default::default(),
                 status: StatusCode::from_u16(status).unwrap_or(StatusCode::from_u16(500).unwrap()),
-                body: Substance::Errors(Errors::default(message.as_str())),
+                body: Substance::FormErrs(FormErrs::default(message.as_str())),
             },
             SpaceErr::ParseErrs(_) => ReflectedCore {
                 headers: Default::default(),
                 status: StatusCode::from_u16(500u16).unwrap_or(StatusCode::from_u16(500).unwrap()),
-                body: Substance::Errors(Errors::default("parsing error...")),
+                body: Substance::FormErrs(FormErrs::default("parsing error...")),
             },
         }
     }
