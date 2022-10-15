@@ -3678,7 +3678,7 @@ pub mod model {
 
         pub fn from<I: ToString>(selector: LexScopeSelector<I>) -> Result<Self, SpaceErr> {
             if selector.name.to_string().as_str() != "Route" {
-                return Err(SpaceErr::from_500("expected Route"));
+                return Err(SpaceErr::server_error("expected Route"));
             }
             let path = match selector.path {
                 None => None,
@@ -4896,7 +4896,7 @@ pub mod error {
      */
 
     fn create_err_report<I: Span>(context: &str, loc: I) -> SpaceErr {
-        SpaceErr::from_500(context)
+        SpaceErr::server_error(context)
     }
     /*    fn create_err_report<I: Span>(context: &str, loc: I) -> UniErr {
             let mut builder = Report::build(ReportKind::Error, (), 23);

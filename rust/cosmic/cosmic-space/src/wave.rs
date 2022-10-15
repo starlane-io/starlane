@@ -263,7 +263,7 @@ impl UltraWave {
             UltraWave::Pong(pong) => Ok(SingularUltraWave::Pong(pong)),
             UltraWave::Echo(echo) => Ok(SingularUltraWave::Echo(echo)),
             UltraWave::Signal(signal) => Ok(SingularUltraWave::Signal(signal)),
-            UltraWave::Ripple(_) => Err(SpaceErr::from_500("cannot change Ripple into a singular")),
+            UltraWave::Ripple(_) => Err(SpaceErr::server_error("cannot change Ripple into a singular")),
         }
     }
 
@@ -1012,7 +1012,7 @@ impl TryInto<Bin> for Pong {
     fn try_into(self) -> Result<Bin, Self::Error> {
         match self.core.body {
             Substance::Bin(bin) => Ok(bin),
-            _ => Err(SpaceErr::err400()),
+            _ => Err(SpaceErr::bad_request("expected Bin")),
         }
     }
 }
@@ -2097,7 +2097,7 @@ where
                 ripple.bounce_backs = bounce_backs;
                 Ok(())
             }
-            _ => Err(SpaceErr::from_500("can only set bouncebacks for Ripple")),
+            _ => Err(SpaceErr::server_error("can only set bouncebacks for Ripple")),
         }
     }
 
@@ -2407,7 +2407,7 @@ impl Recipients {
     pub fn to_single(self) -> Result<Surface, SpaceErr> {
         match self {
             Recipients::Single(surface) => Ok(surface),
-            _ => Err(SpaceErr::from_500(
+            _ => Err(SpaceErr::server_error(
                 "cannot convert a multiple recipient into a single",
             )),
         }
@@ -2677,14 +2677,14 @@ impl Wave<Signal> {
 
     pub fn unwrap_from_hop(self) -> Result<Wave<Signal>, SpaceErr> {
         if self.method != Method::Hyp(HypMethod::Hop) {
-            return Err(SpaceErr::from_500(
+            return Err(SpaceErr::server_error(
                 "expected signal wave to have method Hop",
             ));
         }
         if let Substance::UltraWave(wave) = &self.body {
             Ok((*wave.clone()).to_signal()?)
         } else {
-            Err(SpaceErr::from_500(
+            Err(SpaceErr::server_error(
                 "expected body substance to be of type UltraWave for a transport signal",
             ))
         }
@@ -2692,14 +2692,14 @@ impl Wave<Signal> {
 
     pub fn unwrap_from_transport(self) -> Result<UltraWave, SpaceErr> {
         if self.method != Method::Hyp(HypMethod::Transport) {
-            return Err(SpaceErr::from_500(
+            return Err(SpaceErr::server_error(
                 "expected signal wave to have method Transport",
             ));
         }
         if let Substance::UltraWave(wave) = &self.body {
             Ok(*wave.clone())
         } else {
-            Err(SpaceErr::from_500(
+            Err(SpaceErr::server_error(
                 "expected body substance to be of type UltraWave for a transport signal",
             ))
         }

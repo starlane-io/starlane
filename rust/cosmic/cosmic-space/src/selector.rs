@@ -74,7 +74,7 @@ impl KindSelector {
 
     pub fn as_point_segments(&self) -> Result<String, SpaceErr> {
         match &self.base {
-            KindBaseSelector::Any => Err(SpaceErr::from_500(
+            KindBaseSelector::Any => Err(SpaceErr::server_error(
                 "cannot turn a base wildcard kind into point segments",
             )),
             KindBaseSelector::Exact(e) => Ok(e.to_skewer().to_string()),

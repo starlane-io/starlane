@@ -175,41 +175,6 @@ impl SpaceErr {
             message: message.to_string(),
         }
     }
-
-    pub fn err404() -> Self {
-        Self::Status {
-            status: 404,
-            message: "Not Found".to_string(),
-        }
-    }
-
-    pub fn err403() -> Self {
-        Self::Status {
-            status: 403,
-            message: "Forbidden".to_string(),
-        }
-    }
-
-    pub fn err500() -> Self {
-        Self::Status {
-            status: 500,
-            message: "Internal Server Error".to_string(),
-        }
-    }
-
-    pub fn err400() -> Self {
-        Self::Status {
-            status: 400,
-            message: "Bad Request".to_string(),
-        }
-    }
-
-    pub fn from_500<S: ToString>(message: S) -> Self {
-        Self::Status {
-            status: 500,
-            message: message.to_string(),
-        }
-    }
 }
 
 impl StatusErr for SpaceErr {
@@ -261,19 +226,19 @@ impl<C> From<SendTimeoutError<C>> for SpaceErr {
 
 impl<C> From<tokio::sync::mpsc::error::SendError<C>> for SpaceErr {
     fn from(e: SendError<C>) -> Self {
-        SpaceErr::from_500(e.to_string())
+        SpaceErr::server_error(e.to_string())
     }
 }
 
 impl<C> From<tokio::sync::broadcast::error::SendError<C>> for SpaceErr {
     fn from(e: tokio::sync::broadcast::error::SendError<C>) -> Self {
-        SpaceErr::from_500(e.to_string())
+        SpaceErr::server_error(e.to_string())
     }
 }
 
 impl From<tokio::sync::watch::error::RecvError> for SpaceErr {
     fn from(e: tokio::sync::watch::error::RecvError) -> Self {
-        SpaceErr::from_500(e.to_string())
+        SpaceErr::server_error(e.to_string())
     }
 }
 

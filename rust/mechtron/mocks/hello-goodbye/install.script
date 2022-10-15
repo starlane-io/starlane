@@ -1,4 +1,5 @@
 create? repo<Repo>;
 create? repo:hello-goodbye<BundleSeries>;
 publish ^[ bundle.zip ]-> repo:hello-goodbye:1.0.0;
+create hello-goodbye<Mechtron>{ +config=repo:hello-goodbye:1.0.0:/config/hello-goodbye.mechtron };
 exit;

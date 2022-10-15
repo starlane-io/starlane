@@ -114,7 +114,7 @@ impl ProtoTransmitter {
         if let Some(DirectedKind::Ping) = ping.kind {
             self.direct(ping).await
         } else {
-            Err(SpaceErr::from_500("expected DirectedKind::Ping"))
+            Err(SpaceErr::server_error("expected DirectedKind::Ping"))
         }
     }
 
@@ -126,7 +126,7 @@ impl ProtoTransmitter {
         if let Some(DirectedKind::Ripple) = ripple.kind {
             self.direct(ripple).await
         } else {
-            Err(SpaceErr::from_500("expected DirectedKind::Ping"))
+            Err(SpaceErr::server_error("expected DirectedKind::Ping"))
         }
     }
 
@@ -138,7 +138,7 @@ impl ProtoTransmitter {
         if let Some(DirectedKind::Signal) = signal.kind {
             self.direct(signal).await
         } else {
-            Err(SpaceErr::from_500("expected DirectedKind::Ping"))
+            Err(SpaceErr::server_error("expected DirectedKind::Ping"))
         }
     }
 
@@ -348,7 +348,7 @@ impl Exchanger {
                 .claimed
                 .contains(reflect.reflection_of().to_string().as_str())
             {
-                return Err(SpaceErr::from_500(format!(
+                return Err(SpaceErr::server_error(format!(
                     "Reflection already claimed for {} from: {} to: {} KIND: {} STATUS: {}",
                     reflect.reflection_of().to_short_string(),
                     reflect.from().to_string(),
@@ -357,7 +357,7 @@ impl Exchanger {
                     reflect.core().status.to_string()
                 )));
             }
-            return Err(SpaceErr::from_500(format!(
+            return Err(SpaceErr::server_error(format!(
                 "Not expecting reflected message for {} from: {} to: {} KIND: {} STATUS: {}",
                 reflect.reflection_of().to_short_string(),
                 reflect.from().to_string(),

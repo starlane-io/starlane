@@ -67,7 +67,7 @@ impl Into<SpaceErr> for DefaultHostErr {
 
 impl HostErr for DefaultHostErr {
     fn to_space_err(self) -> SpaceErr {
-        SpaceErr::from_500(self.to_string())
+        SpaceErr::server_error(self.to_string())
     }
 }
 

@@ -151,7 +151,7 @@ pub mod convert {
     }
     impl HyperErr for Err {
         fn to_space_err(&self) -> SpaceErr {
-            SpaceErr::from_500(self.to_string())
+            SpaceErr::server_error(self.to_string())
         }
 
         fn new<S>(message: S) -> Self
@@ -192,7 +192,7 @@ pub mod convert {
     }
     impl Into<SpaceErr> for Err {
         fn into(self) -> SpaceErr {
-            SpaceErr::from_500(self.to_string())
+            SpaceErr::server_error(self.to_string())
         }
     }
 
@@ -276,7 +276,7 @@ pub mod convert {
 
     impl HostErr for Err {
         fn to_space_err(self) -> SpaceErr {
-            SpaceErr::from_500(self.to_string())
+            SpaceErr::server_error(self.to_string())
         }
     }
 

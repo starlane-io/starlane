@@ -135,6 +135,7 @@ where
         Ok(())
     }
 
+    /*
     async fn directed_fabric_bound(
         &self,
         mut traversal: Traversal<DirectedWave>,
@@ -205,6 +206,8 @@ where
         }
         Ok(())
     }
+
+     */
 }
 
 #[handler]

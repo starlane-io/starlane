@@ -60,7 +60,7 @@ impl ArtifactApi {
             }
         }
 
-        let mechtron: Arc<MechtronConfig> = Arc::new(self.fetch(point).await.unwrap());
+        let mechtron: Arc<MechtronConfig> = Arc::new(self.fetch(point).await?);
         self.mechtrons.insert(point.clone(), mechtron.clone());
         return Ok(ArtRef::new(mechtron, point.clone()));
     }
@@ -203,10 +203,11 @@ impl ArtifactFetcher for ReadArtifactFetcher {
         directed.to(point.clone().to_surface());
         directed.method(CmdMethod::Read);
         let pong = self.transmitter.ping(directed).await?;
+println!("\tpong.core.status: {}",pong.core.status.to_string());
         pong.core.ok_or()?;
         match pong.variant.core.body {
             Substance::Bin(bin) => Ok(bin),
-            other => Err(SpaceErr::from_500(format!(
+            other => Err(SpaceErr::server_error(format!(
                 "expected Bin, encountered unexpected substance {} when fetching Artifact",
                 other.kind().to_string()
             ))),

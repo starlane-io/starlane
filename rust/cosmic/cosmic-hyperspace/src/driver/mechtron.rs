@@ -283,7 +283,7 @@ where
                 .properties
                 .get("config")
                 .ok_or("expected config property")
-                .map_err(|e| SpaceErr::from_500(e))?;
+                .map_err(|e| SpaceErr::server_error(e))?;
             let config = Point::from_str(config.value.as_str())?;
             let config = self
                 .skel
@@ -371,7 +371,7 @@ where
                 self.skel
                     .factory
                     .create(assign.details.clone(), bin)
-                    .map_err(|e| SpaceErr::from_500("host err"))?,
+                    .map_err(|e| SpaceErr::server_error("host err"))?,
             );
 
             mechtron_host.create_guest()?;
