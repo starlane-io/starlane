@@ -12,9 +12,9 @@ For a quick overview visit [The Cosmic Initiative](http://thecosmicinitiative.io
 *this framework is a work in progress and not ready for production. It is ready for feedback and discussion.*
 
 ## WHAT TO SEE
-To get started take a look at the [cosmic-universe](rust/cosmic/cosmic-universe) package.
+To get started take a look at the [cosmic-space](rust/cosmic/cosmic-space) package.
 
-After that you might find the [cosmic-hyperverse](rust/cosmic/cosmic-hyperverse) interesting.
+After that you might find the [cosmic-hyperspace](rust/cosmic/cosmic-hyperspace) interesting.
 
 
 ## STARLANE - A REFERENCE IMPLEMENTATION
