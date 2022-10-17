@@ -99,6 +99,7 @@ impl ArtifactApi {
     where
         A: TryFrom<Bin, Error = SpaceErr>,
     {
+println!("FETCHING {} ", point.to_string() );
         if !point.has_bundle() {
             return Err("point is not from a bundle".into());
         }
@@ -202,6 +203,7 @@ impl ArtifactFetcher for ReadArtifactFetcher {
         let mut directed = DirectedProto::ping();
         directed.to(point.clone().to_surface());
         directed.method(CmdMethod::Read);
+println!("\treading: {}",point.to_string());
         let pong = self.transmitter.ping(directed).await?;
 println!("\tpong.core.status: {}",pong.core.status.to_string());
         pong.core.ok_or()?;

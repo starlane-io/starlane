@@ -1367,16 +1367,16 @@ where
 
             let reflection = injection.wave.clone().to_directed().unwrap().reflection();
             let surface = injection.surface.clone();
-            match self.skel.logger.result(self.start_layer_traversal(injection).await) {
+            match self.start_layer_traversal(injection).await {
                 Ok(_) => {}
                 Err(err) => {
+println!("STATUS: {}",err.status());
+println!("ERR: {}",err.to_string());
                     // if it can be reflected then send back as an error
                     match reflection {
                         Ok(reflection) => {
                             let err = err.to_space_err();
                             let reflect = reflection.make(err.into(), self.skel.point.to_surface() );
-println!("SURFACE IS {}", surface.to_string());
-println!("ERR IS {}", reflect.core().status.to_string());
                             let injection = TraversalInjection {
                                 surface,
                                 wave: reflect.to_ultra(),

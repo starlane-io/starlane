@@ -60,15 +60,15 @@ impl SpaceErr {
 impl Into<ReflectedCore> for SpaceErr {
     fn into(self) -> ReflectedCore {
         match self {
-            SpaceErr::Status { status, message } => ReflectedCore {
+            SpaceErr::Status { status, ..} => ReflectedCore {
                 headers: Default::default(),
                 status: StatusCode::from_u16(status).unwrap_or(StatusCode::from_u16(500).unwrap()),
-                body: Substance::FormErrs(FormErrs::default(message.as_str())),
+                body: Substance::Err(self),
             },
             SpaceErr::ParseErrs(_) => ReflectedCore {
                 headers: Default::default(),
                 status: StatusCode::from_u16(500u16).unwrap_or(StatusCode::from_u16(500).unwrap()),
-                body: Substance::FormErrs(FormErrs::default("parsing error...")),
+                body: Substance::Err(self)
             },
         }
     }

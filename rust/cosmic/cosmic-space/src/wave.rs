@@ -41,7 +41,7 @@ use crate::selector::Selector;
 use crate::settings::Timeouts;
 use crate::substance::Bin;
 use crate::substance::{
-    Call, CallKind, CmdCall, FormErrs, ExtCall, HttpCall, HypCall, MultipartFormBuilder, Substance,
+    Call, CallKind, CmdCall, ExtCall, FormErrs, HttpCall, HypCall, MultipartFormBuilder, Substance,
     SubstanceKind, ToRequestCore, ToSubstance, Token,
 };
 use crate::util::{uuid, ValueMatcher, ValuePattern};
@@ -263,7 +263,9 @@ impl UltraWave {
             UltraWave::Pong(pong) => Ok(SingularUltraWave::Pong(pong)),
             UltraWave::Echo(echo) => Ok(SingularUltraWave::Echo(echo)),
             UltraWave::Signal(signal) => Ok(SingularUltraWave::Signal(signal)),
-            UltraWave::Ripple(_) => Err(SpaceErr::server_error("cannot change Ripple into a singular")),
+            UltraWave::Ripple(_) => Err(SpaceErr::server_error(
+                "cannot change Ripple into a singular",
+            )),
         }
     }
 
@@ -1549,7 +1551,9 @@ impl FromReflectedAggregate for () {
     {
         match agg {
             ReflectedAggregate::None => Ok(()),
-            _ => Err(SpaceErr::bad_request("expected a ReflectedAggregate of None")),
+            _ => Err(SpaceErr::bad_request(
+                "expected a ReflectedAggregate of None",
+            )),
         }
     }
 }
@@ -1568,7 +1572,9 @@ impl FromReflectedAggregate for Echoes {
                 }
                 Ok(echoes)
             }
-            _ => Err(SpaceErr::bad_request("expecting a ReflectedAggregate of Multi")),
+            _ => Err(SpaceErr::bad_request(
+                "expecting a ReflectedAggregate of Multi",
+            )),
         }
     }
 }
@@ -1701,6 +1707,9 @@ impl Pong {
         } else {
             if let Substance::FormErrs(errs) = &self.core.body {
                 Err(format!("{} : {}", self.core.status.to_string(), errs.to_string()).into())
+            } else if let Substance::Err(err) = &self.core.body {
+println!("\tSubstance::Err");
+                Err(err.clone())
             } else {
                 Err(self.core.status.to_string().into())
             }
@@ -2097,7 +2106,9 @@ where
                 ripple.bounce_backs = bounce_backs;
                 Ok(())
             }
-            _ => Err(SpaceErr::server_error("can only set bouncebacks for Ripple")),
+            _ => Err(SpaceErr::server_error(
+                "can only set bouncebacks for Ripple",
+            )),
         }
     }
 
@@ -3271,9 +3282,13 @@ impl TryInto<Wave<Pong>> for ReflectedAggregate {
         match self {
             Self::Single(reflected) => match reflected {
                 ReflectedWave::Pong(pong) => Ok(pong),
-                _ => Err(SpaceErr::bad_request("Expected ReflectedAggregate to be for a Pong")),
+                _ => Err(SpaceErr::bad_request(
+                    "Expected ReflectedAggregate to be for a Pong",
+                )),
             },
-            _ => Err(SpaceErr::bad_request("Expected ReflectedAggregate to be a Single")),
+            _ => Err(SpaceErr::bad_request(
+                "Expected ReflectedAggregate to be a Single",
+            )),
         }
     }
 }
@@ -3284,7 +3299,9 @@ impl TryInto<Vec<Wave<Echo>>> for ReflectedAggregate {
         match self {
             Self::Single(reflected) => match reflected {
                 ReflectedWave::Echo(echo) => Ok(vec![echo]),
-                _ => Err(SpaceErr::bad_request("Expected Reflected to be a Single Echo")),
+                _ => Err(SpaceErr::bad_request(
+                    "Expected Reflected to be a Single Echo",
+                )),
             },
             ReflectedAggregate::None => Ok(vec![]),
             ReflectedAggregate::Multi(waves) => {

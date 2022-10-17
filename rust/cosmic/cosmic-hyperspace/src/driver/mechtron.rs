@@ -539,6 +539,7 @@ where
 {
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
+println!("NechtronDriverHandler assign!");
         if let HyperSubstance::Assign(assign) = ctx.input {
             let logger = self.skel.logger.push_mark("assign")?;
 
@@ -549,10 +550,13 @@ where
                 .ok_or("config property must be set for a Mechtron")?;
 
             let config = Point::from_str(config.value.as_str())?;
+println!("GETTING MECHTRON CONFIG {}", config.to_string());
             let config = self
                 .skel
                 .logger
                 .result(self.skel.artifacts().mechtron(&config).await)?;
+println!("GOT MECHTRON CONFIG {}", config.point.to_string());
+
             let config = config.contents();
 
             let host = self.skel.drivers().local_driver_lookup(Kind::Host).await?.ok_or(P::Err::new("missing Host Driver which must be on the same Star as the Mechtron Driver in order for it to work"))?;
