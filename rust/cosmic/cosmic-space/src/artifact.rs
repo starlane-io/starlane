@@ -203,9 +203,7 @@ impl ArtifactFetcher for ReadArtifactFetcher {
         let mut directed = DirectedProto::ping();
         directed.to(point.clone().to_surface());
         directed.method(CmdMethod::Read);
-println!("\treading: {}",point.to_string());
         let pong = self.transmitter.ping(directed).await?;
-println!("\tpong.core.status: {}",pong.core.status.to_string());
         pong.core.ok_or()?;
         match pong.variant.core.body {
             Substance::Bin(bin) => Ok(bin),

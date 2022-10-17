@@ -59,6 +59,7 @@ impl SpaceErr {
 
 impl Into<ReflectedCore> for SpaceErr {
     fn into(self) -> ReflectedCore {
+println!("SpaceErr -> ReflectedCore");
         match self {
             SpaceErr::Status { status, ..} => ReflectedCore {
                 headers: Default::default(),
@@ -83,8 +84,8 @@ impl CoreReflector for SpaceErr {
     fn as_reflected_core(self) -> ReflectedCore {
         ReflectedCore {
             headers: Default::default(),
-            status: StatusCode::from_u16(500u16).unwrap(),
-            body: Substance::Text(self.message().to_string()),
+            status: StatusCode::from_u16(self.status()).unwrap(),
+            body: Substance::Err(self),
         }
     }
 }
@@ -170,6 +171,11 @@ impl SpaceErr {
 
 impl SpaceErr {
     pub fn new<S: ToString>(status: u16, message: S) -> Self {
+
+        if message.to_string().as_str() == "500" {
+            panic!("500 err message");
+        }
+
         Self::Status {
             status,
             message: message.to_string(),
