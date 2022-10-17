@@ -843,7 +843,7 @@ fn test_publish() -> Result<(), CosmicErr> {
     })
 }
 
-#[test]
+//#[test]
 fn test_mechtron() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
