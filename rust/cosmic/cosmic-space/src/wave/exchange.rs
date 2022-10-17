@@ -333,7 +333,7 @@ impl<R, E> ProtoTransmitterDef<R, E> {
     pub fn from_topic(&mut self, topic: Topic) -> Result<(), SpaceErr> {
         self.from = match self.from.clone() {
             SetStrategy::None => {
-                return Err(SpaceErr::from_500(
+                return Err(SpaceErr::server_error(
                     "cannot set Topic without first setting Surface",
                 ));
             }

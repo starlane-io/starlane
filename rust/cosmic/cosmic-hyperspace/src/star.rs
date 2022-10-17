@@ -5,6 +5,7 @@ use std::marker::PhantomData;
 use std::ops::{Add, Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
+use std::sync::atomic::AtomicU16;
 use std::time::Duration;
 
 use dashmap::mapref::one::{Ref, RefMut};
@@ -57,13 +58,10 @@ use cosmic_space::wave::exchange::asynch::{
     ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, TraversalRouter, TxRouter,
 };
 use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{
-    Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
-    HandlingKind, Ping, Pong, Priority, RecipientSelector, Recipients, Reflectable, ReflectedWave,
-    Retries, Ripple, Scope, Signal, SingularRipple, ToRecipients, WaitTime, Wave, WaveKind,
-};
+use cosmic_space::wave::{Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling, HandlingKind, Ping, Pong, Priority, RecipientSelector, Recipients, Reflectable, ReflectedWave, Retries, Ripple, Scope, Signal, SingularRipple, ToRecipients, WaitTime, Wave, WaveKind, Reflection};
 use cosmic_space::wave::{HyperWave, UltraWave};
 use cosmic_space::HYPERUSER;
+use mechtron_host::err::HostErr;
 
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::driver::{
@@ -122,7 +120,7 @@ where
                 if topic.source_selector().is_match(source).is_ok() {
                     Some(Ok(topic))
                 } else {
-                    Some(Err(SpaceErr::forbidden()))
+                    Some(Err(SpaceErr::not_found("topic")))
                 }
             }
         }
@@ -939,7 +937,7 @@ where
                     HyperStarCall::LayerTraversalInjection(inject) => {
                         let layer_traversal_engine = self.layer_traversal_engine.clone();
                         tokio::spawn(async move {
-                            layer_traversal_engine.start_layer_traversal(inject).await;
+                            layer_traversal_engine.inject(inject).await;
                         });
                     }
                     HyperStarCall::Stub(rtn) => {
@@ -1039,7 +1037,7 @@ where
                     from_gravity: true,
                     dir: None,
                 };
-                layer_engine.start_layer_traversal(injection).await;
+                layer_engine.inject(injection).await;
             });
             Ok(())
         } else {
@@ -1364,6 +1362,42 @@ where
         }
     }
 
+    async fn inject(&self, injection: TraversalInjection) {
+        if injection.wave.is_directed() {
+
+            let reflection = injection.wave.clone().to_directed().unwrap().reflection();
+            let surface = injection.surface.clone();
+            match self.start_layer_traversal(injection).await {
+                Ok(_) => {}
+                Err(err) => {
+println!("STATUS: {}",err.status());
+println!("ERR: {}",err.to_string());
+                    // if it can be reflected then send back as an error
+                    match reflection {
+                        Ok(reflection) => {
+                            let err = err.to_space_err();
+                            let reflect = reflection.make(err.into(), self.skel.point.to_surface() );
+                            let injection = TraversalInjection {
+                                surface,
+                                wave: reflect.to_ultra(),
+                                from_gravity: false,
+                                dir: None
+                            };
+                            self.skel.logger.result(self.start_layer_traversal(injection).await).unwrap_or_default();
+                        }
+                        Err(err) => {
+                            self.skel.logger.error(err.to_string());
+                        }
+                    }
+
+                }
+            }
+        } else {
+            self.skel.logger.result(self.start_layer_traversal(injection).await).unwrap_or_default();
+        }
+    }
+
+
     async fn start_layer_traversal(&self, injection: TraversalInjection) -> Result<(), P::Err> {
         let wave = injection.wave;
         let from_gravity = injection.from_gravity;
@@ -1417,13 +1451,14 @@ where
         for to in tos {
             let record = match self.skel.registry.record(&to.point).await {
                 Ok(record) => record,
-                Err(err) => {
-                    // this needs to send a 404  or 30x (moved) status to the caller
-                    return self.skel.err(format!(
+                Err(_) => {
+                    let err = SpaceErr::not_found(format!(
                         "could not locate record for surface {} from {}",
                         to.to_string(),
                         wave.from().to_string()
                     ));
+                    return Err(err.into());
+
                 }
             };
             let plan = record.details.stub.kind.wave_traversal_plan().clone();

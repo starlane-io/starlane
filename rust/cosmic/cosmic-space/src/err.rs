@@ -21,10 +21,15 @@ use cosmic_nom::Span;
 use cosmic_nom::SpanExtra;
 
 use crate::parse::error::find_parse_err;
-use crate::substance::{Errors, Substance};
+use crate::substance::{FormErrs, Substance};
 use crate::wave::core::http2::StatusCode;
 use crate::wave::core::ReflectedCore;
+use serde::{Deserialize,Serialize};
 
+
+
+
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub enum SpaceErr {
     Status { status: u16, message: String },
     ParseErrs(ParseErrs),
@@ -54,29 +59,22 @@ impl SpaceErr {
 
 impl Into<ReflectedCore> for SpaceErr {
     fn into(self) -> ReflectedCore {
+println!("SpaceErr -> ReflectedCore");
         match self {
-            SpaceErr::Status { status, message } => ReflectedCore {
+            SpaceErr::Status { status, ..} => ReflectedCore {
                 headers: Default::default(),
                 status: StatusCode::from_u16(status).unwrap_or(StatusCode::from_u16(500).unwrap()),
-                body: Substance::Errors(Errors::default(message.as_str())),
+                body: Substance::Err(self),
             },
             SpaceErr::ParseErrs(_) => ReflectedCore {
                 headers: Default::default(),
                 status: StatusCode::from_u16(500u16).unwrap_or(StatusCode::from_u16(500).unwrap()),
-                body: Substance::Errors(Errors::default("parsing error...")),
+                body: Substance::Err(self)
             },
         }
     }
 }
 
-impl Clone for SpaceErr {
-    fn clone(&self) -> Self {
-        SpaceErr::Status {
-            status: 500,
-            message: self.message(),
-        }
-    }
-}
 
 pub trait CoreReflector {
     fn as_reflected_core(self) -> ReflectedCore;
@@ -86,8 +84,8 @@ impl CoreReflector for SpaceErr {
     fn as_reflected_core(self) -> ReflectedCore {
         ReflectedCore {
             headers: Default::default(),
-            status: StatusCode::from_u16(500u16).unwrap(),
-            body: Substance::Text(self.message().to_string()),
+            status: StatusCode::from_u16(self.status()).unwrap(),
+            body: Substance::Err(self),
         }
     }
 }
@@ -138,93 +136,48 @@ impl Into<ParseErrs> for UniErr {
  */
 
 impl SpaceErr {
-    pub fn timeout() -> Self {
-        SpaceErr::from_status(408)
+    pub fn timeout<S:ToString>(s:S) -> Self {
+        SpaceErr::new(408,format!("Timeout: {}",s.to_string()))
     }
 
-    pub fn server_error() -> Self {
-        SpaceErr::from_status(500)
+    pub fn server_error<S:ToString>(s:S) -> Self {
+        SpaceErr::new(500,format!("Server Side Error: {}",s.to_string()))
     }
-    pub fn forbidden() -> Self {
-        SpaceErr::err403()
-    }
-
-    pub fn forbidden_msg<S: ToString>(msg: S) -> Self {
-        SpaceErr::Status {
-            status: 403,
-            message: msg.to_string(),
-        }
+    pub fn forbidden<S:ToString>(s:S) -> Self {
+        SpaceErr::new(403,format!("Forbidden: {}",s.to_string()))
     }
 
-    pub fn not_found() -> Self {
-        SpaceErr::err404()
+    pub fn not_found<S:ToString>(s:S) -> Self {
+        SpaceErr::new(404,format!("Not Found: {}",s.to_string()))
     }
 
-    pub fn bad_request() -> Self {
-        SpaceErr::from_status(400)
+    pub fn bad_request<S:ToString>(s:S) -> Self {
+        SpaceErr::new(400,format!("Bad Request: {}",s.to_string()))
     }
 
-    pub fn bad_request_msg<M: ToString>(m: M) -> Self {
-        SpaceErr::Status {
-            status: 400,
-            message: m.to_string(),
-        }
-    }
-}
-
-impl Debug for SpaceErr {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    pub fn ctx<S: ToString>(mut self, ctx: S) -> Self {
         match self {
-            SpaceErr::Status { status, message } => {
-                f.write_str(format!("{}: {}", status, message).as_str())
+            Self::Status { status, message } => {
+                Self::Status {status, message: format!("{} | {}", message, ctx.to_string())}
             }
-            SpaceErr::ParseErrs(errs) => {
-                self.print();
-                f.write_str("Parse Errors... [Report redacted]")
+            Self::ParseErrs(mut errs) => {
+                Self::ParseErrs(errs.ctx(ctx))
             }
+
         }
     }
 }
+
 
 impl SpaceErr {
     pub fn new<S: ToString>(status: u16, message: S) -> Self {
+
+        if message.to_string().as_str() == "500" {
+            panic!("500 err message");
+        }
+
         Self::Status {
             status,
-            message: message.to_string(),
-        }
-    }
-
-    pub fn err404() -> Self {
-        Self::Status {
-            status: 404,
-            message: "Not Found".to_string(),
-        }
-    }
-
-    pub fn err403() -> Self {
-        Self::Status {
-            status: 403,
-            message: "Forbidden".to_string(),
-        }
-    }
-
-    pub fn err500() -> Self {
-        Self::Status {
-            status: 500,
-            message: "Internal Server Error".to_string(),
-        }
-    }
-
-    pub fn err400() -> Self {
-        Self::Status {
-            status: 400,
-            message: "Bad Request".to_string(),
-        }
-    }
-
-    pub fn from_500<S: ToString>(message: S) -> Self {
-        Self::Status {
-            status: 500,
             message: message.to_string(),
         }
     }
@@ -279,19 +232,19 @@ impl<C> From<SendTimeoutError<C>> for SpaceErr {
 
 impl<C> From<tokio::sync::mpsc::error::SendError<C>> for SpaceErr {
     fn from(e: SendError<C>) -> Self {
-        SpaceErr::from_500(e.to_string())
+        SpaceErr::server_error(e.to_string())
     }
 }
 
 impl<C> From<tokio::sync::broadcast::error::SendError<C>> for SpaceErr {
     fn from(e: tokio::sync::broadcast::error::SendError<C>) -> Self {
-        SpaceErr::from_500(e.to_string())
+        SpaceErr::server_error(e.to_string())
     }
 }
 
 impl From<tokio::sync::watch::error::RecvError> for SpaceErr {
     fn from(e: tokio::sync::watch::error::RecvError) -> Self {
-        SpaceErr::from_500(e.to_string())
+        SpaceErr::server_error(e.to_string())
     }
 }
 
@@ -512,22 +465,35 @@ impl<I: Span> From<nom::Err<ErrorTree<I>>> for ParseErrs {
             SpaceErr::Status { .. } => ParseErrs {
                 report: vec![],
                 source: None,
+                ctx: "".to_string()
             },
             SpaceErr::ParseErrs(parse_errs) => parse_errs,
         }
     }
 }
 
+#[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq)]
 pub struct ParseErrs {
     pub report: Vec<Report>,
     pub source: Option<Arc<String>>,
+    pub ctx: String
 }
 
 impl ParseErrs {
+
+    pub fn ctx<S:ToString>( mut self, ctx: S) -> Self{
+        Self {
+            report: self.report,
+            source: self.source,
+            ctx: ctx.to_string()
+        }
+    }
+
     pub fn from_report(report: Report, source: Arc<String>) -> Self {
         Self {
             report: vec![report],
             source: Some(source),
+            ctx: "".to_string()
         }
     }
 
@@ -585,6 +551,7 @@ impl ParseErrs {
         let mut rtn = ParseErrs {
             report: vec![],
             source,
+            ctx: "".to_string()
         };
 
         for err in errs {
@@ -601,6 +568,7 @@ impl From<SpaceErr> for ParseErrs {
         ParseErrs {
             report: vec![],
             source: None,
+            ctx: "".to_string()
         }
     }
 }
@@ -626,7 +594,7 @@ impl From<serde_urlencoded::ser::Error> for SpaceErr {
 pub mod report {
     use serde::{Deserialize, Serialize};
 
-    #[derive(Clone, Serialize, Deserialize)]
+    #[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq)]
     pub struct Report {
         kind: ReportKind,
         code: Option<String>,
@@ -729,7 +697,7 @@ pub mod report {
         }
     }
 
-    #[derive(Clone, Serialize, Deserialize)]
+    #[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq)]
     pub struct Range {
         pub start: u32,
         pub end: u32,
@@ -750,7 +718,7 @@ pub mod report {
         }
     }
 
-    #[derive(Clone, Serialize, Deserialize)]
+    #[derive(Debug,Clone,Serialize,Deserialize,Eq,PartialEq)]
     pub struct Label {
         span: Range,
         msg: Option<String>,
@@ -827,4 +795,15 @@ pub mod report {
         /// A 24-bit RGB color, as specified by ISO-8613-3.
         RGB(u8, u8, u8),
     }
+}
+
+
+#[cfg(test)]
+pub mod test {
+
+    #[test]
+    pub fn compile() {
+
+    }
+
 }

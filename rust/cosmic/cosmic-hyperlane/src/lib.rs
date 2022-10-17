@@ -33,7 +33,7 @@ use cosmic_space::loc::{Layer, Point, PointFactory, Surface, ToPoint, ToSurface,
 use cosmic_space::log::{PointLogger, RootLogger, Tracker};
 use cosmic_space::particle::Status;
 use cosmic_space::settings::Timeouts;
-use cosmic_space::substance::{Errors, Substance, SubstanceKind, Token};
+use cosmic_space::substance::{FormErrs, Substance, SubstanceKind, Token};
 use cosmic_space::util::uuid;
 use cosmic_space::wave::core::ext::ExtMethod;
 use cosmic_space::wave::core::hyp::HypMethod;
@@ -1506,7 +1506,7 @@ impl HyperClient {
             Arc::new(self.router()),
             self.exchanger
                 .as_ref()
-                .ok_or(SpaceErr::from_500(
+                .ok_or(SpaceErr::server_error(
                     "cannot create a transmitter on a client that does not have an exchanger",
                 ))?
                 .clone(),
@@ -1581,7 +1581,7 @@ impl HyperClient {
                         break;
                     }
                     HyperConnectionStatus::Fatal => {
-                        rtn.send(Err(SpaceErr::from_500(
+                        rtn.send(Err(SpaceErr::server_error(
                             "Fatal status from HyperClient while waiting for Ready",
                         )));
                         break;
@@ -1757,7 +1757,7 @@ impl HyperClientRunner {
                                     {
                                         let method: ExtMethod = wave.to_directed().unwrap().core().method.clone().try_into().unwrap();
                                         if method.to_string() == "Reset".to_string() {
-                                           return Err(SpaceErr::from_500("reset"));
+                                           return Err(SpaceErr::server_error("reset"));
                                         } else if method.to_string() == "Close".to_string(){
                                             runner.status_tx.send(HyperConnectionStatus::Closed).await;
                                             return Ok(());
@@ -1768,7 +1768,7 @@ impl HyperClientRunner {
                                             Err(err) => {
                                                 // wave gets lost... need to requeue it somehow...
                                                 //                                    runner.to_client_tx.try_send(err.0);
-                                                return Err(SpaceErr::from_500("ext failure"));
+                                                return Err(SpaceErr::server_error("ext failure"));
                                             }
                                         }
                                     }

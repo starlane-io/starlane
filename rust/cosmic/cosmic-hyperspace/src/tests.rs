@@ -808,7 +808,7 @@ fn test_publish() -> Result<(), CosmicErr> {
         let core = cli.raw(command).await?;
 
         if !core.is_ok() {
-            if let Substance::Errors(ref e) = core.body {
+            if let Substance::FormErrs(ref e) = core.body {
                 println!("{}", e.to_string());
             }
         }
@@ -893,7 +893,7 @@ fn test_mechtron() -> Result<(), CosmicErr> {
         let core = cli.raw(command).await?;
 
         if !core.is_ok() {
-            if let Substance::Errors(ref e) = core.body {
+            if let Substance::FormErrs(ref e) = core.body {
                 println!("{}", e.to_string());
             }
         }
@@ -902,7 +902,7 @@ fn test_mechtron() -> Result<(), CosmicErr> {
 
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-       let reflect = cli.exec("create hello-goodbye<Mechtron>{ +config=repo:hello-goodbye:1.0.0:/config/hello-goodbye.mechtron, +bind=repo:hello-goodbye:1.0.0:/bind/hello-goodbye.bind }")
+       let reflect = cli.exec("create hello-goodbye<Mechtron>{ +config=repo:hello-goodbye:1.0.0:/config/hello-goodbye.mechtron }")
             .await
             .unwrap();
 

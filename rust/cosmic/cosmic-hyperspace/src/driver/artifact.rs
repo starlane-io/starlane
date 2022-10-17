@@ -663,11 +663,11 @@ where
                         let mut store = self.skel.driver.logger.result(self.store())?;
                         store
                             .insert(assign.details.stub.point.to_string(), &substance)
-                            .map_err(|e| SpaceErr::from_500(e.to_string()))?;
+                            .map_err(|e| SpaceErr::server_error(e.to_string()))?;
                         self.skel.driver.logger.result(
                             store
                                 .commit()
-                                .map_err(|e| SpaceErr::from_500(e.to_string())),
+                                .map_err(|e| SpaceErr::server_error(e.to_string())),
                         )?;
                     }
                 }

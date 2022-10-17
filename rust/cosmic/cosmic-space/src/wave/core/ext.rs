@@ -11,7 +11,7 @@ use crate::loc::Meta;
 use crate::parse::camel_case_chars;
 use crate::parse::error::result;
 use crate::parse::model::MethodScopeSelector;
-use crate::substance::{Errors, Substance};
+use crate::substance::{FormErrs, Substance};
 use crate::util::{ValueMatcher, ValuePattern};
 use crate::wave::core::http2::StatusCode;
 use crate::wave::core::{DirectedCore, HeaderMap, Method, ReflectedCore};
@@ -133,11 +133,11 @@ impl ExtDirected {
     }
 
     pub fn fail(&self, error: &str) -> ReflectedCore {
-        let errors = Errors::default(error);
+        let errors = FormErrs::default(error);
         ReflectedCore {
             headers: Default::default(),
             status: StatusCode::from_u16(500u16).unwrap(),
-            body: Substance::Errors(errors),
+            body: Substance::FormErrs(errors),
         }
     }
 }

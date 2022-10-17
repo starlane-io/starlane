@@ -72,7 +72,7 @@ impl From<&str> for GuestErr {
 
 impl MechErr for GuestErr {
     fn to_uni_err(self) -> SpaceErr {
-        SpaceErr::from_500(self.to_string())
+        SpaceErr::server_error(self.to_string())
     }
 }
 
