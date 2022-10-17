@@ -237,6 +237,9 @@ where
                 self.skel.registry.register(&registration).await?;
                 point
             }
+            PointSegTemplate::Root => {
+                Point::root()
+            }
         };
 
         if create.state.has_substance() || child_kind.is_auto_provision() {

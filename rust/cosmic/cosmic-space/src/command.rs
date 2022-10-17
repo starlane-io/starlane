@@ -688,6 +688,7 @@ pub mod direct {
         pub enum PointSegTemplate {
             Exact(String),
             Pattern(String), // must have a '%'
+            Root
         }
     }
 

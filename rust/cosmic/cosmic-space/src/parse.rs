@@ -1570,12 +1570,10 @@ pub fn point_template<I: Span>(input: I) -> Res<I, PointTemplateVar> {
     let (next, (point, wildcard)) = pair(point_var, opt(recognize(tag("%"))))(input.clone())?;
 
     if point.is_root() {
-        let err = ErrorTree::from_error_kind(input.clone(), ErrorKind::Not);
-        return Err(nom::Err::Failure(ErrorTree::add_context(
-            input,
-            "point-template-cannot-be-root",
-            err,
-        )));
+        return Ok((next, PointTemplateVar {
+            parent: point,
+            child_segment_template: PointSegTemplate::Root
+        }));
     }
 
     let parent = point
@@ -7379,6 +7377,7 @@ pub mod test {
         }
 
         util::log(result(point_template(new_span("my-domain.com"))))?;
+        util::log(result(point_template(new_span("ROOT"))))?;
         Ok(())
     }
 
