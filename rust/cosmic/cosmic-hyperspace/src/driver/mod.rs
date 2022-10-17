@@ -1290,7 +1290,6 @@ where
                             let ctx =
                                 RootInCtx::new(wave, port.clone(), logger, transmitter.clone());
                             let handler = self.handler().await;
-println!("\tsubmitting to driver handler...");
                             let skel = self.skel.clone();
                             tokio::spawn(async move {
                                 match handler.handle(ctx).await {

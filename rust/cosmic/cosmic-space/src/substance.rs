@@ -258,8 +258,7 @@ impl Substance {
             Substance::Map(map) => map.to_bin(),
             Substance::Bin(bin) => Ok(bin),
             Substance::Text(text) => {
-                println!("to_bin() -> {}", text);
-                Ok(Arc::new(text.as_bytes().new_builder()))
+                Ok(Arc::new(text.as_bytes().to_vec()))
             }
             what => Err(format!("{}.to_bin() not supported", what.kind().to_string()).into()),
         }
