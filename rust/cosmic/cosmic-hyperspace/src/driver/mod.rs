@@ -13,7 +13,7 @@ use crate::reg::{Registration, Registry};
 use crate::star::HyperStarCall::LayerTraversalInjection;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::Cosmos;
-use cosmic_space::artifact::{ArtRef, ArtifactApi};
+use cosmic_space::artifact::ArtRef;
 use cosmic_space::command::common::{SetProperties, StateSrc};
 use cosmic_space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
@@ -52,7 +52,8 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, oneshot, watch, RwLock};
+use tokio::sync::{mpsc, oneshot, RwLock, watch};
+use cosmic_space::artifact::asynch::ArtifactApi;
 
 lazy_static! {
     static ref DEFAULT_BIND: ArtRef<BindConfig> = ArtRef::new(

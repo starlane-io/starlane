@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
-use futures::future::{join_all, select_all, BoxFuture};
+use futures::future::{BoxFuture, join_all, select_all};
 use futures::FutureExt;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::error::RecvError;
@@ -22,7 +22,7 @@ use cosmic_hyperlane::{
     LocalHyperwayGateUnlocker, MountInterchangeGate, SimpleGreeter,
     TokenAuthenticatorWithRemoteWhitelist,
 };
-use cosmic_space::artifact::{ArtifactApi, ArtifactFetcher, ReadArtifactFetcher};
+use cosmic_space::artifact::asynch::{ArtifactApi, ArtifactFetcher, ReadArtifactFetcher};
 use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{InterchangeKind, Knock};
 use cosmic_space::kind::StarSub;

@@ -44,8 +44,8 @@ use cosmic_hyperspace::Cosmos;
 };
 
  */
-use cosmic_space::artifact::ArtifactApi;
-use cosmic_space::artifact::ReadArtifactFetcher;
+use cosmic_space::artifact::asynch::ArtifactApi;
+use cosmic_space::artifact::asynch::ReadArtifactFetcher;
 use cosmic_space::command::direct::create::KindTemplate;
 use cosmic_space::err::SpaceErr;
 use cosmic_space::kind::{

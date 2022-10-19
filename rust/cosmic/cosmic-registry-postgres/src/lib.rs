@@ -1627,7 +1627,7 @@ pub mod test {
     };
     use cosmic_hyperspace::reg::RegistryApi;
     use cosmic_hyperspace::reg::{Registration, Registry};
-    use cosmic_space::artifact::ArtifactApi;
+    use cosmic_space::artifact::asynch::ArtifactApi;
     use cosmic_space::command::direct::create::Strategy;
     use cosmic_space::command::direct::query::Query;
     use cosmic_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};

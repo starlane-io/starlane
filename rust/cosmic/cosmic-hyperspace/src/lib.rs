@@ -28,7 +28,7 @@ use tracing::error;
 use uuid::Uuid;
 
 use cosmic_hyperlane::{HyperAuthenticator, HyperGate, HyperGateSelector, HyperwayEndpointFactory};
-use cosmic_space::artifact::ArtifactApi;
+use cosmic_space::artifact::asynch::ArtifactApi;
 use cosmic_space::command::common::{SetProperties, SetRegistry};
 use cosmic_space::command::direct::create::{KindTemplate, Strategy};
 use cosmic_space::command::direct::delete::Delete;
