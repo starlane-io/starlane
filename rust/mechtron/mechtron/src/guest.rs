@@ -9,18 +9,21 @@ use cosmic_space::loc::{Layer, Point, ToSurface};
 use cosmic_space::log::{
     LogSource, NoAppender, PointLogger, RootLogger, SynchTransmittingLogAppender,
 };
-use cosmic_space::particle::Details;
+use cosmic_space::particle::{Details, Stub};
 use cosmic_space::wave::core::CoreBounce;
 use cosmic_space::wave::exchange::synch::{
     DirectedHandler, DirectedHandlerProxy, DirectedHandlerShell, ExchangeRouter, InCtx,
     ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx,
 };
 use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{Agent, DirectedWave, ReflectedAggregate, ToRecipients, UltraWave};
+use cosmic_space::wave::{Agent, DirectedProto, DirectedWave, ReflectedAggregate, ToRecipients, UltraWave};
 use dashmap::DashMap;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
+use cosmic_space::artifact::synch::{ArtifactApi, ArtifactFetcher};
+use cosmic_space::substance::{Bin, Substance};
+use cosmic_space::wave::core::cmd::CmdMethod;
 
 #[derive(Clone)]
 pub struct GuestSkel<P>
@@ -32,6 +35,7 @@ where
     factories: Arc<MechtronFactories<P>>,
     logger: PointLogger,
     transmitter: ProtoTransmitterBuilder,
+    artifacts: ArtifactApi,
     platform: P,
 }
 
@@ -42,13 +46,24 @@ where
     pub fn new(details: Details, factories: Arc<MechtronFactories<P>>, platform: P) -> Self {
         let router: GuestRouter<P> = GuestRouter::new();
         let router = Arc::new(router);
-        let mut transmitter = ProtoTransmitterBuilder::new(router);
+        let mut transmitter = ProtoTransmitterBuilder::new(router.clone());
         transmitter.agent = SetStrategy::Override(Agent::Point(details.stub.point.clone()));
         transmitter.from = SetStrategy::Override(details.stub.point.clone().to_surface());
         transmitter.to = SetStrategy::Override(Point::global_logger().to_surface().to_recipients());
         let appender = SynchTransmittingLogAppender::new(transmitter.clone());
         let root_logger = RootLogger::new(LogSource::Core, Arc::new(appender));
         let logger = root_logger.point(details.stub.point.clone());
+
+        let artifacts = {
+            let mut transmitter = ProtoTransmitterBuilder::new(router);
+            transmitter.agent = SetStrategy::Fill(Agent::Point(details.stub.point.clone()));
+            transmitter.from = SetStrategy::Fill(details.stub.point.clone().to_surface());
+            let transmitter = transmitter.build();
+            let fetcher = GuestArtifactFetcher {
+                transmitter
+            };
+            ArtifactApi::new(Arc::new(fetcher))
+        };
 
         let mechtrons = Arc::new(DashMap::new());
         Self {
@@ -58,6 +73,7 @@ where
             logger,
             platform,
             transmitter,
+            artifacts
         }
     }
 
@@ -257,5 +273,31 @@ pub struct HostedMechtron {
 impl HostedMechtron {
     pub fn new(details: Details, name: String) -> Self {
         Self { details, name }
+    }
+}
+
+
+pub struct GuestArtifactFetcher {
+   transmitter:  ProtoTransmitter
+}
+
+impl ArtifactFetcher for GuestArtifactFetcher {
+    fn stub(&self, point: &Point) -> Result<Stub, SpaceErr> {
+        todo!()
+    }
+
+    fn fetch(&self, point: &Point) -> Result<Bin, SpaceErr> {
+        let mut directed = DirectedProto::ping();
+        directed.to(point.clone().to_surface());
+        directed.method(CmdMethod::Read);
+        let pong = self.transmitter.ping(directed)?;
+        pong.core.ok_or()?;
+        match pong.variant.core.body {
+            Substance::Bin(bin) => Ok(bin),
+            other => Err(SpaceErr::server_error(format!(
+                "expected Bin, encountered unexpected substance {} when fetching Artifact",
+                other.kind().to_string()
+            ))),
+        }
     }
 }
