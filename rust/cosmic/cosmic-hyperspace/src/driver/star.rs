@@ -482,7 +482,7 @@ where
             } else {
                 self.skel
                     .logger
-                    .result::<(), SpaceErr>(Err(SpaceErr::from_500(format!(
+                    .result::<(), SpaceErr>(Err(SpaceErr::server_error(format!(
                         "Star {} does not have a driver for kind: {}",
                         self.skel.kind.to_string(),
                         assign.details.stub.kind.to_string()

@@ -171,9 +171,12 @@ impl Frame {
     }
 
     pub async fn from_stream<'a>(read: &'a mut SslStream<TcpStream>) -> Result<Frame, SpaceErr> {
-        let size = read.read_u32().await?;
+        let size = read.read_u32().await? as usize;
         let mut data = Vec::with_capacity(size as usize);
-        read.read_buf(&mut data).await?;
+
+        while data.len() < size {
+            read.read_buf(&mut data).await?;
+        }
         Ok(Self { data })
     }
 
@@ -290,7 +293,7 @@ impl FrameMuxer {
                     self.tx.send(wave).await?;
                        },
                        Err(err) => {
-                          //self.logger.error(format!("read stream err: {}",err.to_string()));
+//                          self.logger.error(format!("read stream err: {}",err.to_string()));
                           break
                        }
                     }
@@ -547,6 +550,10 @@ mod tests {
 
     use chrono::DateTime;
     use chrono::Utc;
+    use cosmic_hyperlane::HyperClient;
+    use cosmic_space::settings::Timeouts;
+    use cosmic_space::wave::DirectedProto;
+    use cosmic_space::wave::exchange::asynch::Exchanger;
 
     use super::*;
 
@@ -596,6 +603,62 @@ mod tests {
         let test = WaveTest::new(fae_client, less_client);
 
         test.go().await.unwrap();
+
+        Ok(())
+    }
+
+
+        #[tokio::test]
+    async fn test_large_frame() -> Result<(), Error> {
+        let platform = SingleInterchangePlatform::new().await;
+
+        CertGenerator::gen(vec!["localhost".to_string()])?
+            .write_to_dir(".".to_string())
+            .await?;
+        let logger = RootLogger::default();
+        let logger = logger.point(Point::from_str("tcp-server")?);
+        let port = 4343u16;
+        let server =
+            HyperlaneTcpServer::new(port, ".".to_string(), platform.gate.clone(), logger.clone())
+                .await?;
+        let api = server.start()?;
+
+        let less_logger = logger.point(LESS.clone());
+        let less_client = Box::new(HyperlaneTcpClient::new(
+            format!("localhost:{}", port),
+            ".",
+            platform.knock(LESS.to_surface()),
+            false,
+            less_logger,
+        ));
+
+            let less_exchanger = Exchanger::new(
+                LESS.push("exchanger").unwrap().to_surface(),
+                Timeouts::default(),
+                PointLogger::default(),
+            );
+
+            let root_logger = RootLogger::default();
+            let logger = root_logger.point(Point::from_str("less-client").unwrap());
+            let less_client = HyperClient::new_with_exchanger(
+                less_client,
+                Some(less_exchanger.clone()),
+                logger,
+            ).unwrap();
+
+            less_client.wait_for_ready(Duration::from_secs(5)).await.unwrap();
+            let transmitter = less_client.transmitter_builder().await.unwrap().build();
+
+
+        let size = 100_000;
+        let mut bin = Vec::with_capacity(100_100);
+        for _ in 0..size {
+            bin.push(0u8);
+        }
+            let bin = Arc::new(bin);
+            let mut wave = DirectedProto::signal();
+            wave.body(Substance::Bin(bin));
+            transmitter.signal(wave).await.unwrap();
 
         Ok(())
     }

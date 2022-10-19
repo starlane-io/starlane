@@ -1,1 +1,10 @@
-bundle.zip
+/target
+**/*.rs.bk
+Cargo.lock
+bin/
+pkg/
+wasm-pack.log
+appy.zip
+bundle
+*wasm
+target

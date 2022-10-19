@@ -237,9 +237,13 @@ where
                 self.skel.registry.register(&registration).await?;
                 point
             }
+            PointSegTemplate::Root => {
+                Point::root()
+            }
         };
 
         if create.state.has_substance() || child_kind.is_auto_provision() {
+println!("\tprovisioning: {}", point.to_string());
             let provisioner = SmartLocator::new(self.skel.clone());
             //tokio::spawn(async move {
             provisioner.provision(&point, create.state.clone()).await?;

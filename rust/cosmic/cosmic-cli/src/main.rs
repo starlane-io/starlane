@@ -125,7 +125,14 @@ impl Session {
     pub fn core_out(&self, core: ReflectedCore) {
         match core.is_ok() {
             true => self.out(core.body),
-            false => self.out_err(core.ok_or().unwrap_err()),
+            false => {
+                if core.body != Substance::Empty {
+                    self.out(core.body);
+                } else {
+                    self.out_err(core.ok_or().unwrap_err());
+                    std::process::exit(1);
+                }
+            },
         }
     }
 
@@ -133,6 +140,9 @@ impl Session {
         match substance {
             Substance::Empty => {
                 println!("Ok");
+            }
+            Substance::Err(err)=> {
+                println!("{}",err.to_string());
             }
             Substance::List(list) => {
                 for i in list.list {

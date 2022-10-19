@@ -428,11 +428,8 @@ impl LogAppender for StdOutAppender {
             Some(action) => action.to_string(),
         };
         println!(
-            "{} | {}<{}>[{}] {}",
+            "{} | {}",
             log.point.to_string(),
-            log.mark.to_string(),
-            action,
-            log.level.to_string(),
             log.payload.to_string()
         )
     }

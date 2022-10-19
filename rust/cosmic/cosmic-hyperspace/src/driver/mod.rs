@@ -427,7 +427,7 @@ where
                     }
                     DriversCall::Status { kind, rtn } => match self.statuses_rx.get(&kind) {
                         None => {
-                            rtn.send(Err(SpaceErr::not_found()));
+                            rtn.send(Err(SpaceErr::not_found("status_rx")));
                         }
                         Some(status_rx) => {
                             rtn.send(Ok(status_rx.borrow().clone()));

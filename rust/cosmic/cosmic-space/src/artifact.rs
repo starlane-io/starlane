@@ -60,7 +60,7 @@ impl ArtifactApi {
             }
         }
 
-        let mechtron: Arc<MechtronConfig> = Arc::new(self.fetch(point).await.unwrap());
+        let mechtron: Arc<MechtronConfig> = Arc::new(self.fetch(point).await?);
         self.mechtrons.insert(point.clone(), mechtron.clone());
         return Ok(ArtRef::new(mechtron, point.clone()));
     }
@@ -99,6 +99,7 @@ impl ArtifactApi {
     where
         A: TryFrom<Bin, Error = SpaceErr>,
     {
+println!("FETCHING {} ", point.to_string() );
         if !point.has_bundle() {
             return Err("point is not from a bundle".into());
         }
@@ -206,7 +207,7 @@ impl ArtifactFetcher for ReadArtifactFetcher {
         pong.core.ok_or()?;
         match pong.variant.core.body {
             Substance::Bin(bin) => Ok(bin),
-            other => Err(SpaceErr::from_500(format!(
+            other => Err(SpaceErr::server_error(format!(
                 "expected Bin, encountered unexpected substance {} when fetching Artifact",
                 other.kind().to_string()
             ))),

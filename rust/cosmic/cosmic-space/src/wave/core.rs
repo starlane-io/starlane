@@ -8,7 +8,7 @@ use cosmic_macros_primitive::Autobox;
 use crate::command::Command;
 use crate::err::StatusErr;
 use crate::loc::ToSurface;
-use crate::substance::Errors;
+use crate::substance::FormErrs;
 use crate::util::{ValueMatcher, ValuePattern};
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::ext::ExtMethod;
@@ -57,7 +57,7 @@ impl ReflectedCore {
         if self.status.is_success() {
             "cannot convert a success into an error".into()
         } else {
-            if let Substance::Errors(errors) = &self.body {
+            if let Substance::FormErrs(errors) = &self.body {
                 errors.to_cosmic_err()
             } else {
                 self.status.to_string().into()
@@ -83,7 +83,7 @@ impl ReflectedCore {
             Ok(core) => core,
             Err(err) => {
                 let mut core = ReflectedCore::status(err.status());
-                core.body = Substance::Errors(Errors::from(err));
+                core.body = Substance::FormErrs(FormErrs::from(err));
                 core
             }
         }
@@ -150,23 +150,23 @@ impl ReflectedCore {
     }
 
     pub fn fail<S: ToString>(status: u16, message: S) -> Self {
-        let errors = Errors::default(message);
+        let errors = FormErrs::default(message);
         Self {
             headers: HeaderMap::new(),
             status: StatusCode::from_u16(status)
                 .or_else(|_| StatusCode::from_u16(500u16))
                 .unwrap(),
-            body: Substance::Errors(errors),
+            body: Substance::FormErrs(errors),
         }
     }
 
     pub fn err(err: SpaceErr) -> Self {
-        let errors = Errors::default(err.to_string().as_str());
+        let errors = FormErrs::default(err.to_string().as_str());
         Self {
             headers: HeaderMap::new(),
             status: StatusCode::from_u16(err.status())
                 .unwrap_or(StatusCode::from_u16(500u16).unwrap()),
-            body: Substance::Errors(errors),
+            body: Substance::FormErrs(errors),
         }
     }
 
@@ -590,18 +590,18 @@ impl DirectedCore {
     }
 
     pub fn fail<M: ToString>(&self, status: u16, message: M) -> ReflectedCore {
-        let errors = Errors::default(message.to_string().as_str());
+        let errors = FormErrs::default(message.to_string().as_str());
         ReflectedCore {
             headers: Default::default(),
             status: StatusCode::from_u16(status)
                 .or_else(|_| StatusCode::from_u16(500u16))
                 .unwrap(),
-            body: Substance::Errors(errors),
+            body: Substance::FormErrs(errors),
         }
     }
 
     pub fn err<E: StatusErr>(&self, error: E) -> ReflectedCore {
-        let errors = Errors::default(error.message().as_str());
+        let errors = FormErrs::default(error.message().as_str());
         let status = match StatusCode::from_u16(error.status()) {
             Ok(status) => status,
             Err(_) => StatusCode::from_u16(500u16).unwrap(),
@@ -610,7 +610,7 @@ impl DirectedCore {
         ReflectedCore {
             headers: Default::default(),
             status,
-            body: Substance::Errors(errors),
+            body: Substance::FormErrs(errors),
         }
     }
 }

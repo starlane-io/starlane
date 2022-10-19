@@ -56,7 +56,7 @@ pub mod common {
 
         pub fn get_substance(&self) -> Result<Substance, SpaceErr> {
             match self {
-                StateSrc::None => Err(SpaceErr::from_500("state has no substance")),
+                StateSrc::None => Err(SpaceErr::server_error("state has no substance")),
                 StateSrc::Substance(substance) => Ok(*substance.clone()),
             }
         }
@@ -190,7 +190,7 @@ pub mod direct {
     use crate::loc::{Meta, Point};
     use crate::selector::KindSelector;
     use crate::substance::Bin;
-    use crate::substance::{Errors, Substance};
+    use crate::substance::{FormErrs, Substance};
     use crate::util::{ValueMatcher, ValuePattern};
     use crate::wave::core::ext::ExtMethod;
     use crate::wave::core::http2::HttpMethod;
@@ -519,10 +519,10 @@ pub mod direct {
                         env.file(name)
                             .map_err(|e| match e {
                                 ResolverErr::NotAvailable => {
-                                    SpaceErr::from_500("files are not available in this context")
+                                    SpaceErr::server_error("files are not available in this context")
                                 }
                                 ResolverErr::NotFound => {
-                                    SpaceErr::from_500(format!("cannot find file '{}'", name))
+                                    SpaceErr::server_error(format!("cannot find file '{}'", name))
                                 }
                             })?
                             .content,
@@ -530,19 +530,19 @@ pub mod direct {
                     StateSrcVar::Var(var) => {
                         let val = env.val(var.name.as_str()).map_err(|e| match e {
                             ResolverErr::NotAvailable => {
-                                SpaceErr::from_500("variable are not available in this context")
+                                SpaceErr::server_error("variable are not available in this context")
                             }
                             ResolverErr::NotFound => {
-                                SpaceErr::from_500(format!("cannot find variable '{}'", var.name))
+                                SpaceErr::server_error(format!("cannot find variable '{}'", var.name))
                             }
                         })?;
                         StateSrc::Substance(Box::new(Substance::Bin(
                             env.file(val.clone())
                                 .map_err(|e| match e {
-                                    ResolverErr::NotAvailable => SpaceErr::from_500(
+                                    ResolverErr::NotAvailable => SpaceErr::server_error(
                                         "files are not available in this context",
                                     ),
-                                    ResolverErr::NotFound => SpaceErr::from_500(format!(
+                                    ResolverErr::NotFound => SpaceErr::server_error(format!(
                                         "cannot find file '{}'",
                                         val.to_text().unwrap_or("err".to_string())
                                     )),
@@ -688,6 +688,7 @@ pub mod direct {
         pub enum PointSegTemplate {
             Exact(String),
             Pattern(String), // must have a '%'
+            Root
         }
     }
 

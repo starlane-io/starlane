@@ -294,7 +294,7 @@ pub mod parse {
         let port = match u32::from_str(port.as_str()) {
             Ok(port) => port,
             Err(err) => {
-                return Err(UniErr::from_500(format!("bad port {}", port).as_str()));
+                return Err(UniErr::server_error(format!("bad port {}", port).as_str()));
             }
         };
         let host_and_port = HostAndPort { host, port };

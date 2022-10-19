@@ -224,10 +224,7 @@ where
         } else {
             let wave = traversal.payload;
             let reflected = wave.to_reflected().unwrap();
-            println!(
-                "Exchanging reflected@! {}",
-                reflected.core().status.to_string()
-            );
+
             self.skel
                 .skel
                 .skel
@@ -328,7 +325,6 @@ where
             .to_lowercase()
             .as_str()
             .to_title_case();
-        println!("Handling Request! {}, {}", method, req.url());
 
         let method = HttpMethod::from_str(method.as_str())?;
         let mut headers = HeaderMap::new();

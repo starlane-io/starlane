@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::err::SpaceErr;
 use crate::loc::Meta;
-use crate::substance::{Errors, Substance};
+use crate::substance::{FormErrs, Substance};
 use crate::util::ValueMatcher;
 use crate::wave::core::{DirectedCore, HeaderMap, Method, ReflectedCore};
 use url::Url;
@@ -48,11 +48,11 @@ impl HttpRequest {
     }
 
     pub fn fail(&self, error: &str) -> ReflectedCore {
-        let errors = Errors::default(error);
+        let errors = FormErrs::default(error);
         ReflectedCore {
             headers: Default::default(),
             status: StatusCode::from_u16(500u16).unwrap(),
-            body: Substance::Errors(errors),
+            body: Substance::FormErrs(errors),
         }
     }
 }
