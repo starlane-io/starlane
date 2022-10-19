@@ -2,14 +2,20 @@
 
 pub mod err;
 pub mod guest;
-mod membrane;
-mod space;
+pub mod membrane;
+pub mod space;
+#[cfg(test)]
+pub mod test;
 
 #[macro_use]
 extern crate lazy_static;
 
 #[macro_use]
 extern crate cosmic_macros;
+
+#[macro_use]
+extern crate cosmic_macros_primitive;
+
 
 extern crate alloc;
 extern crate core;
@@ -46,6 +52,7 @@ use cosmic_space::wave::exchange::synch::{
 use std::sync::RwLock;
 
 use crate::err::{GuestErr, MechErr};
+use crate::guest::GuestCtx;
 use crate::membrane::{mechtron_frame_to_host, mechtron_timestamp, mechtron_uuid};
 
 #[no_mangle]
@@ -110,9 +117,9 @@ where
     P: Platform,
 {
     fn name(&self) -> String;
-
+    fn new(&mut self, skel: MechtronSkel<P>, ctx: &GuestCtx) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err>;
     fn lifecycle(&self, skel: MechtronSkel<P>) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err>;
-    fn handler(&self, ske: MechtronSkel<P>) -> Result<Box<dyn DirectedHandler>, P::Err>;
+    fn handler(&self, skel: MechtronSkel<P>) -> Result<Box<dyn DirectedHandler>, P::Err>;
 }
 
 /// The MechtronSkel holds the common static elements of the Mechtron together
@@ -127,7 +134,6 @@ where
 {
     pub details: Details,
     pub logger: PointLogger,
-    pub transmitter: ProtoTransmitter,
     phantom: PhantomData<P>,
 }
 
@@ -138,7 +144,6 @@ where
     pub fn new(
         details: Details,
         logger: PointLogger,
-        transmitter: ProtoTransmitter,
         phantom: PhantomData<P>,
     ) -> Self {
         let logger = logger.point(details.stub.point.clone());
@@ -146,7 +151,6 @@ where
             details,
             logger,
             phantom,
-            transmitter,
         }
     }
 }
@@ -198,8 +202,3 @@ where
     }
 }
 
-#[cfg(test)]
-pub mod test {
-    #[test]
-    pub fn mechtron() {}
-}

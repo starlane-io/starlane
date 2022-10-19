@@ -96,14 +96,15 @@ where
     fn mechtron_skel(&self, point: &Point) -> Result<MechtronSkel<P>, GuestErr> {
         let hosted = self.hosted(point)?;
         let mut transmitter = self.builder();
-        transmitter.from = SetStrategy::Override(hosted.details.stub.point.to_surface());
+/*        transmitter.from = SetStrategy::Override(hosted.details.stub.point.to_surface());
         transmitter.agent = SetStrategy::Fill(Agent::Point(hosted.details.stub.point.clone()));
+*/
         let logger = self.logger.point(hosted.details.stub.point.clone());
+
         let phantom: PhantomData<P> = PhantomData::default();
         let skel = MechtronSkel::new(
             hosted.details.clone(),
             logger,
-            transmitter.clone().build(),
             phantom,
         );
 
@@ -298,6 +299,18 @@ impl ArtifactFetcher for GuestArtifactFetcher {
                 "expected Bin, encountered unexpected substance {} when fetching Artifact",
                 other.kind().to_string()
             ))),
+        }
+    }
+}
+
+pub struct GuestCtx {
+    pub artifacts: ArtifactApi
+}
+
+impl GuestCtx {
+    pub fn new(artifacts: ArtifactApi ) -> Self {
+        Self {
+            artifacts
         }
     }
 }

@@ -8,6 +8,7 @@ use std::sync::Arc;
 pub struct ArtifactApi {
     binds: Arc<DashMap<Point, Arc<BindConfig>>>,
     mechtrons: Arc<DashMap<Point, Arc<MechtronConfig>>>,
+    raw: Arc<DashMap<Point, Arc<Vec<u8>>>>,
     fetcher: Arc<dyn ArtifactFetcher>,
 }
 
@@ -16,6 +17,7 @@ impl ArtifactApi {
         Self {
             binds: Arc::new(DashMap::new()),
             mechtrons: Arc::new(DashMap::new()),
+            raw: Arc::new(DashMap::new()),
             fetcher,
         }
     }
@@ -46,6 +48,21 @@ impl ArtifactApi {
             self.binds.insert(point.clone(), bind.clone());
         }
         return Ok(ArtRef::new(bind, point.clone()));
+    }
+
+
+    pub fn raw(&self, point: &Point) -> Result<ArtRef<Vec<u8>>, SpaceErr> {
+        {
+            if self.binds.contains_key(point) {
+                let bin = self.raw.get(point).unwrap().clone();
+                return Ok(ArtRef::new(bin, point.clone()));
+            }
+        }
+
+
+        let bin = self.fetcher.fetch(point)?;
+
+        return Ok(ArtRef::new(bin, point.clone()));
     }
 
 
