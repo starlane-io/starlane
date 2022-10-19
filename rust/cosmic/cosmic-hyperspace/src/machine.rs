@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
-use futures::future::{BoxFuture, join_all, select_all};
+use futures::future::{join_all, select_all, BoxFuture};
 use futures::FutureExt;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::error::RecvError;
@@ -23,7 +23,7 @@ use cosmic_hyperlane::{
     TokenAuthenticatorWithRemoteWhitelist,
 };
 use cosmic_space::artifact::{ArtifactApi, ArtifactFetcher, ReadArtifactFetcher};
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{InterchangeKind, Knock};
 use cosmic_space::kind::StarSub;
 use cosmic_space::loc::{
@@ -33,15 +33,15 @@ use cosmic_space::log::{PointLogger, RootLogger};
 use cosmic_space::particle::{Status, Stub};
 use cosmic_space::settings::Timeouts;
 use cosmic_space::substance::{Bin, Substance};
+use cosmic_space::wave::core::cmd::CmdMethod;
 use cosmic_space::wave::exchange::asynch::Exchanger;
 use cosmic_space::wave::exchange::SetStrategy;
 use cosmic_space::wave::{Agent, DirectedProto, HyperWave, Pong, UltraWave, Wave};
-use cosmic_space::wave::core::cmd::CmdMethod;
 
-use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
-use crate::{Cosmos, DriversBuilder};
 use crate::err::HyperErr;
 use crate::reg::{Registry, RegistryApi};
+use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
+use crate::{Cosmos, DriversBuilder};
 
 #[derive(Clone)]
 pub struct MachineApi<P>
@@ -75,7 +75,7 @@ where
         &self,
         kind: InterchangeKind,
         gate: Arc<dyn HyperGate>,
-    ) -> Result<(), UniErr> {
+    ) -> Result<(), SpaceErr> {
         let (rtn, rtn_rx) = oneshot::channel();
         self.tx
             .send(MachineCall::AddGate { kind, gate, rtn })
@@ -83,7 +83,7 @@ where
         rtn_rx.await?
     }
 
-    pub async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, UniErr> {
+    pub async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, SpaceErr> {
         let (rtn, rtn_rx) = oneshot::channel();
         self.tx.send(MachineCall::Knock { knock, rtn }).await;
         rtn_rx.await?
@@ -117,14 +117,14 @@ where
     }
 
     #[cfg(test)]
-    pub async fn get_machine_star(&self) -> Result<HyperStarApi<P>, UniErr> {
+    pub async fn get_machine_star(&self) -> Result<HyperStarApi<P>, SpaceErr> {
         let (tx, mut rx) = oneshot::channel();
         self.tx.send(MachineCall::GetMachineStar(tx)).await;
         Ok(rx.await?)
     }
 
     #[cfg(test)]
-    pub async fn get_star(&self, key: StarKey) -> Result<HyperStarApi<P>, UniErr> {
+    pub async fn get_star(&self, key: StarKey) -> Result<HyperStarApi<P>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.tx.send(MachineCall::GetStar { key, rtn }).await;
         rtn_rx.await?
@@ -391,7 +391,6 @@ where
             HyperClient::new_with_exchanger(Box::new(factory), Some(exchanger), logger.clone())
                 .unwrap();
 
-
         let fetcher = Arc::new(ClientArtifactFetcher::new(client, skel.registry.clone()));
         skel.artifacts.set_fetcher(fetcher).await;
 
@@ -505,11 +504,11 @@ where
     AddGate {
         kind: InterchangeKind,
         gate: Arc<dyn HyperGate>,
-        rtn: oneshot::Sender<Result<(), UniErr>>,
+        rtn: oneshot::Sender<Result<(), SpaceErr>>,
     },
     Knock {
         knock: Knock,
-        rtn: oneshot::Sender<Result<HyperwayEndpoint, UniErr>>,
+        rtn: oneshot::Sender<Result<HyperwayEndpoint, SpaceErr>>,
     },
     EndpointFactory {
         from: StarKey,
@@ -521,7 +520,7 @@ where
     #[cfg(test)]
     GetStar {
         key: StarKey,
-        rtn: oneshot::Sender<Result<HyperStarApi<P>, UniErr>>,
+        rtn: oneshot::Sender<Result<HyperStarApi<P>, SpaceErr>>,
     },
     #[cfg(test)]
     GetRegistry(oneshot::Sender<Registry<P>>),
@@ -646,7 +645,7 @@ where
     async fn create(
         &self,
         status_tx: mpsc::Sender<HyperConnectionDetails>,
-    ) -> Result<HyperwayEndpoint, UniErr> {
+    ) -> Result<HyperwayEndpoint, SpaceErr> {
         let knock = Knock::new(
             InterchangeKind::Star(self.to.clone()),
             self.from
@@ -678,7 +677,7 @@ where
     async fn create(
         &self,
         status_tx: mpsc::Sender<HyperConnectionDetails>,
-    ) -> Result<HyperwayEndpoint, UniErr> {
+    ) -> Result<HyperwayEndpoint, SpaceErr> {
         let knock = Knock {
             kind: InterchangeKind::DefaultControl,
             auth: Box::new(Substance::Empty),
@@ -711,22 +710,27 @@ impl<P> ArtifactFetcher for ClientArtifactFetcher<P>
 where
     P: Cosmos,
 {
-    async fn stub(&self, point: &Point) -> Result<Stub, UniErr> {
+    async fn stub(&self, point: &Point) -> Result<Stub, SpaceErr> {
         let record = self
             .registry
             .record(point)
             .await
-            .map_err(|e| e.to_uni_err())?;
+            .map_err(|e| e.to_space_err())?;
         Ok(record.details.stub)
     }
 
-    async fn fetch(&self, point: &Point) -> Result<Bin, UniErr> {
+    async fn fetch(&self, point: &Point) -> Result<Bin, SpaceErr> {
+println!("\t\tfetch: {}",point.to_string());
         let transmitter = self.client.transmitter_builder().await?.build();
 
         let mut wave = DirectedProto::ping();
         wave.method(CmdMethod::Read);
         wave.to(point.clone().to_surface().with_layer(Layer::Core));
         let pong: Wave<Pong> = transmitter.direct(wave).await?;
+        println!("\tfetch received PONG... {}", pong.is_ok());
+
+        pong.ok_or()?;
+
         if let Substance::Bin(bin) = pong.variant.core.body {
             Ok(bin)
         } else {

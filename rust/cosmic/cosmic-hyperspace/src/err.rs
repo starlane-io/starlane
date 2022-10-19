@@ -1,4 +1,5 @@
-use cosmic_space::err::UniErr;
+use ascii::FromAsciiError;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::substance::Substance;
 use cosmic_space::wave::core::http2::StatusCode;
 use cosmic_space::wave::core::ReflectedCore;
@@ -13,7 +14,7 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
 
-#[derive(Debug, Clone,Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ErrKind {
     Default,
     Dupe,
@@ -34,8 +35,8 @@ pub trait HyperErr:
     + ToString
     + Clone
     + HostErr
-    + Into<UniErr>
-    + From<UniErr>
+    + Into<SpaceErr>
+    + From<SpaceErr>
     + From<String>
     + From<&'static str>
     + From<tokio::sync::oneshot::error::RecvError>
@@ -43,11 +44,14 @@ pub trait HyperErr:
     + From<zip::result::ZipError>
     + From<Box<bincode::ErrorKind>>
     + From<acid_store::Error>
-    + From<UniErr>
-    + Into<UniErr>
+    + From<strum::ParseError>
+    + From<url::ParseError>
+    + From<FromAsciiError<std::string::String>>
+    + From<SpaceErr>
+    + Into<SpaceErr>
     + From<()>
 {
-    fn to_uni_err(&self) -> UniErr;
+    fn to_space_err(&self) -> SpaceErr;
 
     fn new<S>(message: S) -> Self
     where
@@ -88,8 +92,9 @@ pub trait HyperErr:
 pub mod convert {
     use crate::err::{CosmicErr as Err, ErrKind};
     use crate::HyperErr;
+    use ascii::FromAsciiError;
     use bincode::ErrorKind;
-    use cosmic_space::err::UniErr;
+    use cosmic_space::err::SpaceErr;
     use mechtron_host::err::HostErr;
     use std::io;
     use std::str::Utf8Error;
@@ -119,9 +124,34 @@ pub mod convert {
         }
     }
 
+    impl From<strum::ParseError> for Err {
+        fn from(e: strum::ParseError) -> Self {
+            Self {
+                kind: ErrKind::Default,
+                message: e.to_string(),
+            }
+        }
+    }
+
+    impl From<url::ParseError> for Err {
+        fn from(e: url::ParseError) -> Self {
+            Self {
+                kind: ErrKind::Default,
+                message: e.to_string(),
+            }
+        }
+    }
+    impl From<FromAsciiError<std::string::String>> for Err {
+        fn from(e: FromAsciiError<String>) -> Self {
+            Self {
+                kind: ErrKind::Default,
+                message: e.to_string(),
+            }
+        }
+    }
     impl HyperErr for Err {
-        fn to_uni_err(&self) -> UniErr {
-            UniErr::from_500(self.to_string())
+        fn to_space_err(&self) -> SpaceErr {
+            SpaceErr::server_error(self.to_string())
         }
 
         fn new<S>(message: S) -> Self
@@ -160,9 +190,9 @@ pub mod convert {
             }
         }
     }
-    impl Into<UniErr> for Err {
-        fn into(self) -> UniErr {
-            UniErr::from_500(self.to_string())
+    impl Into<SpaceErr> for Err {
+        fn into(self) -> SpaceErr {
+            SpaceErr::server_error(self.to_string())
         }
     }
 
@@ -190,8 +220,8 @@ pub mod convert {
         }
     }
 
-    impl From<UniErr> for Err {
-        fn from(err: UniErr) -> Self {
+    impl From<SpaceErr> for Err {
+        fn from(err: SpaceErr) -> Self {
             Err::new(err)
         }
     }
@@ -220,7 +250,6 @@ pub mod convert {
         }
     }
 
-
     impl From<ExportError> for Err {
         fn from(e: ExportError) -> Self {
             Err::new(e)
@@ -246,8 +275,8 @@ pub mod convert {
     }
 
     impl HostErr for Err {
-        fn to_uni_err(self) -> UniErr {
-            UniErr::from_500(self.to_string())
+        fn to_space_err(self) -> SpaceErr {
+            SpaceErr::server_error(self.to_string())
         }
     }
 
@@ -262,6 +291,4 @@ pub mod convert {
             Err::new(e)
         }
     }
-
-
 }

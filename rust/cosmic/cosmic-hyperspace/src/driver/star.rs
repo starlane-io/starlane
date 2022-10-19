@@ -2,18 +2,20 @@ use crate::driver::{
     Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item,
     ItemHandler, ItemSphere,
 };
+use crate::err::HyperErr;
+use crate::reg::{Registration, RegistryApi};
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::Cosmos;
 use cosmic_space::artifact::ArtRef;
 use cosmic_space::command::common::StateSrc;
 use cosmic_space::command::direct::create::Strategy;
 use cosmic_space::config::bind::BindConfig;
-use cosmic_space::err::{CoreReflector, UniErr};
+use cosmic_space::err::{CoreReflector, SpaceErr};
 use cosmic_space::hyper::{
     Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, ParticleLocation, Search,
 };
 use cosmic_space::kind::{BaseKind, Kind, StarSub};
-use cosmic_space::loc::{Layer, LOCAL_STAR, Point, StarKey, ToPoint, ToSurface};
+use cosmic_space::loc::{Layer, Point, StarKey, ToPoint, ToSurface, LOCAL_STAR};
 use cosmic_space::log::{Trackable, Tracker};
 use cosmic_space::parse::bind_config;
 use cosmic_space::particle::traversal::TraversalInjection;
@@ -42,8 +44,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tracing::error;
-use crate::err::HyperErr;
-use crate::reg::{Registration, RegistryApi};
 
 lazy_static! {
     static ref STAR_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -57,10 +57,12 @@ fn star_bind() -> BindConfig {
         r#"
     Bind(version=1.0.0)
     {
-       Route<Hyp<Transport>> -> (());
-       Route<Hyp<Assign>> -> (()) => &;
-       Route<Hyp<Search>> -> (()) => &;
-       Route<Hyp<Provision>> -> (()) => &;
+       Route -> {
+           Hyp<Transport> -> (());
+           Hyp<Assign> -> (()) => &;
+           Hyp<Search> -> (()) => &;
+           Hyp<Provision> -> (()) => &;
+       }
     }
     "#,
     ))
@@ -230,8 +232,7 @@ where
 
         self.star_skel.api.create_states(point.clone()).await?;
         self.star_skel.registry.register(&registration).await?;
-        let location = ParticleLocation::new(self.star_skel.point.clone(), None);
-        self.star_skel.registry.assign(&point, location).await?;
+        self.star_skel.registry.assign_star(&point,&self.star_skel.point).await?;
 
         logger
             .result(skel.status_tx.send(DriverStatus::Ready).await)
@@ -287,7 +288,7 @@ where
         <Star<P> as Item<P>>::bind(self).await
     }
 
-    async fn init(&self) -> Result<Status, UniErr> {
+    async fn init(&self) -> Result<Status, SpaceErr> {
         match self.skel.kind {
             StarSub::Central => {
                 let registration = Registration {
@@ -303,24 +304,21 @@ where
                     .registry
                     .register(&registration)
                     .await
-                    .map_err(|e| e.to_uni_err())?;
+                    .map_err(|e| e.to_space_err())?;
 
                 let record = self
                     .skel
                     .registry
                     .record(&Point::root())
                     .await
-                    .map_err(|e| e.to_uni_err())?;
+                    .map_err(|e| e.to_space_err())?;
                 let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
-                self.create(&assign).await.map_err(|e| e.to_uni_err())?;
-                let location = ParticleLocation::new(self.skel.point.clone(), None);
+                self.create(&assign).await.map_err(|e| e.to_space_err())?;
                 self.skel
                     .registry
-                    .assign(&Point::root(), location)
+                    .assign_star(&Point::root(), &self.skel.point)
                     .await
-                    .map_err(|e| e.to_uni_err())?;
-
-
+                    .map_err(|e| e.to_space_err())?;
 
                 let registration = Registration {
                     point: Point::global_executor(),
@@ -335,22 +333,21 @@ where
                     .registry
                     .register(&registration)
                     .await
-                    .map_err(|e| e.to_uni_err())?;
+                    .map_err(|e| e.to_space_err())?;
 
                 let record = self
                     .skel
                     .registry
                     .record(&Point::global_executor())
                     .await
-                    .map_err(|e| e.to_uni_err())?;
+                    .map_err(|e| e.to_space_err())?;
                 let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
-                self.create(&assign).await.map_err(|e| e.to_uni_err())?;
-                let location = ParticleLocation::new(LOCAL_STAR.clone(), None);
+                self.create(&assign).await.map_err(|e| e.to_space_err())?;
                 self.skel
                     .registry
-                    .assign(&Point::global_executor(), location)
+                    .assign_star(&Point::global_executor(), &LOCAL_STAR)
                     .await
-                    .map_err(|e| e.to_uni_err())?;
+                    .map_err(|e| e.to_space_err())?;
 
                 Ok(Status::Ready)
             }
@@ -408,7 +405,7 @@ where
 
                         let ctx: InCtx<'_, HyperSubstance> = ctx.push_input_ref(&assign);
                         if self.assign(ctx).await?.is_ok() {
-                            Ok(ParticleLocation::new(self.skel.point.clone(), None))
+                            Ok(ParticleLocation::new(Some(self.skel.point.clone()), None))
                         } else {
                             Err(
                                 format!("could not find assign kind {} to self", kind.to_string())
@@ -485,7 +482,7 @@ where
             } else {
                 self.skel
                     .logger
-                    .result::<(), UniErr>(Err(UniErr::from_500(format!(
+                    .result::<(), SpaceErr>(Err(SpaceErr::server_error(format!(
                         "Star {} does not have a driver for kind: {}",
                         self.skel.kind.to_string(),
                         assign.details.stub.kind.to_string()
@@ -493,10 +490,9 @@ where
                     .into()))?;
             }
 
-            let location = ParticleLocation::new(self.skel.point.clone(), None);
             self.skel
                 .registry
-                .assign(&assign.details.stub.point, location)
+                .assign_star(&assign.details.stub.point,&self.skel.point )
                 .await?;
 
             Ok(ReflectedCore::ok())
@@ -539,7 +535,7 @@ where
             ctx: &'a InCtx<'a, HyperSubstance>,
             mut history: HashSet<Point>,
             search: Search,
-        ) -> Result<ReflectedCore, UniErr>
+        ) -> Result<ReflectedCore, SpaceErr>
         where
             E: Cosmos,
         {
@@ -674,7 +670,7 @@ impl StarWrangles {
         }
     }
 
-    pub fn verify(&self, kinds: &[&Kind]) -> Result<(), UniErr> {
+    pub fn verify(&self, kinds: &[&Kind]) -> Result<(), SpaceErr> {
         for kind in kinds {
             if self.find(*kind).is_none() {
                 return Err(format!(
@@ -687,7 +683,7 @@ impl StarWrangles {
         Ok(())
     }
 
-    pub async fn wrangle(&self, kind: &Kind) -> Result<StarKey, UniErr> {
+    pub async fn wrangle(&self, kind: &Kind) -> Result<StarKey, SpaceErr> {
         self.find(kind)
             .ok_or(format!(
                 "could not find wrangles for kind {}",
@@ -731,7 +727,7 @@ impl RoundRobinWrangleSelector {
         }
     }
 
-    pub async fn wrangle(&mut self) -> Result<StarKey, UniErr> {
+    pub async fn wrangle(&mut self) -> Result<StarKey, SpaceErr> {
         if self.stars.is_empty() {
             return Err(format!("cannot find wrangle for kind: {}", self.kind.to_string()).into());
         }
@@ -792,7 +788,7 @@ where
         }
     }
 
-    pub async fn wrangle(&self, track: bool) -> Result<Discoveries, UniErr> {
+    pub async fn wrangle(&self, track: bool) -> Result<Discoveries, SpaceErr> {
         let mut ripple = DirectedProto::ripple();
         ripple.track = track;
         ripple.method(HypMethod::Search);

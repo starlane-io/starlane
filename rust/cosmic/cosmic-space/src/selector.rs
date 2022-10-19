@@ -23,7 +23,7 @@ use crate::substance::{
     SubstancePatternCtx, SubstancePatternDef,
 };
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
-use crate::{Point, UniErr};
+use crate::{Point, SpaceErr};
 
 pub type KindSelector = KindSelectorDef<KindBaseSelector, SubKindSelector, SpecificSelector>;
 pub type KindSelectorVar =
@@ -72,9 +72,9 @@ impl KindSelector {
         self.base.matches(&kind.to_base())
     }
 
-    pub fn as_point_segments(&self) -> Result<String, UniErr> {
+    pub fn as_point_segments(&self) -> Result<String, SpaceErr> {
         match &self.base {
-            KindBaseSelector::Any => Err(UniErr::from_500(
+            KindBaseSelector::Any => Err(SpaceErr::server_error(
                 "cannot turn a base wildcard kind into point segments",
             )),
             KindBaseSelector::Exact(e) => Ok(e.to_skewer().to_string()),
@@ -83,7 +83,7 @@ impl KindSelector {
 }
 
 impl FromStr for KindSelector {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(result(kind_selector(new_span(s)))?)
@@ -128,13 +128,13 @@ pub type SelectorCtx = SelectorDef<Hop>;
 pub type SelectorVar = SelectorDef<Hop>;
 
 impl ToResolved<Selector> for Selector {
-    fn to_resolved(self, env: &Env) -> Result<Selector, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<Selector, SpaceErr> {
         Ok(self)
     }
 }
 
 impl FromStr for Selector {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (_, rtn) = all_consuming(point_selector)(new_span(s))?;
@@ -367,7 +367,7 @@ impl ToString for VersionReq {
 }
 
 impl TryInto<semver::VersionReq> for VersionReq {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_into(self) -> Result<semver::VersionReq, Self::Error> {
         Ok(self.version)
@@ -375,7 +375,7 @@ impl TryInto<semver::VersionReq> for VersionReq {
 }
 
 impl FromStr for VersionReq {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let version = semver::VersionReq::from_str(s)?;
@@ -419,7 +419,7 @@ pub enum PointSegSelectorCtx {
 }
 
 impl FromStr for PointSegSelector {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(point_segment_selector)(new_span(s)))
@@ -532,7 +532,7 @@ pub type SpecificSelector = SpecificSelectorDef<
 >;
 
 impl FromStr for SpecificSelector {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(specific_selector)(new_span(s)))
@@ -586,7 +586,7 @@ pub mod specific {
     use core::ops::Deref;
     use core::str::FromStr;
 
-    use crate::err::UniErr;
+    use crate::err::SpaceErr;
     use crate::parse::{Domain, SkewerCase};
     use crate::selector::Pattern;
 
@@ -603,7 +603,7 @@ pub mod specific {
     }
 
     impl FromStr for VersionReq {
-        type Err = UniErr;
+        type Err = SpaceErr;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             Ok(VersionReq {
@@ -754,9 +754,9 @@ where
         }
     }
 
-    pub fn convert<To>(self) -> Result<Pattern<To>, UniErr>
+    pub fn convert<To>(self) -> Result<Pattern<To>, SpaceErr>
     where
-        P: TryInto<To, Error = UniErr> + Eq + PartialEq,
+        P: TryInto<To, Error = SpaceErr> + Eq + PartialEq,
     {
         Ok(match self {
             Pattern::Any => Pattern::Any,
@@ -806,9 +806,9 @@ where
         }
     }
 
-    pub fn convert<To>(self) -> Result<EmptyPattern<To>, UniErr>
+    pub fn convert<To>(self) -> Result<EmptyPattern<To>, SpaceErr>
     where
-        P: TryInto<To, Error = UniErr> + Eq + PartialEq,
+        P: TryInto<To, Error = SpaceErr> + Eq + PartialEq,
     {
         Ok(match self {
             EmptyPattern::Any => EmptyPattern::Any,
@@ -946,7 +946,7 @@ impl ToString for PointKindSeg {
 }
 
 impl FromStr for PointHierarchy {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(consume_hierarchy(new_span(s))?)
@@ -958,7 +958,7 @@ pub type PayloadBlockCtx = PayloadBlockDef<PointCtx>;
 pub type PayloadBlockVar = PayloadBlockDef<PointVar>;
 
 impl ToResolved<PayloadBlockCtx> for PayloadBlockVar {
-    fn to_resolved(self, env: &Env) -> Result<PayloadBlockCtx, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<PayloadBlockCtx, SpaceErr> {
         match self {
             PayloadBlockVar::DirectPattern(block) => Ok(PayloadBlockCtx::DirectPattern(
                 block.modify(move |block| {
@@ -989,7 +989,7 @@ pub type PatternBlockVar = PatternBlockDef<PointVar>;
 pub type PatternBlockDef<Pnt> = ValuePattern<SubstancePatternDef<Pnt>>;
 
 impl ToResolved<PatternBlock> for PatternBlockCtx {
-    fn to_resolved(self, env: &Env) -> Result<PatternBlock, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<PatternBlock, SpaceErr> {
         match self {
             PatternBlockCtx::Any => Ok(PatternBlock::Any),
             PatternBlockCtx::None => Ok(PatternBlock::None),
@@ -1001,7 +1001,7 @@ impl ToResolved<PatternBlock> for PatternBlockCtx {
 }
 
 impl ToResolved<PatternBlockCtx> for PatternBlockVar {
-    fn to_resolved(self, env: &Env) -> Result<PatternBlockCtx, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<PatternBlockCtx, SpaceErr> {
         match self {
             PatternBlockVar::Any => Ok(PatternBlockCtx::Any),
             PatternBlockVar::None => Ok(PatternBlockCtx::None),
@@ -1019,7 +1019,7 @@ pub enum PayloadBlockDef<Pnt> {
 }
 
 impl ToResolved<PayloadBlock> for PayloadBlockCtx {
-    fn to_resolved(self, env: &Env) -> Result<PayloadBlock, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<PayloadBlock, SpaceErr> {
         match self {
             PayloadBlockCtx::DirectPattern(block) => {
                 Ok(PayloadBlock::DirectPattern(block.modify(move |block| {
@@ -1035,7 +1035,7 @@ impl ToResolved<PayloadBlock> for PayloadBlockCtx {
 }
 
 impl ToResolved<PayloadBlock> for PayloadBlockVar {
-    fn to_resolved(self, env: &Env) -> Result<PayloadBlock, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<PayloadBlock, SpaceErr> {
         let block: PayloadBlockCtx = self.to_resolved(env)?;
         block.to_resolved(env)
     }

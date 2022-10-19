@@ -11,6 +11,9 @@ extern crate lazy_static;
 #[macro_use]
 extern crate strum_macros;
 
+extern crate inflector;
+use inflector::Inflector;
+
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
@@ -31,17 +34,17 @@ use cosmic_space::command::direct::create::{KindTemplate, Strategy};
 use cosmic_space::command::direct::delete::Delete;
 use cosmic_space::command::direct::query::{Query, QueryResult};
 use cosmic_space::command::direct::select::{Select, SubSelect};
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::fail::Timeout;
 use cosmic_space::hyper::{ParticleLocation, ParticleRecord};
 use cosmic_space::kind::{
-    ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind,
+    ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind,
 };
 use cosmic_space::loc::{
     Layer, MachineName, Point, RouteSeg, StarKey, Surface, ToBaseKind, ToSurface,
 };
 use cosmic_space::log::RootLogger;
-use cosmic_space::particle::property::PropertiesConfig;
+use cosmic_space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
 use cosmic_space::particle::{Details, Properties, Status, Stub};
 use cosmic_space::security::IndexedAccessGrant;
 use cosmic_space::security::{Access, AccessGrant};
@@ -60,17 +63,16 @@ use crate::driver::{DriverFactory, DriversBuilder};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
 
 pub mod driver;
+pub mod err;
 pub mod global;
 pub mod layer;
 pub mod machine;
-pub mod star;
-pub mod err;
-pub mod reg;
 pub mod mem;
+pub mod reg;
+pub mod star;
 
 #[cfg(test)]
 pub mod tests;
-
 
 #[no_mangle]
 pub extern "C" fn cosmic_uuid() -> String {
@@ -109,7 +111,23 @@ where
 
     fn machine_template(&self) -> MachineTemplate;
     fn machine_name(&self) -> MachineName;
-    fn properties_config(&self, kind: &Kind) -> PropertiesConfig;
+
+    fn properties_config(&self, kind: &Kind) -> PropertiesConfig {
+        let mut builder = PropertiesConfigBuilder::new();
+        builder.kind(kind.clone());
+        match kind.to_base() {
+            BaseKind::Mechtron => {
+                builder.add_point("config", true, true).unwrap();
+                builder.build().unwrap()
+            }
+            BaseKind::Host => {
+                builder.add_point("bin", true, true).unwrap();
+                builder.build().unwrap()
+            }
+            _ => builder.build().unwrap(),
+        }
+    }
+
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self>;
     async fn global_registry(&self) -> Result<Registry<Self>, Self::Err>;
     async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>, Self::Err>;
@@ -119,11 +137,15 @@ where
         Default::default()
     }
 
+    fn web_port(&self) -> Result<u16, Self::Err> {
+        Ok(8080u16)
+    }
+
     fn data_dir(&self) -> String {
         "./data/".to_string()
     }
 
-    fn select_kind(&self, template: &KindTemplate) -> Result<Kind, UniErr> {
+    fn select_kind(&self, template: &KindTemplate) -> Result<Kind, SpaceErr> {
         let base: BaseKind = BaseKind::from_str(template.base.to_string().as_str())?;
         Ok(match base {
             BaseKind::Root => Kind::Root,
@@ -175,6 +197,7 @@ where
             BaseKind::Global => Kind::Global,
             BaseKind::Host => Kind::Host,
             BaseKind::Guest => Kind::Guest,
+            BaseKind::Native => Kind::Native(NativeSub::Web),
         })
     }
 

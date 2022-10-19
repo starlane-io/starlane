@@ -1,24 +1,29 @@
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::kind::BaseKind;
 use cosmic_space::loc::ToBaseKind;
-use cosmic_space::particle::property::{AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit, PropertySource, U64Pattern, UsernamePattern};
-
+use cosmic_space::particle::property::{
+    AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig, PropertyPermit,
+    PropertySource, U64Pattern, UsernamePattern,
+};
 
 lazy_static! {
-    pub static ref DEFAULT_PROPERTIES_CONFIG: PropertiesConfig = default_properties_config().unwrap();
+    pub static ref DEFAULT_PROPERTIES_CONFIG: PropertiesConfig =
+        default_properties_config().unwrap();
     pub static ref USER_PROPERTIES_CONFIG: PropertiesConfig = user_properties_config().unwrap();
-    pub static ref USER_BASE_PROPERTIES_CONFIG: PropertiesConfig = userbase_properties_config().unwrap();
-    pub static ref MECHTRON_PROERTIES_CONFIG: PropertiesConfig = mechtron_properties_config().unwrap();
+    pub static ref USER_BASE_PROPERTIES_CONFIG: PropertiesConfig =
+        userbase_properties_config().unwrap();
+    pub static ref MECHTRON_PROERTIES_CONFIG: PropertiesConfig =
+        mechtron_properties_config().unwrap();
     pub static ref UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG: PropertiesConfig =
         unrequired_bind_and_config_properties_config().unwrap();
 }
 
-fn default_properties_config() -> Result<PropertiesConfig,UniErr> {
+fn default_properties_config() -> Result<PropertiesConfig, SpaceErr> {
     let mut builder = PropertiesConfig::builder();
     builder.build()
 }
 
-fn mechtron_properties_config() -> Result<PropertiesConfig,UniErr> {
+fn mechtron_properties_config() -> Result<PropertiesConfig, SpaceErr> {
     let mut builder = PropertiesConfig::builder();
     builder.add(
         "bind",
@@ -43,7 +48,7 @@ fn mechtron_properties_config() -> Result<PropertiesConfig,UniErr> {
     builder.build()
 }
 
-fn unrequired_bind_and_config_properties_config() -> Result<PropertiesConfig,UniErr> {
+fn unrequired_bind_and_config_properties_config() -> Result<PropertiesConfig, SpaceErr> {
     let mut builder = PropertiesConfig::builder();
     builder.add(
         "bind",
@@ -68,7 +73,7 @@ fn unrequired_bind_and_config_properties_config() -> Result<PropertiesConfig,Uni
     builder.build()
 }
 
-fn user_properties_config() -> Result<PropertiesConfig,UniErr> {
+fn user_properties_config() -> Result<PropertiesConfig, SpaceErr> {
     let mut builder = PropertiesConfig::builder();
     builder.add(
         "bind",
@@ -113,7 +118,7 @@ fn user_properties_config() -> Result<PropertiesConfig,UniErr> {
     builder.build()
 }
 
-fn userbase_properties_config() -> Result<PropertiesConfig,UniErr> {
+fn userbase_properties_config() -> Result<PropertiesConfig, SpaceErr> {
     let mut builder = PropertiesConfig::builder();
     builder.add(
         "bind",

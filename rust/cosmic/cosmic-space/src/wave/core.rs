@@ -8,14 +8,14 @@ use cosmic_macros_primitive::Autobox;
 use crate::command::Command;
 use crate::err::StatusErr;
 use crate::loc::ToSurface;
-use crate::substance::Errors;
+use crate::substance::FormErrs;
 use crate::util::{ValueMatcher, ValuePattern};
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::ext::ExtMethod;
 use crate::wave::core::http2::{HttpMethod, StatusCode};
 use crate::wave::core::hyp::HypMethod;
 use crate::wave::{Bounce, Ping, Pong, ToRecipients, WaveId};
-use crate::{Bin, Substance, Surface, ToSubstance, UniErr};
+use crate::{Bin, SpaceErr, Substance, Surface, ToSubstance};
 use url::Url;
 
 pub mod cmd;
@@ -23,8 +23,8 @@ pub mod ext;
 pub mod http2;
 pub mod hyp;
 
-impl From<Result<ReflectedCore, UniErr>> for ReflectedCore {
-    fn from(result: Result<ReflectedCore, UniErr>) -> Self {
+impl From<Result<ReflectedCore, SpaceErr>> for ReflectedCore {
+    fn from(result: Result<ReflectedCore, SpaceErr>) -> Self {
         match result {
             Ok(response) => response,
             Err(err) => err.into(),
@@ -43,21 +43,21 @@ impl<S> ToSubstance<S> for ReflectedCore
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, UniErr> {
+    fn to_substance(self) -> Result<S, SpaceErr> {
         self.body.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, UniErr> {
+    fn to_substance_ref(&self) -> Result<&S, SpaceErr> {
         self.body.to_substance_ref()
     }
 }
 
 impl ReflectedCore {
-    pub fn to_err(&self) -> UniErr {
+    pub fn to_err(&self) -> SpaceErr {
         if self.status.is_success() {
             "cannot convert a success into an error".into()
         } else {
-            if let Substance::Errors(errors) = &self.body {
+            if let Substance::FormErrs(errors) = &self.body {
                 errors.to_cosmic_err()
             } else {
                 self.status.to_string().into()
@@ -78,12 +78,12 @@ impl ReflectedCore {
         }
     }
 
-    pub fn result(result: Result<ReflectedCore, UniErr>) -> ReflectedCore {
+    pub fn result(result: Result<ReflectedCore, SpaceErr>) -> ReflectedCore {
         match result {
             Ok(core) => core,
             Err(err) => {
                 let mut core = ReflectedCore::status(err.status());
-                core.body = Substance::Errors(Errors::from(err));
+                core.body = Substance::FormErrs(FormErrs::from(err));
                 core
             }
         }
@@ -150,23 +150,23 @@ impl ReflectedCore {
     }
 
     pub fn fail<S: ToString>(status: u16, message: S) -> Self {
-        let errors = Errors::default(message);
+        let errors = FormErrs::default(message);
         Self {
             headers: HeaderMap::new(),
             status: StatusCode::from_u16(status)
                 .or_else(|_| StatusCode::from_u16(500u16))
                 .unwrap(),
-            body: Substance::Errors(errors),
+            body: Substance::FormErrs(errors),
         }
     }
 
-    pub fn err(err: UniErr) -> Self {
-        let errors = Errors::default(err.to_string().as_str());
+    pub fn err(err: SpaceErr) -> Self {
+        let errors = FormErrs::default(err.to_string().as_str());
         Self {
             headers: HeaderMap::new(),
             status: StatusCode::from_u16(err.status())
                 .unwrap_or(StatusCode::from_u16(500u16).unwrap()),
-            body: Substance::Errors(errors),
+            body: Substance::FormErrs(errors),
         }
     }
 
@@ -207,11 +207,11 @@ impl ReflectedCore {
         }
     }
 
-    pub fn ok_or(&self) -> Result<(), UniErr> {
+    pub fn ok_or(&self) -> Result<(), SpaceErr> {
         if self.is_ok() {
             Ok(())
         } else {
-            Err(UniErr::new(self.status.as_u16(), "error"))
+            Err(SpaceErr::new(self.status.as_u16(), "error"))
         }
     }
 }
@@ -394,11 +394,11 @@ impl<S> ToSubstance<S> for DirectedCore
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, UniErr> {
+    fn to_substance(self) -> Result<S, SpaceErr> {
         self.body.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, UniErr> {
+    fn to_substance_ref(&self) -> Result<&S, SpaceErr> {
         self.body.to_substance_ref()
     }
 }
@@ -414,7 +414,12 @@ impl DirectedCore {
     }
 
     pub fn to_selection_str(&self) -> String {
-        format!("{}{} -[{}]->", self.method.to_deep_string(), self.uri.path(), self.body.kind().to_string())
+        format!(
+            "{}{} -[{}]->",
+            self.method.to_deep_string(),
+            self.uri.path(),
+            self.body.kind().to_string()
+        )
     }
 
     pub fn ext<M: Into<ExtMethod>>(method: M) -> Self {
@@ -437,7 +442,7 @@ impl DirectedCore {
 }
 
 impl TryFrom<Ping> for DirectedCore {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(request: Ping) -> Result<Self, Self::Error> {
         Ok(request.core)
@@ -585,18 +590,18 @@ impl DirectedCore {
     }
 
     pub fn fail<M: ToString>(&self, status: u16, message: M) -> ReflectedCore {
-        let errors = Errors::default(message.to_string().as_str());
+        let errors = FormErrs::default(message.to_string().as_str());
         ReflectedCore {
             headers: Default::default(),
             status: StatusCode::from_u16(status)
                 .or_else(|_| StatusCode::from_u16(500u16))
                 .unwrap(),
-            body: Substance::Errors(errors),
+            body: Substance::FormErrs(errors),
         }
     }
 
     pub fn err<E: StatusErr>(&self, error: E) -> ReflectedCore {
-        let errors = Errors::default(error.message().as_str());
+        let errors = FormErrs::default(error.message().as_str());
         let status = match StatusCode::from_u16(error.status()) {
             Ok(status) => status,
             Err(_) => StatusCode::from_u16(500u16).unwrap(),
@@ -605,7 +610,7 @@ impl DirectedCore {
         ReflectedCore {
             headers: Default::default(),
             status,
-            body: Substance::Errors(errors),
+            body: Substance::FormErrs(errors),
         }
     }
 }
@@ -623,11 +628,11 @@ impl Into<ReflectedCore> for Surface {
 }
 
 impl TryFrom<ReflectedCore> for Surface {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(core: ReflectedCore) -> Result<Self, Self::Error> {
         if !core.status.is_success() {
-            Err(UniErr::new(core.status.as_u16(), "error"))
+            Err(SpaceErr::new(core.status.as_u16(), "error"))
         } else {
             match core.body {
                 Substance::Surface(surface) => Ok(surface),

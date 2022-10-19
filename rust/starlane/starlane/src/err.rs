@@ -1,9 +1,9 @@
 use cosmic_hyperspace::err::ErrKind;
-use cosmic_registry_postgres::err::PostErr;
+//use cosmic_registry_postgres::err::PostErr;
 
-pub trait StarlaneErr: PostErr {}
+pub trait StarlaneErr {}   //: PostErr {}
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct StarErr {
     pub kind: ErrKind,
     pub message: String,
@@ -11,23 +11,22 @@ pub struct StarErr {
 
 impl StarlaneErr for StarErr {}
 
-
 pub mod convert {
     use crate::err::StarErr as Err;
+    use ascii::FromAsciiError;
     use bincode::ErrorKind;
     use cosmic_hyperspace::err::{ErrKind, HyperErr};
-    use cosmic_registry_postgres::err::PostErr;
-    use cosmic_space::err::UniErr;
+//    use cosmic_registry_postgres::err::PostErr;
+    use cosmic_space::err::SpaceErr;
     use mechtron_host::err::HostErr;
     use sqlx::Error;
     use std::io;
     use std::str::Utf8Error;
-    use std::string::{FromUtf8Error};
+    use std::string::FromUtf8Error;
     use strum::ParseError;
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
-
     impl Err {
         pub fn new<S: ToString>(message: S) -> Self {
             Self {
@@ -37,12 +36,38 @@ pub mod convert {
         }
     }
 
+    impl From<strum::ParseError> for Err {
+        fn from(e: strum::ParseError) -> Self {
+            Self {
+                kind: ErrKind::Default,
+                message: e.to_string(),
+            }
+        }
+    }
+
+    impl From<url::ParseError> for Err {
+        fn from(e: url::ParseError) -> Self {
+            Self {
+                kind: ErrKind::Default,
+                message: e.to_string(),
+            }
+        }
+    }
+    impl From<FromAsciiError<std::string::String>> for Err {
+        fn from(e: FromAsciiError<String>) -> Self {
+            Self {
+                kind: ErrKind::Default,
+                message: e.to_string(),
+            }
+        }
+    }
+
     impl ToString for Err {
         fn to_string(&self) -> String {
             self.message.clone()
         }
     }
-    impl PostErr for Err {
+/*    impl PostErr for Err {
         fn dupe() -> Self {
             Self {
                 kind: ErrKind::Dupe,
@@ -50,9 +75,11 @@ pub mod convert {
             }
         }
     }
+
+ */
     impl HyperErr for Err {
-        fn to_uni_err(&self) -> UniErr {
-            UniErr::from_500(self.to_string())
+        fn to_space_err(&self) -> SpaceErr {
+            SpaceErr::server_error(self.to_string())
         }
 
         fn new<S>(message: S) -> Self
@@ -98,21 +125,15 @@ pub mod convert {
         }
     }
 
-    impl From<ParseError> for Err {
-        fn from(e: ParseError) -> Self {
-            Err::new(e)
-        }
-    }
-
     impl From<sqlx::Error> for Err {
         fn from(e: sqlx::Error) -> Self {
             Err::new(e)
         }
     }
 
-    impl Into<UniErr> for Err {
-        fn into(self) -> UniErr {
-            UniErr::from_500(self.to_string())
+    impl Into<SpaceErr> for Err {
+        fn into(self) -> SpaceErr {
+            SpaceErr::server_error(self.to_string())
         }
     }
 
@@ -140,8 +161,8 @@ pub mod convert {
         }
     }
 
-    impl From<UniErr> for Err {
-        fn from(err: UniErr) -> Self {
+    impl From<SpaceErr> for Err {
+        fn from(err: SpaceErr) -> Self {
             Err::new(err)
         }
     }
@@ -195,8 +216,8 @@ pub mod convert {
     }
 
     impl HostErr for Err {
-        fn to_uni_err(self) -> UniErr {
-            UniErr::from_500(self.to_string())
+        fn to_space_err(self) -> SpaceErr {
+            SpaceErr::server_error(self.to_string())
         }
     }
 

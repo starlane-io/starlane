@@ -7,7 +7,7 @@ use cosmic_macros_primitive::Autobox;
 
 use crate::command::common::StateSrc;
 use crate::config::mechtron::MechtronConfig;
-use crate::err::UniErr;
+use crate::err::SpaceErr;
 use crate::kind::{Kind, KindParts, StarSub};
 use crate::loc::{Point, StarKey, Surface, ToPoint, ToSurface};
 use crate::log::Log;
@@ -57,7 +57,7 @@ impl Location {
         Location::Somewhere(point)
     }
 
-    pub fn ok_or(&self) -> Result<Point, UniErr> {
+    pub fn ok_or(&self) -> Result<Point, SpaceErr> {
         match self {
             Location::Nowhere => Err("Particle is presently nowhere".into()),
             Location::Somewhere(point) => Ok(point.clone()),
@@ -70,17 +70,17 @@ impl Location {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParticleRecord {
     pub details: Details,
-    pub location: Option<ParticleLocation>,
+    pub location: ParticleLocation,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ParticleLocation {
-    pub star: Point,
+    pub star: Option<Point>,
     pub host: Option<Point>,
 }
 
 impl ParticleLocation {
-    pub fn new(star: Point, host: Option<Point>) -> Self {
+    pub fn new(star: Option<Point>, host: Option<Point>) -> Self {
         Self { star, host }
     }
 }
@@ -94,7 +94,7 @@ impl From<ParticleLocation> for ReflectedCore {
 
 impl Default for ParticleLocation {
     fn default() -> Self {
-        ParticleLocation::new(Point::central(), None)
+        ParticleLocation::new(None, None)
     }
 }
 
@@ -105,7 +105,7 @@ impl Default for ParticleRecord {
 }
 
 impl ParticleRecord {
-    pub fn new(details: Details, location: Option<ParticleLocation>) -> Self {
+    pub fn new(details: Details, location: ParticleLocation) -> Self {
         ParticleRecord { details, location }
     }
 
@@ -119,7 +119,7 @@ impl ParticleRecord {
                 },
                 properties: Default::default(),
             },
-            location: Some(Default::default()),
+            location: Default::default(),
         }
     }
 }
@@ -143,13 +143,13 @@ impl Provision {
 }
 
 impl TryFrom<Ping> for Provision {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(request: Ping) -> Result<Self, Self::Error> {
         if let Substance::Hyper(HyperSubstance::Provision(provision)) = request.core.body {
             Ok(provision)
         } else {
-            Err(UniErr::bad_request())
+            Err(SpaceErr::bad_request("expecting a Provision HyperSubstance"))
         }
     }
 }
@@ -277,13 +277,13 @@ impl DerefMut for Discoveries {
 }
 
 impl TryFrom<Ping> for Assign {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(request: Ping) -> Result<Self, Self::Error> {
         if let Substance::Hyper(HyperSubstance::Assign(assign)) = request.core.body {
             Ok(assign)
         } else {
-            Err(UniErr::bad_request())
+            Err(SpaceErr::bad_request("expecting an Assign HyperSubstance"))
         }
     }
 }

@@ -1,6 +1,6 @@
 #![allow(warnings)]
-use std::fs;
 use cosmic_hyperlane_tcp::CertGenerator;
+use std::fs;
 pub mod err;
 pub mod properties;
 
@@ -37,15 +37,17 @@ use cosmic_hyperspace::driver::{DriverAvail, DriversBuilder};
 use cosmic_hyperspace::machine::{Machine, MachineTemplate};
 use cosmic_hyperspace::reg::{Registry, RegistryApi};
 use cosmic_hyperspace::Cosmos;
-use cosmic_registry_postgres::err::PostErr;
-use cosmic_registry_postgres::{
+//use cosmic_registry_postgres::err::PostErr;
+/*use cosmic_registry_postgres::{
     PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
 };
+
+ */
 use cosmic_space::artifact::ArtifactApi;
 use cosmic_space::artifact::ReadArtifactFetcher;
 use cosmic_space::command::direct::create::KindTemplate;
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::kind::{
     ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind,
 };
@@ -59,9 +61,17 @@ use cosmic_space::particle::property::{
 use cosmic_space::substance::Token;
 
 use cosmic_hyperlane_tcp::HyperlaneTcpServer;
+use cosmic_hyperspace::driver::web::WebDriverFactory;
 use cosmic_hyperspace::mem::registry::{MemRegApi, MemRegCtx};
+use cosmic_space::loc;
+use cosmic_space::wasm::Timestamp;
 
 fn main() -> Result<(), StarErr> {
+
+    ctrlc::set_handler(move || {
+        std::process::exit(1);
+    });
+
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -71,7 +81,7 @@ fn main() -> Result<(), StarErr> {
         tokio::time::timeout(Duration::from_secs(30), machine_api.wait_ready())
             .await
             .unwrap();
-println!("> STARLANE Ready!");
+        println!("> STARLANE Ready!");
         // this is a dirty hack which is good enough for a 0.3.0 release...
         loop {
             tokio::time::sleep(Duration::from_secs(60)).await;
@@ -102,18 +112,21 @@ lazy_static! {
         std::env::var("STARLANE_REGISTRY_PASSWORD").unwrap_or("password".to_string());
     pub static ref STARLANE_REGISTRY_DATABASE: String =
         std::env::var("STARLANE_REGISTRY_DATABASE").unwrap_or("postgres".to_string());
-    pub static ref STARLANE_CERTS_DIR: String =
-        std::env::var("STARLANE_CERTS_DIR").unwrap_or("./certs".to_string());
 }
+
+/*
 #[no_mangle]
-pub extern "C" fn cosmic_uuid() -> String {
-    Uuid::new_v4().to_string()
+pub extern "C" fn cosmic_uuid() -> loc::Uuid {
+    loc::Uuid::from(uuid::Uuid::new_v4()).unwrap()
 }
 
 #[no_mangle]
-pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
-    Utc::now()
+pub extern "C" fn cosmic_timestamp() -> Timestamp {
+    Timestamp { millis: Utc::now().timestamp_millis() }
 }
+
+ */
+
 
 #[derive(Clone)]
 pub struct Starlane {
@@ -133,7 +146,6 @@ impl Starlane {
          */
         let ctx = MemRegCtx::new();
         Ok(Self { ctx })
-
     }
 }
 
@@ -168,18 +180,6 @@ impl Cosmos for Starlane {
         "starlane".to_string()
     }
 
-    fn properties_config(&self, kind: &Kind) -> PropertiesConfig {
-        let mut builder = PropertiesConfigBuilder::new();
-        builder.kind(kind.clone());
-        match kind.to_base() {
-            BaseKind::Mechtron => {
-                builder.add_point("config", true, true).unwrap();
-                builder.build().unwrap()
-            }
-            _ => builder.build().unwrap(),
-        }
-    }
-
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
         let mut builder = DriversBuilder::new(kind.clone());
 
@@ -209,7 +209,8 @@ impl Cosmos for Starlane {
                 builder.add_post(Arc::new(ArtifactDriverFactory::new()));
             }
             StarSub::Jump => {
-                //                builder.add_post(Arc::new(ControlDriverFactory::new()));
+                builder.add_post(Arc::new(WebDriverFactory::new()));
+                // builder.add_post(Arc::new(ControlDriverFactory::new()));
             }
             StarSub::Fold => {}
             StarSub::Machine => {
@@ -241,26 +242,37 @@ impl Cosmos for Starlane {
     }
 
     async fn start_services(&self, gate: &Arc<HyperGateSelector>) {
-        fs::create_dir_all(STARLANE_CERTS_DIR.as_str() );
-        let cert = format!("{}/cert.pem", STARLANE_CERTS_DIR.as_str());
-        let key = format!("{}/key.pem", STARLANE_CERTS_DIR.as_str());
-        let cert_path =  Path::new(&cert );
-        let key_path=  Path::new(&key);
+        let dir = match dirs::home_dir() {
+            None => ".starlane/localhost/certs".to_string(),
+            Some(path) => format!("{}/.starlane/localhost/certs", path.display()),
+        };
+        fs::create_dir_all(dir.as_str());
+
+        let cert = format!("{}/cert.pem", dir.as_str());
+        let key = format!("{}/key.pem", dir.as_str());
+        let cert_path = Path::new(&cert);
+        let key_path = Path::new(&key);
 
         if !cert_path.exists() || !key_path.exists() {
-            CertGenerator::gen(vec!["localhost".to_string()]).unwrap()
-            .write_to_dir(STARLANE_CERTS_DIR.clone())
-            .await.unwrap();
+            CertGenerator::gen(vec!["localhost".to_string()])
+                .unwrap()
+                .write_to_dir(dir.clone())
+                .await
+                .unwrap();
         };
 
-        let logger = self.logger().point(Point::from_str("control-server").unwrap());
+        let logger = self
+            .logger()
+            .point(Point::from_str("control-server").unwrap());
         let server =
-            HyperlaneTcpServer::new(STARLANE_CONTROL_PORT.clone(), STARLANE_CERTS_DIR.clone(), gate.clone(), logger)
-                .await.unwrap();
+            HyperlaneTcpServer::new(STARLANE_CONTROL_PORT.clone(), dir, gate.clone(), logger)
+                .await
+                .unwrap();
         server.start().unwrap();
     }
 }
 
+/*
 impl PostgresPlatform for Starlane {
     fn lookup_registry_db() -> Result<PostgresDbInfo, Self::Err> {
         Ok(PostgresDbInfo::new(
@@ -280,4 +292,15 @@ impl PostgresPlatform for Starlane {
             star.to_sql_name(),
         ))
     }
+}
+
+ */
+
+#[cfg(test)]
+pub mod test {
+    #[test]
+    pub fn test() {
+
+    }
+
 }

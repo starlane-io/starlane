@@ -1,7 +1,7 @@
 use alloc::string::FromUtf8Error;
 use bincode::ErrorKind;
 use core::fmt::{Display, Formatter};
-use cosmic_space::err::{CoreReflector, UniErr};
+use cosmic_space::err::{CoreReflector, SpaceErr};
 use cosmic_space::substance::Substance;
 use cosmic_space::wave::core::http2::StatusCode;
 use cosmic_space::wave::core::ReflectedCore;
@@ -11,12 +11,12 @@ pub trait MechErr:
     + ToString
     + From<Box<bincode::ErrorKind>>
     + From<MembraneErr>
-    + From<UniErr>
+    + From<SpaceErr>
     + From<String>
     + From<&'static str>
     + From<GuestErr>
 {
-    fn to_uni_err(self) -> UniErr;
+    fn to_uni_err(self) -> SpaceErr;
 }
 
 #[derive(Debug, Clone)]
@@ -38,8 +38,8 @@ impl From<MembraneErr> for GuestErr {
     }
 }
 
-impl From<UniErr> for GuestErr {
-    fn from(err: UniErr) -> Self {
+impl From<SpaceErr> for GuestErr {
+    fn from(err: SpaceErr) -> Self {
         Self {
             message: err.to_string(),
         }
@@ -71,8 +71,8 @@ impl From<&str> for GuestErr {
 }
 
 impl MechErr for GuestErr {
-    fn to_uni_err(self) -> UniErr {
-        UniErr::from_500(self.to_string())
+    fn to_uni_err(self) -> SpaceErr {
+        SpaceErr::server_error(self.to_string())
     }
 }
 

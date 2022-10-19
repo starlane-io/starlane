@@ -3,10 +3,9 @@ members = [
   "starlane/*",
   "cosmic/*",
   "mechtron/*",
-  "wasm/*",
   ]
 
 exclude = [
-  "cosmic/src", "cosmic/target", "starlane/starlane-old", "starlane/starlane-core"
+  "cosmic/src", "cosmic/target", "starlane/starlane-old", "starlane/starlane-core", "starlane/starlane-macros","mechtron/mocks" , "cosmic/cosmic-hyperlane-quic"
 ]
 

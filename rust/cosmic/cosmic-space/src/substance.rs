@@ -1,4 +1,5 @@
 use core::str::FromStr;
+use nom::ExtendInto;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
@@ -24,7 +25,7 @@ use crate::wave::core::http2::HttpMethod;
 use crate::wave::core::hyp::HypMethod;
 use crate::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use crate::wave::{Pong, UltraWave};
-use crate::{util, Details, Point, Status, Stub, Surface, UniErr};
+use crate::{util, Details, Point, SpaceErr, Status, Stub, Surface};
 use url::Url;
 
 #[derive(
@@ -53,7 +54,7 @@ pub enum SubstanceKind {
     Status,
     Particle,
     Location,
-    Errors,
+    FormErrs,
     Json,
     MultipartForm,
     RawCommand,
@@ -66,6 +67,7 @@ pub enum SubstanceKind {
     Knock,
     Greet,
     Log,
+    Err
 }
 
 #[derive(
@@ -97,7 +99,7 @@ pub enum Substance {
     Location(ParticleLocation),
     RawCommand(RawCommand),
     Command(Box<Command>),
-    Errors(Errors),
+    FormErrs(FormErrs),
     Json(Value),
     MultipartForm(MultipartForm),
     DirectedCore(Box<DirectedCore>),
@@ -108,6 +110,7 @@ pub enum Substance {
     Knock(Knock),
     Greet(Greet),
     Log(LogSubstance),
+    Err(SpaceErr)
 }
 
 impl Substance {
@@ -129,8 +132,8 @@ impl Substance {
 }
 
 pub trait ToSubstance<S> {
-    fn to_substance(self) -> Result<S, UniErr>;
-    fn to_substance_ref(&self) -> Result<&S, UniErr>;
+    fn to_substance(self) -> Result<S, SpaceErr>;
+    fn to_substance_ref(&self) -> Result<&S, SpaceErr>;
 }
 
 pub trait ChildSubstance {}
@@ -167,7 +170,7 @@ impl ToString for Token {
 }
 
 impl FromStr for Token {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Token::new(s))
@@ -175,7 +178,7 @@ impl FromStr for Token {
 }
 
 impl TryFrom<Pong> for Token {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(response: Pong) -> Result<Self, Self::Error> {
         response.core.body.try_into()
@@ -194,7 +197,7 @@ impl Default for Substance {
 }
 
 impl Substance {
-    pub fn to_text(self) -> Result<String, UniErr> {
+    pub fn to_text(self) -> Result<String, SpaceErr> {
         if let Substance::Text(text) = self {
             Ok(text)
         } else {
@@ -228,7 +231,7 @@ impl Substance {
             Substance::Int(_) => SubstanceKind::Int,
             Substance::Status(_) => SubstanceKind::Status,
             Substance::Particle(_) => SubstanceKind::Particle,
-            Substance::Errors(_) => SubstanceKind::Errors,
+            Substance::FormErrs(_) => SubstanceKind::FormErrs,
             Substance::Json(_) => SubstanceKind::Json,
             Substance::RawCommand(_) => SubstanceKind::RawCommand,
             Substance::Surface(_) => SubstanceKind::Surface,
@@ -244,16 +247,20 @@ impl Substance {
             Substance::Details(_) => SubstanceKind::Details,
             Substance::Location(_) => SubstanceKind::Location,
             Substance::Log(_) => SubstanceKind::Log,
+            Substance::Err(_) => SubstanceKind::Err,
         }
     }
 
-    pub fn to_bin(self) -> Result<Bin, UniErr> {
+    pub fn to_bin(self) -> Result<Bin, SpaceErr> {
         match self {
             Substance::Empty => Ok(Arc::new(vec![])),
             Substance::List(list) => list.to_bin(),
             Substance::Map(map) => map.to_bin(),
             Substance::Bin(bin) => Ok(bin),
-            _ => Err("not supported".into()),
+            Substance::Text(text) => {
+                Ok(Arc::new(text.as_bytes().to_vec()))
+            }
+            what => Err(format!("{}.to_bin() not supported", what.kind().to_string()).into()),
         }
     }
 }
@@ -277,7 +284,7 @@ pub enum LogSubstance {
 }
 
 impl TryInto<HashMap<String, Substance>> for Substance {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_into(self) -> Result<HashMap<String, Substance>, Self::Error> {
         match self {
@@ -324,7 +331,7 @@ impl SubstanceMap {
     }
 
      */
-    pub fn to_bin(self) -> Result<Bin, UniErr> {
+    pub fn to_bin(self) -> Result<Bin, SpaceErr> {
         Ok(Arc::new(bincode::serialize(&self)?))
     }
 
@@ -336,13 +343,13 @@ impl SubstanceMap {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct Errors {
+pub struct FormErrs {
     map: HashMap<String, String>,
 }
 
-impl Errors {
-    pub fn to_cosmic_err(&self) -> UniErr {
-        UniErr::new(500, self.to_string().as_str())
+impl FormErrs {
+    pub fn to_cosmic_err(&self) -> SpaceErr {
+        SpaceErr::new(500, self.to_string().as_str())
     }
 
     pub fn empty() -> Self {
@@ -358,18 +365,18 @@ impl Errors {
     }
 }
 
-impl From<UniErr> for Errors {
-    fn from(err: UniErr) -> Self {
+impl From<SpaceErr> for FormErrs {
+    fn from(err: SpaceErr) -> Self {
         match err {
-            UniErr::Status { status, message } => {
+            SpaceErr::Status { status, message } => {
                 Self::default(format!("{} {}", status, message).as_str())
             }
-            UniErr::ParseErrs(_) => Self::default("500: parse error"),
+            SpaceErr::ParseErrs(_) => Self::default("500: parse error"),
         }
     }
 }
 
-impl ToString for Errors {
+impl ToString for FormErrs {
     fn to_string(&self) -> String {
         let mut rtn = String::new();
         for (index, (_, value)) in self.iter().enumerate() {
@@ -382,7 +389,7 @@ impl ToString for Errors {
     }
 }
 
-impl Deref for Errors {
+impl Deref for FormErrs {
     type Target = HashMap<String, String>;
 
     fn deref(&self) -> &Self::Target {
@@ -405,7 +412,7 @@ impl SubstanceList {
     pub fn new() -> Self {
         Self { list: vec![] }
     }
-    pub fn to_bin(self) -> Result<Bin, UniErr> {
+    pub fn to_bin(self) -> Result<Bin, SpaceErr> {
         Ok(Arc::new(bincode::serialize(&self)?))
     }
 }
@@ -431,7 +438,7 @@ pub struct ListPattern {
 }
 
 impl ListPattern {
-    pub fn is_match(&self, list: &SubstanceList) -> Result<(), UniErr> {
+    pub fn is_match(&self, list: &SubstanceList) -> Result<(), SpaceErr> {
         /*
         for i in &list.list {
             if self.primitive != i.primitive_type() {
@@ -470,7 +477,7 @@ pub enum SubstanceTypePatternDef<Pnt> {
 }
 
 impl ToResolved<SubstanceTypePatternDef<Point>> for SubstanceTypePatternDef<PointCtx> {
-    fn to_resolved(self, env: &Env) -> Result<SubstanceTypePatternDef<Point>, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<SubstanceTypePatternDef<Point>, SpaceErr> {
         match self {
             SubstanceTypePatternDef::Empty => Ok(SubstanceTypePatternDef::Empty),
             SubstanceTypePatternDef::Primitive(payload_type) => {
@@ -485,7 +492,7 @@ impl ToResolved<SubstanceTypePatternDef<Point>> for SubstanceTypePatternDef<Poin
 }
 
 impl ToResolved<SubstanceTypePatternCtx> for SubstanceTypePatternVar {
-    fn to_resolved(self, env: &Env) -> Result<SubstanceTypePatternCtx, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<SubstanceTypePatternCtx, SpaceErr> {
         match self {
             SubstanceTypePatternVar::Empty => Ok(SubstanceTypePatternCtx::Empty),
             SubstanceTypePatternVar::Primitive(payload_type) => {
@@ -577,7 +584,7 @@ pub struct SubstancePatternDef<Pnt> {
 }
 
 impl ToResolved<SubstancePatternCtx> for SubstancePatternVar {
-    fn to_resolved(self, env: &Env) -> Result<SubstancePatternCtx, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<SubstancePatternCtx, SpaceErr> {
         let mut errs = vec![];
         let structure = match self.structure.to_resolved(env) {
             Ok(structure) => Some(structure),
@@ -610,7 +617,7 @@ impl ToResolved<SubstancePatternCtx> for SubstancePatternVar {
 }
 
 impl ToResolved<SubstancePattern> for SubstancePatternCtx {
-    fn to_resolved(self, resolver: &Env) -> Result<SubstancePattern, UniErr> {
+    fn to_resolved(self, resolver: &Env) -> Result<SubstancePattern, SpaceErr> {
         let mut errs = vec![];
         let structure = match self.structure.to_resolved(resolver) {
             Ok(structure) => Some(structure),
@@ -662,7 +669,7 @@ pub type CallWithConfigCtx = CallWithConfigDef<PointCtx>;
 pub type CallWithConfigVar = CallWithConfigDef<PointVar>;
 
 impl ToResolved<CallWithConfigCtx> for CallWithConfigVar {
-    fn to_resolved(self, resolver: &Env) -> Result<CallWithConfigCtx, UniErr> {
+    fn to_resolved(self, resolver: &Env) -> Result<CallWithConfigCtx, SpaceErr> {
         let mut errs = vec![];
         let call = match self.call.to_resolved(resolver) {
             Ok(call) => Some(call),
@@ -694,7 +701,7 @@ impl ToResolved<CallWithConfigCtx> for CallWithConfigVar {
 }
 
 impl ToResolved<CallWithConfig> for CallWithConfigCtx {
-    fn to_resolved(self, resolver: &Env) -> Result<CallWithConfig, UniErr> {
+    fn to_resolved(self, resolver: &Env) -> Result<CallWithConfig, SpaceErr> {
         let mut errs = vec![];
         let call = match self.call.to_resolved(resolver) {
             Ok(call) => Some(call),
@@ -730,7 +737,7 @@ pub type CallCtx = CallDef<PointCtx>;
 pub type CallVar = CallDef<PointVar>;
 
 impl ToResolved<Call> for CallCtx {
-    fn to_resolved(self, env: &Env) -> Result<Call, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<Call, SpaceErr> {
         Ok(Call {
             point: self.point.to_resolved(env)?,
             kind: self.kind,
@@ -739,7 +746,7 @@ impl ToResolved<Call> for CallCtx {
 }
 
 impl ToResolved<CallCtx> for CallVar {
-    fn to_resolved(self, env: &Env) -> Result<CallCtx, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<CallCtx, SpaceErr> {
         Ok(CallCtx {
             point: self.point.to_resolved(env)?,
             kind: self.kind,
@@ -748,7 +755,7 @@ impl ToResolved<CallCtx> for CallVar {
 }
 
 impl ToResolved<Call> for CallVar {
-    fn to_resolved(self, env: &Env) -> Result<Call, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<Call, SpaceErr> {
         let call: CallCtx = self.to_resolved(env)?;
         call.to_resolved(env)
     }
@@ -996,7 +1003,7 @@ pub struct MultipartForm {
 }
 
 impl TryInto<HashMap<String, String>> for MultipartForm {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_into(self) -> Result<HashMap<String, String>, Self::Error> {
         let map: HashMap<String, String> = serde_urlencoded::from_str(&self.data)?;
@@ -1079,7 +1086,7 @@ impl DerefMut for MultipartFormBuilder {
 }
 
 impl MultipartFormBuilder {
-    pub fn build(self) -> Result<MultipartForm, UniErr> {
+    pub fn build(self) -> Result<MultipartForm, SpaceErr> {
         let data = serde_urlencoded::to_string(&self.map)?;
         Ok(MultipartForm { data })
     }

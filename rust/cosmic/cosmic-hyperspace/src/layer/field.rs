@@ -5,7 +5,7 @@ use url::Url;
 
 use cosmic_space::artifact::ArtRef;
 use cosmic_space::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
-use cosmic_space::err::{CoreReflector, StatusErr, UniErr};
+use cosmic_space::err::{CoreReflector, SpaceErr, StatusErr};
 use cosmic_space::loc::{Layer, Point, Surface, ToSurface};
 use cosmic_space::log::{PointLogger, Trackable};
 use cosmic_space::parse::model::{PipelineSegmentVar, PipelineVar};
@@ -13,7 +13,7 @@ use cosmic_space::parse::{Env, RegexCapturesResolver};
 use cosmic_space::particle::traversal::{Traversal, TraversalLayer};
 use cosmic_space::selector::PayloadBlock;
 use cosmic_space::substance::Substance;
-use cosmic_space::util::ToResolved;
+use cosmic_space::util::{log, ToResolved};
 use cosmic_space::wave::core::{Method, ReflectedCore};
 use cosmic_space::wave::exchange::asynch::{Exchanger, TraversalTransmitter};
 use cosmic_space::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder};
@@ -21,10 +21,10 @@ use cosmic_space::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Pong, Reflection, UltraWave, Wave,
 };
 
-use crate::star::{HyperStarSkel, LayerInjectionRouter, TraverseToNextRouter};
-use crate::Cosmos;
 use crate::err::HyperErr;
 use crate::reg::RegistryApi;
+use crate::star::{HyperStarSkel, LayerInjectionRouter, TraverseToNextRouter};
+use crate::Cosmos;
 
 pub struct Field<P>
 where
@@ -54,19 +54,22 @@ where
         }
     }
 
-    async fn bind(&self, directed: &Traversal<DirectedWave>) -> Result<ArtRef<BindConfig>, UniErr> {
+    async fn bind(
+        &self,
+        directed: &Traversal<DirectedWave>,
+    ) -> Result<ArtRef<BindConfig>, SpaceErr> {
         let record = self
             .skel
             .registry
             .record(&self.port.point)
             .await
-            .map_err(|e| e.to_uni_err())?;
+            .map_err(|e| e.to_space_err())?;
         let properties = self
             .skel
             .registry
             .get_properties(&directed.to.point)
             .await
-            .map_err(|e| e.to_uni_err())?;
+            .map_err(|e| e.to_space_err())?;
 
         let bind_property = properties.get("bind");
         let bind = match bind_property {
@@ -75,11 +78,11 @@ where
                 driver
                     .bind(&directed.to.point)
                     .await
-                    .map_err(|e| e.to_uni_err())?
+                    .map_err(|e| e.to_space_err())?
             }
             Some(bind) => {
                 let bind = Point::from_str(bind.value.as_str())?;
-                self.skel.machine.artifacts.bind(&bind).await?
+                log(self.skel.machine.artifacts.bind(&bind).await)?
             }
         };
         Ok(bind)
@@ -122,7 +125,7 @@ where
         &self.skel.exchanger
     }
 
-    async fn directed_core_bound(&self, directed: Traversal<DirectedWave>) -> Result<(), UniErr> {
+    async fn directed_core_bound(&self, directed: Traversal<DirectedWave>) -> Result<(), SpaceErr> {
         let bind = self.bind(&directed).await?;
 
         match bind.select(&directed.payload) {
@@ -161,7 +164,7 @@ where
                     Ok(())
                 } else {
                     if err.status() == 404u16 {
-                        Err(UniErr::new(
+                        Err(SpaceErr::new(
                             404,
                             format!(
                                 "no route matches: {} on surface {} and bind {} from {}",
@@ -188,7 +191,7 @@ where
     pub surface: Surface,
     pub logger: PointLogger,
     pub env: Env,
-    pub reflection: Result<Reflection, UniErr>,
+    pub reflection: Result<Reflection, SpaceErr>,
     pub pipeline: PipelineVar,
     pub shell_transmitter: TraversalTransmitter,
     pub gravity_transmitter: ProtoTransmitter,
@@ -272,7 +275,7 @@ where
         proto
     }
 
-    pub async fn execute(&mut self) -> Result<(), UniErr> {
+    pub async fn execute(&mut self) -> Result<(), SpaceErr> {
         while let Some(segment) = self.pipeline.consume() {
             self.execute_step(&segment.step)?;
             self.execute_stop(&segment.stop).await?;
@@ -280,7 +283,7 @@ where
         Ok(())
     }
 
-    fn execute_step(&mut self, step: &PipelineStepVar) -> Result<(), UniErr> {
+    fn execute_step(&mut self, step: &PipelineStepVar) -> Result<(), SpaceErr> {
         for block in &step.blocks {
             match block.clone().to_resolved(&self.env)? {
                 PayloadBlock::DirectPattern(pattern) => {
@@ -294,7 +297,7 @@ where
         Ok(())
     }
 
-    async fn execute_stop(&mut self, stop: &PipelineStopVar) -> Result<(), UniErr> {
+    async fn execute_stop(&mut self, stop: &PipelineStopVar) -> Result<(), SpaceErr> {
         match stop {
             PipelineStopVar::Core => {
                 let mut proto = self.proto();
@@ -334,7 +337,7 @@ where
         &mut self,
         mut proto: DirectedProto,
         transmitter: ProtoTransmitter,
-    ) -> Result<(), UniErr> {
+    ) -> Result<(), SpaceErr> {
         match proto.kind.as_ref().unwrap() {
             DirectedKind::Ping => {
                 let pong: Wave<Pong> = transmitter.direct(proto).await?;
@@ -376,7 +379,7 @@ where
         &mut self,
         mut proto: Traversal<DirectedWave>,
         transmitter: TraversalTransmitter,
-    ) -> Result<(), UniErr> {
+    ) -> Result<(), SpaceErr> {
         match proto.directed_kind() {
             DirectedKind::Ping => {
                 let pong: Wave<Pong> = transmitter.direct(proto).await?;

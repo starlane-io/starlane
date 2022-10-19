@@ -71,7 +71,7 @@ async fn go() -> Result<(),Error> {
 
     let mut clap_app = App::new("Starlane")
         .version("0.2.0")
-        .author("Scott Williams <scott@mightydevco.com>")
+        .author("Scott Williams <scott@starlane.io>")
         .about("A Resource Mesh").subcommands(vec![SubCommand::with_name("serve").usage("serve a starlane machine instance").arg(Arg::with_name("with-external").long("with-external").takes_value(false).required(false).default_value("false")).display_order(0),
                                                             SubCommand::with_name("config").subcommands(vec![SubCommand::with_name("set-shell").usage("set the shell that the starlane CLI connects to").arg(Arg::with_name("hostname").required(true).help("the hostname of the starlane instance you wish to connect to")).display_order(0),
                                                                                                                             SubCommand::with_name("get-shell").usage("get the shell that the starlane CLI connects to")]).usage("read or manipulate the cli config").display_order(1).display_order(1),

@@ -1,21 +1,24 @@
 [package]
 name = "cosmic-space"
-version = "0.3.0"
+version = "0.3.2"
 edition = "2021"
 
-authors = ["Scott Williams <scott@mightydevco.com>"]
-description = "Part of http://thecosmicinitiative.io This package--the Cosmic Universe--provides an API and utilities for interacting with the Cosmic Fabric and other Particles within the Universal Dimension."
+authors = ["Scott Williams <scott@starlane.io>"]
+description = "Part of http://thecosmicinitiative.io This package--the Cosmic Space--provides an API and utilities for interacting with the Cosmic Fabric and other Particles within the Spatial Dimension."
 
 homepage = "http://thecosmicinitiative.io"
 repository = "https://github.com/cosmic-initiative/cosmic-initiative"
 license = "MIT"
 
+[lib]
+doctest = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cosmic-nom = { path="../cosmic-nom" ,version = "0.3.0"}
-cosmic-macros-primitive = { path="../cosmic-macros-primitive" ,version = "0.3.0"}
+cosmic-nom = { path="../cosmic-nom" ,version = "0.3.2"}
+cosmic-macros-primitive = { path="../cosmic-macros-primitive" ,version = "0.3.2"}
+ariadne = "0.1.5"
 async-trait = "0.1.48"
 lazy_static = "1.4.0"
 serde = { version="1.0.69", features=['derive','rc'] }

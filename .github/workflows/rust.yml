@@ -1,0 +1,25 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "main", "stage" ]
+  pull_request:
+    branches: [ "main", "stage" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    shell: bash
+    working-directory: rust 
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Run tests
+      run: cargo test --no-fail-fast --workspace  

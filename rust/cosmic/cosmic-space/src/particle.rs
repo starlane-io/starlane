@@ -13,7 +13,7 @@ use crate::parse::error::result;
 use crate::parse::{parse_alpha1_str, point_and_kind, Env};
 use crate::substance::Substance;
 use crate::util::ToResolved;
-use crate::{BaseKind, Point, UniErr};
+use crate::{BaseKind, Point, SpaceErr};
 
 pub mod property;
 pub mod traversal;
@@ -189,7 +189,7 @@ pub mod particle {
 
     use cosmic_nom::{Res, Span};
 
-    use crate::err::UniErr;
+    use crate::err::SpaceErr;
     use crate::kind::{BaseKind, Kind, KindParts};
     use crate::loc::Point;
     use crate::parse::parse_alpha1_str;
@@ -262,7 +262,7 @@ pub struct PointKindDef<Pnt> {
 }
 
 impl ToResolved<PointKindCtx> for PointKindVar {
-    fn to_resolved(self, env: &Env) -> Result<PointKindCtx, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<PointKindCtx, SpaceErr> {
         Ok(PointKindCtx {
             point: self.point.to_resolved(env)?,
             kind: self.kind,
@@ -271,7 +271,7 @@ impl ToResolved<PointKindCtx> for PointKindVar {
 }
 
 impl ToResolved<PointKind> for PointKindVar {
-    fn to_resolved(self, env: &Env) -> Result<PointKind, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<PointKind, SpaceErr> {
         Ok(PointKind {
             point: self.point.to_resolved(env)?,
             kind: self.kind,
@@ -280,7 +280,7 @@ impl ToResolved<PointKind> for PointKindVar {
 }
 
 impl ToResolved<PointKind> for PointKindCtx {
-    fn to_resolved(self, env: &Env) -> Result<PointKind, UniErr> {
+    fn to_resolved(self, env: &Env) -> Result<PointKind, SpaceErr> {
         Ok(PointKind {
             point: self.point.to_resolved(env)?,
             kind: self.kind,
@@ -301,7 +301,7 @@ impl ToString for PointKind {
 }
 
 impl FromStr for PointKind {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let point_and_kind: PointKindVar = result(all_consuming(point_and_kind)(new_span(s)))?;

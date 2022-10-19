@@ -5,24 +5,29 @@ pub mod mechtron;
 pub mod root;
 pub mod space;
 pub mod star;
+pub mod web;
 
 use crate::driver::star::StarDriverFactory;
+use crate::err::HyperErr;
+use crate::reg::{Registration, Registry};
 use crate::star::HyperStarCall::LayerTraversalInjection;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::Cosmos;
-use cosmic_space::artifact::{ArtifactApi, ArtRef};
+use cosmic_space::artifact::{ArtRef, ArtifactApi};
 use cosmic_space::command::common::{SetProperties, StateSrc};
 use cosmic_space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
 use cosmic_space::config::bind::BindConfig;
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{Assign, HyperSubstance, ParticleLocation, ParticleRecord};
 use cosmic_space::kind::{BaseKind, Kind, KindParts, StarSub};
 use cosmic_space::loc::{Layer, Point, Surface, ToPoint, ToSurface};
 use cosmic_space::log::{PointLogger, Tracker};
 use cosmic_space::parse::bind_config;
-use cosmic_space::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
+use cosmic_space::particle::traversal::{
+    Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
+};
 use cosmic_space::particle::{Details, Status, Stub};
 use cosmic_space::selector::KindSelector;
 use cosmic_space::substance::Substance;
@@ -47,9 +52,7 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, oneshot, RwLock, watch};
-use crate::err::HyperErr;
-use crate::reg::{Registration, Registry};
+use tokio::sync::{mpsc, oneshot, watch, RwLock};
 
 lazy_static! {
     static ref DEFAULT_BIND: ArtRef<BindConfig> = ArtRef::new(
@@ -187,7 +190,7 @@ where
     Drivers(oneshot::Sender<HashMap<KindSelector, DriverApi<P>>>),
     Get {
         kind: Kind,
-        rtn: oneshot::Sender<Result<DriverApi<P>, UniErr>>,
+        rtn: oneshot::Sender<Result<DriverApi<P>, SpaceErr>>,
     },
     LocalDriverLookup {
         kind: Kind,
@@ -195,7 +198,7 @@ where
     },
     Status {
         kind: KindSelector,
-        rtn: oneshot::Sender<Result<DriverStatus, UniErr>>,
+        rtn: oneshot::Sender<Result<DriverStatus, SpaceErr>>,
     },
     StatusRx(oneshot::Sender<watch::Receiver<DriverStatus>>),
     ByPoint {
@@ -228,7 +231,7 @@ where
         self.status_rx.borrow().clone()
     }
 
-    pub async fn status_changed(&mut self) -> Result<DriverStatus, UniErr> {
+    pub async fn status_changed(&mut self) -> Result<DriverStatus, SpaceErr> {
         self.status_rx.changed().await?;
         Ok(self.status())
     }
@@ -237,25 +240,25 @@ where
         self.call_tx.send(DriversCall::Visit(traversal)).await;
     }
 
-    pub async fn internal_kinds(&self) -> Result<Vec<KindSelector>, UniErr> {
+    pub async fn internal_kinds(&self) -> Result<Vec<KindSelector>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx.send(DriversCall::InternalKinds(rtn)).await?;
         Ok(rtn_rx.await?)
     }
 
-    pub async fn external_kinds(&self) -> Result<Vec<KindSelector>, UniErr> {
+    pub async fn external_kinds(&self) -> Result<Vec<KindSelector>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx.send(DriversCall::ExternalKinds(rtn)).await?;
         Ok(rtn_rx.await?)
     }
 
-    pub async fn find(&self, kind: Kind) -> Result<Option<DriverApi<P>>, UniErr> {
+    pub async fn find(&self, kind: Kind) -> Result<Option<DriverApi<P>>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx.send(DriversCall::Find { kind, rtn }).await?;
         Ok(rtn_rx.await?)
     }
 
-    pub async fn find_external(&self, kind: Kind) -> Result<Option<DriverApi<P>>, UniErr> {
+    pub async fn find_external(&self, kind: Kind) -> Result<Option<DriverApi<P>>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
             .send(DriversCall::FindExternalKind { kind, rtn })
@@ -263,7 +266,7 @@ where
         Ok(rtn_rx.await?)
     }
 
-    pub async fn find_internal(&self, kind: Kind) -> Result<Option<DriverApi<P>>, UniErr> {
+    pub async fn find_internal(&self, kind: Kind) -> Result<Option<DriverApi<P>>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
             .send(DriversCall::FindInternalKind { kind, rtn })
@@ -271,7 +274,7 @@ where
         Ok(rtn_rx.await?)
     }
 
-    pub async fn local_driver_lookup(&self, kind: Kind) -> Result<Option<Point>, UniErr> {
+    pub async fn local_driver_lookup(&self, kind: Kind) -> Result<Option<Point>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
             .send(DriversCall::LocalDriverLookup { kind, rtn })
@@ -279,13 +282,13 @@ where
         Ok(rtn_rx.await?)
     }
 
-    pub async fn drivers(&self) -> Result<HashMap<KindSelector, DriverApi<P>>, UniErr> {
+    pub async fn drivers(&self) -> Result<HashMap<KindSelector, DriverApi<P>>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx.send(DriversCall::Drivers(rtn)).await;
         Ok(rtn_rx.await?)
     }
 
-    pub async fn get(&self, kind: &Kind) -> Result<DriverApi<P>, UniErr> {
+    pub async fn get(&self, kind: &Kind) -> Result<DriverApi<P>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
             .send(DriversCall::Get {
@@ -296,7 +299,7 @@ where
         rtn_rx.await?
     }
 
-    pub async fn find_by_point(&self, point: &Point) -> Result<Option<DriverApi<P>>, UniErr> {
+    pub async fn find_by_point(&self, point: &Point) -> Result<Option<DriverApi<P>>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
             .send(DriversCall::ByPoint {
@@ -424,7 +427,7 @@ where
                     }
                     DriversCall::Status { kind, rtn } => match self.statuses_rx.get(&kind) {
                         None => {
-                            rtn.send(Err(UniErr::not_found()));
+                            rtn.send(Err(SpaceErr::not_found("status_rx")));
                         }
                         Some(status_rx) => {
                             rtn.send(Ok(status_rx.borrow().clone()));
@@ -653,8 +656,7 @@ where
 
                 skel.registry.register(&registration).await?;
                 skel.api.create_states(point.clone()).await?;
-                let location = ParticleLocation::new(skel.point.clone(), None);
-                skel.registry.assign(&point, location).await?;
+                skel.registry.assign_star(&point, &skel.point).await?;
                 Ok(())
             }
             let point = drivers_point
@@ -720,11 +722,14 @@ where
                 }
             }
 
-            let router = Arc::new(LayerInjectionRouter::new(
+            let mut router = LayerInjectionRouter::new(
                 skel.clone(),
-                point.clone().to_surface().with_layer(Layer::Guest),
-            ));
-            let mut transmitter = ProtoTransmitterBuilder::new(router, skel.exchanger.clone());
+                point.clone().to_surface().with_layer(Layer::Core),
+            );
+
+            router.direction = Some(TraversalDirection::Fabric);
+
+            let mut transmitter = ProtoTransmitterBuilder::new(Arc::new(router), skel.exchanger.clone());
             transmitter.from =
                 SetStrategy::Override(point.clone().to_surface().with_layer(Layer::Core));
             let transmitter = transmitter.build();
@@ -969,7 +974,7 @@ where
         self.call_tx.send(DriverRunnerCall::AddDriver(api)).await;
     }
 
-    pub async fn init_item(&self, point: Point) -> Result<Status, UniErr> {
+    pub async fn init_item(&self, point: Point) -> Result<Status, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
             .try_send(DriverRunnerCall::InitItem { point, rtn });
@@ -1039,7 +1044,7 @@ where
     OnAdded,
     InitItem {
         point: Point,
-        rtn: oneshot::Sender<Result<Status, UniErr>>,
+        rtn: oneshot::Sender<Result<Status, SpaceErr>>,
     },
     DriverRunnerRequest(DriverRunnerRequest<P>),
     DriverBind(oneshot::Sender<ArtRef<BindConfig>>),
@@ -1088,7 +1093,7 @@ where
         self.surface.clone()
     }
 
-    async fn deliver_directed(&self, direct: Traversal<DirectedWave>) -> Result<(), UniErr> {
+    async fn deliver_directed(&self, direct: Traversal<DirectedWave>) -> Result<(), SpaceErr> {
         self.skel
             .logger
             .track(&direct, || Tracker::new("core:outer", "DeliverDirected"));
@@ -1149,14 +1154,14 @@ where
                 }
             }
             ItemSphere::Router(router) => {
-                router.traverse(direct.wrap()).await;
+                self.skel.logger.result(router.traverse(direct.wrap()).await)?;
             }
         }
 
         Ok(())
     }
 
-    async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) -> Result<(), UniErr> {
+    async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) -> Result<(), SpaceErr> {
         if reflect.to().layer == self.surface.layer {
             self.exchanger().reflected(reflect.payload).await
         } else {
@@ -1244,12 +1249,14 @@ where
             while let Some(call) = self.call_rx.recv().await {
                 match call {
                     DriverRunnerCall::OnAdded => {
-                        let router = Arc::new(LayerInjectionRouter::new(
+                        let mut router = LayerInjectionRouter::new(
                             self.star_skel.clone(),
                             self.skel.point.clone().to_surface().with_layer(Layer::Core),
-                        ));
-                        let transmitter =
-                            ProtoTransmitter::new(router, self.star_skel.exchanger.clone());
+                        );
+                        router.direction = Some(TraversalDirection::Fabric);
+
+                        let mut transmitter =
+                            ProtoTransmitter::new(Arc::new(router), self.star_skel.exchanger.clone());
                         let ctx = DriverCtx::new(transmitter);
                         match self
                             .skel
@@ -1330,7 +1337,7 @@ where
                                 rtn.send(item.init().await);
                             }
                             Err(err) => {
-                                rtn.send(Err(err.to_uni_err()));
+                                rtn.send(Err(err.to_space_err()));
                             }
                         }
                     }
@@ -1338,7 +1345,6 @@ where
                         rtn.send(self.skel.point.clone());
                     }
                     DriverRunnerCall::DriverBind(rtn) => {
-                        ;
                         rtn.send(self.driver.bind());
                     }
                     DriverRunnerCall::AddDriver(api) => {
@@ -1423,7 +1429,6 @@ impl<P> DriverSkel<P>
 where
     P: Cosmos,
 {
-
     pub fn data_dir(&self) -> String {
         self.skel.data_dir()
     }
@@ -1480,7 +1485,7 @@ where
         }
     }
 
-    pub async fn create_driver_particle(
+    pub async fn create_in_driver(
         &self,
         child_segment_template: PointSegTemplate,
         kind: KindTemplate,
@@ -1506,8 +1511,23 @@ where
         self.skel.registry.record(point).await
     }
 
-    pub async fn local_driver_lookup(&self, kind: Kind) -> Result<Option<Point>, UniErr> {
+    pub async fn local_driver_lookup(&self, kind: Kind) -> Result<Option<Point>, SpaceErr> {
         self.skel.drivers.local_driver_lookup(kind).await
+    }
+
+    pub fn item_ctx(&self, point: &Point, layer: Layer) -> Result<ItemCtx, P::Err> {
+        let mut router = LayerInjectionRouter::new(
+            self.skel.clone(),
+            point.to_surface().with_layer(Layer::Core),
+        );
+        router.direction = Some(TraversalDirection::Fabric);
+        let mut transmitter =
+            ProtoTransmitterBuilder::new(Arc::new(router), self.skel.exchanger.clone());
+        transmitter.from = SetStrategy::Fill(point.to_surface().with_layer(layer));
+        transmitter.agent = SetStrategy::Fill(Agent::Point(point.clone()));
+        let transmitter = transmitter.build();
+        let ctx = ItemCtx { transmitter };
+        Ok(ctx)
     }
 }
 
@@ -1664,7 +1684,7 @@ impl<P> DriverHandler<P> for DefaultDriverHandler where P: Cosmos {}
 #[handler]
 impl DefaultDriverHandler {
     #[route("Hyp<Assign>")]
-    pub async fn assign(&self, _ctx: InCtx<'_, HyperSubstance>) -> Result<(), UniErr> {
+    pub async fn assign(&self, _ctx: InCtx<'_, HyperSubstance>) -> Result<(), SpaceErr> {
         Ok(())
     }
 }
@@ -1723,7 +1743,7 @@ impl<P> ItemSphere<P>
 where
     P: Cosmos,
 {
-    pub async fn init(&self) -> Result<Status, UniErr> {
+    pub async fn init(&self) -> Result<Status, SpaceErr> {
         match self {
             ItemSphere::Handler(handler) => handler.init().await,
             ItemSphere::Router(router) => {
@@ -1769,7 +1789,7 @@ where
     P: Cosmos,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err>;
-    async fn init(&self) -> Result<Status, UniErr> {
+    async fn init(&self) -> Result<Status, SpaceErr> {
         Ok(Status::Ready)
     }
 }
@@ -1780,6 +1800,16 @@ where
     P: Cosmos,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err>;
+}
+
+#[derive(Clone)]
+pub struct HyperItemSkel<P>
+where
+    P: Cosmos,
+{
+    pub skel: DriverSkel<P>,
+    pub point: Point,
+    pub kind: Kind,
 }
 
 #[derive(Clone)]
@@ -1797,16 +1827,16 @@ where
     P: Cosmos,
 {
     pub fn new(point: Point, kind: Kind, skel: DriverSkel<P>) -> Self {
-        Self {
-            point,
-            kind,
-            skel,
-        }
+        Self { point, kind, skel }
     }
 
     pub fn data_dir(&self) -> String {
         self.skel.data_dir()
     }
+}
+
+pub struct ItemCtx {
+    pub transmitter: ProtoTransmitter,
 }
 
 pub struct DriverDriverFactory {}
@@ -1956,8 +1986,9 @@ impl<P> TraversalRouter for DriverItem<P>
 where
     P: Cosmos,
 {
-    async fn traverse(&self, traversal: Traversal<UltraWave>) {
+    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
         self.skel.api.handle(traversal).await;
+        Ok(())
     }
 }
 

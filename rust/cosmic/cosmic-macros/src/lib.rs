@@ -43,7 +43,7 @@ extern "C" fn cosmic_timestamp() -> Timestamp {
 }
 
 /// This macro will auto implement the `cosmic_space::wave::exchange::asynch::DirectedHandler` trait.
-/// In order to finalize the implementation a `#[routes]` attribute must also be specified
+/// In order to finalize the implementation a `#[handler]` attribute must also be specified
 /// above one of the impls.
 #[proc_macro_derive(DirectedHandler)]
 pub fn directed_handler(item: TokenStream) -> TokenStream {
@@ -55,7 +55,7 @@ pub fn directed_handler(item: TokenStream) -> TokenStream {
 /// To implement:
 /// ```
 ///
-/// use cosmic_space::err::UniErr;
+/// use cosmic_space::err::SpaceErr;
 /// use cosmic_space::hyper::HyperSubstance;
 /// use cosmic_space::log::PointLogger;
 /// use cosmic_space::substance::Substance;
@@ -68,12 +68,12 @@ pub fn directed_handler(item: TokenStream) -> TokenStream {
 ///   logger: PointLogger
 /// }
 ///
-/// #[routes]
+/// #[handler]
 /// impl MyHandler {
 ///     /// the route attribute captures an ExtMethod implementing a custom `MyNameIs`
 ///     /// notice that the InCtx will accept any valid cosmic_space::substance::Substance
 ///     #[route("Ext<MyNameIs>")]
-///     pub async fn hello(&self, ctx: InCtx<'_, Text>) -> Result<String, UniErr> {
+///     pub async fn hello(&self, ctx: InCtx<'_, Text>) -> Result<String, SpaceErr> {
 ///         /// also we can return any Substance in our Reflected wave
 ///         Ok(format!("Hello, {}", ctx.input.to_string()))
 ///     }
@@ -305,7 +305,7 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
           let ctx: #in_ctx<'_,#item> = match ctx.push::<#item>() {
               Ok(ctx) => ctx,
               Err(err) => {
-                  return cosmic_space::wave::core::CoreBounce::Reflected(cosmic_space::wave::core::ReflectedCore::server_error());
+                  return cosmic_space::wave::core::CoreBounce::Reflected(err.into());
               }
           };
 

@@ -4,7 +4,7 @@ use crate::loc::Layer;
 use crate::log::{SpanLogger, Trackable};
 use crate::wave::exchange::asynch::Exchanger;
 use crate::wave::{DirectedWave, Ping, Pong, ReflectedWave, SingularDirectedWave, UltraWave, Wave};
-use crate::{ParticleRecord, Point, Surface, UniErr};
+use crate::{ParticleRecord, Point, SpaceErr, Surface};
 
 #[async_trait]
 pub trait TraversalLayer {
@@ -15,17 +15,17 @@ pub trait TraversalLayer {
 
     fn exchanger(&self) -> &Exchanger;
 
-    async fn deliver_directed(&self, direct: Traversal<DirectedWave>) -> Result<(), UniErr> {
-        Err(UniErr::from_500(
+    async fn deliver_directed(&self, direct: Traversal<DirectedWave>) -> Result<(), SpaceErr> {
+        Err(SpaceErr::server_error(
             "this layer does not handle directed messages",
         ))
     }
 
-    async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) -> Result<(), UniErr> {
+    async fn deliver_reflected(&self, reflect: Traversal<ReflectedWave>) -> Result<(), SpaceErr> {
         self.exchanger().reflected(reflect.payload).await
     }
 
-    async fn visit(&self, traversal: Traversal<UltraWave>) -> Result<(), UniErr> {
+    async fn visit(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
         if let Some(dest) = &traversal.dest {
             if self.surface().layer == *dest {
                 if traversal.is_directed() {
@@ -59,7 +59,7 @@ pub trait TraversalLayer {
     async fn directed_fabric_bound(
         &self,
         mut traversal: Traversal<DirectedWave>,
-    ) -> Result<(), UniErr> {
+    ) -> Result<(), SpaceErr> {
         self.traverse_next(traversal.wrap()).await;
         Ok(())
     }
@@ -67,7 +67,7 @@ pub trait TraversalLayer {
     async fn directed_core_bound(
         &self,
         mut traversal: Traversal<DirectedWave>,
-    ) -> Result<(), UniErr> {
+    ) -> Result<(), SpaceErr> {
         self.traverse_next(traversal.wrap()).await;
         Ok(())
     }
@@ -76,7 +76,7 @@ pub trait TraversalLayer {
     async fn reflected_core_bound(
         &self,
         traversal: Traversal<ReflectedWave>,
-    ) -> Result<(), UniErr> {
+    ) -> Result<(), SpaceErr> {
         self.traverse_next(traversal.to_ultra()).await;
         Ok(())
     }
@@ -84,7 +84,7 @@ pub trait TraversalLayer {
     async fn reflected_fabric_bound(
         &self,
         traversal: Traversal<ReflectedWave>,
-    ) -> Result<(), UniErr> {
+    ) -> Result<(), SpaceErr> {
         self.traverse_next(traversal.to_ultra()).await;
         Ok(())
     }
@@ -140,18 +140,21 @@ impl TraversalPlan {
     }
 }
 
+#[derive(Clone)]
 pub struct TraversalInjection {
-    pub injector: Surface,
+    pub surface: Surface,
     pub wave: UltraWave,
     pub from_gravity: bool,
+    pub dir: Option<TraversalDirection>,
 }
 
 impl TraversalInjection {
     pub fn new(injector: Surface, wave: UltraWave) -> Self {
         Self {
-            injector,
+            surface: injector,
             wave,
             from_gravity: false,
+            dir: None,
         }
     }
 }
@@ -204,7 +207,7 @@ pub enum TraversalDirection {
 }
 
 impl TraversalDirection {
-    pub fn new(from: &Layer, to: &Layer) -> Result<Self, UniErr> {
+    pub fn new(from: &Layer, to: &Layer) -> Result<Self, SpaceErr> {
         if from == to {
             return Err(
                 "cannot determine traversal direction if from and to are the same layer".into(),

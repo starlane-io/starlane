@@ -26,14 +26,14 @@ use tokio::sync::oneshot::Sender;
 use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 
 use cosmic_space::command::direct::create::{PointFactoryU64, PointSegTemplate};
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::frame::PrimitiveFrame;
 use cosmic_space::hyper::{Greet, HyperSubstance, InterchangeKind, Knock};
 use cosmic_space::loc::{Layer, Point, PointFactory, Surface, ToPoint, ToSurface, Version};
 use cosmic_space::log::{PointLogger, RootLogger, Tracker};
 use cosmic_space::particle::Status;
 use cosmic_space::settings::Timeouts;
-use cosmic_space::substance::{Errors, Substance, SubstanceKind, Token};
+use cosmic_space::substance::{FormErrs, Substance, SubstanceKind, Token};
 use cosmic_space::util::uuid;
 use cosmic_space::wave::core::ext::ExtMethod;
 use cosmic_space::wave::core::hyp::HypMethod;
@@ -157,7 +157,7 @@ impl Hyperway {
 
 #[cfg(test)]
 pub struct HyperwayDiagnostic {
-    pub replaced_ext: broadcast::Sender<Result<(), UniErr>>,
+    pub replaced_ext: broadcast::Sender<Result<(), SpaceErr>>,
 }
 
 #[cfg(test)]
@@ -216,8 +216,8 @@ impl HyperwayEndpoint {
                     while let Some(wave) = endpoint.rx.recv().await {
                         logger.track(&wave, || Tracker::new("hyperway-endpoint", "Rx"));
                         match logger.result(my_tx.send(wave).await) {
-                            Ok(_) => {},
-                            Err(_) => break
+                            Ok(_) => {}
+                            Err(_) => break,
                         }
                     }
                 });
@@ -225,11 +225,10 @@ impl HyperwayEndpoint {
 
             let logger = logger.push_mark("mux:rx").unwrap();
             while let Some(wave) = self.rx.recv().await {
-                logger
-                    .track(&wave, || Tracker::new("hyperway-endpoint", "Tx"));
+                logger.track(&wave, || Tracker::new("hyperway-endpoint", "Tx"));
                 match logger.result(end_tx.send(wave).await) {
                     Ok(_) => {}
-                    Err(_) => break
+                    Err(_) => break,
                 }
             }
         });
@@ -290,7 +289,7 @@ pub enum HyperwayInterchangeCall {
     Mount {
         stub: HyperwayStub,
         init_wave: Option<UltraWave>,
-        rtn: oneshot::Sender<Result<HyperwayEndpoint, UniErr>>,
+        rtn: oneshot::Sender<Result<HyperwayEndpoint, SpaceErr>>,
     },
 }
 
@@ -514,7 +513,7 @@ impl Hyperlane {
         self.eavesdrop_tx.subscribe()
     }
 
-    pub async fn send(&self, wave: UltraWave) -> Result<(), UniErr> {
+    pub async fn send(&self, wave: UltraWave) -> Result<(), SpaceErr> {
         Ok(self
             .tx
             .send_timeout(HyperlaneCall::Wave(wave), Duration::from_secs(5))
@@ -644,7 +643,7 @@ impl HyperwayInterchange {
         &self,
         stub: HyperwayStub,
         init_wave: Option<UltraWave>,
-    ) -> Result<HyperwayEndpoint, UniErr> {
+    ) -> Result<HyperwayEndpoint, SpaceErr> {
         let call_tx = self.call_tx.clone();
         let (tx, rx) = oneshot::channel();
         call_tx
@@ -713,7 +712,7 @@ impl Router for OutboundRouter {
 
 #[async_trait]
 pub trait HyperGreeter: Send + Sync + Clone + Sized {
-    async fn greet(&self, stub: HyperwayStub) -> Result<Greet, UniErr>;
+    async fn greet(&self, stub: HyperwayStub) -> Result<Greet, SpaceErr>;
 }
 
 #[derive(Clone)]
@@ -730,7 +729,7 @@ impl SimpleGreeter {
 
 #[async_trait]
 impl HyperGreeter for SimpleGreeter {
-    async fn greet(&self, stub: HyperwayStub) -> Result<Greet, UniErr> {
+    async fn greet(&self, stub: HyperwayStub) -> Result<Greet, SpaceErr> {
         Ok(Greet {
             surface: stub.remote,
             agent: stub.agent,
@@ -742,7 +741,7 @@ impl HyperGreeter for SimpleGreeter {
 
 #[async_trait]
 pub trait HyperAuthenticator: Send + Sync + Clone + Sized {
-    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, UniErr>;
+    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, SpaceErr>;
 }
 
 #[derive(Clone)]
@@ -759,20 +758,20 @@ impl TokenAuthenticator {
 
 #[async_trait]
 impl HyperAuthenticator for TokenAuthenticator {
-    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, UniErr> {
+    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, SpaceErr> {
         if let Substance::Token(token) = &*knock.auth {
             if *token == self.token {
                 Ok(HyperwayStub {
                     agent: self.agent.clone(),
                     remote: knock
                         .remote
-                        .ok_or::<UniErr>("expected a remote entry selection".into())?,
+                        .ok_or::<SpaceErr>("expected a remote entry selection".into())?,
                 })
             } else {
-                Err(UniErr::new(500, "invalid token"))
+                Err(SpaceErr::new(500, "invalid token"))
             }
         } else {
-            Err(UniErr::new(500, "expected Subtance: Token"))
+            Err(SpaceErr::new(500, "expected Subtance: Token"))
         }
     }
 }
@@ -805,35 +804,35 @@ impl TokenAuthenticatorWithRemoteWhitelist {
 
 #[async_trait]
 impl HyperAuthenticator for TokenAuthenticatorWithRemoteWhitelist {
-    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, UniErr> {
+    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, SpaceErr> {
         if let Substance::Token(token) = &*knock.auth {
             if *token == self.token {
                 let remote = knock
                     .remote
-                    .ok_or(UniErr::new(500, "expected a remote entry selection"))?;
+                    .ok_or(SpaceErr::new(500, "expected a remote entry selection"))?;
                 if self.whitelist.contains(&remote) {
                     Ok(HyperwayStub {
                         agent: self.agent.clone(),
                         remote,
                     })
                 } else {
-                    Err(UniErr::new(500, "remote is not part of the whitelist"))
+                    Err(SpaceErr::new(500, "remote is not part of the whitelist"))
                 }
             } else {
-                Err(UniErr::new(500, "invalid token"))
+                Err(SpaceErr::new(500, "invalid token"))
             }
         } else {
-            Err(UniErr::new(500, "expecting Substance: Token"))
+            Err(SpaceErr::new(500, "expecting Substance: Token"))
         }
     }
 }
 
 #[async_trait]
 impl HyperAuthenticator for AnonHyperAuthenticator {
-    async fn auth(&self, req: Knock) -> Result<HyperwayStub, UniErr> {
+    async fn auth(&self, req: Knock) -> Result<HyperwayStub, SpaceErr> {
         let remote = req
             .remote
-            .ok_or(UniErr::new(500, "required remote point request"))?;
+            .ok_or(SpaceErr::new(500, "required remote point request"))?;
 
         Ok(HyperwayStub {
             agent: Agent::Anonymous,
@@ -859,7 +858,7 @@ impl AnonHyperAuthenticatorAssignEndPoint {
 
 #[async_trait]
 impl HyperAuthenticator for AnonHyperAuthenticatorAssignEndPoint {
-    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, UniErr> {
+    async fn auth(&self, knock: Knock) -> Result<HyperwayStub, SpaceErr> {
         let remote = self
             .logger
             .result(self.remote_point_factory.create().await)?
@@ -885,17 +884,17 @@ impl TokensFromHeavenHyperAuthenticatorAssignEndPoint {
 
 #[async_trait]
 impl HyperAuthenticator for TokensFromHeavenHyperAuthenticatorAssignEndPoint {
-    async fn auth(&self, auth_req: Knock) -> Result<HyperwayStub, UniErr> {
+    async fn auth(&self, auth_req: Knock) -> Result<HyperwayStub, SpaceErr> {
         match &*auth_req.auth {
             Substance::Token(token) => {
                 if let Some((_, stub)) = self.tokens.remove(token) {
                     return Ok(stub);
                 } else {
-                    return Err(UniErr::new(500, "invalid token"));
+                    return Err(SpaceErr::new(500, "invalid token"));
                 }
             }
             _ => {
-                return Err(UniErr::new(500, "expected Substance: Token"));
+                return Err(SpaceErr::new(500, "expected Substance: Token"));
             }
         }
     }
@@ -934,7 +933,7 @@ impl TokenDispensingHyperwayInterchange {
         }
     }
 
-    pub async fn dispense(&self) -> Result<(Token, HyperwayStub), UniErr> {
+    pub async fn dispense(&self) -> Result<(Token, HyperwayStub), SpaceErr> {
         let token = Token::new_uuid();
         let remote_point = self.remote_point_factory.create().await?.to_surface();
         let lane_point = self.lane_point_factory.create().await?;
@@ -981,13 +980,13 @@ impl VersionGate {
 
 #[async_trait]
 pub trait HyperGate: Send + Sync {
-    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, UniErr>;
+    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, SpaceErr>;
 
     async fn jump(
         &self,
         kind: InterchangeKind,
         stub: HyperwayStub,
-    ) -> Result<HyperwayEndpoint, UniErr>;
+    ) -> Result<HyperwayEndpoint, SpaceErr>;
 }
 
 pub struct HopRouter {
@@ -996,7 +995,7 @@ pub struct HopRouter {
 }
 
 impl HopRouter {
-    fn to_hop(&self, mut wave: UltraWave) -> Result<UltraWave, UniErr> {
+    fn to_hop(&self, mut wave: UltraWave) -> Result<UltraWave, SpaceErr> {
         wave.set_agent(self.greet.agent.clone());
         let mut transport = wave
             .wrap_in_transport(self.greet.surface.clone(), self.greet.transport.clone())
@@ -1071,7 +1070,7 @@ impl HyperGateSelector {
         Self { map }
     }
 
-    pub fn add(&self, kind: InterchangeKind, gate: Arc<dyn HyperGate>) -> Result<(), UniErr> {
+    pub fn add(&self, kind: InterchangeKind, gate: Arc<dyn HyperGate>) -> Result<(), SpaceErr> {
         if self.map.contains_key(&kind) {
             Err(format!("already have an interchange of kind: {}", kind.to_string()).into())
         } else {
@@ -1083,11 +1082,11 @@ impl HyperGateSelector {
 
 #[async_trait]
 impl HyperGate for HyperGateSelector {
-    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, UniErr> {
+    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, SpaceErr> {
         if let Some(gate) = self.map.get(&knock.kind) {
             gate.value().knock(knock).await
         } else {
-            Err(UniErr::new(
+            Err(SpaceErr::new(
                 500,
                 format!("interchange not available: {}", knock.kind.to_string()).as_str(),
             ))
@@ -1098,10 +1097,10 @@ impl HyperGate for HyperGateSelector {
         &self,
         kind: InterchangeKind,
         stub: HyperwayStub,
-    ) -> Result<HyperwayEndpoint, UniErr> {
+    ) -> Result<HyperwayEndpoint, SpaceErr> {
         self.map
             .get(&kind)
-            .ok_or(UniErr::new(
+            .ok_or(SpaceErr::new(
                 500,
                 format!("interchange kind not available: {}", kind.to_string()).as_str(),
             ))?
@@ -1163,7 +1162,7 @@ where
     G: HyperGreeter,
     C: HyperwayConfigurator,
 {
-    async fn enter(&self, greet: Greet) -> Result<HyperwayEndpoint, UniErr> {
+    async fn enter(&self, greet: Greet) -> Result<HyperwayEndpoint, SpaceErr> {
         let mut hyperway = Hyperway::new(
             greet.surface.clone(),
             greet.agent.clone(),
@@ -1204,7 +1203,7 @@ where
     G: HyperGreeter,
     C: HyperwayConfigurator,
 {
-    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, UniErr> {
+    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, SpaceErr> {
         let stub = self.auth.auth(knock).await?;
         let greet = self.greeter.greet(stub).await?;
         self.enter(greet).await
@@ -1214,7 +1213,7 @@ where
         &self,
         _kind: InterchangeKind,
         stub: HyperwayStub,
-    ) -> Result<HyperwayEndpoint, UniErr> {
+    ) -> Result<HyperwayEndpoint, SpaceErr> {
         let greet = self.greeter.greet(stub).await?;
         self.enter(greet).await
     }
@@ -1251,7 +1250,7 @@ where
         }
     }
 
-    async fn enter(&self, greet: Greet) -> Result<HyperwayEndpoint, UniErr> {
+    async fn enter(&self, greet: Greet) -> Result<HyperwayEndpoint, SpaceErr> {
         let stub = HyperwayStub::new(greet.surface.clone(), greet.agent.clone());
         let ext = self
             .interchange
@@ -1267,7 +1266,7 @@ where
     A: HyperAuthenticator,
     G: HyperGreeter,
 {
-    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, UniErr> {
+    async fn knock(&self, knock: Knock) -> Result<HyperwayEndpoint, SpaceErr> {
         let stub = self.auth.auth(knock).await?;
         let greet = self.greeter.greet(stub).await?;
         let ext = self.enter(greet).await?;
@@ -1278,7 +1277,7 @@ where
         &self,
         _kind: InterchangeKind,
         stub: HyperwayStub,
-    ) -> Result<HyperwayEndpoint, UniErr> {
+    ) -> Result<HyperwayEndpoint, SpaceErr> {
         let greet = self.greeter.greet(stub).await?;
         let ext = self.enter(greet).await?;
         Ok(ext)
@@ -1298,7 +1297,7 @@ impl HyperClient {
     pub fn new(
         factory: Box<dyn HyperwayEndpointFactory>,
         logger: PointLogger,
-    ) -> Result<HyperClient, UniErr> {
+    ) -> Result<HyperClient, SpaceErr> {
         Self::new_with_exchanger(factory, None, logger)
     }
 
@@ -1306,7 +1305,7 @@ impl HyperClient {
         factory: Box<dyn HyperwayEndpointFactory>,
         exchanger: Option<Exchanger>,
         logger: PointLogger,
-    ) -> Result<HyperClient, UniErr> {
+    ) -> Result<HyperClient, SpaceErr> {
         let (to_client_listener_tx, _) = broadcast::channel(1024);
         let (to_hyperway_tx, from_client_rx) = mpsc::channel(1024);
         let (status_watch_tx, mut status_rx) = watch::channel(HyperConnectionStatus::Pending);
@@ -1370,7 +1369,7 @@ impl HyperClient {
                     greet_tx: watch::Sender<Option<Greet>>,
                     exchanger: Option<Exchanger>,
                     logger: PointLogger,
-                ) -> Result<(), UniErr> {
+                ) -> Result<(), SpaceErr> {
                     if let Some(wave) = from_runner_rx.recv().await {
                         logger.track(&wave, || Tracker::new("client", "ReceiveReflected"));
 
@@ -1501,20 +1500,20 @@ impl HyperClient {
         self.exchanger.clone()
     }
 
-    pub async fn transmitter_builder(&self) -> Result<ProtoTransmitterBuilder, UniErr> {
+    pub async fn transmitter_builder(&self) -> Result<ProtoTransmitterBuilder, SpaceErr> {
         self.wait_for_ready(Duration::from_secs(30)).await?;
         let mut builder = ProtoTransmitterBuilder::new(
             Arc::new(self.router()),
             self.exchanger
                 .as_ref()
-                .ok_or(UniErr::from_500(
+                .ok_or(SpaceErr::server_error(
                     "cannot create a transmitter on a client that does not have an exchanger",
                 ))?
                 .clone(),
         );
         let greet = self
             .get_greeting()
-            .ok_or::<UniErr>("expected greeting to already be set in HyperClient".into())?;
+            .ok_or::<SpaceErr>("expected greeting to already be set in HyperClient".into())?;
         builder.agent = SetStrategy::Fill(greet.agent.clone());
         builder.from = SetStrategy::Fill(greet.surface.clone());
         Ok(builder)
@@ -1557,7 +1556,7 @@ impl HyperClient {
         self.greet_rx.borrow().clone()
     }
 
-    pub async fn wait_for_greet(&self) -> Result<Greet, UniErr> {
+    pub async fn wait_for_greet(&self) -> Result<Greet, SpaceErr> {
         let mut greet_rx = self.greet_rx.clone();
         loop {
             let greet = greet_rx.borrow().clone();
@@ -1569,7 +1568,7 @@ impl HyperClient {
         }
     }
 
-    pub async fn wait_for_ready(&self, duration: Duration) -> Result<(), UniErr> {
+    pub async fn wait_for_ready(&self, duration: Duration) -> Result<(), SpaceErr> {
         let mut status_rx = self.status_rx.clone();
         let (rtn, mut rtn_rx) = oneshot::channel();
 
@@ -1582,7 +1581,7 @@ impl HyperClient {
                         break;
                     }
                     HyperConnectionStatus::Fatal => {
-                        rtn.send(Err(UniErr::from_500(
+                        rtn.send(Err(SpaceErr::server_error(
                             "Fatal status from HyperClient while waiting for Ready",
                         )));
                         break;
@@ -1642,8 +1641,8 @@ impl ToString for HyperConnectionErr {
     }
 }
 
-impl From<UniErr> for HyperConnectionErr {
-    fn from(err: UniErr) -> Self {
+impl From<SpaceErr> for HyperConnectionErr {
+    fn from(err: SpaceErr) -> Self {
         HyperConnectionErr::Retry(err.to_string())
     }
 }
@@ -1742,11 +1741,11 @@ impl HyperClientRunner {
                 }
             }
 
-            async fn relay(runner: &mut HyperClientRunner) -> Result<(), UniErr> {
+            async fn relay(runner: &mut HyperClientRunner) -> Result<(), SpaceErr> {
                 let ext = runner
                     .ext
                     .as_mut()
-                    .ok_or::<UniErr>("must reconnect".into())?;
+                    .ok_or::<SpaceErr>("must reconnect".into())?;
 
                 loop {
                     tokio::select!(
@@ -1758,7 +1757,7 @@ impl HyperClientRunner {
                                     {
                                         let method: ExtMethod = wave.to_directed().unwrap().core().method.clone().try_into().unwrap();
                                         if method.to_string() == "Reset".to_string() {
-                                           return Err(UniErr::from_500("reset"));
+                                           return Err(SpaceErr::server_error("reset"));
                                         } else if method.to_string() == "Close".to_string(){
                                             runner.status_tx.send(HyperConnectionStatus::Closed).await;
                                             return Ok(());
@@ -1769,7 +1768,7 @@ impl HyperClientRunner {
                                             Err(err) => {
                                                 // wave gets lost... need to requeue it somehow...
                                                 //                                    runner.to_client_tx.try_send(err.0);
-                                                return Err(UniErr::from_500("ext failure"));
+                                                return Err(SpaceErr::server_error("ext failure"));
                                             }
                                         }
                                     }
@@ -1795,7 +1794,7 @@ impl HyperClientRunner {
                     );
                 }
 
-//                runner.logger.warn("client relay interrupted");
+                //                runner.logger.warn("client relay interrupted");
 
                 Ok(())
             }
@@ -1840,7 +1839,7 @@ pub trait HyperwayEndpointFactory: Send + Sync {
     async fn create(
         &self,
         status_tx: mpsc::Sender<HyperConnectionDetails>,
-    ) -> Result<HyperwayEndpoint, UniErr>;
+    ) -> Result<HyperwayEndpoint, SpaceErr>;
 }
 
 pub struct LocalHyperwayGateUnlocker {
@@ -1860,7 +1859,7 @@ impl HyperwayEndpointFactory for LocalHyperwayGateUnlocker {
     async fn create(
         &self,
         status_tx: mpsc::Sender<HyperConnectionDetails>,
-    ) -> Result<HyperwayEndpoint, UniErr> {
+    ) -> Result<HyperwayEndpoint, SpaceErr> {
         self.gate.knock(self.knock.clone()).await
     }
 }
@@ -1882,7 +1881,7 @@ impl HyperwayEndpointFactory for LocalHyperwayGateJumper {
     async fn create(
         &self,
         status_tx: mpsc::Sender<HyperConnectionDetails>,
-    ) -> Result<HyperwayEndpoint, UniErr> {
+    ) -> Result<HyperwayEndpoint, SpaceErr> {
         self.gate.jump(self.kind.clone(), self.stub.clone()).await
     }
 }
@@ -1934,7 +1933,7 @@ impl Bridge {
         mut local_hyperway_endpoint: HyperwayEndpoint,
         remote_factory: Box<dyn HyperwayEndpointFactory>,
         logger: PointLogger,
-    ) -> Result<Self, UniErr> {
+    ) -> Result<Self, SpaceErr> {
         let client = HyperClient::new(remote_factory, logger)?;
         let client_router = client.router();
         let local_hyperway_endpoint_tx = local_hyperway_endpoint.tx.clone();
@@ -2054,7 +2053,7 @@ pub mod test_util {
     use tokio::sync::{broadcast, mpsc, oneshot};
 
     use cosmic_space::command::direct::create::PointFactoryU64;
-    use cosmic_space::err::UniErr;
+    use cosmic_space::err::SpaceErr;
     use cosmic_space::hyper::{Greet, InterchangeKind, Knock};
     use cosmic_space::loc::{Layer, Point, Surface, ToPoint, ToSurface};
     use cosmic_space::log::{PointLogger, RootLogger};
@@ -2155,7 +2154,7 @@ pub mod test_util {
             }
         }
 
-        pub async fn go(self) -> Result<(), UniErr> {
+        pub async fn go(self) -> Result<(), SpaceErr> {
             let less_exchanger = Exchanger::new(
                 LESS.push("exchanger").unwrap().to_surface(),
                 Timeouts::default(),
@@ -2244,7 +2243,7 @@ pub mod test_util {
 
     #[async_trait]
     impl HyperGreeter for TestGreeter {
-        async fn greet(&self, stub: HyperwayStub) -> Result<Greet, UniErr> {
+        async fn greet(&self, stub: HyperwayStub) -> Result<Greet, SpaceErr> {
             Ok(Greet {
                 surface: stub.remote.clone(),
                 agent: stub.agent.clone(),
@@ -2269,7 +2268,7 @@ pub mod test {
     use tokio::sync::{broadcast, mpsc, oneshot};
 
     use cosmic_space::command::direct::create::PointFactoryU64;
-    use cosmic_space::err::UniErr;
+    use cosmic_space::err::SpaceErr;
     use cosmic_space::hyper::{Greet, InterchangeKind, Knock};
     use cosmic_space::loc::{Layer, Point, Surface, ToPoint, ToSurface};
     use cosmic_space::log::RootLogger;
@@ -2392,7 +2391,8 @@ pub mod test {
 
      */
 
-    #[tokio::test]
+    // disabled for now
+    //#[tokio::test]
     pub async fn test_hyperclient() {
         pub struct TestFactory {
             pub hyperway: Hyperway,
@@ -2430,7 +2430,7 @@ pub mod test {
             async fn create(
                 &self,
                 status_tx: mpsc::Sender<HyperConnectionDetails>,
-            ) -> Result<HyperwayEndpoint, UniErr> {
+            ) -> Result<HyperwayEndpoint, SpaceErr> {
                 Ok(self.hyperway.hyperway_endpoint_far(None).await)
             }
         }

@@ -1,4 +1,7 @@
-use crate::driver::{Driver, DRIVER_BIND, DriverAvail, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere};
+use crate::driver::{
+    Driver, DriverAvail, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere,
+    DRIVER_BIND,
+};
 use crate::star::HyperStarSkel;
 use crate::Cosmos;
 use cosmic_space::artifact::ArtRef;

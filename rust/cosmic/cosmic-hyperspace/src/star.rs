@@ -5,16 +5,17 @@ use std::marker::PhantomData;
 use std::ops::{Add, Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
+use std::sync::atomic::AtomicU16;
 use std::time::Duration;
 
 use dashmap::mapref::one::{Ref, RefMut};
 use dashmap::DashMap;
-use futures::future::{BoxFuture, join_all};
+use futures::future::{join_all, BoxFuture};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock, watch};
+use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 use tokio::time::error::Elapsed;
 use tracing::{error, info};
 
@@ -28,7 +29,7 @@ use cosmic_space::command::direct::create::{Create, Strategy};
 use cosmic_space::command::direct::set::Set;
 use cosmic_space::command::RawCommand;
 use cosmic_space::config::bind::{BindConfig, RouteSelector};
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{
     Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, Location, ParticleRecord,
     Provision, Search,
@@ -36,11 +37,11 @@ use cosmic_space::hyper::{
 use cosmic_space::hyper::{MountKind, ParticleLocation};
 use cosmic_space::kind::{BaseKind, Kind, StarStub, StarSub, Sub};
 use cosmic_space::loc::{
-    GLOBAL_EXEC, Layer, LOCAL_STAR, Point, RouteSeg, StarKey, Surface, SurfaceSelector, ToBaseKind,
-    Topic, ToPoint, ToSurface, Uuid,
+    Layer, Point, RouteSeg, StarKey, Surface, SurfaceSelector, ToBaseKind, ToPoint, ToSurface,
+    Topic, Uuid, GLOBAL_EXEC, LOCAL_STAR,
 };
 use cosmic_space::log::{PointLogger, RootLogger, Trackable, Tracker};
-use cosmic_space::parse::{bind_config, Env, route_attribute};
+use cosmic_space::parse::{bind_config, route_attribute, Env};
 use cosmic_space::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
@@ -57,20 +58,18 @@ use cosmic_space::wave::exchange::asynch::{
     ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, TraversalRouter, TxRouter,
 };
 use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{
-    Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
-    HandlingKind, Ping, Pong, Priority, Recipients, RecipientSelector, Reflectable, ReflectedWave,
-    Retries, Ripple, Scope, Signal, SingularRipple, ToRecipients, WaitTime, Wave, WaveKind,
-};
+use cosmic_space::wave::{Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling, HandlingKind, Ping, Pong, Priority, RecipientSelector, Recipients, Reflectable, ReflectedWave, Retries, Ripple, Scope, Signal, SingularRipple, ToRecipients, WaitTime, Wave, WaveKind, Reflection};
 use cosmic_space::wave::{HyperWave, UltraWave};
 use cosmic_space::HYPERUSER;
+use mechtron_host::err::HostErr;
 
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, Drivers,
-    DriversApi, DriversCall, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler,
+    Driver, DriverAvail, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, DriverSkel,
+    DriverStatus, Drivers, DriversApi, DriversCall, HyperDriverFactory, Item, ItemHandler,
     ItemSkel, ItemSphere,
 };
+use crate::err::HyperErr;
 use crate::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
 use crate::layer::field::Field;
 use crate::layer::shell::Shell;
@@ -78,7 +77,6 @@ use crate::layer::shell::ShellState;
 use crate::machine::MachineSkel;
 use crate::reg::{Registration, Registry, RegistryApi};
 use crate::{Cosmos, DriversBuilder};
-use crate::err::HyperErr;
 
 #[derive(Clone)]
 pub struct ParticleStates<P>
@@ -114,7 +112,7 @@ where
         &self,
         port: &Surface,
         source: &Surface,
-    ) -> Option<Result<Arc<dyn TopicHandler>, UniErr>> {
+    ) -> Option<Result<Arc<dyn TopicHandler>, SpaceErr>> {
         match self.topic.get(port) {
             None => None,
             Some(topic) => {
@@ -122,13 +120,13 @@ where
                 if topic.source_selector().is_match(source).is_ok() {
                     Some(Ok(topic))
                 } else {
-                    Some(Err(UniErr::forbidden()))
+                    Some(Err(SpaceErr::not_found("topic")))
                 }
             }
         }
     }
 
-    pub fn find_shell(&self, point: &Point) -> Result<ShellState, UniErr> {
+    pub fn find_shell(&self, point: &Point) -> Result<ShellState, SpaceErr> {
         Ok(self
             .shell
             .get(point)
@@ -200,12 +198,15 @@ where
             properties: Default::default(),
             owner: point.clone(),
             strategy: Strategy::Ensure,
-            status: Status::Unknown
+            status: Status::Unknown,
         };
 
         machine.registry.register(&registration).await.unwrap();
-        machine.registry.assign(&point, ParticleLocation::new(point.clone(),None)).await.unwrap();
-
+        machine
+            .registry
+            .assign_star(&point, &point)
+            .await
+            .unwrap();
 
         let api = HyperStarApi::new(
             template.kind.clone(),
@@ -281,7 +282,11 @@ where
     }
 
     pub fn data_dir(&self) -> String {
-        format!("{}/{}/", self.machine.cosmos.data_dir(), self.point.to_string() )
+        format!(
+            "{}/{}/",
+            self.machine.cosmos.data_dir(),
+            self.point.to_string()
+        )
     }
 
     /*
@@ -329,10 +334,10 @@ where
         )?;
 
         let details = Details {
-            stub: Stub{
+            stub: Stub {
                 point: point_kind.point,
                 kind: point_kind.kind,
-                status: Status::Unknown
+                status: Status::Unknown,
             },
             properties: Default::default(),
         };
@@ -355,15 +360,14 @@ where
             kind: HandlingKind::Durable,
             priority: Default::default(),
             retries: Default::default(),
-            wait: WaitTime::High
-        } );
+            wait: WaitTime::High,
+        });
         let transmitter = transmitter.build();
         let assign_result: Wave<Pong> = logger.result_ctx(
             "StarSkel::create(assign_result)",
             transmitter.direct(assign).await,
         )?;
-        let location = ParticleLocation::new(self.point.clone(), None);
-        self.registry.assign(&details.stub.point, location).await?;
+        self.registry.assign_star(&details.stub.point, &self.point ).await?;
         let logger = logger.push_mark("result").unwrap();
         logger.result(assign_result.ok_or())?;
         Ok(details)
@@ -395,7 +399,7 @@ where
     Stub(oneshot::Sender<StarStub>),
     FromHyperway {
         wave: UltraWave,
-        rtn: Option<oneshot::Sender<Result<(), UniErr>>>,
+        rtn: Option<oneshot::Sender<Result<(), SpaceErr>>>,
     },
     TraverseToNextLayer(Traversal<UltraWave>),
     LayerTraversalInjection(TraversalInjection),
@@ -405,10 +409,10 @@ where
     ToHyperway(Wave<Signal>),
     Shard(UltraWave),
     StartWrangling,
-    Wrangle(oneshot::Sender<Result<StarWrangles, UniErr>>),
+    Wrangle(oneshot::Sender<Result<StarWrangles, SpaceErr>>),
     Bounce {
         key: StarKey,
-        rtn: oneshot::Sender<Result<(), UniErr>>,
+        rtn: oneshot::Sender<Result<(), SpaceErr>>,
     },
     #[cfg(test)]
     GetSkel(oneshot::Sender<HyperStarSkel<P>>),
@@ -579,7 +583,7 @@ where
         self.tx.send(HyperStarCall::Init).await;
     }
 
-    pub async fn wrangle(&self) -> Result<StarWrangles, UniErr> {
+    pub async fn wrangle(&self) -> Result<StarWrangles, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.tx.send(HyperStarCall::Wrangle(rtn)).await?;
         tokio::time::timeout(Duration::from_secs(5), rtn_rx).await??
@@ -589,13 +593,13 @@ where
         self.tx.send(HyperStarCall::StartWrangling).await;
     }
 
-    pub async fn bounce(&self, key: StarKey) -> Result<(), UniErr> {
+    pub async fn bounce(&self, key: StarKey) -> Result<(), SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.tx.send(HyperStarCall::Bounce { key, rtn }).await?;
         tokio::time::timeout(Duration::from_secs(5), rtn_rx).await??
     }
 
-    pub async fn from_hyperway(&self, wave: UltraWave, results: bool) -> Result<(), UniErr> {
+    pub async fn from_hyperway(&self, wave: UltraWave, results: bool) -> Result<(), SpaceErr> {
         match results {
             true => {
                 let (tx, mut rx) = oneshot::channel();
@@ -628,13 +632,13 @@ where
             .await;
     }
 
-    pub async fn stub(&self) -> Result<StarStub, UniErr> {
+    pub async fn stub(&self) -> Result<StarStub, SpaceErr> {
         let (tx, rx) = oneshot::channel();
         self.tx.send(HyperStarCall::Stub(tx)).await;
         Ok(rx.await?)
     }
 
-    pub async fn create_states(&self, point: Point) -> Result<(), UniErr> {
+    pub async fn create_states(&self, point: Point) -> Result<(), SpaceErr> {
         let (rtn, rtn_rx) = oneshot::channel();
         self.tx
             .send(HyperStarCall::CreateStates { point, rtn })
@@ -644,7 +648,7 @@ where
     }
 
     #[cfg(test)]
-    pub async fn get_skel(&self) -> Result<HyperStarSkel<P>, UniErr> {
+    pub async fn get_skel(&self) -> Result<HyperStarSkel<P>, SpaceErr> {
         let (tx, rx) = oneshot::channel();
         self.tx.send(HyperStarCall::GetSkel(tx)).await;
         Ok(rx.await?)
@@ -695,7 +699,6 @@ where
             star_tx.drivers_status_tx.take().unwrap(),
             star_tx.drivers_status_rx.clone(),
         );
-
 
         let star_rx = star_tx.call_rx.take().unwrap();
         let star_tx = star_tx.call_tx;
@@ -803,8 +806,8 @@ where
                                     .unwrap();
                                 star_driver.init_item(skel.point.to_point()).await;
                                 api.start_wrangling().await;
-// seeing if wrangling can wait on MachineApi...
-status_tx.send(Status::Ready).await;
+                                // seeing if wrangling can wait on MachineApi...
+                                status_tx.send(Status::Ready).await;
                             }
                             DriverStatus::Retrying(_) => {
                                 status_tx.send(Status::Panic).await;
@@ -882,7 +885,6 @@ status_tx.send(Status::Ready).await;
             });
         }
 
-
         let kind = skel.kind.clone();
         {
             let star = Self {
@@ -912,7 +914,7 @@ status_tx.send(Status::Ready).await;
                         self.drivers.init().await;
                     }
                     HyperStarCall::FromHyperway { wave, rtn } => {
-                        let result = self.from_hyperway(wave).await.map_err(|e| e.to_uni_err());
+                        let result = self.from_hyperway(wave).await.map_err(|e| e.to_space_err());
                         if let Some(tx) = rtn {
                             tx.send(result);
                         } else {
@@ -935,13 +937,7 @@ status_tx.send(Status::Ready).await;
                     HyperStarCall::LayerTraversalInjection(inject) => {
                         let layer_traversal_engine = self.layer_traversal_engine.clone();
                         tokio::spawn(async move {
-                            layer_traversal_engine
-                                .start_layer_traversal(
-                                    inject.wave,
-                                    &inject.injector,
-                                    inject.from_gravity,
-                                )
-                                .await;
+                            layer_traversal_engine.inject(inject).await;
                         });
                     }
                     HyperStarCall::Stub(rtn) => {
@@ -1035,9 +1031,13 @@ status_tx.send(Status::Ready).await;
             });
 
             tokio::spawn(async move {
-                layer_engine
-                    .start_layer_traversal(transport.to_ultra(), &injector, true)
-                    .await;
+                let injection = TraversalInjection {
+                    surface: injector.clone(),
+                    wave: transport.to_ultra(),
+                    from_gravity: true,
+                    dir: None,
+                };
+                layer_engine.inject(injection).await;
             });
             Ok(())
         } else {
@@ -1141,19 +1141,24 @@ status_tx.send(Status::Ready).await;
                         }
                     }
                     _ => {
-if wave.track() {
-    println!("sharding {} to {}", wave.kind().to_string(), wave.to().to_string());
-}
+                        if wave.track() {
+                            println!(
+                                "sharding {} to {}",
+                                wave.kind().to_string(),
+                                wave.to().to_string()
+                            );
+                        }
                         let to = wave.to().unwrap_single();
                         let location = locator.locate(&to.point).await?;
-if wave.track() {
-    println!("\twith LOCATION {} in {}", location.star.to_string(), skel.point.to_string() );
-}
 
-                        if location.star == skel.point {
-if wave.track() {
-    println!("\tSAME POINT -> {} to {}", wave.kind().to_string(), wave.to().to_string());
-}
+                        if location.star.is_some() && *location.star.as_ref().unwrap() == skel.point {
+                            if wave.track() {
+                                println!(
+                                    "\tSAME POINT -> {} to {}",
+                                    wave.kind().to_string(),
+                                    wave.to().to_string()
+                                );
+                            }
                             let mut inject = TraversalInjection::new(
                                 skel.point.to_surface().with_layer(Layer::Gravity),
                                 wave,
@@ -1163,7 +1168,7 @@ if wave.track() {
                         } else {
                             let mut transport = wave.wrap_in_transport(
                                 gravity,
-                                location.star.to_surface().with_layer(Layer::Core),
+                                location.star.as_ref().unwrap().to_surface().with_layer(Layer::Core),
                             );
                             transport.from(skel.point.clone().to_surface());
                             let transport = transport.build()?;
@@ -1228,10 +1233,7 @@ if wave.track() {
     }
 
     async fn start_wrangling(&self) {
-
         self.skel.machine.api.wait_ready().await;
-
-
 
         let skel = self.skel.clone();
         tokio::spawn(async move {
@@ -1267,7 +1269,7 @@ if wave.track() {
         });
     }
 
-    async fn wrangle(&self, rtn: oneshot::Sender<Result<StarWrangles, UniErr>>) {
+    async fn wrangle(&self, rtn: oneshot::Sender<Result<StarWrangles, SpaceErr>>) {
         let skel = self.skel.clone();
         tokio::spawn(async move {
             let mut wrangler = Wrangler::new(skel.clone(), Search::Kinds);
@@ -1302,7 +1304,7 @@ if wave.track() {
         });
     }
 
-    async fn bounce(&self, key: StarKey, rtn: oneshot::Sender<Result<(), UniErr>>) {
+    async fn bounce(&self, key: StarKey, rtn: oneshot::Sender<Result<(), SpaceErr>>) {
         let transmitter = self.skel.star_transmitter.clone();
         let logger = self.skel.logger.clone();
         tokio::spawn(async move {
@@ -1360,12 +1362,48 @@ where
         }
     }
 
-    async fn start_layer_traversal(
-        &self,
-        mut wave: UltraWave,
-        injector: &Surface,
-        from_gravity: bool,
-    ) -> Result<(), P::Err> {
+    async fn inject(&self, injection: TraversalInjection) {
+        if injection.wave.is_directed() {
+
+            let reflection = injection.wave.clone().to_directed().unwrap().reflection();
+            let surface = injection.surface.clone();
+            match self.start_layer_traversal(injection).await {
+                Ok(_) => {}
+                Err(err) => {
+println!("STATUS: {}",err.status());
+println!("ERR: {}",err.to_string());
+                    // if it can be reflected then send back as an error
+                    match reflection {
+                        Ok(reflection) => {
+                            let err = err.to_space_err();
+                            let reflect = reflection.make(err.into(), self.skel.point.to_surface() );
+                            let injection = TraversalInjection {
+                                surface,
+                                wave: reflect.to_ultra(),
+                                from_gravity: false,
+                                dir: None
+                            };
+                            self.skel.logger.result(self.start_layer_traversal(injection).await).unwrap_or_default();
+                        }
+                        Err(err) => {
+                            self.skel.logger.error(err.to_string());
+                        }
+                    }
+
+                }
+            }
+        } else {
+            self.skel.logger.result(self.start_layer_traversal(injection).await).unwrap_or_default();
+        }
+    }
+
+
+    async fn start_layer_traversal(&self, injection: TraversalInjection) -> Result<(), P::Err> {
+        let wave = injection.wave;
+        let from_gravity = injection.from_gravity;
+        let inject_dir = injection.dir;
+        let injection = injection.surface;
+
         #[cfg(test)]
         self.skel
             .diagnostic_interceptors
@@ -1388,8 +1426,8 @@ where
                     Recipients::Multi(ports) => {
                         for port in &ports {
                             let record = self.skel.registry.record(&port.point).await?;
-                            let loc = logger.result(record.location.ok_or(P::Err::new("multi port ripple has recipient that is not located, this should have been provisioned when the ripple was sent")))?;
-                            if loc.star == self.skel.point {
+                            let loc = logger.result(record.location.star.ok_or(P::Err::new("multi port ripple has recipient that is not located, this should have been provisioned when the ripple was sent")))?;
+                            if loc == self.skel.point {
                                 tos.push(port.clone());
                             }
                         }
@@ -1413,23 +1451,30 @@ where
         for to in tos {
             let record = match self.skel.registry.record(&to.point).await {
                 Ok(record) => record,
-                Err(err) => {
-                    // this needs to send a 404  or 30x (moved) status to the caller
-                    return self.skel.err(format!(
+                Err(_) => {
+                    let err = SpaceErr::not_found(format!(
                         "could not locate record for surface {} from {}",
                         to.to_string(),
                         wave.from().to_string()
                     ));
+                    return Err(err.into());
+
                 }
             };
             let plan = record.details.stub.kind.wave_traversal_plan().clone();
 
             let mut dest = None;
             let mut dir = TraversalDirection::Core;
+
+            // injection direction can be forced when we are sending a message from core
+            // to the same core
+            if let Some(inject_dir) = &inject_dir {
+                dir = inject_dir.clone();
+            }
             // now we check if we are doing an inter point delivery (from one layer to another in the same Particle)
             // if this delivery was from_hyperway, then it was certainly a message being routed back to the star
             // and is not considered an inter point delivery
-            if from_gravity {
+            else if from_gravity {
                 dir = TraversalDirection::Core;
                 dest.replace(to.layer.clone());
                 if wave.track() {
@@ -1442,7 +1487,11 @@ where
                 }
             } else if to.point == wave.from().point {
                 if wave.track() {
-                    println!("\twave is to and from the same point... {} <{}>", wave.from().to_string(), wave.kind().to_string() )
+                    println!(
+                        "\twave is to and from the same point... {} <{}>",
+                        wave.from().to_string(),
+                        wave.kind().to_string()
+                    )
                 }
                 // it's the SAME point, so the to layer becomes our dest
                 dest.replace(to.layer.clone());
@@ -1453,7 +1502,7 @@ where
                 }
 
                 // dir is from inject_layer to dest
-                dir = match TraversalDirection::new(&injector.layer, &to.layer) {
+                dir = match TraversalDirection::new(&injection.layer, &to.layer) {
                     Ok(dir) => dir,
                     Err(_) => {
                         // looks like we are already on the dest layer...
@@ -1505,7 +1554,7 @@ where
             let mut traversal = Traversal::new(
                 wave.clone(),
                 record,
-                injector.layer.clone(),
+                injection.layer.clone(),
                 traversal_logger,
                 dir,
                 dest,
@@ -1542,7 +1591,7 @@ where
         *layer == Layer::Shell || *layer == Layer::Field
     }
 
-    async fn exit(&self, traversal: Traversal<UltraWave>) -> Result<(), UniErr> {
+    async fn exit(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
         match traversal.dir {
             TraversalDirection::Fabric => {
                 if traversal.track() {
@@ -1561,7 +1610,7 @@ where
         }
     }
 
-    async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(), UniErr> {
+    async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
         let logger = self.skel.logger.push_mark("stack-traversal:visit")?;
         logger.track(&traversal, || {
             Tracker::new(
@@ -1651,6 +1700,7 @@ pub struct StarMount {
 pub struct LayerInjectionRouter {
     pub inject_tx: mpsc::Sender<TraversalInjection>,
     pub injector: Surface,
+    pub direction: Option<TraversalDirection>,
 }
 
 impl LayerInjectionRouter {
@@ -1661,6 +1711,7 @@ impl LayerInjectionRouter {
         Self {
             inject_tx: skel.inject_tx.clone(),
             injector,
+            direction: None,
         }
     }
 
@@ -1668,6 +1719,7 @@ impl LayerInjectionRouter {
         Self {
             inject_tx: self.inject_tx.clone(),
             injector,
+            direction: None,
         }
     }
 
@@ -1675,6 +1727,7 @@ impl LayerInjectionRouter {
         Self {
             inject_tx,
             injector,
+            direction: None,
         }
     }
 }
@@ -1692,15 +1745,17 @@ impl TraverseToNextRouter {
 
 #[async_trait]
 impl TraversalRouter for TraverseToNextRouter {
-    async fn traverse(&self, traversal: Traversal<UltraWave>) {
-        self.tx.send(traversal).await;
+    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
+        self.tx.send(traversal).await?;
+        Ok(())
     }
 }
 
 #[async_trait]
 impl Router for LayerInjectionRouter {
     async fn route(&self, wave: UltraWave) {
-        let inject = TraversalInjection::new(self.injector.clone(), wave);
+        let mut inject = TraversalInjection::new(self.injector.clone(), wave);
+        inject.dir = self.direction.clone();
         self.inject_tx.send(inject).await;
     }
 }
@@ -1964,8 +2019,8 @@ where
 
     pub async fn locate(&self, point: &Point) -> Result<ParticleLocation, P::Err> {
         let record = self.skel.registry.record(&point).await?;
-        match record.location {
-            Some(location) => Ok(location),
+        match &record.location.star {
+            Some(_) => Ok(record.location),
             None => {
                 // now we must provision
                 self.provision(point, StateSrc::None).await
@@ -1994,18 +2049,18 @@ where
             .parent()
             .ok_or(P::Err::new("expected Root to be provisioned"))?;
         let mut parent_record = self.skel.registry.record(&parent).await?;
-        if parent_record.location.is_none() {
+        if parent_record.location.star.is_none() {
             self.provision_inner(&parent, StateSrc::None).await?;
             parent_record = self.skel.registry.record(&parent).await?;
         }
 
-        let parent_star = parent_record.location.unwrap();
+        let parent_star = parent_record.location.star.unwrap();
         let provision = Provision::new(point.clone(), state);
         let mut wave = DirectedProto::ping();
         wave.method(HypMethod::Provision);
         wave.body(HyperSubstance::Provision(provision).into());
         wave.from(self.skel.point.clone().to_surface().with_layer(Layer::Core));
-        wave.to(parent_star.star.to_surface().with_layer(Layer::Core));
+        wave.to(parent_star.to_surface().with_layer(Layer::Core));
         let pong: Wave<Pong> = self.skel.star_transmitter.direct(wave).await?;
         if pong.core.status.as_u16() == 200 {
             if let Substance::Location(location) = &pong.core.body {

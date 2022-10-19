@@ -21,7 +21,7 @@ use exchange::asynch::ProtoTransmitter;
 use crate::command::Command;
 use crate::command::RawCommand;
 use crate::config::bind::RouteSelector;
-use crate::err::{CoreReflector, StatusErr, UniErr};
+use crate::err::{CoreReflector, SpaceErr, StatusErr};
 use crate::hyper::AssignmentKind;
 use crate::hyper::InterchangeKind::DefaultControl;
 use crate::kind::Sub;
@@ -41,7 +41,7 @@ use crate::selector::Selector;
 use crate::settings::Timeouts;
 use crate::substance::Bin;
 use crate::substance::{
-    Call, CallKind, CmdCall, Errors, ExtCall, HttpCall, HypCall, MultipartFormBuilder, Substance,
+    Call, CallKind, CmdCall, ExtCall, FormErrs, HttpCall, HypCall, MultipartFormBuilder, Substance,
     SubstanceKind, ToRequestCore, ToSubstance, Token,
 };
 use crate::util::{uuid, ValueMatcher, ValuePattern};
@@ -82,11 +82,11 @@ pub enum WaveKind {
 }
 
 impl WaveKind {
-    pub fn reflected_kind(&self) -> Result<ReflectedKind, UniErr> {
+    pub fn reflected_kind(&self) -> Result<ReflectedKind, SpaceErr> {
         match self {
             WaveKind::Pong => Ok(ReflectedKind::Pong),
             WaveKind::Echo => Ok(ReflectedKind::Echo),
-            _ => Err(UniErr::not_found()),
+            _ => Err(SpaceErr::bad_request("expected a reflected WaveKind")),
         }
     }
 }
@@ -95,7 +95,7 @@ pub type UltraWave = UltraWaveDef<Recipients>;
 pub type SingularUltraWave = UltraWaveDef<Surface>;
 
 impl SingularUltraWave {
-    pub fn to_ultra(self) -> Result<UltraWave, UniErr> {
+    pub fn to_ultra(self) -> Result<UltraWave, SpaceErr> {
         match self {
             SingularUltraWave::Ping(ping) => Ok(UltraWave::Ping(ping)),
             SingularUltraWave::Pong(pong) => Ok(UltraWave::Pong(pong)),
@@ -257,13 +257,15 @@ impl UltraWave {
         }
     }
 
-    pub fn to_singular(self) -> Result<SingularUltraWave, UniErr> {
+    pub fn to_singular(self) -> Result<SingularUltraWave, SpaceErr> {
         match self {
             UltraWave::Ping(ping) => Ok(SingularUltraWave::Ping(ping)),
             UltraWave::Pong(pong) => Ok(SingularUltraWave::Pong(pong)),
             UltraWave::Echo(echo) => Ok(SingularUltraWave::Echo(echo)),
             UltraWave::Signal(signal) => Ok(SingularUltraWave::Signal(signal)),
-            UltraWave::Ripple(_) => Err(UniErr::from_500("cannot change Ripple into a singular")),
+            UltraWave::Ripple(_) => Err(SpaceErr::server_error(
+                "cannot change Ripple into a singular",
+            )),
         }
     }
 
@@ -280,12 +282,12 @@ impl UltraWave {
         signal
     }
 
-    pub fn unwrap_from_hop(self) -> Result<Wave<Signal>, UniErr> {
+    pub fn unwrap_from_hop(self) -> Result<Wave<Signal>, SpaceErr> {
         let signal = self.to_signal()?;
         signal.unwrap_from_hop()
     }
 
-    pub fn unwrap_from_transport(self) -> Result<UltraWave, UniErr> {
+    pub fn unwrap_from_transport(self) -> Result<UltraWave, SpaceErr> {
         let signal = self.to_signal()?;
         signal.unwrap_from_transport()
     }
@@ -294,20 +296,20 @@ impl UltraWave {
         Substance::UltraWave(Box::new(self))
     }
 
-    pub fn to_directed(self) -> Result<DirectedWave, UniErr> {
+    pub fn to_directed(self) -> Result<DirectedWave, SpaceErr> {
         match self {
             UltraWave::Ping(ping) => Ok(ping.to_directed()),
             UltraWave::Ripple(ripple) => Ok(ripple.to_directed()),
             UltraWave::Signal(signal) => Ok(signal.to_directed()),
-            _ => Err(UniErr::bad_request()),
+            _ => Err(SpaceErr::bad_request("expected a DirectedWave")),
         }
     }
 
-    pub fn to_reflected(self) -> Result<ReflectedWave, UniErr> {
+    pub fn to_reflected(self) -> Result<ReflectedWave, SpaceErr> {
         match self {
             UltraWave::Pong(pong) => Ok(pong.to_reflected()),
             UltraWave::Echo(echo) => Ok(echo.to_reflected()),
-            _ => Err(UniErr::bad_request_msg(format!(
+            _ => Err(SpaceErr::bad_request(format!(
                 "expected: ReflectedWave; encountered: {}",
                 self.desc()
             ))),
@@ -388,10 +390,10 @@ impl UltraWave {
         }
     }
 
-    pub fn to_signal(self) -> Result<Wave<Signal>, UniErr> {
+    pub fn to_signal(self) -> Result<Wave<Signal>, SpaceErr> {
         match self {
             UltraWave::Signal(signal) => Ok(signal),
-            _ => Err(UniErr::bad_request_msg(format!(
+            _ => Err(SpaceErr::bad_request(format!(
                 "expecting: Wave<Signal> encountered: Wave<{}>",
                 self.kind().to_string()
             ))),
@@ -526,7 +528,7 @@ impl UltraWave {
             UltraWave::Signal(signal) => &signal.scope,
         }
     }
-    pub fn to_ripple(self) -> Result<Wave<Ripple>, UniErr> {
+    pub fn to_ripple(self) -> Result<Wave<Ripple>, SpaceErr> {
         match self {
             UltraWave::Ripple(ripple) => Ok(ripple),
             _ => Err("not a ripple".into()),
@@ -558,7 +560,7 @@ impl<S> ToSubstance<S> for UltraWave
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, UniErr> {
+    fn to_substance(self) -> Result<S, SpaceErr> {
         match self {
             UltraWave::Ping(ping) => ping.to_substance(),
             UltraWave::Pong(pong) => pong.to_substance(),
@@ -568,7 +570,7 @@ where
         }
     }
 
-    fn to_substance_ref(&self) -> Result<&S, UniErr> {
+    fn to_substance_ref(&self) -> Result<&S, SpaceErr> {
         match self {
             UltraWave::Ping(ping) => ping.to_substance_ref(),
             UltraWave::Pong(pong) => pong.to_substance_ref(),
@@ -662,7 +664,7 @@ pub trait Reflectable<R> {
     where
         Self: Sized;
 
-    fn err(self, err: UniErr, responder: Surface) -> R
+    fn err(self, err: SpaceErr, responder: Surface) -> R
     where
         Self: Sized;
 
@@ -681,7 +683,7 @@ pub trait Reflectable<R> {
     where
         Self: Sized;
 
-    fn result<C: Into<ReflectedCore>>(self, result: Result<C, UniErr>, responder: Surface) -> R
+    fn result<C: Into<ReflectedCore>>(self, result: Result<C, SpaceErr>, responder: Surface) -> R
     where
         Self: Sized,
     {
@@ -774,7 +776,7 @@ impl Wave<Ripple> {
         self.clone().replace(ripple)
     }
 
-    pub fn to_singular_directed(self) -> Result<SingularDirectedWave, UniErr> {
+    pub fn to_singular_directed(self) -> Result<SingularDirectedWave, SpaceErr> {
         let to = self.to.clone().to_single()?;
         Ok(self.as_single(to).to_singular_directed())
     }
@@ -793,11 +795,11 @@ where
     Substance: ToSubstance<S>,
     T: ToRecipients + Clone,
 {
-    fn to_substance(self) -> Result<S, UniErr> {
+    fn to_substance(self) -> Result<S, SpaceErr> {
         self.core.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, UniErr> {
+    fn to_substance_ref(&self) -> Result<&S, SpaceErr> {
         self.core.to_substance_ref()
     }
 }
@@ -809,24 +811,24 @@ where
     pub fn require_method<M: Into<Method> + ToString + Clone>(
         self,
         method: M,
-    ) -> Result<RippleDef<T>, UniErr> {
+    ) -> Result<RippleDef<T>, SpaceErr> {
         if self.core.method == method.clone().into() {
             Ok(self)
         } else {
-            Err(UniErr::new(
+            Err(SpaceErr::new(
                 400,
                 format!("Bad Request: expecting method: {}", method.to_string()).as_str(),
             ))
         }
     }
 
-    pub fn require_body<B>(self) -> Result<B, UniErr>
+    pub fn require_body<B>(self) -> Result<B, SpaceErr>
     where
-        B: TryFrom<Substance, Error = UniErr>,
+        B: TryFrom<Substance, Error = SpaceErr>,
     {
         match B::try_from(self.body.clone()) {
             Ok(body) => Ok(body),
-            Err(err) => Err(UniErr::bad_request()),
+            Err(err) => Err(SpaceErr::bad_request("expected a body")),
         }
     }
 }
@@ -908,11 +910,11 @@ impl<S> ToSubstance<S> for Ping
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, UniErr> {
+    fn to_substance(self) -> Result<S, SpaceErr> {
         self.core.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, UniErr> {
+    fn to_substance_ref(&self) -> Result<&S, SpaceErr> {
         self.core.to_substance_ref()
     }
 }
@@ -956,24 +958,24 @@ impl Ping {
     pub fn require_method<M: Into<Method> + ToString + Clone>(
         self,
         method: M,
-    ) -> Result<Ping, UniErr> {
+    ) -> Result<Ping, SpaceErr> {
         if self.core.method == method.clone().into() {
             Ok(self)
         } else {
-            Err(UniErr::new(
+            Err(SpaceErr::new(
                 400,
                 format!("Bad Request: expecting method: {}", method.to_string()).as_str(),
             ))
         }
     }
 
-    pub fn require_body<B>(self) -> Result<B, UniErr>
+    pub fn require_body<B>(self) -> Result<B, SpaceErr>
     where
-        B: TryFrom<Substance, Error = UniErr>,
+        B: TryFrom<Substance, Error = SpaceErr>,
     {
         match B::try_from(self.clone().core.body) {
             Ok(body) => Ok(body),
-            Err(err) => Err(UniErr::bad_request()),
+            Err(err) => Err(SpaceErr::bad_request("body is required")),
         }
     }
 }
@@ -991,7 +993,7 @@ impl<V> WaveXtra<V> {
 }
 
 impl TryFrom<Ping> for RawCommand {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(request: Ping) -> Result<Self, Self::Error> {
         request.core.body.try_into()
@@ -999,7 +1001,7 @@ impl TryFrom<Ping> for RawCommand {
 }
 
 impl TryFrom<Pong> for Substance {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(response: Pong) -> Result<Self, Self::Error> {
         Ok(response.core.body)
@@ -1007,12 +1009,12 @@ impl TryFrom<Pong> for Substance {
 }
 
 impl TryInto<Bin> for Pong {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_into(self) -> Result<Bin, Self::Error> {
         match self.core.body {
             Substance::Bin(bin) => Ok(bin),
-            _ => Err(UniErr::err400()),
+            _ => Err(SpaceErr::bad_request("expected Bin")),
         }
     }
 }
@@ -1143,7 +1145,7 @@ impl ReflectedProto {
         }
     }
 
-    pub fn body(&mut self, body: Substance) -> Result<(), UniErr> {
+    pub fn body(&mut self, body: Substance) -> Result<(), SpaceErr> {
         self.body.replace(body);
         Ok(())
     }
@@ -1181,7 +1183,7 @@ impl ReflectedProto {
         self.from.replace(from);
     }
 
-    pub fn build(self) -> Result<ReflectedWave, UniErr> {
+    pub fn build(self) -> Result<ReflectedWave, SpaceErr> {
         let mut core = ReflectedCore::new();
         core.body = self.body.or_else(|| Some(Substance::Empty)).unwrap();
         core.status = self
@@ -1268,8 +1270,8 @@ impl Trackable for DirectedProto {
 }
 
 impl DirectedProto {
-    pub fn build(self) -> Result<DirectedWave, UniErr> {
-        let kind = self.kind.ok_or::<UniErr>(
+    pub fn build(self) -> Result<DirectedWave, SpaceErr> {
+        let kind = self.kind.ok_or::<SpaceErr>(
             "kind must be set for DirectedProto to create the proper DirectedWave".into(),
         )?;
 
@@ -1284,11 +1286,11 @@ impl DirectedProto {
                     Ping {
                         to: self
                             .to
-                            .ok_or(UniErr::new(500u16, "must set 'to'"))?
+                            .ok_or(SpaceErr::new(500u16, "must set 'to'"))?
                             .single_or()?,
                         core,
                     },
-                    self.from.ok_or(UniErr::new(500u16, "must set 'from'"))?,
+                    self.from.ok_or(SpaceErr::new(500u16, "must set 'from'"))?,
                 );
                 wave.agent = self.agent.unwrap_or_else(|| Agent::Anonymous);
                 wave.handling = self.handling.unwrap_or_else(|| Handling::default());
@@ -1300,12 +1302,12 @@ impl DirectedProto {
             DirectedKind::Ripple => {
                 let mut wave = Wave::new(
                     Ripple {
-                        to: self.to.ok_or(UniErr::new(500u16, "must set 'to'"))?,
+                        to: self.to.ok_or(SpaceErr::new(500u16, "must set 'to'"))?,
                         core,
                         bounce_backs: self.bounce_backs.ok_or("BounceBacks must be set")?,
                         history: self.history,
                     },
-                    self.from.ok_or(UniErr::new(500u16, "must set 'from'"))?,
+                    self.from.ok_or(SpaceErr::new(500u16, "must set 'from'"))?,
                 );
                 wave.agent = self.agent.unwrap_or_else(|| Agent::Anonymous);
                 wave.handling = self.handling.unwrap_or_else(|| Handling::default());
@@ -1319,11 +1321,11 @@ impl DirectedProto {
                     Signal {
                         to: self
                             .to
-                            .ok_or(UniErr::new(500u16, "must set 'to'"))?
+                            .ok_or(SpaceErr::new(500u16, "must set 'to'"))?
                             .single_or()?,
                         core,
                     },
-                    self.from.ok_or(UniErr::new(500u16, "must set 'from'"))?,
+                    self.from.ok_or(SpaceErr::new(500u16, "must set 'from'"))?,
                 );
                 wave.agent = self.agent.unwrap_or_else(|| Agent::Anonymous);
                 wave.handling = self.handling.unwrap_or_else(|| Handling::default());
@@ -1421,12 +1423,12 @@ impl DirectedProto {
         self.core.uri = uri;
     }
 
-    pub fn core(&mut self, core: DirectedCore) -> Result<(), UniErr> {
+    pub fn core(&mut self, core: DirectedCore) -> Result<(), SpaceErr> {
         self.core = core;
         Ok(())
     }
 
-    pub fn method<M: Into<Method>+Clone>(&mut self, method: M) {
+    pub fn method<M: Into<Method> + Clone>(&mut self, method: M) {
         self.method.replace(method.clone().into());
         self.core.method = method.into();
     }
@@ -1543,19 +1545,21 @@ impl Default for DirectedProto {
 pub type Echoes = Vec<Wave<Echo>>;
 
 impl FromReflectedAggregate for () {
-    fn from_reflected_aggregate(agg: ReflectedAggregate) -> Result<Self, UniErr>
+    fn from_reflected_aggregate(agg: ReflectedAggregate) -> Result<Self, SpaceErr>
     where
         Self: Sized,
     {
         match agg {
             ReflectedAggregate::None => Ok(()),
-            _ => Err(UniErr::bad_request()),
+            _ => Err(SpaceErr::bad_request(
+                "expected a ReflectedAggregate of None",
+            )),
         }
     }
 }
 
 impl FromReflectedAggregate for Echoes {
-    fn from_reflected_aggregate(agg: ReflectedAggregate) -> Result<Self, UniErr>
+    fn from_reflected_aggregate(agg: ReflectedAggregate) -> Result<Self, SpaceErr>
     where
         Self: Sized,
     {
@@ -1568,7 +1572,9 @@ impl FromReflectedAggregate for Echoes {
                 }
                 Ok(echoes)
             }
-            _ => Err(UniErr::bad_request()),
+            _ => Err(SpaceErr::bad_request(
+                "expecting a ReflectedAggregate of Multi",
+            )),
         }
     }
 }
@@ -1587,11 +1593,11 @@ impl<S> ToSubstance<S> for Echo
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, UniErr> {
+    fn to_substance(self) -> Result<S, SpaceErr> {
         self.core.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, UniErr> {
+    fn to_substance_ref(&self) -> Result<&S, SpaceErr> {
         self.core.to_substance_ref()
     }
 }
@@ -1628,7 +1634,7 @@ impl Echo {
         }
     }
 
-    pub fn ok_or(self) -> Result<Self, UniErr> {
+    pub fn ok_or(self) -> Result<Self, SpaceErr> {
         if self.core.status.is_success() {
             Ok(self)
         } else {
@@ -1652,16 +1658,16 @@ pub struct Pong {
 }
 
 impl FromReflectedAggregate for Wave<Pong> {
-    fn from_reflected_aggregate(agg: ReflectedAggregate) -> Result<Self, UniErr>
+    fn from_reflected_aggregate(agg: ReflectedAggregate) -> Result<Self, SpaceErr>
     where
         Self: Sized,
     {
         match agg {
             ReflectedAggregate::Single(reflected) => match reflected {
                 ReflectedWave::Pong(pong) => Ok(pong),
-                _ => Err(UniErr::bad_request()),
+                _ => Err(SpaceErr::bad_request("expected a Pong Reflected")),
             },
-            _ => Err(UniErr::bad_request()),
+            _ => Err(SpaceErr::bad_request("expected a Single Reflected")),
         }
     }
 }
@@ -1670,11 +1676,11 @@ impl<S> ToSubstance<S> for Pong
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, UniErr> {
+    fn to_substance(self) -> Result<S, SpaceErr> {
         self.core.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, UniErr> {
+    fn to_substance_ref(&self) -> Result<&S, SpaceErr> {
         self.core.to_substance_ref()
     }
 }
@@ -1695,12 +1701,15 @@ impl Pong {
         self.core.as_result()
     }
 
-    pub fn ok_or(&self) -> Result<(), UniErr> {
+    pub fn ok_or(&self) -> Result<(), SpaceErr> {
         if self.is_ok() {
             Ok(())
         } else {
-            if let Substance::Errors(errs) = &self.core.body {
+            if let Substance::FormErrs(errs) = &self.core.body {
                 Err(format!("{} : {}", self.core.status.to_string(), errs.to_string()).into())
+            } else if let Substance::Err(err) = &self.core.body {
+println!("\tSubstance::Err");
+                Err(err.clone())
             } else {
                 Err(self.core.status.to_string().into())
             }
@@ -1883,7 +1892,7 @@ impl DirectedWave {
         }
     }
 
-    pub fn reflection(&self) -> Result<Reflection, UniErr> {
+    pub fn reflection(&self) -> Result<Reflection, SpaceErr> {
         Ok(Reflection {
             kind: match self {
                 DirectedWave::Ping(_) => ReflectedKind::Pong,
@@ -1897,14 +1906,14 @@ impl DirectedWave {
         })
     }
 
-    pub fn to_signal(self) -> Result<Wave<Signal>, UniErr> {
+    pub fn to_signal(self) -> Result<Wave<Signal>, SpaceErr> {
         match self {
             DirectedWave::Signal(signal) => Ok(signal),
             _ => Err("not a signal wave".into()),
         }
     }
 
-    pub fn to_call(&self, to: Surface) -> Result<Call, UniErr> {
+    pub fn to_call(&self, to: Surface) -> Result<Call, SpaceErr> {
         let kind = match &self.core().method {
             Method::Cmd(method) => CallKind::Cmd(CmdCall::new(
                 method.clone(),
@@ -1984,7 +1993,7 @@ impl SingularDirectedWave {
         }
     }
 
-    pub fn to_call(&self) -> Result<Call, UniErr> {
+    pub fn to_call(&self) -> Result<Call, SpaceErr> {
         let kind = match &self.core().method {
             Method::Cmd(method) => CallKind::Cmd(CmdCall::new(
                 method.clone(),
@@ -2010,7 +2019,7 @@ impl SingularDirectedWave {
         })
     }
 
-    pub fn reflection(&self) -> Result<Reflection, UniErr> {
+    pub fn reflection(&self) -> Result<Reflection, SpaceErr> {
         Ok(Reflection {
             kind: match self {
                 SingularDirectedWave::Ping(_) => ReflectedKind::Pong,
@@ -2071,7 +2080,7 @@ where
         }
     }
 
-    pub fn err(&self, err: UniErr, responder: Surface) -> Bounce<ReflectedWave> {
+    pub fn err(&self, err: SpaceErr, responder: Surface) -> Bounce<ReflectedWave> {
         match self {
             DirectedWaveDef::Ping(ping) => {
                 Bounce::Reflected(ping.err(err, responder).to_reflected())
@@ -2091,13 +2100,15 @@ where
         }
     }
 
-    pub fn set_bounce_backs(&mut self, bounce_backs: BounceBacks) -> Result<(), UniErr> {
+    pub fn set_bounce_backs(&mut self, bounce_backs: BounceBacks) -> Result<(), SpaceErr> {
         match self {
             DirectedWaveDef::Ripple(ripple) => {
                 ripple.bounce_backs = bounce_backs;
                 Ok(())
             }
-            _ => Err(UniErr::from_500("can only set bouncebacks for Ripple")),
+            _ => Err(SpaceErr::server_error(
+                "can only set bouncebacks for Ripple",
+            )),
         }
     }
 
@@ -2206,7 +2217,7 @@ impl<S> ToSubstance<S> for DirectedWave
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, UniErr> {
+    fn to_substance(self) -> Result<S, SpaceErr> {
         match self {
             DirectedWave::Ping(ping) => ping.to_substance(),
             DirectedWave::Ripple(ripple) => ripple.to_substance(),
@@ -2214,7 +2225,7 @@ where
         }
     }
 
-    fn to_substance_ref(&self) -> Result<&S, UniErr> {
+    fn to_substance_ref(&self) -> Result<&S, SpaceErr> {
         match self {
             DirectedWave::Ping(ping) => ping.to_substance_ref(),
             DirectedWave::Ripple(ripple) => ripple.to_substance_ref(),
@@ -2272,14 +2283,14 @@ impl<S> ToSubstance<S> for ReflectedWave
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, UniErr> {
+    fn to_substance(self) -> Result<S, SpaceErr> {
         match self {
             ReflectedWave::Pong(pong) => pong.to_substance(),
             ReflectedWave::Echo(echo) => echo.to_substance(),
         }
     }
 
-    fn to_substance_ref(&self) -> Result<&S, UniErr> {
+    fn to_substance_ref(&self) -> Result<&S, SpaceErr> {
         match self {
             ReflectedWave::Pong(pong) => pong.to_substance_ref(),
             ReflectedWave::Echo(echo) => echo.to_substance_ref(),
@@ -2289,7 +2300,7 @@ where
 
 pub trait ToReflected {
     fn to_reflected(self) -> ReflectedWave;
-    fn from_reflected(reflected: ReflectedWave) -> Result<Self, UniErr>
+    fn from_reflected(reflected: ReflectedWave) -> Result<Self, SpaceErr>
     where
         Self: Sized;
 }
@@ -2337,17 +2348,17 @@ impl ReflectedWave {
         }
     }
 
-    pub fn to_echo(self) -> Result<Wave<Echo>, UniErr> {
+    pub fn to_echo(self) -> Result<Wave<Echo>, SpaceErr> {
         match self {
             ReflectedWave::Echo(echo) => Ok(echo),
-            _ => Err(UniErr::bad_request()),
+            _ => Err(SpaceErr::bad_request("expected Wave to be an Echo")),
         }
     }
 
-    pub fn to_pong(self) -> Result<Wave<Pong>, UniErr> {
+    pub fn to_pong(self) -> Result<Wave<Pong>, SpaceErr> {
         match self {
             ReflectedWave::Pong(pong) => Ok(pong),
-            _ => Err(UniErr::bad_request()),
+            _ => Err(SpaceErr::bad_request("expecrted wave to be a Pong")),
         }
     }
 }
@@ -2360,16 +2371,16 @@ impl ReflectedWave {
         }
     }
 
-    pub fn success_or(&self) -> Result<(), UniErr> {
+    pub fn success_or(&self) -> Result<(), SpaceErr> {
         if self.is_success() {
             Ok(())
         } else {
             match self {
-                ReflectedWave::Pong(pong) => Err(UniErr::Status {
+                ReflectedWave::Pong(pong) => Err(SpaceErr::Status {
                     status: pong.core.status.as_u16(),
                     message: "error".to_string(),
                 }),
-                ReflectedWave::Echo(echo) => Err(UniErr::Status {
+                ReflectedWave::Echo(echo) => Err(SpaceErr::Status {
                     status: echo.core.status.as_u16(),
                     message: "error".to_string(),
                 }),
@@ -2404,10 +2415,10 @@ impl ToRecipients for Recipients {
 }
 
 impl Recipients {
-    pub fn to_single(self) -> Result<Surface, UniErr> {
+    pub fn to_single(self) -> Result<Surface, SpaceErr> {
         match self {
             Recipients::Single(surface) => Ok(surface),
-            _ => Err(UniErr::from_500(
+            _ => Err(SpaceErr::server_error(
                 "cannot convert a multiple recipient into a single",
             )),
         }
@@ -2521,7 +2532,7 @@ impl Recipients {
         self.single_or().expect("single")
     }
 
-    pub fn single_or(self) -> Result<Surface, UniErr> {
+    pub fn single_or(self) -> Result<Surface, SpaceErr> {
         if let Recipients::Single(rtn) = self {
             Ok(rtn)
         } else {
@@ -2567,11 +2578,11 @@ impl<S, V> ToSubstance<S> for Wave<V>
 where
     V: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, UniErr> {
+    fn to_substance(self) -> Result<S, SpaceErr> {
         self.variant.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, UniErr> {
+    fn to_substance_ref(&self) -> Result<&S, SpaceErr> {
         self.variant.to_substance_ref()
     }
 }
@@ -2601,7 +2612,7 @@ impl<T> Wave<RippleDef<T>>
 where
     T: ToRecipients + Clone,
 {
-    pub fn err(&self, err: UniErr, responder: Surface) -> Wave<Echo> {
+    pub fn err(&self, err: SpaceErr, responder: Surface) -> Wave<Echo> {
         Wave::new(
             Echo::new(
                 self.variant.err(err),
@@ -2675,29 +2686,31 @@ impl Wave<Signal> {
         signal
     }
 
-    pub fn unwrap_from_hop(self) -> Result<Wave<Signal>, UniErr> {
+    pub fn unwrap_from_hop(self) -> Result<Wave<Signal>, SpaceErr> {
         if self.method != Method::Hyp(HypMethod::Hop) {
-            return Err(UniErr::from_500("expected signal wave to have method Hop"));
+            return Err(SpaceErr::server_error(
+                "expected signal wave to have method Hop",
+            ));
         }
         if let Substance::UltraWave(wave) = &self.body {
             Ok((*wave.clone()).to_signal()?)
         } else {
-            Err(UniErr::from_500(
+            Err(SpaceErr::server_error(
                 "expected body substance to be of type UltraWave for a transport signal",
             ))
         }
     }
 
-    pub fn unwrap_from_transport(self) -> Result<UltraWave, UniErr> {
+    pub fn unwrap_from_transport(self) -> Result<UltraWave, SpaceErr> {
         if self.method != Method::Hyp(HypMethod::Transport) {
-            return Err(UniErr::from_500(
+            return Err(SpaceErr::server_error(
                 "expected signal wave to have method Transport",
             ));
         }
         if let Substance::UltraWave(wave) = &self.body {
             Ok(*wave.clone())
         } else {
-            Err(UniErr::from_500(
+            Err(SpaceErr::server_error(
                 "expected body substance to be of type UltraWave for a transport signal",
             ))
         }
@@ -2712,11 +2725,11 @@ impl<S> ToSubstance<S> for Signal
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, UniErr> {
+    fn to_substance(self) -> Result<S, SpaceErr> {
         self.core.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, UniErr> {
+    fn to_substance_ref(&self) -> Result<&S, SpaceErr> {
         self.core.to_substance_ref()
     }
 }
@@ -2765,7 +2778,7 @@ impl Wave<Ping> {
         DirectedWave::Ping(self)
     }
 
-    pub fn err(&self, err: UniErr, responder: Surface) -> Wave<Pong> {
+    pub fn err(&self, err: SpaceErr, responder: Surface) -> Wave<Pong> {
         Wave::new(
             Pong::new(
                 self.variant.err(err),
@@ -2797,10 +2810,10 @@ impl ToReflected for Wave<Pong> {
         ReflectedWave::Pong(self)
     }
 
-    fn from_reflected(reflected: ReflectedWave) -> Result<Self, UniErr> {
+    fn from_reflected(reflected: ReflectedWave) -> Result<Self, SpaceErr> {
         match reflected {
             ReflectedWave::Pong(pong) => Ok(pong),
-            _ => Err(UniErr::bad_request()),
+            _ => Err(SpaceErr::bad_request("expected wave to be a Pong")),
         }
     }
 }
@@ -2810,10 +2823,10 @@ impl ToReflected for Wave<Echo> {
         ReflectedWave::Echo(self)
     }
 
-    fn from_reflected(reflected: ReflectedWave) -> Result<Self, UniErr> {
+    fn from_reflected(reflected: ReflectedWave) -> Result<Self, SpaceErr> {
         match reflected {
             ReflectedWave::Echo(echo) => Ok(echo),
-            _ => Err(UniErr::bad_request()),
+            _ => Err(SpaceErr::bad_request("expected Wave to be an Echo")),
         }
     }
 }
@@ -2829,12 +2842,12 @@ impl Wave<Echo> {
 }
 
 impl TryFrom<ReflectedWave> for Wave<Pong> {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(wave: ReflectedWave) -> Result<Self, Self::Error> {
         match wave {
             ReflectedWave::Pong(pong) => Ok(pong),
-            _ => Err(UniErr::bad_request()),
+            _ => Err(SpaceErr::bad_request("Expected Wave to be a Pong")),
         }
     }
 }
@@ -3224,7 +3237,7 @@ pub enum Bounce<W> {
 impl<W> Bounce<W> {
     pub fn to_core_bounce(self) -> CoreBounce
     where
-        W: TryInto<ReflectedCore, Error = UniErr>,
+        W: TryInto<ReflectedCore, Error = SpaceErr>,
     {
         match self {
             Bounce::Absorbed => Bounce::Absorbed,
@@ -3258,31 +3271,37 @@ pub enum ReflectedAggregate {
 }
 
 pub trait FromReflectedAggregate {
-    fn from_reflected_aggregate(agg: ReflectedAggregate) -> Result<Self, UniErr>
+    fn from_reflected_aggregate(agg: ReflectedAggregate) -> Result<Self, SpaceErr>
     where
         Self: Sized;
 }
 
 impl TryInto<Wave<Pong>> for ReflectedAggregate {
-    type Error = UniErr;
+    type Error = SpaceErr;
     fn try_into(self) -> Result<Wave<Pong>, Self::Error> {
         match self {
             Self::Single(reflected) => match reflected {
                 ReflectedWave::Pong(pong) => Ok(pong),
-                _ => Err(UniErr::bad_request()),
+                _ => Err(SpaceErr::bad_request(
+                    "Expected ReflectedAggregate to be for a Pong",
+                )),
             },
-            _ => Err(UniErr::bad_request()),
+            _ => Err(SpaceErr::bad_request(
+                "Expected ReflectedAggregate to be a Single",
+            )),
         }
     }
 }
 
 impl TryInto<Vec<Wave<Echo>>> for ReflectedAggregate {
-    type Error = UniErr;
+    type Error = SpaceErr;
     fn try_into(self) -> Result<Vec<Wave<Echo>>, Self::Error> {
         match self {
             Self::Single(reflected) => match reflected {
                 ReflectedWave::Echo(echo) => Ok(vec![echo]),
-                _ => Err(UniErr::bad_request()),
+                _ => Err(SpaceErr::bad_request(
+                    "Expected Reflected to be a Single Echo",
+                )),
             },
             ReflectedAggregate::None => Ok(vec![]),
             ReflectedAggregate::Multi(waves) => {

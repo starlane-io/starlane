@@ -6,12 +6,15 @@ use crate::driver::control::ControlDriverFactory;
 use crate::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
 use crate::driver::root::RootDriverFactory;
 use crate::driver::space::SpaceDriverFactory;
+use crate::driver::web::WebDriverFactory;
 use crate::driver::DriverAvail;
+use crate::err::{CosmicErr, HyperErr};
 use crate::mem::registry::{MemRegApi, MemRegCtx};
+use crate::reg::Registry;
 use crate::{Cosmos, DriversBuilder, MachineTemplate};
 use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, LocalHyperwayGateJumper};
 use cosmic_space::artifact::{ArtifactApi, ReadArtifactFetcher};
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::kind::{BaseKind, Kind, StarSub};
 use cosmic_space::loc::{MachineName, StarKey, ToBaseKind};
 use cosmic_space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
@@ -25,8 +28,6 @@ use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
-use crate::err::{CosmicErr, HyperErr};
-use crate::reg::Registry;
 
 impl MemCosmos {
     pub fn new() -> Self {
@@ -67,18 +68,6 @@ impl Cosmos for MemCosmos {
         "mem".to_string()
     }
 
-    fn properties_config(&self, kind: &Kind) -> PropertiesConfig {
-        let mut builder = PropertiesConfigBuilder::new();
-        builder.kind(kind.clone());
-        match kind.to_base() {
-            BaseKind::Mechtron => {
-                builder.add_point("config", true, true).unwrap();
-                builder.build().unwrap()
-            }
-            _ => builder.build().unwrap(),
-        }
-    }
-
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
         let mut builder = DriversBuilder::new(kind.clone());
 
@@ -108,7 +97,7 @@ impl Cosmos for MemCosmos {
                 builder.add_post(Arc::new(ArtifactDriverFactory::new()));
             }
             StarSub::Jump => {
-                //                builder.add_post(Arc::new(ControlDriverFactory::new()));
+                builder.add_post(Arc::new(WebDriverFactory::new()));
             }
             StarSub::Fold => {}
             StarSub::Machine => {
@@ -137,5 +126,4 @@ impl Cosmos for MemCosmos {
     }
 
      */
-
 }

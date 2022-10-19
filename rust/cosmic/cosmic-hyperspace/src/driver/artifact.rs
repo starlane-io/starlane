@@ -16,7 +16,7 @@ use cosmic_space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
 use cosmic_space::config::bind::BindConfig;
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{Assign, HyperSubstance, ParticleLocation};
 use cosmic_space::kind::{ArtifactSubKind, BaseKind, Kind};
 use cosmic_space::loc::{Point, ToBaseKind};
@@ -25,8 +25,8 @@ use cosmic_space::particle::PointKind;
 use cosmic_space::selector::KindSelector;
 use cosmic_space::substance::{Bin, Substance};
 use cosmic_space::util::log;
-use cosmic_space::wave::core::DirectedCore;
-use cosmic_space::wave::exchange::asynch::InCtx;
+use cosmic_space::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
+use cosmic_space::wave::exchange::asynch::{DirectedHandler, InCtx, RootInCtx};
 use cosmic_space::wave::{DirectedProto, Pong, Wave};
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -62,6 +62,9 @@ fn artifact_bind() -> BindConfig {
         r#"
     Bind(version=1.0.0)
     {
+        Route -> {
+           Http<Get> -> (()) => &;
+        }
     }
     "#,
     ))
@@ -217,8 +220,7 @@ where
     }
 }
 
-pub struct BundleSeriesDriver {
-}
+pub struct BundleSeriesDriver {}
 
 #[handler]
 impl BundleSeriesDriver {
@@ -347,7 +349,7 @@ impl<P> BundleDriverHandler<P>
 where
     P: Cosmos,
 {
-    fn store(&self) -> Result<ValueRepo<String>, UniErr> {
+    fn store(&self) -> Result<ValueRepo<String>, SpaceErr> {
         let config = acid_store::store::DirectoryConfig {
             path: PathBuf::from(format!("{}artifacts", self.skel.star.data_dir())),
         };
@@ -357,7 +359,7 @@ where
             .open(&config)
         {
             Ok(repo) => Ok(repo),
-            Err(err) => return Err(UniErr::new(500u16, err.to_string())),
+            Err(err) => return Err(SpaceErr::new(500u16, err.to_string())),
         }
     }
     #[route("Hyp<Assign>")]
@@ -400,9 +402,9 @@ where
                 self.skel
                     .star
                     .registry
-                    .assign(
+                    .assign_star(
                         &assign.details.stub.point,
-                        ParticleLocation::new(self.skel.star.point.clone(), None),
+                        &self.skel.star.point,
                     )
                     .await?;
 
@@ -599,7 +601,7 @@ where
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
         let record = self.skel.locate(point).await?;
 
-        let skel = ItemSkel::new(point.clone(), record.details.stub.kind,self.skel.clone());
+        let skel = ItemSkel::new(point.clone(), record.details.stub.kind, self.skel.clone());
         Ok(ItemSphere::Handler(Box::new(Artifact::restore(
             skel,
             (),
@@ -636,7 +638,7 @@ impl<P> ArtifactDriverHandler<P>
 where
     P: Cosmos,
 {
-    fn store(&self) -> Result<ValueRepo<String>, UniErr> {
+    fn store(&self) -> Result<ValueRepo<String>, SpaceErr> {
         let config = acid_store::store::DirectoryConfig {
             path: PathBuf::from(format!("{}artifacts", self.skel.star.data_dir())),
         };
@@ -646,7 +648,7 @@ where
             .open(&config)
         {
             Ok(repo) => Ok(repo),
-            Err(err) => return Err(UniErr::new(500u16, err.to_string())),
+            Err(err) => return Err(SpaceErr::new(500u16, err.to_string())),
         }
     }
 
@@ -661,19 +663,20 @@ where
                         let mut store = self.skel.driver.logger.result(self.store())?;
                         store
                             .insert(assign.details.stub.point.to_string(), &substance)
-                            .map_err(|e| UniErr::from_500(e.to_string()))?;
-                        self.skel
-                            .driver
-                            .logger
-                            .result(store.commit().map_err(|e| UniErr::from_500(e.to_string())))?;
+                            .map_err(|e| SpaceErr::server_error(e.to_string()))?;
+                        self.skel.driver.logger.result(
+                            store
+                                .commit()
+                                .map_err(|e| SpaceErr::server_error(e.to_string())),
+                        )?;
                     }
                 }
                 self.skel
                     .star
                     .registry
-                    .assign(
+                    .assign_star(
                         &assign.details.stub.point,
-                        ParticleLocation::new(self.skel.star.point.clone(), None),
+                        &self.skel.star.point,
                     )
                     .await?;
             }
@@ -696,8 +699,7 @@ impl<P> Artifact<P>
 where
     P: Cosmos,
 {
-
-    fn store(&self) -> Result<ValueRepo<String>, UniErr> {
+    fn store(&self) -> Result<ValueRepo<String>, SpaceErr> {
         let config = acid_store::store::DirectoryConfig {
             path: PathBuf::from(format!("{}artifacts", self.skel.data_dir())),
         };
@@ -707,11 +709,23 @@ where
             .open(&config)
         {
             Ok(repo) => Ok(repo),
-            Err(err) => return Err(UniErr::new(500u16, err.to_string())),
+            Err(err) => return Err(SpaceErr::new(500u16, err.to_string())),
         }
     }
+
     #[route("Cmd<Read>")]
-    pub async fn read(&self, _: InCtx<'_, ()>) -> Result<Substance, P::Err> {
+    pub async fn read(&self, ctx: InCtx<'_, ()>) -> Result<Substance, P::Err> {
+        if let Kind::Artifact(ArtifactSubKind::Dir) = self.skel.kind {
+            return Ok(Substance::Empty);
+        }
+        let store = self.store()?;
+
+        let substance: Substance = store.get(&self.skel.point.to_string()).unwrap();
+        Ok(substance)
+    }
+
+    #[route("Http<Get>")]
+    pub async fn get(&self, _: InCtx<'_, ()>) -> Result<Substance, P::Err> {
         if let Kind::Artifact(ArtifactSubKind::Dir) = self.skel.kind {
             return Ok(Substance::Empty);
         }
@@ -734,6 +748,23 @@ where
         Self { skel }
     }
 }
+
+/*
+#[async_trait]
+impl<P> DirectedHandler for Artifact<P> where P: Cosmos {
+    async fn handle(&self, ctx: RootInCtx) -> CoreBounce {
+        println!("ARTIFACT HANDLE REQUEST : {}",ctx.wave.clone().to_ultra().desc());
+
+        let core = ReflectedCore {
+            headers: Default::default(),
+            status: Default::default(),
+            body: Default::default()
+        };
+        CoreBounce::Reflected(core)
+    }
+}
+
+ */
 
 #[async_trait]
 impl<P> ItemHandler<P> for Artifact<P>

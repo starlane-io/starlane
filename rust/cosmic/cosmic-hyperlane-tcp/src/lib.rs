@@ -27,7 +27,7 @@ use cosmic_hyperlane::{
     HyperConnectionDetails, HyperConnectionStatus, HyperGate, HyperGateSelector, HyperwayEndpoint,
     HyperwayEndpointFactory, VersionGate,
 };
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::Knock;
 use cosmic_space::log::PointLogger;
 use cosmic_space::substance::Substance;
@@ -62,28 +62,29 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
     async fn create(
         &self,
         status_tx: mpsc::Sender<HyperConnectionDetails>,
-    ) -> Result<HyperwayEndpoint, UniErr> {
-
+    ) -> Result<HyperwayEndpoint, SpaceErr> {
         let mut connector: SslConnectorBuilder =
-            SslConnector::builder(SslMethod::tls()).map_err(UniErr::map)?;
-
+            SslConnector::builder(SslMethod::tls()).map_err(SpaceErr::map)?;
 
         connector
             .set_ca_file(format!("{}/cert.pem", self.cert_dir))
-            .map_err(UniErr::map)?;
+            .map_err(SpaceErr::map)?;
 
         let ssl = connector
             .build()
             .configure()
-            .map_err(UniErr::map)?
+            .map_err(SpaceErr::map)?
             .verify_hostname(self.verify)
             .into_ssl(self.host.as_str())
-            .map_err(UniErr::map)?;
+            .map_err(SpaceErr::map)?;
 
         let stream = TcpStream::connect(&self.host).await?;
 
-        let mut stream = SslStream::new(ssl, stream).map_err(UniErr::map)?;
-        Pin::new(&mut stream).connect().await.map_err(UniErr::map)?;
+        let mut stream = SslStream::new(ssl, stream).map_err(SpaceErr::map)?;
+        Pin::new(&mut stream)
+            .connect()
+            .await
+            .map_err(SpaceErr::map)?;
         let mut stream = FrameStream::new(stream);
 
         let endpoint =
@@ -153,7 +154,7 @@ impl Frame {
         }
     }
 
-    pub fn to_string(self) -> Result<String, UniErr> {
+    pub fn to_string(self) -> Result<String, SpaceErr> {
         Ok(String::from_utf8(self.data)?)
     }
 
@@ -163,30 +164,33 @@ impl Frame {
         }
     }
 
-    pub fn to_version(self) -> Result<semver::Version, UniErr> {
+    pub fn to_version(self) -> Result<semver::Version, SpaceErr> {
         Ok(semver::Version::from_str(
             String::from_utf8(self.data)?.as_str(),
         )?)
     }
 
-    pub async fn from_stream<'a>(read: &'a mut SslStream<TcpStream>) -> Result<Frame, UniErr> {
-        let size = read.read_u32().await?;
+    pub async fn from_stream<'a>(read: &'a mut SslStream<TcpStream>) -> Result<Frame, SpaceErr> {
+        let size = read.read_u32().await? as usize;
         let mut data = Vec::with_capacity(size as usize);
-        read.read_buf(&mut data).await?;
+
+        while data.len() < size {
+            read.read_buf(&mut data).await?;
+        }
         Ok(Self { data })
     }
 
-    pub async fn to_stream<'a>(&self, write: &'a mut SslStream<TcpStream>) -> Result<(), UniErr> {
+    pub async fn to_stream<'a>(&self, write: &'a mut SslStream<TcpStream>) -> Result<(), SpaceErr> {
         write.write_u32(self.data.len() as u32).await?;
         write.write_all(self.data.as_slice()).await?;
         Ok(())
     }
 
-    pub fn to_wave(self) -> Result<UltraWave, UniErr> {
+    pub fn to_wave(self) -> Result<UltraWave, SpaceErr> {
         Ok(bincode::deserialize(self.data.as_slice())?)
     }
 
-    pub fn from_wave(wave: UltraWave) -> Result<Self, UniErr> {
+    pub fn from_wave(wave: UltraWave) -> Result<Self, SpaceErr> {
         Ok(Self {
             data: bincode::serialize(&wave)?,
         })
@@ -205,14 +209,13 @@ impl FrameMuxer {
         mut stream: FrameStream,
         status_tx: mpsc::Sender<HyperConnectionDetails>,
         logger: PointLogger,
-    ) -> Result<HyperwayEndpoint, UniErr> {
-
+    ) -> Result<HyperwayEndpoint, SpaceErr> {
         stream.write_version(&VERSION.clone()).await?;
         let in_version =
             tokio::time::timeout(Duration::from_secs(30), stream.read_version()).await??;
 
         if in_version == *VERSION {
-//            logger.info("version match");
+            //            logger.info("version match");
 
             stream.write_string("Ok".to_string()).await?;
         } else {
@@ -270,7 +273,7 @@ impl FrameMuxer {
         HyperwayEndpoint::new_with_drop(out_tx, in_rx, oneshot_terminate_tx, logger)
     }
 
-    pub async fn mux(mut self) -> Result<(), UniErr> {
+    pub async fn mux(mut self) -> Result<(), SpaceErr> {
         loop {
             tokio::select! {
                 wave = self.rx.recv() => {
@@ -290,7 +293,7 @@ impl FrameMuxer {
                     self.tx.send(wave).await?;
                        },
                        Err(err) => {
-                          //self.logger.error(format!("read stream err: {}",err.to_string()));
+//                          self.logger.error(format!("read stream err: {}",err.to_string()));
                           break
                        }
                     }
@@ -314,35 +317,35 @@ impl FrameStream {
         Self { stream }
     }
 
-    pub async fn frame(&mut self) -> Result<Frame, UniErr> {
+    pub async fn frame(&mut self) -> Result<Frame, SpaceErr> {
         Frame::from_stream(&mut self.stream).await
     }
 
-    pub async fn read_version(&mut self) -> Result<semver::Version, UniErr> {
+    pub async fn read_version(&mut self) -> Result<semver::Version, SpaceErr> {
         self.frame().await?.to_version()
     }
 
-    pub async fn read_string(&mut self) -> Result<String, UniErr> {
+    pub async fn read_string(&mut self) -> Result<String, SpaceErr> {
         self.frame().await?.to_string()
     }
 
-    pub async fn read_wave(&mut self) -> Result<UltraWave, UniErr> {
+    pub async fn read_wave(&mut self) -> Result<UltraWave, SpaceErr> {
         self.frame().await?.to_wave()
     }
 
-    pub async fn write_frame(&mut self, frame: Frame) -> Result<(), UniErr> {
+    pub async fn write_frame(&mut self, frame: Frame) -> Result<(), SpaceErr> {
         frame.to_stream(&mut self.stream).await
     }
 
-    pub async fn write_string(&mut self, string: String) -> Result<(), UniErr> {
+    pub async fn write_string(&mut self, string: String) -> Result<(), SpaceErr> {
         self.write_frame(Frame::from_string(string)).await
     }
 
-    pub async fn write_version(&mut self, version: &semver::Version) -> Result<(), UniErr> {
+    pub async fn write_version(&mut self, version: &semver::Version) -> Result<(), SpaceErr> {
         self.write_frame(Frame::from_version(version)).await
     }
 
-    pub async fn write_wave(&mut self, wave: UltraWave) -> Result<(), UniErr> {
+    pub async fn write_wave(&mut self, wave: UltraWave) -> Result<(), SpaceErr> {
         self.write_frame(Frame::from_wave(wave)?).await
     }
 }
@@ -428,7 +431,7 @@ impl HyperlaneTcpServer {
                         let logger = logger.clone();
                         tokio::spawn(async move {
                             while let Some(details) = status_rx.recv().await {
-/*                                logger.info(format!(
+                                /*                                logger.info(format!(
                                     "{} | {}",
                                     details.status.to_string(),
                                     details.info
@@ -450,7 +453,7 @@ impl HyperlaneTcpServer {
                             "expected client Substance::Knock(Knock) encountered '{}'",
                             knock.body().kind().to_string()
                         );
-                        return logger.result(Err(UniErr::str(msg).into()));
+                        return logger.result(Err(SpaceErr::str(msg).into()));
                     }
 
                     Ok(())
@@ -507,8 +510,8 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<UniErr> for Error {
-    fn from(e: UniErr) -> Self {
+impl From<SpaceErr> for Error {
+    fn from(e: SpaceErr) -> Self {
         Error::new(e)
     }
 }
@@ -547,6 +550,10 @@ mod tests {
 
     use chrono::DateTime;
     use chrono::Utc;
+    use cosmic_hyperlane::HyperClient;
+    use cosmic_space::settings::Timeouts;
+    use cosmic_space::wave::DirectedProto;
+    use cosmic_space::wave::exchange::asynch::Exchanger;
 
     use super::*;
 
@@ -596,6 +603,62 @@ mod tests {
         let test = WaveTest::new(fae_client, less_client);
 
         test.go().await.unwrap();
+
+        Ok(())
+    }
+
+
+        #[tokio::test]
+    async fn test_large_frame() -> Result<(), Error> {
+        let platform = SingleInterchangePlatform::new().await;
+
+        CertGenerator::gen(vec!["localhost".to_string()])?
+            .write_to_dir(".".to_string())
+            .await?;
+        let logger = RootLogger::default();
+        let logger = logger.point(Point::from_str("tcp-server")?);
+        let port = 4343u16;
+        let server =
+            HyperlaneTcpServer::new(port, ".".to_string(), platform.gate.clone(), logger.clone())
+                .await?;
+        let api = server.start()?;
+
+        let less_logger = logger.point(LESS.clone());
+        let less_client = Box::new(HyperlaneTcpClient::new(
+            format!("localhost:{}", port),
+            ".",
+            platform.knock(LESS.to_surface()),
+            false,
+            less_logger,
+        ));
+
+            let less_exchanger = Exchanger::new(
+                LESS.push("exchanger").unwrap().to_surface(),
+                Timeouts::default(),
+                PointLogger::default(),
+            );
+
+            let root_logger = RootLogger::default();
+            let logger = root_logger.point(Point::from_str("less-client").unwrap());
+            let less_client = HyperClient::new_with_exchanger(
+                less_client,
+                Some(less_exchanger.clone()),
+                logger,
+            ).unwrap();
+
+            less_client.wait_for_ready(Duration::from_secs(5)).await.unwrap();
+            let transmitter = less_client.transmitter_builder().await.unwrap().build();
+
+
+        let size = 100_000;
+        let mut bin = Vec::with_capacity(100_100);
+        for _ in 0..size {
+            bin.push(0u8);
+        }
+            let bin = Arc::new(bin);
+            let mut wave = DirectedProto::signal();
+            wave.body(Substance::Bin(bin));
+            transmitter.signal(wave).await.unwrap();
 
         Ok(())
     }

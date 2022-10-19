@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-use crate::err::UniErr;
+use crate::err::SpaceErr;
 use crate::loc::Meta;
-use crate::substance::{Errors, Substance};
+use crate::substance::{FormErrs, Substance};
 use crate::util::ValueMatcher;
 use crate::wave::core::{DirectedCore, HeaderMap, Method, ReflectedCore};
 use url::Url;
@@ -48,17 +48,28 @@ impl HttpRequest {
     }
 
     pub fn fail(&self, error: &str) -> ReflectedCore {
-        let errors = Errors::default(error);
+        let errors = FormErrs::default(error);
         ReflectedCore {
             headers: Default::default(),
             status: StatusCode::from_u16(500u16).unwrap(),
-            body: Substance::Errors(errors),
+            body: Substance::FormErrs(errors),
+        }
+    }
+}
+
+impl Into<DirectedCore> for HttpRequest {
+    fn into(self) -> DirectedCore {
+        DirectedCore {
+            headers: self.headers,
+            method: self.method.into(),
+            uri: self.uri,
+            body: self.body,
         }
     }
 }
 
 impl TryFrom<DirectedCore> for HttpRequest {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(core: DirectedCore) -> Result<Self, Self::Error> {
         if let Method::Http(method) = core.method {
@@ -79,7 +90,7 @@ pub struct StatusCode {
 }
 
 impl StatusCode {
-    pub fn from_u16(code: u16) -> Result<Self, UniErr> {
+    pub fn from_u16(code: u16) -> Result<Self, SpaceErr> {
         Ok(Self { code })
     }
 

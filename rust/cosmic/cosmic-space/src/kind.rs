@@ -12,14 +12,14 @@ use crate::loc::{
     MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, STAR_WAVE_TRAVERSAL_PLAN,
     STD_WAVE_TRAVERSAL_PLAN,
 };
-use crate::parse::{kind_parts, CamelCase, Domain, SkewerCase, specific};
+use crate::parse::error::result;
+use crate::parse::{kind_parts, specific, CamelCase, Domain, SkewerCase};
 use crate::particle::traversal::TraversalPlan;
 use crate::selector::{
     KindSelector, KindSelectorDef, Pattern, SpecificSelector, SubKindSelector, VersionReq,
 };
 use crate::util::ValuePattern;
-use crate::{KindTemplate, UniErr};
-use crate::parse::error::result;
+use crate::{KindTemplate, SpaceErr};
 
 impl ToBaseKind for KindParts {
     fn to_base(&self) -> BaseKind {
@@ -84,7 +84,7 @@ impl ToString for KindParts {
 }
 
 impl FromStr for KindParts {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (_, kind) = all_consuming(kind_parts)(new_span(s))?;
@@ -136,6 +136,7 @@ pub enum BaseKind {
     Global,
     Host,
     Guest,
+    Native,
 }
 
 impl BaseKind {
@@ -152,6 +153,7 @@ pub enum Sub {
     Artifact(ArtifactSubKind),
     UserBase(UserBaseSubKind),
     Star(StarSub),
+    Native(NativeSub),
 }
 
 impl Sub {
@@ -163,6 +165,7 @@ impl Sub {
             Sub::Artifact(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
             Sub::UserBase(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
             Sub::Star(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
+            Sub::Native(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
         }
     }
 
@@ -190,6 +193,7 @@ impl Into<Option<CamelCase>> for Sub {
             Sub::Artifact(a) => a.into(),
             Sub::UserBase(u) => u.into(),
             Sub::Star(s) => s.into(),
+            Sub::Native(s) => s.into(),
         }
     }
 }
@@ -203,6 +207,7 @@ impl Into<Option<String>> for Sub {
             Sub::Artifact(a) => a.into(),
             Sub::UserBase(u) => u.into(),
             Sub::Star(s) => s.into(),
+            Sub::Native(s) => s.into(),
         }
     }
 }
@@ -214,7 +219,7 @@ impl ToBaseKind for BaseKind {
 }
 
 impl TryFrom<CamelCase> for BaseKind {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(base: CamelCase) -> Result<Self, Self::Error> {
         Ok(BaseKind::from_str(base.as_str())?)
@@ -247,6 +252,7 @@ pub enum Kind {
     Global,
     Host,
     Guest,
+    Native(NativeSub),
 }
 
 impl ToBaseKind for Kind {
@@ -266,6 +272,7 @@ impl ToBaseKind for Kind {
             Kind::File(_) => BaseKind::File,
             Kind::Artifact(_) => BaseKind::Artifact,
             Kind::Database(_) => BaseKind::Database,
+            Kind::Native(_) => BaseKind::Native,
             Kind::Base => BaseKind::Base,
             Kind::Repo => BaseKind::Repo,
             Kind::Star(_) => BaseKind::Star,
@@ -298,6 +305,8 @@ impl Kind {
             Kind::Bundle => true,
             Kind::Artifact(_) => true,
             Kind::Mechtron => true,
+            Kind::Host => true,
+            Kind::Native(NativeSub::Web) => true,
             _ => false,
         }
     }
@@ -358,7 +367,7 @@ impl Kind {
 }
 
 impl TryFrom<KindParts> for Kind {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_from(value: KindParts) -> Result<Self, Self::Error> {
         Ok(match value.base {
@@ -370,7 +379,7 @@ impl TryFrom<KindParts> for Kind {
                             .ok_or("Database<Relational<?>> requires a Specific")?,
                     )),
                     what => {
-                        return Err(UniErr::from(format!(
+                        return Err(SpaceErr::from(format!(
                             "unexpected Database SubKind '{}'",
                             what
                         )));
@@ -385,7 +394,7 @@ impl TryFrom<KindParts> for Kind {
                             .ok_or("UserBase<OAuth<?>> requires a Specific")?,
                     )),
                     what => {
-                        return Err(UniErr::from(format!(
+                        return Err(SpaceErr::from(format!(
                             "unexpected Database SubKind '{}'",
                             what
                         )));
@@ -402,6 +411,9 @@ impl TryFrom<KindParts> for Kind {
 
             BaseKind::Star => Kind::Star(StarSub::from_str(
                 value.sub.ok_or("Star<?> requires a sub kind")?.as_str(),
+            )?),
+            BaseKind::Native => Kind::Native(NativeSub::from_str(
+                value.sub.ok_or("Native<?> requires a sub kind")?.as_str(),
             )?),
 
             BaseKind::Root => Kind::Root,
@@ -430,6 +442,21 @@ pub trait Tks {
     fn sub(&self) -> Option<CamelCase>;
     fn specific(&self) -> Option<Specific>;
     fn matches(&self, tks: &dyn Tks) -> bool;
+}
+
+#[derive(
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    Serialize,
+    Deserialize,
+    strum_macros::Display,
+    strum_macros::EnumString,
+)]
+pub enum NativeSub {
+    Web,
 }
 
 #[derive(
@@ -486,6 +513,24 @@ impl StarSub {
             StarSub::Machine => false,
             _ => true,
         }
+    }
+}
+
+impl Into<Sub> for NativeSub {
+    fn into(self) -> Sub {
+        Sub::Native(self)
+    }
+}
+
+impl Into<Option<CamelCase>> for NativeSub {
+    fn into(self) -> Option<CamelCase> {
+        Some(CamelCase::from_str(self.to_string().as_str()).unwrap())
+    }
+}
+
+impl Into<Option<String>> for NativeSub {
+    fn into(self) -> Option<String> {
+        Some(self.to_string())
     }
 }
 
@@ -706,7 +751,7 @@ impl ToString for Specific {
 }
 
 impl FromStr for Specific {
-    type Err = UniErr;
+    type Err = SpaceErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(specific(new_span(s)))
@@ -714,7 +759,7 @@ impl FromStr for Specific {
 }
 
 impl TryInto<SpecificSelector> for Specific {
-    type Error = UniErr;
+    type Error = SpaceErr;
 
     fn try_into(self) -> Result<SpecificSelector, Self::Error> {
         Ok(SpecificSelector {
@@ -731,11 +776,11 @@ impl TryInto<SpecificSelector> for Specific {
 pub mod test {
     use crate::parse::kind_selector;
     use crate::selector::KindSelector;
-    use crate::{Kind, StarSub, UniErr};
+    use crate::{Kind, SpaceErr, StarSub};
     use core::str::FromStr;
 
     #[test]
-    pub fn selector() -> Result<(), UniErr> {
+    pub fn selector() -> Result<(), SpaceErr> {
         let kind = Kind::Star(StarSub::Fold);
         let selector = KindSelector::from_str("<Star<Fold>>")?;
         assert!(selector.matches(&kind));

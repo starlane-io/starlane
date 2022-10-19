@@ -6,11 +6,11 @@ use cosmic_nom::new_span;
 use cosmic_space::artifact::ArtRef;
 use cosmic_space::command::common::StateSrc;
 use cosmic_space::command::direct::create::{Create, PointSegTemplate, Strategy};
-use cosmic_space::command::Command;
 use cosmic_space::command::direct::select::Select;
+use cosmic_space::command::Command;
 use cosmic_space::command::RawCommand;
 use cosmic_space::config::bind::{BindConfig, RouteSelector};
-use cosmic_space::err::UniErr;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{Assign, AssignmentKind, HyperSubstance};
 use cosmic_space::kind::Kind;
 use cosmic_space::loc::{Layer, Point, Surface, ToPoint, ToSurface};
@@ -21,6 +21,7 @@ use cosmic_space::parse::{bind_config, command_line};
 use cosmic_space::particle::{Details, PointKind, Status};
 use cosmic_space::substance::Substance;
 use cosmic_space::util::{log, ToResolved};
+use cosmic_space::wave::core::cmd::CmdMethod;
 use cosmic_space::wave::core::hyp::HypMethod;
 use cosmic_space::wave::core::CoreBounce;
 use cosmic_space::wave::core::ReflectedCore;
@@ -34,15 +35,14 @@ use cosmic_space::wave::exchange::SetStrategy;
 use cosmic_space::wave::RecipientSelector;
 use cosmic_space::wave::{Agent, DirectedProto, Handling, Pong, Scope, Wave};
 use cosmic_space::HYPERUSER;
-use cosmic_space::wave::core::cmd::CmdMethod;
 
 use crate::driver::{
     Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere,
 };
-use crate::star::{HyperStarSkel, SmartLocator};
-use crate::reg::{Registration, Registry};
-use crate::{Cosmos, DriverFactory};
 use crate::err::HyperErr;
+use crate::reg::{Registration, Registry};
+use crate::star::{HyperStarSkel, SmartLocator};
+use crate::{Cosmos, DriverFactory};
 
 /*
 #[derive(DirectedHandler,Clone)]
@@ -111,20 +111,25 @@ where
         let agent = ctx.wave().agent().clone();
         match ctx.input {
             Command::Create(create) => {
-                self.skel.logger.result(global.create(create, &agent).await)?;
+                self.skel
+                    .logger
+                    .result(global.create(create, &agent).await)?;
                 Ok(ReflectedCore::ok())
             }
             Command::Select(select) => {
                 let mut select = select.clone();
-                let substance :Substance = self.skel.registry.select(&mut select).await?.into();
+                let substance: Substance = self.skel.registry.select(&mut select).await?.into();
                 Ok(ReflectedCore::ok_body(substance))
             }
             Command::Delete(delete) => {
-                let substance :Substance = self.skel.registry.delete(delete).await?.into();
+                let substance: Substance = self.skel.registry.delete(delete).await?.into();
                 Ok(ReflectedCore::ok_body(substance))
             }
             Command::Set(set) => {
-                self.skel.registry.set_properties(&set.point, &set.properties).await?;
+                self.skel
+                    .registry
+                    .set_properties(&set.point, &set.properties)
+                    .await?;
                 Ok(ReflectedCore::ok())
             }
             Command::Read(read) => {
@@ -160,6 +165,7 @@ where
 
     #[track_caller]
     pub async fn create(&self, create: &Create, agent: &Agent) -> Result<PointKind, P::Err> {
+
         let child_kind = self
             .skel
             .machine
@@ -171,7 +177,7 @@ where
                     create.template.kind.to_string()
                 ))
             })?;
-        let point= match &create.template.point.child_segment_template {
+        let point = match &create.template.point.child_segment_template {
             PointSegTemplate::Exact(child_segment) => {
                 let point = create.template.point.parent.push(child_segment.clone());
                 match &point {
@@ -231,20 +237,21 @@ where
                 self.skel.registry.register(&registration).await?;
                 point
             }
+            PointSegTemplate::Root => {
+                Point::root()
+            }
         };
 
         if create.state.has_substance() || child_kind.is_auto_provision() {
+println!("\tprovisioning: {}", point.to_string());
             let provisioner = SmartLocator::new(self.skel.clone());
             //tokio::spawn(async move {
-            provisioner
-                .provision(&point, create.state.clone())
-                .await?;
+            provisioner.provision(&point, create.state.clone()).await?;
             //});
         }
 
-        let point_kind = PointKind::new( point,child_kind );
+        let point_kind = PointKind::new(point, child_kind);
 
         Ok(point_kind)
     }
-
 }
