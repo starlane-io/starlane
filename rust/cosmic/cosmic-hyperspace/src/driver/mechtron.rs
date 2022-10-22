@@ -32,6 +32,8 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use cosmic_space::wave::exchange::asynch::ProtoTransmitterBuilder;
+use cosmic_space::wave::exchange::SetStrategy;
 
 lazy_static! {
     static ref HOST_DRIVER_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -356,6 +358,12 @@ where
     pub async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
 
+            let mut router = LayerInjectionRouter::new( self.skel.skel.skel.clone(), assign.details.stub.point.to_surface().with_layer(Layer::Core) );
+            router.direction = Some(TraversalDirection::Fabric);
+            let mut transmitter = ProtoTransmitterBuilder::new(Arc::new(router), self.skel.skel.skel.exchanger.clone() );
+            transmitter.via = SetStrategy::Override(assign.details.stub.point.clone().to_surface());
+            let transmitter = transmitter.build();
+
             let wasm = self.skel.skel.logger.result(
                 assign
                     .details
@@ -370,7 +378,7 @@ where
             let mechtron_host = Arc::new(
                 self.skel
                     .factory
-                    .create(assign.details.clone(), bin)
+                    .create(assign.details.clone(), bin, transmitter)
                     .map_err(|e| SpaceErr::server_error("host err"))?,
             );
 

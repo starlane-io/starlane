@@ -261,7 +261,7 @@ where
     fn proto(&self) -> DirectedProto {
         let mut proto = DirectedProto::kind(&self.kind);
         proto.id = self.traversal.id().clone();
-        proto.via(Some(self.surface.clone()));
+        proto.via(&self.surface);
         proto.method(self.method.clone());
         proto.body(self.body.clone());
         proto.uri(self.uri.clone());

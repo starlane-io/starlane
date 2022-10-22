@@ -60,7 +60,8 @@ where
             transmitter.from = SetStrategy::Fill(details.stub.point.clone().to_surface());
             let transmitter = transmitter.build();
             let fetcher = GuestArtifactFetcher {
-                transmitter
+                transmitter,
+                logger: logger.clone()
             };
             ArtifactApi::new(Arc::new(fetcher))
         };
@@ -75,6 +76,10 @@ where
             transmitter,
             artifacts
         }
+    }
+
+    pub fn ctx(&self) -> GuestCtx {
+        GuestCtx::new( self.artifacts.clone() )
     }
 
     fn hosted(&self, point: &Point) -> Result<HostedMechtron, GuestErr> {
@@ -159,9 +164,9 @@ where
         } else {
             let hosted = self.skel.hosted(point)?;
             let factory = self.skel.factories.get(&hosted.name).ok_or(format!(
-                "cannot find factory assicated with name: {}",
+                "cannot find factory associated with name: {}",
                 hosted.name
-            ))?;
+            ))?.read().unwrap();
 
             let skel = self.skel.mechtron_skel(point)?;
             let mechtron = factory
@@ -239,13 +244,13 @@ where
     pub fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         self.skel.logger.info("Received Host command!");
         if let HyperSubstance::Host(host) = ctx.input {
-            let factory =
+            let mut factory =
                 self.skel
                     .logger
                     .result(self.skel.factories.get(&host.config.name).ok_or(format!(
                         "Guest does not have a mechtron with name: {}",
                         host.config.name
-                    )))?;
+                    )))?.write().unwrap();
             self.skel.logger.info("Creating...");
             self.skel.mechtrons.insert(
                 host.details.stub.point.clone(),
@@ -253,7 +258,9 @@ where
             );
 
             let skel = self.skel.mechtron_skel(&host.details.stub.point)?;
-            let mechtron = factory.lifecycle(skel)?;
+            self.skel.logger.info("CREATING MECHTRON!!!");
+            let mechtron = self.skel.logger.result(factory.new(skel, &self.skel.ctx() ))?;
+//            let mechtron = factory.lifecycle(skel)?;
             self.skel.logger.info("Got MechtronLifecycle...");
             let skel = self.skel.mechtron_skel(&host.details.stub.point)?;
             mechtron.create(skel)?;
@@ -279,6 +286,7 @@ impl HostedMechtron {
 
 
 pub struct GuestArtifactFetcher {
+    logger: PointLogger,
    transmitter:  ProtoTransmitter
 }
 
@@ -288,11 +296,17 @@ impl ArtifactFetcher for GuestArtifactFetcher {
     }
 
     fn fetch(&self, point: &Point) -> Result<Bin, SpaceErr> {
+self.logger.error(format!("FETCH: {}", point.to_string() ));
         let mut directed = DirectedProto::ping();
         directed.to(point.clone().to_surface());
         directed.method(CmdMethod::Read);
+        directed.track = true;
+
+self.logger.info("PRE");
         let pong = self.transmitter.ping(directed)?;
+self.logger.info("GOT HERE");
         pong.core.ok_or()?;
+println!("AND HERE");
         match pong.variant.core.body {
             Substance::Bin(bin) => Ok(bin),
             other => Err(SpaceErr::server_error(format!(

@@ -14,6 +14,7 @@ use wasmer::{
     imports, Array, ChainableNamedResolver, Function, ImportObject, Instance, Module,
     NamedResolver, RuntimeError, WasmPtr, WasmerEnv,
 };
+use cosmic_space::wave::exchange::asynch::ProtoTransmitter;
 
 pub static VERSION: i32 = 1;
 
@@ -360,6 +361,7 @@ pub struct WasmHost<P>
 where
     P: HostPlatform,
 {
+    transmitter: ProtoTransmitter,
     membrane: Option<Weak<WasmMembrane<P>>>,
     logger: PointLogger,
 }
@@ -368,10 +370,11 @@ impl<P> WasmHost<P>
 where
     P: HostPlatform,
 {
-    fn new(logger: PointLogger) -> Self {
+    fn new(transmitter: ProtoTransmitter,logger: PointLogger) -> Self {
         WasmHost {
             membrane: Option::None,
             logger,
+            transmitter
         }
     }
 }
@@ -427,6 +430,7 @@ where
         name: String,
         platform: P,
         logger: PointLogger,
+        transmitter: ProtoTransmitter
     ) -> Result<Arc<Self>, P::Err> {
         Self::new_with_init(
             module,
@@ -434,6 +438,7 @@ where
             "mechtron_guest_init".to_string(),
             platform,
             logger,
+            transmitter
         )
     }
 
@@ -443,8 +448,9 @@ where
         name: String,
         platform: P,
         logger: PointLogger,
+        transmitter: ProtoTransmitter
     ) -> Result<Arc<Self>, P::Err> {
-        Self::new_with_init_and_imports(module, init, name, Option::None, platform, logger)
+        Self::new_with_init_and_imports(module, init, name, Option::None, platform, logger, transmitter)
     }
 
     pub fn new_with_init_and_imports(
@@ -454,8 +460,9 @@ where
         ext_imports: Option<ImportObject>,
         platform: P,
         logger: PointLogger,
+        transmitter: ProtoTransmitter
     ) -> Result<Arc<Self>, P::Err> {
-        let host = Arc::new(RwLock::new(WasmHost::new(logger.clone())));
+        let host = Arc::new(RwLock::new(WasmHost::new(transmitter, logger.clone())));
 
         let imports = imports! {
 

@@ -133,6 +133,7 @@ where
                 Ok(ReflectedCore::ok())
             }
             Command::Read(read) => {
+println!("\tread cmd : {}", read.point.to_string());
                 // proxy the read command
                 let mut proto = DirectedProto::ping();
                 proto.method(CmdMethod::Read);

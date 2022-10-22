@@ -82,7 +82,7 @@ pub struct MechtronFactories<P>
 where
     P: Platform,
 {
-    factories: HashMap<String, Box<dyn MechtronFactory<P>>>,
+    factories: HashMap<String, RwLock<Box<dyn MechtronFactory<P>>>>,
     phantom: PhantomData<P>,
 }
 
@@ -101,15 +101,17 @@ where
         F: MechtronFactory<P>,
     {
         SkewerCase::from_str(factory.name().as_str() ).expect("Mechtron Name must be valid kebab (skewer) case (all lower case alphanumeric and dashes with leading letter)");
-        self.factories.insert(factory.name(), Box::new(factory));
+        self.factories.insert(factory.name(), RwLock::new(Box::new(factory)));
     }
 
-    pub fn get<S>(&self, name: S) -> Option<&Box<dyn MechtronFactory<P>>>
+    pub fn get<S>(&self, name: S) -> Option<&RwLock<Box<dyn MechtronFactory<P>>>>
     where
         S: ToString,
     {
         self.factories.get(&name.to_string())
     }
+
+
 }
 
 pub trait MechtronFactory<P>: Sync + Send + 'static
