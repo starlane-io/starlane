@@ -156,6 +156,12 @@ where
         Ok(())
     }
 
+    pub fn wave_to_guest(&self, wave: UltraWave) -> Result<i32,P::Err> {
+        let wave: Vec<u8> = bincode::serialize(&wave)?;
+        Ok(self.membrane.write_buffer(&wave)?)
+    }
+
+
     pub fn route(&self, wave: UltraWave) -> Result<Option<UltraWave>, P::Err> {
         let wave: Vec<u8> = bincode::serialize(&wave)?;
         let wave = self.membrane.write_buffer(&wave)?;

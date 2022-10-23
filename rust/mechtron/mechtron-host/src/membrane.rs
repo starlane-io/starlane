@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::{Arc, RwLock, Weak};
+use tokio::runtime::Handle;
 
 use crate::HostPlatform;
 use cosmic_space::err::SpaceErr;
@@ -9,7 +10,7 @@ use cosmic_space::log::PointLogger;
 use cosmic_space::substance::Substance;
 use cosmic_space::wave::core::cmd::CmdMethod;
 use cosmic_space::wave::core::Method;
-use cosmic_space::wave::UltraWave;
+use cosmic_space::wave::{DirectedProto, DirectedWave, UltraWave};
 use wasmer::{
     imports, Array, ChainableNamedResolver, Function, ImportObject, Instance, Module,
     NamedResolver, RuntimeError, WasmPtr, WasmerEnv,
@@ -511,24 +512,53 @@ where
 
 
         "mechtron_frame_to_host"=>Function::new_native_with_env(module.store(),Env{host:host.clone()},|env:&Env<P>,buffer_id:i32| -> i32 {
+
                     let membrane = env.unwrap().unwrap();
                     let wave = membrane.consume_buffer(buffer_id).unwrap();
                     let wave :UltraWave = bincode::deserialize(wave.as_slice()).unwrap();
-                    if wave.is_directed() {
-                        let wave = wave.to_directed().unwrap();
-                        if let Method::Cmd(CmdMethod::Log) = wave.core().method {
-                            if let Substance::Log(log) = wave.core().body.clone() {
-                                if wave.to().is_single() {
-                                    let to = wave.to().to_single().unwrap();
-                                    if to.point == Point::global_logger() {
-                                     membrane.logger.handle(log)
+                    let transmitter = {
+                        env.host.read().unwrap().transmitter.clone()
+                    };
+
+                    let handle = Handle::current();
+
+                    handle.block_on( async move {
+
+                        if wave.is_directed() {
+                            let wave = wave.to_directed().unwrap();
+                            if let Method::Cmd(CmdMethod::Log) = wave.core().method {
+                                if let Substance::Log(log) = wave.core().body.clone() {
+                                    if wave.to().is_single() {
+                                        let to = wave.to().to_single().unwrap();
+                                        if to.point == Point::global_logger() {
+                                         membrane.logger.handle(log)
+                                        }
                                     }
                                 }
                             }
+
+                        match wave {
+                            DirectedWave::Ping(ping) => {
+                                let proto: DirectedProto = ping.into();
+                                let pong = transmitter.ping(proto);
+                                let host = host.write().unwrap().membrane.unwrap();
+                                return host.write().unwrap().(pong.to_ultra())?;
+
+                            }
+                            DirectedWave::Ripple(ripple) => {
+                                let proto: DirectedProto = ripple.into();
+                                let echoes = transmitter.ripple( proto ).await;
+                            }
+                            DirectedWave::Signal(signal) => {
+                                transmitter.route( signal.to_ultra() ).await;
+                            }
                         }
+                    } else {
+                        transmitter.route(wave).await;
                     }
 
                     0
+                 })
             }),
 
         } };

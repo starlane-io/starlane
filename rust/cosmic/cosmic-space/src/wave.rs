@@ -790,6 +790,17 @@ pub enum BounceBacks {
     Timer(WaitTime),
 }
 
+impl BounceBacks {
+    pub fn has_bounce(&self) -> bool {
+        match self {
+            BounceBacks::None => false,
+            BounceBacks::Single => true,
+            BounceBacks::Count(_) => true,
+            BounceBacks::Timer(_) => true
+        }
+    }
+}
+
 impl<S, T> ToSubstance<S> for RippleDef<T>
 where
     Substance: ToSubstance<S>,
