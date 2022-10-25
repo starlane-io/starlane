@@ -44,7 +44,7 @@ use std::sync::{mpsc, MutexGuard};
 
 use cosmic_space::wave::Bounce;
 
-use cosmic_space::artifact::asynch::ArtifactApi;
+use cosmic_space::artifact::synch::ArtifactApi;
 use cosmic_space::wave::exchange::synch::{
     DirectedHandler, DirectedHandlerProxy, DirectedHandlerShell, ExchangeRouter, InCtx,
     ProtoTransmitter, ProtoTransmitterBuilder,

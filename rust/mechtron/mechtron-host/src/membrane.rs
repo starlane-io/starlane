@@ -520,9 +520,9 @@ where
                         env.host.read().unwrap().transmitter.clone()
                     };
 
-                    let handle = Handle::current();
+                    let (tx,mut rx) = oneshot::channel();
 
-                    handle.block_on( async move {
+                    tokio::spawn( async move {
 
                         if wave.is_directed() {
                             let wave = wave.to_directed().unwrap();
@@ -541,13 +541,13 @@ where
                             DirectedWave::Ping(ping) => {
                                 let proto: DirectedProto = ping.into();
                                 let pong = transmitter.ping(proto);
-                                let host = host.write().unwrap().membrane.unwrap();
-                                return host.write().unwrap().(pong.to_ultra())?;
-
+                                let host = host.read().unwrap();
+                                let rtn = host.wave_to_guest(pong.to_ultra()).unwrap();
+                                tx.send(rtn);
+                                return;
                             }
                             DirectedWave::Ripple(ripple) => {
-                                let proto: DirectedProto = ripple.into();
-                                let echoes = transmitter.ripple( proto ).await;
+                                    unimplemented!()
                             }
                             DirectedWave::Signal(signal) => {
                                 transmitter.route( signal.to_ultra() ).await;
@@ -557,8 +557,8 @@ where
                         transmitter.route(wave).await;
                     }
 
-                    0
-                 })
+                    tx.send(0i32);
+                 });
             }),
 
         } };
