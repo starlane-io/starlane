@@ -12,15 +12,16 @@ use cosmic_space::substance::{Bin, Substance};
 use cosmic_space::wasm::Timestamp;
 use cosmic_space::wave::{Agent, DirectedProto, UltraWave};
 use cosmic_space::{loc, VERSION};
+use cosmic_space::hyper::{HostCmd, HyperSubstance};
+use cosmic_space::wave::core::hyp::HypMethod;
+use cosmic_space::wave::exchange::asynch::ProtoTransmitter;
+
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 use threadpool::ThreadPool;
 use wasmer::Function;
 use wasmer::{imports, Cranelift, Module, Store, Universal};
 use wasmer_compiler_singlepass::Singlepass;
-use cosmic_space::hyper::{HostCmd, HyperSubstance};
-use cosmic_space::wave::core::hyp::HypMethod;
-use cosmic_space::wave::exchange::asynch::ProtoTransmitter;
 
 pub trait HostPlatform: Clone + Send + Sync
 where
