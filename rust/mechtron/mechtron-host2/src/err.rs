@@ -4,6 +4,7 @@ use std::str::Utf8Error;
 use std::string::FromUtf8Error;
 use std::sync::{MutexGuard, PoisonError};
 use std::sync::mpsc::Sender;
+use oneshot::RecvError;
 use tokio::sync;
 use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
 use crate::WasmHostCall;
@@ -36,6 +37,14 @@ impl From<Utf8Error> for DefaultHostErr {
     fn from(e: Utf8Error) -> Self {
         DefaultHostErr {
             message: e.to_string(),
+        }
+    }
+}
+
+impl From<oneshot::RecvError> for DefaultHostErr {
+    fn from(value: RecvError) -> Self {
+        Self {
+            message: value.to_string()
         }
     }
 }

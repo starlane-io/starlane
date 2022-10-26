@@ -12,20 +12,25 @@ use cosmic_space::err::SpaceErr;
 use cosmic_space::loc::{Point, ToSurface};
 use cosmic_space::particle::{Details, Property};
 use cosmic_space::substance::Bin;
-use cosmic_space::wave::UltraWave;
 use cosmic_space::wave::DirectedWave;
+use cosmic_space::wave::{DirectedKind, UltraWave, WaveKind};
 
 use wasmer::Function;
 use wasmer_compiler_singlepass::Singlepass;
 
-use cosmic_space::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
-use cosmic_space::substance::{ Substance};
-use cosmic_space::wasm::Timestamp;
-use cosmic_space::wave::{Agent, DirectedProto };
-use cosmic_space::{loc, VERSION};
 use cosmic_space::hyper::{HostCmd, HyperSubstance};
+use cosmic_space::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
+use cosmic_space::substance::Substance;
+use cosmic_space::wasm::Timestamp;
 use cosmic_space::wave::core::hyp::HypMethod;
+use cosmic_space::wave::{Agent, DirectedProto};
+use cosmic_space::{loc, VERSION};
 
+use cosmic_space::wave::core::cmd::CmdMethod;
+use cosmic_space::wave::core::Method;
+use cosmic_space::wave::exchange::asynch::ProtoTransmitter;
+use cosmic_space::wave::exchange::asynch::ProtoTransmitterBuilder;
+use cosmic_space::wave::exchange::SetStrategy;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, RwLock};
@@ -34,11 +39,6 @@ use threadpool::ThreadPool;
 use tokio::runtime::Handle;
 use tokio::sync::mpsc;
 use wasmer::{imports, Array, Instance, Module, Store, Value, WasmPtr, WasmerEnv};
-use cosmic_space::wave::core::cmd::CmdMethod;
-use cosmic_space::wave::core::Method;
-use cosmic_space::wave::exchange::asynch::ProtoTransmitter;
-use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::exchange::asynch::ProtoTransmitterBuilder;
 
 pub enum MechtronHostsCall {
     Create {
@@ -52,11 +52,14 @@ pub struct MechtronHostsRunner {
     artifacts: ArtifactApi,
     hosts: HashMap<Point, WasmHostApi>,
     mechtron_to_host: HashMap<Point, Point>,
-    transmitter: ProtoTransmitterBuilder
+    transmitter: ProtoTransmitterBuilder,
 }
 
 impl MechtronHostsRunner {
-    pub fn new(artifacts: ArtifactApi, transmitter: ProtoTransmitterBuilder) -> mpsc::Sender<MechtronHostsCall> {
+    pub fn new(
+        artifacts: ArtifactApi,
+        transmitter: ProtoTransmitterBuilder,
+    ) -> mpsc::Sender<MechtronHostsCall> {
         let (tx, rx) = mpsc::channel(1024);
         let runner = Self {
             store: Store::default(),
@@ -64,7 +67,7 @@ impl MechtronHostsRunner {
             artifacts,
             hosts: Default::default(),
             mechtron_to_host: Default::default(),
-            transmitter
+            transmitter,
         };
         tokio::spawn(async move {
             runner.start();
@@ -73,18 +76,22 @@ impl MechtronHostsRunner {
     }
 
     async fn start(mut self) {
-/*        while let Some(call) = self.rx.recv().await {
-            match call {
-                MechtronHostsCall::Create { details, rtn } => {
-                    rtn.send(self.create(details,self.transmitter.clone()).await).unwrap_or_default();
-                }
-            }
-        }
+        /*        while let Some(call) = self.rx.recv().await {
+                   match call {
+                       MechtronHostsCall::Create { details, rtn } => {
+                           rtn.send(self.create(details,self.transmitter.clone()).await).unwrap_or_default();
+                       }
+                   }
+               }
 
- */
+        */
     }
 
-    async fn create(&mut self, details: Details, mut transmitter: ProtoTransmitterBuilder) -> Result<(), SpaceErr> {
+    async fn create(
+        &mut self,
+        details: Details,
+        mut transmitter: ProtoTransmitterBuilder,
+    ) -> Result<(), SpaceErr> {
         transmitter.via = SetStrategy::Override(details.stub.point.to_surface());
         let transmitter = transmitter.build();
         let config = details
@@ -101,7 +108,8 @@ impl MechtronHostsRunner {
             host
         } else {
             let wasm = self.artifacts.wasm(&config.wasm).await?;
-            let host = WasmHost::new(&mut self.store, wasm, transmitter).map_err(|e| e.to_space_err())?;
+            let host =
+                WasmHost::new(&mut self.store, wasm, transmitter).map_err(|e| e.to_space_err())?;
             self.hosts.insert(config.wasm.clone(), host);
             self.hosts.get(&config.wasm).unwrap()
         };
@@ -111,73 +119,109 @@ impl MechtronHostsRunner {
 }
 
 pub struct WasmHostSkel {
-   pool: Arc<ThreadPool>
+    pool: Arc<ThreadPool>,
 }
 
 #[derive(Debug)]
 pub enum WasmHostCall {
-    WriteString{string: String, rtn: tokio::sync::oneshot::Sender<Result<i32,DefaultHostErr>>},
-    WriteBuffer{buffer: Vec<u8>, rtn: tokio::sync::oneshot::Sender<Result<i32,DefaultHostErr>>},
-    WaveToGuest {wave: UltraWave, rtn: tokio::sync::oneshot::Sender<Result<Option<UltraWave>,DefaultHostErr>>},
-    WaveToHost{wave: UltraWave, rtn: tokio::sync::oneshot::Sender<Result<Option<UltraWave>,DefaultHostErr>>},
-    ConsumeString{buffer_id: i32, rtn: tokio::sync::oneshot::Sender<Result<String,DefaultHostErr>>},
-    ConsumeBuffer{buffer_id: i32, rtn: tokio::sync::oneshot::Sender<Result<Vec<u8>,DefaultHostErr>>},
+    WriteString {
+        string: String,
+        rtn: tokio::sync::oneshot::Sender<Result<i32, DefaultHostErr>>,
+    },
+    WriteBuffer {
+        buffer: Vec<u8>,
+        rtn: tokio::sync::oneshot::Sender<Result<i32, DefaultHostErr>>,
+    },
+    WaveToGuest {
+        wave: UltraWave,
+        rtn: tokio::sync::oneshot::Sender<Result<Option<UltraWave>, DefaultHostErr>>,
+    },
+    WaveToHost {
+        wave: UltraWave,
+        rtn: tokio::sync::oneshot::Sender<Result<Option<UltraWave>, DefaultHostErr>>,
+    },
+    ConsumeString {
+        buffer_id: i32,
+        rtn: tokio::sync::oneshot::Sender<Result<String, DefaultHostErr>>,
+    },
+    ConsumeBuffer {
+        buffer_id: i32,
+        rtn: tokio::sync::oneshot::Sender<Result<Vec<u8>, DefaultHostErr>>,
+    },
 }
 
-#[derive(WasmerEnv,Clone)]
+#[derive(WasmerEnv, Clone)]
 pub struct WasmHostApi {
-   tx: Arc<Mutex<std::sync::mpsc::Sender<WasmHostCall>>>
+    tx: Arc<Mutex<std::sync::mpsc::Sender<WasmHostCall>>>,
 }
 
 impl WasmHostApi {
+    pub fn new(tx: std::sync::mpsc::Sender<WasmHostCall>) -> Self {
+        let tx = Arc::new(Mutex::new(tx));
+        Self { tx }
+    }
 
-        pub fn new( tx: std::sync::mpsc::Sender<WasmHostCall>) -> Self {
-            let tx = Arc::new(Mutex::new(tx));
-            Self {
-                tx
-            }
-        }
+    pub fn write_string<S: ToString>(&self, string: S) -> Result<i32, DefaultHostErr> {
+        let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .lock()?
+            .send(WasmHostCall::WriteString {
+                string: string.to_string(),
+                rtn,
+            })
+            .unwrap();
+        rtn_rx.blocking_recv()?
+    }
 
-        pub fn write_string<S: ToString>(&self, string: S) -> Result<i32, DefaultHostErr> {
-            let (rtn,mut rtn_rx) = tokio::sync::oneshot::channel();
-            self.tx.lock()?.send(WasmHostCall::WriteString {string: string.to_string(), rtn }).unwrap();
-            rtn_rx.blocking_recv()?
-        }
+    pub fn consume_string(&self, buffer_id: i32) -> Result<String, DefaultHostErr> {
+        let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .lock()?
+            .send(WasmHostCall::ConsumeString { buffer_id, rtn })
+            .unwrap();
+        rtn_rx.blocking_recv()?
+    }
 
-        pub fn consume_string(&self, buffer_id: i32 ) -> Result<String, DefaultHostErr> {
-            let (rtn,mut rtn_rx) = tokio::sync::oneshot::channel();
-            self.tx.lock()?.send(WasmHostCall::ConsumeString{ buffer_id, rtn }).unwrap();
-            rtn_rx.blocking_recv()?
-        }
+    pub fn consume_buffer(&self, buffer_id: i32) -> Result<Vec<u8>, DefaultHostErr> {
+        let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .lock()?
+            .send(WasmHostCall::ConsumeBuffer { buffer_id, rtn })
+            .unwrap();
+        rtn_rx.blocking_recv()?
+    }
 
-         pub fn consume_buffer(&self, buffer_id: i32 ) -> Result<Vec<u8>, DefaultHostErr> {
-            let (rtn,mut rtn_rx) = tokio::sync::oneshot::channel();
-            self.tx.lock()?.send(WasmHostCall::ConsumeBuffer{ buffer_id, rtn }).unwrap();
-            rtn_rx.blocking_recv()?
-        }
-
-        pub fn mechtron_frame_to_host(&self, buffer_id: i32) -> Result<Option<UltraWave>,DefaultHostErr> {
-            let (rtn,mut rtn_rx) = tokio::sync::oneshot::channel();
-            let wave = self.consume_buffer(buffer_id)?;
-            let wave: UltraWave = bincode::deserialize(wave.as_slice())?;
-            self.tx.lock()?.send(WasmHostCall::WaveToHost{ wave, rtn }).unwrap();
-            rtn_rx.blocking_recv()?
-        }
-
+    pub fn mechtron_frame_to_host(
+        &self,
+        buffer_id: i32,
+    ) -> Result<Option<UltraWave>, DefaultHostErr> {
+        let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
+        let wave = self.consume_buffer(buffer_id)?;
+        let wave: UltraWave = bincode::deserialize(wave.as_slice())?;
+        self.tx
+            .lock()?
+            .send(WasmHostCall::WaveToHost { wave, rtn })
+            .unwrap();
+        rtn_rx.blocking_recv()?
+    }
 }
 
 pub struct WasmHost {
     instance: Instance,
     pub transmitter: ProtoTransmitter,
     handle: Handle,
-    rx: std::sync::mpsc::Receiver<WasmHostCall>
+    rx: std::sync::mpsc::Receiver<WasmHostCall>,
 }
 
 impl WasmHost {
-    pub fn new(store: &mut Store, wasm: ArtRef<Bin>, transmitter: ProtoTransmitter) -> Result<WasmHostApi, DefaultHostErr> {
+    pub fn new(
+        store: &mut Store,
+        wasm: ArtRef<Bin>,
+        transmitter: ProtoTransmitter,
+    ) -> Result<WasmHostApi, DefaultHostErr> {
         let module = Module::new(store, wasm.as_slice())?;
 
-        let (tx,rx) = std::sync::mpsc::channel();
+        let (tx, rx) = std::sync::mpsc::channel();
         let host = WasmHostApi::new(tx);
 
         let handle = Handle::current();
@@ -242,15 +286,48 @@ impl WasmHost {
         } };
         let instance = Instance::new(&module, &imports)?;
 
-
         WasmHost {
             instance,
             transmitter,
             handle,
             rx,
-        }.start();
+        }
+        .start();
 
         Ok(host)
+    }
+
+    pub fn wave_to_host(&self, wave: UltraWave) -> Result<Option<UltraWave>, DefaultHostErr> {
+        let transmitter = self.transmitter.clone();
+        let (tx, mut rx): (
+            oneshot::Sender<Result<Option<UltraWave>, DefaultHostErr>>,
+            oneshot::Receiver<Result<Option<UltraWave>, DefaultHostErr>>,
+        ) = oneshot::channel();
+        self.handle.spawn(async move {
+            if wave.is_directed() {
+                let wave = wave.to_directed().unwrap();
+                match wave.directed_kind() {
+                    DirectedKind::Ping => {
+                        let wave: DirectedProto = wave.into();
+                        let pong = transmitter.ping(wave).await.unwrap();
+                        tx.send(Ok(Some(pong.to_ultra()))).unwrap_or_default();
+                    }
+                    DirectedKind::Ripple => {
+                        unimplemented!()
+                    }
+                    DirectedKind::Signal => {
+                        let wave: DirectedProto = wave.into();
+                        transmitter.signal(wave).await.unwrap_or_default();
+                        tx.send(Ok(None));
+                    }
+                }
+            } else {
+                transmitter.route(wave).await;
+                tx.send(Ok(None));
+            }
+        });
+
+        rx.recv()?
     }
 
     pub fn wave_to_guest(&self, wave: UltraWave) -> Result<i32, DefaultHostErr> {
@@ -366,7 +443,6 @@ impl WasmHost {
         Ok(raw)
     }
 
-
     fn mechtron_guest_dealloc_buffer(&self, buffer_id: i32) -> Result<(), DefaultHostErr> {
         self.instance
             .exports
@@ -375,33 +451,32 @@ impl WasmHost {
         Ok(())
     }
 
-    fn start( mut self ) {
-        thread::spawn( move || {
-        while let Ok(call) = self.rx.recv(){
-            match call {
-                WasmHostCall::WriteString { string, rtn } => {
-                    rtn.send(self.write_string(string));
-                }
-                WasmHostCall::WriteBuffer { buffer, rtn } => {
-                    rtn.send(self.write_buffer(&buffer ));
-                }
+    fn start(mut self) {
+        thread::spawn(move || {
+            while let Ok(call) = self.rx.recv() {
+                match call {
+                    WasmHostCall::WriteString { string, rtn } => {
+                        rtn.send(self.write_string(string));
+                    }
+                    WasmHostCall::WriteBuffer { buffer, rtn } => {
+                        rtn.send(self.write_buffer(&buffer));
+                    }
 
-                WasmHostCall::ConsumeString { buffer_id, rtn } => {
-                    rtn.send(self.consume_string(buffer_id));
-                }
-                WasmHostCall::ConsumeBuffer { buffer_id, rtn } => {
-                    rtn.send( self.consume_buffer(buffer_id));
-                }
-                WasmHostCall::WaveToGuest { wave, rtn } => {
-                    rtn.send(self.route(wave));
-                }
-                WasmHostCall::WaveToHost { wave, rtn } => {
-                    rtn.send(Ok(None));
+                    WasmHostCall::ConsumeString { buffer_id, rtn } => {
+                        rtn.send(self.consume_string(buffer_id));
+                    }
+                    WasmHostCall::ConsumeBuffer { buffer_id, rtn } => {
+                        rtn.send(self.consume_buffer(buffer_id));
+                    }
+                    WasmHostCall::WaveToGuest { wave, rtn } => {
+                        rtn.send(self.route(wave));
+                    }
+                    WasmHostCall::WaveToHost { wave, rtn } => {
+                        rtn.send(self.wave_to_host(wave));
+                    }
                 }
             }
-        }
         });
-
     }
 }
 
