@@ -164,12 +164,8 @@ where
         let host = self
             .skel
             .hosts
-            .get(point)
-            .ok_or(P::Err::not_found_msg(format!(
-                "could not find host for :{}",
-                point.to_string()
-            )))?
-            .value()
+            .get(point).await
+            ?
             .clone();
         let skel = HostItemSkel {
             skel: ItemSkel::new(point.clone(), Kind::Host, self.skel.skel.clone()),
@@ -287,12 +283,14 @@ where
                 .mechtron(&config)
                 .await?;
 
-            if !self.skel.wasm_to_host_lookup.contains_key(&config.wasm) {
+            let host = if let Ok(host) = &self.skel.hosts.get(&config.wasm).await {
+                host.clone()
+            } else {
                 let mut properties = SetProperties::new();
-                properties.push(PropertyMod::Set {
+                properties.push( PropertyMod::Set {
                     key: "wasm".to_string(),
-                    value: config.wasm.clone().to_string(),
-                    lock: false,
+                    value: config.wasm.to_string(),
+                    lock: false
                 });
                 let create = Create {
                     template: Template {
@@ -310,33 +308,15 @@ where
                 let mut create: DirectedProto = create.into();
                 let pong = self.ctx.transmitter.ping(create).await?;
                 pong.ok_or()?;
-
-            }
-
-            let host = self
-                .skel
-                .wasm_to_host_lookup
-                .get(&config.wasm)
-                .ok_or("expected Host to be in wasm_to_host_lookup")?
-                .value()
-                .clone();
-            let host = self
-                .skel
-                .hosts
-                .get(&host)
-                .ok_or(P::Err::new(format!(
-                    "expected host for point : {}",
-                    host.to_string()
-                )))?
-                .value()
-                .clone();
+                self.skel.hosts.get(&config.wasm).await?
+            };
 
             host.create_mechtron(host_cmd.clone());
 
             self.skel
                 .skel
                 .registry()
-                .assign_host(&host_cmd.details.stub.point, &host.details.stub.point)
+                .assign_host(&host_cmd.details.stub.point, &host_cmd.details.stub.point)
                 .await?;
 
             Ok(())
@@ -363,23 +343,8 @@ where
                     .ok_or("wasm property must be set for a Mechtron Host"),
             )?;
             let wasm_point = Point::from_str(wasm.value.as_str())?;
-            let wasm = self.skel.skel.artifacts().wasm(&wasm_point).await?;
+            self.skel.hosts.create( assign.details.stub.point.clone(), wasm_point.clone() ).await?;
 
-            let bin = wasm.deref().deref().clone();
-            let mechtron_host = Arc::new(
-                self.skel
-                    .factory
-                    .create(assign.details.clone(), bin, transmitter)
-                    .map_err(|e| SpaceErr::server_error("host err"))?,
-            );
-
-            mechtron_host.create_guest()?;
-            self.skel
-                .hosts
-                .insert(assign.details.stub.point.clone(), mechtron_host);
-            self.skel
-                .wasm_to_host_lookup
-                .insert(wasm_point, assign.details.stub.point.clone());
             Ok(())
         } else {
             Err(P::Err::new("expected HyperSubstance<Assign>"))
@@ -423,7 +388,7 @@ where
 {
     #[route("Hyp<Transport>")]
     async fn transport(&self, ctx: InCtx<'_, UltraWave>) {
-        if let Ok(Some(wave)) = self.skel.host.route(ctx.input.clone()) {
+        if let Ok(Some(wave)) = self.skel.host.transmit_to_guest(ctx.input.clone()) {
             let re = wave.clone().to_reflected().unwrap();
             ctx.transmitter.route(wave).await;
         }

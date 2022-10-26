@@ -324,7 +324,7 @@ where
 
         let logger = self.logger.push_mark("create-in-star").unwrap();
         let global = GlobalExecutionChamber::new(self.clone());
-        let point_kind = self.logger.result_ctx(
+        let details= self.logger.result_ctx(
             format!(
                 "StarSkel::create_in_star(register({}))",
                 create.template.kind.to_string()
@@ -332,15 +332,6 @@ where
             .as_str(),
             global.create(&create, &Agent::HyperUser).await,
         )?;
-
-        let details = Details {
-            stub: Stub {
-                point: point_kind.point,
-                kind: point_kind.kind,
-                status: Status::Unknown,
-            },
-            properties: Default::default(),
-        };
 
         let assign_body = Assign::new(AssignmentKind::Create, details.clone(), StateSrc::None);
         let mut assign = DirectedProto::sys(

@@ -46,9 +46,9 @@ pub struct HostsApi {
 }
 
 impl HostsApi {
-    pub async fn get( &self, point: &Point ) -> Result<WasmHostApi,SpaceErr> {
+    pub async fn get(&self, wasm: &Point ) -> Result<WasmHostApi,SpaceErr> {
        let (rtn,mut rtn_rx)  = tokio::sync::oneshot::channel();
-       self.tx.send(HostsCall::Get{ wasm: point.clone(), rtn}).await?;
+       self.tx.send(HostsCall::Get{ wasm: wasm.clone(), rtn}).await?;
         rtn_rx.await?
     }
 
@@ -177,9 +177,10 @@ pub enum WasmHostCall {
         buffer_id: i32,
         rtn: tokio::sync::oneshot::Sender<Result<Vec<u8>, DefaultHostErr>>,
     },
+
 }
 
-#[derive(WasmerEnv, Clone)]
+#[derive(WasmerEnv,Clone)]
 pub struct WasmHostApi {
     tx: Arc<Mutex<std::sync::mpsc::Sender<WasmHostCall>>>,
 }
@@ -194,6 +195,10 @@ impl WasmHostApi {
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
         self.tx.lock()?.send(WasmHostCall::Init(rtn)).unwrap();
         rtn_rx.blocking_recv()?
+    }
+
+    pub fn create_mechtron( &self, cmd: HostCmd ) {
+
     }
 
     pub fn write_string<S: ToString>(&self, string: S) -> Result<i32, DefaultHostErr> {
@@ -253,6 +258,17 @@ impl WasmHostApi {
             .send(WasmHostCall::WaveToGuest { wave, rtn })
             .unwrap();
         rtn_rx.blocking_recv()?
+    }
+
+    pub fn transmit_to_guest(&self, wave: UltraWave) -> Result<Option<UltraWave>,DefaultHostErr> {
+       let wave_id = self.wave_to_guest(wave)?;
+        if wave_id <= 0 {
+            Ok(None)
+        } else {
+            let buffer = self.consume_buffer(wave_id)?;
+            let wave: UltraWave = bincode::deserialize(buffer.as_slice())?;
+            Ok(Some(wave))
+        }
     }
 
     pub fn host_mechtron(&self, cmd: HostCmd) {
