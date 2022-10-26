@@ -53,12 +53,14 @@ pub struct MechtronHostsRunner {
     hosts: HashMap<Point, WasmHostApi>,
     mechtron_to_host: HashMap<Point, Point>,
     transmitter: ProtoTransmitterBuilder,
+    logger: RootLogger
 }
 
 impl MechtronHostsRunner {
     pub fn new(
         artifacts: ArtifactApi,
         transmitter: ProtoTransmitterBuilder,
+        logger: RootLogger
     ) -> mpsc::Sender<MechtronHostsCall> {
         let (tx, rx) = mpsc::channel(1024);
         let runner = Self {
@@ -68,6 +70,7 @@ impl MechtronHostsRunner {
             hosts: Default::default(),
             mechtron_to_host: Default::default(),
             transmitter,
+            logger
         };
         tokio::spawn(async move {
             runner.start();
@@ -107,9 +110,10 @@ impl MechtronHostsRunner {
         let host = if let Some(host) = self.hosts.get(&config.wasm) {
             host
         } else {
+            let logger = self.logger.point( details.stub.point.clone() );
             let wasm = self.artifacts.wasm(&config.wasm).await?;
             let host =
-                WasmHost::new(&mut self.store, wasm, transmitter).map_err(|e| e.to_space_err())?;
+                WasmHost::new(&mut self.store, wasm, transmitter, logger).map_err(|e| e.to_space_err())?;
             self.hosts.insert(config.wasm.clone(), host);
             self.hosts.get(&config.wasm).unwrap()
         };
@@ -124,6 +128,7 @@ pub struct WasmHostSkel {
 
 #[derive(Debug)]
 pub enum WasmHostCall {
+    Init(tokio::sync::oneshot::Sender<Result<(), DefaultHostErr>>),
     WriteString {
         string: String,
         rtn: tokio::sync::oneshot::Sender<Result<i32, DefaultHostErr>>,
@@ -134,7 +139,7 @@ pub enum WasmHostCall {
     },
     WaveToGuest {
         wave: UltraWave,
-        rtn: tokio::sync::oneshot::Sender<Result<Option<UltraWave>, DefaultHostErr>>,
+        rtn: tokio::sync::oneshot::Sender<Result<i32, DefaultHostErr>>,
     },
     WaveToHost {
         wave: UltraWave,
@@ -161,6 +166,16 @@ impl WasmHostApi {
         Self { tx }
     }
 
+    pub fn init(&self) -> Result<(),DefaultHostErr> {
+         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .lock()?
+            .send(WasmHostCall::Init(rtn)
+            )
+            .unwrap();
+        rtn_rx.blocking_recv()?
+    }
+
     pub fn write_string<S: ToString>(&self, string: S) -> Result<i32, DefaultHostErr> {
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
         self.tx
@@ -182,6 +197,15 @@ impl WasmHostApi {
         rtn_rx.blocking_recv()?
     }
 
+    pub fn write_buffer(&self, buffer: Vec<u8>) -> Result<i32, DefaultHostErr> {
+        let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .lock()?
+            .send(WasmHostCall::WriteBuffer { buffer, rtn })
+            .unwrap();
+        rtn_rx.blocking_recv()?
+    }
+
     pub fn consume_buffer(&self, buffer_id: i32) -> Result<Vec<u8>, DefaultHostErr> {
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
         self.tx
@@ -191,16 +215,22 @@ impl WasmHostApi {
         rtn_rx.blocking_recv()?
     }
 
-    pub fn mechtron_frame_to_host(
-        &self,
-        buffer_id: i32,
-    ) -> Result<Option<UltraWave>, DefaultHostErr> {
+    pub fn wave_to_host(&self, buffer_id: i32) -> Result<Option<UltraWave>, DefaultHostErr> {
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
         let wave = self.consume_buffer(buffer_id)?;
         let wave: UltraWave = bincode::deserialize(wave.as_slice())?;
         self.tx
             .lock()?
             .send(WasmHostCall::WaveToHost { wave, rtn })
+            .unwrap();
+        rtn_rx.blocking_recv()?
+    }
+
+    pub fn wave_to_guest(&self, wave: UltraWave) -> Result<i32, DefaultHostErr> {
+        let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .lock()?
+            .send(WasmHostCall::WaveToGuest { wave, rtn })
             .unwrap();
         rtn_rx.blocking_recv()?
     }
@@ -211,6 +241,7 @@ pub struct WasmHost {
     pub transmitter: ProtoTransmitter,
     handle: Handle,
     rx: std::sync::mpsc::Receiver<WasmHostCall>,
+    logger: PointLogger
 }
 
 impl WasmHost {
@@ -218,6 +249,7 @@ impl WasmHost {
         store: &mut Store,
         wasm: ArtRef<Bin>,
         transmitter: ProtoTransmitter,
+        logger: PointLogger
     ) -> Result<WasmHostApi, DefaultHostErr> {
         let module = Module::new(store, wasm.as_slice())?;
 
@@ -228,7 +260,7 @@ impl WasmHost {
 
         let imports = imports! {
 
-            "env"=>{
+        "env"=>{
              "mechtron_timestamp"=>Function::new_native_with_env(module.store(),host.clone(),|env:&WasmHostApi| {
                     chrono::Utc::now().timestamp_millis()
             }),
@@ -244,43 +276,12 @@ impl WasmHost {
 
 
         "mechtron_frame_to_host"=>Function::new_native_with_env(module.store(),host.clone(),|env:&WasmHostApi,buffer_id:i32| -> i32 {
-                    match env.mechtron_frame_to_host(buffer_id).unwrap() {
+                    match env.wave_to_host(buffer_id).unwrap() {
                         Some( wave ) => {
-                            0
+                           env.wave_to_guest(wave).unwrap()
                         }
                         None => 0
                     }
-                    /*
-                    let (tx,mut rx) = oneshot::channel();
-
-
-                    env.handle.spawn( async move {
-
-                        if wave.is_directed() {
-                            let wave = wave.to_directed().unwrap();
-                        match wave {
-                            DirectedWave::Ping(ping) => {
-                                let proto: DirectedProto = ping.into();
-                                let pong = transmitter.ping(proto);
-                                let rtn = host.wave_to_guest(pong.to_ultra()).unwrap();
-                                tx.send(rtn);
-                                return;
-                            }
-                            DirectedWave::Ripple(ripple) => {
-                                    unimplemented!()
-                            }
-                            DirectedWave::Signal(signal) => {
-                                transmitter.route( signal.to_ultra() ).await;
-                            }
-                        }
-                    } else {
-                        transmitter.route(wave).await;
-                    }
-
-                    tx.send(0i32);
-
-                 });
-                     */
             }),
 
         } };
@@ -291,10 +292,122 @@ impl WasmHost {
             transmitter,
             handle,
             rx,
+            logger
         }
         .start();
 
         Ok(host)
+    }
+
+    pub fn init(&self) -> Result<(), DefaultHostErr> {
+        let mut pass = true;
+        match self.instance.exports.get_memory("memory") {
+            Ok(_) => {
+                self.logger.info("verified: memory");
+            }
+            Err(_) => {
+                self.logger.info( "failed: memory. could not access wasm memory. (expecting the memory module named 'memory')");
+                pass = false
+            }
+        }
+
+        match self
+            .instance
+            .exports
+            .get_native_function::<i32, i32>("mechtron_guest_alloc_buffer")
+        {
+            Ok(_) => {
+                self.logger.info(
+                    "verified: mechtron_guest_alloc_buffer( i32 ) -> i32",
+                );
+            }
+            Err(_) => {
+                self.logger.info( "failed: mechtron_guest_alloc_buffer( i32 ) -> i32");
+                pass = false
+            }
+        }
+
+        match self
+            .instance
+            .exports
+            .get_native_function::<i32, WasmPtr<u8, Array>>("mechtron_guest_get_buffer_ptr")
+        {
+            Ok(_) => {
+                self.logger.info(
+                    "verified: mechtron_guest_get_buffer_ptr( i32 ) -> *const u8",
+                );
+            }
+            Err(_) => {
+                self.logger.info(
+                    "failed: mechtron_guest_get_buffer_ptr( i32 ) -> *const u8",
+                );
+                pass = false
+            }
+        }
+
+        match self
+            .instance
+            .exports
+            .get_native_function::<i32, i32>("mechtron_guest_get_buffer_len")
+        {
+            Ok(_) => {
+                self.logger.info(
+                    "verified: mechtron_guest_get_buffer_len( i32 ) -> i32",
+                );
+            }
+            Err(_) => {
+                self.logger.info(
+                    "failed: mechtron_guest_get_buffer_len( i32 ) -> i32",
+                );
+                pass = false
+            }
+        }
+        match self
+            .instance
+            .exports
+            .get_native_function::<i32, ()>("mechtron_guest_dealloc_buffer")
+        {
+            Ok(_) => {
+                self.logger.info( "verified: mechtron_guest_dealloc_buffer( i32 )");
+            }
+            Err(_) => {
+                self.logger.info( "failed: mechtron_guest_dealloc_buffer( i32 )");
+                pass = false
+            }
+        }
+
+        match self
+            .instance
+            .exports
+            .get_native_function::<(i32, i32), i32>("mechtron_guest_init")
+        {
+            Ok(func) => {
+                self.logger.info( "verified: mechtron_guest_init()");
+            }
+            Err(_) => {
+                self.logger.info( "failed: mechtron_guest_init() [NOT REQUIRED]");
+            }
+        }
+
+        {
+            let test = "Test write string";
+            match self.write_string(test) {
+                Ok(_) => {
+                    self.logger.info( "passed: write_string()");
+                }
+                Err(e) => {
+                    self.logger.error(
+                        format!("failed: write_string() mem {:?}", e).as_str(),
+                    );
+                    pass = false;
+                }
+            };
+        }
+
+        match pass {
+            true => Ok(()),
+            false => Err("init failed".into()),
+        }
     }
 
     pub fn wave_to_host(&self, wave: UltraWave) -> Result<Option<UltraWave>, DefaultHostErr> {
@@ -335,7 +448,7 @@ impl WasmHost {
         Ok(self.write_buffer(&wave)?)
     }
 
-    pub fn route(&self, wave: UltraWave) -> Result<Option<UltraWave>, DefaultHostErr> {
+    pub fn route(&self, wave: UltraWave) -> Result<i32, DefaultHostErr> {
         let wave = self.wave_to_guest(wave)?;
 
         let reflect = self
@@ -345,14 +458,7 @@ impl WasmHost {
             .unwrap()
             .call(wave)?;
 
-        if reflect == 0 {
-            Ok(None)
-        } else {
-            let reflect = self.consume_buffer(reflect)?;
-            let reflect = reflect.as_slice();
-            let reflect: UltraWave = bincode::deserialize(reflect)?;
-            Ok(Some(reflect))
-        }
+        Ok(reflect)
     }
 
     pub fn write_string<S: ToString>(&self, string: S) -> Result<i32, DefaultHostErr> {
@@ -455,6 +561,9 @@ impl WasmHost {
         thread::spawn(move || {
             while let Ok(call) = self.rx.recv() {
                 match call {
+                    WasmHostCall::Init(rtn) => {
+                        rtn.send(self.init());
+                    }
                     WasmHostCall::WriteString { string, rtn } => {
                         rtn.send(self.write_string(string));
                     }
