@@ -251,6 +251,7 @@ pub fn mech_err(item: TokenStream) -> TokenStream {
         quote!(String),
         quote!(&'static str),
         quote!(mechtron::err::GuestErr),
+        quote!(alloc::string::FromUtf8Error),
     ];
 
     let rtn = quote! {
