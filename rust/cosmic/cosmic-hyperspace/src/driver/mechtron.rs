@@ -26,14 +26,15 @@ use cosmic_space::wave::core::DirectedCore;
 use cosmic_space::wave::exchange::asynch::{InCtx, TraversalRouter};
 use cosmic_space::wave::{DirectedProto, DirectedWave, Pong, UltraWave, Wave};
 use dashmap::DashMap;
-use mechtron_host::{HostPlatform, MechtronHost, MechtronHostFactory};
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::mpsc;
 use cosmic_space::wave::exchange::asynch::ProtoTransmitterBuilder;
 use cosmic_space::wave::exchange::SetStrategy;
+use mechtron_host::{HostsCall, WasmHostApi, HostsRunner, HostsApi};
 
 lazy_static! {
     static ref HOST_DRIVER_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -212,16 +213,6 @@ where
     }
 }
 
-impl<P> HostPlatform for HostDriverPlatform<P>
-where
-    P: Cosmos,
-{
-    type Err = P::Err;
-
-    fn root_logger(&self) -> RootLogger {
-        self.logger.clone()
-    }
-}
 
 #[derive(Clone)]
 pub struct HostDriverSkel<P>
@@ -229,9 +220,7 @@ where
     P: Cosmos,
 {
     pub skel: DriverSkel<P>,
-    pub hosts: Arc<DashMap<Point, Arc<MechtronHost<HostDriverPlatform<P>>>>>,
-    pub wasm_to_host_lookup: Arc<DashMap<Point, Point>>,
-    pub factory: Arc<MechtronHostFactory<HostDriverPlatform<P>>>,
+    pub hosts: HostsApi,
     pub hosts_base: Point,
 }
 
@@ -240,14 +229,16 @@ where
     P: Cosmos,
 {
     pub fn new(skel: DriverSkel<P>) -> Self {
-        let platform = HostDriverPlatform::new(skel.logger.logger.clone());
-        let factory = Arc::new(MechtronHostFactory::new(platform));
+        let mut router = LayerInjectionRouter::new( skel.skel.clone(), skel.point.to_surface() );
+        router.direction = Some(TraversalDirection::Fabric);
+        let router = Arc::new(router);
+        let transmitter = ProtoTransmitterBuilder::new( router, skel.skel.exchanger.clone() );
+
+        let hosts= HostsRunner::new(skel.skel.machine.artifacts.clone(), transmitter, skel.logger.logger.clone() );
         let hosts_base = skel.point.push("hosts").unwrap();
         Self {
             skel,
-            hosts: Arc::new(DashMap::new()),
-            wasm_to_host_lookup: Arc::new(DashMap::new()),
-            factory,
+            hosts,
             hosts_base,
         }
     }
@@ -340,7 +331,7 @@ where
                 .value()
                 .clone();
 
-            host.create_mechtron(host_cmd.clone())?;
+            host.create_mechtron(host_cmd.clone());
 
             self.skel
                 .skel
@@ -397,29 +388,26 @@ where
 }
 
 #[derive(Clone)]
-pub struct HostItemSkel<P, H>
+pub struct HostItemSkel<P>
 where
     P: Cosmos,
-    H: HostPlatform<Err = P::Err>,
 {
     pub skel: ItemSkel<P>,
-    pub host: Arc<MechtronHost<H>>,
+    pub host: WasmHostApi,
 }
 
-pub struct HostItem<P, H>
+pub struct HostItem<P>
 where
     P: Cosmos,
-    H: HostPlatform<Err = P::Err>,
 {
-    pub skel: HostItemSkel<P, H>,
+    pub skel: HostItemSkel<P>,
 }
 
-impl<P, H> Item<P> for HostItem<P, H>
+impl<P> Item<P> for HostItem<P>
 where
     P: Cosmos,
-    H: HostPlatform<Err = P::Err>,
 {
-    type Skel = HostItemSkel<P, H>;
+    type Skel = HostItemSkel<P>;
     type Ctx = ();
     type State = ();
 
@@ -429,10 +417,9 @@ where
 }
 
 #[handler]
-impl<P, H> HostItem<P, H>
+impl<P> HostItem<P>
 where
     P: Cosmos,
-    H: HostPlatform<Err = P::Err>,
 {
     #[route("Hyp<Transport>")]
     async fn transport(&self, ctx: InCtx<'_, UltraWave>) {
@@ -444,10 +431,9 @@ where
 }
 
 #[async_trait]
-impl<P, H> ItemHandler<P> for HostItem<P, H>
+impl<P> ItemHandler<P> for HostItem<P>
 where
     P: Cosmos,
-    H: HostPlatform<Err = P::Err>,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(HOST_BIND_CONFIG.clone())

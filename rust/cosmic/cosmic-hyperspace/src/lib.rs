@@ -56,7 +56,6 @@ use cosmic_space::wave::core::ReflectedCore;
 use cosmic_space::wave::UltraWave;
 use err::HyperErr;
 use mechtron_host::err::HostErr;
-use mechtron_host::HostPlatform;
 use reg::Registry;
 
 use crate::driver::{DriverFactory, DriversBuilder};

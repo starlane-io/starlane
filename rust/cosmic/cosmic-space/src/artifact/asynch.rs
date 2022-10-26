@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use dashmap::DashMap;
+use serde::Serialize;
 use tokio::sync::watch;
 use crate::{Bin, BindConfig, Point, SpaceErr, Stub, Substance};
 use crate::artifact::ArtRef;
@@ -160,3 +162,41 @@ impl ArtifactFetcher for ReadArtifactFetcher {
         }
     }
 }
+
+pub struct MapFetcher {
+    pub map: HashMap<Point,Bin>,
+}
+
+#[async_trait]
+impl ArtifactFetcher for MapFetcher {
+    async fn stub(&self, point: &Point) -> Result<Stub, SpaceErr> {
+        todo!()
+    }
+
+    async fn fetch(&self, point: &Point) -> Result<Bin, SpaceErr> {
+        let rtn = self.map.get(point).ok_or(SpaceErr::not_found(format!("could not find {}",point.to_string())))?;
+        Ok(rtn.clone())
+    }
+}
+
+
+impl MapFetcher {
+    pub fn new() -> Self {
+        Self {
+            map: HashMap::new()
+        }
+    }
+    pub fn ser<S:Serialize>( &mut self, point: &Point, bin: S ) {
+        let bin= Arc::new(bincode::serialize(&bin).unwrap());
+        self.map.insert( point.clone(), bin);
+    }
+
+    pub fn str<S:ToString>( &mut self, point: &Point, string: S ) {
+        let bin = Arc::new(string.to_string().into_bytes());
+        self.map.insert( point.clone(), bin);
+    }
+
+
+}
+
+
