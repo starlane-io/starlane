@@ -50,6 +50,7 @@ use cosmic_space::wave::exchange::synch::{
     ProtoTransmitter, ProtoTransmitterBuilder,
 };
 use std::sync::RwLock;
+use cosmic_space::artifact::ArtRef;
 
 use crate::err::{GuestErr, MechErr};
 use crate::guest::GuestCtx;
@@ -119,7 +120,7 @@ where
     P: Platform,
 {
     fn name(&self) -> String;
-    fn new(&mut self, skel: MechtronSkel<P>, ctx: &GuestCtx) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err>;
+    fn new(&mut self, skel: MechtronSkel<P>) -> Result<(), P::Err>;
     fn lifecycle(&self, skel: MechtronSkel<P>) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err>;
     fn handler(&self, skel: MechtronSkel<P>) -> Result<Box<dyn DirectedHandler>, P::Err>;
 }
@@ -136,6 +137,7 @@ where
 {
     pub details: Details,
     pub logger: PointLogger,
+    pub artifacts: ArtifactApi,
     phantom: PhantomData<P>,
 }
 
@@ -147,13 +149,26 @@ where
         details: Details,
         logger: PointLogger,
         phantom: PhantomData<P>,
+        artifacts: ArtifactApi
     ) -> Self {
         let logger = logger.point(details.stub.point.clone());
         Self {
             details,
             logger,
             phantom,
+            artifacts
         }
+    }
+    pub fn bundle( &self ) -> Result<Point,P::Err> {
+        let config = self.details.properties.get("config").ok_or::<P::Err>("expecting mechtron to have config property set".into())?;
+        let config = Point::from_str(config.value.as_str())?;
+        let bundle = config.to_bundle()?;
+        Ok(bundle)
+    }
+
+    pub fn raw_from_bundle<S:ToString>( &self, path: S) -> Result<ArtRef<Vec<u8>>,P::Err> {
+        let point = self.bundle()?.push(path)?;
+        Ok(self.artifacts.raw(&point)?)
     }
 }
 

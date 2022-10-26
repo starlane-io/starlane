@@ -111,6 +111,7 @@ where
             hosted.details.clone(),
             logger,
             phantom,
+            self.artifacts.clone()
         );
 
         Ok(skel)
@@ -259,8 +260,8 @@ where
 
             let skel = self.skel.mechtron_skel(&host.details.stub.point)?;
             self.skel.logger.info("CREATING MECHTRON!!!");
-            let mechtron = self.skel.logger.result(factory.new(skel, &self.skel.ctx() ))?;
-//            let mechtron = factory.lifecycle(skel)?;
+            self.skel.logger.result(factory.new(skel.clone()))?;
+            let mechtron = factory.lifecycle(skel)?;
             self.skel.logger.info("Got MechtronLifecycle...");
             let skel = self.skel.mechtron_skel(&host.details.stub.point)?;
             mechtron.create(skel)?;
