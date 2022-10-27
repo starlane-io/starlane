@@ -93,7 +93,6 @@ impl ArtifactApi {
     where
         A: TryFrom<Bin, Error = SpaceErr>,
     {
-println!("FETCHING {} ", point.to_string() );
         if !point.has_bundle() {
             return Err("point is not from a bundle".into());
         }

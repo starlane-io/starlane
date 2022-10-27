@@ -308,6 +308,7 @@ where
                 let mut create: DirectedProto = create.into();
                 let pong = self.ctx.transmitter.ping(create).await?;
                 pong.ok_or()?;
+
                 self.skel.hosts.get(&config.wasm).await?
             };
 
@@ -498,7 +499,6 @@ where
 {
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
-println!("NechtronDriverHandler assign!");
         if let HyperSubstance::Assign(assign) = ctx.input {
             let logger = self.skel.logger.push_mark("assign")?;
 
@@ -509,12 +509,10 @@ println!("NechtronDriverHandler assign!");
                 .ok_or("config property must be set for a Mechtron")?;
 
             let config = Point::from_str(config.value.as_str())?;
-println!("GETTING MECHTRON CONFIG {}", config.to_string());
             let config = self
                 .skel
                 .logger
                 .result(self.skel.artifacts().mechtron(&config).await)?;
-println!("GOT MECHTRON CONFIG {}", config.point.to_string());
 
             let config = config.contents();
 

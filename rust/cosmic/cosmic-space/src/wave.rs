@@ -1722,7 +1722,6 @@ impl Pong {
             if let Substance::FormErrs(errs) = &self.core.body {
                 Err(format!("{} : {}", self.core.status.to_string(), errs.to_string()).into())
             } else if let Substance::Err(err) = &self.core.body {
-println!("\tSubstance::Err");
                 Err(err.clone())
             } else {
                 Err(self.core.status.to_string().into())

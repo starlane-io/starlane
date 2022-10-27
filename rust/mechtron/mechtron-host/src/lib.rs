@@ -100,7 +100,7 @@ impl HostsRunner {
             logger,
         };
         tokio::spawn(async move {
-            runner.start();
+            runner.start().await;
         });
         HostsApi {
             tx
@@ -109,6 +109,7 @@ impl HostsRunner {
 
     async fn start(mut self) {
                 while let Some(call) = self.rx.recv().await {
+
                    match call {
                        HostsCall::Create { point,wasm, rtn } => {
                            rtn.send(self.create_host(point, wasm, self.transmitter.clone()).await).unwrap_or_default();
@@ -137,6 +138,8 @@ impl HostsRunner {
                 .map_err(|e| e.to_space_err())?;
          self.wasm_to_host.insert(wasm.clone(), host.clone());
          self.point_to_host.insert(point,host.clone());
+
+        host.init().await;
 
         Ok(host)
     }
@@ -191,10 +194,10 @@ impl WasmHostApi {
         Self { tx }
     }
 
-    pub fn init(&self) -> Result<(), DefaultHostErr> {
+    pub async fn init(&self) -> Result<(), DefaultHostErr> {
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
         self.tx.lock()?.send(WasmHostCall::Init(rtn)).unwrap();
-        rtn_rx.blocking_recv()?
+        rtn_rx.await?
     }
 
     pub fn create_mechtron( &self, cmd: HostCmd ) {

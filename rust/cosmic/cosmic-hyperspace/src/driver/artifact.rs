@@ -715,7 +715,6 @@ where
 
     #[route("Cmd<Read>")]
     pub async fn read(&self, _ctx: InCtx<'_, ()>) -> Result<Substance, P::Err> {
-println!("READ: {}", _ctx.to().point.to_string() );
         if let Kind::Artifact(ArtifactSubKind::Dir) = self.skel.kind {
             return Ok(Substance::Empty);
         }
