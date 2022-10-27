@@ -1703,14 +1703,11 @@ impl Point {
                     format!("{}{}", self.to_string(), segment)
                 }
                 PointSeg::Version(_) => {
-                    if segment != "/" {
-                        return Err(format!(
-                            "expected Root filesystem artifact '/' encountered: {}",
-                            segment
-                        )
-                        .into());
+                    if segment.starts_with(":") {
+                        format!("{}{}", self.to_string(), segment)
+                    } else {
+                        format!("{}:{}", self.to_string(), segment)
                     }
-                    format!("{}:/", self.to_string())
                 }
                 PointSeg::File(_) => return Err("cannot append to a file".into()),
             };
@@ -2045,5 +2042,14 @@ pub mod test {
         let parent = point.parent().unwrap();
         assert!(!parent.is_local_root());
         assert_eq!(parent.to_string(), "GLOBAL::ROOT".to_string())
+    }
+
+    #[test]
+    pub fn test_push_fs() {
+        let point = Point::from_str("repo:some:1.0.0:/blah").unwrap();
+        let bundle = point.to_bundle().unwrap();
+        println!("{}", bundle.to_string());
+        let root = bundle.clone().push(":/").unwrap();
+        println!("{}", root.to_string());
     }
 }
