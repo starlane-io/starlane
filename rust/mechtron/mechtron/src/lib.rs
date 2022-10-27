@@ -162,7 +162,7 @@ where
     pub fn bundle( &self ) -> Result<Point,P::Err> {
         let config = self.details.properties.get("config").ok_or::<P::Err>("expecting mechtron to have config property set".into())?;
         let config = Point::from_str(config.value.as_str())?;
-        let bundle = config.to_bundle()?;
+        let bundle = config.to_bundle()?.push(":/")?;
         Ok(bundle)
     }
 

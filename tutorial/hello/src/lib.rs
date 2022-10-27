@@ -122,7 +122,7 @@ where
     }
 
     fn cache(skel: Self::Skel) -> Result<Option<Self::Cache>, P::Err> {
-        let template = skel.raw_from_bundle("/template/index.html")?;
+        let template = skel.raw_from_bundle("template/index.html")?;
         let template = String::from_utf8((**template).clone())?;
 
         let mut handlebars = Handlebars::new();
