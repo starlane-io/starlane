@@ -312,7 +312,7 @@ where
                 self.skel.hosts.get(&config.wasm).await?
             };
 
-            host.create_mechtron(host_cmd.clone());
+            host.create_mechtron(host_cmd.clone()).await;
 
             self.skel
                 .skel
@@ -344,7 +344,7 @@ where
                     .ok_or("wasm property must be set for a Mechtron Host"),
             )?;
             let wasm_point = Point::from_str(wasm.value.as_str())?;
-            self.skel.hosts.create( assign.details.stub.point.clone(), wasm_point.clone() ).await?;
+            self.skel.hosts.create( assign.details.clone(), wasm_point.clone() ).await?;
 
             Ok(())
         } else {

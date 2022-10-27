@@ -186,7 +186,7 @@ where
 /// Create a Mechtron by implementing this trait.
 /// Mechtrons are created per request and disposed of afterwards...
 /// Implementers of this trait should only hold references to
-/// Mechtron::Skel, Mechtron::Ctx, Mechtron::Cache & Mechtron::State at most.
+/// Mechtron::Skel, Mechtron::Cache & Mechtron::State at most.
 pub trait Mechtron<P>: MechtronLifecycle<P> + Sync + Send + 'static
 where
     P: Platform,
