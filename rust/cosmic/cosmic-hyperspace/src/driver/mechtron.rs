@@ -164,7 +164,7 @@ where
         let host = self
             .skel
             .hosts
-            .get(point).await
+            .get_via_point(point).await
             ?
             .clone();
         let skel = HostItemSkel {
@@ -283,7 +283,7 @@ where
                 .mechtron(&config)
                 .await?;
 
-            let host = if let Ok(host) = &self.skel.hosts.get(&config.wasm).await {
+            let host = if let Ok(host) = &self.skel.hosts.get_via_wasm(&config.wasm).await {
                 host.clone()
             } else {
                 let mut properties = SetProperties::new();
@@ -309,7 +309,7 @@ where
                 let pong = self.ctx.transmitter.ping(create).await?;
                 pong.ok_or()?;
 
-                self.skel.hosts.get(&config.wasm).await?
+                self.skel.hosts.get_via_wasm(&config.wasm).await?
             };
 
             host.create_mechtron(host_cmd.clone()).await;
@@ -388,11 +388,13 @@ where
     P: Cosmos,
 {
     #[route("Hyp<Transport>")]
-    async fn transport(&self, ctx: InCtx<'_, UltraWave>) {
-        if let Ok(Some(wave)) = self.skel.host.transmit_to_guest(ctx.input.clone()) {
+    async fn transport(&self, ctx: InCtx<'_, UltraWave>)  -> Result<(),P::Err>{
+        let wave = ctx.wave().clone().to_ultra().unwrap_from_transport()?;
+        if let Ok(Some(wave)) = self.skel.host.transmit_to_guest(wave) {
             let re = wave.clone().to_reflected().unwrap();
             ctx.transmitter.route(wave).await;
         }
+        Ok(())
     }
 }
 

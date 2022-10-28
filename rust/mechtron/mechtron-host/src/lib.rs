@@ -42,26 +42,48 @@ use wasmer::{imports, Array, Instance, Module, Store, Value, WasmPtr, WasmerEnv}
 
 #[derive(Clone)]
 pub struct HostsApi {
-    tx: tokio::sync::mpsc::Sender<HostsCall>
+    tx: tokio::sync::mpsc::Sender<HostsCall>,
 }
 
 impl HostsApi {
-    pub async fn get(&self, wasm: &Point ) -> Result<WasmHostApi,SpaceErr> {
-       let (rtn,mut rtn_rx)  = tokio::sync::oneshot::channel();
-       self.tx.send(HostsCall::Get{ wasm: wasm.clone(), rtn}).await?;
+    pub async fn get_via_wasm(&self, wasm: &Point) -> Result<WasmHostApi, SpaceErr> {
+        let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(HostsCall::GetViaWasm {
+                wasm: wasm.clone(),
+                rtn,
+            })
+            .await?;
         rtn_rx.await?
     }
 
-    pub async fn create( &self, details: Details, wasm: Point) -> Result<WasmHostApi,SpaceErr> {
-       let (rtn,mut rtn_rx)  = tokio::sync::oneshot::channel();
-       self.tx.send(HostsCall::Create{ details, wasm, rtn}).await?;
+    pub async fn get_via_point(&self, point: &Point) -> Result<WasmHostApi, SpaceErr> {
+        let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(HostsCall::GetViaPoint {
+                point: point.clone(),
+                rtn,
+            })
+            .await?;
+        rtn_rx.await?
+    }
+
+    pub async fn create(&self, details: Details, wasm: Point) -> Result<WasmHostApi, SpaceErr> {
+        let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(HostsCall::Create { details, wasm, rtn })
+            .await?;
         rtn_rx.await?
     }
 }
 
 pub enum HostsCall {
-    Get{
+    GetViaWasm {
         wasm: Point,
+        rtn: tokio::sync::oneshot::Sender<Result<WasmHostApi, SpaceErr>>,
+    },
+    GetViaPoint {
+        point: Point,
         rtn: tokio::sync::oneshot::Sender<Result<WasmHostApi, SpaceErr>>,
     },
     Create {
@@ -75,11 +97,11 @@ pub struct HostsRunner {
     store: Store,
     artifacts: ArtifactApi,
     wasm_to_host: HashMap<Point, WasmHostApi>,
-    point_to_host : HashMap<Point, WasmHostApi>,
+    point_to_host: HashMap<Point, WasmHostApi>,
     mechtron_to_host: HashMap<Point, Point>,
     transmitter: ProtoTransmitterBuilder,
     logger: RootLogger,
-    rx: tokio::sync::mpsc::Receiver<HostsCall>
+    rx: tokio::sync::mpsc::Receiver<HostsCall>,
 }
 
 impl HostsRunner {
@@ -102,25 +124,31 @@ impl HostsRunner {
         tokio::spawn(async move {
             runner.start().await;
         });
-        HostsApi {
-            tx
-        }
+        HostsApi { tx }
     }
 
     async fn start(mut self) {
-                while let Some(call) = self.rx.recv().await {
-
-                   match call {
-                       HostsCall::Create { details,wasm, rtn } => {
-                           rtn.send(self.create_host(details, wasm, self.transmitter.clone()).await).unwrap_or_default();
-                       }
-                       HostsCall::Get { wasm, rtn } => {
-                          rtn.send(self.wasm_to_host.get( &wasm ).cloned().ok_or(format!("could not get host: {}", wasm.to_string()).into()) );
-
-                       }
-                   }
-               }
-
+        while let Some(call) = self.rx.recv().await {
+            match call {
+                HostsCall::Create { details, wasm, rtn } => {
+                    rtn.send(
+                        self.create_host(details, wasm, self.transmitter.clone())
+                            .await,
+                    )
+                    .unwrap_or_default();
+                }
+                HostsCall::GetViaWasm { wasm, rtn } => {
+                    rtn.send(self.wasm_to_host.get(&wasm).cloned().ok_or(
+                        format!("could not get host via wasm: {}", wasm.to_string()).into(),
+                    ));
+                }
+                HostsCall::GetViaPoint { point, rtn } => {
+                    rtn.send(self.point_to_host.get(&point).cloned().ok_or(
+                        format!("could not get host via point: {}", point.to_string()).into(),
+                    ));
+                }
+            }
+        }
     }
 
     async fn create_host(
@@ -135,17 +163,20 @@ impl HostsRunner {
         let logger = self.logger.point(details.stub.point.clone());
         let bin = self.artifacts.wasm(&wasm).await?;
         let host = WasmHostRunner::new(details.clone(), &mut self.store, bin, transmitter, logger)
-                .map_err(|e| e.to_space_err())?;
-         self.wasm_to_host.insert(wasm.clone(), host.clone());
-         self.point_to_host.insert(details.stub.point,host.clone());
+            .map_err(|e| e.to_space_err())?;
+        self.wasm_to_host.insert(wasm.clone(), host.clone());
+        self.point_to_host.insert(details.stub.point, host.clone());
 
         host.init().await;
 
         Ok(host)
     }
 
-    pub fn get(&self, point: &Point) -> Result<WasmHostApi,SpaceErr> {
-        self.point_to_host.get(point).cloned().ok_or(format!("cannot find host: {}",point.to_string()).into())
+    pub fn get(&self, point: &Point) -> Result<WasmHostApi, SpaceErr> {
+        self.point_to_host
+            .get(point)
+            .cloned()
+            .ok_or(format!("cannot find host: {}", point.to_string()).into())
     }
 }
 
@@ -156,7 +187,10 @@ pub struct WasmHostSkel {
 #[derive(Debug)]
 pub enum WasmHostCall {
     Init(tokio::sync::oneshot::Sender<Result<(), DefaultHostErr>>),
-    HostCmd{cmd: HostCmd, rtn: tokio::sync::oneshot::Sender<Result<(), DefaultHostErr>>},
+    HostCmd {
+        cmd: HostCmd,
+        rtn: tokio::sync::oneshot::Sender<Result<(), DefaultHostErr>>,
+    },
     WriteString {
         string: String,
         rtn: tokio::sync::oneshot::Sender<Result<i32, DefaultHostErr>>,
@@ -181,16 +215,15 @@ pub enum WasmHostCall {
         buffer_id: i32,
         rtn: tokio::sync::oneshot::Sender<Result<Vec<u8>, DefaultHostErr>>,
     },
-
 }
 
-#[derive(WasmerEnv,Clone)]
+#[derive(WasmerEnv, Clone)]
 pub struct WasmHostApi {
     tx: Arc<Mutex<std::sync::mpsc::Sender<WasmHostCall>>>,
 }
 
 impl WasmHostApi {
-    pub fn new( tx: std::sync::mpsc::Sender<WasmHostCall>) -> Self {
+    pub fn new(tx: std::sync::mpsc::Sender<WasmHostCall>) -> Self {
         let tx = Arc::new(Mutex::new(tx));
         Self { tx }
     }
@@ -201,9 +234,12 @@ impl WasmHostApi {
         rtn_rx.await?
     }
 
-    pub async fn create_mechtron( &self, cmd: HostCmd ) -> Result<(),DefaultHostErr>{
+    pub async fn create_mechtron(&self, cmd: HostCmd) -> Result<(), DefaultHostErr> {
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
-        self.tx.lock()?.send(WasmHostCall::HostCmd{cmd,rtn}).unwrap();
+        self.tx
+            .lock()?
+            .send(WasmHostCall::HostCmd { cmd, rtn })
+            .unwrap();
         rtn_rx.await?
     }
 
@@ -251,7 +287,6 @@ impl WasmHostApi {
         let wave = self.consume_buffer(buffer_id)?;
         let wave: UltraWave = bincode::deserialize(wave.as_slice())?;
 
-
         self.tx
             .lock()?
             .send(WasmHostCall::WaveToHost { wave, rtn })
@@ -268,8 +303,8 @@ impl WasmHostApi {
         rtn_rx.blocking_recv()?
     }
 
-    pub fn transmit_to_guest(&self, wave: UltraWave) -> Result<Option<UltraWave>,DefaultHostErr> {
-       let wave_id = self.wave_to_guest(wave)?;
+    pub fn transmit_to_guest(&self, wave: UltraWave) -> Result<Option<UltraWave>, DefaultHostErr> {
+        let wave_id = self.wave_to_guest(wave)?;
         if wave_id <= 0 {
             Ok(None)
         } else {
@@ -279,8 +314,7 @@ impl WasmHostApi {
         }
     }
 
-    pub fn host_mechtron(&self, cmd: HostCmd) {
-    }
+    pub fn host_mechtron(&self, cmd: HostCmd) {}
 }
 
 pub struct WasmHostRunner {
@@ -324,7 +358,9 @@ impl WasmHostRunner {
         "mechtron_frame_to_host"=>Function::new_native_with_env(module.store(),api.clone(),|env:&WasmHostApi,buffer_id:i32| -> i32 {
                     match env.wave_to_host(buffer_id).unwrap() {
                         Some( wave ) => {
-                           env.wave_to_guest(wave).unwrap()
+                           let rtn = env.wave_to_guest(wave).unwrap();
+println!("\trtn mechtron_frame_to_host {} ", rtn);
+                            rtn
                         }
                         None => 0
                     }
@@ -368,7 +404,7 @@ impl WasmHostRunner {
                         rtn.send(host.consume_buffer(buffer_id));
                     }
                     WasmHostCall::WaveToGuest { wave, rtn } => {
-                        rtn.send(host.route(wave));
+                        rtn.send(host.wave_to_guest(wave));
                     }
                     WasmHostCall::WaveToHost { wave, rtn } => {
                         rtn.send(host.wave_to_host(wave));
@@ -549,7 +585,6 @@ impl WasmHost {
 
         match pass {
             true => {
-
                 let version = self.write_string(VERSION.to_string())?;
                 let details: Vec<u8> = bincode::serialize(&self.details)?;
                 let details = self.write_buffer(&details)?;
@@ -564,7 +599,7 @@ impl WasmHost {
                 } else {
                     Err(format!("Mechtron init error {} ", ok).into())
                 }
-            },
+            }
             false => Err("init failed".into()),
         }
     }
@@ -593,11 +628,12 @@ impl WasmHost {
                     }
                 }
 
-
                 match wave.directed_kind() {
                     DirectedKind::Ping => {
                         let wave: DirectedProto = wave.into();
+println!("\tping!");
                         let pong = transmitter.ping(wave).await.unwrap();
+println!("\tpong!");
                         tx.send(Ok(Some(pong.to_ultra()))).unwrap_or_default();
                     }
                     DirectedKind::Ripple => {
@@ -732,7 +768,7 @@ impl WasmHost {
         Ok(())
     }
 
-    fn create_mechtron(&self, host_cmd: HostCmd ) -> Result<(),DefaultHostErr> {
+    fn create_mechtron(&self, host_cmd: HostCmd) -> Result<(), DefaultHostErr> {
         let mut wave = DirectedProto::ping();
         wave.to(self.details.stub.point.to_surface().with_layer(Layer::Core));
         wave.from(self.details.stub.point.to_surface().with_layer(Layer::Host));
@@ -747,16 +783,14 @@ impl WasmHost {
 
 #[cfg(test)]
 pub mod test {
-    use std::fs;
     use crate::HostsRunner;
+    use cosmic_space::artifact::asynch::MapFetcher;
     use cosmic_space::loc::Point;
     use cosmic_space::particle::Details;
+    use std::fs;
     use std::str::FromStr;
     use std::sync::Arc;
-    use cosmic_space::artifact::asynch::MapFetcher;
 
     #[tokio::test]
-    pub async fn test() {
-
-    }
+    pub async fn test() {}
 }

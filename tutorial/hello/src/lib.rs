@@ -134,6 +134,8 @@ where
                 .cloned()
                 .ok_or("expecting template")?,
         );
+
+        skel.logger.info("MECHTRON CACHE COMPLETE!");
         Ok(Some(template))
     }
 }

@@ -1,6 +1,9 @@
 
 clean:
 	rm -rf target || true
+	rm bundle.zip || true
+	rm bundle/wasm/* || true
+
 
 
 all: 

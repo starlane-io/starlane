@@ -301,13 +301,12 @@ self.logger.error(format!("FETCH: {}", point.to_string() ));
         let mut directed = DirectedProto::ping();
         directed.to(point.clone().to_surface());
         directed.method(CmdMethod::Read);
-        directed.track = true;
 
 self.logger.info("PRE");
-        let pong = self.transmitter.ping(directed)?;
+        let pong = self.logger.result(self.transmitter.ping(directed))?;
 self.logger.info("GOT HERE");
         pong.core.ok_or()?;
-println!("AND HERE");
+self.logger.info("AND HERE");
         match pong.variant.core.body {
             Substance::Bin(bin) => Ok(bin),
             other => Err(SpaceErr::server_error(format!(
