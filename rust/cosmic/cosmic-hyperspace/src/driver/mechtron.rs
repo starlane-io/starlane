@@ -267,6 +267,7 @@ where
     #[route("Hyp<Host>")]
     pub async fn host(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         if let HyperSubstance::Host(host_cmd) = ctx.input {
+
             let config = host_cmd
                 .details
                 .properties
@@ -317,7 +318,7 @@ where
             self.skel
                 .skel
                 .registry()
-                .assign_host(&host_cmd.details.stub.point, &host_cmd.details.stub.point)
+                .assign_host(&host_cmd.details.stub.point, &host.point().await?)
                 .await?;
 
             Ok(())
@@ -391,7 +392,7 @@ where
     async fn transport(&self, ctx: InCtx<'_, UltraWave>)  -> Result<(),P::Err>{
         let wave = ctx.wave().clone().to_ultra().unwrap_from_transport()?;
         if let Ok(Some(wave)) = self.skel.host.transmit_to_guest(wave) {
-            let re = wave.clone().to_reflected().unwrap();
+println!("\t host receive TRANSPORT: {}",wave.to().to_string());
             ctx.transmitter.route(wave).await;
         }
         Ok(())
@@ -575,6 +576,7 @@ where
             .to_surface()
             .with_layer(Layer::Core);
 
+println!("\tTransporting to host: {}", host.to_string());
         let transport =
             wave.wrap_in_transport(self.skel.point.to_surface().with_layer(Layer::Core), host);
         self.ctx.transmitter.signal(transport).await?;

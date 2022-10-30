@@ -305,7 +305,12 @@ pub fn route(attr: TokenStream, input: TokenStream) -> TokenStream {
           let ctx: #in_ctx<'_,#item> = match ctx.push::<#item>() {
               Ok(ctx) => ctx,
               Err(err) => {
-                  return cosmic_space::wave::core::CoreBounce::Reflected(err.into());
+                    if ctx.wave.is_signal() {
+                      return cosmic_space::wave::core::CoreBounce::Absorbed;
+                    }
+                    else {
+                      return cosmic_space::wave::core::CoreBounce::Reflected(err.into());
+                    }
               }
           };
 

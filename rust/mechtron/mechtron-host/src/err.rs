@@ -6,6 +6,7 @@ use std::sync::{MutexGuard, PoisonError};
 use std::sync::mpsc::Sender;
 use oneshot::RecvError;
 use tokio::sync;
+use tokio::sync::mpsc::error::SendError;
 use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
 use crate::WasmHostCall;
 
@@ -37,6 +38,14 @@ impl From<Utf8Error> for DefaultHostErr {
     fn from(e: Utf8Error) -> Self {
         DefaultHostErr {
             message: e.to_string(),
+        }
+    }
+}
+
+impl From<tokio::sync::mpsc::error::SendError<WasmHostCall>> for DefaultHostErr {
+    fn from(err: SendError<WasmHostCall>) -> Self {
+        DefaultHostErr {
+            message: err.to_string()
         }
     }
 }

@@ -390,6 +390,7 @@ impl UltraWave {
         }
     }
 
+
     pub fn to_signal(self) -> Result<Wave<Signal>, SpaceErr> {
         match self {
             UltraWave::Signal(signal) => Ok(signal),
@@ -1904,6 +1905,13 @@ impl DirectedWave {
             DirectedWave::Ping(ping) => ping.hops.clone(),
             DirectedWave::Ripple(ripple) => ripple.hops.clone(),
             DirectedWave::Signal(signal) => signal.hops.clone(),
+        }
+    }
+
+   pub fn is_signal(&self) -> bool {
+         match self {
+            DirectedWave::Signal(_) => true,
+            _ => false
         }
     }
 

@@ -18,7 +18,7 @@ pub mod convert {
     use cosmic_hyperspace::err::{ErrKind, HyperErr};
 //    use cosmic_registry_postgres::err::PostErr;
     use cosmic_space::err::SpaceErr;
-    use mechtron_host::err::HostErr;
+    use mechtron_host::err::{DefaultHostErr, HostErr};
     use sqlx::Error;
     use std::io;
     use std::str::Utf8Error;
@@ -77,6 +77,16 @@ pub mod convert {
     }
 
  */
+
+
+  impl From<DefaultHostErr> for Err {
+        fn from(e: DefaultHostErr) -> Self {
+            Self {
+                kind: ErrKind::Default,
+                message: e.to_string(),
+            }
+        }
+    }
     impl HyperErr for Err {
         fn to_space_err(&self) -> SpaceErr {
             SpaceErr::server_error(self.to_string())

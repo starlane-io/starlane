@@ -1140,7 +1140,7 @@ where
                     match item.handle(ctx).await {
                         CoreBounce::Absorbed => {}
                         CoreBounce::Reflected(reflected) => {
-                            let reflection = reflection.unwrap();
+                            let reflection = reflection?;
 
                             let wave = reflection.make(reflected, self.surface.clone());
                             let wave = wave.to_ultra();
