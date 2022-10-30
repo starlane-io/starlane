@@ -1,10 +1,16 @@
 #![allow(warnings)]
 
+pub mod err;
+
 #[macro_use]
 extern crate lazy_static;
 
 #[macro_use]
 extern crate cosmic_macros;
+
+#[macro_use]
+extern crate cosmic_macros_primitive;
+
 
 use cosmic_macros::handler_sync;
 use cosmic_space::err::SpaceErr;
@@ -16,7 +22,7 @@ use cosmic_space::wave::core::CoreBounce;
 use cosmic_space::wave::exchange::synch::{
     DirectedHandler, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx,
 };
-use handlebars::{Handlebars, Template};
+use handlebars::{Handlebars, Renderable, Template};
 use mechtron::err::{GuestErr, MechErr};
 use mechtron::guest::{GuestCtx, GuestSkel};
 use mechtron::{guest, Guest, MechtronFactories, MechtronFactory, Platform};
@@ -24,6 +30,8 @@ use mechtron::{Mechtron, MechtronLifecycle, MechtronSkel};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
+use crate::err::MyErr;
+use serde_json::json;
 
 #[no_mangle]
 pub extern "C" fn mechtron_guest(details: Details) -> Result<Arc<dyn mechtron::Guest>, GuestErr> {
@@ -37,7 +45,7 @@ pub extern "C" fn mechtron_guest(details: Details) -> Result<Arc<dyn mechtron::G
 pub struct MyPlatform;
 
 impl Platform for MyPlatform {
-    type Err = GuestErr;
+    type Err = MyErr;
     fn factories(&self) -> Result<MechtronFactories<Self>, Self::Err>
     where
         Self: Sized,
@@ -56,7 +64,7 @@ impl MyPlatform {
 
 pub struct MyMechtronFactory
 {
-    pub cache: HashMap<Point,Arc<Template>>,
+    pub cache: HashMap<Point,Arc<Handlebars<'static>>>,
 }
 
 impl MyMechtronFactory
@@ -106,7 +114,7 @@ where
     P: Platform + 'static,
 {
     skel: MechtronSkel<P>,
-    cache: Arc<Template>,
+    cache: Arc<Handlebars<'static>>,
 }
 
 impl<P> Mechtron<P> for MyMechtron<P>
@@ -114,7 +122,7 @@ where
     P: Platform + 'static,
 {
     type Skel = MechtronSkel<P>;
-    type Cache = Arc<Template>;
+    type Cache = Arc<Handlebars<'static>>;
     type State = ();
 
     fn restore(skel: Self::Skel, cache: Self::Cache, _state: Self::State) -> Self {
@@ -128,30 +136,24 @@ where
         let mut handlebars = Handlebars::new();
 
         handlebars.register_template_string("template", template);
-        let template = Arc::new(
-            handlebars
-                .get_template("template")
-                .cloned()
-                .ok_or("expecting template")?,
-        );
 
         skel.logger.info("MECHTRON CACHE COMPLETE!");
-        Ok(Some(template))
+        Ok(Some(Arc::new(handlebars)))
     }
 }
 
 impl<P> MechtronLifecycle<P> for MyMechtron<P> where P: Platform + 'static {}
 
 #[handler_sync]
-impl<P> MyMechtron<P>
+impl <P> MyMechtron<P>
 where
     P: Platform + 'static,
 {
     #[route("Http<Get>")]
-    pub fn hello(&self, ctx: InCtx<'_, ()>) -> Result<Substance, P::Err> {
+    pub fn hello(&self, ctx: InCtx<'_, ()>) -> Result<Substance, MyErr> {
+        let render = self.cache.render("template", &json!({"title": "My Mechtron", "message": "Hello World"}) )?;
 
-        ctx.logger.info("\tHELLO WORLD");
-        Ok(Substance::Text("Hello, World!".to_string()))
+        Ok(Substance::Text(render))
     }
 }
 
