@@ -200,9 +200,13 @@ pub enum WasmHostCall {
         buffer: Vec<u8>,
         rtn: tokio::sync::oneshot::Sender<Result<i32, DefaultHostErr>>,
     },
-    WaveToGuest {
+    SerializeWaveToGuest {
         wave: UltraWave,
         rtn: tokio::sync::oneshot::Sender<Result<i32, DefaultHostErr>>,
+    },
+    DeSerializeWaveToHost{
+        wave: i32,
+        rtn: tokio::sync::oneshot::Sender<Result<UltraWave, DefaultHostErr>>,
     },
     WaveToHost {
         wave: UltraWave,
@@ -324,12 +328,12 @@ println!("return from INIT...");
         })
     }
 
-    pub fn wave_to_guest(&self, wave: UltraWave) -> Result<i32, DefaultHostErr> {
+    pub fn serialize_wave_to_guest(&self, wave: UltraWave) -> Result<i32, DefaultHostErr> {
         let api = self.clone();
         tokio::task::block_in_place(move || {
             Handle::current().block_on(async move {
                 let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
-                api.tx.send(WasmHostCall::WaveToGuest { wave, rtn }).await?;
+                api.tx.send(WasmHostCall::SerializeWaveToGuest { wave, rtn }).await?;
                 rtn_rx.await?
             })
         })
@@ -347,10 +351,9 @@ println!("return from INIT...");
     }
 
     pub fn transmit_to_guest(&self, wave: UltraWave) -> Result<Option<UltraWave>, DefaultHostErr> {
-        let wave_id = self.wave_to_guest(wave)?;
-        let buffer = self.consume_buffer(wave_id)?;
-        let wave: UltraWave = bincode::deserialize(buffer.as_slice())?;
-        Ok(Some(wave))
+        let wave_id = self.serialize_wave_to_guest(wave)?;
+        let rtn = self.guest_consume_wave(wave_id)?;
+        Ok(rtn)
     }
 
     pub fn host_mechtron(&self, cmd: HostCmd) {}
@@ -397,7 +400,7 @@ impl WasmHostRunner {
                 "mechtron_frame_to_host"=>Function::new_native_with_env(module.store(),api.clone(),|env:&WasmHostApi,buffer_id:i32| -> i32 {
                             match env.wave_to_host(buffer_id).unwrap() {
                                 Some( wave ) => {
-                                   let rtn = env.wave_to_guest(wave).unwrap();
+                                   let rtn = env.serialize_wave_to_guest(wave).unwrap();
         println!("\trtn mechtron_frame_to_host {} ", rtn);
                                     rtn
                                 }
@@ -446,8 +449,11 @@ impl WasmHostRunner {
                 WasmHostCall::ConsumeBuffer { buffer_id, rtn } => {
                     rtn.send(host.consume_buffer(buffer_id));
                 }
-                WasmHostCall::WaveToGuest { wave, rtn } => {
-                    rtn.send(host.wave_to_guest(wave));
+                WasmHostCall::DeSerializeWaveToHost{ wave, rtn } => {
+                    rtn.send(host.deserialize_wave_to_host(wave));
+                }
+                WasmHostCall::SerializeWaveToGuest { wave, rtn } => {
+                    rtn.send(host.serialize_wave_to_guest(wave));
                 }
                 WasmHostCall::WaveToHost { wave, rtn } => {
                     rtn.send(host.wave_to_host(wave));
@@ -458,7 +464,9 @@ impl WasmHostRunner {
                 WasmHostCall::GuestConsumeWave { wave, rtn } => {
                     let frame = host.mechtron_frame_to_guest(wave).unwrap();
                     if frame > 0 {
-                        rtn.send(host.wave_to_host(frame).unwrap())
+                        rtn.send(Ok(Some(host.deserialize_wave_to_host(frame).unwrap())));
+                    } else {
+                        rtn.send(Ok(None));
                     }
                 }
             });
@@ -639,9 +647,7 @@ impl WasmHost {
                 match wave.directed_kind() {
                     DirectedKind::Ping => {
                         let wave: DirectedProto = wave.into();
-                        println!("\tping!");
                         let pong = transmitter.ping(wave).await.unwrap();
-                        println!("\tpong!");
                         tx.send(Ok(Some(pong.to_ultra()))).unwrap_or_default();
                     }
                     DirectedKind::Ripple => {
@@ -662,13 +668,20 @@ impl WasmHost {
         rx.recv()?
     }
 
-    pub fn wave_to_guest(&self, wave: UltraWave) -> Result<i32, DefaultHostErr> {
+     pub fn deserialize_wave_to_host(&self, wave: i32) -> Result<UltraWave, DefaultHostErr> {
+         let buffer = self.read_buffer(wave).unwrap();
+        let wave: UltraWave = bincode::deserialize(buffer.as_slice() )?;
+         Ok(wave)
+    }
+
+
+    pub fn serialize_wave_to_guest(&self, wave: UltraWave) -> Result<i32, DefaultHostErr> {
         let wave: Vec<u8> = bincode::serialize(&wave)?;
         Ok(self.write_buffer(&wave)?)
     }
 
     pub fn route(&self, wave: UltraWave) -> Result<i32, DefaultHostErr> {
-        let wave = self.wave_to_guest(wave)?;
+        let wave = self.serialize_wave_to_guest(wave)?;
 
         let reflect = self
             .instance
