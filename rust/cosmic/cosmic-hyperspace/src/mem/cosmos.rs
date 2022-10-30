@@ -13,7 +13,6 @@ use crate::mem::registry::{MemRegApi, MemRegCtx};
 use crate::reg::Registry;
 use crate::{Cosmos, DriversBuilder, MachineTemplate};
 use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, LocalHyperwayGateJumper};
-use cosmic_space::artifact::{ArtifactApi, ReadArtifactFetcher};
 use cosmic_space::err::SpaceErr;
 use cosmic_space::kind::{BaseKind, Kind, StarSub};
 use cosmic_space::loc::{MachineName, StarKey, ToBaseKind};
@@ -28,6 +27,7 @@ use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
+use cosmic_space::artifact::asynch::{ArtifactApi, ReadArtifactFetcher};
 
 impl MemCosmos {
     pub fn new() -> Self {

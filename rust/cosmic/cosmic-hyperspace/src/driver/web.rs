@@ -300,6 +300,7 @@ where
             for req in server.incoming_requests() {
                 let runtime = runtime.clone();
                 let transmitter = self.transmitter.clone();
+println!("Handling incoming request...");
                 runtime.spawn(async move {
                     match Self::handle::<P>(transmitter, req).await {
                         Ok(_) => {}
@@ -355,6 +356,7 @@ where
 
         let mut wave = DirectedProto::ping();
         wave.core(core);
+println!("Sending request...");
         //        wave.track = true;
         let pong = transmitter.ping(wave).await?;
 

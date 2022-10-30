@@ -121,6 +121,8 @@ where
     Signal(Wave<Signal>),
 }
 
+
+
 impl<W> Spannable for UltraWaveDef<W>
 where
     W: ToRecipients + Clone,
@@ -191,6 +193,23 @@ impl<T> UltraWaveDef<T>
 where
     T: ToRecipients + Clone,
 {
+
+    pub fn via_desc(&self)-> String {
+        let via = match self {
+            UltraWaveDef::Ping(w) => w.via.as_ref(),
+            UltraWaveDef::Pong(w) => w.via.as_ref(),
+            UltraWaveDef::Ripple(w) => w.via.as_ref(),
+            UltraWaveDef::Echo(w) => w.via.as_ref(),
+            UltraWaveDef::Signal(w) => w.via.as_ref(),
+        };
+
+        match via  {
+            None => "None".to_string(),
+            Some(via) => via.to_string()
+        }
+    }
+
+
     pub fn has_visited(&self, star: &Point) -> bool {
         match self {
             UltraWaveDef::Ripple(ripple) => ripple.history.contains(star),
@@ -389,6 +408,7 @@ impl UltraWave {
             _ => {}
         }
     }
+
 
     pub fn to_signal(self) -> Result<Wave<Signal>, SpaceErr> {
         match self {
@@ -788,6 +808,17 @@ pub enum BounceBacks {
     Single,
     Count(usize),
     Timer(WaitTime),
+}
+
+impl BounceBacks {
+    pub fn has_bounce(&self) -> bool {
+        match self {
+            BounceBacks::None => false,
+            BounceBacks::Single => true,
+            BounceBacks::Count(_) => true,
+            BounceBacks::Timer(_) => true
+        }
+    }
 }
 
 impl<S, T> ToSubstance<S> for RippleDef<T>
@@ -1441,15 +1472,14 @@ impl DirectedProto {
         self.from.replace(from.to_surface());
     }
 
-    pub fn via<P: ToSurface>(&mut self, via: Option<P>) {
-        match via {
-            None => {
-                self.via = None;
-            }
-            Some(via) => {
-                self.via.replace(via.to_surface());
-            }
+    pub fn fill_via<P: ToSurface>(&mut self, via: P) {
+        if self.via.is_none() {
+            self.via.replace(via.to_surface());
         }
+    }
+
+    pub fn via<P: ToSurface>(&mut self, via: &P) {
+                self.via.replace(via.to_surface());
     }
 }
 
@@ -1458,6 +1488,7 @@ impl DirectedProto {
         Self {
             id: WaveId::new(WaveKind::Ping),
             kind: Some(DirectedKind::Ping),
+            bounce_backs: Some(BounceBacks::Single),
             ..DirectedProto::default()
         }
     }
@@ -1466,6 +1497,7 @@ impl DirectedProto {
         Self {
             id: WaveId::new(WaveKind::Signal),
             kind: Some(DirectedKind::Signal),
+            bounce_backs: Some(BounceBacks::None),
             ..DirectedProto::default()
         }
     }
@@ -1667,7 +1699,9 @@ impl FromReflectedAggregate for Wave<Pong> {
                 ReflectedWave::Pong(pong) => Ok(pong),
                 _ => Err(SpaceErr::bad_request("expected a Pong Reflected")),
             },
-            _ => Err(SpaceErr::bad_request("expected a Single Reflected")),
+            ReflectedAggregate::None => Err(SpaceErr::bad_request("expected a Single Reflected, encountered: None")),
+            ReflectedAggregate::Multi(_) =>Err(SpaceErr::bad_request("expected a Single Reflected, encountered: Multi"))
+
         }
     }
 }
@@ -1708,7 +1742,6 @@ impl Pong {
             if let Substance::FormErrs(errs) = &self.core.body {
                 Err(format!("{} : {}", self.core.status.to_string(), errs.to_string()).into())
             } else if let Substance::Err(err) = &self.core.body {
-println!("\tSubstance::Err");
                 Err(err.clone())
             } else {
                 Err(self.core.status.to_string().into())
@@ -1764,7 +1797,9 @@ impl Into<DirectedProto> for DirectedWave {
         proto.track = self.track();
         proto.bounce_backs(self.bounce_backs());
         proto.agent(self.agent().clone());
-        proto.via(self.via().clone());
+        if let Some(via) = self.via() {
+            proto.via(via);
+        }
         proto
     }
 }
@@ -1889,6 +1924,13 @@ impl DirectedWave {
             DirectedWave::Ping(ping) => ping.hops.clone(),
             DirectedWave::Ripple(ripple) => ripple.hops.clone(),
             DirectedWave::Signal(signal) => signal.hops.clone(),
+        }
+    }
+
+   pub fn is_signal(&self) -> bool {
+         match self {
+            DirectedWave::Signal(_) => true,
+            _ => false
         }
     }
 

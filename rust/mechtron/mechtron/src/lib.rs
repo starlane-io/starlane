@@ -2,14 +2,20 @@
 
 pub mod err;
 pub mod guest;
-mod membrane;
-mod space;
+pub mod membrane;
+pub mod space;
+#[cfg(test)]
+pub mod test;
 
 #[macro_use]
 extern crate lazy_static;
 
 #[macro_use]
 extern crate cosmic_macros;
+
+#[macro_use]
+extern crate cosmic_macros_primitive;
+
 
 extern crate alloc;
 extern crate core;
@@ -38,14 +44,16 @@ use std::sync::{mpsc, MutexGuard};
 
 use cosmic_space::wave::Bounce;
 
-use cosmic_space::artifact::ArtifactApi;
+use cosmic_space::artifact::synch::ArtifactApi;
 use cosmic_space::wave::exchange::synch::{
     DirectedHandler, DirectedHandlerProxy, DirectedHandlerShell, ExchangeRouter, InCtx,
     ProtoTransmitter, ProtoTransmitterBuilder,
 };
 use std::sync::RwLock;
+use cosmic_space::artifact::ArtRef;
 
 use crate::err::{GuestErr, MechErr};
+use crate::guest::GuestCtx;
 use crate::membrane::{mechtron_frame_to_host, mechtron_timestamp, mechtron_uuid};
 
 #[no_mangle]
@@ -75,7 +83,7 @@ pub struct MechtronFactories<P>
 where
     P: Platform,
 {
-    factories: HashMap<String, Box<dyn MechtronFactory<P>>>,
+    factories: HashMap<String, RwLock<Box<dyn MechtronFactory<P>>>>,
     phantom: PhantomData<P>,
 }
 
@@ -94,15 +102,17 @@ where
         F: MechtronFactory<P>,
     {
         SkewerCase::from_str(factory.name().as_str() ).expect("Mechtron Name must be valid kebab (skewer) case (all lower case alphanumeric and dashes with leading letter)");
-        self.factories.insert(factory.name(), Box::new(factory));
+        self.factories.insert(factory.name(), RwLock::new(Box::new(factory)));
     }
 
-    pub fn get<S>(&self, name: S) -> Option<&Box<dyn MechtronFactory<P>>>
+    pub fn get<S>(&self, name: S) -> Option<&RwLock<Box<dyn MechtronFactory<P>>>>
     where
         S: ToString,
     {
         self.factories.get(&name.to_string())
     }
+
+
 }
 
 pub trait MechtronFactory<P>: Sync + Send + 'static
@@ -110,9 +120,9 @@ where
     P: Platform,
 {
     fn name(&self) -> String;
-
+    fn new(&mut self, skel: MechtronSkel<P>) -> Result<(), P::Err>;
     fn lifecycle(&self, skel: MechtronSkel<P>) -> Result<Box<dyn MechtronLifecycle<P>>, P::Err>;
-    fn handler(&self, ske: MechtronSkel<P>) -> Result<Box<dyn DirectedHandler>, P::Err>;
+    fn handler(&self, skel: MechtronSkel<P>) -> Result<Box<dyn DirectedHandler>, P::Err>;
 }
 
 /// The MechtronSkel holds the common static elements of the Mechtron together
@@ -127,7 +137,7 @@ where
 {
     pub details: Details,
     pub logger: PointLogger,
-    pub transmitter: ProtoTransmitter,
+    pub artifacts: ArtifactApi,
     phantom: PhantomData<P>,
 }
 
@@ -138,16 +148,27 @@ where
     pub fn new(
         details: Details,
         logger: PointLogger,
-        transmitter: ProtoTransmitter,
         phantom: PhantomData<P>,
+        artifacts: ArtifactApi
     ) -> Self {
         let logger = logger.point(details.stub.point.clone());
         Self {
             details,
             logger,
             phantom,
-            transmitter,
+            artifacts
         }
+    }
+    pub fn bundle( &self ) -> Result<Point,P::Err> {
+        let config = self.details.properties.get("config").ok_or::<P::Err>("expecting mechtron to have config property set".into())?;
+        let config = Point::from_str(config.value.as_str())?;
+        let bundle = config.to_bundle()?.push(":/")?;
+        Ok(bundle)
+    }
+
+    pub fn raw_from_bundle<S:ToString>( &self, path: S) -> Result<ArtRef<Vec<u8>>,P::Err> {
+        let point = self.bundle()?.push(path)?;
+        Ok(self.artifacts.raw(&point)?)
     }
 }
 
@@ -165,7 +186,7 @@ where
 /// Create a Mechtron by implementing this trait.
 /// Mechtrons are created per request and disposed of afterwards...
 /// Implementers of this trait should only hold references to
-/// Mechtron::Skel, Mechtron::Ctx, Mechtron::Cache & Mechtron::State at most.
+/// Mechtron::Skel, Mechtron::Cache & Mechtron::State at most.
 pub trait Mechtron<P>: MechtronLifecycle<P> + Sync + Send + 'static
 where
     P: Platform,
@@ -198,8 +219,3 @@ where
     }
 }
 
-#[cfg(test)]
-pub mod test {
-    #[test]
-    pub fn mechtron() {}
-}
