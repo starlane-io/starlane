@@ -272,6 +272,7 @@ where
         proto.from(self.traversal.from().clone());
         proto.history(self.traversal.history());
         proto.track = self.traversal.track();
+
         proto
     }
 

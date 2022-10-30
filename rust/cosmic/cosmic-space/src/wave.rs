@@ -121,6 +121,8 @@ where
     Signal(Wave<Signal>),
 }
 
+
+
 impl<W> Spannable for UltraWaveDef<W>
 where
     W: ToRecipients + Clone,
@@ -191,6 +193,23 @@ impl<T> UltraWaveDef<T>
 where
     T: ToRecipients + Clone,
 {
+
+    pub fn via_desc(&self)-> String {
+        let via = match self {
+            UltraWaveDef::Ping(w) => w.via.as_ref(),
+            UltraWaveDef::Pong(w) => w.via.as_ref(),
+            UltraWaveDef::Ripple(w) => w.via.as_ref(),
+            UltraWaveDef::Echo(w) => w.via.as_ref(),
+            UltraWaveDef::Signal(w) => w.via.as_ref(),
+        };
+
+        match via  {
+            None => "None".to_string(),
+            Some(via) => via.to_string()
+        }
+    }
+
+
     pub fn has_visited(&self, star: &Point) -> bool {
         match self {
             UltraWaveDef::Ripple(ripple) => ripple.history.contains(star),

@@ -148,7 +148,9 @@ where
     P: Platform + 'static,
 {
     #[route("Http<Get>")]
-    pub fn hello(&self, _: InCtx<'_, ()>) -> Result<Substance, P::Err> {
+    pub fn hello(&self, ctx: InCtx<'_, ()>) -> Result<Substance, P::Err> {
+
+        ctx.logger.info("\tHELLO WORLD");
         Ok(Substance::Text("Hello, World!".to_string()))
     }
 }

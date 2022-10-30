@@ -208,6 +208,10 @@ pub enum WasmHostCall {
         wave: UltraWave,
         rtn: tokio::sync::oneshot::Sender<Result<Option<UltraWave>, DefaultHostErr>>,
     },
+    GuestConsumeWave {
+        wave: i32,
+        rtn: tokio::sync::oneshot::Sender<Result<Option<UltraWave>, DefaultHostErr>>,
+    },
     ConsumeString {
         buffer_id: i32,
         rtn: tokio::sync::oneshot::Sender<Result<String, DefaultHostErr>>,
@@ -331,15 +335,22 @@ println!("return from INIT...");
         })
     }
 
+    pub fn guest_consume_wave(&self, wave: i32) -> Result<Option<UltraWave>, DefaultHostErr> {
+        let api = self.clone();
+        tokio::task::block_in_place(move || {
+            Handle::current().block_on(async move {
+                let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
+                api.tx.send(WasmHostCall::GuestConsumeWave{ wave, rtn }).await?;
+                rtn_rx.await?
+            })
+        })
+    }
+
     pub fn transmit_to_guest(&self, wave: UltraWave) -> Result<Option<UltraWave>, DefaultHostErr> {
         let wave_id = self.wave_to_guest(wave)?;
-        if wave_id <= 0 {
-            Ok(None)
-        } else {
-            let buffer = self.consume_buffer(wave_id)?;
-            let wave: UltraWave = bincode::deserialize(buffer.as_slice())?;
-            Ok(Some(wave))
-        }
+        let buffer = self.consume_buffer(wave_id)?;
+        let wave: UltraWave = bincode::deserialize(buffer.as_slice())?;
+        Ok(Some(wave))
     }
 
     pub fn host_mechtron(&self, cmd: HostCmd) {}
@@ -443,6 +454,12 @@ impl WasmHostRunner {
                 }
                 WasmHostCall::HostCmd { cmd, rtn } => {
                     rtn.send(host.create_mechtron(cmd));
+                }
+                WasmHostCall::GuestConsumeWave { wave, rtn } => {
+                    let frame = host.mechtron_frame_to_guest(wave).unwrap();
+                    if frame > 0 {
+                        rtn.send(host.wave_to_host(frame).unwrap())
+                    }
                 }
             });
         }
@@ -774,6 +791,17 @@ impl WasmHost {
             .get_native_function::<i32, ()>("mechtron_guest_dealloc_buffer")?
             .call(buffer_id.clone())?;
         Ok(())
+    }
+
+
+    fn mechtron_frame_to_guest(&self, buffer_id: i32) -> Result<i32, DefaultHostErr> {
+        let rtn = self.instance
+            .as_ref()
+            .unwrap()
+            .exports
+            .get_native_function::<i32, i32>("mechtron_frame_to_guest")?
+            .call(buffer_id.clone())?;
+        Ok(rtn)
     }
 
     fn create_mechtron(&self, host_cmd: HostCmd) -> Result<(), DefaultHostErr> {
