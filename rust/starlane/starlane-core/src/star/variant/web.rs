@@ -94,10 +94,8 @@ fn start(messenger: StarlaneMessenger, skel: StarSkel) {
         runtime.block_on(async move {
             let STARLANE_WEB_PORT =
                 std::env::var("STARLANE_WEB_PORT").unwrap_or("8080".to_string());
-            info!("STARLANE_WEB_PORT: {}", STARLANE_WEB_PORT);
             let server = Server::http(format!("0.0.0.0:{}", STARLANE_WEB_PORT)).unwrap();
             for req in server.incoming_requests() {
-                info!("handling incoming http request");
                 handle(req, messenger.clone(), skel.clone());
             }
         });
@@ -105,7 +103,6 @@ fn start(messenger: StarlaneMessenger, skel: StarSkel) {
 }
 
 fn handle(req: tiny_http::Request, api: StarlaneMessenger, skel: StarSkel) {
-    println!("handling web connection...");
     tokio::spawn(async move {
         async fn process(
             mut req: tiny_http::Request,
@@ -202,9 +199,7 @@ async fn process_request(
     let to = Point::from_str(host.as_str())?;
     let from = skel.info.point;
     let request = messaging::ReqShell::new(core, from, to);
-    println!("exchanging...to :{}", request.to.to_string());
     let response = skel.messaging_api.request(request).await;
-    println!("got response...(status: {})", response.core.status.as_u16());
     if !response.core.status.is_success() {
         let error = response.core.status.canonical_reason().unwrap_or("Unknown");
         let messages =

@@ -144,7 +144,6 @@ where
     {
         let factories = Arc::new(platform.factories()?);
         let skel = GuestSkel::new(details.clone(), factories, platform);
-        skel.logger.info(format!("Guest created '{}'", details.stub.point.to_string() ));
 
         Ok(Self { skel })
     }
@@ -243,7 +242,6 @@ where
 {
     #[route("Hyp<Host>")]
     pub fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
-        self.skel.logger.info("Received Host command!");
         if let HyperSubstance::Host(host) = ctx.input {
             let mut factory =
                 self.skel
@@ -252,17 +250,14 @@ where
                         "Guest does not have a mechtron with name: {}",
                         host.config.name
                     )))?.write().unwrap();
-            self.skel.logger.info("Creating...");
             self.skel.mechtrons.insert(
                 host.details.stub.point.clone(),
                 HostedMechtron::new(host.details.clone(), host.config.name.clone()),
             );
 
             let skel = self.skel.mechtron_skel(&host.details.stub.point)?;
-            self.skel.logger.info("CREATING MECHTRON!!!");
             self.skel.logger.result(factory.new(skel.clone()))?;
             let mechtron = factory.lifecycle(skel)?;
-            self.skel.logger.info("Got MechtronLifecycle...");
             let skel = self.skel.mechtron_skel(&host.details.stub.point)?;
             mechtron.create(skel)?;
 
@@ -297,16 +292,12 @@ impl ArtifactFetcher for GuestArtifactFetcher {
     }
 
     fn fetch(&self, point: &Point) -> Result<Bin, SpaceErr> {
-self.logger.error(format!("FETCH: {}", point.to_string() ));
         let mut directed = DirectedProto::ping();
         directed.to(point.clone().to_surface());
         directed.method(CmdMethod::Read);
 
-self.logger.info("PRE");
         let pong = self.logger.result(self.transmitter.ping(directed))?;
-self.logger.info("GOT HERE");
         pong.core.ok_or()?;
-self.logger.info("AND HERE");
         match pong.variant.core.body {
             Substance::Bin(bin) => Ok(bin),
             other => Err(SpaceErr::server_error(format!(

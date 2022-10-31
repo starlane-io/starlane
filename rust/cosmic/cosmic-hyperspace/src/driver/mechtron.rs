@@ -391,12 +391,10 @@ where
     #[route("Hyp<Transport>")]
     async fn transport(&self, ctx: InCtx<'_, UltraWave>)  {
         let wave = ctx.wave().clone().to_ultra().unwrap_from_transport().unwrap();
-println!("\t host receive TRANSPORT: {} {}",wave.to().to_string(), wave.desc());
         if let Ok(Some(wave)) = self.skel.host.transmit_to_guest(wave) {
             if wave.is_reflected() {
                 ctx.transmitter.route(wave).await;
             } else {
-println!("\t Received dIRECTED WAVYE: {} ",wave.to().to_string());
 
             }
         }
@@ -580,7 +578,6 @@ where
             .to_surface()
             .with_layer(Layer::Core);
 
-println!("\tTransporting to host: {} ({}) from {} via {}", host.to_string(), wave.id().to_short_string(), wave.from().to_string(), wave.via_desc());
         let transport =
             wave.wrap_in_transport(self.skel.point.to_surface().with_layer(Layer::Core), host);
         self.ctx.transmitter.signal(transport).await?;

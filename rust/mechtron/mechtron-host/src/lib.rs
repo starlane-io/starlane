@@ -243,12 +243,10 @@ impl WasmHostApi {
     }
 
     pub async fn init(&self) -> Result<(), DefaultHostErr> {
-println!("Calling INIT");
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
         self.tx.send(WasmHostCall::Init(rtn)).await?;
         let rtn  = rtn_rx.await?;
 
-println!("return from INIT...");
 
         rtn
     }
@@ -401,7 +399,6 @@ impl WasmHostRunner {
                             match env.wave_to_host(buffer_id).unwrap() {
                                 Some( wave ) => {
                                    let rtn = env.serialize_wave_to_guest(wave).unwrap();
-        println!("\trtn mechtron_frame_to_host {} ", rtn);
                                     rtn
                                 }
                                 None => 0

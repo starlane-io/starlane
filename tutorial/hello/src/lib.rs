@@ -137,7 +137,6 @@ where
 
         handlebars.register_template_string("template", template);
 
-        skel.logger.info("MECHTRON CACHE COMPLETE!");
         Ok(Some(Arc::new(handlebars)))
     }
 }
