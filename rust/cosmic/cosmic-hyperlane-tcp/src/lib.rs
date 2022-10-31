@@ -276,33 +276,33 @@ impl FrameMuxer {
     pub async fn mux(mut self) -> Result<(), SpaceErr> {
         loop {
             tokio::select! {
-                wave = self.rx.recv() => {
-                    match wave {
-                        None => {
-                            self.logger.warn("rx discon");
-                            break
-                        },
-                        Some(wave) => {
-                           self.stream.write_wave(wave.clone()).await?;
+                            wave = self.rx.recv() => {
+                                match wave {
+                                    None => {
+                                        self.logger.warn("rx discon");
+                                        break
+                                    },
+                                    Some(wave) => {
+                                       self.stream.write_wave(wave.clone()).await?;
+                                    }
+                                }
+                            }
+                            wave = self.stream.read_wave() => {
+                                match wave {
+                                   Ok(wave) => {
+                                self.tx.send(wave).await?;
+                                   },
+                                   Err(err) => {
+            //                          self.logger.error(format!("read stream err: {}",err.to_string()));
+                                      break
+                                   }
+                                }
+                            }
+                            _ = self.terminate_rx.recv() => {
+                                 self.logger.warn(format!("terminated"));
+                                 return Ok(())
+                                }
                         }
-                    }
-                }
-                wave = self.stream.read_wave() => {
-                    match wave {
-                       Ok(wave) => {
-                    self.tx.send(wave).await?;
-                       },
-                       Err(err) => {
-//                          self.logger.error(format!("read stream err: {}",err.to_string()));
-                          break
-                       }
-                    }
-                }
-                _ = self.terminate_rx.recv() => {
-                     self.logger.warn(format!("terminated"));
-                     return Ok(())
-                    }
-            }
         }
         Ok(())
     }
@@ -552,8 +552,8 @@ mod tests {
     use chrono::Utc;
     use cosmic_hyperlane::HyperClient;
     use cosmic_space::settings::Timeouts;
-    use cosmic_space::wave::DirectedProto;
     use cosmic_space::wave::exchange::asynch::Exchanger;
+    use cosmic_space::wave::DirectedProto;
 
     use super::*;
 
@@ -607,8 +607,7 @@ mod tests {
         Ok(())
     }
 
-
-        #[tokio::test]
+    #[tokio::test]
     async fn test_large_frame() -> Result<(), Error> {
         let platform = SingleInterchangePlatform::new().await;
 
@@ -632,33 +631,33 @@ mod tests {
             less_logger,
         ));
 
-            let less_exchanger = Exchanger::new(
-                LESS.push("exchanger").unwrap().to_surface(),
-                Timeouts::default(),
-                PointLogger::default(),
-            );
+        let less_exchanger = Exchanger::new(
+            LESS.push("exchanger").unwrap().to_surface(),
+            Timeouts::default(),
+            PointLogger::default(),
+        );
 
-            let root_logger = RootLogger::default();
-            let logger = root_logger.point(Point::from_str("less-client").unwrap());
-            let less_client = HyperClient::new_with_exchanger(
-                less_client,
-                Some(less_exchanger.clone()),
-                logger,
-            ).unwrap();
+        let root_logger = RootLogger::default();
+        let logger = root_logger.point(Point::from_str("less-client").unwrap());
+        let less_client =
+            HyperClient::new_with_exchanger(less_client, Some(less_exchanger.clone()), logger)
+                .unwrap();
 
-            less_client.wait_for_ready(Duration::from_secs(5)).await.unwrap();
-            let transmitter = less_client.transmitter_builder().await.unwrap().build();
-
+        less_client
+            .wait_for_ready(Duration::from_secs(5))
+            .await
+            .unwrap();
+        let transmitter = less_client.transmitter_builder().await.unwrap().build();
 
         let size = 100_000;
         let mut bin = Vec::with_capacity(100_100);
         for _ in 0..size {
             bin.push(0u8);
         }
-            let bin = Arc::new(bin);
-            let mut wave = DirectedProto::signal();
-            wave.body(Substance::Bin(bin));
-            transmitter.signal(wave).await.unwrap();
+        let bin = Arc::new(bin);
+        let mut wave = DirectedProto::signal();
+        wave.body(Substance::Bin(bin));
+        transmitter.signal(wave).await.unwrap();
 
         Ok(())
     }
