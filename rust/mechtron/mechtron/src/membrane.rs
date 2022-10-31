@@ -98,7 +98,8 @@ where
         Ok(ReflectedAggregate::None)
     } else {
         let buffer = mechtron_consume_buffer(reflect_id)?;
-        let agg: ReflectedAggregate = bincode::deserialize(buffer.as_slice())?;
+        let agg: UltraWave = bincode::deserialize(buffer.as_slice())?;
+        let agg = ReflectedAggregate::Single(agg.to_reflected().unwrap());
         Ok(agg)
     }
 }

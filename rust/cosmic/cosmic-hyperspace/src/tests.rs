@@ -18,7 +18,7 @@ use cosmic_hyperlane::{
     AnonHyperAuthenticator, HyperClient, HyperConnectionDetails, HyperConnectionErr, HyperGate,
     HyperwayEndpoint, HyperwayStub, LocalHyperwayGateJumper,
 };
-use cosmic_space::artifact::ReadArtifactFetcher;
+use cosmic_space::artifact::asynch::ReadArtifactFetcher;
 use cosmic_space::command::common::StateSrc;
 use cosmic_space::command::direct::create::{
     Create, PointSegTemplate, PointTemplate, Strategy, Template,

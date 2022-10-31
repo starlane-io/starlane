@@ -20,7 +20,7 @@ use dashmap::{DashMap, DashSet};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
-use artifact::ArtifactFetcher;
+use artifact::asynch::ArtifactFetcher;
 use command::common::{SetProperties, SetRegistry};
 use command::direct::create::{KindTemplate, Strategy};
 use command::direct::delete::Delete;

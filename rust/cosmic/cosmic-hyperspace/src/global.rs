@@ -111,10 +111,10 @@ where
         let agent = ctx.wave().agent().clone();
         match ctx.input {
             Command::Create(create) => {
-                self.skel
+                let details = self.skel
                     .logger
                     .result(global.create(create, &agent).await)?;
-                Ok(ReflectedCore::ok())
+                Ok(ReflectedCore::ok_body(details.into()))
             }
             Command::Select(select) => {
                 let mut select = select.clone();
@@ -133,6 +133,7 @@ where
                 Ok(ReflectedCore::ok())
             }
             Command::Read(read) => {
+println!("\tread cmd : {}", read.point.to_string());
                 // proxy the read command
                 let mut proto = DirectedProto::ping();
                 proto.method(CmdMethod::Read);
@@ -164,7 +165,7 @@ where
     }
 
     #[track_caller]
-    pub async fn create(&self, create: &Create, agent: &Agent) -> Result<PointKind, P::Err> {
+    pub async fn create(&self, create: &Create, agent: &Agent) -> Result<Details, P::Err> {
 
         let child_kind = self
             .skel
@@ -250,8 +251,8 @@ println!("\tprovisioning: {}", point.to_string());
             //});
         }
 
-        let point_kind = PointKind::new(point, child_kind);
+        let record =self.skel.registry.record(&point).await?;
 
-        Ok(point_kind)
+        Ok(record.details)
     }
 }

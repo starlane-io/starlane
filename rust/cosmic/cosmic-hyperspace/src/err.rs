@@ -3,7 +3,7 @@ use cosmic_space::err::SpaceErr;
 use cosmic_space::substance::Substance;
 use cosmic_space::wave::core::http2::StatusCode;
 use cosmic_space::wave::core::ReflectedCore;
-use mechtron_host::err::HostErr;
+use mechtron_host::err::{DefaultHostErr, HostErr};
 use std::fmt::Debug;
 use std::io;
 use std::io::Error;
@@ -49,6 +49,7 @@ pub trait HyperErr:
     + From<FromAsciiError<std::string::String>>
     + From<SpaceErr>
     + Into<SpaceErr>
+    + From<DefaultHostErr>
     + From<()>
 {
     fn to_space_err(&self) -> SpaceErr;
@@ -95,7 +96,7 @@ pub mod convert {
     use ascii::FromAsciiError;
     use bincode::ErrorKind;
     use cosmic_space::err::SpaceErr;
-    use mechtron_host::err::HostErr;
+    use mechtron_host::err::{DefaultHostErr, HostErr};
     use std::io;
     use std::str::Utf8Error;
     use std::string::FromUtf8Error;
@@ -149,6 +150,17 @@ pub mod convert {
             }
         }
     }
+
+
+     impl From<DefaultHostErr> for Err {
+        fn from(e: DefaultHostErr) -> Self {
+            Self {
+                kind: ErrKind::Default,
+                message: e.to_string(),
+            }
+        }
+    }
+
     impl HyperErr for Err {
         fn to_space_err(&self) -> SpaceErr {
             SpaceErr::server_error(self.to_string())
