@@ -22,6 +22,7 @@ cosmic-space= { path= "../../cosmic/cosmic-space" ,version = "0.3.3"}
 cosmic-macros= { path= "../../cosmic/cosmic-macros" ,version = "0.3.3"}
 serde = { version="1.0.69", features=['derive','rc'] }
 dashmap = "5.3.4"
+cosmic-macros-primitive = {path="../../cosmic/cosmic-macros-primitive" }
 # `wee_alloc` is a tiny allocator for wasm that is only ~1K in code size
 # compared to the default allocator's ~10K. It is slower than the default
 # allocator, however.
@@ -30,7 +31,6 @@ dashmap = "5.3.4"
 #wee_alloc = { version = "0.4.5", optional = true }
 
 [dev-dependencies]
-
 [profile.release]
 # Tell `rustc` to optimize for small code size.
 #opt-level = "s"

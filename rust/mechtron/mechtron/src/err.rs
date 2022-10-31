@@ -15,6 +15,7 @@ pub trait MechErr:
     + From<String>
     + From<&'static str>
     + From<GuestErr>
+    + From<FromUtf8Error>
 {
     fn to_uni_err(self) -> SpaceErr;
 }
@@ -67,6 +68,15 @@ impl From<&str> for GuestErr {
         Self {
             message: s.to_string(),
         }
+    }
+}
+
+impl From<FromUtf8Error> for GuestErr {
+    fn from(e: FromUtf8Error) -> Self {
+        Self {
+            message: e.to_string()
+        }
+
     }
 }
 

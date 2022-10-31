@@ -161,6 +161,9 @@ impl Session {
             Substance::Stub(stub) => {
                 println!("{}<{}>", stub.point.to_string(), stub.kind.to_string())
             }
+            Substance::Details(details) => {
+                println!("{}<{}>", details.stub.point.to_string(), details.stub.kind.to_string())
+            }
             what => {
                 eprintln!(
                     "cosmic-cli not sure how to output {}",

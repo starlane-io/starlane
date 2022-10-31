@@ -2,12 +2,6 @@
 name = "mechtron-host"
 version = "0.3.3"
 edition = "2021"
-authors = ["Scott Williams <scott@starlane.io>"]
-description = "Part of http://thecosmicinitiative.io This package--MECHTRON HOST--uses Wasmer to host a Wasm guest with Mechtrons"
-
-homepage = "http://thecosmicinitiative.io"
-repository = "https://github.com/cosmic-initiative/cosmic-initiative"
-license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -16,8 +10,9 @@ cosmic-space = { path= "../../cosmic/cosmic-space" ,version = "0.3.3"}
 threadpool = "1.8.1"
 wasmer = "2.3.0"
 wasmer-compiler-singlepass = "2.3.0"
-
 bincode = "1.3.3"
 chrono = { version="0.4.19", features=["serde"] }
 uuid = { version="1.1.2", features=["v4"] }
-
+oneshot = "0.1.5"
+tokio = { version = "1.15.0", features = ["full"] }
+lazy_static = {version="1.4.0"}

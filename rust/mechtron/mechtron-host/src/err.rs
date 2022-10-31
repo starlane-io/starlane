@@ -2,7 +2,13 @@ use cosmic_space::err::SpaceErr;
 use std::fmt::{Debug, Display, Formatter, Write};
 use std::str::Utf8Error;
 use std::string::FromUtf8Error;
+use std::sync::{MutexGuard, PoisonError};
+use std::sync::mpsc::Sender;
+use oneshot::RecvError;
+use tokio::sync;
+use tokio::sync::mpsc::error::SendError;
 use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
+use crate::WasmHostCall;
 
 pub trait HostErr:
     Debug
@@ -13,6 +19,7 @@ pub trait HostErr:
     + From<&'static str>
     + From<Box<bincode::ErrorKind>>
     + From<ExportError>
+    + From<tokio::sync::oneshot::error::RecvError>
     + From<Utf8Error>
     + From<FromUtf8Error>
     + From<InstantiationError>
@@ -30,6 +37,30 @@ pub struct DefaultHostErr {
 impl From<Utf8Error> for DefaultHostErr {
     fn from(e: Utf8Error) -> Self {
         DefaultHostErr {
+            message: e.to_string(),
+        }
+    }
+}
+
+impl From<tokio::sync::mpsc::error::SendError<WasmHostCall>> for DefaultHostErr {
+    fn from(err: SendError<WasmHostCall>) -> Self {
+        DefaultHostErr {
+            message: err.to_string()
+        }
+    }
+}
+
+impl From<oneshot::RecvError> for DefaultHostErr {
+    fn from(value: RecvError) -> Self {
+        Self {
+            message: value.to_string()
+        }
+    }
+}
+
+impl From<PoisonError<std::sync::MutexGuard<'_, std::sync::mpsc::Sender<WasmHostCall>>>> for DefaultHostErr{
+    fn from(e: PoisonError<MutexGuard<'_, Sender<WasmHostCall>>>) -> Self {
+         DefaultHostErr {
             message: e.to_string(),
         }
     }
@@ -117,6 +148,14 @@ impl From<String> for DefaultHostErr {
 
 impl From<ExportError> for DefaultHostErr {
     fn from(e: ExportError) -> Self {
+        DefaultHostErr {
+            message: e.to_string(),
+        }
+    }
+}
+
+impl From<tokio::sync::oneshot::error::RecvError> for DefaultHostErr {
+    fn from(e: tokio::sync::oneshot::error::RecvError) -> Self {
         DefaultHostErr {
             message: e.to_string(),
         }

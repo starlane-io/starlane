@@ -239,6 +239,68 @@ pub fn to_substance(item: TokenStream) -> TokenStream {
     rtn.into()
 }
 
+#[proc_macro_derive(MechErr)]
+pub fn mech_err(item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as DeriveInput);
+    let ident = &input.ident;
+
+    let from = vec![
+        quote!(Box<bincode::ErrorKind>),
+        quote!(mechtron::err::MembraneErr),
+        quote!(cosmic_space::err::SpaceErr),
+        quote!(String),
+        quote!(&'static str),
+        quote!(mechtron::err::GuestErr),
+        quote!(std::string::FromUtf8Error),
+    ];
+
+    let rtn = quote! {
+
+            impl MechErr for #ident {
+                fn to_uni_err(self) -> cosmic_space::err::SpaceErr {
+                   cosmic_space::err::SpaceErr::server_error(self.to_string())
+                }
+            }
+
+            impl From<#ident> for mechtron::err::GuestErr{
+                fn from(e: #ident) -> Self {
+                            mechtron::err::GuestErr {
+                                message: e.to_string()
+                            }
+                }
+            }
+
+            impl cosmic_space::err::CoreReflector for #ident {
+                    fn as_reflected_core(self) -> cosmic_space::wave::core::ReflectedCore {
+                       cosmic_space::wave::core::ReflectedCore{
+                            headers: Default::default(),
+                            status: cosmic_space::wave::core::http2::StatusCode::from_u16(500u16).unwrap(),
+                            body: cosmic_space::substance::Substance::Err(self.to_uni_err()),
+                        }
+                }
+            }
+
+
+            impl ToString for #ident {
+                fn to_string(&self) -> String {
+                    self.message.clone()
+                }
+            }
+
+            #(
+                impl From<#from> for #ident {
+                    fn from(e: #from ) -> Self {
+                        Self {
+                            message: e.to_string()
+                        }
+                    }
+                }
+            )*
+        };
+    //println!("{}", rtn.to_string());
+    rtn.into()
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
