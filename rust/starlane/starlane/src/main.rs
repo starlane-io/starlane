@@ -78,17 +78,20 @@ fn main() -> Result<(), StarErr> {
     runtime.block_on(async move {
         let starlane = Starlane::new().await.unwrap();
         let machine_api = starlane.machine();
-        tokio::time::timeout(Duration::from_secs(30), machine_api.wait_ready())
-            .await
-            .unwrap();
-        println!("> STARLANE Ready!");
-        // this is a dirty hack which is good enough for a 0.3.0 release...
-        loop {
-            tokio::time::sleep(Duration::from_secs(60)).await;
-        }
-        let cl = machine_api.clone();
-        machine_api.await_termination().await.unwrap();
-        cl.terminate();
+
+        machine_api.wait_ready().await;
+
+        // tokio::time::timeout(Duration::from_secs(30), machine_api.wait_ready())
+        //     .await
+        //     .unwrap();
+        // println!("> STARLANE Ready!");
+        // // this is a dirty hack which is good enough for a 0.3.0 release...
+        // loop {
+        //     tokio::time::sleep(Duration::from_secs(60)).await;
+        // }
+        // let cl = machine_api.clone();
+        // machine_api.await_termination().await.unwrap();
+        // cl.terminate();
     });
     Ok(())
 }
@@ -248,8 +251,8 @@ impl Cosmos for Starlane {
         };
         fs::create_dir_all(dir.as_str());
 
-        let cert = format!("{}/cert.pem", dir.as_str());
-        let key = format!("{}/key.pem", dir.as_str());
+        let cert = format!("{}/cert.der", dir.as_str());
+        let key = format!("{}/key.der", dir.as_str());
         let cert_path = Path::new(&cert);
         let key_path = Path::new(&key);
 

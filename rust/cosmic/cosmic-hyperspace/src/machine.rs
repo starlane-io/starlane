@@ -399,7 +399,8 @@ where
     }
 
     async fn init0(&self) {
-        let logger = self.logger.span();
+        // let logger = self.logger.span(); // FIXME: SEGFAULT
+
         let mut inits = vec![];
         for star in self.stars.values() {
             inits.push(star.init().boxed());
@@ -430,13 +431,16 @@ where
                     let mut status_rx = self.skel.status_rx.clone();
                     tokio::spawn(async move {
                         loop {
+                            println!("Looping");
                             if MachineStatus::Ready == status_rx.borrow().clone() {
+                                println!("Machine status ready");
                                 rtn.send(());
                                 break;
                             }
                             match status_rx.changed().await {
                                 Ok(_) => {}
                                 Err(err) => {
+                                    println!("Machine status error: {:?}", err);
                                     rtn.send(());
                                     break;
                                 }
