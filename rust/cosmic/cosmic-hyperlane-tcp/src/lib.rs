@@ -23,6 +23,7 @@ use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf, ReadHalf, WriteHalf};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time::error::Elapsed;
+use tokio_rustls::{TlsAcceptor, TlsConnector, TlsStream};
 
 use cosmic_hyperlane::{
     HyperConnectionDetails, HyperConnectionStatus, HyperGate, HyperGateSelector, HyperwayEndpoint,
@@ -34,7 +35,6 @@ use cosmic_space::log::PointLogger;
 use cosmic_space::substance::Substance;
 use cosmic_space::wave::{Ping, UltraWave, Wave};
 use cosmic_space::VERSION;
-use tokio_rustls::{TlsAcceptor, TlsConnector, TlsStream};
 
 pub struct HyperlaneTcpClient {
     host: String,
