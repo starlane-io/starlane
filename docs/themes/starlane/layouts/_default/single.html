@@ -1,5 +1,0 @@
-{{ define "main" }}
-
-{{ .Content }}
-
-{{ end }}
