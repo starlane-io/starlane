@@ -248,8 +248,8 @@ impl Cosmos for Starlane {
         };
         fs::create_dir_all(dir.as_str());
 
-        let cert = format!("{}/cert.pem", dir.as_str());
-        let key = format!("{}/key.pem", dir.as_str());
+        let cert = format!("{}/cert.der", dir.as_str());
+        let key = format!("{}/key.der", dir.as_str());
         let cert_path = Path::new(&cert);
         let key_path = Path::new(&key);
 
