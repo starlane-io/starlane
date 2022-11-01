@@ -74,7 +74,7 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
         let mut ca_buffer = Vec::new();
         ca_file.read_to_end(&mut ca_buffer).await?;
 
-        let (added, ignored) = root_certs.add_parsable_certificates(&mut [ca_buffer]);
+        root_certs.add_parsable_certificates(&mut [ca_buffer]);
 
         let client_config = Arc::new(
             ClientConfig::builder()
