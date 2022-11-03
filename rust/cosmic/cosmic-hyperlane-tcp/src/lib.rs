@@ -600,7 +600,7 @@ mod tests {
             .await?;
         let logger = RootLogger::default();
         let logger = logger.point(Point::from_str("tcp-server")?);
-        let port = 4343u16;
+        let port = 4344u16;
         let server =
             HyperlaneTcpServer::new(port, ".".to_string(), platform.gate.clone(), logger.clone())
                 .await?;
