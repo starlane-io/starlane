@@ -1,7 +1,13 @@
 use cosmic_hyperspace::err::ErrKind;
-//use cosmic_registry_postgres::err::PostErr;
 
-pub trait StarlaneErr {}   //: PostErr {}
+#[cfg(feature="postgres")]
+use cosmic_registry_postgres::err::PostErr;
+
+#[cfg(feature="postgres")]
+pub trait StarlaneErr : PostErr {}
+
+#[cfg(not(feature="postgres"))]
+pub trait StarlaneErr {}
 
 #[derive(Debug, Clone)]
 pub struct StarErr {
@@ -27,6 +33,9 @@ pub mod convert {
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
+    #[cfg(feature="postgres")]
+    use cosmic_registry_postgres::err::PostErr;
+
     impl Err {
         pub fn new<S: ToString>(message: S) -> Self {
             Self {
@@ -67,7 +76,9 @@ pub mod convert {
             self.message.clone()
         }
     }
-/*    impl PostErr for Err {
+
+    #[cfg(feature="postgres")]
+    impl PostErr for Err {
         fn dupe() -> Self {
             Self {
                 kind: ErrKind::Dupe,
@@ -76,7 +87,6 @@ pub mod convert {
         }
     }
 
- */
 
 
   impl From<DefaultHostErr> for Err {

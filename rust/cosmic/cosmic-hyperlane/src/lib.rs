@@ -2084,6 +2084,7 @@ pub mod test_util {
         pub static ref FAE: Point = Point::from_str("space:users:fae").expect("point");
     }
 
+    #[derive(Clone)]
     pub struct SingleInterchangePlatform {
         pub interchange: Arc<HyperwayInterchange>,
         pub gate: Arc<HyperGateSelector>,
@@ -2137,6 +2138,106 @@ pub mod test_util {
             Box::new(LocalHyperwayGateUnlocker::new(port, self.gate.clone()))
         }
     }
+   pub struct LargeFrameTest{
+        fae_factory: Box<dyn HyperwayEndpointFactory>,
+        less_factory: Box<dyn HyperwayEndpointFactory>,
+    }
+
+    impl LargeFrameTest{
+        pub fn new(
+            fae_factory: Box<dyn HyperwayEndpointFactory>,
+            less_factory: Box<dyn HyperwayEndpointFactory>,
+        ) -> Self {
+            Self {
+                fae_factory,
+                less_factory,
+            }
+        }
+
+        pub async fn go(self) -> Result<(), SpaceErr> {
+            let less_exchanger = Exchanger::new(
+                LESS.push("exchanger").unwrap().to_surface(),
+                Timeouts::default(),
+                PointLogger::default(),
+            );
+            let fae_exchanger = Exchanger::new(
+                FAE.push("exchanger").unwrap().to_surface(),
+                Timeouts::default(),
+                PointLogger::default(),
+            );
+
+            let root_logger = RootLogger::default();
+            let logger = root_logger.point(Point::from_str("less-client").unwrap());
+            let less_client = HyperClient::new_with_exchanger(
+                self.less_factory,
+                Some(less_exchanger.clone()),
+                logger,
+            )
+            .unwrap();
+            let logger = root_logger.point(Point::from_str("fae-client").unwrap());
+            let fae_client = HyperClient::new_with_exchanger(
+                self.fae_factory,
+                Some(fae_exchanger.clone()),
+                logger,
+            )
+            .unwrap();
+
+            let mut less_rx = less_client.rx();
+            let mut fae_rx = fae_client.rx();
+
+            let less_router = less_client.router();
+            let less_transmitter =
+                ProtoTransmitter::new(Arc::new(less_router), less_exchanger.clone());
+
+            let fae_router = fae_client.router();
+            let fae_transmitter =
+                ProtoTransmitter::new(Arc::new(fae_router), fae_exchanger.clone());
+
+            {
+                let fae = FAE.clone();
+                tokio::spawn(async move {
+                    fae_client.wait_for_greet().await.unwrap();
+                    let wave = fae_rx.recv().await.unwrap();
+                    let mut reflected = ReflectedProto::new();
+                    reflected.kind(ReflectedKind::Pong);
+                    reflected.status(200u16);
+                    reflected.to(wave.from().clone());
+                    reflected.from(fae.to_surface());
+                    reflected.intended(wave.to());
+                    reflected.reflection_of(wave.id());
+                    let wave = reflected.build().unwrap();
+                    let wave = wave.to_ultra();
+                    fae_transmitter.route(wave).await;
+                });
+            }
+
+            let (rtn, mut rtn_rx) = oneshot::channel();
+            tokio::spawn(async move {
+                less_client.wait_for_greet().await.unwrap();
+                let mut hello = DirectedProto::ping();
+                hello.to(FAE.clone().to_surface());
+                hello.from(LESS.clone().to_surface());
+                hello.method(ExtMethod::new("Hello").unwrap());
+                let size = 3_000_000usize;
+                let mut body = Vec::with_capacity(size);
+                for _ in 0..size {
+                    body.push(0u8);
+                }
+                hello.body(Substance::Bin( Arc::new(body)));
+                let pong: Wave<Pong> = less_transmitter.direct(hello).await.unwrap();
+                rtn.send(pong.core.status.as_u16() == 200u16);
+            });
+
+            let result = tokio::time::timeout(Duration::from_secs(30), rtn_rx)
+                .await
+                .unwrap()
+                .unwrap();
+            assert!(result);
+            Ok(())
+        }
+    }
+
+
 
     pub struct WaveTest {
         fae_factory: Box<dyn HyperwayEndpointFactory>,
@@ -2223,7 +2324,7 @@ pub mod test_util {
                 rtn.send(pong.core.status.as_u16() == 200u16);
             });
 
-            let result = tokio::time::timeout(Duration::from_secs(5), rtn_rx)
+            let result = tokio::time::timeout(Duration::from_secs(30), rtn_rx)
                 .await
                 .unwrap()
                 .unwrap();

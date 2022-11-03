@@ -1,6 +1,6 @@
 [package]
 name = "starlane"
-version = "0.3.3"
+version = "0.3.4"
 
 
 
@@ -15,13 +15,16 @@ license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+postgres=["dep:cosmic-registry-postgres"]
+
 [dependencies]
-cosmic-space={ path= "../../cosmic/cosmic-space" ,version = "0.3.3"}
-cosmic-hyperspace={ path= "../../cosmic/cosmic-hyperspace" ,version = "0.3.3"}
-#cosmic-registry-postgres={ path= "../../cosmic/cosmic-registry-postgres" ,version = "0.3.1-alpha"}
-cosmic-hyperlane={ path="../../cosmic/cosmic-hyperlane",version = "0.3.3"}
-cosmic-hyperlane-tcp={ path="../../cosmic/cosmic-hyperlane-tcp",version = "0.3.3"}
-mechtron-host={ path="../../mechtron/mechtron-host",version = "0.3.3"}
+cosmic-space={ path= "../../cosmic/cosmic-space" ,version = "0.3.4"}
+cosmic-hyperspace={ path= "../../cosmic/cosmic-hyperspace" ,version = "0.3.4"}
+cosmic-registry-postgres={ path= "../../cosmic/cosmic-registry-postgres" ,version = "0.3.4", optional=true}
+cosmic-hyperlane={ path="../../cosmic/cosmic-hyperlane",version = "0.3.4"}
+cosmic-hyperlane-tcp={ path="../../cosmic/cosmic-hyperlane-tcp",version = "0.3.4"}
+mechtron-host={ path="../../mechtron/mechtron-host",version = "0.3.4"}
 lazy_static = "1.4.0"
 uuid = { version="1.1.2", features=["v4"] }
 chrono = { version="0.4.19", features=["serde"] }

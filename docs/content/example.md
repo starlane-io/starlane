@@ -1,3 +1,0 @@
-# EXAMPLE
-
-jk
