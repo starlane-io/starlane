@@ -33,6 +33,7 @@ pub mod convert {
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
+    #[cfg(feature="postgres")]
     use cosmic_registry_postgres::err::PostErr;
 
     impl Err {
