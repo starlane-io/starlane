@@ -18,7 +18,7 @@ use rustls::{server, ClientConfig, RootCertStore, ServerConfig, ServerName};
 use tls_api_rustls::TlsConnectorBuilder;
 use tokio::fs::File;
 use tokio::io;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf, ReadHalf, WriteHalf};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -186,12 +186,14 @@ impl Frame {
         while data.len() < size {
             read.read_buf(&mut data).await?;
         }
+
         Ok(Self { data })
     }
 
     pub async fn to_stream<'a>(&self, write: &'a mut TlsStream<TcpStream>) -> Result<(), SpaceErr> {
         write.write_u32(self.data.len() as u32).await?;
         write.write_all(self.data.as_slice()).await?;
+        write.flush().await?;
         Ok(())
     }
 
@@ -589,7 +591,7 @@ mod tests {
         Utc::now()
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     async fn test_tcp() -> Result<(), Error> {
         let platform = SingleInterchangePlatform::new().await;
 
@@ -629,45 +631,6 @@ mod tests {
         Ok(())
     }
 
-  #[tokio::test]
-    async fn test_tcp2() -> Result<(), Error> {
-        let platform = SingleInterchangePlatform::new().await;
-
-        CertGenerator::gen(vec!["localhost".to_string()])?
-            .write_to_dir(".".to_string())
-            .await?;
-        let logger = RootLogger::default();
-        let logger = logger.point(Point::from_str("tcp-server")?);
-        let port = 4343u16;
-        let server =
-            HyperlaneTcpServer::new(port, ".".to_string(), platform.gate.clone(), logger.clone())
-                .await?;
-        let api = server.start()?;
-
-        let less_logger = logger.point(LESS.clone());
-        let less_client = Box::new(HyperlaneTcpClient::new(
-            format!("localhost:{}", port),
-            ".",
-            platform.knock(LESS.to_surface()),
-            false,
-            less_logger,
-        ));
-
-        let fae_logger = logger.point(FAE.clone());
-        let fae_client = Box::new(HyperlaneTcpClient::new(
-            format!("localhost:{}", port),
-            ".",
-            platform.knock(FAE.to_surface()),
-            false,
-            fae_logger,
-        ));
-
-        let test = WaveTest::new(fae_client, less_client);
-
-        test.go().await.unwrap();
-
-        Ok(())
-    }
 
     #[tokio::test]
     async fn test_large_frame() -> Result<(), Error> {

@@ -2218,8 +2218,9 @@ pub mod test_util {
                 hello.to(FAE.clone().to_surface());
                 hello.from(LESS.clone().to_surface());
                 hello.method(ExtMethod::new("Hello").unwrap());
-                let mut body = Vec::with_capacity(100_000);
-                for _ in 0..100_000 {
+                let size = 3_000_000usize;
+                let mut body = Vec::with_capacity(size);
+                for _ in 0..size {
                     body.push(0u8);
                 }
                 hello.body(Substance::Bin( Arc::new(body)));
