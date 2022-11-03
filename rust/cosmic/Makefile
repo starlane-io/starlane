@@ -8,6 +8,8 @@ version:
 	$(MAKE) -C cosmic-hyperspace version
 	$(MAKE) -C cosmic-cli version
 	$(MAKE) -C cosmic-registry-postgres version
+	$(MAKE) -C ../mechtron/mechtron-host version
+	$(MAKE) -C ../mechtron/mechtron version
 
 publish-dry-run:
 	$(MAKE) -C cosmic-nom publish-dry-run
@@ -19,6 +21,7 @@ publish-dry-run:
 	$(MAKE) -C cosmic-hyperspace publish-dry-run
 	$(MAKE) -C cosmic-cli publish-dry-run
 	$(MAKE) -C cosmic-registry-postgres publish-dry-run
+	$(MAKE) -C ../mechtron/mechtron-host publish-dry-run
 
 publish:
 	$(MAKE) -C cosmic-nom publish
@@ -33,6 +36,7 @@ publish:
 	$(MAKE) -C cosmic-hyperlane-tcp publish
 	sleep 60
 	$(MAKE) -C ../mechtron/mechtron-host publish
+	$(MAKE) -C ../mechtron/mechtron publish
 	$(MAKE) -C cosmic-hyperspace publish
 	$(MAKE) -C cosmic-cli publish
 	$(MAKE) -C cosmic-registry-postgres publish
