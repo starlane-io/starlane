@@ -2228,7 +2228,7 @@ pub mod test_util {
                 rtn.send(pong.core.status.as_u16() == 200u16);
             });
 
-            let result = tokio::time::timeout(Duration::from_secs(5), rtn_rx)
+            let result = tokio::time::timeout(Duration::from_secs(30), rtn_rx)
                 .await
                 .unwrap()
                 .unwrap();
@@ -2324,7 +2324,7 @@ pub mod test_util {
                 rtn.send(pong.core.status.as_u16() == 200u16);
             });
 
-            let result = tokio::time::timeout(Duration::from_secs(5), rtn_rx)
+            let result = tokio::time::timeout(Duration::from_secs(30), rtn_rx)
                 .await
                 .unwrap()
                 .unwrap();
