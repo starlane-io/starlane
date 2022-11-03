@@ -566,7 +566,7 @@ impl From<&str> for Error {
 mod tests {
     use std::time::Duration;
 
-    use cosmic_hyperlane::test_util::{SingleInterchangePlatform, WaveTest, FAE, LESS};
+    use cosmic_hyperlane::test_util::{SingleInterchangePlatform, WaveTest, FAE, LESS, LargeFrameTest};
     use cosmic_space::loc::{Point, ToSurface};
     use cosmic_space::log::RootLogger;
 
@@ -629,8 +629,8 @@ mod tests {
         Ok(())
     }
 
-    // #[tokio::test]
-    async fn test_large_frame() -> Result<(), Error> {
+  #[tokio::test]
+    async fn test_tcp2() -> Result<(), Error> {
         let platform = SingleInterchangePlatform::new().await;
 
         CertGenerator::gen(vec!["localhost".to_string()])?
@@ -653,33 +653,58 @@ mod tests {
             less_logger,
         ));
 
-        let less_exchanger = Exchanger::new(
-            LESS.push("exchanger").unwrap().to_surface(),
-            Timeouts::default(),
-            PointLogger::default(),
-        );
+        let fae_logger = logger.point(FAE.clone());
+        let fae_client = Box::new(HyperlaneTcpClient::new(
+            format!("localhost:{}", port),
+            ".",
+            platform.knock(FAE.to_surface()),
+            false,
+            fae_logger,
+        ));
 
-        let root_logger = RootLogger::default();
-        let logger = root_logger.point(Point::from_str("less-client").unwrap());
-        let less_client =
-            HyperClient::new_with_exchanger(less_client, Some(less_exchanger.clone()), logger)
-                .unwrap();
+        let test = WaveTest::new(fae_client, less_client);
 
-        less_client
-            .wait_for_ready(Duration::from_secs(5))
-            .await
-            .unwrap();
-        let transmitter = less_client.transmitter_builder().await.unwrap().build();
+        test.go().await.unwrap();
 
-        let size = 100_000;
-        let mut bin = Vec::with_capacity(100_100);
-        for _ in 0..size {
-            bin.push(0u8);
-        }
-        let bin = Arc::new(bin);
-        let mut wave = DirectedProto::signal();
-        wave.body(Substance::Bin(bin));
-        transmitter.signal(wave).await.unwrap();
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_large_frame() -> Result<(), Error> {
+         let platform = SingleInterchangePlatform::new().await;
+
+        CertGenerator::gen(vec!["localhost".to_string()])?
+            .write_to_dir(".".to_string())
+            .await?;
+        let logger = RootLogger::default();
+        let logger = logger.point(Point::from_str("tcp-server")?);
+        let port = 4345u16;
+        let server =
+            HyperlaneTcpServer::new(port, ".".to_string(), platform.gate.clone(), logger.clone())
+                .await?;
+        let api = server.start()?;
+
+        let less_logger = logger.point(LESS.clone());
+        let less_client = Box::new(HyperlaneTcpClient::new(
+            format!("localhost:{}", port),
+            ".",
+            platform.knock(LESS.to_surface()),
+            false,
+            less_logger,
+        ));
+
+        let fae_logger = logger.point(FAE.clone());
+        let fae_client = Box::new(HyperlaneTcpClient::new(
+            format!("localhost:{}", port),
+            ".",
+            platform.knock(FAE.to_surface()),
+            false,
+            fae_logger,
+        ));
+
+        let test = LargeFrameTest::new(fae_client, less_client);
+
+        test.go().await.unwrap();
 
         Ok(())
     }
