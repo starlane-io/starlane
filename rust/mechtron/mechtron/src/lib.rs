@@ -16,7 +16,6 @@ extern crate cosmic_macros;
 #[macro_use]
 extern crate cosmic_macros_primitive;
 
-
 extern crate alloc;
 extern crate core;
 
@@ -45,12 +44,12 @@ use std::sync::{mpsc, MutexGuard};
 use cosmic_space::wave::Bounce;
 
 use cosmic_space::artifact::synch::ArtifactApi;
+use cosmic_space::artifact::ArtRef;
 use cosmic_space::wave::exchange::synch::{
     DirectedHandler, DirectedHandlerProxy, DirectedHandlerShell, ExchangeRouter, InCtx,
     ProtoTransmitter, ProtoTransmitterBuilder,
 };
 use std::sync::RwLock;
-use cosmic_space::artifact::ArtRef;
 
 use crate::err::{GuestErr, MechErr};
 use crate::guest::GuestCtx;
@@ -102,7 +101,8 @@ where
         F: MechtronFactory<P>,
     {
         SkewerCase::from_str(factory.name().as_str() ).expect("Mechtron Name must be valid kebab (skewer) case (all lower case alphanumeric and dashes with leading letter)");
-        self.factories.insert(factory.name(), RwLock::new(Box::new(factory)));
+        self.factories
+            .insert(factory.name(), RwLock::new(Box::new(factory)));
     }
 
     pub fn get<S>(&self, name: S) -> Option<&RwLock<Box<dyn MechtronFactory<P>>>>
@@ -111,8 +111,6 @@ where
     {
         self.factories.get(&name.to_string())
     }
-
-
 }
 
 pub trait MechtronFactory<P>: Sync + Send + 'static
@@ -149,24 +147,28 @@ where
         details: Details,
         logger: PointLogger,
         phantom: PhantomData<P>,
-        artifacts: ArtifactApi
+        artifacts: ArtifactApi,
     ) -> Self {
         let logger = logger.point(details.stub.point.clone());
         Self {
             details,
             logger,
             phantom,
-            artifacts
+            artifacts,
         }
     }
-    pub fn bundle( &self ) -> Result<Point,P::Err> {
-        let config = self.details.properties.get("config").ok_or::<P::Err>("expecting mechtron to have config property set".into())?;
+    pub fn bundle(&self) -> Result<Point, P::Err> {
+        let config = self
+            .details
+            .properties
+            .get("config")
+            .ok_or::<P::Err>("expecting mechtron to have config property set".into())?;
         let config = Point::from_str(config.value.as_str())?;
         let bundle = config.to_bundle()?.push(":/")?;
         Ok(bundle)
     }
 
-    pub fn raw_from_bundle<S:ToString>( &self, path: S) -> Result<ArtRef<Vec<u8>>,P::Err> {
+    pub fn raw_from_bundle<S: ToString>(&self, path: S) -> Result<ArtRef<Vec<u8>>, P::Err> {
         let point = self.bundle()?.push(path)?;
         Ok(self.artifacts.raw(&point)?)
     }
@@ -218,4 +220,3 @@ where
         Ok(None)
     }
 }
-

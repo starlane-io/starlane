@@ -568,7 +568,9 @@ impl From<&str> for Error {
 mod tests {
     use std::time::Duration;
 
-    use cosmic_hyperlane::test_util::{SingleInterchangePlatform, WaveTest, FAE, LESS, LargeFrameTest};
+    use cosmic_hyperlane::test_util::{
+        LargeFrameTest, SingleInterchangePlatform, WaveTest, FAE, LESS,
+    };
     use cosmic_space::loc::{Point, ToSurface};
     use cosmic_space::log::RootLogger;
 
@@ -631,10 +633,9 @@ mod tests {
         Ok(())
     }
 
-
-//    #[tokio::test]
+    //    #[tokio::test]
     async fn test_large_frame() -> Result<(), Error> {
-         let platform = SingleInterchangePlatform::new().await;
+        let platform = SingleInterchangePlatform::new().await;
 
         CertGenerator::gen(vec!["localhost".to_string()])?
             .write_to_dir(".".to_string())

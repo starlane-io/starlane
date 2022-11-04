@@ -13,6 +13,7 @@ use crate::reg::{Registration, Registry};
 use crate::star::HyperStarCall::LayerTraversalInjection;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::Cosmos;
+use cosmic_space::artifact::asynch::ArtifactApi;
 use cosmic_space::artifact::ArtRef;
 use cosmic_space::command::common::{SetProperties, StateSrc};
 use cosmic_space::command::direct::create::{
@@ -52,8 +53,7 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, oneshot, RwLock, watch};
-use cosmic_space::artifact::asynch::ArtifactApi;
+use tokio::sync::{mpsc, oneshot, watch, RwLock};
 
 lazy_static! {
     static ref DEFAULT_BIND: ArtRef<BindConfig> = ArtRef::new(
@@ -730,7 +730,8 @@ where
 
             router.direction = Some(TraversalDirection::Fabric);
 
-            let mut transmitter = ProtoTransmitterBuilder::new(Arc::new(router), skel.exchanger.clone());
+            let mut transmitter =
+                ProtoTransmitterBuilder::new(Arc::new(router), skel.exchanger.clone());
             transmitter.from =
                 SetStrategy::Override(point.clone().to_surface().with_layer(Layer::Core));
             let transmitter = transmitter.build();
@@ -1155,7 +1156,9 @@ where
                 }
             }
             ItemSphere::Router(router) => {
-                self.skel.logger.result(router.traverse(direct.wrap()).await)?;
+                self.skel
+                    .logger
+                    .result(router.traverse(direct.wrap()).await)?;
             }
         }
 
@@ -1256,8 +1259,10 @@ where
                         );
                         router.direction = Some(TraversalDirection::Fabric);
 
-                        let mut transmitter =
-                            ProtoTransmitter::new(Arc::new(router), self.star_skel.exchanger.clone());
+                        let mut transmitter = ProtoTransmitter::new(
+                            Arc::new(router),
+                            self.star_skel.exchanger.clone(),
+                        );
                         let ctx = DriverCtx::new(transmitter);
                         match self
                             .skel

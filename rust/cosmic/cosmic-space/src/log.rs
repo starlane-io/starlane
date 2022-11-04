@@ -427,11 +427,7 @@ impl LogAppender for StdOutAppender {
             None => "None".to_string(),
             Some(action) => action.to_string(),
         };
-        println!(
-            "{} | {}",
-            log.point.to_string(),
-            log.payload.to_string()
-        )
+        println!("{} | {}", log.point.to_string(), log.payload.to_string())
     }
 
     fn audit(&self, log: AuditLog) {

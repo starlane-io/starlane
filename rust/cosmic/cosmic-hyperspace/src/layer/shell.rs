@@ -219,7 +219,9 @@ where
     pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Surface, SpaceErr> {
         // only allow a cli session to be created by any layer of THIS particle
         if ctx.from().clone().to_point() != ctx.to().clone().to_point() {
-            return Err(SpaceErr::forbidden("cli sessions can only be created from within the same Point"));
+            return Err(SpaceErr::forbidden(
+                "cli sessions can only be created from within the same Point",
+            ));
         }
 
         let mut session_port = ctx

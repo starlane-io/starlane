@@ -69,7 +69,7 @@ impl ProtoTransmitter {
 
         let directed = wave.build()?;
 
-println!("DIRECTE!");
+        println!("DIRECTE!");
         match directed.bounce_backs() {
             BounceBacks::None => {
                 self.router.route(directed.to_ultra());
@@ -83,7 +83,7 @@ println!("DIRECTE!");
     where
         D: Into<DirectedProto>,
     {
-println!("PING!");
+        println!("PING!");
         let mut ping: DirectedProto = ping.into();
         ping.bounce_backs = Some(BounceBacks::Single);
         if let Some(DirectedKind::Ping) = ping.kind {

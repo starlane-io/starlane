@@ -59,15 +59,17 @@ lazy_static! {
     pub static ref FAE: Point = Point::from_str("space:users:fae").expect("point");
 }
 
-
 #[async_trait]
-pub trait Test: Sync+Send+Copy{
-    async fn run(&self, client: ControlClient) -> Result<(),CosmicErr> {
+pub trait Test: Sync + Send + Copy {
+    async fn run(&self, client: ControlClient) -> Result<(), CosmicErr> {
         Ok(())
     }
 }
 
-pub fn harness<F>(mut f: F ) -> Result<(),CosmicErr> where F: Test  {
+pub fn harness<F>(mut f: F) -> Result<(), CosmicErr>
+where
+    F: Test,
+{
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -81,15 +83,13 @@ pub fn harness<F>(mut f: F ) -> Result<(),CosmicErr> where F: Test  {
             .await
             .unwrap();
 
-       let factory = MachineApiExtFactory {
+        let factory = MachineApiExtFactory {
             machine_api: machine_api.clone(),
             logger: logger.clone(),
         };
 
-
         let client = ControlClient::new(Box::new(factory))?;
         client.wait_for_ready(Duration::from_secs(5)).await?;
-
 
         f.run(client).await?;
 
@@ -97,7 +97,6 @@ pub fn harness<F>(mut f: F ) -> Result<(),CosmicErr> where F: Test  {
         Ok(())
     })
 }
-
 
 async fn create(
     ctx: &MemRegCtx,
@@ -115,7 +114,7 @@ async fn create(
     );
     ctx.particles.insert(
         particle.clone(),
-        ParticleRecord::new(details.clone(),location),
+        ParticleRecord::new(details.clone(), location),
     );
 
     let mut wave = DirectedProto::ping();
@@ -294,7 +293,11 @@ fn test_provision_and_assign() -> Result<(), CosmicErr> {
         let transmitter = transmitter.build();
 
         tokio::time::sleep(Duration::from_secs(5)).await;
-        assert!(transmitter.bounce(&Point::global_executor().to_surface()).await);
+        assert!(
+            transmitter
+                .bounce(&Point::global_executor().to_surface())
+                .await
+        );
 
         let create = Create {
             template: Template::new(
@@ -395,13 +398,10 @@ fn test_publish() -> Result<(), CosmicErr> {
 
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-
         let cli = client.new_cli_session().await?;
 
-        logger.result(cli.exec("create localhost<Space>")
-            .await
-            .unwrap()
-            .ok_or())
+        logger
+            .result(cli.exec("create localhost<Space>").await.unwrap().ok_or())
             .unwrap();
         cli.exec("create localhost:repo<Repo>")
             .await
@@ -430,11 +430,9 @@ fn test_publish() -> Result<(), CosmicErr> {
 
         assert!(core.is_ok());
 
-
         Ok(())
     })
 }
-
 
 //#[test]
 fn test_mechtron() -> Result<(), CosmicErr> {
@@ -521,23 +519,21 @@ fn test_mechtron() -> Result<(), CosmicErr> {
 }
 
 #[test]
-fn test_create_err() -> Result<(),CosmicErr> {
-    #[derive(Copy,Clone)]
+fn test_create_err() -> Result<(), CosmicErr> {
+    #[derive(Copy, Clone)]
     pub struct CreateErrTest;
     #[async_trait]
-    impl Test for CreateErrTest{
-
-      async fn run(&self, client: ControlClient) -> Result<(),CosmicErr> {
-          let cli = client.new_cli_session().await?;
-          if let Err(err) = cli.exec("create repo<BadKind>") .await ? .ok_or() {
-println!("FINAL : {}", err.to_string());
-              Ok(())
-          } else {
-              Err("expected err".into())
-          }
-      }
-
+    impl Test for CreateErrTest {
+        async fn run(&self, client: ControlClient) -> Result<(), CosmicErr> {
+            let cli = client.new_cli_session().await?;
+            if let Err(err) = cli.exec("create repo<BadKind>").await?.ok_or() {
+                println!("FINAL : {}", err.to_string());
+                Ok(())
+            } else {
+                Err("expected err".into())
+            }
+        }
     }
 
-    harness( CreateErrTest )
+    harness(CreateErrTest)
 }

@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
-use futures::future::{BoxFuture, join_all, select_all};
+use futures::future::{join_all, select_all, BoxFuture};
 use futures::FutureExt;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::error::RecvError;

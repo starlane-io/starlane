@@ -121,8 +121,6 @@ where
     Signal(Wave<Signal>),
 }
 
-
-
 impl<W> Spannable for UltraWaveDef<W>
 where
     W: ToRecipients + Clone,
@@ -193,8 +191,7 @@ impl<T> UltraWaveDef<T>
 where
     T: ToRecipients + Clone,
 {
-
-    pub fn via_desc(&self)-> String {
+    pub fn via_desc(&self) -> String {
         let via = match self {
             UltraWaveDef::Ping(w) => w.via.as_ref(),
             UltraWaveDef::Pong(w) => w.via.as_ref(),
@@ -203,12 +200,11 @@ where
             UltraWaveDef::Signal(w) => w.via.as_ref(),
         };
 
-        match via  {
+        match via {
             None => "None".to_string(),
-            Some(via) => via.to_string()
+            Some(via) => via.to_string(),
         }
     }
-
 
     pub fn has_visited(&self, star: &Point) -> bool {
         match self {
@@ -408,7 +404,6 @@ impl UltraWave {
             _ => {}
         }
     }
-
 
     pub fn to_signal(self) -> Result<Wave<Signal>, SpaceErr> {
         match self {
@@ -816,7 +811,7 @@ impl BounceBacks {
             BounceBacks::None => false,
             BounceBacks::Single => true,
             BounceBacks::Count(_) => true,
-            BounceBacks::Timer(_) => true
+            BounceBacks::Timer(_) => true,
         }
     }
 }
@@ -1479,7 +1474,7 @@ impl DirectedProto {
     }
 
     pub fn via<P: ToSurface>(&mut self, via: &P) {
-                self.via.replace(via.to_surface());
+        self.via.replace(via.to_surface());
     }
 }
 
@@ -1699,9 +1694,12 @@ impl FromReflectedAggregate for Wave<Pong> {
                 ReflectedWave::Pong(pong) => Ok(pong),
                 _ => Err(SpaceErr::bad_request("expected a Pong Reflected")),
             },
-            ReflectedAggregate::None => Err(SpaceErr::bad_request("expected a Single Reflected, encountered: None")),
-            ReflectedAggregate::Multi(_) =>Err(SpaceErr::bad_request("expected a Single Reflected, encountered: Multi"))
-
+            ReflectedAggregate::None => Err(SpaceErr::bad_request(
+                "expected a Single Reflected, encountered: None",
+            )),
+            ReflectedAggregate::Multi(_) => Err(SpaceErr::bad_request(
+                "expected a Single Reflected, encountered: Multi",
+            )),
         }
     }
 }
@@ -1927,10 +1925,10 @@ impl DirectedWave {
         }
     }
 
-   pub fn is_signal(&self) -> bool {
-         match self {
+    pub fn is_signal(&self) -> bool {
+        match self {
             DirectedWave::Signal(_) => true,
-            _ => false
+            _ => false,
         }
     }
 

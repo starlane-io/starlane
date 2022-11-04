@@ -402,10 +402,7 @@ where
                 self.skel
                     .star
                     .registry
-                    .assign_star(
-                        &assign.details.stub.point,
-                        &self.skel.star.point,
-                    )
+                    .assign_star(&assign.details.stub.point, &self.skel.star.point)
                     .await?;
 
                 let mut point_and_kind_set = HashSet::new();
@@ -674,10 +671,7 @@ where
                 self.skel
                     .star
                     .registry
-                    .assign_star(
-                        &assign.details.stub.point,
-                        &self.skel.star.point,
-                    )
+                    .assign_star(&assign.details.stub.point, &self.skel.star.point)
                     .await?;
             }
             Ok(())

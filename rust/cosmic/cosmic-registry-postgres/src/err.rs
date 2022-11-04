@@ -57,7 +57,7 @@ pub mod convert {
         }
     }
 
-        impl From<url::ParseError> for Err {
+    impl From<url::ParseError> for Err {
         fn from(e: url::ParseError) -> Self {
             Self {
                 kind: ErrKind::Default,
@@ -70,7 +70,7 @@ pub mod convert {
         fn from(e: DefaultHostErr) -> Self {
             Self {
                 kind: ErrKind::Default,
-                message: e.to_string()
+                message: e.to_string(),
             }
         }
     }

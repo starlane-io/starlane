@@ -132,7 +132,7 @@ impl Session {
                     self.out_err(core.ok_or().unwrap_err());
                     std::process::exit(1);
                 }
-            },
+            }
         }
     }
 
@@ -141,8 +141,8 @@ impl Session {
             Substance::Empty => {
                 println!("Ok");
             }
-            Substance::Err(err)=> {
-                println!("{}",err.to_string());
+            Substance::Err(err) => {
+                println!("{}", err.to_string());
             }
             Substance::List(list) => {
                 for i in list.list {
@@ -162,7 +162,11 @@ impl Session {
                 println!("{}<{}>", stub.point.to_string(), stub.kind.to_string())
             }
             Substance::Details(details) => {
-                println!("{}<{}>", details.stub.point.to_string(), details.stub.kind.to_string())
+                println!(
+                    "{}<{}>",
+                    details.stub.point.to_string(),
+                    details.stub.kind.to_string()
+                )
             }
             what => {
                 eprintln!(

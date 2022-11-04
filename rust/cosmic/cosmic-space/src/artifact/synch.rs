@@ -50,7 +50,6 @@ impl ArtifactApi {
         return Ok(ArtRef::new(bind, point.clone()));
     }
 
-
     pub fn raw(&self, point: &Point) -> Result<ArtRef<Vec<u8>>, SpaceErr> {
         if self.binds.contains_key(point) {
             let bin = self.raw.get(point).unwrap().clone();
@@ -59,11 +58,10 @@ impl ArtifactApi {
 
         let bin = self.fetcher.fetch(point)?;
 
-        self.raw.insert( point.clone(), bin.clone() );
+        self.raw.insert(point.clone(), bin.clone());
 
         return Ok(ArtRef::new(bin, point.clone()));
     }
-
 
     fn fetch<A>(&self, point: &Point) -> Result<A, SpaceErr>
     where

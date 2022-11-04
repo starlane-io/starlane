@@ -149,7 +149,9 @@ impl TryFrom<Ping> for Provision {
         if let Substance::Hyper(HyperSubstance::Provision(provision)) = request.core.body {
             Ok(provision)
         } else {
-            Err(SpaceErr::bad_request("expecting a Provision HyperSubstance"))
+            Err(SpaceErr::bad_request(
+                "expecting a Provision HyperSubstance",
+            ))
         }
     }
 }

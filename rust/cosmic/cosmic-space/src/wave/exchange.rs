@@ -362,7 +362,7 @@ impl<R, E> ProtoTransmitterDef<R, E> {
         match &self.via {
             SetStrategy::None => {}
             SetStrategy::Fill(via) => wave.fill_via(via.clone()),
-            SetStrategy::Override(via) => wave.via(via)
+            SetStrategy::Override(via) => wave.via(via),
         }
 
         match &self.agent {
