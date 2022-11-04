@@ -1570,13 +1570,10 @@ pub fn point_template<I: Span>(input: I) -> Res<I, PointTemplateVar> {
     let (next, (point, wildcard)) = pair(point_var, opt(recognize(tag("%"))))(input.clone())?;
 
     if point.is_root() {
-        return Ok((
-            next,
-            PointTemplateVar {
-                parent: point,
-                child_segment_template: PointSegTemplate::Root,
-            },
-        ));
+        return Ok((next, PointTemplateVar {
+            parent: point,
+            child_segment_template: PointSegTemplate::Root
+        }));
     }
 
     let parent = point
@@ -1725,10 +1722,7 @@ pub fn get_properties<I: Span>(input: I) -> Res<I, Vec<String>> {
 
 pub fn create<I: Span>(input: I) -> Res<I, CreateVar> {
     tuple((
-        opt(alt((
-            value(Strategy::Override, tag("!")),
-            value(Strategy::Ensure, tag("?")),
-        ))),
+        opt(alt((value(Strategy::Override, tag("!")),value(Strategy::Ensure, tag("?"))))),
         space1,
         template,
         opt(delimited(tag("{"), set_properties, tag("}"))),
@@ -4839,7 +4833,7 @@ pub mod error {
     use crate::command::CommandVar;
     use crate::config::bind::{PipelineStepVar, PipelineStopVar, RouteSelector, WaveDirection};
     use crate::err::report::{Label, Report, ReportKind};
-    use crate::err::{ParseErrs, SpaceErr};
+    use crate::err::SpaceErr;
     use crate::kind::KindParts;
     use crate::loc::{Layer, PointSeg, PointVar, StarKey, Topic, VarVal, Version};
     use crate::parse::model::{
@@ -4900,19 +4894,22 @@ pub mod error {
      */
 
     fn create_err_report<I: Span>(context: &str, loc: I) -> SpaceErr {
-        let mut builder = Report::build(ReportKind::Error, (), 23);
+        SpaceErr::server_error(context)
+    }
+    /*    fn create_err_report<I: Span>(context: &str, loc: I) -> UniErr {
+            let mut builder = Report::build(ReportKind::Error, (), 23);
 
-        match NestedBlockKind::error_message(&loc, context) {
-            Ok(message) => {
-                let builder = builder.with_message(message).with_label(
-                    Label::new(loc.location_offset()..loc.location_offset()).with_message(message),
-                );
-                return ParseErrs::from_report(builder.finish(), loc.extra()).into();
+            match NestedBlockKind::error_message(&loc, context) {
+                Ok(message) => {
+                    let builder = builder.with_message(message).with_label(
+                        Label::new(loc.location_offset()..loc.location_offset()).with_message(message),
+                    );
+                    return ParseErrs::from_report(builder.finish(), loc.extra()).into();
+                }
+                Err(_) => {}
             }
-            Err(_) => {}
-        }
 
-        let builder = match context {
+            let builder = match context {
                 "var" => {
                     let f = |input| {preceded(tag("$"),many0(alt((tag("{"),alphanumeric1,tag("-"),tag("_"),multispace1))))(input)};
                     let len = len(f)(loc.clone())+1;
@@ -4976,28 +4973,27 @@ pub mod error {
                 "scope:expect-space-after-pipeline-step" =>{ builder.with_message("expecting a space after selection pipeline step (->)").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Expecting Space"))},
                 "scope-selector-name:expect-alphanumeric-leading" => { builder.with_message("expecting a valid scope selector name starting with an alphabetic character").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Expecting Alpha Char"))},
                 "scope-selector-name:expect-termination" => { builder.with_message("expecting scope selector to be followed by a space, a filter declaration: '(filter)->' or a sub scope selector: '<SubScope> or subscope terminator '>' '").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Bad Scope Selector Termination"))},
-                "scope-selector-version-closing-tag" =>{ builder.with_message("expecting a closing parenthesis for the root version declaration (no spaces allowed) -> i.e. Bind(version=1.0.0)->").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("missing closing parenthesis"))}
-                "scope-selector-version-missing-kazing"=> { builder.with_message("The version declaration needs a little style.  Try adding a '->' to it.  Make sure there are no spaces between the parenthesis and the -> i.e. Bind(version=1.0.0)->").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("missing stylish arrow"))}
-                "scope-selector-version" => { builder.with_message("Root config selector requires a version declaration with NO SPACES between the name and the version filter example: Bind(version=1.0.0)->").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("bad version declaration"))}
-                "scope-selector-name" => { builder.with_message("Expecting an alphanumeric scope selector name. example: Pipeline").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("expecting scope selector"))}
-                "root-scope-selector-name" => { builder.with_message("Expecting an alphanumeric root scope selector name and version. example: Bind(version=1.0.0)->").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("expecting scope selector"))}
-                "consume" => { builder.with_message("Expected to be able to consume the entire String")}
-                "point:space_segment:dot_dupes" => { builder.with_message("Space Segment cannot have consecutive dots i.e. '..'").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Consecutive dots not allowed"))}
-                "point:version:root_not_trailing" =>{ builder.with_message("Root filesystem is the only segment allowed to follow a bundle version i.e. 'space:base:2.0.0-version:/dir/somefile.txt'").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Only root file segment ':/' allowed here"))}
-                "point:space_segment_leading" => {builder.with_message("The leading character of a Space segment must be a lowercase letter").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Invalid Leading Character"))}
-                "point:space_segment" => {builder.with_message("A Point Space Segment must be all lowercase, alphanumeric with dashes and dots.  It follows Host and Domain name rules i.e. 'localhost', 'mechtron.io'").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Invalid Space Segment"))}
-                "point:bad_leading" => {builder.with_message("The leading character must be a lowercase letter (for Base Segments) or a digit (for Version Segments)").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Invalid Leading Character"))}
-                "point:base_segment" => {builder.with_message("A Point Base Segment must be 'skewer-case': all lowercase alphanumeric with dashes. The leading character must be a letter.").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Invalid Base Segment Character"))}
-                "point:dir_pop" => {builder.with_message("A Point Directory Pop '..'").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Something is Wrong"))}
-                "point:dir_segment" => {builder.with_message("A Point Dir Segment follows legal filesystem characters and must end in a '/'").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Illegal Character"))}
-                "point:root_filesystem_segment" => {builder.with_message("Root FileSystem ':/'").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Illegal Character"))}
-                "point:file_segment" => {builder.with_message("A Point File Segment follows legal filesystem characters").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Illegal Character"))}
-                "point:file_or_directory"=> {builder.with_message("A Point File Segment (Files & Directories) follows legal filesystem characters").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Illegal Character"))}
-                "point:version_segment" => {builder.with_message("A Version Segment allows all legal SemVer characters").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Illegal Character"))}
-                "filter-name" => {builder.with_message("Filter name must be skewer case with leading character").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Invalid filter name"))}
-                "kind-base" => {builder.with_message("Invalid Base Kind").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Base Kind not recognized"))}
-            "command" => {builder.with_message("Unrecognized Command").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Invalid"))}
-                "parsed-scope-selector-kazing" => {builder.with_message("Selector needs some style with the '->' operator either right after the Selector i.e.: 'Pipeline ->' or as part of the filter declaration i.e. 'Pipeline(auth)->'").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Missing or Invalid Kazing Operator( -> )"))}
+                    "scope-selector-version-closing-tag" =>{ builder.with_message("expecting a closing parenthesis for the root version declaration (no spaces allowed) -> i.e. Bind(version=1.0.0)->").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("missing closing parenthesis"))}
+                    "scope-selector-version-missing-kazing"=> { builder.with_message("The version declaration needs a little style.  Try adding a '->' to it.  Make sure there are no spaces between the parenthesis and the -> i.e. Bind(version=1.0.0)->").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("missing stylish arrow"))}
+                    "scope-selector-version" => { builder.with_message("Root config selector requires a version declaration with NO SPACES between the name and the version filter example: Bind(version=1.0.0)->").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("bad version declaration"))}
+                    "scope-selector-name" => { builder.with_message("Expecting an alphanumeric scope selector name. example: Pipeline").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("expecting scope selector"))}
+                    "root-scope-selector-name" => { builder.with_message("Expecting an alphanumeric root scope selector name and version. example: Bind(version=1.0.0)->").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("expecting scope selector"))}
+                    "consume" => { builder.with_message("Expected to be able to consume the entire String")}
+                    "point:space_segment:dot_dupes" => { builder.with_message("Space Segment cannot have consecutive dots i.e. '..'").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Consecutive dots not allowed"))}
+                    "point:version:root_not_trailing" =>{ builder.with_message("Root filesystem is the only segment allowed to follow a bundle version i.e. 'space:base:2.0.0-version:/dir/somefile.txt'").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Only root file segment ':/' allowed here"))}
+                    "point:space_segment_leading" => {builder.with_message("The leading character of a Space segment must be a lowercase letter").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Invalid Leading Character"))}
+                    "point:space_segment" => {builder.with_message("A Point Space Segment must be all lowercase, alphanumeric with dashes and dots.  It follows Host and Domain name rules i.e. 'localhost', 'mechtron.io'").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Invalid Space Segment"))}
+                    "point:bad_leading" => {builder.with_message("The leading character must be a lowercase letter (for Base Segments) or a digit (for Version Segments)").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Invalid Leading Character"))}
+                    "point:base_segment" => {builder.with_message("A Point Base Segment must be 'skewer-case': all lowercase alphanumeric with dashes. The leading character must be a letter.").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Invalid Base Segment Character"))}
+                    "point:dir_pop" => {builder.with_message("A Point Directory Pop '..'").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Something is Wrong"))}
+                    "point:dir_segment" => {builder.with_message("A Point Dir Segment follows legal filesystem characters and must end in a '/'").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Illegal Character"))}
+                    "point:root_filesystem_segment" => {builder.with_message("Root FileSystem ':/'").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Illegal Character"))}
+                    "point:file_segment" => {builder.with_message("A Point File Segment follows legal filesystem characters").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Illegal Character"))}
+                    "point:file_or_directory"=> {builder.with_message("A Point File Segment (Files & Directories) follows legal filesystem characters").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Illegal Character"))}
+                    "point:version_segment" => {builder.with_message("A Version Segment allows all legal SemVer characters").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Illegal Character"))}
+                    "filter-name" => {builder.with_message("Filter name must be skewer case with leading character").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Invalid filter name"))}
+
+                    "parsed-scope-selector-kazing" => {builder.with_message("Selector needs some style with the '->' operator either right after the Selector i.e.: 'Pipeline ->' or as part of the filter declaration i.e. 'Pipeline(auth)->'").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Missing or Invalid Kazing Operator( -> )"))}
                 "variable" => {
                         builder.with_message("variable name must be alphanumeric lowercase, dashes and dots.  Variables are preceded by the '$' operator and must be sorounded by curly brackets ${env.valid-variable-name}")
                     },
@@ -5044,9 +5040,10 @@ pub mod error {
                     }
                 };
 
-        //            let source = String::from_utf8(loc.get_line_beginning().to_vec() ).unwrap_or("could not parse utf8 of original source".to_string() );
-        ParseErrs::from_report(builder.finish(), loc.extra()).into()
-    }
+            //            let source = String::from_utf8(loc.get_line_beginning().to_vec() ).unwrap_or("could not parse utf8 of original source".to_string() );
+            ParseErrs::from_report(builder.finish(), loc.extra()).into()
+        }
+    */
     pub fn find_parse_err<I: Span>(err: &Err<ErrorTree<I>>) -> SpaceErr {
         match err {
             Err::Incomplete(_) => "internal parser error: Incomplete".into(),
@@ -5553,7 +5550,6 @@ pub fn sub_kind_selector<I: Span>(input: I) -> Res<I, SubKindSelector> {
 
 pub fn kind_base<I: Span>(input: I) -> Res<I, BaseKind> {
     let (next, kind) = context("kind-base", camel_case)(input.clone())?;
-
     match BaseKind::try_from(kind) {
         Ok(kind) => Ok((next, kind)),
         Err(err) => {
@@ -7282,18 +7278,18 @@ pub mod test {
         BlockKind, DelimitedBlockKind, LexScope, NestedBlockKind, TerminatedBlockKind,
     };
     use crate::parse::{
-        args, base_point_segment, base_seg, command_line, comment, consume_point_var, create,
-        create_command, doc, expected_block_terminator_or_non_terminator, lex_block,
-        lex_child_scopes, lex_nested_block, lex_scope, lex_scope_pipeline_step_and_block,
-        lex_scope_selector, lex_scopes, lowercase1, mesh_eos, mesh_seg, nested_block,
-        nested_block_content, next_stacked_name, no_comment, parse_bind_config,
-        parse_include_blocks, parse_inner_block, parse_mechtron_config, path_regex, pipeline,
-        pipeline_segment, pipeline_step_var, pipeline_stop_var, point_non_root_var, point_template,
-        point_var, pop, rec_version, root_ctx_seg, root_scope, root_scope_selector,
-        route_attribute, route_selector, scope_filter, scope_filters, skewer_case_chars,
-        skewer_dot, space_chars, space_no_dupe_dots, space_point_segment, strip_comments, subst,
-        template, var_seg, variable_name, version, version_point_segment, wrapper, Env,
-        MapResolver, SubstParser, VarResolver,
+        args, base_point_segment, base_seg, comment, consume_point_var, create, create_command,
+        doc, expected_block_terminator_or_non_terminator, lex_block, lex_child_scopes,
+        lex_nested_block, lex_scope, lex_scope_pipeline_step_and_block, lex_scope_selector,
+        lex_scopes, lowercase1, mesh_eos, mesh_seg, nested_block, nested_block_content,
+        next_stacked_name, no_comment, parse_bind_config, parse_include_blocks, parse_inner_block,
+        parse_mechtron_config, path_regex, pipeline, pipeline_segment, pipeline_step_var,
+        pipeline_stop_var, point_non_root_var, point_template, point_var, pop, rec_version,
+        root_ctx_seg, root_scope, root_scope_selector, route_attribute, route_selector,
+        scope_filter, scope_filters, skewer_case_chars, skewer_dot, space_chars,
+        space_no_dupe_dots, space_point_segment, strip_comments, subst, template, var_seg,
+        variable_name, version, version_point_segment, wrapper, Env, MapResolver, SubstParser,
+        VarResolver,
     };
     use crate::substance::Substance;
     use crate::util;
@@ -7330,15 +7326,7 @@ pub mod test {
 
     #[test]
     pub fn test_create_command() -> Result<(), SpaceErr> {
-        let command = util::log(result(command_line(new_span("create localhost<Space>"))))?;
-        let env = Env::new(Point::root());
-        let command: Command = util::log(command.to_resolved(&env))?;
-        Ok(())
-    }
-
-    #[test]
-    pub fn test_command_line_err() -> Result<(), SpaceErr> {
-        let command = util::log(result(command_line(new_span("create localhost<bad>"))))?;
+        let command = util::log(result(create_command(new_span("create localhost<Space>"))))?;
         let env = Env::new(Point::root());
         let command: Command = util::log(command.to_resolved(&env))?;
         Ok(())
@@ -7346,12 +7334,11 @@ pub mod test {
 
     #[test]
     pub fn test_template() -> Result<(), SpaceErr> {
-        let t = util::log(result(all_consuming(template)(new_span(
-            "localhost<Space>",
-        ))))?;
-        let env = Env::new(Point::root());
-        let t: Template = util::log(t.to_resolved(&env))?;
+        /*        let t= util::log(result(all_consuming(template)(new_span("localhost<Space>"))))?;
+               let env = Env::new(Point::root());
+               let t: Template = util::log(t.to_resolved(&env))?;
 
+        */
         let t = util::log(result(base_point_segment(new_span(
             "localhost:base<Space>",
         ))))?;
@@ -7394,7 +7381,7 @@ pub mod test {
         Ok(())
     }
 
-    //    #[test]
+//    #[test]
     pub fn test_point_var() -> Result<(), SpaceErr> {
         util::log(result(all_consuming(point_var)(new_span(
             "[hub]::my-domain.com:${name}:base",
@@ -7954,7 +7941,7 @@ Hello my friend
         Ok(())
     }
 
-    //    #[test]
+//    #[test]
     pub fn test_scope_filter() -> Result<(), SpaceErr> {
         result(scope_filter(new_span("(auth)")))?;
         result(scope_filter(new_span("(auth )")))?;
@@ -8466,7 +8453,7 @@ pub mod cmd_test {
 
      */
 
-    //    #[test]
+//    #[test]
     pub fn test() -> Result<(), SpaceErr> {
         let input = "xreate? localhost<Space>";
         match command(new_span(input)) {
