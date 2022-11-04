@@ -12,6 +12,7 @@ extern crate lazy_static;
 extern crate strum_macros;
 
 extern crate inflector;
+use cosmic_space::wasm::Timestamp;
 use inflector::Inflector;
 
 use std::cmp::Ordering;
@@ -79,8 +80,8 @@ pub extern "C" fn cosmic_uuid() -> String {
 }
 
 #[no_mangle]
-pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
-    Utc::now()
+pub extern "C" fn cosmic_timestamp() -> Timestamp {
+    Timestamp::new(Utc::now().timestamp_millis())
 }
 
 #[async_trait]
