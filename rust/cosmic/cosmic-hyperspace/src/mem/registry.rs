@@ -82,7 +82,7 @@ where
         };
         let record = ParticleRecord {
             details: details.clone(),
-            location:  ParticleLocation::default(),
+            location: ParticleLocation::default(),
         };
         self.ctx
             .particles
@@ -90,21 +90,13 @@ where
         Ok(())
     }
 
-    async fn assign_star<'a>(
-        &'a self,
-        point: &'a Point,
-        star: &'a Point,
-    ) -> Result<(), C::Err> {
+    async fn assign_star<'a>(&'a self, point: &'a Point, star: &'a Point) -> Result<(), C::Err> {
         let mut record = self.ctx.particles.get_mut(&point).unwrap();
         record.value_mut().location.star = Some(star.clone());
         Ok(())
     }
 
-    async fn assign_host<'a>(
-        &'a self,
-        point: &'a Point,
-        host : &'a Point,
-    ) -> Result<(), C::Err> {
+    async fn assign_host<'a>(&'a self, point: &'a Point, host: &'a Point) -> Result<(), C::Err> {
         let mut record = self.ctx.particles.get_mut(&point).unwrap();
         record.value_mut().location.host = Some(host.clone());
         Ok(())

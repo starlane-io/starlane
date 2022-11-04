@@ -2138,12 +2138,12 @@ pub mod test_util {
             Box::new(LocalHyperwayGateUnlocker::new(port, self.gate.clone()))
         }
     }
-   pub struct LargeFrameTest{
+    pub struct LargeFrameTest {
         fae_factory: Box<dyn HyperwayEndpointFactory>,
         less_factory: Box<dyn HyperwayEndpointFactory>,
     }
 
-    impl LargeFrameTest{
+    impl LargeFrameTest {
         pub fn new(
             fae_factory: Box<dyn HyperwayEndpointFactory>,
             less_factory: Box<dyn HyperwayEndpointFactory>,
@@ -2223,7 +2223,7 @@ pub mod test_util {
                 for _ in 0..size {
                     body.push(0u8);
                 }
-                hello.body(Substance::Bin( Arc::new(body)));
+                hello.body(Substance::Bin(Arc::new(body)));
                 let pong: Wave<Pong> = less_transmitter.direct(hello).await.unwrap();
                 rtn.send(pong.core.status.as_u16() == 200u16);
             });
@@ -2236,8 +2236,6 @@ pub mod test_util {
             Ok(())
         }
     }
-
-
 
     pub struct WaveTest {
         fae_factory: Box<dyn HyperwayEndpointFactory>,

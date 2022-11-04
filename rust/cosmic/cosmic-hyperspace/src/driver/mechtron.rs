@@ -23,18 +23,18 @@ use cosmic_space::substance::Substance;
 use cosmic_space::util::log;
 use cosmic_space::wave::core::hyp::HypMethod;
 use cosmic_space::wave::core::DirectedCore;
+use cosmic_space::wave::exchange::asynch::ProtoTransmitterBuilder;
 use cosmic_space::wave::exchange::asynch::{InCtx, TraversalRouter};
+use cosmic_space::wave::exchange::SetStrategy;
 use cosmic_space::wave::{DirectedProto, DirectedWave, Pong, UltraWave, Wave};
 use dashmap::DashMap;
+use mechtron_host::{HostsApi, HostsCall, HostsRunner, WasmHostApi};
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
-use cosmic_space::wave::exchange::asynch::ProtoTransmitterBuilder;
-use cosmic_space::wave::exchange::SetStrategy;
-use mechtron_host::{HostsCall, WasmHostApi, HostsRunner, HostsApi};
 
 lazy_static! {
     static ref HOST_DRIVER_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -161,12 +161,7 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
-        let host = self
-            .skel
-            .hosts
-            .get_via_point(point).await
-            ?
-            .clone();
+        let host = self.skel.hosts.get_via_point(point).await?.clone();
         let skel = HostItemSkel {
             skel: ItemSkel::new(point.clone(), Kind::Host, self.skel.skel.clone()),
             host,
@@ -209,7 +204,6 @@ where
     }
 }
 
-
 #[derive(Clone)]
 pub struct HostDriverSkel<P>
 where
@@ -225,12 +219,16 @@ where
     P: Cosmos,
 {
     pub fn new(skel: DriverSkel<P>) -> Self {
-        let mut router = LayerInjectionRouter::new( skel.skel.clone(), skel.point.to_surface() );
+        let mut router = LayerInjectionRouter::new(skel.skel.clone(), skel.point.to_surface());
         router.direction = Some(TraversalDirection::Fabric);
         let router = Arc::new(router);
-        let transmitter = ProtoTransmitterBuilder::new( router, skel.skel.exchanger.clone() );
+        let transmitter = ProtoTransmitterBuilder::new(router, skel.skel.exchanger.clone());
 
-        let hosts= HostsRunner::new(skel.skel.machine.artifacts.clone(), transmitter, skel.logger.logger.clone() );
+        let hosts = HostsRunner::new(
+            skel.skel.machine.artifacts.clone(),
+            transmitter,
+            skel.logger.logger.clone(),
+        );
         let hosts_base = skel.point.push("hosts").unwrap();
         Self {
             skel,
@@ -267,7 +265,6 @@ where
     #[route("Hyp<Host>")]
     pub async fn host(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         if let HyperSubstance::Host(host_cmd) = ctx.input {
-
             let config = host_cmd
                 .details
                 .properties
@@ -288,10 +285,10 @@ where
                 host.clone()
             } else {
                 let mut properties = SetProperties::new();
-                properties.push( PropertyMod::Set {
+                properties.push(PropertyMod::Set {
                     key: "wasm".to_string(),
                     value: config.wasm.to_string(),
-                    lock: false
+                    lock: false,
                 });
                 let create = Create {
                     template: Template {
@@ -330,10 +327,20 @@ where
     #[route("Hyp<Assign>")]
     pub async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
-
-            let mut router = LayerInjectionRouter::new( self.skel.skel.skel.clone(), assign.details.stub.point.to_surface().with_layer(Layer::Core) );
+            let mut router = LayerInjectionRouter::new(
+                self.skel.skel.skel.clone(),
+                assign
+                    .details
+                    .stub
+                    .point
+                    .to_surface()
+                    .with_layer(Layer::Core),
+            );
             router.direction = Some(TraversalDirection::Fabric);
-            let mut transmitter = ProtoTransmitterBuilder::new(Arc::new(router), self.skel.skel.skel.exchanger.clone() );
+            let mut transmitter = ProtoTransmitterBuilder::new(
+                Arc::new(router),
+                self.skel.skel.skel.exchanger.clone(),
+            );
             transmitter.via = SetStrategy::Override(assign.details.stub.point.clone().to_surface());
             let transmitter = transmitter.build();
 
@@ -345,7 +352,10 @@ where
                     .ok_or("wasm property must be set for a Mechtron Host"),
             )?;
             let wasm_point = Point::from_str(wasm.value.as_str())?;
-            self.skel.hosts.create( assign.details.clone(), wasm_point.clone() ).await?;
+            self.skel
+                .hosts
+                .create(assign.details.clone(), wasm_point.clone())
+                .await?;
 
             Ok(())
         } else {
@@ -389,13 +399,17 @@ where
     P: Cosmos,
 {
     #[route("Hyp<Transport>")]
-    async fn transport(&self, ctx: InCtx<'_, UltraWave>)  {
-        let wave = ctx.wave().clone().to_ultra().unwrap_from_transport().unwrap();
+    async fn transport(&self, ctx: InCtx<'_, UltraWave>) {
+        let wave = ctx
+            .wave()
+            .clone()
+            .to_ultra()
+            .unwrap_from_transport()
+            .unwrap();
         if let Ok(Some(wave)) = self.skel.host.transmit_to_guest(wave) {
             if wave.is_reflected() {
                 ctx.transmitter.route(wave).await;
             } else {
-
             }
         }
     }

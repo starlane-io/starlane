@@ -151,8 +151,7 @@ pub mod convert {
         }
     }
 
-
-     impl From<DefaultHostErr> for Err {
+    impl From<DefaultHostErr> for Err {
         fn from(e: DefaultHostErr) -> Self {
             Self {
                 kind: ErrKind::Default,

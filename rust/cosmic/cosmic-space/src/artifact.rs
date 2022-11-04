@@ -5,7 +5,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::{RwLock, watch};
+use tokio::sync::{watch, RwLock};
 
 use crate::config::mechtron::MechtronConfig;
 use crate::loc::{Point, ToSurface};
@@ -17,8 +17,8 @@ use crate::wave::exchange::asynch::ProtoTransmitterBuilder;
 use crate::wave::{DirectedProto, Pong, Wave};
 use crate::{BindConfig, SpaceErr, Substance};
 
-pub mod synch;
 pub mod asynch;
+pub mod synch;
 
 #[derive(Clone)]
 pub struct ArtRef<A> {

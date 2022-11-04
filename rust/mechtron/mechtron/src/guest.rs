@@ -2,6 +2,7 @@ use crate::err::GuestErr;
 use crate::err::MechErr;
 use crate::{MechtronFactories, MechtronSkel, Platform};
 use cosmic_macros::handler_sync;
+use cosmic_space::artifact::synch::{ArtifactApi, ArtifactFetcher};
 use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::HyperSubstance;
 use cosmic_space::kind::Kind::Mechtron;
@@ -10,20 +11,21 @@ use cosmic_space::log::{
     LogSource, NoAppender, PointLogger, RootLogger, SynchTransmittingLogAppender,
 };
 use cosmic_space::particle::{Details, Stub};
+use cosmic_space::substance::{Bin, Substance};
+use cosmic_space::wave::core::cmd::CmdMethod;
 use cosmic_space::wave::core::CoreBounce;
 use cosmic_space::wave::exchange::synch::{
     DirectedHandler, DirectedHandlerProxy, DirectedHandlerShell, ExchangeRouter, InCtx,
     ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx,
 };
 use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{Agent, DirectedProto, DirectedWave, ReflectedAggregate, ToRecipients, UltraWave};
+use cosmic_space::wave::{
+    Agent, DirectedProto, DirectedWave, ReflectedAggregate, ToRecipients, UltraWave,
+};
 use dashmap::DashMap;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use cosmic_space::artifact::synch::{ArtifactApi, ArtifactFetcher};
-use cosmic_space::substance::{Bin, Substance};
-use cosmic_space::wave::core::cmd::CmdMethod;
 
 #[derive(Clone)]
 pub struct GuestSkel<P>
@@ -61,7 +63,7 @@ where
             let transmitter = transmitter.build();
             let fetcher = GuestArtifactFetcher {
                 transmitter,
-                logger: logger.clone()
+                logger: logger.clone(),
             };
             ArtifactApi::new(Arc::new(fetcher))
         };
@@ -74,12 +76,12 @@ where
             logger,
             platform,
             transmitter,
-            artifacts
+            artifacts,
         }
     }
 
     pub fn ctx(&self) -> GuestCtx {
-        GuestCtx::new( self.artifacts.clone() )
+        GuestCtx::new(self.artifacts.clone())
     }
 
     fn hosted(&self, point: &Point) -> Result<HostedMechtron, GuestErr> {
@@ -101,9 +103,9 @@ where
     fn mechtron_skel(&self, point: &Point) -> Result<MechtronSkel<P>, GuestErr> {
         let hosted = self.hosted(point)?;
         let mut transmitter = self.builder();
-/*        transmitter.from = SetStrategy::Override(hosted.details.stub.point.to_surface());
-        transmitter.agent = SetStrategy::Fill(Agent::Point(hosted.details.stub.point.clone()));
-*/
+        /*        transmitter.from = SetStrategy::Override(hosted.details.stub.point.to_surface());
+                transmitter.agent = SetStrategy::Fill(Agent::Point(hosted.details.stub.point.clone()));
+        */
         let logger = self.logger.point(hosted.details.stub.point.clone());
 
         let phantom: PhantomData<P> = PhantomData::default();
@@ -111,7 +113,7 @@ where
             hosted.details.clone(),
             logger,
             phantom,
-            self.artifacts.clone()
+            self.artifacts.clone(),
         );
 
         Ok(skel)
@@ -163,10 +165,16 @@ where
             ))
         } else {
             let hosted = self.skel.hosted(point)?;
-            let factory = self.skel.factories.get(&hosted.name).ok_or(format!(
-                "cannot find factory associated with name: {}",
-                hosted.name
-            ))?.read().unwrap();
+            let factory = self
+                .skel
+                .factories
+                .get(&hosted.name)
+                .ok_or(format!(
+                    "cannot find factory associated with name: {}",
+                    hosted.name
+                ))?
+                .read()
+                .unwrap();
 
             let skel = self.skel.mechtron_skel(point)?;
             let mechtron = factory
@@ -243,13 +251,15 @@ where
     #[route("Hyp<Host>")]
     pub fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         if let HyperSubstance::Host(host) = ctx.input {
-            let mut factory =
-                self.skel
-                    .logger
-                    .result(self.skel.factories.get(&host.config.name).ok_or(format!(
-                        "Guest does not have a mechtron with name: {}",
-                        host.config.name
-                    )))?.write().unwrap();
+            let mut factory = self
+                .skel
+                .logger
+                .result(self.skel.factories.get(&host.config.name).ok_or(format!(
+                    "Guest does not have a mechtron with name: {}",
+                    host.config.name
+                )))?
+                .write()
+                .unwrap();
             self.skel.mechtrons.insert(
                 host.details.stub.point.clone(),
                 HostedMechtron::new(host.details.clone(), host.config.name.clone()),
@@ -280,10 +290,9 @@ impl HostedMechtron {
     }
 }
 
-
 pub struct GuestArtifactFetcher {
     logger: PointLogger,
-   transmitter:  ProtoTransmitter
+    transmitter: ProtoTransmitter,
 }
 
 impl ArtifactFetcher for GuestArtifactFetcher {
@@ -309,13 +318,11 @@ impl ArtifactFetcher for GuestArtifactFetcher {
 }
 
 pub struct GuestCtx {
-    pub artifacts: ArtifactApi
+    pub artifacts: ArtifactApi,
 }
 
 impl GuestCtx {
-    pub fn new(artifacts: ArtifactApi ) -> Self {
-        Self {
-            artifacts
-        }
+    pub fn new(artifacts: ArtifactApi) -> Self {
+        Self { artifacts }
     }
 }

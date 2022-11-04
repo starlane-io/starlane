@@ -204,7 +204,7 @@ pub enum WasmHostCall {
         wave: UltraWave,
         rtn: tokio::sync::oneshot::Sender<Result<i32, DefaultHostErr>>,
     },
-    DeSerializeWaveToHost{
+    DeSerializeWaveToHost {
         wave: i32,
         rtn: tokio::sync::oneshot::Sender<Result<UltraWave, DefaultHostErr>>,
     },
@@ -245,8 +245,7 @@ impl WasmHostApi {
     pub async fn init(&self) -> Result<(), DefaultHostErr> {
         let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
         self.tx.send(WasmHostCall::Init(rtn)).await?;
-        let rtn  = rtn_rx.await?;
-
+        let rtn = rtn_rx.await?;
 
         rtn
     }
@@ -331,7 +330,9 @@ impl WasmHostApi {
         tokio::task::block_in_place(move || {
             Handle::current().block_on(async move {
                 let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
-                api.tx.send(WasmHostCall::SerializeWaveToGuest { wave, rtn }).await?;
+                api.tx
+                    .send(WasmHostCall::SerializeWaveToGuest { wave, rtn })
+                    .await?;
                 rtn_rx.await?
             })
         })
@@ -342,7 +343,9 @@ impl WasmHostApi {
         tokio::task::block_in_place(move || {
             Handle::current().block_on(async move {
                 let (rtn, mut rtn_rx) = tokio::sync::oneshot::channel();
-                api.tx.send(WasmHostCall::GuestConsumeWave{ wave, rtn }).await?;
+                api.tx
+                    .send(WasmHostCall::GuestConsumeWave { wave, rtn })
+                    .await?;
                 rtn_rx.await?
             })
         })
@@ -380,32 +383,32 @@ impl WasmHostRunner {
 
         let imports = imports! {
 
-                "env"=>{
-                     "mechtron_timestamp"=>Function::new_native_with_env(module.store(),api.clone(),|env:&WasmHostApi| {
-                            chrono::Utc::now().timestamp_millis()
-                    }),
+        "env"=>{
+             "mechtron_timestamp"=>Function::new_native_with_env(module.store(),api.clone(),|env:&WasmHostApi| {
+                    chrono::Utc::now().timestamp_millis()
+            }),
 
-                "mechtron_uuid"=>Function::new_native_with_env(module.store(),api.clone(),|env:&WasmHostApi | -> i32 {
-                      env.write_string(uuid::Uuid::new_v4().to_string().as_str()).unwrap()
-                    }),
+        "mechtron_uuid"=>Function::new_native_with_env(module.store(),api.clone(),|env:&WasmHostApi | -> i32 {
+              env.write_string(uuid::Uuid::new_v4().to_string().as_str()).unwrap()
+            }),
 
-                "mechtron_host_panic"=>Function::new_native_with_env(module.store(),api.clone(),|env:&WasmHostApi,buffer_id:i32| {
-                      let panic_message = env.consume_string(buffer_id).unwrap();
-                       println!("WASM PANIC: {}",panic_message);
-                  }),
+        "mechtron_host_panic"=>Function::new_native_with_env(module.store(),api.clone(),|env:&WasmHostApi,buffer_id:i32| {
+              let panic_message = env.consume_string(buffer_id).unwrap();
+               println!("WASM PANIC: {}",panic_message);
+          }),
 
 
-                "mechtron_frame_to_host"=>Function::new_native_with_env(module.store(),api.clone(),|env:&WasmHostApi,buffer_id:i32| -> i32 {
-                            match env.wave_to_host(buffer_id).unwrap() {
-                                Some( wave ) => {
-                                   let rtn = env.serialize_wave_to_guest(wave).unwrap();
-                                    rtn
-                                }
-                                None => 0
-                            }
-                    }),
+        "mechtron_frame_to_host"=>Function::new_native_with_env(module.store(),api.clone(),|env:&WasmHostApi,buffer_id:i32| -> i32 {
+                    match env.wave_to_host(buffer_id).unwrap() {
+                        Some( wave ) => {
+                           let rtn = env.serialize_wave_to_guest(wave).unwrap();
+                            rtn
+                        }
+                        None => 0
+                    }
+            }),
 
-                } };
+        } };
         let instance = Some(Instance::new(&module, &imports)?);
 
         let host = WasmHost {
@@ -416,7 +419,7 @@ impl WasmHostRunner {
             logger,
         };
 
-        tokio::spawn( async move {
+        tokio::spawn(async move {
             Self { host, rx }.start().await;
         });
 
@@ -446,7 +449,7 @@ impl WasmHostRunner {
                 WasmHostCall::ConsumeBuffer { buffer_id, rtn } => {
                     rtn.send(host.consume_buffer(buffer_id));
                 }
-                WasmHostCall::DeSerializeWaveToHost{ wave, rtn } => {
+                WasmHostCall::DeSerializeWaveToHost { wave, rtn } => {
                     rtn.send(host.deserialize_wave_to_host(wave));
                 }
                 WasmHostCall::SerializeWaveToGuest { wave, rtn } => {
@@ -665,12 +668,11 @@ impl WasmHost {
         rx.recv()?
     }
 
-     pub fn deserialize_wave_to_host(&self, wave: i32) -> Result<UltraWave, DefaultHostErr> {
-         let buffer = self.read_buffer(wave).unwrap();
-        let wave: UltraWave = bincode::deserialize(buffer.as_slice() )?;
-         Ok(wave)
+    pub fn deserialize_wave_to_host(&self, wave: i32) -> Result<UltraWave, DefaultHostErr> {
+        let buffer = self.read_buffer(wave).unwrap();
+        let wave: UltraWave = bincode::deserialize(buffer.as_slice())?;
+        Ok(wave)
     }
-
 
     pub fn serialize_wave_to_guest(&self, wave: UltraWave) -> Result<i32, DefaultHostErr> {
         let wave: Vec<u8> = bincode::serialize(&wave)?;
@@ -803,9 +805,9 @@ impl WasmHost {
         Ok(())
     }
 
-
     fn mechtron_frame_to_guest(&self, buffer_id: i32) -> Result<i32, DefaultHostErr> {
-        let rtn = self.instance
+        let rtn = self
+            .instance
             .as_ref()
             .unwrap()
             .exports

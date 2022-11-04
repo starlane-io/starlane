@@ -4,8 +4,8 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::ops::{Add, Deref, DerefMut};
 use std::str::FromStr;
-use std::sync::Arc;
 use std::sync::atomic::AtomicU16;
+use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::mapref::one::{Ref, RefMut};
@@ -58,7 +58,12 @@ use cosmic_space::wave::exchange::asynch::{
     ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, TraversalRouter, TxRouter,
 };
 use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling, HandlingKind, Ping, Pong, Priority, RecipientSelector, Recipients, Reflectable, ReflectedWave, Retries, Ripple, Scope, Signal, SingularRipple, ToRecipients, WaitTime, Wave, WaveKind, Reflection};
+use cosmic_space::wave::{
+    Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
+    HandlingKind, Ping, Pong, Priority, RecipientSelector, Recipients, Reflectable, ReflectedWave,
+    Reflection, Retries, Ripple, Scope, Signal, SingularRipple, ToRecipients, WaitTime, Wave,
+    WaveKind,
+};
 use cosmic_space::wave::{HyperWave, UltraWave};
 use cosmic_space::HYPERUSER;
 use mechtron_host::err::HostErr;
@@ -202,11 +207,7 @@ where
         };
 
         machine.registry.register(&registration).await.unwrap();
-        machine
-            .registry
-            .assign_star(&point, &point)
-            .await
-            .unwrap();
+        machine.registry.assign_star(&point, &point).await.unwrap();
 
         let api = HyperStarApi::new(
             template.kind.clone(),
@@ -324,7 +325,7 @@ where
 
         let logger = self.logger.push_mark("create-in-star").unwrap();
         let global = GlobalExecutionChamber::new(self.clone());
-        let details= self.logger.result_ctx(
+        let details = self.logger.result_ctx(
             format!(
                 "StarSkel::create_in_star(register({}))",
                 create.template.kind.to_string()
@@ -358,7 +359,9 @@ where
             "StarSkel::create(assign_result)",
             transmitter.direct(assign).await,
         )?;
-        self.registry.assign_star(&details.stub.point, &self.point ).await?;
+        self.registry
+            .assign_star(&details.stub.point, &self.point)
+            .await?;
         let logger = logger.push_mark("result").unwrap();
         logger.result(assign_result.ok_or())?;
         Ok(details)
@@ -1142,7 +1145,8 @@ where
                         let to = wave.to().unwrap_single();
                         let location = locator.locate(&to.point).await?;
 
-                        if location.star.is_some() && *location.star.as_ref().unwrap() == skel.point {
+                        if location.star.is_some() && *location.star.as_ref().unwrap() == skel.point
+                        {
                             if wave.track() {
                                 println!(
                                     "\tSAME POINT -> {} to {}",
@@ -1159,7 +1163,12 @@ where
                         } else {
                             let mut transport = wave.wrap_in_transport(
                                 gravity,
-                                location.star.as_ref().unwrap().to_surface().with_layer(Layer::Core),
+                                location
+                                    .star
+                                    .as_ref()
+                                    .unwrap()
+                                    .to_surface()
+                                    .with_layer(Layer::Core),
                             );
                             transport.from(skel.point.clone().to_surface());
                             let transport = transport.build()?;
@@ -1355,39 +1364,42 @@ where
 
     async fn inject(&self, injection: TraversalInjection) {
         if injection.wave.is_directed() {
-
             let reflection = injection.wave.clone().to_directed().unwrap().reflection();
             let surface = injection.surface.clone();
             match self.start_layer_traversal(injection).await {
                 Ok(_) => {}
                 Err(err) => {
-println!("STATUS: {}",err.status());
-println!("ERR: {}",err.to_string());
+                    println!("STATUS: {}", err.status());
+                    println!("ERR: {}", err.to_string());
                     // if it can be reflected then send back as an error
                     match reflection {
                         Ok(reflection) => {
                             let err = err.to_space_err();
-                            let reflect = reflection.make(err.into(), self.skel.point.to_surface() );
+                            let reflect = reflection.make(err.into(), self.skel.point.to_surface());
                             let injection = TraversalInjection {
                                 surface,
                                 wave: reflect.to_ultra(),
                                 from_gravity: false,
-                                dir: None
+                                dir: None,
                             };
-                            self.skel.logger.result(self.start_layer_traversal(injection).await).unwrap_or_default();
+                            self.skel
+                                .logger
+                                .result(self.start_layer_traversal(injection).await)
+                                .unwrap_or_default();
                         }
                         Err(err) => {
                             self.skel.logger.error(err.to_string());
                         }
                     }
-
                 }
             }
         } else {
-            self.skel.logger.result(self.start_layer_traversal(injection).await).unwrap_or_default();
+            self.skel
+                .logger
+                .result(self.start_layer_traversal(injection).await)
+                .unwrap_or_default();
         }
     }
-
 
     async fn start_layer_traversal(&self, injection: TraversalInjection) -> Result<(), P::Err> {
         let wave = injection.wave;
@@ -1449,7 +1461,6 @@ println!("ERR: {}",err.to_string());
                         wave.from().to_string()
                     ));
                     return Err(err.into());
-
                 }
             };
             let plan = record.details.stub.kind.wave_traversal_plan().clone();

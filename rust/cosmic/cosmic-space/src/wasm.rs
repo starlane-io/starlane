@@ -6,7 +6,6 @@ pub struct Timestamp {
     pub millis: i64,
 }
 
-
 impl Timestamp {
     pub fn timestamp_millis(&self) -> i64 {
         self.millis

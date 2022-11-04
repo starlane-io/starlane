@@ -74,9 +74,8 @@ impl From<&str> for GuestErr {
 impl From<FromUtf8Error> for GuestErr {
     fn from(e: FromUtf8Error) -> Self {
         Self {
-            message: e.to_string()
+            message: e.to_string(),
         }
-
     }
 }
 

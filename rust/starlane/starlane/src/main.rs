@@ -70,7 +70,6 @@ use cosmic_space::loc;
 use cosmic_space::wasm::Timestamp;
 
 fn main() -> Result<(), StarErr> {
-
     ctrlc::set_handler(move || {
         std::process::exit(1);
     });
@@ -130,7 +129,6 @@ pub extern "C" fn cosmic_timestamp() -> Timestamp {
 
  */
 
-
 #[derive(Clone)]
 pub struct Starlane {
     //pub handle: PostgresRegistryContextHandle<Self>,
@@ -154,7 +152,6 @@ impl Starlane {
 
 #[async_trait]
 impl Cosmos for Starlane {
-
     type Err = StarErr;
     #[cfg(feature = "postgres")]
     type RegistryContext = PostgresRegistryContextHandle<Self>;
@@ -280,7 +277,7 @@ impl Cosmos for Starlane {
     }
 }
 
-#[cfg(feature="postgres")]
+#[cfg(feature = "postgres")]
 impl PostgresPlatform for Starlane {
     fn lookup_registry_db() -> Result<PostgresDbInfo, Self::Err> {
         Ok(PostgresDbInfo::new(
@@ -302,12 +299,8 @@ impl PostgresPlatform for Starlane {
     }
 }
 
-
 #[cfg(test)]
 pub mod test {
     #[test]
-    pub fn test() {
-
-    }
-
+    pub fn test() {}
 }

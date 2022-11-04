@@ -2,12 +2,14 @@
 
 use std::fs;
 use std::io::Error;
+use std::path::Path;
 use std::sync::atomic;
 use std::sync::atomic::AtomicU64;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
+use serde::Serialize;
 use tokio::join;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot::error::RecvError;
@@ -59,6 +61,45 @@ lazy_static! {
     pub static ref FAE: Point = Point::from_str("space:users:fae").expect("point");
 }
 
+#[async_trait]
+pub trait Test: Sync + Send + Copy {
+    async fn run(&self, client: ControlClient) -> Result<(), CosmicErr> {
+        Ok(())
+    }
+}
+
+pub fn harness<F>(mut f: F) -> Result<(), CosmicErr>
+where
+    F: Test,
+{
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async move {
+        let platform = MemCosmos::new();
+        let machine_api = platform.machine();
+        let logger = RootLogger::new(LogSource::Core, Arc::new(StdOutAppender()));
+        let logger = logger.point(Point::from_str("test")?);
+
+        tokio::time::timeout(Duration::from_secs(10), machine_api.wait_ready())
+            .await
+            .unwrap();
+
+        let factory = MachineApiExtFactory {
+            machine_api: machine_api.clone(),
+            logger: logger.clone(),
+        };
+
+        let client = ControlClient::new(Box::new(factory))?;
+        client.wait_for_ready(Duration::from_secs(5)).await?;
+
+        f.run(client).await?;
+
+        machine_api.terminate();
+        Ok(())
+    })
+}
+
 async fn create(
     ctx: &MemRegCtx,
     particle: Point,
@@ -75,7 +116,7 @@ async fn create(
     );
     ctx.particles.insert(
         particle.clone(),
-        ParticleRecord::new(details.clone(),location),
+        ParticleRecord::new(details.clone(), location),
     );
 
     let mut wave = DirectedProto::ping();
@@ -92,401 +133,6 @@ async fn create(
     let wave = wave.to_ultra();
     star_api.to_gravity(wave).await;
     Ok(())
-}
-
-//#[test]
-fn test_gravity_routing() -> Result<(), CosmicErr> {
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()?;
-    runtime.block_on(async move {
-        let platform = MemCosmos::new();
-        let machine_api = platform.machine();
-        machine_api.wait_ready().await;
-
-        let star_api = machine_api.get_machine_star().await.unwrap();
-        let stub = star_api.stub().await.unwrap();
-        let location = ParticleLocation::new(Some(stub.key.clone().to_point()), None);
-
-        //        let record = platform.global_registry().await.unwrap().locate(&LESS).await.expect("IS LESS THERE?");
-
-        let skel = star_api.get_skel().await.unwrap();
-
-        let mut assign_rx = skel.diagnostic_interceptors.assignment.subscribe();
-        let (assign_rtn_tx, assign_rtn_rx) = oneshot::channel();
-
-        tokio::spawn(async move {
-            assign_rx.recv().await;
-            assign_rx.recv().await;
-            assign_rtn_tx.send(());
-        });
-
-        create(
-            &platform.ctx,
-            LESS.clone(),
-            location.clone(),
-            star_api.clone(),
-        )
-        .await?;
-        create(
-            &platform.ctx,
-            FAE.clone(),
-            location.clone(),
-            star_api.clone(),
-        )
-        .await?;
-
-        tokio::time::timeout(Duration::from_secs(5), assign_rtn_rx).await;
-
-        panic!("far enough");
-
-        let mut to_fabric_rx = skel.diagnostic_interceptors.to_gravity.subscribe();
-        let mut from_hyperway_rx = skel.diagnostic_interceptors.from_hyperway.subscribe();
-
-        // send a 'nice' wave from Fae to Less
-        let mut wave = DirectedProto::ping();
-        wave.from(FAE.clone().to_surface());
-        wave.to(LESS.clone().to_surface());
-        wave.method(ExtMethod::new("DieTacEng").unwrap());
-        let wave = wave.build().unwrap();
-        let wave = wave.to_ultra();
-
-        let (check_to_fabric_tx, check_to_fabric_rx): (
-            oneshot::Sender<Result<(), ()>>,
-            oneshot::Receiver<Result<(), ()>>,
-        ) = oneshot::channel();
-        let (check_from_hyperway_tx, check_from_hyperway_rx): (
-            oneshot::Sender<Result<(), ()>>,
-            oneshot::Receiver<Result<(), ()>>,
-        ) = oneshot::channel();
-
-        let wave_id = wave.id();
-        {
-            tokio::spawn(async move {
-                while let Ok(hop) = from_hyperway_rx.recv().await {
-                    let transport = hop.unwrap_from_hop().unwrap();
-                    let wave = transport.unwrap_from_transport().unwrap();
-                    if wave.id() == wave_id {
-                        println!("intercepted from_hyperway event");
-                        check_from_hyperway_tx.send(Ok(()));
-                        break;
-                    } else {
-                        println!("RECEIVED WAVE: {}", wave.id().to_string())
-                    }
-                }
-            });
-        }
-
-        let wave_id = wave.id();
-        {
-            tokio::spawn(async move {
-                while let Ok(wave) = to_fabric_rx.recv().await {
-                    if wave.id() == wave_id {
-                        println!("intercepted to_fabric event!");
-                        check_to_fabric_tx.send(Ok(()));
-                        break;
-                    } else {
-                        println!("RECEIVED WAVE: {}", wave.id().to_string())
-                    }
-                }
-            });
-        }
-
-        // send straight out of the star (circumvent layer traversal)
-        star_api.to_gravity(wave).await;
-
-        tokio::time::timeout(Duration::from_secs(5), check_from_hyperway_rx)
-            .await
-            .unwrap()
-            .unwrap()
-            .unwrap();
-        tokio::time::timeout(Duration::from_secs(5), check_to_fabric_rx)
-            .await
-            .unwrap()
-            .unwrap()
-            .unwrap();
-
-        Ok(())
-    })
-}
-//#[test]
-fn test_layer_traversal() -> Result<(), CosmicErr> {
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()?;
-    runtime.block_on(async move {
-        let (check_to_gravity_tx, check_to_gravity_rx): (
-            oneshot::Sender<Result<(), ()>>,
-            oneshot::Receiver<Result<(), ()>>,
-        ) = oneshot::channel();
-        let (check_from_hyperway_tx, check_from_hyperway_rx): (
-            oneshot::Sender<Result<(), ()>>,
-            oneshot::Receiver<Result<(), ()>>,
-        ) = oneshot::channel();
-        let (check_start_traversal_wave_tx, check_start_traversal_wave_rx): (
-            oneshot::Sender<Result<(), ()>>,
-            oneshot::Receiver<Result<(), ()>>,
-        ) = oneshot::channel();
-        let (check_start_traversal_tx, check_start_traversal_rx): (
-            oneshot::Sender<Result<(), ()>>,
-            oneshot::Receiver<Result<(), ()>>,
-        ) = oneshot::channel();
-        let (check_transport_endpoint_tx, check_transport_endpoint_rx): (
-            oneshot::Sender<Result<(), ()>>,
-            oneshot::Receiver<Result<(), ()>>,
-        ) = oneshot::channel();
-
-        let (direct_tx, direct_rx) = oneshot::channel();
-
-        tokio::spawn(async move {
-            tokio::time::timeout(Duration::from_secs(5), check_from_hyperway_rx)
-                .await
-                .expect("check_from_hyperway")
-                .unwrap()
-                .unwrap();
-            tokio::time::timeout(Duration::from_secs(5), check_to_gravity_rx)
-                .await
-                .unwrap()
-                .unwrap()
-                .unwrap();
-            tokio::time::timeout(Duration::from_secs(5), check_start_traversal_wave_rx)
-                .await
-                .expect("check_start_traversal_wave")
-                .unwrap()
-                .unwrap();
-            tokio::time::timeout(Duration::from_secs(5), check_start_traversal_rx)
-                .await
-                .expect("check_start_traversal")
-                .unwrap()
-                .unwrap();
-            tokio::time::timeout(Duration::from_secs(5), check_transport_endpoint_rx)
-                .await
-                .expect("check_transport_endpoint")
-                .unwrap()
-                .unwrap();
-
-            direct_tx.send(());
-        });
-
-        let platform = MemCosmos::new();
-        let machine_api = platform.machine();
-        machine_api.wait_ready().await;
-
-        let star_api = machine_api.get_machine_star().await.unwrap();
-        let stub = star_api.stub().await.unwrap();
-        let location = ParticleLocation::new(Some(stub.key.clone().to_point()), None);
-
-        //        let record = platform.global_registry().await.unwrap().locate(&LESS).await.expect("IS LESS THERE?");
-
-        let skel = star_api.get_skel().await.unwrap();
-
-        let mut assign_rx = skel.diagnostic_interceptors.assignment.subscribe();
-        let (assign_rtn_tx, assign_rtn_rx) = oneshot::channel();
-
-        tokio::spawn(async move {
-            assign_rx.recv().await;
-            assign_rx.recv().await;
-            assign_rtn_tx.send(());
-        });
-
-        create(
-            &platform.ctx,
-            LESS.clone(),
-            location.clone(),
-            star_api.clone(),
-        )
-        .await?;
-        create(
-            &platform.ctx,
-            FAE.clone(),
-            location.clone(),
-            star_api.clone(),
-        )
-        .await?;
-
-        tokio::time::timeout(Duration::from_secs(5), assign_rtn_rx)
-            .await
-            .unwrap();
-
-        let mut to_gravity_rx = skel.diagnostic_interceptors.to_gravity.subscribe();
-        let mut from_hyperway_rx = skel.diagnostic_interceptors.from_hyperway.subscribe();
-        let mut start_layer_traversal = skel
-            .diagnostic_interceptors
-            .start_layer_traversal
-            .subscribe();
-        let mut start_layer_traversal_wave = skel
-            .diagnostic_interceptors
-            .start_layer_traversal_wave
-            .subscribe();
-        let mut transport_endpoint = skel.diagnostic_interceptors.transport_endpoint.subscribe();
-        let mut reflected_endpoint = skel.diagnostic_interceptors.reflected_endpoint.subscribe();
-
-        // send a 'nice' wave from Fae to Less
-        let mut wave = DirectedProto::ping();
-        wave.from(FAE.clone().to_surface());
-        wave.to(LESS.clone().to_surface());
-        wave.method(CmdMethod::Bounce);
-        let wave = wave.build().unwrap();
-        let wave = wave.to_ultra();
-
-        let wave_id = wave.id();
-        {
-            tokio::spawn(async move {
-                while let Ok(hop) = from_hyperway_rx.recv().await {
-                    let transport = hop.unwrap_from_hop().unwrap();
-                    let wave = transport.unwrap_from_transport().unwrap();
-                    if wave.id() == wave_id {
-                        println!("intercepted from_hyperway event");
-                        check_from_hyperway_tx.send(Ok(()));
-                        break;
-                    } else {
-                        println!("RECEIVED WAVE: {}", wave.id().to_string())
-                    }
-                }
-            });
-        }
-
-        let wave_id = wave.id();
-        {
-            tokio::spawn(async move {
-                while let Ok(wave) = to_gravity_rx.recv().await {
-                    if wave.id() == wave_id {
-                        println!("intercepted to_fabric event!");
-                        check_to_gravity_tx.send(Ok(()));
-                        break;
-                    } else {
-                        println!("to_gravity RECEIVED WAVE: {}", wave.id().to_string())
-                    }
-                }
-            });
-        }
-
-        let wave_id = wave.id();
-        {
-            tokio::spawn(async move {
-                while let Ok(transport) = start_layer_traversal_wave.recv().await {
-                    if let Ok(wave) = transport.clone().unwrap_from_transport() {
-                        if wave.id() == wave_id {
-                            println!("intercepted start_layer_traversal_wave !");
-                            check_start_traversal_wave_tx.send(Ok(()));
-                            break;
-                        } else {
-                            println!(
-                                "start_layer_traversal_wave RECEIVED WAVE: {}",
-                                wave.id().to_string()
-                            )
-                        }
-                    } else {
-                        println!(
-                            "start_layer_traversal_wave RECEIVED TRANSPORT: {}",
-                            transport.id().to_string()
-                        )
-                    }
-                }
-            });
-        }
-
-        let wave_id = wave.id();
-        {
-            tokio::spawn(async move {
-                while let Ok(traversal) = start_layer_traversal.recv().await {
-                    let transport = traversal.payload;
-                    match transport.clone().unwrap_from_transport() {
-                        Ok(wave) => {
-                            if wave.id() == wave_id {
-                                println!("intercepted start_layer_traversal!");
-                                if traversal.dir != TraversalDirection::Core {
-                                    println!("Bad Traversal Direction");
-                                    check_start_traversal_tx.send(Err(()));
-                                } else if traversal.dest.is_some() {
-                                    println!("Bad Traversal Dest ");
-                                    check_start_traversal_tx.send(Err(()));
-                                } else if traversal.layer != Layer::Field {
-                                    println!("Bad Traversal Layer");
-                                    check_start_traversal_tx.send(Err(()));
-                                } else {
-                                    println!("traversal layer {}", traversal.layer.to_string());
-                                    check_start_traversal_tx.send(Ok(()));
-                                }
-                                break;
-                            } else {
-                                println!(
-                                    "intercepted start_layer_traversal RECEIVED WAVE: {}",
-                                    wave.id().to_string()
-                                )
-                            }
-                        }
-                        Err(_) => {
-                            println!(
-                                "intercepted start_layer_traversal RECEIVED TRANSPORT: {}",
-                                transport.id().to_string()
-                            )
-                        }
-                    }
-                }
-            });
-        }
-
-        let wave_id = wave.id();
-        {
-            tokio::spawn(async move {
-                while let Ok(transport) = transport_endpoint.recv().await {
-                    if let Ok(wave) = transport.clone().unwrap_from_transport() {
-                        if wave.id() == wave_id {
-                            println!("intercepted transport_endpoint!");
-                            check_transport_endpoint_tx.send(Ok(()));
-                            break;
-                        } else {
-                            println!(
-                                "transport_endpoint RECEIVED WAVE: {}",
-                                wave.id().to_string()
-                            )
-                        }
-                    } else {
-                        println!(
-                            "transport_endpoint RECEIVED TRANSPORT: {}",
-                            transport.id().to_string()
-                        )
-                    }
-                }
-            });
-        }
-
-        // send straight out of the star (circumvent layer traversal)
-        star_api.to_gravity(wave).await;
-
-        let mut to_gravity_rx = skel.diagnostic_interceptors.to_gravity.subscribe();
-        let wave = tokio::time::timeout(Duration::from_secs(5), reflected_endpoint.recv())
-            .await
-            .expect("reflected_endpoint")
-            .expect("reflected_endpoint");
-
-        let (check_to_gravity_tx, check_to_gravity_rx): (
-            oneshot::Sender<Result<(), ()>>,
-            oneshot::Receiver<Result<(), ()>>,
-        ) = oneshot::channel();
-        let wave_id = wave.id();
-        {
-            tokio::spawn(async move {
-                while let Ok(wave) = to_gravity_rx.recv().await {
-                    if wave.id() == wave_id {
-                        println!("intercepted to_gravity reflection event");
-                        check_to_gravity_tx.send(Ok(()));
-                        break;
-                    } else {
-                        println!("RECEIVED WAVE: {}", wave.id().to_string())
-                    }
-                }
-            });
-        }
-
-        tokio::time::timeout(Duration::from_secs(5), check_to_gravity_rx)
-            .await
-            .expect("check_to_gravity_rx")
-            .expect("check_to_gravity_rx");
-
-        Ok(())
-    })
 }
 
 #[test]
@@ -649,37 +295,11 @@ fn test_provision_and_assign() -> Result<(), CosmicErr> {
         let transmitter = transmitter.build();
 
         tokio::time::sleep(Duration::from_secs(5)).await;
-
-        /*
-                let mut proto = DirectedProto::ping();
-                proto.method(CmdMethod::Bounce);
-                proto.to(Point::root().to_surface());
-        proto.track = true;
-                let reflect: Wave<Pong> = transmitter.direct(proto).await?;
-                println!("\tBOUNCE ROOT: {}", reflect.core.status.to_string());
-                assert!(reflect.core.is_ok());
-
-                let mut proto = DirectedProto::ping();
-                proto.method(CmdMethod::Bounce);
-                proto.to(Point::root().to_surface());
-        proto.track = true;
-                let reflect: Wave<Pong> = transmitter.direct(proto).await?;
-                println!("\tBOUNCE ROOT2: {}", reflect.core.status.to_string());
-                assert!(reflect.core.is_ok());
-
-                 */
-
-        /*
-        let mut proto = DirectedProto::ping();
-        proto.method(CmdMethod::Bounce);
-        proto.to(Point::global_executor().to_surface());
-        let reflect: Wave<Pong> = transmitter.direct(proto).await?;
-        println!("\tBOUNCE EXECUTOR: {}", reflect.core.status.to_string());
-        assert!(reflect.core.is_ok());
-
-         */
-
-        //        assert!(transmitter.bounce(&Point::global_executor().to_surface()).await);
+        assert!(
+            transmitter
+                .bounce(&Point::global_executor().to_surface())
+                .await
+        );
 
         let create = Create {
             template: Template::new(
@@ -753,7 +373,7 @@ fn test_control_cli() -> Result<(), CosmicErr> {
     })
 }
 
-//#[test]
+#[test]
 fn test_publish() -> Result<(), CosmicErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -780,13 +400,10 @@ fn test_publish() -> Result<(), CosmicErr> {
 
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-
         let cli = client.new_cli_session().await?;
 
-        logger.result(cli.exec("create localhost<Space>")
-            .await
-            .unwrap()
-            .ok_or())
+        logger
+            .result(cli.exec("create localhost<Space>").await.unwrap().ok_or())
             .unwrap();
         cli.exec("create localhost:repo<Repo>")
             .await
@@ -814,30 +431,6 @@ fn test_publish() -> Result<(), CosmicErr> {
         }
 
         assert!(core.is_ok());
-
-        tokio::time::sleep(Duration::from_secs(1)).await;
-
-        /*
-        let fetcher = Arc::new(ReadArtifactFetcher::new(client.transmitter_builder().await.unwrap().build()));
-        let artifacts = ArtifactApi::new(fetcher);
-
-        let point = Point::from_str("localhost:repo:my:1.0.0:/bind/app.bind").unwrap();
-        let bind = artifacts.bind( &point).await.unwrap();
-
-
-        let reflect = cli.exec("create localhost:my-app<Mechtron>{ +config=localhost:repo:my:1.0.0:/config/my-app.app }")
-            .await
-            .unwrap();
-
-        tokio::time::sleep(Duration::from_secs(5)).await;
-        reflect.ok_or().unwrap();
-        assert!(reflect.is_ok());
-
-
-        let tx = client.transmitter_builder().await?.build();
-         */
-//        assert!(tx.bounce(&Point::from_str("localhost:my-app").unwrap().to_surface()).await);
-
 
         Ok(())
     })
@@ -925,4 +518,43 @@ fn test_mechtron() -> Result<(), CosmicErr> {
 
         Ok(())
     })
+}
+
+
+pub async fn verify<S>( name: &str, ser: &S) where S: Serialize {
+    let bin = bincode::serialize(&ser).unwrap();
+    fs::create_dir(Path::new("e2e"));
+    let file = format!("e2e/{}", name );
+    let path = Path::new(file.as_str());
+    if path.exists() == true {
+        if fs::read(path).unwrap() != bin {
+            assert!(false)
+        }
+    } else {
+        fs::write( path, bin ).unwrap();
+    }
+}
+
+
+#[test]
+fn test_create_err() -> Result<(), CosmicErr> {
+    #[derive(Copy, Clone)]
+    pub struct CreateErrTest;
+    #[async_trait]
+    impl Test for CreateErrTest {
+        async fn run(&self, client: ControlClient) -> Result<(), CosmicErr> {
+            let cli = client.new_cli_session().await?;
+            if let Err(err) = cli.exec("create repo<BadKind>").await?.ok_or() {
+
+                verify( "create_err", &err).await;
+                println!("FINAL: ");
+                   err.print();
+                Ok(())
+            } else {
+                Err("expected err".into())
+            }
+        }
+    }
+
+    harness(CreateErrTest)
 }

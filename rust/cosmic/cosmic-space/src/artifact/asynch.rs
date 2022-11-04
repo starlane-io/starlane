@@ -1,15 +1,15 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-use dashmap::DashMap;
-use serde::Serialize;
-use tokio::sync::watch;
-use crate::{Bin, BindConfig, Point, SpaceErr, Stub, Substance};
 use crate::artifact::ArtRef;
 use crate::config::mechtron::MechtronConfig;
 use crate::loc::ToSurface;
 use crate::wave::core::cmd::CmdMethod;
-use crate::wave::DirectedProto;
 use crate::wave::exchange::asynch::ProtoTransmitter;
+use crate::wave::DirectedProto;
+use crate::{Bin, BindConfig, Point, SpaceErr, Stub, Substance};
+use dashmap::DashMap;
+use serde::Serialize;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::watch;
 
 #[derive(Clone)]
 pub struct ArtifactApi {
@@ -163,7 +163,7 @@ impl ArtifactFetcher for ReadArtifactFetcher {
 }
 
 pub struct MapFetcher {
-    pub map: HashMap<Point,Bin>,
+    pub map: HashMap<Point, Bin>,
 }
 
 #[async_trait]
@@ -173,29 +173,27 @@ impl ArtifactFetcher for MapFetcher {
     }
 
     async fn fetch(&self, point: &Point) -> Result<Bin, SpaceErr> {
-        let rtn = self.map.get(point).ok_or(SpaceErr::not_found(format!("could not find {}",point.to_string())))?;
+        let rtn = self.map.get(point).ok_or(SpaceErr::not_found(format!(
+            "could not find {}",
+            point.to_string()
+        )))?;
         Ok(rtn.clone())
     }
 }
 
-
 impl MapFetcher {
     pub fn new() -> Self {
         Self {
-            map: HashMap::new()
+            map: HashMap::new(),
         }
     }
-    pub fn ser<S:Serialize>( &mut self, point: &Point, bin: S ) {
-        let bin= Arc::new(bincode::serialize(&bin).unwrap());
-        self.map.insert( point.clone(), bin);
+    pub fn ser<S: Serialize>(&mut self, point: &Point, bin: S) {
+        let bin = Arc::new(bincode::serialize(&bin).unwrap());
+        self.map.insert(point.clone(), bin);
     }
 
-    pub fn str<S:ToString>( &mut self, point: &Point, string: S ) {
+    pub fn str<S: ToString>(&mut self, point: &Point, string: S) {
         let bin = Arc::new(string.to_string().into_bytes());
-        self.map.insert( point.clone(), bin);
+        self.map.insert(point.clone(), bin);
     }
-
-
 }
-
-

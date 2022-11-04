@@ -518,9 +518,9 @@ pub mod direct {
                     StateSrcVar::FileRef(name) => StateSrc::Substance(Box::new(Substance::Bin(
                         env.file(name)
                             .map_err(|e| match e {
-                                ResolverErr::NotAvailable => {
-                                    SpaceErr::server_error("files are not available in this context")
-                                }
+                                ResolverErr::NotAvailable => SpaceErr::server_error(
+                                    "files are not available in this context",
+                                ),
                                 ResolverErr::NotFound => {
                                     SpaceErr::server_error(format!("cannot find file '{}'", name))
                                 }
@@ -532,9 +532,10 @@ pub mod direct {
                             ResolverErr::NotAvailable => {
                                 SpaceErr::server_error("variable are not available in this context")
                             }
-                            ResolverErr::NotFound => {
-                                SpaceErr::server_error(format!("cannot find variable '{}'", var.name))
-                            }
+                            ResolverErr::NotFound => SpaceErr::server_error(format!(
+                                "cannot find variable '{}'",
+                                var.name
+                            )),
                         })?;
                         StateSrc::Substance(Box::new(Substance::Bin(
                             env.file(val.clone())
@@ -688,7 +689,7 @@ pub mod direct {
         pub enum PointSegTemplate {
             Exact(String),
             Pattern(String), // must have a '%'
-            Root
+            Root,
         }
     }
 
