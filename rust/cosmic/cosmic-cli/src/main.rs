@@ -210,7 +210,7 @@ impl Session {
     }
 }
 
-pub fn zip_dir<T>(
+fn zip_dir<T>(
     it: impl Iterator<Item = DirEntry>,
     prefix: &str,
     writer: T,
