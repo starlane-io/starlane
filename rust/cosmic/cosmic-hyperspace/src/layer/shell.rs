@@ -288,7 +288,7 @@ impl CommandExecutor {
         // make sure everything is coming from this command executor topic
         let ctx = ctx.push_from(self.port.clone());
 
-        let command = log(result(command_line(new_span(ctx.line.as_str()))))?;
+        let command = result(command_line(new_span(ctx.line.as_str())))?;
 
         let mut env = self.env.clone();
         for transfer in &ctx.transfers {

@@ -210,7 +210,11 @@ impl ReflectedCore {
     pub fn ok_or(&self) -> Result<(), SpaceErr> {
         if self.is_ok() {
             Ok(())
-        } else {
+        } else if let  Substance::Err(err) = &self.body {
+            Err(err.clone())
+        }
+        else
+        {
             Err(SpaceErr::new(self.status.as_u16(), "error"))
         }
     }
