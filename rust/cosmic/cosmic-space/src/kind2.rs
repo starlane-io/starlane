@@ -1,12 +1,9 @@
-use crate::id::id::Version;
 use crate::loc::Version;
 use crate::parse::{CamelCase, Domain, SkewerCase};
-use crate::selector::selector::VersionReq;
-use crate::selector::specific::VersionReq;
-use crate::MsgErr;
-use http::uri::Parts;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use crate::err::SpaceErr;
+use crate::selector::VersionReq;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct SubTypeDef<Part, SubType> {
@@ -86,7 +83,7 @@ pub enum Variant {
 }
 
 impl Variant {
-    pub fn from(kind: &Kind, variant: &CamelCase) -> Result<Self, MsgErr> {
+    pub fn from(kind: &Kind, variant: &CamelCase) -> Result<Self, SpaceErr> {
         match kind {
             Kind::Db => Ok(Variant::Db(Db::from_str(variant.as_str())?)),
             what => Err(format!(
@@ -365,17 +362,8 @@ pub type KindFullSelector =
     ParentMatcherDef<Pattern<Kind>, OptPattern<VariantFullSelector>, OptPattern<CamelCase>>;
 
 pub mod parse {
-    use crate::kind::{
-        CamelCaseSubTypes, CamelCaseSubTypesSelector, Kind, OptPattern, ParentChildDef,
-        ParentMatcherDef, Pattern, ProtoVariant, ProtoVariantSelector, Specific, SpecificDef,
-        SpecificFullSelector, SpecificSelector, SpecificSubTypes, SpecificSubTypesSelector,
-        SubTypeDef, Variant, VariantDef, VariantFull,
-    };
-    use crate::kind2::{
-        CamelCaseSubTypes, CamelCaseSubTypesSelector, OptPattern, ParentChildDef, ProtoVariant,
-        SpecificDef, SpecificFullSelector, SpecificSubTypes, SpecificSubTypesSelector, SubTypeDef,
-        VariantDef,
-    };
+
+    use crate::kind2::{CamelCaseSubTypes, CamelCaseSubTypesSelector, OptPattern, ParentChildDef, Pattern, ProtoVariant, Specific, SpecificDef, SpecificFullSelector, SpecificSelector, SpecificSubTypes, SpecificSubTypesSelector, SubTypeDef, VariantDef};
     use crate::parse::{camel_case, domain, skewer_case, version, version_req, CamelCase, Domain};
     use cosmic_nom::{Res, Span};
     use nom::branch::alt;
@@ -611,20 +599,14 @@ pub mod parse {
 
     #[cfg(test)]
     pub mod test {
-        use crate::id::id::Version;
-        use crate::kind::parse::{
-            camel_case_sub_types, camel_case_sub_types_selector, opt_pattern, preceded_opt_pattern,
-            proto_variant, specific, specific_full_selector, specific_selector, specific_sub_types,
-        };
-        use crate::kind::{IsMatch, OptPattern, Pattern};
         use crate::kind2::parse::{
             camel_case_sub_types, camel_case_sub_types_selector, opt_pattern, preceded_opt_pattern,
             proto_variant, specific, specific_full_selector, specific_selector, specific_sub_types,
         };
-        use crate::kind2::OptPattern;
+        use crate::kind2::{IsMatch, OptPattern, Pattern};
+
         use crate::parse::error::result;
         use crate::parse::{camel_case, rec_version, version, version_req, CamelCase};
-        use crate::selector::selector::VersionReq;
         use crate::util::log;
         use core::str::FromStr;
         use cosmic_nom::new_span;
@@ -755,24 +737,11 @@ pub mod parse {
 
 #[cfg(test)]
 pub mod test {
-    use crate::id::id::Version;
-    use crate::kind::{
-        DomainSelector, IsMatch, Kind, OptPattern, ParentChildDef, Pattern, SkewerSelector,
-        Specific, SpecificSubTypes, SubTypeDef, Variant, VariantFull, VariantFullSelector,
-        VersionSelector,
-    };
-    use crate::kind2::{
-        DomainSelector, OptPattern, SkewerSelector, SpecificSelector, SpecificSubTypes, SubTypeDef,
-        Variant, VariantFull, VariantFullSelector, VersionSelector,
-    };
+    use core::str::FromStr;
+    use crate::kind2::{DomainSelector, IsMatch, Kind, OptPattern, Pattern, SkewerSelector, Specific, SpecificSelector, SpecificSubTypes, SubTypeDef, Variant, VariantFull, VariantFullSelector, VersionSelector};
     use crate::loc::Version;
     use crate::parse::{CamelCase, Domain, SkewerCase};
-    use crate::selector::selector::VersionReq;
-    use crate::selector::specific::{
-        ProductSelector, ProviderSelector, VariantSelector, VendorSelector, VersionReq,
-    };
-    use crate::util::ValueMatcher;
-    use core::str::FromStr;
+    use crate::selector::VersionReq;
 
     fn create_specific() -> Specific {
         Specific::new(
