@@ -4918,7 +4918,15 @@ pub mod error {
                     let len = len(f)(loc.clone())+1;
                     builder.with_message("Variables should be lowercase skewer with a leading alphabet character and surrounded by ${} i.e.:'${var-name}' ").with_label(Label::new(loc.location_offset()..loc.location_offset()+len).with_message("Bad Variable Substitution"))
                 },
-
+                "assignment:plus" => {
+                    builder.with_message("Expecting a preceding '+' (create variable operator)").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("expected '+'"))
+                }
+                "assignment:equals" => {
+                    builder.with_message("Expecting a preceding '=' for assignment").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("expecting '='"))
+                }
+                "assignment:value" => {
+                    builder.with_message("Expecting a value").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("expecting value"))
+                }
                 "capture-path" => {
                     builder.with_message("Invalid capture path. Legal characters are filesystem characters plus captures $(var=.*) i.e. /users/$(user=.*)").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Illegal capture path"))
 
@@ -6650,8 +6658,9 @@ pub fn doc(src: &str) -> Result<Document, SpaceErr> {
     let root_scope_selector = lex_root_scope.selector.clone().to_concrete()?;
     if root_scope_selector.name.as_str() == "Mechtron" {
         if root_scope_selector.version == Version::from_str("1.0.0")? {
-            let mechtron = parse_mechtron_config(lex_root_scope.block.content.clone())?;
+            let mechtron = result(parse_mechtron_config(lex_root_scope.block.content.clone()))?;
 
+            let mechtron = MechtronConfig::new(mechtron)?;
             return Ok(Document::MechtronConfig(mechtron));
         } else {
             let message = format!(
@@ -6717,17 +6726,15 @@ pub fn doc(src: &str) -> Result<Document, SpaceErr> {
     }
 }
 
-fn parse_mechtron_config<I: Span>(input: I) -> Result<MechtronConfig, SpaceErr> {
-    let (next, (_, _, _, _, assignments, _)) = tuple((
-        multispace0,
+fn parse_mechtron_config<I: Span>(input: I) -> Res<I,Vec<MechtronScope>> {
+    let (next, (_,( _, (_,assignments)))) = pair( multispace0, context("wasm",tuple((
         tag("Wasm"),
+        alt((tuple((
         multispace0,
-        tag("{"),
-        many0(assignment),
-        tag("}"),
-    ))(input)?;
-    let config = MechtronConfig::new(vec![MechtronScope::WasmScope(assignments)])?;
-    Ok(config)
+            unwrap_block(BlockKind::Nested(NestedBlockKind::Curly),many0(assignment)))
+        ),fail))),
+    )))(input)?;
+    Ok((next,vec![MechtronScope::WasmScope(assignments)]))
 }
 
 fn assignment<I>(input: I) -> Res<I, Assignment>
@@ -6736,15 +6743,17 @@ where
 {
     tuple((
         multispace0,
-        skewer,
+        context("assignment:plus", alt( (tag("+"),fail))),
+        context("assignment:key", alt( (skewer,fail))),
         multispace0,
-        tag("="),
+        context( "assignment:equals", alt((tag("="),fail))),
         multispace0,
-        nospace1,
+        context( "assignment:value", alt((nospace1_nosemi,fail))),
         multispace0,
         opt(tag(";")),
+        multispace0
     ))(input)
-    .map(|(next, (_, k, _, _, _, v, _, _))| {
+    .map(|(next, (_, _, k, _, _, _, v, _, _, _))| {
         (
             next,
             Assignment {
@@ -6882,6 +6891,14 @@ pub fn nospace1<I: Span>(input: I) -> Res<I, I> {
         many0(satisfy(|c| !c.is_whitespace())),
     ))(input)
 }
+pub fn nospace1_nosemi<I: Span>(input: I) -> Res<I, I> {
+    recognize(pair(
+        satisfy(|c| !c.is_whitespace() && ';' != c),
+        many0(satisfy(|c| !c.is_whitespace( ) && ';' != c)),
+    ))(input)
+}
+
+
 
 pub fn no_space_with_blocks<I: Span>(input: I) -> Res<I, I> {
     recognize(many1(alt((recognize(any_block), nospace1))))(input)
@@ -7281,32 +7298,41 @@ pub mod test {
     use crate::parse::model::{
         BlockKind, DelimitedBlockKind, LexScope, NestedBlockKind, TerminatedBlockKind,
     };
-    use crate::parse::{
-        args, base_point_segment, base_seg, command_line, comment, consume_point_var, create,
-        create_command, doc, expected_block_terminator_or_non_terminator, lex_block,
-        lex_child_scopes, lex_nested_block, lex_scope, lex_scope_pipeline_step_and_block,
-        lex_scope_selector, lex_scopes, lowercase1, mesh_eos, mesh_seg, nested_block,
-        nested_block_content, next_stacked_name, no_comment, parse_bind_config,
-        parse_include_blocks, parse_inner_block, parse_mechtron_config, path_regex, pipeline,
-        pipeline_segment, pipeline_step_var, pipeline_stop_var, point_non_root_var, point_template,
-        point_var, pop, rec_version, root_ctx_seg, root_scope, root_scope_selector,
-        route_attribute, route_selector, scope_filter, scope_filters, skewer_case_chars,
-        skewer_dot, space_chars, space_no_dupe_dots, space_point_segment, strip_comments, subst,
-        template, var_seg, variable_name, version, version_point_segment, wrapper, Env,
-        MapResolver, SubstParser, VarResolver,
-    };
+    use crate::parse::{args, base_point_segment, base_seg, command_line, comment, consume_point_var, create, create_command, doc, expected_block_terminator_or_non_terminator, lex_block, lex_child_scopes, lex_nested_block, lex_scope, lex_scope_pipeline_step_and_block, lex_scope_selector, lex_scopes, lowercase1, mesh_eos, mesh_seg, nested_block, nested_block_content, next_stacked_name, no_comment, parse_bind_config, parse_include_blocks, parse_inner_block, parse_mechtron_config, path_regex, pipeline, pipeline_segment, pipeline_step_var, pipeline_stop_var, point_non_root_var, point_template, point_var, pop, rec_version, root_ctx_seg, root_scope, root_scope_selector, route_attribute, route_selector, scope_filter, scope_filters, skewer_case_chars, skewer_dot, space_chars, space_no_dupe_dots, space_point_segment, strip_comments, subst, template, var_seg, variable_name, version, version_point_segment, wrapper, Env, MapResolver, SubstParser, VarResolver, assignment};
     use crate::substance::Substance;
     use crate::util;
     use crate::util::{log, ToResolved};
 
     #[test]
+    pub fn test_assignment() {
+        let config = "+bin=some:bin:somewhere;";
+        let assign = log(result(assignment(new_span(config)))).unwrap();
+        assert_eq!(assign.key.as_str(), "bin");
+        assert_eq!(assign.value.as_str(), "some:bin:somewhere");
+
+        let config = "    +bin   =    some:bin:somewhere;";
+        log(result(assignment(new_span(config)))).unwrap();
+
+        let config = "    noplus =    some:bin:somewhere;";
+        assert!(log(result(assignment(new_span(config)))).is_err());
+        let config = "   +nothing ";
+        assert!(log(result(assignment(new_span(config)))).is_err());
+        let config = "   +nothing  = ";
+        assert!(log(result(assignment(new_span(config)))).is_err());
+
+    }
+
+
+    #[test]
     pub fn test_mechtron_config() {
-        let config = r#"Mechtron(version=1.0.0) {
-                              Wasm {
-                                bin=some:bin:somewhere
-                                name=freddy
-                              }
-                             }
+        let config = r#"
+
+Mechtron(version=1.0.0) {
+    Wasm {
+      +bin=repo:1.0.0:/wasm/blah.wasm;
+      +name=my-mechtron;
+    }
+}
 
          "#;
 
@@ -7317,6 +7343,28 @@ pub mod test {
             assert!(false)
         }
     }
+
+
+
+        #[test]
+    pub fn test_bad_mechtron_config() {
+        let config = r#"
+
+Mechtron(version=1.0.0) {
+    Wasm
+    varool
+      +bin=repo:1.0.0:/wasm/blah.wasm;
+      +name=my-mechtron;
+    }
+}
+
+         "#;
+
+        let doc = log(doc(config)).is_err();
+
+
+    }
+
 
     #[test]
     pub fn test_message_selector() {
