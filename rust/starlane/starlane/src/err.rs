@@ -1,7 +1,13 @@
 use cosmic_hyperspace::err::ErrKind;
-//use cosmic_registry_postgres::err::PostErr;
 
-pub trait StarlaneErr {}   //: PostErr {}
+#[cfg(feature = "postgres")]
+use cosmic_registry_postgres::err::PostErr;
+
+#[cfg(feature = "postgres")]
+pub trait StarlaneErr: PostErr {}
+
+#[cfg(not(feature = "postgres"))]
+pub trait StarlaneErr {}
 
 #[derive(Debug, Clone)]
 pub struct StarErr {
@@ -16,9 +22,11 @@ pub mod convert {
     use ascii::FromAsciiError;
     use bincode::ErrorKind;
     use cosmic_hyperspace::err::{ErrKind, HyperErr};
-//    use cosmic_registry_postgres::err::PostErr;
+    //    use cosmic_registry_postgres::err::PostErr;
+    #[cfg(feature = "postgres")]
+    use cosmic_registry_postgres::err::PostErr;
     use cosmic_space::err::SpaceErr;
-    use mechtron_host::err::HostErr;
+    use mechtron_host::err::{DefaultHostErr, HostErr};
     use sqlx::Error;
     use std::io;
     use std::str::Utf8Error;
@@ -27,6 +35,7 @@ pub mod convert {
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
+
     impl Err {
         pub fn new<S: ToString>(message: S) -> Self {
             Self {
@@ -67,7 +76,9 @@ pub mod convert {
             self.message.clone()
         }
     }
-/*    impl PostErr for Err {
+
+    #[cfg(feature = "postgres")]
+    impl PostErr for Err {
         fn dupe() -> Self {
             Self {
                 kind: ErrKind::Dupe,
@@ -76,7 +87,14 @@ pub mod convert {
         }
     }
 
- */
+    impl From<DefaultHostErr> for Err {
+        fn from(e: DefaultHostErr) -> Self {
+            Self {
+                kind: ErrKind::Default,
+                message: e.to_string(),
+            }
+        }
+    }
     impl HyperErr for Err {
         fn to_space_err(&self) -> SpaceErr {
             SpaceErr::server_error(self.to_string())

@@ -48,6 +48,7 @@ impl ProtoTransmitter {
         Self {
             from: SetStrategy::None,
             to: SetStrategy::None,
+            via: SetStrategy::None,
             agent: SetStrategy::Fill(Agent::Anonymous),
             scope: SetStrategy::Fill(Scope::None),
             handling: SetStrategy::Fill(Handling::default()),
@@ -68,6 +69,7 @@ impl ProtoTransmitter {
 
         let directed = wave.build()?;
 
+        println!("DIRECTE!");
         match directed.bounce_backs() {
             BounceBacks::None => {
                 self.router.route(directed.to_ultra());
@@ -81,7 +83,9 @@ impl ProtoTransmitter {
     where
         D: Into<DirectedProto>,
     {
+        println!("PING!");
         let mut ping: DirectedProto = ping.into();
+        ping.bounce_backs = Some(BounceBacks::Single);
         if let Some(DirectedKind::Ping) = ping.kind {
             self.direct(ping)
         } else {
@@ -162,6 +166,7 @@ impl ProtoTransmitterBuilder {
         Self {
             from: SetStrategy::None,
             to: SetStrategy::None,
+            via: SetStrategy::None,
             agent: SetStrategy::Fill(Agent::Anonymous),
             scope: SetStrategy::Fill(Scope::None),
             handling: SetStrategy::Fill(Handling::default()),

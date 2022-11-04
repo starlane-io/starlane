@@ -232,7 +232,10 @@ where
 
         self.star_skel.api.create_states(point.clone()).await?;
         self.star_skel.registry.register(&registration).await?;
-        self.star_skel.registry.assign_star(&point,&self.star_skel.point).await?;
+        self.star_skel
+            .registry
+            .assign_star(&point, &self.star_skel.point)
+            .await?;
 
         logger
             .result(skel.status_tx.send(DriverStatus::Ready).await)
@@ -492,7 +495,7 @@ where
 
             self.skel
                 .registry
-                .assign_star(&assign.details.stub.point,&self.skel.point )
+                .assign_star(&assign.details.stub.point, &self.skel.point)
                 .await?;
 
             Ok(ReflectedCore::ok())

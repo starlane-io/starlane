@@ -37,15 +37,18 @@ use cosmic_hyperspace::driver::{DriverAvail, DriversBuilder};
 use cosmic_hyperspace::machine::{Machine, MachineTemplate};
 use cosmic_hyperspace::reg::{Registry, RegistryApi};
 use cosmic_hyperspace::Cosmos;
-//use cosmic_registry_postgres::err::PostErr;
-/*use cosmic_registry_postgres::{
+
+#[cfg(feature = "postgres")]
+use cosmic_registry_postgres::err::PostErr;
+
+#[cfg(feature = "postgres")]
+use cosmic_registry_postgres::{
     PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
 };
 
- */
-use cosmic_space::artifact::ArtifactApi;
-use cosmic_space::artifact::ReadArtifactFetcher;
+use cosmic_space::artifact::asynch::ArtifactApi;
+use cosmic_space::artifact::asynch::ReadArtifactFetcher;
 use cosmic_space::command::direct::create::KindTemplate;
 use cosmic_space::err::SpaceErr;
 use cosmic_space::kind::{
@@ -67,7 +70,6 @@ use cosmic_space::loc;
 use cosmic_space::wasm::Timestamp;
 
 fn main() -> Result<(), StarErr> {
-
     ctrlc::set_handler(move || {
         std::process::exit(1);
     });
@@ -127,7 +129,6 @@ pub extern "C" fn cosmic_timestamp() -> Timestamp {
 
  */
 
-
 #[derive(Clone)]
 pub struct Starlane {
     //pub handle: PostgresRegistryContextHandle<Self>,
@@ -152,8 +153,12 @@ impl Starlane {
 #[async_trait]
 impl Cosmos for Starlane {
     type Err = StarErr;
-    //type RegistryContext = PostgresRegistryContextHandle<Self>;
+    #[cfg(feature = "postgres")]
+    type RegistryContext = PostgresRegistryContextHandle<Self>;
+
+    #[cfg(not(feature = "postgres"))]
     type RegistryContext = MemRegCtx;
+
     type StarAuth = AnonHyperAuthenticator;
     type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
 
@@ -248,8 +253,8 @@ impl Cosmos for Starlane {
         };
         fs::create_dir_all(dir.as_str());
 
-        let cert = format!("{}/cert.pem", dir.as_str());
-        let key = format!("{}/key.pem", dir.as_str());
+        let cert = format!("{}/cert.der", dir.as_str());
+        let key = format!("{}/key.der", dir.as_str());
         let cert_path = Path::new(&cert);
         let key_path = Path::new(&key);
 
@@ -272,7 +277,7 @@ impl Cosmos for Starlane {
     }
 }
 
-/*
+#[cfg(feature = "postgres")]
 impl PostgresPlatform for Starlane {
     fn lookup_registry_db() -> Result<PostgresDbInfo, Self::Err> {
         Ok(PostgresDbInfo::new(
@@ -294,13 +299,8 @@ impl PostgresPlatform for Starlane {
     }
 }
 
- */
-
 #[cfg(test)]
 pub mod test {
     #[test]
-    pub fn test() {
-
-    }
-
+    pub fn test() {}
 }

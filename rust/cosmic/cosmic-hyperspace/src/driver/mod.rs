@@ -13,7 +13,8 @@ use crate::reg::{Registration, Registry};
 use crate::star::HyperStarCall::LayerTraversalInjection;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::Cosmos;
-use cosmic_space::artifact::{ArtRef, ArtifactApi};
+use cosmic_space::artifact::asynch::ArtifactApi;
+use cosmic_space::artifact::ArtRef;
 use cosmic_space::command::common::{SetProperties, StateSrc};
 use cosmic_space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
@@ -729,7 +730,8 @@ where
 
             router.direction = Some(TraversalDirection::Fabric);
 
-            let mut transmitter = ProtoTransmitterBuilder::new(Arc::new(router), skel.exchanger.clone());
+            let mut transmitter =
+                ProtoTransmitterBuilder::new(Arc::new(router), skel.exchanger.clone());
             transmitter.from =
                 SetStrategy::Override(point.clone().to_surface().with_layer(Layer::Core));
             let transmitter = transmitter.build();
@@ -1139,7 +1141,7 @@ where
                     match item.handle(ctx).await {
                         CoreBounce::Absorbed => {}
                         CoreBounce::Reflected(reflected) => {
-                            let reflection = reflection.unwrap();
+                            let reflection = reflection?;
 
                             let wave = reflection.make(reflected, self.surface.clone());
                             let wave = wave.to_ultra();
@@ -1154,7 +1156,9 @@ where
                 }
             }
             ItemSphere::Router(router) => {
-                self.skel.logger.result(router.traverse(direct.wrap()).await)?;
+                self.skel
+                    .logger
+                    .result(router.traverse(direct.wrap()).await)?;
             }
         }
 
@@ -1255,8 +1259,10 @@ where
                         );
                         router.direction = Some(TraversalDirection::Fabric);
 
-                        let mut transmitter =
-                            ProtoTransmitter::new(Arc::new(router), self.star_skel.exchanger.clone());
+                        let mut transmitter = ProtoTransmitter::new(
+                            Arc::new(router),
+                            self.star_skel.exchanger.clone(),
+                        );
                         let ctx = DriverCtx::new(transmitter);
                         match self
                             .skel

@@ -219,7 +219,9 @@ where
     pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Surface, SpaceErr> {
         // only allow a cli session to be created by any layer of THIS particle
         if ctx.from().clone().to_point() != ctx.to().clone().to_point() {
-            return Err(SpaceErr::forbidden("cli sessions can only be created from within the same Point"));
+            return Err(SpaceErr::forbidden(
+                "cli sessions can only be created from within the same Point",
+            ));
         }
 
         let mut session_port = ctx
@@ -286,7 +288,7 @@ impl CommandExecutor {
         // make sure everything is coming from this command executor topic
         let ctx = ctx.push_from(self.port.clone());
 
-        let command = log(result(command_line(new_span(ctx.line.as_str()))))?;
+        let command = result(command_line(new_span(ctx.line.as_str())))?;
 
         let mut env = self.env.clone();
         for transfer in &ctx.transfers {

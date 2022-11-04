@@ -2,6 +2,7 @@ use crate::err::GuestErr;
 use crate::err::MechErr;
 use crate::{MechtronFactories, MechtronSkel, Platform};
 use cosmic_macros::handler_sync;
+use cosmic_space::artifact::synch::{ArtifactApi, ArtifactFetcher};
 use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::HyperSubstance;
 use cosmic_space::kind::Kind::Mechtron;
@@ -9,14 +10,18 @@ use cosmic_space::loc::{Layer, Point, ToSurface};
 use cosmic_space::log::{
     LogSource, NoAppender, PointLogger, RootLogger, SynchTransmittingLogAppender,
 };
-use cosmic_space::particle::Details;
+use cosmic_space::particle::{Details, Stub};
+use cosmic_space::substance::{Bin, Substance};
+use cosmic_space::wave::core::cmd::CmdMethod;
 use cosmic_space::wave::core::CoreBounce;
 use cosmic_space::wave::exchange::synch::{
     DirectedHandler, DirectedHandlerProxy, DirectedHandlerShell, ExchangeRouter, InCtx,
     ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx,
 };
 use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{Agent, DirectedWave, ReflectedAggregate, ToRecipients, UltraWave};
+use cosmic_space::wave::{
+    Agent, DirectedProto, DirectedWave, ReflectedAggregate, ToRecipients, UltraWave,
+};
 use dashmap::DashMap;
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -32,6 +37,7 @@ where
     factories: Arc<MechtronFactories<P>>,
     logger: PointLogger,
     transmitter: ProtoTransmitterBuilder,
+    artifacts: ArtifactApi,
     platform: P,
 }
 
@@ -42,13 +48,25 @@ where
     pub fn new(details: Details, factories: Arc<MechtronFactories<P>>, platform: P) -> Self {
         let router: GuestRouter<P> = GuestRouter::new();
         let router = Arc::new(router);
-        let mut transmitter = ProtoTransmitterBuilder::new(router);
+        let mut transmitter = ProtoTransmitterBuilder::new(router.clone());
         transmitter.agent = SetStrategy::Override(Agent::Point(details.stub.point.clone()));
         transmitter.from = SetStrategy::Override(details.stub.point.clone().to_surface());
         transmitter.to = SetStrategy::Override(Point::global_logger().to_surface().to_recipients());
         let appender = SynchTransmittingLogAppender::new(transmitter.clone());
         let root_logger = RootLogger::new(LogSource::Core, Arc::new(appender));
         let logger = root_logger.point(details.stub.point.clone());
+
+        let artifacts = {
+            let mut transmitter = ProtoTransmitterBuilder::new(router);
+            transmitter.agent = SetStrategy::Fill(Agent::Point(details.stub.point.clone()));
+            transmitter.from = SetStrategy::Fill(details.stub.point.clone().to_surface());
+            let transmitter = transmitter.build();
+            let fetcher = GuestArtifactFetcher {
+                transmitter,
+                logger: logger.clone(),
+            };
+            ArtifactApi::new(Arc::new(fetcher))
+        };
 
         let mechtrons = Arc::new(DashMap::new());
         Self {
@@ -58,7 +76,12 @@ where
             logger,
             platform,
             transmitter,
+            artifacts,
         }
+    }
+
+    pub fn ctx(&self) -> GuestCtx {
+        GuestCtx::new(self.artifacts.clone())
     }
 
     fn hosted(&self, point: &Point) -> Result<HostedMechtron, GuestErr> {
@@ -80,15 +103,17 @@ where
     fn mechtron_skel(&self, point: &Point) -> Result<MechtronSkel<P>, GuestErr> {
         let hosted = self.hosted(point)?;
         let mut transmitter = self.builder();
-        transmitter.from = SetStrategy::Override(hosted.details.stub.point.to_surface());
-        transmitter.agent = SetStrategy::Fill(Agent::Point(hosted.details.stub.point.clone()));
+        /*        transmitter.from = SetStrategy::Override(hosted.details.stub.point.to_surface());
+                transmitter.agent = SetStrategy::Fill(Agent::Point(hosted.details.stub.point.clone()));
+        */
         let logger = self.logger.point(hosted.details.stub.point.clone());
+
         let phantom: PhantomData<P> = PhantomData::default();
         let skel = MechtronSkel::new(
             hosted.details.clone(),
             logger,
-            transmitter.clone().build(),
             phantom,
+            self.artifacts.clone(),
         );
 
         Ok(skel)
@@ -121,7 +146,6 @@ where
     {
         let factories = Arc::new(platform.factories()?);
         let skel = GuestSkel::new(details.clone(), factories, platform);
-        skel.logger.info(format!("Guest created '{}'", details.stub.point.to_string() ));
 
         Ok(Self { skel })
     }
@@ -141,10 +165,16 @@ where
             ))
         } else {
             let hosted = self.skel.hosted(point)?;
-            let factory = self.skel.factories.get(&hosted.name).ok_or(format!(
-                "cannot find factory assicated with name: {}",
-                hosted.name
-            ))?;
+            let factory = self
+                .skel
+                .factories
+                .get(&hosted.name)
+                .ok_or(format!(
+                    "cannot find factory associated with name: {}",
+                    hosted.name
+                ))?
+                .read()
+                .unwrap();
 
             let skel = self.skel.mechtron_skel(point)?;
             let mechtron = factory
@@ -220,24 +250,24 @@ where
 {
     #[route("Hyp<Host>")]
     pub fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
-        self.skel.logger.info("Received Host command!");
         if let HyperSubstance::Host(host) = ctx.input {
-            let factory =
-                self.skel
-                    .logger
-                    .result(self.skel.factories.get(&host.config.name).ok_or(format!(
-                        "Guest does not have a mechtron with name: {}",
-                        host.config.name
-                    )))?;
-            self.skel.logger.info("Creating...");
+            let mut factory = self
+                .skel
+                .logger
+                .result(self.skel.factories.get(&host.config.name).ok_or(format!(
+                    "Guest does not have a mechtron with name: {}",
+                    host.config.name
+                )))?
+                .write()
+                .unwrap();
             self.skel.mechtrons.insert(
                 host.details.stub.point.clone(),
                 HostedMechtron::new(host.details.clone(), host.config.name.clone()),
             );
 
             let skel = self.skel.mechtron_skel(&host.details.stub.point)?;
+            self.skel.logger.result(factory.new(skel.clone()))?;
             let mechtron = factory.lifecycle(skel)?;
-            self.skel.logger.info("Got MechtronLifecycle...");
             let skel = self.skel.mechtron_skel(&host.details.stub.point)?;
             mechtron.create(skel)?;
 
@@ -257,5 +287,42 @@ pub struct HostedMechtron {
 impl HostedMechtron {
     pub fn new(details: Details, name: String) -> Self {
         Self { details, name }
+    }
+}
+
+pub struct GuestArtifactFetcher {
+    logger: PointLogger,
+    transmitter: ProtoTransmitter,
+}
+
+impl ArtifactFetcher for GuestArtifactFetcher {
+    fn stub(&self, point: &Point) -> Result<Stub, SpaceErr> {
+        todo!()
+    }
+
+    fn fetch(&self, point: &Point) -> Result<Bin, SpaceErr> {
+        let mut directed = DirectedProto::ping();
+        directed.to(point.clone().to_surface());
+        directed.method(CmdMethod::Read);
+
+        let pong = self.logger.result(self.transmitter.ping(directed))?;
+        pong.core.ok_or()?;
+        match pong.variant.core.body {
+            Substance::Bin(bin) => Ok(bin),
+            other => Err(SpaceErr::server_error(format!(
+                "expected Bin, encountered unexpected substance {} when fetching Artifact",
+                other.kind().to_string()
+            ))),
+        }
+    }
+}
+
+pub struct GuestCtx {
+    pub artifacts: ArtifactApi,
+}
+
+impl GuestCtx {
+    pub fn new(artifacts: ArtifactApi) -> Self {
+        Self { artifacts }
     }
 }

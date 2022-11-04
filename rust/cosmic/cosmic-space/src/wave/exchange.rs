@@ -296,6 +296,7 @@ pub struct ProtoTransmitterBuilderDef<R, E> {
     pub scope: SetStrategy<Scope>,
     pub handling: SetStrategy<Handling>,
     pub method: SetStrategy<Method>,
+    pub via: SetStrategy<Surface>,
     pub from: SetStrategy<Surface>,
     pub to: SetStrategy<Recipients>,
     pub router: R,
@@ -311,6 +312,7 @@ impl<R, E> ProtoTransmitterBuilderDef<R, E> {
             method: self.method,
             from: self.from,
             to: self.to,
+            via: self.via,
             router: self.router,
             exchanger: self.exchanger,
         }
@@ -325,6 +327,7 @@ pub struct ProtoTransmitterDef<R, E> {
     method: SetStrategy<Method>,
     from: SetStrategy<Surface>,
     to: SetStrategy<Recipients>,
+    via: SetStrategy<Surface>,
     router: R,
     exchanger: E,
 }
@@ -354,6 +357,12 @@ impl<R, E> ProtoTransmitterDef<R, E> {
             SetStrategy::None => {}
             SetStrategy::Fill(to) => wave.fill_to(to.clone()),
             SetStrategy::Override(to) => wave.to(to),
+        }
+
+        match &self.via {
+            SetStrategy::None => {}
+            SetStrategy::Fill(via) => wave.fill_via(via.clone()),
+            SetStrategy::Override(via) => wave.via(via),
         }
 
         match &self.agent {

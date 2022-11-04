@@ -22,7 +22,7 @@ use cosmic_hyperlane::{
     LocalHyperwayGateUnlocker, MountInterchangeGate, SimpleGreeter,
     TokenAuthenticatorWithRemoteWhitelist,
 };
-use cosmic_space::artifact::{ArtifactApi, ArtifactFetcher, ReadArtifactFetcher};
+use cosmic_space::artifact::asynch::{ArtifactApi, ArtifactFetcher, ReadArtifactFetcher};
 use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{InterchangeKind, Knock};
 use cosmic_space::kind::StarSub;
@@ -720,14 +720,12 @@ where
     }
 
     async fn fetch(&self, point: &Point) -> Result<Bin, SpaceErr> {
-println!("\t\tfetch: {}",point.to_string());
         let transmitter = self.client.transmitter_builder().await?.build();
 
         let mut wave = DirectedProto::ping();
         wave.method(CmdMethod::Read);
         wave.to(point.clone().to_surface().with_layer(Layer::Core));
         let pong: Wave<Pong> = transmitter.direct(wave).await?;
-        println!("\tfetch received PONG... {}", pong.is_ok());
 
         pong.ok_or()?;
 

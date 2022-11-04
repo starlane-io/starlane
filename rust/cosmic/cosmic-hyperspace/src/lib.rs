@@ -12,6 +12,7 @@ extern crate lazy_static;
 extern crate strum_macros;
 
 extern crate inflector;
+use cosmic_space::wasm::Timestamp;
 use inflector::Inflector;
 
 use std::cmp::Ordering;
@@ -28,7 +29,7 @@ use tracing::error;
 use uuid::Uuid;
 
 use cosmic_hyperlane::{HyperAuthenticator, HyperGate, HyperGateSelector, HyperwayEndpointFactory};
-use cosmic_space::artifact::ArtifactApi;
+use cosmic_space::artifact::asynch::ArtifactApi;
 use cosmic_space::command::common::{SetProperties, SetRegistry};
 use cosmic_space::command::direct::create::{KindTemplate, Strategy};
 use cosmic_space::command::direct::delete::Delete;
@@ -56,7 +57,6 @@ use cosmic_space::wave::core::ReflectedCore;
 use cosmic_space::wave::UltraWave;
 use err::HyperErr;
 use mechtron_host::err::HostErr;
-use mechtron_host::HostPlatform;
 use reg::Registry;
 
 use crate::driver::{DriverFactory, DriversBuilder};
@@ -80,8 +80,8 @@ pub extern "C" fn cosmic_uuid() -> String {
 }
 
 #[no_mangle]
-pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
-    Utc::now()
+pub extern "C" fn cosmic_timestamp() -> Timestamp {
+    Timestamp::new(Utc::now().timestamp_millis())
 }
 
 #[async_trait]

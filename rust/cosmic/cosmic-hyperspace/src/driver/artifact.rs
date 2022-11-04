@@ -402,10 +402,7 @@ where
                 self.skel
                     .star
                     .registry
-                    .assign_star(
-                        &assign.details.stub.point,
-                        &self.skel.star.point,
-                    )
+                    .assign_star(&assign.details.stub.point, &self.skel.star.point)
                     .await?;
 
                 let mut point_and_kind_set = HashSet::new();
@@ -674,10 +671,7 @@ where
                 self.skel
                     .star
                     .registry
-                    .assign_star(
-                        &assign.details.stub.point,
-                        &self.skel.star.point,
-                    )
+                    .assign_star(&assign.details.stub.point, &self.skel.star.point)
                     .await?;
             }
             Ok(())
@@ -714,7 +708,7 @@ where
     }
 
     #[route("Cmd<Read>")]
-    pub async fn read(&self, ctx: InCtx<'_, ()>) -> Result<Substance, P::Err> {
+    pub async fn read(&self, _ctx: InCtx<'_, ()>) -> Result<Substance, P::Err> {
         if let Kind::Artifact(ArtifactSubKind::Dir) = self.skel.kind {
             return Ok(Substance::Empty);
         }

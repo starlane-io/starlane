@@ -76,6 +76,7 @@ impl ProtoTransmitter {
             scope: SetStrategy::Fill(Scope::None),
             handling: SetStrategy::Fill(Handling::default()),
             method: SetStrategy::None,
+            via: SetStrategy::None,
             router,
             exchanger,
         }
@@ -197,6 +198,7 @@ impl ProtoTransmitterBuilder {
         Self {
             from: SetStrategy::None,
             to: SetStrategy::None,
+            via: SetStrategy::None,
             agent: SetStrategy::Fill(Agent::Anonymous),
             scope: SetStrategy::Fill(Scope::None),
             handling: SetStrategy::Fill(Handling::default()),
@@ -218,6 +220,7 @@ impl TraversalTransmitter {
             method: SetStrategy::None,
             from: SetStrategy::None,
             to: SetStrategy::None,
+            via: SetStrategy::None,
             router,
             exchanger,
         }

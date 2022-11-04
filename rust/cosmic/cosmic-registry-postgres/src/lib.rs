@@ -293,18 +293,13 @@ where
         Ok(())
     }
 
-    async fn assign_star<'a>(
-        &'a self,
-        point: &'a Point,
-        star: &'a Point,
-    ) -> Result<(), P::Err> {
+    async fn assign_star<'a>(&'a self, point: &'a Point, star: &'a Point) -> Result<(), P::Err> {
         let parent = point
             .parent()
             .ok_or(format!("expecting parent ({})", point.to_string()))?;
         let point_segment = point.last_segment().ok_or("expecting a last_segment")?;
 
-        let statement =
-            "UPDATE particles SET star=$1, WHERE parent=$2 AND point_segment=$3";
+        let statement = "UPDATE particles SET star=$1, WHERE parent=$2 AND point_segment=$3";
 
         let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
@@ -322,19 +317,13 @@ where
         Ok(())
     }
 
-
-        async fn assign_host<'a>(
-            &'a self,
-            point: &'a Point,
-            host: &'a Point,
-    ) -> Result<(), P::Err> {
+    async fn assign_host<'a>(&'a self, point: &'a Point, host: &'a Point) -> Result<(), P::Err> {
         let parent = point
             .parent()
             .ok_or(format!("expecting parent ({})", point.to_string()))?;
         let point_segment = point.last_segment().ok_or("expecting a last_segment")?;
 
-        let statement =
-            "UPDATE particles SET host=$1, WHERE parent=$2 AND point_segment=$3";
+        let statement = "UPDATE particles SET host=$1, WHERE parent=$2 AND point_segment=$3";
 
         let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
@@ -1226,22 +1215,15 @@ where
 
             let star = match star {
                 None => None,
-                Some(p) => {
-                    Some(Point::from_str(p.as_str())?)
-                }
+                Some(p) => Some(Point::from_str(p.as_str())?),
             };
 
             let host = match host {
                 None => None,
-                Some(p) => {
-                    Some(Point::from_str(p.as_str())?)
-                }
+                Some(p) => Some(Point::from_str(p.as_str())?),
             };
 
-            let location = ParticleLocation {
-                star,
-                host
-            };
+            let location = ParticleLocation { star, host };
 
             let status = Status::from_str(status.as_str())?;
 
@@ -1627,7 +1609,7 @@ pub mod test {
     };
     use cosmic_hyperspace::reg::RegistryApi;
     use cosmic_hyperspace::reg::{Registration, Registry};
-    use cosmic_space::artifact::ArtifactApi;
+    use cosmic_space::artifact::asynch::ArtifactApi;
     use cosmic_space::command::direct::create::Strategy;
     use cosmic_space::command::direct::query::Query;
     use cosmic_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
@@ -1771,7 +1753,9 @@ pub mod test {
         };
         registry.register(&registration).await?;
 
-        registry.assign_star(&point, &StarKey::central().to_point()).await?;
+        registry
+            .assign_star(&point, &StarKey::central().to_point())
+            .await?;
         registry.set_status(&point, &Status::Ready).await?;
         registry.sequence(&point).await?;
         let record = registry.record(&point).await?;
