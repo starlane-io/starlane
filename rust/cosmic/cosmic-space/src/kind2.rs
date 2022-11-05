@@ -449,25 +449,6 @@ pub mod parse {
         }
     }
 
-    /*
-    fn parent_matcher_def<I, FnParent, Parent, FnChild, Child, FnSubType, SubType>(
-        fn_parent: FnParent,
-        fn_child: FnChild,
-    ) -> impl FnMut(I) -> Res<I, ParentMatcherDef<Parent, Child>>
-        where
-            FnParent: FnMut(I) -> Res<I, Parent> + Copy,
-            FnChild: FnMut(I) -> Res<I, Child> + Copy,
-            FnSubType: FnMut(I) -> Res<I, SubType> + Copy,
-            I: Span,
-    {
-        move |input: I| {
-            tuple(fn_parent, fn_child)(input)
-                .map(|(next, (parent, child))| (next, ParentMatcherDef{ parent, child }))
-        }
-    }
-
-     */
-
     pub fn specific_def<I, FnDomain, FnSkewer, FnVersion, Domain, Skewer, Version>(
         fn_domain: FnDomain,
         fn_skewer: FnSkewer,
