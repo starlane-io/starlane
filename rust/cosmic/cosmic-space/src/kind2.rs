@@ -1,3 +1,4 @@
+
 use crate::loc::Version;
 use crate::parse::{CamelCase, Domain, SkewerCase};
 use serde::{Deserialize, Serialize};
@@ -587,13 +588,14 @@ pub mod parse {
         use crate::kind2::{IsMatch, OptPattern, Pattern};
 
         use crate::parse::error::result;
-        use crate::parse::{camel_case, rec_version, version, version_req, CamelCase};
+        use crate::parse::{camel_case, rec_version, version, version_req, CamelCase, expect};
         use crate::util::log;
         use core::str::FromStr;
         use cosmic_nom::new_span;
         use nom::bytes::complete::tag;
         use nom::combinator::{all_consuming, opt};
         use nom::sequence::{pair, preceded};
+
 
         #[test]
         pub fn test_camel_case_subtypes() {
@@ -713,6 +715,16 @@ pub mod parse {
             assert!(variant.child.is_some());
             assert!(variant.parent.sub.is_some());
         }
+
+
+       #[test]
+        pub fn test_camel_case_subtypes_err() {
+            let r = log(result(expect(camel_case_sub_types)(new_span("someCamelCase:Sub:Type")))).unwrap();
+        }
+
+
+
+
     }
 }
 

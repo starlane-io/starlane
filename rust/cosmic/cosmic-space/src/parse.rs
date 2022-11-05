@@ -1344,18 +1344,33 @@ pub fn skewer_case<I: Span>(input: I) -> Res<I, SkewerCase> {
 }
 
 pub fn camel_case_chars<I: Span>(input: I) -> Res<I, I> {
-    recognize(tuple((is_a("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), alphanumeric0)))(input)
+    context( "camel-case",recognize(tuple((is_a("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), alphanumeric0))))(input)
 }
 
 pub fn skewer_case_chars<I: Span>(input: I) -> Res<I, I> {
-    recognize(tuple((
+    context("skewer",recognize(tuple((
         is_a("abcdefghijklmnopqrstuvwxyz"),
         many0(alt((alphanumeric1, tag("-")))),
-    )))(input)
+    ))))(input)
 }
 
 pub fn lowercase_alphanumeric<I: Span>(input: I) -> Res<I, I> {
-    recognize(tuple((lowercase1, alphanumeric0)))(input)
+    context("lowercase-alphanumeric",recognize(tuple((lowercase1, alphanumeric0))))(input)
+}
+
+pub fn expect<I,F,O>( mut f: F) -> impl FnMut(I) -> Res<I,O> where I:Span, F: FnMut(I) -> Res<I,O>+Copy{
+   move | i: I | {
+       match f(i) {
+           Ok(r) => { Ok(r)}
+           Err(err) => {
+               match err {
+                   Err::Incomplete(r) => Err(Err::Incomplete(r)),
+                   Err::Error(r) => { Err(Err::Failure(r))}
+                   Err::Failure(r) => { Err(Err::Failure(r))}
+               }
+           }
+       }
+   }
 }
 
 pub fn single_lowercase<T: Span, Input, Error: ParseError<Input>>(
