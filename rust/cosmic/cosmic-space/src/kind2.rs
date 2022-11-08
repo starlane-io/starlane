@@ -78,8 +78,10 @@ where
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum Variant {
-    Artifact,
+    Native(Native),
+    Artifact(Artifact),
     Db(Db),
+    Star(StarVariant)
 }
 
 impl Variant {
@@ -95,6 +97,63 @@ impl Variant {
         }
     }
 }
+
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    Hash,
+    strum_macros::Display,
+    strum_macros::EnumString,
+)]
+pub enum Native {
+   Web
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    Hash,
+    strum_macros::Display,
+    strum_macros::EnumString,
+)]
+pub enum Artifact {
+    Repo,
+    Bundle,
+    Series,
+    Dir,
+    File,
+}
+
+#[derive(
+Clone,
+Debug,
+Eq,
+PartialEq,
+Hash,
+Serialize,
+Deserialize,
+strum_macros::Display,
+strum_macros::EnumString,
+)]
+pub enum StarVariant {
+    Central,
+    Super, // Wrangles nearby Stars... manages Assigning Particles to Stars, Moving, Icing, etc.
+    Nexus, // Relays Waves from Star to Star
+    Maelstrom, // Where executables are run
+    Scribe, // requires durable filesystem (Artifact Bundles, Files...)
+    Jump, // for entry into the Mesh/Fabric for an external connection (client ingress... http for example)
+    Fold, // exit from the Mesh.. maintains connections etc to Databases, Keycloak, etc.... Like A Space Fold out of the Fabric..
+    Machine, // every Machine has one and only one Machine star... it handles messaging for the Machine
+}
+
 
 #[derive(
     Debug,
@@ -153,6 +212,7 @@ pub enum Kind {
     Star,
     Driver,
     Global,
+    Native
 }
 
 impl Kind {
@@ -617,7 +677,7 @@ pub mod parse {
         }
 
         #[test]
-        pub fn test_my_sub() {
+       pub fn test_my_sub() {
             let sub = log(result(opt_pattern(camel_case)(new_span("MySub")))).unwrap();
             assert_eq!(
                 sub,
@@ -734,11 +794,7 @@ pub mod parse {
 
 #[cfg(test)]
 pub mod test {
-    use crate::kind2::{
-        DomainSelector, IsMatch, Kind, OptPattern, Pattern, SkewerSelector, Specific,
-        SpecificSelector, SpecificSubTypes, SubTypeDef, Variant, VariantFull, VariantFullSelector,
-        VersionSelector,
-    };
+    use crate::kind2::{Artifact, DomainSelector, IsMatch, Kind, OptPattern, Pattern, SkewerSelector, Specific, SpecificSelector, SpecificSubTypes, SubTypeDef, Variant, VariantFull, VariantFullSelector, VersionSelector};
     use crate::loc::Version;
     use crate::parse::{CamelCase, Domain, SkewerCase};
     use crate::selector::VersionReq;
@@ -759,7 +815,7 @@ pub mod test {
     }
 
     fn create_variant_full() -> VariantFull {
-        Variant::Artifact.with_specific(Some(create_specific_sub_type()))
+        Variant::Artifact(Artifact::Bundle).with_specific(Some(create_specific_sub_type()))
     }
 
     #[test]
@@ -775,8 +831,8 @@ pub mod test {
 
     #[test]
     pub fn variant() {
-        let var1 = Variant::Artifact.with_specific(Some(create_specific_sub_type()));
-        let var2 = Variant::Artifact.with_specific(Some(create_specific_sub_type()));
+        let var1 = Variant::Artifact(Artifact::Bundle).with_specific(Some(create_specific_sub_type()));
+        let var2 = Variant::Artifact(Artifact::Bundle).with_specific(Some(create_specific_sub_type()));
         assert_eq!(var1, var2);
     }
 
@@ -810,7 +866,6 @@ pub mod test {
         let selector = selector.with_sub(OptPattern::Any);
         assert!(selector.is_match(&specific));
 
-
         let selector = SpecificSelector {
             provider: DomainSelector::Any,
             vendor: DomainSelector::Matches(Domain::from_str("my-domain.com").unwrap()),
@@ -829,7 +884,7 @@ pub mod test {
         let variant = create_variant_full();
         let mut selector = VariantFullSelector {
             parent: SubTypeDef {
-                part: Pattern::Matches(Variant::Artifact),
+                part: Pattern::Matches(Variant::Artifact(Artifact::Bundle)),
                 sub: OptPattern::None,
                 r#type: OptPattern::None,
             },
@@ -840,7 +895,7 @@ pub mod test {
 
         let mut selector = VariantFullSelector {
             parent: SubTypeDef {
-                part: Pattern::Matches(Variant::Artifact),
+                part: Pattern::Matches(Variant::Artifact(Artifact::Bundle)),
                 sub: OptPattern::None,
                 r#type: OptPattern::None,
             },
