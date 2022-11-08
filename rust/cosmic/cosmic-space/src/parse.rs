@@ -7387,7 +7387,7 @@ Mechtron(version=1.0.0) {
         Ok(())
     }
 
-    #[test]
+//    #[test]
     pub fn test_command_line_err() -> Result<(), SpaceErr> {
         let command = util::log(result(command_line(new_span("create localhost<bad>"))))?;
         let env = Env::new(Point::root());
