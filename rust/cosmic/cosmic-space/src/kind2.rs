@@ -810,6 +810,7 @@ pub mod test {
         let selector = selector.with_sub(OptPattern::Any);
         assert!(selector.is_match(&specific));
 
+
         let selector = SpecificSelector {
             provider: DomainSelector::Any,
             vendor: DomainSelector::Matches(Domain::from_str("my-domain.com").unwrap()),
@@ -820,7 +821,7 @@ pub mod test {
 
         let specific = create_specific();
 
-        assert!(!selector.is_match(&specific));
+        assert!(selector.is_match(&specific));
     }
 
     #[test]
