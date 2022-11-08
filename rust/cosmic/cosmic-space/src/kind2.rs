@@ -81,7 +81,7 @@ pub enum Variant {
     Native(Native),
     Artifact(Artifact),
     Db(Db),
-    Star(StarVariant)
+    Star(StarVariant),
 }
 
 impl Variant {
@@ -110,7 +110,7 @@ impl Variant {
     strum_macros::EnumString,
 )]
 pub enum Native {
-   Web
+    Web,
 }
 
 #[derive(
@@ -133,15 +133,15 @@ pub enum Artifact {
 }
 
 #[derive(
-Clone,
-Debug,
-Eq,
-PartialEq,
-Hash,
-Serialize,
-Deserialize,
-strum_macros::Display,
-strum_macros::EnumString,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    Serialize,
+    Deserialize,
+    strum_macros::Display,
+    strum_macros::EnumString,
 )]
 pub enum StarVariant {
     Central,
@@ -153,7 +153,6 @@ pub enum StarVariant {
     Fold, // exit from the Mesh.. maintains connections etc to Databases, Keycloak, etc.... Like A Space Fold out of the Fabric..
     Machine, // every Machine has one and only one Machine star... it handles messaging for the Machine
 }
-
 
 #[derive(
     Debug,
@@ -212,7 +211,7 @@ pub enum Kind {
     Star,
     Driver,
     Global,
-    Native
+    Native,
 }
 
 impl Kind {
@@ -644,11 +643,17 @@ pub mod parse {
 
     #[cfg(test)]
     pub mod test {
-        use crate::kind2::parse::{camel_case_sub_types, camel_case_sub_types_selector, opt_pattern, pattern, preceded_opt_pattern, proto_variant, specific, specific_full_selector, specific_selector, specific_sub_types};
+        use crate::kind2::parse::{
+            camel_case_sub_types, camel_case_sub_types_selector, opt_pattern, pattern,
+            preceded_opt_pattern, proto_variant, specific, specific_full_selector,
+            specific_selector, specific_sub_types,
+        };
         use crate::kind2::{IsMatch, OptPattern, Pattern};
 
         use crate::parse::error::result;
-        use crate::parse::{camel_case, expect, rec_version, version, version_req, CamelCase, domain, skewer};
+        use crate::parse::{
+            camel_case, domain, expect, rec_version, skewer, version, version_req, CamelCase,
+        };
         use crate::util::log;
         use core::str::FromStr;
         use cosmic_nom::new_span;
@@ -677,7 +682,7 @@ pub mod parse {
         }
 
         #[test]
-       pub fn test_my_sub() {
+        pub fn test_my_sub() {
             let sub = log(result(opt_pattern(camel_case)(new_span("MySub")))).unwrap();
             assert_eq!(
                 sub,
@@ -718,12 +723,10 @@ pub mod parse {
 
         #[test]
         pub fn test_specific_selector() {
-
             let selector = log(result(specific_selector(new_span(
                 "my-domain.io:*:product:variant:(1.0.0)",
             ))))
             .unwrap();
-
         }
 
         #[test]
@@ -756,7 +759,6 @@ pub mod parse {
                 selector.sub,
                 OptPattern::Matches(CamelCase::from_str("MySub").unwrap())
             );
-
         }
 
         #[test]
@@ -794,7 +796,11 @@ pub mod parse {
 
 #[cfg(test)]
 pub mod test {
-    use crate::kind2::{Artifact, DomainSelector, IsMatch, Kind, OptPattern, Pattern, SkewerSelector, Specific, SpecificSelector, SpecificSubTypes, SubTypeDef, Variant, VariantFull, VariantFullSelector, VersionSelector};
+    use crate::kind2::{
+        Artifact, DomainSelector, IsMatch, Kind, OptPattern, Pattern, SkewerSelector, Specific,
+        SpecificSelector, SpecificSubTypes, SubTypeDef, Variant, VariantFull, VariantFullSelector,
+        VersionSelector,
+    };
     use crate::loc::Version;
     use crate::parse::{CamelCase, Domain, SkewerCase};
     use crate::selector::VersionReq;
@@ -831,8 +837,10 @@ pub mod test {
 
     #[test]
     pub fn variant() {
-        let var1 = Variant::Artifact(Artifact::Bundle).with_specific(Some(create_specific_sub_type()));
-        let var2 = Variant::Artifact(Artifact::Bundle).with_specific(Some(create_specific_sub_type()));
+        let var1 =
+            Variant::Artifact(Artifact::Bundle).with_specific(Some(create_specific_sub_type()));
+        let var2 =
+            Variant::Artifact(Artifact::Bundle).with_specific(Some(create_specific_sub_type()));
         assert_eq!(var1, var2);
     }
 
