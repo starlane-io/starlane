@@ -584,20 +584,17 @@ pub mod parse {
 
     #[cfg(test)]
     pub mod test {
-        use crate::kind2::parse::{
-            camel_case_sub_types, camel_case_sub_types_selector, opt_pattern, preceded_opt_pattern,
-            proto_variant, specific, specific_full_selector, specific_selector, specific_sub_types,
-        };
+        use crate::kind2::parse::{camel_case_sub_types, camel_case_sub_types_selector, opt_pattern, pattern, preceded_opt_pattern, proto_variant, specific, specific_full_selector, specific_selector, specific_sub_types};
         use crate::kind2::{IsMatch, OptPattern, Pattern};
 
         use crate::parse::error::result;
-        use crate::parse::{camel_case, expect, rec_version, version, version_req, CamelCase};
+        use crate::parse::{camel_case, expect, rec_version, version, version_req, CamelCase, domain, skewer};
         use crate::util::log;
         use core::str::FromStr;
         use cosmic_nom::new_span;
         use nom::bytes::complete::tag;
         use nom::combinator::{all_consuming, opt};
-        use nom::sequence::{pair, preceded};
+        use nom::sequence::{delimited, pair, preceded};
 
         #[test]
         pub fn test_camel_case_subtypes() {
@@ -661,10 +658,12 @@ pub mod parse {
 
         #[test]
         pub fn test_specific_selector() {
+
             let selector = log(result(specific_selector(new_span(
                 "my-domain.io:*:product:variant:(1.0.0)",
             ))))
             .unwrap();
+
         }
 
         #[test]
@@ -683,6 +682,7 @@ pub mod parse {
                 "my-domain.io:*:product:variant:(1.0.0)",
             ))))
             .unwrap();
+
             assert_eq!(selector.sub, OptPattern::None);
             assert_eq!(selector.part.variant.to_string(), "variant".to_string());
             //            assert_eq!(selector.part.version,Pattern::Matches(VersionReq::from_str("1.0.0").unwrap()));
@@ -696,6 +696,7 @@ pub mod parse {
                 selector.sub,
                 OptPattern::Matches(CamelCase::from_str("MySub").unwrap())
             );
+
         }
 
         #[test]
