@@ -1,10 +1,9 @@
-
+use crate::err::SpaceErr;
 use crate::loc::Version;
 use crate::parse::{CamelCase, Domain, SkewerCase};
+use crate::selector::VersionReq;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use crate::err::SpaceErr;
-use crate::selector::VersionReq;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct SubTypeDef<Part, SubType> {
@@ -364,7 +363,11 @@ pub type KindFullSelector =
 
 pub mod parse {
 
-    use crate::kind2::{CamelCaseSubTypes, CamelCaseSubTypesSelector, OptPattern, ParentChildDef, Pattern, ProtoVariant, Specific, SpecificDef, SpecificFullSelector, SpecificSelector, SpecificSubTypes, SpecificSubTypesSelector, SubTypeDef, VariantDef};
+    use crate::kind2::{
+        CamelCaseSubTypes, CamelCaseSubTypesSelector, OptPattern, ParentChildDef, Pattern,
+        ProtoVariant, Specific, SpecificDef, SpecificFullSelector, SpecificSelector,
+        SpecificSubTypes, SpecificSubTypesSelector, SubTypeDef, VariantDef,
+    };
     use crate::parse::{camel_case, domain, skewer_case, version, version_req, CamelCase, Domain};
     use cosmic_nom::{Res, Span};
     use nom::branch::alt;
@@ -588,7 +591,7 @@ pub mod parse {
         use crate::kind2::{IsMatch, OptPattern, Pattern};
 
         use crate::parse::error::result;
-        use crate::parse::{camel_case, rec_version, version, version_req, CamelCase, expect};
+        use crate::parse::{camel_case, expect, rec_version, version, version_req, CamelCase};
         use crate::util::log;
         use core::str::FromStr;
         use cosmic_nom::new_span;
@@ -596,10 +599,12 @@ pub mod parse {
         use nom::combinator::{all_consuming, opt};
         use nom::sequence::{pair, preceded};
 
-
         #[test]
         pub fn test_camel_case_subtypes() {
-            let r = result(camel_case_sub_types(new_span("SomeCamelCase:Sub:Type"))).unwrap();
+            let r = result(expect(camel_case_sub_types)(new_span(
+                "SomeCamelCase:Sub:Type",
+            )))
+            .unwrap();
         }
 
         #[test]
@@ -716,25 +721,27 @@ pub mod parse {
             assert!(variant.parent.sub.is_some());
         }
 
-
-       #[test]
+        #[test]
         pub fn test_camel_case_subtypes_err() {
-            let r = log(result(expect(camel_case_sub_types)(new_span("someCamelCase:Sub:Type")))).unwrap();
+            assert!(log(result(expect(camel_case_sub_types)(new_span(
+                "someCamelCase:Sub:Type"
+            ))))
+            .is_err());
         }
-
-
-
-
     }
 }
 
 #[cfg(test)]
 pub mod test {
-    use core::str::FromStr;
-    use crate::kind2::{DomainSelector, IsMatch, Kind, OptPattern, Pattern, SkewerSelector, Specific, SpecificSelector, SpecificSubTypes, SubTypeDef, Variant, VariantFull, VariantFullSelector, VersionSelector};
+    use crate::kind2::{
+        DomainSelector, IsMatch, Kind, OptPattern, Pattern, SkewerSelector, Specific,
+        SpecificSelector, SpecificSubTypes, SubTypeDef, Variant, VariantFull, VariantFullSelector,
+        VersionSelector,
+    };
     use crate::loc::Version;
     use crate::parse::{CamelCase, Domain, SkewerCase};
     use crate::selector::VersionReq;
+    use core::str::FromStr;
 
     fn create_specific() -> Specific {
         Specific::new(
