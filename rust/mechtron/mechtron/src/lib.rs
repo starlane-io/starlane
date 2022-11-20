@@ -28,7 +28,7 @@ use cosmic_macros::route;
 use cosmic_macros::DirectedHandler;
 use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::HyperSubstance;
-use cosmic_space::loc::{Layer, Point, ToSurface, Uuid};
+use cosmic_space::loc::{Layer, ToSurface, Uuid};
 use cosmic_space::log::{LogSource, NoAppender, PointLogger, RootLogger};
 use cosmic_space::parse::SkewerCase;
 use cosmic_space::particle::{Details, Stub};
@@ -50,6 +50,7 @@ use cosmic_space::wave::exchange::synch::{
     ProtoTransmitter, ProtoTransmitterBuilder,
 };
 use std::sync::RwLock;
+use cosmic_space::point::Point;
 
 use crate::err::{GuestErr, MechErr};
 use crate::guest::GuestCtx;

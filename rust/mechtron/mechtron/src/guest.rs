@@ -6,7 +6,7 @@ use cosmic_space::artifact::synch::{ArtifactApi, ArtifactFetcher};
 use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::HyperSubstance;
 use cosmic_space::kind::Kind::Mechtron;
-use cosmic_space::loc::{Layer, Point, ToSurface};
+use cosmic_space::loc::{Layer, ToSurface};
 use cosmic_space::log::{
     LogSource, NoAppender, PointLogger, RootLogger, SynchTransmittingLogAppender,
 };
@@ -26,6 +26,7 @@ use dashmap::DashMap;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
+use cosmic_space::point::Point;
 
 #[derive(Clone)]
 pub struct GuestSkel<P>

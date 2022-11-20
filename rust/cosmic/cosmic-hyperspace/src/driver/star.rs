@@ -15,7 +15,7 @@ use cosmic_space::hyper::{
     Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, ParticleLocation, Search,
 };
 use cosmic_space::kind::{BaseKind, Kind, StarSub};
-use cosmic_space::loc::{Layer, Point, StarKey, ToPoint, ToSurface, LOCAL_STAR};
+use cosmic_space::loc::{Layer, LOCAL_STAR, StarKey, ToPoint, ToSurface};
 use cosmic_space::log::{Trackable, Tracker};
 use cosmic_space::parse::bind_config;
 use cosmic_space::particle::traversal::TraversalInjection;
@@ -44,6 +44,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tracing::error;
+use cosmic_space::point::Point;
 
 lazy_static! {
     static ref STAR_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(

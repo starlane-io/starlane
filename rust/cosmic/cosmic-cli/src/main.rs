@@ -12,12 +12,12 @@ use clap::{App, Arg, Args, Command as ClapCommand, Parser, Subcommand};
 use cosmic_hyperlane::test_util::SingleInterchangePlatform;
 use cosmic_hyperlane::HyperwayEndpointFactory;
 use cosmic_hyperlane_tcp::HyperlaneTcpClient;
-use cosmic_hyperspace::driver::control::{ControlCliSession, ControlClient};
+use cosmic_hyperspace::driver::control::{ControlClient, ControlCliSession};
 use cosmic_nom::new_span;
 use cosmic_space::command::{CmdTransfer, Command, RawCommand};
 use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{InterchangeKind, Knock};
-use cosmic_space::loc::{Point, ToSurface};
+use cosmic_space::loc::ToSurface;
 use cosmic_space::log::RootLogger;
 use cosmic_space::parse::error::result;
 use cosmic_space::parse::{command_line, upload_blocks};
@@ -34,6 +34,7 @@ use std::{
 };
 use walkdir::{DirEntry, WalkDir};
 use zip::{result::ZipError, write::FileOptions};
+use cosmic_space::point::Point;
 
 #[tokio::main]
 async fn main() -> Result<(), SpaceErr> {

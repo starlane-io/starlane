@@ -23,15 +23,16 @@ use tokio::select;
 use tokio::sync::mpsc::error::{SendError, SendTimeoutError, TrySendError};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot::Sender;
-use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
+use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock, watch};
 
 use cosmic_space::command::direct::create::{PointFactoryU64, PointSegTemplate};
 use cosmic_space::err::SpaceErr;
 use cosmic_space::frame::PrimitiveFrame;
 use cosmic_space::hyper::{Greet, HyperSubstance, InterchangeKind, Knock};
-use cosmic_space::loc::{Layer, Point, PointFactory, Surface, ToPoint, ToSurface, Version};
+use cosmic_space::loc::{Layer, PointFactory, Surface, ToPoint, ToSurface, Version};
 use cosmic_space::log::{PointLogger, RootLogger, Tracker};
 use cosmic_space::particle::Status;
+use cosmic_space::point::Point;
 use cosmic_space::settings::Timeouts;
 use cosmic_space::substance::{FormErrs, Substance, SubstanceKind, Token};
 use cosmic_space::util::uuid;
@@ -1977,7 +1978,7 @@ mod tests {
 
     use cosmic_space::command::direct::create::PointFactoryU64;
     use cosmic_space::hyper::{InterchangeKind, Knock};
-    use cosmic_space::loc::Point;
+    use cosmic_space::point::Point;
     use cosmic_space::loc::Uuid;
     use cosmic_space::log::RootLogger;
     use cosmic_space::substance::Substance;
@@ -2055,8 +2056,9 @@ pub mod test_util {
     use cosmic_space::command::direct::create::PointFactoryU64;
     use cosmic_space::err::SpaceErr;
     use cosmic_space::hyper::{Greet, InterchangeKind, Knock};
-    use cosmic_space::loc::{Layer, Point, Surface, ToPoint, ToSurface};
+    use cosmic_space::loc::{Layer, Surface, ToPoint, ToSurface};
     use cosmic_space::log::{PointLogger, RootLogger};
+    use cosmic_space::point::Point;
     use cosmic_space::settings::Timeouts;
     use cosmic_space::substance::{Substance, Token};
     use cosmic_space::wave::core::cmd::CmdMethod;
@@ -2074,7 +2076,7 @@ pub mod test_util {
     use crate::{
         AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, Bridge, HyperClient,
         HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter,
-        HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
+        Hyperlane, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
         HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper,
         LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist,
     };
@@ -2369,8 +2371,9 @@ pub mod test {
     use cosmic_space::command::direct::create::PointFactoryU64;
     use cosmic_space::err::SpaceErr;
     use cosmic_space::hyper::{Greet, InterchangeKind, Knock};
-    use cosmic_space::loc::{Layer, Point, Surface, ToPoint, ToSurface};
+    use cosmic_space::loc::{Layer, Surface, ToPoint, ToSurface};
     use cosmic_space::log::RootLogger;
+    use cosmic_space::point::Point;
     use cosmic_space::settings::Timeouts;
     use cosmic_space::substance::{Substance, Token};
     use cosmic_space::wave::core::cmd::CmdMethod;
@@ -2385,11 +2388,11 @@ pub mod test {
         ReflectedWave, UltraWave, Wave,
     };
 
-    use crate::test_util::{SingleInterchangePlatform, TestGreeter, WaveTest, FAE, LESS};
+    use crate::test_util::{FAE, LESS, SingleInterchangePlatform, TestGreeter, WaveTest};
     use crate::{
         AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, Bridge, HyperClient,
         HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter,
-        HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
+        Hyperlane, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
         HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper,
         LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist,
     };

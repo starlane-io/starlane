@@ -13,7 +13,7 @@ use cosmic_nom::Tw;
 use crate::command::{Command, RawCommand};
 use crate::err::ParseErrs;
 use crate::hyper::{Greet, HyperSubstance, Knock, ParticleLocation};
-use crate::loc::{Meta, PointCtx, PointVar};
+use crate::loc::Meta;
 use crate::log::{AuditLog, Log, LogSpan, LogSpanEvent, PointlessLog};
 use crate::parse::model::Subst;
 use crate::parse::Env;
@@ -25,8 +25,9 @@ use crate::wave::core::http2::HttpMethod;
 use crate::wave::core::hyp::HypMethod;
 use crate::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use crate::wave::{Pong, UltraWave};
-use crate::{util, Details, Point, SpaceErr, Status, Stub, Surface};
+use crate::{Details, SpaceErr, Status, Stub, Surface, util};
 use url::Url;
+use crate::point::{Point, PointCtx, PointVar};
 
 #[derive(
     Debug,

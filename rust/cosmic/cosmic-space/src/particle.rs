@@ -8,12 +8,12 @@ use serde::{Deserialize, Serialize};
 use cosmic_nom::{new_span, Res, Span};
 
 use crate::kind::{Kind, KindParts};
-use crate::loc::{PointCtx, PointVar};
 use crate::parse::error::result;
-use crate::parse::{parse_alpha1_str, point_and_kind, Env};
+use crate::parse::{Env, parse_alpha1_str, point_and_kind};
 use crate::substance::Substance;
 use crate::util::ToResolved;
-use crate::{BaseKind, Point, SpaceErr};
+use crate::{BaseKind, SpaceErr};
+use crate::point::{Point, PointCtx, PointVar};
 
 pub mod property;
 pub mod traversal;
@@ -191,7 +191,7 @@ pub mod particle {
 
     use crate::err::SpaceErr;
     use crate::kind::{BaseKind, Kind, KindParts};
-    use crate::loc::Point;
+    use crate::point::Point;
     use crate::parse::parse_alpha1_str;
     use crate::particle::PointKind;
     use crate::security::Permissions;

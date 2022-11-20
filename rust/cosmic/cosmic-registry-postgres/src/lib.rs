@@ -41,7 +41,7 @@ use cosmic_space::hyper::{Location, ParticleLocation, ParticleRecord};
 use cosmic_space::kind::{
     ArtifactSubKind, BaseKind, FileSubKind, Kind, KindParts, Specific, UserBaseSubKind,
 };
-use cosmic_space::loc::{Point, PointSeg, StarKey, ToBaseKind, Version};
+use cosmic_space::loc::{StarKey, ToBaseKind, Version};
 use cosmic_space::log::PointLogger;
 use cosmic_space::parse::{CamelCase, Domain, SkewerCase};
 use cosmic_space::particle::{Details, PointKind, Properties, Property, Status, Stub};
@@ -59,6 +59,7 @@ use cosmic_space::selector::{
 use cosmic_space::substance::{Substance, SubstanceList, SubstanceMap};
 use cosmic_space::util::ValuePattern;
 use cosmic_space::HYPERUSER;
+use cosmic_space::point::{Point, PointSeg};
 
 pub trait PostgresPlatform: Cosmos
 where
@@ -1615,10 +1616,11 @@ pub mod test {
     use cosmic_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
     use cosmic_space::hyper::ParticleLocation;
     use cosmic_space::kind::{Kind, Specific, StarSub, UserBaseSubKind};
-    use cosmic_space::loc::{MachineName, Point, StarKey, ToPoint};
+    use cosmic_space::loc::{MachineName, StarKey, ToPoint};
     use cosmic_space::log::RootLogger;
     use cosmic_space::particle::property::PropertiesConfig;
     use cosmic_space::particle::Status;
+    use cosmic_space::point::Point;
     use cosmic_space::security::{
         Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
         Privilege,

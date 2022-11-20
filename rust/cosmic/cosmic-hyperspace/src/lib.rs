@@ -42,11 +42,12 @@ use cosmic_space::kind::{
     ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind,
 };
 use cosmic_space::loc::{
-    Layer, MachineName, Point, RouteSeg, StarKey, Surface, ToBaseKind, ToSurface,
+    Layer, MachineName, StarKey, Surface, ToBaseKind, ToSurface,
 };
 use cosmic_space::log::RootLogger;
 use cosmic_space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
 use cosmic_space::particle::{Details, Properties, Status, Stub};
+use cosmic_space::point::{Point, RouteSeg};
 use cosmic_space::security::IndexedAccessGrant;
 use cosmic_space::security::{Access, AccessGrant};
 use cosmic_space::selector::Selector;

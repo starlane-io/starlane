@@ -11,19 +11,20 @@ use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelecto
 
 use crate::kind::{BaseKind, Kind, KindParts, Specific};
 use crate::loc::{
-    Layer, PointCtx, PointSeg, PointVar, RouteSeg, ToBaseKind, Topic, VarVal, Variable, Version,
+    Layer, ToBaseKind, Topic, Variable, VarVal, Version,
 };
 use crate::parse::error::result;
 use crate::parse::{
-    consume_hierarchy, kind_selector, point_segment_selector, point_selector, specific_selector,
-    CamelCase, Env,
+    CamelCase, consume_hierarchy, Env, kind_selector, point_segment_selector,
+    point_selector, specific_selector,
 };
 use crate::substance::{
     CallWithConfigDef, Substance, SubstanceFormat, SubstanceKind, SubstancePattern,
     SubstancePatternCtx, SubstancePatternDef,
 };
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
-use crate::{Point, SpaceErr};
+use crate::SpaceErr;
+use crate::point::{Point, PointCtx, PointSeg, PointVar, RouteSeg};
 
 pub type KindSelector = KindSelectorDef<KindBaseSelector, SubKindSelector, SpecificSelector>;
 pub type KindSelectorVar =

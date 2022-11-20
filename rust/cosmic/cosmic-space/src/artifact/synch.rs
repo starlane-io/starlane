@@ -1,8 +1,9 @@
 use crate::artifact::ArtRef;
 use crate::config::mechtron::MechtronConfig;
-use crate::{Bin, BindConfig, Point, SpaceErr, Stub};
+use crate::{Bin, BindConfig, SpaceErr, Stub};
 use dashmap::DashMap;
 use std::sync::Arc;
+use crate::point::Point;
 
 #[derive(Clone)]
 pub struct ArtifactApi {
