@@ -8705,11 +8705,11 @@ pub fn port<I: Span>(input: I) -> Res<I, Surface> {
     }
 }
 
-pub type PortSelectorVal = PortSelectorDef<Hop, VarVal<Topic>, VarVal<ValuePattern<Layer>>>;
-pub type PortSelectorCtx = PortSelectorDef<Hop, Topic, ValuePattern<Layer>>;
-pub type PortSelector = PortSelectorDef<Hop, Topic, ValuePattern<Layer>>;
+pub type SurfaceSelectorVal = SurfaceSelectorDef<Hop, VarVal<Topic>, VarVal<ValuePattern<Layer>>>;
+pub type SurfaceSelectorCtx = SurfaceSelectorDef<Hop, Topic, ValuePattern<Layer>>;
+pub type SurfaceSelector = SurfaceSelectorDef<Hop, Topic, ValuePattern<Layer>>;
 
-pub struct PortSelectorDef<Hop, Topic, Layer> {
+pub struct SurfaceSelectorDef<Hop, Topic, Layer> {
     point: SelectorDef<Hop>,
     topic: Topic,
     layer: Layer,
