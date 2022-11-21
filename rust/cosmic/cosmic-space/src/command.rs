@@ -187,7 +187,8 @@ pub mod direct {
     use crate::fail;
     use crate::fail::{BadRequest, Fail, NotFound};
     use crate::kind::{BaseKind, KindParts};
-    use crate::loc::{Meta, Point};
+    use crate::loc::Meta;
+    use crate::point::Point;
     use crate::selector::KindSelector;
     use crate::substance::Bin;
     use crate::substance::{FormErrs, Substance};
@@ -266,8 +267,8 @@ pub mod direct {
 
         use crate::command::common::SetProperties;
         use crate::err::SpaceErr;
-        use crate::loc::{Point, PointCtx, PointVar};
         use crate::parse::Env;
+        use crate::point::{Point, PointCtx, PointVar};
         use crate::util::ToResolved;
 
         pub type Set = SetDef<Point>;
@@ -311,8 +312,8 @@ pub mod direct {
 
         use crate::command::common::SetProperties;
         use crate::err::SpaceErr;
-        use crate::loc::{Point, PointCtx, PointVar};
         use crate::parse::Env;
+        use crate::point::{Point, PointCtx, PointVar};
         use crate::util::ToResolved;
 
         pub type Get = GetDef<Point>;
@@ -369,9 +370,10 @@ pub mod direct {
         use crate::command::Command;
         use crate::err::SpaceErr;
         use crate::kind::{BaseKind, KindParts};
-        use crate::loc::{HostKey, Point, PointCtx, PointFactory, PointSeg, PointVar, ToSurface};
+        use crate::loc::{HostKey, PointFactory, ToSurface};
         use crate::parse::model::Subst;
         use crate::parse::{CamelCase, Env, ResolverErr};
+        use crate::point::{Point, PointCtx, PointSeg, PointVar};
         use crate::selector::SpecificSelector;
         use crate::substance::Bin;
         use crate::substance::Substance;
@@ -702,7 +704,7 @@ pub mod direct {
 
         use crate::err::SpaceErr;
         use crate::fail::{BadCoercion, Fail};
-        use crate::loc::Point;
+        use crate::point::Point;
         use crate::parse::Env;
         use crate::particle::Stub;
         use crate::selector::{Hop, HopCtx, HopVar, PointHierarchy, Selector, SelectorDef};
@@ -905,8 +907,8 @@ pub mod direct {
 
         use crate::command::common::SetProperties;
         use crate::err::SpaceErr;
-        use crate::loc::{Point, PointCtx, PointVar};
         use crate::parse::Env;
+        use crate::point::{Point, PointCtx, PointVar};
         use crate::substance::Substance;
         use crate::util::ToResolved;
 
@@ -943,8 +945,8 @@ pub mod direct {
         use serde::{Deserialize, Serialize};
 
         use crate::err::SpaceErr;
-        use crate::loc::{Point, PointCtx, PointVar};
         use crate::parse::Env;
+        use crate::point::{Point, PointCtx, PointVar};
         use crate::substance::Substance;
         use crate::util::ToResolved;
 

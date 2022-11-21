@@ -4,12 +4,13 @@ use crate::loc::ToSurface;
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::exchange::asynch::ProtoTransmitter;
 use crate::wave::DirectedProto;
-use crate::{Bin, BindConfig, Point, SpaceErr, Stub, Substance};
+use crate::{Bin, BindConfig, SpaceErr, Stub, Substance};
 use dashmap::DashMap;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::watch;
+use crate::point::Point;
 
 #[derive(Clone)]
 pub struct ArtifactApi {

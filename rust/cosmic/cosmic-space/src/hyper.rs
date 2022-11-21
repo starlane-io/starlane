@@ -9,7 +9,7 @@ use crate::command::common::StateSrc;
 use crate::config::mechtron::MechtronConfig;
 use crate::err::SpaceErr;
 use crate::kind::{Kind, KindParts, StarSub};
-use crate::loc::{Point, StarKey, Surface, ToPoint, ToSurface};
+use crate::loc::{StarKey, Surface, ToPoint, ToSurface};
 use crate::log::Log;
 use crate::parse::SkewerCase;
 use crate::particle::{Details, Status, Stub};
@@ -22,6 +22,7 @@ use crate::wave::{
     Ping, Pong, ReflectedKind, ReflectedProto, ToRecipients, UltraWave, Wave, WaveId, WaveKind,
 };
 use crate::{Agent, Document};
+use crate::point::Point;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {

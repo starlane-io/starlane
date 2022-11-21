@@ -1,6 +1,6 @@
 [package]
 name = "mechtron-host"
-version = "0.3.4"
+version = "0.3.6"
 
 authors = ["Scott Williams <scott@starlane.io>"]
 edition = "2021"
@@ -14,7 +14,7 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cosmic-space = { path= "../../cosmic/cosmic-space" ,version = "0.3.4"}
+cosmic-space = { path= "../../cosmic/cosmic-space" ,version = "0.3.6"}
 threadpool = "1.8.1"
 wasmer = "2.3.0"
 wasmer-compiler-singlepass = "2.3.0"

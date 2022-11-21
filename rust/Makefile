@@ -14,14 +14,13 @@ version:
 publish-dry-run-impl: 
 	rustup default stable
 	$(MAKE) -C cosmic publish-dry-run
-	$(MAKE) -C mechtron publish-dry-run
 	$(MAKE) -C starlane/starlane publish-dry-run
   
 
 publish-impl:
 	rustup default stable
 	$(MAKE) -C cosmic publish
-	$(MAKE) -C mechtron publish
+	sleep 30
 	$(MAKE) -C starlane/starlane publish
 
 publish-dry-run: version publish-dry-run-impl

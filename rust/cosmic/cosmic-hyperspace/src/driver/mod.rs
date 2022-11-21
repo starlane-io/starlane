@@ -23,7 +23,7 @@ use cosmic_space::config::bind::BindConfig;
 use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{Assign, HyperSubstance, ParticleLocation, ParticleRecord};
 use cosmic_space::kind::{BaseKind, Kind, KindParts, StarSub};
-use cosmic_space::loc::{Layer, Point, Surface, ToPoint, ToSurface};
+use cosmic_space::loc::{Layer, Surface, ToPoint, ToSurface};
 use cosmic_space::log::{PointLogger, Tracker};
 use cosmic_space::parse::bind_config;
 use cosmic_space::particle::traversal::{
@@ -53,7 +53,8 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, oneshot, watch, RwLock};
+use tokio::sync::{mpsc, oneshot, RwLock, watch};
+use cosmic_space::point::Point;
 
 lazy_static! {
     static ref DEFAULT_BIND: ArtRef<BindConfig> = ArtRef::new(

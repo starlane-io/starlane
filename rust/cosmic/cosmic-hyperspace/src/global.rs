@@ -13,7 +13,7 @@ use cosmic_space::config::bind::{BindConfig, RouteSelector};
 use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{Assign, AssignmentKind, HyperSubstance};
 use cosmic_space::kind::Kind;
-use cosmic_space::loc::{Layer, Point, Surface, ToPoint, ToSurface};
+use cosmic_space::loc::{Layer, Surface, ToPoint, ToSurface};
 use cosmic_space::log::{PointLogger, RootLogger};
 use cosmic_space::parse::error::result;
 use cosmic_space::parse::route_attribute;
@@ -35,6 +35,7 @@ use cosmic_space::wave::exchange::SetStrategy;
 use cosmic_space::wave::RecipientSelector;
 use cosmic_space::wave::{Agent, DirectedProto, Handling, Pong, Scope, Wave};
 use cosmic_space::HYPERUSER;
+use cosmic_space::point::Point;
 
 use crate::driver::{
     Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere,
