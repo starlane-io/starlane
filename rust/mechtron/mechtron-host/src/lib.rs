@@ -9,7 +9,7 @@ use cosmic_space::artifact::asynch::{ArtifactApi, ReadArtifactFetcher};
 use cosmic_space::artifact::ArtRef;
 use cosmic_space::config::mechtron::MechtronConfig;
 use cosmic_space::err::SpaceErr;
-use cosmic_space::loc::{Layer, Point, ToSurface};
+use cosmic_space::loc::{Layer, ToSurface};
 use cosmic_space::particle::{Details, Property};
 use cosmic_space::substance::Bin;
 use cosmic_space::wave::DirectedWave;
@@ -38,7 +38,8 @@ use std::{sync, thread};
 use threadpool::ThreadPool;
 use tokio::runtime::Handle;
 use tokio::sync::mpsc;
-use wasmer::{imports, Array, Instance, Module, Store, Value, WasmPtr, WasmerEnv};
+use wasmer::{Array, imports, Instance, Module, Store, Value, WasmerEnv, WasmPtr};
+use cosmic_space::point::Point;
 
 #[derive(Clone)]
 pub struct HostsApi {
@@ -833,7 +834,7 @@ impl WasmHost {
 pub mod test {
     use crate::HostsRunner;
     use cosmic_space::artifact::asynch::MapFetcher;
-    use cosmic_space::loc::Point;
+    use cosmic_space::point::Point;
     use cosmic_space::particle::Details;
     use std::fs;
     use std::str::FromStr;

@@ -29,11 +29,12 @@ use command::direct::select::{Select, SubSelect};
 use config::bind::BindConfig;
 use config::Document;
 use kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind};
-use loc::{Point, Surface, Uuid};
+use loc::{Surface, Uuid};
 use particle::{Details, Properties, Status, Stub};
+use point::Point;
 use selector::Selector;
 use substance::Bin;
-use substance::{Substance, SubstanceList, ToSubstance, Token};
+use substance::{Substance, SubstanceList, Token, ToSubstance};
 use wave::core::ReflectedCore;
 
 use crate::err::SpaceErr;

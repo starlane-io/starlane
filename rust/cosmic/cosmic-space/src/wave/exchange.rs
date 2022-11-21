@@ -14,7 +14,7 @@ use dashmap::DashMap;
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 use crate::config::bind::RouteSelector;
-use crate::loc::{ToPoint, ToSurface, Topic};
+use crate::loc::{Topic, ToPoint, ToSurface};
 use crate::log::{PointLogger, RootLogger, SpanLogger};
 use crate::settings::Timeouts;
 use crate::wave::core::cmd::CmdMethod;
@@ -23,10 +23,11 @@ use crate::wave::core::{CoreBounce, Method};
 use crate::wave::exchange::asynch::AsyncRouter;
 use crate::wave::{
     Bounce, BounceBacks, BounceProto, DirectedProto, DirectedWave, Echo, FromReflectedAggregate,
-    Handling, Pong, RecipientSelector, Recipients, ReflectedAggregate, ReflectedProto,
+    Handling, Pong, Recipients, RecipientSelector, ReflectedAggregate, ReflectedProto,
     ReflectedWave, Scope, Session, ToRecipients, UltraWave, Wave, WaveId,
 };
-use crate::{wave, Agent, Point, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
+use crate::{Agent, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance, wave};
+use crate::point::Point;
 
 #[derive(Clone)]
 pub struct DirectedHandlerShellDef<D, T> {

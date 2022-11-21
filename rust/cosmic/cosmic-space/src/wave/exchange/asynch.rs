@@ -14,13 +14,14 @@ use crate::wave::{
     FromReflectedAggregate, Handling, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto,
     ReflectedWave, Scope, UltraWave, Wave, WaveId,
 };
-use crate::{Agent, Point, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
+use crate::{Agent, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
 use alloc::borrow::Cow;
 use dashmap::{DashMap, DashSet};
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
+use crate::point::Point;
 
 #[async_trait]
 impl Router for TxRouter {

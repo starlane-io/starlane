@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
-use futures::future::{join_all, select_all, BoxFuture};
+use futures::future::{BoxFuture, join_all, select_all};
 use futures::FutureExt;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::error::RecvError;
@@ -27,10 +27,11 @@ use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{InterchangeKind, Knock};
 use cosmic_space::kind::StarSub;
 use cosmic_space::loc::{
-    ConstellationName, Layer, MachineName, Point, StarHandle, StarKey, Surface, ToPoint, ToSurface,
+    ConstellationName, Layer, MachineName, StarHandle, StarKey, Surface, ToPoint, ToSurface,
 };
 use cosmic_space::log::{PointLogger, RootLogger};
 use cosmic_space::particle::{Status, Stub};
+use cosmic_space::point::Point;
 use cosmic_space::settings::Timeouts;
 use cosmic_space::substance::{Bin, Substance};
 use cosmic_space::wave::core::cmd::CmdMethod;
