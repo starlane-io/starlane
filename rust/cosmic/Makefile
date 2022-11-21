@@ -26,15 +26,15 @@ publish-dry-run:
 publish:
 	$(MAKE) -C cosmic-nom publish
 	$(MAKE) -C cosmic-macros-primitive publish
-	sleep 60
+	sleep 15 
 	$(MAKE) -C cosmic-space publish
-	sleep 60
+	sleep 15 
 	$(MAKE) -C cosmic-macros publish
-	sleep 60
+	sleep 15 
 	$(MAKE) -C cosmic-hyperlane publish
-	sleep 60
+	sleep 15 
 	$(MAKE) -C cosmic-hyperlane-tcp publish
-	sleep 60
+	sleep 15
 	$(MAKE) -C ../mechtron/mechtron-host publish
 	$(MAKE) -C ../mechtron/mechtron publish
 	$(MAKE) -C cosmic-hyperspace publish
