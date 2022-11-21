@@ -20,6 +20,7 @@ publish-dry-run-impl:
 publish-impl:
 	rustup default stable
 	$(MAKE) -C cosmic publish
+	sleep 15
 	$(MAKE) -C starlane/starlane publish
 
 publish-dry-run: version publish-dry-run-impl
