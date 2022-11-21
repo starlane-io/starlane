@@ -8783,6 +8783,7 @@ pub mod cmd_test {
         assert!(!result(point_selector(new_span("*"))).unwrap().matches(&fae ));
         assert!(result(point_selector(new_span("*:dra"))).unwrap().matches(&fae ));
         assert!(!result(point_selector(new_span("*:dra"))).unwrap().matches(&less ));
+        assert!(result(point_selector(new_span("fae:*"))).unwrap().matches(&fae));
         assert!(result(point_selector(new_span("**<User>"))).unwrap().matches(&fae));
         assert!(!result(point_selector(new_span("**<User>"))).unwrap().matches(&less));
         assert!(result(point_selector(new_span("**"))).unwrap().matches(&less));
