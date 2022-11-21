@@ -441,8 +441,11 @@ impl PointSegSelector {
             PointSegSelector::InclusiveRecursive => true,
             PointSegSelector::Any => true,
             PointSegSelector::Recursive => true,
-            PointSegSelector::Exact(exact) => match exact {
-                ExactPointSeg::PointSeg(pattern) => *pattern == *segment,
+            PointSegSelector::Exact(exact) => {
+                match exact {
+                ExactPointSeg::PointSeg(pattern) => {
+                    pattern.to_string() == segment.to_string()
+                },
                 ExactPointSeg::Version(a) => {
                     if let PointSeg::Version(b) = segment {
                         *a == *b
@@ -450,7 +453,7 @@ impl PointSegSelector {
                         false
                     }
                 }
-            },
+            }},
             PointSegSelector::Version(req) => {
                 if let PointSeg::Version(b) = segment {
                     req.matches(b)
@@ -679,6 +682,11 @@ pub struct HopDef<Segment, KindSelector> {
 
 impl Hop {
     pub fn matches(&self, point_kind_segment: &PointKindSeg) -> bool {
+/*println!("point-kind_segment: {}",point_kind_segment.segment.to_string());
+println!("segment_selector: {}",self.segment_selector.to_string());
+println!("\tmatch {}",self.segment_selector.matches(&point_kind_segment.segment));
+
+ */
         self.segment_selector.matches(&point_kind_segment.segment)
             && self.kind_selector.matches(&point_kind_segment.kind)
     }

@@ -8486,6 +8486,134 @@ pub fn rec_script_line<I: Span>(input: I) -> Res<I, I> {
     recognize(script_line)(input)
 }
 
+
+
+pub fn layer<I: Span>(input: I) -> Res<I, Layer> {
+    let (next, layer) = recognize(camel_case)(input.clone())?;
+    match Layer::from_str(layer.to_string().as_str()) {
+        Ok(layer) => Ok((next, layer)),
+        Err(err) => Err(nom::Err::Error(ErrorTree::from_error_kind(
+            input,
+            ErrorKind::Alpha,
+        ))),
+    }
+}
+
+fn topic_uuid<I: Span>(input: I) -> Res<I, Topic> {
+    delimited(tag("Topic<Uuid>("), parse_uuid, tag(")"))(input)
+        .map(|(next, uuid)| ((next, Topic::Uuid(uuid))))
+}
+
+fn topic_cli<I: Span>(input: I) -> Res<I, Topic> {
+    value(Topic::Cli, tag("Topic<Cli>"))(input)
+}
+
+fn topic_path<I: Span>(input: I) -> Res<I, Topic> {
+    delimited(tag("Topic<Path>("), many1(skewer_case), tag(")"))(input)
+        .map(|(next, segments)| ((next, Topic::Path(segments))))
+}
+
+fn topic_any<I: Span>(input: I) -> Res<I, Topic> {
+    context("Topic<*>", value(Topic::Any, tag("Topic<*>")))(input)
+}
+
+fn topic_not<I: Span>(input: I) -> Res<I, Topic> {
+    context("Topic<Not>", value(Topic::Not, tag("Topic<!>")))(input)
+}
+
+pub fn topic_none<I: Span>(input: I) -> Res<I, Topic> {
+    Ok((input, Topic::None))
+}
+
+pub fn topic<I: Span>(input: I) -> Res<I, Topic> {
+    context(
+        "topic",
+        alt((topic_cli, topic_path, topic_uuid, topic_any, topic_not)),
+    )(input)
+}
+
+pub fn topic_or_none<I: Span>(input: I) -> Res<I, Topic> {
+    context("topic_or_none", alt((topic, topic_none)))(input)
+}
+
+pub fn plus_topic_or_none<I: Span>(input: I) -> Res<I, Topic> {
+    context(
+        "plus_topic_or_none",
+        alt((preceded(tag("+"), topic), topic_none)),
+    )(input)
+}
+
+pub fn port<I: Span>(input: I) -> Res<I, Surface> {
+    let (next, (point, layer, topic)) = context(
+        "port",
+        tuple((
+            terminated(tw(point_var), tag("@")),
+            layer,
+            plus_topic_or_none,
+        )),
+    )(input.clone())?;
+
+    match point.w.collapse() {
+        Ok(point) => Ok((next, Surface::new(point, layer, topic))),
+        Err(err) => {
+            let err = ErrorTree::from_error_kind(input.clone(), ErrorKind::Alpha);
+            let loc = input.slice(point.trace.range);
+            Err(nom::Err::Error(ErrorTree::add_context(
+                loc,
+                "resolver-not-available",
+                err,
+            )))
+        }
+    }
+}
+
+pub type SurfaceSelectorVal = SurfaceSelectorDef<Hop, VarVal<Topic>, VarVal<ValuePattern<Layer>>>;
+pub type SurfaceSelectorCtx = SurfaceSelectorDef<Hop, Topic, ValuePattern<Layer>>;
+pub type SurfaceSelector = SurfaceSelectorDef<Hop, Topic, ValuePattern<Layer>>;
+
+pub struct SurfaceSelectorDef<Hop, Topic, Layer> {
+    point: SelectorDef<Hop>,
+    topic: Topic,
+    layer: Layer,
+}
+
+pub struct KindLex {
+    pub base: CamelCase,
+    pub sub: Option<CamelCase>,
+    pub specific: Option<Specific>,
+}
+
+impl TryInto<KindParts> for KindLex {
+    type Error = SpaceErr;
+
+    fn try_into(self) -> Result<KindParts, Self::Error> {
+        Ok(KindParts {
+            base: BaseKind::try_from(self.base)?,
+            sub: self.sub,
+            specific: self.specific,
+        })
+    }
+}
+
+pub fn expect<I,O,F>( mut f: F ) -> impl FnMut(I) -> Res<I,O> where F: FnMut(I) -> Res<I,O>+Copy{
+    move |i: I| {
+        f(i).map_err( |e| {
+            match e {
+                Err::Incomplete(i) => {
+                    Err::Incomplete(i)
+                }
+                Err::Error(e) => {
+                    Err::Failure(e)
+                }
+                Err::Failure(e) => {
+                    Err::Failure(e)
+                }
+            }
+        })
+    }
+}
+
+
 #[cfg(test)]
 pub mod cmd_test {
     use core::str::FromStr;
@@ -8498,11 +8626,12 @@ pub mod cmd_test {
     use crate::command::{Command, CommandVar};
     use crate::err::SpaceErr;
     use crate::parse::error::result;
-    use crate::parse::{
-        CamelCase, command, create_command, publish_command, script, upload_blocks,
-    };
+    use crate::parse::{CamelCase, command, consume_point, create_command, point_selector, publish_command, script, upload_blocks};
     use crate::util::ToResolved;
     use crate::{BaseKind, KindTemplate, SetProperties};
+    use crate::kind::Kind;
+    use crate::point::{PointSeg, RouteSeg};
+    use crate::selector::{PointHierarchy, PointKindSeg};
 
     /*
     #[mem]
@@ -8629,129 +8758,37 @@ pub mod cmd_test {
 
         Ok(())
     }
-}
 
-pub fn layer<I: Span>(input: I) -> Res<I, Layer> {
-    let (next, layer) = recognize(camel_case)(input.clone())?;
-    match Layer::from_str(layer.to_string().as_str()) {
-        Ok(layer) => Ok((next, layer)),
-        Err(err) => Err(nom::Err::Error(ErrorTree::from_error_kind(
-            input,
-            ErrorKind::Alpha,
-        ))),
-    }
-}
+    #[test]
+    pub fn test_selector() {
+        let less = PointHierarchy::new(RouteSeg::Local, vec![PointKindSeg {
+            segment: PointSeg::Base("less".to_string()),
+            kind: Kind::Base
+        }]
+        );
 
-fn topic_uuid<I: Span>(input: I) -> Res<I, Topic> {
-    delimited(tag("Topic<Uuid>("), parse_uuid, tag(")"))(input)
-        .map(|(next, uuid)| ((next, Topic::Uuid(uuid))))
-}
+        let fae = PointHierarchy::new(RouteSeg::Local, vec![PointKindSeg {
+            segment: PointSeg::Base("fae".to_string()),
+            kind: Kind::Base
+        },
+        PointKindSeg {
+            segment: PointSeg::Base("dra".to_string()),
+            kind: Kind::User
+        }]
+        );
 
-fn topic_cli<I: Span>(input: I) -> Res<I, Topic> {
-    value(Topic::Cli, tag("Topic<Cli>"))(input)
-}
 
-fn topic_path<I: Span>(input: I) -> Res<I, Topic> {
-    delimited(tag("Topic<Path>("), many1(skewer_case), tag(")"))(input)
-        .map(|(next, segments)| ((next, Topic::Path(segments))))
-}
+        assert!(result(point_selector(new_span("less"))).unwrap().matches(&less));
+        assert!(result(point_selector(new_span("*"))).unwrap().matches(&less));
+        assert!(!result(point_selector(new_span("*"))).unwrap().matches(&fae ));
+        assert!(result(point_selector(new_span("*:dra"))).unwrap().matches(&fae ));
+        assert!(!result(point_selector(new_span("*:dra"))).unwrap().matches(&less ));
+        assert!(result(point_selector(new_span("**<User>"))).unwrap().matches(&fae));
+        assert!(!result(point_selector(new_span("**<User>"))).unwrap().matches(&less));
+        assert!(result(point_selector(new_span("**"))).unwrap().matches(&less));
+        assert!(result(point_selector(new_span("**"))).unwrap().matches(&fae));
+        assert!(!result(point_selector(new_span("**<Base>"))).unwrap().matches(&fae));
 
-fn topic_any<I: Span>(input: I) -> Res<I, Topic> {
-    context("Topic<*>", value(Topic::Any, tag("Topic<*>")))(input)
-}
-
-fn topic_not<I: Span>(input: I) -> Res<I, Topic> {
-    context("Topic<Not>", value(Topic::Not, tag("Topic<!>")))(input)
-}
-
-pub fn topic_none<I: Span>(input: I) -> Res<I, Topic> {
-    Ok((input, Topic::None))
-}
-
-pub fn topic<I: Span>(input: I) -> Res<I, Topic> {
-    context(
-        "topic",
-        alt((topic_cli, topic_path, topic_uuid, topic_any, topic_not)),
-    )(input)
-}
-
-pub fn topic_or_none<I: Span>(input: I) -> Res<I, Topic> {
-    context("topic_or_none", alt((topic, topic_none)))(input)
-}
-
-pub fn plus_topic_or_none<I: Span>(input: I) -> Res<I, Topic> {
-    context(
-        "plus_topic_or_none",
-        alt((preceded(tag("+"), topic), topic_none)),
-    )(input)
-}
-
-pub fn port<I: Span>(input: I) -> Res<I, Surface> {
-    let (next, (point, layer, topic)) = context(
-        "port",
-        tuple((
-            terminated(tw(point_var), tag("@")),
-            layer,
-            plus_topic_or_none,
-        )),
-    )(input.clone())?;
-
-    match point.w.collapse() {
-        Ok(point) => Ok((next, Surface::new(point, layer, topic))),
-        Err(err) => {
-            let err = ErrorTree::from_error_kind(input.clone(), ErrorKind::Alpha);
-            let loc = input.slice(point.trace.range);
-            Err(nom::Err::Error(ErrorTree::add_context(
-                loc,
-                "resolver-not-available",
-                err,
-            )))
-        }
-    }
-}
-
-pub type SurfaceSelectorVal = SurfaceSelectorDef<Hop, VarVal<Topic>, VarVal<ValuePattern<Layer>>>;
-pub type SurfaceSelectorCtx = SurfaceSelectorDef<Hop, Topic, ValuePattern<Layer>>;
-pub type SurfaceSelector = SurfaceSelectorDef<Hop, Topic, ValuePattern<Layer>>;
-
-pub struct SurfaceSelectorDef<Hop, Topic, Layer> {
-    point: SelectorDef<Hop>,
-    topic: Topic,
-    layer: Layer,
-}
-
-pub struct KindLex {
-    pub base: CamelCase,
-    pub sub: Option<CamelCase>,
-    pub specific: Option<Specific>,
-}
-
-impl TryInto<KindParts> for KindLex {
-    type Error = SpaceErr;
-
-    fn try_into(self) -> Result<KindParts, Self::Error> {
-        Ok(KindParts {
-            base: BaseKind::try_from(self.base)?,
-            sub: self.sub,
-            specific: self.specific,
-        })
-    }
-}
-
-pub fn expect<I,O,F>( mut f: F ) -> impl FnMut(I) -> Res<I,O> where F: FnMut(I) -> Res<I,O>+Copy{
-    move |i: I| {
-        f(i).map_err( |e| {
-            match e {
-                Err::Incomplete(i) => {
-                    Err::Incomplete(i)
-                }
-                Err::Error(e) => {
-                    Err::Failure(e)
-                }
-                Err::Failure(e) => {
-                    Err::Failure(e)
-                }
-            }
-        })
+        let less = result(point_selector(new_span("less"))).unwrap();
     }
 }

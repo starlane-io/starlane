@@ -1,7 +1,8 @@
 use core::str::FromStr;
 use cosmic_nom::{new_span, Trace};
 use nom::combinator::all_consuming;
-use serde_derive::{derive_deserialize as Deserialize, derive_serialize as Serialize};
+use serde::{Serialize,Deserialize};
+
 use crate::err::{ParseErrs, SpaceErr};
 use crate::{ANONYMOUS, HYPERUSER};
 use crate::loc::{CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE, LOCAL_PORTAL, PointSegment, PointSegQuery, REMOTE_ENDPOINT, RouteSegQuery, Surface, ToPoint, ToSurface, Variable, Version};
