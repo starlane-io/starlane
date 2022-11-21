@@ -1,6 +1,6 @@
 [package]
 name = "cosmic-macros-primitive"
-version = "0.3.6-rc4"
+version = "0.3.6-rc5"
 edition = "2021"
 
 authors = ["Scott Williams <scott@starlane.io>"]
