@@ -75,7 +75,7 @@ use cosmic_hyperspace::mem::registry::{MemRegApi, MemRegCtx};
 use cosmic_space::loc;
 use cosmic_space::point::Point;
 use cosmic_space::wasm::Timestamp;
-use crate::keycloak::KeycloakDriverFactory;
+use crate::keycloak::{KeycloakDriverFactory, UserDriverFactory};
 
 fn main() -> Result<(), StarErr> {
     ctrlc::set_handler(move || {
@@ -229,6 +229,7 @@ impl Cosmos for Starlane {
                 #[cfg(feature="keycloak")]
                 {
                     builder.add_post(Arc::new(KeycloakDriverFactory::new()));
+                    builder.add_post(Arc::new(UserDriverFactory::new()));
                 }
             }
             StarSub::Machine => {

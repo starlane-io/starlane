@@ -173,3 +173,170 @@ impl <P> ItemHandler<P> for Keycloak<P> where P: Cosmos{
 }
 
 
+
+
+/// blah
+///
+///
+///
+lazy_static! {
+    static ref USER_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
+        Arc::new(user_bind()),
+        Point::from_str("GLOBAL::repo:1.0.0:/bind/user.bind").unwrap()
+    );
+}
+
+fn user_bind() -> BindConfig {
+    log(bind_config(
+        r#"
+    Bind(version=1.0.0)
+    {
+        Route -> {
+        }
+    }
+    "#,
+    ))
+        .unwrap()
+}
+
+pub struct UserDriverFactory;
+
+impl UserDriverFactory {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait]
+impl<P> HyperDriverFactory<P> for UserDriverFactory
+    where
+        P: Cosmos,
+{
+    fn kind(&self) -> KindSelector {
+        KindSelector::from_base(BaseKind::User)
+    }
+
+    async fn create(
+        &self,
+        skel: HyperStarSkel<P>,
+        driver_skel: DriverSkel<P>,
+        ctx: DriverCtx,
+    ) -> Result<Box<dyn Driver<P>>, P::Err> {
+        let skel = HyperSkel::new(skel, driver_skel);
+        Ok(Box::new(UserDriver::new(skel, ctx)))
+    }
+}
+
+
+pub struct UserDriver<P>
+    where
+        P: Cosmos,
+{
+    skel: HyperSkel<P>,
+    ctx: DriverCtx,
+}
+
+#[handler]
+impl<P> UserDriver<P>
+    where
+        P: Cosmos,
+{
+    pub fn new(skel: HyperSkel<P>, ctx: DriverCtx) -> Self {
+        Self { skel, ctx }
+    }
+}
+
+#[async_trait]
+impl<P> Driver<P> for UserDriver<P>
+    where
+        P: Cosmos,
+{
+    fn kind(&self) -> Kind {
+        Kind::User(UserVariant::OAuth(Specific::from_str("starlane.io:redhat.com:keycloak:community:18.0.0").unwrap()))
+    }
+
+    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+        let record = self.skel.driver.locate(point).await?;
+        let skel = ItemSkel::new(point.clone(), record.details.stub.kind, self.skel.driver.clone());
+        Ok(ItemSphere::Handler(Box::new(User::restore(skel,(),()))))
+    }
+
+    async fn handler(&self) -> Box<dyn DriverHandler<P>> {
+        Box::new(UserDriverHandler::restore(
+            self.skel.clone(),
+            self.ctx.clone(),
+        ))
+    }
+}
+
+pub struct UserDriverHandler<P>
+    where
+        P: Cosmos,
+{
+    skel: HyperSkel<P>,
+    ctx: DriverCtx,
+}
+
+impl<P> UserDriverHandler<P>
+    where
+        P: Cosmos,
+{
+    fn restore(skel: HyperSkel<P>, ctx: DriverCtx) -> Self {
+        Self { skel, ctx }
+    }
+}
+
+impl<P> DriverHandler<P> for UserDriverHandler<P> where P: Cosmos {}
+
+#[handler]
+impl<P> UserDriverHandler<P>
+    where
+        P: Cosmos,
+{
+
+    #[route("Hyp<Assign>")]
+    async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
+        Ok(())
+    }
+}
+
+
+pub struct User<P>
+    where
+        P: Cosmos,
+{
+    skel: ItemSkel<P>,
+}
+
+#[handler]
+impl<P> User<P>
+    where
+        P: Cosmos,
+{
+
+}
+
+impl<P> Item<P> for User<P>
+    where
+        P: Cosmos,
+{
+    type Skel = ItemSkel<P>;
+    type Ctx = ();
+    type State = ();
+
+    fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self {
+        Self { skel }
+    }
+}
+
+#[async_trait]
+impl <P> ItemHandler<P> for User<P> where P: Cosmos{
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+        Ok( USER_BIND_CONFIG.clone() )
+    }
+}
+
+
+
+
+
