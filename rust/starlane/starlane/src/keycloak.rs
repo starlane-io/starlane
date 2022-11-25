@@ -16,9 +16,9 @@ use cosmic_space::util::log;
 use std::sync::Arc;
 
 lazy_static! {
-    static ref AUTH_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
+    static ref KEYCLOAK_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
         Arc::new(auth_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/auth.bind").unwrap()
+        Point::from_str("GLOBAL::repo:1.0.0:/bind/keycloak.bind").unwrap()
     );
 }
 
@@ -64,7 +64,7 @@ impl<P> HyperDriverFactory<P> for KeycloakDriverFactory
 }
 
 
- pub struct KeycloakDriver<P>
+pub struct KeycloakDriver<P>
 where
     P: Cosmos,
 {
@@ -83,13 +83,12 @@ where
 }
 
 #[async_trait]
-
 impl<P> Driver<P> for KeycloakDriver<P>
 where
     P: Cosmos,
 {
     fn kind(&self) -> Kind {
-        Kind::User(UserVariant::OAuth(Specific::from_str("starlane.io:starlane.io:keycloak:community:1.0.0").unwrap()))
+        Kind::User(UserVariant::OAuth(Specific::from_str("starlane.io:redhat.com:keycloak:community:18.0.0").unwrap()))
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
@@ -169,6 +168,8 @@ impl<P> Item<P> for Keycloak<P>
 #[async_trait]
 impl <P> ItemHandler<P> for Keycloak<P> where P: Cosmos{
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
-        Ok( AUTH_BIND_CONFIG.clone() )
+        Ok( KEYCLOAK_BIND_CONFIG.clone() )
     }
 }
+
+

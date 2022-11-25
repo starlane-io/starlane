@@ -193,7 +193,7 @@ where
                             Kind::User(UserVariant::Account)
                         }
                         what => {
-                            Err::<(),SpaceErr>(format!("SubKind '{}' not recognized", sub.as_str()).into())?;
+                            Err::<(),SpaceErr>(format!("SubKind '{}' not recognized", what).into())?;
                             unimplemented!()
                         }
                     }
