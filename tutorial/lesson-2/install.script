@@ -2,4 +2,3 @@ create? repo<Repo>;
 create? repo:hello<BundleSeries>;
 publish ^[ bundle.zip ]-> repo:hello:1.0.0;
 create! localhost<Mechtron>{ +config=repo:hello:1.0.0:/config/my-mechtron.mechtron };
-exit;

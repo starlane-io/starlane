@@ -1,17 +1,19 @@
-SUBDIRS = wasm/my-app 
-
-.PHONY: subdirs $(SUBDIRS)
-
-subdirs: $(SUBDIRS)
-
-$(SUBDIRS):
-	$(MAKE) -C $@ all
 
 clean:
-	rm bundle.zip
+	rm -rf target || true
+	rm bundle.zip || true
+	rm bundle/wasm/* || true
 
-zip:
-	cd bundle && zip -r ../bundle.zip . 
 
-all: subdirs zip
+
+all: 
+	cargo +nightly build -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort --release --target wasm32-unknown-unknown
+	mkdir -p bundle/wasm || true
+	cp ./target/wasm32-unknown-unknown/release/hello.wasm  bundle/wasm/hello.wasm
+	cd bundle && zip -r ../bundle.zip .
+
+
+
+
+	
 

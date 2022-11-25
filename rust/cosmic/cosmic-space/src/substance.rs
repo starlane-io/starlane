@@ -259,6 +259,7 @@ impl Substance {
             Substance::Map(map) => map.to_bin(),
             Substance::Bin(bin) => Ok(bin),
             Substance::Text(text) => Ok(Arc::new(text.as_bytes().to_vec())),
+            Substance::Err(err) => Ok(Arc::new(bincode::serialize(&err)?)),
             what => Err(format!("{}.to_bin() not supported", what.kind().to_string()).into()),
         }
     }

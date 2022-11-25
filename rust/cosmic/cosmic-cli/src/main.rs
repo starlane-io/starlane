@@ -13,7 +13,7 @@ use cosmic_hyperlane::test_util::SingleInterchangePlatform;
 use cosmic_hyperlane::HyperwayEndpointFactory;
 use cosmic_hyperlane_tcp::HyperlaneTcpClient;
 use cosmic_hyperspace::driver::control::{ControlClient, ControlCliSession};
-use cosmic_nom::new_span;
+use cosmic_nom::{new_span, Span};
 use cosmic_space::command::{CmdTransfer, Command, RawCommand};
 use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{InterchangeKind, Knock};
@@ -28,10 +28,10 @@ use std::fs::File;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use std::{
-    io::{Cursor, Read, Seek, Write},
-    path::Path,
-};
+use std::{fs, io::{Cursor, Read, Seek, Write}, io, path::Path};
+use std::io::BufRead;
+use nom::bytes::complete::{is_not, tag};
+use nom::multi::{separated_list0, separated_list1};
 use walkdir::{DirEntry, WalkDir};
 use zip::{result::ZipError, write::FileOptions};
 use cosmic_space::point::Point;
@@ -61,31 +61,37 @@ async fn main() -> Result<(), SpaceErr> {
                 .required(false)
                 .default_value(format!("{}/.starlane/localhost/certs", home_dir).as_str()),
         )
-        .subcommand(ClapCommand::new("script"))
+        .subcommand(ClapCommand::new("script").arg(Arg::new("filename")))
         .allow_external_subcommands(true)
         .get_matches();
 
     let host = matches.get_one::<String>("host").unwrap().clone();
     let certs = matches.get_one::<String>("certs").unwrap().clone();
-    let session = Session::new(host, certs).await?;
 
     if matches.subcommand_name().is_some() {
-        session.command(matches.subcommand_name().unwrap()).await
-    } else {
-        loop {
-            let line: String = text_io::try_read!("{};").map_err(|e| SpaceErr::new(500, "err"))?;
+        match matches.subcommand().unwrap() {
+            ("script", args) => {
+                let filename: &String= args.get_one("filename").unwrap();
+                let script = fs::read_to_string(filename)?;
+                let lines :Vec<String> = result(separated_list0(tag(";"), is_not(";"))(new_span(script.as_str())))?.into_iter().map(|i|i.to_string()).filter(|i|!i.trim().is_empty()).collect();
+                let session = Session::new(host, certs).await?;
+                for line in lines {
+                    session.command(line.as_str()).await?;
+                }
 
-            let line_str = line.trim();
-
-            if "exit" == line_str {
-                return Ok(());
+                Ok(())
             }
-            println!("> {}", line_str);
-            session.command(line.as_str()).await?;
+            (subcommand,args) => {
+                let session = Session::new(host, certs).await?;
+                session.command(subcommand).await
+            }
         }
+    } else {
         Ok(())
     }
 }
+
+
 
 pub struct Session {
     pub client: ControlClient,

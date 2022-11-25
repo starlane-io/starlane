@@ -1,10 +1,6 @@
-Bind {
-
-  Http {
-
-    <Get>/(.*) -> localhost:repo:tutorial:2.0.0:/html/$1 => &;
-    <Get>/app/(.*) -> localhost:my-app^Http<Get>/$1 => &;
-
+Bind(version=1.0.0)
+{
+  Route -> {
+    Http<Get>/users/(?P<user>.*$) -> profiles:${user} => &;
   }
-
 }

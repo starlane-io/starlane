@@ -65,6 +65,7 @@ fn artifact_bind() -> BindConfig {
     {
         Route -> {
            Http<Get> -> (()) => &;
+
         }
     }
     "#,

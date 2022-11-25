@@ -14,7 +14,7 @@ extern crate cosmic_macros_primitive;
 
 use cosmic_macros::handler_sync;
 use cosmic_space::err::SpaceErr;
-use cosmic_space::loc::Point;
+use cosmic_space::point::Point;
 use cosmic_space::log::{PointLogger, RootLogger};
 use cosmic_space::particle::Details;
 use cosmic_space::substance::Substance;
