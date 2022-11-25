@@ -1,6 +1,12 @@
+VERSION := $(shell cat VERSION)
+
 build-docker:
-	docker build . --tag starlane/starlane:latest
-	docker push starlane/starlane:latest
+	docker build . --tag starlane/starlane:${VERSION}
+	docker build . --tag starlane/starlane-k8s:${VERSION} --build-arg FEATURES=k8s
+
+push: build-docker
+	docker push starlane/starlane:${VERSION}
+	docker push starlane/starlane-k8s:${VERSION}
 
 build-ctrl:
 	$(MAKE) -C kubernetes/ctrl

@@ -1,4 +1,5 @@
 FROM rust
+ARG FEATURES=none
 
 USER root
 
@@ -8,7 +9,7 @@ COPY rust /rust
 
 WORKDIR /rust
 
-RUN cd starlane/starlane && cargo install --path . --features postgres --root /target starlane 
+RUN cd starlane/starlane && cargo install --path . --features $FEATURES --root /target starlane 
 RUN cd cosmic/cosmic-cli && cargo install --path . --root /target cosmic-cli
 
 FROM ubuntu
