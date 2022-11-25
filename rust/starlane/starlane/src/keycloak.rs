@@ -1,27 +1,32 @@
-use std::collections::HashMap;
-use std::marker::PhantomData;
-use std::str::FromStr;
-use cosmic_hyperspace::Cosmos;
-use cosmic_hyperspace::driver::{Driver, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, HyperSkel, Item, ItemHandler, ItemSkel, ItemSphere};
+use crate::err::StarlaneErr;
+use cosmic_hyperspace::driver::{
+    Driver, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, HyperSkel, Item, ItemHandler,
+    ItemSkel, ItemSphere,
+};
+use cosmic_hyperspace::err::HyperErr;
 use cosmic_hyperspace::star::HyperStarSkel;
+use cosmic_hyperspace::Cosmos;
+use cosmic_space::artifact::ArtRef;
+use cosmic_space::config::bind::BindConfig;
 use cosmic_space::hyper::HyperSubstance;
-use cosmic_space::kind::{UserVariant, BaseKind, Kind, Specific};
+use cosmic_space::kind::{BaseKind, Kind, Specific, UserVariant};
+use cosmic_space::parse::bind_config;
 use cosmic_space::point::Point;
 use cosmic_space::selector::{KindSelector, Selector};
 use cosmic_space::substance::Substance;
-use cosmic_space::wave::exchange::asynch::InCtx;
-use cosmic_hyperspace::err::HyperErr;
-use cosmic_space::artifact::ArtRef;
-use cosmic_space::config::bind::BindConfig;
-use cosmic_space::parse::bind_config;
 use cosmic_space::util::log;
-use std::sync::Arc;
+use cosmic_space::wave::exchange::asynch::InCtx;
+use keycloak::types::{
+    CredentialRepresentation, ProtocolMapperRepresentation, RealmRepresentation, UserRepresentation,
+};
 use keycloak::{KeycloakAdmin, KeycloakAdminToken};
-use keycloak::types::{CredentialRepresentation, ProtocolMapperRepresentation, RealmRepresentation, UserRepresentation};
-use validator::validate_email;
-use serde_json::{json, Value};
 use mechtron_host::err::HostErr;
-use crate::err::StarlaneErr;
+use serde_json::{json, Value};
+use std::collections::HashMap;
+use std::marker::PhantomData;
+use std::str::FromStr;
+use std::sync::Arc;
+use validator::validate_email;
 
 lazy_static! {
     static ref KEYCLOAK_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -40,7 +45,7 @@ fn auth_bind() -> BindConfig {
     }
     "#,
     ))
-        .unwrap()
+    .unwrap()
 }
 
 pub struct KeycloakDriverFactory;
@@ -53,9 +58,9 @@ impl KeycloakDriverFactory {
 
 #[async_trait]
 impl<P> HyperDriverFactory<P> for KeycloakDriverFactory
-    where
-        P: Cosmos,
-        P::Err: StarlaneErr
+where
+    P: Cosmos,
+    P::Err: StarlaneErr,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_str("<User<OAuth>>").unwrap()
@@ -68,10 +73,11 @@ impl<P> HyperDriverFactory<P> for KeycloakDriverFactory
         ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
         let skel = HyperSkel::new(skel, driver_skel);
-        Ok(Box::new(log(KeycloakDriver::new(skel, ctx).await.map_err(|e|e.to_space_err()))? ))
+        Ok(Box::new(log(KeycloakDriver::new(skel, ctx)
+            .await
+            .map_err(|e| e.to_space_err()))?))
     }
 }
-
 
 pub struct KeycloakDriver<P>
 where
@@ -79,17 +85,17 @@ where
 {
     skel: HyperSkel<P>,
     ctx: DriverCtx,
-    admin: StarlaneKeycloakAdmin<P>
+    admin: StarlaneKeycloakAdmin<P>,
 }
 
 #[handler]
 impl<P> KeycloakDriver<P>
 where
     P: Cosmos,
-    P::Err: StarlaneErr
+    P::Err: StarlaneErr,
 {
-    pub async fn new(skel: HyperSkel<P>, ctx: DriverCtx) -> Result<Self,P::Err> {
-       let admin = StarlaneKeycloakAdmin::new().await?;
+    pub async fn new(skel: HyperSkel<P>, ctx: DriverCtx) -> Result<Self, P::Err> {
+        let admin = StarlaneKeycloakAdmin::new().await?;
         Ok(Self { skel, ctx, admin })
     }
 }
@@ -98,23 +104,33 @@ where
 impl<P> Driver<P> for KeycloakDriver<P>
 where
     P: Cosmos,
-    P::Err: StarlaneErr
+    P::Err: StarlaneErr,
 {
     fn kind(&self) -> Kind {
-        Kind::User(UserVariant::OAuth(Specific::from_str("starlane.io:redhat.com:keycloak:community:16.0.1").unwrap()))
+        Kind::User(UserVariant::OAuth(
+            Specific::from_str("starlane.io:redhat.com:keycloak:community:16.0.1").unwrap(),
+        ))
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
         let record = self.skel.driver.locate(point).await?;
-        let skel = ItemSkel::new(point.clone(), record.details.stub.kind, self.skel.driver.clone());
-        Ok(ItemSphere::Handler(Box::new(Keycloak::restore(skel,(),()))))
+        let skel = ItemSkel::new(
+            point.clone(),
+            record.details.stub.kind,
+            self.skel.driver.clone(),
+        );
+        Ok(ItemSphere::Handler(Box::new(Keycloak::restore(
+            skel,
+            (),
+            (),
+        ))))
     }
 
     async fn handler(&self) -> Box<dyn DriverHandler<P>> {
         Box::new(KeycloakDriverHandler::restore(
             self.skel.clone(),
             self.ctx.clone(),
-            self.admin.clone()
+            self.admin.clone(),
         ))
     }
 }
@@ -125,7 +141,7 @@ where
 {
     skel: HyperSkel<P>,
     ctx: DriverCtx,
-    admin: StarlaneKeycloakAdmin<P>
+    admin: StarlaneKeycloakAdmin<P>,
 }
 
 impl<P> KeycloakDriverHandler<P>
@@ -137,48 +153,47 @@ where
     }
 }
 
-impl<P> DriverHandler<P> for KeycloakDriverHandler<P> where P: Cosmos,
+impl<P> DriverHandler<P> for KeycloakDriverHandler<P>
+where
+    P: Cosmos,
 
-
-<P as Cosmos>::Err: StarlaneErr
-{}
+    <P as Cosmos>::Err: StarlaneErr,
+{
+}
 
 #[handler]
 impl<P> KeycloakDriverHandler<P>
 where
     P: Cosmos,
-    <P as Cosmos>::Err: StarlaneErr
+    <P as Cosmos>::Err: StarlaneErr,
 {
-
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
-            self.admin.init_realm_for_point(normalize_realm(&assign.details.stub.point),&assign.details.stub.point).await?;
+            self.admin
+                .init_realm_for_point(
+                    normalize_realm(&assign.details.stub.point),
+                    &assign.details.stub.point,
+                )
+                .await?;
         }
         Ok(())
     }
-
 }
 
-
 pub struct Keycloak<P>
-    where
-        P: Cosmos,
+where
+    P: Cosmos,
 {
     skel: ItemSkel<P>,
 }
 
 #[handler]
-impl<P> Keycloak<P>
-    where
-        P: Cosmos,
-{
-
-}
+impl<P> Keycloak<P> where P: Cosmos {}
 
 impl<P> Item<P> for Keycloak<P>
-    where
-        P: Cosmos,
+where
+    P: Cosmos,
 {
     type Skel = ItemSkel<P>;
     type Ctx = ();
@@ -190,12 +205,14 @@ impl<P> Item<P> for Keycloak<P>
 }
 
 #[async_trait]
-impl <P> ItemHandler<P> for Keycloak<P> where P: Cosmos{
+impl<P> ItemHandler<P> for Keycloak<P>
+where
+    P: Cosmos,
+{
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
-        Ok( KEYCLOAK_BIND_CONFIG.clone() )
+        Ok(KEYCLOAK_BIND_CONFIG.clone())
     }
 }
-
 
 lazy_static! {
     static ref USER_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -214,7 +231,7 @@ fn user_bind() -> BindConfig {
     }
     "#,
     ))
-        .unwrap()
+    .unwrap()
 }
 
 pub struct UserDriverFactory;
@@ -227,8 +244,8 @@ impl UserDriverFactory {
 
 #[async_trait]
 impl<P> HyperDriverFactory<P> for UserDriverFactory
-    where
-        P: Cosmos,
+where
+    P: Cosmos,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_str("<User<Account>>").unwrap()
@@ -245,10 +262,9 @@ impl<P> HyperDriverFactory<P> for UserDriverFactory
     }
 }
 
-
 pub struct UserDriver<P>
-    where
-        P: Cosmos,
+where
+    P: Cosmos,
 {
     skel: HyperSkel<P>,
     ctx: DriverCtx,
@@ -256,8 +272,8 @@ pub struct UserDriver<P>
 
 #[handler]
 impl<P> UserDriver<P>
-    where
-        P: Cosmos,
+where
+    P: Cosmos,
 {
     pub fn new(skel: HyperSkel<P>, ctx: DriverCtx) -> Self {
         Self { skel, ctx }
@@ -266,17 +282,23 @@ impl<P> UserDriver<P>
 
 #[async_trait]
 impl<P> Driver<P> for UserDriver<P>
-    where
-        P: Cosmos,
+where
+    P: Cosmos,
 {
     fn kind(&self) -> Kind {
-        Kind::User(UserVariant::OAuth(Specific::from_str("starlane.io:redhat.com:keycloak:community:18.0.0").unwrap()))
+        Kind::User(UserVariant::OAuth(
+            Specific::from_str("starlane.io:redhat.com:keycloak:community:18.0.0").unwrap(),
+        ))
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
         let record = self.skel.driver.locate(point).await?;
-        let skel = ItemSkel::new(point.clone(), record.details.stub.kind, self.skel.driver.clone());
-        Ok(ItemSphere::Handler(Box::new(User::restore(skel,(),()))))
+        let skel = ItemSkel::new(
+            point.clone(),
+            record.details.stub.kind,
+            self.skel.driver.clone(),
+        );
+        Ok(ItemSphere::Handler(Box::new(User::restore(skel, (), ()))))
     }
 
     async fn handler(&self) -> Box<dyn DriverHandler<P>> {
@@ -288,16 +310,16 @@ impl<P> Driver<P> for UserDriver<P>
 }
 
 pub struct UserDriverHandler<P>
-    where
-        P: Cosmos,
+where
+    P: Cosmos,
 {
     skel: HyperSkel<P>,
     ctx: DriverCtx,
 }
 
 impl<P> UserDriverHandler<P>
-    where
-        P: Cosmos,
+where
+    P: Cosmos,
 {
     fn restore(skel: HyperSkel<P>, ctx: DriverCtx) -> Self {
         Self { skel, ctx }
@@ -308,35 +330,28 @@ impl<P> DriverHandler<P> for UserDriverHandler<P> where P: Cosmos {}
 
 #[handler]
 impl<P> UserDriverHandler<P>
-    where
-        P: Cosmos,
+where
+    P: Cosmos,
 {
-
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
         Ok(())
     }
 }
 
-
 pub struct User<P>
-    where
-        P: Cosmos,
+where
+    P: Cosmos,
 {
     skel: ItemSkel<P>,
 }
 
 #[handler]
-impl<P> User<P>
-    where
-        P: Cosmos,
-{
-
-}
+impl<P> User<P> where P: Cosmos {}
 
 impl<P> Item<P> for User<P>
-    where
-        P: Cosmos,
+where
+    P: Cosmos,
 {
     type Skel = ItemSkel<P>;
     type Ctx = ();
@@ -348,23 +363,29 @@ impl<P> Item<P> for User<P>
 }
 
 #[async_trait]
-impl <P> ItemHandler<P> for User<P> where P: Cosmos{
+impl<P> ItemHandler<P> for User<P>
+where
+    P: Cosmos,
+{
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
-        Ok( USER_BIND_CONFIG.clone() )
+        Ok(USER_BIND_CONFIG.clone())
     }
 }
 
-
-
-
-
 #[derive(Clone)]
-pub struct StarlaneKeycloakAdmin<P> where P: Cosmos {
+pub struct StarlaneKeycloakAdmin<P>
+where
+    P: Cosmos,
+{
     pub admin: Arc<KeycloakAdmin>,
-    phantom: PhantomData<P>
+    phantom: PhantomData<P>,
 }
 
-impl <P> StarlaneKeycloakAdmin<P> where P: Cosmos, P::Err: StarlaneErr{
+impl<P> StarlaneKeycloakAdmin<P>
+where
+    P: Cosmos,
+    P::Err: StarlaneErr,
+{
     pub async fn new() -> Result<Self, P::Err> {
         let url = std::env::var("STARLANE_KEYCLOAK_URL")
             .map_err(|e| "User<Keycloak>: environment variable 'STARLANE_KEYCLOAK_URL' not set.")?;
@@ -376,7 +397,10 @@ impl <P> StarlaneKeycloakAdmin<P> where P: Cosmos, P::Err: StarlaneErr{
         let admin_token = KeycloakAdminToken::acquire(&url, &user, &password, &client).await?;
 
         let admin = Arc::new(KeycloakAdmin::new(&url, admin_token, client));
-        Ok(Self { admin, phantom: Default::default() })
+        Ok(Self {
+            admin,
+            phantom: Default::default(),
+        })
     }
 
     pub async fn get_realm_from_point(&self, realm: &Point) -> Result<RealmRepresentation, P::Err> {
@@ -660,7 +684,7 @@ impl <P> StarlaneKeycloakAdmin<P> where P: Cosmos, P::Err: StarlaneErr{
                 Some(max),
                 None,
                 None,
-                None
+                None,
             )
             .await?)
     }
@@ -688,7 +712,7 @@ impl <P> StarlaneKeycloakAdmin<P> where P: Cosmos, P::Err: StarlaneErr{
                 None,
                 None,
                 Some(username),
-                None
+                None,
             )
             .await?)
     }
@@ -716,7 +740,7 @@ impl <P> StarlaneKeycloakAdmin<P> where P: Cosmos, P::Err: StarlaneErr{
                 None,
                 None,
                 None,
-                None
+                None,
             )
             .await?)
     }
@@ -826,7 +850,7 @@ impl <P> StarlaneKeycloakAdmin<P> where P: Cosmos, P::Err: StarlaneErr{
 }
 
 pub fn is_hyperuser(point: &Point) -> bool {
-    point.to_string().as_str() == "hyperspace:users:hyperuser"
+    Point::hyperuser() == *point
 }
 
 pub fn is_hyper_userbase(point: &Point) -> bool {

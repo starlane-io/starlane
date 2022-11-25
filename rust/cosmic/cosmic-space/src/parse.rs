@@ -181,6 +181,10 @@ pub fn global_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
     tag("GLOBAL")(input).map(|(next, _)| (next, RouteSeg::Global))
 }
 
+pub fn hyper_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
+    tag("HYPER")(input).map(|(next, _)| (next, RouteSeg::Hyper))
+}
+
 pub fn domain_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
     domain_chars(input).map(|(next, domain)| (next, RouteSeg::Domain(domain.to_string())))
 }
@@ -201,6 +205,7 @@ pub fn other_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
         tag_route_segment,
         domain_route_segment,
         global_route_segment,
+        hyper_route_segment,
         local_route_segment,
         remote_route_segment,
     ))(input)

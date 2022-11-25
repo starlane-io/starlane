@@ -21,6 +21,7 @@ pub enum RouteSeg {
     Domain(String),
     Tag(String),
     Star(String),
+    Hyper
 }
 
 impl RouteSegQuery for RouteSeg {
@@ -45,6 +46,7 @@ pub enum RouteSegVar {
     Local,
     Remote,
     Global,
+    Hyper,
     Domain(String),
     Tag(String),
     Star(String),
@@ -85,6 +87,7 @@ impl TryInto<RouteSeg> for RouteSegVar {
                 var.trace.extra,
             )),
             RouteSegVar::Remote => Ok(RouteSeg::Remote),
+            RouteSegVar::Hyper => Ok(RouteSeg::Hyper)
         }
     }
 }
@@ -95,6 +98,7 @@ impl Into<RouteSegVar> for RouteSeg {
             RouteSeg::This => RouteSegVar::This,
             RouteSeg::Local => RouteSegVar::Local,
             RouteSeg::Remote => RouteSegVar::Remote,
+            RouteSeg::Hyper => RouteSegVar::Hyper,
             RouteSeg::Global => RouteSegVar::Global,
             RouteSeg::Domain(domain) => RouteSegVar::Domain(domain),
             RouteSeg::Tag(tag) => RouteSegVar::Tag(tag),
@@ -120,6 +124,7 @@ impl ToString for RouteSegVar {
             Self::Var(var) => {
                 format!("${{{}}}", var.name)
             }
+            RouteSegVar::Hyper => "HYPER".to_string()
         }
     }
 }
@@ -147,6 +152,7 @@ impl ToString for RouteSeg {
             RouteSeg::Global => "GLOBAL".to_string(),
             RouteSeg::Local => "LOCAL".to_string(),
             RouteSeg::Remote => "REMOTE".to_string(),
+            RouteSeg::Hyper => "HYPER".to_string()
         }
     }
 }
@@ -688,6 +694,9 @@ impl ToResolved<PointCtx> for PointVar {
             }
             RouteSegVar::Remote => {
                 rtn.push_str("REMOTE::");
+            }
+            RouteSegVar::Hyper => {
+                rtn.push_str("HYPER::");
             }
         };
 
