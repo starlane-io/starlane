@@ -1,13 +1,23 @@
+use keycloak::KeycloakError;
 use cosmic_hyperspace::err::ErrKind;
 
 #[cfg(feature = "postgres")]
 use cosmic_registry_postgres::err::PostErr;
 
-#[cfg(feature = "postgres")]
+#[cfg(feature="postgres")]
+#[cfg(not(feature="keycloak"))]
 pub trait StarlaneErr: PostErr {}
 
 #[cfg(not(feature = "postgres"))]
 pub trait StarlaneErr {}
+
+#[cfg(feature="keycloak")]
+#[cfg(not(feature="postgres"))]
+pub trait StarlaneErr: From<KeycloakError>{}
+
+#[cfg(feature="keycloak")]
+#[cfg(feature="postgres")]
+pub trait StarlaneErr: PostErr+From<KeycloakError>{}
 
 #[derive(Debug, Clone)]
 pub struct StarErr {
@@ -31,6 +41,7 @@ pub mod convert {
     use std::io;
     use std::str::Utf8Error;
     use std::string::FromUtf8Error;
+    use keycloak::KeycloakError;
     use strum::ParseError;
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
@@ -41,6 +52,15 @@ pub mod convert {
             Self {
                 message: message.to_string(),
                 kind: ErrKind::Default,
+            }
+        }
+    }
+
+    impl From<KeycloakError> for Err {
+        fn from(e: KeycloakError) -> Self {
+            Self{
+                kind: ErrKind::Default,
+                message: e.to_string()
             }
         }
     }

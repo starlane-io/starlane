@@ -5,7 +5,7 @@ use cosmic_hyperspace::star::HyperStarSkel;
 use cosmic_space::hyper::HyperSubstance;
 use cosmic_space::kind::{UserVariant, BaseKind, Kind, Specific};
 use cosmic_space::point::Point;
-use cosmic_space::selector::KindSelector;
+use cosmic_space::selector::{KindSelector, Selector};
 use cosmic_space::substance::Substance;
 use cosmic_space::wave::exchange::asynch::InCtx;
 use cosmic_hyperspace::err::HyperErr;
@@ -14,6 +14,8 @@ use cosmic_space::config::bind::BindConfig;
 use cosmic_space::parse::bind_config;
 use cosmic_space::util::log;
 use std::sync::Arc;
+use keycloak::{KeycloakAdmin, KeycloakAdminToken};
+use crate::err::StarlaneErr;
 
 lazy_static! {
     static ref KEYCLOAK_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -47,9 +49,10 @@ impl KeycloakDriverFactory {
 impl<P> HyperDriverFactory<P> for KeycloakDriverFactory
     where
         P: Cosmos,
+        P::Err: StarlaneErr
 {
     fn kind(&self) -> KindSelector {
-        KindSelector::from_base(BaseKind::User)
+        KindSelector::from_str("<User<OAuth>>").unwrap()
     }
 
     async fn create(
@@ -59,7 +62,7 @@ impl<P> HyperDriverFactory<P> for KeycloakDriverFactory
         ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
         let skel = HyperSkel::new(skel, driver_skel);
-        Ok(Box::new(KeycloakDriver::new(skel, ctx)))
+        Ok(Box::new(KeycloakDriver::new(skel, ctx).await? ))
     }
 }
 
@@ -70,15 +73,27 @@ where
 {
     skel: HyperSkel<P>,
     ctx: DriverCtx,
+    admin: Arc<KeycloakAdmin>
 }
 
 #[handler]
 impl<P> KeycloakDriver<P>
 where
     P: Cosmos,
+    P::Err: StarlaneErr
 {
-    pub fn new(skel: HyperSkel<P>, ctx: DriverCtx) -> Self {
-        Self { skel, ctx }
+    pub async fn new(skel: HyperSkel<P>, ctx: DriverCtx) -> Result<Self,P::Err> {
+        let url = std::env::var("STARLANE_KEYCLOAK_URL")
+            .map_err(|e| "User<Keycloak>: environment variable 'STARLANE_KEYCLOAK_URL' not set.")?;
+        let password = std::env::var("STARLANE_PASSWORD")
+            .map_err(|e| "User<Keycloak>: environment variable 'STARLANE_PASSWORD' not set.")?;
+
+        let user = "hyperuser".to_string();
+        let client = reqwest::Client::new();
+        let admin_token = KeycloakAdminToken::acquire(&url, &user, &password, &client).await?;
+
+        let admin = Arc::new(KeycloakAdmin::new(&url, admin_token, client));
+        Ok(Self { skel, ctx, admin })
     }
 }
 
@@ -88,7 +103,7 @@ where
     P: Cosmos,
 {
     fn kind(&self) -> Kind {
-        Kind::User(UserVariant::OAuth(Specific::from_str("starlane.io:redhat.com:keycloak:community:20.0.1").unwrap()))
+        Kind::User(UserVariant::OAuth(Specific::from_str("starlane.io:redhat.com:keycloak:community:16.0.1").unwrap()))
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
