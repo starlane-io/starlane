@@ -1,3 +1,4 @@
+use std::num::ParseIntError;
 use keycloak::KeycloakError;
 use cosmic_hyperspace::err::ErrKind;
 
@@ -13,11 +14,11 @@ pub trait StarlaneErr {}
 
 #[cfg(feature="keycloak")]
 #[cfg(not(feature="postgres"))]
-pub trait StarlaneErr: From<KeycloakError>{}
+pub trait StarlaneErr: From<KeycloakError>+From<ParseIntError>{}
 
 #[cfg(feature="keycloak")]
 #[cfg(feature="postgres")]
-pub trait StarlaneErr: PostErr+From<KeycloakError>{}
+pub trait StarlaneErr: PostErr+From<KeycloakError>+From<ParseIntError>{}
 
 #[derive(Debug, Clone)]
 pub struct StarErr {
@@ -39,6 +40,7 @@ pub mod convert {
     use mechtron_host::err::{DefaultHostErr, HostErr};
     use sqlx::Error;
     use std::io;
+    use std::num::ParseIntError;
     use std::str::Utf8Error;
     use std::string::FromUtf8Error;
     use keycloak::KeycloakError;
@@ -56,6 +58,7 @@ pub mod convert {
         }
     }
 
+    #[cfg(feature="keycloak")]
     impl From<KeycloakError> for Err {
         fn from(e: KeycloakError) -> Self {
             Self{
@@ -64,6 +67,17 @@ pub mod convert {
             }
         }
     }
+
+    #[cfg(feature="keycloak")]
+    impl From<ParseIntError> for Err {
+        fn from(e: ParseIntError) -> Self {
+            Self{
+                kind: ErrKind::Default,
+                message: e.to_string()
+            }
+        }
+    }
+
 
     impl From<strum::ParseError> for Err {
         fn from(e: strum::ParseError) -> Self {

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::str::FromStr;
 use cosmic_hyperspace::Cosmos;
 use cosmic_hyperspace::driver::{Driver, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, HyperSkel, Item, ItemHandler, ItemSkel, ItemSphere};
@@ -15,6 +17,10 @@ use cosmic_space::parse::bind_config;
 use cosmic_space::util::log;
 use std::sync::Arc;
 use keycloak::{KeycloakAdmin, KeycloakAdminToken};
+use keycloak::types::{CredentialRepresentation, ProtocolMapperRepresentation, RealmRepresentation, UserRepresentation};
+use validator::validate_email;
+use serde_json::{json, Value};
+use mechtron_host::err::HostErr;
 use crate::err::StarlaneErr;
 
 lazy_static! {
@@ -62,7 +68,7 @@ impl<P> HyperDriverFactory<P> for KeycloakDriverFactory
         ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
         let skel = HyperSkel::new(skel, driver_skel);
-        Ok(Box::new(KeycloakDriver::new(skel, ctx).await? ))
+        Ok(Box::new(log(KeycloakDriver::new(skel, ctx).await.map_err(|e|e.to_space_err()))? ))
     }
 }
 
@@ -73,7 +79,7 @@ where
 {
     skel: HyperSkel<P>,
     ctx: DriverCtx,
-    admin: Arc<KeycloakAdmin>
+    admin: StarlaneKeycloakAdmin<P>
 }
 
 #[handler]
@@ -83,16 +89,7 @@ where
     P::Err: StarlaneErr
 {
     pub async fn new(skel: HyperSkel<P>, ctx: DriverCtx) -> Result<Self,P::Err> {
-        let url = std::env::var("STARLANE_KEYCLOAK_URL")
-            .map_err(|e| "User<Keycloak>: environment variable 'STARLANE_KEYCLOAK_URL' not set.")?;
-        let password = std::env::var("STARLANE_PASSWORD")
-            .map_err(|e| "User<Keycloak>: environment variable 'STARLANE_PASSWORD' not set.")?;
-
-        let user = "hyperuser".to_string();
-        let client = reqwest::Client::new();
-        let admin_token = KeycloakAdminToken::acquire(&url, &user, &password, &client).await?;
-
-        let admin = Arc::new(KeycloakAdmin::new(&url, admin_token, client));
+       let admin = StarlaneKeycloakAdmin::new().await?;
         Ok(Self { skel, ctx, admin })
     }
 }
@@ -101,6 +98,7 @@ where
 impl<P> Driver<P> for KeycloakDriver<P>
 where
     P: Cosmos,
+    P::Err: StarlaneErr
 {
     fn kind(&self) -> Kind {
         Kind::User(UserVariant::OAuth(Specific::from_str("starlane.io:redhat.com:keycloak:community:16.0.1").unwrap()))
@@ -116,6 +114,7 @@ where
         Box::new(KeycloakDriverHandler::restore(
             self.skel.clone(),
             self.ctx.clone(),
+            self.admin.clone()
         ))
     }
 }
@@ -126,29 +125,39 @@ where
 {
     skel: HyperSkel<P>,
     ctx: DriverCtx,
+    admin: StarlaneKeycloakAdmin<P>
 }
 
 impl<P> KeycloakDriverHandler<P>
 where
     P: Cosmos,
 {
-    fn restore(skel: HyperSkel<P>, ctx: DriverCtx) -> Self {
-        Self { skel, ctx }
+    fn restore(skel: HyperSkel<P>, ctx: DriverCtx, admin: StarlaneKeycloakAdmin<P>) -> Self {
+        Self { skel, ctx, admin }
     }
 }
 
-impl<P> DriverHandler<P> for KeycloakDriverHandler<P> where P: Cosmos {}
+impl<P> DriverHandler<P> for KeycloakDriverHandler<P> where P: Cosmos,
+
+
+<P as Cosmos>::Err: StarlaneErr
+{}
 
 #[handler]
 impl<P> KeycloakDriverHandler<P>
 where
     P: Cosmos,
+    <P as Cosmos>::Err: StarlaneErr
 {
 
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
+        if let HyperSubstance::Assign(assign) = ctx.input {
+            self.admin.init_realm_for_point(normalize_realm(&assign.details.stub.point),&assign.details.stub.point).await?;
+        }
         Ok(())
     }
+
 }
 
 
@@ -222,7 +231,7 @@ impl<P> HyperDriverFactory<P> for UserDriverFactory
         P: Cosmos,
 {
     fn kind(&self) -> KindSelector {
-        KindSelector::from_base(BaseKind::User)
+        KindSelector::from_str("<User<Account>>").unwrap()
     }
 
     async fn create(
@@ -349,3 +358,485 @@ impl <P> ItemHandler<P> for User<P> where P: Cosmos{
 
 
 
+#[derive(Clone)]
+pub struct StarlaneKeycloakAdmin<P> where P: Cosmos {
+    pub admin: Arc<KeycloakAdmin>,
+    phantom: PhantomData<P>
+}
+
+impl <P> StarlaneKeycloakAdmin<P> where P: Cosmos, P::Err: StarlaneErr{
+    pub async fn new() -> Result<Self, P::Err> {
+        let url = std::env::var("STARLANE_KEYCLOAK_URL")
+            .map_err(|e| "User<Keycloak>: environment variable 'STARLANE_KEYCLOAK_URL' not set.")?;
+        let password = std::env::var("STARLANE_PASSWORD")
+            .map_err(|e| "User<Keycloak>: environment variable 'STARLANE_PASSWORD' not set.")?;
+
+        let user = "hyperuser".to_string();
+        let client = reqwest::Client::new();
+        let admin_token = KeycloakAdminToken::acquire(&url, &user, &password, &client).await?;
+
+        let admin = Arc::new(KeycloakAdmin::new(&url, admin_token, client));
+        Ok(Self { admin, phantom: Default::default() })
+    }
+
+    pub async fn get_realm_from_point(&self, realm: &Point) -> Result<RealmRepresentation, P::Err> {
+        let realm = normalize_realm(realm);
+        Ok(self.admin.realm_get(realm.as_str()).await?)
+    }
+
+    pub async fn delete_realm_from_point(&self, realm: &Point) -> Result<(), P::Err> {
+        let realm = normalize_realm(realm);
+        self.admin.realm_delete(realm.as_str()).await?;
+        Ok(())
+    }
+
+    pub async fn create_realm_from_point(
+        &self,
+        realm_point: &Point,
+        registration_email_as_username: Option<bool>,
+        verify_email: Option<bool>,
+        sso_session_max_lifespan: Option<String>,
+    ) -> Result<(), P::Err> {
+        let realm = normalize_realm(realm_point);
+        self.admin
+            .post(RealmRepresentation {
+                realm: Some(realm.clone().into()),
+                enabled: Some(true),
+                duplicate_emails_allowed: Some(false),
+                registration_email_as_username,
+                verify_email,
+                ..Default::default()
+            })
+            .await?;
+        self.init_realm_for_point(realm, &realm_point).await?;
+        Ok(())
+    }
+    pub async fn update_realm_for_point(
+        &self,
+        realm: String,
+        realm_point: &Point,
+        registration_email_as_username: Option<bool>,
+        verify_email: Option<bool>,
+        sso_session_max_lifespan: Option<String>,
+    ) -> Result<(), P::Err> {
+        let sso_session_max_lifespan = match sso_session_max_lifespan {
+            None => None,
+            Some(sso_session_max_lifespan) => {
+                Some(i32::from_str(sso_session_max_lifespan.as_str())?)
+            }
+        };
+
+        self.admin
+            .realm_put(
+                &realm,
+                RealmRepresentation {
+                    realm: Some(realm.clone().into()),
+                    enabled: Some(true),
+                    duplicate_emails_allowed: Some(false),
+                    registration_email_as_username,
+                    verify_email,
+                    sso_session_max_lifespan,
+                    ..Default::default()
+                },
+            )
+            .await?;
+        Ok(())
+    }
+
+    pub async fn init_realm_for_point(
+        &self,
+        realm: String,
+        realm_point: &Point,
+    ) -> Result<(), P::Err> {
+        let client_id = "${client_admin-cli}";
+        let clients = self
+            .admin
+            .realm_clients_get(realm.clone().as_str(), None, None, None, None, None, None)
+            .await?;
+        let client_admin_cli_id = clients
+            .into_iter()
+            .find_map(|client| {
+                if let Some(name) = client.name {
+                    if client_id == name {
+                        client.id.clone()
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .ok_or(format!(
+                "User<Keycloak> could not find client_id '{}'",
+                client_id
+            ))?;
+
+        {
+            let mut config = HashMap::new();
+            config.insert(
+                "userinfo.token.claim".to_string(),
+                Value::String("true".to_string()),
+            );
+            config.insert(
+                "user.attribute".to_string(),
+                Value::String("username".to_string()),
+            );
+            config.insert(
+                "id.token.claim".to_string(),
+                Value::String("true".to_string()),
+            );
+            config.insert(
+                "access.token.claim".to_string(),
+                Value::String("true".to_string()),
+            );
+            config.insert(
+                "claim.name".to_string(),
+                Value::String("preferred_username".to_string()),
+            );
+            config.insert(
+                "jsonType.label".to_string(),
+                Value::String("String".to_string()),
+            );
+            let username = ProtocolMapperRepresentation {
+                config: Some(config),
+                name: Some("username".to_string()),
+                protocol: Some("openid-connect".to_string()),
+                protocol_mapper: Some("oidc-usermodel-property-mapper".to_string()),
+                ..Default::default()
+            };
+
+            self.admin
+                .realm_clients_with_id_protocol_mappers_models_post(
+                    realm.as_str(),
+                    client_admin_cli_id.as_str(),
+                    username,
+                )
+                .await?;
+        }
+
+        {
+            let mut config = HashMap::new();
+            config.insert(
+                "userinfo.token.claim".to_string(),
+                Value::String("true".to_string()),
+            );
+            config.insert(
+                "id.token.claim".to_string(),
+                Value::String("true".to_string()),
+            );
+            config.insert(
+                "access.token.claim".to_string(),
+                Value::String("true".to_string()),
+            );
+            config.insert(
+                "claim.name".to_string(),
+                Value::String("userbase_ref".to_string()),
+            );
+            config.insert(
+                "claim.value".to_string(),
+                Value::String(realm_point.to_string()),
+            );
+            config.insert(
+                "jsonType.label".to_string(),
+                Value::String("String".to_string()),
+            );
+            let userbase_ref = ProtocolMapperRepresentation {
+                config: Some(config),
+                name: Some("userbase_ref".to_string()),
+                protocol: Some("openid-connect".to_string()),
+                protocol_mapper: Some("oidc-hardcoded-claim-mapper".to_string()),
+                ..Default::default()
+            };
+
+            self.admin
+                .realm_clients_with_id_protocol_mappers_models_post(
+                    realm.as_str(),
+                    client_admin_cli_id.as_str(),
+                    userbase_ref,
+                )
+                .await?;
+        }
+
+        {
+            let mut config = HashMap::new();
+            config.insert("multivalued".to_string(), Value::String("true".to_string()));
+            config.insert(
+                "user.attribute".to_string(),
+                Value::String("foo".to_string()),
+            );
+            config.insert(
+                "id.token.claim".to_string(),
+                Value::String("true".to_string()),
+            );
+            config.insert(
+                "access.token.claim".to_string(),
+                Value::String("true".to_string()),
+            );
+            config.insert(
+                "claim.name".to_string(),
+                Value::String("groups".to_string()),
+            );
+            config.insert(
+                "jsonType.label".to_string(),
+                Value::String("String".to_string()),
+            );
+            let groups = ProtocolMapperRepresentation {
+                config: Some(config),
+                name: Some("groups".to_string()),
+                protocol: Some("openid-connect".to_string()),
+                protocol_mapper: Some("oidc-usermodel-property-mapper".to_string()),
+                ..Default::default()
+            };
+
+            self.admin
+                .realm_clients_with_id_protocol_mappers_models_post(
+                    realm.as_str(),
+                    client_admin_cli_id.as_str(),
+                    groups,
+                )
+                .await?;
+        }
+
+        {
+            let mut config = HashMap::new();
+            config.insert("multivalued".to_string(), Value::String("true".to_string()));
+            config.insert(
+                "user.attribute".to_string(),
+                Value::String("foo".to_string()),
+            );
+            config.insert(
+                "access.token.claim".to_string(),
+                Value::String("true".to_string()),
+            );
+            config.insert(
+                "claim.name".to_string(),
+                Value::String("realm_access.roles".to_string()),
+            );
+            config.insert(
+                "jsonType.label".to_string(),
+                Value::String("String".to_string()),
+            );
+            let roles = ProtocolMapperRepresentation {
+                config: Some(config),
+                name: Some("realm roles".to_string()),
+                protocol: Some("openid-connect".to_string()),
+                protocol_mapper: Some("oidc-usermodel-property-mapper".to_string()),
+                ..Default::default()
+            };
+
+            self.admin
+                .realm_clients_with_id_protocol_mappers_models_post(
+                    realm.as_str(),
+                    client_admin_cli_id.as_str(),
+                    roles,
+                )
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn select_all(
+        &self,
+        realm: &Point,
+        first: i32,
+        max: i32,
+    ) -> Result<Vec<UserRepresentation>, P::Err> {
+        let realm = normalize_realm(realm);
+        Ok(self
+            .admin
+            .realm_users_get(
+                realm.as_str(),
+                Some(true),
+                None,
+                None,
+                None,
+                None,
+                Some(first),
+                None,
+                None,
+                None,
+                None,
+                Some(max),
+                None,
+                None,
+                None
+            )
+            .await?)
+    }
+
+    pub async fn select_by_username(
+        &self,
+        realm: &Point,
+        username: String,
+    ) -> Result<Vec<UserRepresentation>, P::Err> {
+        let realm = normalize_realm(realm);
+        Ok(self
+            .admin
+            .realm_users_get(
+                realm.as_str(),
+                Some(true),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(username),
+                None
+            )
+            .await?)
+    }
+
+    pub async fn select_by_email(
+        &self,
+        realm: &Point,
+        email: String,
+    ) -> Result<Vec<UserRepresentation>, P::Err> {
+        let realm = normalize_realm(realm);
+        Ok(self
+            .admin
+            .realm_users_get(
+                realm.as_str(),
+                Some(true),
+                Some(email),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None
+            )
+            .await?)
+    }
+
+    pub async fn reset_password(
+        &self,
+        realm: &Point,
+        email: String,
+        password: String,
+    ) -> Result<(), P::Err> {
+        if !validate_email(&email) {
+            return Err(format!("invalid email '{}'", email).into());
+        }
+        let mut users = self.select_by_email(realm, email.clone()).await?;
+        if users.is_empty() {
+            return Err(format!("could not find email '{}'", email).into());
+        } else if users.len() > 1 {
+            return Err(format!("duplicate accounts for email '{}'", email).into());
+        }
+
+        let mut user = users.remove(0);
+        let id = user.id.ok_or("user id must be set")?;
+        let cred = CredentialRepresentation {
+            value: Some(password.clone()),
+            temporary: Some(false),
+            type_: Some("password".to_string()),
+            ..Default::default()
+        };
+
+        let realm = normalize_realm(realm);
+        self.admin
+            .realm_users_with_id_reset_password_put(realm.as_str(), id.as_str(), cred)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn add_user_attributes(
+        &self,
+        realm: &Point,
+        username: String,
+        attributes: HashMap<String, Value>,
+    ) -> Result<(), P::Err> {
+        let users = self.select_by_username(realm, username).await?;
+
+        for mut user in users {
+            let realm = normalize_realm(realm);
+            let mut attributes = attributes.clone();
+            match user.attributes {
+                None => {}
+                Some(mut old_attributes) => {
+                    for (key, value) in old_attributes {
+                        if !attributes.contains_key(&key) {
+                            attributes.insert(key, value.into());
+                        }
+                    }
+                }
+            }
+
+            user.attributes = Some(attributes.into());
+
+            self.admin
+                .realm_users_with_id_put(
+                    realm.as_str(),
+                    user.id.as_ref().ok_or("expected user id")?.clone().as_str(),
+                    user,
+                )
+                .await?;
+        }
+        Ok(())
+    }
+
+    pub async fn create_user(
+        &self,
+        realm: &Point,
+        email: String,
+        username: Option<String>,
+        password: Option<String>,
+        point: &Point,
+    ) -> Result<(), P::Err> {
+        let realm = normalize_realm(realm);
+
+        let mut attributes = HashMap::new();
+        attributes.insert("point".to_string(), Value::String(point.to_string()));
+
+        let user = UserRepresentation {
+            username: username,
+            email: Some(email),
+            enabled: Some(true),
+            attributes: Some(attributes),
+            credentials: match password {
+                None => None,
+                Some(password) => {
+                    let creds = CredentialRepresentation {
+                        value: Some(password),
+                        temporary: Some(false),
+                        type_: Some("password".to_string()),
+                        ..Default::default()
+                    };
+                    Some(vec![creds])
+                }
+            },
+            ..Default::default()
+        };
+        self.admin.realm_users_post(realm.as_str(), user).await?;
+        Ok(())
+    }
+}
+
+pub fn is_hyperuser(point: &Point) -> bool {
+    point.to_string().as_str() == "hyperspace:users:hyperuser"
+}
+
+pub fn is_hyper_userbase(point: &Point) -> bool {
+    point.to_string().as_str() == "hyperspace:users"
+}
+
+fn normalize_realm(realm: &Point) -> String {
+    if is_hyper_userbase(realm) {
+        "master".to_string()
+    } else {
+        realm.to_string().replace(":", "_")
+    }
+}
