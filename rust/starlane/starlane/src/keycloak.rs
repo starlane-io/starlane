@@ -88,7 +88,7 @@ where
     P: Cosmos,
 {
     fn kind(&self) -> Kind {
-        Kind::User(UserVariant::OAuth(Specific::from_str("starlane.io:redhat.com:keycloak:community:18.0.0").unwrap()))
+        Kind::User(UserVariant::OAuth(Specific::from_str("starlane.io:redhat.com:keycloak:community:20.0.1").unwrap()))
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
@@ -173,12 +173,6 @@ impl <P> ItemHandler<P> for Keycloak<P> where P: Cosmos{
 }
 
 
-
-
-/// blah
-///
-///
-///
 lazy_static! {
     static ref USER_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
         Arc::new(user_bind()),

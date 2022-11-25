@@ -696,7 +696,7 @@ func (r *StarlaneReconciler) keycloakDeployment(m *starlanev1alpha1.Starlane) *a
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
-						Image: "jboss/keycloak:13.0.1",
+						Image: "jboss/keycloak:16.1.1",
 						Name:  "keycloak",
 						Args:  []string{},
 						Env: []corev1.EnvVar{
