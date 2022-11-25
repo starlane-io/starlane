@@ -42,7 +42,7 @@ async fn main() -> Result<(), SpaceErr> {
         None => ".".to_string(),
         Some(dir) => dir.display().to_string(),
     };
-    let matches = ClapCommand::new("cosmic-cli")
+    let matches = ClapCommand::new("cosmic")
         .arg(
             Arg::new("host")
                 .short('h')
