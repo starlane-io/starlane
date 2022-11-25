@@ -39,7 +39,7 @@ use cosmic_space::err::SpaceErr;
 use cosmic_space::fail::Timeout;
 use cosmic_space::hyper::{ParticleLocation, ParticleRecord};
 use cosmic_space::kind::{
-    ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind,
+    ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserVariant,
 };
 use cosmic_space::loc::{
     Layer, MachineName, StarKey, Surface, ToBaseKind, ToSurface,
@@ -152,7 +152,6 @@ where
             BaseKind::Root => Kind::Root,
             BaseKind::Space => Kind::Space,
             BaseKind::Base => Kind::Base,
-            BaseKind::User => Kind::User,
             BaseKind::App => Kind::App,
             BaseKind::Mechtron => Kind::Mechtron,
             BaseKind::FileSystem => Kind::FileSystem,
@@ -178,15 +177,27 @@ where
                 }
             },
             BaseKind::Control => Kind::Control,
-            BaseKind::UserBase => match &template.sub {
+            BaseKind::User => match &template.sub {
                 None => {
                     return Err("SubKind must be set for UserBase<?>".into());
                 }
                 Some(sub) => {
-                    let specific =
+                    match sub.as_str() {
+                        "OAuth" => {
+                     let specific =
                         Specific::from_str("starlane.io:redhat.com:keycloak:community:18.0.0")?;
-                    let sub = UserBaseSubKind::OAuth(specific);
-                    Kind::UserBase(sub)
+                    let sub = UserVariant::OAuth(specific);
+                    Kind::User(sub)
+                        }
+                        "Account" => {
+                            Kind::User(UserVariant::Account)
+                        }
+                        what => {
+                            Err::<(),SpaceErr>(format!("SubKind '{}' not recognized", sub.as_str()).into())?;
+                            unimplemented!()
+                        }
+                    }
+
                 }
             },
             BaseKind::Repo => Kind::Repo,

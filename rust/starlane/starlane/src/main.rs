@@ -5,6 +5,12 @@ pub mod err;
 pub mod properties;
 
 #[macro_use]
+extern crate cosmic_macros;
+
+#[cfg(feature = "keycloak")]
+pub mod keycloak;
+
+#[macro_use]
 extern crate async_trait;
 #[macro_use]
 extern crate lazy_static;
@@ -52,7 +58,7 @@ use cosmic_space::artifact::asynch::ReadArtifactFetcher;
 use cosmic_space::command::direct::create::KindTemplate;
 use cosmic_space::err::SpaceErr;
 use cosmic_space::kind::{
-    ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind,
+    ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserVariant,
 };
 use cosmic_space::loc::{MachineName, StarKey};
 use cosmic_space::loc::ToBaseKind;

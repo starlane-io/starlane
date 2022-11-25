@@ -27,6 +27,7 @@ cosmic-hyperspace={ path= "../../cosmic/cosmic-hyperspace" ,version = "0.4.0-alp
 cosmic-registry-postgres={ path= "../../cosmic/cosmic-registry-postgres" ,version = "0.4.0-alpha1", optional=true}
 cosmic-hyperlane={ path="../../cosmic/cosmic-hyperlane",version = "0.4.0-alpha1"}
 cosmic-hyperlane-tcp={ path="../../cosmic/cosmic-hyperlane-tcp",version = "0.4.0-alpha1"}
+cosmic-macros={ path="../../cosmic/cosmic-macros",version = "0.4.0-alpha1"}
 mechtron-host={ path="../../mechtron/mechtron-host",version = "0.4.0-alpha1"}
 lazy_static = "1.4.0"
 uuid = { version="1.1.2", features=["v4"] }

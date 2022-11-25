@@ -117,9 +117,8 @@ impl KindParts {
 pub enum BaseKind {
     Root,
     Space,
-    UserBase,
-    Base,
     User,
+    Base,
     App,
     Mechtron,
     FileSystem,
@@ -151,7 +150,7 @@ pub enum Sub {
     Database(DatabaseSubKind),
     File(FileSubKind),
     Artifact(ArtifactSubKind),
-    UserBase(UserBaseSubKind),
+    Auth(UserVariant),
     Star(StarSub),
     Native(NativeSub),
 }
@@ -163,7 +162,7 @@ impl Sub {
             Sub::Database(d) => Some(CamelCase::from_str(d.to_string().as_str()).unwrap()),
             Sub::File(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
             Sub::Artifact(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
-            Sub::UserBase(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
+            Sub::Auth(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
             Sub::Star(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
             Sub::Native(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
         }
@@ -172,7 +171,7 @@ impl Sub {
     pub fn specific(&self) -> Option<&Specific> {
         match self {
             Sub::Database(sub) => sub.specific(),
-            Sub::UserBase(sub) => sub.specific(),
+            Sub::Auth(sub) => sub.specific(),
             _ => None,
         }
     }
@@ -191,7 +190,7 @@ impl Into<Option<CamelCase>> for Sub {
             Sub::Database(d) => d.into(),
             Sub::File(f) => f.into(),
             Sub::Artifact(a) => a.into(),
-            Sub::UserBase(u) => u.into(),
+            Sub::Auth(u) => u.into(),
             Sub::Star(s) => s.into(),
             Sub::Native(s) => s.into(),
         }
@@ -205,7 +204,7 @@ impl Into<Option<String>> for Sub {
             Sub::Database(d) => d.into(),
             Sub::File(f) => f.into(),
             Sub::Artifact(a) => a.into(),
-            Sub::UserBase(u) => u.into(),
+            Sub::Auth(u) => u.into(),
             Sub::Star(s) => s.into(),
             Sub::Native(s) => s.into(),
         }
@@ -233,7 +232,6 @@ impl TryFrom<CamelCase> for BaseKind {
 pub enum Kind {
     Root,
     Space,
-    User,
     App,
     Mechtron,
     FileSystem,
@@ -247,7 +245,7 @@ pub enum Kind {
     Artifact(ArtifactSubKind),
     Database(DatabaseSubKind),
     Base,
-    UserBase(UserBaseSubKind),
+    User(UserVariant),
     Star(StarSub),
     Global,
     Host,
@@ -260,7 +258,6 @@ impl ToBaseKind for Kind {
         match self {
             Kind::Root => BaseKind::Root,
             Kind::Space => BaseKind::Space,
-            Kind::User => BaseKind::User,
             Kind::App => BaseKind::App,
             Kind::Mechtron => BaseKind::Mechtron,
             Kind::FileSystem => BaseKind::FileSystem,
@@ -268,7 +265,7 @@ impl ToBaseKind for Kind {
             Kind::Bundle => BaseKind::Bundle,
             Kind::Control => BaseKind::Control,
             Kind::Portal => BaseKind::Portal,
-            Kind::UserBase(_) => BaseKind::UserBase,
+            Kind::User(_) => BaseKind::User,
             Kind::File(_) => BaseKind::File,
             Kind::Artifact(_) => BaseKind::Artifact,
             Kind::Database(_) => BaseKind::Database,
@@ -337,7 +334,7 @@ impl Kind {
             Kind::File(s) => s.clone().into(),
             Kind::Artifact(s) => s.clone().into(),
             Kind::Database(s) => s.clone().into(),
-            Kind::UserBase(s) => s.clone().into(),
+            Kind::User(s) => s.clone().into(),
             Kind::Star(s) => s.clone().into(),
             _ => Sub::None,
         }
@@ -386,9 +383,9 @@ impl TryFrom<KindParts> for Kind {
                     }
                 }
             }
-            BaseKind::UserBase => {
+            BaseKind::User => {
                 match value.sub.ok_or("UserBase<?> requires a Sub Kind")?.as_str() {
-                    "OAuth" => Kind::UserBase(UserBaseSubKind::OAuth(
+                    "OAuth" => Kind::User(UserVariant::OAuth(
                         value
                             .specific
                             .ok_or("UserBase<OAuth<?>> requires a Specific")?,
@@ -418,7 +415,6 @@ impl TryFrom<KindParts> for Kind {
 
             BaseKind::Root => Kind::Root,
             BaseKind::Space => Kind::Space,
-            BaseKind::User => Kind::User,
             BaseKind::App => Kind::App,
             BaseKind::Mechtron => Kind::Mechtron,
             BaseKind::FileSystem => Kind::FileSystem,
@@ -553,31 +549,33 @@ impl Into<Option<String>> for StarSub {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize, strum_macros::Display)]
-pub enum UserBaseSubKind {
+pub enum UserVariant {
     OAuth(Specific),
+    Account
 }
 
-impl UserBaseSubKind {
+impl UserVariant {
     pub fn specific(&self) -> Option<&Specific> {
         match self {
-            UserBaseSubKind::OAuth(specific) => Option::Some(specific),
+            UserVariant::OAuth(specific) => Option::Some(specific),
+            UserVariant::Account => None
         }
     }
 }
 
-impl Into<Sub> for UserBaseSubKind {
+impl Into<Sub> for UserVariant {
     fn into(self) -> Sub {
-        Sub::UserBase(self)
+        Sub::Auth(self)
     }
 }
 
-impl Into<Option<CamelCase>> for UserBaseSubKind {
+impl Into<Option<CamelCase>> for UserVariant {
     fn into(self) -> Option<CamelCase> {
         Some(CamelCase::from_str(self.to_string().as_str()).unwrap())
     }
 }
 
-impl Into<Option<String>> for UserBaseSubKind {
+impl Into<Option<String>> for UserVariant {
     fn into(self) -> Option<String> {
         Some(self.to_string())
     }
@@ -688,7 +686,7 @@ impl Into<Option<String>> for DatabaseSubKind {
 impl BaseKind {
     pub fn child_resource_registry_handler(&self) -> ChildRegistry {
         match self {
-            Self::UserBase => ChildRegistry::Core,
+            Self::User => ChildRegistry::Core,
             _ => ChildRegistry::Shell,
         }
     }

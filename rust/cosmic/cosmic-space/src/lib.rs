@@ -28,7 +28,7 @@ use command::direct::query::{Query, QueryResult};
 use command::direct::select::{Select, SubSelect};
 use config::bind::BindConfig;
 use config::Document;
-use kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind};
+use kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserVariant};
 use loc::{Surface, Uuid};
 use particle::{Details, Properties, Status, Stub};
 use point::Point;

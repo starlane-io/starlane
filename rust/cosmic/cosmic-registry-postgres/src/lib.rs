@@ -39,7 +39,7 @@ use cosmic_space::command::direct::set::Set;
 use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{Location, ParticleLocation, ParticleRecord};
 use cosmic_space::kind::{
-    ArtifactSubKind, BaseKind, FileSubKind, Kind, KindParts, Specific, UserBaseSubKind,
+    ArtifactSubKind, BaseKind, FileSubKind, Kind, KindParts, Specific, UserVariant,
 };
 use cosmic_space::loc::{StarKey, ToBaseKind, Version};
 use cosmic_space::log::PointLogger;
@@ -1615,7 +1615,7 @@ pub mod test {
     use cosmic_space::command::direct::query::Query;
     use cosmic_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
     use cosmic_space::hyper::ParticleLocation;
-    use cosmic_space::kind::{Kind, Specific, StarSub, UserBaseSubKind};
+    use cosmic_space::kind::{Kind, Specific, StarSub, UserVariant};
     use cosmic_space::loc::{MachineName, StarKey, ToPoint};
     use cosmic_space::log::RootLogger;
     use cosmic_space::particle::property::PropertiesConfig;
@@ -1814,7 +1814,7 @@ pub mod test {
         };
         registry.register(&registration).await?;
 
-        let userbase = Kind::UserBase(UserBaseSubKind::OAuth(Specific::from_str(
+        let userbase = Kind::User(UserVariant::OAuth(Specific::from_str(
             "mechtronhost.io:keycloak.com:keycloak:community:11.0.0",
         )?));
 

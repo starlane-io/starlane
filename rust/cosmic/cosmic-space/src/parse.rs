@@ -63,7 +63,7 @@ use crate::err::report::{Label, Report, ReportKind};
 use crate::err::{ParseErrs, SpaceErr};
 use crate::kind::{
     ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, NativeSub, Specific,
-    StarSub, UserBaseSubKind,
+    StarSub, UserVariant,
 };
 use crate::loc::StarKey;
 use crate::loc::{Layer, PointSegment, Surface, Topic, Uuid, VarVal, Variable, Version};
@@ -5600,11 +5600,14 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
                     )))
                 }
             },
-            BaseKind::UserBase => match sub.as_str() {
+            BaseKind::User => match sub.as_str() {
                 "OAuth" => {
                     let (next, specific) =
                         context("specific", delimited(tag("<"), specific, tag(">")))(next)?;
-                    Ok((next, Kind::UserBase(UserBaseSubKind::OAuth(specific))))
+                    Ok((next, Kind::User(UserVariant::OAuth(specific))))
+                }
+                "Account" => {
+                    Ok((next, Kind::User(UserVariant::Account)))
                 }
                 _ => {
                     let err = ErrorTree::from_error_kind(input.clone(), ErrorKind::Fail);
@@ -5662,7 +5665,6 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
             BaseKind::Root => Ok((next, Kind::Root)),
             BaseKind::Space => Ok((next, Kind::Space)),
             BaseKind::Base => Ok((next, Kind::Base)),
-            BaseKind::User => Ok((next, Kind::User)),
             BaseKind::App => Ok((next, Kind::App)),
             BaseKind::Mechtron => Ok((next, Kind::Mechtron)),
             BaseKind::FileSystem => Ok((next, Kind::FileSystem)),
