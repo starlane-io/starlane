@@ -303,7 +303,6 @@ impl Kind {
             Kind::Artifact(_) => true,
             Kind::Mechtron => true,
             Kind::Host => true,
-            Kind::User(UserVariant::OAuth(_))=> true,
             Kind::Native(NativeSub::Web) => true,
             _ => false,
         }
@@ -732,7 +731,14 @@ pub struct Specific {
 
 impl Specific {
     pub fn to_selector(&self) -> SpecificSelector {
-        SpecificSelector::from_str(self.to_string().as_str()).unwrap()
+        SpecificSelector::from_str(        format!(
+            "{}:{}:{}:{}:({})",
+            self.provider,
+            self.vendor,
+            self.product,
+            self.variant,
+            self.version.to_string()
+        ).as_str()).unwrap()
     }
 }
 

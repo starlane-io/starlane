@@ -5410,7 +5410,7 @@ pub fn specific_selector<I: Span>(input: I) -> Res<I, SpecificSelector> {
         tag(":"),
         pattern(skewer_case),
         tag(":"),
-        delimited(tag("("), version_req, tag(")")),
+        delimited(tag("("), version_req, tag(")"))
     ))(input)
     .map(
         |(next, (provider, _, vendor, _, product, _, variant, _, version))| {
@@ -8562,10 +8562,7 @@ pub mod cmd_test {
     use crate::err::SpaceErr;
     use crate::kind::Kind;
     use crate::parse::error::result;
-    use crate::parse::{
-        command, consume_point, create_command, point_selector, publish_command, script,
-        upload_blocks, CamelCase,
-    };
+    use crate::parse::{command, consume_point, create_command, point_selector, publish_command, script, upload_blocks, CamelCase, specific_selector, kind_selector, kind};
     use crate::point::{PointSeg, RouteSeg};
     use crate::selector::{PointHierarchy, PointKindSeg};
     use crate::util::ToResolved;
@@ -8716,7 +8713,7 @@ pub mod cmd_test {
                 },
                 PointKindSeg {
                     segment: PointSeg::Base("dra".to_string()),
-                    kind: Kind::User,
+                    kind: Kind::Base,
                 },
             ],
         );
@@ -8754,5 +8751,12 @@ pub mod cmd_test {
             .matches(&fae));
 
         let less = result(point_selector(new_span("less"))).unwrap();
+    }
+
+    #[test]
+    pub fn test_specific_selector() {
+        let selector = result(kind_selector(new_span("<User<OAuth<starlane.io:redhat.com:keycloak:community:(16.0.0)>>>") )).unwrap();
+        let kind = result(kind(new_span("User<OAuth<starlane.io:redhat.com:keycloak:community:16.0.0>>"))).unwrap();
+        assert!(selector.matches(&kind))
     }
 }

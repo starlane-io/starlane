@@ -540,6 +540,24 @@ impl ControlCliSession {
     pub fn new(transmitter: ProtoTransmitter) -> Self {
         Self { transmitter }
     }
+
+    pub async fn other(mut builder: ProtoTransmitterBuilder, point: Point) ->  Result<Self,SpaceErr> {
+        let transmitter = builder.clone().build();
+        let mut proto = DirectedProto::ping();
+        proto.to(point.to_surface().with_layer(Layer::Shell));
+        proto.method(ExtMethod::new("NewCliSession".to_string())?);
+        let pong: Wave<Pong> = transmitter.direct(proto).await?;
+
+        pong.ok_or()?;
+        if let Substance::Surface(port) = pong.variant.core.body {
+            let mut transmitter =
+            builder.to = SetStrategy::Override(port.to_recipients());
+            let transmitter = builder.build();
+            Ok(ControlCliSession::new(transmitter))
+        } else {
+            Err("NewCliSession expected: Surface".into())
+        }
+    }
     pub async fn exec<C>(&self, command: C) -> Result<ReflectedCore, SpaceErr>
     where
         C: ToString,
@@ -552,7 +570,7 @@ impl ControlCliSession {
         let mut proto = DirectedProto::ping();
         proto.method(ExtMethod::new("Exec".to_string())?);
         proto.body(Substance::RawCommand(command));
-        let pong: Wave<Pong> = self.transmitter.direct(proto).await?;
+        let pong = self.transmitter.ping(proto).await?;
         Ok(pong.variant.core)
     }
 }

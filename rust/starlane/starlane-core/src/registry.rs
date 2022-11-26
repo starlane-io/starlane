@@ -1699,7 +1699,7 @@ pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
             }
             Some(sub) => {
                 let specific =
-                    Specific::from_str("starlane.io:redhat.com:keycloak:community:18.0.0")?;
+                    Specific::from_str("starlane.io:redhat.com:keycloak:community:16.0.0")?;
                 let sub = UserBaseSubKind::OAuth(specific);
                 Kind::UserBase(sub)
             }

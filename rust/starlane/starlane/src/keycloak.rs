@@ -63,7 +63,7 @@ where
     P::Err: StarlaneErr,
 {
     fn kind(&self) -> KindSelector {
-        KindSelector::from_str("<User<OAuth>>").unwrap()
+        KindSelector::from_str("<User<OAuth<starlane.io:redhat.com:keycloak:community:(16.0.0)>>>").unwrap()
     }
 
     async fn create(
@@ -287,7 +287,7 @@ where
 {
     fn kind(&self) -> Kind {
         Kind::User(UserVariant::OAuth(
-            Specific::from_str("starlane.io:redhat.com:keycloak:community:18.0.0").unwrap(),
+            Specific::from_str("starlane.io:redhat.com:keycloak:community:16.0.0").unwrap(),
         ))
     }
 

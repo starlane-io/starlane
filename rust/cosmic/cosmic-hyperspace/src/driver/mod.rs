@@ -1110,8 +1110,10 @@ where
             ItemSphere::Handler(item) => {
                 if direct.core().method == Method::Cmd(CmdMethod::Init) {
                     let reflection = direct.reflection()?;
-                    match item.init().await {
+println!("STARING INIT");
+                    match log(item.init().await) {
                         Ok(status) => {
+println!("init and received status: {}", status.to_string() );
                             self.skel
                                 .registry
                                 .set_status(&self.surface().point.clone(), &status)
@@ -1120,6 +1122,7 @@ where
                             self.router.route(reflect.to_ultra()).await;
                         }
                         Err(err) => {
+println!("SETTING TO PANIC");
                             self.skel
                                 .registry
                                 .set_status(&self.surface().point.clone(), &Status::Panic)
@@ -1341,7 +1344,7 @@ where
                         let item = self.driver.item(&point).await;
                         match item {
                             Ok(item) => {
-                                rtn.send(item.init().await);
+                                rtn.send(log(item.init().await));
                             }
                             Err(err) => {
                                 rtn.send(Err(err.to_space_err()));

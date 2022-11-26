@@ -224,13 +224,14 @@ impl Cosmos for Starlane {
             StarSub::Jump => {
                 builder.add_post(Arc::new(WebDriverFactory::new()));
                 // builder.add_post(Arc::new(ControlDriverFactory::new()));
-            }
-            StarSub::Fold => {
                 #[cfg(feature="keycloak")]
                 {
                     builder.add_post(Arc::new(KeycloakDriverFactory::new()));
                     builder.add_post(Arc::new(UserDriverFactory::new()));
                 }
+            }
+            StarSub::Fold => {
+
             }
             StarSub::Machine => {
                 builder.add_post(Arc::new(ControlDriverFactory::new()));

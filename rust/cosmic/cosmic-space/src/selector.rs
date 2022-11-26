@@ -576,7 +576,8 @@ impl ValueMatcher<Specific> for SpecificSelector {
 impl ToString for SpecificSelector {
     fn to_string(&self) -> String {
         format!(
-            "{}:{}:{}:({})",
+            "{}:{}:{}:{}:({})",
+            self.provider.to_string(),
             self.vendor.to_string(),
             self.product.to_string(),
             self.variant.to_string(),

@@ -10,8 +10,6 @@ extern crate cosmic_macros;
 #[macro_use]
 extern crate cosmic_macros_primitive;
 
-
-
 pub mod err;
 pub mod platform;
 pub mod guest;
