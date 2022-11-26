@@ -45,7 +45,7 @@ use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tracing::error;
 use cosmic_space::point::Point;
-
+use crate::driver::HyperItemSkel;
 lazy_static! {
     static ref STAR_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
         Arc::new(star_bind()),
@@ -246,8 +246,13 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+        let skel = HyperItemSkel {
+            skel: self.driver_skel.clone(),
+            point: point.clone(),
+            kind: self.kind()
+        };
         Ok(ItemSphere::Handler(Box::new(Star::restore(
-            self.star_skel.clone(),
+            skel,
             self.ctx.clone(),
             (),
         ))))
@@ -259,7 +264,7 @@ pub struct Star<P>
 where
     P: Cosmos + 'static,
 {
-    pub skel: HyperStarSkel<P>,
+    pub skel: HyperItemSkel<P>,
     pub ctx: DriverCtx,
 }
 
@@ -269,7 +274,7 @@ where
 {
     async fn create(&self, assign: &Assign) -> Result<(), P::Err> {
         self.skel
-            .state
+            .skel.skel.state
             .create_shell(assign.details.stub.point.clone());
 
         /*
@@ -293,8 +298,9 @@ where
     }
 
     async fn init(&self) -> Result<Status, SpaceErr> {
-        match self.skel.kind {
+        match self.skel.skel.skel.kind {
             StarSub::Central => {
+
                 let registration = Registration {
                     point: Point::root(),
                     kind: Kind::Root,
@@ -305,20 +311,20 @@ where
                     status: Status::Ready,
                 };
                 self.skel
-                    .registry
+                    .skel.skel.registry
                     .register(&registration)
                     .await
                     .map_err(|e| e.to_space_err())?;
 
                 let record = self
-                    .skel
+                    .skel.skel.skel
                     .registry
                     .record(&Point::root())
                     .await
                     .map_err(|e| e.to_space_err())?;
                 let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
                 self.create(&assign).await.map_err(|e| e.to_space_err())?;
-                self.skel
+                self.skel.skel.skel
                     .registry
                     .assign_star(&Point::root(), &self.skel.point)
                     .await
@@ -333,14 +339,14 @@ where
                     strategy: Strategy::Ensure,
                     status: Status::Ready,
                 };
-                self.skel
+                self.skel.skel.skel
                     .registry
                     .register(&registration)
                     .await
                     .map_err(|e| e.to_space_err())?;
 
                 let record = self
-                    .skel
+                    .skel.skel.skel
                     .registry
                     .record(&Point::global_executor())
                     .await
@@ -348,6 +354,8 @@ where
                 let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
                 self.create(&assign).await.map_err(|e| e.to_space_err())?;
                 self.skel
+                    .skel
+                    .skel
                     .registry
                     .assign_star(&Point::global_executor(), &LOCAL_STAR)
                     .await
@@ -365,7 +373,7 @@ impl<P> Item<P> for Star<P>
 where
     P: Cosmos + 'static,
 {
-    type Skel = HyperStarSkel<P>;
+    type Skel = HyperItemSkel<P>;
     type Ctx = DriverCtx;
     type State = ();
 
@@ -389,14 +397,14 @@ where
         ctx: InCtx<'_, HyperSubstance>,
     ) -> Result<ParticleLocation, P::Err> {
         if let HyperSubstance::Provision(provision) = ctx.input {
-            let record = self.skel.registry.record(&provision.point).await?;
+            let record = self.skel.skel.skel.registry.record(&provision.point).await?;
 
-            match self.skel.wrangles.find(&record.details.stub.kind) {
+            match self.skel.skel.skel.wrangles.find(&record.details.stub.kind) {
                 None => {
                     let kind = record.details.stub.kind.clone();
                     if self
                         .skel
-                        .drivers
+                        .skel.skel.drivers
                         .find_external(record.details.stub.kind.clone())
                         .await?
                         .is_some()
@@ -457,7 +465,7 @@ where
 
             if self
                 .skel
-                .drivers
+                .skel.skel.drivers
                 .find(assign.details.stub.kind.clone())
                 .await?
                 .is_some()
@@ -466,7 +474,7 @@ where
 
                 let driver = self
                     .skel
-                    .drivers
+                    .skel.skel.drivers
                     .local_driver_lookup(assign.details.stub.kind.clone())
                     .await?
                     .ok_or(P::Err::new(format!(
@@ -482,10 +490,10 @@ where
                 directed.track = ctx.wave().track();
                 let pong: Wave<Pong> = ctx.transmitter.direct(directed).await?;
 
-                self.skel.logger.result(pong.ok_or())?;
+                self.skel.skel.logger.result(pong.ok_or())?;
             } else {
                 self.skel
-                    .logger
+                    .skel.logger
                     .result::<(), SpaceErr>(Err(SpaceErr::server_error(format!(
                         "Star {} does not have a driver for kind: {}",
                         self.skel.kind.to_string(),
@@ -495,7 +503,7 @@ where
             }
 
             self.skel
-                .registry
+                .skel.skel.registry
                 .assign_star(&assign.details.stub.point, &self.skel.point)
                 .await?;
 
@@ -507,14 +515,14 @@ where
 
     #[route("Hyp<Transport>")]
     pub async fn transport(&self, ctx: InCtx<'_, UltraWave>) {
-        self.skel.logger.track(ctx.wave(), || {
+        self.skel.skel.logger.track(ctx.wave(), || {
             Tracker::new("star:core:transport", "Receive")
         });
 
         let wave = ctx.input.clone();
 
         self.skel
-            .logger
+            .skel.logger
             .track(&wave, || Tracker::new("star:core:transport", "Unwrapped"));
 
         //        self.skel.gravity_router.route(wave).await;
@@ -529,7 +537,7 @@ where
         );
         injection.from_gravity = true;
 
-        self.skel.inject_tx.send(injection).await;
+        self.skel.skel.skel.inject_tx.send(injection).await;
     }
 
     #[route("Hyp<Search>")]
@@ -543,8 +551,8 @@ where
         where
             E: Cosmos,
         {
-            let mut discoveries = if star.skel.kind.is_forwarder() {
-                let mut wrangler = Wrangler::new(star.skel.clone(), search);
+            let mut discoveries = if star.skel.skel.skel.kind.is_forwarder() {
+                let mut wrangler = Wrangler::new(star.skel.skel.skel.clone(), search);
                 history.insert(star.skel.point.clone());
                 wrangler.history(history);
                 wrangler.wrangle(false).await?
@@ -553,14 +561,14 @@ where
                 Discoveries::new()
             };
 
-            if star.skel.kind.can_be_wrangled() {
+            if star.skel.skel.skel.kind.can_be_wrangled() {
                 let discovery = Discovery {
-                    star_kind: star.skel.kind.clone(),
+                    star_kind: star.skel.skel.skel.kind.clone(),
                     hops: ctx.wave().hops(),
-                    star_key: star.skel.key.clone(),
+                    star_key: star.skel.skel.skel.key.clone(),
                     kinds: star
                         .skel
-                        .drivers
+                        .skel.skel.drivers
                         .external_kinds()
                         .await?
                         .into_iter()
@@ -578,13 +586,13 @@ where
         if let HyperSubstance::Search(search) = ctx.input {
             match search {
                 Search::Star(star) => {
-                    if self.skel.key == *star {
-                        match self.skel.drivers.external_kinds().await {
+                    if self.skel.skel.skel.key == *star {
+                        match self.skel.skel.skel.drivers.external_kinds().await {
                             Ok(kinds) => {
                                 let discovery = Discovery {
-                                    star_kind: self.skel.kind.clone(),
+                                    star_kind: self.skel.skel.skel.kind.clone(),
                                     hops: ctx.wave().hops(),
-                                    star_key: self.skel.key.clone(),
+                                    star_key: self.skel.skel.skel.key.clone(),
                                     kinds: kinds.into_iter().collect(),
                                 };
                                 let mut discoveries = Discoveries::new();
@@ -612,7 +620,7 @@ where
                         ));
                     }
                 }
-                Search::StarKind(kind) => if *kind == self.skel.kind {},
+                Search::StarKind(kind) => if *kind == self.skel.skel.skel.kind {},
                 Search::Kinds => {
                     return CoreBounce::Reflected(ReflectedCore::result(
                         sub_search_and_reflect(self, &ctx, ctx.wave().history(), Search::Kinds)
@@ -623,7 +631,7 @@ where
             return CoreBounce::Absorbed;
         } else {
             self.skel
-                .logger
+                .skel.logger
                 .error(format!("expected Search got : {}", ctx.input.to_string()));
             return CoreBounce::Reflected(ctx.bad_request());
         }

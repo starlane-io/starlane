@@ -4,7 +4,7 @@ use nom::combinator::all_consuming;
 use serde::{Serialize,Deserialize};
 
 use crate::err::{ParseErrs, SpaceErr};
-use crate::{ANONYMOUS, HYPERUSER};
+use crate::{ANONYMOUS, HYPERUSER, HYPER_USERBASE};
 use crate::loc::{CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE, LOCAL_PORTAL, PointSegment, PointSegQuery, REMOTE_ENDPOINT, RouteSegQuery, Surface, ToPoint, ToSurface, Variable, Version};
 use crate::parse::{consume_point, consume_point_ctx, Env, point_route_segment, point_selector, point_var, ResolverErr};
 use crate::parse::error::result;
@@ -992,6 +992,11 @@ impl Point {
     pub fn hyperuser() -> Self {
         HYPERUSER.clone()
     }
+
+        pub fn hyper_userbase() -> Self {
+        HYPER_USERBASE.clone()
+    }
+
 
     pub fn anonymous() -> Self {
         ANONYMOUS.clone()
