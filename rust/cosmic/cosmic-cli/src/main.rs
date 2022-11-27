@@ -1,10 +1,14 @@
 #![allow(warnings)]
 
+pub mod cli;
+pub mod err;
+
 #[macro_use]
 extern crate clap;
 
+
 #[macro_use]
-extern crate text_io;
+extern crate lazy_static;
 
 use clap::arg;
 use clap::command;
