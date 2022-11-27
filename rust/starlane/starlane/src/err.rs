@@ -1,5 +1,8 @@
 use std::num::ParseIntError;
+
+#[cfg(feature="keycloak")]
 use keycloak::KeycloakError;
+
 use cosmic_hyperspace::err::ErrKind;
 
 #[cfg(feature = "postgres")]
@@ -36,13 +39,17 @@ pub mod convert {
     //    use cosmic_registry_postgres::err::PostErr;
     #[cfg(feature = "postgres")]
     use cosmic_registry_postgres::err::PostErr;
+    #[cfg(feature = "postgres")]
+    use sqlx::Error;
+
     use cosmic_space::err::SpaceErr;
     use mechtron_host::err::{DefaultHostErr, HostErr};
-    use sqlx::Error;
+
     use std::io;
     use std::num::ParseIntError;
     use std::str::Utf8Error;
     use std::string::FromUtf8Error;
+    #[cfg(feature = "keycloak")]
     use keycloak::KeycloakError;
     use strum::ParseError;
     use tokio::sync::oneshot;
@@ -177,6 +184,7 @@ pub mod convert {
         }
     }
 
+    #[cfg(feature="postgres")]
     impl From<sqlx::Error> for Err {
         fn from(e: sqlx::Error) -> Self {
             Err::new(e)

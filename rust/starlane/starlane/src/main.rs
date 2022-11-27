@@ -10,14 +10,19 @@ extern crate cosmic_macros;
 #[cfg(feature = "keycloak")]
 pub mod keycloak;
 
+#[cfg(test)]
+mod test;
+
 #[macro_use]
 extern crate async_trait;
 #[macro_use]
 extern crate lazy_static;
 
 use std::collections::HashSet;
+use std::future::Future;
 
 use std::path::{Path, PathBuf};
+use std::process::Output;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -40,7 +45,7 @@ use cosmic_hyperspace::driver::mechtron::{HostDriverFactory, MechtronDriverFacto
 use cosmic_hyperspace::driver::root::RootDriverFactory;
 use cosmic_hyperspace::driver::space::SpaceDriverFactory;
 use cosmic_hyperspace::driver::{DriverAvail, DriversBuilder};
-use cosmic_hyperspace::machine::{Machine, MachineTemplate};
+use cosmic_hyperspace::machine::{Machine, MachineApi, MachineTemplate};
 use cosmic_hyperspace::reg::{Registry, RegistryApi};
 use cosmic_hyperspace::Cosmos;
 
@@ -75,9 +80,11 @@ use cosmic_hyperspace::mem::registry::{MemRegApi, MemRegCtx};
 use cosmic_space::loc;
 use cosmic_space::point::Point;
 use cosmic_space::wasm::Timestamp;
+
+#[cfg(feature="keycloak")]
 use crate::keycloak::{KeycloakDriverFactory, UserDriverFactory};
 
-fn main() -> Result<(), StarErr> {
+pub fn main() -> Result<(), StarErr> {
     ctrlc::set_handler(move || {
         std::process::exit(1);
     });
@@ -102,6 +109,43 @@ fn main() -> Result<(), StarErr> {
     });
     Ok(())
 }
+
+
+pub fn start<F>(mut future: F) -> Result<(), StarErr> where F: FnMut(MachineApi<Starlane>)+Send+Sync+'static{
+    ctrlc::set_handler(move || {
+        std::process::exit(1);
+    });
+
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async move {
+        let starlane = Starlane::new().await.unwrap();
+        let machine_api = starlane.machine();
+        tokio::time::timeout(Duration::from_secs(30), machine_api.wait_ready())
+            .await
+            .unwrap();
+        println!("> STARLANE Ready!");
+
+        {
+            let machine_api = machine_api.clone();
+            tokio::spawn(async move {
+                future(machine_api);
+            });
+        }
+
+        // this is a dirty hack which is good enough for a 0.3.0 release...
+        loop {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+        }
+        let cl = machine_api.clone();
+        machine_api.await_termination().await.unwrap();
+        cl.terminate();
+    });
+    Ok(())
+}
+
+
 
 lazy_static! {
     pub static ref STARLANE_CONTROL_PORT: u16 = std::env::var("STARLANE_PORT")
@@ -224,14 +268,14 @@ impl Cosmos for Starlane {
             StarSub::Jump => {
                 builder.add_post(Arc::new(WebDriverFactory::new()));
                 // builder.add_post(Arc::new(ControlDriverFactory::new()));
+
+            }
+            StarSub::Fold => {
                 #[cfg(feature="keycloak")]
                 {
                     builder.add_post(Arc::new(KeycloakDriverFactory::new()));
                     builder.add_post(Arc::new(UserDriverFactory::new()));
                 }
-            }
-            StarSub::Fold => {
-
             }
             StarSub::Machine => {
                 builder.add_post(Arc::new(ControlDriverFactory::new()));
@@ -312,10 +356,4 @@ impl PostgresPlatform for Starlane {
             star.to_sql_name(),
         ))
     }
-}
-
-#[cfg(test)]
-pub mod test {
-    #[test]
-    pub fn test() {}
 }

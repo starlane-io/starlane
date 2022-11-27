@@ -371,8 +371,6 @@ where
                 cli.exec(format!("create? {}<User<Account>>", Point::hyperuser().to_string())).await?.ok_or()?;
                 cli.exec(format!("create? {}<User<Account>>", Point::anonymous().to_string())).await?.ok_or()?;
 
-                println!("user accounts created.");
-
                 Ok(Status::Ready)
             }
             _ => Ok(Status::Ready),
