@@ -300,7 +300,7 @@ where
             .ok_or(format!("expecting parent ({})", point.to_string()))?;
         let point_segment = point.last_segment().ok_or("expecting a last_segment")?;
 
-        let statement = "UPDATE particles SET star=$1, WHERE parent=$2 AND point_segment=$3";
+        let statement = "UPDATE particles SET star=$1 WHERE parent=$2 AND point_segment=$3";
 
         let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;

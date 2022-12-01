@@ -176,7 +176,7 @@ async fn refresh() -> Result<String,SpaceErr> {
     let response = client
         .post(&url)
         .form(&json!({
-                "refresh_token": token,
+                "refresh_token": refresh_token,
                 "client_id": "admin-cli",
                 "grant_type": "refresh_token"
             }))

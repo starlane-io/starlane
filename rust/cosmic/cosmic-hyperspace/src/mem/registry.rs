@@ -152,7 +152,7 @@ where
             .ctx
             .particles
             .get(&point)
-            .ok_or("not found")?
+            .ok_or(format!("could not find {}", point.to_string()))?
             .value()
             .clone();
         record.details.properties = properties;

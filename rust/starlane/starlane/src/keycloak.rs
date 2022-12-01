@@ -27,6 +27,7 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use validator::validate_email;
+use cosmic_space::HYPER_USERBASE;
 
 lazy_static! {
     static ref KEYCLOAK_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -854,7 +855,7 @@ pub fn is_hyperuser(point: &Point) -> bool {
 }
 
 pub fn is_hyper_userbase(point: &Point) -> bool {
-    point.to_string().as_str() == "hyperspace:users"
+    Point::hyper_userbase() == *point
 }
 
 fn normalize_realm(realm: &Point) -> String {
