@@ -151,11 +151,13 @@ async fn login(host: &str, oauth_url: &str, username: &str, password: &str) -> R
         .json::<LoginResp>()
         .await?;
 
-    let mut config = crate::cli::CLI_CONFIG.lock()?;
-    config.hostname = host.to_string();
-    config.refresh_token = Some(res.refresh_token);
-    config.oauth_url = Some(oauth_url.to_string());
-    config.save()?;
+    {
+        let mut config = crate::cli::CLI_CONFIG.lock()?;
+        config.hostname = host.to_string();
+        config.refresh_token = Some(res.refresh_token);
+        config.oauth_url = Some(oauth_url.to_string());
+        config.save()?;
+    }
 
     Ok(())
 }
