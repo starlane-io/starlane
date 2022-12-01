@@ -383,23 +383,21 @@ impl TryFrom<KindParts> for Kind {
                     }
                 }
             }
-            BaseKind::User => {
-                match value.sub.ok_or("UserBase<?> requires a Sub Kind")?.as_str() {
-                    "OAuth" => Kind::User(UserVariant::OAuth(
-                        value
-                            .specific
-                            .ok_or("UserBase<OAuth<?>> requires a Specific")?,
-                    )),
+            BaseKind::User => match value.sub.ok_or("UserBase<?> requires a Sub Kind")?.as_str() {
+                "OAuth" => Kind::User(UserVariant::OAuth(
+                   value
+                        .specific
+                        .ok_or("User<OAuth<?>> requires a Specific")?,
+                )),
 
-                  "Account" => Kind::User(UserVariant::Account),
-                    what => {
-                        return Err(SpaceErr::from(format!(
-                            "unexpected User SubKind '{}'",
-                            what
-                        )));
-                    }
+                "Account" => Kind::User(UserVariant::Account),
+                what => {
+                    return Err(SpaceErr::from(format!(
+                        "unexpected User SubKind '{}'",
+                        what
+                    )));
                 }
-            }
+            },
             BaseKind::Base => Kind::Base,
             BaseKind::File => Kind::File(FileSubKind::from_str(
                 value.sub.ok_or("File<?> requires a Sub Kind")?.as_str(),
@@ -553,14 +551,14 @@ impl Into<Option<String>> for StarSub {
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize, strum_macros::Display)]
 pub enum UserVariant {
     OAuth(Specific),
-    Account
+    Account,
 }
 
 impl UserVariant {
     pub fn specific(&self) -> Option<&Specific> {
         match self {
             UserVariant::OAuth(specific) => Option::Some(specific),
-            UserVariant::Account => None
+            UserVariant::Account => None,
         }
     }
 }
@@ -733,14 +731,18 @@ pub struct Specific {
 
 impl Specific {
     pub fn to_selector(&self) -> SpecificSelector {
-        SpecificSelector::from_str(        format!(
-            "{}:{}:{}:{}:({})",
-            self.provider,
-            self.vendor,
-            self.product,
-            self.variant,
-            self.version.to_string()
-        ).as_str()).unwrap()
+        SpecificSelector::from_str(
+            format!(
+                "{}:{}:{}:{}:({})",
+                self.provider,
+                self.vendor,
+                self.product,
+                self.variant,
+                self.version.to_string()
+            )
+            .as_str(),
+        )
+        .unwrap()
     }
 }
 
