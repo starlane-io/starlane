@@ -390,9 +390,11 @@ impl TryFrom<KindParts> for Kind {
                             .specific
                             .ok_or("UserBase<OAuth<?>> requires a Specific")?,
                     )),
+
+                  "Account" => Kind::User(UserVariant::Account),
                     what => {
                         return Err(SpaceErr::from(format!(
-                            "unexpected Database SubKind '{}'",
+                            "unexpected User SubKind '{}'",
                             what
                         )));
                     }

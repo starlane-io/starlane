@@ -298,6 +298,7 @@ where
     async fn init(&self) -> Result<Status, SpaceErr> {
         match self.skel.skel.skel.kind {
             StarSub::Central => {
+                /*
                 let registration = Registration {
                     point: Point::root(),
                     kind: Kind::Root,
@@ -312,8 +313,7 @@ where
                     .register(&registration)
                     .await
                     .map_err(|e| e.to_space_err())?;
-
-                let record = self
+       let record = self
                     .skel.skel.skel
                     .registry
                     .record(&Point::root())
@@ -326,6 +326,9 @@ where
                     .assign_star(&Point::root(), &self.skel.point)
                     .await
                     .map_err(|e| e.to_space_err())?;
+
+                 */
+
 
                 let registration = Registration {
                     point: Point::global_executor(),
