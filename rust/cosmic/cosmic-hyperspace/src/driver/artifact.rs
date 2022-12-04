@@ -4,7 +4,7 @@ use crate::driver::{
 };
 use crate::err::HyperErr;
 use crate::star::HyperStarSkel;
-use crate::Cosmos;
+use crate::Platform;
 use acid_store::repo::key::KeyRepo;
 use acid_store::repo::value::ValueRepo;
 use acid_store::repo::Commit;
@@ -117,7 +117,7 @@ impl RepoDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for RepoDriverFactory
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Repo)
@@ -135,7 +135,7 @@ where
 
 pub struct RepoDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     skel: HyperStarSkel<P>,
 }
@@ -143,7 +143,7 @@ where
 #[handler]
 impl<P> RepoDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(skel: HyperStarSkel<P>) -> Self {
         Self { skel }
@@ -153,7 +153,7 @@ where
 #[async_trait]
 impl<P> Driver<P> for RepoDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> Kind {
         Kind::Repo
@@ -188,7 +188,7 @@ impl Repo {}
 #[async_trait]
 impl<P> ItemHandler<P> for Repo
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(REPO_BIND_CONFIG.clone())
@@ -206,7 +206,7 @@ impl BundleSeriesDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for BundleSeriesDriverFactory
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::BundleSeries)
@@ -234,7 +234,7 @@ impl BundleSeriesDriver {
 #[async_trait]
 impl<P> Driver<P> for BundleSeriesDriver
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> Kind {
         Kind::BundleSeries
@@ -253,7 +253,7 @@ impl BundleSeries {}
 #[async_trait]
 impl<P> ItemHandler<P> for BundleSeries
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(SERIES_BIND_CONFIG.clone())
@@ -271,7 +271,7 @@ impl BundleDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for BundleDriverFactory
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Bundle)
@@ -290,7 +290,7 @@ where
 
 pub struct BundleDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     skel: HyperSkel<P>,
     ctx: DriverCtx,
@@ -299,7 +299,7 @@ where
 #[handler]
 impl<P> BundleDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(skel: HyperSkel<P>, ctx: DriverCtx) -> Self {
         Self { skel, ctx }
@@ -309,7 +309,7 @@ where
 #[async_trait]
 impl<P> Driver<P> for BundleDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> Kind {
         Kind::Bundle
@@ -329,7 +329,7 @@ where
 
 pub struct BundleDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     skel: HyperSkel<P>,
     ctx: DriverCtx,
@@ -337,19 +337,19 @@ where
 
 impl<P> BundleDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn restore(skel: HyperSkel<P>, ctx: DriverCtx) -> Self {
         Self { skel, ctx }
     }
 }
 
-impl<P> DriverHandler<P> for BundleDriverHandler<P> where P: Cosmos {}
+impl<P> DriverHandler<P> for BundleDriverHandler<P> where P: Platform {}
 
 #[handler]
 impl<P> BundleDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn store(&self) -> Result<ValueRepo<String>, SpaceErr> {
         let config = acid_store::store::DirectoryConfig {
@@ -536,7 +536,7 @@ impl Bundle {}
 #[async_trait]
 impl<P> ItemHandler<P> for Bundle
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(BUNDLE_BIND_CONFIG.clone())
@@ -554,7 +554,7 @@ impl ArtifactDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for ArtifactDriverFactory
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Artifact)
@@ -572,7 +572,7 @@ where
 
 pub struct ArtifactDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     skel: DriverSkel<P>,
     ctx: DriverCtx,
@@ -581,7 +581,7 @@ where
 #[handler]
 impl<P> ArtifactDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
         Self { skel, ctx }
@@ -591,7 +591,7 @@ where
 #[async_trait]
 impl<P> Driver<P> for ArtifactDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> Kind {
         Kind::Artifact(ArtifactSubKind::Raw)
@@ -616,26 +616,26 @@ where
 
 pub struct ArtifactDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     skel: HyperSkel<P>,
 }
 
 impl<P> ArtifactDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn restore(skel: HyperSkel<P>) -> Self {
         Self { skel }
     }
 }
 
-impl<P> DriverHandler<P> for ArtifactDriverHandler<P> where P: Cosmos {}
+impl<P> DriverHandler<P> for ArtifactDriverHandler<P> where P: Platform {}
 
 #[handler]
 impl<P> ArtifactDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn store(&self) -> Result<ValueRepo<String>, SpaceErr> {
         let config = acid_store::store::DirectoryConfig {
@@ -685,7 +685,7 @@ where
 
 pub struct Artifact<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     skel: ItemSkel<P>,
 }
@@ -693,7 +693,7 @@ where
 #[handler]
 impl<P> Artifact<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn store(&self) -> Result<ValueRepo<String>, SpaceErr> {
         let config = acid_store::store::DirectoryConfig {
@@ -734,7 +734,7 @@ where
 
 impl<P> Item<P> for Artifact<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     type Skel = ItemSkel<P>;
     type Ctx = ();
@@ -765,7 +765,7 @@ impl<P> DirectedHandler for Artifact<P> where P: Cosmos {
 #[async_trait]
 impl<P> ItemHandler<P> for Artifact<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(ARTIFACT_BIND_CONFIG.clone())

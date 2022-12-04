@@ -5,7 +5,7 @@ use crate::driver::{
 use crate::err::HyperErr;
 use crate::reg::Registration;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::Cosmos;
+use crate::Platform;
 use ascii::IntoAsciiString;
 use cosmic_space::artifact::ArtRef;
 use cosmic_space::command::common::StateSrc;
@@ -73,7 +73,7 @@ impl WebDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for WebDriverFactory
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> KindSelector {
         KindSelector {
@@ -95,14 +95,14 @@ where
 
 pub struct WebDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     skel: DriverSkel<P>,
 }
 
 impl<P> WebDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(skel: DriverSkel<P>) -> Self {
         Self { skel }
@@ -112,7 +112,7 @@ where
 #[async_trait]
 impl<P> Driver<P> for WebDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> Kind {
         Kind::Native(NativeSub::Web)
@@ -164,26 +164,26 @@ where
 
 pub struct WebDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     skel: DriverSkel<P>,
 }
 
 impl<P> WebDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn restore(skel: DriverSkel<P>) -> Self {
         WebDriverHandler { skel }
     }
 }
 
-impl<P> DriverHandler<P> for WebDriverHandler<P> where P: Cosmos {}
+impl<P> DriverHandler<P> for WebDriverHandler<P> where P: Platform {}
 
 #[handler]
 impl<P> WebDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     /*
     #[route("Hyp<Assign>")]
@@ -205,14 +205,14 @@ where
 
 pub struct Web<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     skel: ItemSkel<P>,
 }
 
 impl<P> Web<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(skel: ItemSkel<P>) -> Self {
         Self { skel }
@@ -222,7 +222,7 @@ where
 #[async_trait]
 impl<P> TraversalRouter for Web<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
         if traversal.is_directed() {
@@ -245,7 +245,7 @@ where
 #[async_trait]
 impl<P> ItemRouter<P> for Web<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(WEB_BIND_CONFIG.clone())
@@ -254,7 +254,7 @@ where
 
 pub struct WebRunner<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub skel: ItemSkel<P>,
     pub transmitter: ProtoTransmitter,
@@ -262,7 +262,7 @@ where
 
 impl<P> WebRunner<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(skel: ItemSkel<P>) -> Self {
         let mut router = LayerInjectionRouter::new(
@@ -322,7 +322,7 @@ where
         mut req: tiny_http::Request,
     ) -> Result<(), C::Err>
     where
-        C: Cosmos,
+        C: Platform,
     {
         let method = req
             .method()

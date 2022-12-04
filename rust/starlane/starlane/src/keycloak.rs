@@ -5,7 +5,7 @@ use cosmic_hyperspace::driver::{
 };
 use cosmic_hyperspace::err::HyperErr;
 use cosmic_hyperspace::star::HyperStarSkel;
-use cosmic_hyperspace::Cosmos;
+use cosmic_hyperspace::Platform;
 use cosmic_space::artifact::ArtRef;
 use cosmic_space::config::bind::BindConfig;
 use cosmic_space::hyper::HyperSubstance;
@@ -60,7 +60,7 @@ impl KeycloakDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for KeycloakDriverFactory
 where
-    P: Cosmos,
+    P: Platform,
     P::Err: StarlaneErr,
 {
     fn kind(&self) -> KindSelector {
@@ -82,7 +82,7 @@ where
 
 pub struct KeycloakDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     skel: HyperSkel<P>,
     ctx: DriverCtx,
@@ -92,7 +92,7 @@ where
 #[handler]
 impl<P> KeycloakDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
     P::Err: StarlaneErr,
 {
     pub async fn new(skel: HyperSkel<P>, ctx: DriverCtx) -> Result<Self, P::Err> {
@@ -104,7 +104,7 @@ where
 #[async_trait]
 impl<P> Driver<P> for KeycloakDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
     P::Err: StarlaneErr,
 {
     fn kind(&self) -> Kind {
@@ -138,7 +138,7 @@ where
 
 pub struct KeycloakDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     skel: HyperSkel<P>,
     ctx: DriverCtx,
@@ -147,7 +147,7 @@ where
 
 impl<P> KeycloakDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn restore(skel: HyperSkel<P>, ctx: DriverCtx, admin: StarlaneKeycloakAdmin<P>) -> Self {
         Self { skel, ctx, admin }
@@ -156,17 +156,17 @@ where
 
 impl<P> DriverHandler<P> for KeycloakDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 
-    <P as Cosmos>::Err: StarlaneErr,
+    <P as Platform>::Err: StarlaneErr,
 {
 }
 
 #[handler]
 impl<P> KeycloakDriverHandler<P>
 where
-    P: Cosmos,
-    <P as Cosmos>::Err: StarlaneErr,
+    P: Platform,
+    <P as Platform>::Err: StarlaneErr,
 {
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
@@ -184,17 +184,17 @@ where
 
 pub struct Keycloak<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     skel: ItemSkel<P>,
 }
 
 #[handler]
-impl<P> Keycloak<P> where P: Cosmos {}
+impl<P> Keycloak<P> where P: Platform {}
 
 impl<P> Item<P> for Keycloak<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     type Skel = ItemSkel<P>;
     type Ctx = ();
@@ -208,7 +208,7 @@ where
 #[async_trait]
 impl<P> ItemHandler<P> for Keycloak<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(KEYCLOAK_BIND_CONFIG.clone())
@@ -246,7 +246,7 @@ impl UserDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for UserDriverFactory
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_str("<User<Account>>").unwrap()
@@ -265,7 +265,7 @@ where
 
 pub struct UserDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     skel: HyperSkel<P>,
     ctx: DriverCtx,
@@ -274,7 +274,7 @@ where
 #[handler]
 impl<P> UserDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(skel: HyperSkel<P>, ctx: DriverCtx) -> Self {
         Self { skel, ctx }
@@ -284,7 +284,7 @@ where
 #[async_trait]
 impl<P> Driver<P> for UserDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> Kind {
         Kind::User(UserVariant::OAuth(
@@ -312,7 +312,7 @@ where
 
 pub struct UserDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     skel: HyperSkel<P>,
     ctx: DriverCtx,
@@ -320,19 +320,19 @@ where
 
 impl<P> UserDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn restore(skel: HyperSkel<P>, ctx: DriverCtx) -> Self {
         Self { skel, ctx }
     }
 }
 
-impl<P> DriverHandler<P> for UserDriverHandler<P> where P: Cosmos {}
+impl<P> DriverHandler<P> for UserDriverHandler<P> where P: Platform {}
 
 #[handler]
 impl<P> UserDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
@@ -342,17 +342,17 @@ where
 
 pub struct User<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     skel: ItemSkel<P>,
 }
 
 #[handler]
-impl<P> User<P> where P: Cosmos {}
+impl<P> User<P> where P: Platform {}
 
 impl<P> Item<P> for User<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     type Skel = ItemSkel<P>;
     type Ctx = ();
@@ -366,7 +366,7 @@ where
 #[async_trait]
 impl<P> ItemHandler<P> for User<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(USER_BIND_CONFIG.clone())
@@ -376,7 +376,7 @@ where
 #[derive(Clone)]
 pub struct StarlaneKeycloakAdmin<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub admin: Arc<KeycloakAdmin>,
     phantom: PhantomData<P>,
@@ -384,7 +384,7 @@ where
 
 impl<P> StarlaneKeycloakAdmin<P>
 where
-    P: Cosmos,
+    P: Platform,
     P::Err: StarlaneErr,
 {
     pub async fn new() -> Result<Self, P::Err> {

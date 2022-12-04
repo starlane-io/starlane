@@ -1,4 +1,4 @@
-#![allow(warnings)]
+    #![allow(warnings)]
 
 pub mod cli;
 pub mod err;
@@ -107,7 +107,7 @@ async fn main() -> Result<(), SpaceErr> {
                 Ok(())
             }
             ("script", args) => {
-                refresh().await?;
+//                refresh().await?;
                 let filename: &String = args.get_one("filename").unwrap();
                 let script = fs::read_to_string(filename)?;
                 let lines: Vec<String> = result(separated_list0(tag(";"), is_not(";"))(new_span(
@@ -125,7 +125,7 @@ async fn main() -> Result<(), SpaceErr> {
                 Ok(())
             }
             (subcommand, args) => {
-                refresh().await?;
+//                refresh().await?;
                 let session = Session::new(host, certs).await?;
                 session.command(subcommand).await
             }

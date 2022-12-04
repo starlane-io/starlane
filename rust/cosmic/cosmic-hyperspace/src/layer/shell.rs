@@ -26,12 +26,12 @@ use cosmic_space::wave::{
 };
 
 use crate::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
-use crate::Cosmos;
+use crate::Platform;
 
 #[derive(DirectedHandler)]
 pub struct Shell<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     skel: HyperStarSkel<P>,
     state: ShellState,
@@ -40,7 +40,7 @@ where
 
 impl<P> Shell<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     pub fn new(skel: HyperStarSkel<P>, state: ShellState) -> Self {
         let logger = skel.logger.point(state.point.clone());
@@ -55,7 +55,7 @@ where
 #[async_trait]
 impl<P> TraversalLayer for Shell<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     fn surface(&self) -> Surface {
         self.state
@@ -214,7 +214,7 @@ where
 #[handler]
 impl<P> Shell<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     #[route("Ext<NewCliSession>")]
     pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Surface, SpaceErr> {

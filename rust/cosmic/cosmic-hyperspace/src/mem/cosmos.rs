@@ -11,7 +11,7 @@ use crate::driver::DriverAvail;
 use crate::err::{CosmicErr, HyperErr};
 use crate::mem::registry::{MemRegApi, MemRegCtx};
 use crate::reg::Registry;
-use crate::{Cosmos, DriversBuilder, MachineTemplate};
+use crate::{Platform, DriversBuilder, MachineTemplate};
 use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, LocalHyperwayGateJumper};
 use cosmic_space::artifact::asynch::{ArtifactApi, ReadArtifactFetcher};
 use cosmic_space::err::SpaceErr;
@@ -43,7 +43,7 @@ pub struct MemCosmos {
 }
 
 #[async_trait]
-impl Cosmos for MemCosmos {
+impl Platform for MemCosmos {
     type Err = CosmicErr;
     type RegistryContext = MemRegCtx;
     type StarAuth = AnonHyperAuthenticator;

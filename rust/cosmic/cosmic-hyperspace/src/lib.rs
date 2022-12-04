@@ -86,7 +86,7 @@ pub extern "C" fn cosmic_timestamp() -> Timestamp {
 }
 
 #[async_trait]
-pub trait Cosmos: Send + Sync + Sized + Clone
+pub trait Platform: Send + Sync + Sized + Clone
 where
     Self::Err: HyperErr,
     Self: 'static,
@@ -245,6 +245,10 @@ where
             Ok(_) => {}
         }
         result
+    }
+
+    fn post_startup( machine: &MachineApi<Self> ) -> Result<(),Self::Err> {
+        Ok(())
     }
 }
 

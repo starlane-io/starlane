@@ -47,7 +47,7 @@ use cosmic_hyperspace::driver::space::SpaceDriverFactory;
 use cosmic_hyperspace::driver::{DriverAvail, DriversBuilder};
 use cosmic_hyperspace::machine::{Machine, MachineApi, MachineTemplate};
 use cosmic_hyperspace::reg::{Registry, RegistryApi};
-use cosmic_hyperspace::Cosmos;
+use cosmic_hyperspace::Platform;
 
 #[cfg(feature = "postgres")]
 use cosmic_registry_postgres::err::PostErr;
@@ -211,7 +211,7 @@ impl Starlane {
 }
 
 #[async_trait]
-impl Cosmos for Starlane {
+impl Platform for Starlane {
     type Err = StarErr;
     #[cfg(feature = "postgres")]
     type RegistryContext = PostgresRegistryContextHandle<Self>;
@@ -343,6 +343,10 @@ impl Cosmos for Starlane {
                 .await
                 .unwrap();
         server.start().unwrap();
+    }
+
+    fn post_startup( machine: &MachineApi<Self> ) -> Result<(),Self::Err> {
+        Ok(())
     }
 }
 

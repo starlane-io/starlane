@@ -1,4 +1,4 @@
-use crate::Cosmos;
+use crate::Platform;
 use cosmic_space::command::common::{SetProperties, SetRegistry};
 use cosmic_space::command::direct::create::Strategy;
 use cosmic_space::command::direct::delete::Delete;
@@ -18,7 +18,7 @@ pub type Registry<P> = Arc<dyn RegistryApi<P>>;
 #[async_trait]
 pub trait RegistryApi<P>: Send + Sync
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn nuke<'a>(&'a self) -> Result<(), P::Err>;
 
