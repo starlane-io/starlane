@@ -192,7 +192,7 @@ where
         platform: P,
         call_tx: mpsc::Sender<MachineCall<P>>,
         call_rx: mpsc::Receiver<MachineCall<P>>,
-    ) -> Result<MachineApi<P>, P::Err> {
+    ) -> Result<MachineApi<P>, P::Err> where P: Platform {
         let template = platform.machine_template();
         let machine_name = platform.machine_name();
         let machine_api = MachineApi::new(call_tx.clone());
@@ -406,7 +406,17 @@ where
         let fetcher = Arc::new(ClientArtifactFetcher::new(client, skel.registry.clone()));
         skel.artifacts.set_fetcher(fetcher).await;
 
-        machine.start().await;
+        tokio::spawn( async move {
+            machine.start().await;
+        });
+
+        {
+            let machine_api = machine_api.clone();
+            tokio::spawn(async move {
+                platform.post_startup(&machine_api).await.unwrap();
+            });
+        }
+
         Ok(machine_api)
     }
 

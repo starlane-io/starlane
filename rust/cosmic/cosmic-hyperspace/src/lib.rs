@@ -100,6 +100,10 @@ where
     type StarAuth;
     type RemoteStarConnectionFactory;
 
+    async fn post_startup( &self, machine: &MachineApi<Self> ) -> Result<(),Self::Err> {
+        Ok(())
+    }
+
     fn machine(&self) -> MachineApi<Self> {
         Machine::new(self.clone())
     }
@@ -247,9 +251,7 @@ where
         result
     }
 
-    fn post_startup( machine: &MachineApi<Self> ) -> Result<(),Self::Err> {
-        Ok(())
-    }
+
 }
 
 pub struct Settings {

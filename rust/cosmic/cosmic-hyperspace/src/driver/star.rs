@@ -361,19 +361,6 @@ where
                     .await
                     .map_err(|e| e.to_space_err())?;
 
-                let mut router = LayerInjectionRouter::new( self.skel.skel.skel.clone(), self.skel.skel.point.to_surface().with_layer(Layer::Core));
-                let router = Arc::new(router);
-                let mut builder = ProtoTransmitterBuilder::new( router, self.skel.skel.skel.exchanger.clone() );
-                builder.from = SetStrategy::Override(self.skel.skel.point.to_surface().with_layer(Layer::Core));
-                builder.to = SetStrategy::Override(self.skel.skel.point.to_surface().with_layer(Layer::Shell).to_recipients());
-                //let cli = self.skel.skel.logger.result(ControlCliSession::other(builder, self.skel.point.clone()).await)?;.
-                let result = self.skel.skel.logger.result(ControlCliSession::other(builder, self.skel.point.clone()).await);
-                let cli = result?;
-
-                cli.exec(format!("create? {}<User<OAuth>>", Point::hyper_userbase().to_string())).await?.ok_or()?;
-                cli.exec(format!("create? {}<User<Account>>", Point::hyperuser().to_string())).await?.ok_or()?;
-                cli.exec(format!("create? {}<User<Account>>", Point::anonymous().to_string())).await?.ok_or()?;
-
                 Ok(Status::Ready)
             }
             _ => Ok(Status::Ready),

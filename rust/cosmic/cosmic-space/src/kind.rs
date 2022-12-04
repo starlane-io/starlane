@@ -303,6 +303,9 @@ impl Kind {
             Kind::Artifact(_) => true,
             Kind::Mechtron => true,
             Kind::Host => true,
+            Kind::User(v) => {
+                true
+            },
             Kind::Native(NativeSub::Web) => true,
             _ => false,
         }

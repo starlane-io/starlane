@@ -345,8 +345,13 @@ impl Platform for Starlane {
         server.start().unwrap();
     }
 
-    fn post_startup( machine: &MachineApi<Self> ) -> Result<(),Self::Err> {
+    async fn post_startup( &self, machine: &MachineApi<Self> ) -> Result<(),Self::Err> {
+        let cli = machine.cli().await?;
+        cli.exec(format!("create? {}<User<OAuth>>", Point::hyper_userbase().to_string())).await?.ok_or()?;
+        cli.exec(format!("create? {}<User<Account>>", Point::hyperuser().to_string())).await?.ok_or()?;
+        cli.exec(format!("create? {}<User<Account>>", Point::anonymous().to_string())).await?.ok_or()?;
         Ok(())
+
     }
 }
 
