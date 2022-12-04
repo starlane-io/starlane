@@ -2022,6 +2022,12 @@ where
 
     pub async fn locate(&self, point: &Point) -> Result<ParticleLocation, P::Err> {
         let record = self.skel.registry.record(&point).await?;
+        if point.is_root() {
+            return Ok(ParticleLocation {
+                star: Some(Point::central()),
+                host: None,
+            });
+        }
         match &record.location.star {
             Some(_) => Ok(record.location),
             None => {
@@ -2047,6 +2053,10 @@ where
         point: &Point,
         state: StateSrc,
     ) -> Result<ParticleLocation, P::Err> {
+
+        if point.is_root() {
+            return Ok(ParticleLocation::new( Some(Point::central()), None ));
+        }
         // check if parent is provisioned
         let parent = point
             .parent()

@@ -120,7 +120,10 @@ impl ParticleRecord {
                 },
                 properties: Default::default(),
             },
-            location: Default::default(),
+            location: ParticleLocation {
+                star: Some(Point::central()),
+                host: None
+            }
         }
     }
 }

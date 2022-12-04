@@ -299,6 +299,7 @@ impl Kind {
 
     pub fn is_auto_provision(&self) -> bool {
         match self {
+            Kind::Root => true,
             Kind::Bundle => true,
             Kind::Artifact(_) => true,
             Kind::Mechtron => true,
