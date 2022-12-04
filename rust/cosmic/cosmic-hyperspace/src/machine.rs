@@ -43,6 +43,7 @@ use crate::err::HyperErr;
 use crate::reg::{Registry, RegistryApi};
 use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
 use crate::{Platform, DriversBuilder};
+use crate::driver::control::{ControlClient, ControlCliSession};
 
 #[derive(Clone)]
 pub struct MachineApi<P>
@@ -115,6 +116,17 @@ where
                 return Err(P::Err::new(err.to_string()));
             }
         }
+    }
+
+    pub async fn cli(&self) -> Result<ControlCliSession,P::Err> {
+        let factory = MachineApiExtFactory {
+            machine_api: self.clone(),
+        };
+
+        let client = ControlClient::new(Box::new(factory))?;
+        client.wait_for_ready(Duration::from_secs(5)).await?;
+        let cli = client.new_cli_session().await?;
+        Ok(cli)
     }
 
     #[cfg(test)]
@@ -381,7 +393,6 @@ where
         /// SETUP ARTIFAC
         let factory = MachineApiExtFactory {
             machine_api: machine_api.clone(),
-            logger: logger.clone(),
         };
         let exchanger = Exchanger::new(
             Point::from_str("artifact").unwrap().to_surface(),
@@ -667,7 +678,6 @@ where
     P: Platform,
 {
     pub machine_api: MachineApi<P>,
-    pub logger: PointLogger,
 }
 
 #[async_trait]
@@ -684,8 +694,7 @@ where
             auth: Box::new(Substance::Empty),
             remote: None,
         };
-        self.logger
-            .result_ctx("machine_api.knock()", self.machine_api.knock(knock).await)
+         self.machine_api.knock(knock).await
     }
 }
 
