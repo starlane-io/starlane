@@ -61,10 +61,7 @@ use crate::config::mechtron::MechtronConfig;
 use crate::config::Document;
 use crate::err::report::{Label, Report, ReportKind};
 use crate::err::{ParseErrs, SpaceErr};
-use crate::kind::{
-    ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, NativeSub, Specific,
-    StarSub, UserVariant,
-};
+use crate::kind::{ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, NativeSub, Specific, StarSub, UserBaseSub, UserVariant};
 use crate::loc::StarKey;
 use crate::loc::{Layer, PointSegment, Surface, Topic, Uuid, VarVal, Variable, Version};
 use crate::parse::error::{find_parse_err, result};
@@ -5586,6 +5583,7 @@ pub fn kind_base<I: Span>(input: I) -> Res<I, BaseKind> {
     }
 }
 
+
 pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
     move |input: I| {
         let (next, sub) = context("kind-sub", camel_case)(input.clone())?;
@@ -5595,24 +5593,6 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
                     let (next, specific) =
                         context("specific", delimited(tag("<"), specific, tag(">")))(next)?;
                     Ok((next, Kind::Database(DatabaseSubKind::Relational(specific))))
-                }
-                _ => {
-                    let err = ErrorTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(ErrorTree::add_context(
-                        input,
-                        "kind-sub:not-found",
-                        err,
-                    )))
-                }
-            },
-            BaseKind::User => match sub.as_str() {
-                "OAuth" => {
-                    let (next, specific) =
-                        context("specific", delimited(tag("<"), specific, tag(">")))(next)?;
-                    Ok((next, Kind::User(UserVariant::OAuth(specific))))
-                }
-                "Account" => {
-                    Ok((next, Kind::User(UserVariant::Account)))
                 }
                 _ => {
                     let err = ErrorTree::from_error_kind(input.clone(), ErrorKind::Fail);
@@ -5667,6 +5647,7 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
                     )))
                 }
             },
+            BaseKind::UserBase=> Ok((next, Kind::UserBase)),
             BaseKind::Root => Ok((next, Kind::Root)),
             BaseKind::Space => Ok((next, Kind::Space)),
             BaseKind::Base => Ok((next, Kind::Base)),
@@ -5682,6 +5663,7 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
             BaseKind::Global => Ok((next, Kind::Global)),
             BaseKind::Host => Ok((next, Kind::Host)),
             BaseKind::Guest => Ok((next, Kind::Guest)),
+            BaseKind::User => Ok((next,Kind::User))
         }
     }
 }

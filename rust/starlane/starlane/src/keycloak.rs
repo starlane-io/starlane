@@ -64,7 +64,7 @@ where
     P::Err: StarlaneErr,
 {
     fn kind(&self) -> KindSelector {
-        KindSelector::from_str("<User<OAuth<starlane.io:redhat.com:keycloak:community:(16.0.0)>>>").unwrap()
+        KindSelector::from_str("<UserBase>").unwrap()
     }
 
     async fn create(
@@ -108,9 +108,7 @@ where
     P::Err: StarlaneErr,
 {
     fn kind(&self) -> Kind {
-        Kind::User(UserVariant::OAuth(
-            Specific::from_str("starlane.io:redhat.com:keycloak:community:16.0.1").unwrap(),
-        ))
+        Kind::UserBase
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
@@ -170,6 +168,8 @@ where
 {
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
+
+println!("\tASSIGN OAuth")        ;
         if let HyperSubstance::Assign(assign) = ctx.input {
             self.admin
                 .init_realm_for_point(
@@ -249,7 +249,7 @@ where
     P: Platform,
 {
     fn kind(&self) -> KindSelector {
-        KindSelector::from_str("<User<Account>>").unwrap()
+        KindSelector::from_str("<User>").unwrap()
     }
 
     async fn create(
@@ -287,9 +287,7 @@ where
     P: Platform,
 {
     fn kind(&self) -> Kind {
-        Kind::User(UserVariant::OAuth(
-            Specific::from_str("starlane.io:redhat.com:keycloak:community:16.0.0").unwrap(),
-        ))
+        Kind::User
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
@@ -336,6 +334,7 @@ where
 {
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
+println!("\tASSIGN USER")        ;
         Ok(())
     }
 }

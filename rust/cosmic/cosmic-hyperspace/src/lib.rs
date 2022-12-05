@@ -181,29 +181,7 @@ where
                 }
             },
             BaseKind::Control => Kind::Control,
-            BaseKind::User => match &template.sub {
-                None => {
-                    return Err("SubKind must be set for UserBase<?>".into());
-                }
-                Some(sub) => {
-                    match sub.as_str() {
-                        "OAuth" => {
-                     let specific =
-                        Specific::from_str("starlane.io:redhat.com:keycloak:community:16.0.0")?;
-                    let sub = UserVariant::OAuth(specific);
-                    Kind::User(sub)
-                        }
-                        "Account" => {
-                            Kind::User(UserVariant::Account)
-                        }
-                        what => {
-                            Err::<(),SpaceErr>(format!("SubKind '{}' not recognized", what).into())?;
-                            unimplemented!()
-                        }
-                    }
-
-                }
-            },
+            BaseKind::User => Kind::User,
             BaseKind::Repo => Kind::Repo,
             BaseKind::Portal => Kind::Portal,
             BaseKind::Star => {
@@ -214,6 +192,7 @@ where
             BaseKind::Host => Kind::Host,
             BaseKind::Guest => Kind::Guest,
             BaseKind::Native => Kind::Native(NativeSub::Web),
+            BaseKind::UserBase => Kind::UserBase
         })
     }
 

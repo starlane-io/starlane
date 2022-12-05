@@ -118,6 +118,7 @@ pub enum BaseKind {
     Root,
     Space,
     User,
+    UserBase,
     Base,
     App,
     Mechtron,
@@ -153,6 +154,7 @@ pub enum Sub {
     Auth(UserVariant),
     Star(StarSub),
     Native(NativeSub),
+    UserBase(UserBaseSub)
 }
 
 impl Sub {
@@ -165,6 +167,7 @@ impl Sub {
             Sub::Auth(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
             Sub::Star(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
             Sub::Native(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
+            Sub::UserBase(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap())
         }
     }
 
@@ -193,6 +196,7 @@ impl Into<Option<CamelCase>> for Sub {
             Sub::Auth(u) => u.into(),
             Sub::Star(s) => s.into(),
             Sub::Native(s) => s.into(),
+            Sub::UserBase(s) => s.into()
         }
     }
 }
@@ -207,6 +211,7 @@ impl Into<Option<String>> for Sub {
             Sub::Auth(u) => u.into(),
             Sub::Star(s) => s.into(),
             Sub::Native(s) => s.into(),
+            Sub::UserBase(s) => s.into()
         }
     }
 }
@@ -228,7 +233,7 @@ impl TryFrom<CamelCase> for BaseKind {
 /// Kind defines the behavior and properties of a Particle.  Each particle has a Kind.
 /// At minimum a Kind must have a BaseKind, it can also have a SubKind and a Specific.
 /// A Particle's complete Kind definition is used to match it with a Driver in the Hyperverse
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash )]
 pub enum Kind {
     Root,
     Space,
@@ -245,12 +250,32 @@ pub enum Kind {
     Artifact(ArtifactSubKind),
     Database(DatabaseSubKind),
     Base,
-    User(UserVariant),
+    User,
+    UserBase,
     Star(StarSub),
     Global,
     Host,
     Guest,
     Native(NativeSub),
+}
+
+impl Kind {
+    pub fn to_parts(&self) -> KindParts {
+        KindParts {
+            base: self.to_base(),
+            sub: self.sub().to_camel_case(),
+            specific: match self.specific() {
+                None => None,
+                Some(specific) => Some(specific)
+            }
+        }
+    }
+}
+
+impl ToString for Kind {
+    fn to_string(&self) -> String {
+        self.to_parts().to_string()
+    }
 }
 
 impl ToBaseKind for Kind {
@@ -265,7 +290,7 @@ impl ToBaseKind for Kind {
             Kind::Bundle => BaseKind::Bundle,
             Kind::Control => BaseKind::Control,
             Kind::Portal => BaseKind::Portal,
-            Kind::User(_) => BaseKind::User,
+            Kind::User => BaseKind::User,
             Kind::File(_) => BaseKind::File,
             Kind::Artifact(_) => BaseKind::Artifact,
             Kind::Database(_) => BaseKind::Database,
@@ -277,6 +302,7 @@ impl ToBaseKind for Kind {
             Kind::Global => BaseKind::Global,
             Kind::Host => BaseKind::Host,
             Kind::Guest => BaseKind::Guest,
+            Kind::UserBase => BaseKind::UserBase
         }
     }
 }
@@ -304,7 +330,7 @@ impl Kind {
             Kind::Artifact(_) => true,
             Kind::Mechtron => true,
             Kind::Host => true,
-            Kind::User(v) => {
+            Kind::User => {
                 true
             },
             Kind::Native(NativeSub::Web) => true,
@@ -338,7 +364,6 @@ impl Kind {
             Kind::File(s) => s.clone().into(),
             Kind::Artifact(s) => s.clone().into(),
             Kind::Database(s) => s.clone().into(),
-            Kind::User(s) => s.clone().into(),
             Kind::Star(s) => s.clone().into(),
             _ => Sub::None,
         }
@@ -387,21 +412,7 @@ impl TryFrom<KindParts> for Kind {
                     }
                 }
             }
-            BaseKind::User => match value.sub.ok_or("UserBase<?> requires a Sub Kind")?.as_str() {
-                "OAuth" => Kind::User(UserVariant::OAuth(
-                   value
-                        .specific
-                        .ok_or("User<OAuth<?>> requires a Specific")?,
-                )),
-
-                "Account" => Kind::User(UserVariant::Account),
-                what => {
-                    return Err(SpaceErr::from(format!(
-                        "unexpected User SubKind '{}'",
-                        what
-                    )));
-                }
-            },
+            BaseKind::User => Kind::User,
             BaseKind::Base => Kind::Base,
             BaseKind::File => Kind::File(FileSubKind::from_str(
                 value.sub.ok_or("File<?> requires a Sub Kind")?.as_str(),
@@ -416,7 +427,7 @@ impl TryFrom<KindParts> for Kind {
             BaseKind::Native => Kind::Native(NativeSub::from_str(
                 value.sub.ok_or("Native<?> requires a sub kind")?.as_str(),
             )?),
-
+            BaseKind::UserBase=> Kind::UserBase,
             BaseKind::Root => Kind::Root,
             BaseKind::Space => Kind::Space,
             BaseKind::App => Kind::App,
@@ -686,6 +697,51 @@ impl Into<Option<String>> for DatabaseSubKind {
         Some(self.to_string())
     }
 }
+
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub enum UserBaseSub {
+    OAuth(Specific),
+}
+
+impl ToString for UserBaseSub {
+    fn to_string(&self) -> String {
+        match self {
+            UserBaseSub::OAuth(specific) => {
+                format!("OAuth<{}>", specific.to_string() )
+            }
+        }
+    }
+}
+
+impl UserBaseSub {
+    pub fn specific(&self) -> Option<&Specific> {
+        match self {
+            UserBaseSub::OAuth(specific) => Some(specific),
+        }
+    }
+}
+
+impl Into<Sub> for UserBaseSub {
+    fn into(self) -> Sub {
+        Sub::UserBase(self)
+    }
+}
+
+impl Into<Option<CamelCase>> for UserBaseSub {
+    fn into(self) -> Option<CamelCase> {
+        Some(CamelCase::from_str(self.to_string().as_str()).unwrap())
+    }
+}
+
+impl Into<Option<String>> for UserBaseSub {
+    fn into(self) -> Option<String> {
+        Some(self.to_string())
+    }
+}
+
+
+
 
 impl BaseKind {
     pub fn child_resource_registry_handler(&self) -> ChildRegistry {

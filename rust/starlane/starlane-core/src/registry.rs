@@ -1693,17 +1693,7 @@ pub fn match_kind(template: &KindTemplate) -> Result<Kind, Error> {
             }
         },
         BaseKind::Control => Kind::Control,
-        BaseKind::UserBase => match &template.sub {
-            None => {
-                return Err("SubKind must be set for UserBase<?>".into());
-            }
-            Some(sub) => {
-                let specific =
-                    Specific::from_str("starlane.io:redhat.com:keycloak:community:16.0.0")?;
-                let sub = UserBaseSubKind::OAuth(specific);
-                Kind::UserBase(sub)
-            }
-        },
+        BaseKind::UserBase => Kind::UserBase,
     })
 }
 
