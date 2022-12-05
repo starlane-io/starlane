@@ -62,15 +62,9 @@ impl KindSelector {
     where
         KindParts: Eq + PartialEq,
     {
-        /*
         self.base.matches(&kind.to_base())
             && self.sub.matches(&kind.sub().into())
             && self.specific.is_match_opt(kind.specific().as_ref()).is_ok()
-
-         */
-
-        // HACKED waiting to be refactored when we actually need to match on subtypes
-        self.base.matches(&kind.to_base())
     }
 
     pub fn as_point_segments(&self) -> Result<String, SpaceErr> {

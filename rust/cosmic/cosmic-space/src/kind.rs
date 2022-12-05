@@ -787,10 +787,12 @@ impl TryInto<SpecificSelector> for Specific {
 
 #[cfg(test)]
 pub mod test {
-    use crate::parse::kind_selector;
+    use crate::parse::{kind, kind_selector};
     use crate::selector::KindSelector;
     use crate::{Kind, SpaceErr, StarSub};
     use core::str::FromStr;
+    use cosmic_nom::new_span;
+    use crate::parse::error::result;
 
     #[test]
     pub fn selector() -> Result<(), SpaceErr> {
@@ -799,4 +801,17 @@ pub mod test {
         assert!(selector.matches(&kind));
         Ok(())
     }
+
+        #[test]
+    pub fn selector2() -> Result<(), SpaceErr> {
+        let selector = KindSelector::from_str("<User<OAuth>>")?;
+        let account = result(kind(new_span("User<Account>"))).unwrap();
+        let oauth = result(kind(new_span("User<OAuth<mechtronhub.io:redhat.com:keycloak:community:1.0.0>>"))).unwrap();
+        assert!(!selector.matches(&account));
+        assert!(selector.matches(&oauth));
+        Ok(())
+    }
+
+
+
 }
