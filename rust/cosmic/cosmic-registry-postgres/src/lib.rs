@@ -460,6 +460,10 @@ where
             return Ok(ParticleRecord::root());
         }
 
+        if point.is_global() {
+            return Ok(ParticleRecord::global());
+        }
+
         let mut conn = self.ctx.acquire().await?;
         let parent = point.parent().ok_or("expected a parent")?;
         let point_segment = point

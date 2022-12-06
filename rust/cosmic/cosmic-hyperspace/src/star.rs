@@ -1367,11 +1367,13 @@ where
         if injection.wave.is_directed() {
             let reflection = injection.wave.clone().to_directed().unwrap().reflection();
             let surface = injection.surface.clone();
+let wave = injection.wave.clone();
             match self.start_layer_traversal(injection).await {
                 Ok(_) => {}
                 Err(err) => {
                     println!("STATUS: {}", err.status());
-                    println!("ERR: {}", err.to_string());
+                    self.skel.logger.error( err.to_string() );
+self.skel.logger.error(format!("wave: {} from: {} method: {}", wave.kind().to_string(), wave.from().to_string(), wave.method().unwrap().to_string()) );
                     // if it can be reflected then send back as an error
                     match reflection {
                         Ok(reflection) => {

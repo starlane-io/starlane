@@ -390,7 +390,7 @@ where
             termination_broadcast_tx: term_tx,
         };
 
-        /// SETUP ARTIFAC
+        /// SETUP ARTIFACT
         let factory = MachineApiExtFactory {
             machine_api: machine_api.clone(),
         };

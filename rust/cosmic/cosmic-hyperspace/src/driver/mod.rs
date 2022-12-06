@@ -837,6 +837,7 @@ where
     pub fn find_external(&self, kind: &Kind) -> Option<&DriverApi<P>> {
 println!("Find external for: {}", kind.to_string());
         for selector in &self.external_kinds {
+            println!("\ttesting: {}", selector.to_string() );
             if selector.matches(kind) {
 println!("Found : {} for {}", selector.to_string() , kind.to_string());
                 return self.kind_to_driver.get(selector);

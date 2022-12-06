@@ -394,6 +394,7 @@ where
 
         let user = "hyperuser".to_string();
         let client = reqwest::Client::new();
+println!("keycloak admin url: {} user: {} password: {}", url.to_string(), user.to_string(), password.to_string());
         let admin_token = KeycloakAdminToken::acquire(&url, &user, &password, &client).await?;
 
         let admin = Arc::new(KeycloakAdmin::new(&url, admin_token, client));
@@ -472,11 +473,13 @@ where
         realm: String,
         realm_point: &Point,
     ) -> Result<(), P::Err> {
+println!("Init Realm for Point");
         let client_id = "${client_admin-cli}";
         let clients = self
             .admin
             .realm_clients_get(realm.clone().as_str(), None, None, None, None, None, None)
             .await?;
+println!("Got Realm Clients");
         let client_admin_cli_id = clients
             .into_iter()
             .find_map(|client| {
@@ -528,7 +531,7 @@ where
                 protocol_mapper: Some("oidc-usermodel-property-mapper".to_string()),
                 ..Default::default()
             };
-
+println!("GOT HERE");
             self.admin
                 .realm_clients_with_id_protocol_mappers_models_post(
                     realm.as_str(),
@@ -863,4 +866,32 @@ fn normalize_realm(realm: &Point) -> String {
     } else {
         realm.to_string().replace(":", "_")
     }
+}
+
+#[cfg(test)]
+pub mod zoinks{
+    use cosmic_space::point::Point;
+    use crate::keycloak::StarlaneKeycloakAdmin;
+    use crate::Starlane;
+
+    #[test]
+    pub fn test() {
+        println!("hello test");
+        assert!(true)
+    }
+
+    #[test]
+    pub fn test_admin() {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build().unwrap();
+        runtime.block_on(async move {
+            let admin: StarlaneKeycloakAdmin<Starlane> = StarlaneKeycloakAdmin::new().await.unwrap();
+            admin.init_realm_for_point("master".to_string(), &Point::hyper_userbase()).await.unwrap();
+
+            println!("done");
+        });
+
+    }
+
 }

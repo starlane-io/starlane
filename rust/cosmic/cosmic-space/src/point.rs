@@ -1,16 +1,23 @@
 use core::str::FromStr;
 use cosmic_nom::{new_span, Trace};
 use nom::combinator::all_consuming;
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::err::{ParseErrs, SpaceErr};
-use crate::{ANONYMOUS, HYPERUSER, HYPER_USERBASE};
-use crate::loc::{CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE, LOCAL_PORTAL, PointSegment, PointSegQuery, REMOTE_ENDPOINT, RouteSegQuery, Surface, ToPoint, ToSurface, Variable, Version};
-use crate::parse::{consume_point, consume_point_ctx, Env, point_route_segment, point_selector, point_var, ResolverErr};
+use crate::loc::{
+    PointSegQuery, PointSegment, RouteSegQuery, Surface, ToPoint, ToSurface, Variable, Version,
+    CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE,
+    LOCAL_PORTAL, LOCAL_STAR, REMOTE_ENDPOINT,
+};
 use crate::parse::error::result;
+use crate::parse::{
+    consume_point, consume_point_ctx, point_route_segment, point_selector, point_var, Env,
+    ResolverErr,
+};
 use crate::selector::Selector;
 use crate::util::ToResolved;
 use crate::wave::{Agent, Recipients, ToRecipients};
+use crate::{ANONYMOUS, HYPERUSER, HYPER_USERBASE};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum RouteSeg {
@@ -21,7 +28,7 @@ pub enum RouteSeg {
     Domain(String),
     Tag(String),
     Star(String),
-    Hyper
+    Hyper,
 }
 
 impl RouteSegQuery for RouteSeg {
@@ -87,7 +94,7 @@ impl TryInto<RouteSeg> for RouteSegVar {
                 var.trace.extra,
             )),
             RouteSegVar::Remote => Ok(RouteSeg::Remote),
-            RouteSegVar::Hyper => Ok(RouteSeg::Hyper)
+            RouteSegVar::Hyper => Ok(RouteSeg::Hyper),
         }
     }
 }
@@ -124,7 +131,7 @@ impl ToString for RouteSegVar {
             Self::Var(var) => {
                 format!("${{{}}}", var.name)
             }
-            RouteSegVar::Hyper => "HYPER".to_string()
+            RouteSegVar::Hyper => "HYPER".to_string(),
         }
     }
 }
@@ -152,7 +159,7 @@ impl ToString for RouteSeg {
             RouteSeg::Global => "GLOBAL".to_string(),
             RouteSeg::Local => "LOCAL".to_string(),
             RouteSeg::Remote => "REMOTE".to_string(),
-            RouteSeg::Hyper => "HYPER".to_string()
+            RouteSeg::Hyper => "HYPER".to_string(),
         }
     }
 }
@@ -977,6 +984,10 @@ impl Point {
         LOCAL_PORTAL.clone()
     }
 
+    pub fn local_star() -> Self {
+        LOCAL_STAR.clone()
+    }
+
     pub fn local_hypergate() -> Self {
         LOCAL_HYPERGATE.clone()
     }
@@ -993,10 +1004,9 @@ impl Point {
         HYPERUSER.clone()
     }
 
-        pub fn hyper_userbase() -> Self {
+    pub fn hyper_userbase() -> Self {
         HYPER_USERBASE.clone()
     }
-
 
     pub fn anonymous() -> Self {
         ANONYMOUS.clone()

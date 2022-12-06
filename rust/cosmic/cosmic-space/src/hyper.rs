@@ -126,7 +126,25 @@ impl ParticleRecord {
             }
         }
     }
+
+    pub fn global() -> Self {
+        Self {
+            details: Details {
+                stub: Stub {
+                    point: Point::root(),
+                    kind: Kind::Root,
+                    status: Status::Ready,
+                },
+                properties: Default::default(),
+            },
+            location: ParticleLocation {
+                star: Some(Point::local_star()),
+                host: None
+            }
+        }
+    }
 }
+
 
 impl Into<Stub> for ParticleRecord {
     fn into(self) -> Stub {
