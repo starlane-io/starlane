@@ -534,15 +534,15 @@ println!("Got Realm Clients");
                 ..Default::default()
             };
 println!("GOT HERE");
-            self.admin
+            log_err(self.admin
                 .realm_clients_with_id_protocol_mappers_models_post(
                     realm.as_str(),
                     client_admin_cli_id.as_str(),
                     username,
                 )
-                .await?;
+                .await);
         }
-
+println!("AND HERE");
         {
             let mut config = HashMap::new();
             config.insert(
@@ -583,7 +583,7 @@ println!("GOT HERE");
                     client_admin_cli_id.as_str(),
                     userbase_ref,
                 )
-                .await?;
+                .await;
         }
 
         {
@@ -623,7 +623,7 @@ println!("GOT HERE");
                     client_admin_cli_id.as_str(),
                     groups,
                 )
-                .await?;
+                .await;
         }
 
         {
@@ -659,9 +659,10 @@ println!("GOT HERE");
                     client_admin_cli_id.as_str(),
                     roles,
                 )
-                .await?;
+                .await;
         }
 
+println!("KEYCLOAK INIT COMPLETE");
         Ok(())
     }
 

@@ -333,6 +333,9 @@ impl Kind {
             Kind::User => {
                 true
             },
+             Kind::UserBase => {
+                true
+            },
             Kind::Native(NativeSub::Web) => true,
             _ => false,
         }
