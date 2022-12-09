@@ -168,6 +168,8 @@ where
 
     #[track_caller]
     pub async fn create(&self, create: &Create, agent: &Agent) -> Result<Details, P::Err> {
+
+println!("create parent: {}", create.template.point.parent.to_string());
         let child_kind = self
             .skel
             .machine
@@ -183,7 +185,9 @@ where
             PointSegTemplate::Exact(child_segment) => {
                 let point = create.template.point.parent.push(child_segment.clone());
                 match &point {
-                    Ok(_) => {}
+                    Ok(p) => {
+println!("Point pushed to {}", p.to_string());
+                    }
                     Err(err) => {
                         eprintln!("RC CREATE error: {}", err.to_string());
                     }
@@ -241,6 +245,8 @@ where
             }
             PointSegTemplate::Root => Point::root(),
         };
+
+println!("creating {}", point.to_string());
 
         if create.state.has_substance() || child_kind.is_auto_provision() {
             println!("\tprovisioning: {}", point.to_string());

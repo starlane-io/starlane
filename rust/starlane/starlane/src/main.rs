@@ -351,7 +351,6 @@ impl Platform for Starlane {
         cli.exec(format!("create? {}<User>", Point::hyperuser().to_string())).await?.ok_or()?;
         cli.exec(format!("create? {}<User>", Point::anonymous().to_string())).await?.ok_or()?;
         Ok(())
-
     }
 }
 

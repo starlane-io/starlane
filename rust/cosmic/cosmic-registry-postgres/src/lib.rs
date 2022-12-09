@@ -456,7 +456,7 @@ where
     }
 
     async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, P::Err> {
-        if point.is_local_root() {
+        if point.is_root() {
             return Ok(ParticleRecord::root());
         }
 
@@ -471,13 +471,18 @@ where
             .ok_or("expected last point_segment")?
             .to_string();
 
-        let mut record = sqlx::query_as::<Postgres, PostgresParticleRecord<P>>(
+        let mut record = match sqlx::query_as::<Postgres, PostgresParticleRecord<P>>(
             "SELECT DISTINCT * FROM particles as r WHERE parent=$1 AND point_segment=$2",
         )
         .bind(parent.to_string())
         .bind(point_segment.clone())
         .fetch_one(&mut conn)
-        .await?;
+        .await{
+            Ok(r) => {r},
+            Err(err) => {
+                return Err(SpaceErr::new(404, format!("cannot find record for point: {}", point.to_string())).into());
+            }
+        };
         let mut record: ParticleRecord = record.into();
         let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut conn).await?;
         let mut map = HashMap::new();

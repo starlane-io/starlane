@@ -304,6 +304,7 @@ impl CommandExecutor {
             } else if ctx.transfers.len() > 1 {
                 return Err("create cannot handle more than one state transfer".into());
             }
+println!("CREATE command {}", create.template.point.parent.to_string());
         }
 
         let request: DirectedCore = command.into();

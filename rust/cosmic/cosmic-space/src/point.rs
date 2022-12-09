@@ -1156,7 +1156,9 @@ impl Point {
     pub fn push<S: ToString>(&self, segment: S) -> Result<Self, SpaceErr> {
         let segment = segment.to_string();
         if self.segments.is_empty() {
-            Self::from_str(segment.as_str())
+            let mut point = Self::from_str(segment.as_str())?;
+            point.route = self.route.clone();
+            Ok(point)
         } else {
             let last = self.last_segment().expect("expected last segment");
             let point = match last {

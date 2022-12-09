@@ -1733,7 +1733,6 @@ pub fn create<I: Span>(input: I) -> Res<I, CreateVar> {
     ))(input)
     .map(|(next, (strategy, _, template, properties))| {
 let blah =<TemplateDef<PointTemplateDef<PointDef<RouteSegVar, PointSegVar>>> as ToResolved<Template>>::collapse(template.clone()).unwrap();
-println!("create template {}", blah.point.parent.to_string());
         let strategy = match strategy {
             None => Strategy::Commit,
             Some(strategy) => strategy,
