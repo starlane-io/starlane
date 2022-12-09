@@ -181,7 +181,6 @@ where
             })?;
         let point = match &create.template.point.child_segment_template {
             PointSegTemplate::Exact(child_segment) => {
-println!("template point parent: {}", create.template.point.parent.to_string());
                 let point = create.template.point.parent.push(child_segment.clone());
                 match &point {
                     Ok(_) => {}
@@ -242,7 +241,6 @@ println!("template point parent: {}", create.template.point.parent.to_string());
             }
             PointSegTemplate::Root => Point::root(),
         };
-println!("CREATED {}", point.to_string());
 
         if create.state.has_substance() || child_kind.is_auto_provision() {
             println!("\tprovisioning: {}", point.to_string());

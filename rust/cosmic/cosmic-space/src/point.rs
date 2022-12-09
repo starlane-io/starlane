@@ -797,6 +797,7 @@ impl ToResolved<Point> for PointCtx {
 
         let mut old = self;
         let mut point = Point::root();
+        point.route = old.route.clone();
 
         for (index, segment) in old.segments.iter().enumerate() {
             match segment {
@@ -862,6 +863,7 @@ impl ToResolved<Point> for PointCtx {
             }
         }
 
+        point.route = old.route.clone();
         Ok(point)
     }
 }
@@ -1180,7 +1182,10 @@ impl Point {
                 }
                 PointSeg::File(_) => return Err("cannot append to a file".into()),
             };
-            Self::from_str(point.as_str())
+
+            let mut point = Self::from_str(point.as_str())?;
+            point.route = self.route.clone();
+            Ok(point)
         }
     }
 
