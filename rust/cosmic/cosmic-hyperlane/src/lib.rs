@@ -1532,7 +1532,7 @@ impl HyperClient {
         });
     }
 
-    pub async fn close(&self) {
+    pub fn close(&self) {
         let mut wave = DirectedProto::signal();
         wave.from(LOCAL_CLIENT.clone().to_surface());
         wave.to(LOCAL_CLIENT_RUNNER.clone().to_surface());

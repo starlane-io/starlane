@@ -532,6 +532,12 @@ impl ControlClient {
     }
 }
 
+impl Drop for ControlClient {
+    fn drop(&mut self) {
+            self.client.close()
+    }
+}
+
 pub struct ControlCliSession {
     transmitter: ProtoTransmitter,
 }
@@ -574,3 +580,5 @@ impl ControlCliSession {
         Ok(pong.variant.core)
     }
 }
+
+
