@@ -286,7 +286,7 @@ where
     pub fn data_dir(&self) -> String {
         format!(
             "{}/{}/",
-            self.machine.cosmos.data_dir(),
+            self.machine.platform.data_dir(),
             self.point.to_string()
         )
     }

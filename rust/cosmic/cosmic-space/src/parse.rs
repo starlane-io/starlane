@@ -138,7 +138,7 @@ where
     )
 }
 
-fn sys_route_chars<T>(i: T) -> Res<T, T>
+fn hyper_route_chars<T>(i: T) -> Res<T, T>
 where
     T: InputTakeAtPosition + nom::InputLength,
     <T as InputTakeAtPosition>::Item: AsChar,
@@ -191,14 +191,14 @@ pub fn tag_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
         .map(|(next, tag)| (next, RouteSeg::Tag(tag.to_string())))
 }
 
-pub fn sys_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
-    delimited(tag("<<"), sys_route_chars, tag(">>"))(input)
+pub fn star_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
+    delimited(tag("<<"), hyper_route_chars, tag(">>"))(input)
         .map(|(next, tag)| (next, RouteSeg::Star(tag.to_string())))
 }
 
 pub fn other_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
     alt((
-        sys_route_segment,
+        star_route_segment,
         tag_route_segment,
         domain_route_segment,
         global_route_segment,
@@ -7447,6 +7447,10 @@ Mechtron(version=1.0.0) {
 
         util::log(result(point_template(new_span("my-domain.com"))))?;
         util::log(result(point_template(new_span("ROOT"))))?;
+        let users: PointTemplate = log(result(point_template(new_span("HYPER::users")))).unwrap().collapse().unwrap();
+
+
+
         Ok(())
     }
 

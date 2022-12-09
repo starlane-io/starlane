@@ -14,12 +14,12 @@ use cosmic_space::parse::bind_config;
 use cosmic_space::point::Point;
 use cosmic_space::selector::{KindSelector, Selector};
 use cosmic_space::substance::Substance;
-use cosmic_space::util::log;
+use cosmic_space::util::{log, log_str};
 use cosmic_space::wave::exchange::asynch::InCtx;
 use keycloak::types::{
     CredentialRepresentation, ProtocolMapperRepresentation, RealmRepresentation, UserRepresentation,
 };
-use keycloak::{KeycloakAdmin, KeycloakAdminToken};
+use keycloak::{KeycloakAdmin, KeycloakAdminToken, KeycloakError};
 use mechtron_host::err::HostErr;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -388,9 +388,9 @@ where
 {
     pub async fn new() -> Result<Self, P::Err> {
         let url = std::env::var("STARLANE_KEYCLOAK_URL")
-            .map_err(|e| "User<Keycloak>: environment variable 'STARLANE_KEYCLOAK_URL' not set.")?;
+            .map_err(|e| "UserBase: environment variable 'STARLANE_KEYCLOAK_URL' not set.")?;
         let password = std::env::var("STARLANE_PASSWORD")
-            .map_err(|e| "User<Keycloak>: environment variable 'STARLANE_PASSWORD' not set.")?;
+            .map_err(|e| "UserBase: environment variable 'STARLANE_PASSWORD' not set.")?;
 
         let user = "hyperuser".to_string();
         let client = reqwest::Client::new();
@@ -473,12 +473,14 @@ println!("keycloak admin url: {} user: {} password: {}", url.to_string(), user.t
         realm: String,
         realm_point: &Point,
     ) -> Result<(), P::Err> {
-println!("Init Realm for Point");
+println!("Init Realm for Point: {}", realm);
         let client_id = "${client_admin-cli}";
-        let clients = self
+
+
+        let clients = log_err(self
             .admin
             .realm_clients_get(realm.clone().as_str(), None, None, None, None, None, None)
-            .await?;
+            .await)?;
 println!("Got Realm Clients");
         let client_admin_cli_id = clients
             .into_iter()
@@ -857,6 +859,7 @@ pub fn is_hyperuser(point: &Point) -> bool {
 }
 
 pub fn is_hyper_userbase(point: &Point) -> bool {
+println!("Point::hyper_userbase() == *point : {} == {} {}",Point::hyper_userbase().to_string(), point.to_string(),   (Point::hyper_userbase() == *point).to_string());
     Point::hyper_userbase() == *point
 }
 
@@ -866,6 +869,22 @@ fn normalize_realm(realm: &Point) -> String {
     } else {
         realm.to_string().replace(":", "_")
     }
+}
+
+pub fn log_err<R>(result: Result<R,KeycloakError>) -> Result<R,KeycloakError> {
+    if let Err(err) = &result {
+       match err {
+           KeycloakError::ReqwestFailure(r) => {
+               println!("\tREQUEST FAILURE: {}", r.to_string());
+           }
+           KeycloakError::HttpFailure { status, body, text } => {
+
+               println!("\tHttpFailure {}",text);
+           }
+       }
+    }
+
+    result
 }
 
 #[cfg(test)]

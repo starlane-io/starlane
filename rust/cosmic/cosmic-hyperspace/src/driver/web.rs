@@ -300,7 +300,7 @@ where
     pub fn start(mut self) {
         let runtime = tokio::runtime::Handle::current();
         thread::spawn(move || {
-            let port = self.skel.skel.skel.machine.cosmos.web_port().unwrap();
+            let port = self.skel.skel.skel.machine.platform.web_port().unwrap();
             let server = Server::http(format!("0.0.0.0:{}", port)).unwrap();
             for req in server.incoming_requests() {
                 let runtime = runtime.clone();

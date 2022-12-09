@@ -171,7 +171,7 @@ where
         let child_kind = self
             .skel
             .machine
-            .cosmos
+            .platform
             .select_kind(&create.template.kind)
             .map_err(|err| {
                 P::Err::new(format!(
@@ -181,6 +181,7 @@ where
             })?;
         let point = match &create.template.point.child_segment_template {
             PointSegTemplate::Exact(child_segment) => {
+println!("template point parent: {}", create.template.point.parent.to_string());
                 let point = create.template.point.parent.push(child_segment.clone());
                 match &point {
                     Ok(_) => {}
@@ -193,12 +194,12 @@ where
                 let properties = self
                     .skel
                     .machine
-                    .cosmos
+                    .platform
                     .properties_config(&child_kind)
                     .fill_create_defaults(&create.properties)?;
                 self.skel
                     .machine
-                    .cosmos
+                    .platform
                     .properties_config(&child_kind)
                     .check_create(&properties)?;
 
@@ -241,6 +242,7 @@ where
             }
             PointSegTemplate::Root => Point::root(),
         };
+println!("CREATED {}", point.to_string());
 
         if create.state.has_substance() || child_kind.is_auto_provision() {
             println!("\tprovisioning: {}", point.to_string());

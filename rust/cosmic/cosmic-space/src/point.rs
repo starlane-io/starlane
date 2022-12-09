@@ -1412,3 +1412,18 @@ pub type PointCtx = PointDef<RouteSeg, PointSegCtx>;
 /// let point: Point = point_var.to_resolve(&env)?;
 /// ```
 pub type PointVar = PointDef<RouteSegVar, PointSegVar>;
+
+
+#[cfg(test)]
+pub mod test {
+    use core::str::FromStr;
+    use crate::point::Point;
+
+    #[test]
+    pub fn test_retain_route() {
+        let users = Point::from_str("HYPER::users").unwrap();
+        let less = users.push("less".to_string()).unwrap();
+
+        assert_eq!("HYPER::users:less", less.to_string().as_str())
+    }
+}

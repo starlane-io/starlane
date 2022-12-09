@@ -228,3 +228,14 @@ pub fn log<R>(result: Result<R, SpaceErr>) -> Result<R, SpaceErr> {
         }
     }
 }
+
+
+pub fn log_str<R,S>(result: Result<R, S>) -> Result<R, S> where S: ToString{
+    match result {
+        Ok(r) => Ok(r),
+        Err(err) => {
+            println!("{}", err.to_string());
+            Err(err)
+        }
+    }
+}
