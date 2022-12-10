@@ -10,12 +10,12 @@ use std::time::Duration;
 
 use dashmap::mapref::one::{Ref, RefMut};
 use dashmap::DashMap;
-use futures::future::{BoxFuture, join_all};
+use futures::future::{join_all, BoxFuture};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock, watch};
+use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 use tokio::time::error::Elapsed;
 use tracing::{error, info};
 
@@ -37,15 +37,16 @@ use cosmic_space::hyper::{
 use cosmic_space::hyper::{MountKind, ParticleLocation};
 use cosmic_space::kind::{BaseKind, Kind, StarStub, StarSub, Sub};
 use cosmic_space::loc::{
-    GLOBAL_EXEC, Layer, LOCAL_STAR, StarKey, Surface, SurfaceSelector, ToBaseKind,
-    Topic, ToPoint, ToSurface, Uuid,
+    Layer, StarKey, Surface, SurfaceSelector, ToBaseKind, ToPoint, ToSurface, Topic, Uuid,
+    GLOBAL_EXEC, LOCAL_STAR,
 };
 use cosmic_space::log::{PointLogger, RootLogger, Trackable, Tracker};
-use cosmic_space::parse::{bind_config, Env, route_attribute};
+use cosmic_space::parse::{bind_config, route_attribute, Env};
 use cosmic_space::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
 use cosmic_space::particle::{Details, Status, Stub};
+use cosmic_space::point::{Point, RouteSeg};
 use cosmic_space::settings::Timeouts;
 use cosmic_space::substance::Bin;
 use cosmic_space::substance::{Substance, ToSubstance};
@@ -60,19 +61,18 @@ use cosmic_space::wave::exchange::asynch::{
 use cosmic_space::wave::exchange::SetStrategy;
 use cosmic_space::wave::{
     Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
-    HandlingKind, Ping, Pong, Priority, Recipients, RecipientSelector, Reflectable, ReflectedWave,
+    HandlingKind, Ping, Pong, Priority, RecipientSelector, Recipients, Reflectable, ReflectedWave,
     Reflection, Retries, Ripple, Scope, Signal, SingularRipple, ToRecipients, WaitTime, Wave,
     WaveKind,
 };
 use cosmic_space::wave::{HyperWave, UltraWave};
 use cosmic_space::HYPERUSER;
-use cosmic_space::point::{Point, RouteSeg};
 use mechtron_host::err::HostErr;
 
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, Drivers,
-    DriversApi, DriversCall, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler,
+    Driver, DriverAvail, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, DriverSkel,
+    DriverStatus, Drivers, DriversApi, DriversCall, HyperDriverFactory, Item, ItemHandler,
     ItemSkel, ItemSphere,
 };
 use crate::err::HyperErr;
@@ -82,7 +82,7 @@ use crate::layer::shell::Shell;
 use crate::layer::shell::ShellState;
 use crate::machine::MachineSkel;
 use crate::reg::{Registration, Registry, RegistryApi};
-use crate::{Platform, DriversBuilder};
+use crate::{DriversBuilder, Platform};
 
 #[derive(Clone)]
 pub struct ParticleStates<P>
@@ -1367,13 +1367,11 @@ where
         if injection.wave.is_directed() {
             let reflection = injection.wave.clone().to_directed().unwrap().reflection();
             let surface = injection.surface.clone();
-let wave = injection.wave.clone();
             match self.start_layer_traversal(injection).await {
                 Ok(_) => {}
                 Err(err) => {
                     println!("STATUS: {}", err.status());
-                    self.skel.logger.error( err.to_string() );
-self.skel.logger.error(format!("wave: {} from: {} method: {}", wave.kind().to_string(), wave.from().to_string(), wave.method().unwrap().to_string()) );
+                    self.skel.logger.error(err.to_string());
                     // if it can be reflected then send back as an error
                     match reflection {
                         Ok(reflection) => {
@@ -1496,7 +1494,7 @@ self.skel.logger.error(format!("wave: {} from: {} method: {}", wave.kind().to_st
                         "\twave is to and from the same point... {} <{}>",
                         wave.from().to_string(),
                         wave.kind().to_string()
-                    )
+                    );
                 }
                 // it's the SAME point, so the to layer becomes our dest
                 dest.replace(to.layer.clone());
@@ -1507,7 +1505,7 @@ self.skel.logger.error(format!("wave: {} from: {} method: {}", wave.kind().to_st
                 }
 
                 // dir is from inject_layer to dest
-                dir = match TraversalDirection::new(&injection.layer, &to.layer) {
+                dir = match TraversalDirection::new(&wave.from().layer, &to.layer) {
                     Ok(dir) => dir,
                     Err(_) => {
                         // looks like we are already on the dest layer...
@@ -1548,7 +1546,6 @@ self.skel.logger.error(format!("wave: {} from: {} method: {}", wave.kind().to_st
 
             let traversal_logger = self.skel.logger.point(to.to_point());
             let traversal_logger = traversal_logger.span();
-
             let point = if dir == TraversalDirection::Core {
                 to.clone().to_point()
             } else {
@@ -1578,13 +1575,6 @@ self.skel.logger.error(format!("wave: {} from: {} method: {}", wave.kind().to_st
                     Some(_) => {}
                 }
             }
-
-            #[cfg(test)]
-            self.skel
-                .diagnostic_interceptors
-                .start_layer_traversal
-                .send(traversal.clone())
-                .unwrap_or_default();
 
             // alright, let's visit the injection layer first...
             self.visit_layer(traversal).await?;
@@ -2055,9 +2045,8 @@ where
         point: &Point,
         state: StateSrc,
     ) -> Result<ParticleLocation, P::Err> {
-
         if point.is_root() {
-            return Ok(ParticleLocation::new( Some(Point::central()), None ));
+            return Ok(ParticleLocation::new(Some(Point::central()), None));
         }
         // check if parent is provisioned
         let parent = point

@@ -118,15 +118,14 @@ where
         }
     }
 
-    pub async fn cli(&self) -> Result<ControlCliSession,P::Err> {
+    pub async fn client(&self) -> Result<ControlClient,P::Err> {
         let factory = MachineApiExtFactory {
             machine_api: self.clone(),
         };
 
         let client = ControlClient::new(Box::new(factory))?;
         client.wait_for_ready(Duration::from_secs(5)).await?;
-        let cli = client.new_cli_session().await?;
-        Ok(cli)
+        Ok(client)
     }
 
     #[cfg(test)]
@@ -413,6 +412,8 @@ where
         {
             let machine_api = machine_api.clone();
             tokio::spawn(async move {
+                // HACK: give Wrangles a chance to catch up first
+                tokio::time::sleep(Duration::from_secs(1)).await;
                 platform.post_startup(&machine_api).await.unwrap();
             });
         }
@@ -699,6 +700,7 @@ where
         &self,
         status_tx: mpsc::Sender<HyperConnectionDetails>,
     ) -> Result<HyperwayEndpoint, SpaceErr> {
+println!("MachineApiExtFactory connecting...");
         let knock = Knock {
             kind: InterchangeKind::DefaultControl,
             auth: Box::new(Substance::Empty),

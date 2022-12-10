@@ -40,12 +40,12 @@ use cosmic_hyperspace::driver::artifact::{
     ArtifactDriverFactory, BundleDriverFactory, BundleSeriesDriverFactory, RepoDriverFactory,
 };
 use cosmic_hyperspace::driver::base::BaseDriverFactory;
-use cosmic_hyperspace::driver::control::ControlDriverFactory;
+use cosmic_hyperspace::driver::control::{ControlClient, ControlDriverFactory};
 use cosmic_hyperspace::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
 use cosmic_hyperspace::driver::root::RootDriverFactory;
 use cosmic_hyperspace::driver::space::SpaceDriverFactory;
 use cosmic_hyperspace::driver::{DriverAvail, DriversBuilder};
-use cosmic_hyperspace::machine::{Machine, MachineApi, MachineTemplate};
+use cosmic_hyperspace::machine::{Machine, MachineApi, MachineApiExtFactory, MachineTemplate};
 use cosmic_hyperspace::reg::{Registry, RegistryApi};
 use cosmic_hyperspace::Platform;
 
@@ -346,7 +346,10 @@ impl Platform for Starlane {
     }
 
     async fn post_startup( &self, machine: &MachineApi<Self> ) -> Result<(),Self::Err> {
-        let cli = machine.cli().await?;
+
+       let client = machine.client().await?;
+        let cli = client.new_cli_session().await?;
+
         cli.exec(format!("create? {}<UserBase>", Point::hyper_userbase().to_string())).await?.ok_or()?;
         cli.exec(format!("create? {}<User>", Point::hyperuser().to_string())).await?.ok_or()?;
         cli.exec(format!("create? {}<User>", Point::anonymous().to_string())).await?.ok_or()?;

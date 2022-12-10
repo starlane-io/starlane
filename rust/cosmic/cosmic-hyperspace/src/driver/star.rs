@@ -456,12 +456,6 @@ println!("Provision SELECTOR");
     #[route("Hyp<Assign>")]
     pub async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, P::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
-            #[cfg(test)]
-            self.skel
-                .diagnostic_interceptors
-                .assignment
-                .send(assign.clone())
-                .unwrap_or_default();
 
             if self
                 .skel

@@ -169,14 +169,19 @@ where
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
 
-println!("\tASSIGN OAuth")        ;
+println!("\tASSIGN UserBase")        ;
         if let HyperSubstance::Assign(assign) = ctx.input {
-            self.admin
-                .init_realm_for_point(
-                    normalize_realm(&assign.details.stub.point),
-                    &assign.details.stub.point,
-                )
-                .await?;
+            if is_hyper_userbase(&assign.details.stub.point ) {
+                self.admin
+                    .init_realm_for_point(
+                        normalize_realm(&assign.details.stub.point),
+                        &assign.details.stub.point,
+                    )
+                    .await?;
+            } else {
+
+                unimplemented!()
+            }
         }
         Ok(())
     }

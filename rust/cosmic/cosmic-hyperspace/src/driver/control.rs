@@ -23,6 +23,7 @@ use cosmic_space::kind::{BaseKind, Kind, StarSub};
 use cosmic_space::loc::{Layer, PointFactory, Surface, ToSurface};
 use cosmic_space::log::{RootLogger, Tracker};
 use cosmic_space::particle::traversal::Traversal;
+use cosmic_space::point::Point;
 use cosmic_space::selector::KindSelector;
 use cosmic_space::settings::Timeouts;
 use cosmic_space::substance::Substance;
@@ -38,7 +39,6 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use cosmic_space::point::Point;
 
 pub struct ControlDriverFactory<P>
 where
@@ -534,7 +534,7 @@ impl ControlClient {
 
 impl Drop for ControlClient {
     fn drop(&mut self) {
-            self.client.close()
+        self.client.close()
     }
 }
 
@@ -547,7 +547,11 @@ impl ControlCliSession {
         Self { transmitter }
     }
 
-    pub async fn other(mut builder: ProtoTransmitterBuilder, point: Point) ->  Result<Self,SpaceErr> {
+    pub async fn other(
+        mut builder: ProtoTransmitterBuilder,
+        point: Point,
+    ) -> Result<Self, SpaceErr> {
+        println!("\tOTHER: {}", point.to_string());
         let transmitter = builder.clone().build();
         let mut proto = DirectedProto::ping();
         proto.to(point.to_surface().with_layer(Layer::Shell));
@@ -556,8 +560,7 @@ impl ControlCliSession {
 
         pong.ok_or()?;
         if let Substance::Surface(port) = pong.variant.core.body {
-            let mut transmitter =
-            builder.to = SetStrategy::Override(port.to_recipients());
+            let mut transmitter = builder.to = SetStrategy::Override(port.to_recipients());
             let transmitter = builder.build();
             Ok(ControlCliSession::new(transmitter))
         } else {
@@ -580,5 +583,3 @@ impl ControlCliSession {
         Ok(pong.variant.core)
     }
 }
-
-

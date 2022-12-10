@@ -79,6 +79,7 @@ where
     }
 
     async fn deliver_directed(&self, directed: Traversal<DirectedWave>) -> Result<(), SpaceErr> {
+println!("Shell deliver directed from: {}", directed.from().to_string());
         if directed.from().point == self.surface().point
             && directed.from().layer.ordinal() >= self.surface().layer.ordinal()
         {
@@ -304,7 +305,6 @@ impl CommandExecutor {
             } else if ctx.transfers.len() > 1 {
                 return Err("create cannot handle more than one state transfer".into());
             }
-println!("CREATE command {}", create.template.point.parent.to_string());
         }
 
         let request: DirectedCore = command.into();
