@@ -700,7 +700,6 @@ where
         &self,
         status_tx: mpsc::Sender<HyperConnectionDetails>,
     ) -> Result<HyperwayEndpoint, SpaceErr> {
-println!("MachineApiExtFactory connecting...");
         let knock = Knock {
             kind: InterchangeKind::DefaultControl,
             auth: Box::new(Substance::Empty),

@@ -1,4 +1,4 @@
-use crate::err::StarlaneErr;
+use crate::err::{StarErr, StarlaneErr};
 use cosmic_hyperspace::driver::{
     Driver, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, HyperSkel, Item, ItemHandler,
     ItemSkel, ItemSphere,
@@ -24,10 +24,20 @@ use mechtron_host::err::HostErr;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::num::NonZeroUsize;
 use std::str::FromStr;
 use std::sync::Arc;
+use alcoholic_jwt::{JWKS, token_kid, validate, ValidJWT};
+use lru::LruCache;
+use tokio::sync::RwLock;
 use validator::validate_email;
 use cosmic_space::HYPER_USERBASE;
+use cosmic_space::loc::ToSurface;
+use cosmic_space::wave::{DirectedKind, DirectedProto, Ping, Wave};
+use cosmic_space::wave::core::ext::ExtMethod;
+use cosmic_space::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder};
+use serde::Deserialize;
+use cosmic_space::err::SpaceErr;
 
 lazy_static! {
     static ref KEYCLOAK_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -218,6 +228,12 @@ where
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(KEYCLOAK_BIND_CONFIG.clone())
     }
+
+
+}
+
+impl <P> Keycloak<P> where P:Platform {
+
 }
 
 lazy_static! {
@@ -891,6 +907,103 @@ pub fn log_err<R>(result: Result<R,KeycloakError>) -> Result<R,KeycloakError> {
     }
 
     result
+}
+
+#[derive(Clone)]
+pub struct JwksCache {
+    map: Arc<RwLock<LruCache<Point, JWKS>>>,
+    transmitter: ProtoTransmitter,
+}
+
+impl JwksCache {
+    pub fn new(transmitter: ProtoTransmitter) -> JwksCache {
+        Self {
+            map: Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(1024usize).unwrap()))),
+            transmitter,
+        }
+    }
+
+    pub async fn validate(&self, token: &str) -> Result<ValidJWT, StarErr> {
+        let jwt = UntrustedJwt(token.to_string());
+        let claims = serde_json::from_str::<JwtClaims>(jwt.claims()?.as_str())?;
+        let userbase_address = Point::from_str(claims.userbase_ref.as_str())?;
+        let kid = token_kid(token)?.ok_or("token 'kid' (key id) not found")?;
+
+        let jwks = {
+            let mut lock = self.map.write().await;
+            if let Some(jwks) = lock.get(&userbase_address) {
+                Some(jwks.clone())
+            } else {
+                None
+            }
+        };
+
+        let validations = vec![];
+
+        match jwks {
+            Some(jwks) => match jwks.find(kid.as_str()) {
+                None => {}
+                Some(jwk) => return Ok(validate(token, jwk, validations)?),
+            },
+            None => {}
+        }
+
+        // in the case of jwks not being present OR jwk not present in jwks then fetch jwks from UserBase
+
+        let method = ExtMethod::new("GetJwks")?;
+        let surface = Point::from_str(claims.userbase_ref.as_str())?.to_surface();
+        let mut proto = DirectedProto::kind(&DirectedKind::Ping);
+        proto.to(surface);
+
+        let pong = self.transmitter.ping(proto).await?;
+        let jwks = pong.core.body.clone().to_text()?;
+        let jwks: JWKS = serde_json::from_str(jwks.as_str())?;
+        {
+            let jwks = jwks.clone();
+            let mut lock = self.map.write().await;
+            lock.put(userbase_address, jwks);
+        }
+
+        let jwk = jwks
+            .find(kid.as_str())
+            .ok_or("cannot find keyId to validate token")?;
+        Ok(validate(token, jwk, validations)?)
+    }
+}
+
+
+#[derive(Clone, Deserialize)]
+pub struct JwtClaims {
+    pub exp: u64,
+    pub typ: String,
+    pub jti: String,
+    pub iss: String,
+    pub sub: String,
+    pub session_state: String,
+    pub acr: String,
+    pub azp: String,
+    pub scope: String,
+    pub email_verified: Option<bool>,
+    pub userbase_ref: String,
+    pub preferred_username: String,
+}
+
+pub struct UntrustedJwt(String);
+
+impl UntrustedJwt {
+    pub fn headers(&self) -> Result<String, StarErr> {
+        Ok(String::from_utf8(base64::decode(
+            self.0.split(".").next().ok_or("invalid Jwt")?,
+        )?)?)
+    }
+
+    pub fn claims(&self) -> Result<String, StarErr> {
+        let mut split = self.0.split(".");
+        split.next().ok_or("invalid Jwt")?;
+        Ok(String::from_utf8(base64::decode(
+            split.next().ok_or("invalid Jwt")?,
+        )?)?)
+    }
 }
 
 #[cfg(test)]

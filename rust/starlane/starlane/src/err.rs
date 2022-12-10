@@ -49,6 +49,7 @@ pub mod convert {
     use std::num::ParseIntError;
     use std::str::Utf8Error;
     use std::string::FromUtf8Error;
+    use base64::DecodeError;
     #[cfg(feature = "keycloak")]
     use keycloak::KeycloakError;
     use strum::ParseError;
@@ -65,6 +66,34 @@ pub mod convert {
         }
     }
 
+
+    impl From<serde_json::Error> for Err {
+        fn from(e:serde_json::Error) -> Self {
+            Self{
+                kind: ErrKind::Default,
+                message: e.to_string()
+            }
+        }
+    }
+
+     impl From<alcoholic_jwt::ValidationError> for Err {
+        fn from(e:alcoholic_jwt::ValidationError) -> Self {
+            Self{
+                kind: ErrKind::Default,
+                message: e.to_string()
+            }
+        }
+    }
+
+
+    impl From<DecodeError> for Err {
+        fn from(e:DecodeError) -> Self {
+            Self{
+                kind: ErrKind::Default,
+                message: e.to_string()
+            }
+        }
+    }
     #[cfg(feature="keycloak")]
     impl From<KeycloakError> for Err {
         fn from(e: KeycloakError) -> Self {
