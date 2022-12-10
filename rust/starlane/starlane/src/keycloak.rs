@@ -1,4 +1,5 @@
 use crate::err::{StarErr, StarlaneErr};
+use alcoholic_jwt::{token_kid, validate, ValidJWT, JWKS};
 use cosmic_hyperspace::driver::{
     Driver, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, HyperSkel, Item, ItemHandler,
     ItemSkel, ItemSphere,
@@ -8,36 +9,35 @@ use cosmic_hyperspace::star::HyperStarSkel;
 use cosmic_hyperspace::Platform;
 use cosmic_space::artifact::ArtRef;
 use cosmic_space::config::bind::BindConfig;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::HyperSubstance;
 use cosmic_space::kind::{BaseKind, Kind, Specific, UserVariant};
+use cosmic_space::loc::ToSurface;
 use cosmic_space::parse::bind_config;
 use cosmic_space::point::Point;
 use cosmic_space::selector::{KindSelector, Selector};
 use cosmic_space::substance::Substance;
 use cosmic_space::util::{log, log_str};
+use cosmic_space::wave::core::ext::ExtMethod;
 use cosmic_space::wave::exchange::asynch::InCtx;
+use cosmic_space::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder};
+use cosmic_space::wave::{DirectedKind, DirectedProto, Ping, Wave};
+use cosmic_space::HYPER_USERBASE;
 use keycloak::types::{
     CredentialRepresentation, ProtocolMapperRepresentation, RealmRepresentation, UserRepresentation,
 };
 use keycloak::{KeycloakAdmin, KeycloakAdminToken, KeycloakError};
+use lru::LruCache;
 use mechtron_host::err::HostErr;
+use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 use std::str::FromStr;
 use std::sync::Arc;
-use alcoholic_jwt::{JWKS, token_kid, validate, ValidJWT};
-use lru::LruCache;
 use tokio::sync::RwLock;
 use validator::validate_email;
-use cosmic_space::HYPER_USERBASE;
-use cosmic_space::loc::ToSurface;
-use cosmic_space::wave::{DirectedKind, DirectedProto, Ping, Wave};
-use cosmic_space::wave::core::ext::ExtMethod;
-use cosmic_space::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder};
-use serde::Deserialize;
-use cosmic_space::err::SpaceErr;
 
 lazy_static! {
     static ref KEYCLOAK_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -109,6 +109,24 @@ where
         let admin = StarlaneKeycloakAdmin::new().await?;
         Ok(Self { skel, ctx, admin })
     }
+
+    #[route("Ext<GetJwks>")]
+    pub async fn get_jwks(&self, ctx: InCtx<'_, ()>) -> Result<Substance, P::Err> {
+        let client = reqwest::Client::new();
+        let realm = normalize_realm(&ctx.to().point );
+        let url = std::env::var("STARLANE_KEYCLOAK_URL")
+            .map_err(|e| "UserBase: environment variable 'STARLANE_KEYCLOAK_URL' not set.")?;
+        let jwks = client
+            .get(&format!(
+                "{}/auth/realms/{}/protocol/openid-connect/certs",
+                url, realm
+            ))
+            .send()
+            .await?;
+        let jwks = jwks.text().await?;
+
+        Ok(Substance::Text(jwks))
+    }
 }
 
 #[async_trait]
@@ -178,10 +196,9 @@ where
 {
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
-
-println!("\tASSIGN UserBase")        ;
+        println!("\tASSIGN UserBase");
         if let HyperSubstance::Assign(assign) = ctx.input {
-            if is_hyper_userbase(&assign.details.stub.point ) {
+            if is_hyper_userbase(&assign.details.stub.point) {
                 self.admin
                     .init_realm_for_point(
                         normalize_realm(&assign.details.stub.point),
@@ -189,7 +206,6 @@ println!("\tASSIGN UserBase")        ;
                     )
                     .await?;
             } else {
-
                 unimplemented!()
             }
         }
@@ -228,13 +244,9 @@ where
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(KEYCLOAK_BIND_CONFIG.clone())
     }
-
-
 }
 
-impl <P> Keycloak<P> where P:Platform {
-
-}
+impl<P> Keycloak<P> where P: Platform {}
 
 lazy_static! {
     static ref USER_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -355,7 +367,7 @@ where
 {
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
-println!("\tASSIGN USER")        ;
+        println!("\tASSIGN USER");
         Ok(())
     }
 }
@@ -415,7 +427,12 @@ where
 
         let user = "hyperuser".to_string();
         let client = reqwest::Client::new();
-println!("keycloak admin url: {} user: {} password: {}", url.to_string(), user.to_string(), password.to_string());
+        println!(
+            "keycloak admin url: {} user: {} password: {}",
+            url.to_string(),
+            user.to_string(),
+            password.to_string()
+        );
         let admin_token = KeycloakAdminToken::acquire(&url, &user, &password, &client).await?;
 
         let admin = Arc::new(KeycloakAdmin::new(&url, admin_token, client));
@@ -494,15 +511,15 @@ println!("keycloak admin url: {} user: {} password: {}", url.to_string(), user.t
         realm: String,
         realm_point: &Point,
     ) -> Result<(), P::Err> {
-println!("Init Realm for Point: {}", realm);
+        println!("Init Realm for Point: {}", realm);
         let client_id = "${client_admin-cli}";
 
-
-        let clients = log_err(self
-            .admin
-            .realm_clients_get(realm.clone().as_str(), None, None, None, None, None, None)
-            .await)?;
-println!("Got Realm Clients");
+        let clients = log_err(
+            self.admin
+                .realm_clients_get(realm.clone().as_str(), None, None, None, None, None, None)
+                .await,
+        )?;
+        println!("Got Realm Clients");
         let client_admin_cli_id = clients
             .into_iter()
             .find_map(|client| {
@@ -554,16 +571,18 @@ println!("Got Realm Clients");
                 protocol_mapper: Some("oidc-usermodel-property-mapper".to_string()),
                 ..Default::default()
             };
-println!("GOT HERE");
-            log_err(self.admin
-                .realm_clients_with_id_protocol_mappers_models_post(
-                    realm.as_str(),
-                    client_admin_cli_id.as_str(),
-                    username,
-                )
-                .await);
+            println!("GOT HERE");
+            log_err(
+                self.admin
+                    .realm_clients_with_id_protocol_mappers_models_post(
+                        realm.as_str(),
+                        client_admin_cli_id.as_str(),
+                        username,
+                    )
+                    .await,
+            );
         }
-println!("AND HERE");
+        println!("AND HERE");
         {
             let mut config = HashMap::new();
             config.insert(
@@ -683,7 +702,7 @@ println!("AND HERE");
                 .await;
         }
 
-println!("KEYCLOAK INIT COMPLETE");
+        println!("KEYCLOAK INIT COMPLETE");
         Ok(())
     }
 
@@ -881,7 +900,12 @@ pub fn is_hyperuser(point: &Point) -> bool {
 }
 
 pub fn is_hyper_userbase(point: &Point) -> bool {
-println!("Point::hyper_userbase() == *point : {} == {} {}",Point::hyper_userbase().to_string(), point.to_string(),   (Point::hyper_userbase() == *point).to_string());
+    println!(
+        "Point::hyper_userbase() == *point : {} == {} {}",
+        Point::hyper_userbase().to_string(),
+        point.to_string(),
+        (Point::hyper_userbase() == *point).to_string()
+    );
     Point::hyper_userbase() == *point
 }
 
@@ -893,17 +917,16 @@ fn normalize_realm(realm: &Point) -> String {
     }
 }
 
-pub fn log_err<R>(result: Result<R,KeycloakError>) -> Result<R,KeycloakError> {
+pub fn log_err<R>(result: Result<R, KeycloakError>) -> Result<R, KeycloakError> {
     if let Err(err) = &result {
-       match err {
-           KeycloakError::ReqwestFailure(r) => {
-               println!("\tREQUEST FAILURE: {}", r.to_string());
-           }
-           KeycloakError::HttpFailure { status, body, text } => {
-
-               println!("\tHttpFailure {}",text);
-           }
-       }
+        match err {
+            KeycloakError::ReqwestFailure(r) => {
+                println!("\tREQUEST FAILURE: {}", r.to_string());
+            }
+            KeycloakError::HttpFailure { status, body, text } => {
+                println!("\tHttpFailure {}", text);
+            }
+        }
     }
 
     result
@@ -918,7 +941,9 @@ pub struct JwksCache {
 impl JwksCache {
     pub fn new(transmitter: ProtoTransmitter) -> JwksCache {
         Self {
-            map: Arc::new(RwLock::new(LruCache::new(NonZeroUsize::new(1024usize).unwrap()))),
+            map: Arc::new(RwLock::new(LruCache::new(
+                NonZeroUsize::new(1024usize).unwrap(),
+            ))),
             transmitter,
         }
     }
@@ -971,7 +996,6 @@ impl JwksCache {
     }
 }
 
-
 #[derive(Clone, Deserialize)]
 pub struct JwtClaims {
     pub exp: u64,
@@ -1007,10 +1031,10 @@ impl UntrustedJwt {
 }
 
 #[cfg(test)]
-pub mod zoinks{
-    use cosmic_space::point::Point;
+pub mod zoinks {
     use crate::keycloak::StarlaneKeycloakAdmin;
     use crate::Starlane;
+    use cosmic_space::point::Point;
 
     #[test]
     pub fn test() {
@@ -1022,14 +1046,17 @@ pub mod zoinks{
     pub fn test_admin() {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
-            .build().unwrap();
+            .build()
+            .unwrap();
         runtime.block_on(async move {
-            let admin: StarlaneKeycloakAdmin<Starlane> = StarlaneKeycloakAdmin::new().await.unwrap();
-            admin.init_realm_for_point("master".to_string(), &Point::hyper_userbase()).await.unwrap();
+            let admin: StarlaneKeycloakAdmin<Starlane> =
+                StarlaneKeycloakAdmin::new().await.unwrap();
+            admin
+                .init_realm_for_point("master".to_string(), &Point::hyper_userbase())
+                .await
+                .unwrap();
 
             println!("done");
         });
-
     }
-
 }

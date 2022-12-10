@@ -12,16 +12,17 @@ use cosmic_registry_postgres::err::PostErr;
 #[cfg(not(feature="keycloak"))]
 pub trait StarlaneErr: PostErr {}
 
+#[cfg(feature="keycloak")]
 #[cfg(not(feature = "postgres"))]
-pub trait StarlaneErr {}
+pub trait StarlaneErr:From<reqwest::Error> {}
 
 #[cfg(feature="keycloak")]
 #[cfg(not(feature="postgres"))]
-pub trait StarlaneErr: From<KeycloakError>+From<ParseIntError>{}
+pub trait StarlaneErr: From<KeycloakError>+From<ParseIntError>+From<reqwest::Error>{}
 
 #[cfg(feature="keycloak")]
 #[cfg(feature="postgres")]
-pub trait StarlaneErr: PostErr+From<KeycloakError>+From<ParseIntError>{}
+pub trait StarlaneErr: PostErr+From<KeycloakError>+From<ParseIntError>+From<reqwest::Error>{}
 
 #[derive(Debug, Clone)]
 pub struct StarErr {
@@ -75,6 +76,16 @@ pub mod convert {
             }
         }
     }
+
+         impl From<reqwest::Error> for Err {
+        fn from(e:reqwest::Error) -> Self {
+            Self{
+                kind: ErrKind::Default,
+                message: e.to_string()
+            }
+        }
+    }
+
 
      impl From<alcoholic_jwt::ValidationError> for Err {
         fn from(e:alcoholic_jwt::ValidationError) -> Self {
