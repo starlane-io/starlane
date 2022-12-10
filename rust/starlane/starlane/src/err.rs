@@ -13,10 +13,6 @@ use cosmic_registry_postgres::err::PostErr;
 pub trait StarlaneErr: PostErr {}
 
 #[cfg(feature="keycloak")]
-#[cfg(not(feature = "postgres"))]
-pub trait StarlaneErr:From<reqwest::Error> {}
-
-#[cfg(feature="keycloak")]
 #[cfg(not(feature="postgres"))]
 pub trait StarlaneErr: From<KeycloakError>+From<ParseIntError>+From<reqwest::Error>{}
 
