@@ -211,6 +211,7 @@ println!("Web Server Assign");
             );
             let mut control_tx = WebRunner::new(skel);
             self.servers.insert(ctx.to().point.clone(), control_tx);
+println!("\tcreated web runner!")
         }
         Ok(())
     }
@@ -320,13 +321,14 @@ where
         thread::spawn(move || {
             let port = self.skel.skel.skel.machine.platform.web_port().unwrap();
             let server = Server::http(format!("0.0.0.0:{}", port)).unwrap();
-            for req in server.recv_timeout(Duration::from_secs(1)) {
+            loop {
+            let req = server.recv_timeout(Duration::from_secs(1));
                 if self.control_rx.has_changed().unwrap() {
                     if !(*self.control_rx.borrow()) {
                         break;
                     }
                 }
-                if let Some(req) = req {
+                if let Ok(Some(req)) = req {
                     let runtime = runtime.clone();
                     let transmitter = self.transmitter.clone();
                     runtime.spawn(async move {
