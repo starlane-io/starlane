@@ -368,6 +368,7 @@ impl Kind {
             Kind::Artifact(s) => s.clone().into(),
             Kind::Database(s) => s.clone().into(),
             Kind::Star(s) => s.clone().into(),
+            Kind::Native(s) => s.clone().into(),
             _ => Sub::None,
         }
     }

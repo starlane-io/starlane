@@ -275,8 +275,6 @@ impl Platform for Starlane {
             }
             StarSub::Jump => {
                 builder.add_post(Arc::new(WebDriverFactory::new()));
-                // builder.add_post(Arc::new(ControlDriverFactory::new()));
-
             }
             StarSub::Fold => {
                 #[cfg(feature="keycloak")]
@@ -355,6 +353,23 @@ impl Platform for Starlane {
         cli.exec(format!("create? {}<User>", Point::anonymous().to_string())).await?.ok_or()?;
 
         Ok(())
+    }
+
+
+    fn properties_config(&self, kind: &Kind) -> PropertiesConfig {
+        let mut builder = PropertiesConfigBuilder::new();
+        builder.kind(kind.clone());
+        match kind.to_base() {
+            BaseKind::Mechtron => {
+                builder.add_point("config", true, true).unwrap();
+                builder.build().unwrap()
+            }
+            BaseKind::Host => {
+                builder.add_point("bin", true, true).unwrap();
+                builder.build().unwrap()
+            }
+            _ => builder.build().unwrap(),
+        }
     }
 }
 

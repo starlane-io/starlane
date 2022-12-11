@@ -2065,7 +2065,7 @@ where
         wave.body(HyperSubstance::Provision(provision).into());
         wave.from(self.skel.point.clone().to_surface().with_layer(Layer::Core));
         wave.to(parent_star.to_surface().with_layer(Layer::Core));
-        let pong: Wave<Pong> = self.skel.star_transmitter.direct(wave).await?;
+        let pong: Wave<Pong> = self.skel.logger.result(self.skel.star_transmitter.direct(wave).await)?;
         if pong.core.status.as_u16() == 200 {
             if let Substance::Location(location) = &pong.core.body {
                 Ok(location.clone())
@@ -2085,10 +2085,13 @@ where
                     record.details.stub.kind.to_template().to_string(),
                     pong.core.status.as_u16()
                 ))),
-                Err(_) => Err(P::Err::new(format!(
-                    "failed to provision {}",
+                Err(e) => {
+
+                    self.skel.logger.error(e);
+                    Err(P::Err::new(format!(
+                    "failed to provision '{}'",
                     point.to_string()
-                ))),
+                )))},
             }
         }
     }

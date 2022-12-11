@@ -79,7 +79,6 @@ where
     }
 
     async fn deliver_directed(&self, directed: Traversal<DirectedWave>) -> Result<(), SpaceErr> {
-println!("Shell deliver directed from: {}", directed.from().to_string());
         if directed.from().point == self.surface().point
             && directed.from().layer.ordinal() >= self.surface().layer.ordinal()
         {

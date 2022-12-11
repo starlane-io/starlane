@@ -392,10 +392,11 @@ where
         &self,
         ctx: InCtx<'_, HyperSubstance>,
     ) -> Result<ParticleLocation, P::Err> {
-println!("Provision called for: {}", self.skel.point.to_string() );
+println!("Provision called on : {} ",self.skel.point.to_string() );
         if let HyperSubstance::Provision(provision) = ctx.input {
+println!("provision substance... {}", provision.point.to_string());
             let record = self.skel.skel.skel.registry.record(&provision.point).await?;
-
+println!("got record... {}", provision.point.to_string());
             match self.skel.skel.skel.wrangles.find(&record.details.stub.kind) {
                 None => {
 println!("No wrangles found");

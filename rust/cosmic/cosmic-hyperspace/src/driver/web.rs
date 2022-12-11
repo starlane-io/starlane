@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::driver::{
     Driver, DriverCtx, DriverHandler, DriverSkel, DriverStatus, HyperDriverFactory, HyperItemSkel,
     HyperSkel, ItemHandler, ItemRouter, ItemSkel, ItemSphere,
@@ -38,8 +39,11 @@ use inflector::Inflector;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
+use std::time::Duration;
+use dashmap::DashMap;
 use tiny_http::Server;
 use tokio::runtime::Runtime;
+use tokio::sync::watch;
 use url::Url;
 use cosmic_space::point::Point;
 
@@ -98,6 +102,7 @@ where
     P: Platform,
 {
     skel: DriverSkel<P>,
+    servers: Arc<DashMap<Point,watch::Sender<bool>>>
 }
 
 impl<P> WebDriver<P>
@@ -105,7 +110,8 @@ where
     P: Platform,
 {
     pub fn new(skel: DriverSkel<P>) -> Self {
-        Self { skel }
+        Self { skel,
+        servers: Default::default()}
     }
 }
 
@@ -119,6 +125,7 @@ where
     }
 
     async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
+        /*
         let point = self.skel.point.push("http-server")?;
         let registration = Registration {
             point: point.clone(),
@@ -142,10 +149,13 @@ where
         let mut runner = WebRunner::new(item_skel);
         runner.start();
 
+         */
+
         skel.status_tx
             .send(DriverStatus::Ready)
             .await
             .unwrap_or_default();
+
         Ok(())
     }
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
@@ -158,7 +168,7 @@ where
     }
 
     async fn handler(&self) -> Box<dyn DriverHandler<P>> {
-        Box::new(WebDriverHandler::restore(self.skel.clone()))
+        Box::new(WebDriverHandler::restore(self.skel.clone(), self.servers.clone() ))
     }
 }
 
@@ -167,40 +177,43 @@ where
     P: Platform,
 {
     skel: DriverSkel<P>,
+    servers: Arc<DashMap<Point,watch::Sender<bool>>>
 }
 
 impl<P> WebDriverHandler<P>
 where
     P: Platform,
 {
-    fn restore(skel: DriverSkel<P>) -> Self {
-        WebDriverHandler { skel }
+    fn restore(skel: DriverSkel<P>, servers:Arc<DashMap<Point,watch::Sender<bool>>>) -> Self {
+        WebDriverHandler { skel,
+        servers }
     }
 }
 
-impl<P> DriverHandler<P> for WebDriverHandler<P> where P: Platform {}
+impl<P> DriverHandler<P> for WebDriverHandler<P> where P: Platform {
+}
 
 #[handler]
 impl<P> WebDriverHandler<P>
 where
     P: Platform,
 {
-    /*
+
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
+println!("Web Server Assign");
         if let HyperSubstance::Assign(assign) = ctx.input {
+
             let skel = ItemSkel::new(
                 assign.details.stub.point.clone(),
                 Kind::Native(NativeSub::Web),
                 self.skel.clone(),
             );
-            let mut runner = WebRunner::new(skel);
-            runner.start();
+            let mut control_tx = WebRunner::new(skel);
+            self.servers.insert(ctx.to().point.clone(), control_tx);
         }
         Ok(())
     }
-
-     */
 }
 
 pub struct Web<P>
@@ -258,13 +271,14 @@ where
 {
     pub skel: ItemSkel<P>,
     pub transmitter: ProtoTransmitter,
+    pub control_rx: watch::Receiver<bool>
 }
 
 impl<P> WebRunner<P>
 where
     P: Platform,
 {
-    pub fn new(skel: ItemSkel<P>) -> Self {
+    pub fn new(skel: ItemSkel<P>) -> watch::Sender<bool> {
         let mut router = LayerInjectionRouter::new(
             skel.skel.skel.clone(),
             skel.point.clone().to_surface().with_layer(Layer::Core),
@@ -294,7 +308,11 @@ where
 
         let transmitter = transmitter.build();
 
-        Self { skel, transmitter }
+        let (control_tx,control_rx) = watch::channel(true);
+
+        Self { skel, transmitter, control_rx }.start();
+
+        control_tx
     }
 
     pub fn start(mut self) {
@@ -302,17 +320,24 @@ where
         thread::spawn(move || {
             let port = self.skel.skel.skel.machine.platform.web_port().unwrap();
             let server = Server::http(format!("0.0.0.0:{}", port)).unwrap();
-            for req in server.incoming_requests() {
-                let runtime = runtime.clone();
-                let transmitter = self.transmitter.clone();
-                runtime.spawn(async move {
-                    match Self::handle::<P>(transmitter, req).await {
-                        Ok(_) => {}
-                        Err(err) => {
-                            println!("http handle ERR: {}", err.to_string());
-                        }
+            for req in server.recv_timeout(Duration::from_secs(1)) {
+                if self.control_rx.has_changed().unwrap() {
+                    if !(*self.control_rx.borrow()) {
+                        break;
                     }
-                });
+                }
+                if let Some(req) = req {
+                    let runtime = runtime.clone();
+                    let transmitter = self.transmitter.clone();
+                    runtime.spawn(async move {
+                        match Self::handle::<P>(transmitter, req).await {
+                            Ok(_) => {}
+                            Err(err) => {
+                                println!("http handle ERR: {}", err.to_string());
+                            }
+                        }
+                    });
+                }
             }
         });
     }

@@ -480,7 +480,7 @@ where
         .await{
             Ok(r) => {r},
             Err(err) => {
-                return Err(SpaceErr::new(404, format!("cannot find record for point: {}", point.to_string())).into());
+                return Err(SpaceErr::new(404, format!("{}", err.to_string())).into());
             }
         };
         let mut record: ParticleRecord = record.into();

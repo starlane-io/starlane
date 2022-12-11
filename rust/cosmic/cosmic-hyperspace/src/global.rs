@@ -215,6 +215,7 @@ where
                 };
                 let mut result = self.skel.registry.register(&registration).await;
                 result?;
+println!("CREATE FOR POINT: {}", point.to_string());
                 point
             }
             PointSegTemplate::Pattern(pattern) => {
@@ -244,7 +245,7 @@ where
             PointSegTemplate::Root => Point::root(),
         };
 
-println!("creating {}", point.to_string());
+println!("creating {}<{}>", point.to_string(), child_kind.to_string());
 
         if create.state.has_substance() || child_kind.is_auto_provision() {
             println!("\tprovisioning: {}", point.to_string());
