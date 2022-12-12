@@ -1,11 +1,10 @@
-use std::collections::HashMap;
-use crate::driver::{
+use cosmic_hyperspace::driver::{
     Driver, DriverCtx, DriverHandler, DriverSkel, DriverStatus, HyperDriverFactory, HyperItemSkel,
     HyperSkel, ItemHandler, ItemRouter, ItemSkel, ItemSphere,
 };
-use crate::err::HyperErr;
-use crate::reg::Registration;
-use crate::star::{HyperStarSkel, LayerInjectionRouter};
+use cosmic_hyperspace::err::HyperErr;
+use cosmic_hyperspace::reg::Registration;
+use cosmic_hyperspace::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::Platform;
 use ascii::IntoAsciiString;
 use cosmic_space::artifact::ArtRef;
@@ -22,6 +21,7 @@ use cosmic_space::loc::{Layer, ToSurface};
 use cosmic_space::parse::{bind_config, CamelCase};
 use cosmic_space::particle::traversal::{Traversal, TraversalDirection};
 use cosmic_space::particle::Status;
+use cosmic_space::point::Point;
 use cosmic_space::selector::{KindSelector, Pattern, SubKindSelector};
 use cosmic_space::substance::{Bin, Substance};
 use cosmic_space::util::{log, ValuePattern};
@@ -35,17 +35,17 @@ use cosmic_space::wave::{
     Agent, DirectedProto, Handling, HandlingKind, Ping, ToRecipients, UltraWave, WaitTime, Wave,
 };
 use cosmic_space::HYPERUSER;
+use dashmap::DashMap;
 use inflector::Inflector;
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use dashmap::DashMap;
 use tiny_http::Server;
 use tokio::runtime::Runtime;
 use tokio::sync::watch;
 use url::Url;
-use cosmic_space::point::Point;
 
 lazy_static! {
     static ref WEB_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -102,7 +102,7 @@ where
     P: Platform,
 {
     skel: DriverSkel<P>,
-    servers: Arc<DashMap<Point,watch::Sender<bool>>>
+    servers: Arc<DashMap<Point, watch::Sender<bool>>>,
 }
 
 impl<P> WebDriver<P>
@@ -110,8 +110,10 @@ where
     P: Platform,
 {
     pub fn new(skel: DriverSkel<P>) -> Self {
-        Self { skel,
-        servers: Default::default()}
+        Self {
+            skel,
+            servers: Default::default(),
+        }
     }
 }
 
@@ -168,7 +170,10 @@ where
     }
 
     async fn handler(&self) -> Box<dyn DriverHandler<P>> {
-        Box::new(WebDriverHandler::restore(self.skel.clone(), self.servers.clone() ))
+        Box::new(WebDriverHandler::restore(
+            self.skel.clone(),
+            self.servers.clone(),
+        ))
     }
 }
 
@@ -177,33 +182,29 @@ where
     P: Platform,
 {
     skel: DriverSkel<P>,
-    servers: Arc<DashMap<Point,watch::Sender<bool>>>
+    servers: Arc<DashMap<Point, watch::Sender<bool>>>,
 }
 
 impl<P> WebDriverHandler<P>
 where
     P: Platform,
 {
-    fn restore(skel: DriverSkel<P>, servers:Arc<DashMap<Point,watch::Sender<bool>>>) -> Self {
-        WebDriverHandler { skel,
-        servers }
+    fn restore(skel: DriverSkel<P>, servers: Arc<DashMap<Point, watch::Sender<bool>>>) -> Self {
+        WebDriverHandler { skel, servers }
     }
 }
 
-impl<P> DriverHandler<P> for WebDriverHandler<P> where P: Platform {
-}
+impl<P> DriverHandler<P> for WebDriverHandler<P> where P: Platform {}
 
 #[handler]
 impl<P> WebDriverHandler<P>
 where
     P: Platform,
 {
-
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
-println!("Web Server Assign");
+        println!("Web Server Assign");
         if let HyperSubstance::Assign(assign) = ctx.input {
-
             let skel = ItemSkel::new(
                 assign.details.stub.point.clone(),
                 Kind::Native(NativeSub::Web),
@@ -211,7 +212,7 @@ println!("Web Server Assign");
             );
             let mut control_tx = WebRunner::new(skel);
             self.servers.insert(ctx.to().point.clone(), control_tx);
-println!("\tcreated web runner!")
+            println!("\tcreated web runner!")
         }
         Ok(())
     }
@@ -221,7 +222,7 @@ pub struct Web<P>
 where
     P: Platform,
 {
-    skel: ItemSkel<P>,
+    pub skel: ItemSkel<P>,
 }
 
 impl<P> Web<P>
@@ -272,7 +273,7 @@ where
 {
     pub skel: ItemSkel<P>,
     pub transmitter: ProtoTransmitter,
-    pub control_rx: watch::Receiver<bool>
+    pub control_rx: watch::Receiver<bool>,
 }
 
 impl<P> WebRunner<P>
@@ -309,9 +310,14 @@ where
 
         let transmitter = transmitter.build();
 
-        let (control_tx,control_rx) = watch::channel(true);
+        let (control_tx, control_rx) = watch::channel(true);
 
-        Self { skel, transmitter, control_rx }.start();
+        Self {
+            skel,
+            transmitter,
+            control_rx,
+        }
+        .start();
 
         control_tx
     }
@@ -322,7 +328,7 @@ where
             let port = self.skel.skel.skel.machine.platform.web_port().unwrap();
             let server = Server::http(format!("0.0.0.0:{}", port)).unwrap();
             loop {
-            let req = server.recv_timeout(Duration::from_secs(1));
+                let req = server.recv_timeout(Duration::from_secs(1));
                 if self.control_rx.has_changed().unwrap() {
                     if !(*self.control_rx.borrow()) {
                         break;

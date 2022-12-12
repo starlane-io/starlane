@@ -12,6 +12,7 @@ pub mod keycloak;
 
 #[cfg(test)]
 mod test;
+pub mod web;
 
 #[macro_use]
 extern crate async_trait;
@@ -62,9 +63,7 @@ use cosmic_space::artifact::asynch::ArtifactApi;
 use cosmic_space::artifact::asynch::ReadArtifactFetcher;
 use cosmic_space::command::direct::create::KindTemplate;
 use cosmic_space::err::SpaceErr;
-use cosmic_space::kind::{
-    ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserVariant,
-};
+use cosmic_space::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserVariant};
 use cosmic_space::loc::{MachineName, StarKey};
 use cosmic_space::loc::ToBaseKind;
 use cosmic_space::log::RootLogger;
@@ -75,7 +74,7 @@ use cosmic_space::particle::property::{
 use cosmic_space::substance::Token;
 
 use cosmic_hyperlane_tcp::HyperlaneTcpServer;
-use cosmic_hyperspace::driver::web::WebDriverFactory;
+use web::WebDriverFactory;
 use cosmic_hyperspace::mem::registry::{MemRegApi, MemRegCtx};
 use cosmic_space::loc;
 use cosmic_space::point::Point;
@@ -359,13 +358,17 @@ impl Platform for Starlane {
     fn properties_config(&self, kind: &Kind) -> PropertiesConfig {
         let mut builder = PropertiesConfigBuilder::new();
         builder.kind(kind.clone());
-        match kind.to_base() {
-            BaseKind::Mechtron => {
+        match kind {
+            Kind::Mechtron => {
                 builder.add_point("config", true, true).unwrap();
                 builder.build().unwrap()
             }
-            BaseKind::Host => {
+            Kind::Host => {
                 builder.add_point("bin", true, true).unwrap();
+                builder.build().unwrap()
+            }
+            Kind::Native(NativeSub::Web)=> {
+                builder.add_point("auth", false, true).unwrap();
                 builder.build().unwrap()
             }
             _ => builder.build().unwrap(),

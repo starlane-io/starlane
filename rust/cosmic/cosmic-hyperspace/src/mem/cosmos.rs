@@ -6,7 +6,6 @@ use crate::driver::control::ControlDriverFactory;
 use crate::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
 use crate::driver::root::RootDriverFactory;
 use crate::driver::space::SpaceDriverFactory;
-use crate::driver::web::WebDriverFactory;
 use crate::driver::DriverAvail;
 use crate::err::{CosmicErr, HyperErr};
 use crate::mem::registry::{MemRegApi, MemRegCtx};
@@ -97,7 +96,6 @@ impl Platform for MemCosmos {
                 builder.add_post(Arc::new(ArtifactDriverFactory::new()));
             }
             StarSub::Jump => {
-                builder.add_post(Arc::new(WebDriverFactory::new()));
             }
             StarSub::Fold => {}
             StarSub::Machine => {

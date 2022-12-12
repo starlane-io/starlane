@@ -5,7 +5,6 @@ pub mod mechtron;
 pub mod root;
 pub mod space;
 pub mod star;
-pub mod web;
 
 use crate::driver::star::StarDriverFactory;
 use crate::err::HyperErr;
@@ -1428,7 +1427,7 @@ pub struct DriverSkel<P>
 where
     P: Platform,
 {
-    skel: HyperStarSkel<P>,
+    pub skel: HyperStarSkel<P>,
     pub kind: KindSelector,
     pub point: Point,
     pub logger: PointLogger,
@@ -1830,7 +1829,7 @@ pub struct ItemSkel<P>
 where
     P: Platform,
 {
-    skel: DriverSkel<P>,
+    pub skel: DriverSkel<P>,
     pub point: Point,
     pub kind: Kind,
 }

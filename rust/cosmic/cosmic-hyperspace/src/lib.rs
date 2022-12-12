@@ -173,7 +173,7 @@ where
             BaseKind::Bundle => Kind::Bundle,
             BaseKind::Artifact => match &template.sub {
                 None => {
-                    return Err("expected Sub for Artirtact".into());
+                    return Err("expected Sub for Artifact".into());
                 }
                 Some(sub) => {
                     let artifact_kind = ArtifactSubKind::from_str(sub.as_str())?;
