@@ -1531,7 +1531,7 @@ impl DirectedProto {
         Self::to_with_method(to, method)
     }
 
-    pub fn msg<M: Into<ExtMethod>, P: ToRecipients + Clone>(to: P, method: M) -> Self {
+    pub fn ext<M: Into<ExtMethod>, P: ToRecipients + Clone>(to: P, method: M) -> Self {
         let method: ExtMethod = method.into();
         let method: Method = method.into();
         Self::to_with_method(to, method)

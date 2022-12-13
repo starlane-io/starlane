@@ -73,7 +73,7 @@ pub mod convert {
         }
     }
 
-         impl From<reqwest::Error> for Err {
+    impl From<reqwest::Error> for Err {
         fn from(e:reqwest::Error) -> Self {
             Self{
                 kind: ErrKind::Default,
@@ -219,6 +219,8 @@ pub mod convert {
             Err::new("empty")
         }
     }
+
+
 
     #[cfg(feature="postgres")]
     impl From<sqlx::Error> for Err {

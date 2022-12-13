@@ -16,7 +16,7 @@ use cosmic_space::loc::ToSurface;
 use cosmic_space::parse::bind_config;
 use cosmic_space::point::Point;
 use cosmic_space::selector::{KindSelector, Selector};
-use cosmic_space::substance::Substance;
+use cosmic_space::substance::{Bin, Substance};
 use cosmic_space::util::{log, log_str};
 use cosmic_space::wave::core::ext::ExtMethod;
 use cosmic_space::wave::exchange::asynch::InCtx;
@@ -110,23 +110,7 @@ where
         Ok(Self { skel, ctx, admin })
     }
 
-    #[route("Ext<GetJwks>")]
-    pub async fn get_jwks(&self, ctx: InCtx<'_, ()>) -> Result<Substance, P::Err> {
-        let client = reqwest::Client::new();
-        let realm = normalize_realm(&ctx.to().point );
-        let url = std::env::var("STARLANE_KEYCLOAK_URL")
-            .map_err(|e| "UserBase: environment variable 'STARLANE_KEYCLOAK_URL' not set.")?;
-        let jwks = client
-            .get(&format!(
-                "{}/auth/realms/{}/protocol/openid-connect/certs",
-                url, realm
-            ))
-            .send()
-            .await?;
-        let jwks = jwks.text().await?;
 
-        Ok(Substance::Text(jwks))
-    }
 }
 
 #[async_trait]
@@ -145,6 +129,7 @@ where
             point.clone(),
             record.details.stub.kind,
             self.skel.driver.clone(),
+            record.details.properties
         );
         Ok(ItemSphere::Handler(Box::new(Keycloak::restore(
             skel,
@@ -221,7 +206,27 @@ where
 }
 
 #[handler]
-impl<P> Keycloak<P> where P: Platform {}
+impl<P> Keycloak<P> where P: Platform {
+
+    #[route("Ext<GetJwks>")]
+    pub async fn get_jwks(&self, ctx: InCtx<'_, ()>) -> Result<Substance, P::Err>  {
+        let client = reqwest::Client::new();
+        let realm = normalize_realm(&ctx.to().point );
+        let url = std::env::var("STARLANE_KEYCLOAK_URL")
+            .map_err(|e| "UserBase: environment variable 'STARLANE_KEYCLOAK_URL' not set.")?;
+        let jwks = client
+            .get(&format!(
+                "{}/auth/realms/{}/protocol/openid-connect/certs",
+                url, realm
+            ))
+            .send()
+            .await.map_err(|e|P::Err::new(e))?;
+        let jwks = jwks.text().await.map_err(|e|P::Err::new(e))?;
+println!("jwks: {}",jwks);
+        Ok(Substance::Text(jwks))
+    }
+
+}
 
 impl<P> Item<P> for Keycloak<P>
 where
@@ -246,7 +251,10 @@ where
     }
 }
 
-impl<P> Keycloak<P> where P: Platform {}
+impl<P> Keycloak<P> where P: Platform {
+
+
+}
 
 lazy_static! {
     static ref USER_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -329,6 +337,7 @@ where
             point.clone(),
             record.details.stub.kind,
             self.skel.driver.clone(),
+            record.details.properties
         );
         Ok(ItemSphere::Handler(Box::new(User::restore(skel, (), ()))))
     }
@@ -934,64 +943,21 @@ pub fn log_err<R>(result: Result<R, KeycloakError>) -> Result<R, KeycloakError> 
 
 #[derive(Clone)]
 pub struct JwksCache {
-    map: Arc<RwLock<LruCache<Point, JWKS>>>,
-    transmitter: ProtoTransmitter,
+    jwks: JWKS
 }
 
 impl JwksCache {
-    pub fn new(transmitter: ProtoTransmitter) -> JwksCache {
+    pub fn new(jwks: JWKS) -> JwksCache {
         Self {
-            map: Arc::new(RwLock::new(LruCache::new(
-                NonZeroUsize::new(1024usize).unwrap(),
-            ))),
-            transmitter,
+            jwks
         }
     }
 
     pub async fn validate(&self, token: &str) -> Result<ValidJWT, StarErr> {
-        let jwt = UntrustedJwt(token.to_string());
-        let claims = serde_json::from_str::<JwtClaims>(jwt.claims()?.as_str())?;
-        let userbase_address = Point::from_str(claims.userbase_ref.as_str())?;
         let kid = token_kid(token)?.ok_or("token 'kid' (key id) not found")?;
-
-        let jwks = {
-            let mut lock = self.map.write().await;
-            if let Some(jwks) = lock.get(&userbase_address) {
-                Some(jwks.clone())
-            } else {
-                None
-            }
-        };
+        let jwk = self.jwks.find(&kid).ok_or::<StarErr>(format!("expected JWK for kid: {}", kid).into())?;
 
         let validations = vec![];
-
-        match jwks {
-            Some(jwks) => match jwks.find(kid.as_str()) {
-                None => {}
-                Some(jwk) => return Ok(validate(token, jwk, validations)?),
-            },
-            None => {}
-        }
-
-        // in the case of jwks not being present OR jwk not present in jwks then fetch jwks from UserBase
-
-        let method = ExtMethod::new("GetJwks")?;
-        let surface = Point::from_str(claims.userbase_ref.as_str())?.to_surface();
-        let mut proto = DirectedProto::kind(&DirectedKind::Ping);
-        proto.to(surface);
-
-        let pong = self.transmitter.ping(proto).await?;
-        let jwks = pong.core.body.clone().to_text()?;
-        let jwks: JWKS = serde_json::from_str(jwks.as_str())?;
-        {
-            let jwks = jwks.clone();
-            let mut lock = self.map.write().await;
-            lock.put(userbase_address, jwks);
-        }
-
-        let jwk = jwks
-            .find(kid.as_str())
-            .ok_or("cannot find keyId to validate token")?;
         Ok(validate(token, jwk, validations)?)
     }
 }

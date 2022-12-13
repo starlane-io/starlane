@@ -28,7 +28,7 @@ use cosmic_space::parse::bind_config;
 use cosmic_space::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
-use cosmic_space::particle::{Details, Status, Stub};
+use cosmic_space::particle::{Details, Properties, Status, Stub};
 use cosmic_space::selector::KindSelector;
 use cosmic_space::substance::Substance;
 use cosmic_space::util::log;
@@ -1832,14 +1832,15 @@ where
     pub skel: DriverSkel<P>,
     pub point: Point,
     pub kind: Kind,
+    pub properties: Properties
 }
 
 impl<P> ItemSkel<P>
 where
     P: Platform,
 {
-    pub fn new(point: Point, kind: Kind, skel: DriverSkel<P>) -> Self {
-        Self { point, kind, skel }
+    pub fn new(point: Point, kind: Kind, skel: DriverSkel<P>, properties: Properties) -> Self {
+        Self { point, kind, skel, properties }
     }
 
     pub fn data_dir(&self) -> String {

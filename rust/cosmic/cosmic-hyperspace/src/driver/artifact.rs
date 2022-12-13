@@ -600,7 +600,7 @@ where
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
         let record = self.skel.locate(point).await?;
 
-        let skel = ItemSkel::new(point.clone(), record.details.stub.kind, self.skel.clone());
+        let skel = ItemSkel::new(point.clone(), record.details.stub.kind, self.skel.clone(), record.details.properties);
         Ok(ItemSphere::Handler(Box::new(Artifact::restore(
             skel,
             (),

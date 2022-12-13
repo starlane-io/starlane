@@ -31,9 +31,7 @@ use cosmic_space::wave::exchange::asynch::{
     InCtx, ProtoTransmitter, ProtoTransmitterBuilder, TraversalRouter,
 };
 use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{
-    Agent, DirectedProto, Handling, HandlingKind, Ping, ToRecipients, UltraWave, WaitTime, Wave,
-};
+use cosmic_space::wave::{Agent, DirectedProto, DirectedWave, Handling, HandlingKind, Ping, ToRecipients, UltraWave, WaitTime, Wave};
 use cosmic_space::HYPERUSER;
 use dashmap::DashMap;
 use inflector::Inflector;
@@ -42,10 +40,13 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
+use alcoholic_jwt::JWKS;
 use tiny_http::Server;
 use tokio::runtime::Runtime;
 use tokio::sync::watch;
 use url::Url;
+use cosmic_space::wave::core::ext::ExtMethod;
+use crate::keycloak::JwksCache;
 
 lazy_static! {
     static ref WEB_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -161,10 +162,12 @@ where
         Ok(())
     }
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+        let record = self.skel.locate(point).await?;
         let skel = ItemSkel::new(
             point.clone(),
             Kind::Native(NativeSub::Web),
             self.skel.clone(),
+                record.details.properties
         );
         Ok(ItemSphere::Router(Box::new(Web::new(skel))))
     }
@@ -209,8 +212,9 @@ where
                 assign.details.stub.point.clone(),
                 Kind::Native(NativeSub::Web),
                 self.skel.clone(),
+                assign.details.properties.clone()
             );
-            let mut control_tx = WebRunner::new(skel);
+            let mut control_tx = WebRunner::new(skel).await?;
             self.servers.insert(ctx.to().point.clone(), control_tx);
             println!("\tcreated web runner!")
         }
@@ -271,6 +275,7 @@ pub struct WebRunner<P>
 where
     P: Platform,
 {
+    pub jwks_cache: Arc<Option<JwksCache>>,
     pub skel: ItemSkel<P>,
     pub transmitter: ProtoTransmitter,
     pub control_rx: watch::Receiver<bool>,
@@ -280,7 +285,7 @@ impl<P> WebRunner<P>
 where
     P: Platform,
 {
-    pub fn new(skel: ItemSkel<P>) -> watch::Sender<bool> {
+    pub async fn new(skel: ItemSkel<P>) -> Result<watch::Sender<bool>,P::Err> {
         let mut router = LayerInjectionRouter::new(
             skel.skel.skel.clone(),
             skel.point.clone().to_surface().with_layer(Layer::Core),
@@ -306,9 +311,34 @@ where
             retries: Default::default(),
             wait: WaitTime::Low,
         });
-        transmitter.agent = SetStrategy::Fill(Agent::Anonymous);
 
+        let jwks_cache = Arc::new(if let Some(to) = skel.properties.get("auth") {
+            let to = Point::from_str(to.value.as_str())?;
+
+            let mut jwks_transmitter = transmitter.clone();
+            jwks_transmitter.agent = SetStrategy::Override(Agent::HyperUser);
+            jwks_transmitter.to = SetStrategy::Override(to.to_recipients());
+            let jwks_transmitter = jwks_transmitter.build();
+            let mut proto = DirectedProto::ping();
+            proto.method(ExtMethod::new("GetJwks").unwrap());
+            let pong = jwks_transmitter.ping(proto).await?;
+            pong.ok_or()?;
+            if let Substance::Bin(bin) = pong.variant.core.body  {
+               let jwks: JWKS = bincode::deserialize(bin.as_slice())?;
+               Some(JwksCache::new(jwks))
+            } else {
+                return Err("could not deserialize JWKS".into());
+            }
+        } else {
+            None
+        });
+
+        // waves get a default agent of Anonymous
+        transmitter.agent = SetStrategy::Fill(Agent::Anonymous);
         let transmitter = transmitter.build();
+
+
+
 
         let (control_tx, control_rx) = watch::channel(true);
 
@@ -316,10 +346,11 @@ where
             skel,
             transmitter,
             control_rx,
+            jwks_cache
         }
         .start();
 
-        control_tx
+        Ok(control_tx)
     }
 
     pub fn start(mut self) {
@@ -337,8 +368,9 @@ where
                 if let Ok(Some(req)) = req {
                     let runtime = runtime.clone();
                     let transmitter = self.transmitter.clone();
+                    let jwks_cache = self.jwks_cache.clone();
                     runtime.spawn(async move {
-                        match Self::handle::<P>(transmitter, req).await {
+                        match Self::handle::<P>(transmitter, req, jwks_cache).await {
                             Ok(_) => {}
                             Err(err) => {
                                 println!("http handle ERR: {}", err.to_string());
@@ -353,10 +385,12 @@ where
     async fn handle<C>(
         transmitter: ProtoTransmitter,
         mut req: tiny_http::Request,
+        jwks: Arc<Option<JwksCache>>
     ) -> Result<(), C::Err>
     where
         C: Platform,
     {
+
         let method = req
             .method()
             .to_string()
@@ -366,9 +400,30 @@ where
 
         let method = HttpMethod::from_str(method.as_str())?;
         let mut headers = HeaderMap::new();
+        let mut agent = Agent::Anonymous;
         for header in req.headers() {
-            headers.insert(header.field.to_string(), header.value.to_string());
+            if header.field.as_str() ==  "Authorization" {
+               if let Some(jwks) = &*jwks {
+                   //let token = header.value.to_string();
+                   //jwks.validate(token.as_str()).await?
+               }
+            } else {
+                headers.insert(header.field.to_string(), header.value.to_string());
+            }
         }
+
+        match headers.get("Authorization")
+        {
+            None => {}
+            Some(bearer) => {
+/*                let wave = DirectedProto::ext("VerifyJwt");
+                transmitter.
+
+ */
+            }
+        }
+
+
         let url = format!("http://localhost{}", req.url());
         let uri: Url = Url::from_str(url.as_str())?;
         let body = match req.body_length().as_ref() {

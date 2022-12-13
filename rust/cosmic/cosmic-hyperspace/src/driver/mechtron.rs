@@ -162,9 +162,10 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+        let record = self.skel.skel.locate(point).await?;
         let host = self.skel.hosts.get_via_point(point).await?.clone();
         let skel = HostItemSkel {
-            skel: ItemSkel::new(point.clone(), Kind::Host, self.skel.skel.clone()),
+            skel: ItemSkel::new(point.clone(), Kind::Host, self.skel.skel.clone(), record.details.properties),
             host,
         };
         Ok(ItemSphere::Handler(Box::new(HostItem::restore(
@@ -471,8 +472,9 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+        let record = self.skel.locate(point).await?;
         let ctx = self.skel.item_ctx(point, Layer::Core)?;
-        let skel = ItemSkel::new(point.clone(), Kind::Mechtron, self.skel.clone());
+        let skel = ItemSkel::new(point.clone(), Kind::Mechtron, self.skel.clone(), record.details.properties.clone());
         let mechtron = Mechtron::restore(skel, ctx, ());
         Ok(ItemSphere::Router(Box::new(mechtron)))
     }
