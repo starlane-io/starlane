@@ -32,7 +32,7 @@ use cosmic_space::wave::exchange::asynch::{
 use cosmic_space::wave::exchange::SetStrategy;
 use cosmic_space::wave::{Agent, BounceBacks, DirectedProto, Echoes, Handling, HandlingKind, Pong, Priority, Recipients, Retries, ToRecipients, UltraWave, WaitTime, Wave};
 use cosmic_space::HYPERUSER;
-use dashmap::DashMap;
+use dashmap::{DashMap, DashSet};
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::marker::PhantomData;
@@ -188,6 +188,7 @@ where
     pub star_skel: HyperStarSkel<P>,
     pub driver_skel: DriverSkel<P>,
     pub ctx: DriverCtx,
+    pub states: Arc<DashMap<Point,StarState>>
 }
 
 impl<P> StarDriver<P>
@@ -199,6 +200,7 @@ where
             star_skel,
             driver_skel,
             ctx,
+            states: Arc::new(DashMap::new())
         }
     }
 }
@@ -249,10 +251,17 @@ where
             point: point.clone(),
             kind: self.kind()
         };
+        let state = if self.states.contains_key(point) {
+            self.states.get(point).unwrap().value().clone()
+        } else {
+            let state = StarState::new();
+            self.states.insert(point.clone(),state.clone());
+            state
+        };
         Ok(ItemSphere::Handler(Box::new(Star::restore(
             skel,
             self.ctx.clone(),
-            (),
+            state,
         ))))
     }
 }
@@ -264,6 +273,7 @@ where
 {
     pub skel: HyperItemSkel<P>,
     pub ctx: DriverCtx,
+    pub state: StarState
 }
 
 impl<P> Star<P>
@@ -371,10 +381,10 @@ where
 {
     type Skel = HyperItemSkel<P>;
     type Ctx = DriverCtx;
-    type State = ();
+    type State = StarState;
 
-    fn restore(skel: Self::Skel, ctx: Self::Ctx, _: Self::State) -> Self {
-        Star { skel, ctx }
+    fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self {
+        Star { skel, ctx, state }
     }
 
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
@@ -844,4 +854,18 @@ where
         }
         Ok(discoveries)
     }
+}
+
+
+#[derive(Clone)]
+pub struct StarState {
+    pub readies : Arc<DashSet<Point>>
+}
+
+impl StarState {
+   pub fn new() -> Self {
+       Self {
+           readies: Arc::new(DashSet::new() )
+       }
+   }
 }
