@@ -2781,6 +2781,23 @@ impl Wave<Signal> {
         }
     }
 
+    pub fn unwrap_ref_from_transport<'a>(&'a self) -> Result<&'a UltraWave, SpaceErr> {
+        if self.method != Method::Hyp(HypMethod::Transport) {
+            return Err(SpaceErr::server_error(
+                "expected signal wave to have method Transport",
+            ));
+        }
+        if let Substance::UltraWave(wave) = &self.body {
+            Ok(&*wave)
+        } else {
+            Err(SpaceErr::server_error(
+                "expected body substance to be of type UltraWave for a transport signal",
+            ))
+        }
+    }
+
+
+
     pub fn to_singular_directed(self) -> SingularDirectedWave {
         SingularDirectedWave::Signal(self)
     }

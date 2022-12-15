@@ -1032,6 +1032,10 @@ where
                 Tracker::new("from_hyperway", "SendToStartLayerTraversal")
             });
 
+            if transport.unwrap_ref_from_transport().unwrap().to() == Recipients::Stars {
+println!("\tENCOUNTERED STARS");
+            }
+
             tokio::spawn(async move {
                 let injection = TraversalInjection {
                     surface: injector.clone(),
