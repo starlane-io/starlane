@@ -2439,7 +2439,8 @@ pub enum Recipients {
     Single(Surface),
     Multi(Vec<Surface>),
     Watchers(Watch),
-    Stars,
+    StarsAdjacent,
+    Stars
 }
 
 impl ToString for Recipients {
@@ -2448,7 +2449,8 @@ impl ToString for Recipients {
             Recipients::Single(surface) => surface.to_string(),
             Recipients::Multi(_) => "Multi".to_string(),
             Recipients::Watchers(_) => "Watchers".to_string(),
-            Recipients::Stars => "Stars".to_string(),
+            Recipients::StarsAdjacent => "StarsAdjacent".to_string(),
+            Recipients::Stars=> "Stars".to_string(),
         }
     }
 }
@@ -2480,6 +2482,19 @@ impl Recipients {
                 false
             }
             Recipients::Watchers(_) => false,
+            Recipients::StarsAdjacent => {
+                if let RouteSeg::Star(_) = point.route {
+                    if point.segments.len() == 1
+                        && *point.segments.first().unwrap() == PointSeg::Space("star".to_string())
+                    {
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
             Recipients::Stars => {
                 if let RouteSeg::Star(_) = point.route {
                     if point.segments.len() == 1
@@ -2516,7 +2531,7 @@ pub trait ToRecipients {
 }
 
 impl Recipients {
-    pub fn select_ports(&self, point: &Point) -> Vec<&Surface> {
+    pub fn select_surface(&self, point: &Point) -> Vec<&Surface> {
         let mut rtn = vec![];
         match self {
             Recipients::Single(surface) => {
@@ -2532,6 +2547,7 @@ impl Recipients {
                 }
             }
             Recipients::Watchers(_) => {}
+            Recipients::StarsAdjacent => {}
             Recipients::Stars => {}
         }
         rtn
@@ -2542,7 +2558,8 @@ impl Recipients {
             Recipients::Single(_) => true,
             Recipients::Multi(_) => false,
             Recipients::Watchers(_) => false,
-            Recipients::Stars => false,
+            Recipients::StarsAdjacent => false,
+            Recipients::Stars => false
         }
     }
 
@@ -2551,7 +2568,8 @@ impl Recipients {
             Recipients::Single(_) => false,
             Recipients::Multi(_) => true,
             Recipients::Watchers(_) => false,
-            Recipients::Stars => false,
+            Recipients::StarsAdjacent => false,
+            Recipients::Stars => false
         }
     }
 
@@ -2560,7 +2578,8 @@ impl Recipients {
             Recipients::Single(_) => false,
             Recipients::Multi(_) => false,
             Recipients::Watchers(_) => false,
-            Recipients::Stars => true,
+            Recipients::StarsAdjacent => true,
+            Recipients::Stars => true
         }
     }
 
@@ -2569,7 +2588,8 @@ impl Recipients {
             Recipients::Single(_) => false,
             Recipients::Multi(_) => false,
             Recipients::Watchers(_) => true,
-            Recipients::Stars => false,
+            Recipients::StarsAdjacent => false,
+            Recipients::Stars => false
         }
     }
 

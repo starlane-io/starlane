@@ -408,7 +408,7 @@ println!("\tSTAR READY {}", ctx.from().to_string() );
         if self.state.readies.len() == self.skel.skel.skel.machine.template.stars.len() {
            println!("\n\n\n*** CLUSTER READY ***\n\n\n");
             let mut proto = DirectedProto::ripple();
-            proto.to(Recipients::Stars);
+            proto.to(Recipients::StarsAdjacent);
             proto.method(ExtMethod::new("ClusterReady").unwrap());
             proto.bounce_backs(BounceBacks::None);
             self.skel.skel.skel.star_transmitter.ripple(proto).await.unwrap();
@@ -845,7 +845,7 @@ where
             return Ok(Discoveries::new());
         }
         ripple.bounce_backs = Some(BounceBacks::Count(adjacents.len()));
-        ripple.to(Recipients::Stars);
+        ripple.to(Recipients::StarsAdjacent);
         let echoes: Echoes = self.transmitter.direct(ripple).await?;
         let mut discoveries = Discoveries::new();
         for echo in echoes {

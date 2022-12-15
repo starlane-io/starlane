@@ -1114,9 +1114,9 @@ where
                         let mut map =
                             shard_ripple_by_location(ripple, &skel.adjacents, &skel.registry)
                                 .await?;
-                        if ripple.track {
+//                        if ripple.track {
                             println!("\tRipple sharded into: {}", map.len());
-                        }
+//                        }
                         for (star, mut wave) in map {
                             // add this star to history
                             wave.history.insert(skel.point.clone());
@@ -1434,16 +1434,23 @@ where
                     Recipients::Single(single) => {
                         tos.push(single);
                     }
-                    Recipients::Multi(ports) => {
-                        for port in &ports {
-                            let record = self.skel.registry.record(&port.point).await?;
+                    Recipients::Multi(surfaces) => {
+                        for surface in &surfaces {
+                            let record = self.skel.registry.record(&surface.point).await?;
                             let loc = logger.result(record.location.star.ok_or(P::Err::new("multi port ripple has recipient that is not located, this should have been provisioned when the ripple was sent")))?;
                             if loc == self.skel.point {
-                                tos.push(port.clone());
+                                tos.push(surface.clone());
                             }
                         }
                     }
                     Recipients::Watchers(_) => {}
+                    Recipients::StarsAdjacent => {
+                        if self.skel.point == wave.from().point {
+                            tos.push(self.skel.point.to_surface().with_layer(Layer::Gravity));
+                        } else {
+                            tos.push(self.skel.point.to_surface().with_layer(Layer::Core));
+                        }
+                    }
                     Recipients::Stars => {
                         if self.skel.point == wave.from().point {
                             tos.push(self.skel.point.to_surface().with_layer(Layer::Gravity));
@@ -1872,7 +1879,7 @@ where
     E: Platform,
 {
     let mut rtn = vec![];
-    for port in to_ports(ripple.to.clone(), adjacent, registry).await? {
+    for port in to_surfaces(ripple.to.clone(), adjacent, registry).await? {
         let wave = ripple.as_single(port);
         rtn.push(wave)
     }
@@ -1924,17 +1931,24 @@ where
             // todo
             Ok(map)
         }
+        Recipients::StarsAdjacent => {
+            let mut map = HashMap::new();
+            for (star, _) in adjacent {
+                map.insert(star.clone(), Recipients::StarsAdjacent);
+            }
+            Ok(map)
+        }
         Recipients::Stars => {
             let mut map = HashMap::new();
             for (star, _) in adjacent {
-                map.insert(star.clone(), Recipients::Stars);
+                map.insert(star.clone(), Recipients::Stars );
             }
             Ok(map)
         }
     }
 }
 
-pub async fn to_ports<E>(
+pub async fn to_surfaces<E>(
     recipients: Recipients,
     adjacent: &HashSet<Point>,
     registry: &Registry<E>,
@@ -1947,6 +1961,14 @@ where
         Recipients::Multi(multi) => Ok(multi.into_iter().map(|p| p).collect()),
         Recipients::Watchers(watch) => {
             unimplemented!();
+        }
+        Recipients::StarsAdjacent => {
+            let stars: Vec<Surface> = adjacent
+                .clone()
+                .into_iter()
+                .map(|p| p.to_surface())
+                .collect();
+            Ok(stars)
         }
         Recipients::Stars => {
             let stars: Vec<Surface> = adjacent
