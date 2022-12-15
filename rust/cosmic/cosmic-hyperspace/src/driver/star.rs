@@ -42,6 +42,7 @@ use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tracing::error;
 use cosmic_space::point::Point;
+use cosmic_space::wave::core::ext::ExtMethod;
 use crate::driver::control::ControlCliSession;
 use crate::driver::HyperItemSkel;
 lazy_static! {
@@ -62,6 +63,7 @@ fn star_bind() -> BindConfig {
            Hyp<Search> -> (()) => &;
            Hyp<Provision> -> (()) => &;
            Ext<StarReady> -> (());
+           Ext<ClusterReady> -> (());
        }
     }
     "#,
@@ -404,9 +406,20 @@ where
 println!("\tSTAR READY {}", ctx.from().to_string() );
         self.state.readies.insert( ctx.from().point.clone() );
         if self.state.readies.len() == self.skel.skel.skel.machine.template.stars.len() {
-           println!("\n\n\n*** CLUSTER READY ***\n\n\n")
+           println!("\n\n\n*** CLUSTER READY ***\n\n\n");
+            let mut proto = DirectedProto::ripple();
+            proto.to(Recipients::Stars);
+            proto.method(ExtMethod::new("ClusterReady").unwrap());
+            proto.bounce_backs(BounceBacks::None);
+            self.skel.skel.skel.star_transmitter.ripple(proto).await.unwrap();
         }
     }
+
+    #[route("Ext<ClusterReady>")]
+    pub async fn  cluster_ready(&self, ctx: InCtx<'_,()>) {
+        println!("\tCLUSTER READY {}", ctx.from().to_string() );
+    }
+
 
     #[route("Hyp<Provision>")]
     pub async fn provision(

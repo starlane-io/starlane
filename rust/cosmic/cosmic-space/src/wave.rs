@@ -1600,6 +1600,10 @@ impl FromReflectedAggregate for Echoes {
                 }
                 Ok(echoes)
             }
+            ReflectedAggregate::None => {
+                let mut echoes = Echoes::new();
+                Ok(echoes)
+            }
             _ => Err(SpaceErr::bad_request(
                 "expecting a ReflectedAggregate of Multi",
             )),
