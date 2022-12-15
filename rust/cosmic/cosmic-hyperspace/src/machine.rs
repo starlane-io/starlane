@@ -159,6 +159,7 @@ where
     pub status_tx: mpsc::Sender<MachineStatus>,
     pub machine_star: Surface,
     pub global: Surface,
+    pub template: MachineTemplate
 }
 
 pub struct Machine<P>
@@ -226,6 +227,7 @@ where
             status_tx: mpsc_status_tx,
             status_rx: watch_status_rx,
             global,
+            template: template.clone()
         };
 
         let mut stars = HashMap::new();
@@ -558,6 +560,7 @@ pub enum MachineStatus {
     Fatal,
 }
 
+#[derive(Clone)]
 pub struct MachineTemplate {
     pub stars: Vec<StarTemplate>,
 }

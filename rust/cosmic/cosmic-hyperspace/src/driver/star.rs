@@ -61,6 +61,7 @@ fn star_bind() -> BindConfig {
            Hyp<Assign> -> (()) => &;
            Hyp<Search> -> (()) => &;
            Hyp<Provision> -> (()) => &;
+           Ext<StarReady> -> (());
        }
     }
     "#,
@@ -397,6 +398,16 @@ impl<P> Star<P>
 where
     P: Platform,
 {
+
+    #[route("Ext<StarReady>")]
+    pub async fn  star_ready(&self, ctx: InCtx<'_,()>) {
+println!("\tSTAR READY {}", ctx.from().to_string() );
+        self.state.readies.insert( ctx.from().point.clone() );
+        if self.state.readies.len() == self.skel.skel.skel.machine.template.stars.len() {
+           println!("\n\n\n*** CLUSTER READY ***\n\n\n")
+        }
+    }
+
     #[route("Hyp<Provision>")]
     pub async fn provision(
         &self,

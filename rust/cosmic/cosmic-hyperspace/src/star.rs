@@ -67,6 +67,7 @@ use cosmic_space::wave::{
 };
 use cosmic_space::wave::{HyperWave, UltraWave};
 use cosmic_space::HYPERUSER;
+use cosmic_space::wave::core::ext::ExtMethod;
 use mechtron_host::err::HostErr;
 
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
@@ -800,9 +801,15 @@ where
                                     .await
                                     .unwrap();
                                 star_driver.init_item(skel.point.to_point()).await;
-                                api.start_wrangling().await;
+
+                                let mut proto = DirectedProto::signal();
+                                proto.to(Point::central());
+                                proto.method( ExtMethod::new("StarReady").unwrap() );
+                                skel.star_transmitter.signal(proto).await.unwrap();
+
+                               // api.start_wrangling().await;
                                 // seeing if wrangling can wait on MachineApi...
-                                status_tx.send(Status::Ready).await;
+                                //status_tx.send(Status::Ready).await;
                             }
                             DriverStatus::Retrying(_) => {
                                 status_tx.send(Status::Panic).await;
