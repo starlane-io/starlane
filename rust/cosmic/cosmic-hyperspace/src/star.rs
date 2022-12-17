@@ -1116,7 +1116,7 @@ println!("\tENCOUNTERED STARS");
                 match &mut wave {
                     UltraWave::Ripple(ripple) => {
                         let mut map =
-                            shard_ripple_by_location(ripple, &skel.adjacents, &skel.registry)
+                            shard_ripple_by_location(ripple, &skel)
                                 .await?;
 //                        if ripple.track {
                             println!("\tRipple sharded into: {}", map.len());
@@ -1856,14 +1856,13 @@ impl StarCon {
 
 async fn shard_ripple_by_location<E>(
     ripple: &Wave<Ripple>,
-    adjacent: &HashMap<Point, StarStub>,
-    registry: &Registry<E>,
+    skel: &HyperStarSkel<E>
 ) -> Result<HashMap<Point, Wave<Ripple>>, E::Err>
 where
     E: Platform,
 {
     let mut map = HashMap::new();
-    for (star, recipients) in shard_by_location(ripple.to.clone(), adjacent, registry).await? {
+    for (star, recipients) in shard_by_location(ripple.to.clone(), skel).await? {
         if !ripple.history.contains(&star) {
             let mut ripple = ripple.clone();
             ripple.variant.to = recipients;
@@ -1890,17 +1889,16 @@ where
     Ok(rtn)
 }
 
-pub async fn shard_by_location<E>(
+pub async fn shard_by_location<P>(
     recipients: Recipients,
-    adjacent: &HashMap<Point, StarStub>,
-    registry: &Registry<E>,
-) -> Result<HashMap<Point, Recipients>, E::Err>
+    skel: &HyperStarSkel<P>
+) -> Result<HashMap<Point, Recipients>, P::Err>
 where
-    E: Platform,
+    P: Platform,
 {
     match recipients {
         Recipients::Single(single) => {
-            Err(E::Err::new("unimplemented"))
+            Err(P::Err::new("unimplemented"))
             /*
             let mut map = HashMap::new();
             let record = registry.locate(&single.point).await?;
@@ -1910,25 +1908,22 @@ where
              */
         }
         Recipients::Multi(multi) => {
-            Err(E::Err::new("unimplemented"))
-            /*
-            let mut map: HashMap<Point, Vec<Port>> = HashMap::new();
+            let locator = SmartLocator::new(skel.clone());
+            let mut map: HashMap<Point, Vec<Surface>> = HashMap::new();
             for p in multi {
-                let record = registry.locate(&p).await?;
-                if let Some(found) = map.get_mut(&record.location) {
+                let location = locator.locate(&p).await?.star.ok_or(P::Err::new("expected point assigned to star"))?.to_surface().with_layer(Layer::Core);
+                if let Some(found) = map.get_mut(&location) {
                     found.push(p);
                 } else {
-                    map.insert(record.location, vec![p]);
+                    map.insert(location.point.clone(), vec![p]);
                 }
             }
-
 
             let mut map2 = HashMap::new();
             for (location, points) in map {
                 map2.insert(location, Recipients::Multi(points));
             }
             Ok(map2)
-             */
         }
         Recipients::Watchers(_) => {
             let mut map = HashMap::new();
@@ -1937,14 +1932,14 @@ where
         }
         Recipients::StarsAdjacent => {
             let mut map = HashMap::new();
-            for (star, _) in adjacent {
+            for (star, _) in &skel.adjacents {
                 map.insert(star.clone(), Recipients::StarsAdjacent);
             }
             Ok(map)
         }
         Recipients::Stars => {
             let mut map = HashMap::new();
-            for (star, _) in adjacent {
+            for (star, _) in &skel.adjacents {
                 map.insert(star.clone(), Recipients::Stars );
             }
             Ok(map)
