@@ -15,7 +15,7 @@ use cosmic_space::hyper::{
     Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, ParticleLocation, Search,
 };
 use cosmic_space::kind::{BaseKind, Kind, StarSub};
-use cosmic_space::loc::{Layer, LOCAL_STAR, StarKey, ToPoint, ToSurface};
+use cosmic_space::loc::{Layer, LOCAL_STAR, StarKey, Surface, ToPoint, ToSurface};
 use cosmic_space::log::{Trackable, Tracker};
 use cosmic_space::parse::bind_config;
 use cosmic_space::particle::traversal::{TraversalDirection, TraversalInjection};
@@ -408,7 +408,8 @@ println!("\tSTAR READY {}", ctx.from().to_string() );
         if self.state.readies.len() == self.skel.skel.skel.machine.template.stars.len() {
            println!("\n\n\n*** CLUSTER READY ***\n\n\n");
             let mut proto = DirectedProto::ripple();
-            proto.to(Recipients::Stars);
+            let surfaces: Vec<Surface> = self.state.readies.clone().iter().map(|p|(*p).to_surface().with_layer(Layer::Core)).collect();
+            proto.to(Recipients::Multi(surfaces));
             proto.method(ExtMethod::new("ClusterReady").unwrap());
             proto.bounce_backs(BounceBacks::None);
             self.skel.skel.skel.star_transmitter.ripple(proto).await.unwrap();
