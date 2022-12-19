@@ -407,18 +407,26 @@ println!("\tSTAR READY {}", ctx.from().to_string() );
         self.state.readies.insert( ctx.from().point.clone() );
         if self.state.readies.len() == self.skel.skel.skel.machine.template.stars.len() {
            println!("\n\n\n*** CLUSTER READY ***\n\n\n");
-            let mut proto = DirectedProto::ripple();
             let surfaces: Vec<Surface> = self.state.readies.clone().iter().map(|p|(*p).to_surface().with_layer(Layer::Core)).collect();
-            proto.to(Recipients::Multi(surfaces));
+        for surface in surfaces {
+            let mut proto = DirectedProto::signal();
+            println!("\t~SURFACE: {}",surface.to_string());
+            proto.to(surface);
             proto.method(ExtMethod::new("ClusterReady").unwrap());
-            proto.bounce_backs(BounceBacks::None);
-            self.skel.skel.skel.star_transmitter.ripple(proto).await.unwrap();
+            self.skel.skel.skel.star_transmitter.signal(proto).await.unwrap();
+        }
+
+
         }
     }
 
     #[route("Ext<ClusterReady>")]
     pub async fn  cluster_ready(&self, ctx: InCtx<'_,()>) {
-        println!("\tCLUSTER READY {}", ctx.from().to_string() );
+        println!("\tCLUSTER READY {}", ctx.to().to_string() );
+        let skel = self.skel.skel.skel.clone();
+        tokio::spawn(async move {
+            skel.api.wrangle().await;
+        });
     }
 
 

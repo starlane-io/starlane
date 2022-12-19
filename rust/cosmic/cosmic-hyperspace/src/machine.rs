@@ -618,6 +618,7 @@ impl Default for MachineTemplate {
             StarSub::Fold,
         );
 
+
         nexus.receive(central.to_stub());
         nexus.receive(supe.to_stub());
         nexus.receive(maelstrom.to_stub());

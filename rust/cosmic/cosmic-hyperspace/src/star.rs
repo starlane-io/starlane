@@ -1118,9 +1118,9 @@ println!("\tENCOUNTERED STARS");
                         let mut map =
                             shard_ripple_by_location(ripple, &skel)
                                 .await?;
-//                        if ripple.track {
+                        if ripple.track {
                             println!("\tRipple sharded into: {}", map.len());
-//                        }
+                        }
                         for (star, mut wave) in map {
                             // add this star to history
                             wave.history.insert(skel.point.clone());
@@ -1282,6 +1282,7 @@ println!("\tENCOUNTERED STARS");
     }
 
     async fn wrangle(&self, rtn: oneshot::Sender<Result<StarWrangles, SpaceErr>>) {
+println!("STARTING WRANGLES: {}", self.skel.point.to_string());
         let skel = self.skel.clone();
         tokio::spawn(async move {
             let mut wrangler = Wrangler::new(skel.clone(), Search::Kinds);
@@ -1312,6 +1313,7 @@ println!("\tENCOUNTERED STARS");
             skel.wrangles.add(coalated).await;
             rtn.send(Ok(skel.wrangles.clone())).unwrap_or_default();
 
+println!("Sending READY status");
             skel.status_tx.send(Status::Ready).await;
         });
     }
@@ -1911,6 +1913,7 @@ where
             let locator = SmartLocator::new(skel.clone());
             let mut map: HashMap<Point, Vec<Surface>> = HashMap::new();
             for p in multi {
+println!("\tp => {}", p.to_string());
                 let location = locator.locate(&p).await?.star.ok_or(P::Err::new("expected point assigned to star"))?.to_surface().with_layer(Layer::Core);
                 if let Some(found) = map.get_mut(&location) {
                     found.push(p);
