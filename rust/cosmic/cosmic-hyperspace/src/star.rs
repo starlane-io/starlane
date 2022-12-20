@@ -582,7 +582,7 @@ where
     pub async fn wrangle(&self) -> Result<StarWrangles, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.tx.send(HyperStarCall::Wrangle(rtn)).await?;
-        tokio::time::timeout(Duration::from_secs(5), rtn_rx).await??
+        tokio::time::timeout(Duration::from_secs(30), rtn_rx).await??
     }
 
     pub async fn start_wrangling(&self) {
@@ -804,7 +804,7 @@ where
 
                                 let mut proto = DirectedProto::signal();
                                 proto.to(Point::central());
-                                proto.method( ExtMethod::new("StarReady").unwrap() );
+                                proto.method( ExtMethod::new("StarUp").unwrap() );
                                 skel.star_transmitter.signal(proto).await.unwrap();
 
                                // api.start_wrangling().await;
@@ -1312,6 +1312,14 @@ println!("STARTING WRANGLES: {}", self.skel.point.to_string());
             coalated.sort();
             skel.wrangles.add(coalated).await;
             rtn.send(Ok(skel.wrangles.clone())).unwrap_or_default();
+
+
+
+
+            let mut proto = DirectedProto::signal();
+            proto.to(Point::central());
+            proto.method( ExtMethod::new("StarReady").unwrap() );
+            skel.star_transmitter.signal(proto).await.unwrap();
 
 println!("Sending READY status");
             skel.status_tx.send(Status::Ready).await;

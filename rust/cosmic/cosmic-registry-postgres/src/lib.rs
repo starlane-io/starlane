@@ -997,6 +997,18 @@ where
             Err(format!("'{}' could not revoked grant {} because it does not have full access (super or owner) on {}", to.to_string(), id, access_grant.by_particle.to_string() ).into())
         }
     }
+
+    async fn particles_for_star<'a>(&'a self, star: &Point) -> Result<Vec<ParticleRecord>, P::Err> {
+        let mut conn = self.ctx.acquire().await?;
+        let mut records = sqlx::query_as::<Postgres, PostgresParticleRecord<P>>(
+            "SELECT DISTINCT * FROM particles as r WHERE star=$1",
+        )
+        .bind(star.to_string())
+        .fetch_all(&mut conn).await?;
+
+        let mut records: Vec<ParticleRecord> = records.into_iter().map( |r|r.into() ).collect();
+        Ok(records)
+    }
 }
 
 fn opt<S: ToString>(opt: &Option<S>) -> String {

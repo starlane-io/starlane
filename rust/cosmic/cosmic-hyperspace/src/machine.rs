@@ -159,7 +159,9 @@ where
     pub status_tx: mpsc::Sender<MachineStatus>,
     pub machine_star: Surface,
     pub global: Surface,
-    pub template: MachineTemplate
+    pub template: MachineTemplate,
+    pub cluster_status_tx: mpsc::Sender<ClusterStatus>,
+    pub cluster_status_rx: watch::Receiver<ClusterStatus>
 }
 
 pub struct Machine<P>
@@ -204,6 +206,15 @@ where
             }
         });
 
+        let (mpsc_cluster_status_tx, mut mpsc_cluster_status_rx) = mpsc::channel(128);
+        let (cluster_status_tx, cluster_status_rx) = watch::channel(ClusterStatus::Pending );
+        tokio::spawn(async move {
+            while let Some(status) = mpsc_cluster_status_rx.recv().await {
+                cluster_status_tx.send(status);
+            }
+        });
+
+
         let machine_star = StarKey::machine(machine_name.clone())
             .to_point()
             .to_surface()
@@ -227,7 +238,9 @@ where
             status_tx: mpsc_status_tx,
             status_rx: watch_status_rx,
             global,
-            template: template.clone()
+            template: template.clone(),
+            cluster_status_tx: mpsc_cluster_status_tx,
+            cluster_status_rx,
         };
 
         let mut stars = HashMap::new();
@@ -760,4 +773,12 @@ where
             Err("expecting Bin encountered some other substance when fetching artifact".into())
         }
     }
+}
+
+
+#[derive(Clone,Eq,PartialEq)]
+pub enum ClusterStatus {
+    Pending,
+    Up,
+    Ready
 }

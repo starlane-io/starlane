@@ -45,6 +45,7 @@ use cosmic_space::point::Point;
 use cosmic_space::wave::core::ext::ExtMethod;
 use crate::driver::control::ControlCliSession;
 use crate::driver::HyperItemSkel;
+use crate::machine::ClusterStatus;
 lazy_static! {
     static ref STAR_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
         Arc::new(star_bind()),
@@ -62,7 +63,8 @@ fn star_bind() -> BindConfig {
            Hyp<Assign> -> (()) => &;
            Hyp<Search> -> (()) => &;
            Hyp<Provision> -> (()) => &;
-           Ext<StarReady> -> (());
+           Ext<StarUp> -> (());
+           Ext<ClusterUp> -> (());
            Ext<ClusterReady> -> (());
        }
     }
@@ -308,73 +310,12 @@ where
         <Star<P> as Item<P>>::bind(self).await
     }
 
+    /*
     async fn init(&self) -> Result<Status, SpaceErr> {
-        match self.skel.skel.skel.kind {
-            StarSub::Central => {
-                let registration = Registration {
-                    point: Point::root(),
-                    kind: Kind::Root,
-                    registry: Default::default(),
-                    properties: Default::default(),
-                    owner: HYPERUSER.clone(),
-                    strategy: Strategy::Ensure,
-                    status: Status::Ready,
-                };
-                self.skel
-                    .skel.skel.registry
-                    .register(&registration)
-                    .await
-                    .map_err(|e| e.to_space_err())?;
-       let record = self
-                    .skel.skel.skel
-                    .registry
-                    .record(&Point::root())
-                    .await
-                    .map_err(|e| e.to_space_err())?;
-                let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
-                self.create(&assign).await.map_err(|e| e.to_space_err())?;
-                self.skel.skel.skel
-                    .registry
-                    .assign_star(&Point::root(), &self.skel.point)
-                    .await
-                    .map_err(|e| e.to_space_err())?;
 
-                let registration = Registration {
-                    point: Point::global_executor(),
-                    kind: Kind::Global,
-                    registry: Default::default(),
-                    properties: Default::default(),
-                    owner: HYPERUSER.clone(),
-                    strategy: Strategy::Ensure,
-                    status: Status::Ready,
-                };
-                self.skel.skel.skel
-                    .registry
-                    .register(&registration)
-                    .await
-                    .map_err(|e| e.to_space_err())?;
-
-                let record = self
-                    .skel.skel.skel
-                    .registry
-                    .record(&Point::global_executor())
-                    .await
-                    .map_err(|e| e.to_space_err())?;
-                let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
-                self.create(&assign).await.map_err(|e| e.to_space_err())?;
-                self.skel
-                    .skel
-                    .skel
-                    .registry
-                    .assign_star(&Point::global_executor(), &LOCAL_STAR)
-                    .await
-                    .map_err(|e| e.to_space_err())?;
-
-                Ok(Status::Ready)
-            }
-            _ => Ok(Status::Ready),
-        }
     }
+
+     */
 }
 
 #[async_trait]
@@ -401,18 +342,18 @@ where
     P: Platform,
 {
 
-    #[route("Ext<StarReady>")]
-    pub async fn  star_ready(&self, ctx: InCtx<'_,()>) {
-println!("\tSTAR READY {}", ctx.from().to_string() );
-        self.state.readies.insert( ctx.from().point.clone() );
-        if self.state.readies.len() == self.skel.skel.skel.machine.template.stars.len() {
+    #[route("Ext<StarUp>")]
+    pub async fn  star_up(&self, ctx: InCtx<'_,()>) {
+println!("\tSTAR UP{}", ctx.from().to_string() );
+        self.state.ups.insert( ctx.from().point.clone() );
+        if self.state.ups.len() == self.skel.skel.skel.machine.template.stars.len() {
            println!("\n\n\n*** CLUSTER READY ***\n\n\n");
-            let surfaces: Vec<Surface> = self.state.readies.clone().iter().map(|p|(*p).to_surface().with_layer(Layer::Core)).collect();
+            let surfaces: Vec<Surface> = self.state.ups.clone().iter().map(|p|(*p).to_surface().with_layer(Layer::Core)).collect();
         for surface in surfaces {
             let mut proto = DirectedProto::signal();
             println!("\t~SURFACE: {}",surface.to_string());
             proto.to(surface);
-            proto.method(ExtMethod::new("ClusterReady").unwrap());
+            proto.method(ExtMethod::new("ClusterUp").unwrap());
             self.skel.skel.skel.star_transmitter.signal(proto).await.unwrap();
         }
 
@@ -420,15 +361,110 @@ println!("\tSTAR READY {}", ctx.from().to_string() );
         }
     }
 
-    #[route("Ext<ClusterReady>")]
-    pub async fn  cluster_ready(&self, ctx: InCtx<'_,()>) {
-        println!("\tCLUSTER READY {}", ctx.to().to_string() );
+    #[route("Ext<StarReady>")]
+    pub async fn  star_ready(&self, ctx: InCtx<'_,()>) -> Result<(),P::Err>{
+        println!("\tSTAR READY{}", ctx.from().to_string() );
+        self.state.readies.insert( ctx.from().point.clone() );
+        if self.state.readies.len() == self.skel.skel.skel.machine.template.stars.len() {
+            println!("\n\n\n*** CLUSTER READY ***\n\n\n");
+
+            match self.skel.skel.skel.kind {
+                StarSub::Central => {
+                    let registration = Registration {
+                        point: Point::root(),
+                        kind: Kind::Root,
+                        registry: Default::default(),
+                        properties: Default::default(),
+                        owner: HYPERUSER.clone(),
+                        strategy: Strategy::Ensure,
+                        status: Status::Ready,
+                    };
+                    self.skel
+                        .skel.skel.registry
+                        .register(&registration)
+                        .await
+                        .map_err(|e| e.to_space_err())?;
+                    let record = self
+                        .skel.skel.skel
+                        .registry
+                        .record(&Point::root())
+                        .await
+                        .map_err(|e| e.to_space_err())?;
+                    let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
+                    self.create(&assign).await.map_err(|e| e.to_space_err())?;
+                    self.skel.skel.skel
+                        .registry
+                        .assign_star(&Point::root(), &self.skel.point)
+                        .await
+                        .map_err(|e| e.to_space_err())?;
+
+                    let registration = Registration {
+                        point: Point::global_executor(),
+                        kind: Kind::Global,
+                        registry: Default::default(),
+                        properties: Default::default(),
+                        owner: HYPERUSER.clone(),
+                        strategy: Strategy::Ensure,
+                        status: Status::Ready,
+                    };
+                    self.skel.skel.skel
+                        .registry
+                        .register(&registration)
+                        .await
+                        .map_err(|e| e.to_space_err())?;
+
+                    let record = self
+                        .skel.skel.skel
+                        .registry
+                        .record(&Point::global_executor())
+                        .await
+                        .map_err(|e| e.to_space_err())?;
+                    let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
+                    self.create(&assign).await.map_err(|e| e.to_space_err())?;
+                    self.skel
+                        .skel
+                        .skel
+                        .registry
+                        .assign_star(&Point::global_executor(), &LOCAL_STAR)
+                        .await
+                        .map_err(|e| e.to_space_err())?;
+
+                }
+                _ => {}
+            }
+
+
+            let surfaces: Vec<Surface> = self.state.readies.clone().iter().map(|p|(*p).to_surface().with_layer(Layer::Core)).collect();
+            for surface in surfaces {
+                let mut proto = DirectedProto::signal();
+                proto.to(surface);
+                proto.method(ExtMethod::new("ClusterReady").unwrap());
+                self.skel.skel.skel.star_transmitter.signal(proto).await.unwrap();
+            }
+
+
+        }
+        Ok(())
+    }
+
+    #[route("Ext<ClusterUp>")]
+    pub async fn cluster_up(&self, ctx: InCtx<'_,()>) {
+        println!("\tCLUSTER UP {}", ctx.to().to_string() );
+        self.skel.skel.skel.machine.cluster_status_tx.send(ClusterStatus::Up).await;
         let skel = self.skel.skel.skel.clone();
         tokio::spawn(async move {
             skel.api.wrangle().await;
         });
     }
 
+    #[route("Ext<ClusterReady>")]
+    pub async fn cluster_ready(&self, ctx: InCtx<'_,()>) {
+        println!("\tCLUSTER READY {}", ctx.to().to_string() );
+
+
+
+        self.skel.skel.skel.machine.cluster_status_tx.send(ClusterStatus::Ready).await;
+    }
 
     #[route("Hyp<Provision>")]
     pub async fn provision(
@@ -892,12 +928,14 @@ where
 
 #[derive(Clone)]
 pub struct StarState {
-    pub readies : Arc<DashSet<Point>>
+    pub ups: Arc<DashSet<Point>>,
+    pub readies: Arc<DashSet<Point>>
 }
 
 impl StarState {
    pub fn new() -> Self {
        Self {
+           ups: Arc::new(DashSet::new() ),
            readies: Arc::new(DashSet::new() )
        }
    }
