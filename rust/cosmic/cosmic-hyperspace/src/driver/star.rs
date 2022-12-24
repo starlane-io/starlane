@@ -588,8 +588,10 @@ where
                 Some(selector) => {
                     println!("Provision SELECTOR");
                     // hate using a write lock for this...
-                    let mut selector = selector.write().await;
-                    let key = selector.wrangle().await?;
+                    let key = {
+                        let mut selector = selector.write().await;
+                        selector.wrangle().await?
+                    };
                     let assign =
                         Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
                     let assign: DirectedCore = assign.into();
