@@ -71,6 +71,7 @@ pub mod machine;
 pub mod mem;
 pub mod reg;
 pub mod star;
+pub mod driver2;
 
 #[cfg(test)]
 pub mod tests;

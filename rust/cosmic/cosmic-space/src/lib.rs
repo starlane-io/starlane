@@ -10,6 +10,7 @@ extern crate enum_ordinalize;
 extern crate lazy_static;
 #[macro_use]
 extern crate strum_macros;
+extern crate core;
 
 use core::str::FromStr;
 use std::cmp::Ordering;
@@ -64,6 +65,7 @@ pub mod wasm;
 pub mod wave;
 pub mod kind2;
 pub mod point;
+pub mod kind3;
 
 lazy_static! {
     pub static ref VERSION: semver::Version =
