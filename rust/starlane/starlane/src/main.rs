@@ -13,6 +13,7 @@ pub mod keycloak;
 #[cfg(test)]
 mod test;
 pub mod web;
+pub mod scratch;
 
 #[macro_use]
 extern crate async_trait;

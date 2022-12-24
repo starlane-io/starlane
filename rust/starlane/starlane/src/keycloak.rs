@@ -1,5 +1,5 @@
 use crate::err::{StarErr, StarlaneErr};
-use alcoholic_jwt::{token_kid, validate, ValidJWT, JWKS};
+use alcoholic_jwt::{JWKS, token_kid, validate, ValidJWT};
 use cosmic_hyperspace::driver::{
     Driver, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, HyperSkel, Item, ItemHandler,
     ItemSkel, ItemSphere,
@@ -1025,20 +1025,4 @@ pub mod zoinks {
             println!("done");
         });
     }
-}
-
-
-#[derive(Serialize,Deserialize)]
-pub struct Composite {
-
-}
-
-#[rpc]
-pub trait Blah {
-    async fn me(&self);
-    async fn one(&self, a: u8);
-    async fn two(&self, a: u8, b: u8);
-    async fn comp(&self, comp: Composite);
-    async fn blah(&self) -> Result<(),SpaceErr>;
-    async fn get_composite(&self) -> Result<Composite,SpaceErr>;
 }

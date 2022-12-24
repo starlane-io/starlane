@@ -449,83 +449,75 @@ impl Parse for RouteAttr {
 }
 
 #[proc_macro_attribute]
-pub fn rpc(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let item = parse_macro_input!(item as syn::ItemTrait);
+pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let item2 = item.clone();
+    let item_trait = parse_macro_input!(item2 as syn::ItemTrait);
 
     //        let mut structs = vec![];
     let mut method_sig_tokens = vec![];
     let mut method_guts_sender: Vec<proc_macro2::TokenStream> = vec![];
-    for trait_item in item.items {
+    for trait_item in &item_trait.items {
         match trait_item {
             TraitItem::Const(_) => {}
             TraitItem::Method(method) => {
-                let __async = if method.sig.asyncness.is_some() {
-                    quote!(async)
-                } else {
-                    quote!()
-                };
-
-                let __await= if method.sig.asyncness.is_some() {
-                    quote!(.await)
-                } else {
-                    quote!()
-                };
-
-
                 let ident = method.sig.ident.clone();
                 let inputs = method.sig.inputs.clone().into_iter();
-                let method_ext = format_ident!("{}",ident.to_string().to_case(Case::UpperCamel));
+                let method_ext = format_ident!("{}", ident.to_string().to_case(Case::UpperCamel));
 
                 let method_sig = match &method.sig.output {
                     ReturnType::Default => {
-                        quote! { #__async fn #ident(#(#inputs,)*)}
+                        panic!("rpc methods must return a Result<?,SpaceErr>")
                     }
                     ReturnType::Type(_, r_type) => {
-                        quote! { #__async fn #ident(#(#inputs,)*) -> #r_type }
+                        quote! { fn #ident(#(#inputs,)*) -> #r_type }
                     }
                 };
 
                 let return_type = match &method.sig.output {
                     ReturnType::Default => {
-                        quote! {}
+                        panic!("rpc methods must return a Result<?,SpaceErr>")
                     }
                     ReturnType::Type(_, r_type) => {
-
-                            if let Type::Path(path) = &**r_type  {
-                                match &path.path.segments.last().unwrap().arguments {
-                                    PathArguments::AngleBracketed(brackets) => {
-                                        let first = brackets.args.first().expect("Generic argument");
-                                        println!("arg {}", first.to_token_stream().to_string());
-                                        first.to_token_stream()
-                                    }
-                                    _ => {
-                                        panic!("expecting a Result<?,SpaceErr>")
+                        if let Type::Path(path) = &**r_type {
+                            match &path.path.segments.last().unwrap().arguments {
+                                PathArguments::AngleBracketed(brackets) => {
+                                    let first = brackets.args.first().expect("Generic argument");
+                                    quote! {
+                                        if let Substance::Bin(bin) = &rtn.core.body {
+                                          let rtn : #first = bincode::deserialize(bin.as_slice())?;
+                                            Ok(rtn)
+                                        } else {
+                                            Err(SpaceErr::new(500,"unexpected substance response"))
+                                        }
                                     }
                                 }
+                                _ => {
+                                    panic!("expecting a Result<?,SpaceErr>")
+                                }
                             }
-                            else  {
-                                panic!("expecting a Result<?,SpaceErr>")
-                            }
-
+                        } else {
+                            panic!("expecting a Result<?,SpaceErr>")
+                        }
                     }
                 };
 
+                let method_guts_remote =
+                    quote! {
+                        {
+                            use cosmic_space::wave::core::ext::ExtMethod;
+                            use cosmic_space::wave::Wave;
+                            use cosmic_space::wave::Pong;
+                            use cosmic_space::wave::DirectedProto;
+                            use cosmic_space::substance::Substance;
 
-                println!("method_ext: {}", method_ext.to_string());
-                let method_guts_remote = if method.sig.inputs.len() == 1 {
-
-                   quote!{
-                       {
-                           let mut wave = DirectedWave::ping();
-                           wave.method(ExtMethod::new(stringify!(#method_ext)).unwrap());
-                           wave.body(Substance::Empty);
-                           let rtn = self.tx.ping()#__await;
-                           #return_type
-                       }
-                   }
-                } else  {
-                    quote!{}
-                };
+                            let mut wave = DirectedProto::ping();
+                            wave.method(ExtMethod::new(stringify!(#method_ext)).unwrap());
+                            wave.body(Substance::Empty);
+                            let rtn: Wave<Pong> = self.tx.ping(wave)?;
+                            rtn.ok_or()?;
+                            #return_type
+                        }
+                    };
 
                 /*
                 else {
@@ -546,14 +538,43 @@ pub fn rpc(attr: TokenStream, item: TokenStream) -> TokenStream {
             TraitItem::Verbatim(_) => {}
             _ => {}
         }
+
+
     }
 
-    for m in &method_sig_tokens {
-        println!("{} ", m.to_string());
-    }
+    let method_sig_tokens = method_sig_tokens.into_iter();
+    let method_guts_sender= method_guts_sender.into_iter();
 
-    for m in &method_guts_sender {
-        println!("{} ", m.to_string());
-    }
-    TokenStream::from(quote! {})
+    let rpc =format_ident!("{}_RPC", item_trait.ident.to_string() );
+    let ident = item_trait.ident.clone();
+
+    let out = quote! {
+        pub struct #rpc{
+            pub tx: cosmic_space::wave::exchange::synch::ProtoTransmitter
+        }
+
+        impl #rpc {
+            pub fn new( mut builder: cosmic_space::wave::exchange::synch::ProtoTransmitterBuilder, from: cosmic_space::point::Point, to: cosmic_space::point::Point) -> Self {
+                use cosmic_space::wave::exchange::SetStrategy;
+                use cosmic_space::wave::core::ext::ExtMethod;
+                use cosmic_space::loc::ToSurface;
+                use cosmic_space::wave::ToRecipients;
+                builder.to = SetStrategy::Fill(to.to_surface().to_recipients());
+                builder.from = SetStrategy::Override(from.to_surface());
+                let tx = builder.build();
+                Self {
+                    tx
+                }
+            }
+        }
+
+        impl #ident for #rpc {
+        #(#method_sig_tokens #method_guts_sender)*
+            }
+
+        };
+
+    println!("{}", out.to_string());
+
+    TokenStream2::from_iter(vec![out, TokenStream2::from(item)]).into()
 }
