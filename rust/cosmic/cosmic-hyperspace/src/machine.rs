@@ -465,10 +465,10 @@ where
                     tx.send(self.termination_broadcast_tx.subscribe());
                 }
                 MachineCall::WaitForReady(rtn) => {
-                    let mut status_rx = self.skel.status_rx.clone();
+                    let mut status_rx = self.skel.cluster_status_rx.clone();
                     tokio::spawn(async move {
                         loop {
-                            if MachineStatus::Ready == status_rx.borrow().clone() {
+                            if ClusterStatus::Ready == status_rx.borrow().clone() {
                                 rtn.send(());
                                 break;
                             }
