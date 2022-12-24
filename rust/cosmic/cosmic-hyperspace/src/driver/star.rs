@@ -369,7 +369,7 @@ where
         println!("\tSTAR UP{}", ctx.from().to_string());
         self.state.ups.insert(ctx.from().point.clone());
         if self.state.ups.len() == self.skel.skel.skel.machine.template.stars.len() {
-            println!("\n\n\n*** CLUSTER READY ***\n\n\n");
+            println!("\n\n\n*** CLUSTER UP ***\n\n\n");
             let surfaces: Vec<Surface> = self
                 .state
                 .ups
@@ -381,7 +381,7 @@ where
                 let mut proto = DirectedProto::signal();
                 println!("\t~SURFACE: {}", surface.to_string());
                 proto.to(surface);
-                proto.method(ExtMethod::new("ClusterReady").unwrap());
+                proto.method(ExtMethod::new("ClusterUp").unwrap());
                 self.skel
                     .skel
                     .skel
@@ -501,7 +501,7 @@ where
 
     #[route("Ext<ClusterUp>")]
     pub async fn cluster_up(&self, ctx: InCtx<'_, ()>) {
-        println!("\tCLUSTER UP {}", ctx.to().to_string());
+        println!("\treceived CLUSTER UP {}", ctx.to().to_string());
         self.skel
             .skel
             .skel
@@ -517,8 +517,8 @@ where
 
     #[route("Ext<ClusterReady>")]
     pub async fn cluster_ready(&self, ctx: InCtx<'_, ()>) {
-        println!("\tCLUSTER READY {}", ctx.to().to_string());
 
+        println!("\treceived CLUSTER READY {}", ctx.to().to_string());
         self.skel
             .skel
             .skel
