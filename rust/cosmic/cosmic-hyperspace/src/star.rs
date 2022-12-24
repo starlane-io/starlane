@@ -144,6 +144,10 @@ where
             .value()
             .clone())
     }
+
+    pub fn has_shell(&self, point: &Point) -> bool {
+        self .shell.contains_key(point)
+    }
 }
 
 #[derive(Clone)]
@@ -1653,6 +1657,30 @@ where
                 });
             }
             Layer::Shell => {
+
+                if !self.skel.state.has_shell(&traversal.point)
+                {
+                    let record = self.skel.registry.record(&traversal.point).await.map_err(|e|e.to_space_err())?;
+                    match record.location.star {
+                        None => {}
+                        Some(star) => {
+                            if star == self.skel.point {
+                                println!("\n\n\nNEED CREATE {}\n\n\n", traversal.point.to_string() );
+
+                                let assign =
+                                    Assign::new(AssignmentKind::Restore, record.details, StateSrc::None);
+                                let assign: DirectedCore = assign.into();
+                                let mut proto = DirectedProto::ping();
+                                proto.core(assign);
+                                proto.to(star.to_surface());
+                                let pong: Wave<Pong> = self.skel.star_transmitter.ping(proto).await?;
+                                pong.ok_or()?;
+                            }
+                        }
+                    }
+                }
+
+
                 let shell = Shell::new(
                     self.skel.clone(),
                     self.skel

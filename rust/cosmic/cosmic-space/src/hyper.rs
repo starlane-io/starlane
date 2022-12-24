@@ -27,7 +27,7 @@ use crate::point::Point;
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {
     Create,
-    // eventually we will have Move as well as Create
+    Restore,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]

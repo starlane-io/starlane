@@ -341,6 +341,13 @@ impl Kind {
         }
     }
 
+    pub fn is_auto_restore(&self) -> bool {
+        match self {
+            Kind::Native(NativeSub::Web) => true,
+            _ => false,
+        }
+    }
+
     pub fn as_point_segments(&self) -> String {
         if Sub::None != self.sub() {
             if let Some(specific) = self.specific() {
