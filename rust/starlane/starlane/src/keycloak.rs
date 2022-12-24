@@ -29,7 +29,7 @@ use keycloak::types::{
 use keycloak::{KeycloakAdmin, KeycloakAdminToken, KeycloakError};
 use lru::LruCache;
 use mechtron_host::err::HostErr;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -1025,4 +1025,20 @@ pub mod zoinks {
             println!("done");
         });
     }
+}
+
+
+#[derive(Serialize,Deserialize)]
+pub struct Composite {
+
+}
+
+#[rpc]
+pub trait Blah {
+    async fn me(&self);
+    async fn one(&self, a: u8);
+    async fn two(&self, a: u8, b: u8);
+    async fn comp(&self, comp: Composite);
+    async fn blah(&self) -> Result<(),SpaceErr>;
+    async fn get_composite(&self) -> Result<Composite,SpaceErr>;
 }

@@ -10,6 +10,7 @@ use proc_macro::TokenStream;
 use std::str::FromStr;
 
 use chrono::{DateTime, Utc};
+use convert_case::{Case, Casing};
 use cosmic_space::loc;
 use nom::combinator::into;
 use nom_locate::LocatedSpan;
@@ -25,7 +26,7 @@ use syn::token::Async;
 use syn::{
     parse_macro_input, AngleBracketedGenericArguments, Attribute, Data, DataEnum, DataUnion,
     DeriveInput, FieldsNamed, FieldsUnnamed, FnArg, GenericArgument, ImplItem, ItemImpl,
-    ItemStruct, PathArguments, PathSegment, ReturnType, Signature, Type, Visibility,
+    ItemStruct, PathArguments, PathSegment, ReturnType, Signature, TraitItem, Type, Visibility,
 };
 
 use cosmic_space::parse::route_attribute_value;
@@ -445,4 +446,114 @@ impl Parse for RouteAttr {
             attribute: attribute.remove(0),
         })
     }
+}
+
+#[proc_macro_attribute]
+pub fn rpc(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(item as syn::ItemTrait);
+
+    //        let mut structs = vec![];
+    let mut method_sig_tokens = vec![];
+    let mut method_guts_sender: Vec<proc_macro2::TokenStream> = vec![];
+    for trait_item in item.items {
+        match trait_item {
+            TraitItem::Const(_) => {}
+            TraitItem::Method(method) => {
+                let __async = if method.sig.asyncness.is_some() {
+                    quote!(async)
+                } else {
+                    quote!()
+                };
+
+                let __await= if method.sig.asyncness.is_some() {
+                    quote!(.await)
+                } else {
+                    quote!()
+                };
+
+
+                let ident = method.sig.ident.clone();
+                let inputs = method.sig.inputs.clone().into_iter();
+                let method_ext = format_ident!("{}",ident.to_string().to_case(Case::UpperCamel));
+
+                let method_sig = match &method.sig.output {
+                    ReturnType::Default => {
+                        quote! { #__async fn #ident(#(#inputs,)*)}
+                    }
+                    ReturnType::Type(_, r_type) => {
+                        quote! { #__async fn #ident(#(#inputs,)*) -> #r_type }
+                    }
+                };
+
+                let return_type = match &method.sig.output {
+                    ReturnType::Default => {
+                        quote! {}
+                    }
+                    ReturnType::Type(_, r_type) => {
+
+                            if let Type::Path(path) = &**r_type  {
+                                match &path.path.segments.last().unwrap().arguments {
+                                    PathArguments::AngleBracketed(brackets) => {
+                                        let first = brackets.args.first().expect("Generic argument");
+                                        println!("arg {}", first.to_token_stream().to_string());
+                                        first.to_token_stream()
+                                    }
+                                    _ => {
+                                        panic!("expecting a Result<?,SpaceErr>")
+                                    }
+                                }
+                            }
+                            else  {
+                                panic!("expecting a Result<?,SpaceErr>")
+                            }
+
+                    }
+                };
+
+
+                println!("method_ext: {}", method_ext.to_string());
+                let method_guts_remote = if method.sig.inputs.len() == 1 {
+
+                   quote!{
+                       {
+                           let mut wave = DirectedWave::ping();
+                           wave.method(ExtMethod::new(stringify!(#method_ext)).unwrap());
+                           wave.body(Substance::Empty);
+                           let rtn = self.tx.ping()#__await;
+                           #return_type
+                       }
+                   }
+                } else  {
+                    quote!{}
+                };
+
+                /*
+                else {
+                     let mut iter = method.sig.inputs.clone().into_iter().skip(1).map(|f|f.to_token_stream()).collect::<Vec<proc_macro2::TokenStream>>().into_iter();
+                     let struct_name = format_ident!("__{}__Struct", method.sig.ident.to_string() );
+                     //structs.push(quote!{ pub struct #struct_name { #( #iter, )* } });
+                     println!("{}",quote!{ pub struct #struct_name { #( #iter, )* } }.to_string());
+                     quote! { #__async fn #ident(&self)}
+                 };
+
+                  */
+
+                method_sig_tokens.push(method_sig);
+                method_guts_sender.push(method_guts_remote);
+            }
+            TraitItem::Type(_) => {}
+            TraitItem::Macro(_) => {}
+            TraitItem::Verbatim(_) => {}
+            _ => {}
+        }
+    }
+
+    for m in &method_sig_tokens {
+        println!("{} ", m.to_string());
+    }
+
+    for m in &method_guts_sender {
+        println!("{} ", m.to_string());
+    }
+    TokenStream::from(quote! {})
 }

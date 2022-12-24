@@ -67,6 +67,7 @@ fn star_bind() -> BindConfig {
            Hyp<Search> -> (()) => &;
            Hyp<Provision> -> (()) => &;
            Ext<StarUp> -> (());
+           Ext<StarReady> -> (());
            Ext<ClusterUp> -> (());
            Ext<ClusterReady> -> (());
        }
@@ -379,7 +380,6 @@ where
                 .collect();
             for surface in surfaces {
                 let mut proto = DirectedProto::signal();
-                println!("\t~SURFACE: {}", surface.to_string());
                 proto.to(surface);
                 proto.method(ExtMethod::new("ClusterUp").unwrap());
                 self.skel
@@ -394,14 +394,36 @@ where
     }
 
     #[route("Ext<StarReady>")]
-    pub async fn star_ready(&self, ctx: InCtx<'_, ()>) -> Result<(), P::Err> {
+    pub async fn star_ready(&self, ctx: InCtx<'_, ()>) {
         println!("\tSTAR READY{}", ctx.from().to_string());
         self.state.readies.insert(ctx.from().point.clone());
         if self.state.readies.len() == self.skel.skel.skel.machine.template.stars.len() {
-            println!("\n\n\n*** CLUSTER READY ***\n\n\n");
 
             match self.skel.skel.skel.kind {
                 StarSub::Central => {
+println!("\n\n\n*** CLUSTER READY ***\n\n\n");
+                    println!("\t collecting surfaces....");
+                    let surfaces: Vec<Surface> = self
+                        .state
+                        .readies
+                        .clone()
+                        .iter()
+                        .map(|p| (*p).to_surface().with_layer(Layer::Core))
+                        .collect();
+                    for surface in surfaces {
+                        let mut proto = DirectedProto::signal();
+                        println!("sending ClusterREady to {}", surface.to_string());
+                        proto.to(surface);
+                        proto.method(ExtMethod::new("ClusterReady").unwrap());
+
+                        self.skel
+                            .skel
+                            .skel
+                            .star_transmitter
+                            .signal(proto)
+                            .await
+                            .unwrap();
+                    }
                     let registration = Registration {
                         point: Point::root(),
                         kind: Kind::Root,
@@ -417,7 +439,7 @@ where
                         .registry
                         .register(&registration)
                         .await
-                        .map_err(|e| e.to_space_err())?;
+                        .map_err(|e| e.to_space_err()).unwrap();
                     let record = self
                         .skel
                         .skel
@@ -425,17 +447,17 @@ where
                         .registry
                         .record(&Point::root())
                         .await
-                        .map_err(|e| e.to_space_err())?;
+                        .map_err(|e| e.to_space_err()).unwrap();
                     let assign =
                         Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
-                    self.create(&assign).await.map_err(|e| e.to_space_err())?;
+                    self.create(&assign).await.map_err(|e| e.to_space_err()).unwrap();
                     self.skel
                         .skel
                         .skel
                         .registry
                         .assign_star(&Point::root(), &self.skel.point)
                         .await
-                        .map_err(|e| e.to_space_err())?;
+                        .map_err(|e| e.to_space_err()).unwrap();
 
                     let registration = Registration {
                         point: Point::global_executor(),
@@ -452,7 +474,7 @@ where
                         .registry
                         .register(&registration)
                         .await
-                        .map_err(|e| e.to_space_err())?;
+                        .map_err(|e| e.to_space_err()).unwrap();
 
                     let record = self
                         .skel
@@ -461,42 +483,23 @@ where
                         .registry
                         .record(&Point::global_executor())
                         .await
-                        .map_err(|e| e.to_space_err())?;
+                        .map_err(|e| e.to_space_err()).unwrap();
                     let assign =
                         Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
-                    self.create(&assign).await.map_err(|e| e.to_space_err())?;
+                    self.create(&assign).await.map_err(|e| e.to_space_err()).unwrap();
                     self.skel
                         .skel
                         .skel
                         .registry
                         .assign_star(&Point::global_executor(), &LOCAL_STAR)
                         .await
-                        .map_err(|e| e.to_space_err())?;
+                        .map_err(|e| e.to_space_err()).unwrap();
+
+
                 }
                 _ => {}
             }
-
-            let surfaces: Vec<Surface> = self
-                .state
-                .readies
-                .clone()
-                .iter()
-                .map(|p| (*p).to_surface().with_layer(Layer::Core))
-                .collect();
-            for surface in surfaces {
-                let mut proto = DirectedProto::signal();
-                proto.to(surface);
-                proto.method(ExtMethod::new("ClusterReady").unwrap());
-                self.skel
-                    .skel
-                    .skel
-                    .star_transmitter
-                    .signal(proto)
-                    .await
-                    .unwrap();
-            }
         }
-        Ok(())
     }
 
     #[route("Ext<ClusterUp>")]
