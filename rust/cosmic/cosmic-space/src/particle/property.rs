@@ -8,9 +8,12 @@ use crate::command::common::PropertyMod;
 use crate::point::Point;
 use crate::parse::SkewerCase;
 use crate::{Kind, SetProperties, SpaceErr};
+use serde::Serialize;
+use serde::Deserialize;
 
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, )]
 pub struct PropertyDef {
-    pub pattern: Box<dyn PropertyPattern>,
+    //pub pattern: Box<dyn PropertyPattern>,
     pub required: bool,
     pub mutable: bool,
     pub source: PropertySource,
@@ -21,7 +24,6 @@ pub struct PropertyDef {
 
 impl PropertyDef {
     pub fn new(
-        pattern: Box<dyn PropertyPattern>,
         required: bool,
         mutable: bool,
         source: PropertySource,
@@ -35,21 +37,8 @@ impl PropertyDef {
                 .ok_or("if PropertyDef is a constant then 'default' value must be set")?;
         }
 
-        if let Some(value) = default.as_ref() {
-            match pattern.is_match(value) {
-                Ok(_) => {}
-                Err(err) => {
-                    return Err(format!(
-                        "default value does not match pattern: {}",
-                        err.to_string()
-                    )
-                    .into());
-                }
-            }
-        }
 
         Ok(Self {
-            pattern,
             required,
             mutable,
             source,
@@ -133,7 +122,7 @@ impl PropertyPattern for EmailPattern {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum PropertySource {
     Shell,
     Core,
@@ -141,6 +130,7 @@ pub enum PropertySource {
     CoreSecret,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PropertiesConfig {
     pub properties: HashMap<String, PropertyDef>,
     pub kind: Kind,
@@ -217,7 +207,6 @@ impl PropertiesConfig {
                         )
                         .into());
                     }
-                    def.pattern.is_match(value)?;
                     match def.source {
                         PropertySource::CoreReadOnly => {
                             return Err(format!("{} property '{}' is flagged CoreReadOnly and cannot be set within the Mesh",self.kind.to_string(), key).into());
@@ -245,7 +234,6 @@ impl PropertiesConfig {
                             format!("property: '{}' is constant and cannot be set", key).into()
                         );
                     }
-                    def.pattern.is_match(value)?;
                     match def.source {
                         PropertySource::CoreReadOnly => {
                             return Err(format!("property '{}' is flagged CoreReadOnly and cannot be set within the Mesh",key).into());
@@ -311,6 +299,8 @@ impl PropertiesConfig {
     }
 }
 
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash )]
 pub enum PropertyPermit {
     Read,
     Write,
@@ -356,7 +346,7 @@ impl PropertiesConfigBuilder {
         permits: Vec<PropertyPermit>,
     ) -> Result<(), SpaceErr> {
         let def = PropertyDef::new(
-            pattern, required, mutable, source, default, constant, permits,
+             required, mutable, source, default, constant, permits,
         )?;
         self.properties.insert(name.to_string(), def);
         Ok(())
@@ -364,7 +354,6 @@ impl PropertiesConfigBuilder {
 
     pub fn add_string(&mut self, name: &str) -> Result<(), SpaceErr> {
         let def = PropertyDef::new(
-            Box::new(AnythingPattern {}),
             false,
             true,
             PropertySource::Shell,
@@ -378,7 +367,6 @@ impl PropertiesConfigBuilder {
 
     pub fn add_point(&mut self, name: &str, required: bool, mutable: bool) -> Result<(), SpaceErr> {
         let def = PropertyDef::new(
-            Box::new(PointPattern {}),
             required,
             mutable,
             PropertySource::Shell,

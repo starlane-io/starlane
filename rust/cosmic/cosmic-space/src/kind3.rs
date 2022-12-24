@@ -24,7 +24,7 @@ pub struct ExcactKind {
 impl ToString for Kind {
     fn to_string(&self) -> String {
         let mut s = String::new();
-        for seg in self.segments {
+        for seg in &self.segments {
             s.push_str(seg.as_str());
             s.push_str(":");
         }
@@ -41,13 +41,13 @@ impl FromStr for Kind {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash )]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, )]
 pub struct KindConfig {
     pub properties: PropertiesConfig,
     pub specific: Specific
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash )]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, )]
 pub struct KindDefs {
     map: HashMap<Kind, KindConfig>
 }
