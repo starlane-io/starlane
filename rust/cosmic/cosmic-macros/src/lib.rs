@@ -454,7 +454,7 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item_trait = parse_macro_input!(item2 as syn::ItemTrait);
 
     //        let mut structs = vec![];
-    let mut methods= vec![];
+    let mut methods = vec![];
     for trait_item in &item_trait.items {
         match trait_item {
             TraitItem::Const(_) => {}
@@ -465,9 +465,7 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
                     ReturnType::Default => {
                         panic!("rpc methods must return a Result<T,SpaceErr> where T: Serialize+Deserialize")
                     }
-                    ReturnType::Type(_, r_type) => {
-                        r_type.to_token_stream()
-                    }
+                    ReturnType::Type(_, r_type) => r_type.to_token_stream(),
                 };
 
                 let return_type = match &method.sig.output {
@@ -516,23 +514,26 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
                             wave.body(Substance::Empty);
                             let rtn: Wave<Pong> = self.tx.ping(wave)?;
                             rtn.ok_or()?;
-                            if let Substance::Bin(bin) = &rtn.core.body  {
-                               Err(SpaceErr::new(500,"expected bin substance to be returned in RPC"))
-                            } else {
-                            Ok(#return_type)
-                            }
+
+                            #return_type
                         }
                     }
-                } else if method.sig.inputs.len() == 2{
-                    let last =
-                    if let FnArg::Typed( last ) = method.sig.inputs.clone().last().expect("final parameter").clone() {
+                } else if method.sig.inputs.len() == 2 {
+                    let last = if let FnArg::Typed(last) = method
+                        .sig
+                        .inputs
+                        .clone()
+                        .last()
+                        .expect("final parameter")
+                        .clone()
+                    {
                         last.ty
                     } else {
                         panic!("expected a Typed FnArg")
                     };
 
-                    println!("LAST: {}", last.to_token_stream().to_string() );
-                    quote!{
+                    println!("LAST: {}", last.to_token_stream().to_string());
+                    quote! {
 
                         fn #ident(&self, input: #last) -> #output
                         {
@@ -541,23 +542,17 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
                             use cosmic_space::wave::Pong;
                             use cosmic_space::wave::DirectedProto;
                             use cosmic_space::substance::Substance;
+                            use std::sync::Arc;
 
                             let mut wave = DirectedProto::ping();
                             wave.method(ExtMethod::new(stringify!(#method_ext)).unwrap());
-                            let bin = bincode::serialize( input )?;
-                            let body =
-                            wave.body(Substance::Bin());
+                            let bin = Arc::new(bincode::serialize( input )?);
+                            wave.body(Substance::Bin(bin));
                             let rtn: Wave<Pong> = self.tx.ping(wave)?;
                             rtn.ok_or()?;
-                            if let Substance::Bin(bin) = &rtn.core.body  {
-                               Err(SpaceErr::new(500,"expected bin substance to be returned in RPC"))
-                            } else {
-                            Ok(#return_type)
-                            }
+                            #return_type
                         }
                     }
-
-
                 } else {
                     panic!("only 0 or 1 parameter allowed for RPC")
                 };
@@ -595,49 +590,45 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
 
                  */
 
-
-
-               // method_sig_tokens.push(method_sig);
+                // method_sig_tokens.push(method_sig);
             }
             TraitItem::Type(_) => {}
             TraitItem::Macro(_) => {}
             TraitItem::Verbatim(_) => {}
             _ => {}
         }
-
-
     }
 
     let methods = methods.into_iter();
 
-    let rpc =format_ident!("{}_RPC", item_trait.ident.to_string() );
+    let rpc = format_ident!("{}_RPC", item_trait.ident.to_string());
     let ident = item_trait.ident.clone();
 
     let out = quote! {
-        pub struct #rpc{
-            pub tx: cosmic_space::wave::exchange::synch::ProtoTransmitter
-        }
+    pub struct #rpc{
+        pub tx: cosmic_space::wave::exchange::synch::ProtoTransmitter
+    }
 
-        impl #rpc {
-            pub fn new( mut builder: cosmic_space::wave::exchange::synch::ProtoTransmitterBuilder, from: cosmic_space::point::Point, to: cosmic_space::point::Point) -> Self {
-                use cosmic_space::wave::exchange::SetStrategy;
-                use cosmic_space::wave::core::ext::ExtMethod;
-                use cosmic_space::loc::ToSurface;
-                use cosmic_space::wave::ToRecipients;
-                builder.to = SetStrategy::Fill(to.to_surface().to_recipients());
-                builder.from = SetStrategy::Override(from.to_surface());
-                let tx = builder.build();
-                Self {
-                    tx
-                }
+    impl #rpc {
+        pub fn new( mut builder: cosmic_space::wave::exchange::synch::ProtoTransmitterBuilder, from: cosmic_space::point::Point, to: cosmic_space::point::Point) -> Self {
+            use cosmic_space::wave::exchange::SetStrategy;
+            use cosmic_space::wave::core::ext::ExtMethod;
+            use cosmic_space::loc::ToSurface;
+            use cosmic_space::wave::ToRecipients;
+            builder.to = SetStrategy::Fill(to.to_surface().to_recipients());
+            builder.from = SetStrategy::Override(from.to_surface());
+            let tx = builder.build();
+            Self {
+                tx
             }
         }
+    }
 
-        impl #ident for #rpc {
-        #(#methods)*
-            }
+    impl #ident for #rpc {
+    #(#methods)*
+        }
 
-        };
+    };
 
     println!("{}", out.to_string());
 
