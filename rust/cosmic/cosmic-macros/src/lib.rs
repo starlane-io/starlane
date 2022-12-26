@@ -454,22 +454,19 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item_trait = parse_macro_input!(item2 as syn::ItemTrait);
 
     //        let mut structs = vec![];
-    let mut method_sig_tokens = vec![];
-    let mut method_guts_sender: Vec<proc_macro2::TokenStream> = vec![];
+    let mut methods= vec![];
     for trait_item in &item_trait.items {
         match trait_item {
             TraitItem::Const(_) => {}
             TraitItem::Method(method) => {
                 let ident = method.sig.ident.clone();
-                let inputs = method.sig.inputs.clone().into_iter();
                 let method_ext = format_ident!("{}", ident.to_string().to_case(Case::UpperCamel));
-
-                let method_sig = match &method.sig.output {
+                let output = match &method.sig.output {
                     ReturnType::Default => {
-                        panic!("rpc methods must return a Result<?,SpaceErr>")
+                        panic!("rpc methods must return a Result<T,SpaceErr> where T: Serialize+Deserialize")
                     }
                     ReturnType::Type(_, r_type) => {
-                        quote! { fn #ident(#(#inputs,)*) -> #r_type }
+                        r_type.to_token_stream()
                     }
                 };
 
@@ -500,9 +497,13 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
                         }
                     }
                 };
+                if method.sig.inputs.len() > 2 {
+                    panic!("RPC methods can have only one input parameter")
+                }
 
-                let method_guts_remote =
+                let method = if method.sig.inputs.len() == 1 {
                     quote! {
+                        fn #ident(&self) -> #output
                         {
                             use cosmic_space::wave::core::ext::ExtMethod;
                             use cosmic_space::wave::Wave;
@@ -515,23 +516,88 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
                             wave.body(Substance::Empty);
                             let rtn: Wave<Pong> = self.tx.ping(wave)?;
                             rtn.ok_or()?;
-                            #return_type
+                            if let Substance::Bin(bin) = &rtn.core.body  {
+                               Err(SpaceErr::new(500,"expected bin substance to be returned in RPC"))
+                            } else {
+                            Ok(#return_type)
+                            }
                         }
+                    }
+                } else if method.sig.inputs.len() == 2{
+                    let last =
+                    if let FnArg::Typed( last ) = method.sig.inputs.clone().last().expect("final parameter").clone() {
+                        last.ty
+                    } else {
+                        panic!("expected a Typed FnArg")
                     };
 
+                    println!("LAST: {}", last.to_token_stream().to_string() );
+                    quote!{
+
+                        fn #ident(&self, input: #last) -> #output
+                        {
+                            use cosmic_space::wave::core::ext::ExtMethod;
+                            use cosmic_space::wave::Wave;
+                            use cosmic_space::wave::Pong;
+                            use cosmic_space::wave::DirectedProto;
+                            use cosmic_space::substance::Substance;
+
+                            let mut wave = DirectedProto::ping();
+                            wave.method(ExtMethod::new(stringify!(#method_ext)).unwrap());
+                            let bin = bincode::serialize( input )?;
+                            let body =
+                            wave.body(Substance::Bin());
+                            let rtn: Wave<Pong> = self.tx.ping(wave)?;
+                            rtn.ok_or()?;
+                            if let Substance::Bin(bin) = &rtn.core.body  {
+                               Err(SpaceErr::new(500,"expected bin substance to be returned in RPC"))
+                            } else {
+                            Ok(#return_type)
+                            }
+                        }
+                    }
+
+
+                } else {
+                    panic!("only 0 or 1 parameter allowed for RPC")
+                };
+
+                methods.push(method);
+
                 /*
-                else {
-                     let mut iter = method.sig.inputs.clone().into_iter().skip(1).map(|f|f.to_token_stream()).collect::<Vec<proc_macro2::TokenStream>>().into_iter();
-                     let struct_name = format_ident!("__{}__Struct", method.sig.ident.to_string() );
-                     //structs.push(quote!{ pub struct #struct_name { #( #iter, )* } });
-                     println!("{}",quote!{ pub struct #struct_name { #( #iter, )* } }.to_string());
-                     quote! { #__async fn #ident(&self)}
-                 };
+                let return_type = match &method.sig.output {
+                    ReturnType::Default => {
+                        panic!("rpc methods must return a Result<?,SpaceErr>")
+                    }
+                    ReturnType::Type(_, r_type) => {
+                        if let Type::Path(path) = &**r_type {
+                            match &path.path.segments.last().unwrap().arguments {
+                                PathArguments::AngleBracketed(brackets) => {
+                                    let first = brackets.args.first().expect("Generic argument");
+                                    quote! {
+                                        if let Substance::Bin(bin) = &rtn.core.body {
+                                          let rtn : #first = bincode::deserialize(bin.as_slice())?;
+                                            Ok(rtn)
+                                        } else {
+                                            Err(SpaceErr::new(500,"unexpected substance response"))
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    panic!("expecting a Result<?,SpaceErr>")
+                                }
+                            }
+                        } else {
+                            panic!("expecting a Result<?,SpaceErr>")
+                        }
+                    }
+                };
 
-                  */
+                 */
 
-                method_sig_tokens.push(method_sig);
-                method_guts_sender.push(method_guts_remote);
+
+
+               // method_sig_tokens.push(method_sig);
             }
             TraitItem::Type(_) => {}
             TraitItem::Macro(_) => {}
@@ -542,8 +608,7 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     }
 
-    let method_sig_tokens = method_sig_tokens.into_iter();
-    let method_guts_sender= method_guts_sender.into_iter();
+    let methods = methods.into_iter();
 
     let rpc =format_ident!("{}_RPC", item_trait.ident.to_string() );
     let ident = item_trait.ident.clone();
@@ -569,7 +634,7 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         impl #ident for #rpc {
-        #(#method_sig_tokens #method_guts_sender)*
+        #(#methods)*
             }
 
         };
