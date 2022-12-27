@@ -454,13 +454,14 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item_trait = parse_macro_input!(item2 as syn::ItemTrait);
 
     //        let mut structs = vec![];
-    let mut methods = vec![];
+    let mut sender_methods = vec![];
+    let mut receiver_methods = vec![];
     for trait_item in &item_trait.items {
         match trait_item {
             TraitItem::Const(_) => {}
             TraitItem::Method(method) => {
                 let ident = method.sig.ident.clone();
-                let method_ext = format_ident!("{}", ident.to_string().to_case(Case::UpperCamel));
+                let method_ext = format!("{}", ident.to_string().to_case(Case::UpperCamel));
                 let output = match &method.sig.output {
                     ReturnType::Default => {
                         panic!("rpc methods must return a Result<T,SpaceErr> where T: Serialize+Deserialize")
@@ -499,7 +500,7 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
                     panic!("RPC methods can have only one input parameter")
                 }
 
-                let method = if method.sig.inputs.len() == 1 {
+                let sender_method = if method.sig.inputs.len() == 1 {
                     quote! {
                         fn #ident(&self) -> #output
                         {
@@ -510,7 +511,7 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
                             use cosmic_space::substance::Substance;
 
                             let mut wave = DirectedProto::ping();
-                            wave.method(ExtMethod::new(stringify!(#method_ext)).unwrap());
+                            wave.method(ExtMethod::new(#method_ext).unwrap());
                             wave.body(Substance::Empty);
                             let rtn: Wave<Pong> = self.tx.ping(wave)?;
                             rtn.ok_or()?;
@@ -532,7 +533,6 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
                         panic!("expected a Typed FnArg")
                     };
 
-                    println!("LAST: {}", last.to_token_stream().to_string());
                     quote! {
 
                         fn #ident(&self, input: #last) -> #output
@@ -557,40 +557,48 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
                     panic!("only 0 or 1 parameter allowed for RPC")
                 };
 
-                methods.push(method);
+                sender_methods.push(sender_method);
 
-                /*
-                let return_type = match &method.sig.output {
-                    ReturnType::Default => {
-                        panic!("rpc methods must return a Result<?,SpaceErr>")
+                let receiver_method = if method.sig.inputs.len() == 1 {
+                    let ext = format!("Ext<{}>", method_ext.to_string());
+                    quote! {
+                         #[route(#ext)]
+                         fn #ident( &self, ctx: cosmic_space::wave::exchange::synch::InCtx<'_,()>) -> #output {
+                             self.receiver.#ident()
+                         }
+
                     }
-                    ReturnType::Type(_, r_type) => {
-                        if let Type::Path(path) = &**r_type {
-                            match &path.path.segments.last().unwrap().arguments {
-                                PathArguments::AngleBracketed(brackets) => {
-                                    let first = brackets.args.first().expect("Generic argument");
-                                    quote! {
-                                        if let Substance::Bin(bin) = &rtn.core.body {
-                                          let rtn : #first = bincode::deserialize(bin.as_slice())?;
-                                            Ok(rtn)
-                                        } else {
-                                            Err(SpaceErr::new(500,"unexpected substance response"))
-                                        }
-                                    }
-                                }
-                                _ => {
-                                    panic!("expecting a Result<?,SpaceErr>")
-                                }
-                            }
-                        } else {
-                            panic!("expecting a Result<?,SpaceErr>")
+                } else if method.sig.inputs.len() == 2 {
+                    let last = if let FnArg::Typed(last) = method
+                        .sig
+                        .inputs
+                        .clone()
+                        .last()
+                        .expect("final parameter")
+                        .clone()
+                    {
+                        last.ty
+                    } else {
+                        panic!("expected a Typed FnArg")
+                    };
+
+                    let last = last.to_token_stream().to_string().replace("& ", "");
+                    let last = format_ident!("{}", last);
+
+                    let ext = format!("Ext<{}>", method_ext.to_string());
+                    quote! {
+                        #[route(#ext)]
+                        fn #ident( &self, ctx: cosmic_space::wave::exchange::synch::InCtx<'_,#last>) -> #output {
+
+                            self.receiver.#ident(ctx.input)
                         }
                     }
+                } else {
+                    panic!("only 0 or 1 parameter allowed for RPC")
                 };
 
-                 */
-
-                // method_sig_tokens.push(method_sig);
+                println!("\n{}\n", receiver_method.to_string());
+                receiver_methods.push(receiver_method);
             }
             TraitItem::Type(_) => {}
             TraitItem::Macro(_) => {}
@@ -599,17 +607,19 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     }
 
-    let methods = methods.into_iter();
+    let sender_methods = sender_methods.into_iter();
+    let receiver_methods = receiver_methods.into_iter();
 
-    let rpc = format_ident!("{}_RPC", item_trait.ident.to_string());
+    let sender = format_ident!("{}_Sender", item_trait.ident.to_string());
+    let receiver = format_ident!("{}_Receiver", item_trait.ident.to_string());
     let ident = item_trait.ident.clone();
 
     let out = quote! {
-    pub struct #rpc{
+    pub struct #sender{
         pub tx: cosmic_space::wave::exchange::synch::ProtoTransmitter
     }
 
-    impl #rpc {
+    impl #sender {
         pub fn new( mut builder: cosmic_space::wave::exchange::synch::ProtoTransmitterBuilder, from: cosmic_space::point::Point, to: cosmic_space::point::Point) -> Self {
             use cosmic_space::wave::exchange::SetStrategy;
             use cosmic_space::wave::core::ext::ExtMethod;
@@ -624,11 +634,23 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     }
 
-    impl #ident for #rpc {
-    #(#methods)*
+    impl #ident for #sender {
+    #(#sender_methods)*
         }
 
+    pub struct #receiver {
+            receiver: Box<dyn #ident>
+    }
+
+    #[handler_sync]
+    impl #receiver  {
+      #(#receiver_methods)*
+    }
+
+
     };
+
+
 
     println!("{}", out.to_string());
 
