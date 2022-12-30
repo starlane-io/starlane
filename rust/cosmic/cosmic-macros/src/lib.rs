@@ -545,7 +545,7 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
                             use std::sync::Arc;
 
                             let mut wave = DirectedProto::ping();
-                            wave.method(ExtMethod::new(stringify!(#method_ext)).unwrap());
+                            wave.method(ExtMethod::new(#method_ext).unwrap());
                             let bin = Arc::new(bincode::serialize( input )?);
                             wave.body(Substance::Bin(bin));
                             let rtn: Wave<Pong> = self.tx.ping(wave)?;
@@ -563,8 +563,9 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
                     let ext = format!("Ext<{}>", method_ext.to_string());
                     quote! {
                          #[route(#ext)]
-                         fn #ident( &self, ctx: cosmic_space::wave::exchange::synch::InCtx<'_,()>) -> #output {
-                             self.receiver.#ident()
+                         fn #ident( &self, ctx: cosmic_space::wave::exchange::synch::InCtx<'_,()>) -> Result<cosmic_space::substance::Bin,SpaceErr>{
+                            let rtn = self.receiver.#ident()? ;
+                            Ok(std::sync::Arc::new(bincode::serialize( &rtn )?))
                          }
 
                     }
@@ -588,16 +589,16 @@ pub fn rpc_sync(attr: TokenStream, item: TokenStream) -> TokenStream {
                     let ext = format!("Ext<{}>", method_ext.to_string());
                     quote! {
                         #[route(#ext)]
-                        fn #ident( &self, ctx: cosmic_space::wave::exchange::synch::InCtx<'_,#last>) -> #output {
-
-                            self.receiver.#ident(ctx.input)
+                        fn #ident( &self, ctx: cosmic_space::wave::exchange::synch::InCtx<'_,cosmic_space::substance::Bin>) -> Result<cosmic_space::substance::Bin,SpaceErr>{
+                            let input = bincode::deserialize(ctx.input)?;
+                            let rtn  = self.receiver.#ident(&input)? ;
+                            Ok(std::sync::Arc::new(bincode::serialize( &rtn )?))
                         }
                     }
                 } else {
                     panic!("only 0 or 1 parameter allowed for RPC")
                 };
 
-                println!("\n{}\n", receiver_method.to_string());
                 receiver_methods.push(receiver_method);
             }
             TraitItem::Type(_) => {}

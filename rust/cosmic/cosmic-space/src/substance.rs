@@ -137,6 +137,36 @@ pub trait ToSubstance<S> {
     fn to_substance_ref(&self) -> Result<&S, SpaceErr>;
 }
 
+#[derive(Serialize,Deserialize)]
+pub struct SubstanceWrapper<E> where E: Serialize{
+    pub payload: E
+}
+
+impl <E> SubstanceWrapper<E> where E: Serialize {
+    pub fn new( payload: E ) -> SubstanceWrapper<E>{
+        Self {
+            payload
+        }
+    }
+}
+
+impl <E> ToSubstance<Bin>  for SubstanceWrapper<E> where E: Serialize{
+    fn to_substance(self) -> Result<Bin, SpaceErr> {
+        let bin = Arc::new(bincode::serialize(&self.payload)?);
+        Ok(bin)
+    }
+
+    fn to_substance_ref(&self) -> Result<&Bin, SpaceErr> {
+        unimplemented!()
+    }
+}
+
+impl From<Bin> for ReflectedCore {
+    fn from(value: Bin) -> Self {
+        ReflectedCore::ok_body(Substance::Bin(value))
+    }
+}
+
 pub trait ChildSubstance {}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
