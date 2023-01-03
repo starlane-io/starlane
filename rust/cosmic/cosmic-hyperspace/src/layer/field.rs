@@ -25,11 +25,11 @@ use cosmic_space::wave::{
 use crate::err::HyperErr;
 use crate::reg::RegistryApi;
 use crate::star::{HyperStarSkel, LayerInjectionRouter, TraverseToNextRouter};
-use crate::Cosmos;
+use crate::Platform;
 
 pub struct Field<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub port: Surface,
     pub skel: HyperStarSkel<P>,
@@ -39,7 +39,7 @@ where
 
 impl<P> Field<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(point: Point, skel: HyperStarSkel<P>) -> Self {
         let port = point.to_surface().with_layer(Layer::Field);
@@ -106,7 +106,7 @@ where
 #[async_trait]
 impl<P> TraversalLayer for Field<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn surface(&self) -> Surface {
         self.port.clone()
@@ -186,7 +186,7 @@ where
 
 pub struct PipeEx<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub skel: HyperStarSkel<P>,
     pub surface: Surface,
@@ -207,7 +207,7 @@ where
 
 impl<P> PipeEx<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(
         skel: HyperStarSkel<P>,

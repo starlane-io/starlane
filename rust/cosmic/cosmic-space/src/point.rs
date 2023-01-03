@@ -1,16 +1,23 @@
 use core::str::FromStr;
 use cosmic_nom::{new_span, Trace};
 use nom::combinator::all_consuming;
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::err::{ParseErrs, SpaceErr};
-use crate::{ANONYMOUS, HYPERUSER};
-use crate::loc::{CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE, LOCAL_PORTAL, PointSegment, PointSegQuery, REMOTE_ENDPOINT, RouteSegQuery, Surface, ToPoint, ToSurface, Variable, Version};
-use crate::parse::{consume_point, consume_point_ctx, Env, point_route_segment, point_selector, point_var, ResolverErr};
+use crate::loc::{
+    PointSegQuery, PointSegment, RouteSegQuery, Surface, ToPoint, ToSurface, Variable, Version,
+    CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE,
+    LOCAL_PORTAL, LOCAL_STAR, REMOTE_ENDPOINT,
+};
 use crate::parse::error::result;
+use crate::parse::{
+    consume_point, consume_point_ctx, point_route_segment, point_selector, point_var, Env,
+    ResolverErr,
+};
 use crate::selector::Selector;
 use crate::util::ToResolved;
 use crate::wave::{Agent, Recipients, ToRecipients};
+use crate::{ANONYMOUS, HYPERUSER, HYPER_USERBASE};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum RouteSeg {
@@ -21,6 +28,7 @@ pub enum RouteSeg {
     Domain(String),
     Tag(String),
     Star(String),
+    Hyper,
 }
 
 impl RouteSegQuery for RouteSeg {
@@ -45,6 +53,7 @@ pub enum RouteSegVar {
     Local,
     Remote,
     Global,
+    Hyper,
     Domain(String),
     Tag(String),
     Star(String),
@@ -85,6 +94,7 @@ impl TryInto<RouteSeg> for RouteSegVar {
                 var.trace.extra,
             )),
             RouteSegVar::Remote => Ok(RouteSeg::Remote),
+            RouteSegVar::Hyper => Ok(RouteSeg::Hyper),
         }
     }
 }
@@ -95,6 +105,7 @@ impl Into<RouteSegVar> for RouteSeg {
             RouteSeg::This => RouteSegVar::This,
             RouteSeg::Local => RouteSegVar::Local,
             RouteSeg::Remote => RouteSegVar::Remote,
+            RouteSeg::Hyper => RouteSegVar::Hyper,
             RouteSeg::Global => RouteSegVar::Global,
             RouteSeg::Domain(domain) => RouteSegVar::Domain(domain),
             RouteSeg::Tag(tag) => RouteSegVar::Tag(tag),
@@ -120,6 +131,7 @@ impl ToString for RouteSegVar {
             Self::Var(var) => {
                 format!("${{{}}}", var.name)
             }
+            RouteSegVar::Hyper => "HYPER".to_string(),
         }
     }
 }
@@ -147,6 +159,7 @@ impl ToString for RouteSeg {
             RouteSeg::Global => "GLOBAL".to_string(),
             RouteSeg::Local => "LOCAL".to_string(),
             RouteSeg::Remote => "REMOTE".to_string(),
+            RouteSeg::Hyper => "HYPER".to_string(),
         }
     }
 }
@@ -689,6 +702,9 @@ impl ToResolved<PointCtx> for PointVar {
             RouteSegVar::Remote => {
                 rtn.push_str("REMOTE::");
             }
+            RouteSegVar::Hyper => {
+                rtn.push_str("HYPER::");
+            }
         };
 
         if self.segments.len() == 0 {
@@ -781,6 +797,7 @@ impl ToResolved<Point> for PointCtx {
 
         let mut old = self;
         let mut point = Point::root();
+        point.route = old.route.clone();
 
         for (index, segment) in old.segments.iter().enumerate() {
             match segment {
@@ -846,6 +863,7 @@ impl ToResolved<Point> for PointCtx {
             }
         }
 
+        point.route = old.route.clone();
         Ok(point)
     }
 }
@@ -968,6 +986,10 @@ impl Point {
         LOCAL_PORTAL.clone()
     }
 
+    pub fn local_star() -> Self {
+        LOCAL_STAR.clone()
+    }
+
     pub fn local_hypergate() -> Self {
         LOCAL_HYPERGATE.clone()
     }
@@ -982,6 +1004,10 @@ impl Point {
 
     pub fn hyperuser() -> Self {
         HYPERUSER.clone()
+    }
+
+    pub fn hyper_userbase() -> Self {
+        HYPER_USERBASE.clone()
     }
 
     pub fn anonymous() -> Self {
@@ -1130,7 +1156,9 @@ impl Point {
     pub fn push<S: ToString>(&self, segment: S) -> Result<Self, SpaceErr> {
         let segment = segment.to_string();
         if self.segments.is_empty() {
-            Self::from_str(segment.as_str())
+            let mut point = Self::from_str(segment.as_str())?;
+            point.route = self.route.clone();
+            Ok(point)
         } else {
             let last = self.last_segment().expect("expected last segment");
             let point = match last {
@@ -1156,7 +1184,10 @@ impl Point {
                 }
                 PointSeg::File(_) => return Err("cannot append to a file".into()),
             };
-            Self::from_str(point.as_str())
+
+            let mut point = Self::from_str(point.as_str())?;
+            point.route = self.route.clone();
+            Ok(point)
         }
     }
 
@@ -1388,3 +1419,18 @@ pub type PointCtx = PointDef<RouteSeg, PointSegCtx>;
 /// let point: Point = point_var.to_resolve(&env)?;
 /// ```
 pub type PointVar = PointDef<RouteSegVar, PointSegVar>;
+
+
+#[cfg(test)]
+pub mod test {
+    use core::str::FromStr;
+    use crate::point::Point;
+
+    #[test]
+    pub fn test_retain_route() {
+        let users = Point::from_str("HYPER::users").unwrap();
+        let less = users.push("less".to_string()).unwrap();
+
+        assert_eq!("HYPER::users:less", less.to_string().as_str())
+    }
+}

@@ -1,11 +1,14 @@
+use crate::driver::control::ControlCliSession;
+use crate::driver::HyperItemSkel;
 use crate::driver::{
     Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item,
     ItemHandler, ItemSphere,
 };
 use crate::err::HyperErr;
+use crate::machine::ClusterStatus;
 use crate::reg::{Registration, RegistryApi};
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::Cosmos;
+use crate::Platform;
 use cosmic_space::artifact::ArtRef;
 use cosmic_space::command::common::StateSrc;
 use cosmic_space::command::direct::create::Strategy;
@@ -15,14 +18,16 @@ use cosmic_space::hyper::{
     Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, ParticleLocation, Search,
 };
 use cosmic_space::kind::{BaseKind, Kind, StarSub};
-use cosmic_space::loc::{Layer, LOCAL_STAR, StarKey, ToPoint, ToSurface};
+use cosmic_space::loc::{Layer, StarKey, Surface, ToPoint, ToSurface, LOCAL_STAR};
 use cosmic_space::log::{Trackable, Tracker};
 use cosmic_space::parse::bind_config;
-use cosmic_space::particle::traversal::TraversalInjection;
+use cosmic_space::particle::traversal::{TraversalDirection, TraversalInjection};
 use cosmic_space::particle::Status;
+use cosmic_space::point::Point;
 use cosmic_space::selector::{KindSelector, Pattern, SubKindSelector};
 use cosmic_space::substance::Substance;
 use cosmic_space::util::{log, ValuePattern};
+use cosmic_space::wave::core::ext::ExtMethod;
 use cosmic_space::wave::core::http2::StatusCode;
 use cosmic_space::wave::core::hyp::HypMethod;
 use cosmic_space::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
@@ -32,10 +37,10 @@ use cosmic_space::wave::exchange::asynch::{
 use cosmic_space::wave::exchange::SetStrategy;
 use cosmic_space::wave::{
     Agent, BounceBacks, DirectedProto, Echoes, Handling, HandlingKind, Pong, Priority, Recipients,
-    Retries, UltraWave, WaitTime, Wave,
+    Retries, ToRecipients, UltraWave, WaitTime, Wave,
 };
 use cosmic_space::HYPERUSER;
-use dashmap::DashMap;
+use dashmap::{DashMap, DashSet};
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::marker::PhantomData;
@@ -44,8 +49,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tracing::error;
-use cosmic_space::point::Point;
-
 lazy_static! {
     static ref STAR_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
         Arc::new(star_bind()),
@@ -63,6 +66,10 @@ fn star_bind() -> BindConfig {
            Hyp<Assign> -> (()) => &;
            Hyp<Search> -> (()) => &;
            Hyp<Provision> -> (()) => &;
+           Ext<StarUp> -> (());
+           Ext<StarReady> -> (());
+           Ext<ClusterUp> -> (());
+           Ext<ClusterReady> -> (());
        }
     }
     "#,
@@ -137,7 +144,7 @@ impl PartialOrd for StarDiscovery {
 #[derive(Clone)]
 pub struct StarDriverFactory<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     pub kind: KindSelector,
     pub phantom: PhantomData<P>,
@@ -145,7 +152,7 @@ where
 
 impl<P> StarDriverFactory<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     pub fn new(sub: StarSub) -> Self {
         let kind = KindSelector {
@@ -163,7 +170,7 @@ where
 #[async_trait]
 impl<P> HyperDriverFactory<P> for StarDriverFactory<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     fn kind(&self) -> KindSelector {
         self.kind.clone()
@@ -185,22 +192,24 @@ where
 
 pub struct StarDriver<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     pub star_skel: HyperStarSkel<P>,
     pub driver_skel: DriverSkel<P>,
     pub ctx: DriverCtx,
+    pub states: Arc<DashMap<Point, StarState>>,
 }
 
 impl<P> StarDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(star_skel: HyperStarSkel<P>, driver_skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
         Self {
             star_skel,
             driver_skel,
             ctx,
+            states: Arc::new(DashMap::new()),
         }
     }
 }
@@ -208,7 +217,7 @@ where
 #[async_trait]
 impl<P> Driver<P> for StarDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> Kind {
         Kind::Star(self.star_skel.kind.clone())
@@ -246,10 +255,22 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+        let skel = HyperItemSkel {
+            skel: self.driver_skel.clone(),
+            point: point.clone(),
+            kind: self.kind(),
+        };
+        let state = if self.states.contains_key(point) {
+            self.states.get(point).unwrap().value().clone()
+        } else {
+            let state = StarState::new();
+            self.states.insert(point.clone(), state.clone());
+            state
+        };
         Ok(ItemSphere::Handler(Box::new(Star::restore(
-            self.star_skel.clone(),
+            skel,
             self.ctx.clone(),
-            (),
+            state,
         ))))
     }
 }
@@ -257,18 +278,21 @@ where
 #[derive(DirectedHandler)]
 pub struct Star<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
-    pub skel: HyperStarSkel<P>,
+    pub skel: HyperItemSkel<P>,
     pub ctx: DriverCtx,
+    pub state: StarState,
 }
 
 impl<P> Star<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn create(&self, assign: &Assign) -> Result<(), P::Err> {
         self.skel
+            .skel
+            .skel
             .state
             .create_shell(assign.details.stub.point.clone());
 
@@ -286,91 +310,49 @@ where
 #[async_trait]
 impl<P> ItemHandler<P> for Star<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         <Star<P> as Item<P>>::bind(self).await
     }
 
     async fn init(&self) -> Result<Status, SpaceErr> {
-        match self.skel.kind {
-            StarSub::Central => {
-                let registration = Registration {
-                    point: Point::root(),
-                    kind: Kind::Root,
-                    registry: Default::default(),
-                    properties: Default::default(),
-                    owner: HYPERUSER.clone(),
-                    strategy: Strategy::Ensure,
-                    status: Status::Ready,
-                };
-                self.skel
-                    .registry
-                    .register(&registration)
-                    .await
-                    .map_err(|e| e.to_space_err())?;
+        let mut skel = self.skel.clone();
+        tokio::spawn( async move {
+println!("STAR: {}", skel.point.to_string());
+            while skel.skel.skel.machine.cluster_status_rx.changed().await.is_ok() {
 
-                let record = self
-                    .skel
-                    .registry
-                    .record(&Point::root())
-                    .await
-                    .map_err(|e| e.to_space_err())?;
-                let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
-                self.create(&assign).await.map_err(|e| e.to_space_err())?;
-                self.skel
-                    .registry
-                    .assign_star(&Point::root(), &self.skel.point)
-                    .await
-                    .map_err(|e| e.to_space_err())?;
+                if skel.skel.skel.machine.cluster_status_rx.borrow().clone() == ClusterStatus::Ready {
+                    let particles = skel.skel.skel.registry.particles_for_star(&skel.point).await.unwrap();
 
-                let registration = Registration {
-                    point: Point::global_executor(),
-                    kind: Kind::Global,
-                    registry: Default::default(),
-                    properties: Default::default(),
-                    owner: HYPERUSER.clone(),
-                    strategy: Strategy::Ensure,
-                    status: Status::Ready,
-                };
-                self.skel
-                    .registry
-                    .register(&registration)
-                    .await
-                    .map_err(|e| e.to_space_err())?;
-
-                let record = self
-                    .skel
-                    .registry
-                    .record(&Point::global_executor())
-                    .await
-                    .map_err(|e| e.to_space_err())?;
-                let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
-                self.create(&assign).await.map_err(|e| e.to_space_err())?;
-                self.skel
-                    .registry
-                    .assign_star(&Point::global_executor(), &LOCAL_STAR)
-                    .await
-                    .map_err(|e| e.to_space_err())?;
-
-                Ok(Status::Ready)
+                    for p in particles {
+                        println!("\t\tCHECKING: {}", p.details.stub.point.to_string());
+                        if p.details.stub.kind.is_auto_restore() {
+                            println!("\trestoring: {}", p.details.stub.point.to_string());
+                            skel.skel.skel.star_transmitter.bounce(&p.details.stub.point.to_surface().with_layer(Layer::Shell)).await;
+                        }
+                    }
+                    break;
+                }
             }
-            _ => Ok(Status::Ready),
-        }
+        });
+
+        Ok(Status::Ready)
     }
+
 }
 
 #[async_trait]
 impl<P> Item<P> for Star<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
-    type Skel = HyperStarSkel<P>;
+    type Skel = HyperItemSkel<P>;
     type Ctx = DriverCtx;
-    type State = ();
+    type State = StarState;
 
-    fn restore(skel: Self::Skel, ctx: Self::Ctx, _: Self::State) -> Self {
-        Star { skel, ctx }
+    fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self {
+        Star { skel, ctx, state }
     }
 
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
@@ -381,20 +363,197 @@ where
 #[handler]
 impl<P> Star<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
+    #[route("Ext<StarUp>")]
+    pub async fn star_up(&self, ctx: InCtx<'_, ()>) {
+        println!("\tSTAR UP{}", ctx.from().to_string());
+        self.state.ups.insert(ctx.from().point.clone());
+        if self.state.ups.len() == self.skel.skel.skel.machine.template.stars.len() {
+            println!("\n\n\n*** CLUSTER UP ***\n\n\n");
+            let surfaces: Vec<Surface> = self
+                .state
+                .ups
+                .clone()
+                .iter()
+                .map(|p| (*p).to_surface().with_layer(Layer::Core))
+                .collect();
+            for surface in surfaces {
+                let mut proto = DirectedProto::signal();
+                proto.to(surface);
+                proto.method(ExtMethod::new("ClusterUp").unwrap());
+                self.skel
+                    .skel
+                    .skel
+                    .star_transmitter
+                    .signal(proto)
+                    .await
+                    .unwrap();
+            }
+        }
+    }
+
+    #[route("Ext<StarReady>")]
+    pub async fn star_ready(&self, ctx: InCtx<'_, ()>) {
+        println!("\tSTAR READY{}", ctx.from().to_string());
+        self.state.readies.insert(ctx.from().point.clone());
+        if self.state.readies.len() == self.skel.skel.skel.machine.template.stars.len() {
+
+            match self.skel.skel.skel.kind {
+                StarSub::Central => {
+println!("\n\n\n*** CLUSTER READY ***\n\n\n");
+                    println!("\t collecting surfaces....");
+                    let surfaces: Vec<Surface> = self
+                        .state
+                        .readies
+                        .clone()
+                        .iter()
+                        .map(|p| (*p).to_surface().with_layer(Layer::Core))
+                        .collect();
+                    for surface in surfaces {
+                        let mut proto = DirectedProto::signal();
+                        println!("sending ClusterREady to {}", surface.to_string());
+                        proto.to(surface);
+                        proto.method(ExtMethod::new("ClusterReady").unwrap());
+
+                        self.skel
+                            .skel
+                            .skel
+                            .star_transmitter
+                            .signal(proto)
+                            .await
+                            .unwrap();
+                    }
+                    let registration = Registration {
+                        point: Point::root(),
+                        kind: Kind::Root,
+                        registry: Default::default(),
+                        properties: Default::default(),
+                        owner: HYPERUSER.clone(),
+                        strategy: Strategy::Ensure,
+                        status: Status::Ready,
+                    };
+                    self.skel
+                        .skel
+                        .skel
+                        .registry
+                        .register(&registration)
+                        .await
+                        .map_err(|e| e.to_space_err()).unwrap();
+                    let record = self
+                        .skel
+                        .skel
+                        .skel
+                        .registry
+                        .record(&Point::root())
+                        .await
+                        .map_err(|e| e.to_space_err()).unwrap();
+                    let assign =
+                        Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
+                    self.create(&assign).await.map_err(|e| e.to_space_err()).unwrap();
+                    self.skel
+                        .skel
+                        .skel
+                        .registry
+                        .assign_star(&Point::root(), &self.skel.point)
+                        .await
+                        .map_err(|e| e.to_space_err()).unwrap();
+
+                    let registration = Registration {
+                        point: Point::global_executor(),
+                        kind: Kind::Global,
+                        registry: Default::default(),
+                        properties: Default::default(),
+                        owner: HYPERUSER.clone(),
+                        strategy: Strategy::Ensure,
+                        status: Status::Ready,
+                    };
+                    self.skel
+                        .skel
+                        .skel
+                        .registry
+                        .register(&registration)
+                        .await
+                        .map_err(|e| e.to_space_err()).unwrap();
+
+                    let record = self
+                        .skel
+                        .skel
+                        .skel
+                        .registry
+                        .record(&Point::global_executor())
+                        .await
+                        .map_err(|e| e.to_space_err()).unwrap();
+                    let assign =
+                        Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
+                    self.create(&assign).await.map_err(|e| e.to_space_err()).unwrap();
+                    self.skel
+                        .skel
+                        .skel
+                        .registry
+                        .assign_star(&Point::global_executor(), &LOCAL_STAR)
+                        .await
+                        .map_err(|e| e.to_space_err()).unwrap();
+
+
+                }
+                _ => {}
+            }
+        }
+    }
+
+    #[route("Ext<ClusterUp>")]
+    pub async fn cluster_up(&self, ctx: InCtx<'_, ()>) {
+        println!("\treceived CLUSTER UP {}", ctx.to().to_string());
+        self.skel
+            .skel
+            .skel
+            .machine
+            .cluster_status_tx
+            .send(ClusterStatus::Up)
+            .await;
+        let skel = self.skel.skel.skel.clone();
+        tokio::spawn(async move {
+            skel.api.wrangle().await;
+        });
+    }
+
+    #[route("Ext<ClusterReady>")]
+    pub async fn cluster_ready(&self, ctx: InCtx<'_, ()>) {
+
+        println!("\treceived CLUSTER READY {}", ctx.to().to_string());
+        self.skel
+            .skel
+            .skel
+            .machine
+            .cluster_status_tx
+            .send(ClusterStatus::Ready)
+            .await;
+    }
+
     #[route("Hyp<Provision>")]
     pub async fn provision(
         &self,
         ctx: InCtx<'_, HyperSubstance>,
     ) -> Result<ParticleLocation, P::Err> {
+        println!("Provision called on : {} ", self.skel.point.to_string());
         if let HyperSubstance::Provision(provision) = ctx.input {
-            let record = self.skel.registry.record(&provision.point).await?;
-
-            match self.skel.wrangles.find(&record.details.stub.kind) {
+            println!("provision substance... {}", provision.point.to_string());
+            let record = self
+                .skel
+                .skel
+                .skel
+                .registry
+                .record(&provision.point)
+                .await?;
+            println!("got record... {}", provision.point.to_string());
+            match self.skel.skel.skel.wrangles.find(&record.details.stub.kind) {
                 None => {
+                    println!("No wrangles found");
                     let kind = record.details.stub.kind.clone();
                     if self
+                        .skel
+                        .skel
                         .skel
                         .drivers
                         .find_external(record.details.stub.kind.clone())
@@ -417,7 +576,11 @@ where
                             )
                         }
                     } else {
-                        println!("could not find a place to provision!!!");
+                        println!(
+                            "could not find a place to provision!!! {}",
+                            kind.to_string()
+                        );
+
                         Err(format!(
                             "could not find a place to provision kind {}",
                             kind.to_string()
@@ -426,9 +589,12 @@ where
                     }
                 }
                 Some(selector) => {
+                    println!("Provision SELECTOR");
                     // hate using a write lock for this...
-                    let mut selector = selector.write().await;
-                    let key = selector.wrangle().await?;
+                    let key = {
+                        let mut selector = selector.write().await;
+                        selector.wrangle().await?
+                    };
                     let assign =
                         Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
                     let assign: DirectedCore = assign.into();
@@ -448,14 +614,9 @@ where
     #[route("Hyp<Assign>")]
     pub async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, P::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
-            #[cfg(test)]
-            self.skel
-                .diagnostic_interceptors
-                .assignment
-                .send(assign.clone())
-                .unwrap_or_default();
-
             if self
+                .skel
+                .skel
                 .skel
                 .drivers
                 .find(assign.details.stub.kind.clone())
@@ -465,6 +626,8 @@ where
                 self.create(assign).await;
 
                 let driver = self
+                    .skel
+                    .skel
                     .skel
                     .drivers
                     .local_driver_lookup(assign.details.stub.kind.clone())
@@ -482,9 +645,10 @@ where
                 directed.track = ctx.wave().track();
                 let pong: Wave<Pong> = ctx.transmitter.direct(directed).await?;
 
-                self.skel.logger.result(pong.ok_or())?;
+                self.skel.skel.logger.result(pong.ok_or())?;
             } else {
                 self.skel
+                    .skel
                     .logger
                     .result::<(), SpaceErr>(Err(SpaceErr::server_error(format!(
                         "Star {} does not have a driver for kind: {}",
@@ -495,6 +659,8 @@ where
             }
 
             self.skel
+                .skel
+                .skel
                 .registry
                 .assign_star(&assign.details.stub.point, &self.skel.point)
                 .await?;
@@ -507,13 +673,14 @@ where
 
     #[route("Hyp<Transport>")]
     pub async fn transport(&self, ctx: InCtx<'_, UltraWave>) {
-        self.skel.logger.track(ctx.wave(), || {
+        self.skel.skel.logger.track(ctx.wave(), || {
             Tracker::new("star:core:transport", "Receive")
         });
 
         let wave = ctx.input.clone();
 
         self.skel
+            .skel
             .logger
             .track(&wave, || Tracker::new("star:core:transport", "Unwrapped"));
 
@@ -529,7 +696,7 @@ where
         );
         injection.from_gravity = true;
 
-        self.skel.inject_tx.send(injection).await;
+        self.skel.skel.skel.inject_tx.send(injection).await;
     }
 
     #[route("Hyp<Search>")]
@@ -541,10 +708,10 @@ where
             search: Search,
         ) -> Result<ReflectedCore, SpaceErr>
         where
-            E: Cosmos,
+            E: Platform,
         {
-            let mut discoveries = if star.skel.kind.is_forwarder() {
-                let mut wrangler = Wrangler::new(star.skel.clone(), search);
+            let mut discoveries = if star.skel.skel.skel.kind.is_forwarder() {
+                let mut wrangler = Wrangler::new(star.skel.skel.skel.clone(), search);
                 history.insert(star.skel.point.clone());
                 wrangler.history(history);
                 wrangler.wrangle(false).await?
@@ -553,12 +720,14 @@ where
                 Discoveries::new()
             };
 
-            if star.skel.kind.can_be_wrangled() {
+            if star.skel.skel.skel.kind.can_be_wrangled() {
                 let discovery = Discovery {
-                    star_kind: star.skel.kind.clone(),
+                    star_kind: star.skel.skel.skel.kind.clone(),
                     hops: ctx.wave().hops(),
-                    star_key: star.skel.key.clone(),
+                    star_key: star.skel.skel.skel.key.clone(),
                     kinds: star
+                        .skel
+                        .skel
                         .skel
                         .drivers
                         .external_kinds()
@@ -578,13 +747,13 @@ where
         if let HyperSubstance::Search(search) = ctx.input {
             match search {
                 Search::Star(star) => {
-                    if self.skel.key == *star {
-                        match self.skel.drivers.external_kinds().await {
+                    if self.skel.skel.skel.key == *star {
+                        match self.skel.skel.skel.drivers.external_kinds().await {
                             Ok(kinds) => {
                                 let discovery = Discovery {
-                                    star_kind: self.skel.kind.clone(),
+                                    star_kind: self.skel.skel.skel.kind.clone(),
                                     hops: ctx.wave().hops(),
-                                    star_key: self.skel.key.clone(),
+                                    star_key: self.skel.skel.skel.key.clone(),
                                     kinds: kinds.into_iter().collect(),
                                 };
                                 let mut discoveries = Discoveries::new();
@@ -612,7 +781,7 @@ where
                         ));
                     }
                 }
-                Search::StarKind(kind) => if *kind == self.skel.kind {},
+                Search::StarKind(kind) => if *kind == self.skel.skel.skel.kind {},
                 Search::Kinds => {
                     return CoreBounce::Reflected(ReflectedCore::result(
                         sub_search_and_reflect(self, &ctx, ctx.wave().history(), Search::Kinds)
@@ -623,6 +792,7 @@ where
             return CoreBounce::Absorbed;
         } else {
             self.skel
+                .skel
                 .logger
                 .error(format!("expected Search got : {}", ctx.input.to_string()));
             return CoreBounce::Reflected(ctx.bad_request());
@@ -644,7 +814,9 @@ impl StarWrangles {
 
     pub fn find(&self, kind: &Kind) -> Option<Arc<RwLock<RoundRobinWrangleSelector>>> {
         let mut iter = self.wrangles.iter();
+        println!("Finding wrangles for {}", kind.to_string());
         while let Some(multi) = iter.next() {
+            println!("\ttesting: {}", multi.key().to_string());
             if multi.key().matches(&kind) {
                 return Some(multi.value().clone());
             }
@@ -750,7 +922,7 @@ impl RoundRobinWrangleSelector {
 
 pub struct Wrangler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub skel: HyperStarSkel<P>,
     pub transmitter: ProtoTransmitter,
@@ -760,7 +932,7 @@ where
 
 impl<P> Wrangler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(skel: HyperStarSkel<P>, search: Search) -> Self {
         let router = LayerInjectionRouter::new(
@@ -806,7 +978,7 @@ where
             return Ok(Discoveries::new());
         }
         ripple.bounce_backs = Some(BounceBacks::Count(adjacents.len()));
-        ripple.to(Recipients::Stars);
+        ripple.to(Recipients::StarsAdjacent);
         let echoes: Echoes = self.transmitter.direct(ripple).await?;
         let mut discoveries = Discoveries::new();
         for echo in echoes {
@@ -838,5 +1010,20 @@ where
             }
         }
         Ok(discoveries)
+    }
+}
+
+#[derive(Clone)]
+pub struct StarState {
+    pub ups: Arc<DashSet<Point>>,
+    pub readies: Arc<DashSet<Point>>,
+}
+
+impl StarState {
+    pub fn new() -> Self {
+        Self {
+            ups: Arc::new(DashSet::new()),
+            readies: Arc::new(DashSet::new()),
+        }
     }
 }

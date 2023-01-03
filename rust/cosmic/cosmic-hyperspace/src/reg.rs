@@ -1,4 +1,4 @@
-use crate::Cosmos;
+use crate::Platform;
 use cosmic_space::command::common::{SetProperties, SetRegistry};
 use cosmic_space::command::direct::create::Strategy;
 use cosmic_space::command::direct::delete::Delete;
@@ -18,7 +18,7 @@ pub type Registry<P> = Arc<dyn RegistryApi<P>>;
 #[async_trait]
 pub trait RegistryApi<P>: Send + Sync
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn nuke<'a>(&'a self) -> Result<(), P::Err>;
 
@@ -69,6 +69,8 @@ where
     ) -> Result<Vec<IndexedAccessGrant>, P::Err>;
 
     async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), P::Err>;
+
+    async fn particles_for_star<'a>(&'a self, star: &Point ) -> Result<Vec<ParticleRecord>,P::Err>;
 }
 
 #[derive(Clone)]

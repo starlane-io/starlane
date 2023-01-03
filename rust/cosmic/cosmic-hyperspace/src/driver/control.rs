@@ -4,7 +4,7 @@ use crate::driver::{
 };
 use crate::err::HyperErr;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::Cosmos;
+use crate::Platform;
 use cosmic_hyperlane::{
     AnonHyperAuthenticatorAssignEndPoint, FromTransform, HopTransform, HyperClient, HyperGreeter,
     Hyperway, HyperwayConfigurator, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub,
@@ -23,6 +23,7 @@ use cosmic_space::kind::{BaseKind, Kind, StarSub};
 use cosmic_space::loc::{Layer, PointFactory, Surface, ToSurface};
 use cosmic_space::log::{RootLogger, Tracker};
 use cosmic_space::particle::traversal::Traversal;
+use cosmic_space::point::Point;
 use cosmic_space::selector::KindSelector;
 use cosmic_space::settings::Timeouts;
 use cosmic_space::substance::Substance;
@@ -38,11 +39,10 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use cosmic_space::point::Point;
 
 pub struct ControlDriverFactory<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     phantom: PhantomData<P>,
 }
@@ -50,7 +50,7 @@ where
 #[async_trait]
 impl<P> HyperDriverFactory<P> for ControlDriverFactory<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Control)
@@ -79,7 +79,7 @@ where
 
 impl<P> ControlDriverFactory<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new() -> Self {
         Self {
@@ -90,14 +90,14 @@ where
 
 pub struct ControlFactory<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     phantom: PhantomData<P>,
 }
 
 impl<P> ControlFactory<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new() -> Self {
         Self {
@@ -109,7 +109,7 @@ where
 #[async_trait]
 impl<P> HyperDriverFactory<P> for ControlFactory<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Control)
@@ -136,7 +136,7 @@ where
 #[derive(DirectedHandler)]
 pub struct ControlDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub ctx: DriverCtx,
     pub skel: HyperSkel<P>,
@@ -148,7 +148,7 @@ where
 #[derive(Clone)]
 pub struct ControlSkel<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub star: HyperStarSkel<P>,
     pub driver: DriverSkel<P>,
@@ -157,7 +157,7 @@ where
 #[async_trait]
 impl<P> Driver<P> for ControlDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> Kind {
         Kind::Control
@@ -306,7 +306,7 @@ where
 
 pub struct ControlCreator<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub skel: HyperSkel<P>,
     pub fabric_routers: Arc<DashMap<Point, LayerInjectionRouter>>,
@@ -316,7 +316,7 @@ where
 
 impl<P> ControlCreator<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(
         skel: HyperSkel<P>,
@@ -336,7 +336,7 @@ where
 #[async_trait]
 impl<P> PointFactory for ControlCreator<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn create(&self) -> Result<Point, SpaceErr> {
         let create = Create {
@@ -377,7 +377,7 @@ where
 #[derive(Clone)]
 pub struct ControlGreeter<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub skel: HyperSkel<P>,
     pub controls: Point,
@@ -385,7 +385,7 @@ where
 
 impl<P> ControlGreeter<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(skel: HyperSkel<P>, controls: Point) -> Self {
         Self { skel, controls }
@@ -395,7 +395,7 @@ where
 #[async_trait]
 impl<P> HyperGreeter for ControlGreeter<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn greet(&self, stub: HyperwayStub) -> Result<Greet, SpaceErr> {
         Ok(Greet {
@@ -409,7 +409,7 @@ where
 
 pub struct Control<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub skel: HyperSkel<P>,
     pub ctx: ControlCtx<P>,
@@ -417,7 +417,7 @@ where
 
 impl<P> Item<P> for Control<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     type Skel = HyperSkel<P>;
     type Ctx = ControlCtx<P>;
@@ -431,7 +431,7 @@ where
 #[async_trait]
 impl<P> TraversalRouter for Control<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
         self.skel.driver.logger.track(&traversal, || {
@@ -449,7 +449,7 @@ where
 #[async_trait]
 impl<P> ItemRouter<P> for Control<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         <Control<P> as Item<P>>::bind(self).await
@@ -459,7 +459,7 @@ where
 #[derive(Clone)]
 pub struct ControlCtx<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub phantom: PhantomData<P>,
     pub router: Arc<dyn Router>,
@@ -467,7 +467,7 @@ where
 
 impl<P> ControlCtx<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(router: Arc<dyn Router>) -> Self {
         Self {
@@ -532,6 +532,12 @@ impl ControlClient {
     }
 }
 
+impl Drop for ControlClient {
+    fn drop(&mut self) {
+        self.client.close()
+    }
+}
+
 pub struct ControlCliSession {
     transmitter: ProtoTransmitter,
 }
@@ -539,6 +545,27 @@ pub struct ControlCliSession {
 impl ControlCliSession {
     pub fn new(transmitter: ProtoTransmitter) -> Self {
         Self { transmitter }
+    }
+
+    pub async fn other(
+        mut builder: ProtoTransmitterBuilder,
+        point: Point,
+    ) -> Result<Self, SpaceErr> {
+        println!("\tOTHER: {}", point.to_string());
+        let transmitter = builder.clone().build();
+        let mut proto = DirectedProto::ping();
+        proto.to(point.to_surface().with_layer(Layer::Shell));
+        proto.method(ExtMethod::new("NewCliSession".to_string())?);
+        let pong: Wave<Pong> = transmitter.direct(proto).await?;
+
+        pong.ok_or()?;
+        if let Substance::Surface(port) = pong.variant.core.body {
+            let mut transmitter = builder.to = SetStrategy::Override(port.to_recipients());
+            let transmitter = builder.build();
+            Ok(ControlCliSession::new(transmitter))
+        } else {
+            Err("NewCliSession expected: Surface".into())
+        }
     }
     pub async fn exec<C>(&self, command: C) -> Result<ReflectedCore, SpaceErr>
     where
@@ -552,7 +579,7 @@ impl ControlCliSession {
         let mut proto = DirectedProto::ping();
         proto.method(ExtMethod::new("Exec".to_string())?);
         proto.body(Substance::RawCommand(command));
-        let pong: Wave<Pong> = self.transmitter.direct(proto).await?;
+        let pong = self.transmitter.ping(proto).await?;
         Ok(pong.variant.core)
     }
 }

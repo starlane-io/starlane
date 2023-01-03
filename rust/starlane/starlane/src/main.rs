@@ -5,13 +5,26 @@ pub mod err;
 pub mod properties;
 
 #[macro_use]
+extern crate cosmic_macros;
+
+#[cfg(feature = "keycloak")]
+pub mod keycloak;
+
+#[cfg(test)]
+mod test;
+pub mod web;
+pub mod scratch;
+
+#[macro_use]
 extern crate async_trait;
 #[macro_use]
 extern crate lazy_static;
 
 use std::collections::HashSet;
+use std::future::Future;
 
 use std::path::{Path, PathBuf};
+use std::process::Output;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -29,14 +42,14 @@ use cosmic_hyperspace::driver::artifact::{
     ArtifactDriverFactory, BundleDriverFactory, BundleSeriesDriverFactory, RepoDriverFactory,
 };
 use cosmic_hyperspace::driver::base::BaseDriverFactory;
-use cosmic_hyperspace::driver::control::ControlDriverFactory;
+use cosmic_hyperspace::driver::control::{ControlClient, ControlDriverFactory};
 use cosmic_hyperspace::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
 use cosmic_hyperspace::driver::root::RootDriverFactory;
 use cosmic_hyperspace::driver::space::SpaceDriverFactory;
 use cosmic_hyperspace::driver::{DriverAvail, DriversBuilder};
-use cosmic_hyperspace::machine::{Machine, MachineTemplate};
+use cosmic_hyperspace::machine::{Machine, MachineApi, MachineApiExtFactory, MachineTemplate};
 use cosmic_hyperspace::reg::{Registry, RegistryApi};
-use cosmic_hyperspace::Cosmos;
+use cosmic_hyperspace::Platform;
 
 #[cfg(feature = "postgres")]
 use cosmic_registry_postgres::err::PostErr;
@@ -51,9 +64,7 @@ use cosmic_space::artifact::asynch::ArtifactApi;
 use cosmic_space::artifact::asynch::ReadArtifactFetcher;
 use cosmic_space::command::direct::create::KindTemplate;
 use cosmic_space::err::SpaceErr;
-use cosmic_space::kind::{
-    ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind,
-};
+use cosmic_space::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserVariant};
 use cosmic_space::loc::{MachineName, StarKey};
 use cosmic_space::loc::ToBaseKind;
 use cosmic_space::log::RootLogger;
@@ -64,13 +75,16 @@ use cosmic_space::particle::property::{
 use cosmic_space::substance::Token;
 
 use cosmic_hyperlane_tcp::HyperlaneTcpServer;
-use cosmic_hyperspace::driver::web::WebDriverFactory;
+use web::WebDriverFactory;
 use cosmic_hyperspace::mem::registry::{MemRegApi, MemRegCtx};
 use cosmic_space::loc;
 use cosmic_space::point::Point;
 use cosmic_space::wasm::Timestamp;
 
-fn main() -> Result<(), StarErr> {
+#[cfg(feature="keycloak")]
+use crate::keycloak::{KeycloakDriverFactory, UserDriverFactory};
+
+pub fn main() -> Result<(), StarErr> {
     ctrlc::set_handler(move || {
         std::process::exit(1);
     });
@@ -95,6 +109,43 @@ fn main() -> Result<(), StarErr> {
     });
     Ok(())
 }
+
+
+pub fn start<F>(mut future: F) -> Result<(), StarErr> where F: FnMut(MachineApi<Starlane>)+Send+Sync+'static{
+    ctrlc::set_handler(move || {
+        std::process::exit(1);
+    });
+
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async move {
+        let starlane = Starlane::new().await.unwrap();
+        let machine_api = starlane.machine();
+        tokio::time::timeout(Duration::from_secs(30), machine_api.wait_ready())
+            .await
+            .unwrap();
+        println!("> STARLANE Ready!");
+
+        {
+            let machine_api = machine_api.clone();
+            tokio::spawn(async move {
+                future(machine_api);
+            });
+        }
+
+        // this is a dirty hack which is good enough for a 0.3.0 release...
+        loop {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+        }
+        let cl = machine_api.clone();
+        machine_api.await_termination().await.unwrap();
+        cl.terminate();
+    });
+    Ok(())
+}
+
+
 
 lazy_static! {
     pub static ref STARLANE_CONTROL_PORT: u16 = std::env::var("STARLANE_PORT")
@@ -132,27 +183,35 @@ pub extern "C" fn cosmic_timestamp() -> Timestamp {
 
 #[derive(Clone)]
 pub struct Starlane {
-    //pub handle: PostgresRegistryContextHandle<Self>,
+    #[cfg(feature = "postgres")]
+    pub ctx: PostgresRegistryContextHandle<Self>,
+    #[cfg(not(feature = "postgres"))]
     pub ctx: MemRegCtx,
 }
 
 impl Starlane {
     pub async fn new() -> Result<Self, StarErr> {
-        /*
-        let db = <Self as PostgresPlatform>::lookup_registry_db()?;
-        let mut set = HashSet::new();
-        set.insert(db.clone());
-        let ctx = Arc::new(PostgresRegistryContext::new(set).await?);
-        let handle = PostgresRegistryContextHandle::new(&db, ctx);
 
-         */
-        let ctx = MemRegCtx::new();
-        Ok(Self { ctx })
+        #[cfg(feature = "postgres")]
+        {
+            let db = <Self as PostgresPlatform>::lookup_registry_db()?;
+            let mut set = HashSet::new();
+            set.insert(db.clone());
+            let ctx = Arc::new(PostgresRegistryContext::new(set).await?);
+            let ctx = PostgresRegistryContextHandle::new(&db, ctx);
+            Ok(Self { ctx })
+        }
+
+        #[cfg(not(feature = "postgres"))]
+        {
+            let ctx = MemRegCtx::new();
+            Ok(Self { ctx })
+        }
     }
 }
 
 #[async_trait]
-impl Cosmos for Starlane {
+impl Platform for Starlane {
     type Err = StarErr;
     #[cfg(feature = "postgres")]
     type RegistryContext = PostgresRegistryContextHandle<Self>;
@@ -216,9 +275,14 @@ impl Cosmos for Starlane {
             }
             StarSub::Jump => {
                 builder.add_post(Arc::new(WebDriverFactory::new()));
-                // builder.add_post(Arc::new(ControlDriverFactory::new()));
             }
-            StarSub::Fold => {}
+            StarSub::Fold => {
+                #[cfg(feature="keycloak")]
+                {
+                    builder.add_post(Arc::new(KeycloakDriverFactory::new()));
+                    builder.add_post(Arc::new(UserDriverFactory::new()));
+                }
+            }
             StarSub::Machine => {
                 builder.add_post(Arc::new(ControlDriverFactory::new()));
             }
@@ -230,12 +294,14 @@ impl Cosmos for Starlane {
     async fn global_registry(&self) -> Result<Registry<Self>, Self::Err> {
         let logger = RootLogger::default();
         let logger = logger.point(Point::global_registry());
-        /*
-        Ok(Arc::new(
-            PostgresRegistry::new(self.handle.clone(), self.clone(), logger).await?,
-        ))
-         */
+        #[cfg(feature = "postgres")]
+        {
+            Ok(Arc::new(
+                PostgresRegistry::new(self.ctx.clone(), self.clone(), logger).await?,
+            ))
+        }
 
+        #[cfg(not(feature = "postgres"))]
         Ok(Arc::new(MemRegApi::new(self.ctx.clone())))
     }
 
@@ -276,6 +342,39 @@ impl Cosmos for Starlane {
                 .unwrap();
         server.start().unwrap();
     }
+
+    async fn post_startup( &self, machine: &MachineApi<Self> ) -> Result<(),Self::Err> {
+
+       let client = machine.client().await?;
+        let cli = client.new_cli_session().await?;
+
+        cli.exec(format!("create? {}<UserBase>", Point::hyper_userbase().to_string())).await?.ok_or()?;
+        cli.exec(format!("create? {}<User>", Point::hyperuser().to_string())).await?.ok_or()?;
+        cli.exec(format!("create? {}<User>", Point::anonymous().to_string())).await?.ok_or()?;
+
+        Ok(())
+    }
+
+
+    fn properties_config(&self, kind: &Kind) -> PropertiesConfig {
+        let mut builder = PropertiesConfigBuilder::new();
+        builder.kind(kind.clone());
+        match kind {
+            Kind::Mechtron => {
+                builder.add_point("config", true, true).unwrap();
+                builder.build().unwrap()
+            }
+            Kind::Host => {
+                builder.add_point("bin", true, true).unwrap();
+                builder.build().unwrap()
+            }
+            Kind::Native(NativeSub::Web)=> {
+                builder.add_point("auth", false, true).unwrap();
+                builder.build().unwrap()
+            }
+            _ => builder.build().unwrap(),
+        }
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -298,10 +397,4 @@ impl PostgresPlatform for Starlane {
             star.to_sql_name(),
         ))
     }
-}
-
-#[cfg(test)]
-pub mod test {
-    #[test]
-    pub fn test() {}
 }

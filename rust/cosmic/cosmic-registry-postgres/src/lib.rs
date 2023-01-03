@@ -28,7 +28,7 @@ use crate::err::PostErr;
 use cosmic_hyperspace::err::{ErrKind, HyperErr};
 use cosmic_hyperspace::machine::MachineTemplate;
 use cosmic_hyperspace::reg::{Registration, RegistryApi};
-use cosmic_hyperspace::Cosmos;
+use cosmic_hyperspace::Platform;
 use cosmic_space::command::common::{PropertyMod, SetProperties, SetRegistry};
 use cosmic_space::command::direct::create::{Create, KindTemplate, PointSegTemplate, Strategy};
 use cosmic_space::command::direct::delete::Delete;
@@ -39,7 +39,7 @@ use cosmic_space::command::direct::set::Set;
 use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{Location, ParticleLocation, ParticleRecord};
 use cosmic_space::kind::{
-    ArtifactSubKind, BaseKind, FileSubKind, Kind, KindParts, Specific, UserBaseSubKind,
+    ArtifactSubKind, BaseKind, FileSubKind, Kind, KindParts, Specific, UserVariant,
 };
 use cosmic_space::loc::{StarKey, ToBaseKind, Version};
 use cosmic_space::log::PointLogger;
@@ -61,18 +61,18 @@ use cosmic_space::util::ValuePattern;
 use cosmic_space::HYPERUSER;
 use cosmic_space::point::{Point, PointSeg};
 
-pub trait PostgresPlatform: Cosmos
+pub trait PostgresPlatform: Platform
 where
-    <Self as Cosmos>::Err: PostErr,
+    <Self as Platform>::Err: PostErr,
 {
-    fn lookup_registry_db() -> Result<PostgresDbInfo, <Self as Cosmos>::Err>;
-    fn lookup_star_db(star: &StarKey) -> Result<PostgresDbInfo, <Self as Cosmos>::Err>;
+    fn lookup_registry_db() -> Result<PostgresDbInfo, <Self as Platform>::Err>;
+    fn lookup_star_db(star: &StarKey) -> Result<PostgresDbInfo, <Self as Platform>::Err>;
 }
 
 pub struct PostgresRegistry<P>
 where
     P: PostgresPlatform + 'static,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
     logger: PointLogger,
     ctx: PostgresRegistryContextHandle<P>,
@@ -82,7 +82,7 @@ where
 impl<P> PostgresRegistry<P>
 where
     P: PostgresPlatform + 'static,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
     pub async fn new(
         ctx: PostgresRegistryContextHandle<P>,
@@ -212,7 +212,7 @@ where
 impl<P> RegistryApi<P> for PostgresRegistry<P>
 where
     P: PostgresPlatform + 'static,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
     async fn nuke<'a>(&'a self) -> Result<(), P::Err> {
         self.logger.info("nuking database!");
@@ -300,7 +300,7 @@ where
             .ok_or(format!("expecting parent ({})", point.to_string()))?;
         let point_segment = point.last_segment().ok_or("expecting a last_segment")?;
 
-        let statement = "UPDATE particles SET star=$1, WHERE parent=$2 AND point_segment=$3";
+        let statement = "UPDATE particles SET star=$1 WHERE parent=$2 AND point_segment=$3";
 
         let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
@@ -456,8 +456,12 @@ where
     }
 
     async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, P::Err> {
-        if point.is_local_root() {
+        if point.is_root() {
             return Ok(ParticleRecord::root());
+        }
+
+        if point.is_global() {
+            return Ok(ParticleRecord::global());
         }
 
         let mut conn = self.ctx.acquire().await?;
@@ -467,13 +471,18 @@ where
             .ok_or("expected last point_segment")?
             .to_string();
 
-        let mut record = sqlx::query_as::<Postgres, PostgresParticleRecord<P>>(
+        let mut record = match sqlx::query_as::<Postgres, PostgresParticleRecord<P>>(
             "SELECT DISTINCT * FROM particles as r WHERE parent=$1 AND point_segment=$2",
         )
         .bind(parent.to_string())
         .bind(point_segment.clone())
         .fetch_one(&mut conn)
-        .await?;
+        .await{
+            Ok(r) => {r},
+            Err(err) => {
+                return Err(SpaceErr::new(404, format!("{}", err.to_string())).into());
+            }
+        };
         let mut record: ParticleRecord = record.into();
         let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut conn).await?;
         let mut map = HashMap::new();
@@ -988,6 +997,18 @@ where
             Err(format!("'{}' could not revoked grant {} because it does not have full access (super or owner) on {}", to.to_string(), id, access_grant.by_particle.to_string() ).into())
         }
     }
+
+    async fn particles_for_star<'a>(&'a self, star: &Point) -> Result<Vec<ParticleRecord>, P::Err> {
+        let mut conn = self.ctx.acquire().await?;
+        let mut records = sqlx::query_as::<Postgres, PostgresParticleRecord<P>>(
+            "SELECT DISTINCT * FROM particles as r WHERE star=$1",
+        )
+        .bind(star.to_string())
+        .fetch_all(&mut conn).await?;
+
+        let mut records: Vec<ParticleRecord> = records.into_iter().map( |r|r.into() ).collect();
+        Ok(records)
+    }
 }
 
 fn opt<S: ToString>(opt: &Option<S>) -> String {
@@ -1027,7 +1048,7 @@ impl sqlx::FromRow<'_, PgRow> for LocalProperty {
 pub struct WrappedIndexedAccessGrant<P>
 where
     P: PostgresPlatform,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
     grant: IndexedAccessGrant,
     phantom: PhantomData<P>,
@@ -1035,14 +1056,14 @@ where
 impl<P> Unpin for WrappedIndexedAccessGrant<P>
 where
     P: PostgresPlatform,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
 }
 
 impl<P> Into<IndexedAccessGrant> for WrappedIndexedAccessGrant<P>
 where
     P: PostgresPlatform,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
     fn into(self) -> IndexedAccessGrant {
         self.grant
@@ -1052,13 +1073,13 @@ where
 impl<P> sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant<P>
 where
     P: PostgresPlatform,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
         fn wrap<C>(row: &PgRow) -> Result<IndexedAccessGrant, C::Err>
         where
             C: PostgresPlatform,
-            <C as Cosmos>::Err: PostErr,
+            <C as Platform>::Err: PostErr,
         {
             let id: i32 = row.get("id");
             let kind: &str = row.get("kind");
@@ -1107,7 +1128,7 @@ where
 struct PostgresParticleRecord<P>
 where
     P: PostgresPlatform,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
     pub details: Details,
     pub location: ParticleLocation,
@@ -1117,14 +1138,14 @@ where
 impl<P> Unpin for PostgresParticleRecord<P>
 where
     P: PostgresPlatform,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
 }
 
 impl<P> Into<ParticleRecord> for PostgresParticleRecord<P>
 where
     P: PostgresPlatform,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
     fn into(self) -> ParticleRecord {
         ParticleRecord {
@@ -1137,13 +1158,13 @@ where
 impl<P> sqlx::FromRow<'_, PgRow> for PostgresParticleRecord<P>
 where
     P: PostgresPlatform,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
         fn wrap<C>(row: &PgRow) -> Result<PostgresParticleRecord<C>, C::Err>
         where
             C: PostgresPlatform,
-            <C as Cosmos>::Err: PostErr,
+            <C as Platform>::Err: PostErr,
         {
             let parent: String = row.get("parent");
             let point_segment: String = row.get("point_segment");
@@ -1261,7 +1282,7 @@ where
 pub struct RegistryParams<P>
 where
     P: PostgresPlatform,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
     pub point: String,
     pub point_segment: String,
@@ -1281,7 +1302,7 @@ where
 impl<P> RegistryParams<P>
 where
     P: PostgresPlatform,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
     pub fn from_registration(registration: &Registration) -> Result<Self, P::Err> {
         let point_segment = match registration.point.segments.last() {
@@ -1364,7 +1385,7 @@ where
 impl<P> PostgresRegistry<P>
 where
     P: PostgresPlatform + 'static,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
     pub async fn set(&self, set: &Set) -> Result<(), P::Err> {
         self.set_properties(&set.point, &set.properties).await
@@ -1421,7 +1442,7 @@ where
 pub struct PostRegApi<P>
 where
     P: PostgresPlatform,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
     ctx: PostgresRegistryContext<P>,
 }
@@ -1429,7 +1450,7 @@ where
 impl<P> PostRegApi<P>
 where
     P: PostgresPlatform,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
     pub fn new(ctx: PostgresRegistryContext<P>) -> Self {
         Self { ctx }
@@ -1444,7 +1465,7 @@ where
 pub struct PostgresRegistryContextHandle<P>
 where
     P: PostgresPlatform,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
     key: PostgresDbKey,
     pool: Arc<PostgresRegistryContext<P>>,
@@ -1454,7 +1475,7 @@ where
 impl<P> PostgresRegistryContextHandle<P>
 where
     P: PostgresPlatform,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
     pub fn new(db: &PostgresDbInfo, pool: Arc<PostgresRegistryContext<P>>) -> Self {
         Self {
@@ -1476,7 +1497,7 @@ where
 pub struct PostgresRegistryContext<P>
 where
     P: PostgresPlatform,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
     pools: HashMap<PostgresDbKey, Pool<Postgres>>,
     phantom: PhantomData<P>,
@@ -1485,7 +1506,7 @@ where
 impl<P> PostgresRegistryContext<P>
 where
     P: PostgresPlatform,
-    <P as Cosmos>::Err: PostErr,
+    <P as Platform>::Err: PostErr,
 {
     pub async fn new(dbs: HashSet<PostgresDbInfo>) -> Result<Self, P::Err> {
         let mut pools = HashMap::new();
@@ -1594,7 +1615,7 @@ impl PostgresDbInfo {
 pub mod test {
     use cosmic_hyperspace::driver::DriversBuilder;
     use cosmic_hyperspace::machine::MachineTemplate;
-    use cosmic_hyperspace::Cosmos;
+    use cosmic_hyperspace::Platform;
     use std::collections::HashSet;
     use std::convert::TryInto;
     use std::str::FromStr;
@@ -1615,7 +1636,7 @@ pub mod test {
     use cosmic_space::command::direct::query::Query;
     use cosmic_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
     use cosmic_space::hyper::ParticleLocation;
-    use cosmic_space::kind::{Kind, Specific, StarSub, UserBaseSubKind};
+    use cosmic_space::kind::{Kind, Specific, StarSub, UserVariant};
     use cosmic_space::loc::{MachineName, StarKey, ToPoint};
     use cosmic_space::log::RootLogger;
     use cosmic_space::particle::property::PropertiesConfig;
@@ -1644,7 +1665,7 @@ pub mod test {
     }
 
     impl PostgresPlatform for TestPlatform {
-        fn lookup_registry_db() -> Result<PostgresDbInfo, <Self as Cosmos>::Err> {
+        fn lookup_registry_db() -> Result<PostgresDbInfo, <Self as Platform>::Err> {
             Ok(PostgresDbInfo::new(
                 "localhost",
                 "postgres",
@@ -1653,13 +1674,13 @@ pub mod test {
             ))
         }
 
-        fn lookup_star_db(star: &StarKey) -> Result<PostgresDbInfo, <Self as Cosmos>::Err> {
+        fn lookup_star_db(star: &StarKey) -> Result<PostgresDbInfo, <Self as Platform>::Err> {
             todo!()
         }
     }
 
     #[async_trait]
-    impl Cosmos for TestPlatform {
+    impl Platform for TestPlatform {
         type Err = TestErr;
         type RegistryContext = PostgresRegistryContextHandle<Self>;
         type StarAuth = AnonHyperAuthenticator;
@@ -1814,7 +1835,7 @@ pub mod test {
         };
         registry.register(&registration).await?;
 
-        let userbase = Kind::UserBase(UserBaseSubKind::OAuth(Specific::from_str(
+        let userbase = Kind::User(UserVariant::OAuth(Specific::from_str(
             "mechtronhost.io:keycloak.com:keycloak:community:11.0.0",
         )?));
 

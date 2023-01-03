@@ -1,7 +1,7 @@
 use crate::err::CosmicErr;
 use crate::mem::cosmos::MemCosmos;
 use crate::reg::{Registration, RegistryApi};
-use crate::Cosmos;
+use crate::Platform;
 use cosmic_space::command::common::{PropertyMod, SetProperties};
 use cosmic_space::command::direct::delete::Delete;
 use cosmic_space::command::direct::query::{Query, QueryResult};
@@ -39,7 +39,7 @@ pub struct MemRegCtx {
 
 pub struct MemRegApi<C>
 where
-    C: Cosmos,
+    C: Platform,
 {
     ctx: MemRegCtx,
     phantom: PhantomData<C>,
@@ -47,7 +47,7 @@ where
 
 impl<C> MemRegApi<C>
 where
-    C: Cosmos,
+    C: Platform,
 {
     pub fn new(ctx: MemRegCtx) -> Self {
         let phantom = Default::default();
@@ -62,7 +62,7 @@ where
 #[async_trait]
 impl<C> RegistryApi<C> for MemRegApi<C>
 where
-    C: Cosmos,
+    C: Platform,
 {
     async fn nuke<'a>(&'a self) -> Result<(), C::Err> {
         todo!()
@@ -152,7 +152,7 @@ where
             .ctx
             .particles
             .get(&point)
-            .ok_or("not found")?
+            .ok_or(format!("could not find {}", point.to_string()))?
             .value()
             .clone();
         record.details.properties = properties;
@@ -206,5 +206,9 @@ where
 
     async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), C::Err> {
         todo!()
+    }
+
+    async fn particles_for_star<'a>(&'a self, star: &Point) -> Result<Vec<ParticleRecord>, C::Err> {
+        Ok(vec![])
     }
 }

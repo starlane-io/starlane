@@ -44,10 +44,7 @@ use cosmic_nom::{new_span, span_with_extra, Trace};
 use cosmic_nom::{trim, tw, Res, Span, Wrap};
 
 use crate::command::common::{PropertyMod, SetProperties, StateSrc, StateSrcVar};
-use crate::command::direct::create::{
-    Create, CreateVar, KindTemplate, PointSegTemplate, PointTemplate, PointTemplateSeg,
-    PointTemplateVar, Require, Strategy, Template, TemplateVar,
-};
+use crate::command::direct::create::{Create, CreateVar, KindTemplate, PointSegTemplate, PointTemplate, PointTemplateDef, PointTemplateSeg, PointTemplateVar, Require, Strategy, Template, TemplateDef, TemplateVar};
 use crate::command::direct::get::{Get, GetOp, GetVar};
 use crate::command::direct::select::{Select, SelectIntoSubstance, SelectKind, SelectVar};
 use crate::command::direct::set::{Set, SetVar};
@@ -61,10 +58,7 @@ use crate::config::mechtron::MechtronConfig;
 use crate::config::Document;
 use crate::err::report::{Label, Report, ReportKind};
 use crate::err::{ParseErrs, SpaceErr};
-use crate::kind::{
-    ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, NativeSub, Specific,
-    StarSub, UserBaseSubKind,
-};
+use crate::kind::{ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, NativeSub, Specific, StarSub, UserBaseSub, UserVariant};
 use crate::loc::StarKey;
 use crate::loc::{Layer, PointSegment, Surface, Topic, Uuid, VarVal, Variable, Version};
 use crate::parse::error::{find_parse_err, result};
@@ -77,10 +71,7 @@ use crate::parse::model::{
     TerminatedBlockKind, TextType, Var, VarParser,
 };
 use crate::particle::{PointKind, PointKindVar};
-use crate::point::{
-    Point, PointCtx, PointSeg, PointSegCtx, PointSegDelim, PointSegVar, PointVar, RouteSeg,
-    RouteSegVar,
-};
+use crate::point::{Point, PointCtx, PointDef, PointSeg, PointSegCtx, PointSegDelim, PointSegVar, PointVar, RouteSeg, RouteSegVar};
 use crate::security::{
     AccessGrantKind, AccessGrantKindDef, ChildPerms, ParticlePerms, Permissions, PermissionsMask,
     PermissionsMaskKind, Privilege,
@@ -141,7 +132,7 @@ where
     )
 }
 
-fn sys_route_chars<T>(i: T) -> Res<T, T>
+fn hyper_route_chars<T>(i: T) -> Res<T, T>
 where
     T: InputTakeAtPosition + nom::InputLength,
     <T as InputTakeAtPosition>::Item: AsChar,
@@ -181,6 +172,10 @@ pub fn global_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
     tag("GLOBAL")(input).map(|(next, _)| (next, RouteSeg::Global))
 }
 
+pub fn hyper_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
+    tag("HYPER")(input).map(|(next, _)| (next, RouteSeg::Hyper))
+}
+
 pub fn domain_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
     domain_chars(input).map(|(next, domain)| (next, RouteSeg::Domain(domain.to_string())))
 }
@@ -190,17 +185,18 @@ pub fn tag_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
         .map(|(next, tag)| (next, RouteSeg::Tag(tag.to_string())))
 }
 
-pub fn sys_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
-    delimited(tag("<<"), sys_route_chars, tag(">>"))(input)
+pub fn star_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
+    delimited(tag("<<"), hyper_route_chars, tag(">>"))(input)
         .map(|(next, tag)| (next, RouteSeg::Star(tag.to_string())))
 }
 
 pub fn other_route_segment<I: Span>(input: I) -> Res<I, RouteSeg> {
     alt((
-        sys_route_segment,
+        star_route_segment,
         tag_route_segment,
         domain_route_segment,
         global_route_segment,
+        hyper_route_segment,
         local_route_segment,
         remote_route_segment,
     ))(input)
@@ -1736,6 +1732,7 @@ pub fn create<I: Span>(input: I) -> Res<I, CreateVar> {
         opt(delimited(tag("{"), set_properties, tag("}"))),
     ))(input)
     .map(|(next, (strategy, _, template, properties))| {
+let blah =<TemplateDef<PointTemplateDef<PointDef<RouteSegVar, PointSegVar>>> as ToResolved<Template>>::collapse(template.clone()).unwrap();
         let strategy = match strategy {
             None => Strategy::Commit,
             Some(strategy) => strategy,
@@ -5405,7 +5402,7 @@ pub fn specific_selector<I: Span>(input: I) -> Res<I, SpecificSelector> {
         tag(":"),
         pattern(skewer_case),
         tag(":"),
-        delimited(tag("("), version_req, tag(")")),
+        delimited(tag("("), version_req, tag(")"))
     ))(input)
     .map(
         |(next, (provider, _, vendor, _, product, _, variant, _, version))| {
@@ -5581,6 +5578,7 @@ pub fn kind_base<I: Span>(input: I) -> Res<I, BaseKind> {
     }
 }
 
+
 pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
     move |input: I| {
         let (next, sub) = context("kind-sub", camel_case)(input.clone())?;
@@ -5590,21 +5588,6 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
                     let (next, specific) =
                         context("specific", delimited(tag("<"), specific, tag(">")))(next)?;
                     Ok((next, Kind::Database(DatabaseSubKind::Relational(specific))))
-                }
-                _ => {
-                    let err = ErrorTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(ErrorTree::add_context(
-                        input,
-                        "kind-sub:not-found",
-                        err,
-                    )))
-                }
-            },
-            BaseKind::UserBase => match sub.as_str() {
-                "OAuth" => {
-                    let (next, specific) =
-                        context("specific", delimited(tag("<"), specific, tag(">")))(next)?;
-                    Ok((next, Kind::UserBase(UserBaseSubKind::OAuth(specific))))
                 }
                 _ => {
                     let err = ErrorTree::from_error_kind(input.clone(), ErrorKind::Fail);
@@ -5659,10 +5642,10 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
                     )))
                 }
             },
+            BaseKind::UserBase=> Ok((next, Kind::UserBase)),
             BaseKind::Root => Ok((next, Kind::Root)),
             BaseKind::Space => Ok((next, Kind::Space)),
             BaseKind::Base => Ok((next, Kind::Base)),
-            BaseKind::User => Ok((next, Kind::User)),
             BaseKind::App => Ok((next, Kind::App)),
             BaseKind::Mechtron => Ok((next, Kind::Mechtron)),
             BaseKind::FileSystem => Ok((next, Kind::FileSystem)),
@@ -5675,6 +5658,7 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
             BaseKind::Global => Ok((next, Kind::Global)),
             BaseKind::Host => Ok((next, Kind::Host)),
             BaseKind::Guest => Ok((next, Kind::Guest)),
+            BaseKind::User => Ok((next,Kind::User))
         }
     }
 }
@@ -7458,6 +7442,10 @@ Mechtron(version=1.0.0) {
 
         util::log(result(point_template(new_span("my-domain.com"))))?;
         util::log(result(point_template(new_span("ROOT"))))?;
+        let users: PointTemplate = log(result(point_template(new_span("HYPER::users")))).unwrap().collapse().unwrap();
+
+
+
         Ok(())
     }
 
@@ -8555,10 +8543,7 @@ pub mod cmd_test {
     use crate::err::SpaceErr;
     use crate::kind::Kind;
     use crate::parse::error::result;
-    use crate::parse::{
-        command, consume_point, create_command, point_selector, publish_command, script,
-        upload_blocks, CamelCase,
-    };
+    use crate::parse::{command, consume_point, create_command, point_selector, publish_command, script, upload_blocks, CamelCase, specific_selector, kind_selector, kind};
     use crate::point::{PointSeg, RouteSeg};
     use crate::selector::{PointHierarchy, PointKindSeg};
     use crate::util::ToResolved;
@@ -8709,7 +8694,7 @@ pub mod cmd_test {
                 },
                 PointKindSeg {
                     segment: PointSeg::Base("dra".to_string()),
-                    kind: Kind::User,
+                    kind: Kind::Base,
                 },
             ],
         );
@@ -8747,5 +8732,12 @@ pub mod cmd_test {
             .matches(&fae));
 
         let less = result(point_selector(new_span("less"))).unwrap();
+    }
+
+    #[test]
+    pub fn test_specific_selector() {
+        let selector = result(kind_selector(new_span("<User<OAuth<starlane.io:redhat.com:keycloak:community:(16.0.0)>>>") )).unwrap();
+        let kind = result(kind(new_span("User<OAuth<starlane.io:redhat.com:keycloak:community:16.0.0>>"))).unwrap();
+        assert!(selector.matches(&kind))
     }
 }

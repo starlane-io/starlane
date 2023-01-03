@@ -240,6 +240,14 @@ impl From<tokio::sync::watch::error::RecvError> for SpaceErr {
     }
 }
 
+impl From<serde_json::Error> for SpaceErr {
+    fn from(e:serde_json::Error) -> Self {
+        SpaceErr::server_error(e.to_string())
+    }
+}
+
+
+
 impl From<String> for SpaceErr {
     fn from(message: String) -> Self {
         Self::Status {

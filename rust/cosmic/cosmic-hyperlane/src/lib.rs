@@ -23,7 +23,7 @@ use tokio::select;
 use tokio::sync::mpsc::error::{SendError, SendTimeoutError, TrySendError};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::oneshot::Sender;
-use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock, watch};
+use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 
 use cosmic_space::command::direct::create::{PointFactoryU64, PointSegTemplate};
 use cosmic_space::err::SpaceErr;
@@ -582,11 +582,15 @@ impl HyperwayInterchange {
                             Ok(to) => match hyperways.get(&to) {
                                 None => {
                                     logger.warn(
-                                            format!("wave is addressed to hyperway that this interchagne does not have from: {} to: {} ",
+                                            format!("wave {} is addressed to hyperway that this interchange does not have from: {} to: {} ",
+                                                wave.kind().to_string(),
                                                     wave.from().to_string(),
                                                     wave.to().to_string()
                                             )
                                         );
+                                    for surface in hyperways.keys().clone().into_iter() {
+                                        println!("\tSURFACE {}", surface.to_string());
+                                    }
                                 }
                                 Some(hyperway) => {
                                     hyperway.outbound.send(wave).await;
@@ -1532,7 +1536,7 @@ impl HyperClient {
         });
     }
 
-    pub async fn close(&self) {
+    pub fn close(&self) {
         let mut wave = DirectedProto::signal();
         wave.from(LOCAL_CLIENT.clone().to_surface());
         wave.to(LOCAL_CLIENT_RUNNER.clone().to_surface());
@@ -1978,9 +1982,9 @@ mod tests {
 
     use cosmic_space::command::direct::create::PointFactoryU64;
     use cosmic_space::hyper::{InterchangeKind, Knock};
-    use cosmic_space::point::Point;
     use cosmic_space::loc::Uuid;
     use cosmic_space::log::RootLogger;
+    use cosmic_space::point::Point;
     use cosmic_space::substance::Substance;
     use cosmic_space::wave::HyperWave;
 
@@ -2076,7 +2080,7 @@ pub mod test_util {
     use crate::{
         AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, Bridge, HyperClient,
         HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter,
-        Hyperlane, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
+        HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
         HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper,
         LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist,
     };
@@ -2388,11 +2392,11 @@ pub mod test {
         ReflectedWave, UltraWave, Wave,
     };
 
-    use crate::test_util::{FAE, LESS, SingleInterchangePlatform, TestGreeter, WaveTest};
+    use crate::test_util::{SingleInterchangePlatform, TestGreeter, WaveTest, FAE, LESS};
     use crate::{
         AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, Bridge, HyperClient,
         HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter,
-        Hyperlane, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
+        HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
         HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper,
         LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist,
     };

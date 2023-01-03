@@ -45,8 +45,6 @@ spec:
               storage-class:
                 type: string
             required:
-            - manage-pvc
-            - service-type
             - storage-class
             type: object
           status:

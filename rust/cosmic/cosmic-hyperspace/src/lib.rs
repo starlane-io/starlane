@@ -39,7 +39,7 @@ use cosmic_space::err::SpaceErr;
 use cosmic_space::fail::Timeout;
 use cosmic_space::hyper::{ParticleLocation, ParticleRecord};
 use cosmic_space::kind::{
-    ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind,
+    ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserVariant,
 };
 use cosmic_space::loc::{
     Layer, MachineName, StarKey, Surface, ToBaseKind, ToSurface,
@@ -71,6 +71,7 @@ pub mod machine;
 pub mod mem;
 pub mod reg;
 pub mod star;
+pub mod driver2;
 
 #[cfg(test)]
 pub mod tests;
@@ -86,7 +87,7 @@ pub extern "C" fn cosmic_timestamp() -> Timestamp {
 }
 
 #[async_trait]
-pub trait Cosmos: Send + Sync + Sized + Clone
+pub trait Platform: Send + Sync + Sized + Clone
 where
     Self::Err: HyperErr,
     Self: 'static,
@@ -99,6 +100,10 @@ where
     type RegistryContext;
     type StarAuth;
     type RemoteStarConnectionFactory;
+
+    async fn post_startup( &self, machine: &MachineApi<Self> ) -> Result<(),Self::Err> {
+        Ok(())
+    }
 
     fn machine(&self) -> MachineApi<Self> {
         Machine::new(self.clone())
@@ -152,7 +157,6 @@ where
             BaseKind::Root => Kind::Root,
             BaseKind::Space => Kind::Space,
             BaseKind::Base => Kind::Base,
-            BaseKind::User => Kind::User,
             BaseKind::App => Kind::App,
             BaseKind::Mechtron => Kind::Mechtron,
             BaseKind::FileSystem => Kind::FileSystem,
@@ -170,7 +174,7 @@ where
             BaseKind::Bundle => Kind::Bundle,
             BaseKind::Artifact => match &template.sub {
                 None => {
-                    return Err("expected Sub for Artirtact".into());
+                    return Err("expected Sub for Artifact".into());
                 }
                 Some(sub) => {
                     let artifact_kind = ArtifactSubKind::from_str(sub.as_str())?;
@@ -178,17 +182,7 @@ where
                 }
             },
             BaseKind::Control => Kind::Control,
-            BaseKind::UserBase => match &template.sub {
-                None => {
-                    return Err("SubKind must be set for UserBase<?>".into());
-                }
-                Some(sub) => {
-                    let specific =
-                        Specific::from_str("starlane.io:redhat.com:keycloak:community:18.0.0")?;
-                    let sub = UserBaseSubKind::OAuth(specific);
-                    Kind::UserBase(sub)
-                }
-            },
+            BaseKind::User => Kind::User,
             BaseKind::Repo => Kind::Repo,
             BaseKind::Portal => Kind::Portal,
             BaseKind::Star => {
@@ -199,6 +193,7 @@ where
             BaseKind::Host => Kind::Host,
             BaseKind::Guest => Kind::Guest,
             BaseKind::Native => Kind::Native(NativeSub::Web),
+            BaseKind::UserBase => Kind::UserBase
         })
     }
 
@@ -235,6 +230,8 @@ where
         }
         result
     }
+
+
 }
 
 pub struct Settings {

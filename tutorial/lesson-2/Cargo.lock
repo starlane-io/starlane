@@ -149,7 +149,7 @@ checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
 
 [[package]]
 name = "cosmic-macros"
-version = "0.3.6"
+version = "0.4.0-alpha1"
 dependencies = [
  "chrono",
  "cosmic-space",
@@ -169,7 +169,7 @@ dependencies = [
 
 [[package]]
 name = "cosmic-macros-primitive"
-version = "0.3.6"
+version = "0.4.0-alpha1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -178,7 +178,7 @@ dependencies = [
 
 [[package]]
 name = "cosmic-nom"
-version = "0.3.6"
+version = "0.4.0-alpha1"
 dependencies = [
  "nom",
  "nom-supreme",
@@ -188,7 +188,7 @@ dependencies = [
 
 [[package]]
 name = "cosmic-space"
-version = "0.3.6"
+version = "0.4.0-alpha1"
 dependencies = [
  "ariadne",
  "async-trait",
@@ -516,7 +516,7 @@ checksum = "a3e378b66a060d48947b590737b30a1be76706c8dd7b8ba0f2fe3989c68a853f"
 
 [[package]]
 name = "mechtron"
-version = "0.3.6"
+version = "0.4.0-alpha1"
 dependencies = [
  "bincode",
  "cosmic-macros",

@@ -27,7 +27,7 @@ use crate::point::Point;
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {
     Create,
-    // eventually we will have Move as well as Create
+    Restore,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
@@ -120,10 +120,31 @@ impl ParticleRecord {
                 },
                 properties: Default::default(),
             },
-            location: Default::default(),
+            location: ParticleLocation {
+                star: Some(Point::central()),
+                host: None
+            }
+        }
+    }
+
+    pub fn global() -> Self {
+        Self {
+            details: Details {
+                stub: Stub {
+                    point: Point::root(),
+                    kind: Kind::Root,
+                    status: Status::Ready,
+                },
+                properties: Default::default(),
+            },
+            location: ParticleLocation {
+                star: Some(Point::local_star()),
+                host: None
+            }
         }
     }
 }
+
 
 impl Into<Stub> for ParticleRecord {
     fn into(self) -> Stub {

@@ -4,7 +4,7 @@ use crate::driver::{
 };
 use crate::err::HyperErr;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::Cosmos;
+use crate::Platform;
 use cosmic_space::artifact::ArtRef;
 use cosmic_space::command::common::{PropertyMod, SetProperties, StateSrc};
 use cosmic_space::command::direct::create::{
@@ -107,7 +107,7 @@ impl HostDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for HostDriverFactory
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Host)
@@ -125,7 +125,7 @@ where
 
 pub struct HostDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub skel: HostDriverSkel<P>,
     pub ctx: DriverCtx,
@@ -133,7 +133,7 @@ where
 
 impl<P> HostDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
         let skel = HostDriverSkel::new(skel);
@@ -144,7 +144,7 @@ where
 #[async_trait]
 impl<P> Driver<P> for HostDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> Kind {
         Kind::Host
@@ -162,9 +162,10 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+        let record = self.skel.skel.locate(point).await?;
         let host = self.skel.hosts.get_via_point(point).await?.clone();
         let skel = HostItemSkel {
-            skel: ItemSkel::new(point.clone(), Kind::Host, self.skel.skel.clone()),
+            skel: ItemSkel::new(point.clone(), Kind::Host, self.skel.skel.clone(), record.details.properties),
             host,
         };
         Ok(ItemSphere::Handler(Box::new(HostItem::restore(
@@ -189,7 +190,7 @@ where
 #[derive(Clone)]
 pub struct HostDriverPlatform<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     logger: RootLogger,
     phantom: PhantomData<P>,
@@ -197,7 +198,7 @@ where
 
 impl<P> HostDriverPlatform<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(logger: RootLogger) -> Self {
         let phantom: PhantomData<P> = PhantomData::default();
@@ -208,7 +209,7 @@ where
 #[derive(Clone)]
 pub struct HostDriverSkel<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub skel: DriverSkel<P>,
     pub hosts: HostsApi,
@@ -217,7 +218,7 @@ where
 
 impl<P> HostDriverSkel<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(skel: DriverSkel<P>) -> Self {
         let mut router = LayerInjectionRouter::new(skel.skel.clone(), skel.point.to_surface());
@@ -241,7 +242,7 @@ where
 
 pub struct HostDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub skel: HostDriverSkel<P>,
     pub ctx: DriverCtx,
@@ -249,19 +250,19 @@ where
 
 impl<P> HostDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn restore(skel: HostDriverSkel<P>, ctx: DriverCtx) -> Self {
         HostDriverHandler { skel, ctx }
     }
 }
 
-impl<P> DriverHandler<P> for HostDriverHandler<P> where P: Cosmos {}
+impl<P> DriverHandler<P> for HostDriverHandler<P> where P: Platform {}
 
 #[handler]
 impl<P> HostDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     #[route("Hyp<Host>")]
     pub async fn host(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
@@ -368,7 +369,7 @@ where
 #[derive(Clone)]
 pub struct HostItemSkel<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub skel: ItemSkel<P>,
     pub host: WasmHostApi,
@@ -376,14 +377,14 @@ where
 
 pub struct HostItem<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub skel: HostItemSkel<P>,
 }
 
 impl<P> Item<P> for HostItem<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     type Skel = HostItemSkel<P>;
     type Ctx = ();
@@ -397,7 +398,7 @@ where
 #[handler]
 impl<P> HostItem<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     #[route("Hyp<Transport>")]
     async fn transport(&self, ctx: InCtx<'_, UltraWave>) {
@@ -419,7 +420,7 @@ where
 #[async_trait]
 impl<P> ItemHandler<P> for HostItem<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(HOST_BIND_CONFIG.clone())
@@ -437,7 +438,7 @@ impl MechtronDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for MechtronDriverFactory
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Mechtron)
@@ -455,7 +456,7 @@ where
 
 pub struct MechtronDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub ctx: DriverCtx,
     pub skel: DriverSkel<P>,
@@ -464,15 +465,16 @@ where
 #[async_trait]
 impl<P> Driver<P> for MechtronDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> Kind {
         Kind::Mechtron
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+        let record = self.skel.locate(point).await?;
         let ctx = self.skel.item_ctx(point, Layer::Core)?;
-        let skel = ItemSkel::new(point.clone(), Kind::Mechtron, self.skel.clone());
+        let skel = ItemSkel::new(point.clone(), Kind::Mechtron, self.skel.clone(), record.details.properties.clone());
         let mechtron = Mechtron::restore(skel, ctx, ());
         Ok(ItemSphere::Router(Box::new(mechtron)))
     }
@@ -486,7 +488,7 @@ where
 
 impl<P> MechtronDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
         Self { skel, ctx }
@@ -495,7 +497,7 @@ where
 
 pub struct MechtronDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     skel: DriverSkel<P>,
     ctx: DriverCtx,
@@ -503,19 +505,19 @@ where
 
 impl<P> MechtronDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn restore(skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
         MechtronDriverHandler { skel, ctx }
     }
 }
 
-impl<P> DriverHandler<P> for MechtronDriverHandler<P> where P: Cosmos {}
+impl<P> DriverHandler<P> for MechtronDriverHandler<P> where P: Platform {}
 
 #[handler]
 impl<P> MechtronDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
@@ -552,7 +554,7 @@ where
 
 pub struct Mechtron<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     skel: ItemSkel<P>,
     ctx: ItemCtx,
@@ -560,7 +562,7 @@ where
 
 impl<P> Item<P> for Mechtron<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     type Skel = ItemSkel<P>;
     type Ctx = ItemCtx;
@@ -574,7 +576,7 @@ where
 #[async_trait]
 impl<P> TraversalRouter for Mechtron<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
         let wave = traversal.payload;
@@ -603,7 +605,7 @@ where
 #[async_trait]
 impl<P> ItemRouter<P> for Mechtron<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(MECHTRON_BIND_CONFIG.clone())

@@ -1,11 +1,11 @@
-use crate::driver::{
+use cosmic_hyperspace::driver::{
     Driver, DriverCtx, DriverHandler, DriverSkel, DriverStatus, HyperDriverFactory, HyperItemSkel,
     HyperSkel, ItemHandler, ItemRouter, ItemSkel, ItemSphere,
 };
-use crate::err::HyperErr;
-use crate::reg::Registration;
-use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::Cosmos;
+use cosmic_hyperspace::err::HyperErr;
+use cosmic_hyperspace::reg::Registration;
+use cosmic_hyperspace::star::{HyperStarSkel, LayerInjectionRouter};
+use crate::Platform;
 use ascii::IntoAsciiString;
 use cosmic_space::artifact::ArtRef;
 use cosmic_space::command::common::StateSrc;
@@ -21,6 +21,7 @@ use cosmic_space::loc::{Layer, ToSurface};
 use cosmic_space::parse::{bind_config, CamelCase};
 use cosmic_space::particle::traversal::{Traversal, TraversalDirection};
 use cosmic_space::particle::Status;
+use cosmic_space::point::Point;
 use cosmic_space::selector::{KindSelector, Pattern, SubKindSelector};
 use cosmic_space::substance::{Bin, Substance};
 use cosmic_space::util::{log, ValuePattern};
@@ -30,18 +31,22 @@ use cosmic_space::wave::exchange::asynch::{
     InCtx, ProtoTransmitter, ProtoTransmitterBuilder, TraversalRouter,
 };
 use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{
-    Agent, DirectedProto, Handling, HandlingKind, Ping, ToRecipients, UltraWave, WaitTime, Wave,
-};
+use cosmic_space::wave::{Agent, DirectedProto, DirectedWave, Handling, HandlingKind, Ping, ToRecipients, UltraWave, WaitTime, Wave};
 use cosmic_space::HYPERUSER;
+use dashmap::DashMap;
 use inflector::Inflector;
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
+use std::time::Duration;
+use alcoholic_jwt::JWKS;
 use tiny_http::Server;
 use tokio::runtime::Runtime;
+use tokio::sync::watch;
 use url::Url;
-use cosmic_space::point::Point;
+use cosmic_space::wave::core::ext::ExtMethod;
+use crate::keycloak::JwksCache;
 
 lazy_static! {
     static ref WEB_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
@@ -73,7 +78,7 @@ impl WebDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for WebDriverFactory
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> KindSelector {
         KindSelector {
@@ -95,30 +100,35 @@ where
 
 pub struct WebDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     skel: DriverSkel<P>,
+    servers: Arc<DashMap<Point, watch::Sender<bool>>>,
 }
 
 impl<P> WebDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(skel: DriverSkel<P>) -> Self {
-        Self { skel }
+        Self {
+            skel,
+            servers: Default::default(),
+        }
     }
 }
 
 #[async_trait]
 impl<P> Driver<P> for WebDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> Kind {
         Kind::Native(NativeSub::Web)
     }
 
     async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
+        /*
         let point = self.skel.point.push("http-server")?;
         let registration = Registration {
             point: point.clone(),
@@ -142,77 +152,86 @@ where
         let mut runner = WebRunner::new(item_skel);
         runner.start();
 
+         */
+
         skel.status_tx
             .send(DriverStatus::Ready)
             .await
             .unwrap_or_default();
+
         Ok(())
     }
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+        let record = self.skel.locate(point).await?;
         let skel = ItemSkel::new(
             point.clone(),
             Kind::Native(NativeSub::Web),
             self.skel.clone(),
+                record.details.properties
         );
         Ok(ItemSphere::Router(Box::new(Web::new(skel))))
     }
 
     async fn handler(&self) -> Box<dyn DriverHandler<P>> {
-        Box::new(WebDriverHandler::restore(self.skel.clone()))
+        Box::new(WebDriverHandler::restore(
+            self.skel.clone(),
+            self.servers.clone(),
+        ))
     }
 }
 
 pub struct WebDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     skel: DriverSkel<P>,
+    servers: Arc<DashMap<Point, watch::Sender<bool>>>,
 }
 
 impl<P> WebDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
-    fn restore(skel: DriverSkel<P>) -> Self {
-        WebDriverHandler { skel }
+    fn restore(skel: DriverSkel<P>, servers: Arc<DashMap<Point, watch::Sender<bool>>>) -> Self {
+        WebDriverHandler { skel, servers }
     }
 }
 
-impl<P> DriverHandler<P> for WebDriverHandler<P> where P: Cosmos {}
+impl<P> DriverHandler<P> for WebDriverHandler<P> where P: Platform {}
 
 #[handler]
 impl<P> WebDriverHandler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
-    /*
     #[route("Hyp<Assign>")]
     async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
+        println!("Web Server Assign");
         if let HyperSubstance::Assign(assign) = ctx.input {
             let skel = ItemSkel::new(
                 assign.details.stub.point.clone(),
                 Kind::Native(NativeSub::Web),
                 self.skel.clone(),
+                assign.details.properties.clone()
             );
-            let mut runner = WebRunner::new(skel);
-            runner.start();
+            let mut control_tx = WebRunner::new(skel).await?;
+            self.servers.insert(ctx.to().point.clone(), control_tx);
+            println!("\tcreated web runner!")
         }
         Ok(())
     }
-
-     */
 }
 
 pub struct Web<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
-    skel: ItemSkel<P>,
+    pub skel: ItemSkel<P>,
 }
 
 impl<P> Web<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(skel: ItemSkel<P>) -> Self {
         Self { skel }
@@ -222,7 +241,7 @@ where
 #[async_trait]
 impl<P> TraversalRouter for Web<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
         if traversal.is_directed() {
@@ -245,7 +264,7 @@ where
 #[async_trait]
 impl<P> ItemRouter<P> for Web<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(WEB_BIND_CONFIG.clone())
@@ -254,17 +273,19 @@ where
 
 pub struct WebRunner<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
+    pub jwks_cache: Arc<Option<JwksCache>>,
     pub skel: ItemSkel<P>,
     pub transmitter: ProtoTransmitter,
+    pub control_rx: watch::Receiver<bool>,
 }
 
 impl<P> WebRunner<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
-    pub fn new(skel: ItemSkel<P>) -> Self {
+    pub async fn new(skel: ItemSkel<P>) -> Result<watch::Sender<bool>,P::Err> {
         let mut router = LayerInjectionRouter::new(
             skel.skel.skel.clone(),
             skel.point.clone().to_surface().with_layer(Layer::Core),
@@ -290,29 +311,73 @@ where
             retries: Default::default(),
             wait: WaitTime::Low,
         });
-        transmitter.agent = SetStrategy::Fill(Agent::Anonymous);
 
+        let jwks_cache = Arc::new(if let Some(to) = skel.properties.get("auth") {
+            let to = Point::from_str(to.value.as_str())?;
+
+            let mut jwks_transmitter = transmitter.clone();
+            jwks_transmitter.agent = SetStrategy::Override(Agent::HyperUser);
+            jwks_transmitter.to = SetStrategy::Override(to.to_recipients());
+            let jwks_transmitter = jwks_transmitter.build();
+            let mut proto = DirectedProto::ping();
+            proto.method(ExtMethod::new("GetJwks").unwrap());
+            let pong = jwks_transmitter.ping(proto).await?;
+            pong.ok_or()?;
+            if let Substance::Bin(bin) = pong.variant.core.body  {
+               let jwks: JWKS = bincode::deserialize(bin.as_slice())?;
+               Some(JwksCache::new(jwks))
+            } else {
+                return Err("could not deserialize JWKS".into());
+            }
+        } else {
+            None
+        });
+
+        // waves get a default agent of Anonymous
+        transmitter.agent = SetStrategy::Fill(Agent::Anonymous);
         let transmitter = transmitter.build();
 
-        Self { skel, transmitter }
+
+
+
+        let (control_tx, control_rx) = watch::channel(true);
+
+        Self {
+            skel,
+            transmitter,
+            control_rx,
+            jwks_cache
+        }
+        .start();
+
+        Ok(control_tx)
     }
 
     pub fn start(mut self) {
         let runtime = tokio::runtime::Handle::current();
         thread::spawn(move || {
-            let port = self.skel.skel.skel.machine.cosmos.web_port().unwrap();
+            let port = self.skel.skel.skel.machine.platform.web_port().unwrap();
             let server = Server::http(format!("0.0.0.0:{}", port)).unwrap();
-            for req in server.incoming_requests() {
-                let runtime = runtime.clone();
-                let transmitter = self.transmitter.clone();
-                runtime.spawn(async move {
-                    match Self::handle::<P>(transmitter, req).await {
-                        Ok(_) => {}
-                        Err(err) => {
-                            println!("http handle ERR: {}", err.to_string());
-                        }
+            loop {
+                let req = server.recv_timeout(Duration::from_secs(1));
+                if self.control_rx.has_changed().unwrap() {
+                    if !(*self.control_rx.borrow()) {
+                        break;
                     }
-                });
+                }
+                if let Ok(Some(req)) = req {
+                    let runtime = runtime.clone();
+                    let transmitter = self.transmitter.clone();
+                    let jwks_cache = self.jwks_cache.clone();
+                    runtime.spawn(async move {
+                        match Self::handle::<P>(transmitter, req, jwks_cache).await {
+                            Ok(_) => {}
+                            Err(err) => {
+                                println!("http handle ERR: {}", err.to_string());
+                            }
+                        }
+                    });
+                }
             }
         });
     }
@@ -320,10 +385,12 @@ where
     async fn handle<C>(
         transmitter: ProtoTransmitter,
         mut req: tiny_http::Request,
+        jwks: Arc<Option<JwksCache>>
     ) -> Result<(), C::Err>
     where
-        C: Cosmos,
+        C: Platform,
     {
+
         let method = req
             .method()
             .to_string()
@@ -333,9 +400,30 @@ where
 
         let method = HttpMethod::from_str(method.as_str())?;
         let mut headers = HeaderMap::new();
+        let mut agent = Agent::Anonymous;
         for header in req.headers() {
-            headers.insert(header.field.to_string(), header.value.to_string());
+            if header.field.as_str() ==  "Authorization" {
+               if let Some(jwks) = &*jwks {
+                   //let token = header.value.to_string();
+                   //jwks.validate(token.as_str()).await?
+               }
+            } else {
+                headers.insert(header.field.to_string(), header.value.to_string());
+            }
         }
+
+        match headers.get("Authorization")
+        {
+            None => {}
+            Some(bearer) => {
+/*                let wave = DirectedProto::ext("VerifyJwt");
+                transmitter.
+
+ */
+            }
+        }
+
+
         let url = format!("http://localhost{}", req.url());
         let uri: Url = Url::from_str(url.as_str())?;
         let body = match req.body_length().as_ref() {

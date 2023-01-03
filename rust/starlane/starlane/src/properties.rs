@@ -176,7 +176,7 @@ fn userbase_properties_config() -> Result<PropertiesConfig, SpaceErr> {
 pub fn properties_config<K: ToBaseKind>(base: &K) -> &'static PropertiesConfig {
     match base.to_base() {
         BaseKind::Space => &UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG,
-        BaseKind::UserBase => &USER_BASE_PROPERTIES_CONFIG,
+        BaseKind::User => &USER_BASE_PROPERTIES_CONFIG,
         BaseKind::User => &USER_PROPERTIES_CONFIG,
         BaseKind::App => &MECHTRON_PROERTIES_CONFIG,
         BaseKind::Mechtron => &MECHTRON_PROERTIES_CONFIG,

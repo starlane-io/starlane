@@ -42,19 +42,20 @@ use cosmic_space::wave::{Agent, DirectedProto, HyperWave, Pong, UltraWave, Wave}
 use crate::err::HyperErr;
 use crate::reg::{Registry, RegistryApi};
 use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
-use crate::{Cosmos, DriversBuilder};
+use crate::{Platform, DriversBuilder};
+use crate::driver::control::{ControlClient, ControlCliSession};
 
 #[derive(Clone)]
 pub struct MachineApi<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     tx: mpsc::Sender<MachineCall<P>>,
 }
 
 impl<P> MachineApi<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(tx: mpsc::Sender<MachineCall<P>>) -> Self {
         Self { tx }
@@ -117,6 +118,16 @@ where
         }
     }
 
+    pub async fn client(&self) -> Result<ControlClient,P::Err> {
+        let factory = MachineApiExtFactory {
+            machine_api: self.clone(),
+        };
+
+        let client = ControlClient::new(Box::new(factory))?;
+        client.wait_for_ready(Duration::from_secs(5)).await?;
+        Ok(client)
+    }
+
     #[cfg(test)]
     pub async fn get_machine_star(&self) -> Result<HyperStarApi<P>, SpaceErr> {
         let (tx, mut rx) = oneshot::channel();
@@ -135,10 +146,10 @@ where
 #[derive(Clone)]
 pub struct MachineSkel<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub name: MachineName,
-    pub cosmos: P,
+    pub platform: P,
     pub registry: Registry<P>,
     pub artifacts: ArtifactApi,
     pub logger: RootLogger,
@@ -148,11 +159,14 @@ where
     pub status_tx: mpsc::Sender<MachineStatus>,
     pub machine_star: Surface,
     pub global: Surface,
+    pub template: MachineTemplate,
+    pub cluster_status_tx: mpsc::Sender<ClusterStatus>,
+    pub cluster_status_rx: watch::Receiver<ClusterStatus>
 }
 
 pub struct Machine<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     pub skel: MachineSkel<P>,
     pub stars: Arc<HashMap<Point, HyperStarApi<P>>>,
@@ -166,7 +180,7 @@ where
 
 impl<P> Machine<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     pub fn new(platform: P) -> MachineApi<P> {
         let (call_tx, call_rx) = mpsc::channel(1024);
@@ -180,7 +194,7 @@ where
         platform: P,
         call_tx: mpsc::Sender<MachineCall<P>>,
         call_rx: mpsc::Receiver<MachineCall<P>>,
-    ) -> Result<MachineApi<P>, P::Err> {
+    ) -> Result<MachineApi<P>, P::Err> where P: Platform {
         let template = platform.machine_template();
         let machine_name = platform.machine_name();
         let machine_api = MachineApi::new(call_tx.clone());
@@ -191,6 +205,15 @@ where
                 watch_status_tx.send(status);
             }
         });
+
+        let (mpsc_cluster_status_tx, mut mpsc_cluster_status_rx) = mpsc::channel(128);
+        let (cluster_status_tx, cluster_status_rx) = watch::channel(ClusterStatus::Pending );
+        tokio::spawn(async move {
+            while let Some(status) = mpsc_cluster_status_rx.recv().await {
+                cluster_status_tx.send(status);
+            }
+        });
+
 
         let machine_star = StarKey::machine(machine_name.clone())
             .to_point()
@@ -210,11 +233,14 @@ where
             artifacts: platform.artifact_hub(),
             logger: platform.logger(),
             timeouts: Timeouts::default(),
-            cosmos: platform.clone(),
+            platform: platform.clone(),
             api: machine_api.clone(),
             status_tx: mpsc_status_tx,
             status_rx: watch_status_rx,
             global,
+            template: template.clone(),
+            cluster_status_tx: mpsc_cluster_status_tx,
+            cluster_status_rx,
         };
 
         let mut stars = HashMap::new();
@@ -247,7 +273,7 @@ where
             interchange.singular_to(star_hop.clone());
 
             let interchange = Arc::new(interchange);
-            let auth = skel.cosmos.star_auth(&star_template.key)?;
+            let auth = skel.platform.star_auth(&star_template.key)?;
             let greeter = SimpleGreeter::new(star_hop.clone(), star_port.clone());
             let gate: Arc<dyn HyperGate> = Arc::new(MountInterchangeGate::new(
                 auth,
@@ -294,7 +320,7 @@ where
         }
 
         let mut gate_selector = Arc::new(HyperGateSelector::new(gates));
-        skel.cosmos.start_services(&gate_selector).await;
+        skel.platform.start_services(&gate_selector).await;
         let gate: Arc<dyn HyperGate> = gate_selector.clone();
 
         let (machine_point, machine_star) = stars
@@ -378,10 +404,9 @@ where
             termination_broadcast_tx: term_tx,
         };
 
-        /// SETUP ARTIFAC
+        /// SETUP ARTIFACT
         let factory = MachineApiExtFactory {
             machine_api: machine_api.clone(),
-            logger: logger.clone(),
         };
         let exchanger = Exchanger::new(
             Point::from_str("artifact").unwrap().to_surface(),
@@ -395,7 +420,19 @@ where
         let fetcher = Arc::new(ClientArtifactFetcher::new(client, skel.registry.clone()));
         skel.artifacts.set_fetcher(fetcher).await;
 
-        machine.start().await;
+        tokio::spawn( async move {
+            machine.start().await;
+        });
+
+        {
+            let machine_api = machine_api.clone();
+            tokio::spawn(async move {
+                // HACK: give Wrangles a chance to catch up first
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                platform.post_startup(&machine_api).await.unwrap();
+            });
+        }
+
         Ok(machine_api)
     }
 
@@ -428,10 +465,10 @@ where
                     tx.send(self.termination_broadcast_tx.subscribe());
                 }
                 MachineCall::WaitForReady(rtn) => {
-                    let mut status_rx = self.skel.status_rx.clone();
+                    let mut status_rx = self.skel.cluster_status_rx.clone();
                     tokio::spawn(async move {
                         loop {
-                            if MachineStatus::Ready == status_rx.borrow().clone() {
+                            if ClusterStatus::Ready == status_rx.borrow().clone() {
                                 rtn.send(());
                                 break;
                             }
@@ -496,7 +533,7 @@ where
 
 pub enum MachineCall<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     Init,
     Terminate,
@@ -536,6 +573,7 @@ pub enum MachineStatus {
     Fatal,
 }
 
+#[derive(Clone)]
 pub struct MachineTemplate {
     pub stars: Vec<StarTemplate>,
 }
@@ -593,6 +631,7 @@ impl Default for MachineTemplate {
             StarSub::Fold,
         );
 
+
         nexus.receive(central.to_stub());
         nexus.receive(supe.to_stub());
         nexus.receive(maelstrom.to_stub());
@@ -622,7 +661,7 @@ impl Default for MachineTemplate {
 
 pub struct MachineHyperwayEndpointFactory<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     from: StarKey,
     to: StarKey,
@@ -631,7 +670,7 @@ where
 
 impl<P> MachineHyperwayEndpointFactory<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(from: StarKey, to: StarKey, call_tx: mpsc::Sender<MachineCall<P>>) -> Self {
         Self { from, to, call_tx }
@@ -641,7 +680,7 @@ where
 #[async_trait]
 impl<P> HyperwayEndpointFactory for MachineHyperwayEndpointFactory<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn create(
         &self,
@@ -664,16 +703,15 @@ where
 
 pub struct MachineApiExtFactory<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub machine_api: MachineApi<P>,
-    pub logger: PointLogger,
 }
 
 #[async_trait]
 impl<P> HyperwayEndpointFactory for MachineApiExtFactory<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn create(
         &self,
@@ -684,14 +722,13 @@ where
             auth: Box::new(Substance::Empty),
             remote: None,
         };
-        self.logger
-            .result_ctx("machine_api.knock()", self.machine_api.knock(knock).await)
+         self.machine_api.knock(knock).await
     }
 }
 
 pub struct ClientArtifactFetcher<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub registry: Registry<P>,
     pub client: HyperClient,
@@ -699,7 +736,7 @@ where
 
 impl<P> ClientArtifactFetcher<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(client: HyperClient, registry: Registry<P>) -> Self {
         Self { client, registry }
@@ -709,7 +746,7 @@ where
 #[async_trait]
 impl<P> ArtifactFetcher for ClientArtifactFetcher<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn stub(&self, point: &Point) -> Result<Stub, SpaceErr> {
         let record = self
@@ -736,4 +773,12 @@ where
             Err("expecting Bin encountered some other substance when fetching artifact".into())
         }
     }
+}
+
+
+#[derive(Clone,Eq,PartialEq)]
+pub enum ClusterStatus {
+    Pending,
+    Up,
+    Ready
 }

@@ -26,12 +26,12 @@ use cosmic_space::wave::{
 };
 
 use crate::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
-use crate::Cosmos;
+use crate::Platform;
 
 #[derive(DirectedHandler)]
 pub struct Shell<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     skel: HyperStarSkel<P>,
     state: ShellState,
@@ -40,7 +40,7 @@ where
 
 impl<P> Shell<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     pub fn new(skel: HyperStarSkel<P>, state: ShellState) -> Self {
         let logger = skel.logger.point(state.point.clone());
@@ -55,7 +55,7 @@ where
 #[async_trait]
 impl<P> TraversalLayer for Shell<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     fn surface(&self) -> Surface {
         self.state
@@ -214,7 +214,7 @@ where
 #[handler]
 impl<P> Shell<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     #[route("Ext<NewCliSession>")]
     pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Surface, SpaceErr> {
@@ -225,7 +225,7 @@ where
             ));
         }
 
-        let mut session_port = ctx
+        let mut session_surface = ctx
             .to()
             .clone()
             .with_topic(Topic::uuid())
@@ -236,14 +236,14 @@ where
         let session = CliSession {
             source_selector: ctx.from().clone().into(),
             env,
-            port: session_port.clone(),
+            surface: session_surface.clone(),
         };
 
         self.skel
             .state
-            .topic_handler(session_port.clone(), Arc::new(session));
+            .topic_handler(session_surface.clone(), Arc::new(session));
 
-        Ok(session_port)
+        Ok(session_surface)
     }
 }
 
@@ -252,7 +252,7 @@ impl CliSession {
     #[route("Ext<Exec>")]
     pub async fn exec(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, SpaceErr> {
         let exec_topic = Topic::uuid();
-        let exec_port = self.port.clone().with_topic(exec_topic.clone());
+        let exec_port = self.surface.clone().with_topic(exec_topic.clone());
         let mut exec = CommandExecutor::new(exec_port, ctx.from().clone(), self.env.clone());
 
         Ok(exec.execute(ctx).await?)
@@ -263,7 +263,7 @@ impl CliSession {
 pub struct CliSession {
     pub source_selector: SurfaceSelector,
     pub env: Env,
-    pub port: Surface,
+    pub surface: Surface,
 }
 
 impl TopicHandler for CliSession {
@@ -274,20 +274,20 @@ impl TopicHandler for CliSession {
 
 #[derive(DirectedHandler)]
 pub struct CommandExecutor {
-    port: Surface,
+    surface: Surface,
     source: Surface,
     env: Env,
 }
 
 #[handler]
 impl CommandExecutor {
-    pub fn new(port: Surface, source: Surface, env: Env) -> Self {
-        Self { port, source, env }
+    pub fn new(surface: Surface, source: Surface, env: Env) -> Self {
+        Self { surface, source, env }
     }
 
     pub async fn execute(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, SpaceErr> {
         // make sure everything is coming from this command executor topic
-        let ctx = ctx.push_from(self.port.clone());
+        let ctx = ctx.push_from(self.surface.clone());
 
         let command = result(command_line(new_span(ctx.line.as_str())))?;
 

@@ -28,7 +28,7 @@ use command::direct::query::{Query, QueryResult};
 use command::direct::select::{Select, SubSelect};
 use config::bind::BindConfig;
 use config::Document;
-use kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind};
+use kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserVariant};
 use loc::{Surface, Uuid};
 use particle::{Details, Properties, Status, Stub};
 use point::Point;
@@ -64,12 +64,14 @@ pub mod wasm;
 pub mod wave;
 pub mod kind2;
 pub mod point;
+pub mod kind3;
 
 lazy_static! {
     pub static ref VERSION: semver::Version =
         semver::Version::from_str(include_str!("VERSION").trim()).unwrap();
-    pub static ref HYPERUSER: Point = Point::from_str("hyperspace:users:hyperuser").expect("point");
-    pub static ref ANONYMOUS: Point = Point::from_str("hyperspace:users:anonymous").expect("point");
+    pub static ref HYPER_USERBASE: Point = Point::from_str("HYPER::users").expect("point");
+    pub static ref HYPERUSER: Point = Point::from_str("HYPER::users:hyperuser").expect("point");
+    pub static ref ANONYMOUS: Point = Point::from_str("HYPER::users:anonymous").expect("point");
 }
 
 /*

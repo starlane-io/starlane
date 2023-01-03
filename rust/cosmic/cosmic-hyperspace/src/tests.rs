@@ -87,7 +87,6 @@ where
 
         let factory = MachineApiExtFactory {
             machine_api: machine_api.clone(),
-            logger: logger.clone(),
         };
 
         let client = ControlClient::new(Box::new(factory))?;
@@ -154,7 +153,6 @@ fn test_control() -> Result<(), CosmicErr> {
 
         let factory = MachineApiExtFactory {
             machine_api,
-            logger: logger.clone(),
         };
 
         let exchanger = Exchanger::new(
@@ -195,7 +193,7 @@ fn test_control() -> Result<(), CosmicErr> {
 
         assert!(reflect.core.status.is_success());
 
-        client.close().await;
+        client.close();
         tokio::time::sleep(Duration::from_millis(50)).await;
         Ok(())
     })
@@ -285,7 +283,6 @@ fn test_provision_and_assign() -> Result<(), CosmicErr> {
 
         let factory = MachineApiExtFactory {
             machine_api,
-            logger: logger.clone(),
         };
 
         let client = ControlClient::new(Box::new(factory))?;
@@ -354,7 +351,6 @@ fn test_control_cli() -> Result<(), CosmicErr> {
 
         let factory = MachineApiExtFactory {
             machine_api,
-            logger: logger.clone(),
         };
 
         let client = ControlClient::new(Box::new(factory))?;
@@ -392,7 +388,6 @@ fn test_publish() -> Result<(), CosmicErr> {
 
         let factory = MachineApiExtFactory {
             machine_api,
-            logger: logger.clone(),
         };
 
         let client = ControlClient::new(Box::new(factory))?;
@@ -455,7 +450,6 @@ fn test_mechtron() -> Result<(), CosmicErr> {
 
         let factory = MachineApiExtFactory {
             machine_api,
-            logger: logger.clone(),
         };
 
         let client = ControlClient::new(Box::new(factory))?;

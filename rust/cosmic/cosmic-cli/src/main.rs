@@ -1,18 +1,24 @@
-#![allow(warnings)]
+    #![allow(warnings)]
+
+pub mod cli;
+pub mod err;
+pub mod model;
 
 #[macro_use]
 extern crate clap;
 
 #[macro_use]
-extern crate text_io;
+extern crate lazy_static;
 
+use crate::err::CliErr;
+use crate::model::{AccessTokenResp, LoginResp};
 use clap::arg;
 use clap::command;
 use clap::{App, Arg, Args, Command as ClapCommand, Parser, Subcommand};
 use cosmic_hyperlane::test_util::SingleInterchangePlatform;
 use cosmic_hyperlane::HyperwayEndpointFactory;
 use cosmic_hyperlane_tcp::HyperlaneTcpClient;
-use cosmic_hyperspace::driver::control::{ControlClient, ControlCliSession};
+use cosmic_hyperspace::driver::control::{ControlCliSession, ControlClient};
 use cosmic_nom::{new_span, Span};
 use cosmic_space::command::{CmdTransfer, Command, RawCommand};
 use cosmic_space::err::SpaceErr;
@@ -21,20 +27,27 @@ use cosmic_space::loc::ToSurface;
 use cosmic_space::log::RootLogger;
 use cosmic_space::parse::error::result;
 use cosmic_space::parse::{command_line, upload_blocks};
+use cosmic_space::point::Point;
 use cosmic_space::substance::Substance;
 use cosmic_space::util::{log, ToResolved};
 use cosmic_space::wave::core::ReflectedCore;
+use nom::bytes::complete::{is_not, tag};
+use nom::multi::{separated_list0, separated_list1};
+use std::collections::HashMap;
 use std::fs::File;
+use std::io::BufRead;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use std::{fs, io::{Cursor, Read, Seek, Write}, io, path::Path};
-use std::io::BufRead;
-use nom::bytes::complete::{is_not, tag};
-use nom::multi::{separated_list0, separated_list1};
+use std::{
+    fs, io,
+    io::{Cursor, Read, Seek, Write},
+    path::Path,
+};
+use serde_json::json;
 use walkdir::{DirEntry, WalkDir};
 use zip::{result::ZipError, write::FileOptions};
-use cosmic_space::point::Point;
+use crate::cli::CliConfig;
 
 #[tokio::main]
 async fn main() -> Result<(), SpaceErr> {
@@ -50,7 +63,7 @@ async fn main() -> Result<(), SpaceErr> {
                 .takes_value(true)
                 .value_name("host")
                 .required(false)
-                .default_value("localhost"),
+                .default_value("localhost:4343"),
         )
         .arg(
             Arg::new("certs")
@@ -62,6 +75,19 @@ async fn main() -> Result<(), SpaceErr> {
                 .default_value(format!("{}/.starlane/localhost/certs", home_dir).as_str()),
         )
         .subcommand(ClapCommand::new("script").arg(Arg::new("filename")))
+        .subcommand(
+            ClapCommand::new("login")
+                .arg(
+                    Arg::new("oauth").short('o').long("oauth")
+                        .default_value("http://localhost:8001/auth/realms/master/protocol/openid-connect"),
+                )
+                .arg(Arg::new("user").required(true).default_value("hyperuser"))
+                .arg(
+                    Arg::new("password")
+                        .required(true)
+                        .default_value("password"),
+                ),
+        )
         .allow_external_subcommands(true)
         .get_matches();
 
@@ -70,10 +96,27 @@ async fn main() -> Result<(), SpaceErr> {
 
     if matches.subcommand_name().is_some() {
         match matches.subcommand().unwrap() {
+            ("login", args) => {
+                let hostname = matches.value_of("host").unwrap();
+                let oauth_url = args.value_of("oauth").unwrap();
+                let username = args.value_of("user").unwrap();
+                let password = args.value_of("password").unwrap();
+                login(hostname, oauth_url, username, password)
+                    .await
+                    .unwrap();
+                Ok(())
+            }
             ("script", args) => {
-                let filename: &String= args.get_one("filename").unwrap();
+//                refresh().await?;
+                let filename: &String = args.get_one("filename").unwrap();
                 let script = fs::read_to_string(filename)?;
-                let lines :Vec<String> = result(separated_list0(tag(";"), is_not(";"))(new_span(script.as_str())))?.into_iter().map(|i|i.to_string()).filter(|i|!i.trim().is_empty()).collect();
+                let lines: Vec<String> = result(separated_list0(tag(";"), is_not(";"))(new_span(
+                    script.as_str(),
+                )))?
+                .into_iter()
+                .map(|i| i.to_string())
+                .filter(|i| !i.trim().is_empty())
+                .collect();
                 let session = Session::new(host, certs).await?;
                 for line in lines {
                     session.command(line.as_str()).await?;
@@ -81,7 +124,8 @@ async fn main() -> Result<(), SpaceErr> {
 
                 Ok(())
             }
-            (subcommand,args) => {
+            (subcommand, args) => {
+//                refresh().await?;
                 let session = Session::new(host, certs).await?;
                 session.command(subcommand).await
             }
@@ -91,7 +135,67 @@ async fn main() -> Result<(), SpaceErr> {
     }
 }
 
+async fn login(host: &str, oauth_url: &str, username: &str, password: &str) -> Result<(), CliErr> {
+    let mut form = HashMap::new();
+    form.insert("username", username);
+    form.insert("password", password);
+    form.insert("client_id", "admin-cli");
+    form.insert("grant_type", "password");
+    let client = reqwest::Client::new();
 
+    let res = client
+        .post(format!("{}/token",oauth_url))
+        .form(&form)
+        .send()
+        .await?
+        .json::<LoginResp>()
+        .await?;
+
+    {
+        let mut config = crate::cli::CLI_CONFIG.lock()?;
+        config.hostname = host.to_string();
+        config.refresh_token = Some(res.refresh_token);
+        config.oauth_url = Some(oauth_url.to_string());
+        config.save()?;
+    }
+
+    Ok(())
+}
+
+async fn refresh() -> Result<String,SpaceErr> {
+    let mut config= {
+        let config = crate::cli::CLI_CONFIG.lock()?;
+        (*config).clone()
+    };
+
+    let oauth = config.oauth_url.ok_or::<SpaceErr>("oauth login not set".into())?;
+    let refresh_token = config.refresh_token.ok_or::<SpaceErr>("refresh token not set".into())?;
+
+    let client = reqwest::Client::new();
+    let url = format!("{}/token", oauth);
+    let response = client
+        .post(&url)
+        .form(&json!({
+                "refresh_token": refresh_token,
+                "client_id": "admin-cli",
+                "grant_type": "refresh_token"
+            }))
+        .send()
+        .await.unwrap();
+
+    match &response.status().as_u16() {
+        200 => {
+            let response: AccessTokenResp = response.json().await.unwrap();
+            Ok(response.access_token)
+        }
+        other => {
+            let response = response.text().await.unwrap();
+            println!("response: {}", response);
+            Err("could not refresh token".into())
+        }
+    }
+
+}
 
 pub struct Session {
     pub client: ControlClient,
@@ -103,7 +207,7 @@ impl Session {
         let logger = RootLogger::default();
         let logger = logger.point(Point::from_str("cosmic-cli")?);
         let tcp_client: Box<dyn HyperwayEndpointFactory> = Box::new(HyperlaneTcpClient::new(
-            format!("{}:{}", host, 4343),
+            host,
             certs,
             Knock::default(),
             false,
@@ -123,7 +227,6 @@ impl Session {
         let blocks = result(upload_blocks(new_span(command)))?;
         let mut command = RawCommand::new(command.to_string());
         for block in blocks {
-            
             let path = block.name.clone();
             let metadata = std::fs::metadata(&path)?;
 

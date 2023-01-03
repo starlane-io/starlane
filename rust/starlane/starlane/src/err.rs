@@ -1,13 +1,24 @@
+use std::num::ParseIntError;
+
+#[cfg(feature="keycloak")]
+use keycloak::KeycloakError;
+
 use cosmic_hyperspace::err::ErrKind;
 
 #[cfg(feature = "postgres")]
 use cosmic_registry_postgres::err::PostErr;
 
-#[cfg(feature = "postgres")]
+#[cfg(feature="postgres")]
+#[cfg(not(feature="keycloak"))]
 pub trait StarlaneErr: PostErr {}
 
-#[cfg(not(feature = "postgres"))]
-pub trait StarlaneErr {}
+#[cfg(feature="keycloak")]
+#[cfg(not(feature="postgres"))]
+pub trait StarlaneErr: From<KeycloakError>+From<ParseIntError>+From<reqwest::Error>{}
+
+#[cfg(feature="keycloak")]
+#[cfg(feature="postgres")]
+pub trait StarlaneErr: PostErr+From<KeycloakError>+From<ParseIntError>+From<reqwest::Error>{}
 
 #[derive(Debug, Clone)]
 pub struct StarErr {
@@ -25,12 +36,19 @@ pub mod convert {
     //    use cosmic_registry_postgres::err::PostErr;
     #[cfg(feature = "postgres")]
     use cosmic_registry_postgres::err::PostErr;
+    #[cfg(feature = "postgres")]
+    use sqlx::Error;
+
     use cosmic_space::err::SpaceErr;
     use mechtron_host::err::{DefaultHostErr, HostErr};
-    use sqlx::Error;
+
     use std::io;
+    use std::num::ParseIntError;
     use std::str::Utf8Error;
     use std::string::FromUtf8Error;
+    use base64::DecodeError;
+    #[cfg(feature = "keycloak")]
+    use keycloak::KeycloakError;
     use strum::ParseError;
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
@@ -44,6 +62,65 @@ pub mod convert {
             }
         }
     }
+
+
+    impl From<serde_json::Error> for Err {
+        fn from(e:serde_json::Error) -> Self {
+            Self{
+                kind: ErrKind::Default,
+                message: e.to_string()
+            }
+        }
+    }
+
+    impl From<reqwest::Error> for Err {
+        fn from(e:reqwest::Error) -> Self {
+            Self{
+                kind: ErrKind::Default,
+                message: e.to_string()
+            }
+        }
+    }
+
+
+     impl From<alcoholic_jwt::ValidationError> for Err {
+        fn from(e:alcoholic_jwt::ValidationError) -> Self {
+            Self{
+                kind: ErrKind::Default,
+                message: e.to_string()
+            }
+        }
+    }
+
+
+    impl From<DecodeError> for Err {
+        fn from(e:DecodeError) -> Self {
+            Self{
+                kind: ErrKind::Default,
+                message: e.to_string()
+            }
+        }
+    }
+    #[cfg(feature="keycloak")]
+    impl From<KeycloakError> for Err {
+        fn from(e: KeycloakError) -> Self {
+            Self{
+                kind: ErrKind::Default,
+                message: e.to_string()
+            }
+        }
+    }
+
+    #[cfg(feature="keycloak")]
+    impl From<ParseIntError> for Err {
+        fn from(e: ParseIntError) -> Self {
+            Self{
+                kind: ErrKind::Default,
+                message: e.to_string()
+            }
+        }
+    }
+
 
     impl From<strum::ParseError> for Err {
         fn from(e: strum::ParseError) -> Self {
@@ -143,6 +220,9 @@ pub mod convert {
         }
     }
 
+
+
+    #[cfg(feature="postgres")]
     impl From<sqlx::Error> for Err {
         fn from(e: sqlx::Error) -> Self {
             Err::new(e)
