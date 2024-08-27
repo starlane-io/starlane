@@ -38,7 +38,6 @@ use nom_supreme::error::ErrorTree;
 use nom_supreme::final_parser::ExtractContext;
 use nom_supreme::parser_ext::MapRes;
 use nom_supreme::{parse_from_str, ParserExt};
-use regex::internal::Input;
 use regex::{Captures, Error, Match, Regex};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -4835,7 +4834,6 @@ pub mod error {
         AsChar, Compare, Err, InputLength, InputTake, InputTakeAtPosition, IResult, Parser, Slice,
     };
     use nom_supreme::error::{BaseErrorKind, ErrorTree, StackContext};
-    use regex::internal::Input;
     use regex::{Error, Regex};
 
     use cosmic_nom::{len, new_span, Res, Span, span_with_extra, trim, tw};
@@ -4967,8 +4965,10 @@ pub mod error {
                                                 Error::CompiledTooBig(size) => {
                                                     builder.with_message("Regex compiled too big").with_label(Label::new(span.location_offset()..span.location_offset()+span.len()).with_message("regex compiled too big"))
                                                 }
-                                                Error::__Nonexhaustive => {
+                                                _ => {
+
                                                     builder.with_message("Regex is nonexhaustive").with_label(Label::new(span.location_offset()..span.location_offset()+span.len()).with_message("non-exhaustive regex"))
+
                                                 }
                                             }
                                         }

@@ -2,3 +2,4 @@
 *.wasm
 .cargo
 .fleet
+.DS_Store
