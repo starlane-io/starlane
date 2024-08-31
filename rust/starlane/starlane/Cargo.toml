@@ -19,12 +19,12 @@ repository.workspace = true
 postgres=["dep:cosmic-registry-postgres"]
 
 [dependencies]
-cosmic-space={ path= "../../cosmic/cosmic-space" ,version = "0.3.8" }
-cosmic-hyperspace={ path= "../../cosmic/cosmic-hyperspace" ,version = "0.3.8" }
-cosmic-registry-postgres={ path= "../../cosmic/cosmic-registry-postgres" ,version = "0.3.8", optional=true}
-cosmic-hyperlane={ path="../../cosmic/cosmic-hyperlane",version = "0.3.8" }
-cosmic-hyperlane-tcp={ path="../../cosmic/cosmic-hyperlane-tcp",version = "0.3.8" }
-mechtron-host={ path="../../mechtron/mechtron-host",version = "0.3.8" }
+cosmic-space={ path= "../../cosmic/cosmic-space" ,version = "0.3.11" }
+cosmic-hyperspace={ path= "../../cosmic/cosmic-hyperspace" ,version = "0.3.11" }
+cosmic-registry-postgres={ path= "../../cosmic/cosmic-registry-postgres" ,version = "0.3.11", optional=true}
+cosmic-hyperlane={ path="../../cosmic/cosmic-hyperlane",version = "0.3.11" }
+cosmic-hyperlane-tcp={ path="../../cosmic/cosmic-hyperlane-tcp",version = "0.3.11" }
+mechtron-host={ path="../../mechtron/mechtron-host",version = "0.3.11" }
 lazy_static = "1.4.0"
 uuid = { version="1.1.2", features=["v4"] }
 chrono = { version="0.4.19", features=["serde"] }

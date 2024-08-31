@@ -12,16 +12,16 @@ authors.workspace = true
 homepage.workspace = true
 license.workspace = true
 repository.workspace = true
-
+description="the invisible infrastructure that makes the space dimension work behind the scenes"
 
 
 [dependencies]
 async-recursion = "1.0.0"
-cosmic-macros = { path="../cosmic-macros", version = "0.3.8" }
-cosmic-space = { path= "../cosmic-space", version = "0.3.8" }
-cosmic-nom = { path="../cosmic-nom", version = "0.3.8" }
-cosmic-hyperlane = { path= "../cosmic-hyperlane", version = "0.3.8" }
-mechtron-host = { path="../../mechtron/mechtron-host" , version = "0.3.8" }
+cosmic-macros = { path="../cosmic-macros", version = "0.3.11" }
+cosmic-space = { path= "../cosmic-space", version = "0.3.11" }
+cosmic-nom = { path="../cosmic-nom", version = "0.3.11" }
+cosmic-hyperlane = { path= "../cosmic-hyperlane", version = "0.3.11" }
+mechtron-host = { path="../../mechtron/mechtron-host" , version = "0.3.11" }
 threadpool = "1.8.1"
 #acid-store = { workspace ="true",  features=['store-directory','repo-value'] }
 

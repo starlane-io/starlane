@@ -10,10 +10,12 @@ license.workspace = true
 repository.workspace = true
 
 
+description = "An abstraction of the connections that starlane requires between stars"
+
 
 
 [dependencies]
-cosmic-space = { path= "../cosmic-space", version = "0.3.8" }
+cosmic-space = { path= "../cosmic-space", version = "0.3.11" }
 async-trait = "0.1.48"
 futures = {version = "0.3.21", default-features = true }
 tokio = { version = "1.15.0", features = ["full"] }

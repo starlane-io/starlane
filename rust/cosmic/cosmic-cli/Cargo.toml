@@ -18,11 +18,11 @@ path = "src/main.rs"
 
 [dependencies]
 
-cosmic-hyperlane={ path="../cosmic-hyperlane", version = "0.3.8" }
-cosmic-hyperlane-tcp={ path="../cosmic-hyperlane-tcp", version = "0.3.8" }
-cosmic-space= { path= "../cosmic-space" , version = "0.3.8" }
-cosmic-hyperspace= { path= "../cosmic-hyperspace" , version = "0.3.8" }
-cosmic-nom= { path="../cosmic-nom", version = "0.3.8" }
+cosmic-hyperlane={ path="../cosmic-hyperlane", version = "0.3.11" }
+cosmic-hyperlane-tcp={ path="../cosmic-hyperlane-tcp", version = "0.3.11" }
+cosmic-space= { path= "../cosmic-space" , version = "0.3.11" }
+cosmic-hyperspace= { path= "../cosmic-hyperspace" , version = "0.3.11" }
+cosmic-nom= { path="../cosmic-nom", version = "0.3.11" }
 text_io = "0.1.12"
 clap = { version="3.2.22", features=["cargo"] }
 tokio = { version = "1.15.0", features = ["rt"] }
