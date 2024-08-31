@@ -1,4 +1,6 @@
 
+VERSION := $(shell cat ../VERSION)
+
 .PHONY : clean version
 clean :
 	find . -type f -name "*.toml" -exec touch {} +
@@ -7,6 +9,7 @@ clean :
 
 version:
 	cp ../VERSION cosmic/cosmic-space/src
+	toml set Cargo.toml workspace.package.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
 	$(MAKE) -C cosmic
 	$(MAKE) -C mechtron 
 	$(MAKE) -C starlane/starlane 

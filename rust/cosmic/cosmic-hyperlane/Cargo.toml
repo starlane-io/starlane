@@ -13,7 +13,7 @@ repository.workspace = true
 
 
 [dependencies]
-cosmic-space = { path= "../cosmic-space"}
+cosmic-space = { path= "../cosmic-space", version = "0.3.8" }
 async-trait = "0.1.48"
 futures = {version = "0.3.21", default-features = true }
 tokio = { version = "1.15.0", features = ["full"] }

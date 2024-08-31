@@ -15,8 +15,8 @@ doctest = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cosmic-nom = { path="../cosmic-nom" }
-cosmic-macros-primitive = { path="../cosmic-macros-primitive" }
+cosmic-nom = { path="../cosmic-nom" , version = "0.3.8" }
+cosmic-macros-primitive = { path="../cosmic-macros-primitive" , version = "0.3.8" }
 ariadne = "0.1.5"
 async-trait = "0.1.48"
 lazy_static = "1.4.0"

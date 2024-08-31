@@ -17,11 +17,11 @@ repository.workspace = true
 
 [dependencies]
 async-recursion = "1.0.0"
-cosmic-macros = { path="../cosmic-macros"}
-cosmic-space = { path= "../cosmic-space"}
-cosmic-nom = { path="../cosmic-nom"}
-cosmic-hyperlane = { path= "../cosmic-hyperlane"}
-mechtron-host = { path="../../mechtron/mechtron-host" }
+cosmic-macros = { path="../cosmic-macros", version = "0.3.8" }
+cosmic-space = { path= "../cosmic-space", version = "0.3.8" }
+cosmic-nom = { path="../cosmic-nom", version = "0.3.8" }
+cosmic-hyperlane = { path= "../cosmic-hyperlane", version = "0.3.8" }
+mechtron-host = { path="../../mechtron/mechtron-host" , version = "0.3.8" }
 threadpool = "1.8.1"
 #acid-store = { workspace ="true",  features=['store-directory','repo-value'] }
 
