@@ -12,8 +12,8 @@ description = "Adds TCP server and client to cosmic-hyperlane"
 
 [dependencies]
 async-trait = "0.1.48"
-cosmic-hyperlane= { path= "../cosmic-hyperlane" , version = "0.3.11" }
-cosmic-space = { path= "../cosmic-space", version = "0.3.11" }
+cosmic-hyperlane= { path= "../cosmic-hyperlane" , version = "0.3.12" }
+cosmic-space = { path= "../cosmic-space", version = "0.3.12" }
 tokio-rustls = "0.23"
 tokio = { version = "1.20.1", features = ["full"] }
 rcgen = "0.9.3"
