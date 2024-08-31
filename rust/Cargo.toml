@@ -26,8 +26,7 @@ exclude = [
 ]
 
 [workspace.dependencies]
-acid-store = { git="https://github.com/uberscott/acid-store.git" }
 
-
+acid-store = {git="https://github.com/uberscott/acid-store.git",  features=['store-directory','repo-value']  }
 
 
