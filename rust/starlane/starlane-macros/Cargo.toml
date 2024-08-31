@@ -1,13 +1,18 @@
 [package]
 name = "starlane-macros"
-version = "0.1.0"
-authors = ["Scott Williams <scott@starlane.io>"]
-edition = "2018"
-license = "MIT"
-homepage ="http://starlane.io/"
-readme="README.md"
-repository = "https://github.com/mechtronium/starlane"
+
 description = "Support macros for the Starlane project"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+license.workspace = true
+repository.workspace = true
+
+
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

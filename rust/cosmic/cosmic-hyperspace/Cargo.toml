@@ -1,25 +1,32 @@
 [package]
 name = "cosmic-hyperspace"
-version = "0.3.6"
-edition = "2021"
 
-authors = ["Scott Williams <scott@starlane.io>"]
 description = "The Cosmic Hyperspace is the infrastructure component of The Cosmic Initiative framework that orchestrates and enforces security.  It is responsible for making Space painless to extend by supplying goodies such as provisioning, sharding, load balancing, routing, discovery & of course security."
-homepage = "http://thecosmicinitiative.io"
-repository = "https://github.com/cosmic-initiative/cosmic-initiative"
-license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+license.workspace = true
+repository.workspace = true
+
+
+
 [dependencies]
 async-recursion = "1.0.0"
-cosmic-macros = { path="../cosmic-macros",version = "0.3.6"}
-cosmic-space = { path= "../cosmic-space",version = "0.3.6"}
-cosmic-nom = { path="../cosmic-nom",version = "0.3.6"}
-cosmic-hyperlane = { path= "../cosmic-hyperlane" ,version = "0.3.6"}
-mechtron-host = { path="../../mechtron/mechtron-host" ,version = "0.3.6"}
+cosmic-macros = { path="../cosmic-macros"}
+cosmic-space = { path= "../cosmic-space"}
+cosmic-nom = { path="../cosmic-nom"}
+cosmic-hyperlane = { path= "../cosmic-hyperlane"}
+mechtron-host = { path="../../mechtron/mechtron-host" }
 threadpool = "1.8.1"
-acid-store = { git="https://github.com/uberscott/acid-store.git",  features=['store-directory','repo-value'] }
+#acid-store = { workspace ="true",  features=['store-directory','repo-value'] }
+
+acid-store = { git="https://github.com/uberscott/acid-store.git",  features=['store-directory','repo-value']  }
 
 
 anyhow = "1.0.44"

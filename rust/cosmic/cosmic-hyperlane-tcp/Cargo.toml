@@ -1,13 +1,14 @@
 [package]
 name = "cosmic-hyperlane-tcp"
-version = "0.3.6"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+license.workspace = true
+repository.workspace = true
 
-authors = ["Scott Williams <scott@starlane.io>"]
 description = "Adds TCP server and client to cosmic-hyperlane"
-homepage = "http://thecosmicinitiative.io"
-repository = "https://github.com/cosmic-initiative/cosmic-initiative"
-license = "MIT"
 
 [dependencies]
 async-trait = "0.1.48"

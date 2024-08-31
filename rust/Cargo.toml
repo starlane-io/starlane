@@ -1,3 +1,16 @@
+
+[workspace.package]
+package = "false"
+edition = "2021"
+rust-version = "1.80.1"
+authors = ["Scott Williams"]
+homepage = "https://starlane.io"
+license = "MIT"
+repository = ""
+
+version = "0.3.7"
+
+
 [workspace]
 members = [
   "starlane/*",
@@ -10,4 +23,10 @@ exclude = [
 
 
 ]
+
+[workspace.dependencies]
+acid-store = { git="https://github.com/uberscott/acid-store.git" }
+
+
+
 

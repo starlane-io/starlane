@@ -1,14 +1,13 @@
 [package]
 name = "cosmic-space"
-version = "0.3.6"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+license.workspace = true
+repository.workspace = true
 
-authors = ["Scott Williams <scott@starlane.io>"]
-description = "Part of http://thecosmicinitiative.io This package--the Cosmic Space--provides an API and utilities for interacting with the Cosmic Fabric and other Particles within the Spatial Dimension."
-
-homepage = "http://thecosmicinitiative.io"
-repository = "https://github.com/cosmic-initiative/cosmic-initiative"
-license = "MIT"
 
 [lib]
 doctest = false

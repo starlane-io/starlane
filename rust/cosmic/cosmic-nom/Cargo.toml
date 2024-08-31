@@ -1,13 +1,15 @@
 [package]
 name = "cosmic-nom"
-version = "0.3.6"
-edition = "2021"
-
-authors = ["Scott Williams <scott@starlane.io>"]
 description = "Is a collection of utilities for making using the great [nom](https://crates.io/crates/nom) parser combinator easier to use."
-homepage = "http://thecosmicinitiative.io"
-repository = "https://github.com/cosmic-initiative/cosmic-initiative"
-license = "MIT"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+license.workspace = true
+repository.workspace = true
+
 
 [dependencies]
 nom = "7"
