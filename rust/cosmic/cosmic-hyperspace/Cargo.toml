@@ -1,7 +1,6 @@
 [package]
 name = "cosmic-hyperspace"
 
-description = "The Cosmic Hyperspace is the infrastructure component of The Cosmic Initiative framework that orchestrates and enforces security.  It is responsible for making Space painless to extend by supplying goodies such as provisioning, sharding, load balancing, routing, discovery & of course security."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -26,7 +25,7 @@ mechtron-host = { path="../../mechtron/mechtron-host" }
 threadpool = "1.8.1"
 #acid-store = { workspace ="true",  features=['store-directory','repo-value'] }
 
-acid-store = { git="https://github.com/uberscott/acid-store.git",  features=['store-directory','repo-value']  }
+acid-store = {git="https://github.com/uberscott/acid-store.git",  features=['store-directory','repo-value']  }
 
 
 anyhow = "1.0.44"

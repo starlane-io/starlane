@@ -6,7 +6,8 @@ rust-version = "1.80.1"
 authors = ["Scott Williams"]
 homepage = "https://starlane.io"
 license = "MIT"
-repository = ""
+repository = "https://github.com/cosmic-initiative/cosmic-initiative.git"
+resolver = "2"
 
 version = "0.3.7"
 
