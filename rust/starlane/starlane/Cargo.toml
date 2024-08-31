@@ -19,12 +19,12 @@ repository.workspace = true
 postgres=["dep:cosmic-registry-postgres"]
 
 [dependencies]
-cosmic-space={ path= "../../cosmic/cosmic-space" ,version = "0.3.13" }
-cosmic-hyperspace={ path= "../../cosmic/cosmic-hyperspace" ,version = "0.3.13" }
-cosmic-registry-postgres={ path= "../../cosmic/cosmic-registry-postgres" ,version = "0.3.13", optional=true}
-cosmic-hyperlane={ path="../../cosmic/cosmic-hyperlane",version = "0.3.13" }
-cosmic-hyperlane-tcp={ path="../../cosmic/cosmic-hyperlane-tcp",version = "0.3.13" }
-mechtron-host={ path="../../mechtron/mechtron-host",version = "0.3.13" }
+cosmic-space={ path= "../../cosmic/cosmic-space" ,version = "0.3.14" }
+cosmic-hyperspace={ path= "../../cosmic/cosmic-hyperspace" ,version = "0.3.14" }
+cosmic-registry-postgres={ path= "../../cosmic/cosmic-registry-postgres" ,version = "0.3.14", optional=true}
+cosmic-hyperlane={ path="../../cosmic/cosmic-hyperlane",version = "0.3.14" }
+cosmic-hyperlane-tcp={ path="../../cosmic/cosmic-hyperlane-tcp",version = "0.3.14" }
+mechtron-host={ path="../../mechtron/mechtron-host",version = "0.3.14" }
 lazy_static = "1.4.0"
 uuid = { version="1.1.2", features=["v4"] }
 chrono = { version="0.4.19", features=["serde"] }
@@ -37,7 +37,8 @@ strum = "0.24.1"
 strum_macros = "0.24.1"
 wasmer = "2.3.0"
 wasmer-compiler-singlepass = "2.3.0"
-acid-store = { git="https://github.com/uberscott/acid-store.git" }
+acid-store = {git="https://github.com/uberscott/acid-store.git" , version="0.14.2" }
+
 
 
 zip = "0.6.2"

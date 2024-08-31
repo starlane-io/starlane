@@ -16,10 +16,10 @@ description="various support macros for cosmic"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cosmic-space={ path= "../cosmic-space" , version = "0.3.13" }
+cosmic-space={ path= "../cosmic-space" , version = "0.3.14" }
 #cosmic-hyperspace={ path= "../cosmic-hyperspace" }
-cosmic-hyperspace={ path= "../cosmic-hyperspace" , version = "0.3.13" }
-mechtron-host={ path= "../../mechtron/mechtron-host", version = "0.3.13" }
+cosmic-hyperspace={ path= "../cosmic-hyperspace" , version = "0.3.14" }
+mechtron-host={ path= "../../mechtron/mechtron-host", version = "0.3.14" }
 
 sqlx = { version = "0.5.11", features = [ "runtime-tokio-rustls", "postgres", "macros", "any" ] }
 serde = { version="1.0.69", features=['derive','rc'] }
@@ -34,7 +34,7 @@ strum = "0.24.1"
 zip = "0.6.2"
 wasmer = "2.3.0"
 wasmer-compiler-singlepass = "2.3.0"
-#acid-store = { workspace="true", features=['store-directory','repo-value'] }
+#acid-store = { workspace="true", features=['store-directory','repo-value'], version="0.14.2" }
 bincode = "1.3.3"
 tokio = { version = "1.15.0", features = ["full"] }
 cosmic-hyperlane= { path="../cosmic-hyperlane" }

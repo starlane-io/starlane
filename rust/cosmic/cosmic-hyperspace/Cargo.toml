@@ -17,15 +17,15 @@ description="the invisible infrastructure that makes the space dimension work be
 
 [dependencies]
 async-recursion = "1.0.0"
-cosmic-macros = { path="../cosmic-macros", version = "0.3.13" }
-cosmic-space = { path= "../cosmic-space", version = "0.3.13" }
-cosmic-nom = { path="../cosmic-nom", version = "0.3.13" }
-cosmic-hyperlane = { path= "../cosmic-hyperlane", version = "0.3.13" }
-mechtron-host = { path="../../mechtron/mechtron-host" , version = "0.3.13" }
+cosmic-macros = { path="../cosmic-macros", version = "0.3.14" }
+cosmic-space = { path= "../cosmic-space", version = "0.3.14" }
+cosmic-nom = { path="../cosmic-nom", version = "0.3.14" }
+cosmic-hyperlane = { path= "../cosmic-hyperlane", version = "0.3.14" }
+mechtron-host = { path="../../mechtron/mechtron-host" , version = "0.3.14" }
 threadpool = "1.8.1"
 #acid-store = { workspace ="true",  features=['store-directory','repo-value'] }
 
-acid-store = {git = "https://github.com/uberscott/acid-store.git",  features=['store-directory','repo-value']  }
+acid-store = {git = "https://github.com/uberscott/acid-store.git",  features=['store-directory','repo-value'], version="0.14.2"  }
 
 
 anyhow = "1.0.44"

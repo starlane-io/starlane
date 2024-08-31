@@ -20,7 +20,7 @@ doctest = false
 
 [dependencies]
 
-cosmic-space = { path= "../cosmic-space", default-features=false, version = "0.3.13" }
+cosmic-space = { path= "../cosmic-space", default-features=false, version = "0.3.14" }
 lazy_static = "1.4.0"
 syn = { version = "1.0", features = ["full"] }
 quote = "1.0"
