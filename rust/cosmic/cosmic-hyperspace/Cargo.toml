@@ -17,11 +17,11 @@ description="the invisible infrastructure that makes the space dimension work be
 
 [dependencies]
 async-recursion = "1.0.0"
-cosmic-macros = { path="../cosmic-macros", version = "0.3.12" }
-cosmic-space = { path= "../cosmic-space", version = "0.3.12" }
-cosmic-nom = { path="../cosmic-nom", version = "0.3.12" }
-cosmic-hyperlane = { path= "../cosmic-hyperlane", version = "0.3.12" }
-mechtron-host = { path="../../mechtron/mechtron-host" , version = "0.3.12" }
+cosmic-macros = { path="../cosmic-macros", version = "0.3.13" }
+cosmic-space = { path= "../cosmic-space", version = "0.3.13" }
+cosmic-nom = { path="../cosmic-nom", version = "0.3.13" }
+cosmic-hyperlane = { path= "../cosmic-hyperlane", version = "0.3.13" }
+mechtron-host = { path="../../mechtron/mechtron-host" , version = "0.3.13" }
 threadpool = "1.8.1"
 #acid-store = { workspace ="true",  features=['store-directory','repo-value'] }
 

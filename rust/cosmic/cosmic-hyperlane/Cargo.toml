@@ -15,7 +15,7 @@ description = "An abstraction of the connections that starlane requires between 
 
 
 [dependencies]
-cosmic-space = { path= "../cosmic-space", version = "0.3.12" }
+cosmic-space = { path= "../cosmic-space", version = "0.3.13" }
 async-trait = "0.1.48"
 futures = {version = "0.3.21", default-features = true }
 tokio = { version = "1.15.0", features = ["full"] }
