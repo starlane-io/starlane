@@ -53,5 +53,14 @@ url = { version="2.3.1", features=["serde"] }
 rayon = "1.5.3"
 Inflector = "0.11.4"
 
+
+
+[patch.crates-io]
+socket2 = { git = "https://github.com/wasix-org/socket2.git", branch = "v0.4.9" }
+libc = { git = "https://github.com/wasix-org/libc.git" }
+tokio = { git = "https://github.com/wasix-org/tokio.git", branch = "epoll" }
+
+
+
 [dev-dependencies]
 pretty_assertions = "1"

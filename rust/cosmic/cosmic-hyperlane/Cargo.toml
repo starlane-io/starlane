@@ -25,5 +25,14 @@ lazy_static = "1.4.0"
 strum_macros = "0.24.1"
 uuid = { version="1.1.2", features=["v4"] }
 
+
+
+[patch.crates-io]
+socket2 = { git = "https://github.com/wasix-org/socket2.git", branch = "v0.4.9" }
+libc = { git = "https://github.com/wasix-org/libc.git" }
+tokio = { git = "https://github.com/wasix-org/tokio.git", branch = "epoll" }
+
+
+
 [dev-dependencies]
 chrono = { version="0.4.19", features=["serde"] }

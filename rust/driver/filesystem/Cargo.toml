@@ -10,6 +10,13 @@ tokio = { git = "https://github.com/wasix-org/tokio.git", branch = "epoll", defa
 
 anyhow = { version = "1.0.71" }
 
+cosmic-hyperspace = { path="../../cosmic/cosmic-hyperspace" }
+cosmic-space = { path="../../cosmic/cosmic-space" }
+cosmic-macros = { path="../../cosmic/cosmic-macros" }
+async-trait = "0.1.81"
+lazy_static = "1.5.0"
+
+
 
 
 [patch.crates-io]
