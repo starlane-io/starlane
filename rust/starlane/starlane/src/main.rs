@@ -25,9 +25,12 @@ use crate::err::StarErr;
 use cosmic_hyperlane::{
     AnonHyperAuthenticator, HyperGate, HyperGateSelector, LocalHyperwayGateJumper,
 };
+/*
 use cosmic_hyperspace::driver::artifact::{
     ArtifactDriverFactory, BundleDriverFactory, BundleSeriesDriverFactory, RepoDriverFactory,
 };
+
+ */
 use cosmic_hyperspace::driver::base::BaseDriverFactory;
 use cosmic_hyperspace::driver::control::ControlDriverFactory;
 use cosmic_hyperspace::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
@@ -209,10 +212,13 @@ impl Cosmos for Starlane {
                 builder.add_post(Arc::new(MechtronDriverFactory::new()));
             }
             StarSub::Scribe => {
+                /*
                 builder.add_post(Arc::new(RepoDriverFactory::new()));
                 builder.add_post(Arc::new(BundleSeriesDriverFactory::new()));
                 builder.add_post(Arc::new(BundleDriverFactory::new()));
                 builder.add_post(Arc::new(ArtifactDriverFactory::new()));
+                :w!
+                 */
             }
             StarSub::Jump => {
                 builder.add_post(Arc::new(WebDriverFactory::new()));

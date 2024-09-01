@@ -1,6 +1,8 @@
-use crate::driver::artifact::{
+/*use crate::driver::artifact::{
     ArtifactDriverFactory, BundleDriverFactory, BundleSeriesDriverFactory, RepoDriverFactory,
 };
+
+ */
 use crate::driver::base::BaseDriverFactory;
 use crate::driver::control::ControlDriverFactory;
 use crate::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
@@ -91,10 +93,12 @@ impl Cosmos for MemCosmos {
                 builder.add_post(Arc::new(MechtronDriverFactory::new()));
             }
             StarSub::Scribe => {
-                builder.add_post(Arc::new(RepoDriverFactory::new()));
+/*                builder.add_post(Arc::new(RepoDriverFactory::new()));
                 builder.add_post(Arc::new(BundleSeriesDriverFactory::new()));
                 builder.add_post(Arc::new(BundleDriverFactory::new()));
                 builder.add_post(Arc::new(ArtifactDriverFactory::new()));
+
+ */
             }
             StarSub::Jump => {
                 builder.add_post(Arc::new(WebDriverFactory::new()));
