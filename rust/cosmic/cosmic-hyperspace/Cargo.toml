@@ -25,7 +25,7 @@ mechtron-host = { path="../../mechtron/mechtron-host" , version = "0.3.14" }
 threadpool = "1.8.1"
 #acid-store = { workspace ="true",  features=['store-directory','repo-value'] }
 
-acid-store = {git = "https://github.com/uberscott/acid-store.git",  features=['store-directory','repo-value'], version="0.14.2"  }
+#acid-store = {git = "https://github.com/uberscott/acid-store.git",  features=['store-directory','repo-value'], version="0.14.2"  }
 
 
 anyhow = "1.0.44"

@@ -242,11 +242,6 @@ pub mod convert {
         }
     }
 
-    impl From<acid_store::Error> for Err {
-        fn from(e: acid_store::Error) -> Self {
-            Err::new(e)
-        }
-    }
 
     impl From<zip::result::ZipError> for Err {
         fn from(a: zip::result::ZipError) -> Self {
