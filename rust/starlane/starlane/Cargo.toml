@@ -37,7 +37,7 @@ strum = "0.24.1"
 strum_macros = "0.24.1"
 wasmer = "2.3.0"
 wasmer-compiler-singlepass = "2.3.0"
-acid-store = {git="https://github.com/uberscott/acid-store.git" , version="0.14.2" }
+#acid-store = {git="https://github.com/uberscott/acid-store.git" , version="0.14.2" }
 
 
 

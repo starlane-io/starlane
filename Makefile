@@ -24,6 +24,6 @@ the-docs:
 
 
 install: 
-	cd rust/starlane && cargo install --path .
+	cd rust/starlane/starlane && cargo install --path .
 
 

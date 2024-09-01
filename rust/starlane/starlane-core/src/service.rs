@@ -1,1 +1,0 @@
-type ServiceKind = String;

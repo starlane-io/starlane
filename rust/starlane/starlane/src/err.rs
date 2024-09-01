@@ -95,6 +95,9 @@ pub mod convert {
             }
         }
     }
+
+
+
     impl HyperErr for Err {
         fn to_space_err(&self) -> SpaceErr {
             SpaceErr::server_error(self.to_string())
@@ -188,12 +191,6 @@ pub mod convert {
     impl From<io::Error> for Err {
         fn from(err: io::Error) -> Self {
             Err::new(err)
-        }
-    }
-
-    impl From<acid_store::Error> for Err {
-        fn from(e: acid_store::Error) -> Self {
-            Err::new(e)
         }
     }
 

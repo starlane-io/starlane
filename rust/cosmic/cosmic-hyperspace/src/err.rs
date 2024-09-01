@@ -43,7 +43,6 @@ pub trait HyperErr:
     + From<std::io::Error>
     + From<zip::result::ZipError>
     + From<Box<bincode::ErrorKind>>
-    + From<acid_store::Error>
     + From<strum::ParseError>
     + From<url::ParseError>
     + From<FromAsciiError<std::string::String>>

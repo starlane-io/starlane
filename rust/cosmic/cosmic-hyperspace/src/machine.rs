@@ -549,18 +549,7 @@ impl MachineTemplate {
         rtn
     }
 
-    pub fn with_machine_star(&self, machine: MachineName) -> Vec<StarTemplate> {
-        let mut stars = self.stars.clone();
-        let mut machine = StarTemplate::new(StarKey::machine(machine), StarSub::Machine);
-        for star in stars.iter_mut() {
-            star.connect(machine.to_stub());
-            machine.receive(star.to_stub());
-        }
 
-        stars.push(machine);
-
-        stars
-    }
 }
 
 impl Default for MachineTemplate {
