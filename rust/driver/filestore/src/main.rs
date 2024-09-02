@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use strum_macros::EnumString;
-use std::{env, path::PathBuf};
+use std::{env, fs, path::PathBuf};
 use std::io;
 
 use std::fs::File;
@@ -17,17 +17,13 @@ struct Cli {
 #[derive(Debug, Subcommand, EnumString, strum_macros::Display)]
 enum Commands {
     Write {path: PathBuf},
-    Read {path: PathBuf}
+    Read {path: PathBuf},
+    Mkdir{ path: PathBuf },
+    Delete { path: PathBuf }
 }
 
 fn main() -> Result<(),()> {
     let cli = Cli::parse();
-    let path = match cli.command  {
-        Commands::Write{ref path} => path.clone(),
-        Commands::Read{ref path} => path.clone()
-    };
-
-    println!("{} path -> {}", cli.command.to_string(), path.as_path().to_str().unwrap());
 
 
     match cli.command {
@@ -48,6 +44,12 @@ fn main() -> Result<(),()> {
                 }
                 io::stdout().write( & buf ).unwrap();
             }
+        }
+        Commands::Mkdir { path } => {
+            fs::create_dir(path).unwrap();
+        }
+        Commands::Delete { path } => {
+            fs::remove_file(path).unwrap();
         }
     }
 
