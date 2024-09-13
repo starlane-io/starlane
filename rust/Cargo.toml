@@ -18,7 +18,7 @@ resolver = "2"
 members = [
   "starlane/*",
   "cosmic/*",
-  "mechtron/*", "driver/driver-host", "driver/driver", "driver/hello" 
+  "mechtron/*",  "driver/driver", "driver/hello" 
   ]
 
 exclude = [
