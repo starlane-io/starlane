@@ -3,8 +3,8 @@ use std::ops::Deref;
 use serde::{Deserialize, Serialize};
 
 use crate::config::mechtron::MechtronConfig;
-use crate::point::Point;
 use crate::particle::{Details, Stub};
+use crate::point::Point;
 use crate::BindConfig;
 
 pub mod bind;

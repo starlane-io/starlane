@@ -19,6 +19,7 @@ use cosmic_space::parse::error::result;
 use cosmic_space::parse::route_attribute;
 use cosmic_space::parse::{bind_config, command_line};
 use cosmic_space::particle::{Details, PointKind, Status};
+use cosmic_space::point::Point;
 use cosmic_space::substance::Substance;
 use cosmic_space::util::{log, ToResolved};
 use cosmic_space::wave::core::cmd::CmdMethod;
@@ -35,7 +36,6 @@ use cosmic_space::wave::exchange::SetStrategy;
 use cosmic_space::wave::RecipientSelector;
 use cosmic_space::wave::{Agent, DirectedProto, Handling, Pong, Scope, Wave};
 use cosmic_space::HYPERUSER;
-use cosmic_space::point::Point;
 
 use crate::driver::{
     Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere,

@@ -10,12 +10,12 @@ use std::time::Duration;
 
 use dashmap::mapref::one::{Ref, RefMut};
 use dashmap::DashMap;
-use futures::future::{BoxFuture, join_all};
+use futures::future::{join_all, BoxFuture};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{broadcast, mpsc, Mutex, oneshot, RwLock, watch};
+use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 use tokio::time::error::Elapsed;
 use tracing::{error, info};
 
@@ -37,15 +37,16 @@ use cosmic_space::hyper::{
 use cosmic_space::hyper::{MountKind, ParticleLocation};
 use cosmic_space::kind::{BaseKind, Kind, StarStub, StarSub, Sub};
 use cosmic_space::loc::{
-    GLOBAL_EXEC, Layer, LOCAL_STAR, StarKey, Surface, SurfaceSelector, ToBaseKind,
-    Topic, ToPoint, ToSurface, Uuid,
+    Layer, StarKey, Surface, SurfaceSelector, ToBaseKind, ToPoint, ToSurface, Topic, Uuid,
+    GLOBAL_EXEC, LOCAL_STAR,
 };
 use cosmic_space::log::{PointLogger, RootLogger, Trackable, Tracker};
-use cosmic_space::parse::{bind_config, Env, route_attribute};
+use cosmic_space::parse::{bind_config, route_attribute, Env};
 use cosmic_space::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
 use cosmic_space::particle::{Details, Status, Stub};
+use cosmic_space::point::{Point, RouteSeg};
 use cosmic_space::settings::Timeouts;
 use cosmic_space::substance::Bin;
 use cosmic_space::substance::{Substance, ToSubstance};
@@ -60,19 +61,18 @@ use cosmic_space::wave::exchange::asynch::{
 use cosmic_space::wave::exchange::SetStrategy;
 use cosmic_space::wave::{
     Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
-    HandlingKind, Ping, Pong, Priority, Recipients, RecipientSelector, Reflectable, ReflectedWave,
+    HandlingKind, Ping, Pong, Priority, RecipientSelector, Recipients, Reflectable, ReflectedWave,
     Reflection, Retries, Ripple, Scope, Signal, SingularRipple, ToRecipients, WaitTime, Wave,
     WaveKind,
 };
 use cosmic_space::wave::{HyperWave, UltraWave};
 use cosmic_space::HYPERUSER;
-use cosmic_space::point::{Point, RouteSeg};
 use mechtron_host::err::HostErr;
 
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, Drivers,
-    DriversApi, DriversCall, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler,
+    Driver, DriverAvail, DriverCtx, DriverDriver, DriverDriverFactory, DriverFactory, DriverSkel,
+    DriverStatus, Drivers, DriversApi, DriversCall, HyperDriverFactory, Item, ItemHandler,
     ItemSkel, ItemSphere,
 };
 use crate::err::HyperErr;

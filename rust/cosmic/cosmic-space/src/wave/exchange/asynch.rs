@@ -1,6 +1,7 @@
 use crate::loc::{ToPoint, ToSurface};
 use crate::log::{PointLogger, RootLogger, Trackable, Tracker};
 use crate::particle::traversal::Traversal;
+use crate::point::Point;
 use crate::settings::Timeouts;
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::http2::StatusCode;
@@ -21,7 +22,6 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
-use crate::point::Point;
 
 #[async_trait]
 impl Router for TxRouter {

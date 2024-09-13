@@ -93,12 +93,12 @@ impl Cosmos for MemCosmos {
                 builder.add_post(Arc::new(MechtronDriverFactory::new()));
             }
             StarSub::Scribe => {
-/*                builder.add_post(Arc::new(RepoDriverFactory::new()));
-                builder.add_post(Arc::new(BundleSeriesDriverFactory::new()));
-                builder.add_post(Arc::new(BundleDriverFactory::new()));
-                builder.add_post(Arc::new(ArtifactDriverFactory::new()));
+                /*                builder.add_post(Arc::new(RepoDriverFactory::new()));
+                               builder.add_post(Arc::new(BundleSeriesDriverFactory::new()));
+                               builder.add_post(Arc::new(BundleDriverFactory::new()));
+                               builder.add_post(Arc::new(ArtifactDriverFactory::new()));
 
- */
+                */
             }
             StarSub::Jump => {
                 builder.add_post(Arc::new(WebDriverFactory::new()));

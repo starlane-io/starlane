@@ -8,6 +8,12 @@ edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 homepage.workspace = true
-description.workspace = true
 
 [dependencies]
+wasmer = "4.3.7"
+wasmer-wasix = {  version="0.27.0", features=["sys-thread"]  }
+
+tokio = { version="1.40.0", features=["full"] }
+anyhow = "1.0.86"
+virtual-fs = "0.16.0"
+async-trait = "0.1.81"

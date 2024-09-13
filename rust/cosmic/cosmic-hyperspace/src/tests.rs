@@ -520,21 +520,22 @@ fn test_mechtron() -> Result<(), CosmicErr> {
     })
 }
 
-
-pub async fn verify<S>( name: &str, ser: &S) where S: Serialize {
+pub async fn verify<S>(name: &str, ser: &S)
+where
+    S: Serialize,
+{
     let bin = bincode::serialize(&ser).unwrap();
     fs::create_dir(Path::new("e2e"));
-    let file = format!("e2e/{}", name );
+    let file = format!("e2e/{}", name);
     let path = Path::new(file.as_str());
     if path.exists() == true {
         if fs::read(path).unwrap() != bin {
             assert!(false)
         }
     } else {
-        fs::write( path, bin ).unwrap();
+        fs::write(path, bin).unwrap();
     }
 }
-
 
 #[test]
 fn test_create_err() -> Result<(), CosmicErr> {
@@ -545,10 +546,9 @@ fn test_create_err() -> Result<(), CosmicErr> {
         async fn run(&self, client: ControlClient) -> Result<(), CosmicErr> {
             let cli = client.new_cli_session().await?;
             if let Err(err) = cli.exec("create repo<BadKind>").await?.ok_or() {
-
-                verify( "create_err", &err).await;
+                verify("create_err", &err).await;
                 println!("FINAL: ");
-                   err.print();
+                err.print();
                 Ok(())
             } else {
                 Err("expected err".into())

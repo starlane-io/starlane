@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
-use futures::future::{BoxFuture, join_all, select_all};
+use futures::future::{join_all, select_all, BoxFuture};
 use futures::FutureExt;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::error::RecvError;
@@ -549,21 +549,19 @@ impl MachineTemplate {
         rtn
     }
 
-        pub fn with_machine_star(&self, machine: MachineName) -> Vec<StarTemplate> {
-            let mut stars = self.stars.clone();
-            let mut machine = StarTemplate::new(StarKey::machine(machine), StarSub::Machine);
-            for star in stars.iter_mut() {
-                star.connect(machine.to_stub());
-                machine.receive(star.to_stub());
-            }
-
-            stars.push(machine);
-
-            stars
+    pub fn with_machine_star(&self, machine: MachineName) -> Vec<StarTemplate> {
+        let mut stars = self.stars.clone();
+        let mut machine = StarTemplate::new(StarKey::machine(machine), StarSub::Machine);
+        for star in stars.iter_mut() {
+            star.connect(machine.to_stub());
+            machine.receive(star.to_stub());
         }
+
+        stars.push(machine);
+
+        stars
     }
-
-
+}
 
 impl Default for MachineTemplate {
     fn default() -> Self {

@@ -16,21 +16,24 @@ use crate::kind::KindParts;
 use crate::log::{SpanLogger, Trackable};
 use crate::parse::error::result;
 use crate::parse::{
-    CamelCase, consume_point, consume_point_ctx, Domain, Env,
-    kind_parts, parse_star_key, point_and_kind, point_route_segment, point_selector, point_var, ResolverErr,
+    consume_point, consume_point_ctx, kind_parts, parse_star_key, point_and_kind,
+    point_route_segment, point_selector, point_var, CamelCase, Domain, Env, ResolverErr,
     SkewerCase,
 };
 use crate::particle::traversal::TraversalPlan;
+use crate::point::{
+    Point, PointDef, PointSeg, PointSegCtx, PointSegKind, PointSegPairDef, PointSegVar, RouteSeg,
+    RouteSegVar,
+};
 use crate::selector::{Pattern, Selector, SpecificSelector, VersionReq};
-use crate::util::{ToResolved, uuid, ValueMatcher, ValuePattern};
+use crate::util::{uuid, ToResolved, ValueMatcher, ValuePattern};
 use crate::wave::exchange::asynch::Exchanger;
 use crate::wave::{
     DirectedWave, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave, ToRecipients,
     UltraWave, Wave,
 };
 use crate::Agent::Anonymous;
-use crate::{Agent, ANONYMOUS, BaseKind, HYPERUSER, Kind, KindTemplate, ParticleRecord, SpaceErr};
-use crate::point::{Point, PointDef, PointSeg, PointSegCtx, PointSegKind, PointSegPairDef, PointSegVar, RouteSeg, RouteSegVar};
+use crate::{Agent, BaseKind, Kind, KindTemplate, ParticleRecord, SpaceErr, ANONYMOUS, HYPERUSER};
 
 lazy_static! {
     pub static ref CENTRAL: Point = StarKey::central().to_point();

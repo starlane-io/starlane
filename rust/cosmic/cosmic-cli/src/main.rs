@@ -12,7 +12,7 @@ use clap::{App, Arg, Args, Command as ClapCommand, Parser, Subcommand};
 use cosmic_hyperlane::test_util::SingleInterchangePlatform;
 use cosmic_hyperlane::HyperwayEndpointFactory;
 use cosmic_hyperlane_tcp::HyperlaneTcpClient;
-use cosmic_hyperspace::driver::control::{ControlClient, ControlCliSession};
+use cosmic_hyperspace::driver::control::{ControlCliSession, ControlClient};
 use cosmic_nom::new_span;
 use cosmic_space::command::{CmdTransfer, Command, RawCommand};
 use cosmic_space::err::SpaceErr;
@@ -21,6 +21,7 @@ use cosmic_space::loc::ToSurface;
 use cosmic_space::log::RootLogger;
 use cosmic_space::parse::error::result;
 use cosmic_space::parse::{command_line, upload_blocks};
+use cosmic_space::point::Point;
 use cosmic_space::substance::Substance;
 use cosmic_space::util::{log, ToResolved};
 use cosmic_space::wave::core::ReflectedCore;
@@ -34,7 +35,6 @@ use std::{
 };
 use walkdir::{DirEntry, WalkDir};
 use zip::{result::ZipError, write::FileOptions};
-use cosmic_space::point::Point;
 
 #[tokio::main]
 async fn main() -> Result<(), SpaceErr> {
@@ -117,7 +117,6 @@ impl Session {
         let blocks = result(upload_blocks(new_span(command)))?;
         let mut command = RawCommand::new(command.to_string());
         for block in blocks {
-            
             let path = block.name.clone();
             let metadata = std::fs::metadata(&path)?;
 

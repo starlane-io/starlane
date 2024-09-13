@@ -26,6 +26,7 @@ use cosmic_space::wave::core::hyp::HypMethod;
 use cosmic_space::wave::{Agent, DirectedProto};
 use cosmic_space::{loc, VERSION};
 
+use cosmic_space::point::Point;
 use cosmic_space::wave::core::cmd::CmdMethod;
 use cosmic_space::wave::core::Method;
 use cosmic_space::wave::exchange::asynch::ProtoTransmitter;
@@ -38,8 +39,7 @@ use std::{sync, thread};
 use threadpool::ThreadPool;
 use tokio::runtime::Handle;
 use tokio::sync::mpsc;
-use wasmer::{Array, imports, Instance, Module, Store, Value, WasmerEnv, WasmPtr};
-use cosmic_space::point::Point;
+use wasmer::{imports, Array, Instance, Module, Store, Value, WasmPtr, WasmerEnv};
 
 #[derive(Clone)]
 pub struct HostsApi {
@@ -834,8 +834,8 @@ impl WasmHost {
 pub mod test {
     use crate::HostsRunner;
     use cosmic_space::artifact::asynch::MapFetcher;
-    use cosmic_space::point::Point;
     use cosmic_space::particle::Details;
+    use cosmic_space::point::Point;
     use std::fs;
     use std::str::FromStr;
     use std::sync::Arc;

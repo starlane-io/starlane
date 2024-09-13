@@ -1,6 +1,6 @@
-use crate::point::Point;
 use crate::parse::mechtron_config;
 use crate::parse::model::MechtronScope;
+use crate::point::Point;
 use crate::{Bin, SpaceErr};
 use core::str::FromStr;
 use serde::de::Unexpected::Option;

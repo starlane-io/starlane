@@ -1,16 +1,23 @@
 use core::str::FromStr;
 use cosmic_nom::{new_span, Trace};
 use nom::combinator::all_consuming;
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::err::{ParseErrs, SpaceErr};
-use crate::{ANONYMOUS, HYPERUSER};
-use crate::loc::{CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE, LOCAL_PORTAL, PointSegment, PointSegQuery, REMOTE_ENDPOINT, RouteSegQuery, Surface, ToPoint, ToSurface, Variable, Version};
-use crate::parse::{consume_point, consume_point_ctx, Env, point_route_segment, point_selector, point_var, ResolverErr};
+use crate::loc::{
+    PointSegQuery, PointSegment, RouteSegQuery, Surface, ToPoint, ToSurface, Variable, Version,
+    CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE,
+    LOCAL_PORTAL, REMOTE_ENDPOINT,
+};
 use crate::parse::error::result;
+use crate::parse::{
+    consume_point, consume_point_ctx, point_route_segment, point_selector, point_var, Env,
+    ResolverErr,
+};
 use crate::selector::Selector;
 use crate::util::ToResolved;
 use crate::wave::{Agent, Recipients, ToRecipients};
+use crate::{ANONYMOUS, HYPERUSER};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum RouteSeg {

@@ -21,6 +21,7 @@ use cosmic_space::loc::{Layer, ToSurface};
 use cosmic_space::parse::{bind_config, CamelCase};
 use cosmic_space::particle::traversal::{Traversal, TraversalDirection};
 use cosmic_space::particle::Status;
+use cosmic_space::point::Point;
 use cosmic_space::selector::{KindSelector, Pattern, SubKindSelector};
 use cosmic_space::substance::{Bin, Substance};
 use cosmic_space::util::{log, ValuePattern};
@@ -41,7 +42,6 @@ use std::thread;
 use tiny_http::Server;
 use tokio::runtime::Runtime;
 use url::Url;
-use cosmic_space::point::Point;
 
 lazy_static! {
     static ref WEB_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(

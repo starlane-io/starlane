@@ -302,8 +302,6 @@ pub type KindSubTypes = SubTypeDef<Kind, Option<CamelCase>>;
 pub type KindFull = KindDef<KindSubTypes, Option<VariantFull>>;
 pub type ProtoKind = KindDef<CamelCaseSubTypes, Option<ProtoVariant>>;
 
-
-
 pub type ParentMatcherDef<Matcher, Child, SubTypeMatcher> =
     ParentChildDef<SubTypeDef<Matcher, SubTypeMatcher>, Child>;
 
@@ -421,7 +419,11 @@ pub type KindFullSelector =
 
 pub mod parse {
 
-    use crate::kind2::{CamelCaseSubTypes, CamelCaseSubTypesSelector, KindDef, OptPattern, ParentChildDef, Pattern, ProtoKind, ProtoVariant, Specific, SpecificDef, SpecificFullSelector, SpecificSelector, SpecificSubTypes, SpecificSubTypesSelector, SubTypeDef, VariantDef};
+    use crate::kind2::{
+        CamelCaseSubTypes, CamelCaseSubTypesSelector, KindDef, OptPattern, ParentChildDef, Pattern,
+        ProtoKind, ProtoVariant, Specific, SpecificDef, SpecificFullSelector, SpecificSelector,
+        SpecificSubTypes, SpecificSubTypesSelector, SubTypeDef, VariantDef,
+    };
     use crate::parse::{camel_case, domain, skewer_case, version, version_req, CamelCase, Domain};
     use cosmic_nom::{Res, Span};
     use nom::branch::alt;
@@ -616,7 +618,6 @@ pub mod parse {
         move |input: I| parent_child_def(fn_kind, fn_variant)(input)
     }
 
-
     pub fn camel_case_sub_types<I>(input: I) -> Res<I, CamelCaseSubTypes>
     where
         I: Span,
@@ -653,13 +654,16 @@ pub mod parse {
     where
         I: Span,
     {
-        kind_def(camel_case_sub_types,  |i| opt(child(proto_variant))(i) )(input)
+        kind_def(camel_case_sub_types, |i| opt(child(proto_variant))(i))(input)
     }
-
 
     #[cfg(test)]
     pub mod test {
-        use crate::kind2::parse::{camel_case_sub_types, camel_case_sub_types_selector, opt_pattern, pattern, preceded_opt_pattern, proto_kind, proto_variant, specific, specific_full_selector, specific_selector, specific_sub_types};
+        use crate::kind2::parse::{
+            camel_case_sub_types, camel_case_sub_types_selector, opt_pattern, pattern,
+            preceded_opt_pattern, proto_kind, proto_variant, specific, specific_full_selector,
+            specific_selector, specific_sub_types,
+        };
         use crate::kind2::{IsMatch, OptPattern, Pattern};
 
         use crate::parse::error::result;
@@ -796,9 +800,8 @@ pub mod parse {
             assert!(variant.parent.sub.is_some());
         }
 
-
-      #[test]
-      pub fn test_proto_kind() {
+        #[test]
+        pub fn test_proto_kind() {
             let kind = log(result(proto_kind(new_span("Root")))).unwrap();
 
             let kind = log(result(proto_kind(new_span("Db:Sub")))).unwrap();
@@ -806,10 +809,7 @@ pub mod parse {
 
             let kind = log(result(proto_kind(new_span("Db<Variant>")))).unwrap();
             assert!(kind.child.is_some());
-
-      }
-
-
+        }
 
         #[test]
         pub fn test_camel_case_subtypes_err() {

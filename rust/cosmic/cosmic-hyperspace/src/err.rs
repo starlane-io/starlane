@@ -242,7 +242,6 @@ pub mod convert {
         }
     }
 
-
     impl From<zip::result::ZipError> for Err {
         fn from(a: zip::result::ZipError) -> Self {
             Err::new(a)

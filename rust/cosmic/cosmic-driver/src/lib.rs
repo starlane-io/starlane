@@ -1,11 +1,11 @@
 use async_trait::async_trait;
-use lazy_static::lazy_static;
 use cosmic_space::artifact::ArtRef;
 use cosmic_space::config::bind::BindConfig;
 use cosmic_space::kind::Kind;
 use cosmic_space::loc::Layer;
 use cosmic_space::parse::bind_config;
 use cosmic_space::util::log;
+use lazy_static::lazy_static;
 
 lazy_static! {
     static ref DEFAULT_BIND: ArtRef<BindConfig> = ArtRef::new(
@@ -18,7 +18,6 @@ lazy_static! {
     );
 }
 
-
 fn driver_bind() -> BindConfig {
     log(bind_config(
         r#" Bind(version=1.0.0) {
@@ -27,17 +26,17 @@ fn driver_bind() -> BindConfig {
 
     } "#,
     ))
-        .unwrap()
+    .unwrap()
 }
 
 fn default_bind() -> BindConfig {
     log(bind_config(r#" Bind(version=1.0.0) { } "#)).unwrap()
 }
 
-
 #[async_trait]
 pub trait Driver<P>: Send + Sync
-where P: Cosmos,
+where
+    P: Cosmos,
 {
     fn kind(&self) -> Kind;
 
@@ -69,9 +68,6 @@ where P: Cosmos,
     /// This is sorta a hack, it only works for DriverDriver
     async fn add_driver(&self, _driver: DriverApi<P>) {}
 }
-
-
-
 
 #[derive(Clone, Eq, PartialEq)]
 pub enum DriverAvail {

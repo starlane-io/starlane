@@ -57,8 +57,8 @@ use cosmic_space::err::SpaceErr;
 use cosmic_space::kind::{
     ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind,
 };
-use cosmic_space::loc::{MachineName, StarKey};
 use cosmic_space::loc::ToBaseKind;
+use cosmic_space::loc::{MachineName, StarKey};
 use cosmic_space::log::RootLogger;
 use cosmic_space::particle::property::{
     AnythingPattern, BoolPattern, EmailPattern, PointPattern, PropertiesConfig,

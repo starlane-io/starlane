@@ -42,7 +42,7 @@ use regex::{Captures, Error, Match, Regex};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use cosmic_nom::{new_span, span_with_extra, Trace};
-use cosmic_nom::{Res, Span, trim, tw, Wrap};
+use cosmic_nom::{trim, tw, Res, Span, Wrap};
 
 use crate::command::common::{PropertyMod, SetProperties, StateSrc, StateSrcVar};
 use crate::command::direct::create::{
@@ -67,10 +67,7 @@ use crate::kind::{
     StarSub, UserBaseSubKind,
 };
 use crate::loc::StarKey;
-use crate::loc::{
-    Layer, PointSegment,
-    Surface, Topic, Uuid, Variable, VarVal, Version,
-};
+use crate::loc::{Layer, PointSegment, Surface, Topic, Uuid, VarVal, Variable, Version};
 use crate::parse::error::{find_parse_err, result};
 use crate::parse::model::{
     BindScope, BindScopeKind, Block, BlockKind, Chunk, DelimitedBlockKind, LexBlock,
@@ -81,7 +78,10 @@ use crate::parse::model::{
     TerminatedBlockKind, TextType, Var, VarParser,
 };
 use crate::particle::{PointKind, PointKindVar};
-use crate::point::{Point, PointCtx, PointSeg, PointSegCtx, PointSegDelim, PointSegVar, PointVar, RouteSeg, RouteSegVar};
+use crate::point::{
+    Point, PointCtx, PointSeg, PointSegCtx, PointSegDelim, PointSegVar, PointVar, RouteSeg,
+    RouteSegVar,
+};
 use crate::security::{
     AccessGrantKind, AccessGrantKindDef, ChildPerms, ParticlePerms, Permissions, PermissionsMask,
     PermissionsMaskKind, Privilege,
@@ -3534,10 +3534,10 @@ pub mod model {
     use crate::loc::Version;
     use crate::parse::error::result;
     use crate::parse::{
-        Assignment, camel_case_chars, CtxResolver, Env, filepath_chars, http_method,
-        lex_child_scopes, method_kind, pipeline, rc_command_type,
-        ResolverErr, SubstParser, value_pattern, wrapped_cmd_method, wrapped_ext_method, wrapped_http_method,
-        wrapped_sys_method,
+        camel_case_chars, filepath_chars, http_method, lex_child_scopes, method_kind, pipeline,
+        rc_command_type, value_pattern, wrapped_cmd_method, wrapped_ext_method,
+        wrapped_http_method, wrapped_sys_method, Assignment, CtxResolver, Env, ResolverErr,
+        SubstParser,
     };
     use crate::point::{Point, PointCtx, PointVar};
     use crate::util::{HttpMethodPattern, StringMatcher, ToResolved, ValueMatcher, ValuePattern};
@@ -4831,12 +4831,12 @@ pub mod error {
     use nom::multi::{many0, many1, separated_list0};
     use nom::sequence::{delimited, pair, preceded, terminated, tuple};
     use nom::{
-        AsChar, Compare, Err, InputLength, InputTake, InputTakeAtPosition, IResult, Parser, Slice,
+        AsChar, Compare, Err, IResult, InputLength, InputTake, InputTakeAtPosition, Parser, Slice,
     };
     use nom_supreme::error::{BaseErrorKind, ErrorTree, StackContext};
     use regex::{Error, Regex};
 
-    use cosmic_nom::{len, new_span, Res, Span, span_with_extra, trim, tw};
+    use cosmic_nom::{len, new_span, span_with_extra, trim, tw, Res, Span};
 
     use crate::command::direct::CmdKind;
     use crate::command::CommandVar;
@@ -4851,13 +4851,14 @@ pub mod error {
     };
     use crate::parse::{
         any_block, any_soround_lex_block, camel_case, camel_case_chars,
-        camel_case_to_string_matcher, CamelCase, domain, file_chars, filepath_chars, get,
-        lex_child_scopes, lex_root_scope, lex_route_selector, lex_scopes, lowercase_alphanumeric,
-        method_kind, nospace1, parse_uuid, point_segment_chars, point_var, rec_version, select, set,
-        skewer, skewer_case, skewer_chars, subst_path, SubstParser, unwrap_block,
-        variable_name, version_chars, version_req_chars,
+        camel_case_to_string_matcher, domain, file_chars, filepath_chars, get, lex_child_scopes,
+        lex_root_scope, lex_route_selector, lex_scopes, lowercase_alphanumeric, method_kind,
+        nospace1, parse_uuid, point_segment_chars, point_var, rec_version, select, set, skewer,
+        skewer_case, skewer_chars, subst_path, unwrap_block, variable_name, version_chars,
+        version_req_chars, CamelCase, SubstParser,
     };
     use crate::particle::PointKindVar;
+    use crate::point::{PointSeg, PointVar};
     use crate::selector::{
         ExactPointSeg, Hop, KindBaseSelector, KindSelector, LabeledPrimitiveTypeDef,
         MapEntryPattern, MapEntryPatternVar, Pattern, PatternBlockVar, PayloadBlockVar,
@@ -4879,7 +4880,6 @@ pub mod error {
         ArtifactSubKind, BaseKind, BindConfig, Document, FileSubKind, Kind, Selector, Specific,
         StarSub, Strategy, Surface,
     };
-    use crate::point::{PointSeg, PointVar};
 
     pub fn result<I: Span, R>(result: Result<(I, R), Err<ErrorTree<I>>>) -> Result<R, SpaceErr> {
         match result {
@@ -6734,15 +6734,24 @@ pub fn doc(src: &str) -> Result<Document, SpaceErr> {
     }
 }
 
-fn parse_mechtron_config<I: Span>(input: I) -> Res<I,Vec<MechtronScope>> {
-    let (next, (_,( _, (_,assignments)))) = pair( multispace0, context("wasm",tuple((
-        tag("Wasm"),
-        alt((tuple((
+fn parse_mechtron_config<I: Span>(input: I) -> Res<I, Vec<MechtronScope>> {
+    let (next, (_, (_, (_, assignments)))) = pair(
         multispace0,
-            unwrap_block(BlockKind::Nested(NestedBlockKind::Curly),many0(assignment)))
-        ),fail))),
-    )))(input)?;
-    Ok((next,vec![MechtronScope::WasmScope(assignments)]))
+        context(
+            "wasm",
+            tuple((
+                tag("Wasm"),
+                alt((
+                    tuple((
+                        multispace0,
+                        unwrap_block(BlockKind::Nested(NestedBlockKind::Curly), many0(assignment)),
+                    )),
+                    fail,
+                )),
+            )),
+        ),
+    )(input)?;
+    Ok((next, vec![MechtronScope::WasmScope(assignments)]))
 }
 
 fn assignment<I>(input: I) -> Res<I, Assignment>
@@ -6751,15 +6760,15 @@ where
 {
     tuple((
         multispace0,
-        context("assignment:plus", alt( (tag("+"),fail))),
-        context("assignment:key", alt( (skewer,fail))),
+        context("assignment:plus", alt((tag("+"), fail))),
+        context("assignment:key", alt((skewer, fail))),
         multispace0,
-        context( "assignment:equals", alt((tag("="),fail))),
+        context("assignment:equals", alt((tag("="), fail))),
         multispace0,
-        context( "assignment:value", alt((nospace1_nosemi,fail))),
+        context("assignment:value", alt((nospace1_nosemi, fail))),
         multispace0,
         opt(tag(";")),
-        multispace0
+        multispace0,
     ))(input)
     .map(|(next, (_, _, k, _, _, _, v, _, _, _))| {
         (
@@ -6902,11 +6911,9 @@ pub fn nospace1<I: Span>(input: I) -> Res<I, I> {
 pub fn nospace1_nosemi<I: Span>(input: I) -> Res<I, I> {
     recognize(pair(
         satisfy(|c| !c.is_whitespace() && ';' != c),
-        many0(satisfy(|c| !c.is_whitespace( ) && ';' != c)),
+        many0(satisfy(|c| !c.is_whitespace() && ';' != c)),
     ))(input)
 }
-
-
 
 pub fn no_space_with_blocks<I: Span>(input: I) -> Res<I, I> {
     recognize(many1(alt((recognize(any_block), nospace1))))(input)
@@ -7293,7 +7300,7 @@ pub mod test {
     use nom_locate::LocatedSpan;
     use nom_supreme::error::ErrorTree;
 
-    use cosmic_nom::{new_span, Res, span_with_extra};
+    use cosmic_nom::{new_span, span_with_extra, Res};
 
     use crate::command::direct::create::{
         PointSegTemplate, PointTemplate, PointTemplateCtx, Template,
@@ -7305,7 +7312,20 @@ pub mod test {
     use crate::parse::model::{
         BlockKind, DelimitedBlockKind, LexScope, NestedBlockKind, TerminatedBlockKind,
     };
-    use crate::parse::{args, assignment, base_point_segment, base_seg, command_line, comment, consume_point_var, create, create_command, doc, Env, expected_block_terminator_or_non_terminator, lex_block, lex_child_scopes, lex_nested_block, lex_scope, lex_scope_pipeline_step_and_block, lex_scope_selector, lex_scopes, lowercase1, MapResolver, mesh_eos, mesh_seg, nested_block, nested_block_content, next_stacked_name, no_comment, parse_bind_config, parse_include_blocks, parse_inner_block, parse_mechtron_config, path_regex, pipeline, pipeline_segment, pipeline_step_var, pipeline_stop_var, point_non_root_var, point_template, point_var, pop, rec_version, root_ctx_seg, root_scope, root_scope_selector, route_attribute, route_selector, scope_filter, scope_filters, skewer_case_chars, skewer_dot, space_chars, space_no_dupe_dots, space_point_segment, strip_comments, subst, SubstParser, template, var_seg, variable_name, VarResolver, version, version_point_segment, wrapper};
+    use crate::parse::{
+        args, assignment, base_point_segment, base_seg, command_line, comment, consume_point_var,
+        create, create_command, doc, expected_block_terminator_or_non_terminator, lex_block,
+        lex_child_scopes, lex_nested_block, lex_scope, lex_scope_pipeline_step_and_block,
+        lex_scope_selector, lex_scopes, lowercase1, mesh_eos, mesh_seg, nested_block,
+        nested_block_content, next_stacked_name, no_comment, parse_bind_config,
+        parse_include_blocks, parse_inner_block, parse_mechtron_config, path_regex, pipeline,
+        pipeline_segment, pipeline_step_var, pipeline_stop_var, point_non_root_var, point_template,
+        point_var, pop, rec_version, root_ctx_seg, root_scope, root_scope_selector,
+        route_attribute, route_selector, scope_filter, scope_filters, skewer_case_chars,
+        skewer_dot, space_chars, space_no_dupe_dots, space_point_segment, strip_comments, subst,
+        template, var_seg, variable_name, version, version_point_segment, wrapper, Env,
+        MapResolver, SubstParser, VarResolver,
+    };
     use crate::point::{Point, PointCtx, PointSegVar, RouteSegVar};
     use crate::substance::Substance;
     use crate::util;
@@ -7327,9 +7347,7 @@ pub mod test {
         assert!(log(result(assignment(new_span(config)))).is_err());
         let config = "   +nothing  = ";
         assert!(log(result(assignment(new_span(config)))).is_err());
-
     }
-
 
     #[test]
     pub fn test_mechtron_config() {
@@ -7352,9 +7370,7 @@ Mechtron(version=1.0.0) {
         }
     }
 
-
-
-        #[test]
+    #[test]
     pub fn test_bad_mechtron_config() {
         let config = r#"
 
@@ -7369,10 +7385,7 @@ Mechtron(version=1.0.0) {
          "#;
 
         let doc = log(doc(config)).is_err();
-
-
     }
-
 
     #[test]
     pub fn test_message_selector() {
@@ -7392,7 +7405,7 @@ Mechtron(version=1.0.0) {
         Ok(())
     }
 
-//    #[test]
+    //    #[test]
     pub fn test_command_line_err() -> Result<(), SpaceErr> {
         let command = util::log(result(command_line(new_span("create localhost<bad>"))))?;
         let env = Env::new(Point::root());
@@ -8486,8 +8499,6 @@ pub fn rec_script_line<I: Span>(input: I) -> Res<I, I> {
     recognize(script_line)(input)
 }
 
-
-
 pub fn layer<I: Span>(input: I) -> Res<I, Layer> {
     let (next, layer) = recognize(camel_case)(input.clone())?;
     match Layer::from_str(layer.to_string().as_str()) {
@@ -8595,43 +8606,40 @@ impl TryInto<KindParts> for KindLex {
     }
 }
 
-pub fn expect<I,O,F>( mut f: F ) -> impl FnMut(I) -> Res<I,O> where F: FnMut(I) -> Res<I,O>+Copy{
+pub fn expect<I, O, F>(mut f: F) -> impl FnMut(I) -> Res<I, O>
+where
+    F: FnMut(I) -> Res<I, O> + Copy,
+{
     move |i: I| {
-        f(i).map_err( |e| {
-            match e {
-                Err::Incomplete(i) => {
-                    Err::Incomplete(i)
-                }
-                Err::Error(e) => {
-                    Err::Failure(e)
-                }
-                Err::Failure(e) => {
-                    Err::Failure(e)
-                }
-            }
+        f(i).map_err(|e| match e {
+            Err::Incomplete(i) => Err::Incomplete(i),
+            Err::Error(e) => Err::Failure(e),
+            Err::Failure(e) => Err::Failure(e),
         })
     }
 }
-
 
 #[cfg(test)]
 pub mod cmd_test {
     use core::str::FromStr;
 
     use nom::error::{VerboseError, VerboseErrorKind};
-    use nom_supreme::final_parser::{ExtractContext, final_parser};
+    use nom_supreme::final_parser::{final_parser, ExtractContext};
 
     use cosmic_nom::{new_span, Res};
 
     use crate::command::{Command, CommandVar};
     use crate::err::SpaceErr;
-    use crate::parse::error::result;
-    use crate::parse::{CamelCase, command, consume_point, create_command, point_selector, publish_command, script, upload_blocks};
-    use crate::util::ToResolved;
-    use crate::{BaseKind, KindTemplate, SetProperties};
     use crate::kind::Kind;
+    use crate::parse::error::result;
+    use crate::parse::{
+        command, consume_point, create_command, point_selector, publish_command, script,
+        upload_blocks, CamelCase,
+    };
     use crate::point::{PointSeg, RouteSeg};
     use crate::selector::{PointHierarchy, PointKindSeg};
+    use crate::util::ToResolved;
+    use crate::{BaseKind, KindTemplate, SetProperties};
 
     /*
     #[mem]
@@ -8761,34 +8769,59 @@ pub mod cmd_test {
 
     #[test]
     pub fn test_selector() {
-        let less = PointHierarchy::new(RouteSeg::Local, vec![PointKindSeg {
-            segment: PointSeg::Base("less".to_string()),
-            kind: Kind::Base
-        }]
+        let less = PointHierarchy::new(
+            RouteSeg::Local,
+            vec![PointKindSeg {
+                segment: PointSeg::Base("less".to_string()),
+                kind: Kind::Base,
+            }],
         );
 
-        let fae = PointHierarchy::new(RouteSeg::Local, vec![PointKindSeg {
-            segment: PointSeg::Base("fae".to_string()),
-            kind: Kind::Base
-        },
-        PointKindSeg {
-            segment: PointSeg::Base("dra".to_string()),
-            kind: Kind::User
-        }]
+        let fae = PointHierarchy::new(
+            RouteSeg::Local,
+            vec![
+                PointKindSeg {
+                    segment: PointSeg::Base("fae".to_string()),
+                    kind: Kind::Base,
+                },
+                PointKindSeg {
+                    segment: PointSeg::Base("dra".to_string()),
+                    kind: Kind::User,
+                },
+            ],
         );
 
-
-        assert!(result(point_selector(new_span("less"))).unwrap().matches(&less));
-        assert!(result(point_selector(new_span("*"))).unwrap().matches(&less));
-        assert!(!result(point_selector(new_span("*"))).unwrap().matches(&fae ));
-        assert!(result(point_selector(new_span("*:dra"))).unwrap().matches(&fae ));
-        assert!(!result(point_selector(new_span("*:dra"))).unwrap().matches(&less ));
-        assert!(result(point_selector(new_span("fae:*"))).unwrap().matches(&fae));
-        assert!(result(point_selector(new_span("**<User>"))).unwrap().matches(&fae));
-        assert!(!result(point_selector(new_span("**<User>"))).unwrap().matches(&less));
-        assert!(result(point_selector(new_span("**"))).unwrap().matches(&less));
-        assert!(result(point_selector(new_span("**"))).unwrap().matches(&fae));
-        assert!(!result(point_selector(new_span("**<Base>"))).unwrap().matches(&fae));
+        assert!(result(point_selector(new_span("less")))
+            .unwrap()
+            .matches(&less));
+        assert!(result(point_selector(new_span("*")))
+            .unwrap()
+            .matches(&less));
+        assert!(!result(point_selector(new_span("*"))).unwrap().matches(&fae));
+        assert!(result(point_selector(new_span("*:dra")))
+            .unwrap()
+            .matches(&fae));
+        assert!(!result(point_selector(new_span("*:dra")))
+            .unwrap()
+            .matches(&less));
+        assert!(result(point_selector(new_span("fae:*")))
+            .unwrap()
+            .matches(&fae));
+        assert!(result(point_selector(new_span("**<User>")))
+            .unwrap()
+            .matches(&fae));
+        assert!(!result(point_selector(new_span("**<User>")))
+            .unwrap()
+            .matches(&less));
+        assert!(result(point_selector(new_span("**")))
+            .unwrap()
+            .matches(&less));
+        assert!(result(point_selector(new_span("**")))
+            .unwrap()
+            .matches(&fae));
+        assert!(!result(point_selector(new_span("**<Base>")))
+            .unwrap()
+            .matches(&fae));
 
         let less = result(point_selector(new_span("less"))).unwrap();
     }

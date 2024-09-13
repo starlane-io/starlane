@@ -2,10 +2,10 @@ use std::ops::{Deref, DerefMut};
 
 use crate::loc::Layer;
 use crate::log::{SpanLogger, Trackable};
+use crate::point::Point;
 use crate::wave::exchange::asynch::Exchanger;
 use crate::wave::{DirectedWave, Ping, Pong, ReflectedWave, SingularDirectedWave, UltraWave, Wave};
 use crate::{ParticleRecord, SpaceErr, Surface};
-use crate::point::Point;
 
 #[async_trait]
 pub trait TraversalLayer {

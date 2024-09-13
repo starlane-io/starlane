@@ -12,9 +12,9 @@ use std::string::FromUtf8Error;
 use std::sync::Arc;
 use std::time::Duration;
 
-use rcgen::{Certificate, generate_simple_self_signed, RcgenError};
+use rcgen::{generate_simple_self_signed, Certificate, RcgenError};
 use rustls::internal::msgs::codec::Codec;
-use rustls::{ClientConfig, RootCertStore, server, ServerConfig, ServerName};
+use rustls::{server, ClientConfig, RootCertStore, ServerConfig, ServerName};
 use tls_api_rustls::TlsConnectorBuilder;
 use tokio::fs::File;
 use tokio::io;
@@ -569,7 +569,7 @@ mod tests {
     use std::time::Duration;
 
     use cosmic_hyperlane::test_util::{
-        FAE, LargeFrameTest, LESS, SingleInterchangePlatform, WaveTest,
+        LargeFrameTest, SingleInterchangePlatform, WaveTest, FAE, LESS,
     };
     use cosmic_space::loc::ToSurface;
     use cosmic_space::log::RootLogger;

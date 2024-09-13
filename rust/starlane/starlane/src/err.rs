@@ -96,8 +96,6 @@ pub mod convert {
         }
     }
 
-
-
     impl HyperErr for Err {
         fn to_space_err(&self) -> SpaceErr {
             SpaceErr::server_error(self.to_string())

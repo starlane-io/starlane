@@ -10,21 +10,19 @@ use cosmic_nom::{new_span, Trace};
 use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
 
 use crate::kind::{BaseKind, Kind, KindParts, Specific};
-use crate::loc::{
-    Layer, ToBaseKind, Topic, Variable, VarVal, Version,
-};
+use crate::loc::{Layer, ToBaseKind, Topic, VarVal, Variable, Version};
 use crate::parse::error::result;
 use crate::parse::{
-    CamelCase, consume_hierarchy, Env, kind_selector, point_segment_selector,
-    point_selector, specific_selector,
+    consume_hierarchy, kind_selector, point_segment_selector, point_selector, specific_selector,
+    CamelCase, Env,
 };
+use crate::point::{Point, PointCtx, PointSeg, PointVar, RouteSeg};
 use crate::substance::{
     CallWithConfigDef, Substance, SubstanceFormat, SubstanceKind, SubstancePattern,
     SubstancePatternCtx, SubstancePatternDef,
 };
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
 use crate::SpaceErr;
-use crate::point::{Point, PointCtx, PointSeg, PointVar, RouteSeg};
 
 pub type KindSelector = KindSelectorDef<KindBaseSelector, SubKindSelector, SpecificSelector>;
 pub type KindSelectorVar =
@@ -441,11 +439,8 @@ impl PointSegSelector {
             PointSegSelector::InclusiveRecursive => true,
             PointSegSelector::Any => true,
             PointSegSelector::Recursive => true,
-            PointSegSelector::Exact(exact) => {
-                match exact {
-                ExactPointSeg::PointSeg(pattern) => {
-                    pattern.to_string() == segment.to_string()
-                },
+            PointSegSelector::Exact(exact) => match exact {
+                ExactPointSeg::PointSeg(pattern) => pattern.to_string() == segment.to_string(),
                 ExactPointSeg::Version(a) => {
                     if let PointSeg::Version(b) = segment {
                         *a == *b
@@ -453,7 +448,7 @@ impl PointSegSelector {
                         false
                     }
                 }
-            }},
+            },
             PointSegSelector::Version(req) => {
                 if let PointSeg::Version(b) = segment {
                     req.matches(b)
@@ -682,11 +677,11 @@ pub struct HopDef<Segment, KindSelector> {
 
 impl Hop {
     pub fn matches(&self, point_kind_segment: &PointKindSeg) -> bool {
-/*println!("point-kind_segment: {}",point_kind_segment.segment.to_string());
-println!("segment_selector: {}",self.segment_selector.to_string());
-println!("\tmatch {}",self.segment_selector.matches(&point_kind_segment.segment));
+        /*println!("point-kind_segment: {}",point_kind_segment.segment.to_string());
+        println!("segment_selector: {}",self.segment_selector.to_string());
+        println!("\tmatch {}",self.segment_selector.matches(&point_kind_segment.segment));
 
- */
+         */
         self.segment_selector.matches(&point_kind_segment.segment)
             && self.kind_selector.matches(&point_kind_segment.kind)
     }

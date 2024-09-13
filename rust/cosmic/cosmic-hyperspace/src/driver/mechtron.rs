@@ -18,6 +18,7 @@ use cosmic_space::loc::{Layer, ToSurface};
 use cosmic_space::log::RootLogger;
 use cosmic_space::parse::bind_config;
 use cosmic_space::particle::traversal::{Traversal, TraversalDirection};
+use cosmic_space::point::Point;
 use cosmic_space::selector::KindSelector;
 use cosmic_space::substance::Substance;
 use cosmic_space::util::log;
@@ -35,7 +36,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
-use cosmic_space::point::Point;
 
 lazy_static! {
     static ref HOST_DRIVER_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(

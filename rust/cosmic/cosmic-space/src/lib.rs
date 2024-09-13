@@ -34,7 +34,7 @@ use particle::{Details, Properties, Status, Stub};
 use point::Point;
 use selector::Selector;
 use substance::Bin;
-use substance::{Substance, SubstanceList, Token, ToSubstance};
+use substance::{Substance, SubstanceList, ToSubstance, Token};
 use wave::core::ReflectedCore;
 
 use crate::err::SpaceErr;
@@ -50,11 +50,13 @@ pub mod fail;
 pub mod frame;
 pub mod hyper;
 pub mod kind;
+pub mod kind2;
 pub mod loc;
 pub mod log;
 pub mod parse;
 pub mod particle;
 pub mod path;
+pub mod point;
 pub mod security;
 pub mod selector;
 pub mod settings;
@@ -62,8 +64,6 @@ pub mod substance;
 pub mod util;
 pub mod wasm;
 pub mod wave;
-pub mod kind2;
-pub mod point;
 
 lazy_static! {
     pub static ref VERSION: semver::Version =

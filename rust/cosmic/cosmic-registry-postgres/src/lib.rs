@@ -45,6 +45,7 @@ use cosmic_space::loc::{StarKey, ToBaseKind, Version};
 use cosmic_space::log::PointLogger;
 use cosmic_space::parse::{CamelCase, Domain, SkewerCase};
 use cosmic_space::particle::{Details, PointKind, Properties, Property, Status, Stub};
+use cosmic_space::point::{Point, PointSeg};
 use cosmic_space::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, IndexedAccessGrant, Permissions,
     PermissionsMask, PermissionsMaskKind, Privilege, Privileges,
@@ -59,7 +60,6 @@ use cosmic_space::selector::{
 use cosmic_space::substance::{Substance, SubstanceList, SubstanceMap};
 use cosmic_space::util::ValuePattern;
 use cosmic_space::HYPERUSER;
-use cosmic_space::point::{Point, PointSeg};
 
 pub trait PostgresPlatform: Cosmos
 where

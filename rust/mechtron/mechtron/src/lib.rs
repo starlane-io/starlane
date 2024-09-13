@@ -45,12 +45,12 @@ use cosmic_space::wave::Bounce;
 
 use cosmic_space::artifact::synch::ArtifactApi;
 use cosmic_space::artifact::ArtRef;
+use cosmic_space::point::Point;
 use cosmic_space::wave::exchange::synch::{
     DirectedHandler, DirectedHandlerProxy, DirectedHandlerShell, ExchangeRouter, InCtx,
     ProtoTransmitter, ProtoTransmitterBuilder,
 };
 use std::sync::RwLock;
-use cosmic_space::point::Point;
 
 use crate::err::{GuestErr, MechErr};
 use crate::guest::GuestCtx;

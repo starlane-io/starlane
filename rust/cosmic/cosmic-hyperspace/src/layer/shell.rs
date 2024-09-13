@@ -7,7 +7,7 @@ use cosmic_nom::new_span;
 use cosmic_space::command::common::StateSrc;
 use cosmic_space::command::{Command, RawCommand};
 use cosmic_space::err::SpaceErr;
-use cosmic_space::loc::{Layer, Surface, SurfaceSelector, Topic, ToPoint, ToSurface};
+use cosmic_space::loc::{Layer, Surface, SurfaceSelector, ToPoint, ToSurface, Topic};
 use cosmic_space::log::PointLogger;
 use cosmic_space::parse::error::result;
 use cosmic_space::parse::{command_line, Env};

@@ -18,6 +18,7 @@ use crate::log::{AuditLog, Log, LogSpan, LogSpanEvent, PointlessLog};
 use crate::parse::model::Subst;
 use crate::parse::Env;
 use crate::particle::Particle;
+use crate::point::{Point, PointCtx, PointVar};
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::core::ext::ExtMethod;
@@ -25,9 +26,8 @@ use crate::wave::core::http2::HttpMethod;
 use crate::wave::core::hyp::HypMethod;
 use crate::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use crate::wave::{Pong, UltraWave};
-use crate::{Details, SpaceErr, Status, Stub, Surface, util};
+use crate::{util, Details, SpaceErr, Status, Stub, Surface};
 use url::Url;
-use crate::point::{Point, PointCtx, PointVar};
 
 #[derive(
     Debug,

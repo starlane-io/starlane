@@ -23,6 +23,7 @@ use cosmic_space::kind::{BaseKind, Kind, StarSub};
 use cosmic_space::loc::{Layer, PointFactory, Surface, ToSurface};
 use cosmic_space::log::{RootLogger, Tracker};
 use cosmic_space::particle::traversal::Traversal;
+use cosmic_space::point::Point;
 use cosmic_space::selector::KindSelector;
 use cosmic_space::settings::Timeouts;
 use cosmic_space::substance::Substance;
@@ -38,7 +39,6 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use cosmic_space::point::Point;
 
 pub struct ControlDriverFactory<P>
 where

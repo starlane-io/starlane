@@ -1,6 +1,7 @@
 use crate::artifact::ArtRef;
 use crate::config::mechtron::MechtronConfig;
 use crate::loc::ToSurface;
+use crate::point::Point;
 use crate::wave::core::cmd::CmdMethod;
 use crate::wave::exchange::asynch::ProtoTransmitter;
 use crate::wave::DirectedProto;
@@ -10,7 +11,6 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::watch;
-use crate::point::Point;
 
 #[derive(Clone)]
 pub struct ArtifactApi {

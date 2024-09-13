@@ -11,6 +11,7 @@ use cosmic_space::log::{
     LogSource, NoAppender, PointLogger, RootLogger, SynchTransmittingLogAppender,
 };
 use cosmic_space::particle::{Details, Stub};
+use cosmic_space::point::Point;
 use cosmic_space::substance::{Bin, Substance};
 use cosmic_space::wave::core::cmd::CmdMethod;
 use cosmic_space::wave::core::CoreBounce;
@@ -26,7 +27,6 @@ use dashmap::DashMap;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use cosmic_space::point::Point;
 
 #[derive(Clone)]
 pub struct GuestSkel<P>

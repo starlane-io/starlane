@@ -26,9 +26,7 @@ use crate::hyper::AssignmentKind;
 use crate::hyper::InterchangeKind::DefaultControl;
 use crate::kind::Sub;
 use crate::loc::StarKey;
-use crate::loc::{
-    Layer, Surface, SurfaceSelector, Topic, ToPoint, ToSurface, Uuid,
-};
+use crate::loc::{Layer, Surface, SurfaceSelector, ToPoint, ToSurface, Topic, Uuid};
 use crate::log::{
     LogSpan, LogSpanEvent, PointLogger, RootLogger, SpanLogger, Spannable, Trackable, TrailSpanId,
 };
@@ -36,19 +34,19 @@ use crate::parse::model::Subst;
 use crate::parse::sub;
 use crate::particle::Watch;
 use crate::particle::{Details, Status};
+use crate::point::{Point, PointSeg, RouteSeg};
 use crate::security::{Permissions, Privilege, Privileges};
 use crate::selector::Selector;
 use crate::settings::Timeouts;
 use crate::substance::Bin;
 use crate::substance::{
     Call, CallKind, CmdCall, ExtCall, FormErrs, HttpCall, HypCall, MultipartFormBuilder, Substance,
-    SubstanceKind, Token, ToRequestCore, ToSubstance,
+    SubstanceKind, ToRequestCore, ToSubstance, Token,
 };
 use crate::util::{uuid, ValueMatcher, ValuePattern};
 use crate::wave::core::http2::StatusCode;
 use crate::{ANONYMOUS, HYPERUSER};
 use url::Url;
-use crate::point::{Point, PointSeg, RouteSeg};
 
 use self::core::cmd::CmdMethod;
 use self::core::ext::ExtMethod;

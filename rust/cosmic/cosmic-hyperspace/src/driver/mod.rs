@@ -30,6 +30,7 @@ use cosmic_space::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
 use cosmic_space::particle::{Details, Status, Stub};
+use cosmic_space::point::Point;
 use cosmic_space::selector::KindSelector;
 use cosmic_space::substance::Substance;
 use cosmic_space::util::log;
@@ -53,8 +54,7 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, oneshot, RwLock, watch};
-use cosmic_space::point::Point;
+use tokio::sync::{mpsc, oneshot, watch, RwLock};
 
 lazy_static! {
     static ref DEFAULT_BIND: ArtRef<BindConfig> = ArtRef::new(

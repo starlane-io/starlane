@@ -704,9 +704,9 @@ pub mod direct {
 
         use crate::err::SpaceErr;
         use crate::fail::{BadCoercion, Fail};
-        use crate::point::Point;
         use crate::parse::Env;
         use crate::particle::Stub;
+        use crate::point::Point;
         use crate::selector::{Hop, HopCtx, HopVar, PointHierarchy, Selector, SelectorDef};
         use crate::substance::{MapPattern, Substance, SubstanceList};
         use crate::util::{ConvertFrom, ToResolved};

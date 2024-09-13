@@ -13,6 +13,7 @@ use crate::loc::{StarKey, Surface, ToPoint, ToSurface};
 use crate::log::Log;
 use crate::parse::SkewerCase;
 use crate::particle::{Details, Status, Stub};
+use crate::point::Point;
 use crate::selector::KindSelector;
 use crate::substance::Substance;
 use crate::wave::core::cmd::CmdMethod;
@@ -22,7 +23,6 @@ use crate::wave::{
     Ping, Pong, ReflectedKind, ReflectedProto, ToRecipients, UltraWave, Wave, WaveId, WaveKind,
 };
 use crate::{Agent, Document};
-use crate::point::Point;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {

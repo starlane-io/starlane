@@ -41,9 +41,7 @@ use cosmic_space::hyper::{ParticleLocation, ParticleRecord};
 use cosmic_space::kind::{
     ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind,
 };
-use cosmic_space::loc::{
-    Layer, MachineName, StarKey, Surface, ToBaseKind, ToSurface,
-};
+use cosmic_space::loc::{Layer, MachineName, StarKey, Surface, ToBaseKind, ToSurface};
 use cosmic_space::log::RootLogger;
 use cosmic_space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
 use cosmic_space::particle::{Details, Properties, Status, Stub};

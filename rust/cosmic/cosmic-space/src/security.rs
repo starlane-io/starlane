@@ -11,9 +11,9 @@ use serde::{Deserialize, Serialize};
 use cosmic_nom::new_span;
 
 use crate::err::SpaceErr;
-use crate::point::Point;
 use crate::parse::error::result;
 use crate::parse::{particle_perms, permissions, permissions_mask, privilege, MapResolver};
+use crate::point::Point;
 use crate::selector::{PointHierarchy, Selector};
 use crate::wave::ScopeGrant;
 use crate::Agent;

@@ -9,11 +9,11 @@ use cosmic_nom::{new_span, Res, Span};
 
 use crate::kind::{Kind, KindParts};
 use crate::parse::error::result;
-use crate::parse::{Env, parse_alpha1_str, point_and_kind};
+use crate::parse::{parse_alpha1_str, point_and_kind, Env};
+use crate::point::{Point, PointCtx, PointVar};
 use crate::substance::Substance;
 use crate::util::ToResolved;
 use crate::{BaseKind, SpaceErr};
-use crate::point::{Point, PointCtx, PointVar};
 
 pub mod property;
 pub mod traversal;
@@ -191,9 +191,9 @@ pub mod particle {
 
     use crate::err::SpaceErr;
     use crate::kind::{BaseKind, Kind, KindParts};
-    use crate::point::Point;
     use crate::parse::parse_alpha1_str;
     use crate::particle::PointKind;
+    use crate::point::Point;
     use crate::security::Permissions;
     use crate::substance::{Substance, SubstanceMap};
 
