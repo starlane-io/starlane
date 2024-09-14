@@ -15,6 +15,7 @@ use virtual_fs::{ClonableVirtualFile, FileSystem, Pipe, VirtualFile};
 use wasmer::{Module, Store};
 use wasmer_wasix::runtime::task_manager::tokio::TokioTaskManager;
 use wasmer_wasix::{PluggableRuntime, WasiEnv};
+use wasmer_wasix::runtime::module_cache::ModuleCache;
 use crate::src::Source;
 
 pub struct WasmService {
@@ -22,10 +23,9 @@ pub struct WasmService {
     cache: Box<dyn WasmModuleCache>
 }
 
-impl WasmService {
-    pub fn new(source: Box<dyn Source>, factory:  Box<dyn CacheFactory>) -> Self {
+impl  WasmService{
+    pub fn new(cache: Box<dyn WasmModuleCache>) -> Self {
         let store = Store::default();
-        let cache = factory.create( source, & store );
         Self { store, cache }
     }
 
@@ -299,8 +299,8 @@ pub mod test {
 
         println!("starting test");
         let source = Box::new(FileSystemSrc::new("."));
-        let factory = Arc::new( WasmModuleMemCacheFactory::new(source) );
-        let service = WasmService::new(factory);
+        let cache = Box::new(WasmModuleMemCache::new(source));
+        let service = WasmService::new(cache);
         let mut builder = WasmHostConfig::builder();
         let fs_factory = Arc::new(RootFileSystemFactory::new("./test".into()));
         builder.fs( fs_factory, |fs_builder|{

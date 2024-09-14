@@ -3,30 +3,27 @@ use crate::err::Err;
 use crate::src::Source;
 use async_trait::async_trait;
 use std::collections::HashMap;
+use std::path::Path;
 use std::process;
 use wasmer::{Module, Store};
 
 pub trait CacheFactory {
-    fn create<'a>( &self, source: Box<dyn Source>, store: & 'a Store) -> Box<dyn WasmModuleCache + 'a>;
+    fn create( & self, source: Box<dyn Source>) -> Box<dyn WasmModuleCache>;
 }
 
 pub struct WasmModuleMemCacheFactory {
-   source: Box<dyn Source>
 }
 
 impl WasmModuleMemCacheFactory {
-    pub fn new( source: Box<dyn Source>) -> Self {
-        Self {
-            source
-        }
+    pub fn new( ) -> Self {
+        Self { }
     }
 }
 impl CacheFactory for WasmModuleMemCacheFactory {
 
-    fn create<'a>( &self, source: Box<dyn Source>, store: & 'a Store) -> Box<dyn WasmModuleCache + 'a> {
+    fn create( & self, source: Box<dyn Source>) -> Box<dyn WasmModuleCache> {
         Box::new(WasmModuleMemCache {
             source,
-            store,
             map: Default::default(),
         })
     }
@@ -34,21 +31,29 @@ impl CacheFactory for WasmModuleMemCacheFactory {
 
 #[async_trait]
 pub trait WasmModuleCache {
-    async fn get(&mut self, key: &str) -> Result<Module, Err>;
+    async fn get(&mut self, key: &str, store: & Store) -> Result<Module, Err>;
 }
 
-pub struct WasmModuleMemCache<'a> {
+pub struct WasmModuleMemCache {
     source: Box<dyn Source>,
-    store: &'a Store,
     map: HashMap<String, Result<Module, Err>>,
+}
+impl WasmModuleMemCache {
+    pub fn new( source: Box<dyn Source> ) -> Self {
+        Self {
+            source,
+            map: Default::default(),
+        }
+    }
+
 }
 
 #[async_trait]
-impl<'a> WasmModuleCache for WasmModuleMemCache<'a> {
-    async fn get(&mut self, key: &str) -> Result<Module, Err> {
+impl WasmModuleCache for WasmModuleMemCache {
+    async fn get(&mut self, key: &str, store: & Store) -> Result<Module, Err> {
         if !self.map.contains_key(key) {
             let wasm_bytes = self.source.get(key).await?;
-            let module = Module::new(self.store, wasm_bytes).map_err(|e| e.into());
+            let module = Module::new(store, wasm_bytes).map_err(|e| e.into());
             self.map.insert(key.to_string(), module);
         }
 
@@ -59,4 +64,4 @@ impl<'a> WasmModuleCache for WasmModuleMemCache<'a> {
     }
 }
 
-impl<'a> WasmModuleMemCache<'a> {}
+impl WasmModuleMemCache {}
