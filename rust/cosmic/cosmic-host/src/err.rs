@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct Err {
     message: String,
 }

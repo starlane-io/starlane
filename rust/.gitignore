@@ -6,3 +6,4 @@ cache
 certs
 bundle.zip
 .fleet
+*.wasm

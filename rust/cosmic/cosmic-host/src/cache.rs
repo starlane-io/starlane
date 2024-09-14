@@ -1,7 +1,8 @@
 use crate::err::Err;
-use crate::src::WasmSource;
+use crate::src::Source;
 use async_trait::async_trait;
 use std::collections::HashMap;
+use std::process;
 use wasmer::{Module, Store};
 
 
@@ -13,7 +14,7 @@ pub trait WasmModuleCache
 
 pub struct WasmModuleMemCache {
     map: HashMap<String, Module>,
-    src: Box<dyn WasmSource>,
+    src: Box<dyn Source>,
 }
 
 
@@ -22,14 +23,15 @@ impl WasmModuleCache for WasmModuleMemCache {
     async fn get(&self, key: &str) -> Result<Module, Err> {
         let wasm_bytes = self.src.get(key).await?;
         println!("Compiling module...");
-        let store = Store::default();
-        let module = Module::new(&store,wasm_bytes).unwrap();
-        Ok(module)
+//        let module = Module::new(&store,wasm_bytes).unwrap();
+
+       // Ok(module)
+        todo!()
     }
 }
 
 impl WasmModuleMemCache {
-    pub fn new( src: Box<dyn WasmSource>) -> Self {
+    pub fn new(src: Box<dyn Source>) -> Self {
         Self {
             map: Default::default(),
             src

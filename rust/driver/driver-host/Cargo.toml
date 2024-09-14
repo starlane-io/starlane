@@ -6,7 +6,6 @@ repository = "https://github.com/cosmic-initiative/cosmic-initiative.git"
 version = "0.3.14"
 
 edition = "2021" 
-rust-version.workspace = true
 authors = []
 homepage = "https://starlane.io"
 description="..."
@@ -15,11 +14,11 @@ description="..."
 
 
 [dependencies]
-wasmer= {  path = "../api" }
-wasmer-wasix = {  path = "../wasix", features=["sys-thread"] }
 
 tokio = { version="1.40.0", features=["full"] }
 anyhow = "1.0.86"
-virtual-fs = { path= "../virtual-fs" }
 futures = { version = "0.3" }
 futures-core = "0.3.30"
+wasmer = "4.3.7"
+wasmer-wasix = "0.27.0"
+virtual-fs = "0.16.0"

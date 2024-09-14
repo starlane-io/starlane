@@ -5,37 +5,41 @@ pub mod src;
 use crate::cache::WasmModuleCache;
 use err::Err;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::process;
 use std::sync::Arc;
+use tokio::fs;
 use tokio::io::AsyncWriteExt;
-use tokio::runtime::{Handle, Runtime};
-use virtual_fs::{ClonableVirtualFile, Pipe, VirtualFile};
-use wasmer::Module;
+use tokio::runtime::Handle;
+use virtual_fs::{ClonableVirtualFile, FileSystem, Pipe, VirtualFile};
+use wasmer::{Module, Store};
 use wasmer_wasix::runtime::task_manager::tokio::TokioTaskManager;
 use wasmer_wasix::{PluggableRuntime, WasiEnv};
 
 pub struct WasmService {
     cache: Box<dyn WasmModuleCache>,
-    runtime: Arc<Runtime>,
 }
 
 impl WasmService {
     pub fn new(cache: Box<dyn WasmModuleCache>) -> Self {
-        let runtime = Arc::new(Runtime::new().unwrap());
-        Self { cache, runtime }
+        Self { cache }
     }
 
-    pub async fn provision(
+    pub async fn provision<S>(
         &self,
-        wasm: String,
-        host_config: WasmHostConfig,
-    ) -> Result<WasmHost, Err> {
-        let module = self.cache.get(wasm.as_str()).await?;
-        Result::Ok(WasmHost::new(module, host_config))
+        wasm: S,
+        host_config: WasmHostConfig
+    ) -> Result<WasmHost, Err> where S: ToString{
+
+        let store = Store::default();
+        //let module = self.cache.get(wasm.to_string().as_str()).await?;
+
+        let wasm_bytes = fs::read("filestore.wasm").await?;
+        let module = Module::new(& store,wasm_bytes).unwrap();
+
+        Result::Ok(WasmHost::new(module, host_config,store))
     }
 }
-
-pub struct Run {}
 
 pub struct Process {
     stdin: Box<dyn VirtualFile + Send + Sync + 'static>,
@@ -65,29 +69,56 @@ impl Process {
 pub trait FileSystemFactory {
     fn create(
         &self,
-        runtime: Arc<dyn wasmer_wasix::Runtime>,
-    ) -> Box<dyn virtual_fs::FileSystem + Send + Sync>;
+        runtime: tokio::runtime::Handle
+    ) -> Result<Box<dyn virtual_fs::FileSystem + Send + Sync>,Err>;
+}
+
+struct RootFileSystemFactory {
+    path: PathBuf
+}
+
+impl RootFileSystemFactory {
+    pub fn new( path: PathBuf ) -> Self {
+        Self {
+            path
+        }
+    }
+}
+
+impl FileSystemFactory for RootFileSystemFactory {
+    fn create(&self, handle: tokio::runtime::Handle) -> Result<Box<dyn FileSystem + Send + Sync>,Err> {
+        match virtual_fs::host_fs::FileSystem::new(handle, ".") {
+            Ok(fs) => {
+                Result::Ok(Box::new(fs))
+            }
+            Err(err) => {
+                Result::Err(err.into())
+            }
+        }
+    }
 }
 
 pub struct WasmHost {
+    store: Store,
     module: Module,
     config: WasmHostConfig,
     runtime: Arc<PluggableRuntime>,
 }
 
 impl WasmHost {
-    pub fn new(module: Module, config: WasmHostConfig) -> Self {
+    fn new(module: Module, config: WasmHostConfig, store: Store) -> Self {
         let runtime = Arc::new(PluggableRuntime::new(Arc::new(TokioTaskManager::new(
             Handle::current(),
         ))));
         Self {
+            store,
             module,
             config,
             runtime,
         }
     }
 
-    pub async fn execute<L>(&self, line: L) -> Result<Process, Err>
+    pub async fn execute<L>(& mut self, line: L) -> Result<Process, Err>
     where
         L: ToString,
     {
@@ -106,15 +137,16 @@ impl WasmHost {
             for d in &fs_config.pre_opened_dirs {
                 builder = builder.preopen_dir(Path::new(d))?;
             }
-            builder = builder.fs(fs_config.fs_factory.create(self.runtime.clone()));
+            builder = builder.fs( Box::new(fs_config.fs_factory.create(Handle::current().clone()).unwrap()));
         };
 
         if self.config.runtime {
-            //            let mut rt = Arc::new(PluggableRuntime::new(Arc::new(TokioTaskManager::new(Handle::current()))));
-            builder = builder.runtime(self.runtime.clone());
+           builder = builder.runtime(self.runtime.clone());
         }
 
-        builder.run(self.module.clone())?;
+
+        //builder.run(self.module.clone())?;
+        builder.run_with_store(self.module.clone(), & mut self.store )?;
 
         Ok(Process {
             stdin: Box::new(stdin_tx),
@@ -137,7 +169,6 @@ impl WasmInterfaceKind {}
 
 #[derive(Clone)]
 pub struct WasmHostConfig {
-    pub interface: WasmInterfaceKind,
     pub fs: Option<FsConfig>,
     pub runtime: bool,
 }
@@ -146,17 +177,19 @@ impl Default for WasmHostConfig {
     fn default() -> Self {
         Self {
             runtime: false,
-            interface: WasmInterfaceKind::Cli,
             fs: Option::None,
         }
     }
 }
 
-impl WasmHostConfig {}
+impl WasmHostConfig {
+    pub fn builder() -> WasmHostConfigBuilder {
+        WasmHostConfigBuilder::new()
+    }
+}
 
 pub struct WasmHostConfigBuilder {
     pub runtime: bool,
-    pub interface: WasmInterfaceKind,
     pub fs: Option<FsConfigBuilder>,
 }
 
@@ -167,13 +200,14 @@ impl WasmHostConfigBuilder {
 
     pub fn fs<F>(&mut self, factory: Arc<dyn FileSystemFactory>, f: F) -> &mut Self
     where
-        F: FnOnce(&mut FsConfigBuilder) -> &mut Self,
+        F: FnOnce(&mut FsConfigBuilder)
     {
         if self.fs.is_none() {
             self.fs = Option::Some(FsConfigBuilder::new(factory));
         }
 
-        f(self.fs.as_mut().unwrap())
+        f(self.fs.as_mut().unwrap());
+        self
     }
     pub fn runtime(&mut self, runtime: bool) -> &mut Self {
         self.runtime = runtime;
@@ -182,7 +216,6 @@ impl WasmHostConfigBuilder {
 
     pub fn build(self) -> WasmHostConfig {
         WasmHostConfig {
-            interface: self.interface,
             fs: match self.fs {
                 None => None,
                 Some(builder) => Some(builder.build()),
@@ -196,7 +229,6 @@ impl Default for WasmHostConfigBuilder {
     fn default() -> Self {
         WasmHostConfigBuilder {
             runtime: false,
-            interface: WasmInterfaceKind::Cli,
             fs: None,
         }
     }
@@ -233,8 +265,8 @@ impl FsConfigBuilder {
         }
     }
 
-    pub fn preopen(&mut self, dir: String) -> &mut Self {
-        self.pre_opened_dirs.push(dir);
+    pub fn preopen<S>(&mut self, dir: S) -> &mut Self where S: ToString{
+        self.pre_opened_dirs.push(dir.to_string());
         self
     }
 
@@ -243,5 +275,37 @@ impl FsConfigBuilder {
             fs_factory: self.fs_factory,
             pre_opened_dirs: self.pre_opened_dirs,
         }
+    }
+}
+
+
+#[cfg(test)]
+pub mod test {
+    use std::path::Path;
+    use std::{env, fs, process};
+    use std::sync::Arc;
+    use tokio::runtime::Handle;
+    use wasmer::Store;
+    use crate::cache::WasmModuleMemCache;
+    use crate::src::FileSystemSrc;
+    use crate::{RootFileSystemFactory, WasmHostConfig, WasmHostConfigBuilder, WasmService};
+
+    #[tokio::test]
+    pub async fn test() {
+
+        println!("starting test");
+        let cache = Box::new(WasmModuleMemCache::new( Box::new(FileSystemSrc::new( String::from(".")))));
+        let service = WasmService::new(cache);
+        let mut builder = WasmHostConfig::builder();
+        let fs_factory = Arc::new(RootFileSystemFactory::new("./test".into()));
+        builder.fs( fs_factory, |fs_builder|{
+           fs_builder.preopen("./");
+        });
+        builder.runtime(false);
+        let config = builder.build();
+        let mut host = service.provision( "filestore.wasm", config ).await.unwrap();
+
+        host.execute("test").await.unwrap();
+        println!("it worked i guess?");
     }
 }
