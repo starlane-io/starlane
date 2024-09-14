@@ -23,7 +23,7 @@ impl Source for FileSystemSrc {
 }
 
 impl FileSystemSrc {
-    pub fn new(path: String) -> Self {
-        Self { root: path }
+    pub fn new<S>(path: S) -> Self where S: ToString{
+        Self { root: path.to_string() }
     }
 }

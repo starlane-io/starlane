@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use crate::err::Err;
 use crate::src::Source;
 use async_trait::async_trait;
@@ -6,7 +7,7 @@ use std::process;
 use wasmer::{Module, Store};
 
 pub trait CacheFactory {
-    fn create( self, store: &Store) -> Box<dyn WasmModuleCache>;
+    fn create<'a>( &self, source: Box<dyn Source>, store: & 'a Store) -> Box<dyn WasmModuleCache + 'a>;
 }
 
 pub struct WasmModuleMemCacheFactory {
@@ -21,11 +22,12 @@ impl WasmModuleMemCacheFactory {
     }
 }
 impl CacheFactory for WasmModuleMemCacheFactory {
-    fn create<'a>( self, store: & 'a Store) -> Box<dyn WasmModuleCache> {
+
+    fn create<'a>( &self, source: Box<dyn Source>, store: & 'a Store) -> Box<dyn WasmModuleCache + 'a> {
         Box::new(WasmModuleMemCache {
+            source,
             store,
             map: Default::default(),
-            source: self.source,
         })
     }
 }
@@ -36,16 +38,16 @@ pub trait WasmModuleCache {
 }
 
 pub struct WasmModuleMemCache<'a> {
+    source: Box<dyn Source>,
     store: &'a Store,
     map: HashMap<String, Result<Module, Err>>,
-    source: Box<dyn Source>,
 }
 
 #[async_trait]
 impl<'a> WasmModuleCache for WasmModuleMemCache<'a> {
     async fn get(&mut self, key: &str) -> Result<Module, Err> {
         if !self.map.contains_key(key) {
-            let wasm_bytes = self.src.get(key).await?;
+            let wasm_bytes = self.source.get(key).await?;
             let module = Module::new(self.store, wasm_bytes).map_err(|e| e.into());
             self.map.insert(key.to_string(), module);
         }
