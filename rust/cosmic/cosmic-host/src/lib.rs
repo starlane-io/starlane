@@ -2,7 +2,7 @@ mod cache;
 mod err;
 pub mod src;
 
-use crate::cache::WasmModuleCache;
+use crate::cache::{CacheFactory, WasmModuleCache};
 use err::Err;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -17,12 +17,15 @@ use wasmer_wasix::runtime::task_manager::tokio::TokioTaskManager;
 use wasmer_wasix::{PluggableRuntime, WasiEnv};
 
 pub struct WasmService {
-    cache: Box<dyn WasmModuleCache>,
+    store: Store,
+    cache: Box<dyn WasmModuleCache>
 }
 
 impl WasmService {
-    pub fn new(cache: Box<dyn WasmModuleCache>) -> Self {
-        Self { cache }
+    pub fn new(factory: Box<dyn CacheFactory>) -> Self {
+        let store = Store::default();
+        let cache = factory.create( & store );
+        Self { store, cache }
     }
 
     pub async fn provision<S>(
@@ -286,7 +289,7 @@ pub mod test {
     use std::sync::Arc;
     use tokio::runtime::Handle;
     use wasmer::Store;
-    use crate::cache::WasmModuleMemCache;
+    use crate::cache::{WasmModuleMemCache, WasmModuleMemCacheFactory};
     use crate::src::FileSystemSrc;
     use crate::{RootFileSystemFactory, WasmHostConfig, WasmHostConfigBuilder, WasmService};
 
@@ -294,7 +297,7 @@ pub mod test {
     pub async fn test() {
 
         println!("starting test");
-        let cache = Box::new(WasmModuleMemCache::new( Box::new(FileSystemSrc::new( String::from(".")))));
+        let factory = Box::new( WasmModuleMemCacheFactory::new() );
         let service = WasmService::new(cache);
         let mut builder = WasmHostConfig::builder();
         let fs_factory = Arc::new(RootFileSystemFactory::new("./test".into()));
