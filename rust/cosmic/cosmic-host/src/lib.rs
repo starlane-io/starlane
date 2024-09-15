@@ -32,16 +32,17 @@ impl  WasmService{
     }
 
     pub async fn provision<S>(
-        &self,
+        &mut self,
         wasm: S,
         host_config: WasmHostConfig
     ) -> Result<WasmHost, Err> where S: ToString{
 
-        let store = Store::default();
+        let store = Store::new(Singlepass::default());
         //let module = self.cache.get(wasm.to_string().as_str()).await?;
 
-        let wasm_bytes = fs::read("filestore.wasm").await?;
-        let module = Module::new(& store,wasm_bytes).unwrap();
+        let module = self.cache.get( "filestore.wasm", & store).await?;
+        //let wasm_bytes = fs::read("filestore.wasm").await?;
+        //let module = Module::new(& store,wasm_bytes).unwrap();
 
         Result::Ok(WasmHost::new(module, host_config,store))
     }
@@ -304,7 +305,7 @@ pub mod test {
         println!("starting test");
         let source = Box::new(FileSystemSrc::new("."));
         let cache = Box::new(WasmModuleMemCache::new_with_ser(source, ".".into()));
-        let service = WasmService::new(cache);
+        let mut service = WasmService::new(cache);
         let mut builder = WasmHostConfig::builder();
         let fs_factory = Arc::new(RootFileSystemFactory::new("./".into()));
         builder.fs( fs_factory, |fs_builder|{
