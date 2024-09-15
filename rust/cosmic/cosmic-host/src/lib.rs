@@ -2,21 +2,21 @@ mod cache;
 mod err;
 pub mod src;
 
-use crate::cache::{CacheFactory, WasmModuleCache};
+use crate::cache::{WasmModuleCache};
+use crate::src::Source;
 use err::Err;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process;
 use std::sync::Arc;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::runtime::Handle;
 use virtual_fs::{ClonableVirtualFile, FileSystem, Pipe, VirtualFile};
 use wasmer::{Module, Store};
+use wasmer_compiler_singlepass::Singlepass;
+use wasmer_wasix::runtime::module_cache::ModuleCache;
 use wasmer_wasix::runtime::task_manager::tokio::TokioTaskManager;
 use wasmer_wasix::{PluggableRuntime, WasiEnv};
-use wasmer_wasix::runtime::module_cache::ModuleCache;
-use crate::src::Source;
 
 pub struct WasmService {
     store: Store,
@@ -25,7 +25,9 @@ pub struct WasmService {
 
 impl  WasmService{
     pub fn new(cache: Box<dyn WasmModuleCache>) -> Self {
-        let store = Store::default();
+        let compiler = Singlepass::default();
+        let store = Store::new(compiler);
+
         Self { store, cache }
     }
 
@@ -46,26 +48,26 @@ impl  WasmService{
 }
 
 pub struct Process {
-    stdin: Box<dyn VirtualFile + Send + Sync + 'static>,
-    stdout: Box<dyn VirtualFile + Send + Sync + 'static>,
-    stderr: Box<dyn VirtualFile + Send + Sync + 'static>,
+    stdin: Pipe,
+    stdout: Pipe,
+    stderr: Pipe
 }
 
 impl Process {
-    pub fn stdin(&mut self) -> &mut Box<dyn VirtualFile + Send + Sync + 'static> {
+    pub fn stdin(&mut self) -> &mut Pipe {
         &mut self.stdin
     }
 
-    pub fn stdout(&mut self) -> &mut Box<dyn VirtualFile + Send + Sync + 'static> {
+    pub fn stdout(&mut self) -> &mut Pipe {
         &mut self.stdout
     }
 
-    pub fn stderr(&mut self) -> &mut Box<dyn VirtualFile + Send + Sync + 'static> {
+    pub fn stderr(&mut self) -> &mut Pipe {
         &mut self.stderr
     }
 
-    pub async fn direct_stdin(&mut self, data: Vec<u8>) -> Result<(), Err> {
-        self.stdin.write_all(data.as_slice()).await?;
+    pub async fn direct_stdin(&mut self, data: String) -> Result<(), Err> {
+        writeln!(self.stdin, "{}", data)?;
         Result::Ok(())
     }
 }
@@ -91,7 +93,7 @@ impl RootFileSystemFactory {
 
 impl FileSystemFactory for RootFileSystemFactory {
     fn create(&self, handle: tokio::runtime::Handle) -> Result<Box<dyn FileSystem + Send + Sync>,Err> {
-        match virtual_fs::host_fs::FileSystem::new(handle, ".") {
+        match virtual_fs::host_fs::FileSystem::new(handle, self.path.clone()) {
             Ok(fs) => {
                 Result::Ok(Box::new(fs))
             }
@@ -128,6 +130,8 @@ impl WasmHost {
     {
         let mut builder = WasiEnv::builder("wasm program").args(&[line.to_string().as_str()]);
 
+        builder = builder.env("PWD", "/");
+
         let (stdin_tx, stdin_rx) = Pipe::channel();
         let (stdout_tx, stdout_rx) = Pipe::channel();
         let (stderr_tx, stderr_rx) = Pipe::channel();
@@ -148,14 +152,16 @@ impl WasmHost {
            builder = builder.runtime(self.runtime.clone());
         }
 
+        builder = builder.current_dir("/");
+        //builder = builder.stdout(Box::new(io::stdout()));
 
         //builder.run(self.module.clone())?;
         builder.run_with_store(self.module.clone(), & mut self.store )?;
 
         Ok(Process {
-            stdin: Box::new(stdin_tx),
-            stdout: Box::new(stdout_rx),
-            stderr: Box::new(stderr_rx),
+            stdin: stdin_tx,
+            stdout: stdout_rx,
+            stderr: stderr_rx,
         })
     }
 }
@@ -285,24 +291,22 @@ impl FsConfigBuilder {
 
 #[cfg(test)]
 pub mod test {
-    use std::path::Path;
-    use std::{env, fs, process};
-    use std::sync::Arc;
-    use tokio::runtime::Handle;
-    use wasmer::Store;
-    use crate::cache::{WasmModuleMemCache, WasmModuleMemCacheFactory};
+    use std::io::Read;
+    use crate::cache::WasmModuleMemCache;
     use crate::src::FileSystemSrc;
-    use crate::{RootFileSystemFactory, WasmHostConfig, WasmHostConfigBuilder, WasmService};
+    use crate::{RootFileSystemFactory, WasmHostConfig, WasmService};
+    use std::sync::Arc;
+    use tokio::io::AsyncReadExt;
 
     #[tokio::test]
     pub async fn test() {
 
         println!("starting test");
         let source = Box::new(FileSystemSrc::new("."));
-        let cache = Box::new(WasmModuleMemCache::new(source));
+        let cache = Box::new(WasmModuleMemCache::new_with_ser(source, ".".into()));
         let service = WasmService::new(cache);
         let mut builder = WasmHostConfig::builder();
-        let fs_factory = Arc::new(RootFileSystemFactory::new("./test".into()));
+        let fs_factory = Arc::new(RootFileSystemFactory::new("./".into()));
         builder.fs( fs_factory, |fs_builder|{
            fs_builder.preopen("./");
         });
@@ -310,7 +314,18 @@ pub mod test {
         let config = builder.build();
         let mut host = service.provision( "filestore.wasm", config ).await.unwrap();
 
-        host.execute("test").await.unwrap();
+        let mut process = host.execute("pwd").await.unwrap();
+
+        process.stdin.close();
         println!("it worked i guess?");
+
+        let mut both = AsyncReadExt::chain(process.stdout,process.stdin);
+
+        let mut out = String::new();
+        both.read_to_string(&mut out).await.unwrap();
+
+        println!("{}",out);
+
+
     }
 }

@@ -3,8 +3,7 @@ use strum_macros::EnumString;
 use std::{env, fs, path::PathBuf};
 use std::io;
 
-use std::fs::{File, FileType};
-use std::io::{BufReader, BufWriter, StdinLock};
+use std::fs::{File};
 use std::io::prelude::*;
 use std::path::Path;
 
@@ -22,12 +21,14 @@ enum Commands {
     Mkdir{ path: PathBuf },
     Delete { path: PathBuf },
     List { path: Option<PathBuf> },
+    Pwd,
     Test
 }
 
 fn main() -> Result<(),()> {
     let cli = Cli::parse();
 
+    let pwd = env::var("PWD").unwrap_or(".".to_string());
 
     match cli.command {
         Commands::Write { path } => {
@@ -53,7 +54,7 @@ fn main() -> Result<(),()> {
 
             let mut file = File::open(path).unwrap();
             let mut buf : [u8;1024] = [0; 1024];
-            for size in file.read(& mut buf) {
+            while let Ok(size) = file.read(& mut buf) {
                 if size == 0 {
                     break;
                 }
@@ -69,7 +70,7 @@ fn main() -> Result<(),()> {
         Commands::List { path } => {
 
             let path = match path {
-                None => PathBuf::from("."),
+                None => PathBuf::from(pwd),
                 Some(path) => path
             };
 
@@ -88,19 +89,20 @@ fn main() -> Result<(),()> {
                 }
             }
         }
+    Commands::Pwd =>  {
+        println!("{}", pwd);
+    }
         Commands::Test =>  {
             println!("testing...");
 
-
-
-            let dir = Path::new("./test-dir");
+            let dir = Path::new(&pwd);
 
             fs::metadata(dir).and_then( |m| {
               println!("! --> ./test-dir already exists!");
                 fs::remove_dir_all(dir).unwrap();
                 println!("./test-dir removed");
                 Ok(m)
-            });
+            }).unwrap();
             fs::create_dir(dir).unwrap();
             println!("create_dir: {} ", dir.to_str().unwrap() );
 
@@ -128,4 +130,10 @@ fn main() -> Result<(),()> {
     println!("done from WASM");
 
     Ok(())
+}
+
+
+#[cfg(test)]
+pub mod test {
+
 }
