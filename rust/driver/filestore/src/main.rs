@@ -69,12 +69,15 @@ fn main() -> Result<(),()> {
         }
         Commands::List { path } => {
 
-            let path = match path {
-                None => PathBuf::from(pwd),
-                Some(path) => path
+            println!("path.is_some() : {}", path.is_some());
+            let path = match &path {
+                None => PathBuf::from(pwd.clone()),
+                Some(path) => path.clone()
             };
 
+            println!("files for {}", path.display());
             let paths = fs::read_dir(path).unwrap();
+
 
             for path in paths {
                 let path = path.unwrap().path();
@@ -99,7 +102,7 @@ fn main() -> Result<(),()> {
 
             fs::metadata(dir).and_then( |m| {
               println!("! --> ./test-dir already exists!");
-                fs::remove_dir_all(dir).unwrap();
+//                fs::remove_dir_all(dir).unwrap();
                 println!("./test-dir removed");
                 Ok(m)
             }).unwrap();

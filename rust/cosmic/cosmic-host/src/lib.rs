@@ -125,13 +125,13 @@ impl WasmHost {
         }
     }
 
-    pub async fn execute<L>(& mut self, line: L) -> Result<Process, Err>
+    pub async fn execute<I,Arg>(& mut self, args: I) -> Result<Process, Err>
     where
-        L: ToString,
+        I: IntoIterator<Item = Arg>,
+        Arg: AsRef<[u8]>,
     {
-        let mut builder = WasiEnv::builder("wasm program").args(&[line.to_string().as_str()]);
+        let mut builder = WasiEnv::builder("wasm program").args(args);
 
-        builder = builder.env("PWD", "/");
 
         let (stdin_tx, stdin_rx) = Pipe::channel();
         let (stdout_tx, stdout_rx) = Pipe::channel();
@@ -147,6 +147,8 @@ impl WasmHost {
                 builder = builder.preopen_dir(Path::new(d))?;
             }
             builder = builder.fs( Box::new(fs_config.fs_factory.create(Handle::current().clone()).unwrap()));
+
+            builder = builder.env("PWD", fs_config.pwd.clone() );
         };
 
         if self.config.runtime {
@@ -201,6 +203,7 @@ impl WasmHostConfig {
 
 pub struct WasmHostConfigBuilder {
     pub runtime: bool,
+    pub pwd: String,
     pub fs: Option<FsConfigBuilder>,
 }
 
@@ -239,6 +242,7 @@ impl WasmHostConfigBuilder {
 impl Default for WasmHostConfigBuilder {
     fn default() -> Self {
         WasmHostConfigBuilder {
+            pwd: ".".to_string(),
             runtime: false,
             fs: None,
         }
@@ -249,6 +253,7 @@ impl Default for WasmHostConfigBuilder {
 pub struct FsConfig {
     pub fs_factory: Arc<dyn FileSystemFactory>,
     pub pre_opened_dirs: Vec<String>,
+    pub pwd: String
 }
 
 pub enum FsKind {
@@ -265,6 +270,7 @@ pub struct FsConfigBuilder {
     fs_factory: Arc<dyn FileSystemFactory>,
     kind: FsKind,
     pre_opened_dirs: Vec<String>,
+    pwd: String
 }
 
 impl FsConfigBuilder {
@@ -273,6 +279,7 @@ impl FsConfigBuilder {
             fs_factory,
             kind: Default::default(),
             pre_opened_dirs: vec![],
+            pwd: "./".into()
         }
     }
 
@@ -281,8 +288,15 @@ impl FsConfigBuilder {
         self
     }
 
+    pub fn pwd<S>(&mut self, dir: S) -> &mut Self where S: ToString{
+        self.pwd = dir.to_string();
+        self
+    }
+
+
     pub fn build(self) -> FsConfig {
         FsConfig {
+            pwd: self.pwd,
             fs_factory: self.fs_factory,
             pre_opened_dirs: self.pre_opened_dirs,
         }
@@ -292,6 +306,7 @@ impl FsConfigBuilder {
 
 #[cfg(test)]
 pub mod test {
+    use std::fs;
     use std::io::Read;
     use crate::cache::WasmModuleMemCache;
     use crate::src::FileSystemSrc;
@@ -302,20 +317,22 @@ pub mod test {
     #[tokio::test]
     pub async fn test() {
 
+        tokio::fs::create_dir("./tmp").await;
         println!("starting test");
         let source = Box::new(FileSystemSrc::new("."));
         let cache = Box::new(WasmModuleMemCache::new_with_ser(source, ".".into()));
         let mut service = WasmService::new(cache);
         let mut builder = WasmHostConfig::builder();
-        let fs_factory = Arc::new(RootFileSystemFactory::new("./".into()));
+        let fs_factory = Arc::new(RootFileSystemFactory::new("./tmp".into()));
         builder.fs( fs_factory, |fs_builder|{
-           fs_builder.preopen("./");
+           fs_builder.preopen("/");
+           fs_builder.pwd("/");
         });
         builder.runtime(false);
         let config = builder.build();
         let mut host = service.provision( "filestore.wasm", config ).await.unwrap();
 
-        let mut process = host.execute("pwd").await.unwrap();
+        let mut process = host.execute(&["list"]).await.unwrap();
 
         process.stdin.close();
         println!("it worked i guess?");
@@ -326,6 +343,12 @@ pub mod test {
         both.read_to_string(&mut out).await.unwrap();
 
         println!("{}",out);
+
+        let mut err = String::new();
+        both.read_to_string(&mut err ).await.unwrap();
+
+        println!("{}",err);
+
 
 
     }
