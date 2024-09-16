@@ -16,8 +16,8 @@ use cosmic_space::selector::PayloadBlock;
 use cosmic_space::substance::Substance;
 use cosmic_space::util::{log, ToResolved};
 use cosmic_space::wave::core::{Method, ReflectedCore};
+use cosmic_space::wave::exchange::asynch::ProtoTransmitter;
 use cosmic_space::wave::exchange::asynch::{Exchanger, TraversalTransmitter};
-use cosmic_space::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder};
 use cosmic_space::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Pong, Reflection, UltraWave, Wave,
 };

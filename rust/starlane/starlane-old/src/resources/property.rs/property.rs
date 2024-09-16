@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::str::FromStr;
 
-use crate::{ConfigSrc, FieldSelection, Resource, ResourceIdentifier, ResourcePath, ResourceSelector, ResourceStub, SkewerCase};
 use crate::data::{BinSrc, DataSet, Meta};
 use crate::error::Error;
 use crate::parse::{parse_resource_property_assignment, parse_resource_property_value_selector, parse_resource_value_selector};
 use crate::status::Status;
+use crate::{ConfigSrc, FieldSelection, Resource, ResourceIdentifier, ResourcePath, ResourceSelector, ResourceStub, SkewerCase};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceValueSelector {

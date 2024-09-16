@@ -1,36 +1,44 @@
 pub mod err;
 
-use err::PostErr;
-use cosmic_space::hyper::{ParticleLocation, ParticleRecord};
-use cosmic_space::particle::{Details, Properties, Property, Status, Stub};
-use std::marker::PhantomData;
-use cosmic_space::security::{Access, AccessGrant, AccessGrantKind, EnumeratedAccess, IndexedAccessGrant, Permissions, PermissionsMask, PermissionsMaskKind, Privilege, Privileges};
-use std::sync::Arc;
-use cosmic_space::log::PointLogger;
-use cosmic_space::point::Point;
-use std::collections::{HashMap, HashSet};
-use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
+use crate::hyperspace::err::HyperErr;
+use crate::hyperspace::lib::Cosmos;
+use crate::hyperspace::reg::{Registration, RegistryApi};
+use cosmic_space::command::common::{PropertyMod, SetProperties};
+use cosmic_space::command::direct::create::Strategy;
+use cosmic_space::command::direct::delete::Delete;
 use cosmic_space::command::direct::get::{Get, GetOp};
 use cosmic_space::command::direct::query::{Query, QueryResult};
 use cosmic_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
 use cosmic_space::command::direct::set::Set;
-use cosmic_space::substance::{Substance, SubstanceList, SubstanceMap};
-use sqlx::postgres::{PgPoolOptions, PgRow};
-use cosmic_space::command::common::{PropertyMod, SetProperties};
-use cosmic_space::command::direct::create::Strategy;
-use cosmic_space::command::direct::delete::Delete;
-use cosmic_space::HYPERUSER;
+use cosmic_space::hyper::{ParticleLocation, ParticleRecord};
 use cosmic_space::kind::{BaseKind, Kind, KindParts, Specific};
 use cosmic_space::loc::{StarKey, ToBaseKind, Version};
+use cosmic_space::log::PointLogger;
 use cosmic_space::parse::{CamelCase, Domain, SkewerCase};
-use cosmic_space::selector::{ExactPointSeg, KindBaseSelector, PointHierarchy, PointKindSeg, PointSegSelector, Selector, SubKindSelector};
-use cosmic_space::selector::specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
+use cosmic_space::particle::{Details, Properties, Property, Status, Stub};
+use cosmic_space::point::Point;
+use cosmic_space::security::{
+    Access, AccessGrant, AccessGrantKind, EnumeratedAccess, IndexedAccessGrant, Permissions,
+    PermissionsMask, PermissionsMaskKind, Privilege, Privileges,
+};
+use cosmic_space::selector::specific::{
+    ProductSelector, ProviderSelector, VariantSelector, VendorSelector,
+};
+use cosmic_space::selector::{
+    ExactPointSeg, KindBaseSelector, PointHierarchy, PointKindSeg, PointSegSelector, Selector,
+    SubKindSelector,
+};
+use cosmic_space::substance::{Substance, SubstanceList, SubstanceMap};
 use cosmic_space::util::ValuePattern;
+use cosmic_space::HYPERUSER;
+use err::PostErr;
 use sqlx::pool::PoolConnection;
+use sqlx::postgres::{PgPoolOptions, PgRow};
+use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
+use std::collections::{HashMap, HashSet};
+use std::marker::PhantomData;
 use std::str::FromStr;
-use crate::hyperspace::err::HyperErr;
-use crate::hyperspace::lib::Cosmos;
-use crate::hyperspace::reg::{Registration, RegistryApi};
+use std::sync::Arc;
 
 pub trait PostgresPlatform: Cosmos
 where
@@ -1570,29 +1578,25 @@ pub mod test {
     use std::str::FromStr;
     use std::sync::Arc;
 
-    use cosmic_hyperlane::{
-        AnonHyperAuthenticator, HyperGate, HyperGateSelector, LocalHyperwayGateJumper,
+    use crate::hyperspace::lib::Cosmos;
+    use crate::hyperspace::reg::Registration;
+    use crate::registry::postgres::err::TestErr;
+    use crate::registry::postgres::{
+        PostgresDbInfo, PostgresPlatform, PostgresRegistryContext, PostgresRegistryContextHandle,
     };
+    use cosmic_hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
     use cosmic_space::artifact::asynch::ArtifactApi;
     use cosmic_space::command::direct::create::Strategy;
     use cosmic_space::command::direct::query::Query;
     use cosmic_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
-    use cosmic_space::hyper::ParticleLocation;
     use cosmic_space::kind::{Kind, Specific, StarSub, UserBaseSubKind};
     use cosmic_space::loc::{MachineName, StarKey, ToPoint};
     use cosmic_space::log::RootLogger;
     use cosmic_space::particle::property::PropertiesConfig;
     use cosmic_space::particle::Status;
     use cosmic_space::point::Point;
-    use cosmic_space::security::{
-        Access, AccessGrant, AccessGrantKind, Permissions, PermissionsMask, PermissionsMaskKind,
-        Privilege,
-    };
+    use cosmic_space::security::{AccessGrant, AccessGrantKind, PermissionsMask, Privilege};
     use cosmic_space::selector::{PointHierarchy, Selector};
-    use crate::hyperspace::lib::Cosmos;
-    use crate::hyperspace::reg::Registration;
-    use crate::registry::postgres::err::TestErr;
-    use crate::registry::postgres::{PostgresDbInfo, PostgresPlatform, PostgresRegistryContext, PostgresRegistryContextHandle};
 
     #[derive(Clone)]
     pub struct TestPlatform {

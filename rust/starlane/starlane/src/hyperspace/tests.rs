@@ -1,43 +1,26 @@
 #![cfg(test)]
 
 use std::fs;
-use std::io::Error;
 use std::path::Path;
-use std::sync::atomic;
-use std::sync::atomic::AtomicU64;
 use std::time::Duration;
 
-use chrono::{DateTime, Utc};
-use dashmap::DashMap;
 use serde::Serialize;
-use tokio::join;
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{oneshot, Mutex};
-use tokio::time::error::Elapsed;
 
-use cosmic_hyperlane::{
-    AnonHyperAuthenticator, HyperClient, HyperConnectionDetails, HyperConnectionErr, HyperGate,
-    HyperwayEndpoint, HyperwayStub, LocalHyperwayGateJumper,
-};
-use cosmic_space::artifact::asynch::ReadArtifactFetcher;
+use cosmic_hyperlane::HyperClient;
 use cosmic_space::command::common::StateSrc;
 use cosmic_space::command::direct::create::{
     Create, PointSegTemplate, PointTemplate, Strategy, Template,
 };
 use cosmic_space::command::{CmdTransfer, RawCommand};
-use cosmic_space::hyper::MountKind;
-use cosmic_space::hyper::{Assign, AssignmentKind, HyperSubstance, InterchangeKind, Knock};
-use cosmic_space::loc::{Layer, StarHandle, ToPoint, ToSurface, Uuid};
-use cosmic_space::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
-use cosmic_space::particle::traversal::TraversalDirection;
+use cosmic_space::hyper::{Assign, AssignmentKind, HyperSubstance};
+use cosmic_space::loc::{Layer, StarHandle, ToSurface};
+use cosmic_space::log::{LogSource, RootLogger, StdOutAppender};
 use cosmic_space::wave::core::cmd::CmdMethod;
 use cosmic_space::wave::core::ext::ExtMethod;
 use cosmic_space::wave::core::hyp::HypMethod;
 use cosmic_space::wave::core::Method;
 use cosmic_space::wave::exchange::asynch::Exchanger;
-use cosmic_space::wave::exchange::asynch::ProtoTransmitterBuilder;
-use cosmic_space::wave::{Agent, DirectedKind, DirectedProto, HyperWave, Pong, Wave};
+use cosmic_space::wave::{Agent, DirectedProto, Pong, Wave};
 use cosmic_space::HYPERUSER;
 
 use crate::driver::base::BaseDriverFactory;
@@ -51,10 +34,6 @@ use crate::machine::MachineApiExtFactory;
 use crate::mem::cosmos::MemCosmos;
 use crate::mem::registry::MemRegCtx;
 use crate::star::HyperStarApi;
-
-use super::*;
-
-use super::*;
 
 lazy_static! {
     pub static ref LESS: Point = Point::from_str("space:users:less").expect("point");

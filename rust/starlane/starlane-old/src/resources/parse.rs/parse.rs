@@ -1,4 +1,3 @@
-use nom::{AsChar, InputTakeAtPosition};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
 use nom::character::complete::{alpha0, alpha1, alphanumeric1, anychar, digit0, digit1, multispace0, one_of};
@@ -6,13 +5,14 @@ use nom::combinator::{all_consuming, not, opt};
 use nom::error::{context, ErrorKind, VerboseError};
 use nom::multi::{many1, many_m_n, separated_list0, separated_list1};
 use nom::sequence::{delimited, preceded, terminated, tuple};
+use nom::{AsChar, InputTakeAtPosition};
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 use std::str::FromStr;
 
-use crate::{ConfigSrc, DomainCase, FieldSelection, parse_resource_property, Res, ResourceKind, ResourceKindParts, ResourcePath, ResourcePathAndKind, ResourcePathAndType, ResourcePathSegmentKind, ResourcePropertiesKind, ResourceSelector, ResourceType, SkewerCase, Specific, Version};
 use crate::error::Error;
 use crate::property::{DataSetAspectSelector, ResourceHostPropertyValueSelector, ResourceProperty, ResourcePropertyAssignment, ResourcePropertyValueSelector, ResourceRegistryProperty, ResourceRegistryPropertyValueSelector, ResourceValueSelector};
+use crate::{parse_resource_property, ConfigSrc, DomainCase, FieldSelection, Res, ResourceKind, ResourceKindParts, ResourcePath, ResourcePathAndKind, ResourcePathAndType, ResourcePathSegmentKind, ResourcePropertiesKind, ResourceSelector, ResourceType, SkewerCase, Specific, Version};
 
 pub fn any_resource_path_segment<T>(i: T) -> Res<T, T>
     where
@@ -442,10 +442,10 @@ mod tests {
     use std::convert::TryInto;
     use std::str::FromStr;
 
-    use crate::{ConfigSrc, ResourcePath, ResourcePathAndKind};
     use crate::error::Error;
     use crate::parse::{parse_resource_path, parse_resource_path_and_kind, parse_resource_property_assignment, parse_resource_value_selector};
     use crate::property::{DataSetAspectSelector, FieldValueSelector, MetaFieldValueSelector, ResourceProperty, ResourcePropertyValueSelector};
+    use crate::{ConfigSrc, ResourcePath, ResourcePathAndKind};
 
     #[test]
     fn test_parse_resource_path() -> Result<(), Error> {

@@ -1,6 +1,5 @@
-use std::convert::Infallible;
-use strum::ParseError;
 use crate::hyperspace::err::{ErrKind, HyperErr};
+use strum::ParseError;
 
 #[cfg(test)]
 #[derive(Debug, Clone)]
@@ -34,6 +33,7 @@ impl PostErr for TestErr {
 
 #[cfg(test)]
 pub mod convert {
+    use crate::hyperspace::err::{ErrKind, HyperErr};
     use cosmic_space::err::SpaceErr;
     use mechtron_host::err::{DefaultHostErr, HostErr};
     use sqlx::Error;
@@ -44,12 +44,11 @@ pub mod convert {
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
-    use crate::hyperspace::err::{ErrKind, HyperErr};
 
-    #[derive(Debug,Clone)]
+    #[derive(Debug, Clone)]
     pub struct Err {
         message: String,
-        kind: ErrKind
+        kind: ErrKind,
     }
     impl Err {
         pub fn new<S: ToString>(message: S) -> Self {
@@ -193,8 +192,6 @@ pub mod convert {
             Err::new(err)
         }
     }
-
-
 
     impl From<zip::result::ZipError> for Err {
         fn from(a: zip::result::ZipError) -> Self {

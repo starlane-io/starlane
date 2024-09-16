@@ -22,6 +22,7 @@ use cosmic_space::kind::{ArtifactSubKind, BaseKind, Kind};
 use cosmic_space::loc::ToBaseKind;
 use cosmic_space::parse::bind_config;
 use cosmic_space::particle::PointKind;
+use cosmic_space::point::Point;
 use cosmic_space::selector::KindSelector;
 use cosmic_space::substance::{Bin, Substance};
 use cosmic_space::util::log;
@@ -37,7 +38,6 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use tempdir::TempDir;
-use cosmic_space::point::Point;
 
 lazy_static! {
     static ref REPO_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(

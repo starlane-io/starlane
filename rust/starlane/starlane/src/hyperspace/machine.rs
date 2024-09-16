@@ -1,7 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
-use std::marker::PhantomData;
-use std::process::Output;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -9,26 +7,18 @@ use std::time::Duration;
 use dashmap::DashMap;
 use futures::future::{join_all, select_all, BoxFuture};
 use futures::FutureExt;
-use tokio::sync::broadcast::Receiver;
-use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::watch::Ref;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
-use tracing::info;
 
 use cosmic_hyperlane::{
-    HyperClient, HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector,
-    HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange,
-    HyperwayStub, InterchangeGate, LayerTransform, LocalHyperwayGateJumper,
-    LocalHyperwayGateUnlocker, MountInterchangeGate, SimpleGreeter,
-    TokenAuthenticatorWithRemoteWhitelist,
+    HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, Hyperway, HyperwayEndpoint,
+    HyperwayEndpointFactory, HyperwayInterchange, LayerTransform, MountInterchangeGate,
+    SimpleGreeter,
 };
-use cosmic_space::artifact::asynch::{ArtifactApi, ArtifactFetcher, ReadArtifactFetcher};
+use cosmic_space::artifact::asynch::{ArtifactApi, ArtifactFetcher};
 use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{InterchangeKind, Knock};
 use cosmic_space::kind::StarSub;
-use cosmic_space::loc::{
-    ConstellationName, Layer, MachineName, StarHandle, StarKey, Surface, ToPoint, ToSurface,
-};
+use cosmic_space::loc::{Layer, MachineName, StarHandle, StarKey, Surface, ToPoint, ToSurface};
 use cosmic_space::log::{PointLogger, RootLogger};
 use cosmic_space::particle::{Status, Stub};
 use cosmic_space::point::Point;
@@ -36,8 +26,7 @@ use cosmic_space::settings::Timeouts;
 use cosmic_space::substance::{Bin, Substance};
 use cosmic_space::wave::core::cmd::CmdMethod;
 use cosmic_space::wave::exchange::asynch::Exchanger;
-use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{Agent, DirectedProto, HyperWave, Pong, UltraWave, Wave};
+use cosmic_space::wave::{Agent, DirectedProto, Pong, Wave};
 
 use crate::err::HyperErr;
 use crate::reg::{Registry, RegistryApi};

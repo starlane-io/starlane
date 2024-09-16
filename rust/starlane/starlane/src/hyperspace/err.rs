@@ -6,7 +6,6 @@ use cosmic_space::wave::core::ReflectedCore;
 use mechtron_host::err::{DefaultHostErr, HostErr};
 use std::fmt::Debug;
 
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ErrKind {
     Default,
@@ -83,8 +82,8 @@ pub trait HyperErr:
 }
 
 pub mod convert {
+    use crate::hyperspace::err::{ErrKind, HyperErr};
     use ascii::FromAsciiError;
-    use bincode::ErrorKind;
     use cosmic_space::err::SpaceErr;
     use mechtron_host::err::{DefaultHostErr, HostErr};
     use std::io;
@@ -93,12 +92,11 @@ pub mod convert {
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
-    use crate::hyperspace::err::{ErrKind, HyperErr};
 
-    #[derive(Debug,Clone)]
+    #[derive(Debug, Clone)]
     pub struct Err {
         message: String,
-        kind: ErrKind
+        kind: ErrKind,
     }
 
     impl Err {

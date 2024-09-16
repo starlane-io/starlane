@@ -1,19 +1,16 @@
 #![allow(warnings)]
-pub mod err;
-pub mod properties;
-
-
 #[macro_use]
 extern crate async_trait;
 #[macro_use]
 extern crate lazy_static;
+pub mod err;
+pub mod properties;
 
-
-#[cfg(feature="server")]
-pub mod server;
-#[cfg(feature="hyperspace")]
+#[cfg(feature = "hyperspace")]
 pub mod hyperspace;
 mod registry;
+#[cfg(feature = "server")]
+pub mod server;
 
 use std::str::FromStr;
 use std::time::Duration;
@@ -21,14 +18,10 @@ use uuid::Uuid;
 
 use cosmic_hyperlane::HyperGate;
 
-
-#[cfg(feature = "postgres")]
-use crate::registry::postgres::{ err::PostErr, PostgresPlatform };
-
-use cosmic_space::loc::ToBaseKind;
 use crate::err::StarErr;
 use crate::hyperspace::lib::Cosmos;
 use crate::server::Starlane;
+use cosmic_space::loc::ToBaseKind;
 
 fn main() -> Result<(), StarErr> {
     ctrlc::set_handler(move || {

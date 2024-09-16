@@ -3,7 +3,6 @@ extern crate strum_macros;
 
 use mesh_portal::version::latest::fail::Fail;
 use mesh_portal::version::latest::payload::Payload;
-use nom::{AsChar, InputTakeAtPosition, IResult};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take};
 use nom::character::complete::{alpha0, alpha1, anychar, digit0, digit1, one_of};
@@ -11,6 +10,7 @@ use nom::combinator::{not, opt, recognize};
 use nom::error::{context, ErrorKind, VerboseError};
 use nom::multi::{many1, many_m_n, separated_list0, separated_list1};
 use nom::sequence::{delimited, preceded, terminated, tuple};
+use nom::{AsChar, IResult, InputTakeAtPosition};
 use semver::SemVerError;
 use serde::Deserialize;
 use serde::Serialize;
@@ -1187,16 +1187,16 @@ mod tests {
     use std::convert::TryInto;
     use std::str::FromStr;
 
+    use crate::error::Error;
+    use crate::ResourcePath;
     use crate::{
-        domain, DomainCase, KeyBits, parse_resource_path, path, ResourceAddress,
-        ResourcePathSegment, SkewerCase, Specific, version,
+        domain, parse_resource_path, path, version, DomainCase, KeyBits,
+        ResourceAddress, ResourcePathSegment, SkewerCase, Specific,
     };
     use crate::{
         AppKey, DatabaseKey, DatabaseKind, ResourceKey, ResourceKind, ResourceType,
         RootKey, SpaceKey
     };
-    use crate::error::Error;
-    use crate::ResourcePath;
 
     #[test]
     fn test_kind() -> Result<(), Error> {

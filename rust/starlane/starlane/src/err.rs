@@ -19,22 +19,19 @@ impl StarlaneErr for StarErr {}
 
 pub mod convert {
     use crate::err::StarErr as Err;
-    use ascii::FromAsciiError;
-    use bincode::ErrorKind;
+    use crate::hyperspace::err::{ErrKind, HyperErr};
     //    use cosmic_registry_postgres::err::PostErr;
     #[cfg(feature = "postgres")]
     use crate::registry::postgres::err::PostErr;
+    use ascii::FromAsciiError;
     use cosmic_space::err::SpaceErr;
     use mechtron_host::err::{DefaultHostErr, HostErr};
-    use sqlx::Error;
     use std::io;
     use std::str::Utf8Error;
     use std::string::FromUtf8Error;
-    use strum::ParseError;
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
-    use crate::hyperspace::err::{ErrKind, HyperErr};
 
     impl Err {
         pub fn new<S: ToString>(message: S) -> Self {

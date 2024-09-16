@@ -6,54 +6,33 @@ extern crate async_recursion;
 extern crate async_trait;
 #[macro_use]
 extern crate cosmic_macros;
+extern crate inflector;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate strum_macros;
 
-extern crate inflector;
 use cosmic_space::wasm::Timestamp;
 use inflector::Inflector;
 
-use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
-use tokio::io;
-use tokio::runtime::{Handle, Runtime};
-use tokio::sync::{mpsc, oneshot};
-use tracing::error;
+use chrono::Utc;
 use uuid::Uuid;
 
 use cosmic_hyperlane::{HyperAuthenticator, HyperGate, HyperGateSelector, HyperwayEndpointFactory};
 use cosmic_space::artifact::asynch::ArtifactApi;
-use cosmic_space::command::common::{SetProperties, SetRegistry};
-use cosmic_space::command::direct::create::{KindTemplate, Strategy};
-use cosmic_space::command::direct::delete::Delete;
-use cosmic_space::command::direct::query::{Query, QueryResult};
-use cosmic_space::command::direct::select::{Select, SubSelect};
+use cosmic_space::command::direct::create::KindTemplate;
 use cosmic_space::err::SpaceErr;
-use cosmic_space::fail::Timeout;
-use cosmic_space::hyper::{ParticleLocation, ParticleRecord};
 use cosmic_space::kind::{
     ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind,
 };
-use cosmic_space::loc::{Layer, MachineName, StarKey, Surface, ToBaseKind, ToSurface};
+use cosmic_space::loc::{MachineName, StarKey, ToBaseKind, ToSurface};
 use cosmic_space::log::RootLogger;
 use cosmic_space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
-use cosmic_space::particle::{Details, Properties, Status, Stub};
-use cosmic_space::point::{Point, RouteSeg};
-use cosmic_space::security::IndexedAccessGrant;
-use cosmic_space::security::{Access, AccessGrant};
-use cosmic_space::selector::Selector;
 use cosmic_space::settings::Timeouts;
-use cosmic_space::substance::{Substance, SubstanceList, Token};
-use cosmic_space::wave::core::http2::StatusCode;
-use cosmic_space::wave::core::ReflectedCore;
-use cosmic_space::wave::UltraWave;
 use err::HyperErr;
 use mechtron_host::err::HostErr;
 use reg::Registry;

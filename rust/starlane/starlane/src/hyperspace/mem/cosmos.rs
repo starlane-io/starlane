@@ -14,22 +14,11 @@ use crate::err::{CosmicErr, HyperErr};
 use crate::mem::registry::{MemRegApi, MemRegCtx};
 use crate::reg::Registry;
 use crate::{Cosmos, DriversBuilder, MachineTemplate};
-use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGate, LocalHyperwayGateJumper};
-use cosmic_space::artifact::asynch::{ArtifactApi, ReadArtifactFetcher};
-use cosmic_space::err::SpaceErr;
-use cosmic_space::kind::{BaseKind, Kind, StarSub};
-use cosmic_space::loc::{MachineName, StarKey, ToBaseKind};
-use cosmic_space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
-use mechtron_host::err::HostErr;
-use std::io;
-use std::io::Error;
-use std::str::Utf8Error;
-use std::string::FromUtf8Error;
+use cosmic_hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
+use cosmic_space::artifact::asynch::ArtifactApi;
+use cosmic_space::kind::StarSub;
+use cosmic_space::loc::{MachineName, StarKey};
 use std::sync::Arc;
-use tokio::sync::oneshot;
-use tokio::sync::oneshot::error::RecvError;
-use tokio::time::error::Elapsed;
-use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
 
 impl MemCosmos {
     pub fn new() -> Self {
