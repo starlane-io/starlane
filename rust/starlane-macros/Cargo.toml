@@ -1,0 +1,25 @@
+[package]
+name = "starlane-macros"
+
+description = "Support macros for the Starlane project"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+license.workspace = true
+repository.workspace = true
+
+
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = {workspace=true,features=["full","fold","parsing"]}
+quote = {workspace=true}
+nom = {workspace=true}

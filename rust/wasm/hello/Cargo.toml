@@ -11,9 +11,9 @@ crate-type = ["cdylib"]
 
 [dependencies]
 
-mechtron= { path="../../mechtron/mechtron" }
+mechtron= { path= "../../mechtron" }
 cosmic-space = { path= "../../cosmic/cosmic-space" }
-cosmic-macros = { path="../../cosmic/cosmic-macros" }
+cosmic-macros = { path= "../../starlane-macros/cosmic-macros" }
 lazy_static = "1.4.0"
 
 # `wee_alloc` is a tiny allocator for wasm that is only ~1K in code size

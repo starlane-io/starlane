@@ -14,14 +14,14 @@ crate-type = ["cdylib"]
 
 [dependencies]
 
-#mechtron= "0.2.0-rc1"
-#mechtron-common= "0.2.0-rc1"
+#mech-old= "0.2.0-rc1"
+#mech-old-common= "0.2.0-rc1"
 #wasm_membrane_guest = "0.2.0"
 #mesh-portal= "0.2.0-rc1"
 
-mechtron= { path="../../mechtron/mechtron" }
+mechtron= { path= "../../mechtron" }
 cosmic-space = { path= "../../cosmic/cosmic-space" }
-cosmic-macros = { path="../../cosmic/cosmic-macros" }
+cosmic-macros = { path= "../../starlane-macros/cosmic-macros" }
 
 
 

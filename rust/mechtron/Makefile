@@ -1,12 +1,16 @@
+VERSION := $(shell cat ../../../VERSION)
+
 version:
-	$(MAKE) -C mechtron version
-	$(MAKE) -C mechtron-host version
+	toml set Cargo.toml dependencies.cosmic-space.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
+	toml set Cargo.toml dependencies.cosmic-macros.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
+	toml set Cargo.toml dependencies.cosmic-macros-primitive.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
 
 publish-dry-run:
-	$(MAKE) -C mechtron publish-dry-run
-	$(MAKE) -C mechtron-host publish-dry-run
+	cargo publish --dry-run --allow-dirty
 
 publish:
-	$(MAKE) -C mechtron publish
-	$(MAKE) -C mechtron-host publish
+	cargo publish
+ 
+  
+ 
 

@@ -16,14 +16,10 @@ description="..."
 [workspace]
 resolver = "2"
 members = [
-  "starlane/*",
+  "starlane", "starlane-macros", "starlane-primitive-macros","mechtron"
   ]
 
-exclude = [
-  "cosmic/cosmic-cli","cosmic/src", "cosmic/cosmic-registry-postgres","cosmic/cosmic-hyperspace","cosmic/target", "starlane/starlane-old", "starlane/starlane-core", "starlane/starlane-macros","mechtron/mocks",  "mechtron/mocks/hello-goodbye", "cosmic/cosmic-hyperlane-quic", "driver"
-
-
-]
+exclude = [ ]
 
 [workspace.dependencies]
 lazy_static = "1.5.0"
@@ -80,3 +76,14 @@ validator = "0.15.0"
 
 threadpool = "1.8.1"
 oneshot = "0.1.5"
+
+
+anyhow = "1.0.86"
+virtual-fs = "0.16.0"
+bytes = "1.7.1"
+
+
+syn = { version = "1.0", features = ["full"] }
+quote = "1.0"
+proc-macro2 = "1.0"
+quinn = "0.8.5"
