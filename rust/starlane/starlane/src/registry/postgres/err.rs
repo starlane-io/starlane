@@ -1,18 +1,25 @@
-use cosmic_hyperspace::err::{ErrKind, HyperErr};
-use cosmic_space::err::SpaceErr;
-use std::io::{Error, ErrorKind};
-use std::string::FromUtf8Error;
+use std::convert::Infallible;
 use strum::ParseError;
-
-pub trait PostErr: HyperErr + From<sqlx::Error> + From<ParseError> {
-    fn dupe() -> Self;
-}
+use crate::hyperspace::err::{ErrKind, HyperErr};
 
 #[cfg(test)]
 #[derive(Debug, Clone)]
 pub struct TestErr {
     pub message: String,
     pub kind: ErrKind,
+}
+
+impl TestErr {
+    pub(crate) fn new(e: Err) -> Self {
+        Self {
+            message: e.to_string(),
+            kind: ErrKind::Default,
+        }
+    }
+}
+
+pub trait PostErr: HyperErr + From<sqlx::Error> + From<ParseError> {
+    fn dupe() -> Self;
 }
 
 #[cfg(test)]
@@ -27,10 +34,6 @@ impl PostErr for TestErr {
 
 #[cfg(test)]
 pub mod convert {
-    use crate::err::TestErr as Err;
-    use crate::HyperErr;
-    use bincode::ErrorKind;
-    use cosmic_hyperspace::err::ErrKind;
     use cosmic_space::err::SpaceErr;
     use mechtron_host::err::{DefaultHostErr, HostErr};
     use sqlx::Error;
@@ -41,7 +44,13 @@ pub mod convert {
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
+    use crate::hyperspace::err::{ErrKind, HyperErr};
 
+    #[derive(Debug,Clone)]
+    pub struct Err {
+        message: String,
+        kind: ErrKind
+    }
     impl Err {
         pub fn new<S: ToString>(message: S) -> Self {
             Self {
@@ -185,11 +194,7 @@ pub mod convert {
         }
     }
 
-    impl From<acid_store::Error> for Err {
-        fn from(e: acid_store::Error) -> Self {
-            Err::new(e)
-        }
-    }
+
 
     impl From<zip::result::ZipError> for Err {
         fn from(a: zip::result::ZipError) -> Self {

@@ -1,7 +1,7 @@
-use cosmic_hyperspace::err::ErrKind;
+use crate::hyperspace::err::ErrKind;
 
 #[cfg(feature = "postgres")]
-use cosmic_registry_postgres::err::PostErr;
+use crate::registry::postgres::err::PostErr;
 
 #[cfg(feature = "postgres")]
 pub trait StarlaneErr: PostErr {}
@@ -21,10 +21,9 @@ pub mod convert {
     use crate::err::StarErr as Err;
     use ascii::FromAsciiError;
     use bincode::ErrorKind;
-    use cosmic_hyperspace::err::{ErrKind, HyperErr};
     //    use cosmic_registry_postgres::err::PostErr;
     #[cfg(feature = "postgres")]
-    use cosmic_registry_postgres::err::PostErr;
+    use crate::registry::postgres::err::PostErr;
     use cosmic_space::err::SpaceErr;
     use mechtron_host::err::{DefaultHostErr, HostErr};
     use sqlx::Error;
@@ -35,6 +34,7 @@ pub mod convert {
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
+    use crate::hyperspace::err::{ErrKind, HyperErr};
 
     impl Err {
         pub fn new<S: ToString>(message: S) -> Self {

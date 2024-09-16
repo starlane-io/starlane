@@ -59,6 +59,7 @@ use mechtron_host::err::HostErr;
 use reg::Registry;
 
 use crate::driver::{DriverFactory, DriversBuilder};
+use crate::hyperspace::machine::{Machine, MachineApi};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
 
 pub mod driver;

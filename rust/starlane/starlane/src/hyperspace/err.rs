@@ -5,14 +5,7 @@ use cosmic_space::wave::core::http2::StatusCode;
 use cosmic_space::wave::core::ReflectedCore;
 use mechtron_host::err::{DefaultHostErr, HostErr};
 use std::fmt::Debug;
-use std::io;
-use std::io::Error;
-use std::str::Utf8Error;
-use std::string::FromUtf8Error;
-use tokio::sync::oneshot;
-use tokio::sync::oneshot::error::RecvError;
-use tokio::time::error::Elapsed;
-use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
+
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ErrKind {
@@ -90,8 +83,6 @@ pub trait HyperErr:
 }
 
 pub mod convert {
-    use crate::err::{CosmicErr as Err, ErrKind};
-    use crate::HyperErr;
     use ascii::FromAsciiError;
     use bincode::ErrorKind;
     use cosmic_space::err::SpaceErr;
@@ -102,6 +93,13 @@ pub mod convert {
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
+    use crate::hyperspace::err::{ErrKind, HyperErr};
+
+    #[derive(Debug,Clone)]
+    pub struct Err {
+        message: String,
+        kind: ErrKind
+    }
 
     impl Err {
         pub fn new<S: ToString>(message: S) -> Self {
