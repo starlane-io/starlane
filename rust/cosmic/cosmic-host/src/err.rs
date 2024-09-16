@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct Err {
     message: String,
 }
@@ -19,28 +19,22 @@ impl ToString for Err {
 
  */
 
-
-
-
-impl <T> From<T> for Err where T: ToString {
+impl<T> From<T> for Err
+where
+    T: ToString,
+{
     fn from(value: T) -> Self {
         Self {
-            message: value.to_string()
+            message: value.to_string(),
         }
     }
 }
-
 
 impl Err {
     pub fn new(message: String) -> Self {
         Self { message }
     }
 }
-
-
-
-
-
 
 /*
 impl From<String> for Err {

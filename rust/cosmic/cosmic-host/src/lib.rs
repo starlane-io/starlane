@@ -27,29 +27,38 @@ use wasmer_wasix::{PluggableRuntime, WasiEnv};
 #[derive(Clone, Hash, Eq, PartialEq)]
 pub struct HostKey<B>
 where
-    B: Hash+Eq+PartialEq,
+    B: Hash + Eq + PartialEq,
 {
     bin: B,
     env: Env,
 }
 
-impl <B> HostKey<B> where B: Clone+Hash+Eq+PartialEq {
+impl<B> HostKey<B>
+where
+    B: Clone + Hash + Eq + PartialEq,
+{
     pub fn new(bin: B, env: Env) -> Self {
-        Self {
-            bin,
-            env
-        }
+        Self { bin, env }
     }
 }
 
 #[async_trait]
-pub trait HostService<B,P> {
-    async fn provision(&mut self, bin: B, env: Env) -> Result<Box<dyn Host<P>>,Err>;
+pub trait HostService<B, P> {
+    async fn provision(&mut self, bin: B, env: Env) -> Result<Box<dyn Host<P>>, Err>;
 }
 
 #[async_trait]
-pub trait Host<P> {
-    async fn execute(&mut self, args: Vec<String>) -> Result<P, Err>;
+pub trait Host<P, S> {
+    async fn execute(&self, args: Vec<String>) -> Result<P, Err>;
+
+    fn direct(&self) -> Box<dyn StdinProc<S>>;
+}
+
+#[async_trait]
+pub trait StdinProc<P> {
+    fn stdin(&self) -> P;
+
+    async fn execute(self, args: Vec<String>) -> Result<P, Err>;
 }
 
 #[derive(Clone, Eq, PartialEq)]
@@ -84,7 +93,10 @@ pub struct EnvBuilder {
 
 impl EnvBuilder {
     pub fn build(self) -> Env {
-        Env { pwd:self.pwd, env: self.env }
+        Env {
+            pwd: self.pwd,
+            env: self.env,
+        }
     }
     pub fn pwd<S>(&mut self, pwd: S) -> &mut Self
     where

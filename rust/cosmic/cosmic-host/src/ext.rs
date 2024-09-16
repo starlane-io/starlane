@@ -1,9 +1,10 @@
+use crate::{err, Env, Host, HostKey, HostService, Process, StdinProc};
 use async_trait::async_trait;
-use std::sync::Arc;
 use std::collections::HashMap;
 use std::process::Stdio;
-use tokio::process::{Child, Command};
-use crate::{err, Env, Host, HostKey, HostService, Process};
+use std::sync::Arc;
+use tokio::io::Stdin;
+use tokio::process::{Child, ChildStdin, Command};
 
 #[derive(Clone, Hash, Eq, PartialEq)]
 pub struct ExtBin {
@@ -35,11 +36,10 @@ impl ExtHostService {
 }
 
 #[async_trait]
-impl HostService<ExtBin,Child> for ExtHostService {
+impl HostService<ExtBin, Child> for ExtHostService {
     async fn provision(&mut self, bin: ExtBin, env: Env) -> Result<Box<dyn Host<Child>>, err::Err> {
-        let key = HostKey::new(bin.clone(),env.clone());
-        return Ok(Box::new(ExtHost::new( bin.clone(), env )));
-
+        let key = HostKey::new(bin.clone(), env.clone());
+        return Ok(Box::new(ExtHost::new(bin.clone(), env)));
     }
 }
 
@@ -49,47 +49,59 @@ pub struct ExtHost {
 }
 
 impl ExtHost {
-    fn new( bin: ExtBin, env: Env) -> Self {
-        Self {
-            env,
-            bin,
-        }
+    fn new(bin: ExtBin, env: Env) -> Self {
+        Self { env, bin }
+    }
+
+    async fn pre_exec(&self, args: Vec<String>) -> Result<Command, err::Err> {
+        let mut command = Command::new(self.bin.file.clone());
+        command.envs(self.env.env.clone());
+        command.args(args.clone());
+        command.current_dir(self.env.pwd.clone());
+        command.env_clear();
+        command.stdout(Stdio::piped());
+        command.stderr(Stdio::piped());
+        Ok(command)
     }
 }
 
 #[async_trait]
-impl Host<Child> for ExtHost {
-    async fn execute(&mut self, args: Vec<String>) -> Result<Child, err::Err> {
-
-        let mut command = Command::new( self.bin.file.clone() );
-        command.envs( self.env.env.clone() );
-        command.args( args.clone() );
-        command.current_dir(self.env.pwd.clone());
-        command.env_clear();
-        command.stdin(Stdio::piped());
-        command.stdout(Stdio::piped());
-        command.stderr(Stdio::piped());
-
+impl Host<Child, Stdin> for ExtHost {
+    async fn execute(&self, args: Vec<String>) -> Result<Child, err::Err> {
+        let mut command = self.pre_exec(args).await?;
+        command.stdin(Stdio::null());
         Ok(command.spawn()?)
-
     }
 
+    fn direct(&self) -> Box<dyn StdinProc<ChildStdin>> {
+        let mut command = self.pre_exec(args).await?;
+    }
 }
 
+pub struct ExtStdinProc {
+    stdin: ChildStdin,
+    child: Child,
+}
+
+impl ExtStdinProc {
+    pub fn new(child: Child, stdin: ChildStdin) -> Self {
+        Self { child, stdin }
+    }
+}
 
 #[cfg(test)]
 pub mod test {
-    use std::env::current_dir;
-    use crate::{EnvBuilder, HostService};
     use crate::ext::{ExtBin, ExtHostService};
+    use crate::{EnvBuilder, HostService};
+    use std::env::current_dir;
 
     #[tokio::test]
-    pub async fn test() -> Result<(),crate::err::Err> {
-        let mut service =  ExtHostService::new();
+    pub async fn test() -> Result<(), crate::err::Err> {
+        let mut service = ExtHostService::new();
         let mut builder = EnvBuilder::default();
-        builder.pwd(format!("{}/bins",current_dir().unwrap().to_str().unwrap()));
-        let bin = ExtBin::new( "./filestore".to_string() );
-        let mut host = service.provision(bin,builder.build()).await.unwrap();
+        builder.pwd(format!("{}/bins", current_dir().unwrap().to_str().unwrap()));
+        let bin = ExtBin::new("./filestore".to_string());
+        let mut host = service.provision(bin, builder.build()).await.unwrap();
 
         let child = host.execute(vec!["list".to_string()]).await?;
 
@@ -99,5 +111,4 @@ pub mod test {
         println!("{}", out);
         Ok(())
     }
-
 }

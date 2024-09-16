@@ -27,6 +27,22 @@ exclude = [
 
 ]
 
-
+[workspace.dependencies]
+lazy_static = "1.5.0"
+uuid = { version="1.1.2", features=["v4"] }
+chrono = { version="0.4.19", features=["serde"] }
+tokio = { version = "1.15.0", features = ["full"] }
+async-trait = "0.1.48"
+ctrlc = "3.2.2"
+bincode = "1.3.3"
+sqlx = { version = "0.5.11", features = [ "runtime-tokio-rustls", "postgres", "macros", "any" ] }
+strum = "0.24.1"
+strum_macros = "0.24.1"
+wasmer = "2.3.0"
+wasmer-compiler-singlepass = "2.3.0"
+zip = "0.6.2"
+dirs = "4.0.0"
+ascii = "1.1.0"
+url = "2.3.1"
 
 

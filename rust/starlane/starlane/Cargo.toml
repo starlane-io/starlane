@@ -25,24 +25,24 @@ cosmic-registry-postgres={ path= "../../cosmic/cosmic-registry-postgres" ,versio
 cosmic-hyperlane={ path="../../cosmic/cosmic-hyperlane",version = "0.3.14" }
 cosmic-hyperlane-tcp={ path="../../cosmic/cosmic-hyperlane-tcp",version = "0.3.14" }
 mechtron-host={ path="../../mechtron/mechtron-host",version = "0.3.14" }
-lazy_static = "1.4.0"
-uuid = { version="1.1.2", features=["v4"] }
-chrono = { version="0.4.19", features=["serde"] }
-tokio = { version = "1.15.0", features = ["full"] }
-async-trait = "0.1.48"
-ctrlc = "3.2.2"
-bincode = "1.3.3"
-sqlx = { version = "0.5.11", features = [ "runtime-tokio-rustls", "postgres", "macros", "any" ] }
-strum = "0.24.1"
-strum_macros = "0.24.1"
-wasmer = "2.3.0"
-wasmer-compiler-singlepass = "2.3.0"
+lazy_static = {  workspace=true  }
+uuid = { workspace=true, features=["v4"] }
+chrono = { workspace=true, features=["serde"] }
+tokio = { workspace=true, features = ["full"] }
+async-trait = {workspace = true}
+ctrlc = {workspace = true}
+bincode = {workspace = true}
+sqlx = { workspace=true, features = [ "runtime-tokio-rustls", "postgres", "macros", "any" ] }
+strum =  {workspace = true}
+strum_macros = {workspace = true}
+wasmer = {workspace = true}
+wasmer-compiler-singlepass = {workspace = true}
 #acid-store = {git="https://github.com/uberscott/acid-store.git" , version="0.14.2" }
 
 
 
-zip = "0.6.2"
-dirs = "4.0.0"
-ascii = "1.1.0"
-url = "2.3.1"
+zip = { workspace=true }
+dirs ={ workspace=true }
+ascii ={ workspace=true }
+url ={ workspace=true }
 
