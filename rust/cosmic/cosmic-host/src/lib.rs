@@ -44,7 +44,7 @@ impl <B> HostKey<B> where B: Clone+Hash+Eq+PartialEq {
 
 #[async_trait]
 pub trait HostService<B,P> {
-    async fn provision(&mut self, bin: B, env: Env) -> Result<Arc<dyn Host<P>>,Err>;
+    async fn provision(&mut self, bin: B, env: Env) -> Result<Box<dyn Host<P>>,Err>;
 }
 
 #[async_trait]

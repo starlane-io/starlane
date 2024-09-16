@@ -26,22 +26,20 @@ pub struct ExtHostService {
     hosts: HashMap<HostKey<ExtBin>, Arc<ExtHost>>,
 }
 
+impl ExtHostService {
+    pub fn new() -> Self {
+        Self {
+            hosts: Default::default(),
+        }
+    }
+}
+
 #[async_trait]
 impl HostService<ExtBin,Child> for ExtHostService {
-    async fn provision(&mut self, bin: ExtBin, env: Env) -> Result<Arc<dyn Host<Child>>, err::Err> {
+    async fn provision(&mut self, bin: ExtBin, env: Env) -> Result<Box<dyn Host<Child>>, err::Err> {
         let key = HostKey::new(bin.clone(),env.clone());
-        if !self.hosts.contains_key(&key) {
-            tokio::fs::try_exists(&bin.file).await?;
-            let host = Arc::new(ExtHost::new( bin.clone(), env ));
-            self.hosts.insert(key.clone(),host);
-        }
+        return Ok(Box::new(ExtHost::new( bin.clone(), env )));
 
-        Result::Ok(
-            self.hosts
-                .get(&key)
-                .ok_or(err::Err::new(format!("could not find bin {} in hosts", &bin.file)))?
-                .clone(),
-        )
     }
 }
 
@@ -81,9 +79,25 @@ impl Host<Child> for ExtHost {
 
 #[cfg(test)]
 pub mod test {
-    #[tokio::test]
-    pub async fn test() {
+    use std::env::current_dir;
+    use crate::{EnvBuilder, HostService};
+    use crate::ext::{ExtBin, ExtHostService};
 
+    #[tokio::test]
+    pub async fn test() -> Result<(),crate::err::Err> {
+        let mut service =  ExtHostService::new();
+        let mut builder = EnvBuilder::default();
+        builder.pwd(format!("{}/bins",current_dir().unwrap().to_str().unwrap()));
+        let bin = ExtBin::new( "./filestore".to_string() );
+        let mut host = service.provision(bin,builder.build()).await.unwrap();
+
+        let child = host.execute(vec!["list".to_string()]).await?;
+
+        let output = child.wait_with_output().await?;
+
+        let out = String::from_utf8(output.stdout).unwrap();
+        println!("{}", out);
+        Ok(())
     }
 
 }

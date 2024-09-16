@@ -2,3 +2,4 @@ test
 *.ser
 *.wasm
 tmp
+bins
