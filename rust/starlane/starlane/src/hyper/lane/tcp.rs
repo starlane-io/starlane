@@ -1,40 +1,24 @@
-#![allow(warnings)]
-
-#[macro_use]
-extern crate async_trait;
-
-use std::io::{Empty, Read};
-use std::iter;
-use std::net::{SocketAddr, ToSocketAddrs};
-use std::pin::Pin;
-use std::str::FromStr;
-use std::string::FromUtf8Error;
-use std::sync::Arc;
-use std::time::Duration;
-
-use rcgen::{generate_simple_self_signed, Certificate, RcgenError};
-use rustls::internal::msgs::codec::Codec;
-use rustls::{server, ClientConfig, RootCertStore, ServerConfig, ServerName};
-use tls_api_rustls::TlsConnectorBuilder;
-use tokio::fs::File;
-use tokio::io;
-use tokio::io::{AsyncReadExt, AsyncWriteExt, BufWriter};
-use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf, ReadHalf, WriteHalf};
-use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{broadcast, mpsc, oneshot};
-use tokio::time::error::Elapsed;
-use tokio_rustls::{TlsAcceptor, TlsConnector, TlsStream};
-
-use cosmic_hyperlane::{
-    HyperConnectionDetails, HyperConnectionStatus, HyperGate, HyperGateSelector, HyperwayEndpoint,
-    HyperwayEndpointFactory, VersionGate,
-};
-use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::Knock;
 use cosmic_space::log::PointLogger;
+use tokio::net::{TcpListener, TcpStream};
+use std::sync::Arc;
+use tokio::sync::{broadcast, mpsc, oneshot};
+use std::time::Duration;
+use cosmic_space::err::SpaceErr;
 use cosmic_space::substance::Substance;
+use rcgen::{generate_simple_self_signed, RcgenError};
+use tokio::time::error::Elapsed;
+use tokio::fs::File;
 use cosmic_space::wave::{Ping, UltraWave, Wave};
+use std::io;
+use std::string::FromUtf8Error;
 use cosmic_space::VERSION;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use std::str::FromStr;
+use std::io::Read;
+use rustls::ServerConfig;
+use tokio_rustls::{TlsAcceptor, TlsConnector, TlsStream};
+use crate::hyper::lane::{HyperConnectionDetails, HyperConnectionStatus, HyperGate, HyperGateSelector, HyperwayEndpoint, HyperwayEndpointFactory};
 
 pub struct HyperlaneTcpClient {
     host: String,
@@ -215,6 +199,7 @@ pub struct FrameMuxer {
     terminate_rx: mpsc::Receiver<()>,
     logger: PointLogger,
 }
+
 impl FrameMuxer {
     pub async fn handshake(
         mut stream: FrameStream,
@@ -522,6 +507,7 @@ impl Error {
         }
     }
 }
+
 impl From<Elapsed> for Error {
     fn from(e: Elapsed) -> Self {
         Self::new(e)
@@ -566,23 +552,15 @@ impl From<&str> for Error {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
-    use cosmic_hyperlane::test_util::{
-        LargeFrameTest, SingleInterchangePlatform, WaveTest, FAE, LESS,
-    };
+    use std::str::FromStr;
     use cosmic_space::loc::ToSurface;
     use cosmic_space::log::RootLogger;
 
     use chrono::DateTime;
     use chrono::Utc;
-    use cosmic_hyperlane::HyperClient;
     use cosmic_space::point::Point;
-    use cosmic_space::settings::Timeouts;
-    use cosmic_space::wave::exchange::asynch::Exchanger;
-    use cosmic_space::wave::DirectedProto;
-
-    use super::*;
+    use starlane::hyper::lane::tcp::{CertGenerator, Error, HyperlaneTcpClient, HyperlaneTcpServer};
+    use crate::hyper::lane::test_util::{LargeFrameTest, SingleInterchangePlatform, WaveTest, FAE, LESS};
 
     #[no_mangle]
     pub extern "C" fn cosmic_uuid() -> String {

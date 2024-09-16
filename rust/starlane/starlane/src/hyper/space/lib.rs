@@ -22,7 +22,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use uuid::Uuid;
 
-use cosmic_hyperlane::{HyperAuthenticator, HyperGate, HyperGateSelector, HyperwayEndpointFactory};
+use cosmic_hyperlane::{};
 use cosmic_space::artifact::asynch::ArtifactApi;
 use cosmic_space::command::direct::create::KindTemplate;
 use cosmic_space::err::SpaceErr;
@@ -38,7 +38,8 @@ use mechtron_host::err::HostErr;
 use reg::Registry;
 
 use crate::driver::{DriverFactory, DriversBuilder};
-use crate::hyperspace::machine::{Machine, MachineApi};
+use crate::hyper::lane::{HyperAuthenticator, HyperGate, HyperGateSelector, HyperwayEndpointFactory};
+use crate::hyper::space::machine::{Machine, MachineApi};
 use crate::machine::{Machine, MachineApi, MachineTemplate};
 
 pub mod driver;

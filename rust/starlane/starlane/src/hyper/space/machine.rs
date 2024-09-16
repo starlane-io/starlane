@@ -9,11 +9,7 @@ use futures::future::{join_all, select_all, BoxFuture};
 use futures::FutureExt;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
-use cosmic_hyperlane::{
-    HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, Hyperway, HyperwayEndpoint,
-    HyperwayEndpointFactory, HyperwayInterchange, LayerTransform, MountInterchangeGate,
-    SimpleGreeter,
-};
+use cosmic_hyperlane::{};
 use cosmic_space::artifact::asynch::{ArtifactApi, ArtifactFetcher};
 use cosmic_space::err::SpaceErr;
 use cosmic_space::hyper::{InterchangeKind, Knock};
@@ -32,6 +28,7 @@ use crate::err::HyperErr;
 use crate::reg::{Registry, RegistryApi};
 use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
 use crate::{Cosmos, DriversBuilder};
+use crate::hyper::lane::{HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, LayerTransform, MountInterchangeGate, SimpleGreeter};
 
 #[derive(Clone)]
 pub struct MachineApi<P>

@@ -7,7 +7,7 @@ pub mod err;
 pub mod properties;
 
 #[cfg(feature = "hyperspace")]
-pub mod hyperspace;
+pub mod hyper;
 mod registry;
 #[cfg(feature = "server")]
 pub mod server;
@@ -16,10 +16,10 @@ use std::str::FromStr;
 use std::time::Duration;
 use uuid::Uuid;
 
-use cosmic_hyperlane::HyperGate;
+use self::hyper::lane::HyperGate;
 
 use crate::err::StarErr;
-use crate::hyperspace::lib::Cosmos;
+use self::hyper::space::lib::Cosmos;
 use crate::server::Starlane;
 use cosmic_space::loc::ToBaseKind;
 

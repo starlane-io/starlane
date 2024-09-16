@@ -14,11 +14,12 @@ use crate::err::{CosmicErr, HyperErr};
 use crate::mem::registry::{MemRegApi, MemRegCtx};
 use crate::reg::Registry;
 use crate::{Cosmos, DriversBuilder, MachineTemplate};
-use cosmic_hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
+use cosmic_hyperlane::{};
 use cosmic_space::artifact::asynch::ArtifactApi;
 use cosmic_space::kind::StarSub;
 use cosmic_space::loc::{MachineName, StarKey};
 use std::sync::Arc;
+use crate::hyper::lane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
 
 impl MemCosmos {
     pub fn new() -> Self {

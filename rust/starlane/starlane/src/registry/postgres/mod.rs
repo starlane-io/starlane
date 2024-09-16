@@ -1,8 +1,8 @@
 pub mod err;
 
-use crate::hyperspace::err::HyperErr;
-use crate::hyperspace::lib::Cosmos;
-use crate::hyperspace::reg::{Registration, RegistryApi};
+use crate::hyper::space::err::HyperErr;
+use crate::hyper::space::lib::Cosmos;
+use crate::hyper::space::reg::{Registration, RegistryApi};
 use cosmic_space::command::common::{PropertyMod, SetProperties};
 use cosmic_space::command::direct::create::Strategy;
 use cosmic_space::command::direct::delete::Delete;
@@ -1578,13 +1578,13 @@ pub mod test {
     use std::str::FromStr;
     use std::sync::Arc;
 
-    use crate::hyperspace::lib::Cosmos;
-    use crate::hyperspace::reg::Registration;
+    use crate::hyper::space::lib::Cosmos;
+    use crate::hyper::space::reg::Registration;
     use crate::registry::postgres::err::TestErr;
     use crate::registry::postgres::{
         PostgresDbInfo, PostgresPlatform, PostgresRegistryContext, PostgresRegistryContextHandle,
     };
-    use cosmic_hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
+    use cosmic_hyperlane::{};
     use cosmic_space::artifact::asynch::ArtifactApi;
     use cosmic_space::command::direct::create::Strategy;
     use cosmic_space::command::direct::query::Query;
@@ -1597,6 +1597,7 @@ pub mod test {
     use cosmic_space::point::Point;
     use cosmic_space::security::{AccessGrant, AccessGrantKind, PermissionsMask, Privilege};
     use cosmic_space::selector::{PointHierarchy, Selector};
+    use crate::hyper::lane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
 
     #[derive(Clone)]
     pub struct TestPlatform {
@@ -1700,7 +1701,7 @@ pub mod test {
         registry.nuke().await?;
 
         let point = Point::from_str("localhost")?;
-        let hyperuser = Point::from_str("hyperspace:users:hyperuser")?;
+        let hyperuser = Point::from_str("hyper:users:hyperuser")?;
         let registration = Registration {
             point: point.clone(),
             kind: Kind::Space,
@@ -1756,7 +1757,7 @@ pub mod test {
         let registry = registry().await?;
         registry.nuke().await?;
 
-        let hyperuser = Point::from_str("hyperspace:users:hyperuser")?;
+        let hyperuser = Point::from_str("hyper:users:hyperuser")?;
         let superuser = Point::from_str("localhost:users:superuser")?;
         let scott = Point::from_str("localhost:app:users:scott")?;
         let app = Point::from_str("localhost:app")?;
@@ -1775,7 +1776,7 @@ pub mod test {
         registry.register(&registration).await?;
 
         let registration = Registration {
-            point: Point::from_str("hyperspace")?,
+            point: Point::from_str("hyper")?,
             kind: Kind::Space,
             registry: Default::default(),
             properties: Default::default(),
@@ -1790,7 +1791,7 @@ pub mod test {
         )?));
 
         let registration = Registration {
-            point: Point::from_str("hyperspace:users")?,
+            point: Point::from_str("hyper:users")?,
             kind: userbase.clone(),
             registry: Default::default(),
             properties: Default::default(),

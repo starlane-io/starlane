@@ -1,60 +1,41 @@
-#![allow(warnings)]
+#[cfg(feature="hyperlane-tcp")]
+pub mod tcp;
 
-#[macro_use]
-extern crate async_trait;
-#[macro_use]
-extern crate lazy_static;
 
-use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, HashSet};
-use std::future::Future;
-use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut};
-use std::str::FromStr;
-use std::sync::atomic::{AtomicU16, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
-
-use dashmap::DashMap;
-use futures::future::select_all;
-use futures::FutureExt;
-use tokio::io::AsyncWriteExt;
-use tokio::select;
-use tokio::sync::mpsc::error::{SendError, SendTimeoutError, TrySendError};
-use tokio::sync::mpsc::Receiver;
-use tokio::sync::oneshot::Sender;
-use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
-
-use cosmic_space::command::direct::create::{PointFactoryU64, PointSegTemplate};
-use cosmic_space::err::SpaceErr;
-use cosmic_space::frame::PrimitiveFrame;
-use cosmic_space::hyper::{Greet, HyperSubstance, InterchangeKind, Knock};
-use cosmic_space::loc::{Layer, PointFactory, Surface, ToPoint, ToSurface, Version};
+use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use cosmic_space::log::{PointLogger, RootLogger, Tracker};
-use cosmic_space::particle::Status;
-use cosmic_space::point::Point;
-use cosmic_space::settings::Timeouts;
-use cosmic_space::substance::{FormErrs, Substance, SubstanceKind, Token};
-use cosmic_space::util::uuid;
+use cosmic_space::wave::{Agent, DirectedProto, HyperWave, UltraWave};
+use std::time::Duration;
+use cosmic_space::err::SpaceErr;
+use cosmic_space::loc::{Layer, PointFactory, Surface, ToSurface};
+use std::sync::Arc;
+use dashmap::DashMap;
+use cosmic_space::hyper::{Greet, InterchangeKind, Knock};
+use cosmic_space::substance::{Substance, Token};
 use cosmic_space::wave::core::ext::ExtMethod;
-use cosmic_space::wave::core::hyp::HypMethod;
-use cosmic_space::wave::core::Method;
-use cosmic_space::wave::exchange::asynch::{
-    Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
-};
+use cosmic_space::wave::exchange::asynch::{Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter};
 use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{
-    Agent, DirectedKind, DirectedProto, Handling, HyperWave, Ping, Pong, Reflectable,
-    ReflectedKind, ReflectedProto, ReflectedWave, UltraWave, Wave, WaveId, WaveKind,
-};
+use std::ops::{Deref, DerefMut};
+use cosmic_space::point::Point;
+use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
 use cosmic_space::VERSION;
+use std::sync::atomic::{AtomicU16, Ordering};
+use once_cell::sync::Lazy;
 
-lazy_static! {
-    pub static ref LOCAL_CLIENT: Point = Point::from_str("LOCAL::client").expect("point");
-    pub static ref LOCAL_CLIENT_RUNNER: Point =
-        Point::from_str("LOCAL::client:runner").expect("point");
-    pub static ref HYPERLANE_INDEX: AtomicU16 = AtomicU16::new(0);
-}
+
+
+pub static LOCAL_CLIENT: Lazy<Point> = Lazy::new( | | {
+    Point::from_str("LOCAL::client").expect("point")
+});
+
+pub static LOCAL_CLIENT_RUNNER: Lazy<Point> = Lazy::new( | | {
+    Point::from_str("LOCAL::client:runner").expect("point")
+});
+
+pub static HYPERLANE_INDEX: Lazy<AtomicU16> = Lazy::new( | | {
+    AtomicU16::new(0)
+});
 
 pub enum HyperwayKind {
     Mount,
@@ -422,6 +403,7 @@ impl HyperTransform for FromTransform {
         wave
     }
 }
+
 #[derive(Clone)]
 pub struct Hyperlane {
     tx: mpsc::Sender<HyperlaneCall>,
@@ -1134,6 +1116,7 @@ where
     interchange: Arc<HyperwayInterchange>,
     configurator: C,
 }
+
 impl<A, G, C> InterchangeGate<A, G, C>
 where
     A: HyperAuthenticator,
@@ -1887,43 +1870,6 @@ impl HyperwayEndpointFactory for LocalHyperwayGateJumper {
     }
 }
 
-/*
-pub struct DirectInterchangeMountHyperwayExtFactory {
-    pub stub: HyperwayStub,
-    pub interchange: Arc<HyperwayInterchange>,
-}
-
-impl DirectInterchangeMountHyperwayExtFactory {
-    pub fn new(stub: HyperwayStub, interchange: Arc<HyperwayInterchange>) -> Self {
-        Self { stub, interchange }
-    }
-}
-
-#[async_trait]
-impl HyperwayExtFactory for DirectInterchangeMountHyperwayExtFactory {
-    async fn create(&self) -> Result<HyperwayExt, HyperConnectionErr> {
-        match self.interchange.mount(self.stub.clone()).await {
-            Ok(mount) => {
-                let knock = Knock::new(
-                    InterchangeKind::Singleton,
-                    self.stub.remote.clone(),
-                    Substance::Empty,
-                );
-                let wave: Wave<Ping> = knock.into();
-                let wave = wave.to_ultra();
-                mount.tx.send(wave).await;
-                Ok(mount)
-            }
-            Err(_) => Err(HyperConnectionErr::Fatal(format!(
-                "invalid mount point '{}'",
-                self.stub.remote.to_string()
-            ))),
-        }
-    }
-}
-
- */
-
 // connects two interchanges one local, the other via client
 pub struct Bridge {
     client: HyperClient,
@@ -1983,19 +1929,15 @@ mod tests {
     use cosmic_space::point::Point;
     use cosmic_space::substance::Substance;
     use cosmic_space::wave::HyperWave;
-
-    use crate::{
-        AnonHyperAuthenticator, HyperGate, HyperGateSelector, HyperRouter, HyperwayInterchange,
-        InterchangeGate,
-    };
+    use crate::hyper::lane::HyperRouter;
 
     #[no_mangle]
-    pub(crate) extern "C" fn cosmic_uuid() -> String {
+    pub extern "C" fn cosmic_uuid() -> String {
         uuid::Uuid::new_v4().to_string()
     }
 
     #[no_mangle]
-    pub(crate) extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
+    pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
         Utc::now()
     }
 
@@ -2051,6 +1993,7 @@ pub mod test_util {
 
     use dashmap::DashMap;
     use lazy_static::lazy_static;
+    use once_cell::sync::Lazy;
     use tokio::sync::{broadcast, mpsc, oneshot};
 
     use cosmic_space::command::direct::create::PointFactoryU64;
@@ -2072,19 +2015,21 @@ pub mod test_util {
         Agent, DirectedKind, DirectedProto, HyperWave, Pong, ReflectedKind, ReflectedProto,
         ReflectedWave, UltraWave, Wave,
     };
-
-    use crate::{
-        AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, Bridge, HyperClient,
-        HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter,
-        HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
-        HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper,
-        LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist,
-    };
+    use crate::hyper::lane::{AnonHyperAuthenticator, HyperClient, HyperGate, HyperGateSelector, HyperGreeter, Hyperway, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker, MountInterchangeGate};
 
     lazy_static! {
-        pub static ref LESS: Point = Point::from_str("space:users:less").expect("point");
-        pub static ref FAE: Point = Point::from_str("space:users:fae").expect("point");
+    //    pub static ref LESS: Point = Point::from_str("space:users:less").expect("point");
+//        pub static ref FAE: Point = Point::from_str("space:users:fae").expect("point");
     }
+
+    pub static LESS: Lazy<Point> = Lazy::new( | | {
+        Point::from_str("space:users:less").expect("point")
+    });
+
+    pub static FAE: Lazy<Point> = Lazy::new( | | {
+        Point::from_str("space:users:fae").expect("point")
+    });
+
 
     #[derive(Clone)]
     pub struct SingleInterchangePlatform {
@@ -2388,14 +2333,8 @@ pub mod test {
         ReflectedWave, UltraWave, Wave,
     };
 
-    use crate::test_util::{SingleInterchangePlatform, TestGreeter, WaveTest, FAE, LESS};
-    use crate::{
-        AnonHyperAuthenticator, AnonHyperAuthenticatorAssignEndPoint, Bridge, HyperClient,
-        HyperConnectionDetails, HyperConnectionErr, HyperGate, HyperGateSelector, HyperGreeter,
-        HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
-        HyperwayInterchange, HyperwayStub, InterchangeGate, LocalHyperwayGateJumper,
-        LocalHyperwayGateUnlocker, MountInterchangeGate, TokenAuthenticatorWithRemoteWhitelist,
-    };
+    use starlane::hyper::lane::test_util::{SingleInterchangePlatform, TestGreeter, WaveTest, FAE, LESS};
+    use crate::hyper::lane::{AnonHyperAuthenticator, Bridge, HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker, MountInterchangeGate};
 
     pub struct TestRouter {}
 

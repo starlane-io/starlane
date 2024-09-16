@@ -1,4 +1,4 @@
-use crate::hyperspace::lib::Cosmos;
+use crate::hyper::space::lib::Cosmos;
 use cosmic_space::command::common::{SetProperties, SetRegistry};
 use cosmic_space::command::direct::create::Strategy;
 use cosmic_space::command::direct::delete::Delete;

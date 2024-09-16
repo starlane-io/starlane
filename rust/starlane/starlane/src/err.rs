@@ -1,4 +1,4 @@
-use crate::hyperspace::err::ErrKind;
+use crate::hyper::space::err::ErrKind;
 
 #[cfg(feature = "postgres")]
 use crate::registry::postgres::err::PostErr;
@@ -19,7 +19,7 @@ impl StarlaneErr for StarErr {}
 
 pub mod convert {
     use crate::err::StarErr as Err;
-    use crate::hyperspace::err::{ErrKind, HyperErr};
+    use crate::hyper::space::err::{ErrKind, HyperErr};
     //    use cosmic_registry_postgres::err::PostErr;
     #[cfg(feature = "postgres")]
     use crate::registry::postgres::err::PostErr;

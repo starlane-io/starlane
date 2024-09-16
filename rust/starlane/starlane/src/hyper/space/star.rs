@@ -19,10 +19,7 @@ use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 use tokio::time::error::Elapsed;
 use tracing::{error, info};
 
-use cosmic_hyperlane::{
-    Bridge, HyperClient, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
-    HyperwayInterchange, HyperwayStub,
-};
+use cosmic_hyperlane::{};
 use cosmic_space::artifact::ArtRef;
 use cosmic_space::command::common::StateSrc;
 use cosmic_space::command::direct::create::{Create, Strategy};
@@ -83,6 +80,7 @@ use crate::layer::shell::ShellState;
 use crate::machine::MachineSkel;
 use crate::reg::{Registration, Registry, RegistryApi};
 use crate::{Cosmos, DriversBuilder};
+use crate::hyper::lane::{Bridge, HyperClient, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub};
 
 #[derive(Clone)]
 pub struct ParticleStates<P>

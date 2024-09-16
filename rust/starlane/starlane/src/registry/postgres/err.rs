@@ -1,4 +1,4 @@
-use crate::hyperspace::err::{ErrKind, HyperErr};
+use crate::hyper::space::err::{ErrKind, HyperErr};
 use strum::ParseError;
 
 #[cfg(test)]
@@ -33,7 +33,7 @@ impl PostErr for TestErr {
 
 #[cfg(test)]
 pub mod convert {
-    use crate::hyperspace::err::{ErrKind, HyperErr};
+    use crate::hyper::space::err::{ErrKind, HyperErr};
     use cosmic_space::err::SpaceErr;
     use mechtron_host::err::{DefaultHostErr, HostErr};
     use sqlx::Error;

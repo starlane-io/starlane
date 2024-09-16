@@ -82,7 +82,7 @@ pub trait HyperErr:
 }
 
 pub mod convert {
-    use crate::hyperspace::err::{ErrKind, HyperErr};
+    use crate::hyper::space::err::{ErrKind, HyperErr};
     use ascii::FromAsciiError;
     use cosmic_space::err::SpaceErr;
     use mechtron_host::err::{DefaultHostErr, HostErr};

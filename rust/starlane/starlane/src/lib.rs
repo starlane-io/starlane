@@ -7,7 +7,7 @@ pub mod err;
 pub mod properties;
 
 #[cfg(feature = "hyperspace")]
-pub mod hyperspace;
+pub mod hyper;
 mod registry;
 #[cfg(feature = "server")]
 pub mod server;

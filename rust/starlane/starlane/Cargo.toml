@@ -18,14 +18,14 @@ repository.workspace = true
 [features]
 full=["server"]
 default=["server"]
-server=["hyperspace", "postgres"]
+server=["hyperspace", "hyperlane","postgres", "hyperlane-tcp"]
 hyperspace=["dep:futures","dep:dashmap","dep:semver"]
+hyperlane=["hyperspace"]
+hyperlane-tcp =  ["hyperlane","dep:rcgen","dep:rustls","dep:tokio-rustls","dep:tls-api-rustls"]
 postgres=[ "dep:sqlx","dep:serde","dep:tracing","dep:async-recursion" ]
 
 [dependencies]
 cosmic-space={ path= "../../cosmic/cosmic-space" ,version = "0.3.14" }
-cosmic-hyperlane={ path="../../cosmic/cosmic-hyperlane",version = "0.3.14" }
-cosmic-hyperlane-tcp={ path="../../cosmic/cosmic-hyperlane-tcp",version = "0.3.14" }
 mechtron-host={ path="../../mechtron/mechtron-host",version = "0.3.14" }
 lazy_static = {  workspace=true  }
 uuid = { workspace=true, features=["v4"] }
@@ -40,14 +40,13 @@ wasmer = {workspace = true}
 wasmer-compiler-singlepass = {workspace = true}
 #acid-store = {git="https://github.com/uberscott/acid-store.git" , version="0.14.2" }
 
-
-
+once_cell = { workspace=true }
 zip = { workspace=true }
 dirs ={ workspace=true }
 ascii ={ workspace=true }
 url ={ workspace=true }
 
-# hyperspace requirements
+# hyper requirements
 futures = {workspace=true, default-features = true, optional=true }
 dashmap = {workspace=true, optional = true}
 semver = { workspace=true, features=['serde'], optional = true }
@@ -59,6 +58,11 @@ serde = { workspace = true, features=['derive','rc'], optional=true }
 tracing = { workspace = true, optional = true}
 async-recursion = { workspace = true, optional=true }
 
+
+rcgen = { workspace = true, optional = true}
+rustls = { workspace = true, optional = true}
+tokio-rustls =  { workspace = true, optional = true}
+tls-api-rustls =  { workspace = true, optional = true}
 
 [lib]
 name = "starlane"

@@ -1,22 +1,20 @@
 use crate::err::StarErr;
-use crate::hyperspace::driver::base::BaseDriverFactory;
-use crate::hyperspace::driver::control::ControlDriverFactory;
-use crate::hyperspace::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
-use crate::hyperspace::driver::root::RootDriverFactory;
-use crate::hyperspace::driver::space::SpaceDriverFactory;
-use crate::hyperspace::driver::web::WebDriverFactory;
-use crate::hyperspace::driver::{DriverAvail, DriversBuilder};
-use crate::hyperspace::lib::Cosmos;
-use crate::hyperspace::machine::MachineTemplate;
-use crate::hyperspace::mem::registry::{MemRegApi, MemRegCtx};
-use crate::hyperspace::reg::Registry;
+use crate::hyper::space::::base::BaseDriverFactory;
+use crate::hyper::space::::control::ControlDriverFactory;
+use crate::hyper::space::::mechtron::{HostDriverFactory, MechtronDriverFactory};
+use crate::hyper::space::::root::RootDriverFactory;
+use crate::hyper::space::::space::SpaceDriverFactory;
+use crate::hyper::space::::web::WebDriverFactory;
+use crate::hyper::space::::{DriverAvail, DriversBuilder};
+use crate::hyper::space::lib::Cosmos;
+use crate::hyper::space::machine::MachineTemplate;
+use crate::hyper::space::::registry::{MemRegApi, MemRegCtx};
+use crate::hyper::space::reg::Registry;
 use crate::registry::postgres::{PostgresDbInfo, PostgresPlatform, PostgresRegistryContextHandle};
 use crate::{
     STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_REGISTRY_DATABASE,
     STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_URL, STARLANE_REGISTRY_USER,
 };
-use cosmic_hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
-use cosmic_hyperlane_tcp::{CertGenerator, HyperlaneTcpServer};
 use cosmic_space::artifact::asynch::ArtifactApi;
 use cosmic_space::kind::StarSub;
 use cosmic_space::loc::{MachineName, StarKey};
@@ -26,6 +24,8 @@ use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
+use crate::hyper::lane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
+use crate::hyper::lane::tcp::{CertGenerator, HyperlaneTcpServer};
 
 #[derive(Clone)]
 pub struct Starlane {

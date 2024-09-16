@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use serde::Serialize;
 
-use cosmic_hyperlane::HyperClient;
+use crate::hyper::lane::HyperClient;
 use cosmic_space::command::common::StateSrc;
 use cosmic_space::command::direct::create::{
     Create, PointSegTemplate, PointTemplate, Strategy, Template,

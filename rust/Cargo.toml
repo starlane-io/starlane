@@ -45,7 +45,7 @@ zip = "0.6.2"
 dirs = "4.0.0"
 ascii = "1.1.0"
 url = "2.3.1"
-
+once_cell = "1.20.0"
 futures = {version = "0.3.21", default-features = true }
 dashmap = "5.3.4"
 semver = { version="1.0.10", features=['serde'] }
@@ -54,3 +54,8 @@ semver = { version="1.0.10", features=['serde'] }
 serde = "1.0.69"
 tracing = "0.1.26"
 async-recursion = "1.0.0"
+
+rcgen = "0.9.3"
+rustls = "0.20"
+tokio-rustls = "0.23"
+tls-api-rustls = "0.9.0"

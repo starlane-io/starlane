@@ -81,7 +81,7 @@ fn user_properties_config() -> Result<PropertiesConfig, SpaceErr> {
         true,
         false,
         PropertySource::Shell,
-        Some("hyperspace:repo:boot:1.0.0:/bind/user.bind".to_string()),
+        Some("hyper:repo:boot:1.0.0:/bind/user.bind".to_string()),
         true,
         vec![],
     );
@@ -126,7 +126,7 @@ fn userbase_properties_config() -> Result<PropertiesConfig, SpaceErr> {
         true,
         false,
         PropertySource::Shell,
-        Some("hyperspace:repo:boot:1.0.0:/bind/userbase.bind".to_string()),
+        Some("hyper:repo:boot:1.0.0:/bind/userbase.bind".to_string()),
         true,
         vec![],
     );
