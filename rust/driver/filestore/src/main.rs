@@ -1,10 +1,11 @@
 use clap::{Parser, Subcommand};
 use strum_macros::EnumString;
-use std::{env, fs, path::PathBuf};
+use std::{env, fs, path::PathBuf, process};
 use std::io;
 
 use std::fs::{File};
 use std::io::prelude::*;
+use std::io::stdin;
 use std::path::Path;
 
 #[derive(Debug, Parser)]
@@ -16,11 +17,13 @@ struct Cli {
 
 #[derive(Debug, Subcommand, EnumString, strum_macros::Display)]
 enum Commands {
-    Write {path: PathBuf},
+    Write {path: PathBuf,
+    },
     Read {path: PathBuf},
     Mkdir{ path: PathBuf },
     Delete { path: PathBuf },
     List { path: Option<PathBuf> },
+    Exists{ path: PathBuf },
     Pwd,
     Test
 }
@@ -30,25 +33,12 @@ fn main() -> Result<(),()> {
 
     let pwd = env::var("PWD").unwrap_or(".".to_string());
 
+
     match cli.command {
         Commands::Write { path } => {
-
-            println!("path: {}", path.display());
             let mut file = File::create(path ).unwrap();
-
             // Create a handle to stdin
-            let mut input = std::io::stdin();
-
-            // Use copy to transfer data from stdin to the file
-            let bytes = std::io::copy(&mut input, &mut file).unwrap();
-            println!("written: {}", bytes);
-
-            // Flush the file's buffer to ensure all data is written
-            file.flush().unwrap();
-            println!("FLUSH COMPLETE");
-
-            std::process::exit(0);
-
+            io::copy(&mut io::stdin(), &mut file).unwrap();
         }
         Commands::Read { path } => {
 
@@ -97,16 +87,15 @@ fn main() -> Result<(),()> {
     }
         Commands::Test =>  {
             println!("testing...");
+            let dir = Path::new("subdir");
 
-            let dir = Path::new(&pwd);
-
-            fs::metadata(dir).and_then( |m| {
-              println!("! --> ./test-dir already exists!");
-//                fs::remove_dir_all(dir).unwrap();
-                println!("./test-dir removed");
+            /*fs::metadata(dir).and_then( |m| {
+              println!("! --> ./subdir already exists!");
                 Ok(m)
-            }).unwrap();
-            fs::create_dir(dir).unwrap();
+            });
+           // fs::create_dir(dir).unwrap();
+
+             */
             println!("create_dir: {} ", dir.to_str().unwrap() );
 
 
@@ -127,6 +116,19 @@ fn main() -> Result<(),()> {
             println!("done");
 
 
+        }
+        Commands::Exists { path } => {
+            File::open(path).unwrap();
+/*            match fs::exists(path) {
+                Ok(_) => {
+                    Ok(())
+                }
+                Err(_) => {
+                    Err(())
+                }
+            }
+
+ */
         }
     }
 
