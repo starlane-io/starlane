@@ -11,3 +11,6 @@ pub mod hyper;
 mod registry;
 #[cfg(feature = "server")]
 pub mod server;
+
+#[cfg(feature="space")]
+pub mod space;

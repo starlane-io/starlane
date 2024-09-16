@@ -6,6 +6,9 @@ extern crate lazy_static;
 pub mod err;
 pub mod properties;
 
+#[cfg(feature="space")]
+pub mod space;
+
 #[cfg(feature = "hyperspace")]
 pub mod hyper;
 pub mod registry;
