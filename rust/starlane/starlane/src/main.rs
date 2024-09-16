@@ -8,7 +8,7 @@ pub mod properties;
 
 #[cfg(feature = "hyperspace")]
 pub mod hyper;
-mod registry;
+pub mod registry;
 #[cfg(feature = "server")]
 pub mod server;
 
@@ -16,14 +16,20 @@ use std::str::FromStr;
 use std::time::Duration;
 use uuid::Uuid;
 
-use self::hyper::lane::HyperGate;
 
 use crate::err::StarErr;
 use self::hyper::space::lib::Cosmos;
 use crate::server::Starlane;
 use cosmic_space::loc::ToBaseKind;
+use std::io::{Read, Seek, Write};
+use std::path::Path;
+use std::fs::File;
+use tokio::fs::DirEntry;
+use zip::write::FileOptions;
+use cosmic_space::err::SpaceErr;
 
-fn main() -> Result<(), StarErr> {
+#[cfg(feature = "server")]
+fn server() -> Result<(), StarErr> {
     ctrlc::set_handler(move || {
         std::process::exit(1);
     });
@@ -82,9 +88,102 @@ pub extern "C" fn cosmic_timestamp() -> Timestamp {
 }
 
  */
+#[tokio::main]
+async fn main() -> Result<(),()> {
+    Ok(())
+}
 
 #[cfg(test)]
 pub mod test {
     #[test]
     pub fn test() {}
+}
+
+#[cfg(feature = "cli")]
+async fn cli() -> Result<(), SpaceErr> {
+    let home_dir: String = match dirs::home_dir() {
+        None => ".".to_string(),
+        Some(dir) => dir.display().to_string(),
+    };
+    let matches = ClapCommand::new("cosmic-cli")
+        .arg(
+            Arg::new("host")
+                .short('h')
+                .long("host")
+                .takes_value(true)
+                .value_name("host")
+                .required(false)
+                .default_value("localhost"),
+        )
+        .arg(
+            Arg::new("certs")
+                .short('c')
+                .long("certs")
+                .takes_value(true)
+                .value_name("certs")
+                .required(false)
+                .default_value(format!("{}/.starlane/localhost/certs", home_dir).as_str()),
+        )
+        .subcommand(ClapCommand::new("script"))
+        .allow_external_subcommands(true)
+        .get_matches();
+
+    let host = matches.get_one::<String>("host").unwrap().clone();
+    let certs = matches.get_one::<String>("certs").unwrap().clone();
+    let session = Session::new(host, certs).await?;
+
+    if matches.subcommand_name().is_some() {
+        session.command(matches.subcommand_name().unwrap()).await
+    } else {
+        loop {
+            let line: String = text_io::try_read!("{};").map_err(|e| SpaceErr::new(500, "err"))?;
+
+            let line_str = line.trim();
+
+            if "exit" == line_str {
+                return Ok(());
+            }
+            println!("> {}", line_str);
+            session.command(line.as_str()).await?;
+        }
+        Ok(())
+    }
+}
+
+pub fn zip_dir<T>(
+    it: impl Iterator<Item = DirEntry>,
+    prefix: &str,
+    writer: T,
+    method: zip::CompressionMethod,
+) -> zip::result::ZipResult<T>
+where
+    T: Write + Seek,
+{
+    let mut zip = zip::ZipWriter::new(writer);
+    let options = FileOptions::default()
+        .compression_method(method)
+        .unix_permissions(0o755);
+
+    let mut buffer = Vec::new();
+    for entry in it {
+        let path = entry.path();
+        let name = path.strip_prefix(Path::new(prefix)).unwrap();
+
+        // Write file or directory explicitly
+        // Some unzip tools unzip files with directory paths correctly, some do not!
+        if path.is_file() {
+            zip.start_file(name.to_str().unwrap(), options)?;
+            let mut f = File::open(path)?;
+
+            f.read_to_end(&mut buffer)?;
+            zip.write_all(&*buffer)?;
+            buffer.clear();
+        } else if !name.as_os_str().is_empty() {
+            // Only if not root! Avoids path spec / warning
+            // and mapname conversion failed error on unzip
+            zip.add_directory(name.to_str().unwrap(), options)?;
+        }
+    }
+    let result = zip.finish()?;
+    Result::Ok(result)
 }

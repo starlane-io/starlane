@@ -23,9 +23,13 @@ cosmic-hyperlane-tcp={ path="../cosmic-hyperlane-tcp", version = "0.3.14" }
 cosmic-space= { path= "../cosmic-space" , version = "0.3.14" }
 cosmic-hyperspace= { path= "../cosmic-hyperspace" , version = "0.3.14" }
 cosmic-nom= { path="../cosmic-nom", version = "0.3.14" }
+
+tokio = { version = "1.15.0", features = ["rt"] }
+
+
+
 text_io = "0.1.12"
 clap = { version="3.2.22", features=["cargo"] }
-tokio = { version = "1.15.0", features = ["rt"] }
 dirs= "4.0.0"
 zip = "0.6.3"
 walkdir = "2.3.2"

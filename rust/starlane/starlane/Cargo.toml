@@ -18,7 +18,8 @@ repository.workspace = true
 [features]
 full=["server"]
 default=["server"]
-server=["hyperspace", "hyperlane","postgres", "hyperlane-tcp"]
+server=["hyperspace", "hyperlane","postgres", "hyperlane-tcp", "cli"]
+cli=["dep:text_io","dep:clap", "dep:walkdir"]
 hyperspace=["dep:futures","dep:dashmap","dep:semver"]
 hyperlane=["hyperspace"]
 hyperlane-tcp =  ["hyperlane","dep:rcgen","dep:rustls","dep:tokio-rustls","dep:tls-api-rustls"]
@@ -41,8 +42,8 @@ wasmer-compiler-singlepass = {workspace = true}
 #acid-store = {git="https://github.com/uberscott/acid-store.git" , version="0.14.2" }
 
 once_cell = { workspace=true }
-zip = { workspace=true }
-dirs ={ workspace=true }
+zip = { workspace=true, optional = true }
+dirs ={ workspace=true, optional = true }
 ascii ={ workspace=true }
 url ={ workspace=true }
 
@@ -63,6 +64,10 @@ rcgen = { workspace = true, optional = true}
 rustls = { workspace = true, optional = true}
 tokio-rustls =  { workspace = true, optional = true}
 tls-api-rustls =  { workspace = true, optional = true}
+
+text_io = { workspace = true, optional = true}
+clap =  { workspace = true, optional = true , features=["cargo"]}
+walkdir = { workspace = true, optional = true }
 
 [lib]
 name = "starlane"
