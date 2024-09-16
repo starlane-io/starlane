@@ -29,13 +29,13 @@ use uuid::Uuid;
 use crate::err::StarErr;
 use self::hyper::space::lib::Cosmos;
 use crate::server::Starlane;
-use cosmic_space::loc::ToBaseKind;
+use starlane_space::loc::ToBaseKind;
 use std::io::{Read, Seek, Write};
 use std::path::Path;
 use std::fs::File;
 use tokio::fs::DirEntry;
 use zip::write::FileOptions;
-use cosmic_space::err::SpaceErr;
+use starlane_space::err::SpaceErr;
 
 #[cfg(feature = "server")]
 fn server() -> Result<(), StarErr> {
@@ -87,12 +87,12 @@ lazy_static! {
 
 /*
 #[no_mangle]
-pub extern "C" fn cosmic_uuid() -> loc::Uuid {
+pub extern "C" fn starlane_uuid() -> loc::Uuid {
     loc::Uuid::from(uuid::Uuid::new_v4()).unwrap()
 }
 
 #[no_mangle]
-pub extern "C" fn cosmic_timestamp() -> Timestamp {
+pub extern "C" fn starlane_timestamp() -> Timestamp {
     Timestamp { millis: Utc::now().timestamp_millis() }
 }
 

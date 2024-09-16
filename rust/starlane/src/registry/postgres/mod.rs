@@ -3,34 +3,34 @@ pub mod err;
 use crate::hyper::space::err::HyperErr;
 use crate::hyper::space::lib::Cosmos;
 use crate::hyper::space::reg::{Registration, RegistryApi};
-use cosmic_space::command::common::{PropertyMod, SetProperties};
-use cosmic_space::command::direct::create::Strategy;
-use cosmic_space::command::direct::delete::Delete;
-use cosmic_space::command::direct::get::{Get, GetOp};
-use cosmic_space::command::direct::query::{Query, QueryResult};
-use cosmic_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
-use cosmic_space::command::direct::set::Set;
-use cosmic_space::hyper::{ParticleLocation, ParticleRecord};
-use cosmic_space::kind::{BaseKind, Kind, KindParts, Specific};
-use cosmic_space::loc::{StarKey, ToBaseKind, Version};
-use cosmic_space::log::PointLogger;
-use cosmic_space::parse::{CamelCase, Domain, SkewerCase};
-use cosmic_space::particle::{Details, Properties, Property, Status, Stub};
-use cosmic_space::point::Point;
-use cosmic_space::security::{
+use starlane_space::command::common::{PropertyMod, SetProperties};
+use starlane_space::command::direct::create::Strategy;
+use starlane_space::command::direct::delete::Delete;
+use starlane_space::command::direct::get::{Get, GetOp};
+use starlane_space::command::direct::query::{Query, QueryResult};
+use starlane_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
+use starlane_space::command::direct::set::Set;
+use starlane_space::hyper::{ParticleLocation, ParticleRecord};
+use starlane_space::kind::{BaseKind, Kind, KindParts, Specific};
+use starlane_space::loc::{StarKey, ToBaseKind, Version};
+use starlane_space::log::PointLogger;
+use starlane_space::parse::{CamelCase, Domain, SkewerCase};
+use starlane_space::particle::{Details, Properties, Property, Status, Stub};
+use starlane_space::point::Point;
+use starlane_space::security::{
     Access, AccessGrant, AccessGrantKind, EnumeratedAccess, IndexedAccessGrant, Permissions,
     PermissionsMask, PermissionsMaskKind, Privilege, Privileges,
 };
-use cosmic_space::selector::specific::{
+use starlane_space::selector::specific::{
     ProductSelector, ProviderSelector, VariantSelector, VendorSelector,
 };
-use cosmic_space::selector::{
+use starlane_space::selector::{
     ExactPointSeg, KindBaseSelector, PointHierarchy, PointKindSeg, PointSegSelector, Selector,
     SubKindSelector,
 };
-use cosmic_space::substance::{Substance, SubstanceList, SubstanceMap};
-use cosmic_space::util::ValuePattern;
-use cosmic_space::HYPERUSER;
+use starlane_space::substance::{Substance, SubstanceList, SubstanceMap};
+use starlane_space::util::ValuePattern;
+use starlane_space::HYPERUSER;
 use err::PostErr;
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgPoolOptions, PgRow};
@@ -1584,19 +1584,19 @@ pub mod test {
     use crate::registry::postgres::{
         PostgresDbInfo, PostgresPlatform, PostgresRegistryContext, PostgresRegistryContextHandle,
     };
-    use cosmic_hyperlane::{};
-    use cosmic_space::artifact::asynch::ArtifactApi;
-    use cosmic_space::command::direct::create::Strategy;
-    use cosmic_space::command::direct::query::Query;
-    use cosmic_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
-    use cosmic_space::kind::{Kind, Specific, StarSub, UserBaseSubKind};
-    use cosmic_space::loc::{MachineName, StarKey, ToPoint};
-    use cosmic_space::log::RootLogger;
-    use cosmic_space::particle::property::PropertiesConfig;
-    use cosmic_space::particle::Status;
-    use cosmic_space::point::Point;
-    use cosmic_space::security::{AccessGrant, AccessGrantKind, PermissionsMask, Privilege};
-    use cosmic_space::selector::{PointHierarchy, Selector};
+    use crate::hyper::lane::{};
+    use starlane_space::artifact::asynch::ArtifactApi;
+    use starlane_space::command::direct::create::Strategy;
+    use starlane_space::command::direct::query::Query;
+    use starlane_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
+    use starlane_space::kind::{Kind, Specific, StarSub, UserBaseSubKind};
+    use starlane_space::loc::{MachineName, StarKey, ToPoint};
+    use starlane_space::log::RootLogger;
+    use starlane_space::particle::property::PropertiesConfig;
+    use starlane_space::particle::Status;
+    use starlane_space::point::Point;
+    use starlane_space::security::{AccessGrant, AccessGrantKind, PermissionsMask, Privilege};
+    use starlane_space::selector::{PointHierarchy, Selector};
     use crate::hyper::lane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
 
     #[derive(Clone)]

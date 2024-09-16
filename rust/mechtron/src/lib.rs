@@ -11,10 +11,10 @@ pub mod test;
 extern crate lazy_static;
 
 #[macro_use]
-extern crate cosmic_macros;
+extern crate starlane_macros;
 
 #[macro_use]
-extern crate cosmic_macros_primitive;
+extern crate starlane_macros_primitive;
 
 extern crate alloc;
 extern crate core;
@@ -23,30 +23,30 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::sync::Arc;
 use core::str::FromStr;
-use cosmic_macros::handler;
-use cosmic_macros::route;
-use cosmic_macros::DirectedHandler;
-use cosmic_space::err::SpaceErr;
-use cosmic_space::hyper::HyperSubstance;
-use cosmic_space::loc::{Layer, ToSurface, Uuid};
-use cosmic_space::log::{LogSource, NoAppender, PointLogger, RootLogger};
-use cosmic_space::parse::SkewerCase;
-use cosmic_space::particle::{Details, Stub};
-use cosmic_space::wasm::Timestamp;
-use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{Agent, DirectedWave, ReflectedAggregate, ReflectedWave, UltraWave};
-use cosmic_space::{loc, VERSION};
+use starlane_macros::handler;
+use starlane_macros::route;
+use starlane_macros::DirectedHandler;
+use starlane_space::err::SpaceErr;
+use starlane_space::hyper::HyperSubstance;
+use starlane_space::loc::{Layer, ToSurface, Uuid};
+use starlane_space::log::{LogSource, NoAppender, PointLogger, RootLogger};
+use starlane_space::parse::SkewerCase;
+use starlane_space::particle::{Details, Stub};
+use starlane_space::wasm::Timestamp;
+use starlane_space::wave::exchange::SetStrategy;
+use starlane_space::wave::{Agent, DirectedWave, ReflectedAggregate, ReflectedWave, UltraWave};
+use starlane_space::{loc, VERSION};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::mpsc::Sender;
 use std::sync::{mpsc, MutexGuard};
 
-use cosmic_space::wave::Bounce;
+use starlane_space::wave::Bounce;
 
-use cosmic_space::artifact::synch::ArtifactApi;
-use cosmic_space::artifact::ArtRef;
-use cosmic_space::point::Point;
-use cosmic_space::wave::exchange::synch::{
+use starlane_space::artifact::synch::ArtifactApi;
+use starlane_space::artifact::ArtRef;
+use starlane_space::point::Point;
+use starlane_space::wave::exchange::synch::{
     DirectedHandler, DirectedHandlerProxy, DirectedHandlerShell, ExchangeRouter, InCtx,
     ProtoTransmitter, ProtoTransmitterBuilder,
 };

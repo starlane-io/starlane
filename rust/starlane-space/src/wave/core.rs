@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use cosmic_macros_primitive::Autobox;
+use starlane_macros_primitive::Autobox;
 
 use crate::command::Command;
 use crate::err::StatusErr;
@@ -58,7 +58,7 @@ impl ReflectedCore {
             "cannot convert a success into an error".into()
         } else {
             if let Substance::FormErrs(errors) = &self.body {
-                errors.to_cosmic_err()
+                errors.to_starlane_err()
             } else {
                 self.status.to_string().into()
             }

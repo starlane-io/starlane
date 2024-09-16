@@ -15,11 +15,11 @@ use crate::{
     STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_REGISTRY_DATABASE,
     STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_URL, STARLANE_REGISTRY_USER,
 };
-use cosmic_space::artifact::asynch::ArtifactApi;
-use cosmic_space::kind::StarSub;
-use cosmic_space::loc::{MachineName, StarKey};
-use cosmic_space::log::RootLogger;
-use cosmic_space::point::Point;
+use starlane_space::artifact::asynch::ArtifactApi;
+use starlane_space::kind::StarSub;
+use starlane_space::loc::{MachineName, StarKey};
+use starlane_space::log::RootLogger;
+use starlane_space::point::Point;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;

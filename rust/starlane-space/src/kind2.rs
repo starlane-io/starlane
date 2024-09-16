@@ -425,7 +425,7 @@ pub mod parse {
         SpecificSubTypes, SpecificSubTypesSelector, SubTypeDef, VariantDef,
     };
     use crate::parse::{camel_case, domain, skewer_case, version, version_req, CamelCase, Domain};
-    use cosmic_nom::{Res, Span};
+    use starlane_parse::{Res, Span};
     use nom::branch::alt;
     use nom::bytes::complete::tag;
     use nom::combinator::{fail, opt, success, value};
@@ -672,7 +672,7 @@ pub mod parse {
         };
         use crate::util::log;
         use core::str::FromStr;
-        use cosmic_nom::new_span;
+        use starlane_parse::new_span;
         use nom::bytes::complete::tag;
         use nom::combinator::{all_consuming, opt};
         use nom::sequence::{delimited, pair, preceded};

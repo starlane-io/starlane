@@ -6,7 +6,7 @@ use nom::combinator::all_consuming;
 use serde::de::{Error, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
-use cosmic_nom::{new_span, Trace};
+use starlane_parse::{new_span, Trace};
 use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
 
 use crate::kind::{BaseKind, Kind, KindParts, Specific};

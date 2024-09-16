@@ -11,7 +11,7 @@ use crate::err::SpaceErr;
 use crate::loc;
 use crate::loc::Uuid;
 use crate::parse::Env;
-use crate::wasm::{cosmic_timestamp, cosmic_uuid, Timestamp};
+use crate::wasm::{starlane_timestamp, starlane_uuid, Timestamp};
 use crate::wave::core::http2::HttpMethod;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
@@ -201,11 +201,11 @@ where
 }
 
 pub fn uuid() -> Uuid {
-    unsafe { cosmic_uuid() }
+    unsafe { starlane_uuid() }
 }
 
 pub fn timestamp() -> Timestamp {
-    unsafe { cosmic_timestamp() }
+    unsafe { starlane_timestamp() }
 }
 
 pub trait ToResolved<R>

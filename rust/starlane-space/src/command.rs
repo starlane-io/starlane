@@ -3,8 +3,8 @@ use core::str::FromStr;
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 
-use cosmic_macros_primitive::Autobox;
-use cosmic_nom::{new_span, Trace};
+use starlane_macros_primitive::Autobox;
+use starlane_parse::{new_span, Trace};
 use direct::create::{Create, CreateCtx, CreateVar};
 use direct::delete::{DeleteCtx, DeleteVar};
 use direct::get::{Get, GetCtx, GetVar};

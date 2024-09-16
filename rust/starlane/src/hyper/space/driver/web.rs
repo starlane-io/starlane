@@ -7,34 +7,34 @@ use crate::reg::Registration;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::Cosmos;
 use ascii::IntoAsciiString;
-use cosmic_space::artifact::ArtRef;
-use cosmic_space::command::common::StateSrc;
-use cosmic_space::command::direct::create::{
+use starlane_space::artifact::ArtRef;
+use starlane_space::command::common::StateSrc;
+use starlane_space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
-use cosmic_space::config::bind::BindConfig;
-use cosmic_space::err::SpaceErr;
-use cosmic_space::fail::http;
-use cosmic_space::hyper::{HyperSubstance, ParticleLocation};
-use cosmic_space::kind::{BaseKind, Kind, NativeSub};
-use cosmic_space::loc::{Layer, ToSurface};
-use cosmic_space::parse::{bind_config, CamelCase};
-use cosmic_space::particle::traversal::{Traversal, TraversalDirection};
-use cosmic_space::particle::Status;
-use cosmic_space::point::Point;
-use cosmic_space::selector::{KindSelector, Pattern, SubKindSelector};
-use cosmic_space::substance::{Bin, Substance};
-use cosmic_space::util::{log, ValuePattern};
-use cosmic_space::wave::core::http2::{HttpMethod, HttpRequest};
-use cosmic_space::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
-use cosmic_space::wave::exchange::asynch::{
+use starlane_space::config::bind::BindConfig;
+use starlane_space::err::SpaceErr;
+use starlane_space::fail::http;
+use starlane_space::hyper::{HyperSubstance, ParticleLocation};
+use starlane_space::kind::{BaseKind, Kind, NativeSub};
+use starlane_space::loc::{Layer, ToSurface};
+use starlane_space::parse::{bind_config, CamelCase};
+use starlane_space::particle::traversal::{Traversal, TraversalDirection};
+use starlane_space::particle::Status;
+use starlane_space::point::Point;
+use starlane_space::selector::{KindSelector, Pattern, SubKindSelector};
+use starlane_space::substance::{Bin, Substance};
+use starlane_space::util::{log, ValuePattern};
+use starlane_space::wave::core::http2::{HttpMethod, HttpRequest};
+use starlane_space::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
+use starlane_space::wave::exchange::asynch::{
     InCtx, ProtoTransmitter, ProtoTransmitterBuilder, TraversalRouter,
 };
-use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{
+use starlane_space::wave::exchange::SetStrategy;
+use starlane_space::wave::{
     Agent, DirectedProto, Handling, HandlingKind, Ping, ToRecipients, UltraWave, WaitTime, Wave,
 };
-use cosmic_space::HYPERUSER;
+use starlane_space::HYPERUSER;
 use inflector::Inflector;
 use std::str::FromStr;
 use std::sync::Arc;

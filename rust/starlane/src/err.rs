@@ -24,7 +24,7 @@ pub mod convert {
     #[cfg(feature = "postgres")]
     use crate::registry::postgres::err::PostErr;
     use ascii::FromAsciiError;
-    use cosmic_space::err::SpaceErr;
+    use starlane_space::err::SpaceErr;
     use mechtron_host::err::{DefaultHostErr, HostErr};
     use std::io;
     use std::str::Utf8Error;

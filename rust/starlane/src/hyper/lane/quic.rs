@@ -296,8 +296,8 @@ impl ConErr {
 mod tests {
     use dashmap::DashMap;
 
-    use cosmic_hyperlane::{HyperGateSelector, VersionGate};
-    use cosmic_space::err::SpaceErr;
+    use crate::hyper::lane::{HyperGateSelector, VersionGate};
+    use starlane_space::err::SpaceErr;
 
     use crate::HyperServerQuic;
 

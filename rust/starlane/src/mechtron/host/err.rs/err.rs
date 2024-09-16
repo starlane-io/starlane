@@ -1,5 +1,5 @@
 use starlane::mechtron::host::WasmHostCall;
-use cosmic_space::err::SpaceErr;
+use starlane_space::err::SpaceErr;
 use oneshot::RecvError;
 use std::fmt::{Debug, Display};
 use std::str::Utf8Error;

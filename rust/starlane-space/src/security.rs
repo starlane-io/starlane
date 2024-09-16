@@ -8,7 +8,7 @@ use nom::combinator::all_consuming;
 use nom_supreme::parser_ext::MapRes;
 use serde::{Deserialize, Serialize};
 
-use cosmic_nom::new_span;
+use starlane_parse::new_span;
 
 use crate::err::SpaceErr;
 use crate::parse::error::result;

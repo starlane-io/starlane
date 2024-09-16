@@ -1,16 +1,16 @@
 use crate::hyper::space::lib::Cosmos;
-use cosmic_space::command::common::{SetProperties, SetRegistry};
-use cosmic_space::command::direct::create::Strategy;
-use cosmic_space::command::direct::delete::Delete;
-use cosmic_space::command::direct::query::{Query, QueryResult};
-use cosmic_space::command::direct::select::{Select, SubSelect};
-use cosmic_space::hyper::ParticleRecord;
-use cosmic_space::kind::Kind;
-use cosmic_space::particle::{Properties, Status, Stub};
-use cosmic_space::point::Point;
-use cosmic_space::security::{Access, AccessGrant, IndexedAccessGrant};
-use cosmic_space::selector::Selector;
-use cosmic_space::substance::SubstanceList;
+use starlane_space::command::common::{SetProperties, SetRegistry};
+use starlane_space::command::direct::create::Strategy;
+use starlane_space::command::direct::delete::Delete;
+use starlane_space::command::direct::query::{Query, QueryResult};
+use starlane_space::command::direct::select::{Select, SubSelect};
+use starlane_space::hyper::ParticleRecord;
+use starlane_space::kind::Kind;
+use starlane_space::particle::{Properties, Status, Stub};
+use starlane_space::point::Point;
+use starlane_space::security::{Access, AccessGrant, IndexedAccessGrant};
+use starlane_space::selector::Selector;
+use starlane_space::substance::SubstanceList;
 use std::sync::Arc;
 
 pub type Registry<P> = Arc<dyn RegistryApi<P>>;

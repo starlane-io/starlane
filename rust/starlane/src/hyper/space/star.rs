@@ -19,51 +19,51 @@ use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 use tokio::time::error::Elapsed;
 use tracing::{error, info};
 
-use cosmic_hyperlane::{};
-use cosmic_space::artifact::ArtRef;
-use cosmic_space::command::common::StateSrc;
-use cosmic_space::command::direct::create::{Create, Strategy};
-use cosmic_space::command::direct::set::Set;
-use cosmic_space::command::RawCommand;
-use cosmic_space::config::bind::{BindConfig, RouteSelector};
-use cosmic_space::err::SpaceErr;
-use cosmic_space::hyper::{
+use crate::hyper::lane::{};
+use starlane_space::artifact::ArtRef;
+use starlane_space::command::common::StateSrc;
+use starlane_space::command::direct::create::{Create, Strategy};
+use starlane_space::command::direct::set::Set;
+use starlane_space::command::RawCommand;
+use starlane_space::config::bind::{BindConfig, RouteSelector};
+use starlane_space::err::SpaceErr;
+use starlane_space::hyper::{
     Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, Location, ParticleRecord,
     Provision, Search,
 };
-use cosmic_space::hyper::{MountKind, ParticleLocation};
-use cosmic_space::kind::{BaseKind, Kind, StarStub, StarSub, Sub};
-use cosmic_space::loc::{
+use starlane_space::hyper::{MountKind, ParticleLocation};
+use starlane_space::kind::{BaseKind, Kind, StarStub, StarSub, Sub};
+use starlane_space::loc::{
     Layer, StarKey, Surface, SurfaceSelector, ToBaseKind, ToPoint, ToSurface, Topic, Uuid,
     GLOBAL_EXEC, LOCAL_STAR,
 };
-use cosmic_space::log::{PointLogger, RootLogger, Trackable, Tracker};
-use cosmic_space::parse::{bind_config, route_attribute, Env};
-use cosmic_space::particle::traversal::{
+use starlane_space::log::{PointLogger, RootLogger, Trackable, Tracker};
+use starlane_space::parse::{bind_config, route_attribute, Env};
+use starlane_space::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
-use cosmic_space::particle::{Details, Status, Stub};
-use cosmic_space::point::{Point, RouteSeg};
-use cosmic_space::settings::Timeouts;
-use cosmic_space::substance::Bin;
-use cosmic_space::substance::{Substance, ToSubstance};
-use cosmic_space::util::{log, ValueMatcher, ValuePattern};
-use cosmic_space::wave::core::cmd::CmdMethod;
-use cosmic_space::wave::core::hyp::HypMethod;
-use cosmic_space::wave::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
-use cosmic_space::wave::exchange::asynch::{
+use starlane_space::particle::{Details, Status, Stub};
+use starlane_space::point::{Point, RouteSeg};
+use starlane_space::settings::Timeouts;
+use starlane_space::substance::Bin;
+use starlane_space::substance::{Substance, ToSubstance};
+use starlane_space::util::{log, ValueMatcher, ValuePattern};
+use starlane_space::wave::core::cmd::CmdMethod;
+use starlane_space::wave::core::hyp::HypMethod;
+use starlane_space::wave::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
+use starlane_space::wave::exchange::asynch::{
     DirectedHandler, DirectedHandlerSelector, DirectedHandlerShell, Exchanger, InCtx,
     ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, TraversalRouter, TxRouter,
 };
-use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{
+use starlane_space::wave::exchange::SetStrategy;
+use starlane_space::wave::{
     Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
     HandlingKind, Ping, Pong, Priority, RecipientSelector, Recipients, Reflectable, ReflectedWave,
     Reflection, Retries, Ripple, Scope, Signal, SingularRipple, ToRecipients, WaitTime, Wave,
     WaveKind,
 };
-use cosmic_space::wave::{HyperWave, UltraWave};
-use cosmic_space::HYPERUSER;
+use starlane_space::wave::{HyperWave, UltraWave};
+use starlane_space::HYPERUSER;
 use mechtron_host::err::HostErr;
 
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};

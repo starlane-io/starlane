@@ -1,26 +1,26 @@
 use crate::err::GuestErr;
 use crate::err::MechErr;
 use crate::{MechtronFactories, MechtronSkel, Platform};
-use cosmic_macros::handler_sync;
-use cosmic_space::artifact::synch::{ArtifactApi, ArtifactFetcher};
-use cosmic_space::err::SpaceErr;
-use cosmic_space::hyper::HyperSubstance;
-use cosmic_space::kind::Kind::Mechtron;
-use cosmic_space::loc::{Layer, ToSurface};
-use cosmic_space::log::{
+use starlane_macros::handler_sync;
+use starlane_space::artifact::synch::{ArtifactApi, ArtifactFetcher};
+use starlane_space::err::SpaceErr;
+use starlane_space::hyper::HyperSubstance;
+use starlane_space::kind::Kind::Mechtron;
+use starlane_space::loc::{Layer, ToSurface};
+use starlane_space::log::{
     LogSource, NoAppender, PointLogger, RootLogger, SynchTransmittingLogAppender,
 };
-use cosmic_space::particle::{Details, Stub};
-use cosmic_space::point::Point;
-use cosmic_space::substance::{Bin, Substance};
-use cosmic_space::wave::core::cmd::CmdMethod;
-use cosmic_space::wave::core::CoreBounce;
-use cosmic_space::wave::exchange::synch::{
+use starlane_space::particle::{Details, Stub};
+use starlane_space::point::Point;
+use starlane_space::substance::{Bin, Substance};
+use starlane_space::wave::core::cmd::CmdMethod;
+use starlane_space::wave::core::CoreBounce;
+use starlane_space::wave::exchange::synch::{
     DirectedHandler, DirectedHandlerProxy, DirectedHandlerShell, ExchangeRouter, InCtx,
     ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx,
 };
-use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{
+use starlane_space::wave::exchange::SetStrategy;
+use starlane_space::wave::{
     Agent, DirectedProto, DirectedWave, ReflectedAggregate, ToRecipients, UltraWave,
 };
 use dashmap::DashMap;

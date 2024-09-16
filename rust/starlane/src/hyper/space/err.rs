@@ -1,8 +1,8 @@
 use ascii::FromAsciiError;
-use cosmic_space::err::SpaceErr;
-use cosmic_space::substance::Substance;
-use cosmic_space::wave::core::http2::StatusCode;
-use cosmic_space::wave::core::ReflectedCore;
+use starlane_space::err::SpaceErr;
+use starlane_space::substance::Substance;
+use starlane_space::wave::core::http2::StatusCode;
+use starlane_space::wave::core::ReflectedCore;
 use mechtron_host::err::{DefaultHostErr, HostErr};
 use std::fmt::Debug;
 
@@ -84,7 +84,7 @@ pub trait HyperErr:
 pub mod convert {
     use crate::hyper::space::err::{ErrKind, HyperErr};
     use ascii::FromAsciiError;
-    use cosmic_space::err::SpaceErr;
+    use starlane_space::err::SpaceErr;
     use mechtron_host::err::{DefaultHostErr, HostErr};
     use std::io;
     use std::str::Utf8Error;

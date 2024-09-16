@@ -7,8 +7,8 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use cosmic_macros_primitive::Autobox;
-use cosmic_nom::Tw;
+use starlane_macros_primitive::Autobox;
+use starlane_parse::Tw;
 
 use crate::command::{Command, RawCommand};
 use crate::err::ParseErrs;
@@ -80,7 +80,7 @@ pub enum SubstanceKind {
     PartialEq,
     strum_macros::Display,
     Autobox,
-    cosmic_macros_primitive::ToSubstance,
+    starlane_macros_primitive::ToSubstance,
 )]
 pub enum Substance {
     Empty,
@@ -272,7 +272,7 @@ impl Substance {
     Eq,
     PartialEq,
     Autobox,
-    cosmic_macros_primitive::ToSubstance,
+    starlane_macros_primitive::ToSubstance,
 )]
 pub enum LogSubstance {
     Log(Log),
@@ -347,7 +347,7 @@ pub struct FormErrs {
 }
 
 impl FormErrs {
-    pub fn to_cosmic_err(&self) -> SpaceErr {
+    pub fn to_starlane_err(&self) -> SpaceErr {
         SpaceErr::new(500, self.to_string().as_str())
     }
 

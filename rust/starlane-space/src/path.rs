@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-use cosmic_nom::new_span;
+use starlane_parse::new_span;
 
 use crate::err::SpaceErr;
 use crate::parse::consume_path;

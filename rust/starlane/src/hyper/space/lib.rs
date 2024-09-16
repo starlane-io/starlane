@@ -5,14 +5,14 @@ extern crate async_recursion;
 #[macro_use]
 extern crate async_trait;
 #[macro_use]
-extern crate cosmic_macros;
+extern crate starlane_macros;
 extern crate inflector;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate strum_macros;
 
-use cosmic_space::wasm::Timestamp;
+use starlane_space::wasm::Timestamp;
 use inflector::Inflector;
 
 use std::fmt::Debug;
@@ -22,17 +22,17 @@ use std::sync::Arc;
 use chrono::Utc;
 use uuid::Uuid;
 
-use cosmic_hyperlane::{};
-use cosmic_space::artifact::asynch::ArtifactApi;
-use cosmic_space::command::direct::create::KindTemplate;
-use cosmic_space::err::SpaceErr;
-use cosmic_space::kind::{
+use crate::hyper::lane::{};
+use starlane_space::artifact::asynch::ArtifactApi;
+use starlane_space::command::direct::create::KindTemplate;
+use starlane_space::err::SpaceErr;
+use starlane_space::kind::{
     ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind,
 };
-use cosmic_space::loc::{MachineName, StarKey, ToBaseKind, ToSurface};
-use cosmic_space::log::RootLogger;
-use cosmic_space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
-use cosmic_space::settings::Timeouts;
+use starlane_space::loc::{MachineName, StarKey, ToBaseKind, ToSurface};
+use starlane_space::log::RootLogger;
+use starlane_space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
+use starlane_space::settings::Timeouts;
 use err::HyperErr;
 use mechtron_host::err::HostErr;
 use reg::Registry;
@@ -55,12 +55,12 @@ pub mod star;
 pub mod tests;
 
 #[no_mangle]
-pub extern "C" fn cosmic_uuid() -> String {
+pub extern "C" fn starlane_uuid() -> String {
     Uuid::new_v4().to_string()
 }
 
 #[no_mangle]
-pub extern "C" fn cosmic_timestamp() -> Timestamp {
+pub extern "C" fn starlane_timestamp() -> Timestamp {
     Timestamp::new(Utc::now().timestamp_millis())
 }
 

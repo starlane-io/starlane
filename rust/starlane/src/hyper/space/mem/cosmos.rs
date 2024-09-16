@@ -14,10 +14,10 @@ use crate::err::{CosmicErr, HyperErr};
 use crate::mem::registry::{MemRegApi, MemRegCtx};
 use crate::reg::Registry;
 use crate::{Cosmos, DriversBuilder, MachineTemplate};
-use cosmic_hyperlane::{};
-use cosmic_space::artifact::asynch::ArtifactApi;
-use cosmic_space::kind::StarSub;
-use cosmic_space::loc::{MachineName, StarKey};
+use crate::hyper::lane::{};
+use starlane_space::artifact::asynch::ArtifactApi;
+use starlane_space::kind::StarSub;
+use starlane_space::loc::{MachineName, StarKey};
 use std::sync::Arc;
 use crate::hyper::lane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
 

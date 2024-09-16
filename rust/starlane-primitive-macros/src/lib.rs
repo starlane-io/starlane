@@ -247,7 +247,7 @@ pub fn mech_err(item: TokenStream) -> TokenStream {
     let from = vec![
         quote!(Box<bincode::ErrorKind>),
         quote!(mechtron::err::MembraneErr),
-        quote!(cosmic_space::err::SpaceErr),
+        quote!(starlane_space::err::SpaceErr),
         quote!(String),
         quote!(&'static str),
         quote!(mechtron::err::GuestErr),
@@ -257,8 +257,8 @@ pub fn mech_err(item: TokenStream) -> TokenStream {
     let rtn = quote! {
 
         impl MechErr for #ident {
-            fn to_uni_err(self) -> cosmic_space::err::SpaceErr {
-               cosmic_space::err::SpaceErr::server_error(self.to_string())
+            fn to_uni_err(self) -> starlane_space::err::SpaceErr {
+               starlane_space::err::SpaceErr::server_error(self.to_string())
             }
         }
 
@@ -270,12 +270,12 @@ pub fn mech_err(item: TokenStream) -> TokenStream {
             }
         }
 
-        impl cosmic_space::err::CoreReflector for #ident {
-                fn as_reflected_core(self) -> cosmic_space::wave::core::ReflectedCore {
-                   cosmic_space::wave::core::ReflectedCore{
+        impl starlane_space::err::CoreReflector for #ident {
+                fn as_reflected_core(self) -> starlane_space::wave::core::ReflectedCore {
+                   starlane_space::wave::core::ReflectedCore{
                         headers: Default::default(),
-                        status: cosmic_space::wave::core::http2::StatusCode::from_u16(500u16).unwrap(),
-                        body: cosmic_space::substance::Substance::Err(self.to_uni_err()),
+                        status: starlane_space::wave::core::http2::StatusCode::from_u16(500u16).unwrap(),
+                        body: starlane_space::substance::Substance::Err(self.to_uni_err()),
                     }
             }
         }

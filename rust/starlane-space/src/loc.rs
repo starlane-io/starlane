@@ -8,7 +8,7 @@ use nom::combinator::all_consuming;
 use serde::de::{Error, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
-use cosmic_nom::{new_span, Trace, Tw};
+use starlane_parse::{new_span, Trace, Tw};
 
 use crate::err::ParseErrs;
 use crate::hyper::ChildRegistry;

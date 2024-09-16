@@ -17,8 +17,8 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 
 use crate::err::report::{Label, Report, ReportKind};
-use cosmic_nom::Span;
-use cosmic_nom::SpanExtra;
+use starlane_parse::Span;
+use starlane_parse::SpanExtra;
 
 use crate::parse::error::find_parse_err;
 use crate::substance::{FormErrs, Substance};

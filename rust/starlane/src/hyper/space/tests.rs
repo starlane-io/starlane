@@ -7,21 +7,21 @@ use std::time::Duration;
 use serde::Serialize;
 
 use crate::hyper::lane::HyperClient;
-use cosmic_space::command::common::StateSrc;
-use cosmic_space::command::direct::create::{
+use starlane_space::command::common::StateSrc;
+use starlane_space::command::direct::create::{
     Create, PointSegTemplate, PointTemplate, Strategy, Template,
 };
-use cosmic_space::command::{CmdTransfer, RawCommand};
-use cosmic_space::hyper::{Assign, AssignmentKind, HyperSubstance};
-use cosmic_space::loc::{Layer, StarHandle, ToSurface};
-use cosmic_space::log::{LogSource, RootLogger, StdOutAppender};
-use cosmic_space::wave::core::cmd::CmdMethod;
-use cosmic_space::wave::core::ext::ExtMethod;
-use cosmic_space::wave::core::hyp::HypMethod;
-use cosmic_space::wave::core::Method;
-use cosmic_space::wave::exchange::asynch::Exchanger;
-use cosmic_space::wave::{Agent, DirectedProto, Pong, Wave};
-use cosmic_space::HYPERUSER;
+use starlane_space::command::{CmdTransfer, RawCommand};
+use starlane_space::hyper::{Assign, AssignmentKind, HyperSubstance};
+use starlane_space::loc::{Layer, StarHandle, ToSurface};
+use starlane_space::log::{LogSource, RootLogger, StdOutAppender};
+use starlane_space::wave::core::cmd::CmdMethod;
+use starlane_space::wave::core::ext::ExtMethod;
+use starlane_space::wave::core::hyp::HypMethod;
+use starlane_space::wave::core::Method;
+use starlane_space::wave::exchange::asynch::Exchanger;
+use starlane_space::wave::{Agent, DirectedProto, Pong, Wave};
+use starlane_space::HYPERUSER;
 
 use crate::driver::base::BaseDriverFactory;
 //use crate::control::ControlDriverFactory;

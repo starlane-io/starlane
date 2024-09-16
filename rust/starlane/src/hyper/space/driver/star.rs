@@ -6,36 +6,36 @@ use crate::err::HyperErr;
 use crate::reg::{Registration, RegistryApi};
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::Cosmos;
-use cosmic_space::artifact::ArtRef;
-use cosmic_space::command::common::StateSrc;
-use cosmic_space::command::direct::create::Strategy;
-use cosmic_space::config::bind::BindConfig;
-use cosmic_space::err::{CoreReflector, SpaceErr};
-use cosmic_space::hyper::{
+use starlane_space::artifact::ArtRef;
+use starlane_space::command::common::StateSrc;
+use starlane_space::command::direct::create::Strategy;
+use starlane_space::config::bind::BindConfig;
+use starlane_space::err::{CoreReflector, SpaceErr};
+use starlane_space::hyper::{
     Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, ParticleLocation, Search,
 };
-use cosmic_space::kind::{BaseKind, Kind, StarSub};
-use cosmic_space::loc::{Layer, StarKey, ToPoint, ToSurface, LOCAL_STAR};
-use cosmic_space::log::{Trackable, Tracker};
-use cosmic_space::parse::bind_config;
-use cosmic_space::particle::traversal::TraversalInjection;
-use cosmic_space::particle::Status;
-use cosmic_space::point::Point;
-use cosmic_space::selector::{KindSelector, Pattern, SubKindSelector};
-use cosmic_space::substance::Substance;
-use cosmic_space::util::{log, ValuePattern};
-use cosmic_space::wave::core::http2::StatusCode;
-use cosmic_space::wave::core::hyp::HypMethod;
-use cosmic_space::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
-use cosmic_space::wave::exchange::asynch::{
+use starlane_space::kind::{BaseKind, Kind, StarSub};
+use starlane_space::loc::{Layer, StarKey, ToPoint, ToSurface, LOCAL_STAR};
+use starlane_space::log::{Trackable, Tracker};
+use starlane_space::parse::bind_config;
+use starlane_space::particle::traversal::TraversalInjection;
+use starlane_space::particle::Status;
+use starlane_space::point::Point;
+use starlane_space::selector::{KindSelector, Pattern, SubKindSelector};
+use starlane_space::substance::Substance;
+use starlane_space::util::{log, ValuePattern};
+use starlane_space::wave::core::http2::StatusCode;
+use starlane_space::wave::core::hyp::HypMethod;
+use starlane_space::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
+use starlane_space::wave::exchange::asynch::{
     InCtx, ProtoTransmitter, ProtoTransmitterBuilder, Router,
 };
-use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{
+use starlane_space::wave::exchange::SetStrategy;
+use starlane_space::wave::{
     Agent, BounceBacks, DirectedProto, Echoes, Handling, HandlingKind, Pong, Priority, Recipients,
     Retries, UltraWave, WaitTime, Wave,
 };
-use cosmic_space::HYPERUSER;
+use starlane_space::HYPERUSER;
 use dashmap::DashMap;
 use std::cmp::Ordering;
 use std::collections::HashSet;

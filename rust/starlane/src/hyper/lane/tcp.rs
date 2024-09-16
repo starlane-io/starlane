@@ -1,18 +1,18 @@
-use cosmic_space::hyper::Knock;
-use cosmic_space::log::PointLogger;
+use starlane_space::hyper::Knock;
+use starlane_space::log::PointLogger;
 use tokio::net::{TcpListener, TcpStream};
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use std::time::Duration;
-use cosmic_space::err::SpaceErr;
-use cosmic_space::substance::Substance;
+use starlane_space::err::SpaceErr;
+use starlane_space::substance::Substance;
 use rcgen::{generate_simple_self_signed, RcgenError};
 use tokio::time::error::Elapsed;
 use tokio::fs::File;
-use cosmic_space::wave::{Ping, UltraWave, Wave};
+use starlane_space::wave::{Ping, UltraWave, Wave};
 use std::io;
 use std::string::FromUtf8Error;
-use cosmic_space::VERSION;
+use starlane_space::VERSION;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use std::str::FromStr;
 use std::io::Read;
@@ -553,22 +553,22 @@ impl From<&str> for Error {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
-    use cosmic_space::loc::ToSurface;
-    use cosmic_space::log::RootLogger;
+    use starlane_space::loc::ToSurface;
+    use starlane_space::log::RootLogger;
 
     use chrono::DateTime;
     use chrono::Utc;
-    use cosmic_space::point::Point;
+    use starlane_space::point::Point;
     use starlane::hyper::lane::tcp::{CertGenerator, Error, HyperlaneTcpClient, HyperlaneTcpServer};
     use crate::hyper::lane::test_util::{LargeFrameTest, SingleInterchangePlatform, WaveTest, FAE, LESS};
 
     #[no_mangle]
-    pub extern "C" fn cosmic_uuid() -> String {
+    pub extern "C" fn starlane_uuid() -> String {
         uuid::Uuid::new_v4().to_string()
     }
 
     #[no_mangle]
-    pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
+    pub extern "C" fn starlane_timestamp() -> DateTime<Utc> {
         Utc::now()
     }
 

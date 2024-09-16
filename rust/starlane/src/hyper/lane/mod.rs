@@ -6,23 +6,23 @@ pub mod quic;
 
 
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
-use cosmic_space::log::{PointLogger, RootLogger, Tracker};
-use cosmic_space::wave::{Agent, DirectedProto, HyperWave, UltraWave};
+use starlane_space::log::{PointLogger, RootLogger, Tracker};
+use starlane_space::wave::{Agent, DirectedProto, HyperWave, UltraWave};
 use std::time::Duration;
-use cosmic_space::err::SpaceErr;
-use cosmic_space::loc::{Layer, PointFactory, Surface, ToSurface};
+use starlane_space::err::SpaceErr;
+use starlane_space::loc::{Layer, PointFactory, Surface, ToSurface};
 use std::sync::Arc;
 use dashmap::DashMap;
-use cosmic_space::hyper::{Greet, InterchangeKind, Knock};
-use cosmic_space::substance::{Substance, Token};
-use cosmic_space::wave::core::ext::ExtMethod;
-use cosmic_space::wave::exchange::asynch::{Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter};
-use cosmic_space::wave::exchange::SetStrategy;
+use starlane_space::hyper::{Greet, InterchangeKind, Knock};
+use starlane_space::substance::{Substance, Token};
+use starlane_space::wave::core::ext::ExtMethod;
+use starlane_space::wave::exchange::asynch::{Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter};
+use starlane_space::wave::exchange::SetStrategy;
 use std::ops::{Deref, DerefMut};
-use cosmic_space::point::Point;
+use starlane_space::point::Point;
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
-use cosmic_space::VERSION;
+use starlane_space::VERSION;
 use std::sync::atomic::{AtomicU16, Ordering};
 use once_cell::sync::Lazy;
 
@@ -1925,22 +1925,22 @@ mod tests {
     use chrono::{DateTime, Utc};
     use dashmap::DashMap;
 
-    use cosmic_space::command::direct::create::PointFactoryU64;
-    use cosmic_space::hyper::{InterchangeKind, Knock};
-    use cosmic_space::loc::Uuid;
-    use cosmic_space::log::RootLogger;
-    use cosmic_space::point::Point;
-    use cosmic_space::substance::Substance;
-    use cosmic_space::wave::HyperWave;
+    use starlane_space::command::direct::create::PointFactoryU64;
+    use starlane_space::hyper::{InterchangeKind, Knock};
+    use starlane_space::loc::Uuid;
+    use starlane_space::log::RootLogger;
+    use starlane_space::point::Point;
+    use starlane_space::substance::Substance;
+    use starlane_space::wave::HyperWave;
     use crate::hyper::lane::HyperRouter;
 
     #[no_mangle]
-    pub extern "C" fn cosmic_uuid() -> String {
+    pub extern "C" fn starlane_uuid() -> String {
         uuid::Uuid::new_v4().to_string()
     }
 
     #[no_mangle]
-    pub extern "C" fn cosmic_timestamp() -> DateTime<Utc> {
+    pub extern "C" fn starlane_timestamp() -> DateTime<Utc> {
         Utc::now()
     }
 
@@ -1999,22 +1999,22 @@ pub mod test_util {
     use once_cell::sync::Lazy;
     use tokio::sync::{broadcast, mpsc, oneshot};
 
-    use cosmic_space::command::direct::create::PointFactoryU64;
-    use cosmic_space::err::SpaceErr;
-    use cosmic_space::hyper::{Greet, InterchangeKind, Knock};
-    use cosmic_space::loc::{Layer, Surface, ToPoint, ToSurface};
-    use cosmic_space::log::{PointLogger, RootLogger};
-    use cosmic_space::point::Point;
-    use cosmic_space::settings::Timeouts;
-    use cosmic_space::substance::{Substance, Token};
-    use cosmic_space::wave::core::cmd::CmdMethod;
-    use cosmic_space::wave::core::ext::ExtMethod;
-    use cosmic_space::wave::core::{Method, ReflectedCore};
-    use cosmic_space::wave::exchange::asynch::{
+    use starlane_space::command::direct::create::PointFactoryU64;
+    use starlane_space::err::SpaceErr;
+    use starlane_space::hyper::{Greet, InterchangeKind, Knock};
+    use starlane_space::loc::{Layer, Surface, ToPoint, ToSurface};
+    use starlane_space::log::{PointLogger, RootLogger};
+    use starlane_space::point::Point;
+    use starlane_space::settings::Timeouts;
+    use starlane_space::substance::{Substance, Token};
+    use starlane_space::wave::core::cmd::CmdMethod;
+    use starlane_space::wave::core::ext::ExtMethod;
+    use starlane_space::wave::core::{Method, ReflectedCore};
+    use starlane_space::wave::exchange::asynch::{
         Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
     };
-    use cosmic_space::wave::exchange::SetStrategy;
-    use cosmic_space::wave::{
+    use starlane_space::wave::exchange::SetStrategy;
+    use starlane_space::wave::{
         Agent, DirectedKind, DirectedProto, HyperWave, Pong, ReflectedKind, ReflectedProto,
         ReflectedWave, UltraWave, Wave,
     };
@@ -2316,22 +2316,22 @@ pub mod test {
     use lazy_static::lazy_static;
     use tokio::sync::{broadcast, mpsc, oneshot};
 
-    use cosmic_space::command::direct::create::PointFactoryU64;
-    use cosmic_space::err::SpaceErr;
-    use cosmic_space::hyper::{Greet, InterchangeKind, Knock};
-    use cosmic_space::loc::{Layer, Surface, ToPoint, ToSurface};
-    use cosmic_space::log::RootLogger;
-    use cosmic_space::point::Point;
-    use cosmic_space::settings::Timeouts;
-    use cosmic_space::substance::{Substance, Token};
-    use cosmic_space::wave::core::cmd::CmdMethod;
-    use cosmic_space::wave::core::ext::ExtMethod;
-    use cosmic_space::wave::core::{Method, ReflectedCore};
-    use cosmic_space::wave::exchange::asynch::{
+    use starlane_space::command::direct::create::PointFactoryU64;
+    use starlane_space::err::SpaceErr;
+    use starlane_space::hyper::{Greet, InterchangeKind, Knock};
+    use starlane_space::loc::{Layer, Surface, ToPoint, ToSurface};
+    use starlane_space::log::RootLogger;
+    use starlane_space::point::Point;
+    use starlane_space::settings::Timeouts;
+    use starlane_space::substance::{Substance, Token};
+    use starlane_space::wave::core::cmd::CmdMethod;
+    use starlane_space::wave::core::ext::ExtMethod;
+    use starlane_space::wave::core::{Method, ReflectedCore};
+    use starlane_space::wave::exchange::asynch::{
         Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
     };
-    use cosmic_space::wave::exchange::SetStrategy;
-    use cosmic_space::wave::{
+    use starlane_space::wave::exchange::SetStrategy;
+    use starlane_space::wave::{
         Agent, DirectedKind, DirectedProto, HyperWave, Pong, ReflectedKind, ReflectedProto,
         ReflectedWave, UltraWave, Wave,
     };

@@ -2,40 +2,40 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use cosmic_nom::new_span;
-use cosmic_space::artifact::ArtRef;
-use cosmic_space::command::common::StateSrc;
-use cosmic_space::command::direct::create::{Create, PointSegTemplate, Strategy};
-use cosmic_space::command::direct::select::Select;
-use cosmic_space::command::Command;
-use cosmic_space::command::RawCommand;
-use cosmic_space::config::bind::{BindConfig, RouteSelector};
-use cosmic_space::err::SpaceErr;
-use cosmic_space::hyper::{Assign, AssignmentKind, HyperSubstance};
-use cosmic_space::kind::Kind;
-use cosmic_space::loc::{Layer, Surface, ToPoint, ToSurface};
-use cosmic_space::log::{PointLogger, RootLogger};
-use cosmic_space::parse::error::result;
-use cosmic_space::parse::route_attribute;
-use cosmic_space::parse::{bind_config, command_line};
-use cosmic_space::particle::{Details, PointKind, Status};
-use cosmic_space::point::Point;
-use cosmic_space::substance::Substance;
-use cosmic_space::util::{log, ToResolved};
-use cosmic_space::wave::core::cmd::CmdMethod;
-use cosmic_space::wave::core::hyp::HypMethod;
-use cosmic_space::wave::core::CoreBounce;
-use cosmic_space::wave::core::ReflectedCore;
-use cosmic_space::wave::exchange::asynch::DirectedHandlerShell;
-use cosmic_space::wave::exchange::asynch::Exchanger;
-use cosmic_space::wave::exchange::asynch::{
+use starlane_parse::new_span;
+use starlane_space::artifact::ArtRef;
+use starlane_space::command::common::StateSrc;
+use starlane_space::command::direct::create::{Create, PointSegTemplate, Strategy};
+use starlane_space::command::direct::select::Select;
+use starlane_space::command::Command;
+use starlane_space::command::RawCommand;
+use starlane_space::config::bind::{BindConfig, RouteSelector};
+use starlane_space::err::SpaceErr;
+use starlane_space::hyper::{Assign, AssignmentKind, HyperSubstance};
+use starlane_space::kind::Kind;
+use starlane_space::loc::{Layer, Surface, ToPoint, ToSurface};
+use starlane_space::log::{PointLogger, RootLogger};
+use starlane_space::parse::error::result;
+use starlane_space::parse::route_attribute;
+use starlane_space::parse::{bind_config, command_line};
+use starlane_space::particle::{Details, PointKind, Status};
+use starlane_space::point::Point;
+use starlane_space::substance::Substance;
+use starlane_space::util::{log, ToResolved};
+use starlane_space::wave::core::cmd::CmdMethod;
+use starlane_space::wave::core::hyp::HypMethod;
+use starlane_space::wave::core::CoreBounce;
+use starlane_space::wave::core::ReflectedCore;
+use starlane_space::wave::exchange::asynch::DirectedHandlerShell;
+use starlane_space::wave::exchange::asynch::Exchanger;
+use starlane_space::wave::exchange::asynch::{
     DirectedHandler, DirectedHandlerSelector, InCtx, RootInCtx,
 };
-use cosmic_space::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder, Router};
-use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::RecipientSelector;
-use cosmic_space::wave::{Agent, DirectedProto, Handling, Pong, Scope, Wave};
-use cosmic_space::HYPERUSER;
+use starlane_space::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder, Router};
+use starlane_space::wave::exchange::SetStrategy;
+use starlane_space::wave::RecipientSelector;
+use starlane_space::wave::{Agent, DirectedProto, Handling, Pong, Scope, Wave};
+use starlane_space::HYPERUSER;
 
 use crate::driver::{
     Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere,

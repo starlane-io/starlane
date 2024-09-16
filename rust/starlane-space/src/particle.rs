@@ -5,7 +5,7 @@ use nom::bytes::complete::tag;
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 
-use cosmic_nom::{new_span, Res, Span};
+use starlane_parse::{new_span, Res, Span};
 
 use crate::kind::{Kind, KindParts};
 use crate::parse::error::result;
@@ -187,7 +187,7 @@ pub mod particle {
     use nom_supreme::{parse_from_str, ParserExt};
     use serde::{Deserialize, Serialize};
 
-    use cosmic_nom::{Res, Span};
+    use starlane_parse::{Res, Span};
 
     use crate::err::SpaceErr;
     use crate::kind::{BaseKind, Kind, KindParts};

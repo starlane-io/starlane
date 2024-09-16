@@ -797,9 +797,9 @@ impl WasmHost {
 
 #[cfg(test)]
 pub mod test {
-    use cosmic_space::artifact::asynch::MapFetcher;
-    use cosmic_space::particle::Details;
-    use cosmic_space::point::Point;
+    use starlane_space::artifact::asynch::MapFetcher;
+    use starlane_space::particle::Details;
+    use starlane_space::point::Point;
     #[tokio::test]
     pub async fn test() {}
 }

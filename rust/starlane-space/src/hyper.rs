@@ -3,7 +3,7 @@ use std::ops::{Deref, DerefMut};
 
 use serde::{Deserialize, Serialize};
 
-use cosmic_macros_primitive::Autobox;
+use starlane_macros_primitive::Autobox;
 
 use crate::command::common::StateSrc;
 use crate::config::mechtron::MechtronConfig;

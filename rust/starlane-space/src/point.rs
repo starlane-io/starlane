@@ -1,5 +1,5 @@
 use core::str::FromStr;
-use cosmic_nom::{new_span, Trace};
+use starlane_parse::{new_span, Trace};
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 
@@ -1361,7 +1361,7 @@ impl PointCtx {
 /// To create a Point:
 /// ```
 /// use std::str::FromStr;
-/// use cosmic_space::loc::Point;
+/// use starlane_space::loc::Point;
 /// let Point = Point::from_str("my-domain.com:apps:my-app")?;
 /// ```
 /// Besides PointSegs points also have a RouteSeg which can change the meaning of a Point drastically
@@ -1378,8 +1378,8 @@ pub type Point = PointDef<RouteSeg, PointSeg>;
 /// with a proper Env (environment) reference which should have a contextual point set:
 /// ```
 /// use std::str::FromStr;
-/// use cosmic_space::loc::Point;
-/// use cosmic_space::loc::PointCtx;
+/// use starlane_space::loc::Point;
+/// use starlane_space::loc::PointCtx;
 /// let point_var = PointCtx::from_str("..:another-app:something")?;
 /// let point: Point = point_ctx.to_resolve(&env)?;
 /// ```
@@ -1390,7 +1390,7 @@ pub type PointCtx = PointDef<RouteSeg, PointSegCtx>;
 /// usable point it must be resolved like so:
 /// ```
 /// use std::str::FromStr;
-/// use cosmic_space::loc::{Point, PointVar};
+/// use starlane_space::loc::{Point, PointVar};
 /// let point_var = PointVar::from_str("my-domain:users:${user}")?;
 /// let point: Point = point_var.to_resolve(&env)?;
 /// ```

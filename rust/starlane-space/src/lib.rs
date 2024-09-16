@@ -73,10 +73,10 @@ lazy_static! {
 }
 
 /*
-pub fn cosmic_uuid() -> Uuid {
+pub fn starlane_uuid() -> Uuid {
     uuid::Uuid::new_v4().to_string()
 }
-pub fn cosmic_timestamp() -> DateTime<Utc> {
+pub fn starlane_timestamp() -> DateTime<Utc> {
     Utc::now()
 }
 

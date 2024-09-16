@@ -13,7 +13,7 @@ parser combinator easier to use.
 ## COSMIC NOMS CONTRIBUTIONS
 
 ### IMPLEMENTATION
-To use `cosmic-nom` you must accept an input implementing trait `cosmic_nom::Span` and return a result of type `cosmic_nom::Res`: 
+To use `cosmic-nom` you must accept an input implementing trait `starlane_parse::Span` and return a result of type `starlane_parse::Res`: 
 ```rust
 pub fn name<I:Span>( input:I ) -> Res<I,I> {
   alpha(input)
@@ -43,7 +43,7 @@ pub trait Span:
     + core::fmt::Debug
 ```
 
-To create a span call `cosmic_nom::new_span("scott williams")`
+To create a span call `starlane_parse::new_span("scott williams")`
 
 ```rust
 name(new_span("scott williams"));

@@ -1,11 +1,11 @@
 use crate::err::MembraneErr;
 use crate::Guest;
 use crate::{guest, mechtron_guest, GuestErr, MechtronFactories, Platform};
-use cosmic_space::err::SpaceErr;
-use cosmic_space::particle::Details;
-use cosmic_space::wave::exchange::synch::{DirectedHandlerProxy, DirectedHandlerShell};
-use cosmic_space::wave::{Bounce, ReflectedAggregate, UltraWave};
-use cosmic_space::VERSION;
+use starlane_space::err::SpaceErr;
+use starlane_space::particle::Details;
+use starlane_space::wave::exchange::synch::{DirectedHandlerProxy, DirectedHandlerShell};
+use starlane_space::wave::{Bounce, ReflectedAggregate, UltraWave};
+use starlane_space::VERSION;
 use dashmap::DashMap;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;

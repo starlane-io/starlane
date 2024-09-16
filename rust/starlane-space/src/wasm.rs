@@ -18,6 +18,6 @@ impl Timestamp {
 
 #[no_mangle]
 extern "C" {
-    pub fn cosmic_timestamp() -> Timestamp;
-    pub fn cosmic_uuid() -> loc::Uuid;
+    pub fn starlane_timestamp() -> Timestamp;
+    pub fn starlane_uuid() -> loc::Uuid;
 }

@@ -4,7 +4,7 @@ use nom::combinator::all_consuming;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use cosmic_nom::new_span;
+use starlane_parse::new_span;
 
 use crate::err::SpaceErr;
 use crate::loc::Meta;

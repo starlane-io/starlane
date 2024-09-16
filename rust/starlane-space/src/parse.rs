@@ -41,8 +41,8 @@ use nom_supreme::{parse_from_str, ParserExt};
 use regex::{Captures, Error, Match, Regex};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use cosmic_nom::{new_span, span_with_extra, Trace};
-use cosmic_nom::{trim, tw, Res, Span, Wrap};
+use starlane_parse::{new_span, span_with_extra, Trace};
+use starlane_parse::{trim, tw, Res, Span, Wrap};
 
 use crate::command::common::{PropertyMod, SetProperties, StateSrc, StateSrcVar};
 use crate::command::direct::create::{
@@ -3523,7 +3523,7 @@ pub mod model {
     use serde::de::Visitor;
     use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
-    use cosmic_nom::{new_span, Res, Span, Trace, Tw};
+    use starlane_parse::{new_span, Res, Span, Trace, Tw};
 
     use crate::command::direct::CmdKind;
     use crate::config::bind::{
@@ -4836,7 +4836,7 @@ pub mod error {
     use nom_supreme::error::{BaseErrorKind, ErrorTree, StackContext};
     use regex::{Error, Regex};
 
-    use cosmic_nom::{len, new_span, span_with_extra, trim, tw, Res, Span};
+    use starlane_parse::{len, new_span, span_with_extra, trim, tw, Res, Span};
 
     use crate::command::direct::CmdKind;
     use crate::command::CommandVar;
@@ -7300,7 +7300,7 @@ pub mod test {
     use nom_locate::LocatedSpan;
     use nom_supreme::error::ErrorTree;
 
-    use cosmic_nom::{new_span, span_with_extra, Res};
+    use starlane_parse::{new_span, span_with_extra, Res};
 
     use crate::command::direct::create::{
         PointSegTemplate, PointTemplate, PointTemplateCtx, Template,
@@ -8626,7 +8626,7 @@ pub mod cmd_test {
     use nom::error::{VerboseError, VerboseErrorKind};
     use nom_supreme::final_parser::{final_parser, ExtractContext};
 
-    use cosmic_nom::{new_span, Res};
+    use starlane_parse::{new_span, Res};
 
     use crate::command::{Command, CommandVar};
     use crate::err::SpaceErr;

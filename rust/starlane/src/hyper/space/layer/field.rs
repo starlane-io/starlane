@@ -3,22 +3,22 @@ use std::sync::Arc;
 
 use url::Url;
 
-use cosmic_space::artifact::ArtRef;
-use cosmic_space::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
-use cosmic_space::err::{CoreReflector, SpaceErr, StatusErr};
-use cosmic_space::loc::{Layer, Surface, ToSurface};
-use cosmic_space::log::{PointLogger, Trackable};
-use cosmic_space::parse::model::{PipelineSegmentVar, PipelineVar};
-use cosmic_space::parse::{Env, RegexCapturesResolver};
-use cosmic_space::particle::traversal::{Traversal, TraversalLayer};
-use cosmic_space::point::Point;
-use cosmic_space::selector::PayloadBlock;
-use cosmic_space::substance::Substance;
-use cosmic_space::util::{log, ToResolved};
-use cosmic_space::wave::core::{Method, ReflectedCore};
-use cosmic_space::wave::exchange::asynch::ProtoTransmitter;
-use cosmic_space::wave::exchange::asynch::{Exchanger, TraversalTransmitter};
-use cosmic_space::wave::{
+use starlane_space::artifact::ArtRef;
+use starlane_space::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
+use starlane_space::err::{CoreReflector, SpaceErr, StatusErr};
+use starlane_space::loc::{Layer, Surface, ToSurface};
+use starlane_space::log::{PointLogger, Trackable};
+use starlane_space::parse::model::{PipelineSegmentVar, PipelineVar};
+use starlane_space::parse::{Env, RegexCapturesResolver};
+use starlane_space::particle::traversal::{Traversal, TraversalLayer};
+use starlane_space::point::Point;
+use starlane_space::selector::PayloadBlock;
+use starlane_space::substance::Substance;
+use starlane_space::util::{log, ToResolved};
+use starlane_space::wave::core::{Method, ReflectedCore};
+use starlane_space::wave::exchange::asynch::ProtoTransmitter;
+use starlane_space::wave::exchange::asynch::{Exchanger, TraversalTransmitter};
+use starlane_space::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Pong, Reflection, UltraWave, Wave,
 };
 

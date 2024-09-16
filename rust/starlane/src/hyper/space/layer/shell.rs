@@ -3,24 +3,24 @@ use std::sync::Arc;
 
 use dashmap::{DashMap, DashSet};
 
-use cosmic_nom::new_span;
-use cosmic_space::command::common::StateSrc;
-use cosmic_space::command::{Command, RawCommand};
-use cosmic_space::err::SpaceErr;
-use cosmic_space::loc::{Layer, Surface, SurfaceSelector, ToPoint, ToSurface, Topic};
-use cosmic_space::log::PointLogger;
-use cosmic_space::parse::error::result;
-use cosmic_space::parse::{command_line, Env};
-use cosmic_space::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
-use cosmic_space::point::Point;
-use cosmic_space::substance::Substance;
-use cosmic_space::util::{log, ToResolved};
-use cosmic_space::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
-use cosmic_space::wave::exchange::asynch::{
+use starlane_parse::new_span;
+use starlane_space::command::common::StateSrc;
+use starlane_space::command::{Command, RawCommand};
+use starlane_space::err::SpaceErr;
+use starlane_space::loc::{Layer, Surface, SurfaceSelector, ToPoint, ToSurface, Topic};
+use starlane_space::log::PointLogger;
+use starlane_space::parse::error::result;
+use starlane_space::parse::{command_line, Env};
+use starlane_space::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
+use starlane_space::point::Point;
+use starlane_space::substance::Substance;
+use starlane_space::util::{log, ToResolved};
+use starlane_space::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
+use starlane_space::wave::exchange::asynch::{
     DirectedHandler, Exchanger, InCtx, ProtoTransmitterBuilder, RootInCtx,
 };
-use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{
+use starlane_space::wave::exchange::SetStrategy;
+use starlane_space::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, Pong, ReflectedWave, UltraWave, Wave,
     WaveId,
 };

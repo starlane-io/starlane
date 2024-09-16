@@ -5,31 +5,31 @@ use crate::driver::{
 use crate::err::HyperErr;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::Cosmos;
-use cosmic_hyperlane::{};
-use cosmic_space::artifact::ArtRef;
-use cosmic_space::command::common::StateSrc;
-use cosmic_space::command::direct::create::{
+use crate::hyper::lane::{};
+use starlane_space::artifact::ArtRef;
+use starlane_space::command::common::StateSrc;
+use starlane_space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
-use cosmic_space::command::RawCommand;
-use cosmic_space::config::bind::BindConfig;
-use cosmic_space::err::SpaceErr;
-use cosmic_space::hyper::{ControlPattern, Greet, InterchangeKind};
-use cosmic_space::kind::{BaseKind, Kind, StarSub};
-use cosmic_space::loc::{Layer, PointFactory, Surface, ToSurface};
-use cosmic_space::log::{RootLogger, Tracker};
-use cosmic_space::particle::traversal::Traversal;
-use cosmic_space::point::Point;
-use cosmic_space::selector::KindSelector;
-use cosmic_space::settings::Timeouts;
-use cosmic_space::substance::Substance;
-use cosmic_space::wave::core::ext::ExtMethod;
-use cosmic_space::wave::core::ReflectedCore;
-use cosmic_space::wave::exchange::asynch::{
+use starlane_space::command::RawCommand;
+use starlane_space::config::bind::BindConfig;
+use starlane_space::err::SpaceErr;
+use starlane_space::hyper::{ControlPattern, Greet, InterchangeKind};
+use starlane_space::kind::{BaseKind, Kind, StarSub};
+use starlane_space::loc::{Layer, PointFactory, Surface, ToSurface};
+use starlane_space::log::{RootLogger, Tracker};
+use starlane_space::particle::traversal::Traversal;
+use starlane_space::point::Point;
+use starlane_space::selector::KindSelector;
+use starlane_space::settings::Timeouts;
+use starlane_space::substance::Substance;
+use starlane_space::wave::core::ext::ExtMethod;
+use starlane_space::wave::core::ReflectedCore;
+use starlane_space::wave::exchange::asynch::{
     Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TraversalRouter,
 };
-use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{Agent, DirectedProto, DirectedWave, Pong, ToRecipients, UltraWave, Wave};
+use starlane_space::wave::exchange::SetStrategy;
+use starlane_space::wave::{Agent, DirectedProto, DirectedWave, Pong, ToRecipients, UltraWave, Wave};
 use dashmap::DashMap;
 use std::marker::PhantomData;
 use std::str::FromStr;
