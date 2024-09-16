@@ -1371,7 +1371,7 @@ impl PointCtx {
 pub type Point = PointDef<RouteSeg, PointSeg>;
 
 /// A Point with potential contextual information for example one with a working dir:
-/// `.:mechtrons:mech-old`  the single `.` works the same as in unix shell and refers to the `working`
+/// `.:mechtrons:mechtron`  the single `.` works the same as in unix shell and refers to the `working`
 /// location.  You can also reference parent hierarchies just as you would expect: `..:another-app:something`
 ///
 /// In order to create an absolute Point from a PointCtx one must call the PointCtx::to_resolved(&env) method

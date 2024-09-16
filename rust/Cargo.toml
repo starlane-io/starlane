@@ -17,11 +17,15 @@ description="..."
 resolver = "2"
 members = [
   "starlane", "starlane-macros", "starlane-primitive-macros","mechtron"
-  ]
+  , "starlane-space", "starlane-parse"]
 
 exclude = [ ]
 
 [workspace.dependencies]
+starlane-macros = { path="./starlane-macros"}
+starlane-primitive-macros = { path="./starlane-primitive-macros"}
+starlane-space = { path="./starlane-space"}
+starlane-parse = { path="./starlane-parse"}
 lazy_static = "1.5.0"
 uuid = { version="1.1.2" }
 chrono = { version="0.4.19" }

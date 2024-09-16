@@ -13,36 +13,36 @@ use crate::reg::{Registration, Registry};
 use crate::star::HyperStarCall::LayerTraversalInjection;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::Cosmos;
-use cosmic_space::artifact::asynch::ArtifactApi;
-use cosmic_space::artifact::ArtRef;
-use cosmic_space::command::common::{SetProperties, StateSrc};
-use cosmic_space::command::direct::create::{
+use crate::space::artifact::asynch::ArtifactApi;
+use crate::space::artifact::ArtRef;
+use crate::space::command::common::{SetProperties, StateSrc};
+use crate::space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
-use cosmic_space::config::bind::BindConfig;
-use cosmic_space::err::SpaceErr;
-use cosmic_space::hyper::{Assign, HyperSubstance, ParticleLocation, ParticleRecord};
-use cosmic_space::kind::{BaseKind, Kind, KindParts, StarSub};
-use cosmic_space::loc::{Layer, Surface, ToPoint, ToSurface};
-use cosmic_space::log::{PointLogger, Tracker};
-use cosmic_space::parse::bind_config;
-use cosmic_space::particle::traversal::{
+use crate::space::config::bind::BindConfig;
+use crate::space::err::SpaceErr;
+use crate::space::hyper::{Assign, HyperSubstance, ParticleLocation, ParticleRecord};
+use crate::space::kind::{BaseKind, Kind, KindParts, StarSub};
+use crate::space::loc::{Layer, Surface, ToPoint, ToSurface};
+use crate::space::log::{PointLogger, Tracker};
+use crate::space::parse::bind_config;
+use crate::space::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
-use cosmic_space::particle::{Details, Status, Stub};
-use cosmic_space::point::Point;
-use cosmic_space::selector::KindSelector;
-use cosmic_space::substance::Substance;
-use cosmic_space::util::log;
-use cosmic_space::wave::core::cmd::CmdMethod;
-use cosmic_space::wave::core::{CoreBounce, Method, ReflectedCore};
-use cosmic_space::wave::exchange::asynch::{
+use crate::space::particle::{Details, Status, Stub};
+use crate::space::point::Point;
+use crate::space::selector::KindSelector;
+use crate::space::substance::Substance;
+use crate::space::util::log;
+use crate::space::wave::core::cmd::CmdMethod;
+use crate::space::wave::core::{CoreBounce, Method, ReflectedCore};
+use crate::space::wave::exchange::asynch::{
     DirectedHandler, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx,
     Router, TraversalRouter,
 };
-use cosmic_space::wave::exchange::SetStrategy;
-use cosmic_space::wave::{Agent, DirectedWave, ReflectedWave, UltraWave};
-use cosmic_space::HYPERUSER;
+use crate::space::wave::exchange::SetStrategy;
+use crate::space::wave::{Agent, DirectedWave, ReflectedWave, UltraWave};
+use crate::space::HYPERUSER;
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
 use futures::future::select_all;
@@ -1092,7 +1092,7 @@ impl<P> TraversalLayer for ItemOuter<P>
 where
     P: Cosmos,
 {
-    fn surface(&self) -> cosmic_space::loc::Surface {
+    fn surface(&self) -> crate::space::loc::Surface {
         self.surface.clone()
     }
 

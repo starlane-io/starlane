@@ -5001,7 +5001,7 @@ pub mod error {
                 "point:space_segment:dot_dupes" => { builder.with_message("Space Segment cannot have consecutive dots i.e. '..'").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Consecutive dots not allowed"))}
                 "point:version:root_not_trailing" =>{ builder.with_message("Root filesystem is the only segment allowed to follow a bundle version i.e. 'space:base:2.0.0-version:/dir/somefile.txt'").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Only root file segment ':/' allowed here"))}
                 "point:space_segment_leading" => {builder.with_message("The leading character of a Space segment must be a lowercase letter").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Invalid Leading Character"))}
-                "point:space_segment" => {builder.with_message("A Point Space Segment must be all lowercase, alphanumeric with dashes and dots.  It follows Host and Domain name rules i.e. 'localhost', 'mech-old.io'").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Invalid Space Segment"))}
+                "point:space_segment" => {builder.with_message("A Point Space Segment must be all lowercase, alphanumeric with dashes and dots.  It follows Host and Domain name rules i.e. 'localhost', 'mechtron.io'").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Invalid Space Segment"))}
                 "point:bad_leading" => {builder.with_message("The leading character must be a lowercase letter (for Base Segments) or a digit (for Version Segments)").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Invalid Leading Character"))}
                 "point:base_segment" => {builder.with_message("A Point Base Segment must be 'skewer-case': all lowercase alphanumeric with dashes. The leading character must be a letter.").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Invalid Base Segment Character"))}
                 "point:dir_pop" => {builder.with_message("A Point Directory Pop '..'").with_label(Label::new(loc.location_offset()..loc.location_offset()).with_message("Something is Wrong"))}
@@ -7356,7 +7356,7 @@ pub mod test {
 Mechtron(version=1.0.0) {
     Wasm {
       +bin=repo:1.0.0:/wasm/blah.wasm;
-      +name=my-mech-old;
+      +name=my-mechtron;
     }
 }
 
@@ -7378,7 +7378,7 @@ Mechtron(version=1.0.0) {
     Wasm
     varool
       +bin=repo:1.0.0:/wasm/blah.wasm;
-      +name=my-mech-old;
+      +name=my-mechtron;
     }
 }
 
@@ -7775,7 +7775,7 @@ Mechtron(version=1.0.0) {
         )))(new_span("localhost"))))?;
         util::log(result(space_point_segment(new_span("localhost.com"))))?;
 
-        util::log(result(point_var(new_span("mech-old.io:app:hello")))?.to_point())?;
+        util::log(result(point_var(new_span("mechtron.io:app:hello")))?.to_point())?;
         util::log(result(pipeline_stop_var(new_span("localhost:app:hello"))))?;
         Ok(())
     }

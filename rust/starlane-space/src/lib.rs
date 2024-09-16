@@ -68,8 +68,8 @@ pub mod wave;
 lazy_static! {
     pub static ref VERSION: semver::Version =
         semver::Version::from_str(include_str!("VERSION").trim()).unwrap();
-    pub static ref HYPERUSER: Point = Point::from_str("hyper:users:hyperuser").expect("point");
-    pub static ref ANONYMOUS: Point = Point::from_str("hyper:users:anonymous").expect("point");
+    pub static ref HYPERUSER: Point = Point::from_str("hyperspace:users:hyperuser").expect("point");
+    pub static ref ANONYMOUS: Point = Point::from_str("hyperspace:users:anonymous").expect("point");
 }
 
 /*
