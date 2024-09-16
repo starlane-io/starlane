@@ -1,45 +1,15 @@
-#![allow(warnings)]
-pub mod err;
-
-#[macro_use]
-extern crate lazy_static;
-
-use crate::err::{DefaultHostErr, HostErr};
-use cosmic_space::artifact::asynch::{ArtifactApi, ReadArtifactFetcher};
-use cosmic_space::artifact::ArtRef;
-use cosmic_space::config::mechtron::MechtronConfig;
-use cosmic_space::err::SpaceErr;
-use cosmic_space::loc::{Layer, ToSurface};
-use cosmic_space::particle::{Details, Property};
-use cosmic_space::substance::Bin;
-use cosmic_space::wave::DirectedWave;
-use cosmic_space::wave::{DirectedKind, UltraWave, WaveKind};
-
-use wasmer::Function;
-use wasmer_compiler_singlepass::Singlepass;
-
-use cosmic_space::hyper::{HostCmd, HyperSubstance};
-use cosmic_space::log::{LogSource, PointLogger, RootLogger, StdOutAppender};
-use cosmic_space::substance::Substance;
-use cosmic_space::wasm::Timestamp;
-use cosmic_space::wave::core::hyp::HypMethod;
-use cosmic_space::wave::{Agent, DirectedProto};
-use cosmic_space::{loc, VERSION};
-
-use cosmic_space::point::Point;
-use cosmic_space::wave::core::cmd::CmdMethod;
-use cosmic_space::wave::core::Method;
-use cosmic_space::wave::exchange::asynch::ProtoTransmitter;
-use cosmic_space::wave::exchange::asynch::ProtoTransmitterBuilder;
-use cosmic_space::wave::exchange::SetStrategy;
+use wasmer::sys::store::Store;
 use std::collections::HashMap;
-use std::str::FromStr;
-use std::sync::{Arc, Mutex, RwLock};
-use std::{sync, thread};
-use threadpool::ThreadPool;
-use tokio::runtime::Handle;
+use mechtron_host::err::{DefaultHostErr, HostErr};
+use wasmer::sys::ptr::{Array, WasmPtr};
+use wasmer::sys::module::Module;
 use tokio::sync::mpsc;
-use wasmer::{imports, Array, Instance, Module, Store, Value, WasmPtr, WasmerEnv};
+use tokio::runtime::Handle;
+use wasmer::imports;
+use wasmer::sys::instance::Instance;
+use std::sync::Arc;
+use threadpool::ThreadPool;
+use wasmer_derive::derive_wasmer_env as WasmerEnv;
 
 #[derive(Clone)]
 pub struct HostsApi {
@@ -225,11 +195,6 @@ pub enum WasmHostCall {
         buffer_id: i32,
         rtn: tokio::sync::oneshot::Sender<Result<Vec<u8>, DefaultHostErr>>,
     },
-}
-
-#[derive(WasmerEnv, Clone)]
-pub struct WasmHostApi {
-    tx: mpsc::Sender<WasmHostCall>,
 }
 
 impl WasmHostApi {
@@ -832,14 +797,14 @@ impl WasmHost {
 
 #[cfg(test)]
 pub mod test {
-    use crate::HostsRunner;
     use cosmic_space::artifact::asynch::MapFetcher;
     use cosmic_space::particle::Details;
     use cosmic_space::point::Point;
-    use std::fs;
-    use std::str::FromStr;
-    use std::sync::Arc;
-
     #[tokio::test]
     pub async fn test() {}
+}
+
+#[derive(WasmerEnv, Clone)]
+pub struct WasmHostApi {
+    tx: mpsc::Sender<WasmHostCall>,
 }

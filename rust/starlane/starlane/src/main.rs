@@ -9,11 +9,14 @@ pub mod properties;
 #[cfg(feature="space")]
 pub mod space;
 
+pub mod nom;
 #[cfg(feature = "hyperspace")]
 pub mod hyper;
 pub mod registry;
 #[cfg(feature = "server")]
 pub mod server;
+
+pub mod mechtron;
 
 use std::str::FromStr;
 use std::time::Duration;

@@ -29,13 +29,14 @@ use cosmic_space::wave::exchange::asynch::{InCtx, TraversalRouter};
 use cosmic_space::wave::exchange::SetStrategy;
 use cosmic_space::wave::{DirectedProto, DirectedWave, Pong, UltraWave, Wave};
 use dashmap::DashMap;
-use mechtron_host::{HostsApi, HostsCall, HostsRunner, WasmHostApi};
+use crate::mechtron::host::WasmHostApi;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
+use crate::mechtron::host::{HostsApi, HostsCall, HostsRunner};
 
 lazy_static! {
     static ref HOST_DRIVER_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(

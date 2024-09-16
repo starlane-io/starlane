@@ -18,7 +18,7 @@ repository.workspace = true
 [features]
 full=["server"]
 default=["server"]
-server=["hyperspace", "hyperlane","postgres", "hyperlane-tcp", "cli"]
+server=["hyperspace", "hyperlane","postgres", "hyperlane-tcp", "cli", "dep:threadpool", "dep:oneshot"]
 cli=["dep:text_io","dep:clap", "dep:walkdir", "space"]
 hyperspace=["dep:futures","dep:dashmap","dep:semver", "space"]
 hyperlane=["hyperspace"]
@@ -27,8 +27,6 @@ postgres=[ "dep:sqlx","dep:serde","dep:tracing","dep:async-recursion" ]
 space= ["dep:ariadne", "dep:nom", "dep:nom-supreme", "dep:nom_locate", "dep:regex", "dep:serde_json", "dep:serde_urlencoded", "dep:enum-ordinalize", "dep:convert_case", "dep:validator"]
 
 [dependencies]
-cosmic-space={ path= "../../cosmic/cosmic-space" ,version = "0.3.14" }
-mechtron-host={ path="../../mechtron/mechtron-host",version = "0.3.14" }
 lazy_static = {  workspace=true  }
 uuid = { workspace=true, features=["v4"] }
 chrono = { workspace=true, features=["serde"] }
@@ -81,6 +79,9 @@ enum-ordinalize = { workspace = true, optional = true }
 convert_case = { workspace = true, optional = true }
 validator = { workspace = true, optional = true }
 
+
+threadpool ={ workspace = true, optional = true }
+oneshot = { workspace = true, optional = true }
 
 
 [lib]
