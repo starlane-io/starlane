@@ -1,10 +1,6 @@
-use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverHandler, DriverSkel, DriverStatus, HyperDriverFactory,
-    Item, ItemCtx, ItemHandler, ItemRouter, ItemSkel, ItemSphere,
-};
-use crate::err::HyperErr;
-use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::Cosmos;
+
+
+use crate::hyper::space::Cosmos;
 use starlane_space::artifact::ArtRef;
 use starlane_space::command::common::{PropertyMod, SetProperties, StateSrc};
 use starlane_space::command::direct::create::{
@@ -35,23 +31,26 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use once_cell::sync::Lazy;
 use tokio::sync::mpsc;
+use crate::hyper::space::driver::{Driver, DriverCtx, DriverHandler, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemCtx, ItemHandler, ItemRouter, ItemSkel, ItemSphere};
+use crate::hyper::space::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::mechtron::host::{HostsApi, HostsCall, HostsRunner};
 
-lazy_static! {
-    static ref HOST_DRIVER_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
-        Arc::new(host_driver_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/host-driver.bind").unwrap()
-    );
-    static ref HOST_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
-        Arc::new(host_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/host.bind").unwrap()
-    );
-    static ref MECHTRON_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
-        Arc::new(mechtron_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/mech-old.bind").unwrap()
-    );
-}
+
+static HOST_DRIVER_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new( || {ArtRef::new(
+Arc::new(host_driver_bind()),
+Point::from_str("GLOBAL::repo:1.0.0:/bind/host-driver.bind").unwrap()
+)});
+
+static HOST_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new( || {ArtRef::new(
+Arc::new(host_bind()),
+Point::from_str("GLOBAL::repo:1.0.0:/bind/host.bind").unwrap()
+)});
+static MECHTRON_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new( ||{ArtRef::new(
+Arc::new(mechtron_bind()),
+Point::from_str("GLOBAL::repo:1.0.0:/bind/mech-old.bind").unwrap()
+)});
 
 fn host_driver_bind() -> BindConfig {
     log(bind_config(

@@ -12,7 +12,7 @@ use crate::err::HyperErr;
 use crate::reg::{Registration, Registry};
 use crate::star::HyperStarCall::LayerTraversalInjection;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::Cosmos;
+use crate::hyper::space::Cosmos;
 use crate::space::artifact::asynch::ArtifactApi;
 use crate::space::artifact::ArtRef;
 use crate::space::command::common::{SetProperties, StateSrc};

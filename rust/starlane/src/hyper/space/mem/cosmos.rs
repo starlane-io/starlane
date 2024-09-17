@@ -13,13 +13,13 @@ use crate::driver::DriverAvail;
 use crate::err::{CosmicErr, HyperErr};
 use crate::mem::registry::{MemRegApi, MemRegCtx};
 use crate::reg::Registry;
-use crate::{Cosmos, DriversBuilder, MachineTemplate};
-use crate::hyper::lane::{};
+use crate::{DriversBuilder, MachineTemplate};
 use starlane_space::artifact::asynch::ArtifactApi;
 use starlane_space::kind::StarSub;
 use starlane_space::loc::{MachineName, StarKey};
 use std::sync::Arc;
 use crate::hyper::lane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
+use crate::hyper::space::Cosmos;
 
 impl MemCosmos {
     pub fn new() -> Self {

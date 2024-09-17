@@ -3,7 +3,6 @@ use starlane_space::err::SpaceErr;
 use starlane_space::substance::Substance;
 use starlane_space::wave::core::http2::StatusCode;
 use starlane_space::wave::core::ReflectedCore;
-use mechtron_host::err::{DefaultHostErr, HostErr};
 use std::fmt::Debug;
 
 #[derive(Debug, Clone, Eq, PartialEq)]

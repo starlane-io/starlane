@@ -1,14 +1,8 @@
 use crate::err::StarErr;
-use crate::hyper::space::::base::BaseDriverFactory;
-use crate::hyper::space::::control::ControlDriverFactory;
-use crate::hyper::space::::mechtron::{HostDriverFactory, MechtronDriverFactory};
-use crate::hyper::space::::root::RootDriverFactory;
-use crate::hyper::space::::space::SpaceDriverFactory;
-use crate::hyper::space::::web::WebDriverFactory;
-use crate::hyper::space::::{DriverAvail, DriversBuilder};
-use crate::hyper::space::lib::Cosmos;
+
+use crate::hyper::lane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
+use crate::hyper::space::Cosmos;
 use crate::hyper::space::machine::MachineTemplate;
-use crate::hyper::space::::registry::{MemRegApi, MemRegCtx};
 use crate::hyper::space::reg::Registry;
 use crate::registry::postgres::{PostgresDbInfo, PostgresPlatform, PostgresRegistryContextHandle};
 use crate::{
@@ -24,8 +18,15 @@ use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
-use crate::hyper::lane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
 use crate::hyper::lane::tcp::{CertGenerator, HyperlaneTcpServer};
+use crate::hyper::space::driver::base::BaseDriverFactory;
+use crate::hyper::space::driver::{DriverAvail, DriversBuilder};
+use crate::hyper::space::driver::control::ControlDriverFactory;
+use crate::hyper::space::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
+use crate::hyper::space::driver::root::RootDriverFactory;
+use crate::hyper::space::driver::space::SpaceDriverFactory;
+use crate::hyper::space::driver::web::WebDriverFactory;
+use crate::hyper::space::mem::registry::{MemRegApi, MemRegCtx};
 
 #[derive(Clone)]
 pub struct Starlane {

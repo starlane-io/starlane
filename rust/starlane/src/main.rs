@@ -28,7 +28,7 @@ use uuid::Uuid;
 
 
 use crate::err::StarErr;
-use self::hyper::space::lib::Cosmos;
+use self::hyper::space::Cosmos;
 use crate::server::Starlane;
 use starlane_space::loc::ToBaseKind;
 use std::io::{Read, Seek, Write};

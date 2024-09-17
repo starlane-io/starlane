@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::future::Future;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -9,7 +8,6 @@ use futures::future::{join_all, select_all, BoxFuture};
 use futures::FutureExt;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
-use crate::hyper::lane::{};
 use starlane_space::artifact::asynch::{ArtifactApi, ArtifactFetcher};
 use starlane_space::err::SpaceErr;
 use starlane_space::hyper::{InterchangeKind, Knock};
@@ -24,11 +22,12 @@ use starlane_space::wave::core::cmd::CmdMethod;
 use starlane_space::wave::exchange::asynch::Exchanger;
 use starlane_space::wave::{Agent, DirectedProto, Pong, Wave};
 
-use crate::err::HyperErr;
-use crate::reg::{Registry, RegistryApi};
-use crate::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
-use crate::{Cosmos, DriversBuilder};
+
 use crate::hyper::lane::{HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, LayerTransform, MountInterchangeGate, SimpleGreeter};
+use crate::hyper::space::Cosmos;
+use crate::hyper::space::err::HyperErr;
+use crate::hyper::space::reg::Registry;
+use crate::hyper::space::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
 
 #[derive(Clone)]
 pub struct MachineApi<P>

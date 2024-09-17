@@ -1,4 +1,4 @@
-use crate::hyper::space::lib::Cosmos;
+use crate::hyper::space::Cosmos;
 use starlane_space::command::common::{SetProperties, SetRegistry};
 use starlane_space::command::direct::create::Strategy;
 use starlane_space::command::direct::delete::Delete;

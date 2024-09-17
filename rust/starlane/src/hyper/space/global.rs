@@ -43,8 +43,8 @@ use crate::driver::{
 use crate::err::HyperErr;
 use crate::reg::{Registration, Registry};
 use crate::star::{HyperStarSkel, SmartLocator};
-use crate::{Cosmos, DriverFactory};
-
+use crate::DriverFactory;
+use crate::hyper::space::Cosmos;
 /*
 #[derive(DirectedHandler,Clone)]
 pub struct Global<P> where P: Platform {

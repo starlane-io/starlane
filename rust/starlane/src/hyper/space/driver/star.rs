@@ -5,7 +5,7 @@ use crate::driver::{
 use crate::err::HyperErr;
 use crate::reg::{Registration, RegistryApi};
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::Cosmos;
+use crate::hyper::space::Cosmos;
 use starlane_space::artifact::ArtRef;
 use starlane_space::command::common::StateSrc;
 use starlane_space::command::direct::create::Strategy;

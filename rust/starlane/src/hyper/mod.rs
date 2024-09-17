@@ -3,4 +3,4 @@
 pub mod space;
 
 #[cfg(feature = "hyperlane")]
-mod lane;
+pub mod lane;

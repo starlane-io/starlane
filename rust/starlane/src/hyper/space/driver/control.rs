@@ -4,7 +4,7 @@ use crate::driver::{
 };
 use crate::err::HyperErr;
 use crate::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::Cosmos;
+use crate::hyper::space::Cosmos;
 use crate::hyper::lane::{};
 use starlane_space::artifact::ArtRef;
 use starlane_space::command::common::StateSrc;

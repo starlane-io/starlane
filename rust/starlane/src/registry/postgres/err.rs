@@ -35,7 +35,6 @@ impl PostErr for TestErr {
 pub mod convert {
     use crate::hyper::space::err::{ErrKind, HyperErr};
     use starlane_space::err::SpaceErr;
-    use mechtron_host::err::{DefaultHostErr, HostErr};
     use sqlx::Error;
     use std::io;
     use std::str::Utf8Error;

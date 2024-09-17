@@ -1,7 +1,7 @@
 pub mod err;
 
 use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::lib::Cosmos;
+use crate::hyper::space::Cosmos;
 use crate::hyper::space::reg::{Registration, RegistryApi};
 use starlane_space::command::common::{PropertyMod, SetProperties};
 use starlane_space::command::direct::create::Strategy;
@@ -1578,7 +1578,7 @@ pub mod test {
     use std::str::FromStr;
     use std::sync::Arc;
 
-    use crate::hyper::space::lib::Cosmos;
+    use crate::hyper::space::Cosmos;
     use crate::hyper::space::reg::Registration;
     use crate::registry::postgres::err::TestErr;
     use crate::registry::postgres::{

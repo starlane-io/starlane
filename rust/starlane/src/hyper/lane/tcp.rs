@@ -16,7 +16,7 @@ use starlane_space::VERSION;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use std::str::FromStr;
 use std::io::Read;
-use rustls::ServerConfig;
+use rustls::{ClientConfig, RootCertStore, ServerConfig};
 use tokio_rustls::{TlsAcceptor, TlsConnector, TlsStream};
 use crate::hyper::lane::{HyperConnectionDetails, HyperConnectionStatus, HyperGate, HyperGateSelector, HyperwayEndpoint, HyperwayEndpointFactory};
 

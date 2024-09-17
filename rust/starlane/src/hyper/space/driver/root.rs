@@ -2,7 +2,7 @@ use crate::driver::{
     Driver, DriverCtx, DriverSkel, HyperDriverFactory, Item, ItemHandler, ItemSphere,
 };
 use crate::star::HyperStarSkel;
-use crate::Cosmos;
+use crate::hyper::space::Cosmos;
 use starlane_space::artifact::ArtRef;
 use starlane_space::config::bind::BindConfig;
 use starlane_space::kind::{BaseKind, Kind};

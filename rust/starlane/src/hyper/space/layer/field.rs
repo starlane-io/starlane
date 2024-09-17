@@ -25,7 +25,7 @@ use starlane_space::wave::{
 use crate::err::HyperErr;
 use crate::reg::RegistryApi;
 use crate::star::{HyperStarSkel, LayerInjectionRouter, TraverseToNextRouter};
-use crate::Cosmos;
+use crate::hyper::space::Cosmos;
 
 pub struct Field<P>
 where

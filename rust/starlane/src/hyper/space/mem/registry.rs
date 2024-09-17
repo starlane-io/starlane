@@ -1,7 +1,7 @@
 use crate::err::CosmicErr;
 use crate::mem::cosmos::MemCosmos;
 use crate::reg::{Registration, RegistryApi};
-use crate::Cosmos;
+use crate::hyper::space::Cosmos;
 use starlane_space::command::common::{PropertyMod, SetProperties};
 use starlane_space::command::direct::delete::Delete;
 use starlane_space::command::direct::query::{Query, QueryResult};
