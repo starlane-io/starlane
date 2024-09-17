@@ -1,5 +1,3 @@
-use crate::driver::{Driver, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere};
-use crate::star::HyperStarSkel;
 use crate::hyper::space::Cosmos;
 use starlane_space::artifact::ArtRef;
 use starlane_space::config::bind::BindConfig;
@@ -10,13 +8,14 @@ use starlane_space::selector::KindSelector;
 use starlane_space::util::log;
 use std::str::FromStr;
 use std::sync::Arc;
+use once_cell::sync::Lazy;
+use crate::hyper::space::driver::{Driver, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere};
+use crate::hyper::space::star::HyperStarSkel;
 
-lazy_static! {
-    static ref SPACE_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
+    static SPACE_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new( || {ArtRef::new(
         Arc::new(space_bind()),
         Point::from_str("GLOBAL::repo:1.0.0:/bind/space.bind").unwrap()
-    );
-}
+    )});
 
 fn space_bind() -> BindConfig {
     log(bind_config(

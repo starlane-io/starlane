@@ -1,6 +1,4 @@
-use crate::err::CosmicErr;
-use crate::mem::cosmos::MemCosmos;
-use crate::reg::{Registration, RegistryApi};
+
 use crate::hyper::space::Cosmos;
 use starlane_space::command::common::{PropertyMod, SetProperties};
 use starlane_space::command::direct::delete::Delete;
@@ -16,6 +14,7 @@ use dashmap::DashMap;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicU64;
 use std::sync::{atomic, Arc};
+use crate::hyper::space::reg::{Registration, RegistryApi};
 
 impl MemRegCtx {
     pub fn new() -> Self {

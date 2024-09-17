@@ -8626,7 +8626,6 @@ pub mod cmd_test {
     use nom::error::{VerboseError, VerboseErrorKind};
     use nom_supreme::final_parser::{final_parser, ExtractContext};
 
-    use starlane_parse::{new_span, Res};
 
     use crate::command::{Command, CommandVar};
     use crate::err::SpaceErr;

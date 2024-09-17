@@ -11,6 +11,7 @@ use virtual_fs::Pipe;
 use std::path::Path;
 use std::io::Write;
 use crate::host::{FileSystemFactory, Process};
+use crate::host::err::HostErr;
 use crate::host::wasm::cache::WasmModuleCache;
 
 pub struct WasmService {
@@ -30,7 +31,7 @@ impl WasmService {
         &mut self,
         wasm: S,
         host_config: WasmHostConfig,
-    ) -> Result<WasmHost, Err>
+    ) -> Result<WasmHost, HostErr>
     where
         S: ToString,
     {
@@ -64,7 +65,7 @@ impl WasmHost {
             runtime,
         }
     }
-    pub async fn execute<I, Arg>(&mut self, args: I) -> Result<Process, Err>
+    pub async fn execute<I, Arg>(&mut self, args: I) -> Result<Process, HostErr>
     where
         I: IntoIterator<Item = Arg>,
         Arg: AsRef<[u8]>,
@@ -72,7 +73,7 @@ impl WasmHost {
         self.execute_with_data(args, &[]).await
     }
 
-    pub async fn execute_with_data<I, Arg>(&mut self, args: I, stdin: &[u8]) -> Result<Process, Err>
+    pub async fn execute_with_data<I, Arg>(&mut self, args: I, stdin: &[u8]) -> Result<Process, HostErr>
     where
         I: IntoIterator<Item = Arg>,
         Arg: AsRef<[u8]>,
@@ -122,7 +123,7 @@ impl WasmHost {
         })
     }
 
-    pub async fn execute_with_stdin<I, Arg>(&mut self, args: I, stdin: Pipe) -> Result<Process, Err>
+    pub async fn execute_with_stdin<I, Arg>(&mut self, args: I, stdin: Pipe) -> Result<Process, HostErr>
     where
         I: IntoIterator<Item = Arg>,
         Arg: AsRef<[u8]>,

@@ -3,23 +3,22 @@
 };
 
  */
-use crate::driver::base::BaseDriverFactory;
-use crate::driver::control::ControlDriverFactory;
-use crate::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
-use crate::driver::root::RootDriverFactory;
-use crate::driver::space::SpaceDriverFactory;
-use crate::driver::web::WebDriverFactory;
-use crate::driver::DriverAvail;
-use crate::err::{CosmicErr, HyperErr};
-use crate::mem::registry::{MemRegApi, MemRegCtx};
-use crate::reg::Registry;
-use crate::{DriversBuilder, MachineTemplate};
+
 use starlane_space::artifact::asynch::ArtifactApi;
 use starlane_space::kind::StarSub;
 use starlane_space::loc::{MachineName, StarKey};
 use std::sync::Arc;
 use crate::hyper::lane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
 use crate::hyper::space::Cosmos;
+use crate::hyper::space::driver::base::BaseDriverFactory;
+use crate::hyper::space::driver::{DriverAvail, DriversBuilder};
+use crate::hyper::space::driver::control::ControlDriverFactory;
+use crate::hyper::space::driver::root::RootDriverFactory;
+use crate::hyper::space::driver::space::SpaceDriverFactory;
+use crate::hyper::space::err::CosmicErr;
+use crate::hyper::space::machine::MachineTemplate;
+use crate::hyper::space::mem::registry::{MemRegApi, MemRegCtx};
+use crate::hyper::space::reg::Registry;
 
 impl MemCosmos {
     pub fn new() -> Self {
@@ -79,8 +78,8 @@ impl Cosmos for MemCosmos {
             }
             StarSub::Nexus => {}
             StarSub::Maelstrom => {
-                builder.add_post(Arc::new(HostDriverFactory::new()));
-                builder.add_post(Arc::new(MechtronDriverFactory::new()));
+//                builder.add_post(Arc::new(HostDriverFactory::new()));
+//                builder.add_post(Arc::new(MechtronDriverFactory::new()));
             }
             StarSub::Scribe => {
                 /*                builder.add_post(Arc::new(RepoDriverFactory::new()));
@@ -91,7 +90,7 @@ impl Cosmos for MemCosmos {
                 */
             }
             StarSub::Jump => {
-                builder.add_post(Arc::new(WebDriverFactory::new()));
+//                builder.add_post(Arc::new(WebDriverFactory::new()));
             }
             StarSub::Fold => {}
             StarSub::Machine => {

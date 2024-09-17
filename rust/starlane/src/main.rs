@@ -10,6 +10,8 @@ extern crate starlane_macros;
 pub mod err;
 pub mod properties;
 
+pub mod env;
+
 #[cfg(feature="space")]
 pub mod space;
 
@@ -23,13 +25,8 @@ pub mod server;
 #[cfg(feature = "server")]
 pub mod host;
 
-pub mod mechtron;
-
 use std::str::FromStr;
 use std::time::Duration;
-use uuid::Uuid;
-
-
 use crate::err::StarErr;
 use self::hyper::space::Cosmos;
 use crate::server::Starlane;
@@ -39,8 +36,6 @@ use std::path::Path;
 use std::fs::File;
 use tokio::fs::DirEntry;
 use zip::write::FileOptions;
-use starlane_space::err::SpaceErr;
-
 #[cfg(feature = "server")]
 fn server() -> Result<(), StarErr> {
     ctrlc::set_handler(move || {
@@ -68,39 +63,18 @@ fn server() -> Result<(), StarErr> {
     Ok(())
 }
 
-lazy_static! {
-    pub static ref STARLANE_CONTROL_PORT: u16 = std::env::var("STARLANE_PORT")
-        .unwrap_or("4343".to_string())
-        .parse::<u16>()
-        .unwrap_or(4343);
-    pub static ref STARLANE_DATA_DIR: String =
-        std::env::var("STARLANE_DATA_DIR").unwrap_or("./data/".to_string());
-    pub static ref STARLANE_CACHE_DIR: String =
-        std::env::var("STARLANE_CACHE_DIR").unwrap_or("cache".to_string());
-    pub static ref STARLANE_TOKEN: String =
-        std::env::var("STARLANE_TOKEN").unwrap_or(Uuid::new_v4().to_string());
-    pub static ref STARLANE_REGISTRY_URL: String =
-        std::env::var("STARLANE_REGISTRY_URL").unwrap_or("localhost".to_string());
-    pub static ref STARLANE_REGISTRY_USER: String =
-        std::env::var("STARLANE_REGISTRY_USER").unwrap_or("postgres".to_string());
-    pub static ref STARLANE_REGISTRY_PASSWORD: String =
-        std::env::var("STARLANE_REGISTRY_PASSWORD").unwrap_or("password".to_string());
-    pub static ref STARLANE_REGISTRY_DATABASE: String =
-        std::env::var("STARLANE_REGISTRY_DATABASE").unwrap_or("postgres".to_string());
-}
-
 /*
 #[no_mangle]
 pub extern "C" fn starlane_uuid() -> loc::Uuid {
-    loc::Uuid::from(uuid::Uuid::new_v4()).unwrap()
+loc::Uuid::from(uuid::Uuid::new_v4()).unwrap()
 }
 
 #[no_mangle]
 pub extern "C" fn starlane_timestamp() -> Timestamp {
-    Timestamp { millis: Utc::now().timestamp_millis() }
+Timestamp { millis: Utc::now().timestamp_millis() }
 }
 
- */
+*/
 #[tokio::main]
 async fn main() -> Result<(),()> {
     Ok(())
@@ -112,6 +86,7 @@ pub mod test {
     pub fn test() {}
 }
 
+/*
 #[cfg(feature = "cli")]
 async fn cli() -> Result<(), SpaceErr> {
     let home_dir: String = match dirs::home_dir() {
@@ -162,6 +137,8 @@ async fn cli() -> Result<(), SpaceErr> {
         Ok(())
     }
 }
+
+ */
 
 pub fn zip_dir<T>(
     it: impl Iterator<Item = DirEntry>,

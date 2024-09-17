@@ -1,49 +1,28 @@
-use std::marker::PhantomData;
-use std::str::FromStr;
-use std::sync::Arc;
-
-use starlane_parse::new_span;
 use starlane_space::artifact::ArtRef;
-use starlane_space::command::common::StateSrc;
-use starlane_space::command::direct::create::{Create, PointSegTemplate, Strategy};
-use starlane_space::command::direct::select::Select;
+use starlane_space::command::direct::create::{Create, PointSegTemplate};
 use starlane_space::command::Command;
 use starlane_space::command::RawCommand;
-use starlane_space::config::bind::{BindConfig, RouteSelector};
-use starlane_space::err::SpaceErr;
-use starlane_space::hyper::{Assign, AssignmentKind, HyperSubstance};
-use starlane_space::kind::Kind;
-use starlane_space::loc::{Layer, Surface, ToPoint, ToSurface};
-use starlane_space::log::{PointLogger, RootLogger};
+use starlane_space::config::bind::BindConfig;
+use starlane_space::loc::{ToPoint, ToSurface};
+use starlane_space::log::PointLogger;
 use starlane_space::parse::error::result;
-use starlane_space::parse::route_attribute;
 use starlane_space::parse::{bind_config, command_line};
-use starlane_space::particle::{Details, PointKind, Status};
+use starlane_space::particle::{Details, Status};
 use starlane_space::point::Point;
 use starlane_space::substance::Substance;
 use starlane_space::util::{log, ToResolved};
 use starlane_space::wave::core::cmd::CmdMethod;
-use starlane_space::wave::core::hyp::HypMethod;
-use starlane_space::wave::core::CoreBounce;
 use starlane_space::wave::core::ReflectedCore;
-use starlane_space::wave::exchange::asynch::DirectedHandlerShell;
-use starlane_space::wave::exchange::asynch::Exchanger;
 use starlane_space::wave::exchange::asynch::{
-    DirectedHandler, DirectedHandlerSelector, InCtx, RootInCtx,
+    DirectedHandler, DirectedHandlerSelector, InCtx,
 };
-use starlane_space::wave::exchange::asynch::{ProtoTransmitter, ProtoTransmitterBuilder, Router};
-use starlane_space::wave::exchange::SetStrategy;
-use starlane_space::wave::RecipientSelector;
-use starlane_space::wave::{Agent, DirectedProto, Handling, Pong, Scope, Wave};
-use starlane_space::HYPERUSER;
-
-use crate::driver::{
-    Driver, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere,
-};
-use crate::err::HyperErr;
-use crate::reg::{Registration, Registry};
-use crate::star::{HyperStarSkel, SmartLocator};
-use crate::DriverFactory;
+use starlane_space::wave::{Agent, DirectedProto};
+use std::str::FromStr;
+use std::sync::Arc;
+use starlane_parse::new_span;
+use crate::hyper::space::err::HyperErr;
+use crate::hyper::space::reg::Registration;
+use crate::hyper::space::star::{HyperStarSkel, SmartLocator};
 use crate::hyper::space::Cosmos;
 /*
 #[derive(DirectedHandler,Clone)]

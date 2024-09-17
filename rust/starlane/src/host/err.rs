@@ -1,11 +1,11 @@
 use std::fmt::Display;
 
 #[derive(Clone, Debug)]
-pub struct Err {
+pub struct HostErr {
     message: String,
 }
 
-impl Err {
+impl HostErr {
     pub fn to_string(&self) -> String {
         self.message.clone()
     }
@@ -19,7 +19,7 @@ impl ToString for Err {
 
  */
 
-impl<T> From<T> for Err
+impl<T> From<T> for HostErr
 where
     T: ToString,
 {
@@ -30,7 +30,7 @@ where
     }
 }
 
-impl Err {
+impl HostErr {
     pub fn new(message: String) -> Self {
         Self { message }
     }

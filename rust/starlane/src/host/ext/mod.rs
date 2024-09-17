@@ -1,6 +1,10 @@
 use std::process::Stdio;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::io::Stdin;
+use tokio::process::{Child, ChildStdin, Command};
+use crate::host::err;
+use crate::host::{Host, HostEnv, HostKey, HostService, StdinProc};
 
 #[derive(Clone, Hash, Eq, PartialEq)]
 pub struct ExtBin {
@@ -32,24 +36,24 @@ impl ExtHostService {
 }
 
 #[async_trait]
-impl HostService<ExtBin, Child> for ExtHostService {
-    async fn provision(&mut self, bin: ExtBin, env: Env) -> Result<Box<dyn Host<Child>>, err::Err> {
+impl HostService<ExtBin, Child, ChildStdin> for ExtHostService {
+    async fn provision(&mut self, bin: ExtBin, env: HostEnv) -> Result<Box<dyn Host<Child,ChildStdin>>, crate::host::err::HostErr> {
         let key = HostKey::new(bin.clone(), env.clone());
         return Ok(Box::new(ExtHost::new(bin.clone(), env)));
     }
 }
 
 pub struct ExtHost {
-    env: Env,
+    env: HostEnv,
     bin: ExtBin,
 }
 
 impl ExtHost {
-    fn new(bin: ExtBin, env: Env) -> Self {
+    fn new(bin: ExtBin, env: HostEnv) -> Self {
         Self { env, bin }
     }
 
-    async fn pre_exec(&self, args: Vec<String>) -> Result<Command, err::Err> {
+    async fn pre_exec(&self, args: Vec<String>) -> Result<Command, err::HostErr> {
         let mut command = Command::new(self.bin.file.clone());
         command.envs(self.env.env.clone());
         command.args(args.clone());
@@ -63,14 +67,14 @@ impl ExtHost {
 
 #[async_trait]
 impl Host<Child, Stdin> for ExtHost {
-    async fn execute(&self, args: Vec<String>) -> Result<Child, err::Err> {
+    async fn execute(&self, args: Vec<String>) -> Result<Child, err::HostErr> {
         let mut command = self.pre_exec(args).await?;
         command.stdin(Stdio::null());
         Ok(command.spawn()?)
     }
 
     fn direct(&self) -> Box<dyn StdinProc<ChildStdin>> {
-        let mut command = self.pre_exec(args).await?;
+        let mut command = self.pre_exec(self.args).await?;
     }
 }
 
@@ -87,12 +91,15 @@ impl ExtStdinProc {
 
 #[cfg(test)]
 pub mod test {
-    use crate::ext::{ExtBin, ExtHostService};
-    use crate::{EnvBuilder, HostService};
+    use std::env::current_dir;
+    use starlane::host::err;
+    use crate::host::ext::{ExtBin, ExtHostService};
+    use crate::host::{HostEnvBuilder, HostService};
+
     #[tokio::test]
-    pub async fn test() -> Result<(), crate::err::Err> {
+    pub async fn test() -> Result<(), err::HostErr> {
         let mut service = ExtHostService::new();
-        let mut builder = EnvBuilder::default();
+        let mut builder = HostEnvBuilder::default();
         builder.pwd(format!("{}/bins", current_dir().unwrap().to_str().unwrap()));
         let bin = ExtBin::new("./filestore".to_string());
         let mut host = service.provision(bin, builder.build()).await.unwrap();

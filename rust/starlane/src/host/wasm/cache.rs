@@ -1,16 +1,17 @@
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use wasmer::{Module, Store};
+use crate::host::err;
 use crate::host::wasm::source::Source;
 
 #[async_trait]
 pub trait WasmModuleCache {
-    async fn get(&mut self, key: &str, store: &Store) -> Result<Module, Err>;
+    async fn get(&mut self, key: &str, store: &Store) -> Result<Module, err::HostErr>;
 }
 
 pub struct WasmModuleMemCache {
     source: Box<dyn Source>,
-    map: HashMap<String, Result<Module, Err>>,
+    map: HashMap<String, Result<Module, err::HostErr>>,
     ser: Option<SerializedCache>,
 }
 
@@ -35,9 +36,9 @@ impl WasmModuleMemCache {
 
 #[async_trait]
 impl WasmModuleCache for WasmModuleMemCache {
-    async fn get(&mut self, key: &str, store: &Store) -> Result<Module, Err> {
+    async fn get(&mut self, key: &str, store: &Store) -> Result<Module, err::HostErr> {
         println!("Getting from STORE {}", key);
-        async fn load(source: &Box<dyn Source>, key: &str, store: &Store) -> Result<Module, Err> {
+        async fn load(source: &Box<dyn Source>, key: &str, store: &Store) -> Result<Module, err::HostErr> {
             println!("loading {}", key);
             let wasm_bytes = source.get(key).await?;
             let module = Module::new(store, wasm_bytes).map_err(|e| e.into());
@@ -91,7 +92,7 @@ impl SerializedCache {
         Self { path }
     }
 
-    pub async fn get(&self, name: &str, store: &Store) -> Option<Result<Module, Err>> {
+    pub async fn get(&self, name: &str, store: &Store) -> Option<Result<Module, err::HostErr>> {
         let file = self.path.join(Path::new(format!("{}.ser", name).as_str()));
         if !file.exists() {
             return Option::None;
@@ -102,7 +103,7 @@ impl SerializedCache {
         Some(result.map_err(|e| e.into()))
     }
 
-    pub async fn store(&self, name: &str, module: &Module) -> Result<(), Err> {
+    pub async fn store(&self, name: &str, module: &Module) -> Result<(), err::HostErr> {
         let file = self.path.join(Path::new(format!("{}.ser", name).as_str()));
         module.serialize_to_file(file).map_err(|e| e.into())
     }

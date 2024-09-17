@@ -25,7 +25,6 @@ pub mod convert {
     use crate::registry::postgres::err::PostErr;
     use ascii::FromAsciiError;
     use starlane_space::err::SpaceErr;
-    use mechtron_host::err::{DefaultHostErr, HostErr};
     use std::io;
     use std::str::Utf8Error;
     use std::string::FromUtf8Error;
@@ -84,14 +83,7 @@ pub mod convert {
         }
     }
 
-    impl From<DefaultHostErr> for Err {
-        fn from(e: DefaultHostErr) -> Self {
-            Self {
-                kind: ErrKind::Default,
-                message: e.to_string(),
-            }
-        }
-    }
+
 
     impl HyperErr for Err {
         fn to_space_err(&self) -> SpaceErr {
@@ -225,11 +217,7 @@ pub mod convert {
         }
     }
 
-    impl HostErr for Err {
-        fn to_space_err(self) -> SpaceErr {
-            SpaceErr::server_error(self.to_string())
-        }
-    }
+
 
     impl From<CompileError> for Err {
         fn from(e: CompileError) -> Self {

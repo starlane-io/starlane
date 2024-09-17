@@ -1,11 +1,9 @@
 //pub mod artifact;
 pub mod base;
 pub mod control;
-pub mod mechtron;
 pub mod root;
 pub mod space;
 pub mod star;
-pub mod web;
 
 use crate::hyper::space::Cosmos;
 use starlane_space::artifact::asynch::ArtifactApi;
@@ -51,8 +49,11 @@ use std::sync::Arc;
 use std::time::Duration;
 use once_cell::sync::Lazy;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
-use crate::hyper::space::star::HyperStarSkel;
+use crate::hyper::space::star::{HyperStarSkel, LayerInjectionRouter};
 use starlane_macros::DirectedHandler;
+use crate::hyper::space::driver::star::StarDriverFactory;
+use crate::hyper::space::err::HyperErr;
+use crate::hyper::space::reg::{Registration, Registry};
 
 static DEFAULT_BIND: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {ArtRef::new(
         Arc::new(default_bind()),

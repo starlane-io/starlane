@@ -25,7 +25,6 @@ pub trait HyperErr:
     + Sync
     + ToString
     + Clone
-    + HostErr
     + Into<SpaceErr>
     + From<SpaceErr>
     + From<String>
@@ -39,7 +38,6 @@ pub trait HyperErr:
     + From<FromAsciiError<std::string::String>>
     + From<SpaceErr>
     + Into<SpaceErr>
-    + From<DefaultHostErr>
     + From<()>
 {
     fn to_space_err(&self) -> SpaceErr;
@@ -84,7 +82,6 @@ pub mod convert {
     use crate::hyper::space::err::{ErrKind, HyperErr};
     use ascii::FromAsciiError;
     use starlane_space::err::SpaceErr;
-    use mechtron_host::err::{DefaultHostErr, HostErr};
     use std::io;
     use std::str::Utf8Error;
     use std::string::FromUtf8Error;
@@ -145,14 +142,6 @@ pub mod convert {
         }
     }
 
-    impl From<DefaultHostErr> for Err {
-        fn from(e: DefaultHostErr) -> Self {
-            Self {
-                kind: ErrKind::Default,
-                message: e.to_string(),
-            }
-        }
-    }
 
     impl HyperErr for Err {
         fn to_space_err(&self) -> SpaceErr {
@@ -273,11 +262,6 @@ pub mod convert {
         }
     }
 
-    impl HostErr for Err {
-        fn to_space_err(self) -> SpaceErr {
-            SpaceErr::server_error(self.to_string())
-        }
-    }
 
     impl From<CompileError> for Err {
         fn from(e: CompileError) -> Self {

@@ -5,12 +5,10 @@ use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use itertools::Itertools;
 use virtual_fs::{FileSystem, Pipe};
-use crate::host::cache::WasmModuleCache;
+use crate::host::err::HostErr;
 
-pub mod cache;
 pub mod err;
 pub mod ext;
-pub mod src;
 
 pub mod wasm;
 
@@ -34,12 +32,12 @@ where
 
 #[async_trait]
 pub trait HostService<B, P, S> {
-    async fn provision(&mut self, bin: B, env: HostEnv) -> Result<Box<dyn Host<P,S>>, Err>;
+    async fn provision(&mut self, bin: B, env: HostEnv) -> Result<Box<dyn Host<P,S>>, HostErr>;
 }
 
 #[async_trait]
 pub trait Host<P, S> {
-    async fn execute(&self, args: Vec<String>) -> Result<P, Err>;
+    async fn execute(&self, args: Vec<String>) -> Result<P, HostErr>;
 
     fn direct(&self) -> Box<dyn StdinProc<S>>;
 }
@@ -48,7 +46,7 @@ pub trait Host<P, S> {
 pub trait StdinProc<P> {
     fn stdin(&self) -> P;
 
-    async fn execute(self, args: Vec<String>) -> Result<P, Err>;
+    async fn execute(self, args: Vec<String>) -> Result<P, HostErr>;
 }
 
 #[derive(Clone, Eq, PartialEq)]
@@ -78,12 +76,12 @@ impl Default for HostEnv {
 }
 
 #[derive(Clone)]
-pub struct EnvBuilder {
+pub struct HostEnvBuilder {
     pwd: String,
     env: HashMap<String, String>,
 }
 
-impl EnvBuilder {
+impl HostEnvBuilder {
     pub fn build(self) -> HostEnv {
         HostEnv {
             pwd: self.pwd,
@@ -108,7 +106,7 @@ impl EnvBuilder {
     }
 }
 
-impl Default for EnvBuilder {
+impl Default for HostEnvBuilder {
     fn default() -> Self {
         Self {
             pwd: env::current_dir().unwrap().to_str().unwrap().to_string(),
@@ -132,7 +130,7 @@ impl Process {
     }
 
     /*
-    pub async fn direct_stdin(&mut self, data: String) -> Result<(), Err> {
+    pub async fn direct_stdin(&mut self, data: String) -> Result<(), HostErr> {
         writeln!(self.stdin, "{}", data)?;
         Result::Ok(())
     }
@@ -144,7 +142,7 @@ pub trait FileSystemFactory {
     fn create(
         &self,
         runtime: tokio::runtime::Handle,
-    ) -> Result<Box<dyn virtual_fs::FileSystem + Send + Sync>, Err>;
+    ) -> Result<Box<dyn virtual_fs::FileSystem + Send + Sync>, HostErr>;
 }
 
 struct RootFileSystemFactory {
@@ -161,7 +159,7 @@ impl FileSystemFactory for RootFileSystemFactory {
     fn create(
         &self,
         handle: tokio::runtime::Handle,
-    ) -> Result<Box<dyn FileSystem + Send + Sync>, Err> {
+    ) -> Result<Box<dyn FileSystem + Send + Sync>, HostErr> {
         match virtual_fs::host_fs::FileSystem::new(handle, self.path.clone()) {
             Ok(fs) => Result::Ok(Box::new(fs)),
             Err(err) => Result::Err(err.into()),

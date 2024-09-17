@@ -68,14 +68,14 @@ use starlane_space::HYPERUSER;
 
 use crate::hyper::lane::{Bridge, HyperClient, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub};
 use crate::hyper::space::Cosmos;
-use crate::hyper::space::driver::{DriverStatus, DriversApi, DriversBuilder};
-use crate::hyper::space::driver::star::{StarWrangles, Wrangler};
+use crate::hyper::space::driver::{DriverStatus, DriversApi, DriversBuilder, DriversCall};
+use crate::hyper::space::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::hyper::space::err::HyperErr;
 use crate::hyper::space::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
 use crate::hyper::space::layer::field::Field;
 use crate::hyper::space::layer::shell::{Shell, ShellState};
 use crate::hyper::space::machine::MachineSkel;
-use crate::hyper::space::reg::Registry;
+use crate::hyper::space::reg::{Registration, Registry};
 
 #[derive(Clone)]
 pub struct ParticleStates<P>

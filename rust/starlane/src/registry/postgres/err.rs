@@ -8,6 +8,7 @@ pub struct TestErr {
     pub kind: ErrKind,
 }
 
+#[cfg(test)]
 impl TestErr {
     pub(crate) fn new(e: Err) -> Self {
         Self {

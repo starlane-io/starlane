@@ -1,7 +1,4 @@
-use crate::driver::{
-    Driver, DriverCtx, DriverSkel, HyperDriverFactory, Item, ItemHandler, ItemSphere,
-};
-use crate::star::HyperStarSkel;
+
 use crate::hyper::space::Cosmos;
 use starlane_space::artifact::ArtRef;
 use starlane_space::config::bind::BindConfig;
@@ -16,13 +13,16 @@ use starlane_space::wave::exchange::asynch::RootInCtx;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
+use once_cell::sync::Lazy;
+use crate::hyper::space::driver::{Driver, DriverCtx, DriverSkel, HyperDriverFactory, Item, ItemHandler, ItemSphere};
+use crate::hyper::space::star::HyperStarSkel;
 
-lazy_static! {
-    static ref ROOT_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
-        Arc::new(root_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/root.bind").unwrap()
-    );
-}
+
+
+static ROOT_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new( ||{ArtRef::new(
+Arc::new(root_bind()),
+Point::from_str("GLOBAL::repo:1.0.0:/bind/root.bind").unwrap()
+)});
 
 fn root_bind() -> BindConfig {
     log(bind_config(

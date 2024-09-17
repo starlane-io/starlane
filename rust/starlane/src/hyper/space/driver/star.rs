@@ -1,10 +1,4 @@
-use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item,
-    ItemHandler, ItemSphere,
-};
-use crate::err::HyperErr;
-use crate::reg::{Registration, RegistryApi};
-use crate::star::{HyperStarSkel, LayerInjectionRouter};
+
 use crate::hyper::space::Cosmos;
 use starlane_space::artifact::ArtRef;
 use starlane_space::command::common::StateSrc;
@@ -43,15 +37,18 @@ use std::marker::PhantomData;
 use std::ops::{Add, Deref};
 use std::str::FromStr;
 use std::sync::Arc;
+use once_cell::sync::Lazy;
 use tokio::sync::{Mutex, RwLock};
 use tracing::error;
+use crate::hyper::space::driver::{Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere};
+use crate::hyper::space::err::HyperErr;
+use crate::hyper::space::reg::Registration;
+use crate::hyper::space::star::{HyperStarSkel, LayerInjectionRouter};
 
-lazy_static! {
-    static ref STAR_BIND_CONFIG: ArtRef<BindConfig> = ArtRef::new(
+static STAR_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new( || {ArtRef::new(
         Arc::new(star_bind()),
         Point::from_str("GLOBAL::repo:1.0.0:/bind/star.bind").unwrap()
-    );
-}
+    )});
 
 fn star_bind() -> BindConfig {
     log(bind_config(

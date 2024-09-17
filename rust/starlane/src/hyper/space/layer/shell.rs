@@ -2,7 +2,6 @@ use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::Arc;
 
 use dashmap::{DashMap, DashSet};
-
 use starlane_parse::new_span;
 use starlane_space::command::common::StateSrc;
 use starlane_space::command::{Command, RawCommand};
@@ -25,8 +24,8 @@ use starlane_space::wave::{
     WaveId,
 };
 
-use crate::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
 use crate::hyper::space::Cosmos;
+use crate::hyper::space::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
 
 #[derive(DirectedHandler)]
 pub struct Shell<P>

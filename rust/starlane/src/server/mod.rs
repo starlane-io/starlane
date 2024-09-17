@@ -5,10 +5,6 @@ use crate::hyper::space::Cosmos;
 use crate::hyper::space::machine::MachineTemplate;
 use crate::hyper::space::reg::Registry;
 use crate::registry::postgres::{PostgresDbInfo, PostgresPlatform, PostgresRegistryContextHandle};
-use crate::{
-    STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_REGISTRY_DATABASE,
-    STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_URL, STARLANE_REGISTRY_USER,
-};
 use starlane_space::artifact::asynch::ArtifactApi;
 use starlane_space::kind::StarSub;
 use starlane_space::loc::{MachineName, StarKey};
@@ -18,14 +14,13 @@ use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
+use crate::env::{STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_REGISTRY_DATABASE, STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_URL, STARLANE_REGISTRY_USER};
 use crate::hyper::lane::tcp::{CertGenerator, HyperlaneTcpServer};
 use crate::hyper::space::driver::base::BaseDriverFactory;
 use crate::hyper::space::driver::{DriverAvail, DriversBuilder};
 use crate::hyper::space::driver::control::ControlDriverFactory;
-use crate::hyper::space::driver::mechtron::{HostDriverFactory, MechtronDriverFactory};
 use crate::hyper::space::driver::root::RootDriverFactory;
 use crate::hyper::space::driver::space::SpaceDriverFactory;
-use crate::hyper::space::driver::web::WebDriverFactory;
 use crate::hyper::space::mem::registry::{MemRegApi, MemRegCtx};
 
 #[derive(Clone)]
@@ -103,8 +98,10 @@ impl Cosmos for Starlane {
             }
             StarSub::Nexus => {}
             StarSub::Maelstrom => {
-                builder.add_post(Arc::new(HostDriverFactory::new()));
+/*                builder.add_post(Arc::new(HostDriverFactory::new()));
                 builder.add_post(Arc::new(MechtronDriverFactory::new()));
+
+ */
             }
             StarSub::Scribe => {
                 /*
@@ -116,7 +113,7 @@ impl Cosmos for Starlane {
                  */
             }
             StarSub::Jump => {
-                builder.add_post(Arc::new(WebDriverFactory::new()));
+                //builder.add_post(Arc::new(WebDriverFactory::new()));
                 // builder.add_post(Arc::new(ControlDriverFactory::new()));
             }
             StarSub::Fold => {}
