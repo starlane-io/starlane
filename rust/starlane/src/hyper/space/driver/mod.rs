@@ -7,42 +7,37 @@ pub mod space;
 pub mod star;
 pub mod web;
 
-use crate::driver::star::StarDriverFactory;
-use crate::err::HyperErr;
-use crate::reg::{Registration, Registry};
-use crate::star::HyperStarCall::LayerTraversalInjection;
-use crate::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::hyper::space::Cosmos;
-use crate::space::artifact::asynch::ArtifactApi;
-use crate::space::artifact::ArtRef;
-use crate::space::command::common::{SetProperties, StateSrc};
-use crate::space::command::direct::create::{
+use starlane_space::artifact::asynch::ArtifactApi;
+use starlane_space::artifact::ArtRef;
+use starlane_space::command::common::{SetProperties, StateSrc};
+use starlane_space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
-use crate::space::config::bind::BindConfig;
-use crate::space::err::SpaceErr;
-use crate::space::hyper::{Assign, HyperSubstance, ParticleLocation, ParticleRecord};
-use crate::space::kind::{BaseKind, Kind, KindParts, StarSub};
-use crate::space::loc::{Layer, Surface, ToPoint, ToSurface};
-use crate::space::log::{PointLogger, Tracker};
-use crate::space::parse::bind_config;
-use crate::space::particle::traversal::{
+use starlane_space::config::bind::BindConfig;
+use starlane_space::err::SpaceErr;
+use starlane_space::hyper::{Assign, HyperSubstance, ParticleLocation, ParticleRecord};
+use starlane_space::kind::{BaseKind, Kind, KindParts, StarSub};
+use starlane_space::loc::{Layer, Surface, ToPoint, ToSurface};
+use starlane_space::log::{PointLogger, Tracker};
+use starlane_space::parse::bind_config;
+use starlane_space::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
-use crate::space::particle::{Details, Status, Stub};
-use crate::space::point::Point;
-use crate::space::selector::KindSelector;
-use crate::space::substance::Substance;
-use crate::space::util::log;
-use crate::space::wave::core::cmd::CmdMethod;
-use crate::space::wave::core::{CoreBounce, Method, ReflectedCore};
-use crate::space::wave::exchange::asynch::{
+use starlane_space::particle::{Details, Status, Stub};
+use starlane_space::point::Point;
+use starlane_space::selector::KindSelector;
+use starlane_space::substance::Substance;
+use starlane_space::util::log;
+use starlane_space::wave::core::cmd::CmdMethod;
+use starlane_space::wave::core::{CoreBounce, Method, ReflectedCore};
+use starlane_space::wave::exchange::asynch::{
     DirectedHandler, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx,
     Router, TraversalRouter,
 };
-use crate::space::wave::exchange::SetStrategy;
-use crate::space::wave::{Agent, DirectedWave, ReflectedWave, UltraWave};
-use crate::space::HYPERUSER;
+use starlane_space::wave::exchange::SetStrategy;
+use starlane_space::wave::{Agent, DirectedWave, ReflectedWave, UltraWave};
+use starlane_space::HYPERUSER;
 use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
 use futures::future::select_all;
@@ -54,18 +49,19 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use once_cell::sync::Lazy;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
+use crate::hyper::space::star::HyperStarSkel;
+use starlane_macros::DirectedHandler;
 
-lazy_static! {
-    static ref DEFAULT_BIND: ArtRef<BindConfig> = ArtRef::new(
+static DEFAULT_BIND: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {ArtRef::new(
         Arc::new(default_bind()),
         Point::from_str("GLOBAL::repo:1.0.0:/bind/default.bind").unwrap()
-    );
-    static ref DRIVER_BIND: ArtRef<BindConfig> = ArtRef::new(
+    )});
+    static DRIVER_BIND: Lazy<ArtRef<BindConfig>> = Lazy::new( ||{ArtRef::new(
         Arc::new(driver_bind()),
         Point::from_str("GLOBAL::repo:1.0.0:/bind/driver.bind").unwrap()
-    );
-}
+    )});
 
 fn driver_bind() -> BindConfig {
     log(bind_config(
@@ -1092,7 +1088,7 @@ impl<P> TraversalLayer for ItemOuter<P>
 where
     P: Cosmos,
 {
-    fn surface(&self) -> crate::space::loc::Surface {
+    fn surface(&self) -> starlane_space::loc::Surface {
         self.surface.clone()
     }
 
@@ -1196,7 +1192,7 @@ where
     }
 }
 
-#[derive(DirectedHandler)]
+#[derive(starlane_macros::DirectedHandler)]
 pub struct DriverRunner<P>
 where
     P: Cosmos + 'static,

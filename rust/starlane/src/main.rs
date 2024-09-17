@@ -4,6 +4,9 @@
 extern crate async_trait;
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate starlane_macros;
+
 pub mod err;
 pub mod properties;
 
