@@ -12,11 +12,16 @@ pub enum ErrKind {
     Status(u16),
 }
 
+pub type CosmicErr = convert::Err;
+
+/*
 #[derive(Debug, Clone)]
 pub struct CosmicErr {
     pub kind: ErrKind,
     pub message: String,
 }
+
+ */
 
 pub trait HyperErr:
     Sized
@@ -78,6 +83,57 @@ pub trait HyperErr:
         S: ToString;
 }
 
+/*
+impl HyperErr for CosmicErr {
+    fn to_space_err(&self) -> SpaceErr {
+        SpaceErr::Status {
+            status: 0,
+            message: self.message.to_string(),
+        }
+    }
+
+    fn new<S>(message: S) -> Self
+    where
+        S: ToString,
+    {
+        Self {
+            message,
+            kind: ErrKind::Default,
+        }
+    }
+
+    fn status_msg<S>(status: u16, message: S) -> Self
+    where
+        S: ToString,
+    {
+        Self {
+            kind: ErrKind::Status(status),
+            message: message.to_string(),
+        }
+    }
+
+    fn status(&self) -> u16 {
+        match &self.kind {
+            ErrKind::Status(s) => s.clone(),
+            _ => 0u16,
+        }
+    }
+
+    fn kind(&self) -> ErrKind {
+        self.kind.clone()
+    }
+
+    fn with_kind<S>(kind: ErrKind, msg: S) -> Self
+    where
+        S: ToString,
+    {
+        let message = msg.to_string();
+        Self { kind, message }
+    }
+}
+
+ */
+
 pub mod convert {
     use crate::hyper::space::err::{ErrKind, HyperErr};
     use ascii::FromAsciiError;
@@ -91,8 +147,8 @@ pub mod convert {
 
     #[derive(Debug, Clone)]
     pub struct Err {
-        message: String,
-        kind: ErrKind,
+        pub message: String,
+        pub kind: ErrKind,
     }
 
     impl Err {
@@ -141,7 +197,6 @@ pub mod convert {
             }
         }
     }
-
 
     impl HyperErr for Err {
         fn to_space_err(&self) -> SpaceErr {
@@ -261,7 +316,6 @@ pub mod convert {
             todo!()
         }
     }
-
 
     impl From<CompileError> for Err {
         fn from(e: CompileError) -> Self {

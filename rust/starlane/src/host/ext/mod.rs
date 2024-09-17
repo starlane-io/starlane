@@ -36,8 +36,8 @@ impl ExtHostService {
 }
 
 #[async_trait]
-impl HostService<ExtBin, Child, ChildStdin> for ExtHostService {
-    async fn provision(&mut self, bin: ExtBin, env: HostEnv) -> Result<Box<dyn Host<Child,ChildStdin>>, crate::host::err::HostErr> {
+impl HostService<ExtBin, Child, tokio::io::Stdin> for ExtHostService {
+    async fn provision(&mut self, bin: ExtBin, env: HostEnv) -> Result<Box<dyn Host<Child,tokio::io::Stdin>>, crate::host::err::HostErr> {
         let key = HostKey::new(bin.clone(), env.clone());
         return Ok(Box::new(ExtHost::new(bin.clone(), env)));
     }
@@ -73,9 +73,6 @@ impl Host<Child, Stdin> for ExtHost {
         Ok(command.spawn()?)
     }
 
-    fn direct(&self) -> Box<dyn StdinProc<ChildStdin>> {
-        let mut command = self.pre_exec(self.args).await?;
-    }
 }
 
 pub struct ExtStdinProc {

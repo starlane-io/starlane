@@ -39,7 +39,6 @@ pub trait HostService<B, P, S> {
 pub trait Host<P, S> {
     async fn execute(&self, args: Vec<String>) -> Result<P, HostErr>;
 
-    fn direct(&self) -> Box<dyn StdinProc<S>>;
 }
 
 #[async_trait]

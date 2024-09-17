@@ -410,17 +410,7 @@ where
     pub ctx: ControlCtx<P>,
 }
 
-impl<P> Control<P>
-where
-    P: Cosmos,
-{
-    fn restore(p0: HyperSkel<P>, p1: ControlCtx<P>, p2: ()) -> Box<dyn ItemRouter<P>>
-    where
-        P: Cosmos,
-    {
-        todo!()
-    }
-}
+
 
 impl<P> Item<P> for Control<P>
 where
