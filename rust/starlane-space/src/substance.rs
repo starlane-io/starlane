@@ -7,7 +7,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use starlane_macros_primitive::Autobox;
+use starlane_primitive_macros::Autobox;
 use starlane_parse::Tw;
 
 use crate::command::{Command, RawCommand};
@@ -80,7 +80,7 @@ pub enum SubstanceKind {
     PartialEq,
     strum_macros::Display,
     Autobox,
-    starlane_macros_primitive::ToSubstance,
+    starlane_primitive_macros::ToSubstance,
 )]
 pub enum Substance {
     Empty,
@@ -272,7 +272,7 @@ impl Substance {
     Eq,
     PartialEq,
     Autobox,
-    starlane_macros_primitive::ToSubstance,
+    starlane_primitive_macros::ToSubstance,
 )]
 pub enum LogSubstance {
     Log(Log),

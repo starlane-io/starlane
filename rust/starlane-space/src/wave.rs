@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use tokio::time::Instant;
 
-use starlane_macros_primitive::Autobox;
+use starlane_primitive_macros::Autobox;
 use starlane_parse::{Res, SpanExtra};
 use exchange::asynch::ProtoTransmitter;
 

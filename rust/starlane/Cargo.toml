@@ -42,6 +42,8 @@ strum =  {workspace = true}
 strum_macros = {workspace = true}
 wasmer = {workspace = true}
 wasmer-compiler-singlepass = {workspace = true}
+wasmer-wasix = {workspace = true}
+itertools = {workspace = true}
 #acid-store = {git="https://github.com/uberscott/acid-store.git" , version="0.14.2" }
 
 once_cell = { workspace=true }

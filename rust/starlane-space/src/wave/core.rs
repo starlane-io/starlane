@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use starlane_macros_primitive::Autobox;
+use starlane_primitive_macros::Autobox;
 
 use crate::command::Command;
 use crate::err::StatusErr;

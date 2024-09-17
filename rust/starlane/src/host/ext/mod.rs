@@ -1,10 +1,6 @@
-use crate::{err, Env, Host, HostKey, HostService, Process, StdinProc};
-use async_trait::async_trait;
-use std::collections::HashMap;
 use std::process::Stdio;
+use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::io::Stdin;
-use tokio::process::{Child, ChildStdin, Command};
 
 #[derive(Clone, Hash, Eq, PartialEq)]
 pub struct ExtBin {
@@ -93,8 +89,6 @@ impl ExtStdinProc {
 pub mod test {
     use crate::ext::{ExtBin, ExtHostService};
     use crate::{EnvBuilder, HostService};
-    use std::env::current_dir;
-
     #[tokio::test]
     pub async fn test() -> Result<(), crate::err::Err> {
         let mut service = ExtHostService::new();

@@ -1,13 +1,8 @@
-use crate::err::Err;
-use crate::src::Source;
-use async_trait::async_trait;
-use bytes::{Bytes, BytesMut};
-use std::cell::Cell;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::process;
+use std::collections::HashMap;
 use wasmer::{Module, Store};
-use wasmer_compiler_singlepass::Singlepass;
+use crate::host::wasm::source::Source;
+
 #[async_trait]
 pub trait WasmModuleCache {
     async fn get(&mut self, key: &str, store: &Store) -> Result<Module, Err>;
@@ -18,6 +13,7 @@ pub struct WasmModuleMemCache {
     map: HashMap<String, Result<Module, Err>>,
     ser: Option<SerializedCache>,
 }
+
 impl WasmModuleMemCache {
     pub fn new(source: Box<dyn Source>) -> Self {
         Self {
