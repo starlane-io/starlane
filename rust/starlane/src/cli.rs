@@ -22,7 +22,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use strum_macros::EnumString;
 use tokio::io::AsyncWriteExt;
-use tokio_print::aprintln;
 use walkdir::{DirEntry, WalkDir};
 use zip::write::FileOptions;
 
@@ -60,7 +59,6 @@ impl Default for ScriptArgs {
 }
 
 pub async fn script(script: ScriptArgs) -> Result<(), SpaceErr> {
-aprintln!("ENTERERED SCRIPT");
     let home_dir: String = match dirs::home_dir() {
         None => ".".to_string(),
         Some(dir) => dir.display().to_string(),
@@ -77,7 +75,6 @@ aprintln!("ENTERERED SCRIPT");
     };
 
     let session = Session::new(host, certs).await?;
-aprintln!("got session");
     loop {
         let line: String = text_io::try_read!("{};").map_err(|e| SpaceErr::new(500, "err"))?;
 
@@ -86,7 +83,8 @@ aprintln!("got session");
         if "exit" == line_str {
             return Ok(());
         }
-        println!("> {}", line_str);
+
+        aprintln!("> {}", line_str);
         session.command(line.as_str()).await?;
     }
 }
@@ -99,7 +97,6 @@ pub struct Session {
 impl Session {
     pub async fn new(host: String, certs: String) -> Result<Self, SpaceErr> {
 
-aprintln!("certs: {}", certs);
         let logger = RootLogger::default();
         let logger = logger.point(Point::from_str("starlane-cli")?);
         let tcp_client: Box<dyn HyperwayEndpointFactory> = Box::new(HyperlaneTcpClient::new(
@@ -112,7 +109,7 @@ aprintln!("certs: {}", certs);
 
         let client = ControlClient::new(tcp_client)?;
 
-        client.wait_for_ready(Duration::from_secs(5)).await?;
+        client.wait_for_ready(Duration::from_secs(30)).await?;
         client.wait_for_greet().await?;
 
         let cli = client.new_cli_session().await?;

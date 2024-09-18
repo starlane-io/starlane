@@ -23,8 +23,8 @@ use tokio_rustls::{TlsAcceptor, TlsConnector, TlsStream};
 use crate::hyper::lane::{HyperConnectionDetails, HyperConnectionStatus, HyperGate, HyperGateSelector, HyperwayEndpoint, HyperwayEndpointFactory};
 use rustls::pki_types::{CertificateDer, ServerName};
 use tokio::fs;
-use tokio_print::aprintln;
 use tokio_rustls::TlsStream::Server;
+use tracing::instrument::WithSubscriber;
 
 pub struct HyperlaneTcpClient {
     host: String,
@@ -62,15 +62,25 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
         let mut root_certs = RootCertStore::empty();
 
         let ca_file = format!("{}/cert.der", self.cert_dir);
-        let ca = fs::read_to_string(ca_file).await?;
-aprintln!("loading cert...");
-        let certs = vec![CertificateDer::from( ca.as_bytes() )];
-aprintln!("cert LOADED");
-        root_certs.add_parsable_certificates(certs);
+//        let key_file = format!("{}/key.der", self.cert_dir);
 
-        let client_config = Arc::new(
-            ClientConfig::builder()
-                .with_root_certificates(root_certs).with_no_client_auth()
+        let certs = rustls_pemfile::certs(&mut BufReader::new(&mut std::fs::File::open(ca_file).expect("cert file")))
+            .collect::<Result<Vec<_>, _>>()?;
+/*        let private_key =
+            rustls_pemfile::private_key(&mut BufReader::new(&mut File::open(key_file)?))?
+                .unwrap();
+
+ */
+
+        let mut root = RootCertStore::empty();
+        for c in certs {
+            root.add(c).expect("failed to add cert to root");
+        };
+
+        let mut client_config= Arc::new(rustls::ClientConfig::builder()
+            .with_root_certificates(root)
+            .with_no_client_auth());
+
             /*
             ClientConfig::builder()
                 .with_root_certificates(root_certs)
@@ -81,8 +91,8 @@ aprintln!("cert LOADED");
                 .unwrap()
                 .with_no_client_auth(),
 
-             */
         );
+             */
 
         let mut connector: TlsConnector = TlsConnector::from(client_config);
         let stream = tokio::net::TcpStream::connect(self.host.clone()).await?;

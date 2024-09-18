@@ -45,7 +45,6 @@ use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
 use zip::write::FileOptions;
 use starlane::init;
-use starlane_space::err::SpaceErr;
 use crate::cli::{Cli, Commands};
 
 #[cfg(feature="cli")]

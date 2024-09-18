@@ -26,7 +26,6 @@ use std::str::FromStr;
 use starlane_space::VERSION;
 use std::sync::atomic::{AtomicU16, Ordering};
 use once_cell::sync::Lazy;
-use tokio_print::aprintln;
 
 pub static LOCAL_CLIENT: Lazy<Point> = Lazy::new( | | {
     Point::from_str("LOCAL::client").expect("point")
@@ -1579,11 +1578,9 @@ impl HyperClient {
                 }
             }
         });
-aprintln!("entering timeout");
         let rtn = tokio::time::timeout(duration, rtn_rx).await;
 
         let rtn = rtn??;
-aprintln!("rtn ok?: {}",rtn.is_ok());
         rtn
 //        tokio::time::timeout(duration, rtn_rx).await??
     }
@@ -1708,7 +1705,7 @@ impl HyperClientRunner {
                     match runner.logger.result_ctx(
                         "connect",
                         tokio::time::timeout(
-                            Duration::from_secs(2),
+                            Duration::from_secs(30),
                             runner.factory.create(details_tx.clone()),
                         )
                         .await,

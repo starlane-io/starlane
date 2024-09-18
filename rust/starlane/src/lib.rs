@@ -10,7 +10,6 @@ extern crate lazy_static;
 extern crate starlane_macros;
 
 
-
 pub mod err;
 pub mod properties;
 
@@ -32,7 +31,7 @@ pub fn init()
 {
     #[cfg(feature="cli")]
     {
-        use rustls::crypto::ring::default_provider;
+        use rustls::crypto::aws_lc_rs::default_provider;
         default_provider().install_default().expect("crypto provider could not be installed");
     }
 }

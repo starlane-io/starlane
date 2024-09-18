@@ -69,7 +69,7 @@ async-recursion = { workspace = true, optional=true }
 
 
 rcgen = { workspace = true, optional = true, features=["pem", "x509-parser" ]}
-rustls = { workspace = true, optional = true}
+rustls = { workspace = true, optional = true, features=["aws_lc_rs"]}
 rustls-pemfile = { workspace = true, optional = true }
 tokio-rustls =  { workspace = true, optional = true}
 tls-api-rustls =  { workspace = true, optional = true}
@@ -98,6 +98,7 @@ anyhow = { workspace = true, optional = true }
 virtual-fs ={ workspace = true, optional = true }
 
 quinn ={ workspace = true, optional = true }
+webpki-roots = "0.26.5"
 [lib]
 name = "starlane"
 path= "src/lib.rs"
