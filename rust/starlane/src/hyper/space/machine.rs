@@ -23,12 +23,17 @@ use starlane_space::wave::core::cmd::CmdMethod;
 use starlane_space::wave::exchange::asynch::Exchanger;
 use starlane_space::wave::{Agent, DirectedProto, Pong, Wave};
 
-
-use crate::hyper::lane::{HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, LayerTransform, MountInterchangeGate, SimpleGreeter};
-use crate::hyper::space::Cosmos;
+use crate::hyper::lane::{
+    HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, Hyperway, HyperwayEndpoint,
+    HyperwayEndpointFactory, HyperwayInterchange, LayerTransform, MountInterchangeGate,
+    SimpleGreeter,
+};
 use crate::hyper::space::err::HyperErr;
 use crate::hyper::space::reg::Registry;
-use crate::hyper::space::star::{HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate};
+use crate::hyper::space::star::{
+    HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate,
+};
+use crate::hyper::space::Cosmos;
 
 #[derive(Clone)]
 pub struct MachineApi<P>

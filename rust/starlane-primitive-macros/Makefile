@@ -1,5 +1,7 @@
 VERSION := $(shell cat ../../VERSION)
-PUB := $(shell cargo show --json starlane-primitive-macros | jq ".versions[0].num" )
+NAME := $(shell toml get Cargo.toml package.name | tr -d '"')
+PUB := $(shell cargo show --json $(NAME) | jq ".versions[0].num" | tr -d '"' )
+	
 
 version:
 
@@ -11,5 +13,14 @@ publish-dry-run:
 	endif
  
  
-publish:
-	cargo publish
+pub:
+	@echo $(NAME)
+	@echo $(PUB)
+	@echo $(VERSION)
+
+	if [ "$(VERSION)" == "$(PUB)" ]; then echo "Equal"; 
+	else echo "NOT EQUAL";
+	fi
+
+
+	#cargo publish

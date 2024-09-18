@@ -46,7 +46,7 @@ pub struct ScriptArgs {
     host: Option<String>,
 
     /// Number of times to greet
-    #[arg( long)]
+    #[arg(long)]
     certs: Option<String>,
 }
 
@@ -99,7 +99,6 @@ pub struct Session {
 
 impl Session {
     pub async fn new(host: String, certs: String) -> Result<Self, SpaceErr> {
-
         let logger = RootLogger::default();
         let logger = logger.point(Point::from_str("starlane-cli")?);
         let tcp_client: Box<dyn HyperwayEndpointFactory> = Box::new(HyperlaneTcpClient::new(

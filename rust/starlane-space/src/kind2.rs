@@ -425,11 +425,11 @@ pub mod parse {
         SpecificSubTypes, SpecificSubTypesSelector, SubTypeDef, VariantDef,
     };
     use crate::parse::{camel_case, domain, skewer_case, version, version_req, CamelCase, Domain};
-    use starlane_parse::{Res, Span};
     use nom::branch::alt;
     use nom::bytes::complete::tag;
     use nom::combinator::{fail, opt, success, value};
     use nom::sequence::{delimited, pair, preceded, tuple};
+    use starlane_parse::{Res, Span};
     use std::str::FromStr;
 
     pub fn pattern<I, FnX, X>(mut f: FnX) -> impl FnMut(I) -> Res<I, Pattern<X>> + Copy
@@ -672,10 +672,10 @@ pub mod parse {
         };
         use crate::util::log;
         use core::str::FromStr;
-        use starlane_parse::new_span;
         use nom::bytes::complete::tag;
         use nom::combinator::{all_consuming, opt};
         use nom::sequence::{delimited, pair, preceded};
+        use starlane_parse::new_span;
 
         #[test]
         pub fn test_camel_case_subtypes() {

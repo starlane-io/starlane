@@ -1,5 +1,7 @@
 //pub mod artifact;
+pub mod artifact;
 pub mod base;
+mod cli;
 pub mod control;
 pub mod root;
 pub mod space;
@@ -52,14 +54,18 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
 
-static DEFAULT_BIND: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {ArtRef::new(
+static DEFAULT_BIND: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
+    ArtRef::new(
         Arc::new(default_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/default.bind").unwrap()
-    )});
-    static DRIVER_BIND: Lazy<ArtRef<BindConfig>> = Lazy::new( ||{ArtRef::new(
+        Point::from_str("GLOBAL::repo:1.0.0:/bind/default.bind").unwrap(),
+    )
+});
+static DRIVER_BIND: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
+    ArtRef::new(
         Arc::new(driver_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/driver.bind").unwrap()
-    )});
+        Point::from_str("GLOBAL::repo:1.0.0:/bind/driver.bind").unwrap(),
+    )
+});
 
 fn driver_bind() -> BindConfig {
     log(bind_config(

@@ -1,12 +1,12 @@
-use std::io::Error;
+use crate::hyper::space::err::{ErrKind, HyperErr};
 use ascii::FromAsciiError;
 use bincode::ErrorKind;
-use crate::hyper::space::err::{ErrKind, HyperErr};
+use starlane_space::err::{SpaceErr, StatusErr};
+use starlane_space::point::PointSegKind::Space;
+use std::io::Error;
 use strum::ParseError;
 use tokio::sync::oneshot::error::RecvError;
 use zip::result::ZipError;
-use starlane_space::err::{SpaceErr, StatusErr};
-use starlane_space::point::PointSegKind::Space;
 
 #[cfg(test)]
 #[derive(Debug, Clone)]
@@ -17,7 +17,10 @@ pub struct TestErr {
 
 #[cfg(test)]
 impl TestErr {
-    pub(crate) fn new<E>(e: E ) -> Self where E: ToString{
+    pub(crate) fn new<E>(e: E) -> Self
+    where
+        E: ToString,
+    {
         Self {
             message: e.to_string(),
             kind: ErrKind::Default,
@@ -29,20 +32,20 @@ pub trait PostErr: HyperErr + From<sqlx::Error> + From<ParseError> {
     fn dupe() -> Self;
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct TestErr {
-   pub message: String,
+    pub message: String,
     pub kind: ErrKind,
 }
 
 impl HyperErr for TestErr {
     fn to_space_err(&self) -> SpaceErr {
-        SpaceErr::new(0,self.message.clone())
+        SpaceErr::new(0, self.message.clone())
     }
 
     fn new<S>(message: S) -> Self
     where
-        S: ToString
+        S: ToString,
     {
         Self {
             message: message.to_string(),
@@ -52,7 +55,7 @@ impl HyperErr for TestErr {
 
     fn status_msg<S>(status: u16, message: S) -> Self
     where
-        S: ToString
+        S: ToString,
     {
         Self {
             message: message.to_string(),
@@ -61,10 +64,10 @@ impl HyperErr for TestErr {
     }
 
     fn status(&self) -> u16 {
-        match & self.kind{
-            ErrKind::Default => {0u16}
-            ErrKind::Dupe => {0u16}
-            ErrKind::Status(s) => s.clone()
+        match &self.kind {
+            ErrKind::Default => 0u16,
+            ErrKind::Dupe => 0u16,
+            ErrKind::Status(s) => s.clone(),
         }
     }
 
@@ -74,11 +77,11 @@ impl HyperErr for TestErr {
 
     fn with_kind<S>(kind: ErrKind, msg: S) -> Self
     where
-        S: ToString
+        S: ToString,
     {
         Self {
             message: msg.to_string(),
-            kind
+            kind,
         }
     }
 }
@@ -91,7 +94,7 @@ impl ToString for TestErr {
 
 impl Into<SpaceErr> for TestErr {
     fn into(self) -> SpaceErr {
-        SpaceErr::new(1,self.message.clone())
+        SpaceErr::new(1, self.message.clone())
     }
 }
 
@@ -99,7 +102,7 @@ impl From<SpaceErr> for TestErr {
     fn from(value: SpaceErr) -> Self {
         TestErr {
             message: value.message().to_string(),
-            kind: ErrKind::Default
+            kind: ErrKind::Default,
         }
     }
 }
@@ -189,8 +192,8 @@ impl PostErr for TestErr {
 #[cfg(test)]
 pub mod convert {
     use crate::hyper::space::err::{ErrKind, HyperErr};
-    use starlane_space::err::SpaceErr;
     use sqlx::Error;
+    use starlane_space::err::SpaceErr;
     use std::io;
     use std::str::Utf8Error;
     use std::string::FromUtf8Error;
@@ -227,7 +230,6 @@ pub mod convert {
             }
         }
     }
-
 
     impl From<ascii::FromAsciiError<std::string::String>> for Err {
         fn from(e: ascii::FromAsciiError<String>) -> Self {

@@ -70,7 +70,8 @@ pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(include_str!("VERSION").trim()).unwrap());
 pub static HYPERUSER: Lazy<Point> =
     Lazy::new(|| Point::from_str("hyperspace:users:hyperuser").expect("point"));
-pub static ANONYMOUS: Lazy<Point> = Lazy::new( || {Point::from_str("hyperspace:users:anonymous").expect("point") });
+pub static ANONYMOUS: Lazy<Point> =
+    Lazy::new(|| Point::from_str("hyperspace:users:anonymous").expect("point"));
 
 /*
 pub fn starlane_uuid() -> Uuid {

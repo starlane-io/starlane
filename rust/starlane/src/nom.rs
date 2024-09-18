@@ -1,13 +1,16 @@
-use std::sync::Arc;
-use std::ops::{Deref, Range, RangeFrom, RangeTo};
 use nom::character::complete::multispace0;
 use nom::combinator::recognize;
 use nom::error::{ErrorKind, ParseError};
-use nom::{AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength, InputTake, InputTakeAtPosition, Needed, Offset, Slice};
 use nom::sequence::delimited;
+use nom::{
+    AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength,
+    InputTake, InputTakeAtPosition, Needed, Offset, Slice,
+};
 use nom_locate::LocatedSpan;
 use nom_supreme::error::ErrorTree;
 use serde::{Deserialize, Serialize};
+use std::ops::{Deref, Range, RangeFrom, RangeTo};
+use std::sync::Arc;
 
 #[cfg(test)]
 mod tests {

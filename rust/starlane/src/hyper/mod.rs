@@ -1,4 +1,3 @@
-
 #[cfg(feature = "hyperspace")]
 pub mod space;
 

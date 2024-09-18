@@ -1,5 +1,8 @@
 use crate::hyper::lane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
+use crate::hyper::space::driver::DriversBuilder;
+use crate::hyper::space::err::HyperErr;
 use crate::hyper::space::machine::{Machine, MachineApi, MachineTemplate};
+use crate::hyper::space::reg::Registry;
 use chrono::Utc;
 use starlane_space::artifact::asynch::ArtifactApi;
 use starlane_space::command::direct::create::KindTemplate;
@@ -15,9 +18,6 @@ use starlane_space::wasm::Timestamp;
 use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
-use crate::hyper::space::driver::DriversBuilder;
-use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::reg::Registry;
 
 pub mod driver;
 pub mod err;
@@ -53,7 +53,6 @@ where
     type RegistryContext;
     type StarAuth;
     type RemoteStarConnectionFactory;
-
 
     fn machine(&self) -> MachineApi<Self> {
         Machine::new(self.clone())
@@ -110,7 +109,7 @@ where
             BaseKind::User => Kind::User,
             BaseKind::App => Kind::App,
             BaseKind::Mechtron => Kind::Mechtron,
-            BaseKind::FileSystem => Kind::FileSystem,
+            BaseKind::FileStore => Kind::FileSystem,
             BaseKind::File => match &template.sub {
                 None => return Err("expected kind for File".into()),
                 Some(kind) => {

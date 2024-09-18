@@ -22,10 +22,9 @@ use starlane_space::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Pong, Reflection, UltraWave, Wave,
 };
 
-
-use crate::hyper::space::Cosmos;
 use crate::hyper::space::err::HyperErr;
 use crate::hyper::space::star::{HyperStarSkel, TraverseToNextRouter};
+use crate::hyper::space::Cosmos;
 
 pub struct Field<P>
 where

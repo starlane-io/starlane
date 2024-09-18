@@ -1,18 +1,18 @@
-mod source;
 mod cache;
+mod source;
 
-use std::sync::Arc;
-use wasmer::{Module, Store};
-use wasmer_wasix::{PluggableRuntime, WasiEnv};
-use wasmer_compiler_singlepass::Singlepass;
-use wasmer_wasix::runtime::task_manager::tokio::TokioTaskManager;
-use tokio::runtime::Handle;
-use virtual_fs::Pipe;
-use std::path::Path;
-use std::io::Write;
-use crate::host::{FileSystemFactory, Process};
 use crate::host::err::HostErr;
 use crate::host::wasm::cache::WasmModuleCache;
+use crate::host::{FileSystemFactory, Process};
+use std::io::Write;
+use std::path::Path;
+use std::sync::Arc;
+use tokio::runtime::Handle;
+use virtual_fs::Pipe;
+use wasmer::{Module, Store};
+use wasmer_compiler_singlepass::Singlepass;
+use wasmer_wasix::runtime::task_manager::tokio::TokioTaskManager;
+use wasmer_wasix::{PluggableRuntime, WasiEnv};
 
 pub struct WasmService {
     store: Store,
@@ -73,7 +73,11 @@ impl WasmHost {
         self.execute_with_data(args, &[]).await
     }
 
-    pub async fn execute_with_data<I, Arg>(&mut self, args: I, stdin: &[u8]) -> Result<Process, HostErr>
+    pub async fn execute_with_data<I, Arg>(
+        &mut self,
+        args: I,
+        stdin: &[u8],
+    ) -> Result<Process, HostErr>
     where
         I: IntoIterator<Item = Arg>,
         Arg: AsRef<[u8]>,
@@ -123,7 +127,11 @@ impl WasmHost {
         })
     }
 
-    pub async fn execute_with_stdin<I, Arg>(&mut self, args: I, stdin: Pipe) -> Result<Process, HostErr>
+    pub async fn execute_with_stdin<I, Arg>(
+        &mut self,
+        args: I,
+        stdin: Pipe,
+    ) -> Result<Process, HostErr>
     where
         I: IntoIterator<Item = Arg>,
         Arg: AsRef<[u8]>,
@@ -310,16 +318,16 @@ impl FsConfigBuilder {
 
 #[cfg(test)]
 pub mod test {
+    use crate::host::wasm::cache::WasmModuleMemCache;
+    use crate::host::wasm::source::FileSystemSrc;
+    use crate::host::wasm::{WasmHostConfig, WasmService};
+    use crate::host::{FileSystemFactory, RootFileSystemFactory};
     use std::io::Write;
     use std::path::Path;
     use std::sync::Arc;
     use tokio::io::AsyncReadExt;
     use tokio::runtime::Handle;
     use virtual_fs::{FileSystem, Pipe};
-    use crate::host::{FileSystemFactory, RootFileSystemFactory};
-    use crate::host::wasm::{WasmHostConfig, WasmService};
-    use crate::host::wasm::cache::WasmModuleMemCache;
-    use crate::host::wasm::source::FileSystemSrc;
 
     #[tokio::test]
     pub async fn test_fs() {

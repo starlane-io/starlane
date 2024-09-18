@@ -24,8 +24,8 @@ use starlane_space::wave::{
     WaveId,
 };
 
-use crate::hyper::space::Cosmos;
 use crate::hyper::space::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
+use crate::hyper::space::Cosmos;
 
 #[derive(DirectedHandler)]
 pub struct Shell<P>

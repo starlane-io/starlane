@@ -1,8 +1,8 @@
-use std::path::{Path, PathBuf};
-use std::collections::HashMap;
-use wasmer::{Module, Store};
 use crate::host::err;
 use crate::host::wasm::source::Source;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use wasmer::{Module, Store};
 
 #[async_trait]
 pub trait WasmModuleCache {
@@ -38,7 +38,11 @@ impl WasmModuleMemCache {
 impl WasmModuleCache for WasmModuleMemCache {
     async fn get(&mut self, key: &str, store: &Store) -> Result<Module, err::HostErr> {
         println!("Getting from STORE {}", key);
-        async fn load(source: &Box<dyn Source>, key: &str, store: &Store) -> Result<Module, err::HostErr> {
+        async fn load(
+            source: &Box<dyn Source>,
+            key: &str,
+            store: &Store,
+        ) -> Result<Module, err::HostErr> {
             println!("loading {}", key);
             let wasm_bytes = source.get(key).await?;
             let module = Module::new(store, wasm_bytes).map_err(|e| e.into());

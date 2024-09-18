@@ -8623,10 +8623,6 @@ where
 pub mod cmd_test {
     use core::str::FromStr;
 
-    use nom::error::{VerboseError, VerboseErrorKind};
-    use nom_supreme::final_parser::{final_parser, ExtractContext};
-
-
     use crate::command::{Command, CommandVar};
     use crate::err::SpaceErr;
     use crate::kind::Kind;
@@ -8639,6 +8635,9 @@ pub mod cmd_test {
     use crate::selector::{PointHierarchy, PointKindSeg};
     use crate::util::ToResolved;
     use crate::{BaseKind, KindTemplate, SetProperties};
+    use nom::error::{VerboseError, VerboseErrorKind};
+    use nom_supreme::final_parser::{final_parser, ExtractContext};
+    use starlane_parse::new_span;
 
     /*
     #[mem]

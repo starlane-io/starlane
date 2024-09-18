@@ -6,8 +6,8 @@ use nom::combinator::all_consuming;
 use serde::de::{Error, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
-use starlane_parse::{new_span, Trace};
 use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
+use starlane_parse::{new_span, Trace};
 
 use crate::kind::{BaseKind, Kind, KindParts, Specific};
 use crate::loc::{Layer, ToBaseKind, Topic, VarVal, Variable, Version};

@@ -79,7 +79,10 @@ where
     registry: Registry<P>,
 }
 
-impl<P> RegistryWrapper<P> where P: Cosmos{
+impl<P> RegistryWrapper<P>
+where
+    P: Cosmos,
+{
     pub fn new(registry: Registry<P>) -> Self {
         Self { registry }
     }

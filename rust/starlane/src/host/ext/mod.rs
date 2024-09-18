@@ -1,10 +1,10 @@
-use std::process::Stdio;
+use crate::host::err;
+use crate::host::{Host, HostEnv, HostKey, HostService, StdinProc};
 use std::collections::HashMap;
+use std::process::Stdio;
 use std::sync::Arc;
 use tokio::io::Stdin;
 use tokio::process::{Child, ChildStdin, Command};
-use crate::host::err;
-use crate::host::{Host, HostEnv, HostKey, HostService, StdinProc};
 
 #[derive(Clone, Hash, Eq, PartialEq)]
 pub struct ExtBin {
@@ -37,7 +37,11 @@ impl ExtHostService {
 
 #[async_trait]
 impl HostService<ExtBin, Child, tokio::io::Stdin> for ExtHostService {
-    async fn provision(&mut self, bin: ExtBin, env: HostEnv) -> Result<Box<dyn Host<Child,tokio::io::Stdin>>, crate::host::err::HostErr> {
+    async fn provision(
+        &mut self,
+        bin: ExtBin,
+        env: HostEnv,
+    ) -> Result<Box<dyn Host<Child, tokio::io::Stdin>>, crate::host::err::HostErr> {
         let key = HostKey::new(bin.clone(), env.clone());
         return Ok(Box::new(ExtHost::new(bin.clone(), env)));
     }
@@ -72,7 +76,6 @@ impl Host<Child, Stdin> for ExtHost {
         command.stdin(Stdio::null());
         Ok(command.spawn()?)
     }
-
 }
 
 pub struct ExtStdinProc {
@@ -88,10 +91,10 @@ impl ExtStdinProc {
 
 #[cfg(test)]
 pub mod test {
-    use std::env::current_dir;
+    use crate::host::err::HostErr;
     use crate::host::ext::{ExtBin, ExtHostService};
     use crate::host::{HostEnvBuilder, HostService};
-    use crate::host::err::HostErr;
+    use std::env::current_dir;
 
     #[tokio::test]
     pub async fn test() -> Result<(), HostErr> {

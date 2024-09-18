@@ -1,3 +1,8 @@
+use crate::hyper::space::err::HyperErr;
+use crate::hyper::space::reg::Registration;
+use crate::hyper::space::star::{HyperStarSkel, SmartLocator};
+use crate::hyper::space::Cosmos;
+use starlane_parse::new_span;
 use starlane_space::artifact::ArtRef;
 use starlane_space::command::direct::create::{Create, PointSegTemplate};
 use starlane_space::command::Command;
@@ -13,17 +18,10 @@ use starlane_space::substance::Substance;
 use starlane_space::util::{log, ToResolved};
 use starlane_space::wave::core::cmd::CmdMethod;
 use starlane_space::wave::core::ReflectedCore;
-use starlane_space::wave::exchange::asynch::{
-    DirectedHandler, DirectedHandlerSelector, InCtx,
-};
+use starlane_space::wave::exchange::asynch::{DirectedHandler, DirectedHandlerSelector, InCtx};
 use starlane_space::wave::{Agent, DirectedProto};
 use std::str::FromStr;
 use std::sync::Arc;
-use starlane_parse::new_span;
-use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::reg::Registration;
-use crate::hyper::space::star::{HyperStarSkel, SmartLocator};
-use crate::hyper::space::Cosmos;
 /*
 #[derive(DirectedHandler,Clone)]
 pub struct Global<P> where P: Platform {

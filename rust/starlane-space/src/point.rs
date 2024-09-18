@@ -1,10 +1,14 @@
 use core::str::FromStr;
-use starlane_parse::{new_span, Trace};
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
+use starlane_parse::{new_span, Trace};
 
 use crate::err::{ParseErrs, SpaceErr};
-use crate::loc::{PointSegQuery, PointSegment, RouteSegQuery, Surface, ToPoint, ToSurface, Variable, Version, CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE, LOCAL_PORTAL, LOCAL_STAR, REMOTE_ENDPOINT};
+use crate::loc::{
+    PointSegQuery, PointSegment, RouteSegQuery, Surface, ToPoint, ToSurface, Variable, Version,
+    CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE,
+    LOCAL_PORTAL, LOCAL_STAR, REMOTE_ENDPOINT,
+};
 use crate::parse::error::result;
 use crate::parse::{
     consume_point, consume_point_ctx, point_route_segment, point_selector, point_var, Env,
@@ -958,7 +962,6 @@ impl Point {
     pub fn local_star() -> Self {
         LOCAL_STAR.clone()
     }
-
 
     pub fn global_executor() -> Self {
         GLOBAL_EXEC.clone()

@@ -1,5 +1,6 @@
-
+use crate::hyper::space::reg::{Registration, RegistryApi};
 use crate::hyper::space::Cosmos;
+use dashmap::DashMap;
 use starlane_space::command::common::{PropertyMod, SetProperties};
 use starlane_space::command::direct::delete::Delete;
 use starlane_space::command::direct::query::{Query, QueryResult};
@@ -10,12 +11,10 @@ use starlane_space::point::Point;
 use starlane_space::security::{Access, AccessGrant, IndexedAccessGrant};
 use starlane_space::selector::Selector;
 use starlane_space::substance::SubstanceList;
-use dashmap::DashMap;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicU64;
 use std::sync::{atomic, Arc};
 use tokio_print::aprintln;
-use crate::hyper::space::reg::{Registration, RegistryApi};
 
 impl MemRegCtx {
     pub fn new() -> Self {
@@ -62,11 +61,10 @@ where
     C: Cosmos,
 {
     async fn nuke<'a>(&'a self) -> Result<(), C::Err> {
-       Ok(())
+        Ok(())
     }
 
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), C::Err> {
-
         self.set_properties(&registration.point, &registration.properties)
             .await?;
 

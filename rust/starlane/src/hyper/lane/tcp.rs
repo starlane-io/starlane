@@ -1,29 +1,32 @@
+use crate::hyper::lane::{
+    HyperConnectionDetails, HyperConnectionStatus, HyperGate, HyperGateSelector, HyperwayEndpoint,
+    HyperwayEndpointFactory,
+};
+use rcgen::{generate_simple_self_signed, RcgenError};
+use rustls::crypto::CryptoProvider;
+use rustls::pki_types::{CertificateDer, ServerName};
+use rustls::HandshakeType::Certificate;
+use rustls::{ClientConfig, RootCertStore, ServerConfig};
+use starlane_space::err::SpaceErr;
 use starlane_space::hyper::Knock;
 use starlane_space::log::PointLogger;
-use tokio::net::{TcpListener, TcpStream};
-use std::sync::Arc;
-use tokio::sync::{broadcast, mpsc, oneshot};
-use std::time::Duration;
-use starlane_space::err::SpaceErr;
 use starlane_space::substance::Substance;
-use rcgen::{generate_simple_self_signed, RcgenError};
-use tokio::time::error::Elapsed;
-use tokio::fs::File;
 use starlane_space::wave::{Ping, UltraWave, Wave};
-use std::{io, process};
-use std::string::FromUtf8Error;
 use starlane_space::VERSION;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use std::str::FromStr;
 use std::io::{BufReader, Read};
-use rustls::{ClientConfig, RootCertStore, ServerConfig};
-use rustls::crypto::CryptoProvider;
-use rustls::HandshakeType::Certificate;
-use tokio_rustls::{TlsAcceptor, TlsConnector, TlsStream};
-use crate::hyper::lane::{HyperConnectionDetails, HyperConnectionStatus, HyperGate, HyperGateSelector, HyperwayEndpoint, HyperwayEndpointFactory};
-use rustls::pki_types::{CertificateDer, ServerName};
+use std::str::FromStr;
+use std::string::FromUtf8Error;
+use std::sync::Arc;
+use std::time::Duration;
+use std::{io, process};
 use tokio::fs;
+use tokio::fs::File;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::time::error::Elapsed;
 use tokio_rustls::TlsStream::Server;
+use tokio_rustls::{TlsAcceptor, TlsConnector, TlsStream};
 use tracing::instrument::WithSubscriber;
 
 pub struct HyperlaneTcpClient {
@@ -56,32 +59,33 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
         &self,
         status_tx: mpsc::Sender<HyperConnectionDetails>,
     ) -> Result<HyperwayEndpoint, SpaceErr> {
-
-
-
         let mut root_certs = RootCertStore::empty();
 
         let ca_file = format!("{}/cert.der", self.cert_dir);
-//        let key_file = format!("{}/key.der", self.cert_dir);
+        //        let key_file = format!("{}/key.der", self.cert_dir);
 
-        let certs = rustls_pemfile::certs(&mut BufReader::new(&mut std::fs::File::open(ca_file).expect("cert file")))
-            .collect::<Result<Vec<_>, _>>()?;
-/*        let private_key =
-            rustls_pemfile::private_key(&mut BufReader::new(&mut File::open(key_file)?))?
-                .unwrap();
+        let certs = rustls_pemfile::certs(&mut BufReader::new(
+            &mut std::fs::File::open(ca_file).expect("cert file"),
+        ))
+        .collect::<Result<Vec<_>, _>>()?;
+        /*        let private_key =
+                   rustls_pemfile::private_key(&mut BufReader::new(&mut File::open(key_file)?))?
+                       .unwrap();
 
- */
+        */
 
         let mut root = RootCertStore::empty();
         for c in certs {
             root.add(c).expect("failed to add cert to root");
-        };
+        }
 
-        let mut client_config= Arc::new(rustls::ClientConfig::builder()
-            .with_root_certificates(root)
-            .with_no_client_auth());
+        let mut client_config = Arc::new(
+            rustls::ClientConfig::builder()
+                .with_root_certificates(root)
+                .with_no_client_auth(),
+        );
 
-            /*
+        /*
             ClientConfig::builder()
                 .with_root_certificates(root_certs)
             with_safe_default_protocol_versions()
@@ -396,32 +400,33 @@ impl HyperlaneTcpServer {
     ) -> Result<Self, Error> {
         let (server_kill_tx, server_kill_rx) = broadcast::channel(1);
 
-
-
         // load certificate
         let cert_path = format!("{}/cert.der", cert_dir);
         let key_path = format!("{}/key.der", cert_dir);
 
-
-        let mut file = BufReader::new ( std::fs::File::open(cert_path)?);
-        let ca_certs =rustls_pemfile::certs(&mut file).map( |i|{ i.unwrap() }).collect();
+        let mut file = BufReader::new(std::fs::File::open(cert_path)?);
+        let ca_certs = rustls_pemfile::certs(&mut file)
+            .map(|i| i.unwrap())
+            .collect();
 
         let mut file = BufReader::new(std::fs::File::open(key_path)?);
-        let private_key= rustls_pemfile::private_key(& mut file)?.ok_or(Error::new("no private key"))?;
-
+        let private_key =
+            rustls_pemfile::private_key(&mut file)?.ok_or(Error::new("no private key"))?;
 
         let server_config = Arc::new(
-            ServerConfig::builder().with_no_client_auth().with_single_cert(ca_certs, private_key).expect( "bad certifcate/key")
-/*            ServerConfig::builder()
-                .with_safe_default_cipher_suites()
-                .with_safe_default_kx_groups()
-                .with_safe_default_protocol_versions()
-                .unwrap()
+            ServerConfig::builder()
                 .with_no_client_auth()
                 .with_single_cert(ca_certs, private_key)
-                .expect("bad certificate/key"),
+                .expect("bad certifcate/key"), /*            ServerConfig::builder()
+                                                              .with_safe_default_cipher_suites()
+                                                              .with_safe_default_kx_groups()
+                                                              .with_safe_default_protocol_versions()
+                                                              .unwrap()
+                                                              .with_no_client_auth()
+                                                              .with_single_cert(ca_certs, private_key)
+                                                              .expect("bad certificate/key"),
 
- */
+                                               */
         );
 
         let mut acceptor = TlsAcceptor::from(server_config);
@@ -574,15 +579,17 @@ impl From<&str> for Error {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
     use starlane_space::loc::ToSurface;
     use starlane_space::log::RootLogger;
+    use std::str::FromStr;
 
+    use crate::hyper::lane::tcp::{CertGenerator, Error, HyperlaneTcpClient, HyperlaneTcpServer};
+    use crate::hyper::lane::test_util::{
+        LargeFrameTest, SingleInterchangePlatform, WaveTest, FAE, LESS,
+    };
     use chrono::DateTime;
     use chrono::Utc;
     use starlane_space::point::Point;
-    use crate::hyper::lane::tcp::{CertGenerator, Error, HyperlaneTcpClient, HyperlaneTcpServer};
-    use crate::hyper::lane::test_util::{LargeFrameTest, SingleInterchangePlatform, WaveTest, FAE, LESS};
 
     /*
     #[no_mangle]

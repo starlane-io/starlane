@@ -1,11 +1,25 @@
-use std::collections::HashSet;
 use crate::err::StarErr;
+use std::collections::HashSet;
 
+use crate::env::{
+    STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_REGISTRY_DATABASE,
+    STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_URL, STARLANE_REGISTRY_USER,
+};
+use crate::hyper::lane::tcp::{CertGenerator, HyperlaneTcpServer};
 use crate::hyper::lane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
-use crate::hyper::space::Cosmos;
+use crate::hyper::space::driver::base::BaseDriverFactory;
+use crate::hyper::space::driver::control::ControlDriverFactory;
+use crate::hyper::space::driver::root::RootDriverFactory;
+use crate::hyper::space::driver::space::SpaceDriverFactory;
+use crate::hyper::space::driver::{DriverAvail, DriversBuilder};
 use crate::hyper::space::machine::MachineTemplate;
+use crate::hyper::space::mem::registry::{MemRegApi, MemRegCtx};
 use crate::hyper::space::reg::{Registry, RegistryWrapper};
-use crate::registry::postgres::{PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext, PostgresRegistryContextHandle};
+use crate::hyper::space::Cosmos;
+use crate::registry::postgres::{
+    PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
+    PostgresRegistryContextHandle,
+};
 use starlane_space::artifact::asynch::ArtifactApi;
 use starlane_space::kind::StarSub;
 use starlane_space::loc::{MachineName, StarKey};
@@ -15,33 +29,24 @@ use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
-use crate::env::{STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_REGISTRY_DATABASE, STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_URL, STARLANE_REGISTRY_USER};
-use crate::hyper::lane::tcp::{CertGenerator, HyperlaneTcpServer};
-use crate::hyper::space::driver::base::BaseDriverFactory;
-use crate::hyper::space::driver::{DriverAvail, DriversBuilder};
-use crate::hyper::space::driver::control::ControlDriverFactory;
-use crate::hyper::space::driver::root::RootDriverFactory;
-use crate::hyper::space::driver::space::SpaceDriverFactory;
-use crate::hyper::space::mem::registry::{MemRegApi, MemRegCtx};
 
 #[derive(Clone)]
 pub struct Starlane {
-    pub handle: PostgresRegistryContextHandle<Self>
-//    pub ctx: P::RegistryContext
+    pub handle: PostgresRegistryContextHandle<Self>, //    pub ctx: P::RegistryContext
 }
 
 impl Starlane {
     pub async fn new() -> Result<Starlane, StarErr> {
-        #[cfg(feature="postgres")]
+        #[cfg(feature = "postgres")]
         {
             let db = <Self as PostgresPlatform>::lookup_registry_db()?;
             let mut set = HashSet::new();
             set.insert(db.clone());
             let ctx = Arc::new(PostgresRegistryContext::new(set).await?);
-            let handle= PostgresRegistryContextHandle::new(&db, ctx);
-            Ok(Self{ handle})
+            let handle = PostgresRegistryContextHandle::new(&db, ctx);
+            Ok(Self { handle })
         }
-        #[cfg(not(feature="postgres"))]
+        #[cfg(not(feature = "postgres"))]
         {
             let ctx = MemRegCtx::new();
             Ok(Self { ctx })
@@ -56,8 +61,6 @@ impl Starlane {
          */
     }
 }
-
-
 
 #[async_trait]
 impl Cosmos for Starlane {
@@ -113,10 +116,10 @@ impl Cosmos for Starlane {
             }
             StarSub::Nexus => {}
             StarSub::Maelstrom => {
-/*                builder.add_post(Arc::new(HostDriverFactory::new()));
-                builder.add_post(Arc::new(MechtronDriverFactory::new()));
+                /*                builder.add_post(Arc::new(HostDriverFactory::new()));
+                               builder.add_post(Arc::new(MechtronDriverFactory::new()));
 
- */
+                */
             }
             StarSub::Scribe => {
                 /*
@@ -143,11 +146,11 @@ impl Cosmos for Starlane {
     async fn global_registry(&self) -> Result<Registry<Self>, Self::Err> {
         let logger = RootLogger::default();
         let logger = logger.point(Point::global_registry());
-        Ok(Arc::new(RegistryWrapper::new( Arc::new(
+        Ok(Arc::new(RegistryWrapper::new(Arc::new(
             PostgresRegistry::new(self.handle.clone(), self.clone(), logger).await?,
         ))))
 
-//        Ok(Arc::new(MemRegApi::new(self.ctx.clone())))
+        //        Ok(Arc::new(MemRegApi::new(self.ctx.clone())))
     }
 
     async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>, Self::Err> {

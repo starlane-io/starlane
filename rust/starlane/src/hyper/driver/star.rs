@@ -1,5 +1,13 @@
-
+use crate::hyper::space::driver::{
+    Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item,
+    ItemHandler, ItemSphere,
+};
+use crate::hyper::space::err::HyperErr;
+use crate::hyper::space::reg::Registration;
+use crate::hyper::space::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::hyper::space::Cosmos;
+use dashmap::DashMap;
+use once_cell::sync::Lazy;
 use starlane_space::artifact::ArtRef;
 use starlane_space::command::common::StateSrc;
 use starlane_space::command::direct::create::Strategy;
@@ -30,26 +38,22 @@ use starlane_space::wave::{
     Retries, UltraWave, WaitTime, Wave,
 };
 use starlane_space::HYPERUSER;
-use dashmap::DashMap;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::ops::{Add, Deref};
 use std::str::FromStr;
 use std::sync::Arc;
-use once_cell::sync::Lazy;
 use tokio::sync::{Mutex, RwLock};
 use tokio_print::aprintln;
 use tracing::error;
-use crate::hyper::space::driver::{Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere};
-use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::reg::Registration;
-use crate::hyper::space::star::{HyperStarSkel, LayerInjectionRouter};
 
-static STAR_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new( || {ArtRef::new(
+static STAR_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
+    ArtRef::new(
         Arc::new(star_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/star.bind").unwrap()
-    )});
+        Point::from_str("GLOBAL::repo:1.0.0:/bind/star.bind").unwrap(),
+    )
+});
 
 fn star_bind() -> BindConfig {
     log(bind_config(
@@ -343,7 +347,7 @@ where
                     .record(&Point::global_executor())
                     .await
                     .map_err(|e| e.to_space_err())?;
-aprintln!("Global Executor REGISTERED!");
+                aprintln!("Global Executor REGISTERED!");
                 let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
                 self.create(&assign).await.map_err(|e| e.to_space_err())?;
                 self.skel

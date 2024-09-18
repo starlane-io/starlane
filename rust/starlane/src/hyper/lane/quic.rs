@@ -1,8 +1,8 @@
+use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::task::Poll;
 use std::time::Duration;
-use std::io;
 
 fn generate_self_signed_cert() -> Result<(rustls::Certificate, rustls::PrivateKey), SpaceErr> {
     let cert = rcgen::generate_simple_self_signed(vec!["cosmic-hyperlane".to_string()])?;

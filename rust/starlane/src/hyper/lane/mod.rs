@@ -1,43 +1,40 @@
-#[cfg(feature="hyperlane-tcp")]
+#[cfg(feature = "hyperlane-tcp")]
 pub mod tcp;
 
-#[cfg(feature="hyperlane-quic")]
+#[cfg(feature = "hyperlane-quic")]
 pub mod quic;
 
-
-use tokio::sync::{broadcast, mpsc, oneshot, watch};
-use starlane_space::log::{PointLogger, RootLogger, Tracker};
-use starlane_space::wave::{Agent, DirectedProto, HyperWave, UltraWave};
-use std::time::Duration;
-use starlane_space::err::SpaceErr;
-use starlane_space::loc::{Layer, PointFactory, Surface, ToSurface};
-use std::sync::Arc;
 use dashmap::DashMap;
+use once_cell::sync::Lazy;
+use starlane_space::err::SpaceErr;
 use starlane_space::hyper::{Greet, InterchangeKind, Knock};
+use starlane_space::loc::{Layer, PointFactory, Surface, ToSurface};
+use starlane_space::log::{PointLogger, RootLogger, Tracker};
+use starlane_space::point::Point;
 use starlane_space::substance::{Substance, Token};
 use starlane_space::wave::core::ext::ExtMethod;
-use starlane_space::wave::exchange::asynch::{Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter};
+use starlane_space::wave::exchange::asynch::{
+    Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
+};
 use starlane_space::wave::exchange::SetStrategy;
-use std::ops::{Deref, DerefMut};
-use starlane_space::point::Point;
+use starlane_space::wave::{Agent, DirectedProto, HyperWave, UltraWave};
+use starlane_space::VERSION;
 use std::collections::{HashMap, HashSet};
+use std::ops::{Deref, DerefMut};
 use std::process;
 use std::str::FromStr;
-use starlane_space::VERSION;
 use std::sync::atomic::{AtomicU16, Ordering};
-use once_cell::sync::Lazy;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
-pub static LOCAL_CLIENT: Lazy<Point> = Lazy::new( | | {
-    Point::from_str("LOCAL::client").expect("point")
-});
+pub static LOCAL_CLIENT: Lazy<Point> =
+    Lazy::new(|| Point::from_str("LOCAL::client").expect("point"));
 
-pub static LOCAL_CLIENT_RUNNER: Lazy<Point> = Lazy::new( | | {
-    Point::from_str("LOCAL::client:runner").expect("point")
-});
+pub static LOCAL_CLIENT_RUNNER: Lazy<Point> =
+    Lazy::new(|| Point::from_str("LOCAL::client:runner").expect("point"));
 
-pub static HYPERLANE_INDEX: Lazy<AtomicU16> = Lazy::new( | | {
-    AtomicU16::new(0)
-});
+pub static HYPERLANE_INDEX: Lazy<AtomicU16> = Lazy::new(|| AtomicU16::new(0));
 
 pub enum HyperwayKind {
     Mount,
@@ -1562,7 +1559,6 @@ impl HyperClient {
             loop {
                 let status = status_rx.borrow().clone();
 
-
                 match status {
                     HyperConnectionStatus::Ready => {
                         rtn.send(Ok(()));
@@ -1582,7 +1578,7 @@ impl HyperClient {
 
         let rtn = rtn??;
         rtn
-//        tokio::time::timeout(duration, rtn_rx).await??
+        //        tokio::time::timeout(duration, rtn_rx).await??
     }
 }
 
@@ -1700,8 +1696,6 @@ impl HyperClientRunner {
                     });
                 }
                 loop {
-
-
                     match runner.logger.result_ctx(
                         "connect",
                         tokio::time::timeout(
@@ -1933,6 +1927,7 @@ mod tests {
     use chrono::{DateTime, Utc};
     use dashmap::DashMap;
 
+    use crate::hyper::lane::HyperRouter;
     use starlane_space::command::direct::create::PointFactoryU64;
     use starlane_space::hyper::{InterchangeKind, Knock};
     use starlane_space::loc::Uuid;
@@ -1940,7 +1935,6 @@ mod tests {
     use starlane_space::point::Point;
     use starlane_space::substance::Substance;
     use starlane_space::wave::HyperWave;
-    use crate::hyper::lane::HyperRouter;
 
     /*
     #[no_mangle]
@@ -2010,6 +2004,11 @@ pub mod test_util {
     use once_cell::sync::Lazy;
     use tokio::sync::{broadcast, mpsc, oneshot};
 
+    use crate::hyper::lane::{
+        AnonHyperAuthenticator, HyperClient, HyperGate, HyperGateSelector, HyperGreeter, Hyperway,
+        HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker,
+        MountInterchangeGate,
+    };
     use starlane_space::command::direct::create::PointFactoryU64;
     use starlane_space::err::SpaceErr;
     use starlane_space::hyper::{Greet, InterchangeKind, Knock};
@@ -2029,17 +2028,11 @@ pub mod test_util {
         Agent, DirectedKind, DirectedProto, HyperWave, Pong, ReflectedKind, ReflectedProto,
         ReflectedWave, UltraWave, Wave,
     };
-    use crate::hyper::lane::{AnonHyperAuthenticator, HyperClient, HyperGate, HyperGateSelector, HyperGreeter, Hyperway, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker, MountInterchangeGate};
 
+    pub static LESS: Lazy<Point> =
+        Lazy::new(|| Point::from_str("space:users:less").expect("point"));
 
-    pub static LESS: Lazy<Point> = Lazy::new( | | {
-        Point::from_str("space:users:less").expect("point")
-    });
-
-    pub static FAE: Lazy<Point> = Lazy::new( | | {
-        Point::from_str("space:users:fae").expect("point")
-    });
-
+    pub static FAE: Lazy<Point> = Lazy::new(|| Point::from_str("space:users:fae").expect("point"));
 
     #[derive(Clone)]
     pub struct SingleInterchangePlatform {
@@ -2343,8 +2336,13 @@ pub mod test {
         ReflectedWave, UltraWave, Wave,
     };
 
-    use crate::hyper::lane::{AnonHyperAuthenticator, Bridge, HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker, MountInterchangeGate};
     use crate::hyper::lane::test_util::{SingleInterchangePlatform, TestGreeter, WaveTest};
+    use crate::hyper::lane::{
+        AnonHyperAuthenticator, Bridge, HyperClient, HyperConnectionDetails, HyperGate,
+        HyperGateSelector, HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint,
+        HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker,
+        MountInterchangeGate,
+    };
     use crate::hyper::space::tests::{FAE, LESS};
 
     pub struct TestRouter {}

@@ -1,7 +1,6 @@
 #![crate_type = "lib"]
 #![allow(warnings)]
 
-
 use proc_macro::TokenStream;
 use std::str::FromStr;
 
@@ -15,9 +14,8 @@ use syn::parse::{Parse, ParseStream};
 use syn::parse_quote::ParseQuote;
 use syn::spanned::Spanned;
 use syn::{
-    parse_macro_input, Attribute
-    , FnArg, GenericArgument, ImplItem, ItemImpl
-    , PathArguments, PathSegment, ReturnType, Type,
+    parse_macro_input, Attribute, FnArg, GenericArgument, ImplItem, ItemImpl, PathArguments,
+    PathSegment, ReturnType, Type,
 };
 
 use starlane_space::parse::route_attribute_value;

@@ -1,8 +1,12 @@
 pub mod err;
 
 use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::Cosmos;
 use crate::hyper::space::reg::{Registration, RegistryApi};
+use crate::hyper::space::Cosmos;
+use err::PostErr;
+use sqlx::pool::PoolConnection;
+use sqlx::postgres::{PgPoolOptions, PgRow};
+use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
 use starlane_space::command::common::{PropertyMod, SetProperties};
 use starlane_space::command::direct::create::Strategy;
 use starlane_space::command::direct::delete::Delete;
@@ -31,10 +35,6 @@ use starlane_space::selector::{
 use starlane_space::substance::{Substance, SubstanceList, SubstanceMap};
 use starlane_space::util::ValuePattern;
 use starlane_space::HYPERUSER;
-use err::PostErr;
-use sqlx::pool::PoolConnection;
-use sqlx::postgres::{PgPoolOptions, PgRow};
-use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::str::FromStr;
@@ -1577,16 +1577,20 @@ pub mod test {
     use std::str::FromStr;
     use std::sync::Arc;
 
-    use crate::hyper::space::Cosmos;
+    use crate::hyper::lane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
+    use crate::hyper::space::driver::DriversBuilder;
+    use crate::hyper::space::machine::MachineTemplate;
     use crate::hyper::space::reg::{Registration, Registry};
+    use crate::hyper::space::Cosmos;
     use crate::registry::postgres::err::TestErr;
-    use crate::registry::postgres::{PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext, PostgresRegistryContextHandle};
-    use crate::hyper::lane::{};
+    use crate::registry::postgres::{
+        PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
+        PostgresRegistryContextHandle,
+    };
     use starlane_space::artifact::asynch::ArtifactApi;
     use starlane_space::command::direct::create::Strategy;
     use starlane_space::command::direct::query::Query;
     use starlane_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
-    use starlane_space::HYPERUSER;
     use starlane_space::kind::{Kind, Specific, StarSub, UserBaseSubKind};
     use starlane_space::loc::{MachineName, StarKey, ToPoint};
     use starlane_space::log::RootLogger;
@@ -1595,9 +1599,7 @@ pub mod test {
     use starlane_space::point::Point;
     use starlane_space::security::{AccessGrant, AccessGrantKind, PermissionsMask, Privilege};
     use starlane_space::selector::{PointHierarchy, Selector};
-    use crate::hyper::lane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
-    use crate::hyper::space::driver::DriversBuilder;
-    use crate::hyper::space::machine::MachineTemplate;
+    use starlane_space::HYPERUSER;
 
     #[derive(Clone)]
     pub struct TestPlatform {
@@ -1726,11 +1728,11 @@ pub mod test {
             status: Status::Unknown,
         };
         registry.register(&registration).await?;
-println!("second registration...");
+        println!("second registration...");
         registry
             .assign_star(&point, &StarKey::central().to_point())
             .await?;
-println!("assignment...");
+        println!("assignment...");
         registry.set_status(&point, &Status::Ready).await?;
         registry.sequence(&point).await?;
         let record = registry.record(&point).await?;
@@ -1738,7 +1740,7 @@ println!("assignment...");
         let result = registry.query(&point, &Query::PointHierarchy).await?;
         let kind_path: PointHierarchy = result.try_into()?;
 
-println!("selecting......");
+        println!("selecting......");
         let pattern = Selector::from_str("**")?;
         let mut select = Select {
             pattern,
@@ -1746,9 +1748,9 @@ println!("selecting......");
             into_substance: SelectIntoSubstance::Points,
             kind: SelectKind::Initial,
         };
-println!("doing select...");
+        println!("doing select...");
         let points = registry.select(&mut select).await?;
-println!("select success");
+        println!("select success");
 
         assert_eq!(points.len(), 2);
 
@@ -1897,7 +1899,10 @@ println!("select success");
         let grant = AccessGrant {
             kind: AccessGrantKind::Super,
             on_point: Selector::from_str("localhost+:**")?,
-            to_point: superuser.clone().try_into().map_err(|e| TestErr::new("infallible"))?,
+            to_point: superuser
+                .clone()
+                .try_into()
+                .map_err(|e| TestErr::new("infallible"))?,
             by_particle: hyperuser.clone(),
         };
         println!("granting...");
@@ -2013,9 +2018,7 @@ println!("select success");
         //let selector = Selector::from_str("+:**")?;
         let selector = Selector::from_str("**")?;
         println!("selector created...");
-        let access_grants = registry
-            .list_access(&None, &selector)
-            .await?;
+        let access_grants = registry.list_access(&None, &selector).await?;
         println!("lising access grants...");
         println!(
             "{: <4}{:<6}{:<20}{:<40}{:<40}{:<40}",

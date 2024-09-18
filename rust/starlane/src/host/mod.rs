@@ -1,18 +1,18 @@
+use crate::host::err::HostErr;
+use itertools::Itertools;
 use std::collections::HashMap;
 use std::env;
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
-use itertools::Itertools;
 use virtual_fs::{FileSystem, Pipe};
-use crate::host::err::HostErr;
 
 pub mod err;
 pub mod ext;
 
 pub mod wasm;
 
-#[derive(Clone,Eq, PartialEq,Hash)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub struct HostKey<B>
 where
     B: Hash + Eq + PartialEq,
@@ -32,13 +32,12 @@ where
 
 #[async_trait]
 pub trait HostService<B, P, S> {
-    async fn provision(&mut self, bin: B, env: HostEnv) -> Result<Box<dyn Host<P,S>>, HostErr>;
+    async fn provision(&mut self, bin: B, env: HostEnv) -> Result<Box<dyn Host<P, S>>, HostErr>;
 }
 
 #[async_trait]
 pub trait Host<P, S> {
     async fn execute(&self, args: Vec<String>) -> Result<P, HostErr>;
-
 }
 
 #[async_trait]
@@ -63,7 +62,6 @@ impl Hash for HostEnv {
         }
     }
 }
-
 
 impl Default for HostEnv {
     fn default() -> Self {
@@ -165,4 +163,3 @@ impl FileSystemFactory for RootFileSystemFactory {
         }
     }
 }
-

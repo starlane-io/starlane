@@ -3,8 +3,6 @@ use core::str::FromStr;
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 
-use starlane_primitive_macros::Autobox;
-use starlane_parse::{new_span, Trace};
 use direct::create::{Create, CreateCtx, CreateVar};
 use direct::delete::{DeleteCtx, DeleteVar};
 use direct::get::{Get, GetCtx, GetVar};
@@ -12,6 +10,8 @@ use direct::read::{Read, ReadCtx, ReadVar};
 use direct::select::{SelectCtx, SelectVar};
 use direct::set::{Set, SetCtx, SetVar};
 use direct::write::{Write, WriteCtx, WriteVar};
+use starlane_parse::{new_span, Trace};
+use starlane_primitive_macros::Autobox;
 
 use crate::parse::error::result;
 use crate::parse::{command_line, Env};
