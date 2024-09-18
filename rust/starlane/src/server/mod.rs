@@ -147,8 +147,8 @@ impl Cosmos for Starlane {
 
     async fn start_services(&self, gate: &Arc<HyperGateSelector>) {
         let dir = match dirs::home_dir() {
-            None => ".old/localhost/certs".to_string(),
-            Some(path) => format!("{}/.old/localhost/certs", path.display()),
+            None => ".starlane/localhost/certs".to_string(),
+            Some(path) => format!("{}/.starlane/localhost/certs", path.display()),
         };
         fs::create_dir_all(dir.as_str());
 

@@ -14,7 +14,7 @@ extern crate lazy_static;
 extern crate starlane_macros;
 
 #[macro_use]
-extern crate starlane_macros_primitive;
+extern crate starlane_primitive_macros;
 
 extern crate alloc;
 extern crate core;

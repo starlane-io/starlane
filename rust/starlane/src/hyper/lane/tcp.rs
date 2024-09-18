@@ -10,15 +10,21 @@ use rcgen::{generate_simple_self_signed, RcgenError};
 use tokio::time::error::Elapsed;
 use tokio::fs::File;
 use starlane_space::wave::{Ping, UltraWave, Wave};
-use std::io;
+use std::{io, process};
 use std::string::FromUtf8Error;
 use starlane_space::VERSION;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use std::str::FromStr;
-use std::io::Read;
+use std::io::{BufReader, Read};
 use rustls::{ClientConfig, RootCertStore, ServerConfig};
+use rustls::crypto::CryptoProvider;
+use rustls::HandshakeType::Certificate;
 use tokio_rustls::{TlsAcceptor, TlsConnector, TlsStream};
 use crate::hyper::lane::{HyperConnectionDetails, HyperConnectionStatus, HyperGate, HyperGateSelector, HyperwayEndpoint, HyperwayEndpointFactory};
+use rustls::pki_types::{CertificateDer, ServerName};
+use tokio::fs;
+use tokio_print::aprintln;
+use tokio_rustls::TlsStream::Server;
 
 pub struct HyperlaneTcpClient {
     host: String,
@@ -50,31 +56,39 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
         &self,
         status_tx: mpsc::Sender<HyperConnectionDetails>,
     ) -> Result<HyperwayEndpoint, SpaceErr> {
+
+
+
         let mut root_certs = RootCertStore::empty();
 
         let ca_file = format!("{}/cert.der", self.cert_dir);
-
-        let mut ca_file = File::open(ca_file).await?;
-        let mut ca_buffer = Vec::new();
-        ca_file.read_to_end(&mut ca_buffer).await?;
-
-        root_certs.add_parsable_certificates(&mut [ca_buffer]);
+        let ca = fs::read_to_string(ca_file).await?;
+aprintln!("loading cert...");
+        let certs = vec![CertificateDer::from( ca.as_bytes() )];
+aprintln!("cert LOADED");
+        root_certs.add_parsable_certificates(certs);
 
         let client_config = Arc::new(
             ClientConfig::builder()
+                .with_root_certificates(root_certs).with_no_client_auth()
+            /*
+            ClientConfig::builder()
+                .with_root_certificates(root_certs)
+            with_safe_default_protocol_versions()
                 .with_safe_default_cipher_suites()
                 .with_safe_default_kx_groups()
                 .with_safe_default_protocol_versions()
                 .unwrap()
-                .with_root_certificates(root_certs)
                 .with_no_client_auth(),
+
+             */
         );
 
         let mut connector: TlsConnector = TlsConnector::from(client_config);
-        let stream = tokio::net::TcpStream::connect(self.host.as_str()).await?;
+        let stream = tokio::net::TcpStream::connect(self.host.clone()).await?;
 
         let host = self.host.split(":").next().unwrap().to_string();
-        let server_name = rustls::ServerName::try_from(host.as_str()).unwrap();
+        let server_name = ServerName::try_from(host.clone()).unwrap();
         let tokio_tls_connector = connector.connect(server_name, stream).await?;
 
         let mut stream = FrameStream::new(tokio_tls_connector.into());
@@ -98,8 +112,8 @@ pub struct CertGenerator {
 impl CertGenerator {
     pub fn gen(subject_alt_names: Vec<String>) -> Result<Self, RcgenError> {
         let cert = generate_simple_self_signed(subject_alt_names)?;
-        let certs = cert.serialize_der()?;
-        let key = cert.serialize_private_key_der();
+        let key = cert.key_pair.serialize_pem().into();
+        let certs = cert.cert.pem().into();
         Ok(Self { certs, key })
     }
 
@@ -372,27 +386,23 @@ impl HyperlaneTcpServer {
     ) -> Result<Self, Error> {
         let (server_kill_tx, server_kill_rx) = broadcast::channel(1);
 
+
+
         // load certificate
         let cert_path = format!("{}/cert.der", cert_dir);
         let key_path = format!("{}/key.der", cert_dir);
 
-        let mut cert_data = vec![];
-        let mut key_data = vec![];
 
-        let mut file = std::fs::File::open(cert_path)?;
-        file.read_to_end(&mut cert_data)?;
+        let mut file = BufReader::new ( std::fs::File::open(cert_path)?);
+        let ca_certs =rustls_pemfile::certs(&mut file).map( |i|{ i.unwrap() }).collect();
 
-        let mut file = std::fs::File::open(key_path)?;
-        file.read_to_end(&mut key_data)?;
+        let mut file = BufReader::new(std::fs::File::open(key_path)?);
+        let private_key= rustls_pemfile::private_key(& mut file)?.ok_or(Error::new("no private key"))?;
 
-        // I highly doubt this works
-        let mut ca_certs = Vec::<rustls::Certificate>::new();
-        ca_certs.push(rustls::Certificate(cert_data));
-
-        let private_key = rustls::PrivateKey(key_data);
 
         let server_config = Arc::new(
-            ServerConfig::builder()
+            ServerConfig::builder().with_no_client_auth().with_single_cert(ca_certs, private_key).expect( "bad certifcate/key")
+/*            ServerConfig::builder()
                 .with_safe_default_cipher_suites()
                 .with_safe_default_kx_groups()
                 .with_safe_default_protocol_versions()
@@ -400,6 +410,8 @@ impl HyperlaneTcpServer {
                 .with_no_client_auth()
                 .with_single_cert(ca_certs, private_key)
                 .expect("bad certificate/key"),
+
+ */
         );
 
         let mut acceptor = TlsAcceptor::from(server_config);
@@ -440,7 +452,7 @@ impl HyperlaneTcpServer {
                     server_kill_rx: broadcast::Receiver<()>,
                     logger: PointLogger,
                 ) -> Result<(), Error> {
-                    let mut stream = acceptor.accept(stream).await.unwrap();
+                    let mut stream = acceptor.accept(stream).await?;
 
                     let mut stream = FrameStream::new(stream.into());
 

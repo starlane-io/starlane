@@ -17,6 +17,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use dashmap::{DashMap, DashSet};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
@@ -65,12 +66,11 @@ pub mod util;
 pub mod wasm;
 pub mod wave;
 
-lazy_static! {
-    pub static ref VERSION: semver::Version =
-        semver::Version::from_str(include_str!("VERSION").trim()).unwrap();
-    pub static ref HYPERUSER: Point = Point::from_str("hyperspace:users:hyperuser").expect("point");
-    pub static ref ANONYMOUS: Point = Point::from_str("hyperspace:users:anonymous").expect("point");
-}
+pub static VERSION: Lazy<semver::Version> =
+    Lazy::new(|| semver::Version::from_str(include_str!("VERSION").trim()).unwrap());
+pub static HYPERUSER: Lazy<Point> =
+    Lazy::new(|| Point::from_str("hyperspace:users:hyperuser").expect("point"));
+pub static ANONYMOUS: Lazy<Point> = Lazy::new( || {Point::from_str("hyperspace:users:anonymous").expect("point") });
 
 /*
 pub fn starlane_uuid() -> Uuid {

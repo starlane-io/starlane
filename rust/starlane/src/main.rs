@@ -7,6 +7,9 @@ extern crate lazy_static;
 #[macro_use]
 extern crate starlane_macros;
 
+#[macro_use]
+extern crate clap;
+
 pub mod err;
 pub mod properties;
 
@@ -25,6 +28,9 @@ pub mod server;
 #[cfg(feature = "server")]
 pub mod host;
 
+#[cfg(feature = "cli")]
+pub mod cli;
+
 use std::str::FromStr;
 use std::time::Duration;
 use crate::err::StarErr;
@@ -34,8 +40,43 @@ use starlane_space::loc::ToBaseKind;
 use std::io::{Read, Seek, Write};
 use std::path::Path;
 use std::fs::File;
+use clap::Parser;
 use tokio::fs::DirEntry;
+use tokio::runtime::Builder;
 use zip::write::FileOptions;
+use starlane::init;
+use starlane_space::err::SpaceErr;
+use crate::cli::{Cli, Commands};
+
+#[cfg(feature="cli")]
+pub fn main() -> Result<(), StarErr> {
+
+    init();
+
+   let cli = Cli::parse();
+   match cli.command {
+       Commands::Serve => {
+           server()
+       }
+       Commands::Script(args) => {
+           let runtime = Builder::new_multi_thread().enable_all().build()?;
+
+println!("runnin script...");
+           match runtime.block_on( async move {
+               cli::script(args).await
+           } ) {
+               Ok(_) => Ok(()),
+               Err(err) => {
+                   println!("err! {}",err.to_string());
+                   Err(err.into())
+               }
+           }
+
+       }
+   }
+}
+
+
 #[cfg(feature = "server")]
 fn server() -> Result<(), StarErr> {
     ctrlc::set_handler(move || {
@@ -76,7 +117,8 @@ Timestamp { millis: Utc::now().timestamp_millis() }
 
 */
 #[tokio::main]
-async fn main() -> Result<(),()> {
+#[cfg(not(feature="server"))]
+fn main() -> Result<(),()> {
     Ok(())
 }
 

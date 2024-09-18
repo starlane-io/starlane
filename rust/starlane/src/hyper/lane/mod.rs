@@ -21,12 +21,12 @@ use starlane_space::wave::exchange::SetStrategy;
 use std::ops::{Deref, DerefMut};
 use starlane_space::point::Point;
 use std::collections::{HashMap, HashSet};
+use std::process;
 use std::str::FromStr;
 use starlane_space::VERSION;
 use std::sync::atomic::{AtomicU16, Ordering};
 use once_cell::sync::Lazy;
-
-
+use tokio_print::aprintln;
 
 pub static LOCAL_CLIENT: Lazy<Point> = Lazy::new( | | {
     Point::from_str("LOCAL::client").expect("point")
@@ -1562,6 +1562,8 @@ impl HyperClient {
         tokio::spawn(async move {
             loop {
                 let status = status_rx.borrow().clone();
+
+
                 match status {
                     HyperConnectionStatus::Ready => {
                         rtn.send(Ok(()));
@@ -1577,8 +1579,13 @@ impl HyperClient {
                 }
             }
         });
+aprintln!("entering timeout");
+        let rtn = tokio::time::timeout(duration, rtn_rx).await;
 
-        tokio::time::timeout(duration, rtn_rx).await??
+        let rtn = rtn??;
+aprintln!("rtn ok?: {}",rtn.is_ok());
+        rtn
+//        tokio::time::timeout(duration, rtn_rx).await??
     }
 }
 
@@ -1696,10 +1703,12 @@ impl HyperClientRunner {
                     });
                 }
                 loop {
+
+
                     match runner.logger.result_ctx(
                         "connect",
                         tokio::time::timeout(
-                            Duration::from_secs(60),
+                            Duration::from_secs(2),
                             runner.factory.create(details_tx.clone()),
                         )
                         .await,
@@ -1720,6 +1729,8 @@ impl HyperClientRunner {
                         }
                         Err(err) => {
                             runner.logger.error(format!("{}", err.to_string()));
+                            println!("elapsed");
+                            process::exit(1);
                         }
                     }
                     // wait a little while before attempting to reconnect

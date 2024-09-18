@@ -12,7 +12,6 @@ homepage.workspace = true
 license.workspace = true
 repository.workspace = true
 
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
@@ -22,10 +21,11 @@ server=["hyperspace", "hyperlane","postgres", "hyperlane-tcp", "cli", "dep:threa
 cli=["dep:text_io","dep:clap", "dep:walkdir", "parse"]
 hyperspace=["dep:futures","dep:dashmap","dep:semver", "parse", "dep:zip"]
 hyperlane=[]
-hyperlane-tcp =  ["hyperlane","dep:rcgen","dep:rustls","dep:tokio-rustls","dep:tls-api-rustls"]
-hyperlane-quic =  ["hyperlane","dep:rcgen","dep:rustls", "dep:quinn"]
+hyperlane-tcp =  ["hyperlane","dep:rcgen","rustls","dep:tokio-rustls","dep:tls-api-rustls"]
+hyperlane-quic =  ["hyperlane","dep:rcgen","rustls", "dep:quinn"]
 postgres=[ "dep:sqlx","dep:serde","dep:tracing","dep:async-recursion" ]
 parse=["dep:nom", "dep:nom-supreme", "dep:nom_locate"]
+rustls=["dep:rustls","dep:rcgen","rustls-pemfile"]
 
 
 [dependencies]
@@ -33,6 +33,7 @@ starlane-space = { workspace = true}
 starlane-macros = { workspace = true }
 starlane-parse= { workspace = true }
 starlane-primitive-macros = { workspace = true}
+tokio_print= {  workspace=true  }
 lazy_static = {  workspace=true  }
 uuid = { workspace=true, features=["v4"] }
 chrono = { workspace=true, features=["serde"] }
@@ -67,13 +68,14 @@ tracing = { workspace = true, optional = true}
 async-recursion = { workspace = true, optional=true }
 
 
-rcgen = { workspace = true, optional = true}
+rcgen = { workspace = true, optional = true, features=["pem", "x509-parser" ]}
 rustls = { workspace = true, optional = true}
+rustls-pemfile = { workspace = true, optional = true }
 tokio-rustls =  { workspace = true, optional = true}
 tls-api-rustls =  { workspace = true, optional = true}
 
 text_io = { workspace = true, optional = true}
-clap =  { workspace = true, optional = true , features=["cargo"]}
+clap =  { workspace = true, optional = true , features=["derive"]}
 walkdir = { workspace = true, optional = true }
 
 ariadne = { workspace = true, optional = true }

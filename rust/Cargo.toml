@@ -12,8 +12,8 @@ homepage = "https://starlane.io"
 description="..."
 
 
-
 [workspace]
+default-run = "starlane"
 resolver = "2"
 members = [
   "starlane", "starlane-macros", "starlane-primitive-macros","mechtron"
@@ -29,7 +29,7 @@ starlane-parse = { path="./starlane-parse"}
 lazy_static = "1.5.0"
 uuid = { version="1.1.2" }
 chrono = { version="0.4.19" }
-tokio = { version = "1.15.0" }
+tokio = "1.40.0"
 async-trait = "0.1.48"
 ctrlc = "3.2.2"
 bincode = "1.3.3"
@@ -44,6 +44,7 @@ dirs = "4.0.0"
 ascii = "1.1.0"
 url = "2.3.1"
 once_cell = "1.20.0"
+
 futures = {version = "0.3.21", default-features = true }
 dashmap = "5.3.4"
 semver = { version="1.0.10", features=['serde'] }
@@ -53,11 +54,11 @@ serde = "1.0.69"
 tracing = "0.1.26"
 async-recursion = "1.0.0"
 
-rcgen = "0.9.3"
-rustls = "0.20"
-tokio-rustls = "0.23"
+rcgen = "0.13.1"
+tokio-rustls = "0.26.0"
 tls-api-rustls = "0.9.0"
-
+rustls = "0.23.13"
+rustls-pemfile = "2.1.3"
 
 text_io = "0.1.12"
 clap = "4.5.17"
@@ -80,7 +81,7 @@ validator = "0.15.0"
 
 threadpool = "1.8.1"
 oneshot = "0.1.5"
-
+tokio_print = "0.1.0"
 
 anyhow = "1.0.86"
 virtual-fs = "0.16.0"
