@@ -3,7 +3,7 @@ use crate::hyper::lane::{
     Hyperway, HyperwayConfigurator, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub,
     InterchangeGate, TransportTransform,
 };
-use crate::hyper::space::driver::{
+use crate::hyper::driver::{
     Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Item,
     ItemRouter, ItemSphere,
 };

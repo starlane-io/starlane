@@ -7,7 +7,6 @@ pub mod root;
 pub mod space;
 pub mod star;
 
-use crate::hyper::space::driver::star::StarDriverFactory;
 use crate::hyper::space::err::HyperErr;
 use crate::hyper::space::reg::{Registration, Registry};
 use crate::hyper::space::star::{HyperStarSkel, LayerInjectionRouter};
@@ -53,6 +52,7 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
+use crate::hyper::driver::star::StarDriverFactory;
 
 static DEFAULT_BIND: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
     ArtRef::new(
@@ -1212,11 +1212,7 @@ where
     layer: Layer,
 }
 
-#[handler]
-impl<P> DriverRunner<P>
-where
-    P: Cosmos + 'static,
-{
+impl<P> DriverRunner<P> {
     pub fn new(
         skel: DriverSkel<P>,
         star_skel: HyperStarSkel<P>,
@@ -1248,6 +1244,14 @@ where
 
         call_tx
     }
+}
+
+#[handler]
+impl<P> DriverRunner<P>
+where
+    P: Cosmos + 'static,
+{
+
 
     fn start(mut self) {
         tokio::spawn(async move {

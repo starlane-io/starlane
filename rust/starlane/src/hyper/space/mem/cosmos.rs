@@ -5,11 +5,7 @@
  */
 
 use crate::hyper::lane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
-use crate::hyper::space::driver::base::BaseDriverFactory;
-use crate::hyper::space::driver::control::ControlDriverFactory;
-use crate::hyper::space::driver::root::RootDriverFactory;
-use crate::hyper::space::driver::space::SpaceDriverFactory;
-use crate::hyper::space::driver::{DriverAvail, DriversBuilder};
+
 use crate::hyper::space::err::CosmicErr;
 use crate::hyper::space::machine::MachineTemplate;
 use crate::hyper::space::mem::registry::{MemRegApi, MemRegCtx};
@@ -19,6 +15,11 @@ use starlane_space::artifact::asynch::ArtifactApi;
 use starlane_space::kind::StarSub;
 use starlane_space::loc::{MachineName, StarKey};
 use std::sync::Arc;
+use crate::hyper::driver::base::BaseDriverFactory;
+use crate::hyper::driver::{DriverAvail, DriversBuilder};
+use crate::hyper::driver::control::ControlDriverFactory;
+use crate::hyper::driver::root::RootDriverFactory;
+use crate::hyper::driver::space::SpaceDriverFactory;
 
 impl MemCosmos {
     pub fn new() -> Self {

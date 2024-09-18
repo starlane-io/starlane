@@ -1,4 +1,4 @@
-use crate::hyper::space::driver::{
+use crate::hyper::driver::{
     Driver, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere,
 };
 use crate::hyper::space::star::HyperStarSkel;

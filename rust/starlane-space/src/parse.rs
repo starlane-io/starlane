@@ -5667,7 +5667,7 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
             BaseKind::User => Ok((next, Kind::User)),
             BaseKind::App => Ok((next, Kind::App)),
             BaseKind::Mechtron => Ok((next, Kind::Mechtron)),
-            BaseKind::FileSystem => Ok((next, Kind::FileSystem)),
+            BaseKind::FileStore => Ok((next, Kind::FileStore)),
             BaseKind::BundleSeries => Ok((next, Kind::BundleSeries)),
             BaseKind::Bundle => Ok((next, Kind::Bundle)),
             BaseKind::Control => Ok((next, Kind::Control)),

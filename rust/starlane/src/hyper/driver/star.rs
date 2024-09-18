@@ -1,4 +1,4 @@
-use crate::hyper::space::driver::{
+use crate::hyper::driver::{
     Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item,
     ItemHandler, ItemSphere,
 };

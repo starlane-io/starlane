@@ -1,5 +1,4 @@
 use crate::hyper::lane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
-use crate::hyper::space::driver::DriversBuilder;
 use crate::hyper::space::err::HyperErr;
 use crate::hyper::space::machine::{Machine, MachineApi, MachineTemplate};
 use crate::hyper::space::reg::Registry;
@@ -19,7 +18,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
 
-pub mod driver;
 pub mod err;
 pub mod global;
 pub mod layer;
@@ -28,6 +26,9 @@ pub mod mem;
 pub mod reg;
 pub mod star;
 pub mod tests;
+
+
+
 
 #[no_mangle]
 pub extern "C" fn starlane_uuid() -> String {
@@ -109,7 +110,7 @@ where
             BaseKind::User => Kind::User,
             BaseKind::App => Kind::App,
             BaseKind::Mechtron => Kind::Mechtron,
-            BaseKind::FileStore => Kind::FileSystem,
+            BaseKind::FileStore => Kind::FileStore,
             BaseKind::File => match &template.sub {
                 None => return Err("expected kind for File".into()),
                 Some(kind) => {
