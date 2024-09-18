@@ -1,9 +1,14 @@
-VERSION := $(shell cat ../../../VERSION)
+VERSION := $(shell cat ../../VERSION)
+PUB := $(shell cargo show --json starlane-primitive-macros | jq ".versions[0].num" )
 
 version:
 
 publish-dry-run:
-	cargo publish --dry-run --allow-dirty
+	echo $(PUB)
+	ifneq( $(VERSION), $(PUB) )
+		echo "PUBLISH!"
+		#cargo publish --dry-run --allow-dirty
+	endif
  
  
 publish:

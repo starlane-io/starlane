@@ -8,11 +8,8 @@ clean :
 
 
 version:
-	cp ../VERSION cosmic/cosmic-space/src
+	cp ../VERSION starlane-space/src
 	toml set Cargo.toml workspace.package.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
-	$(MAKE) -C cosmic
-	$(MAKE) -C mechtron 
-	$(MAKE) -C starlane/starlane 
 
 publish-dry-run-impl: 
 	rustup default stable
@@ -22,8 +19,11 @@ publish-dry-run-impl:
 
 publish-impl:
 	rustup default stable
-	$(MAKE) -C cosmic publish
+	$(MAKE) -C starlane-primitive-macros publish
 	sleep 30
+	$(MAKE) -C starlane-macros publish
+	sleep 30
+	$(MAKE) -C starlane-space publish
 	$(MAKE) -C starlane/starlane publish
 
 publish-dry-run: version publish-dry-run-impl
