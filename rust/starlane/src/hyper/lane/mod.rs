@@ -1942,6 +1942,7 @@ mod tests {
     use starlane_space::wave::HyperWave;
     use crate::hyper::lane::HyperRouter;
 
+    /*
     #[no_mangle]
     pub extern "C" fn starlane_uuid() -> String {
         uuid::Uuid::new_v4().to_string()
@@ -1951,6 +1952,8 @@ mod tests {
     pub extern "C" fn starlane_timestamp() -> DateTime<Utc> {
         Utc::now()
     }
+
+     */
 
     pub struct DummyRouter {}
 
@@ -2028,10 +2031,6 @@ pub mod test_util {
     };
     use crate::hyper::lane::{AnonHyperAuthenticator, HyperClient, HyperGate, HyperGateSelector, HyperGreeter, Hyperway, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker, MountInterchangeGate};
 
-    lazy_static! {
-    //    pub static ref LESS: Point = Point::from_str("space:users:less").expect("point");
-//        pub static ref FAE: Point = Point::from_str("space:users:fae").expect("point");
-    }
 
     pub static LESS: Lazy<Point> = Lazy::new( | | {
         Point::from_str("space:users:less").expect("point")
@@ -2344,8 +2343,9 @@ pub mod test {
         ReflectedWave, UltraWave, Wave,
     };
 
-    use starlane::hyper::lane::test_util::{SingleInterchangePlatform, TestGreeter, WaveTest, FAE, LESS};
     use crate::hyper::lane::{AnonHyperAuthenticator, Bridge, HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker, MountInterchangeGate};
+    use crate::hyper::lane::test_util::{SingleInterchangePlatform, TestGreeter, WaveTest};
+    use crate::hyper::space::tests::{FAE, LESS};
 
     pub struct TestRouter {}
 

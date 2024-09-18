@@ -465,7 +465,7 @@ impl FindSubstring<&str> for SliceStr {
 #[cfg(test)]
 pub mod test {
     use nom::Slice;
-    use starlane::nom::SliceStr;
+    use starlane_parse::SliceStr;
 
     #[test]
     pub fn test() {

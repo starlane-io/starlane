@@ -279,7 +279,7 @@ where
             .ok_or(format!("expecting parent ({})", point.to_string()))?;
         let point_segment = point.last_segment().ok_or("expecting a last_segment")?;
 
-        let statement = "UPDATE particles SET star=$1, WHERE parent=$2 AND point_segment=$3";
+        let statement = "UPDATE particles SET star=$1 WHERE parent=$2 AND point_segment=$3";
 
         let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
@@ -939,7 +939,6 @@ where
                 all_access_grants.insert(access_grant.id.clone(), access_grant);
             }
         }
-
         let mut all_access_grants: Vec<IndexedAccessGrant> = all_access_grants
             .values()
             .into_iter()
@@ -1579,16 +1578,15 @@ pub mod test {
     use std::sync::Arc;
 
     use crate::hyper::space::Cosmos;
-    use crate::hyper::space::reg::Registration;
+    use crate::hyper::space::reg::{Registration, Registry};
     use crate::registry::postgres::err::TestErr;
-    use crate::registry::postgres::{
-        PostgresDbInfo, PostgresPlatform, PostgresRegistryContext, PostgresRegistryContextHandle,
-    };
+    use crate::registry::postgres::{PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext, PostgresRegistryContextHandle};
     use crate::hyper::lane::{};
     use starlane_space::artifact::asynch::ArtifactApi;
     use starlane_space::command::direct::create::Strategy;
     use starlane_space::command::direct::query::Query;
     use starlane_space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
+    use starlane_space::HYPERUSER;
     use starlane_space::kind::{Kind, Specific, StarSub, UserBaseSubKind};
     use starlane_space::loc::{MachineName, StarKey, ToPoint};
     use starlane_space::log::RootLogger;
@@ -1598,6 +1596,8 @@ pub mod test {
     use starlane_space::security::{AccessGrant, AccessGrantKind, PermissionsMask, Privilege};
     use starlane_space::selector::{PointHierarchy, Selector};
     use crate::hyper::lane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
+    use crate::hyper::space::driver::DriversBuilder;
+    use crate::hyper::space::machine::MachineTemplate;
 
     #[derive(Clone)]
     pub struct TestPlatform {
@@ -1688,20 +1688,20 @@ pub mod test {
     #[test]
     pub fn test_compile_postgres() {}
 
-    //#[tokio::test]
+    #[tokio::test]
     pub async fn test_nuke() -> Result<(), TestErr> {
         let registry = registry().await?;
         registry.nuke().await?;
         Ok(())
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     pub async fn test_create() -> Result<(), TestErr> {
         let registry = registry().await?;
         registry.nuke().await?;
 
         let point = Point::from_str("localhost")?;
-        let hyperuser = Point::from_str("hyper:users:hyperuser")?;
+        let hyperuser = (*HYPERUSER).clone();
         let registration = Registration {
             point: point.clone(),
             kind: Kind::Space,
@@ -1726,10 +1726,11 @@ pub mod test {
             status: Status::Unknown,
         };
         registry.register(&registration).await?;
-
+println!("second registration...");
         registry
             .assign_star(&point, &StarKey::central().to_point())
             .await?;
+println!("assignment...");
         registry.set_status(&point, &Status::Ready).await?;
         registry.sequence(&point).await?;
         let record = registry.record(&point).await?;
@@ -1737,6 +1738,7 @@ pub mod test {
         let result = registry.query(&point, &Query::PointHierarchy).await?;
         let kind_path: PointHierarchy = result.try_into()?;
 
+println!("selecting......");
         let pattern = Selector::from_str("**")?;
         let mut select = Select {
             pattern,
@@ -1744,25 +1746,26 @@ pub mod test {
             into_substance: SelectIntoSubstance::Points,
             kind: SelectKind::Initial,
         };
-
+println!("doing select...");
         let points = registry.select(&mut select).await?;
+println!("select success");
 
         assert_eq!(points.len(), 2);
 
         Ok(())
     }
 
-    //#[tokio::test]
+    #[tokio::test]
     pub async fn test_access() -> Result<(), TestErr> {
         let registry = registry().await?;
         registry.nuke().await?;
 
-        let hyperuser = Point::from_str("hyper:users:hyperuser")?;
-        let superuser = Point::from_str("localhost:users:superuser")?;
-        let scott = Point::from_str("localhost:app:users:scott")?;
-        let app = Point::from_str("localhost:app")?;
-        let mechtron = Point::from_str("localhost:app:mech-old")?;
-        let localhost = Point::from_str("localhost")?;
+        let hyperuser = (*HYPERUSER).clone();
+        let superuser = Point::from_str("localhost:users:superuser").unwrap();
+        let scott = Point::from_str("localhost:app:users:scott").unwrap();
+        let app = Point::from_str("localhost:app").unwrap();
+        let mechtron = Point::from_str("localhost:app:mech-old").unwrap();
+        let localhost = Point::from_str("localhost").unwrap();
 
         let registration = Registration {
             point: Point::root(),
@@ -1791,7 +1794,7 @@ pub mod test {
         )?));
 
         let registration = Registration {
-            point: Point::from_str("hyper:users")?,
+            point: Point::from_str("hyperspace:users")?,
             kind: userbase.clone(),
             registry: Default::default(),
             properties: Default::default(),
@@ -1894,7 +1897,7 @@ pub mod test {
         let grant = AccessGrant {
             kind: AccessGrantKind::Super,
             on_point: Selector::from_str("localhost+:**")?,
-            to_point: superuser.clone().try_into().map_err(|e| TestErr::new(e))?,
+            to_point: superuser.clone().try_into().map_err(|e| TestErr::new("infallible"))?,
             by_particle: hyperuser.clone(),
         };
         println!("granting...");
@@ -2007,8 +2010,11 @@ pub mod test {
         assert_eq!(access.permissions().to_string(), "csd-rwx".to_string());
         assert!(access.check_privilege("property:email:read").is_ok());
         println!("and here...");
+        //let selector = Selector::from_str("+:**")?;
+        let selector = Selector::from_str("**")?;
+        println!("selector created...");
         let access_grants = registry
-            .list_access(&None, &Selector::from_str("+:**")?)
+            .list_access(&None, &selector)
             .await?;
         println!("lising access grants...");
         println!(

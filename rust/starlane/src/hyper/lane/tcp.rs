@@ -581,9 +581,10 @@ mod tests {
     use chrono::DateTime;
     use chrono::Utc;
     use starlane_space::point::Point;
-    use starlane::hyper::lane::tcp::{CertGenerator, Error, HyperlaneTcpClient, HyperlaneTcpServer};
+    use crate::hyper::lane::tcp::{CertGenerator, Error, HyperlaneTcpClient, HyperlaneTcpServer};
     use crate::hyper::lane::test_util::{LargeFrameTest, SingleInterchangePlatform, WaveTest, FAE, LESS};
 
+    /*
     #[no_mangle]
     pub extern "C" fn starlane_uuid() -> String {
         uuid::Uuid::new_v4().to_string()
@@ -593,6 +594,7 @@ mod tests {
     pub extern "C" fn starlane_timestamp() -> DateTime<Utc> {
         Utc::now()
     }
+     */
 
     //#[tokio::test]
     async fn test_tcp() -> Result<(), Error> {

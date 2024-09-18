@@ -89,12 +89,12 @@ impl ExtStdinProc {
 #[cfg(test)]
 pub mod test {
     use std::env::current_dir;
-    use starlane::host::err;
     use crate::host::ext::{ExtBin, ExtHostService};
     use crate::host::{HostEnvBuilder, HostService};
+    use crate::host::err::HostErr;
 
     #[tokio::test]
-    pub async fn test() -> Result<(), err::HostErr> {
+    pub async fn test() -> Result<(), HostErr> {
         let mut service = ExtHostService::new();
         let mut builder = HostEnvBuilder::default();
         builder.pwd(format!("{}/bins", current_dir().unwrap().to_str().unwrap()));
