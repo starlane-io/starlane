@@ -54,6 +54,7 @@ where
     type StarAuth;
     type RemoteStarConnectionFactory;
 
+
     fn machine(&self) -> MachineApi<Self> {
         Machine::new(self.clone())
     }

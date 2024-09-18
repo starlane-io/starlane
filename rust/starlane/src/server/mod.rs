@@ -1,10 +1,11 @@
+use std::collections::HashSet;
 use crate::err::StarErr;
 
 use crate::hyper::lane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
 use crate::hyper::space::Cosmos;
 use crate::hyper::space::machine::MachineTemplate;
 use crate::hyper::space::reg::Registry;
-use crate::registry::postgres::{PostgresDbInfo, PostgresPlatform, PostgresRegistryContextHandle};
+use crate::registry::postgres::{PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext, PostgresRegistryContextHandle};
 use starlane_space::artifact::asynch::ArtifactApi;
 use starlane_space::kind::StarSub;
 use starlane_space::loc::{MachineName, StarKey};
@@ -25,12 +26,26 @@ use crate::hyper::space::mem::registry::{MemRegApi, MemRegCtx};
 
 #[derive(Clone)]
 pub struct Starlane {
-    //pub handle: PostgresRegistryContextHandle<Self>,
-    pub ctx: MemRegCtx,
+    pub handle: PostgresRegistryContextHandle<Self>
+//    pub ctx: P::RegistryContext
 }
 
 impl Starlane {
-    pub async fn new() -> Result<Self, StarErr> {
+    pub async fn new() -> Result<Starlane, StarErr> {
+        #[cfg(feature="postgres")]
+        {
+            let db = <Self as PostgresPlatform>::lookup_registry_db()?;
+            let mut set = HashSet::new();
+            set.insert(db.clone());
+            let ctx = Arc::new(PostgresRegistryContext::new(set).await?);
+            let handle= PostgresRegistryContextHandle::new(&db, ctx);
+            Ok(Self{ handle})
+        }
+        #[cfg(not(feature="postgres"))]
+        {
+            let ctx = MemRegCtx::new();
+            Ok(Self { ctx })
+        }
         /*
         let db = <Self as PostgresPlatform>::lookup_registry_db()?;
         let mut set = HashSet::new();
@@ -39,10 +54,10 @@ impl Starlane {
         let handle = PostgresRegistryContextHandle::new(&db, ctx);
 
          */
-        let ctx = MemRegCtx::new();
-        Ok(Self { ctx })
     }
 }
+
+
 
 #[async_trait]
 impl Cosmos for Starlane {
@@ -128,13 +143,11 @@ impl Cosmos for Starlane {
     async fn global_registry(&self) -> Result<Registry<Self>, Self::Err> {
         let logger = RootLogger::default();
         let logger = logger.point(Point::global_registry());
-        /*
         Ok(Arc::new(
             PostgresRegistry::new(self.handle.clone(), self.clone(), logger).await?,
         ))
-         */
 
-        Ok(Arc::new(MemRegApi::new(self.ctx.clone())))
+//        Ok(Arc::new(MemRegApi::new(self.ctx.clone())))
     }
 
     async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>, Self::Err> {

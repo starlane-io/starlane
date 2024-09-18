@@ -29,6 +29,12 @@ pub trait PostErr: HyperErr + From<sqlx::Error> + From<ParseError> {
     fn dupe() -> Self;
 }
 
+#[derive(Debug,Clone)]
+pub struct TestErr {
+   pub message: String,
+    pub kind: ErrKind,
+}
+
 impl HyperErr for TestErr {
     fn to_space_err(&self) -> SpaceErr {
         SpaceErr::new(0,self.message.clone())
