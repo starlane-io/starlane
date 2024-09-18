@@ -15,12 +15,12 @@ pub mod properties;
 
 pub mod env;
 
-#[cfg(feature="space")]
+#[cfg(feature = "space")]
 pub mod space;
 
-pub mod nom;
 #[cfg(feature = "hyperspace")]
 pub mod hyper;
+pub mod nom;
 pub mod registry;
 #[cfg(feature = "server")]
 pub mod server;
@@ -31,50 +31,48 @@ pub mod host;
 #[cfg(feature = "cli")]
 pub mod cli;
 
-use std::str::FromStr;
-use std::time::Duration;
-use crate::err::StarErr;
 use self::hyper::space::Cosmos;
+use crate::cli::{Cli, Commands};
+use crate::err::StarErr;
 use crate::server::Starlane;
+use clap::Parser;
+use starlane::init;
 use starlane_space::loc::ToBaseKind;
+use std::fs::File;
 use std::io::{Read, Seek, Write};
 use std::path::Path;
-use std::fs::File;
-use clap::Parser;
+use std::str::FromStr;
+use std::time::Duration;
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
+use tokio_print::aprintln;
 use zip::write::FileOptions;
-use starlane::init;
-use crate::cli::{Cli, Commands};
 
-#[cfg(feature="cli")]
+#[cfg(feature = "cli")]
 pub fn main() -> Result<(), StarErr> {
-
     init();
 
-   let cli = Cli::parse();
-   match cli.command {
-       Commands::Serve => {
-           server()
-       }
-       Commands::Script(args) => {
-           let runtime = Builder::new_multi_thread().enable_all().build()?;
+    let cli = Cli::parse();
+    match cli.command {
+        Commands::Serve => server(),
+        Commands::Script(args) => {
+            let runtime = Builder::new_multi_thread().enable_all().build()?;
 
-println!("runnin script...");
-           match runtime.block_on( async move {
-               cli::script(args).await
-           } ) {
-               Ok(_) => Ok(()),
-               Err(err) => {
-                   println!("err! {}",err.to_string());
-                   Err(err.into())
-               }
-           }
-
-       }
-   }
+            match runtime.block_on(async move { cli::script(args).await }) {
+                Ok(_) => Ok(()),
+                Err(err) => {
+                    println!("err! {}", err.to_string());
+                    Err(err.into())
+                }
+            }
+        }
+    }
 }
 
+#[cfg(not(feature = "server"))]
+fn server() -> Result<(), StarErr> {
+    println!("'serve' feature is not enabled in this starlane installation")
+}
 
 #[cfg(feature = "server")]
 fn server() -> Result<(), StarErr> {
@@ -115,11 +113,7 @@ Timestamp { millis: Utc::now().timestamp_millis() }
 }
 
 */
-#[tokio::main]
-#[cfg(not(feature="server"))]
-fn main() -> Result<(),()> {
-    Ok(())
-}
+
 
 #[cfg(test)]
 pub mod test {

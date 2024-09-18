@@ -203,7 +203,6 @@ impl Display for SpaceErr {
                 f.write_str(format!("{}: {}", status, message).as_str())
             }
             SpaceErr::ParseErrs(errs) => {
-                println!("PRINING!");
                 self.print();
                 f.write_str("Error Report...")
             }

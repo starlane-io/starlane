@@ -5,7 +5,17 @@ pub mod root;
 pub mod space;
 pub mod star;
 
+use crate::hyper::space::driver::star::StarDriverFactory;
+use crate::hyper::space::err::HyperErr;
+use crate::hyper::space::reg::{Registration, Registry};
+use crate::hyper::space::star::{HyperStarSkel, LayerInjectionRouter};
 use crate::hyper::space::Cosmos;
+use dashmap::DashMap;
+use futures::future::select_all;
+use futures::task::Spawn;
+use futures::{FutureExt, TryFutureExt};
+use once_cell::sync::Lazy;
+use starlane_macros::DirectedHandler;
 use starlane_space::artifact::asynch::ArtifactApi;
 use starlane_space::artifact::ArtRef;
 use starlane_space::command::common::{SetProperties, StateSrc};
@@ -14,8 +24,8 @@ use starlane_space::command::direct::create::{
 };
 use starlane_space::config::bind::BindConfig;
 use starlane_space::err::SpaceErr;
-use starlane_space::hyper::{Assign, HyperSubstance, ParticleLocation, ParticleRecord};
-use starlane_space::kind::{BaseKind, Kind, KindParts, StarSub};
+use starlane_space::hyper::{Assign, HyperSubstance, ParticleRecord};
+use starlane_space::kind::{BaseKind, Kind, StarSub};
 use starlane_space::loc::{Layer, Surface, ToPoint, ToSurface};
 use starlane_space::log::{PointLogger, Tracker};
 use starlane_space::parse::bind_config;
@@ -25,7 +35,6 @@ use starlane_space::particle::traversal::{
 use starlane_space::particle::{Details, Status, Stub};
 use starlane_space::point::Point;
 use starlane_space::selector::KindSelector;
-use starlane_space::substance::Substance;
 use starlane_space::util::log;
 use starlane_space::wave::core::cmd::CmdMethod;
 use starlane_space::wave::core::{CoreBounce, Method, ReflectedCore};
@@ -36,24 +45,12 @@ use starlane_space::wave::exchange::asynch::{
 use starlane_space::wave::exchange::SetStrategy;
 use starlane_space::wave::{Agent, DirectedWave, ReflectedWave, UltraWave};
 use starlane_space::HYPERUSER;
-use dashmap::mapref::one::Ref;
-use dashmap::DashMap;
-use futures::future::select_all;
-use futures::task::Spawn;
-use futures::{FutureExt, TryFutureExt};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::Duration;
-use once_cell::sync::Lazy;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
-use crate::hyper::space::star::{HyperStarSkel, LayerInjectionRouter};
-use starlane_macros::DirectedHandler;
-use crate::hyper::space::driver::star::StarDriverFactory;
-use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::reg::{Registration, Registry};
 
 static DEFAULT_BIND: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {ArtRef::new(
         Arc::new(default_bind()),

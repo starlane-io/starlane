@@ -14,6 +14,7 @@ use dashmap::DashMap;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicU64;
 use std::sync::{atomic, Arc};
+use tokio_print::aprintln;
 use crate::hyper::space::reg::{Registration, RegistryApi};
 
 impl MemRegCtx {
@@ -65,6 +66,7 @@ where
     }
 
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), C::Err> {
+
         self.set_properties(&registration.point, &registration.properties)
             .await?;
 
