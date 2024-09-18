@@ -39,6 +39,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use once_cell::sync::Lazy;
 use tokio::sync::{Mutex, RwLock};
+use tokio_print::aprintln;
 use tracing::error;
 use crate::hyper::space::driver::{Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere};
 use crate::hyper::space::err::HyperErr;
@@ -342,6 +343,7 @@ where
                     .record(&Point::global_executor())
                     .await
                     .map_err(|e| e.to_space_err())?;
+aprintln!("Global Executor REGISTERED!");
                 let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
                 self.create(&assign).await.map_err(|e| e.to_space_err())?;
                 self.skel

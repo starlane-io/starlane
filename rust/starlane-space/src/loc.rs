@@ -5,6 +5,7 @@ use std::ops::{Deref, DerefMut};
 
 use convert_case::{Case, Casing};
 use nom::combinator::all_consuming;
+use once_cell::sync::Lazy;
 use serde::de::{Error, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
@@ -35,45 +36,52 @@ use crate::wave::{
 use crate::Agent::Anonymous;
 use crate::{Agent, BaseKind, Kind, KindTemplate, ParticleRecord, SpaceErr, ANONYMOUS, HYPERUSER};
 
-lazy_static! {
-    pub static ref CENTRAL: Point = StarKey::central().to_point();
-    pub static ref GLOBAL_LOGGER: Point = Point::from_str("GLOBAL::logger").unwrap();
-    pub static ref GLOBAL_REGISTRY: Point = Point::from_str("GLOBAL::registry").unwrap();
-    pub static ref GLOBAL_EXEC: Point = Point::from_str("GLOBAL::executor").unwrap();
-    pub static ref LOCAL_STAR: Point = Point::from_str("LOCAL::star").unwrap();
-    pub static ref LOCAL_PORTAL: Point = Point::from_str("LOCAL::portal").unwrap();
-    pub static ref LOCAL_HYPERGATE: Point = Point::from_str("LOCAL::hypergate").unwrap();
-    pub static ref LOCAL_ENDPOINT: Point = Point::from_str("LOCAL::endpoint").unwrap();
-    pub static ref REMOTE_ENDPOINT: Point = Point::from_str("REMOTE::endpoint").unwrap();
-    pub static ref STD_WAVE_TRAVERSAL_PLAN: TraversalPlan =
-        TraversalPlan::new(vec![Layer::Field, Layer::Shell, Layer::Core]);
-    pub static ref MECHTRON_WAVE_TRAVERSAL_PLAN: TraversalPlan = TraversalPlan::new(vec![
+pub static CENTRAL: Lazy<Point> = Lazy::new(|| StarKey::central().to_point());
+pub static GLOBAL_LOGGER: Lazy<Point> = Lazy::new(|| Point::from_str("GLOBAL::logger").unwrap());
+pub static GLOBAL_REGISTRY: Lazy<Point> =
+    Lazy::new(|| Point::from_str("GLOBAL::registry").unwrap());
+pub static GLOBAL_EXEC: Lazy<Point> = Lazy::new(|| Point::from_str("GLOBAL::executor").unwrap());
+pub static LOCAL_STAR: Lazy<Point> = Lazy::new(|| Point::from_str("LOCAL::star").unwrap());
+pub static LOCAL_PORTAL: Lazy<Point> = Lazy::new(|| Point::from_str("LOCAL::portal").unwrap());
+pub static LOCAL_HYPERGATE: Lazy<Point> =
+    Lazy::new(|| Point::from_str("LOCAL::hypergate").unwrap());
+pub static LOCAL_ENDPOINT: Lazy<Point> = Lazy::new(|| Point::from_str("LOCAL::endpoint").unwrap());
+pub static REMOTE_ENDPOINT: Lazy<Point> =
+    Lazy::new(|| Point::from_str("REMOTE::endpoint").unwrap());
+pub static STD_WAVE_TRAVERSAL_PLAN: Lazy<TraversalPlan> =
+    Lazy::new(|| TraversalPlan::new(vec![Layer::Field, Layer::Shell, Layer::Core]));
+pub static MECHTRON_WAVE_TRAVERSAL_PLAN: Lazy<TraversalPlan> = Lazy::new(|| {
+    TraversalPlan::new(vec![
         Layer::Field,
         Layer::Shell,
         Layer::Portal,
         Layer::Host,
         Layer::Guest,
-        Layer::Core
-    ]);
-    pub static ref PORTAL_WAVE_TRAVERSAL_PLAN: TraversalPlan = TraversalPlan::new(vec![
+        Layer::Core,
+    ])
+});
+pub static PORTAL_WAVE_TRAVERSAL_PLAN: Lazy<TraversalPlan> = Lazy::new(|| {
+    TraversalPlan::new(vec![
         Layer::Field,
         Layer::Shell,
         Layer::Portal,
         Layer::Host,
         Layer::Guest,
-        Layer::Core
-    ]);
-    pub static ref CONTROL_WAVE_TRAVERSAL_PLAN: TraversalPlan = TraversalPlan::new(vec![
+        Layer::Core,
+    ])
+});
+pub static CONTROL_WAVE_TRAVERSAL_PLAN: Lazy<TraversalPlan> = Lazy::new(|| {
+    TraversalPlan::new(vec![
         Layer::Field,
         Layer::Shell,
         Layer::Portal,
         Layer::Host,
         Layer::Guest,
-        Layer::Core
-    ]);
-    pub static ref STAR_WAVE_TRAVERSAL_PLAN: TraversalPlan =
-        TraversalPlan::new(vec![Layer::Field, Layer::Shell, Layer::Core]);
-}
+        Layer::Core,
+    ])
+});
+pub static STAR_WAVE_TRAVERSAL_PLAN: Lazy<TraversalPlan> =
+    Lazy::new(|| TraversalPlan::new(vec![Layer::Field, Layer::Shell, Layer::Core]));
 
 pub trait ToBaseKind {
     fn to_base(&self) -> BaseKind;

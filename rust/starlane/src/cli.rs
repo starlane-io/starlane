@@ -85,8 +85,10 @@ pub async fn script(script: ScriptArgs) -> Result<(), SpaceErr> {
             return Ok(());
         }
 
-        aprintln!("> {}", line_str);
-        session.command(line.as_str()).await?;
+        if line_str.len() > 0 {
+            aprintln!("> {}", line_str);
+            session.command(line.as_str()).await?;
+        }
     }
 }
 

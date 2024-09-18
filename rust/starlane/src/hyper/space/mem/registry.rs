@@ -62,7 +62,7 @@ where
     C: Cosmos,
 {
     async fn nuke<'a>(&'a self) -> Result<(), C::Err> {
-        todo!()
+       Ok(())
     }
 
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), C::Err> {

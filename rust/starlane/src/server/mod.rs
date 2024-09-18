@@ -4,7 +4,7 @@ use crate::err::StarErr;
 use crate::hyper::lane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
 use crate::hyper::space::Cosmos;
 use crate::hyper::space::machine::MachineTemplate;
-use crate::hyper::space::reg::Registry;
+use crate::hyper::space::reg::{Registry, RegistryWrapper};
 use crate::registry::postgres::{PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext, PostgresRegistryContextHandle};
 use starlane_space::artifact::asynch::ArtifactApi;
 use starlane_space::kind::StarSub;
@@ -143,9 +143,9 @@ impl Cosmos for Starlane {
     async fn global_registry(&self) -> Result<Registry<Self>, Self::Err> {
         let logger = RootLogger::default();
         let logger = logger.point(Point::global_registry());
-        Ok(Arc::new(
+        Ok(Arc::new(RegistryWrapper::new( Arc::new(
             PostgresRegistry::new(self.handle.clone(), self.clone(), logger).await?,
-        ))
+        ))))
 
 //        Ok(Arc::new(MemRegApi::new(self.ctx.clone())))
     }
