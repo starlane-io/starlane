@@ -1,4 +1,4 @@
-use crate::hyper::space::Cosmos;
+use crate::hyper::space::platform::Platform;
 use starlane_space::command::common::{SetProperties, SetRegistry};
 use starlane_space::command::direct::create::Strategy;
 use starlane_space::command::direct::delete::Delete;
@@ -19,7 +19,7 @@ pub type Registry<P> = Arc<dyn RegistryApi<P>>;
 #[async_trait]
 pub trait RegistryApi<P>: Send + Sync
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn nuke<'a>(&'a self) -> Result<(), P::Err>;
 
@@ -74,14 +74,14 @@ where
 
 pub struct RegistryWrapper<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     registry: Registry<P>,
 }
 
 impl<P> RegistryWrapper<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(registry: Registry<P>) -> Self {
         Self { registry }
@@ -91,7 +91,7 @@ where
 #[async_trait]
 impl<P> RegistryApi<P> for RegistryWrapper<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn nuke<'a>(&'a self) -> Result<(), P::Err> {
         self.registry.nuke().await

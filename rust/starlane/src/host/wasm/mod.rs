@@ -3,7 +3,7 @@ mod source;
 
 use crate::host::err::HostErr;
 use crate::host::wasm::cache::WasmModuleCache;
-use crate::host::{FileSystemFactory, Process};
+use crate::host::{FileSystemFactory, ExtProcess};
 use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
@@ -65,7 +65,7 @@ impl WasmHost {
             runtime,
         }
     }
-    pub async fn execute<I, Arg>(&mut self, args: I) -> Result<Process, HostErr>
+    pub async fn execute<I, Arg>(&mut self, args: I) -> Result<ExtProcess, HostErr>
     where
         I: IntoIterator<Item = Arg>,
         Arg: AsRef<[u8]>,
@@ -77,7 +77,7 @@ impl WasmHost {
         &mut self,
         args: I,
         stdin: &[u8],
-    ) -> Result<Process, HostErr>
+    ) -> Result<ExtProcess, HostErr>
     where
         I: IntoIterator<Item = Arg>,
         Arg: AsRef<[u8]>,
@@ -121,7 +121,7 @@ impl WasmHost {
         //builder.run(self.module.clone())?;
         builder.run_with_store(self.module.clone(), &mut self.store)?;
 
-        Ok(Process {
+        Ok(ExtProcess {
             stdout: stdout_rx,
             stderr: stderr_rx,
         })
@@ -131,7 +131,7 @@ impl WasmHost {
         &mut self,
         args: I,
         stdin: Pipe,
-    ) -> Result<Process, HostErr>
+    ) -> Result<ExtProcess, HostErr>
     where
         I: IntoIterator<Item = Arg>,
         Arg: AsRef<[u8]>,
@@ -170,7 +170,7 @@ impl WasmHost {
         //builder.run(self.module.clone())?;
         builder.run_with_store(self.module.clone(), &mut self.store)?;
 
-        Ok(Process {
+        Ok(ExtProcess {
             stdout: stdout_rx,
             stderr: stderr_rx,
         })

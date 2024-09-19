@@ -1,6 +1,6 @@
 use crate::hyper::lane::tcp::HyperlaneTcpClient;
 use crate::hyper::lane::HyperwayEndpointFactory;
-use crate::hyper::space::driver::control::{ControlCliSession, ControlClient};
+use crate::driver::control::{ControlCliSession, ControlClient};
 use clap::clap_derive::{Args, Subcommand};
 use clap::Parser;
 use starlane_parse::new_span;
@@ -151,7 +151,7 @@ impl Session {
 
             command
                 .transfers
-                .push(CmdTransfer::new(block.name, Arc::new(content)));
+                .push(CmdTransfer::new(block.name, content));
         }
 
         let core = self.cli.raw(command).await?;

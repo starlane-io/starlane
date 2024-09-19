@@ -22,9 +22,9 @@ pub mod server;
 pub mod host;
 
 pub mod cli;
-pub mod nom;
 
 pub mod store;
+pub mod driver;
 
 pub fn init() {
     #[cfg(feature = "cli")]
@@ -35,3 +35,4 @@ pub fn init() {
             .expect("crypto provider could not be installed");
     }
 }
+

@@ -26,7 +26,7 @@ hyperlane-quic =  ["hyperlane","dep:rcgen","rustls", "dep:quinn"]
 postgres=[ "dep:sqlx","dep:serde","dep:tracing","dep:async-recursion" ]
 parse=["dep:nom", "dep:nom-supreme", "dep:nom_locate"]
 rustls=["dep:rustls","dep:rcgen","rustls-pemfile"]
-
+driver=["hyperspace"]
 
 [dependencies]
 starlane-space = { workspace = true}

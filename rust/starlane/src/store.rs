@@ -1,82 +1,90 @@
 use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::Cosmos;
+use crate::hyper::space::platform::Platform;
 use itertools::Itertools;
-use starlane_space::point::{Point, PointSeg};
 use starlane_space::substance::Substance;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
+
+
 #[async_trait]
-pub trait FileStore<P, K>
+pub trait FileStore<K>
 where
-    P: Cosmos,
-    Self: Clone,
+    Self::Err: HyperErr,
+    K: Clone + Sized,
+    Self: Clone + Sized,
 {
-    async fn get(&self, point: &K) -> Result<Substance, P::Err>;
-    async fn insert(&self, point: &K, substance: Substance) -> Result<(), P::Err>;
+    type Err;
+    async fn get<'a>(&'a self, point: &'a K) -> Result<Substance, Self::Err>;
+    async fn insert<'a>(&'a self, point: &'a K, substance: Substance) -> Result<(), Self::Err>;
 
-    async fn mkdir(&self, point: &K) -> Result<(), P::Err>;
-    async fn remove(&self, point: &K) -> Result<(), P::Err>;
+    async fn mkdir<'a>(&'a self, point: &'a K) -> Result<(), Self::Err>;
+    async fn remove<'a>(&'a self, point: &'a K) -> Result<(), Self::Err>;
 
-    async fn list(&self, point: &K) -> Result<Vec<K>, P::Err>;
+    async fn list<'a>(&'a self, point: &'a K) -> Result<Vec<K>, Self::Err>;
 
-    async fn child<F, S>(&self, seg: S) -> Result<F, P::Err>
+    async fn child<F, S>(&self, seg: S) -> Result<F, Self::Err>
     where
-        F: FileStore<P, K>,
+        F: FileStore<K,FileStore::Err=Self::Err>,
         S: ToString;
 }
 
 #[derive(Clone)]
-pub struct LocalFileStore<P>
-where
-    P: Cosmos,
+pub struct LocalFileStore<E>
 {
     pub root: PathBuf,
+    phantom: PhantomData<E>,
 }
 
 impl<P> LocalFileStore<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new<B>(root: B) -> Self
     where
-        B: Into<PathBuf>,
+        B: Into<PathBuf>
     {
         let root = root.into();
-        Self { root }
+        Self {
+            root,
+            phantom: Default::default(),
+        }
     }
 }
 
-impl<P> FileStore<P, PathBuf> for LocalFileStore<P>
-where
-    P: Cosmos,
+#[async_trait]
+impl<E> FileStore<PathBuf> for LocalFileStore<E>
+where E: HyperErr,
+    Self::Err: HyperErr,
+
 {
-    async fn get(&self, path: &PathBuf) -> Result<Substance, P::Err> {
+    type Err = E;
+    async fn get<'a>(&'a self, path: &'a PathBuf) -> Result<Substance, Self::Err> {
         let path = self.root.join(path);
         let data = tokio::fs::read(path).await?;
         Ok(Substance::from_vec(data))
     }
 
-    async fn insert(&self, path: &PathBuf, substance: Substance) -> Result<(), P::Err> {
+    async fn insert<'a>(&'a self, path: &'a PathBuf, substance: Substance) -> Result<(), Self::Err> {
         let path = self.root.join(path);
         let data = substance.to_bin()?;
         tokio::fs::write(path, data).await?;
         Ok(())
     }
 
-    async fn mkdir(&self, path: &PathBuf) -> Result<(), P::Err> {
+    async fn mkdir<'a>(&'a self, path: &'a PathBuf) -> Result<(), Self::Err> {
         let path = self.root.join(path);
         tokio::fs::create_dir_all(path).await?;
         Ok(())
     }
 
-    async fn remove(&self, path: &PathBuf) -> Result<(), P::Err> {
+    async fn remove<'a>(&'a self, path: &'a PathBuf) -> Result<(), Self::Err> {
         let path = self.root.join(path);
         tokio::fs::remove_dir_all(path).await?;
         Ok(())
     }
 
-    async fn list(&self, path: &PathBuf) -> Result<Vec<PathBuf>, P::Err> {
+    async fn list<'a>(&'a self, path: &'a PathBuf) -> Result<Vec<PathBuf>, Self::Err> {
         let path = self.root.join(path);
         let mut read = tokio::fs::read_dir(path).await?;
         let mut rtn = vec![];
@@ -86,13 +94,13 @@ where
         Ok(rtn)
     }
 
-    async fn child<F, S>(&self, seg: S) -> Result<F, P::Err>
+    async fn child<F, S>(&self, seg: S) -> Result<F, Self::Err>
     where
-        F: FileStore<P, PathBuf>,
+        F: FileStore<PathBuf>,
         S: ToString,
     {
         if Path::new(&seg).iter().count() != 1 {
-            return Result::Err(P::Err::new(format!(
+            return Result::Err(Self::Err::new(format!(
                 "invalid child path segment: '{}' ... Child path can only be one path segment",
                 seg.to_string()
             )));

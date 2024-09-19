@@ -9,13 +9,13 @@ use std::time::Duration;
 use serde::Serialize;
 
 use crate::hyper::lane::HyperClient;
-use crate::hyper::driver::control::ControlClient;
+use crate::driver::control::ControlClient;
 use crate::hyper::space::err::CosmicErr;
 use crate::hyper::space::machine::MachineApiExtFactory;
 use crate::hyper::space::mem::cosmos::MemCosmos;
 use crate::hyper::space::mem::registry::MemRegCtx;
 use crate::hyper::space::star::HyperStarApi;
-use crate::hyper::space::Cosmos;
+use crate::hyper::space::platform::Platform;
 use starlane_space::command::common::StateSrc;
 use starlane_space::command::direct::create::{
     Create, PointSegTemplate, PointTemplate, Strategy, Template,

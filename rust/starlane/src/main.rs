@@ -20,7 +20,6 @@ pub mod space;
 
 #[cfg(feature = "hyperspace")]
 pub mod hyper;
-pub mod nom;
 pub mod registry;
 #[cfg(feature = "server")]
 pub mod server;
@@ -31,9 +30,11 @@ pub mod host;
 #[cfg(feature = "cli")]
 pub mod cli;
 
+pub mod driver;
+
 pub mod store;
 
-use self::hyper::space::Cosmos;
+use starlane::hyper::space::platform::Platform;
 use crate::cli::{Cli, Commands};
 use crate::err::StarErr;
 use crate::server::Starlane;

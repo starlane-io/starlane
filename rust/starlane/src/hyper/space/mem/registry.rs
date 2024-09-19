@@ -1,5 +1,5 @@
 use crate::hyper::space::reg::{Registration, RegistryApi};
-use crate::hyper::space::Cosmos;
+use crate::hyper::space::platform::Platform;
 use dashmap::DashMap;
 use starlane_space::command::common::{PropertyMod, SetProperties};
 use starlane_space::command::direct::delete::Delete;
@@ -35,7 +35,7 @@ pub struct MemRegCtx {
 
 pub struct MemRegApi<C>
 where
-    C: Cosmos,
+    C: Platform,
 {
     ctx: MemRegCtx,
     phantom: PhantomData<C>,
@@ -43,7 +43,7 @@ where
 
 impl<C> MemRegApi<C>
 where
-    C: Cosmos,
+    C: Platform,
 {
     pub fn new(ctx: MemRegCtx) -> Self {
         let phantom = Default::default();
@@ -58,7 +58,7 @@ where
 #[async_trait]
 impl<C> RegistryApi<C> for MemRegApi<C>
 where
-    C: Cosmos,
+    C: Platform,
 {
     async fn nuke<'a>(&'a self) -> Result<(), C::Err> {
         Ok(())

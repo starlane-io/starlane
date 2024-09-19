@@ -478,8 +478,6 @@ pub enum PointSeg {
     Version(Version),
 }
 
-
-
 impl PointSegment for PointSeg {}
 
 impl PointSegment for PointSegCtx {}
@@ -957,13 +955,54 @@ impl Point {
         true
     }
 
+    /// returns the "file" path portion of this Point if there is one
+    pub fn truncate_filepath(&self, parent: &Point) -> Result<String, SpaceErr> {
+        if self.non_file_parent() == *parent {
+            self.filepath().ok_or(SpaceErr::str(format!(
+                "could not get filepath for point {}",
+                self.to_string()
+            )))
+        } else {
+            Result::Err(SpaceErr::str(format!(
+                "path {} did not match with truncation parent {}",
+                self.to_string(),
+                parent.to_string()
+            )))
+        }
+    }
 
     /// returns the "file" path portion of this Point if there is one
-    pub fn truncate_filepath(&self, parent: &Point ) -> Result<String,SpaceErr>{
-        if self.non_file_parent()  == *parent  {
-           self.filepath().ok_or( SpaceErr::str(format!("could not get filepath for point {}", self.to_string())))
+    pub fn relative_segs(&self, parent: &Point) -> Result<Vec<String>, SpaceErr> {
+        if self.route != parent.route {
+            return Result::Err(SpaceErr::from(format!(
+                "parent point route {} must match child point route: {}",
+                parent.route.to_string(),
+                self.route.to_string()
+            )));
+        }
+        if self.segments.len() < parent.segments.len() {
+            return Result::Err(SpaceErr::from(format!(
+                "parent point {} cannot have fewer segments than point: {}",
+                parent.to_string(),
+                self.to_string()
+            )));
         } else {
-            Result::Err(SpaceErr::str(format!("path {} did not match with truncation parent {}", self.to_string(), parent.to_string())))
+            for i in 0..parent.segments.len() {
+                if parent.segments.get(i).unwrap() != self.segments.get(i).unwrap() {
+                    return Result::Err(SpaceErr::from(format!(
+                        "parent point {} does not match subset: {}",
+                        parent.to_string(),
+                        self.to_string()
+                    )));
+                }
+            }
+
+            let mut rtn = vec![];
+            for i in parent.segments.len()..self.segments.len() {
+                rtn.push(self.segments.get(i).unwrap().to_string());
+            }
+
+            Ok(rtn)
         }
     }
 
@@ -1290,6 +1329,16 @@ impl FromStr for PointCtx {
 impl Into<String> for Point {
     fn into(self) -> String {
         self.to_string()
+    }
+}
+
+impl Into<Vec<String>> for Point {
+    fn into(self) -> Vec<String> {
+        self.segments
+            .clone()
+            .into_iter()
+            .map(|seg| seg.to_string())
+            .collect()
     }
 }
 

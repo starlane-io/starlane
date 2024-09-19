@@ -683,6 +683,25 @@ pub mod test {
         assert_eq!( filepath, "/dir/subdir/");
     }
 
+    #[test]
+    pub fn test_chop_relative() {
+        let parent = Point::from_str("super:base").unwrap();
+        let point = parent.push( "/subdir/file.txt").unwrap();
+        let filepath = point.relative_segs(&parent).unwrap();
+        assert_eq!( filepath, vec!["/","subdir/","file.txt"].into_iter().map(|s| s.to_string()).collect::<Vec<String>>());
+
+
+        let root = Point::from_str("super").unwrap();
+        let filepath = parent.relative_segs(&root).unwrap();
+        assert_eq!( filepath, vec!["base"].into_iter().map(|s| s.to_string()).collect::<Vec<String>>());
+
+        assert!(root.relative_segs(&parent).is_err());
+
+        let bad = Point::from_str("super:ugly").unwrap();
+
+        assert!(point.relative_segs(&bad).is_err());
+
+    }
 
     #[test]
     pub fn test_root_routes() {

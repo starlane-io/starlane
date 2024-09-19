@@ -1,8 +1,8 @@
-use crate::hyper::driver::{
+use crate::driver::{
     Driver, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere,
 };
 use crate::hyper::space::star::HyperStarSkel;
-use crate::hyper::space::Cosmos;
+use crate::hyper::space::platform::Platform;
 use once_cell::sync::Lazy;
 use starlane_space::artifact::ArtRef;
 use starlane_space::config::bind::BindConfig;
@@ -43,7 +43,7 @@ impl SpaceDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for SpaceDriverFactory
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Space)
@@ -64,7 +64,7 @@ pub struct SpaceDriver;
 #[async_trait]
 impl<P> Driver<P> for SpaceDriver
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> Kind {
         Kind::Space
@@ -83,7 +83,7 @@ impl Space {}
 #[async_trait]
 impl<P> ItemHandler<P> for Space
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(SPACE_BIND_CONFIG.clone())

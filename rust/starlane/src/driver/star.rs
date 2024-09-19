@@ -1,11 +1,11 @@
-use crate::hyper::driver::{
+use crate::driver::{
     Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item,
     ItemHandler, ItemSphere,
 };
 use crate::hyper::space::err::HyperErr;
 use crate::hyper::space::reg::Registration;
 use crate::hyper::space::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::hyper::space::Cosmos;
+use crate::hyper::space::platform::Platform;
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use starlane_space::artifact::ArtRef;
@@ -139,7 +139,7 @@ impl PartialOrd for StarDiscovery {
 #[derive(Clone)]
 pub struct StarDriverFactory<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     pub kind: KindSelector,
     pub phantom: PhantomData<P>,
@@ -147,7 +147,7 @@ where
 
 impl<P> StarDriverFactory<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     pub fn new(sub: StarSub) -> Self {
         let kind = KindSelector {
@@ -165,7 +165,7 @@ where
 #[async_trait]
 impl<P> HyperDriverFactory<P> for StarDriverFactory<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     fn kind(&self) -> KindSelector {
         self.kind.clone()
@@ -187,7 +187,7 @@ where
 
 pub struct StarDriver<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     pub star_skel: HyperStarSkel<P>,
     pub driver_skel: DriverSkel<P>,
@@ -196,7 +196,7 @@ where
 
 impl<P> StarDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(star_skel: HyperStarSkel<P>, driver_skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
         Self {
@@ -210,7 +210,7 @@ where
 #[async_trait]
 impl<P> Driver<P> for StarDriver<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> Kind {
         Kind::Star(self.star_skel.kind.clone())
@@ -259,7 +259,7 @@ where
 #[derive(DirectedHandler)]
 pub struct Star<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     pub skel: HyperStarSkel<P>,
     pub ctx: DriverCtx,
@@ -267,7 +267,7 @@ where
 
 impl<P> Star<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn create(&self, assign: &Assign) -> Result<(), P::Err> {
         self.skel
@@ -288,7 +288,7 @@ where
 #[async_trait]
 impl<P> ItemHandler<P> for Star<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         <Star<P> as Item<P>>::bind(self).await
@@ -366,7 +366,7 @@ where
 #[async_trait]
 impl<P> Item<P> for Star<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     type Skel = HyperStarSkel<P>;
     type Ctx = DriverCtx;
@@ -384,7 +384,7 @@ where
 #[handler]
 impl<P> Star<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     #[route("Hyp<Provision>")]
     pub async fn provision(
@@ -544,7 +544,7 @@ where
             search: Search,
         ) -> Result<ReflectedCore, SpaceErr>
         where
-            E: Cosmos,
+            E: Platform,
         {
             let mut discoveries = if star.skel.kind.is_forwarder() {
                 let mut wrangler = Wrangler::new(star.skel.clone(), search);
@@ -753,7 +753,7 @@ impl RoundRobinWrangleSelector {
 
 pub struct Wrangler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub skel: HyperStarSkel<P>,
     pub transmitter: ProtoTransmitter,
@@ -763,7 +763,7 @@ where
 
 impl<P> Wrangler<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(skel: HyperStarSkel<P>, search: Search) -> Self {
         let router = LayerInjectionRouter::new(

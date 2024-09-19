@@ -68,20 +68,20 @@ use crate::hyper::lane::{
     Bridge, HyperClient, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
     HyperwayInterchange, HyperwayStub,
 };
-use crate::hyper::space::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
-use crate::hyper::space::driver::{DriverStatus, DriversApi, DriversBuilder, DriversCall};
+use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
+use crate::driver::{DriverStatus, DriversApi, DriversBuilder, DriversCall};
 use crate::hyper::space::err::HyperErr;
 use crate::hyper::space::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
 use crate::hyper::space::layer::field::Field;
 use crate::hyper::space::layer::shell::{Shell, ShellState};
 use crate::hyper::space::machine::MachineSkel;
 use crate::hyper::space::reg::{Registration, Registry};
-use crate::hyper::space::Cosmos;
+use crate::hyper::space::platform::Platform;
 
 #[derive(Clone)]
 pub struct ParticleStates<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     phantom: PhantomData<P>,
     topic: Arc<DashMap<Surface, Arc<dyn TopicHandler>>>,
@@ -90,7 +90,7 @@ where
 
 impl<P> ParticleStates<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     pub fn create_shell(&self, point: Point) {
         self.shell.insert(point.clone(), ShellState::new(point));
@@ -142,7 +142,7 @@ where
 #[derive(Clone)]
 pub struct HyperStarSkel<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     pub api: HyperStarApi<P>,
     pub key: StarKey,
@@ -174,7 +174,7 @@ where
 
 impl<P> HyperStarSkel<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub async fn new(
         template: StarTemplate,
@@ -378,7 +378,7 @@ where
 
 pub enum HyperStarCall<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     Init,
     CreateStates {
@@ -409,7 +409,7 @@ where
 
 pub struct HyperStarTx<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub gravity_tx: mpsc::Sender<UltraWave>,
     pub traverse_to_next_tx: mpsc::Sender<Traversal<UltraWave>>,
@@ -427,7 +427,7 @@ where
 
 impl<P> HyperStarTx<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(point: Point) -> Self {
         let (gravity_tx, mut gravity_rx) = mpsc::channel(1024);
@@ -532,7 +532,7 @@ where
 #[derive(Clone)]
 pub struct HyperStarApi<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub kind: StarSub,
     tx: mpsc::Sender<HyperStarCall<P>>,
@@ -541,7 +541,7 @@ where
 
 impl<P> HyperStarApi<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(
         kind: StarSub,
@@ -655,7 +655,7 @@ where
 
 pub struct HyperStar<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     skel: HyperStarSkel<P>,
     star_tx: mpsc::Sender<HyperStarCall<P>>,
@@ -672,7 +672,7 @@ where
 
 impl<P> HyperStar<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub async fn new(
         skel: HyperStarSkel<P>,
@@ -1091,7 +1091,7 @@ where
                 gravity: Surface,
             ) -> Result<(), P::Err>
             where
-                P: Cosmos,
+                P: Platform,
             {
                 if wave.track() {
                     println!("\tsharding wave...{}", wave.kind().to_string());
@@ -1326,7 +1326,7 @@ where
 #[derive(Clone)]
 pub struct LayerTraversalEngine<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     pub skel: HyperStarSkel<P>,
     pub injector: Surface,
@@ -1337,7 +1337,7 @@ where
 
 impl<P> LayerTraversalEngine<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     pub fn new(
         skel: HyperStarSkel<P>,
@@ -1703,7 +1703,7 @@ pub struct LayerInjectionRouter {
 impl LayerInjectionRouter {
     pub fn new<P>(skel: HyperStarSkel<P>, injector: Surface) -> Self
     where
-        P: Cosmos,
+        P: Platform,
     {
         Self {
             inject_tx: skel.inject_tx.clone(),
@@ -1844,7 +1844,7 @@ async fn shard_ripple_by_location<E>(
     registry: &Registry<E>,
 ) -> Result<HashMap<Point, Wave<Ripple>>, E::Err>
 where
-    E: Cosmos,
+    E: Platform,
 {
     let mut map = HashMap::new();
     for (star, recipients) in shard_by_location(ripple.to.clone(), adjacent, registry).await? {
@@ -1864,7 +1864,7 @@ pub async fn ripple_to_singulars<E>(
     registry: &Registry<E>,
 ) -> Result<Vec<Wave<SingularRipple>>, E::Err>
 where
-    E: Cosmos,
+    E: Platform,
 {
     let mut rtn = vec![];
     for port in to_ports(ripple.to.clone(), adjacent, registry).await? {
@@ -1880,7 +1880,7 @@ pub async fn shard_by_location<E>(
     registry: &Registry<E>,
 ) -> Result<HashMap<Point, Recipients>, E::Err>
 where
-    E: Cosmos,
+    E: Platform,
 {
     match recipients {
         Recipients::Single(single) => {
@@ -1935,7 +1935,7 @@ pub async fn to_ports<E>(
     registry: &Registry<E>,
 ) -> Result<Vec<Surface>, E::Err>
 where
-    E: Cosmos,
+    E: Platform,
 {
     match recipients {
         Recipients::Single(single) => Ok(vec![single]),
@@ -1957,7 +1957,7 @@ where
 #[derive(Clone)]
 pub struct DiagnosticInterceptors<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub from_hyperway: broadcast::Sender<UltraWave>,
     pub to_gravity: broadcast::Sender<UltraWave>,
@@ -1972,7 +1972,7 @@ where
 
 impl<P> DiagnosticInterceptors<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new() -> Self {
         let (from_hyperway, _) = broadcast::channel(1024);
@@ -2001,14 +2001,14 @@ where
 #[derive(Clone)]
 pub struct SmartLocator<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub skel: HyperStarSkel<P>,
 }
 
 impl<P> SmartLocator<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(skel: HyperStarSkel<P>) -> Self {
         Self { skel }

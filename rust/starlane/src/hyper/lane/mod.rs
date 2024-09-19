@@ -2173,7 +2173,7 @@ pub mod test_util {
                 for _ in 0..size {
                     body.push(0u8);
                 }
-                hello.body(Substance::Bin(Arc::new(body)));
+                hello.body(Substance::Bin(body));
                 let pong: Wave<Pong> = less_transmitter.direct(hello).await.unwrap();
                 rtn.send(pong.core.status.as_u16() == 200u16);
             });

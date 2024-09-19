@@ -7,15 +7,15 @@ use crate::env::{
 };
 use crate::hyper::lane::tcp::{CertGenerator, HyperlaneTcpServer};
 use crate::hyper::lane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
-use crate::hyper::driver::base::BaseDriverFactory;
-use crate::hyper::driver::control::ControlDriverFactory;
-use crate::hyper::driver::root::RootDriverFactory;
-use crate::hyper::driver::space::SpaceDriverFactory;
-use crate::hyper::driver::{DriverAvail, DriversBuilder};
+use crate::driver::base::BaseDriverFactory;
+use crate::driver::control::ControlDriverFactory;
+use crate::driver::root::RootDriverFactory;
+use crate::driver::space::SpaceDriverFactory;
+use crate::driver::{DriverAvail, DriversBuilder};
 use crate::hyper::space::machine::MachineTemplate;
 use crate::hyper::space::mem::registry::{MemRegApi, MemRegCtx};
 use crate::hyper::space::reg::{Registry, RegistryWrapper};
-use crate::hyper::space::Cosmos;
+use crate::hyper::space::platform::Platform;
 use crate::registry::postgres::{
     PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
@@ -29,6 +29,8 @@ use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
+use crate::driver::artifact::RepoDriverFactory;
+use crate::store::LocalFileStore;
 
 #[derive(Clone)]
 pub struct Starlane {
@@ -63,7 +65,7 @@ impl Starlane {
 }
 
 #[async_trait]
-impl Cosmos for Starlane {
+impl Platform for Starlane {
     type Err = StarErr;
     #[cfg(feature = "postgres")]
     type RegistryContext = PostgresRegistryContextHandle<Self>;
@@ -73,6 +75,9 @@ impl Cosmos for Starlane {
 
     type StarAuth = AnonHyperAuthenticator;
     type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
+
+
+    type StoreFactory = LocalFileStore<>;
 
     fn data_dir(&self) -> String {
         STARLANE_DATA_DIR.clone()
@@ -94,7 +99,7 @@ impl Cosmos for Starlane {
     }
 
     fn machine_name(&self) -> MachineName {
-        "old".to_string()
+        "singularity".to_string()
     }
 
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
@@ -122,13 +127,10 @@ impl Cosmos for Starlane {
                 */
             }
             StarSub::Scribe => {
-                /*
                 builder.add_post(Arc::new(RepoDriverFactory::new()));
                 builder.add_post(Arc::new(BundleSeriesDriverFactory::new()));
                 builder.add_post(Arc::new(BundleDriverFactory::new()));
                 builder.add_post(Arc::new(ArtifactDriverFactory::new()));
-                :w!
-                 */
             }
             StarSub::Jump => {
                 //builder.add_post(Arc::new(WebDriverFactory::new()));
@@ -189,6 +191,11 @@ impl Cosmos for Starlane {
                 .await
                 .unwrap();
         server.start().unwrap();
+    }
+
+
+    fn filestore_factory(&self) -> Self::StoreFactory {
+        todo!()
     }
 }
 

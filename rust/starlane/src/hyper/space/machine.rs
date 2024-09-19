@@ -33,19 +33,19 @@ use crate::hyper::space::reg::Registry;
 use crate::hyper::space::star::{
     HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate,
 };
-use crate::hyper::space::Cosmos;
+use crate::hyper::space::platform::Platform;
 
 #[derive(Clone)]
 pub struct MachineApi<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     tx: mpsc::Sender<MachineCall<P>>,
 }
 
 impl<P> MachineApi<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(tx: mpsc::Sender<MachineCall<P>>) -> Self {
         Self { tx }
@@ -126,7 +126,7 @@ where
 #[derive(Clone)]
 pub struct MachineSkel<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub name: MachineName,
     pub cosmos: P,
@@ -143,7 +143,7 @@ where
 
 pub struct Machine<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     pub skel: MachineSkel<P>,
     pub stars: Arc<HashMap<Point, HyperStarApi<P>>>,
@@ -157,7 +157,7 @@ where
 
 impl<P> Machine<P>
 where
-    P: Cosmos + 'static,
+    P: Platform + 'static,
 {
     pub fn new(platform: P) -> MachineApi<P> {
         let (call_tx, call_rx) = mpsc::channel(1024);
@@ -487,7 +487,7 @@ where
 
 pub enum MachineCall<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     Init,
     Terminate,
@@ -529,6 +529,7 @@ pub enum MachineStatus {
 
 pub struct MachineTemplate {
     pub stars: Vec<StarTemplate>,
+    pub service: HashMap<Service>
 }
 
 impl MachineTemplate {
@@ -613,7 +614,7 @@ impl Default for MachineTemplate {
 
 pub struct MachineHyperwayEndpointFactory<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     from: StarKey,
     to: StarKey,
@@ -622,7 +623,7 @@ where
 
 impl<P> MachineHyperwayEndpointFactory<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(from: StarKey, to: StarKey, call_tx: mpsc::Sender<MachineCall<P>>) -> Self {
         Self { from, to, call_tx }
@@ -632,7 +633,7 @@ where
 #[async_trait]
 impl<P> HyperwayEndpointFactory for MachineHyperwayEndpointFactory<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn create(
         &self,
@@ -655,7 +656,7 @@ where
 
 pub struct MachineApiExtFactory<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub machine_api: MachineApi<P>,
     pub logger: PointLogger,
@@ -664,7 +665,7 @@ where
 #[async_trait]
 impl<P> HyperwayEndpointFactory for MachineApiExtFactory<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn create(
         &self,
@@ -682,7 +683,7 @@ where
 
 pub struct ClientArtifactFetcher<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub registry: Registry<P>,
     pub client: HyperClient,
@@ -690,7 +691,7 @@ where
 
 impl<P> ClientArtifactFetcher<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new(client: HyperClient, registry: Registry<P>) -> Self {
         Self { client, registry }
@@ -700,7 +701,7 @@ where
 #[async_trait]
 impl<P> ArtifactFetcher for ClientArtifactFetcher<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn stub(&self, point: &Point) -> Result<Stub, SpaceErr> {
         let record = self

@@ -1,8 +1,8 @@
-use crate::hyper::driver::{
+use crate::driver::{
     Driver, DriverCtx, DriverSkel, HyperDriverFactory, Item, ItemHandler, ItemSphere,
 };
 use crate::hyper::space::star::HyperStarSkel;
-use crate::hyper::space::Cosmos;
+use crate::hyper::space::platform::Platform;
 use once_cell::sync::Lazy;
 use starlane_space::artifact::ArtRef;
 use starlane_space::config::bind::BindConfig;
@@ -46,7 +46,7 @@ impl RootDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for RootDriverFactory
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Root)
@@ -67,7 +67,7 @@ pub struct RootDriver;
 #[async_trait]
 impl<P> Driver<P> for RootDriver
 where
-    P: Cosmos,
+    P: Platform,
 {
     fn kind(&self) -> Kind {
         Kind::Root
@@ -80,14 +80,14 @@ where
 
 pub struct Root<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     phantom: PhantomData<P>,
 }
 
 impl<P> Root<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     pub fn new() -> Self {
         Self {
@@ -98,7 +98,7 @@ where
 
 impl<P> Item<P> for Root<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     type Skel = ();
     type Ctx = ();
@@ -110,12 +110,13 @@ where
 }
 
 #[handler]
-impl<P> Root<P> where P: Cosmos {}
+impl<P> Root<P> where P: Platform
+{}
 
 #[async_trait]
 impl<P> ItemHandler<P> for Root<P>
 where
-    P: Cosmos,
+    P: Platform,
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(ROOT_BIND_CONFIG.clone())

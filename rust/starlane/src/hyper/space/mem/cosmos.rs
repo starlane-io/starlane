@@ -10,16 +10,16 @@ use crate::hyper::space::err::CosmicErr;
 use crate::hyper::space::machine::MachineTemplate;
 use crate::hyper::space::mem::registry::{MemRegApi, MemRegCtx};
 use crate::hyper::space::reg::Registry;
-use crate::hyper::space::Cosmos;
+use crate::hyper::space::platform::Platform;
 use starlane_space::artifact::asynch::ArtifactApi;
 use starlane_space::kind::StarSub;
 use starlane_space::loc::{MachineName, StarKey};
 use std::sync::Arc;
-use crate::hyper::driver::base::BaseDriverFactory;
-use crate::hyper::driver::{DriverAvail, DriversBuilder};
-use crate::hyper::driver::control::ControlDriverFactory;
-use crate::hyper::driver::root::RootDriverFactory;
-use crate::hyper::driver::space::SpaceDriverFactory;
+use crate::driver::base::BaseDriverFactory;
+use crate::driver::{DriverAvail, DriversBuilder};
+use crate::driver::control::ControlDriverFactory;
+use crate::driver::root::RootDriverFactory;
+use crate::driver::space::SpaceDriverFactory;
 
 impl MemCosmos {
     pub fn new() -> Self {
@@ -35,7 +35,7 @@ pub struct MemCosmos {
 }
 
 #[async_trait]
-impl Cosmos for MemCosmos {
+impl Platform for MemCosmos {
     type Err = CosmicErr;
     type RegistryContext = MemRegCtx;
     type StarAuth = AnonHyperAuthenticator;
