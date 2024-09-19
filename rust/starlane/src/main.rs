@@ -31,6 +31,8 @@ pub mod host;
 #[cfg(feature = "cli")]
 pub mod cli;
 
+pub mod store;
+
 use self::hyper::space::Cosmos;
 use crate::cli::{Cli, Commands};
 use crate::err::StarErr;

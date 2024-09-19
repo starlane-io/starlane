@@ -5,5 +5,6 @@ pub mod driver;
 
 #[cfg(feature = "hyperlane")]
 pub mod lane;
+mod server;
 
 

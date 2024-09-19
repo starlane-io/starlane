@@ -218,6 +218,11 @@ impl Substance {
         Self::Bin(bin)
     }
 
+
+    pub fn from_vec(bin: Vec<u8>) -> Self {
+        Self::Bin(Arc::new(bin))
+    }
+
     pub fn kind(&self) -> SubstanceKind {
         match self {
             Substance::Empty => SubstanceKind::Empty,

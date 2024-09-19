@@ -9,7 +9,7 @@ use std::time::Duration;
 use serde::Serialize;
 
 use crate::hyper::lane::HyperClient;
-use crate::hyper::space::driver::control::ControlClient;
+use crate::hyper::driver::control::ControlClient;
 use crate::hyper::space::err::CosmicErr;
 use crate::hyper::space::machine::MachineApiExtFactory;
 use crate::hyper::space::mem::cosmos::MemCosmos;

@@ -163,7 +163,7 @@ pub enum PointSegKind {
     Root,
     Space,
     Base,
-    FilesystemRootDir,
+    FileStoreRoot,
     Dir,
     File,
     Version,
@@ -180,7 +180,7 @@ impl PointSegKind {
             Self::Dir => "",
             Self::File => "",
             Self::Version => ":",
-            Self::FilesystemRootDir => ":",
+            Self::FileStoreRoot => ":",
             Self::Root => "",
             Self::Pop => match post_fileroot {
                 true => "",
@@ -232,7 +232,7 @@ impl PointSegKind {
             PointSegKind::Root => false,
             PointSegKind::Space => false,
             PointSegKind::Base => false,
-            PointSegKind::FilesystemRootDir => true,
+            PointSegKind::FileStoreRoot => true,
             PointSegKind::Dir => true,
             PointSegKind::File => true,
             PointSegKind::Version => false,
@@ -247,7 +247,7 @@ impl PointSegKind {
             PointSegKind::Root => true,
             PointSegKind::Space => true,
             PointSegKind::Base => true,
-            PointSegKind::FilesystemRootDir => false,
+            PointSegKind::FileStoreRoot => false,
             PointSegKind::Dir => false,
             PointSegKind::File => false,
             PointSegKind::Version => true,
@@ -270,7 +270,7 @@ impl PointSegQuery for PointSeg {
             PointSeg::Root => PointSegKind::Root,
             PointSeg::Space(_) => PointSegKind::Space,
             PointSeg::Base(_) => PointSegKind::Base,
-            PointSeg::FilesystemRootDir => PointSegKind::FilesystemRootDir,
+            PointSeg::FilesystemRootDir => PointSegKind::FileStoreRoot,
             PointSeg::Dir(_) => PointSegKind::Dir,
             PointSeg::File(_) => PointSegKind::File,
             PointSeg::Version(_) => PointSegKind::Version,
@@ -291,7 +291,7 @@ impl PointSegQuery for PointSegCtx {
             Self::Root => PointSegKind::Root,
             Self::Space(_) => PointSegKind::Space,
             Self::Base(_) => PointSegKind::Base,
-            Self::FilesystemRootDir => PointSegKind::FilesystemRootDir,
+            Self::FilesystemRootDir => PointSegKind::FileStoreRoot,
             Self::Dir(_) => PointSegKind::Dir,
             Self::File(_) => PointSegKind::File,
             Self::Version(_) => PointSegKind::Version,
@@ -314,7 +314,7 @@ impl PointSegQuery for PointSegVar {
             Self::Root => PointSegKind::Root,
             Self::Space(_) => PointSegKind::Space,
             Self::Base(_) => PointSegKind::Base,
-            Self::FilesystemRootDir => PointSegKind::FilesystemRootDir,
+            Self::FilesystemRootDir => PointSegKind::FileStoreRoot,
             Self::Dir(_) => PointSegKind::Dir,
             Self::File(_) => PointSegKind::File,
             Self::Version(_) => PointSegKind::Version,
@@ -476,6 +476,20 @@ pub enum PointSeg {
     Dir(String),
     File(String),
     Version(Version),
+}
+
+impl ToString for PointSeg {
+    fn to_string(&self) -> String {
+        match &self {
+            PointSeg::Root => "ROOT".to_string(),
+            PointSeg::Space(s) => s.clone(),
+            PointSeg::Base(s) => s.clone(),
+            PointSeg::FilesystemRootDir => "/".to_string(),
+            PointSeg::Dir(d) => d.clone(),
+            PointSeg::File(f) => f.clone(),
+            PointSeg::Version(v) => v.to_string()
+        }
+    }
 }
 
 impl PointSegment for PointSeg {}
@@ -955,6 +969,16 @@ impl Point {
         true
     }
 
+
+    /// returns the "file" path portion of this Point if there is one
+    pub fn truncate_filepath(&self, parent: &Point ) -> Result<String,SpaceErr>{
+        if self.non_file_parent()  == *parent  {
+           self.filepath().ok_or( SpaceErr::str(format!("could not get filepath for point {}", self.to_string())))
+        } else {
+            Result::Err(SpaceErr::str(format!("path {} did not match with truncation parent {}", self.to_string(), parent.to_string())))
+        }
+    }
+
     pub fn central() -> Self {
         CENTRAL.clone()
     }
@@ -1209,6 +1233,14 @@ impl Point {
             None
         } else {
             Some(path)
+        }
+    }
+
+    pub fn non_file_parent(&self) -> Point {
+        if !self.is_filesystem_ref() {
+            return self.clone();
+        } else {
+            self.parent().unwrap().non_file_parent()
         }
     }
 

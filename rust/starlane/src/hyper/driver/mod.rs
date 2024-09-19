@@ -769,7 +769,7 @@ where
                 let skel = self.skel.clone();
                 let call_tx = call_tx.clone();
                 let logger = logger.clone();
-                let ctx = DriverCtx::new(transmitter.clone());
+                let ctx = DriverCtx::new(transmitter.clone(),());
 
                 tokio::spawn(async move {
                     let driver =
@@ -1410,14 +1410,19 @@ where
     }
 }
 
-#[derive(Clone)]
-pub struct DriverCtx {
-    pub transmitter: ProtoTransmitter,
+pub trait DriverParentApi : Clone {
+
 }
 
-impl DriverCtx {
-    pub fn new(transmitter: ProtoTransmitter) -> Self {
-        Self { transmitter }
+#[derive(Clone)]
+pub struct DriverCtx<A> where A: DriverParentApi{
+    pub transmitter: ProtoTransmitter,
+    pub parent_api: A
+}
+
+impl <A> DriverCtx<A> {
+    pub fn new(transmitter: ProtoTransmitter, parent_api: A) -> Self {
+        Self { transmitter, parent_api }
     }
 }
 
@@ -1600,9 +1605,9 @@ where
 }
 
 #[async_trait]
-pub trait HyperDriverFactory<P>: Send + Sync
+pub trait HyperDriverFactory<P,A>: Send + Sync
 where
-    P: Cosmos,
+    P: Cosmos, A: DriverParentApi
 {
     fn kind(&self) -> KindSelector;
 
@@ -1614,7 +1619,7 @@ where
         &self,
         skel: HyperStarSkel<P>,
         driver_skel: DriverSkel<P>,
-        ctx: DriverCtx,
+        ctx: DriverCtx<A>,
     ) -> Result<Box<dyn Driver<P>>, P::Err>;
 
     fn properties(&self) -> SetProperties {

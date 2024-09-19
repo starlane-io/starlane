@@ -14,7 +14,7 @@ pub mod properties;
 pub mod env;
 #[cfg(feature = "hyperspace")]
 pub mod hyper;
-mod registry;
+pub mod registry;
 #[cfg(feature = "server")]
 pub mod server;
 
@@ -23,6 +23,8 @@ pub mod host;
 
 pub mod cli;
 pub mod nom;
+
+pub mod store;
 
 pub fn init() {
     #[cfg(feature = "cli")]

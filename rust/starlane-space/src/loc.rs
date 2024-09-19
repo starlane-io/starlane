@@ -672,6 +672,19 @@ pub mod test {
     use core::str::FromStr;
 
     #[test]
+    pub fn test_point_file() {
+        let parent = Point::from_str("super:base").unwrap();
+        let point = parent.push( "/subdir/file.txt").unwrap();
+        let filepath = point.truncate_filepath(&parent).unwrap();
+        assert_eq!( filepath, "/subdir/file.txt");
+
+        let point = parent.push( "/dir/subdir/").unwrap();
+        let filepath = point.truncate_filepath(&parent).unwrap();
+        assert_eq!( filepath, "/dir/subdir/");
+    }
+
+
+    #[test]
     pub fn test_root_routes() {
         let point = Point::from_str("GLOBAL::star").unwrap();
         let parent = point.parent().unwrap();

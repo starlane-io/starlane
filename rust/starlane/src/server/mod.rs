@@ -7,11 +7,11 @@ use crate::env::{
 };
 use crate::hyper::lane::tcp::{CertGenerator, HyperlaneTcpServer};
 use crate::hyper::lane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
-use crate::hyper::space::driver::base::BaseDriverFactory;
-use crate::hyper::space::driver::control::ControlDriverFactory;
-use crate::hyper::space::driver::root::RootDriverFactory;
-use crate::hyper::space::driver::space::SpaceDriverFactory;
-use crate::hyper::space::driver::{DriverAvail, DriversBuilder};
+use crate::hyper::driver::base::BaseDriverFactory;
+use crate::hyper::driver::control::ControlDriverFactory;
+use crate::hyper::driver::root::RootDriverFactory;
+use crate::hyper::driver::space::SpaceDriverFactory;
+use crate::hyper::driver::{DriverAvail, DriversBuilder};
 use crate::hyper::space::machine::MachineTemplate;
 use crate::hyper::space::mem::registry::{MemRegApi, MemRegCtx};
 use crate::hyper::space::reg::{Registry, RegistryWrapper};
