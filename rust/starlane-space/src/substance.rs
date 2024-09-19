@@ -220,7 +220,7 @@ impl Substance {
 
 
     pub fn from_vec(bin: Vec<u8>) -> Self {
-        Self::Bin(Arc::new(bin))
+        Self::Bin(bin)
     }
 
     pub fn kind(&self) -> SubstanceKind {
@@ -259,11 +259,11 @@ impl Substance {
 
     pub fn to_bin(self) -> Result<Bin, SpaceErr> {
         match self {
-            Substance::Empty => Ok(Arc::new(vec![])),
+            Substance::Empty => Ok(vec![]),
             Substance::List(list) => list.to_bin(),
             Substance::Map(map) => map.to_bin(),
             Substance::Bin(bin) => Ok(bin),
-            Substance::Text(text) => Ok(Arc::new(text.as_bytes().to_vec())),
+            Substance::Text(text) => Ok(text.as_bytes().to_vec()),
             what => Err(format!("{}.to_bin() not supported", what.kind().to_string()).into()),
         }
     }
@@ -336,7 +336,7 @@ impl SubstanceMap {
 
      */
     pub fn to_bin(self) -> Result<Bin, SpaceErr> {
-        Ok(Arc::new(bincode::serialize(&self)?))
+        Ok(bincode::serialize(&self)?)
     }
 
     pub fn new() -> Self {
@@ -417,7 +417,7 @@ impl SubstanceList {
         Self { list: vec![] }
     }
     pub fn to_bin(self) -> Result<Bin, SpaceErr> {
-        Ok(Arc::new(bincode::serialize(&self)?))
+        Ok(bincode::serialize(&self)?)
     }
 }
 
@@ -1096,4 +1096,4 @@ impl MultipartFormBuilder {
     }
 }
 
-pub type Bin = Arc<Vec<u8>>;
+pub type Bin = Vec<u8>;

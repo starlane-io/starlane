@@ -57,7 +57,7 @@ impl ArtifactApi {
             return Ok(ArtRef::new(bin, point.clone()));
         }
 
-        let bin = self.fetcher.fetch(point)?;
+        let bin = Arc::new(self.fetcher.fetch(point)?);
 
         self.raw.insert(point.clone(), bin.clone());
 

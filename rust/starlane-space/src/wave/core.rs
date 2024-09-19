@@ -66,7 +66,7 @@ impl ReflectedCore {
     }
 
     pub fn ok_html(html: &str) -> Self {
-        let bin = Arc::new(html.to_string().into_bytes());
+        let bin = html.to_string().into_bytes();
         ReflectedCore::ok_body(Substance::Bin(bin))
     }
 

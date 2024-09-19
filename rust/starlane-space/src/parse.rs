@@ -329,7 +329,7 @@ pub fn dir_point_segment<I: Span>(input: I) -> Res<I, PointSeg> {
 
 pub fn root_dir_point_segment<I: Span>(input: I) -> Res<I, PointSeg> {
     context("point:root_filesystem_segment", tag(":/"))(input)
-        .map(|(next, _)| (next, PointSeg::FilesystemRootDir))
+        .map(|(next, _)| (next, PointSeg::FsRootDir))
 }
 
 pub fn root_dir_point_segment_ctx<I: Span>(input: I) -> Res<I, PointSegVar> {
@@ -5846,7 +5846,7 @@ pub fn point_selector<I: Span>(input: I) -> Res<I, Selector> {
                 hops.push(Hop {
                     inclusive: false,
                     segment_selector: PointSegSelector::Exact(ExactPointSeg::PointSeg(
-                        PointSeg::FilesystemRootDir,
+                        PointSeg::FsRootDir,
                     )),
                     kind_selector: KindSelector {
                         base: Pattern::Exact(BaseKind::File),

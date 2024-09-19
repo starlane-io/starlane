@@ -189,12 +189,12 @@ impl MapFetcher {
         }
     }
     pub fn ser<S: Serialize>(&mut self, point: &Point, bin: S) {
-        let bin = Arc::new(bincode::serialize(&bin).unwrap());
+        let bin = bincode::serialize(&bin).unwrap();
         self.map.insert(point.clone(), bin);
     }
 
     pub fn str<S: ToString>(&mut self, point: &Point, string: S) {
-        let bin = Arc::new(string.to_string().into_bytes());
+        let bin = string.to_string().into_bytes();
         self.map.insert(point.clone(), bin);
     }
 }

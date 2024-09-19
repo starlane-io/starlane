@@ -49,11 +49,4 @@ impl TryFrom<Vec<u8>> for MechtronConfig {
     }
 }
 
-impl TryFrom<Bin> for MechtronConfig {
-    type Error = SpaceErr;
 
-    fn try_from(doc: Bin) -> Result<Self, Self::Error> {
-        let doc = String::from_utf8((*doc).clone())?;
-        mechtron_config(doc.as_str())
-    }
-}

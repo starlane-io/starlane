@@ -81,14 +81,6 @@ impl TryFrom<Vec<u8>> for BindConfig {
     }
 }
 
-impl TryFrom<Bin> for BindConfig {
-    type Error = SpaceErr;
-
-    fn try_from(doc: Bin) -> Result<Self, Self::Error> {
-        let doc = String::from_utf8((*doc).clone())?;
-        bind_config(doc.as_str())
-    }
-}
 
 pub struct Cursor {}
 

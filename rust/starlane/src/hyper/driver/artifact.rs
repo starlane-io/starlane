@@ -288,7 +288,7 @@ pub struct BundleSeries<P,S> where P: Cosmos, S: FileStore<P,Point> {
 }
 
 impl <P,S> BundleSeries<P,S> {
-   pub fn new( ctx: DrverCtx<RepoParentApi<P,S>>) -> BundleSeries<P,S>{
+   pub fn new( ctx: DriverCtx<RepoParentApi<P,S>>) -> BundleSeries<P,S>{
        Self {
            ctx
        }

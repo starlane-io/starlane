@@ -261,7 +261,7 @@ impl PointSegKind {
 impl PointSegQuery for PointSeg {
     fn is_filesystem_root(&self) -> bool {
         match self {
-            Self::FilesystemRootDir => true,
+            Self::FsRootDir => true,
             _ => false,
         }
     }
@@ -270,7 +270,7 @@ impl PointSegQuery for PointSeg {
             PointSeg::Root => PointSegKind::Root,
             PointSeg::Space(_) => PointSegKind::Space,
             PointSeg::Base(_) => PointSegKind::Base,
-            PointSeg::FilesystemRootDir => PointSegKind::FileStoreRoot,
+            PointSeg::FsRootDir => PointSegKind::FileStoreRoot,
             PointSeg::Dir(_) => PointSegKind::Dir,
             PointSeg::File(_) => PointSegKind::File,
             PointSeg::Version(_) => PointSegKind::Version,
@@ -437,7 +437,7 @@ impl TryInto<PointSeg> for PointSegCtx {
             PointSegCtx::Root => Ok(PointSeg::Root),
             PointSegCtx::Space(space) => Ok(PointSeg::Space(space)),
             PointSegCtx::Base(base) => Ok(PointSeg::Base(base)),
-            PointSegCtx::FilesystemRootDir => Ok(PointSeg::FilesystemRootDir),
+            PointSegCtx::FilesystemRootDir => Ok(PointSeg::FsRootDir),
             PointSegCtx::Dir(dir) => Ok(PointSeg::Dir(dir)),
             PointSegCtx::File(file) => Ok(PointSeg::File(file)),
             PointSegCtx::Version(version) => Ok(PointSeg::Version(version)),
@@ -472,25 +472,13 @@ pub enum PointSeg {
     Root,
     Space(String),
     Base(String),
-    FilesystemRootDir,
+    FsRootDir,
     Dir(String),
     File(String),
     Version(Version),
 }
 
-impl ToString for PointSeg {
-    fn to_string(&self) -> String {
-        match &self {
-            PointSeg::Root => "ROOT".to_string(),
-            PointSeg::Space(s) => s.clone(),
-            PointSeg::Base(s) => s.clone(),
-            PointSeg::FilesystemRootDir => "/".to_string(),
-            PointSeg::Dir(d) => d.clone(),
-            PointSeg::File(f) => f.clone(),
-            PointSeg::Version(v) => v.to_string()
-        }
-    }
-}
+
 
 impl PointSegment for PointSeg {}
 
@@ -504,7 +492,7 @@ impl Into<PointSegCtx> for PointSeg {
             PointSeg::Root => PointSegCtx::Root,
             PointSeg::Space(space) => PointSegCtx::Space(space),
             PointSeg::Base(base) => PointSegCtx::Base(base),
-            PointSeg::FilesystemRootDir => PointSegCtx::FilesystemRootDir,
+            PointSeg::FsRootDir => PointSegCtx::FilesystemRootDir,
             PointSeg::Dir(dir) => PointSegCtx::Dir(dir),
             PointSeg::File(file) => PointSegCtx::File(file),
             PointSeg::Version(version) => PointSegCtx::Version(version),
@@ -541,7 +529,7 @@ impl ToString for PointSeg {
             PointSeg::Dir(dir) => dir.clone(),
             PointSeg::File(file) => file.clone(),
             PointSeg::Version(version) => version.to_string(),
-            PointSeg::FilesystemRootDir => "/".to_string(),
+            PointSeg::FsRootDir => "/".to_string(),
             PointSeg::Root => "".to_string(),
         }
     }
@@ -1116,7 +1104,7 @@ impl Point {
     pub fn has_filesystem(&self) -> bool {
         for segment in &self.segments {
             match segment {
-                PointSeg::FilesystemRootDir => {
+                PointSeg::FsRootDir => {
                     return true;
                 }
                 _ => {}
@@ -1176,7 +1164,7 @@ impl Point {
                 PointSeg::Base(_) => {
                     format!("{}:{}", self.to_string(), segment)
                 }
-                PointSeg::FilesystemRootDir => {
+                PointSeg::FsRootDir => {
                     format!("{}{}", self.to_string(), segment)
                 }
                 PointSeg::Dir(_) => {
@@ -1217,7 +1205,7 @@ impl Point {
         let mut path = String::new();
         for segment in &self.segments {
             match segment {
-                PointSeg::FilesystemRootDir => {
+                PointSeg::FsRootDir => {
                     path.push_str("/");
                 }
                 PointSeg::Dir(dir) => {
