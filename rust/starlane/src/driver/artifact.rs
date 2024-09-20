@@ -35,7 +35,6 @@ use crate::hyper::space::platform::Platform;
 use crate::driver::{Driver, DriverCtx, DriverHandler,  DriverSkel, HyperDriverFactory, HyperSkel, Item, ItemHandler, ItemSkel, ItemSphere};
 use crate::hyper::space::err::HyperErr;
 use crate::hyper::space::star::HyperStarSkel;
-use crate::store::FileStore;
 
 static REPO_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new( ||{ ArtRef::new(
         Arc::new(repo_bind()),
@@ -101,14 +100,12 @@ fn bundle_bind() -> BindConfig {
     .unwrap()
 }
 
-pub struct RepoDriverFactory<P,S> where P: Platform, S: FileStore<P,Point> {
-    pub store: S
+pub struct RepoDriverFactory<P> where P: Platform{
 }
 
-impl <P,S> RepoDriverFactory<P,S> where P: Platform, S: FileStore<P,Point> {
-    pub fn new(store: S) -> Self {
+impl <P> RepoDriverFactory<P> where P: Platform {
+    pub fn new() -> Self {
         Self {
-          store
         }
     }
 }
@@ -130,37 +127,35 @@ impl<P> HyperDriverFactory<P> for RepoDriverFactory<P> where P: Platform
     }
 }
 
-pub struct RepoDriver<P,S>
+pub struct RepoDriver<P>
 where
     P: Platform,
-    S: FileStore<P,Point>,
 {
     skel: HyperStarSkel<P>,
-    store: S
 }
 
-impl<P,S> RepoDriver<P,S>
+impl<P> RepoDriver<P>
 where
-    P: Platform, S: FileStore<P,Point>,
+    P: Platform
 {
-    pub fn new(skel: HyperStarSkel<P>, store: S) -> Self {
-        Self { skel, store }
+    pub fn new(skel: HyperStarSkel<P>) -> Self {
+        Self { skel}
     }
 }
 
 
 #[handler]
-impl<P,S> RepoDriver<P,S>
+impl<P> RepoDriver<P>
 where
-    P: Platform, S: FileStore<P,Point>,
+    P: Platform
 {
 
 }
 
 #[async_trait]
-impl<P,S> Driver<P> for RepoDriver<P,S>
+impl<P> Driver<P> for RepoDriver<P>
 where
-    P: Platform, S: FileStore<P,Point>,
+    P: Platform
 {
     fn kind(&self) -> Kind {
         Kind::Repo
@@ -171,30 +166,7 @@ where
     }
 }
 
-#[derive(Clone)]
-pub struct RepoParentApi<P,S> where P: Platform, S: FileStore<P,Point>
-{
-    point: Point,
-    store: S
-}
 
-
-impl <P,S> RepoParentApi<P,S> where P: Platform, S: FileStore<P,Point>{
-    pub fn new(point: Point, store: S) -> RepoParentApi<P,S> {
-       Self {
-           point,
-           store
-       }
-    }
-    pub fn store(&self) -> S {
-        self.store.clone()
-    }
-
-    pub fn child(&self, point: &Point ) -> Result<RepoParentApi<S,P>,P::Err>{
-        let store = self.store.child(point)?;
-        Ok(Self::new(point.clone(),store))
-    }
-}
 
 /*
 fn store() -> Result<ValueRepo<String>, UniErr> {
@@ -236,9 +208,9 @@ impl BundleSeriesDriverFactory {
 }
 
 #[async_trait]
-impl<P,S> HyperDriverFactory<P,RepoParentApi<P,S>> for BundleSeriesDriverFactory
+impl<P,S> HyperDriverFactory<P> for BundleSeriesDriverFactory
 where
-    P: Platform, S: FileStore<P,Point>
+    P: Platform
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::BundleSeries)
@@ -248,19 +220,19 @@ where
         &self,
         skel: HyperStarSkel<P>,
         driver_skel: DriverSkel<P>,
-        ctx: DriverCtx<RepoParentApi<P,S>>,
+        ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
-        Ok(Box::new(BundleSeriesDriver::new()))
+        Ok(Box::new(BundleSeriesDriver::new(ctx)))
     }
 }
 
-pub struct BundleSeriesDriver<P,S> where P: Platform, S: FileStore<P,Point> {
-    ctx: DriverCtx<RepoParentApi<P,S>>,
+pub struct BundleSeriesDriver<P> where P: Platform {
+    ctx: DriverCtx,
 }
 
 #[handler]
-impl <P,S> BundleSeriesDriver<P, S> where P: Platform, S: FileStore<P,Point>{
-    pub fn new(ctx: DriverCtx<RepoParentApi<P,S>>) -> Self {
+impl <P> BundleSeriesDriver<P> where P: Platform{
+    pub fn new(ctx: DriverCtx) -> Self {
         Self {
             ctx
         }
@@ -268,25 +240,25 @@ impl <P,S> BundleSeriesDriver<P, S> where P: Platform, S: FileStore<P,Point>{
 }
 
 #[async_trait]
-impl<P,S> Driver<P> for BundleSeriesDriver<P, S>
+impl<P> Driver<P> for BundleSeriesDriver<P>
 where
-    P: Platform, S: FileStore<P,Point>
+    P: Platform
 {
     fn kind(&self) -> Kind {
         Kind::BundleSeries
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
-        Ok(ItemSphere::Handler(Box::new(BundleSeries)))
+        Ok(ItemSphere::Handler(Box::new(BundleSeries::new(self.ctx.clone()))))
     }
 }
 
-pub struct BundleSeries<P,S> where P: Platform, S: FileStore<P,Point> {
-    ctx: DriverCtx<RepoParentApi<P,S>>
+pub struct BundleSeries<P> where P: Platform {
+    ctx: DriverCtx
 }
 
-impl <P,S> BundleSeries<P,S> {
-   pub fn new( ctx: DriverCtx<RepoParentApi<P,S>>) -> BundleSeries<P,S>{
+impl <P> BundleSeries<P> {
+   pub fn new( ctx: DriverCtx) -> BundleSeries<P>{
        Self {
            ctx
        }
@@ -294,12 +266,12 @@ impl <P,S> BundleSeries<P,S> {
 }
 
 #[handler]
-impl BundleSeries {
+impl <P> BundleSeries<P> where P: Platform {
 
 }
 
 #[async_trait]
-impl<P> ItemHandler<P> for BundleSeries
+impl<P> ItemHandler<P> for BundleSeries<P>
 where
     P: Platform,
 {
@@ -375,27 +347,27 @@ where
     }
 }
 
-pub struct BundleDriverHandler<P,A>
+pub struct BundleDriverHandler<P>
 where
-    P: Platform, A: DriverParentApi
+    P: Platform
 {
     skel: HyperSkel<P>,
-    ctx: DriverCtx<A>,
+    ctx: DriverCtx,
 }
 
-impl<P,A> BundleDriverHandler<P,A>
+impl<P> BundleDriverHandler<P>
 where
-    P: Platform, A: DriverParentApi
+    P: Platform
 {
-    fn restore(skel: HyperSkel<P>, ctx: DriverCtx<A>) -> Self {
+    fn restore(skel: HyperSkel<P>, ctx: DriverCtx) -> Self {
         Self { skel, ctx }
     }
 }
 
-impl<P,A> DriverHandler<P> for BundleDriverHandler<P,A> where P: Platform, A: DriverParentApi{}
+impl<P> DriverHandler<P> for BundleDriverHandler<P> where P: Platform{}
 
 #[handler]
-impl<P,A> BundleDriverHandler<P,A>
+impl<P> BundleDriverHandler<P>
 where
     P: Platform,
 {

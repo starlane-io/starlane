@@ -6,7 +6,7 @@ repository = "https://github.com/cosmic-initiative/cosmic-initiative.git"
 version = "0.3.14"
 
 edition = "2021" 
-rust-version = "1.80.0"
+rust-version = "1.81.0"
 authors = []
 homepage = "https://starlane.io"
 description="..."

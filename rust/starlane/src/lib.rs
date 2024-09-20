@@ -23,7 +23,7 @@ pub mod host;
 
 pub mod cli;
 
-pub mod store;
+//pub mod store;
 pub mod driver;
 
 pub fn init() {

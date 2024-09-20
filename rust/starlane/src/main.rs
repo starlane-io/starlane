@@ -32,7 +32,7 @@ pub mod cli;
 
 pub mod driver;
 
-pub mod store;
+//pub mod store;
 
 use starlane::hyper::space::platform::Platform;
 use crate::cli::{Cli, Commands};

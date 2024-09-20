@@ -1,6 +1,6 @@
-use crate::host::{ExeService,  HostEnv, OsEnv, Proc};
+use crate::err::StarErr;
+use crate::host::{ExeService, HostEnv, OsEnv, Proc};
 use crate::hyper::space::err::HyperErr;
-use crate::store::FileStore;
 use nom::AsBytes;
 use starlane_space::command::common::{SetProperties, StateSrc};
 use starlane_space::command::direct::create::{
@@ -22,6 +22,7 @@ use starlane_space::wave::{
 };
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::io::Read;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
@@ -31,15 +32,13 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 use tracing::instrument::WithSubscriber;
-use std::hash::Hash;
-use crate::err::StarErr;
 
 pub struct Service {
-    pub handler: Box<dyn DirectedHandler>
+    pub handler: Box<dyn DirectedHandler>,
 }
 
 impl Service {
-    pub fn new( handler: Box<dyn DirectedHandler> ) -> Self {
+    pub fn new(handler: Box<dyn DirectedHandler>) -> Self {
         Self { handler }
     }
 
@@ -50,38 +49,33 @@ impl Service {
 
 #[derive(Clone)]
 pub enum Dialect {
-    FileStore
+    FileStore,
 }
 
 impl Dialect {
-    pub fn handler(&self, host: Host) -> Result<Box<dyn DirectedHandler>,StarErr> {
+    pub fn handler(&self, host: Host) -> Result<Box<dyn DirectedHandler>, StarErr> {
         match self {
             Dialect::FileStore => {
                 let cli = host.executor().ok_or("Driver ")?;
                 Ok(Box::new(FileStoreCliExecutor::new(cli)))
             }
         }
-
     }
 }
-
 
 #[derive(Clone)]
 pub struct ServiceTemplate {
     pub exec: ExeInfo<String, HostEnv, Option<Vec<String>>>,
-    pub dialect: Dialect
+    pub dialect: Dialect,
 }
 
 impl ServiceTemplate {
-    pub fn new( exec: ExeInfo<String, HostEnv, Option<Vec<String>>>, dialect: Dialect ) -> Self {
-        Self {
-            exec,
-            dialect
-        }
+    pub fn new(exec: ExeInfo<String, HostEnv, Option<Vec<String>>>, dialect: Dialect) -> Self {
+        Self { exec, dialect }
     }
 
     pub fn create(&self) -> Result<Service, StarErr> {
-        let host = self.exec.host.create(&self.exec.stub)?;
+        let host = self.exec.host.create(self.exec.stub.clone())?;
         let handler = self.dialect.handler(host)?;
         Ok(Service::new(handler))
     }
@@ -99,11 +93,11 @@ where
 }
 
 impl FileStoreCliExecutor {
-    async fn assign<'a>(&self, ctx: &'a InCtx<'_, Assign>) -> Result<(), <FileStoreCliExecutor as Executor>::Err> {
-        async fn wait(
-            mut child: OsProcess,
-            line: String,
-        ) -> Result<(), StarErr> {
+    async fn assign<'a>(
+        &self,
+        ctx: &'a InCtx<'_, Assign>,
+    ) -> Result<(), <FileStoreCliExecutor as Executor>::Err> {
+        async fn wait(mut child: OsProcess, line: String) -> Result<(), StarErr> {
             match child.wait().await?.success() {
                 true => Ok(()),
                 false => match child.stderr.as_mut() {
@@ -130,7 +124,10 @@ impl FileStoreCliExecutor {
             StateSrc::None => Box::new(Substance::Empty).to_bin()?,
         };
         let line = format!("write {}", ctx.details.stub.point.to_path().display());
-        let args = line.split_whitespace().map(|a|a.to_string()).collect::<Vec<String>>();
+        let args = line
+            .split_whitespace()
+            .map(|a| a.to_string())
+            .collect::<Vec<String>>();
         let mut child = self.cli.execute(args).await?;
         let mut stdin = child.stdin.take().ok_or(SpaceErr::from(format!(
             "command {} could not write to StdIn",
@@ -150,11 +147,9 @@ impl FileStoreCliExecutor {
             ctx.logger.result(self.assign(&ctx).await)
         } else {
             Err(StarErr::new("Bad Reqeust: expected Assign"))
-
         }
     }
 }
-
 
 pub struct OsProcess {
     child: Child,
@@ -170,7 +165,7 @@ impl Deref for OsProcess {
 
 impl DerefMut for OsProcess {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        & mut self.child
+        &mut self.child
     }
 }
 
@@ -220,11 +215,6 @@ impl Executor for OsExeCli {
 }
 
 
-pub trait CliExecutor:Executor<Args=Vec<String>,Spawn=Result<OsProcess,StarErr>,Err=StarErr> {
-
-}
-
-
 
 #[derive(Clone)]
 pub struct OsExeCli {
@@ -232,22 +222,23 @@ pub struct OsExeCli {
 }
 
 impl OsExeCli {
-    pub fn new<I>(info: I) -> Self where I:Into<OsExeStub>
+    pub fn new<I>(info: I) -> Self
+    where
+        I: Into<OsExeStub>,
     {
         let info = info.into();
         Self { stub: info }
     }
 }
 
-impl CliExecutor for OsExeCli{}
 
 #[derive(DirectedHandler)]
 pub struct FileStoreCliExecutor {
-    pub cli: Box<dyn CliExecutor>,
+    pub cli: Box<dyn Executor<Args = Vec<String>, Spawn = Result<OsProcess, StarErr>, Err = StarErr>+Send+Sync>
 }
 
 impl FileStoreCliExecutor {
-    pub fn new( cli: Box<dyn CliExecutor>) -> Self {
+    pub fn new(cli: Box<dyn Executor<Args = Vec<String>, Spawn = Result<OsProcess, StarErr>, Err = StarErr>+Send+Sync >) -> Self {
         Self { cli }
     }
 }
@@ -263,90 +254,85 @@ impl Executor for FileStoreCliExecutor {
     }
 }
 
-
 #[cfg(test)]
 pub mod tests {
+    use crate::host::{HostEnv, HostEnvBuilder, OsEnv};
+    use crate::hyper::space::service::{ExeStub, HostKind, ServiceTemplate};
+    use crate::hyper::space::service::{
+        Dialect, ExeInfo, HostApi, OsExeInfo, OsExeStub, OsExeStubArgs,
+    };
     use std::env;
     use std::path::{absolute, PathBuf};
-    use crate::host::{HostEnvBuilder, HostEnv};
-    use crate::hyper::space::service::{Dialect, ExeInfo, HostApi, OsExeInfo, OsExeStub, OsExeStubArgs};
-    use crate::hyper::space::service::ServiceTemplate;
 
     #[tokio::test]
     pub async fn test() {
         let mut builder = HostEnv::builder();
-        builder.pwd( absolute( env::current_dir().unwrap()).unwrap().to_str().unwrap().to_string() );
+        builder.pwd(
+            absolute(env::current_dir().unwrap())
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string(),
+        );
         builder.env("DATA_DIR", "./");
         let env = builder.build();
-        let path = PathBuf::from("./runme.sh");
+        let path = "./runme.sh".to_string();
         let args: Option<Vec<String>> = Option::None;
-        let stub = OsExeStub::new(path.to_string(), env, args );
-        let exec = ExeInfo::new(HostApi::Cli, stub );
-        let template = ServiceTemplate::new( exec, Dialect::FileStore );
+        let stub: ExeStub<String, OsEnv, Option<Vec<String>>> = ExeStub::new(path, env, None);
+        let exec = ExeInfo::new(HostApi::Cli(HostKind::Os), stub);
+        let template = ServiceTemplate::new(exec, Dialect::FileStore);
         let service = template.create().unwrap();
     }
-
-
 }
 
 #[derive(Clone, Hash, Eq, PartialEq)]
 pub enum HostApi {
-    Cli(HostKind)
+    Cli(HostKind),
 }
 
 #[derive(Clone, Hash, Eq, PartialEq)]
-pub enum HostKind{
-   Os
+pub enum HostKind {
+    Os,
 }
 
-
 pub enum Host {
-  Cli(CliHost)
+    Cli(CliHost),
 }
 
 impl Host {
-
-
-
-
     pub fn is_cli(&self) -> bool {
         match self {
-            Host::Cli(_) => true
+            Host::Cli(_) => true,
         }
     }
 
-    pub fn executor(&self) -> Option<Box<dyn Executor<Spawn=OsProcess,Err=StarErr, Args=Vec<String>>>>{
+    pub fn executor(
+        &self,
+    ) -> Option<Box<dyn Executor<Spawn = Result<OsProcess,StarErr>, Err = StarErr, Args = Vec<String>>+Send+Sync>> {
         match self {
-            Host::Cli(exec) => {
-                Some(Box::new(exec.clone()))
-            }
+            Host::Cli(CliHost::Os(exec)) => Some(Box::new(exec.clone())),
         }
-
     }
 }
 
 pub enum CliHost {
-    Os(OsExeCli)
+    Os(OsExeCli),
 }
 
 impl CliHost {
     pub fn executor(&self) -> &OsExeCli {
         match self {
-            CliHost::Os(exec) => {
-                exec
-            }
+            CliHost::Os(exec) => exec,
         }
     }
 }
 
-impl Host {
-
-}
-
+impl Host {}
 
 impl HostApi {
-
-    pub async fn create<S>(&self, stub: S) -> Result<Host,StarErr> where S: Into<OsExeStub>
+    pub fn create<S>(&self, stub: S) -> Result<Host, StarErr>
+    where
+        S: Into<OsExeStub>,
     {
         match self {
             HostApi::Cli(HostKind::Os) => {
@@ -356,46 +342,72 @@ impl HostApi {
                 Ok(host)
             }
         }
-
     }
 }
 
+impl Into<OsExeStub> for ExeStub<String, HostEnv, Option<Vec<String>>> {
+    fn into(self) -> OsExeStub {
+        OsExeStub::new( self.loc.into(), self.env.into(), () )
+    }
+}
 #[derive(Clone, Hash, Eq, PartialEq)]
-pub struct ExeStub <L,E,A> where E: Clone+Hash+Eq+PartialEq, L: Clone+Hash+Eq+PartialEq, A: Clone+Hash+Eq+PartialEq{
+pub struct ExeStub<L, E, A>
+where
+    E: Clone + Hash + Eq + PartialEq,
+    L: Clone + Hash + Eq + PartialEq,
+    A: Clone + Hash + Eq + PartialEq,
+{
     pub loc: L,
     pub env: E,
-    args: A,
+    pub args: A,
 }
 
-impl <L,E,A> ExeStub <L,E,A> where E: Clone+Hash+Eq+PartialEq, L: Clone+Hash+Eq+PartialEq, A: Clone+Hash+Eq+PartialEq{
+impl<L, E, A> ExeStub<L, E, A>
+where
+    E: Clone + Hash + Eq + PartialEq,
+    L: Clone + Hash + Eq + PartialEq,
+    A: Clone + Hash + Eq + PartialEq,
+{
     pub fn new(loc: L, env: E, args: A) -> Self {
         Self { loc, env, args }
     }
 }
 
-impl <E> Into<ExeStub<PathBuf, OsEnv,()>> for ExeStub<String,E,()>  where E: Into<HostEnv>+Clone+Hash+Eq+PartialEq {
-
+impl<E> Into<ExeStub<PathBuf, OsEnv, ()>> for ExeStub<String, E, ()>
+where
+    E: Into<HostEnv> + Clone + Hash + Eq + PartialEq,
+{
     fn into(self) -> ExeStub<PathBuf, HostEnv, ()> {
         ExeStub {
             loc: self.loc.into(),
             env: self.env.into(),
-            args: ()
+            args: (),
         }
     }
 }
 
-pub type OsExeInfo = ExeInfo<PathBuf, OsEnv,()>;
-pub type OsExeStub = ExeStub<PathBuf, OsEnv,()>;
-pub type OsExeStubArgs = ExeStub<PathBuf, HostEnv,Vec<String>>;
+pub type OsExeInfo = ExeInfo<PathBuf, OsEnv, ()>;
+pub type OsExeStub = ExeStub<PathBuf, OsEnv, ()>;
+pub type OsExeStubArgs = ExeStub<PathBuf, HostEnv, Vec<String>>;
 
 #[derive(Clone, Hash, Eq, PartialEq)]
-pub struct ExeInfo<L,E,A> where E: Clone+Hash+Eq+PartialEq, L: Clone+Hash+Eq+PartialEq, A: Clone+Hash+Eq+PartialEq{
+pub struct ExeInfo<L, E, A>
+where
+    E: Clone + Hash + Eq + PartialEq,
+    L: Clone + Hash + Eq + PartialEq,
+    A: Clone + Hash + Eq + PartialEq,
+{
     pub host: HostApi,
-    pub stub: ExeStub<L,E,A>,
+    pub stub: ExeStub<L, E, A>,
 }
 
-impl <L,E,A> ExeInfo<L,E,A> where E: Clone+Hash+Eq+PartialEq, L: Clone+Hash+Eq+PartialEq, A: Clone+Hash+Eq+PartialEq{
-    pub fn new(host: HostApi, stub: ExeStub<L,E,A>) -> Self {
+impl<L, E, A> ExeInfo<L, E, A>
+where
+    E: Clone + Hash + Eq + PartialEq,
+    L: Clone + Hash + Eq + PartialEq,
+    A: Clone + Hash + Eq + PartialEq,
+{
+    pub fn new(host: HostApi, stub: ExeStub<L, E, A>) -> Self {
         Self { host, stub }
     }
 }

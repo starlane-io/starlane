@@ -1,7 +1,7 @@
 //pub mod artifact;
 pub mod artifact;
 pub mod base;
-mod cli;
+//pub mod cli;
 pub mod control;
 pub mod root;
 pub mod space;

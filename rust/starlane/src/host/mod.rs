@@ -15,7 +15,7 @@ use crate::hyper::space::service::Executor;
 pub mod err;
 pub mod ext;
 
-pub mod wasm;
+//pub mod wasm;
 
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub struct ExtKey<B>

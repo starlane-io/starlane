@@ -30,7 +30,6 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use crate::driver::artifact::RepoDriverFactory;
-use crate::store::LocalFileStore;
 
 #[derive(Clone)]
 pub struct Starlane {

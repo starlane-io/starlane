@@ -402,7 +402,7 @@ fn test_publish() -> Result<(), StarErr> {
         let mut command = RawCommand::new("publish ^[ bundle.zip ]-> localhost:repo:my:1.0.0");
 
         let file_path = "test/bundle.zip";
-        let bin = Arc::new(fs::read(file_path)?);
+        let bin = fs::read(file_path)?;
         command.transfers.push(CmdTransfer::new("bundle.zip", bin));
 
         let core = cli.raw(command).await?;

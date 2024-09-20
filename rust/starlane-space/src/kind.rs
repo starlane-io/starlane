@@ -137,6 +137,7 @@ pub enum BaseKind {
     Host,
     Guest,
     Native,
+    //Cli,
 }
 
 impl BaseKind {
