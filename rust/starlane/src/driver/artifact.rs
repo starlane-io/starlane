@@ -1,13 +1,27 @@
-use acid_store::repo::key::KeyRepo;
+use crate::driver::{Driver, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, HyperSkel, Item, ItemHandler, ItemSkel, ItemSphere};
+use crate::hyper::space::err::HyperErr;
+use crate::hyper::space::platform::Platform;
+use crate::hyper::space::star::HyperStarSkel;
 use acid_store::repo::Commit;
-use acid_store::repo::{OpenMode, OpenOptions};
-use acid_store::store::MemoryConfig;
+use acid_store::repo::OpenOptions;
+use once_cell::sync::Lazy;
+use starlane_space::artifact::ArtRef;
+use starlane_space::command::common::{SetProperties, StateSrc};
 use starlane_space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
+use starlane_space::config::bind::BindConfig;
+use starlane_space::err::SpaceErr;
+use starlane_space::hyper::HyperSubstance;
+use starlane_space::kind::{ArtifactSubKind, BaseKind, Kind};
 use starlane_space::loc::ToBaseKind;
+use starlane_space::parse::bind_config;
 use starlane_space::particle::PointKind;
-use starlane_space::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
+use starlane_space::point::Point;
+use starlane_space::selector::KindSelector;
+use starlane_space::substance::Substance;
+use starlane_space::util::log;
+use starlane_space::wave::exchange::asynch::InCtx;
 use starlane_space::wave::{DirectedProto, Pong, Wave};
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -17,24 +31,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use once_cell::sync::Lazy;
 use tempdir::TempDir;
-use starlane_space::artifact::ArtRef;
-use starlane_space::command::common::{SetProperties, StateSrc};
-use starlane_space::config::bind::BindConfig;
-use starlane_space::err::SpaceErr;
-use starlane_space::hyper::HyperSubstance;
-use starlane_space::kind::{ArtifactSubKind, BaseKind, Kind};
-use starlane_space::parse::bind_config;
-use starlane_space::point::Point;
-use starlane_space::selector::KindSelector;
-use starlane_space::substance::Substance;
-use starlane_space::util::log;
-use starlane_space::wave::exchange::asynch::InCtx;
-use crate::hyper::space::platform::Platform;
-use crate::driver::{Driver, DriverCtx, DriverHandler,  DriverSkel, HyperDriverFactory, HyperSkel, Item, ItemHandler, ItemSkel, ItemSphere};
-use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::star::HyperStarSkel;
 
 static REPO_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new( ||{ ArtRef::new(
         Arc::new(repo_bind()),

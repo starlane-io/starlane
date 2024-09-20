@@ -19,6 +19,20 @@ use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 use tokio::time::error::Elapsed;
 use tracing::{error, info};
 
+use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
+use crate::driver::{DriverStatus, DriversApi, DriversBuilder, DriversCall};
+use crate::hyper::lane::{
+    Bridge, HyperClient, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
+    HyperwayInterchange, HyperwayStub,
+};
+use crate::hyper::space::err::HyperErr;
+use crate::hyper::space::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
+use crate::hyper::space::layer::field::Field;
+use crate::hyper::space::layer::shell::{Shell, ShellState};
+use crate::hyper::space::machine::MachineSkel;
+use crate::hyper::space::platform::Platform;
+use crate::hyper::space::reg::{Registration, Registry};
+use crate::hyper::space::service::ServiceTemplate;
 use starlane_space::artifact::ArtRef;
 use starlane_space::command::common::StateSrc;
 use starlane_space::command::direct::create::{Create, Strategy};
@@ -43,6 +57,7 @@ use starlane_space::particle::traversal::{
 };
 use starlane_space::particle::{Details, Status, Stub};
 use starlane_space::point::{Point, RouteSeg};
+use starlane_space::selector::KindSelector;
 use starlane_space::settings::Timeouts;
 use starlane_space::substance::Bin;
 use starlane_space::substance::{Substance, ToSubstance};
@@ -63,21 +78,6 @@ use starlane_space::wave::{
 };
 use starlane_space::wave::{HyperWave, UltraWave};
 use starlane_space::HYPERUSER;
-
-use crate::hyper::lane::{
-    Bridge, HyperClient, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
-    HyperwayInterchange, HyperwayStub,
-};
-use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
-use crate::driver::{DriverStatus, DriversApi, DriversBuilder, DriversCall};
-use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
-use crate::hyper::space::layer::field::Field;
-use crate::hyper::space::layer::shell::{Shell, ShellState};
-use crate::hyper::space::machine::MachineSkel;
-use crate::hyper::space::reg::{Registration, Registry};
-use crate::hyper::space::platform::Platform;
-use crate::hyper::space::service::ServiceTemplate;
 
 #[derive(Clone)]
 pub struct ParticleStates<P>
@@ -1768,11 +1768,64 @@ pub trait TopicHandlerSerde<T: TopicHandler> {
 }
 
 #[derive(Clone)]
+pub struct Templates<T> where T:Clone {
+    templates: Vec<T>,
+}
+
+impl <T> Templates<T> where T: Clone {
+  pub fn new( templates: Vec<T> ) -> Self {
+      Self {
+          templates
+      }
+  }
+}
+
+impl Templates<ServiceTemplate> {
+    pub fn select(&self, selector: &KindSelector) -> Vec<ServiceTemplate> {
+        let mut rtn = vec![];
+        for template in &self.templates {
+            if selector.matches(&template.kind) {
+                rtn.push(template.clone());
+            }
+        }
+        rtn
+    }
+
+    /// return the first match found
+    pub fn select_one(&self, selector: &KindSelector) -> Option<ServiceTemplate> {
+        self.select(selector).first().cloned()
+    }
+
+}
+
+impl <T> Default for Templates<T> where T:Clone {
+    fn default() -> Self {
+        Self {
+            templates: Vec::default()
+        }
+    }
+}
+
+impl Deref for Templates<ServiceTemplate> {
+    type Target = Vec<ServiceTemplate>;
+
+    fn deref(&self) -> &Self::Target {
+        & self.templates
+    }
+}
+
+impl DerefMut for Templates<ServiceTemplate> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        & mut self.templates
+    }
+}
+
+#[derive(Clone)]
 pub struct StarTemplate {
     pub key: StarKey,
     pub kind: StarSub,
     pub connections: Vec<StarCon>,
-    pub services: Vec<ServiceTemplate>
+    pub services: Vec<ServiceTemplate>,
 }
 
 impl StarTemplate {

@@ -1,51 +1,65 @@
+use std::collections::hash_map::IntoIter;
+use std::collections::HashMap;
 use crate::err::StarErr;
 use crate::host::{ExeService, HostEnv, OsEnv, Proc};
 use crate::hyper::space::err::HyperErr;
 use nom::AsBytes;
-use starlane_space::command::common::{SetProperties, StateSrc};
-use starlane_space::command::direct::create::{
-    Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
-};
+use starlane_space::command::common::StateSrc;
 use starlane_space::err::SpaceErr;
 use starlane_space::hyper::{Assign, HyperSubstance};
-use starlane_space::kind::{ArtifactSubKind, Kind};
-use starlane_space::loc::{Surface, ToBaseKind};
-use starlane_space::parse::Env;
-use starlane_space::particle::PointKind;
-use starlane_space::point::Point;
+use starlane_space::loc::ToBaseKind;
 use starlane_space::substance::Substance;
-use starlane_space::wave::core::hyp::HypMethod;
-use starlane_space::wave::core::{CoreBounce, Method};
+use starlane_space::wave::core::CoreBounce;
 use starlane_space::wave::exchange::asynch::{DirectedHandler, InCtx, RootInCtx};
-use starlane_space::wave::{
-    Bounce, DirectedProto, DirectedWave, Pong, ReflectedWave, UltraWave, Wave,
-};
-use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::hash::Hash;
 use std::io::Read;
+use std::iter::{Filter, Map};
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::str::FromStr;
 use std::sync::Arc;
+use itertools::Itertools;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 use tracing::instrument::WithSubscriber;
+use starlane_space::kind::Kind;
+use starlane_space::point::Point;
+use starlane_space::selector::KindSelector;
+use crate::env::STARLANE_DATA_DIR;
 
-pub struct Service {
-    pub handler: Box<dyn DirectedHandler>,
+pub struct ServicePool {
+   map: HashMap<Kind, Arc<dyn Service<Handler=Box<dyn DirectedHandler>>>>
 }
 
-impl Service {
-    pub fn new(handler: Box<dyn DirectedHandler>) -> Self {
+pub trait Service where Self::Handler: DirectedHandler {
+    type Handler;
+
+    fn handler(&self) -> & Self::Handler;
+}
+
+pub struct ServiceHandler<D> where  D: DirectedHandler  {
+    handler: D
+}
+
+impl <D> ServiceHandler<D> where D: DirectedHandler {
+
+    pub fn new(handler: D) -> Self {
         Self { handler }
     }
+}
 
-    pub fn handler(&self) -> &dyn DirectedHandler {
-        self.handler.as_ref()
+impl <D> Service for ServiceHandler<D> where D: DirectedHandler{
+    type Handler = D;
+
+    fn handler(&self) -> & Self::Handler {
+        & self.handler
     }
 }
+
+
+
+
 
 #[derive(Clone)]
 pub enum Dialect {
@@ -63,23 +77,51 @@ impl Dialect {
     }
 }
 
+
 #[derive(Clone)]
 pub struct ServiceTemplate {
+    pub kind: Kind,
     pub exec: ExeInfo<String, HostEnv, Option<Vec<String>>>,
     pub dialect: Dialect,
 }
 
 impl ServiceTemplate {
-    pub fn new(exec: ExeInfo<String, HostEnv, Option<Vec<String>>>, dialect: Dialect) -> Self {
-        Self { exec, dialect }
+    pub fn new(kind: Kind, exec: ExeInfo<String, HostEnv, Option<Vec<String>>>, dialect: Dialect) -> Self {
+        Self { kind, exec, dialect }
     }
 
-    pub fn create(&self) -> Result<Service, StarErr> {
-        let host = self.exec.host.create(self.exec.stub.clone())?;
+    pub fn create(&self, ctx: ServiceCtx, mount: &Point) -> Result<Arc<dyn Service<Handler=Box<dyn DirectedHandler>>>, StarErr> {
+        let mut exec = self.exec.clone();
+        exec.stub.env.pwd = ctx.data_dir.join(mount.to_path()).to_str().unwrap().to_string();
+        let host = self.exec.host.create(exec.stub.clone())?;
         let handler = self.dialect.handler(host)?;
-        Ok(Service::new(handler))
+        Ok(Arc::new(ServiceHandler::new(handler)))
     }
 }
+
+#[derive(Clone)]
+pub struct ServiceCtx {
+    pub data_dir: PathBuf,
+}
+
+impl ServiceCtx {
+    pub fn new(data_dir: PathBuf) -> Self {
+        Self {
+            data_dir
+        }
+    }
+}
+
+impl Default for ServiceCtx {
+    fn default() -> Self {
+        let data_dir = STARLANE_DATA_DIR.clone().into();
+        Self { data_dir }
+    }
+}
+
+
+
+
 
 #[async_trait]
 pub trait Executor
@@ -256,13 +298,14 @@ impl Executor for FileStoreCliExecutor {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::host::{HostEnv, HostEnvBuilder, OsEnv};
+    use crate::host::{HostEnv, OsEnv};
+    use crate::hyper::space::service::{Dialect, ExeInfo, HostApi, ServiceCtx};
     use crate::hyper::space::service::{ExeStub, HostKind, ServiceTemplate};
-    use crate::hyper::space::service::{
-        Dialect, ExeInfo, HostApi, OsExeInfo, OsExeStub, OsExeStubArgs,
-    };
     use std::env;
-    use std::path::{absolute, PathBuf};
+    use std::path::absolute;
+    use std::str::FromStr;
+    use starlane_space::kind::Kind;
+    use starlane_space::point::Point;
 
     #[tokio::test]
     pub async fn test() {
@@ -280,8 +323,10 @@ pub mod tests {
         let args: Option<Vec<String>> = Option::None;
         let stub: ExeStub<String, OsEnv, Option<Vec<String>>> = ExeStub::new(path, env, None);
         let exec = ExeInfo::new(HostApi::Cli(HostKind::Os), stub);
-        let template = ServiceTemplate::new(exec, Dialect::FileStore);
-        let service = template.create().unwrap();
+        let ctx = ServiceCtx::new( "test".into() );
+        let template = ServiceTemplate::new(Kind::FileStore,exec, Dialect::FileStore);
+        let mount = Point::from_str("blah:sub").unwrap();
+        let service = template.create(ctx, &mount).unwrap();
     }
 }
 

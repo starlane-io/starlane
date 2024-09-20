@@ -1,7 +1,7 @@
 [package]
 name = "starlane"
 
-description = "Starlane -- A Mesh for extending any enterprise resource with WebAssembly!  Starlane is the Reference implementation of the Cosmic Initiative: http://thecosmicinitiative.io (A WebAssembly Orchestration Framework)"
+description = "Starlane -- An Orchestration and Infrastructure Framework for WebAssembly Components (https://starlane.io)"
 
 
 version.workspace = true
@@ -100,7 +100,7 @@ anyhow = { workspace = true, optional = true }
 virtual-fs ={ workspace = true, optional = true }
 
 quinn ={ workspace = true, optional = true }
-webpki-roots = "0.26.5"
+webpki-roots = { workspace = true}
 [lib]
 name = "starlane"
 path= "src/lib.rs"

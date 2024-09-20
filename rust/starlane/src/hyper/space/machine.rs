@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::process;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -29,12 +28,11 @@ use crate::hyper::lane::{
     SimpleGreeter,
 };
 use crate::hyper::space::err::HyperErr;
+use crate::hyper::space::platform::Platform;
 use crate::hyper::space::reg::Registry;
 use crate::hyper::space::star::{
     HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate,
 };
-use crate::hyper::space::platform::Platform;
-use crate::hyper::space::service::ServiceTemplate;
 
 #[derive(Clone)]
 pub struct MachineApi<P>
