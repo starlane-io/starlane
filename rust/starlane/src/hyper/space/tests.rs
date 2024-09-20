@@ -10,7 +10,6 @@ use serde::Serialize;
 
 use crate::hyper::lane::HyperClient;
 use crate::driver::control::ControlClient;
-use crate::hyper::space::err::CosmicErr;
 use crate::hyper::space::machine::MachineApiExtFactory;
 use crate::hyper::space::mem::cosmos::MemCosmos;
 use crate::hyper::space::mem::registry::MemRegCtx;
@@ -38,6 +37,7 @@ use starlane_space::wave::core::{Method, ReflectedCore};
 use starlane_space::wave::exchange::asynch::Exchanger;
 use starlane_space::wave::{Agent, DirectedProto, Pong, Wave};
 use starlane_space::HYPERUSER;
+use crate::err::StarErr;
 
 lazy_static! {
     pub static ref LESS: Point = Point::from_str("space:users:less").expect("point");
@@ -46,12 +46,12 @@ lazy_static! {
 
 #[async_trait]
 pub trait Test: Sync + Send + Copy {
-    async fn run(&self, client: ControlClient) -> Result<(), CosmicErr> {
+    async fn run(&self, client: ControlClient) -> Result<(), StarErr> {
         Ok(())
     }
 }
 
-pub fn harness<F>(mut f: F) -> Result<(), CosmicErr>
+pub fn harness<F>(mut f: F) -> Result<(), StarErr>
 where
     F: Test,
 {
@@ -88,7 +88,7 @@ async fn create(
     particle: Point,
     location: ParticleLocation,
     star_api: HyperStarApi<MemCosmos>,
-) -> Result<(), CosmicErr> {
+) -> Result<(), StarErr> {
     let details = Details::new(
         Stub {
             point: particle.clone(),
@@ -119,7 +119,7 @@ async fn create(
 }
 
 #[test]
-fn test_control() -> Result<(), CosmicErr> {
+fn test_control() -> Result<(), StarErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -185,7 +185,7 @@ fn test_control() -> Result<(), CosmicErr> {
 }
 
 #[test]
-fn test_star_wrangle() -> Result<(), CosmicErr> {
+fn test_star_wrangle() -> Result<(), StarErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -218,7 +218,7 @@ fn test_star_wrangle() -> Result<(), CosmicErr> {
 }
 
 #[test]
-fn test_golden_path() -> Result<(), CosmicErr> {
+fn test_golden_path() -> Result<(), StarErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -250,7 +250,7 @@ fn test_golden_path() -> Result<(), CosmicErr> {
 }
 
 #[test]
-fn test_provision_and_assign() -> Result<(), CosmicErr> {
+fn test_provision_and_assign() -> Result<(), StarErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -317,7 +317,7 @@ fn test_provision_and_assign() -> Result<(), CosmicErr> {
 }
 
 #[test]
-fn test_control_cli() -> Result<(), CosmicErr> {
+fn test_control_cli() -> Result<(), StarErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -357,7 +357,7 @@ fn test_control_cli() -> Result<(), CosmicErr> {
 }
 
 #[test]
-fn test_publish() -> Result<(), CosmicErr> {
+fn test_publish() -> Result<(), StarErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -420,7 +420,7 @@ fn test_publish() -> Result<(), CosmicErr> {
 }
 
 //#[test]
-fn test_mechtron() -> Result<(), CosmicErr> {
+fn test_mechtron() -> Result<(), StarErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -463,7 +463,7 @@ fn test_mechtron() -> Result<(), CosmicErr> {
         let mut command = RawCommand::new("publish ^[ bundle.zip ]-> repo:hello-goodbye:1.0.0");
 
         let file_path = "../../mech-old/mocks/hello-goodbye/bundle.zip";
-        let bin = Arc::new(fs::read(file_path)?);
+        let bin = fs::read(file_path)?;
         command.transfers.push(CmdTransfer::new("bundle.zip", bin));
 
         let core = cli.raw(command).await?;
@@ -521,12 +521,12 @@ where
 }
 
 #[test]
-fn test_create_err() -> Result<(), CosmicErr> {
+fn test_create_err() -> Result<(), StarErr> {
     #[derive(Copy, Clone)]
     pub struct CreateErrTest;
     #[async_trait]
     impl Test for CreateErrTest {
-        async fn run(&self, client: ControlClient) -> Result<(), CosmicErr> {
+        async fn run(&self, client: ControlClient) -> Result<(), StarErr> {
             let cli = client.new_cli_session().await?;
             if let Err(err) = cli.exec("create repo<BadKind>").await?.ok_or() {
                 verify("create_err", &err).await;

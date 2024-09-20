@@ -1578,11 +1578,10 @@ pub mod test {
     use std::sync::Arc;
 
     use crate::hyper::lane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
-    use crate::hyper::space::driver::DriversBuilder;
+    use crate::driver::DriversBuilder;
     use crate::hyper::space::machine::MachineTemplate;
     use crate::hyper::space::reg::{Registration, Registry};
     use crate::hyper::space::platform::Platform;
-    use crate::registry::postgres::err::TestErr;
     use crate::registry::postgres::{
         PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
         PostgresRegistryContextHandle,
@@ -1600,6 +1599,8 @@ pub mod test {
     use starlane_space::security::{AccessGrant, AccessGrantKind, PermissionsMask, Privilege};
     use starlane_space::selector::{PointHierarchy, Selector};
     use starlane_space::HYPERUSER;
+    use crate::err::StarErr;
+    use crate::hyper::space::err::HyperErr;
 
     #[derive(Clone)]
     pub struct TestPlatform {
@@ -1607,7 +1608,7 @@ pub mod test {
     }
 
     impl TestPlatform {
-        pub async fn new() -> Result<Self, TestErr> {
+        pub async fn new() -> Result<Self, StarErr> {
             let db = <Self as PostgresPlatform>::lookup_registry_db()?;
             let mut set = HashSet::new();
             set.insert(db.clone());
@@ -1634,7 +1635,7 @@ pub mod test {
 
     #[async_trait]
     impl Platform for TestPlatform {
-        type Err = TestErr;
+        type Err = StarErr;
         type RegistryContext = PostgresRegistryContextHandle<Self>;
         type StarAuth = AnonHyperAuthenticator;
         type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
@@ -1683,7 +1684,7 @@ pub mod test {
         }
     }
 
-    pub async fn registry() -> Result<Registry<TestPlatform>, TestErr> {
+    pub async fn registry() -> Result<Registry<TestPlatform>, StarErr> {
         TestPlatform::new().await?.global_registry().await
     }
 
@@ -1691,14 +1692,14 @@ pub mod test {
     pub fn test_compile_postgres() {}
 
     #[tokio::test]
-    pub async fn test_nuke() -> Result<(), TestErr> {
+    pub async fn test_nuke() -> Result<(), StarErr> {
         let registry = registry().await?;
         registry.nuke().await?;
         Ok(())
     }
 
     #[tokio::test]
-    pub async fn test_create() -> Result<(), TestErr> {
+    pub async fn test_create() -> Result<(), StarErr> {
         let registry = registry().await?;
         registry.nuke().await?;
 
@@ -1758,7 +1759,7 @@ pub mod test {
     }
 
     #[tokio::test]
-    pub async fn test_access() -> Result<(), TestErr> {
+    pub async fn test_access() -> Result<(), StarErr> {
         let registry = registry().await?;
         registry.nuke().await?;
 
@@ -1902,7 +1903,7 @@ pub mod test {
             to_point: superuser
                 .clone()
                 .try_into()
-                .map_err(|e| TestErr::new("infallible"))?,
+                .map_err(|e| StarErr::new("infallible"))?,
             by_particle: hyperuser.clone(),
         };
         println!("granting...");
@@ -1928,7 +1929,7 @@ pub mod test {
         let grant = AccessGrant {
             kind: AccessGrantKind::PermissionsMask(PermissionsMask::from_str("+CSD-RWX")?),
             on_point: Selector::from_str("localhost:users:superuser")?,
-            to_point: scott.clone().try_into().map_err(|e| TestErr::new(e))?,
+            to_point: scott.clone().try_into().map_err(|e| StarErr::new(e))?,
             by_particle: app.clone(),
         };
         registry.grant(&grant).await?;

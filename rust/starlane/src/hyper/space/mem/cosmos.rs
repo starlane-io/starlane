@@ -6,7 +6,6 @@
 
 use crate::hyper::lane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
 
-use crate::hyper::space::err::CosmicErr;
 use crate::hyper::space::machine::MachineTemplate;
 use crate::hyper::space::mem::registry::{MemRegApi, MemRegCtx};
 use crate::hyper::space::reg::Registry;
@@ -20,6 +19,7 @@ use crate::driver::{DriverAvail, DriversBuilder};
 use crate::driver::control::ControlDriverFactory;
 use crate::driver::root::RootDriverFactory;
 use crate::driver::space::SpaceDriverFactory;
+use crate::err::StarErr;
 
 impl MemCosmos {
     pub fn new() -> Self {
@@ -36,7 +36,7 @@ pub struct MemCosmos {
 
 #[async_trait]
 impl Platform for MemCosmos {
-    type Err = CosmicErr;
+    type Err = StarErr;
     type RegistryContext = MemRegCtx;
     type StarAuth = AnonHyperAuthenticator;
     type RemoteStarConnectionFactory = LocalHyperwayGateJumper;

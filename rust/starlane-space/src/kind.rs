@@ -230,7 +230,8 @@ impl TryFrom<CamelCase> for BaseKind {
 /// At minimum a Kind must have a BaseKind, it can also have a SubKind and a Specific.
 /// A Particle's complete Kind definition is used to match it with a Driver in the Hyperverse
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
-pub enum Kind {
+pub enum
+Kind {
     Root,
     Space,
     User,
@@ -254,6 +255,11 @@ pub enum Kind {
     Guest,
     Native(NativeSub),
 }
+
+
+
+
+
 
 impl ToBaseKind for Kind {
     fn to_base(&self) -> BaseKind {

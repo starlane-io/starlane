@@ -3,11 +3,7 @@ use crate::hyper::space::err::ErrKind;
 #[cfg(feature = "postgres")]
 use crate::registry::postgres::err::PostErr;
 
-#[cfg(feature = "postgres")]
-pub trait StarlaneErr: PostErr {}
 
-#[cfg(not(feature = "postgres"))]
-pub trait StarlaneErr {}
 
 #[derive(Debug, Clone)]
 pub struct StarErr {
@@ -15,33 +11,28 @@ pub struct StarErr {
     pub message: String,
 }
 
-impl StarlaneErr for StarErr {}
+
 
 pub mod convert {
-    use crate::err::StarErr as Err;
     use crate::hyper::space::err::{ErrKind, HyperErr};
-    //    use cosmic_registry_postgres::err::PostErr;
-    #[cfg(feature = "postgres")]
-    use crate::registry::postgres::err::PostErr;
     use ascii::FromAsciiError;
     use starlane_space::err::SpaceErr;
     use std::io;
+    use std::io::Error;
     use std::str::Utf8Error;
     use std::string::FromUtf8Error;
+    use bincode::ErrorKind;
+    use strum::ParseError;
     use tokio::sync::oneshot;
+    use tokio::sync::oneshot::error::RecvError;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
+    use zip::result::ZipError;
+    use crate::err::StarErr;
 
-    impl Err {
-        pub fn new<S: ToString>(message: S) -> Self {
-            Self {
-                message: message.to_string(),
-                kind: ErrKind::Default,
-            }
-        }
-    }
 
-    impl From<strum::ParseError> for Err {
+
+    impl From<strum::ParseError> for StarErr {
         fn from(e: strum::ParseError) -> Self {
             Self {
                 kind: ErrKind::Default,
@@ -50,7 +41,7 @@ pub mod convert {
         }
     }
 
-    impl From<url::ParseError> for Err {
+    impl From<url::ParseError> for StarErr {
         fn from(e: url::ParseError) -> Self {
             Self {
                 kind: ErrKind::Default,
@@ -58,7 +49,7 @@ pub mod convert {
             }
         }
     }
-    impl From<FromAsciiError<std::string::String>> for Err {
+    impl From<FromAsciiError<std::string::String>> for StarErr {
         fn from(e: FromAsciiError<String>) -> Self {
             Self {
                 kind: ErrKind::Default,
@@ -67,163 +58,112 @@ pub mod convert {
         }
     }
 
-    impl ToString for Err {
+    impl ToString for StarErr {
         fn to_string(&self) -> String {
             self.message.clone()
         }
     }
 
-    #[cfg(feature = "postgres")]
-    impl PostErr for Err {
-        fn dupe() -> Self {
-            Self {
-                kind: ErrKind::Dupe,
-                message: "Dupe".to_string(),
-            }
-        }
-    }
 
-    impl HyperErr for Err {
-        fn to_space_err(&self) -> SpaceErr {
-            SpaceErr::server_error(self.to_string())
-        }
-
-        fn new<S>(message: S) -> Self
-        where
-            S: ToString,
-        {
-            Err::new(message)
-        }
-
-        fn status_msg<S>(status: u16, message: S) -> Self
-        where
-            S: ToString,
-        {
-            Err::new(message)
-        }
-
-        fn status(&self) -> u16 {
-            if let ErrKind::Status(code) = self.kind {
-                code
-            } else {
-                500u16
-            }
-        }
-
-        fn kind(&self) -> ErrKind {
-            self.kind.clone()
-        }
-
-        fn with_kind<S>(kind: ErrKind, msg: S) -> Self
-        where
-            S: ToString,
-        {
-            Err {
-                kind,
-                message: msg.to_string(),
-            }
-        }
-    }
-
-    impl From<()> for Err {
+    impl From<()> for StarErr {
         fn from(_: ()) -> Self {
-            Err::new("empty")
+            StarErr::new("empty")
         }
     }
 
-    impl From<sqlx::Error> for Err {
+    impl From<sqlx::Error> for StarErr {
         fn from(e: sqlx::Error) -> Self {
-            Err::new(e)
+            StarErr::new(e)
         }
     }
 
-    impl Into<SpaceErr> for Err {
+    impl Into<SpaceErr> for StarErr {
         fn into(self) -> SpaceErr {
             SpaceErr::server_error(self.to_string())
         }
     }
 
-    impl From<oneshot::error::RecvError> for Err {
+    impl From<oneshot::error::RecvError> for StarErr {
         fn from(err: oneshot::error::RecvError) -> Self {
-            Err::new(err)
+            StarErr::new(err)
         }
     }
 
-    impl From<Elapsed> for Err {
+    impl From<Elapsed> for StarErr {
         fn from(err: Elapsed) -> Self {
-            Err::new(err)
+            StarErr::new(err)
         }
     }
 
-    impl From<String> for Err {
+    impl From<String> for StarErr {
         fn from(err: String) -> Self {
-            Err::new(err)
+            StarErr::new(err)
         }
     }
 
-    impl From<&'static str> for Err {
+    impl From<&'static str> for StarErr {
         fn from(err: &'static str) -> Self {
-            Err::new(err)
+            StarErr::new(err)
         }
     }
 
-    impl From<SpaceErr> for Err {
+    impl From<SpaceErr> for StarErr {
         fn from(err: SpaceErr) -> Self {
-            Err::new(err)
+            StarErr::new(err)
         }
     }
 
-    impl From<io::Error> for Err {
+    impl From<io::Error> for StarErr {
         fn from(err: io::Error) -> Self {
-            Err::new(err)
+            StarErr::new(err)
         }
     }
 
-    impl From<zip::result::ZipError> for Err {
+    impl From<zip::result::ZipError> for StarErr {
         fn from(a: zip::result::ZipError) -> Self {
-            Err::new(a)
+            StarErr::new(a)
         }
     }
 
-    impl From<Box<bincode::ErrorKind>> for Err {
+    impl From<Box<bincode::ErrorKind>> for StarErr {
         fn from(e: Box<bincode::ErrorKind>) -> Self {
-            Err::new(e)
+            StarErr::new(e)
         }
     }
 
-    impl From<ExportError> for Err {
+    impl From<ExportError> for StarErr {
         fn from(e: ExportError) -> Self {
-            Err::new(e)
+            StarErr::new(e)
         }
     }
 
-    impl From<Utf8Error> for Err {
+    impl From<Utf8Error> for StarErr {
         fn from(e: Utf8Error) -> Self {
-            Err::new(e)
+            StarErr::new(e)
         }
     }
 
-    impl From<FromUtf8Error> for Err {
+    impl From<FromUtf8Error> for StarErr {
         fn from(e: FromUtf8Error) -> Self {
-            Err::new(e)
+            StarErr::new(e)
         }
     }
 
-    impl From<InstantiationError> for Err {
+    impl From<InstantiationError> for StarErr {
         fn from(_: InstantiationError) -> Self {
             todo!()
         }
     }
 
-    impl From<CompileError> for Err {
+    impl From<CompileError> for StarErr {
         fn from(e: CompileError) -> Self {
-            Err::new(e)
+            StarErr::new(e)
         }
     }
 
-    impl From<RuntimeError> for Err {
+    impl From<RuntimeError> for StarErr {
         fn from(e: RuntimeError) -> Self {
-            Err::new(e)
+            StarErr::new(e)
         }
     }
 }

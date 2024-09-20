@@ -34,6 +34,7 @@ use crate::hyper::space::star::{
     HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate,
 };
 use crate::hyper::space::platform::Platform;
+use crate::hyper::space::service::ServiceTemplate;
 
 #[derive(Clone)]
 pub struct MachineApi<P>
@@ -529,7 +530,6 @@ pub enum MachineStatus {
 
 pub struct MachineTemplate {
     pub stars: Vec<StarTemplate>,
-    pub service: HashMap<Service>
 }
 
 impl MachineTemplate {

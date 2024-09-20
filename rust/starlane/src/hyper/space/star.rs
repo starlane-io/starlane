@@ -77,6 +77,7 @@ use crate::hyper::space::layer::shell::{Shell, ShellState};
 use crate::hyper::space::machine::MachineSkel;
 use crate::hyper::space::reg::{Registration, Registry};
 use crate::hyper::space::platform::Platform;
+use crate::hyper::space::service::ServiceTemplate;
 
 #[derive(Clone)]
 pub struct ParticleStates<P>
@@ -1771,6 +1772,7 @@ pub struct StarTemplate {
     pub key: StarKey,
     pub kind: StarSub,
     pub connections: Vec<StarCon>,
+    pub services: Vec<ServiceTemplate>
 }
 
 impl StarTemplate {
@@ -1779,6 +1781,7 @@ impl StarTemplate {
             key,
             kind,
             connections: vec![],
+            services: vec![],
         }
     }
 

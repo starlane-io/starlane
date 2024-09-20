@@ -3,7 +3,7 @@ mod source;
 
 use crate::host::err::HostErr;
 use crate::host::wasm::cache::WasmModuleCache;
-use crate::host::{FileSystemFactory, ExtProcess};
+use crate::host::FileSystemFactory;
 use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
@@ -13,6 +13,7 @@ use wasmer::{Module, Store};
 use wasmer_compiler_singlepass::Singlepass;
 use wasmer_wasix::runtime::task_manager::tokio::TokioTaskManager;
 use wasmer_wasix::{PluggableRuntime, WasiEnv};
+use crate::hyper::space::service::OsProcess;
 
 pub struct WasmService {
     store: Store,
@@ -65,7 +66,7 @@ impl WasmHost {
             runtime,
         }
     }
-    pub async fn execute<I, Arg>(&mut self, args: I) -> Result<ExtProcess, HostErr>
+    pub async fn execute<I, Arg>(&mut self, args: I) -> Result<OsProcess, HostErr>
     where
         I: IntoIterator<Item = Arg>,
         Arg: AsRef<[u8]>,
@@ -77,7 +78,7 @@ impl WasmHost {
         &mut self,
         args: I,
         stdin: &[u8],
-    ) -> Result<ExtProcess, HostErr>
+    ) -> Result<OsProcess, HostErr>
     where
         I: IntoIterator<Item = Arg>,
         Arg: AsRef<[u8]>,
@@ -121,17 +122,21 @@ impl WasmHost {
         //builder.run(self.module.clone())?;
         builder.run_with_store(self.module.clone(), &mut self.store)?;
 
-        Ok(ExtProcess {
+        /*
+        Ok(OsProcess {
             stdout: stdout_rx,
             stderr: stderr_rx,
         })
+
+         */
+        todo!()
     }
 
     pub async fn execute_with_stdin<I, Arg>(
         &mut self,
         args: I,
         stdin: Pipe,
-    ) -> Result<ExtProcess, HostErr>
+    ) -> Result<OsProcess, HostErr>
     where
         I: IntoIterator<Item = Arg>,
         Arg: AsRef<[u8]>,
@@ -170,10 +175,13 @@ impl WasmHost {
         //builder.run(self.module.clone())?;
         builder.run_with_store(self.module.clone(), &mut self.store)?;
 
-        Ok(ExtProcess {
+        /*
+        Ok(OsProcess {
             stdout: stdout_rx,
             stderr: stderr_rx,
         })
+         */
+        todo!()
     }
 }
 

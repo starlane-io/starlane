@@ -16,7 +16,6 @@ use crate::hyper::lane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpoint
 use crate::hyper::space::err::HyperErr;
 use crate::hyper::space::machine::{Machine, MachineApi, MachineTemplate};
 use crate::hyper::space::reg::Registry;
-use crate::store::{FileStore, LocalFileStore, LocalStoreFactory, StoreFactory};
 
 #[async_trait]
 pub trait Platform: Send + Sync + Sized + Clone
@@ -26,7 +25,6 @@ where
     Self::RegistryContext: Send + Sync,
     Self::StarAuth: HyperAuthenticator,
     Self::RemoteStarConnectionFactory: HyperwayEndpointFactory,
-    Self::StoreFactory: StoreFactory<>,
     Self::Err: HyperErr,
 {
     type Err;
@@ -34,7 +32,6 @@ where
     type StarAuth;
     type RemoteStarConnectionFactory;
 
-    type StoreFactory;
 
     fn machine(&self) -> MachineApi<Self> {
         Machine::new(self.clone())
@@ -73,8 +70,6 @@ where
     fn logger(&self) -> RootLogger {
         Default::default()
     }
-
-    fn filestore_factory(&self) ->  Self::StoreFactory;
 
     fn web_port(&self) -> Result<u16, Self::Err> {
         Ok(8080u16)
@@ -183,39 +178,6 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             timeouts: Default::default(),
-        }
-    }
-}
-
-pub trait StoreFactory<F, K>
-where
-    F: FileStore<Self::Err, K>,
-    Self::Err: HyperErr
-{
-    type Err;
-    fn create(kind: &Kind ) -> Result<F, Self::Err>;
-}
-
-impl <P> StoreFactory<P, LocalFileStore<P>> for LocalStoreFactory<P> where P: Platform {
-    fn create(kind: &Kind, point: &Point) -> Result<LocalFileStore<P>, P::Err> {
-        match kind {
-            Kind::Repo => {
-                let mut path: PathBuf = STARLANE_DATA_DIR.clone().try_into()?;
-                path.push("driver".into() );
-                path.push("repo".into() );
-                path = absolute(path)?;
-                Ok(LocalFileStore::new(path))
-            },
-            Kind::FileStore => {
-                let mut path: PathBuf = STARLANE_DATA_DIR.clone().try_into()?;
-                path.push("driver".into() );
-                path.push("filestore".into() );
-                Ok(LocalFileStore::new(path))
-            },
-            _ => {
-                Result::Err(P::Err::new(format!("local filestore not configured for kind '{}'", kind.to_string())))
-            }
-
         }
     }
 }

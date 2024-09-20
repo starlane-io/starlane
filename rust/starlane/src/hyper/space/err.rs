@@ -12,7 +12,6 @@ pub enum ErrKind {
     Status(u16),
 }
 
-pub type CosmicErr = convert::Err;
 
 /*
 #[derive(Debug, Clone)]
@@ -134,198 +133,193 @@ impl HyperErr for CosmicErr {
 
  */
 
-pub mod convert {
-    use crate::hyper::space::err::{ErrKind, HyperErr};
-    use ascii::FromAsciiError;
-    use starlane_space::err::SpaceErr;
-    use std::io;
-    use std::str::Utf8Error;
-    use std::string::FromUtf8Error;
-    use tokio::sync::oneshot;
-    use tokio::time::error::Elapsed;
-    use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
+use std::io;
+use std::str::Utf8Error;
+use std::string::FromUtf8Error;
+use tokio::sync::oneshot;
+use tokio::time::error::Elapsed;
+use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
 
-    #[derive(Debug, Clone)]
-    pub struct Err {
-        pub message: String,
-        pub kind: ErrKind,
-    }
+#[derive(Debug, Clone)]
+pub struct Error {
+    pub message: String,
+    pub kind: ErrKind,
+}
 
-    impl Err {
-        pub fn new<S: ToString>(message: S) -> Self {
-            Self {
-                message: message.to_string(),
-                kind: ErrKind::Default,
-            }
+impl Error {
+    pub fn new<S: ToString>(message: S) -> Self {
+        Self {
+            message: message.to_string(),
+            kind: ErrKind::Default,
         }
     }
+}
 
-    impl ToString for Err {
-        fn to_string(&self) -> String {
-            self.message.clone()
+impl ToString for Error {
+    fn to_string(&self) -> String {
+        self.message.clone()
+    }
+}
+
+impl From<()> for Error {
+    fn from(_: ()) -> Self {
+        Error::new("Empty")
+    }
+}
+
+impl From<strum::ParseError> for Error {
+    fn from(e: strum::ParseError) -> Self {
+        Self {
+            kind: ErrKind::Default,
+            message: e.to_string(),
         }
     }
+}
 
-    impl From<()> for Err {
-        fn from(_: ()) -> Self {
-            Err::new("Empty")
+impl From<url::ParseError> for Error {
+    fn from(e: url::ParseError) -> Self {
+        Self {
+            kind: ErrKind::Default,
+            message: e.to_string(),
         }
     }
-
-    impl From<strum::ParseError> for Err {
-        fn from(e: strum::ParseError) -> Self {
-            Self {
-                kind: ErrKind::Default,
-                message: e.to_string(),
-            }
+}
+impl From<FromAsciiError<std::string::String>> for Error {
+    fn from(e: FromAsciiError<String>) -> Self {
+        Self {
+            kind: ErrKind::Default,
+            message: e.to_string(),
         }
     }
+}
 
-    impl From<url::ParseError> for Err {
-        fn from(e: url::ParseError) -> Self {
-            Self {
-                kind: ErrKind::Default,
-                message: e.to_string(),
-            }
-        }
-    }
-    impl From<FromAsciiError<std::string::String>> for Err {
-        fn from(e: FromAsciiError<String>) -> Self {
-            Self {
-                kind: ErrKind::Default,
-                message: e.to_string(),
-            }
-        }
+impl HyperErr for Error {
+    fn to_space_err(&self) -> SpaceErr {
+        SpaceErr::server_error(self.to_string())
     }
 
-    impl HyperErr for Err {
-        fn to_space_err(&self) -> SpaceErr {
-            SpaceErr::server_error(self.to_string())
-        }
-
-        fn new<S>(message: S) -> Self
-        where
-            S: ToString,
-        {
-            Err::new(message)
-        }
-
-        fn status_msg<S>(status: u16, message: S) -> Self
-        where
-            S: ToString,
-        {
-            Err::new(message)
-        }
-
-        fn status(&self) -> u16 {
-            if let ErrKind::Status(code) = self.kind {
-                code
-            } else {
-                500u16
-            }
-        }
-
-        fn kind(&self) -> ErrKind {
-            self.kind.clone()
-        }
-
-        fn with_kind<S>(kind: ErrKind, msg: S) -> Self
-        where
-            S: ToString,
-        {
-            Err {
-                kind,
-                message: msg.to_string(),
-            }
-        }
+    fn new<S>(message: S) -> Self
+    where
+        S: ToString,
+    {
+        Error::new(message)
     }
-    impl Into<SpaceErr> for Err {
-        fn into(self) -> SpaceErr {
-            SpaceErr::server_error(self.to_string())
+
+    fn status_msg<S>(status: u16, message: S) -> Self
+    where
+        S: ToString,
+    {
+        Error::new(message)
+    }
+
+    fn status(&self) -> u16 {
+        if let ErrKind::Status(code) = self.kind {
+            code
+        } else {
+            500u16
         }
     }
 
-    impl From<oneshot::error::RecvError> for Err {
-        fn from(err: oneshot::error::RecvError) -> Self {
-            Err::new(err)
-        }
+    fn kind(&self) -> ErrKind {
+        self.kind.clone()
     }
 
-    impl From<Elapsed> for Err {
-        fn from(err: Elapsed) -> Self {
-            Err::new(err)
+    fn with_kind<S>(kind: ErrKind, msg: S) -> Self
+    where
+        S: ToString,
+    {
+        Error {
+            kind,
+            message: msg.to_string(),
         }
     }
-
-    impl From<String> for Err {
-        fn from(err: String) -> Self {
-            Err::new(err)
-        }
+}
+impl Into<SpaceErr> for Error {
+    fn into(self) -> SpaceErr {
+        SpaceErr::server_error(self.to_string())
     }
+}
 
-    impl From<&'static str> for Err {
-        fn from(err: &'static str) -> Self {
-            Err::new(err)
-        }
+impl From<oneshot::error::RecvError> for Error {
+    fn from(err: oneshot::error::RecvError) -> Self {
+        Error::new(err)
     }
+}
 
-    impl From<SpaceErr> for Err {
-        fn from(err: SpaceErr) -> Self {
-            Err::new(err)
-        }
+impl From<Elapsed> for Error {
+    fn from(err: Elapsed) -> Self {
+        Error::new(err)
     }
+}
 
-    impl From<io::Error> for Err {
-        fn from(err: io::Error) -> Self {
-            Err::new(err)
-        }
+impl From<String> for Error {
+    fn from(err: String) -> Self {
+        Error::new(err)
     }
+}
 
-    impl From<zip::result::ZipError> for Err {
-        fn from(a: zip::result::ZipError) -> Self {
-            Err::new(a)
-        }
+impl From<&'static str> for Error {
+    fn from(err: &'static str) -> Self {
+        Error::new(err)
     }
+}
 
-    impl From<Box<bincode::ErrorKind>> for Err {
-        fn from(e: Box<bincode::ErrorKind>) -> Self {
-            Err::new(e)
-        }
+impl From<SpaceErr> for Error {
+    fn from(err: SpaceErr) -> Self {
+        Error::new(err)
     }
+}
 
-    impl From<ExportError> for Err {
-        fn from(e: ExportError) -> Self {
-            Err::new(e)
-        }
+impl From<io::Error> for Error {
+    fn from(err: io::Error) -> Self {
+        Error::new(err)
     }
+}
 
-    impl From<Utf8Error> for Err {
-        fn from(e: Utf8Error) -> Self {
-            Err::new(e)
-        }
+impl From<zip::result::ZipError> for Error {
+    fn from(a: zip::result::ZipError) -> Self {
+        Error::new(a)
     }
+}
 
-    impl From<FromUtf8Error> for Err {
-        fn from(e: FromUtf8Error) -> Self {
-            Err::new(e)
-        }
+impl From<Box<bincode::ErrorKind>> for Error {
+    fn from(e: Box<bincode::ErrorKind>) -> Self {
+        Error::new(e)
     }
+}
 
-    impl From<InstantiationError> for Err {
-        fn from(_: InstantiationError) -> Self {
-            todo!()
-        }
+impl From<ExportError> for Error {
+    fn from(e: ExportError) -> Self {
+        Error::new(e)
     }
+}
 
-    impl From<CompileError> for Err {
-        fn from(e: CompileError) -> Self {
-            Err::new(e)
-        }
+impl From<Utf8Error> for Error {
+    fn from(e: Utf8Error) -> Self {
+        Error::new(e)
     }
+}
 
-    impl From<RuntimeError> for Err {
-        fn from(e: RuntimeError) -> Self {
-            Err::new(e)
-        }
+impl From<FromUtf8Error> for Error {
+    fn from(e: FromUtf8Error) -> Self {
+        Error::new(e)
+    }
+}
+
+impl From<InstantiationError> for Error {
+    fn from(_: InstantiationError) -> Self {
+        todo!()
+    }
+}
+
+impl From<CompileError> for Error {
+    fn from(e: CompileError) -> Self {
+        Error::new(e)
+    }
+}
+
+impl From<RuntimeError> for Error {
+    fn from(e: RuntimeError) -> Self {
+        Error::new(e)
     }
 }

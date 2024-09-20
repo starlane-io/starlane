@@ -4,41 +4,35 @@ use itertools::Itertools;
 use starlane_space::substance::Substance;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
-
-
+use crate::err::StarErr;
 
 #[async_trait]
 pub trait FileStore<K>
 where
-    Self::Err: HyperErr,
     K: Clone + Sized,
     Self: Clone + Sized,
 {
-    type Err;
-    async fn get<'a>(&'a self, point: &'a K) -> Result<Substance, Self::Err>;
-    async fn insert<'a>(&'a self, point: &'a K, substance: Substance) -> Result<(), Self::Err>;
+    async fn get<'a>(&'a self, point: &'a K) -> Result<Substance, StarErr>;
+    async fn insert<'a>(&'a self, point: &'a K, substance: Substance) -> Result<(), StarErr>;
 
-    async fn mkdir<'a>(&'a self, point: &'a K) -> Result<(), Self::Err>;
-    async fn remove<'a>(&'a self, point: &'a K) -> Result<(), Self::Err>;
+    async fn mkdir<'a>(&'a self, point: &'a K) -> Result<(), StarErr>;
+    async fn remove<'a>(&'a self, point: &'a K) -> Result<(), StarErr>;
 
-    async fn list<'a>(&'a self, point: &'a K) -> Result<Vec<K>, Self::Err>;
+    async fn list<'a>(&'a self, point: &'a K) -> Result<Vec<K>, StarErr>;
 
-    async fn child<F, S>(&self, seg: S) -> Result<F, Self::Err>
+    async fn child<F, S>(&self, seg: S) -> Result<F, StarErr>
     where
-        F: FileStore<K,FileStore::Err=Self::Err>,
+        F: FileStore<K>,
         S: ToString;
 }
 
 #[derive(Clone)]
-pub struct LocalFileStore<E>
+pub struct LocalFileStore
 {
     pub root: PathBuf,
-    phantom: PhantomData<E>,
 }
 
-impl<P> LocalFileStore<P>
-where
-    P: Platform,
+impl LocalFileStore
 {
     pub fn new<B>(root: B) -> Self
     where
@@ -47,44 +41,40 @@ where
         let root = root.into();
         Self {
             root,
-            phantom: Default::default(),
         }
     }
 }
 
 #[async_trait]
-impl<E> FileStore<PathBuf> for LocalFileStore<E>
-where E: HyperErr,
-    Self::Err: HyperErr,
+impl FileStore<PathBuf> for LocalFileStore
 
 {
-    type Err = E;
-    async fn get<'a>(&'a self, path: &'a PathBuf) -> Result<Substance, Self::Err> {
+    async fn get<'a>(&'a self, path: &'a PathBuf) -> Result<Substance, StarErr> {
         let path = self.root.join(path);
         let data = tokio::fs::read(path).await?;
         Ok(Substance::from_vec(data))
     }
 
-    async fn insert<'a>(&'a self, path: &'a PathBuf, substance: Substance) -> Result<(), Self::Err> {
+    async fn insert<'a>(&'a self, path: &'a PathBuf, substance: Substance) -> Result<(), StarErr> {
         let path = self.root.join(path);
         let data = substance.to_bin()?;
         tokio::fs::write(path, data).await?;
         Ok(())
     }
 
-    async fn mkdir<'a>(&'a self, path: &'a PathBuf) -> Result<(), Self::Err> {
+    async fn mkdir<'a>(&'a self, path: &'a PathBuf) -> Result<(), StarErr> {
         let path = self.root.join(path);
         tokio::fs::create_dir_all(path).await?;
         Ok(())
     }
 
-    async fn remove<'a>(&'a self, path: &'a PathBuf) -> Result<(), Self::Err> {
+    async fn remove<'a>(&'a self, path: &'a PathBuf) -> Result<(), StarErr> {
         let path = self.root.join(path);
         tokio::fs::remove_dir_all(path).await?;
         Ok(())
     }
 
-    async fn list<'a>(&'a self, path: &'a PathBuf) -> Result<Vec<PathBuf>, Self::Err> {
+    async fn list<'a>(&'a self, path: &'a PathBuf) -> Result<Vec<PathBuf>, StarErr> {
         let path = self.root.join(path);
         let mut read = tokio::fs::read_dir(path).await?;
         let mut rtn = vec![];
@@ -94,13 +84,13 @@ where E: HyperErr,
         Ok(rtn)
     }
 
-    async fn child<F, S>(&self, seg: S) -> Result<F, Self::Err>
+    async fn child<F, S>(&self, seg: S) -> Result<F, StarErr>
     where
         F: FileStore<PathBuf>,
         S: ToString,
     {
         if Path::new(&seg).iter().count() != 1 {
-            return Result::Err(Self::Err::new(format!(
+            return Result::Err(StarErr::new(format!(
                 "invalid child path segment: '{}' ... Child path can only be one path segment",
                 seg.to_string()
             )));

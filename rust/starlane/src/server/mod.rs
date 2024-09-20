@@ -76,9 +76,6 @@ impl Platform for Starlane {
     type StarAuth = AnonHyperAuthenticator;
     type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
 
-
-    type StoreFactory = LocalFileStore<>;
-
     fn data_dir(&self) -> String {
         STARLANE_DATA_DIR.clone()
     }
@@ -194,9 +191,7 @@ impl Platform for Starlane {
     }
 
 
-    fn filestore_factory(&self) -> Self::StoreFactory {
-        todo!()
-    }
+
 }
 
 #[cfg(feature = "postgres")]

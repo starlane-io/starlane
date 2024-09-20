@@ -4,12 +4,13 @@ use std::collections::HashMap;
 use std::env;
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
+use std::io::Read;
 use std::path::PathBuf;
-use std::process::Stdio;
-use tokio::io::{Stderr, Stdin, Stdout};
-use tokio::process::{Child, ChildStderr, ChildStdout, ChildStdin, Command};
-use virtual_fs::{FileSystem, Pipe};
+use virtual_fs::FileSystem;
+use starlane_space::wave::exchange::asynch::DirectedHandler;
+use crate::hyper::space::service::ExeInfo;
 use crate::hyper::space::err::HyperErr;
+use crate::hyper::space::service::Executor;
 
 pub mod err;
 pub mod ext;
@@ -22,59 +23,30 @@ where
     B: Hash + Eq + PartialEq,
 {
     bin: B,
-    env: ExeEnv,
+    env: HostEnv,
 }
 
 impl<B> ExtKey<B>
 where
     B: Clone + Hash + Eq + PartialEq,
 {
-    pub fn new(bin: B, env: ExeEnv) -> Self {
+    pub fn new(bin: B, env: HostEnv) -> Self {
         Self { bin, env }
     }
 }
 
 #[async_trait]
-pub trait ExeService where Self::Bin: Into<PathBuf>, Self::Executor: Executor, Self::Err: HyperErr
+pub trait ExeService where Self::ExeInfo: Clone+Hash+Eq+PartialEq, Self::Executor: Executor, Self::Err: HyperErr
 {
-    type Bin;
+    type ExeInfo;
     type Executor;
     type Err;
-    async fn provision(&mut self, bin: Self::Bin, env: ExeEnv) -> Result<Self::Executor, HostErr>;
+    async fn provision(&mut self, exe: Self::ExeInfo) -> Result<Self::Executor, HostErr>;
 }
 
 
-#[async_trait]
-pub trait Executor
-where Self::Err: HyperErr,  Self::Proc: Proc{
-    type Err;
-    type Proc;
-    async fn execute(&self, args: Vec<String>) -> Result<Self::Proc, Self::Err>;
-}
+pub type OsStub = ExeInfo<PathBuf, HostEnv,()>;
 
-pub struct ExtExecutor {
-    pub path: PathBuf,
-    pub env: ExeEnv,
-}
-
-impl Executor for ExtExecutor {
-    type Err = HostErr;
-    type Proc = ExtProcess;
-
-    async fn execute(&self, args: Vec<String>) -> Result<Self::Proc, Self::Err> {
-        let mut command = Command::new(self.path.clone());
-        command.envs(self.env.env.clone());
-        command.args(args);
-        command.current_dir(self.env.pwd.clone());
-        command.env_clear();
-        command.stdin(Stdio::piped()).output().await?;
-        command.stdout(Stdio::piped()).output().await?;
-        command.stderr(Stdio::piped()).output().await?;
-
-        let child = command.spawn()?;
-        Ok(Self::Proc::new(child))
-    }
-}
 
 pub trait Proc where {
     type StdOut;
@@ -86,15 +58,23 @@ pub trait Proc where {
     fn stdin(&mut self) -> Option<&Self::StdIn>;
 }
 
+pub type OsEnv=HostEnv;
+pub type WasmEnv=HostEnv;
 
 
 #[derive(Clone, Eq, PartialEq)]
-pub struct ExeEnv {
-    pwd: String,
-    env: HashMap<String, String>,
+pub struct HostEnv {
+    pub pwd: String,
+    pub env: HashMap<String, String>,
 }
 
-impl Hash for ExeEnv {
+impl HostEnv {
+    pub fn builder() -> HostEnvBuilder {
+       HostEnvBuilder::default()
+    }
+}
+
+impl Hash for HostEnv {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write_str(self.pwd.as_str());
         for key in self.env.keys().sorted() {
@@ -104,7 +84,7 @@ impl Hash for ExeEnv {
     }
 }
 
-impl Default for ExeEnv {
+impl Default for HostEnv {
     fn default() -> Self {
         Self {
             pwd: env::current_dir().unwrap().to_str().unwrap().to_string(),
@@ -114,14 +94,23 @@ impl Default for ExeEnv {
 }
 
 #[derive(Clone)]
-pub struct ExtEnvBuilder {
+pub struct HostEnvBuilder {
     pwd: String,
     env: HashMap<String, String>,
 }
 
-impl ExtEnvBuilder {
-    pub fn build(self) -> ExeEnv {
-        ExeEnv {
+impl Default for HostEnvBuilder {
+    fn default() -> Self {
+        Self {
+            pwd: ".".to_string(),
+            env: Default::default(),
+        }
+    }
+}
+
+impl HostEnvBuilder {
+    pub fn build(self) -> HostEnv {
+        HostEnv {
             pwd: self.pwd,
             env: self.env,
         }
@@ -144,46 +133,7 @@ impl ExtEnvBuilder {
     }
 }
 
-impl Default for ExtEnvBuilder {
-    fn default() -> Self {
-        Self {
-            pwd: env::current_dir().unwrap().to_str().unwrap().to_string(),
-            env: Default::default(),
-        }
-    }
-}
 
-pub struct ExtProcess {
-    child: Child,
-}
-
-impl ExtProcess {
-    pub fn new( child: Child) -> Self {
-        Self {
-            child
-        }
-    }
-}
-
-
-impl Proc for ExtProcess {
-    type StdOut= ChildStdout;
-    type StdIn= ChildStdin;
-    type StdErr = ChildStderr;
-
-    fn stderr(&self) -> Option<&Self::StdErr> {
-        self.child.stderr.as_ref()
-    }
-
-    fn stdout(&self) -> Option<&Self::StdOut> {
-        self.child.stdout.as_ref()
-    }
-
-    fn stdin(&mut self) -> Option<&Self::StdIn> {
-        self.child.stdin.as_ref()
-    }
-
-}
 
 pub trait FileSystemFactory {
     fn create(

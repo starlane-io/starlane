@@ -184,7 +184,7 @@ pub mod particle {
     use nom::CompareResult::Incomplete;
     use nom::Parser;
     use nom_supreme::error::ErrorTree;
-    use nom_supreme::{parse_from_str, ParserExt};
+    use nom_supreme::{ ParserExt};
     use serde::{Deserialize, Serialize};
 
     use starlane_parse::{Res, Span};

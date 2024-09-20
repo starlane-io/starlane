@@ -214,8 +214,8 @@ impl Substance {
         }
     }
 
-    pub fn from_bin(bin: Bin) -> Self {
-        Self::Bin(bin)
+    pub fn from_bin(bin: Bin) -> Result<Self, SpaceErr> {
+        Ok(bincode::deserialize(bin.as_slice())?)
     }
 
 
@@ -257,8 +257,10 @@ impl Substance {
         }
     }
 
-    pub fn to_bin(self) -> Result<Bin, SpaceErr> {
-        match self {
+    pub fn to_bin(&self) -> Result<Bin, SpaceErr> {
+
+        Ok(bincode::serialize(&self)?)
+/*        match self {
             Substance::Empty => Ok(vec![]),
             Substance::List(list) => list.to_bin(),
             Substance::Map(map) => map.to_bin(),
@@ -266,6 +268,8 @@ impl Substance {
             Substance::Text(text) => Ok(text.as_bytes().to_vec()),
             what => Err(format!("{}.to_bin() not supported", what.kind().to_string()).into()),
         }
+
+ */
     }
 }
 
