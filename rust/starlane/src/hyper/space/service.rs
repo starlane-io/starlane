@@ -7,10 +7,10 @@ use nom::AsBytes;
 use starlane_space::command::common::StateSrc;
 use starlane_space::err::SpaceErr;
 use starlane_space::hyper::{Assign, HyperSubstance};
-use starlane_space::loc::ToBaseKind;
+use starlane_space::loc::{StarKey, ToBaseKind};
 use starlane_space::substance::Substance;
 use starlane_space::wave::core::CoreBounce;
-use starlane_space::wave::exchange::asynch::{DirectedHandler, InCtx, RootInCtx};
+use starlane_space::wave::exchange::asynch::{DirectedHandler, InCtx, RootInCtx, TxRouter};
 use std::hash::Hash;
 use std::io::Read;
 use std::iter::{Filter, Map};
@@ -19,17 +19,89 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::str::FromStr;
 use std::sync::Arc;
+use dashmap::DashMap;
 use itertools::Itertools;
+use regex::Regex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
+use tokio::sync::watch;
 use tracing::instrument::WithSubscriber;
 use starlane_space::kind::Kind;
+use starlane_space::particle::{Particle, Status};
 use starlane_space::point::Point;
-use starlane_space::selector::KindSelector;
+use starlane_space::selector::{KindSelector, PointSegSelector, Selector};
+use starlane_space::util::ValuePattern;
+use starlane_space::wave::{Bounce, DirectedWave, ReflectedWave};
 use crate::env::STARLANE_DATA_DIR;
+use crate::hyper::space::star::Templates;
 
-pub struct ServicePool {
-   map: HashMap<Kind, Arc<dyn Service<Handler=Box<dyn DirectedHandler>>>>
+#[derive(Debug,Clone,Hash,Eq,PartialEq)]
+pub struct ServiceKey {
+    pub name: String,
+    pub kind: Kind,
+    pub share: ServiceShare,
+    pub star: Option<Point>,
+    pub driver: Option<Point>,
+    pub particle: Option<Point>
+}
+
+
+
+
+pub struct ServiceSelector {
+    pub name:  Regex,
+    pub kind: KindSelector,
+    pub star: Option<Point>,
+    pub driver: Option<Point>,
+    pub particle: Option<Point>
+}
+
+impl ServiceSelector {
+    pub fn matches(& self, key: & ServiceKey) -> bool {
+        self.name.is_match(key.name.as_str()) &&
+        self.kind.matches(&key.kind) &&
+            (match key.share {
+                ServiceShare::Singleton => true,
+                ServiceShare::Star => {
+                    Self::same(&self.star,&key.star)
+                }
+                ServiceShare::Driver => {
+                    Self::same(&self.star,&key.star) &&
+                    Self::same(&self.driver,&key.driver)
+                }
+                ServiceShare::Particle => {
+                    Self::same(&self.star,&key.star) &&
+                    Self::same(&self.driver,&key.driver) &&
+                    Self::same(&self.particle,&key.particle)
+
+                }
+            })
+
+    }
+
+    pub fn same( a: &Option<Point>, b: &Option<Point>) -> bool {
+        !( a.is_none() || b.is_none() ) && *a == *b
+    }
+}
+
+
+pub struct ServicePool
+{
+    templates: Templates<ServiceTemplate>,
+    services: DashMap<ServiceShare,DashMap<ServiceKey,ServiceStub>>,
+}
+
+impl ServicePool {
+    pub fn select_one( &self, selector: ServiceSelector ) -> Option<ServiceStub> {
+        match  self.templates.select_one(&selector.kind) {
+            None => None,
+            Some(template) => {
+
+
+            }
+        }
+
+    }
 }
 
 pub trait Service where Self::Handler: DirectedHandler {
@@ -78,25 +150,38 @@ impl Dialect {
 }
 
 
+#[derive(Debug,Clone,Hash,Eq,PartialEq)]
+pub enum ServiceShare {
+    Singleton, /// one service for everyone
+    Star,  /// one of this Service per star
+    Driver, /// unique service per driver
+    Particle /// unique service per particle
+}
+
+
 #[derive(Clone)]
 pub struct ServiceTemplate {
+    pub name: String,
     pub kind: Kind,
+    pub share: ServiceShare,
     pub exec: ExeInfo<String, HostEnv, Option<Vec<String>>>,
     pub dialect: Dialect,
 }
 
 impl ServiceTemplate {
-    pub fn new(kind: Kind, exec: ExeInfo<String, HostEnv, Option<Vec<String>>>, dialect: Dialect) -> Self {
-        Self { kind, exec, dialect }
-    }
 
-    pub fn create(&self, ctx: ServiceCtx, mount: &Point) -> Result<Arc<dyn Service<Handler=Box<dyn DirectedHandler>>>, StarErr> {
-        let mut exec = self.exec.clone();
-        exec.stub.env.pwd = ctx.data_dir.join(mount.to_path()).to_str().unwrap().to_string();
-        let host = self.exec.host.create(exec.stub.clone())?;
-        let handler = self.dialect.handler(host)?;
-        Ok(Arc::new(ServiceHandler::new(handler)))
-    }
+    /*
+        pub fn create(&self, ctx: ServiceCtx, mount: &Point) -> Result<Arc<dyn Service<Handler=Box<dyn DirectedHandler>>>, StarErr> {
+            let mut exec = self.exec.clone();
+            exec.stub.env.pwd = ctx.data_dir.join(mount.to_path()).to_str().unwrap().to_string();
+            let host = self.exec.host.create(exec.stub.clone())?;
+            let handler = self.dialect.handler(host)?;
+            Ok(Arc::new(ServiceHandler::new(handler)))
+        }
+
+         */
+
+
 }
 
 #[derive(Clone)]
@@ -299,7 +384,7 @@ impl Executor for FileStoreCliExecutor {
 #[cfg(test)]
 pub mod tests {
     use crate::host::{HostEnv, OsEnv};
-    use crate::hyper::space::service::{Dialect, ExeInfo, HostApi, ServiceCtx};
+    use crate::hyper::space::service::{Dialect, ExeInfo, HostApi, ServiceCtx, ServiceShare};
     use crate::hyper::space::service::{ExeStub, HostKind, ServiceTemplate};
     use std::env;
     use std::path::absolute;
@@ -324,7 +409,13 @@ pub mod tests {
         let stub: ExeStub<String, OsEnv, Option<Vec<String>>> = ExeStub::new(path, env, None);
         let exec = ExeInfo::new(HostApi::Cli(HostKind::Os), stub);
         let ctx = ServiceCtx::new( "test".into() );
-        let template = ServiceTemplate::new(Kind::FileStore,exec, Dialect::FileStore);
+        let template = ServiceTemplate {
+            name: "name".to_string(),
+            kind: Kind::FileStore,
+            share: ServiceShare::Singleton,
+            exec,
+            dialect: Dialect::FileStore,
+        };
         let mount = Point::from_str("blah:sub").unwrap();
         let service = template.create(ctx, &mount).unwrap();
     }
@@ -455,6 +546,51 @@ where
     pub fn new(host: HostApi, stub: ExeStub<L, E, A>) -> Self {
         Self { host, stub }
     }
+}
+
+
+pub struct ServiceCall {
+    pub from: Point,
+    pub tx: tokio::sync::oneshot::Sender<Bounce<ReflectedWave>>
+}
+
+pub enum ServiceCommand {
+    DirectedWave(DirectedWave)
+}
+
+pub struct ServiceRunner {
+    rx: tokio::sync::mpsc::Receiver<ServiceCall>
+}
+
+
+
+#[derive(Clone)]
+pub struct ServiceStub {
+    key: ServiceKey,
+    template: ServiceTemplate,
+    router: TxRouter,
+    status: watch::Receiver<Status>,
+}
+
+impl ServiceRunner {
+    pub fn new( template: ServiceTemplate, core: Box<dyn ServiceCore> )  -> ServiceStub {
+        let (tx,rx) = tokio::sync::mpsc::channel(1024);
+        let (status_tx,status_rx) = tokio::sync::watch::channel(Status::Unknown);
+        let rtn = ServiceStub {
+            name: "".to_string(),
+            router: TxRouter {tx},
+            status: status_rx,
+        };
+
+        let runner = Self{  }
+
+        rtn
+    }
+}
+
+pub trait ServiceCore where Self::Handler: DirectedHandler {
+
+    fn name(&self) -> String;
 }
 
 #[cfg(test)]

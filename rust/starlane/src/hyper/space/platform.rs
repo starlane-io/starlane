@@ -10,6 +10,7 @@ use starlane_space::log::RootLogger;
 use starlane_space::settings::Timeouts;
 use std::str::FromStr;
 use starlane_space::point::Point;
+use starlane_space::selector::KindSelector;
 use crate::driver::DriversBuilder;
 use crate::env::STARLANE_DATA_DIR;
 use crate::hyper::lane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
@@ -45,6 +46,8 @@ where
 
     fn machine_template(&self) -> MachineTemplate;
     fn machine_name(&self) -> MachineName;
+
+    fn select_service(&self, kind: &KindSelector, star: &StarKey, point: &Point ) ->
 
     fn properties_config(&self, kind: &Kind) -> PropertiesConfig {
         let mut builder = PropertiesConfigBuilder::new();

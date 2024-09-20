@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
+use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::{Add, Deref, DerefMut};
 use std::str::FromStr;
@@ -1820,12 +1821,17 @@ impl DerefMut for Templates<ServiceTemplate> {
     }
 }
 
+pub struct HierarchticalTemplates<K,S> where K:Clone+Hash+Eq+PartialEq {
+    parent: Option<HierarchticalTemplates<K,S>>,
+    templates: Templates<K>
+}
+
 #[derive(Clone)]
 pub struct StarTemplate {
     pub key: StarKey,
     pub kind: StarSub,
     pub connections: Vec<StarCon>,
-    pub services: Vec<ServiceTemplate>,
+    pub services: Templates<ServiceTemplate>,
 }
 
 impl StarTemplate {
