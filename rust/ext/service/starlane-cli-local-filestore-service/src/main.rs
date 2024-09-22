@@ -4,27 +4,39 @@ use std::io::{Read, Write};
 use std::path::{absolute, Path, PathBuf};
 use clap::Parser;
 use thiserror::Error;
-use once_cell::unsync::Lazy;
+use once_cell::sync::Lazy;
 use starlane::dialect::cli::filestore::Cli;
 use starlane::dialect::cli::filestore::Commands;
 
 
-pub static DATA_DIR: Lazy<String> = Lazy::new(||{env::var("DATA_DIR").unwrap_or(".".to_string())});
-pub static ROOT_DIR: Lazy<Result<PathBuf,Error>> = Lazy::new(||{absolute(DATA_DIR.into()).into()});
-pub static DIR : Lazy<PathBuf> = Lazy::new(||{ROOT_DIR.unwrap().join("DIR")});
-pub static STATE : Lazy<PathBuf> = Lazy::new(||{ROOT_DIR.unwrap().join("STATE")});
 
-const STATE_FILE : &str = "state.data";
+
+pub fn data_dir() -> String {
+    env::var("DATA_DIR").unwrap_or(".".to_string())
+}
+
+pub fn root_dir() -> PathBuf {
+    absolute(data_dir()).expect("could not determine absolute path of DATA_dir_root()")
+}
+
+pub fn dir_root() -> PathBuf {
+    root_dir().join("DIR")
+}
+
+pub fn state_root() -> PathBuf {
+    root_dir().join("STATE")
+}
+
+const TMP : &str = "state.data";
 
 fn main() -> Result<(),Error> {
-    ROOT_DIR?;
 
     let cli = Cli::parse();
 
     match cli.command {
         Commands::Init => {
-            ensure_dir(&DIR);
-            ensure_dir(&STATE);
+            ensure_dir(&dir_root());
+            ensure_dir(&state_root());
             Ok(())
         }
         Commands::Write { path } => {
@@ -36,9 +48,7 @@ fn main() -> Result<(),Error> {
         }
         Commands::Read { path } => {
             let pair = StatePair::file(&path);
-            if !pair.exists() {
-                return Result::Err(format!("file {} does not exist", path.display()).into());
-            }
+            pair.exists().map_err(|_| { Error::String(format!("file {} does not exist", path.display())) })?;
 
             let mut file = File::open(pair.state_file()?)?;
             io::copy(&mut file, &mut io::stdout())?;
@@ -59,23 +69,32 @@ fn main() -> Result<(),Error> {
             let read = pair.read_dir()?;
 
             for path in read {
+
                 let path = absolute(path?.path())?;
-                let relative: PathBuf  = path.to_str().ok_or(Err("could not convert path to string".into()))?.to_string().replace( format!("^{}",ROOT_DIR?.to_string()),"").into();
+                let relative = path.to_str().ok_or("could not convert path to string".to_string())?.to_string();
+                let pattern = format!("^{}",root_dir().display()).to_string();
+                let relative = relative.replace(pattern.as_str(),"");
+                let relative = relative.into();
+
+
                 match StatePair::from_path(&relative) {
                     None => {}
                     Some(StatePair::File(file)) => {
-                        io::stdout().write(file.to_str().ok_or(Err("could not convert path to string".into()))?.as_bytes())?;
-                        io::stdout().write("\n")?;
+                        io::stdout().write(file.to_str().ok_or("could not convert path to string".to_string())?.as_bytes())?;
+                        io::stdout().write("\n".as_bytes())?;
                     }
                     Some(StatePair::Dir(file)) => {
-                        io::stdout().write(format!("{}/",file.to_str().ok_or(Err("could not convert path to string".into()))?.as_bytes())?)?;
-                        io::stdout().write("\n")?;
+                        io::stdout().write(format!("{}/",file.to_str().ok_or("could not convert path to string".to_string())?).as_bytes())?;
+                        io::stdout().write("\n".as_bytes())?;
                     }
                 }
+
             }
+            Ok(())
         }
         Commands::Pwd =>  {
-            println!("{}", ROOT_DIR?.to_str());
+            println!("{}", root_dir().to_str().unwrap());
+            Ok(())
         }
 
         Commands::Exists { path } => {
@@ -95,8 +114,8 @@ pub enum StatePair {
 impl StatePair {
 
     pub fn from_path( path: &PathBuf) -> Option<Self> {
-        let state = STATE.join(path).join(STATE_FILE);
-        let dir = DIR.join(path);
+        let state = state_root().join(path).join(TMP);
+        let dir = dir_root().join(path);
 
         if state.exists() {
             Option::Some(Self::file(path))
@@ -139,7 +158,7 @@ impl StatePair {
             StatePair::Dir(path) => path,
             StatePair::File(path) => path
         };
-        STATE.join(path).join(STATE_FILE)
+        state_root().join(path).join(TMP)
     }
 
 
@@ -148,22 +167,22 @@ impl StatePair {
             StatePair::Dir(path) => path,
             StatePair::File(path) => path
         };
-        DIR.join(path)
+        dir_root().join(path)
     }
 
     pub fn create(&self) -> Result<PathBuf,Error> {
         match self {
             StatePair::Dir(path) => {
                 Self::check_for_parent_state(path)?;
-                let dir = DIR.join(path);
+                let dir = dir_root().join(path);
                 ensure_dir(&dir)?;
                 Ok(dir)
             },
             StatePair::File(path) => {
-                let parent = path.parent().ok_or("expected parent")?.clone().into();
+                let parent = path.parent().ok_or("expected parent".to_string())?.clone().into();
                 Self::check_for_parent_state(&parent)?;
                 ensure_dir(&parent)?;
-                let state = STATE.join(path).join(STATE_FILE);
+                let state = state_root().join(path).join(TMP);
                 Ok(state)
             }
         }
@@ -174,11 +193,11 @@ impl StatePair {
       */
     pub fn delete(&self) -> Result<(),Error> {
         fn delete_dir(path: &Path ) -> Result<(),Error>{
-            let dir = DIR.join(path);
+            let dir = dir_root().join(path);
             if dir.exists() {
                 fs::remove_dir(dir)?;
             }
-            let state_dir = DIR.join(path);
+            let state_dir = dir_root().join(path);
             if state_dir.exists() {
                 fs::remove_dir_all(state_dir)?;
             }
@@ -196,9 +215,9 @@ impl StatePair {
 
     pub fn state_file(&self) -> Result<PathBuf,Error> {
         match self {
-            StatePair::Dir(path) => Result::Err(format!("cannot create state for a directory {}",path))?,
+            StatePair::Dir(path) => Result::Err(format!("cannot create state for a directory {}",path.display()))?,
             StatePair::File(path) => {
-                let state = STATE.join(path).join(STATE_FILE);
+                let state = state_root().join(path).join(TMP);
                 Ok(state)
             }
         }
@@ -207,14 +226,14 @@ impl StatePair {
 
     /// make sure all parent directories are not stateful
     fn check_for_parent_state(path: &PathBuf) -> Result<(),String>{
-       let mut parent = STATE.join(path);
+       let mut parent = state_root().join(path);
        loop {
-           let state = parent.join(STATE_FILE);
+           let state = parent.join(TMP);
            if state.exists() {
-               return Result::Err(format!("could not create the directory '{}' because '{}' is a file",path, parent.display()))
+               return Result::Err(format!("could not create the directory '{}' because '{}' is a file",path.display(), parent.display()))
            }
            parent = parent.parent().ok_or(format!("expected parent for: {}", path.display()))?.clone().into();
-           if *STATE == parent {
+           if *state_root() == parent {
                return Ok(())
            }
        }
@@ -223,7 +242,7 @@ impl StatePair {
     fn exists( &self ) -> Result<(),Error> {
 
         fn dir_exists( dir: &Path ) -> Result<(),Error>{
-            if !DIR.join(dir).exists() {
+            if !dir_root().join(dir).exists() {
                 Err(format!("directory '{}' does not exist", dir.display()).into())
             } else {
                 Ok(())
@@ -238,7 +257,7 @@ impl StatePair {
             StatePair::File(state) => {
                 dir_exists( state )?;
 
-                if !STATE.join(state).join(STATE_FILE).exists() {
+                if !state_root().join(state).join(TMP).exists() {
                     return Err(format!("state file '{}' does not exist", state.display()).into())
                 }
 
@@ -250,13 +269,13 @@ impl StatePair {
     fn ensure(&self) -> Result<(),Error>{
         match self {
             StatePair::Dir(dir) => {
-                let dir= DIR.join(dir);
+                let dir= dir_root().join(dir);
                 ensure_dir(&dir)?;
                 Ok(())
             }
             StatePair::File(state) => {
-                let dir = DIR.join(state);
-                let state = DIR.join(state);
+                let dir = dir_root().join(state);
+                let state = dir_root().join(state);
                 ensure_dir(&dir)?;
                 ensure_dir(&state)?;
                 Ok(())
@@ -279,13 +298,25 @@ fn ensure_dir(dir: &PathBuf ) -> Result<(),Error> {
 
 
 #[derive(Error, Debug)]
-pub enum Error {
+pub enum Error{
     #[error("could not access local filesystem")]
     FileSys(#[from] io::Error),
-    #[error("could not access parent {0}")]
-    BadParent(String),
-    #[error("{0}")]
-    String(#[from] String)
+    #[error("could not access local filesystem")]
+    String( String),
+
+}
+
+impl From<String> for Error {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
+
+impl From<&str> for Error {
+    fn from(value: &str) -> Self {
+        Self::String(value.to_string())
+    }
 }
 
 
