@@ -48,15 +48,20 @@ fn main() -> Status {
 fn run() -> Result<(),Error> {
     env::var(FILE_STORE_ROOT).map_err( |_|format!("'{}' environment variable is not set.", FILE_STORE_ROOT).to_string())?;
 
-    if !root_dir()?.exists()  {
-        let root = root_dir()?.to_str().unwrap().to_string();
-        Err(format!("{} is set but directory {} does not exisst.  Run 'init' command first.",FILE_STORE_ROOT,root).to_string())?;
-    }
+
     let cli = Cli::parse();
+    if let Commands::Init = cli.command {
+        ensure_dir(&root_dir()?);
+        return Ok(());
+    }
+
+     if !root_dir()?.exists()  {
+          let root = root_dir()?.to_str().unwrap().to_string();
+          Err(format!("{} is set but directory {} does not exisst.  Run 'init' command first.",FILE_STORE_ROOT,root).to_string())?;
+      }
 
     match cli.command {
         Commands::Init => {
-            ensure_dir(&root_dir()?);
             Ok(())
         }
         Commands::Write { path } => {
@@ -125,9 +130,6 @@ fn norm(orig: &PathBuf ) -> Result<PathBuf,Error> {
 //    let normed= canonicalize(absolute(root_dir.join(path))?)?;
     let normed : PathBuf = root_dir.join(path).into();
     let parent = normed.parent().unwrap().canonicalize()?;
-println!("normed:   {}",normed.display());
-    println!("parent:   {}",parent.display());
-println!("dir_Root: {}",root_dir.display());
 
     if let Option::Some(root) = root_dir.parent() {
         if parent == root {

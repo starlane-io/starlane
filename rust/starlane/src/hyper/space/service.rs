@@ -27,6 +27,7 @@ use std::hash::Hash;
 use std::io::Read;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
+use std::{env, process};
 use std::process::Stdio;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -34,6 +35,7 @@ use strum_macros::{EnumIter, EnumString};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 use tokio::sync::watch;
+use tokio_print::aprintln;
 use tracing::instrument::WithSubscriber;
 
 pub struct ServiceCreationSelector {
@@ -362,6 +364,13 @@ pub struct OsProcess {
     child: Child,
 }
 
+impl OsProcess {
+    pub fn close_stdin(& mut self) -> Result<(),StarErr> {
+        drop(self.child.stdin.take().unwrap());
+        Ok(())
+    }
+}
+
 impl Deref for OsProcess {
     type Target = Child;
 
@@ -407,16 +416,33 @@ impl Executor for OsExeCli {
     type Spawn = Result<OsProcess, Self::Err>;
 
     async fn execute(&self, args: Self::Args) -> Self::Spawn {
+        if !self.stub.loc.exists() {
+            return Result::Err(StarErr::new(format!("file not found: {}", self.stub.loc.display() ) ));
+        }
+
+aprintln!("pwd: {}",env::current_dir().unwrap().display());
+aprintln!("self.stub.loc.exists(): {}",self.stub.loc.exists());
+aprintln!("self.stub.loc: {}",self.stub.loc.display());
         let mut command = Command::new(self.stub.loc.clone());
+
         command.envs(self.stub.env.env.clone());
         command.args(args);
         command.current_dir(self.stub.env.pwd.clone());
         command.env_clear();
+        command.envs(&self.stub.env.env);
+        aprintln!("GOT HERE...");
+        //command.stdin(Stdio::piped()).output().await?;
         command.stdin(Stdio::piped()).output().await?;
+        aprintln!("STDIN");
+        //command.stdout(Stdio::piped()).output().await?;
         command.stdout(Stdio::piped()).output().await?;
+        aprintln!("STDOUT");
+        //command.stderr(Stdio::piped()).output().await?;
         command.stderr(Stdio::piped()).output().await?;
-
+        aprintln!("STDERR");
+        println!("{:?}", command);
         let child = command.spawn()?;
+        aprintln!("child created...");
         Ok(OsProcess::new(child))
     }
 }
@@ -560,6 +586,10 @@ where
     pub fn new(loc: L, env: E, args: A) -> Self {
         Self { loc, env, args }
     }
+}
+
+pub fn stringify_args( args: Vec<&str>) -> Vec<String> {
+   args.iter().map(|arg| arg.to_string()).collect()
 }
 
 impl<E> Into<ExeStub<PathBuf, OsEnv, ()>> for ExeStub<String, E, ()>
@@ -746,11 +776,15 @@ where
 #[cfg(test)]
 pub mod tests {
     use crate::host::{HostEnv, OsEnv};
-    use crate::hyper::space::service::{ExeInfo, Host, HostApi};
+    use crate::hyper::space::service::{stringify_args, CliHost, ExeInfo, Executor, Host, HostApi};
     use crate::hyper::space::service::{ExeStub, HostKind};
-    use std::env;
-    use std::path::absolute;
+    use std::{env, io, process};
+    use std::path::{absolute, PathBuf};
+    use itertools::process_results;
+    use nom::AsBytes;
+    use tokio::fs;
     use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+    use wasmer::IntoBytes;
 
     fn cli_host() -> Host {
         let mut builder = HostEnv::builder();
@@ -761,9 +795,10 @@ pub mod tests {
                 .unwrap()
                 .to_string(),
         );
-        builder.env("DATA_DIR", "./");
+        println!("{}",env::current_dir().unwrap().to_str().unwrap());
+        builder.env("FILE_STORE_ROOT", format!("{}/tmp", env::current_dir().unwrap().to_str().unwrap()));
         let env = builder.build();
-        let path = "./cli-host.sh".to_string();
+        let path = "../target/debug/starlane-cli-filestore-service".to_string();
         let args: Option<Vec<String>> = Option::None;
         let stub: ExeStub<String, OsEnv, Option<Vec<String>>> = ExeStub::new(path, env, None);
         let info = ExeInfo::new(HostApi::Cli(HostKind::Os), stub);
@@ -772,16 +807,86 @@ pub mod tests {
     }
 
     #[tokio::test]
+    pub async fn test_cli_primitive() {
+        if let Host::Cli(CliHost::Os(exe)) = cli_host() {
+           let mut child = exe.execute(vec!["init".to_string()]).await.unwrap();
+//           let mut stdout = child.stdout.take().unwrap();
+            drop(child.stdout.take().unwrap());
+
+            let mut output = child.child.wait_with_output().await.unwrap();
+
+            tokio::io::copy(& mut output.stdout.as_bytes() , &mut tokio::io::stdout()).await.unwrap();
+            tokio::io::copy(& mut output.stderr.as_bytes() , &mut tokio::io::stderr()).await.unwrap();
+        } else {
+            assert!(false)
+        }
+    }
+
+    #[tokio::test]
     pub async fn test_os_cli_host() {
         let host = cli_host();
         let executor = host.executor().unwrap();
 
+            fs::remove_dir_all("./tmp").await.unwrap();
+
+
+        // init
         {
-            let mut child = executor.execute(vec!["read".to_string()]).await.unwrap();
+            executor.execute(stringify_args(vec!["init"])).await.unwrap().close_stdin();
+        }
+
+        let path = PathBuf::from("tmp");
+        assert!(path.exists());
+        assert!(path.is_dir());
+
+        {
+            let mut child = executor.execute(stringify_args(vec!["mkdir","blah"])).await.unwrap();
+            child.close_stdin().unwrap();
+            child.wait().await.unwrap();
+        }
+
+        let path = PathBuf::from("tmp/blah");
+        assert!(path.exists());
+        assert!(path.is_dir());
+
+
+        let content = "HEllo from me";
+
+        {
+            let mut child = executor.execute(stringify_args(vec!["write", "blah/somefile.txt"])).await.unwrap();
+            let mut stdin = child.stdin.take().unwrap();
+            tokio::io::copy(&mut content.into_bytes().as_bytes(), &mut stdin).await.unwrap();
+            stdin.flush().await.unwrap();
+            drop(stdin);
+            child.wait().await.unwrap();
+        }
+
+            let path = PathBuf::from("tmp/blah/somefile.txt");
+            assert!(path.exists());
+            assert!(path.is_file());
+
+
+            {
+            let mut child = executor.execute(stringify_args(vec!["read", "blah/somefile.txt"])).await.unwrap();
+            child.close_stdin();
+            let mut stdout = child.stdout.take().unwrap();
+             let mut read = String::new();
+            stdout.read_to_string(&mut read).await.unwrap();
+                println!("content: {}", read);
+            tokio::io::stdout().flush().await.unwrap();
+            child.wait().await.unwrap();
+                assert_eq!(content,read);
+        }
+
+
+
+        /*
+
             let stdout = child
                 .stdout
                 .take()
                 .expect("child did not have a handle to stdout");
+
 
             let mut reader = BufReader::new(stdout).lines();
 
@@ -824,6 +929,8 @@ pub mod tests {
             }
         }
 
+             */
+
         /*
         // Ensure the child process is spawned in the runtime so it can
         // make progress on its own while we await for any output.
@@ -834,6 +941,7 @@ pub mod tests {
             println!("child status was: {}", status);
         });
 
-         */
+
+             */
     }
 }
