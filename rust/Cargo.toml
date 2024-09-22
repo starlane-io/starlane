@@ -17,7 +17,7 @@ default-run = "starlane"
 resolver = "2"
 members = [
   "starlane", "starlane-macros", "starlane-primitive-macros","mechtron"
-  , "starlane-space", "starlane-parse", "ext/service/starlane-cli-local-filestore-service"]
+  , "starlane-space", "starlane-parse","ext/service/starlane-cli-local-filestore-service" ]
 
 exclude = [ ]
 
