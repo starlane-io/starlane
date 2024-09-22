@@ -29,7 +29,7 @@ use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
-use crate::driver::artifact::RepoDriverFactory;
+//use crate::driver::artifact::RepoDriverFactory;
 
 #[derive(Clone)]
 pub struct Starlane {
@@ -123,10 +123,13 @@ impl Platform for Starlane {
                 */
             }
             StarSub::Scribe => {
+                /*
                 builder.add_post(Arc::new(RepoDriverFactory::new()));
                 builder.add_post(Arc::new(BundleSeriesDriverFactory::new()));
                 builder.add_post(Arc::new(BundleDriverFactory::new()));
                 builder.add_post(Arc::new(ArtifactDriverFactory::new()));
+
+                 */
             }
             StarSub::Jump => {
                 //builder.add_post(Arc::new(WebDriverFactory::new()));

@@ -65,6 +65,7 @@ pub mod substance;
 pub mod util;
 pub mod wasm;
 pub mod wave;
+pub mod asynch;
 
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(include_str!("VERSION").trim()).unwrap());

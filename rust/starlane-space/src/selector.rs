@@ -28,6 +28,13 @@ pub type KindSelector = KindSelectorDef<KindBaseSelector, SubKindSelector, Speci
 pub type KindSelectorVar =
     KindSelectorDef<VarVal<KindBaseSelector>, VarVal<SubKindSelector>, VarVal<SpecificSelector>>;
 
+impl PartialEq<Kind> for KindSelector {
+    fn eq(&self, kind: &Kind) -> bool {
+        self.matches(kind)
+    }
+}
+
+
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct KindSelectorDef<GenericKindSelector, GenericSubKindSelector, SpecificSelector> {
     pub base: GenericKindSelector,
@@ -52,7 +59,7 @@ impl KindSelector {
         Self {
             base: Pattern::Exact(base),
             sub: SubKindSelector::Any,
-            specific: ValuePattern::Any,
+            specific: ValuePattern::Always,
         }
     }
 
@@ -110,7 +117,7 @@ impl KindSelector {
         Self {
             base: KindBaseSelector::Any,
             sub: SubKindSelector::Any,
-            specific: ValuePattern::Any,
+            specific: ValuePattern::Always,
         }
     }
 }
@@ -995,8 +1002,8 @@ pub type PatternBlockDef<Pnt> = ValuePattern<SubstancePatternDef<Pnt>>;
 impl ToResolved<PatternBlock> for PatternBlockCtx {
     fn to_resolved(self, env: &Env) -> Result<PatternBlock, SpaceErr> {
         match self {
-            PatternBlockCtx::Any => Ok(PatternBlock::Any),
-            PatternBlockCtx::None => Ok(PatternBlock::None),
+            PatternBlockCtx::Always => Ok(PatternBlock::Always),
+            PatternBlockCtx::Never => Ok(PatternBlock::Never),
             PatternBlockCtx::Pattern(pattern) => {
                 Ok(PatternBlock::Pattern(pattern.to_resolved(env)?))
             }
@@ -1007,8 +1014,8 @@ impl ToResolved<PatternBlock> for PatternBlockCtx {
 impl ToResolved<PatternBlockCtx> for PatternBlockVar {
     fn to_resolved(self, env: &Env) -> Result<PatternBlockCtx, SpaceErr> {
         match self {
-            PatternBlockVar::Any => Ok(PatternBlockCtx::Any),
-            PatternBlockVar::None => Ok(PatternBlockCtx::None),
+            PatternBlockVar::Always => Ok(PatternBlockCtx::Always),
+            PatternBlockVar::Never => Ok(PatternBlockCtx::Never),
             PatternBlockVar::Pattern(pattern) => {
                 Ok(PatternBlockCtx::Pattern(pattern.to_resolved(env)?))
             }

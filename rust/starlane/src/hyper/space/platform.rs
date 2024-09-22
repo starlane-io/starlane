@@ -47,7 +47,7 @@ where
     fn machine_template(&self) -> MachineTemplate;
     fn machine_name(&self) -> MachineName;
 
-    fn select_service(&self, kind: &KindSelector, star: &StarKey, point: &Point ) ->
+//    fn select_service(&self, kind: &KindSelector, star: &StarKey, point: &Point ) ->
 
     fn properties_config(&self, kind: &Kind) -> PropertiesConfig {
         let mut builder = PropertiesConfigBuilder::new();

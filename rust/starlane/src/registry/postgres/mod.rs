@@ -596,8 +596,8 @@ where
             }
 
             match &hop.kind_selector.specific {
-                ValuePattern::Any => {}
-                ValuePattern::None => {}
+                ValuePattern::Always => {}
+                ValuePattern::Never => {}
                 ValuePattern::Pattern(specific) => {
                     match &specific.provider {
                         ProviderSelector::Any => {}

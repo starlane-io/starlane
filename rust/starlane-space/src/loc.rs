@@ -450,9 +450,9 @@ impl Into<SurfaceSelector> for Surface {
     fn into(self) -> SurfaceSelector {
         let point = ValuePattern::Pattern(self.point);
         let topic = match self.topic {
-            Topic::None => ValuePattern::Any,
-            Topic::Not => ValuePattern::None,
-            Topic::Any => ValuePattern::Any,
+            Topic::None => ValuePattern::Always,
+            Topic::Not => ValuePattern::Never,
+            Topic::Any => ValuePattern::Always,
             Topic::Uuid(uuid) => ValuePattern::Pattern(Topic::Uuid(uuid)),
             Topic::Path(path) => ValuePattern::Pattern(Topic::Path(path)),
             Topic::Cli => ValuePattern::Pattern(Topic::Cli),
@@ -469,22 +469,22 @@ impl Into<SurfaceSelector> for Surface {
 impl ValueMatcher<Surface> for SurfaceSelector {
     fn is_match(&self, surface: &Surface) -> Result<(), ()> {
         match &self.point {
-            ValuePattern::Any => {}
-            ValuePattern::None => return Err(()),
+            ValuePattern::Always => {}
+            ValuePattern::Never => return Err(()),
             ValuePattern::Pattern(point) if *point != surface.point => return Err(()),
             _ => {}
         }
 
         match &self.layer {
-            ValuePattern::Any => {}
-            ValuePattern::None => return Err(()),
+            ValuePattern::Always => {}
+            ValuePattern::Never => return Err(()),
             ValuePattern::Pattern(layer) if *layer != surface.layer => return Err(()),
             _ => {}
         }
 
         match &self.topic {
-            ValuePattern::Any => {}
-            ValuePattern::None => return Err(()),
+            ValuePattern::Always => {}
+            ValuePattern::Never => return Err(()),
             ValuePattern::Pattern(topic) if *topic != surface.topic => return Err(()),
             _ => {}
         }

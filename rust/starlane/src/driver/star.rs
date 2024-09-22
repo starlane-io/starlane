@@ -153,7 +153,7 @@ where
         let kind = KindSelector {
             base: Pattern::Exact(BaseKind::Star),
             sub: SubKindSelector::Exact(Some(sub.to_camel_case())),
-            specific: ValuePattern::Any,
+            specific: ValuePattern::Always,
         };
         Self {
             kind,

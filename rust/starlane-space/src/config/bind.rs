@@ -279,7 +279,7 @@ impl RouteSelector {
     pub fn any() -> Self {
         Self {
             topic: None,
-            method: ValuePattern::Any,
+            method: ValuePattern::Always,
             path: Regex::new("/.*").unwrap(),
             filters: Default::default(),
         }

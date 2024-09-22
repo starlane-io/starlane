@@ -14,6 +14,7 @@ use std::str::FromStr;
 use std::sync::atomic::AtomicU16;
 use std::sync::Arc;
 use std::time::Duration;
+use itertools::Itertools;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
@@ -33,7 +34,7 @@ use crate::hyper::space::layer::shell::{Shell, ShellState};
 use crate::hyper::space::machine::MachineSkel;
 use crate::hyper::space::platform::Platform;
 use crate::hyper::space::reg::{Registration, Registry};
-use crate::hyper::space::service::ServiceTemplate;
+use crate::hyper::space::service::{ServiceSelector, ServiceTemplate};
 use starlane_space::artifact::ArtRef;
 use starlane_space::command::common::StateSrc;
 use starlane_space::command::direct::create::{Create, Strategy};
@@ -1773,13 +1774,24 @@ pub struct Templates<T> where T:Clone {
     templates: Vec<T>,
 }
 
-impl <T> Templates<T> where T: Clone {
+impl <T> Templates<T> where T: Clone{
   pub fn new( templates: Vec<T> ) -> Self {
       Self {
           templates
       }
   }
+
+  pub fn select_one<S>( & self, selector: &S) -> Option<&T>  where S: PartialEq<T> {
+      (&self.templates).into_iter().find_position(|t| {*selector == **t}).map( |(size,t )| {
+          t
+      }  )
+  }
+
 }
+
+
+
+
 
 impl Templates<ServiceTemplate> {
     pub fn select(&self, selector: &KindSelector) -> Vec<ServiceTemplate> {
@@ -1792,10 +1804,13 @@ impl Templates<ServiceTemplate> {
         rtn
     }
 
+    /*
     /// return the first match found
-    pub fn select_one(&self, selector: &KindSelector) -> Option<ServiceTemplate> {
+    pub fn select_one(&self, selector: &ServiceSelector) -> Option<ServiceTemplate> {
         self.select(selector).first().cloned()
     }
+
+     */
 
 }
 
@@ -1821,10 +1836,6 @@ impl DerefMut for Templates<ServiceTemplate> {
     }
 }
 
-pub struct HierarchticalTemplates<K,S> where K:Clone+Hash+Eq+PartialEq {
-    parent: Option<HierarchticalTemplates<K,S>>,
-    templates: Templates<K>
-}
 
 #[derive(Clone)]
 pub struct StarTemplate {
@@ -1840,7 +1851,7 @@ impl StarTemplate {
             key,
             kind,
             connections: vec![],
-            services: vec![],
+            services: Templates::default()
         }
     }
 

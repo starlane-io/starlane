@@ -935,7 +935,7 @@ impl<Pnt> Default for MapPatternDef<Pnt> {
     fn default() -> Self {
         MapPatternDef {
             required: Default::default(),
-            allowed: ValuePattern::Any,
+            allowed: ValuePattern::Always,
         }
     }
 }
@@ -957,14 +957,14 @@ impl<Pnt> MapPatternDef<Pnt> {
     pub fn empty() -> Self {
         Self {
             required: HashMap::new(),
-            allowed: ValuePattern::None,
+            allowed: ValuePattern::Never,
         }
     }
 
     pub fn any() -> Self {
         Self {
             required: HashMap::new(),
-            allowed: ValuePattern::Any,
+            allowed: ValuePattern::Always,
         }
     }
 
@@ -973,8 +973,8 @@ impl<Pnt> MapPatternDef<Pnt> {
         for (key, payload) in &map.map {
             if !self.required.contains_key(key) {
                 match &self.allowed {
-                    ValuePattern::Any => {}
-                    ValuePattern::None => {
+                    ValuePattern::Always => {}
+                    ValuePattern::Never => {
                         return Err(());
                     }
                     ValuePattern::Pattern(pattern) => {

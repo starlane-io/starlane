@@ -425,7 +425,7 @@ pub enum SetStrategy<T> {
     /// The ProtoTransmitter will set the DirectedProto value unless
     /// the value was already explicitly set
     Fill(T),
-    /// The ProtoTransmitter will over write the DirectedProto value
+    /// The ProtoTransmitter will override the DirectedProto value
     /// even if it has already been explicitly set
     Override(T),
 }

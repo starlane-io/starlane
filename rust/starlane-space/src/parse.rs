@@ -3913,8 +3913,8 @@ pub mod model {
             selector: LexScopeSelector<I>,
         ) -> Result<Self, SpaceErr> {
             let name = match parent {
-                ValuePattern::Any => ValuePattern::Any,
-                ValuePattern::None => ValuePattern::None,
+                ValuePattern::Always => ValuePattern::Always,
+                ValuePattern::Never => ValuePattern::Never,
                 ValuePattern::Pattern(message_kind) => match message_kind {
                     MethodKind::Hyp => {
                         match result(value_pattern(wrapped_sys_method)(selector.name.clone())) {
@@ -5328,7 +5328,7 @@ where
     E: nom::error::ContextError<I>,
 {
     move |input: I| match tag::<&'static str, I, E>("*")(input.clone()) {
-        Ok((next, _)) => Ok((next, ValuePattern::Any)),
+        Ok((next, _)) => Ok((next, ValuePattern::Always)),
         Err(err) => f
             .parse(input.clone())
             .map(|(next, res)| (next, ValuePattern::Pattern(res))),
@@ -5706,11 +5706,11 @@ pub fn kind_selector<I: Span>(input: I) -> Res<I, KindSelector> {
     )(input)
     .map(|(next, (kind, sub_kind_and_specific))| {
         let (sub_kind, specific) = match sub_kind_and_specific {
-            None => (Pattern::Any, ValuePattern::Any),
+            None => (Pattern::Any, ValuePattern::Always),
             Some((kind, specific)) => (
                 kind,
                 match specific {
-                    None => ValuePattern::Any,
+                    None => ValuePattern::Always,
                     Some(specific) => specific,
                 },
             ),
@@ -5771,7 +5771,7 @@ fn file_hop<I: Span>(input: I) -> Res<I, Hop> {
         let tks = KindSelector {
             base: Pattern::Exact(BaseKind::File),
             sub: Pattern::Any,
-            specific: ValuePattern::Any,
+            specific: ValuePattern::Always,
         };
         let inclusive = inclusive.is_some();
         (
@@ -5850,7 +5850,7 @@ pub fn point_selector<I: Span>(input: I) -> Res<I, Selector> {
                     kind_selector: KindSelector {
                         base: Pattern::Exact(BaseKind::File),
                         sub: Pattern::Any,
-                        specific: ValuePattern::Any,
+                        specific: ValuePattern::Always,
                     },
                 });
                 for dir_hop in dir_hops {
@@ -6181,14 +6181,14 @@ pub fn array_data_struct<I: Span>(input: I) -> Res<I, SubstanceTypePatternDef<Po
 }
 
 pub fn map_entry_pattern_any<I: Span>(input: I) -> Res<I, ValuePattern<MapEntryPatternVar>> {
-    delimited(multispace0, tag("*"), multispace0)(input).map(|(next, _)| (next, ValuePattern::Any))
+    delimited(multispace0, tag("*"), multispace0)(input).map(|(next, _)| (next, ValuePattern::Always))
 }
 
 pub fn map_entry_pattern<I: Span>(input: I) -> Res<I, MapEntryPatternVar> {
     tuple((skewer, opt(delimited(tag("<"), payload_pattern, tag(">")))))(input).map(
         |(next, (key_con, payload_con))| {
             let payload_con = match payload_con {
-                None => ValuePattern::Any,
+                None => ValuePattern::Always,
                 Some(payload_con) => payload_con,
             };
 
@@ -6240,7 +6240,7 @@ pub fn map_pattern_params<I: Span>(input: I) -> Res<I, MapPatternVar> {
 
         let allowed = match allowed {
             Some(allowed) => allowed,
-            None => ValuePattern::None,
+            None => ValuePattern::Never,
         };
 
         let con = MapPatternVar::new(required_map, allowed);
@@ -6323,7 +6323,7 @@ where
     E: nom::error::ContextError<I>,
 {
     move |input: I| match tag::<&'static str, I, E>("*")(input.clone()) {
-        Ok((next, _)) => Ok((next, HttpMethodPattern::Any)),
+        Ok((next, _)) => Ok((next, HttpMethodPattern::Always)),
         Err(err) => f
             .parse(input.clone())
             .map(|(next, res)| (next, HttpMethodPattern::Pattern(res))),
@@ -6438,7 +6438,7 @@ pub fn consume_data_struct_def<I: Span>(input: I) -> Res<I, SubstancePatternVar>
 }
 
 pub fn payload_pattern_any<I: Span>(input: I) -> Res<I, ValuePattern<SubstancePatternVar>> {
-    tag("*")(input).map(|(next, _)| (next, ValuePattern::Any))
+    tag("*")(input).map(|(next, _)| (next, ValuePattern::Always))
 }
 
 pub fn payload_pattern<I: Span>(input: I) -> Res<I, ValuePattern<SubstancePatternVar>> {
@@ -6450,13 +6450,13 @@ pub fn payload_pattern<I: Span>(input: I) -> Res<I, ValuePattern<SubstancePatter
 }
 
 pub fn payload_filter_block_empty<I: Span>(input: I) -> Res<I, PatternBlockVar> {
-    multispace0(input.clone()).map(|(next, _)| (input, PatternBlockVar::None))
+    multispace0(input.clone()).map(|(next, _)| (input, PatternBlockVar::Never))
 }
 
 pub fn payload_filter_block_any<I: Span>(input: I) -> Res<I, PatternBlockVar> {
     let (next, _) = delimited(multispace0, context("selector", tag("*")), multispace0)(input)?;
 
-    Ok((next, PatternBlockVar::Any))
+    Ok((next, PatternBlockVar::Always))
 }
 
 pub fn payload_filter_block_def<I: Span>(input: I) -> Res<I, PatternBlockVar> {
@@ -7211,8 +7211,8 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, SpaceErr> {
         .clone();
     let method_kind = result(value_pattern(method_kind)(method_kind_span.clone()))?;
     let method = match &method_kind {
-        ValuePattern::Any => ValuePattern::Any,
-        ValuePattern::None => ValuePattern::None,
+        ValuePattern::Always => ValuePattern::Always,
+        ValuePattern::Never => ValuePattern::Never,
         ValuePattern::Pattern(method_kind) => match method_kind {
             MethodKind::Hyp => {
                 let method = names.pop().ok_or(ParseErrs::from_loc_span(

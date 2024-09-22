@@ -493,7 +493,7 @@ impl StarSub {
         KindSelector {
             base: Pattern::Exact(BaseKind::Star),
             sub: SubKindSelector::Exact(Some(self.to_camel_case())),
-            specific: ValuePattern::Any,
+            specific: ValuePattern::Always,
         }
     }
 
