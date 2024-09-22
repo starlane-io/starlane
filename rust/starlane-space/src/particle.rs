@@ -172,30 +172,8 @@ impl Particle2 {
 }
 
 pub mod particle {
-    use std::collections::{HashMap, HashSet};
-    use std::str::FromStr;
-
-    use nom::branch::alt;
-    use nom::bytes::complete::{is_a, tag};
-    use nom::character::complete::{alpha1, digit1};
-    use nom::combinator::{not, recognize};
-    use nom::error::{ErrorKind, ParseError, VerboseError};
-    use nom::sequence::{delimited, tuple};
-    use nom::CompareResult::Incomplete;
     use nom::Parser;
-    use nom_supreme::error::ErrorTree;
-    use nom_supreme::{ ParserExt};
-    use serde::{Deserialize, Serialize};
-
-    use starlane_parse::{Res, Span};
-
-    use crate::err::SpaceErr;
-    use crate::kind::{BaseKind, Kind, KindParts};
-    use crate::parse::parse_alpha1_str;
-    use crate::particle::PointKind;
-    use crate::point::Point;
-    use crate::security::Permissions;
-    use crate::substance::{Substance, SubstanceMap};
+    use nom_supreme::ParserExt;
 
     /*
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]

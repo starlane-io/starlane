@@ -6,25 +6,22 @@ use starlane_macros::handler_sync;
 use starlane_space::artifact::synch::{ArtifactApi, ArtifactFetcher};
 use starlane_space::err::SpaceErr;
 use starlane_space::hyper::HyperSubstance;
-use starlane_space::kind::Kind::Mechtron;
-use starlane_space::loc::{Layer, ToSurface};
+use starlane_space::loc::ToSurface;
 use starlane_space::log::{
-    LogSource, NoAppender, PointLogger, RootLogger, SynchTransmittingLogAppender,
+    LogSource, PointLogger, RootLogger, SynchTransmittingLogAppender,
 };
 use starlane_space::particle::{Details, Stub};
 use starlane_space::point::Point;
 use starlane_space::substance::{Bin, Substance};
 use starlane_space::wave::core::cmd::CmdMethod;
-use starlane_space::wave::core::CoreBounce;
 use starlane_space::wave::exchange::synch::{
-    DirectedHandler, DirectedHandlerProxy, DirectedHandlerShell, ExchangeRouter, InCtx,
-    ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx,
+    DirectedHandler, DirectedHandlerShell, ExchangeRouter, InCtx,
+    ProtoTransmitter, ProtoTransmitterBuilder,
 };
 use starlane_space::wave::exchange::SetStrategy;
 use starlane_space::wave::{
     Agent, DirectedProto, DirectedWave, ReflectedAggregate, ToRecipients, UltraWave,
 };
-use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
 

@@ -3,12 +3,11 @@
 #[macro_use]
 extern crate async_trait;
 #[macro_use]
+extern crate clap;
+#[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate starlane_macros;
-
-#[macro_use]
-extern crate clap;
 
 pub mod err;
 pub mod properties;
@@ -34,11 +33,11 @@ pub mod driver;
 
 //pub mod store;
 
-use starlane::hyper::space::platform::Platform;
 use crate::cli::{Cli, Commands};
 use crate::err::StarErr;
 use crate::server::Starlane;
 use clap::Parser;
+use starlane::hyper::space::platform::Platform;
 use starlane::init;
 use starlane_space::loc::ToBaseKind;
 use std::fs::File;
@@ -48,7 +47,6 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
-use tokio_print::aprintln;
 use zip::write::FileOptions;
 
 #[cfg(feature = "cli")]

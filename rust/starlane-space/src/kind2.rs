@@ -418,16 +418,15 @@ pub type KindFullSelector =
     ParentMatcherDef<Pattern<Kind>, OptPattern<VariantFullSelector>, OptPattern<CamelCase>>;
 
 pub mod parse {
-
     use crate::kind2::{
         CamelCaseSubTypes, CamelCaseSubTypesSelector, KindDef, OptPattern, ParentChildDef, Pattern,
         ProtoKind, ProtoVariant, Specific, SpecificDef, SpecificFullSelector, SpecificSelector,
         SpecificSubTypes, SpecificSubTypesSelector, SubTypeDef, VariantDef,
     };
-    use crate::parse::{camel_case, domain, skewer_case, version, version_req, CamelCase, Domain};
+    use crate::parse::{camel_case, domain, skewer_case, version, version_req};
     use nom::branch::alt;
     use nom::bytes::complete::tag;
-    use nom::combinator::{fail, opt, success, value};
+    use nom::combinator::{opt, value};
     use nom::sequence::{delimited, pair, preceded, tuple};
     use starlane_parse::{Res, Span};
     use std::str::FromStr;
@@ -660,21 +659,21 @@ pub mod parse {
     #[cfg(test)]
     pub mod test {
         use crate::kind2::parse::{
-            camel_case_sub_types, camel_case_sub_types_selector, opt_pattern, pattern,
+            camel_case_sub_types, camel_case_sub_types_selector, opt_pattern,
             preceded_opt_pattern, proto_kind, proto_variant, specific, specific_full_selector,
             specific_selector, specific_sub_types,
         };
-        use crate::kind2::{IsMatch, OptPattern, Pattern};
+        use crate::kind2::{IsMatch, OptPattern};
 
         use crate::parse::error::result;
         use crate::parse::{
-            camel_case, domain, expect, rec_version, skewer, version, version_req, CamelCase,
+            camel_case, expect, CamelCase,
         };
         use crate::util::log;
         use core::str::FromStr;
         use nom::bytes::complete::tag;
-        use nom::combinator::{all_consuming, opt};
-        use nom::sequence::{delimited, pair, preceded};
+        use nom::combinator::opt;
+        use nom::sequence::{pair, preceded};
         use starlane_parse::new_span;
 
         #[test]

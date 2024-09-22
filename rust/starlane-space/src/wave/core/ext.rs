@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use starlane_parse::new_span;
 
 use crate::err::SpaceErr;
-use crate::loc::Meta;
 use crate::parse::camel_case_chars;
 use crate::parse::error::result;
 use crate::parse::model::MethodScopeSelector;

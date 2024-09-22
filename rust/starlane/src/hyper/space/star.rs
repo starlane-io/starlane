@@ -1,30 +1,20 @@
 use async_recursion::async_recursion;
-use dashmap::mapref::one::{Ref, RefMut};
 use dashmap::DashMap;
-use futures::future::{join_all, BoxFuture};
 use futures::FutureExt;
-use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
+use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
-use std::future::Future;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::{Add, Deref, DerefMut};
 use std::str::FromStr;
-use std::sync::atomic::AtomicU16;
 use std::sync::Arc;
 use std::time::Duration;
-use itertools::Itertools;
-use tokio::sync::mpsc::error::SendError;
-use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
-use tokio::time::error::Elapsed;
-use tracing::{error, info};
+use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::driver::{DriverStatus, DriversApi, DriversBuilder, DriversCall};
 use crate::hyper::lane::{
-    Bridge, HyperClient, HyperRouter, Hyperway, HyperwayEndpoint, HyperwayEndpointFactory,
+    Bridge, HyperwayEndpoint, HyperwayEndpointFactory,
     HyperwayInterchange, HyperwayStub,
 };
 use crate::hyper::space::err::HyperErr;
@@ -34,52 +24,43 @@ use crate::hyper::space::layer::shell::{Shell, ShellState};
 use crate::hyper::space::machine::MachineSkel;
 use crate::hyper::space::platform::Platform;
 use crate::hyper::space::reg::{Registration, Registry};
-use crate::hyper::space::service::{ServiceSelector, ServiceTemplate};
-use starlane_space::artifact::ArtRef;
+use crate::hyper::space::service::ServiceTemplate;
 use starlane_space::command::common::StateSrc;
 use starlane_space::command::direct::create::{Create, Strategy};
-use starlane_space::command::direct::set::Set;
-use starlane_space::command::RawCommand;
-use starlane_space::config::bind::{BindConfig, RouteSelector};
 use starlane_space::err::SpaceErr;
 use starlane_space::hyper::{
-    Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, Location, ParticleRecord,
+    Assign, AssignmentKind, HyperSubstance,
     Provision, Search,
 };
 use starlane_space::hyper::{MountKind, ParticleLocation};
-use starlane_space::kind::{BaseKind, Kind, StarStub, StarSub, Sub};
+use starlane_space::kind::{Kind, StarStub, StarSub};
 use starlane_space::loc::{
-    Layer, StarKey, Surface, SurfaceSelector, ToBaseKind, ToPoint, ToSurface, Topic, Uuid,
-    GLOBAL_EXEC, LOCAL_STAR,
+    Layer, StarKey, Surface, SurfaceSelector, ToPoint, ToSurface,
+    GLOBAL_EXEC,
 };
-use starlane_space::log::{PointLogger, RootLogger, Trackable, Tracker};
-use starlane_space::parse::{bind_config, route_attribute, Env};
+use starlane_space::log::{PointLogger, Trackable, Tracker};
 use starlane_space::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
-use starlane_space::particle::{Details, Status, Stub};
-use starlane_space::point::{Point, RouteSeg};
+use starlane_space::particle::{Details, Status};
+use starlane_space::point::Point;
 use starlane_space::selector::KindSelector;
-use starlane_space::settings::Timeouts;
-use starlane_space::substance::Bin;
-use starlane_space::substance::{Substance, ToSubstance};
-use starlane_space::util::{log, ValueMatcher, ValuePattern};
+use starlane_space::substance::Substance;
+use starlane_space::util::ValueMatcher;
 use starlane_space::wave::core::cmd::CmdMethod;
 use starlane_space::wave::core::hyp::HypMethod;
-use starlane_space::wave::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
 use starlane_space::wave::exchange::asynch::{
-    DirectedHandler, DirectedHandlerSelector, DirectedHandlerShell, Exchanger, InCtx,
-    ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, Router, TraversalRouter, TxRouter,
+    DirectedHandler, DirectedHandlerShell, Exchanger,
+    ProtoTransmitter, ProtoTransmitterBuilder, Router, TraversalRouter, TxRouter,
 };
 use starlane_space::wave::exchange::SetStrategy;
 use starlane_space::wave::{
-    Agent, Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Echoes, Handling,
-    HandlingKind, Ping, Pong, Priority, RecipientSelector, Recipients, Reflectable, ReflectedWave,
-    Reflection, Retries, Ripple, Scope, Signal, SingularRipple, ToRecipients, WaitTime, Wave,
+    Agent, DirectedProto, Handling,
+    HandlingKind, Pong, Priority, Recipients, Reflectable
+    , Retries, Ripple, Scope, Signal, SingularRipple, WaitTime, Wave,
     WaveKind,
 };
-use starlane_space::wave::{HyperWave, UltraWave};
-use starlane_space::HYPERUSER;
+use starlane_space::wave::UltraWave;
 
 #[derive(Clone)]
 pub struct ParticleStates<P>
@@ -1770,28 +1751,31 @@ pub trait TopicHandlerSerde<T: TopicHandler> {
 }
 
 #[derive(Clone)]
-pub struct Templates<T> where T:Clone {
+pub struct Templates<T>
+where
+    T: Clone,
+{
     templates: Vec<T>,
 }
 
-impl <T> Templates<T> where T: Clone{
-  pub fn new( templates: Vec<T> ) -> Self {
-      Self {
-          templates
-      }
-  }
+impl<T> Templates<T>
+where
+    T: Clone,
+{
+    pub fn new(templates: Vec<T>) -> Self {
+        Self { templates }
+    }
 
-  pub fn select_one<S>( & self, selector: &S) -> Option<&T>  where S: PartialEq<T> {
-      (&self.templates).into_iter().find_position(|t| {*selector == **t}).map( |(size,t )| {
-          t
-      }  )
-  }
-
+    pub fn select_one<S>(&self, selector: &S) -> Option<&T>
+    where
+        S: PartialEq<T>,
+    {
+        (&self.templates)
+            .into_iter()
+            .find_position(|t| *selector == **t)
+            .map(|(size, t)| t)
+    }
 }
-
-
-
-
 
 impl Templates<ServiceTemplate> {
     pub fn select(&self, selector: &KindSelector) -> Vec<ServiceTemplate> {
@@ -1811,13 +1795,15 @@ impl Templates<ServiceTemplate> {
     }
 
      */
-
 }
 
-impl <T> Default for Templates<T> where T:Clone {
+impl<T> Default for Templates<T>
+where
+    T: Clone,
+{
     fn default() -> Self {
         Self {
-            templates: Vec::default()
+            templates: Vec::default(),
         }
     }
 }
@@ -1826,16 +1812,15 @@ impl Deref for Templates<ServiceTemplate> {
     type Target = Vec<ServiceTemplate>;
 
     fn deref(&self) -> &Self::Target {
-        & self.templates
+        &self.templates
     }
 }
 
 impl DerefMut for Templates<ServiceTemplate> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        & mut self.templates
+        &mut self.templates
     }
 }
-
 
 #[derive(Clone)]
 pub struct StarTemplate {
@@ -1851,7 +1836,7 @@ impl StarTemplate {
             key,
             kind,
             connections: vec![],
-            services: Templates::default()
+            services: Templates::default(),
         }
     }
 

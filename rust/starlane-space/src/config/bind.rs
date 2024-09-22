@@ -1,24 +1,21 @@
 use std::convert::TryInto;
 
-use crate::Bin;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::command::direct::Cmd;
 use crate::err::SpaceErr;
 use crate::loc::Topic;
 use crate::parse::model::{
-    BindScope, MethodScope, PipelineSegment, PipelineSegmentDef, PipelineVar, RouteScope,
-    ScopeFilters, WaveScope,
+    BindScope, MethodScope, PipelineSegmentDef, RouteScope,
+    ScopeFilters,
 };
 use crate::parse::{bind_config, Env};
 use crate::point::{Point, PointCtx, PointVar};
-use crate::selector::PayloadBlock;
 use crate::selector::PayloadBlockDef;
-use crate::substance::{Call, CallDef, Substance, SubstancePattern};
+use crate::substance::{CallDef, SubstancePattern};
 use crate::util::{ToResolved, ValueMatcher, ValuePattern};
-use crate::wave::core::{DirectedCore, MethodKind, MethodPattern};
-use crate::wave::{DirectedWave, Ping, RecipientSelector, SingularDirectedWave, Wave};
+use crate::wave::core::MethodPattern;
+use crate::wave::DirectedWave;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WaveDirection {
@@ -80,7 +77,6 @@ impl TryFrom<Vec<u8>> for BindConfig {
         bind_config(doc.as_str())
     }
 }
-
 
 pub struct Cursor {}
 

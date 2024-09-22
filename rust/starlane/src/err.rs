@@ -3,34 +3,23 @@ use crate::hyper::space::err::ErrKind;
 #[cfg(feature = "postgres")]
 use crate::registry::postgres::err::PostErr;
 
-
-
 #[derive(Debug, Clone)]
 pub struct StarErr {
     pub kind: ErrKind,
     pub message: String,
 }
 
-
-
 pub mod convert {
+    use crate::err::StarErr;
     use crate::hyper::space::err::{ErrKind, HyperErr};
     use ascii::FromAsciiError;
     use starlane_space::err::SpaceErr;
     use std::io;
-    use std::io::Error;
     use std::str::Utf8Error;
     use std::string::FromUtf8Error;
-    use bincode::ErrorKind;
-    use strum::ParseError;
     use tokio::sync::oneshot;
-    use tokio::sync::oneshot::error::RecvError;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
-    use zip::result::ZipError;
-    use crate::err::StarErr;
-
-
 
     impl From<strum::ParseError> for StarErr {
         fn from(e: strum::ParseError) -> Self {
@@ -63,7 +52,6 @@ pub mod convert {
             self.message.clone()
         }
     }
-
 
     impl From<()> for StarErr {
         fn from(_: ()) -> Self {

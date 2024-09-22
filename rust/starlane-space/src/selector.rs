@@ -34,7 +34,6 @@ impl PartialEq<Kind> for KindSelector {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct KindSelectorDef<GenericKindSelector, GenericSubKindSelector, SpecificSelector> {
     pub base: GenericKindSelector,
@@ -588,7 +587,6 @@ impl ToString for SpecificSelector {
 }
 
 pub mod specific {
-    use alloc::string::String;
     use core::ops::Deref;
     use core::str::FromStr;
 

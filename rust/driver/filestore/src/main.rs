@@ -1,9 +1,9 @@
 use clap::{Parser, Subcommand};
-use strum_macros::EnumString;
-use std::{env, fs, path::PathBuf, process};
 use std::io;
+use std::{env, fs, path::PathBuf, process};
+use strum_macros::EnumString;
 
-use std::fs::{File};
+use std::fs::File;
 use std::io::prelude::*;
 use std::io::stdin;
 use std::path::Path;

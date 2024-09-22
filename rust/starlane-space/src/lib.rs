@@ -4,46 +4,40 @@ extern crate alloc;
 extern crate async_trait;
 extern crate core;
 #[macro_use]
-extern crate enum_ordinalize;
-//# ! [feature(unboxed_closures)]
+extern crate enum_ordinalize; //# ! [feature(unboxed_closures)]
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate strum_macros;
 
 use core::str::FromStr;
-use std::cmp::Ordering;
 use std::ops::Deref;
-use std::sync::Arc;
 
-use dashmap::{DashMap, DashSet};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
 
 use artifact::asynch::ArtifactFetcher;
-use command::common::{SetProperties, SetRegistry};
+use command::common::SetProperties;
 use command::direct::create::{KindTemplate, Strategy};
 use command::direct::delete::Delete;
-use command::direct::query::{Query, QueryResult};
-use command::direct::select::{Select, SubSelect};
+use command::direct::select::Select;
 use config::bind::BindConfig;
 use config::Document;
-use kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub, UserBaseSubKind};
-use loc::{Surface, Uuid};
-use particle::{Details, Properties, Status, Stub};
+use kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, Specific, StarSub};
+use loc::Surface;
+use particle::{Details, Status, Stub};
 use point::Point;
 use selector::Selector;
 use substance::Bin;
-use substance::{Substance, SubstanceList, ToSubstance, Token};
+use substance::{Substance, ToSubstance};
 use wave::core::ReflectedCore;
 
 use crate::err::SpaceErr;
 use crate::hyper::ParticleRecord;
-use crate::security::{Access, AccessGrant};
 use crate::wave::Agent;
 
 pub mod artifact;
+pub mod asynch;
 pub mod command;
 pub mod config;
 pub mod err;
@@ -65,7 +59,6 @@ pub mod substance;
 pub mod util;
 pub mod wasm;
 pub mod wave;
-pub mod asynch;
 
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(include_str!("VERSION").trim()).unwrap());

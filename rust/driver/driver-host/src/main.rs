@@ -117,7 +117,6 @@ fn main() {
 
 #[cfg(test)]
 mod test {
-    use std::path::Path;
     use tokio::runtime::Handle;
     use virtual_fs::{host_fs, FileSystem};
 

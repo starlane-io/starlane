@@ -1,19 +1,16 @@
 use core::str::FromStr;
 use std::collections::HashMap;
-use std::ops::Deref;
-use std::process::Output;
 use std::sync::Arc;
 
-use crate::{Agent, ToSubstance, ANONYMOUS};
+use crate::Agent;
 use regex::Regex;
 use serde;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::command::common::StateSrc::Substance;
 use crate::err::SpaceErr;
 use crate::loc::{Layer, ToPoint, ToSurface, Uuid};
-use crate::parse::{to_string, CamelCase};
+use crate::parse::CamelCase;
 use crate::point::Point;
 use crate::selector::Selector;
 use crate::substance::LogSubstance;

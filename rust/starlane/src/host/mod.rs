@@ -1,5 +1,9 @@
 use crate::host::err::HostErr;
+use crate::hyper::space::err::HyperErr;
+use crate::hyper::space::service::ExeInfo;
+use crate::hyper::space::service::Executor;
 use itertools::Itertools;
+use starlane_space::wave::exchange::asynch::DirectedHandler;
 use std::collections::HashMap;
 use std::env;
 use std::fmt::Write;
@@ -7,10 +11,6 @@ use std::hash::{Hash, Hasher};
 use std::io::Read;
 use std::path::PathBuf;
 use virtual_fs::FileSystem;
-use starlane_space::wave::exchange::asynch::DirectedHandler;
-use crate::hyper::space::service::ExeInfo;
-use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::service::Executor;
 
 pub mod err;
 pub mod ext;
@@ -36,7 +36,11 @@ where
 }
 
 #[async_trait]
-pub trait ExeService where Self::ExeInfo: Clone+Hash+Eq+PartialEq, Self::Executor: Executor, Self::Err: HyperErr
+pub trait ExeService
+where
+    Self::ExeInfo: Clone + Hash + Eq + PartialEq,
+    Self::Executor: Executor,
+    Self::Err: HyperErr,
 {
     type ExeInfo;
     type Executor;
@@ -44,11 +48,9 @@ pub trait ExeService where Self::ExeInfo: Clone+Hash+Eq+PartialEq, Self::Executo
     async fn provision(&mut self, exe: Self::ExeInfo) -> Result<Self::Executor, HostErr>;
 }
 
+pub type OsStub = ExeInfo<PathBuf, HostEnv, ()>;
 
-pub type OsStub = ExeInfo<PathBuf, HostEnv,()>;
-
-
-pub trait Proc where {
+pub trait Proc {
     type StdOut;
     type StdErr;
     type StdIn;
@@ -58,9 +60,8 @@ pub trait Proc where {
     fn stdin(&mut self) -> Option<&Self::StdIn>;
 }
 
-pub type OsEnv=HostEnv;
-pub type WasmEnv=HostEnv;
-
+pub type OsEnv = HostEnv;
+pub type WasmEnv = HostEnv;
 
 #[derive(Clone, Eq, PartialEq)]
 pub struct HostEnv {
@@ -70,7 +71,7 @@ pub struct HostEnv {
 
 impl HostEnv {
     pub fn builder() -> HostEnvBuilder {
-       HostEnvBuilder::default()
+        HostEnvBuilder::default()
     }
 }
 
@@ -133,8 +134,6 @@ impl HostEnvBuilder {
     }
 }
 
-
-
 pub trait FileSystemFactory {
     fn create(
         &self,
@@ -163,4 +162,3 @@ impl FileSystemFactory for RootFileSystemFactory {
         }
     }
 }
-

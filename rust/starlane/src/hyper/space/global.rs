@@ -19,7 +19,7 @@ use starlane_space::substance::Substance;
 use starlane_space::util::{log, ToResolved};
 use starlane_space::wave::core::cmd::CmdMethod;
 use starlane_space::wave::core::ReflectedCore;
-use starlane_space::wave::exchange::asynch::{DirectedHandler, DirectedHandlerSelector, InCtx};
+use starlane_space::wave::exchange::asynch::{DirectedHandler, InCtx};
 use starlane_space::wave::{Agent, DirectedProto};
 use std::str::FromStr;
 use std::sync::Arc;

@@ -3,7 +3,7 @@ use core::str::FromStr;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
-use convert_case::{Case, Casing};
+use convert_case::Casing;
 use nom::combinator::all_consuming;
 use once_cell::sync::Lazy;
 use serde::de::{Error, Visitor};
@@ -12,29 +12,24 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use starlane_parse::{new_span, Trace, Tw};
 
 use crate::err::ParseErrs;
-use crate::hyper::ChildRegistry;
-use crate::kind::KindParts;
-use crate::log::{SpanLogger, Trackable};
+use crate::log::Trackable;
 use crate::parse::error::result;
 use crate::parse::{
-    consume_point, consume_point_ctx, kind_parts, parse_star_key, point_and_kind,
-    point_route_segment, point_selector, point_var, CamelCase, Domain, Env, ResolverErr,
+    parse_star_key
+    , Env, ResolverErr,
     SkewerCase,
 };
 use crate::particle::traversal::TraversalPlan;
 use crate::point::{
-    Point, PointDef, PointSeg, PointSegCtx, PointSegKind, PointSegPairDef, PointSegVar, RouteSeg,
-    RouteSegVar,
+    Point, PointSeg, PointSegKind, PointSegPairDef, RouteSeg
+    ,
 };
-use crate::selector::{Pattern, Selector, SpecificSelector, VersionReq};
 use crate::util::{uuid, ToResolved, ValueMatcher, ValuePattern};
-use crate::wave::exchange::asynch::Exchanger;
 use crate::wave::{
-    DirectedWave, Ping, Pong, Recipients, ReflectedWave, SingularDirectedWave, ToRecipients,
-    UltraWave, Wave,
+    Recipients, ToRecipients
+    ,
 };
-use crate::Agent::Anonymous;
-use crate::{Agent, BaseKind, Kind, KindTemplate, ParticleRecord, SpaceErr, ANONYMOUS, HYPERUSER};
+use crate::{BaseKind, SpaceErr};
 
 pub static CENTRAL: Lazy<Point> = Lazy::new(|| StarKey::central().to_point());
 pub static GLOBAL_LOGGER: Lazy<Point> = Lazy::new(|| Point::from_str("GLOBAL::logger").unwrap());
@@ -674,33 +669,43 @@ pub mod test {
     #[test]
     pub fn test_point_file() {
         let parent = Point::from_str("super:base").unwrap();
-        let point = parent.push( "/subdir/file.txt").unwrap();
+        let point = parent.push("/subdir/file.txt").unwrap();
         let filepath = point.truncate_filepath(&parent).unwrap();
-        assert_eq!( filepath, "/subdir/file.txt");
+        assert_eq!(filepath, "/subdir/file.txt");
 
-        let point = parent.push( "/dir/subdir/").unwrap();
+        let point = parent.push("/dir/subdir/").unwrap();
         let filepath = point.truncate_filepath(&parent).unwrap();
-        assert_eq!( filepath, "/dir/subdir/");
+        assert_eq!(filepath, "/dir/subdir/");
     }
 
     #[test]
     pub fn test_chop_relative() {
         let parent = Point::from_str("super:base").unwrap();
-        let point = parent.push( "/subdir/file.txt").unwrap();
+        let point = parent.push("/subdir/file.txt").unwrap();
         let filepath = point.relative_segs(&parent).unwrap();
-        assert_eq!( filepath, vec!["/","subdir/","file.txt"].into_iter().map(|s| s.to_string()).collect::<Vec<String>>());
-
+        assert_eq!(
+            filepath,
+            vec!["/", "subdir/", "file.txt"]
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>()
+        );
 
         let root = Point::from_str("super").unwrap();
         let filepath = parent.relative_segs(&root).unwrap();
-        assert_eq!( filepath, vec!["base"].into_iter().map(|s| s.to_string()).collect::<Vec<String>>());
+        assert_eq!(
+            filepath,
+            vec!["base"]
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>()
+        );
 
         assert!(root.relative_segs(&parent).is_err());
 
         let bad = Point::from_str("super:ugly").unwrap();
 
         assert!(point.relative_segs(&bad).is_err());
-
     }
 
     #[test]

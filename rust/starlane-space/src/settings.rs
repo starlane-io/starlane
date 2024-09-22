@@ -1,4 +1,4 @@
-use crate::wave::{Ping, WaitTime};
+use crate::wave::WaitTime;
 
 // measured in seconds
 #[derive(Clone)]

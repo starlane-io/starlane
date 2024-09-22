@@ -11,11 +11,11 @@ pub mod global;
 pub mod layer;
 pub mod machine;
 pub mod mem;
+pub mod platform;
 pub mod reg;
+pub mod service;
 pub mod star;
 pub mod tests;
-pub mod platform;
-pub mod service;
 
 #[no_mangle]
 pub extern "C" fn starlane_uuid() -> String {
@@ -26,4 +26,3 @@ pub extern "C" fn starlane_uuid() -> String {
 pub extern "C" fn starlane_timestamp() -> Timestamp {
     Timestamp::new(Utc::now().timestamp_millis())
 }
-

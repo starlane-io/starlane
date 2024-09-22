@@ -8,13 +8,14 @@ use std::time::Duration;
 
 use serde::Serialize;
 
-use crate::hyper::lane::HyperClient;
 use crate::driver::control::ControlClient;
+use crate::err::StarErr;
+use crate::hyper::lane::HyperClient;
 use crate::hyper::space::machine::MachineApiExtFactory;
 use crate::hyper::space::mem::cosmos::MemCosmos;
 use crate::hyper::space::mem::registry::MemRegCtx;
-use crate::hyper::space::star::HyperStarApi;
 use crate::hyper::space::platform::Platform;
+use crate::hyper::space::star::HyperStarApi;
 use starlane_space::command::common::StateSrc;
 use starlane_space::command::direct::create::{
     Create, PointSegTemplate, PointTemplate, Strategy, Template,
@@ -37,7 +38,6 @@ use starlane_space::wave::core::{Method, ReflectedCore};
 use starlane_space::wave::exchange::asynch::Exchanger;
 use starlane_space::wave::{Agent, DirectedProto, Pong, Wave};
 use starlane_space::HYPERUSER;
-use crate::err::StarErr;
 
 lazy_static! {
     pub static ref LESS: Point = Point::from_str("space:users:less").expect("point");

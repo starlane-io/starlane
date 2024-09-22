@@ -1,5 +1,4 @@
 use crate::err::SpaceErr;
-use crate::loc;
 use crate::loc::Uuid;
 use crate::parse::Env;
 use crate::wasm::{starlane_timestamp, starlane_uuid, Timestamp};
@@ -54,18 +53,16 @@ impl ToString for HttpMethodPattern {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq )]
-pub enum OptSelector<S>
-{
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum OptSelector<S> {
     Some,
     None,
     Always,
     Never,
-    Selector(S)
+    Selector(S),
 }
 
-impl<S> OptSelector<S>
-{
+impl<S> OptSelector<S> {
     pub fn always() -> OptSelector<S> {
         Self::Always
     }
@@ -85,10 +82,12 @@ impl<S> OptSelector<S>
     pub fn selector(selector: S) -> Self {
         Self::Selector(selector)
     }
-
 }
 
-impl <S,V> PartialEq<Option<V>> for OptSelector<S> where S: PartialEq<V> {
+impl<S, V> PartialEq<Option<V>> for OptSelector<S>
+where
+    S: PartialEq<V>,
+{
     fn eq(&self, opt: &Option<V>) -> bool {
         match self {
             OptSelector::Some => opt.is_some(),
@@ -97,7 +96,7 @@ impl <S,V> PartialEq<Option<V>> for OptSelector<S> where S: PartialEq<V> {
             OptSelector::Never => false,
             OptSelector::Selector(selector) => {
                 if let Option::Some(v) = opt.as_ref() {
-                   *selector == *v
+                    *selector == *v
                 } else {
                     false
                 }
@@ -106,10 +105,10 @@ impl <S,V> PartialEq<Option<V>> for OptSelector<S> where S: PartialEq<V> {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq )]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum IdSelector<V>
 where
-    V: Eq + PartialEq+Hash,
+    V: Eq + PartialEq + Hash,
 {
     Always,
     Never,
@@ -145,17 +144,20 @@ where
     }
 }
 
-impl <V> PartialEq<V> for IdSelector<V> where V: Eq + PartialEq +Hash {
+impl<V> PartialEq<V> for IdSelector<V>
+where
+    V: Eq + PartialEq + Hash,
+{
     fn eq(&self, value: &V) -> bool {
         match self {
             IdSelector::Always => true,
             IdSelector::Never => false,
-            IdSelector::Set(set) => set.contains(value)
+            IdSelector::Set(set) => set.contains(value),
         }
     }
 }
 
-#[derive(Debug, Clone,Eq,PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum MatchSelector<S, V>
 where
     S: PartialEq<V> + Hash + Eq + PartialEq,
@@ -431,12 +433,9 @@ pub fn log<R>(result: Result<R, SpaceErr>) -> Result<R, SpaceErr> {
 
 #[cfg(test)]
 pub mod test {
-    use crate::parse::model::RegexStr;
-    use crate::util::{IdSelector, MatchSelector, RegexMatcher};
-    use serde::{Deserialize, Serialize};
-    use std::marker::PhantomData;
+    use crate::util::{IdSelector, MatchSelector};
 
-    #[derive(Clone,Eq,PartialEq,Hash)]
+    #[derive(Clone, Eq, PartialEq, Hash)]
     struct TestValue {
         pub name: String,
     }

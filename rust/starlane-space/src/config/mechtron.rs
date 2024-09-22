@@ -1,9 +1,8 @@
 use crate::parse::mechtron_config;
 use crate::parse::model::MechtronScope;
 use crate::point::Point;
-use crate::{Bin, SpaceErr};
+use crate::SpaceErr;
 use core::str::FromStr;
-use serde::de::Unexpected::Option;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -48,5 +47,3 @@ impl TryFrom<Vec<u8>> for MechtronConfig {
         mechtron_config(doc.as_str())
     }
 }
-
-

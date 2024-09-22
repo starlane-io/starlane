@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicU16, Ordering};
+use std::sync::atomic::AtomicU16;
 use std::sync::Arc;
 
 use dashmap::{DashMap, DashSet};
@@ -13,19 +13,19 @@ use starlane_space::parse::{command_line, Env};
 use starlane_space::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
 use starlane_space::point::Point;
 use starlane_space::substance::Substance;
-use starlane_space::util::{log, ToResolved};
+use starlane_space::util::ToResolved;
 use starlane_space::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
 use starlane_space::wave::exchange::asynch::{
     DirectedHandler, Exchanger, InCtx, ProtoTransmitterBuilder, RootInCtx,
 };
 use starlane_space::wave::exchange::SetStrategy;
 use starlane_space::wave::{
-    BounceBacks, DirectedKind, DirectedProto, DirectedWave, Pong, ReflectedWave, UltraWave, Wave,
+    DirectedProto, DirectedWave, Pong, UltraWave, Wave,
     WaveId,
 };
 
-use crate::hyper::space::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
 use crate::hyper::space::platform::Platform;
+use crate::hyper::space::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
 
 #[derive(DirectedHandler)]
 pub struct Shell<P>

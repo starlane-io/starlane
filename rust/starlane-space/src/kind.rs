@@ -16,7 +16,7 @@ use crate::parse::error::result;
 use crate::parse::{kind_parts, specific, CamelCase, Domain, SkewerCase};
 use crate::particle::traversal::TraversalPlan;
 use crate::selector::{
-    KindSelector, KindSelectorDef, Pattern, SpecificSelector, SubKindSelector, VersionReq,
+    KindSelector, Pattern, SpecificSelector, SubKindSelector, VersionReq,
 };
 use crate::util::ValuePattern;
 use crate::{KindTemplate, SpaceErr};
@@ -231,8 +231,7 @@ impl TryFrom<CamelCase> for BaseKind {
 /// At minimum a Kind must have a BaseKind, it can also have a SubKind and a Specific.
 /// A Particle's complete Kind definition is used to match it with a Driver in the Hyperverse
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
-pub enum
-Kind {
+pub enum Kind {
     Root,
     Space,
     User,
@@ -256,11 +255,6 @@ Kind {
     Guest,
     Native(NativeSub),
 }
-
-
-
-
-
 
 impl ToBaseKind for Kind {
     fn to_base(&self) -> BaseKind {
@@ -781,7 +775,6 @@ impl TryInto<SpecificSelector> for Specific {
 
 #[cfg(test)]
 pub mod test {
-    use crate::parse::kind_selector;
     use crate::selector::KindSelector;
     use crate::{Kind, SpaceErr, StarSub};
     use core::str::FromStr;

@@ -3,9 +3,9 @@ use crate::driver::{
     ItemHandler, ItemSphere,
 };
 use crate::hyper::space::err::HyperErr;
+use crate::hyper::space::platform::Platform;
 use crate::hyper::space::reg::Registration;
 use crate::hyper::space::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::hyper::space::platform::Platform;
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use starlane_space::artifact::ArtRef;
@@ -30,7 +30,7 @@ use starlane_space::wave::core::http2::StatusCode;
 use starlane_space::wave::core::hyp::HypMethod;
 use starlane_space::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
 use starlane_space::wave::exchange::asynch::{
-    InCtx, ProtoTransmitter, ProtoTransmitterBuilder, Router,
+    InCtx, ProtoTransmitter, ProtoTransmitterBuilder,
 };
 use starlane_space::wave::exchange::SetStrategy;
 use starlane_space::wave::{
@@ -41,12 +41,11 @@ use starlane_space::HYPERUSER;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::marker::PhantomData;
-use std::ops::{Add, Deref};
+use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 use tokio_print::aprintln;
-use tracing::error;
 
 static STAR_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
     ArtRef::new(

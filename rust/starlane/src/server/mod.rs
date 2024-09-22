@@ -1,21 +1,20 @@
 use crate::err::StarErr;
 use std::collections::HashSet;
 
+use crate::driver::base::BaseDriverFactory;
+use crate::driver::control::ControlDriverFactory;
+use crate::driver::root::RootDriverFactory;
+use crate::driver::space::SpaceDriverFactory;
+use crate::driver::{DriverAvail, DriversBuilder};
 use crate::env::{
     STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_REGISTRY_DATABASE,
     STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_URL, STARLANE_REGISTRY_USER,
 };
 use crate::hyper::lane::tcp::{CertGenerator, HyperlaneTcpServer};
 use crate::hyper::lane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
-use crate::driver::base::BaseDriverFactory;
-use crate::driver::control::ControlDriverFactory;
-use crate::driver::root::RootDriverFactory;
-use crate::driver::space::SpaceDriverFactory;
-use crate::driver::{DriverAvail, DriversBuilder};
 use crate::hyper::space::machine::MachineTemplate;
-use crate::hyper::space::mem::registry::{MemRegApi, MemRegCtx};
-use crate::hyper::space::reg::{Registry, RegistryWrapper};
 use crate::hyper::space::platform::Platform;
+use crate::hyper::space::reg::{Registry, RegistryWrapper};
 use crate::registry::postgres::{
     PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
@@ -191,9 +190,6 @@ impl Platform for Starlane {
                 .unwrap();
         server.start().unwrap();
     }
-
-
-
 }
 
 #[cfg(feature = "postgres")]

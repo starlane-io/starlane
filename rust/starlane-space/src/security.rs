@@ -1,18 +1,17 @@
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::ops;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 use std::str::FromStr;
 
 use nom::combinator::all_consuming;
-use nom_supreme::parser_ext::MapRes;
 use serde::{Deserialize, Serialize};
 
 use starlane_parse::new_span;
 
 use crate::err::SpaceErr;
 use crate::parse::error::result;
-use crate::parse::{particle_perms, permissions, permissions_mask, privilege, MapResolver};
+use crate::parse::{particle_perms, permissions, permissions_mask, privilege};
 use crate::point::Point;
 use crate::selector::{PointHierarchy, Selector};
 use crate::wave::ScopeGrant;

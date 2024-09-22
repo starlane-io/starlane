@@ -2,9 +2,6 @@ use alloc::string::String;
 
 use serde::{Deserialize, Serialize};
 
-use crate::err::SpaceErr;
-use crate::kind::Specific;
-
 pub mod mesh {
     use alloc::string::String;
 
@@ -48,7 +45,7 @@ pub mod resource {
 
     use serde::{Deserialize, Serialize};
 
-    use crate::fail::{Bad, BadCoercion, BadRequest, Conditional, Messaging, NotFound};
+    use crate::fail::{BadCoercion, BadRequest, Conditional, Messaging};
     use crate::point::Point;
 
     #[derive(Debug, Clone, Serialize, Deserialize)]

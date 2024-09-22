@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +14,7 @@ use crate::wave::core::ext::ExtMethod;
 use crate::wave::core::http2::{HttpMethod, StatusCode};
 use crate::wave::core::hyp::HypMethod;
 use crate::wave::{Bounce, Ping, Pong, ToRecipients, WaveId};
-use crate::{Bin, SpaceErr, Substance, Surface, ToSubstance};
+use crate::{SpaceErr, Substance, Surface, ToSubstance};
 use url::Url;
 
 pub mod cmd;

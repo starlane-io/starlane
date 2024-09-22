@@ -2,10 +2,13 @@
 
 #[macro_use]
 extern crate lazy_static;
-
 #[macro_use]
 extern crate starlane_macros;
 
+use mechtron::err::{GuestErr, MechErr};
+use mechtron::guest::GuestSkel;
+use mechtron::{guest, Guest, MechtronFactories, MechtronFactory, Platform};
+use mechtron::{Mechtron, MechtronLifecycle, MechtronSkel};
 use starlane_macros::handler_sync;
 use starlane_space::err::SpaceErr;
 use starlane_space::log::{PointLogger, RootLogger};
@@ -14,11 +17,6 @@ use starlane_space::wave::core::CoreBounce;
 use starlane_space::wave::exchange::synch::{
     DirectedHandler, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx,
 };
-use mechtron::err::{GuestErr, MechErr};
-use mechtron::guest::GuestSkel;
-use mechtron::{guest, Guest, MechtronFactories, MechtronFactory, Platform};
-use mechtron::{Mechtron, MechtronLifecycle, MechtronSkel};
-use std::marker::PhantomData;
 use std::sync::Arc;
 
 #[no_mangle]

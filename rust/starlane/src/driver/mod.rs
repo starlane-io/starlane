@@ -7,10 +7,11 @@ pub mod root;
 pub mod space;
 pub mod star;
 
+use crate::driver::star::StarDriverFactory;
 use crate::hyper::space::err::HyperErr;
+use crate::hyper::space::platform::Platform;
 use crate::hyper::space::reg::{Registration, Registry};
 use crate::hyper::space::star::{HyperStarSkel, LayerInjectionRouter};
-use crate::hyper::space::platform::Platform;
 use dashmap::DashMap;
 use futures::future::select_all;
 use futures::task::Spawn;
@@ -52,7 +53,6 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
-use crate::driver::star::StarDriverFactory;
 
 static DEFAULT_BIND: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
     ArtRef::new(
@@ -1212,7 +1212,10 @@ where
     layer: Layer,
 }
 
-impl<P> DriverRunner<P> where P: Platform + 'static {
+impl<P> DriverRunner<P>
+where
+    P: Platform + 'static,
+{
     pub fn new(
         skel: DriverSkel<P>,
         star_skel: HyperStarSkel<P>,
@@ -1251,8 +1254,6 @@ impl<P> DriverRunner<P>
 where
     P: Platform + 'static,
 {
-
-
     fn start(mut self) {
         tokio::spawn(async move {
             while let Some(call) = self.call_rx.recv().await {
@@ -1410,8 +1411,6 @@ where
     }
 }
 
-
-
 #[derive(Clone)]
 pub struct DriverCtx {
     pub transmitter: ProtoTransmitter,
@@ -1419,7 +1418,7 @@ pub struct DriverCtx {
 
 impl DriverCtx {
     pub fn new(transmitter: ProtoTransmitter) -> Self {
-        Self { transmitter}
+        Self { transmitter }
     }
 }
 
@@ -1604,7 +1603,7 @@ where
 #[async_trait]
 pub trait HyperDriverFactory<P>: Send + Sync
 where
-    P: Platform
+    P: Platform,
 {
     fn kind(&self) -> KindSelector;
 
@@ -2014,4 +2013,3 @@ where
         self.skel.api.driver_bind().await
     }
 }
-

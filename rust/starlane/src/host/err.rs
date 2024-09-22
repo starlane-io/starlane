@@ -1,5 +1,4 @@
 use std::fmt::Display;
-use crate::hyper::space::err::HyperErr;
 
 #[derive(Clone, Debug)]
 pub struct HostErr {
@@ -11,9 +10,6 @@ impl HostErr {
         self.message.clone()
     }
 }
-
-
-
 
 /*
 impl ToString for Err {

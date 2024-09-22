@@ -6,7 +6,6 @@ use starlane_space::command::direct::query::{Query, QueryResult};
 use starlane_space::command::direct::select::{Select, SubSelect};
 use starlane_space::hyper::{ParticleLocation, ParticleRecord};
 use starlane_space::kind::Kind;
-use starlane_space::loc::LOCAL_STAR;
 use starlane_space::particle::{Details, Properties, Status, Stub};
 use starlane_space::point::Point;
 use starlane_space::security::{Access, AccessGrant, IndexedAccessGrant};

@@ -1,8 +1,8 @@
 pub mod err;
 
 use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::reg::{Registration, RegistryApi};
 use crate::hyper::space::platform::Platform;
+use crate::hyper::space::reg::{Registration, RegistryApi};
 use err::PostErr;
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgPoolOptions, PgRow};
@@ -1577,11 +1577,13 @@ pub mod test {
     use std::str::FromStr;
     use std::sync::Arc;
 
-    use crate::hyper::lane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
     use crate::driver::DriversBuilder;
+    use crate::err::StarErr;
+    use crate::hyper::lane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
+    use crate::hyper::space::err::HyperErr;
     use crate::hyper::space::machine::MachineTemplate;
-    use crate::hyper::space::reg::{Registration, Registry};
     use crate::hyper::space::platform::Platform;
+    use crate::hyper::space::reg::{Registration, Registry};
     use crate::registry::postgres::{
         PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
         PostgresRegistryContextHandle,
@@ -1599,8 +1601,6 @@ pub mod test {
     use starlane_space::security::{AccessGrant, AccessGrantKind, PermissionsMask, Privilege};
     use starlane_space::selector::{PointHierarchy, Selector};
     use starlane_space::HYPERUSER;
-    use crate::err::StarErr;
-    use crate::hyper::space::err::HyperErr;
 
     #[derive(Clone)]
     pub struct TestPlatform {

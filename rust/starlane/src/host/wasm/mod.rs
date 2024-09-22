@@ -4,6 +4,7 @@ mod source;
 use crate::host::err::HostErr;
 use crate::host::wasm::cache::WasmModuleCache;
 use crate::host::FileSystemFactory;
+use crate::hyper::space::service::OsProcess;
 use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
@@ -13,7 +14,6 @@ use wasmer::{Module, Store};
 use wasmer_compiler_singlepass::Singlepass;
 use wasmer_wasix::runtime::task_manager::tokio::TokioTaskManager;
 use wasmer_wasix::{PluggableRuntime, WasiEnv};
-use crate::hyper::space::service::OsProcess;
 
 pub struct WasmService {
     store: Store,
@@ -330,9 +330,6 @@ pub mod test {
     use crate::host::wasm::source::FileSystemSrc;
     use crate::host::wasm::{WasmHostConfig, WasmService};
     use crate::host::{FileSystemFactory, RootFileSystemFactory};
-    use std::io::Write;
-    use std::path::Path;
-    use std::sync::Arc;
     use tokio::io::AsyncReadExt;
     use tokio::runtime::Handle;
     use virtual_fs::{FileSystem, Pipe};

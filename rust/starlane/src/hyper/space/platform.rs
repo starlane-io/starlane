@@ -1,22 +1,20 @@
-use std::path::{absolute, PathBuf};
-use starlane_space::artifact::asynch::ArtifactApi;
-use starlane_space::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind};
-use starlane_space::loc::{MachineName, StarKey, ToBaseKind};
-use starlane_space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
-use std::sync::Arc;
-use starlane_space::command::direct::create::KindTemplate;
-use starlane_space::err::SpaceErr;
-use starlane_space::log::RootLogger;
-use starlane_space::settings::Timeouts;
-use std::str::FromStr;
-use starlane_space::point::Point;
-use starlane_space::selector::KindSelector;
 use crate::driver::DriversBuilder;
-use crate::env::STARLANE_DATA_DIR;
 use crate::hyper::lane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
 use crate::hyper::space::err::HyperErr;
 use crate::hyper::space::machine::{Machine, MachineApi, MachineTemplate};
 use crate::hyper::space::reg::Registry;
+use starlane_space::artifact::asynch::ArtifactApi;
+use starlane_space::command::direct::create::KindTemplate;
+use starlane_space::err::SpaceErr;
+use starlane_space::kind::{
+    ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind,
+};
+use starlane_space::loc::{MachineName, StarKey, ToBaseKind};
+use starlane_space::log::RootLogger;
+use starlane_space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
+use starlane_space::settings::Timeouts;
+use std::str::FromStr;
+use std::sync::Arc;
 
 #[async_trait]
 pub trait Platform: Send + Sync + Sized + Clone
@@ -33,7 +31,6 @@ where
     type StarAuth;
     type RemoteStarConnectionFactory;
 
-
     fn machine(&self) -> MachineApi<Self> {
         Machine::new(self.clone())
     }
@@ -47,7 +44,7 @@ where
     fn machine_template(&self) -> MachineTemplate;
     fn machine_name(&self) -> MachineName;
 
-//    fn select_service(&self, kind: &KindSelector, star: &StarKey, point: &Point ) ->
+    //    fn select_service(&self, kind: &KindSelector, star: &StarKey, point: &Point ) ->
 
     fn properties_config(&self, kind: &Kind) -> PropertiesConfig {
         let mut builder = PropertiesConfigBuilder::new();

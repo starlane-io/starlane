@@ -2,7 +2,6 @@ use crate::err::StarErr;
 use crate::hyper::space::err::{ErrKind, HyperErr};
 use starlane_space::err::SpaceErr;
 
-
 impl HyperErr for StarErr {
     fn to_space_err(&self) -> SpaceErr {
         SpaceErr::server_error(self.to_string())

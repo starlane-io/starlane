@@ -30,8 +30,7 @@ pub mod common {
 
     use crate::err::SpaceErr;
     use crate::loc::Variable;
-    use crate::parse::model::Var;
-    use crate::substance::{Substance, SubstanceMap};
+    use crate::substance::Substance;
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
     pub enum StateSrcVar {
@@ -183,20 +182,7 @@ pub mod direct {
     use crate::command::direct::select::Select;
     use crate::command::direct::set::Set;
     use crate::command::direct::write::Write;
-    use crate::err::SpaceErr;
-    use crate::fail;
-    use crate::fail::{BadRequest, Fail, NotFound};
-    use crate::kind::{BaseKind, KindParts};
-    use crate::loc::Meta;
-    use crate::point::Point;
-    use crate::selector::KindSelector;
-    use crate::substance::Bin;
-    use crate::substance::{FormErrs, Substance};
-    use crate::util::{ValueMatcher, ValuePattern};
-    use crate::wave::core::ext::ExtMethod;
-    use crate::wave::core::http2::HttpMethod;
-    use crate::wave::core::MethodKind;
-    use crate::wave::core::ReflectedCore;
+    use crate::util::ValueMatcher;
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub enum Cmd {
@@ -310,7 +296,6 @@ pub mod direct {
     pub mod get {
         use serde::{Deserialize, Serialize};
 
-        use crate::command::common::SetProperties;
         use crate::err::SpaceErr;
         use crate::parse::Env;
         use crate::point::{Point, PointCtx, PointVar};
@@ -364,25 +349,22 @@ pub mod direct {
         use std::sync::Arc;
 
         use serde::{Deserialize, Serialize};
-        use tokio::sync::Mutex;
 
-        use crate::command::common::{SetProperties, SetRegistry, StateSrc, StateSrcVar};
+        use crate::command::common::{SetProperties, StateSrc, StateSrcVar};
         use crate::command::Command;
         use crate::err::SpaceErr;
         use crate::kind::{BaseKind, KindParts};
-        use crate::loc::{HostKey, PointFactory, ToSurface};
-        use crate::parse::model::Subst;
+        use crate::loc::{PointFactory, ToSurface};
         use crate::parse::{CamelCase, Env, ResolverErr};
         use crate::point::{Point, PointCtx, PointSeg, PointVar};
         use crate::selector::SpecificSelector;
         use crate::substance::Bin;
         use crate::substance::Substance;
-        use crate::util::{ConvertFrom, ToResolved};
+        use crate::util::ToResolved;
         use crate::wave::core::cmd::CmdMethod;
         use crate::wave::core::ext::ExtMethod;
-        use crate::wave::core::hyp::HypMethod;
         use crate::wave::core::DirectedCore;
-        use crate::wave::{DirectedProto, Ping, Wave};
+        use crate::wave::DirectedProto;
 
         pub enum PointTemplateSeg {
             ExactSeg(PointSeg),
@@ -696,20 +678,17 @@ pub mod direct {
     }
 
     pub mod select {
-        use std::collections::{HashMap, HashSet};
         use std::convert::{TryFrom, TryInto};
-        use std::marker::PhantomData;
 
         use serde::{Deserialize, Serialize};
 
         use crate::err::SpaceErr;
-        use crate::fail::{BadCoercion, Fail};
         use crate::parse::Env;
         use crate::particle::Stub;
         use crate::point::Point;
-        use crate::selector::{Hop, HopCtx, HopVar, PointHierarchy, Selector, SelectorDef};
+        use crate::selector::{Hop, PointHierarchy, Selector, SelectorDef};
         use crate::substance::{MapPattern, Substance, SubstanceList};
-        use crate::util::{ConvertFrom, ToResolved};
+        use crate::util::ToResolved;
 
         #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
         pub enum SelectIntoSubstance {
@@ -870,7 +849,7 @@ pub mod direct {
     pub mod delete {
         use serde::{Deserialize, Serialize};
 
-        use crate::command::direct::select::{PropertiesPattern, Select, SelectIntoSubstance};
+        use crate::command::direct::select::{Select, SelectIntoSubstance};
         use crate::err::SpaceErr;
         use crate::parse::Env;
         use crate::selector::{Hop, SelectorDef};
@@ -905,7 +884,6 @@ pub mod direct {
 
         use serde::{Deserialize, Serialize};
 
-        use crate::command::common::SetProperties;
         use crate::err::SpaceErr;
         use crate::parse::Env;
         use crate::point::{Point, PointCtx, PointVar};
@@ -984,7 +962,6 @@ pub mod direct {
 
         use serde::{Deserialize, Serialize};
 
-        use crate::command::direct::Cmd;
         use crate::err::SpaceErr;
         use crate::selector::PointHierarchy;
 

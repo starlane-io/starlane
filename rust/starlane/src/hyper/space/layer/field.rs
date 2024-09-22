@@ -23,8 +23,8 @@ use starlane_space::wave::{
 };
 
 use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::star::{HyperStarSkel, TraverseToNextRouter};
 use crate::hyper::space::platform::Platform;
+use crate::hyper::space::star::{HyperStarSkel, TraverseToNextRouter};
 
 pub struct Field<P>
 where

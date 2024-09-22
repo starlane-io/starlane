@@ -1,49 +1,27 @@
 use ::core::borrow::Borrow;
-use alloc::borrow::Cow;
 use std::collections::{HashMap, HashSet};
-use std::convert::Infallible;
-use std::env::var;
-use std::marker::PhantomData;
 use std::ops;
 use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
-use std::time::Duration;
 
-use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
-use tokio::time::Instant;
 
-use exchange::asynch::ProtoTransmitter;
-use starlane_parse::{Res, SpanExtra};
-use starlane_primitive_macros::Autobox;
-
-use crate::command::Command;
 use crate::command::RawCommand;
-use crate::config::bind::RouteSelector;
 use crate::err::{CoreReflector, SpaceErr, StatusErr};
-use crate::hyper::AssignmentKind;
-use crate::hyper::InterchangeKind::DefaultControl;
-use crate::kind::Sub;
-use crate::loc::StarKey;
-use crate::loc::{Layer, Surface, SurfaceSelector, ToPoint, ToSurface, Topic, Uuid};
+use crate::loc::{Surface, ToPoint, ToSurface, Uuid};
 use crate::log::{
-    LogSpan, LogSpanEvent, PointLogger, RootLogger, SpanLogger, Spannable, Trackable, TrailSpanId,
+    Spannable, Trackable, TrailSpanId,
 };
 use crate::parse::model::Subst;
-use crate::parse::sub;
 use crate::particle::Watch;
-use crate::particle::{Details, Status};
 use crate::point::{Point, PointSeg, RouteSeg};
-use crate::security::{Permissions, Privilege, Privileges};
+use crate::security::{Permissions, Privilege};
 use crate::selector::Selector;
-use crate::settings::Timeouts;
 use crate::substance::Bin;
 use crate::substance::{
-    Call, CallKind, CmdCall, ExtCall, FormErrs, HttpCall, HypCall, MultipartFormBuilder, Substance,
-    SubstanceKind, ToRequestCore, ToSubstance, Token,
+    Call, CallKind, CmdCall, ExtCall, HttpCall, HypCall, Substance
+    , ToRequestCore, ToSubstance,
 };
-use crate::util::{uuid, ValueMatcher, ValuePattern};
+use crate::util::{uuid, ValueMatcher};
 use crate::wave::core::http2::StatusCode;
 use crate::{ANONYMOUS, HYPERUSER};
 use url::Url;

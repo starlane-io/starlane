@@ -12,7 +12,6 @@ pub enum ErrKind {
     Status(u16),
 }
 
-
 /*
 #[derive(Debug, Clone)]
 pub struct CosmicErr {

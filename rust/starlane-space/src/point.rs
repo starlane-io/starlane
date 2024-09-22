@@ -1,8 +1,8 @@
 use core::str::FromStr;
-use std::path::PathBuf;
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 use starlane_parse::{new_span, Trace};
+use std::path::PathBuf;
 
 use crate::err::{ParseErrs, SpaceErr};
 use crate::loc::{
@@ -485,14 +485,6 @@ impl PointSeg {
     }
 }
 
-
-
-
-
-
-
-
-
 impl PointSegment for PointSeg {}
 
 impl PointSegment for PointSegCtx {}
@@ -936,15 +928,13 @@ where
 }
 
 impl Point {
-
     pub fn to_path(&self) -> PathBuf {
         let mut path = String::new();
         for seg in &self.segments {
-            path.push_str( seg.to_path_segment().as_str() );
+            path.push_str(seg.to_path_segment().as_str());
         }
         PathBuf::from(path)
     }
-
 
     pub fn to_agent(&self) -> Agent {
         if *self == *HYPERUSER {

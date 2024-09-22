@@ -7,8 +7,8 @@ use crate::wave::exchange::{
 };
 use crate::wave::{
     Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, FromReflectedAggregate,
-    Handling, Ping, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto, ReflectedWave,
-    Scope, UltraWave, Wave, WaveKind,
+    Handling, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto, ReflectedWave,
+    Scope, UltraWave, Wave,
 };
 use crate::{Agent, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
 use alloc::borrow::Cow;
