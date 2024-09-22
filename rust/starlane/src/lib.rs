@@ -25,6 +25,10 @@ pub mod cli;
 //pub mod store;
 pub mod driver;
 
+
+#[cfg(feature = "dialect-cli")]
+pub mod dialect;
+
 pub fn init() {
     #[cfg(feature = "cli")]
     {

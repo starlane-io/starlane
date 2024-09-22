@@ -28,6 +28,8 @@ postgres=[ "dep:sqlx","dep:serde","dep:tracing","dep:async-recursion" ]
 parse=["dep:nom", "dep:nom-supreme", "dep:nom_locate"]
 rustls=["dep:rustls","dep:rcgen","rustls-pemfile"]
 driver=["hyperspace"]
+dialect=[]
+dialect-cli=["dialect","dep:clap"]
 
 [dependencies]
 starlane-space = { workspace = true}

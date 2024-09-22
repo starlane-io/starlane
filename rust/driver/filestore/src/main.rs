@@ -17,8 +17,8 @@ struct Cli {
 
 #[derive(Debug, Subcommand, EnumString, strum_macros::Display)]
 enum Commands {
-    Write {path: PathBuf,
-    },
+    Init,
+    Write {path: PathBuf },
     Read {path: PathBuf},
     Mkdir{ path: PathBuf },
     Delete { path: PathBuf },

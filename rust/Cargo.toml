@@ -17,11 +17,12 @@ default-run = "starlane"
 resolver = "2"
 members = [
   "starlane", "starlane-macros", "starlane-primitive-macros","mechtron"
-  , "starlane-space", "starlane-parse"]
+  , "starlane-space", "starlane-parse", "ext/service/starlane-cli-local-filestore-service"]
 
 exclude = [ ]
 
 [workspace.dependencies]
+starlane = { path="./starlane" }
 starlane-macros = { path="./starlane-macros"}
 starlane-primitive-macros = { path="./starlane-primitive-macros"}
 starlane-space = { path="./starlane-space"}

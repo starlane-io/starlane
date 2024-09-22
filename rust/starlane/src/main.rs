@@ -31,7 +31,11 @@ pub mod cli;
 
 pub mod driver;
 
-//pub mod store;
+//pub mod store
+// ;
+
+#[cfg(feature = "dialect-cli")]
+pub mod dialect;
 
 use crate::cli::{Cli, Commands};
 use crate::err::StarErr;

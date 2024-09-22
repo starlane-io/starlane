@@ -1,0 +1,16 @@
+[package]
+name = "starlane-cli-filestore-service"
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+description.workspace = true
+
+[dependencies]
+starlane = {workspace = true, features=["dialect-cli"]}
+clap = {workspace = true}
+thiserror = {workspace=true}
+once_cell = {workspace = true}
