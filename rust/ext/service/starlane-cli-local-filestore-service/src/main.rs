@@ -16,30 +16,13 @@ pub fn root_dir() -> Result<PathBuf,Error> {
     Ok(absolute(env::var(FILE_STORE_ROOT)?)?)
 }
 
-struct Status {
-    code: ExitCode
-}
 
-impl Status {
-    pub fn new(code: ExitCode) -> Self {
-        Self {
-            code
-        }
-    }
-}
-
-impl Termination for Status {
-    fn report(self) -> ExitCode {
-        self.code.clone()
-    }
-}
-
-fn main() -> Status {
+fn main() -> ExitCode{
     match run() {
-        Ok(_) => Status::new(ExitCode::SUCCESS),
+        Ok(_) => ExitCode::SUCCESS,
         Err(err) => {
             eprintln!("{}",err.to_string());
-            Status::new(ExitCode::FAILURE)
+            ExitCode::FAILURE
         }
     }
 }

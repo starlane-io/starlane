@@ -776,17 +776,36 @@ where
 #[cfg(test)]
 pub mod tests {
     use crate::host::{HostEnv, OsEnv};
-    use crate::hyper::space::service::{stringify_args, CliHost, ExeInfo, Executor, Host, HostApi};
+    use crate::hyper::space::service::{stringify_args, CliHost, Dialect, ExeInfo, Executor, Host, HostApi};
     use crate::hyper::space::service::{ExeStub, HostKind};
     use std::{env, io, process};
     use std::path::{absolute, PathBuf};
+    use std::str::FromStr;
     use itertools::process_results;
     use nom::AsBytes;
     use tokio::fs;
     use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
     use wasmer::IntoBytes;
+    use starlane_space::command::common::StateSrc;
+    use starlane_space::hyper::{Assign, AssignmentKind, HyperSubstance};
+    use starlane_space::kind::{FileSubKind, Kind};
+    use starlane_space::loc::ToSurface;
+    use starlane_space::log::RootLogger;
+    use starlane_space::particle::{Details, Status, Stub};
+    use starlane_space::point::Point;
+    use starlane_space::substance::Substance;
+    use starlane_space::substance::SubstanceKind::DirectedCore;
+    use starlane_space::wave::{DirectedKind, DirectedProto};
+    use starlane_space::wave::core::cmd::CmdMethod;
+    use starlane_space::wave::core::hyp::HypMethod;
+    use starlane_space::wave::exchange::asynch::{RootInCtx, TxRouter};
+    use starlane_space::wave::exchange::synch::ProtoTransmitterBuilder;
+    use crate::driver::ItemSphere::Router;
+    use crate::hyper::space::service::ServiceCommand::DirectedWave;
 
     fn cli_host() -> Host {
+
+        std::fs::remove_dir_all("./tmp").unwrap();
         let mut builder = HostEnv::builder();
         builder.pwd(
             absolute(env::current_dir().unwrap())
@@ -805,8 +824,34 @@ pub mod tests {
         let host = info.create_host().unwrap();
         host
     }
-
     #[tokio::test]
+    pub async fn test_dialect() {
+        let logger = RootLogger::default();
+        let host = cli_host();
+        let filestore = Dialect::FileStore.handler(host).unwrap();
+        let mut wave = DirectedProto::kind(&DirectedKind::Ping);
+        wave.method( HypMethod::Assign );
+        let point = Point::from_str("fae").unwrap();
+
+        let assign = Assign::new(AssignmentKind::Create, Details::new(Stub {
+            point,
+            kind: Kind::File(FileSubKind::File),
+            status: Status::Unknown
+        }, Default::default()), StateSrc::Substance(Box::new(Substance::Text("helllo everyone".to_string()))));
+
+        wave.body(Substance::Hyper(HyperSubstance::Assign(assign)));
+        let wave = wave.build().unwrap();
+        let to = Point::central().to_surface();
+        let logger = logger.point(to.point.clone()).span();
+        let (tx, rx) = tokio::sync::mpsc::channel(1024);
+        let router = TxRouter::new(tx);
+        let tx = ProtoTransmitterBuilder::new(Box::new(router));
+        let ctx = RootInCtx::new(wave, to, logger,()));
+        filestore.handle()
+    }
+
+
+        #[tokio::test]
     pub async fn test_cli_primitive() {
         if let Host::Cli(CliHost::Os(exe)) = cli_host() {
            let mut child = exe.execute(vec!["init".to_string()]).await.unwrap();
