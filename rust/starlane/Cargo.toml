@@ -39,6 +39,7 @@ lazy_static = {  workspace=true  }
 uuid = { workspace=true, features=["v4"] }
 chrono = { workspace=true, features=["serde"] }
 tokio = { workspace=true, features = ["full"] }
+tokio-util = { workspace=true}
 async-trait = {workspace = true}
 ctrlc = {workspace = true}
 bincode = {workspace = true}

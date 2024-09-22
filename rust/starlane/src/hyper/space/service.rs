@@ -740,7 +740,8 @@ pub mod tests {
     use std::env;
     use std::path::absolute;
     use std::process::Stdio;
-    use tokio::io::AsyncReadExt;
+    use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
+    use tokio_util::codec::{FramedRead, LinesCodec};
 
     #[tokio::test]
     pub async fn test_os_cli_host() {
@@ -764,14 +765,27 @@ pub mod tests {
         let mut child = executor.execute(vec![]).await.unwrap();
 
 
-        let mut out = child.stdout.take().unwrap();
-        let mut buf = String::new();
-        out.read_to_string(& mut buf);
-            println!("{}",buf);
-        let status = child.wait().await.unwrap();
-        println!("ExitStatus : {}", status);
+        let stdout = child.stdout.take()
+            .expect("child did not have a handle to stdout");
 
-//        tokio::process::Command::new( "ls").stdout(Stdio::inherit()).stderr(Stdio::inherit()).spawn().unwrap().wait().await.unwrap();
+        let mut reader = BufReader::new(stdout).lines();
+
+        /*
+        // Ensure the child process is spawned in the runtime so it can
+        // make progress on its own while we await for any output.
+        tokio::spawn(async move {
+            let status = child.wait().await
+                .expect("child process encountered an error");
+
+            println!("child status was: {}", status);
+        });
+
+         */
+
+        while let Some(line) = reader.next_line().await.unwrap() {
+            println!("Line: {}", line);
+        }
+
 
     }
 }
