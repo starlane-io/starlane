@@ -13,4 +13,3 @@ description.workspace = true
 starlane = {workspace = true, features=["dialect-cli"]}
 clap = {workspace = true}
 thiserror = {workspace=true}
-once_cell = {workspace = true}

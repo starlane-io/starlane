@@ -1,59 +1,83 @@
-use std::{env, fs, io};
-use std::fs::{File, ReadDir};
-use std::io::{Read, Write};
-use std::path::{absolute, Path, PathBuf, StripPrefixError};
 use clap::Parser;
-use thiserror::Error;
-use once_cell::sync::Lazy;
 use starlane::dialect::cli::filestore::Cli;
 use starlane::dialect::cli::filestore::Commands;
+use std::fs::File;
+use std::io::{Read, Write};
+use std::path::{absolute, PathBuf, StripPrefixError};
+use std::{env, fs, io};
+use std::env::VarError;
+use std::process::{ExitCode, Termination};
+use thiserror::Error;
 
 
+pub const FILE_STORE_ROOT: &'static str = "FILE_STORE_ROOT";
 
-
-pub fn data_dir() -> String {
-    env::var("DATA_DIR").unwrap_or(env::current_dir().unwrap().display().to_string())
+pub fn root_dir() -> Result<PathBuf,Error> {
+    Ok(absolute(env::var(FILE_STORE_ROOT)?)?)
 }
 
-pub fn root_dir() -> PathBuf {
-    absolute(data_dir()).expect("could not determine absolute path of DATA_dir_root()")
+struct Status {
+    code: ExitCode
 }
 
-pub fn dir_root() -> PathBuf {
-    let dir = PathBuf::from("DIR");
-    join(root_dir(),dir).unwrap()
+impl Status {
+    pub fn new(code: ExitCode) -> Self {
+        Self {
+            code
+        }
+    }
+}
+
+impl Termination for Status {
+    fn report(self) -> ExitCode {
+        self.code.clone()
+    }
+}
+
+fn main() -> Status {
+    match run() {
+        Ok(_) => Status::new(ExitCode::SUCCESS),
+        Err(err) => {
+            eprintln!("{}",err.to_string());
+            Status::new(ExitCode::FAILURE)
+        }
+    }
 }
 
 
-fn main() -> Result<(),Error> {
-    env::var("DATA_DIR").map_err( |_|"DATA_DIR environment variable must be set")?;
+fn run() -> Result<(),Error> {
+    env::var(FILE_STORE_ROOT).map_err( |_|format!("'{}' environment variable is not set.", FILE_STORE_ROOT).to_string())?;
 
+    if !root_dir()?.exists()  {
+        let root = root_dir()?.to_str().unwrap().to_string();
+        Err(format!("{} is set but directory {} does not exisst.  Run 'init' command first.",FILE_STORE_ROOT,root).to_string())?;
+    }
     let cli = Cli::parse();
 
     match cli.command {
         Commands::Init => {
-            ensure_dir(&dir_root());
+            ensure_dir(&root_dir()?);
             Ok(())
         }
         Commands::Write { path } => {
-            let file = join(dir_root(),path)?;
+            let file = norm(&path)?;
             let mut file = File::create(file)?;
             io::copy(&mut io::stdin(), &mut file)?;
             Ok(())
         }
         Commands::Read { path } => {
-            let file = join(dir_root(),path)?;
+            let file = norm(&path)?;
             let mut file = File::open(file)?;
             io::copy(&mut file, &mut io::stdout())?;
             Ok(())
         }
         Commands::Mkdir { path } => {
-            let dir = join(dir_root(),path)?;
+            let dir = norm(&path)?;
             fs::create_dir_all(dir)?;
             Ok(())
         }
         Commands::Delete { path } => {
-            let file = join(dir_root(),path)?;
+            let file = norm(&path)?;
             if file.is_file() {
                 fs::remove_file(file)?;
             }
@@ -62,30 +86,60 @@ fn main() -> Result<(),Error> {
             }
             Ok(())           // delete is always treated as a file but will delte if it is a Dir or a File
         }
-        Commands::List { path } => {
-            let path = path.unwrap_or("/".into());
-            let file = join(dir_root(),path)?;
+        Commands::List { path: Option::Some(path)} => {
+            let file = norm(&path)?;
+            for f in file.read_dir()?.into_iter().map(|r|r.unwrap()) {
+                println!("{}",f.path().display());
+            }
+            Ok(())
+        }
+        Commands::List { path: Option::None } => {
+            let path = "/".into();
+            let file = norm(&path)?;
             for f in file.read_dir()?.into_iter().map(|r|r.unwrap()) {
                 println!("{}",f.path().display());
             }
             Ok(())
         }
         Commands::Pwd =>  {
-            println!("root {}", root_dir().to_str().unwrap());
-            println!("data dir {}", data_dir());
+            println!("{}", root_dir()?.to_str().unwrap());
             Ok(())
         }
 
         Commands::Exists { path } => {
-            let file = join(dir_root(),path)?;
+            let file = norm(&path)?;
             match file.exists() {
                 true => Ok(()),
                 false => Err("file does not exist".into())
             }
         }
     }
+}
 
+fn norm(orig: &PathBuf ) -> Result<PathBuf,Error> {
+    let path: PathBuf = match orig.starts_with("/") {
+        true => orig.strip_prefix("/")?.into(),
+        false => orig.clone()
+    };
+    let root_dir = root_dir()?;
+//    let normed= canonicalize(absolute(root_dir.join(path))?)?;
+    let normed : PathBuf = root_dir.join(path).into();
+    let parent = normed.parent().unwrap().canonicalize()?;
+println!("normed:   {}",normed.display());
+    println!("parent:   {}",parent.display());
+println!("dir_Root: {}",root_dir.display());
 
+    if let Option::Some(root) = root_dir.parent() {
+        if parent == root {
+            return Err(Error::String(format!("illegal path '{}' escapes filesystem boundaries", orig.display())));
+        }
+    }
+
+    if !parent.starts_with(&root_dir){
+        return Err(Error::String(format!("illegal path '{}' escapes filesystem boundaries", orig.display())));
+    }
+
+    Ok(normed)
 }
 
 
@@ -107,6 +161,8 @@ pub enum Error{
     String( String),
     #[error("{0}")]
     Path(#[from] StripPrefixError),
+    #[error("{0}")]
+    VarError(#[from] VarError),
 
 }
 
@@ -123,6 +179,7 @@ impl From<&str> for Error {
     }
 }
 
+/*
 pub fn join( path: PathBuf, ext: PathBuf) -> Result<PathBuf, Error>{
 
     let ext : PathBuf = match ext.starts_with("/") {
@@ -135,12 +192,12 @@ pub fn join( path: PathBuf, ext: PathBuf) -> Result<PathBuf, Error>{
     Ok(joined)
 }
 
+ */
+
 
 
 #[cfg(test)]
 pub mod test {
-    use std::fs;
-
     #[test]
     pub fn test() {
 
