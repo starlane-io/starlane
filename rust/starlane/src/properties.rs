@@ -1,3 +1,4 @@
+use once_cell::sync::Lazy;
 use starlane::space::err::SpaceErr;
 use starlane::space::kind::BaseKind;
 use starlane::space::loc::ToBaseKind;
@@ -6,17 +7,16 @@ use starlane::space::particle::property::{
     PropertySource, U64Pattern, UsernamePattern,
 };
 
-lazy_static! {
-    pub static ref DEFAULT_PROPERTIES_CONFIG: PropertiesConfig =
-        default_properties_config().unwrap();
-    pub static ref USER_PROPERTIES_CONFIG: PropertiesConfig = user_properties_config().unwrap();
-    pub static ref USER_BASE_PROPERTIES_CONFIG: PropertiesConfig =
-        userbase_properties_config().unwrap();
-    pub static ref MECHTRON_PROERTIES_CONFIG: PropertiesConfig =
-        mechtron_properties_config().unwrap();
-    pub static ref UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG: PropertiesConfig =
-        unrequired_bind_and_config_properties_config().unwrap();
-}
+pub static DEFAULT_PROPERTIES_CONFIG: Lazy<PropertiesConfig> =
+    Lazy::new(|| default_properties_config().unwrap());
+pub static USER_PROPERTIES_CONFIG: Lazy<PropertiesConfig> =
+    Lazy::new(|| user_properties_config().unwrap());
+pub static USER_BASE_PROPERTIES_CONFIG: Lazy<PropertiesConfig> =
+    Lazy::new(|| userbase_properties_config().unwrap());
+pub static MECHTRON_PROERTIES_CONFIG: Lazy<PropertiesConfig> =
+    Lazy::new(|| mechtron_properties_config().unwrap());
+pub static UNREQUIRED_BIND_AND_CONFIG_PROERTIES_CONFIG: Lazy<PropertiesConfig> =
+    Lazy::new(|| unrequired_bind_and_config_properties_config().unwrap());
 
 fn default_properties_config() -> Result<PropertiesConfig, SpaceErr> {
     let mut builder = PropertiesConfig::builder();
