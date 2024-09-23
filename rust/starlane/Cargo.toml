@@ -17,7 +17,7 @@ repository.workspace = true
 [features]
 full=["server"]
 default=["server"]
-server=["hyperspace", "hyperlane","postgres", "hyperlane-tcp", "cli", "dep:threadpool", "dep:oneshot", "dep:anyhow", "dep:virtual-fs"]
+server=["space","service","hyperspace", "hyperlane","postgres", "hyperlane-tcp", "cli", "dep:threadpool", "dep:oneshot", "dep:anyhow", "dep:virtual-fs"]
 cli=["dep:text_io","dep:clap", "dep:walkdir", "parse"]
 hypererr=[]
 hyperspace=["dep:futures","dep:dashmap","dep:semver", "parse", "dep:zip","hypererr"]

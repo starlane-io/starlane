@@ -12,8 +12,6 @@ use crate::driver::control::ControlClient;
 use crate::err::StarErr;
 use crate::hyperlane::HyperClient;
 use crate::hyperspace::machine::MachineApiExtFactory;
-use crate::registry::mem::cosmos::MemCosmos;
-use crate::registry::mem::registry::MemRegCtx;
 use crate::platform::Platform;
 use crate::hyperspace::star::HyperStarApi;
 use starlane::space::command::common::StateSrc;

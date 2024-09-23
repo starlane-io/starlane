@@ -6,10 +6,23 @@ use crate::registry::postgres::err::PostErr;
 
 #[derive(Error,Debug)]
 pub enum ThisErr {
-    #[error("{0}")]
-    StarErr(#[from] StarErr)
+    #[error("star error {0}")]
+    StarErr(StarErr),
+     #[error("{0}")]
+    String(String)
 }
 
+impl StarErr {
+ pub fn as_display(&self) -> String {
+     self.to_string()
+ }
+}
+
+impl From<&str> for ThisErr {
+    fn from(value: &str) -> Self {
+        Self::String(value.to_string())
+    }
+}
 
 
 #[derive(Debug, Clone)]
@@ -19,6 +32,7 @@ pub struct StarErr {
 }
 
 pub mod convert {
+    use starlane_space as starlane;
     use crate::err::StarErr;
     use crate::hyperspace::err::{ErrKind, HyperErr};
     use ascii::FromAsciiError;

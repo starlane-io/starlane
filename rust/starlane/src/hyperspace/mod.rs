@@ -10,6 +10,8 @@ pub mod layer;
 pub mod machine;
 pub mod reg;
 pub mod star;
+
+#[cfg(not(feature="postgres"))]
 pub mod tests;
 
 #[no_mangle]

@@ -14,8 +14,10 @@ pub mod properties;
 
 pub mod env;
 
-#[cfg(feature="space")]
-pub extern crate starlane_space as starlane;
+pub mod platform;
+
+//#[cfg(feature="space")]
+//pub extern crate starlane_space as starlane;
 #[cfg(feature="space")]
 pub mod space {
     pub use starlane_space::*;
@@ -51,13 +53,11 @@ pub use server::*;
 
 
 
-#[cfg(feature = "dialect-cli")]
 pub mod dialect;
 
 use crate::cli::{Cli, Commands};
 use crate::err::StarErr;
 use clap::Parser;
-use starlane::platform::Platform;
 use starlane::space::loc::ToBaseKind;
 use std::fs::File;
 use std::io::{Read, Seek, Write};
@@ -67,6 +67,7 @@ use std::time::Duration;
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
 use zip::write::FileOptions;
+use crate::platform::Platform;
 
 pub fn init() {
     #[cfg(feature = "cli")]

@@ -202,7 +202,7 @@ impl FileStoreCliExecutor {
         let cli = Cli {
             command: Commands::Write { path: ctx.details.stub.point.to_path() },
         };
-        let mut child = self.cli.execute(cli).await?;
+        let mut child = self.cli.execute(cli.clone()).await?;
         let mut stdin = child.stdin.take().ok_or(SpaceErr::from(format!(
             "command {} could not write to StdIn",
             cli.to_string()
@@ -288,7 +288,7 @@ impl Proc for OsProcess {
 
 #[async_trait]
 impl Executor for OsExeCli {
-    type Args = Vec<String>;
+    type Args = Cli;
     type Err = StarErr;
     type Spawn = Result<OsProcess, Self::Err>;
 
@@ -306,6 +306,7 @@ impl Executor for OsExeCli {
         let mut command = Command::new(self.stub.loc.clone());
 
         command.envs(self.stub.env.env.clone());
+        let args: Vec<String> = args.into();
         command.args(args);
         command.current_dir(self.stub.env.pwd.clone());
         command.env_clear();
@@ -399,7 +400,7 @@ impl Host {
         &self,
     ) -> Option<
         Box<
-            dyn Executor<Spawn = Result<OsProcess, StarErr>, Err = StarErr, Args = Vec<String>>
+            dyn Executor<Spawn = Result<OsProcess, StarErr>, Err = StarErr, Args = Cli>
                 + Send
                 + Sync,
         >,

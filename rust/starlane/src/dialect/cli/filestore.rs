@@ -33,42 +33,42 @@ impl Cli {
 
 impl Into<Vec<String>> for Cli {
     fn into(self) -> Vec<String> {
-        stringify(match self.command {
-            Commands::Init => vec!["init"],
+        match &self.command {
+            Commands::Init => vec!["init".to_string()],
             Commands::Write { path } => {
-                vec!["write", to_str(path)]
+                vec!["write".to_string(), to_str(path)]
             }
             Commands::Read { path } => {
-                vec!["read", to_str(path)]
+                vec!["read".to_string(), to_str(path)]
             }
             Commands::Mkdir { path } => {
-                vec!["mkdir", to_str(path)]
+                vec!["mkdir".to_string(), to_str(path)]
             }
             Commands::Remove { path } => {
-                vec!["remove", to_str(path)]
+                vec!["remove".to_string(), to_str(path)]
             }
             Commands::List { path } => {
                 match path {
-                    None => vec!["list"],
-                    Some(path) => vec!["list", to_str(path)]
+                    None => vec!["list".to_string()],
+                    Some(path) => vec!["list".to_string(), to_str(path)]
                 }
             }
             Commands::Exists { path } => {
-                vec!["exists", to_str(path)]
+                vec!["exists".to_string(), to_str(path)]
             }
             Commands::Pwd => {
-                vec!["pwd"]
+                vec!["pwd".to_string()]
             }
-        })
+        }
     }
 }
 
-pub fn to_str( path: PathBuf ) -> &'static str {
-    path.to_str().unwrap()
+pub fn to_str( path: &PathBuf ) -> String {
+    path.to_str().unwrap().to_string()
 }
 
 
-pub fn stringify(vec: Vec<dyn ToString> ) -> Vec<String> {
+pub fn stringify(vec: Vec<&'static str> ) -> Vec<String> {
     let mut rtn = vec![];
     for v in vec {
        rtn.push(v.to_string());
