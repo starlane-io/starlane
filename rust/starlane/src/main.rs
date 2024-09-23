@@ -21,8 +21,6 @@ pub mod hyperspace;
 
 #[cfg(feature = "hyperlane")]
 pub mod hyperlane;
-#[cfg(feature = "hyperspace")]
-pub mod hyper;
 pub mod registry;
 #[cfg(feature = "server")]
 pub mod server;
@@ -39,9 +37,11 @@ pub mod driver;
 // ;
 
 
-pub mod starlane {
-    pub use crate::*;
-}
+
+
+
+pub extern crate starlane_space as starlane;
+
 
 #[cfg(feature = "dialect-cli")]
 pub mod dialect;
@@ -50,8 +50,7 @@ use crate::cli::{Cli, Commands};
 use crate::err::StarErr;
 use crate::server::Starlane;
 use clap::Parser;
-use starlane::hyperspace::platform::Platform;
-use starlane::init;
+use crate::hyperspace::platform::Platform;
 use starlane::space::loc::ToBaseKind;
 use std::fs::File;
 use std::io::{Read, Seek, Write};
@@ -62,6 +61,15 @@ use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
 use zip::write::FileOptions;
 
+pub fn init() {
+    #[cfg(feature = "cli")]
+    {
+        use rustls::crypto::aws_lc_rs::default_provider;
+        default_provider()
+            .install_default()
+            .expect("crypto provider could not be installed");
+    }
+}
 #[cfg(feature = "cli")]
 pub fn main() -> Result<(), StarErr> {
     init();

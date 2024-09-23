@@ -1,3 +1,4 @@
+pub use starlane_space as starlane;
 use crate::driver::{
     Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Item,
     ItemRouter, ItemSphere,

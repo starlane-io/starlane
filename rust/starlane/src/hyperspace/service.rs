@@ -3,6 +3,7 @@ use crate::host::{ExeService, HostEnv, OsEnv, Proc};
 use crate::hyperspace::err::HyperErr;
 use itertools::Itertools;
 use nom::AsBytes;
+use starlane_space as starlane;
 use starlane::space::asynch::state_relay;
 use starlane::space::command::common::StateSrc;
 use starlane::space::err::SpaceErr;

@@ -2,6 +2,9 @@ use crate::driver::{
     Driver, DriverAvail, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere,
     DRIVER_BIND,
 };
+
+pub use starlane_space as starlane;
+
 use crate::hyperspace::platform::Platform;
 use crate::hyperspace::star::HyperStarSkel;
 use once_cell::sync::Lazy;

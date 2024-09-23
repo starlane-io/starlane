@@ -13,13 +13,13 @@ pub mod convert {
     use crate::err::StarErr;
     use crate::hyperspace::err::{ErrKind, HyperErr};
     use ascii::FromAsciiError;
-    use crate::space::err::SpaceErr;
     use std::io;
     use std::str::Utf8Error;
     use std::string::FromUtf8Error;
     use tokio::sync::oneshot;
     use tokio::time::error::Elapsed;
     use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
+    use starlane::space::err::SpaceErr;
 
     impl From<strum::ParseError> for StarErr {
         fn from(e: strum::ParseError) -> Self {
