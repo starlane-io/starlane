@@ -22,9 +22,9 @@ use crate::hyperspace::global::{GlobalCommandExecutionHandler, GlobalExecutionCh
 use crate::hyperspace::layer::field::Field;
 use crate::hyperspace::layer::shell::{Shell, ShellState};
 use crate::hyperspace::machine::MachineSkel;
-use crate::hyperspace::platform::Platform;
+use crate::platform::Platform;
 use crate::hyperspace::reg::{Registration, Registry};
-use crate::hyperspace::service::ServiceTemplate;
+use crate::service::ServiceTemplate;
 use starlane::space::command::common::StateSrc;
 use starlane::space::command::direct::create::{Create, Strategy};
 use starlane::space::err::SpaceErr;

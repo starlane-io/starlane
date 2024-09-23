@@ -1,7 +1,16 @@
+use thiserror::Error;
 use crate::hyperspace::err::ErrKind;
 
 #[cfg(feature = "postgres")]
 use crate::registry::postgres::err::PostErr;
+
+#[derive(Error,Debug)]
+pub enum ThisErr {
+    #[error("{0}")]
+    StarErr(#[from] StarErr)
+}
+
+
 
 #[derive(Debug, Clone)]
 pub struct StarErr {

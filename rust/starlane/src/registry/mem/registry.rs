@@ -1,4 +1,4 @@
-use crate::hyperspace::platform::Platform;
+use crate::platform::Platform;
 use crate::hyperspace::reg::{Registration, RegistryApi};
 use dashmap::DashMap;
 use starlane::space::command::common::{PropertyMod, SetProperties};

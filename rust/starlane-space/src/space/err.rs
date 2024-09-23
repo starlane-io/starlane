@@ -23,6 +23,14 @@ use crate::space::substance::Substance;
 use crate::space::wave::core::http2::StatusCode;
 use crate::space::wave::core::ReflectedCore;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+
+
+
+
+
+
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum SpaceErr {

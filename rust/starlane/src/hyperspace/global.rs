@@ -1,5 +1,5 @@
 use crate::hyperspace::err::HyperErr;
-use crate::hyperspace::platform::Platform;
+use crate::platform::Platform;
 use crate::hyperspace::reg::Registration;
 use crate::hyperspace::star::{HyperStarSkel, SmartLocator};
 use once_cell::sync::Lazy;

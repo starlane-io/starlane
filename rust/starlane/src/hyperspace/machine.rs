@@ -28,7 +28,7 @@ use crate::hyperlane::{
     SimpleGreeter,
 };
 use crate::hyperspace::err::HyperErr;
-use crate::hyperspace::platform::Platform;
+use crate::platform::Platform;
 use crate::hyperspace::reg::Registry;
 use crate::hyperspace::star::{
     HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate,

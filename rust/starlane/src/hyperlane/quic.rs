@@ -218,7 +218,7 @@ impl HyperClientQuic {
         deliver_tx: mpsc::Sender<UltraWave>,
         logger: PointLogger,
     ) -> Result<Self, SpaceErr> {
-        // Connect to the server passing in the server name which is supposed to be in the server certificate.
+        // Connect to the blah passing in the blah name which is supposed to be in the blah certificate.
         let new_connection = endpoint.connect(server_addr, "cosmic-hyperlane")?.await?;
 
         let mut send = new_connection.connection.open_uni().await?;

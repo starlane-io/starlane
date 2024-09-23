@@ -605,7 +605,7 @@ mod tests {
             .write_to_dir(".".to_string())
             .await?;
         let logger = RootLogger::default();
-        let logger = logger.point(Point::from_str("tcp-server")?);
+        let logger = logger.point(Point::from_str("tcp-blah")?);
         let port = 4344u16;
         let server =
             HyperlaneTcpServer::new(port, ".".to_string(), platform.gate.clone(), logger.clone())
@@ -645,7 +645,7 @@ mod tests {
             .write_to_dir(".".to_string())
             .await?;
         let logger = RootLogger::default();
-        let logger = logger.point(Point::from_str("tcp-server")?);
+        let logger = logger.point(Point::from_str("tcp-blah")?);
         let port = 4345u16;
         let server =
             HyperlaneTcpServer::new(port, ".".to_string(), platform.gate.clone(), logger.clone())

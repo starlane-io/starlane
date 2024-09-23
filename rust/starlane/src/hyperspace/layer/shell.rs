@@ -24,7 +24,7 @@ use starlane::space::wave::{
     WaveId,
 };
 
-use crate::hyperspace::platform::Platform;
+use crate::platform::Platform;
 use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
 
 #[derive(DirectedHandler)]

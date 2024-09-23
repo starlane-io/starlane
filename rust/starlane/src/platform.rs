@@ -1,20 +1,18 @@
+use starlane::space::artifact::asynch::ArtifactApi;
+use starlane::space::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind};
+use starlane::space::loc::{MachineName, StarKey, ToBaseKind};
+use starlane::space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
+use std::sync::Arc;
+use starlane::space::command::direct::create::KindTemplate;
+use starlane::space::err::SpaceErr;
+use starlane::space::log::RootLogger;
+use std::str::FromStr;
+use starlane::space::settings::Timeouts;
 use crate::driver::DriversBuilder;
 use crate::hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
 use crate::hyperspace::err::HyperErr;
 use crate::hyperspace::machine::{Machine, MachineApi, MachineTemplate};
 use crate::hyperspace::reg::Registry;
-use starlane::space::artifact::asynch::ArtifactApi;
-use starlane::space::command::direct::create::KindTemplate;
-use starlane::space::err::SpaceErr;
-use starlane::space::kind::{
-    ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind,
-};
-use starlane::space::loc::{MachineName, StarKey, ToBaseKind};
-use starlane::space::log::RootLogger;
-use starlane::space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
-use starlane::space::settings::Timeouts;
-use std::str::FromStr;
-use std::sync::Arc;
 
 #[async_trait]
 pub trait Platform: Send + Sync + Sized + Clone
@@ -24,7 +22,6 @@ where
     Self::RegistryContext: Send + Sync,
     Self::StarAuth: HyperAuthenticator,
     Self::RemoteStarConnectionFactory: HyperwayEndpointFactory,
-    Self::Err: HyperErr,
 {
     type Err;
     type RegistryContext;
@@ -67,7 +64,7 @@ where
     async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>, Self::Err>;
     fn artifact_hub(&self) -> ArtifactApi;
     async fn start_services(&self, gate: &Arc<HyperGateSelector>) {}
-    fn logger(&self) -> RootLogger {
+        fn logger(&self) -> RootLogger {
         Default::default()
     }
 

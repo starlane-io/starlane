@@ -1,20 +1,4 @@
-use crate::err::StarErr;
 use std::collections::HashSet;
-
-use crate::driver::base::BaseDriverFactory;
-use crate::driver::control::ControlDriverFactory;
-use crate::driver::root::RootDriverFactory;
-use crate::driver::DriverFactory;
-use crate::driver::{DriverAvail, DriversBuilder};
-use crate::env::{
-    STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_REGISTRY_DATABASE,
-    STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_URL, STARLANE_REGISTRY_USER,
-};
-use crate::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
-use crate::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
-use crate::hyperspace::machine::MachineTemplate;
-use crate::hyperspace::platform::Platform;
-use crate::hyperspace::reg::{Registry, RegistryWrapper};
 use crate::registry::postgres::{
     PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
@@ -28,8 +12,18 @@ use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
+use crate::driver::base::BaseDriverFactory;
+use crate::driver::{DriverAvail, DriversBuilder};
+use crate::driver::control::ControlDriverFactory;
+use crate::driver::root::RootDriverFactory;
 use crate::driver::space::SpaceDriverFactory;
-//use crate::driver::artifact::RepoDriverFactory;
+use crate::env::{STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_REGISTRY_DATABASE, STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_URL, STARLANE_REGISTRY_USER};
+use crate::err::StarErr;
+use crate::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
+use crate::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
+use crate::hyperspace::machine::MachineTemplate;
+use crate::platform::Platform;
+use crate::hyperspace::reg::{Registry, RegistryWrapper};
 
 #[derive(Clone)]
 pub struct Starlane {
@@ -184,7 +178,7 @@ impl Platform for Starlane {
 
         let logger = self
             .logger()
-            .point(Point::from_str("control-server").unwrap());
+            .point(Point::from_str("control-blah").unwrap());
         let server =
             HyperlaneTcpServer::new(STARLANE_CONTROL_PORT.clone(), dir, gate.clone(), logger)
                 .await

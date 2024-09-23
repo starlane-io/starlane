@@ -14,7 +14,15 @@ pub mod properties;
 
 pub mod env;
 
-pub mod space;
+#[cfg(feature="space")]
+pub extern crate starlane_space as starlane;
+#[cfg(feature="space")]
+pub mod space {
+    pub use starlane_space::*;
+}
+
+#[cfg(feature="service")]
+pub mod service;
 
 #[cfg(feature = "hyperspace")]
 pub mod hyperspace;
@@ -22,25 +30,25 @@ pub mod hyperspace;
 #[cfg(feature = "hyperlane")]
 pub mod hyperlane;
 pub mod registry;
-#[cfg(feature = "server")]
-pub mod server;
 
-#[cfg(feature = "server")]
 pub mod host;
+pub mod executor;
 
 #[cfg(feature = "cli")]
 pub mod cli;
 
 pub mod driver;
 
-//pub mod store
-// ;
+#[cfg(feature = "server")]
+mod server;
+
+#[cfg(feature = "server")]
+pub use server::*;
 
 
 
 
 
-pub extern crate starlane_space as starlane;
 
 
 #[cfg(feature = "dialect-cli")]
@@ -48,9 +56,8 @@ pub mod dialect;
 
 use crate::cli::{Cli, Commands};
 use crate::err::StarErr;
-use crate::server::Starlane;
 use clap::Parser;
-use crate::hyperspace::platform::Platform;
+use starlane::platform::Platform;
 use starlane::space::loc::ToBaseKind;
 use std::fs::File;
 use std::io::{Read, Seek, Write};

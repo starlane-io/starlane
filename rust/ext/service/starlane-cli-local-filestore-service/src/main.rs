@@ -64,7 +64,7 @@ fn run() -> Result<(),Error> {
             fs::create_dir_all(dir)?;
             Ok(())
         }
-        Commands::Delete { path } => {
+        Commands::Remove { path } => {
             let file = norm(&path)?;
             if file.is_file() {
                 fs::remove_file(file)?;

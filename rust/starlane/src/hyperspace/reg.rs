@@ -1,4 +1,4 @@
-use crate::hyperspace::platform::Platform;
+use crate::platform::Platform;
 use starlane::space::command::common::{SetProperties, SetRegistry};
 use starlane::space::command::direct::create::Strategy;
 use starlane::space::command::direct::delete::Delete;

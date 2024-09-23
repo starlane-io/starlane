@@ -8,10 +8,7 @@ pub mod err;
 pub mod global;
 pub mod layer;
 pub mod machine;
-pub mod mem;
-pub mod platform;
 pub mod reg;
-pub mod service;
 pub mod star;
 pub mod tests;
 

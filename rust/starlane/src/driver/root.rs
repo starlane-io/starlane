@@ -3,7 +3,7 @@ use crate::driver::{
 };
 pub use starlane_space as starlane;
 
-use crate::hyperspace::platform::Platform;
+use crate::platform::Platform;
 use crate::hyperspace::star::HyperStarSkel;
 use once_cell::sync::Lazy;
 use starlane::space::artifact::ArtRef;

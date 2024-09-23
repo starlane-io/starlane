@@ -24,6 +24,8 @@ semver = { workspace = true, features=['serde'] }
 tokio = { workspace=true, features = ["rt","sync","time"] }
 url = { workspace = true, features=["serde"] }
 
+thiserror={workspace=true }
+
 ariadne={workspace=true }
 async-trait={workspace=true }
 lazy_static={workspace=true }

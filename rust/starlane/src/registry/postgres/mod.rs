@@ -1,7 +1,7 @@
 pub mod err;
 
 use crate::hyperspace::err::HyperErr;
-use crate::hyperspace::platform::Platform;
+use crate::platform::Platform;
 use crate::hyperspace::reg::{Registration, RegistryApi};
 use err::PostErr;
 use sqlx::pool::PoolConnection;
@@ -1582,7 +1582,7 @@ pub mod test {
     use crate::hyperlane::{AnonHyperAuthenticator, LocalHyperwayGateJumper};
     use crate::hyperspace::err::HyperErr;
     use crate::hyperspace::machine::MachineTemplate;
-    use crate::hyperspace::platform::Platform;
+    use crate::platform::Platform;
     use crate::hyperspace::reg::{Registration, Registry};
     use crate::registry::postgres::{
         PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,

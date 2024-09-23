@@ -7,13 +7,13 @@ extern crate lazy_static;
 #[macro_use]
 extern crate starlane_macros;
 
+#[cfg(feature="space")]
 pub extern crate starlane_space as starlane;
 
+#[cfg(feature="space")]
 pub mod space {
     pub use starlane::space::*;
 }
-
-
 
 
 
@@ -37,16 +37,24 @@ pub mod registry;
 pub mod server;
 
 #[cfg(feature = "server")]
+pub use server::*;
+
 pub mod host;
 
 pub mod cli;
 
 //pub mod store;
+
 pub mod driver;
 
 
-#[cfg(feature = "dialect-cli")]
 pub mod dialect;
+pub mod executor;
+
+pub mod platform;
+
+#[cfg(feature = "service")]
+pub mod service;
 
 pub fn init() {
     #[cfg(feature = "cli")]

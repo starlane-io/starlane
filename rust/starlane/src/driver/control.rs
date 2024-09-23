@@ -9,7 +9,7 @@ use crate::hyperlane::{
     InterchangeGate, TransportTransform,
 };
 use crate::hyperspace::err::HyperErr;
-use crate::hyperspace::platform::Platform;
+use crate::platform::Platform;
 use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter};
 use dashmap::DashMap;
 use starlane::space::artifact::ArtRef;

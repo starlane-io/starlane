@@ -52,7 +52,7 @@ fn run() -> Result<(),Error> {
         Commands::Mkdir { path } => {
             todo!()
         }
-        Commands::Delete { path } => {
+        Commands::Remove { path } => {
             todo!()
         }
         Commands::List { path: Option::Some(path)} => {

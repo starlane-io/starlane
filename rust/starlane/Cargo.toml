@@ -30,12 +30,15 @@ rustls=["dep:rustls","dep:rcgen","rustls-pemfile"]
 driver=["hyperspace"]
 dialect=[]
 dialect-cli=["dialect","dep:clap"]
+service=[]
+space=[]
 
 [dependencies]
 starlane-space = { workspace = true}
 starlane-macros = { workspace = true }
 starlane-parse= { workspace = true }
 starlane-primitive-macros = { workspace = true}
+thiserror = { workspace = true}
 tokio_print= {  workspace=true  }
 lazy_static = {  workspace=true  }
 uuid = { workspace=true, features=["v4"] }
