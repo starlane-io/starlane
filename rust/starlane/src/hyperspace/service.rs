@@ -1005,7 +1005,9 @@ pub mod tests {
         let host = cli_host();
         let executor = host.executor().unwrap();
 
-        fs::remove_dir_all("./tmp").await.unwrap();
+        if let io::Result::Ok(true) = fs::try_exists("./tmp").await {
+            fs::remove_dir_all("./tmp").await.unwrap();
+        }
 
         // init
         {
