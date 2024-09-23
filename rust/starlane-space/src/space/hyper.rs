@@ -228,6 +228,9 @@ impl Assign {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Autobox)]
 pub enum HyperSubstance {
+    // I don't really like having a HyperSubstance::Empty, but sometimes HypMethod
+    // seems to dictate a Hyp Substance (even in the case of HypMethod::Init)
+    // I hope to remove this hack one day
     Empty,
     Provision(Provision),
     Assign(Assign),
