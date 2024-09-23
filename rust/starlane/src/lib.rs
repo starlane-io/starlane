@@ -14,13 +14,8 @@ pub mod space {
 }
 
 
-#[cfg(test)]
-pub extern crate starlane_space as starlane;
 
-#[cfg(test)]
-pub mod space {
-    pub use starlane::space::*;
-}
+
 
 //pub(crate) use starlane_space as starlane;
 
