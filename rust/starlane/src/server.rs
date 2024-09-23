@@ -12,6 +12,7 @@ use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
+use tokio_print::aprintln;
 use crate::driver::base::BaseDriverFactory;
 use crate::driver::{DriverAvail, DriversBuilder};
 use crate::driver::control::ControlDriverFactory;
@@ -32,13 +33,16 @@ pub struct Starlane {
 
 impl Starlane {
     pub async fn new() -> Result<Starlane, StarErr> {
+aprintln!("Starlane::new()");
         #[cfg(feature = "postgres")]
         {
+aprintln!("postgres!!!");
             let db = <Self as PostgresPlatform>::lookup_registry_db()?;
             let mut set = HashSet::new();
             set.insert(db.clone());
             let ctx = Arc::new(PostgresRegistryContext::new(set).await?);
             let handle = PostgresRegistryContextHandle::new(&db, ctx);
+aprintln!("returning postgres handle");
             Ok(Self { handle })
         }
         #[cfg(not(feature = "postgres"))]

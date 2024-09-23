@@ -20,7 +20,7 @@ pub mod platform;
 //pub extern crate starlane_space as starlane;
 #[cfg(feature="space")]
 pub mod space {
-    pub use starlane_space::*;
+    pub use starlane_space::space::*;
 }
 
 #[cfg(feature="service")]
@@ -62,10 +62,12 @@ use starlane::space::loc::ToBaseKind;
 use std::fs::File;
 use std::io::{Read, Seek, Write};
 use std::path::Path;
+use std::process;
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
+use tokio_print::aprintln;
 use zip::write::FileOptions;
 use crate::platform::Platform;
 
@@ -106,20 +108,28 @@ fn server() -> Result<(), StarErr> {
 
 #[cfg(feature = "server")]
 fn server() -> Result<(), StarErr> {
+
+    let point = starlane::space::point::Point::from_str("blah").unwrap();
+    println!("PPIONT {}",point.to_string());
     ctrlc::set_handler(move || {
         std::process::exit(1);
     });
 
+println!("launchign tokio");
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     runtime.block_on(async move {
+aprintln!("block on");
         let starlane = Starlane::new().await.unwrap();
+aprintln!("got starlane...");
         let machine_api = starlane.machine();
+aprintln!("got machine api...");
+
         tokio::time::timeout(Duration::from_secs(30), machine_api.wait_ready())
             .await
             .unwrap();
-        println!("> STARLANE Ready!");
+        aprintln!("> STARLANE Ready!");
         // this is a dirty hack which is good enough for a 0.3.0 release...
         loop {
             tokio::time::sleep(Duration::from_secs(60)).await;

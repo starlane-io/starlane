@@ -422,6 +422,7 @@ pub mod tests {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use wasmer::IntoBytes;
     use starlane::space::wave::core::Method;
+    use crate::dialect::cli::filestore::{Cli, Commands};
     use crate::err::StarErr;
     use crate::executor::Executor;
     use crate::service::Dialect;
@@ -585,18 +586,21 @@ pub mod tests {
     #[tokio::test]
     pub async fn test_cli_primitive() {
         if let Host::Cli(CliHost::Os(exe)) = cli_host() {
-            let mut child = exe.execute(vec!["init".to_string()]).await.unwrap();
+            let args = Cli::new(Commands::Init);
+            let mut child = exe.execute(args).await.unwrap();
             //           let mut stdout = child.stdout.take().unwrap();
             drop(child.stdout.take().unwrap());
 
-            let mut output = child.child.wait_with_output().await.unwrap();
-
+            let mut output = child.wait().await.unwrap();
+/*
             tokio::io::copy(&mut output.stdout.as_bytes(), &mut tokio::io::stdout())
                 .await
                 .unwrap();
             tokio::io::copy(&mut output.stderr.as_bytes(), &mut tokio::io::stderr())
                 .await
                 .unwrap();
+
+ */
         } else {
             assert!(false)
         }
@@ -613,8 +617,9 @@ pub mod tests {
 
         // init
         {
+            let init = Cli::new(Commands::Init);
             executor
-                .execute(stringify_args(vec!["init"]))
+                .execute(init)
                 .await
                 .unwrap()
                 .close_stdin();
@@ -625,8 +630,9 @@ pub mod tests {
         assert!(path.is_dir());
 
         {
+            let args = Cli::new(Commands::Mkdir { path: "blah".into() });
             let mut child = executor
-                .execute(stringify_args(vec!["mkdir", "blah"]))
+                .execute(args)
                 .await
                 .unwrap();
             child.close_stdin().unwrap();
@@ -640,8 +646,9 @@ pub mod tests {
         let content = "HEllo from me";
 
         {
+            let args = Cli::new(Commands::Write{ path: "blah/somefile.txt".into() });
             let mut child = executor
-                .execute(stringify_args(vec!["write", "blah/somefile.txt"]))
+                .execute(args)
                 .await
                 .unwrap();
             let mut stdin = child.stdin.take().unwrap();
@@ -658,8 +665,9 @@ pub mod tests {
         assert!(path.is_file());
 
         {
+            let args = Cli::new(Commands::Read{ path: "blah/somefile.txt".into() });
             let mut child = executor
-                .execute(stringify_args(vec!["read", "blah/somefile.txt"]))
+                .execute(args)
                 .await
                 .unwrap();
             child.close_stdin();
