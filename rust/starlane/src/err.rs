@@ -13,7 +13,7 @@ pub mod convert {
     use crate::err::StarErr;
     use crate::hyperspace::err::{ErrKind, HyperErr};
     use ascii::FromAsciiError;
-    use starlane_space::err::SpaceErr;
+    use crate::space::err::SpaceErr;
     use std::io;
     use std::str::Utf8Error;
     use std::string::FromUtf8Error;

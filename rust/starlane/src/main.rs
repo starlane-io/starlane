@@ -14,7 +14,6 @@ pub mod properties;
 
 pub mod env;
 
-#[cfg(feature = "space")]
 pub mod space;
 
 #[cfg(feature = "hyperspace")]
@@ -39,6 +38,11 @@ pub mod driver;
 //pub mod store
 // ;
 
+
+pub mod starlane {
+    pub use crate::*;
+}
+
 #[cfg(feature = "dialect-cli")]
 pub mod dialect;
 
@@ -48,7 +52,7 @@ use crate::server::Starlane;
 use clap::Parser;
 use starlane::hyperspace::platform::Platform;
 use starlane::init;
-use starlane_space::loc::ToBaseKind;
+use starlane::space::loc::ToBaseKind;
 use std::fs::File;
 use std::io::{Read, Seek, Write};
 use std::path::Path;

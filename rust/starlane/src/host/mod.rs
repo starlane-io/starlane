@@ -3,7 +3,7 @@ use crate::hyperspace::err::HyperErr;
 use crate::hyperspace::service::ExeInfo;
 use crate::hyperspace::service::Executor;
 use itertools::Itertools;
-use starlane_space::wave::exchange::asynch::DirectedHandler;
+use starlane::space::wave::exchange::asynch::DirectedHandler;
 use std::collections::HashMap;
 use std::env;
 use std::fmt::Write;

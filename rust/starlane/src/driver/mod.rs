@@ -18,35 +18,35 @@ use futures::task::Spawn;
 use futures::{FutureExt, TryFutureExt};
 use once_cell::sync::Lazy;
 use starlane_macros::DirectedHandler;
-use starlane_space::artifact::asynch::ArtifactApi;
-use starlane_space::artifact::ArtRef;
-use starlane_space::command::common::{SetProperties, StateSrc};
-use starlane_space::command::direct::create::{
+use starlane::space::artifact::asynch::ArtifactApi;
+use starlane::space::artifact::ArtRef;
+use starlane::space::command::common::{SetProperties, StateSrc};
+use starlane::space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
-use starlane_space::config::bind::BindConfig;
-use starlane_space::err::SpaceErr;
-use starlane_space::hyper::{Assign, HyperSubstance, ParticleRecord};
-use starlane_space::kind::{BaseKind, Kind, StarSub};
-use starlane_space::loc::{Layer, Surface, ToPoint, ToSurface};
-use starlane_space::log::{PointLogger, Tracker};
-use starlane_space::parse::bind_config;
-use starlane_space::particle::traversal::{
+use starlane::space::config::bind::BindConfig;
+use starlane::space::err::SpaceErr;
+use starlane::space::hyper::{Assign, HyperSubstance, ParticleRecord};
+use starlane::space::kind::{BaseKind, Kind, StarSub};
+use starlane::space::loc::{Layer, Surface, ToPoint, ToSurface};
+use starlane::space::log::{PointLogger, Tracker};
+use starlane::space::parse::bind_config;
+use starlane::space::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
-use starlane_space::particle::{Details, Status, Stub};
-use starlane_space::point::Point;
-use starlane_space::selector::KindSelector;
-use starlane_space::util::log;
-use starlane_space::wave::core::cmd::CmdMethod;
-use starlane_space::wave::core::{CoreBounce, Method, ReflectedCore};
-use starlane_space::wave::exchange::asynch::{
+use starlane::space::particle::{Details, Status, Stub};
+use starlane::space::point::Point;
+use starlane::space::selector::KindSelector;
+use starlane::space::util::log;
+use starlane::space::wave::core::cmd::CmdMethod;
+use starlane::space::wave::core::{CoreBounce, Method, ReflectedCore};
+use starlane::space::wave::exchange::asynch::{
     DirectedHandler, Exchanger, InCtx, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx,
     Router, TraversalRouter,
 };
-use starlane_space::wave::exchange::SetStrategy;
-use starlane_space::wave::{Agent, DirectedWave, ReflectedWave, UltraWave};
-use starlane_space::HYPERUSER;
+use starlane::space::wave::exchange::SetStrategy;
+use starlane::space::wave::{Agent, DirectedWave, ReflectedWave, UltraWave};
+use starlane::space::HYPERUSER;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -1092,7 +1092,7 @@ impl<P> TraversalLayer for ItemOuter<P>
 where
     P: Platform,
 {
-    fn surface(&self) -> starlane_space::loc::Surface {
+    fn surface(&self) -> starlane::space::loc::Surface {
         self.surface.clone()
     }
 

@@ -6,19 +6,19 @@ pub mod quic;
 
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
-use starlane_space::err::SpaceErr;
-use starlane_space::hyper::{Greet, InterchangeKind, Knock};
-use starlane_space::loc::{Layer, PointFactory, Surface, ToSurface};
-use starlane_space::log::{PointLogger, RootLogger, Tracker};
-use starlane_space::point::Point;
-use starlane_space::substance::{Substance, Token};
-use starlane_space::wave::core::ext::ExtMethod;
-use starlane_space::wave::exchange::asynch::{
+use starlane::space::err::SpaceErr;
+use starlane::space::hyper::{Greet, InterchangeKind, Knock};
+use starlane::space::loc::{Layer, PointFactory, Surface, ToSurface};
+use starlane::space::log::{PointLogger, RootLogger, Tracker};
+use starlane::space::point::Point;
+use starlane::space::substance::{Substance, Token};
+use starlane::space::wave::core::ext::ExtMethod;
+use starlane::space::wave::exchange::asynch::{
     Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
 };
-use starlane_space::wave::exchange::SetStrategy;
-use starlane_space::wave::{Agent, DirectedProto, HyperWave, UltraWave};
-use starlane_space::VERSION;
+use starlane::space::wave::exchange::SetStrategy;
+use starlane::space::wave::{Agent, DirectedProto, HyperWave, UltraWave};
+use starlane::space::VERSION;
 use std::collections::{HashMap, HashSet};
 use std::ops::{Deref, DerefMut};
 use std::process;
@@ -1921,7 +1921,7 @@ impl Bridge {
 #[cfg(test)]
 mod tests {
     use crate::hyperlane::HyperRouter;
-    use starlane_space::wave::HyperWave;
+    use starlane::space::wave::HyperWave;
 
     /*
     #[no_mangle]
@@ -1994,18 +1994,18 @@ pub mod test_util {
         HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker,
         MountInterchangeGate,
     };
-    use starlane_space::err::SpaceErr;
-    use starlane_space::hyper::{Greet, InterchangeKind, Knock};
-    use starlane_space::loc::{Layer, Surface, ToSurface};
-    use starlane_space::log::{PointLogger, RootLogger};
-    use starlane_space::point::Point;
-    use starlane_space::settings::Timeouts;
-    use starlane_space::substance::Substance;
-    use starlane_space::wave::core::ext::ExtMethod;
-    use starlane_space::wave::exchange::asynch::{
+    use starlane::space::err::SpaceErr;
+    use starlane::space::hyper::{Greet, InterchangeKind, Knock};
+    use starlane::space::loc::{Layer, Surface, ToSurface};
+    use starlane::space::log::{PointLogger, RootLogger};
+    use starlane::space::point::Point;
+    use starlane::space::settings::Timeouts;
+    use starlane::space::substance::Substance;
+    use starlane::space::wave::core::ext::ExtMethod;
+    use starlane::space::wave::exchange::asynch::{
         Exchanger, ProtoTransmitter, Router,
     };
-    use starlane_space::wave::{
+    use starlane::space::wave::{
         DirectedProto, Pong, ReflectedKind, ReflectedProto
         , Wave,
     };
@@ -2296,21 +2296,21 @@ pub mod test {
     use once_cell::sync::Lazy;
     use tokio::sync::{broadcast, mpsc, oneshot};
 
-    use starlane_space::err::SpaceErr;
-    use starlane_space::hyper::InterchangeKind;
-    use starlane_space::loc::{Layer, ToSurface};
-    use starlane_space::log::RootLogger;
-    use starlane_space::point::Point;
-    use starlane_space::settings::Timeouts;
-    use starlane_space::substance::Substance;
-    use starlane_space::wave::core::cmd::CmdMethod;
-    use starlane_space::wave::core::ext::ExtMethod;
-    use starlane_space::wave::core::{Method, ReflectedCore};
-    use starlane_space::wave::exchange::asynch::{
+    use starlane::space::err::SpaceErr;
+    use starlane::space::hyper::InterchangeKind;
+    use starlane::space::loc::{Layer, ToSurface};
+    use starlane::space::log::RootLogger;
+    use starlane::space::point::Point;
+    use starlane::space::settings::Timeouts;
+    use starlane::space::substance::Substance;
+    use starlane::space::wave::core::cmd::CmdMethod;
+    use starlane::space::wave::core::ext::ExtMethod;
+    use starlane::space::wave::core::{Method, ReflectedCore};
+    use starlane::space::wave::exchange::asynch::{
         Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
     };
-    use starlane_space::wave::exchange::SetStrategy;
-    use starlane_space::wave::{
+    use starlane::space::wave::exchange::SetStrategy;
+    use starlane::space::wave::{
         Agent, DirectedProto, HyperWave, Pong, ReflectedKind, ReflectedProto
         , UltraWave, Wave,
     };

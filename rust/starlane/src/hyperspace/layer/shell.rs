@@ -3,23 +3,23 @@ use std::sync::Arc;
 
 use dashmap::{DashMap, DashSet};
 use starlane_parse::new_span;
-use starlane_space::command::common::StateSrc;
-use starlane_space::command::{Command, RawCommand};
-use starlane_space::err::SpaceErr;
-use starlane_space::loc::{Layer, Surface, SurfaceSelector, ToPoint, ToSurface, Topic};
-use starlane_space::log::PointLogger;
-use starlane_space::parse::error::result;
-use starlane_space::parse::{command_line, Env};
-use starlane_space::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
-use starlane_space::point::Point;
-use starlane_space::substance::Substance;
-use starlane_space::util::ToResolved;
-use starlane_space::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
-use starlane_space::wave::exchange::asynch::{
+use starlane::space::command::common::StateSrc;
+use starlane::space::command::{Command, RawCommand};
+use starlane::space::err::SpaceErr;
+use starlane::space::loc::{Layer, Surface, SurfaceSelector, ToPoint, ToSurface, Topic};
+use starlane::space::log::PointLogger;
+use starlane::space::parse::error::result;
+use starlane::space::parse::{command_line, Env};
+use starlane::space::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
+use starlane::space::point::Point;
+use starlane::space::substance::Substance;
+use starlane::space::util::ToResolved;
+use starlane::space::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
+use starlane::space::wave::exchange::asynch::{
     DirectedHandler, Exchanger, InCtx, ProtoTransmitterBuilder, RootInCtx,
 };
-use starlane_space::wave::exchange::SetStrategy;
-use starlane_space::wave::{
+use starlane::space::wave::exchange::SetStrategy;
+use starlane::space::wave::{
     DirectedProto, DirectedWave, Pong, UltraWave, Wave,
     WaveId,
 };

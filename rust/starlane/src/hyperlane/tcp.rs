@@ -5,12 +5,12 @@ use crate::hyperlane::{
 use rcgen::{generate_simple_self_signed, RcgenError};
 use rustls::pki_types::ServerName;
 use rustls::{RootCertStore, ServerConfig};
-use starlane_space::err::SpaceErr;
-use starlane_space::hyper::Knock;
-use starlane_space::log::PointLogger;
-use starlane_space::substance::Substance;
-use starlane_space::wave::{Ping, UltraWave, Wave};
-use starlane_space::VERSION;
+use starlane::space::err::SpaceErr;
+use starlane::space::hyper::Knock;
+use starlane::space::log::PointLogger;
+use starlane::space::substance::Substance;
+use starlane::space::wave::{Ping, UltraWave, Wave};
+use starlane::space::VERSION;
 use std::io::{BufReader, Read};
 use std::str::FromStr;
 use std::string::FromUtf8Error;
@@ -575,15 +575,15 @@ impl From<&str> for Error {
 
 #[cfg(test)]
 mod tests {
-    use starlane_space::loc::ToSurface;
-    use starlane_space::log::RootLogger;
+    use starlane::space::loc::ToSurface;
+    use starlane::space::log::RootLogger;
     use std::str::FromStr;
 
     use crate::hyperlane::tcp::{CertGenerator, Error, HyperlaneTcpClient, HyperlaneTcpServer};
     use crate::hyperlane::test_util::{
         LargeFrameTest, SingleInterchangePlatform, WaveTest, FAE, LESS,
     };
-    use starlane_space::point::Point;
+    use starlane::space::point::Point;
 
     /*
     #[no_mangle]

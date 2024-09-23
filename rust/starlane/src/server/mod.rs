@@ -19,11 +19,11 @@ use crate::registry::postgres::{
     PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
 };
-use starlane_space::artifact::asynch::ArtifactApi;
-use starlane_space::kind::StarSub;
-use starlane_space::loc::{MachineName, StarKey};
-use starlane_space::log::RootLogger;
-use starlane_space::point::Point;
+use starlane::space::artifact::asynch::ArtifactApi;
+use starlane::space::kind::StarSub;
+use starlane::space::loc::{MachineName, StarKey};
+use starlane::space::log::RootLogger;
+use starlane::space::point::Point;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;

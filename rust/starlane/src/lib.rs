@@ -7,7 +7,9 @@ extern crate lazy_static;
 #[macro_use]
 extern crate starlane_macros;
 
-
+pub(crate) mod starlane {
+    pub use crate::*;
+}
 
 pub mod err;
 pub mod properties;
@@ -20,6 +22,7 @@ pub mod hyperspace;
 #[cfg(feature = "hyperlane")]
 pub mod hyperlane;
 
+pub mod space;
 
 pub mod registry;
 #[cfg(feature = "server")]

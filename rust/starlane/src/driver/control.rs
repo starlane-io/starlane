@@ -11,30 +11,30 @@ use crate::hyperspace::err::HyperErr;
 use crate::hyperspace::platform::Platform;
 use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter};
 use dashmap::DashMap;
-use starlane_space::artifact::ArtRef;
-use starlane_space::command::common::StateSrc;
-use starlane_space::command::direct::create::{
+use starlane::space::artifact::ArtRef;
+use starlane::space::command::common::StateSrc;
+use starlane::space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
-use starlane_space::command::RawCommand;
-use starlane_space::config::bind::BindConfig;
-use starlane_space::err::SpaceErr;
-use starlane_space::hyper::{ControlPattern, Greet, InterchangeKind};
-use starlane_space::kind::{BaseKind, Kind, StarSub};
-use starlane_space::loc::{Layer, PointFactory, Surface, ToSurface};
-use starlane_space::log::{RootLogger, Tracker};
-use starlane_space::particle::traversal::Traversal;
-use starlane_space::point::Point;
-use starlane_space::selector::KindSelector;
-use starlane_space::settings::Timeouts;
-use starlane_space::substance::Substance;
-use starlane_space::wave::core::ext::ExtMethod;
-use starlane_space::wave::core::ReflectedCore;
-use starlane_space::wave::exchange::asynch::{
+use starlane::space::command::RawCommand;
+use starlane::space::config::bind::BindConfig;
+use starlane::space::err::SpaceErr;
+use starlane::space::hyper::{ControlPattern, Greet, InterchangeKind};
+use starlane::space::kind::{BaseKind, Kind, StarSub};
+use starlane::space::loc::{Layer, PointFactory, Surface, ToSurface};
+use starlane::space::log::{RootLogger, Tracker};
+use starlane::space::particle::traversal::Traversal;
+use starlane::space::point::Point;
+use starlane::space::selector::KindSelector;
+use starlane::space::settings::Timeouts;
+use starlane::space::substance::Substance;
+use starlane::space::wave::core::ext::ExtMethod;
+use starlane::space::wave::core::ReflectedCore;
+use starlane::space::wave::exchange::asynch::{
     Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TraversalRouter,
 };
-use starlane_space::wave::exchange::SetStrategy;
-use starlane_space::wave::{
+use starlane::space::wave::exchange::SetStrategy;
+use starlane::space::wave::{
     Agent, DirectedProto, Pong, ToRecipients, UltraWave, Wave,
 };
 use std::marker::PhantomData;

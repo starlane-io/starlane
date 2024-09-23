@@ -1,8 +1,8 @@
 use ascii::FromAsciiError;
-use starlane_space::err::SpaceErr;
-use starlane_space::substance::Substance;
-use starlane_space::wave::core::http2::StatusCode;
-use starlane_space::wave::core::ReflectedCore;
+use starlane::space::err::SpaceErr;
+use starlane::space::substance::Substance;
+use starlane::space::wave::core::http2::StatusCode;
+use starlane::space::wave::core::ReflectedCore;
 use std::fmt::Debug;
 
 #[derive(Debug, Clone, Eq, PartialEq)]

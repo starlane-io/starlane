@@ -25,42 +25,42 @@ use crate::hyperspace::machine::MachineSkel;
 use crate::hyperspace::platform::Platform;
 use crate::hyperspace::reg::{Registration, Registry};
 use crate::hyperspace::service::ServiceTemplate;
-use starlane_space::command::common::StateSrc;
-use starlane_space::command::direct::create::{Create, Strategy};
-use starlane_space::err::SpaceErr;
-use starlane_space::hyper::{
+use starlane::space::command::common::StateSrc;
+use starlane::space::command::direct::create::{Create, Strategy};
+use starlane::space::err::SpaceErr;
+use starlane::space::hyper::{
     Assign, AssignmentKind, HyperSubstance,
     Provision, Search,
 };
-use starlane_space::hyper::{MountKind, ParticleLocation};
-use starlane_space::kind::{Kind, StarStub, StarSub};
-use starlane_space::loc::{
+use starlane::space::hyper::{MountKind, ParticleLocation};
+use starlane::space::kind::{Kind, StarStub, StarSub};
+use starlane::space::loc::{
     Layer, StarKey, Surface, SurfaceSelector, ToPoint, ToSurface,
     GLOBAL_EXEC,
 };
-use starlane_space::log::{PointLogger, Trackable, Tracker};
-use starlane_space::particle::traversal::{
+use starlane::space::log::{PointLogger, Trackable, Tracker};
+use starlane::space::particle::traversal::{
     Traversal, TraversalDirection, TraversalInjection, TraversalLayer,
 };
-use starlane_space::particle::{Details, Status};
-use starlane_space::point::Point;
-use starlane_space::selector::KindSelector;
-use starlane_space::substance::Substance;
-use starlane_space::util::ValueMatcher;
-use starlane_space::wave::core::cmd::CmdMethod;
-use starlane_space::wave::core::hyp::HypMethod;
-use starlane_space::wave::exchange::asynch::{
+use starlane::space::particle::{Details, Status};
+use starlane::space::point::Point;
+use starlane::space::selector::KindSelector;
+use starlane::space::substance::Substance;
+use starlane::space::util::ValueMatcher;
+use starlane::space::wave::core::cmd::CmdMethod;
+use starlane::space::wave::core::hyp::HypMethod;
+use starlane::space::wave::exchange::asynch::{
     DirectedHandler, DirectedHandlerShell, Exchanger,
     ProtoTransmitter, ProtoTransmitterBuilder, Router, TraversalRouter, TxRouter,
 };
-use starlane_space::wave::exchange::SetStrategy;
-use starlane_space::wave::{
+use starlane::space::wave::exchange::SetStrategy;
+use starlane::space::wave::{
     Agent, DirectedProto, Handling,
     HandlingKind, Pong, Priority, Recipients, Reflectable
     , Retries, Ripple, Scope, Signal, SingularRipple, WaitTime, Wave,
     WaveKind,
 };
-use starlane_space::wave::UltraWave;
+use starlane::space::wave::UltraWave;
 
 #[derive(Clone)]
 pub struct ParticleStates<P>

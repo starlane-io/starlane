@@ -8,19 +8,19 @@ use futures::future::{join_all, select_all, BoxFuture};
 use futures::FutureExt;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
-use starlane_space::artifact::asynch::{ArtifactApi, ArtifactFetcher};
-use starlane_space::err::SpaceErr;
-use starlane_space::hyper::{InterchangeKind, Knock};
-use starlane_space::kind::StarSub;
-use starlane_space::loc::{Layer, MachineName, StarHandle, StarKey, Surface, ToPoint, ToSurface};
-use starlane_space::log::{PointLogger, RootLogger};
-use starlane_space::particle::{Status, Stub};
-use starlane_space::point::Point;
-use starlane_space::settings::Timeouts;
-use starlane_space::substance::{Bin, Substance};
-use starlane_space::wave::core::cmd::CmdMethod;
-use starlane_space::wave::exchange::asynch::Exchanger;
-use starlane_space::wave::{Agent, DirectedProto, Pong, Wave};
+use starlane::space::artifact::asynch::{ArtifactApi, ArtifactFetcher};
+use starlane::space::err::SpaceErr;
+use starlane::space::hyper::{InterchangeKind, Knock};
+use starlane::space::kind::StarSub;
+use starlane::space::loc::{Layer, MachineName, StarHandle, StarKey, Surface, ToPoint, ToSurface};
+use starlane::space::log::{PointLogger, RootLogger};
+use starlane::space::particle::{Status, Stub};
+use starlane::space::point::Point;
+use starlane::space::settings::Timeouts;
+use starlane::space::substance::{Bin, Substance};
+use starlane::space::wave::core::cmd::CmdMethod;
+use starlane::space::wave::exchange::asynch::Exchanger;
+use starlane::space::wave::{Agent, DirectedProto, Pong, Wave};
 
 use crate::hyperlane::{
     HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, Hyperway, HyperwayEndpoint,

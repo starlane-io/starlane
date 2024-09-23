@@ -3,16 +3,16 @@ use crate::hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFa
 use crate::hyperspace::err::HyperErr;
 use crate::hyperspace::machine::{Machine, MachineApi, MachineTemplate};
 use crate::hyperspace::reg::Registry;
-use starlane_space::artifact::asynch::ArtifactApi;
-use starlane_space::command::direct::create::KindTemplate;
-use starlane_space::err::SpaceErr;
-use starlane_space::kind::{
+use starlane::space::artifact::asynch::ArtifactApi;
+use starlane::space::command::direct::create::KindTemplate;
+use starlane::space::err::SpaceErr;
+use starlane::space::kind::{
     ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind,
 };
-use starlane_space::loc::{MachineName, StarKey, ToBaseKind};
-use starlane_space::log::RootLogger;
-use starlane_space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
-use starlane_space::settings::Timeouts;
+use starlane::space::loc::{MachineName, StarKey, ToBaseKind};
+use starlane::space::log::RootLogger;
+use starlane::space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
+use starlane::space::settings::Timeouts;
 use std::str::FromStr;
 use std::sync::Arc;
 
