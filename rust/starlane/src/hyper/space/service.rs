@@ -19,7 +19,6 @@ use starlane_space::wave::core::CoreBounce;
 use starlane_space::wave::exchange::asynch::{
     DirectedHandler, DirectedHandlerShell, InCtx, RootInCtx, Router,
 };
-use starlane_space::wave::exchange::synch::ExchangeRouter;
 use starlane_space::wave::{Bounce, DirectedWave, ReflectedWave};
 use std::collections::HashSet;
 use std::future::Future;
@@ -27,10 +26,10 @@ use std::hash::Hash;
 use std::io::Read;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
-use std::{env, process};
 use std::process::Stdio;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::{env, process};
 use strum_macros::{EnumIter, EnumString};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
@@ -270,7 +269,7 @@ impl Into<ServiceKey> for ServiceTemplate {
 pub struct ServiceCtx {
     pub surface: Surface,
     pub data_dir: PathBuf,
-    pub router: Arc<dyn ExchangeRouter>,
+    pub router: Arc<dyn Router>,
     pub logger: PointLogger,
 }
 
@@ -278,7 +277,7 @@ impl ServiceCtx {
     pub fn new(
         surface: Surface,
         data_dir: PathBuf,
-        router: Arc<dyn ExchangeRouter>,
+        router: Arc<dyn Router>,
         logger: PointLogger,
     ) -> Self {
         Self {
@@ -306,6 +305,7 @@ impl FileStoreCliExecutor {
         &self,
         ctx: &'a InCtx<'_, Assign>,
     ) -> Result<(), <FileStoreCliExecutor as Executor>::Err> {
+        /*
         async fn wait(mut child: OsProcess, line: String) -> Result<(), StarErr> {
             match child.wait().await?.success() {
                 true => Ok(()),
@@ -328,6 +328,8 @@ impl FileStoreCliExecutor {
             }
         }
 
+         */
+
         let bin = match &ctx.state {
             StateSrc::Substance(data) => data.to_bin()?,
             StateSrc::None => Box::new(Substance::Empty).to_bin()?,
@@ -342,13 +344,24 @@ impl FileStoreCliExecutor {
             "command {} could not write to StdIn",
             line
         )))?;
-        stdin.write_all(bin.as_bytes()).await?;
-        wait(child, line).await
+        tokio::io::copy(&mut bin.as_bytes(), &mut stdin).await?;
+        stdin.flush().await?;
+        drop(stdin);
+        Ok(())
     }
 }
 
 #[handler]
 impl FileStoreCliExecutor {
+    #[route("Hyp<Init>")]
+    async fn handle_init(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), StarErr> {
+aprintln!("Hyp<Init>!!!!");
+        let args = stringify_args(vec!["init"]);
+        let mut child = self.cli.execute(args).await?;
+        child.close_stdin()?;
+        child.wait().await?;
+        Ok(())
+    }
     #[route("Hyp<Assign>")]
     async fn handle_assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), StarErr> {
         if let HyperSubstance::Assign(assign) = ctx.input {
@@ -365,7 +378,7 @@ pub struct OsProcess {
 }
 
 impl OsProcess {
-    pub fn close_stdin(& mut self) -> Result<(),StarErr> {
+    pub fn close_stdin(&mut self) -> Result<(), StarErr> {
         drop(self.child.stdin.take().unwrap());
         Ok(())
     }
@@ -417,12 +430,15 @@ impl Executor for OsExeCli {
 
     async fn execute(&self, args: Self::Args) -> Self::Spawn {
         if !self.stub.loc.exists() {
-            return Result::Err(StarErr::new(format!("file not found: {}", self.stub.loc.display() ) ));
+            return Result::Err(StarErr::new(format!(
+                "file not found: {}",
+                self.stub.loc.display()
+            )));
         }
 
-aprintln!("pwd: {}",env::current_dir().unwrap().display());
-aprintln!("self.stub.loc.exists(): {}",self.stub.loc.exists());
-aprintln!("self.stub.loc: {}",self.stub.loc.display());
+        aprintln!("pwd: {}", env::current_dir().unwrap().display());
+        aprintln!("self.stub.loc.exists(): {}", self.stub.loc.exists());
+        aprintln!("self.stub.loc: {}", self.stub.loc.display());
         let mut command = Command::new(self.stub.loc.clone());
 
         command.envs(self.stub.env.env.clone());
@@ -588,8 +604,8 @@ where
     }
 }
 
-pub fn stringify_args( args: Vec<&str>) -> Vec<String> {
-   args.iter().map(|arg| arg.to_string()).collect()
+pub fn stringify_args(args: Vec<&str>) -> Vec<String> {
+    args.iter().map(|arg| arg.to_string()).collect()
 }
 
 impl<E> Into<ExeStub<PathBuf, OsEnv, ()>> for ExeStub<String, E, ()>
@@ -775,18 +791,17 @@ where
 
 #[cfg(test)]
 pub mod tests {
+    use crate::driver::ItemSphere::Router;
     use crate::host::{HostEnv, OsEnv};
-    use crate::hyper::space::service::{stringify_args, CliHost, Dialect, ExeInfo, Executor, Host, HostApi};
+    use crate::hyper::space::service::ServiceCommand::DirectedWave;
+    use crate::hyper::space::service::{
+        stringify_args, CliHost, Dialect, ExeInfo, Executor, Host, HostApi,
+    };
     use crate::hyper::space::service::{ExeStub, HostKind};
-    use std::{env, io, process};
-    use std::path::{absolute, PathBuf};
-    use std::str::FromStr;
     use itertools::process_results;
     use nom::AsBytes;
-    use tokio::fs;
-    use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
-    use wasmer::IntoBytes;
     use starlane_space::command::common::StateSrc;
+    use starlane_space::err::SpaceErr;
     use starlane_space::hyper::{Assign, AssignmentKind, HyperSubstance};
     use starlane_space::kind::{FileSubKind, Kind};
     use starlane_space::loc::ToSurface;
@@ -795,17 +810,24 @@ pub mod tests {
     use starlane_space::point::Point;
     use starlane_space::substance::Substance;
     use starlane_space::substance::SubstanceKind::DirectedCore;
-    use starlane_space::wave::{DirectedKind, DirectedProto};
     use starlane_space::wave::core::cmd::CmdMethod;
     use starlane_space::wave::core::hyp::HypMethod;
-    use starlane_space::wave::exchange::asynch::{RootInCtx, TxRouter};
-    use starlane_space::wave::exchange::synch::ProtoTransmitterBuilder;
-    use crate::driver::ItemSphere::Router;
-    use crate::hyper::space::service::ServiceCommand::DirectedWave;
+    use starlane_space::wave::exchange::asynch::{AsyncRouter, DirectedHandler, Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, RootInCtx, TxRouter};
+    use starlane_space::wave::{DirectedKind, DirectedProto, ReflectedAggregate, UltraWave};
+    use std::path::{absolute, PathBuf};
+    use std::str::FromStr;
+    use std::sync::Arc;
+    use std::{env, io, process};
+    use tokio::fs;
+    use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+    use wasmer::IntoBytes;
+    use starlane_space::wave::core::Method;
+    use crate::err::StarErr;
 
     fn cli_host() -> Host {
-
-        std::fs::remove_dir_all("./tmp").unwrap();
+        if std::fs::exists("./tmp").unwrap() {
+            std::fs::remove_dir_all("./tmp").unwrap();
+        }
         let mut builder = HostEnv::builder();
         builder.pwd(
             absolute(env::current_dir().unwrap())
@@ -814,8 +836,11 @@ pub mod tests {
                 .unwrap()
                 .to_string(),
         );
-        println!("{}",env::current_dir().unwrap().to_str().unwrap());
-        builder.env("FILE_STORE_ROOT", format!("{}/tmp", env::current_dir().unwrap().to_str().unwrap()));
+        println!("{}", env::current_dir().unwrap().to_str().unwrap());
+        builder.env(
+            "FILE_STORE_ROOT",
+            format!("{}/tmp", env::current_dir().unwrap().to_str().unwrap()),
+        );
         let env = builder.build();
         let path = "../target/debug/starlane-cli-filestore-service".to_string();
         let args: Option<Vec<String>> = Option::None;
@@ -824,44 +849,152 @@ pub mod tests {
         let host = info.create_host().unwrap();
         host
     }
+
+    pub async fn create_dialect_handler() -> Result<Box<dyn DirectedHandler>,StarErr>{
+        let logger = RootLogger::default();
+        let host = cli_host();
+        let filestore = Dialect::FileStore.handler(host).unwrap();
+
+        let fae = Point::from_str("fae").unwrap();
+        let less = Point::from_str("less").unwrap();
+
+        let to = fae.clone().to_surface();
+        let logger = logger.point(to.point.clone());
+        let (tx, rx) = tokio::sync::mpsc::channel(1024);
+        let router = Arc::new(TxRouter::new(tx));
+
+        let exchanger = Exchanger::new(to.clone(), Default::default(), logger.clone());
+        let mut tx_builder = ProtoTransmitterBuilder::new(router, exchanger);
+        let transmitter = tx_builder.build();
+
+//        let mut ctx = RootInCtx::new(wave, to, logger.span(), transmitter);
+
+//        filestore.handle(ctx).await;
+        Ok(filestore)
+    }
+
+
+    fn wave( method: Method, body: Substance) -> RootInCtx {
+        let logger = RootLogger::default();
+        let fae = Point::from_str("fae").unwrap();
+        let less = Point::from_str("less").unwrap();
+
+        let mut wave = DirectedProto::kind(&DirectedKind::Ping);
+        wave.method(method);
+        let fae = Point::from_str("fae").unwrap();
+        let less = Point::from_str("less").unwrap();
+        wave.to(fae.clone().to_surface());
+        wave.from(less.clone().to_surface());
+        wave.body(body);
+
+        let wave = wave.build().unwrap();
+        let to = Point::central().to_surface();
+        let logger = logger.point(to.point.clone());
+        let (tx, rx) = tokio::sync::mpsc::channel(1024);
+        let router = Arc::new(TxRouter::new(tx));
+
+        let exchanger = Exchanger::new(to.clone(), Default::default(), logger.clone());
+        let mut tx_builder = ProtoTransmitterBuilder::new(router, exchanger);
+
+        let transmitter = tx_builder.build();
+
+        let mut ctx = RootInCtx::new(wave, to, logger.span(), transmitter);
+
+        ctx
+    }
     #[tokio::test]
     pub async fn test_dialect() {
+
+        let filestore = create_dialect_handler().await.unwrap();
+
+        let fae = Point::from_str("somefile.txt").unwrap();
+        let less = Point::from_str("less").unwrap();
+
+        let ctx = wave(Method::Hyp(HypMethod::Init),Substance::Empty);
+
+        filestore.handle(ctx).await;
+
+//        assert!(PathBuf::from_str("./tmp").unwrap().exists());
+
+
+
+        let assign = Assign::new(
+            AssignmentKind::Create,
+            Details::new(
+                Stub {
+                    point: fae,
+                    kind: Kind::File(FileSubKind::File),
+                    status: Status::Unknown,
+                },
+                Default::default(),
+            ),
+            StateSrc::Substance(Box::new(Substance::Text("helllo everyone".to_string()))),
+        );
+
+        let body = Substance::Hyper(HyperSubstance::Assign(assign));
+
+        let ctx = wave(Method::Hyp(HypMethod::Assign),body );
+
+        filestore.handle(ctx).await;
+    }
+
+    #[tokio::test]
+    pub async fn test_dialect_old() {
         let logger = RootLogger::default();
         let host = cli_host();
         let filestore = Dialect::FileStore.handler(host).unwrap();
         let mut wave = DirectedProto::kind(&DirectedKind::Ping);
-        wave.method( HypMethod::Assign );
-        let point = Point::from_str("fae").unwrap();
+        wave.method(HypMethod::Assign);
+        let fae = Point::from_str("fae").unwrap();
+        let less = Point::from_str("less").unwrap();
+        wave.to(fae.clone().to_surface());
+        wave.from(less.clone().to_surface());
 
-        let assign = Assign::new(AssignmentKind::Create, Details::new(Stub {
-            point,
-            kind: Kind::File(FileSubKind::File),
-            status: Status::Unknown
-        }, Default::default()), StateSrc::Substance(Box::new(Substance::Text("helllo everyone".to_string()))));
+        let assign = Assign::new(
+            AssignmentKind::Create,
+            Details::new(
+                Stub {
+                    point: fae,
+                    kind: Kind::File(FileSubKind::File),
+                    status: Status::Unknown,
+                },
+                Default::default(),
+            ),
+            StateSrc::Substance(Box::new(Substance::Text("helllo everyone".to_string()))),
+        );
 
         wave.body(Substance::Hyper(HyperSubstance::Assign(assign)));
         let wave = wave.build().unwrap();
         let to = Point::central().to_surface();
-        let logger = logger.point(to.point.clone()).span();
+        let logger = logger.point(to.point.clone());
         let (tx, rx) = tokio::sync::mpsc::channel(1024);
-        let router = TxRouter::new(tx);
-        let tx = ProtoTransmitterBuilder::new(Box::new(router));
-        let ctx = RootInCtx::new(wave, to, logger,()));
-        filestore.handle()
+        let router = Arc::new(TxRouter::new(tx));
+
+        let exchanger = Exchanger::new(to.clone(), Default::default(), logger.clone());
+        let mut tx_builder = ProtoTransmitterBuilder::new(router, exchanger);
+
+        let transmitter = tx_builder.build();
+
+        let mut ctx = RootInCtx::new(wave, to, logger.span(), transmitter);
+
+        filestore.handle(ctx).await;
     }
 
-
-        #[tokio::test]
+    #[tokio::test]
     pub async fn test_cli_primitive() {
         if let Host::Cli(CliHost::Os(exe)) = cli_host() {
-           let mut child = exe.execute(vec!["init".to_string()]).await.unwrap();
-//           let mut stdout = child.stdout.take().unwrap();
+            let mut child = exe.execute(vec!["init".to_string()]).await.unwrap();
+            //           let mut stdout = child.stdout.take().unwrap();
             drop(child.stdout.take().unwrap());
 
             let mut output = child.child.wait_with_output().await.unwrap();
 
-            tokio::io::copy(& mut output.stdout.as_bytes() , &mut tokio::io::stdout()).await.unwrap();
-            tokio::io::copy(& mut output.stderr.as_bytes() , &mut tokio::io::stderr()).await.unwrap();
+            tokio::io::copy(&mut output.stdout.as_bytes(), &mut tokio::io::stdout())
+                .await
+                .unwrap();
+            tokio::io::copy(&mut output.stderr.as_bytes(), &mut tokio::io::stderr())
+                .await
+                .unwrap();
         } else {
             assert!(false)
         }
@@ -872,12 +1005,15 @@ pub mod tests {
         let host = cli_host();
         let executor = host.executor().unwrap();
 
-            fs::remove_dir_all("./tmp").await.unwrap();
-
+        fs::remove_dir_all("./tmp").await.unwrap();
 
         // init
         {
-            executor.execute(stringify_args(vec!["init"])).await.unwrap().close_stdin();
+            executor
+                .execute(stringify_args(vec!["init"]))
+                .await
+                .unwrap()
+                .close_stdin();
         }
 
         let path = PathBuf::from("tmp");
@@ -885,7 +1021,10 @@ pub mod tests {
         assert!(path.is_dir());
 
         {
-            let mut child = executor.execute(stringify_args(vec!["mkdir","blah"])).await.unwrap();
+            let mut child = executor
+                .execute(stringify_args(vec!["mkdir", "blah"]))
+                .await
+                .unwrap();
             child.close_stdin().unwrap();
             child.wait().await.unwrap();
         }
@@ -894,36 +1033,40 @@ pub mod tests {
         assert!(path.exists());
         assert!(path.is_dir());
 
-
         let content = "HEllo from me";
 
         {
-            let mut child = executor.execute(stringify_args(vec!["write", "blah/somefile.txt"])).await.unwrap();
+            let mut child = executor
+                .execute(stringify_args(vec!["write", "blah/somefile.txt"]))
+                .await
+                .unwrap();
             let mut stdin = child.stdin.take().unwrap();
-            tokio::io::copy(&mut content.into_bytes().as_bytes(), &mut stdin).await.unwrap();
+            tokio::io::copy(&mut content.into_bytes().as_bytes(), &mut stdin)
+                .await
+                .unwrap();
             stdin.flush().await.unwrap();
             drop(stdin);
             child.wait().await.unwrap();
         }
 
-            let path = PathBuf::from("tmp/blah/somefile.txt");
-            assert!(path.exists());
-            assert!(path.is_file());
+        let path = PathBuf::from("tmp/blah/somefile.txt");
+        assert!(path.exists());
+        assert!(path.is_file());
 
-
-            {
-            let mut child = executor.execute(stringify_args(vec!["read", "blah/somefile.txt"])).await.unwrap();
+        {
+            let mut child = executor
+                .execute(stringify_args(vec!["read", "blah/somefile.txt"]))
+                .await
+                .unwrap();
             child.close_stdin();
             let mut stdout = child.stdout.take().unwrap();
-             let mut read = String::new();
+            let mut read = String::new();
             stdout.read_to_string(&mut read).await.unwrap();
-                println!("content: {}", read);
+            println!("content: {}", read);
             tokio::io::stdout().flush().await.unwrap();
             child.wait().await.unwrap();
-                assert_eq!(content,read);
+            assert_eq!(content, read);
         }
-
-
 
         /*
 
