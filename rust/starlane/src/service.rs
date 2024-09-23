@@ -513,11 +513,11 @@ pub mod tests {
         let fae = Point::from_str("somefile.txt").unwrap();
         let less = Point::from_str("less").unwrap();
 
-        let ctx = wave(Method::Hyp(HypMethod::Init),Substance::Empty);
+        let ctx = wave(Method::Hyp(HypMethod::Init),Substance::Hyper(HyperSubstance::Empty));
 
         filestore.handle(ctx).await;
 
-//        assert!(PathBuf::from_str("./tmp").unwrap().exists());
+        assert!(PathBuf::from_str("./tmp").unwrap().exists());
 
 
 

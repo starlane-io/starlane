@@ -62,7 +62,7 @@ impl SpaceErr {
 
 impl Into<ReflectedCore> for SpaceErr {
     fn into(self) -> ReflectedCore {
-        println!("SpaceErr -> ReflectedCore");
+        println!("SpaceErr -> ReflectedCore({})",self.to_string());
         match self {
             SpaceErr::Status { status, .. } => ReflectedCore {
                 headers: Default::default(),

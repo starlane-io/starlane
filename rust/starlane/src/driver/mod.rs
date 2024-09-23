@@ -71,6 +71,8 @@ fn driver_bind() -> BindConfig {
     log(bind_config(
         r#" Bind(version=1.0.0) {
 
+       Route<Hyp<Init>> -> (()) => &;
+
        Route<Hyp<Assign>> -> (()) => &;
 
     } "#,

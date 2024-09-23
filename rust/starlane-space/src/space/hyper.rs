@@ -228,6 +228,7 @@ impl Assign {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display, Autobox)]
 pub enum HyperSubstance {
+    Empty,
     Provision(Provision),
     Assign(Assign),
     Host(HostCmd),
@@ -255,6 +256,14 @@ pub struct Discovery {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Discoveries {
     pub vec: Vec<Discovery>,
+}
+
+impl Default for Discoveries {
+    fn default() -> Self {
+        Self {
+            vec: Default::default()
+        }
+    }
 }
 
 impl Discoveries {
