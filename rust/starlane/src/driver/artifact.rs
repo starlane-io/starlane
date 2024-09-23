@@ -1,7 +1,7 @@
 use crate::driver::{Driver, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, HyperSkel, Item, ItemHandler, ItemSkel, ItemSphere};
-use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::platform::Platform;
-use crate::hyper::space::star::HyperStarSkel;
+use crate::hyperspace::err::HyperErr;
+use crate::hyperspace::platform::Platform;
+use crate::hyperspace::star::HyperStarSkel;
 use acid_store::repo::Commit;
 use acid_store::repo::OpenOptions;
 use once_cell::sync::Lazy;

@@ -1,6 +1,6 @@
 use crate::driver::{Driver, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere};
-use crate::hyper::space::platform::Platform;
-use crate::hyper::space::star::HyperStarSkel;
+use crate::hyperspace::platform::Platform;
+use crate::hyperspace::star::HyperStarSkel;
 use once_cell::sync::Lazy;
 use starlane_space::artifact::ArtRef;
 use starlane_space::config::bind::BindConfig;

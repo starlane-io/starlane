@@ -1,6 +1,6 @@
 use crate::err::StarErr;
 use crate::host::{ExeService, HostEnv, OsEnv, Proc};
-use crate::hyper::space::err::HyperErr;
+use crate::hyperspace::err::HyperErr;
 use itertools::Itertools;
 use nom::AsBytes;
 use starlane_space::asynch::state_relay;
@@ -793,11 +793,11 @@ where
 pub mod tests {
     use crate::driver::ItemSphere::Router;
     use crate::host::{HostEnv, OsEnv};
-    use crate::hyper::space::service::ServiceCommand::DirectedWave;
-    use crate::hyper::space::service::{
+    use crate::hyperspace::service::ServiceCommand::DirectedWave;
+    use crate::hyperspace::service::{
         stringify_args, CliHost, Dialect, ExeInfo, Executor, Host, HostApi,
     };
-    use crate::hyper::space::service::{ExeStub, HostKind};
+    use crate::hyperspace::service::{ExeStub, HostKind};
     use itertools::process_results;
     use nom::AsBytes;
     use starlane_space::command::common::StateSrc;

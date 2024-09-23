@@ -10,11 +10,11 @@ use crate::env::{
     STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_REGISTRY_DATABASE,
     STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_URL, STARLANE_REGISTRY_USER,
 };
-use crate::hyper::lane::tcp::{CertGenerator, HyperlaneTcpServer};
-use crate::hyper::lane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
-use crate::hyper::space::machine::MachineTemplate;
-use crate::hyper::space::platform::Platform;
-use crate::hyper::space::reg::{Registry, RegistryWrapper};
+use crate::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
+use crate::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
+use crate::hyperspace::machine::MachineTemplate;
+use crate::hyperspace::platform::Platform;
+use crate::hyperspace::reg::{Registry, RegistryWrapper};
 use crate::registry::postgres::{
     PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,

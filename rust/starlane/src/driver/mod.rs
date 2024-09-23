@@ -8,10 +8,10 @@ pub mod space;
 pub mod star;
 
 use crate::driver::star::StarDriverFactory;
-use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::platform::Platform;
-use crate::hyper::space::reg::{Registration, Registry};
-use crate::hyper::space::star::{HyperStarSkel, LayerInjectionRouter};
+use crate::hyperspace::err::HyperErr;
+use crate::hyperspace::platform::Platform;
+use crate::hyperspace::reg::{Registration, Registry};
+use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter};
 use dashmap::DashMap;
 use futures::future::select_all;
 use futures::task::Spawn;

@@ -7,12 +7,20 @@ extern crate lazy_static;
 #[macro_use]
 extern crate starlane_macros;
 
+
+
 pub mod err;
 pub mod properties;
 
 pub mod env;
+
 #[cfg(feature = "hyperspace")]
-pub mod hyper;
+pub mod hyperspace;
+
+#[cfg(feature = "hyperlane")]
+pub mod hyperlane;
+
+
 pub mod registry;
 #[cfg(feature = "server")]
 pub mod server;

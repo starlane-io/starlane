@@ -13,18 +13,18 @@ use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::driver::{DriverStatus, DriversApi, DriversBuilder, DriversCall};
-use crate::hyper::lane::{
+use crate::hyperlane::{
     Bridge, HyperwayEndpoint, HyperwayEndpointFactory,
     HyperwayInterchange, HyperwayStub,
 };
-use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
-use crate::hyper::space::layer::field::Field;
-use crate::hyper::space::layer::shell::{Shell, ShellState};
-use crate::hyper::space::machine::MachineSkel;
-use crate::hyper::space::platform::Platform;
-use crate::hyper::space::reg::{Registration, Registry};
-use crate::hyper::space::service::ServiceTemplate;
+use crate::hyperspace::err::HyperErr;
+use crate::hyperspace::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
+use crate::hyperspace::layer::field::Field;
+use crate::hyperspace::layer::shell::{Shell, ShellState};
+use crate::hyperspace::machine::MachineSkel;
+use crate::hyperspace::platform::Platform;
+use crate::hyperspace::reg::{Registration, Registry};
+use crate::hyperspace::service::ServiceTemplate;
 use starlane_space::command::common::StateSrc;
 use starlane_space::command::direct::create::{Create, Strategy};
 use starlane_space::err::SpaceErr;

@@ -1,5 +1,5 @@
 use crate::err::StarErr;
-use crate::hyper::space::err::{ErrKind, HyperErr};
+use crate::hyperspace::err::{ErrKind, HyperErr};
 use strum::ParseError;
 
 pub trait PostErr: HyperErr + From<sqlx::Error> + From<ParseError> {

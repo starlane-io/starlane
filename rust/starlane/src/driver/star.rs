@@ -2,10 +2,10 @@ use crate::driver::{
     Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item,
     ItemHandler, ItemSphere,
 };
-use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::platform::Platform;
-use crate::hyper::space::reg::Registration;
-use crate::hyper::space::star::{HyperStarSkel, LayerInjectionRouter};
+use crate::hyperspace::err::HyperErr;
+use crate::hyperspace::platform::Platform;
+use crate::hyperspace::reg::Registration;
+use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter};
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use starlane_space::artifact::ArtRef;

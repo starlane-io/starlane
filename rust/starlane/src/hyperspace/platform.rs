@@ -1,8 +1,8 @@
 use crate::driver::DriversBuilder;
-use crate::hyper::lane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
-use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::machine::{Machine, MachineApi, MachineTemplate};
-use crate::hyper::space::reg::Registry;
+use crate::hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
+use crate::hyperspace::err::HyperErr;
+use crate::hyperspace::machine::{Machine, MachineApi, MachineTemplate};
+use crate::hyperspace::reg::Registry;
 use starlane_space::artifact::asynch::ArtifactApi;
 use starlane_space::command::direct::create::KindTemplate;
 use starlane_space::err::SpaceErr;

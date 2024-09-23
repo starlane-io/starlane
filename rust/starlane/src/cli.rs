@@ -1,6 +1,6 @@
 use crate::driver::control::{ControlCliSession, ControlClient};
-use crate::hyper::lane::tcp::HyperlaneTcpClient;
-use crate::hyper::lane::HyperwayEndpointFactory;
+use crate::hyperlane::tcp::HyperlaneTcpClient;
+use crate::hyperlane::HyperwayEndpointFactory;
 use clap::clap_derive::{Args, Subcommand};
 use clap::Parser;
 use starlane_parse::new_span;

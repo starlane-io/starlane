@@ -1,7 +1,7 @@
 use crate::host::err::HostErr;
-use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::service::ExeInfo;
-use crate::hyper::space::service::Executor;
+use crate::hyperspace::err::HyperErr;
+use crate::hyperspace::service::ExeInfo;
+use crate::hyperspace::service::Executor;
 use itertools::Itertools;
 use starlane_space::wave::exchange::asynch::DirectedHandler;
 use std::collections::HashMap;

@@ -18,6 +18,11 @@ pub mod env;
 pub mod space;
 
 #[cfg(feature = "hyperspace")]
+pub mod hyperspace;
+
+#[cfg(feature = "hyperlane")]
+pub mod hyperlane;
+#[cfg(feature = "hyperspace")]
 pub mod hyper;
 pub mod registry;
 #[cfg(feature = "server")]
@@ -41,7 +46,7 @@ use crate::cli::{Cli, Commands};
 use crate::err::StarErr;
 use crate::server::Starlane;
 use clap::Parser;
-use starlane::hyper::space::platform::Platform;
+use starlane::hyperspace::platform::Platform;
 use starlane::init;
 use starlane_space::loc::ToBaseKind;
 use std::fs::File;

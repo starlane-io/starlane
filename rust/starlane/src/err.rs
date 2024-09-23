@@ -1,4 +1,4 @@
-use crate::hyper::space::err::ErrKind;
+use crate::hyperspace::err::ErrKind;
 
 #[cfg(feature = "postgres")]
 use crate::registry::postgres::err::PostErr;
@@ -11,7 +11,7 @@ pub struct StarErr {
 
 pub mod convert {
     use crate::err::StarErr;
-    use crate::hyper::space::err::{ErrKind, HyperErr};
+    use crate::hyperspace::err::{ErrKind, HyperErr};
     use ascii::FromAsciiError;
     use starlane_space::err::SpaceErr;
     use std::io;

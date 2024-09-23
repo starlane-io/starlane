@@ -1920,7 +1920,7 @@ impl Bridge {
 
 #[cfg(test)]
 mod tests {
-    use crate::hyper::lane::HyperRouter;
+    use crate::hyperlane::HyperRouter;
     use starlane_space::wave::HyperWave;
 
     /*
@@ -1989,7 +1989,7 @@ pub mod test_util {
     use once_cell::sync::Lazy;
     use tokio::sync::oneshot;
 
-    use crate::hyper::lane::{
+    use crate::hyperlane::{
         AnonHyperAuthenticator, HyperClient, HyperGate, HyperGateSelector, HyperGreeter, Hyperway,
         HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker,
         MountInterchangeGate,
@@ -2293,6 +2293,7 @@ pub mod test {
     use std::time::Duration;
 
     use dashmap::DashMap;
+    use once_cell::sync::Lazy;
     use tokio::sync::{broadcast, mpsc, oneshot};
 
     use starlane_space::err::SpaceErr;
@@ -2314,14 +2315,16 @@ pub mod test {
         , UltraWave, Wave,
     };
 
-    use crate::hyper::lane::test_util::{SingleInterchangePlatform, TestGreeter, WaveTest};
-    use crate::hyper::lane::{
+    use crate::hyperlane::test_util::{SingleInterchangePlatform, TestGreeter, WaveTest};
+    use crate::hyperlane::{
         AnonHyperAuthenticator, Bridge, HyperClient, HyperConnectionDetails, HyperGate,
         HyperGateSelector, HyperRouter, Hyperlane, Hyperway, HyperwayEndpoint,
         HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub, LocalHyperwayGateUnlocker,
         MountInterchangeGate,
     };
-    use crate::hyper::space::tests::{FAE, LESS};
+    pub static LESS: Lazy<Point> = Lazy::new( || {Point::from_str("space:users:less").expect("point") } );
+    pub static FAE: Lazy<Point> = Lazy::new( || {Point::from_str("space:users:fae").expect("point") } );
+
 
     pub struct TestRouter {}
 

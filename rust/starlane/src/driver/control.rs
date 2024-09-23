@@ -2,14 +2,14 @@ use crate::driver::{
     Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Item,
     ItemRouter, ItemSphere,
 };
-use crate::hyper::lane::{
+use crate::hyperlane::{
     AnonHyperAuthenticatorAssignEndPoint, FromTransform, HopTransform, HyperClient, HyperGreeter,
     Hyperway, HyperwayConfigurator, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub,
     InterchangeGate, TransportTransform,
 };
-use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::platform::Platform;
-use crate::hyper::space::star::{HyperStarSkel, LayerInjectionRouter};
+use crate::hyperspace::err::HyperErr;
+use crate::hyperspace::platform::Platform;
+use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter};
 use dashmap::DashMap;
 use starlane_space::artifact::ArtRef;
 use starlane_space::command::common::StateSrc;

@@ -1,4 +1,4 @@
-use crate::hyper::lane::{
+use crate::hyperlane::{
     HyperConnectionDetails, HyperConnectionStatus, HyperGate, HyperGateSelector, HyperwayEndpoint,
     HyperwayEndpointFactory,
 };
@@ -579,8 +579,8 @@ mod tests {
     use starlane_space::log::RootLogger;
     use std::str::FromStr;
 
-    use crate::hyper::lane::tcp::{CertGenerator, Error, HyperlaneTcpClient, HyperlaneTcpServer};
-    use crate::hyper::lane::test_util::{
+    use crate::hyperlane::tcp::{CertGenerator, Error, HyperlaneTcpClient, HyperlaneTcpServer};
+    use crate::hyperlane::test_util::{
         LargeFrameTest, SingleInterchangePlatform, WaveTest, FAE, LESS,
     };
     use starlane_space::point::Point;

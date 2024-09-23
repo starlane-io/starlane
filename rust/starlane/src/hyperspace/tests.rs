@@ -5,17 +5,17 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-
+use once_cell::sync::Lazy;
 use serde::Serialize;
 
 use crate::driver::control::ControlClient;
 use crate::err::StarErr;
-use crate::hyper::lane::HyperClient;
-use crate::hyper::space::machine::MachineApiExtFactory;
-use crate::hyper::space::mem::cosmos::MemCosmos;
-use crate::hyper::space::mem::registry::MemRegCtx;
-use crate::hyper::space::platform::Platform;
-use crate::hyper::space::star::HyperStarApi;
+use crate::hyperlane::HyperClient;
+use crate::hyperspace::machine::MachineApiExtFactory;
+use crate::hyperspace::mem::cosmos::MemCosmos;
+use crate::hyperspace::mem::registry::MemRegCtx;
+use crate::hyperspace::platform::Platform;
+use crate::hyperspace::star::HyperStarApi;
 use starlane_space::command::common::StateSrc;
 use starlane_space::command::direct::create::{
     Create, PointSegTemplate, PointTemplate, Strategy, Template,
@@ -39,10 +39,8 @@ use starlane_space::wave::exchange::asynch::Exchanger;
 use starlane_space::wave::{Agent, DirectedProto, Pong, Wave};
 use starlane_space::HYPERUSER;
 
-lazy_static! {
-    pub static ref LESS: Point = Point::from_str("space:users:less").expect("point");
-    pub static ref FAE: Point = Point::from_str("space:users:fae").expect("point");
-}
+pub static LESS: Lazy<Point> = Lazy::new( || {Point::from_str("space:users:less").expect("point") } );
+pub static FAE: Lazy<Point> = Lazy::new( || {Point::from_str("space:users:fae").expect("point") } );
 
 #[async_trait]
 pub trait Test: Sync + Send + Copy {

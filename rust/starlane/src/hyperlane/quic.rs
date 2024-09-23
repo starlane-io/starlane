@@ -296,7 +296,7 @@ impl ConErr {
 mod tests {
     use dashmap::DashMap;
 
-    use crate::hyper::lane::{HyperGateSelector, VersionGate};
+    use crate::hyperlane::{HyperGateSelector, VersionGate};
     use starlane_space::err::SpaceErr;
 
     use crate::HyperServerQuic;

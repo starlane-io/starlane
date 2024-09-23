@@ -22,15 +22,15 @@ use starlane_space::wave::core::cmd::CmdMethod;
 use starlane_space::wave::exchange::asynch::Exchanger;
 use starlane_space::wave::{Agent, DirectedProto, Pong, Wave};
 
-use crate::hyper::lane::{
+use crate::hyperlane::{
     HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, Hyperway, HyperwayEndpoint,
     HyperwayEndpointFactory, HyperwayInterchange, LayerTransform, MountInterchangeGate,
     SimpleGreeter,
 };
-use crate::hyper::space::err::HyperErr;
-use crate::hyper::space::platform::Platform;
-use crate::hyper::space::reg::Registry;
-use crate::hyper::space::star::{
+use crate::hyperspace::err::HyperErr;
+use crate::hyperspace::platform::Platform;
+use crate::hyperspace::reg::Registry;
+use crate::hyperspace::star::{
     HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate,
 };
 
