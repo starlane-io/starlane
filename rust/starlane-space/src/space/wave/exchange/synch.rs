@@ -6,16 +6,16 @@ use crate::space::wave::exchange::{
     RootInCtxDef, SetStrategy,
 };
 use crate::space::wave::{
-    Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, FromReflectedAggregate,
-    Handling, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto, ReflectedWave,
-    Scope, UltraWave, Wave,
+    Bounce, BounceBacks, DirectedKind, DirectedProto, DirectedWave, EchoCore, FromReflectedAggregate,
+    Handling, PongCore, RecipientSelector, ReflectedAggregate, ReflectedProto, ReflectedWave,
+    Scope, Wave, WaveVariantDef,
 };
 use crate::{Agent, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
 use alloc::borrow::Cow;
 use std::sync::Arc;
 
 pub trait ExchangeRouter: Send + Sync {
-    fn route(&self, wave: UltraWave);
+    fn route(&self, wave: Wave);
     fn exchange(&self, direct: DirectedWave) -> Result<ReflectedAggregate, SpaceErr>;
 }
 
@@ -31,7 +31,7 @@ impl SyncRouter {
 }
 
 impl ExchangeRouter for SyncRouter {
-    fn route(&self, wave: UltraWave) {
+    fn route(&self, wave: Wave) {
         self.router.route(wave)
     }
 
@@ -72,14 +72,14 @@ impl ProtoTransmitter {
         println!("DIRECTE!");
         match directed.bounce_backs() {
             BounceBacks::None => {
-                self.router.route(directed.to_ultra());
+                self.router.route(directed.to_wave());
                 FromReflectedAggregate::from_reflected_aggregate(ReflectedAggregate::None)
             }
             _ => FromReflectedAggregate::from_reflected_aggregate(self.router.exchange(directed)?),
         }
     }
 
-    pub fn ping<D>(&self, ping: D) -> Result<Wave<Pong>, SpaceErr>
+    pub fn ping<D>(&self, ping: D) -> Result<WaveVariantDef<PongCore>, SpaceErr>
     where
         D: Into<DirectedProto>,
     {
@@ -93,7 +93,7 @@ impl ProtoTransmitter {
         }
     }
 
-    pub fn ripple<D>(&self, ripple: D) -> Result<Vec<Wave<Echo>>, SpaceErr>
+    pub fn ripple<D>(&self, ripple: D) -> Result<Vec<WaveVariantDef<EchoCore>>, SpaceErr>
     where
         D: Into<DirectedProto>,
     {
@@ -138,7 +138,7 @@ impl ProtoTransmitter {
         }
     }
 
-    pub fn route(&self, wave: UltraWave) {
+    pub fn route(&self, wave: Wave) {
         self.router.route(wave)
     }
 
@@ -151,7 +151,7 @@ impl ProtoTransmitter {
         self.prep_reflect(&mut wave);
 
         let wave = wave.build()?;
-        let wave = wave.to_ultra();
+        let wave = wave.to_wave();
         self.router.route(wave);
 
         Ok(())

@@ -11,9 +11,9 @@ use crate::space::wave::exchange::{
     ProtoTransmitterDef, RootInCtxDef, SetStrategy,
 };
 use crate::space::wave::{
-    BounceBacks, BounceProto, DirectedKind, DirectedProto, DirectedWave, Echo,
-    FromReflectedAggregate, Handling, Pong, RecipientSelector, ReflectedAggregate, ReflectedProto,
-    ReflectedWave, Scope, UltraWave, Wave, WaveId,
+    BounceBacks, BounceProto, DirectedKind, DirectedProto, DirectedWave, EchoCore,
+    FromReflectedAggregate, Handling, PongCore, RecipientSelector, ReflectedAggregate, ReflectedProto,
+    ReflectedWave, Scope, Wave, WaveVariantDef, WaveId,
 };
 use crate::{Agent, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
 use alloc::borrow::Cow;
@@ -24,26 +24,26 @@ use tokio::sync::{mpsc, oneshot};
 
 #[async_trait]
 impl Router for TxRouter {
-    async fn route(&self, wave: UltraWave) {
+    async fn route(&self, wave: Wave) {
         self.tx.send(wave).await;
     }
 }
 
 #[async_trait]
 impl Router for BroadTxRouter {
-    async fn route(&self, wave: UltraWave) {
+    async fn route(&self, wave: Wave) {
         self.tx.send(wave);
     }
 }
 
 #[async_trait]
 pub trait Router: Send + Sync {
-    async fn route(&self, wave: UltraWave);
+    async fn route(&self, wave: Wave);
 }
 
 #[async_trait]
 pub trait TraversalRouter: Send + Sync {
-    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr>;
+    async fn traverse(&self, traversal: Traversal<Wave>) -> Result<(), SpaceErr>;
 }
 
 #[derive(Clone)]
@@ -59,7 +59,7 @@ impl AsyncRouter {
 
 #[async_trait]
 impl Router for AsyncRouter {
-    async fn route(&self, wave: UltraWave) {
+    async fn route(&self, wave: Wave) {
         self.router.route(wave).await
     }
 }
@@ -95,19 +95,19 @@ impl ProtoTransmitter {
 
         match directed.bounce_backs() {
             BounceBacks::None => {
-                self.router.route(directed.to_ultra()).await;
+                self.router.route(directed.to_wave()).await;
                 FromReflectedAggregate::from_reflected_aggregate(ReflectedAggregate::None)
             }
             _ => {
                 let reflected_rx = self.exchanger.exchange(&directed).await;
-                self.router.route(directed.to_ultra()).await;
+                self.router.route(directed.to_wave()).await;
                 let reflected_agg = reflected_rx.await?;
                 FromReflectedAggregate::from_reflected_aggregate(reflected_agg)
             }
         }
     }
 
-    pub async fn ping<D>(&self, ping: D) -> Result<Wave<Pong>, SpaceErr>
+    pub async fn ping<D>(&self, ping: D) -> Result<WaveVariantDef<PongCore>, SpaceErr>
     where
         D: Into<DirectedProto>,
     {
@@ -119,7 +119,7 @@ impl ProtoTransmitter {
         }
     }
 
-    pub async fn ripple<D>(&self, ripple: D) -> Result<Vec<Wave<Echo>>, SpaceErr>
+    pub async fn ripple<D>(&self, ripple: D) -> Result<Vec<WaveVariantDef<EchoCore>>, SpaceErr>
     where
         D: Into<DirectedProto>,
     {
@@ -150,7 +150,7 @@ impl ProtoTransmitter {
         directed.method(CmdMethod::Bounce);
         match self.direct(directed).await {
             Ok(pong) => {
-                let pong: Wave<Pong> = pong;
+                let pong: WaveVariantDef<PongCore> = pong;
                 pong.is_ok()
             }
             Err(_) => false,
@@ -163,14 +163,14 @@ impl ProtoTransmitter {
         direct.method(CmdMethod::Bounce);
         match self.direct(direct).await {
             Ok(pong) => {
-                let pong: Wave<Pong> = pong;
+                let pong: WaveVariantDef<PongCore> = pong;
                 pong.is_ok()
             }
             Err(_) => false,
         }
     }
 
-    pub async fn route(&self, wave: UltraWave) {
+    pub async fn route(&self, wave: Wave) {
         self.router.route(wave).await
     }
 
@@ -183,7 +183,7 @@ impl ProtoTransmitter {
         self.prep_reflect(&mut wave);
 
         let wave = wave.build()?;
-        let wave = wave.to_ultra();
+        let wave = wave.to_wave();
         self.router.route(wave).await;
 
         Ok(())
@@ -278,11 +278,11 @@ pub trait DirectedHandler: Send + Sync {
 
 #[derive(Clone)]
 pub struct TxRouter {
-    pub tx: mpsc::Sender<UltraWave>,
+    pub tx: mpsc::Sender<Wave>,
 }
 
 impl TxRouter {
-    pub fn new(tx: mpsc::Sender<UltraWave>) -> Self {
+    pub fn new(tx: mpsc::Sender<Wave>) -> Self {
         Self { tx }
     }
 }
@@ -336,13 +336,13 @@ impl Exchanger {
             self.claimed.insert(reflect.reflection_of().to_string());
             tx.send(ReflectedAggregate::Single(reflect));
         } else {
-            let reflect = reflect.to_ultra();
+            let reflect = reflect.to_wave();
             let kind = match &reflect {
-                UltraWave::Ping(_) => "Ping",
-                UltraWave::Pong(_) => "Pong",
-                UltraWave::Ripple(_) => "Ripple",
-                UltraWave::Echo(_) => "Echo",
-                UltraWave::Signal(_) => "Signal",
+                Wave::Ping(_) => "Ping",
+                Wave::Pong(_) => "Pong",
+                Wave::Ripple(_) => "Ripple",
+                Wave::Echo(_) => "Echo",
+                Wave::Signal(_) => "Signal",
             };
             let reflect = reflect.to_reflected()?;
 
@@ -507,7 +507,7 @@ where
             CoreBounce::Absorbed => {}
             CoreBounce::Reflected(reflected) => {
                 let wave = reflection.unwrap().make(reflected, self.surface.clone());
-                let wave = wave.to_ultra();
+                let wave = wave.to_wave();
                 let transmitter = self.builder.clone().build();
                 transmitter.route(wave).await;
             }

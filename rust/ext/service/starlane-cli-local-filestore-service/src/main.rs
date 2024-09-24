@@ -1,6 +1,6 @@
 use clap::Parser;
-use starlane::dialect::cli::filestore::Cli;
-use starlane::dialect::cli::filestore::Commands;
+use starlane::executor::dialect::filestore::FileStoreCli;
+use starlane::executor::dialect::filestore::FileStoreCommand;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{absolute, PathBuf, StripPrefixError};
@@ -32,8 +32,8 @@ fn run() -> Result<(),Error> {
     env::var(FILE_STORE_ROOT).map_err( |_|format!("'{}' environment variable is not set.", FILE_STORE_ROOT).to_string())?;
 
 
-    let cli = Cli::parse();
-    if let Commands::Init = cli.command {
+    let cli = FileStoreCli::parse();
+    if let FileStoreCommand::Init = cli.command {
         ensure_dir(&root_dir()?);
         return Ok(());
     }
@@ -44,27 +44,27 @@ fn run() -> Result<(),Error> {
       }
 
     match cli.command {
-        Commands::Init => {
+        FileStoreCommand::Init => {
             Ok(())
         }
-        Commands::Write { path } => {
+        FileStoreCommand::Write { path } => {
             let file = norm(&path)?;
             let mut file = File::create(file)?;
             io::copy(&mut io::stdin(), &mut file)?;
             Ok(())
         }
-        Commands::Read { path } => {
+        FileStoreCommand::Read { path } => {
             let file = norm(&path)?;
             let mut file = File::open(file)?;
             io::copy(&mut file, &mut io::stdout())?;
             Ok(())
         }
-        Commands::Mkdir { path } => {
+        FileStoreCommand::Mkdir { path } => {
             let dir = norm(&path)?;
             fs::create_dir_all(dir)?;
             Ok(())
         }
-        Commands::Remove { path } => {
+        FileStoreCommand::Remove { path } => {
             let file = norm(&path)?;
             if file.is_file() {
                 fs::remove_file(file)?;
@@ -74,14 +74,14 @@ fn run() -> Result<(),Error> {
             }
             Ok(())           // delete is always treated as a file but will delte if it is a Dir or a File
         }
-        Commands::List { path: Option::Some(path)} => {
+        FileStoreCommand::List { path: Option::Some(path)} => {
             let file = norm(&path)?;
             for f in file.read_dir()?.into_iter().map(|r|r.unwrap()) {
                 println!("{}",f.path().display());
             }
             Ok(())
         }
-        Commands::List { path: Option::None } => {
+        FileStoreCommand::List { path: Option::None } => {
             let path = "/".into();
             let file = norm(&path)?;
             for f in file.read_dir()?.into_iter().map(|r|r.unwrap()) {
@@ -89,12 +89,12 @@ fn run() -> Result<(),Error> {
             }
             Ok(())
         }
-        Commands::Pwd =>  {
+        FileStoreCommand::Pwd =>  {
             println!("{}", root_dir()?.to_str().unwrap());
             Ok(())
         }
 
-        Commands::Exists { path } => {
+        FileStoreCommand::Exists { path } => {
             let file = norm(&path)?;
             match file.exists() {
                 true => Ok(()),

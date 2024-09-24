@@ -36,7 +36,7 @@ use starlane::space::wave::exchange::asynch::{
 };
 use starlane::space::wave::exchange::SetStrategy;
 use starlane::space::wave::{
-    Agent, DirectedProto, Pong, ToRecipients, UltraWave, Wave,
+    Agent, DirectedProto, PongCore, ToRecipients, Wave, WaveVariantDef,
 };
 use std::marker::PhantomData;
 use std::str::FromStr;
@@ -436,7 +436,7 @@ impl<P> TraversalRouter for Control<P>
 where
     P: Platform,
 {
-    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
+    async fn traverse(&self, traversal: Traversal<Wave>) -> Result<(), SpaceErr> {
         self.skel.driver.logger.track(&traversal, || {
             Tracker::new(
                 format!("control -> {}", traversal.dir.to_string()),
@@ -522,7 +522,7 @@ impl ControlClient {
         let mut proto = DirectedProto::ping();
         proto.to(self.surface()?.with_layer(Layer::Shell));
         proto.method(ExtMethod::new("NewCliSession".to_string())?);
-        let pong: Wave<Pong> = transmitter.direct(proto).await?;
+        let pong: WaveVariantDef<PongCore> = transmitter.direct(proto).await?;
         pong.ok_or()?;
         if let Substance::Surface(port) = pong.variant.core.body {
             let mut transmitter = self.transmitter_builder().await?;
@@ -555,7 +555,7 @@ impl ControlCliSession {
         let mut proto = DirectedProto::ping();
         proto.method(ExtMethod::new("Exec".to_string())?);
         proto.body(Substance::RawCommand(command));
-        let pong: Wave<Pong> = self.transmitter.direct(proto).await?;
+        let pong: WaveVariantDef<PongCore> = self.transmitter.direct(proto).await?;
         Ok(pong.variant.core)
     }
 }

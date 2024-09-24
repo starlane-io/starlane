@@ -4,15 +4,15 @@ use crate::space::loc::Layer;
 use crate::space::log::{SpanLogger, Trackable};
 use crate::space::point::Point;
 use crate::space::wave::exchange::asynch::Exchanger;
-use crate::space::wave::{DirectedWave, Ping, Pong, ReflectedWave, SingularDirectedWave, UltraWave, Wave};
+use crate::space::wave::{DirectedWave, PingCore, PongCore, ReflectedWave, SingularDirectedWave, Wave, WaveVariantDef};
 use crate::{ParticleRecord, SpaceErr, Surface};
 
 #[async_trait]
 pub trait TraversalLayer {
     fn surface(&self) -> Surface;
 
-    async fn traverse_next(&self, traversal: Traversal<UltraWave>);
-    async fn inject(&self, wave: UltraWave);
+    async fn traverse_next(&self, traversal: Traversal<Wave>);
+    async fn inject(&self, wave: Wave);
 
     fn exchanger(&self) -> &Exchanger;
 
@@ -26,7 +26,7 @@ pub trait TraversalLayer {
         self.exchanger().reflected(reflect.payload).await
     }
 
-    async fn visit(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
+    async fn visit(&self, traversal: Traversal<Wave>) -> Result<(), SpaceErr> {
         if let Some(dest) = &traversal.dest {
             if self.surface().layer == *dest {
                 if traversal.is_directed() {
@@ -78,7 +78,7 @@ pub trait TraversalLayer {
         &self,
         traversal: Traversal<ReflectedWave>,
     ) -> Result<(), SpaceErr> {
-        self.traverse_next(traversal.to_ultra()).await;
+        self.traverse_next(traversal.to_wave()).await;
         Ok(())
     }
 
@@ -86,7 +86,7 @@ pub trait TraversalLayer {
         &self,
         traversal: Traversal<ReflectedWave>,
     ) -> Result<(), SpaceErr> {
-        self.traverse_next(traversal.to_ultra()).await;
+        self.traverse_next(traversal.to_wave()).await;
         Ok(())
     }
 }
@@ -144,13 +144,13 @@ impl TraversalPlan {
 #[derive(Clone)]
 pub struct TraversalInjection {
     pub surface: Surface,
-    pub wave: UltraWave,
+    pub wave: Wave,
     pub from_gravity: bool,
     pub dir: Option<TraversalDirection>,
 }
 
 impl TraversalInjection {
-    pub fn new(injector: Surface, wave: UltraWave) -> Self {
+    pub fn new(injector: Surface, wave: Wave) -> Self {
         Self {
             surface: injector,
             wave,
@@ -320,7 +320,7 @@ impl<W> Traversal<W> {
     }
 }
 
-impl Traversal<UltraWave> {
+impl Traversal<Wave> {
     pub fn is_fabric_bound(&self) -> bool {
         match self.dir {
             TraversalDirection::Fabric => true,
@@ -337,25 +337,25 @@ impl Traversal<UltraWave> {
 
     pub fn is_ping(&self) -> bool {
         match &self.payload {
-            UltraWave::Ping(_) => true,
+            Wave::Ping(_) => true,
             _ => false,
         }
     }
 
     pub fn is_pong(&self) -> bool {
         match &self.payload {
-            UltraWave::Pong(_) => true,
+            Wave::Pong(_) => true,
             _ => false,
         }
     }
 
     pub fn is_directed(&self) -> bool {
         match self.payload {
-            UltraWave::Ping(_) => true,
-            UltraWave::Pong(_) => false,
-            UltraWave::Ripple(_) => true,
-            UltraWave::Echo(_) => false,
-            UltraWave::Signal(_) => true,
+            Wave::Ping(_) => true,
+            Wave::Pong(_) => false,
+            Wave::Ripple(_) => true,
+            Wave::Echo(_) => false,
+            Wave::Signal(_) => true,
         }
     }
 
@@ -366,9 +366,9 @@ impl Traversal<UltraWave> {
     pub fn unwrap_directed(self) -> Traversal<DirectedWave> {
         let clone = self.clone();
         match self.payload {
-            UltraWave::Ping(ping) => clone.with(ping.to_directed().clone()),
-            UltraWave::Ripple(ripple) => clone.with(ripple.to_directed()),
-            UltraWave::Signal(signal) => clone.with(signal.to_directed()),
+            Wave::Ping(ping) => clone.with(ping.to_directed().clone()),
+            Wave::Ripple(ripple) => clone.with(ripple.to_directed()),
+            Wave::Signal(signal) => clone.with(signal.to_directed()),
             _ => {
                 panic!("cannot call this unless you are sure it's a DirectedWave")
             }
@@ -378,11 +378,11 @@ impl Traversal<UltraWave> {
     pub fn unwrap_singular_directed(self) -> Traversal<SingularDirectedWave> {
         let clone = self.clone();
         match self.payload {
-            UltraWave::Ping(ping) => clone.with(ping.to_singular_directed()),
-            UltraWave::Ripple(ripple) => {
+            Wave::Ping(ping) => clone.with(ping.to_singular_directed()),
+            Wave::Ripple(ripple) => {
                 clone.with(ripple.to_singular_directed().expect("singular directed"))
             }
-            UltraWave::Signal(signal) => clone.with(signal.to_singular_directed()),
+            Wave::Signal(signal) => clone.with(signal.to_singular_directed()),
             _ => {
                 panic!("cannot call this unless you are sure it's a DirectedWave")
             }
@@ -392,24 +392,24 @@ impl Traversal<UltraWave> {
     pub fn unwrap_reflected(self) -> Traversal<ReflectedWave> {
         let clone = self.clone();
         match self.payload {
-            UltraWave::Pong(pong) => clone.with(pong.to_reflected()),
-            UltraWave::Echo(echo) => clone.with(echo.to_reflected()),
+            Wave::Pong(pong) => clone.with(pong.to_reflected()),
+            Wave::Echo(echo) => clone.with(echo.to_reflected()),
             _ => {
                 panic!("cannot call this unless you are sure it's a ReflectedWave")
             }
         }
     }
 
-    pub fn unwrap_ping(self) -> Traversal<Wave<Ping>> {
-        if let UltraWave::Ping(ping) = self.payload.clone() {
+    pub fn unwrap_ping(self) -> Traversal<WaveVariantDef<PingCore>> {
+        if let Wave::Ping(ping) = self.payload.clone() {
             self.with(ping)
         } else {
             panic!("cannot call this unless you are sure it's a Ping")
         }
     }
 
-    pub fn unwrap_pong(self) -> Traversal<Wave<Pong>> {
-        if let UltraWave::Pong(pong) = self.payload.clone() {
+    pub fn unwrap_pong(self) -> Traversal<WaveVariantDef<PongCore>> {
+        if let Wave::Pong(pong) = self.payload.clone() {
             self.with(pong)
         } else {
             panic!("cannot call this unless you are sure it's a Pong")
@@ -418,37 +418,37 @@ impl Traversal<UltraWave> {
 }
 
 impl Traversal<DirectedWave> {
-    pub fn wrap(self) -> Traversal<UltraWave> {
+    pub fn wrap(self) -> Traversal<Wave> {
         let ping = self.payload.clone();
-        self.with(ping.to_ultra())
+        self.with(ping.to_wave())
     }
 }
 
 impl Traversal<ReflectedWave> {
-    pub fn wrap(self) -> Traversal<UltraWave> {
+    pub fn wrap(self) -> Traversal<Wave> {
         let ping = self.payload.clone();
-        self.with(ping.to_ultra())
+        self.with(ping.to_wave())
     }
 }
 
 impl Traversal<SingularDirectedWave> {
-    pub fn wrap(self) -> Traversal<UltraWave> {
+    pub fn wrap(self) -> Traversal<Wave> {
         let ping = self.payload.clone();
-        self.with(ping.to_ultra())
+        self.with(ping.to_wave())
     }
 }
 
 impl Traversal<ReflectedWave> {
-    pub fn to_ultra(self) -> Traversal<UltraWave> {
+    pub fn to_wave(self) -> Traversal<Wave> {
         let pong = self.payload.clone();
-        self.with(pong.to_ultra())
+        self.with(pong.to_wave())
     }
 }
 
-impl Traversal<Wave<Ping>> {
-    pub fn to_ultra(self) -> Traversal<UltraWave> {
+impl Traversal<WaveVariantDef<PingCore>> {
+    pub fn to_wave(self) -> Traversal<Wave> {
         let ping = self.payload.clone();
-        self.with(ping.to_ultra())
+        self.with(ping.to_wave())
     }
 
     pub fn to_directed(self) -> Traversal<DirectedWave> {
@@ -457,10 +457,10 @@ impl Traversal<Wave<Ping>> {
     }
 }
 
-impl Traversal<Wave<Pong>> {
-    pub fn to_ultra(self) -> Traversal<UltraWave> {
+impl Traversal<WaveVariantDef<PongCore>> {
+    pub fn to_wave(self) -> Traversal<Wave> {
         let pong = self.payload.clone();
-        self.with(pong.to_ultra())
+        self.with(pong.to_wave())
     }
 
     pub fn to_reflected(self) -> Traversal<ReflectedWave> {

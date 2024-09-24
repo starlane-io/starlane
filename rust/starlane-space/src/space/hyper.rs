@@ -18,7 +18,7 @@ use crate::space::substance::Substance;
 use crate::space::wave::core::hyp::HypMethod;
 use crate::space::wave::core::{DirectedCore, ReflectedCore};
 use crate::space::wave::{
-    Ping, ReflectedKind, ReflectedProto, UltraWave, Wave, WaveId, WaveKind,
+    PingCore, ReflectedKind, ReflectedProto, Wave, WaveVariantDef, WaveId, WaveKind,
 };
 use crate::Agent;
 
@@ -141,10 +141,10 @@ impl Provision {
     }
 }
 
-impl TryFrom<Ping> for Provision {
+impl TryFrom<PingCore> for Provision {
     type Error = SpaceErr;
 
-    fn try_from(request: Ping) -> Result<Self, Self::Error> {
+    fn try_from(request: PingCore) -> Result<Self, Self::Error> {
         if let Substance::Hyper(HyperSubstance::Provision(provision)) = request.core.body {
             Ok(provision)
         } else {
@@ -289,10 +289,10 @@ impl DerefMut for Discoveries {
     }
 }
 
-impl TryFrom<Ping> for Assign {
+impl TryFrom<PingCore> for Assign {
     type Error = SpaceErr;
 
-    fn try_from(request: Ping) -> Result<Self, Self::Error> {
+    fn try_from(request: PingCore) -> Result<Self, Self::Error> {
         if let Substance::Hyper(HyperSubstance::Assign(assign)) = request.core.body {
             Ok(assign)
         } else {
@@ -367,12 +367,12 @@ impl Default for Knock {
     }
 }
 
-impl Into<Wave<Ping>> for Knock {
-    fn into(self) -> Wave<Ping> {
+impl Into<WaveVariantDef<PingCore>> for Knock {
+    fn into(self) -> WaveVariantDef<PingCore> {
         let mut core = DirectedCore::new(HypMethod::Knock.into());
         core.body = Substance::Knock(self);
-        let wave = Wave::new(
-            Ping::new(core, Point::local_endpoint().to_surface()),
+        let wave = WaveVariantDef::new(
+            PingCore::new(core, Point::local_endpoint().to_surface()),
             Point::remote_endpoint().to_surface(),
         );
         wave
@@ -398,8 +398,8 @@ impl Greet {
     }
 }
 
-impl Into<UltraWave> for Greet {
-    fn into(self) -> UltraWave {
+impl Into<Wave> for Greet {
+    fn into(self) -> Wave {
         let mut proto = ReflectedProto::new();
         proto.kind(ReflectedKind::Pong);
         proto.agent(Agent::HyperUser);
@@ -409,7 +409,7 @@ impl Into<UltraWave> for Greet {
         proto.reflection_of(WaveId::new(WaveKind::Ping)); // this is just randomly created since this pong reflection will not be traditionally handled on the receiving end
         proto.status(200u16);
         proto.body(self.into());
-        proto.build().unwrap().to_ultra()
+        proto.build().unwrap().to_wave()
     }
 }
 

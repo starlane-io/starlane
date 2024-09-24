@@ -45,7 +45,7 @@ use starlane::space::wave::exchange::asynch::{
     Router, TraversalRouter,
 };
 use starlane::space::wave::exchange::SetStrategy;
-use starlane::space::wave::{Agent, DirectedWave, ReflectedWave, UltraWave};
+use starlane::space::wave::{Agent, DirectedWave, ReflectedWave, Wave};
 use starlane::space::HYPERUSER;
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -176,7 +176,7 @@ where
         driver: DriverApi<P>,
         rtn: oneshot::Sender<()>,
     },
-    Visit(Traversal<UltraWave>),
+    Visit(Traversal<Wave>),
     InternalKinds(oneshot::Sender<Vec<KindSelector>>),
     ExternalKinds(oneshot::Sender<Vec<KindSelector>>),
     Find {
@@ -240,7 +240,7 @@ where
         Ok(self.status())
     }
 
-    pub async fn visit(&self, traversal: Traversal<UltraWave>) {
+    pub async fn visit(&self, traversal: Traversal<Wave>) {
         self.call_tx.send(DriversCall::Visit(traversal)).await;
     }
 
@@ -917,16 +917,16 @@ where
 
      */
 
-    async fn start_outer_traversal(&self, traversal: Traversal<UltraWave>) {
+    async fn start_outer_traversal(&self, traversal: Traversal<Wave>) {
         let traverse_to_next_tx = self.skel.traverse_to_next_tx.clone();
         tokio::spawn(async move {
             traverse_to_next_tx.send(traversal).await;
         });
     }
 
-    async fn start_inner_traversal(&self, traversal: Traversal<UltraWave>) {}
+    async fn start_inner_traversal(&self, traversal: Traversal<Wave>) {}
 
-    pub async fn visit(&self, traversal: Traversal<UltraWave>) {
+    pub async fn visit(&self, traversal: Traversal<Wave>) {
         if traversal.dir.is_core() {
             match self.find(&traversal.record.details.stub.kind) {
                 None => {
@@ -1007,13 +1007,13 @@ where
         Ok(rtn_rx.await?)
     }
 
-    pub async fn traverse(&self, traversal: Traversal<UltraWave>) {
+    pub async fn traverse(&self, traversal: Traversal<Wave>) {
         self.call_tx
             .send(DriverRunnerCall::Traverse(traversal))
             .await;
     }
 
-    pub async fn handle(&self, traversal: Traversal<UltraWave>) {
+    pub async fn handle(&self, traversal: Traversal<Wave>) {
         self.call_tx.send(DriverRunnerCall::Handle(traversal)).await;
     }
 
@@ -1039,8 +1039,8 @@ where
 {
     AddDriver(DriverApi<P>),
     GetPoint(oneshot::Sender<Point>),
-    Traverse(Traversal<UltraWave>),
-    Handle(Traversal<UltraWave>),
+    Traverse(Traversal<Wave>),
+    Handle(Traversal<Wave>),
     Item {
         point: Point,
         tx: oneshot::Sender<Result<ItemSphere<P>, P::Err>>,
@@ -1119,7 +1119,7 @@ where
                                 .set_status(&self.surface().point.clone(), &status)
                                 .await;
                             let reflect = reflection.make(ReflectedCore::ok(), self.surface());
-                            self.router.route(reflect.to_ultra()).await;
+                            self.router.route(reflect.to_wave()).await;
                         }
                         Err(err) => {
                             self.skel
@@ -1127,7 +1127,7 @@ where
                                 .set_status(&self.surface().point.clone(), &Status::Panic)
                                 .await;
                             let reflect = reflection.make(ReflectedCore::err(err), self.surface());
-                            self.router.route(reflect.to_ultra()).await;
+                            self.router.route(reflect.to_wave()).await;
                         }
                     }
                 } else {
@@ -1147,7 +1147,7 @@ where
                             let reflection = reflection?;
 
                             let wave = reflection.make(reflected, self.surface.clone());
-                            let wave = wave.to_ultra();
+                            let wave = wave.to_wave();
                             #[cfg(test)]
                             self.skel
                                 .diagnostic_interceptors
@@ -1184,11 +1184,11 @@ where
         }
     }
 
-    async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
+    async fn traverse_next(&self, traversal: Traversal<Wave>) {
         self.skel.traverse_to_next_tx.send(traversal).await;
     }
 
-    async fn inject(&self, wave: UltraWave) {
+    async fn inject(&self, wave: Wave) {
         let inject = TraversalInjection::new(self.surface().clone().with_layer(Layer::Guest), wave);
         self.skel.inject_tx.send(inject).await;
     }
@@ -1316,7 +1316,7 @@ where
                                             core,
                                             skel.point.to_surface().with_layer(Layer::Core),
                                         );
-                                        transmitter.route(reflect.to_ultra()).await;
+                                        transmitter.route(reflect.to_wave()).await;
                                     }
                                 }
                             });
@@ -1370,7 +1370,7 @@ where
         });
     }
 
-    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), P::Err> {
+    async fn traverse(&self, traversal: Traversal<Wave>) -> Result<(), P::Err> {
         self.skel.logger.track(&traversal, || {
             Tracker::new(
                 format!("drivers -> {}", traversal.dir.to_string()),
@@ -2000,7 +2000,7 @@ impl<P> TraversalRouter for DriverItem<P>
 where
     P: Platform,
 {
-    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
+    async fn traverse(&self, traversal: Traversal<Wave>) -> Result<(), SpaceErr> {
         self.skel.api.handle(traversal).await;
         Ok(())
     }

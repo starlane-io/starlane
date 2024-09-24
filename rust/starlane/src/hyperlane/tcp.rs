@@ -9,7 +9,7 @@ use starlane::space::err::SpaceErr;
 use starlane::space::hyper::Knock;
 use starlane::space::log::PointLogger;
 use starlane::space::substance::Substance;
-use starlane::space::wave::{Ping, UltraWave, Wave};
+use starlane::space::wave::{PingCore, Wave, WaveVariantDef};
 use starlane::space::VERSION;
 use std::io::{BufReader, Read};
 use std::str::FromStr;
@@ -106,8 +106,8 @@ impl HyperwayEndpointFactory for HyperlaneTcpClient {
         let endpoint =
             FrameMuxer::handshake(stream, status_tx.clone(), self.logger.clone()).await?;
 
-        let wave: Wave<Ping> = self.knock.clone().into();
-        let wave = wave.to_ultra();
+        let wave: WaveVariantDef<PingCore> = self.knock.clone().into();
+        let wave = wave.to_wave();
         endpoint.tx.send(wave).await?;
 
         Ok(endpoint)
@@ -205,11 +205,11 @@ impl Frame {
         Ok(())
     }
 
-    pub fn to_wave(self) -> Result<UltraWave, SpaceErr> {
+    pub fn to_wave(self) -> Result<Wave, SpaceErr> {
         Ok(bincode::deserialize(self.data.as_slice())?)
     }
 
-    pub fn from_wave(wave: UltraWave) -> Result<Self, SpaceErr> {
+    pub fn from_wave(wave: Wave) -> Result<Self, SpaceErr> {
         Ok(Self {
             data: bincode::serialize(&wave)?,
         })
@@ -218,8 +218,8 @@ impl Frame {
 
 pub struct FrameMuxer {
     stream: FrameStream,
-    tx: mpsc::Sender<UltraWave>,
-    rx: mpsc::Receiver<UltraWave>,
+    tx: mpsc::Sender<Wave>,
+    rx: mpsc::Receiver<Wave>,
     terminate_rx: mpsc::Receiver<()>,
     logger: PointLogger,
 }
@@ -349,7 +349,7 @@ impl FrameStream {
         self.frame().await?.to_string()
     }
 
-    pub async fn read_wave(&mut self) -> Result<UltraWave, SpaceErr> {
+    pub async fn read_wave(&mut self) -> Result<Wave, SpaceErr> {
         self.frame().await?.to_wave()
     }
 
@@ -365,7 +365,7 @@ impl FrameStream {
         self.write_frame(Frame::from_version(version)).await
     }
 
-    pub async fn write_wave(&mut self, wave: UltraWave) -> Result<(), SpaceErr> {
+    pub async fn write_wave(&mut self, wave: Wave) -> Result<(), SpaceErr> {
         self.write_frame(Frame::from_wave(wave)?).await
     }
 }

@@ -1,4 +1,5 @@
 use thiserror::Error;
+use tokio::io;
 use crate::hyperspace::err::ErrKind;
 
 #[cfg(feature = "postgres")]
@@ -9,7 +10,9 @@ pub enum ThisErr {
     #[error("star error {0}")]
     StarErr(StarErr),
      #[error("{0}")]
-    String(String)
+    String(String),
+    #[error("{0}")]
+    TokioIo(#[from] io::Error)
 }
 
 impl StarErr {

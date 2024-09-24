@@ -34,7 +34,7 @@ use starlane::space::wave::core::ext::ExtMethod;
 use starlane::space::wave::core::hyp::HypMethod;
 use starlane::space::wave::core::{Method, ReflectedCore};
 use starlane::space::wave::exchange::asynch::Exchanger;
-use starlane::space::wave::{Agent, DirectedProto, Pong, Wave};
+use starlane::space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
 use starlane::space::HYPERUSER;
 
 pub static LESS: Lazy<Point> = Lazy::new( || {Point::from_str("space:users:less").expect("point") } );
@@ -109,7 +109,7 @@ async fn create(
         StateSrc::None,
     ))));
     let wave = wave.build()?;
-    let wave = wave.to_ultra();
+    let wave = wave.to_wave();
     star_api.to_gravity(wave).await;
     Ok(())
 }
@@ -158,7 +158,7 @@ fn test_control() -> Result<(), StarErr> {
                             let reflection = directed.reflection().unwrap();
                             let reflect =
                                 reflection.make(ReflectedCore::ok(), greet.surface.clone());
-                            let wave = reflect.to_ultra();
+                            let wave = reflect.to_wave();
                             transmitter.route(wave).await;
                         }
                     }
@@ -170,7 +170,7 @@ fn test_control() -> Result<(), StarErr> {
             greet.transport.clone().with_layer(Layer::Shell),
             CmdMethod::Bounce,
         );
-        let reflect: Wave<Pong> = transmitter.direct(bounce).await?;
+        let reflect: WaveVariantDef<PongCore> = transmitter.direct(bounce).await?;
 
         assert!(reflect.core.status.is_success());
 
@@ -295,7 +295,7 @@ fn test_provision_and_assign() -> Result<(), StarErr> {
         let mut proto: DirectedProto = create.into();
         //proto.track = true;
 
-        let reflect: Wave<Pong> = transmitter.direct(proto).await?;
+        let reflect: WaveVariantDef<PongCore> = transmitter.direct(proto).await?;
         assert!(reflect.core.is_ok());
 
         tokio::time::sleep(Duration::from_secs(5)).await;
@@ -304,7 +304,7 @@ fn test_provision_and_assign() -> Result<(), StarErr> {
         let mut proto = DirectedProto::ping();
         proto.method(CmdMethod::Bounce);
         proto.to(point.to_surface());
-        let reflect: Wave<Pong> = transmitter.direct(proto).await?;
+        let reflect: WaveVariantDef<PongCore> = transmitter.direct(proto).await?;
         println!("{}", reflect.core.status.to_string());
         assert!(reflect.core.is_ok());
 

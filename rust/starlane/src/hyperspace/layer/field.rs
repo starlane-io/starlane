@@ -19,7 +19,7 @@ use starlane::space::wave::core::{Method, ReflectedCore};
 use starlane::space::wave::exchange::asynch::ProtoTransmitter;
 use starlane::space::wave::exchange::asynch::{Exchanger, TraversalTransmitter};
 use starlane::space::wave::{
-    BounceBacks, DirectedKind, DirectedProto, DirectedWave, Echo, Pong, Reflection, UltraWave, Wave,
+    BounceBacks, DirectedKind, DirectedProto, DirectedWave, EchoCore, PongCore, Reflection, Wave, WaveVariantDef,
 };
 
 use crate::hyperspace::err::HyperErr;
@@ -111,12 +111,12 @@ where
         self.port.clone()
     }
 
-    async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
+    async fn traverse_next(&self, traversal: Traversal<Wave>) {
         self.logger
             .eat(self.skel.traverse_to_next_tx.send(traversal).await);
     }
 
-    async fn inject(&self, wave: UltraWave) {
+    async fn inject(&self, wave: Wave) {
         panic!("cannot inject here!");
         //        self.shell_transmitter.route(wave).await;
     }
@@ -249,7 +249,7 @@ where
                         let wave = reflection
                             .clone()
                             .make(err.as_reflected_core(), self.surface.clone());
-                        let wave = wave.to_ultra();
+                        let wave = wave.to_wave();
                         self.gravity_transmitter.route(wave).await;
                     }
                     Err(_) => {}
@@ -315,7 +315,7 @@ where
 
                 let reflected = reflection.make(core, self.traversal.to.clone());
 
-                self.gravity_transmitter.route(reflected.to_ultra()).await;
+                self.gravity_transmitter.route(reflected.to_wave()).await;
                 Ok(())
             }
             PipelineStopVar::Call(_) => {
@@ -341,7 +341,7 @@ where
     ) -> Result<(), SpaceErr> {
         match proto.kind.as_ref().unwrap() {
             DirectedKind::Ping => {
-                let pong: Wave<Pong> = transmitter.direct(proto).await?;
+                let pong: WaveVariantDef<PongCore> = transmitter.direct(proto).await?;
                 self.status = pong.core.status.as_u16();
                 if pong.core.status.is_success() {
                     self.body = pong.core.body.clone();
@@ -355,7 +355,7 @@ where
                 if proto.bounce_backs.is_some() {
                     proto.bounce_backs(BounceBacks::Count(1));
                 }
-                let mut echoes: Vec<Wave<Echo>> = transmitter.direct(proto).await?;
+                let mut echoes: Vec<WaveVariantDef<EchoCore>> = transmitter.direct(proto).await?;
                 if !echoes.is_empty() {
                     let echo = echoes.remove(0);
                     self.status = echo.core.status.as_u16();
@@ -383,7 +383,7 @@ where
     ) -> Result<(), SpaceErr> {
         match proto.directed_kind() {
             DirectedKind::Ping => {
-                let pong: Wave<Pong> = transmitter.direct(proto).await?;
+                let pong: WaveVariantDef<PongCore> = transmitter.direct(proto).await?;
                 self.status = pong.core.status.as_u16();
                 if pong.core.status.is_success() {
                     self.body = pong.core.body.clone();
@@ -395,7 +395,7 @@ where
             DirectedKind::Ripple => {
                 // this should be a single echo since in traversal it is only going to a single target
                 proto.set_bounce_backs(BounceBacks::Count(1));
-                let mut echoes: Vec<Wave<Echo>> = transmitter.direct(proto).await?;
+                let mut echoes: Vec<WaveVariantDef<EchoCore>> = transmitter.direct(proto).await?;
                 if !echoes.is_empty() {
                     let echo = echoes.remove(0);
                     self.status = echo.core.status.as_u16();

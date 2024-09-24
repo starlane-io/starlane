@@ -9,6 +9,7 @@ extern crate lazy_static;
 #[macro_use]
 extern crate starlane_macros;
 
+pub mod template;
 pub mod err;
 pub mod properties;
 

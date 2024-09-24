@@ -23,7 +23,7 @@ use crate::space::wave::core::ext::ExtMethod;
 use crate::space::wave::core::http2::HttpMethod;
 use crate::space::wave::core::hyp::HypMethod;
 use crate::space::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
-use crate::space::wave::{Pong, UltraWave};
+use crate::space::wave::{PongCore, Wave};
 use crate::{Details, SpaceErr, Status, Stub, Surface};
 use url::Url;
 use crate::space::util;
@@ -106,7 +106,7 @@ pub enum Substance {
     ReflectedCore(Box<ReflectedCore>),
     Hyper(HyperSubstance),
     Token(Token),
-    UltraWave(Box<UltraWave>),
+    Wave(Box<Wave>),
     Knock(Knock),
     Greet(Greet),
     Log(LogSubstance),
@@ -114,16 +114,16 @@ pub enum Substance {
 }
 
 impl Substance {
-    pub fn ultrawave(&self) -> Option<&UltraWave> {
-        if let Substance::UltraWave(wave) = self {
+    pub fn wave(&self) -> Option<&Wave> {
+        if let Substance::Wave(wave) = self {
             Some(wave.as_ref())
         } else {
             None
         }
     }
 
-    pub fn ultrawave_mut(&mut self) -> Option<&mut UltraWave> {
-        if let Substance::UltraWave(wave) = self {
+    pub fn wave_mut(&mut self) -> Option<&mut Wave> {
+        if let Substance::Wave(wave) = self {
             Some(wave.as_mut())
         } else {
             None
@@ -177,10 +177,10 @@ impl FromStr for Token {
     }
 }
 
-impl TryFrom<Pong> for Token {
+impl TryFrom<PongCore> for Token {
     type Error = SpaceErr;
 
-    fn try_from(response: Pong) -> Result<Self, Self::Error> {
+    fn try_from(response: PongCore) -> Result<Self, Self::Error> {
         response.core.body.try_into()
     }
 }
@@ -245,7 +245,7 @@ impl Substance {
             Substance::Hyper(_) => SubstanceKind::Hyp,
             Substance::MultipartForm(_) => SubstanceKind::MultipartForm,
             Substance::Token(_) => SubstanceKind::Token,
-            Substance::UltraWave(_) => SubstanceKind::UltraWave,
+            Substance::Wave(_) => SubstanceKind::UltraWave,
             Substance::Knock(_) => SubstanceKind::Knock,
             Substance::Greet(_) => SubstanceKind::Greet,
             Substance::Details(_) => SubstanceKind::Details,

@@ -20,7 +20,7 @@ use starlane::space::settings::Timeouts;
 use starlane::space::substance::{Bin, Substance};
 use starlane::space::wave::core::cmd::CmdMethod;
 use starlane::space::wave::exchange::asynch::Exchanger;
-use starlane::space::wave::{Agent, DirectedProto, Pong, Wave};
+use starlane::space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
 
 use crate::hyperlane::{
     HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, Hyperway, HyperwayEndpoint,
@@ -33,6 +33,8 @@ use crate::hyperspace::reg::Registry;
 use crate::hyperspace::star::{
     HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate,
 };
+use crate::service::ServiceTemplate;
+use crate::template::Templates;
 
 #[derive(Clone)]
 pub struct MachineApi<P>
@@ -528,6 +530,7 @@ pub enum MachineStatus {
 
 pub struct MachineTemplate {
     pub stars: Vec<StarTemplate>,
+    pub services: Templates<ServiceTemplate>,
 }
 
 impl MachineTemplate {
@@ -606,7 +609,8 @@ impl Default for MachineTemplate {
         stars.push(jump);
         stars.push(fold);
 
-        Self { stars }
+        let services = Default::default();
+        Self { stars,services}
     }
 }
 
@@ -716,7 +720,7 @@ where
         let mut wave = DirectedProto::ping();
         wave.method(CmdMethod::Read);
         wave.to(point.clone().to_surface().with_layer(Layer::Core));
-        let pong: Wave<Pong> = transmitter.direct(wave).await?;
+        let pong: WaveVariantDef<PongCore> = transmitter.direct(wave).await?;
 
         pong.ok_or()?;
 

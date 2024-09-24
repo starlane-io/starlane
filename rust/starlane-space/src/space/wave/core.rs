@@ -13,7 +13,7 @@ use crate::space::wave::core::cmd::CmdMethod;
 use crate::space::wave::core::ext::ExtMethod;
 use crate::space::wave::core::http2::{HttpMethod, StatusCode};
 use crate::space::wave::core::hyp::HypMethod;
-use crate::space::wave::{Bounce, Ping, Pong, ToRecipients, WaveId};
+use crate::space::wave::{Bounce, PingCore, PongCore, ToRecipients, WaveId};
 use crate::{SpaceErr, Substance, Surface, ToSubstance};
 use url::Url;
 
@@ -181,11 +181,11 @@ impl ReflectedCore {
         self.status.is_success()
     }
 
-    pub fn into_reflection<P>(self, intended: Surface, to: P, reflection_of: WaveId) -> Pong
+    pub fn into_reflection<P>(self, intended: Surface, to: P, reflection_of: WaveId) -> PongCore
     where
         P: ToSurface,
     {
-        Pong {
+        PongCore {
             to: to.to_surface(),
             intended: intended.to_recipients(),
             core: self,
@@ -442,10 +442,10 @@ impl DirectedCore {
     }
 }
 
-impl TryFrom<Ping> for DirectedCore {
+impl TryFrom<PingCore> for DirectedCore {
     type Error = SpaceErr;
 
-    fn try_from(request: Ping) -> Result<Self, Self::Error> {
+    fn try_from(request: PingCore) -> Result<Self, Self::Error> {
         Ok(request.core)
     }
 }

@@ -30,7 +30,8 @@ pub mod common {
 
     use crate::space::err::SpaceErr;
     use crate::space::loc::Variable;
-    use crate::space::substance::Substance;
+    use crate::space::parse::sub;
+    use crate::space::substance::{Bin, Substance};
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
     pub enum StateSrcVar {
@@ -57,6 +58,19 @@ pub mod common {
             match self {
                 StateSrc::None => Err(SpaceErr::server_error("state has no substance")),
                 StateSrc::Substance(substance) => Ok(*substance.clone()),
+            }
+        }
+
+        pub fn to_bin(self) -> Bin {
+            match self {
+                StateSrc::None => vec![],
+                StateSrc::Substance(substance) => {
+                    if let Substance::Bin(bin) = *substance{
+                        bin
+                    } else {
+                        substance.to_bin().unwrap()
+                    }
+                }
             }
         }
     }

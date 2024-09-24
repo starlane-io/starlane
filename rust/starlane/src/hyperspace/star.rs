@@ -1,11 +1,10 @@
 use async_recursion::async_recursion;
 use dashmap::DashMap;
-use futures::FutureExt;
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::marker::PhantomData;
-use std::ops::{Add, Deref, DerefMut};
+use std::ops::Add;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -24,7 +23,6 @@ use crate::hyperspace::layer::shell::{Shell, ShellState};
 use crate::hyperspace::machine::MachineSkel;
 use crate::platform::Platform;
 use crate::hyperspace::reg::{Registration, Registry};
-use crate::service::ServiceTemplate;
 use starlane::space::command::common::StateSrc;
 use starlane::space::command::direct::create::{Create, Strategy};
 use starlane::space::err::SpaceErr;
@@ -44,7 +42,6 @@ use starlane::space::particle::traversal::{
 };
 use starlane::space::particle::{Details, Status};
 use starlane::space::point::Point;
-use starlane::space::selector::KindSelector;
 use starlane::space::substance::Substance;
 use starlane::space::util::ValueMatcher;
 use starlane::space::wave::core::cmd::CmdMethod;
@@ -56,11 +53,13 @@ use starlane::space::wave::exchange::asynch::{
 use starlane::space::wave::exchange::SetStrategy;
 use starlane::space::wave::{
     Agent, DirectedProto, Handling,
-    HandlingKind, Pong, Priority, Recipients, Reflectable
-    , Retries, Ripple, Scope, Signal, SingularRipple, WaitTime, Wave,
+    HandlingKind, PongCore, Priority, Recipients, Reflectable
+    , Retries, Ripple, Scope, SignalCore, SingularRipple, WaitTime, WaveVariantDef,
     WaveKind,
 };
-use starlane::space::wave::UltraWave;
+use starlane::space::wave::Wave;
+use crate::service::ServiceTemplate;
+use crate::template::Templates;
 
 #[derive(Clone)]
 pub struct ParticleStates<P>
@@ -135,18 +134,18 @@ where
     pub logger: PointLogger,
     pub registry: Registry<P>,
     pub golden_path: Arc<DashMap<StarKey, StarKey>>,
-    pub traverse_to_next_tx: mpsc::Sender<Traversal<UltraWave>>,
+    pub traverse_to_next_tx: mpsc::Sender<Traversal<Wave>>,
     pub inject_tx: mpsc::Sender<TraversalInjection>,
     pub machine: MachineSkel<P>,
     pub exchanger: Exchanger,
     pub state: ParticleStates<P>,
     pub adjacents: HashMap<Point, StarStub>,
     pub wrangles: StarWrangles,
-    pub gravity_tx: mpsc::Sender<UltraWave>,
+    pub gravity_tx: mpsc::Sender<Wave>,
     pub gravity_router: TxRouter,
     pub gravity_transmitter: ProtoTransmitter,
     pub drivers: DriversApi<P>,
-    pub drivers_traversal_tx: mpsc::Sender<Traversal<UltraWave>>,
+    pub drivers_traversal_tx: mpsc::Sender<Traversal<Wave>>,
     pub status_tx: mpsc::Sender<Status>,
     pub status_rx: watch::Receiver<Status>,
     pub template: StarTemplate,
@@ -334,7 +333,7 @@ where
             wait: WaitTime::High,
         });
         let transmitter = transmitter.build();
-        let assign_result: Wave<Pong> = logger.result_ctx(
+        let assign_result: WaveVariantDef<PongCore> = logger.result_ctx(
             "StarSkel::create(assign_result)",
             transmitter.direct(assign).await,
         )?;
@@ -371,16 +370,16 @@ where
     },
     Stub(oneshot::Sender<StarStub>),
     FromHyperway {
-        wave: UltraWave,
+        wave: Wave,
         rtn: Option<oneshot::Sender<Result<(), SpaceErr>>>,
     },
-    TraverseToNextLayer(Traversal<UltraWave>),
+    TraverseToNextLayer(Traversal<Wave>),
     LayerTraversalInjection(TraversalInjection),
-    ToDriver(Traversal<UltraWave>),
+    ToDriver(Traversal<Wave>),
     Phantom(PhantomData<P>),
-    ToGravity(UltraWave),
-    ToHyperway(Wave<Signal>),
-    Shard(UltraWave),
+    ToGravity(Wave),
+    ToHyperway(WaveVariantDef<SignalCore>),
+    Shard(Wave),
     StartWrangling,
     Wrangle(oneshot::Sender<Result<StarWrangles, SpaceErr>>),
     Bounce {
@@ -395,10 +394,10 @@ pub struct HyperStarTx<P>
 where
     P: Platform,
 {
-    pub gravity_tx: mpsc::Sender<UltraWave>,
-    pub traverse_to_next_tx: mpsc::Sender<Traversal<UltraWave>>,
+    pub gravity_tx: mpsc::Sender<Wave>,
+    pub traverse_to_next_tx: mpsc::Sender<Traversal<Wave>>,
     pub inject_tx: mpsc::Sender<TraversalInjection>,
-    pub drivers_traversal_tx: mpsc::Sender<Traversal<UltraWave>>,
+    pub drivers_traversal_tx: mpsc::Sender<Traversal<Wave>>,
     pub call_tx: mpsc::Sender<HyperStarCall<P>>,
     pub call_rx: Option<mpsc::Receiver<HyperStarCall<P>>>,
     pub drivers_call_tx: mpsc::Sender<DriversCall<P>>,
@@ -420,12 +419,12 @@ where
             mpsc::Receiver<TraversalInjection>,
         ) = mpsc::channel(1024);
         let (traverse_to_next_tx, mut traverse_to_next_rx): (
-            mpsc::Sender<Traversal<UltraWave>>,
-            mpsc::Receiver<Traversal<UltraWave>>,
+            mpsc::Sender<Traversal<Wave>>,
+            mpsc::Receiver<Traversal<Wave>>,
         ) = mpsc::channel(1024);
         let (drivers_traversal_tx, mut drivers_rx): (
-            mpsc::Sender<Traversal<UltraWave>>,
-            mpsc::Receiver<Traversal<UltraWave>>,
+            mpsc::Sender<Traversal<Wave>>,
+            mpsc::Receiver<Traversal<Wave>>,
         ) = mpsc::channel(1024);
         let (drivers_call_tx, mut drivers_call_rx) = mpsc::channel(1024);
         let (drivers_status_tx, drivers_status_rx) = watch::channel(DriverStatus::Pending);
@@ -572,7 +571,7 @@ where
         tokio::time::timeout(Duration::from_secs(5), rtn_rx).await??
     }
 
-    pub async fn from_hyperway(&self, wave: UltraWave, results: bool) -> Result<(), SpaceErr> {
+    pub async fn from_hyperway(&self, wave: Wave, results: bool) -> Result<(), SpaceErr> {
         match results {
             true => {
                 let (tx, mut rx) = oneshot::channel();
@@ -593,7 +592,7 @@ where
         }
     }
 
-    pub async fn traverse_to_next_layer(&self, traversal: Traversal<UltraWave>) {
+    pub async fn traverse_to_next_layer(&self, traversal: Traversal<Wave>) {
         self.tx
             .send(HyperStarCall::TraverseToNextLayer(traversal))
             .await;
@@ -628,11 +627,11 @@ where
     }
 
     #[cfg(test)]
-    pub async fn to_gravity(&self, wave: UltraWave) {
+    pub async fn to_gravity(&self, wave: Wave) {
         self.tx.send(HyperStarCall::ToGravity(wave)).await;
     }
 
-    pub async fn to_hyperway(&self, wave: Wave<Signal>) {
+    pub async fn to_hyperway(&self, wave: WaveVariantDef<SignalCore>) {
         self.tx.send(HyperStarCall::ToHyperway(wave)).await;
     }
 }
@@ -716,8 +715,8 @@ where
             .with_layer(Layer::Gravity);
 
         let (to_gravity_traversal_tx, mut to_gravity_traversal_rx): (
-            mpsc::Sender<Traversal<UltraWave>>,
-            mpsc::Receiver<Traversal<UltraWave>>,
+            mpsc::Sender<Traversal<Wave>>,
+            mpsc::Receiver<Traversal<Wave>>,
         ) = mpsc::channel(1024);
         {
             let skel = skel.clone();
@@ -972,7 +971,7 @@ where
     /// all messages are then traversed to the Star Core where they are unwrapped and then sent to
     /// gravity to start a new traversal
     #[track_caller]
-    async fn from_hyperway(&self, wave: UltraWave) -> Result<(), P::Err> {
+    async fn from_hyperway(&self, wave: Wave) -> Result<(), P::Err> {
         self.skel
             .logger
             .track(&wave, || Tracker::new("from_hyperway", "Receive"));
@@ -1006,7 +1005,7 @@ where
             tokio::spawn(async move {
                 let injection = TraversalInjection {
                     surface: injector.clone(),
-                    wave: transport.to_ultra(),
+                    wave: transport.to_wave(),
                     from_gravity: true,
                     dir: None,
                 };
@@ -1019,7 +1018,7 @@ where
     }
 
     // send this transport signal towards it's destination
-    async fn forward(&self, transport: Wave<Signal>) -> Result<(), P::Err> {
+    async fn forward(&self, transport: WaveVariantDef<SignalCore>) -> Result<(), P::Err> {
         if self.skel.kind.is_forwarder() {
             self.to_hyperway(transport).await
         } else {
@@ -1033,7 +1032,7 @@ where
     // here it will be wrapped into a transport for star to star delivery or
     // sent to GLOBAL::registry if addressed in such a way
     #[track_caller]
-    async fn to_gravity(&self, mut wave: UltraWave) -> Result<(), P::Err> {
+    async fn to_gravity(&self, mut wave: Wave) -> Result<(), P::Err> {
         wave.add_to_history(self.skel.point.clone());
 
         #[cfg(test)]
@@ -1063,13 +1062,13 @@ where
     }
 
     #[track_caller]
-    async fn shard(&self, mut wave: UltraWave) {
+    async fn shard(&self, mut wave: Wave) {
         let skel = self.skel.clone();
         let locator = SmartLocator::new(self.skel.clone());
         let gravity = self.gravity.clone();
         tokio::spawn(async move {
             async fn shard<P>(
-                mut wave: UltraWave,
+                mut wave: Wave,
                 skel: HyperStarSkel<P>,
                 locator: SmartLocator<P>,
                 gravity: Surface,
@@ -1081,7 +1080,7 @@ where
                     println!("\tsharding wave...{}", wave.kind().to_string());
                 }
                 match &mut wave {
-                    UltraWave::Ripple(ripple) => {
+                    Wave::Ripple(ripple) => {
                         let mut map =
                             shard_ripple_by_location(ripple, &skel.adjacents, &skel.registry)
                                 .await?;
@@ -1094,7 +1093,7 @@ where
                             if star == skel.point {
                                 let mut inject = TraversalInjection::new(
                                     skel.point.to_surface().with_layer(Layer::Gravity),
-                                    wave.to_ultra(),
+                                    wave.to_wave(),
                                 );
                                 inject.from_gravity = true;
                                 if ripple.track {
@@ -1102,7 +1101,7 @@ where
                                 }
                                 skel.inject_tx.send(inject).await;
                             } else {
-                                let mut transport = wave.to_ultra().wrap_in_transport(
+                                let mut transport = wave.to_wave().wrap_in_transport(
                                     gravity.clone(),
                                     star.to_surface().with_layer(Layer::Core),
                                 );
@@ -1169,7 +1168,7 @@ where
     // wrap the transport into a hop to go to one and only one star
 
     #[track_caller]
-    async fn to_hyperway(&self, transport: Wave<Signal>) -> Result<(), P::Err> {
+    async fn to_hyperway(&self, transport: WaveVariantDef<SignalCore>) -> Result<(), P::Err> {
         let logger = self.skel.logger.push_mark("hyperstar:to-hyperway")?;
         if self.skel.point == transport.to.point {
             // it's a bit of a strange case, but even if this star is sending a transport message
@@ -1290,7 +1289,7 @@ where
             let mut proto = DirectedProto::ping();
             proto.method(CmdMethod::Bounce);
             proto.to(key.to_point().to_surface().with_layer(Layer::Core));
-            let pong: Wave<Pong> = match transmitter.direct(proto).await {
+            let pong: WaveVariantDef<PongCore> = match transmitter.direct(proto).await {
                 Ok(pong) => pong,
                 Err(err) => {
                     rtn.send(Err(err));
@@ -1314,8 +1313,8 @@ where
 {
     pub skel: HyperStarSkel<P>,
     pub injector: Surface,
-    pub exit_up: mpsc::Sender<Traversal<UltraWave>>,
-    pub exit_down: mpsc::Sender<Traversal<UltraWave>>,
+    pub exit_up: mpsc::Sender<Traversal<Wave>>,
+    pub exit_down: mpsc::Sender<Traversal<Wave>>,
     pub layers: HashSet<Layer>,
 }
 
@@ -1326,8 +1325,8 @@ where
     pub fn new(
         skel: HyperStarSkel<P>,
         injector: Surface,
-        exit_down: mpsc::Sender<Traversal<UltraWave>>,
-        exit_up: mpsc::Sender<Traversal<UltraWave>>,
+        exit_down: mpsc::Sender<Traversal<Wave>>,
+        exit_up: mpsc::Sender<Traversal<Wave>>,
     ) -> Self {
         let mut layers = HashSet::new();
         layers.insert(Layer::Field);
@@ -1357,7 +1356,7 @@ where
                             let reflect = reflection.make(err.into(), self.skel.point.to_surface());
                             let injection = TraversalInjection {
                                 surface,
-                                wave: reflect.to_ultra(),
+                                wave: reflect.to_wave(),
                                 from_gravity: false,
                                 dir: None,
                             };
@@ -1572,7 +1571,7 @@ where
         *layer == Layer::Shell || *layer == Layer::Field
     }
 
-    async fn exit(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
+    async fn exit(&self, traversal: Traversal<Wave>) -> Result<(), SpaceErr> {
         match traversal.dir {
             TraversalDirection::Fabric => {
                 if traversal.track() {
@@ -1591,7 +1590,7 @@ where
         }
     }
 
-    async fn visit_layer(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
+    async fn visit_layer(&self, traversal: Traversal<Wave>) -> Result<(), SpaceErr> {
         let logger = self.skel.logger.push_mark("stack-traversal:visit")?;
         logger.track(&traversal, || {
             Tracker::new(
@@ -1635,7 +1634,7 @@ where
         Ok(())
     }
 
-    async fn traverse_to_next_layer(&self, mut traversal: Traversal<UltraWave>) {
+    async fn traverse_to_next_layer(&self, mut traversal: Traversal<Wave>) {
         let logger = self
             .skel
             .logger
@@ -1674,7 +1673,7 @@ where
 pub struct StarMount {
     pub point: Point,
     pub kind: MountKind,
-    pub tx: mpsc::Sender<UltraWave>,
+    pub tx: mpsc::Sender<Wave>,
 }
 
 #[derive(Clone)]
@@ -1715,18 +1714,18 @@ impl LayerInjectionRouter {
 
 #[derive(Clone)]
 pub struct TraverseToNextRouter {
-    pub tx: mpsc::Sender<Traversal<UltraWave>>,
+    pub tx: mpsc::Sender<Traversal<Wave>>,
 }
 
 impl TraverseToNextRouter {
-    pub fn new(tx: mpsc::Sender<Traversal<UltraWave>>) -> Self {
+    pub fn new(tx: mpsc::Sender<Traversal<Wave>>) -> Self {
         Self { tx }
     }
 }
 
 #[async_trait]
 impl TraversalRouter for TraverseToNextRouter {
-    async fn traverse(&self, traversal: Traversal<UltraWave>) -> Result<(), SpaceErr> {
+    async fn traverse(&self, traversal: Traversal<Wave>) -> Result<(), SpaceErr> {
         self.tx.send(traversal).await?;
         Ok(())
     }
@@ -1734,7 +1733,7 @@ impl TraversalRouter for TraverseToNextRouter {
 
 #[async_trait]
 impl Router for LayerInjectionRouter {
-    async fn route(&self, wave: UltraWave) {
+    async fn route(&self, wave: Wave) {
         let mut inject = TraversalInjection::new(self.injector.clone(), wave);
         inject.dir = self.direction.clone();
         self.inject_tx.send(inject).await;
@@ -1751,83 +1750,10 @@ pub trait TopicHandlerSerde<T: TopicHandler> {
 }
 
 #[derive(Clone)]
-pub struct Templates<T>
-where
-    T: Clone,
-{
-    templates: Vec<T>,
-}
-
-impl<T> Templates<T>
-where
-    T: Clone,
-{
-    pub fn new(templates: Vec<T>) -> Self {
-        Self { templates }
-    }
-
-    pub fn select_one<S>(&self, selector: &S) -> Option<&T>
-    where
-        S: PartialEq<T>,
-    {
-        (&self.templates)
-            .into_iter()
-            .find_position(|t| *selector == **t)
-            .map(|(size, t)| t)
-    }
-}
-
-impl Templates<ServiceTemplate> {
-    pub fn select(&self, selector: &KindSelector) -> Vec<ServiceTemplate> {
-        let mut rtn = vec![];
-        for template in &self.templates {
-            if selector.matches(&template.kind) {
-                rtn.push(template.clone());
-            }
-        }
-        rtn
-    }
-
-    /*
-    /// return the first match found
-    pub fn select_one(&self, selector: &ServiceSelector) -> Option<ServiceTemplate> {
-        self.select(selector).first().cloned()
-    }
-
-     */
-}
-
-impl<T> Default for Templates<T>
-where
-    T: Clone,
-{
-    fn default() -> Self {
-        Self {
-            templates: Vec::default(),
-        }
-    }
-}
-
-impl Deref for Templates<ServiceTemplate> {
-    type Target = Vec<ServiceTemplate>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.templates
-    }
-}
-
-impl DerefMut for Templates<ServiceTemplate> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.templates
-    }
-}
-
-#[derive(Clone)]
 pub struct StarTemplate {
     pub key: StarKey,
     pub kind: StarSub,
     pub connections: Vec<StarCon>,
-    pub services: Templates<ServiceTemplate>,
 }
 
 impl StarTemplate {
@@ -1836,7 +1762,7 @@ impl StarTemplate {
             key,
             kind,
             connections: vec![],
-            services: Templates::default(),
+//            services: Templates::default(),
         }
     }
 
@@ -1897,10 +1823,10 @@ impl StarCon {
 }
 
 async fn shard_ripple_by_location<E>(
-    ripple: &Wave<Ripple>,
+    ripple: &WaveVariantDef<Ripple>,
     adjacent: &HashMap<Point, StarStub>,
     registry: &Registry<E>,
-) -> Result<HashMap<Point, Wave<Ripple>>, E::Err>
+) -> Result<HashMap<Point, WaveVariantDef<Ripple>>, E::Err>
 where
     E: Platform,
 {
@@ -1917,10 +1843,10 @@ where
 }
 
 pub async fn ripple_to_singulars<E>(
-    ripple: Wave<Ripple>,
+    ripple: WaveVariantDef<Ripple>,
     adjacent: &HashSet<Point>,
     registry: &Registry<E>,
-) -> Result<Vec<Wave<SingularRipple>>, E::Err>
+) -> Result<Vec<WaveVariantDef<SingularRipple>>, E::Err>
 where
     E: Platform,
 {
@@ -2017,13 +1943,13 @@ pub struct DiagnosticInterceptors<P>
 where
     P: Platform,
 {
-    pub from_hyperway: broadcast::Sender<UltraWave>,
-    pub to_gravity: broadcast::Sender<UltraWave>,
-    pub to_hyperway: broadcast::Sender<Wave<Signal>>,
-    pub start_layer_traversal_wave: broadcast::Sender<UltraWave>,
-    pub start_layer_traversal: broadcast::Sender<Traversal<UltraWave>>,
-    pub transport_endpoint: broadcast::Sender<UltraWave>,
-    pub reflected_endpoint: broadcast::Sender<UltraWave>,
+    pub from_hyperway: broadcast::Sender<Wave>,
+    pub to_gravity: broadcast::Sender<Wave>,
+    pub to_hyperway: broadcast::Sender<WaveVariantDef<SignalCore>>,
+    pub start_layer_traversal_wave: broadcast::Sender<Wave>,
+    pub start_layer_traversal: broadcast::Sender<Traversal<Wave>>,
+    pub transport_endpoint: broadcast::Sender<Wave>,
+    pub reflected_endpoint: broadcast::Sender<Wave>,
     pub assignment: broadcast::Sender<Assign>,
     pub err: broadcast::Sender<P::Err>,
 }
@@ -2116,7 +2042,7 @@ where
         wave.body(HyperSubstance::Provision(provision).into());
         wave.from(self.skel.point.clone().to_surface().with_layer(Layer::Core));
         wave.to(parent_star.to_surface().with_layer(Layer::Core));
-        let pong: Wave<Pong> = self.skel.star_transmitter.direct(wave).await?;
+        let pong: WaveVariantDef<PongCore> = self.skel.star_transmitter.direct(wave).await?;
         if pong.core.status.as_u16() == 200 {
             if let Substance::Location(location) = &pong.core.body {
                 Ok(location.clone())

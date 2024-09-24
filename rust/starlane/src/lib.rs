@@ -16,6 +16,7 @@ pub mod space {
     pub use starlane_space::space::*;
 }
 
+pub mod template;
 
 
 //pub(crate) use starlane_space as starlane;
@@ -49,7 +50,6 @@ pub mod cli;
 pub mod driver;
 
 
-pub mod dialect;
 pub mod executor;
 
 pub mod platform;

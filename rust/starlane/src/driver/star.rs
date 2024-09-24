@@ -34,8 +34,8 @@ use starlane::space::wave::exchange::asynch::{
 };
 use starlane::space::wave::exchange::SetStrategy;
 use starlane::space::wave::{
-    Agent, BounceBacks, DirectedProto, Echoes, Handling, HandlingKind, Pong, Priority, Recipients,
-    Retries, UltraWave, WaitTime, Wave,
+    Agent, BounceBacks, DirectedProto, Echoes, Handling, HandlingKind, PongCore, Priority, Recipients,
+    Retries, Wave, WaitTime, WaveVariantDef,
 };
 use starlane::space::HYPERUSER;
 use std::cmp::Ordering;
@@ -437,7 +437,7 @@ where
                     let mut proto = DirectedProto::ping();
                     proto.core(assign);
                     proto.to(key.to_surface());
-                    let pong: Wave<Pong> = ctx.transmitter.direct(proto).await?;
+                    let pong: WaveVariantDef<PongCore> = ctx.transmitter.direct(proto).await?;
                     pong.ok_or()?;
                     Ok(ParticleLocation::new(key.to_point().into(), None))
                 }
@@ -482,7 +482,7 @@ where
                 directed.to(driver.to_surface());
                 directed.body(HyperSubstance::Assign(assign.clone()).into());
                 directed.track = ctx.wave().track();
-                let pong: Wave<Pong> = ctx.transmitter.direct(directed).await?;
+                let pong: WaveVariantDef<PongCore> = ctx.transmitter.direct(directed).await?;
 
                 self.skel.logger.result(pong.ok_or())?;
             } else {
@@ -508,7 +508,7 @@ where
     }
 
     #[route("Hyp<Transport>")]
-    pub async fn transport(&self, ctx: InCtx<'_, UltraWave>) {
+    pub async fn transport(&self, ctx: InCtx<'_, Wave>) {
         self.skel.logger.track(ctx.wave(), || {
             Tracker::new("star:core:transport", "Receive")
         });

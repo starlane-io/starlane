@@ -767,7 +767,7 @@ where
 #[async_trait]
 impl<P> DirectedHandler for Artifact<P> where P: Cosmos {
     async fn handle(&self, ctx: RootInCtx) -> CoreBounce {
-        println!("ARTIFACT HANDLE REQUEST : {}",ctx.wave.clone().to_ultra().desc());
+        println!("ARTIFACT HANDLE REQUEST : {}",ctx.wave.clone().to_wave().desc());
 
         let core = ReflectedCore {
             headers: Default::default(),

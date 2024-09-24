@@ -17,7 +17,7 @@ use starlane::space::wave::exchange::asynch::{
     Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TxRouter,
 };
 use starlane::space::wave::exchange::SetStrategy;
-use starlane::space::wave::{Agent, DirectedProto, HyperWave, UltraWave};
+use starlane::space::wave::{Agent, DirectedProto, HyperWave, Wave};
 use starlane::space::VERSION;
 use std::collections::{HashMap, HashSet};
 use std::ops::{Deref, DerefMut};
@@ -87,7 +87,7 @@ impl Hyperway {
             .try_send(HyperlaneCall::Transform(Box::new(ToTransform::new(to))));
     }
 
-    pub async fn hyperway_endpoint_near(&self, init_wave: Option<UltraWave>) -> HyperwayEndpoint {
+    pub async fn hyperway_endpoint_near(&self, init_wave: Option<Wave>) -> HyperwayEndpoint {
         let drop_tx = None;
 
         HyperwayEndpoint {
@@ -101,7 +101,7 @@ impl Hyperway {
     pub async fn hyperway_endpoint_near_with_drop_event(
         &self,
         drop_tx: oneshot::Sender<()>,
-        init_wave: Option<UltraWave>,
+        init_wave: Option<Wave>,
     ) -> HyperwayEndpoint {
         let drop_tx = Some(drop_tx);
 
@@ -113,7 +113,7 @@ impl Hyperway {
         }
     }
 
-    pub async fn hyperway_endpoint_far(&self, init_wave: Option<UltraWave>) -> HyperwayEndpoint {
+    pub async fn hyperway_endpoint_far(&self, init_wave: Option<Wave>) -> HyperwayEndpoint {
         HyperwayEndpoint {
             tx: self.inbound.tx(),
             rx: self.outbound.rx(init_wave).await,
@@ -124,7 +124,7 @@ impl Hyperway {
 
     pub async fn hyperway_endpoint_far_drop_event(
         &self,
-        init_wave: Option<UltraWave>,
+        init_wave: Option<Wave>,
         drop_tx: oneshot::Sender<()>,
     ) -> HyperwayEndpoint {
         HyperwayEndpoint {
@@ -151,15 +151,15 @@ impl HyperwayDiagnostic {
 
 pub struct HyperwayEndpoint {
     drop_tx: Option<oneshot::Sender<()>>,
-    pub tx: mpsc::Sender<UltraWave>,
-    pub rx: mpsc::Receiver<UltraWave>,
+    pub tx: mpsc::Sender<Wave>,
+    pub rx: mpsc::Receiver<Wave>,
     pub logger: PointLogger,
 }
 
 impl HyperwayEndpoint {
     pub fn new(
-        tx: mpsc::Sender<UltraWave>,
-        rx: mpsc::Receiver<UltraWave>,
+        tx: mpsc::Sender<Wave>,
+        rx: mpsc::Receiver<Wave>,
         logger: PointLogger,
     ) -> Self {
         let drop_tx = None;
@@ -172,8 +172,8 @@ impl HyperwayEndpoint {
     }
 
     pub fn new_with_drop(
-        tx: mpsc::Sender<UltraWave>,
-        rx: mpsc::Receiver<UltraWave>,
+        tx: mpsc::Sender<Wave>,
+        rx: mpsc::Receiver<Wave>,
         drop_tx: oneshot::Sender<()>,
         logger: PointLogger,
     ) -> Self {
@@ -264,26 +264,26 @@ impl HyperwayStub {
 }
 
 pub enum HyperwayInterchangeCall {
-    Wave(UltraWave),
+    Wave(Wave),
     Internal(Hyperway),
     Remove(Surface),
     Mount {
         stub: HyperwayStub,
-        init_wave: Option<UltraWave>,
+        init_wave: Option<Wave>,
         rtn: oneshot::Sender<Result<HyperwayEndpoint, SpaceErr>>,
     },
 }
 
 pub enum HyperlaneCall {
     Drain,
-    Ext(mpsc::Sender<UltraWave>),
+    Ext(mpsc::Sender<Wave>),
     ResetExt,
-    Wave(UltraWave),
+    Wave(Wave),
     Transform(Box<dyn HyperTransform>),
 }
 
 pub trait HyperTransform: Send + Sync {
-    fn filter(&self, wave: UltraWave) -> UltraWave;
+    fn filter(&self, wave: Wave) -> Wave;
 }
 
 #[derive(Clone)]
@@ -298,7 +298,7 @@ impl AgentTransform {
 }
 
 impl HyperTransform for AgentTransform {
-    fn filter(&self, mut wave: UltraWave) -> UltraWave {
+    fn filter(&self, mut wave: Wave) -> Wave {
         wave.set_agent(self.agent.clone());
         wave
     }
@@ -316,7 +316,7 @@ impl LayerTransform {
 }
 
 impl HyperTransform for LayerTransform {
-    fn filter(&self, mut wave: UltraWave) -> UltraWave {
+    fn filter(&self, mut wave: Wave) -> Wave {
         let to = wave
             .to()
             .clone()
@@ -340,11 +340,11 @@ impl TransportTransform {
 }
 
 impl HyperTransform for TransportTransform {
-    fn filter(&self, wave: UltraWave) -> UltraWave {
+    fn filter(&self, wave: Wave) -> Wave {
         let from = wave.from().clone();
         let transport = wave.wrap_in_transport(from, self.transport_to.clone());
         let wave = transport.build().unwrap();
-        wave.to_ultra()
+        wave.to_wave()
     }
 }
 
@@ -360,12 +360,12 @@ impl HopTransform {
 }
 
 impl HyperTransform for HopTransform {
-    fn filter(&self, wave: UltraWave) -> UltraWave {
+    fn filter(&self, wave: Wave) -> Wave {
         let signal = wave.to_signal().unwrap();
         let from = signal.from.clone();
         let wave = signal.wrap_in_hop(from, self.hop_to.clone());
         let wave = wave.build().unwrap();
-        wave.to_ultra()
+        wave.to_wave()
     }
 }
 
@@ -380,7 +380,7 @@ impl ToTransform {
 }
 
 impl HyperTransform for ToTransform {
-    fn filter(&self, mut wave: UltraWave) -> UltraWave {
+    fn filter(&self, mut wave: Wave) -> Wave {
         wave.set_to(self.to.clone());
         wave
     }
@@ -397,7 +397,7 @@ impl FromTransform {
 }
 
 impl HyperTransform for FromTransform {
-    fn filter(&self, mut wave: UltraWave) -> UltraWave {
+    fn filter(&self, mut wave: Wave) -> Wave {
         wave.set_from(self.from.clone());
         wave
     }
@@ -407,7 +407,7 @@ impl HyperTransform for FromTransform {
 pub struct Hyperlane {
     tx: mpsc::Sender<HyperlaneCall>,
     #[cfg(test)]
-    eavesdrop_tx: broadcast::Sender<UltraWave>,
+    eavesdrop_tx: broadcast::Sender<Wave>,
     label: String,
 }
 
@@ -491,18 +491,18 @@ impl Hyperlane {
     }
 
     #[cfg(test)]
-    pub fn eavesdrop(&self) -> broadcast::Receiver<UltraWave> {
+    pub fn eavesdrop(&self) -> broadcast::Receiver<Wave> {
         self.eavesdrop_tx.subscribe()
     }
 
-    pub async fn send(&self, wave: UltraWave) -> Result<(), SpaceErr> {
+    pub async fn send(&self, wave: Wave) -> Result<(), SpaceErr> {
         Ok(self
             .tx
             .send_timeout(HyperlaneCall::Wave(wave), Duration::from_secs(5))
             .await?)
     }
 
-    pub fn tx(&self) -> mpsc::Sender<UltraWave> {
+    pub fn tx(&self) -> mpsc::Sender<Wave> {
         let (tx, mut rx) = mpsc::channel(1024);
         let call_tx = self.tx.clone();
         tokio::spawn(async move {
@@ -513,7 +513,7 @@ impl Hyperlane {
         tx
     }
 
-    pub async fn rx(&self, init_wave: Option<UltraWave>) -> mpsc::Receiver<UltraWave> {
+    pub async fn rx(&self, init_wave: Option<Wave>) -> mpsc::Receiver<Wave> {
         let (tx, rx) = mpsc::channel(1024);
         if let Some(init_wave) = init_wave {
             tx.send(init_wave).await;
@@ -624,7 +624,7 @@ impl HyperwayInterchange {
     pub async fn mount(
         &self,
         stub: HyperwayStub,
-        init_wave: Option<UltraWave>,
+        init_wave: Option<Wave>,
     ) -> Result<HyperwayEndpoint, SpaceErr> {
         let call_tx = self.call_tx.clone();
         let (tx, rx) = oneshot::channel();
@@ -661,7 +661,7 @@ impl HyperwayInterchange {
         });
     }
 
-    pub async fn route(&self, wave: UltraWave) {
+    pub async fn route(&self, wave: Wave) {
         self.call_tx.send(HyperwayInterchangeCall::Wave(wave)).await;
     }
 }
@@ -684,7 +684,7 @@ impl OutboundRouter {
 
 #[async_trait]
 impl Router for OutboundRouter {
-    async fn route(&self, wave: UltraWave) {
+    async fn route(&self, wave: Wave) {
         self.logger
             .track(&wave, || Tracker::new(format!("outbound:router"), "Route"));
 
@@ -973,11 +973,11 @@ pub trait HyperGate: Send + Sync {
 
 pub struct HopRouter {
     greet: Greet,
-    tx: mpsc::Sender<UltraWave>,
+    tx: mpsc::Sender<Wave>,
 }
 
 impl HopRouter {
-    fn to_hop(&self, mut wave: UltraWave) -> Result<UltraWave, SpaceErr> {
+    fn to_hop(&self, mut wave: Wave) -> Result<Wave, SpaceErr> {
         wave.set_agent(self.greet.agent.clone());
         let mut transport = wave
             .wrap_in_transport(self.greet.surface.clone(), self.greet.transport.clone())
@@ -986,14 +986,14 @@ impl HopRouter {
         let hop = transport
             .wrap_in_hop(Point::local_portal().to_surface(), self.greet.hop.clone())
             .build()?
-            .to_ultra();
+            .to_wave();
         Ok(hop)
     }
 }
 
 #[async_trait]
 impl Router for HopRouter {
-    async fn route(&self, wave: UltraWave) {
+    async fn route(&self, wave: Wave) {
         match self.to_hop(wave) {
             Ok(hop) => {
                 self.tx.send(hop).await.unwrap_or_default();
@@ -1268,9 +1268,9 @@ where
 }
 
 pub struct HyperClient {
-    tx: mpsc::Sender<UltraWave>,
+    tx: mpsc::Sender<Wave>,
     status_rx: watch::Receiver<HyperConnectionStatus>,
-    to_client_listener_tx: broadcast::Sender<UltraWave>,
+    to_client_listener_tx: broadcast::Sender<Wave>,
     logger: PointLogger,
     greet_rx: watch::Receiver<Option<Greet>>,
     exchanger: Option<Exchanger>,
@@ -1346,8 +1346,8 @@ impl HyperClient {
             let status_tx = status_mpsc_tx.clone();
             tokio::spawn(async move {
                 async fn relay(
-                    mut from_runner_rx: mpsc::Receiver<UltraWave>,
-                    to_client_listener_tx: broadcast::Sender<UltraWave>,
+                    mut from_runner_rx: mpsc::Receiver<Wave>,
+                    to_client_listener_tx: broadcast::Sender<Wave>,
                     status_tx: mpsc::Sender<HyperConnectionStatus>,
                     greet_tx: watch::Sender<Option<Greet>>,
                     exchanger: Option<Exchanger>,
@@ -1507,7 +1507,7 @@ impl HyperClient {
         wave.to(LOCAL_CLIENT_RUNNER.clone().to_surface());
         wave.method(ExtMethod::new("Reset").unwrap());
         let wave = wave.build().unwrap();
-        let wave = wave.to_ultra();
+        let wave = wave.to_wave();
         let tx = self.tx.clone();
         tokio::spawn(async move {
             tx.send(wave).await.unwrap_or_default();
@@ -1520,7 +1520,7 @@ impl HyperClient {
         wave.to(LOCAL_CLIENT_RUNNER.clone().to_surface());
         wave.method(ExtMethod::new("Close").unwrap());
         let wave = wave.build().unwrap();
-        let wave = wave.to_ultra();
+        let wave = wave.to_wave();
         let tx = self.tx.clone();
         tokio::spawn(async move {
             tx.send(wave).await.unwrap_or_default();
@@ -1531,7 +1531,7 @@ impl HyperClient {
         TxRouter::new(self.tx.clone())
     }
 
-    pub fn rx(&self) -> broadcast::Receiver<UltraWave> {
+    pub fn rx(&self) -> broadcast::Receiver<Wave> {
         self.to_client_listener_tx.subscribe()
     }
 
@@ -1638,18 +1638,18 @@ pub struct HyperClientRunner {
     ext: Option<HyperwayEndpoint>,
     factory: Box<dyn HyperwayEndpointFactory>,
     status_tx: mpsc::Sender<HyperConnectionStatus>,
-    to_client_tx: mpsc::Sender<UltraWave>,
-    from_client_rx: mpsc::Receiver<UltraWave>,
+    to_client_tx: mpsc::Sender<Wave>,
+    from_client_rx: mpsc::Receiver<Wave>,
     logger: PointLogger,
 }
 
 impl HyperClientRunner {
     pub fn new(
         factory: Box<dyn HyperwayEndpointFactory>,
-        from_client_rx: mpsc::Receiver<UltraWave>,
+        from_client_rx: mpsc::Receiver<Wave>,
         status_tx: mpsc::Sender<HyperConnectionStatus>,
         logger: PointLogger,
-    ) -> mpsc::Receiver<UltraWave> {
+    ) -> mpsc::Receiver<Wave> {
         let (to_client_tx, from_runner_rx) = mpsc::channel(1024);
         let logger = logger.push_point("runner").unwrap();
         let runner = Self {
@@ -2006,8 +2006,8 @@ pub mod test_util {
         Exchanger, ProtoTransmitter, Router,
     };
     use starlane::space::wave::{
-        DirectedProto, Pong, ReflectedKind, ReflectedProto
-        , Wave,
+        DirectedProto, PongCore, ReflectedKind, ReflectedProto
+        , WaveVariantDef,
     };
 
     pub static LESS: Lazy<Point> =
@@ -2137,7 +2137,7 @@ pub mod test_util {
                     reflected.intended(wave.to());
                     reflected.reflection_of(wave.id());
                     let wave = reflected.build().unwrap();
-                    let wave = wave.to_ultra();
+                    let wave = wave.to_wave();
                     fae_transmitter.route(wave).await;
                 });
             }
@@ -2155,7 +2155,7 @@ pub mod test_util {
                     body.push(0u8);
                 }
                 hello.body(Substance::Bin(body));
-                let pong: Wave<Pong> = less_transmitter.direct(hello).await.unwrap();
+                let pong: WaveVariantDef<PongCore> = less_transmitter.direct(hello).await.unwrap();
                 rtn.send(pong.core.status.as_u16() == 200u16);
             });
 
@@ -2236,7 +2236,7 @@ pub mod test_util {
                     reflected.intended(wave.to());
                     reflected.reflection_of(wave.id());
                     let wave = reflected.build().unwrap();
-                    let wave = wave.to_ultra();
+                    let wave = wave.to_wave();
                     fae_transmitter.route(wave).await;
                 });
             }
@@ -2249,7 +2249,7 @@ pub mod test_util {
                 hello.from(LESS.clone().to_surface());
                 hello.method(ExtMethod::new("Hello").unwrap());
                 hello.body(Substance::Empty);
-                let pong: Wave<Pong> = less_transmitter.direct(hello).await.unwrap();
+                let pong: WaveVariantDef<PongCore> = less_transmitter.direct(hello).await.unwrap();
                 rtn.send(pong.core.status.as_u16() == 200u16);
             });
 
@@ -2311,8 +2311,8 @@ pub mod test {
     };
     use starlane::space::wave::exchange::SetStrategy;
     use starlane::space::wave::{
-        Agent, DirectedProto, HyperWave, Pong, ReflectedKind, ReflectedProto
-        , UltraWave, Wave,
+        Agent, DirectedProto, HyperWave, PongCore, ReflectedKind, ReflectedProto
+        , Wave, WaveVariantDef,
     };
 
     use crate::hyperlane::test_util::{SingleInterchangePlatform, TestGreeter, WaveTest};
@@ -2336,14 +2336,14 @@ pub mod test {
         }
     }
 
-    fn hello_wave() -> UltraWave {
+    fn hello_wave() -> Wave {
         let mut hello = DirectedProto::ping();
         hello.to(FAE.clone().to_surface());
         hello.from(LESS.clone().to_surface());
         hello.method(ExtMethod::new("Hello").unwrap());
         hello.body(Substance::Empty);
         let directed = hello.build().unwrap();
-        let wave = directed.to_ultra();
+        let wave = directed.to_wave();
         wave
     }
 
@@ -2439,19 +2439,19 @@ pub mod test {
                 Self { hyperway }
             }
 
-            pub fn inbound_tx(&self) -> mpsc::Sender<UltraWave> {
+            pub fn inbound_tx(&self) -> mpsc::Sender<Wave> {
                 self.hyperway.inbound.tx()
             }
 
-            pub async fn inbound_rx(&self) -> mpsc::Receiver<UltraWave> {
+            pub async fn inbound_rx(&self) -> mpsc::Receiver<Wave> {
                 self.hyperway.inbound.rx(None).await
             }
 
-            pub async fn outbound_rx(&self) -> broadcast::Receiver<UltraWave> {
+            pub async fn outbound_rx(&self) -> broadcast::Receiver<Wave> {
                 self.hyperway.outbound.eavesdrop()
             }
 
-            pub fn outbound_tx(&self) -> mpsc::Sender<UltraWave> {
+            pub fn outbound_tx(&self) -> mpsc::Sender<Wave> {
                 self.hyperway.outbound.tx()
             }
         }
@@ -2603,7 +2603,7 @@ pub mod test {
                 reflected.intended(wave.to());
                 reflected.reflection_of(wave.id());
                 let wave = reflected.build().unwrap();
-                let wave = wave.to_ultra();
+                let wave = wave.to_wave();
                 fae_transmitter.route(wave).await;
             });
         }
@@ -2615,7 +2615,7 @@ pub mod test {
             hello.from(LESS.clone().to_surface());
             hello.method(ExtMethod::new("Hello").unwrap());
             hello.body(Substance::Empty);
-            let pong: Wave<Pong> = less_transmitter.direct(hello).await.unwrap();
+            let pong: WaveVariantDef<PongCore> = less_transmitter.direct(hello).await.unwrap();
             rtn.send(pong.core.status.as_u16() == 200u16);
         });
 
@@ -2727,7 +2727,7 @@ pub mod test {
                         ReflectedCore::ok(),
                         FAE.to_surface().with_layer(Layer::Core),
                     );
-                    fae_access.tx.send(reflection.to_ultra()).await.unwrap();
+                    fae_access.tx.send(reflection.to_wave()).await.unwrap();
                 }
             }
         });
@@ -2756,7 +2756,7 @@ pub mod test {
         let mut wave = DirectedProto::ping();
         wave.method(Method::Cmd(CmdMethod::Bounce));
         wave.to(FAE.to_surface().with_layer(Layer::Core));
-        let reply: Wave<Pong> =
+        let reply: WaveVariantDef<PongCore> =
             tokio::time::timeout(Duration::from_secs(5), transmitter.direct(wave))
                 .await
                 .unwrap()

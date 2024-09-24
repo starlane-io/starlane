@@ -70,7 +70,7 @@ pub fn mechtron_frame_to_guest(frame: i32) -> i32 {
         match handler.handle(wave) {
             Bounce::Absorbed => 0,
             Bounce::Reflected(wave) => {
-                let wave = mechtron_write_wave_to_host(wave.to_ultra()).unwrap();
+                let wave = mechtron_write_wave_to_host(wave.to_wave()).unwrap();
                 wave
             }
         }

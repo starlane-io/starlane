@@ -1,5 +1,4 @@
 use crate::err::StarErr;
-use crate::host::{ExeInfo, FileStoreCliExecutor, Host, HostApi, HostEnv, Proc};
 use crate::hyperspace::err::HyperErr;
 use itertools::Itertools;
 use nom::AsBytes;
@@ -10,7 +9,6 @@ use starlane::space::loc::{Surface, ToBaseKind};
 use starlane::space::log::PointLogger;
 use starlane::space::particle::Status;
 use starlane::space::point::Point;
-use starlane::space::selector::KindSelector;
 use starlane::space::util::{IdSelector, MatchSelector, OptSelector, ValueMatcher};
 use starlane::space::wave::exchange::asynch::{
     DirectedHandler, DirectedHandlerShell, Router,
@@ -28,6 +26,20 @@ use strum_macros::{EnumIter, EnumString};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::watch;
 use tracing::instrument::WithSubscriber;
+use starlane::space::selector::KindSelector;
+use crate::executor::cli::HostEnv;
+use crate::host::ExeInfo;
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq,EnumString)]
+pub enum ServiceKind {
+    FileStore
+}
+
+
+/// at this time the ServiceKindSelector
+/// is an exact match for the ServiceKind
+pub type ServiceKindSelector = ServiceKind;
+
 
 pub struct ServiceCreationSelector {
     pub selector: ServiceSelector,
@@ -37,12 +49,13 @@ pub struct ServiceCreationSelector {
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct ServiceKey {
     pub name: String,
-    pub kind: Kind,
+    pub kind: ServiceKind,
     pub share: ServiceShare,
 }
 
 pub struct ServiceSelector {
     pub name: IdSelector<String>,
+
     pub kind: MatchSelector<KindSelector, Kind>,
     pub share: IdSelector<ServiceShare>,
     pub star: OptSelector<IdSelector<Point>>,
@@ -52,12 +65,14 @@ pub struct ServiceSelector {
 
 impl PartialEq<ServiceKey> for ServiceSelector {
     fn eq(&self, key: &ServiceKey) -> bool {
-        self.name == key.name && self.kind == key.kind && self.share == key.share
+        //self.name == key.name && self.kind == key.kind && self.share == key.share
+        todo!()
     }
 }
 impl PartialEq<ServiceTemplate> for ServiceSelector {
     fn eq(&self, key: &ServiceTemplate) -> bool {
-        self.name == key.name && self.kind == key.kind
+        todo!()
+//        self.name == key.name && self.kind == key.kind
     }
 }
 
@@ -144,31 +159,16 @@ where
     }
 }
 
-#[derive(Clone)]
-pub enum Dialect {
-    FileStore,
-}
-
-impl Dialect {
-    pub fn handler(&self, host: Host) -> Result<Box<dyn DirectedHandler>, StarErr> {
-        match self {
-            Dialect::FileStore => {
-                let cli = host.executor().ok_or("Driver ")?;
-                Ok(Box::new(FileStoreCliExecutor::new(cli)))
-            }
-        }
-    }
-}
-
 #[derive(Debug, Clone, Hash, Eq, PartialEq, EnumIter)]
 pub enum ServiceShare {
-    Singleton,
     /// one service for everyone
-    Star,
+    Singleton,
     /// one of this Service per star
+    Star,
+    /// one Service Per driver
     Driver,
-    /// unique service per driver
-    Particle, // unique service per particle
+    /// unique service per particle
+    Particle
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
@@ -226,11 +226,9 @@ impl Default for ServiceShareSelector {
 #[derive(Clone)]
 pub struct ServiceTemplate {
     pub name: String,
-    pub kind: Kind,
+    pub kind: ServiceKind,
     pub share: ServiceShare,
     pub exec: ExeInfo<String, HostEnv, Option<Vec<String>>>,
-    pub host: HostApi,
-    pub dialect: Dialect,
 }
 
 impl ServiceTemplate {
@@ -400,7 +398,7 @@ where
 
 #[cfg(test)]
 pub mod tests {
-    use crate::host::{stringify_args, CliHost, ExeInfo, ExeStub, Host, HostApi, HostEnv, HostKind, OsEnv};
+    use crate::host::{ExeInfo, ExeStub };
 
     use nom::AsBytes;
     use starlane::space::command::common::StateSrc;
@@ -422,12 +420,14 @@ pub mod tests {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use wasmer::IntoBytes;
     use starlane::space::wave::core::Method;
-    use crate::dialect::cli::filestore::{Cli, Commands};
     use crate::err::StarErr;
     use crate::executor::Executor;
-    use crate::service::Dialect;
+    use crate::executor::cli::{CliExecutor, HostEnv};
+    use crate::executor::cli::os::{OsEnv, OsExeInfo, OsStub};
+    use crate::executor::dialect::filestore::{FileStoreCli, FileStoreCommand, FileStore, FileStoreIn, FileStoreOut};
+    use crate::executor::dialect::{HostDialect, HostRunner};
 
-    fn cli_host() -> Host {
+    fn filestore() -> Box<FileStore> {
         if std::fs::exists("./tmp").unwrap() {
             std::fs::remove_dir_all("./tmp").unwrap();
         }
@@ -447,16 +447,21 @@ pub mod tests {
         let env = builder.build();
         let path = "../target/debug/starlane-cli-filestore-service".to_string();
         let args: Option<Vec<String>> = Option::None;
-        let stub: ExeStub<String, OsEnv, Option<Vec<String>>> = ExeStub::new(path, env, None);
-        let info = ExeInfo::new(HostApi::Cli(HostKind::Os), stub);
-        let host = info.create_host().unwrap();
-        host
+        let stub: OsStub = ExeStub::new(path.into(), env, ());
+//        let info = ExeInfo::new(HostDialect::Cli(HostRunner::Os), stub);
+
+        let info = OsExeInfo::new( HostDialect::Cli(HostRunner::Os), stub);
+
+        let executor: Box<FileStore> = info.create().unwrap();
+
+        executor
     }
 
     pub async fn create_dialect_handler() -> Result<Box<dyn DirectedHandler>,StarErr>{
         let logger = RootLogger::default();
-        let host = cli_host();
-        let filestore = Dialect::FileStore.handler(host).unwrap();
+        let host = filestore();
+//        let filestore = DialectKind::FileStore.handler(host).unwrap();
+        todo!();
 
         let fae = Point::from_str("fae").unwrap();
         let less = Point::from_str("less").unwrap();
@@ -473,7 +478,7 @@ pub mod tests {
 //        let mut ctx = RootInCtx::new(wave, to, logger.span(), transmitter);
 
 //        filestore.handle(ctx).await;
-        Ok(filestore)
+//        Ok(filestore)
     }
 
 
@@ -541,10 +546,11 @@ pub mod tests {
         filestore.handle(ctx).await;
     }
 
+    /*
     #[tokio::test]
     pub async fn test_dialect_old() {
         let logger = RootLogger::default();
-        let host = cli_host();
+        let host = filestore();
         let filestore = Dialect::FileStore.handler(host).unwrap();
         let mut wave = DirectedProto::kind(&DirectedKind::Ping);
         wave.method(HypMethod::Assign);
@@ -583,10 +589,13 @@ pub mod tests {
         filestore.handle(ctx).await;
     }
 
+     */
+
+    /*
     #[tokio::test]
     pub async fn test_cli_primitive() {
-        if let Host::Cli(CliHost::Os(exe)) = cli_host() {
-            let args = Cli::new(Commands::Init);
+        if let Host::Cli(CliHost::Os(exe)) = filestore() {
+            let args = FileStoreCli::new(FileStoreCommand::Init);
             let mut child = exe.execute(args).await.unwrap();
             //           let mut stdout = child.stdout.take().unwrap();
             drop(child.stdout.take().unwrap());
@@ -606,10 +615,11 @@ pub mod tests {
         }
     }
 
+     */
+
     #[tokio::test]
     pub async fn test_os_cli_host() {
-        let host = cli_host();
-        let executor = host.executor().unwrap();
+        let executor = filestore();
 
         if let io::Result::Ok(true) = fs::try_exists("./tmp").await {
             fs::remove_dir_all("./tmp").await.unwrap();
@@ -617,12 +627,10 @@ pub mod tests {
 
         // init
         {
-            let init = Cli::new(Commands::Init);
+            let init = FileStoreIn::Init;
             executor
                 .execute(init)
-                .await
-                .unwrap()
-                .close_stdin();
+                .await.unwrap();
         }
 
         let path = PathBuf::from("tmp");
@@ -630,13 +638,13 @@ pub mod tests {
         assert!(path.is_dir());
 
         {
-            let args = Cli::new(Commands::Mkdir { path: "blah".into() });
+
+            let args = FileStoreIn::Mkdir {path: "blah".into()};
+
             let mut child = executor
                 .execute(args)
                 .await
                 .unwrap();
-            child.close_stdin().unwrap();
-            child.wait().await.unwrap();
         }
 
         let path = PathBuf::from("tmp/blah");
@@ -646,18 +654,13 @@ pub mod tests {
         let content = "HEllo from me";
 
         {
-            let args = Cli::new(Commands::Write{ path: "blah/somefile.txt".into() });
+
+            let args = FileStoreIn::Write{path: "blah/somefile.txt".into(), state: content.clone().into()};
             let mut child = executor
                 .execute(args)
                 .await
                 .unwrap();
-            let mut stdin = child.stdin.take().unwrap();
-            tokio::io::copy(&mut content.into_bytes().as_bytes(), &mut stdin)
-                .await
-                .unwrap();
-            stdin.flush().await.unwrap();
-            drop(stdin);
-            child.wait().await.unwrap();
+
         }
 
         let path = PathBuf::from("tmp/blah/somefile.txt");
@@ -665,19 +668,19 @@ pub mod tests {
         assert!(path.is_file());
 
         {
-            let args = Cli::new(Commands::Read{ path: "blah/somefile.txt".into() });
+            let args = FileStoreIn::Read{ path: "blah/somefile.txt".into() };
             let mut child = executor
                 .execute(args)
                 .await
                 .unwrap();
-            child.close_stdin();
-            let mut stdout = child.stdout.take().unwrap();
-            let mut read = String::new();
-            stdout.read_to_string(&mut read).await.unwrap();
-            println!("content: {}", read);
-            tokio::io::stdout().flush().await.unwrap();
-            child.wait().await.unwrap();
-            assert_eq!(content, read);
+            if let FileStoreOut::Read(bin) = child {
+                let read = String::from_utf8(bin).unwrap();
+                println!("content: {}", read);
+                assert_eq!(content, read);
+            } else {
+                assert!(false);
+            }
+
         }
 
         /*

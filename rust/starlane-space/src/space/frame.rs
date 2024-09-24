@@ -5,7 +5,7 @@ use semver::Version;
 use serde::{Deserialize, Serialize};
 
 use crate::space::hyper::Knock;
-use crate::space::wave::{Ping, Pong, UltraWave};
+use crate::space::wave::{PingCore, PongCore, Wave};
 use crate::SpaceErr;
 
 pub struct PrimitiveFrame {
@@ -63,7 +63,7 @@ pub enum CloseReason {
     Error(String),
 }
 
-impl TryInto<PrimitiveFrame> for Ping {
+impl TryInto<PrimitiveFrame> for PingCore {
     type Error = SpaceErr;
 
     fn try_into(self) -> Result<PrimitiveFrame, Self::Error> {
@@ -72,15 +72,15 @@ impl TryInto<PrimitiveFrame> for Ping {
     }
 }
 
-impl TryInto<Ping> for PrimitiveFrame {
+impl TryInto<PingCore> for PrimitiveFrame {
     type Error = SpaceErr;
 
-    fn try_into(self) -> Result<Ping, Self::Error> {
+    fn try_into(self) -> Result<PingCore, Self::Error> {
         Ok(bincode::deserialize(self.data.as_bytes())?)
     }
 }
 
-impl TryInto<PrimitiveFrame> for Pong {
+impl TryInto<PrimitiveFrame> for PongCore {
     type Error = SpaceErr;
 
     fn try_into(self) -> Result<PrimitiveFrame, Self::Error> {
@@ -89,15 +89,15 @@ impl TryInto<PrimitiveFrame> for Pong {
     }
 }
 
-impl TryInto<Pong> for PrimitiveFrame {
+impl TryInto<PongCore> for PrimitiveFrame {
     type Error = SpaceErr;
 
-    fn try_into(self) -> Result<Pong, Self::Error> {
+    fn try_into(self) -> Result<PongCore, Self::Error> {
         Ok(bincode::deserialize(self.data.as_bytes())?)
     }
 }
 
-impl TryInto<PrimitiveFrame> for UltraWave {
+impl TryInto<PrimitiveFrame> for Wave {
     type Error = SpaceErr;
 
     fn try_into(self) -> Result<PrimitiveFrame, Self::Error> {
@@ -106,10 +106,10 @@ impl TryInto<PrimitiveFrame> for UltraWave {
     }
 }
 
-impl TryInto<UltraWave> for PrimitiveFrame {
+impl TryInto<Wave> for PrimitiveFrame {
     type Error = SpaceErr;
 
-    fn try_into(self) -> Result<UltraWave, Self::Error> {
+    fn try_into(self) -> Result<Wave, Self::Error> {
         Ok(bincode::deserialize(self.data.as_bytes())?)
     }
 }

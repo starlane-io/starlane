@@ -14,9 +14,9 @@ use crate::space::loc::{ToPoint, ToSurface, Topic};
 use crate::space::log::{PointLogger, RootLogger, SpanLogger};
 use crate::space::wave::core::Method;
 use crate::space::wave::{
-    Bounce, DirectedProto, DirectedWave, Echo, FromReflectedAggregate,
-    Handling, Pong, Recipients, ReflectedProto,
-    ReflectedWave, Scope, Session, ToRecipients, UltraWave, Wave,
+    Bounce, DirectedProto, DirectedWave, EchoCore, FromReflectedAggregate,
+    Handling, PongCore, Recipients, ReflectedProto,
+    ReflectedWave, Scope, Session, ToRecipients, Wave, WaveVariantDef,
 };
 use crate::{Agent, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
 
@@ -75,8 +75,8 @@ impl<T> RootInCtxDef<T> {
 
     pub fn status(self, status: u16, from: Surface) -> Bounce<ReflectedWave> {
         match self.wave {
-            DirectedWave::Ping(ping) => Bounce::Reflected(ReflectedWave::Pong(Wave::new(
-                Pong::new(
+            DirectedWave::Ping(ping) => Bounce::Reflected(ReflectedWave::Pong(WaveVariantDef::new(
+                PongCore::new(
                     ReflectedCore::status(status),
                     ping.from.clone(),
                     self.to.clone().to_recipients(),
@@ -84,8 +84,8 @@ impl<T> RootInCtxDef<T> {
                 ),
                 from,
             ))),
-            DirectedWave::Ripple(ripple) => Bounce::Reflected(ReflectedWave::Echo(Wave::new(
-                Echo::new(
+            DirectedWave::Ripple(ripple) => Bounce::Reflected(ReflectedWave::Echo(WaveVariantDef::new(
+                EchoCore::new(
                     ReflectedCore::status(status),
                     ripple.from.clone(),
                     ripple.to.clone(),
@@ -99,8 +99,8 @@ impl<T> RootInCtxDef<T> {
 
     pub fn err(self, status: u16, from: Surface, msg: String) -> Bounce<ReflectedWave> {
         match self.wave {
-            DirectedWave::Ping(ping) => Bounce::Reflected(ReflectedWave::Pong(Wave::new(
-                Pong::new(
+            DirectedWave::Ping(ping) => Bounce::Reflected(ReflectedWave::Pong(WaveVariantDef::new(
+                PongCore::new(
                     ReflectedCore::fail(status, msg),
                     ping.from.clone(),
                     self.to.clone().to_recipients(),
@@ -108,8 +108,8 @@ impl<T> RootInCtxDef<T> {
                 ),
                 from,
             ))),
-            DirectedWave::Ripple(ripple) => Bounce::Reflected(ReflectedWave::Echo(Wave::new(
-                Echo::new(
+            DirectedWave::Ripple(ripple) => Bounce::Reflected(ReflectedWave::Echo(WaveVariantDef::new(
+                EchoCore::new(
                     ReflectedCore::fail(status, msg),
                     ripple.from.clone(),
                     ripple.to.clone(),
@@ -273,11 +273,11 @@ where
 
 #[derive(Clone)]
 pub struct BroadTxRouter {
-    pub tx: broadcast::Sender<UltraWave>,
+    pub tx: broadcast::Sender<Wave>,
 }
 
 impl BroadTxRouter {
-    pub fn new(tx: broadcast::Sender<UltraWave>) -> Self {
+    pub fn new(tx: broadcast::Sender<Wave>) -> Self {
         Self { tx }
     }
 }

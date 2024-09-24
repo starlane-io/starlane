@@ -1,6 +1,6 @@
 use clap::Parser;
-use starlane::dialect::cli::filestore::Cli;
-use starlane::dialect::cli::filestore::Commands;
+use starlane::executor::dialect::filestore::FileStoreCli;
+use starlane::executor::dialect::filestore::FileStoreCommand;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{absolute, PathBuf, StripPrefixError};
@@ -31,41 +31,41 @@ fn main() -> ExitCode{
 fn run() -> Result<(),Error> {
 
 
-    let cli = Cli::parse();
-    if let Commands::Init = cli.command {
+    let cli = FileStoreCli::parse();
+    if let FileStoreCommand::Init = cli.command {
         ensure_dir(&root_dir()?);
         return Ok(());
     }
 
 
     match cli.command {
-        Commands::Init => {
+        FileStoreCommand::Init => {
             todo!()
         }
-        Commands::Write { path } => {
+        FileStoreCommand::Write { path } => {
             todo!()
 
         }
-        Commands::Read { path } => {
+        FileStoreCommand::Read { path } => {
             todo!()
         }
-        Commands::Mkdir { path } => {
+        FileStoreCommand::Mkdir { path } => {
             todo!()
         }
-        Commands::Remove { path } => {
+        FileStoreCommand::Remove { path } => {
             todo!()
         }
-        Commands::List { path: Option::Some(path)} => {
+        FileStoreCommand::List { path: Option::Some(path)} => {
             todo!()
         }
-        Commands::List { path: Option::None } => {
+        FileStoreCommand::List { path: Option::None } => {
             todo!()
         }
-        Commands::Pwd =>  {
+        FileStoreCommand::Pwd =>  {
             todo!()
         }
 
-        Commands::Exists { path } => {
+        FileStoreCommand::Exists { path } => {
             todo!()
         }
     }

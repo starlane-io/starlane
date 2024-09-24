@@ -220,7 +220,7 @@ where
     }
 
     fn exchange(&self, direct: DirectedWave) -> Result<ReflectedAggregate, SpaceErr> {
-        crate::membrane::mechtron_exchange_wave_host::<P>(direct.to_ultra())
+        crate::membrane::mechtron_exchange_wave_host::<P>(direct.to_wave())
             .map_err(|e| e.to_uni_err())
     }
 }

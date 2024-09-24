@@ -20,7 +20,7 @@ use starlane::space::wave::exchange::asynch::{
 };
 use starlane::space::wave::exchange::SetStrategy;
 use starlane::space::wave::{
-    DirectedProto, DirectedWave, Pong, UltraWave, Wave,
+    DirectedProto, DirectedWave, PongCore, Wave, WaveVariantDef,
     WaveId,
 };
 
@@ -64,11 +64,11 @@ where
             .with_layer(Layer::Shell)
     }
 
-    async fn traverse_next(&self, traversal: Traversal<UltraWave>) {
+    async fn traverse_next(&self, traversal: Traversal<Wave>) {
         self.skel.traverse_to_next_tx.send(traversal.clone()).await;
     }
 
-    async fn inject(&self, wave: UltraWave) {
+    async fn inject(&self, wave: Wave) {
         let inject = TraversalInjection::new(self.surface().clone(), wave);
         self.skel.inject_tx.send(inject).await;
     }
@@ -129,7 +129,7 @@ where
             CoreBounce::Absorbed => {}
             CoreBounce::Reflected(core) => {
                 let reflected = reflection.unwrap().make(core, self.surface().clone());
-                self.inject(reflected.to_ultra()).await;
+                self.inject(reflected.to_wave()).await;
             }
         }
         Ok(())
@@ -179,7 +179,7 @@ where
         if let Some(count) = self.state.fabric_requests.get(traversal.reflection_of()) {
             let value = count.value().fetch_sub(1, Ordering::Relaxed);
             if value >= 0 {
-                self.traverse_next(traversal.clone().to_ultra()).await;
+                self.traverse_next(traversal.clone().to_wave()).await;
             } else {
                 self.logger.warn(format!(
                     "{} blocked a reflected from {} to a directed id {} of which the Shell has already received a reflected wave",
@@ -308,7 +308,7 @@ impl CommandExecutor {
         let request: DirectedCore = command.into();
         let mut directed = DirectedProto::from_core(request);
         directed.to(Point::global_executor());
-        let pong: Wave<Pong> = ctx.transmitter.direct(directed).await?;
+        let pong: WaveVariantDef<PongCore> = ctx.transmitter.direct(directed).await?;
 
         Ok(pong.variant.core)
     }
