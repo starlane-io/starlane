@@ -683,68 +683,6 @@ pub mod tests {
 
         }
 
-        /*
 
-            let stdout = child
-                .stdout
-                .take()
-                .expect("child did not have a handle to stdout");
-
-
-            let mut reader = BufReader::new(stdout).lines();
-
-            /*            tokio::spawn(async move {
-                           let status = child.wait().await
-                               .expect("child process encountered an error");
-
-                           println!("child status was: {}", status);
-                       });
-
-            */
-
-            while let Some(line) = reader.next_line().await.unwrap() {
-                println!("Line: {}", line);
-                assert_eq!("Hello World", line);
-            }
-        }
-
-        {
-            let mut child = executor.execute(vec!["write".to_string()]).await.unwrap();
-
-            let text = "From Write";
-
-            let mut stdin = child.stdin.take().unwrap();
-            stdin.write_all(text.as_bytes()).await.unwrap();
-            stdin.flush();
-
-            drop(stdin);
-
-            let stdout = child
-                .stdout
-                .take()
-                .expect("child did not have a handle to stdout");
-
-            let mut reader = BufReader::new(stdout).lines();
-
-            while let Some(line) = reader.next_line().await.unwrap() {
-                println!("Line: {}", line);
-                assert_eq!(text, line);
-            }
-        }
-
-             */
-
-        /*
-        // Ensure the child process is spawned in the runtime so it can
-        // make progress on its own while we await for any output.
-        tokio::spawn(async move {
-            let status = child.wait().await
-                .expect("child process encountered an error");
-
-            println!("child status was: {}", status);
-        });
-
-
-             */
     }
 }

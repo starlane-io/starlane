@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::env;
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
+use tokio::io::AsyncWriteExt;
 use crate::host::Proc;
 
 pub type CliIn = CliInDef<Option<Vec<u8>>>;
@@ -118,6 +119,36 @@ impl CliIn {
 
 pub enum CliOut {
     Os(OsProcess),
+}
+
+impl CliOut {
+
+    pub async fn copy_stdin(&mut self, input: & mut Vec<u8>) -> Result<(),ThisErr>{
+        match self {
+            CliOut::Os(proc) => {
+                let mut stdin = proc.stdin.take().unwrap();
+                stdin.write_all( &input[..] ).await?;
+                stdin.flush().await?;
+            }
+        }
+        Ok(())
+    }
+    pub fn close_stdin(&mut self)  -> Result<(),ThisErr>{
+        match self {
+            CliOut::Os(proc) => proc.close_stdin()?
+        }
+        Ok(())
+    }
+
+    pub async fn copy_stout(&mut self, out: & mut Vec<u8>)  -> Result<(),ThisErr>{
+        match self {
+            CliOut::Os(proc) => {
+                let mut stdout = proc.stdout.take().ok_or("could not get stdout")?;
+                tokio::io::copy(&mut stdout, out).await?;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl CliOut {

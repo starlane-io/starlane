@@ -17,7 +17,8 @@ repository.workspace = true
 [features]
 full=["server"]
 default=["server"]
-server=["space","service","hyperspace", "hyperlane","postgres", "hyperlane-tcp", "cli", "dep:threadpool", "dep:oneshot", "dep:anyhow", "dep:virtual-fs"]
+#server=["space","service","hyperspace", "hyperlane","postgres", "hyperlane-tcp", "cli", "dep:threadpool", "dep:oneshot", "dep:anyhow", "dep:virtual-fs"]
+server=["space","service","hyperspace", "hyperlane","postgres", "hyperlane-tcp", "cli", "dep:threadpool", "dep:oneshot", "dep:anyhow"]
 cli=["dep:text_io","dep:clap", "dep:walkdir", "parse"]
 hypererr=[]
 hyperspace=["dep:futures","dep:dashmap","dep:semver", "parse", "dep:zip","hypererr"]
@@ -32,6 +33,7 @@ dialect=[]
 dialect-cli=["dialect","dep:clap"]
 service=[]
 space=[]
+wasm=[]
 
 [dependencies]
 starlane-space = { workspace = true}
@@ -103,7 +105,7 @@ oneshot = { workspace = true, optional = true }
 
 
 anyhow = { workspace = true, optional = true }
-virtual-fs ={ workspace = true, optional = true }
+##virtual-fs ={ workspace = true, optional = true }
 
 quinn ={ workspace = true, optional = true }
 webpki-roots = { workspace = true}

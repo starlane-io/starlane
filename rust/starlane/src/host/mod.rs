@@ -5,7 +5,7 @@ use std::fmt::Write;
 use std::hash::{Hash, Hasher};
 use std::io::Read;
 use std::path::PathBuf;
-use virtual_fs::FileSystem;
+//use virtual_fs::FileSystem;
 use std::ops::{Deref, DerefMut};
 use clap::CommandFactory;
 use nom::AsBytes;

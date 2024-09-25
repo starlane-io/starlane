@@ -28,16 +28,19 @@ pub enum FileStore {
 
 impl FileStore {
 
-    pub async fn execute(& self, input: FileStoreIn) -> Result<FileStoreOut,ThisErr> {
+    pub async fn execute(& self, mut input: FileStoreIn) -> Result<FileStoreOut,ThisErr> {
         match self {
             FileStore::Cli(executor) => {
                 let kind : FileStoreInKind = (&input).into();
-                let input = input.into();
+                let mut input = input.into();
                 let mut out = executor.execute(input).await?;
-                Ok(match kind {
+                let rtn = match kind {
                     FileStoreInKind::Init => FileStoreOut::Init,
-                    FileStoreInKind::Write { .. } => FileStoreOut::Write,
+                    FileStoreInKind::Write { .. } => {
+                        FileStoreOut::Write
+                    },
                     FileStoreInKind::Read { .. } => {
+                        out.close_stdin()?;
                         let stdout = out.stdout().await?;
                         FileStoreOut::Read(stdout)
                     }
@@ -48,6 +51,7 @@ impl FileStore {
                         FileStoreOut::Remove
                     }
                     FileStoreInKind::List { .. } => {
+                        out.close_stdin()?;
                         let stdout = out.stdout().await?;
                         let paths = stdout
                             .lines()
@@ -70,7 +74,9 @@ impl FileStore {
                             .ok_or(ThisErr::String("pwd didn't return anything".to_string()))??;
                         FileStoreOut::Pwd(line)
                     }
-                })
+                };
+                out.close_stdin();
+                Ok(rtn)
             }
         }
     }
