@@ -26,13 +26,14 @@ use strum_macros::{EnumIter, EnumString};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::watch;
 use tracing::instrument::WithSubscriber;
-use starlane::space::selector::KindSelector;
 use crate::executor::cli::HostEnv;
-use crate::host::ExeInfo;
+use crate::executor::cli::os::OsExeInfo;
+use crate::executor::Executor;
+use crate::host::{ExeInfo, Host};
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq,EnumString)]
+
 pub enum ServiceKind {
-    FileStore
+    Executor(Host)
 }
 
 
@@ -50,17 +51,13 @@ pub struct ServiceCreationSelector {
 pub struct ServiceKey {
     pub name: String,
     pub kind: ServiceKind,
-    pub share: ServiceShare,
+    pub share: ServiceScope,
 }
 
 pub struct ServiceSelector {
     pub name: IdSelector<String>,
-
-    pub kind: MatchSelector<KindSelector, Kind>,
-    pub share: IdSelector<ServiceShare>,
-    pub star: OptSelector<IdSelector<Point>>,
-    pub driver: OptSelector<IdSelector<Point>>,
-    pub particle: OptSelector<IdSelector<Point>>,
+    pub kind: MatchSelector<ServiceKindSelector, ServiceKind>,
+    pub scope: MatchSelector<ServiceScopeSelector,ServiceScope>,
 }
 
 impl PartialEq<ServiceKey> for ServiceSelector {
@@ -69,6 +66,7 @@ impl PartialEq<ServiceKey> for ServiceSelector {
         todo!()
     }
 }
+
 impl PartialEq<ServiceTemplate> for ServiceSelector {
     fn eq(&self, key: &ServiceTemplate) -> bool {
         todo!()
@@ -123,13 +121,12 @@ impl ServicePoolCore {
 
  */
 
-pub trait Service
-where
-    Self::Handler: DirectedHandler,
-{
-    type Handler;
 
-    fn handler(&self) -> &Self::Handler;
+pub trait Service
+{
+    type Call;
+
+    async fn send( &self, call: Self::Call);
 }
 
 pub struct ServiceHandler<D>
@@ -160,64 +157,47 @@ where
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, EnumIter)]
-pub enum ServiceShare {
+pub enum ServiceScope {
     /// one service for everyone
     Singleton,
-    /// one of this Service per star
-    Star,
-    /// one Service Per driver
-    Driver,
-    /// unique service per particle
-    Particle
+    /// service for a point
+    Point(Point)
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub enum ServiceAgent {
-    Singleton,
-    Star(Point),
-    Driver {
-        star: Point,
-        driver: Point,
-    },
-    Particle {
-        star: Point,
-        driver: Point,
-        particle: Point,
-    },
-}
+
 
 #[derive(Debug, Clone, Eq, PartialEq, EnumString)]
-pub enum ServiceShareSelector {
+pub enum ServiceScopeSelector {
     Any,
-    Set(HashSet<ServiceShare>),
+    Set(HashSet<ServiceScope>),
 }
 
-impl PartialEq<ServiceShare> for ServiceShareSelector {
-    fn eq(&self, other: &ServiceShare) -> bool {
+impl PartialEq<ServiceScope> for ServiceScopeSelector {
+    fn eq(&self, other: &ServiceScope) -> bool {
         match &self {
-            ServiceShareSelector::Any => true,
-            ServiceShareSelector::Set(set) => set.contains(other),
+            ServiceScopeSelector::Any => true,
+            ServiceScopeSelector::Set(set) => set.contains(other),
         }
     }
 }
 
-impl ServiceShareSelector {
+impl ServiceScopeSelector {
     pub fn new() -> Self {
         Self::Any
     }
 
-    pub fn or(self, share: ServiceShare) -> Self {
+    pub fn or(self, share: ServiceScope) -> Self {
         match self {
-            ServiceShareSelector::Any => Self::Set(HashSet::from([share])),
-            ServiceShareSelector::Set(mut set) => {
+            ServiceScopeSelector::Any => Self::Set(HashSet::from([share])),
+            ServiceScopeSelector::Set(mut set) => {
                 set.insert(share);
-                ServiceShareSelector::Set(set)
+                ServiceScopeSelector::Set(set)
             }
         }
     }
 }
 
-impl Default for ServiceShareSelector {
+impl Default for ServiceScopeSelector {
     fn default() -> Self {
         Self::Any
     }
@@ -226,9 +206,8 @@ impl Default for ServiceShareSelector {
 #[derive(Clone)]
 pub struct ServiceTemplate {
     pub name: String,
-    pub kind: ServiceKind,
-    pub share: ServiceShare,
-    pub exec: ExeInfo<String, HostEnv, Option<Vec<String>>>,
+    pub scope: ServiceScope,
+    pub params: ServiceParams,
 }
 
 impl ServiceTemplate {
@@ -250,17 +229,22 @@ impl Into<ServiceKey> for ServiceTemplate {
         ServiceKey {
             name: self.name.clone(),
             kind: self.kind.clone(),
-            share: self.share.clone(),
+            share: self.scope.clone(),
         }
     }
 }
 
+//pub exec: ExeInfo<String, HostEnv, Option<Vec<String>>>,
 #[derive(Clone)]
-pub struct ServiceCtx {
-    pub surface: Surface,
+pub enum ServiceParams {
+    Host(ExeInfo<String, HostEnv, Option<Vec<String>>>)
+}
+
+#[derive(Clone)]
+pub struct ServiceCtx<E,I,O> where E: Executor<In=I,Out=O> {
+    pub template: ServiceTemplate,
     pub data_dir: PathBuf,
-    pub router: Arc<dyn Router>,
-    pub logger: PointLogger,
+    pub executor: E
 }
 
 impl ServiceCtx {
@@ -271,6 +255,7 @@ impl ServiceCtx {
         logger: PointLogger,
     ) -> Self {
         Self {
+            template: ServiceTemplate {},
             surface,
             data_dir,
             router,
@@ -279,40 +264,30 @@ impl ServiceCtx {
     }
 }
 
-pub struct ServiceCall {
-    pub from: Point,
-    pub tx: tokio::sync::oneshot::Sender<Bounce<ReflectedWave>>,
-    pub command: ServiceCommand,
-}
 
-pub enum ServiceCommand {
-    DirectedWave(DirectedWave),
-}
 
 #[derive(Clone)]
-pub struct ServiceStub {
-    template: ServiceTemplate,
-    call_tx: tokio::sync::mpsc::Sender<ServiceCall>,
-    status_rx: watch::Receiver<Status>,
+pub struct ServiceStub<C> {
+    pub template: ServiceTemplate,
+    pub call_tx: tokio::sync::mpsc::Sender<C>,
+    pub status_rx: watch::Receiver<Status>,
 }
 
-pub struct ServiceRunner<D>
-where
-    D: DirectedHandler + 'static,
+pub struct ServiceRunner<Core,Call> where Core: ServiceCore<Call>
 {
-    call_rx: tokio::sync::mpsc::Receiver<ServiceCall>,
+    ctx: ServiceCtx,
+    call_rx: tokio::sync::mpsc::Receiver<Call>,
     status_tx: tokio::sync::mpsc::Sender<Status>,
-    core: ServiceCore<D>,
+    core: Core,
 }
 
-impl<D> ServiceRunner<D>
-where
-    D: DirectedHandler,
+impl<Core,Call> ServiceRunner<Core,Call>
+where Core: ServiceCore<Call>
 {
-    fn new(core: ServiceCore<D>) -> ServiceStub {
+    fn new(ctx: ServiceCtx, core: Core) -> ServiceStub<Call> {
         let (call_tx, call_rx) = tokio::sync::mpsc::channel(1024);
         let (status_tx, status_rx) = state_relay(Status::Pending);
-        let template = core.template.clone();
+        let template = ctx.template.clone();
         let rtn = ServiceStub {
             call_tx,
             status_rx,
@@ -320,6 +295,7 @@ where
         };
 
         let runner = Self {
+            ctx,
             call_rx,
             status_tx,
             core,
@@ -347,54 +323,20 @@ where
         self.status_tx.send(Status::Ready);
 
         while let Some(call) = self.call_rx.recv().await {
-            match call.command {
-                ServiceCommand::DirectedWave(wave) => {
-                    self.core.handler.handle(wave).await;
-                }
-            }
+            self.core.handle(wave).await;
         }
 
         Ok(Status::Done)
     }
 }
 
-struct ServiceCore<D>
-where
-    D: DirectedHandler,
+pub trait ServiceCore<C>
 {
-    ctx: ServiceCtx,
-    template: ServiceTemplate,
-    handler: DirectedHandlerShell<D>,
+    fn call(&self, ctx: &ServiceCtx, call: C );
 }
 
-impl<D> ServiceCore<D>
-where
-    D: DirectedHandler,
-{
-    /*
-    pub fn create(ctx: ServiceCtx, template: ServiceTemplate ) -> Result<Self,StarErr>{
-        let host = template.host.create( template.exec.stub.clone() )?;
-        let exchanger= Exchanger::new(ctx.surface.clone(), Timeouts::default(), ctx.logger.clone() );
-        let mut builder = ProtoTransmitterBuilder::new(ctx.router.clone(), exchanger);
-        builder.from = SetStrategy::Override(ctx.surface.clone());
-        let handler = template.dialect.handler(host)?;
-        let handler = DirectedHandlerShell::new( handler, builder, ctx.surface.clone(), ctx.logger.logger.clone());
-        Ok(Self {
-            ctx,
-            template,
-            handler
-        })
-    }
 
-     */
 
-    /*
-    pub fn handler( & self ) -> D {
-        self.handler.clone()
-    }
-
-     */
-}
 
 #[cfg(test)]
 pub mod tests {
@@ -447,7 +389,7 @@ pub mod tests {
         let env = builder.build();
         let path = "../target/debug/starlane-cli-filestore-service".to_string();
         let args: Option<Vec<String>> = Option::None;
-        let stub: OsStub = ExeStub::new(path.into(), env, ());
+        let stub: OsStub = ExeStub::new_with_args(path.into(), env, ());
 //        let info = ExeInfo::new(HostDialect::Cli(HostRunner::Os), stub);
 
         let info = OsExeInfo::new( HostDialect::Cli(HostRunner::Os), stub);
@@ -680,9 +622,6 @@ pub mod tests {
             } else {
                 assert!(false);
             }
-
         }
-
-
     }
 }

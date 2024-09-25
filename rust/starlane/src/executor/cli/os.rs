@@ -8,20 +8,18 @@ use tokio::io::AsyncWriteExt;
 use crate::err::ThisErr;
 use crate::executor::cli::{CliIn, CliOut, HostEnv};
 use crate::executor::Executor;
-use crate::host::{ExeInfo, ExeStub, Proc, StrStub};
+use crate::host::{ExeInfo, ExeStub, Proc };
 
 #[derive(Clone)]
-pub struct CliOsExecutor {
-    pub stub: OsExeStub,
+pub struct CliOsExecutor
+{
+    pub stub: ExeStub,
 }
 
 impl CliOsExecutor {
-    pub fn new<I>(info: I) -> Self
-    where
-        I: Into<OsExeStub>,
+    pub fn new(stub: ExeStub) -> Self
     {
-        let info = info.into();
-        Self { stub: info }
+        Self { stub }
     }
 }
 #[async_trait]
@@ -30,16 +28,17 @@ impl Executor for CliOsExecutor {
     type Out = CliOut;
 
     async fn execute(&self, mut input: Self::In) -> Result<Self::Out, ThisErr> {
-        if !self.stub.loc.exists() {
+        let path: PathBuf = self.stub.loc.clone().into();
+        if !path.exists() {
             Result::Err(ThisErr::String(format!(
                 "file not found: {}",
-                self.stub.loc.display()
+                self.stub.loc
             )))?;
         }
 
         aprintln!("pwd: {}", env::current_dir().unwrap().display());
-        aprintln!("self.stub.loc.exists(): {}", self.stub.loc.exists());
-        aprintln!("self.stub.loc: {}", self.stub.loc.display());
+        aprintln!("self.stub.loc.exists(): {}", path.exists());
+        aprintln!("self.stub.loc: {}", path.display());
         let mut command = Command::new(self.stub.loc.clone());
 
         command.envs(self.stub.env.env.clone());
@@ -76,21 +75,6 @@ impl Executor for CliOsExecutor {
     }
 }
 
-pub type OsExeInfo = ExeInfo<PathBuf, OsEnv, ()>;
-pub type OsExeStub = ExeStub<PathBuf, OsEnv, ()>;
-
-impl From<StrStub> for OsExeStub {
-    fn from(stub : StrStub) -> Self {
-        Self {
-            args: (),
-            env: stub.env,
-            loc: PathBuf::from(stub.loc),
-        }
-    }
-}
-pub type OsExeStubArgs = ExeStub<PathBuf, HostEnv, Vec<String>>;
-pub type OsStub = ExeStub<PathBuf, HostEnv, ()>;
-pub type OsEnv = HostEnv;
 
 
 pub struct OsProcess {

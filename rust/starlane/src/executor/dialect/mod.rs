@@ -23,7 +23,7 @@ pub enum HostRunner {
 }
 
 impl HostDialect {
-    pub fn create_cli<D>( &self, stub: &OsStub) -> Result<Box<D>,ThisErr> where D: From<Box<CliOsExecutor>>{
+    pub fn create_cli<D>( &self, stub: &ExeStub) -> Result<Box<D>,ThisErr> where D: From<Box<CliOsExecutor>>{
         match self {
             HostDialect::Cli(host) => {
                 host.create_cli(stub)
@@ -34,7 +34,7 @@ impl HostDialect {
 
 
 impl HostRunner {
-    pub fn create_cli<D>( &self, stub: &OsStub) -> Result<Box<D>,ThisErr> where D: From<Box<CliOsExecutor>>{
+    pub fn create_cli<D>( &self, stub: &ExeStub) -> Result<Box<D>,ThisErr> where D: From<Box<CliOsExecutor>>{
         match self {
             HostRunner::Os => {
                 Ok(Box::new(D::from( Box::new(CliOsExecutor::new(stub.clone())) )))

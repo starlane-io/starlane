@@ -1,21 +1,21 @@
+use crate::err::ThisErr;
+use crate::executor::cli::os::{CliOsExecutor, OsExeInfo};
+use crate::executor::cli::HostEnv;
+use crate::executor::dialect::HostDialect;
+use crate::executor::Executor;
 use crate::hyperspace::err::HyperErr;
+use clap::CommandFactory;
 use itertools::Itertools;
+use nom::AsBytes;
 use starlane::space::wave::exchange::asynch::DirectedHandler;
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
 use std::io::Read;
-use std::path::PathBuf;
 //use virtual_fs::FileSystem;
 use std::ops::{Deref, DerefMut};
-use clap::CommandFactory;
-use nom::AsBytes;
+use std::path::PathBuf;
 use tokio::io::AsyncWriteExt;
-use crate::err::{StarErr, ThisErr};
-use crate::executor::cli::{CliExecutor, CliIn, CliOut, HostEnv};
-use crate::executor::cli::os::{CliOsExecutor, OsExeInfo, OsStub};
-use crate::executor::dialect::filestore::FileStore;
-use crate::executor::dialect::HostDialect;
-use crate::executor::Executor;
+use starlane::space::particle::{PointKind, Stub};
 
 pub mod err;
 pub mod ext;
@@ -63,27 +63,22 @@ pub trait Proc {
 }
 
 
-pub type StrStub = ExeStub<String,HostEnv,Vec<String>>;
-
 #[derive(Clone, Hash, Eq, PartialEq)]
-pub struct ExeStub<L, E, A>
-where
-    E: Clone + Hash + Eq + PartialEq,
-    L: Clone + Hash + Eq + PartialEq,
-    A: Clone + Hash + Eq + PartialEq,
+pub struct ExeStub
 {
-    pub loc: L,
-    pub env: E,
-    pub args: A,
+    pub loc: String,
+    pub env: HostEnv,
+    pub args: Vec<String>,
 }
 
-impl<L, E, A> ExeStub<L, E, A>
-where
-    E: Clone + Hash + Eq + PartialEq,
-    L: Clone + Hash + Eq + PartialEq,
-    A: Clone + Hash + Eq + PartialEq,
+impl ExeStub
 {
-    pub fn new(loc: L, env: E, args: A) -> Self {
+    pub fn new(loc: String, env: HostEnv ) -> Self {
+        let args = vec![];
+        Self::new_with_args(loc, env, args)
+    }
+
+    pub fn new_with_args(loc: String, env: HostEnv, args: Vec<String> ) -> Self {
         Self { loc, env, args }
     }
 }
@@ -95,30 +90,22 @@ pub fn stringify_args(args: Vec<&str>) -> Vec<String> {
 
 
 #[derive(Clone, Hash, Eq, PartialEq)]
-pub struct ExeInfo<L, E, A>
-where
-    E: Clone + Hash + Eq + PartialEq,
-    L: Clone + Hash + Eq + PartialEq,
-    A: Clone + Hash + Eq + PartialEq,
+pub struct ExeInfo
 {
-    pub stub: ExeStub<L, E, A>,
+    pub stub: ExeStub,
     pub dialect: HostDialect
 }
 
-impl<L, E, A> ExeInfo<L, E, A>
-where
-    E: Clone + Hash + Eq + PartialEq,
-    L: Clone + Hash + Eq + PartialEq,
-    A: Clone + Hash + Eq + PartialEq,
+impl ExeInfo
 {
-    pub fn new(dialect: HostDialect, stub: ExeStub<L, E, A>) -> Self {
+    pub fn new(dialect: HostDialect, stub: ExeStub) -> Self {
         Self {  dialect, stub }
     }
 
 
 }
 
-impl OsExeInfo{
+impl ExeInfo{
     pub fn create<D>( &self ) -> Result<Box<D>,ThisErr> where D: From<Box<CliOsExecutor>> {
         self.dialect.create_cli( &self.stub )
     }
@@ -153,9 +140,11 @@ where
         let path = stub.loc.clone().into();
         let env = stub.env.clone().into();
 
-        ExeStub::new(path, env, ())
+        ExeStub::new_with_args(path, env, ())
     }
 }
+
+
 
 
 
