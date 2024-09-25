@@ -7,6 +7,8 @@ pub mod root;
 pub mod space;
 pub mod star;
 
+pub mod artifact;
+
 use crate::driver::star::StarDriverFactory;
 use crate::hyperspace::err::HyperErr;
 use crate::platform::Platform;

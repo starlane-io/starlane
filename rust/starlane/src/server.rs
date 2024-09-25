@@ -15,6 +15,7 @@ use std::sync::Arc;
 use tokio_print::aprintln;
 use crate::driver::base::BaseDriverFactory;
 use crate::driver::{DriverAvail, DriversBuilder};
+use crate::driver::artifact::RepoDriverFactory;
 use crate::driver::control::ControlDriverFactory;
 use crate::driver::root::RootDriverFactory;
 use crate::driver::space::SpaceDriverFactory;
@@ -121,8 +122,8 @@ impl Platform for Starlane {
                 */
             }
             StarSub::Scribe => {
-                /*
                 builder.add_post(Arc::new(RepoDriverFactory::new()));
+                /*
                 builder.add_post(Arc::new(BundleSeriesDriverFactory::new()));
                 builder.add_post(Arc::new(BundleDriverFactory::new()));
                 builder.add_post(Arc::new(ArtifactDriverFactory::new()));

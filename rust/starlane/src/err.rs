@@ -1,6 +1,7 @@
 use std::convert::Infallible;
 use thiserror::Error;
 use tokio::io;
+use tokio::sync::oneshot::error::RecvError;
 use crate::hyperspace::err::ErrKind;
 
 #[cfg(feature = "postgres")]
@@ -15,7 +16,9 @@ pub enum ThisErr {
     #[error("{0}")]
     TokioIo(#[from] io::Error),
     #[error("{0}")]
-    Iniff(#[from] Infallible)
+    Iniff(#[from] Infallible),
+     #[error("{0}")]
+     RecvErr(#[from] RecvError)
 }
 
 impl StarErr {

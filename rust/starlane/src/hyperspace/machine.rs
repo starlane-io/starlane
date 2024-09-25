@@ -54,6 +54,14 @@ where
         Self { tx }
     }
 
+    pub async fn select_service( &self, selector: ServiceSelector ) -> Result<Option<ServiceTemplate>,ThisErr> {
+
+        let (rtn,rx) = tokio::sync::oneshot::channel();
+        let selector = MachineCall::SelectService {selector,rtn };
+        self.tx.send(selector).await?;
+        Ok(rx.await?)
+    }
+
     pub async fn endpoint_factory(
         &self,
         from: StarKey,
