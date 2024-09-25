@@ -106,6 +106,7 @@ where
 }
 
 
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum IdSelector<V>
 where
@@ -362,6 +363,12 @@ impl ValueMatcher<String> for RegexMatcher {
         } else {
             Err(())
         }
+    }
+}
+
+impl PartialEq<String> for RegexMatcher {
+    fn eq(&self, other: &String) -> bool {
+        self.is_match(other).is_ok()
     }
 }
 

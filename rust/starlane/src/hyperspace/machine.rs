@@ -16,12 +16,14 @@ use starlane::space::loc::{Layer, MachineName, StarHandle, StarKey, Surface, ToP
 use starlane::space::log::{PointLogger, RootLogger};
 use starlane::space::particle::{Status, Stub};
 use starlane::space::point::Point;
+use starlane::space::selector::KindSelector;
 use starlane::space::settings::Timeouts;
 use starlane::space::substance::{Bin, Substance};
+use starlane::space::util::OptSelector;
 use starlane::space::wave::core::cmd::CmdMethod;
 use starlane::space::wave::exchange::asynch::Exchanger;
 use starlane::space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
-
+use crate::err::ThisErr;
 use crate::hyperlane::{
     HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, Hyperway, HyperwayEndpoint,
     HyperwayEndpointFactory, HyperwayInterchange, LayerTransform, MountInterchangeGate,
@@ -33,7 +35,7 @@ use crate::hyperspace::reg::Registry;
 use crate::hyperspace::star::{
     HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate,
 };
-use crate::service::ServiceTemplate;
+use crate::service::{service_conf, Service, ServiceConf, ServiceKind, ServiceSelector, ServiceTemplate};
 use crate::template::Templates;
 
 #[derive(Clone)]
@@ -476,6 +478,12 @@ where
                 MachineCall::GetRegistry(rtn) => {
                     rtn.send(self.skel.registry.clone());
                 }
+                MachineCall::SelectService { selector, rtn } => {
+                      match self.skel.platform.machine_template().services.select_one( &selector ) {
+                          None => rtn.send(Option::None),
+                          Some(template) => rtn.send(Option::Some(template.clone()))
+                      };
+                }
             }
 
             self.termination_broadcast_tx
@@ -507,6 +515,10 @@ where
         from: StarKey,
         to: StarKey,
         rtn: oneshot::Sender<Box<dyn HyperwayEndpointFactory>>,
+    },
+    SelectService{
+        selector: ServiceSelector,
+        rtn: oneshot::Sender<Option<ServiceTemplate>>
     },
     #[cfg(test)]
     GetMachineStar(oneshot::Sender<HyperStarApi<P>>),
@@ -609,7 +621,16 @@ impl Default for MachineTemplate {
         stars.push(jump);
         stars.push(fold);
 
-        let services = Default::default();
+
+        let config = service_conf();
+        let filestore = ServiceTemplate {
+            name: "".to_string(),
+            kind: ServiceKind::FileStore,
+            driver: OptSelector::Selector(KindSelector::from_str("Repo").unwrap()),
+            config,
+        };
+        let services = Templates::new( vec![filestore]);
+
         Self { stars,services}
     }
 }

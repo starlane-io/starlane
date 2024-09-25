@@ -1,9 +1,10 @@
+use std::env;
 use crate::executor::Executor;
 use crate::hyperspace::err::HyperErr;
 use itertools::Itertools;
 use nom::AsBytes;
 use starlane::space::loc::ToBaseKind;
-use starlane::space::util::ValueMatcher;
+use starlane::space::util::{IdSelector, MatchSelector, OptSelector, RegexMatcher, ValueMatcher};
 use starlane::space::wave::exchange::asynch::{
     DirectedHandler, Router,
 };
@@ -12,12 +13,31 @@ use std::future::Future;
 use std::hash::Hash;
 use std::io::Read;
 use std::ops::{Deref, DerefMut};
+use std::path::absolute;
 use std::str::FromStr;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use starlane::space::kind::Kind;
+use starlane::space::particle::Status;
+use starlane::space::selector::KindSelector;
 use crate::err::ThisErr;
+use crate::executor::cli::HostEnv;
 use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::dialect::filestore::FileStore;
-use crate::host::Host;
+use crate::host::{ExeStub, Host, HostCli};
+
+pub type FileStoreService = Service<FileStore>;
+
+
+pub struct ServiceCall<I,O> {
+    pub input: I,
+    pub output: oneshot::Sender<Result<O, ThisErr>>,
+}
+
+#[derive(Clone)]
+pub struct ServiceStub<I,O> {
+    tx: tokio::sync::mpsc::Sender<ServiceCall<I,O>>,
+    status: tokio::sync::watch::Receiver<Status>,
+}
 
 pub struct Service<R> {
     pub template: ServiceTemplate,
@@ -62,10 +82,11 @@ impl ServiceRunner {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone,Eq,PartialEq,Debug)]
 pub enum ServiceKind {
     FileStore
 }
+
 
 impl TryInto<Service<FileStore>> for Service<ServiceRunner>{
     type Error = ThisErr;
@@ -76,15 +97,30 @@ impl TryInto<Service<FileStore>> for Service<ServiceRunner>{
             template: self.template,
             runner: filestore,
         })
-
     }
+}
+
+pub struct ServiceSelector {
+    pub name: IdSelector<String>,
+    pub kind: ServiceKind,
+    pub driver: Option<Kind>
 }
 
 #[derive(Clone)]
 pub struct ServiceTemplate {
     pub name: String,
     pub kind: ServiceKind,
+    // matches drivers that are allowed to use this Service
+    pub driver: OptSelector<KindSelector>,
     pub config: ServiceConf
+}
+
+impl PartialEq<ServiceTemplate> for ServiceSelector{
+    fn eq(&self, other: &ServiceTemplate) -> bool {
+        self.name == other.name &&
+            self.kind == other.kind &&
+            other.driver == self.driver
+    }
 }
 
 
@@ -168,6 +204,31 @@ pub trait ServiceCore<C>
 
  */
 
+pub fn service_conf() -> ServiceConf{
+
+    let mut builder = HostEnv::builder();
+    builder.pwd(
+        absolute(env::current_dir().unwrap())
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string(),
+    );
+    println!("{}", env::current_dir().unwrap().to_str().unwrap());
+    builder.env(
+        "FILE_STORE_ROOT",
+        format!("{}/tmp", env::current_dir().unwrap().to_str().unwrap()),
+    );
+    let env = builder.build();
+    let path = "../target/debug/starlane-cli-filestore-service".to_string();
+    let args: Option<Vec<String>> = Option::None;
+
+    let stub = ExeStub::new(path.into(), env);
+
+    ServiceConf::Host(Host::Cli(HostCli::Os(stub)))
+
+}
+
 #[cfg(test)]
 pub mod tests {
     use crate::host::{ExeInfo, ExeStub, Host};
@@ -179,33 +240,13 @@ pub mod tests {
     use std::path::{absolute, PathBuf};
     use std::{env, io};
     use tokio::fs;
+    use starlane::space::kind::{BaseKind, Kind};
+    use starlane::space::selector::KindSelector;
+    use starlane::space::util::OptSelector;
     use crate::err::ThisErr;
     use crate::hyperspace::star::StarTemplate;
-    use crate::service::{Service, ServiceConf, ServiceKind, ServiceTemplate};
-    fn service_conf() -> ServiceConf{
+    use crate::service::{service_conf, Service, ServiceConf, ServiceKind, ServiceTemplate};
 
-        let mut builder = HostEnv::builder();
-        builder.pwd(
-            absolute(env::current_dir().unwrap())
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_string(),
-        );
-        println!("{}", env::current_dir().unwrap().to_str().unwrap());
-        builder.env(
-            "FILE_STORE_ROOT",
-            format!("{}/tmp", env::current_dir().unwrap().to_str().unwrap()),
-        );
-        let env = builder.build();
-        let path = "../target/debug/starlane-cli-filestore-service".to_string();
-        let args: Option<Vec<String>> = Option::None;
-
-        let stub = ExeStub::new(path.into(), env);
-
-        ServiceConf::Host(Host::Cli(HostCli::Os(stub)))
-
-    }
     fn filestore() -> FileStore {
         if std::fs::exists("./tmp").unwrap() {
             std::fs::remove_dir_all("./tmp").unwrap();
@@ -242,6 +283,7 @@ pub mod tests {
        let template = ServiceTemplate {
            name: "some-filestore".to_string(),
            kind: ServiceKind::FileStore,
+           driver: OptSelector::Selector(KindSelector::from_base(BaseKind::Repo)),
            config
        };
 
