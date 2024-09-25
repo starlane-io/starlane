@@ -228,3 +228,11 @@ impl ToString for FileStoreCli {
         self.command.to_string()
     }
 }
+
+impl TryFrom<CliOsExecutor> for FileStore {
+    type Error = ThisErr;
+
+    fn try_from(cli: CliOsExecutor) -> Result<Self, Self::Error> {
+        Ok(FileStore::Cli(Box::new(cli)))
+    }
+}

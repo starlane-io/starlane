@@ -1,7 +1,6 @@
 use crate::err::ThisErr;
-use crate::executor::cli::os::{CliOsExecutor, OsExeInfo};
-use crate::executor::cli::HostEnv;
-use crate::executor::dialect::HostDialect;
+use crate::executor::cli::os::CliOsExecutor;
+use crate::executor::cli::{CliIn, CliOut, HostEnv};
 use crate::executor::Executor;
 use crate::hyperspace::err::HyperErr;
 use clap::CommandFactory;
@@ -13,22 +12,12 @@ use std::hash::{Hash, Hasher};
 use std::io::Read;
 //use virtual_fs::FileSystem;
 use std::ops::{Deref, DerefMut};
-use std::path::PathBuf;
 use tokio::io::AsyncWriteExt;
-use starlane::space::particle::{PointKind, Stub};
-
 pub mod err;
 pub mod ext;
 
 
 
-pub enum Host {
-    Cli(CliHost)
-}
-
-pub enum CliHost {
-    Os
-}
 
 
 //pub mod wasm;
@@ -93,12 +82,12 @@ pub fn stringify_args(args: Vec<&str>) -> Vec<String> {
 pub struct ExeInfo
 {
     pub stub: ExeStub,
-    pub dialect: HostDialect
+    pub dialect: Host
 }
 
 impl ExeInfo
 {
-    pub fn new(dialect: HostDialect, stub: ExeStub) -> Self {
+    pub fn new(dialect: Host, stub: ExeStub) -> Self {
         Self {  dialect, stub }
     }
 
@@ -106,47 +95,44 @@ impl ExeInfo
 }
 
 impl ExeInfo{
-    pub fn create<D>( &self ) -> Result<Box<D>,ThisErr> where D: From<Box<CliOsExecutor>> {
-        self.dialect.create_cli( &self.stub )
+    pub fn create<D>( &self ) -> Result<D,ThisErr> where D: TryFrom<CliOsExecutor,Error=ThisErr>{
+        match &self.dialect {
+            Host::Cli(cli) => {
+                cli.create_cli( )
+            }
+            _=>  {
+                Err("Host does not support CLI (Command Line Interface)".into())
+            }
+        }
     }
 }
 
-impl StrStub {
-
+#[derive(Clone, Hash, Eq, PartialEq)]
+pub enum Host {
+    Cli(HostCli)
 }
 
-
-
-
-
-impl<L, E, A> ExeInfo<L, E, A>
-where
-    L: Clone + Hash + Eq + PartialEq + Into<PathBuf>,
-    E: Clone + Hash + Eq + PartialEq + Into<HostEnv>,
-    A: Clone + Hash + Eq + PartialEq,
-{
-
-
-
-}
-
-impl<L, E, A> From<&ExeStub<L, E, A>> for ExeStub<PathBuf, HostEnv, ()>
-where
-    L: Clone + Hash + Eq + PartialEq + Into<PathBuf>,
-    E: Clone + Hash + Eq + PartialEq + Into<HostEnv>,
-    A: Clone + Hash + Eq + PartialEq,
-{
-    fn from(stub: &ExeStub<L, E, A>) -> Self {
-        let path = stub.loc.clone().into();
-        let env = stub.env.clone().into();
-
-        ExeStub::new_with_args(path, env, ())
+impl Host {
+    pub fn create_cli<D>( &self) -> Result<D,ThisErr> where D: TryFrom<CliOsExecutor,Error=ThisErr>{
+        match self {
+            Host::Cli(host) => {
+                host.create_cli()
+            }
+        }
     }
 }
 
+#[derive(Clone, Hash, Eq, PartialEq)]
+pub enum HostCli {
+   Os(ExeStub)
+}
 
-
-
-
-
-
+impl HostCli {
+    pub fn create_cli<D>( &self) -> Result<D,ThisErr> where D: TryFrom<CliOsExecutor,Error=ThisErr>{
+        match self {
+            HostCli::Os(stub) => {
+                D::try_from(CliOsExecutor::new(stub.clone()))
+            }
+        }
+    }
+}

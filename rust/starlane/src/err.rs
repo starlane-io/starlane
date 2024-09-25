@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use thiserror::Error;
 use tokio::io;
 use crate::hyperspace::err::ErrKind;
@@ -12,7 +13,9 @@ pub enum ThisErr {
      #[error("{0}")]
     String(String),
     #[error("{0}")]
-    TokioIo(#[from] io::Error)
+    TokioIo(#[from] io::Error),
+    #[error("{0}")]
+    Iniff(#[from] Infallible)
 }
 
 impl StarErr {
