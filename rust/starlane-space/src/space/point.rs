@@ -3,7 +3,7 @@ use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 use starlane_parse::{new_span, Trace};
 use std::path::PathBuf;
-
+use md5::{Digest, Md5};
 use crate::space::err::{ParseErrs, SpaceErr};
 use crate::space::loc::{
     PointSegQuery, PointSegment, RouteSegQuery, Surface, ToPoint, ToSurface, Variable, Version,
@@ -925,6 +925,8 @@ where
     pub fn is_root(&self) -> bool {
         self.segments.is_empty()
     }
+
+
 }
 
 impl Point {
@@ -1314,6 +1316,13 @@ impl Point {
                 self.to_string()
             ),
         })
+    }
+
+    pub fn md5(&self) -> String {
+        let mut hasher = Md5::new();
+        hasher.update(self.to_string());
+        let result = hasher.finalize();
+        format!("{:x}", result)
     }
 }
 

@@ -55,7 +55,11 @@ impl<P> HyperDriverFactory<P> for ControlDriverFactory<P>
 where
     P: Platform,
 {
-    fn kind(&self) -> KindSelector {
+    fn kind(&self) -> Kind {
+        Kind::Control
+    }
+
+    fn selector(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Control)
     }
 
@@ -114,7 +118,11 @@ impl<P> HyperDriverFactory<P> for ControlFactory<P>
 where
     P: Platform,
 {
-    fn kind(&self) -> KindSelector {
+    fn kind(&self) -> Kind {
+        Kind::Control
+    }
+
+    fn selector(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Control)
     }
 

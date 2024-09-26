@@ -140,7 +140,8 @@ pub struct StarDriverFactory<P>
 where
     P: Platform + 'static,
 {
-    pub kind: KindSelector,
+    pub kind: Kind,
+    pub selector: KindSelector,
     pub phantom: PhantomData<P>,
 }
 
@@ -148,14 +149,16 @@ impl<P> StarDriverFactory<P>
 where
     P: Platform + 'static,
 {
-    pub fn new(sub: StarSub) -> Self {
-        let kind = KindSelector {
+    pub fn new(kind: StarSub) -> Self {
+        let selector = KindSelector {
             base: Pattern::Exact(BaseKind::Star),
-            sub: SubKindSelector::Exact(Some(sub.to_camel_case())),
+            sub: SubKindSelector::Exact(Some(kind.to_camel_case())),
             specific: ValuePattern::Always,
         };
+        let kind = Kind::Star(kind);
         Self {
             kind,
+            selector,
             phantom: Default::default(),
         }
     }
@@ -166,8 +169,12 @@ impl<P> HyperDriverFactory<P> for StarDriverFactory<P>
 where
     P: Platform + 'static,
 {
-    fn kind(&self) -> KindSelector {
+    fn kind(&self) -> Kind {
         self.kind.clone()
+    }
+
+    fn selector(&self) -> KindSelector {
+        self.selector.clone()
     }
 
     fn avail(&self) -> DriverAvail {

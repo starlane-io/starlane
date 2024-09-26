@@ -48,7 +48,11 @@ impl<P> HyperDriverFactory<P> for RootDriverFactory
 where
     P: Platform,
 {
-    fn kind(&self) -> KindSelector {
+    fn kind(&self) -> Kind {
+        Kind::Root
+    }
+
+    fn selector(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Root)
     }
 

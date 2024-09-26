@@ -7,8 +7,8 @@ use std::ops::{Deref, DerefMut};
 use tokio::io::AsyncWriteExt;
 use crate::err::ThisErr;
 use crate::executor::cli::{CliIn, CliOut, HostEnv};
-use crate::executor::Executor;
-use crate::host::{ExeInfo, ExeStub, Proc };
+use crate::executor::{ExeConf, Executor};
+use crate::host::{ ExeStub, Host, HostCli, Proc};
 
 #[derive(Clone)]
 pub struct CliOsExecutor
@@ -22,6 +22,8 @@ impl CliOsExecutor {
         Self { stub }
     }
 }
+
+
 #[async_trait]
 impl Executor for CliOsExecutor {
     type In = CliIn;
@@ -72,6 +74,10 @@ impl Executor for CliOsExecutor {
 
 
         Ok(CliOut::Os(process))
+    }
+
+    fn conf(&self) -> ExeConf {
+        ExeConf::Host(Host::Cli(HostCli::Os(self.stub.clone())))
     }
 }
 

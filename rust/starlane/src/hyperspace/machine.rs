@@ -11,7 +11,7 @@ use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use starlane::space::artifact::asynch::{ArtifactApi, ArtifactFetcher};
 use starlane::space::err::SpaceErr;
 use starlane::space::hyper::{InterchangeKind, Knock};
-use starlane::space::kind::StarSub;
+use starlane::space::kind::{BaseKind, StarSub};
 use starlane::space::loc::{Layer, MachineName, StarHandle, StarKey, Surface, ToPoint, ToSurface};
 use starlane::space::log::{PointLogger, RootLogger};
 use starlane::space::particle::{Status, Stub};
@@ -632,9 +632,9 @@ impl Default for MachineTemplate {
 
         let config = service_conf();
         let filestore = ServiceTemplate {
-            name: "".to_string(),
+            name: "repo-filestore".to_string(),
             kind: ServiceKind::FileStore,
-            driver: OptSelector::Selector(KindSelector::from_str("Repo").unwrap()),
+            driver: OptSelector::Selector(KindSelector::from_base(BaseKind::Repo)),
             config,
         };
         let services = Templates::new( vec![filestore]);

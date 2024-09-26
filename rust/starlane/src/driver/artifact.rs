@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use crate::driver::{Driver, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, HyperSkel, Item, ItemHandler, ItemSkel, ItemSphere};
 use crate::hyperspace::err::HyperErr;
 use crate::hyperspace::star::HyperStarSkel;
@@ -19,7 +20,7 @@ use starlane::space::particle::PointKind;
 use starlane::space::point::Point;
 use starlane::space::selector::KindSelector;
 use starlane::space::substance::Substance;
-use starlane::space::util::log;
+use starlane::space::util::{log, IdSelector};
 use starlane::space::wave::exchange::asynch::InCtx;
 use starlane::space::wave::{DirectedProto, Pong, Wave};
 use std::str::FromStr;
@@ -27,7 +28,7 @@ use std::sync::Arc;
 use tempdir::TempDir;
 use tracing::Instrument;
 use crate::platform::Platform;
-use crate::service::FileStoreService;
+use crate::service::{FileStoreService, Service, ServiceKind, ServiceRunner, ServiceSelector};
 
 static REPO_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new( ||{ ArtRef::new(
         Arc::new(repo_bind()),
@@ -106,17 +107,26 @@ impl RepoDriverFactory {
 #[async_trait]
 impl<P> HyperDriverFactory<P> for RepoDriverFactory where P: Platform
 {
-    fn kind(&self) -> KindSelector {
+    fn kind(&self) -> Kind {
+        Kind::Repo
+    }
+
+    fn selector(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Repo)
     }
 
     async fn create(
         &self,
-        skel: HyperStarSkel<P>,
-        driver_skel: DriverSkel<P>,
-        ctx: DriverCtx,
+        _: HyperStarSkel<P>,
+        skel: DriverSkel<P>,
+        _: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
-        Ok(Box::new(RepoDriver::new(driver_skel)))
+
+        let service  = skel.logger.result(skel.logger.result(skel.select_service(ServiceKind::FileStore).await)?.ok_or(format!("could not select service '{}' ",ServiceKind::FileStore.to_string())))?;
+
+        let filestore = service.filestore()?;
+
+        Ok(Box::new(RepoDriver::new(skel, filestore)))
     }
 }
 
@@ -125,14 +135,15 @@ where
     P: Platform,
 {
     skel: DriverSkel<P>,
+    filestore: FileStoreService
 }
 
 impl<P> RepoDriver<P>
 where
     P: Platform
 {
-    pub fn new(skel: DriverSkel<P> ) -> Self {
-        Self { skel}
+    pub fn new(skel: DriverSkel<P>, filestore: FileStoreService ) -> Self {
+        Self { skel, filestore}
     }
 }
 
@@ -155,19 +166,21 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
-        Ok(ItemSphere::Handler(Repo::restore((),(), self. )))
+        let filestore = self.filestore.sub_root(point.md5().into()).await?;
+        Ok(ItemSphere::Handler(Box::new(Repo::restore((),(), filestore ))))
     }
 }
 
 
-impl <P> Item<P> for Repo where P: Platform{
+impl <P> Item<P> for Repo<P> where P: Platform{
     type Skel = ();
     type Ctx = ();
-    type State = Arc<FileStoreService>;
+    type State = FileStoreService;
 
     fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self {
         Self {
-          filestore: state
+          filestore: state,
+            phantom: Default::default(),
         }
     }
 }
@@ -189,15 +202,16 @@ fn store() -> Result<ValueRepo<String>, UniErr> {
 }
  */
 
-pub struct Repo {
-    filestore: Arc<FileStoreService>
+pub struct Repo<P> {
+    filestore: FileStoreService,
+    phantom: PhantomData<P>
 }
 
 #[handler]
-impl Repo {}
+impl <P> Repo<P> where P: Platform {}
 
 #[async_trait]
-impl<P> ItemHandler<P> for Repo
+impl<P> ItemHandler<P> for Repo<P>
 where
     P: Platform,
 {

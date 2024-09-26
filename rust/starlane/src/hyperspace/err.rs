@@ -42,6 +42,7 @@ pub trait HyperErr:
     + From<SpaceErr>
     + Into<SpaceErr>
     + From<()>
+    + From<ThisErr>
 {
     fn to_space_err(&self) -> SpaceErr;
 
@@ -138,7 +139,7 @@ use std::string::FromUtf8Error;
 use tokio::sync::oneshot;
 use tokio::time::error::Elapsed;
 use wasmer::{CompileError, ExportError, InstantiationError, RuntimeError};
-use crate::err::StarErr;
+use crate::err::{StarErr, ThisErr};
 
 #[derive(Debug, Clone)]
 pub struct Error {
@@ -190,6 +191,12 @@ impl From<FromAsciiError<std::string::String>> for Error {
             kind: ErrKind::Default,
             message: e.to_string(),
         }
+    }
+}
+
+impl From<ThisErr> for Error {
+    fn from(value: ThisErr) -> Self {
+        Error::new(value.to_string())
     }
 }
 

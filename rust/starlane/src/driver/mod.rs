@@ -39,7 +39,7 @@ use starlane::space::particle::traversal::{
 use starlane::space::particle::{Details, Status, Stub};
 use starlane::space::point::Point;
 use starlane::space::selector::KindSelector;
-use starlane::space::util::log;
+use starlane::space::util::{log, IdSelector};
 use starlane::space::wave::core::cmd::CmdMethod;
 use starlane::space::wave::core::{CoreBounce, Method, ReflectedCore};
 use starlane::space::wave::exchange::asynch::{
@@ -55,6 +55,8 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
+use crate::err::ThisErr;
+use crate::service::{Service, ServiceConf, ServiceKind, ServiceRunner, ServiceSelector, ServiceTemplate};
 
 static DEFAULT_BIND: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
     ArtRef::new(
@@ -105,13 +107,13 @@ where
         let mut external_kinds = vec![];
         let driver_driver_factory = Arc::new(DriverDriverFactory::new());
         let star_factory = Arc::new(StarDriverFactory::new(kind.clone()));
-        kinds.push(<DriverDriverFactory as HyperDriverFactory<P>>::kind(
+        kinds.push(<DriverDriverFactory as HyperDriverFactory<P>>::selector(
             &driver_driver_factory,
         ));
         if <DriverDriverFactory as HyperDriverFactory<P>>::avail(&driver_driver_factory)
             == DriverAvail::External
         {
-            external_kinds.push(<DriverDriverFactory as HyperDriverFactory<P>>::kind(
+            external_kinds.push(<DriverDriverFactory as HyperDriverFactory<P>>::selector(
                 &driver_driver_factory,
             ));
         }
@@ -130,17 +132,17 @@ where
     }
 
     pub fn add_post(&mut self, factory: Arc<dyn HyperDriverFactory<P>>) {
-        self.kinds.push(factory.kind());
+        self.kinds.push(factory.selector());
         if factory.avail() == DriverAvail::External {
-            self.external_kinds.push(factory.kind());
+            self.external_kinds.push(factory.selector());
         }
         self.factories.push(factory);
     }
 
     pub fn add_pre(&mut self, factory: Arc<dyn HyperDriverFactory<P>>) {
-        self.kinds.insert(0, factory.kind());
+        self.kinds.insert(0, factory.selector());
         if factory.avail() == DriverAvail::External {
-            self.external_kinds.insert(0, factory.kind());
+            self.external_kinds.insert(0, factory.selector());
         }
         self.factories.insert(0, factory);
     }
@@ -517,7 +519,7 @@ where
             self.statuses_rx
                 .insert(KindSelector::from_base(BaseKind::Driver), status_rx.clone());
 
-            self.create(factory.kind(), factory.clone(), status_tx)
+            self.create(factory.kind(), factory.selector(), factory.clone(), status_tx)
                 .await;
 
             let (rtn, mut rtn_rx) = oneshot::channel();
@@ -545,8 +547,8 @@ where
         }
 
         for factory in self.factories.clone() {
-            let status_tx = statuses_tx.remove(&factory.kind()).unwrap();
-            self.create(factory.kind(), factory, status_tx).await;
+            let status_tx = statuses_tx.remove(&factory.selector()).unwrap();
+            self.create(factory.kind(), factory.selector(), factory, status_tx).await;
         }
 
         self.status_listen(None).await;
@@ -633,7 +635,8 @@ where
 
     async fn create(
         &self,
-        kind: KindSelector,
+        kind: Kind,
+        selector: KindSelector,
         factory: Arc<dyn HyperDriverFactory<P>>,
         status_tx: watch::Sender<DriverStatus>,
     ) {
@@ -666,14 +669,14 @@ where
                 Ok(())
             }
             let point = drivers_point
-                .push(kind.as_point_segments().unwrap())
+                .push(selector.as_point_segments().unwrap())
                 .unwrap();
             let logger = self.skel.logger.point(point.clone());
             let status_rx = status_tx.subscribe();
 
             {
                 let logger = logger.point(point.clone());
-                let kind = kind.clone();
+                let kind = selector.clone();
                 let mut status_rx = status_rx.clone();
                 tokio::spawn(async move {
                     loop {
@@ -745,8 +748,9 @@ where
             let (request_tx, mut request_rx) = mpsc::channel(1024);
             let driver_skel = DriverSkel::new(
                 skel,
-                kind.clone(),
+                kind,
                 point.clone(),
+                selector.clone(),
                 transmitter.clone(),
                 logger.clone(),
                 status_tx,
@@ -793,7 +797,7 @@ where
                             let driver = DriverApi::new(
                                 runner.clone(),
                                 driver_skel.point.clone(),
-                                factory.kind(),
+                                factory.selector(),
                             );
                             let (rtn, rtn_rx) = oneshot::channel();
                             call_tx
@@ -1432,19 +1436,29 @@ where
     P: Platform,
 {
     skel: HyperStarSkel<P>,
-    pub kind: KindSelector,
+    pub selector: KindSelector,
+    pub kind: Kind,
     pub point: Point,
     pub logger: PointLogger,
     pub status_rx: watch::Receiver<DriverStatus>,
     pub status_tx: mpsc::Sender<DriverStatus>,
     pub request_tx: mpsc::Sender<DriverRunnerRequest<P>>,
-    pub phantom: PhantomData<P>,
 }
 
 impl<P> DriverSkel<P>
 where
     P: Platform,
 {
+    pub async fn select_service(&self, kind: ServiceKind) -> Result<Option<Service<ServiceRunner>>,P::Err> {
+        let selector = ServiceSelector {
+            name: IdSelector::Always,
+            kind,
+            driver: Some(self.kind.clone()),
+        };
+        let service = self.skel.machine.api.select_service(selector).await?.map(|template|template.into());
+        Ok(service)
+    }
+
     pub fn data_dir(&self) -> String {
         self.skel.data_dir()
     }
@@ -1467,8 +1481,9 @@ where
 
     pub fn new(
         skel: HyperStarSkel<P>,
-        kind: KindSelector,
+        kind: Kind,
         point: Point,
+        selector: KindSelector,
         transmitter: ProtoTransmitter,
         logger: PointLogger,
         status_tx: watch::Sender<DriverStatus>,
@@ -1492,11 +1507,11 @@ where
         Self {
             skel,
             kind,
+            selector,
             point,
             logger,
             status_tx: mpsc_status_tx,
             status_rx: watch_status_rx,
-            phantom: Default::default(),
             request_tx,
         }
     }
@@ -1568,8 +1583,12 @@ impl<P> HyperDriverFactory<P> for DriverFactoryWrapper<P>
 where
     P: Platform,
 {
-    fn kind(&self) -> KindSelector {
+    fn kind(&self) -> Kind {
         self.factory.kind()
+    }
+
+    fn selector(&self) -> KindSelector {
+        self.factory.selector()
     }
 
     async fn create(
@@ -1587,7 +1606,8 @@ pub trait DriverFactory<P>: Send + Sync
 where
     P: Platform,
 {
-    fn kind(&self) -> KindSelector;
+    fn kind(&self) -> Kind;
+    fn selector(&self) -> KindSelector;
 
     fn avail(&self) -> DriverAvail {
         DriverAvail::External
@@ -1609,7 +1629,8 @@ pub trait HyperDriverFactory<P>: Send + Sync
 where
     P: Platform,
 {
-    fn kind(&self) -> KindSelector;
+    fn kind(&self) -> Kind;
+    fn selector(&self) -> KindSelector;
 
     fn avail(&self) -> DriverAvail {
         DriverAvail::External
@@ -1868,7 +1889,11 @@ impl<P> HyperDriverFactory<P> for DriverDriverFactory
 where
     P: Platform,
 {
-    fn kind(&self) -> KindSelector {
+    fn kind(&self) -> Kind {
+        Kind::Driver
+    }
+
+    fn selector(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Driver)
     }
 

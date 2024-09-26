@@ -43,7 +43,11 @@ impl<P> HyperDriverFactory<P> for SpaceDriverFactory
 where
     P: Platform,
 {
-    fn kind(&self) -> KindSelector {
+    fn kind(&self) -> Kind {
+        Kind::Space
+    }
+
+    fn selector(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Space)
     }
 

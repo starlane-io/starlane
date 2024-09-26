@@ -1,19 +1,19 @@
 use crate::err::ThisErr;
-use crate::executor::{Executor, };
+use crate::executor::cli::os::CliOsExecutor;
+use crate::executor::cli::{CliExecutor, CliIn, CliOut};
+use crate::executor::Executor;
+use clap::{Parser, Subcommand};
 use itertools::Itertools;
+use path_clean::PathClean;
+use starlane::space::loc::ToPoint;
+use starlane::space::path::Path;
+use starlane::space::point::Point;
 use starlane::space::substance::Bin;
 use std::io::BufRead;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use clap::{Parser, Subcommand};
-use path_clean::PathClean;
 use strum_macros::EnumString;
-use starlane::space::loc::ToPoint;
-use starlane::space::path::Path;
-use starlane::space::point::Point;
-use crate::executor::cli::{CliExecutor, CliIn, CliOut};
-use crate::executor::cli::os::CliOsExecutor;
 /*
 impl <E> From<Box<E>> for FileStore
 where E: Executor<In=CliIn,Out=CliOut> {
@@ -23,41 +23,34 @@ where E: Executor<In=CliIn,Out=CliOut> {
 }
  */
 
+pub const FILE_STORE_ROOT: &'static str = "FILE_STORE_ROOT";
 
-#[derive(Parser)]
+#[derive(Clone)]
 pub struct FileStoreApi {
     path: PathBuf,
-    filestore: Arc<FileStore>
+    filestore: Arc<FileStore>,
 }
 
-
 impl FileStoreApi {
-
-    pub fn new( path: PathBuf, filestore: Arc<FileStore> ) -> Self {
-        Self {
-            path,
-            filestore,
-        }
+    pub fn new(path: PathBuf, filestore: Arc<FileStore>) -> Self {
+        Self { path, filestore }
     }
 
-    pub fn sub( &self, sub_root: PathBuf ) -> Result<FileStoreApi,ThisErr> {
+    pub fn sub_root(&self, sub_root: PathBuf) -> Result<FileStoreApi, ThisErr> {
         let root = RootDir::new(self.path.clone());
         let path = root.norm(&sub_root)?;
 
         Ok(FileStoreApi {
             path,
-            filestore: self.filestore.clone()
+            filestore: self.filestore.clone(),
         })
-
     }
 
-    pub async fn init(&self) -> Result<(),ThisErr> {
-
+    pub async fn init(&self) -> Result<(), ThisErr> {
+        self.filestore.execute(FileStoreIn::Init).await?;
+        Ok(())
     }
 }
-
-
-
 
 impl From<Box<CliOsExecutor>> for FileStore {
     fn from(value: Box<CliOsExecutor>) -> Self {
@@ -66,47 +59,53 @@ impl From<Box<CliOsExecutor>> for FileStore {
 }
 
 pub enum FileStore {
-    Cli(Box<dyn Executor<In=CliIn,Out=CliOut>>)
+    Cli(Box<dyn Executor<In = CliIn, Out = CliOut>+Send+Sync>),
 }
 
 impl FileStore {
+    pub async fn sub_root(&self, sub_root: PathBuf) -> Result<FileStore, ThisErr> {
+        match self {
+            FileStore::Cli(cli) => {
+                let conf = cli.conf();
+                let value = conf.env(FILE_STORE_ROOT).ok_or(ThisErr::String(format!("expected environment variable '{}' to be set", FILE_STORE_ROOT).to_string()))?;
+                let path = PathBuf::from(value);
+                let root = RootDir::new(path);
+                let root = root.norm(&sub_root)?;
 
-    pub async fn execute(& self, mut input: FileStoreIn) -> Result<FileStoreOut,ThisErr> {
+                let conf = cli.conf().with_env(FILE_STORE_ROOT, &root.to_str().unwrap());
+                Ok(conf.create()?)
+            }
+        }
+    }
+
+    pub async fn execute(&self, mut input: FileStoreIn) -> Result<FileStoreOut, ThisErr> {
         match self {
             FileStore::Cli(executor) => {
-                let kind : FileStoreInKind = (&input).into();
+                let kind: FileStoreInKind = (&input).into();
                 let mut input = input.into();
                 let mut out = executor.execute(input).await?;
                 let rtn = match kind {
                     FileStoreInKind::Init => FileStoreOut::Init,
-                    FileStoreInKind::Write { .. } => {
-                        FileStoreOut::Write
-                    },
+                    FileStoreInKind::Write { .. } => FileStoreOut::Write,
                     FileStoreInKind::Read { .. } => {
                         out.close_stdin()?;
                         let stdout = out.stdout().await?;
                         FileStoreOut::Read(stdout)
                     }
-                    FileStoreInKind::Mkdir { .. } => {
-                        FileStoreOut::Mkdir
-                    }
-                    FileStoreInKind::Remove { .. } => {
-                        FileStoreOut::Remove
-                    }
+                    FileStoreInKind::Mkdir { .. } => FileStoreOut::Mkdir,
+                    FileStoreInKind::Remove { .. } => FileStoreOut::Remove,
                     FileStoreInKind::List { .. } => {
                         out.close_stdin()?;
                         let stdout = out.stdout().await?;
                         let paths = stdout
                             .lines()
                             .into_iter()
-                            .map(|line| {line.unwrap().into() })
+                            .map(|line| line.unwrap().into())
                             .collect::<Vec<PathBuf>>();
 
                         FileStoreOut::List(paths)
                     }
-                    FileStoreInKind::Exists { .. } => {
-                        FileStoreOut::Exists(true)
-                    }
+                    FileStoreInKind::Exists { .. } => FileStoreOut::Exists(true),
                     FileStoreInKind::Pwd => {
                         let stdout = out.stdout().await?;
                         let line: PathBuf = stdout
@@ -124,11 +123,7 @@ impl FileStore {
         }
     }
 
-    pub fn push( &self, path: PathBuf ) -> Result<FileStore,ThisErr> {
-
-    }
 }
-
 
 pub type FileStoreIn = FileStoreInDef<PathBuf, Bin>;
 pub type FileStoreInKind = FileStoreInDef<(), ()>;
@@ -137,26 +132,17 @@ impl Into<FileStoreInKind> for &FileStoreIn {
     fn into(self) -> FileStoreInKind {
         match self {
             FileStoreIn::Init => FileStoreInKind::Init,
-            FileStoreIn::Write { .. } => FileStoreInKind::Write{ path:(),state: ()},
-            FileStoreIn::Read { .. } => FileStoreInKind::Read{path: ()},
-            FileStoreIn::Mkdir { .. } => FileStoreInKind::Mkdir{path: ()},
-            FileStoreIn::Remove { .. } => FileStoreInKind::Remove{path: ()},
-            FileStoreIn::List { .. } => FileStoreInKind::List{path: ()},
-            FileStoreIn::Exists { .. } => FileStoreInKind::Exists{path: ()},
+            FileStoreIn::Write { .. } => FileStoreInKind::Write {
+                path: (),
+                state: (),
+            },
+            FileStoreIn::Read { .. } => FileStoreInKind::Read { path: () },
+            FileStoreIn::Mkdir { .. } => FileStoreInKind::Mkdir { path: () },
+            FileStoreIn::Remove { .. } => FileStoreInKind::Remove { path: () },
+            FileStoreIn::List { .. } => FileStoreInKind::List { path: () },
+            FileStoreIn::Exists { .. } => FileStoreInKind::Exists { path: () },
             FileStoreIn::Pwd => FileStoreInDef::Pwd,
         }
-    }
-}
-
-pub struct FileStoreInWrap {
-    pub point: Option<Point>,
-    pub input: FileStoreInDef<PathBuf, Bin>
-}
-
-impl FileStoreInWrap {
-    pub fn with_point(mut self, point: Point) -> Self{
-        self.point = Some(point);
-        self
     }
 }
 
@@ -171,35 +157,6 @@ pub enum FileStoreInDef<P, S> {
     Pwd,
 }
 
-impl FileStoreIn  {
-    pub fn with_subroot(self, root: PathBuf ) -> Result<Self,ThisErr> {
-        if !root.is_relative() {
-            Result::Err("subroot must be a relative path".to_string())?;
-        }
-        let root = RootDir::new(root);
-        let mut wrap = self.into();
-        let rtn = match &self {
-            FileStoreIn::Init => FileStoreIn::Init,
-            FileStoreIn::Write { path, state } => FileStoreIn::Write{ path: root.norm(path)?, state: state.clone()},
-            FileStoreIn::Read { path } => FileStoreIn::Read{ path: root.norm(path)? },
-            FileStoreIn::Mkdir { path } => FileStoreIn::Mkdir{ path: root.norm(path)? },
-            FileStoreIn::Remove { path } => FileStoreIn::Remove{ path: root.norm(path)? },
-            FileStoreIn::List { path } =>  FileStoreIn::List { path: root.norm(path)? },
-            FileStoreIn::Exists { path } => FileStoreIn::Exists { path: root.norm(path)? },
-            FileStoreIn::Pwd => FileStoreIn
-        }
-        Ok(rtn)
-    }
-}
-impl Into<FileStoreInWrap> for  FileStoreInDef<PathBuf, Bin>  {
-    fn into(self) -> FileStoreInWrap {
-        Self {
-          input: self,
-          subpath: None,
-        }
-    }
-}
-
 impl Into<CliIn> for FileStoreIn {
     fn into(self) -> CliIn {
         match self {
@@ -207,18 +164,14 @@ impl Into<CliIn> for FileStoreIn {
             FileStoreIn::Write { path, state } => {
                 CliIn::str_stdin(vec!["write".to_string(), to_str(&path)], state)
             }
-            FileStoreIn::Read { path } => {
-                CliIn::str_args(vec!["read".to_string(), to_str(&path)])
-            }
+            FileStoreIn::Read { path } => CliIn::str_args(vec!["read".to_string(), to_str(&path)]),
             FileStoreIn::Mkdir { path } => {
                 CliIn::str_args(vec!["mkdir".to_string(), to_str(&path)])
             }
             FileStoreIn::Remove { path } => {
                 CliIn::str_args(vec!["remove".to_string(), to_str(&path)])
             }
-            FileStoreIn::List { path } => {
-                CliIn::str_args(vec!["list".to_string(), to_str(&path)])
-            }
+            FileStoreIn::List { path } => CliIn::str_args(vec!["list".to_string(), to_str(&path)]),
             FileStoreIn::Exists { path } => {
                 CliIn::str_args(vec!["exists".to_string(), to_str(&path)])
             }
@@ -226,8 +179,6 @@ impl Into<CliIn> for FileStoreIn {
         }
     }
 }
-
-
 
 pub enum FileStoreOut {
     Init,
@@ -240,7 +191,7 @@ pub enum FileStoreOut {
     Pwd(PathBuf),
 }
 
-#[derive(Clone,Debug, Parser)]
+#[derive(Clone, Debug, Parser)]
 #[command(version, about, long_about = None)]
 pub struct FileStoreCli {
     #[command(subcommand)]
@@ -250,20 +201,18 @@ pub struct FileStoreCli {
 #[derive(Clone, Debug, Subcommand, EnumString, strum_macros::Display)]
 pub enum FileStoreCommand {
     Init,
-    Write {path: PathBuf },
-    Read {path: PathBuf},
-    Mkdir{ path: PathBuf },
+    Write { path: PathBuf },
+    Read { path: PathBuf },
+    Mkdir { path: PathBuf },
     Remove { path: PathBuf },
-    List { path: Option<PathBuf> },
-    Exists{ path: PathBuf },
+    List { path: PathBuf },
+    Exists { path: PathBuf },
     Pwd,
 }
 
 impl FileStoreCli {
     pub fn new(command: FileStoreCommand) -> Self {
-        FileStoreCli {
-            command
-        }
+        FileStoreCli { command }
     }
 }
 
@@ -284,11 +233,8 @@ impl Into<Vec<String>> for FileStoreCli {
                 vec!["remove".to_string(), to_str(path)]
             }
             FileStoreCommand::List { path } => {
-                match path {
-                    None => vec!["list".to_string()],
-                    Some(path) => vec!["list".to_string(), to_str(path)]
-                }
-            }
+                vec!["list".to_string(), to_str(path)]
+            },
             FileStoreCommand::Exists { path } => {
                 vec!["exists".to_string(), to_str(path)]
             }
@@ -299,14 +245,14 @@ impl Into<Vec<String>> for FileStoreCli {
     }
 }
 
-pub fn to_str(path: &PathBuf ) -> String {
+pub fn to_str(path: &PathBuf) -> String {
     path.to_str().unwrap().to_string()
 }
 
-pub fn stringify(vec: Vec<&'static str> ) -> Vec<String> {
+pub fn stringify(vec: Vec<&'static str>) -> Vec<String> {
     let mut rtn = vec![];
     for v in vec {
-       rtn.push(v.to_string());
+        rtn.push(v.to_string());
     }
     rtn
 }
@@ -325,38 +271,38 @@ impl TryFrom<CliOsExecutor> for FileStore {
     }
 }
 
-
 pub struct RootDir {
-    root: PathBuf
+    root: PathBuf,
 }
 
 impl RootDir {
-    pub fn new( root: PathBuf ) -> Self {
+    pub fn new(root: PathBuf) -> Self {
         let root = root.clean();
         Self { root }
     }
 }
 
 impl RootDir {
-
-    pub fn norm(&self, sub_path: &PathBuf ) -> Result<PathBuf,ThisErr> {
+    pub fn norm(&self, sub_path: &PathBuf) -> Result<PathBuf, ThisErr> {
         let sub_path = sub_path.clean();
 
         let path: PathBuf = match sub_path.starts_with("/") {
             true => sub_path.strip_prefix("/")?.into(),
-            false => sub_path.clone()
+            false => sub_path.clone(),
         };
-        let normed: PathBuf  = self.root.join(path).into().clean();
+        let normed: PathBuf = self.root.join(path).clean();
         let parent = match normed.parent() {
             None => PathBuf::from_str("/")?,
-            Some(parent) => parent.clone().into()
+            Some(parent) => parent.clone().into(),
         };
 
-        if !parent.starts_with(&self.root){
-            return Err(ThisErr::String(format!("illegal path '{}' escapes filesystem boundaries", sub_path.display())));
+        if !parent.starts_with(&self.root) {
+            return Err(ThisErr::String(format!(
+                "illegal path '{}' escapes filesystem boundaries",
+                sub_path.display()
+            )));
         }
 
         Ok(normed)
     }
 }
-

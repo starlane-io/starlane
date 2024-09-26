@@ -9,7 +9,6 @@ use std::env;
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 use tokio::io::AsyncWriteExt;
-use crate::host::Proc;
 
 pub type CliIn = CliInDef<Option<Vec<u8>>>;
 #[derive(Clone, Eq, PartialEq)]
@@ -17,6 +16,9 @@ pub struct HostEnv {
     pub pwd: String,
     pub env: HashMap<String, String>,
 }
+
+
+
 
 impl HostEnv {
     pub fn builder() -> HostEnvBuilder {

@@ -13,20 +13,32 @@ use std::future::Future;
 use std::hash::Hash;
 use std::io::Read;
 use std::ops::{Deref, DerefMut};
-use std::path::absolute;
+use std::path::{absolute, PathBuf};
 use std::str::FromStr;
+use strum_macros::EnumString;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use starlane::space::kind::Kind;
 use starlane::space::particle::Status;
 use starlane::space::point::Point;
 use starlane::space::selector::KindSelector;
+use crate::env::STARLANE_DATA_DIR;
 use crate::err::ThisErr;
 use crate::executor::cli::HostEnv;
 use crate::executor::cli::os::CliOsExecutor;
-use crate::executor::dialect::filestore::FileStore;
+use crate::executor::dialect::filestore::{FileStore, FILE_STORE_ROOT};
 use crate::host::{ExeStub, Host, HostCli};
 
 pub type FileStoreService = Service<FileStore>;
+
+impl FileStoreService {
+    pub async fn sub_root( &self, sub_root: PathBuf) -> Result<FileStoreService,ThisErr> {
+        let runner = self.runner.sub_root(sub_root).await?;
+        Ok(FileStoreService {
+            template: self.template.clone(),
+            runner
+        })
+    }
+}
 
 
 pub struct ServiceCall<I,O> {
@@ -53,6 +65,13 @@ impl Service<ServiceRunner>  {
             runner
         }
     }
+
+    pub fn filestore(  self  ) -> Result<FileStoreService,ThisErr> {
+       Ok(FileStoreService{
+           template: self.template,
+           runner: self.runner.filestore()?
+       })
+    }
 }
 
 
@@ -77,15 +96,25 @@ impl ServiceRunner {
     pub fn filestore( & self  ) -> Result<FileStore,ThisErr> {
         match self {
             ServiceRunner::Host(host) => {
-                host.create_cli()
+                host.create()
             }
         }
     }
 }
 
-#[derive(Clone,Eq,PartialEq,Debug)]
+#[derive(Hash,Clone,Eq,PartialEq,Debug,EnumString,strum_macros::Display)]
 pub enum ServiceKind {
     FileStore
+}
+
+impl Into<Service<ServiceRunner>> for ServiceTemplate {
+    fn into(self) -> Service<ServiceRunner> {
+        let runner = self.config.clone();
+        Service {
+            template: self,
+            runner
+        }
+    }
 }
 
 
@@ -230,8 +259,8 @@ pub fn service_conf() -> ServiceConf{
     );
     println!("{}", env::current_dir().unwrap().to_str().unwrap());
     builder.env(
-        "FILE_STORE_ROOT",
-        format!("{}/tmp", env::current_dir().unwrap().to_str().unwrap()),
+        FILE_STORE_ROOT,
+        STARLANE_DATA_DIR.to_string(),
     );
     let env = builder.build();
     let path = "../target/debug/starlane-cli-filestore-service".to_string();
@@ -245,12 +274,12 @@ pub fn service_conf() -> ServiceConf{
 
 #[cfg(test)]
 pub mod tests {
-    use crate::host::{ExeInfo, ExeStub, Host};
+    use crate::host::{ExeStub, Host};
 
     use crate::executor::cli::HostEnv;
     use crate::executor::dialect::filestore::{FileStore, FileStoreIn, FileStoreOut};
     use crate::host::HostCli;
-    use crate::executor::Executor;
+    use crate::executor::{ExeConf, Executor};
     use std::path::{absolute, PathBuf};
     use std::{env, io};
     use tokio::fs;
@@ -284,7 +313,7 @@ pub mod tests {
         let stub = ExeStub::new(path.into(), env);
         //        let info = ExeInfo::new(HostDialect::Cli(HostRunner::Os), stub);
 
-        let info = ExeInfo::new(Host::Cli(HostCli::Os(stub.clone())),stub);
+        let info = ExeConf::Host(Host::Cli(HostCli::Os(stub.clone())));
 
          info.create().unwrap()
 

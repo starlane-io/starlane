@@ -2,7 +2,7 @@ use std::convert::Infallible;
 use thiserror::Error;
 use tokio::io;
 use tokio::sync::oneshot::error::RecvError;
-use crate::hyperspace::err::ErrKind;
+use crate::hyperspace::err::{ErrKind, HyperErr};
 
 #[cfg(feature = "postgres")]
 use crate::registry::postgres::err::PostErr;
@@ -12,13 +12,15 @@ pub enum ThisErr {
     #[error("star error {0}")]
     StarErr(StarErr),
      #[error("{0}")]
-    String(#[from] String),
+    String(String),
     #[error("{0}")]
     TokioIo(#[from] io::Error),
     #[error("{0}")]
     Iniff(#[from] Infallible),
      #[error("{0}")]
      RecvErr(#[from] RecvError),
+    #[error("{0}")]
+    StripPrefix(#[from] std::path::StripPrefixError),
 }
 
 impl StarErr {
@@ -39,6 +41,14 @@ pub struct StarErr {
     pub kind: ErrKind,
     pub message: String,
 }
+
+impl From<ThisErr> for StarErr {
+    fn from(value: ThisErr) -> Self {
+        StarErr::new( value.to_string())
+    }
+}
+
+
 
 pub mod convert {
     use starlane_space as starlane;
