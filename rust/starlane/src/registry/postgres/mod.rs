@@ -39,6 +39,9 @@ use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
+use tokio_print::aprintln;
+use starlane::space::err::SpaceErr;
+use crate::err::ThisErr;
 
 pub trait PostgresPlatform: Platform
 where
@@ -168,8 +171,9 @@ where
         let point_segment_parent_index = "CREATE UNIQUE INDEX IF NOT EXISTS resource_point_segment_parent_index ON particles(parent,point_segment)";
         let access_grants_index =
             "CREATE INDEX IF NOT EXISTS query_root_index ON access_grants(query_root)";
-
+aprintln!("Postgres acquiring con...");
         let mut conn = self.ctx.acquire().await?;
+aprintln!("conn acquired......");
         let mut transaction = conn.begin().await?;
         transaction.execute(particles).await?;
         transaction.execute(access_grants).await?;
@@ -1484,12 +1488,22 @@ where
         &'a self,
         key: &'a PostgresDbKey,
     ) -> Result<PoolConnection<Postgres>, P::Err> {
-        Ok(self
+aprintln!(" Entered Acquire...       ..");
+aprintln!(" Key {:?}",key);
+        let pool = self
             .pools
-            .get(key)
-            .ok_or(P::Err::new("could not acquire db connection".to_string()))?
-            .acquire()
-            .await?)
+            .get(key);
+aprintln!("pool.is_some():  {}",pool.is_some() );
+
+
+            let pool = pool.unwrap();
+        //let pool = pool.ok_or(SpaceErr::str("could not acquire db connection"));
+//        aprintln!("pool.is_err():  {}",pool.is_err() );
+
+
+           let pool =  pool.acquire();
+aprintln!("Aquire without Await...");
+        Ok(pool.await?)
     }
 
     pub async fn begin<'a>(
@@ -1505,7 +1519,7 @@ where
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct PostgresDbKey {
     pub url: String,
     pub user: String,
