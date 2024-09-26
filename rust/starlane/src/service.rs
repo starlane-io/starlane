@@ -1,5 +1,5 @@
 use std::env;
-use crate::executor::Executor;
+use crate::executor::{ExeConf, Executor};
 use crate::hyperspace::err::HyperErr;
 use itertools::Itertools;
 use nom::AsBytes;
@@ -87,7 +87,7 @@ impl <R> Deref for Service<R> {
 
 #[derive(Clone)]
 pub enum ServiceRunner {
-    Host(Host)
+    Exe(ExeConf)
 }
 
 
@@ -95,8 +95,8 @@ pub enum ServiceRunner {
 impl ServiceRunner {
     pub fn filestore( & self  ) -> Result<FileStore,ThisErr> {
         match self {
-            ServiceRunner::Host(host) => {
-                host.create()
+            ServiceRunner::Exe(exe) => {
+                exe.create()
             }
         }
     }
@@ -268,7 +268,7 @@ pub fn service_conf() -> ServiceConf{
 
     let stub = ExeStub::new(path.into(), env);
 
-    ServiceConf::Host(Host::Cli(HostCli::Os(stub)))
+    ServiceConf::Exe(ExeConf::Host(Host::Cli(HostCli::Os(stub))))
 
 }
 

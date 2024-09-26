@@ -17,6 +17,7 @@ pub trait Executor
     fn conf(&self) -> ExeConf;
 }
 
+#[derive(Clone)]
 pub enum ExeConf {
     Host(Host)
 }
