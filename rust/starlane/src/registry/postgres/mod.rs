@@ -234,7 +234,7 @@ where
             "SELECT count(*) as count from particles WHERE point=$1",
         )
         .bind(params.point.clone())
-        .fetch_one(&mut trans)
+        .fetch_one(&mut *trans)
         .await?;
 
         if count.0 > 0 {
@@ -411,7 +411,7 @@ where
         )
         .bind(parent.to_string())
         .bind(point_segment.to_string())
-        .fetch_one(&mut trans)
+        .fetch_one(&mut *trans)
         .await?;
         trans.commit().await?;
 
@@ -426,7 +426,7 @@ where
             .to_string();
 
         let mut conn = self.ctx.acquire().await?;
-        let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut conn).await?;
+        let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut *conn).await?;
         let mut map = HashMap::new();
         for p in properties {
             map.insert(p.key.clone(), p.into());
@@ -451,10 +451,10 @@ where
         )
         .bind(parent.to_string())
         .bind(point_segment.clone())
-        .fetch_one(&mut conn)
+        .fetch_one(&mut *conn)
         .await?;
         let mut record: ParticleRecord = record.into();
-        let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut conn).await?;
+        let properties = sqlx::query_as::<Postgres,LocalProperty>("SELECT key,value,lock FROM properties WHERE resource_id=(SELECT id FROM particles WHERE parent=$1 AND point_segment=$2)").bind(parent.to_string()).bind(point_segment).fetch_all(& mut *conn).await?;
         let mut map = HashMap::new();
         for p in properties {
             map.insert(p.key.clone(), p.into());
@@ -510,7 +510,7 @@ where
 
             let mut conn = self.ctx.acquire().await?;
             let statement = format!("DELETE FROM particles WHERE point IN [{}]", points);
-            sqlx::query(statement.as_str()).execute(&mut conn).await?;
+            sqlx::query(statement.as_str()).execute(&mut *conn).await?;
         }
 
         Ok(list)
@@ -648,7 +648,7 @@ where
         }
 
         let mut conn = self.ctx.acquire().await?;
-        let mut matching_so_far = query.fetch_all(&mut conn).await?;
+        let mut matching_so_far = query.fetch_all(&mut *conn).await?;
 
         let mut matching_so_far: Vec<ParticleRecord> =
             matching_so_far.into_iter().map(|m| m.into()).collect();
@@ -718,7 +718,7 @@ where
                     .bind(access_grant.on_point.query_root().to_string())
                     .bind(access_grant.on_point.clone().to_string())
                     .bind(access_grant.to_point.clone().to_string())
-                    .bind(access_grant.by_particle.to_string()).execute(& mut conn).await?;
+                    .bind(access_grant.by_particle.to_string()).execute(& mut *conn).await?;
             }
             AccessGrantKind::Privilege(privilege) => {
                 sqlx::query("INSERT INTO access_grants (kind,data,query_root,on_point,to_point,by_particle) VALUES ('priv',$1,$2,$3,$4,(SELECT id FROM particles WHERE point=$5))")
@@ -726,7 +726,7 @@ where
                     .bind(access_grant.on_point.query_root().to_string())
                     .bind(access_grant.on_point.clone().to_string())
                     .bind(access_grant.to_point.clone().to_string())
-                    .bind(access_grant.by_particle.to_string()).execute(& mut conn).await?;
+                    .bind(access_grant.by_particle.to_string()).execute(& mut *conn).await?;
             }
             AccessGrantKind::PermissionsMask(mask) => {
                 sqlx::query("INSERT INTO access_grants (kind,data,query_root,on_point,to_point,by_particle) VALUES ('perm',$1,$2,$3,$4,(SELECT id FROM particles WHERE point=$5))")
@@ -734,7 +734,7 @@ where
                     .bind(access_grant.on_point.query_root().to_string())
                     .bind(access_grant.on_point.clone().to_string())
                     .bind(access_grant.to_point.clone().to_string())
-                    .bind(access_grant.by_particle.to_string() ).execute(& mut conn).await?;
+                    .bind(access_grant.by_particle.to_string() ).execute(& mut *conn).await?;
             }
         }
 
@@ -759,7 +759,7 @@ where
         )
         .bind(on.to_string())
         .bind(to.to_string())
-        .fetch_one(&mut conn)
+        .fetch_one(&mut *conn)
         .await?
         .0;
 
@@ -785,7 +785,7 @@ where
         let mut permissions = Permissions::none();
         let mut level_ands: Vec<Vec<PermissionsMask>> = vec![];
         loop {
-            let mut access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant<P>>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(traversal.to_string() ).fetch_all(& mut conn).await?;
+            let mut access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant<P>>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(traversal.to_string() ).fetch_all(& mut *conn).await?;
             let mut access_grants: Vec<AccessGrant> = access_grants
                 .into_iter()
                 .map(|a| a.into())
@@ -898,7 +898,7 @@ where
             sqlx::query("UPDATE particles SET owner=$1 WHERE point=$2")
                 .bind(owner.to_string())
                 .bind(on.to_string())
-                .execute(&mut trans)
+                .execute(&mut *trans)
                 .await?;
         }
         trans.commit().await?;
@@ -927,7 +927,7 @@ where
         let mut conn = self.ctx.acquire().await?;
         for on in selection.list {
             let on: Point = (*on).try_into()?;
-            let access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant<P>>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(on.to_string() ).fetch_all(& mut conn).await?;
+            let access_grants= sqlx::query_as::<Postgres, WrappedIndexedAccessGrant<P>>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.query_root=$1 AND particles.id=access_grants.by_particle").bind(on.to_string() ).fetch_all(& mut *conn).await?;
             let mut access_grants: Vec<IndexedAccessGrant> =
                 access_grants.into_iter().map(|a| a.into()).collect();
 
@@ -952,13 +952,13 @@ where
 
     async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), P::Err> {
         let mut conn = self.ctx.acquire().await?;
-        let access_grant: IndexedAccessGrant = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant<P>>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.id=$1 AND particles.id=access_grants.by_particle").bind(id ).fetch_one(& mut conn).await?.into();
+        let access_grant: IndexedAccessGrant = sqlx::query_as::<Postgres, WrappedIndexedAccessGrant<P>>("SELECT access_grants.*,particles.point as by_particle FROM access_grants,particles WHERE access_grants.id=$1 AND particles.id=access_grants.by_particle").bind(id ).fetch_one(& mut *conn).await?.into();
         let access = self.access(to, &access_grant.by_particle).await?;
         if access.has_full() {
             let mut trans = conn.begin().await?;
             sqlx::query("DELETE FROM access_grants WHERE id=$1")
                 .bind(id)
-                .execute(&mut trans)
+                .execute(& mut *trans)
                 .await?;
             trans.commit().await?;
             Ok(())

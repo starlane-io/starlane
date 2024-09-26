@@ -54,7 +54,6 @@ pub use server::*;
 
 
 
-pub mod dialect;
 
 use crate::cli::{Cli, Commands};
 use crate::err::StarErr;

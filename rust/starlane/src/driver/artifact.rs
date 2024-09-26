@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use crate::driver::{Driver, DriverCtx, DriverHandler, DriverSkel, HyperDriverFactory, HyperSkel, Item, ItemHandler, ItemSkel, ItemSphere};
+use crate::driver::{Driver, DriverCtx, DriverHandler, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Item, ItemHandler, ItemSkel, ItemSphere};
 use crate::hyperspace::err::HyperErr;
 use crate::hyperspace::star::HyperStarSkel;
 use acid_store::repo::Commit;
@@ -27,6 +27,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tempdir::TempDir;
 use tracing::Instrument;
+use crate::executor::dialect::filestore::FileStoreIn;
 use crate::platform::Platform;
 use crate::service::{FileStoreService, Service, ServiceKind, ServiceRunner, ServiceSelector};
 
@@ -161,6 +162,20 @@ impl<P> Driver<P> for RepoDriver<P>
 where
     P: Platform
 {
+
+
+    async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
+        skel.logger
+            .result(skel.status_tx.send(DriverStatus::Init).await)
+            .unwrap_or_default();
+
+        self.filestore.execute(FileStoreIn::Init).await?;
+
+        skel.logger
+            .result(skel.status_tx.send(DriverStatus::Ready).await)
+            .unwrap_or_default();
+        Ok(())
+    }
     fn kind(&self) -> Kind {
         Kind::Repo
     }

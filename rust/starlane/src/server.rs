@@ -146,6 +146,7 @@ impl Platform for Starlane {
     async fn global_registry(&self) -> Result<Registry<Self>, Self::Err> {
         let logger = RootLogger::default();
         let logger = logger.point(Point::global_registry());
+aprintln!("Creating Global Registry...");
         Ok(Arc::new(RegistryWrapper::new(Arc::new(
             PostgresRegistry::new(self.handle.clone(), self.clone(), logger).await?,
         ))))
