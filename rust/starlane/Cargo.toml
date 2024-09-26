@@ -109,6 +109,8 @@ anyhow = { workspace = true, optional = true }
 
 quinn ={ workspace = true, optional = true }
 webpki-roots = { workspace = true}
+path-clean = { workspace = true}
+
 [lib]
 name = "starlane"
 path= "src/lib.rs"

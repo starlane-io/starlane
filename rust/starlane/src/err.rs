@@ -12,13 +12,13 @@ pub enum ThisErr {
     #[error("star error {0}")]
     StarErr(StarErr),
      #[error("{0}")]
-    String(String),
+    String(#[from] String),
     #[error("{0}")]
     TokioIo(#[from] io::Error),
     #[error("{0}")]
     Iniff(#[from] Infallible),
      #[error("{0}")]
-     RecvErr(#[from] RecvError)
+     RecvErr(#[from] RecvError),
 }
 
 impl StarErr {

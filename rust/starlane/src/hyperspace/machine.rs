@@ -54,11 +54,11 @@ where
         Self { tx }
     }
 
-    pub async fn select_service( &self, selector: ServiceSelector ) -> Result<Option<ServiceTemplate>,ThisErr> {
+    pub async fn select_service( &self, selector: ServiceSelector ) -> Result<Option<ServiceTemplate>,P::Err> {
 
         let (rtn,rx) = tokio::sync::oneshot::channel();
         let selector = MachineCall::SelectService {selector,rtn };
-        self.tx.send(selector).await?;
+        self.tx.send(selector).await.unwrap();
         Ok(rx.await?)
     }
 

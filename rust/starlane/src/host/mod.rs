@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use crate::err::ThisErr;
 use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::cli::{CliIn, CliOut, HostEnv};
@@ -120,6 +121,10 @@ impl Host {
             }
         }
     }
+
+    pub fn sub( &mut self, key: ParamKey, param: ParamOp )-> Result<(),ThisErr> {
+
+    }
 }
 
 #[derive(Clone, Hash, Eq, PartialEq)]
@@ -135,4 +140,26 @@ impl HostCli {
             }
         }
     }
+}
+
+
+#[derive(Clone, Eq, PartialEq)]
+pub struct Params {
+    params: HashSet<ParamKey>
+}
+
+impl Params {
+     pub fn sub( &self, host: Host ) -> Host {
+
+     }
+}
+
+#[derive(Clone, Hash,Eq, PartialEq)]
+pub enum ParamKey {
+    Env(String),
+}
+
+pub enum ParamOp {
+    Replace(String),
+    Append(String)
 }

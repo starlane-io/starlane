@@ -4,8 +4,14 @@ use itertools::Itertools;
 use starlane::space::substance::Bin;
 use std::io::BufRead;
 use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::Arc;
 use clap::{Parser, Subcommand};
+use path_clean::PathClean;
 use strum_macros::EnumString;
+use starlane::space::loc::ToPoint;
+use starlane::space::path::Path;
+use starlane::space::point::Point;
 use crate::executor::cli::{CliExecutor, CliIn, CliOut};
 use crate::executor::cli::os::CliOsExecutor;
 /*
@@ -16,6 +22,43 @@ where E: Executor<In=CliIn,Out=CliOut> {
     }
 }
  */
+
+
+#[derive(Parser)]
+pub struct FileStoreApi {
+    path: PathBuf,
+    filestore: Arc<FileStore>
+}
+
+
+impl FileStoreApi {
+
+    pub fn new( path: PathBuf, filestore: Arc<FileStore> ) -> Self {
+        Self {
+            path,
+            filestore,
+        }
+    }
+
+    pub fn sub( &self, sub_root: PathBuf ) -> Result<FileStoreApi,ThisErr> {
+        let root = RootDir::new(self.path.clone());
+        let path = root.norm(&sub_root)?;
+
+        Ok(FileStoreApi {
+            path,
+            filestore: self.filestore.clone()
+        })
+
+    }
+
+    pub async fn init(&self) -> Result<(),ThisErr> {
+
+    }
+}
+
+
+
+
 impl From<Box<CliOsExecutor>> for FileStore {
     fn from(value: Box<CliOsExecutor>) -> Self {
         FileStore::Cli(value)
@@ -80,6 +123,10 @@ impl FileStore {
             }
         }
     }
+
+    pub fn push( &self, path: PathBuf ) -> Result<FileStore,ThisErr> {
+
+    }
 }
 
 
@@ -101,6 +148,18 @@ impl Into<FileStoreInKind> for &FileStoreIn {
     }
 }
 
+pub struct FileStoreInWrap {
+    pub point: Option<Point>,
+    pub input: FileStoreInDef<PathBuf, Bin>
+}
+
+impl FileStoreInWrap {
+    pub fn with_point(mut self, point: Point) -> Self{
+        self.point = Some(point);
+        self
+    }
+}
+
 pub enum FileStoreInDef<P, S> {
     Init,
     Write { path: P, state: S },
@@ -110,6 +169,35 @@ pub enum FileStoreInDef<P, S> {
     List { path: P },
     Exists { path: P },
     Pwd,
+}
+
+impl FileStoreIn  {
+    pub fn with_subroot(self, root: PathBuf ) -> Result<Self,ThisErr> {
+        if !root.is_relative() {
+            Result::Err("subroot must be a relative path".to_string())?;
+        }
+        let root = RootDir::new(root);
+        let mut wrap = self.into();
+        let rtn = match &self {
+            FileStoreIn::Init => FileStoreIn::Init,
+            FileStoreIn::Write { path, state } => FileStoreIn::Write{ path: root.norm(path)?, state: state.clone()},
+            FileStoreIn::Read { path } => FileStoreIn::Read{ path: root.norm(path)? },
+            FileStoreIn::Mkdir { path } => FileStoreIn::Mkdir{ path: root.norm(path)? },
+            FileStoreIn::Remove { path } => FileStoreIn::Remove{ path: root.norm(path)? },
+            FileStoreIn::List { path } =>  FileStoreIn::List { path: root.norm(path)? },
+            FileStoreIn::Exists { path } => FileStoreIn::Exists { path: root.norm(path)? },
+            FileStoreIn::Pwd => FileStoreIn
+        }
+        Ok(rtn)
+    }
+}
+impl Into<FileStoreInWrap> for  FileStoreInDef<PathBuf, Bin>  {
+    fn into(self) -> FileStoreInWrap {
+        Self {
+          input: self,
+          subpath: None,
+        }
+    }
 }
 
 impl Into<CliIn> for FileStoreIn {
@@ -236,3 +324,39 @@ impl TryFrom<CliOsExecutor> for FileStore {
         Ok(FileStore::Cli(Box::new(cli)))
     }
 }
+
+
+pub struct RootDir {
+    root: PathBuf
+}
+
+impl RootDir {
+    pub fn new( root: PathBuf ) -> Self {
+        let root = root.clean();
+        Self { root }
+    }
+}
+
+impl RootDir {
+
+    pub fn norm(&self, sub_path: &PathBuf ) -> Result<PathBuf,ThisErr> {
+        let sub_path = sub_path.clean();
+
+        let path: PathBuf = match sub_path.starts_with("/") {
+            true => sub_path.strip_prefix("/")?.into(),
+            false => sub_path.clone()
+        };
+        let normed: PathBuf  = self.root.join(path).into().clean();
+        let parent = match normed.parent() {
+            None => PathBuf::from_str("/")?,
+            Some(parent) => parent.clone().into()
+        };
+
+        if !parent.starts_with(&self.root){
+            return Err(ThisErr::String(format!("illegal path '{}' escapes filesystem boundaries", sub_path.display())));
+        }
+
+        Ok(normed)
+    }
+}
+

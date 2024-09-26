@@ -18,6 +18,7 @@ use std::str::FromStr;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use starlane::space::kind::Kind;
 use starlane::space::particle::Status;
+use starlane::space::point::Point;
 use starlane::space::selector::KindSelector;
 use crate::err::ThisErr;
 use crate::executor::cli::HostEnv;
@@ -104,6 +105,19 @@ pub struct ServiceSelector {
     pub name: IdSelector<String>,
     pub kind: ServiceKind,
     pub driver: Option<Kind>
+}
+
+#[derive(Clone,Eq,PartialEq,Debug,Hash)]
+pub enum ServiceScopeKind {
+    Global,
+    Point
+}
+
+
+#[derive(Clone,Eq,PartialEq,Debug,Hash)]
+pub enum ServiceScope {
+    Global,
+    Point(Point)
 }
 
 #[derive(Clone)]

@@ -25,7 +25,9 @@ use starlane::space::wave::{DirectedProto, Pong, Wave};
 use std::str::FromStr;
 use std::sync::Arc;
 use tempdir::TempDir;
+use tracing::Instrument;
 use crate::platform::Platform;
+use crate::service::FileStoreService;
 
 static REPO_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new( ||{ ArtRef::new(
         Arc::new(repo_bind()),
@@ -91,10 +93,10 @@ fn bundle_bind() -> BindConfig {
     .unwrap()
 }
 
-pub struct RepoDriverFactory<P> where P: Platform{
+pub struct RepoDriverFactory{
 }
 
-impl <P> RepoDriverFactory<P> where P: Platform {
+impl RepoDriverFactory {
     pub fn new() -> Self {
         Self {
         }
@@ -102,7 +104,7 @@ impl <P> RepoDriverFactory<P> where P: Platform {
 }
 
 #[async_trait]
-impl<P> HyperDriverFactory<P> for RepoDriverFactory<P> where P: Platform
+impl<P> HyperDriverFactory<P> for RepoDriverFactory where P: Platform
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Repo)
@@ -114,7 +116,7 @@ impl<P> HyperDriverFactory<P> for RepoDriverFactory<P> where P: Platform
         driver_skel: DriverSkel<P>,
         ctx: DriverCtx,
     ) -> Result<Box<dyn Driver<P>>, P::Err> {
-        Ok(Box::new(RepoDriver::new(skel,ctx)))
+        Ok(Box::new(RepoDriver::new(driver_skel)))
     }
 }
 
@@ -122,14 +124,14 @@ pub struct RepoDriver<P>
 where
     P: Platform,
 {
-    skel: HyperStarSkel<P>,
+    skel: DriverSkel<P>,
 }
 
 impl<P> RepoDriver<P>
 where
     P: Platform
 {
-    pub fn new(skel: HyperStarSkel<P>) -> Self {
+    pub fn new(skel: DriverSkel<P> ) -> Self {
         Self { skel}
     }
 }
@@ -153,10 +155,22 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
-        Ok(ItemSphere::Handler(Box::new(Repo)))
+        Ok(ItemSphere::Handler(Repo::restore((),(), self. )))
     }
 }
 
+
+impl <P> Item<P> for Repo where P: Platform{
+    type Skel = ();
+    type Ctx = ();
+    type State = Arc<FileStoreService>;
+
+    fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self {
+        Self {
+          filestore: state
+        }
+    }
+}
 
 
 /*
@@ -175,7 +189,9 @@ fn store() -> Result<ValueRepo<String>, UniErr> {
 }
  */
 
-pub struct Repo;
+pub struct Repo {
+    filestore: Arc<FileStoreService>
+}
 
 #[handler]
 impl Repo {}
@@ -796,3 +812,10 @@ where
 
 
  */
+
+
+#[cfg(test)]
+pub mod tests {
+    #[test]
+    pub fn test() {}
+}
