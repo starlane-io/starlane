@@ -4,6 +4,9 @@ Starlane aims to reduce the drudgery of creating infrastructure code and shift d
 ## WebAssembly And The Enterprise
 Starlane provides a common interface abstraction so WebAssembly components can interact with any resource in the enterprise without requiring special coding, protocols or libraries to do so.  The abstraction pattern was inspired (copied?) from the brilliant Unix File abstraction.  Starlane aims to allow users to compose unrealated WebAssembly components to make things happen that the developers never dreamed of in the same way that system admins compose different command line utilities on Unix.
 
+## WebAssembly what?
+If you haven't heard about WebAssembly--or Wasm for short--it's basically a new virtual machine definition that can be targed for compilation by nearly every language and--unless someone does something very stupid--Wasm executes in such a secure sandbox that it makes Java developers blush.  Wasm binaries are compact and executable an near native speeds almost everywhere!  WebAssembly will be as revolutionaery as Docker containers where ten years ago... at least that is what I'm counting on or else I've wasted my time on this project... 
+
 ## Deploy Starlane in Your Production Environment Today!
 **WAIT! DON'T DO IT!**  Starlane is still a work in progress and not ready for anything approaching a production environment.    PLEASE! PLEASE! DON'T! 
 
