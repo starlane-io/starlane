@@ -1,31 +1,27 @@
 # STARLANE
+Starlane aims to reduce the drudgery of creating infrastructure code and shift developer focus to code that adds value to their users.
+
+## WebAssembly And The Enterprise
+Starlane provides a common interface abstraction so WebAssembly components can interact with any resource in the enterprise without requiring special coding, protocols or libraries to do so.  The abstraction pattern was inspired (copied?) from the brilliant Unix File abstraction.  Starlane aims to allow users to compose unrealated WebAssembly components to make things happen that the developers never dreamed of in the same way that system admins compose different command line utilities on Unix.
+
+## Deploy Starlane in Your Production Environment Today!
+**WAIT! DON'T DO IT!**  Starlane is still a work in progress and not ready for anything approaching a production environment.    PLEASE! PLEASE! DON'T! 
+
+A demonstratable version that folks can play with should be available in a week or two (Some poor developer yanked an essential crate that Starlane relied on and I have some rewriting to do!
+
+## READ ON
+If you want to learn more I recently published a [Medium article explaining the rationale behind Starlane](https://medium.com/@uberscott/starlane-reduce-the-drudgery-of-infrastructure-code-with-webassembly-398d1b0d19f1).  
+
+## HATERS WELCOME
+The proprietor of the Starlane project welcomes scathing commnents and lively discussion about Starlane... even if it hurts our feelings.  How are we supposed to make this thing better if all people do is tell us how wonderful we are? 
 
 
-*A WEBASSEMBLY ORCHESTRATION FRAMEWORK*
-
-Starlane is a framework for orchestrating WebAssembly components locally
-and/or accross every tier of the enterprise (Browser,Mobile,Desktop,Server,Edge,IoT.)
-
-It's charter is to help developers increase focus on their software products **Unique Value Offering** by automagically providing as much **Infrastructure** as possible.
-
-## MEDIUM ARTICLE
-I wrote a nifty [medium article](https://medium.com/@uberscott/starlane-reduce-the-drudgery-of-infrastructure-code-with-webassembly-398d1b0d19f1) that explains Starlane's basic rationale.  I hope you read it!
+## LINKS
+The Starlane Website: [https://starlane.io](https://starlane.io)
 
 
-## WORK IN PROGRESS
-*this framework is a work in progress and not ready for production. It is ready for feedback and discussion.*
+And [The Presently Defunct Documentation](https://starlane.io/docs/) ... none of the guides work but it still paints a picture of how Starlane is envisioned to be utilized ond day.
 
-## WHAT TO SEE
-To get started take a look at the [cosmic-space](rust/cosmic/cosmic-space) package.
+If you want to learn more about Uberscott (that's me) I have a [nice portfolio webpage at https://uberscott.com](https://uberscott.com)
 
-After that you might find the [cosmic-hyperspace](rust/cosmic/cosmic-hyperspace) interesting.
-
-
-## STARLANE - THE STATE OF THINGS
-Development has been halted over the last 2 years, but I'm picking it up again in my free time.  I would love to have some contributors help shape this thing!
-Please reach out to me if you want: scott@uberscott.com
-
-There is a working previous version 0.2.0 which can be downloaded and experimented with, however,
-the archetecture for the upcoming 0.3.0 is already quite different and 0.3.0 is not in a ready
-state to download and toy with. 
 
