@@ -28,11 +28,11 @@ use nom::{
     Parser, Slice,
 };
 use nom::{Err, IResult};
-use nom_supreme::error::ErrorTree;
+use nom_supreme::error::{ErrorTree, GenericErrorTree};
 use nom_supreme::final_parser::ExtractContext;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
+use thiserror::Error;
 use starlane_parse::{new_span, span_with_extra, Trace};
 use starlane_parse::{trim, tw, Res, Span};
 
@@ -99,6 +99,27 @@ use crate::space::wave::core::http2::HttpMethod;
 use crate::space::wave::core::hyp::HypMethod;
 use crate::space::wave::core::MethodKind;
 use crate::space::wave::core::{Method, MethodPattern};
+
+
+#[cfg(test)]
+pub mod test2 {
+
+    #[test]
+    pub fn test() {
+
+    }
+}
+
+pub enum ErrCtx {
+    One
+}
+
+#[derive(Debug,Error)]
+pub enum ParseErr {
+    Error
+}
+
+pub type Res<I:Span,O> = IResult<I,O,GenericErrorTree<I,&'static str,ErrCtx,ParseErr>>;
 
 /*
 pub struct Parser {}
