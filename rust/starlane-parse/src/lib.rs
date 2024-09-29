@@ -12,7 +12,7 @@ use nom::{
     InputTake, InputTakeAtPosition, Needed, Offset, Slice,
 };
 use nom_locate::LocatedSpan;
-use nom_supreme::error::ErrorTree;
+use nom_supreme::error::{ErrorTree, GenericErrorTree};
 use serde::{Deserialize, Serialize};
 
 #[cfg(test)]
@@ -129,10 +129,10 @@ impl<W> Deref for Tw<W> {
     }
 }
 
-pub fn tw<I, F, O>(mut f: F) -> impl FnMut(I) -> Res<I, Tw<O>>
+pub fn tw<I, F, O, C, E>(mut f: F) -> impl FnMut(I) -> Res<I, Tw<O>, C, E>
 where
     I: Span,
-    F: FnMut(I) -> Res<I, O>,
+    F: FnMut(I) -> Res<I, O, C, E>,
 {
     move |input: I| {
         let (next, output) = f(input.clone())?;
@@ -178,9 +178,10 @@ impl Trace {
         }
     }
 
-    pub fn scan<F, I: Span, O>(f: F, input: I) -> Self
+    pub fn scan<F, I: Span, O, C, E>(f: F, input: I) -> Self
     where
-        F: FnMut(I) -> Res<I, O> + Copy,
+        F: FnMut(I) -> Res<I, O, C, E> + Copy,
+        E: std::error::Error + Send + Sync + 'static
     {
         let extra = input.extra();
         let range = input.location_offset()..len(f)(input);
@@ -849,20 +850,22 @@ where
     }
 }
 
-pub type Res<I: Span, O> = IResult<I, O, ErrorTree<I>>;
+pub type Res<I: Span, O, C, E: std::error::Error + Send + Sync + 'static> = IResult<I, O, GenericErrorTree<I, &'static str, C, Box<E>>>;
 
-pub fn wrap<I, F, O>(mut f: F) -> impl FnMut(I) -> Res<I, O>
+pub fn wrap<I, F, O, C, E>(mut f: F) -> impl FnMut(I) -> Res<I, O, C, E>
 where
     I: Span,
-    F: FnMut(I) -> Res<I, O> + Copy,
+    F: FnMut(I) -> Res<I, O, C, E> + Copy,
+    E: std::error::Error + Send + Sync + 'static
 {
     move |input: I| f(input)
 }
 
-pub fn len<I, F, O>(f: F) -> impl FnMut(I) -> usize
+pub fn len<I, F, O, C,E>(f: F) -> impl FnMut(I) -> usize
 where
     I: Span,
-    F: FnMut(I) -> Res<I, O> + Copy,
+    F: FnMut(I) -> Res<I, O, C, E> + Copy,
+    E: std::error::Error + Send + Sync + 'static
 {
     move |input: I| match recognize(wrap(f))(input) {
         Ok((_, span)) => span.len(),
@@ -870,10 +873,11 @@ where
     }
 }
 
-pub fn trim<I, F, O>(f: F) -> impl FnMut(I) -> Res<I, O>
+pub fn trim<I, F, O, C, E>(f: F) -> impl FnMut(I) -> Res<I, O, C, E>
 where
     I: Span,
-    F: FnMut(I) -> Res<I, O> + Copy,
+    F: FnMut(I) -> Res<I, O, C, E> + Copy,
+    E: std::error::Error + Send + Sync + 'static
 {
     move |input: I| delimited(multispace0, f, multispace0)(input)
 }
