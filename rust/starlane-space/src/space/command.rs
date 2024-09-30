@@ -10,7 +10,6 @@ use direct::read::{Read, ReadCtx, ReadVar};
 use direct::select::{SelectCtx, SelectVar};
 use direct::set::{Set, SetCtx, SetVar};
 use direct::write::{Write, WriteCtx, WriteVar};
-use starlane_parse::{new_span, Trace};
 use starlane_primitive_macros::Autobox;
 
 use crate::space::parse::error::result;
@@ -19,6 +18,7 @@ use crate::space::substance::{Bin, ChildSubstance};
 use crate::space::util::ToResolved;
 use crate::space::wave::core::cmd::CmdMethod;
 use crate::{Delete, Select, SpaceErr};
+use crate::space::parse::util::{new_span, Trace};
 
 pub mod common {
     use std::collections::hash_map::Iter;
@@ -30,7 +30,6 @@ pub mod common {
 
     use crate::space::err::SpaceErr;
     use crate::space::loc::Variable;
-    use crate::space::parse::sub;
     use crate::space::substance::{Bin, Substance};
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]

@@ -4,7 +4,7 @@ use convert_case::{Case, Casing};
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 
-use starlane_parse::new_span;
+use crate::space::parse::util::new_span;
 
 use crate::space::hyper::ChildRegistry;
 use crate::space::loc::{

@@ -5,8 +5,6 @@ use nom::bytes::complete::tag;
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 
-use starlane_parse::{new_span, Span};
-
 use crate::space::kind::{Kind, KindParts};
 use crate::space::parse::error::result;
 use crate::space::parse::{parse_alpha1_str, point_and_kind, Env, Res};
@@ -14,6 +12,7 @@ use crate::space::point::{Point, PointCtx, PointVar};
 use crate::space::substance::Substance;
 use crate::space::util::ToResolved;
 use crate::{BaseKind, SpaceErr};
+use crate::space::parse::util::{new_span, Span};
 
 pub mod property;
 pub mod traversal;
@@ -172,9 +171,6 @@ impl Particle2 {
 }
 
 pub mod particle {
-    use nom::Parser;
-    use nom_supreme::ParserExt;
-
     /*
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
     pub struct StatusDetails<C>

@@ -7,7 +7,7 @@ use std::str::FromStr;
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 
-use starlane_parse::new_span;
+use crate::space::parse::util::new_span;
 
 use crate::space::err::SpaceErr;
 use crate::space::parse::error::result;

@@ -1,3 +1,4 @@
+pub mod util;
 
 use core::fmt;
 use core::fmt::Display;
@@ -19,7 +20,7 @@ use nom::character::complete::{
 };
 use nom::combinator::{all_consuming, opt};
 use nom::combinator::{cut, eof, fail, not, peek, recognize, value, verify};
-use nom::error::{ ErrorKind, ParseError};
+use nom::error::{ErrorKind, ParseError};
 use nom::multi::{many0, many1, separated_list0};
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 use nom::{
@@ -28,15 +29,13 @@ use nom::{
 };
 use nom::{Err, IResult};
 use nom_supreme::context::ContextError;
-use nom_supreme::error::{GenericErrorTree};
+use nom_supreme::error::GenericErrorTree;
 use nom_supreme::final_parser::ExtractContext;
 use nom_supreme::ParserExt;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
-use starlane_parse::{new_span, span_with_extra, Trace};
-use starlane_parse::{trim, tw, Span};
-
+use util::{new_span, span_with_extra, trim, tw, Span, Trace};
 use crate::space::command::common::{PropertyMod, SetProperties, StateSrcVar};
 use crate::space::command::direct::create::{
     CreateVar, KindTemplate, PointSegTemplate, PointTemplateSeg,
@@ -104,12 +103,12 @@ use crate::space::wave::core::{Method, MethodPattern};
 pub type SpaceContextError<I:Span> = dyn nom_supreme::context::ContextError<I,ErrCtx>;
 pub type StarParser<I:Span,O> = dyn nom_supreme::parser_ext::ParserExt<I,O,ParseTree<I>>;
 
-pub fn context<I, E, F, O>(
+pub fn context<I, F, O>(
     context: &'static str,
     mut f: F,
-) -> impl FnMut(I) -> IResult<I, O, E>
+) -> impl FnMut(I) -> Res<I, O>
 where
-    F: ParserExt<I, O, ParseTree<I>>,
+    F: Parser<I, O, ParseTree<I>>,
     I: Span,
 {
     let context = ErrCtx::Str(context.to_string());
@@ -117,10 +116,11 @@ where
         Ok(o) => Ok(o),
         Err(Err::Incomplete(i)) => Err(Err::Incomplete(i)),
 
-        Err(Err::Error(e)) => Err(Err::Error(nom_supreme::context::ContextError::add_context(i, context.clone(), e))),
-        Err(Err::Failure(e)) => Err(Err::Failure(E::add_context(i, context.clone(), e))),
+        Err(Err::Error(e)) => Err(Err::Error(ParseTree::add_context(i, context.clone(), e))),
+        Err(Err::Failure(e)) => Err(Err::Failure(ParseTree::add_context(i, context.clone(), e))),
     }
 }
+
 #[cfg(test)]
 pub mod test2 {
 
@@ -135,7 +135,8 @@ pub enum ErrCtx {
     Str(String),
     One,
     InvalidBaseKind(String),
-    InvalidSubKind(BaseKind,String)
+    InvalidSubKind(BaseKind,String),
+    ExpCamelCase
 }
 
 
@@ -860,7 +861,7 @@ pub fn skewer_dot<I: Span, E>(i: I) -> IResult<I, I, E>
 where
     I: InputTakeAtPosition + nom::InputLength,
     <I as InputTakeAtPosition>::Item: AsChar,
-    E: nom::error::ContextError<I> + nom::error::ParseError<I>,
+    E: nom_supreme::context::ContextError<I,ParseTree<I>> + nom::error::ParseError<I>,
 {
     i.split_at_position1_complete(
         |item| {
@@ -2352,7 +2353,7 @@ where
     <I as InputTakeAtPosition>::Item: AsChar,
     I: ToString,
     F: nom::Parser<I, O, E>,
-    E: nom::error::ContextError<I>,
+    E: nom_supreme::context::ContextError<I,ParseTree<I>>,
     O: Clone,
 {
     move |input: I| {
@@ -2401,14 +2402,13 @@ where
     }
 }
 
-pub fn working<I: Span, E: ParseError<I>, F>(
+pub fn working<I: Span, F>(
     mut f: F,
-) -> impl FnMut(I) -> IResult<I, PointSegCtx, E>
+) -> impl FnMut(I) -> Res<I, PointSegCtx>
 where
-    F: nom::Parser<I, PointSeg, E>,
-    E: nom::error::ContextError<I>,
+    F: nom::Parser<I, PointSeg,ParseTree<I>>,
 {
-    move |input: I| match pair(tag::<&str, I, E>("."), eos)(input.clone()) {
+    move |input: I| match pair(tag::<&str, I, ParseTree<I>>("."), eos)(input.clone()) {
         Ok((next, v)) => Ok((
             next.clone(),
             PointSegCtx::Working(Trace {
@@ -2423,14 +2423,13 @@ where
     }
 }
 
-pub fn pop<I: Span, E: ParseError<I>, F>(
+pub fn pop<I: Span, F>(
     mut f: F,
-) -> impl FnMut(I) -> IResult<I, PointSegCtx, E> + Copy
+) -> impl FnMut(I) -> Res<I, PointSegCtx> + Copy
 where
-    F: nom::Parser<I, PointSeg, E> + Copy,
-    E: nom::error::ContextError<I>,
+    F: nom::Parser<I, PointSeg, ParseTree<I>> + Copy,
 {
-    move |input: I| match pair(tag::<&str, I, E>(".."), eos)(input.clone()) {
+    move |input: I| match pair(tag::<&str, I, ParseTree<I>>(".."), eos)(input.clone()) {
         Ok((next, v)) => Ok((
             next.clone(),
             PointSegCtx::Working(Trace {
@@ -2449,18 +2448,18 @@ pub fn base_seg<I, F, S, E>(mut f: F) -> impl FnMut(I) -> IResult<I, S, E>
 where
     I: Span,
     F: nom::Parser<I, S, E> + Copy,
-    E: nom::error::ContextError<I> + nom::error::ParseError<I>,
+    E: nom_supreme::context::ContextError<I,ParseTree<I>> + nom::error::ParseError<I>,
     S: PointSegment,
 {
     move |input: I| preceded(tag(":"), f)(input)
 }
 
-pub fn mesh_seg<I: Span, E: ParseError<I>, F, S1, S2>(
+
+pub fn mesh_seg<I: Span, F, S1, S2>(
     mut f: F,
-) -> impl FnMut(I) -> IResult<I, S2, E>
+) -> impl FnMut(I) -> Res<I, S2>
 where
-    F: nom::Parser<I, S1, E> + Copy,
-    E: nom::error::ContextError<I>,
+    F: nom::Parser<I, S1, ParseTree<I>> + Copy,
     S1: PointSegment + Into<S2>,
     S2: PointSegment,
 {
@@ -2480,7 +2479,7 @@ where
         + InputIter
         + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar + Clone,
-    E: nom::error::ContextError<I> + nom::error::ParseError<I>,
+    E: nom_supreme::context::ContextError<I,ParseTree<I>> + nom::error::ParseError<I>,
 {
     alt((
         value(PointSegDelim::File, tag("/")),
@@ -2490,9 +2489,7 @@ where
 }
 
 // end of segment
-pub fn eos<I: Span, E>(input: I) -> IResult<I, (), E>
-where
-    E: nom::error::ContextError<I> + nom::error::ParseError<I>,
+pub fn eos<I: Span>(input: I) -> Res<I, ()>
 {
     peek(alt((tag("/"), tag(":"), tag("%"), space1, eof)))(input).map(|(next, _)| (next, ()))
 }
@@ -2552,7 +2549,7 @@ where
         + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar + Clone,
     F: nom::Parser<I, O, E> + Clone,
-    E: nom::error::ContextError<I>,
+    E: nom_supreme::context::ContextError<I,ParseTree<I>>,
 {
     alt((
         value(Ctx::RelativePointPop, tuple((tag(".."), eos))),
@@ -2580,7 +2577,7 @@ where
         + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar,
     F: nom::Parser<I, O, E>,
-    E: nom::error::ContextError<I>,
+    E: nom_supreme::context::ContextError<I,ParseTree<I>>,
     O: Clone + FromStr<Err = SpaceErr>,
 {
     move |input: I| {
@@ -2738,7 +2735,7 @@ where
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
     I: nom::Slice<std::ops::RangeFrom<usize>>,
     <I as InputIter>::Item: AsChar,
-    E: nom::error::ContextError<I> + nom::error::ParseError<I>,
+    E: nom_supreme::context::ContextError<I,ParseTree<I>> + nom::error::ParseError<I>,
     F: nom::Parser<I, O, E> + Clone,
 {
     move |input: I| {
@@ -2979,7 +2976,7 @@ where
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
     I: nom::Slice<std::ops::RangeFrom<usize>>,
     <I as InputIter>::Item: AsChar + Copy,
-    E: nom::error::ContextError<I> + nom::error::ParseError<I>,
+    E: nom_supreme::context::ContextError<I,ParseTree<I>> + nom::error::ParseError<I>,
 {
     alt((
         lex_nested_block(NestedBlockKind::Curly),
@@ -3348,7 +3345,7 @@ where
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
     I: nom::Slice<std::ops::RangeFrom<usize>>,
     <I as InputIter>::Item: AsChar + Copy,
-    E: nom::error::ContextError<I> + nom::error::ParseError<I>,
+    E: nom_supreme::context::ContextError<I,ParseTree<I>> + nom::error::ParseError<I>,
     F: Fn(char) -> bool,
     F: Clone,
 {
@@ -3392,7 +3389,7 @@ where
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
     I: nom::Slice<std::ops::RangeFrom<usize>>,
     <I as InputIter>::Item: AsChar,
-    E: nom::error::ContextError<I> + nom::error::ParseError<I>,
+    E: nom_supreme::context::ContextError<I,ParseTree<I>> + nom::error::ParseError<I>,
     F: FnMut(I) -> IResult<I, O2, E>,
     F: Clone,
     <I as InputIter>::Item: std::marker::Copy,
@@ -3552,8 +3549,6 @@ pub mod model {
     use serde::de::Visitor;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-    use starlane_parse::{new_span, Span, Trace, Tw};
-
     use crate::space::config::bind::{
         PipelineStepDef,
         PipelineStopDef,
@@ -3567,6 +3562,7 @@ pub mod model {
         wrapped_http_method, wrapped_sys_method, Assignment, Env
         ,
     };
+    use crate::space::parse::util::{new_span, Span, Trace, Tw};
     use crate::space::point::{Point, PointCtx, PointVar};
     use crate::space::util::{ToResolved, ValueMatcher, ValuePattern};
     use crate::space::wave::core::{Method, MethodKind};
@@ -4859,12 +4855,11 @@ pub mod error {
     use nom_supreme::error::{ErrorTree, StackContext};
     use regex::{Error, Regex};
 
-    use starlane_parse::{len, Span};
-
     use crate::space::err::report::{Label, Report, ReportKind};
     use crate::space::err::{ParseErrs, SpaceErr};
     use crate::space::parse::model::NestedBlockKind;
     use crate::space::parse::{nospace1, ParseTree};
+    use crate::space::parse::util::{len, Span};
 
     pub fn result<I: Span, R>(result: Result<(I, R), Err<ParseTree<I>>>) -> Result<R, SpaceErr> {
         match result {
@@ -5311,7 +5306,7 @@ pub fn value_pattern<I: Span, O, E: ParseError<I>, F>(
 where
     I: InputLength + InputTake + Compare<&'static str>,
     F: Parser<I, O, E>,
-    E: nom::error::ContextError<I>,
+    E: nom_supreme::context::ContextError<I,ParseTree<I>>,
 {
     move |input: I| match tag::<&'static str, I, E>("*")(input.clone()) {
         Ok((next, _)) => Ok((next, ValuePattern::Always)),
@@ -6310,7 +6305,7 @@ pub fn method_pattern<I: Clone, E: ParseError<I>, F>(
 where
     I: InputLength + InputTake + Compare<&'static str>,
     F: Parser<I, HttpMethod, E>,
-    E: nom::error::ContextError<I>,
+    E: nom_supreme::context::ContextError<I,ParseTree<I>>,
 {
     move |input: I| match tag::<&'static str, I, E>("*")(input.clone()) {
         Ok((next, _)) => Ok((next, HttpMethodPattern::Always)),
@@ -7282,8 +7277,6 @@ pub mod test {
     use nom::multi::many0;
     use nom::sequence::{delimited, tuple};
 
-    use starlane_parse::{new_span, span_with_extra};
-
     use crate::space::command::direct::create::{
         PointSegTemplate, PointTemplate, Template,
     };
@@ -7308,6 +7301,7 @@ pub mod test {
         template, var_seg, variable_name, version, Env
         ,
     };
+    use crate::space::parse::util::{new_span, span_with_extra};
     use crate::space::point::{Point, PointCtx, PointSegVar, RouteSegVar};
     use crate::space::substance::Substance;
     use crate::space::util;
@@ -8617,7 +8611,7 @@ pub mod cmd_test {
     use crate::space::selector::{PointHierarchy, PointKindSeg};
     use crate::space::util::ToResolved;
     use crate::{BaseKind, KindTemplate};
-    use starlane_parse::new_span;
+    use crate::space::parse::util::new_span;
 
     /*
     #[mem]

@@ -428,8 +428,8 @@ pub mod parse {
     use nom::bytes::complete::tag;
     use nom::combinator::{opt, value};
     use nom::sequence::{delimited, pair, preceded, tuple};
-    use starlane_parse::{Span};
     use std::str::FromStr;
+    use crate::space::parse::util::Span;
 
     pub fn pattern<I, FnX, X>(mut f: FnX) -> impl FnMut(I) -> Res<I, Pattern<X>> + Copy
     where
@@ -674,7 +674,7 @@ pub mod parse {
         use nom::bytes::complete::tag;
         use nom::combinator::opt;
         use nom::sequence::{pair, preceded};
-        use starlane_parse::new_span;
+        use crate::space::parse::util::new_span;
 
         #[test]
         pub fn test_camel_case_subtypes() {

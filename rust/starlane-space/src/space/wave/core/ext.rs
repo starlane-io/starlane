@@ -4,7 +4,7 @@ use nom::combinator::all_consuming;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use starlane_parse::new_span;
+use crate::space::parse::util::new_span;
 
 use crate::space::err::SpaceErr;
 use crate::space::parse::camel_case_chars;

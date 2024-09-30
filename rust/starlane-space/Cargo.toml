@@ -16,7 +16,6 @@ doctest = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-starlane-parse = { workspace = true }
 starlane-primitive-macros = { workspace = true }
 
 serde = { workspace=true, features=['derive','rc'] }

@@ -3,7 +3,7 @@ use crate::hyperlane::tcp::HyperlaneTcpClient;
 use crate::hyperlane::HyperwayEndpointFactory;
 use clap::clap_derive::{Args, Subcommand};
 use clap::Parser;
-use starlane_parse::new_span;
+use starlane_space::space::parse::util::new_span;
 use starlane::space::command::{CmdTransfer, RawCommand};
 use starlane::space::err::SpaceErr;
 use starlane::space::hyper::Knock;

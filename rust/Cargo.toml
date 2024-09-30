@@ -17,7 +17,7 @@ default-run = "starlane"
 resolver = "2"
 members = [
   "starlane", "starlane-macros", "starlane-primitive-macros","mechtron"
-  , "starlane-space", "starlane-parse","ext/service/starlane-cli-local-filestore-service" , "ext/service/starlane-cli-filestore-s3-service"]
+  , "starlane-space", "ext/service/starlane-cli-local-filestore-service" , "ext/service/starlane-cli-filestore-s3-service"]
 
 exclude = [ ]
 
@@ -26,7 +26,6 @@ starlane = { path="./starlane" }
 starlane-macros = { path="./starlane-macros"}
 starlane-primitive-macros = { path="./starlane-primitive-macros"}
 starlane-space = { path="./starlane-space"}
-starlane-parse = { path="./starlane-parse"}
 lazy_static = "1.5.0"
 uuid = { version="1.1.2" }
 chrono = { version="0.4.19" }

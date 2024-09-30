@@ -3,7 +3,7 @@ use crate::platform::Platform;
 use crate::hyperspace::reg::Registration;
 use crate::hyperspace::star::{HyperStarSkel, SmartLocator};
 use once_cell::sync::Lazy;
-use starlane_parse::new_span;
+use starlane_space::space::parse::util::new_span;
 use starlane::space::artifact::ArtRef;
 use starlane::space::command::direct::create::{Create, PointSegTemplate};
 use starlane::space::command::Command;

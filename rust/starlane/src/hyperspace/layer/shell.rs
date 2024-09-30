@@ -2,7 +2,7 @@ use std::sync::atomic::AtomicU16;
 use std::sync::Arc;
 
 use dashmap::{DashMap, DashSet};
-use starlane_parse::new_span;
+use starlane_space::space::parse::util::new_span;
 use starlane::space::command::common::StateSrc;
 use starlane::space::command::{Command, RawCommand};
 use starlane::space::err::SpaceErr;

@@ -7,8 +7,6 @@ use serde::de::{Error, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
-use starlane_parse::{new_span, Trace};
-
 use crate::space::kind::{BaseKind, Kind, KindParts, Specific};
 use crate::space::loc::{Layer, ToBaseKind, Topic, VarVal, Variable, Version};
 use crate::space::parse::error::result;
@@ -16,6 +14,7 @@ use crate::space::parse::{
     consume_hierarchy, kind_selector, point_segment_selector, point_selector, specific_selector,
     CamelCase, Env,
 };
+use crate::space::parse::util::{new_span, Trace};
 use crate::space::point::{Point, PointCtx, PointSeg, PointVar, RouteSeg};
 use crate::space::substance::{
     CallWithConfigDef, Substance, SubstanceFormat, SubstanceKind, SubstancePattern,

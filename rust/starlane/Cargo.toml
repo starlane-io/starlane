@@ -38,7 +38,6 @@ wasm=[]
 [dependencies]
 starlane-space = { workspace = true}
 starlane-macros = { workspace = true }
-starlane-parse= { workspace = true }
 starlane-primitive-macros = { workspace = true}
 thiserror = { workspace = true}
 tokio_print= {  workspace=true  }

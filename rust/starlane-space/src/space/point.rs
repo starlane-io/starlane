@@ -1,7 +1,6 @@
 use core::str::FromStr;
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
-use starlane_parse::{new_span, Trace};
 use std::path::PathBuf;
 use md5::{Digest, Md5};
 use crate::space::err::{ParseErrs, SpaceErr};
@@ -19,6 +18,7 @@ use crate::space::selector::Selector;
 use crate::space::util::ToResolved;
 use crate::space::wave::{Agent, Recipients, ToRecipients};
 use crate::space::{ANONYMOUS, HYPERUSER};
+use crate::space::parse::util::{new_span, Trace};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum RouteSeg {

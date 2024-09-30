@@ -9,8 +9,6 @@ use once_cell::sync::Lazy;
 use serde::de::{Error, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
-use starlane_parse::{new_span, Trace, Tw};
-
 use crate::space::err::ParseErrs;
 use crate::space::log::Trackable;
 use crate::space::parse::error::result;
@@ -30,6 +28,7 @@ use crate::space::wave::{
     ,
 };
 use crate::{BaseKind, SpaceErr};
+use crate::space::parse::util::{new_span, Trace, Tw};
 
 pub static CENTRAL: Lazy<Point> = Lazy::new(|| StarKey::central().to_point());
 pub static GLOBAL_LOGGER: Lazy<Point> = Lazy::new(|| Point::from_str("GLOBAL::logger").unwrap());
