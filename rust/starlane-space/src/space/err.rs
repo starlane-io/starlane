@@ -18,7 +18,6 @@ use crate::space::err::report::{Label, Report, ReportKind};
 use crate::space::parse::util::Span;
 use crate::space::parse::util::SpanExtra;
 
-use crate::space::parse::error::find_parse_err;
 use crate::space::substance::Substance;
 use crate::space::wave::core::http2::StatusCode;
 use crate::space::wave::core::ReflectedCore;
@@ -467,6 +466,10 @@ impl<I: Span> From<nom::Err<ErrorTree<I>>> for ParseErrs {
             SpaceErr::ParseErrs(parse_errs) => parse_errs,
         }
     }
+}
+
+fn find_parse_err<I: Span>(p0: &Err<ErrorTree<I>>) -> SpaceErr {
+    todo!()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]

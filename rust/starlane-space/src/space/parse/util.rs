@@ -8,6 +8,8 @@ use nom::sequence::delimited;
 use nom_locate::LocatedSpan;
 use nom_supreme::error::GenericErrorTree;
 use serde::{Deserialize, Serialize};
+use crate::space::err::SpaceErr;
+use crate::space::parse::ParseTree;
 
 #[cfg(test)]
 mod tests {
@@ -873,4 +875,11 @@ where
     E: std::error::Error + Send + Sync + 'static
 {
     move |input: I| delimited(multispace0, f, multispace0)(input)
+}
+
+pub fn result<I: Span, R>(result: Result<(I, R), nom::Err<ParseTree<I>>>) -> Result<R, SpaceErr> {
+    match result {
+        Ok((_, e)) => Ok(e),
+        Err(err) => Err(todo!()),
+    }
 }

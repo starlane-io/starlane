@@ -6,13 +6,12 @@ use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 
 use crate::space::kind::{Kind, KindParts};
-use crate::space::parse::error::result;
 use crate::space::parse::{parse_alpha1_str, point_and_kind, Env, Res};
 use crate::space::point::{Point, PointCtx, PointVar};
 use crate::space::substance::Substance;
 use crate::space::util::ToResolved;
 use crate::{BaseKind, SpaceErr};
-use crate::space::parse::util::{new_span, Span};
+use crate::space::parse::util::{new_span, result, Span};
 
 pub mod property;
 pub mod traversal;

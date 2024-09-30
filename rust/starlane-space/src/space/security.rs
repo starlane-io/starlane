@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::space::parse::util::new_span;
 
 use crate::space::err::SpaceErr;
-use crate::space::parse::error::result;
+use crate::space::parse::util::result;
 use crate::space::parse::{particle_perms, permissions, permissions_mask, privilege};
 use crate::space::point::Point;
 use crate::space::selector::{PointHierarchy, Selector};

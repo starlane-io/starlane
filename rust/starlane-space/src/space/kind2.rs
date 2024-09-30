@@ -665,7 +665,7 @@ pub mod parse {
         };
         use crate::space::kind2::{IsMatch, OptPattern};
 
-        use crate::space::parse::error::result;
+        use crate::space::parse::util::result;
         use crate::space::parse::{
             camel_case, expect, CamelCase,
         };

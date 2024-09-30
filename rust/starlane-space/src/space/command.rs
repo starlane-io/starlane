@@ -12,13 +12,12 @@ use direct::set::{Set, SetCtx, SetVar};
 use direct::write::{Write, WriteCtx, WriteVar};
 use starlane_primitive_macros::Autobox;
 
-use crate::space::parse::error::result;
 use crate::space::parse::{command_line, Env};
 use crate::space::substance::{Bin, ChildSubstance};
 use crate::space::util::ToResolved;
 use crate::space::wave::core::cmd::CmdMethod;
 use crate::{Delete, Select, SpaceErr};
-use crate::space::parse::util::{new_span, Trace};
+use crate::space::parse::util::{new_span, result, Trace};
 
 pub mod common {
     use std::collections::hash_map::Iter;

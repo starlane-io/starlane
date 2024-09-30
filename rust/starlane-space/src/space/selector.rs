@@ -9,7 +9,7 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
 use crate::space::kind::{BaseKind, Kind, KindParts, Specific};
 use crate::space::loc::{Layer, ToBaseKind, Topic, VarVal, Variable, Version};
-use crate::space::parse::error::result;
+use crate::space::parse::util::result;
 use crate::space::parse::{
     consume_hierarchy, kind_selector, point_segment_selector, point_selector, specific_selector,
     CamelCase, Env,

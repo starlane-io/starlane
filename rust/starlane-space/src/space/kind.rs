@@ -12,7 +12,7 @@ use crate::space::loc::{
     MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, STAR_WAVE_TRAVERSAL_PLAN,
     STD_WAVE_TRAVERSAL_PLAN,
 };
-use crate::space::parse::error::result;
+use crate::space::parse::util::result;
 use crate::space::parse::{kind_parts, specific, CamelCase, Domain, SkewerCase};
 use crate::space::particle::traversal::TraversalPlan;
 use crate::space::selector::{

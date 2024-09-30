@@ -9,7 +9,7 @@ use crate::space::loc::{
     CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE,
     LOCAL_PORTAL, LOCAL_STAR, REMOTE_ENDPOINT,
 };
-use crate::space::parse::error::result;
+use crate::space::parse::util::result;
 use crate::space::parse::{
     consume_point, consume_point_ctx, point_route_segment, point_selector, point_var, Env,
     ResolverErr,

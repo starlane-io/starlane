@@ -4,11 +4,10 @@ use nom::combinator::all_consuming;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::space::parse::util::new_span;
+use crate::space::parse::util::{new_span, result};
 
 use crate::space::err::SpaceErr;
 use crate::space::parse::camel_case_chars;
-use crate::space::parse::error::result;
 use crate::space::parse::model::MethodScopeSelector;
 use crate::space::substance::{FormErrs, Substance};
 use crate::space::util::{ValueMatcher, ValuePattern};

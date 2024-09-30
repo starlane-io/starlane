@@ -11,7 +11,7 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::space::err::ParseErrs;
 use crate::space::log::Trackable;
-use crate::space::parse::error::result;
+use crate::space::parse::util::result;
 use crate::space::parse::{
     parse_star_key
     , Env, ResolverErr,
