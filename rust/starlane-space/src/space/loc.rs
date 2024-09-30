@@ -12,23 +12,13 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use crate::space::err::ParseErrs;
 use crate::space::log::Trackable;
 use crate::space::parse::util::result;
-use crate::space::parse::{
-    parse_star_key
-    , Env, ResolverErr,
-    SkewerCase,
-};
-use crate::space::particle::traversal::TraversalPlan;
-use crate::space::point::{
-    Point, PointSeg, PointSegKind, PointSegPairDef, RouteSeg
-    ,
-};
-use crate::space::util::{uuid, ToResolved, ValueMatcher, ValuePattern};
-use crate::space::wave::{
-    Recipients, ToRecipients
-    ,
-};
-use crate::{BaseKind, SpaceErr};
 use crate::space::parse::util::{new_span, Trace, Tw};
+use crate::space::parse::{parse_star_key, Env, ResolverErr, SkewerCase, VarCase};
+use crate::space::particle::traversal::TraversalPlan;
+use crate::space::point::{Point, PointSeg, PointSegKind, PointSegPairDef, RouteSeg};
+use crate::space::util::{uuid, ToResolved, ValueMatcher, ValuePattern};
+use crate::space::wave::{Recipients, ToRecipients};
+use crate::{BaseKind, SpaceErr};
 
 pub static CENTRAL: Lazy<Point> = Lazy::new(|| StarKey::central().to_point());
 pub static GLOBAL_LOGGER: Lazy<Point> = Lazy::new(|| Point::from_str("GLOBAL::logger").unwrap());
@@ -207,19 +197,33 @@ impl FromStr for Version {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct Variable {
-    pub name: String,
+    pub name: VarCase,
     pub trace: Trace,
 }
 
 impl Variable {
-    pub fn new(name: String, trace: Trace) -> Self {
+    pub fn new(name: VarCase, trace: Trace) -> Self {
         Self { name, trace }
     }
 }
 
 pub enum VarVal<V> {
-    Var(Tw<SkewerCase>),
+    Var(Tw<VarCase>),
     Val(Tw<V>),
+}
+
+impl<V> TryInto<Variable> for VarVal<V> {
+    type Error = ();
+
+    fn try_into(self) -> Result<Variable, Self::Error> {
+        match self {
+            VarVal::Var(v) => {
+                let var = Variable::new(v.w, v.trace);
+                Ok(var)
+            }
+            VarVal::Val(_) => Err(()),
+        }
+    }
 }
 
 impl<V> ToResolved<V> for VarVal<V>

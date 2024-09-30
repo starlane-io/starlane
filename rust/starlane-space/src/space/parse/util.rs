@@ -9,7 +9,8 @@ use nom_locate::LocatedSpan;
 use nom_supreme::error::GenericErrorTree;
 use serde::{Deserialize, Serialize};
 use crate::space::err::SpaceErr;
-use crate::space::parse::ParseTree;
+use crate::space::loc::Variable;
+use crate::space::parse::{ParseTree, VarCase};
 
 #[cfg(test)]
 mod tests {
@@ -122,6 +123,15 @@ impl<W> Deref for Tw<W> {
 
     fn deref(&self) -> &Self::Target {
         &self.w
+    }
+}
+
+impl Into<Variable> for Tw<VarCase> {
+    fn into(self) -> Variable {
+        Variable {
+            name: self.w,
+            trace: self.trace,
+        }
     }
 }
 

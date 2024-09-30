@@ -12,8 +12,8 @@ use std::sync::Arc;
 
 use crate::space::command::common::{PropertyMod, SetProperties, StateSrcVar};
 use crate::space::command::direct::create::{
-    CreateVar, KindTemplate, PointSegTemplate, PointTemplateSeg,
-    PointTemplateVar, Strategy, TemplateVar,
+    CreateVar, KindTemplate, PointSegTemplate, PointTemplateSeg, PointTemplateVar, Strategy,
+    TemplateVar,
 };
 use crate::space::command::direct::get::{GetOp, GetVar};
 use crate::space::command::direct::select::{SelectIntoSubstance, SelectKind, SelectVar};
@@ -21,8 +21,7 @@ use crate::space::command::direct::set::SetVar;
 use crate::space::command::direct::CmdKind;
 use crate::space::command::CommandVar;
 use crate::space::config::bind::{
-    BindConfig, PipelineStepVar
-    , PipelineStopVar, RouteSelector, WaveDirection,
+    BindConfig, PipelineStepVar, PipelineStopVar, RouteSelector, WaveDirection,
 };
 use crate::space::config::mechtron::MechtronConfig;
 use crate::space::config::Document;
@@ -44,18 +43,16 @@ use crate::space::security::{
     PermissionsMaskKind, Privilege,
 };
 use crate::space::selector::{
-    ExactPointSeg, Hop, KindBaseSelector, KindSelector, LabeledPrimitiveTypeDef, MapEntryPattern
-    , MapEntryPatternVar, Pattern,
-    PatternBlockVar, PayloadBlockVar, PayloadType2Def,
-    PointHierarchy, PointKindSeg, PointSegSelector, Selector, SelectorDef, SpecificSelector,
-    SubKindSelector, UploadBlock, VersionReq,
+    ExactPointSeg, Hop, KindBaseSelector, KindSelector, LabeledPrimitiveTypeDef, MapEntryPattern,
+    MapEntryPatternVar, Pattern, PatternBlockVar, PayloadBlockVar, PayloadType2Def, PointHierarchy,
+    PointKindSeg, PointSegSelector, Selector, SelectorDef, SpecificSelector, SubKindSelector,
+    UploadBlock, VersionReq,
 };
 use crate::space::substance::Bin;
 use crate::space::substance::{
-    CallKind, CallVar, CallWithConfigVar,
-    ExtCall, HttpCall, ListPattern, MapPatternVar, NumRange, Substance,
-    SubstanceFormat, SubstanceKind, SubstancePattern, SubstancePatternVar
-    , SubstanceTypePatternDef, SubstanceTypePatternVar,
+    CallKind, CallVar, CallWithConfigVar, ExtCall, HttpCall, ListPattern, MapPatternVar, NumRange,
+    Substance, SubstanceFormat, SubstanceKind, SubstancePattern, SubstancePatternVar,
+    SubstanceTypePatternDef, SubstanceTypePatternVar,
 };
 use crate::space::util::{HttpMethodPattern, StringMatcher, ToResolved, ValuePattern};
 use crate::space::wave::core::cmd::CmdMethod;
@@ -66,11 +63,9 @@ use crate::space::wave::core::MethodKind;
 use crate::space::wave::core::{Method, MethodPattern};
 use model::{
     BindScope, BindScopeKind, Block, BlockKind, Chunk, DelimitedBlockKind, LexBlock,
-    LexParentScope, LexRootScope, LexScope, LexScopeSelector,
-    MechtronScope, NestedBlockKind
-    , PipelineSegmentVar, PipelineVar, RootScopeSelector, RouteScope,
-    ScopeFilterDef, ScopeFiltersDef, Spanned, Subst,
-    TerminatedBlockKind, TextType, VarParser,
+    LexParentScope, LexRootScope, LexScope, LexScopeSelector, MechtronScope, NestedBlockKind,
+    PipelineSegmentVar, PipelineVar, RootScopeSelector, RouteScope, ScopeFilterDef,
+    ScopeFiltersDef, Spanned, Subst, TerminatedBlockKind, TextType, VarParser,
 };
 //use ariadne::{Label, Report, ReportKind};
 use nom::branch::alt;
@@ -78,8 +73,7 @@ use nom::bytes::complete::{is_a, is_not};
 use nom::bytes::complete::{tag, take_until};
 use nom::character::complete::{alpha1, digit1};
 use nom::character::complete::{
-    alphanumeric0, alphanumeric1, anychar, char, multispace0,
-    multispace1, satisfy, space1,
+    alphanumeric0, alphanumeric1, anychar, char, multispace0, multispace1, satisfy, space1,
 };
 use nom::combinator::{all_consuming, opt};
 use nom::combinator::{cut, eof, fail, not, peek, recognize, value, verify};
@@ -103,29 +97,23 @@ use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
 
 use crate::space::parse::util::*;
 
-
-
-pub type SpaceContextError<I:Span> = dyn nom_supreme::context::ContextError<I,ErrCtx>;
-pub type StarParser<I:Span,O> = dyn nom_supreme::parser_ext::ParserExt<I,O,ParseTree<I>>;
+pub type SpaceContextError<I: Span> = dyn nom_supreme::context::ContextError<I, ErrCtx>;
+pub type StarParser<I: Span, O> = dyn nom_supreme::parser_ext::ParserExt<I, O, ParseTree<I>>;
 
 pub type Xpan<'a> = Wrap<LocatedSpan<&'a str, Arc<String>>>;
 
-
-impl <I> From<ParseTree<I>> for SpaceErr {
+impl<I> From<ParseTree<I>> for SpaceErr {
     fn from(value: ParseTree<I>) -> Self {
-        Self::new(500u16, "parse error" )
+        Self::new(500u16, "parse error")
     }
 }
 
-impl <I> From<Err<ParseTree<I>>> for SpaceErr {
+impl<I> From<Err<ParseTree<I>>> for SpaceErr {
     fn from(value: Err<ParseTree<I>>) -> Self {
-        Self::new(500u16, "parse error" )
+        Self::new(500u16, "parse error")
     }
 }
-pub fn context<I, F, O>(
-    context: &'static str,
-    mut f: F,
-) -> impl FnMut(I) -> Res<I, O>
+pub fn context<I, F, O>(context: &'static str, mut f: F) -> impl FnMut(I) -> Res<I, O>
 where
     F: Parser<I, O, ParseTree<I>>,
     I: Span,
@@ -140,38 +128,38 @@ where
     }
 }
 
+pub enum SpaceParseErr {}
+
 #[cfg(test)]
 pub mod test2 {
+    use crate::space::parse::point_var;
+    use crate::space::parse::util::{new_span, result};
 
     #[test]
     pub fn test() {
-
+        let point = result(point_var(new_span("$the:blasted"))).unwrap();
+        println!("point: {}", point.to_string());
     }
 }
 
 #[derive(Debug, Clone, strum_macros::Display)]
 pub enum ErrCtx {
     Str(String),
-    One,
+    ExpectVarSubstOpenCurly,
     InvalidBaseKind(String),
-    InvalidSubKind(BaseKind,String),
+    InvalidSubKind(BaseKind, String),
     ExpCamelCase,
     ResolverNotAvailable,
 }
 
-
-
-
-
-#[derive(Debug,Error,strum_macros::Display)]
+#[derive(Debug, Error, strum_macros::Display)]
 pub enum ParseErr {
-    Error
+    Error,
 }
 
+pub type ParseTree<I: Span> = GenericErrorTree<I, &'static str, ErrCtx, ParseErr>;
 
-pub type ParseTree<I:Span> = GenericErrorTree<I,&'static str,ErrCtx,ParseErr>;
-
-pub type Res<I:Span,O> = IResult<I,O, ParseTree<I>>;
+pub type Res<I: Span, O> = IResult<I, O, ParseTree<I>>;
 
 /*
 pub struct Parser {}
@@ -453,13 +441,6 @@ pub fn var<O,F,P>(mut f: F ) -> impl FnMut(I) -> Res<I,Var<O,P>> where F: Parser
 
  */
 
-pub fn var_val<F, I: Span, O>(mut f: F) -> impl FnMut(I) -> Res<I, VarVal<O>> + Copy
-where
-    F: FnMut(I) -> Res<I, O> + Copy,
-{
-    move |input: I| context("var_val", alt((var, val(f))))(input)
-}
-
 fn val<I: Span, O, F>(f: F) -> impl FnMut(I) -> Res<I, VarVal<O>>
 where
     F: FnMut(I) -> Res<I, O> + Copy,
@@ -468,10 +449,65 @@ where
 }
 
 fn var<I: Span, O>(input: I) -> Res<I, VarVal<O>> {
-    tw(delimited(tag("${"), skewer_case, tag("}")))(input)
-        .map(|(next, var)| (next, VarVal::Var(var)))
+    pair(
+        peek(tag("$")),
+        cut(delimited(
+            tag("${").context(ErrCtx::ExpectVarSubstOpenCurly),
+            tw(var_name),
+            tag("}"),
+        )),
+    )(input)
+    .map(|(next, (_, var))| (next, VarVal::Var(var)))
 }
 
+fn var_name<I>(input: I) -> Res<I, VarCase>
+where I: Span
+{
+    var_chars(input).map(|(next, var)| {
+        (
+            next,
+            VarCase {
+                string: var.to_string(),
+            },
+        )
+    })
+}
+
+/*
+pub fn point_seg_var<F, I: Span>(mut f: F) -> impl FnMut(I) -> Res<I, PointSegVar> + Copy
+where
+    F: Parser<I, PointSeg, ParseTree<I>> + Copy,
+{
+    move |input: I| {
+         var_decl(f)(input).map(|(next,v)| (next,v))
+    }
+}
+
+ */
+
+/*
+
+
+ */
+
+fn point_seg_var<I,F>(mut f: F) -> impl FnMut(I) -> Res<I, PointSegVar> + Copy
+where F: FnMut(I) -> Res<I,PointSegCtx> + Copy,
+I: Span
+{
+    move |input:I | {
+        variable_ize(f)(input)
+    }
+}
+
+pub fn variable_ize<F, I, O, T>(mut f: F) -> impl FnMut(I) -> Res<I, O> + Copy
+where
+    F: FnMut(I) -> Res<I, T> + Copy,
+    I: Span,
+    O: From<VarVal<T>>,
+{
+    move |input: I| var_or_val(f)(input).map(|(next, varval)| (next, O::from(varval)))
+}
+/*
 pub fn var_seg<F, I: Span>(mut f: F) -> impl FnMut(I) -> Res<I, PointSegVar> + Copy
 where
     F: Parser<I, PointSegCtx, ParseTree<I>> + Copy,
@@ -508,36 +544,56 @@ where
     }
 }
 
-pub fn var_route<'a, F, I: Span>(mut f: F) -> impl FnMut(I) -> Res<I, RouteSegVar>
-where
-    F: Parser<I, RouteSeg, ParseTree<I>>,
+ */
+
+/*fn variable<I,F,O>(input: I) -> impl FnMut(I) -> Res<I,Variable> where I: Span
 {
-    move |input: I| {
-        let offset = input.location_offset();
-        let result = pair(
-            peek(tag("$")),
-            context(
-                "var",
-                cut(delimited(tag("${"), skewer_case_chars, tag("}"))),
-            ),
-        )(input.clone());
-        match result {
-            Ok((next, (_, var))) => {
-                let range = Range {
-                    start: offset,
-                    end: next.location_offset(),
-                };
-                let trace = Trace {
-                    range,
-                    extra: next.extra(),
-                };
-                let var = Variable::new(var.to_string(), trace);
-                Ok((next, RouteSegVar::Var(var)))
-            }
-            Err(err) => f.parse(input).map(|(next, seg)| (next, seg.into())),
+    let offset = input.location_offset();
+    let result = var_name(input.clone());
+
+    match result {
+        Ok((next, name)) => {
+            let range = Range {
+                start: offset,
+                end: next.location_offset(),
+            };
+            let trace = Trace {
+                range,
+                extra: next.extra(),
+            };
+            let var = Variable::new(name, trace);
+            Ok((next, var))
         }
+        Err(err) => match err {
+            Err::Incomplete(needed) => nom::Err::Incomplete(needed),
+            Err::Failure(err) => nom::Err::Error(err),
+            Err::Error(err) => nom::Err::Error(err)
+        },
     }
 }
+
+ */
+
+fn var_or_val<I, F, O>(mut f: F) -> impl FnMut(I) -> Res<I, VarVal<O>>
+where
+    F: FnMut(I) -> Res<I, O> + Copy,
+    I: Span,
+{
+    move |input: I| alt((var, val(f)))(input)
+}
+
+/*
+// scan for a Var declaration ${} or a cont var_or_val<'a, F, I: SpO>(mut f: F) -> impl FnMut(I) -> R, VarVal<O>>re F: Parser<I, O, ParseTree<I>>,   move |input:{     alt( (var,val(f)) put) }
+
+ */
+
+pub fn var_route<'a, F, I: Span>(mut f: F) -> impl FnMut(I) -> Res<I, RouteSegVar>
+where
+    F: FnMut(I) -> Res<I, RouteSeg> + Copy,
+{
+    move |input: I| variable_ize(f)(input)
+}
+
 pub fn root_point_var<I: Span>(input: I) -> Res<I, PointVar> {
     context(
         "root_point",
@@ -564,16 +620,16 @@ pub fn point_non_root_var<I: Span>(input: I) -> Res<I, PointVar> {
                 "point_route",
                 opt(terminated(var_route(point_route_segment), tag("::"))),
             ),
-            var_seg(root_ctx_seg(space_point_segment)),
-            many0(base_seg(var_seg(pop(base_point_segment)))),
-            opt(base_seg(var_seg(pop(version_point_segment)))),
+            point_seg_var(root_ctx_seg(space_point_segment)),
+            many0(base_seg(point_seg_var(pop(base_point_segment)))),
+            opt(base_seg(point_seg_var(pop(version_point_segment)))),
             opt(tuple((
                 root_dir_point_segment_var,
                 many0(recognize(tuple((
-                    var_seg(pop(dir_point_segment)),
+                    point_seg_var(pop(dir_point_segment)),
                     tag("/"),
                 )))),
-                opt(var_seg(pop(file_point_segment))),
+                opt(point_seg_var(pop(file_point_segment))),
                 eop,
             ))),
             eop,
@@ -1340,6 +1396,60 @@ pub struct SkewerCase {
     string: String,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct VarCase {
+    string: String,
+}
+
+impl Serialize for VarCase {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.string.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for VarCase {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let string = String::deserialize(deserializer)?;
+
+        let result = result(var_case(new_span(string.as_str())));
+        match result {
+            Ok(var) => Ok(var),
+            Err(err) => Err(serde::de::Error::custom(err.to_string())),
+        }
+    }
+}
+
+impl FromStr for VarCase {
+    type Err = SpaceErr;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        result(all_consuming(var_chars)(new_span(s)))?;
+        Ok(Self {
+            string: s.to_string(),
+        })
+    }
+}
+
+impl Display for VarCase {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(self.string.as_str())
+    }
+}
+
+impl Deref for VarCase {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.string
+    }
+}
+
 impl Serialize for SkewerCase {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -1408,6 +1518,17 @@ pub fn skewer_case<I: Span>(input: I) -> Res<I, SkewerCase> {
     })
 }
 
+pub fn var_case<I: Span>(input: I) -> Res<I, VarCase> {
+    context("expect-skewer-case", var_chars)(input).map(|(next, skewer_case_chars)| {
+        (
+            next,
+            VarCase{
+                string: skewer_case_chars.to_string(),
+            },
+        )
+    })
+}
+
 pub fn camel_case_chars<I: Span>(input: I) -> Res<I, I> {
     recognize(tuple((is_a("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), alphanumeric0)))(input)
 }
@@ -1417,6 +1538,10 @@ pub fn skewer_case_chars<I: Span>(input: I) -> Res<I, I> {
         is_a("abcdefghijklmnopqrstuvwxyz"),
         many0(alt((alphanumeric1, tag("-")))),
     )))(input)
+}
+
+pub fn var_chars<I: Span>(input: I) -> Res<I, I> {
+    recognize(tuple((alpha1, many0(alt((alphanumeric1, tag("_")))))))(input)
 }
 
 pub fn lowercase_alphanumeric<I: Span>(input: I) -> Res<I, I> {
@@ -2357,10 +2482,7 @@ where
 
  */
 
-pub fn diagnose<I: Clone, O, F>(
-    tag: &'static str,
-    mut f: F,
-) -> impl FnMut(I) -> Res<I, O>
+pub fn diagnose<I: Clone, O, F>(tag: &'static str, mut f: F) -> impl FnMut(I) -> Res<I, O>
 where
     I: ToString
         + InputLength
@@ -2390,11 +2512,9 @@ pub trait SubstParser<T: Sized> {
     fn parse_span<I: Span>(&self, input: I) -> Res<I, T>;
 }
 
-pub fn root_ctx_seg<I: Span, F>(
-    mut f: F,
-) -> impl FnMut(I) -> Res<I, PointSegCtx> + Copy
+pub fn root_ctx_seg<I: Span, F>(mut f: F) -> impl FnMut(I) -> Res<I, PointSegCtx> + Copy
 where
-    F: Parser<I, PointSeg,ParseTree<I>> + Copy,
+    F: Parser<I, PointSeg, ParseTree<I>> + Copy,
 {
     move |input: I| match pair(tag::<&str, I, ParseTree<I>>(".."), eos)(input.clone()) {
         Ok((next, v)) => Ok((
@@ -2420,11 +2540,9 @@ where
     }
 }
 
-pub fn working<I: Span, F>(
-    mut f: F,
-) -> impl FnMut(I) -> Res<I, PointSegCtx>
+pub fn working<I: Span, F>(mut f: F) -> impl FnMut(I) -> Res<I, PointSegCtx>
 where
-    F: nom::Parser<I, PointSeg,ParseTree<I>>,
+    F: nom::Parser<I, PointSeg, ParseTree<I>>,
 {
     move |input: I| match pair(tag::<&str, I, ParseTree<I>>("."), eos)(input.clone()) {
         Ok((next, v)) => Ok((
@@ -2441,9 +2559,7 @@ where
     }
 }
 
-pub fn pop<I: Span, F>(
-    mut f: F,
-) -> impl FnMut(I) -> Res<I, PointSegCtx> + Copy
+pub fn pop<I: Span, F>(mut f: F) -> impl FnMut(I) -> Res<I, PointSegCtx> + Copy
 where
     F: nom::Parser<I, PointSeg, ParseTree<I>> + Copy,
 {
@@ -2465,16 +2581,13 @@ where
 pub fn base_seg<I, F, S>(mut f: F) -> impl FnMut(I) -> Res<I, S>
 where
     I: Span,
-    F: nom::Parser<I, S,ParseTree<I>> + Copy,
+    F: nom::Parser<I, S, ParseTree<I>> + Copy,
     S: PointSegment,
 {
     move |input: I| preceded(tag(":"), f)(input)
 }
 
-
-pub fn mesh_seg<I: Span, F, S1, S2>(
-    mut f: F,
-) -> impl FnMut(I) -> Res<I, S2>
+pub fn mesh_seg<I: Span, F, S1, S2>(mut f: F) -> impl FnMut(I) -> Res<I, S2>
 where
     F: nom::Parser<I, S1, ParseTree<I>> + Copy,
     S1: PointSegment + Into<S2>,
@@ -2505,8 +2618,7 @@ where
 }
 
 // end of segment
-pub fn eos<I: Span>(input: I) -> Res<I, ()>
-{
+pub fn eos<I: Span>(input: I) -> Res<I, ()> {
     peek(alt((tag("/"), tag(":"), tag("%"), space1, eof)))(input).map(|(next, _)| (next, ()))
 }
 
@@ -2580,9 +2692,7 @@ pub fn variable_name<I: Span>(input: I) -> Res<I, I> {
     recognize(pair(lowercase1, opt(skewer_dot)))(input).map(|(next, name)| (next, name))
 }
 
-pub fn ispan<'a, I: Clone, O, F>(
-    mut f: F,
-) -> impl FnMut(I) -> Res<I, Spanned<I, O>>
+pub fn ispan<'a, I: Clone, O, F>(mut f: F) -> impl FnMut(I) -> Res<I, Spanned<I, O>>
 where
     I: ToString
         + InputLength
@@ -2759,9 +2869,7 @@ where
     }
 }
 
-pub fn lex_block_alt<I: Span>(
-    kinds: Vec<BlockKind>,
-) -> impl FnMut(I) -> Res<I, LexBlock<I>>
+pub fn lex_block_alt<I: Span>(kinds: Vec<BlockKind>) -> impl FnMut(I) -> Res<I, LexBlock<I>>
 where
     I: ToString
         + InputLength
@@ -2865,9 +2973,7 @@ where
 
 /// rough block simply makes sure that the opening and closing symbols match
 /// it accounts for multiple embedded blocks of the same kind but NOT of differing kinds
-pub fn lex_nested_block<I: Span>(
-    kind: NestedBlockKind,
-) -> impl FnMut(I) -> Res<I, LexBlock<I>>
+pub fn lex_nested_block<I: Span>(kind: NestedBlockKind) -> impl FnMut(I) -> Res<I, LexBlock<I>>
 where
     I: ToString
         + InputLength
@@ -2976,7 +3082,7 @@ fn block_open<I: Span>(input: I) -> Res<I, NestedBlockKind> {
     ))(input)
 }
 
-fn any_soround_lex_block<I: Span>(input: I) -> Res<I, LexBlock<I> >
+fn any_soround_lex_block<I: Span>(input: I) -> Res<I, LexBlock<I>>
 where
     I: ToString
         + InputLength
@@ -3338,10 +3444,7 @@ where
     f.parse(input)
 }
 
-pub fn parse_inner_block<I, F>(
-    kind: NestedBlockKind,
-    mut f: &F,
-) -> impl FnMut(I) -> Res<I, I> + '_
+pub fn parse_inner_block<I, F>(kind: NestedBlockKind, mut f: &F) -> impl FnMut(I) -> Res<I, I> + '_
 where
     I: Span,
     &'static str: FindToken<<I as InputTakeAtPosition>::Item>,
@@ -3381,10 +3484,7 @@ where
     }
 }
 
-pub fn parse_include_blocks<I, O2, F>(
-    kind: NestedBlockKind,
-    mut f: F,
-) -> impl FnMut(I) -> Res<I, I>
+pub fn parse_include_blocks<I, O2, F>(kind: NestedBlockKind, mut f: F) -> impl FnMut(I) -> Res<I, I>
 where
     I: Span,
     &'static str: FindToken<<I as InputTakeAtPosition>::Item>,
@@ -3560,18 +3660,18 @@ pub mod model {
     use serde::de::Visitor;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-    use crate::space::config::bind::{
-        PipelineStepDef,
-        PipelineStopDef,
-    };
+    use crate::space::config::bind::{PipelineStepDef, PipelineStopDef};
     use crate::space::err::{ParseErrs, SpaceErr};
     use crate::space::loc::Version;
+    use crate::space::parse::util::{new_span, result, Span, Trace, Tw};
+    use crate::space::parse::{
+        lex_child_scopes, method_kind, pipeline, subst_path, value_pattern, wrapped_cmd_method,
+        wrapped_ext_method, wrapped_http_method, wrapped_sys_method, Assignment, Env,
+    };
     use crate::space::point::{Point, PointCtx, PointVar};
     use crate::space::util::{ToResolved, ValueMatcher, ValuePattern};
     use crate::space::wave::core::{Method, MethodKind};
     use crate::space::wave::{DirectedWave, SingularDirectedWave};
-    use crate::space::parse::util::{new_span, result, Span, Trace, Tw};
-    use crate::space::parse::{lex_child_scopes, method_kind, pipeline, subst_path, value_pattern, wrapped_cmd_method, wrapped_ext_method, wrapped_http_method, wrapped_sys_method, Assignment, Env};
 
     #[derive(Clone)]
     pub struct ScopeSelectorAndFiltersDef<S, I> {
@@ -4843,7 +4943,6 @@ pub mod model {
     }
 }
 
-
 fn create_command<I: Span>(input: I) -> Res<I, CommandVar> {
     tuple((tag("create"), create))(input)
         .map(|(next, (_, create))| (next, CommandVar::Create(create)))
@@ -5049,24 +5148,26 @@ pub mod cmd_test {
     use crate::space::util::ToResolved;
     use crate::{BaseKind, KindTemplate};
 
-    use crate::space::parse::{command, create_command, point_selector, publish_command, script, upload_blocks, CamelCase};
+    use crate::space::parse::{
+        command, create_command, point_selector, publish_command, script, upload_blocks, CamelCase,
+    };
     /*
-                    #[mem]
-                    pub async fn test2() -> Result<(),Error>{
-                        let input = "? xreate localhost<Space>";
-                        let x: Result<CommandOp,VerboseError<&str>> = final_parser(command)(input);
-                        match x {
-                            Ok(_) => {}
-                            Err(err) => {
-                                println!("err: {}", err.to_string())
-                            }
-                        }
+    #[mem]
+    pub async fn test2() -> Result<(),Error>{
+        let input = "? xreate localhost<Space>";
+        let x: Result<CommandOp,VerboseError<&str>> = final_parser(command)(input);
+        match x {
+            Ok(_) => {}
+            Err(err) => {
+                println!("err: {}", err.to_string())
+            }
+        }
 
 
-                        Ok(())
-                    }
+        Ok(())
+    }
 
-                     */
+     */
 
     //    #[test]
     pub fn test() -> Result<(), SpaceErr> {
@@ -5382,9 +5483,7 @@ pub fn parse_star_key<I: Span>(input: I) -> Res<I, StarKey> {
     ))
 }
 
-pub fn pattern<I: Span, O, V>(
-    mut value: V,
-) -> impl FnMut(I) -> Res<I, Pattern<O>>
+pub fn pattern<I: Span, O, V>(mut value: V) -> impl FnMut(I) -> Res<I, Pattern<O>>
 where
     V: Parser<I, O, ParseTree<I>>,
 {
@@ -5401,9 +5500,7 @@ where
     }
 }
 
-pub fn value_pattern<I: Span, O, F>(
-    mut f: F,
-) -> impl FnMut(I) -> Res<I, ValuePattern<O>>
+pub fn value_pattern<I: Span, O, F>(mut f: F) -> impl FnMut(I) -> Res<I, ValuePattern<O>>
 where
     I: InputLength + InputTake + Compare<&'static str>,
     F: Parser<I, O, ParseTree<I>>,
@@ -5455,18 +5552,18 @@ pub fn specific_selector<I: Span>(input: I) -> Res<I, SpecificSelector> {
         tag(":"),
         delimited(tag("("), version_req, tag(")")),
     ))(input)
-        .map(
-            |(next, (provider, _, vendor, _, product, _, variant, _, version))| {
-                let specific = SpecificSelector {
-                    provider,
-                    vendor,
-                    product,
-                    variant,
-                    version,
-                };
-                (next, specific)
-            },
-        )
+    .map(
+        |(next, (provider, _, vendor, _, product, _, variant, _, version))| {
+            let specific = SpecificSelector {
+                provider,
+                vendor,
+                product,
+                variant,
+                version,
+            };
+            (next, specific)
+        },
+    )
 }
 
 pub fn rec_domain_pattern<I: Span>(input: I) -> Res<I, Pattern<I>> {
@@ -5502,28 +5599,28 @@ pub fn kind_lex<I: Span>(input: I) -> Res<I, KindLex> {
             tag(">"),
         )),
     ))(input)
-        .map(|(next, (kind, rest))| {
-            let mut rtn = KindLex {
-                base: kind,
-                sub: Option::None,
-                specific: Option::None,
-            };
+    .map(|(next, (kind, rest))| {
+        let mut rtn = KindLex {
+            base: kind,
+            sub: Option::None,
+            specific: Option::None,
+        };
 
-            match rest {
-                Some((sub, specific)) => {
-                    rtn.sub = Option::Some(sub);
-                    match specific {
-                        Some(specific) => {
-                            rtn.specific = Option::Some(specific);
-                        }
-                        None => {}
+        match rest {
+            Some((sub, specific)) => {
+                rtn.sub = Option::Some(sub);
+                match specific {
+                    Some(specific) => {
+                        rtn.specific = Option::Some(specific);
                     }
+                    None => {}
                 }
-                None => {}
             }
+            None => {}
+        }
 
-            (next, rtn)
-        })
+        (next, rtn)
+    })
 }
 
 pub fn kind_parts<I: Span>(input: I) -> Res<I, KindParts> {
@@ -5535,28 +5632,28 @@ pub fn kind_parts<I: Span>(input: I) -> Res<I, KindParts> {
             tag(">"),
         )),
     ))(input)
-        .map(|(next, (base, rest))| {
-            let mut rtn = KindParts {
-                base,
-                sub: Option::None,
-                specific: Option::None,
-            };
+    .map(|(next, (base, rest))| {
+        let mut rtn = KindParts {
+            base,
+            sub: Option::None,
+            specific: Option::None,
+        };
 
-            match rest {
-                Some((sub, specific)) => {
-                    rtn.sub = Option::Some(sub);
-                    match specific {
-                        Some(specific) => {
-                            rtn.specific = Option::Some(specific);
-                        }
-                        None => {}
+        match rest {
+            Some((sub, specific)) => {
+                rtn.sub = Option::Some(sub);
+                match specific {
+                    Some(specific) => {
+                        rtn.specific = Option::Some(specific);
                     }
+                    None => {}
                 }
-                None => {}
             }
+            None => {}
+        }
 
-            (next, rtn)
-        })
+        (next, rtn)
+    })
 }
 
 pub fn delim_kind<I: Span>(input: I) -> Res<I, Kind> {
@@ -5624,8 +5721,7 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
                     let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
                     Err(nom::Err::Error(ParseTree::add_context(
                         input,
-
-                        ErrCtx::InvalidSubKind(BaseKind::Database,sub.to_string()),
+                        ErrCtx::InvalidSubKind(BaseKind::Database, sub.to_string()),
                         err,
                     )))
                 }
@@ -5640,8 +5736,7 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
                     let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
                     Err(nom::Err::Error(ParseTree::add_context(
                         input,
-
-                        ErrCtx::InvalidSubKind(BaseKind::UserBase,sub.to_string()),
+                        ErrCtx::InvalidSubKind(BaseKind::UserBase, sub.to_string()),
                         err,
                     )))
                 }
@@ -5652,7 +5747,7 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
                     let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
                     Err(nom::Err::Error(ParseTree::add_context(
                         input,
-                        ErrCtx::InvalidSubKind(BaseKind::Native,sub.to_string()),
+                        ErrCtx::InvalidSubKind(BaseKind::Native, sub.to_string()),
                         err,
                     )))
                 }
@@ -5663,7 +5758,7 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
                     let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
                     Err(nom::Err::Error(ParseTree::add_context(
                         input,
-                        ErrCtx::InvalidSubKind(BaseKind::Artifact,sub.to_string()),
+                        ErrCtx::InvalidSubKind(BaseKind::Artifact, sub.to_string()),
                         err,
                     )))
                 }
@@ -5674,7 +5769,7 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
                     let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
                     Err(nom::Err::Error(ParseTree::add_context(
                         input,
-                        ErrCtx::InvalidSubKind(BaseKind::Star,sub.to_string()),
+                        ErrCtx::InvalidSubKind(BaseKind::Star, sub.to_string()),
                         err,
                     )))
                 }
@@ -5685,8 +5780,7 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
                     let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
                     Err(nom::Err::Error(ParseTree::add_context(
                         input,
-
-                        ErrCtx::InvalidSubKind(BaseKind::File,sub.to_string()),
+                        ErrCtx::InvalidSubKind(BaseKind::File, sub.to_string()),
                         err,
                     )))
                 }
@@ -5735,26 +5829,26 @@ pub fn kind_selector<I: Span>(input: I) -> Res<I, KindSelector> {
         )),
         tag(">"),
     )(input)
-        .map(|(next, (kind, sub_kind_and_specific))| {
-            let (sub_kind, specific) = match sub_kind_and_specific {
-                None => (Pattern::Any, ValuePattern::Always),
-                Some((kind, specific)) => (
-                    kind,
-                    match specific {
-                        None => ValuePattern::Always,
-                        Some(specific) => specific,
-                    },
-                ),
-            };
+    .map(|(next, (kind, sub_kind_and_specific))| {
+        let (sub_kind, specific) = match sub_kind_and_specific {
+            None => (Pattern::Any, ValuePattern::Always),
+            Some((kind, specific)) => (
+                kind,
+                match specific {
+                    None => ValuePattern::Always,
+                    Some(specific) => specific,
+                },
+            ),
+        };
 
-            let tks = KindSelector {
-                base: kind,
-                sub: sub_kind,
-                specific,
-            };
+        let tks = KindSelector {
+            base: kind,
+            sub: sub_kind,
+            specific,
+        };
 
-            (next, tks)
-        })
+        (next, tks)
+    })
 }
 
 fn space_hop<I: Span>(input: I) -> Res<I, Hop> {
@@ -5861,42 +5955,42 @@ pub fn point_selector<I: Span>(input: I) -> Res<I, Selector> {
             opt(preceded(tag(":/"), tuple((many0(dir_hop), opt(file_hop))))),
         )),
     )(input)
-        .map(
-            |(next, (space_hop, base_hops, version_hop, filesystem_hops))| {
-                let mut hops = vec![];
-                hops.push(space_hop);
-                for base_hop in base_hops {
-                    hops.push(base_hop);
+    .map(
+        |(next, (space_hop, base_hops, version_hop, filesystem_hops))| {
+            let mut hops = vec![];
+            hops.push(space_hop);
+            for base_hop in base_hops {
+                hops.push(base_hop);
+            }
+            if let Option::Some(version_hop) = version_hop {
+                hops.push(version_hop);
+            }
+            if let Some((dir_hops, file_hop)) = filesystem_hops {
+                // first push the filesystem root
+                hops.push(Hop {
+                    inclusive: false,
+                    segment_selector: PointSegSelector::Exact(ExactPointSeg::PointSeg(
+                        PointSeg::FsRootDir,
+                    )),
+                    kind_selector: KindSelector {
+                        base: Pattern::Exact(BaseKind::File),
+                        sub: Pattern::Any,
+                        specific: ValuePattern::Always,
+                    },
+                });
+                for dir_hop in dir_hops {
+                    hops.push(dir_hop);
                 }
-                if let Option::Some(version_hop) = version_hop {
-                    hops.push(version_hop);
+                if let Some(file_hop) = file_hop {
+                    hops.push(file_hop);
                 }
-                if let Some((dir_hops, file_hop)) = filesystem_hops {
-                    // first push the filesystem root
-                    hops.push(Hop {
-                        inclusive: false,
-                        segment_selector: PointSegSelector::Exact(ExactPointSeg::PointSeg(
-                            PointSeg::FsRootDir,
-                        )),
-                        kind_selector: KindSelector {
-                            base: Pattern::Exact(BaseKind::File),
-                            sub: Pattern::Any,
-                            specific: ValuePattern::Always,
-                        },
-                    });
-                    for dir_hop in dir_hops {
-                        hops.push(dir_hop);
-                    }
-                    if let Some(file_hop) = file_hop {
-                        hops.push(file_hop);
-                    }
-                }
+            }
 
-                let rtn = Selector { hops };
+            let rtn = Selector { hops };
 
-                (next, rtn)
-            },
-        )
+            (next, rtn)
+        },
+    )
 }
 
 pub fn point_and_kind<I: Span>(input: I) -> Res<I, PointKindVar> {
@@ -5931,18 +6025,18 @@ pub fn specific<I: Span>(input: I) -> Res<I, Specific> {
         tag(":"),
         version,
     ))(input)
-        .map(
-            |(next, (provider, _, vendor, _, product, _, variant, _, version))| {
-                let specific = Specific {
-                    provider,
-                    vendor,
-                    product,
-                    variant,
-                    version,
-                };
-                (next, specific)
-            },
-        )
+    .map(
+        |(next, (provider, _, vendor, _, product, _, variant, _, version))| {
+            let specific = Specific {
+                provider,
+                vendor,
+                product,
+                variant,
+                version,
+            };
+            (next, specific)
+        },
+    )
 }
 
 pub fn args<T>(i: T) -> Res<T, T>
@@ -6038,19 +6132,19 @@ pub fn primitive_def<I: Span>(input: I) -> Res<I, PayloadType2Def<PointVar>> {
         opt(preceded(tag("~"), opt(format))),
         opt(preceded(tag("~"), call_with_config)),
     ))(input)
-        .map(|(next, (primitive, format, verifier))| {
-            (
-                next,
-                PayloadType2Def {
-                    primitive,
-                    format: match format {
-                        Some(Some(format)) => Some(format),
-                        _ => Option::None,
-                    },
-                    verifier,
+    .map(|(next, (primitive, format, verifier))| {
+        (
+            next,
+            PayloadType2Def {
+                primitive,
+                format: match format {
+                    Some(Some(format)) => Some(format),
+                    _ => Option::None,
                 },
-            )
-        })
+                verifier,
+            },
+        )
+    })
 }
 
 pub fn payload<I: Span>(input: I) -> Res<I, SubstanceKind> {
@@ -6086,13 +6180,13 @@ pub fn ext_call<I: Span>(input: I) -> Res<I, CallKind> {
         delimited(tag("Ext<"), ext_method, tag(">")),
         opt(subst_path),
     ))(input)
-        .map(|(next, (method, path))| {
-            let path = match path {
-                None => subst(filepath_chars)(new_span("/")).unwrap().1.stringify(),
-                Some(path) => path.stringify(),
-            };
-            (next, CallKind::Ext(ExtCall::new(method, path)))
-        })
+    .map(|(next, (method, path))| {
+        let path = match path {
+            None => subst(filepath_chars)(new_span("/")).unwrap().1.stringify(),
+            Some(path) => path.stringify(),
+        };
+        (next, CallKind::Ext(ExtCall::new(method, path)))
+    })
 }
 
 pub fn http_call<I: Span>(input: I) -> Res<I, CallKind> {
@@ -6100,13 +6194,13 @@ pub fn http_call<I: Span>(input: I) -> Res<I, CallKind> {
         delimited(tag("Http<"), http_method, tag(">")),
         opt(subst_path),
     ))(input)
-        .map(|(next, (method, path))| {
-            let path = match path {
-                None => subst(filepath_chars)(new_span("/")).unwrap().1.stringify(),
-                Some(path) => path.stringify(),
-            };
-            (next, CallKind::Http(HttpCall::new(method, path)))
-        })
+    .map(|(next, (method, path))| {
+        let path = match path {
+            None => subst(filepath_chars)(new_span("/")).unwrap().1.stringify(),
+            Some(path) => path.stringify(),
+        };
+        (next, CallKind::Http(HttpCall::new(method, path)))
+    })
 }
 
 pub fn call_kind<I: Span>(input: I) -> Res<I, CallKind> {
@@ -6162,13 +6256,13 @@ pub fn range<I: Span>(input: I) -> Res<I, NumRange> {
         opt(alt((digit_range, exact_range))),
         multispace0,
     )(input)
-        .map(|(next, range)| {
-            let range = match range {
-                Some(range) => range,
-                None => NumRange::Any,
-            };
-            (next, range)
-        })
+    .map(|(next, range)| {
+        let range = match range {
+            Some(range) => range,
+            None => NumRange::Any,
+        };
+        (next, range)
+    })
 }
 
 pub fn primitive_data_struct<I: Span>(input: I) -> Res<I, SubstanceTypePatternDef<PointVar>> {
@@ -6184,12 +6278,12 @@ pub fn array_data_struct<I: Span>(input: I) -> Res<I, SubstanceTypePatternDef<Po
             context("array", delimited(tag("["), range, tag("]"))),
         )),
     )(input)
-        .map(|(next, (primitive, range))| {
-            (
-                next,
-                SubstanceTypePatternDef::List(ListPattern { primitive, range }),
-            )
-        })
+    .map(|(next, (primitive, range))| {
+        (
+            next,
+            SubstanceTypePatternDef::List(ListPattern { primitive, range }),
+        )
+    })
 }
 
 pub fn map_entry_pattern_any<I: Span>(input: I) -> Res<I, ValuePattern<MapEntryPatternVar>> {
@@ -6240,26 +6334,26 @@ pub fn map_pattern_params<I: Span>(input: I) -> Res<I, MapPatternVar> {
         multispace0,
         opt(allowed_map_entry_pattern),
     ))(input)
-        .map(|(next, (required, _, allowed))| {
-            let mut required_map = HashMap::new();
-            match required {
-                Option::Some(required) => {
-                    for require in required {
-                        required_map.insert(require.key, require.payload);
-                    }
+    .map(|(next, (required, _, allowed))| {
+        let mut required_map = HashMap::new();
+        match required {
+            Option::Some(required) => {
+                for require in required {
+                    required_map.insert(require.key, require.payload);
                 }
-                Option::None => {}
             }
+            Option::None => {}
+        }
 
-            let allowed = match allowed {
-                Some(allowed) => allowed,
-                None => ValuePattern::Never,
-            };
+        let allowed = match allowed {
+            Some(allowed) => allowed,
+            None => ValuePattern::Never,
+        };
 
-            let con = MapPatternVar::new(required_map, allowed);
+        let con = MapPatternVar::new(required_map, allowed);
 
-            (next, con)
-        })
+        (next, con)
+    })
 }
 
 pub fn format<I: Span>(input: I) -> Res<I, SubstanceFormat> {
@@ -6289,15 +6383,15 @@ pub fn map_pattern<I: Span>(input: I) -> Res<I, MapPatternVar> {
             tag("}"),
         )),
     ))(input)
-        .map(|(next, (_, entries))| {
-            let mut entries = entries;
-            let con = match entries {
-                None => MapPatternVar::any(),
-                Some(con) => con,
-            };
+    .map(|(next, (_, entries))| {
+        let mut entries = entries;
+        let con = match entries {
+            None => MapPatternVar::any(),
+            Some(con) => con,
+        };
 
-            (next, con)
-        })
+        (next, con)
+    })
 }
 
 pub fn value_constrained_map_pattern<I: Span>(input: I) -> Res<I, ValuePattern<MapPatternVar>> {
@@ -6327,9 +6421,7 @@ pub fn http_method_pattern<I: Span>(input: I) -> Res<I, HttpMethodPattern> {
     context("@http_method_pattern", method_pattern(http_method))(input)
 }
 
-pub fn method_pattern<I: Clone,  F>(
-    mut f: F,
-) -> impl FnMut(I) -> Res<I, HttpMethodPattern>
+pub fn method_pattern<I: Clone, F>(mut f: F) -> impl FnMut(I) -> Res<I, HttpMethodPattern>
 where
     I: InputLength + InputTake + Compare<&'static str>,
     F: Parser<I, HttpMethod, ParseTree<I>>,
@@ -6426,19 +6518,19 @@ pub fn payload_structure_with_validation<I: Span>(input: I) -> Res<I, SubstanceP
         opt(preceded(tag("~"), opt(format))),
         opt(preceded(tag("~"), call_with_config)),
     ))(input)
-        .map(|(next, (data, format, verifier))| {
-            (
-                next,
-                SubstancePatternVar {
-                    structure: data,
-                    format: match format {
-                        Some(Some(format)) => Some(format),
-                        _ => Option::None,
-                    },
-                    validator: verifier,
+    .map(|(next, (data, format, verifier))| {
+        (
+            next,
+            SubstancePatternVar {
+                structure: data,
+                format: match format {
+                    Some(Some(format)) => Some(format),
+                    _ => Option::None,
                 },
-            )
-        })
+                validator: verifier,
+            },
+        )
+    })
 }
 
 pub fn consume_payload_structure<I: Span>(input: I) -> Res<I, SubstanceTypePatternVar> {
@@ -6458,7 +6550,7 @@ pub fn payload_pattern<I: Span>(input: I) -> Res<I, ValuePattern<SubstancePatter
         "@payload-pattern",
         value_pattern(payload_structure_with_validation),
     )(input)
-        .map(|(next, payload_pattern)| (next, payload_pattern))
+    .map(|(next, payload_pattern)| (next, payload_pattern))
 }
 
 pub fn payload_filter_block_empty<I: Span>(input: I) -> Res<I, PatternBlockVar> {
@@ -6522,7 +6614,7 @@ pub fn request_payload_filter_block<I: Span>(input: I) -> Res<I, PayloadBlockVar
         )),
         multispace0,
     ))(input)
-        .map(|(next, (_, block, _))| (next, PayloadBlockVar::DirectPattern(block)))
+    .map(|(next, (_, block, _))| (next, PayloadBlockVar::DirectPattern(block)))
 }
 
 pub fn response_payload_filter_block<I: Span>(input: I) -> Res<I, PayloadBlockVar> {
@@ -6542,7 +6634,7 @@ pub fn response_payload_filter_block<I: Span>(input: I) -> Res<I, PayloadBlockVa
             tag("]"),
         ),
     )(input)
-        .map(|(next, (_, block, _))| (next, PayloadBlockVar::ReflectPattern(block)))
+    .map(|(next, (_, block, _))| (next, PayloadBlockVar::ReflectPattern(block)))
 }
 
 pub fn rough_pipeline_step<I: Span>(input: I) -> Res<I, I> {
@@ -6598,7 +6690,7 @@ where
         },
         ErrorKind::AlphaNumeric,
     )
-        .map(|(next, comment)| (next, TextType::NoComment(comment)))
+    .map(|(next, comment)| (next, TextType::NoComment(comment)))
 }
 
 pub fn comment<T: Span>(i: T) -> Res<T, TextType<T>>
@@ -6613,7 +6705,7 @@ where
         },
         ErrorKind::AlphaNumeric,
     )
-        .map(|(next, comment)| (next, TextType::Comment(comment)))
+    .map(|(next, comment)| (next, TextType::Comment(comment)))
 }
 
 pub fn bind_config(src: &str) -> Result<BindConfig, SpaceErr> {
@@ -6656,9 +6748,9 @@ pub fn doc(src: &str) -> Result<Document, SpaceErr> {
                     Label::new(
                         lex_root_scope.selector.version.span.location_offset()
                             ..lex_root_scope.selector.version.span.location_offset()
-                            + lex_root_scope.selector.version.span.len(),
+                                + lex_root_scope.selector.version.span.len(),
                     )
-                        .with_message("Unsupported Bind Config Version"),
+                    .with_message("Unsupported Bind Config Version"),
                 )
                 .finish();
             Err(ParseErrs::from_report(report, lex_root_scope.block.content.extra.clone()).into())
@@ -6680,9 +6772,9 @@ pub fn doc(src: &str) -> Result<Document, SpaceErr> {
                     Label::new(
                         lex_root_scope.selector.version.span.location_offset()
                             ..lex_root_scope.selector.version.span.location_offset()
-                            + lex_root_scope.selector.version.span.len(),
+                                + lex_root_scope.selector.version.span.len(),
                     )
-                        .with_message("Unsupported Bind Config Version"),
+                    .with_message("Unsupported Bind Config Version"),
                 )
                 .finish();
             Err(ParseErrs::from_report(report, lex_root_scope.block.content.extra.clone()).into())
@@ -6699,9 +6791,9 @@ pub fn doc(src: &str) -> Result<Document, SpaceErr> {
                 Label::new(
                     lex_root_scope.selector.name.location_offset()
                         ..lex_root_scope.selector.name.location_offset()
-                        + lex_root_scope.selector.name.len(),
+                            + lex_root_scope.selector.name.len(),
                 )
-                    .with_message("Unrecognized Config Kind"),
+                .with_message("Unrecognized Config Kind"),
             )
             .finish();
         Err(ParseErrs::from_report(report, lex_root_scope.block.content.extra.clone()).into())
@@ -6744,15 +6836,15 @@ where
         opt(tag(";")),
         multispace0,
     ))(input)
-        .map(|(next, (_, _, k, _, _, _, v, _, _, _))| {
-            (
-                next,
-                Assignment {
-                    key: k.to_string(),
-                    value: v.to_string(),
-                },
-            )
-        })
+    .map(|(next, (_, _, k, _, _, _, v, _, _, _))| {
+        (
+            next,
+            Assignment {
+                key: k.to_string(),
+                value: v.to_string(),
+            },
+        )
+    })
 }
 
 #[derive(Clone)]
@@ -6780,7 +6872,7 @@ fn semantic_mechtron_scope<I: Span>(scope: LexScope<I>) -> Result<MechtronScope,
                         scope.selector.name.location_offset()
                             ..scope.selector.name.location_offset() + scope.selector.name.len(),
                     )
-                        .with_message("Unrecognized Selector"),
+                    .with_message("Unrecognized Selector"),
                 )
                 .finish();
             Err(ParseErrs::from_report(report, scope.block.content.extra().clone()).into())
@@ -6831,7 +6923,7 @@ fn semantic_bind_scope<I: Span>(scope: LexScope<I>) -> Result<BindScope, SpaceEr
                         scope.selector.name.location_offset()
                             ..scope.selector.name.location_offset() + scope.selector.name.len(),
                     )
-                        .with_message("Unrecognized Selector"),
+                    .with_message("Unrecognized Selector"),
                 )
                 .finish();
             Err(ParseErrs::from_report(report, scope.block.content.extra().clone()).into())
@@ -6919,25 +7011,25 @@ pub fn pipeline_step_var<I: Span>(input: I) -> Res<I, PipelineStepVar> {
             context("pipeline:step:exit", cut(tag(">"))),
         )),
     )(input)
-        .map(|(next, (entry, block_and_exit, _))| {
-            let mut blocks = vec![];
-            let exit = match block_and_exit {
-                None => entry.clone(),
-                Some((block, exit)) => {
-                    blocks.push(block);
-                    exit
-                }
-            };
+    .map(|(next, (entry, block_and_exit, _))| {
+        let mut blocks = vec![];
+        let exit = match block_and_exit {
+            None => entry.clone(),
+            Some((block, exit)) => {
+                blocks.push(block);
+                exit
+            }
+        };
 
-            (
-                next,
-                PipelineStepVar {
-                    entry,
-                    exit,
-                    blocks,
-                },
-            )
-        })
+        (
+            next,
+            PipelineStepVar {
+                entry,
+                exit,
+                blocks,
+            },
+        )
+    })
 }
 
 pub fn core_pipeline_stop<I: Span>(input: I) -> Res<I, PipelineStopVar> {
@@ -6949,7 +7041,7 @@ pub fn core_pipeline_stop<I: Span>(input: I) -> Res<I, PipelineStopVar> {
             tag("))"),
         ),
     )(input)
-        .map(|(next, _)| (next, PipelineStopVar::Core))
+    .map(|(next, _)| (next, PipelineStopVar::Core))
 }
 
 pub fn return_pipeline_stop<I: Span>(input: I) -> Res<I, PipelineStopVar> {
@@ -6981,7 +7073,7 @@ pub fn pipeline_stop_var<I: Span>(input: I) -> Res<I, PipelineStopVar> {
             )),
         ),
     )(input)
-        .map(|(next, (_, pipeline_stop))| (next, pipeline_stop))
+    .map(|(next, (_, pipeline_stop))| (next, pipeline_stop))
 }
 
 pub fn consume_pipeline_step<I: Span>(input: I) -> Res<I, PipelineStepVar> {
@@ -7000,7 +7092,7 @@ pub fn pipeline_segment<I: Span>(input: I) -> Res<I, PipelineSegmentVar> {
         pipeline_stop_var,
         multispace0,
     ))(input)
-        .map(|(next, (_, step, _, stop, _))| (next, PipelineSegmentVar { step, stop }))
+    .map(|(next, (_, step, _, stop, _))| (next, PipelineSegmentVar { step, stop }))
 }
 
 pub fn pipeline<I: Span>(input: I) -> Res<I, PipelineVar> {
@@ -7008,7 +7100,7 @@ pub fn pipeline<I: Span>(input: I) -> Res<I, PipelineVar> {
         "pipeline",
         many0(delimited(multispace0, pipeline_segment, multispace0)),
     )(input)
-        .map(|(next, segments)| (next, PipelineVar { segments }))
+    .map(|(next, segments)| (next, PipelineVar { segments }))
 }
 
 pub fn consume_pipeline<I: Span>(input: I) -> Res<I, PipelineVar> {
@@ -7058,7 +7150,7 @@ pub fn var_chunk<I: Span>(input: I) -> Res<I, Chunk<I>> {
             )),
         ),
     )(input)
-        .map(|(next, variable_name)| (next, Chunk::Var(variable_name)))
+    .map(|(next, variable_name)| (next, Chunk::Var(variable_name)))
 }
 
 pub fn route_attribute(input: &str) -> Result<RouteSelector, SpaceErr> {
@@ -7117,7 +7209,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, SpaceErr> {
             "extra",
             next,
         )
-            .into());
+        .into());
     }
 
     let mut names = lex_route.names.clone();

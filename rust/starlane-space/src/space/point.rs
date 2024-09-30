@@ -4,12 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use md5::{Digest, Md5};
 use crate::space::err::{ParseErrs, SpaceErr};
-use crate::space::loc::{
-    PointSegQuery, PointSegment, RouteSegQuery, Surface, ToPoint, ToSurface, Variable, Version,
-    CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE,
-    LOCAL_PORTAL, LOCAL_STAR, REMOTE_ENDPOINT,
-};
-use crate::space::parse::util::result;
+use crate::space::loc::{PointSegQuery, PointSegment, RouteSegQuery, Surface, ToPoint, ToSurface, VarVal, Variable, Version, CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE, LOCAL_PORTAL, LOCAL_STAR, REMOTE_ENDPOINT};
+use crate::space::parse::util::{result, Tw};
 use crate::space::parse::{
     consume_point, consume_point_ctx, point_route_segment, point_selector, point_var, Env,
     ResolverErr,
@@ -57,6 +53,19 @@ pub enum RouteSegVar {
     Tag(String),
     Star(String),
     Var(Variable),
+}
+
+impl From<VarVal<RouteSeg>> for RouteSegVar {
+    fn from(value: VarVal<RouteSeg>) -> Self {
+        match value {
+            VarVal::Var(var) => {
+               RouteSegVar::Var(var.into())
+            }
+            VarVal::Val(val) => {
+                val.w.into()
+            }
+        }
+    }
 }
 
 impl RouteSegQuery for RouteSegVar {
@@ -351,6 +360,20 @@ pub enum PointSegVar {
     Working(Trace),
     Pop(Trace),
     Var(Variable),
+}
+
+impl From<VarVal<PointSegCtx>> for PointSegVar {
+    fn from(value: VarVal<PointSegCtx>) -> Self {
+        match value {
+            VarVal::Var(var) => {
+                Self::Var(var.into())
+            }
+            VarVal::Val(val) =>
+                {
+                    val.w.into()
+                }
+        }
+    }
 }
 
 impl ToString for PointSegVar {
