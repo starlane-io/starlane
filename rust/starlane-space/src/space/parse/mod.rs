@@ -36,7 +36,6 @@ use nom_supreme::ParserExt;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
-use util::{new_span, span_with_extra, trim, tw, Span, Trace};
 use crate::space::command::common::{PropertyMod, SetProperties, StateSrcVar};
 use crate::space::command::direct::create::{
     CreateVar, KindTemplate, PointSegTemplate, PointTemplateSeg,
@@ -70,7 +69,7 @@ use crate::space::parse::model::{
     ScopeFilterDef, ScopeFiltersDef, Spanned, Subst,
     TerminatedBlockKind, TextType, VarParser,
 };
-use crate::space::parse::util::Wrap;
+use crate::space::parse::util::{new_span, Span, Trace, Wrap};
 use crate::space::particle::PointKindVar;
 use crate::space::point::{
     Point, PointCtx, PointSeg, PointSegCtx, PointSegDelim, PointSegVar, PointVar, RouteSeg,
@@ -7305,7 +7304,7 @@ pub mod test {
         template, var_seg, variable_name, version, Env
         ,
     };
-    use crate::space::parse::util::{new_span, span_with_extra};
+    use crate::space::parse::util::{new_span, span_with_extra, Span};
     use crate::space::point::{Point, PointCtx, PointSegVar, RouteSegVar};
     use crate::space::substance::Substance;
     use crate::space::util;
