@@ -28,6 +28,7 @@ use nom::{
     Parser, Slice,
 };
 use nom::{Err, IResult};
+use nom_locate::LocatedSpan;
 use nom_supreme::context::ContextError;
 use nom_supreme::error::GenericErrorTree;
 use nom_supreme::final_parser::ExtractContext;
@@ -69,6 +70,7 @@ use crate::space::parse::model::{
     ScopeFilterDef, ScopeFiltersDef, Spanned, Subst,
     TerminatedBlockKind, TextType, VarParser,
 };
+use crate::space::parse::util::Wrap;
 use crate::space::particle::PointKindVar;
 use crate::space::point::{
     Point, PointCtx, PointSeg, PointSegCtx, PointSegDelim, PointSegVar, PointVar, RouteSeg,
@@ -102,6 +104,8 @@ use crate::space::wave::core::{Method, MethodPattern};
 
 pub type SpaceContextError<I:Span> = dyn nom_supreme::context::ContextError<I,ErrCtx>;
 pub type StarParser<I:Span,O> = dyn nom_supreme::parser_ext::ParserExt<I,O,ParseTree<I>>;
+
+pub type Xpan<'a> = Wrap<LocatedSpan<&'a str, Arc<String>>>;
 
 pub fn context<I, F, O>(
     context: &'static str,
