@@ -1,4 +1,3 @@
-pub mod point;
 
 use core::fmt;
 use core::fmt::Display;
@@ -20,7 +19,7 @@ use nom::character::complete::{
 };
 use nom::combinator::{all_consuming, opt};
 use nom::combinator::{cut, eof, fail, not, peek, recognize, value, verify};
-use nom::error::{context, ContextError, ErrorKind, ParseError};
+use nom::error::{ ErrorKind, ParseError};
 use nom::multi::{many0, many1, separated_list0};
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 use nom::{
@@ -28,13 +27,15 @@ use nom::{
     Parser, Slice,
 };
 use nom::{Err, IResult};
-use nom_supreme::error::{ErrorTree, GenericErrorTree};
+use nom_supreme::context::ContextError;
+use nom_supreme::error::{GenericErrorTree};
 use nom_supreme::final_parser::ExtractContext;
+use nom_supreme::ParserExt;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
 use starlane_parse::{new_span, span_with_extra, Trace};
-use starlane_parse::{trim, tw, Res, Span};
+use starlane_parse::{trim, tw, Span};
 
 use crate::space::command::common::{PropertyMod, SetProperties, StateSrcVar};
 use crate::space::command::direct::create::{
@@ -100,7 +101,26 @@ use crate::space::wave::core::hyp::HypMethod;
 use crate::space::wave::core::MethodKind;
 use crate::space::wave::core::{Method, MethodPattern};
 
+pub type SpaceContextError<I:Span> = dyn nom_supreme::context::ContextError<I,ErrCtx>;
+pub type StarParser<I:Span,O> = dyn nom_supreme::parser_ext::ParserExt<I,O,ParseTree<I>>;
 
+pub fn context<I, E, F, O>(
+    context: &'static str,
+    mut f: F,
+) -> impl FnMut(I) -> IResult<I, O, E>
+where
+    F: ParserExt<I, O, ParseTree<I>>,
+    I: Span,
+{
+    let context = ErrCtx::Str(context.to_string());
+    move |i: I| match f.parse(i.clone()) {
+        Ok(o) => Ok(o),
+        Err(Err::Incomplete(i)) => Err(Err::Incomplete(i)),
+
+        Err(Err::Error(e)) => Err(Err::Error(nom_supreme::context::ContextError::add_context(i, context.clone(), e))),
+        Err(Err::Failure(e)) => Err(Err::Failure(E::add_context(i, context.clone(), e))),
+    }
+}
 #[cfg(test)]
 pub mod test2 {
 
@@ -110,16 +130,27 @@ pub mod test2 {
     }
 }
 
+#[derive(Debug, Clone, strum_macros::Display)]
 pub enum ErrCtx {
-    One
+    Str(String),
+    One,
+    InvalidBaseKind(String),
+    InvalidSubKind(BaseKind,String)
 }
 
-#[derive(Debug,Error)]
+
+
+
+
+#[derive(Debug,Error,strum_macros::Display)]
 pub enum ParseErr {
     Error
 }
 
-pub type Res<I:Span,O> = IResult<I,O,GenericErrorTree<I,&'static str,ErrCtx,ParseErr>>;
+
+pub type ParseTree<I:Span> = GenericErrorTree<I,&'static str,ErrCtx,ParseErr>;
+
+pub type Res<I:Span,O> = IResult<I,O, ParseTree<I>>;
 
 /*
 pub struct Parser {}
@@ -422,7 +453,7 @@ fn var<I: Span, O>(input: I) -> Res<I, VarVal<O>> {
 
 pub fn var_seg<F, I: Span>(mut f: F) -> impl FnMut(I) -> Res<I, PointSegVar> + Copy
 where
-    F: Parser<I, PointSegCtx, ErrorTree<I>> + Copy,
+    F: Parser<I, PointSegCtx, ParseTree<I>> + Copy,
 {
     move |input: I| {
         let offset = input.location_offset();
@@ -458,7 +489,7 @@ where
 
 pub fn var_route<'a, F, I: Span>(mut f: F) -> impl FnMut(I) -> Res<I, RouteSegVar>
 where
-    F: Parser<I, RouteSeg, ErrorTree<I>>,
+    F: Parser<I, RouteSeg, ParseTree<I>>,
 {
     move |input: I| {
         let offset = input.location_offset();
@@ -957,7 +988,7 @@ pub fn parse_uuid<I: Span>(i: I) -> Res<I, Uuid> {
     Ok((
         next,
         Uuid::from(uuid)
-            .map_err(|e| nom::Err::Error(ErrorTree::from_error_kind(i, ErrorKind::Tag)))?,
+            .map_err(|e| nom::Err::Error(ParseTree::from_error_kind(i, ErrorKind::Tag)))?,
     ))
 }
 
@@ -1061,7 +1092,7 @@ pub fn path_regex<I: Span>(input: I) -> Res<I, I> {
         Ok(regex) => Ok((next, regex_span)),
         Err(err) => {
             println!("regex error {}", err.to_string());
-            return Err(nom::Err::Error(ErrorTree::from_error_kind(
+            return Err(nom::Err::Error(ParseTree::from_error_kind(
                 input,
                 ErrorKind::Tag,
             )));
@@ -2340,14 +2371,13 @@ pub trait SubstParser<T: Sized> {
     fn parse_span<I: Span>(&self, input: I) -> Res<I, T>;
 }
 
-pub fn root_ctx_seg<I: Span, E: ParseError<I>, F>(
+pub fn root_ctx_seg<I: Span, F>(
     mut f: F,
-) -> impl FnMut(I) -> IResult<I, PointSegCtx, E> + Copy
+) -> impl FnMut(I) -> Res<I, PointSegCtx> + Copy
 where
-    F: nom::Parser<I, PointSeg, E> + Copy,
-    E: nom::error::ContextError<I>,
+    F: Parser<I, PointSeg,ParseTree<I>> + Copy,
 {
-    move |input: I| match pair(tag::<&str, I, E>(".."), eos)(input.clone()) {
+    move |input: I| match pair(tag::<&str, I, ParseTree<I>>(".."), eos)(input.clone()) {
         Ok((next, v)) => Ok((
             next.clone(),
             PointSegCtx::Pop(Trace {
@@ -2355,7 +2385,7 @@ where
                 extra: next.extra(),
             }),
         )),
-        Err(err) => match pair(tag::<&str, I, E>("."), eos)(input.clone()) {
+        Err(err) => match pair(tag::<&str, I, ParseTree<I>>("."), eos)(input.clone()) {
             Ok((next, _)) => Ok((
                 next.clone(),
                 PointSegCtx::Working(Trace {
@@ -2561,7 +2591,7 @@ where
 
 pub fn sub<I: Span, O, F>(mut f: F) -> impl FnMut(I) -> Res<I, Spanned<I, O>>
 where
-    F: nom::Parser<I, O, ErrorTree<I>>,
+    F: nom::Parser<I, O, ParseTree<I>>,
     O: Clone,
 {
     move |input: I| {
@@ -2718,9 +2748,9 @@ where
     }
 }
 
-pub fn lex_block_alt<I: Span, E>(
+pub fn lex_block_alt<I: Span>(
     kinds: Vec<BlockKind>,
-) -> impl FnMut(I) -> IResult<I, LexBlock<I>, E>
+) -> impl FnMut(I) -> Res<I, LexBlock<I>>
 where
     I: ToString
         + InputLength
@@ -2734,7 +2764,6 @@ where
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
     I: nom::Slice<std::ops::RangeFrom<usize>>,
     <I as InputIter>::Item: AsChar + Copy,
-    E: nom::error::ContextError<I> + nom::error::ParseError<I>,
 {
     move |input: I| {
         for kind in &kinds {
@@ -2753,14 +2782,14 @@ where
             }
         }
 
-        Err(nom::Err::Failure(E::from_error_kind(
+        Err(nom::Err::Failure(ParseTree::from_error_kind(
             input.clone(),
             ErrorKind::Alt,
         )))
     }
 }
 
-pub fn lex_block<I: Span, E>(kind: BlockKind) -> impl FnMut(I) -> IResult<I, LexBlock<I>, E>
+pub fn lex_block<I: Span>(kind: BlockKind) -> impl FnMut(I) -> Res<I, LexBlock<I>>
 where
     I: ToString
         + InputLength
@@ -2774,7 +2803,6 @@ where
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
     I: nom::Slice<std::ops::RangeFrom<usize>>,
     <I as InputIter>::Item: AsChar + Copy,
-    E: nom::error::ContextError<I> + nom::error::ParseError<I>,
 {
     move |input: I| match kind {
         BlockKind::Nested(kind) => lex_nested_block(kind).parse(input),
@@ -2782,7 +2810,7 @@ where
         BlockKind::Delimited(kind) => lex_delimited_block(kind).parse(input),
         BlockKind::Partial => {
             eprintln!("parser should not be seeking partial block kinds...");
-            Err(nom::Err::Failure(E::from_error_kind(
+            Err(nom::Err::Failure(ParseTree::from_error_kind(
                 input,
                 ErrorKind::IsNot,
             )))
@@ -2790,9 +2818,9 @@ where
     }
 }
 
-pub fn lex_terminated_block<I: Span, E>(
+pub fn lex_terminated_block<I: Span>(
     kind: TerminatedBlockKind,
-) -> impl FnMut(I) -> IResult<I, LexBlock<I>, E>
+) -> impl FnMut(I) -> Res<I, LexBlock<I>>
 where
     I: ToString
         + InputLength
@@ -2806,7 +2834,6 @@ where
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
     I: nom::Slice<std::ops::RangeFrom<usize>>,
     <I as InputIter>::Item: AsChar,
-    E: nom::error::ContextError<I> + nom::error::ParseError<I>,
 {
     move |input: I| {
         terminated(
@@ -2827,9 +2854,9 @@ where
 
 /// rough block simply makes sure that the opening and closing symbols match
 /// it accounts for multiple embedded blocks of the same kind but NOT of differing kinds
-pub fn lex_nested_block<I: Span, E>(
+pub fn lex_nested_block<I: Span>(
     kind: NestedBlockKind,
-) -> impl FnMut(I) -> IResult<I, LexBlock<I>, E>
+) -> impl FnMut(I) -> Res<I, LexBlock<I>>
 where
     I: ToString
         + InputLength
@@ -2843,7 +2870,6 @@ where
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
     I: nom::Slice<std::ops::RangeFrom<usize>>,
     <I as InputIter>::Item: AsChar + Copy,
-    E: nom::error::ContextError<I> + nom::error::ParseError<I>,
 {
     move |input: I| {
         let (next, content) = context(
@@ -2896,9 +2922,9 @@ pub fn nested_block<I: Span>(kind: NestedBlockKind) -> impl FnMut(I) -> Res<I, B
     }
 }
 
-pub fn lex_delimited_block<I: Span, E>(
+pub fn lex_delimited_block<I: Span>(
     kind: DelimitedBlockKind,
-) -> impl FnMut(I) -> IResult<I, LexBlock<I>, E>
+) -> impl FnMut(I) -> Res<I, LexBlock<I>>
 where
     I: ToString
         + InputLength
@@ -2912,7 +2938,6 @@ where
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
     I: nom::Slice<std::ops::RangeFrom<usize>>,
     <I as InputIter>::Item: AsChar + Copy,
-    E: nom::error::ContextError<I> + nom::error::ParseError<I>,
 {
     move |input: I| {
         let (next, content) = context(
@@ -4839,12 +4864,12 @@ pub mod error {
     use crate::space::err::report::{Label, Report, ReportKind};
     use crate::space::err::{ParseErrs, SpaceErr};
     use crate::space::parse::model::NestedBlockKind;
-    use crate::space::parse::nospace1;
+    use crate::space::parse::{nospace1, ParseTree};
 
-    pub fn result<I: Span, R>(result: Result<(I, R), Err<ErrorTree<I>>>) -> Result<R, SpaceErr> {
+    pub fn result<I: Span, R>(result: Result<(I, R), Err<ParseTree<I>>>) -> Result<R, SpaceErr> {
         match result {
             Ok((_, e)) => Ok(e),
-            Err(err) => Err(find_parse_err(&err)),
+            Err(err) => Err(todo!()),
         }
     }
 
@@ -5136,7 +5161,7 @@ pub fn parse_version_chars_str<I: Span, O: FromStr>(input: I) -> Res<I, O> {
     let (next, rtn) = recognize(version_chars)(input)?;
     match O::from_str(rtn.to_string().as_str()) {
         Ok(rtn) => Ok((next, rtn)),
-        Err(err) => Err(nom::Err::Error(ErrorTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(ParseTree::from_error_kind(
             next,
             ErrorKind::Fail,
         ))),
@@ -5227,7 +5252,7 @@ pub fn parse_star_key<I: Span>(input: I) -> Res<I, StarKey> {
     let index = match index.to_string().parse::<u16>() {
         Ok(index) => index,
         Err(err) => {
-            return Err(nom::Err::Failure(ErrorTree::from_error_kind(
+            return Err(nom::Err::Failure(ParseTree::from_error_kind(
                 input,
                 ErrorKind::Digit,
             )))
@@ -5339,7 +5364,7 @@ pub fn version_req<I: Span>(input: I) -> Res<I, VersionReq> {
     match rtn {
         Ok(version) => Ok((next, VersionReq { version })),
         Err(err) => {
-            let tree = Err::Error(ErrorTree::from_error_kind(input, ErrorKind::Fail));
+            let tree = Err::Error(ParseTree::from_error_kind(input, ErrorKind::Fail));
             Err(tree)
         }
     }
@@ -5533,10 +5558,10 @@ pub fn kind_base<I: Span>(input: I) -> Res<I, BaseKind> {
     match BaseKind::try_from(kind) {
         Ok(kind) => Ok((next, kind)),
         Err(err) => {
-            let err = ErrorTree::from_error_kind(input.clone(), ErrorKind::Fail);
-            Err(nom::Err::Error(ErrorTree::add_context(
+            let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
+            Err(nom::Err::Error(ParseTree::add_context(
                 input,
-                "kind-base",
+                ErrCtx::InvalidBaseKind(kind.to_string()),
                 err,
             )))
         }
@@ -5554,10 +5579,11 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
                     Ok((next, Kind::Database(DatabaseSubKind::Relational(specific))))
                 }
                 _ => {
-                    let err = ErrorTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(ErrorTree::add_context(
+                    let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(ParseTree::add_context(
                         input,
-                        "kind-sub:not-found",
+
+                        ErrCtx::InvalidSubKind(BaseKind::Database,sub.to_string()),
                         err,
                     )))
                 }
@@ -5569,10 +5595,11 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
                     Ok((next, Kind::UserBase(UserBaseSubKind::OAuth(specific))))
                 }
                 _ => {
-                    let err = ErrorTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(ErrorTree::add_context(
+                    let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(ParseTree::add_context(
                         input,
-                        "kind-sub:not-found",
+
+                        ErrCtx::InvalidSubKind(BaseKind::UserBase,sub.to_string()),
                         err,
                     )))
                 }
@@ -5580,10 +5607,10 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
             BaseKind::Native => match NativeSub::from_str(sub.as_str()) {
                 Ok(sub) => Ok((next, Kind::Native(sub))),
                 Err(err) => {
-                    let err = ErrorTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(ErrorTree::add_context(
+                    let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(ParseTree::add_context(
                         input,
-                        "kind-sub:not-accepted",
+                        ErrCtx::InvalidSubKind(BaseKind::Native,sub.to_string()),
                         err,
                     )))
                 }
@@ -5591,10 +5618,10 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
             BaseKind::Artifact => match ArtifactSubKind::from_str(sub.as_str()) {
                 Ok(sub) => Ok((next, Kind::Artifact(sub))),
                 Err(err) => {
-                    let err = ErrorTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(ErrorTree::add_context(
+                    let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(ParseTree::add_context(
                         input,
-                        "kind-sub:not-accepted",
+                        ErrCtx::InvalidSubKind(BaseKind::Artifact,sub.to_string()),
                         err,
                     )))
                 }
@@ -5602,10 +5629,10 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
             BaseKind::Star => match StarSub::from_str(sub.as_str()) {
                 Ok(sub) => Ok((next, Kind::Star(sub))),
                 Err(err) => {
-                    let err = ErrorTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(ErrorTree::add_context(
+                    let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(ParseTree::add_context(
                         input,
-                        "kind-sub:not-accepted",
+                        ErrCtx::InvalidSubKind(BaseKind::Star,sub.to_string()),
                         err,
                     )))
                 }
@@ -5613,10 +5640,11 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
             BaseKind::File => match FileSubKind::from_str(sub.as_str()) {
                 Ok(sub) => Ok((next, Kind::File(sub))),
                 Err(err) => {
-                    let err = ErrorTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(ErrorTree::add_context(
+                    let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(ParseTree::add_context(
                         input,
-                        "kind-sub:not-accepted",
+
+                        ErrCtx::InvalidSubKind(BaseKind::File,sub.to_string()),
                         err,
                     )))
                 }
@@ -5861,7 +5889,7 @@ pub fn version<I: Span>(input: I) -> Res<I, Version> {
     match rtn {
         Ok(version) => Ok((next, Version { version })),
         Err(err) => {
-            let tree = Err::Error(ErrorTree::from_error_kind(input, ErrorKind::Fail));
+            let tree = Err::Error(ParseTree::from_error_kind(input, ErrorKind::Fail));
             Err(tree)
         }
     }
@@ -6019,7 +6047,7 @@ pub fn parse_alpha1_str<I: Span, O: FromStr>(input: I) -> Res<I, O> {
     let (next, rtn) = recognize(alpha1)(input)?;
     match O::from_str(rtn.to_string().as_str()) {
         Ok(rtn) => Ok((next, rtn)),
-        Err(err) => Err(nom::Err::Error(ErrorTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(ParseTree::from_error_kind(
             next,
             ErrorKind::Fail,
         ))),
@@ -6215,7 +6243,7 @@ pub fn format<I: Span>(input: I) -> Res<I, SubstanceFormat> {
     let (next, format) = recognize(alpha1)(input)?;
     match SubstanceFormat::from_str(format.to_string().as_str()) {
         Ok(format) => Ok((next, format)),
-        Err(err) => Err(nom::Err::Error(ErrorTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(ParseTree::from_error_kind(
             next,
             ErrorKind::Fail,
         ))),
@@ -6261,7 +6289,7 @@ pub fn parse_camel_case_str<I: Span, O: FromStr>(input: I) -> Res<I, O> {
     let (next, rtn) = recognize(camel_case_chars)(input)?;
     match O::from_str(rtn.to_string().as_str()) {
         Ok(rtn) => Ok((next, rtn)),
-        Err(err) => Err(nom::Err::Error(ErrorTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(ParseTree::from_error_kind(
             next,
             ErrorKind::Fail,
         ))),
@@ -6297,7 +6325,7 @@ pub fn ext_method<I: Span>(input: I) -> Res<I, ExtMethod> {
 
     match ExtMethod::new(ext_method.to_string()) {
         Ok(method) => Ok((next, method)),
-        Err(err) => Err(nom::Err::Error(ErrorTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(ParseTree::from_error_kind(
             input,
             ErrorKind::Fail,
         ))),
@@ -6309,7 +6337,7 @@ pub fn sys_method<I: Span>(input: I) -> Res<I, HypMethod> {
 
     match HypMethod::from_str(sys_method.to_string().as_str()) {
         Ok(method) => Ok((next, method)),
-        Err(err) => Err(nom::Err::Error(ErrorTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(ParseTree::from_error_kind(
             input,
             ErrorKind::Fail,
         ))),
@@ -6321,7 +6349,7 @@ pub fn cmd_method<I: Span>(input: I) -> Res<I, CmdMethod> {
 
     match CmdMethod::from_str(method.to_string().as_str()) {
         Ok(method) => Ok((next, method)),
-        Err(err) => Err(nom::Err::Error(ErrorTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(ParseTree::from_error_kind(
             input,
             ErrorKind::Fail,
         ))),
@@ -6333,7 +6361,7 @@ pub fn wrapped_ext_method<I: Span>(input: I) -> Res<I, Method> {
 
     match ExtMethod::new(ext_method.to_string()) {
         Ok(method) => Ok((next, Method::Ext(method))),
-        Err(err) => Err(nom::Err::Error(ErrorTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(ParseTree::from_error_kind(
             input,
             ErrorKind::Fail,
         ))),
@@ -8457,7 +8485,7 @@ pub fn layer<I: Span>(input: I) -> Res<I, Layer> {
     let (next, layer) = recognize(camel_case)(input.clone())?;
     match Layer::from_str(layer.to_string().as_str()) {
         Ok(layer) => Ok((next, layer)),
-        Err(err) => Err(nom::Err::Error(ErrorTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(ParseTree::from_error_kind(
             input,
             ErrorKind::Alpha,
         ))),
@@ -8521,9 +8549,9 @@ pub fn port<I: Span>(input: I) -> Res<I, Surface> {
     match point.w.collapse() {
         Ok(point) => Ok((next, Surface::new(point, layer, topic))),
         Err(err) => {
-            let err = ErrorTree::from_error_kind(input.clone(), ErrorKind::Alpha);
+            let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Alpha);
             let loc = input.slice(point.trace.range);
-            Err(nom::Err::Error(ErrorTree::add_context(
+            Err(nom::Err::Error(ParseTree::add_context(
                 loc,
                 "resolver-not-available",
                 err,
