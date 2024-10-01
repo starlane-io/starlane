@@ -1,4 +1,4 @@
-use crate::space::err::SpaceErr;
+use crate::space::err::{ParseErrs, SpaceErr};
 use crate::space::loc::Uuid;
 use crate::space::parse::Env;
 use crate::space::wasm::{starlane_timestamp, starlane_uuid, Timestamp};
@@ -429,11 +429,11 @@ where
     fn to_resolved(self, env: &Env) -> Result<R, SpaceErr>;
 }
 
-pub fn log<R>(result: Result<R, SpaceErr>) -> Result<R, SpaceErr> {
+pub fn log<R,E>(result: Result<R, E>) -> Result<R, E> {
     match result {
         Ok(r) => Ok(r),
         Err(err) => {
-            err.print();
+//            err.print();
             Err(err)
         }
     }

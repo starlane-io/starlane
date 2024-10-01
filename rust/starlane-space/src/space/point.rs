@@ -100,7 +100,7 @@ impl TryInto<RouteSeg> for RouteSegVar {
                 "variable not allowed here",
                 var.trace.range,
                 var.trace.extra,
-            )),
+            ).into()),
             RouteSegVar::Remote => Ok(RouteSeg::Remote),
         }
     }
@@ -438,19 +438,19 @@ impl TryInto<PointSegCtx> for PointSegVar {
                 "working point not available",
                 trace.range,
                 trace.extra,
-            )),
+            ).into()),
             PointSegVar::Pop(trace) => Err(ParseErrs::from_range(
                 "point pop not available in this context",
                 "point pop not available",
                 trace.range,
                 trace.extra,
-            )),
+            ).into()),
             PointSegVar::Var(var) => Err(ParseErrs::from_range(
                 "variable substitution not available in this context",
                 "var subst not available",
                 var.trace.range,
                 var.trace.extra,
-            )),
+            ).into()),
         }
     }
 }
@@ -472,13 +472,13 @@ impl TryInto<PointSeg> for PointSegCtx {
                 "working point not available",
                 trace.range,
                 trace.extra,
-            )),
+            ).into()),
             PointSegCtx::Pop(trace) => Err(ParseErrs::from_range(
                 "point pop not available in this context",
                 "point pop not available",
                 trace.range,
                 trace.extra,
-            )),
+            ).into()),
         }
     }
 }
@@ -830,7 +830,7 @@ impl ToResolved<Point> for PointCtx {
                             "first segment only",
                             trace.range.clone(),
                             trace.extra.clone(),
-                        ));
+                        ).into());
                     }
                     point = match env.point_or() {
                         Ok(point) => point.clone(),
@@ -840,7 +840,7 @@ impl ToResolved<Point> for PointCtx {
                                 "not available",
                                 trace.range.clone(),
                                 trace.extra.clone(),
-                            ));
+                            ).into());
                         }
                     };
                 }
@@ -854,7 +854,7 @@ impl ToResolved<Point> for PointCtx {
                                     "not available",
                                     trace.range.clone(),
                                     trace.extra.clone(),
-                                ));
+                                ).into());
                             }
                         };
                     }
@@ -868,7 +868,7 @@ impl ToResolved<Point> for PointCtx {
                             "too many point pops",
                             trace.range.clone(),
                             trace.extra.clone(),
-                        ));
+                        ).into());
                     }
                 }
                 PointSegCtx::FilesystemRootDir => {

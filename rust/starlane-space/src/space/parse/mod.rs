@@ -1,4 +1,6 @@
 pub mod util;
+#[cfg(test)]
+pub mod test;
 //pub mod error;
 
 use core::fmt;
@@ -54,7 +56,7 @@ use crate::space::substance::{
     Substance, SubstanceFormat, SubstanceKind, SubstancePattern, SubstancePatternVar,
     SubstanceTypePatternDef, SubstanceTypePatternVar,
 };
-use crate::space::util::{HttpMethodPattern, StringMatcher, ToResolved, ValuePattern};
+use crate::space::util::{log, HttpMethodPattern, StringMatcher, ToResolved, ValuePattern};
 use crate::space::wave::core::cmd::CmdMethod;
 use crate::space::wave::core::ext::ExtMethod;
 use crate::space::wave::core::http2::HttpMethod;
@@ -75,11 +77,11 @@ use nom::character::complete::{alpha1, digit1};
 use nom::character::complete::{
     alphanumeric0, alphanumeric1, anychar, char, multispace0, multispace1, satisfy, space1,
 };
-use nom::combinator::{all_consuming, opt};
-use nom::combinator::{cut, eof, fail, not, peek, recognize, value, verify};
+use nom::combinator::{all_consuming, opt };
+use nom::combinator::{cut, eof, fail, not, peek, value, verify};
 use nom::error::{ErrorKind, ParseError};
 use nom::multi::{many0, many1, separated_list0};
-use nom::sequence::{delimited, pair, preceded, terminated, tuple};
+use nom::sequence::{delimited, pair, terminated, tuple};
 use nom::{
     AsChar, Compare, FindToken, InputIter, InputLength, InputTake, InputTakeAtPosition, Offset,
     Parser, Slice,
@@ -94,30 +96,66 @@ use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
-
-use crate::space::parse::util::*;
-
+use crate::space::parse::util::{log_parse_err, preceded, recognize, result };
+use crate::space::parse::util::unstack;
+use crate::space::parse::VarErrCtx::VarName;
 pub type SpaceContextError<I: Span> = dyn nom_supreme::context::ContextError<I, ErrCtx>;
-pub type StarParser<I: Span, O> = dyn nom_supreme::parser_ext::ParserExt<I, O, ParseTree<I>>;
+pub type StarParser<I: Span, O> = dyn nom_supreme::parser_ext::ParserExt<I, O, SpaceTree<I>>;
 
 pub type Xpan<'a> = Wrap<LocatedSpan<&'a str, Arc<String>>>;
 
-impl<I> From<ParseTree<I>> for SpaceErr {
-    fn from(value: ParseTree<I>) -> Self {
-        Self::new(500u16, "parse error")
+impl<I> From<SpaceTree<I>> for ParseErrs where I: Span{
+    fn from(err: SpaceTree<I>) -> Self {
+        match err {
+            SpaceTree::Base { location, kind } => {
+                ParseErrs::from_loc_span("undefined parse error (error is not associated with an ErrorContext", "undefined", location.clone() )
+            }
+            SpaceTree::Stack { base,contexts } => {
+
+                let mut contexts = contexts.clone();
+                contexts.reverse();
+                let mut message = String::new();
+
+                if !contexts.is_empty()  {
+                    if let (location,err) = contexts.remove(0) {
+                        let mut last = &err;
+                        let line = unstack(&err);
+                        message.push_str(line.as_str());
+
+                        for (span,context) in contexts.iter() {
+                            last = context;
+                            let line = format!("\n\t\tcaused by: {}",unstack(&context));
+                            message.push_str(line.as_str());
+                        }
+                        return ParseErrs::from_loc_span(message.as_str(), last.to_string(), location )
+                    }
+                }
+
+                ParseErrs::default()
+            }
+            SpaceTree::Alt(_) => {
+                //println!("ALT!");
+                ParseErrs::default()
+            }
+        }
     }
 }
 
-impl<I> From<Err<ParseTree<I>>> for SpaceErr {
-    fn from(value: Err<ParseTree<I>>) -> Self {
-        Self::new(500u16, "parse error")
+impl<I> From<nom::Err<SpaceTree<I>>> for ParseErrs where I: Span {
+    fn from(err: nom::Err<SpaceTree<I>>) -> Self {
+        match err {
+            Err::Incomplete(i) => ParseErrs::default(),
+            Err::Error(err) => err.into(),
+            Err::Failure(err) => err.into()
+        }
     }
 }
 pub fn context<I, F, O>(context: &'static str, mut f: F) -> impl FnMut(I) -> Res<I, O>
 where
-    F: Parser<I, O, ParseTree<I>>,
+    F: Parser<I, O, SpaceTree<I>>,
     I: Span,
 {
+    /*
     let context = ErrCtx::Yikes;
     move |i: I| match f.parse(i.clone()) {
         Ok(o) => Ok(o),
@@ -125,6 +163,12 @@ where
 
         Err(Err::Error(e)) => Err(Err::Error(ParseTree::add_context(i, context.clone(), e))),
         Err(Err::Failure(e)) => Err(Err::Failure(ParseTree::add_context(i, context.clone(), e))),
+
+    }
+     */
+
+    move |input: I| {
+        f.parse(input)
     }
 }
 
@@ -154,7 +198,7 @@ pub enum ErrCtx {
     InvalidBaseKind(String),
     #[error("{0}{1}")]
     InvalidSubKind(BaseKind, String),
-    #[error("variable resolver not availabe in this context")]
+    #[error("variable substitution is not supported in this context")]
     ResolverNotAvailable,
     #[error(transparent)]
     Primitive(#[from] PrimitiveErrCtx)
@@ -163,12 +207,15 @@ pub enum ErrCtx {
 #[derive(Debug, Clone, Error)]
 pub enum VarErrCtx{
     #[error("invalid variable declaration after '$'")]
-    VarToken
+    VarToken,
+    #[error("invalid variable name. Legal values: alphanumeric + '_' (must start with a letter)")]
+    VarName
+
 }
 
 #[derive(Debug, Clone, Error)]
 pub enum PointSegErrCtx{
-    #[error("Space PointSegment invalid")]
+    #[error("invalid Space PointSegment")]
     Space,
 }
 
@@ -179,16 +226,22 @@ pub enum PointSegErrCtx{
 
 #[derive(Debug, Clone, Error)]
 pub enum PrimitiveErrCtx {
+    #[error("expecting alpha")]
+    Alpha,
+    #[error("expecting digit")]
+    Digit,
     #[error("expecting upper case alpha")]
     Upper,
     #[error("expecting lower case alpha")]
     Lower,
-    #[error("expecting digit")]
-    Digit,
+    #[error("expecting lower case alpha numeric")]
+    LowerAlphaNumeric,
+    #[error("expecting lower case alpha numeric '.' and '-'")]
+    Domain,
     #[error("expecting {0}")]
     Brace(#[from] BraceErrCtx),
-    #[error("illegal '{0}'")]
-    Illegal(String)
+    #[error("consecutive '..' dots not allowed")]
+    ConsecutiveDots
 
 }
 
@@ -241,7 +294,7 @@ pub enum BraceSideErrCtx {
 
 #[derive(Debug, Clone, Error)]
 pub enum BraceKindErrCtx {
-    #[error("curly")]
+    #[error("curly brace")]
     Curly
 }
 
@@ -254,9 +307,23 @@ pub enum ParseErr {
     Error,
 }
 
-pub type ParseTree<I: Span> = GenericErrorTree<I, &'static str, ErrCtx, ParseErr>;
+pub type SpaceTree<I: Span> = GenericErrorTree<I, &'static str, ErrCtx, ParseErr>;
 
-pub type Res<I: Span, O> = IResult<I, O, ParseTree<I>>;
+pub type Res<I: Span, O> = IResult<I, O, SpaceTree<I>>;
+
+impl <I> From<SpaceTree<I>> for SpaceErr where I: Span {
+    fn from(value: SpaceTree<I>) -> Self {
+        ParseErrs::from(value).into()
+    }
+}
+
+impl <I> From<nom::Err<SpaceTree<I>>> for SpaceErr where I: Span {
+    fn from(value: nom::Err<SpaceTree<I>>) -> Self {
+        ParseErrs::from(value).into()
+    }
+}
+
+
 
 /*
 pub struct Parser {}
@@ -410,23 +477,21 @@ pub fn eop<I: Span>(input: I) -> Res<I, I> {
 }
 
 pub fn space_no_dupe_dots<I: Span>(input: I) -> Res<I, ()> {
-    context(
-        "point:space_segment:dot_dupes",
-        peek(cut(not(take_until("..")))),
+
+        peek(cut(not(take_until(".."))),
     )(input)
     .map(|(next, _)| (next, ()))
 }
 
 pub fn space_point_segment<I: Span>(input: I) -> Res<I, PointSeg> {
-
         cut(pair(
             recognize(tuple((
-                peek(alpha1).context(PrimitiveErrCtx::Lower.into()),
-                space_no_dupe_dots.context(PrimitiveErrCtx::Illegal("..".to_string()).into()),
-                space_chars,
+                lowercase1.context(PrimitiveErrCtx::Lower.into()),
+                space_no_dupe_dots.context(PrimitiveErrCtx::ConsecutiveDots.into()),
+                space_chars.context(PrimitiveErrCtx::Domain.into()),
             ))),
             mesh_eos,
-        ).context(PointSegErrCtx::Space.into()),
+        ) .context(PointSegErrCtx::Space.into()),
     )(input)
     .map(|(next, (space, x))| (next, PointSeg::Space(space.to_string())))
 }
@@ -550,7 +615,7 @@ fn var<I: Span, O>(input: I) -> Res<I, VarVal<O>> {
         cut(delimited(
             tag("${").context(BraceErrCtx::new(BraceKindErrCtx::Curly,BraceSideErrCtx::Open).into()),
             tw(var_name),
-            tag("}"),
+            tag("}").context(BraceErrCtx::new(BraceKindErrCtx::Curly,BraceSideErrCtx::Close).into()),
         )),
     )(input)
     .map(|(next, (_, var))| (next, VarVal::Var(var)))
@@ -565,16 +630,17 @@ pub mod test3 {
     use nom_supreme::error::GenericErrorTree;
     use nom_supreme::ParserExt;
     use crate::space::loc::VarVal;
-    use crate::space::parse::{base_point_segment, point_var, pop, space_point_segment, var, variable_ize, ErrCtx, ParseErr, ParseTree, Res};
-    use crate::space::parse::util::{new_span, result, trim, unstack, Wrap};
-    use crate::space::point::{PointSeg, PointSegVar};
+    use crate::space::parse::{base_point_segment, point_var, pop, space_point_segment, var, variable_ize, ErrCtx, ParseErr, SpaceTree, Res};
+    use crate::space::parse::util::{new_span, print, result, trim, unstack, Wrap};
+    use crate::space::point::{PointSeg, PointSegVar, PointVar};
 
     #[test]
     pub fn test() {
-        let span = new_span("\n\n        $the:blasted\n");
 
+        /*
+        let span = new_span("\n\n        ${the }\n");
         //let result: Res<_,PointSegVar>   = variable_ize(pop(base_point_segment))(span);
-        let result: Res<_,PointSeg>   = cut(trim(space_point_segment))(span);
+        let result: Res<_,PointVar>   = cut(trim(point_var))(span);
 
         match result.unwrap_err() {
             nom::Err::Incomplete(_) => {
@@ -584,32 +650,26 @@ pub mod test3 {
                 assert!(false)
             }
             nom::Err::Failure(err) => {
-                match err {
-                    ParseTree::Base { .. } => {
-                        println!("BASE!");
-                    }
-                    ParseTree::Stack { base,mut contexts } => {
-
-                        println!("STACK!");
-                        contexts.reverse();
-
-                        if !contexts.is_empty()  {
-                            if let (location,err) = contexts.remove(0) {
-                                println!("line {} column: {}",location.location_line(), location.get_column());
-                                println!("{}",unstack(&err));
-                            }
-                        }
+                print(&err);
+            }
+        }
 
 
-                        for (span,context) in contexts.iter() {
-                            println!("\tcaused by: {}", unstack(&context));
-                        }
-                        println!("base: {:?}", base);
-                    }
-                    ParseTree::Alt(_) => {
-                        println!("ALT!");
-                    }
-                }
+         */
+
+        let span = new_span("\n\n\n\n        yHadron\n");
+        //let result: Res<_,PointSegVar>   = variable_ize(pop(base_point_segment))(span);
+        let result: Res<_,PointVar>   = cut(trim(point_var))(span);
+
+        match result.unwrap_err() {
+            nom::Err::Incomplete(_) => {
+                assert!(false)
+            }
+            nom::Err::Error(_) => {
+                assert!(false)
+            }
+            nom::Err::Failure(err) => {
+                print(&err);
             }
         }
     }
@@ -646,7 +706,7 @@ where
 
  */
 
-fn point_seg_var<I,F>(mut f: F) -> impl FnMut(I) -> Res<I, PointSegVar> + Copy
+fn point_var_seg<I,F>(mut f: F) -> impl FnMut(I) -> Res<I, PointSegVar> + Copy
 where F: FnMut(I) -> Res<I,PointSegCtx> + Copy,
 I: Span
 {
@@ -768,6 +828,9 @@ pub fn root_point_var<I: Span>(input: I) -> Res<I, PointVar> {
     })
 }
 
+
+
+
 pub fn point_non_root_var<I: Span>(input: I) -> Res<I, PointVar> {
     context(
         "point_non_root",
@@ -776,16 +839,16 @@ pub fn point_non_root_var<I: Span>(input: I) -> Res<I, PointVar> {
                 "point_route",
                 opt(terminated(var_route(point_route_segment), tag("::"))),
             ),
-            point_seg_var(root_ctx_seg(space_point_segment)),
-            many0(base_seg(point_seg_var(pop(base_point_segment)))),
-            opt(base_seg(point_seg_var(pop(version_point_segment)))),
+            point_var_seg(root_ctx_seg(space_point_segment)),
+            many0(base_seg(point_var_seg(pop(base_point_segment)))),
+            opt(base_seg(point_var_seg(pop(version_point_segment)))),
             opt(tuple((
                 root_dir_point_segment_var,
                 many0(recognize(tuple((
-                    point_seg_var(pop(dir_point_segment)),
+                    point_var_seg(pop(dir_point_segment)),
                     tag("/"),
                 )))),
-                opt(point_seg_var(pop(file_point_segment))),
+                opt(point_var_seg(pop(file_point_segment))),
                 eop,
             ))),
             eop,
@@ -1220,7 +1283,7 @@ pub fn parse_uuid<I: Span>(i: I) -> Res<I, Uuid> {
     Ok((
         next,
         Uuid::from(uuid)
-            .map_err(|e| nom::Err::Error(ParseTree::from_error_kind(i, ErrorKind::Tag)))?,
+            .map_err(|e| nom::Err::Error(SpaceTree::from_error_kind(i, ErrorKind::Tag)))?,
     ))
 }
 
@@ -1324,7 +1387,7 @@ pub fn path_regex<I: Span>(input: I) -> Res<I, I> {
         Ok(regex) => Ok((next, regex_span)),
         Err(err) => {
             println!("regex error {}", err.to_string());
-            return Err(nom::Err::Error(ParseTree::from_error_kind(
+            return Err(nom::Err::Error(SpaceTree::from_error_kind(
                 input,
                 ErrorKind::Tag,
             )));
@@ -1675,11 +1738,11 @@ pub fn skewer_case<I: Span>(input: I) -> Res<I, SkewerCase> {
 }
 
 pub fn var_case<I: Span>(input: I) -> Res<I, VarCase> {
-    context("expect-skewer-case", var_chars)(input).map(|(next, skewer_case_chars)| {
+     var_chars(input).map(|(next, var_case_chars)| {
         (
             next,
             VarCase{
-                string: skewer_case_chars.to_string(),
+                string: var_case_chars.to_string(),
             },
         )
     })
@@ -1696,8 +1759,14 @@ pub fn skewer_case_chars<I: Span>(input: I) -> Res<I, I> {
     )))(input)
 }
 
-pub fn var_chars<I: Span>(input: I) -> Res<I, I> {
-    recognize(tuple((alpha1, many0(alt((alphanumeric1, tag("_")))))))(input)
+fn var_chars<I: Span>(input: I) -> Res<I, I> {
+    recognize(pair(alpha1, many0(alt((alphanumeric1, tag("_"))))).context(VarErrCtx::VarName.into()))(input)
+}
+
+#[cfg(test)]
+#[test]
+fn test_varcars() {
+    log_parse_err(var_chars(new_span("_blah")));
 }
 
 pub fn lowercase_alphanumeric<I: Span>(input: I) -> Res<I, I> {
@@ -2300,7 +2369,7 @@ impl Env {
     pub fn pop(self) -> Result<Env, SpaceErr> {
         Ok(*self
             .parent
-            .ok_or::<SpaceErr>("expected parent scopedVars".into())?)
+            .ok_or(SpaceErr::str("expected parent scopedVars"))?)
     }
 
     pub fn add_var_resolver(&mut self, var_resolver: Arc<dyn VarResolver>) {
@@ -2649,7 +2718,7 @@ where
         + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar,
     I: ToString,
-    F: nom::Parser<I, O, ParseTree<I>>,
+    F: nom::Parser<I, O, SpaceTree<I>>,
     O: Clone,
 {
     move |input: I| {
@@ -2670,9 +2739,9 @@ pub trait SubstParser<T: Sized> {
 
 pub fn root_ctx_seg<I: Span, F>(mut f: F) -> impl FnMut(I) -> Res<I, PointSegCtx> + Copy
 where
-    F: Parser<I, PointSeg, ParseTree<I>> + Copy,
+    F: Parser<I, PointSeg, SpaceTree<I>> + Copy,
 {
-    move |input: I| match pair(tag::<&str, I, ParseTree<I>>(".."), eos)(input.clone()) {
+    move |input: I| match pair(tag::<&str, I, SpaceTree<I>>(".."), eos)(input.clone()) {
         Ok((next, v)) => Ok((
             next.clone(),
             PointSegCtx::Pop(Trace {
@@ -2680,7 +2749,7 @@ where
                 extra: next.extra(),
             }),
         )),
-        Err(err) => match pair(tag::<&str, I, ParseTree<I>>("."), eos)(input.clone()) {
+        Err(err) => match pair(tag::<&str, I, SpaceTree<I>>("."), eos)(input.clone()) {
             Ok((next, _)) => Ok((
                 next.clone(),
                 PointSegCtx::Working(Trace {
@@ -2698,9 +2767,9 @@ where
 
 pub fn working<I: Span, F>(mut f: F) -> impl FnMut(I) -> Res<I, PointSegCtx>
 where
-    F: nom::Parser<I, PointSeg, ParseTree<I>>,
+    F: nom::Parser<I, PointSeg, SpaceTree<I>>,
 {
-    move |input: I| match pair(tag::<&str, I, ParseTree<I>>("."), eos)(input.clone()) {
+    move |input: I| match pair(tag::<&str, I, SpaceTree<I>>("."), eos)(input.clone()) {
         Ok((next, v)) => Ok((
             next.clone(),
             PointSegCtx::Working(Trace {
@@ -2717,9 +2786,9 @@ where
 
 pub fn pop<I: Span, F>(mut f: F) -> impl FnMut(I) -> Res<I, PointSegCtx> + Copy
 where
-    F: nom::Parser<I, PointSeg, ParseTree<I>> + Copy,
+    F: nom::Parser<I, PointSeg, SpaceTree<I>> + Copy,
 {
-    move |input: I| match pair(tag::<&str, I, ParseTree<I>>(".."), eos)(input.clone()) {
+    move |input: I| match pair(tag::<&str, I, SpaceTree<I>>(".."), eos)(input.clone()) {
         Ok((next, v)) => Ok((
             next.clone(),
             PointSegCtx::Working(Trace {
@@ -2737,7 +2806,7 @@ where
 pub fn base_seg<I, F, S>(mut f: F) -> impl FnMut(I) -> Res<I, S>
 where
     I: Span,
-    F: nom::Parser<I, S, ParseTree<I>> + Copy,
+    F: nom::Parser<I, S, SpaceTree<I>> + Copy,
     S: PointSegment,
 {
     move |input: I| preceded(tag(":"), f)(input)
@@ -2745,7 +2814,7 @@ where
 
 pub fn mesh_seg<I: Span, F, S1, S2>(mut f: F) -> impl FnMut(I) -> Res<I, S2>
 where
-    F: nom::Parser<I, S1, ParseTree<I>> + Copy,
+    F: nom::Parser<I, S1, SpaceTree<I>> + Copy,
     S1: PointSegment + Into<S2>,
     S2: PointSegment,
 {
@@ -2844,9 +2913,7 @@ where
 
  */
 
-pub fn variable_name<I: Span>(input: I) -> Res<I, I> {
-    recognize(pair(lowercase1, opt(skewer_dot)))(input).map(|(next, name)| (next, name))
-}
+
 
 pub fn ispan<'a, I: Clone, O, F>(mut f: F) -> impl FnMut(I) -> Res<I, Spanned<I, O>>
 where
@@ -2858,7 +2925,7 @@ where
         + Clone
         + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar,
-    F: nom::Parser<I, O, ParseTree<I>>,
+    F: nom::Parser<I, O, SpaceTree<I>>,
     O: Clone + FromStr<Err = SpaceErr>,
 {
     move |input: I| {
@@ -2869,7 +2936,7 @@ where
 
 pub fn sub<I: Span, O, F>(mut f: F) -> impl FnMut(I) -> Res<I, Spanned<I, O>>
 where
-    F: nom::Parser<I, O, ParseTree<I>>,
+    F: nom::Parser<I, O, SpaceTree<I>>,
     O: Clone,
 {
     move |input: I| {
@@ -3016,7 +3083,7 @@ where
     I: Offset + nom::Slice<std::ops::RangeTo<usize>>,
     I: nom::Slice<std::ops::RangeFrom<usize>>,
     <I as InputIter>::Item: AsChar,
-    F: nom::Parser<I, O, ParseTree<I>> + Clone,
+    F: nom::Parser<I, O, SpaceTree<I>> + Clone,
 {
     move |input: I| {
         f.clone()
@@ -3057,7 +3124,7 @@ where
             }
         }
 
-        Err(nom::Err::Failure(ParseTree::from_error_kind(
+        Err(nom::Err::Failure(SpaceTree::from_error_kind(
             input.clone(),
             ErrorKind::Alt,
         )))
@@ -3085,7 +3152,7 @@ where
         BlockKind::Delimited(kind) => lex_delimited_block(kind).parse(input),
         BlockKind::Partial => {
             eprintln!("parser should not be seeking partial block kinds...");
-            Err(nom::Err::Failure(ParseTree::from_error_kind(
+            Err(nom::Err::Failure(SpaceTree::from_error_kind(
                 input,
                 ErrorKind::IsNot,
             )))
@@ -3815,7 +3882,7 @@ pub mod model {
     use regex::Regex;
     use serde::de::Visitor;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
+    use thiserror::Error;
     use crate::space::config::bind::{PipelineStepDef, PipelineStopDef};
     use crate::space::err::{ParseErrs, SpaceErr};
     use crate::space::loc::Version;
@@ -4151,7 +4218,7 @@ pub mod model {
                         .as_str(),
                         "unknown message kind",
                         selector.name,
-                    ));
+                    ).into());
                 }
             };
 
@@ -4213,7 +4280,7 @@ pub mod model {
                                     .as_str(),
                                     "invalid Hyp",
                                     selector.name,
-                                ))
+                                ).into())
                             }
                         }
                     }
@@ -4229,7 +4296,7 @@ pub mod model {
                                     .as_str(),
                                     "invalid Cmd",
                                     selector.name,
-                                ))
+                                ).into())
                             }
                         }
                     }
@@ -4245,7 +4312,7 @@ pub mod model {
                                     .as_str(),
                                     "invalid Ext",
                                     selector.name,
-                                ))
+                                ).into())
                             }
                         }
                     }
@@ -4253,7 +4320,7 @@ pub mod model {
                         match result(value_pattern( wrapped_http_method)(selector.name.clone())) {
                                 Ok(r) => r,
                                 Err(_) => {
-                                    return Err(ParseErrs::from_loc_span(format!("invalid Http Pattern '{}'.  Http should be camel case 'Get' and a valid Http method", selector.name.to_string()).as_str(), "invalid Http method", selector.name ))
+                                    return Err(ParseErrs::from_loc_span(format!("invalid Http Pattern '{}'.  Http should be camel case 'Get' and a valid Http method", selector.name.to_string()).as_str(), "invalid Http method", selector.name ).into())
                                 }
                             }
                     }
@@ -4762,16 +4829,21 @@ pub mod model {
         }
     }
 
-    #[derive(Debug, Copy, Clone, strum_macros::Display, Eq, PartialEq)]
+    #[derive(Debug, Copy, Clone, Error, Eq, PartialEq)]
     pub enum BlockKind {
-        Nested(NestedBlockKind),
-        Terminated(TerminatedBlockKind),
-        Delimited(DelimitedBlockKind),
+        #[error("nexted block")]
+        Nested(#[from] NestedBlockKind),
+        #[error("terminated")]
+        Terminated(#[from] TerminatedBlockKind),
+        #[error("delimited")]
+        Delimited(#[from] DelimitedBlockKind),
+        #[error("partial")]
         Partial,
     }
 
-    #[derive(Debug, Copy, Clone, strum_macros::Display, Eq, PartialEq)]
+    #[derive(Debug, Copy, Clone, Error, Eq, PartialEq)]
     pub enum TerminatedBlockKind {
+        #[error("semicolon")]
         Semicolon,
     }
 
@@ -4790,10 +4862,12 @@ pub mod model {
     }
 
     #[derive(
-        Debug, Copy, Clone, strum_macros::Display, strum_macros::EnumString, Eq, PartialEq,
+        Debug, Copy, Clone, Error, Eq, PartialEq,
     )]
     pub enum DelimitedBlockKind {
+        #[error("single quotes")]
         SingleQuotes,
+        #[error("double quotes")]
         DoubleQuotes,
     }
 
@@ -4827,13 +4901,15 @@ pub mod model {
         }
     }
 
-    #[derive(
-        Debug, Copy, Clone, strum_macros::Display, strum_macros::EnumString, Eq, PartialEq,
-    )]
+    #[derive(Debug, Copy, Clone, Error, Eq, PartialEq)]
     pub enum NestedBlockKind {
+        #[error("curly")]
         Curly,
+        #[error("parenthesis")]
         Parens,
+        #[error("square")]
         Square,
+        #[error("angle")]
         Angle,
     }
 
@@ -5175,7 +5251,7 @@ pub fn layer<I: Span>(input: I) -> Res<I, Layer> {
     let (next, layer) = recognize(camel_case)(input.clone())?;
     match Layer::from_str(layer.to_string().as_str()) {
         Ok(layer) => Ok((next, layer)),
-        Err(err) => Err(nom::Err::Error(ParseTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(SpaceTree::from_error_kind(
             input,
             ErrorKind::Alpha,
         ))),
@@ -5239,9 +5315,9 @@ pub fn port<I: Span>(input: I) -> Res<I, Surface> {
     match point.w.collapse() {
         Ok(point) => Ok((next, Surface::new(point, layer, topic))),
         Err(err) => {
-            let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Alpha);
+            let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Alpha);
             let loc = input.slice(point.trace.range);
-            Err(nom::Err::Error(ParseTree::add_context(
+            Err(nom::Err::Error(SpaceTree::add_context(
                 loc,
                 ErrCtx::ResolverNotAvailable,
                 err,
@@ -5296,7 +5372,7 @@ pub mod cmd_test {
     use core::str::FromStr;
 
     use crate::space::command::{Command, CommandVar};
-    use crate::space::err::SpaceErr;
+    use crate::space::err::{ParseErrs, SpaceErr};
     use crate::space::kind::Kind;
     use crate::space::parse::util::{new_span, result};
     use crate::space::point::{PointSeg, RouteSeg};
@@ -5552,7 +5628,7 @@ pub fn parse_version_chars_str<I: Span, O: FromStr>(input: I) -> Res<I, O> {
     let (next, rtn) = recognize(version_chars)(input)?;
     match O::from_str(rtn.to_string().as_str()) {
         Ok(rtn) => Ok((next, rtn)),
-        Err(err) => Err(nom::Err::Error(ParseTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(SpaceTree::from_error_kind(
             next,
             ErrorKind::Fail,
         ))),
@@ -5622,7 +5698,7 @@ pub fn parse_star_key<I: Span>(input: I) -> Res<I, StarKey> {
     let index = match index.to_string().parse::<u16>() {
         Ok(index) => index,
         Err(err) => {
-            return Err(nom::Err::Failure(ParseTree::from_error_kind(
+            return Err(nom::Err::Failure(SpaceTree::from_error_kind(
                 input,
                 ErrorKind::Digit,
             )))
@@ -5641,7 +5717,7 @@ pub fn parse_star_key<I: Span>(input: I) -> Res<I, StarKey> {
 
 pub fn pattern<I: Span, O, V>(mut value: V) -> impl FnMut(I) -> Res<I, Pattern<O>>
 where
-    V: Parser<I, O, ParseTree<I>>,
+    V: Parser<I, O, SpaceTree<I>>,
 {
     move |input: I| {
         let x: Res<I, I> = tag("*")(input.clone());
@@ -5659,9 +5735,9 @@ where
 pub fn value_pattern<I: Span, O, F>(mut f: F) -> impl FnMut(I) -> Res<I, ValuePattern<O>>
 where
     I: InputLength + InputTake + Compare<&'static str>,
-    F: Parser<I, O, ParseTree<I>>,
+    F: Parser<I, O, SpaceTree<I>>,
 {
-    move |input: I| match tag::<&'static str, I, ParseTree<I>>("*")(input.clone()) {
+    move |input: I| match tag::<&'static str, I, SpaceTree<I>>("*")(input.clone()) {
         Ok((next, _)) => Ok((next, ValuePattern::Always)),
         Err(err) => f
             .parse(input.clone())
@@ -5678,7 +5754,7 @@ pub fn version_req<I: Span>(input: I) -> Res<I, VersionReq> {
     match rtn {
         Ok(version) => Ok((next, VersionReq { version })),
         Err(err) => {
-            let tree = Err::Error(ParseTree::from_error_kind(input, ErrorKind::Fail));
+            let tree = Err::Error(SpaceTree::from_error_kind(input, ErrorKind::Fail));
             Err(tree)
         }
     }
@@ -5853,8 +5929,8 @@ pub fn kind_base<I: Span>(input: I) -> Res<I, BaseKind> {
     match BaseKind::try_from(kind.clone()) {
         Ok(kind) => Ok((next, kind)),
         Err(err) => {
-            let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
-            Err(nom::Err::Error(ParseTree::add_context(
+            let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+            Err(nom::Err::Error(SpaceTree::add_context(
                 input,
                 ErrCtx::InvalidBaseKind(kind.to_string()),
                 err,
@@ -5874,8 +5950,8 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
                     Ok((next, Kind::Database(DatabaseSubKind::Relational(specific))))
                 }
                 _ => {
-                    let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(ParseTree::add_context(
+                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(SpaceTree::add_context(
                         input,
                         ErrCtx::InvalidSubKind(BaseKind::Database, sub.to_string()),
                         err,
@@ -5889,8 +5965,8 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
                     Ok((next, Kind::UserBase(UserBaseSubKind::OAuth(specific))))
                 }
                 _ => {
-                    let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(ParseTree::add_context(
+                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(SpaceTree::add_context(
                         input,
                         ErrCtx::InvalidSubKind(BaseKind::UserBase, sub.to_string()),
                         err,
@@ -5900,8 +5976,8 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
             BaseKind::Native => match NativeSub::from_str(sub.as_str()) {
                 Ok(sub) => Ok((next, Kind::Native(sub))),
                 Err(err) => {
-                    let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(ParseTree::add_context(
+                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(SpaceTree::add_context(
                         input,
                         ErrCtx::InvalidSubKind(BaseKind::Native, sub.to_string()),
                         err,
@@ -5911,8 +5987,8 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
             BaseKind::Artifact => match ArtifactSubKind::from_str(sub.as_str()) {
                 Ok(sub) => Ok((next, Kind::Artifact(sub))),
                 Err(err) => {
-                    let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(ParseTree::add_context(
+                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(SpaceTree::add_context(
                         input,
                         ErrCtx::InvalidSubKind(BaseKind::Artifact, sub.to_string()),
                         err,
@@ -5922,8 +5998,8 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
             BaseKind::Star => match StarSub::from_str(sub.as_str()) {
                 Ok(sub) => Ok((next, Kind::Star(sub))),
                 Err(err) => {
-                    let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(ParseTree::add_context(
+                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(SpaceTree::add_context(
                         input,
                         ErrCtx::InvalidSubKind(BaseKind::Star, sub.to_string()),
                         err,
@@ -5933,8 +6009,8 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
             BaseKind::File => match FileSubKind::from_str(sub.as_str()) {
                 Ok(sub) => Ok((next, Kind::File(sub))),
                 Err(err) => {
-                    let err = ParseTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(ParseTree::add_context(
+                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(SpaceTree::add_context(
                         input,
                         ErrCtx::InvalidSubKind(BaseKind::File, sub.to_string()),
                         err,
@@ -6163,7 +6239,7 @@ pub fn version<I: Span>(input: I) -> Res<I, Version> {
     match rtn {
         Ok(version) => Ok((next, Version { version })),
         Err(err) => {
-            let tree = Err::Error(ParseTree::from_error_kind(input, ErrorKind::Fail));
+            let tree = Err::Error(SpaceTree::from_error_kind(input, ErrorKind::Fail));
             Err(tree)
         }
     }
@@ -6320,7 +6396,7 @@ pub fn parse_alpha1_str<I: Span, O: FromStr>(input: I) -> Res<I, O> {
     let (next, rtn) = recognize(alpha1)(input)?;
     match O::from_str(rtn.to_string().as_str()) {
         Ok(rtn) => Ok((next, rtn)),
-        Err(err) => Err(nom::Err::Error(ParseTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(SpaceTree::from_error_kind(
             next,
             ErrorKind::Fail,
         ))),
@@ -6516,7 +6592,7 @@ pub fn format<I: Span>(input: I) -> Res<I, SubstanceFormat> {
     let (next, format) = recognize(alpha1)(input)?;
     match SubstanceFormat::from_str(format.to_string().as_str()) {
         Ok(format) => Ok((next, format)),
-        Err(err) => Err(nom::Err::Error(ParseTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(SpaceTree::from_error_kind(
             next,
             ErrorKind::Fail,
         ))),
@@ -6562,7 +6638,7 @@ pub fn parse_camel_case_str<I: Span, O: FromStr>(input: I) -> Res<I, O> {
     let (next, rtn) = recognize(camel_case_chars)(input)?;
     match O::from_str(rtn.to_string().as_str()) {
         Ok(rtn) => Ok((next, rtn)),
-        Err(err) => Err(nom::Err::Error(ParseTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(SpaceTree::from_error_kind(
             next,
             ErrorKind::Fail,
         ))),
@@ -6580,9 +6656,9 @@ pub fn http_method_pattern<I: Span>(input: I) -> Res<I, HttpMethodPattern> {
 pub fn method_pattern<I: Clone, F>(mut f: F) -> impl FnMut(I) -> Res<I, HttpMethodPattern>
 where
     I: InputLength + InputTake + Compare<&'static str>,
-    F: Parser<I, HttpMethod, ParseTree<I>>,
+    F: Parser<I, HttpMethod, SpaceTree<I>>,
 {
-    move |input: I| match tag::<&'static str, I, ParseTree<I>>("*")(input.clone()) {
+    move |input: I| match tag::<&'static str, I, SpaceTree<I>>("*")(input.clone()) {
         Ok((next, _)) => Ok((next, HttpMethodPattern::Always)),
         Err(err) => f
             .parse(input.clone())
@@ -6595,7 +6671,7 @@ pub fn ext_method<I: Span>(input: I) -> Res<I, ExtMethod> {
 
     match ExtMethod::new(ext_method.to_string()) {
         Ok(method) => Ok((next, method)),
-        Err(err) => Err(nom::Err::Error(ParseTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(SpaceTree::from_error_kind(
             input,
             ErrorKind::Fail,
         ))),
@@ -6607,7 +6683,7 @@ pub fn sys_method<I: Span>(input: I) -> Res<I, HypMethod> {
 
     match HypMethod::from_str(sys_method.to_string().as_str()) {
         Ok(method) => Ok((next, method)),
-        Err(err) => Err(nom::Err::Error(ParseTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(SpaceTree::from_error_kind(
             input,
             ErrorKind::Fail,
         ))),
@@ -6619,7 +6695,7 @@ pub fn cmd_method<I: Span>(input: I) -> Res<I, CmdMethod> {
 
     match CmdMethod::from_str(method.to_string().as_str()) {
         Ok(method) => Ok((next, method)),
-        Err(err) => Err(nom::Err::Error(ParseTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(SpaceTree::from_error_kind(
             input,
             ErrorKind::Fail,
         ))),
@@ -6631,7 +6707,7 @@ pub fn wrapped_ext_method<I: Span>(input: I) -> Res<I, Method> {
 
     match ExtMethod::new(ext_method.to_string()) {
         Ok(method) => Ok((next, Method::Ext(method))),
-        Err(err) => Err(nom::Err::Error(ParseTree::from_error_kind(
+        Err(err) => Err(nom::Err::Error(SpaceTree::from_error_kind(
             input,
             ErrorKind::Fail,
         ))),
@@ -7087,7 +7163,7 @@ fn semantic_bind_scope<I: Span>(scope: LexScope<I>) -> Result<BindScope, SpaceEr
     }
 }
 
-fn parse_bind_pipelines_scope<I: Span>(input: I) -> Result<Spanned<I, BindScopeKind>, ParseErrs> {
+fn parse_bind_pipelines_scope<I: Span>(input: I) -> Result<Spanned<I, BindScopeKind>, SpaceErr> {
     unimplemented!()
     /*
     let (next, lex_scopes) = lex_scopes(input.clone())?;
@@ -7297,13 +7373,12 @@ where
 pub fn var_chunk<I: Span>(input: I) -> Res<I, Chunk<I>> {
     preceded(
         tag("$"),
-        context(
-            "variable",
+
             cut(delimited(
-                context("variable:open", cut(tag("{"))),
-                context("variable:name", variable_name),
-                context("variable:close", cut(tag("}"))),
-            )),
+                cut(tag("{")).context(BraceErrCtx::new(BraceKindErrCtx::Curly,BraceSideErrCtx::Open).into()),
+                recognize(var_case),
+                cut(tag("}")).context(BraceErrCtx::new(BraceKindErrCtx::Curly,BraceSideErrCtx::Close).into()),
+            ),
         ),
     )(input)
     .map(|(next, variable_name)| (next, Chunk::Var(variable_name)))
@@ -7355,7 +7430,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, SpaceErr> {
     {
         Ok((next, (topic, lex_route))) => (next, (topic, lex_route)),
         Err(err) => {
-            return Err(find_parse_err(&err));
+            return Err(err.into());
         }
     };
 
@@ -7436,7 +7511,7 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, SpaceErr> {
                     format!("cannot parse Path regex: '{}'", err.to_string()).as_str(),
                     "path regex error",
                     i.clone(),
-                ));
+                ).into());
             }
         },
     };
@@ -7449,6 +7524,6 @@ pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, SpaceErr> {
     ))
 }
 
-fn find_parse_err<I: Span>(_: &Err<ParseTree<I>>) -> SpaceErr {
+fn find_parse_err<I: Span>(_: &Err<SpaceTree<I>>) -> ParseErrs {
     todo!()
 }

@@ -377,6 +377,7 @@ impl From<SpaceErr> for FormErrs {
                 Self::default(format!("{} {}", status, message).as_str())
             }
             SpaceErr::ParseErrs(_) => Self::default("500: parse error"),
+            e => Self::default(e.to_string())
         }
     }
 }

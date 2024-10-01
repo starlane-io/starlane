@@ -245,13 +245,13 @@ where
                             "variables not available",
                             trace.range,
                             trace.extra,
-                        )),
+                        ).into()),
                         ResolverErr::NotFound => Err(ParseErrs::from_range(
                             format!("variable '{}' not found", var.unwrap().to_string()).as_str(),
                             "not found",
                             trace.range,
                             trace.extra,
-                        )),
+                        ).into()),
                     }
                 }
             },

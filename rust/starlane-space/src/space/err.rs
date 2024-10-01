@@ -8,7 +8,6 @@ use std::sync::{Arc, PoisonError};
 
 use nom::error::VerboseError;
 use nom::Err;
-use nom_supreme::error::ErrorTree;
 use serde::de::Error;
 use tokio::sync::mpsc::error::{SendError, SendTimeoutError};
 use tokio::sync::oneshot::error::RecvError;
@@ -24,36 +23,30 @@ use crate::space::wave::core::ReflectedCore;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-
-
-
-
-
-
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Error)]
 pub enum SpaceErr {
+    #[error("{0}")]
+    Message(String),
+    #[error("{status}: {message}")]
     Status { status: u16, message: String },
-    ParseErrs(ParseErrs),
+    #[error(transparent)]
+    ParseErrs(#[from] ParseErrs),
 }
 
 impl SpaceErr {
     pub fn print(&self) {
         match self {
             SpaceErr::Status { status, message } => {
-                println!("{}: {}", status, message);
+                println!("err::status::[{}]: {}", status, message);
             }
             SpaceErr::ParseErrs(errs) => {
-                println!("REport len: {}", errs.report.len());
                 for report in &errs.report {
                     let report: ariadne::Report = report.clone().into();
-                    if let Some(source) = &errs.source {
-                        let source = source.to_string();
-                        report.print(ariadne::Source::from(source));
-                    } else {
-                        println!("No source..");
-                    }
+                    report.print(ariadne::Source::from(&errs.source));
                 }
+            }
+            _ => {
+                println!("{}",self);
             }
         }
     }
@@ -61,7 +54,7 @@ impl SpaceErr {
 
 impl Into<ReflectedCore> for SpaceErr {
     fn into(self) -> ReflectedCore {
-        println!("SpaceErr -> ReflectedCore({})",self.to_string());
+        println!("SpaceErr -> ReflectedCore({})", self.to_string());
         match self {
             SpaceErr::Status { status, .. } => ReflectedCore {
                 headers: Default::default(),
@@ -73,6 +66,11 @@ impl Into<ReflectedCore> for SpaceErr {
                 status: StatusCode::from_u16(500u16).unwrap_or(StatusCode::from_u16(500).unwrap()),
                 body: Substance::Err(self),
             },
+            x => ReflectedCore {
+                headers: Default::default(),
+                status: Default::default(),
+                body: Substance::Err(x)
+            }
         }
     }
 }
@@ -156,15 +154,7 @@ impl SpaceErr {
         SpaceErr::new(400, format!("Bad Request: {}", s.to_string()))
     }
 
-    pub fn ctx<S: ToString>(mut self, ctx: S) -> Self {
-        match self {
-            Self::Status { status, message } => Self::Status {
-                status,
-                message: format!("{} | {}", message, ctx.to_string()),
-            },
-            Self::ParseErrs(mut errs) => Self::ParseErrs(errs.ctx(ctx)),
-        }
-    }
+
 }
 
 impl SpaceErr {
@@ -184,14 +174,15 @@ impl StatusErr for SpaceErr {
     fn status(&self) -> u16 {
         match self {
             SpaceErr::Status { status, .. } => status.clone(),
-            SpaceErr::ParseErrs(_) => 500u16,
+            _ => 500u16,
         }
     }
 
     fn message(&self) -> String {
         match self {
             SpaceErr::Status { status, message } => message.clone(),
-            SpaceErr::ParseErrs(_) => "Error report".to_string(),
+            SpaceErr::ParseErrs(err) => err.to_string(),
+            err => err.to_string()
         }
     }
 }
@@ -201,21 +192,8 @@ pub trait StatusErr {
     fn message(&self) -> String;
 }
 
-impl Display for SpaceErr {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SpaceErr::Status { status, message } => {
-                f.write_str(format!("{}: {}", status, message).as_str())
-            }
-            SpaceErr::ParseErrs(errs) => {
-                self.print();
-                f.write_str("Error Report...")
-            }
-        }
-    }
-}
 
-impl std::error::Error for SpaceErr {}
+
 
 impl<C> From<SendTimeoutError<C>> for SpaceErr {
     fn from(e: SendTimeoutError<C>) -> Self {
@@ -244,14 +222,7 @@ impl From<tokio::sync::watch::error::RecvError> for SpaceErr {
     }
 }
 
-impl From<String> for SpaceErr {
-    fn from(message: String) -> Self {
-        Self::Status {
-            status: 500,
-            message,
-        }
-    }
-}
+
 
 impl From<Elapsed> for SpaceErr {
     fn from(e: Elapsed) -> Self {
@@ -325,14 +296,7 @@ impl From<semver::Error> for SpaceErr {
     }
 }
 
-impl From<ErrorTree<&str>> for SpaceErr {
-    fn from(error: ErrorTree<&str>) -> Self {
-        Self::Status {
-            status: 500,
-            message: error.to_string(),
-        }
-    }
-}
+
 
 impl From<strum::ParseError> for SpaceErr {
     fn from(error: strum::ParseError) -> Self {
@@ -391,6 +355,7 @@ impl From<ToStrError> for UniErr {
 
  */
 
+/*
 impl<I: Span> From<nom::Err<ErrorTree<I>>> for SpaceErr {
     fn from(err: Err<ErrorTree<I>>) -> Self {
         fn handle<I: Span>(err: ErrorTree<I>) -> SpaceErr {
@@ -436,7 +401,7 @@ impl<I: Span> From<nom::Err<ErrorTree<I>>> for SpaceErr {
             Err::Failure(err) => handle(err),
         }
     }
-}
+}*/
 
 impl Into<String> for SpaceErr {
     fn into(self) -> String {
@@ -450,53 +415,50 @@ impl From<io::Error> for SpaceErr {
     }
 }
 
-impl From<ParseErrs> for SpaceErr {
-    fn from(errs: ParseErrs) -> Self {
-        SpaceErr::ParseErrs(errs)
-    }
-}
-impl<I: Span> From<nom::Err<ErrorTree<I>>> for ParseErrs {
-    fn from(err: Err<ErrorTree<I>>) -> Self {
-        match find_parse_err(&err) {
-            SpaceErr::Status { .. } => ParseErrs {
-                report: vec![],
-                source: None,
-                ctx: "".to_string(),
-            },
-            SpaceErr::ParseErrs(parse_errs) => parse_errs,
-        }
-    }
-}
 
-fn find_parse_err<I: Span>(p0: &Err<ErrorTree<I>>) -> SpaceErr {
-    todo!()
-}
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Error)]
 pub struct ParseErrs {
     pub report: Vec<Report>,
-    pub source: Option<Arc<String>>,
-    pub ctx: String,
+    pub source: String,
+}
+
+impl Display for ParseErrs {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "ParseErrs -> {} errors", self.report.len())
+    }
+}
+
+impl Default for ParseErrs {
+    fn default() -> Self {
+        Self {
+            report: vec![],
+            source: Default::default(),
+        }
+    }
 }
 
 impl ParseErrs {
-    pub fn ctx<S: ToString>(mut self, ctx: S) -> Self {
-        Self {
-            report: self.report,
-            source: self.source,
-            ctx: ctx.to_string(),
+    pub fn print(&self) {
+        println!("REport len: {}", self.report.len());
+        for report in &self.report {
+            let report: ariadne::Report = report.clone().into();
+                report.print(ariadne::Source::from(&self.source));
         }
     }
 
-    pub fn from_report(report: Report, source: Arc<String>) -> Self {
+
+    pub fn from_report<S>(report: Report, source: S) -> Self where S:ToString{
         Self {
             report: vec![report],
-            source: Some(source),
-            ctx: "".to_string(),
+            // not good that we are copying the string here... need to return to this and make it more efficient...
+            source: source.to_string(),
         }
     }
 
-    pub fn from_loc_span<I: Span>(message: &str, label: &str, span: I) -> SpaceErr {
+    pub fn from_loc_span<I,S>(message: &str, label: S, span: I) -> ParseErrs where I: Span,   S: ToString{
         let mut builder = Report::build(ReportKind::Error, (), 23);
         let report = builder
             .with_message(message)
@@ -505,7 +467,7 @@ impl ParseErrs {
                     .with_message(label),
             )
             .finish();
-        return ParseErrs::from_report(report, span.extra()).into();
+        return ParseErrs::from_report(report, span.extra());
     }
 
     pub fn from_range(
@@ -513,16 +475,16 @@ impl ParseErrs {
         label: &str,
         range: Range<usize>,
         extra: SpanExtra,
-    ) -> SpaceErr {
+    ) -> ParseErrs{
         let mut builder = Report::build(ReportKind::Error, (), 23);
         let report = builder
             .with_message(message)
             .with_label(Label::new(range).with_message(label))
             .finish();
-        return ParseErrs::from_report(report, extra).into();
+        return ParseErrs::from_report(report, extra);
     }
 
-    pub fn from_owned_span<I: Span>(message: &str, label: &str, span: I) -> SpaceErr {
+    pub fn from_owned_span<I: Span>(message: &str, label: &str, span: I) -> ParseErrs{
         let mut builder = Report::build(ReportKind::Error, (), 23);
         let report = builder
             .with_message(message)
@@ -531,26 +493,21 @@ impl ParseErrs {
                     .with_message(label),
             )
             .finish();
-        return ParseErrs::from_report(report, span.extra()).into();
+        return ParseErrs::from_report(report, span.extra());
     }
 
     pub fn fold<E: Into<ParseErrs>>(errs: Vec<E>) -> ParseErrs {
         let errs: Vec<ParseErrs> = errs.into_iter().map(|e| e.into()).collect();
 
         let source = if let Some(first) = errs.first() {
-            if let Some(source) = first.source.as_ref().cloned() {
-                Some(source)
-            } else {
-                None
-            }
+            first.source.clone()
         } else {
-            None
+            Default::default()
         };
 
         let mut rtn = ParseErrs {
             report: vec![],
             source,
-            ctx: "".to_string(),
         };
 
         for err in errs {
@@ -562,15 +519,38 @@ impl ParseErrs {
     }
 }
 
+impl From<String> for SpaceErr  {
+    fn from(value: String) -> Self {
+        SpaceErr::server_error(value)
+    }
+}
+
+
+
+/*
+
 impl From<SpaceErr> for ParseErrs {
     fn from(u: SpaceErr) -> Self {
         ParseErrs {
             report: vec![],
             source: None,
-            ctx: "".to_string(),
         }
     }
 }
+
+ */
+
+
+impl Into<ParseErrs> for SpaceErr {
+    fn into(self) -> ParseErrs {
+        match self {
+            SpaceErr::ParseErrs(errs) => errs,
+            _ => Default::default()
+        }
+    }
+}
+
+
 
 impl From<serde_urlencoded::de::Error> for SpaceErr {
     fn from(err: serde_urlencoded::de::Error) -> Self {
@@ -750,7 +730,7 @@ pub mod report {
             }
         }
 
-        pub fn with_message(mut self, msg: &str) -> Label {
+        pub fn with_message<S>(mut self, msg: S) -> Label  where S: ToString{
             self.msg.replace(msg.to_string());
             self
         }

@@ -3,14 +3,15 @@ use std::sync::Arc;
 use nom::error::{ErrorKind, ParseError};
 use nom::{AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength, InputTake, InputTakeAtPosition, Needed, Offset, Slice};
 use nom::character::complete::multispace0;
-use nom::combinator::recognize;
 use nom::sequence::delimited;
 use nom_locate::LocatedSpan;
 use nom_supreme::error::{GenericErrorTree, StackContext};
+use nom_supreme::ParserExt;
 use serde::{Deserialize, Serialize};
-use crate::space::err::SpaceErr;
+use thiserror::__private::AsDisplay;
+use crate::space::err::{ParseErrs, SpaceErr};
 use crate::space::loc::Variable;
-use crate::space::parse::{ErrCtx, ParseTree, VarCase};
+use crate::space::parse::{ErrCtx, SpaceTree, VarCase};
 
 #[cfg(test)]
 mod tests {
@@ -887,10 +888,19 @@ where
     move |input: I| delimited(multispace0, f, multispace0)(input)
 }
 
-pub fn result<I: Span, R>(result: Result<(I, R), nom::Err<ParseTree<I>>>) -> Result<R, SpaceErr> {
+pub fn result<I: Span, R>(result: Result<(I, R), nom::Err<SpaceTree<I>>>) -> Result<R, SpaceErr> {
     match result {
         Ok((_, e)) => Ok(e),
-        Err(err) => Err(todo!()),
+        /*
+        Err(nom::Err::Error(err)) => {
+        }
+        Err(nom::Err::Failure(err)) => {
+        }
+        _ =>  {
+        }
+
+         */
+        _ => Err(ParseErrs::default().into())
     }
 }
 
@@ -902,5 +912,87 @@ pub fn unstack( ctx: &StackContext<ErrCtx>) -> String {
         StackContext::Context(c) => {
             format!("{}",c).to_string()
         }
+    }
+}
+
+
+pub fn recognize<I: Clone + Offset + Slice<RangeTo<usize>>, O, E: ParseError<I>, F>(
+    mut parser: F,
+) -> impl FnMut(I) -> IResult<I, I, E>
+where
+    F: ParserExt<I, O, E>,
+{
+    move |input: I| {
+        let i = input.clone();
+        match parser.parse(i) {
+            Ok((i, _)) => {
+                let index = input.offset(&i);
+                Ok((i, input.slice(..index)))
+            }
+            Err(e) => Err(e),
+        }
+    }
+}
+
+
+pub fn log_parse_err<I,O>( result: crate::space::parse::Res<I,O>) -> crate::space::parse::Res<I,O> where I: Span{
+
+    if let Result::Err(err) = &result {
+        match err {
+            nom::Err::Incomplete(_) => {}
+            nom::Err::Error(e) => print(e),
+            nom::Err::Failure(e) => print(e)
+        }
+    }
+    result
+}
+
+pub fn print<I>(err: &SpaceTree<I>) where I: Span{
+
+    match err {
+        SpaceTree::Base { .. } => {
+            println!("BASE!");
+        }
+        SpaceTree::Stack { base,contexts } => {
+
+            println!("STACK!");
+            let mut contexts = contexts.clone();
+            contexts.reverse();
+            let mut message = String::new();
+
+            if !contexts.is_empty()  {
+                if let (location,err) = contexts.remove(0) {
+                    let mut last = &err;
+                    println!("line {} column: {}",location.location_line(), location.get_column());
+                    let line = unstack(&err);
+                    message.push_str(line.as_str());
+
+                    for (span,context) in contexts.iter() {
+                        last = context;
+                        let line = format!("\n\t\tcaused by: {}",unstack(&context));
+                        message.push_str(line.as_str());
+                    }
+                    ParseErrs::from_loc_span(message.as_str(), last.to_string(), location ).print();
+                }
+            }
+        }
+        SpaceTree::Alt(_) => {
+            println!("ALT!");
+        }
+    }
+
+}
+
+pub fn preceded<I, O1, O2, E: ParseError<I>, F, G>(
+    mut first: F,
+    mut second: G,
+) -> impl FnMut(I) -> IResult<I, O2, E>
+where
+    F: ParserExt<I, O1, E>,
+    G: ParserExt<I, O2, E>,
+{
+    move |input: I| {
+        let (input, _) = first.parse(input)?;
+        second.parse(input)
     }
 }
