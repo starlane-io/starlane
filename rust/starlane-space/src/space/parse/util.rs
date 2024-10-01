@@ -6,11 +6,11 @@ use nom::character::complete::multispace0;
 use nom::combinator::recognize;
 use nom::sequence::delimited;
 use nom_locate::LocatedSpan;
-use nom_supreme::error::GenericErrorTree;
+use nom_supreme::error::{GenericErrorTree, StackContext};
 use serde::{Deserialize, Serialize};
 use crate::space::err::SpaceErr;
 use crate::space::loc::Variable;
-use crate::space::parse::{ParseTree, VarCase};
+use crate::space::parse::{ErrCtx, ParseTree, VarCase};
 
 #[cfg(test)]
 mod tests {
@@ -891,5 +891,16 @@ pub fn result<I: Span, R>(result: Result<(I, R), nom::Err<ParseTree<I>>>) -> Res
     match result {
         Ok((_, e)) => Ok(e),
         Err(err) => Err(todo!()),
+    }
+}
+
+pub fn unstack( ctx: &StackContext<ErrCtx>) -> String {
+    match ctx {
+        StackContext::Kind(k) => {
+            k.description().to_string()
+        }
+        StackContext::Context(c) => {
+            format!("{}",c).to_string()
+        }
     }
 }

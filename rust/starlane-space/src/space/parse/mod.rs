@@ -118,7 +118,7 @@ where
     F: Parser<I, O, ParseTree<I>>,
     I: Span,
 {
-    let context = ErrCtx::Str(context.to_string());
+    let context = ErrCtx::Yikes;
     move |i: I| match f.parse(i.clone()) {
         Ok(o) => Ok(o),
         Err(Err::Incomplete(i)) => Err(Err::Incomplete(i)),
@@ -142,14 +142,111 @@ pub mod test2 {
     }
 }
 
-#[derive(Debug, Clone, strum_macros::Display)]
+#[derive(Debug, Clone, Error)]
 pub enum ErrCtx {
-    Str(String),
-    ExpectVarSubstOpenCurly,
+    #[error("Yikes!")]
+    Yikes,
+    #[error(transparent)]
+    Var(#[from] VarErrCtx),
+    #[error("{0}")]
+    PointSeg(#[from] PointSegErrCtx),
+    #[error("{0}")]
     InvalidBaseKind(String),
+    #[error("{0}{1}")]
     InvalidSubKind(BaseKind, String),
-    ExpCamelCase,
+    #[error("variable resolver not availabe in this context")]
     ResolverNotAvailable,
+    #[error(transparent)]
+    Primitive(#[from] PrimitiveErrCtx)
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum VarErrCtx{
+    #[error("invalid variable declaration after '$'")]
+    VarToken
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum PointSegErrCtx{
+    #[error("Space PointSegment invalid")]
+    Space,
+}
+
+
+
+
+
+
+#[derive(Debug, Clone, Error)]
+pub enum PrimitiveErrCtx {
+    #[error("expecting upper case alpha")]
+    Upper,
+    #[error("expecting lower case alpha")]
+    Lower,
+    #[error("expecting digit")]
+    Digit,
+    #[error("expecting {0}")]
+    Brace(#[from] BraceErrCtx),
+    #[error("illegal '{0}'")]
+    Illegal(String)
+
+}
+
+#[derive(Debug, Clone, Error)]
+pub struct BraceErrCtx {
+    pub kind: BraceKindErrCtx,
+    pub side: BraceSideErrCtx,
+}
+
+impl Into<ErrCtx> for BraceErrCtx {
+    fn into(self) -> ErrCtx {
+        ErrCtx::Primitive(self.into())
+    }
+}
+
+
+impl BraceErrCtx {
+  pub fn new(kind: BraceKindErrCtx, side: BraceSideErrCtx ) -> Self {
+      Self {
+          kind,
+          side
+      }
+  }
+
+    pub fn describe(&self) ->  &'static str{
+        match &self.kind {
+            BraceKindErrCtx::Curly => {
+                match &self.side {
+                    BraceSideErrCtx::Open => "{",
+                    BraceSideErrCtx::Close => "}"
+                }
+            }
+        }
+    }
+}
+
+impl Display for BraceErrCtx {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{} {} '{}'", self.side, self.kind, self.describe())
+    }
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum BraceSideErrCtx {
+    #[error("opening")]
+    Open,
+    #[error("closing")]
+    Close
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum BraceKindErrCtx {
+    #[error("curly")]
+    Curly
+}
+
+impl BraceKindErrCtx {
+
 }
 
 #[derive(Debug, Error, strum_macros::Display)]
@@ -321,24 +418,23 @@ pub fn space_no_dupe_dots<I: Span>(input: I) -> Res<I, ()> {
 }
 
 pub fn space_point_segment<I: Span>(input: I) -> Res<I, PointSeg> {
-    context(
-        "point:space_segment",
+
         cut(pair(
             recognize(tuple((
-                context("point:space_segment_leading", peek(alpha1)),
-                space_no_dupe_dots,
+                peek(alpha1).context(PrimitiveErrCtx::Lower.into()),
+                space_no_dupe_dots.context(PrimitiveErrCtx::Illegal("..".to_string()).into()),
                 space_chars,
             ))),
             mesh_eos,
-        )),
+        ).context(PointSegErrCtx::Space.into()),
     )(input)
     .map(|(next, (space, x))| (next, PointSeg::Space(space.to_string())))
 }
 
 pub fn base_point_segment<I: Span>(input: I) -> Res<I, PointSeg> {
     preceded(
-        peek(lowercase1),
-        context("point:base_segment", cut(pair(rec_skewer, mesh_eos))),
+        peek(lowercase1).context(PrimitiveErrCtx::Lower.into()),
+        cut(pair(rec_skewer, mesh_eos)),
     )(input)
     .map(|(next, (base, _))| (next, PointSeg::Base(base.to_string())))
 }
@@ -452,13 +548,73 @@ fn var<I: Span, O>(input: I) -> Res<I, VarVal<O>> {
     pair(
         peek(tag("$")),
         cut(delimited(
-            tag("${").context(ErrCtx::ExpectVarSubstOpenCurly),
+            tag("${").context(BraceErrCtx::new(BraceKindErrCtx::Curly,BraceSideErrCtx::Open).into()),
             tw(var_name),
             tag("}"),
         )),
     )(input)
     .map(|(next, (_, var))| (next, VarVal::Var(var)))
 }
+
+
+#[cfg(test)]
+pub mod test3 {
+    use std::sync::Arc;
+    use nom::combinator::cut;
+    use nom_locate::LocatedSpan;
+    use nom_supreme::error::GenericErrorTree;
+    use nom_supreme::ParserExt;
+    use crate::space::loc::VarVal;
+    use crate::space::parse::{base_point_segment, point_var, pop, space_point_segment, var, variable_ize, ErrCtx, ParseErr, ParseTree, Res};
+    use crate::space::parse::util::{new_span, result, trim, unstack, Wrap};
+    use crate::space::point::{PointSeg, PointSegVar};
+
+    #[test]
+    pub fn test() {
+        let span = new_span("\n\n        $the:blasted\n");
+
+        //let result: Res<_,PointSegVar>   = variable_ize(pop(base_point_segment))(span);
+        let result: Res<_,PointSeg>   = cut(trim(space_point_segment))(span);
+
+        match result.unwrap_err() {
+            nom::Err::Incomplete(_) => {
+                assert!(false)
+            }
+            nom::Err::Error(_) => {
+                assert!(false)
+            }
+            nom::Err::Failure(err) => {
+                match err {
+                    ParseTree::Base { .. } => {
+                        println!("BASE!");
+                    }
+                    ParseTree::Stack { base,mut contexts } => {
+
+                        println!("STACK!");
+                        contexts.reverse();
+
+                        if !contexts.is_empty()  {
+                            if let (location,err) = contexts.remove(0) {
+                                println!("line {} column: {}",location.location_line(), location.get_column());
+                                println!("{}",unstack(&err));
+                            }
+                        }
+
+
+                        for (span,context) in contexts.iter() {
+                            println!("\tcaused by: {}", unstack(&context));
+                        }
+                        println!("base: {:?}", base);
+                    }
+                    ParseTree::Alt(_) => {
+                        println!("ALT!");
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 fn var_name<I>(input: I) -> Res<I, VarCase>
 where I: Span

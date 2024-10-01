@@ -362,6 +362,8 @@ pub enum PointSegVar {
     Var(Variable),
 }
 
+
+
 impl From<VarVal<PointSegCtx>> for PointSegVar {
     fn from(value: VarVal<PointSegCtx>) -> Self {
         match value {
