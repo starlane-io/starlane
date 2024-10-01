@@ -25,8 +25,6 @@ use thiserror::Error;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Error)]
 pub enum SpaceErr {
-    #[error("{0}")]
-    Message(String),
     #[error("{status}: {message}")]
     Status { status: u16, message: String },
     #[error(transparent)]
@@ -42,7 +40,7 @@ impl SpaceErr {
             SpaceErr::ParseErrs(errs) => {
                 for report in &errs.report {
                     let report: ariadne::Report = report.clone().into();
-                    report.print(ariadne::Source::from(&errs.source));
+                    report.print(ariadne::Source::from(&errs.src));
                 }
             }
             _ => {
@@ -422,7 +420,7 @@ impl From<io::Error> for SpaceErr {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Error)]
 pub struct ParseErrs {
     pub report: Vec<Report>,
-    pub source: String,
+    pub src: String,
 }
 
 impl Display for ParseErrs {
@@ -435,7 +433,7 @@ impl Default for ParseErrs {
     fn default() -> Self {
         Self {
             report: vec![],
-            source: Default::default(),
+            src: Default::default(),
         }
     }
 }
@@ -445,7 +443,7 @@ impl ParseErrs {
         println!("REport len: {}", self.report.len());
         for report in &self.report {
             let report: ariadne::Report = report.clone().into();
-                report.print(ariadne::Source::from(&self.source));
+                report.print(ariadne::Source::from(&self.src));
         }
     }
 
@@ -454,7 +452,7 @@ impl ParseErrs {
         Self {
             report: vec![report],
             // not good that we are copying the string here... need to return to this and make it more efficient...
-            source: source.to_string(),
+            src: source.to_string(),
         }
     }
 
@@ -500,14 +498,14 @@ impl ParseErrs {
         let errs: Vec<ParseErrs> = errs.into_iter().map(|e| e.into()).collect();
 
         let source = if let Some(first) = errs.first() {
-            first.source.clone()
+            first.src.clone()
         } else {
             Default::default()
         };
 
         let mut rtn = ParseErrs {
             report: vec![],
-            source,
+            src: source,
         };
 
         for err in errs {
