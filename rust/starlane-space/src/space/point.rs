@@ -266,6 +266,13 @@ impl PointSegKind {
             PointSegKind::Var => true,
         }
     }
+
+    pub fn is_terminator(&self)  -> bool {
+        match self {
+            PointSegKind::File => true,
+            _ => false
+        }
+    }
 }
 
 impl PointSegQuery for PointSeg {
@@ -1258,7 +1265,7 @@ impl Point {
                         format!("{}:{}", self.to_string(), segment)
                     }
                 }
-                PointSeg::File(_) => return Err("cannot append to a file".into()),
+                PointSeg::File(_) => return Err(SpaceErr::PointPushTerminal(PointSegKind::File)),
             };
             Self::from_str(point.as_str())
         }
@@ -1275,9 +1282,9 @@ impl Point {
             Ok(point)
         } else {
             if self.has_filesystem() {
-                Err("cannot push a Mesh segment onto a point after the FileSystemRoot segment has been pushed".into())
+                 Err(SpaceErr::PointPushTerminal(PointSegKind::File))?
             } else {
-                Err("cannot push a FileSystem segment onto a point until after the FileSystemRoot segment has been pushed".into())
+                Err(SpaceErr::PointPushNoFileRoot(segment.kind()))
             }
         }
     }

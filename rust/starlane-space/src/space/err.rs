@@ -26,6 +26,8 @@ use thiserror::Error;
 use crate::space::command::direct::create::KindTemplate;
 use crate::space::kind::{BaseKind, FileSubKind, Kind};
 use crate::space::parse::Res;
+use crate::space::particle::PointKind;
+use crate::space::point::{Point, PointSegKind};
 use crate::space::selector::KindSelector;
 
 
@@ -58,7 +60,11 @@ pub enum SpaceErr {
     #[error("{0}")]
     Msg(String),
     #[error("expecting a wildcard in point template.  found: '{0}'")]
-    ExpectingWildcardInPointTemplate(String)
+    ExpectingWildcardInPointTemplate(String),
+    #[error("cannot push to terminal '{0}' PointSegment.")]
+    PointPushTerminal(PointSegKind),
+    #[error("cannot push a FileSystem PointSegment '{0}' onto a point until after the FileSystemRoot ':/' segment has been pushed")]
+    PointPushNoFileRoot(PointSegKind),
 }
 
 impl SpaceErr {

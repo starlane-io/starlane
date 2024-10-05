@@ -55,6 +55,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
 use crate::err::{HypErr, HyperErr2};
+use crate::registry::postgres::err::RegErr;
 use crate::service::{Service, ServiceConf, ServiceKind, ServiceRunner, ServiceSelector, ServiceTemplate};
 
 static DEFAULT_BIND: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
@@ -1056,7 +1057,7 @@ where
         point: Point,
         rtn: oneshot::Sender<Result<Status, SpaceErr>>,
     },
-    DriverRunnerRequest(DriverRunnerRequest<P>),
+    DriverRunnerRequest(DriverRunnerRequest),
     DriverBind(oneshot::Sender<ArtRef<BindConfig>>),
     Bind {
         point: Point,
@@ -1064,9 +1065,7 @@ where
     },
 }
 
-pub enum DriverRunnerRequest<P>
-where
-    P: Platform,
+pub enum DriverRunnerRequest
 {
     Create {
         agent: Agent,
@@ -1441,7 +1440,7 @@ where
     pub logger: PointLogger,
     pub status_rx: watch::Receiver<DriverStatus>,
     pub status_tx: mpsc::Sender<DriverStatus>,
-    pub request_tx: mpsc::Sender<DriverRunnerRequest<P>>,
+    pub request_tx: mpsc::Sender<DriverRunnerRequest>,
 }
 
 impl<P> DriverSkel<P>
@@ -1486,7 +1485,7 @@ where
         transmitter: ProtoTransmitter,
         logger: PointLogger,
         status_tx: watch::Sender<DriverStatus>,
-        request_tx: mpsc::Sender<DriverRunnerRequest<P>>,
+        request_tx: mpsc::Sender<DriverRunnerRequest>,
     ) -> Self {
         let (mpsc_status_tx, mut mpsc_status_rx): (
             tokio::sync::mpsc::Sender<DriverStatus>,
@@ -1532,12 +1531,12 @@ where
             strategy: Strategy::Ensure,
             state: StateSrc::None,
         };
-        self.skel
+        Ok(self.skel
             .logger
-            .result(self.skel.create_in_star(create).await)
+            .result(self.skel.create_in_star(create).await)?)
     }
 
-    pub async fn locate(&self, point: &Point) -> Result<ParticleRecord, HyperErr2> {
+    pub async fn locate(&self, point: &Point) -> Result<ParticleRecord, RegErr> {
         self.skel.registry.record(point).await
     }
 

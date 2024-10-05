@@ -18,9 +18,7 @@ use starlane::space::wave::core::ReflectedCore;
 
 pub type HyperErr2 = anyhow::Error;
 pub use anyhow::anyhow as err;
-
-
-
+use crate::hyperspace::star::StarErr;
 
 #[derive(Error, Debug,Clone)]
 pub enum HypErr {
@@ -28,14 +26,16 @@ pub enum HypErr {
     SpaceErr(#[from] SpaceErr),
     #[error(transparent)]
     RegErr(#[from] RegErr),
+    #[error(transparent)]
+    StarErr(#[from] StarErr),
+    #[error(transparent)]
+    Anyhow(#[from] Arc<anyhow::Error>),
     #[error("{0}")]
     String(String),
     #[error("{0}")]
     Iniff(#[from] Infallible),
     #[error("{0}")]
     StripPrefix(#[from] std::path::StripPrefixError),
-    #[error(transparent)]
-    Anyhow(#[from] Arc<anyhow::Error>),
     #[error("{0}")]
     OneshotRecvErr(#[from] oneshot::RecvError),
     #[error("{0}")]
@@ -75,20 +75,6 @@ pub enum PlatformErr {}
 impl From<&str> for HypErr {
     fn from(value: &str) -> Self {
         Self::String(value.to_string())
-    }
-}
-
-#[derive(Error, Debug, Clone)]
-pub enum StarErr {
-    #[error("{0}")]
-    SpaceErr(#[from] SpaceErr),
-    #[error("Error when attempting to Provision {0}")]
-    ProvisioningError(SpaceErr),
-}
-
-impl StarErr {
-    pub fn provisioning(err: SpaceErr) -> Self {
-        Self::ProvisioningError(err)
     }
 }
 

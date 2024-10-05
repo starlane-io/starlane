@@ -1,14 +1,16 @@
+use std::sync::Arc;
+use sqlx::Error;
 use strum::ParseError;
 use thiserror::Error;
 use starlane::space::err::SpaceErr;
 use starlane::space::point::Point;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug,Clone)]
 pub enum RegErr {
   #[error("duplicate error")]
   Dupe,
   #[error("postgres error: {0}")]
-  SqlxErr(#[from] sqlx::Error),
+  SqlxErr(#[from] Arc<sqlx::Error>),
   #[error(transparent)]
   SpaceErr(#[from] SpaceErr),
   #[error("postgres registry db connection pool '{0}' not found")]
@@ -21,6 +23,12 @@ pub enum RegErr {
   DatabaseSetupFail,
   #[error("Point '{point}' registry error: {message}")]
   Point { point: Point, message: String }
+}
+
+impl From<sqlx::Error> for RegErr {
+    fn from(value: Error) -> Self {
+        RegErr::SqlxErr(Arc::new(value))
+    }
 }
 
 impl RegErr {

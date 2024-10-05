@@ -1,7 +1,8 @@
 pub mod err;
 
-use crate::platform::Platform;
+use crate::err::{err, HypErr};
 use crate::hyperspace::reg::{Registration, RegistryApi};
+use crate::platform::Platform;
 use err::RegErr;
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgPoolOptions, PgRow};
@@ -11,12 +12,16 @@ use starlane::space::command::direct::create::Strategy;
 use starlane::space::command::direct::delete::Delete;
 use starlane::space::command::direct::get::{Get, GetOp};
 use starlane::space::command::direct::query::{Query, QueryResult};
-use starlane::space::command::direct::select::{Select, SelectIntoSubstance, SelectKind, SubSelect};
+use starlane::space::command::direct::select::{
+    Select, SelectIntoSubstance, SelectKind, SubSelect,
+};
 use starlane::space::command::direct::set::Set;
+use starlane::space::err::SpaceErr;
 use starlane::space::hyper::{ParticleLocation, ParticleRecord};
 use starlane::space::kind::{BaseKind, Kind, KindParts, Specific};
 use starlane::space::loc::{StarKey, ToBaseKind, Version};
 use starlane::space::log::PointLogger;
+use starlane::space::parse::util::{result, space_err};
 use starlane::space::parse::{CamelCase, Domain, SkewerCase};
 use starlane::space::particle::{Details, Properties, Property, Status, Stub};
 use starlane::space::point::Point;
@@ -39,27 +44,20 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio_print::aprintln;
-use starlane::space::err::SpaceErr;
-use starlane::space::parse::util::{result, space_err};
-use crate::err::{err, HypErr};
 
-
-pub trait PostgresPlatform: Send + Sync
-{
+pub trait PostgresPlatform: Send + Sync {
     fn lookup_registry_db(&self) -> Result<PostgresDbInfo, RegErr>;
-    fn lookup_star_db(&self,star: &StarKey) -> Result<PostgresDbInfo, RegErr>;
+    fn lookup_star_db(&self, star: &StarKey) -> Result<PostgresDbInfo, RegErr>;
 }
 
-pub struct PostgresRegistry
-{
+pub struct PostgresRegistry {
     logger: PointLogger,
     ctx: PostgresRegistryContextHandle,
     platform: Box<dyn PostgresPlatform>,
 }
 
-impl PostgresRegistry
-{
-   pub async fn new(
+impl PostgresRegistry {
+    pub async fn new(
         ctx: PostgresRegistryContextHandle,
         platform: Box<dyn PostgresPlatform>,
         logger: PointLogger,
@@ -164,9 +162,9 @@ impl PostgresRegistry
         let point_segment_parent_index = "CREATE UNIQUE INDEX IF NOT EXISTS resource_point_segment_parent_index ON particles(parent,point_segment)";
         let access_grants_index =
             "CREATE INDEX IF NOT EXISTS query_root_index ON access_grants(query_root)";
-aprintln!("Postgres acquiring con...");
+        aprintln!("Postgres acquiring con...");
         let mut conn = self.ctx.acquire().await?;
-aprintln!("conn acquired......");
+        aprintln!("conn acquired......");
         let mut transaction = conn.begin().await?;
         transaction.execute(particles).await?;
         transaction.execute(access_grants).await?;
@@ -185,8 +183,7 @@ aprintln!("conn acquired......");
 }
 
 #[async_trait]
-impl  RegistryApi for PostgresRegistry
-{
+impl RegistryApi for PostgresRegistry {
     async fn nuke<'a>(&'a self) -> Result<(), RegErr> {
         self.logger.info("nuking database!");
         let mut conn = self.ctx.acquire().await?;
@@ -222,7 +219,7 @@ impl  RegistryApi for PostgresRegistry
 
         let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
-        let params= RegistryParams::from_registration(registration)?;
+        let params = RegistryParams::from_registration(registration)?;
 
         let count = sqlx::query_as::<Postgres, Count>(
             "SELECT count(*) as count from particles WHERE point=$1",
@@ -268,9 +265,7 @@ impl  RegistryApi for PostgresRegistry
     }
 
     async fn assign_star<'a>(&'a self, point: &'a Point, star: &'a Point) -> Result<(), RegErr> {
-        let parent = point
-            .parent()
-            .ok_or(RegErr::expected_parent(point))?;
+        let parent = point.parent().ok_or(RegErr::expected_parent(point))?;
         let point_segment = point.last_segment().ok_or("expecting a last_segment")?;
 
         let statement = "UPDATE particles SET star=$1 WHERE parent=$2 AND point_segment=$3";
@@ -292,9 +287,7 @@ impl  RegistryApi for PostgresRegistry
     }
 
     async fn assign_host<'a>(&'a self, point: &'a Point, host: &'a Point) -> Result<(), RegErr> {
-        let parent = point
-            .parent()
-            .ok_or(RegErr::expected_parent(point))?;
+        let parent = point.parent().ok_or(RegErr::expected_parent(point))?;
         let point_segment = point.last_segment().ok_or("expecting a last_segment")?;
 
         let statement = "UPDATE particles SET host=$1, WHERE parent=$2 AND point_segment=$3";
@@ -634,9 +627,8 @@ impl  RegistryApi for PostgresRegistry
             where_clause
         );
 
-        let mut query = sqlx::query_as::<Postgres, PostgresParticleRecord>(
-            matching_so_far_statement.as_str(),
-        );
+        let mut query =
+            sqlx::query_as::<Postgres, PostgresParticleRecord>(matching_so_far_statement.as_str());
         for param in params {
             query = query.bind(param);
         }
@@ -952,7 +944,7 @@ impl  RegistryApi for PostgresRegistry
             let mut trans = conn.begin().await?;
             sqlx::query("DELETE FROM access_grants WHERE id=$1")
                 .bind(id)
-                .execute(& mut *trans)
+                .execute(&mut *trans)
                 .await?;
             trans.commit().await?;
             Ok(())
@@ -996,27 +988,21 @@ impl sqlx::FromRow<'_, PgRow> for LocalProperty {
     }
 }
 
-pub struct WrappedIndexedAccessGrant
-{
+pub struct WrappedIndexedAccessGrant {
     grant: IndexedAccessGrant,
 }
 
-impl Unpin for WrappedIndexedAccessGrant
-{
-}
+impl Unpin for WrappedIndexedAccessGrant {}
 
-impl Into<IndexedAccessGrant> for WrappedIndexedAccessGrant
-{
+impl Into<IndexedAccessGrant> for WrappedIndexedAccessGrant {
     fn into(self) -> IndexedAccessGrant {
         self.grant
     }
 }
 
-impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant
-{
+impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
-        fn wrap(row: &PgRow) -> Result<IndexedAccessGrant, RegErr>
-        {
+        fn wrap(row: &PgRow) -> Result<IndexedAccessGrant, RegErr> {
             let id: i32 = row.get("id");
             let kind: &str = row.get("kind");
             let kind = match kind {
@@ -1051,27 +1037,21 @@ impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant
         match wrap(row) {
             Ok(record) => {
                 let phantom = Default::default();
-                Ok(WrappedIndexedAccessGrant {
-                    grant: record,
-                })
+                Ok(WrappedIndexedAccessGrant { grant: record })
             }
             Err(err) => Err(sqlx::error::Error::PoolClosed),
         }
     }
 }
 
-struct PostgresParticleRecord
-{
+struct PostgresParticleRecord {
     pub details: Details,
     pub location: ParticleLocation,
 }
 
-impl Unpin for PostgresParticleRecord
-{
-}
+impl Unpin for PostgresParticleRecord {}
 
-impl Into<ParticleRecord> for PostgresParticleRecord
-{
+impl Into<ParticleRecord> for PostgresParticleRecord {
     fn into(self) -> ParticleRecord {
         ParticleRecord {
             details: self.details,
@@ -1080,11 +1060,9 @@ impl Into<ParticleRecord> for PostgresParticleRecord
     }
 }
 
-impl sqlx::FromRow<'_, PgRow> for PostgresParticleRecord
-{
+impl sqlx::FromRow<'_, PgRow> for PostgresParticleRecord {
     fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
-        fn wrap(row: &PgRow) -> Result<PostgresParticleRecord, sqlx::Error>
-        {
+        fn wrap(row: &PgRow) -> Result<PostgresParticleRecord, RegErr> {
             let parent: String = row.get("parent");
             let point_segment: String = row.get("point_segment");
             let base: String = row.get("base");
@@ -1179,20 +1157,19 @@ impl sqlx::FromRow<'_, PgRow> for PostgresParticleRecord
                 properties: Default::default(), // not implemented yet...
             };
 
-            let record = PostgresParticleRecord {
-                details,
-                location,
-            };
+            let record = PostgresParticleRecord { details, location };
 
             Ok(record)
         }
 
-        Ok(wrap(row)?)
+        match wrap(row) {
+            Ok(rtn) => Ok(rtn),
+            Err(err) => Err(sqlx::Error::RowNotFound),
+        }
     }
 }
 
-pub struct RegistryParams
-{
+pub struct RegistryParams {
     pub point: String,
     pub point_segment: String,
     pub base: String,
@@ -1207,8 +1184,7 @@ pub struct RegistryParams
     pub owner: Point,
 }
 
-impl RegistryParams
-{
+impl RegistryParams {
     pub fn from_registration(registration: &Registration) -> Result<Self, RegErr> {
         let point_segment = match registration.point.segments.last() {
             None => "".to_string(),
@@ -1286,8 +1262,7 @@ impl RegistryParams
     }
 }
 
-impl PostgresRegistry
-{
+impl PostgresRegistry {
     pub async fn set(&self, set: &Set) -> Result<(), RegErr> {
         self.set_properties(&set.point, &set.properties).await
     }
@@ -1341,13 +1316,11 @@ impl PostgresRegistry
     }
 }
 
-pub struct PostRegApi
-{
+pub struct PostRegApi {
     ctx: PostgresRegistryContext,
 }
 
-impl PostRegApi
-{
+impl PostRegApi {
     pub fn new(ctx: PostgresRegistryContext) -> Self {
         Self { ctx }
     }
@@ -1358,15 +1331,13 @@ impl PostRegApi
 }
 
 #[derive(Clone)]
-pub struct PostgresRegistryContextHandle
-{
+pub struct PostgresRegistryContextHandle {
     key: PostgresDbKey,
     pool: Arc<PostgresRegistryContext>,
     pub schema: String,
 }
 
-impl PostgresRegistryContextHandle
-{
+impl PostgresRegistryContextHandle {
     pub fn new(db: &PostgresDbInfo, pool: Arc<PostgresRegistryContext>) -> Self {
         Self {
             key: db.to_key(),
@@ -1384,15 +1355,16 @@ impl PostgresRegistryContextHandle
     }
 }
 
-pub struct PostgresRegistryContext
-{
+pub struct PostgresRegistryContext {
     pools: HashMap<PostgresDbKey, Pool<Postgres>>,
-    platform: Box<dyn PostgresPlatform>
+    platform: Box<dyn PostgresPlatform>,
 }
 
-impl PostgresRegistryContext
-{
-    pub async fn new(dbs: HashSet<PostgresDbInfo>, platform: Box<dyn PostgresPlatform>) -> Result<Self, RegErr> {
+impl PostgresRegistryContext {
+    pub async fn new(
+        dbs: HashSet<PostgresDbInfo>,
+        platform: Box<dyn PostgresPlatform>,
+    ) -> Result<Self, RegErr> {
         let mut pools = HashMap::new();
         for db in dbs {
             let pool = PgPoolOptions::new()
@@ -1401,27 +1373,23 @@ impl PostgresRegistryContext
                 .await?;
             pools.insert(db.to_key(), pool);
         }
-        Ok(Self { pools, platform})
+        Ok(Self { pools, platform })
     }
 
     pub async fn acquire<'a>(
         &'a self,
         key: &'a PostgresDbKey,
     ) -> Result<PoolConnection<Postgres>, RegErr> {
-aprintln!(" Entered Acquire...       ..");
-aprintln!(" Key {:?}",key);
-        let pool = self
-            .pools
-            .get(key);
-aprintln!("pool.is_some():  {}",pool.is_some() );
+        aprintln!(" Entered Acquire...       ..");
+        aprintln!(" Key {:?}", key);
+        let pool = self.pools.get(key);
+        aprintln!("pool.is_some():  {}", pool.is_some());
 
-
-            let pool = pool.unwrap();
+        let pool = pool.unwrap();
         //let pool = pool.ok_or(SpaceErr::str("could not acquire db connection"));
-//        aprintln!("pool.is_err():  {}",pool.is_err() );
+        //        aprintln!("pool.is_err():  {}",pool.is_err() );
 
-
-aprintln!("Aquire without Await...");
+        aprintln!("Aquire without Await...");
         Ok(pool.acquire().await?)
     }
 
@@ -1447,13 +1415,13 @@ pub struct PostgresDbKey {
 
 impl ToString for PostgresDbKey {
     fn to_string(&self) -> String {
-        format!("{}:{}@{}",  self.user, self.database, self.url)
+        format!("{}:{}@{}", self.user, self.database, self.url)
     }
 }
 
 impl ToString for &PostgresDbKey {
     fn to_string(&self) -> String {
-        format!("{}:{}@{}",  self.user, self.database, self.url)
+        format!("{}:{}@{}", self.user, self.database, self.url)
     }
 }
 
@@ -1516,7 +1484,7 @@ impl PostgresDbInfo {
 }
 
 #[cfg(test)]
-#[cfg(feature="never")]
+#[cfg(feature = "never")]
 pub mod test {
     use std::collections::HashSet;
     use std::convert::TryInto;
@@ -1529,10 +1497,12 @@ pub mod test {
     use crate::hyperspace::err::HyperErr;
     use crate::hyperspace::machine::MachineTemplate;
     use crate::hyperspace::reg::{Registration, Registry};
+    use crate::registry::postgres::err::RegErr;
     use crate::registry::postgres::{
         PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
         PostgresRegistryContextHandle,
     };
+    use crate::StarlanePostgres;
     use starlane::space::artifact::asynch::ArtifactApi;
     use starlane::space::command::direct::create::Strategy;
     use starlane::space::command::direct::query::Query;
@@ -1546,12 +1516,10 @@ pub mod test {
     use starlane::space::security::{AccessGrant, AccessGrantKind, PermissionsMask, Privilege};
     use starlane::space::selector::{PointHierarchy, Selector};
     use starlane::space::HYPERUSER;
-    use crate::registry::postgres::err::RegErr;
-    use crate::StarlanePostgres;
 
     #[derive(Clone)]
     pub struct TestPlatform {
-        pub handle: PostgresRegistryContextHandle
+        pub handle: PostgresRegistryContextHandle,
     }
 
     impl TestPlatform {
@@ -1560,7 +1528,7 @@ pub mod test {
             let db = postgres.lookup_registry_db()?;
             let mut set = HashSet::new();
             set.insert(db.clone());
-            let ctx = Arc::new(PostgresRegistryContext::new(set,postgres).await?);
+            let ctx = Arc::new(PostgresRegistryContext::new(set, postgres).await?);
             let handle = PostgresRegistryContextHandle::new(&db, ctx);
             Ok(Self { handle })
         }

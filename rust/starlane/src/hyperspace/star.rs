@@ -8,6 +8,8 @@ use std::ops::Add;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use anyhow::Context;
+use thiserror::Error;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::driver::{DriverStatus, DriversApi, DriversBuilder, DriversCall};
@@ -15,7 +17,7 @@ use crate::hyperlane::{
     Bridge, HyperwayEndpoint, HyperwayEndpointFactory,
     HyperwayInterchange, HyperwayStub,
 };
-use crate::hyperspace::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
+use crate::hyperspace::global::{GlobalCommandExecutionHandler, GlobalErr, GlobalExecutionChamber};
 use crate::hyperspace::layer::field::Field;
 use crate::hyperspace::layer::shell::{Shell, ShellState};
 use crate::hyperspace::machine::MachineSkel;
@@ -57,6 +59,7 @@ use starlane::space::wave::{
 };
 use starlane::space::wave::Wave;
 use crate::err::{err, HypErr};
+use crate::registry::postgres::err::RegErr;
 use crate::service::ServiceTemplate;
 use crate::template::Templates;
 
@@ -293,23 +296,16 @@ where
      */
 
     #[track_caller]
-    pub async fn create_in_star(&self, create: Create) -> Result<Details, HypErr> {
+    pub async fn create_in_star(&self, create: Create) -> Result<Details, StarErr> {
         if self.point != create.template.point.parent
             && !self.point.is_parent_of(&create.template.point.parent)
         {
-            Err(err!("cannot create_in_star in star {} for parent point {} since it is not a point within this star", self.point.to_string(), create.template.point.parent.to_string()))?;
+            Err(StarErr::point_not_in_star(&self.point, &create.template.point.parent))?;
         }
 
         let logger = self.logger.push_mark("create-in-star").unwrap();
         let global = GlobalExecutionChamber::new(self.clone());
-        let details = self.logger.result_ctx(
-            format!(
-                "StarSkel::create_in_star(register({}))",
-                create.template.kind.to_string()
-            )
-            .as_str(),
-            global.create(&create, &Agent::HyperUser).await,
-        )?;
+        let details = global.create(&create, &Agent::HyperUser).await?;
 
         let assign_body = Assign::new(AssignmentKind::Create, details.clone(), StateSrc::None);
         let mut assign = DirectedProto::sys(
@@ -344,10 +340,13 @@ where
         Ok(details)
     }
 
-    pub fn err<M: ToString>(&self, message: M) -> Result<(), HypErr> {
+    /*
+    pub fn err<M: ToString>(&self, message: M) -> Result<(), StarErr> {
         self.logger.warn(message.to_string());
         return Err(err!("{}",message.to_string()))?;
     }
+
+     */
 
     pub fn location(&self) -> &Point {
         &self.logger.point
@@ -662,7 +661,7 @@ where
         mut hyperway_endpoint: HyperwayEndpoint,
         interchange: Arc<HyperwayInterchange>,
         mut star_tx: HyperStarTx<P>,
-    ) -> Result<HyperStarApi<P>, HypErr> {
+    ) -> Result<HyperStarApi<P>, StarErr> {
         let drivers = drivers.build(
             skel.clone(),
             star_tx.drivers_call_tx.clone(),
@@ -1069,7 +1068,7 @@ where
             async fn shard<P>(
                 mut wave: Wave,
                 skel: HyperStarSkel<P>,
-                locator: SmartLocator<P>,
+                locator: SmartLocator<P,StarErr>,
                 gravity: Surface,
             ) -> Result<(), HypErr>
             where
@@ -1968,10 +1967,18 @@ impl DiagnosticInterceptors
     }
 }
 
+
+pub(crate) trait SmartLocatorErr {
+    fn reg_err( err: RegErr ) -> Self;
+
+    fn star_err( err: StarErr) -> Self;
+}
+
+
 #[derive(Clone)]
 pub struct SmartLocator<P>
 where
-    P: Platform,
+    P: Platform
 {
     pub skel: HyperStarSkel<P>,
 }
@@ -1984,7 +1991,7 @@ where
         Self { skel }
     }
 
-    pub async fn locate(&self, point: &Point) -> Result<ParticleLocation, HypErr> {
+    pub async fn locate(&self, point: &Point) -> Result<ParticleLocation, StarErr> {
         let record = self.skel.registry.record(&point).await?;
         match &record.location.star {
             Some(_) => Ok(record.location),
@@ -1999,7 +2006,7 @@ where
         &self,
         point: &Point,
         state: StateSrc,
-    ) -> Result<ParticleLocation, HypErr> {
+    ) -> Result<ParticleLocation, StarErr> {
         self.skel
             .logger
             .result(self.provision_inner(point, state).await)
@@ -2010,11 +2017,11 @@ where
         &self,
         point: &Point,
         state: StateSrc,
-    ) -> Result<ParticleLocation, HypErr> {
+    ) -> Result<ParticleLocation, StarErr> {
         // check if parent is provisioned
         let parent = point
             .parent()
-            .ok_or(err!("expected Root to be provisioned"))?;
+            .ok_or(StarErr::ExpectedRootProvisioned)?;
         let mut parent_record = self.skel.registry.record(&parent).await?;
         if parent_record.location.star.is_none() {
             self.provision_inner(&parent, StateSrc::None).await?;
@@ -2031,11 +2038,13 @@ where
         let pong: WaveVariantDef<PongCore> = self.skel.star_transmitter.direct(wave).await?;
         (pong.core.clone().body).expect(SubstanceKind::Location);
         if pong.core.status.as_u16() == 200 {
-            if let Substance::Location(location) = &pong.core.body {
-                Ok(location.clone())
-            } else {
-                Err(err!("Provision result expected Substance Point"))
-            }
+
+            let location = match &pong.core.body {
+                Substance::Location(location) => location,
+                s =>  Err(SpaceErr::ExpectedSubstance {expected: SubstanceKind::Location, found: s.kind()})?
+            };
+
+            Ok(location.clone())
         } else {
             self.skel
                 .registry
@@ -2043,17 +2052,51 @@ where
                 .await?;
 
             match self.skel.registry.record(&point).await {
-                Ok(record) => Err(err!(
-                    "failed to provision {}<{}> status code {}",
-                    point.to_string(),
-                    record.details.stub.kind.to_template().to_string(),
-                    pong.core.status.as_u16()
-                )),
-                Err(_) => Err(err!(
-                    "failed to provision {}",
-                    point.to_string()
-                )),
+                Ok(record) => Err(RegErr::dupe())?,
+                Err(err) => Err(err)?,
             }
         }
     }
 }
+
+
+#[derive(Error,Debug,Clone)]
+pub enum StarErr {
+    #[error("cannot create_in_star in star {point} for parent point {parent} since it is not a point within this star")]
+    PointNotInStar{point: Point, parent: Point},
+    #[error("star expected Root to be already provisioned")]
+    ExpectedRootProvisioned,
+    #[error("could not find parent '{parent}' caused by '{source}'")]
+    CannotFindParent{ #[source] source: RegErr, parent: Point },
+    #[error("caused by '{0}'")]
+    RegErr(#[source] #[from] RegErr),
+    #[error("SmartLocator expected a Surface ")]
+    ExpectedSurface,
+}
+
+impl SmartLocatorErr for StarErr {
+    fn reg_err(err: RegErr) -> Self {
+        Self::RegErr(err)
+    }
+
+    fn star_err(err: StarErr) -> Self {
+        err
+    }
+}
+
+impl StarErr {
+    pub fn point_not_in_star( point: &Point, parent: &Point ) -> Self {
+        let point = point.clone();
+        let parent = parent.clone();
+        Self::PointNotInStar {point, parent}
+    }
+}
+
+
+#[derive(Debug,Clone,strum_macros::EnumString,strum_macros::Display)]
+pub enum StarErrCtx {
+    CreateInStar
+}
+
+
+

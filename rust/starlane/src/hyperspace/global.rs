@@ -1,6 +1,6 @@
 use crate::platform::Platform;
 use crate::hyperspace::reg::Registration;
-use crate::hyperspace::star::{HyperStarSkel, SmartLocator};
+use crate::hyperspace::star::{HyperStarSkel, SmartLocator,  StarErr};
 use once_cell::sync::Lazy;
 use starlane_space::space::parse::util::new_span;
 use starlane::space::artifact::ArtRef;
@@ -23,8 +23,9 @@ use starlane::space::wave::{Agent, DirectedProto};
 use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
+use thiserror_context::impl_context;
 use starlane::space::err::{CoreReflector, SpaceErr};
-use crate::err::HypErr;
+use starlane::space::wave::core::http2::StatusCode;
 use crate::registry::postgres::err::RegErr;
 /*
 #[derive(DirectedHandler,Clone)]
@@ -78,7 +79,7 @@ where
     P: Platform,
 {
     #[route("Cmd<RawCommand>")]
-    pub async fn raw(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, HypErr> {
+    pub async fn raw(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, GlobalErr> {
         let line = ctx.input.line.clone();
         let span = new_span(line.as_str());
         let command = log(result(command_line(span)))?;
@@ -88,7 +89,7 @@ where
     }
 
     #[route("Cmd<Command>")]
-    pub async fn command(&self, ctx: InCtx<'_, Command>) -> Result<ReflectedCore, HypErr> {
+    pub async fn command(&self, ctx: InCtx<'_, Command>) -> Result<ReflectedCore, GlobalErr> {
         let global = GlobalExecutionChamber::new(self.skel.clone());
         let agent = ctx.wave().agent().clone();
         match ctx.input {
@@ -148,7 +149,7 @@ where
     }
 
     #[track_caller]
-    pub async fn create(&self, create: &Create, agent: &Agent) -> Result<Details, HypErr> {
+    pub async fn create(&self, create: &Create, agent: &Agent) -> Result<Details, GlobalErr> {
         let child_kind = self
             .skel
             .machine
@@ -156,14 +157,7 @@ where
             .select_kind(&create.template.kind)?;
         let point = match &create.template.point.child_segment_template {
             PointSegTemplate::Exact(child_segment) => {
-                let point = create.template.point.parent.push(child_segment.clone());
-                match &point {
-                    Ok(_) => {}
-                    Err(err) => {
-                        eprintln!("RC CREATE error: {}", err.to_string());
-                    }
-                }
-                let point = point?;
+                let point = create.template.point.parent.push(child_segment.clone())?;
 
                 let properties = self
                     .skel
@@ -219,7 +213,7 @@ where
 
         if create.state.has_substance() || child_kind.is_auto_provision() {
             println!("\tprovisioning: {}", point.to_string());
-            let provisioner = SmartLocator::new(self.skel.clone());
+            let provisioner  = SmartLocator::new(self.skel.clone());
             //tokio::spawn(async move {
             provisioner.provision(&point, create.state.clone()).await?;
             //});
@@ -234,4 +228,23 @@ where
 
 
 
+#[derive(Debug,Error,Clone)]
+pub enum GlobalErr{
+   #[error("global error caused by {0}")]
+   SpaceErr(#[from] #[source] SpaceErr),
+    #[error("global error caused by {0}")]
+   RegErr(#[from] #[source] RegErr),
+   #[error("global error caused by {0}")]
+   StarErr(#[from] #[source] StarErr),
+}
+
+impl CoreReflector for GlobalErr {
+    fn as_reflected_core(self) -> ReflectedCore {
+        ReflectedCore {
+            headers: Default::default(),
+            status: StatusCode::default(),
+            body: Default::default(),
+        }
+    }
+}
 

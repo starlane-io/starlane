@@ -109,6 +109,7 @@ anyhow = { workspace = true, optional = true }
 quinn ={ workspace = true, optional = true }
 webpki-roots = { workspace = true}
 path-clean = { workspace = true}
+thiserror-context = { workspace = true }
 
 [lib]
 name = "starlane"
