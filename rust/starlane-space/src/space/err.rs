@@ -31,8 +31,8 @@ pub enum SpaceErr {
     ParseErrs(#[from] ParseErrs),
 }
 
-impl SpaceErr {
-    pub fn print(&self) {
+impl PrintErr for SpaceErr {
+    fn print(&self) {
         match self {
             SpaceErr::Status { status, message } => {
                 println!("err::status::[{}]: {}", status, message);
@@ -438,16 +438,18 @@ impl Default for ParseErrs {
     }
 }
 
-impl ParseErrs {
-    pub fn print(&self) {
+impl PrintErr for ParseErrs {
+    fn print(&self) {
         println!("REport len: {}", self.report.len());
         for report in &self.report {
             let report: ariadne::Report = report.clone().into();
                 report.print(ariadne::Source::from(&self.src));
         }
     }
+}
 
 
+    impl ParseErrs {
     pub fn from_report<S>(report: Report, source: S) -> Self where S:ToString{
         Self {
             report: vec![report],
@@ -772,6 +774,11 @@ pub mod report {
         /// A 24-bit RGB color, as specified by ISO-8613-3.
         RGB(u8, u8, u8),
     }
+}
+
+
+pub trait PrintErr {
+    fn print(&self);
 }
 
 #[cfg(test)]

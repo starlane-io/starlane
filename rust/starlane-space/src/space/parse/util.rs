@@ -9,7 +9,7 @@ use nom_supreme::error::{GenericErrorTree, StackContext};
 use nom_supreme::ParserExt;
 use serde::{Deserialize, Serialize};
 use thiserror::__private::AsDisplay;
-use crate::space::err::{ParseErrs, SpaceErr};
+use crate::space::err::{ParseErrs, PrintErr, SpaceErr};
 use crate::space::loc::Variable;
 use crate::space::parse::{ErrCtx, SpaceTree, VarCase};
 
