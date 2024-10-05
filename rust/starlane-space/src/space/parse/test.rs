@@ -5,7 +5,7 @@ use crate::space::command::direct::create::{PointSegTemplate, PointTemplate, Tem
 use crate::space::command::Command;
 use crate::space::config::Document;
 use crate::space::err::{PrintErr, SpaceErr};
-use crate::space::parse::context;
+use crate::space::parse::{context, space};
 use crate::space::parse::model::{
     BlockKind, DelimitedBlockKind, NestedBlockKind, TerminatedBlockKind,
 };
@@ -1116,4 +1116,10 @@ pub fn test_subst() -> Result<(), SpaceErr> {
 
      */
     unimplemented!()
+}
+
+
+#[test]
+pub fn space_point() {
+    assert!(log(result(space_point_segment(new_span("lah.com")))).is_ok());
 }

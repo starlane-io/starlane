@@ -11,7 +11,7 @@ use starlane::space::command::RawCommand;
 use starlane::space::config::bind::BindConfig;
 use starlane::space::loc::{ToPoint, ToSurface};
 use starlane::space::log::PointLogger;
-use starlane::space::parse::error::result;
+use starlane::space::parse::util::result;
 use starlane::space::parse::{bind_config, command_line};
 use starlane::space::particle::{Details, Status};
 use starlane::space::point::Point;

@@ -1501,7 +1501,6 @@ aprintln!("pool.is_some():  {}",pool.is_some() );
 //        aprintln!("pool.is_err():  {}",pool.is_err() );
 
 
-           let pool =  pool.acquire();
 aprintln!("Aquire without Await...");
         Ok(pool.await?)
     }

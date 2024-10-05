@@ -486,9 +486,10 @@ pub fn space_no_dupe_dots<I: Span>(input: I) -> Res<I, ()> {
 pub fn space_point_segment<I: Span>(input: I) -> Res<I, PointSeg> {
         cut(pair(
             recognize(tuple((
-                lowercase1.context(PrimitiveErrCtx::Lower.into()),
+                //lowercase1.context(PrimitiveErrCtx::Lower.into()),
+                peek(lowercase_alphanumeric),
                 space_no_dupe_dots.context(PrimitiveErrCtx::ConsecutiveDots.into()),
-                space_chars.context(PrimitiveErrCtx::Domain.into()),
+                space_chars//.context(PrimitiveErrCtx::Domain.into()),
             ))),
             mesh_eos,
         ) .context(PointSegErrCtx::Space.into()),

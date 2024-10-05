@@ -891,16 +891,16 @@ where
 pub fn result<I: Span, R>(result: Result<(I, R), nom::Err<SpaceTree<I>>>) -> Result<R, SpaceErr> {
     match result {
         Ok((_, e)) => Ok(e),
-        /*
         Err(nom::Err::Error(err)) => {
+            Result::Err(err.into())
         }
         Err(nom::Err::Failure(err)) => {
+            Result::Err(err.into())
         }
         _ =>  {
+            Result::Err(SpaceErr::str("Unidentified nom parse error"))
         }
 
-         */
-        _ => Err(ParseErrs::default().into())
     }
 }
 

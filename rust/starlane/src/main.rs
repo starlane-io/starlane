@@ -17,6 +17,9 @@ pub mod env;
 
 pub mod platform;
 
+#[cfg(test)]
+pub mod test;
+
 //#[cfg(feature="space")]
 //pub extern crate starlane_space as starlane;
 #[cfg(feature="space")]
@@ -109,7 +112,7 @@ fn server() -> Result<(), StarErr> {
 #[cfg(feature = "server")]
 fn server() -> Result<(), StarErr> {
 
-    let point = starlane::space::point::Point::from_str("blah").unwrap();
+    let point = starlane::space::point::Point::from_str("blah.com").unwrap();
     println!("PPIONT {}",point.to_string());
     ctrlc::set_handler(move || {
         std::process::exit(1);

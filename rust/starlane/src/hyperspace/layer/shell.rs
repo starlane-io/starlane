@@ -8,7 +8,6 @@ use starlane::space::command::{Command, RawCommand};
 use starlane::space::err::SpaceErr;
 use starlane::space::loc::{Layer, Surface, SurfaceSelector, ToPoint, ToSurface, Topic};
 use starlane::space::log::PointLogger;
-use starlane::space::parse::error::result;
 use starlane::space::parse::{command_line, Env};
 use starlane::space::particle::traversal::{Traversal, TraversalInjection, TraversalLayer};
 use starlane::space::point::Point;
@@ -23,6 +22,8 @@ use starlane::space::wave::{
     DirectedProto, DirectedWave, PongCore, Wave, WaveVariantDef,
     WaveId,
 };
+
+use starlane::space::parse::util::result;
 
 use crate::platform::Platform;
 use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};

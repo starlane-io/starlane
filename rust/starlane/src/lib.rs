@@ -10,6 +10,9 @@ extern crate starlane_macros;
 #[cfg(feature="space")]
 pub extern crate starlane_space as starlane;
 
+#[cfg(test)]
+pub mod test;
+
 
 #[cfg(feature="space")]
 pub mod space {
