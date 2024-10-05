@@ -29,20 +29,18 @@ use crate::platform::Platform;
 use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, TopicHandler};
 
 #[derive(DirectedHandler)]
-pub struct Shell<P>
-where
-    P: Platform + 'static,
+pub struct Shell
+
 {
-    skel: HyperStarSkel<P>,
+    skel: HyperStarSkel,
     state: ShellState,
     logger: PointLogger,
 }
 
-impl<P> Shell<P>
-where
-    P: Platform + 'static,
+impl Shell
+
 {
-    pub fn new(skel: HyperStarSkel<P>, state: ShellState) -> Self {
+    pub fn new(skel: HyperStarSkel, state: ShellState) -> Self {
         let logger = skel.logger.point(state.point.clone());
         Self {
             skel,
@@ -53,9 +51,8 @@ where
 }
 
 #[async_trait]
-impl<P> TraversalLayer for Shell<P>
-where
-    P: Platform + 'static,
+impl TraversalLayer for Shell
+
 {
     fn surface(&self) -> Surface {
         self.state
@@ -212,9 +209,8 @@ where
 }
 
 #[handler]
-impl<P> Shell<P>
-where
-    P: Platform + 'static,
+impl Shell
+
 {
     #[route("Ext<NewCliSession>")]
     pub async fn new_session(&self, ctx: InCtx<'_, ()>) -> Result<Surface, SpaceErr> {

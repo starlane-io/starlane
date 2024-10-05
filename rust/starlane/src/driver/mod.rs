@@ -55,7 +55,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
-use crate::err::{HypErr, HyperErr2};
 use crate::registry::postgres::err::RegErr;
 use crate::service::{Service, ServiceConf, ServiceKind, ServiceRunner, ServiceSelector, ServiceTemplate};
 
@@ -89,32 +88,30 @@ fn default_bind() -> BindConfig {
     log(bind_config(r#" Bind(version=1.0.0) { } "#)).unwrap()
 }
 
-pub struct DriversBuilder<P>
-where
-    P: Platform,
+pub struct DriversBuilder
+
 {
-    factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
+    factories: Vec<Arc<dyn HyperDriverFactory>>,
     kinds: Vec<KindSelector>,
     external_kinds: Vec<KindSelector>,
 }
 
-impl<P> DriversBuilder<P>
-where
-    P: Platform,
+impl DriversBuilder
+
 {
     pub fn new(kind: StarSub) -> Self {
-        let mut pre: Vec<Arc<dyn HyperDriverFactory<P>>> = vec![];
+        let mut pre: Vec<Arc<dyn HyperDriverFactory>> = vec![];
         let mut kinds = vec![];
         let mut external_kinds = vec![];
         let driver_driver_factory = Arc::new(DriverDriverFactory::new());
         let star_factory = Arc::new(StarDriverFactory::new(kind.clone()));
-        kinds.push(<DriverDriverFactory as HyperDriverFactory<P>>::selector(
+        kinds.push(<DriverDriverFactory as HyperDriverFactory>::selector(
             &driver_driver_factory,
         ));
-        if <DriverDriverFactory as HyperDriverFactory<P>>::avail(&driver_driver_factory)
+        if <DriverDriverFactory as HyperDriverFactory>::avail(&driver_driver_factory)
             == DriverAvail::External
         {
-            external_kinds.push(<DriverDriverFactory as HyperDriverFactory<P>>::selector(
+            external_kinds.push(<DriverDriverFactory as HyperDriverFactory>::selector(
                 &driver_driver_factory,
             ));
         }
@@ -132,7 +129,7 @@ where
         self.kinds.clone()
     }
 
-    pub fn add_post(&mut self, factory: Arc<dyn HyperDriverFactory<P>>) {
+    pub fn add_post(&mut self, factory: Arc<dyn HyperDriverFactory>) {
         self.kinds.push(factory.selector());
         if factory.avail() == DriverAvail::External {
             self.external_kinds.push(factory.selector());
@@ -140,7 +137,7 @@ where
         self.factories.push(factory);
     }
 
-    pub fn add_pre(&mut self, factory: Arc<dyn HyperDriverFactory<P>>) {
+    pub fn add_pre(&mut self, factory: Arc<dyn HyperDriverFactory>) {
         self.kinds.insert(0, factory.selector());
         if factory.avail() == DriverAvail::External {
             self.external_kinds.insert(0, factory.selector());
@@ -150,12 +147,12 @@ where
 
     pub fn build(
         self,
-        skel: HyperStarSkel<P>,
-        call_tx: mpsc::Sender<DriversCall<P>>,
-        call_rx: mpsc::Receiver<DriversCall<P>>,
+        skel: HyperStarSkel,
+        call_tx: mpsc::Sender<DriversCall>,
+        call_rx: mpsc::Receiver<DriversCall>,
         status_tx: watch::Sender<DriverStatus>,
         status_rx: watch::Receiver<DriverStatus>,
-    ) -> DriversApi<P> {
+    ) -> DriversApi {
         let port = skel.point.push("drivers").unwrap().to_surface();
         Drivers::new(
             port,
@@ -171,14 +168,12 @@ where
     }
 }
 
-pub enum DriversCall<P>
-where
-    P: Platform,
+pub enum DriversCall
 {
     Init0,
     Init1,
     AddDriver {
-        driver: DriverApi<P>,
+        driver: DriverApi,
         rtn: oneshot::Sender<()>,
     },
     Visit(Traversal<Wave>),
@@ -186,20 +181,20 @@ where
     ExternalKinds(oneshot::Sender<Vec<KindSelector>>),
     Find {
         kind: Kind,
-        rtn: oneshot::Sender<Option<DriverApi<P>>>,
+        rtn: oneshot::Sender<Option<DriverApi>>,
     },
     FindExternalKind {
         kind: Kind,
-        rtn: oneshot::Sender<Option<DriverApi<P>>>,
+        rtn: oneshot::Sender<Option<DriverApi>>,
     },
     FindInternalKind {
         kind: Kind,
-        rtn: oneshot::Sender<Option<DriverApi<P>>>,
+        rtn: oneshot::Sender<Option<DriverApi>>,
     },
-    Drivers(oneshot::Sender<HashMap<KindSelector, DriverApi<P>>>),
+    Drivers(oneshot::Sender<HashMap<KindSelector, DriverApi>>),
     Get {
         kind: Kind,
-        rtn: oneshot::Sender<Result<DriverApi<P>, SpaceErr>>,
+        rtn: oneshot::Sender<Result<DriverApi, SpaceErr>>,
     },
     LocalDriverLookup {
         kind: Kind,
@@ -212,24 +207,22 @@ where
     StatusRx(oneshot::Sender<watch::Receiver<DriverStatus>>),
     ByPoint {
         point: Point,
-        rtn: oneshot::Sender<Option<DriverApi<P>>>,
+        rtn: oneshot::Sender<Option<DriverApi>>,
     },
 }
 
 #[derive(Clone)]
-pub struct DriversApi<P>
-where
-    P: Platform,
+pub struct DriversApi
+
 {
-    call_tx: mpsc::Sender<DriversCall<P>>,
+    call_tx: mpsc::Sender<DriversCall>,
     status_rx: watch::Receiver<DriverStatus>,
 }
 
-impl<P> DriversApi<P>
-where
-    P: Platform,
+impl DriversApi
+
 {
-    pub fn new(tx: mpsc::Sender<DriversCall<P>>, status_rx: watch::Receiver<DriverStatus>) -> Self {
+    pub fn new(tx: mpsc::Sender<DriversCall>, status_rx: watch::Receiver<DriverStatus>) -> Self {
         Self {
             call_tx: tx,
             status_rx,
@@ -261,13 +254,13 @@ where
         Ok(rtn_rx.await?)
     }
 
-    pub async fn find(&self, kind: Kind) -> Result<Option<DriverApi<P>>, SpaceErr> {
+    pub async fn find(&self, kind: Kind) -> Result<Option<DriverApi>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx.send(DriversCall::Find { kind, rtn }).await?;
         Ok(rtn_rx.await?)
     }
 
-    pub async fn find_external(&self, kind: Kind) -> Result<Option<DriverApi<P>>, SpaceErr> {
+    pub async fn find_external(&self, kind: Kind) -> Result<Option<DriverApi>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
             .send(DriversCall::FindExternalKind { kind, rtn })
@@ -275,7 +268,7 @@ where
         Ok(rtn_rx.await?)
     }
 
-    pub async fn find_internal(&self, kind: Kind) -> Result<Option<DriverApi<P>>, SpaceErr> {
+    pub async fn find_internal(&self, kind: Kind) -> Result<Option<DriverApi>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
             .send(DriversCall::FindInternalKind { kind, rtn })
@@ -291,13 +284,13 @@ where
         Ok(rtn_rx.await?)
     }
 
-    pub async fn drivers(&self) -> Result<HashMap<KindSelector, DriverApi<P>>, SpaceErr> {
+    pub async fn drivers(&self) -> Result<HashMap<KindSelector, DriverApi>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx.send(DriversCall::Drivers(rtn)).await;
         Ok(rtn_rx.await?)
     }
 
-    pub async fn get(&self, kind: &Kind) -> Result<DriverApi<P>, SpaceErr> {
+    pub async fn get(&self, kind: &Kind) -> Result<DriverApi, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
             .send(DriversCall::Get {
@@ -308,7 +301,7 @@ where
         rtn_rx.await?
     }
 
-    pub async fn find_by_point(&self, point: &Point) -> Result<Option<DriverApi<P>>, SpaceErr> {
+    pub async fn find_by_point(&self, point: &Point) -> Result<Option<DriverApi>, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
             .send(DriversCall::ByPoint {
@@ -332,17 +325,16 @@ where
 }
 
 #[derive(DirectedHandler)]
-pub struct Drivers<P>
-where
-    P: Platform + 'static,
+pub struct Drivers
+
 {
     port: Surface,
-    skel: HyperStarSkel<P>,
-    factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
-    kind_to_driver: HashMap<KindSelector, DriverApi<P>>,
-    point_to_driver: HashMap<Point, DriverApi<P>>,
-    call_rx: mpsc::Receiver<DriversCall<P>>,
-    call_tx: mpsc::Sender<DriversCall<P>>,
+    skel: HyperStarSkel,
+    factories: Vec<Arc<dyn HyperDriverFactory>>,
+    kind_to_driver: HashMap<KindSelector, DriverApi>,
+    point_to_driver: HashMap<Point, DriverApi>,
+    call_rx: mpsc::Receiver<DriversCall>,
+    call_tx: mpsc::Sender<DriversCall>,
     statuses_rx: Arc<DashMap<KindSelector, watch::Receiver<DriverStatus>>>,
     status_tx: mpsc::Sender<DriverStatus>,
     status_rx: watch::Receiver<DriverStatus>,
@@ -351,21 +343,20 @@ where
     init: bool,
 }
 
-impl<P> Drivers<P>
-where
-    P: Platform + 'static,
+impl Drivers
+
 {
     pub fn new(
         port: Surface,
-        skel: HyperStarSkel<P>,
-        factories: Vec<Arc<dyn HyperDriverFactory<P>>>,
+        skel: HyperStarSkel,
+        factories: Vec<Arc<dyn HyperDriverFactory>>,
         kinds: Vec<KindSelector>,
         external_kinds: Vec<KindSelector>,
-        call_tx: mpsc::Sender<DriversCall<P>>,
-        call_rx: mpsc::Receiver<DriversCall<P>>,
+        call_tx: mpsc::Sender<DriversCall>,
+        call_rx: mpsc::Receiver<DriversCall>,
         watch_status_tx: watch::Sender<DriverStatus>,
         watch_status_rx: watch::Receiver<DriverStatus>,
-    ) -> DriversApi<P> {
+    ) -> DriversApi {
         let statuses_rx = Arc::new(DashMap::new());
         let kind_to_driver = HashMap::new();
         let point_to_driver = HashMap::new();
@@ -638,7 +629,7 @@ where
         &self,
         kind: Kind,
         selector: KindSelector,
-        factory: Arc<dyn HyperDriverFactory<P>>,
+        factory: Arc<dyn HyperDriverFactory>,
         status_tx: watch::Sender<DriverStatus>,
     ) {
         {
@@ -646,13 +637,12 @@ where
             let call_tx = self.call_tx.clone();
             let drivers_point = self.skel.point.push("drivers").unwrap();
 
-            async fn register<P>(
-                skel: &HyperStarSkel<P>,
+            async fn register(
+                skel: &HyperStarSkel,
                 point: &Point,
                 logger: &PointLogger,
-            ) -> Result<(), HyperErr2>
-            where
-                P: Platform,
+            ) -> Result<(), DriverErr>
+
             {
                 let registration = Registration {
                     point: point.clone(),
@@ -828,7 +818,7 @@ where
         }
     }
 
-    pub fn find(&self, kind: &Kind) -> Option<&DriverApi<P>> {
+    pub fn find(&self, kind: &Kind) -> Option<&DriverApi> {
         for selector in &self.kinds {
             if selector.matches(kind) {
                 return self.kind_to_driver.get(&selector);
@@ -843,7 +833,7 @@ where
         None
     }
 
-    pub fn find_external(&self, kind: &Kind) -> Option<&DriverApi<P>> {
+    pub fn find_external(&self, kind: &Kind) -> Option<&DriverApi> {
         for selector in &self.external_kinds {
             if selector.matches(kind) {
                 return self.kind_to_driver.get(selector);
@@ -852,7 +842,7 @@ where
         None
     }
 
-    pub fn find_internal(&self, kind: &Kind) -> Option<&DriverApi<P>> {
+    pub fn find_internal(&self, kind: &Kind) -> Option<&DriverApi> {
         for selector in &self.kinds {
             if selector.matches(kind) {
                 return self.kind_to_driver.get(selector);
@@ -862,12 +852,11 @@ where
     }
 }
 
-impl<P> Drivers<P>
-where
-    P: Platform,
+impl Drivers
+
 {
     /*
-    pub async fn assign(&self, assign: Assign) -> Result<(), HyperErr2> {
+    pub async fn assign(&self, assign: Assign) -> Result<(), DriverErr> {
         let driver = self.find(&assign.details.stub.kind).ok_or::<UniErr>(
             format!(
                 "Kind {} not supported by Drivers for Star: {}",
@@ -882,7 +871,7 @@ where
      */
 
     /*
-    pub async fn route(&self, wave: UltraWave) -> Result<(),HyperErr2>{
+    pub async fn route(&self, wave: UltraWave) -> Result<(),DriverErr>{
         let record = self
             .skel
             .registry
@@ -956,20 +945,16 @@ where
 }
 
 #[derive(Clone)]
-pub struct DriverApi<P>
-where
-    P: Platform,
+pub struct DriverApi
 {
-    pub call_tx: mpsc::Sender<DriverRunnerCall<P>>,
+    pub call_tx: mpsc::Sender<DriverRunnerCall>,
     pub kind: KindSelector,
     pub point: Point,
 }
 
-impl<P> DriverApi<P>
-where
-    P: Platform,
+impl DriverApi
 {
-    pub fn new(tx: mpsc::Sender<DriverRunnerCall<P>>, point: Point, kind: KindSelector) -> Self {
+    pub fn new(tx: mpsc::Sender<DriverRunnerCall>, point: Point, kind: KindSelector) -> Self {
         Self {
             call_tx: tx,
             point,
@@ -982,7 +967,7 @@ where
     }
 
     /// This method call will only work for DriverDriver
-    pub async fn add_driver(&self, api: DriverApi<P>) {
+    pub async fn add_driver(&self, api: DriverApi) {
         self.call_tx.send(DriverRunnerCall::AddDriver(api)).await;
     }
 
@@ -997,7 +982,7 @@ where
         self.call_tx.try_send(DriverRunnerCall::OnAdded);
     }
 
-    pub async fn bind(&self, point: &Point) -> Result<ArtRef<BindConfig>, HyperErr2> {
+    pub async fn bind(&self, point: &Point) -> Result<ArtRef<BindConfig>, DriverErr> {
         let (rtn, rtn_rx) = oneshot::channel();
         self.call_tx
             .send(DriverRunnerCall::Bind {
@@ -1008,7 +993,7 @@ where
         rtn_rx.await?
     }
 
-    pub async fn driver_bind(&self) -> Result<ArtRef<BindConfig>, HyperErr2> {
+    pub async fn driver_bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
         let (rtn, rtn_rx) = oneshot::channel();
         self.call_tx.send(DriverRunnerCall::DriverBind(rtn)).await;
         Ok(rtn_rx.await?)
@@ -1040,17 +1025,15 @@ where
 }
 
 #[derive(strum_macros::Display)]
-pub enum DriverRunnerCall<P>
-where
-    P: Platform,
+pub enum DriverRunnerCall
 {
-    AddDriver(DriverApi<P>),
+    AddDriver(DriverApi),
     GetPoint(oneshot::Sender<Point>),
     Traverse(Traversal<Wave>),
     Handle(Traversal<Wave>),
     Item {
         point: Point,
-        tx: oneshot::Sender<Result<ItemSphere<P>, HyperErr2>>,
+        tx: oneshot::Sender<Result<ItemSphere, DriverErr>>,
     },
 
     OnAdded,
@@ -1062,7 +1045,7 @@ where
     DriverBind(oneshot::Sender<ArtRef<BindConfig>>),
     Bind {
         point: Point,
-        rtn: oneshot::Sender<Result<ArtRef<BindConfig>, HyperErr2>>,
+        rtn: oneshot::Sender<Result<ArtRef<BindConfig>, DriverErr>>,
     },
 }
 
@@ -1071,33 +1054,30 @@ pub enum DriverRunnerRequest
     Create {
         agent: Agent,
         create: Create,
-        rtn: oneshot::Sender<Result<Stub, HyperErr2>>,
+        rtn: oneshot::Sender<Result<Stub, DriverErr>>,
     },
 }
 
-pub struct ItemOuter<P>
-where
-    P: Platform + 'static,
+pub struct ItemOuter
+
 {
     pub surface: Surface,
-    pub skel: HyperStarSkel<P>,
-    pub item: ItemSphere<P>,
+    pub skel: HyperStarSkel,
+    pub item: ItemSphere,
     pub router: Arc<dyn Router>,
 }
 
-impl<P> ItemOuter<P>
-where
-    P: Platform + 'static,
+impl ItemOuter
+
 {
-    pub async fn bind(&self) -> Result<ArtRef<BindConfig>, HyperErr2> {
+    pub async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
         self.item.bind().await
     }
 }
 
 #[async_trait]
-impl<P> TraversalLayer for ItemOuter<P>
-where
-    P: Platform,
+impl TraversalLayer for ItemOuter
+
 {
     fn surface(&self) -> starlane::space::loc::Surface {
         self.surface.clone()
@@ -1204,34 +1184,32 @@ where
 }
 
 #[derive(starlane_macros::DirectedHandler)]
-pub struct DriverRunner<P>
-where
-    P: Platform + 'static,
+pub struct DriverRunner
+
 {
-    skel: DriverSkel<P>,
-    star_skel: HyperStarSkel<P>,
-    call_tx: mpsc::Sender<DriverRunnerCall<P>>,
-    call_rx: mpsc::Receiver<DriverRunnerCall<P>>,
-    driver: Box<dyn Driver<P>>,
+    skel: DriverSkel,
+    star_skel: HyperStarSkel,
+    call_tx: mpsc::Sender<DriverRunnerCall>,
+    call_rx: mpsc::Receiver<DriverRunnerCall>,
+    driver: Box<dyn Driver>,
     router: LayerInjectionRouter,
     logger: PointLogger,
     status_rx: watch::Receiver<DriverStatus>,
     layer: Layer,
 }
 
-impl<P> DriverRunner<P>
-where
-    P: Platform + 'static,
+impl DriverRunner
+
 {
     pub fn new(
-        skel: DriverSkel<P>,
-        star_skel: HyperStarSkel<P>,
-        driver: Box<dyn Driver<P>>,
-        call_tx: mpsc::Sender<DriverRunnerCall<P>>,
-        call_rx: mpsc::Receiver<DriverRunnerCall<P>>,
+        skel: DriverSkel,
+        star_skel: HyperStarSkel,
+        driver: Box<dyn Driver>,
+        call_tx: mpsc::Sender<DriverRunnerCall>,
+        call_rx: mpsc::Receiver<DriverRunnerCall>,
         status_rx: watch::Receiver<DriverStatus>,
         layer: Layer,
-    ) -> mpsc::Sender<DriverRunnerCall<P>> {
+    ) -> mpsc::Sender<DriverRunnerCall> {
         let logger = star_skel.logger.point(skel.point.clone());
         let router = LayerInjectionRouter::new(
             star_skel.clone(),
@@ -1256,10 +1234,9 @@ where
     }
 }
 
-#[handler]
-impl<P> DriverRunner<P>
-where
-    P: Platform + 'static,
+
+impl DriverRunner
+
 {
     fn start(mut self) {
         tokio::spawn(async move {
@@ -1375,7 +1352,7 @@ where
         });
     }
 
-    async fn traverse(&self, traversal: Traversal<Wave>) -> Result<(), HyperErr2> {
+    async fn traverse(&self, traversal: Traversal<Wave>) -> Result<(), DriverErr> {
         self.skel.logger.track(&traversal, || {
             Tracker::new(
                 format!("drivers -> {}", traversal.dir.to_string()),
@@ -1402,7 +1379,7 @@ where
         Ok(())
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemOuter<P>, HyperErr2> {
+    async fn item(&self, point: &Point) -> Result<ItemOuter, DriverErr> {
         let port = point.clone().to_surface().with_layer(self.layer.clone());
 
         Ok(ItemOuter {
@@ -1413,7 +1390,7 @@ where
         })
     }
 
-    async fn handler(&self) -> Box<dyn DriverHandler<P>> {
+    async fn handler(&self) -> Box<dyn DriverHandler> {
         self.driver.handler().await
     }
 }
@@ -1430,11 +1407,10 @@ impl DriverCtx {
 }
 
 #[derive(Clone)]
-pub struct DriverSkel<P>
-where
-    P: Platform,
+pub struct DriverSkel
+
 {
-    skel: HyperStarSkel<P>,
+    skel: HyperStarSkel,
     pub selector: KindSelector,
     pub kind: Kind,
     pub point: Point,
@@ -1444,11 +1420,10 @@ where
     pub request_tx: mpsc::Sender<DriverRunnerRequest>,
 }
 
-impl<P> DriverSkel<P>
-where
-    P: Platform,
+impl DriverSkel
+
 {
-    pub async fn select_service(&self, kind: ServiceKind) -> Result<Option<Service<ServiceRunner>>,HyperErr2> {
+    pub async fn select_service(&self, kind: ServiceKind) -> Result<Option<Service<ServiceRunner>>,DriverErr> {
         let selector = ServiceSelector {
             name: IdSelector::Always,
             kind,
@@ -1466,7 +1441,7 @@ where
         self.status_rx.borrow().clone()
     }
 
-    pub fn drivers(&self) -> &DriversApi<P> {
+    pub fn drivers(&self) -> &DriversApi {
         &self.skel.drivers
     }
 
@@ -1479,7 +1454,7 @@ where
     }
 
     pub fn new(
-        skel: HyperStarSkel<P>,
+        skel: HyperStarSkel,
         kind: Kind,
         point: Point,
         selector: KindSelector,
@@ -1519,7 +1494,7 @@ where
         &self,
         child_segment_template: PointSegTemplate,
         kind: KindTemplate,
-    ) -> Result<Details, HyperErr2> {
+    ) -> Result<Details, DriverErr> {
         let create = Create {
             template: Template::new(
                 PointTemplate {
@@ -1545,7 +1520,7 @@ where
         self.skel.drivers.local_driver_lookup(kind).await
     }
 
-    pub fn item_ctx(&self, point: &Point, layer: Layer) -> Result<ItemCtx, HyperErr2> {
+    pub fn item_ctx(&self, point: &Point, layer: Layer) -> Result<ItemCtx, DriverErr> {
         let mut router = LayerInjectionRouter::new(
             self.skel.clone(),
             point.to_surface().with_layer(Layer::Core),
@@ -1561,26 +1536,23 @@ where
     }
 }
 
-pub struct DriverFactoryWrapper<P>
-where
-    P: Platform,
+pub struct DriverFactoryWrapper
+
 {
-    pub factory: Box<dyn DriverFactory<P>>,
+    pub factory: Box<dyn DriverFactory>,
 }
 
-impl<P> DriverFactoryWrapper<P>
-where
-    P: Platform,
+impl DriverFactoryWrapper
+
 {
-    pub fn wrap(factory: Box<dyn DriverFactory<P>>) -> Arc<dyn HyperDriverFactory<P>> {
+    pub fn wrap(factory: Box<dyn DriverFactory>) -> Arc<dyn HyperDriverFactory> {
         Arc::new(Self { factory })
     }
 }
 
 #[async_trait]
-impl<P> HyperDriverFactory<P> for DriverFactoryWrapper<P>
-where
-    P: Platform,
+impl HyperDriverFactory for DriverFactoryWrapper
+
 {
     fn kind(&self) -> Kind {
         self.factory.kind()
@@ -1592,18 +1564,17 @@ where
 
     async fn create(
         &self,
-        star_skel: HyperStarSkel<P>,
-        driver_skel: DriverSkel<P>,
+        star_skel: HyperStarSkel,
+        driver_skel: DriverSkel,
         ctx: DriverCtx,
-    ) -> Result<Box<dyn Driver<P>>, HyperErr2> {
+    ) -> Result<Box<dyn Driver>, DriverErr> {
         self.factory.create(driver_skel, ctx).await
     }
 }
 
 #[async_trait]
-pub trait DriverFactory<P>: Send + Sync
-where
-    P: Platform,
+pub trait DriverFactory: Send + Sync
+
 {
     fn kind(&self) -> Kind;
     fn selector(&self) -> KindSelector;
@@ -1614,9 +1585,9 @@ where
 
     async fn create(
         &self,
-        skel: DriverSkel<P>,
+        skel: DriverSkel,
         ctx: DriverCtx,
-    ) -> Result<Box<dyn Driver<P>>, HyperErr2>;
+    ) -> Result<Box<dyn Driver>, DriverErr>;
 
     fn properties(&self) -> SetProperties {
         SetProperties::default()
@@ -1624,9 +1595,8 @@ where
 }
 
 #[async_trait]
-pub trait HyperDriverFactory<P>: Send + Sync
-where
-    P: Platform,
+pub trait HyperDriverFactory: Send + Sync
+
 {
     fn kind(&self) -> Kind;
     fn selector(&self) -> KindSelector;
@@ -1637,10 +1607,10 @@ where
 
     async fn create(
         &self,
-        skel: HyperStarSkel<P>,
-        driver_skel: DriverSkel<P>,
+        skel: HyperStarSkel,
+        driver_skel: DriverSkel,
         ctx: DriverCtx,
-    ) -> Result<Box<dyn Driver<P>>, HyperErr2>;
+    ) -> Result<Box<dyn Driver>, DriverErr>;
 
     fn properties(&self) -> SetProperties {
         SetProperties::default()
@@ -1648,27 +1618,24 @@ where
 }
 
 #[derive(Clone)]
-pub struct HyperSkel<P>
-where
-    P: Platform,
+pub struct HyperSkel
+
 {
-    pub star: HyperStarSkel<P>,
-    pub driver: DriverSkel<P>,
+    pub star: HyperStarSkel,
+    pub driver: DriverSkel,
 }
 
-impl<P> HyperSkel<P>
-where
-    P: Platform,
+impl HyperSkel
+
 {
-    pub fn new(star: HyperStarSkel<P>, driver: DriverSkel<P>) -> Self {
+    pub fn new(star: HyperStarSkel, driver: DriverSkel) -> Self {
         Self { star, driver }
     }
 }
 
 #[async_trait]
-pub trait Driver<P>: Send + Sync
-where
-    P: Platform,
+pub trait Driver: Send + Sync
+
 {
     fn kind(&self) -> Kind;
 
@@ -1684,30 +1651,29 @@ where
         DRIVER_BIND.clone()
     }
 
-    async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), HyperErr2> {
+    async fn init(&mut self, skel: DriverSkel, ctx: DriverCtx) -> Result<(), DriverErr> {
         skel.logger
             .result(skel.status_tx.send(DriverStatus::Ready).await)
             .unwrap_or_default();
         Ok(())
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, HyperErr2>;
+    async fn item(&self, point: &Point) -> Result<ItemSphere, DriverErr>;
 
-    async fn handler(&self) -> Box<dyn DriverHandler<P>> {
+    async fn handler(&self) -> Box<dyn DriverHandler> {
         Box::new(DefaultDriverHandler::restore())
     }
 
     /// This is sorta a hack, it only works for DriverDriver
-    async fn add_driver(&self, _driver: DriverApi<P>) {}
+    async fn add_driver(&self, _driver: DriverApi) {}
 }
 
 #[async_trait]
-pub trait DriverHandler<P>: DirectedHandler
-where
-    P: Platform,
+pub trait DriverHandler: DirectedHandler
 {
 }
 
+#[derive(DirectedHandler)]
 pub struct DefaultDriverHandler {}
 
 impl DefaultDriverHandler {
@@ -1716,7 +1682,7 @@ impl DefaultDriverHandler {
     }
 }
 
-impl<P> DriverHandler<P> for DefaultDriverHandler where P: Platform {}
+
 #[handler]
 impl DefaultDriverHandler {
     #[route("Hyp<Assign>")]
@@ -1767,17 +1733,14 @@ pub struct DriverStatusEvent {
 
 pub trait ItemState: Send + Sync {}
 
-pub enum ItemSphere<P>
-where
-    P: Platform,
+pub enum ItemSphere
 {
-    Handler(Box<dyn ItemHandler<P>>),
-    Router(Box<dyn ItemRouter<P>>),
+    Handler(Box<dyn ItemHandler>),
+    Router(Box<dyn ItemRouter>),
 }
 
-impl<P> ItemSphere<P>
-where
-    P: Platform,
+impl ItemSphere
+
 {
     pub async fn init(&self) -> Result<Status, SpaceErr> {
         match self {
@@ -1789,7 +1752,7 @@ where
         }
     }
 
-    pub async fn bind(&self) -> Result<ArtRef<BindConfig>, HyperErr2> {
+    pub async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
         match self {
             ItemSphere::Handler(handler) => handler.bind().await,
             ItemSphere::Router(router) => router.bind().await,
@@ -1804,9 +1767,8 @@ pub enum DriverAvail {
 }
 
 #[async_trait]
-pub trait Item<P>
-where
-    P: Platform,
+pub trait Item
+
 {
     type Skel;
     type Ctx;
@@ -1814,55 +1776,48 @@ where
 
     fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self;
 
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, HyperErr2> {
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
         Ok(DEFAULT_BIND.clone())
     }
 }
 
 #[async_trait]
-pub trait ItemHandler<P>: DirectedHandler + Send + Sync
-where
-    P: Platform,
+pub trait ItemHandler: DirectedHandler + Send + Sync
 {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, HyperErr2>;
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr>;
     async fn init(&self) -> Result<Status, SpaceErr> {
         Ok(Status::Ready)
     }
 }
 
 #[async_trait]
-pub trait ItemRouter<P>: TraversalRouter + Send + Sync
-where
-    P: Platform,
+pub trait ItemRouter: TraversalRouter + Send + Sync
 {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, HyperErr2>;
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr>;
 }
 
 #[derive(Clone)]
-pub struct HyperItemSkel<P>
-where
-    P: Platform,
+pub struct HyperItemSkel
+
 {
-    pub skel: DriverSkel<P>,
+    pub skel: DriverSkel,
     pub point: Point,
     pub kind: Kind,
 }
 
 #[derive(Clone)]
-pub struct ItemSkel<P>
-where
-    P: Platform,
+pub struct ItemSkel
+
 {
-    skel: DriverSkel<P>,
+    skel: DriverSkel,
     pub point: Point,
     pub kind: Kind,
 }
 
-impl<P> ItemSkel<P>
-where
-    P: Platform,
+impl ItemSkel
+
 {
-    pub fn new(point: Point, kind: Kind, skel: DriverSkel<P>) -> Self {
+    pub fn new(point: Point, kind: Kind, skel: DriverSkel) -> Self {
         Self { point, kind, skel }
     }
 
@@ -1884,9 +1839,8 @@ impl DriverDriverFactory {
 }
 
 #[async_trait]
-impl<P> HyperDriverFactory<P> for DriverDriverFactory
-where
-    P: Platform,
+impl HyperDriverFactory for DriverDriverFactory
+
 {
     fn kind(&self) -> Kind {
         Kind::Driver
@@ -1902,66 +1856,60 @@ where
 
     async fn create(
         &self,
-        star: HyperStarSkel<P>,
-        driver: DriverSkel<P>,
+        star: HyperStarSkel,
+        driver: DriverSkel,
         ctx: DriverCtx,
-    ) -> Result<Box<dyn Driver<P>>, HyperErr2> {
+    ) -> Result<Box<dyn Driver>, DriverErr> {
         Ok(Box::new(DriverDriver::new(driver).await?))
     }
 }
 
 #[derive(Clone)]
-pub struct DriverDriverItemSkel<P>
-where
-    P: Platform,
+pub struct DriverDriverItemSkel
+
 {
-    skel: DriverSkel<P>,
-    pub api: DriverApi<P>,
+    skel: DriverSkel,
+    pub api: DriverApi,
 }
 
-impl<P> DriverDriverItemSkel<P>
-where
-    P: Platform,
+impl DriverDriverItemSkel
+
 {
-    pub fn new(skel: DriverSkel<P>, api: DriverApi<P>) -> Self {
+    pub fn new(skel: DriverSkel, api: DriverApi) -> Self {
         Self { skel, api }
     }
 }
 
-impl<P> Deref for DriverDriverItemSkel<P>
-where
-    P: Platform,
+impl Deref for DriverDriverItemSkel
+
 {
-    type Target = DriverSkel<P>;
+    type Target = DriverSkel;
 
     fn deref(&self) -> &Self::Target {
         &self.skel
     }
 }
 
-pub struct DriverDriver<P>
-where
-    P: Platform,
+pub struct DriverDriver
+
 {
-    skel: DriverSkel<P>,
-    map: DashMap<Point, DriverApi<P>>,
+    skel: DriverSkel,
+    map: DashMap<Point, DriverApi>,
 }
 
-impl<P> DriverDriver<P>
-where
-    P: Platform,
+impl DriverDriver
+
 {
-    async fn new(skel: DriverSkel<P>) -> Result<Self, HyperErr2> {
+    async fn new(skel: DriverSkel) -> Result<Self, DriverErr> {
         let map = DashMap::new();
         Ok(Self { skel, map })
     }
 }
 
-impl<P> DriverDriver<P>
-where
-    P: Platform,
+impl DriverDriver
+
 {
-    pub fn get_driver(&self, point: &Point) -> Option<DriverApi<P>> {
+    pub fn get_driver(&self, point: &Point) -> Option<DriverApi> {
         let rtn = self.map.get(point);
         match rtn {
             None => None,
@@ -1971,20 +1919,19 @@ where
 }
 
 #[async_trait]
-impl<P> Driver<P> for DriverDriver<P>
-where
-    P: Platform,
+impl Driver for DriverDriver
+
 {
     fn kind(&self) -> Kind {
         Kind::Driver
     }
 
-    async fn add_driver(&self, api: DriverApi<P>) {
+    async fn add_driver(&self, api: DriverApi) {
         let point = api.get_point();
         self.map.insert(point, api);
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, HyperErr2> {
+    async fn item(&self, point: &Point) -> Result<ItemSphere, DriverErr> {
         let api = self.get_driver(point).ok_or(format!(
             "DriverApi is not associated with point: {} ",
             point.to_string()
@@ -2001,18 +1948,16 @@ where
 }
 
 #[derive(DirectedHandler)]
-pub struct DriverItem<P>
-where
-    P: Platform,
+pub struct DriverItem
+
 {
-    skel: DriverDriverItemSkel<P>,
+    skel: DriverDriverItemSkel,
 }
 
-impl<P> Item<P> for DriverItem<P>
-where
-    P: Platform,
+impl Item for DriverItem
+
 {
-    type Skel = DriverDriverItemSkel<P>;
+    type Skel = DriverDriverItemSkel;
     type Ctx = ();
     type State = ();
 
@@ -2022,9 +1967,8 @@ where
 }
 
 #[async_trait]
-impl<P> TraversalRouter for DriverItem<P>
-where
-    P: Platform,
+impl TraversalRouter for DriverItem
+
 {
     async fn traverse(&self, traversal: Traversal<Wave>) -> Result<(), SpaceErr> {
         self.skel.api.handle(traversal).await;
@@ -2033,11 +1977,9 @@ where
 }
 
 #[async_trait]
-impl<P> ItemRouter<P> for DriverItem<P>
-where
-    P: Platform,
+impl ItemRouter for DriverItem
 {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, HyperErr2> {
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
         self.skel.api.driver_bind().await
     }
 }
@@ -2048,7 +1990,19 @@ where
 #[derive(Error,Debug,Clone)]
 pub enum DriverErr {
     #[error(transparent)]
-    SpaceErr(#[from] #[source] SpaceErr),
+    SpaceErr(#[from]  SpaceErr),
     #[error(transparent)]
-    RegErr(#[from] #[source] RegErr)
+    RegErr(#[from]  RegErr),
+    #[error("item router for '{point}<{kind}>' is not set")]
+    ItemRouterNotSet{ point: Point, kind: Kind },
+    #[error("tokio recv error")]
+    OneshotRecvErr(#[from] tokio::sync::oneshot::error::RecvError),
+}
+
+impl DriverErr {
+    pub fn item_router_not_set( point: &Point, kind: &Kind ) -> Self {
+        let point = point.clone();
+        let kind = kind.clone();
+        DriverErr::ItemRouterNotSet{ point, kind }
+    }
 }

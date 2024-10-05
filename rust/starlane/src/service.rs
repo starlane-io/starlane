@@ -20,8 +20,9 @@ use starlane::space::kind::Kind;
 use starlane::space::particle::Status;
 use starlane::space::point::Point;
 use starlane::space::selector::KindSelector;
+use crate::driver::DriverErr;
 use crate::env::STARLANE_DATA_DIR;
-use crate::err::HypErr;
+use crate::err::DriverErr;
 use crate::executor::cli::HostEnv;
 use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::dialect::filestore::{FileStore, FILE_STORE_ROOT};
@@ -30,7 +31,7 @@ use crate::host::{ExeStub, Host, HostCli};
 pub type FileStoreService = Service<FileStore>;
 
 impl FileStoreService {
-    pub async fn sub_root( &self, sub_root: PathBuf) -> Result<FileStoreService, HypErr> {
+    pub async fn sub_root( &self, sub_root: PathBuf) -> Result<FileStoreService, DriverErr> {
         let runner = self.runner.sub_root(sub_root).await?;
         Ok(FileStoreService {
             template: self.template.clone(),
@@ -42,7 +43,7 @@ impl FileStoreService {
 
 pub struct ServiceCall<I,O> {
     pub input: I,
-    pub output: oneshot::Sender<Result<O, HypErr>>,
+    pub output: oneshot::Sender<Result<O, DriverErr>>,
 }
 
 #[derive(Clone)]
@@ -65,7 +66,7 @@ impl Service<ServiceRunner>  {
         }
     }
 
-    pub fn filestore(  self  ) -> Result<FileStoreService, HypErr> {
+    pub fn filestore(  self  ) -> Result<FileStoreService, DriverErr> {
        Ok(FileStoreService{
            template: self.template,
            runner: self.runner.filestore()?
@@ -92,7 +93,7 @@ pub enum ServiceRunner {
 
 
 impl ServiceRunner {
-    pub fn filestore( & self  ) -> Result<FileStore, HypErr> {
+    pub fn filestore( & self  ) -> Result<FileStore, DriverErr> {
         match self {
             ServiceRunner::Exe(exe) => {
                 exe.create()
@@ -118,7 +119,7 @@ impl Into<Service<ServiceRunner>> for ServiceTemplate {
 
 
 impl TryInto<Service<FileStore>> for Service<ServiceRunner>{
-    type Error = HypErr;
+    type Error = DriverErr;
 
     fn try_into(self) -> Result<Service<FileStore>, Self::Error> {
         let filestore = self.runner.filestore()?;
@@ -285,7 +286,8 @@ pub mod tests {
     use starlane::space::kind::{BaseKind, Kind};
     use starlane::space::selector::KindSelector;
     use starlane::space::util::OptSelector;
-    use crate::err::HypErr;
+    use crate::driver::DriverErr;
+    use crate::err::DriverErr;
     use crate::hyperspace::star::StarTemplate;
     use crate::service::{service_conf, Service, ServiceConf, ServiceKind, ServiceTemplate};
 
@@ -318,7 +320,7 @@ pub mod tests {
 
     }
 
-    pub async fn filestore_from_service()  -> Result<Service<FileStore>, HypErr> {
+    pub async fn filestore_from_service()  -> Result<Service<FileStore>, DriverErr> {
 
         let config = service_conf();
 

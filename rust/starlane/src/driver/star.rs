@@ -1,7 +1,4 @@
-use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item,
-    ItemHandler, ItemSphere,
-};
+use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere};
 use crate::platform::Platform;
 use crate::hyperspace::reg::Registration;
 use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter};
@@ -135,18 +132,15 @@ impl PartialOrd for StarDiscovery {
 }
 
 #[derive(Clone)]
-pub struct StarDriverFactory<P>
-where
-    P: Platform + 'static,
+pub struct StarDriverFactory
+
 {
     pub kind: Kind,
     pub selector: KindSelector,
-    pub phantom: PhantomData<P>,
 }
 
-impl<P> StarDriverFactory<P>
-where
-    P: Platform + 'static,
+impl StarDriverFactory
+
 {
     pub fn new(kind: StarSub) -> Self {
         let selector = KindSelector {
@@ -158,15 +152,13 @@ where
         Self {
             kind,
             selector,
-            phantom: Default::default(),
         }
     }
 }
 
 #[async_trait]
-impl<P> HyperDriverFactory<P> for StarDriverFactory<P>
-where
-    P: Platform + 'static,
+impl HyperDriverFactory for StarDriverFactory
+
 {
     fn kind(&self) -> Kind {
         self.kind.clone()
@@ -182,28 +174,26 @@ where
 
     async fn create(
         &self,
-        star: HyperStarSkel<P>,
-        skel: DriverSkel<P>,
+        star: HyperStarSkel,
+        skel: DriverSkel,
         ctx: DriverCtx,
-    ) -> Result<Box<dyn Driver<P>>, P::Err> {
+    ) -> Result<Box<dyn Driver>, DriverErr> {
         Ok(Box::new(StarDriver::new(star, skel, ctx)))
     }
 }
 
-pub struct StarDriver<P>
-where
-    P: Platform + 'static,
+pub struct StarDriver
+
 {
-    pub star_skel: HyperStarSkel<P>,
-    pub driver_skel: DriverSkel<P>,
+    pub star_skel: HyperStarSkel,
+    pub driver_skel: DriverSkel,
     pub ctx: DriverCtx,
 }
 
-impl<P> StarDriver<P>
-where
-    P: Platform,
+impl StarDriver
+
 {
-    pub fn new(star_skel: HyperStarSkel<P>, driver_skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
+    pub fn new(star_skel: HyperStarSkel, driver_skel: DriverSkel, ctx: DriverCtx) -> Self {
         Self {
             star_skel,
             driver_skel,
@@ -213,15 +203,14 @@ where
 }
 
 #[async_trait]
-impl<P> Driver<P> for StarDriver<P>
-where
-    P: Platform,
+impl Driver for StarDriver
+
 {
     fn kind(&self) -> Kind {
         Kind::Star(self.star_skel.kind.clone())
     }
 
-    async fn init(&mut self, skel: DriverSkel<P>, _: DriverCtx) -> Result<(), P::Err> {
+    async fn init(&mut self, skel: DriverSkel, _: DriverCtx) -> Result<(), DriverErr> {
         let logger = skel.logger.push_mark("init")?;
         logger
             .result(self.driver_skel.status_tx.send(DriverStatus::Init).await)
@@ -252,7 +241,7 @@ where
         Ok(())
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+    async fn item(&self, point: &Point) -> Result<ItemSphere, DriverErr> {
         Ok(ItemSphere::Handler(Box::new(Star::restore(
             self.star_skel.clone(),
             self.ctx.clone(),
@@ -262,19 +251,17 @@ where
 }
 
 #[derive(DirectedHandler)]
-pub struct Star<P>
-where
-    P: Platform + 'static,
+pub struct Star
+
 {
-    pub skel: HyperStarSkel<P>,
+    pub skel: HyperStarSkel,
     pub ctx: DriverCtx,
 }
 
-impl<P> Star<P>
-where
-    P: Platform,
+impl Star
+
 {
-    async fn create(&self, assign: &Assign) -> Result<(), P::Err> {
+    async fn create(&self, assign: &Assign) -> Result<(), DriverErr> {
         self.skel
             .state
             .create_shell(assign.details.stub.point.clone());
@@ -291,15 +278,14 @@ where
 }
 
 #[async_trait]
-impl<P> ItemHandler<P> for Star<P>
-where
-    P: Platform,
+impl ItemHandler for Star
+
 {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
-        <Star<P> as Item<P>>::bind(self).await
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
+        <Star as Item>::bind(self).await
     }
 
-    async fn init(&self) -> Result<Status, SpaceErr> {
+    async fn init(&self) -> Result<Status, DriverErr> {
         match self.skel.kind {
             StarSub::Central => {
                 let registration = Registration {
@@ -314,22 +300,19 @@ where
                 self.skel
                     .registry
                     .register(&registration)
-                    .await
-                    .map_err(|e| e.to_space_err())?;
+                    .await?;
 
                 let record = self
                     .skel
                     .registry
                     .record(&Point::root())
-                    .await
-                    .map_err(|e| e.to_space_err())?;
+                    .await?;
                 let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
-                self.create(&assign).await.map_err(|e| e.to_space_err())?;
+                self.create(&assign).await?;
                 self.skel
                     .registry
                     .assign_star(&Point::root(), &self.skel.point)
-                    .await
-                    .map_err(|e| e.to_space_err())?;
+                    .await?;
 
                 let registration = Registration {
                     point: Point::global_executor(),
@@ -343,23 +326,20 @@ where
                 self.skel
                     .registry
                     .register(&registration)
-                    .await
-                    .map_err(|e| e.to_space_err())?;
+                    .await?;
 
                 let record = self
                     .skel
                     .registry
                     .record(&Point::global_executor())
-                    .await
-                    .map_err(|e| e.to_space_err())?;
+                    .await?;
                 aprintln!("Global Executor REGISTERED!");
                 let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
-                self.create(&assign).await.map_err(|e| e.to_space_err())?;
+                self.create(&assign).await?;
                 self.skel
                     .registry
                     .assign_star(&Point::global_executor(), &LOCAL_STAR)
-                    .await
-                    .map_err(|e| e.to_space_err())?;
+                    .await?;
 
                 Ok(Status::Ready)
             }
@@ -369,11 +349,10 @@ where
 }
 
 #[async_trait]
-impl<P> Item<P> for Star<P>
-where
-    P: Platform + 'static,
+impl Item for Star
+
 {
-    type Skel = HyperStarSkel<P>;
+    type Skel = HyperStarSkel;
     type Ctx = DriverCtx;
     type State = ();
 
@@ -381,21 +360,20 @@ where
         Star { skel, ctx }
     }
 
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
         Ok(STAR_BIND_CONFIG.clone())
     }
 }
 
 #[handler]
-impl<P> Star<P>
-where
-    P: Platform,
+impl Star
+
 {
     #[route("Hyp<Provision>")]
     pub async fn provision(
         &self,
         ctx: InCtx<'_, HyperSubstance>,
-    ) -> Result<ParticleLocation, P::Err> {
+    ) -> Result<ParticleLocation, DriverErr> {
         if let HyperSubstance::Provision(provision) = ctx.input {
             let record = self.skel.registry.record(&provision.point).await?;
 
@@ -454,7 +432,7 @@ where
     }
 
     #[route("Hyp<Assign>")]
-    pub async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, P::Err> {
+    pub async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, DriverErr> {
         if let HyperSubstance::Assign(assign) = ctx.input {
             #[cfg(test)]
             self.skel
@@ -477,7 +455,7 @@ where
                     .drivers
                     .local_driver_lookup(assign.details.stub.kind.clone())
                     .await?
-                    .ok_or(P::Err::new(format!(
+                    .ok_or(DriverErr::new(format!(
                         "Star does not have  driver for {}",
                         assign.details.stub.kind.to_string()
                     )))?;
@@ -756,21 +734,19 @@ impl RoundRobinWrangleSelector {
     }
 }
 
-pub struct Wrangler<P>
-where
-    P: Platform,
+pub struct Wrangler
+
 {
-    pub skel: HyperStarSkel<P>,
+    pub skel: HyperStarSkel,
     pub transmitter: ProtoTransmitter,
     pub history: HashSet<Point>,
     pub search: Search,
 }
 
-impl<P> Wrangler<P>
-where
-    P: Platform,
+impl Wrangler
+
 {
-    pub fn new(skel: HyperStarSkel<P>, search: Search) -> Self {
+    pub fn new(skel: HyperStarSkel, search: Search) -> Self {
         let router = LayerInjectionRouter::new(
             skel.clone(),
             skel.point.to_surface().with_layer(Layer::Shell),

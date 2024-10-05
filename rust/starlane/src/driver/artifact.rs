@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use crate::driver::{Driver, DriverCtx, DriverHandler, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Item, ItemHandler, ItemSkel, ItemSphere};
+use crate::driver::{Driver, DriverCtx, DriverErr, DriverHandler, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Item, ItemHandler, ItemSkel, ItemSphere};
 use crate::hyperspace::star::HyperStarSkel;
 use acid_store::repo::Commit;
 use acid_store::repo::OpenOptions;
@@ -105,7 +105,7 @@ impl RepoDriverFactory {
 }
 
 #[async_trait]
-impl<P> HyperDriverFactory<P> for RepoDriverFactory where P: Platform
+impl HyperDriverFactory for RepoDriverFactory
 {
     fn kind(&self) -> Kind {
         Kind::Repo
@@ -117,10 +117,10 @@ impl<P> HyperDriverFactory<P> for RepoDriverFactory where P: Platform
 
     async fn create(
         &self,
-        _: HyperStarSkel<P>,
-        skel: DriverSkel<P>,
+        _: HyperStarSkel,
+        skel: DriverSkel,
         _: DriverCtx,
-    ) -> Result<Box<dyn Driver<P>>, P::Err> {
+    ) -> Result<Box<dyn Driver>, DriverErr> {
 
         let service  = skel.logger.result(skel.logger.result(skel.select_service(ServiceKind::FileStore).await)?.ok_or(format!("could not select service '{}' ",ServiceKind::FileStore.to_string())))?;
 
@@ -130,40 +130,36 @@ impl<P> HyperDriverFactory<P> for RepoDriverFactory where P: Platform
     }
 }
 
-pub struct RepoDriver<P>
-where
-    P: Platform,
+pub struct RepoDriver
+
 {
-    skel: DriverSkel<P>,
+    skel: DriverSkel,
     filestore: FileStoreService
 }
 
-impl<P> RepoDriver<P>
-where
-    P: Platform
+impl RepoDriver
+
 {
-    pub fn new(skel: DriverSkel<P>, filestore: FileStoreService ) -> Self {
+    pub fn new(skel: DriverSkel, filestore: FileStoreService ) -> Self {
         Self { skel, filestore}
     }
 }
 
 
 #[handler]
-impl<P> RepoDriver<P>
-where
-    P: Platform
+impl RepoDriver
+
 {
 
 }
 
 #[async_trait]
-impl<P> Driver<P> for RepoDriver<P>
-where
-    P: Platform
+impl Driver for RepoDriver
+
 {
 
 
-    async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
+    async fn init(&mut self, skel: DriverSkel, ctx: DriverCtx) -> Result<(), DriverErr> {
         skel.logger
             .result(skel.status_tx.send(DriverStatus::Init).await)
             .unwrap_or_default();
@@ -179,14 +175,14 @@ where
         Kind::Repo
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+    async fn item(&self, point: &Point) -> Result<ItemSphere, DriverErr> {
         let filestore = self.filestore.sub_root(point.md5().into()).await?;
         Ok(ItemSphere::Handler(Box::new(Repo::restore((),(), filestore ))))
     }
 }
 
 
-impl <P> Item<P> for Repo<P> where P: Platform{
+impl  Item for Repo where P: Platform{
     type Skel = ();
     type Ctx = ();
     type State = FileStoreService;
@@ -216,20 +212,19 @@ fn store() -> Result<ValueRepo<String>, UniErr> {
 }
  */
 
-pub struct Repo<P> {
+pub struct Repo {
     filestore: FileStoreService,
-    phantom: PhantomData<P>
+    phantom: PhantomData
 }
 
 #[handler]
-impl <P> Repo<P> where P: Platform {}
+impl  Repo where P: Platform {}
 
 #[async_trait]
-impl<P> ItemHandler<P> for Repo<P>
-where
-    P: Platform,
+impl ItemHandler for Repo
+
 {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
         Ok(REPO_BIND_CONFIG.clone())
     }
 }
@@ -247,9 +242,8 @@ impl BundleSeriesDriverFactory {
 }
 
 #[async_trait]
-impl<P,S> HyperDriverFactory<P> for BundleSeriesDriverFactory
-where
-    P: Platform
+impl<P,S> HyperDriverFactory for BundleSeriesDriverFactory
+
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::BundleSeries)
@@ -257,20 +251,20 @@ where
 
     async fn create(
         &self,
-        skel: HyperStarSkel<P>,
-        driver_skel: DriverSkel<P>,
+        skel: HyperStarSkel,
+        driver_skel: DriverSkel,
         ctx: DriverCtx,
-    ) -> Result<Box<dyn Driver<P>>, P::Err> {
+    ) -> Result<Box<dyn Driver>, DriverErr> {
         Ok(Box::new(BundleSeriesDriver::new(ctx)))
     }
 }
 
-pub struct BundleSeriesDriver<P> where P: Platform {
+pub struct BundleSeriesDriver where P: Platform {
     ctx: DriverCtx,
 }
 
 #[handler]
-impl <P> BundleSeriesDriver<P> where P: Platform{
+impl  BundleSeriesDriver where P: Platform{
     pub fn new(ctx: DriverCtx) -> Self {
         Self {
             ctx
@@ -279,25 +273,24 @@ impl <P> BundleSeriesDriver<P> where P: Platform{
 }
 
 #[async_trait]
-impl<P> Driver<P> for BundleSeriesDriver<P>
-where
-    P: Platform
+impl Driver for BundleSeriesDriver
+
 {
     fn kind(&self) -> Kind {
         Kind::BundleSeries
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+    async fn item(&self, point: &Point) -> Result<ItemSphere, DriverErr> {
         Ok(ItemSphere::Handler(Box::new(BundleSeries::new(self.ctx.clone()))))
     }
 }
 
-pub struct BundleSeries<P> where P: Platform {
+pub struct BundleSeries where P: Platform {
     ctx: DriverCtx
 }
 
-impl <P> BundleSeries<P> {
-   pub fn new( ctx: DriverCtx) -> BundleSeries<P>{
+impl  BundleSeries {
+   pub fn new( ctx: DriverCtx) -> BundleSeries{
        Self {
            ctx
        }
@@ -305,16 +298,15 @@ impl <P> BundleSeries<P> {
 }
 
 #[handler]
-impl <P> BundleSeries<P> where P: Platform {
+impl  BundleSeries where P: Platform {
 
 }
 
 #[async_trait]
-impl<P> ItemHandler<P> for BundleSeries<P>
-where
-    P: Platform,
+impl ItemHandler for BundleSeries
+
 {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
         Ok(SERIES_BIND_CONFIG.clone())
     }
 }
@@ -328,9 +320,8 @@ impl BundleDriverFactory {
 }
 
 #[async_trait]
-impl<P> HyperDriverFactory<P> for BundleDriverFactory
-where
-    P: Platform,
+impl HyperDriverFactory for BundleDriverFactory
+
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Bundle)
@@ -338,47 +329,44 @@ where
 
     async fn create(
         &self,
-        skel: HyperStarSkel<P>,
-        driver_skel: DriverSkel<P>,
+        skel: HyperStarSkel,
+        driver_skel: DriverSkel,
         ctx: DriverCtx,
-    ) -> Result<Box<dyn Driver<P>>, P::Err> {
+    ) -> Result<Box<dyn Driver>, DriverErr> {
         let skel = HyperSkel::new(skel, driver_skel);
         Ok(Box::new(BundleDriver::new(skel, ctx)))
     }
 }
 
-pub struct BundleDriver<P>
-where
-    P: Platform,
+pub struct BundleDriver
+
 {
-    skel: HyperSkel<P>,
+    skel: HyperSkel,
     ctx: DriverCtx,
 }
 
 #[handler]
-impl<P> BundleDriver<P>
-where
-    P: Platform,
+impl BundleDriver
+
 {
-    pub fn new(skel: HyperSkel<P>, ctx: DriverCtx) -> Self {
+    pub fn new(skel: HyperSkel, ctx: DriverCtx) -> Self {
         Self { skel, ctx }
     }
 }
 
 #[async_trait]
-impl<P> Driver<P> for BundleDriver<P>
-where
-    P: Platform,
+impl Driver for BundleDriver
+
 {
     fn kind(&self) -> Kind {
         Kind::Bundle
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+    async fn item(&self, point: &Point) -> Result<ItemSphere, DriverErr> {
         Ok(ItemSphere::Handler(Box::new(Bundle)))
     }
 
-    async fn handler(&self) -> Box<dyn DriverHandler<P>> {
+    async fn handler(&self) -> Box<dyn DriverHandler> {
         Box::new(BundleDriverHandler::restore(
             self.skel.clone(),
             self.ctx.clone(),
@@ -386,29 +374,26 @@ where
     }
 }
 
-pub struct BundleDriverHandler<P>
-where
-    P: Platform
+pub struct BundleDriverHandler
+
 {
-    skel: HyperSkel<P>,
+    skel: HyperSkel,
     ctx: DriverCtx,
 }
 
-impl<P> BundleDriverHandler<P>
-where
-    P: Platform
+impl BundleDriverHandler
+
 {
-    fn restore(skel: HyperSkel<P>, ctx: DriverCtx) -> Self {
+    fn restore(skel: HyperSkel, ctx: DriverCtx) -> Self {
         Self { skel, ctx }
     }
 }
 
-impl<P> DriverHandler<P> for BundleDriverHandler<P> where P: Platform{}
+impl DriverHandler for BundleDriverHandler where P: Platform{}
 
 #[handler]
-impl<P> BundleDriverHandler<P>
-where
-    P: Platform,
+impl BundleDriverHandler
+
 {
     fn store(&self) -> Result<ValueRepo<String>, SpaceErr> {
         let config = acid_store::store::DirectoryConfig {
@@ -424,7 +409,7 @@ where
         }
     }
     #[route("Hyp<Assign>")]
-    async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
+    async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), DriverErr> {
         if let HyperSubstance::Assign(assign) = ctx.input {
             let state = match &assign.state {
                 StateSrc::Substance(data) => data.clone(),
@@ -582,7 +567,7 @@ where
 
             Ok(())
         } else {
-            Err(P::Err::new("Bad Reqeust: expected Assign"))
+            Err(DriverErr::new("Bad Reqeust: expected Assign"))
         }
     }
 }
@@ -593,11 +578,10 @@ pub struct Bundle;
 impl Bundle {}
 
 #[async_trait]
-impl<P> ItemHandler<P> for Bundle
-where
-    P: Platform,
+impl ItemHandler for Bundle
+
 {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
         Ok(BUNDLE_BIND_CONFIG.clone())
     }
 }
@@ -611,9 +595,8 @@ impl ArtifactDriverFactory {
 }
 
 #[async_trait]
-impl<P> HyperDriverFactory<P> for ArtifactDriverFactory
-where
-    P: Platform,
+impl HyperDriverFactory for ArtifactDriverFactory
+
 {
     fn kind(&self) -> KindSelector {
         KindSelector::from_base(BaseKind::Artifact)
@@ -621,49 +604,45 @@ where
 
     async fn create(
         &self,
-        skel: HyperStarSkel<P>,
-        driver_skel: DriverSkel<P>,
+        skel: HyperStarSkel,
+        driver_skel: DriverSkel,
         ctx: DriverCtx,
-    ) -> Result<Box<dyn Driver<P>>, P::Err> {
+    ) -> Result<Box<dyn Driver>, DriverErr> {
         Ok(Box::new(ArtifactDriver::new(driver_skel, ctx)))
     }
 }
 
-pub struct ArtifactDriver<P>
-where
-    P: Platform,
+pub struct ArtifactDriver
+
 {
-    skel: DriverSkel<P>,
+    skel: DriverSkel,
     ctx: DriverCtx,
 }
 
 
-impl<P> ArtifactDriver<P>
-where
-    P: Platform,
+impl ArtifactDriver
+
 {
-    pub fn new(skel: DriverSkel<P>, ctx: DriverCtx) -> Self {
+    pub fn new(skel: DriverSkel, ctx: DriverCtx) -> Self {
         Self { skel, ctx }
     }
 }
 
 #[handler]
-impl<P> ArtifactDriver<P>
-where
-    P: Platform,
+impl ArtifactDriver
+
 {
 }
 
 #[async_trait]
-impl<P> Driver<P> for ArtifactDriver<P>
-where
-    P: Platform,
+impl Driver for ArtifactDriver
+
 {
     fn kind(&self) -> Kind {
         Kind::Artifact(ArtifactSubKind::Raw)
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+    async fn item(&self, point: &Point) -> Result<ItemSphere, DriverErr> {
         let record = self.skel.locate(point).await?;
 
         let skel = ItemSkel::new(point.clone(), record.details.stub.kind, self.skel.clone());
@@ -674,34 +653,31 @@ where
         ))))
     }
 
-    async fn handler(&self) -> Box<dyn DriverHandler<P>> {
+    async fn handler(&self) -> Box<dyn DriverHandler> {
         let skel = HyperSkel::new(self.skel.skel.clone(), self.skel.clone());
         Box::new(ArtifactDriverHandler::restore(skel))
     }
 }
 
-pub struct ArtifactDriverHandler<P>
-where
-    P: Platform,
+pub struct ArtifactDriverHandler
+
 {
-    skel: HyperSkel<P>,
+    skel: HyperSkel,
 }
 
-impl<P> ArtifactDriverHandler<P>
-where
-    P: Platform,
+impl ArtifactDriverHandler
+
 {
-    fn restore(skel: HyperSkel<P>) -> Self {
+    fn restore(skel: HyperSkel) -> Self {
         Self { skel }
     }
 }
 
-impl<P> DriverHandler<P> for ArtifactDriverHandler<P> where P: Platform {}
+impl DriverHandler for ArtifactDriverHandler where P: Platform {}
 
 #[handler]
-impl<P> ArtifactDriverHandler<P>
-where
-    P: Platform,
+impl ArtifactDriverHandler
+
 {
     fn store(&self) -> Result<ValueRepo<String>, SpaceErr> {
         let config = acid_store::store::DirectoryConfig {
@@ -718,7 +694,7 @@ where
     }
 
     #[route("Hyp<Assign>")]
-    async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), P::Err> {
+    async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<(), DriverErr> {
         if let HyperSubstance::Assign(assign) = ctx.input {
             if let Kind::Artifact(sub) = &assign.details.stub.kind {
                 match sub {
@@ -744,22 +720,20 @@ where
             }
             Ok(())
         } else {
-            Err(P::Err::new("ArtifactDriver expected Assign"))
+            Err(DriverErr::new("ArtifactDriver expected Assign"))
         }
     }
 }
 
-pub struct Artifact<P>
-where
-    P: Platform,
+pub struct Artifact
+
 {
-    skel: ItemSkel<P>,
+    skel: ItemSkel,
 }
 
 #[handler]
-impl<P> Artifact<P>
-where
-    P: Platform,
+impl Artifact
+
 {
     fn store(&self) -> Result<ValueRepo<String>, SpaceErr> {
         let config = acid_store::store::DirectoryConfig {
@@ -776,7 +750,7 @@ where
     }
 
     #[route("Cmd<Read>")]
-    pub async fn read(&self, _ctx: InCtx<'_, ()>) -> Result<Substance, P::Err> {
+    pub async fn read(&self, _ctx: InCtx<'_, ()>) -> Result<Substance, DriverErr> {
         if let Kind::Artifact(ArtifactSubKind::Dir) = self.skel.kind {
             return Ok(Substance::Empty);
         }
@@ -787,7 +761,7 @@ where
     }
 
     #[route("Http<Get>")]
-    pub async fn get(&self, _: InCtx<'_, ()>) -> Result<Substance, P::Err> {
+    pub async fn get(&self, _: InCtx<'_, ()>) -> Result<Substance, DriverErr> {
         if let Kind::Artifact(ArtifactSubKind::Dir) = self.skel.kind {
             return Ok(Substance::Empty);
         }
@@ -798,11 +772,10 @@ where
     }
 }
 
-impl<P> Item<P> for Artifact<P>
-where
-    P: Platform,
+impl Item for Artifact
+
 {
-    type Skel = ItemSkel<P>;
+    type Skel = ItemSkel;
     type Ctx = ();
     type State = ();
 
@@ -813,7 +786,7 @@ where
 
 /*
 #[async_trait]
-impl<P> DirectedHandler for Artifact<P> where P: Cosmos {
+impl DirectedHandler for Artifact where P: Cosmos {
     async fn handle(&self, ctx: RootInCtx) -> CoreBounce {
         println!("ARTIFACT HANDLE REQUEST : {}",ctx.wave.clone().to_wave().desc());
 
@@ -829,11 +802,10 @@ impl<P> DirectedHandler for Artifact<P> where P: Cosmos {
  */
 
 #[async_trait]
-impl<P> ItemHandler<P> for Artifact<P>
-where
-    P: Platform,
+impl ItemHandler for Artifact
+
 {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
         Ok(ARTIFACT_BIND_CONFIG.clone())
     }
 }

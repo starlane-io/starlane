@@ -1,7 +1,7 @@
 pub mod cli;
 pub mod dialect;
 
-use crate::err::HypErr;
+use crate::driver::DriverErr;
 use crate::executor::cli::os::CliOsExecutor;
 use crate::host::Host;
 
@@ -12,7 +12,7 @@ pub trait Executor
 
     type Out;
 
-    async fn execute(&self, args: Self::In ) -> Result<Self::Out, HypErr>;
+    async fn execute(&self, args: Self::In ) -> Result<Self::Out, DriverErr>;
 
     fn conf(&self) -> ExeConf;
 }
@@ -37,9 +37,9 @@ impl ExeConf {
         }
     }
 
-    pub fn create<D>(&self) -> Result<D, HypErr>
+    pub fn create<D>(&self) -> Result<D, DriverErr>
     where
-        D: TryFrom<CliOsExecutor, Error =HypErr>,
+        D: TryFrom<CliOsExecutor, Error =DriverErr>,
     {
         match self {
             ExeConf::Host(host) => host.create()

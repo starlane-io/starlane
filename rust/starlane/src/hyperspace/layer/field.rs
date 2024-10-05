@@ -25,21 +25,19 @@ use starlane::space::wave::{
 use crate::platform::Platform;
 use crate::hyperspace::star::{HyperStarSkel, TraverseToNextRouter};
 
-pub struct Field<P>
-where
-    P: Platform,
+pub struct Field
+
 {
     pub port: Surface,
-    pub skel: HyperStarSkel<P>,
+    pub skel: HyperStarSkel,
     pub logger: PointLogger,
     pub shell_transmitter: TraversalTransmitter,
 }
 
-impl<P> Field<P>
-where
-    P: Platform,
+impl Field
+
 {
-    pub fn new(point: Point, skel: HyperStarSkel<P>) -> Self {
+    pub fn new(point: Point, skel: HyperStarSkel) -> Self {
         let port = point.to_surface().with_layer(Layer::Field);
         let logger = skel.logger.point(port.point.clone());
         let shell_router = Arc::new(TraverseToNextRouter::new(skel.traverse_to_next_tx.clone()));
@@ -102,9 +100,8 @@ where
 }
 
 #[async_trait]
-impl<P> TraversalLayer for Field<P>
-where
-    P: Platform,
+impl TraversalLayer for Field
+
 {
     fn surface(&self) -> Surface {
         self.port.clone()
@@ -182,11 +179,10 @@ where
     }
 }
 
-pub struct PipeEx<P>
-where
-    P: Platform,
+pub struct PipeEx
+
 {
-    pub skel: HyperStarSkel<P>,
+    pub skel: HyperStarSkel,
     pub surface: Surface,
     pub logger: PointLogger,
     pub env: Env,
@@ -203,12 +199,11 @@ where
     pub status: u16,
 }
 
-impl<P> PipeEx<P>
-where
-    P: Platform,
+impl PipeEx
+
 {
     pub fn new(
-        skel: HyperStarSkel<P>,
+        skel: HyperStarSkel,
         port: Surface,
         traversal: Traversal<DirectedWave>,
         pipeline: PipelineVar,

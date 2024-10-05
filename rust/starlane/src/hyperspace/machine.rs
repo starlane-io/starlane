@@ -38,18 +38,14 @@ use crate::service::{service_conf, Service, ServiceConf, ServiceKind, ServiceSel
 use crate::template::Templates;
 
 #[derive(Clone)]
-pub struct MachineApi<P>
-where
-    P: Platform,
+pub struct MachineApi
 {
-    tx: mpsc::Sender<MachineCall<P>>,
+    tx: mpsc::Sender<MachineCall>,
 }
 
-impl<P> MachineApi<P>
-where
-    P: Platform,
+impl MachineApi
 {
-    pub fn new(tx: mpsc::Sender<MachineCall<P>>) -> Self {
+    pub fn new(tx: mpsc::Sender<MachineCall>) -> Self {
         Self { tx }
     }
 
@@ -116,14 +112,14 @@ aprintln!("submitting WaitForReady....");
 
 
     #[cfg(test)]
-    pub async fn get_machine_star(&self) -> Result<HyperStarApi<P>, SpaceErr> {
+    pub async fn get_machine_star(&self) -> Result<HyperStarApi, SpaceErr> {
         let (tx, mut rx) = oneshot::channel();
         self.tx.send(MachineCall::GetMachineStar(tx)).await;
         Ok(rx.await?)
     }
 
     #[cfg(test)]
-    pub async fn get_star(&self, key: StarKey) -> Result<HyperStarApi<P>, SpaceErr> {
+    pub async fn get_star(&self, key: StarKey) -> Result<HyperStarApi, SpaceErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.tx.send(MachineCall::GetStar { key, rtn }).await;
         rtn_rx.await?
@@ -141,7 +137,7 @@ where
     pub artifacts: ArtifactApi,
     pub logger: RootLogger,
     pub timeouts: Timeouts,
-    pub api: MachineApi<P>,
+    pub api: MachineApi,
     pub status_rx: watch::Receiver<MachineStatus>,
     pub status_tx: mpsc::Sender<MachineStatus>,
     pub machine_star: Surface,
@@ -153,11 +149,11 @@ where
     P: Platform + 'static,
 {
     pub skel: MachineSkel<P>,
-    pub stars: Arc<HashMap<Point, HyperStarApi<P>>>,
-    pub machine_star: HyperStarApi<P>,
+    pub stars: Arc<HashMap<Point, HyperStarApi>>,
+    pub machine_star: HyperStarApi,
     pub gate_selector: Arc<HyperGateSelector>,
-    pub call_tx: mpsc::Sender<MachineCall<P>>,
-    pub call_rx: mpsc::Receiver<MachineCall<P>>,
+    pub call_tx: mpsc::Sender<MachineCall>,
+    pub call_rx: mpsc::Receiver<MachineCall>,
     pub termination_broadcast_tx: broadcast::Sender<Result<(), String>>,
     pub logger: PointLogger,
 }
@@ -166,7 +162,7 @@ impl<P> Machine<P>
 where
     P: Platform + 'static,
 {
-    pub fn new(platform: P) -> MachineApi<P> {
+    pub fn new_api(platform: P) -> MachineApi {
         let (call_tx, call_rx) = mpsc::channel(1024);
         let machine_api = MachineApi::new(call_tx.clone());
         tokio::spawn(async move { Machine::init(platform, call_tx, call_rx).await });
@@ -176,9 +172,9 @@ where
 
     async fn init(
         platform: P,
-        call_tx: mpsc::Sender<MachineCall<P>>,
-        call_rx: mpsc::Receiver<MachineCall<P>>,
-    ) -> Result<MachineApi<P>, HyperErr2> {
+        call_tx: mpsc::Sender<MachineCall>,
+        call_rx: mpsc::Receiver<MachineCall>,
+    ) -> Result<MachineApi, HyperErr2> {
 
 aprintln!("Init Machine....");
         let template = platform.machine_template();
@@ -234,7 +230,7 @@ aprintln!("Machine Skel......");
             let drivers_point = star_point.push("drivers".to_string()).unwrap();
             let logger = skel.logger.point(drivers_point.clone());
 
-            let mut star_tx: HyperStarTx<P> = HyperStarTx::new(star_point.clone());
+            let mut star_tx: HyperStarTx = HyperStarTx::new(star_point.clone());
             let star_skel =
                 HyperStarSkel::new(star_template.clone(), skel.clone(), &mut star_tx).await;
 
@@ -514,9 +510,7 @@ aprintln!("waiting looop....");
 }
 
 #[derive(strum_macros::Display)]
-pub enum MachineCall<P>
-where
-    P: Platform,
+pub enum MachineCall
 {
     Init,
     Terminate,
@@ -540,12 +534,13 @@ where
         selector: ServiceSelector,
         rtn: oneshot::Sender<Option<ServiceTemplate>>
     },
+    Platform(oneshot::Sender<Box<dyn Platform>>),
     #[cfg(test)]
-    GetMachineStar(oneshot::Sender<HyperStarApi<P>>),
+    GetMachineStar(oneshot::Sender<HyperStarApi>),
     #[cfg(test)]
     GetStar {
         key: StarKey,
-        rtn: oneshot::Sender<Result<HyperStarApi<P>, SpaceErr>>,
+        rtn: oneshot::Sender<Result<HyperStarApi, SpaceErr>>,
     },
     #[cfg(test)]
     GetRegistry(oneshot::Sender<Registry>),
@@ -655,28 +650,22 @@ impl Default for MachineTemplate {
     }
 }
 
-pub struct MachineHyperwayEndpointFactory<P>
-where
-    P: Platform,
+pub struct MachineHyperwayEndpointFactory
 {
     from: StarKey,
     to: StarKey,
-    call_tx: mpsc::Sender<MachineCall<P>>,
+    call_tx: mpsc::Sender<MachineCall>,
 }
 
-impl<P> MachineHyperwayEndpointFactory<P>
-where
-    P: Platform,
+impl MachineHyperwayEndpointFactory
 {
-    pub fn new(from: StarKey, to: StarKey, call_tx: mpsc::Sender<MachineCall<P>>) -> Self {
+    pub fn new(from: StarKey, to: StarKey, call_tx: mpsc::Sender<MachineCall>) -> Self {
         Self { from, to, call_tx }
     }
 }
 
 #[async_trait]
-impl<P> HyperwayEndpointFactory for MachineHyperwayEndpointFactory<P>
-where
-    P: Platform,
+impl HyperwayEndpointFactory for MachineHyperwayEndpointFactory
 {
     async fn create(
         &self,
@@ -697,18 +686,14 @@ where
     }
 }
 
-pub struct MachineApiExtFactory<P>
-where
-    P: Platform,
+pub struct MachineApiExtFactory
 {
-    pub machine_api: MachineApi<P>,
+    pub machine_api: MachineApi,
     pub logger: PointLogger,
 }
 
 #[async_trait]
-impl<P> HyperwayEndpointFactory for MachineApiExtFactory<P>
-where
-    P: Platform,
+impl HyperwayEndpointFactory for MachineApiExtFactory
 {
     async fn create(
         &self,

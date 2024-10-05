@@ -27,8 +27,8 @@ where
     type StarAuth;
     type RemoteStarConnectionFactory;
 
-    fn machine(&self) -> MachineApi<Self> {
-        Machine::new(self.clone())
+    fn machine(&self) -> MachineApi {
+        Machine::new_api(self.clone())
     }
 
     fn star_auth(&self, star: &StarKey) -> Result<Self::StarAuth, Self::Err>;

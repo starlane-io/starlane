@@ -1,4 +1,3 @@
-use crate::err::HypErr;
 use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::cli::{CliIn, CliOut, HostEnv};
 use crate::executor::{ExeConf, Executor};
@@ -11,6 +10,8 @@ use std::hash::{Hash, Hasher};
 use std::io::Read;
 use std::ops::{Deref, DerefMut};
 use tokio::io::AsyncWriteExt;
+use crate::driver::DriverErr;
+
 pub mod err;
 
 #[derive(Clone, Eq, PartialEq, Hash)]
@@ -79,9 +80,9 @@ impl Host {
             Host::Cli(cli) => cli.env(key)
         }
     }
-    pub fn create<D>(&self) -> Result<D, HypErr>
+    pub fn create<D>(&self) -> Result<D, DriverErr>
     where
-        D: TryFrom<CliOsExecutor, Error =HypErr>,
+        D: TryFrom<CliOsExecutor, Error =DriverErr>,
     {
         match self {
             Host::Cli(host) => host.create(),
@@ -110,9 +111,9 @@ impl HostCli {
         }
     }
 
-    pub fn create<D>(&self) -> Result<D, HypErr>
+    pub fn create<D>(&self) -> Result<D, DriverErr>
     where
-        D: TryFrom<CliOsExecutor, Error =HypErr>,
+        D: TryFrom<CliOsExecutor, Error =DriverErr>,
     {
         match self {
             HostCli::Os(stub) => D::try_from(CliOsExecutor::new(stub.clone())),

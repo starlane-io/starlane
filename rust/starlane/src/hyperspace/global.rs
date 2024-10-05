@@ -29,9 +29,9 @@ use starlane::space::wave::core::http2::StatusCode;
 use crate::registry::postgres::err::RegErr;
 /*
 #[derive(DirectedHandler,Clone)]
-pub struct Global<P> where P: Platform {
+pub struct Global where P: Platform {
     pub logger: PointLogger,
-    pub registry: Registry<P>,
+    pub registry: Registry,
 }
 
  */
@@ -57,26 +57,23 @@ fn global_bind() -> BindConfig {
 }
 
 #[derive(Clone, DirectedHandler)]
-pub struct GlobalCommandExecutionHandler<P>
-where
-    P: Platform,
+pub struct GlobalCommandExecutionHandler
+
 {
-    skel: HyperStarSkel<P>,
+    skel: HyperStarSkel,
 }
 
-impl<P> GlobalCommandExecutionHandler<P>
-where
-    P: Platform,
+impl GlobalCommandExecutionHandler
+
 {
-    pub fn new(skel: HyperStarSkel<P>) -> Self {
+    pub fn new(skel: HyperStarSkel) -> Self {
         Self { skel }
     }
 }
 
 #[handler]
-impl<P> GlobalCommandExecutionHandler<P>
-where
-    P: Platform,
+impl GlobalCommandExecutionHandler
+
 {
     #[route("Cmd<RawCommand>")]
     pub async fn raw(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, StarErr> {
@@ -131,19 +128,17 @@ where
     }
 }
 
-pub struct GlobalExecutionChamber<P>
-where
-    P: Platform,
+pub struct GlobalExecutionChamber
+
 {
-    pub skel: HyperStarSkel<P>,
+    pub skel: HyperStarSkel,
     pub logger: PointLogger,
 }
 
-impl<P> GlobalExecutionChamber<P>
-where
-    P: Platform,
+impl GlobalExecutionChamber
+
 {
-    pub fn new(skel: HyperStarSkel<P>) -> Self {
+    pub fn new(skel: HyperStarSkel) -> Self {
         let logger = skel.logger.push_point("global").unwrap();
         Self { skel, logger }
     }

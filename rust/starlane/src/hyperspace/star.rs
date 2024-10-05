@@ -20,7 +20,7 @@ use crate::hyperlane::{
 use crate::hyperspace::global::{GlobalCommandExecutionHandler,  GlobalExecutionChamber};
 use crate::hyperspace::layer::field::Field;
 use crate::hyperspace::layer::shell::{Shell, ShellState};
-use crate::hyperspace::machine::MachineSkel;
+use crate::hyperspace::machine::{MachineApi, MachineSkel};
 use crate::platform::Platform;
 use crate::hyperspace::reg::{Registration, Registry};
 use starlane::space::command::common::StateSrc;
@@ -59,18 +59,15 @@ use crate::service::ServiceTemplate;
 use crate::template::Templates;
 
 #[derive(Clone)]
-pub struct ParticleStates<P>
-where
-    P: Platform + 'static,
+pub struct ParticleStates
+
 {
-    phantom: PhantomData<P>,
     topic: Arc<DashMap<Surface, Arc<dyn TopicHandler>>>,
     shell: Arc<DashMap<Point, ShellState>>,
 }
 
-impl<P> ParticleStates<P>
-where
-    P: Platform + 'static,
+impl ParticleStates
+
 {
     pub fn create_shell(&self, point: Point) {
         self.shell.insert(point.clone(), ShellState::new(point));
@@ -80,7 +77,6 @@ where
         Self {
             topic: Arc::new(DashMap::new()),
             shell: Arc::new(DashMap::new()),
-            phantom: PhantomData::default(),
         }
     }
 
@@ -120,11 +116,10 @@ where
 }
 
 #[derive(Clone)]
-pub struct HyperStarSkel<P>
-where
-    P: Platform + 'static,
+pub struct HyperStarSkel
 {
-    pub api: HyperStarApi<P>,
+    pub api: HyperStarApi,
+    pub machine_api: MachineApi,
     pub key: StarKey,
     pub point: Point,
     pub kind: StarSub,
@@ -133,15 +128,15 @@ where
     pub golden_path: Arc<DashMap<StarKey, StarKey>>,
     pub traverse_to_next_tx: mpsc::Sender<Traversal<Wave>>,
     pub inject_tx: mpsc::Sender<TraversalInjection>,
-    pub machine: MachineSkel<P>,
+//    pub machine: MachineSkel,
     pub exchanger: Exchanger,
-    pub state: ParticleStates<P>,
+    pub state: ParticleStates,
     pub adjacents: HashMap<Point, StarStub>,
     pub wrangles: StarWrangles,
     pub gravity_tx: mpsc::Sender<Wave>,
     pub gravity_router: TxRouter,
     pub gravity_transmitter: ProtoTransmitter,
-    pub drivers: DriversApi<P>,
+    pub drivers: DriversApi,
     pub drivers_traversal_tx: mpsc::Sender<Traversal<Wave>>,
     pub status_tx: mpsc::Sender<Status>,
     pub status_rx: watch::Receiver<Status>,
@@ -152,15 +147,14 @@ where
     pub diagnostic_interceptors: DiagnosticInterceptors,
 }
 
-impl<P> HyperStarSkel<P>
-where
-    P: Platform,
+impl HyperStarSkel
+
 {
-    pub async fn new(
+    pub async fn new<P>(
         template: StarTemplate,
         machine: MachineSkel<P>,
-        star_tx: &mut HyperStarTx<P>,
-    ) -> Self {
+        star_tx: &mut HyperStarTx,
+    ) -> Self where P: Platform{
         let point = template.key.clone().to_point();
         let logger = machine.logger.point(point.clone());
         let exchanger = Exchanger::new(
@@ -230,6 +224,7 @@ where
 
         Self {
             api,
+            machine_api: machine.api.clone(),
             key: template.key.clone(),
             point,
             kind: template.kind.clone(),
@@ -243,7 +238,6 @@ where
             exchanger,
             state,
             registry: machine.registry.clone(),
-            machine,
             adjacents,
             wrangles: StarWrangles::new(),
             drivers,
@@ -260,7 +254,7 @@ where
     pub fn data_dir(&self) -> String {
         format!(
             "{}/{}/",
-            self.machine.platform.data_dir(),
+            self.machine_api.platform.data_dir(),
             self.point.to_string()
         )
     }
@@ -356,9 +350,7 @@ where
     }
 }
 
-pub enum HyperStarCall<P>
-where
-    P: Platform,
+pub enum HyperStarCall
 {
     Init,
     CreateStates {
@@ -373,7 +365,6 @@ where
     TraverseToNextLayer(Traversal<Wave>),
     LayerTraversalInjection(TraversalInjection),
     ToDriver(Traversal<Wave>),
-    Phantom(PhantomData<P>),
     ToGravity(Wave),
     ToHyperway(WaveVariantDef<SignalCore>),
     Shard(Wave),
@@ -384,30 +375,27 @@ where
         rtn: oneshot::Sender<Result<(), SpaceErr>>,
     },
     #[cfg(test)]
-    GetSkel(oneshot::Sender<HyperStarSkel<P>>),
+    GetSkel(oneshot::Sender<HyperStarSkel>),
 }
 
-pub struct HyperStarTx<P>
-where
-    P: Platform,
+pub struct HyperStarTx
 {
     pub gravity_tx: mpsc::Sender<Wave>,
     pub traverse_to_next_tx: mpsc::Sender<Traversal<Wave>>,
     pub inject_tx: mpsc::Sender<TraversalInjection>,
     pub drivers_traversal_tx: mpsc::Sender<Traversal<Wave>>,
-    pub call_tx: mpsc::Sender<HyperStarCall<P>>,
-    pub call_rx: Option<mpsc::Receiver<HyperStarCall<P>>>,
-    pub drivers_call_tx: mpsc::Sender<DriversCall<P>>,
-    pub drivers_call_rx: Option<mpsc::Receiver<DriversCall<P>>>,
+    pub call_tx: mpsc::Sender<HyperStarCall>,
+    pub call_rx: Option<mpsc::Receiver<HyperStarCall>>,
+    pub drivers_call_tx: mpsc::Sender<DriversCall>,
+    pub drivers_call_rx: Option<mpsc::Receiver<DriversCall>>,
     pub drivers_status_tx: Option<watch::Sender<DriverStatus>>,
     pub drivers_status_rx: watch::Receiver<DriverStatus>,
     pub status_tx: mpsc::Sender<Status>,
     pub status_rx: watch::Receiver<Status>,
 }
 
-impl<P> HyperStarTx<P>
-where
-    P: Platform,
+impl HyperStarTx
+
 {
     pub fn new(point: Point) -> Self {
         let (gravity_tx, mut gravity_rx) = mpsc::channel(1024);
@@ -504,28 +492,24 @@ where
         }
     }
 
-    pub fn star_rx(&mut self) -> Option<mpsc::Receiver<HyperStarCall<P>>> {
+    pub fn star_rx(&mut self) -> Option<mpsc::Receiver<HyperStarCall>> {
         self.call_rx.take()
     }
 }
 
 #[derive(Clone)]
-pub struct HyperStarApi<P>
-where
-    P: Platform,
+pub struct HyperStarApi
 {
     pub kind: StarSub,
-    tx: mpsc::Sender<HyperStarCall<P>>,
+    tx: mpsc::Sender<HyperStarCall>,
     pub status_rx: watch::Receiver<Status>,
 }
 
-impl<P> HyperStarApi<P>
-where
-    P: Platform,
+impl HyperStarApi
 {
     pub fn new(
         kind: StarSub,
-        tx: mpsc::Sender<HyperStarCall<P>>,
+        tx: mpsc::Sender<HyperStarCall>,
         status_rx: watch::Receiver<Status>,
     ) -> Self {
         Self {
@@ -617,7 +601,7 @@ where
     }
 
     #[cfg(test)]
-    pub async fn get_skel(&self) -> Result<HyperStarSkel<P>, SpaceErr> {
+    pub async fn get_skel(&self) -> Result<HyperStarSkel, SpaceErr> {
         let (tx, rx) = oneshot::channel();
         self.tx.send(HyperStarCall::GetSkel(tx)).await;
         Ok(rx.await?)
@@ -633,34 +617,32 @@ where
     }
 }
 
-pub struct HyperStar<P>
-where
-    P: Platform + 'static,
+pub struct HyperStar
+
 {
-    skel: HyperStarSkel<P>,
-    star_tx: mpsc::Sender<HyperStarCall<P>>,
-    star_rx: mpsc::Receiver<HyperStarCall<P>>,
-    drivers: DriversApi<P>,
+    skel: HyperStarSkel,
+    star_tx: mpsc::Sender<HyperStarCall>,
+    star_rx: mpsc::Receiver<HyperStarCall>,
+    drivers: DriversApi,
     injector: Surface,
     forwarders: Vec<Point>,
     hyperway_transmitter: ProtoTransmitter,
     gravity: Surface,
     hyper_router: Arc<dyn Router>,
-    layer_traversal_engine: LayerTraversalEngine<P>,
-    global_handler: DirectedHandlerShell<GlobalCommandExecutionHandler<P>>,
+    layer_traversal_engine: LayerTraversalEngine,
+    global_handler: DirectedHandlerShell<GlobalCommandExecutionHandler>,
 }
 
-impl<P> HyperStar<P>
-where
-    P: Platform,
+impl HyperStar
+
 {
     pub async fn new(
-        skel: HyperStarSkel<P>,
-        mut drivers: DriversBuilder<P>,
+        skel: HyperStarSkel,
+        mut drivers: DriversBuilder,
         mut hyperway_endpoint: HyperwayEndpoint,
         interchange: Arc<HyperwayInterchange>,
-        mut star_tx: HyperStarTx<P>,
-    ) -> Result<HyperStarApi<P>, StarErr> {
+        mut star_tx: HyperStarTx,
+    ) -> Result<HyperStarApi, StarErr> {
         let drivers = drivers.build(
             skel.clone(),
             star_tx.drivers_call_tx.clone(),
@@ -816,8 +798,7 @@ where
                         {
                             Ok(local_endpoint) => {
                                 match skel
-                                    .machine
-                                    .api
+                                    .machine_api
                                     .endpoint_factory(skel.key.clone(), stub.key.clone())
                                     .await
                                 {
@@ -911,9 +892,6 @@ where
                     }
                     HyperStarCall::Stub(rtn) => {
                         rtn.send(self.skel.stub());
-                    }
-                    HyperStarCall::Phantom(_) => {
-                        // phantom literally does nothing but hold the P in not mem mode
                     }
                     HyperStarCall::ToDriver(traversal) => {
                         self.drivers.visit(traversal).await;
@@ -1066,14 +1044,13 @@ where
         let locator = SmartLocator::new(self.skel.clone());
         let gravity = self.gravity.clone();
         tokio::spawn(async move {
-            async fn shard<P>(
+            async fn shard(
                 mut wave: Wave,
-                skel: HyperStarSkel<P>,
-                locator: SmartLocator<P>,
+                skel: HyperStarSkel,
+                locator: SmartLocator,
                 gravity: Surface,
             ) -> Result<(), StarErr>
-            where
-                P: Platform,
+
             {
                 if wave.track() {
                     println!("\tsharding wave...{}", wave.kind().to_string());
@@ -1210,7 +1187,7 @@ where
     }
 
     async fn start_wrangling(&self) {
-        self.skel.machine.api.wait_ready().await;
+        self.skel.machine_api.wait_ready().await;
 
         let skel = self.skel.clone();
         tokio::spawn(async move {
@@ -1306,23 +1283,21 @@ where
 }
 
 #[derive(Clone)]
-pub struct LayerTraversalEngine<P>
-where
-    P: Platform + 'static,
+pub struct LayerTraversalEngine
+
 {
-    pub skel: HyperStarSkel<P>,
+    pub skel: HyperStarSkel,
     pub injector: Surface,
     pub exit_up: mpsc::Sender<Traversal<Wave>>,
     pub exit_down: mpsc::Sender<Traversal<Wave>>,
     pub layers: HashSet<Layer>,
 }
 
-impl<P> LayerTraversalEngine<P>
-where
-    P: Platform + 'static,
+impl LayerTraversalEngine
+
 {
     pub fn new(
-        skel: HyperStarSkel<P>,
+        skel: HyperStarSkel,
         injector: Surface,
         exit_down: mpsc::Sender<Traversal<Wave>>,
         exit_up: mpsc::Sender<Traversal<Wave>>,
@@ -1682,9 +1657,8 @@ pub struct LayerInjectionRouter {
 }
 
 impl LayerInjectionRouter {
-    pub fn new<P>(skel: HyperStarSkel<P>, injector: Surface) -> Self
-    where
-        P: Platform,
+    pub fn new(skel: HyperStarSkel, injector: Surface) -> Self
+
     {
         Self {
             inject_tx: skel.inject_tx.clone(),
@@ -1971,18 +1945,16 @@ impl DiagnosticInterceptors
 
 
 #[derive(Clone)]
-pub struct SmartLocator<P>
-where
-    P: Platform
+pub struct SmartLocator
+
 {
-    pub skel: HyperStarSkel<P>,
+    pub skel: HyperStarSkel,
 }
 
-impl<P> SmartLocator<P>
-where
-    P: Platform,
+impl SmartLocator
+
 {
-    pub fn new(skel: HyperStarSkel<P>) -> Self {
+    pub fn new(skel: HyperStarSkel) -> Self {
         Self { skel }
     }
 

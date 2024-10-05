@@ -1,8 +1,5 @@
 pub use starlane_space as starlane;
-use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Item,
-    ItemRouter, ItemSphere,
-};
+use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Item, ItemRouter, ItemSphere};
 use crate::hyperlane::{
     AnonHyperAuthenticatorAssignEndPoint, FromTransform, HopTransform, HyperClient, HyperGreeter,
     Hyperway, HyperwayConfigurator, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub,
@@ -42,17 +39,14 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-pub struct ControlDriverFactory<P>
-where
-    P: Platform,
+pub struct ControlDriverFactory
+
 {
-    phantom: PhantomData<P>,
 }
 
 #[async_trait]
-impl<P> HyperDriverFactory<P> for ControlDriverFactory<P>
-where
-    P: Platform,
+impl HyperDriverFactory for ControlDriverFactory
+
 {
     fn kind(&self) -> Kind {
         Kind::Control
@@ -68,10 +62,10 @@ where
 
     async fn create(
         &self,
-        star: HyperStarSkel<P>,
-        driver: DriverSkel<P>,
+        star: HyperStarSkel,
+        driver: DriverSkel,
         ctx: DriverCtx,
-    ) -> Result<Box<dyn Driver<P>>, P::Err> {
+    ) -> Result<Box<dyn Driver>, DriverErr> {
         let skel = HyperSkel::new(star, driver);
         Ok(Box::new(ControlDriver {
             skel,
@@ -83,39 +77,32 @@ where
     }
 }
 
-impl<P> ControlDriverFactory<P>
-where
-    P: Platform,
+impl ControlDriverFactory
+
 {
     pub fn new() -> Self {
         Self {
-            phantom: Default::default(),
         }
     }
 }
 
-pub struct ControlFactory<P>
-where
-    P: Platform,
+pub struct ControlFactory
+
 {
-    phantom: PhantomData<P>,
 }
 
-impl<P> ControlFactory<P>
-where
-    P: Platform,
+impl ControlFactory
+
 {
     pub fn new() -> Self {
         Self {
-            phantom: Default::default(),
         }
     }
 }
 
 #[async_trait]
-impl<P> HyperDriverFactory<P> for ControlFactory<P>
-where
-    P: Platform,
+impl HyperDriverFactory for ControlFactory
+
 {
     fn kind(&self) -> Kind {
         Kind::Control
@@ -127,10 +114,10 @@ where
 
     async fn create(
         &self,
-        star: HyperStarSkel<P>,
-        driver: DriverSkel<P>,
+        star: HyperStarSkel,
+        driver: DriverSkel,
         ctx: DriverCtx,
-    ) -> Result<Box<dyn Driver<P>>, P::Err> {
+    ) -> Result<Box<dyn Driver>, DriverErr> {
         let skel = HyperSkel::new(star, driver);
 
         Ok(Box::new(ControlDriver {
@@ -144,30 +131,27 @@ where
 }
 
 #[derive(DirectedHandler)]
-pub struct ControlDriver<P>
-where
-    P: Platform,
+pub struct ControlDriver
+
 {
     pub ctx: DriverCtx,
-    pub skel: HyperSkel<P>,
+    pub skel: HyperSkel,
     pub external_router: Option<Arc<dyn Router>>,
-    pub control_ctxs: Arc<DashMap<Point, ControlCtx<P>>>,
+    pub control_ctxs: Arc<DashMap<Point, ControlCtx>>,
     pub fabric_routers: Arc<DashMap<Point, LayerInjectionRouter>>,
 }
 
 #[derive(Clone)]
-pub struct ControlSkel<P>
-where
-    P: Platform,
+pub struct ControlSkel
+
 {
-    pub star: HyperStarSkel<P>,
-    pub driver: DriverSkel<P>,
+    pub star: HyperStarSkel,
+    pub driver: DriverSkel,
 }
 
 #[async_trait]
-impl<P> Driver<P> for ControlDriver<P>
-where
-    P: Platform,
+impl Driver for ControlDriver
+
 {
     fn kind(&self) -> Kind {
         Kind::Control
@@ -177,7 +161,7 @@ where
         Layer::Portal
     }
 
-    async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
+    async fn init(&mut self, skel: DriverSkel, ctx: DriverCtx) -> Result<(), DriverErr> {
         self.skel.driver.status_tx.send(DriverStatus::Init).await;
 
         skel.create_in_driver(
@@ -277,8 +261,7 @@ where
 
         self.skel
             .star
-            .machine
-            .api
+            .machine_api
             .add_interchange(
                 InterchangeKind::Control(ControlPattern::Star(self.skel.star.point.clone())),
                 gate.clone(),
@@ -288,8 +271,7 @@ where
         if self.skel.star.kind == StarSub::Machine {
             self.skel
                 .star
-                .machine
-                .api
+                .machine_api
                 .add_interchange(InterchangeKind::DefaultControl, gate)
                 .await?;
         }
@@ -299,11 +281,11 @@ where
         Ok(())
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+    async fn item(&self, point: &Point) -> Result<ItemSphere, DriverErr> {
         let router = self
             .external_router
             .as_ref()
-            .ok_or(P::Err::new("FATAL: router is not set"))?
+            .ok_or(DriverErr::item_router_not_set(point, &self.kind()))?
             .clone();
         let ctx = ControlCtx::new(router);
         Ok(ItemSphere::Router(Box::new(Control::restore(
@@ -314,22 +296,20 @@ where
     }
 }
 
-pub struct ControlCreator<P>
-where
-    P: Platform,
+pub struct ControlCreator
+
 {
-    pub skel: HyperSkel<P>,
+    pub skel: HyperSkel,
     pub fabric_routers: Arc<DashMap<Point, LayerInjectionRouter>>,
     pub controls: Point,
     pub ctx: DriverCtx,
 }
 
-impl<P> ControlCreator<P>
-where
-    P: Platform,
+impl ControlCreator
+
 {
     pub fn new(
-        skel: HyperSkel<P>,
+        skel: HyperSkel,
         fabric_routers: Arc<DashMap<Point, LayerInjectionRouter>>,
         ctx: DriverCtx,
     ) -> Self {
@@ -344,9 +324,8 @@ where
 }
 
 #[async_trait]
-impl<P> PointFactory for ControlCreator<P>
-where
-    P: Platform,
+impl PointFactory for ControlCreator
+
 {
     async fn create(&self) -> Result<Point, SpaceErr> {
         let create = Create {
@@ -385,27 +364,24 @@ where
 }
 
 #[derive(Clone)]
-pub struct ControlGreeter<P>
-where
-    P: Platform,
+pub struct ControlGreeter
+
 {
-    pub skel: HyperSkel<P>,
+    pub skel: HyperSkel,
     pub controls: Point,
 }
 
-impl<P> ControlGreeter<P>
-where
-    P: Platform,
+impl ControlGreeter
+
 {
-    pub fn new(skel: HyperSkel<P>, controls: Point) -> Self {
+    pub fn new(skel: HyperSkel, controls: Point) -> Self {
         Self { skel, controls }
     }
 }
 
 #[async_trait]
-impl<P> HyperGreeter for ControlGreeter<P>
-where
-    P: Platform,
+impl HyperGreeter for ControlGreeter
+
 {
     async fn greet(&self, stub: HyperwayStub) -> Result<Greet, SpaceErr> {
         Ok(Greet {
@@ -417,20 +393,18 @@ where
     }
 }
 
-pub struct Control<P>
-where
-    P: Platform,
+pub struct Control
+
 {
-    pub skel: HyperSkel<P>,
-    pub ctx: ControlCtx<P>,
+    pub skel: HyperSkel,
+    pub ctx: ControlCtx,
 }
 
-impl<P> Item<P> for Control<P>
-where
-    P: Platform,
+impl Item for Control
+
 {
-    type Skel = HyperSkel<P>;
-    type Ctx = ControlCtx<P>;
+    type Skel = HyperSkel;
+    type Ctx = ControlCtx;
     type State = ();
 
     fn restore(skel: Self::Skel, ctx: Self::Ctx, _: Self::State) -> Self {
@@ -439,9 +413,8 @@ where
 }
 
 #[async_trait]
-impl<P> TraversalRouter for Control<P>
-where
-    P: Platform,
+impl TraversalRouter for Control
+
 {
     async fn traverse(&self, traversal: Traversal<Wave>) -> Result<(), SpaceErr> {
         self.skel.driver.logger.track(&traversal, || {
@@ -457,31 +430,26 @@ where
 }
 
 #[async_trait]
-impl<P> ItemRouter<P> for Control<P>
-where
-    P: Platform,
+impl ItemRouter for Control
+
 {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
-        <Control<P> as Item<P>>::bind(self).await
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
+        Ok(<Control as Item>::bind(self).await?)
     }
 }
 
 #[derive(Clone)]
-pub struct ControlCtx<P>
-where
-    P: Platform,
+pub struct ControlCtx
+
 {
-    pub phantom: PhantomData<P>,
     pub router: Arc<dyn Router>,
 }
 
-impl<P> ControlCtx<P>
-where
-    P: Platform,
+impl ControlCtx
+
 {
     pub fn new(router: Arc<dyn Router>) -> Self {
         Self {
-            phantom: Default::default(),
             router,
         }
     }
