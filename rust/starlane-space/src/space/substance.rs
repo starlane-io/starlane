@@ -26,6 +26,7 @@ use crate::space::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use crate::space::wave::{PongCore, Wave};
 use crate::{Details, SpaceErr, Status, Stub, Surface};
 use url::Url;
+use crate::space::kind::Sub;
 use crate::space::util;
 
 #[derive(
@@ -127,6 +128,14 @@ impl Substance {
             Some(wave.as_mut())
         } else {
             None
+        }
+    }
+
+    pub fn expect( self, expect: SubstanceKind ) -> Result<Self,SpaceErr> {
+        if self.kind() != expect {
+            Err(SpaceErr::expected_substance(expect, self.kind()))
+        } else {
+            Ok(self)
         }
     }
 }

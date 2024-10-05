@@ -1,6 +1,5 @@
 use std::env;
 use crate::executor::{ExeConf, Executor};
-use crate::hyperspace::err::HyperErr;
 use itertools::Itertools;
 use nom::AsBytes;
 use starlane::space::loc::ToBaseKind;
@@ -22,7 +21,7 @@ use starlane::space::particle::Status;
 use starlane::space::point::Point;
 use starlane::space::selector::KindSelector;
 use crate::env::STARLANE_DATA_DIR;
-use crate::err::ThisErr;
+use crate::err::HypErr;
 use crate::executor::cli::HostEnv;
 use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::dialect::filestore::{FileStore, FILE_STORE_ROOT};
@@ -31,7 +30,7 @@ use crate::host::{ExeStub, Host, HostCli};
 pub type FileStoreService = Service<FileStore>;
 
 impl FileStoreService {
-    pub async fn sub_root( &self, sub_root: PathBuf) -> Result<FileStoreService,ThisErr> {
+    pub async fn sub_root( &self, sub_root: PathBuf) -> Result<FileStoreService, HypErr> {
         let runner = self.runner.sub_root(sub_root).await?;
         Ok(FileStoreService {
             template: self.template.clone(),
@@ -43,7 +42,7 @@ impl FileStoreService {
 
 pub struct ServiceCall<I,O> {
     pub input: I,
-    pub output: oneshot::Sender<Result<O, ThisErr>>,
+    pub output: oneshot::Sender<Result<O, HypErr>>,
 }
 
 #[derive(Clone)]
@@ -66,7 +65,7 @@ impl Service<ServiceRunner>  {
         }
     }
 
-    pub fn filestore(  self  ) -> Result<FileStoreService,ThisErr> {
+    pub fn filestore(  self  ) -> Result<FileStoreService, HypErr> {
        Ok(FileStoreService{
            template: self.template,
            runner: self.runner.filestore()?
@@ -93,7 +92,7 @@ pub enum ServiceRunner {
 
 
 impl ServiceRunner {
-    pub fn filestore( & self  ) -> Result<FileStore,ThisErr> {
+    pub fn filestore( & self  ) -> Result<FileStore, HypErr> {
         match self {
             ServiceRunner::Exe(exe) => {
                 exe.create()
@@ -119,7 +118,7 @@ impl Into<Service<ServiceRunner>> for ServiceTemplate {
 
 
 impl TryInto<Service<FileStore>> for Service<ServiceRunner>{
-    type Error = ThisErr;
+    type Error = HypErr;
 
     fn try_into(self) -> Result<Service<FileStore>, Self::Error> {
         let filestore = self.runner.filestore()?;
@@ -286,7 +285,7 @@ pub mod tests {
     use starlane::space::kind::{BaseKind, Kind};
     use starlane::space::selector::KindSelector;
     use starlane::space::util::OptSelector;
-    use crate::err::ThisErr;
+    use crate::err::HypErr;
     use crate::hyperspace::star::StarTemplate;
     use crate::service::{service_conf, Service, ServiceConf, ServiceKind, ServiceTemplate};
 
@@ -319,7 +318,7 @@ pub mod tests {
 
     }
 
-    pub async fn filestore_from_service()  -> Result<Service<FileStore>, ThisErr> {
+    pub async fn filestore_from_service()  -> Result<Service<FileStore>, HypErr> {
 
         let config = service_conf();
 

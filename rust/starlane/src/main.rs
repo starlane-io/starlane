@@ -59,7 +59,7 @@ pub use server::*;
 
 
 use crate::cli::{Cli, Commands};
-use crate::err::StarErr;
+use crate::err::OldStarErr;
 use clap::Parser;
 use starlane::space::loc::ToBaseKind;
 use std::fs::File;
@@ -84,7 +84,7 @@ pub fn init() {
     }
 }
 #[cfg(feature = "cli")]
-pub fn main() -> Result<(), StarErr> {
+pub fn main() -> Result<(), OldStarErr> {
     init();
 
     let cli = Cli::parse();
@@ -105,12 +105,12 @@ pub fn main() -> Result<(), StarErr> {
 }
 
 #[cfg(not(feature = "server"))]
-fn server() -> Result<(), StarErr> {
+fn server() -> Result<(), OldStarErr> {
     println!("'serve' feature is not enabled in this starlane installation")
 }
 
 #[cfg(feature = "server")]
-fn server() -> Result<(), StarErr> {
+fn server() -> Result<(), OldStarErr> {
 
     let point = starlane::space::point::Point::from_str("blah.com").unwrap();
     println!("PPIONT {}",point.to_string());

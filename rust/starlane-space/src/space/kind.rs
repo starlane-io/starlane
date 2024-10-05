@@ -455,6 +455,7 @@ pub trait Tks {
     Deserialize,
     strum_macros::Display,
     strum_macros::EnumString,
+    strum_macros::EnumIter,
 )]
 pub enum NativeSub {
     Web,
@@ -470,6 +471,7 @@ pub enum NativeSub {
     Deserialize,
     strum_macros::Display,
     strum_macros::EnumString,
+    strum_macros::EnumIter,
 )]
 pub enum StarSub {
     Central,
@@ -553,6 +555,11 @@ impl Into<Option<String>> for StarSub {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize, strum_macros::Display, strum_macros::EnumIter)]
+pub enum UserBaseSubKindBase {
+    OAuth
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize, strum_macros::Display)]
 pub enum UserBaseSubKind {
     OAuth(Specific),
@@ -594,6 +601,7 @@ impl Into<Option<String>> for UserBaseSubKind {
     Deserialize,
     strum_macros::Display,
     strum_macros::EnumString,
+    strum_macros::EnumIter
 )]
 pub enum FileSubKind {
     File,
@@ -628,6 +636,7 @@ impl Into<Option<String>> for FileSubKind {
     Deserialize,
     strum_macros::Display,
     strum_macros::EnumString,
+    strum_macros::EnumIter
 )]
 pub enum ArtifactSubKind {
     Raw,

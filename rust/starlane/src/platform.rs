@@ -1,5 +1,5 @@
 use starlane::space::artifact::asynch::ArtifactApi;
-use starlane::space::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind};
+use starlane::space::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind, UserBaseSubKindBase};
 use starlane::space::loc::{MachineName, StarKey, ToBaseKind};
 use starlane::space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
 use std::sync::Arc;
@@ -10,14 +10,13 @@ use std::str::FromStr;
 use starlane::space::settings::Timeouts;
 use crate::driver::DriversBuilder;
 use crate::hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
-use crate::hyperspace::err::HyperErr;
 use crate::hyperspace::machine::{Machine, MachineApi, MachineTemplate};
 use crate::hyperspace::reg::Registry;
 
 #[async_trait]
 pub trait Platform: Send + Sync + Sized + Clone
 where
-    Self::Err: HyperErr,
+    Self::Err: std::error::Error + Send + Sync,
     Self: 'static,
     Self::RegistryContext: Send + Sync,
     Self::StarAuth: HyperAuthenticator,
@@ -60,8 +59,8 @@ where
     }
 
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self>;
-    async fn global_registry(&self) -> Result<Registry<Self>, Self::Err>;
-    async fn star_registry(&self, star: &StarKey) -> Result<Registry<Self>, Self::Err>;
+    async fn global_registry(&self) -> Result<Registry, Self::Err>;
+    async fn star_registry(&self, star: &StarKey) -> Result<Registry, Self::Err>;
     fn artifact_hub(&self) -> ArtifactApi;
     async fn start_services(&self, gate: &Arc<HyperGateSelector>) {}
         fn logger(&self) -> RootLogger {
@@ -87,7 +86,7 @@ where
             BaseKind::Mechtron => Kind::Mechtron,
             BaseKind::FileStore => Kind::FileStore,
             BaseKind::File => match &template.sub {
-                None => return Err("expected kind for File".into()),
+                None => return Err(SpaceErr::KindNotAvailable(template.clone())),
                 Some(kind) => {
                     let file_kind = FileSubKind::from_str(kind.as_str())?;
                     return Ok(Kind::File(file_kind));
@@ -100,7 +99,7 @@ where
             BaseKind::Bundle => Kind::Bundle,
             BaseKind::Artifact => match &template.sub {
                 None => {
-                    return Err("expected Sub for Artirtact".into());
+                    return Err(SpaceErr::expect_sub::<ArtifactSubKind>(BaseKind::Artifact));
                 }
                 Some(sub) => {
                     let artifact_kind = ArtifactSubKind::from_str(sub.as_str())?;
@@ -110,7 +109,8 @@ where
             BaseKind::Control => Kind::Control,
             BaseKind::UserBase => match &template.sub {
                 None => {
-                    return Err("SubKind must be set for UserBase<?>".into());
+
+                    return Err(SpaceErr::expect_sub::<UserBaseSubKindBase>(BaseKind::UserBase));
                 }
                 Some(sub) => {
                     let specific =
@@ -122,7 +122,7 @@ where
             BaseKind::Repo => Kind::Repo,
             BaseKind::Portal => Kind::Portal,
             BaseKind::Star => {
-                unimplemented!()
+                return Err(SpaceErr::unimplemented("stars cannot be created via the template"))
             }
             BaseKind::Driver => Kind::Driver,
             BaseKind::Global => Kind::Global,

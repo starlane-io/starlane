@@ -2,7 +2,6 @@ use crate::driver::{
     Driver, DriverAvail, DriverCtx, DriverSkel, DriverStatus, HyperDriverFactory, Item,
     ItemHandler, ItemSphere,
 };
-use crate::hyperspace::err::HyperErr;
 use crate::platform::Platform;
 use crate::hyperspace::reg::Registration;
 use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter};

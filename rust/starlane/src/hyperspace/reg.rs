@@ -12,103 +12,96 @@ use starlane::space::security::{Access, AccessGrant, IndexedAccessGrant};
 use starlane::space::selector::Selector;
 use starlane::space::substance::SubstanceList;
 use std::sync::Arc;
+use crate::registry::postgres::err::RegErr;
 
-pub type Registry<P> = Arc<dyn RegistryApi<P>>;
+pub type Registry = Arc<dyn RegistryApi>;
 
 #[async_trait]
-pub trait RegistryApi<P>: Send + Sync
-where
-    P: Platform,
+pub trait RegistryApi: Send + Sync
 {
-    async fn nuke<'a>(&'a self) -> Result<(), P::Err>;
+    async fn nuke<'a>(&'a self) -> Result<(), RegErr>;
 
-    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), P::Err>;
+    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), RegErr>;
 
-    async fn assign_star<'a>(&'a self, point: &'a Point, star: &'a Point) -> Result<(), P::Err>;
+    async fn assign_star<'a>(&'a self, point: &'a Point, star: &'a Point) -> Result<(), RegErr>;
 
-    async fn assign_host<'a>(&'a self, point: &'a Point, host: &'a Point) -> Result<(), P::Err>;
+    async fn assign_host<'a>(&'a self, point: &'a Point, host: &'a Point) -> Result<(), RegErr>;
 
-    async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), P::Err>;
+    async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), RegErr>;
 
     async fn set_properties<'a>(
         &'a self,
         point: &'a Point,
         properties: &'a SetProperties,
-    ) -> Result<(), P::Err>;
+    ) -> Result<(), RegErr>;
 
-    async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, P::Err>;
+    async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, RegErr>;
 
-    async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, P::Err>;
+    async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, RegErr>;
 
-    async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, P::Err>;
+    async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, RegErr>;
 
     async fn query<'a>(&'a self, point: &'a Point, query: &'a Query)
-        -> Result<QueryResult, P::Err>;
+        -> Result<QueryResult, RegErr>;
 
-    async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, P::Err>;
+    async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, RegErr>;
 
-    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, P::Err>;
+    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, RegErr>;
 
-    async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, P::Err>;
+    async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, RegErr>;
 
-    async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), P::Err>;
+    async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), RegErr>;
 
-    async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, P::Err>;
+    async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, RegErr>;
 
     async fn chown<'a>(
         &'a self,
         on: &'a Selector,
         owner: &'a Point,
         by: &'a Point,
-    ) -> Result<(), P::Err>;
+    ) -> Result<(), RegErr>;
 
     async fn list_access<'a>(
         &'a self,
         to: &'a Option<&'a Point>,
         on: &'a Selector,
-    ) -> Result<Vec<IndexedAccessGrant>, P::Err>;
+    ) -> Result<Vec<IndexedAccessGrant>, RegErr>;
 
-    async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), P::Err>;
+    async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), RegErr>;
 }
 
-pub struct RegistryWrapper<P>
-where
-    P: Platform,
+pub struct RegistryWrapper
 {
-    registry: Registry<P>,
+    registry: Registry,
 }
 
-impl<P> RegistryWrapper<P>
-where
-    P: Platform,
+impl RegistryWrapper
 {
-    pub fn new(registry: Registry<P>) -> Self {
+    pub fn new(registry: Registry) -> Self {
         Self { registry }
     }
 }
 
 #[async_trait]
-impl<P> RegistryApi<P> for RegistryWrapper<P>
-where
-    P: Platform,
+impl RegistryApi for RegistryWrapper
 {
-    async fn nuke<'a>(&'a self) -> Result<(), P::Err> {
+    async fn nuke<'a>(&'a self) -> Result<(), RegErr> {
         self.registry.nuke().await
     }
 
-    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), P::Err> {
+    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), RegErr> {
         self.registry.register(registration).await
     }
 
-    async fn assign_star<'a>(&'a self, point: &'a Point, star: &'a Point) -> Result<(), P::Err> {
+    async fn assign_star<'a>(&'a self, point: &'a Point, star: &'a Point) -> Result<(), RegErr> {
         self.registry.assign_star(point, star).await
     }
 
-    async fn assign_host<'a>(&'a self, point: &'a Point, host: &'a Point) -> Result<(), P::Err> {
+    async fn assign_host<'a>(&'a self, point: &'a Point, host: &'a Point) -> Result<(), RegErr> {
         self.registry.assign_host(point, host).await
     }
 
-    async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), P::Err> {
+    async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), RegErr> {
         self.registry.set_status(point, status).await
     }
 
@@ -116,19 +109,19 @@ where
         &'a self,
         point: &'a Point,
         properties: &'a SetProperties,
-    ) -> Result<(), P::Err> {
+    ) -> Result<(), RegErr> {
         self.registry.set_properties(point, properties).await
     }
 
-    async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, P::Err> {
+    async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, RegErr> {
         self.registry.sequence(point).await
     }
 
-    async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, P::Err> {
+    async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, RegErr> {
         self.registry.get_properties(point).await
     }
 
-    async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, P::Err> {
+    async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, RegErr> {
         if point.is_global() {
             let location = ParticleLocation::new(Some(Point::local_star()), None);
             let record = ParticleRecord {
@@ -153,27 +146,27 @@ where
         &'a self,
         point: &'a Point,
         query: &'a Query,
-    ) -> Result<QueryResult, P::Err> {
+    ) -> Result<QueryResult, RegErr> {
         self.registry.query(point, query).await
     }
 
-    async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, P::Err> {
+    async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, RegErr> {
         self.registry.delete(delete).await
     }
 
-    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, P::Err> {
+    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, RegErr> {
         self.registry.select(select).await
     }
 
-    async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, P::Err> {
+    async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, RegErr> {
         self.registry.sub_select(sub_select).await
     }
 
-    async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), P::Err> {
+    async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), RegErr> {
         self.registry.grant(access_grant).await
     }
 
-    async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, P::Err> {
+    async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, RegErr> {
         self.registry.access(to, on).await
     }
 
@@ -182,7 +175,7 @@ where
         on: &'a Selector,
         owner: &'a Point,
         by: &'a Point,
-    ) -> Result<(), P::Err> {
+    ) -> Result<(), RegErr> {
         self.registry.chown(on, owner, by).await
     }
 
@@ -190,11 +183,11 @@ where
         &'a self,
         to: &'a Option<&'a Point>,
         on: &'a Selector,
-    ) -> Result<Vec<IndexedAccessGrant>, P::Err> {
+    ) -> Result<Vec<IndexedAccessGrant>, RegErr> {
         self.registry.list_access(to, on).await
     }
 
-    async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), P::Err> {
+    async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), RegErr> {
         self.registry.remove_access(id, to).await
     }
 }

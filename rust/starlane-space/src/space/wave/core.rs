@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-
+use thiserror::__private::AsDisplay;
 use starlane_primitive_macros::Autobox;
 
 use crate::space::command::Command;
@@ -265,6 +265,15 @@ pub enum Method {
     Cmd(CmdMethod),
     Http(HttpMethod),
     Ext(ExtMethod),
+}
+
+
+impl AsDisplay<'_> for Method {
+    type Target = String;
+
+    fn as_display(& self) -> Self::Target {
+        self.to_deep_string()
+    }
 }
 
 impl Method {

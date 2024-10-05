@@ -361,7 +361,7 @@ pub mod direct {
         use std::sync::Arc;
 
         use serde::{Deserialize, Serialize};
-
+        use thiserror::__private::AsDisplay;
         use crate::space::command::common::{SetProperties, StateSrc, StateSrcVar};
         use crate::space::command::Command;
         use crate::space::err::SpaceErr;
@@ -375,7 +375,7 @@ pub mod direct {
         use crate::space::util::ToResolved;
         use crate::space::wave::core::cmd::CmdMethod;
         use crate::space::wave::core::ext::ExtMethod;
-        use crate::space::wave::core::DirectedCore;
+        use crate::space::wave::core::{DirectedCore, Method};
         use crate::space::wave::DirectedProto;
 
         pub enum PointTemplateSeg {
@@ -445,6 +445,13 @@ pub mod direct {
             pub specific: Option<SpecificSelector>,
         }
 
+        impl AsDisplay<'_> for KindTemplate{
+            type Target = String;
+
+            fn as_display(& self) -> Self::Target {
+                self.to_string()
+            }
+        }
         impl ToString for KindTemplate {
             fn to_string(&self) -> String {
                 if self.sub.is_some() {

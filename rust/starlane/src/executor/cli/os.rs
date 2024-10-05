@@ -5,7 +5,7 @@ use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 use std::process::Stdio;
 use std::ops::{Deref, DerefMut};
 use tokio::io::AsyncWriteExt;
-use crate::err::ThisErr;
+use crate::err::HypErr;
 use crate::executor::cli::{CliIn, CliOut, HostEnv};
 use crate::executor::{ExeConf, Executor};
 use crate::host::{ ExeStub, Host, HostCli, Proc};
@@ -29,10 +29,10 @@ impl Executor for CliOsExecutor {
     type In = CliIn;
     type Out = CliOut;
 
-    async fn execute(&self, mut input: Self::In) -> Result<Self::Out, ThisErr> {
+    async fn execute(&self, mut input: Self::In) -> Result<Self::Out, HypErr> {
         let path: PathBuf = self.stub.loc.clone().into();
         if !path.exists() {
-            Result::Err(ThisErr::String(format!(
+            Result::Err(HypErr::String(format!(
                 "file not found: {}",
                 self.stub.loc
             )))?;
@@ -65,7 +65,7 @@ impl Executor for CliOsExecutor {
         let mut process = OsProcess::new(child);
 
         if let Option::Some(mut data) = input.stdin.take() {
-            let mut stdin = process.stdin.take().ok_or(ThisErr::from("expected stdin"))?;
+            let mut stdin = process.stdin.take().ok_or(HypErr::from("expected stdin"))?;
             stdin.write_all(&mut data).await?;
             stdin.flush().await?;
         }
@@ -88,7 +88,7 @@ pub struct OsProcess {
 }
 
 impl OsProcess {
-    pub fn close_stdin(&mut self) -> Result<(), ThisErr> {
+    pub fn close_stdin(&mut self) -> Result<(), HypErr> {
         if self.child.stdin.is_some() {
             drop(self.child.stdin.take().unwrap());
         }

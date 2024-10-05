@@ -8,7 +8,7 @@ use std::{env, fs, io};
 use std::env::VarError;
 use std::process::{ExitCode, Termination};
 use thiserror::Error;
-use starlane::err::ThisErr;
+use starlane::err::HypErr;
 
 
 
@@ -125,7 +125,7 @@ pub enum Error{
     #[error("{0}")]
     VarError(#[from] VarError),
     #[error("{0}")]
-    ThisErr(#[from] ThisErr)
+    ThisErr(#[from] HypErr)
 }
 
 impl From<String> for Error {

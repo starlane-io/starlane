@@ -1,6 +1,6 @@
 pub mod os;
 
-use crate::err::ThisErr;
+use crate::err::HypErr;
 use os::OsProcess;
 use crate::executor::Executor;
 use itertools::Itertools;
@@ -125,7 +125,7 @@ pub enum CliOut {
 
 impl CliOut {
 
-    pub async fn copy_stdin(&mut self, input: & mut Vec<u8>) -> Result<(),ThisErr>{
+    pub async fn copy_stdin(&mut self, input: & mut Vec<u8>) -> Result<(), HypErr>{
         match self {
             CliOut::Os(proc) => {
                 let mut stdin = proc.stdin.take().unwrap();
@@ -135,14 +135,14 @@ impl CliOut {
         }
         Ok(())
     }
-    pub fn close_stdin(&mut self)  -> Result<(),ThisErr>{
+    pub fn close_stdin(&mut self)  -> Result<(), HypErr>{
         match self {
             CliOut::Os(proc) => proc.close_stdin()?
         }
         Ok(())
     }
 
-    pub async fn copy_stout(&mut self, out: & mut Vec<u8>)  -> Result<(),ThisErr>{
+    pub async fn copy_stout(&mut self, out: & mut Vec<u8>)  -> Result<(), HypErr>{
         match self {
             CliOut::Os(proc) => {
                 let mut stdout = proc.stdout.take().ok_or("could not get stdout")?;
@@ -154,14 +154,14 @@ impl CliOut {
 }
 
 impl CliOut {
-    pub async fn stdout(&mut self) -> Result<Vec<u8>, ThisErr> {
+    pub async fn stdout(&mut self) -> Result<Vec<u8>, HypErr> {
         match self {
             CliOut::Os(proc) => {
                 let mut out = vec![];
                 let mut stdout = proc
                     .stdout
                     .take()
-                    .ok_or(ThisErr::String("could not unwarp stdout".to_string()))?;
+                    .ok_or(HypErr::String("could not unwarp stdout".to_string()))?;
                 tokio::io::copy(&mut stdout, &mut out).await?;
                 Ok(out)
             }

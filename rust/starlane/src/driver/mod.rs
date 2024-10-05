@@ -10,7 +10,6 @@ pub mod star;
 pub mod artifact;
 
 use crate::driver::star::StarDriverFactory;
-use crate::hyperspace::err::HyperErr;
 use crate::platform::Platform;
 use crate::hyperspace::reg::{Registration, Registry};
 use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter};
@@ -55,7 +54,7 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
-use crate::err::ThisErr;
+use crate::err::HypErr;
 use crate::service::{Service, ServiceConf, ServiceKind, ServiceRunner, ServiceSelector, ServiceTemplate};
 
 static DEFAULT_BIND: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
@@ -1475,7 +1474,7 @@ where
         &self.skel.machine.artifacts
     }
 
-    pub fn registry(&self) -> &Registry<P> {
+    pub fn registry(&self) -> &Registry {
         &self.skel.machine.registry
     }
 

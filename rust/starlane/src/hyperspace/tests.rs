@@ -9,7 +9,7 @@ use once_cell::sync::Lazy;
 use serde::Serialize;
 
 use crate::driver::control::ControlClient;
-use crate::err::StarErr;
+use crate::err::OldStarErr;
 use crate::hyperlane::HyperClient;
 use crate::hyperspace::machine::MachineApiExtFactory;
 use crate::platform::Platform;
@@ -42,12 +42,12 @@ pub static FAE: Lazy<Point> = Lazy::new( || {Point::from_str("space:users:fae").
 
 #[async_trait]
 pub trait Test: Sync + Send + Copy {
-    async fn run(&self, client: ControlClient) -> Result<(), StarErr> {
+    async fn run(&self, client: ControlClient) -> Result<(), OldStarErr> {
         Ok(())
     }
 }
 
-pub fn harness<F>(mut f: F) -> Result<(), StarErr>
+pub fn harness<F>(mut f: F) -> Result<(), OldStarErr>
 where
     F: Test,
 {
@@ -84,7 +84,7 @@ async fn create(
     particle: Point,
     location: ParticleLocation,
     star_api: HyperStarApi<MemCosmos>,
-) -> Result<(), StarErr> {
+) -> Result<(), OldStarErr> {
     let details = Details::new(
         Stub {
             point: particle.clone(),
@@ -115,7 +115,7 @@ async fn create(
 }
 
 #[test]
-fn test_control() -> Result<(), StarErr> {
+fn test_control() -> Result<(), OldStarErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -181,7 +181,7 @@ fn test_control() -> Result<(), StarErr> {
 }
 
 #[test]
-fn test_star_wrangle() -> Result<(), StarErr> {
+fn test_star_wrangle() -> Result<(), OldStarErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -214,7 +214,7 @@ fn test_star_wrangle() -> Result<(), StarErr> {
 }
 
 #[test]
-fn test_golden_path() -> Result<(), StarErr> {
+fn test_golden_path() -> Result<(), OldStarErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -246,7 +246,7 @@ fn test_golden_path() -> Result<(), StarErr> {
 }
 
 #[test]
-fn test_provision_and_assign() -> Result<(), StarErr> {
+fn test_provision_and_assign() -> Result<(), OldStarErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -313,7 +313,7 @@ fn test_provision_and_assign() -> Result<(), StarErr> {
 }
 
 #[test]
-fn test_control_cli() -> Result<(), StarErr> {
+fn test_control_cli() -> Result<(), OldStarErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -353,7 +353,7 @@ fn test_control_cli() -> Result<(), StarErr> {
 }
 
 #[test]
-fn test_publish() -> Result<(), StarErr> {
+fn test_publish() -> Result<(), OldStarErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -416,7 +416,7 @@ fn test_publish() -> Result<(), StarErr> {
 }
 
 //#[test]
-fn test_mechtron() -> Result<(), StarErr> {
+fn test_mechtron() -> Result<(), OldStarErr> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
@@ -517,12 +517,12 @@ where
 }
 
 #[test]
-fn test_create_err() -> Result<(), StarErr> {
+fn test_create_err() -> Result<(), OldStarErr> {
     #[derive(Copy, Clone)]
     pub struct CreateErrTest;
     #[async_trait]
     impl Test for CreateErrTest {
-        async fn run(&self, client: ControlClient) -> Result<(), StarErr> {
+        async fn run(&self, client: ControlClient) -> Result<(), OldStarErr> {
             let cli = client.new_cli_session().await?;
             if let Err(err) = cli.exec("create repo<BadKind>").await?.ok_or() {
                 verify("create_err", &err).await;

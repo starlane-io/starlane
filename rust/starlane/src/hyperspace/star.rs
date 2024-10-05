@@ -9,14 +9,13 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
-
+use starlane::err;
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::driver::{DriverStatus, DriversApi, DriversBuilder, DriversCall};
 use crate::hyperlane::{
     Bridge, HyperwayEndpoint, HyperwayEndpointFactory,
     HyperwayInterchange, HyperwayStub,
 };
-use crate::hyperspace::err::HyperErr;
 use crate::hyperspace::global::{GlobalCommandExecutionHandler, GlobalExecutionChamber};
 use crate::hyperspace::layer::field::Field;
 use crate::hyperspace::layer::shell::{Shell, ShellState};
@@ -42,7 +41,7 @@ use starlane::space::particle::traversal::{
 };
 use starlane::space::particle::{Details, Status};
 use starlane::space::point::Point;
-use starlane::space::substance::Substance;
+use starlane::space::substance::{Substance, SubstanceKind};
 use starlane::space::util::ValueMatcher;
 use starlane::space::wave::core::cmd::CmdMethod;
 use starlane::space::wave::core::hyp::HypMethod;
@@ -58,6 +57,7 @@ use starlane::space::wave::{
     WaveKind,
 };
 use starlane::space::wave::Wave;
+use crate::err::{err, HypErr};
 use crate::service::ServiceTemplate;
 use crate::template::Templates;
 
@@ -132,7 +132,7 @@ where
     pub point: Point,
     pub kind: StarSub,
     pub logger: PointLogger,
-    pub registry: Registry<P>,
+    pub registry: Registry,
     pub golden_path: Arc<DashMap<StarKey, StarKey>>,
     pub traverse_to_next_tx: mpsc::Sender<Traversal<Wave>>,
     pub inject_tx: mpsc::Sender<TraversalInjection>,
@@ -269,10 +269,10 @@ where
     }
 
     /*
-    pub async fn create_star_particle(&self, point: Point, kind: Kind ) -> Result<(),P::Err> {
+    pub async fn create_star_particle(&self, point: Point, kind: Kind ) -> Result<(),HypErr> {
 
         if !self.point.is_parent_of(&point) {
-            return Err(P::Err::new(format!("create_star_particle must be a child of star. expected: {}+:**, encountered: {}", self.point.to_string(), point.to_string())));
+            return Err(HypErr::new(format!("create_star_particle must be a child of star. expected: {}+:**, encountered: {}", self.point.to_string(), point.to_string())));
         }
 
         let registration = Registration {
@@ -294,11 +294,11 @@ where
      */
 
     #[track_caller]
-    pub async fn create_in_star(&self, create: Create) -> Result<Details, P::Err> {
+    pub async fn create_in_star(&self, create: Create) -> Result<Details, HypErr> {
         if self.point != create.template.point.parent
             && !self.point.is_parent_of(&create.template.point.parent)
         {
-            return Err(P::Err::new(format!("cannot create_in_star in star {} for parent point {} since it is not a point within this star", self.point.to_string(), create.template.point.parent.to_string())));
+            Err(err!("cannot create_in_star in star {} for parent point {} since it is not a point within this star", self.point.to_string(), create.template.point.parent.to_string()))?;
         }
 
         let logger = self.logger.push_mark("create-in-star").unwrap();
@@ -345,9 +345,9 @@ where
         Ok(details)
     }
 
-    pub fn err<M: ToString>(&self, message: M) -> Result<(), P::Err> {
+    pub fn err<M: ToString>(&self, message: M) -> Result<(), HypErr> {
         self.logger.warn(message.to_string());
-        return Err(P::Err::new(message.to_string()));
+        return Err(err!("{}",message.to_string()))?;
     }
 
     pub fn location(&self) -> &Point {
@@ -663,7 +663,7 @@ where
         mut hyperway_endpoint: HyperwayEndpoint,
         interchange: Arc<HyperwayInterchange>,
         mut star_tx: HyperStarTx<P>,
-    ) -> Result<HyperStarApi<P>, P::Err> {
+    ) -> Result<HyperStarApi<P>, HypErr> {
         let drivers = drivers.build(
             skel.clone(),
             star_tx.drivers_call_tx.clone(),
@@ -886,7 +886,7 @@ where
                         self.drivers.init().await;
                     }
                     HyperStarCall::FromHyperway { wave, rtn } => {
-                        let result = self.from_hyperway(wave).await.map_err(|e| e.to_space_err());
+                        let result = self.from_hyperway(wave).await.map_err(|e| SpaceErr::to_space_err(e));
                         if let Some(tx) = rtn {
                             tx.send(result);
                         } else {
@@ -971,7 +971,7 @@ where
     /// all messages are then traversed to the Star Core where they are unwrapped and then sent to
     /// gravity to start a new traversal
     #[track_caller]
-    async fn from_hyperway(&self, wave: Wave) -> Result<(), P::Err> {
+    async fn from_hyperway(&self, wave: Wave) -> Result<(), HypErr> {
         self.skel
             .logger
             .track(&wave, || Tracker::new("from_hyperway", "Receive"));
@@ -1018,7 +1018,7 @@ where
     }
 
     // send this transport signal towards it's destination
-    async fn forward(&self, transport: WaveVariantDef<SignalCore>) -> Result<(), P::Err> {
+    async fn forward(&self, transport: WaveVariantDef<SignalCore>) -> Result<(), HypErr> {
         if self.skel.kind.is_forwarder() {
             self.to_hyperway(transport).await
         } else {
@@ -1032,7 +1032,7 @@ where
     // here it will be wrapped into a transport for star to star delivery or
     // sent to GLOBAL::registry if addressed in such a way
     #[track_caller]
-    async fn to_gravity(&self, mut wave: Wave) -> Result<(), P::Err> {
+    async fn to_gravity(&self, mut wave: Wave) -> Result<(), HypErr> {
         wave.add_to_history(self.skel.point.clone());
 
         #[cfg(test)]
@@ -1072,7 +1072,7 @@ where
                 skel: HyperStarSkel<P>,
                 locator: SmartLocator<P>,
                 gravity: Surface,
-            ) -> Result<(), P::Err>
+            ) -> Result<(), HypErr>
             where
                 P: Platform,
             {
@@ -1168,7 +1168,7 @@ where
     // wrap the transport into a hop to go to one and only one star
 
     #[track_caller]
-    async fn to_hyperway(&self, transport: WaveVariantDef<SignalCore>) -> Result<(), P::Err> {
+    async fn to_hyperway(&self, transport: WaveVariantDef<SignalCore>) -> Result<(), HypErr> {
         let logger = self.skel.logger.push_mark("hyperstar:to-hyperway")?;
         if self.skel.point == transport.to.point {
             // it's a bit of a strange case, but even if this star is sending a transport message
@@ -1347,12 +1347,11 @@ where
             match self.start_layer_traversal(injection).await {
                 Ok(_) => {}
                 Err(err) => {
-                    println!("STATUS: {}", err.status());
                     println!("ERR: {}", err.to_string());
                     // if it can be reflected then send back as an error
                     match reflection {
                         Ok(reflection) => {
-                            let err = err.to_space_err();
+                            let err = SpaceErr::to_space_err(err);
                             let reflect = reflection.make(err.into(), self.skel.point.to_surface());
                             let injection = TraversalInjection {
                                 surface,
@@ -1379,7 +1378,7 @@ where
         }
     }
 
-    async fn start_layer_traversal(&self, injection: TraversalInjection) -> Result<(), P::Err> {
+    async fn start_layer_traversal(&self, injection: TraversalInjection) -> Result<(), HypErr> {
         let wave = injection.wave;
         let from_gravity = injection.from_gravity;
         let inject_dir = injection.dir;
@@ -1407,7 +1406,7 @@ where
                     Recipients::Multi(ports) => {
                         for port in &ports {
                             let record = self.skel.registry.record(&port.point).await?;
-                            let loc = logger.result(record.location.star.ok_or(P::Err::new("multi port ripple has recipient that is not located, this should have been provisioned when the ripple was sent")))?;
+                            let loc = logger.result(record.location.star.ok_or(err!("multi port ripple has recipient that is not located, this should have been provisioned when the ripple was sent")))?;
                             if loc == self.skel.point {
                                 tos.push(port.clone());
                             }
@@ -1822,13 +1821,11 @@ impl StarCon {
     }
 }
 
-async fn shard_ripple_by_location<E>(
+async fn shard_ripple_by_location(
     ripple: &WaveVariantDef<Ripple>,
     adjacent: &HashMap<Point, StarStub>,
-    registry: &Registry<E>,
-) -> Result<HashMap<Point, WaveVariantDef<Ripple>>, E::Err>
-where
-    E: Platform,
+    registry: &Registry,
+) -> Result<HashMap<Point, WaveVariantDef<Ripple>>, HypErr>
 {
     let mut map = HashMap::new();
     for (star, recipients) in shard_by_location(ripple.to.clone(), adjacent, registry).await? {
@@ -1845,10 +1842,8 @@ where
 pub async fn ripple_to_singulars<E>(
     ripple: WaveVariantDef<Ripple>,
     adjacent: &HashSet<Point>,
-    registry: &Registry<E>,
-) -> Result<Vec<WaveVariantDef<SingularRipple>>, E::Err>
-where
-    E: Platform,
+    registry: &Registry,
+) -> Result<Vec<WaveVariantDef<SingularRipple>>, HypErr>
 {
     let mut rtn = vec![];
     for port in to_ports(ripple.to.clone(), adjacent, registry).await? {
@@ -1858,17 +1853,15 @@ where
     Ok(rtn)
 }
 
-pub async fn shard_by_location<E>(
+pub async fn shard_by_location(
     recipients: Recipients,
     adjacent: &HashMap<Point, StarStub>,
-    registry: &Registry<E>,
-) -> Result<HashMap<Point, Recipients>, E::Err>
-where
-    E: Platform,
+    registry: &Registry,
+) -> Result<HashMap<Point, Recipients>, HypErr>
 {
     match recipients {
         Recipients::Single(single) => {
-            Err(E::Err::new("unimplemented"))
+            unimplemented!()
             /*
             let mut map = HashMap::new();
             let record = registry.locate(&single.point).await?;
@@ -1878,7 +1871,7 @@ where
              */
         }
         Recipients::Multi(multi) => {
-            Err(E::Err::new("unimplemented"))
+            unimplemented!()
             /*
             let mut map: HashMap<Point, Vec<Port>> = HashMap::new();
             for p in multi {
@@ -1913,13 +1906,11 @@ where
     }
 }
 
-pub async fn to_ports<E>(
+pub async fn to_ports(
     recipients: Recipients,
     adjacent: &HashSet<Point>,
-    registry: &Registry<E>,
-) -> Result<Vec<Surface>, E::Err>
-where
-    E: Platform,
+    registry: &Registry,
+) -> Result<Vec<Surface>, HypErr>
 {
     match recipients {
         Recipients::Single(single) => Ok(vec![single]),
@@ -1951,7 +1942,7 @@ where
     pub transport_endpoint: broadcast::Sender<Wave>,
     pub reflected_endpoint: broadcast::Sender<Wave>,
     pub assignment: broadcast::Sender<Assign>,
-    pub err: broadcast::Sender<P::Err>,
+    pub err: broadcast::Sender<HypErr>,
 }
 
 impl<P> DiagnosticInterceptors<P>
@@ -1998,7 +1989,7 @@ where
         Self { skel }
     }
 
-    pub async fn locate(&self, point: &Point) -> Result<ParticleLocation, P::Err> {
+    pub async fn locate(&self, point: &Point) -> Result<ParticleLocation, HypErr> {
         let record = self.skel.registry.record(&point).await?;
         match &record.location.star {
             Some(_) => Ok(record.location),
@@ -2013,7 +2004,7 @@ where
         &self,
         point: &Point,
         state: StateSrc,
-    ) -> Result<ParticleLocation, P::Err> {
+    ) -> Result<ParticleLocation, HypErr> {
         self.skel
             .logger
             .result(self.provision_inner(point, state).await)
@@ -2024,11 +2015,11 @@ where
         &self,
         point: &Point,
         state: StateSrc,
-    ) -> Result<ParticleLocation, P::Err> {
+    ) -> Result<ParticleLocation, HypErr> {
         // check if parent is provisioned
         let parent = point
             .parent()
-            .ok_or(P::Err::new("expected Root to be provisioned"))?;
+            .ok_or(err("expected Root to be provisioned"))?;
         let mut parent_record = self.skel.registry.record(&parent).await?;
         if parent_record.location.star.is_none() {
             self.provision_inner(&parent, StateSrc::None).await?;
@@ -2043,11 +2034,12 @@ where
         wave.from(self.skel.point.clone().to_surface().with_layer(Layer::Core));
         wave.to(parent_star.to_surface().with_layer(Layer::Core));
         let pong: WaveVariantDef<PongCore> = self.skel.star_transmitter.direct(wave).await?;
+        (pong.core.clone().body).expect(SubstanceKind::Location);
         if pong.core.status.as_u16() == 200 {
             if let Substance::Location(location) = &pong.core.body {
                 Ok(location.clone())
             } else {
-                Err(P::Err::new("Provision result expected Substance Point"))
+                Err(err!("Provision result expected Substance Point"))
             }
         } else {
             self.skel
@@ -2056,16 +2048,16 @@ where
                 .await?;
 
             match self.skel.registry.record(&point).await {
-                Ok(record) => Err(P::Err::new(format!(
+                Ok(record) => Err(err!(
                     "failed to provision {}<{}> status code {}",
                     point.to_string(),
                     record.details.stub.kind.to_template().to_string(),
                     pong.core.status.as_u16()
-                ))),
-                Err(_) => Err(P::Err::new(format!(
+                )),
+                Err(_) => Err(err!(
                     "failed to provision {}",
                     point.to_string()
-                ))),
+                )),
             }
         }
     }

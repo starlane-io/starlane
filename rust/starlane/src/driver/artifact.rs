@@ -1,6 +1,5 @@
 use std::marker::PhantomData;
 use crate::driver::{Driver, DriverCtx, DriverHandler, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Item, ItemHandler, ItemSkel, ItemSphere};
-use crate::hyperspace::err::HyperErr;
 use crate::hyperspace::star::HyperStarSkel;
 use acid_store::repo::Commit;
 use acid_store::repo::OpenOptions;

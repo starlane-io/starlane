@@ -17,11 +17,23 @@ use crate::space::err::report::{Label, Report, ReportKind};
 use crate::space::parse::util::Span;
 use crate::space::parse::util::SpanExtra;
 
-use crate::space::substance::Substance;
+use crate::space::substance::{Substance, SubstanceKind};
 use crate::space::wave::core::http2::StatusCode;
-use crate::space::wave::core::ReflectedCore;
+use crate::space::wave::core::{Method, ReflectedCore};
 use serde::{Deserialize, Serialize};
+use strum::IntoEnumIterator;
 use thiserror::Error;
+use crate::space::command::direct::create::KindTemplate;
+use crate::space::kind::{BaseKind, FileSubKind, Kind};
+use crate::space::parse::Res;
+use crate::space::selector::KindSelector;
+
+#[macro_export]
+macro_rules! err {
+    ($($tt:tt)*) => {
+        SpaceErr::Msg(format!($($tt)*).to_string())
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Error)]
 pub enum SpaceErr {
@@ -29,6 +41,45 @@ pub enum SpaceErr {
     Status { status: u16, message: String },
     #[error(transparent)]
     ParseErrs(#[from] ParseErrs),
+    #[error("expected substance: '{expected}' instead found: '{found}'")]
+    ExpectedSubstance{ expected: SubstanceKind, found:  SubstanceKind },
+    #[error("because method was '{method}' expected substance: '{expected}' instead found:  '{found}'")]
+    ExpectedBody{ method: Method, expected: SubstanceKind, found:  SubstanceKind },
+    #[error("not implemented: {0}")]
+    NotImplemented(String),
+    #[error("platform does not have a kind that matches template '{0}'")]
+    KindNotAvailable(KindTemplate),
+    #[error("expected a sub kind for base kind '{kind}' ... known options: [{subs}]")]
+    ExpectedSub{ kind: BaseKind, subs: String},
+    #[error("{0}")]
+    Msg(String),
+    #[error("expecting a wildcard in point template.  found: '{0}'")]
+    ExpectingWildcardInPointTemplate(String)
+}
+
+impl SpaceErr {
+    pub fn to_space_err<E>( err: E ) -> Self where E: ToString{
+        err!("hello");
+        Self::Status{ status: 500u16,message: err.to_string()}
+    }
+
+
+    pub fn kind_not_available( template: &KindTemplate ) -> Self {
+        Self::KindNotAvailable(template.clone())
+    }
+
+    pub fn expect_sub<S>( kind: BaseKind) -> Self  where S: IntoEnumIterator+ToString {
+        let mut subs = vec![];
+        for sub in S::iter() {
+            subs.push(sub.to_string());
+        }
+        let subs = subs.join(", ").to_string();
+
+        Self::ExpectedSub {
+            kind,
+            subs
+        }
+    }
 }
 
 impl PrintErr for SpaceErr {
@@ -49,6 +100,19 @@ impl PrintErr for SpaceErr {
         }
     }
 }
+
+impl SpaceErr{
+    pub fn expected_substance(expected: SubstanceKind, found: SubstanceKind ) -> Self {
+        Self::ExpectedSubstance {expected, found }
+    }
+
+    pub fn unimplemented<S>(s:S) -> Self where S: ToString {
+        Self::NotImplemented(s.to_string())
+    }
+
+
+}
+
 
 impl Into<ReflectedCore> for SpaceErr {
     fn into(self) -> ReflectedCore {

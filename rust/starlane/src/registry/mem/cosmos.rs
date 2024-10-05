@@ -11,7 +11,7 @@ use crate::driver::control::ControlDriverFactory;
 use crate::driver::root::RootDriverFactory;
 use crate::driver::DriverFactory;
 use crate::driver::{DriverAvail, DriversBuilder};
-use crate::err::StarErr;
+use crate::err::OldStarErr;
 use crate::hyperspace::machine::MachineTemplate;
 use crate::registry::mem::registry::{MemRegApi, MemRegCtx};
 use crate::platform::Platform;
@@ -37,7 +37,7 @@ pub struct MemCosmos {
 
 #[async_trait]
 impl Platform for MemCosmos {
-    type Err = StarErr;
+    type Err = OldStarErr;
     type RegistryContext = MemRegCtx;
     type StarAuth = AnonHyperAuthenticator;
     type RemoteStarConnectionFactory = LocalHyperwayGateJumper;

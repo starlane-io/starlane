@@ -8,7 +8,6 @@ use crate::hyperlane::{
     Hyperway, HyperwayConfigurator, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub,
     InterchangeGate, TransportTransform,
 };
-use crate::hyperspace::err::HyperErr;
 use crate::platform::Platform;
 use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter};
 use dashmap::DashMap;

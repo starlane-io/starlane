@@ -1,8 +1,7 @@
-use crate::err::ThisErr;
+use crate::err::HypErr;
 use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::cli::{CliIn, CliOut, HostEnv};
 use crate::executor::{ExeConf, Executor};
-use crate::hyperspace::err::HyperErr;
 use clap::CommandFactory;
 use itertools::Itertools;
 use nom::AsBytes;
@@ -80,9 +79,9 @@ impl Host {
             Host::Cli(cli) => cli.env(key)
         }
     }
-    pub fn create<D>(&self) -> Result<D, ThisErr>
+    pub fn create<D>(&self) -> Result<D, HypErr>
     where
-        D: TryFrom<CliOsExecutor, Error = ThisErr>,
+        D: TryFrom<CliOsExecutor, Error =HypErr>,
     {
         match self {
             Host::Cli(host) => host.create(),
@@ -111,9 +110,9 @@ impl HostCli {
         }
     }
 
-    pub fn create<D>(&self) -> Result<D, ThisErr>
+    pub fn create<D>(&self) -> Result<D, HypErr>
     where
-        D: TryFrom<CliOsExecutor, Error = ThisErr>,
+        D: TryFrom<CliOsExecutor, Error =HypErr>,
     {
         match self {
             HostCli::Os(stub) => D::try_from(CliOsExecutor::new(stub.clone())),

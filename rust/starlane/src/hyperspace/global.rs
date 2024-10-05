@@ -1,4 +1,3 @@
-use crate::hyperspace::err::HyperErr;
 use crate::platform::Platform;
 use crate::hyperspace::reg::Registration;
 use crate::hyperspace::star::{HyperStarSkel, SmartLocator};
@@ -23,6 +22,10 @@ use starlane::space::wave::exchange::asynch::{DirectedHandler, InCtx};
 use starlane::space::wave::{Agent, DirectedProto};
 use std::str::FromStr;
 use std::sync::Arc;
+use thiserror::Error;
+use starlane::space::err::{CoreReflector, SpaceErr};
+use crate::err::HypErr;
+use crate::registry::postgres::err::RegErr;
 /*
 #[derive(DirectedHandler,Clone)]
 pub struct Global<P> where P: Platform {
@@ -75,7 +78,7 @@ where
     P: Platform,
 {
     #[route("Cmd<RawCommand>")]
-    pub async fn raw(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, P::Err> {
+    pub async fn raw(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, HypErr> {
         let line = ctx.input.line.clone();
         let span = new_span(line.as_str());
         let command = log(result(command_line(span)))?;
@@ -85,7 +88,7 @@ where
     }
 
     #[route("Cmd<Command>")]
-    pub async fn command(&self, ctx: InCtx<'_, Command>) -> Result<ReflectedCore, P::Err> {
+    pub async fn command(&self, ctx: InCtx<'_, Command>) -> Result<ReflectedCore, HypErr> {
         let global = GlobalExecutionChamber::new(self.skel.clone());
         let agent = ctx.wave().agent().clone();
         match ctx.input {
@@ -122,7 +125,7 @@ where
                 let pong = ctx.transmitter.ping(proto).await?;
                 Ok(pong.variant.core)
             }
-            _ => Err(P::Err::new("not implemented")),
+            c => Err(SpaceErr::unimplemented(format!("command not recognized")))?,
         }
     }
 }
@@ -145,18 +148,12 @@ where
     }
 
     #[track_caller]
-    pub async fn create(&self, create: &Create, agent: &Agent) -> Result<Details, P::Err> {
+    pub async fn create(&self, create: &Create, agent: &Agent) -> Result<Details, HypErr> {
         let child_kind = self
             .skel
             .machine
             .platform
-            .select_kind(&create.template.kind)
-            .map_err(|err| {
-                P::Err::new(format!(
-                    "Kind {} is not available on this Platform",
-                    create.template.kind.to_string()
-                ))
-            })?;
+            .select_kind(&create.template.kind)?;
         let point = match &create.template.point.child_segment_template {
             PointSegTemplate::Exact(child_segment) => {
                 let point = create.template.point.parent.push(child_segment.clone());
@@ -195,7 +192,7 @@ where
             }
             PointSegTemplate::Pattern(pattern) => {
                 if !pattern.contains("%") {
-                    return Err(P::Err::status_msg(500u16, "AddressSegmentTemplate::Pattern must have at least one '%' char for substitution"));
+                    Err(SpaceErr::ExpectingWildcardInPointTemplate(pattern.to_string()))?;
                 }
                 let index = self
                     .skel
@@ -233,3 +230,8 @@ where
         Ok(record.details)
     }
 }
+
+
+
+
+

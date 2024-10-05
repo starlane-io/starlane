@@ -23,13 +23,12 @@ use starlane::space::util::OptSelector;
 use starlane::space::wave::core::cmd::CmdMethod;
 use starlane::space::wave::exchange::asynch::Exchanger;
 use starlane::space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
-use crate::err::ThisErr;
+use crate::err::HypErr;
 use crate::hyperlane::{
     HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, Hyperway, HyperwayEndpoint,
     HyperwayEndpointFactory, HyperwayInterchange, LayerTransform, MountInterchangeGate,
     SimpleGreeter,
 };
-use crate::hyperspace::err::HyperErr;
 use crate::platform::Platform;
 use crate::hyperspace::reg::Registry;
 use crate::hyperspace::star::{
@@ -142,7 +141,7 @@ where
 {
     pub name: MachineName,
     pub platform: P,
-    pub registry: Registry<P>,
+    pub registry: Registry,
     pub artifacts: ArtifactApi,
     pub logger: RootLogger,
     pub timeouts: Timeouts,
@@ -553,7 +552,7 @@ where
         rtn: oneshot::Sender<Result<HyperStarApi<P>, SpaceErr>>,
     },
     #[cfg(test)]
-    GetRegistry(oneshot::Sender<Registry<P>>),
+    GetRegistry(oneshot::Sender<Registry>),
 }
 
 #[derive(Clone, Eq, PartialEq, strum_macros::Display)]
@@ -729,34 +728,27 @@ where
     }
 }
 
-pub struct ClientArtifactFetcher<P>
-where
-    P: Platform,
+pub struct ClientArtifactFetcher
 {
-    pub registry: Registry<P>,
+    pub registry: Registry,
     pub client: HyperClient,
 }
 
-impl<P> ClientArtifactFetcher<P>
-where
-    P: Platform,
+impl ClientArtifactFetcher
 {
-    pub fn new(client: HyperClient, registry: Registry<P>) -> Self {
+    pub fn new(client: HyperClient, registry: Registry) -> Self {
         Self { client, registry }
     }
 }
 
 #[async_trait]
-impl<P> ArtifactFetcher for ClientArtifactFetcher<P>
-where
-    P: Platform,
+impl ArtifactFetcher for ClientArtifactFetcher
 {
     async fn stub(&self, point: &Point) -> Result<Stub, SpaceErr> {
         let record = self
             .registry
             .record(point)
-            .await
-            .map_err(|e| e.to_space_err())?;
+            .await?;
         Ok(record.details.stub)
     }
 

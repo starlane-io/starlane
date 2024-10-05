@@ -22,7 +22,6 @@ use starlane::space::wave::{
     BounceBacks, DirectedKind, DirectedProto, DirectedWave, EchoCore, PongCore, Reflection, Wave, WaveVariantDef,
 };
 
-use crate::hyperspace::err::HyperErr;
 use crate::platform::Platform;
 use crate::hyperspace::star::{HyperStarSkel, TraverseToNextRouter};
 
@@ -63,13 +62,13 @@ where
             .registry
             .record(&self.port.point)
             .await
-            .map_err(|e| e.to_space_err())?;
+            .map_err(|e| SpaceErr::to_space_err(e))?;
         let properties = self
             .skel
             .registry
             .get_properties(&directed.to.point)
             .await
-            .map_err(|e| e.to_space_err())?;
+            .map_err(|e| SpaceErr::to_space_err(e))?;
 
         let bind_property = properties.get("bind");
         let bind = match bind_property {
@@ -78,7 +77,7 @@ where
                 driver
                     .bind(&directed.to.point)
                     .await
-                    .map_err(|e| e.to_space_err())?
+                    .map_err(|e| SpaceErr::to_space_err(e))?
             }
             Some(bind) => {
                 let bind = Point::from_str(bind.value.as_str())?;

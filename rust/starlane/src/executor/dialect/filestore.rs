@@ -1,4 +1,4 @@
-use crate::err::ThisErr;
+use crate::err::HypErr;
 use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::cli::{CliExecutor, CliIn, CliOut};
 use crate::executor::Executor;
@@ -36,7 +36,7 @@ impl FileStoreApi {
         Self { path, filestore }
     }
 
-    pub fn sub_root(&self, sub_root: PathBuf) -> Result<FileStoreApi, ThisErr> {
+    pub fn sub_root(&self, sub_root: PathBuf) -> Result<FileStoreApi, HypErr> {
         let root = RootDir::new(self.path.clone());
         let path = root.norm(&sub_root)?;
 
@@ -46,7 +46,7 @@ impl FileStoreApi {
         })
     }
 
-    pub async fn init(&self) -> Result<(), ThisErr> {
+    pub async fn init(&self) -> Result<(), HypErr> {
         self.filestore.execute(FileStoreIn::Init).await?;
         Ok(())
     }
@@ -63,11 +63,11 @@ pub enum FileStore {
 }
 
 impl FileStore {
-    pub async fn sub_root(&self, sub_root: PathBuf) -> Result<FileStore, ThisErr> {
+    pub async fn sub_root(&self, sub_root: PathBuf) -> Result<FileStore, HypErr> {
         match self {
             FileStore::Cli(cli) => {
                 let conf = cli.conf();
-                let value = conf.env(FILE_STORE_ROOT).ok_or(ThisErr::String(format!("expected environment variable '{}' to be set", FILE_STORE_ROOT).to_string()))?;
+                let value = conf.env(FILE_STORE_ROOT).ok_or(HypErr::String(format!("expected environment variable '{}' to be set", FILE_STORE_ROOT).to_string()))?;
                 let path = PathBuf::from(value);
                 let root = RootDir::new(path);
                 let root = root.norm(&sub_root)?;
@@ -78,7 +78,7 @@ impl FileStore {
         }
     }
 
-    pub async fn execute(&self, mut input: FileStoreIn) -> Result<FileStoreOut, ThisErr> {
+    pub async fn execute(&self, mut input: FileStoreIn) -> Result<FileStoreOut, HypErr> {
         match self {
             FileStore::Cli(executor) => {
                 let kind: FileStoreInKind = (&input).into();
@@ -113,7 +113,7 @@ impl FileStore {
                             .into_iter()
                             .map_ok(|line| line.into())
                             .find_or_first(|_| true)
-                            .ok_or(ThisErr::String("pwd didn't return anything".to_string()))??;
+                            .ok_or(HypErr::String("pwd didn't return anything".to_string()))??;
                         FileStoreOut::Pwd(line)
                     }
                 };
@@ -264,7 +264,7 @@ impl ToString for FileStoreCli {
 }
 
 impl TryFrom<CliOsExecutor> for FileStore {
-    type Error = ThisErr;
+    type Error = HypErr;
 
     fn try_from(cli: CliOsExecutor) -> Result<Self, Self::Error> {
         Ok(FileStore::Cli(Box::new(cli)))
@@ -283,7 +283,7 @@ impl RootDir {
 }
 
 impl RootDir {
-    pub fn norm(&self, sub_path: &PathBuf) -> Result<PathBuf, ThisErr> {
+    pub fn norm(&self, sub_path: &PathBuf) -> Result<PathBuf, HypErr> {
         let sub_path = sub_path.clean();
 
         let path: PathBuf = match sub_path.starts_with("/") {
@@ -297,7 +297,7 @@ impl RootDir {
         };
 
         if !parent.starts_with(&self.root) {
-            return Err(ThisErr::String(format!(
+            return Err(HypErr::String(format!(
                 "illegal path '{}' escapes filesystem boundaries",
                 sub_path.display()
             )));

@@ -904,6 +904,14 @@ pub fn result<I: Span, R>(result: Result<(I, R), nom::Err<SpaceTree<I>>>) -> Res
     }
 }
 
+
+pub fn space_err<R,E>(result: Result<R,E>) -> Result<R,SpaceErr> where E: Into<SpaceErr> {
+    match result {
+        Ok(ok) => Ok(ok),
+        Err(err) => Err(err.into())
+    }
+}
+
 pub fn unstack( ctx: &StackContext<ErrCtx>) -> String {
     match ctx {
         StackContext::Kind(k) => {
