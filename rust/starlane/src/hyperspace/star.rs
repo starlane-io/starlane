@@ -17,7 +17,7 @@ use crate::hyperlane::{
     Bridge, HyperwayEndpoint, HyperwayEndpointFactory,
     HyperwayInterchange, HyperwayStub,
 };
-use crate::hyperspace::global::{GlobalCommandExecutionHandler, GlobalErr, GlobalExecutionChamber};
+use crate::hyperspace::global::{GlobalCommandExecutionHandler,  GlobalExecutionChamber};
 use crate::hyperspace::layer::field::Field;
 use crate::hyperspace::layer::shell::{Shell, ShellState};
 use crate::hyperspace::machine::MachineSkel;
@@ -25,7 +25,7 @@ use crate::platform::Platform;
 use crate::hyperspace::reg::{Registration, Registry};
 use starlane::space::command::common::StateSrc;
 use starlane::space::command::direct::create::{Create, Strategy};
-use starlane::space::err::SpaceErr;
+use starlane::space::err::{CoreReflector, SpaceErr};
 use starlane::space::hyper::{
     Assign, AssignmentKind, HyperSubstance,
     Provision, Search,
@@ -51,14 +51,9 @@ use starlane::space::wave::exchange::asynch::{
     ProtoTransmitter, ProtoTransmitterBuilder, Router, TraversalRouter, TxRouter,
 };
 use starlane::space::wave::exchange::SetStrategy;
-use starlane::space::wave::{
-    Agent, DirectedProto, Handling,
-    HandlingKind, PongCore, Priority, Recipients, Reflectable
-    , Retries, Ripple, Scope, SignalCore, SingularRipple, WaitTime, WaveVariantDef,
-    WaveKind,
-};
+use starlane::space::wave::{Agent, DirectedProto, Handling, HandlingKind, PongCore, Priority, Recipients, Reflectable, Retries, Ripple, Scope, SignalCore, SingularRipple, WaitTime, WaveVariantDef, WaveKind, ToReflected, ReflectedWave, WaveId};
+use starlane::space::wave::core::ReflectedCore;
 use starlane::space::wave::Wave;
-use crate::err::{err, HypErr};
 use crate::registry::postgres::err::RegErr;
 use crate::service::ServiceTemplate;
 use crate::template::Templates;
@@ -271,10 +266,10 @@ where
     }
 
     /*
-    pub async fn create_star_particle(&self, point: Point, kind: Kind ) -> Result<(),HypErr> {
+    pub async fn create_star_particle(&self, point: Point, kind: Kind ) -> Result<(),StarErr> {
 
         if !self.point.is_parent_of(&point) {
-            return Err(HypErr::new(format!("create_star_particle must be a child of star. expected: {}+:**, encountered: {}", self.point.to_string(), point.to_string())));
+            return Err(StarErr::new(format!("create_star_particle must be a child of star. expected: {}+:**, encountered: {}", self.point.to_string(), point.to_string())));
         }
 
         let registration = Registration {
@@ -294,6 +289,10 @@ where
     }
 
      */
+
+    pub fn err( &self, err: &StarErr ) {
+        self.logger.error(err);
+    }
 
     #[track_caller]
     pub async fn create_in_star(&self, create: Create) -> Result<Details, StarErr> {
@@ -891,7 +890,7 @@ where
                             match result {
                                 Ok(_) => {}
                                 Err(e) => {
-                                    self.skel.err(e.to_string());
+                                    self.skel.err(e.into());
                                 }
                             }
                         }
@@ -922,13 +921,13 @@ where
                     HyperStarCall::ToGravity(wave) => match self.to_gravity(wave).await {
                         Ok(_) => {}
                         Err(err) => {
-                            self.skel.err(err.to_string());
+                            self.skel.err(&err);
                         }
                     },
                     HyperStarCall::ToHyperway(wave) => match self.to_hyperway(wave).await {
                         Ok(_) => {}
                         Err(err) => {
-                            self.skel.err(err.to_string());
+                            self.skel.err(&err);
                         }
                     },
                     #[cfg(test)]
@@ -956,6 +955,11 @@ where
         });
     }
 
+
+    pub fn err( &self, err: &StarErr ) {
+        self.skel.logger.error(err)
+    }
+
     async fn create_states(&self, point: Point) {
         self.skel.state.create_shell(point.clone());
     }
@@ -969,7 +973,7 @@ where
     /// all messages are then traversed to the Star Core where they are unwrapped and then sent to
     /// gravity to start a new traversal
     #[track_caller]
-    async fn from_hyperway(&self, wave: Wave) -> Result<(), HypErr> {
+    async fn from_hyperway(&self, wave: Wave) -> Result<(), StarErr> {
         self.skel
             .logger
             .track(&wave, || Tracker::new("from_hyperway", "Receive"));
@@ -987,7 +991,7 @@ where
                 || Tracker::new("from_hyperway", "HopsExceeded"),
                 || "transport hops exceeded",
             );
-            return self.skel.err("transport signal exceeded max hops");
+            Err(StarErr::TransportSignalExceededMaxHops)?
         }
 
         if transport.to.point == self.skel.point {
@@ -1016,21 +1020,18 @@ where
     }
 
     // send this transport signal towards it's destination
-    async fn forward(&self, transport: WaveVariantDef<SignalCore>) -> Result<(), HypErr> {
+    async fn forward(&self, transport: WaveVariantDef<SignalCore>) -> Result<(), StarErr> {
         if self.skel.kind.is_forwarder() {
             self.to_hyperway(transport).await
         } else {
-            self.skel.err(format!(
-                "attempt to forward a transport on a non forwarding Star Kind: {}",
-                self.skel.kind.to_string()
-            ))
+            Err(StarErr::AttemptToForwardATransportOnANonForwardingStar)?
         }
     }
     // sending a wave that is from and to a particle into the fabric...
     // here it will be wrapped into a transport for star to star delivery or
     // sent to GLOBAL::registry if addressed in such a way
     #[track_caller]
-    async fn to_gravity(&self, mut wave: Wave) -> Result<(), HypErr> {
+    async fn to_gravity(&self, mut wave: Wave) -> Result<(), StarErr> {
         wave.add_to_history(self.skel.point.clone());
 
         #[cfg(test)]
@@ -1068,9 +1069,9 @@ where
             async fn shard<P>(
                 mut wave: Wave,
                 skel: HyperStarSkel<P>,
-                locator: SmartLocator<P,StarErr>,
+                locator: SmartLocator<P>,
                 gravity: Surface,
-            ) -> Result<(), HypErr>
+            ) -> Result<(), StarErr>
             where
                 P: Platform,
             {
@@ -1166,7 +1167,7 @@ where
     // wrap the transport into a hop to go to one and only one star
 
     #[track_caller]
-    async fn to_hyperway(&self, transport: WaveVariantDef<SignalCore>) -> Result<(), HypErr> {
+    async fn to_hyperway(&self, transport: WaveVariantDef<SignalCore>) -> Result<(), StarErr> {
         let logger = self.skel.logger.push_mark("hyperstar:to-hyperway")?;
         if self.skel.point == transport.to.point {
             // it's a bit of a strange case, but even if this star is sending a transport message
@@ -1202,7 +1203,7 @@ where
             )?;
             Ok(())
         } else if self.forwarders.is_empty() {
-            self.skel.err("this star needs to send a transport to a non-adjacent star yet does not have any adjacent forwarders")
+            Err(StarErr::MissingAdjacentForwarder)?
         } else {
             unimplemented!("need to now send out a ripple search for the star being transported to")
         }
@@ -1376,7 +1377,7 @@ where
         }
     }
 
-    async fn start_layer_traversal(&self, injection: TraversalInjection) -> Result<(), HypErr> {
+    async fn start_layer_traversal(&self, injection: TraversalInjection) -> Result<(), StarErr> {
         let wave = injection.wave;
         let from_gravity = injection.from_gravity;
         let inject_dir = injection.dir;
@@ -1404,7 +1405,7 @@ where
                     Recipients::Multi(ports) => {
                         for port in &ports {
                             let record = self.skel.registry.record(&port.point).await?;
-                            let loc = logger.result(record.location.star.ok_or(err!("multi port ripple has recipient that is not located, this should have been provisioned when the ripple was sent")))?;
+                            let loc = logger.result(record.location.star.ok_or(StarErr::UnprovisionedMultiPortRipple))?;
                             if loc == self.skel.point {
                                 tos.push(port.clone());
                             }
@@ -1435,7 +1436,7 @@ where
                         to.to_string(),
                         wave.from().to_string()
                     ));
-                    return Err(err.into());
+                    return Err(err)?;
                 }
             };
             let plan = record.details.stub.kind.wave_traversal_plan().clone();
@@ -1475,7 +1476,7 @@ where
 
                 // make sure we have this layer in the plan
                 if to.layer != Layer::Gravity && !plan.has_layer(&to.layer) {
-                    return self.skel.err(format!("attempt to send wave {} to layer {} that the recipient Kind {} does not have in its traversal plan", wave.id().to_string(), to.layer.to_string(),record.details.stub.kind.to_string() ) );
+                    Err(StarErr::TraversalPlanNotFound{ wave: wave.id(), layer: to.layer.clone(), kind: record.details.stub.kind.clone() })?;
                 }
 
                 // dir is from inject_layer to dest
@@ -1823,7 +1824,7 @@ async fn shard_ripple_by_location(
     ripple: &WaveVariantDef<Ripple>,
     adjacent: &HashMap<Point, StarStub>,
     registry: &Registry,
-) -> Result<HashMap<Point, WaveVariantDef<Ripple>>, HypErr>
+) -> Result<HashMap<Point, WaveVariantDef<Ripple>>, StarErr>
 {
     let mut map = HashMap::new();
     for (star, recipients) in shard_by_location(ripple.to.clone(), adjacent, registry).await? {
@@ -1841,7 +1842,7 @@ pub async fn ripple_to_singulars<E>(
     ripple: WaveVariantDef<Ripple>,
     adjacent: &HashSet<Point>,
     registry: &Registry,
-) -> Result<Vec<WaveVariantDef<SingularRipple>>, HypErr>
+) -> Result<Vec<WaveVariantDef<SingularRipple>>, StarErr>
 {
     let mut rtn = vec![];
     for port in to_ports(ripple.to.clone(), adjacent, registry).await? {
@@ -1855,7 +1856,7 @@ pub async fn shard_by_location(
     recipients: Recipients,
     adjacent: &HashMap<Point, StarStub>,
     registry: &Registry,
-) -> Result<HashMap<Point, Recipients>, HypErr>
+) -> Result<HashMap<Point, Recipients>, StarErr>
 {
     match recipients {
         Recipients::Single(single) => {
@@ -1908,7 +1909,7 @@ pub async fn to_ports(
     recipients: Recipients,
     adjacent: &HashSet<Point>,
     registry: &Registry,
-) -> Result<Vec<Surface>, HypErr>
+) -> Result<Vec<Surface>, StarErr>
 {
     match recipients {
         Recipients::Single(single) => Ok(vec![single]),
@@ -1967,12 +1968,6 @@ impl DiagnosticInterceptors
     }
 }
 
-
-pub(crate) trait SmartLocatorErr {
-    fn reg_err( err: RegErr ) -> Self;
-
-    fn star_err( err: StarErr) -> Self;
-}
 
 
 #[derive(Clone)]
@@ -2070,19 +2065,36 @@ pub enum StarErr {
     CannotFindParent{ #[source] source: RegErr, parent: Point },
     #[error("caused by '{0}'")]
     RegErr(#[source] #[from] RegErr),
-    #[error("SmartLocator expected a Surface ")]
-    ExpectedSurface,
+    #[error("caused by '{0}'")]
+    SpaceErr(#[source] #[from] SpaceErr),
+    #[error("transport signal exceeded maximum hops")]
+    TransportSignalExceededMaxHops,
+    #[error("attempt to forward a transport on a non forwarding star")]
+    AttemptToForwardATransportOnANonForwardingStar,
+    #[error("star needs to send a transport to a non-adjacent star yet does not have any adjacent forwarders")]
+    MissingAdjacentForwarder,
+    #[error("attempt to send wave {wave} to layer {layer} that the recipient Kind {kind} does not have in its traversal plan")]
+    TraversalPlanNotFound { wave: WaveId, layer: Layer, kind: Kind },
+    #[error("multi port ripple has recipient that is not located, this should have been provisioned when the ripple was sent")]
+    UnprovisionedMultiPortRipple
 }
 
-impl SmartLocatorErr for StarErr {
-    fn reg_err(err: RegErr) -> Self {
-        Self::RegErr(err)
-    }
-
-    fn star_err(err: StarErr) -> Self {
-        err
+impl CoreReflector for StarErr {
+    fn as_reflected_core(self) -> ReflectedCore {
+        if let StarErr::SpaceErr(err) = self {
+            err.as_reflected_core()
+        }
+        else {
+            ReflectedCore {
+                headers: Default::default(),
+                status: Default::default(),
+                body: Substance::Err(SpaceErr::str("from StarErr")),
+            }
+        }
     }
 }
+
+
 
 impl StarErr {
     pub fn point_not_in_star( point: &Point, parent: &Point ) -> Self {
@@ -2091,6 +2103,8 @@ impl StarErr {
         Self::PointNotInStar {point, parent}
     }
 }
+
+
 
 
 #[derive(Debug,Clone,strum_macros::EnumString,strum_macros::Display)]

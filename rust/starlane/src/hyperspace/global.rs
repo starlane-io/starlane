@@ -79,7 +79,7 @@ where
     P: Platform,
 {
     #[route("Cmd<RawCommand>")]
-    pub async fn raw(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, GlobalErr> {
+    pub async fn raw(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, StarErr> {
         let line = ctx.input.line.clone();
         let span = new_span(line.as_str());
         let command = log(result(command_line(span)))?;
@@ -89,7 +89,7 @@ where
     }
 
     #[route("Cmd<Command>")]
-    pub async fn command(&self, ctx: InCtx<'_, Command>) -> Result<ReflectedCore, GlobalErr> {
+    pub async fn command(&self, ctx: InCtx<'_, Command>) -> Result<ReflectedCore, StarErr> {
         let global = GlobalExecutionChamber::new(self.skel.clone());
         let agent = ctx.wave().agent().clone();
         match ctx.input {
@@ -149,7 +149,7 @@ where
     }
 
     #[track_caller]
-    pub async fn create(&self, create: &Create, agent: &Agent) -> Result<Details, GlobalErr> {
+    pub async fn create(&self, create: &Create, agent: &Agent) -> Result<Details, StarErr> {
         let child_kind = self
             .skel
             .machine
@@ -227,24 +227,4 @@ where
 
 
 
-
-#[derive(Debug,Error,Clone)]
-pub enum GlobalErr{
-   #[error("global error caused by {0}")]
-   SpaceErr(#[from] #[source] SpaceErr),
-    #[error("global error caused by {0}")]
-   RegErr(#[from] #[source] RegErr),
-   #[error("global error caused by {0}")]
-   StarErr(#[from] #[source] StarErr),
-}
-
-impl CoreReflector for GlobalErr {
-    fn as_reflected_core(self) -> ReflectedCore {
-        ReflectedCore {
-            headers: Default::default(),
-            status: StatusCode::default(),
-            body: Default::default(),
-        }
-    }
-}
 
