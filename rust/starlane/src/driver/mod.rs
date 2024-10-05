@@ -53,6 +53,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
+use thiserror::Error;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
 use crate::err::{HypErr, HyperErr2};
 use crate::registry::postgres::err::RegErr;
@@ -2039,4 +2040,15 @@ where
     async fn bind(&self) -> Result<ArtRef<BindConfig>, HyperErr2> {
         self.skel.api.driver_bind().await
     }
+}
+
+
+
+
+#[derive(Error,Debug,Clone)]
+pub enum DriverErr {
+    #[error(transparent)]
+    SpaceErr(#[from] #[source] SpaceErr),
+    #[error(transparent)]
+    RegErr(#[from] #[source] RegErr)
 }
