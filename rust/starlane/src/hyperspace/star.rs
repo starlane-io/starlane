@@ -9,7 +9,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
-use starlane::err;
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
 use crate::driver::{DriverStatus, DriversApi, DriversBuilder, DriversCall};
 use crate::hyperlane::{
@@ -152,7 +151,7 @@ where
     pub star_transmitter: ProtoTransmitter,
 
     #[cfg(test)]
-    pub diagnostic_interceptors: DiagnosticInterceptors<P>,
+    pub diagnostic_interceptors: DiagnosticInterceptors,
 }
 
 impl<P> HyperStarSkel<P>
@@ -1930,9 +1929,7 @@ pub async fn to_ports(
 }
 
 #[derive(Clone)]
-pub struct DiagnosticInterceptors<P>
-where
-    P: Platform,
+pub struct DiagnosticInterceptors
 {
     pub from_hyperway: broadcast::Sender<Wave>,
     pub to_gravity: broadcast::Sender<Wave>,
@@ -1942,12 +1939,10 @@ where
     pub transport_endpoint: broadcast::Sender<Wave>,
     pub reflected_endpoint: broadcast::Sender<Wave>,
     pub assignment: broadcast::Sender<Assign>,
-    pub err: broadcast::Sender<HypErr>,
+    pub err: broadcast::Sender<String>,
 }
 
-impl<P> DiagnosticInterceptors<P>
-where
-    P: Platform,
+impl DiagnosticInterceptors
 {
     pub fn new() -> Self {
         let (from_hyperway, _) = broadcast::channel(1024);
@@ -2019,7 +2014,7 @@ where
         // check if parent is provisioned
         let parent = point
             .parent()
-            .ok_or(err("expected Root to be provisioned"))?;
+            .ok_or(err!("expected Root to be provisioned"))?;
         let mut parent_record = self.skel.registry.record(&parent).await?;
         if parent_record.location.star.is_none() {
             self.provision_inner(&parent, StateSrc::None).await?;

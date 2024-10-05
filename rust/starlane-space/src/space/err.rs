@@ -28,12 +28,16 @@ use crate::space::kind::{BaseKind, FileSubKind, Kind};
 use crate::space::parse::Res;
 use crate::space::selector::KindSelector;
 
+
+/*
 #[macro_export]
 macro_rules! err {
     ($($tt:tt)*) => {
         SpaceErr::Msg(format!($($tt)*).to_string())
     }
 }
+
+ */
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Error)]
 pub enum SpaceErr {
@@ -59,7 +63,6 @@ pub enum SpaceErr {
 
 impl SpaceErr {
     pub fn to_space_err<E>( err: E ) -> Self where E: ToString{
-        err!("hello");
         Self::Status{ status: 500u16,message: err.to_string()}
     }
 

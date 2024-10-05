@@ -1,45 +1,57 @@
 use std::convert::Infallible;
+use std::io::Error;
+use std::sync::Arc;
 use strum_macros::Display;
 use thiserror::Error;
 use tokio::io;
 use tokio::sync::oneshot::error::RecvError;
 
-
-
-
-
+#[cfg(feature = "postgres")]
+use crate::registry::postgres::err::RegErr;
 use starlane::space::err::{CoreReflector, SpaceErr};
+use starlane::space::kind::Kind;
+use starlane::space::point::Point;
 use starlane::space::substance::{Substance, SubstanceKind};
 use starlane::space::wave::core::http2::StatusCode;
 use starlane::space::wave::core::ReflectedCore;
-#[cfg(feature = "postgres")]
-use crate::registry::postgres::err::RegErr;
 
-pub fn err<S>( s: S ) -> HypErr where S: ToString {
-    HypErr::String(s.to_string())
-}
+
+pub type HyperErr2 = anyhow::Error;
+pub use anyhow::anyhow as err;
 
 
 
 
-#[derive(Error,Debug)]
+#[derive(Error, Debug,Clone)]
 pub enum HypErr {
     #[error(transparent)]
     SpaceErr(#[from] SpaceErr),
     #[error(transparent)]
     RegErr(#[from] RegErr),
-     #[error("{0}")]
+    #[error("{0}")]
     String(String),
     #[error("{0}")]
-    TokioIo(#[from] io::Error),
-    #[error("{0}")]
     Iniff(#[from] Infallible),
-     #[error("{0}")]
-     RecvErr(#[from] RecvError),
     #[error("{0}")]
     StripPrefix(#[from] std::path::StripPrefixError),
     #[error(transparent)]
-    Anyhow(#[from] anyhow::Error)
+    Anyhow(#[from] Arc<anyhow::Error>),
+    #[error("{0}")]
+    OneshotRecvErr(#[from] oneshot::RecvError),
+    #[error("{0}")]
+    Io(#[from] Arc<tokio::io::Error>),
+}
+
+impl From<anyhow::Error> for HypErr {
+    fn from(value: anyhow::Error) -> Self {
+        HypErr::Anyhow(Arc::new(value))
+    }
+}
+
+impl From<tokio::io::Error> for HypErr {
+    fn from(value: Error) -> Self {
+        HypErr::Io(Arc::new(value))
+    }
 }
 
 impl CoreReflector for HypErr {
@@ -47,7 +59,7 @@ impl CoreReflector for HypErr {
         match self {
             HypErr::SpaceErr(err) => err.as_reflected_core(),
             m => {
-                let err = SpaceErr::Msg(self.to_string());
+                let err = SpaceErr::Msg(m.to_string());
                 ReflectedCore {
                     headers: Default::default(),
                     status: StatusCode::from_u16(500u16).unwrap(),
@@ -55,14 +67,10 @@ impl CoreReflector for HypErr {
                 }
             }
         }
-
     }
 }
 
-pub enum PlatformErr {
-
-}
-
+pub enum PlatformErr {}
 
 impl From<&str> for HypErr {
     fn from(value: &str) -> Self {
@@ -70,23 +78,19 @@ impl From<&str> for HypErr {
     }
 }
 
-
-#[derive(Error,Debug,Clone)]
+#[derive(Error, Debug, Clone)]
 pub enum StarErr {
-  #[error("{0}")]
-  SpaceErr(#[from] SpaceErr),
-  #[error("Error when attempting to Provision {0}")]
-  ProvisioningError(SpaceErr),
+    #[error("{0}")]
+    SpaceErr(#[from] SpaceErr),
+    #[error("Error when attempting to Provision {0}")]
+    ProvisioningError(SpaceErr),
 }
 
 impl StarErr {
-    pub fn provisioning( err: SpaceErr) -> Self {
+    pub fn provisioning(err: SpaceErr) -> Self {
         Self::ProvisioningError(err)
     }
 }
-
-
-
 
 /*
 #[derive(Debug, Clone,Error)]
@@ -105,8 +109,6 @@ impl From<ThisErr> for OldStarErr {
 }
 
  */
-
-
 
 /*
 pub mod convert {
@@ -258,3 +260,5 @@ pub mod convert {
 }
 
  */
+
+

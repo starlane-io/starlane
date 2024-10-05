@@ -54,7 +54,7 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
-use crate::err::HypErr;
+use crate::err::{HypErr, HyperErr2};
 use crate::service::{Service, ServiceConf, ServiceKind, ServiceRunner, ServiceSelector, ServiceTemplate};
 
 static DEFAULT_BIND: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
@@ -648,7 +648,7 @@ where
                 skel: &HyperStarSkel<P>,
                 point: &Point,
                 logger: &PointLogger,
-            ) -> Result<(), P::Err>
+            ) -> Result<(), HyperErr2>
             where
                 P: Platform,
             {
@@ -865,7 +865,7 @@ where
     P: Platform,
 {
     /*
-    pub async fn assign(&self, assign: Assign) -> Result<(), P::Err> {
+    pub async fn assign(&self, assign: Assign) -> Result<(), HyperErr2> {
         let driver = self.find(&assign.details.stub.kind).ok_or::<UniErr>(
             format!(
                 "Kind {} not supported by Drivers for Star: {}",
@@ -880,7 +880,7 @@ where
      */
 
     /*
-    pub async fn route(&self, wave: UltraWave) -> Result<(),P::Err>{
+    pub async fn route(&self, wave: UltraWave) -> Result<(),HyperErr2>{
         let record = self
             .skel
             .registry
@@ -995,7 +995,7 @@ where
         self.call_tx.try_send(DriverRunnerCall::OnAdded);
     }
 
-    pub async fn bind(&self, point: &Point) -> Result<ArtRef<BindConfig>, P::Err> {
+    pub async fn bind(&self, point: &Point) -> Result<ArtRef<BindConfig>, HyperErr2> {
         let (rtn, rtn_rx) = oneshot::channel();
         self.call_tx
             .send(DriverRunnerCall::Bind {
@@ -1006,7 +1006,7 @@ where
         rtn_rx.await?
     }
 
-    pub async fn driver_bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+    pub async fn driver_bind(&self) -> Result<ArtRef<BindConfig>, HyperErr2> {
         let (rtn, rtn_rx) = oneshot::channel();
         self.call_tx.send(DriverRunnerCall::DriverBind(rtn)).await;
         Ok(rtn_rx.await?)
@@ -1048,7 +1048,7 @@ where
     Handle(Traversal<Wave>),
     Item {
         point: Point,
-        tx: oneshot::Sender<Result<ItemSphere<P>, P::Err>>,
+        tx: oneshot::Sender<Result<ItemSphere<P>, HyperErr2>>,
     },
 
     OnAdded,
@@ -1060,7 +1060,7 @@ where
     DriverBind(oneshot::Sender<ArtRef<BindConfig>>),
     Bind {
         point: Point,
-        rtn: oneshot::Sender<Result<ArtRef<BindConfig>, P::Err>>,
+        rtn: oneshot::Sender<Result<ArtRef<BindConfig>, HyperErr2>>,
     },
 }
 
@@ -1071,7 +1071,7 @@ where
     Create {
         agent: Agent,
         create: Create,
-        rtn: oneshot::Sender<Result<Stub, P::Err>>,
+        rtn: oneshot::Sender<Result<Stub, HyperErr2>>,
     },
 }
 
@@ -1089,7 +1089,7 @@ impl<P> ItemOuter<P>
 where
     P: Platform + 'static,
 {
-    pub async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+    pub async fn bind(&self) -> Result<ArtRef<BindConfig>, HyperErr2> {
         self.item.bind().await
     }
 }
@@ -1356,7 +1356,7 @@ where
                                 rtn.send(item.init().await);
                             }
                             Err(err) => {
-                                rtn.send(Err(err.to_space_err()));
+                                rtn.send(Err(SpaceErr::to_space_err(err)));
                             }
                         }
                     }
@@ -1375,7 +1375,7 @@ where
         });
     }
 
-    async fn traverse(&self, traversal: Traversal<Wave>) -> Result<(), P::Err> {
+    async fn traverse(&self, traversal: Traversal<Wave>) -> Result<(), HyperErr2> {
         self.skel.logger.track(&traversal, || {
             Tracker::new(
                 format!("drivers -> {}", traversal.dir.to_string()),
@@ -1402,7 +1402,7 @@ where
         Ok(())
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemOuter<P>, P::Err> {
+    async fn item(&self, point: &Point) -> Result<ItemOuter<P>, HyperErr2> {
         let port = point.clone().to_surface().with_layer(self.layer.clone());
 
         Ok(ItemOuter {
@@ -1448,7 +1448,7 @@ impl<P> DriverSkel<P>
 where
     P: Platform,
 {
-    pub async fn select_service(&self, kind: ServiceKind) -> Result<Option<Service<ServiceRunner>>,P::Err> {
+    pub async fn select_service(&self, kind: ServiceKind) -> Result<Option<Service<ServiceRunner>>,HyperErr2> {
         let selector = ServiceSelector {
             name: IdSelector::Always,
             kind,
@@ -1519,7 +1519,7 @@ where
         &self,
         child_segment_template: PointSegTemplate,
         kind: KindTemplate,
-    ) -> Result<Details, P::Err> {
+    ) -> Result<Details, HyperErr2> {
         let create = Create {
             template: Template::new(
                 PointTemplate {
@@ -1537,7 +1537,7 @@ where
             .result(self.skel.create_in_star(create).await)
     }
 
-    pub async fn locate(&self, point: &Point) -> Result<ParticleRecord, P::Err> {
+    pub async fn locate(&self, point: &Point) -> Result<ParticleRecord, HyperErr2> {
         self.skel.registry.record(point).await
     }
 
@@ -1545,7 +1545,7 @@ where
         self.skel.drivers.local_driver_lookup(kind).await
     }
 
-    pub fn item_ctx(&self, point: &Point, layer: Layer) -> Result<ItemCtx, P::Err> {
+    pub fn item_ctx(&self, point: &Point, layer: Layer) -> Result<ItemCtx, HyperErr2> {
         let mut router = LayerInjectionRouter::new(
             self.skel.clone(),
             point.to_surface().with_layer(Layer::Core),
@@ -1595,7 +1595,7 @@ where
         star_skel: HyperStarSkel<P>,
         driver_skel: DriverSkel<P>,
         ctx: DriverCtx,
-    ) -> Result<Box<dyn Driver<P>>, P::Err> {
+    ) -> Result<Box<dyn Driver<P>>, HyperErr2> {
         self.factory.create(driver_skel, ctx).await
     }
 }
@@ -1616,7 +1616,7 @@ where
         &self,
         skel: DriverSkel<P>,
         ctx: DriverCtx,
-    ) -> Result<Box<dyn Driver<P>>, P::Err>;
+    ) -> Result<Box<dyn Driver<P>>, HyperErr2>;
 
     fn properties(&self) -> SetProperties {
         SetProperties::default()
@@ -1640,7 +1640,7 @@ where
         skel: HyperStarSkel<P>,
         driver_skel: DriverSkel<P>,
         ctx: DriverCtx,
-    ) -> Result<Box<dyn Driver<P>>, P::Err>;
+    ) -> Result<Box<dyn Driver<P>>, HyperErr2>;
 
     fn properties(&self) -> SetProperties {
         SetProperties::default()
@@ -1684,14 +1684,14 @@ where
         DRIVER_BIND.clone()
     }
 
-    async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), P::Err> {
+    async fn init(&mut self, skel: DriverSkel<P>, ctx: DriverCtx) -> Result<(), HyperErr2> {
         skel.logger
             .result(skel.status_tx.send(DriverStatus::Ready).await)
             .unwrap_or_default();
         Ok(())
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err>;
+    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, HyperErr2>;
 
     async fn handler(&self) -> Box<dyn DriverHandler<P>> {
         Box::new(DefaultDriverHandler::restore())
@@ -1789,7 +1789,7 @@ where
         }
     }
 
-    pub async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+    pub async fn bind(&self) -> Result<ArtRef<BindConfig>, HyperErr2> {
         match self {
             ItemSphere::Handler(handler) => handler.bind().await,
             ItemSphere::Router(router) => router.bind().await,
@@ -1814,7 +1814,7 @@ where
 
     fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self;
 
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, HyperErr2> {
         Ok(DEFAULT_BIND.clone())
     }
 }
@@ -1824,7 +1824,7 @@ pub trait ItemHandler<P>: DirectedHandler + Send + Sync
 where
     P: Platform,
 {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err>;
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, HyperErr2>;
     async fn init(&self) -> Result<Status, SpaceErr> {
         Ok(Status::Ready)
     }
@@ -1835,7 +1835,7 @@ pub trait ItemRouter<P>: TraversalRouter + Send + Sync
 where
     P: Platform,
 {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err>;
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, HyperErr2>;
 }
 
 #[derive(Clone)]
@@ -1905,7 +1905,7 @@ where
         star: HyperStarSkel<P>,
         driver: DriverSkel<P>,
         ctx: DriverCtx,
-    ) -> Result<Box<dyn Driver<P>>, P::Err> {
+    ) -> Result<Box<dyn Driver<P>>, HyperErr2> {
         Ok(Box::new(DriverDriver::new(driver).await?))
     }
 }
@@ -1951,7 +1951,7 @@ impl<P> DriverDriver<P>
 where
     P: Platform,
 {
-    async fn new(skel: DriverSkel<P>) -> Result<Self, P::Err> {
+    async fn new(skel: DriverSkel<P>) -> Result<Self, HyperErr2> {
         let map = DashMap::new();
         Ok(Self { skel, map })
     }
@@ -1984,7 +1984,7 @@ where
         self.map.insert(point, api);
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, HyperErr2> {
         let api = self.get_driver(point).ok_or(format!(
             "DriverApi is not associated with point: {} ",
             point.to_string()
@@ -2037,7 +2037,7 @@ impl<P> ItemRouter<P> for DriverItem<P>
 where
     P: Platform,
 {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, HyperErr2> {
         self.skel.api.driver_bind().await
     }
 }

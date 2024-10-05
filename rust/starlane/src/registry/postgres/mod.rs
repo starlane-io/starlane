@@ -41,10 +41,10 @@ use std::sync::Arc;
 use tokio_print::aprintln;
 use starlane::space::err::SpaceErr;
 use starlane::space::parse::util::{result, space_err};
-use crate::err::HypErr;
+use crate::err::{err, HypErr};
 
 
-pub trait PostgresPlatform
+pub trait PostgresPlatform: Send + Sync
 {
     fn lookup_registry_db(&self) -> Result<PostgresDbInfo, RegErr>;
     fn lookup_star_db(&self,star: &StarKey) -> Result<PostgresDbInfo, RegErr>;
@@ -84,7 +84,7 @@ impl PostgresRegistry
             Err(err) => {
                 let message = err.to_string();
                 logger.error(format!("database setup failed {} ", message));
-                return Err(message.into());
+                return Err(err);
             }
         }
 
@@ -1082,7 +1082,7 @@ impl Into<ParticleRecord> for PostgresParticleRecord
 
 impl sqlx::FromRow<'_, PgRow> for PostgresParticleRecord
 {
-    fn from_row(row: &PgRow) -> Result<Self, RegErr> {
+    fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
         fn wrap(row: &PgRow) -> Result<PostgresParticleRecord, sqlx::Error>
         {
             let parent: String = row.get("parent");
@@ -1187,12 +1187,7 @@ impl sqlx::FromRow<'_, PgRow> for PostgresParticleRecord
             Ok(record)
         }
 
-        match wrap(row) {
-            Ok(record) => Ok(record),
-            Err(err) => Err(sqlx::error::Error::Decode(
-                format!("particle record: {}", err.to_string()).into(),
-            ))?,
-        }
+        Ok(wrap(row)?)
     }
 }
 
@@ -1427,7 +1422,7 @@ aprintln!("pool.is_some():  {}",pool.is_some() );
 
 
 aprintln!("Aquire without Await...");
-        Ok(pool.await?)
+        Ok(pool.acquire().await?)
     }
 
     pub async fn begin<'a>(

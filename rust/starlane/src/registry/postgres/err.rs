@@ -16,12 +16,21 @@ pub enum RegErr {
  #[error("expected parent for point `{0}'")]
   ExpectedParent(Point),
   #[error("Registry does not handle GetOp::State operations")]
-  NoGetOpStateOperations
+  NoGetOpStateOperations,
+  #[error("Database Setup Failed")]
+  DatabaseSetupFail,
+  #[error("Point '{point}' registry error: {message}")]
+  Point { point: Point, message: String }
 }
 
 impl RegErr {
     pub fn dupe() -> Self {
         Self::Dupe
+    }
+
+    pub fn point<S>( point: Point, message: S ) -> RegErr {
+        let message = message.to_string();
+        RegErr::Point {point, message }
     }
 
     pub fn pool_not_found<S:ToString>( key: S ) -> Self {

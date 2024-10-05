@@ -23,7 +23,7 @@ use starlane::space::util::OptSelector;
 use starlane::space::wave::core::cmd::CmdMethod;
 use starlane::space::wave::exchange::asynch::Exchanger;
 use starlane::space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
-use crate::err::HypErr;
+use crate::err::{err, HypErr, HyperErr2};
 use crate::hyperlane::{
     HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, Hyperway, HyperwayEndpoint,
     HyperwayEndpointFactory, HyperwayInterchange, LayerTransform, MountInterchangeGate,
@@ -53,7 +53,7 @@ where
         Self { tx }
     }
 
-    pub async fn select_service( &self, selector: ServiceSelector ) -> Result<Option<ServiceTemplate>,P::Err> {
+    pub async fn select_service( &self, selector: ServiceSelector ) -> Result<Option<ServiceTemplate>,HyperErr2> {
 
         let (rtn,rx) = tokio::sync::oneshot::channel();
         let selector = MachineCall::SelectService {selector,rtn };
@@ -65,7 +65,7 @@ where
         &self,
         from: StarKey,
         to: StarKey,
-    ) -> Result<Box<dyn HyperwayEndpointFactory>, P::Err> {
+    ) -> Result<Box<dyn HyperwayEndpointFactory>, HyperErr2> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.tx
             .send(MachineCall::EndpointFactory { from, to, rtn })
@@ -102,22 +102,18 @@ aprintln!("submitting WaitForReady....");
         rx.await;
     }
 
-    pub async fn await_termination(&self) -> Result<(), P::Err> {
+    pub async fn await_termination(&self) -> Result<(), String> {
         let (tx, mut rx) = oneshot::channel();
         self.tx.send(MachineCall::AwaitTermination(tx)).await;
         let mut rx = match rx.await {
             Ok(rx) => rx,
             Err(err) => {
-                return Err(P::Err::new(err.to_string()));
+                return Err(err.to_string());
             }
         };
-        match rx.recv().await {
-            Ok(result) => result,
-            Err(err) => {
-                return Err(P::Err::new(err.to_string()));
-            }
+          rx.recv().await.unwrap()
         }
-    }
+
 
     #[cfg(test)]
     pub async fn get_machine_star(&self) -> Result<HyperStarApi<P>, SpaceErr> {
@@ -162,7 +158,7 @@ where
     pub gate_selector: Arc<HyperGateSelector>,
     pub call_tx: mpsc::Sender<MachineCall<P>>,
     pub call_rx: mpsc::Receiver<MachineCall<P>>,
-    pub termination_broadcast_tx: broadcast::Sender<Result<(), P::Err>>,
+    pub termination_broadcast_tx: broadcast::Sender<Result<(), String>>,
     pub logger: PointLogger,
 }
 
@@ -182,7 +178,7 @@ where
         platform: P,
         call_tx: mpsc::Sender<MachineCall<P>>,
         call_rx: mpsc::Receiver<MachineCall<P>>,
-    ) -> Result<MachineApi<P>, P::Err> {
+    ) -> Result<MachineApi<P>, HyperErr2> {
 
 aprintln!("Init Machine....");
         let template = platform.machine_template();
@@ -422,7 +418,7 @@ aprintln!("Machine Star Templates processed......");
         join_all(inits).await;
     }
 
-    async fn start(mut self) -> Result<(), P::Err> {
+    async fn start(mut self) -> Result<(), HyperErr2> {
 aprintln!("MACHINE STARTING!");
         self.call_tx
             .send(MachineCall::Init)
@@ -510,7 +506,7 @@ aprintln!("waiting looop....");
             }
 
             self.termination_broadcast_tx
-                .send(Err(P::Err::new("machine quit unexpectedly.")));
+                .send(Err(err!("machine quit unexpectedly."))?);
         }
 
         Ok(())
@@ -524,7 +520,7 @@ where
 {
     Init,
     Terminate,
-    AwaitTermination(oneshot::Sender<broadcast::Receiver<Result<(), P::Err>>>),
+    AwaitTermination(oneshot::Sender<broadcast::Receiver<Result<(), String>>>),
     WaitForReady(oneshot::Sender<()>),
     AddGate {
         kind: InterchangeKind,
@@ -748,7 +744,7 @@ impl ArtifactFetcher for ClientArtifactFetcher
         let record = self
             .registry
             .record(point)
-            .await?;
+            .await.into()?;
         Ok(record.details.stub)
     }
 
