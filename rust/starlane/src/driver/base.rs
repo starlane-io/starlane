@@ -1,5 +1,5 @@
 use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere,
+    Driver, DriverAvail, DriverCtx, DriverSkel, HyperDriverFactory, ParticleHandler, ParticleSphere,
     DRIVER_BIND,
 };
 
@@ -48,9 +48,8 @@ impl BaseDriverFactory {
 }
 
 #[async_trait]
-impl<P> HyperDriverFactory<P> for BaseDriverFactory
-where
-    P: Platform,
+impl HyperDriverFactory for BaseDriverFactory
+
 {
     fn kind(&self) -> Kind {
         Kind::Base
@@ -62,10 +61,10 @@ where
 
     async fn create(
         &self,
-        skel: HyperStarSkel<P>,
-        driver_skel: DriverSkel<P>,
+        skel: HyperStarSkel,
+        driver_skel: DriverSkel,
         ctx: DriverCtx,
-    ) -> Result<Box<dyn Driver<P>>, P::Err> {
+    ) -> Result<Box<dyn Driver>, P::Err> {
         Ok(Box::new(BaseDriver::new(self.avail.clone())))
     }
 }
@@ -81,17 +80,16 @@ impl BaseDriver {
 }
 
 #[async_trait]
-impl<P> Driver<P> for BaseDriver
-where
-    P: Platform,
+impl Driver for BaseDriver
+
 {
     fn kind(&self) -> Kind {
         Kind::Base
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
+    async fn particle(&self, point: &Point) -> Result<ParticleSphere, P::Err> {
         println!("ITEM get BASE");
-        Ok(ItemSphere::Handler(Box::new(Base)))
+        Ok(ParticleSphere::Handler(Box::new(Base)))
     }
 }
 
@@ -101,9 +99,7 @@ pub struct Base;
 impl Base {}
 
 #[async_trait]
-impl<P> ItemHandler<P> for Base
-where
-    P: Platform,
+impl ParticleHandler for Base
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
         Ok(DRIVER_BIND.clone())

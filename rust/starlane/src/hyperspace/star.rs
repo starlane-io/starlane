@@ -20,7 +20,7 @@ use crate::hyperlane::{
 use crate::hyperspace::global::{GlobalCommandExecutionHandler,  GlobalExecutionChamber};
 use crate::hyperspace::layer::field::Field;
 use crate::hyperspace::layer::shell::{Shell, ShellState};
-use crate::hyperspace::machine::{MachineApi, MachineSkel};
+use crate::hyperspace::machine::{MachineApi, MachineErr, MachineSkel};
 use crate::platform::Platform;
 use crate::hyperspace::reg::{Registration, Registry};
 use starlane::space::command::common::StateSrc;
@@ -2039,6 +2039,8 @@ pub enum StarErr {
     RegErr(#[source] #[from] RegErr),
     #[error("caused by '{0}'")]
     SpaceErr(#[source] #[from] SpaceErr),
+    #[error("caused by '{0}'")]
+    MachineErr(#[source] #[from] MachineErr),
     #[error("transport signal exceeded maximum hops")]
     TransportSignalExceededMaxHops,
     #[error("attempt to forward a transport on a non forwarding star")]

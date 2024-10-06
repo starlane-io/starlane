@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use crate::driver::{Driver, DriverCtx, DriverErr, DriverHandler, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Item, ItemHandler, ItemSkel, ItemSphere};
+use crate::driver::{Driver, DriverCtx, DriverErr, DriverHandler, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Particle, ParticleHandler, ParticleSkel, ParticleSphere};
 use crate::hyperspace::star::HyperStarSkel;
 use acid_store::repo::Commit;
 use acid_store::repo::OpenOptions;
@@ -175,14 +175,14 @@ impl Driver for RepoDriver
         Kind::Repo
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemSphere, DriverErr> {
+    async fn particle(&self, point: &Point) -> Result<ParticleSphere, DriverErr> {
         let filestore = self.filestore.sub_root(point.md5().into()).await?;
-        Ok(ItemSphere::Handler(Box::new(Repo::restore((),(), filestore ))))
+        Ok(ParticleSphere::Handler(Box::new(Repo::restore((), (), filestore ))))
     }
 }
 
 
-impl  Item for Repo where P: Platform{
+impl Particle for Repo {
     type Skel = ();
     type Ctx = ();
     type State = FileStoreService;
@@ -214,14 +214,13 @@ fn store() -> Result<ValueRepo<String>, UniErr> {
 
 pub struct Repo {
     filestore: FileStoreService,
-    phantom: PhantomData
 }
 
 #[handler]
-impl  Repo where P: Platform {}
+impl  Repo  {}
 
 #[async_trait]
-impl ItemHandler for Repo
+impl ParticleHandler for Repo
 
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
@@ -259,12 +258,12 @@ impl<P,S> HyperDriverFactory for BundleSeriesDriverFactory
     }
 }
 
-pub struct BundleSeriesDriver where P: Platform {
+pub struct BundleSeriesDriver  {
     ctx: DriverCtx,
 }
 
 #[handler]
-impl  BundleSeriesDriver where P: Platform{
+impl  BundleSeriesDriver {
     pub fn new(ctx: DriverCtx) -> Self {
         Self {
             ctx
@@ -285,7 +284,7 @@ impl Driver for BundleSeriesDriver
     }
 }
 
-pub struct BundleSeries where P: Platform {
+pub struct BundleSeries  {
     ctx: DriverCtx
 }
 
@@ -298,7 +297,7 @@ impl  BundleSeries {
 }
 
 #[handler]
-impl  BundleSeries where P: Platform {
+impl  BundleSeries  {
 
 }
 
@@ -389,7 +388,7 @@ impl BundleDriverHandler
     }
 }
 
-impl DriverHandler for BundleDriverHandler where P: Platform{}
+impl DriverHandler for BundleDriverHandler {}
 
 #[handler]
 impl BundleDriverHandler
@@ -673,7 +672,7 @@ impl ArtifactDriverHandler
     }
 }
 
-impl DriverHandler for ArtifactDriverHandler where P: Platform {}
+impl DriverHandler for ArtifactDriverHandler  {}
 
 #[handler]
 impl ArtifactDriverHandler

@@ -58,7 +58,7 @@ where
         }
     }
 
-    fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self>;
+    fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder;
     async fn global_registry(&self) -> Result<Registry, Self::Err>;
     async fn star_registry(&self, star: &StarKey) -> Result<Registry, Self::Err>;
     fn artifact_hub(&self) -> ArtifactApi;

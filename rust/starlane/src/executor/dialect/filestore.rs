@@ -1,4 +1,3 @@
-use crate::err::HypErr;
 use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::cli::{CliExecutor, CliIn, CliOut};
 use crate::executor::Executor;
@@ -14,6 +13,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use strum_macros::EnumString;
+use thiserror::Error;
 /*
 impl <E> From<Box<E>> for FileStore
 where E: Executor<In=CliIn,Out=CliOut> {
@@ -36,7 +36,7 @@ impl FileStoreApi {
         Self { path, filestore }
     }
 
-    pub fn sub_root(&self, sub_root: PathBuf) -> Result<FileStoreApi, HypErr> {
+    pub fn sub_root(&self, sub_root: PathBuf) -> Result<FileStoreApi, FileStoreErr> {
         let root = RootDir::new(self.path.clone());
         let path = root.norm(&sub_root)?;
 
@@ -46,7 +46,7 @@ impl FileStoreApi {
         })
     }
 
-    pub async fn init(&self) -> Result<(), HypErr> {
+    pub async fn init(&self) -> Result<(), FileStoreErr> {
         self.filestore.execute(FileStoreIn::Init).await?;
         Ok(())
     }
@@ -63,11 +63,11 @@ pub enum FileStore {
 }
 
 impl FileStore {
-    pub async fn sub_root(&self, sub_root: PathBuf) -> Result<FileStore, HypErr> {
+    pub async fn sub_root(&self, sub_root: PathBuf) -> Result<FileStore, FileStoreErr> {
         match self {
             FileStore::Cli(cli) => {
                 let conf = cli.conf();
-                let value = conf.env(FILE_STORE_ROOT).ok_or(HypErr::String(format!("expected environment variable '{}' to be set", FILE_STORE_ROOT).to_string()))?;
+                let value = conf.env(FILE_STORE_ROOT).ok_or(FileStoreErr::expected_env(FILE_STORE_ROOT))?;
                 let path = PathBuf::from(value);
                 let root = RootDir::new(path);
                 let root = root.norm(&sub_root)?;
@@ -78,7 +78,7 @@ impl FileStore {
         }
     }
 
-    pub async fn execute(&self, mut input: FileStoreIn) -> Result<FileStoreOut, HypErr> {
+    pub async fn execute(&self, mut input: FileStoreIn) -> Result<FileStoreOut, FileStoreErr> {
         match self {
             FileStore::Cli(executor) => {
                 let kind: FileStoreInKind = (&input).into();
@@ -113,7 +113,7 @@ impl FileStore {
                             .into_iter()
                             .map_ok(|line| line.into())
                             .find_or_first(|_| true)
-                            .ok_or(HypErr::String("pwd didn't return anything".to_string()))??;
+                            .ok_or(FileStoreErr::String("pwd didn't return anything".to_string()))??;
                         FileStoreOut::Pwd(line)
                     }
                 };
@@ -264,7 +264,7 @@ impl ToString for FileStoreCli {
 }
 
 impl TryFrom<CliOsExecutor> for FileStore {
-    type Error = HypErr;
+    type Error = FileStoreErr;
 
     fn try_from(cli: CliOsExecutor) -> Result<Self, Self::Error> {
         Ok(FileStore::Cli(Box::new(cli)))
@@ -283,7 +283,7 @@ impl RootDir {
 }
 
 impl RootDir {
-    pub fn norm(&self, sub_path: &PathBuf) -> Result<PathBuf, HypErr> {
+    pub fn norm(&self, sub_path: &PathBuf) -> Result<PathBuf, FileStoreErr> {
         let sub_path = sub_path.clean();
 
         let path: PathBuf = match sub_path.starts_with("/") {
@@ -297,12 +297,27 @@ impl RootDir {
         };
 
         if !parent.starts_with(&self.root) {
-            return Err(HypErr::String(format!(
-                "illegal path '{}' escapes filesystem boundaries",
-                sub_path.display()
-            )));
+            return Err(FileStoreErr::PathEscapesFileStoreBoundary(sub_path))?;
         }
 
         Ok(normed)
+    }
+}
+
+
+#[derive(Error,Debug,Clone)]
+pub enum FileStoreErr {
+    #[error("path '{0}' escapes FileStore boundaries")]
+    PathEscapesFileStoreBoundary(PathBuf),
+    #[error("expected environment variable to be set: {0}")]
+    ExpectEnvVar(String)
+}
+
+impl FileStoreErr {
+    pub fn expected_env<S>(key: S) -> Self
+    where
+        S: ToString
+    {
+        Self::ExpectEnvVar(key.to_string())
     }
 }

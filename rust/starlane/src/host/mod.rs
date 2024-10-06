@@ -10,7 +10,7 @@ use std::hash::{Hash, Hasher};
 use std::io::Read;
 use std::ops::{Deref, DerefMut};
 use tokio::io::AsyncWriteExt;
-use crate::driver::DriverErr;
+use crate::service::ServiceErr;
 
 pub mod err;
 
@@ -80,9 +80,9 @@ impl Host {
             Host::Cli(cli) => cli.env(key)
         }
     }
-    pub fn create<D>(&self) -> Result<D, DriverErr>
+    pub fn create<D>(&self) -> Result<D, ServiceErr>
     where
-        D: TryFrom<CliOsExecutor, Error =DriverErr>,
+        D: TryFrom<CliOsExecutor, Error =ServiceErr>,
     {
         match self {
             Host::Cli(host) => host.create(),
@@ -111,9 +111,9 @@ impl HostCli {
         }
     }
 
-    pub fn create<D>(&self) -> Result<D, DriverErr>
+    pub fn create<D>(&self) -> Result<D, ServiceErr>
     where
-        D: TryFrom<CliOsExecutor, Error =DriverErr>,
+        D: TryFrom<CliOsExecutor, Error =ServiceErr>,
     {
         match self {
             HostCli::Os(stub) => D::try_from(CliOsExecutor::new(stub.clone())),

@@ -1,4 +1,4 @@
-use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory, Item, ItemHandler, ItemSphere};
+use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory, Particle, ParticleHandler, ParticleSphere};
 use crate::platform::Platform;
 use crate::hyperspace::reg::Registration;
 use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter};
@@ -241,8 +241,8 @@ impl Driver for StarDriver
         Ok(())
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemSphere, DriverErr> {
-        Ok(ItemSphere::Handler(Box::new(Star::restore(
+    async fn particle(&self, point: &Point) -> Result<ParticleSphere, DriverErr> {
+        Ok(ParticleSphere::Handler(Box::new(Star::restore(
             self.star_skel.clone(),
             self.ctx.clone(),
             (),
@@ -278,11 +278,11 @@ impl Star
 }
 
 #[async_trait]
-impl ItemHandler for Star
+impl ParticleHandler for Star
 
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
-        <Star as Item>::bind(self).await
+        <Star as Particle>::bind(self).await
     }
 
     async fn init(&self) -> Result<Status, DriverErr> {
@@ -349,7 +349,7 @@ impl ItemHandler for Star
 }
 
 #[async_trait]
-impl Item for Star
+impl Particle for Star
 
 {
     type Skel = HyperStarSkel;
@@ -521,7 +521,7 @@ impl Star
     #[route("Hyp<Search>")]
     pub async fn handle_search_request(&self, ctx: InCtx<'_, HyperSubstance>) -> CoreBounce {
         async fn sub_search_and_reflect<'a, E>(
-            star: &Star<E>,
+            star: &Star,
             ctx: &'a InCtx<'a, HyperSubstance>,
             mut history: HashSet<Point>,
             search: Search,

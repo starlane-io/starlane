@@ -1,4 +1,4 @@
-use crate::driver::{Driver, DriverCtx, DriverSkel, HyperDriverFactory, ItemHandler, ItemSphere};
+use crate::driver::{Driver, DriverCtx, DriverErr, DriverSkel, HyperDriverFactory, ParticleHandler, ParticleSphere};
 use crate::platform::Platform;
 use crate::hyperspace::star::HyperStarSkel;
 use once_cell::sync::Lazy;
@@ -39,9 +39,7 @@ impl SpaceDriverFactory {
 }
 
 #[async_trait]
-impl<P> HyperDriverFactory<P> for SpaceDriverFactory
-where
-    P: Platform,
+impl HyperDriverFactory for SpaceDriverFactory
 {
     fn kind(&self) -> Kind {
         Kind::Space
@@ -53,10 +51,10 @@ where
 
     async fn create(
         &self,
-        skel: HyperStarSkel<P>,
-        driver_skel: DriverSkel<P>,
+        skel: HyperStarSkel,
+        driver_skel: DriverSkel,
         ctx: DriverCtx,
-    ) -> Result<Box<dyn Driver<P>>, P::Err> {
+    ) -> Result<Box<dyn Driver>, DriverErr> {
         Ok(Box::new(SpaceDriver))
     }
 }
@@ -64,16 +62,14 @@ where
 pub struct SpaceDriver;
 
 #[async_trait]
-impl<P> Driver<P> for SpaceDriver
-where
-    P: Platform,
+impl Driver for SpaceDriver
 {
     fn kind(&self) -> Kind {
         Kind::Space
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
-        Ok(ItemSphere::Handler(Box::new(Space)))
+    async fn particle(&self, point: &Point) -> Result<ParticleSphere, DriverErr> {
+        Ok(ParticleSphere::Handler(Box::new(Space)))
     }
 }
 
@@ -83,11 +79,9 @@ pub struct Space;
 impl Space {}
 
 #[async_trait]
-impl<P> ItemHandler<P> for Space
-where
-    P: Platform,
+impl ParticleHandler for Space
 {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
         Ok(SPACE_BIND_CONFIG.clone())
     }
 }

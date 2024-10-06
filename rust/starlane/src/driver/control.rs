@@ -1,5 +1,5 @@
 pub use starlane_space as starlane;
-use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Item, ItemRouter, ItemSphere};
+use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Particle, ParticleRouter, ParticleSphere};
 use crate::hyperlane::{
     AnonHyperAuthenticatorAssignEndPoint, FromTransform, HopTransform, HyperClient, HyperGreeter,
     Hyperway, HyperwayConfigurator, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub,
@@ -281,14 +281,14 @@ impl Driver for ControlDriver
         Ok(())
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemSphere, DriverErr> {
+    async fn particle(&self, point: &Point) -> Result<ParticleSphere, DriverErr> {
         let router = self
             .external_router
             .as_ref()
             .ok_or(DriverErr::item_router_not_set(point, &self.kind()))?
             .clone();
         let ctx = ControlCtx::new(router);
-        Ok(ItemSphere::Router(Box::new(Control::restore(
+        Ok(ParticleSphere::Router(Box::new(Control::restore(
             self.skel.clone(),
             ctx,
             (),
@@ -400,7 +400,7 @@ pub struct Control
     pub ctx: ControlCtx,
 }
 
-impl Item for Control
+impl Particle for Control
 
 {
     type Skel = HyperSkel;
@@ -430,11 +430,11 @@ impl TraversalRouter for Control
 }
 
 #[async_trait]
-impl ItemRouter for Control
+impl ParticleRouter for Control
 
 {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
-        Ok(<Control as Item>::bind(self).await?)
+        Ok(<Control as Particle>::bind(self).await?)
     }
 }
 

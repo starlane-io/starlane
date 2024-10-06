@@ -99,7 +99,7 @@ impl Platform for Starlane where Self: Sync+Send+Sized{
         "singularity".to_string()
     }
 
-    fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder<Self> {
+    fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder {
         let mut builder = DriversBuilder::new(kind.clone());
 
         // only allow external Base wrangling external to Super

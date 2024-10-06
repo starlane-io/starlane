@@ -147,23 +147,20 @@ impl GlobalExecutionChamber
     pub async fn create(&self, create: &Create, agent: &Agent) -> Result<Details, StarErr> {
         let child_kind = self
             .skel
-            .machine
-            .platform
-            .select_kind(&create.template.kind)?;
+            .machine_api
+            .select_kind(&create.template.kind).await?;
         let point = match &create.template.point.child_segment_template {
             PointSegTemplate::Exact(child_segment) => {
                 let point = create.template.point.parent.push(child_segment.clone())?;
 
                 let properties = self
                     .skel
-                    .machine
-                    .platform
-                    .properties_config(&child_kind)
+                    .machine_api
+                    .properties_config(&child_kind).await?
                     .fill_create_defaults(&create.properties)?;
                 self.skel
-                    .machine
-                    .platform
-                    .properties_config(&child_kind)
+                    .machine_api
+                    .properties_config(&child_kind).await?
                     .check_create(&properties)?;
 
                 let registration = Registration {

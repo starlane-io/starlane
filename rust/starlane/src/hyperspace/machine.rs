@@ -1,20 +1,25 @@
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::Arc;
+use std::sync::mpsc::SendError;
 use std::time::Duration;
 
 use dashmap::DashMap;
 use futures::future::{join_all, select_all, BoxFuture};
 use futures::FutureExt;
+use thiserror::Error;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
+use tokio::sync::oneshot::error::RecvError;
 use tokio_print::aprintln;
 use starlane::space::artifact::asynch::{ArtifactApi, ArtifactFetcher};
+use starlane::space::command::direct::create::KindTemplate;
 use starlane::space::err::SpaceErr;
 use starlane::space::hyper::{InterchangeKind, Knock};
-use starlane::space::kind::{BaseKind, StarSub};
+use starlane::space::kind::{BaseKind, Kind, StarSub};
 use starlane::space::loc::{Layer, MachineName, StarHandle, StarKey, Surface, ToPoint, ToSurface};
 use starlane::space::log::{PointLogger, RootLogger};
-use starlane::space::particle::{Status, Stub};
+use starlane::space::particle::{Property, Status, Stub};
+use starlane::space::particle::property::PropertiesConfig;
 use starlane::space::point::Point;
 use starlane::space::selector::KindSelector;
 use starlane::space::settings::Timeouts;
@@ -23,6 +28,7 @@ use starlane::space::util::OptSelector;
 use starlane::space::wave::core::cmd::CmdMethod;
 use starlane::space::wave::exchange::asynch::Exchanger;
 use starlane::space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
+use crate::driver::DriverErr;
 use crate::err::{err, HypErr, HyperErr2};
 use crate::hyperlane::{
     HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, Hyperway, HyperwayEndpoint,
@@ -41,15 +47,43 @@ use crate::template::Templates;
 pub struct MachineApi
 {
     tx: mpsc::Sender<MachineCall>,
+    pub artifacts: ArtifactApi,
+    pub registry: Registry
+}
+
+impl MachineApi {
+
+}
+
+impl MachineApi {
+
 }
 
 impl MachineApi
 {
-    pub fn new(tx: mpsc::Sender<MachineCall>) -> Self {
-        Self { tx }
+    pub fn new(tx: mpsc::Sender<MachineCall>, registry: Registry, artifacts: ArtifactApi) -> Self {
+        Self { tx, registry, artifacts }
+    }
+    pub async fn properties_config(&self, kind: &Kind) -> Result<PropertiesConfig,MachineErr> {
+        let (rtn,rx) = tokio::sync::oneshot::channel();
+        self.tx.send(MachineCall::PropertiesConfig{
+            kind: kind.clone(),
+            rtn
+        }).await?;
+
+        Ok(rx.await?)
+    }
+    pub async fn select_kind(&self, template: &KindTemplate) -> Result<Kind,MachineErr>{
+        let (rtn,rx) = tokio::sync::oneshot::channel();
+        self.tx.send(MachineCall::SelectKind {
+            template: template.clone(),
+            rtn
+        }).await?;
+
+        Ok(rx.await??)
     }
 
-    pub async fn select_service( &self, selector: ServiceSelector ) -> Result<Option<ServiceTemplate>,HyperErr2> {
+    pub async fn select_service( &self, selector: ServiceSelector ) -> Result<Option<ServiceTemplate>,MachineErr> {
 
         let (rtn,rx) = tokio::sync::oneshot::channel();
         let selector = MachineCall::SelectService {selector,rtn };
@@ -61,7 +95,7 @@ impl MachineApi
         &self,
         from: StarKey,
         to: StarKey,
-    ) -> Result<Box<dyn HyperwayEndpointFactory>, HyperErr2> {
+    ) -> Result<Box<dyn HyperwayEndpointFactory>, MachineErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.tx
             .send(MachineCall::EndpointFactory { from, to, rtn })
@@ -162,12 +196,14 @@ impl<P> Machine<P>
 where
     P: Platform + 'static,
 {
-    pub fn new_api(platform: P) -> MachineApi {
+    pub async fn new_api(platform: P) -> Result<MachineApi,P::Err> {
         let (call_tx, call_rx) = mpsc::channel(1024);
-        let machine_api = MachineApi::new(call_tx.clone());
+        let artifacts = platform.artifact_hub();
+        let registry= platform.global_registry().await?;
+        let machine_api = MachineApi::new(call_tx.clone(),registry, artifacts);
         tokio::spawn(async move { Machine::init(platform, call_tx, call_rx).await });
 
-        machine_api
+        Ok(machine_api)
     }
 
     async fn init(
@@ -179,7 +215,9 @@ where
 aprintln!("Init Machine....");
         let template = platform.machine_template();
         let machine_name = platform.machine_name();
-        let machine_api = MachineApi::new(call_tx.clone());
+        let artifacts = platform.artifact_hub();
+        let registry = platform.global_registry().await?;
+        let machine_api = MachineApi::new(call_tx.clone(), registry, artifacts);
         let (mpsc_status_tx, mut mpsc_status_rx) = mpsc::channel(128);
         let (watch_status_tx, watch_status_rx) = watch::channel(MachineStatus::Init);
         tokio::spawn(async move {
@@ -454,6 +492,12 @@ aprintln!("waiting looop....");
                         }
                     });
                 }
+                MachineCall::SelectKind { template, rtn } => {
+                   rtn.send(self.skel.platform.select_kind(&template));
+                }
+                MachineCall::PropertiesConfig { kind, rtn } => {
+                    rtn.send(self.skel.platform.properties_config(&kind));
+                }
                 MachineCall::AddGate { kind, gate, rtn } => {
                     rtn.send(self.gate_selector.add(kind.clone(), gate));
                 }
@@ -534,7 +578,14 @@ pub enum MachineCall
         selector: ServiceSelector,
         rtn: oneshot::Sender<Option<ServiceTemplate>>
     },
-    Platform(oneshot::Sender<Box<dyn Platform>>),
+    SelectKind{
+        template: KindTemplate,
+        rtn: oneshot::Sender<Result<Kind,SpaceErr>>
+    },
+    PropertiesConfig {
+        kind: Kind,
+        rtn: oneshot::Sender<PropertiesConfig>,
+    },
     #[cfg(test)]
     GetMachineStar(oneshot::Sender<HyperStarApi>),
     #[cfg(test)]
@@ -748,5 +799,31 @@ impl ArtifactFetcher for ClientArtifactFetcher
         } else {
             Err("expecting Bin encountered some other substance when fetching artifact".into())
         }
+    }
+}
+
+
+
+#[derive(Clone,Debug,Error)]
+pub enum MachineErr {
+    #[error(transparent)]
+    SpaceErr(#[from] SpaceErr),
+    #[error("no configured driver for kind template: '{0}'")]
+    KindNotSupported(KindTemplate),
+    #[error("tokio send error.")]
+    TokioSendErr,
+#[error("tokio receive error.")]
+TokioReceiveErr
+}
+
+impl <T> From<tokio::sync::mpsc::error::SendError<T>> for MachineErr {
+    fn from(value: tokio::sync::mpsc::error::SendError<T>) -> Self {
+        MachineErr::TokioSendErr
+    }
+}
+
+impl  From<tokio::sync::oneshot::error::RecvError> for MachineErr {
+    fn from(value: tokio::sync::oneshot::error::RecvError) -> Self {
+        MachineErr::TokioReceiveErr
     }
 }

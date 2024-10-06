@@ -79,7 +79,7 @@ impl Field
             }
             Some(bind) => {
                 let bind = Point::from_str(bind.value.as_str())?;
-                log(self.skel.machine.artifacts.bind(&bind).await)?
+                log(self.skel.machine_api.artifacts.bind(&bind).await)?
             }
         };
         Ok(bind)

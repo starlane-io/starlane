@@ -1,13 +1,16 @@
 pub mod os;
 
-use crate::err::HypErr;
-use os::OsProcess;
 use crate::executor::Executor;
 use itertools::Itertools;
+use os::OsProcess;
 use std::collections::HashMap;
 use std::env;
 use std::hash::{Hash, Hasher};
+use std::io::Error;
 use std::ops::{Deref, DerefMut};
+use std::path::PathBuf;
+use std::sync::Arc;
+use thiserror::Error;
 use tokio::io::AsyncWriteExt;
 
 pub type CliIn = CliInDef<Option<Vec<u8>>>;
@@ -16,9 +19,6 @@ pub struct HostEnv {
     pub pwd: String,
     pub env: HashMap<String, String>,
 }
-
-
-
 
 impl HostEnv {
     pub fn builder() -> HostEnvBuilder {
@@ -124,25 +124,24 @@ pub enum CliOut {
 }
 
 impl CliOut {
-
-    pub async fn copy_stdin(&mut self, input: & mut Vec<u8>) -> Result<(), HypErr>{
+    pub async fn copy_stdin(&mut self, input: &mut Vec<u8>) -> Result<(), CliErr> {
         match self {
             CliOut::Os(proc) => {
                 let mut stdin = proc.stdin.take().unwrap();
-                stdin.write_all( &input[..] ).await?;
+                stdin.write_all(&input[..]).await?;
                 stdin.flush().await?;
             }
         }
         Ok(())
     }
-    pub fn close_stdin(&mut self)  -> Result<(), HypErr>{
+    pub fn close_stdin(&mut self) -> Result<(), CliErr> {
         match self {
-            CliOut::Os(proc) => proc.close_stdin()?
+            CliOut::Os(proc) => proc.close_stdin()?,
         }
         Ok(())
     }
 
-    pub async fn copy_stout(&mut self, out: & mut Vec<u8>)  -> Result<(), HypErr>{
+    pub async fn copy_stout(&mut self, out: &mut Vec<u8>) -> Result<(), CliErr> {
         match self {
             CliOut::Os(proc) => {
                 let mut stdout = proc.stdout.take().ok_or("could not get stdout")?;
@@ -154,14 +153,11 @@ impl CliOut {
 }
 
 impl CliOut {
-    pub async fn stdout(&mut self) -> Result<Vec<u8>, HypErr> {
+    pub async fn stdout(&mut self) -> Result<Vec<u8>, CliErr> {
         match self {
             CliOut::Os(proc) => {
                 let mut out = vec![];
-                let mut stdout = proc
-                    .stdout
-                    .take()
-                    .ok_or(HypErr::String("could not unwarp stdout".to_string()))?;
+                let mut stdout = proc.stdout.take().ok_or(CliErr::TakeStdOut)?;
                 tokio::io::copy(&mut stdout, &mut out).await?;
                 Ok(out)
             }
@@ -169,4 +165,24 @@ impl CliOut {
     }
 }
 
-pub type CliExecutor = Box<dyn Executor<In=CliIn,Out=CliOut>>;
+pub type CliExecutor = Box<dyn Executor<In = CliIn, Out = CliOut>>;
+
+#[derive(Debug, Error, Clone)]
+pub enum CliErr {
+    #[error("could not take stdout")]
+    TakeStdOut,
+    #[error("could not take stderr")]
+    TakeStdErr,
+    #[error("could not take stdin")]
+    TakeStdIn,
+    #[error("tokio io error: {0}")]
+    TokioIoErr(#[from] Arc<tokio::io::Error>),
+    #[error("file not found: '{0}'")]
+    FileNotFound(String),
+}
+
+impl From<tokio::io::Error> for CliErr {
+    fn from(value: Error) -> Self {
+        Self::TokioIoErr(Arc::new(value))
+    }
+}

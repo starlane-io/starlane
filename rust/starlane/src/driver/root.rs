@@ -1,6 +1,4 @@
-use crate::driver::{
-    Driver, DriverCtx, DriverSkel, HyperDriverFactory, Item, ItemHandler, ItemSphere,
-};
+use crate::driver::{Driver, DriverCtx, DriverErr, DriverSkel, HyperDriverFactory, Particle, ParticleHandler, ParticleSphere};
 pub use starlane_space as starlane;
 
 use crate::platform::Platform;
@@ -44,9 +42,8 @@ impl RootDriverFactory {
 }
 
 #[async_trait]
-impl<P> HyperDriverFactory<P> for RootDriverFactory
-where
-    P: Platform,
+impl HyperDriverFactory for RootDriverFactory
+
 {
     fn kind(&self) -> Kind {
         Kind::Root
@@ -58,10 +55,10 @@ where
 
     async fn create(
         &self,
-        skel: HyperStarSkel<P>,
-        driver_skel: DriverSkel<P>,
+        skel: HyperStarSkel,
+        driver_skel: DriverSkel,
         ctx: DriverCtx,
-    ) -> Result<Box<dyn Driver<P>>, P::Err> {
+    ) -> Result<Box<dyn Driver>, DriverErr> {
         Ok(Box::new(RootDriver {}))
     }
 }
@@ -69,40 +66,34 @@ where
 pub struct RootDriver;
 
 #[async_trait]
-impl<P> Driver<P> for RootDriver
-where
-    P: Platform,
+impl Driver for RootDriver
+
 {
     fn kind(&self) -> Kind {
         Kind::Root
     }
 
-    async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
-        Ok(ItemSphere::Handler(Box::new(Root::restore((), (), ()))))
+    async fn particle(&self, point: &Point) -> Result<ParticleSphere, DriverErr> {
+        Ok(ParticleSphere::Handler(Box::new(Root::restore((), (), ()))))
     }
 }
 
-pub struct Root<P>
-where
-    P: Platform,
+pub struct Root
+
 {
-    phantom: PhantomData<P>,
 }
 
-impl<P> Root<P>
-where
-    P: Platform,
+impl Root
+
 {
     pub fn new() -> Self {
         Self {
-            phantom: PhantomData::default(),
         }
     }
 }
 
-impl<P> Item<P> for Root<P>
-where
-    P: Platform,
+impl Particle for Root
+
 {
     type Skel = ();
     type Ctx = ();
@@ -114,14 +105,13 @@ where
 }
 
 #[handler]
-impl<P> Root<P> where P: Platform {}
+impl Root {}
 
 #[async_trait]
-impl<P> ItemHandler<P> for Root<P>
-where
-    P: Platform,
+impl ParticleHandler for Root
+
 {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
         Ok(ROOT_BIND_CONFIG.clone())
     }
 }
