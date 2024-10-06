@@ -17,7 +17,7 @@ use starlane::space::command::direct::create::{
 };
 use starlane::space::command::RawCommand;
 use starlane::space::config::bind::BindConfig;
-use starlane::space::err::SpaceErr;
+use starlane::space::err::{CoreReflector, SpaceErr};
 use starlane::space::hyper::{ControlPattern, Greet, InterchangeKind};
 use starlane::space::kind::{BaseKind, Kind, StarSub};
 use starlane::space::loc::{Layer, PointFactory, Surface, ToSurface};
@@ -489,6 +489,16 @@ impl ControlCliSession {
 pub enum ControlErr {
     #[error(transparent)]
     SpaceErr(#[from] SpaceErr),
+}
+
+impl CoreReflector for ControlErr {
+    fn as_reflected_core(self) -> ReflectedCore {
+        ReflectedCore {
+            headers: Default::default(),
+            status: Default::default(),
+            body: Substance::Err(SpaceErr::to_space_err(self))
+        }
+    }
 }
 
 impl ParticleErr for ControlErr {}

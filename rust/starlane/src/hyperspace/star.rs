@@ -12,7 +12,7 @@ use anyhow::Context;
 use thiserror::Error;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
-use crate::driver::{DriverStatus, DriversApi, DriversBuilder, DriversCall};
+use crate::driver::{DriverErr, DriverStatus, DriversApi, DriversBuilder, DriversCall};
 use crate::hyperlane::{
     Bridge, HyperwayEndpoint, HyperwayEndpointFactory,
     HyperwayInterchange, HyperwayStub,
@@ -45,7 +45,7 @@ use starlane::space::point::Point;
 use starlane::space::substance::{Substance, SubstanceKind};
 use starlane::space::util::ValueMatcher;
 use starlane::space::wave::core::cmd::CmdMethod;
-use starlane::space::wave::core::hyp::HypMethod;
+use starlane::space::wave::core::hyper::HypMethod;
 use starlane::space::wave::exchange::asynch::{
     DirectedHandler, DirectedHandlerShell, Exchanger,
     ProtoTransmitter, ProtoTransmitterBuilder, Router, TraversalRouter, TxRouter,
@@ -2029,6 +2029,8 @@ impl SmartLocator
 
 #[derive(Error,Debug,Clone)]
 pub enum StarErr {
+    #[error(transparent)]
+    DriverErr( #[from] DriverErr),
     #[error("cannot create_in_star in star {point} for parent point {parent} since it is not a point within this star")]
     PointNotInStar{point: Point, parent: Point},
     #[error("star expected Root to be already provisioned")]
@@ -2050,7 +2052,12 @@ pub enum StarErr {
     #[error("attempt to send wave {wave} to layer {layer} that the recipient Kind {kind} does not have in its traversal plan")]
     TraversalPlanNotFound { wave: WaveId, layer: Layer, kind: Kind },
     #[error("multi port ripple has recipient that is not located, this should have been provisioned when the ripple was sent")]
-    UnprovisionedMultiPortRipple
+    UnprovisionedMultiPortRipple,
+    #[error("could not find assign kind '{0}' to self")]
+    CouldNotAssignToSelf(Kind),
+    #[error("could not find a host to provision '{0}'")]
+    CouldNotFindHostToProvision(Kind),
+
 }
 
 impl CoreReflector for StarErr {

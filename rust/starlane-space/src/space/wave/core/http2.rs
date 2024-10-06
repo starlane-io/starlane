@@ -99,6 +99,10 @@ impl StatusCode {
     pub fn is_success(&self) -> bool {
         self.code >= 200 && self.code <= 299
     }
+
+    pub fn fail() -> StatusCode {
+        Self::from_u16(500u16).unwrap()
+    }
 }
 
 impl ToString for StatusCode {

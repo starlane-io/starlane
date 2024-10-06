@@ -71,7 +71,8 @@ impl Driver for SpaceDriver
     }
 
     async fn particle(&self, point: &Point) -> Result<ParticleSphere, DriverErr> {
-
+        let space = Space::restore((),(),());
+        Ok(space.sphere()?)
     }
 }
 
@@ -91,13 +92,12 @@ impl Particle for Space {
         Space
     }
 
-
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
-        Ok(SPACE_BIND_CONFIG.clone())
+    fn bind(&self) -> ArtRef<BindConfig> {
+        SPACE_BIND_CONFIG.clone()
     }
 
-    fn sphere(self) -> ParticleSphereInner {
-        ParticleSphereInner::Handler(Box::new(self))
+    fn sphere(self) -> Result<ParticleSphere, Self::Err> {
+       Ok(ParticleSphere::new_handler(self.bind(),self))
     }
 }
 

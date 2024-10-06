@@ -31,7 +31,7 @@ use starlane::space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
 use starlane::space::config::bind::BindConfig;
-use starlane::space::err::SpaceErr;
+use starlane::space::err::{CoreReflector, SpaceErr};
 use starlane::space::hyper::{Assign, HyperSubstance, ParticleRecord};
 use starlane::space::kind::{BaseKind, Kind, StarSub};
 use starlane::space::loc::{Layer, Surface, ToPoint, ToSurface};
@@ -56,12 +56,15 @@ use starlane::space::HYPERUSER;
 use starlane_macros::DirectedHandler;
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::ops::Deref;
+use std::ops::{Deref};
 use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
+use starlane::space::command::common::StateSrc::Subst;
+use starlane::space::substance::Substance;
+use starlane::space::wave::core::http2::StatusCode;
 
 static STD_BIND: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
     ArtRef::new(
@@ -631,7 +634,7 @@ impl Drivers {
         status_tx: watch::Sender<DriverStatus>,
     ) {
         {
-            let skel = self.skel.clone();
+            let star = self.skel.clone();
             let call_tx = self.call_tx.clone();
             let drivers_point = self.skel.point.push("drivers").unwrap();
 
@@ -708,7 +711,7 @@ impl Drivers {
                 });
             }
 
-            match logger.result(register(&skel, &point, &logger).await) {
+            match logger.result(register(&star, &point, &logger).await) {
                 Ok(_) => {}
                 Err(err) => {
                     status_tx.send(DriverStatus::Fatal(
@@ -719,14 +722,14 @@ impl Drivers {
             }
 
             let mut router = LayerInjectionRouter::new(
-                skel.clone(),
+                star.clone(),
                 point.clone().to_surface().with_layer(Layer::Core),
             );
 
             router.direction = Some(TraversalDirection::Fabric);
 
             let mut transmitter =
-                ProtoTransmitterBuilder::new(Arc::new(router), skel.exchanger.clone());
+                ProtoTransmitterBuilder::new(Arc::new(router), star.exchanger.clone());
             transmitter.from =
                 SetStrategy::Override(point.clone().to_surface().with_layer(Layer::Core));
             let transmitter = transmitter.build();
@@ -734,7 +737,7 @@ impl Drivers {
             let (runner_tx, runner_rx) = mpsc::channel(1024);
             let (request_tx, mut request_rx) = mpsc::channel(1024);
             let driver_skel = DriverSkel::new(
-                skel,
+                star,
                 kind,
                 point.clone(),
                 selector.clone(),
@@ -1117,13 +1120,13 @@ impl TraversalLayer for ParticleOuter {
         if reflect.to().layer == self.surface.layer {
             self.exchanger().reflected(reflect.payload).await
         } else {
-            match &self.particle {
+            match &self.particle.inner {
                 ParticleSphereInner::Router(router) => {
                     router.traverse(reflect.wrap() ).await;
                     Ok(())
                 }
                 ParticleSphereInner::Handler(_) => {
-                    Err("cannot deliver a reflected to an ItemHandler::Handler, it must be an ItemHandler::Router".into())
+                    Err("cannot deliver a reflected to an ParticleSphere::Handler::Handler, it must be an ParticleSphere::Router".into())
                 }
             }
         }
@@ -1194,7 +1197,6 @@ impl DriverRunner {
     fn start(mut self) {
         tokio::spawn(async move {
             while let Some(call) = self.call_rx.recv().await {
-                let result: Result<(), DriverErr> = {
                     match call {
                         DriverRunnerCall::OnAdded => {
                             let mut router = LayerInjectionRouter::new(
@@ -1223,7 +1225,7 @@ impl DriverRunner {
                             }
                         }
                         DriverRunnerCall::Traverse(traversal) => {
-                            self.traverse(traversal).await?;
+                            self.traverse(traversal).await.unwrap();
                         }
                         DriverRunnerCall::Handle(traversal) => {
                             if traversal.is_directed() {
@@ -1258,22 +1260,22 @@ impl DriverRunner {
                                 });
                             } else {
                                 let wave = traversal.payload.to_reflected().unwrap();
-                                self.star_skel.exchanger.reflected(wave).await?;
+                                self.star_skel.exchanger.reflected(wave).await.unwrap();
                             }
                         }
                         DriverRunnerCall::Particle { point, tx } => {
                             let result = self.logger.result(self.driver.particle(&point).await);
-                            tx.send(result)?;
+                            tx.send(result);
                         }
                         DriverRunnerCall::DriverRunnerRequest(request) => match request {
                             DriverRunnerRequest::Create { .. } => {}
                         },
                         DriverRunnerCall::ParticleBind { point, rtn } => {
-                            rtn.send(Ok(self.driver.particle_bind()))?;
+                            rtn.send(Ok(self.driver.particle_bind()));
                         }
                         DriverRunnerCall::InitParticle { point, rtn } => {
-                            let item = self.driver.particle(&point).await?;
-                            match item {
+                            let particle = self.driver.particle(&point).await.unwrap();
+                            match particle {
                                 Ok(item) => {
                                     rtn.send(item.init().await);
                                 }
@@ -1293,9 +1295,6 @@ impl DriverRunner {
                             api.on_added();
                         }
                     }
-                    Ok(())
-                };
-                self.skel.logger.result(result);
             }
         });
     }
@@ -1364,7 +1363,7 @@ impl DriverCtx {
 
 #[derive(Clone)]
 pub struct DriverSkel {
-    skel: HyperStarSkel,
+    star: HyperStarSkel,
     pub selector: KindSelector,
     pub kind: Kind,
     pub point: Point,
@@ -1387,7 +1386,7 @@ impl DriverSkel {
             driver: Some(self.kind.clone()),
         };
         let service = self
-            .skel
+            .star
             .machine_api
             .select_service(selector)
             .await?
@@ -1396,7 +1395,7 @@ impl DriverSkel {
     }
 
     pub fn data_dir(&self) -> String {
-        self.skel.data_dir()
+        self.star.data_dir()
     }
 
     pub fn status(&self) -> DriverStatus {
@@ -1404,19 +1403,19 @@ impl DriverSkel {
     }
 
     pub fn drivers(&self) -> &DriversApi {
-        &self.skel.drivers
+        &self.star.drivers
     }
 
     pub fn artifacts(&self) -> &ArtifactApi {
-        &self.skel.machine_api.artifacts
+        &self.star.machine_api.artifacts
     }
 
     pub fn registry(&self) -> &Registry {
-        &self.skel.machine_api.registry
+        &self.star.machine_api.registry
     }
 
     pub fn new(
-        skel: HyperStarSkel,
+        star: HyperStarSkel,
         kind: Kind,
         point: Point,
         selector: KindSelector,
@@ -1424,6 +1423,8 @@ impl DriverSkel {
         logger: PointLogger,
         status_tx: watch::Sender<DriverStatus>,
         request_tx: mpsc::Sender<DriverRunnerRequest>,
+        bind: ArtRef<BindConfig>,
+        particle_bind: ArtRef<BindConfig>,
     ) -> Self {
         let (mpsc_status_tx, mut mpsc_status_rx): (
             tokio::sync::mpsc::Sender<DriverStatus>,
@@ -1441,10 +1442,12 @@ impl DriverSkel {
         });
 
         Self {
-            skel,
+            star,
             kind,
             selector,
             point,
+            bind,
+            particle_bind,
             logger,
             status_tx: mpsc_status_tx,
             status_rx: watch_status_rx,
@@ -1470,27 +1473,27 @@ impl DriverSkel {
             state: StateSrc::None,
         };
         Ok(self
-            .skel
+            .star
             .logger
-            .result(self.skel.create_in_star(create).await)?)
+            .result(self.star.create_in_star(create).await)?)
     }
 
     pub async fn locate(&self, point: &Point) -> Result<ParticleRecord, RegErr> {
-        self.skel.registry.record(point).await
+        self.star.registry.record(point).await
     }
 
     pub async fn local_driver_lookup(&self, kind: Kind) -> Result<Option<Point>, SpaceErr> {
-        self.skel.drivers.local_driver_lookup(kind).await
+        self.star.drivers.local_driver_lookup(kind).await
     }
 
     pub fn item_ctx(&self, point: &Point, layer: Layer) -> Result<ParticleCtx, DriverErr> {
         let mut router = LayerInjectionRouter::new(
-            self.skel.clone(),
+            self.star.clone(),
             point.to_surface().with_layer(Layer::Core),
         );
         router.direction = Some(TraversalDirection::Fabric);
         let mut transmitter =
-            ProtoTransmitterBuilder::new(Arc::new(router), self.skel.exchanger.clone());
+            ProtoTransmitterBuilder::new(Arc::new(router), self.star.exchanger.clone());
         transmitter.from = SetStrategy::Fill(point.to_surface().with_layer(layer));
         transmitter.agent = SetStrategy::Fill(Agent::Point(point.clone()));
         let transmitter = transmitter.build();
@@ -1598,7 +1601,7 @@ pub trait Driver: Send + Sync {
         STD_BIND.clone()
     }
 
-    async fn init(&mut self, skel: DriverSkel, ctx: DriverCtx) -> Result<(), DriverErr> {
+    async fn init(&mut self, skel: DriverSkel, _: DriverCtx) -> Result<(), DriverErr> {
         skel.logger
             .result(skel.status_tx.send(DriverStatus::Ready).await)
             .unwrap_or_default();
@@ -1831,7 +1834,7 @@ impl Deref for DriverDriverParticleSkel {
     type Target = DriverSkel;
 
     fn deref(&self) -> &Self::Target {
-        &self.skel
+        &self.star
     }
 }
 
@@ -1915,18 +1918,89 @@ impl TraversalRouter for DriverParticle {
 impl ParticleRouter for DriverParticle {}
 
 
-#[derive(Error,Debug,Clone)]
+#[derive(Error,Debug,Clone,ToSpaceErr)]
 pub enum ParticleDriverErr {
     #[error(transparent)]
     DriverErr(#[from] DriverErr),
 }
+
+impl ParticleDriverErr {
+    pub fn unwrap(self) -> DriverErr{
+        match self {
+            ParticleDriverErr::DriverErr(err) => err
+        }
+    }
+}
+
+#[derive(Error,Debug,Clone,ToSpaceErr)]
+pub enum ParticleStarErr {
+    #[error(transparent)]
+    StarErr(#[from] StarErr),
+    #[error(transparent)]
+    RegErr(#[from] RegErr),
+}
+
+impl From<DriverErr> for ParticleStarErr{
+    fn from(err: DriverErr) -> Self {
+        StarErr::DriverErr(err).into()
+    }
+}
+
+
+
+impl ParticleStarErr {
+    pub fn unwrap(self) -> StarErr {
+        match self {
+            ParticleStarErr::StarErr(err) => err,
+            ParticleStarErr::RegErr(err) => err.into()
+        }
+    }
+}
+
+impl CoreReflector for ParticleStarErr {
+    fn as_reflected_core(self) -> ReflectedCore {
+        ReflectedCore{
+            headers: Default::default(),
+            status: StatusCode::fail(),
+            body: Substance::Err(SpaceErr::to_space_err(self))
+        }
+    }
+}
+
+
+impl CoreReflector for ParticleDriverErr{
+    fn as_reflected_core(self) -> ReflectedCore {
+        ReflectedCore{
+            headers: Default::default(),
+            status: StatusCode::fail(),
+            body: Substance::Err(SpaceErr::to_space_err(self))
+        }
+    }
+}
+
+impl From<SpaceErr> for ParticleStarErr {
+    fn from(value: SpaceErr) -> Self {
+        Self::StarErr(StarErr::from(value))
+    }
+}
+
+impl From<SpaceErr> for ParticleDriverErr {
+    fn from(value: SpaceErr) -> Self {
+        Self::DriverErr(DriverErr::from(value))
+    }
+}
+
+impl ParticleErr for ParticleStarErr {
+
+}
+
 
 impl ParticleErr for ParticleDriverErr {
 
 }
 
 
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug, Clone,ToSpaceErr)]
 pub enum DriverErr {
     #[error(transparent)]
     SpaceErr(#[from] SpaceErr),
@@ -1934,8 +2008,6 @@ pub enum DriverErr {
     RegErr(#[from] RegErr),
     #[error(transparent)]
     MachineErr(#[from] MachineErr),
-    #[error(transparent)]
-    StarErr(#[from] StarErr),
     #[error(transparent)]
     ParticleErr(#[from] Box<dyn ParticleErr>),
     #[error(transparent)]
@@ -1952,9 +2024,15 @@ pub enum DriverErr {
     ExpectEnvVar(String),
     #[error("DriverApi is not associated with point: '{0}'")]
     DriverApiNotFound(Point),
+    #[error("Driver not found: '{0}'")]
+    DriverNotFound(String),
 }
 
 impl DriverErr {
+
+    pub fn driver_not_found<S>(name: S) -> Self where S: ToString {
+        Self::DriverNotFound(name.to_string())
+    }
     pub fn particle_router_not_set(point: &Point, kind: &Kind) -> Self {
         let point = point.clone();
         let kind = kind.clone();
@@ -1971,18 +2049,31 @@ impl DriverErr {
 
 
 
-pub trait ParticleErr: std::error::Error + Send + Sync + 'static {}
+pub trait ParticleErr: std::error::Error + Send + Sync + 'static + CoreReflector{}
 
 
 
 
+pub type StdParticleErr = Box<StdParticleErrInner>;
 
-#[derive(Error, Debug, Clone)]
-pub enum StdParticleErr {}
+
+
+#[derive(Error, Debug, Clone,ToSpaceErr)]
+pub enum StdParticleErrInner {}
 
 impl Into<DriverErr> for StdParticleErr {
     fn into(self) -> DriverErr {
         DriverErr::ParticleErr(Box::new(self))
+    }
+}
+
+impl CoreReflector for StdParticleErr {
+    fn as_reflected_core(self) -> ReflectedCore {
+        ReflectedCore {
+            headers: Default::default(),
+            status: StatusCode::fail(),
+            body: Substance::Err(SpaceErr::to_space_err(self)),
+        }
     }
 }
 
@@ -1993,3 +2084,4 @@ impl<T> From<tokio::sync::mpsc::error::SendError<T>> for DriverErr {
         DriverErr::TokioMpscSendErr
     }
 }
+

@@ -12,7 +12,7 @@ use crate::space::util::{ValueMatcher, ValuePattern};
 use crate::space::wave::core::cmd::CmdMethod;
 use crate::space::wave::core::ext::ExtMethod;
 use crate::space::wave::core::http2::{HttpMethod, StatusCode};
-use crate::space::wave::core::hyp::HypMethod;
+use crate::space::wave::core::hyper::HypMethod;
 use crate::space::wave::{Bounce, PingCore, PongCore, ToRecipients, WaveId};
 use crate::{SpaceErr, Substance, Surface, ToSubstance};
 use url::Url;
@@ -20,7 +20,7 @@ use url::Url;
 pub mod cmd;
 pub mod ext;
 pub mod http2;
-pub mod hyp;
+pub mod hyper;
 
 impl From<Result<ReflectedCore, SpaceErr>> for ReflectedCore {
     fn from(result: Result<ReflectedCore, SpaceErr>) -> Self {
@@ -265,6 +265,9 @@ pub enum Method {
     Cmd(CmdMethod),
     Http(HttpMethod),
     Ext(ExtMethod),
+}
+
+pub trait BodyExpect {
 }
 
 

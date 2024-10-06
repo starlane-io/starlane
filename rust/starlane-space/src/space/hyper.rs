@@ -14,13 +14,15 @@ use crate::space::log::Log;
 use crate::space::particle::{Details, Status, Stub};
 use crate::space::point::Point;
 use crate::space::selector::KindSelector;
-use crate::space::substance::Substance;
-use crate::space::wave::core::hyp::HypMethod;
+use crate::space::substance::{Substance, SubstanceKind};
+use crate::space::wave::core::hyper::HypMethod;
 use crate::space::wave::core::{DirectedCore, ReflectedCore};
 use crate::space::wave::{
     PingCore, ReflectedKind, ReflectedProto, Wave, WaveVariantDef, WaveId, WaveKind,
 };
 use crate::Agent;
+use crate::space::substance::CallKind::Hyp;
+use crate::space::substance::Substance::Hyper;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {
@@ -239,6 +241,57 @@ pub enum HyperSubstance {
     Log(Log),
     Search(Search),
     Discoveries(Discoveries),
+}
+
+impl HyperSubstance {
+    pub fn kind(&self) -> HyperSubstanceKind {
+       match self {
+           HyperSubstance::Empty => HyperSubstanceKind::Empty,
+           HyperSubstance::Provision(_) => HyperSubstanceKind::Provision,
+           HyperSubstance::Assign(_) => HyperSubstanceKind::Assign,
+           HyperSubstance::Host(_) => HyperSubstanceKind::Host,
+           HyperSubstance::Event(_) => HyperSubstanceKind::Event,
+           HyperSubstance::Log(_) => HyperSubstanceKind::Log,
+           HyperSubstance::Search(_) => HyperSubstanceKind::Search,
+           HyperSubstance::Discoveries(_) => HyperSubstanceKind::Discoveries
+       }
+    }
+}
+
+
+
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    strum_macros::Display,
+    strum_macros::EnumString,
+)]
+#[non_exhaustive]
+pub enum HyperSubstanceKind {
+    Empty,
+    Provision,
+    Assign,
+    Host,
+    Event,
+    Log,
+    Search,
+    Discoveries,
+}
+
+impl Default for HyperSubstanceKind {
+    fn default() -> Self {
+        Self::Empty
+    }
+}
+
+impl Into<SubstanceKind> for HyperSubstanceKind {
+    fn into(self) -> SubstanceKind {
+        SubstanceKind::Hyper(self)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]

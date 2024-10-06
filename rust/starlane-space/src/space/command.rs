@@ -41,28 +41,28 @@ pub mod common {
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
     pub enum StateSrc {
         None,
-        Substance(Box<Substance>),
+        Subst(Box<Substance>),
     }
 
     impl StateSrc {
         pub fn has_substance(&self) -> bool {
             match self {
                 StateSrc::None => false,
-                StateSrc::Substance(_) => true,
+                StateSrc::Subst(_) => true,
             }
         }
 
         pub fn get_substance(&self) -> Result<Substance, SpaceErr> {
             match self {
                 StateSrc::None => Err(SpaceErr::server_error("state has no substance")),
-                StateSrc::Substance(substance) => Ok(*substance.clone()),
+                StateSrc::Subst(substance) => Ok(*substance.clone()),
             }
         }
 
         pub fn to_bin(self) -> Bin {
             match self {
                 StateSrc::None => vec![],
-                StateSrc::Substance(substance) => {
+                StateSrc::Subst(substance) => {
                     if let Substance::Bin(bin) = *substance{
                         bin
                     } else {
@@ -518,7 +518,7 @@ pub mod direct {
                 let template = self.template.to_resolved(env)?;
                 let state = match &self.state {
                     StateSrcVar::None => StateSrc::None,
-                    StateSrcVar::FileRef(name) => StateSrc::Substance(Box::new(Substance::Bin(
+                    StateSrcVar::FileRef(name) => StateSrc::Subst(Box::new(Substance::Bin(
                         env.file(name)
                             .map_err(|e| match e {
                                 ResolverErr::NotAvailable => SpaceErr::server_error(
@@ -540,7 +540,7 @@ pub mod direct {
                                 var.name
                             )),
                         })?;
-                        StateSrc::Substance(Box::new(Substance::Bin(
+                        StateSrc::Subst(Box::new(Substance::Bin(
                             env.file(val.clone())
                                 .map_err(|e| match e {
                                     ResolverErr::NotAvailable => SpaceErr::server_error(
@@ -588,7 +588,7 @@ pub mod direct {
             pub fn fulfillment(mut self, bin: Bin) -> Create {
                 Create {
                     template: self.template,
-                    state: StateSrc::Substance(Box::new(Substance::Bin(bin))),
+                    state: StateSrc::Subst(Box::new(Substance::Bin(bin))),
                     properties: self.properties,
                     strategy: self.strategy,
                 }

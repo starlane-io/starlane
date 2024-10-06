@@ -60,7 +60,7 @@ use crate::space::util::{log, HttpMethodPattern, StringMatcher, ToResolved, Valu
 use crate::space::wave::core::cmd::CmdMethod;
 use crate::space::wave::core::ext::ExtMethod;
 use crate::space::wave::core::http2::HttpMethod;
-use crate::space::wave::core::hyp::HypMethod;
+use crate::space::wave::core::hyper::HypMethod;
 use crate::space::wave::core::MethodKind;
 use crate::space::wave::core::{Method, MethodPattern};
 use model::{

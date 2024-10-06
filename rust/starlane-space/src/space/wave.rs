@@ -28,7 +28,7 @@ use crate::space::{ANONYMOUS, HYPERUSER};
 use self::core::cmd::CmdMethod;
 use self::core::ext::ExtMethod;
 use self::core::http2::HttpMethod;
-use self::core::hyp::HypMethod;
+use self::core::hyper::HypMethod;
 use self::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
 
 pub mod core;

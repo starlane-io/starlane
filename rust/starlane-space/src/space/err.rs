@@ -65,6 +65,8 @@ pub enum SpaceErr {
     PointPushTerminal(PointSegKind),
     #[error("cannot push a FileSystem PointSegment '{0}' onto a point until after the FileSystemRoot ':/' segment has been pushed")]
     PointPushNoFileRoot(PointSegKind),
+    #[error("expected '{kind}' : '{expected}' found: '{found}'")]
+    Expected{ kind: String, expected: String, found: String },
 }
 
 impl SpaceErr {
@@ -89,7 +91,18 @@ impl SpaceErr {
             subs
         }
     }
+
+    pub fn expected<K,E>( kind: K,expected: E, found: Option<E>) -> Self where E: ToString, K: ToString{
+        let kind = kind.to_string();
+        let expected = expected.to_string();
+        let found = match found {
+            None => "None".to_string(),
+            Some(some) => some.to_string()
+        };
+        Self::Expected {kind, expected, found}
+    }
 }
+
 
 impl PrintErr for SpaceErr {
     fn print(&self) {
@@ -852,6 +865,13 @@ pub mod report {
 
 pub trait PrintErr {
     fn print(&self);
+}
+
+
+pub trait ToSpaceErr where Self: Display{
+    fn to_space_err(&self) -> SpaceErr {
+        SpaceErr::Msg(format!("{}",self).to_string())
+    }
 }
 
 #[cfg(test)]

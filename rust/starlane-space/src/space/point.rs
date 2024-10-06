@@ -3,6 +3,7 @@ use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use md5::{Digest, Md5};
+use thiserror::__private::AsDisplay;
 use crate::space::err::{ParseErrs, SpaceErr};
 use crate::space::loc::{PointSegQuery, PointSegment, RouteSegQuery, Surface, ToPoint, ToSurface, VarVal, Variable, Version, CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE, LOCAL_PORTAL, LOCAL_STAR, REMOTE_ENDPOINT};
 use crate::space::parse::util::{result, Tw};
@@ -1358,6 +1359,7 @@ impl Point {
     }
 }
 
+
 impl FromStr for Point {
     type Err = SpaceErr;
 
@@ -1435,6 +1437,10 @@ where
     }
 }
 
+
+
+
+
 impl<Route, Seg> ToString for PointDef<Route, Seg>
 where
     Route: RouteSegQuery + ToString,
@@ -1442,6 +1448,19 @@ where
 {
     fn to_string(&self) -> String {
         self.to_string_impl(!self.route.is_local())
+    }
+}
+
+impl <Route,Seg> AsDisplay<'_> for PointDef<Route,Seg>
+where
+    Route: RouteSegQuery + ToString,
+    Seg: PointSegQuery + ToString,
+
+{
+    type Target = String;
+
+    fn as_display(&'_ self) -> Self::Target {
+        self.to_string()
     }
 }
 
@@ -1524,3 +1543,7 @@ pub type PointCtx = PointDef<RouteSeg, PointSegCtx>;
 /// let point: Point = point_var.to_resolve(&env)?;
 /// ```
 pub type PointVar = PointDef<RouteSegVar, PointSegVar>;
+
+
+
+

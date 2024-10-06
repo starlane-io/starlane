@@ -15,10 +15,7 @@ use syn::__private::TokenStream2;
 use syn::parse::{Parse, ParseStream};
 use syn::parse_quote::ParseQuote;
 use syn::spanned::Spanned;
-use syn::{
-    parse_macro_input, Attribute, FnArg, GenericArgument, ImplItem, ItemImpl, PathArguments,
-    PathSegment, ReturnType, Type,
-};
+use syn::{parse_macro_input, Attribute, DeriveInput, FnArg, GenericArgument, ImplItem, ItemImpl, PathArguments, PathSegment, ReturnType, Type};
 
 use starlane::space::parse::route_attribute_value;
 use starlane::space::util::log;
@@ -443,3 +440,17 @@ impl Parse for RouteAttr {
 }
 
 
+/// adds a trait to given struct or enum
+#[proc_macro_derive(ToSpaceErr)]
+pub fn to_space_err(item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as DeriveInput);
+    let ident = &input.ident;
+    let rtn = quote! {
+       impl starlane::space::err::ToSpaceErr for #ident {
+            fn to_space_err(&self) -> starlane::space::err::SpaceErr {
+                starlane::space::err::SpaceErr::to_space_err(&self.to_string())
+            }
+        }
+    };
+    rtn.into()
+}

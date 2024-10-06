@@ -1,4 +1,4 @@
-use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory, Particle, ParticleSphereInner};
+use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory, Particle, ParticleSphere, ParticleSphereInner, ParticleStarErr, STD_BIND};
 use crate::platform::Platform;
 use crate::hyperspace::reg::Registration;
 use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
@@ -10,7 +10,7 @@ use starlane::space::command::direct::create::Strategy;
 use starlane::space::config::bind::BindConfig;
 use starlane::space::err::{CoreReflector, SpaceErr};
 use starlane::space::hyper::{
-    Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, ParticleLocation, Search,
+    Assign, AssignmentKind, Discoveries, Discovery, HyperSubstance, ParticleLocation, Search, HyperSubstanceKind
 };
 use starlane::space::kind::{BaseKind, Kind, StarSub};
 use starlane::space::loc::{Layer, StarKey, ToPoint, ToSurface, LOCAL_STAR};
@@ -20,10 +20,10 @@ use starlane::space::particle::traversal::TraversalInjection;
 use starlane::space::particle::Status;
 use starlane::space::point::Point;
 use starlane::space::selector::{KindSelector, Pattern, SubKindSelector};
-use starlane::space::substance::Substance;
+use starlane::space::substance::{Substance, SubstanceKind};
 use starlane::space::util::{log, ValuePattern};
 use starlane::space::wave::core::http2::StatusCode;
-use starlane::space::wave::core::hyp::HypMethod;
+use starlane::space::wave::core::hyper::HypMethod;
 use starlane::space::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
 use starlane::space::wave::exchange::asynch::{
     InCtx, ProtoTransmitter, ProtoTransmitterBuilder,
@@ -42,6 +42,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio_print::aprintln;
+use starlane::space::wave::core::MethodKind::Hyp;
 
 static STAR_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
     ArtRef::new(
@@ -56,6 +57,7 @@ fn star_bind() -> BindConfig {
     Bind(version=1.0.0)
     {
        Route -> {
+           Hyp<Init> -> (());
            Hyp<Transport> -> (());
            Hyp<Assign> -> (()) => &;
            Hyp<Search> -> (()) => &;
@@ -241,12 +243,13 @@ impl Driver for StarDriver
         Ok(())
     }
 
-    async fn particle(&self, point: &Point) -> Result<ParticleSphereInner, DriverErr> {
-        Ok(Star::restore(
+    async fn particle(&self, point: &Point) -> Result<ParticleSphere, DriverErr> {
+        let star = Star::restore(
             self.star_skel.clone(),
             self.ctx.clone(),
             (),
-        ).sphere())
+        );
+        Ok(star.sphere()?)
     }
 }
 
@@ -261,7 +264,7 @@ pub struct Star
 impl Star
 
 {
-    async fn create(&self, assign: &Assign) -> Result<(), DriverErr> {
+    async fn create(&self, assign: &Assign) -> Result<(), <Self as Particle>::Err> {
         self.skel
             .state
             .create_shell(assign.details.stub.point.clone());
@@ -290,31 +293,30 @@ impl Particle for Star
     type Skel = HyperStarSkel;
     type Ctx = DriverCtx;
     type State = ();
-    type Err = StarErr;
+    type Err = ParticleStarErr;
 
     fn restore(skel: Self::Skel, ctx: Self::Ctx, _: Self::State) -> Self {
         Star { skel, ctx }
     }
 
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
-        Ok(STAR_BIND_CONFIG.clone())
+    fn bind(&self) -> ArtRef<BindConfig> {
+        STAR_BIND_CONFIG.clone()
     }
 
-    fn sphere(self) -> ParticleSphereInner {
-        ParticleSphereInner::Handler(Box::new(self))
+    fn sphere(self) -> Result<ParticleSphere, Self::Err>{
+        Ok(ParticleSphere::new_handler(self.bind(),self))
     }
 }
 
 #[handler]
 impl Star
-
 {
 
     #[route("Hyp<Init>")]
     pub async fn init(
         &self,
         ctx: InCtx<'_, HyperSubstance>,
-    ) -> Result<Status, Self::Err> {
+    ) -> Result<Status, <Self as Particle>::Err> {
 
         match self.skel.kind {
             StarSub::Central => {
@@ -382,15 +384,14 @@ impl Star
     pub async fn provision(
         &self,
         ctx: InCtx<'_, HyperSubstance>,
-    ) -> Result<ParticleLocation, Self::Err> {
+    ) -> Result<ParticleLocation, <Self as Particle>::Err> {
         if let HyperSubstance::Provision(provision) = ctx.input {
             let record = self.skel.registry.record(&provision.point).await?;
 
             match self.skel.wrangles.find(&record.details.stub.kind) {
                 None => {
                     let kind = record.details.stub.kind.clone();
-                    if self
-                        .skel
+                    if self .skel
                         .drivers
                         .find_external(record.details.stub.kind.clone())
                         .await?
@@ -406,18 +407,10 @@ impl Star
                         if self.assign(ctx).await?.is_ok() {
                             Ok(ParticleLocation::new(Some(self.skel.point.clone()), None))
                         } else {
-                            Err(
-                                format!("could not find assign kind {} to self", kind.to_string())
-                                    .into(),
-                            )
+                            Err(StarErr::CouldNotAssignToSelf(kind))?
                         }
                     } else {
-                        println!("could not find a place to provision!!!");
-                        Err(format!(
-                            "could not find a place to provision kind {}",
-                            kind.to_string()
-                        )
-                        .into())
+                        Err(StarErr::CouldNotFindHostToProvision(kind))?
                     }
                 }
                 Some(selector) => {
@@ -436,12 +429,12 @@ impl Star
                 }
             }
         } else {
-            Err("expected Hyp<Provision>".into())
+            Err(SpaceErr::expected_substance(SubstanceKind::Hyper(HyperSubstanceKind::Provision), ctx.input.kind().into()) )?
         }
     }
 
     #[route("Hyp<Assign>")]
-    pub async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, Self::Err> {
+    pub async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, <Self as Particle>::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
             #[cfg(test)]
             self.skel
@@ -464,10 +457,9 @@ impl Star
                     .drivers
                     .local_driver_lookup(assign.details.stub.kind.clone())
                     .await?
-                    .ok_or(DriverErr::new(format!(
-                        "Star does not have  driver for {}",
-                        assign.details.stub.kind.to_string()
-                    )))?;
+                    .ok_or(
+                        DriverErr::driver_not_found(&assign.details.stub.kind)
+                    )?;
 
                 let mut directed = DirectedProto::ping();
                 directed.method(HypMethod::Assign);
@@ -496,7 +488,7 @@ impl Star
 
             Ok(ReflectedCore::ok())
         } else {
-            Err("expected Hyp<Assign>".into())
+            Err(SpaceErr::expected_substance(SubstanceKind::Hyper(HyperSubstanceKind::Assign), ctx.input.kind().into()))?
         }
     }
 

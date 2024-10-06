@@ -12,6 +12,8 @@ use crate::space::substance::Substance;
 use crate::space::util::ToResolved;
 use crate::{BaseKind, SpaceErr};
 use crate::space::parse::util::{new_span, result, Span};
+use crate::space::wave::core::http2::StatusCode;
+use crate::space::wave::core::ReflectedCore;
 
 pub mod property;
 pub mod traversal;
@@ -42,6 +44,30 @@ pub enum Status {
     Paused, // can not receive requests (probably because it is waiting for some other particle to make updates)...
     Resuming, // like Initializing but triggered after a pause is lifted, the particle may be doing something before it is ready to accept requests again.
     Done, // this particle had a life span and has now completed succesfully it can no longer receive requests.
+}
+
+impl From<Status> for ReflectedCore {
+    fn from(status: Status) -> Self {
+        let code= StatusCode::from_u16( match &status{
+            Status::Unknown => 520u16,
+            Status::Pending => 202u16,
+            Status::Init => 200u16,
+            Status::Panic => 500u16,
+            Status::Fatal => 500u16,
+            Status::Ready => 200u16,
+            Status::Paused => 503u16,
+            Status::Resuming => 205u16,
+            Status::Done => 200u16
+        }).unwrap_or(StatusCode::fail());
+
+        let body = Substance::Status(status);
+        let status = code;
+        ReflectedCore {
+            headers: Default::default(),
+            status,
+            body
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]

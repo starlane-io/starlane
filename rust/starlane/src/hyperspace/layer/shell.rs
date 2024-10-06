@@ -296,7 +296,7 @@ impl CommandExecutor {
         if let Command::Create(create) = &mut command {
             if ctx.transfers.len() == 1 {
                 let transfer = ctx.transfers.get(0).unwrap().clone();
-                create.state = StateSrc::Substance(Box::new(Substance::Bin(transfer.content)));
+                create.state = StateSrc::Subst(Box::new(Substance::Bin(transfer.content)));
             } else if ctx.transfers.len() > 1 {
                 return Err("create cannot handle more than one state transfer".into());
             }

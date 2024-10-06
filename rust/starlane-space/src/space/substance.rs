@@ -10,7 +10,7 @@ use starlane_primitive_macros::Autobox;
 
 use crate::space::command::{Command, RawCommand};
 use crate::space::err::ParseErrs;
-use crate::space::hyper::{Greet, HyperSubstance, Knock, ParticleLocation};
+use crate::space::hyper::{Greet, HyperSubstance, HyperSubstanceKind, Knock, ParticleLocation};
 use crate::space::loc::Meta;
 use crate::space::log::{AuditLog, Log, LogSpan, LogSpanEvent, PointlessLog};
 use crate::space::parse::model::Subst;
@@ -21,7 +21,7 @@ use crate::space::util::{ToResolved, ValueMatcher, ValuePattern};
 use crate::space::wave::core::cmd::CmdMethod;
 use crate::space::wave::core::ext::ExtMethod;
 use crate::space::wave::core::http2::HttpMethod;
-use crate::space::wave::core::hyp::HypMethod;
+use crate::space::wave::core::hyper::HypMethod;
 use crate::space::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use crate::space::wave::{PongCore, Wave};
 use crate::{Details, SpaceErr, Status, Stub, Surface};
@@ -39,6 +39,7 @@ use crate::space::util;
     strum_macros::Display,
     strum_macros::EnumString,
 )]
+#[non_exhaustive]
 pub enum SubstanceKind {
     Empty,
     List,
@@ -62,9 +63,10 @@ pub enum SubstanceKind {
     Command,
     DirectedCore,
     ReflectedCore,
-    Hyp,
+    #[strum(to_string="Hyp<{0}>")]
+    Hyper(HyperSubstanceKind),
     Token,
-    UltraWave,
+    Wave,
     Knock,
     Greet,
     Log,
@@ -82,6 +84,7 @@ pub enum SubstanceKind {
     Autobox,
     starlane_primitive_macros::ToSubstance,
 )]
+#[non_exhaustive]
 pub enum Substance {
     Empty,
     List(SubstanceList),
@@ -251,10 +254,10 @@ impl Substance {
             Substance::Command(_) => SubstanceKind::Command,
             Substance::DirectedCore(_) => SubstanceKind::DirectedCore,
             Substance::ReflectedCore(_) => SubstanceKind::ReflectedCore,
-            Substance::Hyper(_) => SubstanceKind::Hyp,
+            Substance::Hyper(hyper) => SubstanceKind::Hyper(hyper.kind()),
             Substance::MultipartForm(_) => SubstanceKind::MultipartForm,
             Substance::Token(_) => SubstanceKind::Token,
-            Substance::Wave(_) => SubstanceKind::UltraWave,
+            Substance::Wave(_) => SubstanceKind::Wave,
             Substance::Knock(_) => SubstanceKind::Knock,
             Substance::Greet(_) => SubstanceKind::Greet,
             Substance::Details(_) => SubstanceKind::Details,

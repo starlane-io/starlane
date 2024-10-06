@@ -31,7 +31,7 @@ use starlane::space::settings::Timeouts;
 use starlane::space::substance::Substance;
 use starlane::space::wave::core::cmd::CmdMethod;
 use starlane::space::wave::core::ext::ExtMethod;
-use starlane::space::wave::core::hyp::HypMethod;
+use starlane::space::wave::core::hyper::HypMethod;
 use starlane::space::wave::core::{Method, ReflectedCore};
 use starlane::space::wave::exchange::asynch::Exchanger;
 use starlane::space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};

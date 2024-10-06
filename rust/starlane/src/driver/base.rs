@@ -92,6 +92,7 @@ impl Driver for BaseDriver
     }
 }
 
+#[derive(DirectedHandler)]
 pub struct Base;
 
 impl Particle for Base {
