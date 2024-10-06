@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use serde::{Deserialize, Serialize};
-
+use starlane_primitive_macros::Autobox;
 use crate::space::config::mechtron::MechtronConfig;
 use crate::space::particle::{Details, Stub};
 use crate::space::point::Point;
@@ -64,11 +64,19 @@ impl<Body> Deref for PointConfig<Body> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone,Autobox)]
 pub enum Document {
     BindConfig(BindConfig),
     MechtronConfig(MechtronConfig),
 }
+
+#[derive(Clone,Hash,Eq,PartialEq,strum_macros::Display,strum_macros::EnumString)]
+pub enum DocKind {
+    BindConfig,
+    MechtronConfig
+}
+
+
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ParticleConfigBody {

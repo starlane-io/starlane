@@ -3,7 +3,8 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-
+use crate::space::artifact::asynch::{ArtifactPipeline, Artifacts};
+use crate::space::err::SpaceErr;
 use crate::space::loc::ToSurface;
 use crate::space::point::Point;
 use crate::space::substance::Bin;
@@ -11,17 +12,33 @@ use crate::space::substance::Bin;
 pub mod asynch;
 pub mod synch;
 
-#[derive(Clone)]
 pub struct ArtRef<A> {
     artifact: Arc<A>,
     pub point: Point,
+    tx: tokio::sync::mpsc::Sender<()>,
+}
+
+impl <A> Clone for ArtRef<A> {
+    fn clone(&self) -> Self {
+        /// cloning indicates a usage event...
+        self.tx.try_send(()).unwrap_or_default();
+        Self {
+            artifact: self.artifact.clone(),
+            point: self.point.clone(),
+            tx: self.tx.clone()
+        }
+    }
 }
 
 impl<A> ArtRef<A> {
-    pub fn new(artifact: Arc<A>, point: Point) -> Self {
-        Self { artifact, point }
+    fn new(artifact: A, point: Point, tx: tokio::sync::mpsc::Sender<()>) -> Self {
+        Self { artifact, point, tx }
     }
 }
+
+
+
+
 
 impl<A> ArtRef<A>
 where
@@ -42,9 +59,10 @@ impl<A> ArtRef<A> {
 }
 
 impl<A> Deref for ArtRef<A> {
-    type Target = Arc<A>;
+    type Target = A;
 
     fn deref(&self) -> &Self::Target {
+        self.tx.try_send(()).unwrap_or_default();
         &self.artifact
     }
 }

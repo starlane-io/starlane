@@ -1451,6 +1451,16 @@ where
     }
 }
 
+impl<Route, Seg> ToString for &PointDef<Route, Seg>
+where
+    Route: RouteSegQuery + ToString,
+    Seg: PointSegQuery + ToString,
+{
+    fn to_string(&self) -> String {
+        self.to_string_impl(!self.route.is_local())
+    }
+}
+
 impl <Route,Seg> AsDisplay<'_> for PointDef<Route,Seg>
 where
     Route: RouteSegQuery + ToString,

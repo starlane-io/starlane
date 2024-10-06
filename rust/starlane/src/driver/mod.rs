@@ -1559,13 +1559,17 @@ pub trait HyperDriverFactory: Send + Sync {
 
     async fn create(
         &self,
-        skel: HyperStarSkel,
-        driver_skel: DriverSkel,
+        star: HyperStarSkel,
+        skel: DriverSkel,
         ctx: DriverCtx,
     ) -> Result<Box<dyn Driver>, DriverErr>;
 
     fn properties(&self) -> SetProperties {
         SetProperties::default()
+    }
+
+    fn builtin_artifacts(&self) -> Vec<ArtRef> {
+
     }
 }
 

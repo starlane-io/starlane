@@ -9,33 +9,141 @@ use crate::{Bin, BindConfig, SpaceErr, Stub, Substance};
 use dashmap::DashMap;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use std::time::SystemTime;
+use dashmap::mapref::one::Ref;
+use thiserror::Error;
 use tokio::sync::watch;
+use tokio::sync::watch::Receiver;
+use crate::space::config::{DocKind, Document};
+
+#[derive(Clone,Error,Debug)]
+pub enum ArtErr {
+    #[error("artifact '{0}' not found.")]
+    NotFound(Point),
+    #[error("repo for artifact '{0}' is is not currently reachable")]
+    Unreachable(Point)
+}
+
+#[derive(Clone)]
+pub struct Attempt{
+    pub err: ArtErr,
+    pub time: SystemTime
+}
+
+impl Attempt {
+    pub fn new( err: ArtErr) -> Self {
+        Self {
+            err,
+            time: SystemTime::now()
+        }
+    }
+}
+
+impl ArtErr {
+}
+
+pub enum ArtStatus<A> {
+    Unknown,
+    Fetching,
+    Raw(String),
+    Parsing,
+    Cached(ArtRef<A>),
+    Fail(Attempt)
+}
+
+pub struct ArtifactPipeline<A> {
+    watch: watch::Receiver<ArtStatus<A>>
+}
+
+impl <A>  ArtifactPipeline<A> {
+    pub fn new( ) -> (ArtifactPipeline<A>, watch::Sender<ArtStatus<A>>)  {
+        let (tx, watch) = watch::channel(ArtStatus::Unknown);
+        (ArtifactPipeline {
+            watch
+        }, tx)
+    }
+}
+
+struct ArtifactCache<A,F> where F: ArtifactFetcher {
+   artifacts: DashMap<Point, ArtRef<A>>,
+   bins: DashMap<Point, Arc<Bin>>,
+   pipeline: DashMap<Point, ArtifactPipeline<A>>,
+   fetcher: F
+}
+
+impl <'a,A,F> ArtifactCache<A,&'a F> where F: ArtifactFetcher{
+   pub fn new(fetcher: &'a F) -> ArtifactCache<A,&'a F> {
+       ArtifactCache {
+           artifacts: Default::default(),
+           bins: Default::default(),
+           pipeline: Default::default(),
+           fetcher,
+       }
+   }
+}
+
+
+
+pub struct Artifacts<'a> {
+    fetcher: Box<dyn ArtifactFetcher>,
+    pub bind: ArtifactCache<BindConfig,&'a dyn ArtifactFetcher>,
+    pub mechtron: ArtifactCache<MechtronConfig,&'a dyn ArtifactFetcher>
+}
+
+
+impl <'a> Artifacts<'a>  {
+    pub fn new( fetcher: Box<dyn ArtifactFetcher>) -> Artifacts<'a>{
+        Artifacts {
+            bind: ArtifactCache::new(&*fetcher),
+            mechtron: ArtifactCache::new(&*fetcher),
+            fetcher,
+        }
+    }
+}
+
+
+
+impl <A,F>  ArtifactCache<A,F> where F: ArtifactFetcher{
+    fn new(fetcher: F) -> ArtifactCache<A,F>{
+        Self {
+            artifacts: Default::default(),
+            bins: Default::default(),
+            pipeline: Default::default(),
+            fetcher: fetcher,
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct ArtifactApi {
-    binds: Arc<DashMap<Point, Arc<BindConfig>>>,
-    mechtrons: Arc<DashMap<Point, Arc<MechtronConfig>>>,
-    wasm: Arc<DashMap<Point, Bin>>,
-    fetcher_tx: Arc<watch::Sender<Arc<dyn ArtifactFetcher>>>,
-    fetcher_rx: watch::Receiver<Arc<dyn ArtifactFetcher>>,
+    builtin: Arc<Artifacts>,
+    cached: Arc<Artifacts>,
 }
 
 impl ArtifactApi {
     pub fn no_fetcher() -> Self {
-        let fetcher = Arc::new(NoDiceArtifactFetcher);
+        let fetcher = Arc::new(NoDiceArtifactFetcher{});
         Self::new(fetcher)
     }
 
     pub fn new(fetcher: Arc<dyn ArtifactFetcher>) -> Self {
-        let (fetcher_tx, fetcher_rx) = watch::channel(fetcher);
-        let fetcher_tx = Arc::new(fetcher_tx);
+        let builtin= Arc::new(ArtifactCache::default());
+        let cached = Arc::new(ArtifactCache::default());
         Self {
-            binds: Arc::new(DashMap::new()),
-            mechtrons: Arc::new(DashMap::new()),
-            wasm: Arc::new(DashMap::new()),
-            fetcher_tx,
-            fetcher_rx,
+            builtin,
+            cached,
+        }
+    }
+
+    pub fn bind<A>( &self, point: &Point ) -> Result<ArtRef<A>,SpaceErr> where A: TryFrom<Document>{
+
+        match self.builtin.bind.get_mut(point) {
+            Some(v) => {
+
+            },
+            None => {}
         }
     }
 
@@ -60,7 +168,7 @@ impl ArtifactApi {
         return Ok(ArtRef::new(mechtron, point.clone()));
     }
 
-    pub async fn bind(&self, point: &Point) -> Result<ArtRef<BindConfig>, SpaceErr> {
+/*    pub async fn bind(&self, point: &Point) -> Result<ArtRef<BindConfig>, SpaceErr> {
         {
             if self.binds.contains_key(point) {
                 let bind = self.binds.get(point).unwrap().clone();
@@ -74,6 +182,8 @@ impl ArtifactApi {
         }
         return Ok(ArtRef::new(bind, point.clone()));
     }
+
+ */
 
     pub async fn wasm(&self, point: &Point) -> Result<ArtRef<Bin>, SpaceErr> {
         {
@@ -113,9 +223,56 @@ impl FetchChamber {
 }
 
 #[async_trait]
-pub trait ArtifactFetcher: Send + Sync {
+pub trait ArtifactFetcher: Send + Sync + Clone {
     async fn stub(&self, point: &Point) -> Result<Stub, SpaceErr>;
-    async fn fetch(&self, point: &Point) -> Result<Bin, SpaceErr>;
+    async fn fetch(&self, point: &Point ) -> Result<ArtifactPipeline<Bin>, SpaceErr>;
+}
+
+
+pub struct BuiltinArtifactFetcherBuilder {
+    bins: HashMap<Point,Arc<Bin>>
+}
+
+impl BuiltinArtifactFetcherBuilder {
+    pub fn add(& mut self, point: &Point, bin: Bin ) {
+        self.bins.insert(point.clone(),Arc::new(bin));
+    }
+
+    pub fn build(self) -> BuiltinArtifactFetcher {
+        BuiltinArtifactFetcher {
+            bins: self.bins
+        }
+    }
+}
+
+impl Deref for BuiltinArtifactFetcherBuilder {
+    type Target = HashMap<Point,Arc<Bin>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.bins
+    }
+}
+
+impl DerefMut for BuiltinArtifactFetcherBuilder {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        & mut self.bins
+    }
+}
+
+
+
+pub struct BuiltinArtifactFetcher {
+    bins: HashMap<Point,Arc<Bin>>
+}
+#[async_trait]
+impl ArtifactFetcher for BuiltinArtifactFetcher{
+    async fn stub(&self, point: &Point) -> Result<Stub, SpaceErr> {
+        Err("cannot pull artifacts right now".into())
+    }
+
+    async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, SpaceErr> {
+        Ok(self.bins.get(point).cloned().ok_or(SpaceErr::not_found(point))?)
+    }
 }
 
 pub struct NoDiceArtifactFetcher;
