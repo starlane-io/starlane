@@ -1,4 +1,4 @@
-use crate::driver::{Driver, DriverCtx, DriverErr, DriverSkel, HyperDriverFactory, ParticleHandler, ParticleSphere};
+use crate::driver::{Driver, DriverCtx, DriverErr, DriverSkel, HyperDriverFactory, Particle, ParticleSphere, ParticleSphereInner, StdParticleErr};
 use crate::platform::Platform;
 use crate::hyperspace::star::HyperStarSkel;
 use once_cell::sync::Lazy;
@@ -11,6 +11,8 @@ use starlane::space::selector::KindSelector;
 use starlane::space::util::log;
 use std::str::FromStr;
 use std::sync::Arc;
+use starlane::space::wave::core::CoreBounce;
+use starlane::space::wave::exchange::asynch::{DirectedHandler, RootInCtx};
 
 static SPACE_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
     ArtRef::new(
@@ -69,19 +71,34 @@ impl Driver for SpaceDriver
     }
 
     async fn particle(&self, point: &Point) -> Result<ParticleSphere, DriverErr> {
-        Ok(ParticleSphere::Handler(Box::new(Space)))
+
     }
 }
 
+#[derive(DirectedHandler)]
 pub struct Space;
 
 #[handler]
 impl Space {}
 
-#[async_trait]
-impl ParticleHandler for Space
-{
+impl Particle for Space {
+    type Skel = ();
+    type Ctx = ();
+    type State = ();
+    type Err = StdParticleErr;
+
+    fn restore(_: Self::Skel, _: Self::Ctx, _: Self::State) -> Self {
+        Space
+    }
+
+
     async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
         Ok(SPACE_BIND_CONFIG.clone())
     }
+
+    fn sphere(self) -> ParticleSphereInner {
+        ParticleSphereInner::Handler(Box::new(self))
+    }
 }
+
+

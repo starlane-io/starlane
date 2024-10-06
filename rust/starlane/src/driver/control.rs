@@ -1,12 +1,14 @@
-pub use starlane_space as starlane;
-use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Particle, ParticleRouter, ParticleSphere};
+use crate::driver::{
+    Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory,
+    HyperSkel, Particle, ParticleErr, ParticleRouter, ParticleSphere, ParticleSphereInner,
+};
 use crate::hyperlane::{
     AnonHyperAuthenticatorAssignEndPoint, FromTransform, HopTransform, HyperClient, HyperGreeter,
     Hyperway, HyperwayConfigurator, HyperwayEndpointFactory, HyperwayInterchange, HyperwayStub,
     InterchangeGate, TransportTransform,
 };
-use crate::platform::Platform;
 use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter};
+use crate::platform::Platform;
 use dashmap::DashMap;
 use starlane::space::artifact::ArtRef;
 use starlane::space::command::common::StateSrc;
@@ -31,23 +33,18 @@ use starlane::space::wave::exchange::asynch::{
     Exchanger, ProtoTransmitter, ProtoTransmitterBuilder, Router, TraversalRouter,
 };
 use starlane::space::wave::exchange::SetStrategy;
-use starlane::space::wave::{
-    Agent, DirectedProto, PongCore, ToRecipients, Wave, WaveVariantDef,
-};
+use starlane::space::wave::{Agent, DirectedProto, PongCore, ToRecipients, Wave, WaveVariantDef};
+pub use starlane_space as starlane;
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use thiserror::Error;
 
-pub struct ControlDriverFactory
-
-{
-}
+pub struct ControlDriverFactory {}
 
 #[async_trait]
-impl HyperDriverFactory for ControlDriverFactory
-
-{
+impl HyperDriverFactory for ControlDriverFactory {
     fn kind(&self) -> Kind {
         Kind::Control
     }
@@ -77,33 +74,22 @@ impl HyperDriverFactory for ControlDriverFactory
     }
 }
 
-impl ControlDriverFactory
-
-{
+impl ControlDriverFactory {
     pub fn new() -> Self {
-        Self {
-        }
+        Self {}
     }
 }
 
-pub struct ControlFactory
+pub struct ControlFactory {}
 
-{
-}
-
-impl ControlFactory
-
-{
+impl ControlFactory {
     pub fn new() -> Self {
-        Self {
-        }
+        Self {}
     }
 }
 
 #[async_trait]
-impl HyperDriverFactory for ControlFactory
-
-{
+impl HyperDriverFactory for ControlFactory {
     fn kind(&self) -> Kind {
         Kind::Control
     }
@@ -131,9 +117,7 @@ impl HyperDriverFactory for ControlFactory
 }
 
 #[derive(DirectedHandler)]
-pub struct ControlDriver
-
-{
+pub struct ControlDriver {
     pub ctx: DriverCtx,
     pub skel: HyperSkel,
     pub external_router: Option<Arc<dyn Router>>,
@@ -142,17 +126,13 @@ pub struct ControlDriver
 }
 
 #[derive(Clone)]
-pub struct ControlSkel
-
-{
+pub struct ControlSkel {
     pub star: HyperStarSkel,
     pub driver: DriverSkel,
 }
 
 #[async_trait]
-impl Driver for ControlDriver
-
-{
+impl Driver for ControlDriver {
     fn kind(&self) -> Kind {
         Kind::Control
     }
@@ -285,29 +265,23 @@ impl Driver for ControlDriver
         let router = self
             .external_router
             .as_ref()
-            .ok_or(DriverErr::item_router_not_set(point, &self.kind()))?
+            .ok_or(DriverErr::particle_router_not_set(point, &self.kind()))?
             .clone();
         let ctx = ControlCtx::new(router);
-        Ok(ParticleSphere::Router(Box::new(Control::restore(
-            self.skel.clone(),
-            ctx,
-            (),
-        ))))
+        let control = Control::restore(self.skel.clone(), ctx, ());
+
+        Ok(control.sphere()?)
     }
 }
 
-pub struct ControlCreator
-
-{
+pub struct ControlCreator {
     pub skel: HyperSkel,
     pub fabric_routers: Arc<DashMap<Point, LayerInjectionRouter>>,
     pub controls: Point,
     pub ctx: DriverCtx,
 }
 
-impl ControlCreator
-
-{
+impl ControlCreator {
     pub fn new(
         skel: HyperSkel,
         fabric_routers: Arc<DashMap<Point, LayerInjectionRouter>>,
@@ -324,9 +298,7 @@ impl ControlCreator
 }
 
 #[async_trait]
-impl PointFactory for ControlCreator
-
-{
+impl PointFactory for ControlCreator {
     async fn create(&self) -> Result<Point, SpaceErr> {
         let create = Create {
             template: Template::new(
@@ -364,25 +336,19 @@ impl PointFactory for ControlCreator
 }
 
 #[derive(Clone)]
-pub struct ControlGreeter
-
-{
+pub struct ControlGreeter {
     pub skel: HyperSkel,
     pub controls: Point,
 }
 
-impl ControlGreeter
-
-{
+impl ControlGreeter {
     pub fn new(skel: HyperSkel, controls: Point) -> Self {
         Self { skel, controls }
     }
 }
 
 #[async_trait]
-impl HyperGreeter for ControlGreeter
-
-{
+impl HyperGreeter for ControlGreeter {
     async fn greet(&self, stub: HyperwayStub) -> Result<Greet, SpaceErr> {
         Ok(Greet {
             surface: stub.remote.clone().with_layer(Layer::Core),
@@ -393,29 +359,28 @@ impl HyperGreeter for ControlGreeter
     }
 }
 
-pub struct Control
-
-{
+pub struct Control {
     pub skel: HyperSkel,
     pub ctx: ControlCtx,
 }
 
-impl Particle for Control
-
-{
+impl Particle for Control {
     type Skel = HyperSkel;
     type Ctx = ControlCtx;
     type State = ();
+    type Err = ControlErr;
 
     fn restore(skel: Self::Skel, ctx: Self::Ctx, _: Self::State) -> Self {
         Self { skel, ctx }
     }
+
+    fn sphere(self) -> Result<ParticleSphere, Self::Err> {
+        Ok(ParticleSphere::new_router(self.skel.driver.particle_bind.clone(), self))
+    }
 }
 
 #[async_trait]
-impl TraversalRouter for Control
-
-{
+impl TraversalRouter for Control {
     async fn traverse(&self, traversal: Traversal<Wave>) -> Result<(), SpaceErr> {
         self.skel.driver.logger.track(&traversal, || {
             Tracker::new(
@@ -429,29 +394,14 @@ impl TraversalRouter for Control
     }
 }
 
-#[async_trait]
-impl ParticleRouter for Control
-
-{
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
-        Ok(<Control as Particle>::bind(self).await?)
-    }
-}
-
 #[derive(Clone)]
-pub struct ControlCtx
-
-{
+pub struct ControlCtx {
     pub router: Arc<dyn Router>,
 }
 
-impl ControlCtx
-
-{
+impl ControlCtx {
     pub fn new(router: Arc<dyn Router>) -> Self {
-        Self {
-            router,
-        }
+        Self { router }
     }
 }
 
@@ -534,3 +484,11 @@ impl ControlCliSession {
         Ok(pong.variant.core)
     }
 }
+
+#[derive(Error, Debug, Clone)]
+pub enum ControlErr {
+    #[error(transparent)]
+    SpaceErr(#[from] SpaceErr),
+}
+
+impl ParticleErr for ControlErr {}

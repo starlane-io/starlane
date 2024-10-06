@@ -1,7 +1,7 @@
-use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory, Particle, ParticleHandler, ParticleSphere};
+use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory, Particle, ParticleSphereInner};
 use crate::platform::Platform;
 use crate::hyperspace::reg::Registration;
-use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter};
+use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use starlane::space::artifact::ArtRef;
@@ -241,12 +241,12 @@ impl Driver for StarDriver
         Ok(())
     }
 
-    async fn particle(&self, point: &Point) -> Result<ParticleSphere, DriverErr> {
-        Ok(ParticleSphere::Handler(Box::new(Star::restore(
+    async fn particle(&self, point: &Point) -> Result<ParticleSphereInner, DriverErr> {
+        Ok(Star::restore(
             self.star_skel.clone(),
             self.ctx.clone(),
             (),
-        ))))
+        ).sphere())
     }
 }
 
@@ -277,15 +277,45 @@ impl Star
     }
 }
 
+impl Star
+{
+
+
+}
+
 #[async_trait]
-impl ParticleHandler for Star
+impl Particle for Star
 
 {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
-        <Star as Particle>::bind(self).await
+    type Skel = HyperStarSkel;
+    type Ctx = DriverCtx;
+    type State = ();
+    type Err = StarErr;
+
+    fn restore(skel: Self::Skel, ctx: Self::Ctx, _: Self::State) -> Self {
+        Star { skel, ctx }
     }
 
-    async fn init(&self) -> Result<Status, DriverErr> {
+    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
+        Ok(STAR_BIND_CONFIG.clone())
+    }
+
+    fn sphere(self) -> ParticleSphereInner {
+        ParticleSphereInner::Handler(Box::new(self))
+    }
+}
+
+#[handler]
+impl Star
+
+{
+
+    #[route("Hyp<Init>")]
+    pub async fn init(
+        &self,
+        ctx: InCtx<'_, HyperSubstance>,
+    ) -> Result<Status, Self::Err> {
+
         match self.skel.kind {
             StarSub::Central => {
                 let registration = Registration {
@@ -346,34 +376,13 @@ impl ParticleHandler for Star
             _ => Ok(Status::Ready),
         }
     }
-}
 
-#[async_trait]
-impl Particle for Star
 
-{
-    type Skel = HyperStarSkel;
-    type Ctx = DriverCtx;
-    type State = ();
-
-    fn restore(skel: Self::Skel, ctx: Self::Ctx, _: Self::State) -> Self {
-        Star { skel, ctx }
-    }
-
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
-        Ok(STAR_BIND_CONFIG.clone())
-    }
-}
-
-#[handler]
-impl Star
-
-{
     #[route("Hyp<Provision>")]
     pub async fn provision(
         &self,
         ctx: InCtx<'_, HyperSubstance>,
-    ) -> Result<ParticleLocation, DriverErr> {
+    ) -> Result<ParticleLocation, Self::Err> {
         if let HyperSubstance::Provision(provision) = ctx.input {
             let record = self.skel.registry.record(&provision.point).await?;
 
@@ -432,7 +441,7 @@ impl Star
     }
 
     #[route("Hyp<Assign>")]
-    pub async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, DriverErr> {
+    pub async fn assign(&self, ctx: InCtx<'_, HyperSubstance>) -> Result<ReflectedCore, Self::Err> {
         if let HyperSubstance::Assign(assign) = ctx.input {
             #[cfg(test)]
             self.skel

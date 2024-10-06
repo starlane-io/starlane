@@ -1,4 +1,4 @@
-use crate::driver::{Driver, DriverCtx, DriverErr, DriverSkel, HyperDriverFactory, Particle, ParticleHandler, ParticleSphere};
+use crate::driver::{Driver, DriverCtx, DriverErr, DriverSkel, HyperDriverFactory, Particle, ParticleSphere, ParticleSphereInner, StdParticleErr};
 pub use starlane_space as starlane;
 
 use crate::platform::Platform;
@@ -74,10 +74,12 @@ impl Driver for RootDriver
     }
 
     async fn particle(&self, point: &Point) -> Result<ParticleSphere, DriverErr> {
-        Ok(ParticleSphere::Handler(Box::new(Root::restore((), (), ()))))
+        let root = Root::restore((), (), ());
+        root.sphere()
     }
 }
 
+#[derive(DirectedHandler)]
 pub struct Root
 
 {
@@ -98,20 +100,22 @@ impl Particle for Root
     type Skel = ();
     type Ctx = ();
     type State = ();
+    type Err = StdParticleErr;
 
-    fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self {
+    fn restore(_: Self::Skel, _: Self::Ctx, _: Self::State) -> Self {
         Self::new()
+    }
+
+    fn sphere(self) -> Result<ParticleSphere,Self::Err> {
+        Ok(ParticleSphere::new_handler(self.bind(),self))
+    }
+
+    fn bind(&self) -> ArtRef<BindConfig> {
+        ROOT_BIND_CONFIG.clone()
     }
 }
 
 #[handler]
 impl Root {}
 
-#[async_trait]
-impl ParticleHandler for Root
 
-{
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
-        Ok(ROOT_BIND_CONFIG.clone())
-    }
-}

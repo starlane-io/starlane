@@ -1,6 +1,11 @@
-use std::marker::PhantomData;
-use crate::driver::{Driver, DriverCtx, DriverErr, DriverHandler, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Particle, ParticleHandler, ParticleSkel, ParticleSphere};
+use crate::driver::{
+    Driver, DriverCtx, DriverErr, DriverHandler, DriverSkel, DriverStatus, HyperDriverFactory,
+    HyperSkel, Particle, ParticleSkel, ParticleSphereInner,
+};
+use crate::executor::dialect::filestore::FileStoreIn;
 use crate::hyperspace::star::HyperStarSkel;
+use crate::platform::Platform;
+use crate::service::{FileStoreService, Service, ServiceKind, ServiceRunner, ServiceSelector};
 use acid_store::repo::Commit;
 use acid_store::repo::OpenOptions;
 use once_cell::sync::Lazy;
@@ -22,30 +27,36 @@ use starlane::space::substance::Substance;
 use starlane::space::util::{log, IdSelector};
 use starlane::space::wave::exchange::asynch::InCtx;
 use starlane::space::wave::{DirectedProto, Pong, Wave};
+use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use tempdir::TempDir;
 use tracing::Instrument;
-use crate::executor::dialect::filestore::FileStoreIn;
-use crate::platform::Platform;
-use crate::service::{FileStoreService, Service, ServiceKind, ServiceRunner, ServiceSelector};
 
-static REPO_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new( ||{ ArtRef::new(
+static REPO_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
+    ArtRef::new(
         Arc::new(repo_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/repo.bind").unwrap()
-    )});
-    static SERIES_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new( ||{ArtRef::new(
+        Point::from_str("GLOBAL::repo:1.0.0:/bind/repo.bind").unwrap(),
+    )
+});
+static SERIES_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
+    ArtRef::new(
         Arc::new(series_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/bundle_series.bind").unwrap()
-    )});
-    static BUNDLE_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new( ||{ArtRef::new(
+        Point::from_str("GLOBAL::repo:1.0.0:/bind/bundle_series.bind").unwrap(),
+    )
+});
+static BUNDLE_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
+    ArtRef::new(
         Arc::new(bundle_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/bundle.bind").unwrap()
-    )});
-    static ARTIFACT_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new( ||{ArtRef::new(
+        Point::from_str("GLOBAL::repo:1.0.0:/bind/bundle.bind").unwrap(),
+    )
+});
+static ARTIFACT_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
+    ArtRef::new(
         Arc::new(artifact_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/artifact.bind").unwrap()
-    )});
+        Point::from_str("GLOBAL::repo:1.0.0:/bind/artifact.bind").unwrap(),
+    )
+});
 
 fn artifact_bind() -> BindConfig {
     log(bind_config(
@@ -94,19 +105,16 @@ fn bundle_bind() -> BindConfig {
     .unwrap()
 }
 
-pub struct RepoDriverFactory{
-}
+pub struct RepoDriverFactory {}
 
 impl RepoDriverFactory {
     pub fn new() -> Self {
-        Self {
-        }
+        Self {}
     }
 }
 
 #[async_trait]
-impl HyperDriverFactory for RepoDriverFactory
-{
+impl HyperDriverFactory for RepoDriverFactory {
     fn kind(&self) -> Kind {
         Kind::Repo
     }
@@ -121,8 +129,14 @@ impl HyperDriverFactory for RepoDriverFactory
         skel: DriverSkel,
         _: DriverCtx,
     ) -> Result<Box<dyn Driver>, DriverErr> {
-
-        let service  = skel.logger.result(skel.logger.result(skel.select_service(ServiceKind::FileStore).await)?.ok_or(format!("could not select service '{}' ",ServiceKind::FileStore.to_string())))?;
+        let service = skel.logger.result(
+            skel.logger
+                .result(skel.select_service(ServiceKind::FileStore).await)?
+                .ok_or(format!(
+                    "could not select service '{}' ",
+                    ServiceKind::FileStore.to_string()
+                )),
+        )?;
 
         let filestore = service.filestore()?;
 
@@ -130,35 +144,22 @@ impl HyperDriverFactory for RepoDriverFactory
     }
 }
 
-pub struct RepoDriver
-
-{
+pub struct RepoDriver {
     skel: DriverSkel,
-    filestore: FileStoreService
+    filestore: FileStoreService,
 }
 
-impl RepoDriver
-
-{
-    pub fn new(skel: DriverSkel, filestore: FileStoreService ) -> Self {
-        Self { skel, filestore}
+impl RepoDriver {
+    pub fn new(skel: DriverSkel, filestore: FileStoreService) -> Self {
+        Self { skel, filestore }
     }
 }
 
-
 #[handler]
-impl RepoDriver
-
-{
-
-}
+impl RepoDriver {}
 
 #[async_trait]
-impl Driver for RepoDriver
-
-{
-
-
+impl Driver for RepoDriver {
     async fn init(&mut self, skel: DriverSkel, ctx: DriverCtx) -> Result<(), DriverErr> {
         skel.logger
             .result(skel.status_tx.send(DriverStatus::Init).await)
@@ -175,26 +176,30 @@ impl Driver for RepoDriver
         Kind::Repo
     }
 
-    async fn particle(&self, point: &Point) -> Result<ParticleSphere, DriverErr> {
+    async fn particle(&self, point: &Point) -> Result<ParticleSphereInner, DriverErr> {
         let filestore = self.filestore.sub_root(point.md5().into()).await?;
-        Ok(ParticleSphere::Handler(Box::new(Repo::restore((), (), filestore ))))
+        Ok(ParticleSphereInner::Handler(Box::new(Repo::restore(
+            (),
+            (),
+            filestore,
+        ))))
     }
 }
-
 
 impl Particle for Repo {
     type Skel = ();
     type Ctx = ();
     type State = FileStoreService;
+    type Err = ();
 
     fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self {
-        Self {
-          filestore: state,
-            phantom: Default::default(),
-        }
+        Self { filestore: state }
+    }
+
+    fn sphere(self) -> ParticleSphereInner {
+        ParticleSphereInner::Handler(Box::new(self))
     }
 }
-
 
 /*
 fn store() -> Result<ValueRepo<String>, UniErr> {
@@ -212,24 +217,19 @@ fn store() -> Result<ValueRepo<String>, UniErr> {
 }
  */
 
+#[derive(DirectedHandler)]
 pub struct Repo {
     filestore: FileStoreService,
 }
 
-#[handler]
-impl  Repo  {}
-
-#[async_trait]
-impl ParticleHandler for Repo
-
-{
+impl Repo {
     async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
         Ok(REPO_BIND_CONFIG.clone())
     }
 }
 
-
-
+#[handler]
+impl Repo {}
 
 /*
 pub struct BundleSeriesDriverFactory;
@@ -811,7 +811,6 @@ impl ItemHandler for Artifact
 
 
  */
-
 
 #[cfg(test)]
 pub mod tests {

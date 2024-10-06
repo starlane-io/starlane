@@ -1,7 +1,4 @@
-use crate::driver::{
-    Driver, DriverAvail, DriverCtx, DriverSkel, HyperDriverFactory, ParticleHandler, ParticleSphere,
-    DRIVER_BIND,
-};
+use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, HyperDriverFactory, Particle, ParticleSphere, ParticleSphereInner, StdParticleErr, DRIVER_BIND};
 
 pub use starlane_space as starlane;
 
@@ -61,10 +58,10 @@ impl HyperDriverFactory for BaseDriverFactory
 
     async fn create(
         &self,
-        skel: HyperStarSkel,
-        driver_skel: DriverSkel,
-        ctx: DriverCtx,
-    ) -> Result<Box<dyn Driver>, P::Err> {
+        _: HyperStarSkel,
+        _: DriverSkel,
+        _: DriverCtx,
+    ) -> Result<Box<dyn Driver>, DriverErr> {
         Ok(Box::new(BaseDriver::new(self.avail.clone())))
     }
 }
@@ -87,21 +84,36 @@ impl Driver for BaseDriver
         Kind::Base
     }
 
-    async fn particle(&self, point: &Point) -> Result<ParticleSphere, P::Err> {
+    async fn particle(&self, point: &Point) -> Result<ParticleSphere, DriverErr> {
         println!("ITEM get BASE");
-        Ok(ParticleSphere::Handler(Box::new(Base)))
+        let base = Base::restore((), (), ());
+
+        Ok(base.sphere())
     }
 }
 
 pub struct Base;
 
+impl Particle for Base {
+    type Skel = ();
+    type Ctx = ();
+    type State = ();
+    type Err = StdParticleErr;
+
+    fn restore(_: Self::Skel, _: Self::Ctx, _: Self::State) -> Self {
+        Base
+    }
+
+    fn bind(&self) -> ArtRef<BindConfig> {
+        BASE_BIND_CONFIG.clone()
+    }
+
+    fn sphere(self) -> Result<ParticleSphere,Self::Err>{
+        Ok(ParticleSphere::new_handler(self.bind(),Box::new(self)))
+    }
+}
+
 #[handler]
 impl Base {}
 
-#[async_trait]
-impl ParticleHandler for Base
-{
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, P::Err> {
-        Ok(DRIVER_BIND.clone())
-    }
-}
+
