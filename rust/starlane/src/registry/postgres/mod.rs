@@ -559,7 +559,7 @@ impl RegistryApi for PostgresRegistry {
             }
 
             match &hop.kind_selector.base {
-                KindBaseSelector::Any => {}
+                KindBaseSelector::Always => {}
                 KindBaseSelector::Exact(kind) => {
                     index = index + 1;
                     where_clause.push_str(format!(" AND base=${}", index).as_str());
@@ -568,9 +568,9 @@ impl RegistryApi for PostgresRegistry {
             }
 
             match &hop.kind_selector.base {
-                KindBaseSelector::Any => {}
+                KindBaseSelector::Always => {}
                 KindBaseSelector::Exact(kind) => match &hop.kind_selector.sub {
-                    SubKindSelector::Any => {}
+                    SubKindSelector::Always => {}
                     SubKindSelector::Exact(sub) => match sub {
                         None => {}
                         Some(sub) => {
@@ -587,7 +587,7 @@ impl RegistryApi for PostgresRegistry {
                 ValuePattern::Never => {}
                 ValuePattern::Pattern(specific) => {
                     match &specific.provider {
-                        ProviderSelector::Any => {}
+                        ProviderSelector::Always => {}
                         ProviderSelector::Exact(provider) => {
                             index = index + 1;
                             where_clause.push_str(format!(" AND provider=${}", index).as_str());
@@ -595,7 +595,7 @@ impl RegistryApi for PostgresRegistry {
                         }
                     }
                     match &specific.vendor {
-                        VendorSelector::Any => {}
+                        VendorSelector::Always => {}
                         VendorSelector::Exact(vendor) => {
                             index = index + 1;
                             where_clause.push_str(format!(" AND vendor=${}", index).as_str());
@@ -603,7 +603,7 @@ impl RegistryApi for PostgresRegistry {
                         }
                     }
                     match &specific.product {
-                        ProductSelector::Any => {}
+                        ProductSelector::Always => {}
                         ProductSelector::Exact(product) => {
                             index = index + 1;
                             where_clause.push_str(format!(" AND product=${}", index).as_str());
@@ -611,7 +611,7 @@ impl RegistryApi for PostgresRegistry {
                         }
                     }
                     match &specific.variant {
-                        VariantSelector::Any => {}
+                        VariantSelector::Always => {}
                         VariantSelector::Exact(variant) => {
                             index = index + 1;
                             where_clause.push_str(format!(" AND variant=${}", index).as_str());
@@ -682,7 +682,7 @@ impl RegistryApi for PostgresRegistry {
                         .expect("expecting at least one segment"),
                     kind: stub.kind.clone(),
                 });
-                sub_select.pattern.matches(&point_tks_path)
+                sub_select.pattern.matches_found(&point_tks_path)
             });
 
             matching_so_far.append(&mut child_stub_matches);
@@ -778,8 +778,8 @@ impl RegistryApi for PostgresRegistry {
                 .map(|a: IndexedAccessGrant| a.into())
                 .collect();
             access_grants.retain(|access_grant| {
-                access_grant.to_point.matches(&to_kind_path)
-                    && access_grant.on_point.matches(&on_kind_path)
+                access_grant.to_point.matches_found(&to_kind_path)
+                    && access_grant.on_point.matches_found(&on_kind_path)
             });
             // check for any superusers
             for access_grant in &access_grants {
@@ -919,7 +919,7 @@ impl RegistryApi for PostgresRegistry {
 
             access_grants.retain(|a| match to.as_ref() {
                 None => true,
-                Some(to) => a.to_point.matches(to),
+                Some(to) => a.to_point.matches_found(to),
             });
             for access_grant in access_grants {
                 all_access_grants.insert(access_grant.id.clone(), access_grant);

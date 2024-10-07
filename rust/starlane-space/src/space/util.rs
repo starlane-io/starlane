@@ -15,6 +15,7 @@ use std::collections::HashSet;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
+use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum HttpMethodPattern {
@@ -264,6 +265,8 @@ pub enum ValuePattern<T> {
     Pattern(T),
 }
 
+
+
 impl<T> ValuePattern<T>
 where
     T: ToString,
@@ -286,6 +289,18 @@ where
             ValuePattern::Always => "*".to_string(),
             ValuePattern::Never => "!".to_string(),
             ValuePattern::Pattern(pattern) => pattern.to_string(),
+        }
+    }
+}
+
+impl<T> ValueMatcher<T> for ValuePattern<T> {
+    fn is_match(&self, x: &T) -> Result<(), ()> {
+        match self {
+            ValuePattern::Always => Ok(()),
+            ValuePattern::Never => Err(()),
+            ValuePattern::Pattern(pattern)  if *pattern == *x =>  {
+
+            }
         }
     }
 }

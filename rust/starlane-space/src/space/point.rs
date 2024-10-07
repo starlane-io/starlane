@@ -11,8 +11,8 @@ use crate::space::parse::{
     consume_point, consume_point_ctx, point_route_segment, point_selector, point_var, Env,
     ResolverErr,
 };
-use crate::space::selector::Selector;
-use crate::space::util::ToResolved;
+use crate::space::selector::{PointHierarchy, PointHierarchyOpt, PointKindSeg, PointKindSegOpt, Selector};
+use crate::space::util::{ToResolved, ValueMatcher};
 use crate::space::wave::{Agent, Recipients, ToRecipients};
 use crate::space::{ANONYMOUS, HYPERUSER};
 use crate::space::parse::util::{new_span, Trace};
@@ -962,7 +962,23 @@ where
 
 }
 
+
+
+
 impl Point {
+
+
+    /// this is kind of a hack because I want to reuse my Selector code on points where
+    /// the kind for each segment is not known... I really need to create a PointSelector
+    /// that only selects on Point in the future.
+    pub fn to_opt_hierarchy(self) -> PointHierarchyOpt {
+        PointHierarchyOpt {
+            route: self.route,
+            segments: self.segments.into_iter().map( |segment| PointKindSegOpt{ segment, kind: None }).collect()
+        }
+    }
+
+
     pub fn to_path(&self) -> PathBuf {
         let mut path = String::new();
         for seg in &self.segments {

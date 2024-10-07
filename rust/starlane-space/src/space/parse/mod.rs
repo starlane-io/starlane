@@ -44,12 +44,7 @@ use crate::space::security::{
     AccessGrantKind, AccessGrantKindDef, ChildPerms, ParticlePerms, Permissions, PermissionsMask,
     PermissionsMaskKind, Privilege,
 };
-use crate::space::selector::{
-    ExactPointSeg, Hop, KindBaseSelector, KindSelector, LabeledPrimitiveTypeDef, MapEntryPattern,
-    MapEntryPatternVar, Pattern, PatternBlockVar, PayloadBlockVar, PayloadType2Def, PointHierarchy,
-    PointKindSeg, PointSegSelector, Selector, SelectorDef, SpecificSelector, SubKindSelector,
-    UploadBlock, VersionReq,
-};
+use crate::space::selector::{ExactPointSeg, KindBaseSelector, KindSelector, LabeledPrimitiveTypeDef, MapEntryPattern, MapEntryPatternVar, Pattern, PatternBlockVar, PayloadBlockVar, PayloadType2Def, PointHierarchy, PointKindSeg, PointSegKindHop, PointSegSelector, Selector, SelectorDef, SpecificSelector, SubKindSelector, UploadBlock, VersionReq};
 use crate::space::substance::Bin;
 use crate::space::substance::{
     CallKind, CallVar, CallWithConfigVar, ExtCall, HttpCall, ListPattern, MapPatternVar, NumRange,
@@ -5327,9 +5322,9 @@ pub fn port<I: Span>(input: I) -> Res<I, Surface> {
     }
 }
 
-pub type SurfaceSelectorVal = SurfaceSelectorDef<Hop, VarVal<Topic>, VarVal<ValuePattern<Layer>>>;
-pub type SurfaceSelectorCtx = SurfaceSelectorDef<Hop, Topic, ValuePattern<Layer>>;
-pub type SurfaceSelector = SurfaceSelectorDef<Hop, Topic, ValuePattern<Layer>>;
+pub type SurfaceSelectorVal = SurfaceSelectorDef<PointSegKindHop, VarVal<Topic>, VarVal<ValuePattern<Layer>>>;
+pub type SurfaceSelectorCtx = SurfaceSelectorDef<PointSegKindHop, Topic, ValuePattern<Layer>>;
+pub type SurfaceSelector = SurfaceSelectorDef<PointSegKindHop, Topic, ValuePattern<Layer>>;
 
 pub struct SurfaceSelectorDef<Hop, Topic, Layer> {
     point: SelectorDef<Hop>,
@@ -5518,7 +5513,7 @@ pub mod cmd_test {
                 segment: PointSeg::Base("less".to_string()),
                 kind: Kind::Base,
             }],
-        );
+        ).into();
 
         let fae = PointHierarchy::new(
             RouteSeg::Local,
@@ -5532,39 +5527,39 @@ pub mod cmd_test {
                     kind: Kind::User,
                 },
             ],
-        );
+        ).into();
 
         assert!(result(point_selector(new_span("less")))
             .unwrap()
-            .matches(&less));
+            .matches_found(&less));
         assert!(result(point_selector(new_span("*")))
             .unwrap()
-            .matches(&less));
-        assert!(!result(point_selector(new_span("*"))).unwrap().matches(&fae));
+            .matches_found(&less));
+        assert!(!result(point_selector(new_span("*"))).unwrap().matches_found(&fae));
         assert!(result(point_selector(new_span("*:dra")))
             .unwrap()
-            .matches(&fae));
+            .matches_found(&fae));
         assert!(!result(point_selector(new_span("*:dra")))
             .unwrap()
-            .matches(&less));
+            .matches_found(&less));
         assert!(result(point_selector(new_span("fae:*")))
             .unwrap()
-            .matches(&fae));
+            .matches_found(&fae));
         assert!(result(point_selector(new_span("**<User>")))
             .unwrap()
-            .matches(&fae));
+            .matches_found(&fae));
         assert!(!result(point_selector(new_span("**<User>")))
             .unwrap()
-            .matches(&less));
+            .matches_found(&less));
         assert!(result(point_selector(new_span("**")))
             .unwrap()
-            .matches(&less));
+            .matches_found(&less));
         assert!(result(point_selector(new_span("**")))
             .unwrap()
-            .matches(&fae));
+            .matches_found(&fae));
         assert!(!result(point_selector(new_span("**<Base>")))
             .unwrap()
-            .matches(&fae));
+            .matches_found(&fae));
 
         let less = result(point_selector(new_span("less"))).unwrap();
     }
@@ -5723,7 +5718,7 @@ where
     move |input: I| {
         let x: Res<I, I> = tag("*")(input.clone());
         match x {
-            Ok((next, _)) => Ok((next, Pattern::Any)),
+            Ok((next, _)) => Ok((next, Pattern::Always)),
             Err(_) => {
                 let (next, p) = value.parse(input)?;
                 let pattern = Pattern::Exact(p);
@@ -5919,7 +5914,7 @@ where
 
 pub fn sub_kind_selector<I: Span>(input: I) -> Res<I, SubKindSelector> {
     pattern(camel_case)(input).map(|(next, selector)| match selector {
-        Pattern::Any => (next, Pattern::Any),
+        Pattern::Always => (next, Pattern::Always),
         Pattern::Exact(sub) => (next, Pattern::Exact(Some(sub))),
     })
 }
@@ -6064,7 +6059,7 @@ pub fn kind_selector<I: Span>(input: I) -> Res<I, KindSelector> {
     )(input)
     .map(|(next, (kind, sub_kind_and_specific))| {
         let (sub_kind, specific) = match sub_kind_and_specific {
-            None => (Pattern::Any, ValuePattern::Always),
+            None => (Pattern::Always, ValuePattern::Always),
             Some((kind, specific)) => (
                 kind,
                 match specific {
@@ -6084,17 +6079,17 @@ pub fn kind_selector<I: Span>(input: I) -> Res<I, KindSelector> {
     })
 }
 
-fn space_hop<I: Span>(input: I) -> Res<I, Hop> {
+fn space_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
     tuple((point_segment_selector, opt(kind_selector), opt(tag("+"))))(input).map(
         |(next, (segment_selector, kind_selector, inclusive))| {
             let kind_selector = match kind_selector {
-                None => KindSelector::any(),
-                Some(tks) => tks,
+                None => ValuePattern::Always,
+                Some(kind_selector) => ValuePattern::Pattern(kind_selector)
             };
             let inclusive = inclusive.is_some();
             (
                 next,
-                Hop {
+                PointSegKindHop {
                     inclusive,
                     segment_selector,
                     kind_selector,
@@ -6104,7 +6099,7 @@ fn space_hop<I: Span>(input: I) -> Res<I, Hop> {
     )
 }
 
-fn base_hop<I: Span>(input: I) -> Res<I, Hop> {
+fn base_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
     tuple((base_segment, opt(kind_selector), opt(tag("+"))))(input).map(
         |(next, (segment, tks, inclusive))| {
             let tks = match tks {
@@ -6114,7 +6109,7 @@ fn base_hop<I: Span>(input: I) -> Res<I, Hop> {
             let inclusive = inclusive.is_some();
             (
                 next,
-                Hop {
+                PointSegKindHop {
                     inclusive,
                     segment_selector: segment,
                     kind_selector: tks,
@@ -6124,17 +6119,17 @@ fn base_hop<I: Span>(input: I) -> Res<I, Hop> {
     )
 }
 
-fn file_hop<I: Span>(input: I) -> Res<I, Hop> {
+fn file_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
     tuple((file_segment, opt(tag("+"))))(input).map(|(next, (segment, inclusive))| {
         let tks = KindSelector {
             base: Pattern::Exact(BaseKind::File),
-            sub: Pattern::Any,
+            sub: Pattern::Always,
             specific: ValuePattern::Always,
         };
         let inclusive = inclusive.is_some();
         (
             next,
-            Hop {
+            PointSegKindHop {
                 inclusive,
                 segment_selector: segment,
                 kind_selector: tks,
@@ -6143,13 +6138,13 @@ fn file_hop<I: Span>(input: I) -> Res<I, Hop> {
     })
 }
 
-fn dir_hop<I: Span>(input: I) -> Res<I, Hop> {
+fn dir_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
     tuple((dir_segment, opt(tag("+"))))(input).map(|(next, (segment, inclusive))| {
-        let tks = KindSelector::any();
+        let tks = ValuePattern::Always;
         let inclusive = inclusive.is_some();
         (
             next,
-            Hop {
+            PointSegKindHop {
                 inclusive,
                 segment_selector: segment,
                 kind_selector: tks,
@@ -6158,7 +6153,7 @@ fn dir_hop<I: Span>(input: I) -> Res<I, Hop> {
     })
 }
 
-fn version_hop<I: Span>(input: I) -> Res<I, Hop> {
+fn version_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
     tuple((version_segment, opt(kind_selector), opt(tag("+"))))(input).map(
         |(next, (segment, tks, inclusive))| {
             let tks = match tks {
@@ -6168,7 +6163,7 @@ fn version_hop<I: Span>(input: I) -> Res<I, Hop> {
             let inclusive = inclusive.is_some();
             (
                 next,
-                Hop {
+                PointSegKindHop {
                     inclusive,
                     segment_selector: segment,
                     kind_selector: tks,
@@ -6200,14 +6195,14 @@ pub fn point_selector<I: Span>(input: I) -> Res<I, Selector> {
             }
             if let Some((dir_hops, file_hop)) = filesystem_hops {
                 // first push the filesystem root
-                hops.push(Hop {
+                hops.push(PointSegKindHop {
                     inclusive: false,
                     segment_selector: PointSegSelector::Exact(ExactPointSeg::PointSeg(
                         PointSeg::FsRootDir,
                     )),
                     kind_selector: KindSelector {
                         base: Pattern::Exact(BaseKind::File),
-                        sub: Pattern::Any,
+                        sub: Pattern::Always,
                         specific: ValuePattern::Always,
                     },
                 });

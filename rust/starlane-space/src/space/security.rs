@@ -503,7 +503,7 @@ impl GrantTo {
     pub fn is_match(&self, hierarchy: &PointHierarchy) -> Result<(), ()> {
         match self {
             GrantTo::World => Ok(()),
-            GrantTo::PointSelector(selector) => match selector.matches(hierarchy) {
+            GrantTo::PointSelector(selector) => match selector.matches_found(hierarchy) {
                 true => Ok(()),
                 false => Err(()),
             },

@@ -26,7 +26,7 @@ use tokio::sync::watch::Ref;
 use tokio::sync::{broadcast, mpsc, watch};
 use tokio::time::error::Elapsed;
 use tokio::time::Timeout;
-use crate::space::selector::Selector;
+use crate::space::selector::{PointSelector, Selector};
 use crate::space::util::ValuePattern;
 
 #[derive(Clone, Error, Debug)]
@@ -318,7 +318,7 @@ pub struct ArtifactHub {
     skel: ArtifactsSkel,
     pub bind: ArtifactCache<BindConfig>,
     pub mechtron: ArtifactCache<MechtronConfig>,
-    pub selector: ValuePattern<Selector>
+    pub selector: ValuePattern<PointSelector>
 }
 
 impl ArtifactHub {
@@ -376,23 +376,18 @@ impl Artifacts {
         Self { hubs: vec![hub] }
     }
 
-    pub async fn get_bind(&self, point: &Point) -> Option<Result<ArtRef<BindConfig>, ArtErr>> {
-        /*
+    pub async fn get_bind(&self, point: &Point) -> Result<ArtRef<BindConfig>, ArtErr> {
         for hub in &self.hubs {
-            if hub.selector.is_match(point) {
+            if hub.selector.is_match(point).is_ok() {
                 match hub.bind.get(point).await {
-                    Ok(art) => return Some(Ok(art)),
-                    Err(ArtErr::NotFound) => return None,
+                    Ok(art) => return Ok(art),
                     Err(err) => {
-                        return Some(Err(err));
+                        return Err(err);
                     }
                 }
             }
         }
-
-         */
-        todo!();
-        None
+        Err(ArtErr::NotFound)
     }
 
     pub async fn get_mechtron(

@@ -705,7 +705,7 @@ pub mod direct {
         use crate::space::parse::Env;
         use crate::space::particle::Stub;
         use crate::space::point::Point;
-        use crate::space::selector::{Hop, PointHierarchy, Selector, SelectorDef};
+        use crate::space::selector::{PointSegKindHop, PointHierarchy, Selector, SelectorDef};
         use crate::space::substance::{MapPattern, Substance, SubstanceList};
         use crate::space::util::ToResolved;
 
@@ -738,9 +738,9 @@ pub mod direct {
             }
         }
 
-        pub type Select = SelectDef<Hop>;
-        pub type SelectCtx = SelectDef<Hop>;
-        pub type SelectVar = SelectDef<Hop>;
+        pub type Select = SelectDef<PointSegKindHop>;
+        pub type SelectCtx = SelectDef<PointSegKindHop>;
+        pub type SelectVar = SelectDef<PointSegKindHop>;
 
         impl ToResolved<Select> for Select {
             fn to_resolved(self, env: &Env) -> Result<Select, SpaceErr> {
@@ -761,7 +761,7 @@ pub mod direct {
             Initial,
             SubSelect {
                 point: Point,
-                hops: Vec<Hop>,
+                hops: Vec<PointSegKindHop>,
                 hierarchy: PointHierarchy,
             },
         }
@@ -770,7 +770,7 @@ pub mod direct {
             pub fn sub_select(
                 self,
                 point: Point,
-                hops: Vec<Hop>,
+                hops: Vec<PointSegKindHop>,
                 hierarchy: PointHierarchy,
             ) -> SubSelect {
                 SubSelect {
@@ -814,7 +814,7 @@ pub mod direct {
             pub pattern: Selector,
             pub properties: PropertiesPattern,
             pub into_payload: SelectIntoSubstance,
-            pub hops: Vec<Hop>,
+            pub hops: Vec<PointSegKindHop>,
             pub hierarchy: PointHierarchy,
         }
 
@@ -837,7 +837,7 @@ pub mod direct {
             pub fn sub_select(
                 &self,
                 point: Point,
-                hops: Vec<Hop>,
+                hops: Vec<PointSegKindHop>,
                 hierarchy: PointHierarchy,
             ) -> SubSelect {
                 SubSelect {
@@ -871,12 +871,12 @@ pub mod direct {
         use crate::space::command::direct::select::{Select, SelectIntoSubstance};
         use crate::space::err::SpaceErr;
         use crate::space::parse::Env;
-        use crate::space::selector::{Hop, SelectorDef};
+        use crate::space::selector::{PointSegKindHop, SelectorDef};
         use crate::space::util::ToResolved;
 
-        pub type Delete = DeleteDef<Hop>;
-        pub type DeleteCtx = DeleteDef<Hop>;
-        pub type DeleteVar = DeleteDef<Hop>;
+        pub type Delete = DeleteDef<PointSegKindHop>;
+        pub type DeleteCtx = DeleteDef<PointSegKindHop>;
+        pub type DeleteVar = DeleteDef<PointSegKindHop>;
 
         impl ToResolved<Delete> for Delete {
             fn to_resolved(self, env: &Env) -> Result<Delete, SpaceErr> {
