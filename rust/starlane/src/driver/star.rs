@@ -44,31 +44,6 @@ use tokio::sync::RwLock;
 use tokio_print::aprintln;
 use starlane::space::wave::core::MethodKind::Hyp;
 
-static STAR_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
-    ArtRef::new(
-        Arc::new(star_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/star.bind").unwrap(),
-    )
-});
-
-fn star_bind() -> BindConfig {
-    log(bind_config(
-        r#"
-    Bind(version=1.0.0)
-    {
-       Route -> {
-           Hyp<Init> -> (());
-           Hyp<Transport> -> (());
-           Hyp<Assign> -> (()) => &;
-           Hyp<Search> -> (()) => &;
-           Hyp<Provision> -> (()) => &;
-       }
-    }
-    "#,
-    ))
-    .unwrap()
-}
-
 #[derive(Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct StarPair {
     pub a: StarKey,

@@ -10,6 +10,8 @@ use crate::BindConfig;
 pub mod bind;
 pub mod mechtron;
 
+use crate::space::err::SpaceErr;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PortalKind {
     Mechtron,

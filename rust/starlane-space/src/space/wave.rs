@@ -3192,7 +3192,7 @@ pub enum WaitTime {
 
 impl Default for WaitTime {
     fn default() -> Self {
-        WaitTime::Low
+        WaitTime::Med
     }
 }
 

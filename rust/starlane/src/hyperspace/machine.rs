@@ -11,7 +11,7 @@ use thiserror::Error;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use tokio::sync::oneshot::error::RecvError;
 use tokio_print::aprintln;
-use starlane::space::artifact::asynch::{ArtifactApi, ArtifactFetcher};
+use starlane::space::artifact::asynch::{Artifacts, ArtifactFetcher};
 use starlane::space::command::direct::create::KindTemplate;
 use starlane::space::err::SpaceErr;
 use starlane::space::hyper::{InterchangeKind, Knock};
@@ -47,7 +47,7 @@ use crate::template::Templates;
 pub struct MachineApi
 {
     tx: mpsc::Sender<MachineCall>,
-    pub artifacts: ArtifactApi,
+    pub artifacts: Artifacts,
     pub registry: Registry
 }
 
@@ -61,7 +61,7 @@ impl MachineApi {
 
 impl MachineApi
 {
-    pub fn new(tx: mpsc::Sender<MachineCall>, registry: Registry, artifacts: ArtifactApi) -> Self {
+    pub fn new(tx: mpsc::Sender<MachineCall>, registry: Registry, artifacts: Artifacts) -> Self {
         Self { tx, registry, artifacts }
     }
     pub async fn properties_config(&self, kind: &Kind) -> Result<PropertiesConfig,MachineErr> {
@@ -168,7 +168,7 @@ where
     pub name: MachineName,
     pub platform: P,
     pub registry: Registry,
-    pub artifacts: ArtifactApi,
+    pub artifacts: Artifacts,
     pub logger: RootLogger,
     pub timeouts: Timeouts,
     pub api: MachineApi,

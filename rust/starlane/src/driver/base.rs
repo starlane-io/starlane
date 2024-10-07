@@ -16,23 +16,7 @@ use starlane::space::wave::exchange::asynch::DirectedHandler;
 use std::str::FromStr;
 use std::sync::Arc;
 
-static BASE_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
-    ArtRef::new(
-        Arc::new(base_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/base.bind").unwrap(),
-    )
-});
 
-fn base_bind() -> BindConfig {
-    log(bind_config(
-        r#"
-    Bind(version=1.0.0)
-    {
-    }
-    "#,
-    ))
-    .unwrap()
-}
 
 pub struct BaseDriverFactory {
     pub avail: DriverAvail,

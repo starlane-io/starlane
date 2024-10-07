@@ -3,14 +3,14 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use crate::space::artifact::asynch::{ArtifactPipeline, Artifacts};
+use crate::space::artifact::asynch::{ArtifactPipeline, ArtifactHub};
 use crate::space::err::SpaceErr;
 use crate::space::loc::ToSurface;
 use crate::space::point::Point;
 use crate::space::substance::Bin;
 
 pub mod asynch;
-pub mod synch;
+pub mod builtin;
 
 pub struct ArtRef<A> {
     artifact: Arc<A>,

@@ -1,4 +1,4 @@
-use starlane::space::artifact::asynch::ArtifactApi;
+use starlane::space::artifact::asynch::Artifacts;
 use starlane::space::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind, UserBaseSubKindBase};
 use starlane::space::loc::{MachineName, StarKey, ToBaseKind};
 use starlane::space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
@@ -61,7 +61,7 @@ where
     fn drivers_builder(&self, kind: &StarSub) -> DriversBuilder;
     async fn global_registry(&self) -> Result<Registry, Self::Err>;
     async fn star_registry(&self, star: &StarKey) -> Result<Registry, Self::Err>;
-    fn artifact_hub(&self) -> ArtifactApi;
+    fn artifact_hub(&self) -> Artifacts;
     async fn start_services(&self, gate: &Arc<HyperGateSelector>) {}
         fn logger(&self) -> RootLogger {
         Default::default()

@@ -1503,7 +1503,7 @@ pub mod test {
         PostgresRegistryContextHandle,
     };
     use crate::StarlanePostgres;
-    use starlane::space::artifact::asynch::ArtifactApi;
+    use starlane::space::artifact::asynch::Artifacts;
     use starlane::space::command::direct::create::Strategy;
     use starlane::space::command::direct::query::Query;
     use starlane::space::command::direct::select::{Select, SelectIntoSubstance, SelectKind};
@@ -1597,7 +1597,7 @@ pub mod test {
             todo!()
         }
 
-        fn artifact_hub(&self) -> ArtifactApi {
+        fn artifact_hub(&self) -> Artifacts {
             todo!()
         }
     }

@@ -35,15 +35,24 @@ pub struct StatusUpdate {
     strum_macros::EnumString,
 )]
 pub enum Status {
-    Unknown,  /// initial status or when status cannot be determined
-    Pending,  /// initial status
-    Init, /// undergoing custom initialization...This particle can send requests but not receive requests.
-    Panic, /// something is wrong... all requests are blocked and responses are cancelled.
-    Fatal, /// unrecoverable panic
-    Ready, /// ready to take requests
-    Paused, /// can not receive requests (probably because it is waiting for some other particle to make updates)...
-    Resuming, /// like Initializing but triggered after a pause is lifted, the particle may be doing something before it is ready to accept requests again.
-    Done, /// this particle had a life span and has now completed succesfully it can no longer receive requests.
+    /// initial status or when status cannot be determined
+    Unknown,
+    /// initial status
+    Pending,
+    /// undergoing custom initialization...This particle can send requests but not receive requests.
+    Init,
+    /// something is wrong... all requests are blocked and responses are cancelled.
+    Panic,
+    /// unrecoverable panic
+    Fatal,
+    /// ready to take requests
+    Ready,
+    /// can not receive requests (probably because it is waiting for some other particle to make updates)...
+    Paused,
+    /// like Initializing but triggered after a pause is lifted, the particle may be doing something before it is ready to accept requests again.
+    Resuming,
+    /// this particle had a life span and has now completed succesfully it can no longer receive requests.
+    Done,
 }
 
 impl From<Status> for ReflectedCore {

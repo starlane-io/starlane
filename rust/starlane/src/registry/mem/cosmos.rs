@@ -16,7 +16,7 @@ use crate::hyperspace::machine::MachineTemplate;
 use crate::registry::mem::registry::{MemRegApi, MemRegCtx};
 use crate::platform::Platform;
 use crate::hyperspace::reg::Registry;
-use starlane::space::artifact::asynch::ArtifactApi;
+use starlane::space::artifact::asynch::Artifacts;
 use starlane::space::kind::StarSub;
 use starlane::space::loc::{MachineName, StarKey};
 use std::sync::Arc;
@@ -111,8 +111,8 @@ impl Platform for MemCosmos {
         todo!()
     }
 
-    fn artifact_hub(&self) -> ArtifactApi {
-        ArtifactApi::no_fetcher()
+    fn artifact_hub(&self) -> Artifacts {
+        Artifacts::just_builtins()
     }
 
     /*

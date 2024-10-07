@@ -24,7 +24,7 @@ use futures::future::select_all;
 use futures::task::Spawn;
 use futures::{FutureExt, TryFutureExt};
 use once_cell::sync::Lazy;
-use starlane::space::artifact::asynch::ArtifactApi;
+use starlane::space::artifact::asynch::Artifacts;
 use starlane::space::artifact::ArtRef;
 use starlane::space::command::common::{SetProperties, StateSrc};
 use starlane::space::command::direct::create::{
@@ -1267,8 +1267,12 @@ impl DriverRunner {
                             let result = self.logger.result(self.driver.particle(&point).await);
                             tx.send(result);
                         }
-                        DriverRunnerCall::DriverRunnerRequest(request) => match request {
-                            DriverRunnerRequest::Create { .. } => {}
+                        DriverRunnerCall::DriverRunnerRequest(request) => {
+                            match request {
+                            DriverRunnerRequest::Create { .. } => {
+                                todo!()
+                            }
+                        }
                         },
                         DriverRunnerCall::ParticleBind { point, rtn } => {
                             rtn.send(Ok(self.driver.particle_bind()));
@@ -1406,7 +1410,7 @@ impl DriverSkel {
         &self.star.drivers
     }
 
-    pub fn artifacts(&self) -> &ArtifactApi {
+    pub fn artifacts(&self) -> &Artifacts {
         &self.star.machine_api.artifacts
     }
 

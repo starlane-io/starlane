@@ -1,214 +1,357 @@
-use crate::space::artifact::ArtRef;
+use crate::space::artifact::builtin::BUILTIN_FETCHER;
+use crate::space::artifact::{builtin, ArtRef};
 use crate::space::config::mechtron::MechtronConfig;
 use crate::space::loc::ToSurface;
+use crate::space::parse::doc;
+use crate::space::parse::util::new_span;
 use crate::space::point::Point;
+use crate::space::settings::Timeouts;
 use crate::space::wave::core::cmd::CmdMethod;
 use crate::space::wave::exchange::asynch::ProtoTransmitter;
-use crate::space::wave::DirectedProto;
+use crate::space::wave::{DirectedProto, WaitTime};
 use crate::{Bin, BindConfig, SpaceErr, Stub, Substance};
+use alloc::string::FromUtf8Error;
+use core::str::FromStr;
 use dashmap::DashMap;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use std::time::SystemTime;
-use dashmap::mapref::one::Ref;
+use std::time::{Duration, SystemTime};
 use thiserror::Error;
-use tokio::sync::watch;
-use tokio::sync::watch::Receiver;
-use crate::space::config::{DocKind, Document};
+use tokio::sync::broadcast::error::RecvError;
+use tokio::sync::watch::Ref;
+use tokio::sync::{broadcast, mpsc, watch};
+use tokio::time::error::Elapsed;
+use tokio::time::Timeout;
 
-#[derive(Clone,Error,Debug)]
+#[derive(Clone, Error, Debug)]
 pub enum ArtErr {
-    #[error("artifact '{0}' not found.")]
-    NotFound(Point),
-    #[error("repo for artifact '{0}' is is not currently reachable")]
-    Unreachable(Point)
+    #[error("artifact is in an unknown status")]
+    UnknownStatus,
+    #[error("artifact has not completed fetching ")]
+    FetchingStatus,
+    #[error("artifact raw data has completed fetching")]
+    BinStatus,
+    #[error("artifact is being parsing")]
+    ParsingStatus,
+    #[error("artifact not found.")]
+    NotFound,
+    #[error("repo for artifact is is not currently reachable")]
+    Unreachable,
+    #[error(transparent)]
+    SpaceErr(#[from] SpaceErr),
+    #[error("timeout")]
+    Timeout,
+    #[error("watch was unexpectedly cancelled")]
+    WatchReceiveErr,
+    #[error("watch broadcast unexpectedly failed")]
+    BroadcastSendErr,
+    #[error("Utf8 error")]
+    Utf8Error,
+}
+
+impl From<FromUtf8Error> for ArtErr {
+    fn from(_: FromUtf8Error) -> Self {
+        Self::Utf8Error
+    }
+}
+
+impl From<Elapsed> for ArtErr {
+    fn from(_: Elapsed) -> Self {
+        Self::Timeout
+    }
+}
+
+impl From<watch::error::RecvError> for ArtErr {
+    fn from(_: watch::error::RecvError) -> Self {
+        Self::WatchReceiveErr
+    }
+}
+
+impl<T> From<broadcast::error::SendError<T>> for ArtErr {
+    fn from(_: broadcast::error::SendError<T>) -> Self {
+        Self::BroadcastSendErr
+    }
 }
 
 #[derive(Clone)]
-pub struct Attempt{
+pub struct Attempt {
     pub err: ArtErr,
-    pub time: SystemTime
+    pub time: SystemTime,
+    pub retries: u16,
 }
 
 impl Attempt {
-    pub fn new( err: ArtErr) -> Self {
+    pub fn new(err: ArtErr) -> Self {
         Self {
             err,
-            time: SystemTime::now()
+            time: SystemTime::now(),
+            retries: 1u16,
         }
     }
 }
 
-impl ArtErr {
-}
+impl ArtErr {}
 
+#[derive(Clone)]
 pub enum ArtStatus<A> {
     Unknown,
     Fetching,
-    Raw(String),
+    Raw(Arc<Bin>),
     Parsing,
     Cached(ArtRef<A>),
-    Fail(Attempt)
+    Fail(Attempt),
+}
+
+impl<A> Into<Result<ArtRef<A>, ArtErr>> for ArtStatus<A> {
+    fn into(self) -> Result<ArtRef<A>, ArtErr> {
+        match self {
+            ArtStatus::Unknown => Err(ArtErr::UnknownStatus)?,
+            ArtStatus::Fetching => Err(ArtErr::FetchingStatus)?,
+            ArtStatus::Raw(raw) => Err(ArtErr::BinStatus)?,
+            ArtStatus::Parsing => Err(ArtErr::ParsingStatus)?,
+            ArtStatus::Cached(art) => Ok(art),
+            ArtStatus::Fail(err) => Err(err.err)?,
+        }
+    }
 }
 
 pub struct ArtifactPipeline<A> {
-    watch: watch::Receiver<ArtStatus<A>>
+    watch: watch::Receiver<ArtStatus<A>>,
 }
 
-impl <A>  ArtifactPipeline<A> {
-    pub fn new( ) -> (ArtifactPipeline<A>, watch::Sender<ArtStatus<A>>)  {
-        let (tx, watch) = watch::channel(ArtStatus::Unknown);
-        (ArtifactPipeline {
-            watch
-        }, tx)
+#[derive(Clone)]
+pub struct ArtifactsSkel {
+    pub timeouts: Timeouts,
+    pub wait_time: WaitTime,
+}
+
+impl Default for ArtifactsSkel {
+    fn default() -> Self {
+        Self {
+            timeouts: Default::default(),
+            wait_time: WaitTime::default(),
+        }
     }
 }
 
-struct ArtifactCache<A,F> where F: ArtifactFetcher {
-   artifacts: DashMap<Point, ArtRef<A>>,
-   bins: DashMap<Point, Arc<Bin>>,
-   pipeline: DashMap<Point, ArtifactPipeline<A>>,
-   fetcher: F
+impl<A> ArtifactPipeline<A> {
+    pub fn new(point: &Point, fetcher: Arc<dyn ArtifactFetcher>) -> ArtifactPipeline<A> {
+        let runner = ArtifactPipelineRunner::new(point.clone(), fetcher);
+        let watch = runner.watch();
+        runner.start();
+        Self { watch }
+    }
+
+    pub fn status(&self) -> ArtStatus<A> {
+        self.watch.borrow().clone()
+    }
+
+    pub fn watch(&self) -> watch::Receiver<ArtStatus<A>> {
+        self.watch.clone()
+    }
 }
 
-impl <'a,A,F> ArtifactCache<A,&'a F> where F: ArtifactFetcher{
-   pub fn new(fetcher: &'a F) -> ArtifactCache<A,&'a F> {
-       ArtifactCache {
-           artifacts: Default::default(),
-           bins: Default::default(),
-           pipeline: Default::default(),
-           fetcher,
-       }
-   }
+struct ArtifactPipelineRunner<A> {
+    point: Point,
+    fetcher: Arc<dyn ArtifactFetcher>,
+    broadcast_tx: broadcast::Sender<ArtStatus<A>>,
+    watch_rx: watch::Receiver<ArtStatus<A>>,
 }
 
+impl<A> ArtifactPipelineRunner<A>
+where
+    A: FromStr<Err = SpaceErr>,
+{
+    pub fn new<B>(point: Point, fetcher: Arc<dyn ArtifactFetcher>) -> Self {
+        let (watch_tx, watch_rx) = watch::channel(ArtStatus::Unknown);
+        let (broadcast_tx, mut broadcast_rx) = broadcast::channel(10);
 
+        tokio::spawn(async move {
+            while let Ok(status) = broadcast_rx.recv().await {
+                watch_tx.send(status).unwrap_or_default();
+            }
+        });
 
-pub struct Artifacts<'a> {
-    fetcher: Box<dyn ArtifactFetcher>,
-    pub bind: ArtifactCache<BindConfig,&'a dyn ArtifactFetcher>,
-    pub mechtron: ArtifactCache<MechtronConfig,&'a dyn ArtifactFetcher>
+        let runner = Self {
+            point,
+            fetcher,
+            broadcast_tx: broadcast_tx,
+            watch_rx,
+        };
+
+        runner
+    }
+
+    pub fn watch(&self) -> watch::Receiver<ArtStatus<A>> {
+        self.watch_rx.clone()
+    }
+
+    pub fn start(mut self) {
+        tokio::spawn(async move {
+            match self.run().await {
+                Ok(_) => {}
+                Err(err) => {
+                    let attempt = Attempt::new(err);
+                    self.broadcast_tx
+                        .send(ArtStatus::Fail(attempt))
+                        .unwrap_or_default();
+                }
+            }
+        });
+    }
+
+    async fn run(&mut self) -> Result<(), ArtErr> {
+        self.broadcast_tx.send(ArtStatus::Fetching)?;
+        let bin = self.fetcher.fetch(&self.point).await?;
+        self.broadcast_tx.send(ArtStatus::Raw(bin.clone()))?;
+        let string = String::from_utf8((*bin).clone())?;
+
+        self.broadcast_tx.send(ArtStatus::Parsing)?;
+        let artifact = A::from_str(string.as_str())?;
+        let (tx, rx) = mpsc::channel(10);
+        let art = ArtRef::new(artifact, self.point.clone(), tx);
+        self.broadcast_tx.send(ArtStatus::Cached(art))?;
+        Ok(())
+    }
 }
 
+struct ArtifactCache<A> {
+    skel: ArtifactsSkel,
+    artifacts: DashMap<Point, ArtRef<A>>,
+    bins: DashMap<Point, Arc<Bin>>,
+    pipelines: DashMap<Point, ArtifactPipeline<A>>,
+    fetcher: Arc<dyn ArtifactFetcher>,
+}
 
-impl <'a> Artifacts<'a>  {
-    pub fn new( fetcher: Box<dyn ArtifactFetcher>) -> Artifacts<'a>{
-        Artifacts {
-            bind: ArtifactCache::new(&*fetcher),
-            mechtron: ArtifactCache::new(&*fetcher),
+impl<A> ArtifactCache<A> {
+    pub fn new(fetcher: Arc<dyn ArtifactFetcher>, skel: ArtifactsSkel) -> ArtifactCache<A> {
+        ArtifactCache {
+            skel,
+            artifacts: DashMap::new(),
+            bins: DashMap::new(),
+            pipelines: DashMap::new(),
             fetcher,
         }
     }
+
+    pub async fn get(&self, point: &Point) -> Result<ArtRef<A>, ArtErr> {
+        self.get_with_wait(point, self.skel.wait_time.clone())
+    }
+    pub async fn get_with_wait(&self, point: &Point, wait: WaitTime) -> Result<ArtRef<A>, ArtErr> {
+        if let Some(art) = self.artifacts.get(point) {
+            return Ok(art.value().clone());
+        }
+
+        let timeout = Duration::from_secs(self.skel.timeouts.from(wait));
+        let fetcher = self.fetcher.clone();
+        let pipeline = self
+            .pipelines
+            .entry(point.clone())
+            .or_insert_with(move || ArtifactPipeline::new(point, fetcher))
+            .value();
+        let mut watch = pipeline.watch();
+        let bins = &self.bins;
+        let artifacts = &self.artifacts;
+        let status = tokio::time::timeout(
+            timeout,
+            watch.wait_for(move |status| match status {
+                ArtStatus::Raw(bin) => {
+                    bins.insert(point.clone(), bin.clone());
+                    false
+                }
+                ArtStatus::Cached(art) => {
+                    artifacts.insert(point.clone(), art.clone());
+                    true
+                }
+                ArtStatus::Fail(_) => true,
+                _ => false,
+            }),
+        )
+        .await??;
+
+        match status.clone() {
+            ArtStatus::Unknown => Err(ArtErr::UnknownStatus),
+            ArtStatus::Fetching => Err(ArtErr::FetchingStatus),
+            ArtStatus::Raw(_) => Err(ArtErr::BinStatus),
+            ArtStatus::Parsing => Err(ArtErr::ParsingStatus),
+            ArtStatus::Cached(art) => Ok(art),
+            ArtStatus::Fail(err) => Err(err.err),
+        }
+    }
 }
 
+impl ArtifactCache<Bin> {}
 
+pub struct ArtifactHub {
+    skel: ArtifactsSkel,
+    pub bind: ArtifactCache<BindConfig>,
+    pub mechtron: ArtifactCache<MechtronConfig>,
+}
 
-impl <A,F>  ArtifactCache<A,F> where F: ArtifactFetcher{
-    fn new(fetcher: F) -> ArtifactCache<A,F>{
-        Self {
-            artifacts: Default::default(),
-            bins: Default::default(),
-            pipeline: Default::default(),
-            fetcher: fetcher,
+impl ArtifactHub {
+    pub fn new(fetcher: Arc<dyn ArtifactFetcher>, skel: ArtifactsSkel) -> ArtifactHub {
+        ArtifactHub {
+            bind: ArtifactCache::new(fetcher.clone(), skel.clone()),
+            mechtron: ArtifactCache::new(fetcher.clone(), skel.clone()),
+            skel,
         }
+    }
+
+    pub async fn bind_conf(&self, point: &Point) -> Result<ArtRef<BindConfig>, ArtErr> {
+        self.bind.get(point).await
+    }
+
+    pub async fn mechtron_conf(&self, point: &Point) -> Result<ArtRef<MechtronConfig>, ArtErr> {
+        self.mechtron.get(point).await
+    }
+}
+
+pub struct ArtifactsBuilder {
+    fetchers: Vec<Arc<dyn ArtifactFetcher>>,
+}
+
+impl ArtifactsBuilder {
+    pub fn new() -> Self {
+        Self { fetchers: vec![] }
+    }
+}
+
+impl Deref for ArtifactsBuilder {
+    type Target = Vec<Arc<dyn ArtifactFetcher>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.fetchers
+    }
+}
+
+impl DerefMut for ArtifactsBuilder {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.fetchers
     }
 }
 
 #[derive(Clone)]
-pub struct ArtifactApi {
-    builtin: Arc<Artifacts>,
-    cached: Arc<Artifacts>,
+pub struct Artifacts {
+    hubs: Vec<Arc<ArtifactHub>>,
 }
 
-impl ArtifactApi {
-    pub fn no_fetcher() -> Self {
-        let fetcher = Arc::new(NoDiceArtifactFetcher{});
-        Self::new(fetcher)
+impl Artifacts {
+    pub fn just_builtins() -> Self {
+        let fetcher = BUILTIN_FETCHER.clone();
+        let hub = Arc::new(ArtifactHub::new(fetcher, ArtifactsSkel::default()));
+        Self { hubs: vec![hub] }
     }
 
-    pub fn new(fetcher: Arc<dyn ArtifactFetcher>) -> Self {
-        let builtin= Arc::new(ArtifactCache::default());
-        let cached = Arc::new(ArtifactCache::default());
-        Self {
-            builtin,
-            cached,
-        }
-    }
-
-    pub fn bind<A>( &self, point: &Point ) -> Result<ArtRef<A>,SpaceErr> where A: TryFrom<Document>{
-
-        match self.builtin.bind.get_mut(point) {
-            Some(v) => {
-
-            },
-            None => {}
-        }
-    }
-
-    pub async fn set_fetcher(&self, fetcher: Arc<dyn ArtifactFetcher>) {
-        self.fetcher_tx.send(fetcher);
-    }
-
-    fn get_fetcher(&self) -> Arc<dyn ArtifactFetcher> {
-        self.fetcher_rx.borrow().clone()
-    }
-
-    pub async fn mechtron(&self, point: &Point) -> Result<ArtRef<MechtronConfig>, SpaceErr> {
-        {
-            if self.mechtrons.contains_key(point) {
-                let mechtron = self.mechtrons.get(point).unwrap().clone();
-                return Ok(ArtRef::new(mechtron, point.clone()));
-            }
-        }
-
-        let mechtron: Arc<MechtronConfig> = Arc::new(self.fetch(point).await?);
-        self.mechtrons.insert(point.clone(), mechtron.clone());
-        return Ok(ArtRef::new(mechtron, point.clone()));
-    }
-
-/*    pub async fn bind(&self, point: &Point) -> Result<ArtRef<BindConfig>, SpaceErr> {
-        {
-            if self.binds.contains_key(point) {
-                let bind = self.binds.get(point).unwrap().clone();
-                return Ok(ArtRef::new(bind, point.clone()));
-            }
-        }
-
-        let bind: Arc<BindConfig> = Arc::new(self.fetch(point).await?);
-        {
-            self.binds.insert(point.clone(), bind.clone());
-        }
-        return Ok(ArtRef::new(bind, point.clone()));
-    }
-
- */
-
-    pub async fn wasm(&self, point: &Point) -> Result<ArtRef<Bin>, SpaceErr> {
-        {
-            if self.wasm.contains_key(point) {
-                let wasm = self.wasm.get(point).unwrap().clone();
-                return Ok(ArtRef::new(Arc::new(wasm), point.clone()));
-            }
-        }
-
-        let wasm = self.get_fetcher().fetch(point).await?;
-        {
-            self.wasm.insert(point.clone(), wasm.clone());
-        }
-        return Ok(ArtRef::new(Arc::new(wasm), point.clone()));
-    }
-
-    async fn fetch<A>(&self, point: &Point) -> Result<A, SpaceErr>
+    pub async fn get<A>(&self, point: &Point) -> Result<ArtRef<A>, ArtErr>
     where
-        A: TryFrom<Bin, Error = SpaceErr>,
+        A: FromStr<Err = SpaceErr>,
     {
-        if !point.has_bundle() {
-            return Err("point is not from a bundle".into());
+        for hub in &self.hubs {
+            hub.get
         }
-        let bin = self.get_fetcher().fetch(point).await?;
-        Ok(A::try_from(bin)?)
     }
 }
 
@@ -223,56 +366,9 @@ impl FetchChamber {
 }
 
 #[async_trait]
-pub trait ArtifactFetcher: Send + Sync + Clone {
+pub trait ArtifactFetcher: Send + Sync {
     async fn stub(&self, point: &Point) -> Result<Stub, SpaceErr>;
-    async fn fetch(&self, point: &Point ) -> Result<ArtifactPipeline<Bin>, SpaceErr>;
-}
-
-
-pub struct BuiltinArtifactFetcherBuilder {
-    bins: HashMap<Point,Arc<Bin>>
-}
-
-impl BuiltinArtifactFetcherBuilder {
-    pub fn add(& mut self, point: &Point, bin: Bin ) {
-        self.bins.insert(point.clone(),Arc::new(bin));
-    }
-
-    pub fn build(self) -> BuiltinArtifactFetcher {
-        BuiltinArtifactFetcher {
-            bins: self.bins
-        }
-    }
-}
-
-impl Deref for BuiltinArtifactFetcherBuilder {
-    type Target = HashMap<Point,Arc<Bin>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.bins
-    }
-}
-
-impl DerefMut for BuiltinArtifactFetcherBuilder {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        & mut self.bins
-    }
-}
-
-
-
-pub struct BuiltinArtifactFetcher {
-    bins: HashMap<Point,Arc<Bin>>
-}
-#[async_trait]
-impl ArtifactFetcher for BuiltinArtifactFetcher{
-    async fn stub(&self, point: &Point) -> Result<Stub, SpaceErr> {
-        Err("cannot pull artifacts right now".into())
-    }
-
-    async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, SpaceErr> {
-        Ok(self.bins.get(point).cloned().ok_or(SpaceErr::not_found(point))?)
-    }
+    async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, SpaceErr>;
 }
 
 pub struct NoDiceArtifactFetcher;
@@ -283,7 +379,7 @@ impl ArtifactFetcher for NoDiceArtifactFetcher {
         Err("cannot pull artifacts right now".into())
     }
 
-    async fn fetch(&self, point: &Point) -> Result<Bin, SpaceErr> {
+    async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, SpaceErr> {
         Err("cannot pull artifacts right now".into())
     }
 }

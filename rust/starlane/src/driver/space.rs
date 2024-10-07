@@ -14,23 +14,6 @@ use std::sync::Arc;
 use starlane::space::wave::core::CoreBounce;
 use starlane::space::wave::exchange::asynch::{DirectedHandler, RootInCtx};
 
-static SPACE_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
-    ArtRef::new(
-        Arc::new(space_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/space.bind").unwrap(),
-    )
-});
-
-fn space_bind() -> BindConfig {
-    log(bind_config(
-        r#"
-    Bind(version=1.0.0)
-    {
-    }
-    "#,
-    ))
-    .unwrap()
-}
 
 pub struct SpaceDriverFactory;
 

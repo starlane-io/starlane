@@ -3,7 +3,7 @@ use crate::registry::postgres::{
     PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle,
 };
-use starlane::space::artifact::asynch::ArtifactApi;
+use starlane::space::artifact::asynch::Artifacts;
 use starlane::space::kind::StarSub;
 use starlane::space::loc::{MachineName, StarKey};
 use starlane::space::log::RootLogger;
@@ -31,7 +31,7 @@ use crate::registry::postgres::err::RegErr;
 #[derive(Clone)]
 pub struct Starlane {
     pub handle: PostgresRegistryContextHandle, //    pub ctx: P::RegistryContext
-    artifacts: ArtifactApi
+    artifacts: Artifacts
 }
 
 impl Starlane {
@@ -46,7 +46,7 @@ aprintln!("postgres!!!");
             set.insert(db.clone());
             let ctx = Arc::new(PostgresRegistryContext::new(set,Box::new(lookup)).await?);
             let handle = PostgresRegistryContextHandle::new(&db, ctx);
-            let artifacts = ArtifactApi::no_fetcher();
+            let artifacts = Artifacts::just_builtins();
 aprintln!("returning postgres handle");
             Ok(Self { handle, artifacts })
         }
@@ -162,7 +162,7 @@ aprintln!("Creating Global Registry...");
         todo!()
     }
 
-    fn artifact_hub(&self) -> ArtifactApi {
+    fn artifact_hub(&self) -> Artifacts {
         self.artifacts.clone()
     }
 
