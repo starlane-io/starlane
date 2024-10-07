@@ -827,7 +827,7 @@ pub mod test {
     pub fn selector() -> Result<(), SpaceErr> {
         let kind = Kind::Star(StarSub::Fold);
         let selector = KindSelector::from_str("<Star<Fold>>")?;
-        //assert!(selector.is_match(&kind));
+        assert!(selector.is_match(&kind).is_ok());
         Ok(())
     }
 }

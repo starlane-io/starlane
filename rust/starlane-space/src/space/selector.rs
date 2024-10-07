@@ -56,7 +56,7 @@ impl ValueMatcher<Kind> for KindSelector {
     fn is_match(&self, kind: &Kind) -> Result<(), ()> {
         let base = kind.to_base();
         let sub = kind.sub().to_camel_case();
-        let specific = kind.specific().as_ref();
+        let specific = &kind.specific();
         match self.base.is_match(&base) && self.sub.is_match(&sub) && self.specific.is_match_opt(specific).is_ok() {
             true => Ok(()),
             false => Err(())
@@ -342,7 +342,7 @@ impl Selector {
         } else if hop.segment_selector.is_recursive() {
             hop.is_match(hierarchy.segments.last().expect("segment"))
                 && self.matches_found(&hierarchy.consume().expect("hierarchy"))
-        } else if hop.is_matchs(seg) {
+        } else if hop.is_match(seg) {
             // in a normal match situation, we consume the hop and move to the next one
             self.consume()
                 .expect("AddressTksPattern")
@@ -740,12 +740,13 @@ pub struct HopDef<Segment, KindSelector> {
 
 impl HopDef<PointSegSelector, ValuePattern<KindSelector>>
 {
-    pub fn is_match<K>(&self, point_kind_segment: &PointKindSegOpt) -> bool
+    pub fn is_match(&self, point_kind_segment: &PointKindSegOpt) -> bool
     {
+        let kind = point_kind_segment.kind.clone();
         self
             .segment_selector
             .is_match(&point_kind_segment.segment)
-            && self.kind_selector.is_match_opt(&point_kind_segment.kind).is_ok()
+            && self.kind_selector.is_match_opt(&kind).is_ok()
     }
 }
 

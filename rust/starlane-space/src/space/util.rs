@@ -293,7 +293,7 @@ where
     }
 }
 
-impl<T> ValueMatcher<T> for ValuePattern<T> {
+impl<P,T> ValueMatcher<T> for ValuePattern<P> where P: PartialEq<T> {
     fn is_match(&self, x: &T) -> Result<(), ()> {
         match self {
             ValuePattern::Always => Ok(()),
@@ -338,7 +338,7 @@ impl<T> ValuePattern<T> {
         }
     }
 
-    pub fn is_match_opt<X>(&self, x: Option<&X>) -> Result<(), ()>
+    pub fn is_match_opt<X>(&self, x: &Option<X>) -> Result<(), ()>
     where
         T: ValueMatcher<X>,
     {
