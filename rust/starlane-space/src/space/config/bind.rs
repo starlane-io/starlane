@@ -1,3 +1,4 @@
+use core::str::FromStr;
 use std::convert::TryInto;
 
 use regex::Regex;
@@ -66,6 +67,14 @@ impl BindConfig {
                 directed.core().uri.path().to_string()
             ),
         })
+    }
+}
+
+impl FromStr for BindConfig {
+    type Err = SpaceErr;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        bind_config(s)
     }
 }
 

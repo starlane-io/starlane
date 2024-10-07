@@ -1,3 +1,4 @@
+use core::str::FromStr;
 use std::ops::Deref;
 
 use serde::{Deserialize, Serialize};
@@ -11,6 +12,7 @@ pub mod bind;
 pub mod mechtron;
 
 use crate::space::err::SpaceErr;
+use crate::space::parse::doc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PortalKind {
@@ -66,10 +68,18 @@ impl<Body> Deref for PointConfig<Body> {
     }
 }
 
-#[derive(Clone,Autobox)]
+#[derive(Autobox)]
 pub enum Document {
     BindConfig(BindConfig),
     MechtronConfig(MechtronConfig),
+}
+
+impl FromStr for Document {
+    type Err = SpaceErr;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        doc(s)
+    }
 }
 
 #[derive(Clone,Hash,Eq,PartialEq,strum_macros::Display,strum_macros::EnumString)]

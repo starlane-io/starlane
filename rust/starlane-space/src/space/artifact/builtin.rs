@@ -15,18 +15,19 @@ use std::sync::Arc;
 
 pub static BUILTIN_FETCHER: Lazy<Arc<BuiltinArtifactFetcher>> = Lazy::new(|| {
     let mut builder = BuiltinArtifactFetcherBuilder::new();
+
     builder.insert(
         Point::from_str("GLOBAL::repo:1.0.0:/bind/star.bind").unwrap(),
-        Arc::new(include_str!("../../../conf/star.bind").into()).unwrap(),
+        Arc::<Vec<u8>>::new(include_bytes!("../../../conf/star.bind").into()),
     );
 
     builder.insert(
         Point::from_str("GLOBAL::repo:1.0.0:/bind/driver.bind").unwrap(),
-        Arc::new(include_str!("../../../conf/driver.bind").into()).unwrap(),
+        Arc::<Vec<u8>>::new(include_bytes!("../../../conf/driver.bind").into()),
     );
     builder.insert(
         Point::from_str("GLOBAL::repo:1.0.0:/bind/nothing.bind").unwrap(),
-        Arc::new(include_str!("../../../conf/nothing.bind").into()).unwrap(),
+        Arc::<Vec<u8>>::new(include_bytes!("../../../conf/nothing.bind").into()),
     );
 
     Arc::new(builder.build())

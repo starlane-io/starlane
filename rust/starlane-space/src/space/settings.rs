@@ -16,7 +16,16 @@ impl Timeouts {
             WaitTime::Low => self.low,
         }
     }
+
+    pub fn from_wait(&self, wait: &WaitTime ) -> u64 {
+        match wait {
+            WaitTime::High => self.high,
+            WaitTime::Med => self.med,
+            WaitTime::Low => self.low,
+        }
+    }
 }
+
 
 impl Default for Timeouts {
     fn default() -> Self {

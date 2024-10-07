@@ -39,6 +39,14 @@ impl MechtronConfig {
     }
 }
 
+impl FromStr for MechtronConfig {
+    type Err = SpaceErr;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        mechtron_config(s)
+    }
+}
+
 impl TryFrom<Vec<u8>> for MechtronConfig {
     type Error = SpaceErr;
 

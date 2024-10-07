@@ -1,22 +1,30 @@
-use core::borrow::Borrow;
-use std::ops::Deref;
-use std::sync::Arc;
-
-use serde::{Deserialize, Serialize};
-use crate::space::artifact::asynch::{ArtifactPipeline, ArtifactHub};
+use crate::space::artifact::asynch::{ArtifactHub, ArtifactPipeline};
+use crate::space::config::Document;
 use crate::space::err::SpaceErr;
 use crate::space::loc::ToSurface;
 use crate::space::point::Point;
 use crate::space::substance::Bin;
+use core::borrow::Borrow;
+use serde::{Deserialize, Serialize};
+use std::ops::Deref;
+use std::sync::Arc;
 
 pub mod asynch;
 pub mod builtin;
 
+#[derive(Debug)]
 pub struct ArtRef<A> {
     artifact: Arc<A>,
     pub point: Point,
     tx: tokio::sync::mpsc::Sender<()>,
 }
+
+impl ArtRef<Document> {}
+
+unsafe impl <A> Send for ArtRef<A> {}
+
+
+unsafe impl <A> Sync for ArtRef<A> {}
 
 impl <A> Clone for ArtRef<A> {
     fn clone(&self) -> Self {
@@ -25,31 +33,29 @@ impl <A> Clone for ArtRef<A> {
         Self {
             artifact: self.artifact.clone(),
             point: self.point.clone(),
-            tx: self.tx.clone()
+            tx: self.tx.clone(),
         }
     }
 }
 
 impl<A> ArtRef<A> {
     fn new(artifact: A, point: Point, tx: tokio::sync::mpsc::Sender<()>) -> Self {
+        let artifact = Arc::new(artifact);
         Self { artifact, point, tx }
     }
 }
 
-
-
-
-
 impl<A> ArtRef<A>
-where
-    A: Clone,
+
 {
-    pub fn contents(&self) -> A {
-        (*self.artifact).clone()
+    pub fn contents(&self) -> Arc<A> {
+        self.artifact.clone()
     }
 }
 
-impl<A> ArtRef<A> {
+impl<A> ArtRef<A>
+
+{
     pub fn bundle(&self) -> Point {
         self.point.clone().to_bundle().unwrap()
     }
@@ -58,7 +64,9 @@ impl<A> ArtRef<A> {
     }
 }
 
-impl<A> Deref for ArtRef<A> {
+impl<A> Deref for ArtRef<A>
+
+{
     type Target = A;
 
     fn deref(&self) -> &Self::Target {

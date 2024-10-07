@@ -19,6 +19,7 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
+use nom_supreme::ParserExt;
 use thiserror::Error;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::watch::Ref;
@@ -95,8 +96,8 @@ impl Attempt {
 
 impl ArtErr {}
 
-#[derive(Clone)]
-pub enum ArtStatus<A> {
+pub enum ArtStatus<A>
+{
     Unknown,
     Fetching,
     Raw(Arc<Bin>),
@@ -105,7 +106,21 @@ pub enum ArtStatus<A> {
     Fail(Attempt),
 }
 
-impl<A> Into<Result<ArtRef<A>, ArtErr>> for ArtStatus<A> {
+impl <A> Clone for ArtStatus<A> {
+    fn clone(&self) -> Self {
+        match self {
+            ArtStatus::Unknown => ArtStatus::Unknown,
+            ArtStatus::Fetching => ArtStatus::Fetching,
+            ArtStatus::Raw(raw) => ArtStatus::Raw(raw.clone()),
+            ArtStatus::Parsing => ArtStatus::Parsing,
+            ArtStatus::Cached(art) => ArtStatus::Cached(art.clone()),
+            ArtStatus::Fail(err) => ArtStatus::Fail(err.clone())
+        }
+    }
+}
+
+impl<A> Into<Result<ArtRef<A>, ArtErr>> for ArtStatus<A>
+{
     fn into(self) -> Result<ArtRef<A>, ArtErr> {
         match self {
             ArtStatus::Unknown => Err(ArtErr::UnknownStatus)?,
@@ -118,7 +133,8 @@ impl<A> Into<Result<ArtRef<A>, ArtErr>> for ArtStatus<A> {
     }
 }
 
-pub struct ArtifactPipeline<A> {
+pub struct ArtifactPipeline<A> where A: FromStr<Err=SpaceErr>
+{
     watch: watch::Receiver<ArtStatus<A>>,
 }
 
@@ -137,7 +153,8 @@ impl Default for ArtifactsSkel {
     }
 }
 
-impl<A> ArtifactPipeline<A> {
+impl<A> ArtifactPipeline<A> where A: FromStr<Err=SpaceErr>+'static
+{
     pub fn new(point: &Point, fetcher: Arc<dyn ArtifactFetcher>) -> ArtifactPipeline<A> {
         let runner = ArtifactPipelineRunner::new(point.clone(), fetcher);
         let watch = runner.watch();
@@ -145,8 +162,10 @@ impl<A> ArtifactPipeline<A> {
         Self { watch }
     }
 
-    pub fn status(&self) -> ArtStatus<A> {
-        self.watch.borrow().clone()
+    pub fn status(& mut self) -> ArtStatus<A> {
+        let x = self.watch.borrow_and_update();
+        let x = (*x).clone();
+        x
     }
 
     pub fn watch(&self) -> watch::Receiver<ArtStatus<A>> {
@@ -154,18 +173,17 @@ impl<A> ArtifactPipeline<A> {
     }
 }
 
-struct ArtifactPipelineRunner<A> {
+struct ArtifactPipelineRunner<A>
+{
     point: Point,
     fetcher: Arc<dyn ArtifactFetcher>,
     broadcast_tx: broadcast::Sender<ArtStatus<A>>,
     watch_rx: watch::Receiver<ArtStatus<A>>,
 }
 
-impl<A> ArtifactPipelineRunner<A>
-where
-    A: FromStr<Err = SpaceErr>,
+impl<A> ArtifactPipelineRunner<A> where A: FromStr<Err=SpaceErr>+'static
 {
-    pub fn new<B>(point: Point, fetcher: Arc<dyn ArtifactFetcher>) -> Self {
+    pub fn new(point: Point, fetcher: Arc<dyn ArtifactFetcher>) -> Self {
         let (watch_tx, watch_rx) = watch::channel(ArtStatus::Unknown);
         let (broadcast_tx, mut broadcast_rx) = broadcast::channel(10);
 
@@ -218,7 +236,8 @@ where
     }
 }
 
-struct ArtifactCache<A> {
+struct ArtifactCache<A> where A: FromStr<Err=SpaceErr>
+{
     skel: ArtifactsSkel,
     artifacts: DashMap<Point, ArtRef<A>>,
     bins: DashMap<Point, Arc<Bin>>,
@@ -226,7 +245,8 @@ struct ArtifactCache<A> {
     fetcher: Arc<dyn ArtifactFetcher>,
 }
 
-impl<A> ArtifactCache<A> {
+impl<A> ArtifactCache<A> where A: FromStr<Err=SpaceErr>+'static
+{
     pub fn new(fetcher: Arc<dyn ArtifactFetcher>, skel: ArtifactsSkel) -> ArtifactCache<A> {
         ArtifactCache {
             skel,
@@ -237,21 +257,25 @@ impl<A> ArtifactCache<A> {
         }
     }
 
-    pub async fn get(&self, point: &Point) -> Result<ArtRef<A>, ArtErr> {
-        self.get_with_wait(point, self.skel.wait_time.clone())
+    pub async fn get(&self, point: &Point) -> Result<ArtRef<A>, ArtErr>
+    {
+        self.get_with_wait(point, &self.skel.wait_time).await
     }
-    pub async fn get_with_wait(&self, point: &Point, wait: WaitTime) -> Result<ArtRef<A>, ArtErr> {
+
+    pub async fn get_with_wait(&self, point: &Point, wait: &WaitTime) -> Result<ArtRef<A>, ArtErr>
+    {
         if let Some(art) = self.artifacts.get(point) {
-            return Ok(art.value().clone());
+            let art2 =&*art;
+            //return Ok((*art).clone());
+            return Ok(art2.clone());
         }
 
-        let timeout = Duration::from_secs(self.skel.timeouts.from(wait));
+        let timeout = Duration::from_secs(self.skel.timeouts.from_wait(wait));
         let fetcher = self.fetcher.clone();
         let pipeline = self
             .pipelines
             .entry(point.clone())
-            .or_insert_with(move || ArtifactPipeline::new(point, fetcher))
-            .value();
+            .or_insert_with(move || ArtifactPipeline::new(point, fetcher));
         let mut watch = pipeline.watch();
         let bins = &self.bins;
         let artifacts = &self.artifacts;
@@ -272,18 +296,17 @@ impl<A> ArtifactCache<A> {
         )
         .await??;
 
-        match status.clone() {
+        match &*status {
             ArtStatus::Unknown => Err(ArtErr::UnknownStatus),
             ArtStatus::Fetching => Err(ArtErr::FetchingStatus),
             ArtStatus::Raw(_) => Err(ArtErr::BinStatus),
             ArtStatus::Parsing => Err(ArtErr::ParsingStatus),
-            ArtStatus::Cached(art) => Ok(art),
-            ArtStatus::Fail(err) => Err(err.err),
+            ArtStatus::Cached(art) => Ok(art.clone()),
+            ArtStatus::Fail(err) => Err(err.err.clone()),
         }
     }
 }
 
-impl ArtifactCache<Bin> {}
 
 pub struct ArtifactHub {
     skel: ArtifactsSkel,
@@ -345,13 +368,33 @@ impl Artifacts {
         Self { hubs: vec![hub] }
     }
 
-    pub async fn get<A>(&self, point: &Point) -> Result<ArtRef<A>, ArtErr>
-    where
-        A: FromStr<Err = SpaceErr>,
-    {
+    pub async fn get_bind(&self, point: &Point) -> Option<Result<ArtRef<BindConfig>, ArtErr>> {
         for hub in &self.hubs {
-            hub.get
+            match hub.bind.get(point).await {
+                Ok(art) => return Some(Ok(art)),
+                Err(ArtErr::NotFound) => return None,
+                Err(err) => {
+                    return Some(Err(err));
+                }
+            }
         }
+        None
+    }
+
+    pub async fn get_mechtron(
+        &self,
+        point: &Point,
+    ) -> Option<Result<ArtRef<MechtronConfig>, ArtErr>> {
+        for hub in &self.hubs {
+            match hub.mechtron.get(point).await {
+                Ok(art) => return Some(Ok(art)),
+                Err(ArtErr::NotFound) => return None,
+                Err(err) => {
+                    return Some(Err(err));
+                }
+            }
+        }
+        None
     }
 }
 
@@ -400,14 +443,14 @@ impl ArtifactFetcher for ReadArtifactFetcher {
         Err(SpaceErr::from_status(404u16))
     }
 
-    async fn fetch(&self, point: &Point) -> Result<Bin, SpaceErr> {
+    async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, SpaceErr> {
         let mut directed = DirectedProto::ping();
         directed.to(point.clone().to_surface());
         directed.method(CmdMethod::Read);
         let pong = self.transmitter.ping(directed).await?;
         pong.core.ok_or()?;
         match pong.variant.core.body {
-            Substance::Bin(bin) => Ok(bin),
+            Substance::Bin(bin) => Ok(Arc::new(bin)),
             other => Err(SpaceErr::server_error(format!(
                 "expected Bin, encountered unexpected substance {} when fetching Artifact",
                 other.kind().to_string()
@@ -417,7 +460,7 @@ impl ArtifactFetcher for ReadArtifactFetcher {
 }
 
 pub struct MapFetcher {
-    pub map: HashMap<Point, Bin>,
+    pub map: HashMap<Point, Arc<Bin>>,
 }
 
 #[async_trait]
@@ -426,7 +469,7 @@ impl ArtifactFetcher for MapFetcher {
         todo!()
     }
 
-    async fn fetch(&self, point: &Point) -> Result<Bin, SpaceErr> {
+    async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, SpaceErr> {
         let rtn = self.map.get(point).ok_or(SpaceErr::not_found(format!(
             "could not find {}",
             point.to_string()
@@ -442,12 +485,29 @@ impl MapFetcher {
         }
     }
     pub fn ser<S: Serialize>(&mut self, point: &Point, bin: S) {
-        let bin = bincode::serialize(&bin).unwrap();
+        let bin = Arc::new(bincode::serialize(&bin).unwrap());
         self.map.insert(point.clone(), bin);
     }
 
     pub fn str<S: ToString>(&mut self, point: &Point, string: S) {
-        let bin = string.to_string().into_bytes();
+        let bin = Arc::new(string.to_string().into_bytes());
         self.map.insert(point.clone(), bin);
     }
+}
+
+
+#[cfg(test)]
+#[test]
+fn test() {
+   struct Blah;
+
+    let arc = Arc::new(Blah);
+
+    arc.clone();
+
+    #[derive(Clone)]
+    struct BeBo<A> {
+        arc: Arc<A>
+    }
+
 }
