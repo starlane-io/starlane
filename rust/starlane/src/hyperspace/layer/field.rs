@@ -4,6 +4,7 @@ use std::sync::Arc;
 use url::Url;
 
 use starlane::space::artifact::ArtRef;
+use starlane::space::artifact::asynch::ArtErr;
 use starlane::space::config::bind::{BindConfig, PipelineStepVar, PipelineStopVar};
 use starlane::space::err::{CoreReflector, SpaceErr, StatusErr};
 use starlane::space::loc::{Layer, Surface, ToSurface};
@@ -54,7 +55,7 @@ impl Field
     async fn bind(
         &self,
         directed: &Traversal<DirectedWave>,
-    ) -> Result<ArtRef<BindConfig>, SpaceErr> {
+    ) -> Result<ArtRef<BindConfig>, ArtErr> {
         let record = self
             .skel
             .registry

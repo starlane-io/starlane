@@ -112,16 +112,28 @@ where
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum IdSelector<V>
 where
-    V: Eq + PartialEq + Hash,
+    V: Clone+ Eq + PartialEq + Hash,
 {
     Always,
     Never,
     Set(HashSet<V>),
 }
 
+impl <V> ToString for IdSelector<V> where V: Clone+ Eq + PartialEq + Hash +ToString {
+    fn to_string(&self) -> String {
+        match self {
+            IdSelector::Always => "*".to_string(),
+            IdSelector::Never => "!".to_string(),
+            IdSelector::Set(set) => {
+                set.into_iter().map(|v| v.to_string()).collect::<Vec<String>>().join("|")
+            }
+        }
+    }
+}
+
 impl<V> IdSelector<V>
 where
-    V: Eq + PartialEq + Hash,
+    V: Clone+ Eq + PartialEq + Hash,
 {
     pub fn always() -> IdSelector<V> {
         Self::Always
@@ -150,7 +162,7 @@ where
 
 impl<V> PartialEq<V> for IdSelector<V>
 where
-    V: Eq + PartialEq + Hash,
+    V: Clone+ Eq + PartialEq + Hash,
 {
     fn eq(&self, value: &V) -> bool {
         match self {

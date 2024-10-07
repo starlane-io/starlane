@@ -144,7 +144,7 @@ impl CliOut {
     pub async fn copy_stout(&mut self, out: &mut Vec<u8>) -> Result<(), CliErr> {
         match self {
             CliOut::Os(proc) => {
-                let mut stdout = proc.stdout.take().ok_or("could not get stdout")?;
+                let mut stdout = proc.stdout.take().ok_or(CliErr::TakeStdOut)?;
                 tokio::io::copy(&mut stdout, out).await?;
             }
         }

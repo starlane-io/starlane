@@ -26,6 +26,7 @@ use tokio::sync::{broadcast, mpsc, watch};
 use tokio::time::error::Elapsed;
 use tokio::time::Timeout;
 use crate::space::artifact::builtin::BUILTIN_FETCHER;
+use crate::space::err::PrintErr;
 use crate::space::selector::{PointSelector, Selector};
 use crate::space::util::ValuePattern;
 
@@ -53,6 +54,22 @@ pub enum ArtErr {
     BroadcastSendErr,
     #[error("Utf8 error")]
     Utf8Error,
+    #[error("Artifacts cannot be fetched because no Artifacts service not available")]
+    ArtifactServiceNotAvailable,
+    #[error("expecting {thing}: {expecting}, found: {found}")]
+    Expecting{thing:String, expecting:String, found: String }
+}
+
+impl ArtErr {
+    pub fn expecting<A,B,C>( thing: A, expecting: B, found: C) -> Self where A: ToString, B: ToString, C: ToString {
+        Self::Expecting {thing: thing.to_string(), expecting: expecting.to_string(), found: found.to_string()}
+    }
+}
+
+impl PrintErr for ArtErr {
+    fn print(&self) {
+        println!("ArtErr: {}", self);
+    }
 }
 
 impl From<FromUtf8Error> for ArtErr {
@@ -419,8 +436,8 @@ impl FetchChamber {
 
 #[async_trait]
 pub trait ArtifactFetcher: Send + Sync {
-    async fn stub(&self, point: &Point) -> Result<Stub, SpaceErr>;
-    async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, SpaceErr>;
+    async fn stub(&self, point: &Point) -> Result<Stub, ArtErr>;
+    async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, ArtErr>;
     fn selector(&self) -> ValuePattern<Selector>;
 }
 
@@ -428,12 +445,12 @@ pub struct NoDiceArtifactFetcher;
 
 #[async_trait]
 impl ArtifactFetcher for NoDiceArtifactFetcher {
-    async fn stub(&self, point: &Point) -> Result<Stub, SpaceErr> {
-        Err("cannot pull artifacts right now".into())
+    async fn stub(&self, point: &Point) -> Result<Stub, ArtErr> {
+        Err(ArtErr::ArtifactServiceNotAvailable)
     }
 
-    async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, SpaceErr> {
-        Err("cannot pull artifacts right now".into())
+    async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, ArtErr> {
+        Err(ArtErr::ArtifactServiceNotAvailable)
     }
 
     fn selector(&self) -> ValuePattern<Selector> {
@@ -453,11 +470,11 @@ impl ReadArtifactFetcher {
 
 #[async_trait]
 impl ArtifactFetcher for ReadArtifactFetcher {
-    async fn stub(&self, point: &Point) -> Result<Stub, SpaceErr> {
-        Err(SpaceErr::from_status(404u16))
+    async fn stub(&self, point: &Point) -> Result<Stub, ArtErr> {
+        Err(SpaceErr::from_status(404u16).into())
     }
 
-    async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, SpaceErr> {
+    async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, ArtErr> {
         let mut directed = DirectedProto::ping();
         directed.to(point.clone().to_surface());
         directed.method(CmdMethod::Read);
@@ -468,7 +485,7 @@ impl ArtifactFetcher for ReadArtifactFetcher {
             other => Err(SpaceErr::server_error(format!(
                 "expected Bin, encountered unexpected substance {} when fetching Artifact",
                 other.kind().to_string()
-            ))),
+            )))?,
         }
     }
 
@@ -483,11 +500,11 @@ pub struct MapFetcher {
 
 #[async_trait]
 impl ArtifactFetcher for MapFetcher {
-    async fn stub(&self, point: &Point) -> Result<Stub, SpaceErr> {
+    async fn stub(&self, point: &Point) -> Result<Stub, ArtErr> {
         todo!()
     }
 
-    async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, SpaceErr> {
+    async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, ArtErr> {
         let rtn = self.map.get(point).ok_or(SpaceErr::not_found(format!(
             "could not find {}",
             point.to_string()

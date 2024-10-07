@@ -43,7 +43,7 @@ use starlane::space::particle::traversal::{
 use starlane::space::particle::{Details, Status, Stub};
 use starlane::space::point::Point;
 use starlane::space::selector::KindSelector;
-use starlane::space::util::{log, IdSelector};
+use starlane::space::util::{log, IdSelector, ValueMatcher};
 use starlane::space::wave::core::cmd::CmdMethod;
 use starlane::space::wave::core::{CoreBounce, Method, ReflectedCore};
 use starlane::space::wave::exchange::asynch::{
@@ -59,14 +59,14 @@ use std::marker::PhantomData;
 use std::ops::{Deref};
 use std::str::FromStr;
 use std::sync::Arc;
+use anyhow::anyhow;
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
 use starlane::space::command::common::StateSrc::Subst;
+use starlane::space::parse::util::space_err;
 use starlane::space::substance::Substance;
 use starlane::space::wave::core::http2::StatusCode;
-
-
 
 pub struct DriversBuilder {
     factories: Vec<Arc<dyn HyperDriverFactory>>,
@@ -377,7 +377,7 @@ impl Drivers {
                             .insert(driver.get_point(), driver.clone());
                         self.kind_to_driver
                             .insert(driver.kind.clone(), driver.clone());
-                        if !driver.kind.matches(&Kind::Driver) {
+                        if !driver.kind.is_match(&Kind::Driver).is_ok() {
                             let driver_driver = self.find(&Kind::Driver).unwrap();
                             driver_driver.add_driver(driver.clone()).await;
                         }
@@ -760,7 +760,7 @@ impl Drivers {
                                 })
                                 .await
                                 .unwrap_or_default();
-                            if driver.kind.matches(&Kind::Driver) {
+                            if driver.kind.is_match(&Kind::Driver).is_ok() {
                                 driver.on_added();
                             }
                             rtn_rx.await;
@@ -782,13 +782,13 @@ impl Drivers {
 
     pub fn find(&self, kind: &Kind) -> Option<&DriverApi> {
         for selector in &self.kinds {
-            if selector.matches(kind) {
+            if selector.is_match(kind).is_ok() {
                 return self.kind_to_driver.get(&selector);
             }
         }
 
         for selector in &self.external_kinds {
-            if selector.matches(kind) {
+            if selector.is_match(kind).is_ok() {
                 return self.kind_to_driver.get(selector);
             }
         }
@@ -797,7 +797,7 @@ impl Drivers {
 
     pub fn find_external(&self, kind: &Kind) -> Option<&DriverApi> {
         for selector in &self.external_kinds {
-            if selector.matches(kind) {
+            if selector.is_match(kind).is_ok() {
                 return self.kind_to_driver.get(selector);
             }
         }
@@ -806,7 +806,8 @@ impl Drivers {
 
     pub fn find_internal(&self, kind: &Kind) -> Option<&DriverApi> {
         for selector in &self.kinds {
-            if selector.matches(kind) {
+            if selector.is_match(kind).is_ok()
+            {
                 return self.kind_to_driver.get(selector);
             }
         }
@@ -1240,14 +1241,7 @@ impl DriverRunner {
                         }
                         DriverRunnerCall::InitParticle { point, rtn } => {
                             let particle = self.driver.particle(&point).await.unwrap();
-                            match particle {
-                                Ok(item) => {
-                                    rtn.send(item.init().await);
-                                }
-                                Err(err) => {
-                                    rtn.send(Err(SpaceErr::to_space_err(err)));
-                                }
-                            }
+                            particle.init().await?;
                         }
                         DriverRunnerCall::GetPoint(rtn) => {
                             rtn.send(self.skel.point.clone());
@@ -1342,7 +1336,7 @@ impl DriverSkel {
     pub async fn select_service(
         &self,
         kind: ServiceKind,
-    ) -> Result<Option<Service<ServiceRunner>>, DriverErr> {
+    ) -> Result<Service<ServiceRunner>, ServiceErr> {
         let selector = ServiceSelector {
             name: IdSelector::Always,
             kind,
@@ -1352,8 +1346,8 @@ impl DriverSkel {
             .star
             .machine_api
             .select_service(selector)
-            .await?
-            .map(|template| template.into());
+            .await?;
+        let service = service.into();
         Ok(service)
     }
 
@@ -1434,7 +1428,7 @@ impl DriverSkel {
         Ok(self
             .star
             .logger
-            .result(self.star.create_in_star(create).await)?)
+            .result(self.star.create_in_star(create).await.map_err(|e|SpaceErr::to_space_err(e)))?)
     }
 
     pub async fn locate(&self, point: &Point) -> Result<ParticleRecord, RegErr> {
@@ -1637,6 +1631,7 @@ pub struct ParticleSphere {
 }
 
 impl ParticleSphere {
+    pub async fn init(&self) {}
     pub fn new_handler<H>(handler: H) -> Self where H: DirectedHandler{
         Self {
             inner: ParticleSphereInner::Handler(Box::new(handler)),
@@ -1658,7 +1653,7 @@ impl Deref for ParticleSphere {
     }
 }
 
-pub enum ParticleSphereInner {
+enum ParticleSphereInner {
     Handler(Box<dyn DirectedHandler>),
     Router(Box<dyn TraversalRouter>),
 }
@@ -1823,7 +1818,7 @@ impl Driver for DriverDriver {
         let skel = DriverDriverParticleSkel::new(self.skel.clone(), api);
         let particle = Box::new(DriverParticle::restore(skel, (), ()));
 
-        Ok(particle.sphere()?)
+        Ok(space_err(particle.sphere())?)
     }
 }
 
@@ -1876,6 +1871,8 @@ impl ParticleDriverErr {
 #[derive(Error,Debug,Clone,ToSpaceErr)]
 pub enum ParticleStarErr {
     #[error(transparent)]
+    SpaceErr(#[from] SpaceErr),
+    #[error(transparent)]
     StarErr(#[from] StarErr),
     #[error(transparent)]
     RegErr(#[from] RegErr),
@@ -1919,17 +1916,8 @@ impl CoreReflector for ParticleDriverErr{
     }
 }
 
-impl From<SpaceErr> for ParticleStarErr {
-    fn from(value: SpaceErr) -> Self {
-        Self::StarErr(StarErr::from(value))
-    }
-}
 
-impl From<SpaceErr> for ParticleDriverErr {
-    fn from(value: SpaceErr) -> Self {
-        Self::DriverErr(DriverErr::from(value))
-    }
-}
+
 
 impl ParticleErr for ParticleStarErr {
 
@@ -1972,6 +1960,7 @@ pub enum DriverErr {
 
 impl DriverErr {
 
+
     pub fn driver_not_found<S>(name: S) -> Self where S: ToString {
         Self::DriverNotFound(name.to_string())
     }
@@ -2001,7 +1990,10 @@ pub type StdParticleErr = Box<StdParticleErrInner>;
 
 
 #[derive(Error, Debug, Clone,ToSpaceErr)]
-pub enum StdParticleErrInner {}
+pub enum StdParticleErrInner {
+    #[error(transparent)]
+   SpaceErr(#[from] SpaceErr),
+}
 
 impl Into<DriverErr> for StdParticleErr {
     fn into(self) -> DriverErr {

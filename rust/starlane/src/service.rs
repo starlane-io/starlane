@@ -17,6 +17,7 @@ use std::str::FromStr;
 use strum_macros::EnumString;
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use starlane::space::err::SpaceErr;
 use starlane::space::kind::Kind;
 use starlane::space::particle::Status;
 use starlane::space::point::Point;
@@ -26,6 +27,7 @@ use crate::executor::cli::HostEnv;
 use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::dialect::filestore::{FileStore, FileStoreErr, FILE_STORE_ROOT};
 use crate::host::{ExeStub, Host, HostCli};
+use crate::hyperspace::machine::MachineErr;
 
 pub type FileStoreService = Service<FileStore>;
 
@@ -129,10 +131,24 @@ impl TryInto<Service<FileStore>> for Service<ServiceRunner>{
     }
 }
 
+#[derive(Clone,Debug)]
 pub struct ServiceSelector {
     pub name: IdSelector<String>,
     pub kind: ServiceKind,
     pub driver: Option<Kind>
+}
+
+impl ToString for ServiceSelector {
+    fn to_string(&self) -> String {
+        match &self.driver {
+            None => {
+                format!("{}<*:{}>",self.name.to_string(),self.kind.to_string())
+            }
+            Some(kind) => {
+                format!("{}<{}:{}>",self.name.to_string(),kind.to_string(),self.kind.to_string())
+            }
+        }
+    }
 }
 
 #[derive(Clone,Eq,PartialEq,Debug,Hash)]
@@ -474,5 +490,13 @@ pub mod tests {
 #[derive(Debug,Error,Clone)]
 pub enum ServiceErr {
     #[error(transparent)]
-    FileStoreErr(#[from] FileStoreErr)
+    MachineErr(#[from] MachineErr),
+    #[error(transparent)]
+    FileStoreErr(#[from] FileStoreErr),
+    #[error(transparent)]
+    SpaceErr(#[from] SpaceErr),
+    #[error("no template available that matches ServiceSelector: '{0}' (name<DriverKind:ServiceKind>)")]
+    NoTemplate(ServiceSelector),
+    #[error("call not processed")]
+    CallRecvErr(#[from] tokio::sync::oneshot::error::RecvError),
 }

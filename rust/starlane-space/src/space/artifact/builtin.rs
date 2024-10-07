@@ -1,4 +1,4 @@
-use crate::space::artifact::asynch::ArtifactFetcher;
+use crate::space::artifact::asynch::{ArtErr, ArtifactFetcher};
 use crate::space::artifact::ArtRef;
 use crate::space::config::bind::BindConfig;
 use crate::space::err::SpaceErr;
@@ -57,11 +57,11 @@ pub struct BuiltinArtifactFetcher {
 
 #[async_trait]
 impl ArtifactFetcher for BuiltinArtifactFetcher {
-    async fn stub(&self, point: &Point) -> Result<Stub, SpaceErr> {
-        Err("cannot pull artifacts right now".into())
+    async fn stub(&self, point: &Point) -> Result<Stub, ArtErr> {
+        Err(ArtErr::ArtifactServiceNotAvailable)
     }
 
-    async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, SpaceErr> {
+    async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, ArtErr> {
         Ok(self
             .bins
             .get(point)

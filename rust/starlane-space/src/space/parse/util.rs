@@ -1,3 +1,4 @@
+use core::fmt::Display;
 use std::ops::{Deref, Range, RangeFrom, RangeTo};
 use std::sync::Arc;
 use nom::error::{ErrorKind, ParseError};
@@ -906,10 +907,10 @@ pub fn result<I: Span, R>(result: Result<(I, R), nom::Err<SpaceTree<I>>>) -> Res
 }
 
 
-pub fn space_err<R,E>(result: Result<R,E>) -> Result<R,SpaceErr> where E: Into<SpaceErr> {
+pub fn space_err<R,E>(result: Result<R,E>) -> Result<R,SpaceErr> where E: Display {
     match result {
         Ok(ok) => Ok(ok),
-        Err(err) => Err(err.into())
+        Err(err) => Err(SpaceErr::to_space_err(err))
     }
 }
 

@@ -42,6 +42,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio_print::aprintln;
+use starlane::space::parse::util::{result, space_err};
 use starlane::space::wave::core::MethodKind::Hyp;
 
 #[derive(Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -224,7 +225,7 @@ impl Driver for StarDriver
             self.ctx.clone(),
             (),
         );
-        Ok(star.sphere()?)
+        Ok(space_err(star.sphere())?)
     }
 }
 
@@ -492,14 +493,12 @@ impl Star
 
     #[route("Hyp<Search>")]
     pub async fn handle_search_request(&self, ctx: InCtx<'_, HyperSubstance>) -> CoreBounce {
-        async fn sub_search_and_reflect<'a, E>(
+        async fn sub_search_and_reflect<'a>(
             star: &Star,
             ctx: &'a InCtx<'a, HyperSubstance>,
             mut history: HashSet<Point>,
             search: Search,
         ) -> Result<ReflectedCore, SpaceErr>
-        where
-            E: Platform,
         {
             let mut discoveries = if star.skel.kind.is_forwarder() {
                 let mut wrangler = Wrangler::new(star.skel.clone(), search);

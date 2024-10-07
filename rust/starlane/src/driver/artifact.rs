@@ -1,13 +1,8 @@
-use crate::driver::{
-    Driver, DriverCtx, DriverErr, DriverHandler, DriverSkel, DriverStatus, HyperDriverFactory,
-    HyperSkel, Particle, ParticleSkel, ParticleSphereInner,
-};
+use crate::driver::{Driver, DriverCtx, DriverErr, DriverHandler, DriverSkel, DriverStatus, HyperDriverFactory, HyperSkel, Particle, ParticleSkel, ParticleSphere, ParticleSphereInner, StdParticleErr};
 use crate::executor::dialect::filestore::FileStoreIn;
 use crate::hyperspace::star::HyperStarSkel;
 use crate::platform::Platform;
 use crate::service::{FileStoreService, Service, ServiceKind, ServiceRunner, ServiceSelector};
-use acid_store::repo::Commit;
-use acid_store::repo::OpenOptions;
 use once_cell::sync::Lazy;
 use starlane::space::artifact::ArtRef;
 use starlane::space::command::common::{SetProperties, StateSrc};
@@ -58,14 +53,7 @@ impl HyperDriverFactory for RepoDriverFactory {
         skel: DriverSkel,
         _: DriverCtx,
     ) -> Result<Box<dyn Driver>, DriverErr> {
-        let service = skel.logger.result(
-            skel.logger
-                .result(skel.select_service(ServiceKind::FileStore).await)?
-                .ok_or(format!(
-                    "could not select service '{}' ",
-                    ServiceKind::FileStore.to_string()
-                )),
-        )?;
+        let service = skel.select_service(ServiceKind::FileStore).await?;
 
         let filestore = service.filestore()?;
 
@@ -105,13 +93,17 @@ impl Driver for RepoDriver {
         Kind::Repo
     }
 
-    async fn particle(&self, point: &Point) -> Result<ParticleSphereInner, DriverErr> {
+    async fn particle(&self, point: &Point) -> Result<ParticleSphere, DriverErr> {
         let filestore = self.filestore.sub_root(point.md5().into()).await?;
-        Ok(ParticleSphereInner::Handler(Box::new(Repo::restore(
+
+        let repo = Repo::restore(
             (),
             (),
-            filestore,
-        ))))
+            filestore
+        );
+
+        ;
+        Ok(repo.sphere())
     }
 }
 
@@ -119,14 +111,14 @@ impl Particle for Repo {
     type Skel = ();
     type Ctx = ();
     type State = FileStoreService;
-    type Err = ();
+    type Err = StdParticleErr;
 
     fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self {
         Self { filestore: state }
     }
 
-    fn sphere(self) -> ParticleSphereInner {
-        ParticleSphereInner::Handler(Box::new(self))
+    fn sphere(self) -> Result<ParticleSphere, Self::Err> {
+       Ok(ParticleSphere::new_handler(self))
     }
 }
 

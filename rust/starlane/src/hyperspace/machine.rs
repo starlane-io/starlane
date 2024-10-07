@@ -11,7 +11,7 @@ use thiserror::Error;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use tokio::sync::oneshot::error::RecvError;
 use tokio_print::aprintln;
-use starlane::space::artifact::asynch::{Artifacts, ArtifactFetcher};
+use starlane::space::artifact::asynch::{Artifacts, ArtifactFetcher, ArtErr};
 use starlane::space::command::direct::create::KindTemplate;
 use starlane::space::err::SpaceErr;
 use starlane::space::hyper::{InterchangeKind, Knock};
@@ -21,10 +21,10 @@ use starlane::space::log::{PointLogger, RootLogger};
 use starlane::space::particle::{Property, Status, Stub};
 use starlane::space::particle::property::PropertiesConfig;
 use starlane::space::point::Point;
-use starlane::space::selector::KindSelector;
+use starlane::space::selector::{KindSelector, Selector};
 use starlane::space::settings::Timeouts;
 use starlane::space::substance::{Bin, Substance};
-use starlane::space::util::OptSelector;
+use starlane::space::util::{OptSelector, ValuePattern};
 use starlane::space::wave::core::cmd::CmdMethod;
 use starlane::space::wave::exchange::asynch::Exchanger;
 use starlane::space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
@@ -40,7 +40,7 @@ use crate::hyperspace::reg::Registry;
 use crate::hyperspace::star::{
     HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate,
 };
-use crate::service::{service_conf, Service, ServiceConf, ServiceKind, ServiceSelector, ServiceTemplate};
+use crate::service::{service_conf, Service, ServiceConf, ServiceErr, ServiceKind, ServiceSelector, ServiceTemplate};
 use crate::template::Templates;
 
 #[derive(Clone)]
@@ -83,12 +83,12 @@ impl MachineApi
         Ok(rx.await??)
     }
 
-    pub async fn select_service( &self, selector: ServiceSelector ) -> Result<Option<ServiceTemplate>,MachineErr> {
+    pub async fn select_service( &self, selector: ServiceSelector ) -> Result<ServiceTemplate,ServiceErr> {
 
         let (rtn,rx) = tokio::sync::oneshot::channel();
         let selector = MachineCall::SelectService {selector,rtn };
         self.tx.send(selector).await.unwrap();
-        Ok(rx.await?)
+        Ok(rx.await??)
     }
 
     pub async fn endpoint_factory(
@@ -539,8 +539,8 @@ aprintln!("waiting looop....");
                 }
                 MachineCall::SelectService { selector, rtn } => {
                       match self.skel.platform.machine_template().services.select_one( &selector ) {
-                          None => rtn.send(Option::None),
-                          Some(template) => rtn.send(Option::Some(template.clone()))
+                          None => rtn.send(Err(ServiceErr::NoTemplate(selector))),
+                          Some(template) => rtn.send(Ok(template.clone()))
                       };
                 }
             }
@@ -576,7 +576,7 @@ pub enum MachineCall
     },
     SelectService{
         selector: ServiceSelector,
-        rtn: oneshot::Sender<Option<ServiceTemplate>>
+        rtn: oneshot::Sender<Result<ServiceTemplate,ServiceErr>>
     },
     SelectKind{
         template: KindTemplate,
@@ -776,15 +776,19 @@ impl ClientArtifactFetcher
 #[async_trait]
 impl ArtifactFetcher for ClientArtifactFetcher
 {
-    async fn stub(&self, point: &Point) -> Result<Stub, SpaceErr> {
+    async fn stub(&self, point: &Point) -> Result<Stub, ArtErr> {
+        /*
         let record = self
             .registry
             .record(point)
-            .await.into()?;
+            .await;
         Ok(record.details.stub)
+
+         */
+        todo!()
     }
 
-    async fn fetch(&self, point: &Point) -> Result<Bin, SpaceErr> {
+    async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, ArtErr> {
         let transmitter = self.client.transmitter_builder().await?.build();
 
         let mut wave = DirectedProto::ping();
@@ -795,10 +799,14 @@ impl ArtifactFetcher for ClientArtifactFetcher
         pong.ok_or()?;
 
         if let Substance::Bin(bin) = pong.variant.core.body {
-            Ok(bin)
+            Ok(Arc::new(bin))
         } else {
-            Err("expecting Bin encountered some other substance when fetching artifact".into())
+            Err(ArtErr::expecting("Body Substance", "Bin", pong.variant.core.body.kind()))
         }
+    }
+
+    fn selector(&self) -> ValuePattern<Selector> {
+        todo!()
     }
 }
 

@@ -23,6 +23,7 @@ use crate::space::wave::core::{Method, ReflectedCore};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use thiserror::Error;
+use crate::space::artifact::asynch::ArtErr;
 use crate::space::command::direct::create::KindTemplate;
 use crate::space::kind::{BaseKind, FileSubKind, Kind};
 use crate::space::parse::Res;
