@@ -66,35 +66,7 @@ use starlane::space::command::common::StateSrc::Subst;
 use starlane::space::substance::Substance;
 use starlane::space::wave::core::http2::StatusCode;
 
-static STD_BIND: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
-    ArtRef::new(
-        Arc::new(default_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/default.bind").unwrap(),
-    )
-});
-static DRIVER_BIND: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
-    ArtRef::new(
-        Arc::new(driver_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/driver.bind").unwrap(),
-    )
-});
 
-fn driver_bind() -> BindConfig {
-    log(bind_config(
-        r#" Bind(version=1.0.0) {
-
-       Route<Hyp<Init>> -> (()) => &;
-
-       Route<Hyp<Assign>> -> (()) => &;
-
-    } "#,
-    ))
-    .unwrap()
-}
-
-fn default_bind() -> BindConfig {
-    log(bind_config(r#" Bind(version=1.0.0) { } "#)).unwrap()
-}
 
 pub struct DriversBuilder {
     factories: Vec<Arc<dyn HyperDriverFactory>>,
@@ -736,16 +708,7 @@ impl Drivers {
 
             let (runner_tx, runner_rx) = mpsc::channel(1024);
             let (request_tx, mut request_rx) = mpsc::channel(1024);
-            let driver_skel = DriverSkel::new(
-                star,
-                kind,
-                point.clone(),
-                selector.clone(),
-                transmitter.clone(),
-                logger.clone(),
-                status_tx,
-                request_tx,
-            );
+            let driver_skel = DriverSkel::new(star, kind, point.clone(), selector.clone(), transmitter.clone(), logger.clone(), status_tx, request_tx);
 
             {
                 let runner_tx = runner_tx.clone();
@@ -1059,9 +1022,7 @@ pub struct ParticleOuter {
 }
 
 impl ParticleOuter {
-    pub async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
-        Ok(self.particle.bind.clone())
-    }
+
 }
 
 #[async_trait]
@@ -1371,8 +1332,6 @@ pub struct DriverSkel {
     pub selector: KindSelector,
     pub kind: Kind,
     pub point: Point,
-    pub bind: ArtRef<BindConfig>,
-    pub particle_bind: ArtRef<BindConfig>,
     pub logger: PointLogger,
     pub status_rx: watch::Receiver<DriverStatus>,
     pub status_tx: mpsc::Sender<DriverStatus>,
@@ -1427,8 +1386,6 @@ impl DriverSkel {
         logger: PointLogger,
         status_tx: watch::Sender<DriverStatus>,
         request_tx: mpsc::Sender<DriverRunnerRequest>,
-        bind: ArtRef<BindConfig>,
-        particle_bind: ArtRef<BindConfig>,
     ) -> Self {
         let (mpsc_status_tx, mut mpsc_status_rx): (
             tokio::sync::mpsc::Sender<DriverStatus>,
@@ -1450,8 +1407,6 @@ impl DriverSkel {
             kind,
             selector,
             point,
-            bind,
-            particle_bind,
             logger,
             status_tx: mpsc_status_tx,
             status_rx: watch_status_rx,
@@ -1571,10 +1526,6 @@ pub trait HyperDriverFactory: Send + Sync {
     fn properties(&self) -> SetProperties {
         SetProperties::default()
     }
-
-    fn builtin_artifacts(&self) -> Vec<ArtRef> {
-
-    }
 }
 
 #[derive(Clone)]
@@ -1601,13 +1552,6 @@ pub trait Driver: Send + Sync {
         DriverAvail::External
     }
 
-    fn bind(&self) -> ArtRef<BindConfig> {
-        DRIVER_BIND.clone()
-    }
-
-    fn particle_bind(&self) -> ArtRef<BindConfig> {
-        STD_BIND.clone()
-    }
 
     async fn init(&mut self, skel: DriverSkel, _: DriverCtx) -> Result<(), DriverErr> {
         skel.logger
@@ -1648,14 +1592,14 @@ impl DefaultDriverHandler {
 
 pub trait States: Sync + Sync
 where
-    Self::ItemState: ParticleState,
+    Self::State: ParticleState,
 {
-    type ItemState;
+    type State;
     fn new() -> Self;
 
-    fn create(assign: Assign) -> Arc<RwLock<Self::ItemState>>;
-    fn get(point: &Point) -> Option<&Arc<RwLock<Self::ItemState>>>;
-    fn remove(point: &Point) -> Option<Arc<RwLock<Self::ItemState>>>;
+    fn create(assign: Assign) -> Arc<RwLock<Self::State>>;
+    fn get(point: &Point) -> Option<&Arc<RwLock<Self::State>>>;
+    fn remove(point: &Point) -> Option<Arc<RwLock<Self::State>>>;
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, strum_macros::Display)]
@@ -1689,21 +1633,18 @@ pub struct DriverStatusEvent {
 pub trait ParticleState: Send + Sync {}
 
 pub struct ParticleSphere {
-    pub bind: ArtRef<BindConfig>,
     inner: ParticleSphereInner,
 }
 
 impl ParticleSphere {
-    pub fn new_handler<H>(bind: ArtRef<BindConfig>, handler: H) -> Self where H: DirectedHandler{
+    pub fn new_handler<H>(handler: H) -> Self where H: DirectedHandler{
         Self {
-            bind,
             inner: ParticleSphereInner::Handler(Box::new(handler)),
         }
     }
 
-    pub fn new_router<R>(bind: ArtRef<BindConfig>, router: R) -> Self where R: TraversalRouter {
+    pub fn new_router<R>(router: R) -> Self where R: TraversalRouter {
         Self {
-            bind,
             inner: ParticleSphereInner::Router(Box::new(router)),
         }
     }
@@ -1744,10 +1685,6 @@ where
 
     async fn init(&self) -> Result<Status, Self::Err> {
         Ok(Status::Ready)
-    }
-
-    fn bind(&self) -> ArtRef<BindConfig> {
-        STD_BIND.clone()
     }
 
     fn sphere(self) -> Result<ParticleSphere, Self::Err>;
@@ -1842,7 +1779,7 @@ impl Deref for DriverDriverParticleSkel {
     type Target = DriverSkel;
 
     fn deref(&self) -> &Self::Target {
-        &self.star
+        &self.skel
     }
 }
 
@@ -1886,7 +1823,7 @@ impl Driver for DriverDriver {
         let skel = DriverDriverParticleSkel::new(self.skel.clone(), api);
         let particle = Box::new(DriverParticle::restore(skel, (), ()));
 
-        Ok(particle.sphere())
+        Ok(particle.sphere()?)
     }
 }
 
@@ -1901,17 +1838,13 @@ impl Particle for DriverParticle {
     type State = ();
     type Err = ParticleDriverErr;
 
-    fn restore(skel: Self::Skel, ctx: Self::Ctx, state: Self::State) -> Self {
+    fn restore(skel: Self::Skel, _: Self::Ctx, _: Self::State) -> Self {
         Self { skel }
-    }
-
-    fn bind(&self) -> ArtRef<BindConfig> {
-        self.skel.bind.clone()
     }
 
     fn sphere(self) -> Result<ParticleSphere, Self::Err> {
         let router: Box<dyn TraversalRouter> = Box::new(self);
-        Ok(ParticleSphere::new_router(self.bind(), router))
+        Ok(ParticleSphere::new_router(router))
     }
 }
 
@@ -2034,6 +1967,7 @@ pub enum DriverErr {
     DriverApiNotFound(Point),
     #[error("Driver not found: '{0}'")]
     DriverNotFound(String),
+
 }
 
 impl DriverErr {

@@ -1,4 +1,4 @@
-use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory, Particle, ParticleSphere, ParticleSphereInner, ParticleStarErr, STD_BIND};
+use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, DriverStatus, HyperDriverFactory, Particle, ParticleSphere, ParticleSphereInner, ParticleStarErr};
 use crate::platform::Platform;
 use crate::hyperspace::reg::Registration;
 use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
@@ -274,12 +274,8 @@ impl Particle for Star
         Star { skel, ctx }
     }
 
-    fn bind(&self) -> ArtRef<BindConfig> {
-        STAR_BIND_CONFIG.clone()
-    }
-
     fn sphere(self) -> Result<ParticleSphere, Self::Err>{
-        Ok(ParticleSphere::new_handler(self.bind(),self))
+        Ok(ParticleSphere::new_handler(self))
     }
 }
 

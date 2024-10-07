@@ -36,25 +36,7 @@ pub struct Global where P: Platform {
 
  */
 
-static GLOBAL_BIND_CONFIG: Lazy<ArtRef<BindConfig>> = Lazy::new(|| {
-    ArtRef::new(
-        Arc::new(global_bind()),
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/global.bind").unwrap(),
-    )
-});
 
-fn global_bind() -> BindConfig {
-    log(bind_config(
-        r#"
-    Bind(version=1.0.0)
-    {
-       Route<Cmd<RawCommand>> -> (());
-       Route<Cmd<Command>> -> (()) => &;
-    }
-    "#,
-    ))
-    .unwrap()
-}
 
 #[derive(Clone, DirectedHandler)]
 pub struct GlobalCommandExecutionHandler

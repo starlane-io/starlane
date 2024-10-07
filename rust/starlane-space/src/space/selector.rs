@@ -1,27 +1,27 @@
-use core::fmt::Formatter;
+use core::fmt::{Debug, Formatter};
 use core::str::FromStr;
 use std::ops::Deref;
 
 use nom::combinator::all_consuming;
-use serde::de::{Error, Visitor};
+use serde::de::{DeserializeOwned, Error, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
-use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
 use crate::space::kind::{BaseKind, Kind, KindParts, Specific};
 use crate::space::loc::{Layer, ToBaseKind, Topic, VarVal, Variable, Version};
 use crate::space::parse::util::result;
-use crate::space::parse::{
-    consume_hierarchy, kind_selector, point_segment_selector, point_selector, specific_selector,
-    CamelCase, Env,
-};
 use crate::space::parse::util::{new_span, Trace};
-use crate::space::point::{Point, PointCtx, PointSeg, PointVar, RouteSeg};
+use crate::space::parse::{
+    consume_hierarchy, kind_selector, point_kind_hierarchy, point_segment_selector, point_selector,
+    specific_selector, CamelCase, Env,
+};
+use crate::space::point::{Point, PointCtx, PointDef, PointSeg, PointVar, RouteSeg};
 use crate::space::substance::{
     CallWithConfigDef, Substance, SubstanceFormat, SubstanceKind, SubstancePattern,
     SubstancePatternCtx, SubstancePatternDef,
 };
 use crate::space::util::{ToResolved, ValueMatcher, ValuePattern};
 use crate::SpaceErr;
+use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
 
 pub type KindSelector = KindSelectorDef<KindBaseSelector, SubKindSelector, SpecificSelector>;
 pub type KindSelectorVar =
@@ -865,10 +865,16 @@ impl PortHierarchy {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct PointHierarchy {
-    pub route: RouteSeg,
-    pub segments: Vec<PointKindSeg>,
+
+pub type PointHierarchy = PointDef<RouteSeg,PointKindSeg>;
+
+
+impl FromStr for PointHierarchy {
+    type Err = SpaceErr;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        consume_hierarchy(new_span(s))
+    }
 }
 
 impl PointHierarchy {
@@ -908,12 +914,19 @@ impl PointHierarchy {
         })
     }
 
-    pub fn is_root(&self) -> bool {
-        self.segments.is_empty()
-    }
 
     pub fn is_final(&self) -> bool {
         self.segments.len() == 1
+    }
+}
+
+impl Into<Point> for PointHierarchy {
+    fn into(self) -> Point {
+        let segments = self.segments.iter().map(|seg|seg.segment.clone()).collect();
+        Point {
+            route: self.route,
+            segments
+        }
     }
 }
 
@@ -953,13 +966,6 @@ impl ToString for PointKindSeg {
     }
 }
 
-impl FromStr for PointHierarchy {
-    type Err = SpaceErr;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(consume_hierarchy(new_span(s))?)
-    }
-}
 
 pub type PayloadBlock = PayloadBlockDef<Point>;
 pub type PayloadBlockCtx = PayloadBlockDef<PointCtx>;

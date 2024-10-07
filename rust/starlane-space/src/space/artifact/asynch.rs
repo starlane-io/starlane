@@ -26,6 +26,8 @@ use tokio::sync::watch::Ref;
 use tokio::sync::{broadcast, mpsc, watch};
 use tokio::time::error::Elapsed;
 use tokio::time::Timeout;
+use crate::space::selector::Selector;
+use crate::space::util::ValuePattern;
 
 #[derive(Clone, Error, Debug)]
 pub enum ArtErr {
@@ -257,6 +259,10 @@ impl<A> ArtifactCache<A> where A: FromStr<Err=SpaceErr>+'static
         }
     }
 
+    pub fn selector(&self) -> ValuePattern<Selector> {
+        self.fetcher.selector()
+    }
+
     pub async fn get(&self, point: &Point) -> Result<ArtRef<A>, ArtErr>
     {
         self.get_with_wait(point, &self.skel.wait_time).await
@@ -312,6 +318,7 @@ pub struct ArtifactHub {
     skel: ArtifactsSkel,
     pub bind: ArtifactCache<BindConfig>,
     pub mechtron: ArtifactCache<MechtronConfig>,
+    pub selector: ValuePattern<Selector>
 }
 
 impl ArtifactHub {
@@ -320,6 +327,7 @@ impl ArtifactHub {
             bind: ArtifactCache::new(fetcher.clone(), skel.clone()),
             mechtron: ArtifactCache::new(fetcher.clone(), skel.clone()),
             skel,
+            selector: ValuePattern::Always,
         }
     }
 
@@ -369,15 +377,21 @@ impl Artifacts {
     }
 
     pub async fn get_bind(&self, point: &Point) -> Option<Result<ArtRef<BindConfig>, ArtErr>> {
+        /*
         for hub in &self.hubs {
-            match hub.bind.get(point).await {
-                Ok(art) => return Some(Ok(art)),
-                Err(ArtErr::NotFound) => return None,
-                Err(err) => {
-                    return Some(Err(err));
+            if hub.selector.is_match(point) {
+                match hub.bind.get(point).await {
+                    Ok(art) => return Some(Ok(art)),
+                    Err(ArtErr::NotFound) => return None,
+                    Err(err) => {
+                        return Some(Err(err));
+                    }
                 }
             }
         }
+
+         */
+        todo!();
         None
     }
 
@@ -412,6 +426,7 @@ impl FetchChamber {
 pub trait ArtifactFetcher: Send + Sync {
     async fn stub(&self, point: &Point) -> Result<Stub, SpaceErr>;
     async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, SpaceErr>;
+    fn selector(&self) -> ValuePattern<Selector>;
 }
 
 pub struct NoDiceArtifactFetcher;
@@ -424,6 +439,10 @@ impl ArtifactFetcher for NoDiceArtifactFetcher {
 
     async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, SpaceErr> {
         Err("cannot pull artifacts right now".into())
+    }
+
+    fn selector(&self) -> ValuePattern<Selector> {
+        ValuePattern::Never
     }
 }
 
@@ -457,6 +476,10 @@ impl ArtifactFetcher for ReadArtifactFetcher {
             ))),
         }
     }
+
+    fn selector(&self) -> ValuePattern<Selector> {
+        todo!()
+    }
 }
 
 pub struct MapFetcher {
@@ -475,6 +498,10 @@ impl ArtifactFetcher for MapFetcher {
             point.to_string()
         )))?;
         Ok(rtn.clone())
+    }
+
+    fn selector(&self) -> ValuePattern<Selector> {
+        todo!()
     }
 }
 

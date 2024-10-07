@@ -6,27 +6,35 @@ use crate::space::parse::bind_config;
 use crate::space::particle::Stub;
 use crate::space::point::Point;
 use crate::space::substance::Bin;
-use crate::space::util::log;
+use crate::space::util::{log, ValuePattern};
 use core::str::FromStr;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use crate::space::kind::BaseKind;
+use crate::space::selector::Selector;
 
 pub static BUILTIN_FETCHER: Lazy<Arc<BuiltinArtifactFetcher>> = Lazy::new(|| {
     let mut builder = BuiltinArtifactFetcherBuilder::new();
 
     builder.insert(
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/star.bind").unwrap(),
+        BaseKind::Star.bind(),
         Arc::<Vec<u8>>::new(include_bytes!("../../../conf/star.bind").into()),
     );
 
     builder.insert(
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/driver.bind").unwrap(),
+        BaseKind::Driver.bind(),
         Arc::<Vec<u8>>::new(include_bytes!("../../../conf/driver.bind").into()),
     );
+
     builder.insert(
-        Point::from_str("GLOBAL::repo:1.0.0:/bind/nothing.bind").unwrap(),
+        BaseKind::Global.bind(),
+        Arc::<Vec<u8>>::new(include_bytes!("../../../conf/global.bind").into()),
+    );
+
+    builder.insert(
+        BaseKind::nothing_bind(),
         Arc::<Vec<u8>>::new(include_bytes!("../../../conf/nothing.bind").into()),
     );
 
@@ -59,6 +67,10 @@ impl ArtifactFetcher for BuiltinArtifactFetcher {
             .get(point)
             .cloned()
             .ok_or(SpaceErr::not_found(point))?)
+    }
+
+    fn selector(&self) -> ValuePattern<Selector> {
+        todo!()
     }
 }
 

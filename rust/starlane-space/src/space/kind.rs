@@ -15,11 +15,10 @@ use crate::space::loc::{
 use crate::space::parse::util::result;
 use crate::space::parse::{kind_parts, specific, CamelCase, Domain, SkewerCase};
 use crate::space::particle::traversal::TraversalPlan;
-use crate::space::selector::{
-    KindSelector, Pattern, SpecificSelector, SubKindSelector, VersionReq,
-};
+use crate::space::selector::{KindSelector, Pattern, PointHierarchy, SpecificSelector, SubKindSelector, VersionReq};
 use crate::space::util::ValuePattern;
 use crate::{KindTemplate, SpaceErr};
+use crate::space::point::Point;
 
 impl ToBaseKind for KindParts {
     fn to_base(&self) -> BaseKind {
@@ -138,6 +137,37 @@ pub enum BaseKind {
     Guest,
     Native,
     //Cli,
+}
+
+impl BaseKind {
+
+    pub fn bind_point_hierarchy(&self) -> PointHierarchy {
+        match self {
+            BaseKind::Star => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/star.bind<File>").unwrap(),
+            BaseKind::Driver => PointHierarchy::from_str("GLOBAL::repo:1.0.0:/bind/driver.bind").unwrap(),
+            BaseKind::Global => PointHierarchy::from_str("GLOBAL::repo:1.0.0:/bind/global.bind").unwrap(),
+            _ => Self::nothing_bind_point_hierarchy()
+        }
+    }
+
+    pub fn bind(&self) -> Point {
+        match self {
+            BaseKind::Star => Point::from_str("GLOBAL::repo:1.0.0:/bind/star.bind").unwrap(),
+            BaseKind::Driver => Point::from_str("GLOBAL::repo:1.0.0:/bind/driver.bind").unwrap(),
+            BaseKind::Global => Point::from_str("GLOBAL::repo:1.0.0:/bind/global.bind").unwrap(),
+            _ => Self::nothing_bind()
+        }
+    }
+
+    pub fn nothing_bind() -> Point {
+        Point::from_str("GLOBAL::repo:1.0.0:/bind/nothing.bind").unwrap()
+    }
+
+    pub fn nothing_bind_point_hierarchy() -> PointHierarchy {
+        PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/nothing.bind<File>").unwrap()
+    }
+
+
 }
 
 impl BaseKind {

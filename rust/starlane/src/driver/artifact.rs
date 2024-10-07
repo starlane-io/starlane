@@ -152,9 +152,7 @@ pub struct Repo {
 }
 
 impl Repo {
-    async fn bind(&self) -> Result<ArtRef<BindConfig>, DriverErr> {
-        Ok(REPO_BIND_CONFIG.clone())
-    }
+
 }
 
 #[handler]

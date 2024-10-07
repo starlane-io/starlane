@@ -1,4 +1,4 @@
-use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, HyperDriverFactory, Particle, ParticleSphere, ParticleSphereInner, StdParticleErr, DRIVER_BIND};
+use crate::driver::{Driver, DriverAvail, DriverCtx, DriverErr, DriverSkel, HyperDriverFactory, Particle, ParticleSphere, ParticleSphereInner, StdParticleErr};
 
 pub use starlane_space as starlane;
 
@@ -89,12 +89,9 @@ impl Particle for Base {
         Base
     }
 
-    fn bind(&self) -> ArtRef<BindConfig> {
-        BASE_BIND_CONFIG.clone()
-    }
 
     fn sphere(self) -> Result<ParticleSphere,Self::Err>{
-        Ok(ParticleSphere::new_handler(self.bind(),Box::new(self)))
+        Ok(ParticleSphere::new_handler(self))
     }
 }
 

@@ -436,7 +436,7 @@ aprintln!("Machine Star Templates processed......");
                 .unwrap();
 
         let fetcher = Arc::new(ClientArtifactFetcher::new(client, skel.registry.clone()));
-        skel.artifacts.set_fetcher(fetcher).await;
+//        skel.artifacts.set_fetcher(fetcher).await;
 
         machine.start().await;
         Ok(machine_api)

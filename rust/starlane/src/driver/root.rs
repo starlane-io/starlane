@@ -60,7 +60,7 @@ impl Driver for RootDriver
 
     async fn particle(&self, point: &Point) -> Result<ParticleSphere, DriverErr> {
         let root = Root::restore((), (), ());
-        root.sphere()
+        Ok(root.sphere()?)
     }
 }
 
@@ -92,12 +92,9 @@ impl Particle for Root
     }
 
     fn sphere(self) -> Result<ParticleSphere,Self::Err> {
-        Ok(ParticleSphere::new_handler(self.bind(),self))
+        Ok(ParticleSphere::new_handler(self))
     }
 
-    fn bind(&self) -> ArtRef<BindConfig> {
-        ROOT_BIND_CONFIG.clone()
-    }
 }
 
 #[handler]

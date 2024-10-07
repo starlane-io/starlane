@@ -75,12 +75,9 @@ impl Particle for Space {
         Space
     }
 
-    fn bind(&self) -> ArtRef<BindConfig> {
-        SPACE_BIND_CONFIG.clone()
-    }
 
     fn sphere(self) -> Result<ParticleSphere, Self::Err> {
-       Ok(ParticleSphere::new_handler(self.bind(),self))
+       Ok(ParticleSphere::new_handler(self))
     }
 }
 
