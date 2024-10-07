@@ -16,7 +16,7 @@ use crate::space::command::RawCommand;
 use crate::space::err::{CoreReflector, ParseErrs, SpaceErr, SpatialError, StatusErr};
 use crate::space::loc::{Surface, ToPoint, ToSurface, Uuid};
 use crate::space::log::{
-    Spannable, Trackable, TrailSpanId,
+    Spanner, Trackable, TrailSpanId,
 };
 use crate::space::parse::model::Subst;
 use crate::space::particle::Watch;
@@ -105,7 +105,7 @@ where
     Signal(WaveVariantDef<SignalCore>),
 }
 
-impl<W> Spannable for WaveDef<W>
+impl<W> Spanner for WaveDef<W>
 where
     W: ToRecipients + Clone,
 {
@@ -1893,7 +1893,7 @@ where
     }
 }
 
-impl<W> Spannable for DirectedWaveDef<W>
+impl<W> Spanner for DirectedWaveDef<W>
 where
     W: ToRecipients + Clone,
 {

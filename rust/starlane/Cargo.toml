@@ -135,6 +135,7 @@ crossterm = {workspace = true}
 #log= {workspace = true}
 textwrap = {workspace = true}
 console = {workspace = true}
+derive-name = {workspace = true}
 
 [lib]
 name = "starlane"

@@ -31,6 +31,7 @@ use thiserror::Error;
 use tokio::sync::SetError;
 use crate::space::log::RootLogger;
 use crate::space::substance::{Substance, SubstanceErr, SubstanceKind};
+use crate::space::task::OpErr;
 /*
 #[macro_export]
 macro_rules! err {
@@ -86,6 +87,8 @@ pub enum SpaceErr {
     RootLoggerNotInt,
     #[error("the root logger has already been initialized therefore another RootLogger cannot be created.")]
     RootLoggerAlreadyInit,
+    #[error(transparent)]
+    OpErr(#[from] OpErr),
     #[error("{0}")]
     Anyhow(#[from] Arc<anyhow::Error>),
 }
@@ -577,7 +580,7 @@ impl From<io::Error> for SpaceErr {
     }
 }
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Clone, Error, Serialize,Deserialize)]
 pub struct ParseErrs {
     pub report: Vec<Report>,
     pub src: String,

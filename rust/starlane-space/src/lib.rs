@@ -1,4 +1,8 @@
 #![allow(warnings)]
+#![feature(prelude_import)]
+#![feature(custom_inner_attributes)]
+#![feature(proc_macro_hygiene)]
+#![starlane_primitive_macros::loggerhead]
 //extern crate alloc;
 #[macro_use]
 extern crate async_trait;
@@ -8,6 +12,7 @@ extern crate enum_ordinalize; //# ! [feature(unboxed_closures)]
 extern crate lazy_static;
 #[macro_use]
 extern crate strum_macros;
+
 
 extern crate core;
 

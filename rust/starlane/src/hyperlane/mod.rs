@@ -26,6 +26,7 @@ use std::str::FromStr;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+use derive_name::Name;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
 pub static LOCAL_CLIENT: Lazy<Point> =
@@ -149,11 +150,18 @@ impl HyperwayDiagnostic {
     }
 }
 
+#[derive(Name)]
 pub struct HyperwayEndpoint {
     drop_tx: Option<oneshot::Sender<()>>,
     pub tx: mpsc::Sender<Wave>,
     pub rx: mpsc::Receiver<Wave>,
     pub logger: PointLogger,
+}
+
+impl ToString for HyperwayEndpoint {
+    fn to_string(&self) -> String {
+        format!("{}<~{}>", self.logger.point.to_string(), Self::name())
+    }
 }
 
 impl HyperwayEndpoint {

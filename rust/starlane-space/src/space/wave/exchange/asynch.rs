@@ -326,8 +326,6 @@ impl Exchanger {
     }
 
     pub async fn reflected(&self, reflect: ReflectedWave) -> Result<(), SpaceErr> {
-        self.logger
-            .track(&reflect, || Tracker::new("exchange", "Reflected"));
 
         if let Some(multi) = self.multis.get(reflect.reflection_of()) {
             multi.value().send(reflect).await;
@@ -496,13 +494,10 @@ where
     D: DirectedHandler,
 {
     pub async fn handle(&self, wave: DirectedWave) {
-        let logger = self
-            .logger
-            .point(self.surface.clone().to_point())
-            .spanner(&wave);
+
         let mut transmitter = self.builder.clone().build();
         let reflection = wave.reflection();
-        let ctx = RootInCtx::new(wave, self.surface.clone(), logger, transmitter);
+        let ctx = RootInCtx::new(wave, self.surface.clone(), self.logger.span(), transmitter);
         match self.handler.handle(ctx).await {
             CoreBounce::Absorbed => {}
             CoreBounce::Reflected(reflected) => {
