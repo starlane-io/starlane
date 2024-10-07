@@ -501,9 +501,10 @@ pub enum GrantToDef<PointSelector> {
 
 impl GrantTo {
     pub fn is_match(&self, hierarchy: &PointHierarchy) -> Result<(), ()> {
+        let hierarchy = hierarchy.clone().into();
         match self {
             GrantTo::World => Ok(()),
-            GrantTo::PointSelector(selector) => match selector.matches_found(hierarchy) {
+            GrantTo::PointSelector(selector) => match selector.matches_found(&hierarchy) {
                 true => Ok(()),
                 false => Err(()),
             },

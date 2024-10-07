@@ -299,10 +299,12 @@ impl<T> ValueMatcher<T> for ValuePattern<T> {
             ValuePattern::Always => Ok(()),
             ValuePattern::Never => Err(()),
             ValuePattern::Pattern(pattern)  if *pattern == *x =>  {
-
+                Ok(())
             }
+            _ => Err(())
         }
     }
+
 }
 
 impl<T> ValuePattern<T> {
@@ -350,6 +352,8 @@ impl<T> ValuePattern<T> {
         }
     }
 }
+
+
 
 pub trait ValueMatcher<X> {
     fn is_match(&self, x: &X) -> Result<(), ()>;

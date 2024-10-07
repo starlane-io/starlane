@@ -6112,7 +6112,7 @@ fn base_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
                 PointSegKindHop {
                     inclusive,
                     segment_selector: segment,
-                    kind_selector: tks,
+                    kind_selector: ValuePattern::Pattern(tks),
                 },
             )
         },
@@ -6132,7 +6132,7 @@ fn file_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
             PointSegKindHop {
                 inclusive,
                 segment_selector: segment,
-                kind_selector: tks,
+                kind_selector: ValuePattern::Pattern(tks),
             },
         )
     })
@@ -6166,7 +6166,7 @@ fn version_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
                 PointSegKindHop {
                     inclusive,
                     segment_selector: segment,
-                    kind_selector: tks,
+                    kind_selector: ValuePattern::Pattern(tks),
                 },
             )
         },
@@ -6200,11 +6200,11 @@ pub fn point_selector<I: Span>(input: I) -> Res<I, Selector> {
                     segment_selector: PointSegSelector::Exact(ExactPointSeg::PointSeg(
                         PointSeg::FsRootDir,
                     )),
-                    kind_selector: KindSelector {
+                    kind_selector: ValuePattern::Pattern(KindSelector {
                         base: Pattern::Exact(BaseKind::File),
                         sub: Pattern::Always,
                         specific: ValuePattern::Always,
-                    },
+                    }),
                 });
                 for dir_hop in dir_hops {
                     hops.push(dir_hop);

@@ -137,8 +137,12 @@ pub struct SelectorDef<Hop> {
     pub hops: Vec<Hop>,
 }
 
-
-
+impl PartialEq<Point> for SelectorDef<PointSegKindHop> {
+    fn eq(&self, other: &Point) -> bool {
+        let hierarchy = other.clone().to_opt_hierarchy();
+        self.matches_found(&hierarchy)
+    }
+}
 
 /*
 pub type Selector = SelectorDef<PointSegKindHop>;
@@ -186,7 +190,19 @@ impl FromStr for SelectorDef<PointSegKindHop> {
     }
 }
 
+impl ValueMatcher<Point> for Selector {
+    fn is_match(&self, point: &Point) -> Result<(), ()> {
+        let hierarchy = point.clone().to_opt_hierarchy();
+        match self.matches_found(&hierarchy) {
+            true => Ok(()),
+            false => Err(())
+        }
+    }
+}
+
 impl Selector {
+
+
     fn consume(&self) -> Option<Selector> {
         if self.hops.is_empty() {
             Option::None
@@ -299,7 +315,7 @@ impl Selector {
             // we still have hops that haven't been matched and we are all out of path... but we have a weird rule
             // if a hop is 'inclusive' then this will match to true.  We do this for cases like:
             // localhost+:**   // Here we want everything under localhost INCLUDING localhost to be matched
-            if hop.inclusive && hop.matches(&seg) {
+            if hop.inclusive && hop.is_match(&seg) {
                 true
             } else {
                 false
@@ -310,7 +326,7 @@ impl Selector {
             // a Recursive is similar to an Any in that it will match anything, however,
             // it is not consumed until the NEXT segment matches...
             let next_hop = self.hops.get(1).expect("next<Hop>");
-            if next_hop.matches(seg) {
+            if next_hop.is_match(seg) {
                 // since the next hop after the recursive matches, we consume the recursive and continue hopping
                 // this allows us to make matches like:
                 // space.org:**:users ~ space.org:many:silly:dirs:users
@@ -322,11 +338,11 @@ impl Selector {
                 self.matches_found(&hierarchy.consume().expect("AddressKindPath"))
             }
         } else if hop.segment_selector.is_recursive() && hierarchy.is_final() {
-            hop.matches(hierarchy.segments.last().expect("segment"))
+            hop.is_match(hierarchy.segments.last().expect("segment"))
         } else if hop.segment_selector.is_recursive() {
-            hop.matches(hierarchy.segments.last().expect("segment"))
+            hop.is_match(hierarchy.segments.last().expect("segment"))
                 && self.matches_found(&hierarchy.consume().expect("hierarchy"))
-        } else if hop.matches(seg) {
+        } else if hop.is_matchs(seg) {
             // in a normal match situation, we consume the hop and move to the next one
             self.consume()
                 .expect("AddressTksPattern")
@@ -724,11 +740,12 @@ pub struct HopDef<Segment, KindSelector> {
 
 impl HopDef<PointSegSelector, ValuePattern<KindSelector>>
 {
-    pub fn is_match<K>(&self, point_kind_segment: &PointKindSegDef<K>) -> bool {
+    pub fn is_match<K>(&self, point_kind_segment: &PointKindSegOpt) -> bool
+    {
         self
             .segment_selector
             .is_match(&point_kind_segment.segment)
-            && self.kind_selector.is_match(&point_kind_segment.kind).is_ok()
+            && self.kind_selector.is_match_opt(&point_kind_segment.kind).is_ok()
     }
 }
 

@@ -1,4 +1,3 @@
-use crate::space::artifact::builtin::BUILTIN_FETCHER;
 use crate::space::artifact::{builtin, ArtRef};
 use crate::space::config::mechtron::MechtronConfig;
 use crate::space::loc::ToSurface;
@@ -26,6 +25,7 @@ use tokio::sync::watch::Ref;
 use tokio::sync::{broadcast, mpsc, watch};
 use tokio::time::error::Elapsed;
 use tokio::time::Timeout;
+use crate::space::artifact::builtin::BUILTIN_FETCHER;
 use crate::space::selector::{PointSelector, Selector};
 use crate::space::util::ValuePattern;
 
@@ -327,7 +327,7 @@ impl ArtifactHub {
             bind: ArtifactCache::new(fetcher.clone(), skel.clone()),
             mechtron: ArtifactCache::new(fetcher.clone(), skel.clone()),
             skel,
-            selector: ValuePattern::Always,
+            selector: ValuePattern::Always
         }
     }
 
