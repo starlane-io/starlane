@@ -2,17 +2,20 @@ pub mod cli;
 pub mod dialect;
 
 use crate::executor::cli::os::CliOsExecutor;
+use crate::host::err::HostErr;
 use crate::host::Host;
 use crate::service::ServiceErr;
 
 #[async_trait]
-pub trait Executor
+pub trait Executor where Self::Err: std::error::Error + 'static
 {
     type In;
 
     type Out;
 
-    async fn execute(&self, args: Self::In ) -> Result<Self::Out, ServiceErr>;
+    type Err;
+
+    async fn execute(&self, args: Self::In ) -> Result<Self::Out, Self::Err>;
 
     fn conf(&self) -> ExeConf;
 }
@@ -23,7 +26,6 @@ pub enum ExeConf {
 }
 
 impl ExeConf {
-
 
    pub fn with_env( &self, key: &str, value: &str) -> Self {
       match self {
@@ -37,12 +39,12 @@ impl ExeConf {
         }
     }
 
-    pub fn create<D>(&self) -> Result<D, ServiceErr>
+    pub fn create<D>(&self) -> Result<D, HostErr>
     where
-        D: TryFrom<CliOsExecutor, Error =ServiceErr>,
+        D: TryFrom<CliOsExecutor, Error =HostErr>,
     {
         match self {
-            ExeConf::Host(host) => host.create()
+            ExeConf::Host(host) => Ok(host.create()?)
         }
     }
 }

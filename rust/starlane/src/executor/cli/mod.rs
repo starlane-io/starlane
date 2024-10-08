@@ -165,7 +165,7 @@ impl CliOut {
     }
 }
 
-pub type CliExecutor = Box<dyn Executor<In = CliIn, Out = CliOut>>;
+pub type CliExecutor = Box<dyn Executor<In = CliIn, Out = CliOut, Err=CliErr>>;
 
 #[derive(Debug, Error, Clone)]
 pub enum CliErr {
@@ -175,14 +175,14 @@ pub enum CliErr {
     TakeStdErr,
     #[error("could not take stdin")]
     TakeStdIn,
-    #[error("tokio io error: {0}")]
-    TokioIoErr(#[from] Arc<tokio::io::Error>),
+    #[error("tokio io error:'{0}'")]
+    TokioIoErr(String),
     #[error("file not found: '{0}'")]
     FileNotFound(String),
 }
 
 impl From<tokio::io::Error> for CliErr {
-    fn from(value: Error) -> Self {
-        Self::TokioIoErr(Arc::new(value))
+    fn from(err: Error) -> Self {
+        Self::TokioIoErr(err.to_string())
     }
 }

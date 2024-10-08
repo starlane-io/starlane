@@ -1,5 +1,5 @@
 use crate::executor::cli::os::CliOsExecutor;
-use crate::executor::cli::{CliExecutor, CliIn, CliOut};
+use crate::executor::cli::{CliErr, CliExecutor, CliIn, CliOut};
 use crate::executor::Executor;
 use clap::{Parser, Subcommand};
 use itertools::Itertools;
@@ -8,12 +8,13 @@ use starlane::space::loc::ToPoint;
 use starlane::space::path::Path;
 use starlane::space::point::Point;
 use starlane::space::substance::Bin;
-use std::io::BufRead;
-use std::path::PathBuf;
+use std::io::{BufRead, Error};
+use std::path::{PathBuf, StripPrefixError};
 use std::str::FromStr;
 use std::sync::Arc;
 use strum_macros::EnumString;
 use thiserror::Error;
+use crate::host::err::HostErr;
 /*
 impl <E> From<Box<E>> for FileStore
 where E: Executor<In=CliIn,Out=CliOut> {
@@ -59,7 +60,7 @@ impl From<Box<CliOsExecutor>> for FileStore {
 }
 
 pub enum FileStore {
-    Cli(Box<dyn Executor<In = CliIn, Out = CliOut>+Send+Sync>),
+    Cli(Box<dyn Executor<In = CliIn, Out = CliOut, Err=CliErr >+Send+Sync>),
 }
 
 impl FileStore {
@@ -97,23 +98,27 @@ impl FileStore {
                     FileStoreInKind::List { .. } => {
                         out.close_stdin()?;
                         let stdout = out.stdout().await?;
-                        let paths = stdout
-                            .lines()
-                            .into_iter()
-                            .map(|line| line.unwrap().into())
-                            .collect::<Vec<PathBuf>>();
+                        let paths :Vec<std::io::Result<String>> = stdout
+                            .lines().into_iter().collect_vec();
+
+                        let (paths,errs):(Vec<PathBuf>,Vec<_>) = paths.into_iter().map_ok(|path|path.into()).partition_result();
+                        if !errs.is_empty() {
+                            Err(errs.first().unwrap())?;
+                        }
+                        let paths = paths.into_iter().collect_vec();
 
                         FileStoreOut::List(paths)
+
                     }
                     FileStoreInKind::Exists { .. } => FileStoreOut::Exists(true),
                     FileStoreInKind::Pwd => {
                         let stdout = out.stdout().await?;
-                        let line: PathBuf = stdout
+                        let line = stdout
                             .lines()
                             .into_iter()
                             .map_ok(|line| line.into())
                             .find_or_first(|_| true)
-                            .ok_or(FileStoreErr::String("pwd didn't return anything".to_string()))??;
+                            .ok_or(FileStoreErr::Pwd)??;
                         FileStoreOut::Pwd(line)
                     }
                 };
@@ -305,13 +310,50 @@ impl RootDir {
 }
 
 
-#[derive(Error,Debug,Clone)]
+#[derive(Error,Debug)]
 pub enum FileStoreErr {
+    #[error("HostErr: '{0}'")]
+    HostErr(#[from] HostErr),
     #[error("path '{0}' escapes FileStore boundaries")]
     PathEscapesFileStoreBoundary(PathBuf),
     #[error("expected environment variable to be set: {0}")]
-    ExpectEnvVar(String)
+    ExpectEnvVar(String),
+    #[error(transparent)]
+    CliErr(#[from] CliErr),
+    #[error("command 'pwd' did not return anything")]
+    Pwd,
+    #[error("io error: {0}")]
+    TokioIo(String),
+    #[error(transparent)]
+    StdIoErr(std::io::ErrorKind),
+    #[error("unknown FileStoreErr: {0}")]
+    StdErr(#[source] anyhow::Error)
+
 }
+
+/*
+impl From<tokio::io::Error> for FileStoreErr{
+    fn from(err: tokio::io::Error) -> Self {
+        std::io::Error::new(std::io::ErrorKind::Other, format!("{}", err));
+        Self::TokioIo(err.to_string())
+    }
+}
+
+ */
+
+impl From<std::io::Error> for FileStoreErr {
+    fn from(err: std::io::Error) -> Self {
+        Self::StdIoErr(err.kind())
+    }
+}
+
+impl From<&std::io::Error> for FileStoreErr {
+    fn from(err: &std::io::Error) -> Self {
+        Self::StdIoErr(err.kind())
+    }
+}
+
+
 
 impl FileStoreErr {
     pub fn expected_env<S>(key: S) -> Self

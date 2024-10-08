@@ -25,10 +25,12 @@ impl CliOsExecutor {
 
 #[async_trait]
 impl Executor for CliOsExecutor {
+
     type In = CliIn;
     type Out = CliOut;
+    type Err = CliErr;
 
-    async fn execute(&self, mut input: Self::In) -> Result<Self::Out, CliErr> {
+    async fn execute(&self, mut input: Self::In) -> Result<Self::Out, Self::Err> {
         let path: PathBuf = self.stub.loc.clone().into();
         if !path.exists() {
             Result::Err(CliErr::FileNotFound(self.stub.loc.clone()))?;
