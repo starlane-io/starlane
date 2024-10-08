@@ -44,6 +44,7 @@ convert_case={workspace=true }
 validator={workspace=true }
 once_cell={workspace=true }
 md-5 = {workspace=true }
+anyhow = "1.0.89"
 
 
 #uuid={workspace=true }

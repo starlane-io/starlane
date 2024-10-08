@@ -14,10 +14,12 @@ use core::str::FromStr;
 use dashmap::DashMap;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::error::Error;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
+use anyhow::anyhow;
 use nom_supreme::ParserExt;
 use thiserror::Error;
 use tokio::sync::broadcast::error::RecvError;
@@ -30,7 +32,7 @@ use crate::space::err::PrintErr;
 use crate::space::selector::{PointSelector, Selector};
 use crate::space::util::ValuePattern;
 
-#[derive(Clone, Error, Debug)]
+#[derive(Clone,Error, Debug)]
 pub enum ArtErr {
     #[error("artifact is in an unknown status")]
     UnknownStatus,
@@ -57,12 +59,24 @@ pub enum ArtErr {
     #[error("Artifacts cannot be fetched because no Artifacts service not available")]
     ArtifactServiceNotAvailable,
     #[error("expecting {thing}: {expecting}, found: {found}")]
-    Expecting{thing:String, expecting:String, found: String }
+    Expecting{thing:String, expecting:String, found: String },
+    #[error("Err({0})")]
+    Source(#[source] Arc<anyhow::Error>)
 }
 
 impl ArtErr {
     pub fn expecting<A,B,C>( thing: A, expecting: B, found: C) -> Self where A: ToString, B: ToString, C: ToString {
         Self::Expecting {thing: thing.to_string(), expecting: expecting.to_string(), found: found.to_string()}
+    }
+
+    pub fn err<E>(err: E) -> Self where E: std::error::Error {
+        ArtErr::Source(Arc::new(anyhow!("Err: {err}")))
+    }
+}
+
+impl From<anyhow::Error> for ArtErr {
+    fn from(err: anyhow::Error) -> Self {
+        ArtErr::Source(Arc::new(err))
     }
 }
 

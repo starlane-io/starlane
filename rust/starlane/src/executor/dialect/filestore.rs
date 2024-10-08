@@ -269,7 +269,7 @@ impl ToString for FileStoreCli {
 }
 
 impl TryFrom<CliOsExecutor> for FileStore {
-    type Error = FileStoreErr;
+    type Error = HostErr;
 
     fn try_from(cli: CliOsExecutor) -> Result<Self, Self::Error> {
         Ok(FileStore::Cli(Box::new(cli)))
