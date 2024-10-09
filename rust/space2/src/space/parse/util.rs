@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
 use std::ops::{Deref, Range, RangeFrom, RangeTo};
 use std::sync::Arc;
 use thiserror::__private::AsDisplay;
-
+use crate::space::parse::case::VarCase;
+use crate::space::parse::ctx::{ParseCtx, ParseLoc, SpanCtx};
+use crate::space::parse::vars::Variable;
 
 #[cfg(test)]
 mod tests {
@@ -151,6 +153,8 @@ where
     }
 }
 
+fn some<I:Span,E>( input: I) -> Res<I,String>
+
 //pub type OwnedSpan<'a> = LocatedSpan<&'a str, SpanExtra>;
 pub type SpanExtra = Arc<String>;
 
@@ -168,26 +172,13 @@ pub fn span_with_extra<'a>(
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub struct TraceDef<I,R> where I: Span, R: Range<usize>
+pub struct Trace
 {
     pub range: Range<usize>,
-    pub src: I
-}
-
-impl <'a> AsRef<TraceDef<&'a str>> for Trace where Self: 'a{
-    fn as_ref(&self) -> &'a TraceRef {
-        TraceRef {
-            range: &
-            src: (),
-        }
-    }
+    pub extra: SpanExtra
 }
 
 
-
-pub type Trace = TraceDef<SpanExtra>;
-
-pub type TraceRef<'a> = TraceDef<& 'a str>;
 
 
 
@@ -874,6 +865,7 @@ where
 }
 
 type Res<I: Span, O, C, E: std::error::Error + Send + Sync + 'static> = IResult<I, O, GenericErrorTree<I, &'static str, C, E>>;
+type Res2<'a,C,I: Span, L:ParseLoc, O, E: std::error::Error + Send + Sync + 'static> = IResult<I, O, GenericErrorTree<I, &'static str, SpanCtx<'a,I,L>, E>>;
 
 pub fn wrap<I, F, O, C, E>(mut f: F) -> impl FnMut(I) -> Res<I, O, C, E>
 where

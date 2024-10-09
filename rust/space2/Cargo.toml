@@ -21,6 +21,7 @@ thiserror = "1.0.63"
 anyhow = "1.0.89"
 async-trait = "0.1.83"
 
+ariadne={workspace=true }
 
 tokio = "1.40.0"
 
