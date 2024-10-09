@@ -28,7 +28,7 @@ pub mod common {
 
     use serde::{Deserialize, Serialize};
 
-    use crate::space::err::SpaceErr;
+    use crate::space::err::{ParseErrs, SpaceErr};
     use crate::space::loc::Variable;
     use crate::space::substance::{Bin, Substance};
 
@@ -53,9 +53,9 @@ pub mod common {
             }
         }
 
-        pub fn get_substance(&self) -> Result<Substance, SpaceErr> {
+        pub fn get_substance(&self) -> Result<Substance, ParseErrs> {
             match self {
-                StateSrc::None => Err(SpaceErr::server_error("state has no substance")),
+                StateSrc::None => Err(ParseErrs::from("state has no substance")),
                 StateSrc::Subst(substance) => Ok(*substance.clone()),
             }
         }
@@ -522,11 +522,11 @@ pub mod direct {
                     StateSrcVar::FileRef(name) => StateSrc::Subst(Box::new(Substance::Bin(
                         env.file(name)
                             .map_err(|e| match e {
-                                ResolverErr::NotAvailable => SpaceErr::server_error(
+                                ResolverErr::NotAvailable => ParseErrs::from(
                                     "files are not available in this context",
                                 ),
                                 ResolverErr::NotFound => {
-                                    SpaceErr::server_error(format!("cannot find file '{}'", name))
+                                    ParseErrs::from(format!("cannot find file '{}'", name))
                                 }
                             })?
                             .content,
@@ -534,9 +534,9 @@ pub mod direct {
                     StateSrcVar::Var(var) => {
                         let val = env.val(var.name.as_str()).map_err(|e| match e {
                             ResolverErr::NotAvailable => {
-                                SpaceErr::server_error("variable are not available in this context")
+                                ParseErrs::from("variable are not available in this context")
                             }
-                            ResolverErr::NotFound => SpaceErr::server_error(format!(
+                            ResolverErr::NotFound => ParseErrs::from(format!(
                                 "cannot find variable '{}'",
                                 var.name
                             )),
@@ -544,10 +544,10 @@ pub mod direct {
                         StateSrc::Subst(Box::new(Substance::Bin(
                             env.file(val.clone())
                                 .map_err(|e| match e {
-                                    ResolverErr::NotAvailable => SpaceErr::server_error(
+                                    ResolverErr::NotAvailable => ParseErrs::from(
                                         "files are not available in this context",
                                     ),
-                                    ResolverErr::NotFound => SpaceErr::server_error(format!(
+                                    ResolverErr::NotFound => ParseErrs::from(format!(
                                         "cannot find file '{}'",
                                         val.to_text().unwrap_or("err".to_string())
                                     )),

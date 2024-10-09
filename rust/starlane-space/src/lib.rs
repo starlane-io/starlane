@@ -2,13 +2,13 @@
 extern crate alloc;
 #[macro_use]
 extern crate async_trait;
-extern crate core;
 #[macro_use]
 extern crate enum_ordinalize; //# ! [feature(unboxed_closures)]
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate strum_macros;
+extern crate core;
 
 use core::str::FromStr;
 use std::ops::Deref;

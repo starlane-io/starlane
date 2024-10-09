@@ -25,6 +25,12 @@ pub enum HypMethod {
     Search,
 }
 
+impl Default for HypMethod {
+    fn default() -> Self {
+        Self::Init
+    }
+}
+
 
 // this need ei
 /*

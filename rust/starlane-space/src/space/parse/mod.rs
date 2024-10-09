@@ -93,6 +93,7 @@ use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
+
 pub type SpaceContextError<I: Span> = dyn nom_supreme::context::ContextError<I, ErrCtx>;
 pub type StarParser<I: Span, O> = dyn nom_supreme::parser_ext::ParserExt<I, O, SpaceTree<I>>;
 
@@ -298,12 +299,8 @@ impl BraceKindErrCtx {
 
 }
 
-#[derive(Debug, Error, strum_macros::Display)]
-pub enum NomErr {
-    Error
-}
 
-pub type SpaceTree<I: Span> = GenericErrorTree<I, &'static str, ErrCtx, NomErr>;
+pub type SpaceTree<I: Span> = GenericErrorTree<I, &'static str, ErrCtx, ParseErrs>;
 
 pub type Res<I: Span, O> = IResult<I, O, SpaceTree<I>>;
 
@@ -6953,7 +6950,7 @@ pub fn bind_config(src: &str) -> Result<BindConfig, ParseErrs> {
     let document = doc(src)?;
     match document {
         Document::BindConfig(bind_config) => Ok(bind_config),
-        _ => Err(ParseErrs::expected(&DocKind::BindConfig, &document.kind())),
+        _ => Err(ParseErrs::expected("Document", DocKind::BindConfig.to_string(), document.kind().to_string())),
     }
 }
 
@@ -6961,7 +6958,7 @@ pub fn mechtron_config(src: &str) -> Result<MechtronConfig, ParseErrs> {
     let document = doc(src)?;
     match document {
         Document::MechtronConfig(mechtron_config) => Ok(mechtron_config),
-        _ => Err(ParseErrs::expected(&DocKind::MechtronConfig, &document.kind())),
+        _ => Err(ParseErrs::expected("Document",&DocKind::MechtronConfig, &document.kind())),
     }
 }
 

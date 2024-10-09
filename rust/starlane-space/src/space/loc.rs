@@ -179,7 +179,7 @@ impl ToString for Version {
 }
 
 impl TryInto<semver::Version> for Version {
-    type Error = SpaceErr;
+    type Error = ParseErrs;
 
     fn try_into(self) -> Result<semver::Version, Self::Error> {
         Ok(self.version)
@@ -229,7 +229,7 @@ impl<V> TryInto<Variable> for VarVal<V> {
 
 impl<V> ToResolved<V> for VarVal<V>
 where
-    V: FromStr<Err = SpaceErr>,
+    V: FromStr<Err = ParseErrs>,
 {
     fn to_resolved(self, env: &Env) -> Result<V, ParseErrs> {
         match self {
@@ -572,7 +572,7 @@ impl Into<Surface> for StarKey {
 }
 
 impl TryFrom<Point> for StarKey {
-    type Error = SpaceErr;
+    type Error = ParseErrs;
 
     fn try_from(point: Point) -> Result<Self, Self::Error> {
         match point.route {
@@ -653,7 +653,7 @@ impl StarKey {
 }
 
 impl FromStr for StarKey {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(result(all_consuming(parse_star_key)(new_span(s)))?)

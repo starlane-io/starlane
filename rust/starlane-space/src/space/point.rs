@@ -1,4 +1,4 @@
-use crate::space::err::{ParseErrs, SpaceErr};
+use crate::space::err::{ParseErrs};
 use crate::space::loc::{PointSegQuery, PointSegment, RouteSegQuery, Surface, ToPoint, ToSurface, VarVal, Variable, Version, CENTRAL, GLOBAL_EXEC, GLOBAL_LOGGER, GLOBAL_REGISTRY, LOCAL_ENDPOINT, LOCAL_HYPERGATE, LOCAL_PORTAL, LOCAL_STAR, REMOTE_ENDPOINT};
 use crate::space::parse::util::{new_span, Trace};
 use crate::space::parse::util::result;
@@ -143,7 +143,7 @@ impl ToString for RouteSegVar {
 }
 
 impl FromStr for RouteSeg {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = new_span(s);
@@ -430,7 +430,7 @@ impl Into<PointSegVar> for PointSegCtx {
 }
 
 impl TryInto<PointSegCtx> for PointSegVar {
-    type Error = SpaceErr;
+    type Error = ParseErrs;
 
     fn try_into(self) -> Result<PointSegCtx, Self::Error> {
         match self {
@@ -464,7 +464,7 @@ impl TryInto<PointSegCtx> for PointSegVar {
 }
 
 impl TryInto<PointSeg> for PointSegCtx {
-    type Error = SpaceErr;
+    type Error = ParseErrs;
 
     fn try_into(self) -> Result<PointSeg, Self::Error> {
         match self {
@@ -1022,14 +1022,14 @@ impl Point {
     }
 
     /// returns the "file" path portion of this Point if there is one
-    pub fn truncate_filepath(&self, parent: &Point) -> Result<String, SpaceErr> {
+    pub fn truncate_filepath(&self, parent: &Point) -> Result<String, ParseErrs> {
         if self.non_file_parent() == *parent {
-            self.filepath().ok_or(SpaceErr::str(format!(
+            self.filepath().ok_or(ParseErrs::new(format!(
                 "could not get filepath for point {}",
                 self.to_string()
             )))
         } else {
-            Result::Err(SpaceErr::str(format!(
+            Result::Err(ParseErrs::new(format!(
                 "path {} did not match with truncation parent {}",
                 self.to_string(),
                 parent.to_string()
@@ -1038,16 +1038,16 @@ impl Point {
     }
 
     /// returns the "file" path portion of this Point if there is one
-    pub fn relative_segs(&self, parent: &Point) -> Result<Vec<String>, SpaceErr> {
+    pub fn relative_segs(&self, parent: &Point) -> Result<Vec<String>, ParseErrs> {
         if self.route != parent.route {
-            return Result::Err(SpaceErr::from(format!(
+            return Result::Err(ParseErrs::from(format!(
                 "parent point route {} must match child point route: {}",
                 parent.route.to_string(),
                 self.route.to_string()
             )));
         }
         if self.segments.len() < parent.segments.len() {
-            return Result::Err(SpaceErr::from(format!(
+            return Result::Err(ParseErrs::from(format!(
                 "parent point {} cannot have fewer segments than point: {}",
                 parent.to_string(),
                 self.to_string()
@@ -1055,7 +1055,7 @@ impl Point {
         } else {
             for i in 0..parent.segments.len() {
                 if parent.segments.get(i).unwrap() != self.segments.get(i).unwrap() {
-                    return Result::Err(SpaceErr::from(format!(
+                    return Result::Err(ParseErrs::from(format!(
                         "parent point {} does not match subset: {}",
                         parent.to_string(),
                         self.to_string()
@@ -1116,7 +1116,7 @@ impl Point {
         ANONYMOUS.clone()
     }
 
-    pub fn normalize(self) -> Result<Point, SpaceErr> {
+    pub fn normalize(self) -> Result<Point, ParseErrs> {
         if self.is_normalized() {
             return Ok(self);
         }
@@ -1178,7 +1178,7 @@ impl Point {
         true
     }
 
-    pub fn to_bundle(self) -> Result<Point, SpaceErr> {
+    pub fn to_bundle(self) -> Result<Point, ParseErrs> {
         if self.segments.is_empty() {
             return Err("Point does not contain a bundle".into());
         }
@@ -1288,20 +1288,20 @@ impl Point {
         }
     }
 
-    pub fn push_file(&self, segment: String) -> Result<Self, SpaceErr> {
+    pub fn push_file(&self, segment: String) -> Result<Self, ParseErrs> {
         Self::from_str(format!("{}{}", self.to_string(), segment).as_str())
     }
 
-    pub fn push_segment(&self, segment: PointSeg) -> Result<Self, SpaceErr> {
+    pub fn push_segment(&self, segment: PointSeg) -> Result<Self, ParseErrs> {
         if (self.has_filesystem() && segment.is_filesystem_seg()) || segment.kind().is_mesh_seg() {
             let mut point = self.clone();
             point.segments.push(segment);
             Ok(point)
         } else {
             if self.has_filesystem() {
-                 Err(SpaceErr::PointPushTerminal(PointSegKind::File))?
+                 Err(ParseErrs::PointPushTerminal(PointSegKind::File))?
             } else {
-                Err(SpaceErr::PointPushNoFileRoot(segment.kind()))
+                Err(ParseErrs::PointPushNoFileRoot(segment.kind()))
             }
         }
     }
@@ -1345,7 +1345,7 @@ impl Point {
         }
     }
 
-    pub fn truncate(self, kind: PointSegKind) -> Result<Point, SpaceErr> {
+    pub fn truncate(self, kind: PointSegKind) -> Result<Point, ParseErrs> {
         let mut segments = vec![];
         for segment in &self.segments {
             segments.push(segment.clone());
@@ -1357,14 +1357,12 @@ impl Point {
             }
         }
 
-        Err(SpaceErr::Status {
-            status: 404,
-            message: format!(
+        Err(ParseErrs::from(
+             format!(
                 "Point segment kind: {} not found in point: {}",
                 kind.to_string(),
                 self.to_string()
-            ),
-        })
+            )))
     }
 
     pub fn md5(&self) -> String {

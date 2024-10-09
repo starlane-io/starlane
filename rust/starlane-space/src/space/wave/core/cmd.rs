@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::space::util::ValueMatcher;
+use crate::space::wave::core::hyper::HypMethod;
 
 #[derive(
     Debug,
@@ -23,6 +24,11 @@ pub enum CmdMethod {
     Command,
     RawCommand,
     Log,
+}
+impl Default for CmdMethod{
+    fn default() -> Self {
+        Self::Init
+    }
 }
 
 impl ValueMatcher<CmdMethod> for CmdMethod {

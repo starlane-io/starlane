@@ -97,7 +97,7 @@ impl KindSelector {
 }
 
 impl FromStr for KindSelector {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(result(kind_selector(new_span(s)))?)
@@ -182,7 +182,7 @@ impl ValueMatcher<PointSeg> for PointSegKindHop {
 
 
 impl FromStr for SelectorDef<PointSegKindHop> {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (_, rtn) = all_consuming(point_selector)(new_span(s))?;
@@ -435,7 +435,7 @@ impl TryInto<semver::VersionReq> for VersionReq {
 }
 
 impl FromStr for VersionReq {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let version = semver::VersionReq::from_str(s)?;
@@ -649,7 +649,7 @@ pub mod specific {
     use core::ops::Deref;
     use core::str::FromStr;
 
-    use crate::space::err::SpaceErr;
+    use crate::space::err::{ParseErrs, SpaceErr};
     use crate::space::parse::{Domain, SkewerCase};
     use crate::space::selector::Pattern;
 
@@ -666,7 +666,7 @@ pub mod specific {
     }
 
     impl FromStr for VersionReq {
-        type Err = SpaceErr;
+        type Err = ParseErrs;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             Ok(VersionReq {

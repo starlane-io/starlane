@@ -25,6 +25,7 @@ use crate::space::wave::core::{Method, ReflectedCore};
 use serde::{Deserialize, Serialize};
 use strum::{IntoEnumIterator, ParseError};
 use thiserror::Error;
+use crate::space::parse::ResolverErr;
 /*
 #[macro_export]
 macro_rules! err {
@@ -554,7 +555,7 @@ impl ParseErrs {
     }
 
     pub fn expected<A,B,C>( thing: A, expected: B, found: C ) -> Self where A: AsRef<str>, B: AsRef<str>, C: AsRef<str> {
-        let report= Report::build(ReportKind::Error, (), 0).with_message(format!("'{} expected: '{}' but found: '{}'", thing, expected, found)).finish();
+        let report= Report::build(ReportKind::Error, (), 0).with_message(format!("'{} expected: '{}' but found: '{}'", thing.as_ref(), expected.as_ref(), found.as_ref())).finish();
         Self::report(report)
     }
 
@@ -572,7 +573,7 @@ impl ParseErrs {
     }
 
     pub fn new<M>(msg: M) -> Self where M: AsRef<str>{
-        let report = Report::build(ReportKind::Error,(),0).with_message(msg).finish();
+        let report = Report::build(ReportKind::Error,(),0).with_message(msg.as_ref()).finish();
         Self {
             report: vec![report],
             src: "".to_string(),
@@ -580,6 +581,40 @@ impl ParseErrs {
     }
 }
 
+impl From<strum::ParseError> for ParseErrs {
+    fn from(err: ParseError) -> Self {
+        ParseErrs::new(err.to_string())
+    }
+}
+
+impl From<&str> for ParseErrs {
+    fn from(err: &str) -> Self {
+        ParseErrs::new(err)
+    }
+}
+
+impl From<&String> for ParseErrs {
+    fn from(err: &String) -> Self {
+        ParseErrs::new(err)
+    }
+}
+
+impl From<ResolverErr> for ParseErrs {
+    fn from(err: ResolverErr) -> Self {
+        ParseErrs::new(err.to_string())
+    }
+}
+
+impl From<String> for ParseErrs {
+    fn from(err: String) -> Self {
+        ParseErrs::new(err)
+    }
+}
+impl From<Infallible> for ParseErrs {
+    fn from(err: Infallible) -> Self {
+        ParseErrs::new(err.to_string())
+    }
+}
 
 impl From<FromUtf8Error> for ParseErrs {
     fn from(err: FromUtf8Error) -> Self {

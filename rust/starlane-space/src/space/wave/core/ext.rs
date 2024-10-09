@@ -1,3 +1,4 @@
+use core::fmt::{Display, Formatter};
 use std::ops::Deref;
 
 use nom::combinator::all_consuming;
@@ -20,6 +21,14 @@ pub struct ExtMethod {
     string: String,
 }
 
+
+
+impl Default for ExtMethod {
+    fn default() -> Self {
+        Self{ string: "Default".to_string() }
+    }
+}
+
 impl ExtMethod {
     pub fn new<S: ToString>(string: S) -> Result<Self, SpaceErr> {
         let tmp = string.to_string();
@@ -28,11 +37,12 @@ impl ExtMethod {
     }
 }
 
-impl ToString for ExtMethod {
-    fn to_string(&self) -> String {
-        self.string.clone()
+impl Display for ExtMethod {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.write_str(&self.string)
     }
 }
+
 
 impl ValueMatcher<ExtMethod> for ExtMethod {
     fn is_match(&self, x: &ExtMethod) -> Result<(), ()> {
@@ -77,13 +87,7 @@ impl Deref for ExtMethod {
     }
 }
 
-impl Default for ExtMethod {
-    fn default() -> Self {
-        Self {
-            string: "Def".to_string(),
-        }
-    }
-}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExtDirected {

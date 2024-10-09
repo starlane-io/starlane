@@ -13,12 +13,13 @@ use crate::space::loc::{
     STD_WAVE_TRAVERSAL_PLAN,
 };
 use crate::space::parse::util::result;
-use crate::space::parse::{kind_parts, specific, CamelCase, Domain, NomErr, SkewerCase};
+use crate::space::parse::{kind_parts, specific, CamelCase, Domain,  SkewerCase};
+use crate::space::err::ParseErrs;
 use crate::space::particle::traversal::TraversalPlan;
 use crate::space::point::Point;
 use crate::space::selector::{KindSelector, Pattern, PointHierarchy, SpecificSelector, SubKindSelector, VersionReq};
 use crate::space::util::ValuePattern;
-use crate::{KindTemplate, SpaceErr};
+use crate::{KindTemplate};
 
 impl ToBaseKind for KindParts {
     fn to_base(&self) -> BaseKind {
@@ -83,7 +84,7 @@ impl ToString for KindParts {
 }
 
 impl FromStr for KindParts {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (_, kind) = all_consuming(kind_parts)(new_span(s))?;
@@ -245,7 +246,7 @@ impl ToBaseKind for BaseKind {
 }
 
 impl TryFrom<CamelCase> for BaseKind {
-    type Error = NomErr;
+    type Error = ParseErrs;
 
     fn try_from(base: CamelCase) -> Result<Self, Self::Error> {
         Ok(BaseKind::from_str(base.as_str())?)
@@ -402,7 +403,7 @@ impl Kind {
 }
 
 impl TryFrom<KindParts> for Kind {
-    type Error = NomErr;
+    type Error = ParseErrs;
 
     fn try_from(value: KindParts) -> Result<Self, Self::Error> {
         Ok(match value.base {
@@ -414,7 +415,7 @@ impl TryFrom<KindParts> for Kind {
                             .ok_or("Database<Relational<?>> requires a Specific")?,
                     )),
                     what => {
-                        return Err(SpaceErr::from(format!(
+                        return Err(ParseErrs::from(format!(
                             "unexpected Database SubKind '{}'",
                             what
                         )));
@@ -429,7 +430,7 @@ impl TryFrom<KindParts> for Kind {
                             .ok_or("UserBase<OAuth<?>> requires a Specific")?,
                     )),
                     what => {
-                        return Err(SpaceErr::from(format!(
+                        return Err(ParseErrs::from(format!(
                             "unexpected Database SubKind '{}'",
                             what
                         )));
@@ -795,7 +796,7 @@ impl ToString for Specific {
 }
 
 impl FromStr for Specific {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(specific(new_span(s)))
@@ -803,7 +804,7 @@ impl FromStr for Specific {
 }
 
 impl TryInto<SpecificSelector> for Specific {
-    type Error = NomErr;
+    type Error = ParseErrs;
 
     fn try_into(self) -> Result<SpecificSelector, Self::Error> {
         Ok(SpecificSelector {
@@ -820,11 +821,12 @@ impl TryInto<SpecificSelector> for Specific {
 pub mod test {
     use crate::space::selector::KindSelector;
     use crate::space::util::ValueMatcher;
-    use crate::{Kind, SpaceErr, StarSub};
+    use crate::{Kind,  StarSub};
     use core::str::FromStr;
+    use crate::space::err::ParseErrs;
 
     #[test]
-    pub fn selector() -> Result<(), SpaceErr> {
+    pub fn selector() -> Result<(), ParseErrs> {
         let kind = Kind::Star(StarSub::Fold);
         let selector = KindSelector::from_str("<Star<Fold>>")?;
         assert!(selector.is_match(&kind).is_ok());

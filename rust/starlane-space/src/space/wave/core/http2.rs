@@ -4,6 +4,7 @@ use crate::space::err::SpaceErr;
 use crate::space::substance::{FormErrs, Substance};
 use crate::space::wave::core::{DirectedCore, HeaderMap, Method, ReflectedCore};
 use url::Url;
+use crate::space::wave::core::cmd::CmdMethod;
 
 #[derive(
     Debug,
@@ -26,6 +27,12 @@ pub enum HttpMethod {
     Trace,
     Connect,
     Patch,
+}
+
+impl Default for HttpMethod {
+    fn default() -> Self {
+        Self::Get
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
