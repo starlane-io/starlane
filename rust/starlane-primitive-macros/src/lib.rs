@@ -277,7 +277,7 @@ pub fn mech_err(item: TokenStream) -> TokenStream {
                    starlane_space::wave::core::ReflectedCore{
                         headers: Default::default(),
                         status: starlane_space::wave::core::http2::StatusCode::from_u16(500u16).unwrap(),
-                        body: starlane_space::substance::Substance::Err(self.to_uni_err()),
+                        body: self.into().into()
                     }
             }
         }

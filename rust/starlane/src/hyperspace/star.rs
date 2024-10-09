@@ -2030,22 +2030,14 @@ impl SmartLocator
 
 #[derive(Error,Debug,Clone)]
 pub enum StarErr {
-    #[error(transparent)]
-    ParseErrs(#[from] ParseErrs),
-    #[error(transparent)]
-    DriverErr( #[from] DriverErr),
+    #[error("caused by '{0}'")]
+    SpaceErr(#[source] #[from] SpaceErr),
     #[error("cannot create_in_star in star {point} for parent point {parent} since it is not a point within this star")]
     PointNotInStar{point: Point, parent: Point},
     #[error("star expected Root to be already provisioned")]
     ExpectedRootProvisioned,
     #[error("could not find parent '{parent}' caused by '{source}'")]
     CannotFindParent{ #[source] source: RegErr, parent: Point },
-    #[error("caused by '{0}'")]
-    RegErr(#[source] #[from] RegErr),
-    #[error("caused by '{0}'")]
-    SpaceErr(#[source] #[from] SpaceErr),
-    #[error("caused by '{0}'")]
-    MachineErr(#[source] #[from] MachineErr),
     #[error("transport signal exceeded maximum hops")]
     TransportSignalExceededMaxHops,
     #[error("attempt to forward a transport on a non forwarding star")]
@@ -2060,9 +2052,12 @@ pub enum StarErr {
     CouldNotAssignToSelf(Kind),
     #[error("could not find a host to provision '{0}'")]
     CouldNotFindHostToProvision(Kind),
-    #[error("anyhow")]
+    #[error("{0}")]
     Anyhow(#[source] Arc<anyhow::Error>)
 }
+
+
+
 
 impl From<anyhow::Error> for StarErr {
     fn from(err: Error) -> Self {

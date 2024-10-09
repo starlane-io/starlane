@@ -1,3 +1,5 @@
+use anyhow::anyhow;
+use bincode::ErrorKind;
 use nom::error::VerboseError;
 use serde::de::Error;
 use std::convert::Infallible;
@@ -6,8 +8,7 @@ use std::io;
 use std::num::ParseIntError;
 use std::ops::Range;
 use std::string::FromUtf8Error;
-use std::sync::PoisonError;
-use bincode::ErrorKind;
+use std::sync::{Arc, PoisonError};
 use tokio::sync::mpsc::error::{SendError, SendTimeoutError};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
@@ -19,14 +20,15 @@ use crate::space::parse::util::SpanExtra;
 use crate::space::artifact::asynch::ArtErr;
 use crate::space::command::direct::create::KindTemplate;
 use crate::space::kind::BaseKind;
+use crate::space::parse::model::Subst;
+use crate::space::parse::ResolverErr;
 use crate::space::point::PointSegKind;
-use crate::space::substance::{Substance, SubstanceKind};
 use crate::space::wave::core::http2::StatusCode;
 use crate::space::wave::core::{Method, ReflectedCore};
 use serde::{Deserialize, Serialize};
 use strum::{IntoEnumIterator, ParseError};
 use thiserror::Error;
-use crate::space::parse::ResolverErr;
+use crate::space::substance::{Substance, SubstanceErr, SubstanceKind};
 /*
 #[macro_export]
 macro_rules! err {
@@ -37,7 +39,7 @@ macro_rules! err {
 
  */
 
-#[derive(Debug, Clone, Serialize, Deserialize, Error,Eq,PartialEq)]
+#[derive(Debug, Clone, Error)]
 pub enum SpaceErr {
     #[error("{status}: {message}")]
     Status { status: u16, message: String },
@@ -76,9 +78,9 @@ pub enum SpaceErr {
         expected: String,
         found: String,
     },
-
+    #[error("{0}")]
+    Anyhow(#[from] Arc<anyhow::Error>),
 }
-
 
 /*    #[error("artifact error: '{0}'")]
     #[serde(skip_serializing)]
@@ -142,9 +144,22 @@ impl SpaceErr {
     }
 }
 
+impl SpatialError for SpaceErr {
+
+}
+
 impl From<anyhow::Error> for SpaceErr {
     fn from(err: anyhow::Error) -> Self {
-        SpaceErr::Msg(err.to_string())
+        Arc::new(err).into()
+    }
+}
+
+
+
+impl SpatialError for ParseErrs {
+    fn anyhow(self) -> Arc<anyhow::Error> {
+        // first promote it to a space err...
+        SpaceErr::from(self).anyhow()
     }
 }
 
@@ -193,17 +208,18 @@ impl Into<ReflectedCore> for SpaceErr {
             SpaceErr::Status { status, .. } => ReflectedCore {
                 headers: Default::default(),
                 status: StatusCode::from_u16(status).unwrap_or(StatusCode::from_u16(500).unwrap()),
-                body: Substance::Err(self),
+                body: SpatialError::to_substance(self)
             },
             SpaceErr::ParseErrs(_) => ReflectedCore {
                 headers: Default::default(),
                 status: StatusCode::from_u16(500u16).unwrap_or(StatusCode::from_u16(500).unwrap()),
-                body: Substance::Err(self),
+                body: SpatialError::to_substance(self)
+
             },
             x => ReflectedCore {
                 headers: Default::default(),
                 status: Default::default(),
-                body: Substance::Err(x),
+                body: SpatialError::to_substance(x)
             },
         }
     }
@@ -218,7 +234,7 @@ impl CoreReflector for SpaceErr {
         ReflectedCore {
             headers: Default::default(),
             status: StatusCode::from_u16(self.status()).unwrap(),
-            body: Substance::Err(self),
+            body: SpatialError::to_substance(self)
         }
     }
 }
@@ -330,6 +346,12 @@ impl<C> From<SendTimeoutError<C>> for SpaceErr {
             status: 500,
             message: e.to_string(),
         }
+    }
+}
+
+impl From<&SubstanceErr> for SpaceErr  {
+    fn from(err: &SubstanceErr) -> Self {
+        SpaceErr::from(err.to_string())
     }
 }
 
@@ -540,41 +562,59 @@ impl From<io::Error> for SpaceErr {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Error)]
+#[derive(Debug, Clone, Error)]
 pub struct ParseErrs {
     pub report: Vec<Report>,
     pub src: String,
 }
 
 impl ParseErrs {
-
-    pub fn report( report: Report) -> Self {
+    pub fn report(report: Report) -> Self {
         Self {
             report: vec![report],
             src: "".to_string(),
         }
     }
 
-    pub fn expected<A,B,C>( thing: A, expected: B, found: C ) -> Self where A: AsRef<str>, B: AsRef<str>, C: AsRef<str> {
-        let report= Report::build(ReportKind::Error, (), 0).with_message(format!("'{} expected: '{}' but found: '{}'", thing.as_ref(), expected.as_ref(), found.as_ref())).finish();
+    pub fn expected<A, B, C>(thing: A, expected: B, found: C) -> Self
+    where
+        A: AsRef<str>,
+        B: AsRef<str>,
+        C: AsRef<str>,
+    {
+        let report = Report::build(ReportKind::Error, (), 0)
+            .with_message(format!(
+                "'{} expected: '{}' but found: '{}'",
+                thing.as_ref(),
+                expected.as_ref(),
+                found.as_ref()
+            ))
+            .finish();
         Self::report(report)
     }
 
-    pub fn result_utf8<R>(  result: Result<R,FromUtf8Error>) -> Result<R,Self> {
+    pub fn result_utf8<R>(result: Result<R, FromUtf8Error>) -> Result<R, Self> {
         match result {
             Ok(ok) => Ok(ok),
-            Err(err) => Err(Self::new(&format!("ParseErrs(FromUtf8Error): {}",err)))
+            Err(err) => Err(Self::new(&format!("ParseErrs(FromUtf8Error): {}", err))),
         }
     }
 
     pub fn utf8_encoding_err<I>(span: I, err: FromUtf8Error) -> ParseErrs
-    where I: Span{
-        let err= err.to_string();
-        Self::from_loc_span(err.as_str(), "FromUtf8Error", span )
+    where
+        I: Span,
+    {
+        let err = err.to_string();
+        Self::from_loc_span(err.as_str(), "FromUtf8Error", span)
     }
 
-    pub fn new<M>(msg: M) -> Self where M: AsRef<str>{
-        let report = Report::build(ReportKind::Error,(),0).with_message(msg.as_ref()).finish();
+    pub fn new<M>(msg: M) -> Self
+    where
+        M: AsRef<str>,
+    {
+        let report = Report::build(ReportKind::Error, (), 0)
+            .with_message(msg.as_ref())
+            .finish();
         Self {
             report: vec![report],
             src: "".to_string(),
@@ -587,7 +627,6 @@ impl From<Box<bincode::ErrorKind>> for ParseErrs {
         Self::new(err.to_string())
     }
 }
-
 
 impl From<strum::ParseError> for ParseErrs {
     fn from(err: ParseError) -> Self {
@@ -1012,15 +1051,28 @@ where
     }
 }
 
-#[derive(Clone,Debug,Error)]
+#[derive(Clone, Debug, Error)]
 pub enum AutoboxErr {
     #[error("cannot convert '{thing}' from '{from}' to '{to}'")]
-    CannotConvert{ thing: String, from: String, to: String }
+    CannotConvert {
+        thing: String,
+        from: String,
+        to: String,
+    },
 }
 
 impl AutoboxErr {
-    pub fn no_into<A,B,C>( thing: A, from: B, to: C ) -> Self where A: AsRef<str>, B: AsRef<str>, C: AsRef<str> {
-        Self::CannotConvert { thing: thing.as_ref().to_string(), from: from.as_ref().to_string(), to: to.as_ref().to_string() }
+    pub fn no_into<A, B, C>(thing: A, from: B, to: C) -> Self
+    where
+        A: AsRef<str>,
+        B: AsRef<str>,
+        C: AsRef<str>,
+    {
+        Self::CannotConvert {
+            thing: thing.as_ref().to_string(),
+            from: from.as_ref().to_string(),
+            to: to.as_ref().to_string(),
+        }
     }
 }
 
@@ -1033,6 +1085,23 @@ impl From<strum::ParseErr> for ParseErrs {
 
  */
 
+pub trait SpatialError where Self: Sized+ ToString {
+    fn anyhow(self) -> Arc<anyhow::Error> {
+        Arc::new(anyhow!(self.to_string()))
+    }
+
+    fn to_substance(self) -> Substance {
+        Substance::Err(SubstanceErr(self.to_string()))
+    }
+
+}
+
+
+
+
+pub trait HyperSpatialError: SpatialError {
+
+}
 
 #[cfg(test)]
 pub mod test {

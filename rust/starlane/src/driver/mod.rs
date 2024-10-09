@@ -1878,7 +1878,6 @@ pub enum ParticleStarErr {
     RegErr(#[from] RegErr),
     #[error("{0}")]
     Anyhow(#[source]Arc<anyhow::Error>)
-
 }
 
 impl From<anyhow::Error> for ParticleStarErr {

@@ -211,7 +211,7 @@ impl ReflectedCore {
         if self.is_ok() {
             Ok(())
         } else if let Substance::Err(err) = &self.body {
-            Err(err.clone())
+            Err(SpaceErr::from(err))
         } else {
             Err(SpaceErr::new(self.status.as_u16(), "error"))
         }

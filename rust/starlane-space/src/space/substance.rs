@@ -10,7 +10,7 @@ use crate::space::parse::util::Tw;
 use starlane_primitive_macros::Autobox;
 
 use crate::space::command::{Command, RawCommand};
-use crate::space::err::ParseErrs;
+use crate::space::err::{ParseErrs, SpatialError};
 use crate::space::hyper::{Greet, HyperSubstance, HyperSubstanceKind, Knock, ParticleLocation};
 use crate::space::loc::Meta;
 use crate::space::log::{AuditLog, Log, LogSpan, LogSpanEvent, PointlessLog};
@@ -28,6 +28,7 @@ use crate::space::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use crate::space::wave::{PongCore, Wave};
 use crate::{Details, SpaceErr, Status, Stub, Surface};
 use url::Url;
+use crate::space::kind::Sub;
 
 #[derive(
     Debug,
@@ -114,8 +115,31 @@ pub enum Substance {
     Knock(Knock),
     Greet(Greet),
     Log(LogSubstance),
-    Err(SpaceErr),
+    Err(SubstanceErr),
 }
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+)]
+pub struct SubstanceErr(pub String);
+
+impl ToString for SubstanceErr {
+    fn to_string(&self) -> String {
+        self.0.clone()
+    }
+}
+
+
+impl <E> From<E> for SubstanceErr where E: SpatialError {
+    fn from(err: E) -> Self {
+       Self(err.to_string())
+    }
+}
+
 
 impl Substance {
     pub fn wave(&self) -> Option<&Wave> {
