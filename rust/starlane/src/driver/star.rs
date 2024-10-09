@@ -602,7 +602,7 @@ impl StarWrangles {
     pub fn find(&self, kind: &Kind) -> Option<Arc<RwLock<RoundRobinWrangleSelector>>> {
         let mut iter = self.wrangles.iter();
         while let Some(multi) = iter.next() {
-            if multi.key().is_match(&kind).is_ok()+ {
+            if multi.key().is_match(&kind).is_ok() {
                 return Some(multi.value().clone());
             }
         }

@@ -62,7 +62,7 @@ impl MachineApi {
 
 impl MachineApi
 {
-    pub fn new<P>(tx: mpsc::Sender<MachineCall>, registry: Registry, artifacts: Artifacts, platform: P) -> Self where P: Platform{
+    pub fn new<P>(tx: mpsc::Sender<MachineCall>, registry: Registry, artifacts: Artifacts, platform: &P) -> Self where P: Platform{
         let data_dir = platform.data_dir();
         Self { tx, registry, artifacts, data_dir }
     }
@@ -202,7 +202,7 @@ where
         let (call_tx, call_rx) = mpsc::channel(1024);
         let artifacts = platform.artifact_hub();
         let registry= platform.global_registry().await?;
-        let machine_api = MachineApi::new(call_tx.clone(),registry, artifacts);
+        let machine_api = MachineApi::new(call_tx.clone(),registry, artifacts,&platform);
         tokio::spawn(async move { Machine::init(platform, call_tx, call_rx).await });
 
         Ok(machine_api)
@@ -219,7 +219,7 @@ aprintln!("Init Machine....");
         let machine_name = platform.machine_name();
         let artifacts = platform.artifact_hub();
         let registry = platform.global_registry().await?;
-        let machine_api = MachineApi::new(call_tx.clone(), registry, artifacts);
+        let machine_api = MachineApi::new(call_tx.clone(), registry, artifacts,&platform);
         let (mpsc_status_tx, mut mpsc_status_rx) = mpsc::channel(128);
         let (watch_status_tx, watch_status_rx) = watch::channel(MachineStatus::Init);
         tokio::spawn(async move {

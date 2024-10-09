@@ -22,8 +22,24 @@ pub enum RegErr {
   #[error("Database Setup Failed")]
   DatabaseSetupFail,
   #[error("Point '{point}' registry error: {message}")]
-  Point { point: Point, message: String }
+  Point { point: Point, message: String },
+  #[error("{0}")]
+  Msg(#[from] String),
 }
+
+impl From<&str> for RegErr {
+    fn from(err: &str) -> Self {
+        Self::Msg(err.to_string())
+    }
+}
+
+impl From<&String> for RegErr {
+    fn from(err: &String) -> Self {
+        Self::Msg(err.to_string())
+    }
+}
+
+
 
 impl From<sqlx::Error> for RegErr {
     fn from(value: Error) -> Self {
@@ -36,7 +52,7 @@ impl RegErr {
         Self::Dupe
     }
 
-    pub fn point<S>( point: Point, message: S ) -> RegErr {
+    pub fn point<S>( point: Point, message: S ) -> RegErr where S: ToString {
         let message = message.to_string();
         RegErr::Point {point, message }
     }
