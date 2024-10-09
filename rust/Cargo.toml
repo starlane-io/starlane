@@ -12,13 +12,16 @@ homepage = "https://starlane.io"
 description="..."
 
 
-[workspace]
-default-run = "starlane"
-resolver = "2"
-members = [
-  "starlane", "starlane-macros", "starlane-primitive-macros","mechtron"
-  , "starlane-space", "ext/service/starlane-cli-local-filestore-service" , "ext/service/starlane-cli-filestore-s3-service"]
 
+[workspace]
+default-run = "space2"
+resolver = "2"
+
+#members = [
+#  "starlane", "starlane-macros", "starlane-primitive-macros","mechtron"
+#  , "starlane-space", "ext/service/starlane-cli-local-filestore-service" , "ext/service/starlane-cli-filestore-s3-service", "space2", "starlane-util"]
+
+members = ["space2"]
 exclude = [ ]
 
 [workspace.dependencies]
@@ -26,6 +29,7 @@ starlane = { path="./starlane" }
 starlane-macros = { path="./starlane-macros"}
 starlane-primitive-macros = { path="./starlane-primitive-macros"}
 starlane-space = { path="./starlane-space"}
+space2 = {  path="./space2"}
 lazy_static = "1.5.0"
 uuid = { version="1.1.2" }
 chrono = { version="0.4.19" }
