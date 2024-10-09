@@ -423,13 +423,13 @@ pub mod parse {
         ProtoKind, ProtoVariant, Specific, SpecificDef, SpecificFullSelector, SpecificSelector,
         SpecificSubTypes, SpecificSubTypesSelector, SubTypeDef, VariantDef,
     };
+    use crate::space::parse::util::Span;
     use crate::space::parse::{camel_case, domain, skewer_case, version, version_req, Res};
     use nom::branch::alt;
     use nom::bytes::complete::tag;
     use nom::combinator::{opt, value};
     use nom::sequence::{delimited, pair, preceded, tuple};
     use std::str::FromStr;
-    use crate::space::parse::util::Span;
 
     pub fn pattern<I, FnX, X>(mut f: FnX) -> impl FnMut(I) -> Res<I, Pattern<X>> + Copy
     where
@@ -665,6 +665,7 @@ pub mod parse {
         };
         use crate::space::kind2::{IsMatch, OptPattern};
 
+        use crate::space::parse::util::new_span;
         use crate::space::parse::util::result;
         use crate::space::parse::{
             camel_case, expect, CamelCase,
@@ -674,7 +675,6 @@ pub mod parse {
         use nom::bytes::complete::tag;
         use nom::combinator::opt;
         use nom::sequence::{pair, preceded};
-        use crate::space::parse::util::new_span;
 
         #[test]
         pub fn test_camel_case_subtypes() {

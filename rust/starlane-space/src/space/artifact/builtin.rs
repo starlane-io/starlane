@@ -1,19 +1,14 @@
 use crate::space::artifact::asynch::{ArtErr, ArtifactFetcher};
-use crate::space::artifact::ArtRef;
-use crate::space::config::bind::BindConfig;
-use crate::space::err::SpaceErr;
-use crate::space::parse::bind_config;
+use crate::space::kind::BaseKind;
 use crate::space::particle::Stub;
 use crate::space::point::Point;
+use crate::space::selector::Selector;
 use crate::space::substance::Bin;
-use crate::space::util::{log, ValuePattern};
-use core::str::FromStr;
+use crate::space::util::ValuePattern;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use crate::space::kind::BaseKind;
-use crate::space::selector::Selector;
 
 pub static BUILTIN_FETCHER: Lazy<Arc<BuiltinArtifactFetcher>> = Lazy::new(|| {
     let mut builder = BuiltinArtifactFetcherBuilder::new();

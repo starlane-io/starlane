@@ -13,12 +13,12 @@ use crate::space::loc::{
     STD_WAVE_TRAVERSAL_PLAN,
 };
 use crate::space::parse::util::result;
-use crate::space::parse::{kind_parts, specific, CamelCase, Domain, SkewerCase};
+use crate::space::parse::{kind_parts, specific, CamelCase, Domain, NomErr, SkewerCase};
 use crate::space::particle::traversal::TraversalPlan;
+use crate::space::point::Point;
 use crate::space::selector::{KindSelector, Pattern, PointHierarchy, SpecificSelector, SubKindSelector, VersionReq};
 use crate::space::util::ValuePattern;
 use crate::{KindTemplate, SpaceErr};
-use crate::space::point::Point;
 
 impl ToBaseKind for KindParts {
     fn to_base(&self) -> BaseKind {
@@ -245,7 +245,7 @@ impl ToBaseKind for BaseKind {
 }
 
 impl TryFrom<CamelCase> for BaseKind {
-    type Error = SpaceErr;
+    type Error = NomErr;
 
     fn try_from(base: CamelCase) -> Result<Self, Self::Error> {
         Ok(BaseKind::from_str(base.as_str())?)
@@ -402,7 +402,7 @@ impl Kind {
 }
 
 impl TryFrom<KindParts> for Kind {
-    type Error = SpaceErr;
+    type Error = NomErr;
 
     fn try_from(value: KindParts) -> Result<Self, Self::Error> {
         Ok(match value.base {
@@ -803,7 +803,7 @@ impl FromStr for Specific {
 }
 
 impl TryInto<SpecificSelector> for Specific {
-    type Error = SpaceErr;
+    type Error = NomErr;
 
     fn try_into(self) -> Result<SpecificSelector, Self::Error> {
         Ok(SpecificSelector {
@@ -819,9 +819,9 @@ impl TryInto<SpecificSelector> for Specific {
 #[cfg(test)]
 pub mod test {
     use crate::space::selector::KindSelector;
+    use crate::space::util::ValueMatcher;
     use crate::{Kind, SpaceErr, StarSub};
     use core::str::FromStr;
-    use crate::space::util::ValueMatcher;
 
     #[test]
     pub fn selector() -> Result<(), SpaceErr> {

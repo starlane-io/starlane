@@ -1,7 +1,4 @@
-use core::str::Utf8Error;
-use anyhow::anyhow;
 use nom::error::VerboseError;
-use nom::Err;
 use serde::de::Error;
 use std::convert::Infallible;
 use std::fmt::{Debug, Display, Formatter};
@@ -9,26 +6,25 @@ use std::io;
 use std::num::ParseIntError;
 use std::ops::Range;
 use std::string::FromUtf8Error;
-use std::sync::{Arc, PoisonError};
+use std::sync::PoisonError;
 use tokio::sync::mpsc::error::{SendError, SendTimeoutError};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
 
-use crate::space::err::report::{Label, Report, ReportBuilder, ReportKind};
+use crate::space::err::report::{Label, Report, ReportKind};
 use crate::space::parse::util::Span;
 use crate::space::parse::util::SpanExtra;
 
 use crate::space::artifact::asynch::ArtErr;
 use crate::space::command::direct::create::KindTemplate;
-use crate::space::kind::{BaseKind, FileSubKind, Kind};
-use crate::space::point::{Point, PointSegKind};
+use crate::space::kind::BaseKind;
+use crate::space::point::PointSegKind;
 use crate::space::substance::{Substance, SubstanceKind};
 use crate::space::wave::core::http2::StatusCode;
 use crate::space::wave::core::{Method, ReflectedCore};
 use serde::{Deserialize, Serialize};
-use strum::IntoEnumIterator;
+use strum::{IntoEnumIterator, ParseError};
 use thiserror::Error;
-use url::form_urlencoded::Parse;
 /*
 #[macro_export]
 macro_rules! err {
@@ -557,8 +553,8 @@ impl ParseErrs {
         }
     }
 
-    pub fn expected( thing: &dyn AsRef<str>, expected: &dyn AsRef<str>, found: &dyn AsRef<str> ) -> Self {
-        let report= Report::build(ReportKind::Error, (), 0).with_message(format!("'{}' parser expected: '{}' but found: '{}'", thing, expected, found)).finish();
+    pub fn expected<A,B,C>( thing: A, expected: B, found: C ) -> Self where A: AsRef<str>, B: AsRef<str>, C: AsRef<str> {
+        let report= Report::build(ReportKind::Error, (), 0).with_message(format!("'{} expected: '{}' but found: '{}'", thing, expected, found)).finish();
         Self::report(report)
     }
 
@@ -569,12 +565,13 @@ impl ParseErrs {
         }
     }
 
-    pub fn utf8_encoding_err<I>(span: I, err: FromUtf8Error) -> ParseErrs where I: Span{
+    pub fn utf8_encoding_err<I>(span: I, err: FromUtf8Error) -> ParseErrs
+    where I: Span{
         let err= err.to_string();
         Self::from_loc_span(err.as_str(), "FromUtf8Error", span )
     }
 
-    pub fn new(msg: &dyn AsRef<str>) -> Self {
+    pub fn new<M>(msg: M) -> Self where M: AsRef<str>{
         let report = Report::build(ReportKind::Error,(),0).with_message(msg).finish();
         Self {
             report: vec![report],
@@ -979,10 +976,19 @@ pub enum AutoboxErr {
 }
 
 impl AutoboxErr {
-    pub fn no_into( thing: &dyn AsRef<str>, from: &dyn AsRef<str>, to: &dyn AsRef<str> ) -> Self {
+    pub fn no_into<A,B,C>( thing: A, from: B, to: C ) -> Self where A: AsRef<str>, B: AsRef<str>, C: AsRef<str> {
         Self::CannotConvert { thing: thing.as_ref().to_string(), from: from.as_ref().to_string(), to: to.as_ref().to_string() }
     }
 }
+
+/*
+impl From<strum::ParseErr> for ParseErrs {
+    fn from(err: ParseError) -> Self {
+        ParseErrs::new(err.to_string())
+    Err}
+}
+
+ */
 
 
 #[cfg(test)]

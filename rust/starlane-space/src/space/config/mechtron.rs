@@ -1,10 +1,10 @@
+use crate::space::err::ParseErrs;
 use crate::space::parse::mechtron_config;
 use crate::space::parse::model::MechtronScope;
 use crate::space::point::Point;
 use crate::SpaceErr;
 use core::str::FromStr;
 use serde::{Deserialize, Serialize};
-use crate::space::err::ParseErrs;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct MechtronConfig {

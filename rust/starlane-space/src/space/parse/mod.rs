@@ -8,7 +8,7 @@ use core::fmt::Display;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::Formatter;
-use std::ops::{Deref, Range, RangeFrom, RangeTo};
+use std::ops::{Deref, RangeFrom, RangeTo};
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -28,13 +28,15 @@ use crate::space::config::bind::{
 use crate::space::config::mechtron::MechtronConfig;
 use crate::space::config::{DocKind, Document};
 use crate::space::err::report::{Label, Report, ReportKind};
-use crate::space::err::{ParseErrs};
+use crate::space::err::ParseErrs;
 use crate::space::kind::{
     ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, NativeSub, Specific,
     StarSub, UserBaseSubKind,
 };
 use crate::space::loc::StarKey;
-use crate::space::loc::{Layer, PointSegment, Surface, Topic, Uuid, VarVal, Variable, Version};
+use crate::space::loc::{Layer, PointSegment, Surface, Topic, Uuid, VarVal, Version};
+use crate::space::parse::util::unstack;
+use crate::space::parse::util::{log_parse_err, preceded, recognize, result};
 use crate::space::particle::PointKindVar;
 use crate::space::point::{
     Point, PointCtx, PointSeg, PointSegCtx, PointSegDelim, PointSegVar, PointVar, RouteSeg,
@@ -51,7 +53,7 @@ use crate::space::substance::{
     Substance, SubstanceFormat, SubstanceKind, SubstancePattern, SubstancePatternVar,
     SubstanceTypePatternDef, SubstanceTypePatternVar,
 };
-use crate::space::util::{log, HttpMethodPattern, StringMatcher, ToResolved, ValuePattern};
+use crate::space::util::{HttpMethodPattern, StringMatcher, ToResolved, ValuePattern};
 use crate::space::wave::core::cmd::CmdMethod;
 use crate::space::wave::core::ext::ExtMethod;
 use crate::space::wave::core::http2::HttpMethod;
@@ -72,7 +74,7 @@ use nom::character::complete::{alpha1, digit1};
 use nom::character::complete::{
     alphanumeric0, alphanumeric1, anychar, char, multispace0, multispace1, satisfy, space1,
 };
-use nom::combinator::{all_consuming, opt };
+use nom::combinator::{all_consuming, opt};
 use nom::combinator::{cut, eof, fail, not, peek, value, verify};
 use nom::error::{ErrorKind, ParseError};
 use nom::multi::{many0, many1, separated_list0};
@@ -91,15 +93,13 @@ use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
 use util::{new_span, span_with_extra, trim, tw, Span, Trace, Wrap};
-use crate::space::parse::util::{log_parse_err, preceded, recognize, result };
-use crate::space::parse::util::unstack;
-use crate::space::parse::VarErrCtx::VarName;
 pub type SpaceContextError<I: Span> = dyn nom_supreme::context::ContextError<I, ErrCtx>;
 pub type StarParser<I: Span, O> = dyn nom_supreme::parser_ext::ParserExt<I, O, SpaceTree<I>>;
 
 pub type Xpan<'a> = Wrap<LocatedSpan<&'a str, Arc<String>>>;
 
-impl<I> From<SpaceTree<I>> for ParseErrs where I: Span{
+impl<I> From<SpaceTree<I>> for ParseErrs
+where I: Span{
     fn from(err: SpaceTree<I>) -> Self {
         match err {
             SpaceTree::Base { location, kind } => {
@@ -136,7 +136,8 @@ impl<I> From<SpaceTree<I>> for ParseErrs where I: Span{
     }
 }
 
-impl<I> From<nom::Err<SpaceTree<I>>> for ParseErrs where I: Span {
+impl<I> From<nom::Err<SpaceTree<I>>> for ParseErrs
+where I: Span {
     fn from(err: nom::Err<SpaceTree<I>>) -> Self {
         match err {
             Err::Incomplete(i) => ParseErrs::default(),
@@ -298,11 +299,11 @@ impl BraceKindErrCtx {
 }
 
 #[derive(Debug, Error, strum_macros::Display)]
-pub enum ParseErr {
-    Error,
+pub enum NomErr {
+    Error
 }
 
-pub type SpaceTree<I: Span> = GenericErrorTree<I, &'static str, ErrCtx, ParseErr>;
+pub type SpaceTree<I: Span> = GenericErrorTree<I, &'static str, ErrCtx, NomErr>;
 
 pub type Res<I: Span, O> = IResult<I, O, SpaceTree<I>>;
 
@@ -625,15 +626,11 @@ fn var<I: Span, O>(input: I) -> Res<I, VarVal<O>> {
 
 #[cfg(test)]
 pub mod test3 {
-    use std::sync::Arc;
+    use crate::space::parse::util::{new_span, print, trim};
+    use crate::space::parse::{point_var, Res};
+    use crate::space::point::PointVar;
     use nom::combinator::cut;
-    use nom_locate::LocatedSpan;
-    use nom_supreme::error::GenericErrorTree;
     use nom_supreme::ParserExt;
-    use crate::space::loc::VarVal;
-    use crate::space::parse::{base_point_segment, point_var, pop, space_point_segment, var, variable_ize, ErrCtx, ParseErr, SpaceTree, Res};
-    use crate::space::parse::util::{new_span, print, result, trim, unstack, Wrap};
-    use crate::space::point::{PointSeg, PointSegVar, PointVar};
 
     #[test]
     pub fn test() {
@@ -2938,7 +2935,7 @@ where
         + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar,
     F: nom::Parser<I, O, SpaceTree<I>>,
-    O: Clone + FromStr<Err = ParseErrs>,
+    O: Clone + FromStr<Err =ParseErrs>,
 {
     move |input: I| {
         let (next, element) = f.parse(input.clone())?;
@@ -3891,12 +3888,8 @@ pub mod model {
     use std::ops::{Deref, DerefMut};
     use std::str::FromStr;
 
-    use regex::Regex;
-    use serde::de::Visitor;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    use thiserror::Error;
     use crate::space::config::bind::{PipelineStepDef, PipelineStopDef};
-    use crate::space::err::{ParseErrs};
+    use crate::space::err::ParseErrs;
     use crate::space::loc::Version;
     use crate::space::parse::util::{new_span, result, Span, Trace, Tw};
     use crate::space::parse::{
@@ -3907,6 +3900,10 @@ pub mod model {
     use crate::space::util::{ToResolved, ValueMatcher, ValuePattern};
     use crate::space::wave::core::{Method, MethodKind};
     use crate::space::wave::{DirectedWave, SingularDirectedWave};
+    use regex::Regex;
+    use serde::de::Visitor;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use thiserror::Error;
 
     #[derive(Clone)]
     pub struct ScopeSelectorAndFiltersDef<S, I> {
@@ -4049,7 +4046,7 @@ pub mod model {
 
         pub fn from<I: ToString>(selector: LexScopeSelector<I>) -> Result<Self, ParseErrs> {
             if selector.name.to_string().as_str() != "Route" {
-                return Err(ParseErrs::expected("","expected Route"));
+                return Err(ParseErrs::expected("", "expected Route", selector.name.to_string()));
             }
             let path = match selector.path {
                 None => None,
@@ -5396,22 +5393,22 @@ pub mod cmd_test {
         command, create_command, point_selector, publish_command, script, upload_blocks, CamelCase,
     };
     /*
-    #[mem]
-    pub async fn test2() -> Result<(),Error>{
-        let input = "? xreate localhost<Space>";
-        let x: Result<CommandOp,VerboseError<&str>> = final_parser(command)(input);
-        match x {
-            Ok(_) => {}
-            Err(err) => {
-                println!("err: {}", err.to_string())
+        #[mem]
+        pub async fn test2() -> Result<(),Error>{
+            let input = "? xreate localhost<Space>";
+            let x: Result<CommandOp,VerboseError<&str>> = final_parser(command)(input);
+            match x {
+                Ok(_) => {}
+                Err(err) => {
+                    println!("err: {}", err.to_string())
+                }
             }
+
+
+            Ok(())
         }
 
-
-        Ok(())
-    }
-
-     */
+         */
 
     //    #[test]
     pub fn test() -> Result<(), ParseErrs> {

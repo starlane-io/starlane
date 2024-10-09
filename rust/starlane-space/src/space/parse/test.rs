@@ -5,7 +5,6 @@ use crate::space::command::direct::create::{PointSegTemplate, PointTemplate, Tem
 use crate::space::command::Command;
 use crate::space::config::Document;
 use crate::space::err::{PrintErr, SpaceErr};
-use crate::space::parse::{context, space};
 use crate::space::parse::model::{
     BlockKind, DelimitedBlockKind, NestedBlockKind, TerminatedBlockKind,
 };
@@ -20,6 +19,7 @@ use crate::space::parse::{
     space_no_dupe_dots, space_point_segment, strip_comments, template, var_case, version, Env
     ,
 };
+use crate::space::parse::context;
 use crate::space::point::{Point, PointCtx, PointSegVar, RouteSegVar};
 use crate::space::substance::Substance;
 use crate::space::util;

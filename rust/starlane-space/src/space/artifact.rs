@@ -1,6 +1,4 @@
-use crate::space::artifact::asynch::{ArtifactHub, ArtifactPipeline};
 use crate::space::config::Document;
-use crate::space::err::SpaceErr;
 use crate::space::loc::ToSurface;
 use crate::space::point::Point;
 use crate::space::substance::Bin;

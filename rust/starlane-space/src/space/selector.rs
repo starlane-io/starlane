@@ -6,15 +6,16 @@ use nom::combinator::all_consuming;
 use serde::de::{DeserializeOwned, Error, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::space::kind::{BaseKind, Kind, KindParts, Specific, Sub};
+use crate::space::err::ParseErrs;
+use crate::space::kind::{BaseKind, Kind, KindParts, Specific};
 use crate::space::loc::{Layer, ToBaseKind, Topic, VarVal, Variable, Version};
 use crate::space::parse::util::result;
 use crate::space::parse::util::{new_span, Trace};
 use crate::space::parse::{
-    consume_hierarchy, kind_selector, point_kind_hierarchy, point_segment_selector, point_selector,
+    consume_hierarchy, kind_selector, point_segment_selector, point_selector,
     specific_selector, CamelCase, Env,
 };
-use crate::space::point::{Point, PointCtx, PointDef, PointSeg, PointSegKind, PointVar, RouteSeg};
+use crate::space::point::{Point, PointCtx, PointDef, PointSeg, PointVar, RouteSeg};
 use crate::space::substance::{
     CallWithConfigDef, Substance, SubstanceFormat, SubstanceKind, SubstancePattern,
     SubstancePatternCtx, SubstancePatternDef,
@@ -22,8 +23,6 @@ use crate::space::substance::{
 use crate::space::util::{ToResolved, ValueMatcher, ValuePattern};
 use crate::SpaceErr;
 use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
-use crate::space::err::ParseErrs;
-use crate::space::kind2::KindDef;
 
 pub type PointSegKindHop = HopDef<PointSegSelector, ValuePattern<KindSelector>>;
 pub type PointSegKindHopCtx = HopDef<PointSegSelectorCtx, ValuePattern<KindSelector>>;

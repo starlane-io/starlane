@@ -1,4 +1,3 @@
-use std::any::Any;
 use serde::{Deserialize, Serialize};
 
 use crate::space::util::ValueMatcher;
@@ -25,6 +24,28 @@ pub enum HypMethod {
     HyperWave,
     Search,
 }
+
+
+// this need ei
+/*
+impl HypMethod {
+
+    pub fn as_str(&self) -> & 'static str {
+        match self {
+            HypMethod::Init => "Hyp<Init>",
+            HypMethod::Assign => "Hyp<Assign>",
+            HypMethod::Host => "Hyp<Host>",
+            HypMethod::Provision => "Hyp<Provision>",
+            HypMethod::Knock => "Hyp<Knock>",
+            HypMethod::Hop => "Hyp<Hop>",
+            HypMethod::Transport => "Hyp<Transport>",
+            HypMethod::HyperWave => "Hyp<HyperWave>",
+            HypMethod::Search => "Hyp<Search>"
+        }
+}
+}
+
+ */
 
 impl ValueMatcher<HypMethod> for HypMethod {
     fn is_match(&self, x: &HypMethod) -> Result<(), ()> {

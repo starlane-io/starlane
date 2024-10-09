@@ -13,7 +13,7 @@ use crate::space::wave::exchange::{
 use crate::space::wave::{
     BounceBacks, BounceProto, DirectedKind, DirectedProto, DirectedWave, EchoCore,
     FromReflectedAggregate, Handling, PongCore, RecipientSelector, ReflectedAggregate, ReflectedProto,
-    ReflectedWave, Scope, Wave, WaveVariantDef, WaveId,
+    ReflectedWave, Scope, Wave, WaveId, WaveVariantDef,
 };
 use crate::{Agent, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
 use alloc::borrow::Cow;

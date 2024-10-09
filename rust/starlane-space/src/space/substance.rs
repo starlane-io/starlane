@@ -17,6 +17,7 @@ use crate::space::parse::model::Subst;
 use crate::space::parse::Env;
 use crate::space::particle::Particle;
 use crate::space::point::{Point, PointCtx, PointVar};
+use crate::space::util;
 use crate::space::util::{ToResolved, ValueMatcher, ValuePattern};
 use crate::space::wave::core::cmd::CmdMethod;
 use crate::space::wave::core::ext::ExtMethod;
@@ -26,8 +27,6 @@ use crate::space::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use crate::space::wave::{PongCore, Wave};
 use crate::{Details, SpaceErr, Status, Stub, Surface};
 use url::Url;
-use crate::space::kind::Sub;
-use crate::space::util;
 
 #[derive(
     Debug,
@@ -134,9 +133,9 @@ impl Substance {
         }
     }
 
-    pub fn expect( self, expect: SubstanceKind ) -> Result<Self,SpaceErr> {
+    pub fn expect( self, expect: SubstanceKind ) -> Result<Self, ParseErrs> {
         if self.kind() != expect {
-            Err(SpaceErr::expected_substance(expect, self.kind()))
+            Err(ParseErrs::expected("SubstanceKind", &expect.to_string(), &self.kind().to_string()))
         } else {
             Ok(self)
         }
@@ -144,8 +143,8 @@ impl Substance {
 }
 
 pub trait ToSubstance<S> {
-    fn to_substance(self) -> Result<S, SpaceErr>;
-    fn to_substance_ref(&self) -> Result<&S, SpaceErr>;
+    fn to_substance(self) -> Result<S, ParseErrs>;
+    fn to_substance_ref(&self) -> Result<&S, ParseErrs>;
 }
 
 pub trait ChildSubstance {}

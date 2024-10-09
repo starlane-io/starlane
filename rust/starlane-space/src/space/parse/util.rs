@@ -1,19 +1,19 @@
+use crate::space::err::{ParseErrs, PrintErr};
+use crate::space::loc::Variable;
+use crate::space::parse::{ErrCtx, SpaceTree, VarCase};
 use core::fmt::Display;
-use std::ops::{Deref, Range, RangeFrom, RangeTo};
-use std::sync::Arc;
-use nom::error::{ErrorKind, ParseError};
-use nom::{AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength, InputTake, InputTakeAtPosition, Needed, Offset, Slice};
 use nom::character::complete::multispace0;
+use nom::error::{ErrorKind, ParseError};
 use nom::sequence::delimited;
+use nom::{AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength, InputTake, InputTakeAtPosition, Needed, Offset, Slice};
 use nom_locate::LocatedSpan;
 use nom_supreme::error::{GenericErrorTree, StackContext};
 use nom_supreme::final_parser::ExtractContext;
 use nom_supreme::ParserExt;
 use serde::{Deserialize, Serialize};
+use std::ops::{Deref, Range, RangeFrom, RangeTo};
+use std::sync::Arc;
 use thiserror::__private::AsDisplay;
-use crate::space::err::{ParseErrs, PrintErr};
-use crate::space::loc::Variable;
-use crate::space::parse::{ErrCtx, SpaceTree, VarCase};
 
 #[cfg(test)]
 mod tests {
@@ -480,8 +480,8 @@ impl FindSubstring<&str> for SliceStr {
 
 #[cfg(test)]
 pub mod test {
-    use nom::Slice;
     use crate::space::parse::util::SliceStr;
+    use nom::Slice;
 
     #[test]
     pub fn test() {
@@ -907,7 +907,7 @@ pub fn result<I: Span, R>(result: Result<(I, R), nom::Err<SpaceTree<I>>>) -> Res
 }
 
 
-pub fn parse_errs<R,E>(result: Result<R,E>) -> Result<R,ParseErrs> where E: Display {
+pub fn parse_errs<R,E>(result: Result<R,E>) -> Result<R, ParseErrs> where E: Display {
     match result {
         Ok(ok) => Ok(ok),
         Err(err) => Err(ParseErrs::new(&(err.to_string())))

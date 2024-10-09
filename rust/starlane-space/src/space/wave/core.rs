@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use thiserror::__private::AsDisplay;
 use starlane_primitive_macros::Autobox;
+use thiserror::__private::AsDisplay;
 
 use crate::space::command::Command;
+use crate::space::err::ParseErrs;
 use crate::space::err::StatusErr;
 use crate::space::loc::ToSurface;
 use crate::space::substance::FormErrs;
@@ -42,11 +43,11 @@ impl<S> ToSubstance<S> for ReflectedCore
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, SpaceErr> {
+    fn to_substance(self) -> Result<S, ParseErrs> {
         self.body.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, SpaceErr> {
+    fn to_substance_ref(&self) -> Result<&S, ParseErrs> {
         self.body.to_substance_ref()
     }
 }
@@ -259,13 +260,20 @@ impl TryInto<http::Response<Bin>> for ReflectedCore {
 
  */
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Autobox)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Autobox, strum_macros::EnumString,strum_macros::Display )]
 pub enum Method {
+    #[strum(to_string="Hyp<{0}>")]
     Hyp(HypMethod),
+    #[strum(to_string="Cmd<{0}>")]
     Cmd(CmdMethod),
+    #[strum(to_string="Http<{0}>")]
     Http(HttpMethod),
+    #[strum(to_string="Ext<{0}>")]
     Ext(ExtMethod),
 }
+
+
+
 
 pub trait BodyExpect {
 }
@@ -373,16 +381,7 @@ impl Method {
     }
 }
 
-impl ToString for Method {
-    fn to_string(&self) -> String {
-        match self {
-            Method::Cmd(cmd) => format!("Cmd<{}>", cmd.to_string()),
-            Method::Http(method) => format!("Http<{}>", method.to_string()),
-            Method::Ext(msg) => format!("Ext<{}>", msg.to_string()),
-            Method::Hyp(sys) => format!("Hyp<{}>", sys.to_string()),
-        }
-    }
-}
+
 
 impl Into<DirectedCore> for Method {
     fn into(self) -> DirectedCore {
@@ -407,11 +406,11 @@ impl<S> ToSubstance<S> for DirectedCore
 where
     Substance: ToSubstance<S>,
 {
-    fn to_substance(self) -> Result<S, SpaceErr> {
+    fn to_substance(self) -> Result<S, ParseErrs> {
         self.body.to_substance()
     }
 
-    fn to_substance_ref(&self) -> Result<&S, SpaceErr> {
+    fn to_substance_ref(&self) -> Result<&S, ParseErrs> {
         self.body.to_substance_ref()
     }
 }

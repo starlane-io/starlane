@@ -7,6 +7,7 @@ use starlane_primitive_macros::Autobox;
 
 use crate::space::command::common::StateSrc;
 use crate::space::config::mechtron::MechtronConfig;
+use crate::space::err::ParseErrs;
 use crate::space::err::SpaceErr;
 use crate::space::kind::{Kind, KindParts, StarSub};
 use crate::space::loc::{StarKey, Surface, ToSurface};
@@ -18,11 +19,9 @@ use crate::space::substance::{Substance, SubstanceKind};
 use crate::space::wave::core::hyper::HypMethod;
 use crate::space::wave::core::{DirectedCore, ReflectedCore};
 use crate::space::wave::{
-    PingCore, ReflectedKind, ReflectedProto, Wave, WaveVariantDef, WaveId, WaveKind,
+    PingCore, ReflectedKind, ReflectedProto, Wave, WaveId, WaveKind, WaveVariantDef,
 };
 use crate::Agent;
-use crate::space::substance::CallKind::Hyp;
-use crate::space::substance::Substance::Hyper;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum AssignmentKind {

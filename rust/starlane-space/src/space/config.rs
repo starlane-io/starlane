@@ -1,17 +1,17 @@
 use core::str::FromStr;
 use std::ops::Deref;
 
-use serde::{Deserialize, Serialize};
-use starlane_primitive_macros::Autobox;
 use crate::space::config::mechtron::MechtronConfig;
 use crate::space::particle::{Details, Stub};
 use crate::space::point::Point;
 use crate::BindConfig;
+use serde::{Deserialize, Serialize};
+use starlane_primitive_macros::Autobox;
 
 pub mod bind;
 pub mod mechtron;
 
-use crate::space::err::{ParseErrs, SpaceErr};
+use crate::space::err::ParseErrs;
 use crate::space::parse::doc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

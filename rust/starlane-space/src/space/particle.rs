@@ -5,16 +5,16 @@ use nom::bytes::complete::tag;
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 
+use crate::space::err::ParseErrs;
 use crate::space::kind::{Kind, KindParts};
+use crate::space::parse::util::{new_span, result, Span};
 use crate::space::parse::{parse_alpha1_str, point_and_kind, Env, Res};
 use crate::space::point::{Point, PointCtx, PointVar};
 use crate::space::substance::Substance;
 use crate::space::util::ToResolved;
-use crate::{BaseKind, SpaceErr};
-use crate::space::err::ParseErrs;
-use crate::space::parse::util::{new_span, result, Span};
 use crate::space::wave::core::http2::StatusCode;
 use crate::space::wave::core::ReflectedCore;
+use crate::{BaseKind, SpaceErr};
 
 pub mod property;
 pub mod traversal;
