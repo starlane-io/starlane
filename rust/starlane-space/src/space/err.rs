@@ -7,6 +7,7 @@ use std::num::ParseIntError;
 use std::ops::Range;
 use std::string::FromUtf8Error;
 use std::sync::PoisonError;
+use bincode::ErrorKind;
 use tokio::sync::mpsc::error::{SendError, SendTimeoutError};
 use tokio::sync::oneshot::error::RecvError;
 use tokio::time::error::Elapsed;
@@ -67,7 +68,7 @@ pub enum SpaceErr {
     ExpectingWildcardInPointTemplate(String),
     #[error("cannot push to terminal '{0}' PointSegment.")]
     PointPushTerminal(PointSegKind),
-    #[error("cannot push a FileSystem PointSegment '{0}' onto a point until after the FileSystemRoot ':/' segment has been pushed")]
+    #[error("cannot push a non FileSystem PointSegment '{0}' onto a point until after the FileSystemRoot ':/' segment has been pushed")]
     PointPushNoFileRoot(PointSegKind),
     #[error("expected '{kind}' : '{expected}' found: '{found}'")]
     Expected {
@@ -580,6 +581,13 @@ impl ParseErrs {
         }
     }
 }
+
+impl From<Box<bincode::ErrorKind>> for ParseErrs {
+    fn from(err: Box<ErrorKind>) -> Self {
+        Self::new(err.to_string())
+    }
+}
+
 
 impl From<strum::ParseError> for ParseErrs {
     fn from(err: ParseError) -> Self {

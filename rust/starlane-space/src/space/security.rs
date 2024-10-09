@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::space::parse::util::new_span;
 
-use crate::space::err::SpaceErr;
+use crate::space::err::ParseErrs;
 use crate::space::parse::util::result;
 use crate::space::parse::{particle_perms, permissions, permissions_mask, privilege};
 use crate::space::point::Point;
@@ -66,7 +66,7 @@ impl Access {
         }
     }
 
-    pub fn check_privilege(&self, privilege: &str) -> Result<(), SpaceErr> {
+    pub fn check_privilege(&self, privilege: &str) -> Result<(), ParseErrs> {
         match self {
             Access::Super => Ok(()),
             Access::Owner => Ok(()),
@@ -218,7 +218,7 @@ impl ToString for Privilege {
 }
 
 impl FromStr for Privilege {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let span = new_span(s);
@@ -281,7 +281,7 @@ pub struct PermissionsMask {
 }
 
 impl FromStr for PermissionsMask {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = new_span(s);
@@ -305,7 +305,7 @@ pub struct Permissions {
 }
 
 impl FromStr for Permissions {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(permissions(new_span(s)))
@@ -445,7 +445,7 @@ impl ParticlePerms {
 }
 
 impl FromStr for ParticlePerms {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = new_span(s);
@@ -585,13 +585,13 @@ impl Into<AccessGrant> for IndexedAccessGrant {
 }
 
 pub trait AccessProvider: Send + Sync {
-    fn access(&self, to: &Agent, on: &Point) -> Result<Access, SpaceErr>;
+    fn access(&self, to: &Agent, on: &Point) -> Result<Access, ParseErrs>;
 }
 
 pub struct AllAccessProvider();
 
 impl AccessProvider for AllAccessProvider {
-    fn access(&self, _: &Agent, _: &Point) -> Result<Access, SpaceErr> {
+    fn access(&self, _: &Agent, _: &Point) -> Result<Access, ParseErrs> {
         Ok(Access::SuperOwner)
     }
 }

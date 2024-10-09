@@ -189,7 +189,7 @@ impl FromStr for Token {
 }
 
 impl TryFrom<PongCore> for Token {
-    type Error = SpaceErr;
+    type Error = ParseErrs;
 
     fn try_from(response: PongCore) -> Result<Self, Self::Error> {
         response.core.body.try_into()

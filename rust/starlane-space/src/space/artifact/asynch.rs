@@ -525,7 +525,7 @@ impl ArtifactFetcher for ReadArtifactFetcher {
         ArtErr::result(pong.core.ok_or())?;
         match pong.variant.core.body {
             Substance::Bin(bin) => Ok(Arc::new(bin)),
-            other => Err(ArtErr::expecting("Substance", "Bin", &pong.core.body))?,
+            ref other => Err(ArtErr::expecting("Substance", "Bin", other.kind()))?,
         }
     }
 

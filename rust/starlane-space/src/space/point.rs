@@ -1299,9 +1299,9 @@ impl Point {
             Ok(point)
         } else {
             if self.has_filesystem() {
-                 Err(ParseErrs::PointPushTerminal(PointSegKind::File))?
+                 Err(ParseErrs::from(format!("cannot push segment on terminating segment type '{}'",PointSegKind::File)))?
             } else {
-                Err(ParseErrs::PointPushNoFileRoot(segment.kind()))
+                Err(ParseErrs::from(format!("cannot push a non FileSystem PointSegment '{0}' onto a point until after the FileSystemRoot ':/' segment has been pushed",segment.kind())))?
             }
         }
     }

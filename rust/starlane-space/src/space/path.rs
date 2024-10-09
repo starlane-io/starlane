@@ -31,7 +31,7 @@ impl Path {
     }
 
     pub fn bin(&self) -> Result<Vec<u8>, ParseErrs> {
-        let bin = bincode::serialize(self)?;
+        let bin = bincode::serialize(self).map_err(ParseErrs::from)?;
         Ok(bin)
     }
 
