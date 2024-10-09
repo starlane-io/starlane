@@ -21,7 +21,7 @@ use starlane::space::particle::Status;
 use starlane::space::point::Point;
 use starlane::space::selector::{KindSelector, Pattern, SubKindSelector};
 use starlane::space::substance::{Substance, SubstanceKind};
-use starlane::space::util::{log, ValuePattern};
+use starlane::space::util::{log, ValueMatcher, ValuePattern};
 use starlane::space::wave::core::http2::StatusCode;
 use starlane::space::wave::core::hyper::HypMethod;
 use starlane::space::wave::core::{CoreBounce, DirectedCore, ReflectedCore};
@@ -602,7 +602,7 @@ impl StarWrangles {
     pub fn find(&self, kind: &Kind) -> Option<Arc<RwLock<RoundRobinWrangleSelector>>> {
         let mut iter = self.wrangles.iter();
         while let Some(multi) = iter.next() {
-            if multi.key().matches(&kind) {
+            if multi.key().is_match(&kind).is_ok()+ {
                 return Some(multi.value().clone());
             }
         }

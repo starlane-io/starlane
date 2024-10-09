@@ -578,7 +578,7 @@ mod tests {
     use starlane::space::loc::ToSurface;
     use starlane::space::log::RootLogger;
     use std::str::FromStr;
-
+    use anyhow::anyhow;
     use crate::hyperlane::tcp::{CertGenerator, Error, HyperlaneTcpClient, HyperlaneTcpServer};
     use crate::hyperlane::test_util::{
         LargeFrameTest, SingleInterchangePlatform, WaveTest, FAE, LESS,
@@ -605,7 +605,7 @@ mod tests {
             .write_to_dir(".".to_string())
             .await?;
         let logger = RootLogger::default();
-        let logger = logger.point(Point::from_str("tcp-blah")?);
+        let logger = logger.point(Point::from_str("tcp-blah").unwrap());
         let port = 4344u16;
         let server =
             HyperlaneTcpServer::new(port, ".".to_string(), platform.gate.clone(), logger.clone())
@@ -645,7 +645,7 @@ mod tests {
             .write_to_dir(".".to_string())
             .await?;
         let logger = RootLogger::default();
-        let logger = logger.point(Point::from_str("tcp-blah")?);
+        let logger = logger.point(Point::from_str("tcp-blah").unwrap());
         let port = 4345u16;
         let server =
             HyperlaneTcpServer::new(port, ".".to_string(), platform.gate.clone(), logger.clone())

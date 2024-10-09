@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use dashmap::DashMap;
 use futures::future::{join_all, select_all, BoxFuture};
-use futures::FutureExt;
+use futures::{FutureExt, TryFutureExt};
 use thiserror::Error;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use tokio::sync::oneshot::error::RecvError;
@@ -48,7 +48,8 @@ pub struct MachineApi
 {
     tx: mpsc::Sender<MachineCall>,
     pub artifacts: Artifacts,
-    pub registry: Registry
+    pub registry: Registry,
+    pub data_dir: String
 }
 
 impl MachineApi {
@@ -61,8 +62,9 @@ impl MachineApi {
 
 impl MachineApi
 {
-    pub fn new(tx: mpsc::Sender<MachineCall>, registry: Registry, artifacts: Artifacts) -> Self {
-        Self { tx, registry, artifacts }
+    pub fn new<P>(tx: mpsc::Sender<MachineCall>, registry: Registry, artifacts: Artifacts, platform: P) -> Self where P: Platform{
+        let data_dir = platform.data_dir();
+        Self { tx, registry, artifacts, data_dir }
     }
     pub async fn properties_config(&self, kind: &Kind) -> Result<PropertiesConfig,MachineErr> {
         let (rtn,rx) = tokio::sync::oneshot::channel();
@@ -789,12 +791,12 @@ impl ArtifactFetcher for ClientArtifactFetcher
     }
 
     async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, ArtErr> {
-        let transmitter = self.client.transmitter_builder().await?.build();
+        let transmitter = self.client.transmitter_builder().await.map_err(anyhow::Error::from)?.build();
 
         let mut wave = DirectedProto::ping();
         wave.method(CmdMethod::Read);
         wave.to(point.clone().to_surface().with_layer(Layer::Core));
-        let pong: WaveVariantDef<PongCore> = transmitter.direct(wave).await?;
+        let pong: WaveVariantDef<PongCore> = transmitter.direct(wave).await.map_err(anyhow::Error::from)?;
 
         pong.ok_or()?;
 

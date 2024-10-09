@@ -1,10 +1,11 @@
+use core::fmt::{Display, Formatter, Write};
 use core::str::FromStr;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-
+use thiserror::Error;
 use crate::space::parse::util::Tw;
 use starlane_primitive_macros::Autobox;
 
@@ -358,10 +359,12 @@ impl SubstanceMap {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Error,)]
 pub struct FormErrs {
     map: HashMap<String, String>,
 }
+
+
 
 impl FormErrs {
     pub fn to_starlane_err(&self) -> SpaceErr {
@@ -393,16 +396,20 @@ impl From<SpaceErr> for FormErrs {
     }
 }
 
-impl ToString for FormErrs {
-    fn to_string(&self) -> String {
+impl Display for FormErrs {
+
+
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let mut rtn = String::new();
-        for (index, (_, value)) in self.iter().enumerate() {
+        for (index, (key, value)) in self.iter().enumerate() {
+            rtn.push_str(key.as_str());
+            rtn.push_str("=");
             rtn.push_str(value.as_str());
             if index == self.len() - 1 {
                 rtn.push_str("\n");
             }
         }
-        rtn
+        write!(f, "{}", rtn)
     }
 }
 

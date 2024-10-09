@@ -327,8 +327,14 @@ pub enum FileStoreErr {
     #[error(transparent)]
     StdIoErr(std::io::ErrorKind),
     #[error("unknown FileStoreErr: {0}")]
-    StdErr(#[source] anyhow::Error)
+    Anyhow(#[source] Arc<anyhow::Error>)
 
+}
+
+impl From<anyhow::Error> for FileStoreErr {
+    fn from(err: anyhow::Error) -> Self {
+        Arc::new(err).into()
+    }
 }
 
 /*

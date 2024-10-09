@@ -60,27 +60,26 @@ impl Field
             .skel
             .registry
             .record(&self.port.point)
-            .await
-            .map_err(|e| SpaceErr::to_space_err(e))?;
+            .await.map_err(anyhow::Error::from)?;
+
         let properties = self
             .skel
             .registry
             .get_properties(&directed.to.point)
-            .await
-            .map_err(|e| SpaceErr::to_space_err(e))?;
+            .await.map_err(anyhow::Error::from)?;
 
         let bind_property = properties.get("bind");
         let bind = match bind_property {
             None => {
-                let driver = self.skel.drivers.get(&record.details.stub.kind).await?;
+                let driver = self.skel.drivers.get(&record.details.stub.kind).await
+                    .map_err(anyhow::Error::from)?;
                 driver
                     .bind(&directed.to.point)
-                    .await
-                    .map_err(|e| SpaceErr::to_space_err(e))?
+                    .await.map_err(anyhow::Error::from)?
             }
             Some(bind) => {
-                let bind = Point::from_str(bind.value.as_str())?;
-                log(self.skel.machine_api.artifacts.get_bind(&bind).await)?
+                let bind = Point::from_str(bind.value.as_str()).map_err(anyhow::Error::from)?;
+                log(self.skel.machine_api.artifacts.get_bind(&bind).await).map_err(anyhow::Error::from)?
             }
         };
         Ok(bind)

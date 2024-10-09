@@ -59,7 +59,7 @@ use std::marker::PhantomData;
 use std::ops::{Deref};
 use std::str::FromStr;
 use std::sync::Arc;
-use anyhow::anyhow;
+use anyhow::{anyhow, Error};
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
@@ -1876,6 +1876,15 @@ pub enum ParticleStarErr {
     StarErr(#[from] StarErr),
     #[error(transparent)]
     RegErr(#[from] RegErr),
+    #[error("{0}")]
+    Anyhow(#[source]Arc<anyhow::Error>)
+
+}
+
+impl From<anyhow::Error> for ParticleStarErr {
+    fn from(err: Error) -> Self {
+        Arc::new(err).into()
+    }
 }
 
 impl From<DriverErr> for ParticleStarErr{
@@ -1939,6 +1948,8 @@ pub enum DriverErr {
     MachineErr(#[from] MachineErr),
     #[error(transparent)]
     ParticleErr(#[from] Box<dyn ParticleErr>),
+    #[error(transparent)]
+    ParticleStarErr(#[from] ParticleStarErr),
     #[error(transparent)]
     FileStoreErr(#[from] FileStoreErr),
     #[error(transparent)]

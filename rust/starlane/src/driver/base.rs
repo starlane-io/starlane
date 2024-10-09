@@ -72,7 +72,7 @@ impl Driver for BaseDriver
         println!("ITEM get BASE");
         let base = Base::restore((), (), ());
 
-        Ok(base.sphere())
+        Ok(base.sphere()?)
     }
 }
 

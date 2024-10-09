@@ -8,7 +8,7 @@ use std::ops::Add;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use anyhow::Context;
+use anyhow::{Context, Error};
 use thiserror::Error;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use crate::driver::star::{StarDiscovery, StarPair, StarWrangles, Wrangler};
@@ -25,7 +25,7 @@ use crate::platform::Platform;
 use crate::hyperspace::reg::{Registration, Registry};
 use starlane::space::command::common::StateSrc;
 use starlane::space::command::direct::create::{Create, Strategy};
-use starlane::space::err::{CoreReflector, SpaceErr};
+use starlane::space::err::{CoreReflector, ParseErrs, SpaceErr};
 use starlane::space::hyper::{
     Assign, AssignmentKind, HyperSubstance,
     Provision, Search,
@@ -254,10 +254,11 @@ impl HyperStarSkel
     pub fn data_dir(&self) -> String {
         format!(
             "{}/{}/",
-            self.machine_api.platform.data_dir(),
+            self.machine_api.data_dir,
             self.point.to_string()
         )
     }
+
 
     /*
     pub async fn create_star_particle(&self, point: Point, kind: Kind ) -> Result<(),StarErr> {
@@ -2030,6 +2031,8 @@ impl SmartLocator
 #[derive(Error,Debug,Clone)]
 pub enum StarErr {
     #[error(transparent)]
+    ParseErrs(#[from] ParseErrs),
+    #[error(transparent)]
     DriverErr( #[from] DriverErr),
     #[error("cannot create_in_star in star {point} for parent point {parent} since it is not a point within this star")]
     PointNotInStar{point: Point, parent: Point},
@@ -2057,7 +2060,14 @@ pub enum StarErr {
     CouldNotAssignToSelf(Kind),
     #[error("could not find a host to provision '{0}'")]
     CouldNotFindHostToProvision(Kind),
+    #[error("anyhow")]
+    Anyhow(#[source] Arc<anyhow::Error>)
+}
 
+impl From<anyhow::Error> for StarErr {
+    fn from(err: Error) -> Self {
+        Arc::new(err).into()
+    }
 }
 
 impl CoreReflector for StarErr {

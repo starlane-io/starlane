@@ -39,6 +39,7 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use anyhow::anyhow;
 use thiserror::Error;
 
 pub struct ControlDriverFactory {}
@@ -330,7 +331,7 @@ impl PointFactory for ControlCreator {
                 self.fabric_routers.insert(point.clone(), fabric_router);
                 Ok(point)
             }
-            Err(err) => Err(err.into()),
+            Err(err) => Err(anyhow!(err))?,
         }
     }
 }

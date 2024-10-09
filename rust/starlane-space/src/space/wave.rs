@@ -2,7 +2,7 @@ use ::core::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::ops;
 use std::ops::{Deref, DerefMut};
-
+use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 
 use self::core::cmd::CmdMethod;
@@ -1715,16 +1715,16 @@ impl PongCore {
         self.core.as_result()
     }
 
-    pub fn ok_or(&self) -> Result<(), SpaceErr> {
+    pub fn ok_or(&self) -> Result<(), anyhow::Error> {
         if self.is_ok() {
             Ok(())
         } else {
             if let Substance::FormErrs(errs) = &self.core.body {
-                Err(format!("{} : {}", self.core.status.to_string(), errs.to_string()).into())
+                Err(anyhow!(format!("{} : {}", self.core.status.to_string(), errs.to_string())))
             } else if let Substance::Err(err) = &self.core.body {
-                Err(err.clone())
+                Err(anyhow!(err.to_string()))
             } else {
-                Err(self.core.status.to_string().into())
+                Err(anyhow!(self.core.status.to_string()))
             }
         }
     }
