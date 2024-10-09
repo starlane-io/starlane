@@ -11,6 +11,7 @@ use crate::space::point::{Point, PointCtx, PointVar};
 use crate::space::substance::Substance;
 use crate::space::util::ToResolved;
 use crate::{BaseKind, SpaceErr};
+use crate::space::err::ParseErrs;
 use crate::space::parse::util::{new_span, result, Span};
 use crate::space::wave::core::http2::StatusCode;
 use crate::space::wave::core::ReflectedCore;
@@ -270,7 +271,7 @@ pub struct PointKindDef<Pnt> {
 }
 
 impl ToResolved<PointKindCtx> for PointKindVar {
-    fn to_resolved(self, env: &Env) -> Result<PointKindCtx, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<PointKindCtx, ParseErrs> {
         Ok(PointKindCtx {
             point: self.point.to_resolved(env)?,
             kind: self.kind,
@@ -279,7 +280,7 @@ impl ToResolved<PointKindCtx> for PointKindVar {
 }
 
 impl ToResolved<PointKind> for PointKindVar {
-    fn to_resolved(self, env: &Env) -> Result<PointKind, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<PointKind, ParseErrs> {
         Ok(PointKind {
             point: self.point.to_resolved(env)?,
             kind: self.kind,
@@ -288,7 +289,7 @@ impl ToResolved<PointKind> for PointKindVar {
 }
 
 impl ToResolved<PointKind> for PointKindCtx {
-    fn to_resolved(self, env: &Env) -> Result<PointKind, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<PointKind, ParseErrs> {
         Ok(PointKind {
             point: self.point.to_resolved(env)?,
             kind: self.kind,

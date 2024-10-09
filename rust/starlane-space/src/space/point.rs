@@ -86,7 +86,7 @@ impl RouteSegQuery for RouteSegVar {
 }
 
 impl TryInto<RouteSeg> for RouteSegVar {
-    type Error = SpaceErr;
+    type Error = ParseErrs;
 
     fn try_into(self) -> Result<RouteSeg, Self::Error> {
         match self {
@@ -628,11 +628,11 @@ impl ToRecipients for Point {
 }
 
 impl PointVar {
-    pub fn to_point(self) -> Result<Point, SpaceErr> {
+    pub fn to_point(self) -> Result<Point, ParseErrs> {
         self.collapse()
     }
 
-    pub fn to_point_ctx(self) -> Result<PointCtx, SpaceErr> {
+    pub fn to_point_ctx(self) -> Result<PointCtx, ParseErrs> {
         self.collapse()
     }
 }
@@ -650,7 +650,7 @@ impl ToSurface for Point {
 }
 
 impl ToResolved<Point> for PointVar {
-    fn to_resolved(self, env: &Env) -> Result<Point, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<Point, ParseErrs> {
         let point_ctx: PointCtx = self.to_resolved(env)?;
         point_ctx.to_resolved(env)
     }
@@ -666,13 +666,13 @@ impl Into<Selector> for Point {
 }
 
 impl PointCtx {
-    pub fn to_point(self) -> Result<Point, SpaceErr> {
+    pub fn to_point(self) -> Result<Point, ParseErrs> {
         self.collapse()
     }
 }
 
 impl ToResolved<PointCtx> for PointVar {
-    fn collapse(self) -> Result<PointCtx, SpaceErr> {
+    fn collapse(self) -> Result<PointCtx, ParseErrs> {
         let route = self.route.try_into()?;
         let mut segments = vec![];
         for segment in self.segments {
@@ -681,7 +681,7 @@ impl ToResolved<PointCtx> for PointVar {
         Ok(PointCtx { route, segments })
     }
 
-    fn to_resolved(self, env: &Env) -> Result<PointCtx, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<PointCtx, ParseErrs> {
         let mut rtn = String::new();
         let mut after_fs = false;
         let mut errs = vec![];
@@ -807,7 +807,7 @@ impl ToResolved<PointCtx> for PointVar {
 }
 
 impl ToResolved<Point> for PointCtx {
-    fn collapse(self) -> Result<Point, SpaceErr> {
+    fn collapse(self) -> Result<Point, ParseErrs> {
         let mut segments = vec![];
         for segment in self.segments {
             segments.push(segment.try_into()?);
@@ -818,7 +818,7 @@ impl ToResolved<Point> for PointCtx {
         })
     }
 
-    fn to_resolved(self, env: &Env) -> Result<Point, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<Point, ParseErrs> {
         if self.segments.is_empty() {
             return Ok(Point {
                 route: self.route,
@@ -898,7 +898,7 @@ impl ToResolved<Point> for PointCtx {
 }
 
 impl TryInto<Point> for PointCtx {
-    type Error = SpaceErr;
+    type Error = ParseErrs;
 
     fn try_into(self) -> Result<Point, Self::Error> {
         let mut rtn = vec![];
@@ -913,7 +913,7 @@ impl TryInto<Point> for PointCtx {
 }
 
 impl TryFrom<String> for Point {
-    type Error = SpaceErr;
+    type Error = ParseErrs;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         consume_point(value.as_str())
@@ -921,7 +921,7 @@ impl TryFrom<String> for Point {
 }
 
 impl TryFrom<&str> for Point {
-    type Error = SpaceErr;
+    type Error = ParseErrs;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         consume_point(value)
@@ -1255,7 +1255,7 @@ impl Point {
             segments,
         }
     }
-    pub fn push<S: ToString>(&self, segment: S) -> Result<Self, SpaceErr> {
+    pub fn push<S: ToString>(&self, segment: S) -> Result<Self, ParseErrs> {
         let segment = segment.to_string();
         if self.segments.is_empty() {
             Self::from_str(segment.as_str())
@@ -1282,7 +1282,7 @@ impl Point {
                         format!("{}:{}", self.to_string(), segment)
                     }
                 }
-                PointSeg::File(_) => return Err(SpaceErr::PointPushTerminal(PointSegKind::File)),
+                PointSeg::File(_) => return Err(ParseErrs::new(&format!("cannot push segment to '{}' segment which is terminal", PointSegKind::File))),
             };
             Self::from_str(point.as_str())
         }
@@ -1377,7 +1377,7 @@ impl Point {
 
 
 impl FromStr for Point {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         consume_point(s)
@@ -1385,7 +1385,7 @@ impl FromStr for Point {
 }
 
 impl FromStr for PointVar {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(point_var(new_span(s)))
@@ -1393,7 +1393,7 @@ impl FromStr for PointVar {
 }
 
 impl FromStr for PointCtx {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(result(point_var(new_span(s)))?.collapse()?)

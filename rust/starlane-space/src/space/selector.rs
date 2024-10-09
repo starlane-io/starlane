@@ -22,6 +22,7 @@ use crate::space::substance::{
 use crate::space::util::{ToResolved, ValueMatcher, ValuePattern};
 use crate::SpaceErr;
 use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
+use crate::space::err::ParseErrs;
 use crate::space::kind2::KindDef;
 
 pub type PointSegKindHop = HopDef<PointSegSelector, ValuePattern<KindSelector>>;
@@ -152,7 +153,7 @@ pub type SelectorVar = SelectorDef<SelHopVar>;
  */
 
 impl ToResolved<Selector> for Selector {
-    fn to_resolved(self, env: &Env) -> Result<Selector, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<Selector, ParseErrs> {
         Ok(self)
     }
 }
@@ -483,7 +484,7 @@ pub enum PointSegSelectorCtx {
 }
 
 impl FromStr for PointSegSelector {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(point_segment_selector)(new_span(s)))
@@ -596,7 +597,7 @@ pub type SpecificSelector = SpecificSelectorDef<
 >;
 
 impl FromStr for SpecificSelector {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(specific_selector)(new_span(s)))
@@ -936,7 +937,7 @@ pub type PointHierarchy = PointDef<RouteSeg, PointKindSeg>;
 pub type PointHierarchyOpt = PointDef<RouteSeg, PointKindSegOpt>;
 
 impl FromStr for PointHierarchy {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         consume_hierarchy(new_span(s))
@@ -1075,7 +1076,7 @@ pub type PayloadBlockCtx = PayloadBlockDef<PointCtx>;
 pub type PayloadBlockVar = PayloadBlockDef<PointVar>;
 
 impl ToResolved<PayloadBlockCtx> for PayloadBlockVar {
-    fn to_resolved(self, env: &Env) -> Result<PayloadBlockCtx, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<PayloadBlockCtx, ParseErrs> {
         match self {
             PayloadBlockVar::DirectPattern(block) => Ok(PayloadBlockCtx::DirectPattern(
                 block.modify(move |block| {
@@ -1106,7 +1107,7 @@ pub type PatternBlockVar = PatternBlockDef<PointVar>;
 pub type PatternBlockDef<Pnt> = ValuePattern<SubstancePatternDef<Pnt>>;
 
 impl ToResolved<PatternBlock> for PatternBlockCtx {
-    fn to_resolved(self, env: &Env) -> Result<PatternBlock, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<PatternBlock, ParseErrs> {
         match self {
             PatternBlockCtx::Always => Ok(PatternBlock::Always),
             PatternBlockCtx::Never => Ok(PatternBlock::Never),
@@ -1118,7 +1119,7 @@ impl ToResolved<PatternBlock> for PatternBlockCtx {
 }
 
 impl ToResolved<PatternBlockCtx> for PatternBlockVar {
-    fn to_resolved(self, env: &Env) -> Result<PatternBlockCtx, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<PatternBlockCtx, ParseErrs> {
         match self {
             PatternBlockVar::Always => Ok(PatternBlockCtx::Always),
             PatternBlockVar::Never => Ok(PatternBlockCtx::Never),
@@ -1136,7 +1137,7 @@ pub enum PayloadBlockDef<Pnt> {
 }
 
 impl ToResolved<PayloadBlock> for PayloadBlockCtx {
-    fn to_resolved(self, env: &Env) -> Result<PayloadBlock, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<PayloadBlock, ParseErrs> {
         match self {
             PayloadBlockCtx::DirectPattern(block) => {
                 Ok(PayloadBlock::DirectPattern(block.modify(move |block| {
@@ -1152,7 +1153,7 @@ impl ToResolved<PayloadBlock> for PayloadBlockCtx {
 }
 
 impl ToResolved<PayloadBlock> for PayloadBlockVar {
-    fn to_resolved(self, env: &Env) -> Result<PayloadBlock, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<PayloadBlock, ParseErrs> {
         let block: PayloadBlockCtx = self.to_resolved(env)?;
         block.to_resolved(env)
     }

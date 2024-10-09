@@ -28,7 +28,7 @@ use crate::space::config::bind::{
 use crate::space::config::mechtron::MechtronConfig;
 use crate::space::config::{DocKind, Document};
 use crate::space::err::report::{Label, Report, ReportKind};
-use crate::space::err::{ParseErrs, ParseErrs};
+use crate::space::err::{ParseErrs};
 use crate::space::kind::{
     ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, NativeSub, Specific,
     StarSub, UserBaseSubKind,
@@ -306,17 +306,22 @@ pub type SpaceTree<I: Span> = GenericErrorTree<I, &'static str, ErrCtx, ParseErr
 
 pub type Res<I: Span, O> = IResult<I, O, SpaceTree<I>>;
 
-impl <I> From<SpaceTree<I>> for ParseErrs where I: Span {
+/*impl <I> From<SpaceTree<I>> for ParseErrs where I: Span {
     fn from(value: SpaceTree<I>) -> Self {
         ParseErrs::from(value).into()
     }
 }
 
+ */
+
+/*
 impl <I> From<nom::Err<SpaceTree<I>>> for ParseErrs where I: Span {
     fn from(value: nom::Err<SpaceTree<I>>) -> Self {
         ParseErrs::from(value).into()
     }
 }
+
+ */
 
 
 
@@ -2365,7 +2370,7 @@ impl Env {
     pub fn pop(self) -> Result<Env, ParseErrs> {
         Ok(*self
             .parent
-            .ok_or(ParseErrs::str("expected parent scopedVars"))?)
+            .ok_or(ParseErrs::new(&"expected parent scopedVars"))?)
     }
 
     pub fn add_var_resolver(&mut self, var_resolver: Arc<dyn VarResolver>) {
@@ -2585,8 +2590,19 @@ impl CtxResolver for PointCtxResolver {
     }
 }
 
+#[derive(Clone,Debug,Error)]
+#[error("{err}: {context}")]
+pub struct ResolverErrCtx {
+   thing: String,
+   context: String,
+   err: ResolverErr
+}
+
+#[derive(Clone,Debug,Error)]
 pub enum ResolverErr {
+    #[error("not available")]
     NotAvailable,
+    #[error("not found")]
     NotFound,
 }
 
@@ -2641,7 +2657,7 @@ pub struct RegexCapturesResolver {
 
 impl RegexCapturesResolver {
     pub fn new(regex: Regex, text: String) -> Result<Self, ParseErrs> {
-        regex.captures(text.as_str()).ok_or("no regex captures")?;
+        regex.captures(text.as_str()).ok_or(ParseErrs::new("no regex captures"))?;
         Ok(Self { regex, text })
     }
 }
@@ -4033,7 +4049,7 @@ pub mod model {
 
         pub fn from<I: ToString>(selector: LexScopeSelector<I>) -> Result<Self, ParseErrs> {
             if selector.name.to_string().as_str() != "Route" {
-                return Err(ParseErrs::server_error("expected Route"));
+                return Err(ParseErrs::expected("","expected Route"));
             }
             let path = match selector.path {
                 None => None,

@@ -1,4 +1,3 @@
-use crate::space::err::{ParseErrs, PrintErr, SpaceErr};
 use crate::space::loc::Uuid;
 use crate::space::parse::Env;
 use crate::space::wasm::{starlane_timestamp, starlane_uuid, Timestamp};
@@ -16,6 +15,7 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use serde_json::Value;
+use crate::space::err::{ParseErrs, PrintErr};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum HttpMethodPattern {
@@ -320,9 +320,9 @@ impl<P,T> ValueMatcher<T> for ValuePattern<P> where P: PartialEq<T> {
 }
 
 impl<T> ValuePattern<T> {
-    pub fn modify<X, F>(self, mut f: F) -> Result<ValuePattern<X>, SpaceErr>
+    pub fn modify<X, F>(self, mut f: F) -> Result<ValuePattern<X>, ParseErrs>
     where
-        F: FnMut(T) -> Result<X, SpaceErr>,
+        F: FnMut(T) -> Result<X, ParseErrs>,
     {
         Ok(match self {
             ValuePattern::Always => ValuePattern::Always,
@@ -432,14 +432,14 @@ impl ValueMatcher<String> for StringMatcher {
 }
 
 pub trait Convert<A> {
-    fn convert(self) -> Result<A, SpaceErr>;
+    fn convert(self) -> Result<A, ParseErrs>;
 }
 
 pub trait ConvertFrom<A>
 where
     Self: Sized,
 {
-    fn convert_from(a: A) -> Result<Self, SpaceErr>;
+    fn convert_from(a: A) -> Result<Self, ParseErrs>;
 }
 
 pub fn uuid() -> Uuid {
@@ -454,11 +454,11 @@ pub trait ToResolved<R>
 where
     Self: Sized,
 {
-    fn collapse(self) -> Result<R, SpaceErr> {
+    fn collapse(self) -> Result<R, ParseErrs> {
         self.to_resolved(&Env::no_point())
     }
 
-    fn to_resolved(self, env: &Env) -> Result<R, SpaceErr>;
+    fn to_resolved(self, env: &Env) -> Result<R, ParseErrs>;
 }
 
 pub fn log<R,E>(result: Result<R, E>) -> Result<R, E> where E: PrintErr{

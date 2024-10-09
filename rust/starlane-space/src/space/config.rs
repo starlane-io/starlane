@@ -101,7 +101,7 @@ pub enum DocKind {
 
 impl AsRef<str> for DocKind {
     fn as_ref(&self) -> &str {
-        self.to_string().as_str()
+        self.as_ref()
     }
 }
 

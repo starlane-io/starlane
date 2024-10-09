@@ -495,7 +495,7 @@ pub enum SubstanceTypePatternDef<Pnt> {
 }
 
 impl ToResolved<SubstanceTypePatternDef<Point>> for SubstanceTypePatternDef<PointCtx> {
-    fn to_resolved(self, env: &Env) -> Result<SubstanceTypePatternDef<Point>, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<SubstanceTypePatternDef<Point>, ParseErrs> {
         match self {
             SubstanceTypePatternDef::Empty => Ok(SubstanceTypePatternDef::Empty),
             SubstanceTypePatternDef::Primitive(payload_type) => {
@@ -510,7 +510,7 @@ impl ToResolved<SubstanceTypePatternDef<Point>> for SubstanceTypePatternDef<Poin
 }
 
 impl ToResolved<SubstanceTypePatternCtx> for SubstanceTypePatternVar {
-    fn to_resolved(self, env: &Env) -> Result<SubstanceTypePatternCtx, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<SubstanceTypePatternCtx, ParseErrs> {
         match self {
             SubstanceTypePatternVar::Empty => Ok(SubstanceTypePatternCtx::Empty),
             SubstanceTypePatternVar::Primitive(payload_type) => {
@@ -602,7 +602,7 @@ pub struct SubstancePatternDef<Pnt> {
 }
 
 impl ToResolved<SubstancePatternCtx> for SubstancePatternVar {
-    fn to_resolved(self, env: &Env) -> Result<SubstancePatternCtx, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<SubstancePatternCtx, ParseErrs> {
         let mut errs = vec![];
         let structure = match self.structure.to_resolved(env) {
             Ok(structure) => Some(structure),
@@ -635,7 +635,7 @@ impl ToResolved<SubstancePatternCtx> for SubstancePatternVar {
 }
 
 impl ToResolved<SubstancePattern> for SubstancePatternCtx {
-    fn to_resolved(self, resolver: &Env) -> Result<SubstancePattern, SpaceErr> {
+    fn to_resolved(self, resolver: &Env) -> Result<SubstancePattern, ParseErrs> {
         let mut errs = vec![];
         let structure = match self.structure.to_resolved(resolver) {
             Ok(structure) => Some(structure),
@@ -687,7 +687,7 @@ pub type CallWithConfigCtx = CallWithConfigDef<PointCtx>;
 pub type CallWithConfigVar = CallWithConfigDef<PointVar>;
 
 impl ToResolved<CallWithConfigCtx> for CallWithConfigVar {
-    fn to_resolved(self, resolver: &Env) -> Result<CallWithConfigCtx, SpaceErr> {
+    fn to_resolved(self, resolver: &Env) -> Result<CallWithConfigCtx, ParseErrs> {
         let mut errs = vec![];
         let call = match self.call.to_resolved(resolver) {
             Ok(call) => Some(call),
@@ -719,7 +719,7 @@ impl ToResolved<CallWithConfigCtx> for CallWithConfigVar {
 }
 
 impl ToResolved<CallWithConfig> for CallWithConfigCtx {
-    fn to_resolved(self, resolver: &Env) -> Result<CallWithConfig, SpaceErr> {
+    fn to_resolved(self, resolver: &Env) -> Result<CallWithConfig, ParseErrs> {
         let mut errs = vec![];
         let call = match self.call.to_resolved(resolver) {
             Ok(call) => Some(call),
@@ -755,7 +755,7 @@ pub type CallCtx = CallDef<PointCtx>;
 pub type CallVar = CallDef<PointVar>;
 
 impl ToResolved<Call> for CallCtx {
-    fn to_resolved(self, env: &Env) -> Result<Call, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<Call, ParseErrs> {
         Ok(Call {
             point: self.point.to_resolved(env)?,
             kind: self.kind,
@@ -764,7 +764,7 @@ impl ToResolved<Call> for CallCtx {
 }
 
 impl ToResolved<CallCtx> for CallVar {
-    fn to_resolved(self, env: &Env) -> Result<CallCtx, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<CallCtx, ParseErrs> {
         Ok(CallCtx {
             point: self.point.to_resolved(env)?,
             kind: self.kind,
@@ -773,7 +773,7 @@ impl ToResolved<CallCtx> for CallVar {
 }
 
 impl ToResolved<Call> for CallVar {
-    fn to_resolved(self, env: &Env) -> Result<Call, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<Call, ParseErrs> {
         let call: CallCtx = self.to_resolved(env)?;
         call.to_resolved(env)
     }

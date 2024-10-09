@@ -39,7 +39,7 @@ macro_rules! err {
 
  */
 
-#[derive(Debug, Clone, Serialize, Deserialize, Error)]
+#[derive(Debug, Clone, Serialize, Deserialize, Error,Eq,PartialEq)]
 pub enum SpaceErr {
     #[error("{status}: {message}")]
     Status { status: u16, message: String },
@@ -78,18 +78,24 @@ pub enum SpaceErr {
         expected: String,
         found: String,
     },
-    #[error("artifact error: '{0}'")]
-    ArtErr(#[from] ArtErr),
-    #[error("Err: {0}")]
-    Any(#[source] Arc<anyhow::Error>),
+
 }
 
+
+/*    #[error("artifact error: '{0}'")]
+    #[serde(skip_serializing)]
+//    ArtErr(#[from] ArtErr),
+ //   #[error("Err: {0}")]
+ //   #[serde(skip_serializing)]
+//    Any(#[source] Arc<anyhow::Error>),
+
+ */
 impl SpaceErr {
     pub fn err<E>(err: E) -> Self
     where
         E: std::error::Error,
     {
-        Self::Any(Arc::new(anyhow!("Err: {err}")))
+        Self::Msg(err.to_string())
     }
 
     pub fn to_space_err<E>(err: E) -> Self
@@ -140,7 +146,7 @@ impl SpaceErr {
 
 impl From<anyhow::Error> for SpaceErr {
     fn from(err: anyhow::Error) -> Self {
-        SpaceErr::Any(Arc::new(err))
+        SpaceErr::Msg(err.to_string())
     }
 }
 
@@ -160,6 +166,12 @@ impl PrintErr for SpaceErr {
                 println!("{}", self);
             }
         }
+    }
+}
+
+impl From<ArtErr> for SpaceErr {
+    fn from(err: ArtErr) -> Self {
+        SpaceErr::Msg(err.to_string())
     }
 }
 
@@ -545,8 +557,8 @@ impl ParseErrs {
         }
     }
 
-    pub fn expected( expected: &dyn AsRef<str>, found: &dyn AsRef<str> ) -> Self {
-        let report= Report::build(ReportKind::Error, (), 0).with_message(format!("parser document kind expected: '{}' but found: '{}'", expected, found)).finish();
+    pub fn expected( thing: &dyn AsRef<str>, expected: &dyn AsRef<str>, found: &dyn AsRef<str> ) -> Self {
+        let report= Report::build(ReportKind::Error, (), 0).with_message(format!("'{}' parser expected: '{}' but found: '{}'", thing, expected, found)).finish();
         Self::report(report)
     }
 
@@ -578,6 +590,12 @@ impl From<FromUtf8Error> for ParseErrs {
     }
 }
 
+impl From<regex::Error> for ParseErrs {
+    fn from(err: regex::Error) -> Self {
+        Self::new(&err.to_string())
+    }
+}
+
 impl Display for ParseErrs {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "ParseErrs -> {} errors", self.report.len())
@@ -590,6 +608,12 @@ impl Default for ParseErrs {
             report: vec![],
             src: Default::default(),
         }
+    }
+}
+
+impl From<semver::Error> for ParseErrs {
+    fn from(err: semver::Error) -> Self {
+        ParseErrs::new(&err.to_string())
     }
 }
 
@@ -947,6 +971,19 @@ where
         SpaceErr::Msg(format!("{}", self).to_string())
     }
 }
+
+#[derive(Clone,Debug,Error)]
+pub enum AutoboxErr {
+    #[error("cannot convert '{thing}' from '{from}' to '{to}'")]
+    CannotConvert{ thing: String, from: String, to: String }
+}
+
+impl AutoboxErr {
+    pub fn no_into( thing: &dyn AsRef<str>, from: &dyn AsRef<str>, to: &dyn AsRef<str> ) -> Self {
+        Self::CannotConvert { thing: thing.as_ref().to_string(), from: from.as_ref().to_string(), to: to.as_ref().to_string() }
+    }
+}
+
 
 #[cfg(test)]
 pub mod test {

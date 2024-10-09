@@ -900,7 +900,7 @@ pub fn result<I: Span, R>(result: Result<(I, R), nom::Err<SpaceTree<I>>>) -> Res
             Result::Err(err.into())
         }
         _ =>  {
-            Result::Err(ParseErrs::new("Unidentified nom parse error"))
+            Result::Err(ParseErrs::new(&"Unidentified nom parse error"))
         }
 
     }
@@ -910,7 +910,7 @@ pub fn result<I: Span, R>(result: Result<(I, R), nom::Err<SpaceTree<I>>>) -> Res
 pub fn parse_errs<R,E>(result: Result<R,E>) -> Result<R,ParseErrs> where E: Display {
     match result {
         Ok(ok) => Ok(ok),
-        Err(err) => Err(ParseErrs::new(&err))
+        Err(err) => Err(ParseErrs::new(&(err.to_string())))
     }
 }
 

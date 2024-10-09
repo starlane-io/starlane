@@ -187,7 +187,8 @@ impl TryInto<semver::Version> for Version {
 }
 
 impl FromStr for Version {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
+
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let version = semver::Version::from_str(s)?;
@@ -230,7 +231,7 @@ impl<V> ToResolved<V> for VarVal<V>
 where
     V: FromStr<Err = SpaceErr>,
 {
-    fn to_resolved(self, env: &Env) -> Result<V, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<V, ParseErrs> {
         match self {
             VarVal::Var(var) => match env.val(var.as_str()) {
                 Ok(val) => {

@@ -17,6 +17,7 @@ use crate::space::substance::{Bin, ChildSubstance};
 use crate::space::util::ToResolved;
 use crate::space::wave::core::cmd::CmdMethod;
 use crate::{Delete, Select, SpaceErr};
+use crate::space::err::ParseErrs;
 use crate::space::parse::util::{new_span, result, Trace};
 
 pub mod common {
@@ -264,7 +265,7 @@ pub mod direct {
         use serde::{Deserialize, Serialize};
 
         use crate::space::command::common::SetProperties;
-        use crate::space::err::SpaceErr;
+        use crate::space::err::{ParseErrs, SpaceErr};
         use crate::space::parse::Env;
         use crate::space::point::{Point, PointCtx, PointVar};
         use crate::space::util::ToResolved;
@@ -280,14 +281,14 @@ pub mod direct {
         }
 
         impl ToResolved<Set> for SetVar {
-            fn to_resolved(self, env: &Env) -> Result<Set, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<Set, ParseErrs> {
                 let set: SetCtx = self.to_resolved(env)?;
                 set.to_resolved(env)
             }
         }
 
         impl ToResolved<SetCtx> for SetVar {
-            fn to_resolved(self, env: &Env) -> Result<SetCtx, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<SetCtx, ParseErrs> {
                 Ok(SetCtx {
                     point: self.point.to_resolved(env)?,
                     properties: self.properties,
@@ -296,7 +297,7 @@ pub mod direct {
         }
 
         impl ToResolved<Set> for SetCtx {
-            fn to_resolved(self, env: &Env) -> Result<Set, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<Set, ParseErrs> {
                 Ok(Set {
                     point: self.point.to_resolved(env)?,
                     properties: self.properties,
@@ -308,7 +309,7 @@ pub mod direct {
     pub mod get {
         use serde::{Deserialize, Serialize};
 
-        use crate::space::err::SpaceErr;
+        use crate::space::err::{ParseErrs, SpaceErr};
         use crate::space::parse::Env;
         use crate::space::point::{Point, PointCtx, PointVar};
         use crate::space::util::ToResolved;
@@ -324,14 +325,14 @@ pub mod direct {
         }
 
         impl ToResolved<Get> for GetVar {
-            fn to_resolved(self, env: &Env) -> Result<Get, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<Get, ParseErrs> {
                 let set: GetCtx = self.to_resolved(env)?;
                 set.to_resolved(env)
             }
         }
 
         impl ToResolved<GetCtx> for GetVar {
-            fn to_resolved(self, env: &Env) -> Result<GetCtx, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<GetCtx, ParseErrs> {
                 Ok(GetCtx {
                     point: self.point.to_resolved(env)?,
                     op: self.op,
@@ -340,7 +341,7 @@ pub mod direct {
         }
 
         impl ToResolved<Get> for GetCtx {
-            fn to_resolved(self, env: &Env) -> Result<Get, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<Get, ParseErrs> {
                 Ok(Get {
                     point: self.point.to_resolved(env)?,
                     op: self.op,
@@ -364,7 +365,7 @@ pub mod direct {
         use thiserror::__private::AsDisplay;
         use crate::space::command::common::{SetProperties, StateSrc, StateSrcVar};
         use crate::space::command::Command;
-        use crate::space::err::SpaceErr;
+        use crate::space::err::{ParseErrs, SpaceErr};
         use crate::space::kind::{BaseKind, KindParts};
         use crate::space::loc::{PointFactory, ToSurface};
         use crate::space::parse::{CamelCase, Env, ResolverErr};
@@ -403,14 +404,14 @@ pub mod direct {
         }
 
         impl ToResolved<Template> for TemplateVar {
-            fn to_resolved(self, env: &Env) -> Result<Template, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<Template, ParseErrs> {
                 let template: TemplateCtx = self.to_resolved(env)?;
                 template.to_resolved(env)
             }
         }
 
         impl ToResolved<TemplateCtx> for TemplateVar {
-            fn to_resolved(self, env: &Env) -> Result<TemplateCtx, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<TemplateCtx, ParseErrs> {
                 let point: PointTemplateCtx = self.point.to_resolved(env)?;
 
                 let template = TemplateCtx {
@@ -421,7 +422,7 @@ pub mod direct {
             }
         }
         impl ToResolved<Template> for TemplateCtx {
-            fn to_resolved(self, env: &Env) -> Result<Template, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<Template, ParseErrs> {
                 let point = self.point.to_resolved(env)?;
 
                 let template = Template {
@@ -507,14 +508,14 @@ pub mod direct {
         pub type CreateCtx = CreateDef<PointCtx, StateSrc>;
 
         impl ToResolved<Create> for CreateVar {
-            fn to_resolved(self, env: &Env) -> Result<Create, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<Create, ParseErrs> {
                 let create: CreateCtx = self.to_resolved(env)?;
                 create.to_resolved(env)
             }
         }
 
         impl ToResolved<CreateCtx> for CreateVar {
-            fn to_resolved(self, env: &Env) -> Result<CreateCtx, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<CreateCtx, ParseErrs> {
                 let template = self.template.to_resolved(env)?;
                 let state = match &self.state {
                     StateSrcVar::None => StateSrc::None,
@@ -565,7 +566,7 @@ pub mod direct {
         }
 
         impl ToResolved<Create> for CreateCtx {
-            fn to_resolved(self, env: &Env) -> Result<Create, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<Create, ParseErrs> {
                 let template = self.template.to_resolved(env)?;
                 Ok(Create {
                     template,
@@ -647,7 +648,7 @@ pub mod direct {
         impl PointFactory for PointFactoryU64 {
             async fn create(&self) -> Result<Point, SpaceErr> {
                 let index = self.atomic.fetch_add(1u64, Ordering::Relaxed);
-                self.parent.push(format!("{}{}", self.prefix, index))
+                Ok(self.parent.push(format!("{}{}", self.prefix, index))?)
             }
         }
 
@@ -662,7 +663,7 @@ pub mod direct {
         }
 
         impl ToResolved<PointTemplateCtx> for PointTemplateVar {
-            fn to_resolved(self, env: &Env) -> Result<PointTemplateCtx, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<PointTemplateCtx, ParseErrs> {
                 let parent = self.parent.to_resolved(env)?;
                 Ok(PointTemplateCtx {
                     parent,
@@ -672,7 +673,7 @@ pub mod direct {
         }
 
         impl ToResolved<PointTemplate> for PointTemplateCtx {
-            fn to_resolved(self, env: &Env) -> Result<PointTemplate, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<PointTemplate, ParseErrs> {
                 let parent = self.parent.to_resolved(env)?;
                 Ok(PointTemplate {
                     parent,
@@ -682,7 +683,7 @@ pub mod direct {
         }
 
         impl ToResolved<PointTemplate> for PointTemplateVar {
-            fn to_resolved(self, env: &Env) -> Result<PointTemplate, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<PointTemplate, ParseErrs> {
                 let ctx: PointTemplateCtx = self.to_resolved(env)?;
                 ctx.to_resolved(env)
             }
@@ -701,7 +702,7 @@ pub mod direct {
 
         use serde::{Deserialize, Serialize};
 
-        use crate::space::err::SpaceErr;
+        use crate::space::err::{ParseErrs, SpaceErr};
         use crate::space::parse::Env;
         use crate::space::particle::Stub;
         use crate::space::point::Point;
@@ -743,7 +744,7 @@ pub mod direct {
         pub type SelectVar = SelectDef<PointSegKindHop>;
 
         impl ToResolved<Select> for Select {
-            fn to_resolved(self, env: &Env) -> Result<Select, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<Select, ParseErrs> {
                 Ok(self)
             }
         }
@@ -869,7 +870,7 @@ pub mod direct {
         use serde::{Deserialize, Serialize};
 
         use crate::space::command::direct::select::{Select, SelectIntoSubstance};
-        use crate::space::err::SpaceErr;
+        use crate::space::err::{ParseErrs, SpaceErr};
         use crate::space::parse::Env;
         use crate::space::selector::{PointSegKindHop, SelectorDef};
         use crate::space::util::ToResolved;
@@ -879,7 +880,7 @@ pub mod direct {
         pub type DeleteVar = DeleteDef<PointSegKindHop>;
 
         impl ToResolved<Delete> for Delete {
-            fn to_resolved(self, env: &Env) -> Result<Delete, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<Delete, ParseErrs> {
                 Ok(self)
             }
         }
@@ -903,7 +904,7 @@ pub mod direct {
 
         use serde::{Deserialize, Serialize};
 
-        use crate::space::err::SpaceErr;
+        use crate::space::err::{ParseErrs, SpaceErr};
         use crate::space::parse::Env;
         use crate::space::point::{Point, PointCtx, PointVar};
         use crate::space::substance::Substance;
@@ -920,7 +921,7 @@ pub mod direct {
         }
 
         impl ToResolved<WriteCtx> for WriteVar {
-            fn to_resolved(self, env: &Env) -> Result<WriteCtx, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<WriteCtx, ParseErrs> {
                 Ok(WriteCtx {
                     point: self.point.to_resolved(env)?,
                     payload: self.payload,
@@ -929,7 +930,7 @@ pub mod direct {
         }
 
         impl ToResolved<Write> for WriteCtx {
-            fn to_resolved(self, env: &Env) -> Result<Write, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<Write, ParseErrs> {
                 Ok(Write {
                     point: self.point.to_resolved(env)?,
                     payload: self.payload,
@@ -941,7 +942,7 @@ pub mod direct {
     pub mod read {
         use serde::{Deserialize, Serialize};
 
-        use crate::space::err::SpaceErr;
+        use crate::space::err::{ParseErrs, SpaceErr};
         use crate::space::parse::Env;
         use crate::space::point::{Point, PointCtx, PointVar};
         use crate::space::substance::Substance;
@@ -958,7 +959,7 @@ pub mod direct {
         }
 
         impl ToResolved<ReadCtx> for ReadVar {
-            fn to_resolved(self, env: &Env) -> Result<ReadCtx, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<ReadCtx, ParseErrs> {
                 Ok(ReadCtx {
                     point: self.point.to_resolved(env)?,
                     payload: self.payload,
@@ -967,7 +968,7 @@ pub mod direct {
         }
 
         impl ToResolved<Read> for ReadCtx {
-            fn to_resolved(self, env: &Env) -> Result<Read, SpaceErr> {
+            fn to_resolved(self, env: &Env) -> Result<Read, ParseErrs> {
                 Ok(Read {
                     point: self.point.to_resolved(env)?,
                     payload: self.payload,
@@ -1062,7 +1063,7 @@ pub enum CommandVar {
 }
 
 impl FromStr for CommandVar {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = new_span(s);
@@ -1071,14 +1072,14 @@ impl FromStr for CommandVar {
 }
 
 impl ToResolved<Command> for CommandVar {
-    fn to_resolved(self, env: &Env) -> Result<Command, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<Command, ParseErrs> {
         let command: CommandCtx = self.to_resolved(env)?;
         command.to_resolved(env)
     }
 }
 
 impl ToResolved<CommandCtx> for CommandVar {
-    fn to_resolved(self, env: &Env) -> Result<CommandCtx, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<CommandCtx, ParseErrs> {
         Ok(match self {
             CommandVar::Create(i) => CommandCtx::Create(i.to_resolved(env)?),
             CommandVar::Select(i) => CommandCtx::Select(i.to_resolved(env)?),
@@ -1092,7 +1093,7 @@ impl ToResolved<CommandCtx> for CommandVar {
 }
 
 impl ToResolved<Command> for CommandCtx {
-    fn to_resolved(self, env: &Env) -> Result<Command, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<Command, ParseErrs> {
         Ok(match self {
             CommandCtx::Create(i) => Command::Create(i.to_resolved(env)?),
             CommandCtx::Select(i) => Command::Select(i.to_resolved(env)?),

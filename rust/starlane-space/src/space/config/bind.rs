@@ -156,7 +156,7 @@ impl<Pnt> PipelineStepDef<Pnt> {
 }
 
 impl ToResolved<PipelineStep> for PipelineStepCtx {
-    fn to_resolved(self, env: &Env) -> Result<PipelineStep, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<PipelineStep, ParseErrs> {
         let mut blocks = vec![];
         for block in self.blocks {
             blocks.push(block.to_resolved(env)?);
@@ -171,7 +171,7 @@ impl ToResolved<PipelineStep> for PipelineStepCtx {
 }
 
 impl ToResolved<PipelineStepCtx> for PipelineStepVar {
-    fn to_resolved(self, env: &Env) -> Result<PipelineStepCtx, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<PipelineStepCtx, ParseErrs> {
         let mut blocks = vec![];
         for block in self.blocks {
             blocks.push(block.to_resolved(env)?);
@@ -211,14 +211,14 @@ pub enum PipelineStopDef<Pnt> {
 }
 
 impl ToResolved<PipelineStop> for PipelineStopVar {
-    fn to_resolved(self, env: &Env) -> Result<PipelineStop, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<PipelineStop, ParseErrs> {
         let stop: PipelineStopCtx = self.to_resolved(env)?;
         stop.to_resolved(env)
     }
 }
 
 impl ToResolved<PipelineStop> for PipelineStopCtx {
-    fn to_resolved(self, env: &Env) -> Result<PipelineStop, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<PipelineStop, ParseErrs> {
         Ok(match self {
             PipelineStopCtx::Core => PipelineStop::Core,
             PipelineStopCtx::Call(call) => PipelineStop::Call(call.to_resolved(env)?),
@@ -230,7 +230,7 @@ impl ToResolved<PipelineStop> for PipelineStopCtx {
 }
 
 impl ToResolved<PipelineStopCtx> for PipelineStopVar {
-    fn to_resolved(self, env: &Env) -> Result<PipelineStopCtx, SpaceErr> {
+    fn to_resolved(self, env: &Env) -> Result<PipelineStopCtx, ParseErrs> {
         Ok(match self {
             PipelineStopVar::Core => PipelineStopCtx::Core,
             PipelineStopVar::Call(call) => PipelineStopCtx::Call(call.to_resolved(env)?),

@@ -19,7 +19,7 @@ use core::fmt::Display;
 use core::str::FromStr;
 use dashmap::DashMap;
 use nom_supreme::ParserExt;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
 use std::marker::PhantomData;
