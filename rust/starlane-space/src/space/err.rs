@@ -208,18 +208,18 @@ impl Into<ReflectedCore> for SpaceErr {
             SpaceErr::Status { status, .. } => ReflectedCore {
                 headers: Default::default(),
                 status: StatusCode::from_u16(status).unwrap_or(StatusCode::from_u16(500).unwrap()),
-                body: SpatialError::to_substance(self)
+                body: self.to_substance()
             },
             SpaceErr::ParseErrs(_) => ReflectedCore {
                 headers: Default::default(),
                 status: StatusCode::from_u16(500u16).unwrap_or(StatusCode::from_u16(500).unwrap()),
-                body: SpatialError::to_substance(self)
+                body: self.to_substance()
 
             },
             x => ReflectedCore {
                 headers: Default::default(),
                 status: Default::default(),
-                body: SpatialError::to_substance(x)
+                body: x.to_substance()
             },
         }
     }
@@ -234,7 +234,7 @@ impl CoreReflector for SpaceErr {
         ReflectedCore {
             headers: Default::default(),
             status: StatusCode::from_u16(self.status()).unwrap(),
-            body: SpatialError::to_substance(self)
+            body: self.to_substance()
         }
     }
 }

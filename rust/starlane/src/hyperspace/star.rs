@@ -25,7 +25,7 @@ use crate::platform::Platform;
 use crate::hyperspace::reg::{Registration, Registry};
 use starlane::space::command::common::StateSrc;
 use starlane::space::command::direct::create::{Create, Strategy};
-use starlane::space::err::{CoreReflector, ParseErrs, SpaceErr};
+use starlane::space::err::{CoreReflector, ParseErrs, SpaceErr, SpatialError};
 use starlane::space::hyper::{
     Assign, AssignmentKind, HyperSubstance,
     Provision, Search,
@@ -2053,17 +2053,18 @@ pub enum StarErr {
     #[error("could not find a host to provision '{0}'")]
     CouldNotFindHostToProvision(Kind),
     #[error("{0}")]
-    Anyhow(#[source] Arc<anyhow::Error>)
+    Anyhow( Arc<anyhow::Error>)
 }
 
 
-
-
-impl From<anyhow::Error> for StarErr {
-    fn from(err: Error) -> Self {
-        Arc::new(err).into()
+impl <E> From<E> for StarErr where E: Sized+SpatialError {
+    fn from(err: E) -> Self {
+        Self::Anyhow(err.anyhow())
     }
 }
+
+
+
 
 impl CoreReflector for StarErr {
     fn as_reflected_core(self) -> ReflectedCore {

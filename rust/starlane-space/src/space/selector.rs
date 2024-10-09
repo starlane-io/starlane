@@ -7,7 +7,7 @@ use serde::de::{DeserializeOwned, Error, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::space::err::ParseErrs;
-use crate::space::kind::{BaseKind, Kind, KindParts, Specific};
+use crate::space::kind::{BaseKind, Kind, KindParts, Specific, Sub};
 use crate::space::loc::{Layer, ToBaseKind, Topic, VarVal, Variable, Version};
 use crate::space::parse::util::result;
 use crate::space::parse::util::{new_span, Trace};
@@ -23,6 +23,7 @@ use crate::space::substance::{
 use crate::space::util::{ToResolved, ValueMatcher, ValuePattern};
 use crate::SpaceErr;
 use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
+use crate::space::command::direct::select::SubSelect;
 
 pub type PointSegKindHop = HopDef<PointSegSelector, ValuePattern<KindSelector>>;
 pub type PointSegKindHopCtx = HopDef<PointSegSelectorCtx, ValuePattern<KindSelector>>;
@@ -51,6 +52,8 @@ pub struct KindSelectorDef<GenericKindSelector, GenericSubKindSelector, Specific
     pub sub: GenericSubKindSelector,
     pub specific: ValuePattern<SpecificSelector>,
 }
+
+
 
 impl ValueMatcher<Kind> for KindSelector {
     fn is_match(&self, kind: &Kind) -> Result<(), ()> {
@@ -129,8 +132,27 @@ impl KindSelector {
         }
     }
 }
-
-pub type SubKindSelector = Pattern<Option<CamelCase>>;
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    Hash,
+    strum_macros::Display,
+    strum_macros::EnumString,
+)]
+pub enum SubKindSelector {
+    #[strum(to_string="")]
+    None,
+    #[strum(to_string="*")]
+    Always,
+    #[strum(to_string="!")]
+    Never,
+    #[strum(to_string="<{0}>")]
+    Exact(Sub)
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct SelectorDef<Hop> {
@@ -911,8 +933,25 @@ where
         }
     }
 }
-
-pub type KindBaseSelector = Pattern<BaseKind>;
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    Eq,
+    PartialEq,
+    Hash,
+    strum_macros::Display,
+    strum_macros::EnumString,
+)]
+pub enum KindBaseSelector {
+    #[strum(to_string="*")]
+    Always,
+    #[strum(to_string="!")]
+    Never,
+    #[strum(to_string="{0}")]
+    Exact(BaseKind)
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PortHierarchy {

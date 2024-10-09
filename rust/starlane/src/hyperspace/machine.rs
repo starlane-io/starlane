@@ -13,7 +13,7 @@ use tokio::sync::oneshot::error::RecvError;
 use tokio_print::aprintln;
 use starlane::space::artifact::asynch::{Artifacts, ArtifactFetcher, ArtErr};
 use starlane::space::command::direct::create::KindTemplate;
-use starlane::space::err::SpaceErr;
+use starlane::space::err::{HyperSpatialError, SpaceErr, SpatialError};
 use starlane::space::hyper::{InterchangeKind, Knock};
 use starlane::space::kind::{BaseKind, Kind, StarSub};
 use starlane::space::loc::{Layer, MachineName, StarHandle, StarKey, Surface, ToPoint, ToSurface};
@@ -823,8 +823,15 @@ pub enum MachineErr {
     #[error("tokio send error.")]
     TokioSendErr,
 #[error("tokio receive error.")]
-TokioReceiveErr
+TokioReceiveErr,
+ #[error("{0}")]
+ Anyhow(Arc<anyhow::Error>)
 }
+
+impl SpatialError for MachineErr {}
+
+impl HyperSpatialError for MachineErr { }
+
 
 impl <T> From<tokio::sync::mpsc::error::SendError<T>> for MachineErr {
     fn from(value: tokio::sync::mpsc::error::SendError<T>) -> Self {

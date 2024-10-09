@@ -8,7 +8,7 @@ use tokio::sync::oneshot::error::RecvError;
 
 #[cfg(feature = "postgres")]
 use crate::registry::postgres::err::RegErr;
-use starlane::space::err::{CoreReflector, SpaceErr};
+use starlane::space::err::{CoreReflector, HyperSpatialError, SpaceErr, SpatialError};
 use starlane::space::kind::Kind;
 use starlane::space::point::Point;
 use starlane::space::substance::{Substance, SubstanceKind};
@@ -42,6 +42,10 @@ pub enum HypErr {
     Io(#[from] Arc<tokio::io::Error>),
 }
 
+impl SpatialError for HypErr {}
+
+impl HyperSpatialError for HypErr {}
+
 impl From<anyhow::Error> for HypErr {
     fn from(value: anyhow::Error) -> Self {
         HypErr::Anyhow(Arc::new(value))
@@ -63,7 +67,7 @@ impl CoreReflector for HypErr {
                 ReflectedCore {
                     headers: Default::default(),
                     status: StatusCode::from_u16(500u16).unwrap(),
-                    body: Substance::Err(err),
+                    body: self.to_substance()
                 }
             }
         }

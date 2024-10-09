@@ -310,7 +310,7 @@ impl RootDir {
 }
 
 
-#[derive(Error,Debug)]
+#[derive(Error,Debug,Clone)]
 pub enum FileStoreErr {
     #[error("HostErr: '{0}'")]
     HostErr(#[from] HostErr),

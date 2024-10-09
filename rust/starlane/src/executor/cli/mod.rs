@@ -167,6 +167,9 @@ impl CliOut {
 
 pub type CliExecutor = Box<dyn Executor<In = CliIn, Out = CliOut, Err=CliErr>>;
 
+// CLiErr should really be limited in scope to bad or missin args,env variable etc...
+// things like stdout dropping etc... should be part of HostErr...
+
 #[derive(Debug, Error, Clone)]
 pub enum CliErr {
     #[error("could not take stdout")]

@@ -17,7 +17,7 @@ use crate::space::parse::{kind_parts, specific, CamelCase, Domain,  SkewerCase};
 use crate::space::err::ParseErrs;
 use crate::space::particle::traversal::TraversalPlan;
 use crate::space::point::Point;
-use crate::space::selector::{KindSelector, Pattern, PointHierarchy, SpecificSelector, SubKindSelector, VersionReq};
+use crate::space::selector::{KindBaseSelector, KindSelector, Pattern, PointHierarchy, SpecificSelector, SubKindSelector, VersionReq};
 use crate::space::util::ValuePattern;
 use crate::{KindTemplate};
 
@@ -172,7 +172,7 @@ impl BaseKind {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display,strum_macros::EnumString)]
 pub enum Sub {
     None,
     Database(DatabaseSubKind),
@@ -182,6 +182,32 @@ pub enum Sub {
     Star(StarSub),
     Native(NativeSub),
 }
+
+impl Sub {
+    pub fn sub_kind(self) -> SubKind{
+        match self {
+            Sub::None => SubKind::None,
+            Sub::Database(_) => SubKind::Database,
+            Sub::File(_) => SubKind::File,
+            Sub::Artifact(_) => SubKind::Artifact,
+            Sub::UserBase(_) => SubKind::UserBase,
+            Sub::Star(_) => SubKind::Star,
+            Sub::Native(_) => SubKind::Native
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display,strum_macros::EnumString)]
+pub enum SubKind {
+    None,
+    Database,
+    File,
+    Artifact,
+    UserBase,
+    Star,
+    Native,
+}
+
 
 impl Sub {
     pub fn to_camel_case(&self) -> Option<CamelCase> {
@@ -522,8 +548,8 @@ pub enum StarSub {
 impl StarSub {
     pub fn to_selector(&self) -> KindSelector {
         KindSelector {
-            base: Pattern::Exact(BaseKind::Star),
-            sub: SubKindSelector::Exact(Some(self.to_camel_case())),
+            base: KindBaseSelector::Exact(BaseKind::Star),
+            sub:  SubKindSelector::Exact(self.into()),
             specific: ValuePattern::Always,
         }
     }

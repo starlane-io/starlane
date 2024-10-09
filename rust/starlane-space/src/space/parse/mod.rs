@@ -29,10 +29,7 @@ use crate::space::config::mechtron::MechtronConfig;
 use crate::space::config::{DocKind, Document};
 use crate::space::err::report::{Label, Report, ReportKind};
 use crate::space::err::ParseErrs;
-use crate::space::kind::{
-    ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, NativeSub, Specific,
-    StarSub, UserBaseSubKind,
-};
+use crate::space::kind::{ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, NativeSub, Specific, StarSub, Sub, UserBaseSubKind};
 use crate::space::loc::StarKey;
 use crate::space::loc::{Layer, PointSegment, Surface, Topic, Uuid, VarVal, Version};
 use crate::space::parse::util::unstack;
@@ -5922,10 +5919,24 @@ where
     }
 }
 
+/*
 pub fn sub_kind_selector<I: Span>(input: I) -> Res<I, SubKindSelector> {
     pattern(camel_case)(input).map(|(next, selector)| match selector {
         Pattern::Always => (next, Pattern::Always),
         Pattern::Exact(sub) => (next, Pattern::Exact(Some(sub))),
+    })
+}
+
+ */
+
+pub fn sub_kind_selector<I: Span>(input: I) -> Res<I, SubKindSelector> {
+    value_pattern(camel_case)(input).map(|(next, selector)| {
+        match selector {
+            ValuePattern::Always => SubKindSelector::Always,
+            ValuePattern::Never => SubKindSelector::Never,
+            ValuePattern::Pattern(SubKind::from) =>
+        }
+
     })
 }
 
@@ -5944,6 +5955,7 @@ pub fn kind_base<I: Span>(input: I) -> Res<I, BaseKind> {
         }
     }
 }
+
 
 pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
     move |input: I| {
@@ -6044,7 +6056,14 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
 }
 
 pub fn kind_base_selector<I: Span>(input: I) -> Res<I, KindBaseSelector> {
-    pattern(kind_base)(input)
+    value_pattern(kind_base)(input).map( |(next,pattern)| {
+        (next,
+        match pattern {
+            ValuePattern::Always => KindBaseSelector::Always,
+            ValuePattern::Never => KindBaseSelector::Never,
+            ValuePattern::Pattern(kind) =>KindBaseSelector::Exact(kind)
+        })
+    })
 }
 
 pub fn kind_selector<I: Span>(input: I) -> Res<I, KindSelector> {
@@ -6129,11 +6148,33 @@ fn base_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
     )
 }
 
+/*
 fn file_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
     tuple((file_segment, opt(tag("+"))))(input).map(|(next, (segment, inclusive))| {
         let tks = KindSelector {
             base: Pattern::Exact(BaseKind::File),
             sub: Pattern::Always,
+            specific: ValuePattern::Always,
+        };
+        let inclusive = inclusive.is_some();
+        (
+            next,
+            PointSegKindHop {
+                inclusive,
+                segment_selector: segment,
+                kind_selector: ValuePattern::Pattern(tks),
+            },
+        )
+    })
+}
+
+ */
+
+fn file_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
+    tuple((file_segment, opt(tag("+"))))(input).map(|(next, (segment, inclusive))| {
+        let tks = KindSelector {
+            base: KindBaseSelector::Exact(BaseKind::File),
+            sub: SubKindSelector::None,
             specific: ValuePattern::Always,
         };
         let inclusive = inclusive.is_some();
@@ -6211,8 +6252,8 @@ pub fn point_selector<I: Span>(input: I) -> Res<I, Selector> {
                         PointSeg::FsRootDir,
                     )),
                     kind_selector: ValuePattern::Pattern(KindSelector {
-                        base: Pattern::Exact(BaseKind::File),
-                        sub: Pattern::Always,
+                        base: BaseKind::File,
+                        sub: None,
                         specific: ValuePattern::Always,
                     }),
                 });

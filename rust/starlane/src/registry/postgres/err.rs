@@ -2,7 +2,7 @@ use std::sync::Arc;
 use sqlx::Error;
 use strum::ParseError;
 use thiserror::Error;
-use starlane::space::err::SpaceErr;
+use starlane::space::err::{HyperSpatialError, SpaceErr, SpatialError};
 use starlane::space::point::Point;
 
 #[derive(Error, Debug,Clone)]
@@ -24,8 +24,18 @@ pub enum RegErr {
   #[error("Point '{point}' registry error: {message}")]
   Point { point: Point, message: String },
   #[error("{0}")]
-  Msg(#[from] String),
+  Msg(String),
 }
+
+impl SpatialError for RegErr {
+
+}
+
+impl HyperSpatialError for RegErr {
+
+}
+
+
 
 impl From<&str> for RegErr {
     fn from(err: &str) -> Self {

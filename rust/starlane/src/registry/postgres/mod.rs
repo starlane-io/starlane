@@ -542,6 +542,7 @@ impl RegistryApi for PostgresRegistry {
         params.push(sub_select.point.to_string());
 
         if let Option::Some(hop) = sub_select.hops.first() {
+            let x = &hop.kind_selector;
             match &hop.segment_selector {
                 PointSegSelector::Exact(exact) => {
                     index = index + 1;
