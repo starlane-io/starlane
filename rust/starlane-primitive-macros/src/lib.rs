@@ -11,6 +11,7 @@ use quote::quote;
 use quote::ToTokens;
 use syn::{parse_macro_input, Data, DeriveInput, PathArguments, Type};
 
+
 /// Takes a given enum (which in turn accepts child enums) and auto generates a `Parent::From` so the child
 /// can turn into the parent and a `TryInto<Child> for Parent` so the Parent can attempt to turn into the child.
 /// ```
@@ -26,6 +27,7 @@ use syn::{parse_macro_input, Data, DeriveInput, PathArguments, Type};
 /// ```
 /// Will generate something like:
 /// ```
+/// //impl Autobox for Parent { }
 ///
 /// impl From<Child> for Parent {
 ///   fn from( child: Child ) -> Self {

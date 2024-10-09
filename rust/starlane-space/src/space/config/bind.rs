@@ -71,7 +71,7 @@ impl BindConfig {
 }
 
 impl FromStr for BindConfig {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         bind_config(s)
@@ -79,10 +79,10 @@ impl FromStr for BindConfig {
 }
 
 impl TryFrom<Vec<u8>> for BindConfig {
-    type Error = SpaceErr;
+    type Error = ParseErrs;
 
     fn try_from(doc: Vec<u8>) -> Result<Self, Self::Error> {
-        let doc = String::from_utf8(doc)?;
+        let doc = ParseErrs::result_utf8(String::from_utf8(doc))?;
         bind_config(doc.as_str())
     }
 }

@@ -64,7 +64,7 @@ use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
 use starlane::space::command::common::StateSrc::Subst;
-use starlane::space::parse::util::space_err;
+use starlane::space::parse::util::parse_errs;
 use starlane::space::substance::Substance;
 use starlane::space::wave::core::http2::StatusCode;
 
@@ -1818,7 +1818,7 @@ impl Driver for DriverDriver {
         let skel = DriverDriverParticleSkel::new(self.skel.clone(), api);
         let particle = Box::new(DriverParticle::restore(skel, (), ()));
 
-        Ok(space_err(particle.sphere())?)
+        Ok(parse_errs(particle.sphere())?)
     }
 }
 

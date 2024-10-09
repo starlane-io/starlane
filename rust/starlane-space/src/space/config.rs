@@ -11,7 +11,7 @@ use crate::BindConfig;
 pub mod bind;
 pub mod mechtron;
 
-use crate::space::err::SpaceErr;
+use crate::space::err::{ParseErrs, SpaceErr};
 use crate::space::parse::doc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,8 +74,19 @@ pub enum Document {
     MechtronConfig(MechtronConfig),
 }
 
+impl Document {
+   pub fn kind(&self) -> DocKind {
+       match self {
+           Document::BindConfig(_) => DocKind::BindConfig,
+           Document::MechtronConfig(_) => DocKind::MechtronConfig,
+       }
+   }
+}
+
+
+
 impl FromStr for Document {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         doc(s)
@@ -86,6 +97,12 @@ impl FromStr for Document {
 pub enum DocKind {
     BindConfig,
     MechtronConfig
+}
+
+impl AsRef<str> for DocKind {
+    fn as_ref(&self) -> &str {
+        self.to_string().as_str()
+    }
 }
 
 

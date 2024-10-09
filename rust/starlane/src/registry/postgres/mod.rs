@@ -21,7 +21,7 @@ use starlane::space::hyper::{ParticleLocation, ParticleRecord};
 use starlane::space::kind::{BaseKind, Kind, KindParts, Specific};
 use starlane::space::loc::{StarKey, ToBaseKind, Version};
 use starlane::space::log::PointLogger;
-use starlane::space::parse::util::{result, space_err};
+use starlane::space::parse::util::{result, parse_errs};
 use starlane::space::parse::{CamelCase, Domain, SkewerCase};
 use starlane::space::particle::{Details, Properties, Property, Status, Stub};
 use starlane::space::point::Point;
@@ -1086,7 +1086,7 @@ impl sqlx::FromRow<'_, PgRow> for PostgresParticleRecord {
 
             let point = Point::from_str(parent.as_str())?;
             let point = point.push(point_segment)?;
-            let base = space_err(BaseKind::from_str(base.as_str()))?;
+            let base = parse_errs(BaseKind::from_str(base.as_str()))?;
 
             let specific = if let Option::Some(provider) = provider {
                 if let Option::Some(vendor) = vendor {
@@ -1144,7 +1144,7 @@ impl sqlx::FromRow<'_, PgRow> for PostgresParticleRecord {
 
             let location = ParticleLocation { star, host };
 
-            let status = space_err(Status::from_str(status.as_str()))?;
+            let status = parse_errs(Status::from_str(status.as_str()))?;
 
             let stub = Stub {
                 point,

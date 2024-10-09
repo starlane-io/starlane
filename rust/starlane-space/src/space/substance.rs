@@ -81,7 +81,7 @@ pub enum SubstanceKind {
     Eq,
     PartialEq,
     strum_macros::Display,
-    Autobox,
+    starlane_primitive_macros::Autobox,
     starlane_primitive_macros::ToSubstance,
 )]
 #[non_exhaustive]

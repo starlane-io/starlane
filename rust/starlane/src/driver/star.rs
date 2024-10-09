@@ -42,7 +42,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio_print::aprintln;
-use starlane::space::parse::util::{result, space_err};
+use starlane::space::parse::util::{result, parse_errs};
 use starlane::space::wave::core::MethodKind::Hyp;
 
 #[derive(Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -225,7 +225,7 @@ impl Driver for StarDriver
             self.ctx.clone(),
             (),
         );
-        Ok(space_err(star.sphere())?)
+        Ok(parse_errs(star.sphere())?)
     }
 }
 

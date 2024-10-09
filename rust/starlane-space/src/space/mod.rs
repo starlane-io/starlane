@@ -26,6 +26,8 @@ pub mod substance;
 pub mod util;
 pub mod wasm;
 
+pub mod prelude;
+
 pub static VERSION: Lazy<semver::Version> =
     Lazy::new(|| semver::Version::from_str(include_str!("../VERSION").trim()).unwrap());
 pub static HYPERUSER: Lazy<Point> =

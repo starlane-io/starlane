@@ -11,7 +11,7 @@ use nom_supreme::final_parser::ExtractContext;
 use nom_supreme::ParserExt;
 use serde::{Deserialize, Serialize};
 use thiserror::__private::AsDisplay;
-use crate::space::err::{ParseErrs, PrintErr, SpaceErr};
+use crate::space::err::{ParseErrs, PrintErr};
 use crate::space::loc::Variable;
 use crate::space::parse::{ErrCtx, SpaceTree, VarCase};
 
@@ -890,7 +890,7 @@ where
     move |input: I| delimited(multispace0, f, multispace0)(input)
 }
 
-pub fn result<I: Span, R>(result: Result<(I, R), nom::Err<SpaceTree<I>>>) -> Result<R, SpaceErr> {
+pub fn result<I: Span, R>(result: Result<(I, R), nom::Err<SpaceTree<I>>>) -> Result<R, ParseErrs> {
     match result {
         Ok((_, e)) => Ok(e),
         Err(nom::Err::Error(err)) => {
@@ -900,17 +900,17 @@ pub fn result<I: Span, R>(result: Result<(I, R), nom::Err<SpaceTree<I>>>) -> Res
             Result::Err(err.into())
         }
         _ =>  {
-            Result::Err(SpaceErr::str("Unidentified nom parse error"))
+            Result::Err(ParseErrs::new("Unidentified nom parse error"))
         }
 
     }
 }
 
 
-pub fn space_err<R,E>(result: Result<R,E>) -> Result<R,SpaceErr> where E: Display {
+pub fn parse_errs<R,E>(result: Result<R,E>) -> Result<R,ParseErrs> where E: Display {
     match result {
         Ok(ok) => Ok(ok),
-        Err(err) => Err(SpaceErr::to_space_err(err))
+        Err(err) => Err(ParseErrs::new(&err))
     }
 }
 

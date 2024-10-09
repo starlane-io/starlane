@@ -66,7 +66,7 @@ impl ArtifactFetcher for BuiltinArtifactFetcher {
             .bins
             .get(point)
             .cloned()
-            .ok_or(SpaceErr::not_found(point))?)
+            .ok_or(ArtErr::not_found(point))?)
     }
 
     fn selector(&self) -> ValuePattern<Selector> {

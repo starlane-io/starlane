@@ -4,6 +4,7 @@ use crate::space::point::Point;
 use crate::SpaceErr;
 use core::str::FromStr;
 use serde::{Deserialize, Serialize};
+use crate::space::err::ParseErrs;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct MechtronConfig {
@@ -40,7 +41,7 @@ impl MechtronConfig {
 }
 
 impl FromStr for MechtronConfig {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         mechtron_config(s)
@@ -48,7 +49,7 @@ impl FromStr for MechtronConfig {
 }
 
 impl TryFrom<Vec<u8>> for MechtronConfig {
-    type Error = SpaceErr;
+    type Error = ParseErrs;
 
     fn try_from(doc: Vec<u8>) -> Result<Self, Self::Error> {
         let doc = String::from_utf8(doc)?;

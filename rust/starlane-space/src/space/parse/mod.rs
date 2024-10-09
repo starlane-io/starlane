@@ -26,9 +26,9 @@ use crate::space::config::bind::{
     BindConfig, PipelineStepVar, PipelineStopVar, RouteSelector, WaveDirection,
 };
 use crate::space::config::mechtron::MechtronConfig;
-use crate::space::config::Document;
+use crate::space::config::{DocKind, Document};
 use crate::space::err::report::{Label, Report, ReportKind};
-use crate::space::err::{ParseErrs, SpaceErr};
+use crate::space::err::{ParseErrs, ParseErrs};
 use crate::space::kind::{
     ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, NativeSub, Specific,
     StarSub, UserBaseSubKind,
@@ -306,13 +306,13 @@ pub type SpaceTree<I: Span> = GenericErrorTree<I, &'static str, ErrCtx, ParseErr
 
 pub type Res<I: Span, O> = IResult<I, O, SpaceTree<I>>;
 
-impl <I> From<SpaceTree<I>> for SpaceErr where I: Span {
+impl <I> From<SpaceTree<I>> for ParseErrs where I: Span {
     fn from(value: SpaceTree<I>) -> Self {
         ParseErrs::from(value).into()
     }
 }
 
-impl <I> From<nom::Err<SpaceTree<I>>> for SpaceErr where I: Span {
+impl <I> From<nom::Err<SpaceTree<I>>> for ParseErrs where I: Span {
     fn from(value: nom::Err<SpaceTree<I>>) -> Self {
         ParseErrs::from(value).into()
     }
@@ -883,15 +883,15 @@ pub fn point_non_root_var<I: Span>(input: I) -> Res<I, PointVar> {
     )
 }
 
-pub fn consume_point(input: &str) -> Result<Point, SpaceErr> {
+pub fn consume_point(input: &str) -> Result<Point, ParseErrs> {
     consume_point_ctx(input)?.collapse()
 }
 
-pub fn consume_point_ctx(input: &str) -> Result<PointCtx, SpaceErr> {
+pub fn consume_point_ctx(input: &str) -> Result<PointCtx, ParseErrs> {
     consume_point_var(input)?.collapse()
 }
 
-pub fn consume_point_var(input: &str) -> Result<PointVar, SpaceErr> {
+pub fn consume_point_var(input: &str) -> Result<PointVar, ParseErrs> {
     let span = new_span(input);
     let point = result(context("consume", all_consuming(point_var))(span))?;
     Ok(point)
@@ -1048,7 +1048,7 @@ pub fn version_point_kind_segment<I: Span>(input: I) -> Res<I, PointKindSeg> {
     })
 }
 
-pub fn consume_hierarchy<I: Span>(input: I) -> Result<PointHierarchy, SpaceErr> {
+pub fn consume_hierarchy<I: Span>(input: I) -> Result<PointHierarchy, ParseErrs> {
     let (_, rtn) = all_consuming(point_kind_hierarchy)(input)?;
     Ok(rtn)
 }
@@ -1510,7 +1510,7 @@ impl CamelCase {
 }
 
 impl FromStr for CamelCase {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(camel_case)(new_span(s)))
@@ -1585,7 +1585,7 @@ impl<'de> Deserialize<'de> for Domain {
 }
 
 impl FromStr for Domain {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(domain)(new_span(s)))
@@ -1641,7 +1641,7 @@ impl<'de> Deserialize<'de> for VarCase {
 }
 
 impl FromStr for VarCase {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(var_chars)(new_span(s)))?;
@@ -1690,7 +1690,7 @@ impl<'de> Deserialize<'de> for SkewerCase {
 }
 
 impl FromStr for SkewerCase {
-    type Err = SpaceErr;
+    type Err = ParseErrs;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         result(all_consuming(skewer_case)(new_span(s)))
@@ -2348,7 +2348,7 @@ impl Env {
         }
     }
 
-    pub fn push_working<S: ToString>(self, segs: S) -> Result<Self, SpaceErr> {
+    pub fn push_working<S: ToString>(self, segs: S) -> Result<Self, ParseErrs> {
         Ok(Self {
             point: self.point.push(segs.to_string())?,
             parent: Some(Box::new(self)),
@@ -2358,14 +2358,14 @@ impl Env {
         })
     }
 
-    pub fn point_or(&self) -> Result<Point, SpaceErr> {
+    pub fn point_or(&self) -> Result<Point, ParseErrs> {
         Ok(self.point.clone())
     }
 
-    pub fn pop(self) -> Result<Env, SpaceErr> {
+    pub fn pop(self) -> Result<Env, ParseErrs> {
         Ok(*self
             .parent
-            .ok_or(SpaceErr::str("expected parent scopedVars"))?)
+            .ok_or(ParseErrs::str("expected parent scopedVars"))?)
     }
 
     pub fn add_var_resolver(&mut self, var_resolver: Arc<dyn VarResolver>) {
@@ -2574,13 +2574,13 @@ impl VarResolver for CompositeResolver {
 }
 
 pub trait CtxResolver {
-    fn working_point(&self) -> Result<&Point, SpaceErr>;
+    fn working_point(&self) -> Result<&Point, ParseErrs>;
 }
 
 pub struct PointCtxResolver(Point);
 
 impl CtxResolver for PointCtxResolver {
-    fn working_point(&self) -> Result<&Point, SpaceErr> {
+    fn working_point(&self) -> Result<&Point, ParseErrs> {
         Ok(&self.0)
     }
 }
@@ -2640,7 +2640,7 @@ pub struct RegexCapturesResolver {
 }
 
 impl RegexCapturesResolver {
-    pub fn new(regex: Regex, text: String) -> Result<Self, SpaceErr> {
+    pub fn new(regex: Regex, text: String) -> Result<Self, ParseErrs> {
         regex.captures(text.as_str()).ok_or("no regex captures")?;
         Ok(Self { regex, text })
     }
@@ -2724,7 +2724,7 @@ where
 }
 
 pub trait SubstParser<T: Sized> {
-    fn parse_string(&self, string: String) -> Result<T, SpaceErr> {
+    fn parse_string(&self, string: String) -> Result<T, ParseErrs> {
         let span = new_span(string.as_str());
         let output = result(self.parse_span(span))?;
         Ok(output)
@@ -2922,7 +2922,7 @@ where
         + InputTakeAtPosition,
     <I as InputTakeAtPosition>::Item: AsChar,
     F: nom::Parser<I, O, SpaceTree<I>>,
-    O: Clone + FromStr<Err = SpaceErr>,
+    O: Clone + FromStr<Err = ParseErrs>,
 {
     move |input: I| {
         let (next, element) = f.parse(input.clone())?;
@@ -3404,7 +3404,7 @@ where
     }
 }
 
-pub fn lex_child_scopes<I: Span>(parent: LexScope<I>) -> Result<LexParentScope<I>, SpaceErr> {
+pub fn lex_child_scopes<I: Span>(parent: LexScope<I>) -> Result<LexParentScope<I>, ParseErrs> {
     if parent.selector.children.is_some() {
         let (_, child_selector) = all_consuming(lex_scope_selector)(
             parent
@@ -3536,7 +3536,7 @@ pub fn root_scope<I: Span>(input: I) -> Res<I, LexRootScope<I>> {
     })
 }
 
-pub fn lex_scopes<I: Span>(input: I) -> Result<Vec<LexScope<I>>, SpaceErr> {
+pub fn lex_scopes<I: Span>(input: I) -> Result<Vec<LexScope<I>>, ParseErrs> {
     if input.len() == 0 {
         return Ok(vec![]);
     }
@@ -3860,7 +3860,7 @@ pub fn root_scope_selector_name<I: Span>(input: I) -> Res<I, I> {
     .map(|(next, (_, name))| (next, name))
 }
 
-pub fn lex_root_scope<I: Span>(span: I) -> Result<LexRootScope<I>, SpaceErr> {
+pub fn lex_root_scope<I: Span>(span: I) -> Result<LexRootScope<I>, ParseErrs> {
     let root_scope = result(delimited(multispace0, root_scope, multispace0)(span))?;
     Ok(root_scope)
 }
@@ -3880,7 +3880,7 @@ pub mod model {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use thiserror::Error;
     use crate::space::config::bind::{PipelineStepDef, PipelineStopDef};
-    use crate::space::err::{ParseErrs, SpaceErr};
+    use crate::space::err::{ParseErrs};
     use crate::space::loc::Version;
     use crate::space::parse::util::{new_span, result, Span, Trace, Tw};
     use crate::space::parse::{
@@ -3992,7 +3992,7 @@ pub mod model {
     }
 
     impl<I: ToString, V: ToString> RootScopeSelector<I, V> {
-        pub fn to_concrete(self) -> Result<RootScopeSelector<String, Version>, SpaceErr> {
+        pub fn to_concrete(self) -> Result<RootScopeSelector<String, Version>, ParseErrs> {
             Ok(RootScopeSelector {
                 name: self.name.to_string(),
                 version: Version::from_str(self.version.to_string().as_str())?,
@@ -4018,7 +4018,7 @@ pub mod model {
     }
 
     impl RouteScopeSelector {
-        pub fn new<I: ToString>(path: Option<I>) -> Result<Self, SpaceErr> {
+        pub fn new<I: ToString>(path: Option<I>) -> Result<Self, ParseErrs> {
             let path = match path {
                 None => Regex::new(".*")?,
                 Some(path) => Regex::new(path.to_string().as_str())?,
@@ -4031,9 +4031,9 @@ pub mod model {
             })
         }
 
-        pub fn from<I: ToString>(selector: LexScopeSelector<I>) -> Result<Self, SpaceErr> {
+        pub fn from<I: ToString>(selector: LexScopeSelector<I>) -> Result<Self, ParseErrs> {
             if selector.name.to_string().as_str() != "Route" {
-                return Err(SpaceErr::server_error("expected Route"));
+                return Err(ParseErrs::server_error("expected Route"));
             }
             let path = match selector.path {
                 None => None,
@@ -4102,14 +4102,14 @@ pub mod model {
         }
     }
 
-    fn default_path<I: ToString>(path: Option<I>) -> Result<Regex, SpaceErr> {
+    fn default_path<I: ToString>(path: Option<I>) -> Result<Regex, ParseErrs> {
         match path {
             None => Ok(Regex::new(".*")?),
             Some(path) => Ok(Regex::new(path.to_string().as_str())?),
         }
     }
     impl WaveScope {
-        pub fn from_scope<I: Span>(scope: LexParentScope<I>) -> Result<Self, SpaceErr> {
+        pub fn from_scope<I: Span>(scope: LexParentScope<I>) -> Result<Self, ParseErrs> {
             let selector = MessageScopeSelectorAndFilters::from_selector(scope.selector)?;
             let mut block = vec![];
 
@@ -4133,7 +4133,7 @@ pub mod model {
     }
 
     impl MessageScopeSelectorAndFilters {
-        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, SpaceErr> {
+        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, ParseErrs> {
             let filters = selector.filters.clone().to_scope_filters();
             let selector = MessageScopeSelector::from_selector(selector)?;
             Ok(Self { selector, filters })
@@ -4141,7 +4141,7 @@ pub mod model {
     }
 
     impl RouteScopeSelectorAndFilters {
-        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, SpaceErr> {
+        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, ParseErrs> {
             let filters = selector.filters.clone().to_scope_filters();
             let selector = RouteScopeSelector::new(selector.path.clone())?;
             Ok(Self { selector, filters })
@@ -4194,7 +4194,7 @@ pub mod model {
         pub fn from_scope<I: Span>(
             parent: &ValuePattern<MethodKind>,
             scope: LexScope<I>,
-        ) -> Result<Self, SpaceErr> {
+        ) -> Result<Self, ParseErrs> {
             let selector = MethodScopeSelectorAndFilters::from_selector(parent, scope.selector)?;
             let block = result(pipeline(scope.block.content))?;
             Ok(Self { selector, block })
@@ -4202,7 +4202,7 @@ pub mod model {
     }
 
     impl MessageScopeSelector {
-        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, SpaceErr> {
+        pub fn from_selector<I: Span>(selector: LexScopeSelector<I>) -> Result<Self, ParseErrs> {
             let kind = match result(value_pattern(method_kind)(selector.name.clone())) {
                 Ok(kind) => kind,
                 Err(_) => {
@@ -4248,7 +4248,7 @@ pub mod model {
         pub fn from_selector<I: Span>(
             parent: &ValuePattern<MethodKind>,
             selector: LexScopeSelector<I>,
-        ) -> Result<Self, SpaceErr> {
+        ) -> Result<Self, ParseErrs> {
             let filters = selector.filters.clone().to_scope_filters();
             let selector = MethodScopeSelector::from_selector(parent, selector)?;
             Ok(Self { selector, filters })
@@ -4259,7 +4259,7 @@ pub mod model {
         pub fn from_selector<I: Span>(
             parent: &ValuePattern<MethodKind>,
             selector: LexScopeSelector<I>,
-        ) -> Result<Self, SpaceErr> {
+        ) -> Result<Self, ParseErrs> {
             let name = match parent {
                 ValuePattern::Always => ValuePattern::Always,
                 ValuePattern::Never => ValuePattern::Never,
@@ -4448,14 +4448,14 @@ pub mod model {
     }
 
     impl ToResolved<PipelineSegment> for PipelineSegmentVar {
-        fn to_resolved(self, env: &Env) -> Result<PipelineSegment, SpaceErr> {
+        fn to_resolved(self, env: &Env) -> Result<PipelineSegment, ParseErrs> {
             let rtn: PipelineSegmentCtx = self.to_resolved(env)?;
             rtn.to_resolved(env)
         }
     }
 
     impl ToResolved<PipelineSegment> for PipelineSegmentCtx {
-        fn to_resolved(self, env: &Env) -> Result<PipelineSegment, SpaceErr> {
+        fn to_resolved(self, env: &Env) -> Result<PipelineSegment, ParseErrs> {
             Ok(PipelineSegment {
                 step: self.step.to_resolved(env)?,
                 stop: self.stop.to_resolved(env)?,
@@ -4464,7 +4464,7 @@ pub mod model {
     }
 
     impl ToResolved<PipelineSegmentCtx> for PipelineSegmentVar {
-        fn to_resolved(self, env: &Env) -> Result<PipelineSegmentCtx, SpaceErr> {
+        fn to_resolved(self, env: &Env) -> Result<PipelineSegmentCtx, ParseErrs> {
             Ok(PipelineSegmentCtx {
                 step: self.step.to_resolved(env)?,
                 stop: self.stop.to_resolved(env)?,
@@ -4524,7 +4524,7 @@ pub mod model {
     //    pub type Pipeline = Vec<PipelineSegment>;
 
     impl<I: Span> TryFrom<LexParentScope<I>> for RouteScope {
-        type Error = SpaceErr;
+        type Error = ParseErrs;
 
         fn try_from(scope: LexParentScope<I>) -> Result<Self, Self::Error> {
             let mut errs = vec![];
@@ -4586,7 +4586,7 @@ pub mod model {
     pub type PipelineVar = PipelineDef<PipelineSegmentVar>;
 
     impl ToResolved<Pipeline> for PipelineCtx {
-        fn to_resolved(self, env: &Env) -> Result<Pipeline, SpaceErr> {
+        fn to_resolved(self, env: &Env) -> Result<Pipeline, ParseErrs> {
             let mut segments = vec![];
             for segment in self.segments.into_iter() {
                 segments.push(segment.to_resolved(env)?);
@@ -4597,7 +4597,7 @@ pub mod model {
     }
 
     impl ToResolved<PipelineCtx> for PipelineVar {
-        fn to_resolved(self, env: &Env) -> Result<PipelineCtx, SpaceErr> {
+        fn to_resolved(self, env: &Env) -> Result<PipelineCtx, ParseErrs> {
             let mut segments = vec![];
             for segment in self.segments.into_iter() {
                 segments.push(segment.to_resolved(env)?);
@@ -5085,7 +5085,7 @@ pub mod model {
     }
 
     pub trait VarParser<O> {
-        fn parse<I: Span>(input: I) -> Result<O, SpaceErr>;
+        fn parse<I: Span>(input: I) -> Result<O, ParseErrs>;
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -5095,7 +5095,7 @@ pub mod model {
     }
 
     impl Subst<Tw<String>> {
-        pub fn new(path: &str) -> Result<Self, SpaceErr> {
+        pub fn new(path: &str) -> Result<Self, ParseErrs> {
             let path = result(subst_path(new_span(path)))?;
             Ok(path.stringify())
         }
@@ -5136,7 +5136,7 @@ pub mod model {
     }
 
     impl ToResolved<String> for Subst<Tw<String>> {
-        fn to_resolved(self, env: &Env) -> Result<String, SpaceErr> {
+        fn to_resolved(self, env: &Env) -> Result<String, ParseErrs> {
             let mut rtn = String::new();
             let mut errs = vec![];
             for chunk in self.chunks {
@@ -5339,7 +5339,7 @@ pub struct KindLex {
 }
 
 impl TryInto<KindParts> for KindLex {
-    type Error = SpaceErr;
+    type Error = ParseErrs;
 
     fn try_into(self) -> Result<KindParts, Self::Error> {
         Ok(KindParts {
@@ -5368,7 +5368,7 @@ pub mod cmd_test {
     use core::str::FromStr;
 
     use crate::space::command::{Command, CommandVar};
-    use crate::space::err::{ParseErrs, SpaceErr};
+    use crate::space::err::{ParseErrs, ParseErrs};
     use crate::space::kind::Kind;
     use crate::space::parse::util::{new_span, result};
     use crate::space::point::{PointSeg, RouteSeg};
@@ -5398,7 +5398,7 @@ pub mod cmd_test {
      */
 
     //    #[test]
-    pub fn test() -> Result<(), SpaceErr> {
+    pub fn test() -> Result<(), ParseErrs> {
         let input = "xreate? localhost<Space>";
         match command(new_span(input)) {
             Ok(_) => {}
@@ -5414,7 +5414,7 @@ pub mod cmd_test {
     }
 
     #[test]
-    pub fn test_kind() -> Result<(), SpaceErr> {
+    pub fn test_kind() -> Result<(), ParseErrs> {
         let input = "create localhost:users<UserBase<Keycloak>>";
         let (_, command) = command(new_span(input))?;
         match command {
@@ -5432,7 +5432,7 @@ pub mod cmd_test {
     }
 
     #[test]
-    pub fn test_script() -> Result<(), SpaceErr> {
+    pub fn test_script() -> Result<(), ParseErrs> {
         let input = r#" create? localhost<Space>;
  Xcrete localhost:repo<Base<Repo>>;
  create? localhost:repo:tutorial<ArtifactBundleSeries>;
@@ -5445,14 +5445,14 @@ pub mod cmd_test {
     }
 
     #[test]
-    pub fn test_publish() -> Result<(), SpaceErr> {
+    pub fn test_publish() -> Result<(), ParseErrs> {
         let input = r#"publish ^[ bundle.zip ]-> localhost:repo:tutorial:1.0.0"#;
         publish_command(new_span(input))?;
         Ok(())
     }
 
     #[test]
-    pub fn test_upload_blocks() -> Result<(), SpaceErr> {
+    pub fn test_upload_blocks() -> Result<(), ParseErrs> {
         let input = r#"publish ^[ bundle.zip ]-> localhost:repo:tutorial:1.0.0"#;
         let blocks = result(upload_blocks(new_span(input)))?;
         assert_eq!(1, blocks.len());
@@ -5473,7 +5473,7 @@ pub mod cmd_test {
     }
 
     #[test]
-    pub fn test_create_kind() -> Result<(), SpaceErr> {
+    pub fn test_create_kind() -> Result<(), ParseErrs> {
         let input = r#"create localhost:repo:tutorial:1.0.0<Repo>"#;
         let mut command = result(create_command(new_span(input)))?;
         let command = command.collapse()?;
@@ -5492,7 +5492,7 @@ pub mod cmd_test {
     }
 
     #[test]
-    pub fn test_create_properties() -> Result<(), SpaceErr> {
+    pub fn test_create_properties() -> Result<(), ParseErrs> {
         let input = r#"create localhost:repo:tutorial:1.0.0<Repo>{ +config=the:cool:property }"#;
         let mut command = result(create_command(new_span(input)))?;
         let command = command.collapse()?;
@@ -5896,7 +5896,7 @@ pub fn delim_kind_parts<I: Span>(input: I) -> Res<I, KindParts> {
     delimited(tag("<"), kind_parts, tag(">"))(input)
 }
 
-pub fn consume_kind<I: Span>(input: I) -> Result<KindParts, SpaceErr> {
+pub fn consume_kind<I: Span>(input: I) -> Result<KindParts, ParseErrs> {
     let (_, kind_parts) = all_consuming(kind_parts)(input)?;
 
     Ok(kind_parts.try_into()?)
@@ -6936,23 +6936,23 @@ where
     .map(|(next, comment)| (next, TextType::Comment(comment)))
 }
 
-pub fn bind_config(src: &str) -> Result<BindConfig, SpaceErr> {
+pub fn bind_config(src: &str) -> Result<BindConfig, ParseErrs> {
     let document = doc(src)?;
     match document {
         Document::BindConfig(bind_config) => Ok(bind_config),
-        _ => Err("not a bind config".into()),
+        _ => Err(ParseErrs::expected(&DocKind::BindConfig, &document.kind())),
     }
 }
 
-pub fn mechtron_config(src: &str) -> Result<MechtronConfig, SpaceErr> {
+pub fn mechtron_config(src: &str) -> Result<MechtronConfig, ParseErrs> {
     let document = doc(src)?;
     match document {
         Document::MechtronConfig(mechtron_config) => Ok(mechtron_config),
-        _ => Err("not a Mechtron config".into()),
+        _ => Err(ParseErrs::expected(&DocKind::MechtronConfig, &document.kind())),
     }
 }
 
-pub fn doc(src: &str) -> Result<Document, SpaceErr> {
+pub fn doc(src: &str) -> Result<Document, ParseErrs> {
     let src = src.to_string();
     let (next, stripped) = strip_comments(new_span(src.as_str()))?;
     let span = span_with_extra(stripped.as_str(), Arc::new(src.to_string()));
@@ -7081,7 +7081,7 @@ pub struct Assignment {
     pub value: String,
 }
 
-fn semantic_mechtron_scope<I: Span>(scope: LexScope<I>) -> Result<MechtronScope, SpaceErr> {
+fn semantic_mechtron_scope<I: Span>(scope: LexScope<I>) -> Result<MechtronScope, ParseErrs> {
     let selector_name = scope.selector.name.to_string();
     match selector_name.as_str() {
         "Wasm" => {
@@ -7108,7 +7108,7 @@ fn semantic_mechtron_scope<I: Span>(scope: LexScope<I>) -> Result<MechtronScope,
     }
 }
 
-fn parse_bind_config<I: Span>(input: I) -> Result<BindConfig, SpaceErr> {
+fn parse_bind_config<I: Span>(input: I) -> Result<BindConfig, ParseErrs> {
     let lex_scopes = lex_scopes(input)?;
     let mut scopes = vec![];
     let mut errors = vec![];
@@ -7131,7 +7131,7 @@ fn parse_bind_config<I: Span>(input: I) -> Result<BindConfig, SpaceErr> {
     Ok(config)
 }
 
-fn semantic_bind_scope<I: Span>(scope: LexScope<I>) -> Result<BindScope, SpaceErr> {
+fn semantic_bind_scope<I: Span>(scope: LexScope<I>) -> Result<BindScope, ParseErrs> {
     let selector_name = scope.selector.name.to_string();
     match selector_name.as_str() {
         "Route" => {
@@ -7159,7 +7159,7 @@ fn semantic_bind_scope<I: Span>(scope: LexScope<I>) -> Result<BindScope, SpaceEr
     }
 }
 
-fn parse_bind_pipelines_scope<I: Span>(input: I) -> Result<Spanned<I, BindScopeKind>, SpaceErr> {
+fn parse_bind_pipelines_scope<I: Span>(input: I) -> Result<Spanned<I, BindScopeKind>, ParseErrs> {
     unimplemented!()
     /*
     let (next, lex_scopes) = lex_scopes(input.clone())?;
@@ -7380,7 +7380,7 @@ pub fn var_chunk<I: Span>(input: I) -> Res<I, Chunk<I>> {
     .map(|(next, variable_name)| (next, Chunk::Var(variable_name)))
 }
 
-pub fn route_attribute(input: &str) -> Result<RouteSelector, SpaceErr> {
+pub fn route_attribute(input: &str) -> Result<RouteSelector, ParseErrs> {
     let input = new_span(input);
     let (_, (_, lex_route)) = result(pair(
         tag("#"),
@@ -7402,7 +7402,7 @@ pub fn route_attribute(input: &str) -> Result<RouteSelector, SpaceErr> {
     route_selector(lex_route)
 }
 
-pub fn route_attribute_value(input: &str) -> Result<RouteSelector, SpaceErr> {
+pub fn route_attribute_value(input: &str) -> Result<RouteSelector, ParseErrs> {
     let input = new_span(input);
     let lex_route = result(unwrap_block(
         BlockKind::Delimited(DelimitedBlockKind::DoubleQuotes),
@@ -7412,7 +7412,7 @@ pub fn route_attribute_value(input: &str) -> Result<RouteSelector, SpaceErr> {
     route_selector(lex_route)
 }
 
-pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, SpaceErr> {
+pub fn route_selector<I: Span>(input: I) -> Result<RouteSelector, ParseErrs> {
     let (next, (topic, lex_route)) = match pair(
         opt(terminated(
             unwrap_block(
