@@ -2,7 +2,7 @@ use core::fmt::Display;
 use nom::character::complete::multispace0;
 use nom::error::{ErrorKind, ParseError};
 use nom::sequence::delimited;
-use nom::{AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength, InputTake, InputTakeAtPosition, Needed, Offset, Slice};
+use nom::{AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength, InputTake, InputTakeAtPosition, Offset, Slice};
 use nom_locate::LocatedSpan;
 use nom_supreme::error::{GenericErrorTree, StackContext};
 use nom_supreme::final_parser::ExtractContext;
@@ -12,7 +12,9 @@ use std::ops::{Deref, Range, RangeFrom, RangeTo};
 use std::sync::Arc;
 use thiserror::__private::AsDisplay;
 use crate::space::parse::case::VarCase;
-use crate::space::parse::ctx::{ParseCtx, ParseLoc, SpanCtx};
+use crate::space::parse::ctx::{ParseCtx, SpanCtx};
+use crate::space::parse::nom::{Input, Span};
+use crate::space::parse::nom::err::ErrTree;
 use crate::space::parse::vars::Variable;
 
 #[cfg(test)]
@@ -24,74 +26,6 @@ mod tests {
     }
 }
 
-pub trait Span:
-    Clone
-    + ToString
-    + AsBytes
-    + Slice<Range<usize>>
-    + Slice<RangeTo<usize>>
-    + Slice<RangeFrom<usize>>
-    + InputLength
-    + Offset
-    + InputTake
-    + InputIter<Item = char>
-    + InputTakeAtPosition<Item = char>
-    + Compare<&'static str>
-    + FindSubstring<&'static str>
-    + core::fmt::Debug
-where
-    Self: Sized,
-    <Self as InputTakeAtPosition>::Item: AsChar,
-{
-    fn location_offset(&self) -> usize;
-
-    fn location_line(&self) -> u32;
-
-    fn get_column(&self) -> usize;
-
-    fn extra(&self) -> Arc<String>;
-
-    fn len(&self) -> usize;
-
-    fn range(&self) -> Range<usize>;
-
-    fn trace(&self) -> Trace {
-        Trace {
-            range: self.range(),
-            extra: self.extra(),
-        }
-    }
-}
-
-impl<'a> Span for Wrap<LocatedSpan<&'a str, Arc<String>>> {
-    fn location_offset(&self) -> usize {
-        self.input.location_offset()
-    }
-
-    fn get_column(&self) -> usize {
-        self.input.get_column()
-    }
-
-    fn location_line(&self) -> u32 {
-        self.input.location_line()
-    }
-
-    fn extra(&self) -> Arc<String> {
-        self.input.extra.clone()
-    }
-
-    fn len(&self) -> usize {
-        self.input.len()
-    }
-
-    fn range(&self) -> Range<usize> {
-        Range {
-            start: self.location_offset(),
-            end: self.location_offset() + self.len(),
-        }
-    }
-}
-
 // TraceWrap
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Tw<W> {
@@ -100,7 +34,7 @@ pub struct Tw<W> {
 }
 
 impl<W> Tw<W> {
-    pub fn new<I: Span>(span: I, w: W) -> Self {
+    pub fn new<I: Input>(span: I, w: W) -> Self {
         Self {
             trace: span.trace(),
             w,
@@ -140,7 +74,7 @@ impl Into<Variable> for Tw<VarCase> {
 
 pub fn tw<I, F, O, C, E>(mut f: F) -> impl FnMut(I) -> Res<I, Tw<O>, C, E>
 where
-    I: Span,
+    I: Input,
     F: FnMut(I) -> Res<I, O, C, E>,
 {
     move |input: I| {
@@ -153,22 +87,24 @@ where
     }
 }
 
-fn some<I:Span,E>( input: I) -> Res<I,String>
+fn some<I: Input,E>(input: I) -> Res2<I,String> {
+
+}
 
 //pub type OwnedSpan<'a> = LocatedSpan<&'a str, SpanExtra>;
 pub type SpanExtra = Arc<String>;
 
-pub fn new_span<'a>(s: &'a str) -> Wrap<LocatedSpan<&'a str, Arc<String>>> {
+pub fn new_span<'a>(s: &'a str) -> Span<LocatedSpan<&'a str, Arc<String>>> {
     let extra = Arc::new(s.to_string());
     let span = LocatedSpan::new_extra(s, extra);
-    Wrap::new(span)
+    Span::new(span)
 }
 
 pub fn span_with_extra<'a>(
     s: &'a str,
     extra: Arc<String>,
-) -> Wrap<LocatedSpan<&'a str, Arc<String>>> {
-    Wrap::new(LocatedSpan::new_extra(s, extra))
+) -> Span<LocatedSpan<&'a str, Arc<String>>> {
+    Span::new(LocatedSpan::new_extra(s, extra))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
@@ -194,7 +130,7 @@ impl Trace {
         }
     }
 
-    pub fn scan<F, I: Span, O, C, E>(f: F, input: I) -> Self
+    pub fn scan<F, I: Input, O, C, E>(f: F, input: I) -> Self
     where
         F: FnMut(I) -> Res<I, O, C, E> + Copy,
         E: std::error::Error + Send + Sync + 'static
@@ -486,8 +422,9 @@ impl FindSubstring<&str> for SliceStr {
 
 #[cfg(test)]
 pub mod test {
-    use crate::space::parse::util::SliceStr;
+    use util::SliceStr;
     use nom::Slice;
+    use crate::space::parse::util::SliceStr;
 
     #[test]
     pub fn test() {
@@ -507,369 +444,12 @@ pub mod test {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Wrap<I>
-where
-    I: Clone
-        + ToString
-        + AsBytes
-        + Slice<Range<usize>>
-        + Slice<RangeTo<usize>>
-        + Slice<RangeFrom<usize>>
-        + InputLength
-        + Offset
-        + InputTake
-        + InputIter<Item = char>
-        + core::fmt::Debug
-        + InputTakeAtPosition<Item = char>,
-{
-    input: I,
-}
-
-impl<I> Wrap<I>
-where
-    I: Clone
-        + ToString
-        + AsBytes
-        + Slice<Range<usize>>
-        + Slice<RangeTo<usize>>
-        + Slice<RangeFrom<usize>>
-        + InputLength
-        + Offset
-        + InputTake
-        + InputIter<Item = char>
-        + core::fmt::Debug
-        + InputTakeAtPosition<Item = char>,
-{
-    pub fn new(input: I) -> Self {
-        Self { input }
-    }
-}
-
-impl<I> Deref for Wrap<I>
-where
-    I: Clone
-        + ToString
-        + AsBytes
-        + Slice<Range<usize>>
-        + Slice<RangeTo<usize>>
-        + Slice<RangeFrom<usize>>
-        + InputLength
-        + Offset
-        + InputTake
-        + InputIter<Item = char>
-        + core::fmt::Debug
-        + InputTakeAtPosition<Item = char>,
-{
-    type Target = I;
-
-    fn deref(&self) -> &Self::Target {
-        &self.input
-    }
-}
-
-impl<I> AsBytes for Wrap<I>
-where
-    I: Clone
-        + ToString
-        + AsBytes
-        + Slice<Range<usize>>
-        + Slice<RangeTo<usize>>
-        + Slice<RangeFrom<usize>>
-        + InputLength
-        + Offset
-        + InputTake
-        + InputIter<Item = char>
-        + core::fmt::Debug
-        + InputTakeAtPosition<Item = char>,
-{
-    fn as_bytes(&self) -> &[u8] {
-        self.input.as_bytes()
-    }
-}
-
-impl<I> Slice<Range<usize>> for Wrap<I>
-where
-    I: Clone
-        + ToString
-        + AsBytes
-        + Slice<Range<usize>>
-        + Slice<RangeTo<usize>>
-        + Slice<RangeFrom<usize>>
-        + InputLength
-        + Offset
-        + InputTake
-        + InputIter<Item = char>
-        + core::fmt::Debug
-        + InputTakeAtPosition<Item = char>,
-{
-    fn slice(&self, range: Range<usize>) -> Self {
-        Self::new(self.input.slice(range))
-    }
-}
-
-impl<I> Slice<RangeFrom<usize>> for Wrap<I>
-where
-    I: Clone
-        + ToString
-        + AsBytes
-        + Slice<Range<usize>>
-        + Slice<RangeTo<usize>>
-        + Slice<RangeFrom<usize>>
-        + InputLength
-        + Offset
-        + InputTake
-        + InputIter<Item = char>
-        + core::fmt::Debug
-        + InputTakeAtPosition<Item = char>,
-{
-    fn slice(&self, range: RangeFrom<usize>) -> Self {
-        Self::new(self.input.slice(range))
-    }
-}
-
-impl<I> Slice<RangeTo<usize>> for Wrap<I>
-where
-    I: Clone
-        + ToString
-        + AsBytes
-        + Slice<Range<usize>>
-        + Slice<RangeTo<usize>>
-        + Slice<RangeFrom<usize>>
-        + InputLength
-        + Offset
-        + InputTake
-        + InputIter<Item = char>
-        + core::fmt::Debug
-        + InputTakeAtPosition<Item = char>,
-{
-    fn slice(&self, range: RangeTo<usize>) -> Self {
-        Self::new(self.input.slice(range))
-    }
-}
-
-impl<'a> Compare<&'static str> for Wrap<LocatedSpan<&'a str, Arc<String>>> {
-    fn compare(&self, t: &str) -> CompareResult {
-        self.input.compare(t)
-    }
-
-    fn compare_no_case(&self, t: &str) -> CompareResult {
-        self.input.compare_no_case(t)
-    }
-}
-
-impl<I> InputLength for Wrap<I>
-where
-    I: Clone
-        + ToString
-        + AsBytes
-        + Slice<Range<usize>>
-        + Slice<RangeTo<usize>>
-        + Slice<RangeFrom<usize>>
-        + InputLength
-        + Offset
-        + InputTake
-        + InputIter<Item = char>
-        + core::fmt::Debug
-        + InputTakeAtPosition<Item = char>,
-{
-    fn input_len(&self) -> usize {
-        self.input.input_len()
-    }
-}
-
-impl<I> Offset for Wrap<I>
-where
-    I: Clone
-        + ToString
-        + AsBytes
-        + Slice<Range<usize>>
-        + Slice<RangeTo<usize>>
-        + Slice<RangeFrom<usize>>
-        + InputLength
-        + Offset
-        + InputTake
-        + InputIter<Item = char>
-        + core::fmt::Debug
-        + InputTakeAtPosition<Item = char>,
-{
-    fn offset(&self, second: &Self) -> usize {
-        self.input.offset(&second.input)
-    }
-}
-
-impl<I> InputIter for Wrap<I>
-where
-    I: Clone
-        + ToString
-        + AsBytes
-        + Slice<Range<usize>>
-        + Slice<RangeTo<usize>>
-        + Slice<RangeFrom<usize>>
-        + InputLength
-        + Offset
-        + InputTake
-        + InputIter<Item = char>
-        + core::fmt::Debug
-        + InputTakeAtPosition<Item = char>,
-{
-    type Item = <I as InputIter>::Item;
-    type Iter = <I as InputIter>::Iter;
-    type IterElem = <I as InputIter>::IterElem;
-
-    fn iter_indices(&self) -> Self::Iter {
-        self.input.iter_indices()
-    }
-
-    fn iter_elements(&self) -> Self::IterElem {
-        self.input.iter_elements()
-    }
-
-    fn position<P>(&self, predicate: P) -> Option<usize>
-    where
-        P: Fn(Self::Item) -> bool,
-    {
-        self.input.position(predicate)
-    }
-
-    fn slice_index(&self, count: usize) -> Result<usize, Needed> {
-        self.input.slice_index(count)
-    }
-}
-
-impl<I> InputTake for Wrap<I>
-where
-    I: Clone
-        + ToString
-        + AsBytes
-        + Slice<Range<usize>>
-        + Slice<RangeTo<usize>>
-        + Slice<RangeFrom<usize>>
-        + InputLength
-        + Offset
-        + InputTake
-        + InputIter<Item = char>
-        + core::fmt::Debug
-        + InputTakeAtPosition<Item = char>,
-{
-    fn take(&self, count: usize) -> Self {
-        Wrap::new(self.input.take(count))
-    }
-
-    fn take_split(&self, count: usize) -> (Self, Self) {
-        let (left, right) = self.input.take_split(count);
-        (Wrap::new(left), Wrap::new(right))
-    }
-}
-
-impl<I> ToString for Wrap<I>
-where
-    I: Clone
-        + ToString
-        + AsBytes
-        + Slice<Range<usize>>
-        + Slice<RangeTo<usize>>
-        + Slice<RangeFrom<usize>>
-        + InputLength
-        + Offset
-        + InputTake
-        + InputIter<Item = char>
-        + core::fmt::Debug
-        + InputTakeAtPosition<Item = char>,
-{
-    fn to_string(&self) -> String {
-        self.input.to_string()
-    }
-}
-
-impl<'a> FindSubstring<&str> for Wrap<LocatedSpan<&'a str, Arc<String>>> {
-    fn find_substring(&self, substr: &str) -> Option<usize> {
-        self.input.find_substring(substr)
-    }
-}
-
-impl<I> InputTakeAtPosition for Wrap<I>
-where
-    I: Clone
-        + ToString
-        + AsBytes
-        + Slice<Range<usize>>
-        + Slice<RangeTo<usize>>
-        + Slice<RangeFrom<usize>>
-        + InputLength
-        + Offset
-        + InputTake
-        + InputIter<Item = char>
-        + core::fmt::Debug
-        + InputTakeAtPosition<Item = char>,
-{
-    type Item = <I as InputIter>::Item;
-
-    fn split_at_position<P, E: ParseError<Self>>(&self, predicate: P) -> IResult<Self, Self, E>
-    where
-        P: Fn(Self::Item) -> bool,
-    {
-        match self.position(predicate) {
-            Some(n) => Ok(self.take_split(n)),
-            None => Err(nom::Err::Incomplete(Needed::new(1))),
-        }
-    }
-
-    fn split_at_position1<P, E: ParseError<Self>>(
-        &self,
-        predicate: P,
-        e: ErrorKind,
-    ) -> IResult<Self, Self, E>
-    where
-        P: Fn(Self::Item) -> bool,
-    {
-        match self.position(predicate) {
-            Some(0) => Err(nom::Err::Error(E::from_error_kind(self.clone(), e))),
-            Some(n) => Ok(self.take_split(n)),
-            None => Err(nom::Err::Incomplete(Needed::new(1))),
-        }
-    }
-
-    fn split_at_position_complete<P, E: ParseError<Self>>(
-        &self,
-        predicate: P,
-    ) -> IResult<Self, Self, E>
-    where
-        P: Fn(Self::Item) -> bool,
-    {
-        match self.split_at_position(predicate) {
-            Err(nom::Err::Incomplete(_)) => Ok(self.take_split(self.input_len())),
-            res => res,
-        }
-    }
-
-    fn split_at_position1_complete<P, E: ParseError<Self>>(
-        &self,
-        predicate: P,
-        e: ErrorKind,
-    ) -> IResult<Self, Self, E>
-    where
-        P: Fn(Self::Item) -> bool,
-    {
-        match self.split_at_position1(predicate, e) {
-            Err(nom::Err::Incomplete(_)) => {
-                if self.input_len() == 0 {
-                    Err(nom::Err::Error(E::from_error_kind(self.clone(), e)))
-                } else {
-                    Ok(self.take_split(self.input_len()))
-                }
-            }
-            res => res,
-        }
-    }
-}
-
-type Res<I: Span, O, C, E: std::error::Error + Send + Sync + 'static> = IResult<I, O, GenericErrorTree<I, &'static str, C, E>>;
-type Res2<'a,C,I: Span, L:ParseLoc, O, E: std::error::Error + Send + Sync + 'static> = IResult<I, O, GenericErrorTree<I, &'static str, SpanCtx<'a,I,L>, E>>;
+type Res<I: Input, O, C, E: std::error::Error + Send + Sync + 'static> = IResult<I, O, GenericErrorTree<I, &'static str, C, E>>;
+type Res2<'a,C,I: Input, L: ParseCtx, O, E: std::error::Error + Send + Sync + 'static> = IResult<I, O, GenericErrorTree<I, &'static str, SpanCtx<'a,I,L>, E>>;
 
 pub fn wrap<I, F, O, C, E>(mut f: F) -> impl FnMut(I) -> Res<I, O, C, E>
 where
-    I: Span,
+    I: Input,
     F: FnMut(I) -> Res<I, O, C, E> + Copy,
     E: std::error::Error + Send + Sync + 'static
 {
@@ -878,7 +458,7 @@ where
 
 pub fn len<I, F, O, C,E>(f: F) -> impl FnMut(I) -> usize
 where
-    I: Span,
+    I: Input,
     F: FnMut(I) -> Res<I, O, C, E> + Copy,
     E: std::error::Error + Send + Sync + 'static
 {
@@ -890,14 +470,14 @@ where
 
 pub fn trim<I, F, O, C, E>(f: F) -> impl FnMut(I) -> Res<I, O, C, E>
 where
-    I: Span,
+    I: Input,
     F: FnMut(I) -> Res<I, O, C, E> + Copy,
     E: std::error::Error + Send + Sync + 'static
 {
     move |input: I| delimited(multispace0, f, multispace0)(input)
 }
 
-pub fn result<I: Span, R>(result: Result<(I, R), nom::Err<SpaceTree<I>>>) -> Result<R, ParseErrs> {
+pub fn result<I: Input, R>(result: Result<(I, R), nom::Err<ErrTree<I>>>) -> Result<R, ParseErrs> {
     match result {
         Ok((_, e)) => Ok(e),
         Err(nom::Err::Error(err)) => {
@@ -952,7 +532,8 @@ where
 }
 
 
-pub fn log_parse_err<I,O>( result: crate::space::parse::Res<I,O>) -> crate::space::parse::Res<I,O> where I: Span{
+pub fn log_parse_err<I,O>( result: Res<I,O>) -> Res<I,O> where I: Input
+{
 
     if let Result::Err(err) = &result {
         match err {
@@ -964,13 +545,14 @@ pub fn log_parse_err<I,O>( result: crate::space::parse::Res<I,O>) -> crate::spac
     result
 }
 
-pub fn print<I>(err: &SpaceTree<I>) where I: Span{
+pub fn print<I>(err: &ErrTree<I>) where I: Input
+{
 
     match err {
-        SpaceTree::Base { .. } => {
+        ErrTree::Base { .. } => {
             println!("BASE!");
         }
-        SpaceTree::Stack { base,contexts } => {
+        ErrTree::Stack { base,contexts } => {
 
             println!("STACK!");
             let mut contexts = contexts.clone();
@@ -993,7 +575,7 @@ pub fn print<I>(err: &SpaceTree<I>) where I: Span{
                 }
             }
         }
-        SpaceTree::Alt(_) => {
+        ErrTree::Alt(_) => {
             println!("ALT!");
         }
     }

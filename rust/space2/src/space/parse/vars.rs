@@ -1,6 +1,7 @@
 use std::str::FromStr;
+use crate::space::parse::case::VarCase;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Variable {
     pub name: VarCase,
     pub trace: Trace,

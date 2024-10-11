@@ -1,6 +1,20 @@
+#![no_std]
+#![no_main]
+
+#![feature(new_range_api)]
+extern crate core;
+extern crate alloc;
 
 pub mod space;
 
+
+
+use core::panic::PanicInfo;
+
+#[panic_handler]
+fn panic(_panic: &PanicInfo<'_>) -> ! {
+    loop {}
+}
 
 
 

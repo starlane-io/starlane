@@ -1,44 +1,42 @@
-use std::ops::{Deref, DerefMut};
-use crate::space::parse::util::{SliceStr, Span, Wrap};
-
-pub struct ParseCtx {
-    slice: SliceStr,
-    loc: ParseLoc
-}
+use alloc::string::ToString;
+use alloc::vec::Vec;
+use core::ops::Deref;
+use starlane_primitive_macros::Autobox;
+use crate::space::parse::nom::Input;
 
 
-pub trait ParseLoc {
-
-}
-
-pub struct SpanCtx<'a,S,L> where S: 'a+Span, L: 'a+ParseLoc{
-    span: &'a dyn S,
-    loc: L
-}
-
-impl <'a,S,L> SpanCtx<'a,S,L> where S: 'a+Span , L: 'a+ParseLoc {
-    pub fn push<'b,C>(&'a self, span: &'b S, loc: C) -> SpanCtx<'b,S,C> where C: 'b+ParseLoc {
-        SpanCtx {
-            span,
-            loc,
-        }
+pub trait ParseCtx: Into<&'static str>{
+    fn as_str(&self) -> &'static str {
+        self.into()
     }
 }
 
-impl <'a,S,L> Drop for SpanCtx<'a,S,L> where S: 'a+Span , L: 'a+ParseLoc {
-    fn drop(&mut self) {
-        // must somehow report jhow
-    }
+#[derive(Autobox,strum_macros::IntoStaticStr)]
+pub enum RootCtx {
+    TokenCtx(TokenCtx)
+}
+impl ParseCtx for RootCtx {}
+
+#[derive(Autobox,strum_macros::IntoStaticStr)]
+pub enum TokenCtx {
+
 }
 
-pub struct Stack<'a,S> where S: 'a+Span {
+impl ParseCtx for TokenCtx{}
+
+
+
+
+pub struct Stack<'a,S> where S: 'a+ Input
+{
     top: &'a dyn S,
     spans: Vec<&'a dyn S>
 }
 
 
 
-impl <'a,S> Deref for Stack<S> where S: 'a+Span {
+impl <'a,S> Deref for Stack<S> where S: 'a+ Input
+{
     type Target =  dyn S;
 
     fn deref(&self) -> &'a Self::Target {

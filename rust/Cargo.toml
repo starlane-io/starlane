@@ -21,7 +21,8 @@ resolver = "2"
 #  "starlane", "starlane-macros", "starlane-primitive-macros","mechtron"
 #  , "starlane-space", "ext/service/starlane-cli-local-filestore-service" , "ext/service/starlane-cli-filestore-s3-service", "space2", "starlane-util"]
 
-members = ["space2"]
+members = ["space2","starlane-space","starlane-primitive-macros" ]
+
 exclude = [ ]
 
 [workspace.dependencies]
