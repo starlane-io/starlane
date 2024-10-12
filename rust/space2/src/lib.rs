@@ -1,8 +1,10 @@
 #![no_std]
 #![no_main]
 
+
 #![feature(new_range_api)]
 extern crate core;
+#[macro_use]
 extern crate alloc;
 
 pub mod space;
@@ -59,3 +61,5 @@ pub mod test {
 }
 
 */
+
+pub(crate) use core::error::Error as RustErr;

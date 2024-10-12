@@ -1,4 +1,8 @@
+use alloc::string::{String, ToString};
+use alloc::sync::Arc;
 use core::fmt::Display;
+use core::ops::{Deref, RangeTo};
+use core::range::{Range, RangeFrom};
 use nom::character::complete::multispace0;
 use nom::error::{ErrorKind, ParseError};
 use nom::sequence::delimited;
@@ -8,14 +12,13 @@ use nom_supreme::error::{GenericErrorTree, StackContext};
 use nom_supreme::final_parser::ExtractContext;
 use nom_supreme::ParserExt;
 use serde::{Deserialize, Serialize};
-use std::ops::{Deref, Range, RangeFrom, RangeTo};
-use std::sync::Arc;
 use thiserror::__private::AsDisplay;
 use crate::space::parse::case::VarCase;
-use crate::space::parse::ctx::{ParseCtx, SpanCtx};
-use crate::space::parse::nom::{Input, Span};
+use crate::space::parse::ctx::{InputCtx, RootCtx};
+use crate::space::parse::nom::{Input, Res, Span};
 use crate::space::parse::nom::err::ErrTree;
 use crate::space::parse::vars::Variable;
+use core::error::Error as RustErr;
 
 #[cfg(test)]
 mod tests {
@@ -27,16 +30,16 @@ mod tests {
 }
 
 // TraceWrap
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct Tw<W> {
-    pub trace: Trace,
+pub struct Trace<W> {
+    pub range: Range<usize>,
     pub w: W,
 }
 
-impl<W> Tw<W> {
-    pub fn new<I: Input>(span: I, w: W) -> Self {
+
+impl<W> Trace<W> {
+    pub fn new<I>(input :I, w: W) -> Self where I: Input{
         Self {
-            trace: span.trace(),
+            range: input.range(),
             w,
         }
     }
@@ -46,7 +49,38 @@ impl<W> Tw<W> {
     }
 }
 
-impl<W> ToString for Tw<W>
+impl<W> PartialEq<W> for Trace<W>
+where
+    W: PartialEq<W>,
+{
+    fn eq(&self, other: &W) -> bool {
+       self.w == other
+    }
+}
+
+impl<W> PartialEq<Self> for Trace<W>
+where
+    W: PartialEq<W>,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.range == other.range && self.w == other.w
+    }
+}
+
+impl <W> Eq for Trace<W> where W: Eq {
+
+}
+
+impl <W> Clone for Trace<W> where W: Clone {
+    fn clone(&self) -> Self {
+        Self {
+            range: self.clone(),
+            w: self.w.clone(),
+        }
+    }
+}
+
+impl<W> ToString for Trace<W>
 where
     W: ToString,
 {
@@ -55,7 +89,7 @@ where
     }
 }
 
-impl<W> Deref for Tw<W> {
+impl<W> Deref for Trace<W> {
     type Target = W;
 
     fn deref(&self) -> &Self::Target {
@@ -63,7 +97,7 @@ impl<W> Deref for Tw<W> {
     }
 }
 
-impl Into<Variable> for Tw<VarCase> {
+impl Into<Variable> for Trace<VarCase> {
     fn into(self) -> Variable {
         Variable {
             name: self.w,
@@ -72,23 +106,19 @@ impl Into<Variable> for Tw<VarCase> {
     }
 }
 
-pub fn tw<I, F, O, C, E>(mut f: F) -> impl FnMut(I) -> Res<I, Tw<O>, C, E>
+pub fn tron<I, F, O>(mut f: F) -> impl FnMut(I) -> Res<I,Trace<O>>
 where
     I: Input,
-    F: FnMut(I) -> Res<I, O, C, E>,
+    F: FnMut(I) -> Res<I, O>,
 {
     move |input: I| {
         let (next, output) = f(input.clone())?;
 
         let span = input.slice(0..next.len());
-        let tw = Tw::new(span, output);
+        let tw = Trace::new(span, output);
 
         Ok((next, tw))
     }
-}
-
-fn some<I: Input,E>(input: I) -> Res2<I,String> {
-
 }
 
 //pub type OwnedSpan<'a> = LocatedSpan<&'a str, SpanExtra>;
@@ -107,8 +137,9 @@ pub fn span_with_extra<'a>(
     Span::new(LocatedSpan::new_extra(s, extra))
 }
 
+
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub struct Trace
+pub struct OldTrace
 {
     pub range: Range<usize>,
     pub extra: SpanExtra
@@ -118,14 +149,14 @@ pub struct Trace
 
 
 
-impl Trace {
+impl OldTrace {
     pub fn new(range: Range<usize>, extra: SpanExtra) -> Self {
         Self { range, extra }
     }
 
     pub fn at_offset(offset: usize, extra: SpanExtra) -> Self {
         Self {
-            range: offset..offset,
+            range: Range::from(offset..offset),
             extra,
         }
     }
@@ -133,7 +164,7 @@ impl Trace {
     pub fn scan<F, I: Input, O, C, E>(f: F, input: I) -> Self
     where
         F: FnMut(I) -> Res<I, O, C, E> + Copy,
-        E: std::error::Error + Send + Sync + 'static
+        E: RustErr + Send + Sync + 'static
     {
         let extra = input.extra();
         let range = input.location_offset()..len(f)(input);
@@ -197,7 +228,6 @@ impl Deref for SliceStr {
 
 impl AsBytes for SliceStr {
     fn as_bytes(&self) -> &[u8] {
-        println!("AS BYTES: {}", self.string.as_bytes().len());
         self.string
             .as_bytes()
             .slice(self.location_offset..self.location_offset + self.len)
@@ -422,7 +452,7 @@ impl FindSubstring<&str> for SliceStr {
 
 #[cfg(test)]
 pub mod test {
-    use util::SliceStr;
+    use alloc::string::ToString;
     use nom::Slice;
     use crate::space::parse::util::SliceStr;
 
@@ -435,8 +465,6 @@ pub mod test {
         assert_eq!(3, s.len());
         assert_eq!("abc", s.as_str());
 
-        println!("bytes: {}", s.as_bytes().len());
-        println!("chars: {}", s.chars().count());
 
         let s = SliceStr::new("abc123".to_string());
         assert_eq!("123", s.slice(3..).as_str());
@@ -444,14 +472,12 @@ pub mod test {
     }
 }
 
-type Res<I: Input, O, C, E: std::error::Error + Send + Sync + 'static> = IResult<I, O, GenericErrorTree<I, &'static str, C, E>>;
-type Res2<'a,C,I: Input, L: ParseCtx, O, E: std::error::Error + Send + Sync + 'static> = IResult<I, O, GenericErrorTree<I, &'static str, SpanCtx<'a,I,L>, E>>;
 
 pub fn wrap<I, F, O, C, E>(mut f: F) -> impl FnMut(I) -> Res<I, O, C, E>
 where
     I: Input,
     F: FnMut(I) -> Res<I, O, C, E> + Copy,
-    E: std::error::Error + Send + Sync + 'static
+    E: RustErr + Send + Sync + 'static
 {
     move |input: I| f(input)
 }
@@ -460,7 +486,7 @@ pub fn len<I, F, O, C,E>(f: F) -> impl FnMut(I) -> usize
 where
     I: Input,
     F: FnMut(I) -> Res<I, O, C, E> + Copy,
-    E: std::error::Error + Send + Sync + 'static
+    E: RustErr + Send + Sync + 'static
 {
     move |input: I| match recognize(wrap(f))(input) {
         Ok((_, span)) => span.len(),
@@ -472,12 +498,12 @@ pub fn trim<I, F, O, C, E>(f: F) -> impl FnMut(I) -> Res<I, O, C, E>
 where
     I: Input,
     F: FnMut(I) -> Res<I, O, C, E> + Copy,
-    E: std::error::Error + Send + Sync + 'static
+    E: RustErr + Send + Sync + 'static
 {
     move |input: I| delimited(multispace0, f, multispace0)(input)
 }
 
-pub fn result<I: Input, R>(result: Result<(I, R), nom::Err<ErrTree<I>>>) -> Result<R, ParseErrs> {
+pub fn result<I: Input, R>(result: Result<(I, R), nom::Err<ErrTree<I,RootCtx>>>) -> Result<R, ParseErrs> {
     match result {
         Ok((_, e)) => Ok(e),
         Err(nom::Err::Error(err)) => {

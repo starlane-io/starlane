@@ -1,85 +1,66 @@
-use alloc::string::String;
+use crate::space::parse::ctx::InputCtx;
+use crate::space::parse::nom::err::ParseErr;
+use crate::space::parse::nom::{Input, Res};
+use crate::space::parse::util::recognize;
+use ::nom::branch::alt;
+use ::nom::bytes::complete::{is_a, tag};
+use ::nom::character::complete::{alpha1, alphanumeric1};
+use ::nom::combinator::peek;
+use ::nom::error::ErrorKind;
+use ::nom::multi::many0;
+use ::nom::sequence::tuple;
+use ::nom::{AsChar, InputTakeAtPosition};
+use alloc::string::{String, ToString};
 use core::fmt;
 use core::fmt::{Display, Formatter};
 use core::ops::Deref;
 use core::str::FromStr;
-use crate::space::parse::nom::err::ParseErr;
+use nom::character::complete::alphanumeric0;
+use starlane_primitive_macros::Case;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct VarCase {
-    string: String,
-}
-impl Deref for VarCase {
-    type Target = String;
+#[derive(Case, Debug, Clone, Eq, PartialEq, Hash)]
+pub struct SkewerCase(String);
 
-    fn deref(&self) -> &Self::Target {
-        &self.string
-    }
-}
+#[derive(Case, Debug, Clone, Eq, PartialEq, Hash)]
+pub struct VarCase(String);
+#[derive(Case, Debug, Clone, Eq, PartialEq, Hash)]
+pub struct DomainCase(String);
 
-impl FromStr for VarCase {
-    type Err = ParseErr;
+#[derive(Case, Debug, Clone, Eq, PartialEq, Hash)]
+pub struct CamelCase(String);
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        result(all_consuming(var_chars)(new_span(s)))?;
-        Ok(Self {
-            string: s.to_string(),
-        })
-    }
+pub fn skewer_case<I: Input>(input: I) -> Res<I, SkewerCase> {
+    recognize(tuple((peek(alpha1), many0(alt((alphanumeric1, tag("-")))))))(input)
+        .map(|(next, rtn)| (next, SkewerCase(rtn.to_string())))
 }
 
-impl Display for VarCase {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(self.string.as_str())
-    }
+pub fn var_case<I: Input>(input: I) -> Res<I, VarCase> {
+    recognize(tuple((peek(alpha1), many0(alt((alphanumeric1, tag("_")))))))(input)
+        .map(|(next, rtn)| (next, VarCase(rtn.to_string())))
 }
 
-
-#[cfg(feature="serde")]
-pub mod serde {
-    use alloc::string::String;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    use crate::space::parse::case::VarCase;
-
-    impl Serialize for VarCase {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
-        {
-            serializer.serialize_str(self.string.as_str())
-        }
-    }
-
-    impl<'de> Deserialize<'de> for VarCase {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            let string = String::deserialize(deserializer)?;
-
-            let result = result(var_case(new_span(string.as_str())));
-            match result {
-                Ok(var) => Ok(var),
-                Err(err) => Err(serde::de::Error::custom(err.to_string())),
-            }
-        }
-    }
-
-
-
-}
-pub(crate) mod nom {
-    use nom::combinator::recognize;
-    use nom::sequence::pair;
-    use nom::character::complete::{alpha1, alphanumeric1};
-    use nom::multi::many0;
-    use nom::branch::alt;
-    use nom_supreme::ParserExt;
-    use nom_supreme::tag::complete::tag;
-    use crate::space::parse::nom::Input;
-
-    fn var_chars<I: Input>(input: I) -> Res<I, I> {
-        recognize(pair(alpha1, many0(alt((alphanumeric1, tag("_"))))).context(VarErrCtx::VarName.into()))(input)
-    }
+pub fn domain_case<I: Input>(input: I) -> Res<I, DomainCase> {
+    recognize(tuple((
+        peek(alpha1),
+        many0(alt((alphanumeric1, tag("-"), tag(".")))),
+    )))(input)
+    .map(|(next, rtn)| (next, DomainCase(rtn.to_string())))
 }
 
+pub fn lowercase_alphanumeric<I: Input>(input: I) -> Res<I, I> {
+    recognize(tuple((lowercase1, alphanumeric0)))(input)
+}
+
+pub fn lowercase1<T: Input>(i: T) -> Res<T, T>
+where
+    T: InputTakeAtPosition + nom::InputLength,
+    <T as InputTakeAtPosition>::Item: AsChar,
+{
+    i.split_at_position1_complete(
+        |item| {
+            let char_item = item.as_char();
+            !(char_item.is_alpha() && char_item.is_lowercase())
+        },
+        ErrorKind::AlphaNumeric,
+    )
+}

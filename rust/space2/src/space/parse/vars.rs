@@ -1,21 +1,12 @@
 use std::str::FromStr;
 use crate::space::parse::case::VarCase;
+use crate::space::parse::util::{OldTrace, Trace};
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct Variable {
-    pub name: VarCase,
-    pub trace: Trace,
-}
-
-impl Variable {
-    pub fn new(name: VarCase, trace: Trace) -> Self {
-        Self { name, trace }
-    }
-}
+pub type Variable = Trace<VarCase>;
 
 pub enum VarVal<V> {
-    Var(Tw<VarCase>),
-    Val(Tw<V>),
+    Var(Trace<VarCase>),
+    Val(Trace<V>),
 }
 
 impl<V> TryInto<Variable> for VarVal<V> {

@@ -1,16 +1,27 @@
+use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use core::ops::Deref;
 use core::range::{Range, RangeFrom, RangeTo};
 use nom::{AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength, InputTake, InputTakeAtPosition, Needed, Offset, Slice};
 use nom::error::{ErrorKind, ParseError};
-use crate::space::parse::util::{Input, Trace};
-
-
+use nom_supreme::error::GenericErrorTree;
+use nom_supreme::ParserExt;
+use crate::space::parse::ctx::InputCtx;
+use crate::space::parse::util::{Input, OldTrace};
+use crate::RustErr;
+use crate::space::parse::nom::err::ParseErr;
 
 pub type LocatedSpan<'a> = nom_locate::LocatedSpan<&'a str,()>;
 
 
+pub type ErrTree<'a,I: Input,Ctx: InputCtx> = GenericErrorTree<I, Tag, Ctx, ParseErr<'a>>;
+pub type Res<'a,'b,I: Input,Output> = IResult<I, Output, ErrTree<'a,I,Box<dyn InputCtx>>>;
+
+pub trait MyParser<'a,I:Input,O,Ctx:InputCtx> {
+        fn parse(&mut self, input: I) -> Res<I, O, ErrTree<'a, I, Ctx>>;
+
+}
 
 
 pub trait Input:
@@ -32,6 +43,7 @@ where
     Self: Sized,
     <Self as InputTakeAtPosition>::Item: AsChar,
 {
+
     fn location_offset(&self) -> usize;
 
     fn location_line(&self) -> u32;
@@ -44,12 +56,7 @@ where
 
     fn range(&self) -> Range<usize>;
 
-    fn trace(&self) -> Trace {
-        Trace {
-            range: self.range(),
-            extra: self.extra(),
-        }
-    }
+
 }
 
 impl<'a> Input for Span<LocatedSpan<'a>> {
@@ -445,6 +452,7 @@ where
 
 
 pub enum Tag {
+    DomainDef,
     SegSep,
     VarPrefix,
     CurlyOpen,
@@ -455,6 +463,7 @@ pub enum Tag {
     SquareClose,
     ParenOpen,
     ParenClose,
+    Pipe,
     DoubleQuote,
     SingleQuote,
     Slash,
@@ -471,6 +480,7 @@ pub enum Tag {
 impl Tag {
     fn as_str(&self) -> &'static str {
         match self {
+            Tag::DomainDef => "::",
             Tag::SegSep => ":",
             Tag::VarPrefix => "$",
             Tag::CurlyOpen => "{",
@@ -481,6 +491,7 @@ impl Tag {
             Tag::SquareClose => "]",
             Tag::ParenOpen => "(",
             Tag::ParenClose=> ")",
+            Tag::Pipe => "|",
             Tag::DoubleQuote => "\"",
             Tag::SingleQuote => "'",
             Tag::Slash => "/",
@@ -496,24 +507,25 @@ impl Tag {
     }
 }
 pub mod err {
+    use alloc::boxed::Box;
     use alloc::format;
     use alloc::string::String;
     use core::range::Range;
     use nom_supreme::error::GenericErrorTree;
     use thiserror::Error;
-    use crate::space::parse::ctx::ParseCtx;
+    use crate::space::parse::ctx::InputCtx;
     use crate::space::parse::nom::{Input, Tag};
-    pub type ErrTree<'a,I: Input,Ctx:ParseCtx> = GenericErrorTree<I, Tag, Ctx, ParseErr<'a>>;
 
     pub struct ErrCtxStack {
 
     }
 
     #[derive(Error)]
-    pub struct ParseErr<'a,M> where M: ErrMsg+'static {
-        message: &'static dyn M,
+    pub struct ParseErr<'b>  {
+        ctx: Box<dyn InputCtx>,
+        message: &'static str,
         range: Range<usize>,
-        span: &'a str
+        span: &'b str
     }
 
     pub trait ErrMsg: 'static+Into<&str>

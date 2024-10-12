@@ -47,3 +47,4 @@ strum_macros = "0.26.4"
 
 
 strum = "0.26.3"
+log = "0.4.22"

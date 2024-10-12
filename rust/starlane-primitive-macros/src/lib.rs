@@ -11,7 +11,6 @@ use quote::quote;
 use quote::ToTokens;
 use syn::{parse_macro_input, Data, DeriveInput, PathArguments, Type};
 
-
 /// Takes a given enum (which in turn accepts child enums) and auto generates a `Parent::From` so the child
 /// can turn into the parent and a `TryInto<Child> for Parent` so the Parent can attempt to turn into the child.
 /// ```
@@ -314,8 +313,67 @@ mod tests {
     }
 }
 
-
 #[proc_macro_derive(EnumAsStr)]
 pub fn directed_handler(item: TokenStream) -> TokenStream {
     TokenStream::from(quote! {})
 }
+
+#[proc_macro_derive(AsStr)]
+pub fn as_str(item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as DeriveInput);
+    let ident = &input.ident;
+
+    let ts = quote! {
+    impl AsStr<&'static str> for #ident {
+        fn as_str(&self) -> &'static str {
+                stringify!(#ident)
+        }
+    }
+    };
+
+    ts.into()
+}
+
+
+
+#[proc_macro_derive(Case)]
+pub fn case(item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as DeriveInput);
+    let ident = &input.ident;
+
+    let ts = quote! {
+
+    impl #ident{
+      pub(crate) fn new<S>( string: S) -> Self where S: ToString {
+        Self(string.to_string())
+      }
+     }
+
+    impl AsRef<str> for #ident {
+        fn as_ref(&self) -> &str {
+          self.0.as_str()
+        }
+    }
+
+    impl ToString for #ident {
+    fn to_string(&self) -> String {
+        self.0.clone()
+    }
+
+    impl Deref for #ident {
+       type Target = String;
+       fn deref(&self) -> &Self::Target {
+                    &self.0
+        }
+    }
+}
+
+
+    };
+
+
+
+    ts.into()
+}
+
+
