@@ -1,4 +1,5 @@
 use std::env;
+use std::fmt::{Display, Formatter};
 use crate::executor::{ExeConf, Executor};
 use itertools::Itertools;
 use nom::AsBytes;
@@ -98,7 +99,7 @@ impl ServiceRunner {
     pub fn filestore( & self  ) -> Result<FileStore, ServiceErr> {
         match self {
             ServiceRunner::Exe(exe) => {
-                Ok(FileStore::try_from(exe.create()?)?)
+                Ok(exe.create()?)
             }
         }
     }
@@ -139,18 +140,19 @@ pub struct ServiceSelector {
     pub driver: Option<Kind>
 }
 
-impl ToString for ServiceSelector {
-    fn to_string(&self) -> String {
+impl Display for ServiceSelector {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self.driver {
             None => {
-                format!("{}<*:{}>",self.name.to_string(),self.kind.to_string())
+                write!(f, "{}<*:{}>",self.name.to_string(),self.kind.to_string())
             }
             Some(kind) => {
-                format!("{}<{}:{}>",self.name.to_string(),kind.to_string(),self.kind.to_string())
+                write!(f, "{}<{}:{}>",self.name.to_string(),kind.to_string(),self.kind.to_string())
             }
         }
     }
 }
+
 
 #[derive(Clone,Eq,PartialEq,Debug,Hash)]
 pub enum ServiceScopeKind {
