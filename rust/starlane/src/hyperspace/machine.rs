@@ -798,7 +798,7 @@ impl ArtifactFetcher for ClientArtifactFetcher
         wave.to(point.clone().to_surface().with_layer(Layer::Core));
         let pong: WaveVariantDef<PongCore> = transmitter.direct(wave).await.map_err(anyhow::Error::from)?;
 
-        pong.ok_or()?;
+        pong.ok_or().err();
 
         if let Substance::Bin(bin) = pong.variant.core.body {
             Ok(Arc::new(bin))

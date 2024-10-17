@@ -1,7 +1,9 @@
 use ::core::borrow::Borrow;
+use ::core::fmt::{write, Display, Formatter};
 use std::collections::{HashMap, HashSet};
 use std::ops;
 use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 
@@ -11,7 +13,7 @@ use self::core::http2::HttpMethod;
 use self::core::hyper::HypMethod;
 use self::core::{CoreBounce, DirectedCore, Method, ReflectedCore};
 use crate::space::command::RawCommand;
-use crate::space::err::{CoreReflector, ParseErrs, SpaceErr, StatusErr};
+use crate::space::err::{CoreReflector, ParseErrs, SpaceErr, SpatialError, StatusErr};
 use crate::space::loc::{Surface, ToPoint, ToSurface, Uuid};
 use crate::space::log::{
     Spannable, Trackable, TrailSpanId,
@@ -584,6 +586,13 @@ pub struct WaveId {
     kind: WaveKind,
 }
 
+impl Display for WaveId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> ::core::fmt::Result {
+        f.write_str(self.to_short_string().as_str())
+    }
+}
+
+
 impl WaveId {
     pub fn new(kind: WaveKind) -> Self {
         let uuid = uuid();
@@ -607,6 +616,7 @@ impl WaveId {
     }
 }
 
+/*
 impl ToString for WaveId {
     fn to_string(&self) -> String {
         format!(
@@ -616,6 +626,9 @@ impl ToString for WaveId {
         )
     }
 }
+
+ */
+
 
 pub trait Reflectable<R> {
     fn forbidden(self, responder: Surface) -> R
@@ -1714,17 +1727,20 @@ impl PongCore {
     pub fn as_result<E: From<&'static str>, P: TryFrom<Substance>>(self) -> Result<P, E> {
         self.core.as_result()
     }
+    pub fn ok_or_anyhow(&self) -> Result<(), Arc<anyhow::Error>> {
+        self.ok_or().map_err(|e|e.anyhow())
+    }
 
-    pub fn ok_or(&self) -> Result<(), anyhow::Error> {
+    pub fn ok_or(&self) -> Result<(), SpaceErr> {
         if self.is_ok() {
             Ok(())
         } else {
             if let Substance::FormErrs(errs) = &self.core.body {
-                Err(anyhow!(format!("{} : {}", self.core.status.to_string(), errs.to_string())))
+                Err(SpaceErr::Status {status: self.core.status.as_u16(), message: errs.to_string() })
             } else if let Substance::Err(err) = &self.core.body {
-                Err(anyhow!(err.to_string()))
+                Err(SpaceErr::Msg(err.to_string()))
             } else {
-                Err(anyhow!(self.core.status.to_string()))
+                Err(SpaceErr::Msg("wave err".to_string()))
             }
         }
     }

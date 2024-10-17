@@ -2,11 +2,13 @@ use std::sync::Arc;
 use sqlx::Error;
 use strum::ParseError;
 use thiserror::Error;
-use starlane::space::err::{HyperSpatialError, SpaceErr, SpatialError};
+use starlane::space::err::{HyperSpatialError, ParseErrs, SpaceErr, SpatialError};
 use starlane::space::point::Point;
 
 #[derive(Error, Debug,Clone)]
 pub enum RegErr {
+  #[error(transparent)]
+  Parse(#[from] ParseErrs),
   #[error("duplicate error")]
   Dupe,
   #[error("postgres error: {0}")]
@@ -26,6 +28,8 @@ pub enum RegErr {
   #[error("{0}")]
   Msg(String),
 }
+
+
 
 impl SpatialError for RegErr {
 

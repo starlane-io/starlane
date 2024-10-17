@@ -42,7 +42,7 @@ use starlane::space::particle::traversal::{
 };
 use starlane::space::particle::{Details, Status};
 use starlane::space::point::Point;
-use starlane::space::substance::{Substance, SubstanceKind};
+use starlane::space::substance::{Substance, SubstanceErr, SubstanceKind};
 use starlane::space::util::ValueMatcher;
 use starlane::space::wave::core::cmd::CmdMethod;
 use starlane::space::wave::core::hyper::HypMethod;
@@ -872,7 +872,7 @@ impl HyperStar
                             match result {
                                 Ok(_) => {}
                                 Err(e) => {
-                                    self.skel.err(e.into());
+                                    self.skel.err(&e.into());
                                 }
                             }
                         }
@@ -2031,7 +2031,7 @@ impl SmartLocator
 #[derive(Error,Debug,Clone)]
 pub enum StarErr {
     #[error("caused by '{0}'")]
-    SpaceErr(#[source] #[from] SpaceErr),
+    SpaceErr(#[source] SpaceErr),
     #[error("cannot create_in_star in star {point} for parent point {parent} since it is not a point within this star")]
     PointNotInStar{point: Point, parent: Point},
     #[error("star expected Root to be already provisioned")]
@@ -2075,7 +2075,7 @@ impl CoreReflector for StarErr {
             ReflectedCore {
                 headers: Default::default(),
                 status: Default::default(),
-                body: Substance::Err(SpaceErr::str("from StarErr")),
+                body: Substance::Err(SubstanceErr("from StarErr".to_string())),
             }
         }
     }

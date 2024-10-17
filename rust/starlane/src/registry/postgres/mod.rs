@@ -566,21 +566,22 @@ impl RegistryApi for PostgresRegistry {
                     where_clause.push_str(format!(" AND base=${}", index).as_str());
                     params.push(kind.to_string());
                 }
+                KindBaseSelector::Never => {}
             }
 
             match &hop.kind_selector.base {
                 KindBaseSelector::Always => {}
                 KindBaseSelector::Exact(kind) => match &hop.kind_selector.sub {
                     SubKindSelector::Always => {}
-                    SubKindSelector::Exact(sub) => match sub {
-                        None => {}
-                        Some(sub) => {
+                    SubKindSelector::Exact(sub) => {
                             index = index + 1;
                             where_clause.push_str(format!(" AND sub=${}", index).as_str());
                             params.push(sub.to_string());
-                        }
                     },
+                    SubKindSelector::None => {}
+                    SubKindSelector::Never => {}
                 },
+                KindBaseSelector::Never => {}
             }
 
             match &hop.kind_selector.specific {
@@ -683,6 +684,7 @@ impl RegistryApi for PostgresRegistry {
                         .expect("expecting at least one segment"),
                     kind: stub.kind.clone(),
                 });
+                let point_tks_path = point_tks_path.into();
                 sub_select.pattern.matches_found(&point_tks_path)
             });
 

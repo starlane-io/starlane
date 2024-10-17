@@ -67,7 +67,7 @@ impl CoreReflector for HypErr {
                 ReflectedCore {
                     headers: Default::default(),
                     status: StatusCode::from_u16(500u16).unwrap(),
-                    body: self.to_substance()
+                    body: err.to_substance()
                 }
             }
         }
