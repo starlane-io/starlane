@@ -59,7 +59,6 @@ pub use server::*;
 
 
 use crate::cli::{Cli, Commands};
-use crate::err::OldStarErr;
 use clap::Parser;
 use starlane::space::loc::ToBaseKind;
 use std::fs::File;
@@ -84,7 +83,7 @@ pub fn init() {
     }
 }
 #[cfg(feature = "cli")]
-pub fn main() -> Result<(), OldStarErr> {
+pub fn main() -> Result<(), anyhow::Error> {
     init();
 
     let cli = Cli::parse();
@@ -110,7 +109,7 @@ fn server() -> Result<(), OldStarErr> {
 }
 
 #[cfg(feature = "server")]
-fn server() -> Result<(), OldStarErr> {
+fn server() -> Result<(), anyhow::Error> {
 
     let point = starlane::space::point::Point::from_str("blah.com").unwrap();
     println!("PPIONT {}",point.to_string());
@@ -129,17 +128,20 @@ aprintln!("got starlane...");
         let machine_api = starlane.machine();
 aprintln!("got machine api...");
 
-        tokio::time::timeout(Duration::from_secs(30), machine_api.wait_ready())
+        let result = tokio::time::timeout(Duration::from_secs(30), machine_api.await.unwrap().await_termination())
             .await
-            .unwrap();
+            .unwrap().unwrap();
         aprintln!("> STARLANE Ready!");
         // this is a dirty hack which is good enough for a 0.3.0 release...
         loop {
             tokio::time::sleep(Duration::from_secs(60)).await;
         }
+        /*
         let cl = machine_api.clone();
         machine_api.await_termination().await.unwrap();
         cl.terminate();
+
+         */
     });
     Ok(())
 }
