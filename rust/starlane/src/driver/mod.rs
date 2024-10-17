@@ -24,17 +24,17 @@ use futures::future::select_all;
 use futures::task::Spawn;
 use futures::{FutureExt, TryFutureExt};
 use once_cell::sync::Lazy;
-use starlane::space::artifact::asynch::Artifacts;
+use starlane::space::artifact::asynch::{ArtErr, Artifacts};
 use starlane::space::artifact::ArtRef;
 use starlane::space::command::common::{SetProperties, StateSrc};
 use starlane::space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
 use starlane::space::config::bind::BindConfig;
-use starlane::space::err::{CoreReflector, SpaceErr, SpatialError};
+use starlane::space::err::{any_result, CoreReflector, SpaceErr, SpatialError};
 use starlane::space::hyper::{Assign, HyperSubstance, ParticleRecord};
 use starlane::space::kind::{BaseKind, Kind, StarSub};
-use starlane::space::loc::{Layer, Surface, ToPoint, ToSurface};
+use starlane::space::loc::{Layer, Surface, ToBaseKind, ToPoint, ToSurface};
 use starlane::space::log::{PointLogger, Tracker};
 use starlane::space::parse::bind_config;
 use starlane::space::particle::traversal::{
@@ -60,12 +60,13 @@ use std::ops::{Deref};
 use std::str::FromStr;
 use std::sync::Arc;
 use anyhow::{anyhow, Error};
+use anyhow::__private::kind::TraitKind;
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{mpsc, oneshot, watch, RwLock};
 use starlane::space::command::common::StateSrc::Subst;
-use starlane::space::parse::util::parse_errs;
-use starlane::space::substance::Substance;
+use starlane::space::parse::util::{parse_errs, result};
+use starlane::space::substance::{Substance, SubstanceErr};
 use starlane::space::wave::core::http2::StatusCode;
 use crate::driver::control::ControlErr;
 
@@ -931,7 +932,7 @@ impl DriverApi {
         self.call_tx.send(DriverRunnerCall::AddDriver(api)).await;
     }
 
-    pub async fn init_item(&self, point: Point) -> Result<Status, SpaceErr> {
+    pub async fn init_item(&self, point: Point) -> Result<Status, DriverErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
         self.call_tx
             .try_send(DriverRunnerCall::InitParticle { point, rtn });
@@ -998,7 +999,8 @@ pub enum DriverRunnerCall {
     OnAdded,
     InitParticle {
         point: Point,
-        rtn: oneshot::Sender<Result<Status, SpaceErr>>,
+        rtn: oneshot::Sender<Result<Status, DriverErr >>,
+
     },
     DriverRunnerRequest(DriverRunnerRequest),
     DriverBind(oneshot::Sender<ArtRef<BindConfig>>),
@@ -1238,17 +1240,19 @@ impl DriverRunner {
                         }
                         },
                         DriverRunnerCall::ParticleBind { point, rtn } => {
-                            rtn.send(Ok(self.driver.particle_bind()));
+                            let bind = self.skel.artifacts().get_bind(&self.driver.kind().to_base().bind()).await.map_err(|e|e.into());
+                            rtn.send(bind);
                         }
                         DriverRunnerCall::InitParticle { point, rtn } => {
                             let particle = self.driver.particle(&point).await.unwrap();
-                            particle.init().await?;
+                            rtn.send(particle.init().await);
                         }
                         DriverRunnerCall::GetPoint(rtn) => {
                             rtn.send(self.skel.point.clone());
                         }
                         DriverRunnerCall::DriverBind(rtn) => {
-                            rtn.send(self.driver.bind());
+                            let bind = self.skel.artifacts().get_bind(&BaseKind::Driver.bind()).await.unwrap();
+                            rtn.send(bind);
                         }
                         DriverRunnerCall::AddDriver(api) => {
                             self.driver.add_driver(api.clone()).await;
@@ -1571,6 +1575,8 @@ pub trait DriverHandler: DirectedHandler {}
 #[derive(DirectedHandler)]
 pub struct DefaultDriverHandler {}
 
+impl DriverHandler for DefaultDriverHandler {}
+
 impl DefaultDriverHandler {
     fn restore() -> Self {
         DefaultDriverHandler {}
@@ -1632,17 +1638,17 @@ pub struct ParticleSphere {
 }
 
 impl ParticleSphere {
-    pub async fn init(&self) -> Result<(), DriverErr> {
-        Ok(())
+    pub async fn init(&self) -> Result<Status, DriverErr> {
+        Ok(Status::Ready)
     }
 
-    pub fn new_handler<H>(handler: H) -> Self where H: DirectedHandler{
+    pub fn new_handler<H>(handler: H) -> Self where H: DirectedHandler + 'static {
         Self {
             inner: ParticleSphereInner::Handler(Box::new(handler)),
         }
     }
 
-    pub fn new_router<R>(router: R) -> Self where R: TraversalRouter {
+    pub fn new_router<R>(router: R) -> Self where R: TraversalRouter + 'static {
         Self {
             inner: ParticleSphereInner::Router(Box::new(router)),
         }
@@ -1822,8 +1828,9 @@ impl Driver for DriverDriver {
         let skel = DriverDriverParticleSkel::new(self.skel.clone(), api);
         let particle = Box::new(DriverParticle::restore(skel, (), ()));
 
-        Ok(parse_errs(particle.sphere())?)
+        Ok(any_result(particle.sphere())?)
     }
+
 }
 
 #[derive(DirectedHandler)]
@@ -1842,8 +1849,8 @@ impl Particle for DriverParticle {
     }
 
     fn sphere(self) -> Result<ParticleSphere, Self::Err> {
-        let router: Box<dyn TraversalRouter> = Box::new(self);
-        Ok(ParticleSphere::new_router(router))
+//        let router: dyn TraversalRouter = Box::new(self);
+        Ok(ParticleSphere::new_router(self))
     }
 }
 
@@ -1884,17 +1891,20 @@ pub enum ParticleStarErr {
     Anyhow(#[source]Arc<anyhow::Error>)
 }
 
+
+
 impl From<anyhow::Error> for ParticleStarErr {
-    fn from(err: Error) -> Self {
-        Arc::new(err).into()
+    fn from(err: anyhow::Error) -> Self {
+        ParticleStarErr::Anyhow(Arc::new(err))
     }
 }
 
 impl From<DriverErr> for ParticleStarErr{
     fn from(err: DriverErr) -> Self {
-        StarErr::DriverErr(err).into()
+        StarErr::Anyhow(Arc::new(anyhow!("{}",err))).into()
     }
 }
+
 
 
 
@@ -1902,7 +1912,11 @@ impl ParticleStarErr {
     pub fn unwrap(self) -> StarErr {
         match self {
             ParticleStarErr::StarErr(err) => err,
-            ParticleStarErr::RegErr(err) => err.into()
+            ParticleStarErr::RegErr(err) => err.into(),
+            ParticleStarErr::SpaceErr(err) => StarErr::SpaceErr(err),
+            ParticleStarErr::Anyhow(any) => StarErr::Anyhow(any),
+            e => StarErr::Anyhow(Arc::new(anyhow!("{}",e))),
+            _ => StarErr::Anyhow(Arc::new(anyhow!("exhausted error")))
         }
     }
 }
@@ -1912,7 +1926,7 @@ impl CoreReflector for ParticleStarErr {
         ReflectedCore{
             headers: Default::default(),
             status: StatusCode::fail(),
-            body: Substance::Err(SpaceErr::to_space_err(self))
+            body: Substance::Err(SubstanceErr(self.to_string()))
         }
     }
 }
@@ -1923,7 +1937,7 @@ impl CoreReflector for ParticleDriverErr{
         ReflectedCore{
             headers: Default::default(),
             status: StatusCode::fail(),
-            body: Substance::Err(SpaceErr::to_space_err(self))
+            body: Substance::Err(SubstanceErr(self.to_string()))
         }
     }
 }
@@ -1943,8 +1957,11 @@ impl ParticleErr for ParticleDriverErr {
 
 #[derive(Error, Debug, Clone,ToSpaceErr)]
 pub enum DriverErr {
+
     #[error(transparent)]
     SpaceErr(#[from] SpaceErr),
+    #[error(transparent)]
+    ArtErr(#[from] ArtErr),
     #[error(transparent)]
     RegErr(#[from] RegErr),
     #[error(transparent)]
@@ -1973,7 +1990,8 @@ pub enum DriverErr {
     DriverApiNotFound(Point),
     #[error("Driver not found: '{0}'")]
     DriverNotFound(String),
-
+    #[error("{0}")]
+    Anyhow(#[from] Arc<anyhow::Error>)
 }
 
 impl DriverErr {
@@ -1998,7 +2016,7 @@ impl DriverErr {
 
 
 
-pub trait ParticleErr: std::error::Error + Send + Sync + 'static + CoreReflector{}
+pub trait ParticleErr: Clone+std::error::Error + Send + Sync + 'static + CoreReflector+Sized {}
 
 
 
@@ -2019,7 +2037,7 @@ impl CoreReflector for StdParticleErr {
         ReflectedCore {
             headers: Default::default(),
             status: StatusCode::fail(),
-            body: SpatialError::to_substance(self),
+            body: Substance::Err(SubstanceErr(self.to_string()))
         }
     }
 }

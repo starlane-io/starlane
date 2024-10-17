@@ -1097,6 +1097,15 @@ pub trait SpatialError where Self: Sized+ ToString {
 }
 
 
+pub fn any_result<R,E>( result: Result<R,E>) -> Result<R,Arc<anyhow::Error>> where E: Display{
+    match result {
+        Ok(ok) => Ok(ok),
+        Err(err) => {
+            Err(Arc::new(anyhow!("{}",err)))
+        }
+    }
+}
+
 
 
 pub trait HyperSpatialError: SpatialError {

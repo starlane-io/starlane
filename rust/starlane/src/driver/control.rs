@@ -376,7 +376,7 @@ impl Particle for Control {
     }
 
     fn sphere(self) -> Result<ParticleSphere, Self::Err> {
-        Ok(ParticleSphere::new_router(self.skel.driver.particle_bind.clone(), self))
+        Ok(ParticleSphere::new_router(self))
     }
 }
 
