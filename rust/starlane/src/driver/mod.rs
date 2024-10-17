@@ -31,7 +31,7 @@ use starlane::space::command::direct::create::{
     Create, KindTemplate, PointSegTemplate, PointTemplate, Strategy, Template,
 };
 use starlane::space::config::bind::BindConfig;
-use starlane::space::err::{CoreReflector, SpaceErr};
+use starlane::space::err::{CoreReflector, SpaceErr, SpatialError};
 use starlane::space::hyper::{Assign, HyperSubstance, ParticleRecord};
 use starlane::space::kind::{BaseKind, Kind, StarSub};
 use starlane::space::loc::{Layer, Surface, ToPoint, ToSurface};
@@ -67,6 +67,7 @@ use starlane::space::command::common::StateSrc::Subst;
 use starlane::space::parse::util::parse_errs;
 use starlane::space::substance::Substance;
 use starlane::space::wave::core::http2::StatusCode;
+use crate::driver::control::ControlErr;
 
 pub struct DriversBuilder {
     factories: Vec<Arc<dyn HyperDriverFactory>>,
@@ -1631,7 +1632,10 @@ pub struct ParticleSphere {
 }
 
 impl ParticleSphere {
-    pub async fn init(&self) {}
+    pub async fn init(&self) -> Result<(), DriverErr> {
+        Ok(())
+    }
+
     pub fn new_handler<H>(handler: H) -> Self where H: DirectedHandler{
         Self {
             inner: ParticleSphereInner::Handler(Box::new(handler)),
@@ -1946,9 +1950,13 @@ pub enum DriverErr {
     #[error(transparent)]
     MachineErr(#[from] MachineErr),
     #[error(transparent)]
-    ParticleErr(#[from] Box<dyn ParticleErr>),
+    StdParticleErr(#[from] StdParticleErr),
     #[error(transparent)]
     ParticleStarErr(#[from] ParticleStarErr),
+    #[error(transparent)]
+    ControlErr(#[from] ControlErr),
+    #[error(transparent)]
+    ParticleErr(#[from] Box<dyn ParticleErr>),
     #[error(transparent)]
     FileStoreErr(#[from] FileStoreErr),
     #[error(transparent)]
@@ -2005,18 +2013,13 @@ pub enum StdParticleErrInner {
    SpaceErr(#[from] SpaceErr),
 }
 
-impl Into<DriverErr> for StdParticleErr {
-    fn into(self) -> DriverErr {
-        DriverErr::ParticleErr(Box::new(self))
-    }
-}
 
 impl CoreReflector for StdParticleErr {
     fn as_reflected_core(self) -> ReflectedCore {
         ReflectedCore {
             headers: Default::default(),
             status: StatusCode::fail(),
-            body: Substance::Err(SpaceErr::to_space_err(self)),
+            body: SpatialError::to_substance(self),
         }
     }
 }

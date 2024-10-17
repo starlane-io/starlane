@@ -27,6 +27,7 @@ use crate::executor::cli::HostEnv;
 use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::dialect::filestore::{FileStore, FileStoreErr, FILE_STORE_ROOT};
 use crate::host::{ExeStub, Host, HostCli};
+use crate::host::err::HostErr;
 use crate::hyperspace::machine::MachineErr;
 
 pub type FileStoreService = Service<FileStore>;
@@ -97,7 +98,7 @@ impl ServiceRunner {
     pub fn filestore( & self  ) -> Result<FileStore, ServiceErr> {
         match self {
             ServiceRunner::Exe(exe) => {
-                exe.create()
+                Ok(FileStore::try_from(exe.create()?)?)
             }
         }
     }
@@ -495,6 +496,8 @@ pub enum ServiceErr {
     FileStoreErr(#[from] FileStoreErr),
     #[error(transparent)]
     SpaceErr(#[from] SpaceErr),
+    #[error(transparent)]
+    HostErr(#[from] HostErr),
     #[error("no template available that matches ServiceSelector: '{0}' (name<DriverKind:ServiceKind>)")]
     NoTemplate(ServiceSelector),
     #[error("call not processed")]

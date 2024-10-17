@@ -19,7 +19,7 @@ use starlane::space::parse::bind_config;
 use starlane::space::particle::traversal::TraversalInjection;
 use starlane::space::particle::Status;
 use starlane::space::point::Point;
-use starlane::space::selector::{KindSelector, Pattern, SubKindSelector};
+use starlane::space::selector::{KindBaseSelector, KindSelector, Pattern, SubKindSelector};
 use starlane::space::substance::{Substance, SubstanceKind};
 use starlane::space::util::{log, ValueMatcher, ValuePattern};
 use starlane::space::wave::core::http2::StatusCode;
@@ -122,8 +122,8 @@ impl StarDriverFactory
 {
     pub fn new(kind: StarSub) -> Self {
         let selector = KindSelector {
-            base: Pattern::Exact(BaseKind::Star),
-            sub: SubKindSelector::Exact(Some(kind.to_camel_case())),
+            base: KindBaseSelector::Exact(BaseKind::Star),
+            sub: SubKindSelector::Exact(kind.to_camel_case()),
             specific: ValuePattern::Always,
         };
         let kind = Kind::Star(kind);
@@ -225,7 +225,7 @@ impl Driver for StarDriver
             self.ctx.clone(),
             (),
         );
-        Ok(parse_errs(star.sphere())?)
+        Ok(star.sphere()?)
     }
 }
 

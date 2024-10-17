@@ -103,7 +103,7 @@ impl Driver for RepoDriver {
         );
 
         ;
-        Ok(repo.sphere())
+        Ok(repo.sphere()?)
     }
 }
 

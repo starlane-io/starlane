@@ -44,7 +44,7 @@ impl ExeConf {
         D: TryFrom<CliOsExecutor, Error =HostErr>,
     {
         match self {
-            ExeConf::Host(host) => Ok(host.create().try_into()?)
+            ExeConf::Host(host) => Ok(host.create::<D>()?.try_into()?)
         }
     }
 }

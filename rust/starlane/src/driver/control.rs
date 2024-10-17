@@ -26,7 +26,7 @@ use starlane::space::particle::traversal::Traversal;
 use starlane::space::point::Point;
 use starlane::space::selector::KindSelector;
 use starlane::space::settings::Timeouts;
-use starlane::space::substance::Substance;
+use starlane::space::substance::{Substance, SubstanceErr};
 use starlane::space::wave::core::ext::ExtMethod;
 use starlane::space::wave::core::ReflectedCore;
 use starlane::space::wave::exchange::asynch::{
@@ -492,12 +492,14 @@ pub enum ControlErr {
     SpaceErr(#[from] SpaceErr),
 }
 
+
+
 impl CoreReflector for ControlErr {
     fn as_reflected_core(self) -> ReflectedCore {
         ReflectedCore {
             headers: Default::default(),
             status: Default::default(),
-            body: Substance::Err(SpaceErr::to_space_err(self))
+            body: Substance::Err(SubstanceErr(format!("{}",self.to_string())))
         }
     }
 }

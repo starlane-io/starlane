@@ -117,7 +117,7 @@ impl HostCli {
         D: TryFrom<CliOsExecutor, Error =HostErr>,
     {
         match self {
-            HostCli::Os(stub) => D::try_from(CliOsExecutor::new(stub.clone())),
+            HostCli::Os(stub) => Ok(D::try_from(CliOsExecutor::new(stub.clone()))?),
         }
     }
 

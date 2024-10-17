@@ -31,6 +31,7 @@ use crate::registry::postgres::err::RegErr;
 #[derive(Clone)]
 pub struct Starlane {
     pub handle: PostgresRegistryContextHandle, //    pub ctx: P::RegistryContext
+    pub registry_platform: StarlanePostgres,
     artifacts: Artifacts
 }
 
@@ -47,8 +48,9 @@ aprintln!("postgres!!!");
             let ctx = Arc::new(PostgresRegistryContext::new(set,Box::new(lookup)).await?);
             let handle = PostgresRegistryContextHandle::new(&db, ctx);
             let artifacts = Artifacts::just_builtins();
+            let registry_platform = StarlanePostgres::new();
 aprintln!("returning postgres handle");
-            Ok(Self { handle, artifacts })
+            Ok(Self { handle, artifacts, registry_platform })
         }
         #[cfg(not(feature = "postgres"))]
         {
@@ -152,7 +154,7 @@ impl Platform for Starlane where Self: Sync+Send+Sized{
         let logger = logger.point(Point::global_registry());
 aprintln!("Creating Global Registry...");
         Ok(Arc::new(RegistryWrapper::new(Arc::new(
-            PostgresRegistry::new(self.handle.clone(), Box::new(self.clone()), logger).await?,
+            PostgresRegistry::new(self.handle.clone(), Box::new(self.registry_platform.clone()), logger).await?,
         ))))
 
         //        Ok(Arc::new(MemRegApi::new(self.ctx.clone())))
@@ -198,11 +200,22 @@ aprintln!("Creating Global Registry...");
 }
 
 
+#[cfg(feature = "postgres")]
+#[derive(Clone)]
 pub struct StarlanePostgres;
 
+#[cfg(feature = "postgres")]
 impl StarlanePostgres {
     pub fn new() -> Self {
         Self
+    }
+}
+
+
+#[cfg(feature = "postgres")]
+impl Default for StarlanePostgres {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
