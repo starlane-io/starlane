@@ -684,7 +684,6 @@ impl RegistryApi for PostgresRegistry {
                         .expect("expecting at least one segment"),
                     kind: stub.kind.clone(),
                 });
-                let point_tks_path = point_tks_path.into();
                 sub_select.pattern.matches_found(&point_tks_path)
             });
 
@@ -906,9 +905,10 @@ impl RegistryApi for PostgresRegistry {
             kind: SelectKind::Initial,
         };
 
-        let to = match to.as_ref() {
+        let to: Option<PointHierarchy> = match to {
             None => None,
-            Some(to) => Some(self.query(to, &Query::PointHierarchy).await?.try_into()?),
+            //Some(to) => Some(self.query(*to, &Query::PointHierarchy).await?.try_into()?),
+            Some(to) => Some(self.query(*to, &Query::PointHierarchy).await?.try_into().expect("convert point to ...")),
         };
 
         let selection = self.select(&mut select).await?;
@@ -952,7 +952,7 @@ impl RegistryApi for PostgresRegistry {
             trans.commit().await?;
             Ok(())
         } else {
-            Err(format!("'{}' could not revoked grant {} because it does not have full access (super or owner) on {}", to.to_string(), id, access_grant.by_particle.to_string() ).into())
+            Err(RegErr::Msg(format!("'{}' could not revoked grant {} because it does not have full access (super or owner) on {}", to.to_string(), id, access_grant.by_particle.to_string() ).to_string()))
         }
     }
 }
@@ -1039,7 +1039,6 @@ impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
 
         match wrap(row) {
             Ok(record) => {
-                let phantom = Default::default();
                 Ok(WrappedIndexedAccessGrant { grant: record })
             }
             Err(err) => Err(sqlx::error::Error::PoolClosed),
