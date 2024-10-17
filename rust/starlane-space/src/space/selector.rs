@@ -7,7 +7,7 @@ use serde::de::{DeserializeOwned, Error, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::space::err::ParseErrs;
-use crate::space::kind::{BaseKind, Kind, KindParts, Specific, Sub};
+use crate::space::kind::{BaseKind, Kind, KindParts, Specific, Sub, SubKind};
 use crate::space::loc::{Layer, ToBaseKind, Topic, VarVal, Variable, Version};
 use crate::space::parse::util::result;
 use crate::space::parse::util::{new_span, Trace};
@@ -25,9 +25,9 @@ use crate::SpaceErr;
 use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
 use crate::space::command::direct::select::SubSelect;
 
-pub type PointSegKindHop = HopDef<PointSegSelector, ValuePattern<KindSelector>>;
-pub type PointSegKindHopCtx = HopDef<PointSegSelectorCtx, ValuePattern<KindSelector>>;
-pub type PointSegKindHopVar = HopDef<PointSegSelectorVar, ValuePattern<KindSelector>>;
+pub type PointSegKindHop = HopDef<PointSegSelector, KindSelector>;
+pub type PointSegKindHopCtx = HopDef<PointSegSelectorCtx, KindSelector>;
+pub type PointSegKindHopVar = HopDef<PointSegSelectorVar, KindSelector>;
 
 pub type Selector = SelectorDef<PointSegKindHop>;
 pub type SelectorCtx = SelectorDef<PointSegKindHopCtx>;
@@ -55,12 +55,13 @@ pub struct KindSelectorDef<GenericKindSelector, GenericSubKindSelector, Specific
 
 
 
+
 impl ValueMatcher<Kind> for KindSelector {
     fn is_match(&self, kind: &Kind) -> Result<(), ()> {
         let base = kind.to_base();
         let sub = kind.sub().to_camel_case();
         let specific = &kind.specific();
-        match self.base.is_match(&base) && self.sub.is_match(&sub) && self.specific.is_match_opt(specific).is_ok() {
+        match self.base.is_match(&base).is_ok() && self.sub.is_match(&sub).is_ok() && self.specific.is_match_opt(specific).is_ok() {
             true => Ok(()),
             false => Err(())
         }
@@ -82,7 +83,7 @@ impl KindSelector {
 
     pub fn from_base(base: BaseKind) -> Self {
         Self {
-            base: Pattern::Exact(base),
+            base: KindBaseSelector::Exact(base),
             sub: SubKindSelector::Always,
             specific: ValuePattern::Always,
         }
@@ -95,6 +96,9 @@ impl KindSelector {
                 "cannot turn a base wildcard kind into point segments",
             )),
             KindBaseSelector::Exact(e) => Ok(e.to_skewer().to_string()),
+            KindBaseSelector::Never => Err(SpaceErr::server_error(
+                                                                           "cannot turn a base never kind into point segments",
+                                                                       )),
         }
     }
 }
@@ -114,9 +118,10 @@ impl ToString for KindSelector {
             self.base.to_string(),
             match &self.sub {
                 SubKindSelector::Always => "*".to_string(),
-                SubKindSelector::Exact(sub) => {
-                    sub.as_ref().unwrap().to_string()
-                }
+                SubKindSelector::Exact(sub) =>
+                    sub.to_string(),
+                SubKindSelector::None => "".to_string(),
+                SubKindSelector::Never => "!".to_string()
             },
             self.specific.to_string()
         )
@@ -141,7 +146,6 @@ impl KindSelector {
     PartialEq,
     Hash,
     strum_macros::Display,
-    strum_macros::EnumString,
 )]
 pub enum SubKindSelector {
     #[strum(to_string="")]
@@ -150,8 +154,69 @@ pub enum SubKindSelector {
     Always,
     #[strum(to_string="!")]
     Never,
-    #[strum(to_string="<{0}>")]
-    Exact(Sub)
+    #[strum(to_string="{0}")]
+    Exact(CamelCase)
+}
+
+
+impl ValueMatcher<CamelCase> for SubKindSelector {
+    fn is_match(&self, other: &CamelCase) -> Result<(), ()> {
+        match self {
+            SubKindSelector::None => Ok(()),
+            SubKindSelector::Always => Ok(()),
+            SubKindSelector::Never => Err(()),
+            SubKindSelector::Exact(sub) if sub == other => Ok(()),
+            _ => Err(())
+        }
+    }
+}
+
+
+
+
+impl ValueMatcher<SubKind> for SubKindSelector {
+    fn is_match(&self, other: &SubKind) -> Result<(), ()> {
+        match self {
+            SubKindSelector::None => Ok(()),
+            SubKindSelector::Always => Ok(()),
+            SubKindSelector::Never => Err(()),
+            SubKindSelector::Exact(sub) if sub.to_string() == other.to_string() => Ok(()),
+            _ => Err(())
+        }
+    }
+}
+
+impl ValueMatcher<Option<CamelCase>> for SubKindSelector {
+    fn is_match(&self, other: &Option<CamelCase>) -> Result<(), ()> {
+        match self {
+            SubKindSelector::None => Ok(()),
+            SubKindSelector::Always => Ok(()),
+            SubKindSelector::Never => Err(()),
+            SubKindSelector::Exact(sub) => {
+                match other.as_ref() {
+                    None => Err(()),
+                    Some(other) if sub  == other => Ok(()),
+                    _ => Err(())
+                }
+            }
+        }
+    }
+}
+impl ValueMatcher<Option<SubKind>> for SubKindSelector {
+    fn is_match(&self, other: &Option<SubKind>) -> Result<(), ()> {
+        match self {
+            SubKindSelector::None => Ok(()),
+            SubKindSelector::Always => Ok(()),
+            SubKindSelector::Never => Err(()),
+            SubKindSelector::Exact(sub) => {
+                match other.as_ref() {
+                    None => Err(()),
+                    Some(other) if sub.to_string() == other.to_string() => Ok(()),
+                    _ => Err(())
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
@@ -159,12 +224,23 @@ pub struct SelectorDef<Hop> {
     pub hops: Vec<Hop>,
 }
 
+impl PointSelector {
+    pub fn always() -> Self {
+        Self {
+            hops: vec![PointSegKindHop::always()],
+        }
+    }
+}
+
+/*
 impl PartialEq<Point> for SelectorDef<PointSegKindHop> {
     fn eq(&self, other: &Point) -> bool {
         let hierarchy = other.clone().to_opt_hierarchy();
         self.matches_found(&hierarchy)
     }
 }
+
+ */
 
 /*
 pub type Selector = SelectorDef<PointSegKindHop>;
@@ -203,6 +279,32 @@ impl ValueMatcher<PointSeg> for PointSegKindHop {
 }
 
 
+impl ValueMatcher<PointKindSeg> for PointSegKindHop {
+    fn is_match(&self, x: &PointKindSeg) -> Result<(), ()> {
+        if self.segment_selector.is_match(&x.segment)  && self.kind_selector.is_match(&x.kind).is_ok() {
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+}
+
+impl ValueMatcher<PointKindSegOpt> for PointSegKindHop {
+    fn is_match(&self, x: &PointKindSegOpt) -> Result<(), ()> {
+
+        if self.segment_selector.is_match(&x.segment)  {
+            if let Some(ref k) = x.kind {
+                self.kind_selector.is_match(k)
+            }  else {
+                Ok(())
+            }
+        } else {
+            Err(())
+        }
+    }
+}
+
+
 impl FromStr for SelectorDef<PointSegKindHop> {
     type Err = ParseErrs;
 
@@ -221,6 +323,7 @@ impl ValueMatcher<Point> for Selector {
         }
     }
 }
+
 
 impl Selector {
 
@@ -328,7 +431,7 @@ impl Selector {
 
         if hierarchy.is_final() && self.is_final() {
             // this is the final hop & segment if they match, everything matches!
-            hop.is_match(seg)
+            hop.is_match(seg).is_ok()
         } else if hierarchy.is_root() {
             false
         } else if self.is_root() {
@@ -337,7 +440,7 @@ impl Selector {
             // we still have hops that haven't been matched and we are all out of path... but we have a weird rule
             // if a hop is 'inclusive' then this will match to true.  We do this for cases like:
             // localhost+:**   // Here we want everything under localhost INCLUDING localhost to be matched
-            if hop.inclusive && hop.is_match(&seg) {
+            if hop.inclusive && hop.is_match(seg).is_ok() {
                 true
             } else {
                 false
@@ -348,7 +451,7 @@ impl Selector {
             // a Recursive is similar to an Any in that it will match anything, however,
             // it is not consumed until the NEXT segment matches...
             let next_hop = self.hops.get(1).expect("next<Hop>");
-            if next_hop.is_match(seg) {
+            if next_hop.is_match(seg).is_ok() {
                 // since the next hop after the recursive matches, we consume the recursive and continue hopping
                 // this allows us to make matches like:
                 // space.org:**:users ~ space.org:many:silly:dirs:users
@@ -360,11 +463,11 @@ impl Selector {
                 self.matches_found(&hierarchy.consume().expect("AddressKindPath"))
             }
         } else if hop.segment_selector.is_recursive() && hierarchy.is_final() {
-            hop.is_match(hierarchy.segments.last().expect("segment"))
+            hop.is_match(hierarchy.segments.last().expect("segment")).is_ok()
         } else if hop.segment_selector.is_recursive() {
-            hop.is_match(hierarchy.segments.last().expect("segment"))
+            hop.is_match(hierarchy.segments.last().expect("segment")).is_ok()
                 && self.matches_found(&hierarchy.consume().expect("hierarchy"))
-        } else if hop.is_match(seg) {
+        } else if hop.is_match(seg).is_ok() {
             // in a normal match situation, we consume the hop and move to the next one
             self.consume()
                 .expect("AddressTksPattern")
@@ -391,6 +494,12 @@ impl ToString for Selector {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct VersionReq {
     pub version: semver::VersionReq,
+}
+
+impl VersionReq {
+    pub fn always() -> VersionReq {
+        VersionReq::from_str("").expect("expected ANY match for VersionReq")
+    }
 }
 
 impl Deref for VersionReq {
@@ -617,6 +726,18 @@ pub type SpecificSelector = SpecificSelectorDef<
     VersionReq,
 >;
 
+impl SpecificSelector {
+    pub fn always() -> SpecificSelector {
+        Self {
+            provider: ProviderSelector::Always,
+            vendor: VendorSelector::Always,
+            product: ProductSelector::Always,
+            variant: VariantSelector::Always,
+            version: VersionReq::always()
+        }
+    }
+}
+
 impl FromStr for SpecificSelector {
     type Err = ParseErrs;
 
@@ -759,6 +880,17 @@ pub struct HopDef<Segment, KindSelector> {
 }
 
 
+impl PointSegKindHop {
+    pub fn always() -> Self {
+        Self {
+            inclusive: true,
+            segment_selector: PointSegSelector::Any,
+            kind_selector: KindSelector::any(),
+        }
+    }
+}
+
+
 
 impl HopDef<PointSegSelector, ValuePattern<KindSelector>>
 {
@@ -777,7 +909,10 @@ impl ToString for PointSegKindHop {
         let mut rtn = String::new();
         rtn.push_str(self.segment_selector.to_string().as_str());
 
-        match &self.kind_selector {
+        rtn.push_str( format!("<{}>",self.kind_selector.to_string()).as_str());
+
+
+/*        match &self.kind_selector {
             ValuePattern::Always => rtn.push_str("<*>"),
             ValuePattern::Never => rtn.push_str("<!>"),
             ValuePattern::Pattern(kind_selector) => {
@@ -786,8 +921,7 @@ impl ToString for PointSegKindHop {
                     if let Pattern::Exact(sub) = &kind_selector.sub {
                         rtn.push_str(format!("<{}", sub.as_ref().unwrap().to_string()).as_str());
                         if let ValuePattern::Pattern(specific) = &kind_selector.specific {
-                            rtn.push_str(format!("<{}", specific.to_string()).as_str());
-                            rtn.push_str(">");
+                            rtn.push_str(format!("<{}>", specific.to_string()).as_str());
                         }
                         rtn.push_str(">");
                     }
@@ -795,6 +929,8 @@ impl ToString for PointSegKindHop {
                 }
             }
         }
+
+ */
 
 
         if self.inclusive {
@@ -942,7 +1078,6 @@ where
     PartialEq,
     Hash,
     strum_macros::Display,
-    strum_macros::EnumString,
 )]
 pub enum KindBaseSelector {
     #[strum(to_string="*")]
@@ -951,6 +1086,17 @@ pub enum KindBaseSelector {
     Never,
     #[strum(to_string="{0}")]
     Exact(BaseKind)
+}
+
+impl KindBaseSelector {
+    pub fn is_match(&self, other: &BaseKind) -> Result<(),()>{
+        match self {
+            KindBaseSelector::Always => Ok(()),
+            KindBaseSelector::Never => Err(()),
+            KindBaseSelector::Exact(me) if me == other => Ok(()),
+            _ => Err(())
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -1024,6 +1170,24 @@ impl PointDef<RouteSeg,PointKindSegOpt>{
         let mut segments = self.segments.clone();
         segments.remove(0);
         Option::Some(PointHierarchyOpt {
+            route: self.route.clone(),
+            segments,
+        })
+    }
+
+    pub fn is_final(&self) -> bool {
+        self.segments.len() == 1
+    }
+}
+
+impl PointDef<RouteSeg,PointKindSeg>{
+    pub fn consume(&self) -> Option<PointHierarchy> {
+        if self.segments.len() <= 1 {
+            return Option::None;
+        }
+        let mut segments = self.segments.clone();
+        segments.remove(0);
+        Option::Some(PointHierarchy{
             route: self.route.clone(),
             segments,
         })

@@ -6,7 +6,7 @@ use crate::space::loc::ToSurface;
 use crate::space::point::Point;
 use crate::space::selector::{PointSelector, Selector};
 use crate::space::settings::Timeouts;
-use crate::space::util::ValuePattern;
+use crate::space::util::{ValueMatcher, ValuePattern};
 use crate::space::wave::core::cmd::CmdMethod;
 use crate::space::wave::exchange::asynch::ProtoTransmitter;
 use crate::space::wave::{DirectedProto, WaitTime};
@@ -378,7 +378,7 @@ pub struct ArtifactHub {
     skel: ArtifactsSkel,
     pub bind: ArtifactCache<BindConfig>,
     pub mechtron: ArtifactCache<MechtronConfig>,
-    pub selector: ValuePattern<PointSelector>,
+    pub selector: PointSelector,
 }
 
 impl ArtifactHub {
@@ -387,7 +387,7 @@ impl ArtifactHub {
             bind: ArtifactCache::new(fetcher.clone(), skel.clone()),
             mechtron: ArtifactCache::new(fetcher.clone(), skel.clone()),
             skel,
-            selector: ValuePattern::Always,
+            selector: PointSelector::always()
         }
     }
 

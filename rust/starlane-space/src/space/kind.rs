@@ -172,7 +172,7 @@ impl BaseKind {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display,strum_macros::EnumString)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum Sub {
     None,
     Database(DatabaseSubKind),
@@ -546,10 +546,10 @@ pub enum StarSub {
 }
 
 impl StarSub {
-    pub fn to_selector(&self) -> KindSelector {
+    pub fn to_selector(self) -> KindSelector {
         KindSelector {
             base: KindBaseSelector::Exact(BaseKind::Star),
-            sub:  SubKindSelector::Exact(self.into()),
+            sub:  SubKindSelector::Exact(self.to_camel_case()),
             specific: ValuePattern::Always,
         }
     }

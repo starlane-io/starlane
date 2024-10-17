@@ -6,7 +6,7 @@ use crate::space::parse::{
     consume_point, consume_point_ctx, point_route_segment, point_selector, point_var, Env,
     ResolverErr,
 };
-use crate::space::selector::{PointHierarchyOpt, PointKindSegOpt, Selector};
+use crate::space::selector::{PointHierarchy, PointHierarchyOpt, PointKindSeg, PointKindSegOpt, Selector};
 use crate::space::util::ToResolved;
 use crate::space::wave::{Agent, Recipients, ToRecipients};
 use crate::space::{ANONYMOUS, HYPERUSER};
@@ -977,6 +977,8 @@ impl Point {
             segments: self.segments.into_iter().map( |segment| PointKindSegOpt{ segment, kind: None }).collect()
         }
     }
+
+
 
 
     pub fn to_path(&self) -> PathBuf {

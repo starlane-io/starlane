@@ -14,7 +14,10 @@ pub mod fail;
 pub mod frame;
 pub mod hyper;
 pub mod kind;
+
+#[cfg(feature = "kind2")]
 pub mod kind2;
+
 pub mod loc;
 pub mod log;
 pub mod path;

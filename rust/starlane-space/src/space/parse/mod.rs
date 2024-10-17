@@ -29,7 +29,7 @@ use crate::space::config::mechtron::MechtronConfig;
 use crate::space::config::{DocKind, Document};
 use crate::space::err::report::{Label, Report, ReportKind};
 use crate::space::err::ParseErrs;
-use crate::space::kind::{ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, NativeSub, Specific, StarSub, Sub, UserBaseSubKind};
+use crate::space::kind::{ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, NativeSub, Specific, StarSub, Sub, SubKind, UserBaseSubKind};
 use crate::space::loc::StarKey;
 use crate::space::loc::{Layer, PointSegment, Surface, Topic, Uuid, VarVal, Version};
 use crate::space::parse::util::unstack;
@@ -5375,7 +5375,7 @@ pub mod cmd_test {
     use core::str::FromStr;
 
     use crate::space::command::{Command, CommandVar};
-    use crate::space::err::{ParseErrs, ParseErrs};
+    use crate::space::err::{ParseErrs };
     use crate::space::kind::Kind;
     use crate::space::parse::util::{new_span, result};
     use crate::space::point::{PointSeg, RouteSeg};
@@ -5919,26 +5919,17 @@ where
     }
 }
 
-/*
 pub fn sub_kind_selector<I: Span>(input: I) -> Res<I, SubKindSelector> {
     pattern(camel_case)(input).map(|(next, selector)| match selector {
-        Pattern::Always => (next, Pattern::Always),
-        Pattern::Exact(sub) => (next, Pattern::Exact(Some(sub))),
+        Pattern::Always => (next, SubKindSelector::Always),
+        Pattern::Exact(sub) => (next, SubKindSelector::Exact(sub)),
     })
 }
 
- */
 
-pub fn sub_kind_selector<I: Span>(input: I) -> Res<I, SubKindSelector> {
-    value_pattern(camel_case)(input).map(|(next, selector)| {
-        match selector {
-            ValuePattern::Always => SubKindSelector::Always,
-            ValuePattern::Never => SubKindSelector::Never,
-            ValuePattern::Pattern(SubKind::from) =>
-        }
 
-    })
-}
+
+
 
 pub fn kind_base<I: Span>(input: I) -> Res<I, BaseKind> {
     let (next, kind) = context("kind-base", camel_case)(input.clone())?;
@@ -6055,6 +6046,101 @@ pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
     }
 }
 
+pub fn resolve_sub<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Sub> {
+    move |input: I| {
+        let (next, sub) = context("kind-sub", camel_case)(input.clone())?;
+        match &base {
+            BaseKind::Database => match sub.as_str() {
+                "Relational" => {
+                    let (next, specific) =
+                        context("specific", delimited(tag("<"), specific, tag(">")))(next)?;
+                    Ok((next, Sub::Database(DatabaseSubKind::Relational(specific))))
+                }
+                _ => {
+                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(SpaceTree::add_context(
+                        input,
+                        ErrCtx::InvalidSubKind(BaseKind::Database, sub.to_string()),
+                        err,
+                    )))
+                }
+            },
+            BaseKind::UserBase => match sub.as_str() {
+                "OAuth" => {
+                    let (next, specific) =
+                        context("specific", delimited(tag("<"), specific, tag(">")))(next)?;
+                    Ok((next, Sub::UserBase(UserBaseSubKind::OAuth(specific))))
+                }
+                _ => {
+                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(SpaceTree::add_context(
+                        input,
+                        ErrCtx::InvalidSubKind(BaseKind::UserBase, sub.to_string()),
+                        err,
+                    )))
+                }
+            },
+            BaseKind::Native => match NativeSub::from_str(sub.as_str()) {
+                Ok(sub) => Ok((next, Sub::Native(sub))),
+                Err(err) => {
+                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(SpaceTree::add_context(
+                        input,
+                        ErrCtx::InvalidSubKind(BaseKind::Native, sub.to_string()),
+                        err,
+                    )))
+                }
+            },
+            BaseKind::Artifact => match ArtifactSubKind::from_str(sub.as_str()) {
+                Ok(sub) => Ok((next, Sub::Artifact(sub))),
+                Err(err) => {
+                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(SpaceTree::add_context(
+                        input,
+                        ErrCtx::InvalidSubKind(BaseKind::Artifact, sub.to_string()),
+                        err,
+                    )))
+                }
+            },
+            BaseKind::Star => match StarSub::from_str(sub.as_str()) {
+                Ok(sub) => Ok((next, Sub::Star(sub))),
+                Err(err) => {
+                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(SpaceTree::add_context(
+                        input,
+                        ErrCtx::InvalidSubKind(BaseKind::Star, sub.to_string()),
+                        err,
+                    )))
+                }
+            },
+            BaseKind::File => match FileSubKind::from_str(sub.as_str()) {
+                Ok(sub) => Ok((next, Sub::File(sub))),
+                Err(err) => {
+                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(SpaceTree::add_context(
+                        input,
+                        ErrCtx::InvalidSubKind(BaseKind::File, sub.to_string()),
+                        err,
+                    )))
+                }
+            },
+            k => {
+                let kind = k.to_string();
+                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                    Err(nom::Err::Error(SpaceTree::add_context(
+                        input,
+                        ErrCtx::InvalidSubKind(k.clone(), format!("Kind: `{}` does not have any associated SubKind",kind).to_string()),
+
+
+
+                        err,
+                    )))
+            }
+
+        }
+    }
+}
+
 pub fn kind_base_selector<I: Span>(input: I) -> Res<I, KindBaseSelector> {
     value_pattern(kind_base)(input).map( |(next,pattern)| {
         (next,
@@ -6087,33 +6173,38 @@ pub fn kind_selector<I: Span>(input: I) -> Res<I, KindSelector> {
         tag(">"),
     )(input)
     .map(|(next, (kind, sub_kind_and_specific))| {
-        let (sub_kind, specific) = match sub_kind_and_specific {
-            None => (Pattern::Always, ValuePattern::Always),
-            Some((kind, specific)) => (
-                kind,
-                match specific {
+
+        let (sub, specific):(SubKindSelector,ValuePattern<SpecificSelector>) =  match sub_kind_and_specific {
+            None => (SubKindSelector::Always, ValuePattern::Always),
+            Some((sub, specific)) => {
+                let specific = match specific {
                     None => ValuePattern::Always,
-                    Some(specific) => specific,
-                },
-            ),
+                    Some(s) => s
+                };
+
+                (sub,specific)
+            }
         };
 
         let tks = KindSelector {
             base: kind,
-            sub: sub_kind,
+            sub,
             specific,
         };
 
+
         (next, tks)
+
     })
 }
 
 fn space_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
     tuple((point_segment_selector, opt(kind_selector), opt(tag("+"))))(input).map(
         |(next, (segment_selector, kind_selector, inclusive))| {
+
             let kind_selector = match kind_selector {
-                None => ValuePattern::Always,
-                Some(kind_selector) => ValuePattern::Pattern(kind_selector)
+                None => KindSelector::any(),
+                Some(kind_selector) => kind_selector
             };
             let inclusive = inclusive.is_some();
             (
@@ -6141,7 +6232,7 @@ fn base_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
                 PointSegKindHop {
                     inclusive,
                     segment_selector: segment,
-                    kind_selector: ValuePattern::Pattern(tks),
+                    kind_selector:tks
                 },
             )
         },
@@ -6183,7 +6274,7 @@ fn file_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
             PointSegKindHop {
                 inclusive,
                 segment_selector: segment,
-                kind_selector: ValuePattern::Pattern(tks),
+                kind_selector: tks
             },
         )
     })
@@ -6191,7 +6282,7 @@ fn file_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
 
 fn dir_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
     tuple((dir_segment, opt(tag("+"))))(input).map(|(next, (segment, inclusive))| {
-        let tks = ValuePattern::Always;
+        let tks = KindSelector::any();
         let inclusive = inclusive.is_some();
         (
             next,
@@ -6217,7 +6308,7 @@ fn version_hop<I: Span>(input: I) -> Res<I, PointSegKindHop> {
                 PointSegKindHop {
                     inclusive,
                     segment_selector: segment,
-                    kind_selector: ValuePattern::Pattern(tks),
+                    kind_selector: tks
                 },
             )
         },
@@ -6251,12 +6342,11 @@ pub fn point_selector<I: Span>(input: I) -> Res<I, Selector> {
                     segment_selector: PointSegSelector::Exact(ExactPointSeg::PointSeg(
                         PointSeg::FsRootDir,
                     )),
-                    kind_selector: ValuePattern::Pattern(KindSelector {
-                        base: BaseKind::File,
-                        sub: None,
-                        specific: ValuePattern::Always,
-                    }),
-                });
+                    kind_selector: KindSelector {
+                        base: KindBaseSelector::Exact(BaseKind::File),
+                        sub: SubKindSelector::Always,
+                        specific: ValuePattern::Always
+                    }});
                 for dir_hop in dir_hops {
                     hops.push(dir_hop);
                 }
