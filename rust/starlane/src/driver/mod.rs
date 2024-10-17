@@ -1663,7 +1663,7 @@ impl Deref for ParticleSphere {
     }
 }
 
-enum ParticleSphereInner {
+pub enum ParticleSphereInner {
     Handler(Box<dyn DirectedHandler>),
     Router(Box<dyn TraversalRouter>),
 }
@@ -1973,8 +1973,6 @@ pub enum DriverErr {
     #[error(transparent)]
     ControlErr(#[from] ControlErr),
     #[error(transparent)]
-    ParticleErr(#[from] Box<dyn ParticleErr>),
-    #[error(transparent)]
     FileStoreErr(#[from] FileStoreErr),
     #[error(transparent)]
     ServiceErr(#[from] ServiceErr),
@@ -1988,8 +1986,8 @@ pub enum DriverErr {
     ExpectEnvVar(String),
     #[error("DriverApi is not associated with point: '{0}'")]
     DriverApiNotFound(Point),
-    #[error("Driver not found: '{0}'")]
-    DriverNotFound(String),
+    #[error("'{0}'")]
+    String(String),
     #[error("{0}")]
     Anyhow(#[from] Arc<anyhow::Error>)
 }
@@ -1998,7 +1996,7 @@ impl DriverErr {
 
 
     pub fn driver_not_found<S>(name: S) -> Self where S: ToString {
-        Self::DriverNotFound(name.to_string())
+        Self::String(name.to_string())
     }
     pub fn particle_router_not_set(point: &Point, kind: &Kind) -> Self {
         let point = point.clone();
