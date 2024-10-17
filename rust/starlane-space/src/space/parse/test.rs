@@ -9,13 +9,13 @@ use crate::space::parse::model::{
     BlockKind, DelimitedBlockKind, NestedBlockKind, TerminatedBlockKind,
 };
 use crate::space::parse::util::{new_span, result, span_with_extra};
-use crate::space::parse::{assignment, base_point_segment, base_seg, command_line, doc, expected_block_terminator_or_non_terminator, lex_block, lex_nested_block, lex_scope, lex_scope_selector, lex_scopes, lowercase1, mesh_eos, nested_block, next_stacked_name, path_regex, pipeline, pipeline_segment, pipeline_step_var, pipeline_stop_var, point_route_segment, point_template, point_var, point_var_seg, pop, rec_version, root_ctx_seg, root_scope, root_scope_selector, route_attribute, scope_filter, scope_filters, skewer_case_chars, skewer_dot, space_chars, space_no_dupe_dots, space_point_segment, strip_comments, template, var_case, var_route, version, Env, PrimitiveErrCtx};
+use crate::space::parse::{assignment, base_point_segment, base_seg, command_line, doc, expected_block_terminator_or_non_terminator, lex_block, lex_nested_block, lex_scope, lex_scope_selector, lex_scopes, lowercase1, mesh_eos, nested_block, next_stacked_name, path_regex, pipeline, pipeline_segment, pipeline_step_var, pipeline_stop_var, point_route_segment, point_template, point_var, point_var_seg, pop, rec_version, root_ctx_seg, root_scope, root_scope_selector, route_attribute, scope_filter, scope_filters, skewer_case_chars, skewer_dot, space_chars, space_no_dupe_dots, space_point_kind_segment, space_point_segment, strip_comments, template, var_case, var_route, version, Env, PrimitiveErrCtx};
 use crate::space::parse::context;
 use crate::space::point::{Point, PointCtx, PointSegVar, RouteSegVar};
 use crate::space::substance::Substance;
 use crate::space::util;
 use crate::space::util::{log, ToResolved};
-use nom::bytes::complete::{escaped, tag};
+use nom::bytes::complete::{escaped, tag, take_until};
 use nom::character::complete::{alpha1, anychar, multispace0};
 use nom::combinator::{all_consuming, opt, peek, recognize};
 use nom::multi::many0;
@@ -104,13 +104,14 @@ pub fn test_command_line_err()  {
 }
 
 #[test]
-pub fn test_route_seg() {
+pub fn test_point_hierarchy_FIXME() {
     let i = new_span("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/star.bind<File>");
 
-    let blah = result(terminated(var_route(point_route_segment).context(PrimitiveErrCtx::RouteScopeTag.into()), tag("::"))(i)).unwrap();
-
-    println!("Blah: {}", blah.to_string());
-
+    let i = new_span("repo<Repo>");
+//    println!("Blah: {}", blah.to_string());
+    let answer = log(result(space_point_kind_segment(i))).unwrap();
+//    let answer = log(result(space_point_segment(i))).unwrap();
+    println!("PointSeg: '{}'", answer.to_string());
 }
 
 #[test]

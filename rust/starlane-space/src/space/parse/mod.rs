@@ -440,6 +440,10 @@ pub fn mesh_eos<I: Span>(input: I) -> Res<I, I> {
     peek(alt((tag(":"), eop)))(input)
 }
 
+pub fn mesh_kind_eos<I: Span>(input: I) -> Res<I, I> {
+    peek(alt((tag(":"), eop)))(input)
+}
+
 pub fn fs_trailing<I: Span>(input: I) -> Res<I, I> {
     peek(pair(
         recognize(tag(":")),
@@ -480,16 +484,15 @@ pub fn space_no_dupe_dots<I: Span>(input: I) -> Res<I, ()> {
 }
 
 pub fn space_point_segment<I: Span>(input: I) -> Res<I, PointSeg> {
-        cut(pair(
-            recognize(tuple((
-                lowercase1.context(PrimitiveErrCtx::Lower.into()),
-                space_no_dupe_dots.context(PrimitiveErrCtx::ConsecutiveDots.into()),
-                space_chars.context(PrimitiveErrCtx::Domain.into()),
-            ))),
-            mesh_eos,
-        ) .context(PointSegErrCtx::Space.into()),
+        cut(terminated(
+            recognize(pair(
+                peek(lowercase1).context(PrimitiveErrCtx::Lower.into()),
+                space_chars,
+            )).context(PrimitiveErrCtx::Domain.into()),
+            mesh_eos.context(PrimitiveErrCtx::Brace(BraceErrCtx{kind: BraceKindErrCtx::Curly,side: BraceSideErrCtx::Open}).into()),
+        ).context(PointSegErrCtx::Space.into()),
     )(input)
-    .map(|(next, (space, x))| (next, PointSeg::Space(space.to_string())))
+    .map(|(next, space)| (next, PointSeg::Space(space.to_string())))
 }
 
 pub fn base_point_segment<I: Span>(input: I) -> Res<I, PointSeg> {
@@ -979,7 +982,7 @@ pub fn file_point_capture_segment(input: Span) -> Res<Span, PointSeg> {
  */
 
 pub fn space_point_kind_segment<I: Span>(input: I) -> Res<I, PointKindSeg> {
-    tuple((space_point_segment, delim_kind))(input).map(|(next, (point_segment, kind))| {
+    pair(space_point_segment, delim_kind)(input).map(|(next, (point_segment, kind))| {
         (
             next,
             PointKindSeg {
@@ -1067,7 +1070,7 @@ pub fn point_kind_hierarchy<I: Span>(input: I) -> Res<I, PointHierarchy> {
 
         let route_seg = match route_seg {
             None => RouteSeg::Local,
-            Some(rs) => rs,
+            Some(route_seg) => route_seg
         };
 
         segments.append(&mut files);
@@ -1324,6 +1327,7 @@ where
 {
     i.split_at_position1_complete(
         |item| {
+println!("testing: {}", item);
             let char_item = item.as_char();
             !(char_item == '-')
                 && !(char_item == '.')
