@@ -1,6 +1,7 @@
 pub mod util;
 #[cfg(test)]
 pub mod test;
+pub mod nomplus;
 //pub mod error;
 
 use core::fmt;
@@ -11,7 +12,7 @@ use std::fmt::Formatter;
 use std::ops::{Deref, RangeFrom, RangeTo};
 use std::str::FromStr;
 use std::sync::Arc;
-
+use anyhow::Context;
 use crate::space::command::common::{PropertyMod, SetProperties, StateSrcVar};
 use crate::space::command::direct::create::{
     CreateVar, KindTemplate, PointSegTemplate, PointTemplateSeg, PointTemplateVar, Strategy,
@@ -175,8 +176,7 @@ pub mod test2 {
 
     #[test]
     pub fn test() {
-        let point = result(point_var(new_span("$the:blasted"))).unwrap();
-        println!("point: {}", point.to_string());
+         assert!(result(point_var(new_span("$the:blasted"))).is_err());
     }
 }
 
@@ -235,8 +235,9 @@ pub enum PrimitiveErrCtx {
     #[error("expecting {0}")]
     Brace(#[from] BraceErrCtx),
     #[error("consecutive '..' dots not allowed")]
-    ConsecutiveDots
-
+    ConsecutiveDots,
+    #[error("error processing route")]
+    RouteScopeTag
 }
 
 #[derive(Debug, Clone, Error)]
@@ -481,10 +482,9 @@ pub fn space_no_dupe_dots<I: Span>(input: I) -> Res<I, ()> {
 pub fn space_point_segment<I: Span>(input: I) -> Res<I, PointSeg> {
         cut(pair(
             recognize(tuple((
-                //lowercase1.context(PrimitiveErrCtx::Lower.into()),
-                peek(lowercase_alphanumeric),
+                lowercase1.context(PrimitiveErrCtx::Lower.into()),
                 space_no_dupe_dots.context(PrimitiveErrCtx::ConsecutiveDots.into()),
-                space_chars//.context(PrimitiveErrCtx::Domain.into()),
+                space_chars.context(PrimitiveErrCtx::Domain.into()),
             ))),
             mesh_eos,
         ) .context(PointSegErrCtx::Space.into()),
@@ -827,10 +827,7 @@ pub fn point_non_root_var<I: Span>(input: I) -> Res<I, PointVar> {
     context(
         "point_non_root",
         tuple((
-            context(
-                "point_route",
-                opt(terminated(var_route(point_route_segment), tag("::"))),
-            ),
+                opt(terminated(var_route(point_route_segment), tag("::"))).context(PrimitiveErrCtx::RouteScopeTag.into()),
             point_var_seg(root_ctx_seg(space_point_segment)),
             many0(base_seg(point_var_seg(pop(base_point_segment)))),
             opt(base_seg(point_var_seg(pop(version_point_segment)))),
@@ -1051,12 +1048,13 @@ pub fn consume_hierarchy<I: Span>(input: I) -> Result<PointHierarchy, ParseErrs>
 
 pub fn point_kind_hierarchy<I: Span>(input: I) -> Res<I, PointHierarchy> {
     tuple((
-        tuple((point_route_segment, space_point_kind_segment)),
+        opt(terminated(point_route_segment,tag("::"))).context(PrimitiveErrCtx::RouteScopeTag.into()),
+        space_point_kind_segment,
         many0(base_point_kind_segment),
         opt(version_point_kind_segment),
         many0(file_point_kind_segment),
     ))(input)
-    .map(|(next, ((hub, space), mut bases, version, mut files))| {
+    .map(|(next, (route_seg, space, mut bases, version, mut files))| {
         let mut segments = vec![];
         segments.push(space);
         segments.append(&mut bases);
@@ -1066,9 +1064,15 @@ pub fn point_kind_hierarchy<I: Span>(input: I) -> Res<I, PointHierarchy> {
                 segments.push(version);
             }
         }
+
+        let route_seg = match route_seg {
+            None => RouteSeg::Local,
+            Some(rs) => rs,
+        };
+
         segments.append(&mut files);
 
-        let point = PointHierarchy::new(hub, segments);
+        let point = PointHierarchy::new(route_seg, segments);
 
         (next, point)
     })
@@ -1224,18 +1228,9 @@ where
     )
 }
 
-pub fn lowercase1<T: Span>(i: T) -> Res<T, T>
-where
-    T: InputTakeAtPosition + nom::InputLength,
-    <T as InputTakeAtPosition>::Item: AsChar,
+pub fn lowercase1<I>(i: I) -> Res<I, I> where I: Span
 {
-    i.split_at_position1_complete(
-        |item| {
-            let char_item = item.as_char();
-            !(char_item.is_alpha() && char_item.is_lowercase())
-        },
-        ErrorKind::AlphaNumeric,
-    )
+    nomplus::lowercase1(i)
 }
 
 pub fn rec_skewer<I: Span>(input: I) -> Res<I, I> {
@@ -5520,7 +5515,7 @@ pub mod cmd_test {
                 segment: PointSeg::Base("less".to_string()),
                 kind: Kind::Base,
             }],
-        ).into();
+        );
 
         let fae = PointHierarchy::new(
             RouteSeg::Local,
@@ -5534,7 +5529,7 @@ pub mod cmd_test {
                     kind: Kind::User,
                 },
             ],
-        ).into();
+        );
 
         assert!(result(point_selector(new_span("less")))
             .unwrap()

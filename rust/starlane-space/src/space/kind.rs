@@ -14,7 +14,7 @@ use crate::space::loc::{
 };
 use crate::space::parse::util::result;
 use crate::space::parse::{kind_parts, specific, CamelCase, Domain,  SkewerCase};
-use crate::space::err::ParseErrs;
+use crate::space::err::{ParseErrs, PrintErr, SpaceErr};
 use crate::space::particle::traversal::TraversalPlan;
 use crate::space::point::Point;
 use crate::space::selector::{KindBaseSelector, KindSelector, Pattern, PointHierarchy, SpecificSelector, SubKindSelector, VersionReq};
@@ -143,12 +143,12 @@ pub enum BaseKind {
 impl BaseKind {
 
     pub fn bind_point_hierarchy(&self) -> PointHierarchy {
-        match self {
-            BaseKind::Star => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/star.bind<File>").unwrap(),
-            BaseKind::Driver => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/driver.bind<File>").unwrap(),
-            BaseKind::Global => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/global.bind<File>").unwrap(),
-            _ => Self::nothing_bind_point_hierarchy()
-        }
+        (match self {
+            BaseKind::Star => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/star.bind<File>"),
+            BaseKind::Driver => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/driver.bind<File>"),
+            BaseKind::Global => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/global.bind<File>"),
+            _ => Ok(Self::nothing_bind_point_hierarchy())
+        }).map_err(|errs| { errs.print(); errs }).unwrap()
     }
 
     pub fn bind(&self) -> Point {

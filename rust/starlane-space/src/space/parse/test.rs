@@ -1,6 +1,6 @@
 use std::str::FromStr;
 use std::sync::Arc;
-
+use anyhow::Context;
 use crate::space::command::direct::create::{PointSegTemplate, PointTemplate, Template};
 use crate::space::command::Command;
 use crate::space::config::Document;
@@ -9,26 +9,18 @@ use crate::space::parse::model::{
     BlockKind, DelimitedBlockKind, NestedBlockKind, TerminatedBlockKind,
 };
 use crate::space::parse::util::{new_span, result, span_with_extra};
-use crate::space::parse::{
-    assignment, base_point_segment, base_seg, command_line, doc,
-    expected_block_terminator_or_non_terminator, lex_block, lex_nested_block, lex_scope,
-    lex_scope_selector, lex_scopes, lowercase1, mesh_eos, nested_block, next_stacked_name,
-    path_regex, pipeline, pipeline_segment, pipeline_step_var, pipeline_stop_var, point_template,
-    point_var, point_var_seg, pop, rec_version, root_ctx_seg, root_scope, root_scope_selector,
-    route_attribute, scope_filter, scope_filters, skewer_case_chars, skewer_dot, space_chars,
-    space_no_dupe_dots, space_point_segment, strip_comments, template, var_case, version, Env
-    ,
-};
+use crate::space::parse::{assignment, base_point_segment, base_seg, command_line, doc, expected_block_terminator_or_non_terminator, lex_block, lex_nested_block, lex_scope, lex_scope_selector, lex_scopes, lowercase1, mesh_eos, nested_block, next_stacked_name, path_regex, pipeline, pipeline_segment, pipeline_step_var, pipeline_stop_var, point_route_segment, point_template, point_var, point_var_seg, pop, rec_version, root_ctx_seg, root_scope, root_scope_selector, route_attribute, scope_filter, scope_filters, skewer_case_chars, skewer_dot, space_chars, space_no_dupe_dots, space_point_segment, strip_comments, template, var_case, var_route, version, Env, PrimitiveErrCtx};
 use crate::space::parse::context;
 use crate::space::point::{Point, PointCtx, PointSegVar, RouteSegVar};
 use crate::space::substance::Substance;
 use crate::space::util;
 use crate::space::util::{log, ToResolved};
-use nom::bytes::complete::escaped;
+use nom::bytes::complete::{escaped, tag};
 use nom::character::complete::{alpha1, anychar, multispace0};
-use nom::combinator::{all_consuming, peek, recognize};
+use nom::combinator::{all_consuming, opt, peek, recognize};
 use nom::multi::many0;
-use nom::sequence::{delimited, tuple};
+use nom::sequence::{delimited, terminated, tuple};
+use nom_supreme::ParserExt;
 
 #[test]
 pub fn test_assignment() {
@@ -96,90 +88,100 @@ pub fn test_message_selector() {
 }
 
 #[test]
-pub fn test_create_command() -> Result<(), SpaceErr> {
-    let command = util::log(result(command_line(new_span("create localhost<Space>"))))?;
+pub fn test_create_command()  {
+    let command = util::log(result(command_line(new_span("create localhost<Space>")))).unwrap();
     let env = Env::new(Point::root());
-    let command: Command = util::log(command.to_resolved(&env))?;
-    Ok(())
+    let command: Command = util::log(command.to_resolved(&env)).unwrap();
+    
 }
 
 //    #[test]
-pub fn test_command_line_err() -> Result<(), SpaceErr> {
-    let command = util::log(result(command_line(new_span("create localhost<bad>"))))?;
+pub fn test_command_line_err()  {
+    let command = util::log(result(command_line(new_span("create localhost<bad>")))).unwrap();
     let env = Env::new(Point::root());
-    let command: Command = util::log(command.to_resolved(&env))?;
-    Ok(())
+    let command: Command = util::log(command.to_resolved(&env)).unwrap();
+    
 }
 
 #[test]
-pub fn test_template() -> Result<(), SpaceErr> {
+pub fn test_route_seg() {
+    let i = new_span("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/star.bind<File>");
+
+    let blah = result(terminated(var_route(point_route_segment).context(PrimitiveErrCtx::RouteScopeTag.into()), tag("::"))(i)).unwrap();
+
+    println!("Blah: {}", blah.to_string());
+
+}
+
+#[test]
+pub fn test_template()  {
     let t = util::log(result(all_consuming(template)(new_span(
         "localhost<Space>",
-    ))))?;
+    )))).unwrap();
     let env = Env::new(Point::root());
-    let t: Template = util::log(t.to_resolved(&env))?;
+    let t: Template = util::log(t.to_resolved(&env)).unwrap();
 
     let t = util::log(result(base_point_segment(new_span(
         "localhost:base<Space>",
-    ))))?;
+    )))).unwrap();
 
     let (space, bases): (PointSegVar, Vec<PointSegVar>) =
         util::log(result(tuple((
             point_var_seg(root_ctx_seg(space_point_segment)),
             many0(base_seg(point_var_seg(pop(base_point_segment)))),
-        ))(new_span("localhost:base:nopo<Space>"))))?;
+        ))(new_span("localhost:base:nopo<Space>")))).unwrap();
     println!("space: {}", space.to_string());
     for base in bases {
         println!("\tbase: {}", base.to_string());
     }
-    //let t= util::log(result(all_consuming(template)(new_span("localhost:base<Space>"))))?;
+    //let t= util::log(result(all_consuming(template)(new_span("localhost:base<Space>")))).unwrap();
     //        let env = Env::new(Point::root());
-    //       let t: Template = util::log(t.to_resolved(&env))?;
+    //       let t: Template = util::log(t.to_resolved(&env)).unwrap();
 
-    Ok(())
+    
 }
 
 #[test]
-pub fn test_point_template() -> Result<(), SpaceErr> {
+pub fn test_point_template()  {
     assert!(mesh_eos(new_span(":")).is_ok());
     assert!(mesh_eos(new_span("%")).is_ok());
     assert!(mesh_eos(new_span("x")).is_err());
 
     assert!(point_var(new_span("localhost:some-%")).is_ok());
 
-    util::log(result(all_consuming(point_template)(new_span("localhost"))))?;
+    util::log(result(all_consuming(point_template)(new_span("localhost")))).unwrap();
 
-    let template = util::log(result(point_template(new_span("localhost:other:some-%"))))?;
-    let template: PointTemplate = util::log(template.collapse())?;
+    let template = util::log(result(point_template(new_span("localhost:other:some-%")))).unwrap();
+    let template: PointTemplate = util::log(template.collapse()).unwrap();
     if let PointSegTemplate::Pattern(child) = template.child_segment_template {
         assert_eq!(child.as_str(), "some-%")
     }
 
-    util::log(result(point_template(new_span("my-domain.com"))))?;
-    util::log(result(point_template(new_span("ROOT"))))?;
-    Ok(())
+    util::log(result(point_template(new_span("my-domain.com")))).unwrap();
+    util::log(result(point_template(new_span("ROOT")))).unwrap();
+    
 }
 
 //    #[test]
-pub fn test_point_var() -> Result<(), SpaceErr> {
+pub fn test_point_var()  {
     util::log(result(all_consuming(point_var)(new_span(
         "[hub]::my-domain.com:${name}:base",
-    ))))?;
+    )))).unwrap();
     util::log(result(all_consuming(point_var)(new_span(
         "[hub]::my-domain.com:1.0.0:/dorko/x/",
-    ))))?;
+    )))).unwrap();
     util::log(result(all_consuming(point_var)(new_span(
         "[hub]::my-domain.com:1.0.0:/dorko/${x}/",
-    ))))?;
+    )))).unwrap();
     util::log(result(all_consuming(point_var)(new_span(
         "[hub]::.:1.0.0:/dorko/${x}/",
-    ))))?;
+    )))).unwrap();
     util::log(result(all_consuming(point_var)(new_span(
         "[hub]::..:1.0.0:/dorko/${x}/",
-    ))))?;
+    )))).unwrap();
     let point = util::log(result(point_var(new_span(
         "[hub]::my-domain.com:1.0.0:/dorko/${x}/file.txt",
-    ))))?;
+    )))).unwrap();
     if let Some(PointSegVar::Var(var)) = point.segments.get(4) {
         assert_eq!("x", var.name.as_str());
     } else {
@@ -194,7 +196,7 @@ pub fn test_point_var() -> Result<(), SpaceErr> {
 
     let point = util::log(result(point_var(new_span(
         "${route}::my-domain.com:${name}:base",
-    ))))?;
+    )))).unwrap();
 
     // this one SHOULD fail and an appropriate error should be located at BAD
     util::log(result(point_var(new_span(
@@ -225,93 +227,93 @@ pub fn test_point_var() -> Result<(), SpaceErr> {
         assert!(false);
     }
 
-    let mut env = Env::new(Point::from_str("my-domain.com")?);
+    let mut env = Env::new(Point::from_str("my-domain.com").unwrap());
     env.set_var("route", Substance::Text("[hub]".to_string()));
     env.set_var("name", Substance::Text("zophis".to_string()));
-    let point: Point = point.to_resolved(&env)?;
+    let point: Point = point.to_resolved(&env).unwrap();
     println!("point.to_string(): {}", point.to_string());
 
     util::log(
         util::log(result(all_consuming(point_var)(new_span(
             "[hub]::my-domain.com:1.0.0:/dorko/x/",
-        ))))?
+        )))).unwrap()
         .to_point(),
     );
     util::log(
         util::log(result(all_consuming(point_var)(new_span(
             "[hub]::my-domain.com:1.0.0:/${dorko}/x/",
-        ))))?
+        )))).unwrap()
         .to_point(),
     );
     util::log(
         util::log(result(all_consuming(point_var)(new_span(
             "${not-supported}::my-domain.com:1.0.0:/${dorko}/x/",
-        ))))?
+        )))).unwrap()
         .to_point(),
     );
 
-    let point = util::log(result(point_var(new_span("${route}::${root}:base1"))))?;
-    let mut env = Env::new(Point::from_str("my-domain.com:blah")?);
+    let point = util::log(result(point_var(new_span("${route}::${root}:base1")))).unwrap();
+    let mut env = Env::new(Point::from_str("my-domain.com:blah").unwrap());
     env.set_var("route", Substance::Text("[hub]".to_string()));
     env.set_var("root", Substance::Text("..".to_string()));
 
-    let point: PointCtx = util::log(point.to_resolved(&env))?;
+    let point: PointCtx = util::log(point.to_resolved(&env)).unwrap();
 
     /*
-            let resolver = Env::new(Point::from_str("my-domain.com:under:over")?);
-            let point = log(consume_point_var("../../hello") )?;
-    //        let point: Point = log(point.to_resolved(&resolver))?;
+            let resolver = Env::new(Point::from_str("my-domain.com:under:over").unwrap());
+            let point = log(consume_point_var("../../hello") ).unwrap();
+    //        let point: Point = log(point.to_resolved(&resolver)).unwrap();
       //      println!("point.to_string(): {}", point.to_string());
             let _: Result<Point, ExtErr> = log(log(result(all_consuming(point_var)(new_span(
                 "${not-supported}::my-domain.com:1.0.0:/${dorko}/x/",
-            )))?
+            ))).unwrap()
                 .to_resolved(&env)));
 
              */
-    Ok(())
+    
 }
 
 #[test]
-pub fn test_point() -> Result<(), SpaceErr> {
+pub fn test_point()  {
     util::log(
         result(all_consuming(point_var)(new_span(
             "[hub]::my-domain.com:name:base",
-        )))?
+        ))).unwrap()
         .to_point(),
-    )?;
+    ).unwrap();
     util::log(
         result(all_consuming(point_var)(new_span(
             "[hub]::my-domain.com:1.0.0:/dorko/x/",
-        )))?
+        ))).unwrap()
         .to_point(),
-    )?;
+    ).unwrap();
     util::log(
         result(all_consuming(point_var)(new_span(
             "[hub]::my-domain.com:1.0.0:/dorko/xyz/",
-        )))?
+        ))).unwrap()
         .to_point(),
-    )?;
+    ).unwrap();
 
-    Ok(())
+    
 }
 
 #[test]
-pub fn test_simple_point_var() -> Result<(), SpaceErr> {
+pub fn test_simple_point_var()  {
     /*
-    let point = util::log(result(point_var(new_span("localhost:base"))))?;
+    let point = util::log(result(point_var(new_span("localhost:base")))).unwrap();
     println!("point '{}'", point.to_string());
-    let point :Point = point.collapse()?;
+    let point :Point = point.collapse().unwrap();
     assert_eq!("localhost:base", point.to_string().as_str());
-    let point = util::log(result(point_var(new_span("localhost:base<Kind>"))))?;
-    let point :Point = point.collapse()?;
+    let point = util::log(result(point_var(new_span("localhost:base<Kind>")))).unwrap();
+    let point :Point = point.collapse().unwrap();
     assert_eq!("localhost:base", point.to_string().as_str());
 
-    let point = util::log(result(point_var(new_span("localhost:base:3.0.0<Kind>"))))?;
-    let point :Point = point.collapse()?;
+    let point = util::log(result(point_var(new_span("localhost:base:3.0.0<Kind>")))).unwrap();
+    let point :Point = point.collapse().unwrap();
     assert_eq!("localhost:base:3.0.0", point.to_string().as_str());
-    let point = util::log(result(point_var(new_span("localhost:base:3.0.0:/some/file.txt<Kind>"))))?;
+    let point = util::log(result(point_var(new_span("localhost:base:3.0.0:/some/file.txt<Kind>")))).unwrap();
     assert_eq!("localhost:base:3.0.0:/some/file.txt", point.to_string().as_str());
-    let point :Point = point.collapse()?;
+    let point :Point = point.collapse().unwrap();
     println!("point: '{}'",point.to_string());
 
     for seg in &point.segments {
@@ -323,48 +325,48 @@ pub fn test_simple_point_var() -> Result<(), SpaceErr> {
 
     let point = util::log(result(point_var(new_span(
         "localhost:base:/fs/file.txt<Kind>",
-    ))))?;
-    let point: Point = point.collapse()?;
+    )))).unwrap();
+    let point: Point = point.collapse().unwrap();
     assert_eq!("localhost:base:/fs/file.txt", point.to_string().as_str());
 
-    Ok(())
+    
 }
 
 #[test]
-pub fn test_lex_block() -> Result<(), SpaceErr> {
-    let esc = result(escaped(anychar, '\\', anychar)(new_span("\\}")))?;
+pub fn test_lex_block()  {
+    let esc = result(escaped(anychar, '\\', anychar)(new_span("\\}"))).unwrap();
     //println!("esc: {}", esc);
     util::log(result(all_consuming(lex_block(BlockKind::Nested(
         NestedBlockKind::Curly,
-    )))(new_span("{}"))))?;
+    )))(new_span("{}")))).unwrap();
     util::log(result(all_consuming(lex_block(BlockKind::Nested(
         NestedBlockKind::Curly,
-    )))(new_span("{x}"))))?;
+    )))(new_span("{x}")))).unwrap();
     util::log(result(all_consuming(lex_block(BlockKind::Nested(
         NestedBlockKind::Curly,
-    )))(new_span("{\\}}"))))?;
+    )))(new_span("{\\}}")))).unwrap();
     util::log(result(all_consuming(lex_block(BlockKind::Delimited(
         DelimitedBlockKind::SingleQuotes,
-    )))(new_span("'hello'"))))?;
+    )))(new_span("'hello'")))).unwrap();
     util::log(result(all_consuming(lex_block(BlockKind::Delimited(
         DelimitedBlockKind::SingleQuotes,
-    )))(new_span("'ain\\'t it cool?'"))))?;
+    )))(new_span("'ain\\'t it cool.unwrap()'")))).unwrap();
 
     //assert!(log(result(all_consuming(lex_block( BlockKind::Nested(NestedBlockKind::Curly)))(create_span("{ }}")))).is_err());
-    Ok(())
+    
 }
 #[test]
-pub fn test_path_regex2() -> Result<(), SpaceErr> {
-    util::log(result(path_regex(new_span("/xyz"))))?;
-    Ok(())
+pub fn test_path_regex2()  {
+    util::log(result(path_regex(new_span("/xyz")))).unwrap();
+    
 }
 #[test]
-pub fn test_bind_config() -> Result<(), SpaceErr> {
+pub fn test_bind_config()  {
     let bind_config_str = r#"Bind(version=1.0.0)  { Route<Http> -> { <Get> -> ((*)) => &; } }
         "#;
 
-    util::log(doc(bind_config_str))?;
-    if let Document::BindConfig(bind) = util::log(doc(bind_config_str))? {
+    util::log(doc(bind_config_str)).unwrap();
+    if let Document::BindConfig(bind) = util::log(doc(bind_config_str)).unwrap() {
         assert_eq!(bind.route_scopes().len(), 1);
         let mut pipelines = bind.route_scopes();
         let pipeline_scope = pipelines.pop().unwrap();
@@ -387,7 +389,7 @@ pub fn test_bind_config() -> Result<(), SpaceErr> {
               Route<Ext<Create>> -> localhost:app => &;
            }"#;
 
-    if let Document::BindConfig(bind) = util::log(doc(bind_config_str))? {
+    if let Document::BindConfig(bind) = util::log(doc(bind_config_str)).unwrap() {
         assert_eq!(bind.route_scopes().len(), 1);
         let mut pipelines = bind.route_scopes();
         let pipeline_scope = pipelines.pop().unwrap();
@@ -409,13 +411,13 @@ pub fn test_bind_config() -> Result<(), SpaceErr> {
     let bind_config_str = r#"  Bind(version=1.0.0) {
               Route -> {
                  <*> -> {
-                    <Get>/users/(?P<user>)/.* -> localhost:users:${user} => &;
+                    <Get>/users/(.unwrap()P<user>)/.* -> localhost:users:${user} => &;
                  }
               }
            }
 
            "#;
-    util::log(doc(bind_config_str))?;
+    util::log(doc(bind_config_str)).unwrap();
 
     let bind_config_str = r#"  Bind(version=1.0.0) {
               Route -> {
@@ -424,7 +426,7 @@ pub fn test_bind_config() -> Result<(), SpaceErr> {
            }
 
            "#;
-    util::log(doc(bind_config_str))?;
+    util::log(doc(bind_config_str)).unwrap();
 
     let bind_config_str = r#"  Bind(version=1.0.0) {
               * -> { // This should fail since Route needs to be defined
@@ -446,58 +448,58 @@ pub fn test_bind_config() -> Result<(), SpaceErr> {
     assert!(util::log(doc(bind_config_str)).is_err());
     //   assert!(log(config(bind_config_str)).is_err());
 
-    Ok(())
+    
 }
 
 #[test]
-pub fn test_pipeline_segment() -> Result<(), SpaceErr> {
-    util::log(result(pipeline_segment(new_span("-> localhost"))))?;
+pub fn test_pipeline_segment()  {
+    util::log(result(pipeline_segment(new_span("-> localhost")))).unwrap();
     assert!(util::log(result(pipeline_segment(new_span("->")))).is_err());
     assert!(util::log(result(pipeline_segment(new_span("localhost")))).is_err());
-    Ok(())
+    
 }
 
 #[test]
-pub fn test_pipeline_stop() -> Result<(), SpaceErr> {
-    util::log(result(space_chars(new_span("localhost"))))?;
-    util::log(result(space_no_dupe_dots(new_span("localhost"))))?;
+pub fn test_pipeline_stop()  {
+    util::log(result(space_chars(new_span("localhost")))).unwrap();
+    util::log(result(space_no_dupe_dots(new_span("localhost")))).unwrap();
 
-    util::log(result(mesh_eos(new_span(""))))?;
-    util::log(result(mesh_eos(new_span(":"))))?;
+    util::log(result(mesh_eos(new_span("")))).unwrap();
+    util::log(result(mesh_eos(new_span(":")))).unwrap();
 
     util::log(result(recognize(tuple((
         context("point:space_segment_leading", peek(alpha1)),
         space_no_dupe_dots,
         space_chars,
-    )))(new_span("localhost"))))?;
-    util::log(result(space_point_segment(new_span("localhost.com"))))?;
+    )))(new_span("localhost")))).unwrap();
+    util::log(result(space_point_segment(new_span("localhost.com")))).unwrap();
 
-    util::log(result(point_var(new_span("mechtron.io:app:hello")))?.to_point())?;
-    util::log(result(pipeline_stop_var(new_span("localhost:app:hello"))))?;
-    Ok(())
+    util::log(result(point_var(new_span("mechtron.io:app:hello"))).unwrap().to_point()).unwrap();
+    util::log(result(pipeline_stop_var(new_span("localhost:app:hello")))).unwrap();
+    
 }
 
 #[test]
-pub fn test_pipeline() -> Result<(), SpaceErr> {
-    util::log(result(pipeline(new_span("-> localhost => &"))))?;
-    Ok(())
+pub fn test_pipeline()  {
+    util::log(result(pipeline(new_span("-> localhost => &")))).unwrap();
+    
 }
 
 #[test]
-pub fn test_pipeline_step() -> Result<(), SpaceErr> {
-    util::log(result(pipeline_step_var(new_span("->"))))?;
-    util::log(result(pipeline_step_var(new_span("-[ Text ]->"))))?;
-    util::log(result(pipeline_step_var(new_span("-[ Text ]=>"))))?;
-    util::log(result(pipeline_step_var(new_span("=[ Text ]=>"))))?;
+pub fn test_pipeline_step()  {
+    util::log(result(pipeline_step_var(new_span("->")))).unwrap();
+    util::log(result(pipeline_step_var(new_span("-[ Text ]->")))).unwrap();
+    util::log(result(pipeline_step_var(new_span("-[ Text ]=>")))).unwrap();
+    util::log(result(pipeline_step_var(new_span("=[ Text ]=>")))).unwrap();
 
     assert!(util::log(result(pipeline_step_var(new_span("=")))).is_err());
     assert!(util::log(result(pipeline_step_var(new_span("-[ Bin ]=")))).is_err());
     assert!(util::log(result(pipeline_step_var(new_span("[ Bin ]=>")))).is_err());
-    Ok(())
+    
 }
 
 #[test]
-pub fn test_rough_bind_config() -> Result<(), SpaceErr> {
+pub fn test_rough_bind_config()  {
     let unknown_config_kind = r#"
 Unknown(version=1.0.0) # mem unknown config kind
 {
@@ -542,11 +544,11 @@ Bind(version=1.0.0)
     util::log(doc(multiple_unknown_sub_selectors)).unwrap();
     util::log(doc(now_we_got_rows_to_parse)).unwrap();
 
-    Ok(())
+    
 }
 
 #[test]
-pub fn test_remove_comments() -> Result<(), SpaceErr> {
+pub fn test_remove_comments()  {
     let bind_str = r#"
 # this is a mem of comments
 Bind(version=1.0.0)->
@@ -571,25 +573,24 @@ Bind(version=1.0.0)->
         }
     }
 
-    Ok(())
+    
 }
 
 #[test]
-pub fn test_version() -> Result<(), SpaceErr> {
-    rec_version(new_span("1.0.0"))?;
-    rec_version(new_span("1.0.0-alpha"))?;
-    version(new_span("1.0.0-alpha"))?;
+pub fn test_version()  {
+    rec_version(new_span("1.0.0")).unwrap();
+    rec_version(new_span("1.0.0-alpha")).unwrap();
+    version(new_span("1.0.0-alpha")).unwrap();
 
-    Ok(())
 }
 #[test]
-pub fn test_rough_block() -> Result<(), SpaceErr> {
+pub fn test_rough_block()  {
     result(all_consuming(lex_nested_block(NestedBlockKind::Curly))(
         new_span("{  }"),
-    ))?;
+    )).unwrap();
     result(all_consuming(lex_nested_block(NestedBlockKind::Curly))(
         new_span("{ {} }"),
-    ))?;
+    )).unwrap();
     assert!(
         result(all_consuming(lex_nested_block(NestedBlockKind::Curly))(
             new_span("{ } }")
@@ -599,7 +600,7 @@ pub fn test_rough_block() -> Result<(), SpaceErr> {
     // this is allowed by rough_block
     result(all_consuming(lex_nested_block(NestedBlockKind::Curly))(
         new_span("{ ] }"),
-    ))?;
+    )).unwrap();
 
     result(lex_nested_block(NestedBlockKind::Curly)(new_span(
         r#"x blah
@@ -625,20 +626,20 @@ Hello my friend
     .err()
     .unwrap()
     .print();
-    Ok(())
+    
 }
 
 #[test]
-pub fn test_block() -> Result<(), SpaceErr> {
+pub fn test_block()  {
     util::log(result(lex_nested_block(NestedBlockKind::Curly)(new_span(
         "{ <Get> -> localhost; }    ",
-    ))))?;
+    )))).unwrap();
 
-    all_consuming(nested_block(NestedBlockKind::Curly))(new_span("{  }"))?;
-    all_consuming(nested_block(NestedBlockKind::Curly))(new_span("{ {} }"))?;
+    all_consuming(nested_block(NestedBlockKind::Curly))(new_span("{  }")).unwrap();
+    all_consuming(nested_block(NestedBlockKind::Curly))(new_span("{ {} }")).unwrap();
     util::log(result(nested_block(NestedBlockKind::Curly)(new_span(
         "{ [] }",
-    ))))?;
+    )))).unwrap();
     assert!(
         expected_block_terminator_or_non_terminator(NestedBlockKind::Curly)(new_span("}")).is_ok()
     );
@@ -662,11 +663,11 @@ pub fn test_block() -> Result<(), SpaceErr> {
     .err()
     .unwrap()
     .print();
-    Ok(())
+    
 }
 
 //#[test]
-pub fn test_root_scope_selector() -> Result<(), SpaceErr> {
+pub fn test_root_scope_selector()  {
     assert!(
         (result(root_scope_selector(new_span(
             r#"
@@ -712,22 +713,22 @@ pub fn test_root_scope_selector() -> Result<(), SpaceErr> {
     .unwrap()
     .print();
 
-    Ok(())
+    
 }
 
 //    #[test]
-pub fn test_scope_filter() -> Result<(), SpaceErr> {
-    result(scope_filter(new_span("(auth)")))?;
-    result(scope_filter(new_span("(auth )")))?;
-    result(scope_filter(new_span("(auth hello)")))?;
-    result(scope_filter(new_span("(auth +hello)")))?;
-    result(scope_filters(new_span("(auth +hello)->")))?;
-    result(scope_filters(new_span("(auth +hello)-(filter2)->")))?;
+pub fn test_scope_filter()  {
+    result(scope_filter(new_span("(auth)"))).unwrap();
+    result(scope_filter(new_span("(auth )"))).unwrap();
+    result(scope_filter(new_span("(auth hello)"))).unwrap();
+    result(scope_filter(new_span("(auth +hello)"))).unwrap();
+    result(scope_filters(new_span("(auth +hello)->"))).unwrap();
+    result(scope_filters(new_span("(auth +hello)-(filter2)->"))).unwrap();
     result(scope_filters(new_span("(3auth +hello)-(filter2)->")))
         .err()
         .unwrap()
         .print();
-    result(scope_filters(new_span("(a?th +hello)-(filter2)->")))
+    result(scope_filters(new_span("(a.unwrap()th +hello)-(filter2)->")))
         .err()
         .unwrap()
         .print();
@@ -738,7 +739,7 @@ pub fn test_scope_filter() -> Result<(), SpaceErr> {
 
     assert!(skewer_case_chars(new_span("3x")).is_err());
 
-    Ok(())
+    
 }
 #[test]
 pub fn test_next_selector() {
@@ -802,25 +803,25 @@ pub fn test_next_selector() {
     assert!(next_stacked_name(new_span("<*x<Ext>>")).is_err());
 }
 #[test]
-pub fn test_lex_scope2() -> Result<(), SpaceErr> {
+pub fn test_lex_scope2()  {
     /*        let scope = log(result(lex_scopes(create_span(
                "  Get -> {}\n\nPut -> {}   ",
-           ))))?;
+           )))).unwrap();
 
     */
     util::log(result(many0(delimited(
         multispace0,
         lex_scope,
         multispace0,
-    ))(new_span(""))))?;
-    util::log(result(path_regex(new_span("/root/$(subst)"))))?;
-    util::log(result(path_regex(new_span("/users/$(user=.*)"))))?;
+    ))(new_span("")))).unwrap();
+    util::log(result(path_regex(new_span("/root/$(subst)")))).unwrap();
+    util::log(result(path_regex(new_span("/users/$(user=.*)")))).unwrap();
 
-    Ok(())
+    
 }
 
 #[test]
-pub fn test_lex_scope() -> Result<(), SpaceErr> {
+pub fn test_lex_scope()  {
     let pipes = util::log(result(lex_scope(new_span("Pipes -> {}")))).unwrap();
 
     //        let pipes = log(result(lex_scope(create_span("Pipes {}"))));
@@ -833,7 +834,7 @@ pub fn test_lex_scope() -> Result<(), SpaceErr> {
 
     assert!(util::log(result(lex_scope(new_span("Pipes {}")))).is_err());
 
-    let pipes = util::log(result(lex_scope(new_span("Pipes -> 12345;"))))?;
+    let pipes = util::log(result(lex_scope(new_span("Pipes -> 12345;")))).unwrap();
     assert_eq!(pipes.selector.name.to_string().as_str(), "Pipes");
     assert_eq!(pipes.block.content.to_string().as_str(), "-> 12345");
     assert_eq!(
@@ -845,7 +846,7 @@ pub fn test_lex_scope() -> Result<(), SpaceErr> {
     let pipes = util::log(result(lex_scope(new_span(
         //This time adding a space before the 12345... there should be one space in the content, not two
         r#"Pipes ->  12345;"#,
-    ))))?;
+    )))).unwrap();
     assert_eq!(pipes.selector.name.to_string().as_str(), "Pipes");
     assert_eq!(pipes.block.content.to_string().as_str(), "->  12345");
     assert_eq!(
@@ -855,7 +856,7 @@ pub fn test_lex_scope() -> Result<(), SpaceErr> {
     assert_eq!(pipes.selector.filters.len(), 0);
     assert!(pipes.pipeline_step.is_none());
 
-    let pipes = util::log(result(lex_scope(new_span("Pipes(auth) -> {}"))))?;
+    let pipes = util::log(result(lex_scope(new_span("Pipes(auth) -> {}")))).unwrap();
 
     assert_eq!(pipes.selector.name.to_string().as_str(), "Pipes");
     assert_eq!(pipes.block.content.len(), 0);
@@ -863,7 +864,7 @@ pub fn test_lex_scope() -> Result<(), SpaceErr> {
     assert_eq!(pipes.selector.filters.len(), 1);
     assert!(pipes.pipeline_step.is_some());
 
-    let pipes = util::log(result(lex_scope(new_span("Route<Ext> -> {}"))))?;
+    let pipes = util::log(result(lex_scope(new_span("Route<Ext> -> {}")))).unwrap();
 
     assert_eq!(pipes.selector.name.to_string().as_str(), "Route");
     assert_eq!(
@@ -886,7 +887,7 @@ pub fn test_lex_scope() -> Result<(), SpaceErr> {
 
     let pipes = util::log(result(lex_scope(new_span(
         "Route<Http>(noauth) -> {zoink!{}}",
-    ))))?;
+    )))).unwrap();
     assert_eq!(pipes.selector.name.to_string().as_str(), "Route");
     assert_eq!(
         Some(
@@ -907,7 +908,7 @@ pub fn test_lex_scope() -> Result<(), SpaceErr> {
 
     let msg = "Hello my future friend";
     let parseme = format!("<Http<Get>> -> {};", msg);
-    let pipes = util::log(result(lex_scope(new_span(parseme.as_str()))))?;
+    let pipes = util::log(result(lex_scope(new_span(parseme.as_str())))).unwrap();
 
     assert_eq!(pipes.selector.name.to_string().as_str(), "Http");
     assert_eq!(
@@ -960,7 +961,7 @@ pub fn test_lex_scope() -> Result<(), SpaceErr> {
 
     let pipes = util::log(result(lex_scope(new_span(
         "Route<Http<Get>>(auth)/users/ -[Text ]-> {}",
-    ))))?;
+    )))).unwrap();
     assert_eq!(pipes.selector.name.to_string().as_str(), "Route");
     assert_eq!(
         Some(
@@ -983,7 +984,7 @@ pub fn test_lex_scope() -> Result<(), SpaceErr> {
 
     let pipes = util::log(result(lex_scope(new_span(
         "Route<Http<Get>>(auth)-(blah xyz)/users/ -[Text ]-> {}",
-    ))))?;
+    )))).unwrap();
     assert_eq!(pipes.selector.name.to_string().as_str(), "Route");
     assert_eq!(
         Some(
@@ -1012,18 +1013,18 @@ pub fn test_lex_scope() -> Result<(), SpaceErr> {
             Post/users/scott -> localhost:app^Ext<SuperScott> => &;
 
         }"#,
-    ))?;
+    )).unwrap();
     let span = span_with_extra(stripped.as_str(), Arc::new(stripped.to_string()));
-    let pipes = util::log(result(lex_scope(span)))?;
+    let pipes = util::log(result(lex_scope(span))).unwrap();
 
-    let pipes = util::log(result(lex_scope(new_span("* -> {}"))))?;
+    let pipes = util::log(result(lex_scope(new_span("* -> {}")))).unwrap();
 
     /* let pipes = log(result(lex_scope(create_span(
         "* -> {}",
-    ))))?;
+    )))).unwrap();
 
     */
-    Ok(())
+    
 }
 
 pub fn test_nesting_bind() {
@@ -1041,7 +1042,7 @@ pub fn test_nesting_bind() {
 }
 
 //#[test]
-pub fn test_root_and_subscope_phases() -> Result<(), SpaceErr> {
+pub fn test_root_and_subscope_phases()  {
     let config = r#"
 Bind(version=1.2.3)-> {
    Route -> {
@@ -1053,32 +1054,32 @@ Bind(version=1.2.3)-> {
 
         "#;
 
-    let root = result(root_scope(new_span(config)))?;
+    let root = result(root_scope(new_span(config))).unwrap();
 
     util::log(lex_scopes(root.block.content.clone()));
-    let sub_scopes = lex_scopes(root.block.content.clone())?;
+    let sub_scopes = lex_scopes(root.block.content.clone()).unwrap();
 
     assert_eq!(sub_scopes.len(), 2);
 
-    Ok(())
+    
 }
 #[test]
-pub fn test_variable_name() -> Result<(), SpaceErr> {
+pub fn test_variable_name()  {
     assert_eq!(
         "v".to_string(),
-        util::log(result(lowercase1(new_span("v"))))?.to_string()
+        util::log(result(lowercase1(new_span("v")))).unwrap().to_string()
     );
     assert_eq!(
         "var".to_string(),
-        util::log(result(skewer_dot(new_span("var"))))?.to_string()
+        util::log(result(skewer_dot(new_span("var")))).unwrap().to_string()
     );
 
-    util::log(result(var_case(new_span("var"))))?;
-    Ok(())
+    util::log(result(var_case(new_span("var")))).unwrap();
+    
 }
 
 //#[test]
-pub fn test_subst() -> Result<(), SpaceErr> {
+pub fn test_subst()  {
     /*
     #[derive(Clone)]
     pub struct SomeParser();
@@ -1092,27 +1093,27 @@ pub fn test_subst() -> Result<(), SpaceErr> {
         }
     }
 
-    let chunks = log(result(subst(SomeParser())(create_span("123[]:${var}:abc"))))?;
+    let chunks = log(result(subst(SomeParser())(create_span("123[]:${var}:abc")))).unwrap();
     assert_eq!(chunks.chunks.len(), 3);
     let mut resolver = MapResolver::new();
     resolver.insert("var", "hello");
-    let resolved = log(chunks.resolve_vars(&resolver))?;
+    let resolved = log(chunks.resolve_vars(&resolver)).unwrap();
 
     let chunks = log(result(subst(SomeParser())(create_span(
         "123[]:\\${var}:abc",
-    ))))?;
-    let resolved = log(chunks.resolve_vars(&resolver))?;
+    )))).unwrap();
+    let resolved = log(chunks.resolve_vars(&resolver)).unwrap();
 
     let r = log(result(subst(SomeParser())(create_span(
         "123[    ]:${var}:abc",
-    ))))?;
+    )))).unwrap();
     println!("{}", r.to_string());
     log(result(subst(SomeParser())(create_span("123[]:${vAr}:abc"))));
     log(result(subst(SomeParser())(create_span(
         "123[]:${vAr }:abc",
     ))));
 
-    Ok(())
+    
 
      */
     unimplemented!()

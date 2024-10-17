@@ -111,13 +111,13 @@ fn server() -> Result<(), OldStarErr> {
 #[cfg(feature = "server")]
 fn server() -> Result<(), anyhow::Error> {
 
-    let point = starlane::space::point::Point::from_str("blah.com").unwrap();
-    println!("PPIONT {}",point.to_string());
+//    let point = starlane::space::point::Point::from_str("blah.com").unwrap();
+//    println!("POINT {}",point.to_string());
     ctrlc::set_handler(move || {
         std::process::exit(1);
     });
 
-println!("launchign tokio");
+println!("launching tokio");
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
