@@ -3,24 +3,34 @@ use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use core::ops::Deref;
 use core::range::{Range, RangeFrom, RangeTo};
-use nom::{AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength, InputTake, InputTakeAtPosition, Needed, Offset, Slice};
+use nom::{AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength, InputTake, InputTakeAtPosition, Needed, Offset, Parser, Slice};
 use nom::error::{ErrorKind, ParseError};
+use nom_supreme::context::ContextError;
 use nom_supreme::error::GenericErrorTree;
+use nom_supreme::parser_ext::Context;
 use nom_supreme::ParserExt;
-use crate::space::parse::ctx::InputCtx;
-use crate::space::parse::util::Input;
+use crate::space::parse::ctx::{InputCtx, ToInputCtx};
+use crate::space::parse::util::{CharIterator, Input, MyChars, SliceStr};
 use crate::RustErr;
 use crate::space::parse::nomplus::err::ParseErr;
 
 pub type LocatedSpan<'a> = nom_locate::LocatedSpan<&'a str,()>;
 
 
-pub type ErrTree<'a,I: Input> = GenericErrorTree<I, Tag, InputCtx, ParseErr<'a>>;
-pub type Res<'a,'b,I: Input,Output> = IResult<I, Output, ErrTree<'a,I>>;
+pub type ErrTree<'a,I: Input> = GenericErrorTree<I, Tag, InputCtx , ParseErr<'a>>;
+pub type Res<'a,I: Input,Output> = IResult<I, Output, ErrTree<'a,I>>;
 
 
-pub trait MyParser<'a,I:Input,O> {
-        fn parse(&mut self, input: I) -> Res<I, O>;
+pub trait MyParser<'a,I:Input,O> : ParserExt<I,O,ErrTree<'a,I>> where I:Input{
+        fn ctx<C>( self, ctx: C) -> Context<Self,InputCtx> where C: ToInputCtx+Copy{
+            self.context(ctx.to()())
+        }
+}
+
+
+
+impl<'a,I, O, P> MyParser<I, O> for P where P: Parser<I, O, ErrTree<'a,I>>, I: Input {
+
 }
 
 
@@ -451,6 +461,7 @@ where
 
 
 
+#[derive(Clone)]
 pub enum Tag {
     DomainDef,
     SegSep,
@@ -474,8 +485,23 @@ pub enum Tag {
     BackTic,
     Pound,
     Plus,
-    Minus
+    Minus,
+    Concat,
+    VarOpen,
+    VarClose,
+    FileRoot,
 }
+
+
+
+impl Into<SliceStr> for Tag {
+    fn into(self) -> SliceStr {
+        SliceStr::new(self.as_str().to_string())
+    }
+}
+
+
+
 
 impl Tag {
     fn as_str(&self) -> &'static str {
@@ -502,18 +528,29 @@ impl Tag {
             Tag::BackTic => "`",
             Tag::Pound => "#",
             Tag::Plus => "+",
-            Tag::Minus => "-"
+            Tag::Minus => "-",
+            Tag::Concat => "+",
+            Tag::VarOpen => "${",
+            Tag::VarClose => "}",
+            Tag::FileRoot => ":/"
         }
     }
 }
+
+pub fn tag<I>( tag: Tag ) -> impl Clone + Fn(I) -> Res<I, I> where I: Input{
+   let tag : SliceStr= tag.into();
+   nom_supreme::tag::complete::tag(tag)
+}
+
+
 pub mod err {
     use alloc::boxed::Box;
     use alloc::format;
-    use alloc::string::String;
+    use alloc::string::{String, ToString};
     use core::range::Range;
     use nom_supreme::error::GenericErrorTree;
     use thiserror::Error;
-    use crate::space::parse::ctx::InputCtx;
+    use crate::space::parse::ctx::{InputCtx, ToInputCtx};
     use crate::space::parse::nomplus::{Input, Tag};
 
     pub struct ErrCtxStack {
@@ -523,9 +560,24 @@ pub mod err {
     #[derive(Error)]
     pub struct ParseErr<'b>  {
         ctx: InputCtx,
-        message: &'static str,
+        message: String,
         range: Range<usize>,
-        span: &'b str
+        input: String
+    }
+
+    impl ParseErr {
+        pub fn new<'a,Ctx,M,I>( ctx: Ctx, message: M, range: Range<usize>, input: I ) -> Self where Ctx: ToInputCtx, M: AsRef<str>, I:AsRef<str>
+        {
+            let message = message.as_ref().to_string();
+            let input = input.as_ref().to_string();
+            let ctx = ctx.to()();
+            Self {
+                ctx,
+                message,
+                range,
+                input
+            }
+        }
     }
 
     pub trait ErrMsg: 'static+Into<&str>

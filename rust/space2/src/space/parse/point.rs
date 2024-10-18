@@ -8,7 +8,7 @@ use nom::error::ErrorKind;
 use nom::sequence::{delimited, pair, preceded};
 use nom_supreme::ParserExt;
 use log::trace;
-use crate::space::parse::case::{domain_case, lowercase1, skewer_case, var_case};
+use crate::space::parse::case::{domain_case, lowercase1, skewer_case, var_case, SkewerCase};
 use crate::space::parse::ctx::{InputCtx, PointCtx};
 use crate::space::parse::nomplus::{ErrTree, Input, Res, Tag};
 use crate::space::point::{Point, PointDef, RouteSeg};
@@ -75,7 +75,7 @@ struct PointSegParser {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum PointSeg {
     Root,
-    Base(String),
+    Base(SkewerCase),
     FsRootDir,
     Dir(String),
     File(String),
