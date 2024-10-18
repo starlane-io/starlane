@@ -15,7 +15,7 @@ use crate::space::point::{Point, PointDef, RouteSeg};
 use crate::space::parse::nomplus::MyParser;
 use crate::space::parse::util::tron;
 
-/*fn var<I, O>(input: I) -> Res<I, Variable> where I: Input{
+/*fn var<'a,I, O>(input: I) -> Res<I, Variable> where I: Input{
     pair(
         peek(tag("$")),
         cut(tron(delimited(
@@ -28,31 +28,22 @@ use crate::space::parse::util::tron;
 }
 
  */
-pub fn tokenize_point<I>(input: I) -> Res<I,Point> where I: Input {
-
-}
-
-pub fn point_def<I,R,S,RouteSeg,Seg>(route: R, seg: S) -> Res<I,PointDef<RouteSeg,Seg>> where I: Input, R: FnOnce(I) -> Res<I, RouteSeg>+Copy {
-    todo!()
-}
-
-pub fn base_eos<I: Input>(input: I) -> Res<I, I> {
-    peek(alt((tag(":"), eop)))(input)
-}
 
 
 
-pub fn base_point_segment<I>(input: I) -> Res<I, PointSeg> where I: Input{
-    preceded(
-        peek(lowercase1),
-        cut(pair(recognize(skewer_case), base_eos)),
-    )(input)
-        .map(|(next, (base, _))| (next, PointSeg::Base(base.to_string())))
-}
 
-pub fn route_seg<I>(input: I) -> Res<I, RouteSeg> {
+
+
+
+pub fn route_seg<'a,I>(input: I) -> Res<I, RouteSeg> {
     alt((
         this_route_segment,
+        other_route_segment,
+    ))(input)
+}
+
+pub fn other_route_segment<'a,I>(input: I) -> Res<I, RouteSeg> {
+    alt((
         sys_route_segment,
         tag_route_segment,
         domain_route_segment,
@@ -62,7 +53,7 @@ pub fn route_seg<I>(input: I) -> Res<I, RouteSeg> {
     ))(input)
 }
 
-pub fn eos<I>(input: I) -> Res<I, ()> where I: Input{
+pub fn eos<'a,I>(input: I) -> Res<I, ()> where I: Input{
     peek(alt((tag("/"), tag(":"), tag("%"), space1, eof)))(input).map(|(next, _)| (next, ()))
 }
 
@@ -85,7 +76,7 @@ pub enum PointSeg {
 
 
 
-fn any_resource_path_segment<T>(i: T) -> Res<T, T>
+fn any_resource_path_segment<'a,T>(i: T) -> Res< T, T>
 where
     T: InputTakeAtPosition + nom::InputLength,
     <T as InputTakeAtPosition>::Item: AsChar,
@@ -103,7 +94,7 @@ where
     )
 }
 
-fn sys_route_chars<T>(i: T) -> Res<T, T>
+fn sys_route_chars<'a,T>(i: T) -> Res<T, T>
 where
     T: InputTakeAtPosition + nom::InputLength,
     <T as InputTakeAtPosition>::Item: AsChar,
@@ -126,39 +117,39 @@ where
     )
 }
 
-pub fn this_route_segment<I: Input>(input: I) -> Res<I, RouteSeg> {
+pub fn this_route_segment<'a,I: Input>(input: I) -> Res<I, RouteSeg> {
     alt((recognize(tag(".")), recognize(not(other_route_segment))))(input)
         .map(|(next, _)| (next, RouteSeg::This))
 }
 
-pub fn local_route_segment<I: Input>(input: I) -> Res<I, RouteSeg> {
+pub fn local_route_segment<'a,I: Input>(input: I) -> Res<I, RouteSeg> {
     tag("LOCAL")(input).map(|(next, _)| (next, RouteSeg::Local))
 }
 
-pub fn remote_route_segment<I: Input>(input: I) -> Res<I, RouteSeg> {
+pub fn remote_route_segment<'a,I: Input>(input: I) -> Res<I, RouteSeg> {
     tag("REMOTE")(input).map(|(next, _)| (next, RouteSeg::Remote))
 }
 
-pub fn global_route_segment<I: Input>(input: I) -> Res<I, RouteSeg> {
+pub fn global_route_segment<'a,I: Input>(input: I) -> Res<I, RouteSeg> {
     tag("GLOBAL")(input).map(|(next, _)| (next, RouteSeg::Global))
 }
 
-pub fn domain_route_segment<I: Input>(input: I) -> Res<I, RouteSeg> {
-    domain_case(input).map(|(next, domain)| (next, RouteSeg::Domain(domain.to_string())))
+pub fn domain_route_segment<'a,I: Input>(input: I) -> Res<I, RouteSeg> {
+    domain_case(input).map(|(next, domain)| (next, RouteSeg::Domain(domain)))
 }
 
-pub fn tag_route_segment<I: Input>(input: I) -> Res<I, RouteSeg> {
+pub fn tag_route_segment<'a,I: Input>(input: I) -> Res<I, RouteSeg> {
     delimited(tag("#["), skewer_case, tag("]"))(input)
-        .map(|(next, tag)| (next, RouteSeg::Tag(tag.to_string())))
+        .map(|(next, tag)| (next, RouteSeg::Tag(tag)))
 }
 
-pub fn sys_route_segment<I: Input>(input: I) -> Res<I, RouteSeg> {
+pub fn sys_route_segment<'a,I: Input>(input: I) -> Res<I, RouteSeg> {
     delimited(tag("<<"), sys_route_chars, tag(">>"))(input)
         .map(|(next, tag)| (next, RouteSeg::Star(tag.to_string())))
 }
 
 
-pub fn eop<I: Input>(input: I) -> Res<I, I> {
+pub fn eop<'a,I: Input>(input: I) -> Res<I, I> {
     peek(alt((
         eof,
         multispace1,

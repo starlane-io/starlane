@@ -54,5 +54,5 @@ log = "0.4.22"
 [dependencies.nom]
 workspace= true
 default-features = false
-features = ["alloc"]
+#features = ["alloc"]
 #optional=true

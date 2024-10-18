@@ -15,7 +15,7 @@ use nom::character::complete::multispace0;
 use nom::sequence::delimited;
 use nom_supreme::error::StackContext;
 use nom_supreme::ParserExt;
-use crate::space::parse::err::ParseErrs;
+use crate::space::parse::err::{ParseErrs, ParseErrsDef};
 use crate::space::parse::nomplus::err::ParseErr;
 
 #[cfg(test)]
@@ -111,10 +111,10 @@ impl Into<Variable> for Trace<VarCase> {
 
  */
 
-pub fn tron<'a, I, F, O>(mut f: F) -> impl FnMut(I) -> Res<'a,I,Trace<O>>
+pub fn tron<I, F, O>(mut f: F) -> impl FnMut(I) -> Res<I,Trace<O>>
 where
-    I: Input+'a,
-    F: FnMut(I) -> Res<'a,I, O>+ 'a,
+    I: Input,
+    F: FnMut(I) -> Res<I, O>,
 {
     move |input: I| {
         let (next, output) = f(input.clone())?;
@@ -444,7 +444,7 @@ pub mod test {
 pub fn wrap<I, F, O>(mut f: F) -> impl FnMut(I) -> Res<I, O>
 where
     I: Input,
-    F: FnMut(I) -> Res<I, O> + Copy,
+    F: FnMut(I) -> Res<I, O> + Copy
 
 {
     move |input: I| f(input)
@@ -453,7 +453,7 @@ where
 pub fn len<I, F, O>(f: F) -> impl FnMut(I) -> usize
 where
     I: Input,
-    F: FnMut(I) -> Res<I, O> + Copy,
+    F: FnMut(I) -> Res< I, O> + Copy,
 {
     move |input: I| match recognize(wrap(f))(input) {
         Ok((_, span)) => span.len(),
@@ -461,10 +461,10 @@ where
     }
 }
 
-pub fn trim<I, F, O, C, E>(f: F) -> impl FnMut(I) -> Res<I, O>
+pub fn trim< I, F, O, C, E>(f: F) -> impl FnMut(I) -> Res<I, O>
 where
     I: Input,
-    F: FnMut(I) -> Res<I, O> + Copy,
+    F: FnMut(I) -> Res< I, O> + Copy,
 {
     move |input: I| delimited(multispace0, f, multispace0)(input)
 }
@@ -490,7 +490,7 @@ pub fn result<I: Input, R>(result: Result<(I, R), nom::Err<ErrTree<I>>>) -> Resu
 }
 
 
-pub fn parse_errs<R,E>(result: Result<R,E>) -> Result<R, ParseErrs> where E: Display {
+pub fn parse_errs<'a,R,E>(result: Result<R,E>) -> Result<R, ParseErrs<'a>> where E: Display {
     match result {
         Ok(ok) => Ok(ok),
         Err(err) => Err(todo!())

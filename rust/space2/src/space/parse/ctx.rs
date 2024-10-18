@@ -73,7 +73,7 @@ impl ToInputCtx for CaseCtx{
 
 
 
-#[derive(Clone,AsStr,Error,Debug,Clone)]
+#[derive(Clone,Error,Debug)]
 pub enum PointCtx {
     #[error("Var def")]
     Var,

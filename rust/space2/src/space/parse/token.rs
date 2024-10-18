@@ -43,11 +43,11 @@ pub type Variable = Trace<VarCase>;
 
 pub type PointTokens = Vec<PntFragment>;
 
-pub(crate) fn tk<I,F,O>( f: F) -> impl FnMut(I) -> Res<I,TokenTron> where I: Input, F: FnMut(I) -> Res<I,O> + Copy{
+pub(crate) fn tk<'a,I,F,O>( f: F) -> impl FnMut(I) -> Res<I,TokenTron> where I: Input, F: FnMut(I) -> Res< I,O> + Copy{
     move |input| tron(f)(input)
 }
 
-pub(crate) fn point_fragments<'a, I>(input: I) -> Res<'a, I, PointTokens>
+pub(crate) fn point_fragments<'a, I>(input: I) -> Res< I, PointTokens>
 where
     I: 'a + Input,
 {
@@ -60,21 +60,21 @@ where
 }
 
 
-pub(crate) fn point_fragment_route<'a, I>(input: I) -> Res<'a, I, PntFragment>
+pub(crate) fn point_fragment_route<'a, I>(input: I) -> Res< I, PntFragment>
 where
     I: 'a + Input
 {
     terminated(route_seg,tag(Tag::RouteSegSep))(input).map(|(r,t)| (r, PntFragment::RouteSeg(t)) )
 
 }
-pub(crate) fn point_fragment_base<'a, I>(input: I) -> Res<'a, I, PntFragment>
+pub(crate) fn point_fragment_base<'a, I>(input: I) -> Res< I, PntFragment>
 where
     I: 'a + Input
 {
     alt((point_fragment_domain, point_fragment_var, point_fragment_concat))(input)
 }
 
-pub(crate) fn point_fragment_domain<'a, I>(input: I) -> Res<'a, I, PntFragment>
+pub(crate) fn point_fragment_domain<'a, I>(input: I) -> Res< I, PntFragment>
 where
     I: 'a + Input
 {
@@ -85,61 +85,61 @@ where
 
 
 
-pub(crate) fn point_fragment_file_root<'a, I>(input: I) -> Res<'a, I, PntFragment>
+pub(crate) fn point_fragment_file_root<'a, I>(input: I) -> Res< I, PntFragment>
 where
     I: 'a + Input
 {
     tag(Tag::FileRoot)(input).map( |(next,_)| (next, PntFragment::FileRoot))
 }
 
-pub(crate) fn point_fragment_dir<'a, I>(input: I) -> Res<'a, I, PntFragment>
+pub(crate) fn point_fragment_dir<'a, I>(input: I) -> Res< I, PntFragment>
 where
     I: 'a + Input
 {
     tag(Tag::FileRoot)(input).map( |(next,_)| (next, PntFragment::FileRoot))
 }
 
-pub(crate) fn point_fragments_end<'a, I>(input: I) -> Res<'a, I, I>
+pub(crate) fn point_fragments_end<'a, I>(input: I) -> Res< I, I>
 where
     I: 'a + Input,
 {
     alt((multispace1))
 }
 
-pub(crate) fn point_fragment_base_sep<'a,I>(input:I) -> Res<'a,I,PntFragment> where I: 'a+Input
+pub(crate) fn point_fragment_base_sep<'a,I>(input:I) -> Res<I,PntFragment> where I: 'a+Input
 {
     alt((point_fragment_segment_delimeter, point_fragment_concat))(input)
 }
 
-pub(crate) fn point_fragment_segment_delimeter<'a, I>(input: I) -> Res<'a, I, PntFragment>
+pub(crate) fn point_fragment_segment_delimeter<'a, I>(input: I) -> Res< I, PntFragment>
 where
     I: 'a + Input,
 {
     tag(Tag::SegSep)(input).map(|(next, _)| (next, PntFragment::SegSep))
 }
 
-pub(crate) fn point_fragment_route_seg<'a, I>(input: I) -> Res<'a, I, PntFragment>
+pub(crate) fn point_fragment_route_seg<'a, I>(input: I) -> Res< I, PntFragment>
 where
     I: 'a + Input,
 {
     route_seg(input).map(|(r,t)| (r, PntFragment::RouteSeg(t)))
 }
 
-pub(crate) fn point_fragment_route_seg_sep<'a, I>(input: I) -> Res<'a, I, PntFragment>
+pub(crate) fn point_fragment_route_seg_sep<'a, I>(input: I) -> Res< I, PntFragment>
 where
     I: 'a + Input,
 {
     tag(Tag::RouteSegSep)(input).map(|(next, _)| (next, PntFragment::SegSep))
 }
 
-pub(crate) fn point_fragment_concat<'a, I>(input: I) -> Res<'a, I, PntFragment>
+pub(crate) fn point_fragment_concat<'a, I>(input: I) -> Res< I, PntFragment>
 where
     I: 'a + Input,
 {
     tag(Tag::Concat)(input).map(|(next, _)| (next, PntFragment::ConCat))
 }
 
-pub(crate) fn point_fragment_var<I>(input: I) -> Res<I, PntFragment>
+pub(crate) fn point_fragment_var<'a,I>(input: I) -> Res<I, PntFragment>
 where
     I: Input,
 {
@@ -151,7 +151,7 @@ where
     }))
 }
 
-pub(crate) fn base_segment_tokens<'a, I>(input: I) -> Res<'a, I, PointTokens>
+pub(crate) fn base_segment_tokens<'a, I>(input: I) -> Res< I, PointTokens>
 where
     I: 'a + Input,
 {

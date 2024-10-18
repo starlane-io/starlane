@@ -10,18 +10,18 @@ use nom_supreme::error::GenericErrorTree;
 use nom_supreme::parser_ext::Context;
 use nom_supreme::ParserExt;
 use crate::space::parse::ctx::{InputCtx, ToInputCtx};
-use crate::space::parse::util::{CharIterator, Input, MyChars, SliceStr};
+use crate::space::parse::util::{CharIterator, MyChars, SliceStr};
 use crate::RustErr;
 use crate::space::parse::nomplus::err::ParseErr;
 
 pub type LocatedSpan<'a> = nom_locate::LocatedSpan<&'a str,()>;
 
 
-pub type ErrTree<'a,I: Input> = GenericErrorTree<I, Tag, InputCtx , ParseErr<'a>>;
-pub type Res<'a,I: Input,Output> = IResult<I, Output, ErrTree<'a,I>>;
+pub type ErrTree<I: Input> = GenericErrorTree<I, Tag, InputCtx , ParseErr>;
+pub type Res<I: Input,Output> = IResult<I, Output, ErrTree<I>>;
 
 
-pub trait MyParser<'a,I:Input,O> : ParserExt<I,O,ErrTree<'a,I>> where I:Input{
+pub trait MyParser<'a,I:Input,O> : ParserExt<I,O,ErrTree<I>> where I:Input{
         fn ctx<C>( self, ctx: C) -> Context<Self,InputCtx> where C: ToInputCtx+Copy{
             self.context(ctx.to()())
         }
@@ -29,7 +29,7 @@ pub trait MyParser<'a,I:Input,O> : ParserExt<I,O,ErrTree<'a,I>> where I:Input{
 
 
 
-impl<'a,I, O, P> MyParser<I, O> for P where P: Parser<I, O, ErrTree<'a,I>>, I: Input {
+impl<'a,I, O, P> MyParser<'a, I, O> for P where P: Parser<I, O, ErrTree<'a,I>>, I: Input {
 
 }
 
@@ -537,7 +537,7 @@ impl Tag {
     }
 }
 
-pub fn tag<I>( tag: Tag ) -> impl Clone + Fn(I) -> Res<I, I> where I: Input{
+pub fn tag<'a, I>( tag: Tag ) -> impl Clone + Fn(I) -> Res<I, I> where I: Input{
    let tag : SliceStr= tag.into();
    nom_supreme::tag::complete::tag(tag)
 }
@@ -558,29 +558,26 @@ pub mod err {
     }
 
     #[derive(Error)]
-    pub struct ParseErr<'b>  {
+    pub struct ParseErr  {
         ctx: InputCtx,
         message: String,
         range: Range<usize>,
-        input: String
     }
 
     impl ParseErr {
-        pub fn new<'a,Ctx,M,I>( ctx: Ctx, message: M, range: Range<usize>, input: I ) -> Self where Ctx: ToInputCtx, M: AsRef<str>, I:AsRef<str>
+        pub fn new<Ctx,M>( ctx: Ctx, message: M, range: Range<usize> ) -> Self where Ctx: ToInputCtx, M: AsRef<str>
         {
             let message = message.as_ref().to_string();
-            let input = input.as_ref().to_string();
             let ctx = ctx.to()();
             Self {
                 ctx,
                 message,
                 range,
-                input
             }
         }
     }
 
-    pub trait ErrMsg: 'static+Into<&str>
+    pub trait ErrMsg: 'static+Into<&'static str>
     {
         fn msg( &self, span: &str) -> &str;
     }

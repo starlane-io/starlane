@@ -23,7 +23,7 @@ use nom::Slice;
 use nom_supreme::ParserExt;
 use thiserror::Error;
 use starlane_primitive_macros::Case;
-use crate::space::parse::err::ParseErrs;
+use crate::space::parse::err::{ParseErrsDef, ParseErrsOwn};
 use crate::space::parse::nomplus;
 use crate::space::util::AsStr;
 
@@ -34,13 +34,14 @@ pub struct SkewerCase(pub(crate) String);
 
 impl SkewerCase {
 
-    pub fn validate<S>( string: &S ) -> Result<(),ParseErr> where S: AsRef<str>{
+    pub fn validate<S>( string: &S ) -> Result<(),ParseErrsOwn> where S: AsRef<str>{
         for (index,c) in string.as_ref().char_indices() {
             if( index == 0 )
             {
                 if (!c.is_alpha() || !c.is_lowercase()) {
                     let range = Range::from( 0..1);
-                    let err = ParseErr::new(CaseCtx::SkewerCase,"skewer case must start with a lowercase alpha character", range, string);
+                    let err = ParseErr::new(CaseCtx::SkewerCase,"skewer case must start with a lowercase alpha character", range);
+                    let err = ParseErrsOwn::new(string.as_ref().to_string(),err);
                     return Err(err);
                 }
             } else {
@@ -205,27 +206,27 @@ impl crate::space::parse::case::DirCase {
     }
 }
 
-pub fn file_case<I: Input>(input: I) -> Res<I, FileCase> {
+pub fn file_case<'a,I: Input>(input: I) -> Res<I, FileCase> {
     recognize(many0(alt((alphanumeric1, tag("-"),tag("_")))).ctx(CaseCtx::FileCase))(input)
         .map(|(next, rtn)| (next, FileCase(rtn.to_string())))
 }
 
-pub fn dir_case<I: Input>(input: I) -> Res<I, FileCase> {
+pub fn dir_case<'a,I: Input>(input: I) -> Res<I, FileCase> {
     recognize(terminated(many0(alt((alphanumeric1, tag("-"),tag("_")))),nomplus::tag(Tag::Slash)).ctx(CaseCtx::DirCase))(input)
         .map(|(next, rtn)| (next, FileCase(rtn.to_string())))
 }
 
-pub fn skewer_case<I: Input>(input: I) -> Res<I, SkewerCase> {
+pub fn skewer_case<'a,I: Input>(input: I) -> Res<I, SkewerCase> {
     recognize(tuple((peek(alpha1), many0(alt((alphanumeric1, tag("-")))))).ctx(CaseCtx::SkewerCase))(input)
         .map(|(next, rtn)| (next, SkewerCase(rtn.to_string())))
 }
 
-pub fn var_case<I: Input>(input: I) -> Res<I, VarCase> {
+pub fn var_case<'a,I: Input>(input: I) -> Res<I, VarCase> {
     recognize(tuple((peek(alpha1), many0(alt((alphanumeric1, tag("_")))))).ctx(CaseCtx::VarCase))(input)
         .map(|(next, rtn)| (next, VarCase(rtn.to_string())))
 }
 
-pub fn domain_case<I: Input>(input: I) -> Res<I, DomainCase> {
+pub fn domain_case<'a,I: Input>(input: I) -> Res<I, DomainCase> {
     recognize(tuple((
         peek(alpha1),
         many0(alt((alphanumeric1, tag("-"), tag(".")))),
@@ -233,11 +234,11 @@ pub fn domain_case<I: Input>(input: I) -> Res<I, DomainCase> {
     .map(|(next, rtn)| (next, DomainCase(rtn.to_string())))
 }
 
-pub fn lowercase_alphanumeric<I: Input>(input: I) -> Res<I, I> {
+pub fn lowercase_alphanumeric<'a,I: Input>(input: I) -> Res<I, I> {
     recognize(tuple((lowercase1, alphanumeric0)))(input)
 }
 
-pub fn lowercase1<T: Input>(i: T) -> Res<T, T>
+pub fn lowercase1<'a,T: Input>(i: T) -> Res<T, T>
 where
     T: InputTakeAtPosition + nom::InputLength,
     <T as InputTakeAtPosition>::Item: AsChar,
