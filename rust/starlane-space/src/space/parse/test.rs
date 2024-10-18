@@ -16,8 +16,7 @@ use crate::space::parse::{
     path_regex, pipeline, pipeline_segment, pipeline_step_var, pipeline_stop_var, point_template,
     point_var, point_var_seg, pop, rec_version, root_ctx_seg, root_scope, root_scope_selector,
     route_attribute, scope_filter, scope_filters, skewer_case_chars, skewer_dot, space_chars,
-    space_no_dupe_dots, space_point_segment, strip_comments, template, var_case, version, Env
-    ,
+    space_no_dupe_dots, space_point_segment, strip_comments, template, var_case, version,
 };
 use crate::space::parse::context;
 use crate::space::point::{Point, PointCtx, PointSegVar, RouteSegVar};
@@ -29,6 +28,7 @@ use nom::character::complete::{alpha1, anychar, multispace0};
 use nom::combinator::{all_consuming, peek, recognize};
 use nom::multi::many0;
 use nom::sequence::{delimited, tuple};
+use crate::space::parse::var::Env;
 
 #[test]
 pub fn test_assignment() {

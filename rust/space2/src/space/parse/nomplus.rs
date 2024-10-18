@@ -8,19 +8,19 @@ use nom::error::{ErrorKind, ParseError};
 use nom_supreme::error::GenericErrorTree;
 use nom_supreme::ParserExt;
 use crate::space::parse::ctx::InputCtx;
-use crate::space::parse::util::{Input, OldTrace};
+use crate::space::parse::util::Input;
 use crate::RustErr;
-use crate::space::parse::nom::err::ParseErr;
+use crate::space::parse::nomplus::err::ParseErr;
 
 pub type LocatedSpan<'a> = nom_locate::LocatedSpan<&'a str,()>;
 
 
-pub type ErrTree<'a,I: Input,Ctx: InputCtx> = GenericErrorTree<I, Tag, Ctx, ParseErr<'a>>;
-pub type Res<'a,'b,I: Input,Output> = IResult<I, Output, ErrTree<'a,I,Box<dyn InputCtx>>>;
+pub type ErrTree<'a,I: Input> = GenericErrorTree<I, Tag, InputCtx, ParseErr<'a>>;
+pub type Res<'a,'b,I: Input,Output> = IResult<I, Output, ErrTree<'a,I>>;
 
-pub trait MyParser<'a,I:Input,O,Ctx:InputCtx> {
-        fn parse(&mut self, input: I) -> Res<I, O, ErrTree<'a, I, Ctx>>;
 
+pub trait MyParser<'a,I:Input,O> {
+        fn parse(&mut self, input: I) -> Res<I, O>;
 }
 
 
@@ -514,7 +514,7 @@ pub mod err {
     use nom_supreme::error::GenericErrorTree;
     use thiserror::Error;
     use crate::space::parse::ctx::InputCtx;
-    use crate::space::parse::nom::{Input, Tag};
+    use crate::space::parse::nomplus::{Input, Tag};
 
     pub struct ErrCtxStack {
 
@@ -522,7 +522,7 @@ pub mod err {
 
     #[derive(Error)]
     pub struct ParseErr<'b>  {
-        ctx: Box<dyn InputCtx>,
+        ctx: InputCtx,
         message: &'static str,
         range: Range<usize>,
         span: &'b str

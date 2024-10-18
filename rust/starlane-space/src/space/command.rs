@@ -14,11 +14,12 @@ use starlane_primitive_macros::Autobox;
 
 use crate::space::err::ParseErrs;
 use crate::space::parse::util::{new_span, result, Trace};
-use crate::space::parse::{command_line, Env};
+use crate::space::parse::command_line;
 use crate::space::substance::{Bin, ChildSubstance};
 use crate::space::util::ToResolved;
 use crate::space::wave::core::cmd::CmdMethod;
 use crate::{Delete, Select};
+use crate::space::parse::var::Env;
 
 pub mod common {
     use std::collections::hash_map::Iter;
@@ -28,7 +29,7 @@ pub mod common {
 
     use serde::{Deserialize, Serialize};
 
-    use crate::space::err::{ParseErrs, SpaceErr};
+    use crate::space::err::ParseErrs;
     use crate::space::loc::Variable;
     use crate::space::substance::{Bin, Substance};
 
@@ -266,7 +267,7 @@ pub mod direct {
 
         use crate::space::command::common::SetProperties;
         use crate::space::err::ParseErrs;
-        use crate::space::parse::Env;
+        use crate::space::parse::var::Env;
         use crate::space::point::{Point, PointCtx, PointVar};
         use crate::space::util::ToResolved;
 
@@ -310,7 +311,7 @@ pub mod direct {
         use serde::{Deserialize, Serialize};
 
         use crate::space::err::ParseErrs;
-        use crate::space::parse::Env;
+        use crate::space::parse::var::Env;
         use crate::space::point::{Point, PointCtx, PointVar};
         use crate::space::util::ToResolved;
 
@@ -366,7 +367,7 @@ pub mod direct {
         use crate::space::err::{ParseErrs, SpaceErr};
         use crate::space::kind::{BaseKind, KindParts};
         use crate::space::loc::{PointFactory, ToSurface};
-        use crate::space::parse::{CamelCase, Env, ResolverErr};
+        use crate::space::parse::{CamelCase, ResolverErr};
         use crate::space::point::{Point, PointCtx, PointSeg, PointVar};
         use crate::space::selector::SpecificSelector;
         use crate::space::substance::Bin;
@@ -378,6 +379,7 @@ pub mod direct {
         use crate::space::wave::DirectedProto;
         use serde::{Deserialize, Serialize};
         use thiserror::__private::AsDisplay;
+        use crate::space::parse::var::Env;
 
         pub enum PointTemplateSeg {
             ExactSeg(PointSeg),
@@ -703,7 +705,7 @@ pub mod direct {
         use serde::{Deserialize, Serialize};
 
         use crate::space::err::{ParseErrs, SpaceErr};
-        use crate::space::parse::Env;
+        use crate::space::parse::var::Env;
         use crate::space::particle::Stub;
         use crate::space::point::Point;
         use crate::space::selector::{PointHierarchy, PointSegKindHop, Selector, SelectorDef};
@@ -871,7 +873,7 @@ pub mod direct {
 
         use crate::space::command::direct::select::{Select, SelectIntoSubstance};
         use crate::space::err::ParseErrs;
-        use crate::space::parse::Env;
+        use crate::space::parse::var::Env;
         use crate::space::selector::{PointSegKindHop, SelectorDef};
         use crate::space::util::ToResolved;
 
@@ -905,7 +907,7 @@ pub mod direct {
         use serde::{Deserialize, Serialize};
 
         use crate::space::err::ParseErrs;
-        use crate::space::parse::Env;
+        use crate::space::parse::var::Env;
         use crate::space::point::{Point, PointCtx, PointVar};
         use crate::space::substance::Substance;
         use crate::space::util::ToResolved;
@@ -943,7 +945,7 @@ pub mod direct {
         use serde::{Deserialize, Serialize};
 
         use crate::space::err::ParseErrs;
-        use crate::space::parse::Env;
+        use crate::space::parse::var::Env;
         use crate::space::point::{Point, PointCtx, PointVar};
         use crate::space::substance::Substance;
         use crate::space::util::ToResolved;

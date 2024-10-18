@@ -7,17 +7,15 @@ use nom::combinator::{cut, eof, not, peek, recognize};
 use nom::error::ErrorKind;
 use nom::sequence::{delimited, pair, preceded};
 use nom_supreme::ParserExt;
-use serde::{Deserialize, Serialize};
 use log::trace;
 use crate::space::parse::case::{domain_case, lowercase1, skewer_case, var_case};
 use crate::space::parse::ctx::{InputCtx, PointCtx};
-use crate::space::parse::nom::{ErrTree, Input, Res, Tag};
+use crate::space::parse::nomplus::{ErrTree, Input, Res, Tag};
 use crate::space::point::{Point, PointDef, RouteSeg};
-use crate::space::parse::nom::MyParser;
+use crate::space::parse::nomplus::MyParser;
 use crate::space::parse::util::tron;
-use crate::space::parse::vars::Variable;
 
-fn var<I, O>(input: I) -> Res<I, Variable> where I: Input{
+/*fn var<I, O>(input: I) -> Res<I, Variable> where I: Input{
     pair(
         peek(tag("$")),
         cut(tron(delimited(
@@ -28,14 +26,17 @@ fn var<I, O>(input: I) -> Res<I, Variable> where I: Input{
     )(input)
         .map(|(next, (_, var))| (next, var))
 }
+
+ */
 pub fn tokenize_point<I>(input: I) -> Res<I,Point> where I: Input {
 
 }
 
-pub fn point_def<I,R,S,RouteSeg,Seg>(route: R, seg: S) -> Res<I,PointCtx,PointDef<RouteSeg,Seg>> where I: Input, R: FnOnce(I) -> Res<I, RouteSeg>+Copy {
+pub fn point_def<I,R,S,RouteSeg,Seg>(route: R, seg: S) -> Res<I,PointDef<RouteSeg,Seg>> where I: Input, R: FnOnce(I) -> Res<I, RouteSeg>+Copy {
+    todo!()
 }
 
-pub fn mesh_eos<I: Input>(input: I) -> Res<I, I> {
+pub fn base_eos<I: Input>(input: I) -> Res<I, I> {
     peek(alt((tag(":"), eop)))(input)
 }
 
@@ -44,7 +45,7 @@ pub fn mesh_eos<I: Input>(input: I) -> Res<I, I> {
 pub fn base_point_segment<I>(input: I) -> Res<I, PointSeg> where I: Input{
     preceded(
         peek(lowercase1),
-        cut(pair(recognize(skewer_case), mesh_eos)),
+        cut(pair(recognize(skewer_case), base_eos)),
     )(input)
         .map(|(next, (base, _))| (next, PointSeg::Base(base.to_string())))
 }
@@ -78,13 +79,14 @@ pub enum PointSeg {
     FsRootDir,
     Dir(String),
     File(String),
-    Version(Version),
+  //  Version(Version),
 }
 
-impl <I,O,Ctx> MyParser<I,O,Ctx> for PointSegParser where I: Input , Ctx: InputCtx{
-    fn parse(&mut self, input: I) -> Res<I, O, ErrTree<'a, I, Ctx>> {
+impl <I,O> MyParser<I,O> for PointSegParser where I: Input {
+    fn parse(&mut self, input: I) -> Res<I, O> {
 
     }
+
 }
 
 

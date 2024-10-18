@@ -1,5 +1,6 @@
-#![no_std]
-#![no_main]
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
+
 
 
 #![feature(new_range_api)]
@@ -10,13 +11,17 @@ extern crate alloc;
 pub mod space;
 
 
+#[cfg(test)]
+pub mod test;
 
 use core::panic::PanicInfo;
 
+#[cfg(not(test))]
 #[panic_handler]
 fn panic(_panic: &PanicInfo<'_>) -> ! {
     loop {}
 }
+
 
 
 

@@ -1,6 +1,5 @@
-use crate::space::parse::nom::Input;
+use crate::space::parse::nomplus::Input;
 use crate::space::parse::point::PointSeg;
-use crate::space::parse::vars::Variable;
 use crate::space::point::RouteSeg;
 
 pub struct Token<'a,I> where I:Input+'a {
@@ -15,7 +14,7 @@ pub enum TokenKind {
 
 
 enum PointToken{
-   Var(Variable),
+//   Var(Variable),
    RouteSegPart(RouteSeg),
    SegPart(PointSeg),
    FileRoot,

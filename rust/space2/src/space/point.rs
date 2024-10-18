@@ -1,6 +1,5 @@
 use alloc::string::String;
 use alloc::vec::Vec;
-use serde::{Deserialize, Serialize};
 
 pub type Point = PointDef<RouteSeg,PointSeg>;
 pub struct PointDef<Route,Seg> {

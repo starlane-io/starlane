@@ -13,12 +13,13 @@ use crate::space::err::ParseErrs;
 use crate::space::log::Trackable;
 use crate::space::parse::util::result;
 use crate::space::parse::util::{new_span, Trace, Tw};
-use crate::space::parse::{parse_star_key, Env, ResolverErr, SkewerCase, VarCase};
+use crate::space::parse::{parse_star_key, ResolverErr, SkewerCase, VarCase};
 use crate::space::particle::traversal::TraversalPlan;
 use crate::space::point::{Point, PointSeg, PointSegKind, PointSegPairDef, RouteSeg};
 use crate::space::util::{uuid, ToResolved, ValueMatcher, ValuePattern};
 use crate::space::wave::{Recipients, ToRecipients};
 use crate::{BaseKind, SpaceErr};
+use crate::space::parse::var::Env;
 
 pub static CENTRAL: Lazy<Point> = Lazy::new(|| StarKey::central().to_point());
 pub static GLOBAL_LOGGER: Lazy<Point> = Lazy::new(|| Point::from_str("GLOBAL::logger").unwrap());

@@ -3,22 +3,20 @@ use alloc::sync::Arc;
 use core::fmt::Display;
 use core::ops::{Deref, RangeTo};
 use core::range::{Range, RangeFrom};
-use nom::character::complete::multispace0;
-use nom::error::{ErrorKind, ParseError};
-use nom::sequence::delimited;
-use nom::{AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength, InputTake, InputTakeAtPosition, Offset, Slice};
-use nom_locate::LocatedSpan;
-use nom_supreme::error::{GenericErrorTree, StackContext};
-use nom_supreme::final_parser::ExtractContext;
-use nom_supreme::ParserExt;
-use serde::{Deserialize, Serialize};
+
 use thiserror::__private::AsDisplay;
 use crate::space::parse::case::VarCase;
-use crate::space::parse::ctx::{InputCtx, RootCtx};
-use crate::space::parse::nom::{Input, Res, Span};
-use crate::space::parse::nom::err::ErrTree;
-use crate::space::parse::vars::Variable;
+use crate::space::parse::ctx::{InputCtx, PrimCtx};
+use crate::space::parse::nomplus::{ErrTree, Input, LocatedSpan, Res, Span};
 use core::error::Error as RustErr;
+use nom::error::{ErrorKind, ParseError};
+use nom::{AsBytes, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength, InputTake, InputTakeAtPosition, Offset, Slice};
+use nom::character::complete::multispace0;
+use nom::sequence::delimited;
+use nom_supreme::error::StackContext;
+use nom_supreme::ParserExt;
+use crate::space::parse::err::ParseErrs;
+use crate::space::parse::nomplus::err::ParseErr;
 
 #[cfg(test)]
 mod tests {
@@ -41,6 +39,13 @@ impl<W> Trace<W> {
         Self {
             range: input.range(),
             w,
+        }
+    }
+
+    pub fn from_range<N>( range: Range<usize>, w: N ) -> Trace<N> {
+        Trace {
+            range,
+            w
         }
     }
 
@@ -74,7 +79,7 @@ impl <W> Eq for Trace<W> where W: Eq {
 impl <W> Clone for Trace<W> where W: Clone {
     fn clone(&self) -> Self {
         Self {
-            range: self.clone(),
+            range: self.range.clone(),
             w: self.w.clone(),
         }
     }
@@ -97,14 +102,14 @@ impl<W> Deref for Trace<W> {
     }
 }
 
+/*
 impl Into<Variable> for Trace<VarCase> {
     fn into(self) -> Variable {
-        Variable {
-            name: self.w,
-            trace: self.trace,
-        }
+        Trace::from_range(self.range,VarCase(self.w.to_string()))
     }
 }
+
+ */
 
 pub fn tron<I, F, O>(mut f: F) -> impl FnMut(I) -> Res<I,Trace<O>>
 where
@@ -124,52 +129,15 @@ where
 //pub type OwnedSpan<'a> = LocatedSpan<&'a str, SpanExtra>;
 pub type SpanExtra = Arc<String>;
 
-pub fn new_span<'a>(s: &'a str) -> Span<LocatedSpan<&'a str, Arc<String>>> {
-    let extra = Arc::new(s.to_string());
-    let span = LocatedSpan::new_extra(s, extra);
+pub fn new_span<'a>(s: &'a str) -> Span<LocatedSpan<'a>> {
+    let span = LocatedSpan::new(s);
     Span::new(span)
 }
 
-pub fn span_with_extra<'a>(
-    s: &'a str,
-    extra: Arc<String>,
-) -> Span<LocatedSpan<&'a str, Arc<String>>> {
-    Span::new(LocatedSpan::new_extra(s, extra))
-}
-
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub struct OldTrace
-{
-    pub range: Range<usize>,
-    pub extra: SpanExtra
-}
 
 
 
 
-
-impl OldTrace {
-    pub fn new(range: Range<usize>, extra: SpanExtra) -> Self {
-        Self { range, extra }
-    }
-
-    pub fn at_offset(offset: usize, extra: SpanExtra) -> Self {
-        Self {
-            range: Range::from(offset..offset),
-            extra,
-        }
-    }
-
-    pub fn scan<F, I: Input, O, C, E>(f: F, input: I) -> Self
-    where
-        F: FnMut(I) -> Res<I, O, C, E> + Copy,
-        E: RustErr + Send + Sync + 'static
-    {
-        let extra = input.extra();
-        let range = input.location_offset()..len(f)(input);
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct SliceStr {
@@ -473,20 +441,19 @@ pub mod test {
 }
 
 
-pub fn wrap<I, F, O, C, E>(mut f: F) -> impl FnMut(I) -> Res<I, O, C, E>
+pub fn wrap<I, F, O>(mut f: F) -> impl FnMut(I) -> Res<I, O>
 where
     I: Input,
-    F: FnMut(I) -> Res<I, O, C, E> + Copy,
-    E: RustErr + Send + Sync + 'static
+    F: FnMut(I) -> Res<I, O> + Copy,
+
 {
     move |input: I| f(input)
 }
 
-pub fn len<I, F, O, C,E>(f: F) -> impl FnMut(I) -> usize
+pub fn len<I, F, O>(f: F) -> impl FnMut(I) -> usize
 where
     I: Input,
-    F: FnMut(I) -> Res<I, O, C, E> + Copy,
-    E: RustErr + Send + Sync + 'static
+    F: FnMut(I) -> Res<I, O> + Copy,
 {
     move |input: I| match recognize(wrap(f))(input) {
         Ok((_, span)) => span.len(),
@@ -494,16 +461,17 @@ where
     }
 }
 
-pub fn trim<I, F, O, C, E>(f: F) -> impl FnMut(I) -> Res<I, O, C, E>
+pub fn trim<I, F, O, C, E>(f: F) -> impl FnMut(I) -> Res<I, O>
 where
     I: Input,
-    F: FnMut(I) -> Res<I, O, C, E> + Copy,
-    E: RustErr + Send + Sync + 'static
+    F: FnMut(I) -> Res<I, O> + Copy,
 {
     move |input: I| delimited(multispace0, f, multispace0)(input)
 }
 
-pub fn result<I: Input, R>(result: Result<(I, R), nom::Err<ErrTree<I,RootCtx>>>) -> Result<R, ParseErrs> {
+pub fn result<I: Input, R>(result: Result<(I, R), nom::Err<ErrTree<I>>>) -> Result<R, ParseErr> {
+    todo!()
+    /*
     match result {
         Ok((_, e)) => Ok(e),
         Err(nom::Err::Error(err)) => {
@@ -517,17 +485,19 @@ pub fn result<I: Input, R>(result: Result<(I, R), nom::Err<ErrTree<I,RootCtx>>>)
         }
 
     }
+
+     */
 }
 
 
 pub fn parse_errs<R,E>(result: Result<R,E>) -> Result<R, ParseErrs> where E: Display {
     match result {
         Ok(ok) => Ok(ok),
-        Err(err) => Err(ParseErrs::new(&(err.to_string())))
+        Err(err) => Err(todo!())
     }
 }
 
-pub fn unstack( ctx: &StackContext<ErrCtx>) -> String {
+pub fn unstack( ctx: &StackContext<InputCtx>) -> String {
     match ctx {
         StackContext::Kind(k) => {
             k.description().to_string()
@@ -573,6 +543,8 @@ pub fn log_parse_err<I,O>( result: Res<I,O>) -> Res<I,O> where I: Input
 
 pub fn print<I>(err: &ErrTree<I>) where I: Input
 {
+    todo!()
+    /*
 
     match err {
         ErrTree::Base { .. } => {
@@ -605,6 +577,8 @@ pub fn print<I>(err: &ErrTree<I>) where I: Input
             println!("ALT!");
         }
     }
+
+     */
 
 }
 

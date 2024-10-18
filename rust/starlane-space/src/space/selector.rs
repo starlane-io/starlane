@@ -13,7 +13,7 @@ use crate::space::parse::util::result;
 use crate::space::parse::util::{new_span, Trace};
 use crate::space::parse::{
     consume_hierarchy, kind_selector, point_segment_selector, point_selector,
-    specific_selector, CamelCase, Env,
+    specific_selector,
 };
 use crate::space::point::{Point, PointCtx, PointDef, PointSeg, PointVar, RouteSeg};
 use crate::space::substance::{
@@ -23,7 +23,7 @@ use crate::space::substance::{
 use crate::space::util::{ToResolved, ValueMatcher, ValuePattern};
 use crate::SpaceErr;
 use specific::{ProductSelector, ProviderSelector, VariantSelector, VendorSelector};
-use crate::space::command::direct::select::SubSelect;
+use crate::space::parse::var::Env;
 
 pub type PointSegKindHop = HopDef<PointSegSelector, ValuePattern<KindSelector>>;
 pub type PointSegKindHopCtx = HopDef<PointSegSelectorCtx, ValuePattern<KindSelector>>;
@@ -671,7 +671,7 @@ pub mod specific {
     use core::ops::Deref;
     use core::str::FromStr;
 
-    use crate::space::err::{ParseErrs, SpaceErr};
+    use crate::space::err::ParseErrs;
     use crate::space::parse::{Domain, SkewerCase};
     use crate::space::selector::Pattern;
 
