@@ -463,7 +463,7 @@ where
 
 #[derive(Clone)]
 pub enum Tag {
-    DomainDef,
+    RouteSegSep,
     SegSep,
     VarPrefix,
     CurlyOpen,
@@ -506,7 +506,7 @@ impl Into<SliceStr> for Tag {
 impl Tag {
     fn as_str(&self) -> &'static str {
         match self {
-            Tag::DomainDef => "::",
+            Tag::RouteSegSep => "::",
             Tag::SegSep => ":",
             Tag::VarPrefix => "$",
             Tag::CurlyOpen => "{",

@@ -82,12 +82,7 @@ pub enum PointSeg {
   //  Version(Version),
 }
 
-impl <I,O> MyParser<I,O> for PointSegParser where I: Input {
-    fn parse(&mut self, input: I) -> Res<I, O> {
 
-    }
-
-}
 
 
 fn any_resource_path_segment<T>(i: T) -> Res<T, T>

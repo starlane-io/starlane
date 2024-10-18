@@ -14,11 +14,11 @@ pub trait ToInputCtx  {
 
 #[derive(Clone,Error,strum_macros::IntoStaticStr)]
 pub enum InputCtx {
- #[error(tranparent)]
+ #[error("{0}")]
  Prim(PrimCtx),
- #[error(tranparent)]
+ #[error("{0}")]
  Case(CaseCtx),
- #[error(tranparent)]
+ #[error("{0}")]
  Point(PointCtx)
 }
 
@@ -56,7 +56,9 @@ pub enum CaseCtx {
     #[error("expected filename (mixed case alphanumeric & '_' & '-')")]
     FileCase,
     #[error("expected domain case (mixed case alphanumeric & '-' & '.' )")]
-    DomainCase
+    DomainCase,
+    #[error("expected filename (mixed case alphanumeric & '_' & '-') must end with a '/'")]
+    DirCase,
 }
 
 

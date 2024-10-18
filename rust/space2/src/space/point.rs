@@ -1,5 +1,6 @@
 use alloc::string::String;
 use alloc::vec::Vec;
+use crate::space::parse::case::{DomainCase, SkewerCase};
 
 pub type Point = PointDef<RouteSeg,PointSeg>;
 pub struct PointDef<Route,Seg> {
@@ -20,7 +21,7 @@ pub enum RouteSeg {
     Local,
     Remote,
     Global,
-    Domain(String),
-    Tag(String),
+    Domain(DomainCase),
+    Tag(SkewerCase),
     Star(String),
 }

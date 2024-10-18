@@ -1,5 +1,6 @@
+use thiserror::Error;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Error,Debug, Copy, Clone, Eq, PartialEq)]
 pub enum BlockKind {
     #[error("nexted block")]
     Nested(#[from] NestedBlockKind),
@@ -11,7 +12,7 @@ pub enum BlockKind {
     Partial,
 }
 
-#[derive(Debug, Copy, Clone,  Eq, PartialEq)]
+#[derive(Error,Debug, Copy, Clone,  Eq, PartialEq)]
 pub enum TerminatedBlockKind {
     #[error("semicolon")]
     Semicolon,
@@ -71,7 +72,7 @@ impl DelimitedBlockKind {
     }
 }
 
-#[derive(Debug, Copy, Clone,  Eq, PartialEq)]
+#[derive(Error,Debug, Copy, Clone,  Eq, PartialEq)]
 pub enum NestedBlockKind {
     #[error("curly")]
     Curly,

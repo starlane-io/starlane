@@ -111,10 +111,10 @@ impl Into<Variable> for Trace<VarCase> {
 
  */
 
-pub fn tron<I, F, O>(mut f: F) -> impl FnMut(I) -> Res<I,Trace<O>>
+pub fn tron<'a, I, F, O>(mut f: F) -> impl FnMut(I) -> Res<'a,I,Trace<O>>
 where
-    I: Input,
-    F: FnMut(I) -> Res<I, O>,
+    I: Input+'a,
+    F: FnMut(I) -> Res<'a,I, O>+ 'a,
 {
     move |input: I| {
         let (next, output) = f(input.clone())?;

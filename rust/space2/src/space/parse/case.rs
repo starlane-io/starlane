@@ -1,6 +1,6 @@
 use crate::space::parse::ctx::{CaseCtx, InputCtx, PrimCtx};
 use crate::space::parse::nomplus::err::ParseErr;
-use crate::space::parse::nomplus::{Input, MyParser, Res};
+use crate::space::parse::nomplus::{Input, MyParser, Res, Tag};
 use crate::space::parse::util::recognize;
 use ::nom::branch::alt;
 use ::nom::bytes::complete::{is_a, tag};
@@ -18,16 +18,18 @@ use core::ops::Deref;
 use core::range::Range;
 use core::str::FromStr;
 use nom::character::complete::alphanumeric0;
+use nom::sequence::terminated;
 use nom::Slice;
 use nom_supreme::ParserExt;
 use thiserror::Error;
 use starlane_primitive_macros::Case;
 use crate::space::parse::err::ParseErrs;
+use crate::space::parse::nomplus;
 use crate::space::util::AsStr;
 
 
 
-#[derive(Case, Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct SkewerCase(pub(crate) String);
 
 impl SkewerCase {
@@ -59,7 +61,7 @@ impl SkewerCase {
 
 
 
-#[derive(Case, Debug, Clone, Eq, PartialEq, Hash)]
+#[derive( Debug, Clone, Eq, PartialEq, Hash)]
 pub struct VarCase(pub(crate) String);
 
 
@@ -93,7 +95,7 @@ impl VarCase{
 
 
 
-#[derive(Case, Debug, Clone, Eq, PartialEq, Hash)]
+#[derive( Debug, Clone, Eq, PartialEq, Hash)]
 pub struct DomainCase(pub(crate) String);
 
 
@@ -125,7 +127,7 @@ impl DomainCase{
     }
 }
 
-#[derive(Case, Debug, Clone, Eq, PartialEq, Hash)]
+#[derive( Debug, Clone, Eq, PartialEq, Hash)]
 pub struct CamelCase(pub(crate) String);
 
 impl CamelCase{
@@ -155,7 +157,7 @@ impl CamelCase{
     }
 }
 
-#[derive(Case, Debug, Clone, Eq, PartialEq, Hash)]
+#[derive( Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FileCase(pub(crate)String);
 
 
@@ -178,8 +180,38 @@ impl FileCase{
     }
 }
 
+
+
+#[derive( Debug, Clone, Eq, PartialEq, Hash)]
+pub struct DirCase(pub(crate)String);
+
+
+impl crate::space::parse::case::DirCase {
+
+    pub fn validate<S>( string: &S ) -> Result<(),ParseErr> where S: AsRef<str>{
+        for (index,c) in string.as_ref().char_indices() {
+            if !(c.is_alpha() || c.is_digit(10)||c == '-'||c == '.'|| c=='_') {
+                let start = min(0,index-1);
+                let range = Range::from(start..index );
+                let err = ParseErr::new(CaseCtx::DirCase,"valid DirCase case characters are lowercase alpha, digits 0-9 and dash '-', dot '.' and underscore '_' and must terminate with a '/'", range, string);
+                return Err(err);
+            }
+        }
+        Ok(())
+    }
+    pub fn new<S>( string: &S) -> Result<Self,ParseErr> where S: AsRef<str>{
+        Self::validate(string)?;
+        Ok(Self(string.as_ref().to_string()))
+    }
+}
+
 pub fn file_case<I: Input>(input: I) -> Res<I, FileCase> {
     recognize(many0(alt((alphanumeric1, tag("-"),tag("_")))).ctx(CaseCtx::FileCase))(input)
+        .map(|(next, rtn)| (next, FileCase(rtn.to_string())))
+}
+
+pub fn dir_case<I: Input>(input: I) -> Res<I, FileCase> {
+    recognize(terminated(many0(alt((alphanumeric1, tag("-"),tag("_")))),nomplus::tag(Tag::Slash)).ctx(CaseCtx::DirCase))(input)
         .map(|(next, rtn)| (next, FileCase(rtn.to_string())))
 }
 
