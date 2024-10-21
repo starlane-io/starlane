@@ -5,7 +5,7 @@ use std::ops::{Deref, DerefMut};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use thiserror::Error;
+use thiserror_no_std::Error;
 use crate::space::parse::util::Tw;
 use starlane_primitive_macros::Autobox;
 

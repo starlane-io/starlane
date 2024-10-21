@@ -1,5 +1,5 @@
 use alloc::string::String;
-use crate::space::parse::case::{domain_case, skewer_case, var_case, CamelCase, DomainCase, FileCase, SkewerCase, VarCase};
+use crate::space::parse::case::{dir_case, domain_case, file_case, skewer_case, var_case, CamelCase, DirCase, DomainCase, FileCase, SkewerCase, VarCase};
 use crate::space::parse::nomplus::{tag, Input, MyParser, Res, Tag};
 use crate::space::parse::point::{route_seg, PointSeg};
 use crate::space::parse::util::{recognize, tron, Trace};
@@ -27,12 +27,14 @@ pub(crate) enum PntFragment {
     Var(VarCase),
     CamelCase(CamelCase),
     SkewerCase(SkewerCase),
+    /// the first slash '/'
     FileRoot,
-    Dir(FileCase),
+    DirFrag(FileCase),
+    DirEnd(DirCase),
     File(FileCase),
     DomainCase(DomainCase),
     FilePart,
-    /// ${some_var}+something+${something_else} (just the + symbol)
+    /// ${some_var}+something+${something_else}+${suffix} (just the + symbol)
     ConCat,
     Def,
     SegSep,
@@ -52,21 +54,24 @@ where
     I: 'a + Input,
 {
 
-    tuple((opt(terminated(tk(point_fragment_route),tag(Tag::RouteSegSep))),
-           separated_list0(point_fragment_base_sep, tk(point_fragment_base)),
-           opt(tk(point_fragment_file_root)),
-           separated_list0(point_fragment_concat, point_fragment_base)
-    ))
+    terminated(tuple((opt(terminated(tk(point_route_segment), tag(Tag::RouteSegSep))),
+           separated_list0(point_fragment_concat, tk(point_fragment_base)),
+           opt(tuple((tk(point_fragment_file_root), many0(tk(point_fragment_file)), opt(point_fragment_file))))) ), point_fragments_end)(input).map( |( next,(route,base,files))| {
+
+
+        (next, PointTokens::new())
+    })
+
 }
 
 
-pub(crate) fn point_fragment_route<'a, I>(input: I) -> Res< I, PntFragment>
+pub(crate) fn point_route_segment<'a, I>(input: I) -> Res< I, PntFragment>
 where
     I: 'a + Input
 {
     terminated(route_seg,tag(Tag::RouteSegSep))(input).map(|(r,t)| (r, PntFragment::RouteSeg(t)) )
-
 }
+
 pub(crate) fn point_fragment_base<'a, I>(input: I) -> Res< I, PntFragment>
 where
     I: 'a + Input
@@ -82,9 +87,6 @@ where
        (next, PntFragment::DomainCase(domain))
    })
 }
-
-
-
 pub(crate) fn point_fragment_file_root<'a, I>(input: I) -> Res< I, PntFragment>
 where
     I: 'a + Input
@@ -92,12 +94,33 @@ where
     tag(Tag::FileRoot)(input).map( |(next,_)| (next, PntFragment::FileRoot))
 }
 
-pub(crate) fn point_fragment_dir<'a, I>(input: I) -> Res< I, PntFragment>
+pub(crate) fn point_fragment_file<'a, I>(input: I) -> Res< I, PntFragment>
 where
     I: 'a + Input
 {
-    tag(Tag::FileRoot)(input).map( |(next,_)| (next, PntFragment::FileRoot))
+    fn dir_end<'a, I>(input: I) -> Res< I, PntFragment>
+    where
+        I: 'a + Input
+    {
+        dir_case(input).map( |(next,dir)| (next, PntFragment::DirEnd(dir)))
+    }
+
+    fn dir_fragment<'a, I>(input: I) -> Res< I, PntFragment>
+    where
+        I: 'a + Input
+    {
+        file_case(input).map( |(next,file)| (next, PntFragment::DirFrag(file)))
+    }
+
+
+    alt((dir_end,dir_fragment, point_fragment_var, point_fragment_concat))(input)
 }
+
+
+
+
+
+
 
 pub(crate) fn point_fragments_end<'a, I>(input: I) -> Res< I, I>
 where
@@ -108,7 +131,7 @@ where
 
 pub(crate) fn point_fragment_base_sep<'a,I>(input:I) -> Res<I,PntFragment> where I: 'a+Input
 {
-    alt((point_fragment_segment_delimeter, point_fragment_concat))(input)
+    alt((point_fragment_segment_delimeter,  point_fragment_concat))(input)
 }
 
 pub(crate) fn point_fragment_segment_delimeter<'a, I>(input: I) -> Res< I, PntFragment>
@@ -117,6 +140,8 @@ where
 {
     tag(Tag::SegSep)(input).map(|(next, _)| (next, PntFragment::SegSep))
 }
+
+
 
 pub(crate) fn point_fragment_route_seg<'a, I>(input: I) -> Res< I, PntFragment>
 where

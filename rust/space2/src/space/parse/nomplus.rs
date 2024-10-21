@@ -537,6 +537,14 @@ impl Tag {
     }
 }
 
+
+struct Scoped {
+   pub open: &'static str,
+   pub close: &'static str
+}
+
+
+
 pub fn tag<'a, I>( tag: Tag ) -> impl Clone + Fn(I) -> Res<I, I> where I: Input{
    let tag : SliceStr= tag.into();
    nom_supreme::tag::complete::tag(tag)
@@ -549,7 +557,7 @@ pub mod err {
     use alloc::string::{String, ToString};
     use core::range::Range;
     use nom_supreme::error::GenericErrorTree;
-    use thiserror::Error;
+    use thiserror_no_std::Error;
     use crate::space::parse::ctx::{InputCtx, ToInputCtx};
     use crate::space::parse::nomplus::{Input, Tag};
 

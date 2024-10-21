@@ -21,7 +21,7 @@ use nom::character::complete::alphanumeric0;
 use nom::sequence::terminated;
 use nom::Slice;
 use nom_supreme::ParserExt;
-use thiserror::Error;
+use thiserror_no_std::Error;
 use starlane_primitive_macros::Case;
 use crate::space::parse::err::{ParseErrsDef, ParseErrsOwn};
 use crate::space::parse::nomplus;
@@ -47,7 +47,7 @@ impl SkewerCase {
             } else {
                 if (c.is_alpha() && !c.is_lowercase()) || !(c.is_digit(10)||c == '-') {
                     let range = Range::from(index-1..index );
-                    let err = ParseErr::new(CaseCtx::SkewerCase,"valid skewer case characters are lowercase alpha, digits 0-9 and dash '-'", range, string);
+                    let err = ParseErr::new(CaseCtx::SkewerCase,"valid skewer case characters are lowercase alpha, digits 0-9 and dash '-'", range);
                     return Err(err);
                 }
             }
@@ -75,13 +75,13 @@ impl VarCase{
             {
                 if (!c.is_alpha() || !c.is_lowercase()) {
                     let range = Range::from( 0..1);
-                    let err = ParseErr::new(CaseCtx::VarCase,"VarCase must start with a lowercase alpha character", range, string);
+                    let err = ParseErr::new(CaseCtx::VarCase,"VarCase must start with a lowercase alpha character", range);
                     return Err(err);
                 }
             } else {
                 if (c.is_alpha() && !c.is_lowercase()) || !(c.is_digit(10)||c == '_') {
                     let range = Range::from(index-1..index );
-                    let err = ParseErr::new(CaseCtx::VarCase,"valid VarCase case characters are lowercase alpha, digits 0-9 and underscore '_'", range, string);
+                    let err = ParseErr::new(CaseCtx::VarCase,"valid VarCase case characters are lowercase alpha, digits 0-9 and underscore '_'", range);
                     return Err(err);
                 }
             }
@@ -109,13 +109,13 @@ impl DomainCase{
             {
                 if (!c.is_alpha() || !c.is_lowercase()) {
                     let range = Range::from( 0..1);
-                    let err = ParseErr::new(CaseCtx::DomainCase,"DomainCase must start with a lowercase alpha character", range, string);
+                    let err = ParseErr::new(CaseCtx::DomainCase,"DomainCase must start with a lowercase alpha character", range);
                     return Err(err);
                 }
             } else {
                 if (c.is_alpha() && !c.is_lowercase()) || !(c.is_digit(10)||c == '-'||c == '.') {
                     let range = Range::from(index-1..index );
-                    let err = ParseErr::new(CaseCtx::DomainCase,"valid DomainCase case characters are lowercase alpha, digits 0-9 and dash '-' and dot '.'", range, string);
+                    let err = ParseErr::new(CaseCtx::DomainCase,"valid DomainCase case characters are lowercase alpha, digits 0-9 and dash '-' and dot '.'", range);
                     return Err(err);
                 }
             }
@@ -139,13 +139,13 @@ impl CamelCase{
             {
                 if (!c.is_alpha() || !c.is_uppercase()) {
                     let range = Range::from( 0..1);
-                    let err = ParseErr::new(CaseCtx::CamelCase,"CamelCase must start with an uppercase alpha character", range, string);
+                    let err = ParseErr::new(CaseCtx::CamelCase,"CamelCase must start with an uppercase alpha character", range);
                     return Err(err);
                 }
             } else {
                 if (c.is_alpha() && !c.is_lowercase()) || !(c.is_digit(10)||c == '-'||c == '.') {
                     let range = Range::from(index-1..index );
-                    let err = ParseErr::new(CaseCtx::CamelCase,"valid CamelCase characters are mixed case alpha, digits 0-9", range, string);
+                    let err = ParseErr::new(CaseCtx::CamelCase,"valid CamelCase characters are mixed case alpha, digits 0-9", range);
                     return Err(err);
                 }
             }
@@ -169,7 +169,7 @@ impl FileCase{
                 if !(c.is_alpha() || c.is_digit(10)||c == '-'||c == '.'|| c=='_') {
                     let start = min(0,index-1);
                     let range = Range::from(start..index );
-                    let err = ParseErr::new(CaseCtx::FileCase,"valid FileCase case characters are lowercase alpha, digits 0-9 and dash '-', dot '.' and underscore '_'", range, string);
+                    let err = ParseErr::new(CaseCtx::FileCase,"valid FileCase case characters are lowercase alpha, digits 0-9 and dash '-', dot '.' and underscore '_'", range);
                     return Err(err);
                 }
         }
@@ -194,7 +194,7 @@ impl crate::space::parse::case::DirCase {
             if !(c.is_alpha() || c.is_digit(10)||c == '-'||c == '.'|| c=='_') {
                 let start = min(0,index-1);
                 let range = Range::from(start..index );
-                let err = ParseErr::new(CaseCtx::DirCase,"valid DirCase case characters are lowercase alpha, digits 0-9 and dash '-', dot '.' and underscore '_' and must terminate with a '/'", range, string);
+                let err = ParseErr::new(CaseCtx::DirCase,"valid DirCase case characters are lowercase alpha, digits 0-9 and dash '-', dot '.' and underscore '_' and must terminate with a '/'", range);
                 return Err(err);
             }
         }
@@ -207,22 +207,22 @@ impl crate::space::parse::case::DirCase {
 }
 
 pub fn file_case<'a,I: Input>(input: I) -> Res<I, FileCase> {
-    recognize(many0(alt((alphanumeric1, tag("-"),tag("_")))).ctx(CaseCtx::FileCase))(input)
+    recognize(many0(alt((alphanumeric1, tag("-"),tag("_")))).ctx(&CaseCtx::FileCase))(input)
         .map(|(next, rtn)| (next, FileCase(rtn.to_string())))
 }
 
-pub fn dir_case<'a,I: Input>(input: I) -> Res<I, FileCase> {
-    recognize(terminated(many0(alt((alphanumeric1, tag("-"),tag("_")))),nomplus::tag(Tag::Slash)).ctx(CaseCtx::DirCase))(input)
-        .map(|(next, rtn)| (next, FileCase(rtn.to_string())))
+pub fn dir_case<'a,I: Input>(input: I) -> Res<I, DirCase> {
+    recognize(terminated(many0(alt((alphanumeric1, tag("-"),tag("_")))),nomplus::tag(Tag::Slash)).ctx(&CaseCtx::DirCase))(input)
+        .map(|(next, rtn)| (next, DirCase(rtn.to_string())))
 }
 
 pub fn skewer_case<'a,I: Input>(input: I) -> Res<I, SkewerCase> {
-    recognize(tuple((peek(alpha1), many0(alt((alphanumeric1, tag("-")))))).ctx(CaseCtx::SkewerCase))(input)
+    recognize(tuple((peek(alpha1), many0(alt((alphanumeric1, tag("-")))))).ctx(&CaseCtx::SkewerCase))(input)
         .map(|(next, rtn)| (next, SkewerCase(rtn.to_string())))
 }
 
 pub fn var_case<'a,I: Input>(input: I) -> Res<I, VarCase> {
-    recognize(tuple((peek(alpha1), many0(alt((alphanumeric1, tag("_")))))).ctx(CaseCtx::VarCase))(input)
+    recognize(tuple((peek(alpha1), many0(alt((alphanumeric1, tag("_")))))).ctx(&CaseCtx::VarCase))(input)
         .map(|(next, rtn)| (next, VarCase(rtn.to_string())))
 }
 

@@ -4,7 +4,6 @@ use core::fmt::Display;
 use core::ops::{Deref, RangeTo};
 use core::range::{Range, RangeFrom};
 
-use thiserror::__private::AsDisplay;
 use crate::space::parse::case::VarCase;
 use crate::space::parse::ctx::{InputCtx, PrimCtx};
 use crate::space::parse::nomplus::{ErrTree, Input, LocatedSpan, Res, Span};
@@ -119,7 +118,8 @@ where
     move |input: I| {
         let (next, output) = f(input.clone())?;
 
-        let span = input.slice(0..next.len());
+        let range = Range::from(0..next.len());
+        let span = input.slice(range);
         let tw = Trace::new(span, output);
 
         Ok((next, tw))

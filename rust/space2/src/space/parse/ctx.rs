@@ -3,13 +3,13 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::ops::Deref;
 use nom_supreme::context::ContextError;
-use thiserror::Error;
+use thiserror_no_std::Error;
 use starlane_primitive_macros::{AsStr, Autobox};
 use crate::space::parse::nomplus::Input;
 
 
 pub trait ToInputCtx  {
-    fn to(self) -> impl Fn()->InputCtx;
+    fn to(&self) -> impl Fn()->InputCtx;
 }
 
 #[derive(Clone,Error,strum_macros::IntoStaticStr)]
@@ -38,9 +38,9 @@ pub enum PrimCtx {
 }
 
 impl ToInputCtx for PrimCtx{
-    fn to(self) -> impl Fn()->InputCtx
+    fn to(&self) -> impl Fn()->InputCtx
     {
-        move || InputCtx::Prim(self)
+        move || InputCtx::Prim(self.clone())
     }
 }
 
@@ -64,9 +64,9 @@ pub enum CaseCtx {
 
 
 impl ToInputCtx for CaseCtx{
-    fn to(self) -> impl Fn()->InputCtx
+    fn to(&self) -> impl Fn()->InputCtx
     {
-        move || InputCtx::Case(self)
+        move || InputCtx::Case(self.clone())
     }
 }
 
@@ -84,9 +84,9 @@ pub enum PointCtx {
 }
 
 impl ToInputCtx for PointCtx{
-    fn to(self) -> impl Fn()->InputCtx
+    fn to(&self) -> impl Fn()->InputCtx
     {
-        move || InputCtx::Point(self)
+        move || InputCtx::Point(self.clone())
     }
 }
 
