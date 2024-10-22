@@ -334,8 +334,7 @@ pub fn as_str(item: TokenStream) -> TokenStream {
     ts.into()
 }
 
-
-
+//pub fn autobox(item: TokenStream) -> TokenStream {
 #[proc_macro_derive(Case)]
 pub fn case(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
@@ -343,37 +342,35 @@ pub fn case(item: TokenStream) -> TokenStream {
 
     let ts = quote! {
 
-    impl #ident{
-      pub(crate) fn new<S>( string: S) -> Self where S: ToString {
-        Self(string.to_string())
-      }
-     }
-
-    impl AsRef<str> for #ident {
-        fn as_ref(&self) -> &str {
-          self.0.as_str()
+        impl AsRef<str> for #ident {
+            fn as_ref(&self) -> &str {
+              self.0.as_str()
+            }
         }
-    }
 
-    impl ToString for #ident {
-    fn to_string(&self) -> String {
-        self.0.clone()
-    }
-
-    impl Deref for #ident {
-       type Target = String;
-       fn deref(&self) -> &Self::Target {
-                    &self.0
+        impl ToString for #ident {
+            fn to_string(&self) -> String {
+                self.0.clone()
+            }
         }
-    }
-}
 
+        impl Deref for #ident {
+           type Target = String;
+           fn deref(&self) -> &Self::Target {
+                        &self.0
+            }
+        }
 
-    };
+        impl FromStr for #ident {
+                type Err = ParseErr;
+                fn from_str(s: &str) -> Result<Self, Self::Err> {
+                    Self::validate(s)?;
+                    Ok(Self(s.to_string()))
+                }
+        }
 
+            };
 
 
     ts.into()
 }
-
-

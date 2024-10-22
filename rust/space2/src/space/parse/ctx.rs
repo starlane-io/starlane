@@ -9,10 +9,10 @@ use crate::space::parse::nomplus::Input;
 
 
 pub trait ToInputCtx  {
-    fn to(&self) -> impl Fn()->InputCtx;
+    fn to(self) -> impl Fn()->InputCtx;
 }
 
-#[derive(Clone,Error,strum_macros::IntoStaticStr)]
+#[derive(Copy,Clone,Error,strum_macros::IntoStaticStr)]
 pub enum InputCtx {
  #[error("{0}")]
  Prim(PrimCtx),
@@ -29,7 +29,7 @@ impl ToInputCtx for InputCtx {
     }
 }
 
-#[derive(Clone,Error,strum_macros::IntoStaticStr)]
+#[derive(Copy,Clone,Error,strum_macros::IntoStaticStr)]
 pub enum PrimCtx {
     #[error("token")]
     Token,
@@ -38,14 +38,14 @@ pub enum PrimCtx {
 }
 
 impl ToInputCtx for PrimCtx{
-    fn to(&self) -> impl Fn()->InputCtx
+    fn to(self) -> impl Fn()->InputCtx
     {
-        move || InputCtx::Prim(self.clone())
+        move || InputCtx::Prim(self)
     }
 }
 
 
-#[derive(Clone,Debug,Error)]
+#[derive(Copy,Clone,Debug,Error)]
 pub enum CaseCtx {
     #[error("expected skewer case value (lowercase alphanumeric & '-')")]
     SkewerCase,
@@ -64,16 +64,16 @@ pub enum CaseCtx {
 
 
 impl ToInputCtx for CaseCtx{
-    fn to(&self) -> impl Fn()->InputCtx
+    fn to(self) -> impl Fn()->InputCtx
     {
-        move || InputCtx::Case(self.clone())
+        move || InputCtx::Case(self)
     }
 }
 
 
 
 
-#[derive(Clone,Error,Debug)]
+#[derive(Copy,Clone,Error,Debug)]
 pub enum PointCtx {
     #[error("Var def")]
     Var,
@@ -84,9 +84,9 @@ pub enum PointCtx {
 }
 
 impl ToInputCtx for PointCtx{
-    fn to(&self) -> impl Fn()->InputCtx
+    fn to(self) -> impl Fn()->InputCtx
     {
-        move || InputCtx::Point(self.clone())
+        move || InputCtx::Point(self)
     }
 }
 

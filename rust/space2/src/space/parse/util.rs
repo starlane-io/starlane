@@ -1,8 +1,8 @@
-use alloc::string::{String, ToString};
-use alloc::sync::Arc;
-use core::fmt::Display;
-use core::ops::{Deref, RangeTo};
-use core::range::{Range, RangeFrom};
+use crate::lib::std::sync::Arc;
+use crate::lib::std::string::{String, ToString};
+use crate::lib::std::fmt::{Display};
+
+use crate::lib::std::ops::{Deref, RangeTo,RangeFrom,Range};
 
 use crate::space::parse::case::VarCase;
 use crate::space::parse::ctx::{InputCtx, PrimCtx};
@@ -503,7 +503,7 @@ pub fn unstack( ctx: &StackContext<InputCtx>) -> String {
             k.description().to_string()
         }
         StackContext::Context(c) => {
-            format!("{}",c).to_string()
+            c.to_string()
         }
     }
 }

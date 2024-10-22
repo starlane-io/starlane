@@ -14,7 +14,8 @@ default=["parse"]
 std=[]
 #parse=["dep:nom","dep:nom-supreme","dep:nom_locate"]
 #//parse=["dep:nom-supreme","dep:nom_locate"]
-parse=["std"]
+alloc=["nom/alloc", "nom_locate/alloc", "nom-supreme/alloc"]
+parse=["dep:nom", "dep:nom-supreme", "dep:nom_locate"]
 parse-report=["dep:ariadne"]
 serde=["dep:serde"]
 async=["dep:async-trait","dep:tokio"]
@@ -24,8 +25,8 @@ starlane-primitive-macros = { workspace = true }
 
 
 #feature 'parse'
-nom-supreme =  { version="0.8.0"}
-nom_locate = { version="4.2.0" }
+nom-supreme =  { path="../../../nom-supreme", default-features = false, optional = true}
+nom_locate = { version="4.2.0" ,default-features = false, optional=true}
 
 #feature 'parse-report'
 ariadne={workspace=true, optional = true }
@@ -56,5 +57,4 @@ log = "0.4.22"
 [dependencies.nom]
 workspace= true
 default-features = false
-features = ["alloc"]
-#optional=true
+optional=true

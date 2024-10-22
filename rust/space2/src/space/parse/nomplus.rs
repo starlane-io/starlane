@@ -1,8 +1,8 @@
-use alloc::boxed::Box;
-use alloc::string::{String, ToString};
-use alloc::sync::Arc;
-use core::ops::Deref;
-use core::range::{Range, RangeFrom, RangeTo};
+use crate::lib::std::string::{String, ToString};
+use crate::lib::std::str::FromStr;
+use crate::lib::std::sync::Arc;
+use crate::lib::std::ops::{Deref,Range, RangeFrom, RangeTo};
+
 use nom::{AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength, InputTake, InputTakeAtPosition, Needed, Offset, Parser, Slice};
 use nom::error::{ErrorKind, ParseError};
 use nom_supreme::context::ContextError;
@@ -14,6 +14,8 @@ use crate::space::parse::util::{CharIterator, MyChars, SliceStr};
 use crate::RustErr;
 use crate::space::parse::nomplus::err::ParseErr;
 
+
+
 pub type LocatedSpan<'a> = nom_locate::LocatedSpan<&'a str,()>;
 
 
@@ -21,15 +23,15 @@ pub type ErrTree<I: Input> = GenericErrorTree<I, Tag, InputCtx , ParseErr>;
 pub type Res<I: Input,Output> = IResult<I, Output, ErrTree<I>>;
 
 
-pub trait MyParser<'a,I:Input,O> : ParserExt<I,O,ErrTree<I>> where I:Input{
-        fn ctx<C>( self, ctx: C) -> Context<Self,InputCtx> where C: ToInputCtx+Copy{
+pub trait MyParser<I:Input,O> : ParserExt<I,O,ErrTree<I>> where I:Input{
+        fn ctx<C>( self, ctx: C) -> Context<Self,InputCtx> where C: ToInputCtx{
             self.context(ctx.to()())
         }
 }
 
 
 
-impl<'a,I, O, P> MyParser<'a, I, O> for P where P: Parser<I, O, ErrTree<'a,I>>, I: Input {
+impl<I, O, P> MyParser<I, O> for P where P: Parser<I, O, ErrTree<I>>, I: Input {
 
 }
 
@@ -554,8 +556,8 @@ pub fn tag<'a, I>( tag: Tag ) -> impl Clone + Fn(I) -> Res<I, I> where I: Input{
 pub mod err {
     use alloc::boxed::Box;
     use alloc::format;
-    use alloc::string::{String, ToString};
-    use core::range::Range;
+    use crate::lib::std::string::{String, ToString};
+    use crate::lib::std::ops::Range;
     use nom_supreme::error::GenericErrorTree;
     use thiserror_no_std::Error;
     use crate::space::parse::ctx::{InputCtx, ToInputCtx};
