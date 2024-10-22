@@ -1,8 +1,10 @@
 use thiserror_no_std::Error;
+use crate::space::parse::ctx::{InputCtx, PrimCtx, ToInputCtx};
+use crate::space::parse::nomplus::Input;
 
 #[derive(Error,Debug, Copy, Clone, Eq, PartialEq)]
 pub enum BlockKind {
-    #[error("nexted block")]
+    #[error("nested block")]
     Nested(#[from] NestedBlockKind),
     #[error("terminated")]
     Terminated(#[from] TerminatedBlockKind),
@@ -12,10 +14,24 @@ pub enum BlockKind {
     Partial,
 }
 
+impl ToInputCtx for BlockKind{
+    fn to(self) -> impl Fn()->InputCtx
+    {
+        move || InputCtx::Block(self)
+    }
+}
+
+
 #[derive(Error,Debug, Copy, Clone,  Eq, PartialEq)]
 pub enum TerminatedBlockKind {
     #[error("semicolon")]
     Semicolon,
+}
+impl ToInputCtx for TerminatedBlockKind{
+    fn to(self) -> impl Fn()->InputCtx
+    {
+        move || InputCtx::Block(BlockKind::Terminated(self))
+    }
 }
 
 impl TerminatedBlockKind {
@@ -42,6 +58,12 @@ pub enum DelimitedBlockKind {
     DoubleQuotes,
 }
 
+impl ToInputCtx for DelimitedBlockKind{
+    fn to(self) -> impl Fn()->InputCtx
+    {
+        move || InputCtx::Block(BlockKind::Delimited(self))
+    }
+}
 impl DelimitedBlockKind {
     pub fn delim(&self) -> &'static str {
         match self {
@@ -84,6 +106,13 @@ pub enum NestedBlockKind {
     Angle,
 }
 
+impl ToInputCtx for NestedBlockKind{
+    fn to(self) -> impl Fn()->InputCtx
+    {
+        move || InputCtx::Block(BlockKind::Nested(self))
+    }
+}
+
 impl NestedBlockKind {
     pub fn is_block_terminator(c: char) -> bool {
         match c {
@@ -95,36 +124,6 @@ impl NestedBlockKind {
         }
     }
 
-    pub fn error_message<I: Span>(span: &I, context: &str) -> Result<&'static str, ()> {
-        if Self::Curly.open_context() == context {
-            Ok("expecting '{' (open scope block)")
-        } else if Self::Parens.open_context() == context {
-            Ok("expecting '(' (open scope block)")
-        } else if Self::Angle.open_context() == context {
-            Ok("expecting '<' (open scope block)")
-        } else if Self::Square.open_context() == context {
-            Ok("expecting '[' (open scope block)")
-        } else if Self::Curly.close_context() == context {
-            Ok("expecting '}' (close scope block)")
-        } else if Self::Parens.close_context() == context {
-            Ok("expecting ')' (close scope block)")
-        } else if Self::Angle.close_context() == context {
-            Ok("expecting '>' (close scope block)")
-        } else if Self::Square.close_context() == context {
-            Ok("expecting ']' (close scope block)")
-        } else if Self::Curly.unpaired_closing_scope() == context {
-            Ok("closing scope without an opening scope")
-        } else if Self::Parens.unpaired_closing_scope() == context {
-            Ok("closing scope without an opening scope")
-        } else if Self::Angle.unpaired_closing_scope() == context {
-            Ok("closing scope without an opening scope")
-        } else if Self::Square.unpaired_closing_scope() == context {
-            Ok("closing scope without an opening scope")
-        } else {
-            Err(())
-        }
-    }
-
     pub fn context(&self) -> &'static str {
         match self {
             NestedBlockKind::Curly => "block:{}",
@@ -133,6 +132,8 @@ impl NestedBlockKind {
             NestedBlockKind::Angle => "block:<>",
         }
     }
+
+
 
     pub fn open_context(&self) -> &'static str {
         match self {

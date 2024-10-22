@@ -5,6 +5,7 @@ use core::ops::Deref;
 use nom_supreme::context::ContextError;
 use thiserror_no_std::Error;
 use starlane_primitive_macros::{AsStr, Autobox};
+use crate::space::parse::block::BlockKind;
 use crate::space::parse::nomplus::Input;
 
 
@@ -19,7 +20,9 @@ pub enum InputCtx {
  #[error("{0}")]
  Case(CaseCtx),
  #[error("{0}")]
- Point(PointCtx)
+ Point(PointCtx),
+ #[error("{0}")]
+ Block(BlockKind)
 }
 
 impl ToInputCtx for InputCtx {

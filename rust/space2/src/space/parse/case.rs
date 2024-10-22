@@ -1,31 +1,28 @@
 use crate::lib::std::cmp::min;
 use crate::lib::std::ops::Range;
-use crate::lib::std::string::{String,ToString};
+use crate::lib::std::string::{String, ToString};
 use crate::lib::std::ops::Deref;
 use crate::lib::std::str::FromStr;
 
 
-use crate::space::parse::ctx::{CaseCtx, InputCtx, PrimCtx};
+use crate::space::parse::ctx::CaseCtx;
 use crate::space::parse::nomplus::err::ParseErr;
-use crate::space::parse::nomplus::{Input, MyParser, Res, Tag};
+use crate::space::parse::nomplus::{Input, MyParser, Res};
 use crate::space::parse::util::recognize;
 use ::nom::branch::alt;
-use ::nom::bytes::complete::{is_a, tag};
 use ::nom::character::complete::{alpha1, alphanumeric1};
 use ::nom::combinator::peek;
 use ::nom::error::ErrorKind;
 use ::nom::multi::many0;
 use ::nom::sequence::tuple;
 use ::nom::{AsChar, InputTakeAtPosition};
-use core::fmt;
+use nom::bytes::complete::take_until;
 use nom::character::complete::alphanumeric0;
 use nom::sequence::terminated;
-use nom::Slice;
 use nom_supreme::ParserExt;
-use thiserror_no_std::Error;
 use starlane_primitive_macros::Case;
-use crate::space::parse::err::{ParseErrsDef, ParseErrsOwn};
-use crate::space::parse::nomplus;
+use crate::space::parse::tag;
+use crate::space::parse::tag::{tag, Tag};
 use crate::space::util::AsStr;
 
 
@@ -192,31 +189,28 @@ impl Case for DirCase {
 }
 
 pub fn file_case<'a,I: Input>(input: I) -> Res<I, FileCase> {
-    recognize(many0(alt((alphanumeric1, tag("-"),tag("_")))).ctx(CaseCtx::FileCase))(input)
+    recognize(many0(alt((alphanumeric1, tag(CharTag::Dash),tag(CharTag::Underscore)))).ctx(CaseCtx::FileCase))(input)
         .map(|(next, rtn)| (next, FileCase(rtn.to_string())))
 }
 
 pub fn dir_case<'a,I: Input>(input: I) -> Res<I, DirCase> {
-    recognize(terminated(many0(alt((alphanumeric1, tag("-"),tag("_")))),nomplus::tag(Tag::Slash)).ctx(CaseCtx::DirCase))(input)
+    recognize(terminated(many0(alt((alphanumeric1, tag(CharTag::Dash),tag(CharTag::Underscore)))), tag::tag(Tag::Slash)).ctx(CaseCtx::DirCase))(input)
         .map(|(next, rtn)| (next, DirCase(rtn.to_string())))
 }
 
 pub fn skewer_case<'a,I: Input>(input: I) -> Res<I, SkewerCase> {
-    recognize(tuple((peek(alpha1), many0(alt((alphanumeric1, tag("-")))))).ctx(CaseCtx::SkewerCase))(input)
+    recognize(tuple((peek(alpha1), many0(alt((lowercase_alphanumeric, tag(CharTag::Dash)))))).ctx(CaseCtx::SkewerCase))(input)
         .map(|(next, rtn)| (next, SkewerCase(rtn.to_string())))
 }
 
 pub fn var_case<'a,I: Input>(input: I) -> Res<I, VarCase> {
-    recognize(tuple((peek(alpha1), many0(alt((alphanumeric1, tag("_")))))).ctx(CaseCtx::VarCase))(input)
+    recognize(tuple((peek(alpha1), many0(alt((alphanumeric1, tag(CharTag::Underscore)))))).ctx(CaseCtx::VarCase))(input)
         .map(|(next, rtn)| (next, VarCase(rtn.to_string())))
 }
 
 pub fn domain_case<'a,I: Input>(input: I) -> Res<I, DomainCase> {
-    recognize(tuple((
-        peek(alpha1),
-        many0(alt((alphanumeric1, tag("-"), tag(".")))),
-    )).ctx(CaseCtx::DomainCase))(input)
-    .map(|(next, rtn)| (next, DomainCase(rtn.to_string())))
+    recognize(tuple((peek(alpha1), many0(alt((lowercase_alphanumeric, tag(CharTag::Dash), tag(CharTag::Dot)))))).ctx(CaseCtx::DomainCase))(input)
+        .map(|(next, rtn)| (next, DomainCase(rtn.to_string())))
 }
 
 pub fn lowercase_alphanumeric<'a,I: Input>(input: I) -> Res<I, I> {
@@ -235,4 +229,27 @@ where
         },
         ErrorKind::AlphaNumeric,
     )
+}
+
+#[derive(Clone,Eq,PartialEq,Debug)]
+pub enum CharTag {
+    Dash,
+    Underscore,
+    Dot,
+}
+
+impl CharTag {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            CharTag::Dash => "-",
+            CharTag::Underscore => "_",
+            CharTag::Dot => "."
+        }
+    }
+}
+
+impl Into<Tag> for CharTag {
+    fn into(self) -> Tag {
+        Tag::Char(self)
+    }
 }

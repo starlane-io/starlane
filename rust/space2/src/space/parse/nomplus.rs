@@ -1,7 +1,6 @@
 use crate::lib::std::string::{String, ToString};
 use crate::lib::std::str::FromStr;
-use crate::lib::std::sync::Arc;
-use crate::lib::std::ops::{Deref,Range, RangeFrom, RangeTo};
+use crate::lib::std::ops::{Deref, Range, RangeFrom, RangeTo};
 use crate::lib::std::convert::AsRef;
 
 use nom::{AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength, InputTake, InputTakeAtPosition, Needed, Offset, Parser, Slice};
@@ -11,11 +10,9 @@ use nom_supreme::error::GenericErrorTree;
 use nom_supreme::parser_ext::Context;
 use nom_supreme::ParserExt;
 use crate::space::parse::ctx::{InputCtx, ToInputCtx};
-use crate::space::parse::util::{CharIterator, MyChars, SliceStr};
 use crate::RustErr;
 use crate::space::parse::nomplus::err::ParseErr;
-
-
+use crate::space::parse::tag::Tag;
 
 pub type LocatedSpan<'a> = nom_locate::LocatedSpan<&'a str,()>;
 
@@ -482,106 +479,9 @@ where
 }
 
 
-
-
-#[derive(Clone,Eq,PartialEq,Debug)]
-pub enum Tag {
-    RouteSegSep,
-    SegSep,
-    VarPrefix,
-    CurlyOpen,
-    CurlyClose,
-    AngleOpen,
-    AngleClose,
-    SquareOpen,
-    SquareClose,
-    ParenOpen,
-    ParenClose,
-    Pipe,
-    DoubleQuote,
-    SingleQuote,
-    Slash,
-    At,
-    Bang,
-    Question,
-    Wildcard,
-    BackTic,
-    Pound,
-    Plus,
-    Minus,
-    Concat,
-    VarOpen,
-    VarClose,
-    FileRoot,
-}
-
-impl InputLength for Tag {
-    fn input_len(&self) -> usize {
-        self.as_str().input_len()
-    }
-}
-
-
-
-impl Into<SliceStr> for Tag {
-    fn into(self) -> SliceStr {
-        SliceStr::new(self.as_str().to_string())
-    }
-}
-
-
-
-
-impl Tag {
-    fn as_str(&self) -> &'static str {
-        match self {
-            Tag::RouteSegSep => "::",
-            Tag::SegSep => ":",
-            Tag::VarPrefix => "$",
-            Tag::CurlyOpen => "{",
-            Tag::CurlyClose => "}",
-            Tag::AngleOpen => "<",
-            Tag::AngleClose => ">",
-            Tag::SquareOpen => "[",
-            Tag::SquareClose => "]",
-            Tag::ParenOpen => "(",
-            Tag::ParenClose=> ")",
-            Tag::Pipe => "|",
-            Tag::DoubleQuote => "\"",
-            Tag::SingleQuote => "'",
-            Tag::Slash => "/",
-            Tag::At => "@",
-            Tag::Bang => "!",
-            Tag::Question => "?",
-            Tag::Wildcard => "*",
-            Tag::BackTic => "`",
-            Tag::Pound => "#",
-            Tag::Plus => "+",
-            Tag::Minus => "-",
-            Tag::Concat => "+",
-            Tag::VarOpen => "${",
-            Tag::VarClose => "}",
-            Tag::FileRoot => ":/"
-        }
-    }
-}
-
-impl crate::lib::std::convert::AsRef<[u8]> for Tag {
-    fn as_ref(&self) -> &[u8] {
-        self.as_str().as_bytes()
-    }
-}
-
-
 struct Scoped {
    pub open: &'static str,
    pub close: &'static str
-}
-
-
-
-pub fn tag<'a, I>( tag: Tag ) -> impl Clone + Fn(I) -> Res<I, I> where I: Input{
-   nom_supreme::tag::complete::tag(tag)
 }
 
 
@@ -602,14 +502,10 @@ impl <I> Compare<Tag> for Span<I> where I: Input{
 
 
 pub mod err {
-    use crate::lib::std::boxed::Box;
     use crate::lib::std::string::{String, ToString};
     use crate::lib::std::ops::Range;
-    use nom_supreme::error::GenericErrorTree;
     use thiserror_no_std::Error;
     use crate::space::parse::ctx::{InputCtx, ToInputCtx};
-    use crate::space::parse::nomplus::{Input, Tag};
-
     pub struct ErrCtxStack {
 
     }

@@ -1,11 +1,10 @@
 use crate::lib::std::sync::Arc;
 use crate::lib::std::string::{String, ToString};
-use crate::lib::std::fmt::{Display};
+use crate::lib::std::fmt::Display;
 
-use crate::lib::std::ops::{Deref, RangeTo,RangeFrom,Range};
+use crate::lib::std::ops::{Deref, Range, RangeFrom, RangeTo};
 
-use crate::space::parse::case::VarCase;
-use crate::space::parse::ctx::{InputCtx, PrimCtx};
+use crate::space::parse::ctx::InputCtx;
 use crate::space::parse::nomplus::{ErrTree, Input, LocatedSpan, Res, Span};
 use core::error::Error as RustErr;
 use nom::error::{ErrorKind, ParseError};
@@ -14,9 +13,10 @@ use nom::character::complete::multispace0;
 use nom::sequence::delimited;
 use nom_supreme::error::StackContext;
 use nom_supreme::ParserExt;
-use crate::space::parse::err::{ParseErrs, ParseErrsDef};
+use crate::space::parse::err::ParseErrs;
 use crate::space::parse::nomplus::err::ParseErr;
-use crate::space::parse::token::{PntFragment, Token};
+use crate::space::parse::token::Token;
+use crate::space::parse::token::point::PntFragment;
 
 #[cfg(test)]
 mod tests {
