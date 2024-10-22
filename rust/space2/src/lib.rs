@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg(feature = "alloc")]
-#![macro_use]
+#![feature(string_as_str)]
+#[macro_use]
 extern crate alloc;
 
 #[cfg_attr(not(feature = "std"), no_std)]

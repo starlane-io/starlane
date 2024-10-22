@@ -16,6 +16,7 @@ use nom_supreme::error::StackContext;
 use nom_supreme::ParserExt;
 use crate::space::parse::err::{ParseErrs, ParseErrsDef};
 use crate::space::parse::nomplus::err::ParseErr;
+use crate::space::parse::token::{PntFragment, Token};
 
 #[cfg(test)]
 mod tests {
@@ -58,7 +59,7 @@ where
     W: PartialEq<W>,
 {
     fn eq(&self, other: &W) -> bool {
-       self.w == other
+       &self.w == other
     }
 }
 
@@ -100,6 +101,17 @@ impl<W> Deref for Trace<W> {
         &self.w
     }
 }
+
+
+impl Into<Trace<Token>> for Trace<PntFragment> {
+    fn into(self) -> Trace<Token> {
+        Trace {
+            w: self.w.into(),
+            range: self.range,
+        }
+    }
+}
+
 
 /*
 impl Into<Variable> for Trace<VarCase> {

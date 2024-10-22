@@ -30,7 +30,7 @@ use crate::space::util::AsStr;
 
 
 pub trait Case {
-    fn validate<S>( s: &S ) -> Result<(),ParseErr> where S: AsRef<str>;
+    fn validate<S>( s: &S ) -> Result<(),ParseErr> where S: AsRef<str> + ?Sized;
 }
 
 
@@ -40,7 +40,7 @@ pub struct SkewerCase(pub(crate) String);
 impl Case for SkewerCase {
     fn validate<S>(string: &S) -> Result<(), ParseErr>
     where
-        S: AsRef<str>
+        S: AsRef<str> + ?Sized
     {
         for (index, c) in string.as_ref().char_indices() {
             if (index == 0)
@@ -71,7 +71,8 @@ pub struct VarCase(pub(crate) String);
 
 impl Case for VarCase{
 
-    fn validate<S>( string: &S ) -> Result<(),ParseErr> where S: AsRef<str>{
+    fn validate<S>( string: &S ) -> Result<(),ParseErr> where
+        S: AsRef<str> + ?Sized{
         for (index,c) in string.as_ref().char_indices() {
             if( index == 0 )
             {
@@ -101,7 +102,8 @@ pub struct DomainCase(pub(crate) String);
 
 impl Case for  DomainCase{
 
-    fn validate<S>( string: &S ) -> Result<(),ParseErr> where S: AsRef<str>{
+    fn validate<S>( string: &S ) -> Result<(),ParseErr> where
+        S: AsRef<str> + ?Sized{
         for (index,c) in string.as_ref().char_indices() {
             if( index == 0 )
             {
@@ -128,7 +130,7 @@ pub struct CamelCase(pub(crate) String);
 
 impl Case for CamelCase{
 
-    fn validate<S>( string: &S ) -> Result<(),ParseErr> where S: AsRef<str>{
+    fn validate<S>( string: &S ) -> Result<(),ParseErr> where S: AsRef<str>+?Sized{
         for (index,c) in string.as_ref().char_indices() {
             if( index == 0 )
             {
@@ -155,7 +157,7 @@ pub struct FileCase(pub(crate)String);
 
 impl Case for FileCase{
 
-    fn validate<S>( string: &S ) -> Result<(),ParseErr> where S: AsRef<str>{
+    fn validate<S>( string: &S ) -> Result<(),ParseErr> where S: AsRef<str> + ?Sized{
         for (index,c) in string.as_ref().char_indices() {
                 if !(c.is_alpha() || c.is_digit(10)||c == '-'||c == '.'|| c=='_') {
                     let start = min(0,index-1);
@@ -176,7 +178,7 @@ pub struct DirCase(pub(crate)String);
 
 impl Case for DirCase {
 
-    fn validate<S>( string: &S ) -> Result<(),ParseErr> where S: AsRef<str>{
+    fn validate<S>( string: &S ) -> Result<(),ParseErr> where S: AsRef<str>+?Sized{
         for (index,c) in string.as_ref().char_indices() {
             if !(c.is_alpha() || c.is_digit(10)||c == '-'||c == '.'|| c=='_') {
                 let start = min(0,index-1);
@@ -190,22 +192,22 @@ impl Case for DirCase {
 }
 
 pub fn file_case<'a,I: Input>(input: I) -> Res<I, FileCase> {
-    recognize(many0(alt((alphanumeric1, tag("-"),tag("_")))).ctx(&CaseCtx::FileCase))(input)
+    recognize(many0(alt((alphanumeric1, tag("-"),tag("_")))).ctx(CaseCtx::FileCase))(input)
         .map(|(next, rtn)| (next, FileCase(rtn.to_string())))
 }
 
 pub fn dir_case<'a,I: Input>(input: I) -> Res<I, DirCase> {
-    recognize(terminated(many0(alt((alphanumeric1, tag("-"),tag("_")))),nomplus::tag(Tag::Slash)).ctx(&CaseCtx::DirCase))(input)
+    recognize(terminated(many0(alt((alphanumeric1, tag("-"),tag("_")))),nomplus::tag(Tag::Slash)).ctx(CaseCtx::DirCase))(input)
         .map(|(next, rtn)| (next, DirCase(rtn.to_string())))
 }
 
 pub fn skewer_case<'a,I: Input>(input: I) -> Res<I, SkewerCase> {
-    recognize(tuple((peek(alpha1), many0(alt((alphanumeric1, tag("-")))))).ctx(&CaseCtx::SkewerCase))(input)
+    recognize(tuple((peek(alpha1), many0(alt((alphanumeric1, tag("-")))))).ctx(CaseCtx::SkewerCase))(input)
         .map(|(next, rtn)| (next, SkewerCase(rtn.to_string())))
 }
 
 pub fn var_case<'a,I: Input>(input: I) -> Res<I, VarCase> {
-    recognize(tuple((peek(alpha1), many0(alt((alphanumeric1, tag("_")))))).ctx(&CaseCtx::VarCase))(input)
+    recognize(tuple((peek(alpha1), many0(alt((alphanumeric1, tag("_")))))).ctx(CaseCtx::VarCase))(input)
         .map(|(next, rtn)| (next, VarCase(rtn.to_string())))
 }
 
