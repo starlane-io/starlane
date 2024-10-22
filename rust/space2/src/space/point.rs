@@ -1,5 +1,5 @@
-use alloc::string::String;
-use alloc::vec::Vec;
+use crate::lib::std::string::String;
+use crate::lib::std::vec::Vec;
 use crate::space::parse::case::{DomainCase, SkewerCase};
 
 pub type Point = PointDef<RouteSeg,PointSeg>;

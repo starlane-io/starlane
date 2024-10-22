@@ -84,7 +84,7 @@ fn panic(_panic: &PanicInfo<'_>) -> ! {
 
 extern crate alloc;
 
-use alloc::string::String;
+use crate::lib::std::string::String;
 use core::ops::Deref;
 
 #[macro_use]

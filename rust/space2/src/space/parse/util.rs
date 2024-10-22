@@ -420,7 +420,7 @@ impl FindSubstring<&str> for SliceStr {
 
 #[cfg(test)]
 pub mod test {
-    use alloc::string::ToString;
+    use crate::lib::std::string::ToString;
     use nom::Slice;
     use crate::space::parse::util::SliceStr;
 

@@ -2,6 +2,7 @@ use crate::lib::std::string::{String, ToString};
 use crate::lib::std::str::FromStr;
 use crate::lib::std::sync::Arc;
 use crate::lib::std::ops::{Deref,Range, RangeFrom, RangeTo};
+use crate::lib::std::convert::AsRef;
 
 use nom::{AsBytes, AsChar, Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength, InputTake, InputTakeAtPosition, Needed, Offset, Parser, Slice};
 use nom::error::{ErrorKind, ParseError};
@@ -51,6 +52,8 @@ pub trait Input:
     + Compare<&'static str>
     + FindSubstring<&'static str>
     + core::fmt::Debug
+    + AsRef<[u8]>
+    + Compare<Tag>
 where
     Self: Sized,
     <Self as InputTakeAtPosition>::Item: AsChar,
@@ -62,7 +65,6 @@ where
 
     fn get_column(&self) -> usize;
 
-    fn extra(&self) -> Arc<String>;
 
     fn len(&self) -> usize;
 
@@ -82,10 +84,6 @@ impl<'a> Input for Span<LocatedSpan<'a>> {
 
     fn location_line(&self) -> u32 {
         self.input.location_line()
-    }
-
-    fn extra(&self) -> () {
-        ()
     }
 
     fn len(&self) -> usize {
@@ -141,6 +139,9 @@ where
         Self { input }
     }
 }
+
+
+
 
 impl<I> Deref for Span<I>
 where
@@ -251,6 +252,26 @@ impl<'a> Compare<&'static str> for Span<LocatedSpan<'a>> {
 
     fn compare_no_case(&self, t: &str) -> CompareResult {
         self.input.compare_no_case(t)
+    }
+}
+impl <'a> AsRef<[u8]> for Span<LocatedSpan<'a>> {
+    fn as_ref(&self) -> &[u8] {
+        self.input.as_ref()
+    }
+}
+
+impl <'a> Compare<Tag> for Span<LocatedSpan<'a>> {
+    fn compare(&self, t: Tag) -> CompareResult {
+        if t.as_str() == self.input.to_string().as_str() {
+            CompareResult::Ok
+        } else
+        {
+            CompareResult::Error
+        }
+    }
+
+    fn compare_no_case(&self, t: Tag) -> CompareResult {
+        self.compare(t)
     }
 }
 
@@ -463,7 +484,7 @@ where
 
 
 
-#[derive(Clone)]
+#[derive(Clone,Eq,PartialEq,Debug)]
 pub enum Tag {
     RouteSegSep,
     SegSep,
@@ -492,6 +513,12 @@ pub enum Tag {
     VarOpen,
     VarClose,
     FileRoot,
+}
+
+impl InputLength for Tag {
+    fn input_len(&self) -> usize {
+        self.as_str().input_len()
+    }
 }
 
 
@@ -548,14 +575,28 @@ struct Scoped {
 
 
 pub fn tag<'a, I>( tag: Tag ) -> impl Clone + Fn(I) -> Res<I, I> where I: Input{
-   let tag : SliceStr= tag.into();
    nom_supreme::tag::complete::tag(tag)
 }
 
 
+impl <I> Compare<Tag> for Span<I> where I: Input{
+    fn compare(&self, t: Tag) -> CompareResult {
+        if t.as_str() == self.to_string().as_str()
+        {
+            CompareResult::Ok
+        } else {
+            CompareResult::Error
+        }
+    }
+
+    fn compare_no_case(&self, t: Tag) -> CompareResult {
+        self.compare(t)
+    }
+}
+
+
 pub mod err {
-    use alloc::boxed::Box;
-    use alloc::format;
+    use crate::lib::std::boxed::Box;
     use crate::lib::std::string::{String, ToString};
     use crate::lib::std::ops::Range;
     use nom_supreme::error::GenericErrorTree;

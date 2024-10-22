@@ -1,6 +1,6 @@
-use alloc::boxed::Box;
-use alloc::string::ToString;
-use alloc::vec::Vec;
+use crate::lib::std::boxed::Box;
+use crate::lib::std::string::ToString;
+use crate::lib::std::vec::Vec;
 use core::ops::Deref;
 use nom_supreme::context::ContextError;
 use thiserror_no_std::Error;

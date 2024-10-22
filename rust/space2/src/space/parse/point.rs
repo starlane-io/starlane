@@ -1,4 +1,4 @@
-use alloc::string::String;
+use crate::lib::std::string::String;
 use nom::{AsChar, IResult, InputTakeAtPosition};
 use nom::branch::alt;
 use nom::bytes::complete::tag;

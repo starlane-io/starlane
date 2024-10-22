@@ -1,5 +1,5 @@
-use alloc::string::{String, ToString};
-use alloc::sync::Arc;
+use crate::lib::std::string::{String, ToString};
+use crate::lib::std::sync::Arc;
 use core::str::FromStr;
 use crate::space::parse::case::VarCase;
 use crate::space::parse::err::ParseErrs;

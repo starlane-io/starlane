@@ -1,10 +1,10 @@
-use alloc::string::String;
+use crate::lib::std::string::String;
 use crate::space::parse::case::{dir_case, domain_case, file_case, skewer_case, var_case, CamelCase, DirCase, DomainCase, FileCase, SkewerCase, VarCase};
 use crate::space::parse::nomplus::{tag, Input, MyParser, Res, Tag};
 use crate::space::parse::point::{route_seg, PointSeg};
 use crate::space::parse::util::{recognize, tron, Trace};
 use crate::space::point::RouteSeg;
-use alloc::vec::Vec;
+use crate::lib::std::vec::Vec;
 use nom::branch::alt;
 use nom::character::complete::{multispace0, multispace1};
 use nom::combinator::{cut, opt, peek};
