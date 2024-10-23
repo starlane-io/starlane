@@ -12,7 +12,7 @@ version:
 	toml set Cargo.toml workspace.dependencies.starlane.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
 	toml set Cargo.toml workspace.dependencies.starlane-macros.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
 	toml set Cargo.toml workspace.dependencies.starlane-space.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
-	toml set Cargo.toml workspace.dependencies.starlane-macros-primitive.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
+	toml set Cargo.toml workspace.dependencies.starlane-primitive-macros.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
 	$(MAKE) -C starlane-space version
 	$(MAKE) -C starlane-macros version
 	$(MAKE) -C starlane version
@@ -22,10 +22,10 @@ publish-dry-run-impl:
   
 
 publish-impl:
-	./publish.sh starlane-primitive-macros && sleep 10
-	./publish.sh starlane-space  && sleep 10
-	./publish.sh starlane-macros && sleep 10
-	./publish.sh starlane
+	./publish.sh starlane-primitive-macros 10
+	./publish.sh starlane-space  10
+	./publish.sh starlane-macros 10
+	./publish.sh starlane 0
 
 yokel:
 	#@echo $(shell echo 'doing stuff'; exit 123)
