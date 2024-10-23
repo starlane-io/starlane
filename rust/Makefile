@@ -13,9 +13,9 @@ version:
 	toml set Cargo.toml workspace.dependencies.starlane-macros.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
 	toml set Cargo.toml workspace.dependencies.starlane-space.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
 	toml set Cargo.toml workspace.dependencies.starlane-primitive-macros.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
-	$(MAKE) -C starlane-space version
-	$(MAKE) -C starlane-macros version
-	$(MAKE) -C starlane version
+	#$(MAKE) -C starlane-space version
+	#$(MAKE) -C starlane-macros version
+	#$(MAKE) -C starlane version
 
 publish-dry-run-impl: 
 	rustup default stable
