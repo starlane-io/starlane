@@ -160,7 +160,7 @@ impl BaseKind {
     }
 
     pub fn nothing_bind_point_hierarchy() -> PointHierarchy {
-        PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/nothing.bind<File<File>>").unwrap()
+        PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>nothing.bind<File<File>>").unwrap()
     }
 
 
