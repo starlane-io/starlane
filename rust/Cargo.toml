@@ -15,16 +15,19 @@ description="The Workspace package for Starlane.  What to see: './starlane-space
 [workspace]
 default-run = "starlane"
 resolver = "2"
-members = [
-  "starlane", "starlane-macros", "starlane-primitive-macros","mechtron"
-  , "starlane-space", "ext/service/starlane-cli-local-filestore-service" , "ext/service/starlane-cli-filestore-s3-service"]
+members = [ "starlane", "starlane-macros", "starlane-primitive-macros", "starlane-space" ]
+
+
+#members = [
+#  "starlane", "starlane-macros", "starlane-primitive-macros","mechtron"
+#  , "starlane-space", "ext/service/starlane-cli-local-filestore-service" , "ext/service/starlane-cli-filestore-s3-service"]
 
 exclude = [ ]
 
 [workspace.dependencies]
 starlane = { path="./starlane" , version = "0.3.16" }
 starlane-macros = { path="./starlane-macros", version = "0.3.16" }
-starlane-primitive-macros = { path="./starlane-primitive-macros"}
+starlane-primitive-macros = { path="./starlane-primitive-macros", version = "0.3.16" }
 starlane-space = { path="./starlane-space", version = "0.3.16" }
 lazy_static = "1.5.0"
 uuid = { version="1.1.2" }
@@ -102,6 +105,4 @@ tempdir = "0.3.7"
 path-clean = "1.0.1"
 thiserror-context = "0.1.2"
 
-[workspace.dependencies.starlane-macros-primitive]
-version = "0.3.16"
 

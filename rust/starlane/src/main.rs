@@ -1,4 +1,3 @@
-#![feature(hasher_prefixfree_extras)]
 #![allow(warnings)]
 #[macro_use]
 extern crate async_trait;
@@ -8,6 +7,11 @@ extern crate clap;
 extern crate lazy_static;
 #[macro_use]
 extern crate starlane_macros;
+
+
+pub static VERSION: Lazy<semver::Version> =
+    Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap() );
+
 
 pub mod template;
 pub mod err;
@@ -67,6 +71,7 @@ use std::path::Path;
 use std::process;
 use std::str::FromStr;
 use std::time::Duration;
+use once_cell::sync::Lazy;
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
 use tokio_print::aprintln;
@@ -99,6 +104,10 @@ pub fn main() -> Result<(), anyhow::Error> {
                     Err(err.into())
                 }
             }
+        }
+        Commands::Version => {
+            println!("{}", VERSION.to_string());
+            Ok(())
         }
     }
 }

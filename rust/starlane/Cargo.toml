@@ -44,8 +44,8 @@ space=[]
 wasm=[]
 
 [dependencies]
-starlane-space = { workspace = true }
-starlane-macros = { workspace = true }
+starlane-space = { workspace = true  }
+starlane-macros = { workspace = true  }
 starlane-primitive-macros = { workspace = true}
 thiserror = { workspace = true}
 tokio_print= {  workspace=true  }
@@ -118,6 +118,7 @@ quinn ={ workspace = true, optional = true }
 webpki-roots = { workspace = true}
 path-clean = { workspace = true}
 thiserror-context = { workspace = true }
+
 
 [lib]
 name = "starlane"
