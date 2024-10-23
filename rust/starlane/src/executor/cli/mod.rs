@@ -10,6 +10,7 @@ use std::io::Error;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::sync::Arc;
+use nom::AsBytes;
 use thiserror::Error;
 use tokio::io::AsyncWriteExt;
 
@@ -28,10 +29,10 @@ impl HostEnv {
 
 impl Hash for HostEnv {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write_str(self.pwd.as_str());
+        state.write(self.pwd.as_bytes());
         for key in self.env.keys().sorted() {
-            state.write_str(key.as_str());
-            state.write_str(self.env.get(key).unwrap());
+            state.write(key.as_bytes());
+            state.write(self.env.get(key).unwrap().as_bytes());
         }
     }
 }
