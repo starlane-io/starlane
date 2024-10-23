@@ -1,7 +1,15 @@
 [package]
 name = "starlane"
 
-description = "Starlane -- An Orchestration and Infrastructure Framework for WebAssembly Components (https://starlane.io)"
+description = """
+Starlane -- An Orchestration and Infrastructure Framework for WebAssembly Components (https://starlane.io)
+
+This packaged manages `HyperSpace` which provides infrastructure for `space`
+Apis (WebAssembly & external programs meant to provide custom behaviors in Starlane),
+
+This package references the `starlane-space` package and reuses of it to run the infrastructure and
+it also contains mechanisms (Drivers) for extending the Starlane Type system.
+"""
 
 
 version.workspace = true

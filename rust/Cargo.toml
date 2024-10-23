@@ -1,7 +1,7 @@
 [workspace.package]
 
 license = "MIT"
-repository = "https://github.com/cosmic-initiative/cosmic-initiative.git"
+repository = "https://github.com/starlane-io/starlane.git"
 
 version = "0.3.16"
 
@@ -9,7 +9,7 @@ edition = "2021"
 rust-version = "1.81.0"
 authors = []
 homepage = "https://starlane.io"
-description="..."
+description="The Workspace package for Starlane.  What to see: './starlane-space' contains the "
 
 
 [workspace]
@@ -104,3 +104,4 @@ thiserror-context = "0.1.2"
 
 [workspace.dependencies.starlane-macros-primitive]
 version = "0.3.16"
+
