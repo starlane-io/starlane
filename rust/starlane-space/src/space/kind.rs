@@ -144,9 +144,9 @@ impl BaseKind {
 
     pub fn bind_point_hierarchy(&self) -> PointHierarchy {
         (match self {
-            BaseKind::Star => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/star.bind<File>"),
-            BaseKind::Driver => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/driver.bind<File>"),
-            BaseKind::Global => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/global.bind<File>"),
+            BaseKind::Star => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>star.bind<File>"),
+            BaseKind::Driver => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>driver.bind<File>"),
+            BaseKind::Global => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>global.bind<File>"),
             _ => Ok(Self::nothing_bind_point_hierarchy())
         }).map_err(|errs| { errs.print(); errs }).unwrap()
     }
@@ -848,11 +848,14 @@ pub mod test {
     use crate::space::selector::{KindSelector, PointHierarchy};
     use crate::space::util::ValueMatcher;
     use crate::{Kind,  StarSub};
-    use core::str::FromStr;
     use crate::space::err::{ParseErrs, PrintErr};
-    use crate::space::parse::{consume_hierarchy, delim_kind, kind, lex_block, point_kind_hierarchy, resolve_kind, unwrap_block};
+    use crate::space::parse::{consume_hierarchy, delim_kind, file_point_kind_segment, kind, lex_block, point_kind_hierarchy, resolve_kind, unwrap_block};
     use crate::space::parse::model::{BlockKind, NestedBlockKind};
     use crate::space::parse::util::{new_span, recognize, result};
+    use std::str::FromStr;
+    use nom::combinator::all_consuming;
+    use nom::IResult;
+    use crate::space::kind::FileSubKind;
 
     #[test]
     pub fn selector() -> Result<(), ParseErrs> {
@@ -864,9 +867,49 @@ pub mod test {
 
     #[test]
     pub fn star_bind() {
-        let s = new_span("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/star.bind<File>");
+        let s = "GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>star.bind<File>";
+        let string = s.to_string();
+        let s = new_span(s );
 
-        point_kind_hierarchy(s).unwrap();
+        let (_,hierarchy) = point_kind_hierarchy(s).unwrap();
+        println!("HIERARCHY {}", hierarchy.to_string());
+        let v = hierarchy.to_string();
 
+        assert_eq!(v,string);
+    }
+
+    #[test]
+    pub fn file_bind() {
+        println!("File<File> == {}", Kind::File(FileSubKind::File).to_string() );
+        let s = "star.bind<File<File>>";
+        match result(all_consuming(file_point_kind_segment)(new_span(s)))  {
+            Ok(ok) => {
+                println!("filePoint seg: '{}'", ok.to_string());
+                assert!(false)
+            }
+            Err(err) => {
+               err.print() ;
+                assert!(false)
+            }
+        }
+    }
+    #[test]
+    pub fn star_bind_from_str() {
+
+
+
+
+        let s = "GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>star.bind<File<File>>";
+        match PointHierarchy::from_str(s) {
+            Ok(hierarchy) => {
+                println!("HIERARCHY from_str {}", hierarchy.to_string());
+                let v = s.to_string();
+                assert_eq!(v,hierarchy.to_string());
+            }
+            Err(err) => {
+                err.print();
+                panic!("from_str does not work!")
+            }
+        }
     }
 }

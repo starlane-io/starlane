@@ -1032,6 +1032,18 @@ pub fn file_point_kind_segment<I: Span>(input: I) -> Res<I, PointKindSeg> {
     })
 }
 
+pub fn file_root_kind_segment<I: Span>(input: I) -> Res<I, PointKindSeg> {
+    tuple((tag(":/"), delim_kind))(input).map(|(next, (point_segment, kind))| {
+        (
+            next,
+            PointKindSeg {
+                segment: PointSeg::FsRootDir,
+                kind,
+            },
+        )
+    })
+}
+
 pub fn version_point_kind_segment<I: Span>(input: I) -> Res<I, PointKindSeg> {
     tuple((version_point_segment, delim_kind))(input).map(|(next, (point_segment, kind))| {
         (
@@ -1045,20 +1057,24 @@ pub fn version_point_kind_segment<I: Span>(input: I) -> Res<I, PointKindSeg> {
 }
 
 pub fn consume_hierarchy<I: Span>(input: I) -> Result<PointHierarchy, ParseErrs> {
-    let (_, rtn) = all_consuming(point_kind_hierarchy)(input)?;
+    let (next, rtn) = point_kind_hierarchy(input)?;
+println!("next: {}",next.to_string());
     Ok(rtn)
 }
 
 pub fn point_kind_hierarchy<I: Span>(input: I) -> Res<I, PointHierarchy> {
     tuple((
         opt(terminated(point_route_segment,tag("::"))).context(PrimitiveErrCtx::RouteScopeTag.into()),
-        space_point_kind_segment,
-        many0(base_point_kind_segment),
-        opt(version_point_kind_segment),
-        many0(file_point_kind_segment),
+        terminated(space_point_kind_segment,tag(":")),
+        separated_list0(tag(":"),base_point_kind_segment),
+        opt(preceded(tag(":"),version_point_kind_segment)),
+        opt(file_root_kind_segment),
+        many0(terminated(dir_point_kind_segment,tag("/"))),
+        opt(file_point_kind_segment),
     ))(input)
-    .map(|(next, (route_seg, space, mut bases, version, mut files))| {
-        let mut segments = vec![];
+    .map(|(next,(route_seg, space,mut bases, version, file_root, mut dirs, file )) | {
+
+        let mut segments: Vec<PointKindSeg> = vec![];
         segments.push(space);
         segments.append(&mut bases);
         match version {
@@ -1073,7 +1089,18 @@ pub fn point_kind_hierarchy<I: Span>(input: I) -> Res<I, PointHierarchy> {
             Some(route_seg) => route_seg
         };
 
-        segments.append(&mut files);
+        if file_root.is_some() {
+            segments.push(PointKindSeg {
+                segment: PointSeg::FsRootDir,
+                kind: Kind::FileStore
+            });
+        }
+
+        segments.append(&mut dirs);
+
+        if let Some(file) = file {
+            segments.push(file);
+        }
 
         let point = PointHierarchy::new(route_seg, segments);
 

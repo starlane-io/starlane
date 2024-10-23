@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use crate::space::loc::{ToPoint, ToSurface};
 use crate::space::log::{PointLogger, RootLogger, Trackable, Tracker};
 use crate::space::particle::traversal::Traversal;
@@ -16,7 +17,6 @@ use crate::space::wave::{
     ReflectedWave, Scope, Wave, WaveId, WaveVariantDef,
 };
 use crate::{Agent, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
-use alloc::borrow::Cow;
 use dashmap::{DashMap, DashSet};
 use std::sync::Arc;
 use std::time::Duration;
