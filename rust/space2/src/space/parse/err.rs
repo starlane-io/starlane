@@ -15,19 +15,9 @@ pub struct ParseErrsDef<Src>
 pub type ParseErrs<'a> = ParseErrsDef<&'a str>;
 pub type ParseErrsOwn = ParseErrsDef<String>;
 
-impl <'a> Borrow<ParseErrsDef<&'a str>> for ParseErrsDef<String>{
-    fn borrow(&self) -> &'a ParseErrs<'a> {
-        &ParseErrs{
-            src : self.src.as_str(),
-            errs : self.errs.clone()
-        }
-    }
-}
 
-impl <'a> ToOwned for ParseErrsDef<&'a str> {
-    type Owned = ParseErrsDef<String>;
-
-    fn to_owned(&self) -> Self::Owned {
+impl ParseErrsDef<&str> {
+    fn to_owned(&self) -> ParseErrsOwn {
         ParseErrsDef::many(self.src.to_string(), self.errs.clone())
     }
 }

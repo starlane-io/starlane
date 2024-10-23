@@ -82,7 +82,8 @@ impl Tag {
             Tag::VarOpen => "${",
             Tag::VarClose => "}",
             Tag::FileRoot => ":/",
-            Tag::Point(pnt) => pnt.as_str()
+            Tag::Point(pnt) => pnt.as_str(),
+            Tag::Char(c) => c.as_str()
         }
     }
 }
@@ -93,7 +94,7 @@ impl crate::lib::std::convert::AsRef<[u8]> for Tag {
     }
 }
 
-pub fn tag<'a, I, T>(tag: T ) -> impl Clone + Fn(I) -> Res<I, I> where I: Input, T: Into<Tag>{
+pub fn tag<'a, I, T>(tag: T ) -> impl Clone + FnMut(I) -> Res<I, I> where I: Input, T: Into<Tag>{
    let tag = tag.into();
    nom_supreme::tag::complete::tag(tag)
 }

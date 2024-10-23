@@ -216,7 +216,6 @@ pub fn eop<'a,I: Input>(input: I) -> Res<I, I> {
     peek(alt((
         eof,
         multispace1,
-        not(alt((alphanumeric1,tag(CharTag::Underscore))))
     )))(input)
 }
 
@@ -365,17 +364,21 @@ where
 
 pub(crate) fn point_fragment_var<'a, I>(input: I) -> Res<I, PntFragment>
 where
-    I: Input,
+    I: Input + 'a,
 {
-    pair(
-        peek(tag(Tag::VarPrefix)),
-        cut(delimited(tag(Tag::VarOpen), var_case, tag(Tag::VarClose)))(input)
-            .map(|(next, var_name)| (next, PntFragment::Var(var_name))),
-    )
+
+//    tuple((
+//        peek(tag(Tag::VarPrefix)),
+        delimited(tag(Tag::VarOpen), var_case, tag(Tag::VarClose))(input)
+            .map(|(next, var)| (next, PntFragment::Var(var)))
 }
 
+/*
 pub(crate) fn base_segment_tokens<'a, I>(input: I) -> Res<I, PointTokens>
 where
     I: 'a + Input,
 {
+
 }
+
+ */

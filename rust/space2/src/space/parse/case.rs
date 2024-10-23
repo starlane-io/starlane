@@ -96,7 +96,6 @@ impl Case for VarCase{
 pub struct DomainCase(pub(crate) String);
 
 
-
 impl Case for  DomainCase{
 
     fn validate<S>( string: &S ) -> Result<(),ParseErr> where
@@ -203,6 +202,11 @@ pub fn skewer_case<'a,I: Input>(input: I) -> Res<I, SkewerCase> {
         .map(|(next, rtn)| (next, SkewerCase(rtn.to_string())))
 }
 
+pub fn camel_case<'a,I: Input>(input: I) -> Res<I, CamelCase> {
+    recognize(tuple((peek(alpha1), many0(alt((alphanumeric0, tag(CharTag::Dash),tag(CharTag::Dash)))))).ctx(CaseCtx::SkewerCase))(input)
+        .map(|(next, rtn)| (next, CamelCase(rtn.to_string())))
+}
+
 pub fn var_case<'a,I: Input>(input: I) -> Res<I, VarCase> {
     recognize(tuple((peek(alpha1), many0(alt((alphanumeric1, tag(CharTag::Underscore)))))).ctx(CaseCtx::VarCase))(input)
         .map(|(next, rtn)| (next, VarCase(rtn.to_string())))
@@ -215,6 +219,11 @@ pub fn domain_case<'a,I: Input>(input: I) -> Res<I, DomainCase> {
 
 pub fn lowercase_alphanumeric<'a,I: Input>(input: I) -> Res<I, I> {
     recognize(tuple((lowercase1, alphanumeric0)))(input)
+}
+
+
+pub fn point_case<'a,I: Input>(input: I) -> Res<I, I> {
+    alt((recognize(skewer_case),recognize(camel_case),recognize(skewer_case), recognize(alphanumeric1)))(input)
 }
 
 pub fn lowercase1<'a,T: Input>(i: T) -> Res<T, T>
