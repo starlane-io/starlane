@@ -1057,8 +1057,7 @@ pub fn version_point_kind_segment<I: Span>(input: I) -> Res<I, PointKindSeg> {
 }
 
 pub fn consume_hierarchy<I: Span>(input: I) -> Result<PointHierarchy, ParseErrs> {
-    let (next, rtn) = point_kind_hierarchy(input)?;
-println!("next: {}",next.to_string());
+    let (next, rtn) = all_consuming(point_kind_hierarchy)(input)?;
     Ok(rtn)
 }
 
