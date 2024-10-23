@@ -6,6 +6,8 @@ use crate::lib::std::vec::Vec;
 use crate::lib::std::vec;
 use crate::space::parse::nomplus::err::ParseErr;
 
+
+#[derive(Debug)]
 pub struct ParseErrsDef<Src>
 {
     pub src: Src,

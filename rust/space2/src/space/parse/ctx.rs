@@ -13,7 +13,7 @@ pub trait ToInputCtx  {
     fn to(self) -> impl Fn()->InputCtx;
 }
 
-#[derive(Copy,Clone,Error,strum_macros::IntoStaticStr)]
+#[derive(Copy,Clone,Debug,Error,strum_macros::IntoStaticStr)]
 pub enum InputCtx {
  #[error("{0}")]
  Prim(PrimCtx),
@@ -32,7 +32,7 @@ impl ToInputCtx for InputCtx {
     }
 }
 
-#[derive(Copy,Clone,Error,strum_macros::IntoStaticStr)]
+#[derive(Copy,Clone,Debug,Error,strum_macros::IntoStaticStr)]
 pub enum PrimCtx {
     #[error("token")]
     Token,

@@ -10,7 +10,7 @@ pub mod kind;
 pub mod code;
 pub mod data;
 pub mod util;
-
+pub mod case;
 //pub mod substance;
 
 

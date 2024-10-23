@@ -1,5 +1,5 @@
 use crate::lib::std::vec::Vec;
-use crate::space::parse::case::VarCase;
+use crate::space::case::VarCase;
 use crate::space::parse::nomplus::{Input, MyParser, Res};
 use point::{PntFragment};
 use crate::space::parse::util::{tron, Trace};

@@ -10,7 +10,7 @@ use crate::space::parse::err::ParseErrs;
 #[derive(Clone,Eq,PartialEq,Debug)]
 pub enum Tag {
     HyperSegmentSep,
-    SegSep,
+    PointSegSep,
     VarPrefix,
     CurlyOpen,
     CurlyClose,
@@ -56,7 +56,7 @@ impl Tag {
     pub fn as_str(&self) -> &'static str {
         match self {
             Tag::HyperSegmentSep => "::",
-            Tag::SegSep => ":",
+            Tag::PointSegSep => ":",
             Tag::VarPrefix => "$",
             Tag::CurlyOpen => "{",
             Tag::CurlyClose => "}",
@@ -81,7 +81,7 @@ impl Tag {
             Tag::Concat => "+",
             Tag::VarOpen => "${",
             Tag::VarClose => "}",
-            Tag::FileRoot => ":/",
+            Tag::FileRoot => "/",
             Tag::Point(pnt) => pnt.as_str(),
             Tag::Char(c) => c.as_str()
         }
@@ -96,5 +96,11 @@ impl crate::lib::std::convert::AsRef<[u8]> for Tag {
 
 pub fn tag<'a, I, T>(tag: T ) -> impl Clone + FnMut(I) -> Res<I, I> where I: Input, T: Into<Tag>{
    let tag = tag.into();
-   nom_supreme::tag::complete::tag(tag)
+    move |input:I| {
+        nom_supreme::tag::complete::tag(tag.as_str())(input)
+    }
+
 }
+
+
+

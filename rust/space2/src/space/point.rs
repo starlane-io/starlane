@@ -1,7 +1,6 @@
 use crate::lib::std::string::String;
 use crate::lib::std::vec::Vec;
-use crate::space::parse::case::{DomainCase, SkewerCase};
-
+use crate::space::case::{DomainCase, SkewerCase};
 pub type Point = PointDef<HyperSegment,PointSeg>;
 pub struct PointDef<Route,Seg> {
     route: Route,

@@ -112,16 +112,6 @@ impl Into<Trace<Token>> for Trace<PntFragment> {
     }
 }
 
-
-/*
-impl Into<Variable> for Trace<VarCase> {
-    fn into(self) -> Variable {
-        Trace::from_range(self.range,VarCase(self.w.to_string()))
-    }
-}
-
- */
-
 pub fn tron<I, F, O>(mut f: F) -> impl FnMut(I) -> Res<I,Trace<O>>
 where
     I: Input,
@@ -141,7 +131,7 @@ where
 //pub type OwnedSpan<'a> = LocatedSpan<&'a str, SpanExtra>;
 pub type SpanExtra = Arc<String>;
 
-pub fn new_span<'a>(s: &'a str) -> Span<LocatedSpan<'a>> {
+pub fn span<'a>(s: &'a str) -> Span<LocatedSpan<'a>> {
     let span = LocatedSpan::new(s);
     Span::new(span)
 }

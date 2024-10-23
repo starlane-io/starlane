@@ -1,14 +1,13 @@
-use crate::lib::std::string::String;
 use nom::{AsChar, InputTakeAtPosition};
 use nom::branch::alt;
-use nom::character::complete::{alphanumeric1, multispace1, space1};
-use nom::combinator::{cut, eof, not, opt, peek, recognize};
+use nom::character::complete::multispace1;
+use nom::combinator::{eof, opt, peek};
 use nom::error::ErrorKind;
-use nom::sequence::{delimited, pair, terminated, tuple};
+use nom::sequence::{delimited, terminated, tuple};
 use nom_supreme::ParserExt;
 use nom::multi::{many0, separated_list0};
-use starlane_primitive_macros::Autobox;
-use crate::space::parse::case::{dir_case, domain_case, file_case, skewer_case, var_case, CharTag, DirCase, DomainCase, FileCase, SkewerCase, VarCase};
+use crate::space::case::{DirCase, DomainCase, FileCase, SkewerCase, VarCase};
+use crate::space::parse::case::{dir_case, domain_case, file_case, skewer_case, var_case};
 use crate::space::parse::nomplus::{Input, Res};
 use crate::space::point::HyperSegment;
 use crate::space::parse::tag::{tag, Tag};
@@ -219,6 +218,7 @@ pub fn eop<'a,I: Input>(input: I) -> Res<I, I> {
     )))(input)
 }
 
+#[derive(Debug,Eq,PartialEq)]
 pub(crate) enum PntFragment {
     HyperSegment(HyperSegment),
     Var(VarCase),
@@ -233,7 +233,7 @@ pub(crate) enum PntFragment {
     /// ${some_var}+something+${something_else}+${suffix} (just the + symbol)
     ConCat,
     Def,
-    SegSep,
+    SegmentSeparator,
     RouteSegSep,
 }
 
@@ -250,7 +250,7 @@ where
     terminated(
         tuple((
             opt(terminated(token::tk(point_hyper_segment), tag(Tag::HyperSegmentSep))),
-            separated_list0(point_fragment_concat, token::tk(point_fragment_base)),
+            separated_list0(point_fragment_base_sep, token::tk(point_fragment_base)),
             opt(tuple((
                 token::tk(point_fragment_file_root),
                 many0(token::tk(point_fragment_file)),
@@ -338,21 +338,21 @@ pub(crate) fn point_fragment_segment_delimeter<'a, I>(input: I) -> Res<I, PntFra
 where
     I: 'a + Input,
 {
-    tag(Tag::SegSep)(input).map(|(next, _)| (next, PntFragment::SegSep))
+    tag(Tag::PointSegSep)(input).map(|(next, _)| (next, PntFragment::SegmentSeparator))
 }
 
-pub(crate) fn point_fragment_hyperoute_seg<'a, I>(input: I) -> Res<I, PntFragment>
+pub(crate) fn point_fragment_hyper_seg<'a, I>(input: I) -> Res<I, PntFragment>
 where
     I: 'a + Input,
 {
     hyper_segment(input).map(|(r, t)| (r, PntFragment::HyperSegment(t)))
 }
 
-pub(crate) fn point_fragment_route_seg_sep<'a, I>(input: I) -> Res<I, PntFragment>
+pub(crate) fn point_fragment_hyper_seg_sep<'a, I>(input: I) -> Res<I, PntFragment>
 where
     I: 'a + Input,
 {
-    tag(Tag::HyperSegmentSep)(input).map(|(next, _)| (next, PntFragment::SegSep))
+    tag(Tag::HyperSegmentSep)(input).map(|(next, _)| (next, PntFragment::SegmentSeparator))
 }
 
 pub(crate) fn point_fragment_concat<'a, I>(input: I) -> Res<I, PntFragment>
@@ -382,3 +382,47 @@ where
 }
 
  */
+
+#[cfg(test)]
+mod test_point {
+    use alloc::string::ToString;
+    use log::debug;
+    use nom::combinator::all_consuming;
+    use nom::multi::separated_list0;
+    use crate::space::case::DomainCase;
+    use crate::space::parse::case::lowercase1;
+    use crate::space::parse::tag::{tag, Tag};
+    use crate::space::parse::token::point::{hyper_segment, point_fragment_base, point_fragment_base_sep, point_fragment_segment_delimeter, point_fragments, point_hyper_segment, PntFragment};
+    use crate::space::parse::util::{result, span, tron};
+    use crate::space::point::HyperSegment;
+
+    #[test]
+   fn parse_hyper_segment() {
+       let span = span("SPACE");
+       assert_eq!( HyperSegment::Space, hyper_segment(span).unwrap().1);
+   }
+
+    #[test]
+    fn parse_basic_point() {
+
+        let input = span(":");
+        let (_,r) = point_fragment_base_sep(input).unwrap();
+        assert_eq!(r,PntFragment::SegmentSeparator);
+        let span = span("one:two:three");
+        let (_,r) = separated_list0(tag(Tag::PointSegSep), lowercase1)(span).unwrap();
+        assert_eq!(r.len(),3);
+
+
+
+//       assert_eq!(PntFragment::DomainCase(DomainCase("web".to_string())), r.w);
+
+
+
+/*        let iter = r.iter();
+        assert_eq!(iter.count(),3);
+
+ */
+
+    }
+
+}

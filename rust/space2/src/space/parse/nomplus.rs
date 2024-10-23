@@ -510,7 +510,7 @@ pub mod err {
 
     }
 
-    #[derive(Error,Clone)]
+    #[derive(Error,Debug,Clone)]
     pub struct ParseErr  {
         ctx: InputCtx,
         message: String,
