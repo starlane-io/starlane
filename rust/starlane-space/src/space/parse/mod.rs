@@ -1327,7 +1327,6 @@ where
 {
     i.split_at_position1_complete(
         |item| {
-println!("testing: {}", item);
             let char_item = item.as_char();
             !(char_item == '-')
                 && !(char_item == '.')

@@ -7,7 +7,13 @@ authors.workspace = true
 homepage.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "the Space portion of starlane as opposed to hyperspace"
+description = """
+The 'Space' portion of starlane as opposed to hyperspace.
+
+This is where 3rd parties customize Starlane's behavior with WebAssembly and external executables.
+
+To develop a starlane driver please look in `./starlane` which holds the 'hyperspace' code (which provides infrastructure)"
+"""
 
 
 [lib]
