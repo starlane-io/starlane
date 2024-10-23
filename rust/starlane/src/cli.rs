@@ -35,6 +35,7 @@ pub struct Cli {
 pub enum Commands {
     Serve,
     Script(ScriptArgs),
+    Version,
 }
 
 #[derive(Debug, Args)]
