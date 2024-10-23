@@ -15,9 +15,12 @@ description="The Workspace package for Starlane.  What to see: './starlane-space
 [workspace]
 default-run = "starlane"
 resolver = "2"
-members = [
-  "starlane", "starlane-macros", "starlane-primitive-macros","mechtron"
-  , "starlane-space", "ext/service/starlane-cli-local-filestore-service" , "ext/service/starlane-cli-filestore-s3-service"]
+members = [ "starlane", "starlane-macros", "starlane-primitive-macros", "starlane-space" ]
+
+
+#members = [
+#  "starlane", "starlane-macros", "starlane-primitive-macros","mechtron"
+#  , "starlane-space", "ext/service/starlane-cli-local-filestore-service" , "ext/service/starlane-cli-filestore-s3-service"]
 
 exclude = [ ]
 
