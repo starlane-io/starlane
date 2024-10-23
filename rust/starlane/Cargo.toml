@@ -36,7 +36,7 @@ space=[]
 wasm=[]
 
 [dependencies]
-starlane-space = { workspace = true}
+starlane-space = { workspace = true }
 starlane-macros = { workspace = true }
 starlane-primitive-macros = { workspace = true}
 thiserror = { workspace = true}

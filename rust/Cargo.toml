@@ -3,7 +3,7 @@
 license = "MIT"
 repository = "https://github.com/cosmic-initiative/cosmic-initiative.git"
 
-version = "0.3.14"
+version = "0.3.16"
 
 edition = "2021" 
 rust-version = "1.81.0"
@@ -22,10 +22,10 @@ members = [
 exclude = [ ]
 
 [workspace.dependencies]
-starlane = { path="./starlane" }
-starlane-macros = { path="./starlane-macros"}
+starlane = { path="./starlane" , version = "0.3.16" }
+starlane-macros = { path="./starlane-macros", version = "0.3.16" }
 starlane-primitive-macros = { path="./starlane-primitive-macros"}
-starlane-space = { path="./starlane-space"}
+starlane-space = { path="./starlane-space", version = "0.3.16" }
 lazy_static = "1.5.0"
 uuid = { version="1.1.2" }
 chrono = { version="0.4.19" }
@@ -101,3 +101,6 @@ thiserror = "1.0.63"
 tempdir = "0.3.7"
 path-clean = "1.0.1"
 thiserror-context = "0.1.2"
+
+[workspace.dependencies.starlane-macros-primitive]
+version = "0.3.16"
