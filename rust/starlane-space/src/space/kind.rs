@@ -845,11 +845,14 @@ impl TryInto<SpecificSelector> for Specific {
 
 #[cfg(test)]
 pub mod test {
-    use crate::space::selector::KindSelector;
+    use crate::space::selector::{KindSelector, PointHierarchy};
     use crate::space::util::ValueMatcher;
     use crate::{Kind,  StarSub};
     use core::str::FromStr;
-    use crate::space::err::ParseErrs;
+    use crate::space::err::{ParseErrs, PrintErr};
+    use crate::space::parse::{consume_hierarchy, delim_kind, kind, lex_block, point_kind_hierarchy, resolve_kind, unwrap_block};
+    use crate::space::parse::model::{BlockKind, NestedBlockKind};
+    use crate::space::parse::util::{new_span, recognize, result};
 
     #[test]
     pub fn selector() -> Result<(), ParseErrs> {
@@ -857,5 +860,13 @@ pub mod test {
         let selector = KindSelector::from_str("<Star<Fold>>")?;
         assert!(selector.is_match(&kind).is_ok());
         Ok(())
+    }
+
+    #[test]
+    pub fn star_bind() {
+        let s = new_span("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/star.bind<File>");
+
+        point_kind_hierarchy(s).unwrap();
+
     }
 }

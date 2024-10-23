@@ -2015,7 +2015,7 @@ pub fn point_template<I: Span>(input: I) -> Res<I, PointTemplateVar> {
 
 pub fn kind_template<I: Span>(input: I) -> Res<I, KindTemplate> {
     tuple((
-        kind_base,
+        base_kind,
         opt(delimited(
             tag("<"),
             tuple((
@@ -5812,11 +5812,9 @@ pub fn specific_version_req<I: Span>(input: I) -> Res<I, VersionReq> {
 }
 
 pub fn kind<I: Span>(input: I) -> Res<I, Kind> {
-    let (next, base) = kind_base(input.clone())?;
-    unwrap_block(
-        BlockKind::Nested(NestedBlockKind::Angle),
-        resolve_kind(base),
-    )(next)
+    let (next,lex)= kind_lex(input)?;
+
+    resolve_kind(lex)(next)
 }
 
 pub fn rec_kind<I: Span>(input: I) -> Res<I, I> {
@@ -5858,7 +5856,7 @@ pub fn kind_lex<I: Span>(input: I) -> Res<I, KindLex> {
 
 pub fn kind_parts<I: Span>(input: I) -> Res<I, KindParts> {
     tuple((
-        kind_base,
+        base_kind,
         opt(delimited(
             tag("<"),
             tuple((camel_case, opt(delimited(tag("<"), specific, tag(">"))))),
@@ -5889,8 +5887,14 @@ pub fn kind_parts<I: Span>(input: I) -> Res<I, KindParts> {
     })
 }
 
+
+
+
 pub fn delim_kind<I: Span>(input: I) -> Res<I, Kind> {
-    delimited(tag("<"), kind, tag(">"))(input)
+    unwrap_block(
+        BlockKind::Nested(NestedBlockKind::Angle),
+        kind
+    )(input)
 }
 
 pub fn delim_kind_lex<I: Span>(input: I) -> Res<I, KindLex> {
@@ -5929,7 +5933,7 @@ pub fn sub_kind_selector<I: Span>(input: I) -> Res<I, SubKindSelector> {
 
 
 
-pub fn kind_base<I: Span>(input: I) -> Res<I, BaseKind> {
+pub fn base_kind<I: Span>(input: I) -> Res<I, BaseKind> {
     let (next, kind) = context("kind-base", camel_case)(input.clone())?;
 
     match BaseKind::try_from(kind.clone()) {
@@ -5946,100 +5950,160 @@ pub fn kind_base<I: Span>(input: I) -> Res<I, BaseKind> {
 }
 
 
-pub fn resolve_kind<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Kind> {
+pub fn resolve_kind<I: Span>(lex: KindLex) -> impl FnMut(I) -> Res<I, Kind> {
+
     move |input: I| {
-        let (next, sub) = context("kind-sub", camel_case)(input.clone())?;
-        match base {
-            BaseKind::Database => match sub.as_str() {
-                "Relational" => {
-                    let (next, specific) =
-                        context("specific", delimited(tag("<"), specific, tag(">")))(next)?;
-                    Ok((next, Kind::Database(DatabaseSubKind::Relational(specific))))
-                }
-                _ => {
+        let s = new_span(lex.base.as_str());
+
+        let input2 = input.clone();
+        let base = match BaseKind::try_from(lex.base.clone()) {
+            Ok(base) => base,
+            Err(err) => {
+                let err = SpaceTree::from_error_kind(input2.clone(), ErrorKind::Fail);
+                Err(nom::Err::Error(SpaceTree::add_context(
+                    input2,
+                    ErrCtx::InvalidBaseKind(lex.base.to_string()),
+                    err,
+                )))?
+            }
+        };
+
+        match base{
+
+            BaseKind::Root => Ok((input, Kind::Root)),
+            BaseKind::Space => Ok((input, Kind::Space)),
+            BaseKind::Base => Ok((input, Kind::Base)),
+            BaseKind::User => Ok((input, Kind::User)),
+            BaseKind::App => Ok((input, Kind::App)),
+            BaseKind::Mechtron => Ok((input, Kind::Mechtron)),
+            BaseKind::FileStore => Ok((input, Kind::FileStore)),
+            BaseKind::BundleSeries => Ok((input, Kind::BundleSeries)),
+            BaseKind::Bundle => Ok((input, Kind::Bundle)),
+            BaseKind::Control => Ok((input, Kind::Control)),
+            BaseKind::Portal => Ok((input, Kind::Portal)),
+            BaseKind::Repo => Ok((input, Kind::Repo)),
+            BaseKind::Driver => Ok((input, Kind::Driver)),
+            BaseKind::Global => Ok((input, Kind::Global)),
+            BaseKind::Host => Ok((input, Kind::Host)),
+            BaseKind::Guest => Ok((input, Kind::Guest)),
+            _ => {
+                if lex.sub.is_none() {
                     let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
                     Err(nom::Err::Error(SpaceTree::add_context(
-                        input,
-                        ErrCtx::InvalidSubKind(BaseKind::Database, sub.to_string()),
+                        input.clone(),
+                        ErrCtx::InvalidSubKind(BaseKind::Database, "none".to_string()),
                         err,
-                    )))
+                    )))?;
                 }
-            },
-            BaseKind::UserBase => match sub.as_str() {
-                "OAuth" => {
-                    let (next, specific) =
-                        context("specific", delimited(tag("<"), specific, tag(">")))(next)?;
-                    Ok((next, Kind::UserBase(UserBaseSubKind::OAuth(specific))))
+                let sub = lex.sub.as_ref().unwrap().clone();
+                match base {
+                    BaseKind::Database => match sub.as_str() {
+                        "Relational" => {
+
+                            match lex.specific.as_ref() {
+                                Some(specific) => {
+                                    Ok((input,Kind::Database(DatabaseSubKind::Relational(specific.clone()))))
+                                }
+                                None => {
+                                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                                    Err(nom::Err::Error(SpaceTree::add_context(
+                                        input,
+                                        ErrCtx::InvalidSubKind(BaseKind::Database, sub.to_string()),
+                                        err,
+                                    )))
+                                }
+                            }
+                        }
+                        _ => {
+                            let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                            Err(nom::Err::Error(SpaceTree::add_context(
+                                input,
+                                ErrCtx::InvalidSubKind(BaseKind::Database, sub.to_string()),
+                                err,
+                            )))
+                        }
+                    },
+                    BaseKind::UserBase => match sub.as_str() {
+                        "OAuth" => {
+                            match lex.specific.as_ref() {
+                                Some(specific) => {
+                                    return Ok((input,Kind::UserBase(UserBaseSubKind::OAuth(specific.clone()))));
+                                }
+                                None => {
+                                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                                    Err(nom::Err::Error(SpaceTree::add_context(
+                                        input,
+                                        ErrCtx::InvalidSubKind(BaseKind::UserBase, sub.to_string()),
+                                        err,
+                                    )))?
+                                }
+                            }
+
+                        }
+                        _ => {
+                            let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                            Err(nom::Err::Error(SpaceTree::add_context(
+                                input,
+                                ErrCtx::InvalidSubKind(BaseKind::UserBase, sub.to_string()),
+                                err,
+                            )))
+                        }
+                    },
+                    BaseKind::Native => match NativeSub::from_str(sub.as_str()) {
+                        Ok(sub) => Ok((input, Kind::Native(sub))),
+                        Err(err) => {
+                            let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                            Err(nom::Err::Error(SpaceTree::add_context(
+                                input,
+                                ErrCtx::InvalidSubKind(BaseKind::Native, sub.to_string()),
+                                err,
+                            )))
+                        }
+                    },
+                    BaseKind::Artifact => match ArtifactSubKind::from_str(sub.as_str()) {
+                        Ok(sub) => Ok((input, Kind::Artifact(sub))),
+                        Err(err) => {
+                            let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                            Err(nom::Err::Error(SpaceTree::add_context(
+                                input,
+                                ErrCtx::InvalidSubKind(BaseKind::Artifact, sub.to_string()),
+                                err,
+                            )))
+                        }
+                    },
+                    BaseKind::Star => match StarSub::from_str(sub.as_str()) {
+                        Ok(sub) => Ok((input, Kind::Star(sub))),
+                        Err(err) => {
+                            let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                            Err(nom::Err::Error(SpaceTree::add_context(
+                                input,
+                                ErrCtx::InvalidSubKind(BaseKind::Star, sub.to_string()),
+                                err,
+                            )))
+                        }
+                    },
+                    BaseKind::File => match FileSubKind::from_str(sub.as_str()) {
+                        Ok(sub) => Ok((input, Kind::File(sub))),
+                        Err(err) => {
+                            let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                            Err(nom::Err::Error(SpaceTree::add_context(
+                                input,
+                                ErrCtx::InvalidSubKind(BaseKind::File, sub.to_string()),
+                                err,
+                            )))
+                        }
+                    },
+
+                    _ => {
+                        let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
+                        Err(nom::Err::Error(SpaceTree::add_context(
+                            input,
+                            ErrCtx::InvalidSubKind(BaseKind::File, sub.to_string()),
+                            err,
+                        )))
+                    }
                 }
-                _ => {
-                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(SpaceTree::add_context(
-                        input,
-                        ErrCtx::InvalidSubKind(BaseKind::UserBase, sub.to_string()),
-                        err,
-                    )))
-                }
-            },
-            BaseKind::Native => match NativeSub::from_str(sub.as_str()) {
-                Ok(sub) => Ok((next, Kind::Native(sub))),
-                Err(err) => {
-                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(SpaceTree::add_context(
-                        input,
-                        ErrCtx::InvalidSubKind(BaseKind::Native, sub.to_string()),
-                        err,
-                    )))
-                }
-            },
-            BaseKind::Artifact => match ArtifactSubKind::from_str(sub.as_str()) {
-                Ok(sub) => Ok((next, Kind::Artifact(sub))),
-                Err(err) => {
-                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(SpaceTree::add_context(
-                        input,
-                        ErrCtx::InvalidSubKind(BaseKind::Artifact, sub.to_string()),
-                        err,
-                    )))
-                }
-            },
-            BaseKind::Star => match StarSub::from_str(sub.as_str()) {
-                Ok(sub) => Ok((next, Kind::Star(sub))),
-                Err(err) => {
-                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(SpaceTree::add_context(
-                        input,
-                        ErrCtx::InvalidSubKind(BaseKind::Star, sub.to_string()),
-                        err,
-                    )))
-                }
-            },
-            BaseKind::File => match FileSubKind::from_str(sub.as_str()) {
-                Ok(sub) => Ok((next, Kind::File(sub))),
-                Err(err) => {
-                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(SpaceTree::add_context(
-                        input,
-                        ErrCtx::InvalidSubKind(BaseKind::File, sub.to_string()),
-                        err,
-                    )))
-                }
-            },
-            BaseKind::Root => Ok((next, Kind::Root)),
-            BaseKind::Space => Ok((next, Kind::Space)),
-            BaseKind::Base => Ok((next, Kind::Base)),
-            BaseKind::User => Ok((next, Kind::User)),
-            BaseKind::App => Ok((next, Kind::App)),
-            BaseKind::Mechtron => Ok((next, Kind::Mechtron)),
-            BaseKind::FileStore => Ok((next, Kind::FileStore)),
-            BaseKind::BundleSeries => Ok((next, Kind::BundleSeries)),
-            BaseKind::Bundle => Ok((next, Kind::Bundle)),
-            BaseKind::Control => Ok((next, Kind::Control)),
-            BaseKind::Portal => Ok((next, Kind::Portal)),
-            BaseKind::Repo => Ok((next, Kind::Repo)),
-            BaseKind::Driver => Ok((next, Kind::Driver)),
-            BaseKind::Global => Ok((next, Kind::Global)),
-            BaseKind::Host => Ok((next, Kind::Host)),
-            BaseKind::Guest => Ok((next, Kind::Guest)),
+            }
         }
     }
 }
@@ -6140,7 +6204,7 @@ pub fn resolve_sub<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Sub> {
 }
 
 pub fn kind_base_selector<I: Span>(input: I) -> Res<I, KindBaseSelector> {
-    value_pattern(kind_base)(input).map( |(next,pattern)| {
+    value_pattern(base_kind)(input).map( |(next,pattern)| {
         (next,
         match pattern {
             ValuePattern::Always => KindBaseSelector::Always,
