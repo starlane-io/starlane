@@ -1,5 +1,6 @@
 use core::str::FromStr;
 use std::collections::HashMap;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use crate::Agent;
@@ -7,7 +8,8 @@ use regex::Regex;
 use serde;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-
+use tokio::io::{AsyncWriteExt, BufWriter};
+use tokio::pin;
 use crate::space::err::SpaceErr;
 use crate::space::loc::{Layer, ToPoint, ToSurface, Uuid};
 use crate::space::parse::CamelCase;
@@ -1213,5 +1215,80 @@ impl TrackDef<String> {
             stop: Regex::from_str(self.stop.as_str())?,
             action: Regex::from_str(self.action.as_str())?,
         })
+    }
+}
+
+
+
+
+pub struct FileAppender(tokio::sync::mpsc::Sender<Log>);
+
+impl FileAppender {
+    pub fn new<A>(file:A) -> Self where A: AsyncWriteExt+Sync+Send+'static {
+        FileAppender(InnerFileAppender::new(file))
+    }
+}
+
+impl LogAppender for FileAppender {
+    fn log(&self, log: Log) {
+        let action = match &log.action {
+            None => "None".to_string(),
+            Some(action) => action.to_string(),
+        };
+        self.0.try_send(log).unwrap();
+
+    }
+
+    fn audit(&self, log: AuditLog) {
+        println!("audit log...")
+    }
+
+    fn span_event(&self, log: LogSpanEvent) {
+        /*         println!(
+                   "{} | Span({})",
+                   log.point.to_string(),
+                   log.span.to_string(),
+               )
+
+        */
+    }
+
+    fn pointless(&self, log: PointlessLog) {
+        println!("{}", log.message);
+    }
+}
+
+
+
+struct InnerFileAppender<F> where F: AsyncWriteExt  {
+    rx: tokio::sync::mpsc::Receiver<Log>,
+    file: Pin<Box<F>>
+}
+
+impl<F> InnerFileAppender<F> where F: AsyncWriteExt+ Sync+Send+'static{
+
+    fn new(file: F) -> tokio::sync::mpsc::Sender<Log> {
+        let file = Box::pin(file);
+        let (tx, rx) = tokio::sync::mpsc::channel(1024);
+
+
+       let appender =  Self {
+            rx,
+            file
+        };
+
+        appender.start();
+
+        tx
+    }
+
+    fn start(mut self) {
+        tokio::spawn( async move {
+            while let Some(log) = self.rx.recv().await {
+                let log = format!("{} | {}", log.point.to_string(), log.payload.to_string());
+                self.file.write_all(log.as_bytes()).await.unwrap_or_default();
+                self.file.flush().await.unwrap_or_default();
+            }
+        });
     }
 }

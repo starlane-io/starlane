@@ -64,6 +64,7 @@ use std::io::{Read, Seek, Write};
 use std::ops::{Add, Mul};
 use std::path::{Path, PathBuf};
 use std::process;
+use std::process::Stdio;
 use std::str::FromStr;
 use std::time::Duration;
 use colored::{Colorize, CustomColor};
@@ -76,7 +77,6 @@ use tokio::runtime::Builder;
 use zip::write::FileOptions;
 use starlane_space::space::util::log;
 use crate::env::STARLANE_HOME;
-use crate::hyperspace::starlane_timestamp;
 
 #[cfg(feature = "server")]
 async fn config() -> StarlaneConfig {
@@ -138,6 +138,10 @@ pub fn init() {
 pub fn main() -> Result<(), anyhow::Error> {
     ctrlc::set_handler(move || process::exit(1)).unwrap();
 
+
+    let file = File::create("out.txt").unwrap();
+    let stdio = Stdio::from(file);
+
     init();
 
     let cli = Cli::parse();
@@ -173,9 +177,11 @@ fn run() -> Result<(), anyhow::Error> {
 fn run() -> Result<(), anyhow::Error> {
     match to_art("*STARLANE*".to_string(), "default", 0, 0, 0) {
         Ok(string) => {
-            let begin = (0xEE, 0xAA, 0x5A);
+            let begin= (0xFF, 0xFF, 0xFF);
+            let end= (0xEE, 0xAA, 0x5A);
+            let end= (0x6D, 0xD7, 0xFD);
+
             //let begin = (0x00, 0x00, 0x00);
-            let end = (0xFF, 0xFF, 0xFF);
             // this is bad code however I couldn't find out how to get lines().len() withou
             // giving up ownership (therefor the clone)
             let size = string.clone().lines().count();
