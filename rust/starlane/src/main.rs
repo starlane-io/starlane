@@ -188,13 +188,6 @@ Timestamp { millis: Utc::now().timestamp_millis() }
 }
 
 */
-
-#[cfg(test)]
-pub mod test {
-    #[test]
-    pub fn test() {}
-}
-
 /*
 #[cfg(feature = "cli")]
 async fn cli() -> Result<(), SpaceErr> {

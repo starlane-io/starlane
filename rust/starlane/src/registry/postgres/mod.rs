@@ -41,12 +41,14 @@ use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
+use serde::{Deserialize, Serialize};
+use crate::Database;
 use crate::env::{STARLANE_REGISTRY_DATABASE, STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_SCHEMA, STARLANE_REGISTRY_URL, STARLANE_REGISTRY_USER};
 use crate::hyperspace::reg::{Registration, RegistryApi};
 
 pub trait PostgresPlatform: Send + Sync {
-    fn lookup_registry_db(&self) -> Result<PostgresDbInfo, RegErr>;
-    fn lookup_star_db(&self, star: &StarKey) -> Result<PostgresDbInfo, RegErr>;
+    fn lookup_registry_db(&self) -> Result<Database<PostgresConnectInfo>, RegErr>;
+    fn lookup_star_db(&self, star: &StarKey) -> Result<Database<PostgresConnectInfo>, RegErr>;
 }
 
 pub struct PostgresRegistry {
@@ -1313,7 +1315,7 @@ pub struct PostgresRegistryContextHandle {
 }
 
 impl PostgresRegistryContextHandle {
-    pub fn new(db: &PostgresDbInfo, pool: Arc<PostgresRegistryContext>) -> Self {
+    pub fn new(db: &Database<PostgresConnectInfo>, pool: Arc<PostgresRegistryContext>) -> Self {
         Self {
             key: db.to_key(),
             schema: db.schema.clone(),
@@ -1337,7 +1339,7 @@ pub struct PostgresRegistryContext {
 
 impl PostgresRegistryContext {
     pub async fn new(
-        dbs: HashSet<PostgresDbInfo>,
+        dbs: HashSet<Database<PostgresConnectInfo>>,
         platform: Box<dyn PostgresPlatform>,
     ) -> Result<Self, RegErr> {
         let mut pools = HashMap::new();
@@ -1395,74 +1397,40 @@ impl ToString for &PostgresDbKey {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Hash)]
-pub struct PostgresDbInfo {
+#[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct PostgresConnectInfo {
     pub url: String,
     pub user: String,
     pub password: String,
-    pub database: String,
-    pub schema: String,
+
 }
 
-impl Default for PostgresDbInfo {
+impl Default for PostgresConnectInfo {
     fn default() -> Self {
-        PostgresDbInfo {
+        PostgresConnectInfo {
             url: STARLANE_REGISTRY_URL.to_string(),
             user: STARLANE_REGISTRY_USER.to_string(),
             password: STARLANE_REGISTRY_PASSWORD.to_string(),
-            database: STARLANE_REGISTRY_DATABASE.to_string(),
-            schema: STARLANE_REGISTRY_SCHEMA.to_string()
+
         }
     }
 }
 
-impl PostgresDbInfo {
-    pub fn new<Url, User, Pass, Db>(url: Url, user: User, password: Pass, database: Db) -> Self
+impl PostgresConnectInfo {
+    pub fn new<Url, User, Pass>(url: Url, user: User, password: Pass) -> Self
     where
         Url: ToString,
         User: ToString,
         Pass: ToString,
-        Db: ToString,
     {
-        Self::new_with_schema(
-            url.to_string(),
-            user.to_string(),
-            password.to_string(),
-            database.to_string(),
-            "PUBLIC".to_string(),
-        )
-    }
-
-    pub fn new_with_schema(
-        url: String,
-        user: String,
-        password: String,
-        database: String,
-        schema: String,
-    ) -> Self {
         Self {
-            url,
-            user,
-            password,
-            database,
-            schema,
+            url: url.to_string(),
+            user: user.to_string(),
+            password: password.to_string(),
         }
     }
 
-    pub fn to_key(&self) -> PostgresDbKey {
-        PostgresDbKey {
-            url: self.url.clone(),
-            user: self.user.clone(),
-            database: self.database.clone(),
-        }
-    }
 
-    pub fn to_uri(&self) -> String {
-        format!(
-            "postgres://{}:{}@{}/{}",
-            self.user, self.password, self.url, self.database
-        )
-    }
 }
 
 #[cfg(test)]
@@ -1481,7 +1449,7 @@ pub mod test {
     use crate::hyperspace::reg::{Registration, Registry};
     use crate::registry::err::RegErr;
     use crate::registry::postgres::{
-        PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
+        PostgresConnectInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
         PostgresRegistryContextHandle,
     };
     use crate::StarlanePostgres;

@@ -1,11 +1,19 @@
 #[cfg(feature = "postgres")]
-use crate::registry::postgres::{
-    PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
-    PostgresRegistryContextHandle
+use crate::env::{
+    STARLANE_REGISTRY_DATABASE, STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_URL,
+    STARLANE_REGISTRY_USER,
 };
 #[cfg(feature = "postgres")]
-use crate::env::{STARLANE_REGISTRY_USER,STARLANE_REGISTRY_PASSWORD,STARLANE_REGISTRY_URL,STARLANE_REGISTRY_DATABASE};
+use crate::registry::postgres::{
+    PostgresConnectInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
+    PostgresRegistryContextHandle,
+};
 
+use crate::driver::base::BaseDriverFactory;
+use crate::driver::control::ControlDriverFactory;
+use crate::driver::root::RootDriverFactory;
+use crate::driver::space::SpaceDriverFactory;
+use crate::driver::{DriverAvail, DriversBuilder};
 use starlane::space::artifact::asynch::Artifacts;
 use starlane::space::kind::StarSub;
 use starlane::space::loc::{MachineName, StarKey};
@@ -15,35 +23,33 @@ use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
-use crate::driver::base::BaseDriverFactory;
-use crate::driver::{DriverAvail, DriversBuilder};
-use crate::driver::control::ControlDriverFactory;
-use crate::driver::root::RootDriverFactory;
-use crate::driver::space::SpaceDriverFactory;
 
-use crate::env::{STARLANE_CONTROL_PORT, STARLANE_DATA_DIR,};
-use crate::err::HypErr;
-use crate::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
-use crate::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
-use crate::hyperspace::machine::MachineTemplate;
-use crate::platform::Platform;
-use crate::hyperspace::reg::{Registry, RegistryWrapper};
-use std::collections::{HashMap, HashSet};
-use serde::{Deserialize, Serialize};
 use crate::driver::star::Star;
-use crate::registry::mem::registry::{MemoryRegistry, MemoryRegistryCtx};
+use crate::env::{STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_REGISTRY_SCHEMA};
+use crate::err::HypErr;
+use crate::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
+use crate::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
+use crate::hyperspace::machine::MachineTemplate;
+use crate::hyperspace::reg::{Registry, RegistryWrapper};
+use crate::platform::Platform;
 use crate::registry::err::RegErr;
+use crate::registry::mem::registry::{MemoryRegistry, MemoryRegistryCtx};
 use crate::registry::postgres::embed::PgEmbedSettings;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::ops::Deref;
+use crate::registry::postgres::PostgresDbKey;
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {
-   pub registry: RegistryConfig
+    pub registry: PgRegistryConfig,
 }
 
 impl Default for StarlaneConfig {
     fn default() -> StarlaneConfig {
         Self {
-            registry: RegistryConfig::default()
+            registry: PgRegistryConfig::default(),
         }
     }
 }
@@ -54,54 +60,160 @@ pub struct Starlane {
     registry: Registry,
 }
 
-#[derive(Clone,Serialize,Deserialize)]
 pub enum RegistryConfig {
     #[cfg(feature = "postgres")]
-    PostgresEmbedded(PgEmbedSettings),
-    #[cfg(feature = "postgres")]
-    Postgres(PostgresDbInfo)
+    Postgres(PgRegistryConfig),
+}
+#[cfg(feature = "postgres")]
+#[derive(Clone, Serialize, Deserialize)]
+pub enum PgRegistryConfig {
+    Embedded(Database<PgEmbedSettings>),
+    External(Database<PostgresConnectInfo>),
 }
 
-impl Default for RegistryConfig {
+#[cfg(feature = "postgres")]
+impl Default for PgRegistryConfig {
     fn default() -> Self {
-        Self::PostgresEmbedded(PostgresDbInfo::default())
+        let database = Database::new(
+            STARLANE_REGISTRY_DATABASE.to_string(),
+            STARLANE_REGISTRY_SCHEMA.to_string(),
+            PgEmbedSettings::default(),
+        );
+        Self::Embedded(database)
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize,Eq,PartialEq,Hash)]
+pub struct Database<S> {
+    pub database: String,
+    pub schema: String,
+    pub settings: S,
+}
+
+impl<Info> Database<Info> {
+    pub fn new<D, S>(database: D, schema: S, settings: Info) -> Database<Info>
+    where
+        D: ToString,
+        S: ToString,
+    {
+        let database = database.to_string();
+        let schema = schema.to_string();
+        Database {
+            database,
+            settings,
+            schema,
+        }
+    }
+}
+
+impl Database<PostgresConnectInfo> {
+    pub fn from_con<D, S>(
+        database: D,
+        schema: S,
+        info: PostgresConnectInfo,
+    ) -> Database<PostgresConnectInfo>
+    where
+        D: ToString,
+        S: ToString,
+    {
+        Database::new(database, schema, info)
+    }
+
+    pub fn to_key(&self) -> PostgresDbKey {
+        PostgresDbKey {
+            url: self.url.clone(),
+            user: self.user.clone(),
+            database: self.database.clone(),
+        }
+    }
+
+
+
+    pub fn to_uri(&self) -> String {
+        format!(
+            "postgres://{}:{}@{}/{}",
+            self.user, self.password, self.url, self.database
+        )
+    }
+
+}
+
+impl Database<PgEmbedSettings> {
+    pub fn from_embed<D, S>(
+        database: D,
+        schema: S,
+        settings: PgEmbedSettings,
+    ) -> Database<PgEmbedSettings>
+    where
+        D: ToString,
+        S: ToString,
+    {
+        Self::new(database, schema, settings)
+    }
+
+
+    pub fn to_key(&self) -> PostgresDbKey {
+        PostgresDbKey {
+            url: "localhost".to_string(),
+            user: self.settings.user.clone(),
+            database: self.database.clone(),
+        }
+    }
+
+    pub fn to_uri(&self) -> String {
+        format!(
+            "postgres://{}:{}@localhost/{}",
+            self.user, self.password, self.database
+        )
+    }
+
+}
+
+impl<S> Deref for Database<S> {
+    type Target = S;
+
+    fn deref(&self) -> &Self::Target {
+        &self.settings
     }
 }
 
 impl Starlane {
-    pub async fn new(kind: RegistryConfig) -> Result<Starlane, HypErr> {
-
+    pub async fn new(kind: PgRegistryConfig) -> Result<Starlane, HypErr> {
         let artifacts = Artifacts::just_builtins();
-        let registry = match kind{
-            RegistryConfig::PgEmbedded=> {
-                    Arc::new(RegistryWrapper::new(Arc::new(
-                        MemoryRegistry::new(),
-                    )))
+        let registry = match kind {
+            PgRegistryConfig::Embedded(database) => {
+                Arc::new(RegistryWrapper::new(Arc::new(MemoryRegistry::new())))
             }
             #[cfg(feature = "postgres")]
-            RegistryConfig::Postgres=> {
-                    let lookup = PostgresLookups::new();
-                    let db = lookup.lookup_registry_db()?;
-                    let mut set = HashSet::new();
-                    set.insert(db.clone());
-                    let ctx = Arc::new(PostgresRegistryContext::new(set,Box::new(lookup)).await?);
-                    let handle = PostgresRegistryContextHandle::new(&db, ctx);
-                    let postgres_lookups = PostgresLookups::new();
+            PgRegistryConfig::External(database) => {
+                let lookup = PostgresLookups::new();
+                let db = lookup.lookup_registry_db()?;
+                let mut set = HashSet::new();
+                set.insert(db.clone());
+                let ctx = Arc::new(PostgresRegistryContext::new(set, Box::new(lookup)).await?);
+                let handle = PostgresRegistryContextHandle::new(&db, ctx);
+                let postgres_lookups = PostgresLookups::new();
 
-                    let logger = RootLogger::default();
-                    let logger = logger.point(Point::global_registry());
-                    Arc::new(RegistryWrapper::new(Arc::new(
-                        PostgresRegistry::new(handle, Box::new(postgres_lookups), logger).await?,
-                    )))
+                let logger = RootLogger::default();
+                let logger = logger.point(Point::global_registry());
+                Arc::new(RegistryWrapper::new(Arc::new(
+                    PostgresRegistry::new(handle, Box::new(postgres_lookups), logger).await?,
+                )))
             }
         };
 
-        Ok(Self { registry, artifacts})
+        Ok(Self {
+            registry,
+            artifacts,
+        })
     }
 }
 
 #[async_trait]
-impl Platform for Starlane where Self: Sync+Send+Sized{
+impl Platform for Starlane
+where
+    Self: Sync + Send + Sized,
+{
     type Err = HypErr;
 
     type StarAuth = AnonHyperAuthenticator;
@@ -218,8 +330,6 @@ impl Platform for Starlane where Self: Sync+Send+Sized{
     }
 }
 
-
-
 #[cfg(feature = "postgres")]
 #[derive(Clone)]
 pub struct PostgresLookups;
@@ -231,7 +341,6 @@ impl PostgresLookups {
     }
 }
 
-
 #[cfg(feature = "postgres")]
 impl Default for PostgresLookups {
     fn default() -> Self {
@@ -241,22 +350,27 @@ impl Default for PostgresLookups {
 
 #[cfg(feature = "postgres")]
 impl PostgresPlatform for PostgresLookups {
-    fn lookup_registry_db(&self) -> Result<PostgresDbInfo, RegErr> {
-        Ok(PostgresDbInfo::new(
-            STARLANE_REGISTRY_URL.to_string(),
-            STARLANE_REGISTRY_USER.to_string(),
-            STARLANE_REGISTRY_PASSWORD.to_string(),
+    fn lookup_registry_db(&self) -> Result<Database<PostgresConnectInfo>, RegErr> {
+        Ok(Database::from_con(
             STARLANE_REGISTRY_DATABASE.to_string(),
+            "public".to_string(),
+            PostgresConnectInfo::new(
+                STARLANE_REGISTRY_URL.to_string(),
+                STARLANE_REGISTRY_USER.to_string(),
+                STARLANE_REGISTRY_PASSWORD.to_string(),
+            ),
         ))
     }
 
-    fn lookup_star_db(&self, star: &StarKey) -> Result<PostgresDbInfo, RegErr> {
-        Ok(PostgresDbInfo::new_with_schema(
-            STARLANE_REGISTRY_URL.to_string(),
-            STARLANE_REGISTRY_USER.to_string(),
-            STARLANE_REGISTRY_PASSWORD.to_string(),
+    fn lookup_star_db(&self, star: &StarKey) -> Result<Database<PostgresConnectInfo>, RegErr> {
+        Ok(Database::from_con(
             STARLANE_REGISTRY_DATABASE.to_string(),
             star.to_sql_name(),
+            PostgresConnectInfo::new(
+                STARLANE_REGISTRY_URL.to_string(),
+                STARLANE_REGISTRY_USER.to_string(),
+                STARLANE_REGISTRY_PASSWORD.to_string(),
+            ),
         ))
     }
 }

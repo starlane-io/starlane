@@ -6,7 +6,6 @@ use starlane::space::point::Point;
 use std::sync::Arc;
 use pg_embed::pg_errors::PgEmbedError;
 use thiserror::Error;
-use crate::registry::err::RegErr::PgEmbedError;
 
 #[derive(Error, Debug, Clone)]
 pub enum RegErr {
