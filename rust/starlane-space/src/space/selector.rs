@@ -201,13 +201,16 @@ impl ValueMatcher<Option<SubKind>> for SubKindSelector {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct SelectorDef<Hop> {
+    /// this is a temporary hack which will hopefully not be necessary when types 2.0 become available
+    pub(crate) always: bool,
     pub hops: Vec<Hop>,
 }
 
 impl PointSelector {
     pub fn always() -> Self {
         Self {
-            hops: vec![PointSegKindHop::always()],
+            always: true,
+            hops: vec![],
         }
     }
 }
@@ -295,6 +298,10 @@ impl FromStr for SelectorDef<PointSegKindHop> {
 
 impl ValueMatcher<Point> for Selector {
     fn is_match(&self, point: &Point) -> Result<(), ()> {
+        if self.always {
+            return Ok(());
+        }
+
         match self.matches_found(point) {
             true => Ok(()),
             false => Err(()),
@@ -309,7 +316,7 @@ impl Selector {
         } else {
             let mut hops = self.hops.clone();
             hops.remove(0);
-            Option::Some(Selector { hops })
+            Option::Some(Selector { hops, always:false })
         }
     }
 
@@ -1347,4 +1354,27 @@ impl ToResolved<PayloadBlock> for PayloadBlockVar {
         let block: PayloadBlockCtx = self.to_resolved(env)?;
         block.to_resolved(env)
     }
+}
+
+
+#[cfg(test)]
+mod test {
+    use crate::space::kind::BaseKind;
+    use crate::space::selector::{PointKindSeg, PointSegKindHop, PointSelector};
+    use crate::space::util::ValueMatcher;
+
+    #[test]
+    pub fn test() {
+        let selector = PointSelector::always();
+        let point = BaseKind::Driver.bind();
+        assert!( selector.is_match(&point).is_ok())
+    }
+
+    #[test]
+    pub fn segment() {
+        let selector = PointSegKindHop::always();
+        let point = BaseKind::Driver.bind();
+        assert!(selector.is_match(point.segments.first().unwrap()).is_ok());
+    }
+
 }

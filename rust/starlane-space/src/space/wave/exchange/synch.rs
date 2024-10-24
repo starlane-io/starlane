@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use crate::space::loc::ToPoint;
 use crate::space::wave::core::cmd::CmdMethod;
 use crate::space::wave::core::CoreBounce;
@@ -11,7 +12,6 @@ use crate::space::wave::{
     Scope, Wave, WaveVariantDef,
 };
 use crate::{Agent, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
-use alloc::borrow::Cow;
 use std::sync::Arc;
 
 pub trait ExchangeRouter: Send + Sync {

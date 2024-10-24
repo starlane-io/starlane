@@ -1,7 +1,7 @@
 pub mod asynch;
 pub mod synch;
 
-use alloc::borrow::Cow;
+use std::borrow::Cow;
 use std::ops::Deref;
 
 use asynch::{

@@ -12,7 +12,6 @@ use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
-use tokio_print::aprintln;
 use crate::driver::base::BaseDriverFactory;
 use crate::driver::{DriverAvail, DriversBuilder};
 use crate::driver::artifact::RepoDriverFactory;
@@ -37,10 +36,8 @@ pub struct Starlane {
 
 impl Starlane {
     pub async fn new() -> Result<Starlane, HypErr> {
-aprintln!("Starlane::new()");
         #[cfg(feature = "postgres")]
         {
-aprintln!("postgres!!!");
             let lookup = StarlanePostgres::new();
             let db = lookup.lookup_registry_db()?;
             let mut set = HashSet::new();
@@ -49,7 +46,6 @@ aprintln!("postgres!!!");
             let handle = PostgresRegistryContextHandle::new(&db, ctx);
             let artifacts = Artifacts::just_builtins();
             let registry_platform = StarlanePostgres::new();
-aprintln!("returning postgres handle");
             Ok(Self { handle, artifacts, registry_platform })
         }
         #[cfg(not(feature = "postgres"))]
@@ -128,8 +124,7 @@ impl Platform for Starlane where Self: Sync+Send+Sized{
                 */
             }
             StarSub::Scribe => {
-                builder.add_post(Arc::new(RepoDriverFactory::new()));
-                /*
+                /*builder.add_post(Arc::new(RepoDriverFactory::new()));
                 builder.add_post(Arc::new(BundleSeriesDriverFactory::new()));
                 builder.add_post(Arc::new(BundleDriverFactory::new()));
                 builder.add_post(Arc::new(ArtifactDriverFactory::new()));
@@ -152,7 +147,6 @@ impl Platform for Starlane where Self: Sync+Send+Sized{
     async fn global_registry(&self) -> Result<Registry, Self::Err> {
         let logger = RootLogger::default();
         let logger = logger.point(Point::global_registry());
-aprintln!("Creating Global Registry...");
         Ok(Arc::new(RegistryWrapper::new(Arc::new(
             PostgresRegistry::new(self.handle.clone(), Box::new(self.registry_platform.clone()), logger).await?,
         ))))

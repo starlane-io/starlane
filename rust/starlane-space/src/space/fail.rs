@@ -1,9 +1,9 @@
-use alloc::string::String;
+
 
 use serde::{Deserialize, Serialize};
 
 pub mod mesh {
-    use alloc::string::String;
+
 
     use serde::{Deserialize, Serialize};
 
@@ -14,7 +14,7 @@ pub mod mesh {
 }
 
 pub mod portal {
-    use alloc::string::String;
+
 
     use serde::{Deserialize, Serialize};
 
@@ -30,7 +30,7 @@ pub mod portal {
 }
 
 pub mod http {
-    use alloc::string::String;
+
 
     use serde::{Deserialize, Serialize};
 
@@ -41,7 +41,7 @@ pub mod http {
 }
 
 pub mod resource {
-    use alloc::string::String;
+
 
     use serde::{Deserialize, Serialize};
 
@@ -80,7 +80,7 @@ pub mod resource {
 }
 
 pub mod ext {
-    use alloc::string::String;
+
 
     use serde::{Deserialize, Serialize};
 
