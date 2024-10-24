@@ -7,7 +7,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 use atty::Stream;
 use colored::Colorize;
-use rolling_file::{BasicRollingFileAppender, RollingConditionBasic};
 use uuid::Uuid;
 use starlane::space::err::SpaceErr;
 use starlane::space::log::{FileAppender, LogAppender, RootLogger, StdOutAppender};

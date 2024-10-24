@@ -127,7 +127,7 @@ text-to-ascii-art = { workspace = true}
 colored = {workspace = true}
 lerp = { workspace = true, features=["derive"] }
 atty ={workspace = true}
-rolling-file = {workspace = true}
+#rolling-file = {workspace = true}
 
 [lib]
 name = "starlane"

@@ -76,6 +76,7 @@ use tokio::{fs, signal};
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
 use zip::write::FileOptions;
+use starlane_primitive_macros::ToBase;
 use starlane_space::space::util::log;
 use crate::env::STARLANE_HOME;
 
@@ -173,38 +174,10 @@ fn run() -> Result<(), anyhow::Error> {
 
 #[cfg(feature = "server")]
 fn run() -> Result<(), anyhow::Error> {
-    match to_art("*STARLANE*".to_string(), "default", 0, 0, 0) {
-        Ok(string) => {
-            let begin= (0xFF, 0xFF, 0xFF);
-            let end= (0xEE, 0xAA, 0x5A);
-            let end= (0x6D, 0xD7, 0xFD);
 
-            //let begin = (0x00, 0x00, 0x00);
-            // this is bad code however I couldn't find out how to get lines().len() withou
-            // giving up ownership (therefor the clone)
-            let size = string.clone().lines().count();
-            let mut index = 0;
-            for line in  string.lines(){
-                let progress =  index as f32 / size as f32;
-                //let color = begin.clone().lerp(end.clone(), progress);
-                //let color= color.custom();
-                let r = (begin.0 as f32).lerp(end.0 as f32, progress) as u8;
-                let g = (begin.1 as f32).lerp(end.1 as f32, progress) as u8;
-                let b = (begin.2 as f32).lerp(end.2 as f32, progress) as u8;
-                println!("{}", line.truecolor(r, g, b));
-                index = index + 1;
-            }
-
-//            println!("{}", string.truecolor(0xEE, 0xAA, 0x5A));
-        }
-        Err(err) =>  {
-            eprintln!("err! {}", err.to_string());
-        }
-    }
     let spinner = cliclack::spinner();
 
-
-    spinner.start("Starlane starting...");
+    spinner.start("starting...");
 
 
     let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -387,4 +360,41 @@ impl Color {
 
 
 
+fn splash( ) {
+    match to_art("*STARLANE*".to_string(), "default", 0, 0, 0) {
+        Ok(string) => {
+            let begin= (0xFF, 0xFF, 0xFF);
+            let end= (0xEE, 0xAA, 0x5A);
+            let end= (0x6D, 0xD7, 0xFD);
 
+            //let begin = (0x00, 0x00, 0x00);
+            // this is bad code however I couldn't find out how to get lines().len() withou
+            // giving up ownership (therefor the clone)
+            let size = string.clone().lines().count();
+            let mut index = 0;
+            for line in  string.lines(){
+                let progress =  index as f32 / size as f32;
+                //let color = begin.clone().lerp(end.clone(), progress);
+                //let color= color.custom();
+                let r = (begin.0 as f32).lerp(end.0 as f32, progress) as u8;
+                let g = (begin.1 as f32).lerp(end.1 as f32, progress) as u8;
+                let b = (begin.2 as f32).lerp(end.2 as f32, progress) as u8;
+                println!("{}", line.truecolor(r, g, b));
+                index = index + 1;
+            }
+
+            //            println!("{}", string.truecolor(0xEE, 0xAA, 0x5A));
+        }
+        Err(err) =>  {
+            eprintln!("err! {}", err.to_string());
+        }
+    }
+}
+
+
+
+
+#[derive(ToBase)]
+pub enum StartSequence{
+    Init(String)
+}
