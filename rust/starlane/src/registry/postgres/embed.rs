@@ -2,37 +2,44 @@ use std::path::PathBuf;
 use std::time::Duration;
 use derive_builder::Builder;
 use pg_embed::pg_enums::PgAuthMethod;
-use pg_embed::postgres::PgSettings;
+use pg_embed::pg_fetch::{PgFetchSettings, PG_V13};
+use pg_embed::postgres::{PgEmbed, PgSettings};
 use serde::{Deserialize, Serialize};
 use crate::env::{STARLANE_DATA_DIR, STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_USER};
-use crate::StarlaneConfig;
+use crate::{RegistryConfig, StarlaneConfig};
+use crate::registry::err::RegErr;
 
 pub struct Postgres {
 
 }
 
 impl Postgres {
-    pub async fn new(config: StarlaneConfig) -> Self {
-        let pg_settings = PgSettings{
-            // Where to store the postgresql database
-            database_dir: PathBuf::from("data/db"),
-            port: 5432,
-            user: "postgres".to_string(),
-            password: "password".to_string(),
-            // authentication method
-            auth_method: PgAuthMethod::Plain,
-            // If persistent is false clean up files and directories on drop, otherwise keep them
-            persistent: false,
-            // duration to wait before terminating process execution
-            // pg_ctl start/stop and initdb timeout
-            // if set to None the process will not be terminated
-            timeout: Some(Duration::from_secs(15)),
-            // If migration sql scripts need to be run, the directory containing those scripts can be
-            // specified here with `Some(PathBuf(path_to_dir)), otherwise `None` to run no migrations.
-            // To enable migrations view the **Usage** section for details
-            migration_dir: None,
+    pub async fn new(config: PgEmbedSettings) -> Result<Self,RegErr> {
+        let pg_settings: PgSettings = config.into();
+        let fetch_settings = PgFetchSettings{
+            version: PG_V13,
+            ..Default::default()
         };
+
+        let mut pg = PgEmbed::new(pg_settings, fetch_settings).await?;
+
+        // Download, unpack, create password file and database cluster
+        pg.setup().await;
+
+        // start postgresql database
+        pg.start_db().await;
+
+        // create a new database
+        // to enable migrations view the [Usage] section for details
+        if pg.database_exists(config.d)
+        pg.create_database("database_name").await;
+
+
+
     }
+
+
+
 }
 
 
