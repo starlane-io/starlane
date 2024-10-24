@@ -48,7 +48,6 @@ starlane-space = { workspace = true  }
 starlane-macros = { workspace = true  }
 starlane-primitive-macros = { workspace = true}
 thiserror = { workspace = true}
-tokio_print= {  workspace=true  }
 lazy_static = {  workspace=true  }
 uuid = { workspace=true, features=["v4"] }
 chrono = { workspace=true, features=["serde"] }

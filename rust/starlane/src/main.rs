@@ -74,7 +74,6 @@ use std::time::Duration;
 use once_cell::sync::Lazy;
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
-use tokio_print::aprintln;
 use zip::write::FileOptions;
 use crate::platform::Platform;
 
@@ -131,16 +130,12 @@ println!("launching tokio");
         .enable_all()
         .build()?;
     runtime.block_on(async move {
-aprintln!("block on");
         let starlane = Starlane::new().await.unwrap();
-aprintln!("got starlane...");
         let machine_api = starlane.machine();
-aprintln!("got machine api...");
 
-        let result = tokio::time::timeout(Duration::from_secs(30), machine_api.await.unwrap().await_termination())
+        let api = tokio::time::timeout(Duration::from_secs(30), machine_api)
             .await
             .unwrap().unwrap();
-        aprintln!("> STARLANE Ready!");
         // this is a dirty hack which is good enough for a 0.3.0 release...
         loop {
             tokio::time::sleep(Duration::from_secs(60)).await;

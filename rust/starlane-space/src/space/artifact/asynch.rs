@@ -437,6 +437,8 @@ impl Artifacts {
     }
 
     pub async fn get_bind(&self, point: &Point) -> Result<ArtRef<BindConfig>, ArtErr> {
+println!("\t\t!!!! pnt {} hubs: {}", point.to_string(), self.hubs.len());
+
         for hub in &self.hubs {
             if hub.selector.is_match(point).is_ok() {
                 match hub.bind.get(point).await {

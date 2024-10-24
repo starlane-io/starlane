@@ -19,7 +19,6 @@ use std::str::FromStr;
 use std::time::Duration;
 use strum_macros::EnumString;
 use tokio::io::AsyncWriteExt;
-use tokio_print::aprintln;
 use walkdir::{DirEntry, WalkDir};
 use zip::write::FileOptions;
 use starlane::space::parse::util::result;
@@ -85,7 +84,6 @@ pub async fn script(script: ScriptArgs) -> Result<(), SpaceErr> {
         }
 
         if line_str.len() > 0 {
-            aprintln!("> {}", line_str);
             session.command(line.as_str()).await?;
         }
     }

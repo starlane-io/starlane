@@ -43,7 +43,6 @@ use starlane::space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
 use thiserror::Error;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
-use tokio_print::aprintln;
 
 #[derive(Clone)]
 pub struct MachineApi {
@@ -110,7 +109,6 @@ impl MachineApi {
         to: StarKey,
     ) -> Result<Box<dyn HyperwayEndpointFactory>, MachineErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
-println!("TX IS CLOSED: {}",self.tx.is_closed());
         self.tx
             .send(MachineCall::EndpointFactory { from, to, rtn })
             .await;
@@ -140,7 +138,6 @@ println!("TX IS CLOSED: {}",self.tx.is_closed());
     }
 
     pub async fn wait_ready(&self) {
-        aprintln!("submitting WaitForReady....");
         let (tx, mut rx) = oneshot::channel();
         self.tx.send(MachineCall::WaitForReady(tx)).await;
         rx.await;
@@ -224,7 +221,6 @@ where
         call_tx: mpsc::Sender<MachineCall>,
         call_rx: mpsc::Receiver<MachineCall>,
     ) -> Result<MachineApi, HyperErr2> {
-        aprintln!("Init Machine....");
         let template = platform.machine_template();
         let machine_name = platform.machine_name();
         let artifacts = platform.artifact_hub();
@@ -238,7 +234,6 @@ where
             }
         });
 
-        aprintln!("Watch Status Created......");
 
         let machine_star = StarKey::machine(machine_name.clone())
             .to_point()
@@ -251,7 +246,6 @@ where
             .unwrap()
             .to_surface()
             .with_layer(Layer::Core);
-        aprintln!("PRE platform.global_registry().await?");
         let registry = logger.result(platform.global_registry().await)?;
 
         let skel = MachineSkel {
@@ -268,7 +262,6 @@ where
             global,
         };
 
-        aprintln!("Machine Skel......");
         let mut stars = HashMap::new();
         let mut gates = Arc::new(DashMap::new());
         let star_templates = template.with_machine_star(machine_name);
@@ -308,7 +301,6 @@ where
                 logger.clone(),
             ));
 
-            aprintln!("MachineStar ready......");
             for con in star_template.connections.iter() {
                 match con {
                     StarCon::Receiver(remote) => {
@@ -334,7 +326,6 @@ where
                 }
             }
 
-            aprintln!("connections created ......");
             gates.insert(InterchangeKind::Star(star_template.key.clone()), gate);
             let star_api = HyperStar::new(
                 star_skel.clone(),
@@ -347,7 +338,6 @@ where
             stars.insert(star_point.clone(), star_api);
         }
 
-        aprintln!("Machine Star Templates processed......");
         let mut gate_selector = Arc::new(HyperGateSelector::new(gates));
         skel.platform.start_services(&gate_selector).await;
         let gate: Arc<dyn HyperGate> = gate_selector.clone();
@@ -465,14 +455,12 @@ where
     }
 
     async fn start(mut self) -> Result<(), HyperErr2> {
-        aprintln!("MACHINE STARTING!");
         self.call_tx
             .send(MachineCall::Init)
             .await
             .unwrap_or_default();
 
         while let Some(call) = self.call_rx.recv().await {
-            aprintln!("processing MachineCall: {}", call);
             match call {
                 MachineCall::Init => {
                     self.init0().await;
@@ -487,11 +475,9 @@ println!("~~~ self.termination_broadcast_tx.is_empty(): {}", self.termination_br
 println!("~~~ AwaitTermination processeed");
                 }
                 MachineCall::WaitForReady(rtn) => {
-                    aprintln!("Waiting for REady...");
                     let mut status_rx = self.skel.status_rx.clone();
                     tokio::spawn(async move {
                         loop {
-                            aprintln!("waiting looop....");
                             if MachineStatus::Ready == status_rx.borrow().clone() {
                                 rtn.send(());
                                 break;

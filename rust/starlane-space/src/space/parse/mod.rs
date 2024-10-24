@@ -6443,7 +6443,7 @@ pub fn point_selector<I: Span>(input: I) -> Res<I, Selector> {
                 }
             }
 
-            let rtn = Selector { hops };
+            let rtn = Selector { hops, always: false };
 
             (next, rtn)
         },
