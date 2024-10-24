@@ -120,6 +120,8 @@ thiserror-context = { workspace = true }
 rustyline = { workspace = true, features=["with-file-history", "with-dirs"]}
 cliclack = { workspace = true }
 
+serde_yaml = { workspace = true }
+
 
 [lib]
 name = "starlane"

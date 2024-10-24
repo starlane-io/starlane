@@ -54,6 +54,7 @@ pub struct Starlane {
     registry: Registry,
 }
 
+#[derive(Clone,Serialize,Deserialize)]
 pub enum PlatformKind {
     Simple,
     #[cfg(feature = "postgres")]

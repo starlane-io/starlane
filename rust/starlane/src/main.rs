@@ -65,9 +65,37 @@ use std::path::Path;
 use std::process;
 use std::str::FromStr;
 use std::time::Duration;
+use tokio::fs;
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
 use zip::write::FileOptions;
+
+#[cfg(feature = "server")]
+pub fn config() -> Result<StarlaneConfig, anyhow::Error> {
+    let home_dir: String = match dirs::home_dir() {
+        None => ".".to_string(),
+        Some(dir) => dir.display().to_string(),
+    };
+    let file = format!("{}/.starlane/config.yaml", home_dir);
+    let config = match fs::try_exists(file.clone()) {
+        Ok(_) => {
+            let config = fs::read_to_string(file)?;
+            serde_yaml::from_str(&config).map_err(|e| anyhow!(e))?
+        }
+        Err(_) => {
+            StarlaneConfig::default()
+        }
+    };
+
+    Ok(config)
+
+}
+
+let history= match script.history.as_ref() {
+None => ,
+Some(history) => history.clone(),
+};
+
 
 pub fn init() {
     #[cfg(feature = "cli")]
@@ -118,11 +146,13 @@ fn machine() -> Result<(), anyhow::Error> {
         std::process::exit(1);
     });
 
+    let config = config()?;
+
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     runtime.block_on(async move {
-        let starlane = Starlane::new().await.unwrap();
+        let starlane = Starlane::new(config.kind).await.unwrap();
         let machine_api = starlane.machine();
 
         let api = tokio::time::timeout(Duration::from_secs(30), machine_api)
