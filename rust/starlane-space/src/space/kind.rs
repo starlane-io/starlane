@@ -883,7 +883,6 @@ pub mod test {
         let s = new_span(s );
 
         let (_,hierarchy) = point_kind_hierarchy(s).unwrap();
-        println!("HIERARCHY {}", hierarchy.to_string());
         let v = hierarchy.to_string();
 
         assert_eq!(v,string);

@@ -138,15 +138,7 @@ pub fn init() {
 #[cfg(feature = "cli")]
 pub fn main() -> Result<(), anyhow::Error> {
 
-
-
-
     ctrlc::set_handler(move || process::exit(1)).unwrap();
-
-
-
-    let file = File::create("out.txt").unwrap();
-    let stdio = Stdio::from(file);
 
     init();
 

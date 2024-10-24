@@ -3178,7 +3178,6 @@ where
         BlockKind::Terminated(kind) => lex_terminated_block(kind).parse(input),
         BlockKind::Delimited(kind) => lex_delimited_block(kind).parse(input),
         BlockKind::Partial => {
-            eprintln!("parser should not be seeking partial block kinds...");
             Err(nom::Err::Failure(SpaceTree::from_error_kind(
                 input,
                 ErrorKind::IsNot,

@@ -1235,7 +1235,6 @@ impl HyperStar
             let discoveries = match skel.logger.result(wrangler.wrangle(false).await) {
                 Ok(discoveries) => discoveries,
                 Err(err) => {
-                    println!("\tWrangle ERROR");
                     rtn.send(Err(err)).unwrap_or_default();
                     return;
                 }
@@ -1322,7 +1321,6 @@ impl LayerTraversalEngine
             match self.start_layer_traversal(injection).await {
                 Ok(_) => {}
                 Err(err) => {
-                    println!("ERR: {}", err.to_string());
                     // if it can be reflected then send back as an error
                     match reflection {
                         Ok(reflection) => {

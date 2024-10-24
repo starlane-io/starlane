@@ -1720,7 +1720,6 @@ impl HyperClientRunner {
                         }
                         Err(err) => {
                             runner.logger.error(format!("{}", err.to_string()));
-                            println!("elapsed");
                             process::exit(1);
                         }
                     }

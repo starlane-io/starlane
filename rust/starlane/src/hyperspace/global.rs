@@ -96,7 +96,6 @@ impl GlobalCommandExecutionHandler
                 Ok(ReflectedCore::ok())
             }
             Command::Read(read) => {
-                println!("\tread cmd : {}", read.point.to_string());
                 // proxy the read command
                 let mut proto = DirectedProto::ping();
                 proto.method(CmdMethod::Read);
@@ -186,7 +185,6 @@ impl GlobalExecutionChamber
         };
 
         if create.state.has_substance() || child_kind.is_auto_provision() {
-            println!("\tprovisioning: {}", point.to_string());
             let provisioner  = SmartLocator::new(self.skel.clone());
             //tokio::spawn(async move {
             provisioner.provision(&point, create.state.clone()).await?;

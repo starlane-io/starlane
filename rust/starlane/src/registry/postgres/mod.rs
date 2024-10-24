@@ -1262,11 +1262,9 @@ impl PostgresRegistry {
                  */
             }
             GetOp::Properties(keys) => {
-                println!("GET PROPERTIES for {}", get.point.to_string());
                 let properties = self.get_properties(&get.point).await?;
                 let mut map = SubstanceMap::new();
                 for (index, property) in properties.iter().enumerate() {
-                    println!("\tprop{}", property.0.clone());
                     map.insert(
                         property.0.clone(),
                         Substance::Text(property.1.value.clone()),

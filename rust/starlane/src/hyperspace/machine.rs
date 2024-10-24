@@ -469,9 +469,7 @@ where
                     return Ok(());
                 }
                 MachineCall::AwaitTermination(tx) => {
-println!("~~~ self.termination_broadcast_tx.is_empty(): {}", self.termination_broadcast_tx.is_empty());
                     tx.send(self.termination_broadcast_tx.subscribe());
-println!("~~~ AwaitTermination processeed");
                 }
                 MachineCall::WaitForReady(rtn) => {
                     let mut status_rx = self.skel.status_rx.clone();
@@ -553,7 +551,6 @@ println!("~~~ AwaitTermination processeed");
         }
         self.termination_broadcast_tx
             .send(Err(err!("machine quit unexpectedly."))?);
-println!("MachineCall loop has exited");
 
         Ok(())
     }

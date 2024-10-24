@@ -49,7 +49,6 @@ impl Executor for CliOsExecutor {
         command.stdout(Stdio::piped()).output().await?;
         //command.stderr(Stdio::piped()).output().await?;
         command.stderr(Stdio::piped()).output().await?;
-        println!("{:?}", command);
         let child = command.spawn()?;
         //        Ok(OsProcess::new(child))
         let mut process = OsProcess::new(child);

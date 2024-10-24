@@ -37,38 +37,25 @@ impl WasmModuleMemCache {
 #[async_trait]
 impl WasmModuleCache for WasmModuleMemCache {
     async fn get(&mut self, key: &str, store: &Store) -> Result<Module, err::HostErr> {
-        println!("Getting from STORE {}", key);
         async fn load(
             source: &Box<dyn Source>,
             key: &str,
             store: &Store,
         ) -> Result<Module, err::HostErr> {
-            println!("loading {}", key);
             let wasm_bytes = source.get(key).await?;
             let module = Module::new(store, wasm_bytes).map_err(|e| e.into());
             module
         }
 
         if !self.map.contains_key(key) {
-            println!("not loaded: {}", key);
             if let Some(ser) = &self.ser {
-                println!("check if ser...: {}", key);
                 if let Option::Some(Result::Ok(module)) = ser.get(&key.to_string(), store).await {
                     self.map.insert(key.to_string(), Result::Ok(module));
                 } else {
                     let rtn = load(&self.source, key, store).await;
 
-                    println!("loaded from wasm...: {}", key);
                     if let Result::Ok(module) = &rtn {
-                        println!("storing ser...: {}", key);
-                        match ser.store(&key.to_string(), module).await {
-                            Ok(_) => {
-                                println!("saved module: {}", key);
-                            }
-                            Err(err) => {
-                                eprintln!("error ser module: {}", err.to_string());
-                            }
-                        }
+                        ser.store(&key.to_string(), module).await?;
                     }
                     self.map.insert(key.to_string(), rtn);
                 }

@@ -21,7 +21,6 @@ fn main() -> ExitCode{
     match run() {
         Ok(_) => ExitCode::SUCCESS,
         Err(err) => {
-            eprintln!("{}",err.to_string());
             ExitCode::FAILURE
         }
     }

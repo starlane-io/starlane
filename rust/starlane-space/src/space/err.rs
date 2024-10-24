@@ -184,7 +184,6 @@ impl PrintErr for SpaceErr {
     fn print(&self) {
         match self {
             SpaceErr::Status { status, message } => {
-                println!("err::status::[{}]: {}", status, message);
             }
             SpaceErr::ParseErrs(errs) => {
                 for report in &errs.report {
@@ -220,7 +219,6 @@ impl SpaceErr {
 
 impl Into<ReflectedCore> for SpaceErr {
     fn into(self) -> ReflectedCore {
-        println!("SpaceErr -> ReflectedCore({})", self.to_string());
         match self {
             SpaceErr::Status { status, .. } => ReflectedCore {
                 headers: Default::default(),

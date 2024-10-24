@@ -15,7 +15,6 @@ pub struct Postgres {
 
 impl Postgres {
     pub async fn new(config: Database<PgEmbedSettings>) -> Result<Self, RegErr> {
-        println!("starting embedded db");
         let pg_settings: PgSettings = config.settings.clone().into();
         let fetch_settings = PgFetchSettings {
             version: PG_V15,

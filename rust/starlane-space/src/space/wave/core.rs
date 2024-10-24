@@ -620,7 +620,6 @@ impl DirectedCore {
             Ok(status) => status,
             Err(_) => StatusCode::from_u16(500u16).unwrap(),
         };
-        println!("----->   returning STATUS of {}", status.to_string());
         ReflectedCore {
             headers: Default::default(),
             status,
