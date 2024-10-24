@@ -125,7 +125,6 @@ fn server() -> Result<(), anyhow::Error> {
         std::process::exit(1);
     });
 
-println!("launching tokio");
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
