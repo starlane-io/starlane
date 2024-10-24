@@ -33,17 +33,17 @@ use serde::{Deserialize, Serialize};
 use crate::driver::star::Star;
 use crate::registry::mem::registry::{MemoryRegistry, MemoryRegistryCtx};
 use crate::registry::err::RegErr;
-
+use crate::registry::postgres::embed::PgEmbedSettings;
 
 #[derive(Clone,Serialize,Deserialize)]
 pub struct StarlaneConfig {
-   pub kind: PlatformKind
+   pub registry: RegistryConfig
 }
 
 impl Default for StarlaneConfig {
     fn default() -> StarlaneConfig {
         Self {
-            kind: PlatformKind::Simple
+            registry: RegistryConfig::default()
         }
     }
 }
@@ -55,24 +55,31 @@ pub struct Starlane {
 }
 
 #[derive(Clone,Serialize,Deserialize)]
-pub enum PlatformKind {
-    Simple,
+pub enum RegistryConfig {
     #[cfg(feature = "postgres")]
-    Postgres
+    PostgresEmbedded(PgEmbedSettings),
+    #[cfg(feature = "postgres")]
+    Postgres(PostgresDbInfo)
+}
+
+impl Default for RegistryConfig {
+    fn default() -> Self {
+        Self::PostgresEmbedded(PostgresDbInfo::default())
+    }
 }
 
 impl Starlane {
-    pub async fn new(kind: PlatformKind) -> Result<Starlane, HypErr> {
+    pub async fn new(kind: RegistryConfig) -> Result<Starlane, HypErr> {
 
         let artifacts = Artifacts::just_builtins();
         let registry = match kind{
-            PlatformKind::Simple => {
+            RegistryConfig::PgEmbedded=> {
                     Arc::new(RegistryWrapper::new(Arc::new(
                         MemoryRegistry::new(),
                     )))
             }
             #[cfg(feature = "postgres")]
-            PlatformKind::Postgres=> {
+            RegistryConfig::Postgres=> {
                     let lookup = PostgresLookups::new();
                     let db = lookup.lookup_registry_db()?;
                     let mut set = HashSet::new();

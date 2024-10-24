@@ -853,7 +853,7 @@ impl TryInto<SpecificSelector> for Specific {
 
 #[cfg(test)]
 pub mod test {
-    use crate::space::selector::{KindSelector, PointHierarchy};
+    use crate::space::selector::{KindSelector, PointHierarchy, Selector};
     use crate::space::util::ValueMatcher;
     use crate::{Kind,  StarSub};
     use crate::space::err::{ParseErrs, PrintErr};
@@ -864,12 +864,15 @@ pub mod test {
     use nom::combinator::all_consuming;
     use nom::IResult;
     use crate::space::kind::FileSubKind;
+    use crate::space::point::Point;
 
     #[test]
     pub fn selector() -> Result<(), ParseErrs> {
         let kind = Kind::Star(StarSub::Fold);
         let selector = KindSelector::from_str("<Star<Fold>>")?;
         assert!(selector.is_match(&kind).is_ok());
+
+
         Ok(())
     }
 

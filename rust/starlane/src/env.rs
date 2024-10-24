@@ -36,3 +36,7 @@ pub static STARLANE_REGISTRY_PASSWORD: Lazy<String> =
 #[cfg(feature = "postgres")]
 pub static STARLANE_REGISTRY_DATABASE: Lazy<String> =
     Lazy::new(|| std::env::var("STARLANE_REGISTRY_DATABASE").unwrap_or("postgres".to_string()));
+
+#[cfg(feature = "postgres")]
+pub static STARLANE_REGISTRY_SCHEMA: Lazy<String> =
+    Lazy::new(|| std::env::var("STARLANE_REGISTRY_SCHEMA").unwrap_or("public".to_string()));

@@ -10,6 +10,7 @@ use starlane::space::particle::{Details, Properties, Property, Status, Stub};
 use starlane::space::point::Point;
 use starlane::space::security::{Access, AccessGrant, IndexedAccessGrant};
 use starlane::space::selector::Selector;
+use starlane::space::util::ValueMatcher;
 use starlane::space::substance::SubstanceList;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicU64;
@@ -160,9 +161,6 @@ impl RegistryApi for MemoryRegistry
         todo!()
     }
 
-    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, RegErr> {
-        todo!()
-    }
 
     async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, RegErr> {
         todo!()

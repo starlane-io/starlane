@@ -46,7 +46,34 @@ pub trait RegistryApi: Send + Sync
 
     async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, RegErr>;
 
-    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, RegErr>;
+//    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, RegErr>;
+
+    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, RegErr> {
+        let point = select.pattern.query_root();
+
+        let hierarchy = self
+            .query(&point, &Query::PointHierarchy)
+            .await?
+            .try_into()?;
+
+        let sub_select_hops = select.pattern.sub_select_hops();
+        let sub_select = select
+            .clone()
+            .sub_select(point.clone(), sub_select_hops, hierarchy);
+        let mut list = self.sub_select(&sub_select).await?;
+        if select.pattern.matches_root() {
+            list.push(Stub {
+                point: Point::root(),
+                kind: Kind::Root,
+                status: Status::Ready,
+            });
+        }
+
+        let list = sub_select.into_payload.to_primitive(list)?;
+
+        Ok(list)
+    }
+
 
     async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, RegErr>;
 

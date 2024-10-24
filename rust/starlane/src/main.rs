@@ -161,7 +161,7 @@ fn machine() -> Result<(), anyhow::Error> {
         .build()?;
     runtime.block_on(async move {
         let config = config().await;
-        let starlane = Starlane::new(config.kind).await.unwrap();
+        let starlane = Starlane::new(config.registry).await.unwrap();
         let machine_api = starlane.machine();
 
         let api = tokio::time::timeout(Duration::from_secs(30), machine_api)

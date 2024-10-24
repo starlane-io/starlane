@@ -1,3 +1,5 @@
+pub mod embed;
+
 use crate::platform::Platform;
 use crate::registry::err::RegErr;
 use sqlx::pool::PoolConnection;
@@ -39,6 +41,7 @@ use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
+use crate::env::{STARLANE_REGISTRY_DATABASE, STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_SCHEMA, STARLANE_REGISTRY_URL, STARLANE_REGISTRY_USER};
 use crate::hyperspace::reg::{Registration, RegistryApi};
 
 pub trait PostgresPlatform: Send + Sync {
@@ -499,32 +502,6 @@ impl RegistryApi for PostgresRegistry {
         Ok(list)
     }
 
-    //    #[async_recursion]
-    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, RegErr> {
-        let point = select.pattern.query_root();
-
-        let hierarchy = self
-            .query(&point, &Query::PointHierarchy)
-            .await?
-            .try_into()?;
-
-        let sub_select_hops = select.pattern.sub_select_hops();
-        let sub_select = select
-            .clone()
-            .sub_select(point.clone(), sub_select_hops, hierarchy);
-        let mut list = self.sub_select(&sub_select).await?;
-        if select.pattern.matches_root() {
-            list.push(Stub {
-                point: Point::root(),
-                kind: Kind::Root,
-                status: Status::Ready,
-            });
-        }
-
-        let list = sub_select.into_payload.to_primitive(list)?;
-
-        Ok(list)
-    }
 
     //    #[async_recursion]
     async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, RegErr> {
@@ -1425,6 +1402,18 @@ pub struct PostgresDbInfo {
     pub password: String,
     pub database: String,
     pub schema: String,
+}
+
+impl Default for PostgresDbInfo {
+    fn default() -> Self {
+        PostgresDbInfo {
+            url: STARLANE_REGISTRY_URL.to_string(),
+            user: STARLANE_REGISTRY_USER.to_string(),
+            password: STARLANE_REGISTRY_PASSWORD.to_string(),
+            database: STARLANE_REGISTRY_DATABASE.to_string(),
+            schema: STARLANE_REGISTRY_SCHEMA.to_string()
+        }
+    }
 }
 
 impl PostgresDbInfo {
