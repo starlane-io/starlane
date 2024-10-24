@@ -31,7 +31,6 @@ url = { workspace = true, features=["serde"] }
 
 thiserror={workspace=true }
 
-tokio_print = { workspace = true }
 ariadne={workspace=true }
 async-trait={workspace=true }
 lazy_static={workspace=true }

@@ -41,7 +41,6 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tokio_print::aprintln;
 use starlane::space::parse::util::{result, parse_errs};
 use starlane::space::wave::core::MethodKind::Hyp;
 
@@ -337,7 +336,6 @@ impl Star
                     .registry
                     .record(&Point::global_executor())
                     .await?;
-                aprintln!("Global Executor REGISTERED!");
                 let assign = Assign::new(AssignmentKind::Create, record.details, StateSrc::None);
                 self.create(&assign).await?;
                 self.skel
