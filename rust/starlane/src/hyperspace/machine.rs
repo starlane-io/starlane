@@ -1,25 +1,37 @@
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
-use std::sync::Arc;
 use std::sync::mpsc::SendError;
+use std::sync::Arc;
 use std::time::Duration;
 
+use crate::driver::DriverErr;
+use crate::err::{err, HypErr, HyperErr2};
+use crate::hyperlane::{
+    HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, Hyperway, HyperwayEndpoint,
+    HyperwayEndpointFactory, HyperwayInterchange, LayerTransform, MountInterchangeGate,
+    SimpleGreeter,
+};
+use crate::hyperspace::reg::Registry;
+use crate::hyperspace::star::{
+    HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate,
+};
+use crate::platform::Platform;
+use crate::service::{
+    service_conf, Service, ServiceConf, ServiceErr, ServiceKind, ServiceSelector, ServiceTemplate,
+};
+use crate::template::Templates;
 use dashmap::DashMap;
 use futures::future::{join_all, select_all, BoxFuture};
 use futures::{FutureExt, TryFutureExt};
-use thiserror::Error;
-use tokio::sync::{broadcast, mpsc, oneshot, watch};
-use tokio::sync::oneshot::error::RecvError;
-use tokio_print::aprintln;
-use starlane::space::artifact::asynch::{Artifacts, ArtifactFetcher, ArtErr};
+use starlane::space::artifact::asynch::{ArtErr, ArtifactFetcher, Artifacts};
 use starlane::space::command::direct::create::KindTemplate;
 use starlane::space::err::{HyperSpatialError, SpaceErr, SpatialError};
 use starlane::space::hyper::{InterchangeKind, Knock};
 use starlane::space::kind::{BaseKind, Kind, StarSub};
 use starlane::space::loc::{Layer, MachineName, StarHandle, StarKey, Surface, ToPoint, ToSurface};
 use starlane::space::log::{PointLogger, RootLogger};
-use starlane::space::particle::{Property, Status, Stub};
 use starlane::space::particle::property::PropertiesConfig;
+use starlane::space::particle::{Property, Status, Stub};
 use starlane::space::point::Point;
 use starlane::space::selector::{KindSelector, Selector};
 use starlane::space::settings::Timeouts;
@@ -28,67 +40,66 @@ use starlane::space::util::{OptSelector, ValuePattern};
 use starlane::space::wave::core::cmd::CmdMethod;
 use starlane::space::wave::exchange::asynch::Exchanger;
 use starlane::space::wave::{Agent, DirectedProto, PongCore, WaveVariantDef};
-use crate::driver::DriverErr;
-use crate::err::{err, HypErr, HyperErr2};
-use crate::hyperlane::{
-    HyperClient, HyperConnectionDetails, HyperGate, HyperGateSelector, Hyperway, HyperwayEndpoint,
-    HyperwayEndpointFactory, HyperwayInterchange, LayerTransform, MountInterchangeGate,
-    SimpleGreeter,
-};
-use crate::platform::Platform;
-use crate::hyperspace::reg::Registry;
-use crate::hyperspace::star::{
-    HyperStar, HyperStarApi, HyperStarSkel, HyperStarTx, StarCon, StarTemplate,
-};
-use crate::service::{service_conf, Service, ServiceConf, ServiceErr, ServiceKind, ServiceSelector, ServiceTemplate};
-use crate::template::Templates;
+use thiserror::Error;
+use tokio::sync::oneshot::error::RecvError;
+use tokio::sync::{broadcast, mpsc, oneshot, watch};
+use tokio_print::aprintln;
 
 #[derive(Clone)]
-pub struct MachineApi
-{
+pub struct MachineApi {
     tx: mpsc::Sender<MachineCall>,
     pub artifacts: Artifacts,
     pub registry: Registry,
-    pub data_dir: String
+    pub data_dir: String,
 }
 
 impl MachineApi {
-
-}
-
-impl MachineApi {
-
-}
-
-impl MachineApi
-{
-    pub fn new<P>(tx: mpsc::Sender<MachineCall>, registry: Registry, artifacts: Artifacts, platform: &P) -> Self where P: Platform{
+    pub fn new<P>(
+        tx: mpsc::Sender<MachineCall>,
+        registry: Registry,
+        artifacts: Artifacts,
+        platform: &P,
+    ) -> Self
+    where
+        P: Platform,
+    {
         let data_dir = platform.data_dir();
-        Self { tx, registry, artifacts, data_dir }
+        Self {
+            tx,
+            registry,
+            artifacts,
+            data_dir,
+        }
     }
-    pub async fn properties_config(&self, kind: &Kind) -> Result<PropertiesConfig,MachineErr> {
-        let (rtn,rx) = tokio::sync::oneshot::channel();
-        self.tx.send(MachineCall::PropertiesConfig{
-            kind: kind.clone(),
-            rtn
-        }).await?;
+    pub async fn properties_config(&self, kind: &Kind) -> Result<PropertiesConfig, MachineErr> {
+        let (rtn, rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(MachineCall::PropertiesConfig {
+                kind: kind.clone(),
+                rtn,
+            })
+            .await?;
 
         Ok(rx.await?)
     }
-    pub async fn select_kind(&self, template: &KindTemplate) -> Result<Kind,MachineErr>{
-        let (rtn,rx) = tokio::sync::oneshot::channel();
-        self.tx.send(MachineCall::SelectKind {
-            template: template.clone(),
-            rtn
-        }).await?;
+    pub async fn select_kind(&self, template: &KindTemplate) -> Result<Kind, MachineErr> {
+        let (rtn, rx) = tokio::sync::oneshot::channel();
+        self.tx
+            .send(MachineCall::SelectKind {
+                template: template.clone(),
+                rtn,
+            })
+            .await?;
 
         Ok(rx.await??)
     }
 
-    pub async fn select_service( &self, selector: ServiceSelector ) -> Result<ServiceTemplate,ServiceErr> {
-
-        let (rtn,rx) = tokio::sync::oneshot::channel();
-        let selector = MachineCall::SelectService {selector,rtn };
+    pub async fn select_service(
+        &self,
+        selector: ServiceSelector,
+    ) -> Result<ServiceTemplate, ServiceErr> {
+        let (rtn, rx) = tokio::sync::oneshot::channel();
+        let selector = MachineCall::SelectService { selector, rtn };
         self.tx.send(selector).await.unwrap();
         Ok(rx.await??)
     }
@@ -99,6 +110,7 @@ impl MachineApi
         to: StarKey,
     ) -> Result<Box<dyn HyperwayEndpointFactory>, MachineErr> {
         let (rtn, mut rtn_rx) = oneshot::channel();
+println!("TX IS CLOSED: {}",self.tx.is_closed());
         self.tx
             .send(MachineCall::EndpointFactory { from, to, rtn })
             .await;
@@ -128,7 +140,7 @@ impl MachineApi
     }
 
     pub async fn wait_ready(&self) {
-aprintln!("submitting WaitForReady....");
+        aprintln!("submitting WaitForReady....");
         let (tx, mut rx) = oneshot::channel();
         self.tx.send(MachineCall::WaitForReady(tx)).await;
         rx.await;
@@ -143,9 +155,8 @@ aprintln!("submitting WaitForReady....");
                 return Err(err.to_string());
             }
         };
-          rx.recv().await.unwrap()
-        }
-
+        rx.recv().await.unwrap()
+    }
 
     #[cfg(test)]
     pub async fn get_machine_star(&self) -> Result<HyperStarApi, SpaceErr> {
@@ -198,11 +209,11 @@ impl<P> Machine<P>
 where
     P: Platform + 'static,
 {
-    pub async fn new_api(platform: P) -> Result<MachineApi,P::Err> {
+    pub async fn new_api(platform: P) -> Result<MachineApi, P::Err> {
         let (call_tx, call_rx) = mpsc::channel(1024);
         let artifacts = platform.artifact_hub();
-        let registry= platform.global_registry().await?;
-        let machine_api = MachineApi::new(call_tx.clone(),registry, artifacts,&platform);
+        let registry = platform.global_registry().await?;
+        let machine_api = MachineApi::new(call_tx.clone(), registry, artifacts, &platform);
         tokio::spawn(async move { Machine::init(platform, call_tx, call_rx).await });
 
         Ok(machine_api)
@@ -213,13 +224,12 @@ where
         call_tx: mpsc::Sender<MachineCall>,
         call_rx: mpsc::Receiver<MachineCall>,
     ) -> Result<MachineApi, HyperErr2> {
-
-aprintln!("Init Machine....");
+        aprintln!("Init Machine....");
         let template = platform.machine_template();
         let machine_name = platform.machine_name();
         let artifacts = platform.artifact_hub();
         let registry = platform.global_registry().await?;
-        let machine_api = MachineApi::new(call_tx.clone(), registry, artifacts,&platform);
+        let machine_api = MachineApi::new(call_tx.clone(), registry, artifacts, &platform);
         let (mpsc_status_tx, mut mpsc_status_rx) = mpsc::channel(128);
         let (watch_status_tx, watch_status_rx) = watch::channel(MachineStatus::Init);
         tokio::spawn(async move {
@@ -228,7 +238,7 @@ aprintln!("Init Machine....");
             }
         });
 
-aprintln!("Watch Status Created......");
+        aprintln!("Watch Status Created......");
 
         let machine_star = StarKey::machine(machine_name.clone())
             .to_point()
@@ -241,8 +251,8 @@ aprintln!("Watch Status Created......");
             .unwrap()
             .to_surface()
             .with_layer(Layer::Core);
-aprintln!("PRE platform.global_registry().await?");
-            let registry = logger.result(platform.global_registry().await)?;
+        aprintln!("PRE platform.global_registry().await?");
+        let registry = logger.result(platform.global_registry().await)?;
 
         let skel = MachineSkel {
             name: machine_name.clone(),
@@ -258,7 +268,7 @@ aprintln!("PRE platform.global_registry().await?");
             global,
         };
 
-aprintln!("Machine Skel......");
+        aprintln!("Machine Skel......");
         let mut stars = HashMap::new();
         let mut gates = Arc::new(DashMap::new());
         let star_templates = template.with_machine_star(machine_name);
@@ -298,7 +308,7 @@ aprintln!("Machine Skel......");
                 logger.clone(),
             ));
 
-aprintln!("MachineStar ready......");
+            aprintln!("MachineStar ready......");
             for con in star_template.connections.iter() {
                 match con {
                     StarCon::Receiver(remote) => {
@@ -324,7 +334,7 @@ aprintln!("MachineStar ready......");
                 }
             }
 
-aprintln!("connections created ......");
+            aprintln!("connections created ......");
             gates.insert(InterchangeKind::Star(star_template.key.clone()), gate);
             let star_api = HyperStar::new(
                 star_skel.clone(),
@@ -337,7 +347,7 @@ aprintln!("connections created ......");
             stars.insert(star_point.clone(), star_api);
         }
 
-aprintln!("Machine Star Templates processed......");
+        aprintln!("Machine Star Templates processed......");
         let mut gate_selector = Arc::new(HyperGateSelector::new(gates));
         skel.platform.start_services(&gate_selector).await;
         let gate: Arc<dyn HyperGate> = gate_selector.clone();
@@ -438,7 +448,7 @@ aprintln!("Machine Star Templates processed......");
                 .unwrap();
 
         let fetcher = Arc::new(ClientArtifactFetcher::new(client, skel.registry.clone()));
-//        skel.artifacts.set_fetcher(fetcher).await;
+        //        skel.artifacts.set_fetcher(fetcher).await;
 
         machine.start().await;
         Ok(machine_api)
@@ -455,14 +465,14 @@ aprintln!("Machine Star Templates processed......");
     }
 
     async fn start(mut self) -> Result<(), HyperErr2> {
-aprintln!("MACHINE STARTING!");
+        aprintln!("MACHINE STARTING!");
         self.call_tx
             .send(MachineCall::Init)
             .await
             .unwrap_or_default();
 
         while let Some(call) = self.call_rx.recv().await {
-aprintln!("processing MachineCall: {}", call);
+            aprintln!("processing MachineCall: {}", call);
             match call {
                 MachineCall::Init => {
                     self.init0().await;
@@ -472,14 +482,16 @@ aprintln!("processing MachineCall: {}", call);
                     return Ok(());
                 }
                 MachineCall::AwaitTermination(tx) => {
+println!("~~~ self.termination_broadcast_tx.is_empty(): {}", self.termination_broadcast_tx.is_empty());
                     tx.send(self.termination_broadcast_tx.subscribe());
+println!("~~~ AwaitTermination processeed");
                 }
                 MachineCall::WaitForReady(rtn) => {
-aprintln!("Waiting for REady...");
+                    aprintln!("Waiting for REady...");
                     let mut status_rx = self.skel.status_rx.clone();
                     tokio::spawn(async move {
                         loop {
-aprintln!("waiting looop....");
+                            aprintln!("waiting looop....");
                             if MachineStatus::Ready == status_rx.borrow().clone() {
                                 rtn.send(());
                                 break;
@@ -495,7 +507,7 @@ aprintln!("waiting looop....");
                     });
                 }
                 MachineCall::SelectKind { template, rtn } => {
-                   rtn.send(self.skel.platform.select_kind(&template));
+                    rtn.send(self.skel.platform.select_kind(&template));
                 }
                 MachineCall::PropertiesConfig { kind, rtn } => {
                     rtn.send(self.skel.platform.properties_config(&kind));
@@ -540,24 +552,31 @@ aprintln!("waiting looop....");
                     rtn.send(self.skel.registry.clone());
                 }
                 MachineCall::SelectService { selector, rtn } => {
-                      match self.skel.platform.machine_template().services.select_one( &selector ) {
-                          None => rtn.send(Err(ServiceErr::NoTemplate(selector))),
-                          Some(template) => rtn.send(Ok(template.clone()))
-                      };
+                    match self
+                        .skel
+                        .platform
+                        .machine_template()
+                        .services
+                        .select_one(&selector)
+                    {
+                        None => rtn.send(Err(ServiceErr::NoTemplate(selector))),
+                        Some(template) => rtn.send(Ok(template.clone())),
+                    };
                 }
             }
 
-            self.termination_broadcast_tx
-                .send(Err(err!("machine quit unexpectedly."))?);
+
         }
+        self.termination_broadcast_tx
+            .send(Err(err!("machine quit unexpectedly."))?);
+println!("MachineCall loop has exited");
 
         Ok(())
     }
 }
 
 #[derive(strum_macros::Display)]
-pub enum MachineCall
-{
+pub enum MachineCall {
     Init,
     Terminate,
     AwaitTermination(oneshot::Sender<broadcast::Receiver<Result<(), String>>>),
@@ -576,13 +595,13 @@ pub enum MachineCall
         to: StarKey,
         rtn: oneshot::Sender<Box<dyn HyperwayEndpointFactory>>,
     },
-    SelectService{
+    SelectService {
         selector: ServiceSelector,
-        rtn: oneshot::Sender<Result<ServiceTemplate,ServiceErr>>
+        rtn: oneshot::Sender<Result<ServiceTemplate, ServiceErr>>,
     },
-    SelectKind{
+    SelectKind {
         template: KindTemplate,
-        rtn: oneshot::Sender<Result<Kind,SpaceErr>>
+        rtn: oneshot::Sender<Result<Kind, SpaceErr>>,
     },
     PropertiesConfig {
         kind: Kind,
@@ -689,7 +708,6 @@ impl Default for MachineTemplate {
         stars.push(jump);
         stars.push(fold);
 
-
         let config = service_conf();
         let filestore = ServiceTemplate {
             name: "repo-filestore".to_string(),
@@ -697,29 +715,26 @@ impl Default for MachineTemplate {
             driver: OptSelector::Selector(KindSelector::from_base(BaseKind::Repo)),
             config,
         };
-        let services = Templates::new( vec![filestore]);
+        let services = Templates::new(vec![filestore]);
 
-        Self { stars,services}
+        Self { stars, services }
     }
 }
 
-pub struct MachineHyperwayEndpointFactory
-{
+pub struct MachineHyperwayEndpointFactory {
     from: StarKey,
     to: StarKey,
     call_tx: mpsc::Sender<MachineCall>,
 }
 
-impl MachineHyperwayEndpointFactory
-{
+impl MachineHyperwayEndpointFactory {
     pub fn new(from: StarKey, to: StarKey, call_tx: mpsc::Sender<MachineCall>) -> Self {
         Self { from, to, call_tx }
     }
 }
 
 #[async_trait]
-impl HyperwayEndpointFactory for MachineHyperwayEndpointFactory
-{
+impl HyperwayEndpointFactory for MachineHyperwayEndpointFactory {
     async fn create(
         &self,
         status_tx: mpsc::Sender<HyperConnectionDetails>,
@@ -739,15 +754,13 @@ impl HyperwayEndpointFactory for MachineHyperwayEndpointFactory
     }
 }
 
-pub struct MachineApiExtFactory
-{
+pub struct MachineApiExtFactory {
     pub machine_api: MachineApi,
     pub logger: PointLogger,
 }
 
 #[async_trait]
-impl HyperwayEndpointFactory for MachineApiExtFactory
-{
+impl HyperwayEndpointFactory for MachineApiExtFactory {
     async fn create(
         &self,
         status_tx: mpsc::Sender<HyperConnectionDetails>,
@@ -762,22 +775,19 @@ impl HyperwayEndpointFactory for MachineApiExtFactory
     }
 }
 
-pub struct ClientArtifactFetcher
-{
+pub struct ClientArtifactFetcher {
     pub registry: Registry,
     pub client: HyperClient,
 }
 
-impl ClientArtifactFetcher
-{
+impl ClientArtifactFetcher {
     pub fn new(client: HyperClient, registry: Registry) -> Self {
         Self { client, registry }
     }
 }
 
 #[async_trait]
-impl ArtifactFetcher for ClientArtifactFetcher
-{
+impl ArtifactFetcher for ClientArtifactFetcher {
     async fn stub(&self, point: &Point) -> Result<Stub, ArtErr> {
         /*
         let record = self
@@ -791,19 +801,31 @@ impl ArtifactFetcher for ClientArtifactFetcher
     }
 
     async fn fetch(&self, point: &Point) -> Result<Arc<Bin>, ArtErr> {
-        let transmitter = self.client.transmitter_builder().await.map_err(anyhow::Error::from)?.build();
+        let transmitter = self
+            .client
+            .transmitter_builder()
+            .await
+            .map_err(anyhow::Error::from)?
+            .build();
 
         let mut wave = DirectedProto::ping();
         wave.method(CmdMethod::Read);
         wave.to(point.clone().to_surface().with_layer(Layer::Core));
-        let pong: WaveVariantDef<PongCore> = transmitter.direct(wave).await.map_err(anyhow::Error::from)?;
+        let pong: WaveVariantDef<PongCore> = transmitter
+            .direct(wave)
+            .await
+            .map_err(anyhow::Error::from)?;
 
         pong.ok_or().err();
 
         if let Substance::Bin(bin) = pong.variant.core.body {
             Ok(Arc::new(bin))
         } else {
-            Err(ArtErr::expecting("Body Substance", "Bin", pong.variant.core.body.kind()))
+            Err(ArtErr::expecting(
+                "Body Substance",
+                "Bin",
+                pong.variant.core.body.kind(),
+            ))
         }
     }
 
@@ -812,9 +834,7 @@ impl ArtifactFetcher for ClientArtifactFetcher
     }
 }
 
-
-
-#[derive(Clone,Debug,Error)]
+#[derive(Clone, Debug, Error)]
 pub enum MachineErr {
     #[error(transparent)]
     SpaceErr(#[from] SpaceErr),
@@ -822,25 +842,24 @@ pub enum MachineErr {
     KindNotSupported(KindTemplate),
     #[error("tokio send error.")]
     TokioSendErr,
-#[error("tokio receive error.")]
-TokioReceiveErr,
- #[error("{0}")]
- Anyhow(Arc<anyhow::Error>)
+    #[error("tokio receive error '{0}'")]
+    TokioReceiveErr(RecvError),
+    #[error("{0}")]
+    Anyhow(Arc<anyhow::Error>),
 }
 
 impl SpatialError for MachineErr {}
 
-impl HyperSpatialError for MachineErr { }
+impl HyperSpatialError for MachineErr {}
 
-
-impl <T> From<tokio::sync::mpsc::error::SendError<T>> for MachineErr {
+impl<T> From<tokio::sync::mpsc::error::SendError<T>> for MachineErr {
     fn from(value: tokio::sync::mpsc::error::SendError<T>) -> Self {
         MachineErr::TokioSendErr
     }
 }
 
-impl  From<tokio::sync::oneshot::error::RecvError> for MachineErr {
+impl From<tokio::sync::oneshot::error::RecvError> for MachineErr {
     fn from(value: tokio::sync::oneshot::error::RecvError) -> Self {
-        MachineErr::TokioReceiveErr
+        MachineErr::TokioReceiveErr(value)
     }
 }
