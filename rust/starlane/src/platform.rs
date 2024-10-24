@@ -18,12 +18,10 @@ pub trait Platform: Send + Sync + Sized + Clone
 where
     Self::Err: std::error::Error + Send + Sync,
     Self: 'static,
-    Self::RegistryContext: Send + Sync,
     Self::StarAuth: HyperAuthenticator,
     Self::RemoteStarConnectionFactory: HyperwayEndpointFactory,
 {
     type Err;
-    type RegistryContext;
     type StarAuth;
     type RemoteStarConnectionFactory;
 

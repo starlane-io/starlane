@@ -1,7 +1,3 @@
-pub mod err;
-
-use crate::err::{err, HypErr};
-use crate::hyperspace::reg::{Registration, RegistryApi};
 use crate::platform::Platform;
 use crate::registry::err::RegErr;
 use sqlx::pool::PoolConnection;
@@ -43,6 +39,7 @@ use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
+use crate::hyperspace::reg::{Registration, RegistryApi};
 
 pub trait PostgresPlatform: Send + Sync {
     fn lookup_registry_db(&self) -> Result<PostgresDbInfo, RegErr>;
@@ -194,6 +191,8 @@ impl RegistryApi for PostgresRegistry {
     }
 
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), RegErr> {
+
+
         /*
         async fn check<'a>( registration: &Registration,  trans:&mut Transaction<Postgres>, ) -> Result<(),Erroror> {
             let params = RegistryParams::from_registration(registration)?;

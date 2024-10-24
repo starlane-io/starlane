@@ -13,11 +13,15 @@ static STARLANE_CACHE_DIR: Lazy<String> =
     Lazy::new(|| std::env::var("STARLANE_CACHE_DIR").unwrap_or("cache".to_string()));
 static STARLANE_TOKEN: Lazy<String> =
     Lazy::new(|| std::env::var("STARLANE_TOKEN").unwrap_or(Uuid::new_v4().to_string()));
+#[cfg(feature = "postgres")]
 pub static STARLANE_REGISTRY_URL: Lazy<String> =
     Lazy::new(|| std::env::var("STARLANE_REGISTRY_URL").unwrap_or("localhost".to_string()));
+#[cfg(feature = "postgres")]
 pub static STARLANE_REGISTRY_USER: Lazy<String> =
     Lazy::new(|| std::env::var("STARLANE_REGISTRY_USER").unwrap_or("postgres".to_string()));
+#[cfg(feature = "postgres")]
 pub static STARLANE_REGISTRY_PASSWORD: Lazy<String> =
     Lazy::new(|| std::env::var("STARLANE_REGISTRY_PASSWORD").unwrap_or("password".to_string()));
+#[cfg(feature = "postgres")]
 pub static STARLANE_REGISTRY_DATABASE: Lazy<String> =
     Lazy::new(|| std::env::var("STARLANE_REGISTRY_DATABASE").unwrap_or("postgres".to_string()));

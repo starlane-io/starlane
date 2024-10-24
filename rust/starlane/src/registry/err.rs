@@ -1,46 +1,45 @@
-
 #[cfg(feature = "postgres")]
 use sqlx::Error;
 
-
-use std::sync::Arc;
-use starlane::space::point::Point;
-use thiserror::Error;
 use starlane::space::err::{HyperSpatialError, ParseErrs, SpaceErr, SpatialError};
+use starlane::space::point::Point;
+use std::sync::Arc;
+use thiserror::Error;
 
-#[derive(Error, Debug,Clone)]
+#[derive(Error, Debug, Clone)]
 pub enum RegErr {
-  #[error(transparent)]
-  Parse(#[from] ParseErrs),
-  #[error("duplicate error")]
-  Dupe,
-  #[cfg(feature = "postgres")]
-  #[error("postgres error: {0}")]
-  SqlxErr(#[from] Arc<sqlx::Error>),
-  #[error(transparent)]
-  SpaceErr(#[from] SpaceErr),
-  #[cfg(feature = "postgres")]
-  #[error("postgres registry db connection pool '{0}' not found")]
-  PoolNotFound(String),
- #[error("expected parent for point `{0}'")]
-  ExpectedParent(Point),
-  #[error("Registry does not handle GetOp::State operations")]
-  NoGetOpStateOperations,
-  #[error("Database Setup Failed")]
-  RegistrySetupFailed,
-  #[error("Point '{point}' registry error: {message}")]
-  Point { point: Point, message: String },
-  #[error("{0}")]
-  Msg(String),
+    #[error(transparent)]
+    Parse(#[from] ParseErrs),
+    #[error("duplicate error")]
+    Dupe,
+    #[error("particle not found: '{0}'")]
+    NotFound(Point),
+
+    #[error(transparent)]
+    SpaceErr(#[from] SpaceErr),
+
+    #[error("expected parent for point `{0}'")]
+    ExpectedParent(Point),
+    #[error("Registry does not handle GetOp::State operations")]
+    NoGetOpStateOperations,
+    #[error("Database Setup Failed")]
+    RegistrySetupFailed,
+    #[error("Point '{point}' registry error: {message}")]
+    Point { point: Point, message: String },
+    #[error("{0}")]
+    Msg(String),
+
+    #[cfg(feature = "postgres")]
+    #[error("postgres error: {0}")]
+    SqlxErr(#[from] Arc<sqlx::Error>),
+    #[cfg(feature = "postgres")]
+    #[error("postgres registry db connection pool '{0}' not found")]
+    PoolNotFound(String),
 }
 
-impl SpatialError for RegErr {
+impl SpatialError for RegErr {}
 
-}
-
-impl HyperSpatialError for RegErr {
-
-}
+impl HyperSpatialError for RegErr {}
 
 impl From<&str> for RegErr {
     fn from(err: &str) -> Self {
@@ -66,13 +65,16 @@ impl RegErr {
         Self::Dupe
     }
 
-    pub fn point<S>( point: Point, message: S ) -> RegErr where S: ToString {
+    pub fn point<S>(point: Point, message: S) -> RegErr
+    where
+        S: ToString,
+    {
         let message = message.to_string();
-        RegErr::Point {point, message }
+        RegErr::Point { point, message }
     }
 
     #[cfg(feature = "postgres")]
-    pub fn pool_not_found<S:ToString>( key: S ) -> Self {
+    pub fn pool_not_found<S: ToString>(key: S) -> Self {
         Self::PoolNotFound(key.to_string())
     }
 

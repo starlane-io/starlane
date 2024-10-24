@@ -14,8 +14,9 @@ use starlane::space::substance::SubstanceList;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicU64;
 use std::sync::{atomic, Arc};
+use crate::registry::err::RegErr;
 
-impl MemRegCtx {
+impl MemoryRegistryCtx {
     pub fn new() -> Self {
         Self {
             sequence: Arc::new(AtomicU64::new(0u64)),
@@ -26,44 +27,37 @@ impl MemRegCtx {
 }
 
 #[derive(Clone)]
-pub struct MemRegCtx {
+pub struct MemoryRegistryCtx {
     pub sequence: Arc<AtomicU64>,
     pub particles: Arc<DashMap<Point, ParticleRecord>>,
     pub properties: Arc<DashMap<Point, Properties>>,
 }
 
-pub struct MemRegApi<C>
-where
-    C: Platform,
+pub struct MemoryRegistry
 {
-    ctx: MemRegCtx,
-    phantom: PhantomData<C>,
+    ctx: MemoryRegistryCtx,
 }
 
-impl<C> MemRegApi<C>
-where
-    C: Platform,
+impl MemoryRegistry
 {
-    pub fn new(ctx: MemRegCtx) -> Self {
-        let phantom = Default::default();
-        Self { phantom, ctx }
+    pub fn new() -> Self {
+        let ctx = MemoryRegistryCtx::new();
+        Self {  ctx }
     }
 
-    fn ctx(&self) -> &MemRegCtx {
+    fn ctx(&self) -> &MemoryRegistryCtx {
         &self.ctx
     }
 }
 
 #[async_trait]
-impl<C> RegistryApi<C> for MemRegApi<C>
-where
-    C: Platform,
+impl RegistryApi for MemoryRegistry
 {
-    async fn nuke<'a>(&'a self) -> Result<(), C::Err> {
+    async fn nuke<'a>(&'a self) -> Result<(), RegErr> {
         Ok(())
     }
 
-    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), C::Err> {
+    async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), RegErr> {
         self.set_properties(&registration.point, &registration.properties)
             .await?;
 
@@ -85,24 +79,24 @@ where
         Ok(())
     }
 
-    async fn assign_star<'a>(&'a self, point: &'a Point, star: &'a Point) -> Result<(), C::Err> {
+    async fn assign_star<'a>(&'a self, point: &'a Point, star: &'a Point) -> Result<(), RegErr> {
         let mut record = self.ctx.particles.get_mut(&point).unwrap();
         record.value_mut().location.star = Some(star.clone());
         Ok(())
     }
 
-    async fn assign_host<'a>(&'a self, point: &'a Point, host: &'a Point) -> Result<(), C::Err> {
+    async fn assign_host<'a>(&'a self, point: &'a Point, host: &'a Point) -> Result<(), RegErr> {
         let mut record = self.ctx.particles.get_mut(&point).unwrap();
         record.value_mut().location.host = Some(host.clone());
         Ok(())
     }
 
-    async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), C::Err> {
+    async fn set_status<'a>(&'a self, point: &'a Point, status: &'a Status) -> Result<(), RegErr> {
         let mut record = self
             .ctx
             .particles
             .get_mut(point)
-            .ok_or(format!("not found: {}", point.to_string()))?;
+            .ok_or(RegErr::NotFound(point.clone()))?;
         record.value_mut().details.stub.status = status.clone();
         Ok(())
     }
@@ -111,7 +105,7 @@ where
         &'a self,
         point: &'a Point,
         properties: &'a SetProperties,
-    ) -> Result<(), C::Err> {
+    ) -> Result<(), RegErr> {
         let mut rtn = Properties::new();
         for (id, property) in properties.iter() {
             match property {
@@ -130,24 +124,24 @@ where
         Ok(())
     }
 
-    async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, C::Err> {
+    async fn sequence<'a>(&'a self, point: &'a Point) -> Result<u64, RegErr> {
         Ok(self.ctx.sequence.fetch_add(1, atomic::Ordering::Relaxed))
     }
 
-    async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, C::Err> {
+    async fn get_properties<'a>(&'a self, point: &'a Point) -> Result<Properties, RegErr> {
         match self.ctx.properties.get(point) {
             None => Ok(Default::default()),
             Some(mul) => Ok(mul.value().clone()),
         }
     }
 
-    async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, C::Err> {
+    async fn record<'a>(&'a self, point: &'a Point) -> Result<ParticleRecord, RegErr> {
         let properties = self.get_properties(point).await?;
         let mut record = self
             .ctx
             .particles
             .get(&point)
-            .ok_or("not found")?
+            .ok_or(RegErr::NotFound(point.clone()))?
             .value()
             .clone();
         record.details.properties = properties;
@@ -158,27 +152,27 @@ where
         &'a self,
         point: &'a Point,
         query: &'a Query,
-    ) -> Result<QueryResult, C::Err> {
+    ) -> Result<QueryResult, RegErr> {
         todo!()
     }
 
-    async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, C::Err> {
+    async fn delete<'a>(&'a self, delete: &'a Delete) -> Result<SubstanceList, RegErr> {
         todo!()
     }
 
-    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, C::Err> {
+    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, RegErr> {
         todo!()
     }
 
-    async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, C::Err> {
+    async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, RegErr> {
         todo!()
     }
 
-    async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), C::Err> {
+    async fn grant<'a>(&'a self, access_grant: &'a AccessGrant) -> Result<(), RegErr> {
         todo!()
     }
 
-    async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, C::Err> {
+    async fn access<'a>(&'a self, to: &'a Point, on: &'a Point) -> Result<Access, RegErr> {
         Ok(Access::Super)
     }
 
@@ -187,7 +181,7 @@ where
         on: &'a Selector,
         owner: &'a Point,
         by: &'a Point,
-    ) -> Result<(), C::Err> {
+    ) -> Result<(), RegErr> {
         todo!()
     }
 
@@ -195,11 +189,13 @@ where
         &'a self,
         to: &'a Option<&'a Point>,
         on: &'a Selector,
-    ) -> Result<Vec<IndexedAccessGrant>, C::Err> {
+    ) -> Result<Vec<IndexedAccessGrant>, RegErr> {
         todo!()
     }
 
-    async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), C::Err> {
+    async fn remove_access<'a>(&'a self, id: i32, to: &'a Point) -> Result<(), RegErr> {
         todo!()
     }
 }
+
+

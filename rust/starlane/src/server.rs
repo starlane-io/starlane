@@ -3,6 +3,8 @@ use crate::registry::postgres::{
     PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
     PostgresRegistryContextHandle
 };
+#[cfg(feature = "postgres")]
+use crate::env::{STARLANE_REGISTRY_USER,STARLANE_REGISTRY_PASSWORD,STARLANE_REGISTRY_URL,STARLANE_REGISTRY_DATABASE};
 
 use starlane::space::artifact::asynch::Artifacts;
 use starlane::space::kind::StarSub;
@@ -18,25 +20,23 @@ use crate::driver::{DriverAvail, DriversBuilder};
 use crate::driver::control::ControlDriverFactory;
 use crate::driver::root::RootDriverFactory;
 use crate::driver::space::SpaceDriverFactory;
-use crate::env::{STARLANE_CONTROL_PORT, STARLANE_DATA_DIR};
+
+use crate::env::{STARLANE_CONTROL_PORT, STARLANE_DATA_DIR,};
 use crate::err::HypErr;
 use crate::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
 use crate::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
 use crate::hyperspace::machine::MachineTemplate;
 use crate::platform::Platform;
 use crate::hyperspace::reg::{Registry, RegistryWrapper};
-#[cfg(feature = "postgres")]
+use std::collections::{HashMap, HashSet};
+
+use crate::registry::mem::registry::{MemoryRegistry, MemoryRegistryCtx};
 use crate::registry::err::RegErr;
 
 #[derive(Clone)]
 pub struct Starlane {
-    #[cfg(feature = "postgres")]
-    pub registry_platform: StarlanePostgres,
-
     artifacts: Artifacts,
     registry: Registry,
-
-    pub ctx: MemRegCtx
 }
 
 pub enum PlatformKind {
@@ -51,50 +51,35 @@ impl Starlane {
         let artifacts = Artifacts::just_builtins();
         let registry = match kind{
             PlatformKind::Simple => {
-
+                    Arc::new(RegistryWrapper::new(Arc::new(
+                        MemoryRegistry::new(),
+                    )))
             }
             #[cfg(feature = "postgres")]
             PlatformKind::Postgres=> {
-                    let lookup = StarlanePostgres::new();
+                    let lookup = PostgresLookups::new();
                     let db = lookup.lookup_registry_db()?;
                     let mut set = HashSet::new();
                     set.insert(db.clone());
                     let ctx = Arc::new(PostgresRegistryContext::new(set,Box::new(lookup)).await?);
                     let handle = PostgresRegistryContextHandle::new(&db, ctx);
-                    let registry_platform = StarlanePostgres::new();
+                    let postgres_lookups = PostgresLookups::new();
 
                     let logger = RootLogger::default();
                     let logger = logger.point(Point::global_registry());
                     Arc::new(RegistryWrapper::new(Arc::new(
-                        PostgresRegistry::new(self.handle.clone(), Box::new(self.registry_platform.clone()), logger).await?,
+                        PostgresRegistry::new(handle, Box::new(postgres_lookups), logger).await?,
                     )))
             }
         };
 
-        return Ok(Self { registry, artifacts})
-        {
-            let ctx = MemRegCtx::new();
-            Ok(Self { ctx })
-        }
-        /*
-        let db = <Self as PostgresPlatform>::lookup_registry_db()?;
-        let mut set = HashSet::new();
-        set.insert(db.clone());
-        let ctx = Arc::new(PostgresRegistryContext::new(set).await?);
-        let handle = PostgresRegistryContextHandle::new(&db, ctx);
-
-         */
+        Ok(Self { registry, artifacts})
     }
 }
 
 #[async_trait]
 impl Platform for Starlane where Self: Sync+Send+Sized{
     type Err = HypErr;
-    #[cfg(feature = "postgres")]
-    type RegistryContext = PostgresRegistryContextHandle;
-
-    #[cfg(not(feature = "postgres"))]
-    type RegistryContext = MemRegCtx;
 
     type StarAuth = AnonHyperAuthenticator;
     type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
@@ -168,9 +153,7 @@ impl Platform for Starlane where Self: Sync+Send+Sized{
     }
 
     async fn global_registry(&self) -> Result<Registry, Self::Err> {
-        self.registry.clone()
-
-        //        Ok(Arc::new(MemRegApi::new(self.ctx.clone())))
+        Ok(self.registry.clone())
     }
 
     async fn star_registry(&self, star: &StarKey) -> Result<Registry, Self::Err> {
@@ -216,10 +199,10 @@ impl Platform for Starlane where Self: Sync+Send+Sized{
 
 #[cfg(feature = "postgres")]
 #[derive(Clone)]
-pub struct StarlanePostgres;
+pub struct PostgresLookups;
 
 #[cfg(feature = "postgres")]
-impl StarlanePostgres {
+impl PostgresLookups {
     pub fn new() -> Self {
         Self
     }
@@ -227,14 +210,14 @@ impl StarlanePostgres {
 
 
 #[cfg(feature = "postgres")]
-impl Default for StarlanePostgres {
+impl Default for PostgresLookups {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[cfg(feature = "postgres")]
-impl PostgresPlatform for StarlanePostgres{
+impl PostgresPlatform for PostgresLookups {
     fn lookup_registry_db(&self) -> Result<PostgresDbInfo, RegErr> {
         Ok(PostgresDbInfo::new(
             STARLANE_REGISTRY_URL.to_string(),
