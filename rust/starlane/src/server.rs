@@ -353,7 +353,7 @@ impl PostgresPlatform for PostgresLookups {
     fn lookup_registry_db(&self) -> Result<Database<PostgresConnectInfo>, RegErr> {
         Ok(Database::from_con(
             STARLANE_REGISTRY_DATABASE.to_string(),
-            "public".to_string(),
+            STARLANE_REGISTRY_SCHEMA.to_string(),
             PostgresConnectInfo::new(
                 STARLANE_REGISTRY_URL.to_string(),
                 STARLANE_REGISTRY_USER.to_string(),

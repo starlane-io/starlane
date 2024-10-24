@@ -61,7 +61,7 @@ use once_cell::sync::Lazy;
 use starlane::space::loc::ToBaseKind;
 use std::fs::File;
 use std::io::{Read, Seek, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process;
 use std::str::FromStr;
 use std::time::Duration;
@@ -69,12 +69,13 @@ use tokio::fs;
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
 use zip::write::FileOptions;
+use starlane_space::space::util::log;
 use crate::env::STARLANE_HOME;
 
 #[cfg(feature = "server")]
 async fn config() -> StarlaneConfig {
 
-    let file = format!("{}/config.yaml", STARLANE_HOME.to_string());
+    let file = format!("{}/config.yaml", STARLANE_HOME.to_string()).to_string();
     let config = match fs::try_exists(file.clone()).await {
         Ok(true) => {
             match fs::read_to_string(file.clone()).await {
@@ -94,7 +95,18 @@ async fn config() -> StarlaneConfig {
             }
         }
         Ok(false) => {
-           Default::default()
+           let config = Default::default();
+            if let Ok(ser) = serde_yaml::to_string(&config) {
+                let file: PathBuf = file.into();
+                match file.parent() {
+                    None => {}
+                    Some(dir) => {
+                        fs::create_dir_all(dir).await.unwrap_or_default();
+                        fs::write(file,ser).await.unwrap_or_default();
+                    }
+                }
+            }
+           config
         }
         Err(err) => {
             println!("starlane encountered problem when attempting to load config file: '{}' with error: '{}'", file, err.to_string());
