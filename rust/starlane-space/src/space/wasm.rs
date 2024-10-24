@@ -1,5 +1,6 @@
 use crate::space::loc;
 use serde::{Deserialize, Serialize};
+use crate::space::log::RootLogger;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Timestamp {
@@ -20,4 +21,7 @@ impl Timestamp {
 extern "C" {
     pub fn starlane_timestamp() -> Timestamp;
     pub fn starlane_uuid() -> loc::Uuid;
+
+    pub fn starlane_root_logger() -> RootLogger;
 }
+

@@ -61,16 +61,22 @@ use once_cell::sync::Lazy;
 use starlane::space::loc::ToBaseKind;
 use std::fs::File;
 use std::io::{Read, Seek, Write};
+use std::ops::{Add, Mul};
 use std::path::{Path, PathBuf};
 use std::process;
 use std::str::FromStr;
 use std::time::Duration;
-use tokio::fs;
+use colored::{Colorize, CustomColor};
+use lerp::Lerp;
+use text_to_ascii_art::fonts::get_font;
+use text_to_ascii_art::to_art;
+use tokio::{fs, signal};
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
 use zip::write::FileOptions;
 use starlane_space::space::util::log;
 use crate::env::STARLANE_HOME;
+use crate::hyperspace::starlane_timestamp;
 
 #[cfg(feature = "server")]
 async fn config() -> StarlaneConfig {
@@ -130,11 +136,13 @@ pub fn init() {
 
 #[cfg(feature = "cli")]
 pub fn main() -> Result<(), anyhow::Error> {
+    ctrlc::set_handler(move || process::exit(1)).unwrap();
+
     init();
 
     let cli = Cli::parse();
     match cli.command {
-        Commands::Machine => machine(),
+        Commands::Run => run(),
         Commands::Term(args) => {
             let runtime = Builder::new_multi_thread().enable_all().build()?;
 
@@ -154,7 +162,7 @@ pub fn main() -> Result<(), anyhow::Error> {
 }
 
 #[cfg(not(feature = "server"))]
-fn machine() -> Result<(), anyhow::Error> {
+fn run() -> Result<(), anyhow::Error> {
     println!("'' feature is not enabled in this starlane installation");
     Err(anyhow!(
         "'machine' feature is not enabled in this starlane installation"
@@ -162,10 +170,37 @@ fn machine() -> Result<(), anyhow::Error> {
 }
 
 #[cfg(feature = "server")]
-fn machine() -> Result<(), anyhow::Error> {
-    ctrlc::set_handler(move || {
-        std::process::exit(1);
-    });
+fn run() -> Result<(), anyhow::Error> {
+    match to_art("*STARLANE*".to_string(), "default", 0, 0, 0) {
+        Ok(string) => {
+            let begin = (0xEE, 0xAA, 0x5A);
+            //let begin = (0x00, 0x00, 0x00);
+            let end = (0xFF, 0xFF, 0xFF);
+            // this is bad code however I couldn't find out how to get lines().len() withou
+            // giving up ownership (therefor the clone)
+            let size = string.clone().lines().count();
+            let mut index = 0;
+            for line in  string.lines(){
+                let progress =  index as f32 / size as f32;
+                //let color = begin.clone().lerp(end.clone(), progress);
+                //let color= color.custom();
+                let r = (begin.0 as f32).lerp(end.0 as f32, progress) as u8;
+                let g = (begin.1 as f32).lerp(end.1 as f32, progress) as u8;
+                let b = (begin.2 as f32).lerp(end.2 as f32, progress) as u8;
+                println!("{}", line.truecolor(r, g, b));
+                index = index + 1;
+            }
+
+//            println!("{}", string.truecolor(0xEE, 0xAA, 0x5A));
+        }
+        Err(err) =>  {
+            eprintln!("err! {}", err.to_string());
+        }
+    }
+    let spinner = cliclack::spinner();
+
+
+    spinner.start("Starlane starting...");
 
 
     let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -291,3 +326,61 @@ where
     let result = zip.finish()?;
     Result::Ok(result)
 }
+
+/*
+
+#[derive(Lerp,Clone)]
+struct Color {
+   pub r: Nu,
+   pub g: Nu,
+   pub b: Nu,
+}
+
+#[derive(Lerp,Clone)]
+pub struct Nu {
+    value: u8
+}
+
+impl Nu {
+    pub fn new(value: u8) -> Nu {
+        Nu { value }
+    }
+}
+
+
+impl Mul for Nu {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Nu::new((self.value as f32 * rhs.value as f32) as u8)
+    }
+}
+
+impl Add for Nu {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Nu::new(self.value + rhs.value  )
+    }
+}
+
+impl Color {
+    pub fn new( r: u8, g: u8, b: u8 ) -> Self {
+        let r = Nu::new(r);
+        let g = Nu::new(g);
+        let b = Nu::new(b);
+        Self { r, g, b }
+    }
+
+    pub fn custom(&self) -> CustomColor {
+        CustomColor::new(self.r.value.clone() , self.g.value.0.clone() , self.b.value.0.clone() )
+    }
+}
+
+ */
+
+
+
+
+
+

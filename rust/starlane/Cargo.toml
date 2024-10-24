@@ -123,7 +123,9 @@ cliclack = { workspace = true }
 serde_yaml = { workspace = true }
 derive_builder = { workspace=true }
 pg-embed = { workspace=true , optional=true, features=["rt_tokio"]}
-
+text-to-ascii-art = { workspace = true}
+colored = {workspace = true}
+lerp = { workspace = true, features=["derive"] }
 
 [lib]
 name = "starlane"
