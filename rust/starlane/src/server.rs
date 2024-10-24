@@ -1,8 +1,9 @@
-use std::collections::HashSet;
+#[cfg(feature = "postgres")]
 use crate::registry::postgres::{
     PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
-    PostgresRegistryContextHandle,
+    PostgresRegistryContextHandle
 };
+
 use starlane::space::artifact::asynch::Artifacts;
 use starlane::space::kind::StarSub;
 use starlane::space::loc::{MachineName, StarKey};
@@ -14,24 +15,30 @@ use std::str::FromStr;
 use std::sync::Arc;
 use crate::driver::base::BaseDriverFactory;
 use crate::driver::{DriverAvail, DriversBuilder};
-use crate::driver::artifact::RepoDriverFactory;
 use crate::driver::control::ControlDriverFactory;
 use crate::driver::root::RootDriverFactory;
 use crate::driver::space::SpaceDriverFactory;
-use crate::env::{STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_REGISTRY_DATABASE, STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_URL, STARLANE_REGISTRY_USER};
-use crate::err::{HypErr};
+use crate::env::{STARLANE_CONTROL_PORT, STARLANE_DATA_DIR};
+use crate::err::HypErr;
 use crate::hyperlane::{AnonHyperAuthenticator, HyperGateSelector, LocalHyperwayGateJumper};
 use crate::hyperlane::tcp::{CertGenerator, HyperlaneTcpServer};
 use crate::hyperspace::machine::MachineTemplate;
 use crate::platform::Platform;
 use crate::hyperspace::reg::{Registry, RegistryWrapper};
-use crate::registry::postgres::err::RegErr;
+#[cfg(feature = "postgres")]
+use crate::registry::err::RegErr;
 
 #[derive(Clone)]
 pub struct Starlane {
+    #[cfg(feature = "postgres")]
     pub handle: PostgresRegistryContextHandle, //    pub ctx: P::RegistryContext
+
+
     pub registry_platform: StarlanePostgres,
-    artifacts: Artifacts
+    artifacts: Artifacts,
+
+    #[cfg(not(feature = "postgres"))]
+    pub ctx: MemRegCtx
 }
 
 impl Starlane {

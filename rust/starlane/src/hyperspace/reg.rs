@@ -12,7 +12,7 @@ use starlane::space::security::{Access, AccessGrant, IndexedAccessGrant};
 use starlane::space::selector::Selector;
 use starlane::space::substance::SubstanceList;
 use std::sync::Arc;
-use crate::registry::postgres::err::RegErr;
+use crate::registry::err::RegErr;
 
 pub type Registry = Arc<dyn RegistryApi>;
 

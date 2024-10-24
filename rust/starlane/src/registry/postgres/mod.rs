@@ -3,7 +3,7 @@ pub mod err;
 use crate::err::{err, HypErr};
 use crate::hyperspace::reg::{Registration, RegistryApi};
 use crate::platform::Platform;
-use err::RegErr;
+use crate::registry::err::RegErr;
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
@@ -1491,7 +1491,7 @@ pub mod test {
     use crate::hyperspace::err::HyperErr;
     use crate::hyperspace::machine::MachineTemplate;
     use crate::hyperspace::reg::{Registration, Registry};
-    use crate::registry::postgres::err::RegErr;
+    use crate::registry::err::RegErr;
     use crate::registry::postgres::{
         PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
         PostgresRegistryContextHandle,

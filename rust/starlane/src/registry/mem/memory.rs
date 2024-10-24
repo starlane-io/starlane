@@ -11,7 +11,6 @@ use crate::driver::control::ControlDriverFactory;
 use crate::driver::root::RootDriverFactory;
 use crate::driver::DriverFactory;
 use crate::driver::{DriverAvail, DriversBuilder};
-use crate::err::OldStarErr;
 use crate::hyperspace::machine::MachineTemplate;
 use crate::registry::mem::registry::{MemRegApi, MemRegCtx};
 use crate::platform::Platform;
@@ -22,7 +21,7 @@ use starlane::space::loc::{MachineName, StarKey};
 use std::sync::Arc;
 use crate::driver::space::SpaceDriverFactory;
 
-impl MemCosmos {
+impl Basic {
     pub fn new() -> Self {
         Self {
             ctx: MemRegCtx::new(),
@@ -31,13 +30,12 @@ impl MemCosmos {
 }
 
 #[derive(Clone)]
-pub struct MemCosmos {
+pub struct Basic {
     pub ctx: MemRegCtx,
 }
 
 #[async_trait]
-impl Platform for MemCosmos {
-    type Err = OldStarErr;
+impl Platform for Basic {
     type RegistryContext = MemRegCtx;
     type StarAuth = AnonHyperAuthenticator;
     type RemoteStarConnectionFactory = LocalHyperwayGateJumper;

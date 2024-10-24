@@ -1,9 +1,12 @@
-use std::sync::Arc;
+
+#[cfg(feature = "postgres")]
 use sqlx::Error;
-use strum::ParseError;
+
+
+use std::sync::Arc;
+use starlane::space::point::Point;
 use thiserror::Error;
 use starlane::space::err::{HyperSpatialError, ParseErrs, SpaceErr, SpatialError};
-use starlane::space::point::Point;
 
 #[derive(Error, Debug,Clone)]
 pub enum RegErr {
@@ -11,10 +14,12 @@ pub enum RegErr {
   Parse(#[from] ParseErrs),
   #[error("duplicate error")]
   Dupe,
+  #[cfg(feature = "postgres")]
   #[error("postgres error: {0}")]
   SqlxErr(#[from] Arc<sqlx::Error>),
   #[error(transparent)]
   SpaceErr(#[from] SpaceErr),
+  #[cfg(feature = "postgres")]
   #[error("postgres registry db connection pool '{0}' not found")]
   PoolNotFound(String),
  #[error("expected parent for point `{0}'")]
@@ -22,14 +27,12 @@ pub enum RegErr {
   #[error("Registry does not handle GetOp::State operations")]
   NoGetOpStateOperations,
   #[error("Database Setup Failed")]
-  DatabaseSetupFail,
+  RegistrySetupFailed,
   #[error("Point '{point}' registry error: {message}")]
   Point { point: Point, message: String },
   #[error("{0}")]
   Msg(String),
 }
-
-
 
 impl SpatialError for RegErr {
 
@@ -38,8 +41,6 @@ impl SpatialError for RegErr {
 impl HyperSpatialError for RegErr {
 
 }
-
-
 
 impl From<&str> for RegErr {
     fn from(err: &str) -> Self {
@@ -53,8 +54,7 @@ impl From<&String> for RegErr {
     }
 }
 
-
-
+#[cfg(feature = "postgres")]
 impl From<sqlx::Error> for RegErr {
     fn from(value: Error) -> Self {
         RegErr::SqlxErr(Arc::new(value))
@@ -71,6 +71,7 @@ impl RegErr {
         RegErr::Point {point, message }
     }
 
+    #[cfg(feature = "postgres")]
     pub fn pool_not_found<S:ToString>( key: S ) -> Self {
         Self::PoolNotFound(key.to_string())
     }

@@ -26,7 +26,7 @@ use thiserror::Error;
 use thiserror_context::impl_context;
 use starlane::space::err::{CoreReflector, SpaceErr};
 use starlane::space::wave::core::http2::StatusCode;
-use crate::registry::postgres::err::RegErr;
+use crate::registry::err::RegErr;
 /*
 #[derive(DirectedHandler,Clone)]
 pub struct Global where P: Platform {

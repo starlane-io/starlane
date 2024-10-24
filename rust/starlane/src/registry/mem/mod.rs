@@ -1,2 +1,2 @@
-pub mod cosmos;
+pub mod memory;
 pub mod registry;
