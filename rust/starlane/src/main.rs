@@ -71,6 +71,7 @@ use std::path::Path;
 use std::process;
 use std::str::FromStr;
 use std::time::Duration;
+use anyhow::anyhow;
 use once_cell::sync::Lazy;
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
@@ -92,7 +93,7 @@ pub fn main() -> Result<(), anyhow::Error> {
 
     let cli = Cli::parse();
     match cli.command {
-        Commands::Serve => server(),
+        Commands::Machine => machine(),
         Commands::Term(args) => {
             let runtime = Builder::new_multi_thread().enable_all().build()?;
 
@@ -112,8 +113,9 @@ pub fn main() -> Result<(), anyhow::Error> {
 }
 
 #[cfg(not(feature = "server"))]
-fn server() -> Result<(), OldStarErr> {
-    println!("'serve' feature is not enabled in this starlane installation")
+fn machine() -> Result<(), anyhow::Error> {
+    println!("'' feature is not enabled in this starlane installation");
+    Err(anyhow!("'machine' feature is not enabled in this starlane installation"))?;
 }
 
 #[cfg(feature = "server")]

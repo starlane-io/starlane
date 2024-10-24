@@ -31,31 +31,47 @@ use crate::registry::err::RegErr;
 #[derive(Clone)]
 pub struct Starlane {
     #[cfg(feature = "postgres")]
-    pub handle: PostgresRegistryContextHandle, //    pub ctx: P::RegistryContext
-
-
     pub registry_platform: StarlanePostgres,
-    artifacts: Artifacts,
 
-    #[cfg(not(feature = "postgres"))]
+    artifacts: Artifacts,
+    registry: Registry,
+
     pub ctx: MemRegCtx
 }
 
+pub enum PlatformKind {
+    Simple,
+    #[cfg(feature = "postgres")]
+    Postgres
+}
+
 impl Starlane {
-    pub async fn new() -> Result<Starlane, HypErr> {
-        #[cfg(feature = "postgres")]
-        {
-            let lookup = StarlanePostgres::new();
-            let db = lookup.lookup_registry_db()?;
-            let mut set = HashSet::new();
-            set.insert(db.clone());
-            let ctx = Arc::new(PostgresRegistryContext::new(set,Box::new(lookup)).await?);
-            let handle = PostgresRegistryContextHandle::new(&db, ctx);
-            let artifacts = Artifacts::just_builtins();
-            let registry_platform = StarlanePostgres::new();
-            Ok(Self { handle, artifacts, registry_platform })
-        }
-        #[cfg(not(feature = "postgres"))]
+    pub async fn new(kind: PlatformKind) -> Result<Starlane, HypErr> {
+
+        let artifacts = Artifacts::just_builtins();
+        let registry = match kind{
+            PlatformKind::Simple => {
+
+            }
+            #[cfg(feature = "postgres")]
+            PlatformKind::Postgres=> {
+                    let lookup = StarlanePostgres::new();
+                    let db = lookup.lookup_registry_db()?;
+                    let mut set = HashSet::new();
+                    set.insert(db.clone());
+                    let ctx = Arc::new(PostgresRegistryContext::new(set,Box::new(lookup)).await?);
+                    let handle = PostgresRegistryContextHandle::new(&db, ctx);
+                    let registry_platform = StarlanePostgres::new();
+
+                    let logger = RootLogger::default();
+                    let logger = logger.point(Point::global_registry());
+                    Arc::new(RegistryWrapper::new(Arc::new(
+                        PostgresRegistry::new(self.handle.clone(), Box::new(self.registry_platform.clone()), logger).await?,
+                    )))
+            }
+        };
+
+        return Ok(Self { registry, artifacts})
         {
             let ctx = MemRegCtx::new();
             Ok(Self { ctx })
@@ -152,11 +168,7 @@ impl Platform for Starlane where Self: Sync+Send+Sized{
     }
 
     async fn global_registry(&self) -> Result<Registry, Self::Err> {
-        let logger = RootLogger::default();
-        let logger = logger.point(Point::global_registry());
-        Ok(Arc::new(RegistryWrapper::new(Arc::new(
-            PostgresRegistry::new(self.handle.clone(), Box::new(self.registry_platform.clone()), logger).await?,
-        ))))
+        self.registry.clone()
 
         //        Ok(Arc::new(MemRegApi::new(self.ctx.clone())))
     }
@@ -199,6 +211,7 @@ impl Platform for Starlane where Self: Sync+Send+Sized{
         server.start().unwrap();
     }
 }
+
 
 
 #[cfg(feature = "postgres")]

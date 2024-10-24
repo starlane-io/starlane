@@ -118,6 +118,7 @@ webpki-roots = { workspace = true}
 path-clean = { workspace = true}
 thiserror-context = { workspace = true }
 rustyline = { workspace = true, features=["with-file-history", "with-dirs"]}
+cliclack = { workspace = true }
 
 
 [lib]
