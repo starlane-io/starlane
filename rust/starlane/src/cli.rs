@@ -33,7 +33,7 @@ pub struct Cli {
 #[derive(Debug, Subcommand, EnumString, strum_macros::Display)]
 pub enum Commands {
     Serve,
-    Script(ScriptArgs),
+    Term(ScriptArgs),
     Version,
 }
 
@@ -46,6 +46,9 @@ pub struct ScriptArgs {
     /// Number of times to greet
     #[arg(long)]
     certs: Option<String>,
+
+    #[arg(long)]
+    history: Option<String>
 }
 
 impl Default for ScriptArgs {
@@ -53,29 +56,42 @@ impl Default for ScriptArgs {
         Self {
             host: None,
             certs: None,
+            history: None,
         }
     }
 }
 
-pub async fn script(script: ScriptArgs) -> Result<(), SpaceErr> {
+pub async fn term(script: ScriptArgs) -> Result<(), SpaceErr> {
     let home_dir: String = match dirs::home_dir() {
         None => ".".to_string(),
         Some(dir) => dir.display().to_string(),
     };
 
-    let certs = match script.certs {
+    let certs = match script.certs.as_ref() {
         None => format!("{}/.starlane/localhost/certs", home_dir),
-        Some(certs) => certs,
+        Some(certs) => certs.clone(),
     };
 
-    let host = match script.host {
+    let history= match script.history.as_ref() {
+        None => format!("{}/.starlane/history.log", home_dir),
+        Some(history) => history.clone(),
+    };
+
+    let host = match script.host.as_ref() {
         None => "localhost".to_string(),
-        Some(host) => host,
+        Some(host) => host.clone(),
     };
 
     let session = Session::new(host, certs).await?;
+
+    let mut rl = rustyline::DefaultEditor::new().unwrap();
+    rl.add_history_entry(history.as_str());
+    rl.save_history(history.as_str());
+
     loop {
-        let line: String = text_io::try_read!("{};").map_err(|e| SpaceErr::new(500, "err"))?;
+
+        let line = rl.readline(">> ").unwrap();
+        rl.add_history_entry(line.as_str());
 
         let line_str = line.trim();
 
@@ -87,6 +103,7 @@ pub async fn script(script: ScriptArgs) -> Result<(), SpaceErr> {
             session.command(line.as_str()).await?;
         }
     }
+
 }
 
 pub struct Session {

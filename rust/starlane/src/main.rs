@@ -93,10 +93,10 @@ pub fn main() -> Result<(), anyhow::Error> {
     let cli = Cli::parse();
     match cli.command {
         Commands::Serve => server(),
-        Commands::Script(args) => {
+        Commands::Term(args) => {
             let runtime = Builder::new_multi_thread().enable_all().build()?;
 
-            match runtime.block_on(async move { cli::script(args).await }) {
+            match runtime.block_on(async move { cli::term(args).await }) {
                 Ok(_) => Ok(()),
                 Err(err) => {
                     println!("err! {}", err.to_string());
