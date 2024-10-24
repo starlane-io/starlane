@@ -69,32 +69,41 @@ use tokio::fs;
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
 use zip::write::FileOptions;
+use crate::env::STARLANE_HOME;
 
 #[cfg(feature = "server")]
-pub fn config() -> Result<StarlaneConfig, anyhow::Error> {
-    let home_dir: String = match dirs::home_dir() {
-        None => ".".to_string(),
-        Some(dir) => dir.display().to_string(),
-    };
-    let file = format!("{}/.starlane/config.yaml", home_dir);
-    let config = match fs::try_exists(file.clone()) {
-        Ok(_) => {
-            let config = fs::read_to_string(file)?;
-            serde_yaml::from_str(&config).map_err(|e| anyhow!(e))?
-        }
-        Err(_) => {
-            StarlaneConfig::default()
-        }
-    };
+async fn config() -> StarlaneConfig {
 
-    Ok(config)
-
+    let file = format!("{}/config.yaml", STARLANE_HOME.to_string());
+    let config = match fs::try_exists(file.clone()).await {
+        Ok(true) => {
+            match fs::read_to_string(file.clone()).await {
+                Ok(config) => {
+                    match serde_yaml::from_str(&config).map_err(|e| anyhow!(e)) {
+                        Ok(config) => config,
+                        Err(err) => {
+                            println!("starlane config file '{}' failed to parse: '{}'", file, err.to_string());
+                            Default::default()
+                        }
+                    }
+                }
+                Err(err) => {
+                    println!("starlane config file '{}' error when attempting to read to string: '{}'", file, err.to_string());
+                    Default::default()
+                }
+            }
+        }
+        Ok(false) => {
+           Default::default()
+        }
+        Err(err) => {
+            println!("starlane encountered problem when attempting to load config file: '{}' with error: '{}'", file, err.to_string());
+            Default::default()
+        }
+    };
+    config
 }
 
-let history= match script.history.as_ref() {
-None => ,
-Some(history) => history.clone(),
-};
 
 
 pub fn init() {
@@ -146,12 +155,12 @@ fn machine() -> Result<(), anyhow::Error> {
         std::process::exit(1);
     });
 
-    let config = config()?;
 
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     runtime.block_on(async move {
+        let config = config().await;
         let starlane = Starlane::new(config.kind).await.unwrap();
         let machine_api = starlane.machine();
 

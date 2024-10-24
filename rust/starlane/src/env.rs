@@ -7,6 +7,17 @@ pub static STARLANE_CONTROL_PORT: Lazy<u16> = Lazy::new(|| {
         .parse::<u16>()
         .unwrap_or(4343)
 });
+
+pub static STARLANE_HOME: Lazy<String> = Lazy::new(|| {
+    std::env::var("STARLANE_HOME").unwrap_or_else(|e| {
+        let home_dir: String = match dirs::home_dir() {
+            None => ".".to_string(),
+            Some(dir) => dir.display().to_string(),
+        };
+        format!("{}/.starlane", home_dir).to_string()
+    })
+});
+
 pub static STARLANE_DATA_DIR: Lazy<String> =
     Lazy::new(|| std::env::var("STARLANE_DATA_DIR").unwrap_or("./data/".to_string()));
 static STARLANE_CACHE_DIR: Lazy<String> =
