@@ -33,13 +33,13 @@ pub struct Cli {
 #[derive(Debug, Subcommand, EnumString, strum_macros::Display)]
 pub enum Commands {
     Machine,
-    Term(ScriptArgs),
+    Term(TermArgs),
     Version,
 }
 
 #[derive(Debug, Args)]
 #[command(version, about, long_about = None)]
-pub struct ScriptArgs {
+pub struct TermArgs {
     #[arg(long)]
     host: Option<String>,
 
@@ -51,7 +51,7 @@ pub struct ScriptArgs {
     history: Option<String>
 }
 
-impl Default for ScriptArgs {
+impl Default for TermArgs {
     fn default() -> Self {
         Self {
             host: None,
@@ -61,7 +61,7 @@ impl Default for ScriptArgs {
     }
 }
 
-pub async fn term(script: ScriptArgs) -> Result<(), SpaceErr> {
+pub async fn term(script: TermArgs) -> Result<(), SpaceErr> {
     let home_dir: String = match dirs::home_dir() {
         None => ".".to_string(),
         Some(dir) => dir.display().to_string(),

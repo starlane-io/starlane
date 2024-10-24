@@ -107,3 +107,4 @@ thiserror-context = "0.1.2"
 
 rustyline = "14.0.0"
 cliclack = "0.3.5"
+serde_yaml = "0.9.34"

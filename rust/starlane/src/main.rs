@@ -8,14 +8,12 @@ extern crate lazy_static;
 #[macro_use]
 extern crate starlane_macros;
 
-
 pub static VERSION: Lazy<semver::Version> =
-    Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap() );
+    Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap());
 
-
-pub mod template;
 pub mod err;
 pub mod properties;
+pub mod template;
 
 pub mod env;
 
@@ -26,12 +24,12 @@ pub mod test;
 
 //#[cfg(feature="space")]
 //pub extern crate starlane_space as starlane;
-#[cfg(feature="space")]
+#[cfg(feature = "space")]
 pub mod space {
     pub use starlane_space::space::*;
 }
 
-#[cfg(feature="service")]
+#[cfg(feature = "service")]
 pub mod service;
 
 #[cfg(feature = "hyperspace")]
@@ -41,8 +39,8 @@ pub mod hyperspace;
 pub mod hyperlane;
 pub mod registry;
 
-pub mod host;
 pub mod executor;
+pub mod host;
 
 #[cfg(feature = "cli")]
 pub mod cli;
@@ -55,15 +53,11 @@ mod server;
 #[cfg(feature = "server")]
 pub use server::*;
 
-
-
-
-
-
-
-
 use crate::cli::{Cli, Commands};
+use crate::platform::Platform;
+use anyhow::anyhow;
 use clap::Parser;
+use once_cell::sync::Lazy;
 use starlane::space::loc::ToBaseKind;
 use std::fs::File;
 use std::io::{Read, Seek, Write};
@@ -71,12 +65,9 @@ use std::path::Path;
 use std::process;
 use std::str::FromStr;
 use std::time::Duration;
-use anyhow::anyhow;
-use once_cell::sync::Lazy;
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
 use zip::write::FileOptions;
-use crate::platform::Platform;
 
 pub fn init() {
     #[cfg(feature = "cli")]
@@ -87,6 +78,7 @@ pub fn init() {
             .expect("crypto provider could not be installed");
     }
 }
+
 #[cfg(feature = "cli")]
 pub fn main() -> Result<(), anyhow::Error> {
     init();
@@ -115,14 +107,13 @@ pub fn main() -> Result<(), anyhow::Error> {
 #[cfg(not(feature = "server"))]
 fn machine() -> Result<(), anyhow::Error> {
     println!("'' feature is not enabled in this starlane installation");
-    Err(anyhow!("'machine' feature is not enabled in this starlane installation"))?;
+    Err(anyhow!(
+        "'machine' feature is not enabled in this starlane installation"
+    ))
 }
 
 #[cfg(feature = "server")]
-fn server() -> Result<(), anyhow::Error> {
-
-//    let point = starlane::space::point::Point::from_str("blah.com").unwrap();
-//    println!("POINT {}",point.to_string());
+fn machine() -> Result<(), anyhow::Error> {
     ctrlc::set_handler(move || {
         std::process::exit(1);
     });
@@ -136,17 +127,12 @@ fn server() -> Result<(), anyhow::Error> {
 
         let api = tokio::time::timeout(Duration::from_secs(30), machine_api)
             .await
-            .unwrap().unwrap();
+            .unwrap()
+            .unwrap();
         // this is a dirty hack which is good enough for a 0.3.0 release...
         loop {
             tokio::time::sleep(Duration::from_secs(60)).await;
         }
-        /*
-        let cl = machine_api.clone();
-        machine_api.await_termination().await.unwrap();
-        cl.terminate();
-
-         */
     });
     Ok(())
 }
@@ -163,7 +149,6 @@ Timestamp { millis: Utc::now().timestamp_millis() }
 }
 
 */
-
 
 #[cfg(test)]
 pub mod test {

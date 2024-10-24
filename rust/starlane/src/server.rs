@@ -29,9 +29,24 @@ use crate::hyperspace::machine::MachineTemplate;
 use crate::platform::Platform;
 use crate::hyperspace::reg::{Registry, RegistryWrapper};
 use std::collections::{HashMap, HashSet};
-
+use serde::{Deserialize, Serialize};
+use crate::driver::star::Star;
 use crate::registry::mem::registry::{MemoryRegistry, MemoryRegistryCtx};
 use crate::registry::err::RegErr;
+
+
+#[derive(Clone,Serialize,Deserialize)]
+pub struct StarlaneConfig {
+   pub kind: PlatformKind
+}
+
+impl Default for StarlaneConfig {
+    fn default() -> StarlaneConfig {
+        Self {
+            kind: PlatformKind::Simple
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct Starlane {
