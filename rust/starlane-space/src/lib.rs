@@ -1,4 +1,5 @@
 #![allow(warnings)]
+#![feature(lazy_get)]
 //extern crate alloc;
 #[macro_use]
 extern crate async_trait;

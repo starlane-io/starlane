@@ -67,6 +67,7 @@ use std::process;
 use std::process::Stdio;
 use std::str::FromStr;
 use std::time::Duration;
+use atty::Stream;
 use colored::{Colorize, CustomColor};
 use lerp::Lerp;
 use text_to_ascii_art::fonts::get_font;
@@ -136,7 +137,12 @@ pub fn init() {
 
 #[cfg(feature = "cli")]
 pub fn main() -> Result<(), anyhow::Error> {
+
+
+
+
     ctrlc::set_handler(move || process::exit(1)).unwrap();
+
 
 
     let file = File::create("out.txt").unwrap();

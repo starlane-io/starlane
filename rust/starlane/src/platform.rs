@@ -5,7 +5,7 @@ use starlane::space::particle::property::{PropertiesConfig, PropertiesConfigBuil
 use std::sync::Arc;
 use starlane::space::command::direct::create::KindTemplate;
 use starlane::space::err::SpaceErr;
-use starlane::space::log::RootLogger;
+use starlane::space::log::{root_logger, RootLogger};
 use std::str::FromStr;
 use starlane::space::settings::Timeouts;
 use crate::driver::DriversBuilder;
@@ -62,7 +62,7 @@ where
     fn artifact_hub(&self) -> Artifacts;
     async fn start_services(&self, gate: &Arc<HyperGateSelector>) {}
         fn logger(&self) -> RootLogger {
-        Default::default()
+            root_logger()
     }
 
     fn web_port(&self) -> Result<u16, Self::Err> {

@@ -1997,7 +1997,7 @@ pub mod test_util {
     use starlane::space::err::SpaceErr;
     use starlane::space::hyper::{Greet, InterchangeKind, Knock};
     use starlane::space::loc::{Layer, Surface, ToSurface};
-    use starlane::space::log::{PointLogger, RootLogger};
+    use starlane::space::log::{root_logger, PointLogger, RootLogger};
     use starlane::space::point::Point;
     use starlane::space::settings::Timeouts;
     use starlane::space::substance::Substance;
@@ -2023,7 +2023,7 @@ pub mod test_util {
 
     impl SingleInterchangePlatform {
         pub async fn new() -> Self {
-            let root_logger = RootLogger::default();
+            let root_logger = root_logger();
             let logger = root_logger.point(Point::from_str("point").unwrap());
             let interchange = Arc::new(HyperwayInterchange::new(
                 logger.push_point("interchange").unwrap(),
@@ -2097,7 +2097,7 @@ pub mod test_util {
                 PointLogger::default(),
             );
 
-            let root_logger = RootLogger::default();
+            let root_logger = root_logger();
             let logger = root_logger.point(Point::from_str("less-client").unwrap());
             let less_client = HyperClient::new_with_exchanger(
                 self.less_factory,
@@ -2196,7 +2196,7 @@ pub mod test_util {
                 PointLogger::default(),
             );
 
-            let root_logger = RootLogger::default();
+            let root_logger = root_logger();
             let logger = root_logger.point(Point::from_str("less-client").unwrap());
             let less_client = HyperClient::new_with_exchanger(
                 self.less_factory,
@@ -2299,7 +2299,7 @@ pub mod test {
     use starlane::space::err::SpaceErr;
     use starlane::space::hyper::InterchangeKind;
     use starlane::space::loc::{Layer, ToSurface};
-    use starlane::space::log::RootLogger;
+    use starlane::space::log::{root_logger, RootLogger};
     use starlane::space::point::Point;
     use starlane::space::settings::Timeouts;
     use starlane::space::substance::Substance;
@@ -2469,7 +2469,7 @@ pub mod test {
         {
             let factory = Box::new(TestFactory::new());
             let mut inbound_rx = factory.inbound_rx().await;
-            let root_logger = RootLogger::default();
+            let root_logger = root_logger();
             let logger = root_logger.point(Point::from_str("client").unwrap());
             let client = HyperClient::new(factory, logger).unwrap();
 
@@ -2491,7 +2491,7 @@ pub mod test {
         {
             let factory = Box::new(TestFactory::new());
             let outbound_tx = factory.outbound_tx();
-            let root_logger = RootLogger::default();
+            let root_logger = root_logger();
             let logger = root_logger.point(Point::from_str("client").unwrap());
             let client = HyperClient::new(factory, logger).unwrap();
 
@@ -2519,8 +2519,7 @@ pub mod test {
 
     #[tokio::test]
     pub async fn test_dual_interchange() {
-        let root_logger = RootLogger::default();
-        let logger = root_logger.point(Point::from_str("point").unwrap());
+        let logger = root_logger().point(Point::from_str("point").unwrap());
         let interchange = Arc::new(HyperwayInterchange::new(
             logger.push_point("interchange").unwrap(),
         ));
@@ -2572,7 +2571,7 @@ pub mod test {
             Default::default(),
         );
 
-        let root_logger = RootLogger::default();
+        let root_logger = root_logger();
         let logger = root_logger.point(Point::from_str("less-client").unwrap());
         let less_client =
             HyperClient::new_with_exchanger(less_factory, Some(less_exchanger.clone()), logger)
@@ -2629,7 +2628,7 @@ pub mod test {
     #[tokio::test]
     pub async fn test_bridge() {
         pub fn create(name: &str) -> (Arc<HyperwayInterchange>, Arc<dyn HyperGate>) {
-            let root_logger = RootLogger::default();
+            let root_logger = root_logger();
             let logger = root_logger.point(Point::from_str(name).unwrap());
             let interchange = Arc::new(HyperwayInterchange::new(
                 logger.push_point("interchange").unwrap(),
@@ -2694,7 +2693,7 @@ pub mod test {
             LESS.clone().to_surface(),
             fae_gate.clone(),
         ));
-        let logger = RootLogger::default().point(Point::from_str("bridge").unwrap());
+        let logger  = root_logger().point(Point::from_str("bridge").unwrap());
         let bridge = Bridge::new(fae_endpoint_from_less, fae_factory, logger);
 
         let mut less_access = less_interchange

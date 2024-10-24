@@ -1,4 +1,5 @@
 use once_cell::sync::Lazy;
+use std::string::ToString;
 use uuid::Uuid;
 
 pub static STARLANE_CONTROL_PORT: Lazy<u16> = Lazy::new(|| {
@@ -17,11 +18,18 @@ pub static STARLANE_HOME: Lazy<String> = Lazy::new(|| {
         format!("{}/.starlane", home_dir).to_string()
     })
 });
+pub static STARLANE_LOG_DIR: Lazy<String> = Lazy::new(|| {
+    std::env::var("STARLANE_LOG_DIR").unwrap_or(format!("{}/log", STARLANE_HOME.as_str()).to_string())
+});
 
-pub static STARLANE_DATA_DIR: Lazy<String> =
-    Lazy::new(|| std::env::var("STARLANE_DATA_DIR").unwrap_or("./data/".to_string()));
-static STARLANE_CACHE_DIR: Lazy<String> =
-    Lazy::new(|| std::env::var("STARLANE_CACHE_DIR").unwrap_or("cache".to_string()));
+pub static STARLANE_DATA_DIR: Lazy<String> = Lazy::new(|| {
+    std::env::var("STARLANE_DATA_DIR").unwrap_or(format!("{}/data", STARLANE_HOME.as_str()).to_string())
+});
+
+pub static STARLANE_CACHE_DIR: Lazy<String> = Lazy::new(|| {
+    std::env::var("STARLANE_CACHE_DIR").unwrap_or(format!("{}/cache", STARLANE_HOME.to_string()).to_string())
+});
+
 static STARLANE_TOKEN: Lazy<String> =
     Lazy::new(|| std::env::var("STARLANE_TOKEN").unwrap_or(Uuid::new_v4().to_string()));
 #[cfg(feature = "postgres")]

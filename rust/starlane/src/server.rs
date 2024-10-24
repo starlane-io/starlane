@@ -17,7 +17,7 @@ use crate::driver::{DriverAvail, DriversBuilder};
 use starlane::space::artifact::asynch::Artifacts;
 use starlane::space::kind::StarSub;
 use starlane::space::loc::{MachineName, StarKey};
-use starlane::space::log::RootLogger;
+use starlane::space::log::{root_logger, RootLogger};
 use starlane::space::point::Point;
 use std::fs;
 use std::path::Path;
@@ -194,7 +194,7 @@ impl Starlane {
                 let handle = PostgresRegistryContextHandle::new(&db, ctx);
                 let postgres_lookups = PostgresLookups::new();
 
-                let logger = RootLogger::default();
+                let logger = root_logger();
                 let logger = logger.point(Point::global_registry());
                 Arc::new(RegistryWrapper::new(Arc::new(
                     PostgresRegistry::new(handle, Box::new(postgres_lookups), logger).await?,

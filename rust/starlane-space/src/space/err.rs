@@ -28,6 +28,8 @@ use crate::space::wave::core::{Method, ReflectedCore};
 use serde::{Deserialize, Serialize};
 use strum::{IntoEnumIterator, ParseError};
 use thiserror::Error;
+use tokio::sync::SetError;
+use crate::space::log::RootLogger;
 use crate::space::substance::{Substance, SubstanceErr, SubstanceKind};
 /*
 #[macro_export]
@@ -78,6 +80,12 @@ pub enum SpaceErr {
         expected: String,
         found: String,
     },
+    #[error("could not set RootLogger due to error: '{0}'")]
+    RootLoggerSetErr(String),
+    #[error("the root logger is not available. This probably means that the RootLogger initialization is not happening soon enough.")]
+    RootLoggerNotInt,
+    #[error("the root logger has already been initialized therefore another RootLogger cannot be created.")]
+    RootLoggerAlreadyInit,
     #[error("{0}")]
     Anyhow(#[from] Arc<anyhow::Error>),
 }
@@ -147,6 +155,15 @@ impl SpaceErr {
 impl SpatialError for SpaceErr {
 
 }
+
+
+impl From<SetError<RootLogger>> for SpaceErr {
+    fn from(err: SetError<RootLogger>) -> Self {
+        let err = err.to_string();
+        Self::RootLoggerSetErr(err)
+    }
+}
+
 
 impl From<anyhow::Error> for SpaceErr {
     fn from(err: anyhow::Error) -> Self {

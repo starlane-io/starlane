@@ -7,7 +7,7 @@ use starlane_space::space::parse::util::new_span;
 use starlane::space::command::{CmdTransfer, RawCommand};
 use starlane::space::err::SpaceErr;
 use starlane::space::hyper::Knock;
-use starlane::space::log::RootLogger;
+use starlane::space::log::{root_logger, RootLogger};
 use starlane::space::parse::upload_blocks;
 use starlane::space::point::Point;
 use starlane::space::substance::Substance;
@@ -111,7 +111,7 @@ pub struct Session {
 
 impl Session {
     pub async fn new(host: String, certs: String) -> Result<Self, SpaceErr> {
-        let logger = RootLogger::default();
+        let logger = root_logger();
         let logger = logger.point(Point::from_str("starlane-cli")?);
         let tcp_client: Box<dyn HyperwayEndpointFactory> = Box::new(HyperlaneTcpClient::new(
             format!("{}:{}", host, 4343),

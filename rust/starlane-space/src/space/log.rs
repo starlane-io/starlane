@@ -1,7 +1,10 @@
+use once_cell::sync::Lazy;
 use core::str::FromStr;
+use std::cell::LazyCell;
 use std::collections::HashMap;
+use std::io::Write;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use crate::Agent;
 use regex::Regex;
@@ -10,7 +13,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::io::{AsyncWriteExt, BufWriter};
 use tokio::pin;
+use tokio::sync::{Mutex, OnceCell};
 use crate::space::err::SpaceErr;
+use crate::space::loc;
 use crate::space::loc::{Layer, ToPoint, ToSurface, Uuid};
 use crate::space::parse::CamelCase;
 use crate::space::point::Point;
@@ -24,6 +29,34 @@ use crate::space::wave::exchange::SetStrategy;
 use crate::space::wave::{
     DirectedProto, Handling, HandlingKind, Priority, Retries, ToRecipients, WaitTime,
 };
+
+static LOGGER: LazyLock<RootLogger> = LazyLock::new( ||unsafe{
+    match starlane_root_log_appender(){
+        Ok(appender) => {
+            RootLogger {
+                source: LogSource::Shell,
+                appender
+            }
+        }
+        Err(err) => {
+            let appender = Arc::new(StdOutAppender());
+            let logger=RootLogger {
+                source: LogSource::Shell,
+                appender
+            };
+            logger
+        }
+    }
+
+});
+pub fn root_logger() -> RootLogger{
+    LOGGER.clone()
+}
+
+#[no_mangle]
+extern "C" {
+    pub fn starlane_root_log_appender() -> Result<Arc<dyn LogAppender>,SpaceErr>;
+}
 
 
 
@@ -181,7 +214,7 @@ impl ToString for LogPayload {
     }
 }
 
-pub struct RootLogBuilder {
+pub struct RootLoggerBuilder {
     pub point: Option<Point>,
     pub span: Option<Uuid>,
     pub logger: RootLogger,
@@ -191,9 +224,9 @@ pub struct RootLogBuilder {
     msg_overrides: Vec<String>,
 }
 
-impl RootLogBuilder {
+impl RootLoggerBuilder {
     pub fn new(logger: RootLogger, span: Option<Uuid>) -> Self {
-        RootLogBuilder {
+        RootLoggerBuilder {
             logger,
             span,
             point: None,
@@ -342,29 +375,25 @@ pub trait LogAppender: Send + Sync {
     fn pointless(&self, log: PointlessLog);
 }
 
+
 #[derive(Clone)]
 pub struct RootLogger {
     source: LogSource,
     appender: Arc<dyn LogAppender>,
 }
 
+
+
+/*
 impl Default for RootLogger {
     fn default() -> Self {
         RootLogger::new(LogSource::Core, Arc::new(StdOutAppender::new()))
     }
 }
 
-impl RootLogger {
-    pub fn new(source: LogSource, appender: Arc<dyn LogAppender>) -> Self {
-        Self { source, appender }
-    }
+ */
 
-    pub fn stdout(source: LogSource) -> Self {
-        Self {
-            source,
-            ..RootLogger::default()
-        }
-    }
+impl RootLogger {
 
     fn source(&self) -> LogSource {
         self.source.clone()
@@ -520,7 +549,7 @@ pub struct PointLogger {
 impl Default for PointLogger {
     fn default() -> Self {
         Self {
-            logger: Default::default(),
+            logger: root_logger(),
             point: Point::root(),
             mark: Point::root(),
             action: None,
@@ -955,7 +984,7 @@ impl SpanLogger {
     }
 
     pub fn builder(&self) -> LogBuilder {
-        let builder = RootLogBuilder::new(self.root_logger.clone(), None);
+        let builder = RootLoggerBuilder::new(self.root_logger.clone(), None);
         let builder = LogBuilder::new(self.root_logger.clone(), builder);
         builder
     }
@@ -1007,11 +1036,11 @@ impl Drop for SpanLogger {
 
 pub struct LogBuilder {
     logger: RootLogger,
-    builder: RootLogBuilder,
+    builder: RootLoggerBuilder,
 }
 
 impl LogBuilder {
-    pub fn new(logger: RootLogger, builder: RootLogBuilder) -> Self {
+    pub fn new(logger: RootLogger, builder: RootLoggerBuilder) -> Self {
         LogBuilder { logger, builder }
     }
 
@@ -1224,8 +1253,8 @@ impl TrackDef<String> {
 pub struct FileAppender(tokio::sync::mpsc::Sender<Log>);
 
 impl FileAppender {
-    pub fn new<A>(file:A) -> Self where A: AsyncWriteExt+Sync+Send+'static {
-        FileAppender(InnerFileAppender::new(file))
+    pub fn new<A>(writer:A) -> Self where A: Write+Sync+Send+'static {
+        FileAppender(InnerFileAppender::new(writer))
     }
 }
 
@@ -1260,22 +1289,21 @@ impl LogAppender for FileAppender {
 
 
 
-struct InnerFileAppender<F> where F: AsyncWriteExt  {
+struct InnerFileAppender<F> where F: Write {
     rx: tokio::sync::mpsc::Receiver<Log>,
-    file: Pin<Box<F>>
+    writer: F
 }
 
-impl<F> InnerFileAppender<F> where F: AsyncWriteExt+ Sync+Send+'static{
+impl<F> InnerFileAppender<F> where F: Write+ Sync+Send+'static{
 
-    fn new(file: F) -> tokio::sync::mpsc::Sender<Log> {
-        let file = Box::pin(file);
+    fn new(writer: F) -> tokio::sync::mpsc::Sender<Log> {
         let (tx, rx) = tokio::sync::mpsc::channel(1024);
 
 
        let appender =  Self {
             rx,
-            file
-        };
+           writer
+       };
 
         appender.start();
 
@@ -1286,8 +1314,8 @@ impl<F> InnerFileAppender<F> where F: AsyncWriteExt+ Sync+Send+'static{
         tokio::spawn( async move {
             while let Some(log) = self.rx.recv().await {
                 let log = format!("{} | {}", log.point.to_string(), log.payload.to_string());
-                self.file.write_all(log.as_bytes()).await.unwrap_or_default();
-                self.file.flush().await.unwrap_or_default();
+                self.writer.write_all(log.as_bytes()).unwrap_or_default();
+                self.writer.flush().unwrap_or_default();
             }
         });
     }
