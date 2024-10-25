@@ -37,6 +37,7 @@ pub enum Commands {
     Run,
     Term(TermArgs),
     Version,
+    Splash,
 }
 
 #[derive(Debug, Args)]
