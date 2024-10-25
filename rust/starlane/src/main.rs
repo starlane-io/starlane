@@ -68,7 +68,7 @@ use std::process::Stdio;
 use std::str::FromStr;
 use std::time::Duration;
 use atty::Stream;
-use cliclack::{clear_screen, confirm, intro, multi_progress, progress_bar, select, spinner, ProgressBar};
+use cliclack::{clear_screen, confirm, intro, multi_progress, outro, progress_bar, select, spinner, ProgressBar};
 use colored::{Colorize, CustomColor};
 use lerp::Lerp;
 use text_to_ascii_art::fonts::get_font;
@@ -184,6 +184,9 @@ fn run() -> Result<(), anyhow::Error> {
         .build()?;
     runtime.block_on(async move {
 
+        splash().await;
+
+
 
         let config = config().await;
         let starlane = Starlane::new(config.registry).await.unwrap();
@@ -194,6 +197,8 @@ fn run() -> Result<(), anyhow::Error> {
             .unwrap()
             .unwrap();
         // this is a dirty hack which is good enough for a 0.3.0 release...
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        outro("starlane is running.");
         loop {
             tokio::time::sleep(Duration::from_secs(60)).await;
         }
@@ -417,42 +422,37 @@ pub enum StartSequence{
 
 
 
-fn demo() -> Result<(), anyhow::Error> {
+#[tokio::main]
+async fn demo() -> Result<(), anyhow::Error> {
 
 
+    intro("STARLANE DEMO");
 
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()?;
-    runtime.block_on(async move {
 
-        tokio::spawn( async {
-            async fn wait(t:u64) {
+            async fn wait(t: u64) {
                 tokio::time::sleep(Duration::from_millis(t)).await;
             }
             wait(1000).await;
             {
                 let spinner = spinner();
                 spinner.start("starting...");
-                wait(5000 ).await;
+                wait(5000).await;
                 spinner.stop("start successful!");
-                wait(250 ).await;
+                wait(250).await;
                 clear_screen();
-                wait(1000 ).await;
+                wait(1000).await;
                 splash().await;
-                wait(1000 ).await;
+                wait(1000).await;
                 spinner.stop("Config not found");
                 intro("Install?");
             }
 
             let selected = select(
-r#"This Starlane instance has not configured.
+                r#"This Starlane instance has not configured.
 This program (the Starlane Runner) must either be a stand alone cluster or can connect to a remote cluster.
 \n
 Would you like to install a cluster on this machine or provide a configuration for a remote machine?
 "#
-
-
             )
                 .item("this", "Install stand alone on this machine", "")
                 .item("remote", "Configure to access a remote machine", "")
@@ -460,11 +460,9 @@ Would you like to install a cluster on this machine or provide a configuration f
 
             wait(1000).await;
             let postgres = select(
-r#"Starlane needs a Postgres instance as it's registry when in stand alone mode.\n
+                r#"Starlane needs a Postgres instance as it's registry when in stand alone mode.\n
 Do you have an existing postgres instance that you would like Starlane to connect to or
 would your prefer Starlane to install and manage its own Postgres instance?"#
-
-
             )
                 .item("remote", "Connect to an existing Postgres Cluster Instance", "")
                 .item("this", "Let Starlane manage its own Postgres instance", "")
@@ -473,35 +471,34 @@ would your prefer Starlane to install and manage its own Postgres instance?"#
             wait(1000).await;
 
 
-
             let multi = multi_progress("Downloading Service Extensions");
             let postgres = multi.add(progress_bar(100));
-            let filestore  = multi.add(progress_bar(100).with_download_template());
-            let artifacts= multi.add(progress_bar(100).with_download_template());
+            let filestore = multi.add(progress_bar(100).with_download_template());
+            let artifacts = multi.add(progress_bar(100).with_download_template());
             let spinner = multi.add(spinner());
 
             async fn go(bar: ProgressBar, name: &'static str, size: u64) {
-                bar.start(format!("looking up: '{}'",name));
+                bar.start(format!("looking up: '{}'", name));
                 tokio::time::sleep(Duration::from_millis(size)).await;
-                bar.set_message(format!("downloading {}...",name));
+                bar.set_message(format!("downloading {}...", name));
                 tokio::time::sleep(Duration::from_millis(size)).await;
                 for _ in 0..100 {
                     bar.inc(1);
-                    tokio::time::sleep(Duration::from_millis(size/100)).await;
+                    tokio::time::sleep(Duration::from_millis(size / 100)).await;
                 }
                 tokio::time::sleep(Duration::from_millis(size)).await;
                 bar.set_message(format!("{} download complete", name));
 
-                tokio::time::sleep(Duration::from_millis(size*2)).await;
+                tokio::time::sleep(Duration::from_millis(size * 2)).await;
 
                 bar.set_message(format!("installing {}", name));
                 tokio::time::sleep(Duration::from_millis(500)).await;
                 for _ in 0..100 {
                     bar.inc(1);
-                    tokio::time::sleep(Duration::from_millis(3*(size/100))).await;
+                    tokio::time::sleep(Duration::from_millis(3 * (size / 100))).await;
                 }
                 tokio::time::sleep(Duration::from_millis(500)).await;
-                bar.stop(format!("{} installation complete",name));
+                bar.stop(format!("{} installation complete", name));
             }
 
             let postgres = go(postgres, "postgres", 500);
@@ -517,21 +514,18 @@ would your prefer Starlane to install and manage its own Postgres instance?"#
             spinner.stop("Service extension installation complete.");
 
             multi.stop();
-        });
 
-        println!();
-        println!();
-        println!();
-        println!();
-        let end= (0x6D, 0xD7, 0xFD);
-        println!("{}", "Installation complete! To run your local starlane instance: `starlane run` ".to_string().truecolor(COLORS.0,COLORS.1,COLORS.2));
-        println!();
-        println!();
-    //    process::exit(0);
+            println!();
+            println!();
+            println!();
+            println!();
+            println!("{}", "Installation complete! To run your local starlane instance: `starlane run` ".to_string().truecolor(COLORS.0, COLORS.1, COLORS.2));
+            println!();
+            println!();
 
-    });
+          outro("DEMO COMPLETED");
+            process::exit(0);
 
 
-
-    Ok(())
-}
+            Ok(())
+        }
