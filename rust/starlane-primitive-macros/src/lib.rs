@@ -420,7 +420,7 @@ pub fn mark(_item: TokenStream) -> TokenStream {
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
-    builder.build().unwrap();
+    builder.build().unwrap()
         };
 
    rtn.into()
@@ -430,11 +430,13 @@ pub fn mark(_item: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn create_mark(_item: TokenStream) -> TokenStream {
     let rtn = quote! {
+        {
     let mut builder = LogMarkBuilder::default();
     builder.package(env!("CARGO_PKG_NAME").to_string());
     builder.file(file!().to_string());
     builder.line(line!().to_string());
-    builder.build().unwrap();
+    builder.build().unwrap()
+            }
         };
 
     rtn.into()

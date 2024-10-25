@@ -577,7 +577,7 @@ impl From<io::Error> for SpaceErr {
     }
 }
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Clone, Error, Serialize,Deserialize)]
 pub struct ParseErrs {
     pub report: Vec<Report>,
     pub src: String,

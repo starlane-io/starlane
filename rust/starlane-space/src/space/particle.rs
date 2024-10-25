@@ -58,10 +58,7 @@ pub enum Status {
 #[derive(
     Debug,
     Clone,
-    Serialize,
-    Deserialize,
     strum_macros::Display,
-    strum_macros::EnumString,
 )]
 
 pub enum StatusDetail {
@@ -74,6 +71,12 @@ pub enum StatusDetail {
     Paused,
     Resuming,
     Done,
+}
+
+impl Default for StatusDetail {
+    fn default() -> Self {
+        Self::Unknown
+    }
 }
 
 impl Into<Status> for StatusDetail {

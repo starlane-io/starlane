@@ -13,7 +13,7 @@ use crate::space::command::{Command, RawCommand};
 use crate::space::err::{ParseErrs, SpatialError};
 use crate::space::hyper::{Greet, HyperSubstance, HyperSubstanceKind, Knock, ParticleLocation};
 use crate::space::loc::Meta;
-use crate::space::log::{AuditLog, Log, LogSpan, LogSpanEvent, PointlessLog};
+use crate::space::log::{ Log, LogSpan, SpanEvent, PointlessLog};
 use crate::space::parse::model::Subst;
 use crate::space::parse::Env;
 use crate::space::particle::Particle;
@@ -319,7 +319,7 @@ impl Substance {
 pub enum LogSubstance {
     Log(Log),
     Span(LogSpan),
-    Event(LogSpanEvent),
+    Event(SpanEvent),
     Pointless(PointlessLog),
 }
 

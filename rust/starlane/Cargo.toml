@@ -128,6 +128,7 @@ colored = {workspace = true}
 lerp = { workspace = true, features=["derive"] }
 atty ={workspace = true}
 #rolling-file = {workspace = true}
+derive-name = {workspace = true}
 
 [lib]
 name = "starlane"
