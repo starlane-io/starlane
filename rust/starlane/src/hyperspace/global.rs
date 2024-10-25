@@ -26,7 +26,7 @@ use thiserror::Error;
 use thiserror_context::impl_context;
 use starlane::space::err::{CoreReflector, SpaceErr};
 use starlane::space::wave::core::http2::StatusCode;
-use crate::registry::postgres::err::RegErr;
+use crate::registry::err::RegErr;
 /*
 #[derive(DirectedHandler,Clone)]
 pub struct Global where P: Platform {
@@ -96,7 +96,6 @@ impl GlobalCommandExecutionHandler
                 Ok(ReflectedCore::ok())
             }
             Command::Read(read) => {
-                println!("\tread cmd : {}", read.point.to_string());
                 // proxy the read command
                 let mut proto = DirectedProto::ping();
                 proto.method(CmdMethod::Read);
@@ -186,7 +185,6 @@ impl GlobalExecutionChamber
         };
 
         if create.state.has_substance() || child_kind.is_auto_provision() {
-            println!("\tprovisioning: {}", point.to_string());
             let provisioner  = SmartLocator::new(self.skel.clone());
             //tokio::spawn(async move {
             provisioner.provision(&point, create.state.clone()).await?;

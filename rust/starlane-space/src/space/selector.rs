@@ -1145,9 +1145,6 @@ impl PointHierarchy {
         KindParts: Clone,
         BaseKind: Clone,
     {
-        if let PointSeg::Root = segment.segment {
-            println!("pushing ROOT");
-        }
         let mut segments = self.segments.clone();
         segments.push(segment);
         Self {

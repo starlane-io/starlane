@@ -1,4 +1,5 @@
 use once_cell::sync::Lazy;
+use std::string::ToString;
 use uuid::Uuid;
 
 pub static STARLANE_CONTROL_PORT: Lazy<u16> = Lazy::new(|| {
@@ -7,17 +8,43 @@ pub static STARLANE_CONTROL_PORT: Lazy<u16> = Lazy::new(|| {
         .parse::<u16>()
         .unwrap_or(4343)
 });
-pub static STARLANE_DATA_DIR: Lazy<String> =
-    Lazy::new(|| std::env::var("STARLANE_DATA_DIR").unwrap_or("./data/".to_string()));
-static STARLANE_CACHE_DIR: Lazy<String> =
-    Lazy::new(|| std::env::var("STARLANE_CACHE_DIR").unwrap_or("cache".to_string()));
+
+pub static STARLANE_HOME: Lazy<String> = Lazy::new(|| {
+    std::env::var("STARLANE_HOME").unwrap_or_else(|e| {
+        let home_dir: String = match dirs::home_dir() {
+            None => ".".to_string(),
+            Some(dir) => dir.display().to_string(),
+        };
+        format!("{}/.starlane", home_dir).to_string()
+    })
+});
+pub static STARLANE_LOG_DIR: Lazy<String> = Lazy::new(|| {
+    std::env::var("STARLANE_LOG_DIR").unwrap_or(format!("{}/log", STARLANE_HOME.as_str()).to_string())
+});
+
+pub static STARLANE_DATA_DIR: Lazy<String> = Lazy::new(|| {
+    std::env::var("STARLANE_DATA_DIR").unwrap_or(format!("{}/data", STARLANE_HOME.as_str()).to_string())
+});
+
+pub static STARLANE_CACHE_DIR: Lazy<String> = Lazy::new(|| {
+    std::env::var("STARLANE_CACHE_DIR").unwrap_or(format!("{}/cache", STARLANE_HOME.to_string()).to_string())
+});
+
 static STARLANE_TOKEN: Lazy<String> =
     Lazy::new(|| std::env::var("STARLANE_TOKEN").unwrap_or(Uuid::new_v4().to_string()));
+#[cfg(feature = "postgres")]
 pub static STARLANE_REGISTRY_URL: Lazy<String> =
     Lazy::new(|| std::env::var("STARLANE_REGISTRY_URL").unwrap_or("localhost".to_string()));
+#[cfg(feature = "postgres")]
 pub static STARLANE_REGISTRY_USER: Lazy<String> =
     Lazy::new(|| std::env::var("STARLANE_REGISTRY_USER").unwrap_or("postgres".to_string()));
+#[cfg(feature = "postgres")]
 pub static STARLANE_REGISTRY_PASSWORD: Lazy<String> =
     Lazy::new(|| std::env::var("STARLANE_REGISTRY_PASSWORD").unwrap_or("password".to_string()));
+#[cfg(feature = "postgres")]
 pub static STARLANE_REGISTRY_DATABASE: Lazy<String> =
     Lazy::new(|| std::env::var("STARLANE_REGISTRY_DATABASE").unwrap_or("postgres".to_string()));
+
+#[cfg(feature = "postgres")]
+pub static STARLANE_REGISTRY_SCHEMA: Lazy<String> =
+    Lazy::new(|| std::env::var("STARLANE_REGISTRY_SCHEMA").unwrap_or("public".to_string()));

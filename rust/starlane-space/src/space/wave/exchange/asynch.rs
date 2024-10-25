@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use crate::space::loc::{ToPoint, ToSurface};
-use crate::space::log::{PointLogger, RootLogger, Trackable, Tracker};
+use crate::space::log::{root_logger, PointLogger, RootLogger, Trackable, Tracker};
 use crate::space::particle::traversal::Traversal;
 use crate::space::point::Point;
 use crate::space::settings::Timeouts;
@@ -484,7 +484,7 @@ impl Default for Exchanger {
         Self::new(
             Point::root().to_surface(),
             Default::default(),
-            RootLogger::default().point(Point::root()),
+            root_logger().point(Point::root()),
         )
     }
 }

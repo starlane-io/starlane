@@ -1,9 +1,7 @@
-pub mod err;
+pub mod embed;
 
-use crate::err::{err, HypErr};
-use crate::hyperspace::reg::{Registration, RegistryApi};
 use crate::platform::Platform;
-use err::RegErr;
+use crate::registry::err::RegErr;
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
@@ -43,10 +41,14 @@ use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
+use serde::{Deserialize, Serialize};
+use crate::Database;
+use crate::env::{STARLANE_REGISTRY_DATABASE, STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_SCHEMA, STARLANE_REGISTRY_URL, STARLANE_REGISTRY_USER};
+use crate::hyperspace::reg::{Registration, RegistryApi};
 
 pub trait PostgresPlatform: Send + Sync {
-    fn lookup_registry_db(&self) -> Result<PostgresDbInfo, RegErr>;
-    fn lookup_star_db(&self, star: &StarKey) -> Result<PostgresDbInfo, RegErr>;
+    fn lookup_registry_db(&self) -> Result<Database<PostgresConnectInfo>, RegErr>;
+    fn lookup_star_db(&self, star: &StarKey) -> Result<Database<PostgresConnectInfo>, RegErr>;
 }
 
 pub struct PostgresRegistry {
@@ -194,6 +196,8 @@ impl RegistryApi for PostgresRegistry {
     }
 
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), RegErr> {
+
+
         /*
         async fn check<'a>( registration: &Registration,  trans:&mut Transaction<Postgres>, ) -> Result<(),Erroror> {
             let params = RegistryParams::from_registration(registration)?;
@@ -500,32 +504,6 @@ impl RegistryApi for PostgresRegistry {
         Ok(list)
     }
 
-    //    #[async_recursion]
-    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, RegErr> {
-        let point = select.pattern.query_root();
-
-        let hierarchy = self
-            .query(&point, &Query::PointHierarchy)
-            .await?
-            .try_into()?;
-
-        let sub_select_hops = select.pattern.sub_select_hops();
-        let sub_select = select
-            .clone()
-            .sub_select(point.clone(), sub_select_hops, hierarchy);
-        let mut list = self.sub_select(&sub_select).await?;
-        if select.pattern.matches_root() {
-            list.push(Stub {
-                point: Point::root(),
-                kind: Kind::Root,
-                status: Status::Ready,
-            });
-        }
-
-        let list = sub_select.into_payload.to_primitive(list)?;
-
-        Ok(list)
-    }
 
     //    #[async_recursion]
     async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, RegErr> {
@@ -1284,11 +1262,9 @@ impl PostgresRegistry {
                  */
             }
             GetOp::Properties(keys) => {
-                println!("GET PROPERTIES for {}", get.point.to_string());
                 let properties = self.get_properties(&get.point).await?;
                 let mut map = SubstanceMap::new();
                 for (index, property) in properties.iter().enumerate() {
-                    println!("\tprop{}", property.0.clone());
                     map.insert(
                         property.0.clone(),
                         Substance::Text(property.1.value.clone()),
@@ -1337,7 +1313,7 @@ pub struct PostgresRegistryContextHandle {
 }
 
 impl PostgresRegistryContextHandle {
-    pub fn new(db: &PostgresDbInfo, pool: Arc<PostgresRegistryContext>) -> Self {
+    pub fn new(db: &Database<PostgresConnectInfo>, pool: Arc<PostgresRegistryContext>) -> Self {
         Self {
             key: db.to_key(),
             schema: db.schema.clone(),
@@ -1361,7 +1337,7 @@ pub struct PostgresRegistryContext {
 
 impl PostgresRegistryContext {
     pub async fn new(
-        dbs: HashSet<PostgresDbInfo>,
+        dbs: HashSet<Database<PostgresConnectInfo>>,
         platform: Box<dyn PostgresPlatform>,
     ) -> Result<Self, RegErr> {
         let mut pools = HashMap::new();
@@ -1419,62 +1395,40 @@ impl ToString for &PostgresDbKey {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Hash)]
-pub struct PostgresDbInfo {
+#[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct PostgresConnectInfo {
     pub url: String,
     pub user: String,
     pub password: String,
-    pub database: String,
-    pub schema: String,
+
 }
 
-impl PostgresDbInfo {
-    pub fn new<Url, User, Pass, Db>(url: Url, user: User, password: Pass, database: Db) -> Self
+impl Default for PostgresConnectInfo {
+    fn default() -> Self {
+        PostgresConnectInfo {
+            url: STARLANE_REGISTRY_URL.to_string(),
+            user: STARLANE_REGISTRY_USER.to_string(),
+            password: STARLANE_REGISTRY_PASSWORD.to_string(),
+
+        }
+    }
+}
+
+impl PostgresConnectInfo {
+    pub fn new<Url, User, Pass>(url: Url, user: User, password: Pass) -> Self
     where
         Url: ToString,
         User: ToString,
         Pass: ToString,
-        Db: ToString,
     {
-        Self::new_with_schema(
-            url.to_string(),
-            user.to_string(),
-            password.to_string(),
-            database.to_string(),
-            "PUBLIC".to_string(),
-        )
-    }
-
-    pub fn new_with_schema(
-        url: String,
-        user: String,
-        password: String,
-        database: String,
-        schema: String,
-    ) -> Self {
         Self {
-            url,
-            user,
-            password,
-            database,
-            schema,
+            url: url.to_string(),
+            user: user.to_string(),
+            password: password.to_string(),
         }
     }
 
-    pub fn to_key(&self) -> PostgresDbKey {
-        PostgresDbKey {
-            url: self.url.clone(),
-            user: self.user.clone(),
-            database: self.database.clone(),
-        }
-    }
 
-    pub fn to_uri(&self) -> String {
-        format!(
-            "postgres://{}:{}@{}/{}",
-            self.user, self.password, self.url, self.database
-        )
-    }
 }
 
 #[cfg(test)]
@@ -1491,9 +1445,9 @@ pub mod test {
     use crate::hyperspace::err::HyperErr;
     use crate::hyperspace::machine::MachineTemplate;
     use crate::hyperspace::reg::{Registration, Registry};
-    use crate::registry::postgres::err::RegErr;
+    use crate::registry::err::RegErr;
     use crate::registry::postgres::{
-        PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
+        PostgresConnectInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
         PostgresRegistryContextHandle,
     };
     use crate::StarlanePostgres;

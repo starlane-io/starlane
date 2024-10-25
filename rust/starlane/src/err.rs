@@ -7,7 +7,7 @@ use tokio::io;
 use tokio::sync::oneshot::error::RecvError;
 
 #[cfg(feature = "postgres")]
-use crate::registry::postgres::err::RegErr;
+use crate::registry::err::RegErr;
 use starlane::space::err::{CoreReflector, HyperSpatialError, SpaceErr, SpatialError};
 use starlane::space::kind::Kind;
 use starlane::space::point::Point;

@@ -57,7 +57,6 @@ impl Path {
                 Some(some) => match Self::from_str(some) {
                     Ok(parent) => Option::Some(parent),
                     Err(error) => {
-                        eprintln!("{}", error.to_string());
                         Option::None
                     }
                 },

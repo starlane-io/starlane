@@ -576,7 +576,7 @@ impl From<&str> for Error {
 #[cfg(test)]
 mod tests {
     use starlane::space::loc::ToSurface;
-    use starlane::space::log::RootLogger;
+    use starlane::space::log::{root_logger, RootLogger};
     use std::str::FromStr;
     use anyhow::anyhow;
     use crate::hyperlane::tcp::{CertGenerator, Error, HyperlaneTcpClient, HyperlaneTcpServer};
@@ -604,7 +604,7 @@ mod tests {
         CertGenerator::gen(vec!["localhost".to_string()])?
             .write_to_dir(".".to_string())
             .await?;
-        let logger = RootLogger::default();
+        let logger = root_logger();
         let logger = logger.point(Point::from_str("tcp-blah").unwrap());
         let port = 4344u16;
         let server =
@@ -644,7 +644,7 @@ mod tests {
         CertGenerator::gen(vec!["localhost".to_string()])?
             .write_to_dir(".".to_string())
             .await?;
-        let logger = RootLogger::default();
+        let logger = root_logger();
         let logger = logger.point(Point::from_str("tcp-blah").unwrap());
         let port = 4345u16;
         let server =

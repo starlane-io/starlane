@@ -15,7 +15,7 @@ use crate::hyperspace::machine::MachineErr;
 use crate::hyperspace::reg::{Registration, Registry};
 use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
 use crate::platform::Platform;
-use crate::registry::postgres::err::RegErr;
+use crate::registry::err::RegErr;
 use crate::service::{
     Service, ServiceConf, ServiceErr, ServiceKind, ServiceRunner, ServiceSelector, ServiceTemplate,
 };

@@ -59,34 +59,22 @@ fn main() -> Result<(),()> {
         }
         Commands::List { path } => {
 
-            println!("path.is_some() : {}", path.is_some());
             let path = match &path {
                 None => PathBuf::from(pwd.clone()),
                 Some(path) => path.clone()
             };
 
-            println!("files for {}", path.display());
             let paths = fs::read_dir(path).unwrap();
 
 
             for path in paths {
                 let path = path.unwrap().path();
-                match path.is_dir() {
-                    true => {
-                        // we signal a directory path by appending a slash to the end
-                        println!("{}/", path.display())
-                    }
-                    false => {
-                        println!("{}", path.display())
-                    }
-                }
             }
         }
     Commands::Pwd =>  {
-        println!("{}", pwd);
+        //println!("{}", pwd);
     }
         Commands::Test =>  {
-            println!("testing...");
             let dir = Path::new("subdir");
 
             /*fs::metadata(dir).and_then( |m| {
@@ -96,25 +84,17 @@ fn main() -> Result<(),()> {
            // fs::create_dir(dir).unwrap();
 
              */
-            println!("create_dir: {} ", dir.to_str().unwrap() );
 
 
             let file = dir.join("file1.txt");
             let mut file = File::create(file).unwrap();
             file.write_all(b"Hello, world!").unwrap();
-            println!("write: file1.txt");
 
             let file = dir.join("file2.txt");
             let mut file = File::create(file).unwrap();
             file.write_all(b"Blah Blah blah!").unwrap();
-            println!("write: file2.txt");
             let paths = fs::read_dir(dir).unwrap();
-            println!("ls...");
-            paths.into_iter().map( |d| d.unwrap() ).for_each(|e| {println!("- {}",e.file_name().to_os_string().to_str().unwrap())});
-
-
-            println!("done");
-
+            paths.into_iter().map( |d| d.unwrap() );
 
         }
         Commands::Exists { path } => {
@@ -132,7 +112,6 @@ fn main() -> Result<(),()> {
         }
     }
 
-    println!("done from WASM");
 
     Ok(())
 }

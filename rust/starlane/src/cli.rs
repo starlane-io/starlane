@@ -7,7 +7,7 @@ use starlane_space::space::parse::util::new_span;
 use starlane::space::command::{CmdTransfer, RawCommand};
 use starlane::space::err::SpaceErr;
 use starlane::space::hyper::Knock;
-use starlane::space::log::RootLogger;
+use starlane::space::log::{root_logger, RootLogger};
 use starlane::space::parse::upload_blocks;
 use starlane::space::point::Point;
 use starlane::space::substance::Substance;
@@ -22,6 +22,7 @@ use tokio::io::AsyncWriteExt;
 use walkdir::{DirEntry, WalkDir};
 use zip::write::FileOptions;
 use starlane::space::parse::util::result;
+use crate::env::STARLANE_HOME;
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -32,14 +33,15 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand, EnumString, strum_macros::Display)]
 pub enum Commands {
-    Serve,
-    Term(ScriptArgs),
+    Demo,
+    Run,
+    Term(TermArgs),
     Version,
 }
 
 #[derive(Debug, Args)]
 #[command(version, about, long_about = None)]
-pub struct ScriptArgs {
+pub struct TermArgs {
     #[arg(long)]
     host: Option<String>,
 
@@ -48,50 +50,47 @@ pub struct ScriptArgs {
     certs: Option<String>,
 
     #[arg(long)]
-    history: Option<String>
+    history_log: Option<String>
 }
 
-impl Default for ScriptArgs {
+impl Default for TermArgs {
     fn default() -> Self {
+
         Self {
             host: None,
             certs: None,
-            history: None,
+            history_log: None
         }
     }
 }
 
-pub async fn term(script: ScriptArgs) -> Result<(), SpaceErr> {
-    let home_dir: String = match dirs::home_dir() {
-        None => ".".to_string(),
-        Some(dir) => dir.display().to_string(),
+pub async fn term(args: TermArgs) -> Result<(), SpaceErr> {
+    let history_log = match args.history_log {
+        None => format!("{}/history.log", STARLANE_HOME.to_string()).to_string(),
+        Some(history) => history.to_string(),
     };
 
-    let certs = match script.certs.as_ref() {
-        None => format!("{}/.starlane/localhost/certs", home_dir),
+    let certs = match args.certs.as_ref() {
+        None => format!("{}/localhost/certs", STARLANE_HOME.to_string()),
         Some(certs) => certs.clone(),
     };
 
-    let history= match script.history.as_ref() {
-        None => format!("{}/.starlane/history.log", home_dir),
-        Some(history) => history.clone(),
-    };
-
-    let host = match script.host.as_ref() {
+    let host = match args.host.as_ref() {
         None => "localhost".to_string(),
         Some(host) => host.clone(),
     };
 
+
     let session = Session::new(host, certs).await?;
 
     let mut rl = rustyline::DefaultEditor::new().unwrap();
-    rl.add_history_entry(history.as_str());
-    rl.save_history(history.as_str());
+    rl.add_history_entry(history_log.as_str());
+    rl.save_history(history_log.as_str());
 
     loop {
 
         let line = rl.readline(">> ").unwrap();
-        rl.add_history_entry(line.as_str());
+        rl.add_history_entry(history_log.as_str());
 
         let line_str = line.trim();
 
@@ -113,7 +112,7 @@ pub struct Session {
 
 impl Session {
     pub async fn new(host: String, certs: String) -> Result<Self, SpaceErr> {
-        let logger = RootLogger::default();
+        let logger = root_logger();
         let logger = logger.point(Point::from_str("starlane-cli")?);
         let tcp_client: Box<dyn HyperwayEndpointFactory> = Box::new(HyperlaneTcpClient::new(
             format!("{}:{}", host, 4343),

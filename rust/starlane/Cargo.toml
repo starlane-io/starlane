@@ -33,7 +33,7 @@ hyperspace=["dep:futures","dep:dashmap","dep:semver", "parse", "dep:zip","hypere
 hyperlane=["hypererr"]
 hyperlane-tcp =  ["hyperlane","dep:rcgen","rustls","dep:tokio-rustls","dep:tls-api-rustls"]
 hyperlane-quic =  ["hyperlane","dep:rcgen","rustls", "dep:quinn"]
-postgres=[ "dep:sqlx","dep:serde","dep:tracing","dep:async-recursion" ]
+postgres=[ "dep:sqlx","dep:serde","dep:tracing","dep:async-recursion", "dep:pg-embed" ]
 parse=["dep:nom", "dep:nom-supreme", "dep:nom_locate"]
 rustls=["dep:rustls","dep:rcgen","rustls-pemfile"]
 driver=["hyperspace"]
@@ -118,7 +118,16 @@ webpki-roots = { workspace = true}
 path-clean = { workspace = true}
 thiserror-context = { workspace = true }
 rustyline = { workspace = true, features=["with-file-history", "with-dirs"]}
+cliclack = { workspace = true }
 
+serde_yaml = { workspace = true }
+derive_builder = { workspace=true }
+pg-embed = { workspace=true , optional=true, features=["rt_tokio"]}
+text-to-ascii-art = { workspace = true}
+colored = {workspace = true}
+lerp = { workspace = true, features=["derive"] }
+atty ={workspace = true}
+#rolling-file = {workspace = true}
 
 [lib]
 name = "starlane"

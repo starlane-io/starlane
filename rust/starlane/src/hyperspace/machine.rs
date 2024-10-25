@@ -445,7 +445,6 @@ where
     }
 
     async fn init0(&self) {
-        let logger = self.logger.span();
         let mut inits = vec![];
         for star in self.stars.values() {
             inits.push(star.init().boxed());
@@ -470,9 +469,7 @@ where
                     return Ok(());
                 }
                 MachineCall::AwaitTermination(tx) => {
-println!("~~~ self.termination_broadcast_tx.is_empty(): {}", self.termination_broadcast_tx.is_empty());
                     tx.send(self.termination_broadcast_tx.subscribe());
-println!("~~~ AwaitTermination processeed");
                 }
                 MachineCall::WaitForReady(rtn) => {
                     let mut status_rx = self.skel.status_rx.clone();
@@ -506,9 +503,8 @@ println!("~~~ AwaitTermination processeed");
                     let logger = self.skel.logger.point(self.skel.machine_star.point.clone());
                     tokio::spawn(async move {
                         rtn.send(
-                            logger
-                                .result_ctx("MachineCall::Knock", gate_selector.knock(knock).await),
-                        );
+                            gate_selector.knock(knock).await
+                        ).unwrap_or_default();
                     });
                 }
                 MachineCall::EndpointFactory { from, to, rtn } => {
@@ -555,7 +551,6 @@ println!("~~~ AwaitTermination processeed");
         }
         self.termination_broadcast_tx
             .send(Err(err!("machine quit unexpectedly."))?);
-println!("MachineCall loop has exited");
 
         Ok(())
     }
@@ -756,8 +751,10 @@ impl HyperwayEndpointFactory for MachineApiExtFactory {
             auth: Box::new(Substance::Empty),
             remote: None,
         };
-        self.logger
-            .result_ctx("machine_api.knock()", self.machine_api.knock(knock).await)
+
+        self.machine_api.knock(knock).await
+ //       self.logger
+//            .result_ctx("machine_api.knock()", )
     }
 }
 

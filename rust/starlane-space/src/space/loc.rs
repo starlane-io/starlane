@@ -648,7 +648,7 @@ impl ToString for StarKey {
 
 impl StarKey {
     pub fn to_sql_name(&self) -> String {
-        format!("STAR::{}_{}_{}", self.constellation, self.name, self.index)
+        format!("{}_{}_{}", self.constellation, self.name, self.index)
     }
 }
 

@@ -255,7 +255,6 @@ impl Deref for SliceStr {
 
 impl AsBytes for SliceStr {
     fn as_bytes(&self) -> &[u8] {
-        println!("AS BYTES: {}", self.string.as_bytes().len());
         self.string
             .as_bytes()
             .slice(self.location_offset..self.location_offset + self.len)

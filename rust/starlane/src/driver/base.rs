@@ -69,7 +69,6 @@ impl Driver for BaseDriver
     }
 
     async fn particle(&self, point: &Point) -> Result<ParticleSphere, DriverErr> {
-        println!("ITEM get BASE");
         let base = Base::restore((), (), ());
 
         Ok(base.sphere()?)
