@@ -340,7 +340,7 @@ pub fn base(item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_derive(ToLogMark)]
-pub fn mark(item: TokenStream) -> TokenStream {
+pub fn to_log_mark(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
     let ident = &input.ident;
     let base = format_ident!("{}Base", ident);

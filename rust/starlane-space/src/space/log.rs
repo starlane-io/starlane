@@ -1,22 +1,6 @@
-use once_cell::sync::Lazy;
-use core::str::FromStr;
-use std::cell::LazyCell;
-use std::collections::HashMap;
-use std::io::Write;
-use std::marker::PhantomData;
-use std::pin::Pin;
-use std::sync::{Arc, LazyLock};
-use derive_builder::Builder;
-use crate::Agent;
-use regex::Regex;
-use serde;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use tokio::task_local;
-use starlane_primitive_macros::{create_mark, mark};
 use crate::space::err::SpaceErr;
 use crate::space::loc;
-use crate::space::loc::{Layer, ToPoint, ToSurface,  Uuid};
+use crate::space::loc::{Layer, ToPoint, ToSurface, Uuid};
 use crate::space::parse::CamelCase;
 use crate::space::point::Point;
 use crate::space::selector::Selector;
@@ -30,46 +14,60 @@ use crate::space::wave::exchange::SetStrategy;
 use crate::space::wave::{
     DirectedProto, Handling, HandlingKind, Priority, Retries, ToRecipients, WaitTime,
 };
+use crate::Agent;
+use core::str::FromStr;
+use derive_builder::Builder;
+use once_cell::sync::Lazy;
+use regex::Regex;
+use serde;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use starlane_primitive_macros::{create_mark, mark};
+use std::cell::LazyCell;
+use std::collections::HashMap;
+use std::io::Write;
+use std::marker::PhantomData;
+use std::pin::Pin;
+use std::sync::{Arc, LazyLock};
+use tokio::task_local;
 
 task_local! {
     static LOGGER: Box<dyn ISpanLogger>;
 }
 
-pub async fn log_entry_point<F>( f: F ) where F: FnMut() {
+pub async fn log_entry_point<F>(f: F)
+where
+    F: FnMut(),
+{
     let root = root_logger();
     let span: Box<dyn ISpanLogger> = Box::new(root.span());
-    LOGGER.scope( span, f).await;
+    LOGGER.scope(span, f).await;
 }
 
-static ROOT_LOGGER: LazyLock<RootLogger> = LazyLock::new( ||unsafe{
-    match starlane_root_log_appender(){
-        Ok(appender) => {
-            RootLogger {
-                source: LogSource::Shell,
-                appender
-            }
-        }
+static ROOT_LOGGER: LazyLock<RootLogger> = LazyLock::new(|| unsafe {
+    match starlane_root_log_appender() {
+        Ok(appender) => RootLogger {
+            source: LogSource::Shell,
+            appender,
+        },
         Err(err) => {
             let appender = Arc::new(StdOutAppender());
-            let logger=RootLogger {
+            let logger = RootLogger {
                 source: LogSource::Shell,
-                appender
+                appender,
             };
             logger
         }
     }
-
 });
-pub fn root_logger() -> RootLogger{
+pub fn root_logger() -> RootLogger {
     ROOT_LOGGER.clone()
 }
 
 #[no_mangle]
 extern "C" {
-    pub fn starlane_root_log_appender() -> Result<Arc<dyn LogAppender>,SpaceErr>;
+    pub fn starlane_root_log_appender() -> Result<Arc<dyn LogAppender>, SpaceErr>;
 }
-
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
 pub enum Level {
@@ -126,27 +124,24 @@ pub trait SpanEvent {
 
     fn kind(&self) -> &LogSpanEventKind;
 
-    fn attributes(&self) -> &HashMap<String,String>;
+    fn attributes(&self) -> &HashMap<String, String>;
 
     fn mark(&self) -> LogMark;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct LogSpanEvent
-{
+pub struct LogSpanEvent {
     pub point: Option<Point>,
     pub span: Uuid,
     pub kind: LogSpanEventKind,
     pub attributes: HashMap<String, String>,
     pub timestamp: Timestamp,
-    pub mark: LogMark
+    pub mark: LogMark,
 }
 
-impl LogSpanEvent {
-}
+impl LogSpanEvent {}
 
-impl SpanEvent for LogSpanEvent
-{
+impl SpanEvent for LogSpanEvent {
     fn point(&self) -> &Option<Point> {
         &self.point
     }
@@ -168,13 +163,12 @@ impl SpanEvent for LogSpanEvent
     }
 }
 
-impl  LogSpanEvent {
-
+impl LogSpanEvent {
     pub fn no_point(
         span: &LogSpan,
         kind: LogSpanEventKind,
         attributes: HashMap<String, String>,
-        mark: LogMark
+        mark: LogMark,
     ) -> LogSpanEvent {
         LogSpanEvent {
             span: span.id.clone(),
@@ -182,7 +176,7 @@ impl  LogSpanEvent {
             kind,
             attributes,
             timestamp: timestamp(),
-            mark
+            mark,
         }
     }
     pub fn point(
@@ -190,7 +184,7 @@ impl  LogSpanEvent {
         point: &Point,
         kind: LogSpanEventKind,
         attributes: HashMap<String, String>,
-        mark: LogMark
+        mark: LogMark,
     ) -> LogSpanEvent {
         LogSpanEvent {
             span: span.id.clone(),
@@ -198,7 +192,7 @@ impl  LogSpanEvent {
             kind,
             attributes,
             timestamp: timestamp(),
-            mark
+            mark,
         }
     }
 }
@@ -300,7 +294,7 @@ pub struct RootLoggerBuilder {
     pub message: Option<String>,
     pub json: Option<Value>,
     msg_overrides: Vec<String>,
-    topic_tx: HashMap<String,tokio::sync::mpsc::Sender<LogTopicState>>
+    topic_tx: HashMap<String, tokio::sync::mpsc::Sender<LogTopicState>>,
 }
 
 impl RootLoggerBuilder {
@@ -317,10 +311,7 @@ impl RootLoggerBuilder {
         }
     }
 
-    pub fn update<F>( &self, state: LogTopicState) {
-
-    }
-
+    pub fn update<F>(&self, state: LogTopicState) {}
 
     pub fn level(mut self, level: Level) -> Self {
         self.level = level;
@@ -446,10 +437,6 @@ impl RootLoggerBuilder {
         };
         self.logger.log(log);
     }
-
-
-
-
 }
 
 pub trait LogAppender: Send + Sync {
@@ -464,14 +451,11 @@ pub trait LogAppender: Send + Sync {
     fn pointless(&self, log: PointlessLog);
 }
 
-
 #[derive(Clone)]
 pub struct RootLogger {
     source: LogSource,
     appender: Arc<dyn LogAppender>,
 }
-
-
 
 /*
 impl Default for RootLogger {
@@ -483,7 +467,6 @@ impl Default for RootLogger {
  */
 
 impl RootLogger {
-
     fn source(&self) -> LogSource {
         self.source.clone()
     }
@@ -516,7 +499,6 @@ impl RootLogger {
     }
 
     pub fn span<M>(&self) -> SpanLogger<M> {
-
         let span = LogSpan::pointless();
 
         let logger = SpanLogger {
@@ -525,14 +507,11 @@ impl RootLogger {
             commit_on_drop: true,
         };
 
-
-
         self.span_event(LogSpanEvent::no_point(
             &span,
             LogSpanEventKind::Entry,
             Default::default(),
             create_mark!(),
-            Default::default()
         ));
 
         logger
@@ -636,8 +615,8 @@ impl LogAppender for SynchTransmittingLogAppender {
     fn span_event(&self, log: LogSpanEvent) {
         let point = log.point().clone();
         let mut directed = DirectedProto::signal();
-        directed.from=point.clone().map(|p|p.to_surface());
-        directed.agent = point.map( |p| Agent::Point(p.clone()));
+        directed.from = point.clone().map(|p| p.to_surface());
+        directed.agent = point.map(|p| Agent::Point(p.clone()));
         directed.body(LogSubstance::Event(log).into());
         self.transmitter.signal(directed);
     }
@@ -675,9 +654,10 @@ impl PointLogger {
         self.logger.source()
     }
 
-
-
-    pub fn span<I>(&self) -> Box<dyn I> where I: ISpanLogger{
+    pub fn span<I>(&self) -> Box<dyn I>
+    where
+        I: ISpanLogger,
+    {
         let mark = create_mark!();
         let span = LogSpan::new(self.point.clone());
         let logger = SpanLogger {
@@ -842,7 +822,8 @@ impl PointLogger {
 
     pub fn result_ctx<R, E>(&self, ctx: &str, result: Result<R, E>) -> Result<R, E>
     where
-        E: ToString, R: ToString
+        E: ToString,
+        R: ToString,
     {
         match &result {
             Ok(_) => {}
@@ -909,86 +890,89 @@ impl SpanLogBuilder {
 }
 
 trait ISpanLogger {
-        fn span_uuid(&self) -> Uuid;
+    fn span_uuid(&self) -> Uuid;
 
-        fn point(&self) -> &Point;
+    fn point(&self) -> &Point;
 
-        fn span<I>(&self) -> I where I: Self;
+    fn span<I>(&self) -> I
+    where
+        I: Self;
 
-        fn span_attr<M>(&self, attr: HashMap<String, String>) -> SpanLogger<M>;
+    fn span_attr<M>(&self, attr: HashMap<String, String>) -> SpanLogger<M>;
 
-        fn current_span(&self) -> &LogSpan;
+    fn current_span(&self) -> &LogSpan;
 
-        fn entry_timestamp(&self) -> Timestamp;
+    fn entry_timestamp(&self) -> Timestamp;
 
-        fn set_span_attr<K, V>(&mut self, key: K, value: V)
-        where
-            K: ToString,
-            V: ToString;
+    fn set_span_attr<K, V>(&mut self, key: K, value: V)
+    where
+        K: ToString,
+        V: ToString;
 
-        fn get_span_attr<K>(&self, key: K) -> Option<String>
-        where
-            K: ToString;
+    fn get_span_attr<K>(&self, key: K) -> Option<String>
+    where
+        K: ToString;
 
-        fn msg<M>(&self, level: Level, message: M)
-        where
-            M: ToString;
+    fn msg<M>(&self, level: Level, message: M)
+    where
+        M: ToString;
 
-        fn trace<M>(&self, message: M)
-        where
-            M: ToString;
+    fn trace<M>(&self, message: M)
+    where
+        M: ToString;
 
+    fn debug<M>(&self, message: M)
+    where
+        M: ToString;
 
-        fn debug<M>(&self, message: M)
-        where
-            M: ToString;
+    fn info<M>(&self, message: M)
+    where
+        M: ToString;
 
-        fn info<M>(&self, message: M)
-        where
-            M: ToString;
+    fn warn<M>(&self, message: M)
+    where
+        M: ToString;
 
-        fn warn<M>(&self, message: M) where
-            M: ToString;
+    fn error<M>(&self, message: M)
+    where
+        M: ToString;
 
-        fn error<M>(&self, message: M)
-        where
-            M: ToString;
+    fn builder(&self) -> LogBuilder;
 
+    fn result<R, E>(&self, result: Result<R, E>) -> Result<R, E>
+    where
+        E: ToString;
 
-        fn builder(&self) -> LogBuilder;
-
-        }
-
-        fn result<R, E>(&self, result: Result<R, E>) -> Result<R, E>
-        where
-            E: ToString;
-
-
-        fn result_ctx<R, E>(&self, ctx: &str, result: Result<R, E>) -> Result<R, E>
-        where
-            E: ToString;
-
+    fn result_ctx<R, E>(&self, ctx: &str, result: Result<R, E>) -> Result<R, E>
+    where
+        E: ToString;
 }
 
 #[derive(Clone)]
-pub struct SpanLogger<M> where M: AsLogMark
+pub struct SpanLogger<M>
+where
+    M: AsLogMark,
 {
     root_logger: RootLogger,
     span: LogSpan,
     commit_on_drop: bool,
 }
 
-impl <M> SpanLogger<M> where M: AsLogMark
+impl<M> SpanLogger<M>
+where
+    M: AsLogMark,
 {
     pub fn span_uuid(&self) -> Uuid {
         self.span.id.clone()
     }
 
-    pub fn point(&self) -> &Point {
+    pub fn point(&self) -> &Option<Point> {
         &self.span.point
     }
 
-    pub fn span<M2>(&self) -> SpanLogger<M2> where M2: AsLogMark
+    pub fn span<M2>(&self) -> SpanLogger<M2>
+    where
+        M2: AsLogMark,
     {
         let span = LogSpan::new(self.point().clone());
         SpanLogger {
@@ -997,7 +981,6 @@ impl <M> SpanLogger<M> where M: AsLogMark
             commit_on_drop: true,
         }
     }
-
 
     pub fn span_attr(&self, attr: HashMap<String, String>) -> SpanLogger<M> {
         let mut span = LogSpan::new(self.point().clone());
@@ -1008,7 +991,6 @@ impl <M> SpanLogger<M> where M: AsLogMark
             commit_on_drop: true,
         }
     }
-
 
     pub fn current_span(&self) -> &LogSpan {
         &self.span
@@ -1132,10 +1114,19 @@ impl <M> SpanLogger<M> where M: AsLogMark
     }
 }
 
-impl <M> Drop for SpanLogger<M> where M: AsLogMark{
+impl<M> Drop for SpanLogger<M>
+where
+    M: AsLogMark,
+{
     fn drop(&mut self) {
         if self.commit_on_drop {
-            let log = LogSpanEvent::point(&self.span, self.point(), LogSpanEventKind::Exit, self.span.attributes.clone(), LogMark {});
+            let log = LogSpanEvent::point(
+                &self.span,
+                self.point(),
+                LogSpanEventKind::Exit,
+                self.span.attributes.clone(),
+                create_mark![]
+            );
             self.root_logger.span_event(log)
         }
     }
@@ -1251,7 +1242,10 @@ pub struct AuditLog {
     pub metrics: HashMap<String, String>,
 }
 
-pub trait Spanner<M> where M: AsLogMark{
+pub trait Spanner<M>
+where
+    M: AsLogMark,
+{
     fn span_id(&self) -> String;
     fn span_type(&self) -> &'static str;
     fn entry(&self) -> M;
@@ -1355,13 +1349,13 @@ impl TrackDef<String> {
     }
 }
 
-
-
-
 pub struct FileAppender(tokio::sync::mpsc::Sender<Log>);
 
 impl FileAppender {
-    pub fn new<A>(writer:A) -> Self where A: Write+Sync+Send+'static {
+    pub fn new<A>(writer: A) -> Self
+    where
+        A: Write + Sync + Send + 'static,
+    {
         FileAppender(InnerFileAppender::new(writer))
     }
 }
@@ -1373,7 +1367,6 @@ impl LogAppender for FileAppender {
             Some(action) => action.to_string(),
         };
         self.0.try_send(log).unwrap();
-
     }
 
     fn audit(&self, log: AuditLog) {
@@ -1395,23 +1388,22 @@ impl LogAppender for FileAppender {
     }
 }
 
-
-
-struct InnerFileAppender<F> where F: Write {
+struct InnerFileAppender<F>
+where
+    F: Write,
+{
     rx: tokio::sync::mpsc::Receiver<Log>,
-    writer: F
+    writer: F,
 }
 
-impl<F> InnerFileAppender<F> where F: Write+ Sync+Send+'static{
-
+impl<F> InnerFileAppender<F>
+where
+    F: Write + Sync + Send + 'static,
+{
     fn new(writer: F) -> tokio::sync::mpsc::Sender<Log> {
         let (tx, rx) = tokio::sync::mpsc::channel(1024);
 
-
-       let appender =  Self {
-            rx,
-           writer
-       };
+        let appender = Self { rx, writer };
 
         appender.start();
 
@@ -1419,7 +1411,7 @@ impl<F> InnerFileAppender<F> where F: Write+ Sync+Send+'static{
     }
 
     fn start(mut self) {
-        tokio::spawn( async move {
+        tokio::spawn(async move {
             while let Some(log) = self.rx.recv().await {
                 let log = format!("{} | {}", log.point.to_string(), log.payload.to_string());
                 self.writer.write_all(log.as_bytes()).unwrap_or_default();
@@ -1429,37 +1421,28 @@ impl<F> InnerFileAppender<F> where F: Write+ Sync+Send+'static{
     }
 }
 
-
-
 struct TopicUpdate {
     name: String,
-    state: LogTopicState
+    state: LogTopicState,
 }
 
 impl TopicUpdate {
     fn new(name: String, state: LogTopicState) -> Self {
-        Self {
-            name,
-            state,
-        }
+        Self { name, state }
     }
 }
 
-
 pub enum LogTopicKind {
-    Operation
+    Operation,
 }
 
 pub enum LogTopicState {
-    Operation(OpStateUpdate)
+    Operation(OpStateUpdate),
 }
-
-
 
 pub trait AsLogMark {
     fn as_log_mark(&self) -> LogMark;
 }
-
 
 macro_rules! log{
     ($($args: expr),*) => {
@@ -1478,11 +1461,7 @@ macro_rules! log{
     }
 }
 
-
-
-
-
-#[derive(Debug,Clone,Builder,Serialize,Deserialize,Eq,PartialEq,Hash)]
+#[derive(Debug, Clone, Builder, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct LogMark {
     pub package: String,
     pub file: String,
@@ -1490,7 +1469,3 @@ pub struct LogMark {
     pub object: Option<String>,
     pub function: Option<String>,
 }
-
-
-
-

@@ -1,5 +1,5 @@
 #![allow(warnings)]
-#![dolog]
+#![starlane_primitive_macros::loggit]
 //extern crate alloc;
 #[macro_use]
 extern crate async_trait;
