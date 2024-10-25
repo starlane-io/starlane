@@ -1,5 +1,8 @@
 #![allow(warnings)]
-//#![starlane_primitive_macros::loggerize]
+#![feature(prelude_import)]
+#![feature(custom_inner_attributes)]
+#![feature(proc_macro_hygiene)]
+#![starlane_primitive_macros::loggerize]
 //extern crate alloc;
 #[macro_use]
 extern crate async_trait;
