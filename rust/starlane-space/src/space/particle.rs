@@ -55,6 +55,42 @@ pub enum Status {
     /// this particle had a life span and has now completed succesfully it can no longer receive requests.
     Done,
 }
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    strum_macros::Display,
+    strum_macros::EnumString,
+)]
+
+pub enum StatusDetail {
+    Unknown,
+    Pending(String),
+    Init(String),
+    Panic(SpaceErr),
+    Fatal(SpaceErr),
+    Ready,
+    Paused,
+    Resuming,
+    Done,
+}
+
+impl Into<Status> for StatusDetail {
+    fn into(self) -> Status {
+        match self {
+            StatusDetail::Unknown => Status::Unknown,
+            StatusDetail::Pending(_) => Status::Pending,
+            StatusDetail::Init(_) => Status::Init,
+            StatusDetail::Panic(_) => Status::Panic,
+            StatusDetail::Fatal(_) => Status::Fatal,
+            StatusDetail::Ready => Status::Ready,
+            StatusDetail::Paused => Status::Paused,
+            StatusDetail::Resuming => Status::Resuming,
+            StatusDetail::Done => Status::Done
+        }
+    }
+}
 
 impl From<Status> for ReflectedCore {
     fn from(status: Status) -> Self {

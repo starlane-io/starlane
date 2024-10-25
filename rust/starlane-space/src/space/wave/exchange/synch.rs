@@ -237,10 +237,7 @@ pub type DirectedHandlerShell =
 
 impl DirectedHandlerShell {
     pub fn handle(&self, wave: DirectedWave) -> Bounce<ReflectedWave> {
-        let logger = self
-            .logger
-            .point(self.surface.clone().to_point())
-            .spanner(&wave);
+
         let mut transmitter = self.builder.clone().build();
         let reflection = wave.reflection();
         let ctx = RootInCtx::new(wave, self.surface.clone(), logger, transmitter.clone());

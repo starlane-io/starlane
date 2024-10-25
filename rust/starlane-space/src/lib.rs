@@ -1,4 +1,5 @@
 #![allow(warnings)]
+#![dolog]
 //extern crate alloc;
 #[macro_use]
 extern crate async_trait;
@@ -8,6 +9,7 @@ extern crate enum_ordinalize; //# ! [feature(unboxed_closures)]
 extern crate lazy_static;
 #[macro_use]
 extern crate strum_macros;
+
 
 extern crate core;
 

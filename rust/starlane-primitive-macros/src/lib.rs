@@ -1,6 +1,7 @@
 /*#![feature(proc_macro_quote)]*/
 #![crate_type = "lib"]
 #![allow(warnings)]
+#[feature("proc_macro_lib2")]
 
 #[macro_use]
 extern crate quote;
@@ -9,8 +10,8 @@ use proc_macro::TokenStream;
 use proc_macro2::Ident;
 use quote::quote;
 use quote::ToTokens;
-use syn::{parse_macro_input, Data, DeriveInput, PathArguments, Type};
-
+use syn::{parse_file, parse_macro_input, Data, DeriveInput, File, PathArguments, Token, Type};
+use syn::__private::TokenStream2;
 
 /// Takes a given enum (which in turn accepts child enums) and auto generates a `Parent::From` so the child
 /// can turn into the parent and a `TryInto<Child> for Parent` so the Parent can attempt to turn into the child.
@@ -338,6 +339,41 @@ pub fn base(item: TokenStream) -> TokenStream {
     rtn.into()
 }
 
+#[proc_macro_derive(ToLogMark)]
+pub fn mark(item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as DeriveInput);
+    let ident = &input.ident;
+    let base = format_ident!("{}Base", ident);
+    let mut variants: Vec<Ident> = vec![];
+
+    if let Data::Enum(data) = &input.data {
+        for variant in data.variants.clone() {
+            variants.push(variant.ident.clone());
+        }
+    }
+
+
+    let rtn = quote! {
+        pub enum #base {
+        #(#variants),*
+        }
+
+
+        #[allow(bindings_with_variant_name)]
+        impl ToString for #base {
+            fn to_string(&self) -> String {
+                match self {
+            #( #variants => "#variants".to_string() ),*
+                }
+            }
+        }
+    };
+
+    rtn.into()
+}
+
+
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -352,3 +388,57 @@ mod tests {
 pub fn directed_handler(item: TokenStream) -> TokenStream {
     TokenStream::from(quote! {})
 }
+
+
+
+
+#[proc_macro_attribute]
+pub fn loggit(_attr: TokenStream, item: TokenStream) -> TokenStream {
+
+
+    let mut out = vec![];
+    let input = parse_macro_input!(item as File);
+    for item in input.items.into_iter() {
+        let item = quote!(#item);
+println!("running parser over {}",item);
+        out.push(item);
+     }
+
+
+    let rtn = quote! {
+        #(#out)*
+    };
+
+    rtn.into()
+}
+
+
+#[proc_macro]
+pub fn mark(_item: TokenStream) -> TokenStream {
+    let rtn = quote! {
+    let mut builder = LogMarkBuilder::default();
+    builder.package(env!("CARGO_PKG_NAME").to_string());
+    builder.file(file!().to_string());
+    builder.line(line!().to_string());
+    builder.build().unwrap();
+        };
+
+   rtn.into()
+}
+
+
+#[proc_macro]
+pub fn create_mark(_item: TokenStream) -> TokenStream {
+    let rtn = quote! {
+    let mut builder = LogMarkBuilder::default();
+    builder.package(env!("CARGO_PKG_NAME").to_string());
+    builder.file(file!().to_string());
+    builder.line(line!().to_string());
+    builder.build().unwrap();
+        };
+
+    rtn.into()
+}
+
+
+

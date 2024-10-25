@@ -49,10 +49,14 @@ convert_case={workspace=true }
 validator={workspace=true }
 once_cell={workspace=true }
 md-5 = {workspace=true }
-anyhow = "1.0.89"
-
-
+anyhow = {workspace = true}
+function_name = {workspace = true}
+derive-name = {workspace = true}
+derive_builder = {workspace = true}
+tokio-scoped = {workspace = true}
 
 #uuid={workspace=true }
 #getrandom={workspace=true }
 #chrono={workspace=true }
+
+

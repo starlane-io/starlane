@@ -496,10 +496,7 @@ where
     D: DirectedHandler,
 {
     pub async fn handle(&self, wave: DirectedWave) {
-        let logger = self
-            .logger
-            .point(self.surface.clone().to_point())
-            .spanner(&wave);
+
         let mut transmitter = self.builder.clone().build();
         let reflection = wave.reflection();
         let ctx = RootInCtx::new(wave, self.surface.clone(), logger, transmitter);
