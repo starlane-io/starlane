@@ -28,16 +28,24 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::{Arc, LazyLock};
 use tokio::task_local;
+use log::warn;
 use crate::space::particle::traversal::Traversal;
 
 task_local! {
     static LOGGER: SpanLogger;
 }
 
+
+
+
 pub async fn log_entry_point<F>(f: F)
 where
     F: FnMut()+Future,
 {
+    if LOGGER.try_with(|v|{}).is_ok() {
+        root_logger().loko
+    }
+
     let root = root_logger();
     let span= root.span();
     LOGGER.scope(span, f).await;
@@ -83,7 +91,7 @@ impl Default for Level {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Builder)]
 pub struct Log {
     pub point: Option<Point>,
     pub mark: Option<LogMark>,
@@ -475,6 +483,7 @@ impl RootLogger {
     fn log(&self, log: Log) {
         self.appender.log(log);
     }
+
 
 
     fn span_event(&self, log: SpanEvent) {

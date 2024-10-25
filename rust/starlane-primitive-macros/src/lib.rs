@@ -442,5 +442,28 @@ pub fn create_mark(_item: TokenStream) -> TokenStream {
     rtn.into()
 }
 
+#[proc_macro]
+pub fn warn(_item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(_item as &str);
+    let rtn = quote! {
+
+        // pushing scope so we don't collide with
+        // any other imports or local things...
+        {
+            use starlane_primitive_macros::mark;
+            use starlane_primitive_macros::create_mark;
+            use starlane_space::space::log::Log;
+            use starlane_space::space::log::Log;
+            use starlane_space::space::log::LOGGER;
+
+            // need to push_mark somewhere around here...
+            LOGGER.try_with(|logger| {
+                 logger.warn(stringify!(#input));
+            } ).unwrap_or_default();
+            }
+         };
+    rtn.into()
+}
+
 
 
