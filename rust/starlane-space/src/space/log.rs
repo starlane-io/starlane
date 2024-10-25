@@ -86,8 +86,8 @@ impl Default for Level {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Log {
-    pub point: Point,
-    pub mark: Point,
+    pub point: Option<Point>,
+    pub mark: Option<LogMark>,
     pub action: Option<CamelCase>,
     pub source: LogSource,
     pub span: Option<Uuid>,
@@ -164,6 +164,23 @@ impl SpanEvent for LogSpanEvent {
 }
 
 impl LogSpanEvent {
+
+    pub fn opt_point(
+        span: &LogSpan,
+        point: &Option<Point>,
+        kind: LogSpanEventKind,
+        attributes: HashMap<String, String>,
+        mark: LogMark,
+    ) -> LogSpanEvent {
+
+        match point {
+            None => Self::no_point(span, kind, attributes, mark),
+            Some(point) => Self::point( span, point, kind, attributes, mark)
+        }
+
+    }
+
+
     pub fn no_point(
         span: &LogSpan,
         kind: LogSpanEventKind,
@@ -235,17 +252,16 @@ impl LogSpan {
         }
     }
 
-    pub fn opt(point: Point, span: Option<Self>) -> Self {
-        let mut span = span.unwrap_or(Self {
+    pub fn optional(point: Option<Point>) -> Self {
+        Self {
             id: uuid(),
-            point: Some(point),
+            point,
             mark: None,
             action: None,
             parent: None,
             attributes: Default::default(),
             entry_timestamp: timestamp(),
-        });
-        span
+        }
     }
     pub fn pointless() -> Self {
         Self {
@@ -426,8 +442,8 @@ impl RootLoggerBuilder {
 
         let point = self.point.expect("point");
         let log = Log {
-            point,
-            mark: Point::root(),
+            point: Option::Some(point),
+            mark: None,
             action: None,
             level: self.level,
             timestamp: timestamp().timestamp_millis(),
@@ -441,8 +457,6 @@ impl RootLoggerBuilder {
 
 pub trait LogAppender: Send + Sync {
     fn log(&self, log: Log);
-
-    fn audit(&self, log: AuditLog);
 
     fn span_event(&self, log: dyn SpanEvent);
 
@@ -475,9 +489,6 @@ impl RootLogger {
         self.appender.log(log);
     }
 
-    fn audit(&self, log: AuditLog) {
-        self.appender.audit(log);
-    }
 
     fn span_event(&self, log: LogSpanEvent) {
         self.appender.span_event(log);
@@ -493,7 +504,7 @@ impl RootLogger {
         PointLogger {
             logger: self.clone(),
             point: point.to_point(),
-            mark: Point::root(),
+            mark: create_mark!(),
             action: None,
         }
     }
@@ -528,7 +539,6 @@ impl NoAppender {
 impl LogAppender for NoAppender {
     fn log(&self, log: Log) {}
 
-    fn audit(&self, log: AuditLog) {}
 
     fn span_event(&self, log: LogSpanEvent) {}
 
@@ -552,9 +562,6 @@ impl LogAppender for StdOutAppender {
         println!("{} | {}", log.point.to_string(), log.payload.to_string())
     }
 
-    fn audit(&self, log: AuditLog) {
-        println!("audit log...")
-    }
 
     fn span_event(&self, log: LogSpanEvent) {
         /*         println!(
@@ -598,19 +605,15 @@ impl SynchTransmittingLogAppender {
 impl LogAppender for SynchTransmittingLogAppender {
     fn log(&self, log: Log) {
         let mut directed = DirectedProto::signal();
-        directed.from(log.point.to_surface());
-        directed.agent(Agent::Point(log.point.clone()));
+        if let Some(from) = &log.point {
+            directed.from(from.to_surface().clone());
+            directed.agent(Agent::Point(from.clone()));
+        }
+
         directed.body(LogSubstance::Log(log).into());
         self.transmitter.signal(directed);
     }
 
-    fn audit(&self, log: AuditLog) {
-        let mut directed = DirectedProto::signal();
-        directed.from(log.point.to_surface());
-        directed.agent(Agent::Point(log.point.clone()));
-        directed.body(LogSubstance::Audit(log).into());
-        self.transmitter.signal(directed);
-    }
 
     fn span_event(&self, log: LogSpanEvent) {
         let point = log.point().clone();
@@ -634,7 +637,7 @@ impl LogAppender for SynchTransmittingLogAppender {
 pub struct PointLogger {
     pub logger: RootLogger,
     pub point: Point,
-    pub mark: Point,
+    pub mark: LogMark,
     pub action: Option<CamelCase>,
 }
 
@@ -643,7 +646,7 @@ impl Default for PointLogger {
         Self {
             logger: root_logger(),
             point: Point::root(),
-            mark: Point::root(),
+            mark: create_mark!(),
             action: None,
         }
     }
@@ -681,7 +684,7 @@ impl PointLogger {
         PointLogger {
             logger: self.logger.clone(),
             point,
-            mark: Point::root(),
+            mark: create_mark!(),
             action: None,
         }
     }
@@ -690,11 +693,12 @@ impl PointLogger {
         Ok(PointLogger {
             logger: self.logger.clone(),
             point: self.point.push(segs)?,
-            mark: Point::root(),
+            mark: create_mark!(),
             action: None,
         })
     }
 
+    /*
     pub fn pop_mark(&self) -> PointLogger {
         PointLogger {
             logger: self.logger.clone(),
@@ -713,6 +717,8 @@ impl PointLogger {
         })
     }
 
+     */
+
     pub fn push_action<A: ToString>(&self, action: A) -> Result<PointLogger, SpaceErr> {
         Ok(PointLogger {
             logger: self.logger.clone(),
@@ -726,9 +732,12 @@ impl PointLogger {
     where
         M: ToString,
     {
+        let point = self.point.clone();
+        let mark = self.mark.clone();
+
         self.logger.log(Log {
-            point: self.point.clone(),
-            mark: self.mark.clone(),
+            point: Some(point),
+            mark: Some(mark),
             action: self.action.clone(),
             level,
             timestamp: timestamp().timestamp_millis(),
@@ -750,9 +759,7 @@ impl PointLogger {
             LogSubstance::Event(event) => {
                 self.logger.span_event(event);
             }
-            LogSubstance::Audit(audit) => {
-                self.logger.audit(audit);
-            }
+
             LogSubstance::Pointless(pointless) => {
                 self.logger.pointless(pointless);
             }
@@ -974,7 +981,8 @@ where
     where
         M2: AsLogMark,
     {
-        let span = LogSpan::new(self.point().clone());
+        let point = self.point().clone();
+        let span = LogSpan::optional(point);
         SpanLogger {
             root_logger: self.root_logger.clone(),
             span,
@@ -983,7 +991,7 @@ where
     }
 
     pub fn span_attr(&self, attr: HashMap<String, String>) -> SpanLogger<M> {
-        let mut span = LogSpan::new(self.point().clone());
+        let mut span = LogSpan::pointless();
         span.attributes = attr;
         SpanLogger {
             root_logger: self.root_logger.clone(),
@@ -1021,9 +1029,12 @@ where
     where
         M: ToString,
     {
+        let point = self.point().clone();
+        let mark = self.span.mark.clone();
+
         self.root_logger.log(Log {
-            point: self.point().clone(),
-            mark: self.span.mark.clone(),
+            point,
+            mark,
             action: self.span.action.clone(),
             level,
             timestamp: timestamp().timestamp_millis(),
@@ -1068,14 +1079,6 @@ where
         self.msg(Level::Error, message);
     }
 
-    pub fn audit(&self) -> AuditLogBuilder {
-        AuditLogBuilder {
-            logger: self.root_logger.clone(),
-            point: self.point().clone(),
-            span: self.span.id.clone(),
-            attributes: HashMap::new(),
-        }
-    }
 
     pub fn builder(&self) -> LogBuilder {
         let builder = RootLoggerBuilder::new(self.root_logger.clone(), None);
@@ -1083,9 +1086,6 @@ where
         builder
     }
 
-    pub fn log_audit(&self, log: AuditLog) {
-        self.root_logger.audit(log);
-    }
 
     pub fn result<R, E>(&self, result: Result<R, E>) -> Result<R, E>
     where
@@ -1120,7 +1120,7 @@ where
 {
     fn drop(&mut self) {
         if self.commit_on_drop {
-            let log = LogSpanEvent::point(
+            let log = LogSpanEvent::opt_point(
                 &self.span,
                 self.point(),
                 LogSpanEventKind::Exit,
@@ -1189,9 +1189,10 @@ impl LogBuilder {
     }
 }
 
+/*
 pub struct AuditLogBuilder {
     logger: RootLogger,
-    point: Point,
+    point: Option<Point>,
     span: Uuid,
     attributes: HashMap<String, String>,
 }
@@ -1241,6 +1242,8 @@ pub struct AuditLog {
     pub timestamp: Timestamp,
     pub metrics: HashMap<String, String>,
 }
+
+ */
 
 pub trait Spanner<M>
 where

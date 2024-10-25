@@ -320,7 +320,6 @@ pub enum LogSubstance {
     Log(Log),
     Span(LogSpan),
     Event(LogSpanEvent),
-    Audit(AuditLog),
     Pointless(PointlessLog),
 }
 

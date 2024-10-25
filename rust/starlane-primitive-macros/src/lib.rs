@@ -393,7 +393,7 @@ pub fn directed_handler(item: TokenStream) -> TokenStream {
 
 
 #[proc_macro_attribute]
-pub fn loggit(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn loggerize(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
 
     let mut out = vec![];
