@@ -396,5 +396,5 @@ fn splash( ) {
 
 #[derive(ToBase)]
 pub enum StartSequence{
-    Init(String)
+    Starting(String)
 }

@@ -323,6 +323,16 @@ pub fn base(item: TokenStream) -> TokenStream {
         pub enum #base {
         #(#variants),*
         }
+
+
+        #[allow(bindings_with_variant_name)]
+        impl ToString for #base {
+            fn to_string(&self) -> String {
+                match self {
+            #( #variants => "#variants".to_string() ),*
+                }
+            }
+        }
     };
 
     rtn.into()
