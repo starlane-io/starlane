@@ -458,7 +458,7 @@ impl RootLoggerBuilder {
 pub trait LogAppender: Send + Sync {
     fn log(&self, log: Log);
 
-    fn span_event(&self, log: dyn SpanEvent);
+    fn span_event(&self, log: Box<dyn SpanEvent>);
 
     /// PointlessLog is used for error diagnosis of the logging system itself, particularly
     /// where there is parsing error due to a bad point
@@ -657,7 +657,7 @@ impl PointLogger {
         self.logger.source()
     }
 
-    pub fn span<I>(&self) -> Box<dyn I>
+    pub fn span<I>(&self) -> Box<I>
     where
         I: ISpanLogger,
     {
