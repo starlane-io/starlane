@@ -68,11 +68,12 @@ use std::process::Stdio;
 use std::str::FromStr;
 use std::time::Duration;
 use atty::Stream;
+use cliclack::{clear_screen, confirm, intro, multi_progress, progress_bar, select, spinner, ProgressBar};
 use colored::{Colorize, CustomColor};
 use lerp::Lerp;
 use text_to_ascii_art::fonts::get_font;
 use text_to_ascii_art::to_art;
-use tokio::{fs, signal};
+use tokio::{fs, join, signal};
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
 use zip::write::FileOptions;
@@ -145,6 +146,7 @@ pub fn main() -> Result<(), anyhow::Error> {
 
     let cli = Cli::parse();
     match cli.command {
+        Commands::Demo=> demo(),
         Commands::Run => run(),
         Commands::Term(args) => {
             let runtime = Builder::new_multi_thread().enable_all().build()?;
@@ -175,15 +177,14 @@ fn run() -> Result<(), anyhow::Error> {
 #[cfg(feature = "server")]
 fn run() -> Result<(), anyhow::Error> {
 
-    let spinner = cliclack::spinner();
-
-    spinner.start("starting...");
 
 
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     runtime.block_on(async move {
+
+
         let config = config().await;
         let starlane = Starlane::new(config.registry).await.unwrap();
         let machine_api = starlane.machine();
@@ -197,6 +198,9 @@ fn run() -> Result<(), anyhow::Error> {
             tokio::time::sleep(Duration::from_secs(60)).await;
         }
     });
+
+
+
     Ok(())
 }
 
@@ -357,15 +361,18 @@ impl Color {
  */
 
 
+static COLORS: (u8,u8,u8) = (0x6D, 0xD7, 0xFD);
 
 
-
-fn splash( ) {
+async fn splash( ) {
     match to_art("*STARLANE*".to_string(), "default", 0, 0, 0) {
         Ok(string) => {
+
+            let string = format!("\n\n\n\n\n\n{}\n\n\n\n\n\n",string).to_string();
+
             let begin= (0xFF, 0xFF, 0xFF);
             let end= (0xEE, 0xAA, 0x5A);
-            let end= (0x6D, 0xD7, 0xFD);
+            let end= COLORS;
 
             //let begin = (0x00, 0x00, 0x00);
             // this is bad code however I couldn't find out how to get lines().len() withou
@@ -373,15 +380,24 @@ fn splash( ) {
             let size = string.clone().lines().count();
             let mut index = 0;
             for line in  string.lines(){
-                let progress =  index as f32 / size as f32;
-                //let color = begin.clone().lerp(end.clone(), progress);
-                //let color= color.custom();
+                let progress =  if index < 6 {
+                    0.0f32
+                } else if index > 6 && index < size-6 {
+                    (index-6) as f32 / (size-6) as f32
+                } else {
+                    1.0f32
+                };
+
+
                 let r = (begin.0 as f32).lerp(end.0 as f32, progress) as u8;
                 let g = (begin.1 as f32).lerp(end.1 as f32, progress) as u8;
                 let b = (begin.2 as f32).lerp(end.2 as f32, progress) as u8;
                 println!("{}", line.truecolor(r, g, b));
+                tokio::time::sleep(Duration::from_millis(50)).await;
+
                 index = index + 1;
             }
+
 
             //            println!("{}", string.truecolor(0xEE, 0xAA, 0x5A));
         }
@@ -397,4 +413,125 @@ fn splash( ) {
 #[derive(ToBase)]
 pub enum StartSequence{
     Starting(String)
+}
+
+
+
+fn demo() -> Result<(), anyhow::Error> {
+
+
+
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async move {
+
+        tokio::spawn( async {
+            async fn wait(t:u64) {
+                tokio::time::sleep(Duration::from_millis(t)).await;
+            }
+            wait(1000).await;
+            {
+                let spinner = spinner();
+                spinner.start("starting...");
+                wait(5000 ).await;
+                spinner.stop("start successful!");
+                wait(250 ).await;
+                clear_screen();
+                wait(1000 ).await;
+                splash().await;
+                wait(1000 ).await;
+                spinner.stop("Config not found");
+                intro("Install?");
+            }
+
+            let selected = select(
+r#"This Starlane instance has not configured.
+This program (the Starlane Runner) must either be a stand alone cluster or can connect to a remote cluster.
+\n
+Would you like to install a cluster on this machine or provide a configuration for a remote machine?
+"#
+
+
+            )
+                .item("this", "Install stand alone on this machine", "")
+                .item("remote", "Configure to access a remote machine", "")
+                .interact().unwrap_or_default();
+
+            wait(1000).await;
+            let postgres = select(
+r#"Starlane needs a Postgres instance as it's registry when in stand alone mode.\n
+Do you have an existing postgres instance that you would like Starlane to connect to or
+would your prefer Starlane to install and manage its own Postgres instance?"#
+
+
+            )
+                .item("remote", "Connect to an existing Postgres Cluster Instance", "")
+                .item("this", "Let Starlane manage its own Postgres instance", "")
+                .interact().unwrap_or_default();
+
+            wait(1000).await;
+
+
+
+            let multi = multi_progress("Downloading Service Extensions");
+            let postgres = multi.add(progress_bar(100));
+            let filestore  = multi.add(progress_bar(100).with_download_template());
+            let artifacts= multi.add(progress_bar(100).with_download_template());
+            let spinner = multi.add(spinner());
+
+            async fn go(bar: ProgressBar, name: &'static str, size: u64) {
+                bar.start(format!("looking up: '{}'",name));
+                tokio::time::sleep(Duration::from_millis(size)).await;
+                bar.set_message(format!("downloading {}...",name));
+                tokio::time::sleep(Duration::from_millis(size)).await;
+                for _ in 0..100 {
+                    bar.inc(1);
+                    tokio::time::sleep(Duration::from_millis(size/100)).await;
+                }
+                tokio::time::sleep(Duration::from_millis(size)).await;
+                bar.set_message(format!("{} download complete", name));
+
+                tokio::time::sleep(Duration::from_millis(size*2)).await;
+
+                bar.set_message(format!("installing {}", name));
+                tokio::time::sleep(Duration::from_millis(500)).await;
+                for _ in 0..100 {
+                    bar.inc(1);
+                    tokio::time::sleep(Duration::from_millis(3*(size/100))).await;
+                }
+                tokio::time::sleep(Duration::from_millis(500)).await;
+                bar.stop(format!("{} installation complete",name));
+            }
+
+            let postgres = go(postgres, "postgres", 500);
+            let filestore = go(filestore, "local filestore", 1500);
+            let artifacts = go(artifacts, "artifact repository", 700);
+
+            println!();
+
+            join!(postgres, filestore, artifacts);
+
+            println!();
+
+            spinner.stop("Service extension installation complete.");
+
+            multi.stop();
+        });
+
+        println!();
+        println!();
+        println!();
+        println!();
+        let end= (0x6D, 0xD7, 0xFD);
+        println!("{}", "Installation complete! To run your local starlane instance: `starlane run` ".to_string().truecolor(COLORS.0,COLORS.1,COLORS.2));
+        println!();
+        println!();
+    //    process::exit(0);
+
+    });
+
+
+
+    Ok(())
 }
