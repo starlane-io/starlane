@@ -326,8 +326,6 @@ impl Exchanger {
     }
 
     pub async fn reflected(&self, reflect: ReflectedWave) -> Result<(), SpaceErr> {
-        self.logger
-            .track(&reflect, || Tracker::new("exchange", "Reflected"));
 
         if let Some(multi) = self.multis.get(reflect.reflection_of()) {
             multi.value().send(reflect).await;
