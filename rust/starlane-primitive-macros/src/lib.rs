@@ -10,7 +10,7 @@ use proc_macro::TokenStream;
 use proc_macro2::Ident;
 use quote::quote;
 use quote::ToTokens;
-use syn::{parse_file, parse_macro_input, Data, DeriveInput, File, PathArguments, Token, Type};
+use syn::{parse_file, parse_macro_input, Data, DeriveInput, File, LitStr, PathArguments, Token, Type};
 use syn::__private::TokenStream2;
 
 /// Takes a given enum (which in turn accepts child enums) and auto generates a `Parent::From` so the child
@@ -393,7 +393,7 @@ pub fn directed_handler(item: TokenStream) -> TokenStream {
 
 
 #[proc_macro_attribute]
-pub fn loggerize(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn loggerhead(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
 
     let mut out = vec![];
@@ -444,7 +444,7 @@ pub fn create_mark(_item: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn warn(_item: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(_item as &str);
+    let input = parse_macro_input!(_item as LitStr);
     let rtn = quote! {
 
         // pushing scope so we don't collide with
@@ -455,11 +455,14 @@ pub fn warn(_item: TokenStream) -> TokenStream {
             use starlane_space::space::log::Log;
             use starlane_space::space::log::Log;
             use starlane_space::space::log::LOGGER;
+            use starlane_space::space::log::root_logger;
 
             // need to push_mark somewhere around here...
             LOGGER.try_with(|logger| {
                  logger.warn(stringify!(#input));
-            } ).unwrap_or_default();
+            } ).map_err(|e| {
+            root_logger().warn(stringify!(#input));
+        })
             }
          };
     rtn.into()

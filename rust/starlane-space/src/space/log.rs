@@ -43,7 +43,7 @@ where
     F: FnMut()+Future,
 {
     if LOGGER.try_with(|v|{}).is_ok() {
-        root_logger().loko
+
     }
 
     let root = root_logger();
@@ -91,12 +91,16 @@ impl Default for Level {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Builder)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq,Builder)]
 pub struct Log {
+    #[builder(default)]
     pub point: Option<Point>,
+    #[builder(default)]
     pub mark: Option<LogMark>,
+    #[builder(default)]
     pub action: Option<CamelCase>,
     pub source: LogSource,
+    #[builder(default)]
     pub span: Option<Uuid>,
     pub timestamp: i64,
     pub payload: LogPayload,
@@ -484,6 +488,36 @@ impl RootLogger {
         self.appender.log(log);
     }
 
+    fn raw<R>(&self, txt: R, level: Level) where R: AsRef<str> {
+        let mut builder = LogBuilder::default();
+        builder.source(LogSource::Core);
+        builder.timestamp(timestamp().millis);
+        builder.payload(LogPayload::Message(txt.as_ref().to_string()));
+        // technically unwrap should not fail unless Log was changed
+        let log = builder.build().unwrap();
+        self.log(log);
+    }
+
+    pub fn info<R>(&self, txt: R)  where R: AsRef<str> {
+        self.raw(txt, Level::Info);
+    }
+
+    pub fn debug<R>(&self, txt: R)  where R: AsRef<str> {
+        self.raw(txt, Level::Debug);
+    }
+
+    pub fn trace<R>(&self, txt: R)  where R: AsRef<str> {
+        self.raw(txt, Level::Trace);
+    }
+
+    pub fn warn<R>(&self, txt: R)  where R: AsRef<str> {
+        self.raw(txt, Level::Warn);
+    }
+
+
+    pub fn error<R>(&self, txt: R)  where R: AsRef<str> {
+        self.raw(txt, Level::Error);
+    }
 
 
     fn span_event(&self, log: SpanEvent) {
@@ -1041,11 +1075,7 @@ impl SpanLogger
     }
 
 
-    pub fn builder(&self) -> LogBuilder {
-        let builder = RootLoggerBuilder::new(self.root_logger.clone(), None);
-        let builder = LogBuilder::new(self.root_logger.clone(), builder);
-        builder
-    }
+
 
 
     pub fn result<R, E>(&self, result: Result<R, E>) -> Result<R, E>
@@ -1103,6 +1133,7 @@ impl Drop for SpanLogger
     }
 }
 
+/*
 pub struct LogBuilder {
     logger: RootLogger,
     builder: RootLoggerBuilder,
@@ -1159,6 +1190,8 @@ impl LogBuilder {
         self.builder.commit();
     }
 }
+
+ */
 
 /*
 pub struct AuditLogBuilder {
@@ -1432,6 +1465,8 @@ pub struct LogMark {
     pub package: String,
     pub file: String,
     pub line: String,
+    #[builder(default)]
     pub object: Option<String>,
+    #[builder(default)]
     pub function: Option<String>,
 }
