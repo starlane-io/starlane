@@ -29,6 +29,7 @@ use std::pin::Pin;
 use std::sync::{Arc, LazyLock};
 use tokio::task_local;
 use log::warn;
+use crate::space::parse::util::Span;
 use crate::space::particle::traversal::Traversal;
 
 task_local! {
@@ -74,6 +75,11 @@ pub fn root_logger() -> RootLogger {
 #[no_mangle]
 extern "C" {
     pub fn starlane_root_log_appender() -> Result<Arc<dyn LogAppender>, SpaceErr>;
+}
+
+pub trait Logger {
+    fn span() -> LogSpan;
+    fn point(&self) -> &Option<Point>;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, strum_macros::Display)]
