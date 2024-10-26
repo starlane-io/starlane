@@ -76,6 +76,7 @@ use std::process;
 use std::process::Stdio;
 use std::str::FromStr;
 use std::time::Duration;
+use nom::InputIter;
 use text_to_ascii_art::fonts::get_font;
 use text_to_ascii_art::to_art;
 use tokio::fs::DirEntry;
@@ -370,43 +371,68 @@ async fn splash(  ) {
 }
 
 async fn splash_with_params( pre: usize, post: usize, interval: u64) {
-    match to_art("*STARLANE*".to_string(), "default", 0, 0, 0) {
-        Ok(string) => {
+    if let Some( size ) =  termsize::get() {
+println!("width: {}",size.cols);
+println!("{}","x".repeat(size.cols as usize));
 
-            let string = format!("{}{}{}","\n".repeat(pre),string,"\n".repeat(post));
+        let banners = if size.cols as usize > splash_widest("*STARLANE*" ) {
+            vec!("*STARLANE*")
+        } else {
+            vec!["STAR","LANE"]
+        };
+        splash_with_params_and_banners(pre,post,interval, banners ).await;
+    }
+}
 
-            let begin = (0xFF, 0xFF, 0xFF);
-            let end = (0xEE, 0xAA, 0x5A);
-            let end = COLORS;
 
-            //let begin = (0x00, 0x00, 0x00);
-            // this is bad code however I couldn't find out how to get lines().len() withou
-            // giving up ownership (therefor the clone)
-            let size = string.clone().lines().count();
+fn splash_widest( string: & str ) -> usize {
+    to_art(string.to_string(), "default", 0, 0, 0).unwrap().lines().into_iter().map(|line| line.chars().count()).max().unwrap()
+}
+
+
+async fn splash_with_params_and_banners( pre: usize, post: usize, interval: u64, banners: Vec<&str>) {
+
+
+    for i in 0..banners.len() {
+        let banner = banners.get(i).unwrap();
+        match to_art(banner.to_string(), "default", 0, 0, 0) {
+            Ok(string) => {
+
+                let string = format!("{}{}{}", string.len(),"\n".repeat(pre), string);
+
+                let begin = (0xFF, 0xFF, 0xFF);
+                let end = (0xEE, 0xAA, 0x5A);
+                let end = COLORS;
+
+                //let begin = (0x00, 0x00, 0x00);
+                // this is bad code however I couldn't find out how to get lines().len() withou
+                // giving up ownership (therefor the clone)
+                let size = string.clone().lines().count();
+
             let mut index = 0;
-            for line in string.lines() {
+                for line in string.lines() {
+                    let progress = if index < (pre - 1) {
+                        0.0f32
+                    } else if index > pre && index < size - (post - 1) {
+                        (index - (pre - 1)) as f32 / (size - (post - 1)) as f32
+                    } else {
+                        1.0f32
+                    };
 
-                let progress = if index < (pre-1) {
-                    0.0f32
-                } else if index > pre && index < size - (post-1) {
-                    (index - (pre-1)) as f32 / (size - (post-1)) as f32
-                } else {
-                    1.0f32
-                };
+                    let r = (begin.0 as f32).lerp(end.0 as f32, progress) as u8;
+                    let g = (begin.1 as f32).lerp(end.1 as f32, progress) as u8;
+                    let b = (begin.2 as f32).lerp(end.2 as f32, progress) as u8;
+                    println!("{}", line.truecolor(r, g, b));
+                    tokio::time::sleep(Duration::from_millis(interval)).await;
 
-                let r = (begin.0 as f32).lerp(end.0 as f32, progress) as u8;
-                let g = (begin.1 as f32).lerp(end.1 as f32, progress) as u8;
-                let b = (begin.2 as f32).lerp(end.2 as f32, progress) as u8;
-                println!("{}", line.truecolor(r, g, b));
-                tokio::time::sleep(Duration::from_millis(interval)).await;
+                    index = index + 1;
+                }
 
-                index = index + 1;
+                //            println!("{}", string.truecolor(0xEE, 0xAA, 0x5A));
             }
-
-            //            println!("{}", string.truecolor(0xEE, 0xAA, 0x5A));
-        }
-        Err(err) => {
-            eprintln!("err! {}", err.to_string());
+            Err(err) => {
+                eprintln!("err! {}", err.to_string());
+            }
         }
     }
 }
