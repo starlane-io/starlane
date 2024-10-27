@@ -34,7 +34,7 @@ use crate::hyperspace::reg::{Registry, RegistryWrapper};
 use crate::platform::Platform;
 use crate::registry::err::RegErr;
 use crate::registry::mem::registry::{MemoryRegistry, MemoryRegistryCtx};
-use crate::registry::postgres::embed::PgEmbedSettings;
+use crate::registry::postgres::embed::{PgEmbedSettings, Postgres};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -56,6 +56,7 @@ impl Default for StarlaneConfig {
 
 #[derive(Clone)]
 pub struct Starlane {
+    config: StarlaneConfig,
     artifacts: Artifacts,
     registry: Registry,
 }
@@ -67,6 +68,7 @@ pub enum RegistryConfig {
 #[cfg(feature = "postgres")]
 #[derive(Clone, Serialize, Deserialize)]
 pub enum PgRegistryConfig {
+    #[cfg(feature = "postgres-embedded")]
     Embedded(Database<PgEmbedSettings>),
     External(Database<PostgresConnectInfo>),
 }
@@ -88,6 +90,7 @@ pub struct Database<S> {
     pub database: String,
     pub schema: String,
     pub settings: S,
+    pub nuke: bool
 }
 
 impl<Info> Database<Info> {
@@ -102,6 +105,7 @@ impl<Info> Database<Info> {
             database,
             settings,
             schema,
+            nuke: false
         }
     }
 }
@@ -178,11 +182,11 @@ impl<S> Deref for Database<S> {
 }
 
 impl Starlane {
-    pub async fn new(kind: PgRegistryConfig) -> Result<Starlane, HypErr> {
+    pub async fn new(config: StarlaneConfig) -> Result<Starlane, HypErr> {
         let artifacts = Artifacts::just_builtins();
         let registry = match kind {
             PgRegistryConfig::Embedded(database) => {
-                Arc::new(RegistryWrapper::new(Arc::new(MemoryRegistry::new())))
+                Postgres::new(database).await?;
             }
             #[cfg(feature = "postgres")]
             PgRegistryConfig::External(database) => {

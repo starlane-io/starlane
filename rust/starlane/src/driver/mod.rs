@@ -17,7 +17,7 @@ use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
 use crate::platform::Platform;
 use crate::registry::err::RegErr;
 use crate::service::{
-    Service, ServiceConf, ServiceErr, ServiceKind, ServiceRunner, ServiceSelector, ServiceTemplate,
+    Service,  ServiceErr, ServiceKind, ServiceRunner, ServiceSelector, ServiceTemplate,
 };
 use dashmap::DashMap;
 use futures::future::select_all;

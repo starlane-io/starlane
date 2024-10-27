@@ -91,7 +91,7 @@ impl FileStore {
                     FileStoreInKind::Read { .. } => {
                         out.close_stdin()?;
                         let stdout = out.stdout().await?;
-                        FileStoreOut::Read(stdout)
+                       FileStoreOut::Read(stdout)
                     }
                     FileStoreInKind::Mkdir { .. } => FileStoreOut::Mkdir,
                     FileStoreInKind::Remove { .. } => FileStoreOut::Remove,

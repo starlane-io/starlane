@@ -49,7 +49,9 @@ pub struct PgEmbedSettings {
     pub password: String,
     pub auth_method: PgEmbedAuthMethod,
     pub persistent: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout: Option<Duration>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub migration_dir: Option<String>,
 }
 

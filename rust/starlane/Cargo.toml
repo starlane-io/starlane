@@ -34,6 +34,7 @@ hyperlane=["hypererr"]
 hyperlane-tcp =  ["hyperlane","dep:rcgen","rustls","dep:tokio-rustls","dep:tls-api-rustls"]
 hyperlane-quic =  ["hyperlane","dep:rcgen","rustls", "dep:quinn"]
 postgres=[ "dep:sqlx","dep:serde","dep:tracing","dep:async-recursion", "dep:pg-embed" ]
+postgres-embedded=[ "postgres" ]
 parse=["dep:nom", "dep:nom-supreme", "dep:nom_locate"]
 rustls=["dep:rustls","dep:rcgen","rustls-pemfile"]
 driver=["hyperspace"]
@@ -129,6 +130,9 @@ lerp = { workspace = true, features=["derive"] }
 atty ={workspace = true}
 #rolling-file = {workspace = true}
 termsize = {workspace = true}
+
+#log= {workspace = true}
+textwrap = {workspace = true}
 
 [lib]
 name = "starlane"

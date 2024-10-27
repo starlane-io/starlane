@@ -1,7 +1,5 @@
 use crate::executor::cli::os::CliOsExecutor;
-use crate::executor::cli::{CliIn, CliOut, HostEnv};
-use crate::executor::{ExeConf, Executor};
-use clap::CommandFactory;
+use crate::executor::{Executor, ExecutorConfig};
 use itertools::Itertools;
 use nom::AsBytes;
 use starlane::space::wave::exchange::asynch::DirectedHandler;
@@ -11,58 +9,20 @@ use std::io::Read;
 use std::ops::{Deref, DerefMut};
 use tokio::io::AsyncWriteExt;
 use crate::host::err::HostErr;
-use crate::service::ServiceErr;
-
 pub mod err;
 
-#[derive(Clone, Eq, PartialEq, Hash)]
-pub struct ExtKey<B>
-where
-    B: Hash + Eq + PartialEq,
-{
-    bin: B,
-    env: HostEnv,
-}
 
-impl<B> ExtKey<B>
-where
-    B: Clone + Hash + Eq + PartialEq,
-{
-    pub fn new(bin: B, env: HostEnv) -> Self {
-        Self { bin, env }
-    }
-}
-
-pub trait Proc {
+pub trait ShellExecutor {
     type StdOut;
     type StdErr;
     type StdIn;
     fn stderr(&self) -> Option<&Self::StdErr>;
     fn stdout(&self) -> Option<&Self::StdOut>;
-
     fn stdin(&mut self) -> Option<&Self::StdIn>;
 }
 
-#[derive(Clone, Hash, Eq, PartialEq)]
-pub struct ExeStub {
-    pub loc: String,
-    pub env: HostEnv,
-    pub args: Vec<String>,
-}
 
-
-impl ExeStub {
-    pub fn new(loc: String, env: HostEnv) -> Self {
-        let args = vec![];
-        Self::new_with_args(loc, env, args)
-    }
-
-    pub fn new_with_args(loc: String, env: HostEnv, args: Vec<String>) -> Self {
-        Self { loc, env, args }
-    }
-}
-
-pub fn stringify_args(args: Vec<&str>) -> Vec<String> {
+pub(crate) fn stringify_args(args: Vec<&str>) -> Vec<String> {
     args.iter().map(|arg| arg.to_string()).collect()
 }
 
@@ -70,15 +30,15 @@ pub fn stringify_args(args: Vec<&str>) -> Vec<String> {
 
 
 #[derive(Clone, Hash, Eq, PartialEq)]
-pub enum Host {
+pub enum CommandHost {
     Cli(HostCli),
 }
 
-impl Host {
+impl CommandHost {
 
     pub fn env( &self, key: &str ) -> Option<&String> {
         match self {
-            Host::Cli(cli) => cli.env(key)
+            CommandHost::Cli(cli) => cli.env(key)
         }
     }
     pub fn create<D>(&self) -> Result<D, HostErr>
@@ -86,13 +46,13 @@ impl Host {
         D: TryFrom<CliOsExecutor, Error =HostErr>,
     {
         match self {
-            Host::Cli(host) => host.create(),
+            CommandHost::Cli(host) => host.create(),
         }
     }
 
     pub fn with_env( &self, key: &str, value: &str) -> Self {
         match self {
-            Host::Cli(cli) => Host::Cli(cli.with_env(key,value))
+            CommandHost::Cli(cli) => CommandHost::Cli(cli.with_env(key, value))
         }
     }
 
@@ -100,7 +60,7 @@ impl Host {
 
 #[derive(Clone, Hash, Eq, PartialEq)]
 pub enum HostCli {
-    Os(ExeStub),
+    Os(ExecutorConfig),
 }
 
 impl HostCli {

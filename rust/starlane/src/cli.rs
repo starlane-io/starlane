@@ -33,7 +33,7 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand, EnumString, strum_macros::Display)]
 pub enum Commands {
-    Demo,
+    Install,
     Run,
     Term(TermArgs),
     Version,

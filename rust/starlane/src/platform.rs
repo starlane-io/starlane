@@ -1,17 +1,20 @@
-use starlane::space::artifact::asynch::Artifacts;
-use starlane::space::kind::{ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind, UserBaseSubKindBase};
-use starlane::space::loc::{MachineName, StarKey, ToBaseKind};
-use starlane::space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
-use std::sync::Arc;
-use starlane::space::command::direct::create::KindTemplate;
-use starlane::space::err::SpaceErr;
-use starlane::space::log::{root_logger, RootLogger};
-use std::str::FromStr;
-use starlane::space::settings::Timeouts;
 use crate::driver::DriversBuilder;
 use crate::hyperlane::{HyperAuthenticator, HyperGateSelector, HyperwayEndpointFactory};
 use crate::hyperspace::machine::{Machine, MachineApi, MachineTemplate};
 use crate::hyperspace::reg::Registry;
+use starlane::space::artifact::asynch::Artifacts;
+use starlane::space::command::direct::create::KindTemplate;
+use starlane::space::err::SpaceErr;
+use starlane::space::kind::{
+    ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind,
+    UserBaseSubKindBase,
+};
+use starlane::space::loc::{MachineName, StarKey, ToBaseKind};
+use starlane::space::log::{root_logger, RootLogger};
+use starlane::space::particle::property::{PropertiesConfig, PropertiesConfigBuilder};
+use starlane::space::settings::Timeouts;
+use std::str::FromStr;
+use std::sync::Arc;
 
 #[async_trait]
 pub trait Platform: Send + Sync + Sized + Clone
@@ -25,7 +28,7 @@ where
     type StarAuth;
     type RemoteStarConnectionFactory;
 
-    async fn machine(&self) -> Result<MachineApi,Self::Err> {
+    async fn machine(&self) -> Result<MachineApi, Self::Err> {
         Ok(Machine::new_api(self.clone()).await?)
     }
 
@@ -61,8 +64,8 @@ where
     async fn star_registry(&self, star: &StarKey) -> Result<Registry, Self::Err>;
     fn artifact_hub(&self) -> Artifacts;
     async fn start_services(&self, gate: &Arc<HyperGateSelector>) {}
-        fn logger(&self) -> RootLogger {
-            root_logger()
+    fn logger(&self) -> RootLogger {
+        root_logger()
     }
 
     fn web_port(&self) -> Result<u16, Self::Err> {
@@ -107,8 +110,9 @@ where
             BaseKind::Control => Kind::Control,
             BaseKind::UserBase => match &template.sub {
                 None => {
-
-                    return Err(SpaceErr::expect_sub::<UserBaseSubKindBase>(BaseKind::UserBase));
+                    return Err(SpaceErr::expect_sub::<UserBaseSubKindBase>(
+                        BaseKind::UserBase,
+                    ));
                 }
                 Some(sub) => {
                     let specific =
@@ -120,13 +124,16 @@ where
             BaseKind::Repo => Kind::Repo,
             BaseKind::Portal => Kind::Portal,
             BaseKind::Star => {
-                return Err(SpaceErr::unimplemented("stars cannot be created via the template"))
+                return Err(SpaceErr::unimplemented(
+                    "stars cannot be created via the template",
+                ))
             }
             BaseKind::Driver => Kind::Driver,
             BaseKind::Global => Kind::Global,
             BaseKind::Host => Kind::Host,
             BaseKind::Guest => Kind::Guest,
-            BaseKind::Native => Kind::Native(NativeSub::Web),
+            BaseKind::Registry => Kind::Registry,
+            BaseKind::WebServer => Kind::WebServer
         })
     }
 
@@ -163,6 +170,7 @@ where
         }
         result
     }
+
 }
 
 pub struct Settings {
