@@ -16,10 +16,15 @@ pub struct Postgres {
 
 impl Postgres {
 
+    pub fn url(&self) -> String {
+        self.pg_embed.db_uri.clone()
+    }
+
     pub async fn install(config: &Database<PgEmbedSettings>) -> Result<(), RegErr> {
-        fs::create_dir_all(&config.database_dir).await?;
+
 
         println!("setup");
+        println!("db dir: {}",config.database_dir);
         fs::create_dir_all(&config.database_dir).await?;
 
         let pg_settings: PgSettings = config.settings.clone().into();
@@ -137,14 +142,13 @@ impl Into<PgSettings> for PgEmbedSettings {
 impl Default for PgEmbedSettings {
     fn default() -> Self {
         Self {
-            //database_dir: format!("{}/registry", STARLANE_DATA_DIR.to_string()).to_string(),
-            database_dir: "./registry".to_string(),
+            database_dir: format!("{}/registry", STARLANE_DATA_DIR.to_string()).to_string(),
             port: 5432,
             user: STARLANE_REGISTRY_USER.to_string(),
             password: STARLANE_REGISTRY_PASSWORD.to_string(),
             auth_method: Default::default(),
-            persistent: false,
-            timeout: Some(Duration::from_secs(30)),
+            persistent: true,
+            timeout: Some(Duration::from_secs(5)),
         }
     }
 }

@@ -46,12 +46,14 @@ use crate::registry::postgres::PostgresDbKey;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {
+    pub can_nuke: bool,
     pub registry: PgRegistryConfig,
 }
 
 impl Default for StarlaneConfig {
     fn default() -> StarlaneConfig {
         Self {
+            can_nuke: true,
             registry: PgRegistryConfig::default(),
         }
     }
@@ -166,10 +168,14 @@ impl Database<PostgresConnectInfo> {
 
 
     pub fn to_uri(&self) -> String {
+        /*
         format!(
             "postgres://{}:{}@{}/{}",
             self.user, self.password, self.url, self.database
         )
+
+         */
+        self.url.clone()
     }
 
 }
@@ -220,7 +226,10 @@ impl Starlane {
 
         let db = match config.clone().registry {
             PgRegistryConfig::Embedded(db) => {
-                foundation.provision_registry(db).await?
+                println!("provisioning embedded...");
+                let rtn = foundation.provision_registry(db).await?;
+                println!("embedded. provisioned....");
+                rtn
             }
             PgRegistryConfig::External(db) => {
 
@@ -238,15 +247,20 @@ impl Starlane {
         let lookup = PostgresLookups::new();
         let mut set = HashSet::new();
         set.insert(db.database.clone());
+println!("hello");
         let ctx = Arc::new(PostgresRegistryContext::new(set, Box::new(lookup)).await?);
+println!("all");
         let handle = PostgresRegistryContextHandle::new(&db.database, ctx, db.handle);
         let postgres_lookups = PostgresLookups::new();
 
         let logger = root_logger();
         let logger = logger.point(Point::global_registry());
+println!("you");
         let registry =Arc::new(RegistryWrapper::new(Arc::new(
             PostgresRegistry::new(handle, Box::new(postgres_lookups), logger).await?,
         )));
+println!("happy people");
+
 
         Ok(Self {
             config,

@@ -95,7 +95,7 @@ use tokio::{fs, join, signal};
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::FileOptions;
-use starlane::foundation::Foundation;
+use crate::foundation::Foundation;
 use crate::foundation::StandAloneFoundation;
 use crate::registry::postgres::embed::PgEmbedSettings;
 
@@ -182,6 +182,10 @@ pub fn main() -> Result<(), anyhow::Error> {
         }
         Commands::Version => {
             println!("{}", VERSION.to_string());
+            Ok(())
+        }
+        Commands::Nuke => {
+            nuke();
             Ok(())
         }
     }
@@ -466,17 +470,24 @@ async fn splash() {
 
 fn info(text: &str) -> io::Result<()> {
     let padding = 10usize;
-    let size = termsize::get().unwrap();
-    let len = size.cols as usize - padding;
+    let size = term_width();
+    let len = size - padding;
     let text = textwrap::wrap(text, len).join("\n");
     cliclack::log::info(text)
+}
+
+fn term_width() -> usize {
+    match termsize::get() {
+        None => 128,
+        Some(size) => size.cols as usize
+    }
 }
 
 
 pub fn note(prompt: impl Display, message: impl Display) -> io::Result<()> {
     let padding = 10usize;
-    let size = termsize::get().unwrap();
-    let len = size.cols as usize - padding;
+    let size = term_width();
+    let len = size - padding;
     let text = textwrap::wrap(message.to_string().as_str(), len).join("\n");
     cliclack::note(prompt,text)
 }
@@ -484,22 +495,20 @@ pub fn note(prompt: impl Display, message: impl Display) -> io::Result<()> {
 
 pub fn wrap( text: impl Display) -> impl Display {
     let padding = 10usize;
-    let size = termsize::get().unwrap();
-    let len = size.cols as usize - padding;
+    let size = term_width();
+    let len = size - padding;
     textwrap::wrap(text.to_string().as_str(), len).join("\n")
 }
 
 
 
 async fn splash_with_params(pre: usize, post: usize, interval: u64) {
-    if let Some(size) = termsize::get() {
-        let banners = if size.cols as usize > splash_widest("*STARLANE*") {
+        let banners = if term_width() > splash_widest("*STARLANE*") {
             vec!["*STARLANE*"]
         } else {
             vec!["STAR", "LANE"]
         };
         splash_with_params_and_banners(pre, post, interval, banners).await;
-    }
 }
 
 fn splash_widest(string: &str) -> usize {
@@ -711,9 +720,9 @@ async fn standalone_foundation() -> Result<(), anyhow::Error> {
         info("config saved.")?;
         delay(100).await;
         spinner.set_message("starting local postgres registry...");
-        let registry = PgRegistryConfig::default();
         if let PgRegistryConfig::Embedded(db) = config.registry {
-            StandAloneFoundation::install(&db).await?;
+            let foundation = StandAloneFoundation::new();
+            foundation.install(&db).await?;
         } else {
 
         }
@@ -766,4 +775,17 @@ async fn newlines( len: usize, delay: u64 )  {
         println!();
         crate::delay(delay).await;
     }
+}
+
+
+
+#[tokio::main]
+async fn nuke()  {
+    if let Ok(Some(config)) = config().await {
+        if !config.can_nuke  {
+            panic!("in config: '{}' can_nuke flag is set to false.",config_path());
+        }
+    }
+
+    fs::remove_dir_all(STARLANE_HOME.to_string()).await.unwrap();
 }

@@ -45,8 +45,10 @@ impl Foundation for StandAloneFoundation {
         config: Database<PgEmbedSettings>,
     ) -> Result<LiveDatabase, Self::Err> {
         let db = Postgres::new(config.clone()).await?;
+        let url = db.url();
         let handle = db.start().await?;
-        let database = config.into();
+        let mut database :Database<PostgresConnectInfo>= config.into();
+        database.settings.url= url;
         Ok(LiveDatabase { database, handle })
     }
 }

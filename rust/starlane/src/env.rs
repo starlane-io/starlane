@@ -1,3 +1,5 @@
+use std::env::VarError;
+use std::str::FromStr;
 use once_cell::sync::Lazy;
 use std::string::ToString;
 use uuid::Uuid;
@@ -29,6 +31,32 @@ pub static STARLANE_DATA_DIR: Lazy<String> = Lazy::new(|| {
 pub static STARLANE_CACHE_DIR: Lazy<String> = Lazy::new(|| {
     std::env::var("STARLANE_CACHE_DIR").unwrap_or(format!("{}/cache", STARLANE_HOME.to_string()).to_string())
 });
+
+pub static STARLANE_WRITE_LOGS : Lazy<StarlaneWriteLogs> = Lazy::new(|| {
+    match std::env::var("STARLANE_WRITE_LOGS")
+    {
+        Ok(value) => StarlaneWriteLogs::from_str(value.as_str()).unwrap_or_default(),
+        Err(err) => StarlaneWriteLogs::default()
+    }
+
+});
+
+#[derive(Debug, Clone,strum_macros::EnumString,strum_macros::Display)]
+pub enum StarlaneWriteLogs {
+    #[strum(serialize = "auto")]
+    Auto,
+    #[strum(serialize = "file")]
+    File,
+    #[strum(serialize = "stdout")]
+    StdOut
+}
+
+impl Default for StarlaneWriteLogs {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
 
 static STARLANE_TOKEN: Lazy<String> =
     Lazy::new(|| std::env::var("STARLANE_TOKEN").unwrap_or(Uuid::new_v4().to_string()));
