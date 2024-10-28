@@ -22,6 +22,15 @@ impl Postgres {
     fn postgresql(config: &Database<PgEmbedSettings> ) -> Settings
     {
         let mut settings = Settings::default();
+        settings.temporary = false;
+        settings
+    }
+
+    /*
+
+    fn postgresql(config: &Database<PgEmbedSettings> ) -> Settings
+    {
+        let mut settings = Settings::default();
         settings.data_dir = format!("{}/registry",config.database_dir).to_string().into();
         settings.password_file = format!("{}/.password",config.database_dir).to_string().into();
         settings.temporary = !config.persistent;
@@ -30,12 +39,14 @@ impl Postgres {
         settings
     }
 
+     */
+
 
     pub async fn install( config: &Database<PgEmbedSettings>) -> Result<(), RegErr> {
 
         let settings = Self::postgresql(config);
-        println!("creating directoriesi {}", settings.data_dir.display());
-        println!("temporarry? {}",settings.temporary);
+        println!("creating directories {}", settings.data_dir.display());
+        println!("temporary? {}",settings.temporary);
         fs::create_dir_all(&settings.data_dir).await?;
 
         println!("installing postgres...");
@@ -72,9 +83,13 @@ impl Postgres {
     }
 
     /// as long as the Sender is alive
+    ///
     pub async fn start(mut self) -> Result<tokio::sync::mpsc::Sender<()>, RegErr> {
-
+        println!("setup..");
+        self.postgres.setup().await?;
+        println!("starting...");
         self.postgres.start().await?;
+        println!("*started(");
         let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(1);
         tokio::spawn(
             async move {

@@ -255,7 +255,7 @@ fn run() -> Result<(), anyhow::Error> {
             delay(100).await;
             spinner().set_message("launching registry");
             delay(1000).await;
-            let starlane = Starlane::new(config,StandAloneFoundation()).await.unwrap();
+            let starlane = Starlane::new(config,StandAloneFoundation()).await.map_err(|e|{println!("{}",e.to_string()); e}).unwrap();
             success("registry ready.")?;
             delay(100).await;
             spinner().set_message("starting starlane...");
