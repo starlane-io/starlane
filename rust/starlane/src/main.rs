@@ -199,10 +199,9 @@ fn run() -> Result<(), anyhow::Error> {
 
     runtime.block_on(async move {
 
-        intro("RUN STARLANE").unwrap();
+        intro("RUN STARLANE").unwrap_or_default();
 
         async fn runner() -> Result<(),anyhow::Error> {
-            println!();
             spinner().start("initializing");
             tokio::time::sleep(Duration::from_millis(100)).await;
             info("initialization complete.")?;
@@ -213,49 +212,65 @@ fn run() -> Result<(), anyhow::Error> {
             let config = match config().await {
                 Ok(Some(config)) => config,
                 Ok(None) => {
+                    delay(1000).await;
                     spinner().error("Starlane configuration not found.");
+                    delay(100).await;
                     error(format!("Starlane looked for a configuration here: '{}' But none was found.", config_path()))?;
+                    delay(100).await;
                     note("wrong config?", format!("if '{}' isn't the config file you wanted, please set environment variable `export STARLANE_HOME=\"/config/parent/dir\"", config_path()))?;
+                    delay(100).await;
                     note("install", "please run `starlane install` to configure a new Starlane runner")?;
+                    delay(100).await;
                     outro("Good Luck!")?;
-                    println!();
-                    println!();
-                    println!();
+                    newlines(3,100).await;
                     process::exit(1);
                 }
                 Err(err) => {
+                    delay(1000).await;
                     spinner().error("invalid configuration");
+                    delay(100).await;
                     error(format!("{}", err.to_string()))?;
+                    delay(100).await;
                     note("wrong config?", format!("if '{}' isn't the config file you wanted, please set environment variable `export STARLANE_HOME=\"/config/parent/dir\"", config_path()))?;
+                    delay(100).await;
                     note("fresh install", "To create a fresh configuration please run: `starlane install`")?;
+                    delay(100).await;
                     outro("Good Luck!")?;
-                    println!();
-                    println!();
-                    println!();
+                    newlines(3,100).await;
                     process::exit(1);
                 }
             };
 
             success("starlane configured.")?;
+            delay(100).await;
             spinner().set_message("launching registry");
+            delay(1000).await;
             let starlane = Starlane::new(config.registry).await.unwrap();
             success("registry ready.")?;
+            delay(100).await;
             spinner().set_message("starting starlane...");
 
             let machine_api = starlane.machine();
 
+            delay(100).await;
             success("starlane started.")?;
+            delay(100).await;
             spinner().set_message("waiting for ready status...");
             let api = tokio::time::timeout(Duration::from_secs(30), machine_api).await??;
+            delay(100).await;
             success("starlane ready.")?;
 
+            delay(100).await;
             spinner().clear();
+            newlines(3, 100).await;
 
-            tokio::time::sleep(Duration::from_secs(2)).await;
+            delay(2000).await;
             splash_with_params(1,2, 25).await;
-            tokio::time::sleep(Duration::from_secs(2)).await;
-            note("starlane terminal", "You can connect to this starlane runner with a control terminal: `starlane term`" )?;
+            delay(250).await;
+            note("what's next?", "You can connect to this starlane runner with a control terminal: `starlane term`" )?;
+            delay(250).await;
             outro("Starlane is running.")?;
+            newlines(3, 100).await;
 
             // this is a dirty hack which is good enough for a 0.3.0 release...
             loop {
@@ -269,14 +284,15 @@ fn run() -> Result<(), anyhow::Error> {
             Ok(_) => {}
             Err(err) =>
                 {
-                    error(format!("starlane haulted due to an error: {}", err.to_string())).unwrap_or_default();
-                    outro("complete").unwrap();
+                    delay(250).await;
+                    error(format!("starlane halted due to an error: {}", err.to_string())).unwrap_or_default();
+                    delay(250).await;
+                    outro("runner failed").unwrap();
+                    newlines(3, 100).await;
                 }
         }
     });
-    println!();
-    println!();
-    println!();
+
     Ok(())
 }
 
@@ -588,9 +604,7 @@ pub enum StartSequence {
 
 #[tokio::main]
 async fn install() -> Result<(), anyhow::Error> {
-    async fn wait(t: u64) {
-        tokio::time::sleep(Duration::from_millis(t)).await;
-    }
+
     intro("pre-install checklist")?;
     let spinner = spinner();
     spinner.start("checking configuration");
@@ -638,7 +652,7 @@ async fn install() -> Result<(), anyhow::Error> {
     outro("checklist complete.")?;
 
     print!("{}", "\n".repeat(3));
-    wait(1000).await;
+    delay(1000).await;
 
 
     intro("Install Starlane")?;
@@ -647,7 +661,7 @@ async fn install() -> Result<(), anyhow::Error> {
     //note("Foundations", "Select a foundation for this runner.  A foundation abstracts most infrastructure capabilities for starlane (provisioning servers, networking etc)" )?;
     note("Standalone", "If you are using Starlane to develop on your local machine the `Standalone` foundation is recommended and will get you going with minimal hastles")?;
 
-    wait(500).await;
+    delay(500).await;
     let selected = select(r#"Choose a Foundation:"#)
         .item(
             "Standalone",
@@ -661,8 +675,7 @@ async fn install() -> Result<(), anyhow::Error> {
         )
 
  */
-        .interact()
-        .unwrap_or_default();
+        .interact()?;
 
     match selected {
         "Standalone" => standalone_foundation().await,
@@ -698,7 +711,7 @@ async fn standalone_foundation() -> Result<(), anyhow::Error> {
         }
         Err(err) => {
             spinner.stop("installation failed");
-            error(err.to_string().as_str()).unwrap_or_default();
+            error(wrap(err.to_string().as_str())).unwrap_or_default();
             outro("Standalone installation failed").unwrap_or_default();
             process::exit(1);
         }
@@ -722,3 +735,18 @@ println!();
 
 
  */
+
+
+
+
+
+async fn delay(t: u64) {
+    tokio::time::sleep(Duration::from_millis(t)).await;
+}
+
+async fn newlines( len: usize, delay: u64 )  {
+    for i in 0..len {
+        println!();
+        crate::delay(delay).await;
+    }
+}
