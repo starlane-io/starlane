@@ -637,6 +637,7 @@ async fn install() -> Result<(), anyhow::Error> {
 
     outro("checklist complete.")?;
 
+    print!("{}", "\n".repeat(3));
     wait(1000).await;
 
 

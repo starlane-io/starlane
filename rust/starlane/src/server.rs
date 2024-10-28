@@ -181,15 +181,18 @@ impl<S> Deref for Database<S> {
     }
 }
 
+#[cfg(feature = "postgres")]
 impl Starlane {
-    pub async fn new(config: StarlaneConfig) -> Result<Starlane, HypErr> {
+    pub async fn new(config: PgRegistryConfig) -> Result<Starlane, HypErr> {
         let artifacts = Artifacts::just_builtins();
-        let registry = match kind {
+        let registry = match config{
+
+            #[cfg(feature = "postgres-embedded")]
             PgRegistryConfig::Embedded(database) => {
                 Postgres::new(database).await?;
             }
-            #[cfg(feature = "postgres")]
             PgRegistryConfig::External(database) => {
+                /*
                 let lookup = PostgresLookups::new();
                 let db = lookup.lookup_registry_db()?;
                 let mut set = HashSet::new();
@@ -203,13 +206,21 @@ impl Starlane {
                 Arc::new(RegistryWrapper::new(Arc::new(
                     PostgresRegistry::new(handle, Box::new(postgres_lookups), logger).await?,
                 )))
+
+                 */
+                todo!()
             }
         };
 
+        /*
         Ok(Self {
             registry,
             artifacts,
         })
+
+         */
+
+        todo!()
     }
 }
 
