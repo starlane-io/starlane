@@ -39,20 +39,32 @@ impl Postgres {
 
         Ok(Self { pg_embed: pg })
     }
+
+    /// as long as the Sender is alive
+    pub async fn start(self) -> Result<tokio::sync::mpsc::Sender<()>, RegErr> {
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(1);
+        tokio::spawn(
+            async move {
+                while let Some(_) = rx.recv().await {
+                    // do nothing but linger
+                }
+            }
+        );
+        Ok(tx)
+    }
+
 }
 
 #[derive(Builder, Clone, Serialize, Deserialize,Eq,PartialEq,Hash)]
 pub struct PgEmbedSettings {
-    pub database_dir: String,
     pub port: u16,
     pub user: String,
     pub password: String,
     pub auth_method: PgEmbedAuthMethod,
     pub persistent: bool,
+    pub database_dir: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timeout: Option<Duration>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub migration_dir: Option<String>,
 }
 
 impl Into<PgSettings> for PgEmbedSettings {
@@ -65,10 +77,14 @@ impl Into<PgSettings> for PgEmbedSettings {
             auth_method: self.auth_method.into(),
             persistent: self.persistent,
             timeout: self.timeout,
+            migration_dir: None,
+            /*
             migration_dir: match self.migration_dir {
                 None => None,
                 Some(path) => Some(path.into())
             }
+
+             */
         }
     }
 }
@@ -83,7 +99,6 @@ impl Default for PgEmbedSettings {
             auth_method: Default::default(),
             persistent: false,
             timeout: Some(Duration::from_secs(30)),
-            migration_dir: None,
         }
     }
 }

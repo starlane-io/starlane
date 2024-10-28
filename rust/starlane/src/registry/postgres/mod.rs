@@ -55,13 +55,16 @@ pub struct PostgresRegistry {
     logger: PointLogger,
     ctx: PostgresRegistryContextHandle,
     platform: Box<dyn PostgresPlatform>,
+
+
 }
+
 
 impl PostgresRegistry {
     pub async fn new(
         ctx: PostgresRegistryContextHandle,
         platform: Box<dyn PostgresPlatform>,
-        logger: PointLogger,
+        logger: PointLogger
     ) -> Result<Self, RegErr> {
         let logger = logger.point(Point::global_registry());
         /*
@@ -187,9 +190,9 @@ impl RegistryApi for PostgresRegistry {
         self.logger.info("nuking database!");
         let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
-        trans.execute("DROP TABLE particles CASCADE").await;
-        trans.execute("DROP TABLE access_grants CASCADE").await;
-        trans.execute("DROP TABLE properties CASCADE").await;
+        trans.execute("DROP TABLE particles CASCADE").await?;
+        trans.execute("DROP TABLE access_grants CASCADE").await?;
+        trans.execute("DROP TABLE properties CASCADE").await?;
         trans.commit().await?;
         self.setup().await?;
         Ok(())
@@ -1310,14 +1313,21 @@ pub struct PostgresRegistryContextHandle {
     key: PostgresDbKey,
     pool: Arc<PostgresRegistryContext>,
     pub schema: String,
+
+    /// the receiver for this particular Sender may be an embedded database
+    /// which needs to remain alive OR it may be nothing. Either way
+    /// this handle will ensure that everything on the foundation that is needed
+    /// to support this registry will stay alive
+    keep_alive: tokio::sync::mpsc::Sender<()>
 }
 
 impl PostgresRegistryContextHandle {
-    pub fn new(db: &Database<PostgresConnectInfo>, pool: Arc<PostgresRegistryContext>) -> Self {
+    pub fn new(db: &Database<PostgresConnectInfo>, pool: Arc<PostgresRegistryContext>, keep_alive: tokio::sync::mpsc::Sender<()>) -> Self {
         Self {
             key: db.to_key(),
             schema: db.schema.clone(),
             pool,
+            keep_alive
         }
     }
 
@@ -1400,7 +1410,6 @@ pub struct PostgresConnectInfo {
     pub url: String,
     pub user: String,
     pub password: String,
-
 }
 
 impl Default for PostgresConnectInfo {

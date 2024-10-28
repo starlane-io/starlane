@@ -15,6 +15,7 @@ use starlane::space::particle::property::{PropertiesConfig, PropertiesConfigBuil
 use starlane::space::settings::Timeouts;
 use std::str::FromStr;
 use std::sync::Arc;
+use crate::foundation::Foundation;
 
 #[async_trait]
 pub trait Platform: Send + Sync + Sized + Clone
@@ -23,16 +24,20 @@ where
     Self: 'static,
     Self::StarAuth: HyperAuthenticator,
     Self::RemoteStarConnectionFactory: HyperwayEndpointFactory,
+    Self::Foundation: Foundation+Clone+Send+Sync,
 {
     type Err;
     type StarAuth;
     type RemoteStarConnectionFactory;
+    type Foundation;
 
     async fn machine(&self) -> Result<MachineApi, Self::Err> {
         Ok(Machine::new_api(self.clone()).await?)
     }
 
     fn star_auth(&self, star: &StarKey) -> Result<Self::StarAuth, Self::Err>;
+
+
     fn remote_connection_factory_for_star(
         &self,
         star: &StarKey,

@@ -39,6 +39,9 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
+use sqlx::PgConnection;
+use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
+use crate::foundation::{Foundation, StandAloneFoundation};
 use crate::registry::postgres::PostgresDbKey;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -59,6 +62,7 @@ pub struct Starlane {
     config: StarlaneConfig,
     artifacts: Artifacts,
     registry: Registry,
+    foundation: StandAloneFoundation
 }
 
 pub enum RegistryConfig {
@@ -90,7 +94,6 @@ pub struct Database<S> {
     pub database: String,
     pub schema: String,
     pub settings: S,
-    pub nuke: bool
 }
 
 impl<Info> Database<Info> {
@@ -105,10 +108,39 @@ impl<Info> Database<Info> {
             database,
             settings,
             schema,
-            nuke: false
         }
     }
 }
+
+impl Into<Database<PostgresConnectInfo>> for Database<PgEmbedSettings> {
+    fn into(self) -> Database<PostgresConnectInfo> {
+        Database {
+            settings: PostgresConnectInfo {
+                url: "localhost".to_string(),
+                user: self.user.clone(),
+                password: self.password.clone()
+            },
+            database: self.database,
+            schema: self.schema,
+        }
+    }
+}
+
+pub struct LiveDatabase {
+    pub database: Database<PostgresConnectInfo>,
+    pub(crate) handle: tokio::sync::mpsc::Sender<()>
+}
+
+impl LiveDatabase {
+    pub fn new( database: Database<PostgresConnectInfo>, handle: tokio::sync::mpsc::Sender<()>) -> Self {
+        Self {
+            database,
+            handle,
+        }
+    }
+}
+
+
 
 impl Database<PostgresConnectInfo> {
     pub fn from_con<D, S>(
@@ -183,44 +215,46 @@ impl<S> Deref for Database<S> {
 
 #[cfg(feature = "postgres")]
 impl Starlane {
-    pub async fn new(config: PgRegistryConfig) -> Result<Starlane, HypErr> {
+    pub async fn new(config: StarlaneConfig, foundation: StandAloneFoundation) -> Result<Starlane, HypErr> {
         let artifacts = Artifacts::just_builtins();
-        let registry = match config{
 
-            #[cfg(feature = "postgres-embedded")]
-            PgRegistryConfig::Embedded(database) => {
-                Postgres::new(database).await?;
+        let db = match config.clone().registry {
+            PgRegistryConfig::Embedded(db) => {
+                foundation.provision_registry(db).await?
             }
-            PgRegistryConfig::External(database) => {
-                /*
-                let lookup = PostgresLookups::new();
-                let db = lookup.lookup_registry_db()?;
-                let mut set = HashSet::new();
-                set.insert(db.clone());
-                let ctx = Arc::new(PostgresRegistryContext::new(set, Box::new(lookup)).await?);
-                let handle = PostgresRegistryContextHandle::new(&db, ctx);
-                let postgres_lookups = PostgresLookups::new();
+            PgRegistryConfig::External(db) => {
 
-                let logger = root_logger();
-                let logger = logger.point(Point::global_registry());
-                Arc::new(RegistryWrapper::new(Arc::new(
-                    PostgresRegistry::new(handle, Box::new(postgres_lookups), logger).await?,
-                )))
+                let (handle, mut rx) = tokio::sync::mpsc::channel(1);
+                tokio::spawn( async move {
+                    while let Some(_) = rx.recv().await {
+                        // do nothing until sender goes out of scope
+                    }
+                });
 
-                 */
-                todo!()
+                LiveDatabase::new(db,handle)
             }
         };
 
-        /*
+        let lookup = PostgresLookups::new();
+        let mut set = HashSet::new();
+        set.insert(db.database.clone());
+        let ctx = Arc::new(PostgresRegistryContext::new(set, Box::new(lookup)).await?);
+        let handle = PostgresRegistryContextHandle::new(&db.database, ctx, db.handle);
+        let postgres_lookups = PostgresLookups::new();
+
+        let logger = root_logger();
+        let logger = logger.point(Point::global_registry());
+        let registry =Arc::new(RegistryWrapper::new(Arc::new(
+            PostgresRegistry::new(handle, Box::new(postgres_lookups), logger).await?,
+        )));
+
         Ok(Self {
+            config,
             registry,
             artifacts,
+            foundation
         })
 
-         */
-
-        todo!()
     }
 }
 
@@ -233,6 +267,8 @@ where
 
     type StarAuth = AnonHyperAuthenticator;
     type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
+
+    type Foundation = StandAloneFoundation;
 
     fn data_dir(&self) -> String {
         STARLANE_DATA_DIR.clone()
@@ -343,6 +379,7 @@ where
                 .unwrap();
         server.start().unwrap();
     }
+
 }
 
 #[cfg(feature = "postgres")]

@@ -14,10 +14,12 @@ pub static VERSION: Lazy<semver::Version> =
 pub mod err;
 pub mod properties;
 pub mod template;
-
 pub mod env;
 
 pub mod platform;
+
+
+pub mod foundation;
 
 #[cfg(test)]
 pub mod test;
@@ -93,6 +95,7 @@ use tokio::{fs, join, signal};
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::FileOptions;
+use crate::foundation::StandAloneFoundation;
 
 fn config_path() -> String {
     format!("{}/config.yaml", STARLANE_HOME.to_string()).to_string()
@@ -245,7 +248,7 @@ fn run() -> Result<(), anyhow::Error> {
             delay(100).await;
             spinner().set_message("launching registry");
             delay(1000).await;
-            let starlane = Starlane::new(config.registry).await.unwrap();
+            let starlane = Starlane::new(config,StandAloneFoundation()).await.unwrap();
             success("registry ready.")?;
             delay(100).await;
             spinner().set_message("starting starlane...");
@@ -691,16 +694,20 @@ async fn install() -> Result<(), anyhow::Error> {
 async fn standalone_foundation() -> Result<(), anyhow::Error> {
     let spinner = spinner();
     spinner.start("starting install");
+    delay(1000).await;
     async fn inner(spinner: &ProgressBar) -> Result<(), anyhow::Error> {
         spinner.set_message("generating config");
         let config = StarlaneConfig::default();
+        delay(100).await;
         spinner.clear();
         info("config generated.")?;
+        delay(100).await;
         spinner.set_message("saving config");
         config_save(config.clone()).await?;
+        delay(100).await;
         info("config saved.")?;
+        delay(100).await;
         spinner.set_message("starting local postgres registry...");
-
         Ok(())
     }
 
