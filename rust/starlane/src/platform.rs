@@ -6,7 +6,7 @@ use starlane::space::artifact::asynch::Artifacts;
 use starlane::space::command::direct::create::KindTemplate;
 use starlane::space::err::SpaceErr;
 use starlane::space::kind::{
-    ArtifactSubKind, BaseKind, FileSubKind, Kind, NativeSub, Specific, StarSub, UserBaseSubKind,
+    ArtifactSubKind, BaseKind, FileSubKind, Kind,  Specific, StarSub, UserBaseSubKind,
     UserBaseSubKindBase,
 };
 use starlane::space::loc::{MachineName, StarKey, ToBaseKind};

@@ -17,7 +17,7 @@ use crate::hyperspace::star::{
 };
 use crate::platform::Platform;
 use crate::service::{
-    service_conf, Service, ServiceConf, ServiceErr, ServiceKind, ServiceSelector, ServiceTemplate,
+    service_conf, Service,  ServiceErr, ServiceKind, ServiceSelector, ServiceTemplate,
 };
 use crate::template::Templates;
 use dashmap::DashMap;

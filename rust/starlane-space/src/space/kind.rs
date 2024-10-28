@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::space::parse::util::new_span;
 
-use crate::space::hyper::ChildRegistry;
 use crate::space::loc::{
     ProvisionAffinity, StarKey, ToBaseKind, Version, CONTROL_WAVE_TRAVERSAL_PLAN,
     MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, STAR_WAVE_TRAVERSAL_PLAN,
@@ -504,21 +503,6 @@ pub trait Tks {
     fn matches(&self, tks: &dyn Tks) -> bool;
 }
 
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    Hash,
-    Serialize,
-    Deserialize,
-    strum_macros::Display,
-    strum_macros::EnumString,
-    strum_macros::EnumIter,
-)]
-pub enum NativeSub {
-    Web,
-}
 
 #[derive(
     Clone,
@@ -741,14 +725,7 @@ impl Into<Option<String>> for DatabaseSubKind {
     }
 }
 
-impl BaseKind {
-    pub fn child_resource_registry_handler(&self) -> ChildRegistry {
-        match self {
-            Self::UserBase => ChildRegistry::Core,
-            _ => ChildRegistry::Shell,
-        }
-    }
-}
+
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct StarStub {

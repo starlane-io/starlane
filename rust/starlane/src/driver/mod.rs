@@ -9,6 +9,8 @@ pub mod star;
 
 pub mod artifact;
 
+pub mod filestore;
+
 use crate::driver::star::StarDriverFactory;
 use crate::executor::dialect::filestore::FileStoreErr;
 use crate::hyperspace::machine::MachineErr;
