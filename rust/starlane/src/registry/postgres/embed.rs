@@ -8,12 +8,48 @@ use pg_embed::postgres::{PgEmbed, PgSettings};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
+use tokio::fs;
 
 pub struct Postgres {
     pg_embed: PgEmbed,
 }
 
 impl Postgres {
+
+    pub async fn install(config: &Database<PgEmbedSettings>) -> Result<(), RegErr> {
+        fs::create_dir_all(&config.database_dir).await?;
+
+        println!("setup");
+        fs::create_dir_all(&config.database_dir).await?;
+
+        let pg_settings: PgSettings = config.settings.clone().into();
+        let fetch_settings = PgFetchSettings {
+            version: PG_V15,
+            ..Default::default()
+        };
+
+        let mut pg = PgEmbed::new(pg_settings, fetch_settings).await?;
+        // Download, unpack, create password file and database cluster
+        pg.setup().await?;
+
+        println!("starting db");
+        // start postgresql database
+        pg.start_db().await?;
+
+        println!("check exist db");
+        // create a new database
+        // to enable migrations view the [Usage] section for details
+        if !pg.database_exists(config.database.as_str()).await? {
+            println!("dreating db");
+            pg.create_database(config.database.as_str()).await?;
+        }
+
+        println!("shutting down db");
+        pg.stop_db().await?;
+
+        Ok(())
+    }
+
     pub async fn new(config: Database<PgEmbedSettings>) -> Result<Self, RegErr> {
         let pg_settings: PgSettings = config.settings.clone().into();
         let fetch_settings = PgFetchSettings {
@@ -23,25 +59,29 @@ impl Postgres {
 
         let mut pg = PgEmbed::new(pg_settings, fetch_settings).await?;
 
+        println!("setup");
         // Download, unpack, create password file and database cluster
         pg.setup().await?;
 
+        println!("starting db");
         // start postgresql database
         pg.start_db().await?;
 
+        println!("check exist db");
         // create a new database
         // to enable migrations view the [Usage] section for details
         if !pg.database_exists(config.database.as_str()).await? {
+            println!("dreating db");
             pg.create_database(config.database.as_str()).await?;
         }
 
-        println!("pg running");
+        println!("pg created");
 
         Ok(Self { pg_embed: pg })
     }
 
     /// as long as the Sender is alive
-    pub async fn start(self) -> Result<tokio::sync::mpsc::Sender<()>, RegErr> {
+    pub async fn start(mut self) -> Result<tokio::sync::mpsc::Sender<()>, RegErr> {
         let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(1);
         tokio::spawn(
             async move {
@@ -50,6 +90,11 @@ impl Postgres {
                 }
             }
         );
+
+//        self.pg_embed.start_db().await?;
+
+        println!("pg running");
+
         Ok(tx)
     }
 
@@ -92,7 +137,8 @@ impl Into<PgSettings> for PgEmbedSettings {
 impl Default for PgEmbedSettings {
     fn default() -> Self {
         Self {
-            database_dir: format!("{}/registry", STARLANE_DATA_DIR.to_string()).to_string(),
+            //database_dir: format!("{}/registry", STARLANE_DATA_DIR.to_string()).to_string(),
+            database_dir: "./registry".to_string(),
             port: 5432,
             user: STARLANE_REGISTRY_USER.to_string(),
             password: STARLANE_REGISTRY_PASSWORD.to_string(),

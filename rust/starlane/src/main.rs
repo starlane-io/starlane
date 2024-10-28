@@ -95,7 +95,9 @@ use tokio::{fs, join, signal};
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::FileOptions;
+use starlane::foundation::Foundation;
 use crate::foundation::StandAloneFoundation;
+use crate::registry::postgres::embed::PgEmbedSettings;
 
 fn config_path() -> String {
     format!("{}/config.yaml", STARLANE_HOME.to_string()).to_string()
@@ -244,6 +246,7 @@ fn run() -> Result<(), anyhow::Error> {
                 }
             };
 
+            delay(1000).await;
             success("starlane configured.")?;
             delay(100).await;
             spinner().set_message("launching registry");
@@ -708,6 +711,13 @@ async fn standalone_foundation() -> Result<(), anyhow::Error> {
         info("config saved.")?;
         delay(100).await;
         spinner.set_message("starting local postgres registry...");
+        let registry = PgRegistryConfig::default();
+        if let PgRegistryConfig::Embedded(db) = config.registry {
+            StandAloneFoundation::install(&db).await?;
+        } else {
+
+        }
+
         Ok(())
     }
 

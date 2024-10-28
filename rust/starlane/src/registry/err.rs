@@ -39,8 +39,15 @@ pub enum RegErr {
     #[cfg(feature = "postgres")]
     #[error("postgres embed error error: {0}")]
     PgEmbedError(#[from] Arc<PgEmbedError>),
+    #[error(transparent)]
+    IoErr(Arc<std::io::Error>),
 }
 
+impl  From<std::io::Error> for RegErr {
+    fn from(value: std::io::Error) -> Self {
+       Self::IoErr(Arc::new(value))
+    }
+}
 impl From<PgEmbedError> for RegErr {
     fn from(err: PgEmbedError) -> Self {
         Self::PgEmbedError(Arc::new(err))
