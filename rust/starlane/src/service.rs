@@ -1,12 +1,13 @@
-use std::collections::HashMap;
 use std::env;
 use std::fmt::{Display, Formatter};
-use crate::executor::{Executor, ExecutorConfig, ExecutorRunner};
+use crate::executor::{ExeConf, Executor};
 use itertools::Itertools;
 use nom::AsBytes;
 use starlane::space::loc::ToBaseKind;
-use starlane::space::util::{IdSelector, OptSelector, ValueMatcher};
-use starlane::space::wave::exchange::asynch::{DirectedHandler, Router, TraversalRouter};
+use starlane::space::util::{IdSelector, MatchSelector, OptSelector, RegexMatcher, ValueMatcher};
+use starlane::space::wave::exchange::asynch::{
+    DirectedHandler, Router,
+};
 use starlane_space as starlane;
 use std::future::Future;
 use std::hash::Hash;
@@ -14,25 +15,21 @@ use std::io::Read;
 use std::ops::{Deref, DerefMut};
 use std::path::{absolute, PathBuf};
 use std::str::FromStr;
-use serde::{Deserialize, Serialize};
-use strum_macros::{EnumIter, EnumString};
+use strum_macros::EnumString;
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use starlane::space::err::SpaceErr;
 use starlane::space::kind::Kind;
-use starlane::space::parse::{CamelCase, SkewerCase, VarCase};
-use starlane::space::particle::{PointKind, Status};
+use starlane::space::particle::Status;
 use starlane::space::point::Point;
 use starlane::space::selector::KindSelector;
-use crate::driver::{DriverErr, ParticleSphere, ParticleSphereInner};
 use crate::env::STARLANE_DATA_DIR;
-use crate::executor::cli::Env;
+use crate::executor::cli::HostEnv;
+use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::dialect::filestore::{FileStore, FileStoreErr, FILE_STORE_ROOT};
-use crate::host::{CommandHost, HostCli};
+use crate::host::{ExeStub, Host, HostCli};
 use crate::host::err::HostErr;
 use crate::hyperspace::machine::MachineErr;
-
-
 
 pub type FileStoreService = Service<FileStore>;
 
@@ -46,11 +43,6 @@ impl FileStoreService {
     }
 }
 
-pub struct Service {
-    template: ServiceTemplate
-}
-
-pub type ServiceSphere = ParticleSphere;
 
 pub struct ServiceCall<I,O> {
     pub input: I,
@@ -63,29 +55,42 @@ pub struct ServiceStub<I,O> {
     status: tokio::sync::watch::Receiver<Status>,
 }
 
+pub struct Service<R> {
+    pub template: ServiceTemplate,
+    runner: R
+}
 
-#[derive(Clone)]
-pub enum ServiceRunner {
-    /// a command is an external executable which must be triggered on EACH request
-    /// as opposed to a service that runs as a daemon.  The advantage to the Command
-    /// approach is that it should be the easiest way to integrate AND the services
-    /// triggered need not know anything about Starlane in order to work.
-    Command(ExecutorRunner),
-    /// The service is `Embedded` into Starlane meaning that it has been included
-    /// with this build at compilation time and will be directly managed by this
-    /// instance of Starlane.
-    Embedded(EmbeddedRunner)
+impl Service<ServiceRunner>  {
+    pub fn new( template: ServiceTemplate )  -> Service<ServiceRunner>{
+        let runner = template.config.clone();
+        Self {
+            template,
+            runner
+        }
+    }
+
+    pub fn filestore(  self  ) -> Result<FileStoreService, ServiceErr> {
+       Ok(FileStoreService{
+           template: self.template,
+           runner: self.runner.filestore()?
+       })
+    }
+}
+
+
+
+impl <R> Deref for Service<R> {
+    type Target = R;
+
+    fn deref(&self) -> &Self::Target {
+        & self.runner
+    }
 }
 
 
 #[derive(Clone)]
-pub enum ServiceRunnerLifetime {
-    /// A new service is created for each message request and the service
-    /// terminates after a response is returned
-    RequestResponse,
-    /// The service is started and all subsequent requests are routed to this
-    /// Daemon
-    Daemon
+pub enum ServiceRunner {
+    Exe(ExeConf)
 }
 
 
@@ -93,15 +98,17 @@ pub enum ServiceRunnerLifetime {
 impl ServiceRunner {
     pub fn filestore( & self  ) -> Result<FileStore, ServiceErr> {
         match self {
-            ServiceRunner::Command(exe) => {
+            ServiceRunner::Exe(exe) => {
                 Ok(exe.create()?)
             }
-            ServiceRunner::Embedded(_) => {}
         }
     }
 }
 
-
+#[derive(Hash,Clone,Eq,PartialEq,Debug,EnumString,strum_macros::Display)]
+pub enum ServiceKind {
+    FileStore
+}
 
 impl Into<Service<ServiceRunner>> for ServiceTemplate {
     fn into(self) -> Service<ServiceRunner> {
@@ -160,70 +167,14 @@ pub enum ServiceScope {
     Point(Point)
 }
 
-#[derive(Clone,Serialize,Deserialize)]
-pub struct ServiceTemplate {
-    pub name: SkewerCase,
-    pub kind: ServiceKind,
-    pub driver: OptSelector<KindSelector>,
-    pub config: String
-}
-
-#[derive(Hash,Clone,Eq,PartialEq,Debug,EnumString,strum_macros::Display,Serialize,Deserialize)]
-pub enum ServiceKind {
-    Registry,
-    FileStore,
-    Ext(CamelCase)
-}
-
-#[derive(Clone,Serialize,Deserialize)]
-pub enum ServiceConfig {
-    Shell{ command: String,  },
-    Embedded
-}
-
-/*
-/// matches drivers that are allowed to use this Service
-pub lifetime: ServiceRunnerLifetime,
-pub vars : HashMap<SkewerCase,HashMap<VarCase,String>>,
-pub launcher: ServiceLauncher,
-
- */
-
-
-
-
-pub struct ServiceRegistry {
-
-}
-
-
 #[derive(Clone)]
-enum ServiceLauncher {
-  // service launcher is another program executed through the shell
-  Shell(String),
-  Embedded
+pub struct ServiceTemplate {
+    pub name: String,
+    pub kind: ServiceKind,
+    // matches drivers that are allowed to use this Service
+    pub driver: OptSelector<KindSelector>,
+    pub config: ServiceConf
 }
-
-impl ServiceLauncher {
-    pub fn launch(&self, template:&ServiceTemplate) -> Result<Service,ServiceErr> {
-
-        match self {
-            ServiceLauncher::Shell(_) => {}
-            ServiceLauncher::Embedded => {}
-        }
-
-        Ok(todo!())
-    }
-}
-
-
-
-impl ServiceLauncher {
-    pub async fn launch(&self, ) -> Service {
-
-    }
-}
-
 
 impl PartialEq<ServiceTemplate> for ServiceSelector{
     fn eq(&self, other: &ServiceTemplate) -> bool {
@@ -235,6 +186,7 @@ impl PartialEq<ServiceTemplate> for ServiceSelector{
 
 
 // at this time, Conf and Runner do not differ
+pub type ServiceConf = ServiceRunner;
 
 
 /*
@@ -313,9 +265,9 @@ pub trait ServiceCore<C>
 
  */
 
-pub fn service_conf() -> ServiceRunner{
+pub fn service_conf() -> ServiceConf{
 
-    let mut builder = Env::builder();
+    let mut builder = HostEnv::builder();
     builder.pwd(
         absolute(env::current_dir().unwrap())
             .unwrap()
@@ -332,33 +284,33 @@ pub fn service_conf() -> ServiceRunner{
     let path = "../target/debug/starlane-cli-filestore-service".to_string();
     let args: Option<Vec<String>> = Option::None;
 
-    let stub = ExecutorConfig::new(path.into(), env);
+    let stub = ExeStub::new(path.into(), env);
 
-    ServiceRunner::Command(ExecutorRunner::Shell(CommandHost::Cli(HostCli::Os(stub))))
+    ServiceConf::Exe(ExeConf::Host(Host::Cli(HostCli::Os(stub))))
 
 }
 
 #[cfg(test)]
 pub mod tests {
-    use crate::host::CommandHost;
+    use crate::host::{ExeStub, Host};
 
-    use crate::executor::cli::Env;
+    use crate::executor::cli::HostEnv;
     use crate::executor::dialect::filestore::{FileStore, FileStoreIn, FileStoreOut};
     use crate::host::HostCli;
-    use crate::executor::{Executor, ExecutorConfig, ExecutorRunner};
+    use crate::executor::{ExeConf, Executor};
     use std::path::{absolute, PathBuf};
     use std::{env, io};
     use tokio::fs;
-    use starlane::space::kind::BaseKind;
+    use starlane::space::kind::{BaseKind, Kind};
     use starlane::space::selector::KindSelector;
     use starlane::space::util::OptSelector;
-    use crate::service::{service_conf, Service, ServiceErr, ServiceKind, ServiceTemplate};
+    use crate::service::{service_conf, Service, ServiceConf, ServiceErr, ServiceKind, ServiceTemplate};
 
     fn filestore() -> FileStore {
         if std::fs::exists("./tmp").unwrap() {
             std::fs::remove_dir_all("./tmp").unwrap();
         }
-        let mut builder = Env::builder();
+        let mut builder = HostEnv::builder();
         builder.pwd(
             absolute(env::current_dir().unwrap())
                 .unwrap()
@@ -374,10 +326,10 @@ pub mod tests {
         let env = builder.build();
         let path = "../target/debug/starlane-cli-filestore-service".to_string();
         let args: Option<Vec<String>> = Option::None;
-        let stub = ExecutorConfig::new(path.into(), env);
+        let stub = ExeStub::new(path.into(), env);
         //        let info = ExeInfo::new(HostDialect::Cli(HostRunner::Os), stub);
 
-        let info = ExecutorRunner::Shell(CommandHost::Cli(HostCli::Os(stub.clone())));
+        let info = ExeConf::Host(Host::Cli(HostCli::Os(stub.clone())));
 
          info.create().unwrap()
 
@@ -552,26 +504,4 @@ pub enum ServiceErr {
     NoTemplate(ServiceSelector),
     #[error("call not processed")]
     CallRecvErr(#[from] tokio::sync::oneshot::error::RecvError),
-}
-
-
-
-#[derive(Clone,EnumIter)]
-pub enum EmbeddedRunner
-{
-    #[cfg(feature="postgres-embedded")]
-    Postgres
-}
-
-impl EmbeddedRunner {
-
-}
-
-#[async_trait]
-pub trait DaemonService {
-    fn name(&self) -> &'static str;
-    fn status() -> Status;
-    fn status_watcher() -> tokio::sync::watch::Receiver<Status>;
-    async fn start(&self) -> Result<Status, ServiceErr>;
-    async fn stop(&self) -> Result<Status, ServiceErr>;
 }

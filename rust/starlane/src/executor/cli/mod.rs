@@ -2,7 +2,7 @@ pub mod os;
 
 use crate::executor::Executor;
 use itertools::Itertools;
-use os::ShellExecutor;
+use os::OsProcess;
 use std::collections::HashMap;
 use std::env;
 use std::hash::{Hash, Hasher};
@@ -16,18 +16,18 @@ use tokio::io::AsyncWriteExt;
 
 pub type CliIn = CliInDef<Option<Vec<u8>>>;
 #[derive(Clone, Eq, PartialEq)]
-pub struct Env {
+pub struct HostEnv {
     pub pwd: String,
     pub env: HashMap<String, String>,
 }
 
-impl Env {
+impl HostEnv {
     pub fn builder() -> HostEnvBuilder {
         HostEnvBuilder::default()
     }
 }
 
-impl Hash for Env {
+impl Hash for HostEnv {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write(self.pwd.as_bytes());
         for key in self.env.keys().sorted() {
@@ -37,7 +37,7 @@ impl Hash for Env {
     }
 }
 
-impl Default for Env {
+impl Default for HostEnv {
     fn default() -> Self {
         Self {
             pwd: env::current_dir().unwrap().to_str().unwrap().to_string(),
@@ -62,8 +62,8 @@ impl Default for HostEnvBuilder {
 }
 
 impl HostEnvBuilder {
-    pub fn build(self) -> Env {
-        Env {
+    pub fn build(self) -> HostEnv {
+        HostEnv {
             pwd: self.pwd,
             env: self.env,
         }
@@ -121,13 +121,13 @@ impl CliIn {
 }
 
 pub enum CliOut {
-    Shell(OsProcess),
+    Os(OsProcess),
 }
 
 impl CliOut {
     pub async fn copy_stdin(&mut self, input: &mut Vec<u8>) -> Result<(), CliErr> {
         match self {
-            CliOut::Shell(proc) => {
+            CliOut::Os(proc) => {
                 let mut stdin = proc.stdin.take().unwrap();
                 stdin.write_all(&input[..]).await?;
                 stdin.flush().await?;
@@ -137,14 +137,14 @@ impl CliOut {
     }
     pub fn close_stdin(&mut self) -> Result<(), CliErr> {
         match self {
-            CliOut::Shell(proc) => proc.close_stdin()?,
+            CliOut::Os(proc) => proc.close_stdin()?,
         }
         Ok(())
     }
 
     pub async fn copy_stout(&mut self, out: &mut Vec<u8>) -> Result<(), CliErr> {
         match self {
-            CliOut::Shell(proc) => {
+            CliOut::Os(proc) => {
                 let mut stdout = proc.stdout.take().ok_or(CliErr::TakeStdOut)?;
                 tokio::io::copy(&mut stdout, out).await?;
             }
@@ -156,7 +156,7 @@ impl CliOut {
 impl CliOut {
     pub async fn stdout(&mut self) -> Result<Vec<u8>, CliErr> {
         match self {
-            CliOut::Shell(proc) => {
+            CliOut::Os(proc) => {
                 let mut out = vec![];
                 let mut stdout = proc.stdout.take().ok_or(CliErr::TakeStdOut)?;
                 tokio::io::copy(&mut stdout, &mut out).await?;

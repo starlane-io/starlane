@@ -1,20 +1,21 @@
+use std::env;
 use std::path::PathBuf;
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 use std::process::Stdio;
 use std::ops::{Deref, DerefMut};
 use tokio::io::AsyncWriteExt;
-use crate::executor::cli::{CliErr, CliIn, CliOut};
-use crate::executor::{Executor, ExecutorConfig, ExecutorRunner};
-use crate::host::{CommandHost, HostCli, ShellExecutor};
+use crate::executor::cli::{CliErr, CliIn, CliOut, HostEnv};
+use crate::executor::{ExeConf, Executor};
+use crate::host::{ ExeStub, Host, HostCli, Proc};
 
 #[derive(Clone)]
 pub struct CliOsExecutor
 {
-    pub stub: ExecutorConfig,
+    pub stub: ExeStub,
 }
 
 impl CliOsExecutor {
-    pub fn new(stub: ExecutorConfig) -> Self
+    pub fn new(stub: ExeStub) -> Self
     {
         Self { stub }
     }
@@ -29,13 +30,13 @@ impl Executor for CliOsExecutor {
     type Err = CliErr;
 
     async fn execute(&self, mut input: Self::In) -> Result<Self::Out, Self::Err> {
-        let path: PathBuf = self.stub.identifier.clone().into();
+        let path: PathBuf = self.stub.loc.clone().into();
         if !path.exists() {
-            Result::Err(CliErr::FileNotFound(self.stub.identifier.clone()))?;
+            Result::Err(CliErr::FileNotFound(self.stub.loc.clone()))?;
         }
 
 
-        let mut command = Command::new(self.stub.identifier.clone());
+        let mut command = Command::new(self.stub.loc.clone());
 
         command.envs(self.stub.env.env.clone());
         command.args(&input.args);
@@ -50,7 +51,7 @@ impl Executor for CliOsExecutor {
         command.stderr(Stdio::piped()).output().await?;
         let child = command.spawn()?;
         //        Ok(OsProcess::new(child))
-        let mut process = ShellExecutor::new(child);
+        let mut process = OsProcess::new(child);
 
         if let Option::Some(mut data) = input.stdin.take() {
             let mut stdin = process.stdin.take().ok_or(CliErr::TakeStdIn)?;
@@ -61,11 +62,11 @@ impl Executor for CliOsExecutor {
         process.close_stdin()?;
 
 
-        Ok(CliOut::Shell(process))
+        Ok(CliOut::Os(process))
     }
 
-    fn conf(&self) -> ExecutorRunner {
-        ExecutorRunner::Shell(CommandHost::Cli(HostCli::Os(self.stub.clone())))
+    fn conf(&self) -> ExeConf {
+        ExeConf::Host(Host::Cli(HostCli::Os(self.stub.clone())))
     }
 }
 
@@ -75,7 +76,7 @@ pub struct OsProcess {
     child: Child,
 }
 
-impl ShellExecutor {
+impl OsProcess {
     pub fn close_stdin(&mut self) -> Result<(), CliErr> {
         if self.child.stdin.is_some() {
             drop(self.child.stdin.take().ok_or(CliErr::TakeStdIn)?);
@@ -84,7 +85,7 @@ impl ShellExecutor {
     }
 }
 
-impl Deref for ShellExecutor {
+impl Deref for OsProcess {
     type Target = Child;
 
     fn deref(&self) -> &Self::Target {
@@ -92,19 +93,19 @@ impl Deref for ShellExecutor {
     }
 }
 
-impl DerefMut for ShellExecutor {
+impl DerefMut for OsProcess {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.child
     }
 }
 
-impl ShellExecutor {
+impl OsProcess {
     pub fn new(child: Child) -> Self {
         Self { child }
     }
 }
 
-impl ShellExecutor for ShellExecutor {
+impl Proc for OsProcess {
     type StdOut = ChildStdout;
     type StdIn = ChildStdin;
     type StdErr = ChildStderr;
