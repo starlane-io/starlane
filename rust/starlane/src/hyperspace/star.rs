@@ -2026,7 +2026,7 @@ impl SmartLocator
 }
 
 
-#[derive(Error,Debug,Clone)]
+#[derive(Error,Debug)]
 pub enum StarErr {
     #[error("caused by '{0}'")]
     SpaceErr(#[source] SpaceErr),

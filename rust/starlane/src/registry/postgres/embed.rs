@@ -1,92 +1,79 @@
+use tokio::fs;
 use crate::env::{STARLANE_DATA_DIR, STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_USER};
 use crate::registry::err::RegErr;
 use crate::{Database, PgRegistryConfig, StarlaneConfig};
 use derive_builder::Builder;
-use pg_embed::pg_enums::PgAuthMethod;
-use pg_embed::pg_fetch::{PgFetchSettings, PG_V13, PG_V15};
-use pg_embed::postgres::{PgEmbed, PgSettings};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
-use tokio::fs;
+use postgresql_embedded::{PostgreSQL, Settings};
+use starlane::space::parse::set;
 
 pub struct Postgres {
-    pg_embed: PgEmbed,
+    postgres: PostgreSQL
 }
 
 impl Postgres {
 
     pub fn url(&self) -> String {
-        self.pg_embed.db_uri.clone()
+        "localhost".to_string()
     }
 
-    pub async fn install(config: &Database<PgEmbedSettings>) -> Result<(), RegErr> {
+    fn postgresql(config: &Database<PgEmbedSettings> ) -> Settings
+    {
+        let mut settings = Settings::default();
+        settings.data_dir = format!("{}/register",config.database_dir).to_string().into();
+        settings.password_file = format!("{}/.password",config.database_dir).to_string().into();
+        settings.temporary = !config.persistent;
+        settings.username = config.user.clone();
+        settings.password = config.password.clone();
+        settings
+    }
 
 
-        println!("setup");
-        println!("db dir: {}",config.database_dir);
-        fs::create_dir_all(&config.database_dir).await?;
+    pub async fn install( config: &Database<PgEmbedSettings>) -> Result<(), RegErr> {
 
-        let pg_settings: PgSettings = config.settings.clone().into();
-        let fetch_settings = PgFetchSettings {
-            version: PG_V15,
-            ..Default::default()
-        };
+        let settings = Self::postgresql(config);
+        println!("creating directoriesi {}", settings.data_dir.display());
+        fs::create_dir_all(&settings.data_dir).await?;
 
-        let mut pg = PgEmbed::new(pg_settings, fetch_settings).await?;
-        // Download, unpack, create password file and database cluster
-        pg.setup().await?;
+        println!("installing postgres...");
 
-        println!("starting db");
-        // start postgresql database
-        pg.start_db().await?;
+        let mut postgres = PostgreSQL::new(settings);
 
-        println!("check exist db");
-        // create a new database
-        // to enable migrations view the [Usage] section for details
-        if !pg.database_exists(config.database.as_str()).await? {
-            println!("dreating db");
-            pg.create_database(config.database.as_str()).await?;
+        println!("running setup...");
+
+        postgres.setup().await?;
+        println!("staring ...");
+        postgres.start().await?;
+
+        println!("Started...");
+        if !postgres.database_exists(&config.database).await? {
+            println!("DB create...");
+            postgres.create_database(&config.database).await?;
         }
 
-        println!("shutting down db");
-        pg.stop_db().await?;
+        println!("stopping...");
 
+        postgres.stop().await?;
+
+        println!("done");
         Ok(())
     }
 
-    pub async fn new(config: Database<PgEmbedSettings>) -> Result<Self, RegErr> {
-        let pg_settings: PgSettings = config.settings.clone().into();
-        let fetch_settings = PgFetchSettings {
-            version: PG_V15,
-            ..Default::default()
-        };
 
-        let mut pg = PgEmbed::new(pg_settings, fetch_settings).await?;
 
-        println!("setup");
-        // Download, unpack, create password file and database cluster
-        pg.setup().await?;
+    pub async fn new(config: &Database<PgEmbedSettings>) -> Result<Self, RegErr> {
 
-        println!("starting db");
-        // start postgresql database
-        pg.start_db().await?;
+        let mut postgres = PostgreSQL::new(Self::postgresql(config));
 
-        println!("check exist db");
-        // create a new database
-        // to enable migrations view the [Usage] section for details
-        if !pg.database_exists(config.database.as_str()).await? {
-            println!("dreating db");
-            pg.create_database(config.database.as_str()).await?;
-        }
-
-        println!("pg created");
-
-        Ok(Self { pg_embed: pg })
+        Ok(Self { postgres })
     }
 
     /// as long as the Sender is alive
     pub async fn start(mut self) -> Result<tokio::sync::mpsc::Sender<()>, RegErr> {
+
+        self.postgres.start().await?;
         let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(1);
         tokio::spawn(
             async move {
@@ -117,32 +104,11 @@ pub struct PgEmbedSettings {
     pub timeout: Option<Duration>,
 }
 
-impl Into<PgSettings> for PgEmbedSettings {
-    fn into(self) -> PgSettings {
-        PgSettings {
-            database_dir: self.database_dir.into(),
-            port: self.port,
-            user: self.user,
-            password: self.password,
-            auth_method: self.auth_method.into(),
-            persistent: self.persistent,
-            timeout: self.timeout,
-            migration_dir: None,
-            /*
-            migration_dir: match self.migration_dir {
-                None => None,
-                Some(path) => Some(path.into())
-            }
-
-             */
-        }
-    }
-}
 
 impl Default for PgEmbedSettings {
     fn default() -> Self {
         Self {
-            database_dir: format!("{}/registry", STARLANE_DATA_DIR.to_string()).to_string(),
+            database_dir: format!("{}/postgres", STARLANE_DATA_DIR.to_string()).to_string(),
             port: 5432,
             user: STARLANE_REGISTRY_USER.to_string(),
             password: STARLANE_REGISTRY_PASSWORD.to_string(),
@@ -160,15 +126,7 @@ pub enum PgEmbedAuthMethod {
     ScramSha256,
 }
 
-impl Into<PgAuthMethod> for PgEmbedAuthMethod {
-    fn into(self) -> PgAuthMethod {
-        match self {
-            PgEmbedAuthMethod::Plain => PgAuthMethod::Plain,
-            PgEmbedAuthMethod::MD5 => PgAuthMethod::MD5,
-            PgEmbedAuthMethod::ScramSha256 => PgAuthMethod::ScramSha256,
-        }
-    }
-}
+
 
 impl Default for PgEmbedAuthMethod {
     fn default() -> Self {

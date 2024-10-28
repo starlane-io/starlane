@@ -8,3 +8,4 @@ bundle.zip
 .fleet
 *.wasm
 publish
+*.log

@@ -33,8 +33,8 @@ hyperspace=["dep:futures","dep:dashmap","dep:semver", "parse", "dep:zip","hypere
 hyperlane=["hypererr"]
 hyperlane-tcp =  ["hyperlane","dep:rcgen","rustls","dep:tokio-rustls","dep:tls-api-rustls"]
 hyperlane-quic =  ["hyperlane","dep:rcgen","rustls", "dep:quinn"]
-postgres=[ "dep:sqlx","dep:serde","dep:tracing","dep:async-recursion", "dep:pg-embed" ]
-postgres-embedded=[ "postgres" ]
+postgres=[ "dep:sqlx","dep:serde","dep:tracing","dep:async-recursion" ]
+postgres-embedded=[ "postgres", "dep:postgresql_embedded" ]
 parse=["dep:nom", "dep:nom-supreme", "dep:nom_locate"]
 rustls=["dep:rustls","dep:rcgen","rustls-pemfile"]
 driver=["hyperspace"]
@@ -123,7 +123,7 @@ cliclack = { workspace = true }
 
 serde_yaml = { workspace = true }
 derive_builder = { workspace=true }
-pg-embed = { workspace=true , optional=true, features=["rt_tokio"]}
+postgresql_embedded = { workspace=true, optional = true }
 text-to-ascii-art = { workspace = true}
 colored = {workspace = true}
 lerp = { workspace = true, features=["derive"] }

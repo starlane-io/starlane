@@ -1867,7 +1867,7 @@ impl TraversalRouter for DriverParticle {
 impl ParticleRouter for DriverParticle {}
 
 
-#[derive(Error,Debug,Clone,ToSpaceErr)]
+#[derive(Error,Debug,ToSpaceErr)]
 pub enum ParticleDriverErr {
     #[error(transparent)]
     DriverErr(#[from] DriverErr),
@@ -1881,7 +1881,7 @@ impl ParticleDriverErr {
     }
 }
 
-#[derive(Error,Debug,Clone,ToSpaceErr)]
+#[derive(Error,Debug,ToSpaceErr)]
 pub enum ParticleStarErr {
     #[error(transparent)]
     SpaceErr(#[from] SpaceErr),
@@ -1957,7 +1957,7 @@ impl ParticleErr for ParticleDriverErr {
 }
 
 
-#[derive(Error, Debug, Clone,ToSpaceErr)]
+#[derive(Error, Debug, ToSpaceErr)]
 pub enum DriverErr {
 
     #[error(transparent)]
@@ -2016,7 +2016,7 @@ impl DriverErr {
 
 
 
-pub trait ParticleErr: Clone+std::error::Error + Send + Sync + 'static + CoreReflector+Sized {}
+pub trait ParticleErr: std::error::Error + Send + Sync + 'static + CoreReflector+Sized {}
 
 
 
