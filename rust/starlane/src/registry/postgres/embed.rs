@@ -22,7 +22,7 @@ impl Postgres {
     fn postgresql(config: &Database<PgEmbedSettings> ) -> Settings
     {
         let mut settings = Settings::default();
-        settings.data_dir = format!("{}/register",config.database_dir).to_string().into();
+        settings.data_dir = format!("{}/registry",config.database_dir).to_string().into();
         settings.password_file = format!("{}/.password",config.database_dir).to_string().into();
         settings.temporary = !config.persistent;
         settings.username = config.user.clone();
@@ -35,6 +35,7 @@ impl Postgres {
 
         let settings = Self::postgresql(config);
         println!("creating directoriesi {}", settings.data_dir.display());
+        println!("temporarry? {}",settings.temporary);
         fs::create_dir_all(&settings.data_dir).await?;
 
         println!("installing postgres...");

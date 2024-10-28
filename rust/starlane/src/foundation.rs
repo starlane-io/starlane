@@ -44,11 +44,14 @@ impl Foundation for StandAloneFoundation {
         &self,
         config: Database<PgEmbedSettings>,
     ) -> Result<LiveDatabase, Self::Err> {
+        println!("provision registry");
         let db = Postgres::new(&config).await?;
+        println!("postgres is starated.");
         let url = db.url();
         let handle = db.start().await?;
         let mut database :Database<PostgresConnectInfo>= config.into();
         database.settings.url= url;
+        println!("returning live databawe");
         Ok(LiveDatabase { database, handle })
     }
 }
