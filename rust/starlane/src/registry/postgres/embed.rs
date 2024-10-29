@@ -7,22 +7,29 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
 use postgresql_embedded::{PostgreSQL, Settings};
+use sqlx::PgPool;
 use starlane::space::parse::set;
 
 pub struct Postgres {
+    config: Database<PgEmbedSettings>,
     postgres: PostgreSQL
 }
 
 impl Postgres {
 
     pub fn url(&self) -> String {
-        "localhost".to_string()
+        self.postgres.settings().url("postgres")
     }
+
 
     fn postgresql(config: &Database<PgEmbedSettings> ) -> Settings
     {
         let mut settings = Settings::default();
         settings.temporary = false;
+        settings.port = 5432;
+println!("data_dir: {}", settings.data_dir.display());
+println!("installation_dir: {}", settings.installation_dir.display());
+println!("settings: {:?}", settings);
         settings
     }
 
@@ -60,10 +67,18 @@ impl Postgres {
         postgres.start().await?;
 
         println!("Started...");
+        println!("checking db: {}", config.database);
         if !postgres.database_exists(&config.database).await? {
-            println!("DB create...");
+            println!("\n\nDB create...");
             postgres.create_database(&config.database).await?;
         }
+        println!();
+        println!();
+        println!();
+        println!();
+        println!("{}",postgres.settings().url(&config.database) );
+
+        tokio::time::sleep(Duration::from_secs(30)).await;
 
         println!("stopping...");
 
@@ -79,7 +94,8 @@ impl Postgres {
 
         let mut postgres = PostgreSQL::new(Self::postgresql(config));
 
-        Ok(Self { postgres })
+        let config = config.clone();
+        Ok(Self { postgres, config })
     }
 
     /// as long as the Sender is alive
@@ -89,12 +105,13 @@ impl Postgres {
         self.postgres.setup().await?;
         println!("starting...");
         self.postgres.start().await?;
-        println!("*started(");
+        println!("*started() : {:?}",self.postgres.settings());
         let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(1);
+        let blah = self;
         tokio::spawn(
             async move {
                 while let Some(_) = rx.recv().await {
-                    // do nothing but linger
+                    blah.url();
                 }
             }
         );

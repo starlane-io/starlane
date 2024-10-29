@@ -1439,7 +1439,6 @@ impl PostgresConnectInfo {
         }
     }
 
-
 }
 
 #[cfg(test)]
