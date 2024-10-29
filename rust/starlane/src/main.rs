@@ -253,7 +253,7 @@ fn run() -> Result<(), anyhow::Error> {
             delay(1000).await;
             success("starlane configured.")?;
             delay(100).await;
-            spinner().set_message("launching registry");
+            spinner().set_message("launching registry [this may take a while]");
             delay(1000).await;
             let starlane = Starlane::new(config,StandAloneFoundation()).await.map_err(|e|{println!("{}",e.to_string()); e}).unwrap();
             success("registry ready.")?;
@@ -707,19 +707,19 @@ async fn standalone_foundation() -> Result<(), anyhow::Error> {
     let spinner = spinner();
     spinner.start("starting install");
     delay(1000).await;
-    async fn inner(spinner: &ProgressBar) -> Result<(), anyhow::Error> {
-        spinner.set_message("generating config");
+    async fn inner(spin: &ProgressBar) -> Result<(), anyhow::Error> {
+        spin.set_message("generating config");
         let config = StarlaneConfig::default();
         delay(100).await;
-        spinner.clear();
-        info("config generated.")?;
+        spin.stop("config generated");
         delay(100).await;
-        spinner.set_message("saving config");
+        spin.set_message("saving config");
         config_save(config.clone()).await?;
         delay(100).await;
         info("config saved.")?;
         delay(100).await;
-        spinner.set_message("starting local postgres registry...");
+        spin.set_message("creating local postgres registry [this may take a while...]");
+        warning("creating local postgres registry [this may take a while...]");
         if let PgRegistryConfig::Embedded(db) = config.registry {
             let foundation = StandAloneFoundation::new();
             foundation.install(&db).await?;

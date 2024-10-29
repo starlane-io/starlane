@@ -22,18 +22,17 @@ impl Postgres {
     }
 
 
+    /*
     fn postgresql(config: &Database<PgEmbedSettings> ) -> Settings
     {
         let mut settings = Settings::default();
         settings.temporary = false;
         settings.port = 5432;
-println!("data_dir: {}", settings.data_dir.display());
-println!("installation_dir: {}", settings.installation_dir.display());
-println!("settings: {:?}", settings);
         settings
     }
 
-    /*
+     */
+
 
     fn postgresql(config: &Database<PgEmbedSettings> ) -> Settings
     {
@@ -46,45 +45,25 @@ println!("settings: {:?}", settings);
         settings
     }
 
-     */
 
 
     pub async fn install( config: &Database<PgEmbedSettings>) -> Result<(), RegErr> {
 
         let settings = Self::postgresql(config);
-        println!("creating directories {}", settings.data_dir.display());
-        println!("temporary? {}",settings.temporary);
         fs::create_dir_all(&settings.data_dir).await?;
 
-        println!("installing postgres...");
 
         let mut postgres = PostgreSQL::new(settings);
 
-        println!("running setup...");
 
         postgres.setup().await?;
-        println!("staring ...");
         postgres.start().await?;
 
-        println!("Started...");
-        println!("checking db: {}", config.database);
         if !postgres.database_exists(&config.database).await? {
-            println!("\n\nDB create...");
             postgres.create_database(&config.database).await?;
         }
-        println!();
-        println!();
-        println!();
-        println!();
-        println!("{}",postgres.settings().url(&config.database) );
+       postgres.stop().await?;
 
-        tokio::time::sleep(Duration::from_secs(30)).await;
-
-        println!("stopping...");
-
-        postgres.stop().await?;
-
-        println!("done");
         Ok(())
     }
 
@@ -101,11 +80,8 @@ println!("settings: {:?}", settings);
     /// as long as the Sender is alive
     ///
     pub async fn start(mut self) -> Result<tokio::sync::mpsc::Sender<()>, RegErr> {
-        println!("setup..");
         self.postgres.setup().await?;
-        println!("starting...");
         self.postgres.start().await?;
-        println!("*started() : {:?}",self.postgres.settings());
         let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(1);
         let blah = self;
         tokio::spawn(
@@ -116,9 +92,6 @@ println!("settings: {:?}", settings);
             }
         );
 
-//        self.pg_embed.start_db().await?;
-
-        println!("pg running");
 
         Ok(tx)
     }
