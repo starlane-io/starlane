@@ -9,6 +9,8 @@ pub mod star;
 
 pub mod artifact;
 
+pub mod filestore;
+
 use crate::driver::star::StarDriverFactory;
 use crate::executor::dialect::filestore::FileStoreErr;
 use crate::hyperspace::machine::MachineErr;
@@ -17,7 +19,7 @@ use crate::hyperspace::star::{HyperStarSkel, LayerInjectionRouter, StarErr};
 use crate::platform::Platform;
 use crate::registry::err::RegErr;
 use crate::service::{
-    Service, ServiceConf, ServiceErr, ServiceKind, ServiceRunner, ServiceSelector, ServiceTemplate,
+    Service,  ServiceErr, ServiceKind, ServiceRunner, ServiceSelector, ServiceTemplate,
 };
 use dashmap::DashMap;
 use futures::future::select_all;
@@ -1865,7 +1867,7 @@ impl TraversalRouter for DriverParticle {
 impl ParticleRouter for DriverParticle {}
 
 
-#[derive(Error,Debug,Clone,ToSpaceErr)]
+#[derive(Error,Debug,ToSpaceErr)]
 pub enum ParticleDriverErr {
     #[error(transparent)]
     DriverErr(#[from] DriverErr),
@@ -1879,7 +1881,7 @@ impl ParticleDriverErr {
     }
 }
 
-#[derive(Error,Debug,Clone,ToSpaceErr)]
+#[derive(Error,Debug,ToSpaceErr)]
 pub enum ParticleStarErr {
     #[error(transparent)]
     SpaceErr(#[from] SpaceErr),
@@ -1955,7 +1957,7 @@ impl ParticleErr for ParticleDriverErr {
 }
 
 
-#[derive(Error, Debug, Clone,ToSpaceErr)]
+#[derive(Error, Debug, ToSpaceErr)]
 pub enum DriverErr {
 
     #[error(transparent)]
@@ -2014,7 +2016,7 @@ impl DriverErr {
 
 
 
-pub trait ParticleErr: Clone+std::error::Error + Send + Sync + 'static + CoreReflector+Sized {}
+pub trait ParticleErr: std::error::Error + Send + Sync + 'static + CoreReflector+Sized {}
 
 
 

@@ -78,7 +78,6 @@ where
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum Variant {
-    Native(Native),
     Artifact(Artifact),
     Db(Db),
     Star(StarVariant),
@@ -208,7 +207,6 @@ pub enum Kind {
     Star,
     Driver,
     Global,
-    Native,
 }
 
 impl Kind {

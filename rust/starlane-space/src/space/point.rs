@@ -1110,7 +1110,7 @@ impl Point {
         REMOTE_ENDPOINT.clone()
     }
 
-    pub fn hyperuser() -> Self {
+    pub fn hyper_user() -> Self {
         HYPERUSER.clone()
     }
 

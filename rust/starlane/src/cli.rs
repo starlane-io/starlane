@@ -27,17 +27,25 @@ use crate::env::STARLANE_HOME;
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
 pub struct Cli {
+    #[arg(
+    short,
+            long,
+            default_value_t = true
+    )]
+    pub logs: bool,
+
     #[command(subcommand)]
     pub command: Commands,
 }
 
 #[derive(Debug, Subcommand, EnumString, strum_macros::Display)]
 pub enum Commands {
-    Demo,
+    Install,
     Run,
     Term(TermArgs),
     Version,
     Splash,
+    Nuke
 }
 
 #[derive(Debug, Args)]

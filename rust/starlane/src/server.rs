@@ -34,21 +34,26 @@ use crate::hyperspace::reg::{Registry, RegistryWrapper};
 use crate::platform::Platform;
 use crate::registry::err::RegErr;
 use crate::registry::mem::registry::{MemoryRegistry, MemoryRegistryCtx};
-use crate::registry::postgres::embed::PgEmbedSettings;
+use crate::registry::postgres::embed::{PgEmbedSettings, Postgres};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
+use sqlx::PgConnection;
+use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
+use crate::foundation::{Foundation, StandAloneFoundation};
 use crate::registry::postgres::PostgresDbKey;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {
+    pub can_nuke: bool,
     pub registry: PgRegistryConfig,
 }
 
 impl Default for StarlaneConfig {
     fn default() -> StarlaneConfig {
         Self {
+            can_nuke: true,
             registry: PgRegistryConfig::default(),
         }
     }
@@ -56,8 +61,10 @@ impl Default for StarlaneConfig {
 
 #[derive(Clone)]
 pub struct Starlane {
+    config: StarlaneConfig,
     artifacts: Artifacts,
     registry: Registry,
+    foundation: StandAloneFoundation
 }
 
 pub enum RegistryConfig {
@@ -67,6 +74,7 @@ pub enum RegistryConfig {
 #[cfg(feature = "postgres")]
 #[derive(Clone, Serialize, Deserialize)]
 pub enum PgRegistryConfig {
+    #[cfg(feature = "postgres-embedded")]
     Embedded(Database<PgEmbedSettings>),
     External(Database<PostgresConnectInfo>),
 }
@@ -106,6 +114,36 @@ impl<Info> Database<Info> {
     }
 }
 
+impl Into<Database<PostgresConnectInfo>> for Database<PgEmbedSettings> {
+    fn into(self) -> Database<PostgresConnectInfo> {
+        Database {
+            settings: PostgresConnectInfo {
+                url: "localhost".to_string(),
+                user: self.user.clone(),
+                password: self.password.clone()
+            },
+            database: self.database,
+            schema: self.schema,
+        }
+    }
+}
+
+pub struct LiveDatabase {
+    pub database: Database<PostgresConnectInfo>,
+    pub(crate) handle: tokio::sync::mpsc::Sender<()>
+}
+
+impl LiveDatabase {
+    pub fn new( database: Database<PostgresConnectInfo>, handle: tokio::sync::mpsc::Sender<()>) -> Self {
+        Self {
+            database,
+            handle,
+        }
+    }
+}
+
+
+
 impl Database<PostgresConnectInfo> {
     pub fn from_con<D, S>(
         database: D,
@@ -130,10 +168,14 @@ impl Database<PostgresConnectInfo> {
 
 
     pub fn to_uri(&self) -> String {
+        /*
         format!(
             "postgres://{}:{}@{}/{}",
             self.user, self.password, self.url, self.database
         )
+
+         */
+        self.url.clone()
     }
 
 }
@@ -177,35 +219,56 @@ impl<S> Deref for Database<S> {
     }
 }
 
+#[cfg(feature = "postgres")]
 impl Starlane {
-    pub async fn new(kind: PgRegistryConfig) -> Result<Starlane, HypErr> {
+    pub async fn new(config: StarlaneConfig, foundation: StandAloneFoundation) -> Result<Starlane, HypErr> {
         let artifacts = Artifacts::just_builtins();
-        let registry = match kind {
-            PgRegistryConfig::Embedded(database) => {
-                Arc::new(RegistryWrapper::new(Arc::new(MemoryRegistry::new())))
-            }
-            #[cfg(feature = "postgres")]
-            PgRegistryConfig::External(database) => {
-                let lookup = PostgresLookups::new();
-                let db = lookup.lookup_registry_db()?;
-                let mut set = HashSet::new();
-                set.insert(db.clone());
-                let ctx = Arc::new(PostgresRegistryContext::new(set, Box::new(lookup)).await?);
-                let handle = PostgresRegistryContextHandle::new(&db, ctx);
-                let postgres_lookups = PostgresLookups::new();
 
-                let logger = root_logger();
-                let logger = logger.point(Point::global_registry());
-                Arc::new(RegistryWrapper::new(Arc::new(
-                    PostgresRegistry::new(handle, Box::new(postgres_lookups), logger).await?,
-                )))
+        let db = match config.clone().registry {
+            PgRegistryConfig::Embedded(db) => {
+                println!("provisioning embedded...");
+                let rtn = foundation.provision_registry(db).await?;
+                println!("embedded. provisioned....");
+                rtn
+            }
+            PgRegistryConfig::External(db) => {
+
+                let (handle, mut rx) = tokio::sync::mpsc::channel(1);
+                tokio::spawn( async move {
+                    while let Some(_) = rx.recv().await {
+                        // do nothing until sender goes out of scope
+                    }
+                });
+
+                LiveDatabase::new(db,handle)
             }
         };
 
+        let lookup = PostgresLookups::new();
+        let mut set = HashSet::new();
+        set.insert(db.database.clone());
+println!("hello");
+        let ctx = Arc::new(PostgresRegistryContext::new(set, Box::new(lookup)).await?);
+println!("all");
+        let handle = PostgresRegistryContextHandle::new(&db.database, ctx, db.handle);
+        let postgres_lookups = PostgresLookups::new();
+
+        let logger = root_logger();
+        let logger = logger.point(Point::global_registry());
+println!("you");
+        let registry =Arc::new(RegistryWrapper::new(Arc::new(
+            PostgresRegistry::new(handle, Box::new(postgres_lookups), logger).await?,
+        )));
+println!("happy people");
+
+
         Ok(Self {
+            config,
             registry,
             artifacts,
+            foundation
         })
+
     }
 }
 
@@ -218,6 +281,8 @@ where
 
     type StarAuth = AnonHyperAuthenticator;
     type RemoteStarConnectionFactory = LocalHyperwayGateJumper;
+
+    type Foundation = StandAloneFoundation;
 
     fn data_dir(&self) -> String {
         STARLANE_DATA_DIR.clone()
@@ -328,6 +393,7 @@ where
                 .unwrap();
         server.start().unwrap();
     }
+
 }
 
 #[cfg(feature = "postgres")]

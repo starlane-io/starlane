@@ -4,10 +4,9 @@ use sqlx::Error;
 use starlane::space::err::{HyperSpatialError, ParseErrs, SpaceErr, SpatialError};
 use starlane::space::point::Point;
 use std::sync::Arc;
-use pg_embed::pg_errors::PgEmbedError;
 use thiserror::Error;
 
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug)]
 pub enum RegErr {
     #[error(transparent)]
     Parse(#[from] ParseErrs),
@@ -38,14 +37,17 @@ pub enum RegErr {
     PoolNotFound(String),
     #[cfg(feature = "postgres")]
     #[error("postgres embed error error: {0}")]
-    PgEmbedError(#[from] Arc<PgEmbedError>),
+    PgErr(#[from] postgresql_embedded::Error),
+    #[error(transparent)]
+    IoErr(Arc<std::io::Error>),
 }
 
-impl From<PgEmbedError> for RegErr {
-    fn from(err: PgEmbedError) -> Self {
-        Self::PgEmbedError(Arc::new(err))
+impl  From<std::io::Error> for RegErr {
+    fn from(value: std::io::Error) -> Self {
+       Self::IoErr(Arc::new(value))
     }
 }
+
 
 impl SpatialError for RegErr {}
 

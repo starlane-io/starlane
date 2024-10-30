@@ -54,7 +54,7 @@ impl ToString for HttpMethodPattern {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq,Serialize,Deserialize)]
 pub enum OptSelector<S> {
     Some,
     None,

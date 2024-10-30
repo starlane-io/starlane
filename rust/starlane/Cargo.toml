@@ -4,11 +4,11 @@ name = "starlane"
 description = """
 Starlane -- An Orchestration and Infrastructure Framework for WebAssembly Components (https://starlane.io)
 
-This packaged manages `HyperSpace` which provides infrastructure for `space`
+This packaged manages `HyperSpace` which provides infrastructure for `Space`
 Apis (WebAssembly & external programs meant to provide custom behaviors in Starlane),
 
 This package references the `starlane-space` package and reuses of it to run the infrastructure and
-it also contains mechanisms (Drivers) for extending the Starlane Type system.
+it also contains mechanisms (Drivers) for extending the Starlane Type system
 """
 
 
@@ -26,14 +26,15 @@ repository.workspace = true
 full=["server"]
 default=["server"]
 #server=["space","service","hyperspace", "hyperlane","postgres", "hyperlane-tcp", "cli", "dep:threadpool", "dep:oneshot", "dep:anyhow", "dep:virtual-fs"]
-server=["space","service","hyperspace", "hyperlane","postgres", "hyperlane-tcp", "cli", "dep:threadpool", "dep:oneshot", "dep:anyhow"]
+server=["space","service","hyperspace", "hyperlane","postgres", "postgres-embedded","hyperlane-tcp", "cli", "dep:threadpool", "dep:oneshot", "dep:anyhow"]
 cli=["dep:text_io","dep:clap", "dep:walkdir", "parse"]
 hypererr=[]
 hyperspace=["dep:futures","dep:dashmap","dep:semver", "parse", "dep:zip","hypererr"]
 hyperlane=["hypererr"]
 hyperlane-tcp =  ["hyperlane","dep:rcgen","rustls","dep:tokio-rustls","dep:tls-api-rustls"]
 hyperlane-quic =  ["hyperlane","dep:rcgen","rustls", "dep:quinn"]
-postgres=[ "dep:sqlx","dep:serde","dep:tracing","dep:async-recursion", "dep:pg-embed" ]
+postgres=[ "dep:sqlx","dep:serde","dep:tracing","dep:async-recursion" ]
+postgres-embedded=[ "postgres", "dep:postgresql_embedded" ]
 parse=["dep:nom", "dep:nom-supreme", "dep:nom_locate"]
 rustls=["dep:rustls","dep:rcgen","rustls-pemfile"]
 driver=["hyperspace"]
@@ -122,12 +123,16 @@ cliclack = { workspace = true }
 
 serde_yaml = { workspace = true }
 derive_builder = { workspace=true }
-pg-embed = { workspace=true , optional=true, features=["rt_tokio"]}
+postgresql_embedded = { workspace=true, optional = true }
 text-to-ascii-art = { workspace = true}
 colored = {workspace = true}
 lerp = { workspace = true, features=["derive"] }
 atty ={workspace = true}
 #rolling-file = {workspace = true}
+termsize = {workspace = true}
+
+#log= {workspace = true}
+textwrap = {workspace = true}
 
 [lib]
 name = "starlane"

@@ -31,7 +31,7 @@ use crate::space::config::mechtron::MechtronConfig;
 use crate::space::config::{DocKind, Document};
 use crate::space::err::report::{Label, Report, ReportKind};
 use crate::space::err::ParseErrs;
-use crate::space::kind::{ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts, NativeSub, Specific, StarSub, Sub, SubKind, UserBaseSubKind};
+use crate::space::kind::{ArtifactSubKind, BaseKind, DatabaseSubKind, FileSubKind, Kind, KindParts,  Specific, StarSub, Sub, SubKind, UserBaseSubKind};
 use crate::space::loc::StarKey;
 use crate::space::loc::{Layer, PointSegment, Surface, Topic, Uuid, VarVal, Version};
 use crate::space::parse::util::unstack;
@@ -6075,17 +6075,7 @@ pub fn resolve_kind<I: Span>(lex: KindLex) -> impl FnMut(I) -> Res<I, Kind> {
                             )))
                         }
                     },
-                    BaseKind::Native => match NativeSub::from_str(sub.as_str()) {
-                        Ok(sub) => Ok((input, Kind::Native(sub))),
-                        Err(err) => {
-                            let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                            Err(nom::Err::Error(SpaceTree::add_context(
-                                input,
-                                ErrCtx::InvalidSubKind(BaseKind::Native, sub.to_string()),
-                                err,
-                            )))
-                        }
-                    },
+
                     BaseKind::Artifact => match ArtifactSubKind::from_str(sub.as_str()) {
                         Ok(sub) => Ok((input, Kind::Artifact(sub))),
                         Err(err) => {
@@ -6168,17 +6158,7 @@ pub fn resolve_sub<I: Span>(base: BaseKind) -> impl FnMut(I) -> Res<I, Sub> {
                     )))
                 }
             },
-            BaseKind::Native => match NativeSub::from_str(sub.as_str()) {
-                Ok(sub) => Ok((next, Sub::Native(sub))),
-                Err(err) => {
-                    let err = SpaceTree::from_error_kind(input.clone(), ErrorKind::Fail);
-                    Err(nom::Err::Error(SpaceTree::add_context(
-                        input,
-                        ErrCtx::InvalidSubKind(BaseKind::Native, sub.to_string()),
-                        err,
-                    )))
-                }
-            },
+
             BaseKind::Artifact => match ArtifactSubKind::from_str(sub.as_str()) {
                 Ok(sub) => Ok((next, Sub::Artifact(sub))),
                 Err(err) => {

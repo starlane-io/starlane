@@ -14,10 +14,12 @@ pub static VERSION: Lazy<semver::Version> =
 pub mod err;
 pub mod properties;
 pub mod template;
-
 pub mod env;
 
 pub mod platform;
+
+
+pub mod foundation;
 
 #[cfg(test)]
 pub mod test;
@@ -55,80 +57,93 @@ pub use server::*;
 
 use crate::cli::{Cli, Commands};
 use crate::env::STARLANE_HOME;
+use crate::err::HypErr;
 use crate::platform::Platform;
-use anyhow::anyhow;
+use anyhow::{anyhow, Error};
+use ascii::AsciiChar::P;
 use atty::Stream;
 use clap::Parser;
+use cliclack::log::{error, remark, success, warning};
 use cliclack::{
-    clear_screen, confirm, intro, multi_progress, outro, progress_bar, select, spinner, ProgressBar,
+    clear_screen, confirm, intro, multi_progress, outro, progress_bar, select, spinner,
+    ProgressBar,
 };
 use colored::{Colorize, CustomColor};
 use lerp::Lerp;
+use nom::{InputIter, InputTake, Slice};
 use once_cell::sync::Lazy;
 use starlane::space::loc::ToBaseKind;
 use starlane_primitive_macros::ToBase;
+use starlane_space::space::particle::Progress;
 use starlane_space::space::util::log;
+use std::cmp::min;
 use std::fs::File;
 use std::io::{Read, Seek, Write};
 use std::ops::{Add, Mul};
 use std::path::{Path, PathBuf};
-use std::process;
 use std::process::Stdio;
 use std::str::FromStr;
 use std::time::Duration;
+use std::{io, process};
+use std::fmt::Display;
+use termsize::Size;
 use text_to_ascii_art::fonts::get_font;
 use text_to_ascii_art::to_art;
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
 use tokio::{fs, join, signal};
+use tracing::instrument::WithSubscriber;
+use tracing::Instrument;
 use zip::write::FileOptions;
+use crate::foundation::Foundation;
+use crate::foundation::StandAloneFoundation;
+use crate::registry::postgres::embed::PgEmbedSettings;
+
+fn config_path() -> String {
+    format!("{}/config.yaml", STARLANE_HOME.to_string()).to_string()
+}
 
 #[cfg(feature = "server")]
-async fn config() -> StarlaneConfig {
-    let file = format!("{}/config.yaml", STARLANE_HOME.to_string()).to_string();
-    let config = match fs::try_exists(file.clone()).await {
-        Ok(true) => match fs::read_to_string(file.clone()).await {
-            Ok(config) => match serde_yaml::from_str(&config).map_err(|e| anyhow!(e)) {
-                Ok(config) => config,
-                Err(err) => {
-                    println!(
-                        "starlane config file '{}' failed to parse: '{}'",
-                        file,
-                        err.to_string()
-                    );
-                    Default::default()
-                }
-            },
-            Err(err) => {
-                println!(
-                    "starlane config file '{}' error when attempting to read to string: '{}'",
-                    file,
-                    err.to_string()
-                );
-                Default::default()
-            }
-        },
-        Ok(false) => {
-            let config = Default::default();
-            if let Ok(ser) = serde_yaml::to_string(&config) {
-                let file: PathBuf = file.into();
-                match file.parent() {
-                    None => {}
-                    Some(dir) => {
-                        fs::create_dir_all(dir).await.unwrap_or_default();
-                        fs::write(file, ser).await.unwrap_or_default();
-                    }
-                }
-            }
-            config
+async fn config() -> Result<Option<StarlaneConfig>, HypErr> {
+    let file = config_path();
+    match fs::try_exists(file.clone()).await? {
+        true => {
+            let config = fs::read_to_string(file.clone()).await?;
+            let config = serde_yaml::from_str(config.as_str()).map_err(|err| anyhow!("starlane config found: '{}' yet Starlane encountered an error when attempting to process the config: '{}'", config_path(), err))?;
+            Ok(Some(config))
         }
-        Err(err) => {
-            println!("starlane encountered problem when attempting to load config file: '{}' with error: '{}'", file, err.to_string());
-            Default::default()
-        }
-    };
-    config
+        false => Ok(None),
+    }
 }
+
+async fn config_save(config: StarlaneConfig) -> Result<(), anyhow::Error> {
+    let file = config_path();
+    match serde_yaml::to_string(&config) {
+        Ok(ser) => {
+            let file: PathBuf = file.into();
+            match file.parent() {
+                Some(dir) => {
+                    fs::create_dir_all(dir).await?;
+                    fs::write(file, ser).await?;
+                    Ok(())
+                }
+                None => {
+                    Err(anyhow!("starlane encountered an error when attempting to save config file: 'invalid parent'"))
+                }
+            }
+        }
+        Err(err) => Err(anyhow!(
+            "starlane internal error: 'could not deserialize config"
+        )),
+    }
+}
+
+/*
+let config = Default::default();
+
+config
+
+ */
 
 pub fn init() {
     #[cfg(feature = "cli")]
@@ -152,7 +167,7 @@ pub fn main() -> Result<(), anyhow::Error> {
             splash_html();
             Ok(())
         }
-        Commands::Demo => install(),
+        Commands::Install => install(),
         Commands::Run => run(),
         Commands::Term(args) => {
             let runtime = Builder::new_multi_thread().enable_all().build()?;
@@ -169,6 +184,10 @@ pub fn main() -> Result<(), anyhow::Error> {
             println!("{}", VERSION.to_string());
             Ok(())
         }
+        Commands::Nuke => {
+            nuke();
+            Ok(())
+        }
     }
 }
 
@@ -182,25 +201,105 @@ fn run() -> Result<(), anyhow::Error> {
 
 #[cfg(feature = "server")]
 fn run() -> Result<(), anyhow::Error> {
+    info("starlane started.")?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
+
     runtime.block_on(async move {
-        splash_with_params(1,2, 25).await;
 
-        let config = config().await;
-        let starlane = Starlane::new(config.registry).await.unwrap();
-        let machine_api = starlane.machine();
+        intro("RUN STARLANE").unwrap_or_default();
 
-        let api = tokio::time::timeout(Duration::from_secs(30), machine_api)
-            .await
-            .unwrap()
-            .unwrap();
-        // this is a dirty hack which is good enough for a 0.3.0 release...
-        tokio::time::sleep(Duration::from_secs(2)).await;
-        outro("starlane is running.");
-        loop {
-            tokio::time::sleep(Duration::from_secs(60)).await;
+        async fn runner() -> Result<(),anyhow::Error> {
+            spinner().start("initializing");
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            info("initialization complete.")?;
+
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            spinner().set_message("loading configuration");
+
+            let config = match config().await {
+                Ok(Some(config)) => config,
+                Ok(None) => {
+                    delay(1000).await;
+                    spinner().error("Starlane configuration not found.");
+                    delay(100).await;
+                    error(format!("Starlane looked for a configuration here: '{}' But none was found.", config_path()))?;
+                    delay(100).await;
+                    note("wrong config?", format!("if '{}' isn't the config file you wanted, please set environment variable `export STARLANE_HOME=\"/config/parent/dir\"", config_path()))?;
+                    delay(100).await;
+                    note("install", "please run `starlane install` to configure a new Starlane runner")?;
+                    delay(100).await;
+                    outro("Good Luck!")?;
+                    newlines(3,100).await;
+                    process::exit(1);
+                }
+                Err(err) => {
+                    delay(1000).await;
+                    spinner().error("invalid configuration");
+                    delay(100).await;
+                    error(format!("{}", err.to_string()))?;
+                    delay(100).await;
+                    note("wrong config?", format!("if '{}' isn't the config file you wanted, please set environment variable `export STARLANE_HOME=\"/config/parent/dir\"", config_path()))?;
+                    delay(100).await;
+                    note("fresh install", "To create a fresh configuration please run: `starlane install`")?;
+                    delay(100).await;
+                    outro("Good Luck!")?;
+                    newlines(3,100).await;
+                    process::exit(1);
+                }
+            };
+
+            delay(1000).await;
+            success("starlane configured.")?;
+            delay(100).await;
+            spinner().set_message("launching registry [this may take a while]");
+            delay(1000).await;
+            let starlane = Starlane::new(config,StandAloneFoundation()).await.map_err(|e|{println!("{}",e.to_string()); e}).unwrap();
+            success("registry ready.")?;
+            delay(100).await;
+            spinner().set_message("starting starlane...");
+
+            let machine_api = starlane.machine();
+
+            delay(100).await;
+            success("starlane started.")?;
+            delay(100).await;
+            spinner().set_message("waiting for ready status...");
+            let api = tokio::time::timeout(Duration::from_secs(30), machine_api).await??;
+            delay(100).await;
+            success("starlane ready.")?;
+
+            delay(100).await;
+            spinner().clear();
+            newlines(3, 100).await;
+
+            delay(2000).await;
+            splash_with_params(1,2, 25).await;
+            delay(250).await;
+            note("what's next?", "You can connect to this starlane runner with a control terminal: `starlane term`" )?;
+            delay(250).await;
+            outro("Starlane is running.")?;
+            newlines(3, 100).await;
+
+            // this is a dirty hack which is good enough for a 0.3.0 release...
+            loop {
+                tokio::time::sleep(Duration::from_secs(60)).await;
+            }
+
+            Ok(())
+        };
+
+        match runner().await {
+            Ok(_) => {}
+            Err(err) =>
+                {
+                    delay(250).await;
+                    error(format!("starlane halted due to an error: {}", err.to_string())).unwrap_or_default();
+                    delay(250).await;
+                    outro("runner failed").unwrap();
+                    newlines(3, 100).await;
+                }
         }
     });
 
@@ -365,48 +464,106 @@ impl Color {
 
 static COLORS: (u8, u8, u8) = (0x6D, 0xD7, 0xFD);
 
-async fn splash(  ) {
-   splash_with_params( 6, 6, 100).await;
+async fn splash() {
+    splash_with_params(6, 6, 100).await;
 }
 
-async fn splash_with_params( pre: usize, post: usize, interval: u64) {
-    match to_art("*STARLANE*".to_string(), "default", 0, 0, 0) {
-        Ok(string) => {
+fn info(text: &str) -> io::Result<()> {
+    let padding = 10usize;
+    let size = term_width();
+    let len = size - padding;
+    let text = textwrap::wrap(text, len).join("\n");
+    cliclack::log::info(text)
+}
 
-            let string = format!("{}{}{}","\n".repeat(pre),string,"\n".repeat(post));
+fn term_width() -> usize {
+    match termsize::get() {
+        None => 128,
+        Some(size) => size.cols as usize
+    }
+}
 
-            let begin = (0xFF, 0xFF, 0xFF);
-            let end = (0xEE, 0xAA, 0x5A);
-            let end = COLORS;
 
-            //let begin = (0x00, 0x00, 0x00);
-            // this is bad code however I couldn't find out how to get lines().len() withou
-            // giving up ownership (therefor the clone)
-            let size = string.clone().lines().count();
-            let mut index = 0;
-            for line in string.lines() {
+pub fn note(prompt: impl Display, message: impl Display) -> io::Result<()> {
+    let padding = 10usize;
+    let size = term_width();
+    let len = size - padding;
+    let text = textwrap::wrap(message.to_string().as_str(), len).join("\n");
+    cliclack::note(prompt,text)
+}
 
-                let progress = if index < (pre-1) {
-                    0.0f32
-                } else if index > pre && index < size - (post-1) {
-                    (index - (pre-1)) as f32 / (size - (post-1)) as f32
-                } else {
-                    1.0f32
-                };
 
-                let r = (begin.0 as f32).lerp(end.0 as f32, progress) as u8;
-                let g = (begin.1 as f32).lerp(end.1 as f32, progress) as u8;
-                let b = (begin.2 as f32).lerp(end.2 as f32, progress) as u8;
-                println!("{}", line.truecolor(r, g, b));
-                tokio::time::sleep(Duration::from_millis(interval)).await;
+pub fn wrap( text: impl Display) -> impl Display {
+    let padding = 10usize;
+    let size = term_width();
+    let len = size - padding;
+    textwrap::wrap(text.to_string().as_str(), len).join("\n")
+}
 
-                index = index + 1;
+
+
+async fn splash_with_params(pre: usize, post: usize, interval: u64) {
+        let banners = if term_width() > splash_widest("*STARLANE*") {
+            vec!["*STARLANE*"]
+        } else {
+            vec!["STAR", "LANE"]
+        };
+        splash_with_params_and_banners(pre, post, interval, banners).await;
+}
+
+fn splash_widest(string: &str) -> usize {
+    to_art(string.to_string(), "default", 0, 0, 0)
+        .unwrap()
+        .lines()
+        .into_iter()
+        .map(|line| line.chars().count())
+        .max()
+        .unwrap()
+}
+
+async fn splash_with_params_and_banners(
+    pre: usize,
+    post: usize,
+    interval: u64,
+    banners: Vec<&str>,
+) {
+    for i in 0..banners.len() {
+        let banner = banners.get(i).unwrap();
+        match to_art(banner.to_string(), "default", 0, 0, 0) {
+            Ok(string) => {
+                let begin = (0xFF, 0xFF, 0xFF);
+                let end = (0xEE, 0xAA, 0x5A);
+                let end = COLORS;
+
+                //let begin = (0x00, 0x00, 0x00);
+                // this is bad code however I couldn't find out how to get lines().len() withou
+                // giving up ownership (therefor the clone)
+                let size = string.clone().lines().count();
+
+                let mut index = 0;
+                for line in string.lines() {
+                    let progress = if index < (pre - 1) {
+                        0.0f32
+                    } else if index > pre && index < size - (post - 1) {
+                        (index - (pre - 1)) as f32 / (size - (post - 1)) as f32
+                    } else {
+                        1.0f32
+                    };
+
+                    let r = (begin.0 as f32).lerp(end.0 as f32, progress) as u8;
+                    let g = (begin.1 as f32).lerp(end.1 as f32, progress) as u8;
+                    let b = (begin.2 as f32).lerp(end.2 as f32, progress) as u8;
+                    println!("{}", line.truecolor(r, g, b));
+                    tokio::time::sleep(Duration::from_millis(interval)).await;
+
+                    index = index + 1;
+                }
+
+                //            println!("{}", string.truecolor(0xEE, 0xAA, 0x5A));
             }
-
-            //            println!("{}", string.truecolor(0xEE, 0xAA, 0x5A));
-        }
-        Err(err) => {
-            eprintln!("err! {}", err.to_string());
+            Err(err) => {
+                eprintln!("err! {}", err.to_string());
+            }
         }
     }
 }
@@ -425,7 +582,7 @@ async fn splash_html() {
             // this is bad code however I couldn't find out how to get lines().len() withou
             // giving up ownership (therefor the clone)
             let size = string.clone().lines().count();
-            let row_span = 1.0f32/((size-10) as f32);
+            let row_span = 1.0f32 / ((size - 10) as f32);
             let mut index = 0;
             for line in string.lines() {
                 let progress = if index < 5 {
@@ -442,7 +599,7 @@ async fn splash_html() {
                 let rgb = (r << 16) + (g << 8) + b;
 
                 let color = format!("{:#0x}", rgb);
-                println!("<div style=\"color:{}\">{}</div>",  color, line);
+                println!("<div style=\"color:{}\">{}</div>", color, line);
 
                 index = index + 1;
             }
@@ -462,113 +619,173 @@ pub enum StartSequence {
 
 #[tokio::main]
 async fn install() -> Result<(), anyhow::Error> {
-    intro("INSTALL STARLANE");
 
-    async fn wait(t: u64) {
-        tokio::time::sleep(Duration::from_millis(t)).await;
-    }
-    wait(1000).await;
-    {
-        let spinner = spinner();
-        spinner.start("starting...");
-        wait(5000).await;
-        spinner.stop("start successful!");
-        wait(250).await;
-        clear_screen();
-        wait(1000).await;
-        splash().await;
-        wait(1000).await;
-        spinner.stop("Config not found");
-        intro("Install?");
-    }
+    intro("pre-install checklist")?;
+    let spinner = spinner();
+    spinner.start("checking configuration");
 
-    let selected = select(
-                r#"This Starlane instance has not configured.
-This program (the Starlane Runner) must either be a stand alone cluster or can connect to a remote cluster.
-\n
-Would you like to install a cluster on this machine or provide a configuration for a remote machine?
-"#
-            )
-                .item("this", "Install stand alone on this machine", "")
-                .item("remote", "Configure to access a remote machine", "")
-                .interact().unwrap_or_default();
-
-    wait(1000).await;
-    let postgres = select(
-        r#"Starlane needs a Postgres instance as it's registry when in stand alone mode.\n
-Do you have an existing postgres instance that you would like Starlane to connect to or
-would your prefer Starlane to install and manage its own Postgres instance?"#,
-    )
-    .item(
-        "remote",
-        "Connect to an existing Postgres Cluster Instance",
-        "",
-    )
-    .item("this", "Let Starlane manage its own Postgres instance", "")
-    .interact()
-    .unwrap_or_default();
-
-    wait(1000).await;
-
-    let multi = multi_progress("Downloading Service Extensions");
-    let postgres = multi.add(progress_bar(100));
-    let filestore = multi.add(progress_bar(100).with_download_template());
-    let artifacts = multi.add(progress_bar(100).with_download_template());
-    let spinner = multi.add(spinner());
-
-    async fn go(bar: ProgressBar, name: &'static str, size: u64) {
-        bar.start(format!("looking up: '{}'", name));
-        tokio::time::sleep(Duration::from_millis(size)).await;
-        bar.set_message(format!("downloading {}...", name));
-        tokio::time::sleep(Duration::from_millis(size)).await;
-        for _ in 0..100 {
-            bar.inc(1);
-            tokio::time::sleep(Duration::from_millis(size / 100)).await;
+    match config().await {
+        Ok(Some(_)) => {
+            warning(format!("A valid starlane configuration already exists: '{}' this install process will overwrite the existing config", config_path() ))?;
+            let should_continue = confirm(format!("Overwrite: '{}'?", config_path())).interact()?;
+            if !should_continue {
+                outro("Starlane installation aborted by user.")?;
+                println!();
+                println!();
+                println!();
+                process::exit(0);
+            } else {
+                spinner.start("deleting old config");
+                fs::remove_file(config_path()).await?;
+                info("config deleted.")?;
+                spinner.clear();
+            }
         }
-        tokio::time::sleep(Duration::from_millis(size)).await;
-        bar.set_message(format!("{} download complete", name));
 
-        tokio::time::sleep(Duration::from_millis(size * 2)).await;
-
-        bar.set_message(format!("installing {}", name));
-        tokio::time::sleep(Duration::from_millis(500)).await;
-        for _ in 0..100 {
-            bar.inc(1);
-            tokio::time::sleep(Duration::from_millis(3 * (size / 100))).await;
+        Err(err) => {
+            warning(format!("An invalid (corrupted) starlane configuration already exists: '{}' the installation process will overwrite this config file.", config_path() )).unwrap_or_default();
+            let should_continue = confirm("Proceed with installation?").interact()?;
+            if !should_continue {
+                outro("Starlane installation aborted by user.")?;
+                println!();
+                println!();
+                println!();
+                process::exit(0);
+            } else {
+                spinner.start("deleting invalid config");
+                fs::remove_file(config_path()).await?;
+                success("config deleted.")?;
+                spinner.clear();
+            }
         }
-        tokio::time::sleep(Duration::from_millis(500)).await;
-        bar.stop(format!("{} installation complete", name));
+        Ok(None) => {
+            // there's no config so proceed with install
+            spinner.clear();
+        }
     }
 
-    let postgres = go(postgres, "postgres", 500);
-    let filestore = go(filestore, "local filestore", 1500);
-    let artifacts = go(artifacts, "artifact repository", 700);
+    outro("checklist complete.")?;
 
-    println!();
+    print!("{}", "\n".repeat(3));
+    delay(1000).await;
 
-    join!(postgres, filestore, artifacts);
 
-    println!();
+    intro("Install Starlane")?;
 
-    spinner.stop("Service extension installation complete.");
+    success( "Select a foundation for this runner.  A foundation abstracts most infrastructure capabilities for starlane (provisioning servers, networking etc)" )?;
+    //note("Foundations", "Select a foundation for this runner.  A foundation abstracts most infrastructure capabilities for starlane (provisioning servers, networking etc)" )?;
+    note("Standalone", "If you are using Starlane to develop on your local machine the `Standalone` foundation is recommended and will get you going with minimal hastles")?;
 
-    multi.stop();
+    delay(500).await;
+    let selected = select(r#"Choose a Foundation:"#)
+        .item(
+            "Standalone",
+            "Standalone",
+            wrap("Standalone is recommended for local development and if you are just getting started"),
+        )
+/*        .item(
+            "Docker",
+            "Install Starlane on Docker Desktop",
+            "~~~ Kubernetes install isn't actually working in this demo!",
+        )
 
-    println!();
-    println!();
-    println!();
-    println!();
-    println!(
-        "{}",
-        "Installation complete! To run your local starlane instance: `starlane run` "
-            .to_string()
-            .truecolor(COLORS.0, COLORS.1, COLORS.2)
-    );
-    println!();
-    println!();
+ */
+        .interact()?;
 
-    outro("DEMO COMPLETED");
-    process::exit(0);
+    match selected {
+        "Standalone" => standalone_foundation().await,
+        x => {
+            error(format!("Sorry! this is just a proof of concept and the '{}' Foundation is not working just yet!",x))?;
+            outro("Installation aborted because of lazy developers")?;
+            process::exit(1);
+            Ok(())
+        }
+    }
+}
 
-    Ok(())
+async fn standalone_foundation() -> Result<(), anyhow::Error> {
+    let spinner = spinner();
+    spinner.start("starting install");
+    delay(1000).await;
+    async fn inner(spin: &ProgressBar) -> Result<(), anyhow::Error> {
+        spin.set_message("generating config");
+        let config = StarlaneConfig::default();
+        delay(100).await;
+        spin.stop("config generated");
+        delay(100).await;
+        spin.set_message("saving config");
+        config_save(config.clone()).await?;
+        delay(100).await;
+        info("config saved.")?;
+        delay(100).await;
+        spin.set_message("creating local postgres registry [this may take a while...]");
+        warning("creating local postgres registry [this may take a while...]");
+        if let PgRegistryConfig::Embedded(db) = config.registry {
+            let foundation = StandAloneFoundation::new();
+            foundation.install(&db).await?;
+        } else {
+
+        }
+
+        Ok(())
+    }
+
+    match inner(&spinner).await {
+        Ok(()) => {
+            spinner.stop("installation complete");
+            Ok(())
+        }
+        Err(err) => {
+            spinner.stop("installation failed");
+            error(wrap(err.to_string().as_str())).unwrap_or_default();
+            outro("Standalone installation failed").unwrap_or_default();
+            process::exit(1);
+        }
+    }
+}
+
+
+
+/*
+splash().await;
+
+println!(
+    "{}",
+    "Let Starlane manage your infrastructure with WebAssembly & More!"
+        .truecolor(COLORS.0, COLORS.1, crate::COLORS.2)
+);
+println!();
+println!("{}", "Welcome to Starlane!".white());
+println!();
+println!();
+
+
+ */
+
+
+
+
+
+async fn delay(t: u64) {
+    tokio::time::sleep(Duration::from_millis(t)).await;
+}
+
+async fn newlines( len: usize, delay: u64 )  {
+    for i in 0..len {
+        println!();
+        crate::delay(delay).await;
+    }
+}
+
+
+
+#[tokio::main]
+async fn nuke()  {
+    if let Ok(Some(config)) = config().await {
+        if !config.can_nuke  {
+            panic!("in config: '{}' can_nuke flag is set to false.",config_path());
+        }
+    }
+
+    fs::remove_dir_all(STARLANE_HOME.to_string()).await.unwrap();
 }

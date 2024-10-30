@@ -655,20 +655,20 @@ impl HyperStar
         let star_rx = star_tx.call_rx.take().unwrap();
         let star_tx = star_tx.call_tx;
 
-        let global_port = Point::global_executor()
+        let global_executor = Point::global_executor()
             .to_surface()
             .with_layer(Layer::Core);
         let mut transmitter = ProtoTransmitterBuilder::new(
             Arc::new(skel.gravity_router.clone()),
             skel.exchanger.clone(),
         );
-        transmitter.from = SetStrategy::Override(global_port.clone());
+        transmitter.from = SetStrategy::Override(global_executor.clone());
         transmitter.agent = SetStrategy::Fill(Agent::HyperUser);
 
         let global_handler = DirectedHandlerShell::new(
             GlobalCommandExecutionHandler::new(skel.clone()),
             transmitter,
-            global_port,
+            global_executor,
             skel.logger.logger.clone(),
         );
 
@@ -2026,7 +2026,7 @@ impl SmartLocator
 }
 
 
-#[derive(Error,Debug,Clone)]
+#[derive(Error,Debug)]
 pub enum StarErr {
     #[error("caused by '{0}'")]
     SpaceErr(#[source] SpaceErr),

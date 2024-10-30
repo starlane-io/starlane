@@ -1,5 +1,6 @@
 use std::fs;
 use std::fs::File;
+use std::ops::Deref;
 use chrono::Utc;
 use starlane::space::loc::ToBaseKind;
 use starlane::space::wasm::Timestamp;
@@ -7,10 +8,11 @@ use std::str::FromStr;
 use std::sync::Arc;
 use atty::Stream;
 use colored::Colorize;
+use once_cell::sync::Lazy;
 use uuid::Uuid;
 use starlane::space::err::SpaceErr;
 use starlane::space::log::{FileAppender, LogAppender, RootLogger, StdOutAppender};
-use crate::env::STARLANE_LOG_DIR;
+use crate::env::{StarlaneWriteLogs, STARLANE_LOG_DIR, STARLANE_WRITE_LOGS};
 
 pub mod err;
 pub mod global;
@@ -34,15 +36,16 @@ pub extern "C" fn starlane_timestamp() -> Timestamp {
 
 #[no_mangle]
 extern "C" fn starlane_root_log_appender() -> Result<Arc<dyn LogAppender>,SpaceErr> {
-    if atty::is(Stream::Stdout) {
-/*        fs::create_dir_all(STARLANE_LOG_DIR.to_string())?;
-        let writer = BasicRollingFileAppender::new(
-            STARLANE_LOG_DIR.to_string(),
-            RollingConditionBasic::new().daily(),
-            9
-        ).unwrap();
-        Ok(Arc::new(FileAppender::new( writer )))
- */
+
+    let append_to_file = match &STARLANE_WRITE_LOGS.deref() {
+        StarlaneWriteLogs::Auto => {
+            atty::is(Stream::Stdout)
+        }
+        StarlaneWriteLogs::File => true,
+        StarlaneWriteLogs::StdOut => false
+    };
+
+    if append_to_file {
             fs::create_dir_all(STARLANE_LOG_DIR.to_string())?;
             let writer = File::create(format!("{}/stdout.log",STARLANE_LOG_DIR.to_string()))?;
             Ok(Arc::new(FileAppender::new( writer )))

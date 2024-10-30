@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::space::parse::util::new_span;
 
-use crate::space::hyper::ChildRegistry;
 use crate::space::loc::{
     ProvisionAffinity, StarKey, ToBaseKind, Version, CONTROL_WAVE_TRAVERSAL_PLAN,
     MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, STAR_WAVE_TRAVERSAL_PLAN,
@@ -136,8 +135,8 @@ pub enum BaseKind {
     Global,
     Host,
     Guest,
-    Native,
-    //Cli,
+    Registry,
+    WebServer
 }
 
 impl BaseKind {
@@ -180,7 +179,6 @@ pub enum Sub {
     Artifact(ArtifactSubKind),
     UserBase(UserBaseSubKind),
     Star(StarSub),
-    Native(NativeSub),
 }
 
 impl Sub {
@@ -192,7 +190,6 @@ impl Sub {
             Sub::Artifact(_) => SubKind::Artifact,
             Sub::UserBase(_) => SubKind::UserBase,
             Sub::Star(_) => SubKind::Star,
-            Sub::Native(_) => SubKind::Native
         }
     }
 }
@@ -205,7 +202,6 @@ pub enum SubKind {
     Artifact,
     UserBase,
     Star,
-    Native,
 }
 
 
@@ -218,7 +214,6 @@ impl Sub {
             Sub::Artifact(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
             Sub::UserBase(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
             Sub::Star(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
-            Sub::Native(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
         }
     }
 
@@ -246,7 +241,6 @@ impl Into<Option<CamelCase>> for Sub {
             Sub::Artifact(a) => a.into(),
             Sub::UserBase(u) => u.into(),
             Sub::Star(s) => s.into(),
-            Sub::Native(s) => s.into(),
         }
     }
 }
@@ -260,7 +254,6 @@ impl Into<Option<String>> for Sub {
             Sub::Artifact(a) => a.into(),
             Sub::UserBase(u) => u.into(),
             Sub::Star(s) => s.into(),
-            Sub::Native(s) => s.into(),
         }
     }
 }
@@ -309,7 +302,8 @@ pub enum Kind {
     Global,
     Host,
     Guest,
-    Native(NativeSub),
+    Registry,
+    WebServer
 }
 
 impl ToBaseKind for Kind {
@@ -329,7 +323,6 @@ impl ToBaseKind for Kind {
             Kind::File(_) => BaseKind::File,
             Kind::Artifact(_) => BaseKind::Artifact,
             Kind::Database(_) => BaseKind::Database,
-            Kind::Native(_) => BaseKind::Native,
             Kind::Base => BaseKind::Base,
             Kind::Repo => BaseKind::Repo,
             Kind::Star(_) => BaseKind::Star,
@@ -337,6 +330,8 @@ impl ToBaseKind for Kind {
             Kind::Global => BaseKind::Global,
             Kind::Host => BaseKind::Host,
             Kind::Guest => BaseKind::Guest,
+            Kind::Registry => BaseKind::Registry,
+            Kind::WebServer => BaseKind::WebServer
         }
     }
 }
@@ -372,7 +367,6 @@ impl Kind {
             Kind::Artifact(_) => true,
             Kind::Mechtron => true,
             Kind::Host => true,
-            Kind::Native(NativeSub::Web) => true,
             _ => false,
         }
     }
@@ -478,9 +472,6 @@ impl TryFrom<KindParts> for Kind {
             BaseKind::Star => Kind::Star(StarSub::from_str(
                 value.sub.ok_or("Star<?> requires a sub kind")?.as_str(),
             )?),
-            BaseKind::Native => Kind::Native(NativeSub::from_str(
-                value.sub.ok_or("Native<?> requires a sub kind")?.as_str(),
-            )?),
 
             BaseKind::Root => Kind::Root,
             BaseKind::Space => Kind::Space,
@@ -498,6 +489,8 @@ impl TryFrom<KindParts> for Kind {
             BaseKind::Global => Kind::Global,
             BaseKind::Host => Kind::Host,
             BaseKind::Guest => Kind::Guest,
+            BaseKind::Registry => Kind::Registry,
+            BaseKind::WebServer => Kind::WebServer
         })
     }
 }
@@ -510,21 +503,6 @@ pub trait Tks {
     fn matches(&self, tks: &dyn Tks) -> bool;
 }
 
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    Hash,
-    Serialize,
-    Deserialize,
-    strum_macros::Display,
-    strum_macros::EnumString,
-    strum_macros::EnumIter,
-)]
-pub enum NativeSub {
-    Web,
-}
 
 #[derive(
     Clone,
@@ -584,23 +562,8 @@ impl StarSub {
     }
 }
 
-impl Into<Sub> for NativeSub {
-    fn into(self) -> Sub {
-        Sub::Native(self)
-    }
-}
 
-impl Into<Option<CamelCase>> for NativeSub {
-    fn into(self) -> Option<CamelCase> {
-        Some(CamelCase::from_str(self.to_string().as_str()).unwrap())
-    }
-}
 
-impl Into<Option<String>> for NativeSub {
-    fn into(self) -> Option<String> {
-        Some(self.to_string())
-    }
-}
 
 impl Into<Sub> for StarSub {
     fn into(self) -> Sub {
@@ -762,14 +725,7 @@ impl Into<Option<String>> for DatabaseSubKind {
     }
 }
 
-impl BaseKind {
-    pub fn child_resource_registry_handler(&self) -> ChildRegistry {
-        match self {
-            Self::UserBase => ChildRegistry::Core,
-            _ => ChildRegistry::Shell,
-        }
-    }
-}
+
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct StarStub {
