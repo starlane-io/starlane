@@ -15,7 +15,6 @@ use crate::space::hyper::{Greet, HyperSubstance, HyperSubstanceKind, Knock, Part
 use crate::space::loc::Meta;
 use crate::space::log::{AuditLog, Log, LogSpan, LogSpanEvent, PointlessLog};
 use crate::space::parse::model::Subst;
-use crate::space::parse::var::Env;
 use crate::space::particle::Particle;
 use crate::space::point::{Point, PointCtx, PointVar};
 use crate::space::util;
@@ -28,7 +27,7 @@ use crate::space::wave::core::{DirectedCore, HeaderMap, ReflectedCore};
 use crate::space::wave::{PongCore, Wave};
 use crate::{Details, SpaceErr, Status, Stub, Surface};
 use url::Url;
-use crate::space::kind::Sub;
+use crate::space::parse::Env;
 
 #[derive(
     Debug,

@@ -1,6 +1,5 @@
 use crate::space::err::{ParseErrs, PrintErr};
 use crate::space::loc::Uuid;
-use crate::space::parse::var::Env;
 use crate::space::wasm::{starlane_timestamp, starlane_uuid, Timestamp};
 use crate::space::wave::core::http2::HttpMethod;
 
@@ -15,6 +14,7 @@ use std::collections::HashSet;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
+use crate::space::parse::Env;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub enum HttpMethodPattern {

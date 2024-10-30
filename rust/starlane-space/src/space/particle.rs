@@ -8,14 +8,13 @@ use serde::{Deserialize, Serialize};
 use crate::space::err::ParseErrs;
 use crate::space::kind::{Kind, KindParts};
 use crate::space::parse::util::{new_span, result, Span};
-use crate::space::parse::{parse_alpha1_str, point_and_kind, Res};
+use crate::space::parse::{parse_alpha1_str, point_and_kind, Env, Res};
 use crate::space::point::{Point, PointCtx, PointVar};
 use crate::space::substance::Substance;
 use crate::space::util::ToResolved;
 use crate::space::wave::core::http2::StatusCode;
 use crate::space::wave::core::ReflectedCore;
 use crate::{BaseKind, SpaceErr};
-use crate::space::parse::var::Env;
 
 pub mod property;
 pub mod traversal;
