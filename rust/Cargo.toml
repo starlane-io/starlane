@@ -15,14 +15,14 @@ description="The Workspace package for Starlane.  What to see: './starlane-space
 [workspace]
 default-run = "starlane"
 resolver = "2"
-members = [ "starlane", "starlane-macros", "starlane-primitive-macros", "starlane-space" ]
+members = [ "starlane", "starlane-macros", "starlane-primitive-macros", "starlane-space"  ]
 
 
 #members = [
 #  "starlane", "starlane-macros", "starlane-primitive-macros","mechtron"
 #  , "starlane-space", "ext/service/starlane-cli-local-filestore-service" , "ext/service/starlane-cli-filestore-s3-service"]
 
-exclude = [ ]
+exclude = [ "space2" ]
 
 [workspace.dependencies]
 starlane = { path="./starlane" , version = "0.3.19" }
@@ -119,3 +119,10 @@ atty = "0.2.14"
 termsize = "0.1.9"
 textwrap = "0.16.1"
 postgresql_embedded = "0.17.2"
+
+
+[profile.dev]
+panic="abort"
+
+[profile.release]
+panic="abort"

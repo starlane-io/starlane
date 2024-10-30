@@ -1,13 +1,12 @@
 [package]
 name = "space2"
-license.workspace = true
-repository.workspace = true
-version.workspace = true
-edition.workspace = true
-rust-version.workspace = true
-authors.workspace = true
-homepage.workspace = true
-description.workspace = true
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.81.0"
+authors = []
+homepage = "https://starlane.io"
+description="The Workspace package for Starlane.  What to see: './starlane-space' contains the "
+
 
 [features]
 default=["parse"]
@@ -21,16 +20,15 @@ serde=["dep:serde"]
 async=["dep:async-trait","dep:tokio"]
 
 [dependencies]
-starlane-primitive-macros = { workspace = true }
-
+starlane-primitive-macros = { path= "../starlane-primitive-macros"}
 
 #feature 'parse'
-#nom-supreme =  { path="../../../nom-supreme", default-features = false, optional = true}
-nom-supreme =  { workspace = true, default-features = false, optional = true}
+nom-supreme =  { path="../../../../other/nom-supreme", default-features = false, optional = true}
 nom_locate = { version="4.2.0" ,default-features = false, optional=true}
 
 #feature 'parse-report'
-ariadne={workspace=true, optional = true }
+
+ariadne = {  version="0.1.5" , optional = true}
 
 #feature 'serde'
 serde = { version = "1.0.210", features = ["derive"], optional = true }
@@ -54,9 +52,15 @@ strum_macros = "0.26.4"
 strum = "0.26.3"
 log = "0.4.22"
 
+nom = {version="7.1.3", default-features = false, optional=true}
 
 
-[dependencies.nom]
-version="7.1.3"
-default-features = false
-optional=true
+
+[profile.dev]
+panic = 'abort'
+
+[profile.release]
+panic = 'abort'
+
+[profile.test]
+panic = 'abort'
