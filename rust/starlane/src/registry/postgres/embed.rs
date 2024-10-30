@@ -39,6 +39,7 @@ impl Postgres {
         let mut settings = Settings::default();
         settings.data_dir = format!("{}/registry",config.database_dir).to_string().into();
         settings.password_file = format!("{}/.password",config.database_dir).to_string().into();
+        settings.port = 5432u16;
         settings.temporary = !config.persistent;
         settings.username = config.user.clone();
         settings.password = config.password.clone();
@@ -52,9 +53,7 @@ impl Postgres {
         let settings = Self::postgresql(config);
         fs::create_dir_all(&settings.data_dir).await?;
 
-
         let mut postgres = PostgreSQL::new(settings);
-
 
         postgres.setup().await?;
         postgres.start().await?;
