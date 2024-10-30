@@ -247,19 +247,15 @@ impl Starlane {
         let lookup = PostgresLookups::new();
         let mut set = HashSet::new();
         set.insert(db.database.clone());
-println!("hello");
         let ctx = Arc::new(PostgresRegistryContext::new(set, Box::new(lookup)).await?);
-println!("all");
         let handle = PostgresRegistryContextHandle::new(&db.database, ctx, db.handle);
         let postgres_lookups = PostgresLookups::new();
 
         let logger = root_logger();
         let logger = logger.point(Point::global_registry());
-println!("you");
         let registry =Arc::new(RegistryWrapper::new(Arc::new(
             PostgresRegistry::new(handle, Box::new(postgres_lookups), logger).await?,
         )));
-println!("happy people");
 
 
         Ok(Self {
@@ -269,6 +265,17 @@ println!("happy people");
             foundation
         })
 
+    }
+}
+
+impl Drop for Starlane {
+    fn drop(&mut self) {
+        match &self.config.registry {
+            PgRegistryConfig::Embedded(db) => {
+
+            }
+            _ => {}
+        };
     }
 }
 
