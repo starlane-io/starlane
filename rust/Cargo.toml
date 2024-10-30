@@ -1,43 +1,41 @@
 [workspace.package]
 
 license = "MIT"
-repository = "https://github.com/cosmic-initiative/cosmic-initiative.git"
+repository = "https://github.com/starlane-io/starlane.git"
 
-version = "0.3.14"
+version = "0.3.19"
 
 edition = "2021" 
 rust-version = "1.81.0"
 authors = []
 homepage = "https://starlane.io"
-description="..."
-
+description="The Workspace package for Starlane.  What to see: './starlane-space' contains the "
 
 
 [workspace]
-default-run = "space2"
+default-run = "starlane"
 resolver = "2"
+members = [ "starlane", "starlane-macros", "starlane-primitive-macros", "starlane-space" ]
+
 
 #members = [
 #  "starlane", "starlane-macros", "starlane-primitive-macros","mechtron"
-#  , "starlane-space", "ext/service/starlane-cli-local-filestore-service" , "ext/service/starlane-cli-filestore-s3-service", "space2", "starlane-util"]
-
-members = ["space2","starlane-space","starlane-primitive-macros" ]
+#  , "starlane-space", "ext/service/starlane-cli-local-filestore-service" , "ext/service/starlane-cli-filestore-s3-service"]
 
 exclude = [ ]
 
 [workspace.dependencies]
-starlane = { path="./starlane" }
-starlane-macros = { path="./starlane-macros"}
-starlane-primitive-macros = { path="./starlane-primitive-macros"}
-starlane-space = { path="./starlane-space"}
-space2 = {  path="./space2"}
+starlane = { path="./starlane" , version = "0.3.19" }
+starlane-macros = { path="./starlane-macros", version = "0.3.19" }
+starlane-primitive-macros = { path="./starlane-primitive-macros", version = "0.3.19" }
+starlane-space = { path="./starlane-space", version = "0.3.19" }
 lazy_static = "1.5.0"
 uuid = { version="1.1.2" }
 chrono = { version="0.4.19" }
-tokio = "1.40.0"
+tokio = "1.41.0"
 tokio-util = "0.7.12"
-async-trait = "0.1.48"
-ctrlc = "3.2.2"
+tokio-rustls = "0.26.0"
+
 bincode = "1.3.3"
 #sqlx = { version = "0.5.11", features = [ "runtime-tokio-rustls", "postgres", "macros", "any" ] }
 sqlx = "0.8.2"
@@ -52,6 +50,7 @@ ascii = "1.1.0"
 url = "2.3.1"
 once_cell = "1.20.0"
 
+async-trait = "0.1.83"
 futures = {version = "0.3.21", default-features = true }
 dashmap = "5.3.4"
 semver = { version="1.0.10", features=['serde'] }
@@ -62,7 +61,6 @@ tracing = "0.1.26"
 async-recursion = "1.0.0"
 
 rcgen = "0.13.1"
-tokio-rustls = "0.26.0"
 tls-api-rustls = "0.9.0"
 rustls = "0.23.13"
 rustls-pemfile = "2.1.3"
@@ -75,7 +73,7 @@ walkdir = "2.3.2"
 # space
 ariadne = "0.1.5"
 nom = "7.1.3"
-nom-supreme = {git = "https://github.com/starlane-io/nom-supreme.git" }
+nom-supreme = "0.8.0"
 nom_locate = "4.2.0"
 regex = "1.5.4"
 #http = "0.2.6"
@@ -88,7 +86,6 @@ validator = "0.15.0"
 
 threadpool = "1.8.1"
 oneshot = "0.1.5"
-tokio_print = "0.1.0"
 
 webpki-roots = "0.26.5"
 anyhow = "1.0.86"
@@ -106,3 +103,19 @@ thiserror = "1.0.63"
 tempdir = "0.3.7"
 path-clean = "1.0.1"
 thiserror-context = "0.1.2"
+
+rustyline = "14.0.0"
+cliclack = "0.3.5"
+derive_builder = "0.20.2"
+pg-embed = "0.7.1"
+
+serde_yaml = "0.9.34"
+text-to-ascii-art = "0.1.10"
+ctrlc = "3.4.5"
+colored = "2.1.0"
+lerp = "0.5.0"
+atty = "0.2.14"
+#rolling-file = "0.2.0"
+termsize = "0.1.9"
+textwrap = "0.16.1"
+postgresql_embedded = "0.17.2"

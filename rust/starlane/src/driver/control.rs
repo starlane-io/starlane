@@ -21,12 +21,12 @@ use starlane::space::err::{CoreReflector, SpaceErr};
 use starlane::space::hyper::{ControlPattern, Greet, InterchangeKind};
 use starlane::space::kind::{BaseKind, Kind, StarSub};
 use starlane::space::loc::{Layer, PointFactory, Surface, ToSurface};
-use starlane::space::log::{RootLogger, Tracker};
+use starlane::space::log::{root_logger, RootLogger, Tracker};
 use starlane::space::particle::traversal::Traversal;
 use starlane::space::point::Point;
 use starlane::space::selector::KindSelector;
 use starlane::space::settings::Timeouts;
-use starlane::space::substance::Substance;
+use starlane::space::substance::{Substance, SubstanceErr};
 use starlane::space::wave::core::ext::ExtMethod;
 use starlane::space::wave::core::ReflectedCore;
 use starlane::space::wave::exchange::asynch::{
@@ -376,7 +376,7 @@ impl Particle for Control {
     }
 
     fn sphere(self) -> Result<ParticleSphere, Self::Err> {
-        Ok(ParticleSphere::new_router(self.skel.driver.particle_bind.clone(), self))
+        Ok(ParticleSphere::new_router(self))
     }
 }
 
@@ -417,7 +417,7 @@ impl ControlClient {
             Timeouts::default(),
             Default::default(),
         );
-        let logger = RootLogger::default();
+        let logger = root_logger();
         let logger = logger.point(Point::from_str("control-client")?);
         let client = HyperClient::new_with_exchanger(factory, Some(exchanger), logger)?;
         Ok(Self { client })
@@ -492,12 +492,14 @@ pub enum ControlErr {
     SpaceErr(#[from] SpaceErr),
 }
 
+
+
 impl CoreReflector for ControlErr {
     fn as_reflected_core(self) -> ReflectedCore {
         ReflectedCore {
             headers: Default::default(),
             status: Default::default(),
-            body: Substance::Err(SpaceErr::to_space_err(self))
+            body: Substance::Err(SubstanceErr(format!("{}",self.to_string())))
         }
     }
 }

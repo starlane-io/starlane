@@ -1,12 +1,11 @@
 use core::str::FromStr;
-
+use std::fmt::{Display, Formatter};
 use convert_case::{Case, Casing};
 use nom::combinator::all_consuming;
 use serde::{Deserialize, Serialize};
 
 use crate::space::parse::util::new_span;
 
-use crate::space::hyper::ChildRegistry;
 use crate::space::loc::{
     ProvisionAffinity, StarKey, ToBaseKind, Version, CONTROL_WAVE_TRAVERSAL_PLAN,
     MECHTRON_WAVE_TRAVERSAL_PLAN, PORTAL_WAVE_TRAVERSAL_PLAN, STAR_WAVE_TRAVERSAL_PLAN,
@@ -14,7 +13,7 @@ use crate::space::loc::{
 };
 use crate::space::parse::util::result;
 use crate::space::parse::{kind_parts, specific, CamelCase, Domain,  SkewerCase};
-use crate::space::err::ParseErrs;
+use crate::space::err::{ParseErrs, PrintErr, SpaceErr};
 use crate::space::particle::traversal::TraversalPlan;
 use crate::space::point::Point;
 use crate::space::selector::{KindBaseSelector, KindSelector, Pattern, PointHierarchy, SpecificSelector, SubKindSelector, VersionReq};
@@ -136,19 +135,19 @@ pub enum BaseKind {
     Global,
     Host,
     Guest,
-    Native,
-    //Cli,
+    Registry,
+    WebServer
 }
 
 impl BaseKind {
 
     pub fn bind_point_hierarchy(&self) -> PointHierarchy {
-        match self {
-            BaseKind::Star => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/star.bind<File>").unwrap(),
-            BaseKind::Driver => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/driver.bind<File>").unwrap(),
-            BaseKind::Global => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/global.bind<File>").unwrap(),
-            _ => Self::nothing_bind_point_hierarchy()
-        }
+        (match self {
+            BaseKind::Star => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>star.bind<File<File>>"),
+            BaseKind::Driver => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>driver.bind<File<File>>"),
+            BaseKind::Global => PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>global.bind<File<File>>"),
+            _ => Ok(Self::nothing_bind_point_hierarchy())
+        }).map_err(|errs| { errs.print(); errs }).unwrap()
     }
 
     pub fn bind(&self) -> Point {
@@ -160,7 +159,7 @@ impl BaseKind {
     }
 
     pub fn nothing_bind_point_hierarchy() -> PointHierarchy {
-        PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>/nothing.bind<File>").unwrap()
+        PointHierarchy::from_str("GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>nothing.bind<File<File>>").unwrap()
     }
 
 
@@ -172,7 +171,7 @@ impl BaseKind {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display,strum_macros::EnumString)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::Display)]
 pub enum Sub {
     None,
     Database(DatabaseSubKind),
@@ -180,7 +179,6 @@ pub enum Sub {
     Artifact(ArtifactSubKind),
     UserBase(UserBaseSubKind),
     Star(StarSub),
-    Native(NativeSub),
 }
 
 impl Sub {
@@ -192,7 +190,6 @@ impl Sub {
             Sub::Artifact(_) => SubKind::Artifact,
             Sub::UserBase(_) => SubKind::UserBase,
             Sub::Star(_) => SubKind::Star,
-            Sub::Native(_) => SubKind::Native
         }
     }
 }
@@ -205,7 +202,6 @@ pub enum SubKind {
     Artifact,
     UserBase,
     Star,
-    Native,
 }
 
 
@@ -218,7 +214,6 @@ impl Sub {
             Sub::Artifact(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
             Sub::UserBase(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
             Sub::Star(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
-            Sub::Native(x) => Some(CamelCase::from_str(x.to_string().as_str()).unwrap()),
         }
     }
 
@@ -246,7 +241,6 @@ impl Into<Option<CamelCase>> for Sub {
             Sub::Artifact(a) => a.into(),
             Sub::UserBase(u) => u.into(),
             Sub::Star(s) => s.into(),
-            Sub::Native(s) => s.into(),
         }
     }
 }
@@ -260,7 +254,6 @@ impl Into<Option<String>> for Sub {
             Sub::Artifact(a) => a.into(),
             Sub::UserBase(u) => u.into(),
             Sub::Star(s) => s.into(),
-            Sub::Native(s) => s.into(),
         }
     }
 }
@@ -296,16 +289,21 @@ pub enum Kind {
     Control,
     Portal,
     Driver,
+    #[strum(to_string = "File<{0}>")]
     File(FileSubKind),
+    #[strum(to_string = "Artifact<{0}>")]
     Artifact(ArtifactSubKind),
+    #[strum(to_string = "Database<{0}>")]
     Database(DatabaseSubKind),
     Base,
+    #[strum(to_string = "UserBase<{0}>")]
     UserBase(UserBaseSubKind),
     Star(StarSub),
     Global,
     Host,
     Guest,
-    Native(NativeSub),
+    Registry,
+    WebServer
 }
 
 impl ToBaseKind for Kind {
@@ -325,7 +323,6 @@ impl ToBaseKind for Kind {
             Kind::File(_) => BaseKind::File,
             Kind::Artifact(_) => BaseKind::Artifact,
             Kind::Database(_) => BaseKind::Database,
-            Kind::Native(_) => BaseKind::Native,
             Kind::Base => BaseKind::Base,
             Kind::Repo => BaseKind::Repo,
             Kind::Star(_) => BaseKind::Star,
@@ -333,6 +330,8 @@ impl ToBaseKind for Kind {
             Kind::Global => BaseKind::Global,
             Kind::Host => BaseKind::Host,
             Kind::Guest => BaseKind::Guest,
+            Kind::Registry => BaseKind::Registry,
+            Kind::WebServer => BaseKind::WebServer
         }
     }
 }
@@ -368,7 +367,6 @@ impl Kind {
             Kind::Artifact(_) => true,
             Kind::Mechtron => true,
             Kind::Host => true,
-            Kind::Native(NativeSub::Web) => true,
             _ => false,
         }
     }
@@ -474,9 +472,6 @@ impl TryFrom<KindParts> for Kind {
             BaseKind::Star => Kind::Star(StarSub::from_str(
                 value.sub.ok_or("Star<?> requires a sub kind")?.as_str(),
             )?),
-            BaseKind::Native => Kind::Native(NativeSub::from_str(
-                value.sub.ok_or("Native<?> requires a sub kind")?.as_str(),
-            )?),
 
             BaseKind::Root => Kind::Root,
             BaseKind::Space => Kind::Space,
@@ -494,6 +489,8 @@ impl TryFrom<KindParts> for Kind {
             BaseKind::Global => Kind::Global,
             BaseKind::Host => Kind::Host,
             BaseKind::Guest => Kind::Guest,
+            BaseKind::Registry => Kind::Registry,
+            BaseKind::WebServer => Kind::WebServer
         })
     }
 }
@@ -506,21 +503,6 @@ pub trait Tks {
     fn matches(&self, tks: &dyn Tks) -> bool;
 }
 
-#[derive(
-    Clone,
-    Debug,
-    Eq,
-    PartialEq,
-    Hash,
-    Serialize,
-    Deserialize,
-    strum_macros::Display,
-    strum_macros::EnumString,
-    strum_macros::EnumIter,
-)]
-pub enum NativeSub {
-    Web,
-}
 
 #[derive(
     Clone,
@@ -546,10 +528,10 @@ pub enum StarSub {
 }
 
 impl StarSub {
-    pub fn to_selector(&self) -> KindSelector {
+    pub fn to_selector(self) -> KindSelector {
         KindSelector {
             base: KindBaseSelector::Exact(BaseKind::Star),
-            sub:  SubKindSelector::Exact(self.into()),
+            sub:  SubKindSelector::Exact(self.to_camel_case()),
             specific: ValuePattern::Always,
         }
     }
@@ -580,23 +562,8 @@ impl StarSub {
     }
 }
 
-impl Into<Sub> for NativeSub {
-    fn into(self) -> Sub {
-        Sub::Native(self)
-    }
-}
 
-impl Into<Option<CamelCase>> for NativeSub {
-    fn into(self) -> Option<CamelCase> {
-        Some(CamelCase::from_str(self.to_string().as_str()).unwrap())
-    }
-}
 
-impl Into<Option<String>> for NativeSub {
-    fn into(self) -> Option<String> {
-        Some(self.to_string())
-    }
-}
 
 impl Into<Sub> for StarSub {
     fn into(self) -> Sub {
@@ -623,6 +590,7 @@ pub enum UserBaseSubKindBase {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize, strum_macros::Display)]
 pub enum UserBaseSubKind {
+    #[strum(to_string = "OAuth<{0}>")]
     OAuth(Specific),
 }
 
@@ -727,6 +695,7 @@ impl Into<Option<String>> for ArtifactSubKind {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize, strum_macros::Display)]
 pub enum DatabaseSubKind {
+    #[strum(to_string = "Relational<{0}>")]
     Relational(Specific),
 }
 
@@ -756,14 +725,7 @@ impl Into<Option<String>> for DatabaseSubKind {
     }
 }
 
-impl BaseKind {
-    pub fn child_resource_registry_handler(&self) -> ChildRegistry {
-        match self {
-            Self::UserBase => ChildRegistry::Core,
-            _ => ChildRegistry::Shell,
-        }
-    }
-}
+
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct StarStub {
@@ -793,7 +755,7 @@ impl StarStub {
 /// `mechtronhub.com:postgres.org:postgres:gis:8.0.0`
 /// And the above would be embedde into the appropriate Base Kind and Sub Kind:
 /// `<Database<Rel<mechtronhub.com:postgres.org:postgres:gis:8.0.0>>>`
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash )]
 pub struct Specific {
     pub provider: Domain,
     pub vendor: Domain,
@@ -802,22 +764,24 @@ pub struct Specific {
     pub version: Version,
 }
 
+
 impl Specific {
     pub fn to_selector(&self) -> SpecificSelector {
         SpecificSelector::from_str(self.to_string().as_str()).unwrap()
     }
 }
 
-impl ToString for Specific {
-    fn to_string(&self) -> String {
-        format!(
+impl Display for Specific {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let string = format!(
             "{}:{}:{}:{}:{}",
             self.provider,
             self.vendor,
             self.product,
             self.variant,
             self.version.to_string()
-        )
+        );
+        f.write_str(string.as_str())
     }
 }
 
@@ -845,17 +809,72 @@ impl TryInto<SpecificSelector> for Specific {
 
 #[cfg(test)]
 pub mod test {
-    use crate::space::selector::KindSelector;
+    use crate::space::selector::{KindSelector, PointHierarchy, Selector};
     use crate::space::util::ValueMatcher;
     use crate::{Kind,  StarSub};
-    use core::str::FromStr;
-    use crate::space::err::ParseErrs;
+    use crate::space::err::{ParseErrs, PrintErr};
+    use crate::space::parse::{consume_hierarchy, delim_kind, file_point_kind_segment, kind, lex_block, point_kind_hierarchy, resolve_kind, unwrap_block};
+    use crate::space::parse::model::{BlockKind, NestedBlockKind};
+    use crate::space::parse::util::{new_span, recognize, result};
+    use std::str::FromStr;
+    use nom::combinator::all_consuming;
+    use nom::IResult;
+    use crate::space::kind::FileSubKind;
+    use crate::space::point::Point;
 
     #[test]
     pub fn selector() -> Result<(), ParseErrs> {
         let kind = Kind::Star(StarSub::Fold);
         let selector = KindSelector::from_str("<Star<Fold>>")?;
         assert!(selector.is_match(&kind).is_ok());
+
+
         Ok(())
+    }
+
+    #[test]
+    pub fn star_bind() {
+        let s = "GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>star.bind<File<File>>";
+        let string = s.to_string();
+        let s = new_span(s );
+
+        let (_,hierarchy) = point_kind_hierarchy(s).unwrap();
+        let v = hierarchy.to_string();
+
+        assert_eq!(v,string);
+    }
+
+    #[test]
+    pub fn file_bind() {
+        println!("File<File> == {}", Kind::File(FileSubKind::File).to_string() );
+        let s = "star.bind<File<File>>";
+        match result(all_consuming(file_point_kind_segment)(new_span(s)))  {
+            Ok(ok) => {
+                println!("filePoint seg: '{}'", ok.to_string());
+            }
+            Err(err) => {
+               err.print() ;
+                assert!(false)
+            }
+        }
+    }
+    #[test]
+    pub fn star_bind_from_str() {
+
+
+
+
+        let s = "GLOBAL::repo<Repo>:builtin<BundleSeries>:1.0.0<Bundle>:/<FileStore>star.bind<File<File>>";
+        match PointHierarchy::from_str(s) {
+            Ok(hierarchy) => {
+                println!("HIERARCHY from_str {}", hierarchy.to_string());
+                let v = s.to_string();
+                assert_eq!(v,hierarchy.to_string());
+            }
+            Err(err) => {
+                err.print();
+                panic!("from_str does not work!")
+            }
+        }
     }
 }

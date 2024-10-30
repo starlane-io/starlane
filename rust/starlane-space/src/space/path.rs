@@ -1,6 +1,6 @@
-use alloc::format;
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
+
+
+
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
@@ -57,7 +57,6 @@ impl Path {
                 Some(some) => match Self::from_str(some) {
                     Ok(parent) => Option::Some(parent),
                     Err(error) => {
-                        eprintln!("{}", error.to_string());
                         Option::None
                     }
                 },

@@ -6,7 +6,7 @@ use crate::space::parse::{
     consume_point, consume_point_ctx, point_route_segment, point_selector, point_var,
     ResolverErr,
 };
-use crate::space::selector::{PointHierarchyOpt, PointKindSegOpt, Selector};
+use crate::space::selector::{PointHierarchy, PointHierarchyOpt, PointKindSeg, PointKindSegOpt, Selector};
 use crate::space::util::ToResolved;
 use crate::space::wave::{Agent, Recipients, ToRecipients};
 use crate::space::{ANONYMOUS, HYPERUSER};
@@ -980,6 +980,8 @@ impl Point {
     }
 
 
+
+
     pub fn to_path(&self) -> PathBuf {
         let mut path = String::new();
         for seg in &self.segments {
@@ -1109,7 +1111,7 @@ impl Point {
         REMOTE_ENDPOINT.clone()
     }
 
-    pub fn hyperuser() -> Self {
+    pub fn hyper_user() -> Self {
         HYPERUSER.clone()
     }
 

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use crate::space::loc::ToPoint;
 use crate::space::wave::core::cmd::CmdMethod;
 use crate::space::wave::core::CoreBounce;
@@ -11,7 +12,6 @@ use crate::space::wave::{
     Scope, Wave, WaveVariantDef,
 };
 use crate::{Agent, ReflectedCore, SpaceErr, Substance, Surface, ToSubstance};
-use alloc::borrow::Cow;
 use std::sync::Arc;
 
 pub trait ExchangeRouter: Send + Sync {
@@ -69,7 +69,6 @@ impl ProtoTransmitter {
 
         let directed = wave.build()?;
 
-        println!("DIRECTE!");
         match directed.bounce_backs() {
             BounceBacks::None => {
                 self.router.route(directed.to_wave());
@@ -83,7 +82,6 @@ impl ProtoTransmitter {
     where
         D: Into<DirectedProto>,
     {
-        println!("PING!");
         let mut ping: DirectedProto = ping.into();
         ping.bounce_backs = Some(BounceBacks::Single);
         if let Some(DirectedKind::Ping) = ping.kind {

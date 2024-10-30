@@ -14,7 +14,10 @@ pub mod fail;
 pub mod frame;
 pub mod hyper;
 pub mod kind;
+
+#[cfg(feature = "kind2")]
 pub mod kind2;
+
 pub mod loc;
 pub mod log;
 pub mod path;
@@ -28,9 +31,22 @@ pub mod wasm;
 
 pub mod prelude;
 
+
 pub static VERSION: Lazy<semver::Version> =
-    Lazy::new(|| semver::Version::from_str(include_str!("../VERSION").trim()).unwrap());
+    Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap() );
+
 pub static HYPERUSER: Lazy<Point> =
     Lazy::new(|| Point::from_str("hyperspace:users:hyperuser").expect("point"));
 pub static ANONYMOUS: Lazy<Point> =
     Lazy::new(|| Point::from_str("hyperspace:users:anonymous").expect("point"));
+
+#[cfg(test)]
+pub mod test {
+    use crate::space::VERSION;
+
+    #[test]
+    pub fn test_version() {
+//        println!("{}", VERSION.to_string());
+        println!("Helo");
+    }
+}

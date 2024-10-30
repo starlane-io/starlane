@@ -86,7 +86,6 @@ where
     }
 
     async fn item(&self, point: &Point) -> Result<ItemSphere<P>, P::Err> {
-        println!("ITEM get BASE");
         Ok(ItemSphere::Handler(Box::new(Cli)))
     }
 }

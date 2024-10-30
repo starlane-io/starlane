@@ -1,4 +1,5 @@
 use std::env;
+use std::fmt::{Display, Formatter};
 use crate::executor::{ExeConf, Executor};
 use itertools::Itertools;
 use nom::AsBytes;
@@ -27,6 +28,7 @@ use crate::executor::cli::HostEnv;
 use crate::executor::cli::os::CliOsExecutor;
 use crate::executor::dialect::filestore::{FileStore, FileStoreErr, FILE_STORE_ROOT};
 use crate::host::{ExeStub, Host, HostCli};
+use crate::host::err::HostErr;
 use crate::hyperspace::machine::MachineErr;
 
 pub type FileStoreService = Service<FileStore>;
@@ -97,7 +99,7 @@ impl ServiceRunner {
     pub fn filestore( & self  ) -> Result<FileStore, ServiceErr> {
         match self {
             ServiceRunner::Exe(exe) => {
-                exe.create()
+                Ok(exe.create()?)
             }
         }
     }
@@ -138,18 +140,19 @@ pub struct ServiceSelector {
     pub driver: Option<Kind>
 }
 
-impl ToString for ServiceSelector {
-    fn to_string(&self) -> String {
+impl Display for ServiceSelector {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self.driver {
             None => {
-                format!("{}<*:{}>",self.name.to_string(),self.kind.to_string())
+                write!(f, "{}<*:{}>",self.name.to_string(),self.kind.to_string())
             }
             Some(kind) => {
-                format!("{}<{}:{}>",self.name.to_string(),kind.to_string(),self.kind.to_string())
+                write!(f, "{}<{}:{}>",self.name.to_string(),kind.to_string(),self.kind.to_string())
             }
         }
     }
 }
+
 
 #[derive(Clone,Eq,PartialEq,Debug,Hash)]
 pub enum ServiceScopeKind {
@@ -495,6 +498,8 @@ pub enum ServiceErr {
     FileStoreErr(#[from] FileStoreErr),
     #[error(transparent)]
     SpaceErr(#[from] SpaceErr),
+    #[error(transparent)]
+    HostErr(#[from] HostErr),
     #[error("no template available that matches ServiceSelector: '{0}' (name<DriverKind:ServiceKind>)")]
     NoTemplate(ServiceSelector),
     #[error("call not processed")]

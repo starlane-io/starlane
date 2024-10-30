@@ -42,7 +42,7 @@ use starlane::space::particle::traversal::{
 };
 use starlane::space::particle::{Details, Status};
 use starlane::space::point::Point;
-use starlane::space::substance::{Substance, SubstanceKind};
+use starlane::space::substance::{Substance, SubstanceErr, SubstanceKind};
 use starlane::space::util::ValueMatcher;
 use starlane::space::wave::core::cmd::CmdMethod;
 use starlane::space::wave::core::hyper::HypMethod;
@@ -54,7 +54,7 @@ use starlane::space::wave::exchange::SetStrategy;
 use starlane::space::wave::{Agent, DirectedProto, Handling, HandlingKind, PongCore, Priority, Recipients, Reflectable, Retries, Ripple, Scope, SignalCore, SingularRipple, WaitTime, WaveVariantDef, WaveKind, ToReflected, ReflectedWave, WaveId};
 use starlane::space::wave::core::ReflectedCore;
 use starlane::space::wave::Wave;
-use crate::registry::postgres::err::RegErr;
+use crate::registry::err::RegErr;
 use crate::service::ServiceTemplate;
 use crate::template::Templates;
 
@@ -655,20 +655,20 @@ impl HyperStar
         let star_rx = star_tx.call_rx.take().unwrap();
         let star_tx = star_tx.call_tx;
 
-        let global_port = Point::global_executor()
+        let global_executor = Point::global_executor()
             .to_surface()
             .with_layer(Layer::Core);
         let mut transmitter = ProtoTransmitterBuilder::new(
             Arc::new(skel.gravity_router.clone()),
             skel.exchanger.clone(),
         );
-        transmitter.from = SetStrategy::Override(global_port.clone());
+        transmitter.from = SetStrategy::Override(global_executor.clone());
         transmitter.agent = SetStrategy::Fill(Agent::HyperUser);
 
         let global_handler = DirectedHandlerShell::new(
             GlobalCommandExecutionHandler::new(skel.clone()),
             transmitter,
-            global_port,
+            global_executor,
             skel.logger.logger.clone(),
         );
 
@@ -872,7 +872,7 @@ impl HyperStar
                             match result {
                                 Ok(_) => {}
                                 Err(e) => {
-                                    self.skel.err(e.into());
+                                    self.skel.err(&e.into());
                                 }
                             }
                         }
@@ -1235,7 +1235,6 @@ impl HyperStar
             let discoveries = match skel.logger.result(wrangler.wrangle(false).await) {
                 Ok(discoveries) => discoveries,
                 Err(err) => {
-                    println!("\tWrangle ERROR");
                     rtn.send(Err(err)).unwrap_or_default();
                     return;
                 }
@@ -1322,7 +1321,6 @@ impl LayerTraversalEngine
             match self.start_layer_traversal(injection).await {
                 Ok(_) => {}
                 Err(err) => {
-                    println!("ERR: {}", err.to_string());
                     // if it can be reflected then send back as an error
                     match reflection {
                         Ok(reflection) => {
@@ -2028,10 +2026,10 @@ impl SmartLocator
 }
 
 
-#[derive(Error,Debug,Clone)]
+#[derive(Error,Debug)]
 pub enum StarErr {
     #[error("caused by '{0}'")]
-    SpaceErr(#[source] #[from] SpaceErr),
+    SpaceErr(#[source] SpaceErr),
     #[error("cannot create_in_star in star {point} for parent point {parent} since it is not a point within this star")]
     PointNotInStar{point: Point, parent: Point},
     #[error("star expected Root to be already provisioned")]
@@ -2075,7 +2073,7 @@ impl CoreReflector for StarErr {
             ReflectedCore {
                 headers: Default::default(),
                 status: Default::default(),
-                body: Substance::Err(SpaceErr::str("from StarErr")),
+                body: Substance::Err(SubstanceErr("from StarErr".to_string())),
             }
         }
     }

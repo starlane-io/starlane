@@ -29,11 +29,7 @@ pub enum AssignmentKind {
     // eventually we will have Move as well as Create
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
-pub enum ChildRegistry {
-    Shell,
-    Core,
-}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Location {

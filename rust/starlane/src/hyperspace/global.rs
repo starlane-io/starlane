@@ -1,13 +1,14 @@
-use crate::platform::Platform;
 use crate::hyperspace::reg::Registration;
-use crate::hyperspace::star::{HyperStarSkel, SmartLocator,  StarErr};
+use crate::hyperspace::star::{HyperStarSkel, SmartLocator, StarErr};
+use crate::platform::Platform;
+use crate::registry::err::RegErr;
 use once_cell::sync::Lazy;
-use starlane_space::space::parse::util::new_span;
 use starlane::space::artifact::ArtRef;
 use starlane::space::command::direct::create::{Create, PointSegTemplate};
 use starlane::space::command::Command;
 use starlane::space::command::RawCommand;
 use starlane::space::config::bind::BindConfig;
+use starlane::space::err::{CoreReflector, SpaceErr};
 use starlane::space::loc::{ToPoint, ToSurface};
 use starlane::space::log::PointLogger;
 use starlane::space::parse::util::result;
@@ -17,16 +18,15 @@ use starlane::space::point::Point;
 use starlane::space::substance::Substance;
 use starlane::space::util::{log, ToResolved};
 use starlane::space::wave::core::cmd::CmdMethod;
+use starlane::space::wave::core::http2::StatusCode;
 use starlane::space::wave::core::ReflectedCore;
 use starlane::space::wave::exchange::asynch::{DirectedHandler, InCtx};
 use starlane::space::wave::{Agent, DirectedProto};
+use starlane_space::space::parse::util::new_span;
 use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
 use thiserror_context::impl_context;
-use starlane::space::err::{CoreReflector, SpaceErr};
-use starlane::space::wave::core::http2::StatusCode;
-use crate::registry::postgres::err::RegErr;
 /*
 #[derive(DirectedHandler,Clone)]
 pub struct Global where P: Platform {
@@ -36,27 +36,19 @@ pub struct Global where P: Platform {
 
  */
 
-
-
 #[derive(Clone, DirectedHandler)]
-pub struct GlobalCommandExecutionHandler
-
-{
+pub struct GlobalCommandExecutionHandler {
     skel: HyperStarSkel,
 }
 
-impl GlobalCommandExecutionHandler
-
-{
+impl GlobalCommandExecutionHandler {
     pub fn new(skel: HyperStarSkel) -> Self {
         Self { skel }
     }
 }
 
 #[handler]
-impl GlobalCommandExecutionHandler
-
-{
+impl GlobalCommandExecutionHandler {
     #[route("Cmd<RawCommand>")]
     pub async fn raw(&self, ctx: InCtx<'_, RawCommand>) -> Result<ReflectedCore, StarErr> {
         let line = ctx.input.line.clone();
@@ -96,7 +88,6 @@ impl GlobalCommandExecutionHandler
                 Ok(ReflectedCore::ok())
             }
             Command::Read(read) => {
-                println!("\tread cmd : {}", read.point.to_string());
                 // proxy the read command
                 let mut proto = DirectedProto::ping();
                 proto.method(CmdMethod::Read);
@@ -110,16 +101,12 @@ impl GlobalCommandExecutionHandler
     }
 }
 
-pub struct GlobalExecutionChamber
-
-{
+pub struct GlobalExecutionChamber {
     pub skel: HyperStarSkel,
     pub logger: PointLogger,
 }
 
-impl GlobalExecutionChamber
-
-{
+impl GlobalExecutionChamber {
     pub fn new(skel: HyperStarSkel) -> Self {
         let logger = skel.logger.push_point("global").unwrap();
         Self { skel, logger }
@@ -130,7 +117,8 @@ impl GlobalExecutionChamber
         let child_kind = self
             .skel
             .machine_api
-            .select_kind(&create.template.kind).await?;
+            .select_kind(&create.template.kind)
+            .await?;
         let point = match &create.template.point.child_segment_template {
             PointSegTemplate::Exact(child_segment) => {
                 let point = create.template.point.parent.push(child_segment.clone())?;
@@ -138,11 +126,13 @@ impl GlobalExecutionChamber
                 let properties = self
                     .skel
                     .machine_api
-                    .properties_config(&child_kind).await?
+                    .properties_config(&child_kind)
+                    .await?
                     .fill_create_defaults(&create.properties)?;
                 self.skel
                     .machine_api
-                    .properties_config(&child_kind).await?
+                    .properties_config(&child_kind)
+                    .await?
                     .check_create(&properties)?;
 
                 let registration = Registration {
@@ -160,7 +150,9 @@ impl GlobalExecutionChamber
             }
             PointSegTemplate::Pattern(pattern) => {
                 if !pattern.contains("%") {
-                    Err(SpaceErr::ExpectingWildcardInPointTemplate(pattern.to_string()))?;
+                    Err(SpaceErr::ExpectingWildcardInPointTemplate(
+                        pattern.to_string(),
+                    ))?;
                 }
                 let index = self
                     .skel
@@ -186,8 +178,7 @@ impl GlobalExecutionChamber
         };
 
         if create.state.has_substance() || child_kind.is_auto_provision() {
-            println!("\tprovisioning: {}", point.to_string());
-            let provisioner  = SmartLocator::new(self.skel.clone());
+            let provisioner = SmartLocator::new(self.skel.clone());
             //tokio::spawn(async move {
             provisioner.provision(&point, create.state.clone()).await?;
             //});
@@ -198,7 +189,3 @@ impl GlobalExecutionChamber
         Ok(record.details)
     }
 }
-
-
-
-

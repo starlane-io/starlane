@@ -8,24 +8,27 @@ clean :
 
 
 version:
-	cp ../VERSION starlane-space/src
 	toml set Cargo.toml workspace.package.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
+	toml set Cargo.toml workspace.dependencies.starlane.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
+	toml set Cargo.toml workspace.dependencies.starlane-macros.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
+	toml set Cargo.toml workspace.dependencies.starlane-space.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
+	toml set Cargo.toml workspace.dependencies.starlane-primitive-macros.version ${VERSION} > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
+	#$(MAKE) -C starlane-space version
+	#$(MAKE) -C starlane-macros version
+	#$(MAKE) -C starlane version
 
 publish-dry-run-impl: 
 	rustup default stable
-	$(MAKE) -C cosmic publish-dry-run
-	$(MAKE) -C starlane/starlane publish-dry-run
   
 
 publish-impl:
 	rustup default stable
-	$(MAKE) -C starlane-primitive-macros publish
-	sleep 30
-	$(MAKE) -C starlane-macros publish
-	sleep 30
-	$(MAKE) -C starlane-space publish
-	$(MAKE) -C starlane/starlane publish
+	./publish.sh starlane-primitive-macros 10
+	./publish.sh starlane-space  10
+	./publish.sh starlane-macros 10
+	./publish.sh starlane 0
+
 
 publish-dry-run: version publish-dry-run-impl
 publish: version publish-impl
- 
+

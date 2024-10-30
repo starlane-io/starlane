@@ -1,9 +1,7 @@
-pub mod err;
+pub mod embed;
 
-use crate::err::{err, HypErr};
-use crate::hyperspace::reg::{Registration, RegistryApi};
 use crate::platform::Platform;
-use err::RegErr;
+use crate::registry::err::RegErr;
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{Acquire, Executor, Pool, Postgres, Row, Transaction};
@@ -43,24 +41,30 @@ use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
-use tokio_print::aprintln;
+use serde::{Deserialize, Serialize};
+use crate::Database;
+use crate::env::{STARLANE_REGISTRY_DATABASE, STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_SCHEMA, STARLANE_REGISTRY_URL, STARLANE_REGISTRY_USER};
+use crate::hyperspace::reg::{Registration, RegistryApi};
 
 pub trait PostgresPlatform: Send + Sync {
-    fn lookup_registry_db(&self) -> Result<PostgresDbInfo, RegErr>;
-    fn lookup_star_db(&self, star: &StarKey) -> Result<PostgresDbInfo, RegErr>;
+    fn lookup_registry_db(&self) -> Result<Database<PostgresConnectInfo>, RegErr>;
+    fn lookup_star_db(&self, star: &StarKey) -> Result<Database<PostgresConnectInfo>, RegErr>;
 }
 
 pub struct PostgresRegistry {
     logger: PointLogger,
     ctx: PostgresRegistryContextHandle,
     platform: Box<dyn PostgresPlatform>,
+
+
 }
+
 
 impl PostgresRegistry {
     pub async fn new(
         ctx: PostgresRegistryContextHandle,
         platform: Box<dyn PostgresPlatform>,
-        logger: PointLogger,
+        logger: PointLogger
     ) -> Result<Self, RegErr> {
         let logger = logger.point(Point::global_registry());
         /*
@@ -162,9 +166,7 @@ impl PostgresRegistry {
         let point_segment_parent_index = "CREATE UNIQUE INDEX IF NOT EXISTS resource_point_segment_parent_index ON particles(parent,point_segment)";
         let access_grants_index =
             "CREATE INDEX IF NOT EXISTS query_root_index ON access_grants(query_root)";
-        aprintln!("Postgres acquiring con...");
         let mut conn = self.ctx.acquire().await?;
-        aprintln!("conn acquired......");
         let mut transaction = conn.begin().await?;
         transaction.execute(particles).await?;
         transaction.execute(access_grants).await?;
@@ -188,15 +190,17 @@ impl RegistryApi for PostgresRegistry {
         self.logger.info("nuking database!");
         let mut conn = self.ctx.acquire().await?;
         let mut trans = conn.begin().await?;
-        trans.execute("DROP TABLE particles CASCADE").await;
-        trans.execute("DROP TABLE access_grants CASCADE").await;
-        trans.execute("DROP TABLE properties CASCADE").await;
+        trans.execute("DROP TABLE particles CASCADE").await?;
+        trans.execute("DROP TABLE access_grants CASCADE").await?;
+        trans.execute("DROP TABLE properties CASCADE").await?;
         trans.commit().await?;
         self.setup().await?;
         Ok(())
     }
 
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), RegErr> {
+
+
         /*
         async fn check<'a>( registration: &Registration,  trans:&mut Transaction<Postgres>, ) -> Result<(),Erroror> {
             let params = RegistryParams::from_registration(registration)?;
@@ -503,32 +507,6 @@ impl RegistryApi for PostgresRegistry {
         Ok(list)
     }
 
-    //    #[async_recursion]
-    async fn select<'a>(&'a self, select: &'a mut Select) -> Result<SubstanceList, RegErr> {
-        let point = select.pattern.query_root();
-
-        let hierarchy = self
-            .query(&point, &Query::PointHierarchy)
-            .await?
-            .try_into()?;
-
-        let sub_select_hops = select.pattern.sub_select_hops();
-        let sub_select = select
-            .clone()
-            .sub_select(point.clone(), sub_select_hops, hierarchy);
-        let mut list = self.sub_select(&sub_select).await?;
-        if select.pattern.matches_root() {
-            list.push(Stub {
-                point: Point::root(),
-                kind: Kind::Root,
-                status: Status::Ready,
-            });
-        }
-
-        let list = sub_select.into_payload.to_primitive(list)?;
-
-        Ok(list)
-    }
 
     //    #[async_recursion]
     async fn sub_select<'a>(&'a self, sub_select: &'a SubSelect) -> Result<Vec<Stub>, RegErr> {
@@ -566,21 +544,22 @@ impl RegistryApi for PostgresRegistry {
                     where_clause.push_str(format!(" AND base=${}", index).as_str());
                     params.push(kind.to_string());
                 }
+                KindBaseSelector::Never => {}
             }
 
             match &hop.kind_selector.base {
                 KindBaseSelector::Always => {}
                 KindBaseSelector::Exact(kind) => match &hop.kind_selector.sub {
                     SubKindSelector::Always => {}
-                    SubKindSelector::Exact(sub) => match sub {
-                        None => {}
-                        Some(sub) => {
+                    SubKindSelector::Exact(sub) => {
                             index = index + 1;
                             where_clause.push_str(format!(" AND sub=${}", index).as_str());
                             params.push(sub.to_string());
-                        }
                     },
+                    SubKindSelector::None => {}
+                    SubKindSelector::Never => {}
                 },
+                KindBaseSelector::Never => {}
             }
 
             match &hop.kind_selector.specific {
@@ -904,9 +883,10 @@ impl RegistryApi for PostgresRegistry {
             kind: SelectKind::Initial,
         };
 
-        let to = match to.as_ref() {
+        let to: Option<PointHierarchy> = match to {
             None => None,
-            Some(to) => Some(self.query(to, &Query::PointHierarchy).await?.try_into()?),
+            //Some(to) => Some(self.query(*to, &Query::PointHierarchy).await?.try_into()?),
+            Some(to) => Some(self.query(*to, &Query::PointHierarchy).await?.try_into().expect("convert point to ...")),
         };
 
         let selection = self.select(&mut select).await?;
@@ -950,7 +930,7 @@ impl RegistryApi for PostgresRegistry {
             trans.commit().await?;
             Ok(())
         } else {
-            Err(format!("'{}' could not revoked grant {} because it does not have full access (super or owner) on {}", to.to_string(), id, access_grant.by_particle.to_string() ).into())
+            Err(RegErr::Msg(format!("'{}' could not revoked grant {} because it does not have full access (super or owner) on {}", to.to_string(), id, access_grant.by_particle.to_string() ).to_string()))
         }
     }
 }
@@ -1037,7 +1017,6 @@ impl sqlx::FromRow<'_, PgRow> for WrappedIndexedAccessGrant {
 
         match wrap(row) {
             Ok(record) => {
-                let phantom = Default::default();
                 Ok(WrappedIndexedAccessGrant { grant: record })
             }
             Err(err) => Err(sqlx::error::Error::PoolClosed),
@@ -1286,11 +1265,9 @@ impl PostgresRegistry {
                  */
             }
             GetOp::Properties(keys) => {
-                println!("GET PROPERTIES for {}", get.point.to_string());
                 let properties = self.get_properties(&get.point).await?;
                 let mut map = SubstanceMap::new();
                 for (index, property) in properties.iter().enumerate() {
-                    println!("\tprop{}", property.0.clone());
                     map.insert(
                         property.0.clone(),
                         Substance::Text(property.1.value.clone()),
@@ -1336,14 +1313,21 @@ pub struct PostgresRegistryContextHandle {
     key: PostgresDbKey,
     pool: Arc<PostgresRegistryContext>,
     pub schema: String,
+
+    /// the receiver for this particular Sender may be an embedded database
+    /// which needs to remain alive OR it may be nothing. Either way
+    /// this handle will ensure that everything on the foundation that is needed
+    /// to support this registry will stay alive
+    keep_alive: tokio::sync::mpsc::Sender<()>
 }
 
 impl PostgresRegistryContextHandle {
-    pub fn new(db: &PostgresDbInfo, pool: Arc<PostgresRegistryContext>) -> Self {
+    pub fn new(db: &Database<PostgresConnectInfo>, pool: Arc<PostgresRegistryContext>, keep_alive: tokio::sync::mpsc::Sender<()>) -> Self {
         Self {
             key: db.to_key(),
             schema: db.schema.clone(),
             pool,
+            keep_alive
         }
     }
 
@@ -1363,11 +1347,13 @@ pub struct PostgresRegistryContext {
 
 impl PostgresRegistryContext {
     pub async fn new(
-        dbs: HashSet<PostgresDbInfo>,
+        dbs: HashSet<Database<PostgresConnectInfo>>,
         platform: Box<dyn PostgresPlatform>,
     ) -> Result<Self, RegErr> {
         let mut pools = HashMap::new();
+
         for db in dbs {
+println!("DATABASE CONNECTION: {}",db.url);
             let pool = PgPoolOptions::new()
                 .max_connections(5)
                 .connect(db.to_uri().as_str())
@@ -1381,16 +1367,11 @@ impl PostgresRegistryContext {
         &'a self,
         key: &'a PostgresDbKey,
     ) -> Result<PoolConnection<Postgres>, RegErr> {
-        aprintln!(" Entered Acquire...       ..");
-        aprintln!(" Key {:?}", key);
         let pool = self.pools.get(key);
-        aprintln!("pool.is_some():  {}", pool.is_some());
 
         let pool = pool.unwrap();
         //let pool = pool.ok_or(SpaceErr::str("could not acquire db connection"));
-        //        aprintln!("pool.is_err():  {}",pool.is_err() );
 
-        aprintln!("Aquire without Await...");
         Ok(pool.acquire().await?)
     }
 
@@ -1426,62 +1407,38 @@ impl ToString for &PostgresDbKey {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Hash)]
-pub struct PostgresDbInfo {
+#[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct PostgresConnectInfo {
     pub url: String,
     pub user: String,
     pub password: String,
-    pub database: String,
-    pub schema: String,
 }
 
-impl PostgresDbInfo {
-    pub fn new<Url, User, Pass, Db>(url: Url, user: User, password: Pass, database: Db) -> Self
+impl Default for PostgresConnectInfo {
+    fn default() -> Self {
+        PostgresConnectInfo {
+            url: STARLANE_REGISTRY_URL.to_string(),
+            user: STARLANE_REGISTRY_USER.to_string(),
+            password: STARLANE_REGISTRY_PASSWORD.to_string(),
+
+        }
+    }
+}
+
+impl PostgresConnectInfo {
+    pub fn new<Url, User, Pass>(url: Url, user: User, password: Pass) -> Self
     where
         Url: ToString,
         User: ToString,
         Pass: ToString,
-        Db: ToString,
     {
-        Self::new_with_schema(
-            url.to_string(),
-            user.to_string(),
-            password.to_string(),
-            database.to_string(),
-            "PUBLIC".to_string(),
-        )
-    }
-
-    pub fn new_with_schema(
-        url: String,
-        user: String,
-        password: String,
-        database: String,
-        schema: String,
-    ) -> Self {
         Self {
-            url,
-            user,
-            password,
-            database,
-            schema,
+            url: url.to_string(),
+            user: user.to_string(),
+            password: password.to_string(),
         }
     }
 
-    pub fn to_key(&self) -> PostgresDbKey {
-        PostgresDbKey {
-            url: self.url.clone(),
-            user: self.user.clone(),
-            database: self.database.clone(),
-        }
-    }
-
-    pub fn to_uri(&self) -> String {
-        format!(
-            "postgres://{}:{}@{}/{}",
-            self.user, self.password, self.url, self.database
-        )
-    }
 }
 
 #[cfg(test)]
@@ -1498,9 +1455,9 @@ pub mod test {
     use crate::hyperspace::err::HyperErr;
     use crate::hyperspace::machine::MachineTemplate;
     use crate::hyperspace::reg::{Registration, Registry};
-    use crate::registry::postgres::err::RegErr;
+    use crate::registry::err::RegErr;
     use crate::registry::postgres::{
-        PostgresDbInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
+        PostgresConnectInfo, PostgresPlatform, PostgresRegistry, PostgresRegistryContext,
         PostgresRegistryContextHandle,
     };
     use crate::StarlanePostgres;

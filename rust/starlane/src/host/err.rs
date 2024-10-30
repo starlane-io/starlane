@@ -1,13 +1,22 @@
-use std::fmt::Display;
+use std::convert::Infallible;
+use std::fmt::{Display, Formatter};
+use thiserror::Error;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug,Error)]
 pub struct HostErr {
     message: String,
 }
 
-impl HostErr {
-    pub fn to_string(&self) -> String {
-        self.message.clone()
+
+impl Display for HostErr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.message.fmt(f)
+    }
+}
+
+impl From<Infallible> for HostErr {
+    fn from(value: Infallible) -> Self {
+        HostErr::new(value.to_string())
     }
 }
 
@@ -20,6 +29,7 @@ impl ToString for Err {
 
  */
 
+/*
 impl<T> From<T> for HostErr
 where
     T: ToString,
@@ -30,6 +40,8 @@ where
         }
     }
 }
+
+ */
 
 impl HostErr {
     pub fn new(message: String) -> Self {

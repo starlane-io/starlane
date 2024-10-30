@@ -1,7 +1,15 @@
 [package]
 name = "starlane"
 
-description = "Starlane -- An Orchestration and Infrastructure Framework for WebAssembly Components (https://starlane.io)"
+description = """
+Starlane -- An Orchestration and Infrastructure Framework for WebAssembly Components (https://starlane.io)
+
+This packaged manages `HyperSpace` which provides infrastructure for `Space`
+Apis (WebAssembly & external programs meant to provide custom behaviors in Starlane),
+
+This package references the `starlane-space` package and reuses of it to run the infrastructure and
+it also contains mechanisms (Drivers) for extending the Starlane Type system
+"""
 
 
 version.workspace = true
@@ -18,7 +26,7 @@ repository.workspace = true
 full=["server"]
 default=["server"]
 #server=["space","service","hyperspace", "hyperlane","postgres", "hyperlane-tcp", "cli", "dep:threadpool", "dep:oneshot", "dep:anyhow", "dep:virtual-fs"]
-server=["space","service","hyperspace", "hyperlane","postgres", "hyperlane-tcp", "cli", "dep:threadpool", "dep:oneshot", "dep:anyhow"]
+server=["space","service","hyperspace", "hyperlane","postgres", "postgres-embedded","hyperlane-tcp", "cli", "dep:threadpool", "dep:oneshot", "dep:anyhow"]
 cli=["dep:text_io","dep:clap", "dep:walkdir", "parse"]
 hypererr=[]
 hyperspace=["dep:futures","dep:dashmap","dep:semver", "parse", "dep:zip","hypererr"]
@@ -26,6 +34,7 @@ hyperlane=["hypererr"]
 hyperlane-tcp =  ["hyperlane","dep:rcgen","rustls","dep:tokio-rustls","dep:tls-api-rustls"]
 hyperlane-quic =  ["hyperlane","dep:rcgen","rustls", "dep:quinn"]
 postgres=[ "dep:sqlx","dep:serde","dep:tracing","dep:async-recursion" ]
+postgres-embedded=[ "postgres", "dep:postgresql_embedded" ]
 parse=["dep:nom", "dep:nom-supreme", "dep:nom_locate"]
 rustls=["dep:rustls","dep:rcgen","rustls-pemfile"]
 driver=["hyperspace"]
@@ -36,11 +45,10 @@ space=[]
 wasm=[]
 
 [dependencies]
-starlane-space = { workspace = true}
-starlane-macros = { workspace = true }
+starlane-space = { workspace = true  }
+starlane-macros = { workspace = true  }
 starlane-primitive-macros = { workspace = true}
 thiserror = { workspace = true}
-tokio_print= {  workspace=true  }
 lazy_static = {  workspace=true  }
 uuid = { workspace=true, features=["v4"] }
 chrono = { workspace=true, features=["serde"] }
@@ -110,6 +118,21 @@ quinn ={ workspace = true, optional = true }
 webpki-roots = { workspace = true}
 path-clean = { workspace = true}
 thiserror-context = { workspace = true }
+rustyline = { workspace = true, features=["with-file-history", "with-dirs"]}
+cliclack = { workspace = true }
+
+serde_yaml = { workspace = true }
+derive_builder = { workspace=true }
+postgresql_embedded = { workspace=true, optional = true }
+text-to-ascii-art = { workspace = true}
+colored = {workspace = true}
+lerp = { workspace = true, features=["derive"] }
+atty ={workspace = true}
+#rolling-file = {workspace = true}
+termsize = {workspace = true}
+
+#log= {workspace = true}
+textwrap = {workspace = true}
 
 [lib]
 name = "starlane"

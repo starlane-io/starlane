@@ -25,10 +25,6 @@ fn main() {
         .enable_all()
         .build()
         .unwrap();
-    println!(
-        "PWD: {}",
-        std::env::current_dir().unwrap().as_path().display()
-    );
 
     let (stdout_tx, mut stdout_rx) = Pipe::channel();
     let (stderr_tx, mut stderr_rx) = Pipe::channel();
@@ -90,12 +86,10 @@ fn main() {
         // Create a Store.
         let mut store = Store::default();
 
-        println!("Compiling module...");
         // Let's compile the Wasm module.
         let module = Module::new(&store, wasm_bytes).unwrap();
 
         builder.run_with_store(module, &mut store).unwrap();
-        println!("done");
     });
 
     //    WasiEnvBuilder::preopen_vfs_dirs( & mut builder, vec![String::from(format!("{}/scratch/", std::env::current_dir().unwrap().as_path().display()))]);

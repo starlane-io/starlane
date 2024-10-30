@@ -316,6 +316,8 @@ pub enum FileStoreErr {
     HostErr(#[from] HostErr),
     #[error("path '{0}' escapes FileStore boundaries")]
     PathEscapesFileStoreBoundary(PathBuf),
+    #[error("could not strip prefix of path '{0}'")]
+    StripPrefixError(#[from] StripPrefixError),
     #[error("expected environment variable to be set: {0}")]
     ExpectEnvVar(String),
     #[error(transparent)]
@@ -324,10 +326,12 @@ pub enum FileStoreErr {
     Pwd,
     #[error("io error: {0}")]
     TokioIo(String),
-    #[error(transparent)]
+    #[error("{0}")]
     StdIoErr(std::io::ErrorKind),
+    #[error(transparent)]
+    Inifable(  #[from] core::convert::Infallible),
     #[error("unknown FileStoreErr: {0}")]
-    Anyhow(#[source] Arc<anyhow::Error>)
+    Anyhow(#[source] #[from] Arc<anyhow::Error>)
 
 }
 

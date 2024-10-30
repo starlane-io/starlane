@@ -6,7 +6,7 @@
 extern crate quote;
 
 use proc_macro::TokenStream;
-
+use proc_macro2::Ident;
 use quote::quote;
 use quote::ToTokens;
 use syn::{parse_macro_input, Data, DeriveInput, PathArguments, Type};
@@ -303,6 +303,39 @@ pub fn mech_err(item: TokenStream) -> TokenStream {
 }
 
  */
+
+#[proc_macro_derive(ToBase)]
+pub fn base(item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as DeriveInput);
+    let ident = &input.ident;
+    let base = format_ident!("{}Base", ident);
+    let mut variants: Vec<Ident> = vec![];
+
+    if let Data::Enum(data) = &input.data {
+        for variant in data.variants.clone() {
+            variants.push(variant.ident.clone());
+        }
+    }
+
+
+    let rtn = quote! {
+        pub enum #base {
+        #(#variants),*
+        }
+
+
+        #[allow(bindings_with_variant_name)]
+        impl ToString for #base {
+            fn to_string(&self) -> String {
+                match self {
+            #( #variants => "#variants".to_string() ),*
+                }
+            }
+        }
+    };
+
+    rtn.into()
+}
 
 #[cfg(test)]
 mod tests {

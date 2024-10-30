@@ -7,7 +7,6 @@ use crate::hyperspace::star::HyperStarSkel;
 use once_cell::sync::Lazy;
 use starlane::space::artifact::ArtRef;
 use starlane::space::config::bind::BindConfig;
-use starlane::space::kind::{BaseKind, Kind};
 use starlane::space::parse::bind_config;
 use starlane::space::point::Point;
 use starlane::space::selector::KindSelector;
@@ -15,29 +14,28 @@ use starlane::space::util::log;
 use starlane::space::wave::exchange::asynch::DirectedHandler;
 use std::str::FromStr;
 use std::sync::Arc;
+use starlane::space::kind::{BaseKind, Kind};
 
-
-
-pub struct BaseDriverFactory {
+pub struct FileStoreDriverFactory {
     pub avail: DriverAvail,
 }
 
-impl BaseDriverFactory {
+impl FileStoreDriverFactory {
     pub fn new(avail: DriverAvail) -> Self {
         Self { avail }
     }
 }
 
 #[async_trait]
-impl HyperDriverFactory for BaseDriverFactory
+impl HyperDriverFactory for FileStoreDriverFactory
 
 {
     fn kind(&self) -> Kind {
-        Kind::Base
+        Kind::FileStore
     }
 
     fn selector(&self) -> KindSelector {
-        KindSelector::from_base(BaseKind::Base)
+        KindSelector::from_base(BaseKind::FileStore)
     }
 
     async fn create(
@@ -46,46 +44,46 @@ impl HyperDriverFactory for BaseDriverFactory
         _: DriverSkel,
         _: DriverCtx,
     ) -> Result<Box<dyn Driver>, DriverErr> {
-        Ok(Box::new(BaseDriver::new(self.avail.clone())))
+        Ok(Box::new(FileStoreDriver::new(self.avail.clone())))
     }
 }
 
-pub struct BaseDriver {
+pub struct FileStoreDriver {
     pub avail: DriverAvail,
 }
 
-impl BaseDriver {
+impl FileStoreDriver {
     pub fn new(avail: DriverAvail) -> Self {
         Self { avail }
     }
 }
 
 #[async_trait]
-impl Driver for BaseDriver
+impl Driver for FileStoreDriver
 
 {
     fn kind(&self) -> Kind {
-        Kind::Base
+        Kind::FileStore
     }
 
     async fn particle(&self, point: &Point) -> Result<ParticleSphere, DriverErr> {
-        let base = Base::restore((), (), ());
+        let base = FileStore::restore((), (), ());
 
         Ok(base.sphere()?)
     }
 }
 
 #[derive(DirectedHandler)]
-pub struct Base;
+pub struct FileStore;
 
-impl Particle for Base {
+impl Particle for FileStore {
     type Skel = ();
     type Ctx = ();
     type State = ();
     type Err = StdParticleErr;
 
     fn restore(_: Self::Skel, _: Self::Ctx, _: Self::State) -> Self {
-        Base
+        FileStore
     }
 
 
@@ -95,6 +93,6 @@ impl Particle for Base {
 }
 
 #[handler]
-impl Base {}
+impl FileStore {}
 
 

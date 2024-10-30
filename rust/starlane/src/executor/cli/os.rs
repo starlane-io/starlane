@@ -1,6 +1,5 @@
 use std::env;
 use std::path::PathBuf;
-use tokio_print::aprintln;
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 use std::process::Stdio;
 use std::ops::{Deref, DerefMut};
@@ -36,9 +35,7 @@ impl Executor for CliOsExecutor {
             Result::Err(CliErr::FileNotFound(self.stub.loc.clone()))?;
         }
 
-        aprintln!("pwd: {}", env::current_dir().unwrap().display());
-        aprintln!("self.stub.loc.exists(): {}", path.exists());
-        aprintln!("self.stub.loc: {}", path.display());
+
         let mut command = Command::new(self.stub.loc.clone());
 
         command.envs(self.stub.env.env.clone());
@@ -46,19 +43,13 @@ impl Executor for CliOsExecutor {
         command.current_dir(self.stub.env.pwd.clone());
         command.env_clear();
         command.envs(&self.stub.env.env);
-        aprintln!("GOT HERE...");
         //command.stdin(Stdio::piped()).output().await?;
         command.stdin(Stdio::piped()).output().await?;
-        aprintln!("STDIN");
         //command.stdout(Stdio::piped()).output().await?;
         command.stdout(Stdio::piped()).output().await?;
-        aprintln!("STDOUT");
         //command.stderr(Stdio::piped()).output().await?;
         command.stderr(Stdio::piped()).output().await?;
-        aprintln!("STDERR");
-        println!("{:?}", command);
         let child = command.spawn()?;
-        aprintln!("child created...");
         //        Ok(OsProcess::new(child))
         let mut process = OsProcess::new(child);
 

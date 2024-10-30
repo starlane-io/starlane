@@ -1,5 +1,5 @@
 #![allow(warnings)]
-#![feature(hasher_prefixfree_extras)]
+//#![feature(hasher_prefixfree_extras)]
 #[macro_use]
 extern crate async_trait;
 #[macro_use]
@@ -13,6 +13,9 @@ extern crate core;
 
 #[cfg(test)]
 pub mod test;
+
+
+pub mod foundation;
 
 
 #[cfg(feature="space")]
@@ -42,6 +45,8 @@ pub mod registry;
 #[cfg(feature = "server")]
 pub mod server;
 
+use std::str::FromStr;
+use once_cell::sync::Lazy;
 #[cfg(feature = "server")]
 pub use server::*;
 
@@ -60,6 +65,13 @@ pub mod platform;
 
 #[cfg(feature = "service")]
 pub mod service;
+
+
+
+
+
+pub static VERSION: Lazy<semver::Version> =
+    Lazy::new(|| semver::Version::from_str(env!("CARGO_PKG_VERSION").trim()).unwrap() );
 
 pub fn init() {
     #[cfg(feature = "cli")]
