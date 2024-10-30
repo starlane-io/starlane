@@ -97,6 +97,16 @@ impl Postgres {
 
 }
 
+impl Drop for Postgres {
+    fn drop(&mut self) {
+        let handler = tokio::runtime::Handle::current();
+        let mut postgres = self.postgres.clone();
+        handler.block_on( async move{
+            postgres.stop().await.unwrap_or_default();
+        });
+    }
+}
+
 #[derive(Builder, Clone, Serialize, Deserialize,Eq,PartialEq,Hash)]
 pub struct PgEmbedSettings {
     pub port: u16,
