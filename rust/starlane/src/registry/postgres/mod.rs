@@ -43,7 +43,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use crate::Database;
-use crate::env::{STARLANE_REGISTRY_DATABASE, STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_SCHEMA, STARLANE_REGISTRY_URL, STARLANE_REGISTRY_USER};
+use crate::env::STARLANE_CONFIG;
 use crate::hyperspace::reg::{Registration, RegistryApi};
 
 pub trait PostgresPlatform: Send + Sync {
@@ -1414,16 +1414,6 @@ pub struct PostgresConnectInfo {
     pub password: String,
 }
 
-impl Default for PostgresConnectInfo {
-    fn default() -> Self {
-        PostgresConnectInfo {
-            url: STARLANE_REGISTRY_URL.to_string(),
-            user: STARLANE_REGISTRY_USER.to_string(),
-            password: STARLANE_REGISTRY_PASSWORD.to_string(),
-
-        }
-    }
-}
 
 impl PostgresConnectInfo {
     pub fn new<Url, User, Pass>(url: Url, user: User, password: Pass) -> Self

@@ -1,8 +1,41 @@
-use std::env::VarError;
+use std::fs;
 use std::str::FromStr;
 use once_cell::sync::Lazy;
 use std::string::ToString;
+use anyhow::anyhow;
 use uuid::Uuid;
+use std::path::PathBuf;
+use crate::err::HypErr;
+use crate::shutdown::{panic_shutdown, shutdown};
+use crate::StarlaneConfig;
+
+pub static STARLANE_CONTEXT: Lazy<String> = Lazy::new(|| {
+    match std::env::var("STARLANE_CONTEXT") {
+        Ok(context) => {
+            context
+        }
+        Err(_) => {
+            fs::read_to_string(format!("{}/.context", STARLANE_HOME.as_str()).to_string()).unwrap_or("default".to_string())
+        }
+    }
+});
+
+
+
+
+pub static STARLANE_CONFIG: Lazy<StarlaneConfig> = Lazy::new(|| { match config() {
+    Ok(Some(config)) => {
+        config
+    }
+    Ok(None) => {
+        StarlaneConfig::default()
+    }
+    Err(err) => {
+        eprintln!();
+        panic_shutdown(format!("missing or corrupted config file: '{}' ... with error: '{}'", config_path(), err.to_string()));
+        panic!("missing or corrupted config file: '{}' ... with error: '{}'", config_path(), err.to_string());
+    }
+}});
 
 pub static STARLANE_CONTROL_PORT: Lazy<u16> = Lazy::new(|| {
     std::env::var("STARLANE_PORT")
@@ -60,19 +93,45 @@ impl Default for StarlaneWriteLogs {
 
 static STARLANE_TOKEN: Lazy<String> =
     Lazy::new(|| std::env::var("STARLANE_TOKEN").unwrap_or(Uuid::new_v4().to_string()));
-#[cfg(feature = "postgres")]
-pub static STARLANE_REGISTRY_URL: Lazy<String> =
-    Lazy::new(|| std::env::var("STARLANE_REGISTRY_URL").unwrap_or("localhost".to_string()));
-#[cfg(feature = "postgres")]
-pub static STARLANE_REGISTRY_USER: Lazy<String> =
-    Lazy::new(|| std::env::var("STARLANE_REGISTRY_USER").unwrap_or("postgres".to_string()));
-#[cfg(feature = "postgres")]
-pub static STARLANE_REGISTRY_PASSWORD: Lazy<String> =
-    Lazy::new(|| std::env::var("STARLANE_REGISTRY_PASSWORD").unwrap_or("password".to_string()));
-#[cfg(feature = "postgres")]
-pub static STARLANE_REGISTRY_DATABASE: Lazy<String> =
-    Lazy::new(|| std::env::var("STARLANE_REGISTRY_DATABASE").unwrap_or("postgres".to_string()));
 
-#[cfg(feature = "postgres")]
-pub static STARLANE_REGISTRY_SCHEMA: Lazy<String> =
-    Lazy::new(|| std::env::var("STARLANE_REGISTRY_SCHEMA").unwrap_or("public".to_string()));
+
+fn config_path() -> String {
+    format!("{}/config.yaml", STARLANE_CONTEXT.to_string()).to_string()
+}
+
+#[cfg(feature = "server")]
+pub fn config() -> Result<Option<StarlaneConfig>, HypErr> {
+    let file = config_path();
+    match fs::exists(file.clone())? {
+        true => {
+            let config = std::fs::read_to_string(file.clone())?;
+            let mut config: StarlaneConfig  = serde_yaml::from_str(config.as_str()).map_err(|err| anyhow!("starlane config found: '{}' yet Starlane encountered an error when attempting to process the config: '{}'", config_path(), err))?;
+            config.context = STARLANE_CONTEXT.to_string();
+
+            Ok(Some(config))
+        }
+        false => Ok(None),
+    }
+}
+
+pub fn config_save(config: StarlaneConfig) -> Result<(), anyhow::Error> {
+    let file = config_path();
+    match serde_yaml::to_string(&config) {
+        Ok(ser) => {
+            let file: PathBuf = file.into();
+            match file.parent() {
+                Some(dir) => {
+                    std::fs::create_dir_all(dir)?;
+                    std::fs::write(file, ser)?;
+                    Ok(())
+                }
+                None => {
+                    Err(anyhow!("starlane encountered an error when attempting to save config file: 'invalid parent'"))
+                }
+            }
+        }
+        Err(err) => Err(anyhow!(
+            "starlane internal error: 'could not deserialize config"
+        )),
+    }
+}

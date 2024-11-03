@@ -29,9 +29,7 @@ pub mod test;
 //#[cfg(feature="space")]
 //pub extern crate starlane_space as starlane;
 #[cfg(feature = "space")]
-pub mod space {
-    pub use starlane_space::space::*;
-}
+pub mod space {}
 
 #[cfg(feature = "service")]
 pub mod service;
@@ -59,87 +57,39 @@ pub use server::*;
 
 use crate::cli::{Cli, Commands};
 use crate::env::STARLANE_HOME;
-use crate::err::HypErr;
 use crate::platform::Platform;
-use anyhow::{anyhow, Error};
-use ascii::AsciiChar::P;
-use atty::Stream;
 use clap::Parser;
-use cliclack::log::{error, remark, success, warning};
+use cliclack::log::{error, success, warning};
 use cliclack::{
-    clear_screen, confirm, intro, multi_progress, outro, progress_bar, select, spinner,
+    confirm, intro, outro, select, spinner,
     ProgressBar,
 };
-use colored::{Colorize, CustomColor};
+use colored::Colorize;
 use lerp::Lerp;
 use nom::{InputIter, InputTake, Slice};
 use once_cell::sync::Lazy;
 use starlane::space::loc::ToBaseKind;
 use starlane_primitive_macros::ToBase;
-use starlane_space::space::particle::Progress;
-use starlane_space::space::util::log;
-use std::cmp::min;
 use std::fs::File;
 use std::io::{Read, Seek, Write};
 use std::ops::{Add, Index, Mul};
-use std::path::{Path, PathBuf};
-use std::process::Stdio;
+use std::path::Path;
 use std::str::FromStr;
 use std::time::Duration;
 use std::{io, process};
 use std::fmt::Display;
-use termsize::Size;
-use text_to_ascii_art::fonts::get_font;
 use text_to_ascii_art::to_art;
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
-use tokio::{fs, join, signal};
+use tokio::fs;
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::FileOptions;
+use starlane::env;
+use starlane::shutdown::panic_shutdown;
 use crate::foundation::Foundation;
 use crate::foundation::StandAloneFoundation;
-use crate::registry::postgres::embed::PgEmbedSettings;
 use crate::shutdown::shutdown;
-
-fn config_path() -> String {
-    format!("{}/config.yaml", STARLANE_HOME.to_string()).to_string()
-}
-
-#[cfg(feature = "server")]
-async fn config() -> Result<Option<StarlaneConfig>, HypErr> {
-    let file = config_path();
-    match fs::try_exists(file.clone()).await? {
-        true => {
-            let config = fs::read_to_string(file.clone()).await?;
-            let config = serde_yaml::from_str(config.as_str()).map_err(|err| anyhow!("starlane config found: '{}' yet Starlane encountered an error when attempting to process the config: '{}'", config_path(), err))?;
-            Ok(Some(config))
-        }
-        false => Ok(None),
-    }
-}
-
-async fn config_save(config: StarlaneConfig) -> Result<(), anyhow::Error> {
-    let file = config_path();
-    match serde_yaml::to_string(&config) {
-        Ok(ser) => {
-            let file: PathBuf = file.into();
-            match file.parent() {
-                Some(dir) => {
-                    fs::create_dir_all(dir).await?;
-                    fs::write(file, ser).await?;
-                    Ok(())
-                }
-                None => {
-                    Err(anyhow!("starlane encountered an error when attempting to save config file: 'invalid parent'"))
-                }
-            }
-        }
-        Err(err) => Err(anyhow!(
-            "starlane internal error: 'could not deserialize config"
-        )),
-    }
-}
 
 /*
 let config = Default::default();
@@ -191,8 +141,14 @@ pub fn main() -> Result<(), anyhow::Error> {
             nuke();
             Ok(())
         }
+        Commands::Context(args) => {
+            println!("Context: {}", args.command.to_string() );
+            Ok(())
+        }
     }
 }
+
+
 
 #[cfg(not(feature = "server"))]
 fn run() -> Result<(), anyhow::Error> {
@@ -221,21 +177,21 @@ fn run() -> Result<(), anyhow::Error> {
             tokio::time::sleep(Duration::from_millis(100)).await;
             spinner().set_message("loading configuration");
 
-            let config = match config().await {
+            let config = match env::config().await {
                 Ok(Some(config)) => config,
                 Ok(None) => {
                     delay(1000).await;
                     spinner().error("Starlane configuration not found.");
                     delay(100).await;
-                    error(format!("Starlane looked for a configuration here: '{}' But none was found.", config_path()))?;
+                    error(format!("Starlane looked for a configuration here: '{}' But none was found.", env::config_path()))?;
                     delay(100).await;
-                    note("wrong config?", format!("if '{}' isn't the config file you wanted, please set environment variable `export STARLANE_HOME=\"/config/parent/dir\"", config_path()))?;
+                    note("wrong config?", format!("if '{}' isn't the config file you wanted, please set environment variable `export STARLANE_HOME=\"/config/parent/dir\"", env::config_path()))?;
                     delay(100).await;
                     note("install", "please run `starlane install` to configure a new Starlane runner")?;
                     delay(100).await;
                     outro("Good Luck!")?;
                     newlines(3,100).await;
-                    process::exit(1);
+                    shutdown(1);
                 }
                 Err(err) => {
                     delay(1000).await;
@@ -243,13 +199,13 @@ fn run() -> Result<(), anyhow::Error> {
                     delay(100).await;
                     error(format!("{}", err.to_string()))?;
                     delay(100).await;
-                    note("wrong config?", format!("if '{}' isn't the config file you wanted, please set environment variable `export STARLANE_HOME=\"/config/parent/dir\"", config_path()))?;
+                    note("wrong config?", format!("if '{}' isn't the config file you wanted, please set environment variable `export STARLANE_HOME=\"/config/parent/dir\"", env::config_path()))?;
                     delay(100).await;
                     note("fresh install", "To create a fresh configuration please run: `starlane install`")?;
                     delay(100).await;
                     outro("Good Luck!")?;
                     newlines(3,100).await;
-                    process::exit(1);
+                    shutdown(1);
                 }
             };
 
@@ -678,36 +634,36 @@ async fn install() -> Result<(), anyhow::Error> {
     let spinner = spinner();
     spinner.start("checking configuration");
 
-    match config().await {
+    match env::config().await {
         Ok(Some(_)) => {
-            warning(format!("A valid starlane configuration already exists: '{}' this install process will overwrite the existing config", config_path() ))?;
-            let should_continue = confirm(format!("Overwrite: '{}'?", config_path())).interact()?;
+            warning(format!("A valid starlane configuration already exists: '{}' this install process will overwrite the existing config", env::config_path() ))?;
+            let should_continue = confirm(format!("Overwrite: '{}'?", env::config_path())).interact()?;
             if !should_continue {
                 outro("Starlane installation aborted by user.")?;
                 println!();
                 println!();
                 println!();
-                process::exit(0);
+                shutdown(0);
             } else {
                 spinner.start("deleting old config");
-                fs::remove_file(config_path()).await?;
+                fs::remove_file(env::config_path()).await?;
                 info("config deleted.")?;
                 spinner.clear();
             }
         }
 
         Err(err) => {
-            warning(format!("An invalid (corrupted) starlane configuration already exists: '{}' the installation process will overwrite this config file.", config_path() )).unwrap_or_default();
+            warning(format!("An invalid (corrupted) starlane configuration already exists: '{}' the installation process will overwrite this config file.", env::config_path() )).unwrap_or_default();
             let should_continue = confirm("Proceed with installation?").interact()?;
             if !should_continue {
                 outro("Starlane installation aborted by user.")?;
                 println!();
                 println!();
                 println!();
-                process::exit(0);
+                shutdown(0);
             } else {
                 spinner.start("deleting invalid config");
-                fs::remove_file(config_path()).await?;
+                fs::remove_file(env::config_path()).await?;
                 success("config deleted.")?;
                 spinner.clear();
             }
@@ -751,7 +707,7 @@ async fn install() -> Result<(), anyhow::Error> {
         x => {
             error(format!("Sorry! this is just a proof of concept and the '{}' Foundation is not working just yet!",x))?;
             outro("Installation aborted because of lazy developers")?;
-            process::exit(1);
+            panic_shutdown("Installation aborted because of lazy developers");
             Ok(())
         }
     }
@@ -768,7 +724,7 @@ async fn standalone_foundation() -> Result<(), anyhow::Error> {
         spin.stop("config generated");
         delay(100).await;
         spin.set_message("saving config");
-        config_save(config.clone()).await?;
+        env::config_save(config.clone()).await?;
         delay(100).await;
         info("config saved.")?;
         delay(100).await;
@@ -793,7 +749,8 @@ async fn standalone_foundation() -> Result<(), anyhow::Error> {
             spinner.stop("installation failed");
             error(wrap(err.to_string().as_str())).unwrap_or_default();
             outro("Standalone installation failed").unwrap_or_default();
-            process::exit(1);
+            shutdown(1);
+            Err(err)
         }
     }
 }
@@ -835,9 +792,9 @@ async fn newlines( len: usize, delay: u64 )  {
 
 #[tokio::main]
 async fn nuke()  {
-    if let Ok(Some(config)) = config().await {
+    if let Ok(Some(config)) = env::config().await {
         if !config.can_nuke  {
-            panic!("in config: '{}' can_nuke flag is set to false.",config_path());
+            panic!("in config: '{}' can_nuke flag is set to false.", env::config_path());
         }
     }
 

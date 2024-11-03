@@ -8,7 +8,7 @@ use starlane::space::command::{CmdTransfer, RawCommand};
 use starlane::space::err::SpaceErr;
 use starlane::space::hyper::Knock;
 use starlane::space::log::{root_logger, RootLogger};
-use starlane::space::parse::upload_blocks;
+use starlane::space::parse::{upload_blocks, SkewerCase};
 use starlane::space::point::Point;
 use starlane::space::substance::Substance;
 use starlane::space::wave::core::ReflectedCore;
@@ -45,7 +45,26 @@ pub enum Commands {
     Term(TermArgs),
     Version,
     Splash,
-    Nuke
+    Nuke,
+    Context(ContextArgs)
+}
+
+#[derive(Debug,Args)]
+pub struct ContextArgs{
+    #[clap(subcommand)]
+    pub command: ContextCmd,
+}
+
+impl Default for ContextArgs {
+    fn default() -> Self {
+        todo!()
+    }
+}
+
+#[derive(Debug,Subcommand,EnumString, strum_macros::Display)]
+pub enum ContextCmd {
+    Create,
+    Switch,
 }
 
 #[derive(Debug, Args)]
