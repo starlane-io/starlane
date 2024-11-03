@@ -66,6 +66,8 @@ impl Default for ContextArgs {
 pub enum ContextCmd {
     Create{ context_name: String},
     Switch{ context_name: String},
+    Default,
+    List,
     Which
 }
 

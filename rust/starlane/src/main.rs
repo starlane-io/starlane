@@ -77,6 +77,7 @@ use std::path::Path;
 use std::str::FromStr;
 use std::time::Duration;
 use std::{io, process};
+use std::any::Any;
 use std::fmt::Display;
 use anyhow::anyhow;
 use text_to_ascii_art::to_art;
@@ -159,8 +160,26 @@ pub fn main() -> Result<(), anyhow::Error> {
                     let context_name = SkewerCase::from_str(context_name.as_str()).map_err(|e|{ e.print(); anyhow!("illegal context name") })?;
                     set_context(context_name.as_str());
                 }
+                ContextCmd::Default => {
+                    set_context("default").unwrap_or_default();
+                }
                 ContextCmd::Which => {
                     println!("{}",context());
+                }
+                ContextCmd::List => {
+                    let context = context();
+                    let dir = std::fs::read_dir(STARLANE_HOME.to_string())?;
+                    for dir in dir.into_iter() {
+                        let dir = dir?;
+                        if dir.metadata()?.is_dir() {
+                            let dir= dir.path().iter().last().expect("expected a last directory").to_str().unwrap_or_default().to_string();
+                            if context == dir {
+                                println!("{}{}", "*", dir.truecolor(0xff, 0xff, 0xff));
+                            }else {
+                                println!(" {}", dir.truecolor(COLORS.0, COLORS.1, COLORS.2));
+                            }
+                        }
+                    }
                 }
             }
             Ok(())
