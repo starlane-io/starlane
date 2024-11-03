@@ -39,10 +39,12 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
+use port_check::is_local_ipv4_port_free;
 use sqlx::PgConnection;
 use wasmer_wasix::virtual_net::VirtualConnectedSocketExt;
 use crate::foundation::{Foundation, StandAloneFoundation};
 use crate::registry::postgres::PostgresDbKey;
+use crate::shutdown::{panic_shutdown, shutdown};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct StarlaneConfig {
@@ -394,6 +396,11 @@ where
         let logger = self
             .logger()
             .point(Point::from_str("control-blah").unwrap());
+
+        if !is_local_ipv4_port_free(STARLANE_CONTROL_PORT.clone()) {
+            panic_shutdown(format!("starlane port '{}' is being used by another process", STARLANE_CONTROL_PORT.to_string()));
+        }
+
         let server =
             HyperlaneTcpServer::new(STARLANE_CONTROL_PORT.clone(), dir, gate.clone(), logger)
                 .await

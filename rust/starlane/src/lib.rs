@@ -17,6 +17,7 @@ pub mod test;
 
 pub mod foundation;
 
+pub mod shutdown;
 
 #[cfg(feature="space")]
 pub mod space {

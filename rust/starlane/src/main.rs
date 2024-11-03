@@ -21,6 +21,8 @@ pub mod platform;
 
 pub mod foundation;
 
+pub mod shutdown;
+
 #[cfg(test)]
 pub mod test;
 
@@ -79,7 +81,7 @@ use starlane_space::space::util::log;
 use std::cmp::min;
 use std::fs::File;
 use std::io::{Read, Seek, Write};
-use std::ops::{Add, Mul};
+use std::ops::{Add, Index, Mul};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::str::FromStr;
@@ -98,6 +100,7 @@ use zip::write::FileOptions;
 use crate::foundation::Foundation;
 use crate::foundation::StandAloneFoundation;
 use crate::registry::postgres::embed::PgEmbedSettings;
+use crate::shutdown::shutdown;
 
 fn config_path() -> String {
     format!("{}/config.yaml", STARLANE_HOME.to_string()).to_string()
@@ -157,14 +160,14 @@ pub fn init() {
 
 #[cfg(feature = "cli")]
 pub fn main() -> Result<(), anyhow::Error> {
-    ctrlc::set_handler(move || process::exit(1)).unwrap();
+    ctrlc::set_handler(move || shutdown(1)).unwrap();
 
     init();
 
     let cli = Cli::parse();
     match cli.command {
         Commands::Splash => {
-            splash_html();
+            splash2();
             Ok(())
         }
         Commands::Install => install(),
@@ -465,7 +468,7 @@ impl Color {
 static COLORS: (u8, u8, u8) = (0x6D, 0xD7, 0xFD);
 
 async fn splash() {
-    splash_with_params(6, 6, 100).await;
+    splash_with_params(6, 6, 50).await;
 }
 
 fn info(text: &str) -> io::Result<()> {
@@ -503,12 +506,47 @@ pub fn wrap( text: impl Display) -> impl Display {
 
 
 async fn splash_with_params(pre: usize, post: usize, interval: u64) {
-        let banners = if term_width() > splash_widest("*STARLANE*") {
-            vec!["*STARLANE*"]
+       if term_width() > splash_widest("*STARLANE*") {
+            splash_with_params_and_banners(pre, post, interval, vec!["*STARLANE*"]).await;
+        } else if term_width() > splash_widest("STAR") {
+            splash_with_params_and_banners(pre, post, interval, vec!["STAR","LANE"]).await;
         } else {
-            vec!["STAR", "LANE"]
-        };
-        splash_with_params_and_banners(pre, post, interval, banners).await;
+            let begin= COLORS;
+           let end= (0xFF, 0xFF, 0xFF);
+            let banner = "* S T A R L A N E *";
+            let buffer = center(banner).len()-banner.len();
+            print!("{}"," ".repeat(buffer));
+            let count = banner.chars().count();
+            for (index,c) in banner.chars().enumerate() {
+                let progress = index as f32 / count  as f32;
+                let r = (begin.0 as f32).lerp(end.0 as f32, progress) as u8;
+                let g = (begin.1 as f32).lerp(end.1 as f32, progress) as u8;
+                let b = (begin.2 as f32).lerp(end.2 as f32, progress) as u8;
+                    print!("{}", c.to_string().truecolor(r, g, b));
+            }
+           println!();
+
+        }
+
+}
+
+fn center<S>( input: S) -> String where S: AsRef<str>{
+    let string = input.as_ref();
+    let widest = widest(string);
+    let term_width = term_width();
+    if term_width < widest {
+        return string.to_string();
+    }
+
+    let mut rtn = String::new();
+    for line in string.lines() {
+        let count = line.chars().count();
+        let col = (term_width/2)-(count/2);
+        rtn.push_str(" ".repeat(col).as_str());
+        rtn.push_str(line);
+        rtn.push_str("\n");
+    }
+    rtn
 }
 
 fn splash_widest(string: &str) -> usize {
@@ -521,18 +559,32 @@ fn splash_widest(string: &str) -> usize {
         .unwrap()
 }
 
+
+fn widest(string: &str) -> usize {
+        string.lines()
+        .into_iter()
+        .map(|line| line.chars().count())
+        .max()
+        .unwrap()
+}
+
+
+
+
 async fn splash_with_params_and_banners(
     pre: usize,
     post: usize,
     interval: u64,
     banners: Vec<&str>,
 ) {
+
+    println!("{}","\n".repeat(pre));
     for i in 0..banners.len() {
         let banner = banners.get(i).unwrap();
         match to_art(banner.to_string(), "default", 0, 0, 0) {
             Ok(string) => {
+                let string = center(string);
                 let begin = (0xFF, 0xFF, 0xFF);
-                let end = (0xEE, 0xAA, 0x5A);
                 let end = COLORS;
 
                 //let begin = (0x00, 0x00, 0x00);
@@ -542,13 +594,9 @@ async fn splash_with_params_and_banners(
 
                 let mut index = 0;
                 for line in string.lines() {
-                    let progress = if index < (pre - 1) {
-                        0.0f32
-                    } else if index > pre && index < size - (post - 1) {
-                        (index - (pre - 1)) as f32 / (size - (post - 1)) as f32
-                    } else {
-                        1.0f32
-                    };
+                    let progress = index as f32 / size as f32;
+
+//                    print!("{}",progress);
 
                     let r = (begin.0 as f32).lerp(end.0 as f32, progress) as u8;
                     let g = (begin.1 as f32).lerp(end.1 as f32, progress) as u8;
@@ -566,8 +614,14 @@ async fn splash_with_params_and_banners(
             }
         }
     }
+
+    println!("{}","\n".repeat(post));
 }
 
+#[tokio::main]
+async fn splash2() {
+    splash().await;
+}
 #[tokio::main]
 async fn splash_html() {
     match to_art("*STARLANE*".to_string(), "default", 0, 0, 0) {
