@@ -56,7 +56,7 @@ mod server;
 pub use server::*;
 
 use crate::cli::{Cli, Commands, ContextCmd};
-use crate::env::{config_exists, config_save, config_save_new, context, context_dir, set_context, GlobalMode, STARLANE_HOME};
+use crate::env::{config, config_exists, config_save, config_save_new, context, context_dir, set_context, GlobalMode, STARLANE_HOME};
 use crate::platform::Platform;
 use clap::Parser;
 use cliclack::log::{error, success, warning};
@@ -139,6 +139,10 @@ pub fn main() -> Result<(), anyhow::Error> {
         }
         Commands::Version => {
             println!("{}", VERSION.to_string());
+            Ok(())
+        }
+        Commands::Scorch=> {
+            scorch();
             Ok(())
         }
         Commands::Nuke => {
@@ -832,6 +836,14 @@ async fn newlines( len: usize, delay: u64 )  {
 }
 
 
+#[tokio::main]
+async fn scorch()  {
+    if let Ok(Some(config)) = env::config() {
+        if !config.can_scorch{
+            panic!("in config: '{}' can_scorch flag is set to false.", env::config_path());
+        }
+    }
+}
 
 #[tokio::main]
 async fn nuke()  {

@@ -15,25 +15,45 @@ use starlane::space::particle::property::{PropertiesConfig, PropertiesConfigBuil
 use starlane::space::settings::Timeouts;
 use std::str::FromStr;
 use std::sync::Arc;
+use anyhow::anyhow;
+use crate::env::config_path;
 use crate::foundation::Foundation;
+use crate::PgRegistryConfig;
 
 #[async_trait]
 pub trait Platform: Send + Sync + Sized + Clone
 where
-    Self::Err: std::error::Error + Send + Sync,
+    Self::Err: std::error::Error + Send + Sync+ From<anyhow::Error>,
     Self: 'static,
     Self::StarAuth: HyperAuthenticator,
     Self::RemoteStarConnectionFactory: HyperwayEndpointFactory,
     Self::Foundation: Foundation+Clone+Send+Sync,
+    Self::Config: PlatformConfig
 {
     type Err;
     type StarAuth;
     type RemoteStarConnectionFactory;
     type Foundation;
+    type Config;
+
+    fn config(&self) -> &Self::Config;
 
     async fn machine(&self) -> Result<MachineApi, Self::Err> {
         Ok(Machine::new_api(self.clone()).await?)
     }
+
+    /// delete the registry
+    async fn scorch(&self) -> Result<(),Self::Err>;
+
+    /// exactly like `scorch` except the `context` is also deleted
+    async fn nuke(&self) -> Result<(),Self::Err> {
+        if !self.config().can_nuke() {
+            Err(anyhow!("in config '{}' can_nuke=false", config_path()))?;
+        }
+        self.scorch().await?;
+        Ok(())
+    }
+
 
     fn star_auth(&self, star: &StarKey) -> Result<Self::StarAuth, Self::Err>;
 
@@ -188,4 +208,12 @@ impl Default for Settings {
             timeouts: Default::default(),
         }
     }
+}
+
+
+pub trait PlatformConfig: Clone+Send+Sync+'static
+{
+    fn can_scorch(&self) -> bool;
+    fn can_nuke(&self) -> bool;
+    fn registry(&self) -> &PgRegistryConfig;
 }

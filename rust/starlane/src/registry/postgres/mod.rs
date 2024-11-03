@@ -96,6 +96,12 @@ impl PostgresRegistry {
     async fn setup(&self) -> Result<(), RegErr> {
         //        let database= format!("CREATE DATABASE IF NOT EXISTS {}", REGISTRY_DATABASE );
 
+        /// reset mode of 'none' will not let the db be deleted
+        let mode = r#"CREATE TYPE reset_mode_enum AS ENUM ('None', 'Scorch');
+                            CREATE TABLE reset_mode (mode reset_mode_enum DEFAULT 'none' NOT NULL UNIQUE);
+w                           INSERT INTO reset_mode VALUES ('None');"#;
+
+
         let particles = r#"CREATE TABLE IF NOT EXISTS particles (
          id SERIAL PRIMARY KEY,
          point TEXT NOT NULL,
@@ -174,6 +180,7 @@ impl PostgresRegistry {
         transaction.execute(labels).await?;
         transaction.execute(tags).await?;
          */
+        transaction.execute(mode).await?;
         transaction.execute(properties).await?;
         transaction.execute(point_index).await?;
         transaction.execute(point_segment_parent_index).await?;
@@ -186,10 +193,43 @@ impl PostgresRegistry {
 
 #[async_trait]
 impl RegistryApi for PostgresRegistry {
-    async fn nuke<'a>(&'a self) -> Result<(), RegErr> {
-        self.logger.info("nuking database!");
+    async fn scorch<'a>(&'a self) -> Result<(), RegErr> {
+        self.logger.info("scorching database!");
         let mut conn = self.ctx.acquire().await?;
+
+
+
         let mut trans = conn.begin().await?;
+
+        struct CanScorch(bool);
+
+        impl CanScorch {
+            fn can(&self) -> bool {
+                self.0
+            }
+        }
+
+
+        impl sqlx::FromRow<'_, PgRow> for CanScorch{
+            fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
+                let v:i64 = row.get(0);
+                let v = v != 0;
+                Ok(Self(v))
+            }
+        }
+
+        let scorch= sqlx::query_as::<Postgres,CanScorch>(
+            "SELECT count(*) FROM reset_mode WHERE mode=('Scorch')",
+        )
+            .fetch_one(&mut *trans)
+            .await?;
+
+        if !scorch.can() {
+            let err = "database has scorch guard enabled.  To change this: 'INSERT INTO reset_mode VALUES ('Scorch')'";
+            self.logger.error(err);
+            Result::Err(RegErr::NoScorch)?;
+        }
+
         trans.execute("DROP TABLE particles CASCADE").await?;
         trans.execute("DROP TABLE access_grants CASCADE").await?;
         trans.execute("DROP TABLE properties CASCADE").await?;
@@ -1560,14 +1600,14 @@ pub mod test {
     #[tokio::test]
     pub async fn test_nuke() -> Result<(), OldStarErr> {
         let registry = registry().await?;
-        registry.nuke().await?;
+        registry.scorch().await?;
         Ok(())
     }
 
     #[tokio::test]
     pub async fn test_create() -> Result<(), OldStarErr> {
         let registry = registry().await?;
-        registry.nuke().await?;
+        registry.scorch().await?;
 
         let point = Point::from_str("localhost")?;
         let hyperuser = (*HYPERUSER).clone();
@@ -1627,7 +1667,7 @@ pub mod test {
     #[tokio::test]
     pub async fn test_access() -> Result<(), HypErr> {
         let registry = registry().await?;
-        registry.nuke().await?;
+        registry.scorch().await?;
 
         let hyperuser = (*HYPERUSER).clone();
         let superuser = Point::from_str("localhost:users:superuser").unwrap();

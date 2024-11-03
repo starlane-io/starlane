@@ -211,3 +211,30 @@ pub enum GlobalMode {
    Newbie,
    Expert
 }
+
+
+pub trait Enviro {
+
+    fn is_terminal(&self) -> bool;
+    fn term_width(&self) -> usize;
+
+
+}
+
+
+pub struct StdEnviro {
+
+}
+
+impl Enviro for StdEnviro {
+    fn is_terminal(&self) -> bool {
+        todo!()
+    }
+
+    fn term_width(&self) -> usize {
+        todo!()
+    }
+}
+
+
+

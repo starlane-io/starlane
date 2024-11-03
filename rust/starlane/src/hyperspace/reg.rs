@@ -19,7 +19,7 @@ pub type Registry = Arc<dyn RegistryApi>;
 #[async_trait]
 pub trait RegistryApi: Send + Sync
 {
-    async fn nuke<'a>(&'a self) -> Result<(), RegErr>;
+    async fn scorch<'a>(&'a self) -> Result<(), RegErr>;
 
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), RegErr>;
 
@@ -112,8 +112,8 @@ impl RegistryWrapper
 #[async_trait]
 impl RegistryApi for RegistryWrapper
 {
-    async fn nuke<'a>(&'a self) -> Result<(), RegErr> {
-        self.registry.nuke().await
+    async fn scorch<'a>(&'a self) -> Result<(), RegErr> {
+        self.registry.scorch().await
     }
 
     async fn register<'a>(&'a self, registration: &'a Registration) -> Result<(), RegErr> {

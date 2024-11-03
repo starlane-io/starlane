@@ -46,6 +46,7 @@ pub enum Commands {
     Term(TermArgs),
     Version,
     Splash,
+    Scorch,
     Nuke,
     Context(ContextArgs)
 }
