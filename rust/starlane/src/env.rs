@@ -1,4 +1,4 @@
-use std::fs;
+use std::{fs, process};
 use std::str::FromStr;
 use once_cell::sync::Lazy;
 use std::string::ToString;
@@ -9,18 +9,21 @@ use crate::err::HypErr;
 use crate::shutdown::{panic_shutdown, shutdown};
 use crate::StarlaneConfig;
 
-pub static STARLANE_CONTEXT: Lazy<String> = Lazy::new(|| {
-    match std::env::var("STARLANE_CONTEXT") {
-        Ok(context) => {
-            context
-        }
-        Err(_) => {
-            fs::read_to_string(format!("{}/.context", STARLANE_HOME.as_str()).to_string()).unwrap_or("default".to_string())
-        }
-    }
-});
+
+pub fn context() -> String {
+    fs::read_to_string(format!("{}/.context", STARLANE_HOME.as_str()).to_string()).unwrap_or("default".to_string())
+}
+
+pub fn set_context<S>(context: S) -> Result<(),anyhow::Error> where S: AsRef<str>{
+    fs::create_dir_all(STARLANE_HOME.as_str())?;
+    fs::write(format!("{}/.context", STARLANE_HOME.as_str()).to_string(), context.as_ref().to_string())?;
+    Ok(())
+}
 
 
+pub fn context_dir() -> String {
+    format!("{}/{}",STARLANE_HOME.as_str(),context()).to_string()
+}
 
 
 pub static STARLANE_CONFIG: Lazy<StarlaneConfig> = Lazy::new(|| { match config() {
@@ -95,27 +98,42 @@ static STARLANE_TOKEN: Lazy<String> =
     Lazy::new(|| std::env::var("STARLANE_TOKEN").unwrap_or(Uuid::new_v4().to_string()));
 
 
-fn config_path() -> String {
-    format!("{}/config.yaml", STARLANE_CONTEXT.to_string()).to_string()
+pub fn config_path() -> String {
+    config_path_context(context())
+}
+
+pub fn config_path_context(context: String) -> String {
+    format!("{}/config.yaml", context).to_string()
+}
+
+pub fn config_exists( context: String ) -> bool {
+   fs::exists(config_path_context(context)).unwrap_or(false)
 }
 
 #[cfg(feature = "server")]
 pub fn config() -> Result<Option<StarlaneConfig>, HypErr> {
     let file = config_path();
+
     match fs::exists(file.clone())? {
         true => {
             let config = std::fs::read_to_string(file.clone())?;
             let mut config: StarlaneConfig  = serde_yaml::from_str(config.as_str()).map_err(|err| anyhow!("starlane config found: '{}' yet Starlane encountered an error when attempting to process the config: '{}'", config_path(), err))?;
-            config.context = STARLANE_CONTEXT.to_string();
+            config.context = context();
 
             Ok(Some(config))
         }
-        false => Ok(None),
+        false => {
+
+            Ok(None)
+        },
     }
 }
-
 pub fn config_save(config: StarlaneConfig) -> Result<(), anyhow::Error> {
     let file = config_path();
+    config_save_new(config,file)
+}
+
+pub fn config_save_new(config: StarlaneConfig, file: String) -> Result<(), anyhow::Error> {
     match serde_yaml::to_string(&config) {
         Ok(ser) => {
             let file: PathBuf = file.into();

@@ -55,8 +55,8 @@ mod server;
 #[cfg(feature = "server")]
 pub use server::*;
 
-use crate::cli::{Cli, Commands};
-use crate::env::STARLANE_HOME;
+use crate::cli::{Cli, Commands, ContextCmd};
+use crate::env::{config_exists, config_save, config_save_new, context, context_dir, set_context, STARLANE_HOME};
 use crate::platform::Platform;
 use clap::Parser;
 use cliclack::log::{error, success, warning};
@@ -78,6 +78,7 @@ use std::str::FromStr;
 use std::time::Duration;
 use std::{io, process};
 use std::fmt::Display;
+use anyhow::anyhow;
 use text_to_ascii_art::to_art;
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
@@ -85,8 +86,9 @@ use tokio::fs;
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::FileOptions;
-use starlane::env;
 use starlane::shutdown::panic_shutdown;
+use starlane_space::space::err::PrintErr;
+use starlane_space::space::parse::SkewerCase;
 use crate::foundation::Foundation;
 use crate::foundation::StandAloneFoundation;
 use crate::shutdown::shutdown;
@@ -142,7 +144,24 @@ pub fn main() -> Result<(), anyhow::Error> {
             Ok(())
         }
         Commands::Context(args) => {
-            println!("Context: {}", args.command.to_string() );
+            match args.command {
+                ContextCmd::Create { context_name } => {
+                    let context_name = SkewerCase::from_str(context_name.as_str()).map_err(|e|{ e.print(); anyhow!("illegal context name") })?;
+                    set_context(context_name.as_str())?;
+                    if config_exists(context_name.to_string())
+                    {
+                        Err(anyhow!("context '{}' already exists", context_name))?;
+                    }
+                    install()?;
+                }
+                ContextCmd::Switch { context_name } => {
+                    let context_name = SkewerCase::from_str(context_name.as_str()).map_err(|e|{ e.print(); anyhow!("illegal context name") })?;
+                    set_context(context_name.as_str());
+                }
+                ContextCmd::Which => {
+                    println!("{}",context());
+                }
+            }
             Ok(())
         }
     }
@@ -177,7 +196,7 @@ fn run() -> Result<(), anyhow::Error> {
             tokio::time::sleep(Duration::from_millis(100)).await;
             spinner().set_message("loading configuration");
 
-            let config = match env::config().await {
+            let config = match env::config() {
                 Ok(Some(config)) => config,
                 Ok(None) => {
                     delay(1000).await;
@@ -192,6 +211,7 @@ fn run() -> Result<(), anyhow::Error> {
                     outro("Good Luck!")?;
                     newlines(3,100).await;
                     shutdown(1);
+                    panic!();
                 }
                 Err(err) => {
                     delay(1000).await;
@@ -206,6 +226,7 @@ fn run() -> Result<(), anyhow::Error> {
                     outro("Good Luck!")?;
                     newlines(3,100).await;
                     shutdown(1);
+                    panic!();
                 }
             };
 
@@ -630,11 +651,11 @@ pub enum StartSequence {
 #[tokio::main]
 async fn install() -> Result<(), anyhow::Error> {
 
-    intro("pre-install checklist")?;
+    let context = context();
+    intro(format!("install context '{}'", context))?;
     let spinner = spinner();
     spinner.start("checking configuration");
-
-    match env::config().await {
+    match env::config() {
         Ok(Some(_)) => {
             warning(format!("A valid starlane configuration already exists: '{}' this install process will overwrite the existing config", env::config_path() ))?;
             let should_continue = confirm(format!("Overwrite: '{}'?", env::config_path())).interact()?;
@@ -653,7 +674,7 @@ async fn install() -> Result<(), anyhow::Error> {
         }
 
         Err(err) => {
-            warning(format!("An invalid (corrupted) starlane configuration already exists: '{}' the installation process will overwrite this config file.", env::config_path() )).unwrap_or_default();
+            warning(format!("An invalid (corrupted or out of date) starlane configuration already exists: '{}' the installation process will overwrite this config file.", env::config_path() )).unwrap_or_default();
             let should_continue = confirm("Proceed with installation?").interact()?;
             if !should_continue {
                 outro("Starlane installation aborted by user.")?;
@@ -724,18 +745,14 @@ async fn standalone_foundation() -> Result<(), anyhow::Error> {
         spin.stop("config generated");
         delay(100).await;
         spin.set_message("saving config");
-        env::config_save(config.clone()).await?;
+        env::config_save(config.clone())?;
         delay(100).await;
         info("config saved.")?;
         delay(100).await;
         spin.set_message("creating local postgres registry [this may take a while...]");
         warning("creating local postgres registry [this may take a while...]");
-        if let PgRegistryConfig::Embedded(db) = config.registry {
-            let foundation = StandAloneFoundation::new();
-            foundation.install(&db).await?;
-        } else {
-
-        }
+        let foundation = StandAloneFoundation::new();
+        foundation.install(&config).await?;
 
         Ok(())
     }
@@ -792,11 +809,11 @@ async fn newlines( len: usize, delay: u64 )  {
 
 #[tokio::main]
 async fn nuke()  {
-    if let Ok(Some(config)) = env::config().await {
+    if let Ok(Some(config)) = env::config() {
         if !config.can_nuke  {
             panic!("in config: '{}' can_nuke flag is set to false.", env::config_path());
         }
     }
 
-    fs::remove_dir_all(STARLANE_HOME.to_string()).await.unwrap();
+    std::fs::remove_dir_all(context_dir()).unwrap();
 }

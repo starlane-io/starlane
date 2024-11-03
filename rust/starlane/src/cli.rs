@@ -39,6 +39,7 @@ pub struct Cli {
 }
 
 #[derive(Debug, Subcommand, EnumString, strum_macros::Display)]
+#[command(version, about, long_about = None)]
 pub enum Commands {
     Install,
     Run,
@@ -63,12 +64,12 @@ impl Default for ContextArgs {
 
 #[derive(Debug,Subcommand,EnumString, strum_macros::Display)]
 pub enum ContextCmd {
-    Create,
-    Switch,
+    Create{ context_name: String},
+    Switch{ context_name: String},
+    Which
 }
 
 #[derive(Debug, Args)]
-#[command(version, about, long_about = None)]
 pub struct TermArgs {
     #[arg(long)]
     host: Option<String>,
