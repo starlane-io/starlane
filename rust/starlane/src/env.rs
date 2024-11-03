@@ -6,6 +6,7 @@ use anyhow::anyhow;
 use uuid::Uuid;
 use std::path::PathBuf;
 use ascii::AsciiChar::G;
+use atty::Stream;
 use serde::{Deserialize, Serialize};
 use crate::err::HypErr;
 use crate::shutdown::{panic_shutdown, shutdown};
@@ -222,18 +223,27 @@ pub trait Enviro {
 }
 
 
-pub struct StdEnviro {
+pub struct StdEnviro();
 
+
+impl Default  for StdEnviro  {
+    fn default() -> Self {
+        StdEnviro()
+    }
 }
 
 impl Enviro for StdEnviro {
     fn is_terminal(&self) -> bool {
-        todo!()
+        atty::is(Stream::Stdout)
     }
 
     fn term_width(&self) -> usize {
-        todo!()
+            match termsize::get() {
+                None => 128,
+                Some(size) => size.cols as usize
+            }
     }
+
 }
 
 
