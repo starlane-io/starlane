@@ -5,9 +5,13 @@ use std::string::ToString;
 use anyhow::anyhow;
 use uuid::Uuid;
 use std::path::PathBuf;
+use ascii::AsciiChar::G;
+use serde::{Deserialize, Serialize};
 use crate::err::HypErr;
 use crate::shutdown::{panic_shutdown, shutdown};
 use crate::StarlaneConfig;
+
+
 
 
 pub fn context() -> String {
@@ -56,6 +60,12 @@ pub static STARLANE_HOME: Lazy<String> = Lazy::new(|| {
         format!("{}/.starlane", home_dir).to_string()
     })
 });
+
+
+pub static STARLANE_GLOBAL_SETTINGS: Lazy<GlobalSettings> = Lazy::new(|| {
+    ensure_global_settings()
+});
+
 pub static STARLANE_LOG_DIR: Lazy<String> = Lazy::new(|| {
     std::env::var("STARLANE_LOG_DIR").unwrap_or(format!("{}/log", STARLANE_HOME.as_str()).to_string())
 });
@@ -102,8 +112,11 @@ pub fn config_path() -> String {
     config_path_context(context())
 }
 
+
+
+
 pub fn config_path_context(context: String) -> String {
-    format!("{}/config.yaml", context).to_string()
+    format!("{}/{}/config.yaml", STARLANE_HOME.as_str(),context).to_string()
 }
 
 pub fn config_exists( context: String ) -> bool {
@@ -152,4 +165,49 @@ pub fn config_save_new(config: StarlaneConfig, file: String) -> Result<(), anyho
             "starlane internal error: 'could not deserialize config"
         )),
     }
+}
+
+
+pub fn global_settings_path() -> String {
+    format!("{}/global.conf",STARLANE_HOME.to_string()).to_string()
+}
+
+pub fn global_settings_exists() -> bool {
+    fs::exists(global_settings_path()).unwrap_or(false)
+}
+
+pub fn ensure_global_settings() -> GlobalSettings {
+    if !global_settings_exists() {
+        save_global_settings(GlobalSettings::default()).unwrap();
+    }
+    global_settings()
+}
+
+pub fn global_settings() -> GlobalSettings{
+    serde_yaml::from_str(global_settings_path().as_str()).map_err(|err| eprintln!("{}",anyhow!("could not process global settings: '{}' caused by err '{}'", global_settings_path(), err).to_string()) ).unwrap_or(GlobalSettings::default())
+}
+
+pub fn save_global_settings( settings: GlobalSettings ) -> Result<(), anyhow::Error> {
+    let settings = serde_yaml::to_string(&settings).map_err(|err| anyhow!("could not process global settings: '{}' caused by err '{}'", global_settings_path(), err))?;
+    fs::write(global_settings_path(), settings)?;
+    Ok(())
+}
+
+#[derive(Debug,Clone,Serialize,Deserialize)]
+pub struct GlobalSettings {
+    pub mode: GlobalMode
+}
+
+impl Default for GlobalSettings {
+    fn default() -> Self {
+        Self {
+            mode: GlobalMode::Newbie
+        }
+    }
+}
+
+#[derive(Debug,Clone,Serialize,Deserialize)]
+pub enum GlobalMode {
+   Newbie,
+   Expert
 }

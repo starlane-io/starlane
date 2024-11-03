@@ -56,7 +56,7 @@ mod server;
 pub use server::*;
 
 use crate::cli::{Cli, Commands, ContextCmd};
-use crate::env::{config_exists, config_save, config_save_new, context, context_dir, set_context, STARLANE_HOME};
+use crate::env::{config_exists, config_save, config_save_new, context, context_dir, set_context, GlobalMode, STARLANE_HOME};
 use crate::platform::Platform;
 use clap::Parser;
 use cliclack::log::{error, success, warning};
@@ -86,6 +86,7 @@ use tokio::fs;
 use tracing::instrument::WithSubscriber;
 use tracing::Instrument;
 use zip::write::FileOptions;
+use env::STARLANE_GLOBAL_SETTINGS;
 use starlane::shutdown::panic_shutdown;
 use starlane_space::space::err::PrintErr;
 use starlane_space::space::parse::SkewerCase;
@@ -190,10 +191,10 @@ fn run() -> Result<(), anyhow::Error> {
 
         async fn runner() -> Result<(),anyhow::Error> {
             spinner().start("initializing");
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            delay(100).await;
             info("initialization complete.")?;
 
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            delay(100).await;
             spinner().set_message("loading configuration");
 
             let config = match env::config() {
@@ -579,7 +580,8 @@ async fn splash_with_params_and_banners(
                     let g = (begin.1 as f32).lerp(end.1 as f32, progress) as u8;
                     let b = (begin.2 as f32).lerp(end.2 as f32, progress) as u8;
                     println!("{}", line.truecolor(r, g, b));
-                    tokio::time::sleep(Duration::from_millis(interval)).await;
+
+                    delay(interval).await;
 
                     index = index + 1;
                 }
@@ -795,7 +797,12 @@ println!();
 
 
 async fn delay(t: u64) {
-    tokio::time::sleep(Duration::from_millis(t)).await;
+    match &STARLANE_GLOBAL_SETTINGS.mode {
+        GlobalMode::Newbie => {
+            tokio::time::sleep(Duration::from_millis(t)).await;
+        }
+        GlobalMode::Expert => {}
+    }
 }
 
 async fn newlines( len: usize, delay: u64 )  {
