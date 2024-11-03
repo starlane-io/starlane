@@ -9,6 +9,7 @@ use std::time::Duration;
 use postgresql_embedded::{PostgreSQL, Settings};
 use sqlx::PgPool;
 use starlane::space::parse::set;
+use crate::shutdown::add_shutdown_hook;
 
 pub struct Postgres {
     config: Database<PgEmbedSettings>,
@@ -79,6 +80,17 @@ impl Postgres {
     /// as long as the Sender is alive
     ///
     pub async fn start(mut self) -> Result<tokio::sync::mpsc::Sender<()>, RegErr> {
+        let postgres = self.postgres.clone();
+
+        add_shutdown_hook(Box::pin(async move {
+println!("shutdown postgres...");
+            postgres.stop().await.unwrap_or_default();
+println!("postgres halted");
+
+        }));
+
+        let blah = async move {};
+
         self.postgres.setup().await?;
         self.postgres.start().await?;
         let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(1);
@@ -101,7 +113,7 @@ impl Drop for Postgres {
     fn drop(&mut self) {
         let handler = tokio::runtime::Handle::current();
         let mut postgres = self.postgres.clone();
-        handler.block_on( async move{
+        handler.spawn( async move{
             postgres.stop().await.unwrap_or_default();
         });
     }

@@ -21,6 +21,8 @@ pub mod platform;
 
 pub mod foundation;
 
+pub mod shutdown;
+
 #[cfg(test)]
 pub mod test;
 
@@ -98,6 +100,7 @@ use zip::write::FileOptions;
 use crate::foundation::Foundation;
 use crate::foundation::StandAloneFoundation;
 use crate::registry::postgres::embed::PgEmbedSettings;
+use crate::shutdown::shutdown;
 
 fn config_path() -> String {
     format!("{}/config.yaml", STARLANE_HOME.to_string()).to_string()
@@ -157,7 +160,7 @@ pub fn init() {
 
 #[cfg(feature = "cli")]
 pub fn main() -> Result<(), anyhow::Error> {
-    ctrlc::set_handler(move || process::exit(1)).unwrap();
+    ctrlc::set_handler(move || shutdown(1)).unwrap();
 
     init();
 
