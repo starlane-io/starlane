@@ -47,7 +47,11 @@ pub enum Commands {
     Version,
     Splash,
     Scorch,
-    Nuke,
+    Nuke{
+        #[arg(long)]
+        all: bool
+    } ,
+
     Context(ContextArgs)
 }
 

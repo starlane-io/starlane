@@ -181,27 +181,32 @@ pub fn ensure_global_settings() -> GlobalSettings {
     if !global_settings_exists() {
         save_global_settings(GlobalSettings::default()).unwrap();
     }
-    global_settings()
+    load_global_settings().unwrap()
 }
 
-pub fn global_settings() -> GlobalSettings{
-    serde_yaml::from_str(global_settings_path().as_str()).map_err(|err| eprintln!("{}",anyhow!("could not process global settings: '{}' caused by err '{}'", global_settings_path(), err).to_string()) ).unwrap_or(GlobalSettings::default())
+pub fn load_global_settings( ) -> Result<GlobalSettings, anyhow::Error> {
+    let string = fs::read_to_string(global_settings_path())?;
+    Ok(serde_yaml::from_str(string.as_str()).map_err(|err| eprintln!("{}",anyhow!("could not process global settings: '{}' caused by err '{}'", global_settings_path(), err).to_string()) ).unwrap_or(GlobalSettings::default()))
 }
 
 pub fn save_global_settings( settings: GlobalSettings ) -> Result<(), anyhow::Error> {
     let settings = serde_yaml::to_string(&settings).map_err(|err| anyhow!("could not process global settings: '{}' caused by err '{}'", global_settings_path(), err))?;
+    let path : PathBuf= global_settings_path().into();
+    fs::create_dir_all(path.parent().unwrap())?;
     fs::write(global_settings_path(), settings)?;
     Ok(())
 }
 
 #[derive(Debug,Clone,Serialize,Deserialize)]
 pub struct GlobalSettings {
+    pub nuke: bool,
     pub mode: GlobalMode
 }
 
 impl Default for GlobalSettings {
     fn default() -> Self {
         Self {
+            nuke: false,
             mode: GlobalMode::Newbie
         }
     }

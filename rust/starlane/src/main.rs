@@ -58,7 +58,7 @@ mod server;
 pub use server::*;
 
 use crate::cli::{Cli, Commands, ContextCmd};
-use crate::env::{config_exists, context, context_dir, set_context, STARLANE_HOME};
+use crate::env::{config_exists, context, context_dir, ensure_global_settings, save_global_settings, set_context, STARLANE_HOME};
 use crate::platform::Platform;
 use clap::Parser;
 use cliclack::log::{error, success};
@@ -79,7 +79,7 @@ use std::str::FromStr;
 use std::time::Duration;
 use std::any::Any;
 use std::fmt::Display;
-use anyhow::anyhow;
+use anyhow::{anyhow, ensure};
 use tokio::fs::DirEntry;
 use tokio::runtime::Builder;
 use tracing::instrument::WithSubscriber;
@@ -143,8 +143,8 @@ pub fn main() -> Result<(), anyhow::Error> {
             scorch();
             Ok(())
         }
-        Commands::Nuke => {
-            nuke();
+        Commands::Nuke{ all } => {
+            nuke(all);
             Ok(())
         }
         Commands::Context(args) => {
@@ -494,13 +494,44 @@ async fn scorch()  {
     }
 }
 
-#[tokio::main]
-async fn nuke()  {
-    if let Ok(Some(config)) = env::config() {
-        if !config.can_nuke  {
-            panic!("in config: '{}' can_nuke flag is set to false.", env::config_path());
+fn nuke(all: bool)  {
+    println!("nuke --all ? {}", all);
+
+
+    if all {
+        let global = ensure_global_settings();
+        if global.nuke {
+            std::fs::remove_dir_all(STARLANE_HOME.as_str()).unwrap();
+            println!("all starlane contexts deleted");
+            // saving the global.conf again
+            save_global_settings(global).unwrap();
         }
     }
 
-    std::fs::remove_dir_all(context_dir()).unwrap();
+    if let Ok(Some(config)) = env::config() {
+        if !config.can_nuke  {
+            panic!("in config: '{}' can_nuke flag is set to false.", env::config_path());
+        } else {
+            std::fs::remove_dir_all(context_dir()).unwrap();
+        }
+    }
+
 }
+
+
+/*
+fn list_contexts() -> Result<Vec<String>,anyhow::Error> {
+    let mut rtn = vec![];
+    let dir = std::fs::read_dir(STARLANE_HOME.to_string())?;
+    for dir in dir.into_iter() {
+        let dir = dir?;
+        if dir.metadata()?.is_dir() {
+            let dir : String= dir.path().into();
+            rtn.push(dir);
+        }
+    }
+    Ok(rtn)
+}
+
+ */
+
