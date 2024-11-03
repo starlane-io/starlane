@@ -130,6 +130,7 @@ lerp = { workspace = true, features=["derive"] }
 atty ={workspace = true}
 #rolling-file = {workspace = true}
 termsize = {workspace = true}
+port_check = {workspace = true}
 
 #log= {workspace = true}
 textwrap = {workspace = true}

@@ -1,15 +1,16 @@
 use tokio::fs;
-use crate::env::{STARLANE_DATA_DIR, STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_USER};
+use crate::env::{STARLANE_CONTROL_PORT, STARLANE_DATA_DIR, STARLANE_REGISTRY_PASSWORD, STARLANE_REGISTRY_USER};
 use crate::registry::err::RegErr;
 use crate::{Database, PgRegistryConfig, StarlaneConfig};
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
+use port_check::is_local_ipv4_port_free;
 use postgresql_embedded::{PostgreSQL, Settings};
 use sqlx::PgPool;
 use starlane::space::parse::set;
-use crate::shutdown::add_shutdown_hook;
+use crate::shutdown::{add_shutdown_hook, panic_shutdown, shutdown};
 
 pub struct Postgres {
     config: Database<PgEmbedSettings>,
@@ -57,6 +58,13 @@ impl Postgres {
         let mut postgres = PostgreSQL::new(settings);
 
         postgres.setup().await?;
+
+
+        if !is_local_ipv4_port_free(config.port) {
+            panic_shutdown(format!("postgres registry port '{}' is being used by another process", config.port));
+        }
+
+
         postgres.start().await?;
 
         if !postgres.database_exists(&config.database).await? {
@@ -80,19 +88,23 @@ impl Postgres {
     /// as long as the Sender is alive
     ///
     pub async fn start(mut self) -> Result<tokio::sync::mpsc::Sender<()>, RegErr> {
+
+        self.postgres.setup().await?;
+
+        if !is_local_ipv4_port_free(self.postgres.settings().port) {
+            panic_shutdown(format!("embedded postgres registry port '{}' is already in use", self.postgres.settings().port));
+        }
+        self.postgres.start().await?;
+
+
         let postgres = self.postgres.clone();
 
         add_shutdown_hook(Box::pin(async move {
-println!("shutdown postgres...");
-            postgres.stop().await.unwrap_or_default();
-println!("postgres halted");
-
+            println!("shutdown postgres...");
+            postgres.stop().await.unwrap();
+            println!("postgres halted");
         }));
 
-        let blah = async move {};
-
-        self.postgres.setup().await?;
-        self.postgres.start().await?;
         let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(1);
         let blah = self;
         tokio::spawn(
